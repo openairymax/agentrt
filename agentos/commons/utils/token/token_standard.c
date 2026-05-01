@@ -380,7 +380,7 @@ int agentos_token_set_precision(
 int agentos_token_check_quota(
     const agentos_token_quota_t* quota,
     size_t requested_tokens,
-    const void* current_usage
+    const agentos_token_usage_t* current_usage
 ) {
     if (!quota) {
         return -1;

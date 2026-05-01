@@ -50,6 +50,7 @@ foreach(TEST_SRC ${MARKET_TEST_SOURCES})
 
     target_link_libraries(test_market_${TEST_NAME} PRIVATE
         svc_common
+        agentos_common
         Threads::Threads
     )
 
