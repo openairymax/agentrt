@@ -235,7 +235,7 @@ build_modules_fallback() {
 
         log_info "Building module: $module"
 
-        local build_dir="${PROJECT_ROOT}/build-${module}"
+        local build_dir="${PROJECT_ROOT}/../AgentOS-build"
         mkdir -p "$build_dir"
         cd "$build_dir"
 
@@ -306,7 +306,7 @@ run_tests_fallback() {
     local total_skipped=0
 
     for module in "${modules[@]}"; do
-        local build_dir="${PROJECT_ROOT}/build-${module}"
+        local build_dir="${PROJECT_ROOT}/../AgentOS-build/${module}"
         if [[ ! -d "$build_dir" ]] || [[ ! -f "${build_dir}/CTestTestfile.cmake" ]]; then
             log_warn "No tests found for module: $module"
             ((total_skipped++))
