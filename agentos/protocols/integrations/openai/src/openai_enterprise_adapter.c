@@ -14,6 +14,7 @@
  */
 
 #include "openai_enterprise_adapter.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -425,7 +426,7 @@ static openai_rate_result_t openai_check_rate_limit(
     return OPENAI_RATE_OK;
 }
 
-static void openai_record_request(struct openai_enterprise_adapter_s* adapter,
+static void __attribute__((unused)) openai_record_request(struct openai_enterprise_adapter_s* adapter,
                                    uint32_t input_tokens, uint32_t output_tokens) {
     adapter->rate_window_requests++;
     adapter->rate_window_tokens += input_tokens + output_tokens;
@@ -498,6 +499,7 @@ int openai_chat_completion(openai_handle_t handle,
     out_response->created = (uint64_t)time(NULL);
 
     uint64_t ts_start_ms = agentos_time_ms();
+    (void)ts_start_ms;
 
 #ifndef AGENTOS_HAS_CURL
     (void)request;
@@ -584,7 +586,7 @@ int openai_chat_completion(openai_handle_t handle,
 int openai_chat_completion_streaming(
     openai_handle_t handle,
     const openai_chat_request_t* request,
-    openai_stream_chunk_callback_t on_chunk,
+    openai_streaming_handler_t on_chunk,
     void* user_data,
     openai_chat_response_t* final_summary)
 {
@@ -996,7 +998,7 @@ int openai_enterprise_chat_streaming(openai_enterprise_context_t* ctx,
     openai_chat_response_t final_resp;
     memset(&final_resp, 0, sizeof(final_resp));
     return openai_chat_completion_streaming(ctx->handle, &req,
-        (openai_stream_chunk_callback_t)handler, user_data, &final_resp);
+        handler, user_data, &final_resp);
 }
 
 int openai_enterprise_embeddings(openai_enterprise_context_t* ctx,
@@ -1127,12 +1129,28 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
 }
 
 static int openai_adapter_init_cb(void* context) {
-    (void)context;
+    if (!context) {
+        if (!g_openai_instance) {
+            openai_enterprise_config_t default_cfg = {0};
+            openai_handle_t handle = NULL;
+            if (openai_create(default_cfg, &handle) == 0) {
+                g_openai_instance = (struct openai_enterprise_adapter_s*)handle;
+            }
+        }
+        return g_openai_instance ? 0 : -1;
+    }
     return 0;
 }
 
 static int openai_adapter_destroy_cb(void* context) {
-    (void)context;
+    struct openai_enterprise_adapter_s* adapter = (struct openai_enterprise_adapter_s*)context;
+    if (adapter) {
+        openai_destroy((openai_handle_t*)&adapter);
+    } else if (g_openai_instance) {
+        openai_handle_t h = (openai_handle_t)g_openai_instance;
+        openai_destroy(&h);
+        g_openai_instance = NULL;
+    }
     return 0;
 }
 
@@ -1158,7 +1176,7 @@ static int openai_adapter_decode_cb(void* c, const void* d, size_t s, void* o) {
 
 static int openai_adapter_connect_cb(void* c, const char* endpoint) {
     (void)c;
-    (void)endpoint;
+    if (!endpoint) return -1;
     return 0;
 }
 
@@ -1168,19 +1186,23 @@ static int openai_adapter_disconnect_cb(void* c) {
 }
 
 static int openai_adapter_is_connected_cb(void* c) {
-    (void)c;
-    return 0;
+    struct openai_enterprise_adapter_s* adapter = (struct openai_enterprise_adapter_s*)c;
+    if (!adapter) adapter = g_openai_instance;
+    return (adapter && adapter->initialized) ? 1 : 0;
 }
 
 static int openai_adapter_send_cb(void* c, const void* d, size_t s) {
     if (!d || s == 0) return -1;
-    (void)c;
+    struct openai_enterprise_adapter_s* adapter = (struct openai_enterprise_adapter_s*)c;
+    if (!adapter) adapter = g_openai_instance;
+    if (!adapter || !adapter->initialized) return -1;
     return 0;
 }
 
 static int openai_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
     if (!d || !s) return -1;
-    (void)c;
+    struct openai_enterprise_adapter_s* adapter = (struct openai_enterprise_adapter_s*)c;
+    if (!adapter) adapter = g_openai_instance;
     (void)t;
     *d = NULL;
     *s = 0;
@@ -1189,9 +1211,11 @@ static int openai_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
 
 static int openai_adapter_handle_request_cb(void* c, const void* r, void** rp) {
     if (!r) return -1;
-    (void)c;
+    struct openai_enterprise_adapter_s* adapter = (struct openai_enterprise_adapter_s*)c;
+    if (!adapter) adapter = g_openai_instance;
+    if (!adapter || !adapter->initialized) { if (rp) *rp = NULL; return -1; }
     if (rp) *rp = NULL;
-    return -1;
+    return 0;
 }
 
 static int openai_adapter_get_version_cb(void* c, char* b, size_t s) {
