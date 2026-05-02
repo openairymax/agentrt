@@ -737,15 +737,31 @@ static int fw_adapter_handle_request(void* ctx, const void* req, void** resp) {
     (void)ctx;
     if (!req || !resp) return -1;
     if (!g_framework_instance) return -2;
+
+    const char* req_str = (const char*)req;
+    proto_ext_adapter_entry_t* target = NULL;
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
         if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {
-            g_framework_instance->adapters[i].messages_processed++;
-            g_framework_instance->total_messages++;
+            target = &g_framework_instance->adapters[i];
             break;
         }
     }
-    *resp = strdup("{\"status\":\"ok\",\"framework\":\"extension\"}");
-    return *resp ? 0 : -1;
+    if (!target || !target->callbacks.handle_request) {
+        *resp = NULL;
+        return -3;
+    }
+
+    char* response_json = NULL;
+    int rc = target->callbacks.handle_request(
+        target->adapter_context, req_str, req_str, &response_json);
+    if (rc == 0 && response_json) {
+        target->messages_processed++;
+        g_framework_instance->total_messages++;
+        *resp = response_json;
+    } else {
+        *resp = NULL;
+    }
+    return rc;
 }
 
 static int fw_adapter_get_version(void* ctx, char* buf, size_t max_size) {

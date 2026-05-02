@@ -1,16 +1,65 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # MemoryRovol 模块顶层构建文件
-# 
+#
 # 注意：本文件中的宏定义与顶层 agentos/atoms/CMakeLists.txt 保持一致，
 #       统一使用 AGENTOS_HAS_* 前缀
 
 cmake_minimum_required(VERSION 3.20)
 project(agentos-memoryrovol VERSION 1.0.0.5 LANGUAGES C)
 
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR
+        "MemoryRovol in-source builds are not allowed!\n"
+        "Please use an out-of-source build directory:\n"
+        "  mkdir -p ../MemoryRovol-build && cd ../MemoryRovol-build\n"
+        "  cmake ../MemoryRovol\n"
+    )
+endif()
+
 # 选项
 option(BUILD_TESTS "Build tests" OFF)
 option(ENABLE_TRACING "Enable OpenTelemetry tracing" OFF)
 option(USE_SENTENCE_TRANSFORMERS "Enable Sentence Transformers support" OFF)
+option(MEMORYROVOL_OSS "Build open-source edition (L1+L2 only, no L3/L4/forgetting)" OFF)
+
+# MEMORYROVOL_PRO_LIB: path to precompiled commercial static library (.a/.lib)
+# When set, links against the precompiled PRO library instead of compiling from source
+if(DEFINED MEMORYROVOL_PRO_LIB)
+    if(MEMORYROVOL_OSS)
+        message(FATAL_ERROR
+            "MEMORYROVOL_OSS and MEMORYROVOL_PRO_LIB are mutually exclusive.\n"
+            "OSS mode builds only L1+L2 from source; PRO_LIB mode links a precompiled\n"
+            "commercial library with full L1-L4+forgetting support.\n"
+            "Set only one of these options."
+        )
+    endif()
+    if(NOT EXISTS "${MEMORYROVOL_PRO_LIB}")
+        message(FATAL_ERROR
+            "MEMORYROVOL_PRO_LIB specified but file not found: ${MEMORYROVOL_PRO_LIB}\n"
+            "Please provide a valid path to the precompiled MemoryRovol PRO library."
+        )
+    endif()
+    message(STATUS "MemoryRovol PRO mode: linking precompiled library ${MEMORYROVOL_PRO_LIB}")
+    set(MEMORYROVOL_PRO_MODE ON)
+else()
+    set(MEMORYROVOL_PRO_MODE OFF)
+endif()
+
+if(MEMORYROVOL_OSS)
+    message(STATUS "MemoryRovol OSS mode: building L1+L2 only (no L3/L4/forgetting)")
+elseif(NOT MEMORYROVOL_PRO_MODE)
+    message(STATUS "MemoryRovol PRO mode: building full L1+L2+L3+L4+forgetting from source")
+endif()
+
+if(AGENTOS_ROOT)
+    message(STATUS "AGENTOS_ROOT set: ${AGENTOS_ROOT} (standalone build mode)")
+    set(AGENTOS_INCLUDE_DIR "${AGENTOS_ROOT}/agentos")
+    set(AGENTOS_ATOMS_DIR "${AGENTOS_ROOT}/agentos/atoms")
+else()
+    message(STATUS "AGENTOS_ROOT not set (embedded build mode, assuming part of AgentOS tree)")
+    set(AGENTOS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+    set(AGENTOS_ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
+endif()
 
 # 查找依赖
 find_package(PkgConfig QUIET)
@@ -95,18 +144,20 @@ endif()
 # 包含子目录
 add_subdirectory(src)
 
+if(NOT MEMORYROVOL_OSS AND NOT MEMORYROVOL_PRO_MODE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+    add_subdirectory(tools)
+endif()
+
 # 安全编译选项（基于AgentOS C编码风格指南附录A）
 if(TARGET agentos_memoryrovol)
     if(MSVC)
         target_compile_options(agentos_memoryrovol PRIVATE /W4 /WX)
         target_compile_definitions(agentos_memoryrovol PRIVATE _CRT_SECURE_NO_WARNINGS)
-        # MSVC安全选项
-        target_compile_options(agentos_memoryrovol PRIVATE /GS)  # 缓冲区安全检查
-        target_compile_options(agentos_memoryrovol PRIVATE /sdl) # 启用额外安全检查
-        target_compile_options(agentos_memoryrovol PRIVATE /guard:cf) # 控制流防护
+        target_compile_options(agentos_memoryrovol PRIVATE /GS)
+        target_compile_options(agentos_memoryrovol PRIVATE /sdl)
+        target_compile_options(agentos_memoryrovol PRIVATE /guard:cf)
     else()
         target_compile_options(agentos_memoryrovol PRIVATE -Wall -Wextra -Wpedantic )
-        # GCC/Clang安全选项
         target_compile_options(agentos_memoryrovol PRIVATE -fstack-protector-strong)
         target_compile_options(agentos_memoryrovol PRIVATE -D_FORTIFY_SOURCE=2)
         target_compile_options(agentos_memoryrovol PRIVATE -fPIE)
@@ -121,11 +172,26 @@ if(TARGET agentos_memoryrovol)
         target_link_options(agentos_memoryrovol PRIVATE -Wl,-dead_strip -pie)
     endif()
 
-    # 安装头文件
-    install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol)
+    # 安装头文件（根据构建模式选择安装范围）
+    if(MEMORYROVOL_OSS)
+        install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol
+                PATTERN "layer3_structure.h" EXCLUDE
+                PATTERN "layer4_pattern.h" EXCLUDE
+                PATTERN "forgetting.h" EXCLUDE
+                PATTERN "llm_client.h" EXCLUDE
+                PATTERN "binder.h" EXCLUDE
+                PATTERN "unbinder.h" EXCLUDE
+                PATTERN "relation.h" EXCLUDE
+                PATTERN "sequence.h" EXCLUDE)
+    else()
+        install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol)
+    endif()
 
     # 安装库
     install(TARGETS agentos_memoryrovol DESTINATION lib)
+elseif(MEMORYROVOL_PRO_MODE)
+    install(FILES "${MEMORYROVOL_PRO_LIB}" DESTINATION lib)
+    install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol)
 endif()
 
 # 单元测试

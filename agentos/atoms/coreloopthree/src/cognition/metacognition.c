@@ -424,8 +424,15 @@ agentos_error_t agentos_mc_apply_correction(
             if (corrected) AGENTOS_FREE(corrected);
 
             if (attempt < max_retries - 1) {
-                struct timespec ts = { .tv_sec = 1U << (attempt > 30 ? 30 : attempt), .tv_nsec = 0 };
+                uint64_t backoff_ms = 1000ULL << (attempt > 20 ? 20 : attempt);
+#ifdef _WIN32
+                Sleep((DWORD)backoff_ms);
+#else
+                struct timespec ts;
+                ts.tv_sec  = (time_t)(backoff_ms / 1000ULL);
+                ts.tv_nsec = (long)((backoff_ms % 1000ULL) * 1000000UL);
                 nanosleep(&ts, NULL);
+#endif
             }
         }
 

@@ -35,7 +35,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <time.h>
 #include <cjson/cJSON.h>
 
 /* ==================== 内部常量定义 ==================== */

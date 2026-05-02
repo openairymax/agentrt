@@ -152,8 +152,8 @@ static int claude_generate_response(const char* user_msg,
         cJSON_AddStringToObject(req, "system", system_ctx);
 
     char* req_json = cJSON_PrintUnformatted(req);
-    int result = claude_api_call(g_claude_ctx->config.api_key,
-                                 g_claude_ctx->config.base_url,
+    int result = claude_api_call(ctx->config.api_key,
+                                 ctx->config.base_url,
                                  req_json, out_buf, buf_len);
     free(req_json);
     cJSON_Delete(req);
@@ -631,8 +631,9 @@ int claude_messages_stream(claude_adapter_context_t* ctx,
 
     char full_response[CLAUDE_MAX_RESPONSE_LEN];
     memset(full_response, 0, sizeof(full_response));
-    claude_generate_response(user_content, sys_ctx,
+    int gen_result = claude_generate_response(user_content, sys_ctx,
                               full_response, sizeof(full_response));
+    if (gen_result < 0) return gen_result;
 
     size_t resp_len = strlen(full_response);
     size_t pos = 0;

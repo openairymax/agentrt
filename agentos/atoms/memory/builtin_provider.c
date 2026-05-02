@@ -228,6 +228,55 @@ static agentos_error_t builtin_mount(
     return AGENTOS_SUCCESS;
 }
 
+static agentos_error_t builtin_health_check(
+    agentos_memory_provider_t* provider,
+    char** out_json) {
+    if (!provider || !out_json) return AGENTOS_EINVAL;
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
+
+    char buf[512];
+    snprintf(buf, sizeof(buf),
+        "{\"status\":\"%s\",\"provider\":\"%s\",\"records\":%llu}",
+        impl && impl->storage ? "healthy" : "degraded",
+        provider->name ? provider->name : "builtin",
+        (unsigned long long)(impl ? impl->stats.total_records : 0));
+
+    *out_json = strdup(buf);
+    return *out_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+}
+
+static agentos_error_t builtin_add_memory(
+    agentos_memory_provider_t* provider,
+    const char* content,
+    size_t content_len) {
+    if (!provider || !provider->impl || !content) return AGENTOS_EINVAL;
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
+
+    char* record_id = NULL;
+    agentos_error_t err = builtin_storage_write(impl->storage, content, content_len, NULL, &record_id);
+    if (err != AGENTOS_SUCCESS) return err;
+
+    builtin_index_add(impl->index, record_id, "", content_len);
+    impl->stats.total_records++;
+    impl->stats.l1_count++;
+    impl->stats.total_bytes += content_len;
+
+    free(record_id);
+    return AGENTOS_SUCCESS;
+}
+
+static agentos_error_t builtin_retrieve(
+    agentos_memory_provider_t* provider,
+    const char* query,
+    size_t limit,
+    char*** out_record_ids,
+    float** out_scores,
+    size_t* out_count) {
+    if (!provider || !provider->impl || !query) return AGENTOS_EINVAL;
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
+    return builtin_index_search(impl->index, query, (uint32_t)limit, out_record_ids, out_scores, out_count);
+}
+
 /* ========== 全局提供商注册 ========== */
 
 static agentos_memory_provider_t* g_active_provider = NULL;
@@ -265,11 +314,13 @@ static void setup_provider_vtable(agentos_memory_provider_t* provider) {
     provider->get_raw = builtin_get_raw;
     provider->delete_raw = builtin_delete_raw;
     provider->query = builtin_query;
-    provider->retrieve = builtin_retrieve_fn;
+    provider->retrieve = builtin_retrieve;
     provider->evolve = builtin_evolve;
     provider->forget = builtin_forget;
     provider->stats = builtin_stats;
     provider->mount = builtin_mount;
+    provider->health_check = builtin_health_check;
+    provider->add_memory = builtin_add_memory;
 }
 
 static void setup_provider_capabilities(agentos_memory_provider_t* provider) {

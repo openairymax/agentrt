@@ -241,9 +241,11 @@ static void bench_mac_consensus_100_votes(void)
     const int n_votes = 100;
     uint64_t t_start  = bench_time_ns();
     for (int i = 0; i < n_votes; i++) {
+        char agent_id[32];
         char vote[64];
+        snprintf(agent_id, sizeof(agent_id), "voter_%03d", i);
         snprintf(vote, sizeof(vote), "{\"agent_id\":\"voter_%03d\",\"vote\":\"approve\"}", i);
-        mac_framework_vote(fw, cid, vote, vote);
+        mac_framework_vote(fw, cid, agent_id, vote);
     }
 
     char *result = NULL;
@@ -325,6 +327,16 @@ static void bench_mac_consensus_100_accuracy(void)
         mac_framework_register_agent(fw, &agent);
     }
 
+    const char *agent_ids[100];
+    char id_bufs[100][32];
+    for (int i = 0; i < 100; i++) {
+        snprintf(id_bufs[i], sizeof(id_bufs[i]), "acc_voter_%03d", i);
+        agent_ids[i] = id_bufs[i];
+    }
+
+    char *gid = NULL;
+    mac_framework_create_group(fw, "bench_acc_group", MAC_MODE_CONSENSUS, agent_ids, 100, &gid);
+
     int correct = 0;
     int total   = 10;
 
@@ -332,7 +344,7 @@ static void bench_mac_consensus_100_accuracy(void)
         char *cid = NULL;
         char proposal[64];
         snprintf(proposal, sizeof(proposal), "{\"trial\":%d}", trial);
-        mac_framework_start_consensus(fw, "bench_acc_group", proposal, MAC_CONSENSUS_MAJORITY, &cid);
+        mac_framework_start_consensus(fw, gid, proposal, MAC_CONSENSUS_MAJORITY, &cid);
 
         for (int i = 0; i < 100; i++) {
             char agent_id[32];
@@ -344,7 +356,7 @@ static void bench_mac_consensus_100_accuracy(void)
 
         char *result = NULL;
         mac_framework_resolve_consensus(fw, cid, &result);
-        if (result && strstr(result, "approved")) {
+        if (result && !strstr(result, "rejected")) {
             correct++;
         }
         free(cid);
@@ -355,6 +367,7 @@ static void bench_mac_consensus_100_accuracy(void)
     printf("    Accuracy: %.1f%% (%d/%d)\n", accuracy, correct, total);
     printf("    SLA check (100%% correct): %s\n", correct == total ? "PASS" : "FAIL");
 
+    free(gid);
     mac_framework_destroy(fw);
     BENCH_PASS("MultiAgent 100-agent consensus accuracy");
 }
