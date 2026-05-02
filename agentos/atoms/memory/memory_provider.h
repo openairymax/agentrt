@@ -124,6 +124,15 @@ typedef struct agentos_memory_provider {
         const char* record_id,
         const char* context);
 
+    agentos_error_t (*health_check)(
+        struct agentos_memory_provider* provider,
+        char** out_json);
+
+    agentos_error_t (*add_memory)(
+        struct agentos_memory_provider* provider,
+        const char* content,
+        size_t content_len);
+
 } agentos_memory_provider_t;
 
 /**

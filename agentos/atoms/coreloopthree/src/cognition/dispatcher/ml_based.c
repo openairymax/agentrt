@@ -18,7 +18,6 @@
 #include "string_compat.h"
 #include <string.h>
 #include <math.h>
-#include <time.h>
 
 #include "platform.h"
 

@@ -40,6 +40,39 @@ static void ensure_lock(mac_framework_t *fw)
     }
 }
 
+static bool is_approval_vote(const char *vote)
+{
+    if (!vote) return false;
+    const char *v = vote;
+    while (*v == ' ' || *v == '\t') v++;
+    if (strncasecmp(v, "approve", 7) == 0 || strncasecmp(v, "yes", 3) == 0 ||
+        strncasecmp(v, "true", 4) == 0 || strncasecmp(v, "1", 1) == 0)
+        return true;
+    if (strncmp(v, "{\"approve\"", 11) == 0)
+        return true;
+    if (strstr(vote, "\"vote\":\"approve\"") || strstr(vote, "\"vote\":\"yes\"") ||
+        strstr(vote, "\"vote\":true") || strstr(vote, "\"vote\":1") ||
+        strstr(vote, "\"approved\":true") || strstr(vote, "\"approved\":1") ||
+        strstr(vote, "\"approve\":true") || strstr(vote, "\"approve\":1"))
+        return true;
+    return false;
+}
+
+static bool is_rejection_vote(const char *vote)
+{
+    if (!vote) return false;
+    const char *v = vote;
+    while (*v == ' ' || *v == '\t') v++;
+    if (strncasecmp(v, "reject", 6) == 0 || strncasecmp(v, "no", 2) == 0 ||
+        strncasecmp(v, "false", 5) == 0 || strncasecmp(v, "0", 1) == 0)
+        return true;
+    if (strstr(vote, "\"vote\":\"reject\"") || strstr(vote, "\"vote\":\"no\"") ||
+        strstr(vote, "\"vote\":false") || strstr(vote, "\"vote\":0") ||
+        strstr(vote, "\"rejected\":true") || strstr(vote, "\"reject\":true"))
+        return true;
+    return false;
+}
+
 static void generate_id(char *buf, size_t buf_size, const char *prefix)
 {
     snprintf(buf, buf_size, "%s_%lu_%u", prefix, (unsigned long) (agentos_time_ns() / 1000000ULL),
@@ -393,6 +426,7 @@ int mac_framework_start_consensus(mac_framework_t *fw, const char *group_id, con
     c->strategy      = strategy;
     c->proposal_json = strdup(proposal_json);
     c->votes         = NULL;
+    c->voter_ids     = NULL;
     c->vote_count    = 0;
     c->result_json   = NULL;
     c->resolved      = false;
@@ -426,9 +460,16 @@ int mac_framework_vote(mac_framework_t *fw, const char *consensus_id, const char
                 agentos_mutex_unlock(&fw->lock);
                 return -3;
             }
-            c->votes                = new_votes;
-            c->votes[c->vote_count] = strdup(vote_json);
-            c->vote_count           = new_count;
+            char **new_voter_ids = (char **) realloc(c->voter_ids, new_count * sizeof(char *));
+            if (!new_voter_ids) {
+                agentos_mutex_unlock(&fw->lock);
+                return -3;
+            }
+            c->votes                    = new_votes;
+            c->voter_ids                = new_voter_ids;
+            c->votes[c->vote_count]     = strdup(vote_json);
+            c->voter_ids[c->vote_count] = strdup(agent_id);
+            c->vote_count               = new_count;
 
             agentos_mutex_unlock(&fw->lock);
             return 0;
@@ -457,15 +498,8 @@ static bool consensus_evaluate_majority(mac_consensus_t *c, mac_framework_t *fw)
         total_members = 1;
 
     for (size_t v = 0; v < c->vote_count; v++) {
-        if (c->votes[v]) {
-            char *v_trimmed = c->votes[v];
-            while (*v_trimmed == ' ' || *v_trimmed == '\t')
-                v_trimmed++;
-            if (strncasecmp(v_trimmed, "approve", 7) == 0 || strncasecmp(v_trimmed, "yes", 3) == 0 ||
-                strncasecmp(v_trimmed, "true", 4) == 0 || strncasecmp(v_trimmed, "1", 1) == 0 ||
-                strncmp(v_trimmed, "{\"approve\"", 11) == 0) {
-                approve_count++;
-            }
+        if (is_approval_vote(c->votes[v])) {
+            approve_count++;
         }
     }
 
@@ -490,17 +524,11 @@ static bool consensus_evaluate_unanimous(mac_consensus_t *c, mac_framework_t *fw
 
     size_t approve_count = 0;
     for (size_t v = 0; v < c->vote_count; v++) {
-        if (c->votes[v]) {
-            char *v_trimmed = c->votes[v];
-            while (*v_trimmed == ' ' || *v_trimmed == '\t')
-                v_trimmed++;
-            if (strncasecmp(v_trimmed, "approve", 7) == 0 || strncasecmp(v_trimmed, "yes", 3) == 0 ||
-                strncasecmp(v_trimmed, "true", 4) == 0 || strncasecmp(v_trimmed, "1", 1) == 0) {
-                approve_count++;
-            } else if (strncasecmp(v_trimmed, "reject", 6) == 0 || strncasecmp(v_trimmed, "no", 2) == 0 ||
-                       strncasecmp(v_trimmed, "false", 5) == 0 || strncasecmp(v_trimmed, "0", 1) == 0) {
-                return false;
-            }
+        if (is_rejection_vote(c->votes[v])) {
+            return false;
+        }
+        if (is_approval_vote(c->votes[v])) {
+            approve_count++;
         }
     }
 
@@ -520,22 +548,25 @@ static bool consensus_evaluate_weighted(mac_consensus_t *c, mac_framework_t *fw)
             continue;
 
         double voter_weight = 1.0;
-        for (size_t a = 0; a < fw->agent_count; a++) {
-            if (strstr(c->votes[v], fw->agents[a].id)) {
-                voter_weight = fw->agents[a].reliability_score * (1.0 + fw->agents[a].performance_score);
-                break;
+        const char *voter_id = (c->voter_ids && c->voter_ids[v]) ? c->voter_ids[v] : NULL;
+        if (voter_id) {
+            for (size_t a = 0; a < fw->agent_count; a++) {
+                if (strcmp(voter_id, fw->agents[a].id) == 0) {
+                    voter_weight = fw->agents[a].reliability_score * (1.0 + fw->agents[a].performance_score);
+                    break;
+                }
+            }
+        } else {
+            for (size_t a = 0; a < fw->agent_count; a++) {
+                if (strstr(c->votes[v], fw->agents[a].id)) {
+                    voter_weight = fw->agents[a].reliability_score * (1.0 + fw->agents[a].performance_score);
+                    break;
+                }
             }
         }
 
-        char *v_trimmed = c->votes[v];
-        while (*v_trimmed == ' ' || *v_trimmed == '\t')
-            v_trimmed++;
-
-        int is_approve = (strncasecmp(v_trimmed, "approve", 7) == 0 || strncasecmp(v_trimmed, "yes", 3) == 0 ||
-                          strncasecmp(v_trimmed, "true", 4) == 0 || strncasecmp(v_trimmed, "1", 1) == 0);
-
         weight_sum += voter_weight;
-        if (is_approve)
+        if (is_approval_vote(c->votes[v]))
             approve_weight += voter_weight;
     }
 
@@ -556,12 +587,10 @@ static bool consensus_evaluate_leader(mac_consensus_t *c, mac_framework_t *fw)
                 return true;
 
             for (size_t v = 0; v < c->vote_count; v++) {
-                if (c->votes[v] && strstr(c->votes[v], leader_id)) {
-                    char *v_trimmed = c->votes[v];
-                    while (*v_trimmed == ' ' || *v_trimmed == '\t')
-                        v_trimmed++;
-                    return (strncasecmp(v_trimmed, "approve", 7) == 0 || strncasecmp(v_trimmed, "yes", 3) == 0 ||
-                            strncasecmp(v_trimmed, "true", 4) == 0 || strncasecmp(v_trimmed, "1", 1) == 0);
+                const char *voter_id = (c->voter_ids && c->voter_ids[v]) ? c->voter_ids[v] : NULL;
+                if ((voter_id && strcmp(voter_id, leader_id) == 0) ||
+                    (c->votes[v] && strstr(c->votes[v], leader_id))) {
+                    return is_approval_vote(c->votes[v]);
                 }
             }
             return false;
