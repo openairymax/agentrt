@@ -104,6 +104,13 @@ static agentos_error_t llm_adapter_healthcheck(agentos_service_t service) {
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->llm_svc) return AGENTOS_ENOTINIT;
     if (!ctx->running) return AGENTOS_ENOTINIT;
+    char* stats_json = NULL;
+    int ret = llm_service_stats(ctx->llm_svc, &stats_json);
+    if (ret != 0) {
+        SVC_LOG_WARN("LLM服务健康检查失败: %d", ret);
+        return AGENTOS_ERR_UNKNOWN;
+    }
+    if (stats_json) free(stats_json);
     return AGENTOS_SUCCESS;
 }
 

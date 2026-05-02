@@ -23,13 +23,40 @@ static agentos_error_t tool_execute(agentos_execution_unit_t *unit, const void *
         return AGENTOS_EINVAL;
 
     const char *cmd = (const char *) input;
-    (void) cmd;
 
-    const char *result = "Tool executed successfully";
-    *out_output        = AGENTOS_STRDUP(result);
-    if (!*out_output)
-        return AGENTOS_ENOMEM;
-    return AGENTOS_SUCCESS;
+    if (strncmp(cmd, "invoke ", 7) == 0) {
+        const char *tool_args = cmd + 7;
+        size_t args_len = strlen(tool_args);
+        char *result = (char *)AGENTOS_MALLOC(args_len + 128);
+        if (!result) return AGENTOS_ENOMEM;
+        snprintf(result, args_len + 128,
+                 "{\"tool\":\"%s\",\"status\":\"invoked\",\"args\":\"%s\"}",
+                 data->tool_name, tool_args);
+        *out_output = result;
+        return AGENTOS_SUCCESS;
+    } else if (strncmp(cmd, "validate", 8) == 0) {
+        size_t name_len = strlen(data->tool_name);
+        char *result = (char *)AGENTOS_MALLOC(name_len + 64);
+        if (!result) return AGENTOS_ENOMEM;
+        snprintf(result, name_len + 64,
+                 "{\"tool\":\"%s\",\"status\":\"valid\"}",
+                 data->tool_name);
+        *out_output = result;
+        return AGENTOS_SUCCESS;
+    } else if (strncmp(cmd, "describe", 8) == 0) {
+        const char *meta = data->metadata_json ? data->metadata_json : "{}";
+        size_t meta_len = strlen(meta);
+        char *result = (char *)AGENTOS_MALLOC(meta_len + 64);
+        if (!result) return AGENTOS_ENOMEM;
+        snprintf(result, meta_len + 64,
+                 "{\"tool\":\"%s\",\"status\":\"described\",\"metadata\":%s}",
+                 data->tool_name, meta);
+        *out_output = result;
+        return AGENTOS_SUCCESS;
+    }
+
+    *out_output = AGENTOS_STRDUP("{\"error\":\"unsupported_tool_command\",\"status\":\"failed\"}");
+    return *out_output ? AGENTOS_ENOTSUP : AGENTOS_ENOMEM;
 }
 
 static void tool_destroy(agentos_execution_unit_t *unit)
