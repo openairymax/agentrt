@@ -9,7 +9,7 @@
 # ==========================================================================
 FROM alpine:3.19 AS builder
 
-LABEL maintainer="SPHARX <dev@spharx.cn>"
+LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL description="AgentOS Multi-Protocol Gateway Build Stage"
 
 ARG BUILD_VERSION=2.0.0
@@ -54,7 +54,7 @@ RUN cd build && DESTDIR=/install ninja install
 # ==========================================================================
 FROM alpine:3.19 AS runtime
 
-LABEL maintainer="SPHARX <dev@spharx.cn>"
+LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL description="AgentOS Multi-Protocol Gateway Runtime"
 LABEL version="${BUILD_VERSION}"
 LABEL build-date="${BUILD_DATE}"

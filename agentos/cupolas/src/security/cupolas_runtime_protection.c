@@ -334,13 +334,13 @@ void* cupolas_memory_alloc_protected(size_t size, int prot) {
 #endif
 }
 
-void cupolas_memory_free_protected(void* ptr) {
+void cupolas_memory_free_protected(void *ptr) {
     if (!ptr) return;
-    
+
 #ifdef _WIN32
     VirtualFree(ptr, 0, MEM_RELEASE);
 #elif defined(__linux__) || defined(__APPLE__)
-    munmap(ptr, 0);
+    munmap(ptr, 4096);
 #else
     free(ptr);
 #endif

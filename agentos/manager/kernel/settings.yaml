@@ -9,7 +9,7 @@
 # 配置归属（按双重责任模型）
 _owner:
   module: "corekern"
-  contact: "corekern-team@spharx.cn"
+  contact: "corekern-team@example.com"
   path: "AgentOS/agentos/atoms/corekern"
   description: "内容定义责任归属 corekern 模块，管理责任归属 Manager 模块"
 

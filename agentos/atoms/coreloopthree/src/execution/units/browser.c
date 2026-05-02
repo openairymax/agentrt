@@ -237,18 +237,108 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
         *out_output = result_json;
         return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "screenshot") != NULL) {
-        result_json = AGENTOS_STRDUP("{\"status\":\"screenshot_taken\",\"format\":\"png\",\"size_bytes\":0}");
+        const char *selector = strstr(cmd, "selector=");
+        const char *fmt = strstr(cmd, "format=");
+        const char fmt_default[] = "png";
+        char fmt_buf[16];
+        strncpy(fmt_buf, fmt_default, sizeof(fmt_buf));
+        fmt_buf[sizeof(fmt_buf) - 1] = '\0';
+        if (fmt) {
+            fmt += strlen("format=");
+            size_t f_len = 0;
+            while (fmt[f_len] && fmt[f_len] != ' ' && fmt[f_len] != ',' && fmt[f_len] != '\n' && f_len < 15) {
+                fmt_buf[f_len] = fmt[f_len];
+                f_len++;
+            }
+            fmt_buf[f_len] = '\0';
+        }
+        if (selector) {
+            selector += strlen("selector=");
+            size_t sel_len = strlen(selector);
+            char *sel_copy = (char *)AGENTOS_MALLOC(sel_len + 1);
+            if (!sel_copy) return AGENTOS_ENOMEM;
+            memcpy(sel_copy, selector, sel_len + 1);
+            for (char *p = sel_copy; *p; p++) {
+                if (*p == ' ' || *p == '\n' || *p == '\r' || *p == ',') { *p = '\0'; break; }
+            }
+            size_t buf_size = 128 + strlen(sel_copy) + 1;
+            result_json = (char *)AGENTOS_MALLOC(buf_size);
+            if (!result_json) { AGENTOS_FREE(sel_copy); return AGENTOS_ENOMEM; }
+            snprintf(result_json, buf_size,
+                     "{\"status\":\"screenshot_taken\",\"format\":\"%s\",\"selector\":\"%s\",\"size_bytes\":0}",
+                     fmt_buf, sel_copy);
+            AGENTOS_FREE(sel_copy);
+        } else {
+            size_t buf_size = 128;
+            result_json = (char *)AGENTOS_MALLOC(buf_size);
+            if (!result_json) return AGENTOS_ENOMEM;
+            snprintf(result_json, buf_size,
+                     "{\"status\":\"screenshot_taken\",\"format\":\"%s\",\"size_bytes\":0}", fmt_buf);
+        }
         if (!result_json) return AGENTOS_ENOMEM;
         *out_output = result_json;
         return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "type") != NULL || strstr(cmd, "fill") != NULL) {
-        result_json = AGENTOS_STRDUP("{\"status\":\"typed\",\"value\":\"\"}");
+        const char *selector = strstr(cmd, "selector=");
+        const char *value = strstr(cmd, "value=");
+        char sel_buf[128] = "unknown";
+        char val_buf[256] = "";
+        if (selector) {
+            selector += strlen("selector=");
+            size_t s_len = 0;
+            while (selector[s_len] && selector[s_len] != ' ' && selector[s_len] != ',' && selector[s_len] != '\n' && s_len < 127) {
+                sel_buf[s_len] = selector[s_len];
+                s_len++;
+            }
+            sel_buf[s_len] = '\0';
+        }
+        if (value) {
+            value += strlen("value=");
+            size_t v_len = 0;
+            while (value[v_len] && value[v_len] != '\n' && value[v_len] != '\r' && v_len < 255) {
+                val_buf[v_len] = value[v_len];
+                v_len++;
+            }
+            val_buf[v_len] = '\0';
+        }
+        size_t buf_size = 128 + strlen(sel_buf) + strlen(val_buf) + 1;
+        result_json = (char *)AGENTOS_MALLOC(buf_size);
         if (!result_json) return AGENTOS_ENOMEM;
+        snprintf(result_json, buf_size,
+                 "{\"status\":\"typed\",\"selector\":\"%s\",\"value\":\"%s\"}", sel_buf, val_buf);
         *out_output = result_json;
         return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "wait") != NULL) {
-        result_json = AGENTOS_STRDUP("{\"status\":\"waited\",\"timeout_ms\":0}");
-        if (!result_json) return AGENTOS_ENOMEM;
+        const char *timeout = strstr(cmd, "timeout=");
+        const char *wait_selector = strstr(cmd, "selector=");
+        uint32_t timeout_ms = 5000;
+        if (timeout) {
+            timeout += strlen("timeout=");
+            timeout_ms = (uint32_t) strtoul(timeout, NULL, 10);
+            if (timeout_ms == 0) timeout_ms = 5000;
+        }
+        if (wait_selector) {
+            wait_selector += strlen("selector=");
+            size_t sel_len = strlen(wait_selector);
+            char *sel_copy = (char *)AGENTOS_MALLOC(sel_len + 1);
+            if (!sel_copy) return AGENTOS_ENOMEM;
+            memcpy(sel_copy, wait_selector, sel_len + 1);
+            for (char *p = sel_copy; *p; p++) {
+                if (*p == ' ' || *p == '\n' || *p == '\r' || *p == ',') { *p = '\0'; break; }
+            }
+            size_t buf_size = 128 + strlen(sel_copy) + 1;
+            result_json = (char *)AGENTOS_MALLOC(buf_size);
+            if (!result_json) { AGENTOS_FREE(sel_copy); return AGENTOS_ENOMEM; }
+            snprintf(result_json, buf_size,
+                     "{\"status\":\"waited\",\"selector\":\"%s\",\"timeout_ms\":%u}", sel_copy, timeout_ms);
+            AGENTOS_FREE(sel_copy);
+        } else {
+            size_t buf_size = 128;
+            result_json = (char *)AGENTOS_MALLOC(buf_size);
+            if (!result_json) return AGENTOS_ENOMEM;
+            snprintf(result_json, buf_size,
+                     "{\"status\":\"waited\",\"timeout_ms\":%u}", timeout_ms);
+        }
         *out_output = result_json;
         return AGENTOS_SUCCESS;
     }

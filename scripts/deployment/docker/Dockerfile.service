@@ -4,7 +4,7 @@
 
 FROM spharx/agentos-kernel:runtime AS base
 
-LABEL maintainer="SPHARX Team <lidecheng@spharx.cn>"
+LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="1.0.0.5"
 LABEL description="AgentOS Service Layer Image"
 

@@ -48,15 +48,15 @@ environments:
       memory_limit: "1Gi"
     
     endpoints:
-      api: "https://staging.agentos.spharx.cn/cupolas"
-      metrics: "https://staging.agentos.spharx.cn/agentos/cupolas/metrics"
+      api: "${CUPOLAS_API_URL:-https://staging.agentos.example.com/cupolas}"
+      metrics: "${CUPOLAS_METRICS_URL:-https://staging.agentos.example.com/agentos/cupolas/metrics}"
     
     notifications:
       slack: true
       slack_channel: "#agentos-staging"
       email: true
       email_recipients:
-        - "team@spharx.cn"
+        - "${NOTIFICATION_EMAIL:-team@example.com}"
 
   production:
     name: production
@@ -84,16 +84,16 @@ environments:
       replicas: 3
     
     endpoints:
-      api: "https://agentos.spharx.cn/cupolas"
-      metrics: "https://agentos.spharx.cn/agentos/cupolas/metrics"
+      api: "${CUPOLAS_API_URL:-https://agentos.example.com/cupolas}"
+      metrics: "${CUPOLAS_METRICS_URL:-https://agentos.example.com/agentos/cupolas/metrics}"
     
     notifications:
       slack: true
       slack_channel: "#agentos-production"
       email: true
       email_recipients:
-        - "oncall@spharx.cn"
-        - "team@spharx.cn"
+        - "${ONCALL_EMAIL:-oncall@example.com}"
+        - "${TEAM_EMAIL:-team@example.com}"
     
     rollback:
       enabled: true

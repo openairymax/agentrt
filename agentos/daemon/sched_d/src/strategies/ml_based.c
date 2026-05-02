@@ -10,9 +10,10 @@
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
-#include <time.h>
 #include "../../include/scheduler_service.h"
 #include "../include/strategy_interface.h"
+#include "platform.h"
+#include <svc_logger.h>
 
 #define ML_MODEL_VERSION 2
 #define FEATURE_COUNT 5
@@ -103,19 +104,21 @@ static void record_prediction(ml_based_data_t* mld, const char* agent_id,
     ml_history_entry_t* entry = &mld->history[idx];
 
     free(entry->agent_id);
-    entry->task_id = ++mld->total_predictions;
-    entry->timestamp = time(NULL);
+    entry->task_id = mld->total_predictions + 1;
+    mld->total_predictions++;
+    entry->timestamp = (time_t)(agentos_time_ms() / 1000ULL);
     entry->agent_id = strdup(agent_id);
     entry->predicted_score = pred_score;
     entry->actual_score = success ? 1.0f : 0.0f;
     entry->response_time_ms = resp_time_ms;
     entry->success = success;
 
-    mld->total_predictions++;
     if (success) mld->correct_predictions++;
 
-    float error = fabsf(pred_score - entry->actual_score);
-    mld->mae = (mld->mae * (mld->history_count - 1) + error) / mld->history_count;
+    if (mld->history_count > 0) {
+        float error = fabsf(pred_score - entry->actual_score);
+        mld->mae = (mld->mae * (float)(mld->history_count - 1) + error) / (float)mld->history_count;
+    }
     mld->history_count++;
     mld->history_head = idx + 1;
 }
@@ -174,7 +177,7 @@ static int ml_based_create(const sched_config_t* manager, void** data) {
                     header->training_mae = file_header.training_mae;
                     mld->weights = file_header.trained_weights;
                     mld->model_loaded = true;
-                    printf("Info: ML model loaded from %s (samples=%llu, mae=%.4f)\n",
+                    SVC_LOG_INFO("ML model loaded from %s (samples=%llu, mae=%.4f)",
                            mld->model_path,
                            (unsigned long long)file_header.training_samples,
                            file_header.training_mae);
@@ -185,13 +188,13 @@ static int ml_based_create(const sched_config_t* manager, void** data) {
                     header->trained_weights = mld->weights;
                     header->training_samples = 0;
                     header->training_mae = 0.0f;
-                    mld->model_loaded = true;
-                    printf("Warn: ML model file %s has incompatible format, using default weights\n",
+                    mld->model_loaded = false;
+                    SVC_LOG_WARN("ML model file %s has incompatible format, using default heuristic weights",
                            mld->model_path);
                 }
             }
         } else {
-            printf("Info: ML model file not found: %s, using default heuristic weights\n", mld->model_path);
+            SVC_LOG_INFO("ML model file not found: %s, using default heuristic weights", mld->model_path);
         }
     }
 
@@ -213,7 +216,7 @@ static int ml_based_destroy(void* data) {
     }
     free(mld->agents);
 
-    for (size_t i = 0; i < HISTORY_WINDOW && i < mld->history_count; i++) {
+    for (size_t i = 0; i < HISTORY_WINDOW; i++) {
         free(mld->history[i].agent_id);
     }
 

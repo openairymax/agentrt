@@ -74,8 +74,17 @@ static agentos_error_t llm_adapter_stop(agentos_service_t service, bool force) {
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->running) return AGENTOS_SUCCESS;
     ctx->running = false;
-    (void)force;
-    svc_logger_info("LLM服务适配器已停止");
+    if (force) {
+        if (ctx->llm_svc && ctx->owns_service) {
+            llm_service_destroy(ctx->llm_svc);
+            ctx->llm_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->config_path) { free(ctx->config_path); ctx->config_path = NULL; }
+        svc_logger_info("LLM服务适配器已强制停止");
+    } else {
+        svc_logger_info("LLM服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 

@@ -176,49 +176,119 @@ sync_result_t sync_reset_stats(void* lock) {
     return SYNC_SUCCESS;
 }
 
-/**
- * @brief 设置锁的选项
- *
- * @note 预留接口，可扩展支持：
- *       - 默认超时时间设置
- *       - 调试级别配置
- *       - 优先级继承设置
- *       - 健壮锁配置
- *
- * @param lock 锁对象指针（不能为NULL）
- * @param option 选项标识符
- * @param value 选项值指针
- * @return sync_result_t 成功返回SYNC_SUCCESS，参数无效返回SYNC_ERROR_INVALID
- *
- * @threadsafe 是（内部使用互斥锁保护）
- */
-sync_result_t sync_set_option(void* lock, int option, void* value) {
-    if (lock == NULL) {
-        return SYNC_ERROR_INVALID;
+#define SYNC_MAX_OPTION_SLOTS 64
+
+typedef struct {
+    void* lock;
+    uint64_t timeout_ms;
+    bool priority_inherit;
+    bool robust;
+    bool in_use;
+} sync_option_slot_t;
+
+static sync_option_slot_t s_option_slots[SYNC_MAX_OPTION_SLOTS] = {{0}};
+static size_t s_option_count = 0;
+
+static sync_option_slot_t* find_option_slot(void* lock) {
+    for (size_t i = 0; i < s_option_count; i++) {
+        if (s_option_slots[i].in_use && s_option_slots[i].lock == lock)
+            return &s_option_slots[i];
     }
-    (void)option;
-    (void)value;
-    return SYNC_ERROR_UNSUPPORTED;
+    return NULL;
 }
 
-/**
- * @brief 获取锁的选项
- *
- * @note 当前为预留接口，暂不支持任何选项查询
- *
- * @param lock 锁对象指针（不能为NULL）
- * @param option 选项标识符
- * @param[out] value 输出选项值的缓冲区（不能为NULL）
- * @return sync_result_t 成功返回SYNC_SUCCESS，参数无效返回SYNC_ERROR_INVALID
- *
- * @threadsafe 是
- */
+static sync_option_slot_t* alloc_option_slot(void* lock) {
+    sync_option_slot_t* slot = find_option_slot(lock);
+    if (slot) return slot;
+    if (s_option_count >= SYNC_MAX_OPTION_SLOTS) return NULL;
+    slot = &s_option_slots[s_option_count++];
+    slot->lock = lock;
+    slot->timeout_ms = 0;
+    slot->priority_inherit = false;
+    slot->robust = false;
+    slot->in_use = true;
+    return slot;
+}
+
+sync_result_t sync_set_option(void* lock, int option, void* value) {
+    if (lock == NULL || value == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+
+    struct sync_mutex* base = (struct sync_mutex*)lock;
+    if (!base->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+
+    switch (option) {
+        case SYNC_OPTION_NAME: {
+            const char* name = (const char*)value;
+            base->name = name;
+            return SYNC_SUCCESS;
+        }
+        case SYNC_OPTION_TIMEOUT: {
+            uint64_t timeout = *(uint64_t*)value;
+            sync_option_slot_t* slot = alloc_option_slot(lock);
+            if (!slot) return SYNC_ERROR_MEMORY;
+            slot->timeout_ms = timeout;
+            return SYNC_SUCCESS;
+        }
+        case SYNC_OPTION_PRIORITY_INHERIT: {
+            bool pi = *(bool*)value;
+            sync_option_slot_t* slot = alloc_option_slot(lock);
+            if (!slot) return SYNC_ERROR_MEMORY;
+            slot->priority_inherit = pi;
+            return SYNC_SUCCESS;
+        }
+        case SYNC_OPTION_ROBUST: {
+            bool rb = *(bool*)value;
+            sync_option_slot_t* slot = alloc_option_slot(lock);
+            if (!slot) return SYNC_ERROR_MEMORY;
+            slot->robust = rb;
+            return SYNC_SUCCESS;
+        }
+        default:
+            return SYNC_ERROR_UNSUPPORTED;
+    }
+}
+
 sync_result_t sync_get_option(void* lock, int option, void* value) {
     if (lock == NULL || value == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    (void)option;
-    return SYNC_ERROR_UNSUPPORTED;
+
+    struct sync_mutex* base = (struct sync_mutex*)lock;
+    if (!base->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+
+    switch (option) {
+        case SYNC_OPTION_NAME: {
+            const char** out = (const char**)value;
+            *out = base->name;
+            return SYNC_SUCCESS;
+        }
+        case SYNC_OPTION_TIMEOUT: {
+            uint64_t* out = (uint64_t*)value;
+            sync_option_slot_t* slot = find_option_slot(lock);
+            *out = slot ? slot->timeout_ms : 0;
+            return SYNC_SUCCESS;
+        }
+        case SYNC_OPTION_PRIORITY_INHERIT: {
+            bool* out = (bool*)value;
+            sync_option_slot_t* slot = find_option_slot(lock);
+            *out = slot ? slot->priority_inherit : false;
+            return SYNC_SUCCESS;
+        }
+        case SYNC_OPTION_ROBUST: {
+            bool* out = (bool*)value;
+            sync_option_slot_t* slot = find_option_slot(lock);
+            *out = slot ? slot->robust : false;
+            return SYNC_SUCCESS;
+        }
+        default:
+            return SYNC_ERROR_UNSUPPORTED;
+    }
 }
 
 /**
