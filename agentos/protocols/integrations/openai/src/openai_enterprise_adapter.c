@@ -552,11 +552,11 @@ int openai_chat_completion(openai_handle_t handle,
             cJSON_AddStringToObject(tool_obj, "type", "function");
             cJSON *func_obj = cJSON_CreateObject();
             cJSON_AddStringToObject(func_obj, "name",
-                                    request->tools[i].name ? request->tools[i].name : "");
+                                    request->tools[i].function.name ? request->tools[i].function.name : "");
             cJSON_AddStringToObject(func_obj, "description",
-                                    request->tools[i].description ? request->tools[i].description : "");
-            if (request->tools[i].parameters) {
-                cJSON *params = cJSON_Parse(request->tools[i].parameters);
+                                    request->tools[i].function.description ? request->tools[i].function.description : "");
+            if (request->tools[i].function.parameters_schema_json) {
+                cJSON *params = cJSON_Parse(request->tools[i].function.parameters_schema_json);
                 if (params) {
                     cJSON_AddItemToObject(func_obj, "parameters", params);
                 } else {
@@ -1172,22 +1172,62 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
     }
     if (strcmp(path, "/v1/embeddings") == 0) {
         const char* inputs[1] = { body_json ? body_json : "" };
-        openai_embedding_response_t resp;
-        memset(&resp, 0, sizeof(resp));
-        int rc = openai_enterprise_embeddings(ctx, "text-embedding-ada-002", inputs, 1, &resp);
-        (void)rc;
-        *response_json = strdup("{\"status\":\"embedding_complete\"}");
+        openai_embedding_response_t emb_resp;
+        memset(&emb_resp, 0, sizeof(emb_resp));
+        int rc = openai_enterprise_embeddings(ctx, "text-embedding-ada-002", inputs, 1, &emb_resp);
+        if (rc != 0) {
+            *response_json = strdup("{\"error\":\"embedding request failed\"}");
+            return rc;
+        }
+        size_t json_sz = 512 + (emb_resp.embedding_dim > 0 ? emb_resp.embedding_dim * 16 : 0);
+        char* json = (char*)malloc(json_sz);
+        if (!json) return -1;
+        size_t pos = 0;
+        pos += snprintf(json + pos, json_sz - pos,
+            "{\"object\":\"list\",\"model\":\"%s\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[",
+            emb_resp.model ? emb_resp.model : "text-embedding-ada-002");
+        if (emb_resp.embeddings && emb_resp.embedding_dim > 0) {
+            size_t show_dim = emb_resp.embedding_dim < 8 ? emb_resp.embedding_dim : 8;
+            for (size_t j = 0; j < show_dim && pos < json_sz - 64; j++) {
+                if (j > 0) pos += snprintf(json + pos, json_sz - pos, ",");
+                pos += snprintf(json + pos, json_sz - pos, "%.6f", emb_resp.embeddings[j]);
+            }
+            if (emb_resp.embedding_dim > 8)
+                pos += snprintf(json + pos, json_sz - pos, ",...(%zu_more)", emb_resp.embedding_dim - 8);
+        }
+        pos += snprintf(json + pos, json_sz - pos, "]}],\"usage\":{\"prompt_tokens\":%zu,\"total_tokens\":%zu}}",
+            (size_t)emb_resp.usage.prompt_tokens, (size_t)emb_resp.usage.total_tokens);
+        *response_json = json;
         return 0;
     }
     if (strcmp(path, "/v1/models") == 0) {
         openai_model_t* models = NULL;
         size_t count = 0;
-        openai_enterprise_list_models(ctx, &models, &count);
-        for (size_t i = 0; i < count; i++) {
+        int rc = openai_enterprise_list_models(ctx, &models, &count);
+        if (rc != 0) {
+            *response_json = strdup("{\"error\":\"list models failed\"}");
+            return rc;
+        }
+        size_t json_sz = 256 + count * 256;
+        char* json = (char*)malloc(json_sz);
+        if (!json) {
+            for (size_t i = 0; i < count; i++) { free(models[i].id); free(models[i].name); free(models[i].owned_by); }
+            free(models);
+            return -1;
+        }
+        size_t pos = 0;
+        pos += snprintf(json + pos, json_sz - pos, "{\"object\":\"list\",\"data\":[");
+        for (size_t i = 0; i < count && pos < json_sz - 128; i++) {
+            if (i > 0) pos += snprintf(json + pos, json_sz - pos, ",");
+            pos += snprintf(json + pos, json_sz - pos,
+                "{\"id\":\"%s\",\"object\":\"model\",\"owned_by\":\"%s\"}",
+                models[i].id ? models[i].id : "",
+                models[i].owned_by ? models[i].owned_by : "");
             free(models[i].id); free(models[i].name); free(models[i].owned_by);
         }
         free(models);
-        *response_json = strdup("{\"status\":\"models_listed\"}");
+        pos += snprintf(json + pos, json_sz - pos, "]}");
+        *response_json = json;
         return 0;
     }
     *response_json = strdup("{\"error\":\"unknown endpoint\"}");
@@ -1211,10 +1251,10 @@ static int openai_adapter_init_cb(void* context) {
 static int openai_adapter_destroy_cb(void* context) {
     struct openai_enterprise_adapter_s* adapter = (struct openai_enterprise_adapter_s*)context;
     if (adapter) {
-        openai_destroy((openai_handle_t*)&adapter);
+        openai_destroy((openai_handle_t)adapter);
     } else if (g_openai_instance) {
         openai_handle_t h = (openai_handle_t)g_openai_instance;
-        openai_destroy(&h);
+        openai_destroy(h);
         g_openai_instance = NULL;
     }
     return 0;
@@ -1320,9 +1360,10 @@ static int openai_adapter_handle_request_cb(void *c, const void *r, void **rp) {
 
     const char *request_json = (const char *)r;
     char *response_json = NULL;
-    int rc = openai_enterprise_handle_request(
-        (openai_enterprise_context_t *)&adapter->config,
+    int rc = openai_enterprise_route_request(
+        (openai_enterprise_context_t *)adapter,
         "/v1/chat/completions",
+        "POST",
         request_json,
         &response_json);
 

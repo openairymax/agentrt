@@ -68,6 +68,9 @@ struct mcp_v1_context_s {
     mcp_transport_t* transport;
 
     uint64_t request_counter;
+
+    mcp_stream_config_t stream_config;
+    int stream_active;
 };
 
 static char* json_string_escape(const char* str) {
@@ -592,9 +595,11 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t* ctx,
     for (size_t i = 0; i < message_count && i < 100; i++) {
         if (i > 0) offset += snprintf(buf + offset, buf_size - offset, ",");
         char* role = json_string_escape(messages[i].role);
+        char* content = json_string_escape(messages[i].content ? messages[i].content : "");
         offset += snprintf(buf + offset, buf_size - offset,
-            "{\"role\":%s,\"content\":{\"type\":\"text\",\"text\":\"\"}}", role);
+            "{\"role\":%s,\"content\":{\"type\":\"text\",\"text\":\"%s\"}}", role, content);
         free(role);
+        free(content);
     }
 
     offset += snprintf(buf + offset, buf_size - offset, "]}");
@@ -652,20 +657,25 @@ typedef struct {
 } mcp_stream_state_t;
 
 static mcp_stream_state_t* get_stream_state(mcp_v1_context_t* ctx) {
-    static mcp_stream_state_t default_state = {
+    if (!ctx) return NULL;
+    static mcp_stream_state_t fallback = {
         .config = { .enabled = true, .chunk_size = 4096, .max_buffer_size = (10 * 1024 * 1024), .flush_interval_ms = 50 },
         .active = false
     };
-    (void)ctx;
-    return &default_state;
+    if (ctx->stream_config.chunk_size == 0) {
+        ctx->stream_config = fallback.config;
+        ctx->stream_active = 0;
+    }
+    fallback.config = ctx->stream_config;
+    fallback.active = ctx->stream_active;
+    return &fallback;
 }
 
 int mcp_v1_stream_config(mcp_v1_context_t* ctx, const mcp_stream_config_t* config) {
     if (!ctx) return -1;
     if (!config) return -2;
 
-    mcp_stream_state_t* ss = get_stream_state(ctx);
-    ss->config = *config;
+    ctx->stream_config = *config;
     return 0;
 }
 
@@ -779,22 +789,23 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
             size_t text_len = results[i].text ? strlen(results[i].text) : 0;
             size_t offset = 0;
             while (offset < text_len) {
-                size_t chunk_end = offset + 256;
-                if (chunk_end > text_len) chunk_end = text_len;
+                size_t chunk_size = 128;
+                if (offset + chunk_size > text_len) chunk_size = text_len - offset;
 
-                char tmp = results[i].text[chunk_end];
-                ((char*)results[i].text)[chunk_end] = '\0';
+                char chunk_buf[256];
+                memcpy(chunk_buf, results[i].text + offset, chunk_size);
+                chunk_buf[chunk_size] = '\0';
 
+                char* escaped_chunk = json_string_escape(chunk_buf);
                 char sse_data[1024];
                 snprintf(sse_data, sizeof(sse_data),
                     "%s{\"delta\":{\"text\":\"%s\"}}",
                     offset == 0 ? chunk_json : "",
-                    results[i].text + offset);
+                    escaped_chunk);
+                free(escaped_chunk);
 
                 emit_sse_event(callback, user_data, "tools/call/chunk", sse_data);
-
-                ((char*)results[i].text)[chunk_end] = tmp;
-                offset = chunk_end;
+                offset += chunk_size;
 
                 double pct = (double)offset / (double)(text_len > 0 ? text_len : 1) * 80.0;
                 mcp_stream_event_t progress_evt;
@@ -874,21 +885,23 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
                 size_t text_len = strlen(result.content[i].text);
                 size_t offset = 0;
                 while (offset < text_len) {
-                    size_t chunk_end = offset + 256;
-                    if (chunk_end > text_len) chunk_end = text_len;
+                    size_t chunk_size = 128;
+                    if (offset + chunk_size > text_len) chunk_size = text_len - offset;
 
-                    char tmp = result.content[i].text[chunk_end];
-                    ((char*)result.content[i].text)[chunk_end] = '\0';
+                    char chunk_buf[256];
+                    memcpy(chunk_buf, result.content[i].text + offset, chunk_size);
+                    chunk_buf[chunk_size] = '\0';
 
+                    char* escaped_chunk = json_string_escape(chunk_buf);
                     char sse_data[512];
                     snprintf(sse_data, sizeof(sse_data),
                         "{\"model\":\"%s\",\"delta\":{\"type\":\"text\",\"text\":\"%s\"},\"index\":%zu}",
                         result.model ? result.model : "unknown",
-                        result.content[i].text + offset, i);
+                        escaped_chunk, i);
+                    free(escaped_chunk);
                     emit_sse_event(callback, user_data, "sampling/chunk", sse_data);
 
-                    ((char*)result.content[i].text)[chunk_end] = tmp;
-                    offset = chunk_end;
+                    offset += chunk_size;
 
                     double pct = (double)offset / (double)(text_len > 0 ? text_len : 1) * 90.0;
                     mcp_stream_event_t progress_evt;
@@ -981,7 +994,24 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
         return mcp_v1_handle_prompts_get(ctx, prompt_name[0] ? prompt_name : "unknown",
                                          params_json, response_json);
     } else if (strcmp(method, "logging/setLogLevel") == 0) {
-        return mcp_v1_set_log_level(ctx, MCP_LOG_INFO);
+        mcp_log_level_t level = MCP_LOG_INFO;
+        if (params_json) {
+            char* level_str = strstr(params_json, "\"level\"");
+            if (level_str) {
+                level_str = strchr(level_str + 7, '"');
+                if (level_str) {
+                    level_str++;
+                    if (strncmp(level_str, "debug", 5) == 0) level = MCP_LOG_DEBUG;
+                    else if (strncmp(level_str, "notice", 6) == 0) level = MCP_LOG_NOTICE;
+                    else if (strncmp(level_str, "warning", 7) == 0) level = MCP_LOG_WARNING;
+                    else if (strncmp(level_str, "error", 5) == 0) level = MCP_LOG_ERROR;
+                    else if (strncmp(level_str, "critical", 8) == 0) level = MCP_LOG_CRITICAL;
+                    else if (strncmp(level_str, "alert", 5) == 0) level = MCP_LOG_ALERT;
+                    else if (strncmp(level_str, "emergency", 9) == 0) level = MCP_LOG_EMERGENCY;
+                }
+            }
+        }
+        return mcp_v1_set_log_level(ctx, level);
     } else if (strcmp(method, "initialize") == 0) {
         size_t len = snprintf(NULL, 0,
             "{\"protocolVersion\":\"%s\",\"capabilities\":{\"tools\":%s,\"resources\":%s,\"prompts\":%s,\"sampling\":%s,\"logging\":%s},\"serverInfo\":{\"name\":\"%s\",\"version\":\"%s\"}}",
@@ -1063,8 +1093,28 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
     memcpy(input_copy, data, data_size);
     input_copy[data_size] = '\0';
 
+    char* method = "tools/call";
+    char* method_start = strstr(input_copy, "\"method\"");
+    if (method_start) {
+        method_start = strchr(method_start + 8, '"');
+        if (method_start) {
+            method_start++;
+            char* method_end = strchr(method_start, '"');
+            if (method_end) {
+                size_t method_len = (size_t)(method_end - method_start);
+                char* method_buf = malloc(method_len + 1);
+                if (method_buf) {
+                    memcpy(method_buf, method_start, method_len);
+                    method_buf[method_len] = '\0';
+                    method = method_buf;
+                }
+            }
+        }
+    }
+
     char* response_json = NULL;
-    int result = mcp_v1_route_request(ctx, "tools/call", input_copy, &response_json);
+    int result = mcp_v1_route_request(ctx, method, input_copy, &response_json);
+    if (method != "tools/call") free((void*)method);
     free(input_copy);
 
     if (result == 0 && response_json) {
@@ -1082,7 +1132,20 @@ static int mcp_adapter_connect(void* context, const char* address) {
     if (!context) return -1;
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
     if (address) {
+        char* old_name = (char*)ctx->config.server_name;
         ctx->config.server_name = strdup(address);
+        free(old_name);
+    }
+    if (ctx->transport) {
+        mcp_transport_config_t tcfg;
+        memset(&tcfg, 0, sizeof(tcfg));
+        tcfg.type = MCP_TRANSPORT_HTTP_SSE;
+        tcfg.config.http.base_url = address;
+        tcfg.config.http.sse_endpoint = "/sse";
+        tcfg.config.http.post_endpoint = "/message";
+        tcfg.read_timeout_ms = (uint32_t)ctx->config.default_timeout_ms;
+        tcfg.write_timeout_ms = (uint32_t)ctx->config.default_timeout_ms;
+        return mcp_transport_start(ctx->transport);
     }
     return 0;
 }
@@ -1100,7 +1163,32 @@ static int mcp_adapter_disconnect(void* context) {
 static int mcp_adapter_is_connected(void* context) {
     if (!context) return 0;
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    if (ctx->transport) {
+        return mcp_transport_is_connected(ctx->transport) ? 1 : 0;
+    }
     return (ctx->tool_count > 0 || ctx->resource_count > 0) ? 1 : 0;
+}
+
+static int mcp_adapter_send(void* context, const void* data, size_t size) {
+    if (!context || !data) return -1;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    if (!ctx->transport) return -2;
+    return mcp_transport_send(ctx->transport, (const char*)data, size);
+}
+
+static int mcp_adapter_receive(void* context, void** data, size_t* size) {
+    if (!context || !data || !size) return -1;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    if (!ctx->transport) return -2;
+    char* msg = NULL;
+    size_t msg_len = 0;
+    int ret = mcp_transport_receive(ctx->transport, &msg, &msg_len,
+                                     ctx->config.default_timeout_ms);
+    if (ret == 0 && msg) {
+        *data = msg;
+        *size = msg_len;
+    }
+    return ret;
 }
 
 static int mcp_adapter_get_stats(void* context, char* stats_json, size_t max_size) {
@@ -1161,8 +1249,8 @@ static protocol_adapter_t mcp_v1_adapter_internal = {
     .connect = mcp_adapter_connect,
     .disconnect = mcp_adapter_disconnect,
     .is_connected = mcp_adapter_is_connected,
-    .send = NULL,
-    .receive = NULL,
+    .send = mcp_adapter_send,
+    .receive = mcp_adapter_receive,
     .handle_request = mcp_adapter_handle_request,
     .get_version = mcp_adapter_get_version,
     .capabilities = mcp_adapter_capabilities,
