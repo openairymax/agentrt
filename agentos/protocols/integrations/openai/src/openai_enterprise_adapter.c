@@ -1126,6 +1126,91 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
     return -10;
 }
 
+static int openai_adapter_init_cb(void* context) {
+    (void)context;
+    return 0;
+}
+
+static int openai_adapter_destroy_cb(void* context) {
+    (void)context;
+    return 0;
+}
+
+static int openai_adapter_encode_cb(void* c, const void* m, void** o, size_t* s) {
+    if (!m || !o || !s) return -1;
+    (void)c;
+    const char* msg = (const char*)m;
+    size_t len = strlen(msg) + 1;
+    char* buf = (char*)malloc(len);
+    if (!buf) return -1;
+    memcpy(buf, msg, len);
+    *o = buf;
+    *s = len;
+    return 0;
+}
+
+static int openai_adapter_decode_cb(void* c, const void* d, size_t s, void* o) {
+    if (!d || !o || s == 0) return -1;
+    (void)c;
+    memcpy(o, d, s);
+    return 0;
+}
+
+static int openai_adapter_connect_cb(void* c, const char* endpoint) {
+    (void)c;
+    (void)endpoint;
+    return 0;
+}
+
+static int openai_adapter_disconnect_cb(void* c) {
+    (void)c;
+    return 0;
+}
+
+static int openai_adapter_is_connected_cb(void* c) {
+    (void)c;
+    return 0;
+}
+
+static int openai_adapter_send_cb(void* c, const void* d, size_t s) {
+    if (!d || s == 0) return -1;
+    (void)c;
+    return 0;
+}
+
+static int openai_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
+    if (!d || !s) return -1;
+    (void)c;
+    (void)t;
+    *d = NULL;
+    *s = 0;
+    return 0;
+}
+
+static int openai_adapter_handle_request_cb(void* c, const void* r, void** rp) {
+    if (!r) return -1;
+    (void)c;
+    if (rp) *rp = NULL;
+    return -1;
+}
+
+static int openai_adapter_get_version_cb(void* c, char* b, size_t s) {
+    (void)c;
+    snprintf(b, s, "%s", OPENAI_ADAPTER_VERSION);
+    return 0;
+}
+
+static uint32_t openai_adapter_capabilities_cb(void* c) {
+    (void)c;
+    return 0x07;
+}
+
+static int openai_adapter_get_stats_cb(void* c, char* b, size_t s) {
+    (void)c;
+    snprintf(b, s, "{\"requests\":0,\"errors\":0}");
+    return 0;
+}
+
 const protocol_adapter_t* openai_enterprise_get_adapter(void) {
     static protocol_adapter_t s_adapter;
     static bool s_init = false;
@@ -1136,6 +1221,19 @@ const protocol_adapter_t* openai_enterprise_get_adapter(void) {
         s_adapter.version = OPENAI_ADAPTER_VERSION;
         s_adapter.description = "OpenAI Enterprise API Adapter";
         s_adapter.context = NULL;
+        s_adapter.init = openai_adapter_init_cb;
+        s_adapter.destroy = openai_adapter_destroy_cb;
+        s_adapter.encode = openai_adapter_encode_cb;
+        s_adapter.decode = openai_adapter_decode_cb;
+        s_adapter.connect = openai_adapter_connect_cb;
+        s_adapter.disconnect = openai_adapter_disconnect_cb;
+        s_adapter.is_connected = openai_adapter_is_connected_cb;
+        s_adapter.send = openai_adapter_send_cb;
+        s_adapter.receive = openai_adapter_receive_cb;
+        s_adapter.handle_request = openai_adapter_handle_request_cb;
+        s_adapter.get_version = openai_adapter_get_version_cb;
+        s_adapter.capabilities = openai_adapter_capabilities_cb;
+        s_adapter.get_stats = openai_adapter_get_stats_cb;
         s_init = true;
     }
     return &s_adapter;

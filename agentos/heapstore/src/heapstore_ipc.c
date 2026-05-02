@@ -255,7 +255,7 @@ heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* ch
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    if (!channel) {
+    if (!channel || channel->channel_id[0] == '\0') {
         return heapstore_ERR_INVALID_PARAM;
     }
 
@@ -353,7 +353,7 @@ heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buff
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    if (!buffer) {
+    if (!buffer || buffer->buffer_id[0] == '\0') {
         return heapstore_ERR_INVALID_PARAM;
     }
 

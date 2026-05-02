@@ -43,6 +43,7 @@ struct agentos_layer4_pattern_config {
     double min_persistence;
     double persistence_threshold;
     int min_cluster_size;
+    size_t embedding_dim;
     char* pattern_storage_path;
     char data_source[128];
 };
@@ -140,7 +141,7 @@ static agentos_error_t generate_rules_for_clusters(
 
     if (!miner->rule_gen) return AGENTOS_ENOTSUP;
 
-    size_t dim = 384;  // 应从配置获取，这里简�?
+    size_t dim = miner->manager.embedding_dim > 0 ? miner->manager.embedding_dim : 768;
     size_t pattern_cap = 16;
     size_t pattern_cnt = 0;
     agentos_pattern_t** patterns = (agentos_pattern_t**)AGENTOS_MALLOC(pattern_cap * sizeof(agentos_pattern_t*));
@@ -327,7 +328,7 @@ agentos_error_t agentos_pattern_miner_mine(
     agentos_mutex_lock(miner->lock);
 
     // 1. 计算距离矩阵
-    size_t dim = 384; // 实际应从上下文获取，这里简�?
+    size_t dim = miner->manager.embedding_dim > 0 ? miner->manager.embedding_dim : 768;
     float* distance_matrix = compute_distance_matrix(vectors, count, dim);
     if (!distance_matrix) {
         agentos_mutex_unlock(miner->lock);
