@@ -29,12 +29,15 @@ typedef void* openai_handle_t;
 #endif
 
 typedef struct {
-    char* model;
-    openai_message_t* messages;
+    char *model;
+    openai_message_t *messages;
     size_t num_messages;
     float temperature;
+    float top_p;
     int max_tokens;
-    char* stop_sequences[4];
+    char *stop_sequences[4];
+    const openai_tool_def_t *tools;
+    size_t tool_count;
 } openai_chat_request_t;
 
 typedef struct {
@@ -108,6 +111,9 @@ struct openai_enterprise_adapter_s {
     time_t rate_last_429_time;
     double rate_backoff_multiplier;
     time_t rate_backoff_until;
+
+    char *last_response_body;
+    size_t last_response_len;
 };
 
 static struct openai_enterprise_adapter_s* g_openai_instance = NULL;
@@ -167,6 +173,8 @@ void openai_destroy(openai_handle_t handle) {
         free((void*)adapter->models[i].owned_by);
     }
 
+    free(adapter->last_response_body);
+
     adapter->initialized = false;
     if (g_openai_instance == adapter) g_openai_instance = NULL;
     free(adapter);
@@ -224,10 +232,29 @@ int openai_list_models(openai_handle_t handle,
     struct openai_enterprise_adapter_s* adapter =
         (struct openai_enterprise_adapter_s*)handle;
     if (!adapter->initialized) return -2;
-    (void)search_query;
-    (void)out_results;
 
-    return (int)adapter->model_count;
+    int count = 0;
+    for (size_t i = 0; i < adapter->model_count; i++) {
+        if (!search_query || strstr(adapter->models[i].name, search_query)) {
+            count++;
+        }
+    }
+
+    if (out_results) {
+        openai_model_t* results = (openai_model_t*)calloc(
+            count > 0 ? (size_t)count : 1, sizeof(openai_model_t));
+        if (results) {
+            int idx = 0;
+            for (size_t i = 0; i < adapter->model_count && idx < count; i++) {
+                if (!search_query || strstr(adapter->models[i].name, search_query)) {
+                    results[idx++] = adapter->models[i];
+                }
+            }
+            *(openai_model_t**)out_results = results;
+        }
+    }
+
+    return count;
 }
 
 /* ============================================================================
@@ -499,9 +526,9 @@ int openai_chat_completion(openai_handle_t handle,
     out_response->created = (uint64_t)time(NULL);
 
     uint64_t ts_start_ms = agentos_time_ms();
-    (void)ts_start_ms;
 
 #ifndef AGENTOS_HAS_CURL
+    openai_record_latency(adapter, 0.0);
     (void)request;
     return -10;
 #else
@@ -514,6 +541,36 @@ int openai_chat_completion(openai_handle_t handle,
                             request->max_tokens > 0 ? request->max_tokens : 4096);
     cJSON_AddNumberToObject(req_json, "temperature",
                             request->temperature >= 0 ? request->temperature : 0.7);
+    if (request->top_p > 0 && request->top_p <= 1.0) {
+        cJSON_AddNumberToObject(req_json, "top_p", request->top_p);
+    }
+
+    if (request->tools && request->tool_count > 0) {
+        cJSON *tools_arr = cJSON_CreateArray();
+        for (size_t i = 0; i < request->tool_count; i++) {
+            cJSON *tool_obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(tool_obj, "type", "function");
+            cJSON *func_obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(func_obj, "name",
+                                    request->tools[i].name ? request->tools[i].name : "");
+            cJSON_AddStringToObject(func_obj, "description",
+                                    request->tools[i].description ? request->tools[i].description : "");
+            if (request->tools[i].parameters) {
+                cJSON *params = cJSON_Parse(request->tools[i].parameters);
+                if (params) {
+                    cJSON_AddItemToObject(func_obj, "parameters", params);
+                } else {
+                    cJSON_AddItemToObject(func_obj, "parameters",
+                                          cJSON_CreateObject());
+                }
+            } else {
+                cJSON_AddItemToObject(func_obj, "parameters", cJSON_CreateObject());
+            }
+            cJSON_AddItemToObject(tool_obj, "function", func_obj);
+            cJSON_AddItemToArray(tools_arr, tool_obj);
+        }
+        cJSON_AddItemToObject(req_json, "tools", tools_arr);
+    }
 
     cJSON* msgs_arr = cJSON_CreateArray();
     for (size_t i = 0; i < request->num_messages && i < 256; i++) {
@@ -826,7 +883,12 @@ int openai_get_stats(void* handle, openai_rate_limit_t* out_stats) {
 
 void openai_free_model_list(void* list) {
     if (!list) return;
-    (void)list;
+    openai_model_t* models = (openai_model_t*)list;
+    for (int i = 0; i < OPENAI_MAX_MODELS; i++) {
+        if (models[i].name) { free(models[i].name); models[i].name = NULL; }
+        if (models[i].owned_by) { free(models[i].owned_by); models[i].owned_by = NULL; }
+    }
+    free(list);
 }
 
 void openai_free_chat_response(openai_chat_response_t* response) {
@@ -968,7 +1030,6 @@ int openai_enterprise_chat_completion(openai_enterprise_context_t* ctx,
                                        int max_tokens,
                                        openai_chat_response_t* response) {
     if (!ctx || !ctx->handle || !response) return -1;
-    (void)tools; (void)tool_count; (void)temperature; (void)top_p; (void)max_tokens;
     const char* effective_model = model ? model : "gpt-4o";
     openai_chat_request_t req;
     memset(&req, 0, sizeof(req));
@@ -977,6 +1038,11 @@ int openai_enterprise_chat_completion(openai_enterprise_context_t* ctx,
         req.messages = (openai_message_t*)messages;
         req.num_messages = message_count;
     }
+    req.temperature = (float)(temperature > 0 ? temperature : 1.0);
+    req.top_p = (float)(top_p > 0 && top_p <= 1.0 ? top_p : 1.0);
+    req.max_tokens = max_tokens > 0 ? max_tokens : 4096;
+    req.tools = tools;
+    req.tool_count = tool_count;
     return openai_chat_completion(ctx->handle, &req, response);
 }
 
@@ -1007,11 +1073,11 @@ int openai_enterprise_embeddings(openai_enterprise_context_t* ctx,
                                    size_t input_count,
                                    openai_embedding_response_t* response) {
     if (!ctx || !ctx->handle || !response) return -1;
-    (void)model;
     openai_embedding_request_t req;
     memset(&req, 0, sizeof(req));
     req.input_text = (inputs && input_count > 0 && inputs[0]) ? strdup(inputs[0]) : strdup("");
     req.embedding_dim = 1536;
+    req.model = model ? strdup(model) : strdup("text-embedding-3-small");
     return openai_create_embedding(ctx->handle, &req, response);
 }
 
@@ -1211,38 +1277,73 @@ static int openai_adapter_send_cb(void* c, const void* d, size_t s) {
     return (int)s;
 }
 
-static int openai_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
+static int openai_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t) {
     if (!d || !s) return -1;
-    struct openai_enterprise_adapter_s* adapter = (struct openai_enterprise_adapter_s*)c;
+    struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)c;
     if (!adapter) adapter = g_openai_instance;
-    (void)t;
     if (!adapter || !adapter->initialized) {
         *d = NULL;
         *s = 0;
         return -2;
     }
-    const char* placeholder = "{\"status\":\"ok\",\"adapter\":\"openai\"}";
-    size_t len = strlen(placeholder);
-    char* buf = (char*)malloc(len + 1);
-    if (!buf) { *d = NULL; *s = 0; return -3; }
-    memcpy(buf, placeholder, len + 1);
-    *d = buf;
-    *s = len;
+
+    if (adapter->last_response_body && adapter->last_response_len > 0) {
+        size_t len = adapter->last_response_len;
+        char *buf = (char *)malloc(len + 1);
+        if (!buf) {
+            *d = NULL;
+            *s = 0;
+            return -3;
+        }
+        memcpy(buf, adapter->last_response_body, len);
+        buf[len] = '\0';
+        *d = buf;
+        *s = len;
+        return 0;
+    }
+
+    (void)t;
+    *d = NULL;
+    *s = 0;
     return 0;
 }
 
-static int openai_adapter_handle_request_cb(void* c, const void* r, void** rp) {
+static int openai_adapter_handle_request_cb(void *c, const void *r, void **rp) {
     if (!r) return -1;
-    struct openai_enterprise_adapter_s* adapter = (struct openai_enterprise_adapter_s*)c;
+    struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)c;
     if (!adapter) adapter = g_openai_instance;
-    if (!adapter || !adapter->initialized) { if (rp) *rp = NULL; return -1; }
-    adapter->request_counter++;
-    const char* resp = "{\"status\":\"processed\",\"adapter\":\"openai\"}";
-    if (rp) {
-        *rp = strdup(resp);
-        if (!*rp) return -3;
+    if (!adapter || !adapter->initialized) {
+        if (rp) *rp = NULL;
+        return -1;
     }
-    return 0;
+    adapter->request_counter++;
+
+    const char *request_json = (const char *)r;
+    char *response_json = NULL;
+    int rc = openai_enterprise_handle_request(
+        (openai_enterprise_context_t *)&adapter->config,
+        "/v1/chat/completions",
+        request_json,
+        &response_json);
+
+    if (rc == 0 && response_json) {
+        if (adapter->last_response_body) {
+            free(adapter->last_response_body);
+        }
+        adapter->last_response_len = strlen(response_json);
+        adapter->last_response_body = strdup(response_json);
+
+        if (rp) {
+            *rp = response_json;
+        } else {
+            free(response_json);
+        }
+        return 0;
+    }
+
+    free(response_json);
+    if (rp) *rp = NULL;
+    return rc != 0 ? rc : -1;
 }
 
 static int openai_adapter_get_version_cb(void* c, char* b, size_t s) {

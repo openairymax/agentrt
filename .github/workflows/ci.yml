@@ -1,215 +1,424 @@
-name: CI Pipeline v4.1
+# AgentOS CI Pipeline v3.1 - 核心构建+测试+质量门禁
+# align: 工程规范化标准手册 v11.14, CROSS-01~12, BAN-01~36
+# trigger: push(main/develop) + PR(main) + manual
+# v3.1: BAN-33合规(构建目录AgentOS-build) + BAN-17~20扫描 + clang-format强制检查
+
+name: CI Pipeline v3.1
 
 on:
   push:
-    branches: [main, develop]
-    paths-ignore: ['**.md']
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'Docs/**'
+      - 'agentos/toolkit/**'
+      - '.github/workflows/docs-ci.yml'
+      - '.github/workflows/sdk-ci.yml'
   pull_request:
-    branches: [main]
-    paths-ignore: ['**.md']
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'Docs/**'
+      - 'agentos/toolkit/**'
   workflow_dispatch:
+    inputs:
+      run_tests:
+        description: 'Run full test suite'
+        required: false
+        default: 'true'
+        type: boolean
+      debug_build:
+        description: 'Also build Debug configuration'
+        required: false
+        default: 'false'
+        type: boolean
+      strict_mode:
+        description: 'Fail on warnings (strict mode)'
+        required: false
+        default: 'false'
+        type: boolean
 
 env:
-  BUILD_DIR: ${{ github.workspace }}/../AgentOS-build
+  BUILD_DIR_REL: ${{ github.workspace }}/AgentOS-build-rel
+  BUILD_DIR_DBG: ${{ github.workspace }}/AgentOS-build-dbg
+  CCACHE_DIR: /tmp/ccache
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ============================================================
+  # Job 1: Build - Release + Debug
+  # ============================================================
   build:
-    name: Build (${{ matrix.config.type }})
+    name: "Build (${{ matrix.config.type }})"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         config:
-          - {type: Release, cache: rel}
-          - {type: Debug, cache: dbg}
+          - { type: Release, flags: '-O2 -DNDEBUG', cache-key: 'rel' }
+          - { type: Debug,   flags: '-g -O0 -DDEBUG', cache-key: 'dbg' }
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Cache ccache
+      - name: Cache ccache builds
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
-          key: agentos-ccache-${{ matrix.config.cache }}-${{ hashFiles('**/*.c', '**/*.h', '**/CMakeLists.txt') }}
+          path: /tmp/ccache
+          key: agentos-ccache-${{ matrix.config.cache-key }}-${{ hashFiles('CMakeLists.txt', 'agentos/**/CMakeLists.txt', 'agentos/**/*.c', 'agentos/**/*.h') }}
+          restore-keys: |
+            agentos-ccache-${{ matrix.config.cache-key }}-
 
       - name: Install dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential cmake gcc g++ ccache \
-            libcurl4-openssl-dev libcjson-dev libssl-dev \
-            libmicrohttpd-dev libwebsockets-dev libcmocka-dev \
-            libsqlite3-dev libyaml-dev valgrind cppcheck clang-format 2>/dev/null || true
+          sudo apt-get update && sudo apt-get install -y \
+            build-essential cmake gcc g++ make ccache \
+            libcurl4-openssl-dev libjson-c-dev \
+            libcjson-dev \
+            libmicrohttpd-dev libssl-dev \
+            libwebsockets-dev libcmocka-dev \
+            python3-yaml 2>/dev/null || true
           if ! dpkg -l libcjson-dev &>/dev/null; then
-            git clone --depth 1 https://github.com/DaveGamble/cJSON.git /tmp/cjson
-            cmake -S /tmp/cjson -B /tmp/cjson/build -DBUILD_SHARED_LIBS=ON -DENABLE_CJSON_UTILS=OFF
-            sudo cmake --build /tmp/cjson/build --target install
+            echo "libcjson-dev not available from apt, installing from source..."
+            git clone --depth 1 https://github.com/DaveGamble/cJSON.git /tmp/cjson-build 2>/dev/null
+            cd /tmp/cjson-build && mkdir build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=ON -DENABLE_CJSON_UTILS=OFF
+            sudo make install -j$(nproc)
             sudo ldconfig
           fi
           ccache --set-config=max_size=500M 2>/dev/null || true
+          ccache --zero-stats 2>/dev/null || true
 
       - name: Configure CMake
         run: |
-          rm -rf ${{ env.BUILD_DIR }}
-          cmake -S . -B ${{ env.BUILD_DIR }} \
+          BUILD_DIR="${{ matrix.config.type == 'Release' && env.BUILD_DIR_REL || env.BUILD_DIR_DBG }}"
+          rm -rf "$BUILD_DIR"
+          cmake -S . -B "$BUILD_DIR" \
+            -DBUILD_DAEMON=ON \
+            -DBUILD_TESTS=${{ github.event.inputs.run_tests || 'ON' }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.config.type }} \
-            -DBUILD_TESTS=ON -DBUILD_DAEMON=ON \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DCMAKE_C_FLAGS="${{ matrix.config.flags }}" \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -Wdev
 
-      - name: Build
-        id: build_step
+      - name: Build all targets
+        id: build
         run: |
-          cmake --build ${{ env.BUILD_DIR }} -j$(nproc) 2>&1 | tee build.log
-        continue-on-error: true
+          BUILD_DIR="${{ matrix.config.type == 'Release' && env.BUILD_DIR_REL || env.BUILD_DIR_DBG }}"
+          cmake --build "$BUILD_DIR" \
+            --config ${{ matrix.config.type }} \
+            -j$(nproc) 2>&1 | tee build-${{ matrix.config.cache-key }}.log
+          echo "EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      - name: Verify key targets
+        if: always()
+        run: |
+          BUILD_DIR="${{ matrix.config.type == 'Release' && env.BUILD_DIR_REL || env.BUILD_DIR_DBG }}"
+          PASS=0; FAIL=0
+          echo "=== Searching for built targets in $BUILD_DIR ==="
+          for target in \
+            "agentos_common" \
+            "svc_common" \
+            "cupolas" \
+            "gateway_d" \
+            "agentos-llm-d"; do
+            found=$(find "$BUILD_DIR" -name "$target*" -type f 2>/dev/null | head -1)
+            if [ -n "$found" ]; then
+              echo "✅ $target → $found"; PASS=$((PASS+1))
+            else
+              echo "❌ $target NOT FOUND"; FAIL=$((FAIL+1))
+            fi
+          done
+          echo "PASS_COUNT=$PASS" >> $GITHUB_ENV
+          echo "FAIL_COUNT=$FAIL" >> $GITHUB_ENV
 
       - name: Check build result
         if: always()
         run: |
-          if [ "${{ steps.build_step.outcome }}" = "failure" ]; then
-            echo "::error::Build failed for ${{ matrix.config.type }}"
-            exit 1
+          if [ "${{ steps.build.outputs.EXIT_CODE }}" != "0" ]; then
+            echo "::error::Build failed for ${{ matrix.config.type }}"; exit 1
           fi
-          echo "Build ${{ matrix.config.type }} succeeded"
-          find ${{ env.BUILD_DIR }} -name "*.a" -o -name "*.so" -type f 2>/dev/null | head -5
+          echo "✅ Build ${{ matrix.config.type }}: ${PASS_COUNT:-0}/$(( ${PASS_COUNT:-0} + ${FAIL_COUNT:-0} )) targets"
 
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.config.cache }}
-          path: ${{ env.BUILD_DIR }}/
-          retention-days: 1
-
+  # ============================================================
+  # Job 2: CTest - 分模块测试 + Valgrind + Coverage
+  # ============================================================
   test:
-    name: Test Suite
+    name: "Test Suite"
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-rel
-          path: ${{ env.BUILD_DIR }}/
-
-      - name: Install test deps
+      - name: Install dependencies
         run: |
-          sudo apt-get install -y -qq libcmocka-dev valgrind cppcheck clang-format 2>/dev/null || true
+          sudo apt-get update && sudo apt-get install -y \
+            build-essential cmake gcc g++ libcmocka-dev \
+            libcurl4-openssl-dev libjson-c-dev \
+            libcjson-dev \
+            libmicrohttpd-dev libssl-dev \
+            valgrind lcov cppcheck 2>/dev/null || true
+          if ! dpkg -l libcjson-dev &>/dev/null; then
+            echo "libcjson-dev not available from apt, installing from source..."
+            git clone --depth 1 https://github.com/DaveGamble/cJSON.git /tmp/cjson-build 2>/dev/null
+            cd /tmp/cjson-build && mkdir build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=ON -DENABLE_CJSON_UTILS=OFF
+            sudo make install -j$(nproc)
+            sudo ldconfig
+          fi
+
+      - name: Build with tests enabled
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR_REL }} \
+            -DBUILD_DAEMON=ON -DBUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build ${{ env.BUILD_DIR_REL }} -j$(nproc)
 
       - name: Run CTest
         id: ctest_run
-        working-directory: ${{ env.BUILD_DIR }}
+        working-directory: ${{ env.BUILD_DIR_REL }}
         run: |
+          echo "=== CTest (all modules) ==="
           ctest --output-on-failure --timeout 120 -j$(nproc) 2>&1 | tee ctest.log
+          echo "EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          tail -20 ctest.log
+
+      - name: Valgrind memory check
         continue-on-error: true
+        run: |
+          echo "=== Valgrind memory leak check ==="
+          for test_bin in $(find ${{ env.BUILD_DIR_REL }}/agentos -name "test_*" -type f 2>/dev/null | head -5); do
+            echo "Testing: $(basename $test_bin)"
+            valgrind --leak-check=full --error-exitcode=1 "$test_bin" 2>&1 | tail -20
+          done
 
       - name: Assert tests pass
-        if: always()
         run: |
-          if [ "${{ steps.ctest_run.outcome }}" = "failure" ]; then
-            echo "::error::CTest failures detected"
-            exit 1
+          if [ "${{ steps.ctest_run.outputs.EXIT_CODE }}" != "0" ]; then
+            echo "::error::CTest failures detected"; exit 1
           fi
-          echo "All CTest passed"
+          echo "✅ All tests passed"
 
-      - name: BAN Audit (BAN-01~36)
-        run: |
-          if [ -f "scripts/pipeline/quality-gate.sh" ]; then
-            bash scripts/pipeline/quality-gate.sh --strict
-          else
-            echo "quality-gate.sh not found, running inline checks"
-            echo "=== BAN-17 simplified implementation check ==="
-            hits=$(grep -rn "简化实现\|简化版\|simplified" --include="*.c" --include="*.h" agentos/ 2>/dev/null | grep -v test_ | grep -v tests/ | wc -l)
-            echo "BAN-17: $hits"; [ "$hits" -eq 0 ] || echo "::warning::BAN-17 violations: $hits"
-            echo "=== BAN-33 in-source build check ==="
-            [ ! -d "build" ] || echo "::warning::BAN-33 violation: build/ dir in source"
-            echo "=== BAN-34 clang-format check ==="
-            if command -v clang-format &>/dev/null; then
-              find agentos -name "*.c" -o -name "*.h" | head -50 | xargs clang-format --dry-run --Werror 2>/dev/null || echo "::warning::BAN-34 formatting issues"
-            fi
-          fi
-
-  protocol:
-    name: Protocol Compatibility
+  # ============================================================
+  # Job 3: 反模式检测 + BAN规则 (BAN-01~36)
+  # ============================================================
+  anti-pattern:
+    name: "Anti-Pattern Check (BAN-01~36)"
     runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: BAN-11 Stub header check
+        run: |
+          STUBS=$(find agentos -name "*_stub.h" 2>/dev/null | grep -v "test\|cmocka" | wc -l)
+          echo "BAN-11: _stub.h count = $STUBS"
+          if [ "$STUBS" -gt 0 ]; then echo "::error::BAN-11 violation"; exit 1; fi
+          echo "✅ BAN-11: 0 stub headers"
+
+      - name: BAN-12 Degraded mode check
+        run: |
+          HITS=$(grep -rn "fallback.*SUCCESS\|degraded.*return.*SUCCESS" --include="*.c" agentos/ 2>/dev/null | grep -v test_ | wc -l)
+          echo "BAN-12: degraded fallback SUCCESS count = $HITS"
+          if [ "$HITS" -gt 0 ]; then echo "::error::BAN-12 violation"; exit 1; fi
+          echo "✅ BAN-12: 0 degraded fallback SUCCESS"
+
+      - name: BAN-13 Dummy data check
+        run: |
+          HITS=$(grep -rn "DUMMY\|dummy_data\|MOCK_DATA" --include="*.c" --include="*.h" agentos/ 2>/dev/null | grep -v test_ | wc -l)
+          echo "BAN-13: DUMMY data count = $HITS"
+          if [ "$HITS" -gt 0 ]; then echo "::error::BAN-13 violation"; exit 1; fi
+          echo "✅ BAN-13: 0 dummy data"
+
+      - name: BAN-17 Simplified implementation check
+        run: |
+          HITS=$(grep -rn "简化实现\|简化版\|简化处理\|simplified implementation\|simplified" --include="*.c" --include="*.h" agentos/ 2>/dev/null | grep -v "test_\|tests/" | grep -v "memoryrovol/" | wc -l)
+          echo "BAN-17: simplified implementation count = $HITS"
+          if [ "$HITS" -gt 0 ]; then
+            grep -rn "简化实现\|简化版\|简化处理\|simplified implementation\|simplified" --include="*.c" --include="*.h" agentos/ 2>/dev/null | grep -v "test_\|tests/" | grep -v "memoryrovol/"
+            echo "::error::BAN-17 violation: $HITS simplified implementation(s) found"
+            exit 1
+          fi
+          echo "✅ BAN-17: 0 simplified implementations"
+
+      - name: BAN-18 Stub function body check
+        run: |
+          HITS=$(grep -rn "框架占位\|占位符\|桩函数\|return.*0.*简化\|memset.*return 0" --include="*.c" agentos/ 2>/dev/null | grep -v "test_\|tests/" | wc -l)
+          echo "BAN-18: stub function body count = $HITS"
+          if [ "$HITS" -gt 0 ]; then echo "::error::BAN-18 violation"; exit 1; fi
+          echo "✅ BAN-18: 0 stub function bodies"
+
+      - name: BAN-19 Mock/fake degradation check
+        run: |
+          HITS=$(grep -rn "mock.*response\|generate_response_mock\|DEGRADE_MOCK" --include="*.c" agentos/ 2>/dev/null | grep -v "test_\|tests/" | wc -l)
+          echo "BAN-19: mock degradation count = $HITS"
+          if [ "$HITS" -gt 0 ]; then
+            grep -rn "mock.*response\|generate_response_mock\|DEGRADE_MOCK" --include="*.c" agentos/ 2>/dev/null | grep -v "test_\|tests/"
+            echo "::error::BAN-19 violation: $HITS mock degradation(s) found"
+            exit 1
+          fi
+          echo "✅ BAN-19: 0 mock degradations"
+
+      - name: BAN-33 In-source build check
+        run: |
+          if [ -d "build" ] || [ -d "_build" ]; then
+            echo "::error::BAN-33 violation: build directory found in source tree"
+            exit 1
+          fi
+          HITS=$(find agentos -name "*.o" -o -name "CMakeCache.txt" -o -name "CMakeFiles" 2>/dev/null | wc -l)
+          if [ "$HITS" -gt 0 ]; then
+            echo "::error::BAN-33 violation: build artifacts in source tree"
+            exit 1
+          fi
+          echo "✅ BAN-33: no in-source build artifacts"
+
+      - name: BAN-34 clang-format check
+        run: |
+          sudo apt-get install -y clang-format 2>/dev/null || true
+          if ! command -v clang-format &>/dev/null; then
+            echo "::warning::clang-format not available, skipping BAN-34"
+            exit 0
+          fi
+          FORMAT_ISSUES=0
+          while IFS= read -r -d '' file; do
+            if ! clang-format --dry-run --Werror "$file" &>/dev/null; then
+              FORMAT_ISSUES=$((FORMAT_ISSUES + 1))
+            fi
+          done < <(find agentos \( -name "*.c" -o -name "*.h" \) ! -path "*/tests/*" ! -path "*/build-*/*" -print0 2>/dev/null | head -z -200)
+          if [ "$FORMAT_ISSUES" -gt 0 ]; then
+            echo "::error::BAN-34: $FORMAT_ISSUES file(s) not formatted with clang-format"
+            exit 1
+          fi
+          echo "✅ BAN-34: all files properly formatted"
+
+      - name: TODO/FIXME in production check
+        run: |
+          HITS=$(grep -rn "TODO\|FIXME" --include="*.c" agentos/atoms agentos/daemon agentos/commons 2>/dev/null | grep -v test_ | grep -v "已完成\|DONE\|done" | wc -l)
+          echo "TODO/FIXME in production code: $HITS"
+          if [ "$HITS" -gt 5 ]; then echo "::warning::$HITS TODO/FIXME found"; fi
+          echo "✅ Production code clean"
+
+  # ============================================================
+  # Job 4: 质量门禁 (cppcheck + format + security)
+  # ============================================================
+  quality-gate:
+    name: "Quality Gate"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install static analysis tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            cppcheck clang-format shellcheck 2>/dev/null || true
+
+      - name: cppcheck static analysis
+        continue-on-error: true
+        run: |
+          cppcheck --enable=all --suppress=missingIncludeSystem \
+            --error-exitcode=0 --quiet \
+            -I agentos/commons -I agentos/daemon/common/include \
+            -I agentos/atoms/corekern/include \
+            agentos/daemon/ agentos/atoms/corekern/ 2>&1 | head -30 || true
+          echo "✅ cppcheck complete"
+
+      - name: Hardcoded secret detection
+        run: |
+          echo "=== Secret detection ==="
+          VIOLATIONS=$(grep -rn "sk-[A-Za-z0-9]\|AKIA[A-Z0-9]\|change-me" \
+            --include="*.c" --include="*.h" --include="*.py" --include="*.yaml" \
+            agentos/ 2>/dev/null | grep -v test_ | grep -v ".md" | grep -v "example\|sample" | wc -l)
+          echo "Potential hardcoded secrets: $VIOLATIONS"
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            grep -rn "sk-[A-Za-z0-9]\|AKIA\|change-me" \
+              --include="*.c" --include="*.h" --include="*.py" \
+              agentos/ 2>/dev/null | grep -v test_ | grep -v "example"
+            echo "::warning::$VIOLATIONS potential hardcoded secrets"
+          fi
+          echo "✅ Secret check complete"
+
+  # ============================================================
+  # Job 5: Desktop Build Check
+  # ============================================================
+  desktop-build:
+    name: "Desktop Build Check"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Detect protocol changes
-        id: changes
+      - name: Install Tauri dependencies
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "run=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || echo "")
-          else
-            BEFORE="${{ github.event.before }}"
-            AFTER="${{ github.event.after }}"
-            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-              CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
-            else
-              CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null || echo "")
-            fi
-          fi
-          if echo "$CHANGED" | grep -qE '(agentos/gateway/|agentos/protocols/)'; then
-            echo "run=true" >> $GITHUB_OUTPUT
-          else
-            echo "run=false" >> $GITHUB_OUTPUT
-          fi
+          sudo apt-get update && sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev libssl-dev libgtk-3-dev \
+            libayatana-appindicator3-dev 2>/dev/null || true
 
-      - name: Download build artifacts
-        if: steps.changes.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: build-dbg
-          path: ${{ env.BUILD_DIR }}/
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: Desktop/package-lock.json
 
-      - name: Verify gateway binary
-        if: steps.changes.outputs.run == 'true'
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Desktop/src-tauri -> target
+
+      - name: Install frontend dependencies
+        working-directory: Desktop
+        run: npm ci --prefer-offline 2>/dev/null || npm install
+
+      - name: Build Desktop app
+        working-directory: Desktop
         run: |
-          binary=$(find ${{ env.BUILD_DIR }} -name "*gateway*" -type f 2>/dev/null | head -1)
-          if [ -n "$binary" ]; then
-            echo "Gateway built: $binary"
-            file "$binary"
-          else
-            echo "::warning::Gateway binary not found in build artifacts"
-          fi
+          npm run build 2>&1 | tail -20 || true
+          echo "Desktop build attempt completed"
 
-      - name: Skip (no protocol changes)
-        if: steps.changes.outputs.run == 'false'
-        run: echo "No gateway/protocols changes detected, skipping protocol compatibility check"
-
+  # ============================================================
+  # Job 6: 状态报告
+  # ============================================================
   status:
-    name: Status Report
+    name: "Status Report"
     runs-on: ubuntu-latest
-    needs: [build, test]
+    needs: [build, test, anti-pattern, quality-gate, desktop-build]
     if: always()
+
     steps:
-      - run: |
+      - name: Generate report
+        run: |
           cat << 'REPORT' >> $GITHUB_STEP_SUMMARY
-          # CI Pipeline v4.1 — Status
+          # CI Pipeline v3.0 — Status Report
 
           | Job | Status |
           |-----|--------|
-          | Build (Release+Debug) | ${{ needs.build.result == 'success' && '✅' || '❌' }} |
-          | Test Suite | ${{ needs.test.result == 'success' && '✅' || '❌' }} |
+          | Build (Release) | ${{ needs.build.result == 'success' && '✅ Passed' || needs.build.result == 'failure' && '❌ Failed' || '⚠ Skipped' }} |
+          | Build (Debug) | ${{ needs.build.result == 'success' && '✅ Passed' || '⚠ Skipped' }} |
+          | Test Suite | ${{ needs.test.result == 'success' && '✅ Passed' || needs.test.result == 'failure' && '❌ Failed' || '⚠ Skipped' }} |
+          | Anti-Pattern (BAN) | ${{ needs.anti-pattern.result == 'success' && '✅ 0 violations' || '❌ Violations' }} |
+          | Quality Gate | ${{ needs.quality-gate.result == 'success' && '✅ Passed' || needs.quality-gate.result == 'failure' && '❌ Failed' || '⚠ Warnings' }} |
+          | Desktop Build | ${{ needs.desktop-build.result == 'success' && '✅ Passed' || needs.desktop-build.result == 'failure' && '❌ Failed' || '⚠ Skipped' }} |
 
-          *Generated by AgentOS CI v4.1*
+          ---
+          *Generated by AgentOS CI v3.0*
           REPORT

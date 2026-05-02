@@ -85,8 +85,18 @@ static agentos_error_t market_adapter_stop(agentos_service_t service, bool force
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->running) return AGENTOS_SUCCESS;
     ctx->running = false;
-    (void)force;
-    SVC_LOG_INFO("市场服务适配器已停止");
+    if (force) {
+        if (ctx->market_svc && ctx->owns_service) {
+            market_service_destroy(ctx->market_svc);
+            ctx->market_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->market_cfg.registry_url) { free((void*)ctx->market_cfg.registry_url); ctx->market_cfg.registry_url = NULL; }
+        if (ctx->market_cfg.storage_path) { free((void*)ctx->market_cfg.storage_path); ctx->market_cfg.storage_path = NULL; }
+        SVC_LOG_INFO("市场服务适配器已强制停止");
+    } else {
+        SVC_LOG_INFO("市场服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 

@@ -43,10 +43,13 @@ typedef struct {
 
 /** 环境变量配置源私有数�?*/
 typedef struct {
-    char* prefix;                    // 环境变量前缀
-    bool case_sensitive;             // 是否区分大小�?    char* separator;                 // 键分隔符
-    bool expand_vars;                // 是否展开变量引用
-    char** env_keys;                 // 环境变量键数�?    size_t env_count;                // 环境变量数量
+    char *prefix;
+    bool case_sensitive;
+    char *separator;
+    bool expand_vars;
+    char **env_keys;
+    size_t env_count;
+    uint64_t env_hash;
 } env_source_priv_t;
 
 /** 命令行配置源私有数据 */
@@ -998,9 +1001,10 @@ static config_error_t env_source_load(config_source_t* source, config_context_t*
         if (priv->separator) {
             for (char* p = key; *p; p++) { if (*p == '_') *p = '.'; }
         }
-        config_value_t* cv = config_value_create_string(val);
+        config_value_t *cv = config_value_create_string(val);
         if (cv) config_context_set(ctx, key, cv);
     }
+    priv->env_hash = compute_env_hash(priv);
     return CONFIG_SUCCESS;
 }
 
@@ -1019,9 +1023,38 @@ static config_error_t env_source_save(config_source_t* source, const config_cont
  * @brief 环境变量配置源检查变化函�? * 
  * 环境变量通常不会变化�? * 
  * @param source 配置�? * @return 是否已修�? */
-static bool env_source_has_changed(config_source_t* source) {
-    // 环境变量变化检测
-    (void)source;
+static uint64_t compute_env_hash(env_source_priv_t *priv) {
+    extern char **environ;
+    char **env = environ;
+    if (!env) return 0;
+
+    uint64_t hash = 14695981039346656037ULL;
+    size_t prefix_len = priv->prefix ? strlen(priv->prefix) : 0;
+
+    for (char **p = env; *p; p++) {
+        if (prefix_len > 0 && strncmp(*p, priv->prefix, prefix_len) != 0) {
+            continue;
+        }
+        for (const char *s = *p; *s; s++) {
+            hash ^= (uint64_t)(unsigned char)*s;
+            hash *= 1099511628211ULL;
+        }
+        hash ^= 0xFFULL;
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+static bool env_source_has_changed(config_source_t *source) {
+    if (!source) return false;
+    env_source_priv_t *priv = (env_source_priv_t *)source->priv_data;
+    if (!priv) return false;
+
+    uint64_t current_hash = compute_env_hash(priv);
+    if (current_hash != priv->env_hash) {
+        priv->env_hash = current_hash;
+        return true;
+    }
     return false;
 }
 

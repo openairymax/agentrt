@@ -169,7 +169,7 @@ void agentos_cognition_destroy(agentos_cognition_engine_t* engine) {
         engine->context_destroy(engine->context);
     }
     if (engine->lock) {
-        agentos_mutex_free(engine->lock);
+        agentos_mutex_destroy(engine->lock);
     }
     AGENTOS_FREE(engine);
 }
