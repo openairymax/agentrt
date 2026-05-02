@@ -11,6 +11,7 @@
 #endif
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 typedef enum {
     GW_STATE_CREATED = 0,
@@ -88,9 +89,9 @@ agentos_error_t gateway_service_load_config(
         if (strcmp(key, "http.port") == 0) {
             config->http.port = (uint16_t)atoi(val);
         } else if (strcmp(key, "http.host") == 0) {
-            snprintf(config->http.host, sizeof(config->http.host), "%s", val);
-        } else if (strcmp(key, "http.enable_cors") == 0) {
-            config->http.enable_cors = (strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
+            config->http.host = val;
+        } else if (strcmp(key, "http.enabled") == 0) {
+            config->http.enabled = (strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
         } else if (strcmp(key, "stdio.max_request_size") == 0) {
             config->stdio.max_request_size = (size_t)atol(val);
         } else if (strcmp(key, "stdio.timeout_ms") == 0) {

@@ -85,7 +85,20 @@ static const char* s_subpath_map[][heapstore_MAX_SUBPATHS] = {
     {"pools", "allocations", "stats", "index", "meta", "patterns", "raw", NULL}
 };
 
-static const char* s_default_root = "heapstore";
+static const char* s_default_root = NULL;
+
+static const char* _get_default_root(void) {
+    if (s_default_root) return s_default_root;
+    const char* env = getenv("AGENTOS_HEAPSTORE_ROOT");
+    if (env && env[0]) {
+        s_default_root = env;
+        return s_default_root;
+    }
+    static char fallback[512];
+    snprintf(fallback, sizeof(fallback), "%s/agentos/heapstore", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+    s_default_root = fallback;
+    return s_default_root;
+}
 
 typedef struct {
     atomic_uint_fast32_t state;
@@ -127,7 +140,7 @@ static heapstore_internal_metrics_t s_metrics = {
 
 static void set_default_config(void) {
     memset(&s_config, 0, sizeof(s_config));
-    s_config.root_path = s_default_root;
+    s_config.root_path = _get_default_root();
     s_config.max_log_size_mb = 100;
     s_config.log_retention_days = 7;
     s_config.trace_retention_days = 3;
