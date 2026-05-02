@@ -22,6 +22,7 @@ typedef struct {
     sched_config_t sched_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } sched_adapter_ctx_t;
 
 static sched_adapter_ctx_t* sched_get_ctx(agentos_service_t service) {
@@ -71,6 +72,8 @@ static agentos_error_t sched_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     sched_adapter_ctx_t* ctx = sched_get_ctx(service);
     if (!ctx || !ctx->sched_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     SVC_LOG_INFO("调度器服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
@@ -79,6 +82,9 @@ static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force)
     if (!service) return AGENTOS_EINVAL;
     sched_adapter_ctx_t* ctx = sched_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    (void)force;
     SVC_LOG_INFO("调度器服务适配器已停止");
     return AGENTOS_SUCCESS;
 }

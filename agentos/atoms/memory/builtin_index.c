@@ -318,3 +318,8 @@ agentos_error_t builtin_index_search(
 size_t builtin_index_total_docs(const builtin_index_t* idx) {
     return idx ? idx->total_docs : 0;
 }
+
+void builtin_index_compact(builtin_index_t* idx) {
+    if (!idx) return;
+    (void)idx;
+}

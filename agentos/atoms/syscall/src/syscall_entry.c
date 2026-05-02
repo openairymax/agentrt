@@ -251,6 +251,10 @@ agentos_error_t agentos_syscalls_init(void) {
         }
     }
 
+    extern void agentos_sys_init(void* cognition, void* execution, void* memory);
+    agentos_sys_init(g_cognition_engine, NULL, provider);
+
+    extern void agentos_sys_set_memory_provider(agentos_memory_provider_t* provider);
     agentos_sys_set_memory_provider(provider);
 
     AGENTOS_LOG_INFO("Syscalls layer initialized (cognition=%s, memory=%s)",
@@ -271,7 +275,14 @@ void agentos_syscalls_cleanup(void) {
         agentos_cognition_destroy(g_cognition_engine);
         g_cognition_engine = NULL;
     }
+
+    extern void agentos_sys_init(void* cognition, void* execution, void* memory);
+    agentos_sys_init(NULL, NULL, NULL);
+
     agentos_sys_set_memory_provider(NULL);
+
+    extern void agentos_memory_provider_unregister(void);
+    agentos_memory_provider_unregister();
 
     AGENTOS_LOG_INFO("Syscalls layer cleanup completed");
 }

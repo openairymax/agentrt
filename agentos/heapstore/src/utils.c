@@ -52,6 +52,7 @@ bool heapstore_ensure_directory(const char* path) {
         if (*p == '/' || *p == '\\') {
             *p = '\0';
             if (_mkdir(tmp) != 0 && errno != EEXIST) {
+                return false;
             }
             *p = '/';
         }
@@ -85,6 +86,7 @@ bool heapstore_ensure_directory(const char* path) {
         if (*p == '/') {
             *p = '\0';
             if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+                return false;
             }
             *p = '/';
         }

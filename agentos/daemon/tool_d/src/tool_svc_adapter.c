@@ -22,6 +22,7 @@ typedef struct {
     char* config_path;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } tool_adapter_ctx_t;
 
 static tool_adapter_ctx_t* tool_get_ctx(agentos_service_t service) {
@@ -67,6 +68,8 @@ static agentos_error_t tool_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     tool_adapter_ctx_t* ctx = tool_get_ctx(service);
     if (!ctx || !ctx->tool_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     svc_logger_info("工具服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
@@ -75,6 +78,9 @@ static agentos_error_t tool_adapter_stop(agentos_service_t service, bool force) 
     if (!service) return AGENTOS_EINVAL;
     tool_adapter_ctx_t* ctx = tool_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    (void)force;
     svc_logger_info("工具服务适配器已停止");
     return AGENTOS_SUCCESS;
 }
@@ -111,7 +117,9 @@ static agentos_error_t tool_adapter_healthcheck(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     tool_adapter_ctx_t* ctx = tool_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    return ctx->tool_svc ? AGENTOS_SUCCESS : AGENTOS_ENOTINIT;
+    if (!ctx->tool_svc) return AGENTOS_ENOTINIT;
+    if (!ctx->running) return AGENTOS_ENOTINIT;
+    return AGENTOS_SUCCESS;
 }
 
 static const agentos_svc_interface_t tool_adapter_iface = {

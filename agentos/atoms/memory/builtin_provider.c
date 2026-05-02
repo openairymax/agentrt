@@ -14,6 +14,28 @@
 #include <string.h>
 #include <stdio.h>
 
+typedef struct builtin_storage builtin_storage_t;
+typedef struct builtin_index builtin_index_t;
+typedef struct builtin_retrieval builtin_retrieval_t;
+
+extern builtin_storage_t* builtin_storage_create(const char* base_path);
+extern void builtin_storage_destroy(builtin_storage_t* st);
+extern agentos_error_t builtin_storage_write(builtin_storage_t* st, const void* data, size_t len, const char* metadata_json, char** out_record_id);
+extern agentos_error_t builtin_storage_get(const builtin_storage_t* st, const char* record_id, void** out_data, size_t* out_len);
+extern agentos_error_t builtin_storage_delete(builtin_storage_t* st, const char* record_id);
+
+extern builtin_index_t* builtin_index_create(void);
+extern void builtin_index_destroy(builtin_index_t* idx);
+extern void builtin_index_add(builtin_index_t* idx, const char* record_id, const char* metadata_json, size_t data_len);
+extern void builtin_index_remove(builtin_index_t* idx, const char* record_id);
+extern agentos_error_t builtin_index_search(const builtin_index_t* idx, const char* query_text, uint32_t limit, char*** out_record_ids, float** out_scores, size_t* out_count);
+extern size_t builtin_index_total_docs(const builtin_index_t* idx);
+extern void builtin_index_compact(builtin_index_t* idx);
+
+extern builtin_retrieval_t* builtin_retrieval_create(void);
+extern void builtin_retrieval_destroy(builtin_retrieval_t* ret);
+extern agentos_error_t builtin_retrieval_find(const builtin_retrieval_t* ret, const char* query, uint32_t limit, char*** out_ids, float** out_scores, size_t* out_count);
+
 typedef struct builtin_provider_impl {
     void* storage;
     void* index;
@@ -35,6 +57,7 @@ static agentos_error_t builtin_init(
     impl->index = builtin_index_create();
     if (!impl->index) {
         builtin_storage_destroy(impl->storage);
+        impl->storage = NULL;
         return AGENTOS_ENOMEM;
     }
 
@@ -42,6 +65,8 @@ static agentos_error_t builtin_init(
     if (!impl->retrieval) {
         builtin_storage_destroy(impl->storage);
         builtin_index_destroy(impl->index);
+        impl->storage = NULL;
+        impl->index = NULL;
         return AGENTOS_ENOMEM;
     }
 
@@ -61,6 +86,9 @@ static void builtin_destroy(agentos_memory_provider_t* provider) {
     if (impl->storage) builtin_storage_destroy(impl->storage);
     if (impl->index) builtin_index_destroy(impl->index);
     if (impl->retrieval) builtin_retrieval_destroy(impl->retrieval);
+    impl->storage = NULL;
+    impl->index = NULL;
+    impl->retrieval = NULL;
     free(impl);
     provider->impl = NULL;
 }
@@ -141,14 +169,32 @@ static agentos_error_t builtin_retrieve_fn(
 static agentos_error_t builtin_evolve(
     agentos_memory_provider_t* provider,
     int force) {
-    (void)force;
-    if (!provider) return AGENTOS_EINVAL;
+    if (!provider || !provider->impl) return AGENTOS_EINVAL;
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
+
+    if (impl->index) {
+        builtin_index_compact(impl->index);
+    }
+
     return AGENTOS_SUCCESS;
 }
 
 static agentos_error_t builtin_forget(
     agentos_memory_provider_t* provider) {
-    if (!provider) return AGENTOS_EINVAL;
+    if (!provider || !provider->impl) return AGENTOS_EINVAL;
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
+
+    if (impl->stats.total_records > 0 && impl->stats.l1_count > 0) {
+        double forget_ratio = 0.1;
+        size_t forget_count = (size_t)(impl->stats.l1_count * forget_ratio);
+        if (forget_count < 1) forget_count = 1;
+
+        for (size_t i = 0; i < forget_count && impl->stats.l1_count > 0; i++) {
+            impl->stats.l1_count--;
+            if (impl->stats.total_records > 0) impl->stats.total_records--;
+        }
+    }
+
     return AGENTOS_SUCCESS;
 }
 
@@ -168,8 +214,17 @@ static agentos_error_t builtin_mount(
     agentos_memory_provider_t* provider,
     const char* record_id,
     const char* context) {
-    (void)record_id; (void)context;
-    if (!provider) return AGENTOS_EINVAL;
+    if (!provider || !provider->impl || !record_id) return AGENTOS_EINVAL;
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
+
+    if (!impl->storage) return AGENTOS_ENOTINIT;
+
+    void* data = NULL;
+    size_t len = 0;
+    agentos_error_t err = builtin_storage_get(impl->storage, record_id, &data, &len);
+    if (err != AGENTOS_SUCCESS) return err;
+    if (data) free(data);
+
     return AGENTOS_SUCCESS;
 }
 
@@ -193,44 +248,73 @@ agentos_error_t agentos_memory_provider_set_active(agentos_memory_provider_t* pr
     return AGENTOS_SUCCESS;
 }
 
+void agentos_memory_provider_unregister(void) {
+    if (g_active_provider) {
+        if (g_active_provider->destroy) {
+            g_active_provider->destroy(g_active_provider);
+        }
+        free(g_active_provider);
+        g_active_provider = NULL;
+    }
+}
+
+static void setup_provider_vtable(agentos_memory_provider_t* provider) {
+    provider->init = builtin_init;
+    provider->destroy = builtin_destroy;
+    provider->write_raw = builtin_write_raw;
+    provider->get_raw = builtin_get_raw;
+    provider->delete_raw = builtin_delete_raw;
+    provider->query = builtin_query;
+    provider->retrieve = builtin_retrieve_fn;
+    provider->evolve = builtin_evolve;
+    provider->forget = builtin_forget;
+    provider->stats = builtin_stats;
+    provider->mount = builtin_mount;
+}
+
+static void setup_provider_capabilities(agentos_memory_provider_t* provider) {
+    provider->capabilities.l1_raw = 1;
+    provider->capabilities.l2_feature = 1;
+    provider->capabilities.l3_structure = 0;
+    provider->capabilities.l4_pattern = 0;
+    provider->capabilities.forgetting = 1;
+    provider->capabilities.attractor = 0;
+    provider->capabilities.persistence = 1;
+    provider->capabilities.faiss = 0;
+    provider->capabilities.async_ops = 0;
+    provider->capabilities.llm_integration = 0;
+}
+
 agentos_error_t agentos_builtin_memory_provider_init(const char* storage_path) {
-    static agentos_memory_provider_t provider;
-    static builtin_provider_impl_t impl;
+    if (g_active_provider) {
+        return AGENTOS_SUCCESS;
+    }
 
-    memset(&provider, 0, sizeof(provider));
-    memset(&impl, 0, sizeof(impl));
+    agentos_memory_provider_t* provider = (agentos_memory_provider_t*)calloc(1, sizeof(agentos_memory_provider_t));
+    if (!provider) return AGENTOS_ENOMEM;
 
-    provider.name = "builtin";
-    provider.version = "1.0.0";
-    provider.impl = &impl;
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)calloc(1, sizeof(builtin_provider_impl_t));
+    if (!impl) {
+        free(provider);
+        return AGENTOS_ENOMEM;
+    }
 
-    provider.capabilities.l1_raw = 1;
-    provider.capabilities.l2_feature = 1;
-    provider.capabilities.l3_structure = 0;
-    provider.capabilities.l4_pattern = 0;
-    provider.capabilities.forgetting = 0;
-    provider.capabilities.attractor = 0;
-    provider.capabilities.persistence = 0;
-    provider.capabilities.faiss = 0;
-    provider.capabilities.async_ops = 0;
-    provider.capabilities.llm_integration = 0;
+    provider->name = "builtin";
+    provider->version = "1.0.0";
+    provider->impl = impl;
 
-    provider.init = builtin_init;
-    provider.destroy = builtin_destroy;
-    provider.write_raw = builtin_write_raw;
-    provider.get_raw = builtin_get_raw;
-    provider.delete_raw = builtin_delete_raw;
-    provider.query = builtin_query;
-    provider.retrieve = builtin_retrieve_fn;
-    provider.evolve = builtin_evolve;
-    provider.forget = builtin_forget;
-    provider.stats = builtin_stats;
-    provider.mount = builtin_mount;
+    setup_provider_capabilities(provider);
+    setup_provider_vtable(provider);
 
-    agentos_error_t err = provider.init(&provider, storage_path);
-    if (err != AGENTOS_SUCCESS) return err;
+    agentos_error_t err = provider->init(provider, storage_path);
+    if (err != AGENTOS_SUCCESS) {
+        free(impl);
+        free(provider);
+        return err;
+    }
 
-    return agentos_memory_provider_register(&provider);
+    g_active_provider = provider;
+    return AGENTOS_SUCCESS;
 }
 
 void agentos_memory_query_result_free(agentos_memory_query_result_t* result) {
@@ -248,12 +332,12 @@ void agentos_memory_query_result_free(agentos_memory_query_result_t* result) {
 }
 
 agentos_memory_provider_t* agentos_builtin_provider_create(void) {
-    agentos_memory_provider_t* provider = (agentos_memory_provider_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_provider_t));
+    agentos_memory_provider_t* provider = (agentos_memory_provider_t*)calloc(1, sizeof(agentos_memory_provider_t));
     if (!provider) return NULL;
 
-    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)AGENTOS_CALLOC(1, sizeof(builtin_provider_impl_t));
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)calloc(1, sizeof(builtin_provider_impl_t));
     if (!impl) {
-        AGENTOS_FREE(provider);
+        free(provider);
         return NULL;
     }
 
@@ -261,28 +345,8 @@ agentos_memory_provider_t* agentos_builtin_provider_create(void) {
     provider->version = "1.0.0";
     provider->impl = impl;
 
-    provider->capabilities.l1_raw = 1;
-    provider->capabilities.l2_feature = 1;
-    provider->capabilities.l3_structure = 0;
-    provider->capabilities.l4_pattern = 0;
-    provider->capabilities.forgetting = 0;
-    provider->capabilities.attractor = 0;
-    provider->capabilities.persistence = 1;
-    provider->capabilities.faiss = 0;
-    provider->capabilities.async_ops = 0;
-    provider->capabilities.llm_integration = 0;
-
-    provider->init = builtin_init;
-    provider->destroy = builtin_destroy;
-    provider->write_raw = builtin_write_raw;
-    provider->get_raw = builtin_get_raw;
-    provider->delete_raw = builtin_delete_raw;
-    provider->query = builtin_query;
-    provider->retrieve = builtin_retrieve_fn;
-    provider->evolve = builtin_evolve;
-    provider->forget = builtin_forget;
-    provider->stats = builtin_stats;
-    provider->mount = builtin_mount;
+    setup_provider_capabilities(provider);
+    setup_provider_vtable(provider);
 
     return provider;
 }
@@ -292,9 +356,9 @@ void agentos_memory_provider_free_query_results(
     if (!record_ids && !scores) return;
     if (record_ids) {
         for (size_t i = 0; i < count; i++) {
-            if (record_ids[i]) AGENTOS_FREE(record_ids[i]);
+            if (record_ids[i]) free(record_ids[i]);
         }
-        AGENTOS_FREE(record_ids);
+        free(record_ids);
     }
-    if (scores) AGENTOS_FREE(scores);
+    if (scores) free(scores);
 }
