@@ -159,8 +159,8 @@ heapstore_error_t heapstore_registry_init(void) {
         strncpy(root_path, configured_root, sizeof(root_path) - 1);
         root_path[sizeof(root_path) - 1] = '\0';
     } else {
-        strncpy(root_path, "heapstore", sizeof(root_path) - 1);
-        root_path[sizeof(root_path) - 1] = '\0';
+        const char* tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp";
+        snprintf(root_path, sizeof(root_path), "%s/agentos/heapstore", tmpdir);
     }
 
     char full_path[512];

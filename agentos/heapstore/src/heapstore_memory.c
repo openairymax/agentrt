@@ -45,7 +45,14 @@ heapstore_error_t heapstore_memory_init(void) {
         return heapstore_SUCCESS;
     }
 
-    const char* base_path = "agentos/heapstore/kernel/memory";
+    const char* root = heapstore_get_root();
+    char base_path[512];
+    if (root && root[0]) {
+        snprintf(base_path, sizeof(base_path), "%s/kernel/memory", root);
+    } else {
+        snprintf(base_path, sizeof(base_path), "%s/agentos/heapstore/kernel/memory",
+                 getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+    }
     strncpy(s_memory_path, base_path, sizeof(s_memory_path) - 1);
     s_memory_path[sizeof(s_memory_path) - 1] = '\0';
 
