@@ -353,8 +353,25 @@ int protocol_transformer_default(const unified_message_t* source,
     if (!source || !target) {
         return -1;
     }
-    
+
     *target = *source;
+
+    if (source->payload && source->payload_size > 0) {
+        void* new_payload = malloc(source->payload_size);
+        if (!new_payload) return -1;
+        memcpy(new_payload, source->payload, source->payload_size);
+        target->payload = new_payload;
+    }
+
+    if (source->body && source->body_length > 0) {
+        void* new_body = malloc(source->body_length);
+        if (new_body) {
+            memcpy(new_body, source->body, source->body_length);
+            target->body = new_body;
+        }
+    }
+
+    (void)context;
     return 0;
 }
 

@@ -141,6 +141,8 @@ agentos_memory_provider_t* agentos_memory_provider_get_active(void);
  */
 agentos_error_t agentos_memory_provider_set_active(agentos_memory_provider_t* provider);
 
+void agentos_memory_provider_unregister(void);
+
 /**
  * @brief 初始化内置免费提供商并注册为活跃
  */

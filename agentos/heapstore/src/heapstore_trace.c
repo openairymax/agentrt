@@ -99,6 +99,10 @@ heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
+    if (span->span_id[0] == '\0' || span->trace_id[0] == '\0') {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
     agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_count >= heapstore_TRACE_MAX_SPANS) {

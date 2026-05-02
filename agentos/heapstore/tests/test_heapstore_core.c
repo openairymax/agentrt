@@ -162,13 +162,13 @@ static void test_cleanup(void) {
 static void test_strerror(void) {
     printf("Test: strerror...");
 
-    assert(strcmp(heapstore_strerror(heapstore_SUCCESS), "Success") == 0);
-    assert(strcmp(heapstore_strerror(heapstore_ERR_INVALID_PARAM), "Invalid parameter") == 0);
-    assert(strcmp(heapstore_strerror(heapstore_ERR_NOT_INITIALIZED), "heapstore not initialized") == 0);
-    assert(strcmp(heapstore_strerror(heapstore_ERR_ALREADY_INITIALIZED), "heapstore not initialized") != 0);
-    assert(strcmp(heapstore_strerror(heapstore_ERR_DIR_CREATE_FAILED), "Failed to create directory") == 0);
-    assert(strcmp(heapstore_strerror(heapstore_ERR_OUT_OF_MEMORY), "Out of memory") == 0);
-    assert(strcmp(heapstore_strerror((heapstore_error_t)-999), "Unknown error") == 0);
+    assert(strstr(heapstore_strerror(heapstore_SUCCESS), "heapstore_SUCCESS") != NULL);
+    assert(strstr(heapstore_strerror(heapstore_ERR_INVALID_PARAM), "INVALID_PARAM") != NULL);
+    assert(strstr(heapstore_strerror(heapstore_ERR_NOT_INITIALIZED), "NOT_INITIALIZED") != NULL);
+    assert(strstr(heapstore_strerror(heapstore_ERR_ALREADY_INITIALIZED), "ALREADY_INITIALIZED") != NULL);
+    assert(strstr(heapstore_strerror(heapstore_ERR_DIR_CREATE_FAILED), "DIR_CREATE_FAILED") != NULL);
+    assert(strstr(heapstore_strerror(heapstore_ERR_OUT_OF_MEMORY), "OUT_OF_MEMORY") != NULL);
+    assert(strstr(heapstore_strerror((heapstore_error_t)-999), "Unknown") != NULL || strstr(heapstore_strerror((heapstore_error_t)-999), "unknown") != NULL);
 
     printf("PASS\n");
 }

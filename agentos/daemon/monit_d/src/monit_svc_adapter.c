@@ -18,10 +18,11 @@
 #include <string.h>
 
 typedef struct {
-    void* monit_svc;  // monitor_service_t* 但使用 void* 避免类型问题
+    void* monit_svc;
     monitor_config_t monit_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } monit_adapter_ctx_t;
 
 static monit_adapter_ctx_t* monit_get_ctx(agentos_service_t service) {
@@ -74,15 +75,19 @@ static agentos_error_t monit_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     monit_adapter_ctx_t* ctx = monit_get_ctx(service);
     if (!ctx || !ctx->monit_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     SVC_LOG_INFO("监控服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
 static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force) {
     if (!service) return AGENTOS_EINVAL;
-    (void)force;
     monit_adapter_ctx_t* ctx = monit_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    (void)force;
     SVC_LOG_INFO("监控服务适配器已停止");
     return AGENTOS_SUCCESS;
 }

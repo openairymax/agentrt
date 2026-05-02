@@ -22,6 +22,7 @@ typedef struct {
     market_config_t market_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } market_adapter_ctx_t;
 
 static market_adapter_ctx_t* market_get_ctx(agentos_service_t service) {
@@ -71,6 +72,8 @@ static agentos_error_t market_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx || !ctx->market_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     SVC_LOG_INFO("市场服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
@@ -79,6 +82,9 @@ static agentos_error_t market_adapter_stop(agentos_service_t service, bool force
     if (!service) return AGENTOS_EINVAL;
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    (void)force;
     SVC_LOG_INFO("市场服务适配器已停止");
     return AGENTOS_SUCCESS;
 }
@@ -105,6 +111,7 @@ static agentos_error_t market_adapter_healthcheck(agentos_service_t service) {
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->market_svc) return AGENTOS_ENOTINIT;
+    if (!ctx->running) return AGENTOS_ENOTINIT;
     return AGENTOS_SUCCESS;
 }
 
