@@ -24,7 +24,7 @@ groups:
         annotations:
           summary: "cupolas module build failed"
           description: "The cupolas CI/CD pipeline has failed. Check the workflow run for details."
-          runbook_url: "https://docs.agentos.spharx.cn/runbooks/cupolas-build-failure"
+          runbook_url: "${RUNBOOK_BASE_URL:-https://docs.agentos.example.com}/runbooks/cupolas-build-failure"
 
       # Build Timeout Alert
       - alert: CupolasBuildTimeout

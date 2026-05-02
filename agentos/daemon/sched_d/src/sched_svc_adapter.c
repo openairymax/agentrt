@@ -86,8 +86,17 @@ static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force)
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->running) return AGENTOS_SUCCESS;
     ctx->running = false;
-    (void)force;
-    SVC_LOG_INFO("调度器服务适配器已停止");
+    if (force) {
+        if (ctx->sched_svc && ctx->owns_service) {
+            sched_service_destroy(ctx->sched_svc);
+            ctx->sched_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->sched_cfg.ml_model_path) { free((void*)ctx->sched_cfg.ml_model_path); ctx->sched_cfg.ml_model_path = NULL; }
+        SVC_LOG_INFO("调度器服务适配器已强制停止");
+    } else {
+        SVC_LOG_INFO("调度器服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 

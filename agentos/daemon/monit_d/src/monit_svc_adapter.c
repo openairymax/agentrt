@@ -87,8 +87,18 @@ static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force)
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->running) return AGENTOS_SUCCESS;
     ctx->running = false;
-    (void)force;
-    SVC_LOG_INFO("监控服务适配器已停止");
+    if (force) {
+        if (ctx->monit_svc && ctx->owns_service) {
+            monitor_service_destroy(ctx->monit_svc);
+            ctx->monit_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->monit_cfg.log_file_path) { free((void*)ctx->monit_cfg.log_file_path); ctx->monit_cfg.log_file_path = NULL; }
+        if (ctx->monit_cfg.metrics_storage_path) { free((void*)ctx->monit_cfg.metrics_storage_path); ctx->monit_cfg.metrics_storage_path = NULL; }
+        SVC_LOG_INFO("监控服务适配器已强制停止");
+    } else {
+        SVC_LOG_INFO("监控服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 

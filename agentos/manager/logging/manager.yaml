@@ -9,7 +9,7 @@
 # 配置归属（按双重责任模型）
 _owner:
   module: "commons"
-  contact: "commons-team@spharx.cn"
+  contact: "commons-team@example.com"
   path: "AgentOS/commons"
   description: "内容定义责任归属 commons 模块，管理责任归属 Manager 模块"
 
