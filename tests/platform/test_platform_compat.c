@@ -242,11 +242,11 @@ static void pt_thread_api(void)
 
     /* 创建线程 */
     agentos_thread_t th;
-    int ret = agentos_thread_create(&th, pt_thread_fn, NULL);
+    int ret = agentos_platform_thread_create(&th, pt_thread_fn, NULL);
     TEST_ASSERT(ret == 0, "thread_create 成功");
 
     /* Join线程 */
-    ret = agentos_thread_join(th, NULL);
+    ret = agentos_platform_thread_join(th, NULL);
     TEST_ASSERT(ret == 0, "thread_join 成功");
 
     TEST_ASSERT_EQ(g_thread_counter, 1, "线程函数执行完成");
@@ -255,12 +255,12 @@ static void pt_thread_api(void)
     #define PT_THREAD_COUNT 5
     agentos_thread_t threads[PT_THREAD_COUNT];
     for (int i = 0; i < PT_THREAD_COUNT; i++) {
-        ret = agentos_thread_create(&threads[i], pt_thread_fn, NULL);
+        ret = agentos_platform_thread_create(&threads[i], pt_thread_fn, NULL);
         TEST_ASSERT(ret == 0, "多线程创建成功");
     }
 
     for (int i = 0; i < PT_THREAD_COUNT; i++) {
-        agentos_thread_join(threads[i], NULL);
+        agentos_platform_thread_join(threads[i], NULL);
     }
     TEST_ASSERT_EQ(g_thread_counter, PT_THREAD_COUNT + 1, "所有线程执行完成");
 

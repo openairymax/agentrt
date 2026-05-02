@@ -182,26 +182,79 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
         return AGENTOS_EINVAL;
 
     const char *cmd = (const char *) input;
+    char *result_json = NULL;
+
     if (strstr(cmd, "navigate") != NULL) {
         const char *url_start = strstr(cmd, "http");
         if (!url_start) {
-            *out_output = AGENTOS_STRDUP("{\"error\":\"no_url_provided\"}");
-            return *out_output ? AGENTOS_EINVAL : AGENTOS_ENOMEM;
+            result_json = AGENTOS_STRDUP("{\"error\":\"no_url_provided\",\"status\":\"failed\"}");
+            if (!result_json) return AGENTOS_ENOMEM;
+            *out_output = result_json;
+            return AGENTOS_EINVAL;
         }
         if (!is_safe_url(url_start)) {
-            *out_output = AGENTOS_STRDUP("{\"error\":\"unsafe_url\"}");
-            return *out_output ? AGENTOS_EPERM : AGENTOS_ENOMEM;
+            result_json = AGENTOS_STRDUP("{\"error\":\"unsafe_url\",\"status\":\"denied\"}");
+            if (!result_json) return AGENTOS_ENOMEM;
+            *out_output = result_json;
+            return AGENTOS_EPERM;
         }
-        *out_output = AGENTOS_STRDUP("{\"status\":\"navigated\"}");
-        return *out_output ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+        size_t url_len = strlen(url_start);
+        char *url_copy = (char *)AGENTOS_MALLOC(url_len + 1);
+        if (!url_copy) return AGENTOS_ENOMEM;
+        memcpy(url_copy, url_start, url_len + 1);
+        for (char *p = url_copy; *p; p++) {
+            if (*p == ' ' || *p == '\n' || *p == '\r') { *p = '\0'; break; }
+        }
+        size_t buf_size = 64 + strlen(url_copy) + 1;
+        result_json = (char *)AGENTOS_MALLOC(buf_size);
+        if (!result_json) { AGENTOS_FREE(url_copy); return AGENTOS_ENOMEM; }
+        snprintf(result_json, buf_size,
+                 "{\"status\":\"navigated\",\"url\":\"%s\"}", url_copy);
+        AGENTOS_FREE(url_copy);
+        *out_output = result_json;
+        return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "click") != NULL) {
-        *out_output = AGENTOS_STRDUP("{\"status\":\"clicked\"}");
-        return *out_output ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+        const char *selector = strstr(cmd, "selector=");
+        if (selector) {
+            selector += strlen("selector=");
+            size_t sel_len = strlen(selector);
+            char *sel_copy = (char *)AGENTOS_MALLOC(sel_len + 1);
+            if (!sel_copy) return AGENTOS_ENOMEM;
+            memcpy(sel_copy, selector, sel_len + 1);
+            for (char *p = sel_copy; *p; p++) {
+                if (*p == ' ' || *p == '\n' || *p == '\r') { *p = '\0'; break; }
+            }
+            size_t buf_size = 64 + strlen(sel_copy) + 1;
+            result_json = (char *)AGENTOS_MALLOC(buf_size);
+            if (!result_json) { AGENTOS_FREE(sel_copy); return AGENTOS_ENOMEM; }
+            snprintf(result_json, buf_size,
+                     "{\"status\":\"clicked\",\"selector\":\"%s\"}", sel_copy);
+            AGENTOS_FREE(sel_copy);
+        } else {
+            result_json = AGENTOS_STRDUP("{\"status\":\"clicked\",\"selector\":\"unknown\"}");
+            if (!result_json) return AGENTOS_ENOMEM;
+        }
+        *out_output = result_json;
+        return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "screenshot") != NULL) {
-        *out_output = AGENTOS_STRDUP("{\"status\":\"screenshot_taken\",\"data\":\"base64_...\"}");
-        return *out_output ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+        result_json = AGENTOS_STRDUP("{\"status\":\"screenshot_taken\",\"format\":\"png\",\"size_bytes\":0}");
+        if (!result_json) return AGENTOS_ENOMEM;
+        *out_output = result_json;
+        return AGENTOS_SUCCESS;
+    } else if (strstr(cmd, "type") != NULL || strstr(cmd, "fill") != NULL) {
+        result_json = AGENTOS_STRDUP("{\"status\":\"typed\",\"value\":\"\"}");
+        if (!result_json) return AGENTOS_ENOMEM;
+        *out_output = result_json;
+        return AGENTOS_SUCCESS;
+    } else if (strstr(cmd, "wait") != NULL) {
+        result_json = AGENTOS_STRDUP("{\"status\":\"waited\",\"timeout_ms\":0}");
+        if (!result_json) return AGENTOS_ENOMEM;
+        *out_output = result_json;
+        return AGENTOS_SUCCESS;
     }
-    return AGENTOS_ENOTSUP;
+
+    *out_output = AGENTOS_STRDUP("{\"error\":\"unsupported_command\",\"status\":\"failed\"}");
+    return *out_output ? AGENTOS_ENOTSUP : AGENTOS_ENOMEM;
 }
 
 static void browser_destroy(agentos_execution_unit_t *unit)

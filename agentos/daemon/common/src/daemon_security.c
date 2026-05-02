@@ -270,9 +270,9 @@ int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
     }
 
     if (!g_daemon_security.initialized || !g_daemon_security.permission_enabled) {
-        /* If security not initialized, allow but log warning */
-        SVC_LOG_WARN("Permission check bypassed (security not fully initialized)");
-        return 1;
+        SVC_LOG_ERROR("Tool permission check DENIED (security not fully initialized): agent=%s tool=%s action=%s",
+                     agent_id, tool_name, action);
+        return 0;
     }
 
     /* Build resource path for the tool */

@@ -418,8 +418,28 @@ static void* auto_miner_thread_func(void* arg) {
         err = agentos_pattern_miner_mine(miner, vectors, (const char**)ids, count, &patterns, &pattern_count);
         if (err == AGENTOS_SUCCESS && pattern_count > 0) {
             AGENTOS_LOG_INFO("Auto mining discovered %zu patterns", pattern_count);
-            // 这里可以通知进化委员会或存储模式
-            // 暂不实现
+            if (miner->manager.pattern_storage_path) {
+                FILE* f = fopen(miner->manager.pattern_storage_path, "a");
+                if (f) {
+                    for (size_t pi = 0; pi < pattern_count; pi++) {
+                        if (patterns[pi]) {
+                            fprintf(f, "{\"id\":%d,\"dim\":%d,\"birth\":%.6f,\"death\":%.6f,"
+                                       "\"persistence\":%.6f,\"confidence\":%.6f,"
+                                       "\"description\":\"%s\"}\n",
+                                    patterns[pi]->id, patterns[pi]->dimension,
+                                    patterns[pi]->birth, patterns[pi]->death,
+                                    patterns[pi]->persistence, patterns[pi]->confidence,
+                                    patterns[pi]->description);
+                        }
+                    }
+                    fclose(f);
+                    AGENTOS_LOG_INFO("Auto mining: %zu patterns stored to %s",
+                                 pattern_count, miner->manager.pattern_storage_path);
+                } else {
+                    AGENTOS_LOG_WARN("Auto mining: failed to open pattern storage at %s",
+                                 miner->manager.pattern_storage_path);
+                }
+            }
             agentos_patterns_free(patterns, pattern_count);
         }
 

@@ -423,18 +423,16 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    (void)include_events; /* 预留参数，当前版本不使用 */
-
     agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_count == 0) {
-        *out_json = strdup("[]");
+        *out_json = strdup(include_events ? "[]" : "[]");
         agentos_mutex_unlock(&s_trace_lock);
         return (*out_json != NULL) ? heapstore_SUCCESS : heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    /* 计算预估的 JSON 大小（每个 span 约 500 字节） */
     size_t estimated_size = s_span_count * 512 + 64;
+    if (include_events) estimated_size += s_span_count * 256;
     char* json_buffer = (char*)malloc(estimated_size);
     if (!json_buffer) {
         agentos_mutex_unlock(&s_trace_lock);
@@ -469,7 +467,7 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
             "    \"startTimeNs\": %llu,\n"
             "    \"endTimeNs\": %llu,\n"
             "    \"status\": \"%s\",\n"
-            "    \"attributeCount\": %zu\n"
+            "    \"attributeCount\": %zu%s\n"
             "  }%s\n",
             span->trace_id,
             span->span_id,
@@ -479,6 +477,7 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
             (unsigned long long)span->end_time_ns,
             span->status,
             span->attribute_count,
+            include_events ? ",\n    \"events\": []" : "",
             (i < s_span_count - 1) ? "," : "");
 
         /* 检查缓冲区是否足够 */

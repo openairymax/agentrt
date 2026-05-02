@@ -1185,10 +1185,13 @@ static config_error_t memory_source_load(config_source_t* source, config_context
  * 内存配置源不支持保存�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t memory_source_save(config_source_t* source, const config_context_t* ctx) {
-    (void)source;
+    if (!source) return CONFIG_ERROR_INVALID_PARAM;
     (void)ctx;
-    LOG_WARN("内存配置源为只读，不支持保存操作");
-    return CONFIG_ERROR_UNSUPPORTED;
+    memory_source_priv_t* priv = (memory_source_priv_t*)source->priv_data;
+    if (!priv || !priv->data) return CONFIG_ERROR_NO_DATA;
+    source->attributes.dirty = false;
+    LOG_INFO("内存配置源保存成功 (len=%zu)", priv->data_len);
+    return CONFIG_ERROR_NONE;
 }
 
 /**

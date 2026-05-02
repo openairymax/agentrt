@@ -119,6 +119,12 @@ static agentos_error_t tool_adapter_healthcheck(agentos_service_t service) {
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->tool_svc) return AGENTOS_ENOTINIT;
     if (!ctx->running) return AGENTOS_ENOTINIT;
+    char* list_json = tool_service_list(ctx->tool_svc);
+    if (!list_json) {
+        SVC_LOG_WARN("工具服务健康检查失败: 无法获取工具列表");
+        return AGENTOS_ERR_UNKNOWN;
+    }
+    free(list_json);
     return AGENTOS_SUCCESS;
 }
 

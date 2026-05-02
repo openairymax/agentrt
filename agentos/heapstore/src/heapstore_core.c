@@ -759,6 +759,7 @@ heapstore_error_t heapstore_flush(void) {
 static bool check_subsystem_health(const char* name, bool (*check_func)(void)) {
     bool healthy = check_func();
     if (!healthy) {
+        heapstore_log_write_fast("health", HEAPSTORE_LOG_WARN, name);
     }
     return healthy;
 }

@@ -267,11 +267,11 @@ static void sec_audit_concurrent_safety(void)
         ctxs[i].mutex = mtx;
         ctxs[i].shared_counter = &shared;
         ctxs[i].thread_id = i;
-        agentos_thread_create(&threads[i], sec_mutex_thread_fn, &ctxs[i]);
+        agentos_platform_thread_create(&threads[i], sec_mutex_thread_fn, &ctxs[i]);
     }
 
     for (int i = 0; i < SEC_THREAD_COUNT; i++) {
-        agentos_thread_join(threads[i], NULL);
+        agentos_platform_thread_join(threads[i], NULL);
     }
 
     int expected = SEC_THREAD_COUNT * 10000;
