@@ -35,7 +35,8 @@ static void market_config_from_common(
     const agentos_svc_config_t* common_cfg
 ) {
     memset(market_cfg, 0, sizeof(market_config_t));
-    market_cfg->sync_interval_ms = 30000;
+    market_cfg->sync_interval_ms = (common_cfg && common_cfg->timeout_ms > 0)
+                                   ? common_cfg->timeout_ms : 30000;
     market_cfg->cache_ttl_ms = 300000;
     market_cfg->enable_remote_registry = true;
     market_cfg->enable_auto_update = false;
@@ -112,6 +113,15 @@ static agentos_error_t market_adapter_healthcheck(agentos_service_t service) {
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->market_svc) return AGENTOS_ENOTINIT;
     if (!ctx->running) return AGENTOS_ENOTINIT;
+    agent_info_t** agents = NULL;
+    size_t count = 0;
+    search_params_t params = {0};
+    int ret = market_service_search_agents(ctx->market_svc, &params, &agents, &count);
+    if (ret != 0) {
+        SVC_LOG_WARN("市场服务健康检查失败: %d", ret);
+        return AGENTOS_ERR_UNKNOWN;
+    }
+    if (agents) free(agents);
     return AGENTOS_SUCCESS;
 }
 

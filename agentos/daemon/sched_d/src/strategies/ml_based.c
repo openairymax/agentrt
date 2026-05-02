@@ -143,12 +143,8 @@ static int ml_based_create(const sched_config_t* manager, void** data) {
     init_default_weights(&mld->weights);
 
     if (mld->model_path) {
-        FILE* test_file = fopen(mld->model_path, "rb");
-        if (test_file) {
-            fseek(test_file, 0, SEEK_END);
-            long file_size __attribute__((unused)) = ftell(test_file);
-            fclose(test_file);
-
+        FILE* model_file = fopen(mld->model_path, "rb");
+        if (model_file) {
             typedef struct {
                 uint32_t magic;
                 uint32_t version;
@@ -159,16 +155,40 @@ static int ml_based_create(const sched_config_t* manager, void** data) {
                 char reserved[256];
             } ml_model_header_t;
 
+            ml_model_header_t file_header;
+            size_t bytes_read = fread(&file_header, sizeof(ml_model_header_t), 1, model_file);
+            fclose(model_file);
+
             mld->model = calloc(1, sizeof(ml_model_header_t));
             if (mld->model) {
                 ml_model_header_t* header = (ml_model_header_t*)mld->model;
-                header->magic = 0x4D4C4F53; /* "MLOS" */
-                header->version = ML_MODEL_VERSION;
-                header->feature_count = FEATURE_COUNT;
-                header->trained_weights = mld->weights;
-                header->training_samples = 0;
-                header->training_mae = 0.0f;
-                mld->model_loaded = true;
+                if (bytes_read == 1 &&
+                    file_header.magic == 0x4D4C4F53 &&
+                    file_header.version == ML_MODEL_VERSION &&
+                    file_header.feature_count == FEATURE_COUNT) {
+                    header->magic = file_header.magic;
+                    header->version = file_header.version;
+                    header->feature_count = file_header.feature_count;
+                    header->trained_weights = file_header.trained_weights;
+                    header->training_samples = file_header.training_samples;
+                    header->training_mae = file_header.training_mae;
+                    mld->weights = file_header.trained_weights;
+                    mld->model_loaded = true;
+                    printf("Info: ML model loaded from %s (samples=%llu, mae=%.4f)\n",
+                           mld->model_path,
+                           (unsigned long long)file_header.training_samples,
+                           file_header.training_mae);
+                } else {
+                    header->magic = 0x4D4C4F53;
+                    header->version = ML_MODEL_VERSION;
+                    header->feature_count = FEATURE_COUNT;
+                    header->trained_weights = mld->weights;
+                    header->training_samples = 0;
+                    header->training_mae = 0.0f;
+                    mld->model_loaded = true;
+                    printf("Warn: ML model file %s has incompatible format, using default weights\n",
+                           mld->model_path);
+                }
             }
         } else {
             printf("Info: ML model file not found: %s, using default heuristic weights\n", mld->model_path);

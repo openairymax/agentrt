@@ -356,11 +356,21 @@ int container_get_stats(void* mgr, container_info_t* info) {
              handle->container_name);
 
     char output[256];
-    if (execute_command(cmd, 5000, output, sizeof(output)) == 0) {
+    memset(output, 0, sizeof(output));
+    if (execute_command(cmd, 5000, output, sizeof(output)) == 0 && output[0] != '\0') {
+        unsigned long mem_used = 0;
+        unsigned long mem_limit_val = 0;
+        if (sscanf(output, "%lu / %lu", &mem_used, &mem_limit_val) == 2) {
+            info->stats.memory_usage = (uint64_t)mem_used;
+            info->stats.memory_limit = (uint64_t)mem_limit_val;
+        } else {
+            info->stats.memory_usage = handle->manager.resources.memory_limit;
+            info->stats.memory_limit = handle->manager.resources.memory_limit;
+        }
+    } else {
+        info->stats.memory_usage = handle->manager.resources.memory_limit;
+        info->stats.memory_limit = handle->manager.resources.memory_limit;
     }
-
-    info->stats.memory_usage = handle->manager.resources.memory_limit;
-    info->stats.memory_limit = handle->manager.resources.memory_limit;
     info->stats.pids_current = 1;
 
     return cupolas_OK;

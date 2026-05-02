@@ -171,7 +171,7 @@ void test_export_prometheus(void) {
     char buffer[4096];
     memset(buffer, 0, sizeof(buffer));
     
-    int bytes = agentos_metrics_export_prometheus(buffer, sizeof(buffer));
+    int bytes = agentos_observability_export_prometheus(buffer, sizeof(buffer));
     /* 应输出一些数据 */
     assert(bytes >= 0 || bytes < 0); /* 无论成功失败都继续 */
     

@@ -34,15 +34,15 @@ static void monit_config_from_common(
     monitor_config_t* monit_cfg,
     const agentos_svc_config_t* common_cfg
 ) {
-    (void)common_cfg;
     memset(monit_cfg, 0, sizeof(monitor_config_t));
     monit_cfg->metrics_collection_interval_ms = 5000;
-    monit_cfg->health_check_interval_ms = 10000;
+    monit_cfg->health_check_interval_ms = (common_cfg && common_cfg->timeout_ms > 0)
+                                           ? common_cfg->timeout_ms : 10000;
     monit_cfg->log_flush_interval_ms = 1000;
     monit_cfg->alert_check_interval_ms = 5000;
     monit_cfg->log_file_path = strdup("./logs/monitor.log");
     monit_cfg->metrics_storage_path = strdup("./metrics");
-    monit_cfg->enable_tracing = true;
+    monit_cfg->enable_tracing = (common_cfg && common_cfg->enable_tracing);
     monit_cfg->enable_alerting = true;
 }
 

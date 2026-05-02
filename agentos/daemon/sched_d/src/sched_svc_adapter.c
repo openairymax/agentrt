@@ -36,11 +36,13 @@ static void sched_config_from_common(
 ) {
     memset(sched_cfg, 0, sizeof(sched_config_t));
     sched_cfg->strategy = SCHED_STRATEGY_WEIGHTED;
-    sched_cfg->health_check_interval_ms = 10000;
+    sched_cfg->health_check_interval_ms = (common_cfg && common_cfg->timeout_ms > 0)
+                                           ? common_cfg->timeout_ms : 10000;
     sched_cfg->stats_report_interval_ms = 60000;
-    sched_cfg->enable_ml_strategy = false;
+    sched_cfg->enable_ml_strategy = (common_cfg && common_cfg->enable_metrics);
     sched_cfg->ml_model_path = NULL;
-    sched_cfg->max_agents = 100;
+    sched_cfg->max_agents = (common_cfg && common_cfg->max_concurrent > 0)
+                            ? common_cfg->max_concurrent : 100;
 }
 
 static agentos_error_t sched_adapter_init(
