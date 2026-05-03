@@ -12,7 +12,7 @@ services:
       context: ../../
       dockerfile: scripts/deploy/docker/Dockerfile.kernel
       target: production
-    image: ghcr.io/spharx/agentos-atoms:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-atoms:${VERSION:-latest}
     container_name: agentos-atoms
     hostname: agentos-atoms-prod
     restart: always
@@ -98,7 +98,7 @@ services:
       context: ../../
       dockerfile: scripts/deploy/docker/Dockerfile.gateway
       target: production
-    image: ghcr.io/spharx/agentos-gateway:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-gateway:${VERSION:-latest}
     container_name: agentos-gateway
     hostname: agentos-gateway-prod
     restart: always
@@ -162,7 +162,7 @@ services:
       context: ../../
       dockerfile: scripts/deploy/docker/Dockerfile.service
       target: production
-    image: ghcr.io/spharx/agentos-daemon:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-daemon:${VERSION:-latest}
     container_name: agentos-daemon
     hostname: agentos-daemon-prod
     restart: always
@@ -224,7 +224,7 @@ services:
       context: ../../
       dockerfile: scripts/deploy/docker/Dockerfile.openlab
       target: production
-    image: ghcr.io/spharx/agentos-openlab:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-openlab:${VERSION:-latest}
     container_name: agentos-openlab
     hostname: agentos-openlab-prod
     restart: always
@@ -534,9 +534,9 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD is required}
-      - GF_SECURITY_ADMIN_EMAIL=admin@spharx.cn
+      - GF_SECURITY_ADMIN_EMAIL=${GRAFANA_ADMIN_EMAIL:-admin@example.com}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=https://grafana.spharx.cn
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
       - GF_ALERTING_ENABLED=true
       - GF_LOG_MODE=console
       - GF_LOG_LEVEL=warn

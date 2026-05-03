@@ -93,6 +93,16 @@ typedef enum {
 } sync_flag_t;
 
 /**
+ * @brief 锁选项标识符（用于 sync_set_option / sync_get_option）
+ */
+typedef enum {
+    SYNC_OPTION_NAME = 1,                /**< 锁名称（const char*） */
+    SYNC_OPTION_TIMEOUT = 2,             /**< 默认超时时间（uint64_t，毫秒） */
+    SYNC_OPTION_PRIORITY_INHERIT = 3,    /**< 优先级继承（bool） */
+    SYNC_OPTION_ROBUST = 4               /**< 健壮锁配置（bool） */
+} sync_option_t;
+
+/**
  * @brief 超时选项
  */
 typedef struct {
@@ -699,6 +709,42 @@ uintptr_t sync_atomic_load(volatile void* ptr);
  * @param[in] value 要存储的值
  */
 void sync_atomic_store(volatile void* ptr, uintptr_t value);
+
+/**
+ * @brief 设置锁的选项
+ *
+ * 支持的选项：
+ * - SYNC_OPTION_NAME: 设置锁名称（value为const char*）
+ * - SYNC_OPTION_TIMEOUT: 设置默认超时时间（value为uint64_t*，毫秒）
+ * - SYNC_OPTION_PRIORITY_INHERIT: 设置优先级继承（value为bool*）
+ * - SYNC_OPTION_ROBUST: 设置健壮锁配置（value为bool*）
+ *
+ * @param[in] lock 锁句柄（任何类型）
+ * @param[in] option 选项标识符
+ * @param[in] value 选项值指针
+ * @return 成功返回SYNC_SUCCESS，失败返回错误码
+ *
+ * @threadsafe 是
+ */
+sync_result_t sync_set_option(void* lock, int option, void* value);
+
+/**
+ * @brief 获取锁的选项
+ *
+ * 支持的选项：
+ * - SYNC_OPTION_NAME: 获取锁名称（value为const char**）
+ * - SYNC_OPTION_TIMEOUT: 获取默认超时时间（value为uint64_t*，毫秒）
+ * - SYNC_OPTION_PRIORITY_INHERIT: 获取优先级继承设置（value为bool*）
+ * - SYNC_OPTION_ROBUST: 获取健壮锁配置（value为bool*）
+ *
+ * @param[in] lock 锁句柄（任何类型）
+ * @param[in] option 选项标识符
+ * @param[out] value 输出选项值的缓冲区
+ * @return 成功返回SYNC_SUCCESS，失败返回错误码
+ *
+ * @threadsafe 是
+ */
+sync_result_t sync_get_option(void* lock, int option, void* value);
 
 /** @} */ // end of sync_api
 

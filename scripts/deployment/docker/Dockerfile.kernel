@@ -4,7 +4,7 @@
 
 FROM ubuntu:22.04 AS base
 
-LABEL maintainer="SPHARX Team <lidecheng@spharx.cn>"
+LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="1.0.0.5"
 LABEL description="AgentOS Kernel Base Image"
 
@@ -114,7 +114,7 @@ RUN mkdir -p build && cd build \
 # === 6. 运行时阶段 ===
 FROM ubuntu:22.04 AS runtime
 
-LABEL maintainer="SPHARX Team <lidecheng@spharx.cn>"
+LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="1.0.0.5"
 LABEL description="AgentOS Kernel Runtime Image"
 

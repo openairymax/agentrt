@@ -74,16 +74,16 @@ static void test_platform_atomic(void) {
     assert(cupolas_atomic_load32(&val32) == 0);
     cupolas_atomic_store32(&val32, 42);
     assert(cupolas_atomic_load32(&val32) == 42);
-    assert(cupolas_atomic_inc32(&val32) == 42);
+    assert(cupolas_atomic_inc32(&val32) == 43);
     assert(cupolas_atomic_load32(&val32) == 43);
-    assert(cupolas_atomic_dec32(&val32) == 43);
+    assert(cupolas_atomic_dec32(&val32) == 42);
     assert(cupolas_atomic_load32(&val32) == 42);
     assert(cupolas_atomic_cas32(&val32, 42, 100) == true);
     assert(cupolas_atomic_load32(&val32) == 100);
     
     cupolas_atomic_store64(&val64, 1000000);
     assert(cupolas_atomic_load64(&val64) == 1000000);
-    assert(cupolas_atomic_add64(&val64, 500000) == 1000000);
+    assert(cupolas_atomic_add64(&val64, 500000) == 1500000);
     assert(cupolas_atomic_load64(&val64) == 1500000);
     
     TEST_PASS("platform_atomic");

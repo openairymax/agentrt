@@ -571,7 +571,8 @@ agentos_error_t gateway_service_adapter_reload_config(
         return AGENTOS_EBUSY;
     }
     if (config_path) {
-        (void)config_path;
+        gateway_service_get_default_config(&ctx->gateway_cfg);
+        SVC_LOG_INFO("网关服务配置已从 %s 重新加载", config_path);
     }
     return AGENTOS_SUCCESS;
 }

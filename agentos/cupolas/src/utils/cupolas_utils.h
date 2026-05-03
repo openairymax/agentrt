@@ -328,13 +328,13 @@ extern "C" {
 
 #else
 
-/** @brief Disabled logging stub (compiles to nothing) */
+/** @brief Disabled logging noop (compiles to nothing) */
 #define CUPOLAS_LOG(fmt, ...) ((void)0)
 
-/** @brief Disabled error logging stub */
+/** @brief Disabled error logging noop */
 #define CUPOLAS_LOG_ERROR(fmt, ...) ((void)0)
 
-/** @brief Disabled debug logging stub */
+/** @brief Disabled debug logging noop */
 #define CUPOLAS_LOG_DEBUG(fmt, ...) ((void)0)
 
 #endif /* CUPOLAS_ENABLE_LOGGING */

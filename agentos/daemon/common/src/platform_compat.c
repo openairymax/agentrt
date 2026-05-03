@@ -7,6 +7,9 @@
 #include <dlfcn.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
 #endif
 
 #ifndef AGENTOS_TIMESTAMP_T_DEFINED
@@ -172,9 +175,28 @@ int agentos_get_sysinfo(agentos_sysinfo_t* info) {
     return 0;
 #elif defined(__APPLE__)
     strncpy(info->os_name, "macOS", sizeof(info->os_name));
-    info->memory_total = 0;
-    info->memory_free = 0;
-    info->cpu_count = 0;
+    {
+        int mib[2] = {CTL_HW, HW_MEMSIZE};
+        int64_t memsize = 0;
+        size_t len = sizeof(memsize);
+        if (sysctl(mib, 2, &memsize, &len, NULL, 0) == 0) {
+            info->memory_total = (uint64_t)memsize;
+        }
+        mib[0] = CTL_HW;
+        mib[1] = HW_PHYSMEM;
+        int64_t physmem = 0;
+        len = sizeof(physmem);
+        if (sysctl(mib, 2, &physmem, &len, NULL, 0) == 0 && physmem > 0) {
+            info->memory_free = (uint64_t)physmem;
+        }
+        mib[0] = CTL_HW;
+        mib[1] = HW_NCPU;
+        int ncpu = 0;
+        len = sizeof(ncpu);
+        if (sysctl(mib, 2, &ncpu, &len, NULL, 0) == 0) {
+            info->cpu_count = (uint32_t)ncpu;
+        }
+    }
     gethostname(info->hostname, sizeof(info->hostname));
     info->os_version[0] = '\0';
     return 0;
