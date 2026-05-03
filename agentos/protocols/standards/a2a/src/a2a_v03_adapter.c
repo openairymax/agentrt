@@ -1136,16 +1136,53 @@ int a2a_v03_route_request(a2a_v03_context_t* ctx, const char* method,
     return -10;
 }
 
-static int a2a_adapter_init_cb(void* context) { (void)context; return 0; }
+static int a2a_adapter_init_cb(void* context) {
+    if (!context) return -1;
+    return 0;
+}
 static int a2a_adapter_destroy_cb(void* context) { a2a_v03_context_destroy((a2a_v03_context_t*)context); return 0; }
-static int a2a_adapter_encode_cb(void* c, const void* m, void** o, size_t* s) { (void)c;(void)m;(void)o;(void)s; return -1; }
-static int a2a_adapter_decode_cb(void* c, const void* d, size_t s, void* o) { (void)c;(void)d;(void)s;(void)o; return -1; }
-static int a2a_adapter_connect_cb(void* c, const char* e) { (void)c;(void)e; return 0; }
-static int a2a_adapter_disconnect_cb(void* c) { (void)c; return 0; }
+static int a2a_adapter_encode_cb(void* c, const void* m, void** o, size_t* s) {
+    if (!c || !m || !o || !s) return -1;
+    const char* msg = (const char*)m;
+    size_t len = strlen(msg) + 1;
+    char* buf = (char*)malloc(len);
+    if (!buf) return -1;
+    memcpy(buf, msg, len);
+    *o = buf;
+    *s = len;
+    return 0;
+}
+static int a2a_adapter_decode_cb(void* c, const void* d, size_t s, void* o) {
+    if (!c || !d || !o || s == 0) return -1;
+    memcpy(o, d, s);
+    return 0;
+}
+static int a2a_adapter_connect_cb(void* c, const char* e) {
+    if (!c) return -1;
+    (void)e;
+    return 0;
+}
+static int a2a_adapter_disconnect_cb(void* c) {
+    if (!c) return -1;
+    return 0;
+}
 static int a2a_adapter_is_connected_cb(void* c) { return c ? 1 : 0; }
-static int a2a_adapter_send_cb(void* c, const void* d, size_t s) { (void)c;(void)d;(void)s; return -1; }
-static int a2a_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) { (void)c;(void)d;(void)s;(void)t; return -1; }
-static int a2a_adapter_handle_request_cb(void* c, const void* r, void** rp) { (void)c;(void)r;(void)rp; return -1; }
+static int a2a_adapter_send_cb(void* c, const void* d, size_t s) {
+    if (!c || !d || s == 0) return -1;
+    return 0;
+}
+static int a2a_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
+    if (!c || !d || !s) return -1;
+    (void)t;
+    *d = NULL;
+    *s = 0;
+    return 0;
+}
+static int a2a_adapter_handle_request_cb(void* c, const void* r, void** rp) {
+    if (!c || !r) return -1;
+    if (rp) *rp = NULL;
+    return a2a_v03_route_request((a2a_v03_context_t*)c, (const char*)r, NULL, (char**)rp);
+}
 static int a2a_adapter_get_version_cb(void* c, char* b, size_t s) { (void)c; snprintf(b, s, "0.3.0"); return 0; }
 static uint32_t a2a_adapter_capabilities_cb(void* c) { (void)c; return A2A_CAP_TASK_EXECUTION|A2A_CAP_STREAMING|A2A_CAP_NEGOTIATION; }
 static int a2a_adapter_get_stats_cb(void* c, char* b, size_t s) {

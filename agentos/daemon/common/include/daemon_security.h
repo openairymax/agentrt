@@ -25,11 +25,11 @@
  *
  * daemon_security 依赖 cupolas 安全框架。提供两种编译模式:
  * 1. 正常模式 (默认): 直接包含 cupolas 头文件
- * 2. 存根模式 (DAEMON_SECURITY_STUB_MODE): 不链接 cupolas，函数降级为安全默认值
+ * 2. Fail-closed 模式 (DAEMON_SECURITY_STUB_MODE): 不链接 cupolas，安全函数返回拒绝/失败
  *
  * 设计决策依据 ARCHITECTURAL_PRINCIPLES.md:
- * - K-4 零信任: 即使 cupolas 不可用也不应导致编译失败
- * - E-6 错误可追溯: 存根模式下记录明确的降级警告日志
+ * - K-4 零信任: cupolas 不可用时所有安全操作必须 fail-closed
+ * - E-6 错误可追溯: fail-closed 模式下记录明确的降级警告日志
  */
 #ifdef DAEMON_SECURITY_STUB_MODE
     #define CUPOLAS_AVAILABLE 0

@@ -64,6 +64,9 @@ void mac_framework_destroy(mac_framework_t *fw)
         free(fw->agents[i].capabilities_json);
     }
     for (size_t i = 0; i < fw->group_count; i++) {
+        for (size_t m = 0; m < fw->groups[i].member_count; m++) {
+            free(fw->groups[i].members[m].capabilities_json);
+        }
         free(fw->groups[i].members);
         free(fw->groups[i].shared_context_json);
     }
@@ -75,8 +78,10 @@ void mac_framework_destroy(mac_framework_t *fw)
         free(fw->consensuses[i].proposal_json);
         for (size_t j = 0; j < fw->consensuses[i].vote_count; j++) {
             free(fw->consensuses[i].votes[j]);
+            free(fw->consensuses[i].voter_ids[j]);
         }
         free(fw->consensuses[i].votes);
+        free(fw->consensuses[i].voter_ids);
         free(fw->consensuses[i].result_json);
     }
     if (fw->lock_init)
@@ -197,6 +202,9 @@ int mac_framework_disband_group(mac_framework_t *fw, const char *group_id)
 
     for (size_t i = 0; i < fw->group_count; i++) {
         if (strcmp(fw->groups[i].id, group_id) == 0) {
+            for (size_t m = 0; m < fw->groups[i].member_count; m++) {
+                free(fw->groups[i].members[m].capabilities_json);
+            }
             free(fw->groups[i].members);
             free(fw->groups[i].shared_context_json);
             if (i < fw->group_count - 1) {

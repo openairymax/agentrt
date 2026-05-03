@@ -33,7 +33,13 @@ static inline void agentos_observability_destroy(agentos_observability_t* obs) {
 /* 函数映射：注册指标（新API不需要注册，直接忽略） */
 static inline int agentos_observability_register_metric(
     agentos_observability_t* obs, const char* name, int type, const char* desc) {
-    (void)obs; (void)name; (void)type; (void)desc;
+    if (!obs || !name) return -1;
+    (void)desc;
+    if (type == AGENTOS_METRIC_COUNTER) {
+        agentos_metrics_increment(obs, name, 0);
+    } else if (type == AGENTOS_METRIC_GAUGE) {
+        agentos_metrics_gauge(obs, name, 0.0);
+    }
     return 0;
 }
 

@@ -4,7 +4,7 @@
 
 FROM ubuntu:22.04 AS builder
 
-LABEL maintainer="SPHARX Team <lidecheng@spharx.cn>"
+LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="1.0.0"
 LABEL description="AgentOS daemon Build Environment"
 
@@ -104,7 +104,7 @@ RUN cd /build/daemon/market_d/build && ctest --output-on-failure || true
 # ============================================================================
 FROM ubuntu:22.04 AS runtime
 
-LABEL maintainer="SPHARX Team <lidecheng@spharx.cn>"
+LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="1.0.0"
 LABEL description="AgentOS daemon Runtime"
 

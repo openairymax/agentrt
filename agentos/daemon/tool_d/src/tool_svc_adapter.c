@@ -22,6 +22,7 @@ typedef struct {
     char* config_path;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } tool_adapter_ctx_t;
 
 static tool_adapter_ctx_t* tool_get_ctx(agentos_service_t service) {
@@ -67,6 +68,8 @@ static agentos_error_t tool_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     tool_adapter_ctx_t* ctx = tool_get_ctx(service);
     if (!ctx || !ctx->tool_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     svc_logger_info("工具服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
@@ -75,7 +78,19 @@ static agentos_error_t tool_adapter_stop(agentos_service_t service, bool force) 
     if (!service) return AGENTOS_EINVAL;
     tool_adapter_ctx_t* ctx = tool_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    svc_logger_info("工具服务适配器已停止");
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    if (force) {
+        if (ctx->tool_svc && ctx->owns_service) {
+            tool_service_destroy(ctx->tool_svc);
+            ctx->tool_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->config_path) { free(ctx->config_path); ctx->config_path = NULL; }
+        svc_logger_info("工具服务适配器已强制停止");
+    } else {
+        svc_logger_info("工具服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 
@@ -111,7 +126,15 @@ static agentos_error_t tool_adapter_healthcheck(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     tool_adapter_ctx_t* ctx = tool_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    return ctx->tool_svc ? AGENTOS_SUCCESS : AGENTOS_ENOTINIT;
+    if (!ctx->tool_svc) return AGENTOS_ENOTINIT;
+    if (!ctx->running) return AGENTOS_ENOTINIT;
+    char* list_json = tool_service_list(ctx->tool_svc);
+    if (!list_json) {
+        SVC_LOG_WARN("工具服务健康检查失败: 无法获取工具列表");
+        return AGENTOS_ERR_UNKNOWN;
+    }
+    free(list_json);
+    return AGENTOS_SUCCESS;
 }
 
 static const agentos_svc_interface_t tool_adapter_iface = {

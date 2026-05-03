@@ -43,6 +43,7 @@ struct agentos_layer4_pattern_config {
     double min_persistence;
     double persistence_threshold;
     int min_cluster_size;
+    size_t embedding_dim;
     char* pattern_storage_path;
     char data_source[128];
 };
@@ -140,7 +141,7 @@ static agentos_error_t generate_rules_for_clusters(
 
     if (!miner->rule_gen) return AGENTOS_ENOTSUP;
 
-    size_t dim = 384;  // 应从配置获取，这里简�?
+    size_t dim = miner->manager.embedding_dim > 0 ? miner->manager.embedding_dim : 768;
     size_t pattern_cap = 16;
     size_t pattern_cnt = 0;
     agentos_pattern_t** patterns = (agentos_pattern_t**)AGENTOS_MALLOC(pattern_cap * sizeof(agentos_pattern_t*));
@@ -327,7 +328,7 @@ agentos_error_t agentos_pattern_miner_mine(
     agentos_mutex_lock(miner->lock);
 
     // 1. 计算距离矩阵
-    size_t dim = 384; // 实际应从上下文获取，这里简�?
+    size_t dim = miner->manager.embedding_dim > 0 ? miner->manager.embedding_dim : 768;
     float* distance_matrix = compute_distance_matrix(vectors, count, dim);
     if (!distance_matrix) {
         agentos_mutex_unlock(miner->lock);
@@ -417,8 +418,28 @@ static void* auto_miner_thread_func(void* arg) {
         err = agentos_pattern_miner_mine(miner, vectors, (const char**)ids, count, &patterns, &pattern_count);
         if (err == AGENTOS_SUCCESS && pattern_count > 0) {
             AGENTOS_LOG_INFO("Auto mining discovered %zu patterns", pattern_count);
-            // 这里可以通知进化委员会或存储模式
-            // 暂不实现
+            if (miner->manager.pattern_storage_path) {
+                FILE* f = fopen(miner->manager.pattern_storage_path, "a");
+                if (f) {
+                    for (size_t pi = 0; pi < pattern_count; pi++) {
+                        if (patterns[pi]) {
+                            fprintf(f, "{\"id\":%d,\"dim\":%d,\"birth\":%.6f,\"death\":%.6f,"
+                                       "\"persistence\":%.6f,\"confidence\":%.6f,"
+                                       "\"description\":\"%s\"}\n",
+                                    patterns[pi]->id, patterns[pi]->dimension,
+                                    patterns[pi]->birth, patterns[pi]->death,
+                                    patterns[pi]->persistence, patterns[pi]->confidence,
+                                    patterns[pi]->description);
+                        }
+                    }
+                    fclose(f);
+                    AGENTOS_LOG_INFO("Auto mining: %zu patterns stored to %s",
+                                 pattern_count, miner->manager.pattern_storage_path);
+                } else {
+                    AGENTOS_LOG_WARN("Auto mining: failed to open pattern storage at %s",
+                                 miner->manager.pattern_storage_path);
+                }
+            }
             agentos_patterns_free(patterns, pattern_count);
         }
 
