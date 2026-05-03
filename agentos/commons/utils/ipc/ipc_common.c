@@ -1292,7 +1292,7 @@ agentos_error_t ipc_client_connect(ipc_client_t* client, uint32_t timeout_ms) {
         struct sockaddr_un addr;
         memset(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
-        const char* path = client->config.name ? client->config.name : "/tmp/agentos_ipc";
+        const char* path = client->config.name ? client->config.name : AGENTOS_TMP_DIR "/ipc";
         strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
         if (timeout_ms > 0 && client->config.nonblocking) {

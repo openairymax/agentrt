@@ -1,6 +1,6 @@
 /**
  * @file yaml_minimal.c
- * @brief Minimal YAML 1.1 subset parser - production-grade implementation
+ * @brief YAML 1.1 parser - production-grade implementation
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -15,6 +15,12 @@
 #define MAX_LINE_LEN 8192
 #define MAX_DEPTH 64
 #define MAX_KEY_LEN 256
+#define INITIAL_ANCHORS 64
+
+struct anchor_entry {
+    char* name;
+    struct yaml_node* node;
+};
 
 struct parse_ctx {
     const char* src;
@@ -22,8 +28,25 @@ struct parse_ctx {
     size_t pos;
     int line;
     int line_pos;
+    int col;
     yaml_document_t* doc;
+    struct anchor_entry* anchors;
+    int anchor_count;
+    int anchor_capacity;
+    char* error_msg;
+    char** tag_handles;
+    char** tag_prefixes;
+    int tag_handle_count;
 };
+
+static char peek(struct parse_ctx* ctx);
+static char advance(struct parse_ctx* ctx);
+static bool at_end(struct parse_ctx* ctx);
+static struct yaml_node* parse_value(struct parse_ctx* ctx, int base_indent);
+static void register_anchor(struct parse_ctx* ctx, const char* name, struct yaml_node* node);
+static struct yaml_node* lookup_anchor(struct parse_ctx* ctx, const char* name);
+static char* parse_tag(struct parse_ctx* ctx);
+static char* parse_anchor_name(struct parse_ctx* ctx);
 
 static struct yaml_node* alloc_node(yaml_document_t* doc, yaml_node_type_t type) {
     if (doc->node_count >= doc->node_capacity) {
@@ -69,7 +92,16 @@ static void free_node(struct yaml_node* node) {
 }
 
 static void register_anchor(struct parse_ctx* ctx, const char* name, struct yaml_node* node) {
-    if (!name || !node || ctx->anchor_count >= MAX_ANCHORS) return;
+    if (!name || !node) return;
+    if (ctx->anchor_count >= ctx->anchor_capacity) {
+        int new_cap = ctx->anchor_capacity * 2;
+        if (new_cap == 0) new_cap = INITIAL_ANCHORS;
+        struct anchor_entry* new_anchors = (struct anchor_entry*)realloc(
+            ctx->anchors, sizeof(struct anchor_entry) * new_cap);
+        if (!new_anchors) return;
+        ctx->anchors = new_anchors;
+        ctx->anchor_capacity = new_cap;
+    }
     if (node->anchor_name) free(node->anchor_name);
     node->anchor_name = strdup(name);
     ctx->anchors[ctx->anchor_count].name = strdup(name);
@@ -222,7 +254,11 @@ static int count_indent(struct parse_ctx* ctx) {
     while (!at_end(ctx)) {
         char c = peek(ctx);
         if (c == ' ') { indent++; advance(ctx); }
-        else if (c == '\t') { indent += 2; advance(ctx); }
+        else if (c == '\t') {
+            set_error(ctx, "line %d: YAML forbids tabs for indentation", ctx->line);
+            advance(ctx);
+            indent += 2;
+        }
         else break;
     }
     return indent;
@@ -282,7 +318,7 @@ static char* parse_plain_scalar(struct parse_ctx* ctx, int end_indent) {
 
         if (c == ':' && (ctx->pos + 1 < ctx->len &&
             (ctx->src[ctx->pos + 1] == ' ' || ctx->src[ctx->pos + 1] == '\n'))) break;
-        if (c == '#' && len > 0 && (len == 0 || buf[len-1] == ' ')) break;
+        if (c == '#' && len > 0 && buf[len-1] == ' ') break;
         if (c == '\n' || c == '\r') break;
         if (!is_plain_scalar_char(c)) break;
 
@@ -348,6 +384,40 @@ static struct yaml_node* parse_sequence(struct parse_ctx* ctx, int base_indent) 
     return seq;
 }
 
+static void merge_mapping_into(yaml_document_t* doc, struct yaml_node* target, struct yaml_node* source) {
+    if (!doc || !target || !source || target->type != YAML_NODE_MAPPING ||
+        source->type != YAML_NODE_MAPPING) return;
+
+    size_t src_sz = yaml_size(source);
+    size_t tgt_sz = yaml_size(target);
+    size_t cap = tgt_sz + 1;
+    while (cap < tgt_sz + src_sz) cap *= 2;
+
+    target->mapping = (struct yaml_mapping_entry*)realloc(
+        target->mapping, cap * sizeof(struct yaml_mapping_entry));
+
+    for (size_t i = 0; i < src_sz; i++) {
+        bool found = false;
+        size_t tgt_current = yaml_size(target);
+        for (size_t j = 0; j < tgt_current; j++) {
+            if (target->mapping[j].key && source->mapping[i].key &&
+                strcmp(target->mapping[j].key, source->mapping[i].key) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            if (tgt_current >= cap) {
+                cap *= 2;
+                target->mapping = (struct yaml_mapping_entry*)realloc(
+                    target->mapping, cap * sizeof(struct yaml_mapping_entry));
+            }
+            target->mapping[tgt_current].key = strdup(source->mapping[i].key);
+            target->mapping[tgt_current].value = deep_copy_node(doc, source->mapping[i].value);
+        }
+    }
+}
+
 static struct yaml_node* parse_mapping(struct parse_ctx* ctx, int base_indent) {
     struct yaml_node* map = alloc_node(ctx->doc, YAML_NODE_MAPPING);
     if (!map) return NULL;
@@ -383,6 +453,18 @@ static struct yaml_node* parse_mapping(struct parse_ctx* ctx, int base_indent) {
             if (next_ind > ind) {
                 struct yaml_node* val = parse_value(ctx, ind);
                 if (val) {
+                    if (strcmp(key, "<<") == 0) {
+                        if (val->type == YAML_NODE_SEQUENCE) {
+                            for (size_t si = 0; si < val->sequence.count; si++) {
+                                merge_mapping_into(ctx->doc, map, val->sequence.items[si].item);
+                            }
+                        } else {
+                            merge_mapping_into(ctx->doc, map, val);
+                        }
+                        free(key);
+                        map_size = yaml_size(map);
+                        continue;
+                    }
                     if (map_size >= cap) {
                         cap *= 2;
                         map->mapping = (struct yaml_mapping_entry*)realloc(
@@ -393,6 +475,10 @@ static struct yaml_node* parse_mapping(struct parse_ctx* ctx, int base_indent) {
                     map_size++;
                     continue;
                 }
+            }
+            if (strcmp(key, "<<") == 0) {
+                free(key);
+                continue;
             }
             struct yaml_node* null_node = alloc_node(ctx->doc, YAML_NODE_SCALAR);
             if (null_node) null_node->scalar.value = strdup("");
@@ -412,6 +498,20 @@ static struct yaml_node* parse_mapping(struct parse_ctx* ctx, int base_indent) {
         if (val && val->type == YAML_NODE_NONE) val->type = YAML_NODE_SCALAR;
         if (val && val->type == YAML_NODE_SCALAR && !val->scalar.value)
             val->scalar.value = strdup("");
+
+        if (strcmp(key, "<<") == 0) {
+            if (val->type == YAML_NODE_SEQUENCE) {
+                for (size_t si = 0; si < val->sequence.count; si++) {
+                    merge_mapping_into(ctx->doc, map, val->sequence.items[si].item);
+                }
+            } else {
+                merge_mapping_into(ctx->doc, map, val);
+            }
+            free(key);
+            free_node(val);
+            map_size = yaml_size(map);
+            continue;
+        }
 
         if (map_size >= cap) {
             cap *= 2;
@@ -484,25 +584,108 @@ static struct yaml_node* parse_value(struct parse_ctx* ctx, int base_indent) {
         free(anchor_name); free(tag);
         return n;
     }
-    if (c == '|') {
+    if (c == '|' || c == '>') {
+        bool is_folded = (c == '>');
         advance(ctx);
-        skip_ws_and_nl(ctx);
+
+        enum { CHOMP_CLIP, CHOMP_STRIP, CHOMP_KEEP } chomp = CHOMP_CLIP;
+        int block_indent = -1;
+
+        while (!at_end(ctx)) {
+            char mod = peek(ctx);
+            if (mod == '-') { chomp = CHOMP_STRIP; advance(ctx); }
+            else if (mod == '+') { chomp = CHOMP_KEEP; advance(ctx); }
+            else if (mod >= '1' && mod <= '9') { block_indent = mod - '0'; advance(ctx); }
+            else break;
+        }
+
+        skip_ws(ctx);
+        if (!at_end(ctx) && peek(ctx) == '#') {
+            while (!at_end(ctx) && peek(ctx) != '\n' && peek(ctx) != '\r') advance(ctx);
+        }
+        if (!at_end(ctx) && peek(ctx) == '\r') advance(ctx);
+        if (!at_end(ctx) && peek(ctx) == '\n') advance(ctx);
+
         size_t cap = 1024;
         size_t len = 0;
         char* buf = (char*)malloc(cap);
         if (!buf) return NULL;
-        int literal_indent = count_indent(ctx);
+
+        int first_line_indent = -1;
+        bool has_content = false;
+
         while (!at_end(ctx)) {
-            int line_ind = count_indent(ctx);
-            if (line_ind < literal_indent) break;
-            if (len > 0) { buf[len++] = '\n'; }
+            int line_ind = 0;
+            while (!at_end(ctx) && peek(ctx) == ' ') { line_ind++; advance(ctx); }
+
+            if (at_end(ctx)) break;
+
+            char line_char = peek(ctx);
+            if (line_char == '\n' || line_char == '\r') {
+                if (peek(ctx) == '\r') advance(ctx);
+                if (peek(ctx) == '\n') advance(ctx);
+                if (chomp == CHOMP_KEEP) {
+                    if (len + 2 >= cap) { cap *= 2; buf = (char*)realloc(buf, cap); }
+                    buf[len++] = '\n';
+                } else {
+                    if (len + 2 >= cap) { cap *= 2; buf = (char*)realloc(buf, cap); }
+                    buf[len++] = '\n';
+                }
+                continue;
+            }
+
+            if (line_char == ' ' || line_char == '\t') {
+                continue;
+            }
+
+            if (block_indent < 0) {
+                if (first_line_indent < 0) {
+                    first_line_indent = line_ind;
+                    block_indent = line_ind;
+                }
+            }
+
+            if (line_ind < block_indent && line_char != '\0') break;
+
+            if (has_content) {
+                if (is_folded) {
+                    if (len > 0 && buf[len - 1] == '\n') {
+                        buf[len - 1] = '\n';
+                    } else {
+                        if (len + 2 >= cap) { cap *= 2; buf = (char*)realloc(buf, cap); }
+                        buf[len++] = ' ';
+                    }
+                } else {
+                    if (len + 2 >= cap) { cap *= 2; buf = (char*)realloc(buf, cap); }
+                    buf[len++] = '\n';
+                }
+            }
+
             while (!at_end(ctx) && peek(ctx) != '\n' && peek(ctx) != '\r') {
                 if (len + 2 >= cap) { cap *= 2; buf = (char*)realloc(buf, cap); }
                 buf[len++] = advance(ctx);
             }
-            if (peek(ctx) == '\r') advance(ctx);
-            if (peek(ctx) == '\n') advance(ctx);
+            has_content = true;
+
+            if (!at_end(ctx) && peek(ctx) == '\r') advance(ctx);
+            if (!at_end(ctx) && peek(ctx) == '\n') advance(ctx);
         }
+
+        switch (chomp) {
+            case CHOMP_STRIP:
+                while (len > 0 && buf[len-1] == '\n') len--;
+                break;
+            case CHOMP_KEEP:
+                break;
+            case CHOMP_CLIP:
+            default:
+                if (len > 0 && buf[len-1] != '\n') {
+                    if (len + 2 >= cap) { cap *= 2; buf = (char*)realloc(buf, cap); }
+                    buf[len++] = '\n';
+                }
+                break;
+        }
+
         buf[len] = '\0';
         struct yaml_node* n = alloc_node(ctx->doc, YAML_NODE_SCALAR);
         if (n) { n->scalar.value = buf; n->scalar.length = len;
@@ -612,26 +795,199 @@ static struct yaml_node* parse_value(struct parse_ctx* ctx, int base_indent) {
     return n;
 }
 
+static void skip_yaml_directives(struct parse_ctx* ctx) {
+    while (!at_end(ctx)) {
+        if (peek(ctx) == '%') {
+            while (!at_end(ctx) && peek(ctx) != '\n' && peek(ctx) != '\r') {
+                advance(ctx);
+            }
+            if (!at_end(ctx) && peek(ctx) == '\r') advance(ctx);
+            if (!at_end(ctx) && peek(ctx) == '\n') advance(ctx);
+        } else if (peek(ctx) == ' ' || peek(ctx) == '\t' ||
+                   peek(ctx) == '\n' || peek(ctx) == '\r') {
+            advance(ctx);
+        } else {
+            break;
+        }
+    }
+}
+
+static bool is_document_marker(struct parse_ctx* ctx, const char* marker) {
+    size_t marker_len = strlen(marker);
+    if (ctx->pos + marker_len > ctx->len) return false;
+    if (memcmp(ctx->src + ctx->pos, marker, marker_len) != 0) return false;
+    if (ctx->pos + marker_len < ctx->len) {
+        char after = ctx->src[ctx->pos + marker_len];
+        if (after != ' ' && after != '\t' && after != '\n' && after != '\r' &&
+            after != '\0') return false;
+    }
+    return true;
+}
+
+static void skip_document_marker(struct parse_ctx* ctx, const char* marker) {
+    size_t marker_len = strlen(marker);
+    ctx->pos += marker_len;
+    while (!at_end(ctx) && peek(ctx) != '\n' && peek(ctx) != '\r') advance(ctx);
+    if (!at_end(ctx) && peek(ctx) == '\r') advance(ctx);
+    if (!at_end(ctx) && peek(ctx) == '\n') advance(ctx);
+}
+
+static void cleanup_parse_ctx(struct parse_ctx* ctx) {
+    if (ctx->anchors) {
+        for (int i = 0; i < ctx->anchor_count; i++) {
+            free(ctx->anchors[i].name);
+        }
+        free(ctx->anchors);
+    }
+    if (ctx->tag_handles) {
+        for (int i = 0; i < ctx->tag_handle_count; i++) {
+            free(ctx->tag_handles[i]);
+        }
+        free(ctx->tag_handles);
+    }
+    if (ctx->tag_prefixes) {
+        for (int i = 0; i < ctx->tag_handle_count; i++) {
+            free(ctx->tag_prefixes[i]);
+        }
+        free(ctx->tag_prefixes);
+    }
+}
+
 int yaml_parse_string(yaml_document_t* doc, const char* input, size_t len) {
-    if (!doc || !input || len == 0) return -1;
+    if (!doc || !input) return -1;
     memset(doc, 0, sizeof(*doc));
 
-    doc->source = (char*)malloc(len + 1);
+    size_t start_pos = 0;
+    if (len >= 3 && (unsigned char)input[0] == 0xEF &&
+        (unsigned char)input[1] == 0xBB && (unsigned char)input[2] == 0xBF) {
+        start_pos = 3;
+    }
+
+    size_t effective_len = (len > 0) ? len : strlen(input);
+    if (effective_len == 0) {
+        doc->root = alloc_node(doc, YAML_NODE_SCALAR);
+        if (doc->root) doc->root->scalar.value = strdup("");
+        return 0;
+    }
+
+    doc->source = (char*)malloc(effective_len + 1);
     if (!doc->source) return -1;
-    memcpy(doc->source, input, len);
-    doc->source[len] = '\0';
-    doc->source_len = len;
+    memcpy(doc->source, input, effective_len);
+    doc->source[effective_len] = '\0';
+    doc->source_len = effective_len;
 
     struct parse_ctx ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.src = doc->source;
-    ctx.len = len;
+    ctx.len = effective_len;
+    ctx.pos = start_pos;
     ctx.doc = doc;
     ctx.line = 1;
     ctx.anchor_count = 0;
+    ctx.anchor_capacity = 0;
+    ctx.anchors = NULL;
+    ctx.tag_handles = NULL;
+    ctx.tag_prefixes = NULL;
+    ctx.tag_handle_count = 0;
+
+    skip_yaml_directives(&ctx);
+
+    if (is_document_marker(&ctx, "---")) {
+        skip_document_marker(&ctx, "---");
+    }
 
     doc->root = parse_value(&ctx, -1);
+
+    cleanup_parse_ctx(&ctx);
     return doc->root ? 0 : -1;
+}
+
+int yaml_parse_multi(yaml_document_t* doc, const char* input, size_t len) {
+    if (!doc || !input) return -1;
+
+    size_t start_pos = 0;
+    if (len >= 3 && (unsigned char)input[0] == 0xEF &&
+        (unsigned char)input[1] == 0xBB && (unsigned char)input[2] == 0xBF) {
+        start_pos = 3;
+    }
+
+    size_t effective_len = (len > 0) ? len : strlen(input);
+
+    char* source_copy = (char*)malloc(effective_len + 1);
+    if (!source_copy) return -1;
+    memcpy(source_copy, input, effective_len);
+    source_copy[effective_len] = '\0';
+
+    struct parse_ctx ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.src = source_copy;
+    ctx.len = effective_len;
+    ctx.pos = start_pos;
+    ctx.doc = doc;
+    ctx.line = 1;
+    ctx.anchor_count = 0;
+    ctx.anchor_capacity = 0;
+    ctx.anchors = NULL;
+
+    skip_yaml_directives(&ctx);
+    if (is_document_marker(&ctx, "---")) {
+        skip_document_marker(&ctx, "---");
+    }
+
+    doc->source = source_copy;
+    doc->source_len = effective_len;
+    doc->document_index = 0;
+    doc->root = parse_value(&ctx, -1);
+
+    yaml_document_t* current = doc;
+
+    while (!at_end(&ctx)) {
+        skip_ws_and_nl(&ctx);
+
+        if (is_document_marker(&ctx, "...")) {
+            skip_document_marker(&ctx, "...");
+            skip_ws_and_nl(&ctx);
+        }
+
+        if (at_end(&ctx)) break;
+
+        skip_yaml_directives(&ctx);
+
+        if (is_document_marker(&ctx, "---")) {
+            skip_document_marker(&ctx, "---");
+        } else {
+            break;
+        }
+
+        yaml_document_t* next_doc = yaml_create();
+        if (!next_doc) break;
+
+        next_doc->source = source_copy;
+        next_doc->source_len = effective_len;
+        next_doc->document_index = current->document_index + 1;
+
+        ctx.doc = next_doc;
+        ctx.anchor_count = 0;
+
+        next_doc->root = parse_value(&ctx, -1);
+        current->next = next_doc;
+        current = next_doc;
+    }
+
+    cleanup_parse_ctx(&ctx);
+    return doc->root ? 0 : -1;
+}
+
+void yaml_destroy_chain(yaml_document_t* doc) {
+    if (!doc) return;
+    yaml_document_t* current = doc;
+    while (current) {
+        yaml_document_t* next = current->next;
+        current->next = NULL;
+        current->source = NULL;
+        yaml_destroy(current);
+        current = next;
+    }
 }
 
 int yaml_parse_file(yaml_document_t* doc, const char* filepath) {
@@ -645,10 +1001,16 @@ int yaml_parse_file(yaml_document_t* doc, const char* filepath) {
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (sz <= 0 || sz > 10 * 1024 * 1024) {
+    if (sz < 0 || sz > 10 * 1024 * 1024) {
         fclose(f);
-        doc->error_msg = strdup("File empty or too large");
+        doc->error_msg = strdup("File too large");
         return -1;
+    }
+    if (sz == 0) {
+        fclose(f);
+        doc->root = alloc_node(doc, YAML_NODE_SCALAR);
+        if (doc->root) doc->root->scalar.value = strdup("");
+        return 0;
     }
     char* buf = (char*)malloc(sz + 1);
     if (!buf) { fclose(f); return -1; }

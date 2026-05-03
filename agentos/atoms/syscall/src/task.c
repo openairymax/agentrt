@@ -31,8 +31,8 @@ void agentos_sys_init(void* cognition, void* execution, void* memory) {
     g_cognition = (agentos_cognition_engine_t*)cognition;
     g_execution = (agentos_execution_engine_t*)execution;
     if (memory) {
-        extern void agentos_sys_set_memory(void*);
-        agentos_sys_set_memory(memory);
+        extern void agentos_sys_set_memory_provider(void*);
+        agentos_sys_set_memory_provider(memory);
     }
 }
 

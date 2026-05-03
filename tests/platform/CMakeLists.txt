@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 跨平台兼容性测试 (TeamC P2-C04)
 
+if(NOT TARGET svc_common)
+    message(STATUS "  [platform] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    return()
+endif()
+
 add_executable(test_platform_compat test_platform_compat.c)
 
 target_include_directories(test_platform_compat PRIVATE

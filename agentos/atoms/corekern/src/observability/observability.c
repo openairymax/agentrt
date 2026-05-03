@@ -58,7 +58,12 @@ typedef struct {
 
 static obs_state_t g_obs = {0};
 
-static void generate_hex_id(char* out, size_t out_len, size_t byte_count) {
+static int obs_ensure_init(void) {
+    if (g_obs.initialized) return AGENTOS_SUCCESS;
+    return agentos_observability_init(NULL);
+}
+
+static void generate_hex_id(char *out, size_t out_len, size_t byte_count) {
     static const char hex_chars[] = "0123456789abcdef";
     uint64_t ns = agentos_time_monotonic_ns();
     uint64_t pid = (uint64_t)getpid();
@@ -139,7 +144,7 @@ int agentos_health_check_register(const char* name,
                                   agentos_health_check_cb callback,
                                   void* user_data) {
     if (!name || !callback) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
     if (g_obs.health_check_count >= OBS_MAX_HEALTH_CHECKS) return AGENTOS_ENOSPC;
 
     agentos_mutex_lock(g_obs.lock);
@@ -156,7 +161,7 @@ int agentos_health_check_register(const char* name,
 }
 
 agentos_health_status_t agentos_health_check_run(int timeout_ms) {
-    if (!g_obs.initialized) return AGENTOS_HEALTH_FAIL;
+    obs_ensure_init();
 
     agentos_health_status_t worst = AGENTOS_HEALTH_PASS;
     uint64_t deadline_ns = 0;
@@ -185,7 +190,7 @@ agentos_health_status_t agentos_health_check_run(int timeout_ms) {
 
 int agentos_metric_record(const agentos_metric_sample_t* sample) {
     if (!sample) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
@@ -220,7 +225,7 @@ int agentos_metric_record(const agentos_metric_sample_t* sample) {
 
 int agentos_metric_counter_create(const char* name, const char* labels) {
     if (!name) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
@@ -253,7 +258,7 @@ int agentos_metric_counter_create(const char* name, const char* labels) {
 
 int agentos_metric_counter_inc(const char* name, const char* labels, double value) {
     if (!name) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
@@ -275,7 +280,7 @@ int agentos_metric_counter_inc(const char* name, const char* labels, double valu
 
 int agentos_metric_gauge_create(const char* name, const char* labels, double initial_value) {
     if (!name) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
@@ -308,7 +313,7 @@ int agentos_metric_gauge_create(const char* name, const char* labels, double ini
 
 int agentos_metric_gauge_set(const char* name, const char* labels, double value) {
     if (!name) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
@@ -332,7 +337,7 @@ int agentos_trace_span_start(agentos_trace_context_t* context,
                              const char* service_name,
                              const char* operation_name) {
     if (!context) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     generate_hex_id(context->trace_id, sizeof(context->trace_id), OBS_TRACE_ID_SIZE);
     generate_hex_id(context->span_id, sizeof(context->span_id), OBS_SPAN_ID_SIZE);
@@ -367,7 +372,7 @@ int agentos_trace_span_start(agentos_trace_context_t* context,
 
 int agentos_trace_span_end(agentos_trace_context_t* context, int error_code) {
     if (!context) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     context->end_ns = agentos_time_monotonic_ns();
     context->error_code = error_code;
@@ -388,7 +393,7 @@ int agentos_trace_span_end(agentos_trace_context_t* context, int error_code) {
 int agentos_trace_set_tag(agentos_trace_context_t* context,
                           const char* key, const char* value) {
     if (!context || !key) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
@@ -412,7 +417,7 @@ int agentos_trace_set_tag(agentos_trace_context_t* context,
 
 int agentos_trace_log(agentos_trace_context_t* context, const char* message) {
     if (!context || !message) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
@@ -492,9 +497,9 @@ int agentos_performance_get_metrics(double* out_cpu_usage,
     return AGENTOS_SUCCESS;
 }
 
-int agentos_metrics_export_prometheus(char* buffer, size_t buffer_size) {
+int agentos_observability_export_prometheus(char* buffer, size_t buffer_size) {
     if (!buffer || buffer_size == 0) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
@@ -532,7 +537,7 @@ int agentos_metrics_export_prometheus(char* buffer, size_t buffer_size) {
 
 int agentos_health_export_status(char* buffer, size_t buffer_size) {
     if (!buffer || buffer_size == 0) return AGENTOS_EINVAL;
-    if (!g_obs.initialized) return AGENTOS_ENOTSUP;
+    obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 

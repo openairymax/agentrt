@@ -60,10 +60,10 @@ endif()
 
 # 链接器安全选项
 if(UNIX AND NOT APPLE)
-    target_link_libraries(agentos_core PUBLIC pthread rt)
+    target_link_libraries(agentos_core PUBLIC Threads::Threads rt)
     target_link_options(agentos_core PRIVATE -Wl,-z,relro -Wl,-z,now -pie)
 elseif(APPLE)
-    target_link_libraries(agentos_core PUBLIC pthread)
+    target_link_libraries(agentos_core PUBLIC Threads::Threads)
     target_link_options(agentos_core PRIVATE -Wl,-dead_strip -pie)
 endif()
 

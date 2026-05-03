@@ -107,20 +107,20 @@ build_kernel() {
     if command -v cmake &> /dev/null; then
         print_info "构建 C++ 内核..."
 
-        # 创建构建目录
-        mkdir -p build
-        cd build
+        local PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+        local BUILD_DIR="${PROJECT_ROOT}/../AgentOS-build"
 
-        # 配置 CMake
-        cmake ../atoms \
+        mkdir -p "${BUILD_DIR}"
+        cd "${BUILD_DIR}"
+
+        cmake "${PROJECT_ROOT}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTS=OFF \
             -DENABLE_TRACING=OFF
 
-        # 编译
         cmake --build . --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
-        cd ..
+        cd "${PROJECT_ROOT}"
         print_success "内核构建完成"
     else
         print_warning "跳过 C++ 内核构建（CMake 未安装）"

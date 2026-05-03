@@ -315,9 +315,7 @@ static uint64_t get_current_time_ns(void) {
     uli.HighPart = ft.dwHighDateTime;
     return uli.QuadPart * 100;
 #else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+    return agentos_time_ns();
 #endif
 }
 

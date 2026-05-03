@@ -96,7 +96,7 @@ agentos_error_t agentos_compensation_register(agentos_compensation_t *manager, c
     entry->compensator_id = AGENTOS_STRDUP(compensator_id);
 
     if (input) {
-        size_t input_len = strnlen((const char *) input, 65536);
+        size_t input_len = strlen((const char *) input);
         entry->input     = AGENTOS_MALLOC(input_len + 1);
         if (entry->input) {
             memcpy(entry->input, input, input_len + 1);

@@ -108,7 +108,8 @@ typedef enum {
     cupolas_VAULT_ERR_ALREADY_EXISTS = -5,
     cupolas_VAULT_ERR_CORRUPT      =  -6,
     cupolas_VAULT_ERR_DECRYPT_FAILED = -7,
-    cupolas_VAULT_ERR_ENCRYPT_FAILED = -8
+    cupolas_VAULT_ERR_ENCRYPT_FAILED = -8,
+    cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE = -9
 } cupolas_vault_error_t;
 
 /**

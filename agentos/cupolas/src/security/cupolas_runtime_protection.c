@@ -145,11 +145,7 @@ int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t* manager
     
     memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
     
-#ifdef _WIN32
-    agentos_mutex_init(&g_runtime_prot.lock);
-#else
-    agentos_mutex_init(&g_runtime_prot.lock);
-#endif
+    cupolas_mutex_init(&g_runtime_prot.lock);
     
     if (manager) {
         g_runtime_prot.manager = *manager;
@@ -282,9 +278,7 @@ int cupolas_memory_lock(void* addr, size_t len) {
 #elif defined(__linux__) || defined(__APPLE__)
     return mlock(addr, len);
 #else
-    (void)addr;
-    (void)len;
-    return 0;
+    return -1;
 #endif
 }
 
@@ -296,9 +290,7 @@ int cupolas_memory_unlock(void* addr, size_t len) {
 #elif defined(__linux__) || defined(__APPLE__)
     return munlock(addr, len);
 #else
-    (void)addr;
-    (void)len;
-    return 0;
+    return -1;
 #endif
 }
 
@@ -318,10 +310,8 @@ int cupolas_memory_protect(void* addr, size_t len, int prot) {
 #elif defined(__linux__) || defined(__APPLE__)
     return mprotect(addr, len, prot);
 #else
-    (void)addr;
-    (void)len;
     (void)prot;
-    return 0;
+    return -1;
 #endif
 }
 
@@ -344,13 +334,13 @@ void* cupolas_memory_alloc_protected(size_t size, int prot) {
 #endif
 }
 
-void cupolas_memory_free_protected(void* ptr) {
+void cupolas_memory_free_protected(void *ptr) {
     if (!ptr) return;
-    
+
 #ifdef _WIN32
     VirtualFree(ptr, 0, MEM_RELEASE);
 #elif defined(__linux__) || defined(__APPLE__)
-    munmap(ptr, 0);
+    munmap(ptr, 4096);
 #else
     free(ptr);
 #endif

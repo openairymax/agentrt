@@ -16,12 +16,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-#else
-    #include <pthread.h>
-#endif
+#include "../../commons/platform/include/platform.h"
 
 #include "heapstore.h"
 
@@ -77,11 +72,7 @@ typedef struct heapstore_batch_context {
     heapstore_batch_item_t* tail;
     size_t count;
     size_t capacity;
-#ifdef _WIN32
-    CRITICAL_SECTION lock;
-#else
-    pthread_mutex_t lock;
-#endif
+    agentos_mutex_t lock;
 } heapstore_batch_context_t;
 
 /**

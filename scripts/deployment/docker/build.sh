@@ -17,6 +17,9 @@ AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "${AGENTOS_SCRIPT_DIR}")"
 AGENTOS_PROJECT_ROOT="$(dirname "${AGENTOS_SCRIPTS_DIR}")"
 VERSION="1.0.0.6"
+DOCKER_REGISTRY="${DOCKER_REGISTRY:-spharx}"
+KERNEL_IMAGE="${DOCKER_REGISTRY}/agentos-kernel"
+SERVICE_IMAGE="${DOCKER_REGISTRY}/agentos-services"
 
 # 打印帮助信息
 print_usage() {
@@ -84,8 +87,8 @@ build_kernel() {
         # 开发版本：包含所有调试工�?
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.kernel" \
-            -t spharx/agentos-kernel:${VERSION}-dev \
-            -t spharx/agentos-kernel:dev \
+            -t ${KERNEL_IMAGE}:${VERSION}-dev \
+            -t ${KERNEL_IMAGE}:dev \
             --target builder \
             --build-arg BUILD_TYPE=development \
             .
@@ -93,8 +96,8 @@ build_kernel() {
         # 生产版本：多阶段构建，最小化镜像
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.kernel" \
-            -t spharx/agentos-kernel:${VERSION} \
-            -t spharx/agentos-kernel:latest \
+            -t ${KERNEL_IMAGE}:${VERSION} \
+            -t ${KERNEL_IMAGE}:latest \
             --target runtime \
             --build-arg BUILD_TYPE=release \
             .
@@ -113,7 +116,7 @@ build_service() {
     cd "${AGENTOS_PROJECT_ROOT}"
 
     # 确保内核镜像已存�?
-    if ! docker image inspect spharx/agentos-kernel:${VERSION} &> /dev/null; then
+    if ! docker image inspect ${KERNEL_IMAGE}:${VERSION} &> /dev/null; then
         log_warning "内核镜像不存在，先构建内核镜�?
         build_kernel "release"
     fi
@@ -122,8 +125,8 @@ build_service() {
         # 开发版�?
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.service" \
-            -t spharx/agentos-services:${VERSION}-dev \
-            -t spharx/agentos-services:dev \
+            -t ${SERVICE_IMAGE}:${VERSION}-dev \
+            -t ${SERVICE_IMAGE}:dev \
             --target dev \
             --build-arg BUILD_TYPE=development \
             .
@@ -131,8 +134,8 @@ build_service() {
         # 生产版本
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.service" \
-            -t spharx/agentos-services:${VERSION} \
-            -t spharx/agentos-services:latest \
+            -t ${SERVICE_IMAGE}:${VERSION} \
+            -t ${SERVICE_IMAGE}:latest \
             .
     fi
 
