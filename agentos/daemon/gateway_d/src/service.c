@@ -11,6 +11,7 @@
 #endif
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 typedef enum {
     GW_STATE_CREATED = 0,
@@ -63,8 +64,48 @@ void gateway_service_get_default_config(gateway_service_config_t* config) {
 agentos_error_t gateway_service_load_config(
     gateway_service_config_t* config,
     const char* config_path) {
-    if (!config || !config_path) return AGENTOS_EINVAL;
+    if (!config) return AGENTOS_EINVAL;
     gateway_service_get_default_config(config);
+    if (!config_path || config_path[0] == '\0') return AGENTOS_SUCCESS;
+
+    FILE* f = fopen(config_path, "r");
+    if (!f) return AGENTOS_SUCCESS;
+
+    char line[512];
+    while (fgets(line, sizeof(line), f)) {
+        char* nl = strchr(line, '\n');
+        if (nl) *nl = '\0';
+        char* cr = strchr(line, '\r');
+        if (cr) *cr = '\0';
+
+        if (line[0] == '#' || line[0] == '\0') continue;
+
+        char* eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        const char* key = line;
+        const char* val = eq + 1;
+
+        if (strcmp(key, "http.port") == 0) {
+            config->http.port = (uint16_t)atoi(val);
+        } else if (strcmp(key, "http.host") == 0) {
+            config->http.host = val;
+        } else if (strcmp(key, "http.enabled") == 0) {
+            config->http.enabled = (strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
+        } else if (strcmp(key, "stdio.max_request_size") == 0) {
+            config->stdio.max_request_size = (size_t)atol(val);
+        } else if (strcmp(key, "stdio.timeout_ms") == 0) {
+            config->stdio.timeout_ms = (uint32_t)atoi(val);
+        } else if (strcmp(key, "enable_metrics") == 0) {
+            config->enable_metrics = (strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
+        } else if (strcmp(key, "enable_tracing") == 0) {
+            config->enable_tracing = (strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
+        } else if (strcmp(key, "shutdown_timeout_ms") == 0) {
+            config->shutdown_timeout_ms = (uint32_t)atoi(val);
+        }
+    }
+
+    fclose(f);
     return AGENTOS_SUCCESS;
 }
 

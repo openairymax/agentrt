@@ -204,6 +204,11 @@ typedef void (*langchain_trace_fn)(const char* trace_event,
                                    const char* trace_data_json,
                                    void* user_data);
 
+typedef int (*langchain_llm_callback_fn)(const char* prompt,
+                                         const char* model,
+                                         char** response,
+                                         void* user_data);
+
 typedef struct langchain_adapter_context_s {
     langchain_config_t config;
     langchain_chain_instance_t chains[LANGCHAIN_MAX_CHAINS];
@@ -218,6 +223,8 @@ typedef struct langchain_adapter_context_s {
     void* streaming_user_data;
     langchain_trace_fn trace_handler;
     void* trace_user_data;
+    langchain_llm_callback_fn llm_callback;
+    void* llm_callback_data;
     bool is_initialized;
     uint64_t total_chains_executed;
     uint64_t total_tokens_used;
@@ -290,6 +297,10 @@ int langchain_set_streaming_handler(langchain_adapter_context_t* ctx,
 
 int langchain_set_trace_handler(langchain_adapter_context_t* ctx,
                                 langchain_trace_fn handler,
+                                void* user_data);
+
+int langchain_set_llm_callback(langchain_adapter_context_t* ctx,
+                                langchain_llm_callback_fn callback,
                                 void* user_data);
 
 int langchain_get_statistics(langchain_adapter_context_t* ctx,

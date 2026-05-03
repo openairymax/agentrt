@@ -135,6 +135,12 @@ typedef int32_t agentos_error_t;
 #ifndef AGENTOS_E2BIG
 #define AGENTOS_E2BIG                 (-27)
 #endif
+#ifndef AGENTOS_ENOTDIR
+#define AGENTOS_ENOTDIR               (-28)
+#endif
+#ifndef AGENTOS_ENAMETOOLONG
+#define AGENTOS_ENAMETOOLONG          (-29)
+#endif
 
 /* ==================== 错误码分段 ==================== */
 /*

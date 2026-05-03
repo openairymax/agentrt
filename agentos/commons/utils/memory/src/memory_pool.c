@@ -153,8 +153,13 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
     
     // 如果已有内存区域，需要合并（需要重新分配内存区域）
     if (pool->memory_area != NULL) {
-        // 当前区域已满�?        // 在实际实现中，这里可以使用realloc或分配新区域并复制数�?        memory_free(pool->memory_area);
-        pool->memory_area = NULL;
+        void* merged = memory_realloc(pool->memory_area, total_size, "memory_pool_expand");
+        if (merged == NULL) {
+            memory_free(new_memory);
+            return false;
+        }
+        memory_free(new_memory);
+        new_memory = merged;
     }
     
     pool->memory_area = new_memory;
@@ -521,28 +526,49 @@ size_t memory_pool_shrink(memory_pool_t* pool, size_t blocks_to_keep) {
     if (pool == NULL) {
         return 0;
     }
-    
+
     memory_pool_lock(pool);
-    
-    // 确保至少保留blocks_to_keep个块（包括已分配块）
+
     if (blocks_to_keep < pool->stats.allocated_blocks) {
         blocks_to_keep = pool->stats.allocated_blocks;
     }
-    
-    // 计算可以释放的空闲块�?    size_t blocks_to_free = 0;
+
+    size_t blocks_to_free = 0;
     if (pool->stats.total_blocks > blocks_to_keep) {
         blocks_to_free = pool->stats.total_blocks - blocks_to_keep;
     }
-    
+
     if (blocks_to_free == 0) {
         memory_pool_unlock(pool);
         return 0;
     }
-    
-    // 执行内存碎片整理
-    // 这里返回0表示不支持收�?    memory_pool_unlock(pool);
-    
-    return 0;
+
+    size_t freed = 0;
+    memory_pool_block_t* prev = NULL;
+    memory_pool_block_t* current = pool->free_list;
+
+    while (current != NULL && freed < blocks_to_free) {
+        memory_pool_block_t* next = current->next;
+
+        AGENTOS_FREE(current);
+        pool->stats.total_blocks--;
+        pool->stats.free_blocks--;
+        freed++;
+
+        if (prev == NULL) {
+            pool->free_list = next;
+        } else {
+            prev->next = next;
+        }
+        current = next;
+    }
+
+    if (freed > 0) {
+        pool->stats.peak_usage = pool->stats.allocated_blocks;
+    }
+
+    memory_pool_unlock(pool);
+    return freed;
 }
 
 bool memory_pool_validate(memory_pool_t* pool) {

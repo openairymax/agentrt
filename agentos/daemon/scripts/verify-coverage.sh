@@ -7,8 +7,10 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKS_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 COVERAGE_TARGET="${COVERAGE_TARGET:-80}"
-REPORT_DIR="${BACKS_ROOT}/reports"
+EXTERNAL_BUILD_DIR="${PROJECT_ROOT}/../AgentOS-build"
+REPORT_DIR="${EXTERNAL_BUILD_DIR}/reports"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -53,7 +55,7 @@ collect_coverage() {
     local all_info_files=""
     
     for module in commons llm_d tool_d monit_d sched_d market_d; do
-        local module_build="$BACKS_ROOT/$module/build"
+        local module_build="${EXTERNAL_BUILD_DIR}/daemon/${module}"
         if [ -d "$module_build" ]; then
             cd "$module_build"
             
@@ -78,7 +80,7 @@ collect_coverage() {
     fi
     
     # 合并所有覆盖率数据
-    cd "$BACKS_ROOT"
+    cd "${EXTERNAL_BUILD_DIR}"
     lcov $all_info_files -o "$REPORT_DIR/coverage/total_coverage.info" 2>/dev/null || true
     
     # 过滤系统头文件

@@ -30,7 +30,7 @@
 
 /* ==================== 配置常量 ==================== */
 
-#define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/tool.sock"
+#define DEFAULT_SOCKET_PATH_UNIX AGENTOS_RUNTIME_DIR "/tool.sock"
 #define DEFAULT_SOCKET_PATH_WIN "\\\\.\\pipe\\agentos_tool"
 #define DEFAULT_TCP_PORT 8081
 #define MAX_BUFFER 65536
@@ -500,7 +500,7 @@ static void print_usage(const char* prog) {
     printf("  --help             Show this help\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s --manager /etc/agentos/tool.yaml\n", prog);
+    printf("  %s --manager AGENTOS_CONFIG_DIR \"/tool.yaml\"\n", prog);
     printf("  %s --tcp           # Use TCP mode on port 8081\n", prog);
 }
 

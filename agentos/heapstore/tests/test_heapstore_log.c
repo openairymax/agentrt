@@ -33,12 +33,12 @@ static void test_log_write(void) {
 
     heapstore_error_t err = heapstore_log_init();
     if (err == heapstore_SUCCESS) {
-        heapstore_log_set_level(heapstore_LOG_DEBUG);
+        heapstore_log_set_level(HEAPSTORE_LOG_DEBUG);
 
-        heapstore_LOG_ERROR("test_service", "trace_001", "Test error message");
-        heapstore_LOG_WARN("test_service", "trace_001", "Test warning message");
-        heapstore_LOG_INFO("test_service", "trace_001", "Test info message");
-        heapstore_LOG_DEBUG("test_service", "trace_001", "Test debug message");
+        HEAPSTORE_LOG_ERROR("test_service", "trace_001", "Test error message");
+        HEAPSTORE_LOG_WARN("test_service", "trace_001", "Test warning message");
+        HEAPSTORE_LOG_INFO("test_service", "trace_001", "Test info message");
+        HEAPSTORE_LOG_DEBUG("test_service", "trace_001", "Test debug message");
 
         heapstore_log_shutdown();
     }
@@ -51,15 +51,15 @@ static void test_log_level_filter(void) {
 
     heapstore_error_t err = heapstore_log_init();
     if (err == heapstore_SUCCESS) {
-        heapstore_log_set_level(heapstore_LOG_ERROR);
+        heapstore_log_set_level(HEAPSTORE_LOG_ERROR);
 
-        heapstore_LOG_ERROR("test_service", NULL, "This should appear");
-        heapstore_LOG_WARN("test_service", NULL, "This should NOT appear");
-        heapstore_LOG_INFO("test_service", NULL, "This should NOT appear");
-        heapstore_LOG_DEBUG("test_service", NULL, "This should NOT appear");
+        HEAPSTORE_LOG_ERROR("test_service", NULL, "This should appear");
+        HEAPSTORE_LOG_WARN("test_service", NULL, "This should NOT appear");
+        HEAPSTORE_LOG_INFO("test_service", NULL, "This should NOT appear");
+        HEAPSTORE_LOG_DEBUG("test_service", NULL, "This should NOT appear");
 
-        heapstore_log_set_level(heapstore_LOG_DEBUG);
-        heapstore_LOG_DEBUG("test_service", NULL, "This should appear");
+        heapstore_log_set_level(HEAPSTORE_LOG_DEBUG);
+        HEAPSTORE_LOG_DEBUG("test_service", NULL, "This should appear");
 
         heapstore_log_shutdown();
     }
@@ -70,17 +70,17 @@ static void test_log_level_filter(void) {
 static void test_log_get_set_level(void) {
     printf("Test: log_get_set_level...");
 
-    heapstore_log_set_level(heapstore_LOG_ERROR);
-    assert(heapstore_log_get_level() == heapstore_LOG_ERROR);
+    heapstore_log_set_level(HEAPSTORE_LOG_ERROR);
+    assert(heapstore_log_get_level() == HEAPSTORE_LOG_ERROR);
 
-    heapstore_log_set_level(heapstore_LOG_WARN);
-    assert(heapstore_log_get_level() == heapstore_LOG_WARN);
+    heapstore_log_set_level(HEAPSTORE_LOG_WARN);
+    assert(heapstore_log_get_level() == HEAPSTORE_LOG_WARN);
 
-    heapstore_log_set_level(heapstore_LOG_INFO);
-    assert(heapstore_log_get_level() == heapstore_LOG_INFO);
+    heapstore_log_set_level(HEAPSTORE_LOG_INFO);
+    assert(heapstore_log_get_level() == HEAPSTORE_LOG_INFO);
 
-    heapstore_log_set_level(heapstore_LOG_DEBUG);
-    assert(heapstore_log_get_level() == heapstore_LOG_DEBUG);
+    heapstore_log_set_level(HEAPSTORE_LOG_DEBUG);
+    assert(heapstore_log_get_level() == HEAPSTORE_LOG_DEBUG);
 
     printf("PASS\n");
 }
@@ -114,7 +114,7 @@ static void test_log_rotate(void) {
 
     heapstore_error_t err = heapstore_log_init();
     if (err == heapstore_SUCCESS) {
-        heapstore_LOG_INFO("test_service", NULL, "Message before rotation");
+        HEAPSTORE_LOG_INFO("test_service", NULL, "Message before rotation");
 
         err = heapstore_log_rotate();
         assert(err == heapstore_SUCCESS);
@@ -190,11 +190,11 @@ static void test_log_multiple_services(void) {
 
     heapstore_error_t err = heapstore_log_init();
     if (err == heapstore_SUCCESS) {
-        heapstore_log_set_level(heapstore_LOG_DEBUG);
+        heapstore_log_set_level(HEAPSTORE_LOG_DEBUG);
 
-        heapstore_LOG_INFO("service_a", "trace_a", "Message from service A");
-        heapstore_LOG_INFO("service_b", "trace_b", "Message from service B");
-        heapstore_LOG_INFO("service_c", "trace_c", "Message from service C");
+        HEAPSTORE_LOG_INFO("service_a", "trace_a", "Message from service A");
+        HEAPSTORE_LOG_INFO("service_b", "trace_b", "Message from service B");
+        HEAPSTORE_LOG_INFO("service_c", "trace_c", "Message from service C");
 
         char path[512];
         err = heapstore_log_get_service_path("service_a", path, sizeof(path));

@@ -328,7 +328,7 @@ static void print_usage(const char* prog) {
     printf("  --help             Show this help\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s --manager /etc/agentos/sched.yaml\n", prog);
+    printf("  %s --manager AGENTOS_CONFIG_DIR \"/sched.yaml\"\n", prog);
     printf("  %s --tcp           # Use TCP mode on port 8083\n", prog);
 }
 

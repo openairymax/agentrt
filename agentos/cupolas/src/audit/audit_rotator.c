@@ -57,6 +57,7 @@ struct audit_rotator {
     int max_files;
     size_t current_size;
     cupolas_mutex_t lock;
+    int no_file_mode;
 };
 
 static const char* cupolas_audit_event_type_str(audit_event_type_t type) {
@@ -103,10 +104,12 @@ static int cupolas_audit_open_current_file(audit_rotator_t* rotator) {
     if (!rotator->fp) {
         cupolas_mem_free(rotator->current_file);
         rotator->current_file = NULL;
-        return cupolas_ERROR_IO;
+        rotator->no_file_mode = 1;
+        return cupolas_OK;
     }
     
     rotator->current_size = 0;
+    rotator->no_file_mode = 0;
     
     cupolas_file_stat_t st;
     if (cupolas_file_stat(rotator->current_file, &st) == cupolas_OK) {
@@ -117,6 +120,10 @@ static int cupolas_audit_open_current_file(audit_rotator_t* rotator) {
 }
 
 static int cupolas_audit_rotate_files(audit_rotator_t* rotator) {
+    if (rotator->no_file_mode) {
+        return cupolas_OK;
+    }
+
     if (rotator->fp) {
         fclose(rotator->fp);
         rotator->fp = NULL;
@@ -210,6 +217,11 @@ int audit_rotator_write(audit_rotator_t* rotator, const audit_entry_t* entry) {
     if (!rotator || !entry) return cupolas_ERROR_INVALID_ARG;
     
     cupolas_mutex_lock(&rotator->lock);
+    
+    if (rotator->no_file_mode) {
+        cupolas_mutex_unlock(&rotator->lock);
+        return cupolas_OK;
+    }
     
     if (!rotator->fp) {
         cupolas_mutex_unlock(&rotator->lock);

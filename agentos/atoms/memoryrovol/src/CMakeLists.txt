@@ -36,6 +36,7 @@ add_library(agentos_memoryrovol STATIC
     memory_optimizer.c
     memory_pool.c
     memoryrovol.c
+    monitoring_metrics.c
     vector_store.c
     llm_client.c
 )

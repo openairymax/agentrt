@@ -12,6 +12,7 @@
 #include "heapstore_log.h"
 #include "private.h"
 #include "utils.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +40,7 @@
 #define heapstore_LOG_MAX_SERVICES 32
 #define heapstore_LOG_MAX_PATH 512
 
-static heapstore_log_level_t s_log_level = heapstore_LOG_INFO;
+static heapstore_log_level_t s_log_level = HEAPSTORE_LOG_INFO;
 static agentos_mutex_t s_log_lock = {0};
 static FILE* s_main_log_file = NULL;
 static char s_log_root_path[heapstore_LOG_MAX_PATH] = {0};
@@ -59,10 +60,10 @@ static agentos_mutex_t s_service_lock = {0};
 
 static const char* level_to_string(heapstore_log_level_t level) {
     switch (level) {
-        case heapstore_LOG_ERROR: return "ERROR";
-        case heapstore_LOG_WARN: return "WARN";
-        case heapstore_LOG_INFO: return "INFO";
-        case heapstore_LOG_DEBUG: return "DEBUG";
+        case HEAPSTORE_LOG_ERROR: return "ERROR";
+        case HEAPSTORE_LOG_WARN: return "WARN";
+        case HEAPSTORE_LOG_INFO: return "INFO";
+        case HEAPSTORE_LOG_DEBUG: return "DEBUG";
         default: return "UNKNOWN";
     }
 }
@@ -169,7 +170,7 @@ heapstore_error_t heapstore_log_init(void) {
     }
 
     s_initialized = true;
-    s_log_level = heapstore_LOG_INFO;
+    s_log_level = HEAPSTORE_LOG_INFO;
 
     return heapstore_SUCCESS;
 }
@@ -276,14 +277,13 @@ void heapstore_log_writev(heapstore_log_level_t level,
 
     agentos_mutex_lock(&s_log_lock);
 
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    time_t now = ts.tv_sec;
+    uint64_t now_ms = agentos_time_ms();
+    time_t now = (time_t)(now_ms / 1000);
     struct tm* tm_info = localtime(&now);
     char timestamp[32];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
     char msec[8];
-    snprintf(msec, sizeof(msec), "%03d", (int)(ts.tv_nsec / 1000000));
+    snprintf(msec, sizeof(msec), "%03d", (int)(now_ms % 1000));
 
     char message[heapstore_LOG_MAX_LINE_LEN];
     vsnprintf(message, sizeof(message), format, args); /* flawfinder: ignore - bounded buffer heapstore_LOG_MAX_LINE_LEN */
