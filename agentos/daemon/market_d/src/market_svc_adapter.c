@@ -22,6 +22,7 @@ typedef struct {
     market_config_t market_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } market_adapter_ctx_t;
 
 static market_adapter_ctx_t* market_get_ctx(agentos_service_t service) {
@@ -34,7 +35,8 @@ static void market_config_from_common(
     const agentos_svc_config_t* common_cfg
 ) {
     memset(market_cfg, 0, sizeof(market_config_t));
-    market_cfg->sync_interval_ms = 30000;
+    market_cfg->sync_interval_ms = (common_cfg && common_cfg->timeout_ms > 0)
+                                   ? common_cfg->timeout_ms : 30000;
     market_cfg->cache_ttl_ms = 300000;
     market_cfg->enable_remote_registry = true;
     market_cfg->enable_auto_update = false;
@@ -71,6 +73,8 @@ static agentos_error_t market_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx || !ctx->market_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     SVC_LOG_INFO("市场服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
@@ -79,7 +83,20 @@ static agentos_error_t market_adapter_stop(agentos_service_t service, bool force
     if (!service) return AGENTOS_EINVAL;
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    SVC_LOG_INFO("市场服务适配器已停止");
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    if (force) {
+        if (ctx->market_svc && ctx->owns_service) {
+            market_service_destroy(ctx->market_svc);
+            ctx->market_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->market_cfg.registry_url) { free((void*)ctx->market_cfg.registry_url); ctx->market_cfg.registry_url = NULL; }
+        if (ctx->market_cfg.storage_path) { free((void*)ctx->market_cfg.storage_path); ctx->market_cfg.storage_path = NULL; }
+        SVC_LOG_INFO("市场服务适配器已强制停止");
+    } else {
+        SVC_LOG_INFO("市场服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 
@@ -105,6 +122,16 @@ static agentos_error_t market_adapter_healthcheck(agentos_service_t service) {
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
     if (!ctx->market_svc) return AGENTOS_ENOTINIT;
+    if (!ctx->running) return AGENTOS_ENOTINIT;
+    agent_info_t** agents = NULL;
+    size_t count = 0;
+    search_params_t params = {0};
+    int ret = market_service_search_agents(ctx->market_svc, &params, &agents, &count);
+    if (ret != 0) {
+        SVC_LOG_WARN("市场服务健康检查失败: %d", ret);
+        return AGENTOS_ERR_UNKNOWN;
+    }
+    if (agents) free(agents);
     return AGENTOS_SUCCESS;
 }
 

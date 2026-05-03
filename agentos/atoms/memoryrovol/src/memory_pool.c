@@ -331,3 +331,37 @@ double memory_pool_get_utilization(memory_pool_t* pool) {
     if (!pool || pool->total_size == 0) return 0.0;
     return (double)pool->used_size / (double)pool->total_size;
 }
+
+void memory_pool_compact(memory_pool_t* pool) {
+    if (!pool) return;
+    if (pool->lock) agentos_mutex_lock(pool->lock);
+
+    memory_block_header_t* prev = NULL;
+    memory_block_header_t* curr = pool->free_list;
+    while (curr) {
+        memory_block_header_t* next = curr->next;
+        if (prev &&
+            (uint8_t*)prev + sizeof(memory_block_header_t) + prev->size == (uint8_t*)curr) {
+            prev->size += sizeof(memory_block_header_t) + curr->size;
+            prev->next = next;
+            if (next) next->prev = prev;
+            curr = next;
+        } else {
+            prev = curr;
+            curr = next;
+        }
+    }
+
+    if (pool->lock) agentos_mutex_unlock(pool->lock);
+}
+
+uint64_t memory_pool_reclaimed_bytes(memory_pool_t* pool) {
+    if (!pool) return 0;
+    uint64_t reclaimed = 0;
+    memory_block_header_t* block = pool->free_list;
+    while (block) {
+        reclaimed += block->size;
+        block = block->next;
+    }
+    return reclaimed;
+}

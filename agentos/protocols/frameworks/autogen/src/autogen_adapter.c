@@ -31,6 +31,8 @@ struct autogen_adapter_context_s {
     void* code_executor_data;
     autogen_human_callback_fn human_callback;
     void* human_callback_data;
+    autogen_llm_callback_fn llm_callback;
+    void* llm_callback_data;
     autogen_message_hook_fn message_hook;
     void* message_hook_data;
     uint64_t total_chats_initiated;

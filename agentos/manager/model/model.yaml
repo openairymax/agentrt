@@ -9,7 +9,7 @@
 # 配置归属（按双重责任模型）
 _owner:
   module: "llm_d"
-  contact: "llm-team@spharx.cn"
+  contact: "llm-team@example.com"
   path: "AgentOS/agentos/daemon/llm_d"
   description: "内容定义责任归属 llm_d 模块，管理责任归属 Manager 模块"
 

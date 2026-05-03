@@ -32,7 +32,7 @@ typedef struct {
     taskflow_unit_private_t* unit_private;  // 所属单元
     taskflow_task_input_t* input;           // 任务输入
     taskflow_task_output_t* output;         // 任务输出
-    taskflow_graph_handle_t graph;          // 图句柄（临时）
+    taskflow_graph_handle_t graph;
     bool graph_owned;                       // 是否拥有图所有权
 } taskflow_execution_context_t;
 

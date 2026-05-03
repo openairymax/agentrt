@@ -54,6 +54,9 @@ bool validate_pointer(const void* ptr);
 /** @brief 验证数值范围 */
 bool validate_range(int64_t value, int64_t min_val, int64_t max_val);
 
+/** @brief 验证字符串仅包含有效 ASCII 字符 (0x00-0x7F) */
+bool is_valid_ascii(const char* str, size_t len);
+
 /* ==================== 安全内存操作 ==================== */
 
 /** @brief 安全内存分配（带用途标记） */

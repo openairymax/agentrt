@@ -121,9 +121,7 @@ rule_manager_t* rule_manager_create(const char* path) {
         
         if (rule_manager_reload(mgr) != 0) {
             cupolas_mem_free(mgr->path);
-            cupolas_rwlock_destroy(&mgr->rwlock);
-            cupolas_mem_free(mgr);
-            return NULL;
+            mgr->path = NULL;
         }
     }
     

@@ -18,7 +18,7 @@
           "type": "string",
           "format": "email",
           "description": "Contact email for the owning team",
-          "examples": ["manager-team@spharx.cn"]
+          "examples": ["team@example.com"]
         },
         "path": {
           "type": "string",

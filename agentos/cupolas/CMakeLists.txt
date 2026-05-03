@@ -163,6 +163,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 # 条件包含OpenSSL目录
 if(OpenSSL_FOUND)
     target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_compile_definitions(${PROJECT_NAME} PRIVATE CUPOLAS_USE_OPENSSL)
 endif()
 
 # 链接 commons 模块

@@ -22,6 +22,7 @@ typedef struct {
     sched_config_t sched_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } sched_adapter_ctx_t;
 
 static sched_adapter_ctx_t* sched_get_ctx(agentos_service_t service) {
@@ -35,11 +36,13 @@ static void sched_config_from_common(
 ) {
     memset(sched_cfg, 0, sizeof(sched_config_t));
     sched_cfg->strategy = SCHED_STRATEGY_WEIGHTED;
-    sched_cfg->health_check_interval_ms = 10000;
+    sched_cfg->health_check_interval_ms = (common_cfg && common_cfg->timeout_ms > 0)
+                                           ? common_cfg->timeout_ms : 10000;
     sched_cfg->stats_report_interval_ms = 60000;
-    sched_cfg->enable_ml_strategy = false;
+    sched_cfg->enable_ml_strategy = (common_cfg && common_cfg->enable_metrics);
     sched_cfg->ml_model_path = NULL;
-    sched_cfg->max_agents = 100;
+    sched_cfg->max_agents = (common_cfg && common_cfg->max_concurrent > 0)
+                            ? common_cfg->max_concurrent : 100;
 }
 
 static agentos_error_t sched_adapter_init(
@@ -71,6 +74,8 @@ static agentos_error_t sched_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     sched_adapter_ctx_t* ctx = sched_get_ctx(service);
     if (!ctx || !ctx->sched_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     SVC_LOG_INFO("调度器服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
@@ -79,7 +84,19 @@ static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force)
     if (!service) return AGENTOS_EINVAL;
     sched_adapter_ctx_t* ctx = sched_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    SVC_LOG_INFO("调度器服务适配器已停止");
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    if (force) {
+        if (ctx->sched_svc && ctx->owns_service) {
+            sched_service_destroy(ctx->sched_svc);
+            ctx->sched_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->sched_cfg.ml_model_path) { free((void*)ctx->sched_cfg.ml_model_path); ctx->sched_cfg.ml_model_path = NULL; }
+        SVC_LOG_INFO("调度器服务适配器已强制停止");
+    } else {
+        SVC_LOG_INFO("调度器服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 

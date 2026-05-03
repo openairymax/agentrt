@@ -562,7 +562,8 @@ Gates:
     3. Python Quality (syntax, isort)
     4. Shell Script Quality (bash -n, shellcheck)
     5. Basic Security Scan (secrets, dangerous functions)
-    6. Documentation Completeness
+    6. BAN-17~BAN-20 + BAN-33~BAN-35 Audit Scan
+    7. Documentation Completeness
 EOF
 }
 

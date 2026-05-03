@@ -3,7 +3,7 @@
   "_config_version": "1.0.0",
   "_owner": {
     "module": "cupolas",
-    "contact": "cupolas-team@spharx.cn",
+    "contact": "cupolas-team@example.com",
     "path": "AgentOS/agentos/cupolas/sanitizer",
     "description": "内容定义责任归属 cupolas 模块，管理责任归属 Manager 模块"
   },

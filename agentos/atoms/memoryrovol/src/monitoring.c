@@ -320,13 +320,16 @@ agentos_error_t agentos_monitoring_record_error(agentos_monitoring_t* monitoring
                                                int layer,
                                                const char* error_msg) {
     if (!monitoring || layer < 0 || layer > 3) return AGENTOS_EINVAL;
-    (void)error_msg;  /* 未使用 */
 
     agentos_mutex_lock(monitoring->lock);
     monitoring->layer_data[layer].error_count++;
     agentos_mutex_unlock(monitoring->lock);
 
-    AGENTOS_LOG_ERROR("Error recorded in layer %d", layer);
+    if (error_msg) {
+        AGENTOS_LOG_ERROR("Error recorded in layer %d: %s", layer, error_msg);
+    } else {
+        AGENTOS_LOG_ERROR("Error recorded in layer %d", layer);
+    }
     return AGENTOS_SUCCESS;
 }
 

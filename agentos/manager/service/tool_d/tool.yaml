@@ -9,7 +9,7 @@
 # 配置归属（按双重责任模型）
 _owner:
   module: "daemon"
-  contact: "daemon-team@spharx.cn"
+  contact: "daemon-team@example.com"
   path: "AgentOS/agentos/daemon/tool_d"
   description: "内容定义责任归属 agentos/daemon/tool_d 模块，管理责任归属 Manager 模块"
 

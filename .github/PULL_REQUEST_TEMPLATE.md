@@ -21,14 +21,36 @@
 - 模块:
 - 文件:
 
-### 测试验证
-<!-- 描述测试覆盖情况 -->
-- [ ] 单元测试通过
-- [ ] 集成测试通过
-- [ ] 编译零错误零警告
-- [ ] 无 BAN 违规（simplified/stub/mock/fake/dummy）
-- [ ] CROSS 合规（无 pthread.h/clock_gettime 直接使用）
-- [ ] 性能基准无明显退化
+### S-01~S-08 统一工作标准检查 (v11.14)
+
+| # | 标准 | 检查项 | 状态 |
+|---|------|--------|------|
+| S-01 | 统一构建输出目录 | 构建产物在 `AgentOS-build/`，源码目录无 `.o`/`.a`/`.exe` | [ ] |
+| S-02 | 统一CMake命令 | 使用 `cmake -B ../AgentOS-build` 构建 | [ ] |
+| S-03 | 统一代码风格 | 所有 `.c`/`.h` 通过 `clang-format --dry-run --Werror` | [ ] |
+| S-04 | 统一PR模板 | 使用本模板，填写完整 | [ ] |
+| S-05 | 统一测试命令 | 使用 `cd ../AgentOS-build && ctest --output-on-failure` | [ ] |
+| S-06 | 统一commit前缀 | `feat:`/`fix:`/`refactor:`/`docs:`/`test:`/`chore:` | [ ] |
+| S-07 | 统一分支命名 | `feature/<name>-<issue>` / `fix/<name>-<issue>` | [ ] |
+| S-08 | 统一BAN检查 | 运行 `scripts/pipeline/quality-gate.sh`，BAN-01~BAN-36 零违规 | [ ] |
+
+### BAN 违规检查 (BAN-01~BAN-36)
+
+- [ ] 无 BAN-01~BAN-13 违规（基础铁律）
+- [ ] 无 BAN-17 违规（src/ 下无"简化实现"标记）
+- [ ] 无 BAN-18 违规（src/ 下无返回固定值桩函数体）
+- [ ] 无 BAN-19 违规（src/ 下无 mock/fake 降级）
+- [ ] 无 BAN-20 违规（解析器无功能缺失）
+- [ ] 无 BAN-25 违规（二进制无明文 License 字符串）
+- [ ] 无 BAN-26 违规（Trial 版未正确限制）
+- [ ] 无 BAN-28~BAN-29 违规（声明即实现，无桩函数）
+- [ ] 无 BAN-30~BAN-31 违规（无资源泄漏，getter无副作用）
+- [ ] 无 BAN-32 违规（无硬编码平台路径）
+- [ ] 无 BAN-33 违规（构建产物不在源码目录内）
+- [ ] 无 BAN-34 违规（代码已 clang-format 格式化）
+- [ ] 无 BAN-35 违规（CI 无硬编码路径）
+- [ ] 无 BAN-36 违规（无私有构建脚本）
+- [ ] 无 TODO/FIXME/HACK 标记
 
 ### 构建验证命令（符合 v11.14 BAN-33 规范）
 ```bash
@@ -43,6 +65,11 @@ cd ../AgentOS-build && ctest --output-on-failure
 # cmake --build .
 ```
 
+### 跨平台验证
+- [ ] Linux GCC 编译通过
+- [ ] Windows MSVC 编译通过（如适用）
+- [ ] 无 CROSS-01 违规（无 pthread.h/clock_gettime 直接使用）
+
 ### Commit Message 格式规范
 ```
 <类型>(<范围>): <简短描述>
@@ -51,7 +78,7 @@ cd ../AgentOS-build && ctest --output-on-failure
 
 <footer>
 ```
-**类型**: feat/fix/refactor/docs/test/perf/chore
+**类型**: feat/fix/refactor/docs/test/chore
 **范围**: checkpoint/multiagent/memoryrovol/coreloopthree/daemon/commons
 
 ### 审查清单

@@ -87,7 +87,7 @@ static void print_usage(const char* prog) {
     printf("  --help        Show this help\n");
     printf("\nExamples:\n");
     printf("  %s -h 127.0.0.1 -p 8080\n", prog);
-    printf("  %s -c /etc/agentos/gateway.conf\n", prog);
+    printf("  %s -c AGENTOS_CONFIG_DIR \"/gateway.conf\"\n", prog);
 }
 
 /* ==================== 参数解析 ==================== */

@@ -112,7 +112,7 @@ void agentos_memory_optimizer_destroy(agentos_memory_optimizer_t* opt) {
     }
 
     if (opt->lock) {
-        agentos_mutex_destroy(opt->lock);
+        agentos_mutex_free(opt->lock);
     }
 
     if (opt->optimizer_id) {
@@ -271,7 +271,15 @@ agentos_error_t agentos_memory_optimizer_defragment(
     }
 
     agentos_mutex_lock(opt->lock);
+
     opt->defrag_operations++;
+
+    memory_pool_compact(pool);
+
+    opt->total_freed += memory_pool_reclaimed_bytes(pool);
+    opt->fragmentation_ratio = memory_pool_get_fragmentation_ratio(pool);
+    opt->last_defrag_time_ns = (uint64_t)time(NULL) * 1000000000ULL;
+
     agentos_mutex_unlock(opt->lock);
 
     return AGENTOS_SUCCESS;

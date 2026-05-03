@@ -143,11 +143,19 @@ cd vcpkg && bootstrap-vcpkg.sh
 ### 4. 构建项目
 
 ```bash
-mkdir build && cd build
-cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
-cmake --build . --parallel $(nproc)
-ctest --output-on-failure
+# ✅ 正确：使用 cmake -B 统一构建到 AgentOS-build/ 目录（BAN-33 合规）
+cd AgentOS
+cmake -B ../AgentOS-build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
+cmake --build ../AgentOS-build --parallel $(nproc)
+cd ../AgentOS-build && ctest --output-on-failure
+
+# ❌ 禁止：以下方式违反 BAN-33（在源码目录内构建）
+# mkdir build && cd build
+# cmake -B build
+# cmake --build .
 ```
+
+> **BAN-33 铁律**：所有编译产物必须输出到 `AgentOS-build/` 目录，AgentOS 源码目录内绝不允许出现任何构建产物。详见 [工程规范化标准手册](../DocsClosed/工程规范化标准手册09.md) 第7章。
 
 ### 5. 开发工具配置
 
@@ -215,17 +223,20 @@ refactor/xxx   (重构分支)
 docs/xxx       (文档分支)
 ```
 
-### 分支命名规范
+### 分支命名规范（S-07 合规）
 
 | 分支类型 | 前缀 | 示例 | 生命周期 |
 |---------|------|------|---------|
-| 功能分支 | `feature/` | `feature/memory-l4-pattern` | 合并后删除 |
-| Bug 修复 | `bugfix/` | `bugfix/ipc-race-condition` | 合并后删除 |
-| 紧急修复 | `hotfix/` | `hotfix/security-patch` | 合并后删除 |
-| 文档改进 | `docs/` | `docs/api-reference` | 合并后删除 |
-| 性能优化 | `perf/` | `perf/faiss-indexing` | 合并后删除 |
-| 重构 | `refactor/` | `refactor/error-handling` | 合并后删除 |
-| 测试 | `test/` | `test/syscall-coverage` | 合并后删除 |
+| 功能分支 | `feature/` | `feature/memory-l4-pattern-123` | 合并后删除 |
+| Bug 修复 | `fix/` | `fix/ipc-race-condition-456` | 合并后删除 |
+| 紧急修复 | `hotfix/` | `hotfix/security-patch-789` | 合并后删除 |
+| 文档改进 | `docs/` | `docs/api-reference-101` | 合并后删除 |
+| 性能优化 | `perf/` | `perf/faiss-indexing-202` | 合并后删除 |
+| 重构 | `refactor/` | `refactor/error-handling-303` | 合并后删除 |
+| 测试 | `test/` | `test/syscall-coverage-404` | 合并后删除 |
+| 发布 | `release/` | `release/v0.0.5` | 版本发布后保留 |
+
+> **S-07 规范**：分支命名格式为 `<类型>/<名称>-<issue编号>`，三团队统一执行。
 
 ### 分支操作规范
 
@@ -270,7 +281,7 @@ git checkout -b feature/your-feature-name
 在提交 PR 前，确保通过以下检查：
 
 ```bash
-# 1. 代码格式化
+# 1. 代码格式化（BAN-34 合规）
 find agentos -name "*.c" -o -name "*.h" | xargs clang-format -i
 black agentos/openlab/ && isort agentos/openlab/
 
@@ -279,15 +290,19 @@ cppcheck --enable=all agentos/
 flake8 agentos/openlab/
 mypy agentos/openlab/
 
-# 3. 构建验证
-cd build && cmake --build . --parallel $(nproc)
+# 3. 构建验证（S-02/S-05 合规：使用统一构建目录）
+cmake -B ../AgentOS-build -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build ../AgentOS-build --parallel $(nproc)
 
-# 4. 运行测试
-ctest --output-on-failure
-cd ../tests && python -m pytest -v
+# 4. 运行测试（S-05 合规：从构建目录运行测试）
+cd ../AgentOS-build && ctest --output-on-failure
+cd ../AgentOS && python -m pytest tests/ -v
 
 # 5. 安全检查
 bandit -r agentos/openlab/
+
+# 6. BAN 检查（S-08 合规：运行质量门禁脚本）
+scripts/pipeline/quality-gate.sh --strict
 ```
 
 ### 第四步：提交和推送
@@ -517,18 +532,18 @@ class TestMemoryRovol:
 ### 运行测试
 
 ```bash
-# 运行全部测试
-cd tests && python run_tests.py
+# 运行全部测试（S-05 合规：从统一构建目录运行）
+cd ../AgentOS-build && ctest --output-on-failure
 
 # 运行特定模块测试
-python -m pytest tests/unit/coreloopthree/ -v
+cd ../AgentOS-build && ctest -R <module> --output-on-failure
+
+# 运行 Python 测试
+cd ../AgentOS && python -m pytest tests/unit/coreloopthree/ -v
 python -m pytest tests/integration/syscall/ -v
 
-# 运行 C 测试
-cd build && ctest --output-on-failure
-
 # 生成覆盖率报告
-cd tests && python -m pytest --cov=agentos --cov-report=html
+cd ../AgentOS && python -m pytest --cov=agentos --cov-report=html
 ```
 
 ---
@@ -576,7 +591,7 @@ cd tests && python -m pytest --cov=agentos --cov-report=html
 
 ## 提交规范
 
-AgentOS 采用 **Conventional Commits** 规范。
+AgentOS 采用 **Conventional Commits** 规范（S-06 合规）。
 
 ### 提交类型
 
@@ -584,14 +599,12 @@ AgentOS 采用 **Conventional Commits** 规范。
 |------|------|------|
 | `feat` | 新功能 | `feat(syscall): add skill management API` |
 | `fix` | Bug 修复 | `fix(ipc): resolve race condition in binder` |
-| `docs` | 文档更新 | `docs(api): update memory syscall reference` |
-| `style` | 代码格式 | `style(atoms): format with clang-format` |
 | `refactor` | 重构 | `refactor(cupolas): simplify permission engine` |
-| `perf` | 性能优化 | `perf(memoryrovol): optimize FAISS indexing` |
+| `docs` | 文档更新 | `docs(api): update memory syscall reference` |
 | `test` | 测试 | `test(daemon): add llm_d unit tests` |
 | `chore` | 构建/工具 | `chore(ci): update CMakeLists.txt` |
-| `ci` | CI/CD 配置 | `ci: add caching for pip dependencies` |
-| `revert` | 回滚提交 | `revert: fix ipc race condition` |
+
+> **S-06 规范**：三团队统一使用以上6种commit前缀，禁止使用其他前缀。
 
 ### Scope 范围
 

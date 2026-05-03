@@ -124,6 +124,15 @@ bool validate_range(int64_t value, int64_t min_val, int64_t max_val) {
     return value >= min_val && value <= max_val;
 }
 
+bool is_valid_ascii(const char* str, size_t len) {
+    if (!str) return false;
+    for (size_t i = 0; i < len; i++) {
+        if (str[i] == '\0') return true;
+        if ((unsigned char)str[i] > 0x7F) return false;
+    }
+    return true;
+}
+
 /* ==================== 安全内存操作 ==================== */
 
 void* safe_malloc(size_t size, const char* purpose) {

@@ -4,6 +4,11 @@ cmake_minimum_required(VERSION 3.20)
 # 覆盖: corekern+daemon+syscall 跨模块联动
 # 场景: 初始化/配置/IPC/syscall/熔断/告警/多线程/追踪/定时器/压力/幂等
 
+if(NOT TARGET svc_common)
+    message(STATUS "  [integration] Skipping test_e2e_core: svc_common not available (BUILD_DAEMON=OFF)")
+    return()
+endif()
+
 add_executable(test_e2e_core test_e2e_core.c)
 
 target_include_directories(test_e2e_core PRIVATE

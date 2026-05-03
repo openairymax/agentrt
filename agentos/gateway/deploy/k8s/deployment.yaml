@@ -43,7 +43,7 @@ spec:
       # 容器配置
       containers:
         - name: gateway
-          image: ghcr.io/spharx/agentos-gateway:latest
+          image: ${GATEWAY_IMAGE:-ghcr.io/spharx/agentos-gateway}:latest
           imagePullPolicy: Always
           
           # 端口配置

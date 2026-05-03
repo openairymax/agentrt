@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 性能基准测试 (TeamC P2-C02)
 
+if(NOT TARGET svc_common)
+    message(STATUS "  [benchmarks] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    return()
+endif()
+
 add_executable(test_performance_benchmarks test_performance_benchmarks.c)
 
 target_include_directories(test_performance_benchmarks PRIVATE

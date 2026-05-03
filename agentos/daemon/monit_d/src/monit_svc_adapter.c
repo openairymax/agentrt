@@ -18,10 +18,11 @@
 #include <string.h>
 
 typedef struct {
-    void* monit_svc;  // monitor_service_t* 但使用 void* 避免类型问题
+    void* monit_svc;
     monitor_config_t monit_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } monit_adapter_ctx_t;
 
 static monit_adapter_ctx_t* monit_get_ctx(agentos_service_t service) {
@@ -33,15 +34,15 @@ static void monit_config_from_common(
     monitor_config_t* monit_cfg,
     const agentos_svc_config_t* common_cfg
 ) {
-    (void)common_cfg;
     memset(monit_cfg, 0, sizeof(monitor_config_t));
     monit_cfg->metrics_collection_interval_ms = 5000;
-    monit_cfg->health_check_interval_ms = 10000;
+    monit_cfg->health_check_interval_ms = (common_cfg && common_cfg->timeout_ms > 0)
+                                           ? common_cfg->timeout_ms : 10000;
     monit_cfg->log_flush_interval_ms = 1000;
     monit_cfg->alert_check_interval_ms = 5000;
     monit_cfg->log_file_path = strdup("./logs/monitor.log");
     monit_cfg->metrics_storage_path = strdup("./metrics");
-    monit_cfg->enable_tracing = true;
+    monit_cfg->enable_tracing = (common_cfg && common_cfg->enable_tracing);
     monit_cfg->enable_alerting = true;
 }
 
@@ -74,16 +75,30 @@ static agentos_error_t monit_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     monit_adapter_ctx_t* ctx = monit_get_ctx(service);
     if (!ctx || !ctx->monit_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     SVC_LOG_INFO("监控服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
 static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force) {
     if (!service) return AGENTOS_EINVAL;
-    (void)force;
     monit_adapter_ctx_t* ctx = monit_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    SVC_LOG_INFO("监控服务适配器已停止");
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    if (force) {
+        if (ctx->monit_svc && ctx->owns_service) {
+            monitor_service_destroy(ctx->monit_svc);
+            ctx->monit_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->monit_cfg.log_file_path) { free((void*)ctx->monit_cfg.log_file_path); ctx->monit_cfg.log_file_path = NULL; }
+        if (ctx->monit_cfg.metrics_storage_path) { free((void*)ctx->monit_cfg.metrics_storage_path); ctx->monit_cfg.metrics_storage_path = NULL; }
+        SVC_LOG_INFO("监控服务适配器已强制停止");
+    } else {
+        SVC_LOG_INFO("监控服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 

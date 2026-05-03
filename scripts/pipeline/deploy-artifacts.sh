@@ -43,6 +43,7 @@ BUILD_NUMBER="${GITHUB_RUN_NUMBER:-$(date +%Y%m%d%H%M)}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io/spharx}"
 DOCKER_PUSH="${DOCKER_PUSH:-false}"
 PACKAGE_TYPE="${PACKAGE_TYPE:-tar.gz}"
+BUILD_DIR="${AGENTOS_BUILD_DIR:-${PROJECT_ROOT}/../AgentOS-build}"
 
 # 版本信息
 extract_version() {
@@ -169,34 +170,29 @@ collect_binaries() {
     version=$(extract_version)
     local bin_dir="${OUTPUT_DIR}/binaries-${version}"
 
-    log_info "Collecting built binaries..."
+    log_info "Collecting built binaries from: $BUILD_DIR"
 
     mkdir -p "$bin_dir"
 
+    if [[ ! -d "$BUILD_DIR" ]]; then
+        log_warn "Build directory not found: $BUILD_DIR"
+        return 0
+    fi
+
     local found=0
-    for build_dir in "${PROJECT_ROOT}"/build-*; do
-        if [[ ! -d "$build_dir" ]]; then
-            continue
+
+    while IFS= read -r -d '' bin_file; do
+        if [[ -x "$bin_file" ]] && [[ -f "$bin_file" ]]; then
+            cp "$bin_file" "${bin_dir}/$(basename "$bin_file")" 2>/dev/null || true
+            ((found++))
         fi
+    done < <(find "$BUILD_DIR" -type f \( -executable -o -name "*.dll" -o -name "*.exe" \) \
+        ! -path "*/tests/*" ! -name "ctest" -print0 2>/dev/null | head -z -20)
 
-        local module_name
-        module_name=$(basename "$build_dir" | sed 's/build-//')
-
-        # 收集可执行文件
-        while IFS= read -r -d '' bin_file; do
-            if [[ -x "$bin_file" ]] && [[ -f "$bin_file" ]]; then
-                cp "$bin_file" "${bin_dir}/${module_name}-$(basename "$bin_file")" 2>/dev/null || true
-                ((found++))
-            fi
-        done < <(find "$build_dir" -type f \( -executable -o -name "*.dll" -o -name "*.exe" \) \
-            ! -path "*/tests/*" ! -name "ctest" -print0 2>/dev/null | head -z -20)
-
-        # 收集库文件
-        while IFS= read -r -d '' lib_file; do
-            cp "$lib_file" "${bin_dir}/" 2>/dev/null || true
-        done < <(find "$build_dir" \( -name "*.so" -o -name "*.dylib" -o -name "*.a" \) \
-            -print0 2>/dev/null | head -z -20)
-    done
+    while IFS= read -r -d '' lib_file; do
+        cp "$lib_file" "${bin_dir}/" 2>/dev/null || true
+    done < <(find "$BUILD_DIR" \( -name "*.so" -o -name "*.dylib" -o -name "*.a" \) \
+        -print0 2>/dev/null | head -z -20)
 
     if [[ $found -gt 0 ]]; then
         local size

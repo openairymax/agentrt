@@ -68,6 +68,8 @@ double   memory_pool_get_fragmentation_ratio(memory_pool_t* pool);
 uint64_t memory_pool_get_alloc_count(memory_pool_t* pool);
 uint64_t memory_pool_get_free_count(memory_pool_t* pool);
 double   memory_pool_get_utilization(memory_pool_t* pool);
+void     memory_pool_compact(memory_pool_t* pool);
+uint64_t memory_pool_reclaimed_bytes(memory_pool_t* pool);
 
 #ifdef __cplusplus
 }

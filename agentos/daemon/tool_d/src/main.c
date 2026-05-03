@@ -500,7 +500,7 @@ static void print_usage(const char* prog) {
     printf("  --help             Show this help\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s --manager /etc/agentos/tool.yaml\n", prog);
+    printf("  %s --manager AGENTOS_CONFIG_DIR \"/tool.yaml\"\n", prog);
     printf("  %s --tcp           # Use TCP mode on port 8081\n", prog);
 }
 

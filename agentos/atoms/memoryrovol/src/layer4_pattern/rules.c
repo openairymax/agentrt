@@ -77,9 +77,28 @@ agentos_error_t agentos_rule_generator_generate(
 
     // 调用LLM服务
     if (!gen->llm) {
-        // 无LLM服务，返回简单占位符（生产环境应确保有LLM服务）
-        *out_rule = AGENTOS_STRDUP("{\"name\":\"Fallback pattern\",\"description\":\"No LLM available\",\"condition\":\"true\",\"action\":\"none\",\"confidence\":0.5}");
-        if (!*out_rule) return AGENTOS_ENOMEM;
+        size_t name_len = 0;
+        for (size_t i = 0; i < count && cluster_ids[i]; i++) {
+            name_len += strlen(cluster_ids[i]) + 1;
+        }
+        char* rule = (char*)AGENTOS_MALLOC(name_len + 256);
+        if (!rule) return AGENTOS_ENOMEM;
+        char id_list[512] = {0};
+        size_t pos = 0;
+        for (size_t i = 0; i < count && cluster_ids[i] && pos < sizeof(id_list) - 64; i++) {
+            pos += snprintf(id_list + pos, sizeof(id_list) - pos,
+                            "%s\"%s\"", i > 0 ? "," : "", cluster_ids[i]);
+        }
+        snprintf(rule, name_len + 256,
+                 "{\"name\":\"statistical_pattern_%zu\","
+                 "\"description\":\"Pattern derived from %zu clustered items (no LLM)\","
+                 "\"condition\":\"cluster_match\","
+                 "\"action\":\"observe\","
+                 "\"confidence\":0.3,"
+                 "\"cluster_ids\":[%s]}",
+                 gen->rule_count, count, id_list);
+        *out_rule = rule;
+        gen->rule_count++;
         return AGENTOS_SUCCESS;
     }
 
