@@ -56,8 +56,8 @@
 #define AGENTOS_DEFAULT_HTTP_PORT           8080
 #define AGENTOS_DEFAULT_WS_PORT             8081
 #define AGENTOS_DEFAULT_TOOL_PORT           8082
-#define AGENTOS_DEFAULT_LLM_SOCK_PATH       "/var/run/agentos/llm.sock"
-#define AGENTOS_DEFAULT_TOOL_SOCK_PATH      "/var/run/agentos/tool.sock"
+#define AGENTOS_DEFAULT_LLM_SOCK_PATH       AGENTOS_RUNTIME_DIR "/llm.sock"
+#define AGENTOS_DEFAULT_TOOL_SOCK_PATH      AGENTOS_RUNTIME_DIR "/tool.sock"
 
 /* ========== 安全/认证 ========== */
 

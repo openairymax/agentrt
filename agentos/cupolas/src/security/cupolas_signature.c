@@ -249,7 +249,7 @@ int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
     (void)data_len;
     (void)sig_len;
     (void)algo;
-    return CUPOLAS_SIG_OK;
+    return CUPOLAS_SIG_UNTRUSTED;
 #endif
 }
 
@@ -284,14 +284,14 @@ int cupolas_signature_get_signer_info(const char* file_path,
 
     memset(info, 0, sizeof(cupolas_signer_info_t));
 
-    info->subject_cn = strdup("Unknown");
-    info->subject_org = strdup("Unknown");
+    info->subject_cn = strdup("unavailable");
+    info->subject_org = strdup("unavailable");
     info->not_before = 0;
-    info->not_after = UINT64_MAX;
+    info->not_after = 0;
     info->is_ca = false;
     info->key_usage = 0;
 
-    return CUPOLAS_SIG_OK;
+    return CUPOLAS_SIG_UNTRUSTED;
 }
 
 void cupolas_signature_free_signer_info(cupolas_signer_info_t* info) {
@@ -441,8 +441,8 @@ int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
 #else
     (void)data_len;
     (void)algo;
-    memset(signature_out, 0, *sig_len);
-    return CUPOLAS_SIG_OK;
+    if (sig_len) *sig_len = 0;
+    return CUPOLAS_SIG_UNTRUSTED;
 #endif
 }
 

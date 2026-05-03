@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 安全审计测试 (TeamC P2-C03)
 
+if(NOT TARGET svc_common)
+    message(STATUS "  [security] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    return()
+endif()
+
 add_executable(test_security_audit test_security_audit.c)
 
 target_include_directories(test_security_audit PRIVATE

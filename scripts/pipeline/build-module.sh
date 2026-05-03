@@ -35,6 +35,7 @@ CLEAN_BUILD=false
 VERBOSE=false
 INSTALL_PREFIX="${AGENTOS_INSTALL_PREFIX:-/usr/local}"
 CMAKE_EXTRA_ARGS=()
+BUILD_DIR="${AGENTOS_BUILD_DIR:-${PROJECT_ROOT}/../AgentOS-build}"
 
 # 模块定义（含源码路径和 CMake 选项）
 declare -A MODULE_SOURCES=(
@@ -181,15 +182,12 @@ setup_build_env() {
 build_module() {
     local module="$1"
     local source_dir="${PROJECT_ROOT}/${MODULE_SOURCES[$module]}"
-    local build_dir="${PROJECT_ROOT}/build-${module}"
 
-    # 验证源码目录
     if [[ ! -d "$source_dir" ]]; then
         log_warn "Source directory not found for '$module': $source_dir, skipping"
         return 0
     fi
 
-    # 检查 CMakeLists.txt
     if [[ ! -f "${source_dir}/CMakeLists.txt" ]]; then
         log_warn "No CMakeLists.txt found for '$module', skipping"
         return 0
@@ -198,25 +196,23 @@ build_module() {
     log_info "==========================================="
     log_info "Building Module: $module"
     log_info "  Source: $source_dir"
+    log_info "  Build:  $BUILD_DIR"
     log_info "  Type:   $BUILD_TYPE"
     log_info "  Jobs:   $(get_parallel_jobs)"
     log_info "==========================================="
 
-    # Clean build
-    if [[ "$CLEAN_BUILD" == "true" ]] && [[ -d "$build_dir" ]]; then
-        log_info "Cleaning build directory: $build_dir"
-        rm -rf "$build_dir"
+    if [[ "$CLEAN_BUILD" == "true" ]] && [[ -d "$BUILD_DIR" ]]; then
+        log_info "Cleaning build directory: $BUILD_DIR"
+        rm -rf "$BUILD_DIR"
     fi
 
-    mkdir -p "$build_dir"
-    cd "$build_dir"
+    mkdir -p "$BUILD_DIR"
 
-    # CMake 配置（增量构建时跳过已配置的模块）
     local need_cmake_config=true
-    if [[ "$INCREMENTAL" == "true" ]] && [[ -f "${build_dir}/CMakeCache.txt" ]]; then
+    if [[ "$INCREMENTAL" == "true" ]] && [[ -f "${BUILD_DIR}/CMakeCache.txt" ]]; then
         local cache_source_dir
-        cache_source_dir=$(grep -m1 "CMAKE_HOME_DIRECTORY:INTERNAL=" "${build_dir}/CMakeCache.txt" 2>/dev/null | cut -d= -f2 || echo "")
-        if [[ "$cache_source_dir" == "$source_dir" ]]; then
+        cache_source_dir=$(grep -m1 "CMAKE_HOME_DIRECTORY:INTERNAL=" "${BUILD_DIR}/CMakeCache.txt" 2>/dev/null | cut -d= -f2 || echo "")
+        if [[ "$cache_source_dir" == "$PROJECT_ROOT" ]]; then
             log_info "Incremental build: reusing existing CMake configuration"
             need_cmake_config=false
         else
@@ -226,7 +222,8 @@ build_module() {
 
     if [[ "$need_cmake_config" == "true" ]]; then
         local cmake_args=(
-            "$source_dir"
+            -S "$PROJECT_ROOT"
+            -B "$BUILD_DIR"
             "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
             "-DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX}"
             ${MODULE_CMAKE_OPTIONS[$module]}
@@ -243,40 +240,35 @@ build_module() {
             if ! cmake "${cmake_args[@]}" > "$cmake_log" 2>&1; then
                 log_error "CMake configuration failed for $module"
                 log_error "See log: $cmake_log"
-                cd "$PROJECT_ROOT"
                 return 1
             fi
         fi
     fi
 
-    # 构建
     local build_log="${PROJECT_ROOT}/ci-logs/${module}-build.log"
     local jobs=$(get_parallel_jobs)
 
     log_info "Building with $jobs parallel jobs..."
     if [[ "$VERBOSE" == "true" ]]; then
-        cmake --build . --parallel "$jobs" | tee "$build_log"
+        cmake --build "$BUILD_DIR" --parallel "$jobs" | tee "$build_log"
     else
-        if ! cmake --build . --parallel "$jobs" > "$build_log" 2>&1; then
+        if ! cmake --build "$BUILD_DIR" --parallel "$jobs" > "$build_log" 2>&1; then
             log_error "Build failed for $module"
             log_error "See log: $build_log"
-            cd "$PROJECT_ROOT"
             return 1
         fi
     fi
 
-    # 统计构建产物
     local obj_count
-    obj_count=$(find . -name "*.o" 2>/dev/null | wc -l)
+    obj_count=$(find "$BUILD_DIR" -name "*.o" 2>/dev/null | wc -l)
     local lib_count
-    lib_count=$(find . \( -name "*.a" -o -name "*.so" -o -name "*.dylib" \) 2>/dev/null | wc -l)
+    lib_count=$(find "$BUILD_DIR" \( -name "*.a" -o -name "*.so" -o -name "*.dylib" \) 2>/dev/null | wc -l)
     local bin_count
-    bin_count=$(find . -type f -executable ! -name "*.sh" 2>/dev/null | wc -l)
+    bin_count=$(find "$BUILD_DIR" -type f -executable ! -name "*.sh" 2>/dev/null | wc -l)
 
     log_ok "Module $module built successfully!"
     log_info "  Objects: $obj_count, Libraries: $lib_count, Binaries: $bin_count"
 
-    cd "$PROJECT_ROOT"
     return 0
 }
 

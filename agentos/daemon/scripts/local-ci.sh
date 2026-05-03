@@ -8,10 +8,12 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKS_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 PARALLEL_JOBS="${PARALLEL_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 ENABLE_COVERAGE="${ENABLE_COVERAGE:-OFF}"
-REPORT_DIR="${BACKS_ROOT}/reports"
+EXTERNAL_BUILD_DIR="${PROJECT_ROOT}/../AgentOS-build"
+REPORT_DIR="${EXTERNAL_BUILD_DIR}/reports"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -79,13 +81,7 @@ check_dependencies() {
 # 清理构建目录
 clean() {
     log_info "清理构建目录..."
-    rm -rf "$BACKS_ROOT/agentos/commons/build"
-    rm -rf "$BACKS_ROOT/llm_d/build"
-    rm -rf "$BACKS_ROOT/tool_d/build"
-    rm -rf "$BACKS_ROOT/monit_d/build"
-    rm -rf "$BACKS_ROOT/sched_d/build"
-    rm -rf "$BACKS_ROOT/market_d/build"
-    rm -rf "$REPORT_DIR"
+    rm -rf "${EXTERNAL_BUILD_DIR}"
     log_success "清理完成"
 }
 
@@ -93,10 +89,11 @@ clean() {
 build_module() {
     local module=$1
     local module_dir="$BACKS_ROOT/$module"
+    local module_build_dir="${EXTERNAL_BUILD_DIR}/daemon/${module}"
     
     log_info "构建 $module..."
-    mkdir -p "$module_dir/build"
-    cd "$module_dir/build"
+    mkdir -p "$module_build_dir"
+    cd "$module_build_dir"
 
     local cmake_args="-DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=ON"
     
@@ -106,11 +103,10 @@ build_module() {
         cmake_args="$cmake_args -DCMAKE_EXE_LINKER_FLAGS=--coverage"
     fi
 
-    cmake .. $cmake_args
+    cmake "$module_dir" $cmake_args
 
     make -j"$PARALLEL_JOBS"
 
-    # 运行测试
     log_info "运行 $module 测试..."
     if [ -f "CTestTestfile.cmake" ]; then
         ctest --output-on-failure -j"$PARALLEL_JOBS" || log_warn "$module 部分测试失败"
@@ -190,8 +186,9 @@ coverage_analysis() {
     # 收集所有模块的覆盖率数据
     local all_info_files=""
     for module in commons llm_d tool_d monit_d sched_d market_d; do
-        if [ -d "$BACKS_ROOT/$module/build" ]; then
-            cd "$BACKS_ROOT/$module/build"
+        local module_build_dir="${EXTERNAL_BUILD_DIR}/daemon/${module}"
+        if [ -d "$module_build_dir" ]; then
+            cd "$module_build_dir"
             if ls *.gcda 1>/dev/null 2>&1; then
                 lcov --capture --directory . --output-file "${module}_coverage.info" 2>/dev/null || true
                 if [ -f "${module}_coverage.info" ]; then
@@ -251,7 +248,8 @@ generate_report() {
         echo ""
         echo "--- 模块状态 ---"
         for module in commons llm_d tool_d market_d monit_d sched_d; do
-            if [ -d "$BACKS_ROOT/$module/build" ]; then
+            local module_build_dir="${EXTERNAL_BUILD_DIR}/daemon/${module}"
+            if [ -d "$module_build_dir" ]; then
                 echo "  ${module}: ✓ 已构建"
             else
                 echo "  ${module}: ✗ 未构建"

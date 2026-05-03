@@ -140,8 +140,7 @@ int log_store_service_store_entry(heapstore_log_level_t level,
     fprintf(f, "[%s] [%s] [%s] %s\n", time_buf, level_str, component, message);
     fclose(f);
     
-    // 执行日志轮转检查
-    (void)current_file;
+    log_store_service_check_rotation(current_file);
     
     return 0;
 }

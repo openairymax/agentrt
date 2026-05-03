@@ -78,8 +78,21 @@ agentos_error_t heapstore_integration_init(const char* root_path) {
         return AGENTOS_SUCCESS;
     }
 
+    const char* effective_root = root_path;
+    char auto_root[512];
+    if (!effective_root) {
+        const char* env = getenv("AGENTOS_HEAPSTORE_ROOT");
+        if (env && env[0]) {
+            effective_root = env;
+        } else {
+            snprintf(auto_root, sizeof(auto_root), "%s/agentos/heapstore",
+                     getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+            effective_root = auto_root;
+        }
+    }
+
     heapstore_config_t config = {
-        .root_path = root_path ? root_path : "heapstore",
+        .root_path = effective_root,
         .max_log_size_mb = 100,
         .log_retention_days = 7,
         .trace_retention_days = 3,
@@ -101,7 +114,14 @@ agentos_error_t heapstore_integration_init(const char* root_path) {
         strncpy(g_root_path, root_path, sizeof(g_root_path) - 1);
         g_root_path[sizeof(g_root_path) - 1] = '\0';
     } else {
-        strncpy(g_root_path, "heapstore", sizeof(g_root_path) - 1);
+        const char* env = getenv("AGENTOS_HEAPSTORE_ROOT");
+        if (env && env[0]) {
+            strncpy(g_root_path, env, sizeof(g_root_path) - 1);
+        } else {
+            snprintf(g_root_path, sizeof(g_root_path), "%s/agentos/heapstore",
+                     getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+        }
+        g_root_path[sizeof(g_root_path) - 1] = '\0';
     }
 
     g_integration_initialized = true;
@@ -510,11 +530,11 @@ agentos_error_t heapstore_logging_write(
 
     heapstore_log_level_t log_level;
     switch (level) {
-        case 0: log_level = heapstore_LOG_DEBUG; break;
-        case 1: log_level = heapstore_LOG_INFO; break;
-        case 2: log_level = heapstore_LOG_WARN; break;
-        case 3: log_level = heapstore_LOG_ERROR; break;
-        default: log_level = heapstore_LOG_INFO; break;
+        case 0: log_level = HEAPSTORE_LOG_DEBUG; break;
+        case 1: log_level = HEAPSTORE_LOG_INFO; break;
+        case 2: log_level = HEAPSTORE_LOG_WARN; break;
+        case 3: log_level = HEAPSTORE_LOG_ERROR; break;
+        default: log_level = HEAPSTORE_LOG_INFO; break;
     }
 
     heapstore_log_file_info_t info;

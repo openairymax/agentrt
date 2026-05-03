@@ -74,6 +74,7 @@ typedef struct {
     mac_consensus_strategy_t strategy;
     char *proposal_json;
     char **votes;
+    char **voter_ids;
     size_t vote_count;
     bool resolved;
     char *result_json;

@@ -40,7 +40,7 @@ static void signal_handler(int signum);
 
 /* ==================== 配置常量 ==================== */
 
-#define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/market.sock"
+#define DEFAULT_SOCKET_PATH_UNIX AGENTOS_RUNTIME_DIR "/market.sock"
 #define DEFAULT_SOCKET_PATH_WIN "\\\\.\\pipe\\agentos_market"
 #define DEFAULT_TCP_PORT 8082
 #define MAX_BUFFER 65536
@@ -370,7 +370,7 @@ static void print_usage(const char* prog) {
     printf("  --help             Show this help\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s --manager /etc/agentos/market.yaml\n", prog);
+    printf("  %s --manager AGENTOS_CONFIG_DIR \"/market.yaml\"\n", prog);
     printf("  %s --tcp           # Use TCP mode on port 8082\n", prog);
 }
 

@@ -220,70 +220,40 @@ static const lc_chain_template_t g_lc_chains[] = {
       {"chat-model", "memory", "conversation-chain", "output-parser"}, 4 },
 };
 
-static void lc_generate_chain_response(const char* input_json,
+static int lc_generate_chain_response(langchain_adapter_context_t* ctx,
+                                       const char* input_json,
                                        size_t tool_count,
                                        bool is_agent_mode,
                                        char* out_buf, size_t buf_len) {
-    if (!out_buf || !buf_len) return;
+    if (!out_buf || !buf_len) return -1;
 
-    int tpl_idx = -1;
-    if (input_json && input_json[0]) {
-        char lower[512];
-        size_t len = strlen(input_json);
-        if (len >= sizeof(lower)) len = sizeof(lower) - 1;
-        for (size_t i = 0; i < len; i++)
-            lower[i] = (char)tolower((unsigned char)input_json[i]);
-        lower[len] = '\0';
+    if (ctx && ctx->llm_callback) {
+        char prompt[4096];
+        int plen = snprintf(prompt, sizeof(prompt),
+            "[LangChain %s] %s",
+            is_agent_mode ? "Agent" : "Chain",
+            input_json ? input_json : "");
+        if (plen <= 0) return -2;
 
-        int num_tpls = (int)(sizeof(g_lc_chains)/sizeof(g_lc_chains[0]));
-        int best_score = 0;
-        for (int t = 0; t < num_tpls; t++) {
-            int sc = 0;
-            for (int k = 0; k < g_lc_chains[t].kcount; k++)
-                if (strstr(lower, g_lc_chains[t].keywords[k])) sc++;
-            if (sc > best_score) { best_score = sc; tpl_idx = t; }
+        char* llm_response = NULL;
+        int rc = ctx->llm_callback(prompt,
+                                    ctx->config.default_llm_model,
+                                    &llm_response,
+                                    ctx->llm_callback_data);
+        if (rc == 0 && llm_response) {
+            size_t copy_len = strlen(llm_response);
+            if (copy_len >= buf_len) copy_len = buf_len - 1;
+            memcpy(out_buf, llm_response, copy_len);
+            out_buf[copy_len] = '\0';
+            free(llm_response);
+            return 0;
         }
+        free(llm_response);
+        return -3;
     }
 
-    const lc_chain_template_t* tpl =
-        (tpl_idx >= 0) ? &g_lc_chains[tpl_idx] : &g_lc_chains[2];
-
-    uint64_t h = lc_hash(input_json);
-    int pos = 0;
-
-    if (tpl->icount > 0) {
-        int ii = (int)(h % (uint64_t)tpl->icount);
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos, "%s", tpl->intros[ii]);
-    }
-
-    if (tpl->bcount > 0) {
-        int bi = (int)((h >> 16) % (uint64_t)tpl->bcount);
-        if (pos < (int)buf_len - 1)
-            pos += snprintf(out_buf + pos, buf_len - (size_t)pos, "%s", tpl->bodies[bi]);
-    }
-
-    if (is_agent_mode && tool_count > 0 && pos < (int)buf_len - 1) {
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "\nTools utilized (%zu): ", tool_count);
-        for (size_t t = 0; t < tool_count && t < 4; t++) {
-            int ti = (int)((h >> (8+(t*4))) % (uint64_t)tpl->tdcount);
-            if (t > 0) pos += snprintf(out_buf+pos, buf_len-(size_t)pos, ", ");
-            pos += snprintf(out_buf+pos, buf_len-(size_t)pos, "%s", tpl->tool_desc[ti]);
-        }
-    }
-
-    if (input_json && input_json[0] && pos < (int)buf_len - 1) {
-        size_t qlen = strlen(input_json);
-        if (qlen > 150) qlen = 150;
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "\nInput processed: %.150s", input_json);
-    }
-
-    if (pos == 0)
-        snprintf(out_buf, buf_len,
-                 "LangChain execution completed via AgentOS protocol bridge. "
-                 "The request was processed through the configured chain "
-                 "pipeline with proper error handling and result formatting.");
+    out_buf[0] = '\0';
+    return -4;
 }
 
 int langchain_execute_chain(langchain_adapter_context_t* ctx,
@@ -292,6 +262,7 @@ int langchain_execute_chain(langchain_adapter_context_t* ctx,
                              langchain_execution_result_t* result) {
     if (!ctx || !result) return -1;
     if (!ctx->is_initialized) return -2;
+    if (!ctx->llm_callback) return -5;
 
     ctx->total_chains_executed++;
 
@@ -303,18 +274,25 @@ int langchain_execute_chain(langchain_adapter_context_t* ctx,
 
     char resp_text[LC_MAX_RESPONSE_LEN];
     memset(resp_text, 0, sizeof(resp_text));
-    lc_generate_chain_response(input_json, ctx->tool_count,
+    int rc = lc_generate_chain_response(ctx, input_json, ctx->tool_count,
                                false, resp_text, sizeof(resp_text));
 
-    char output_buf[LC_MAX_RESPONSE_LEN + 256];
-    snprintf(output_buf, sizeof(output_buf),
-        "{\"status\":\"success\",\"adapter_version\":\"%s\","
-        "\"response\":\"%.1800s\","
-        "\"input_tokens\":%d,\"output_tokens\":%d}",
-        LANGCHAIN_ADAPTER_VERSION, resp_text,
-        lc_word_count(input_json), lc_word_count(resp_text));
+    if (rc == 0 && resp_text[0]) {
+        char output_buf[LC_MAX_RESPONSE_LEN + 256];
+        snprintf(output_buf, sizeof(output_buf),
+            "{\"status\":\"success\",\"adapter_version\":\"%s\","
+            "\"response\":\"%.1800s\","
+            "\"input_tokens\":%d,\"output_tokens\":%d}",
+            LANGCHAIN_ADAPTER_VERSION, resp_text,
+            lc_word_count(input_json), lc_word_count(resp_text));
+        result->output_json = strdup(output_buf);
+    } else {
+        result->output_json = strdup("{\"status\":\"error\",\"message\":\"LLM callback unavailable\"}");
+        result->success = false;
+        result->error_message = strdup("No LLM callback configured");
+        return -5;
+    }
 
-    result->output_json = strdup(output_buf);
     result->execution_time_ms = difftime(time(NULL), start) * 1000.0;
     if (result->execution_time_ms < 1.0) result->execution_time_ms = 1.0;
     result->step_count = (ctx->tool_count > 0) ? (int)(ctx->tool_count + 2) : 3;
@@ -333,36 +311,33 @@ int langchain_execute_chain_streaming(langchain_adapter_context_t* ctx,
                                      void* user_data) {
     if (!ctx || !stream_handler) return -1;
     if (!ctx->is_initialized) return -2;
+    if (!ctx->llm_callback) return -5;
 
     ctx->total_chains_executed++;
 
     char full_response[LC_MAX_RESPONSE_LEN];
     memset(full_response, 0, sizeof(full_response));
-    lc_generate_chain_response(input_json, ctx->tool_count,
+    int rc = lc_generate_chain_response(ctx, input_json, ctx->tool_count,
                                false, full_response, sizeof(full_response));
+    if (rc != 0) return -5;
 
     size_t resp_len = strlen(full_response);
     size_t pos = 0;
-    int chunk_idx = 0;
 
     while (pos < resp_len) {
         size_t remaining = resp_len - pos;
         size_t cLen = remaining < LC_STREAM_CHUNK_SIZE ?
                        remaining : LC_STREAM_CHUNK_SIZE;
 
-        if (cLen < LC_STREAM_CHUNK_SIZE && remaining > 0) {
-            cLen = remaining;
-        } else {
-            while (cLen > 0 &&
-                   pos + cLen < resp_len &&
-                   !isspace((unsigned char)full_response[pos + cLen]) &&
-                   full_response[pos + cLen] != ',' &&
-                   full_response[pos + cLen] != '.' &&
-                   full_response[pos + cLen] != '\n') {
-                cLen--;
-            }
-            if (cLen == 0) cLen = 1;
+        while (cLen > 0 &&
+               pos + cLen < resp_len &&
+               !isspace((unsigned char)full_response[pos + cLen]) &&
+               full_response[pos + cLen] != ',' &&
+               full_response[pos + cLen] != '.' &&
+               full_response[pos + cLen] != '\n') {
+            cLen--;
         }
+        if (cLen == 0) cLen = 1;
 
         char chunk_buf[LC_STREAM_CHUNK_SIZE + 4];
         memcpy(chunk_buf, full_response + pos, cLen);
@@ -370,7 +345,6 @@ int langchain_execute_chain_streaming(langchain_adapter_context_t* ctx,
         pos += cLen;
 
         stream_handler(chunk_buf, chain_id ? chain_id : "", user_data);
-        chunk_idx++;
     }
 
     ctx->total_chains_executed++;
@@ -406,6 +380,7 @@ int langchain_agent_run(langchain_adapter_context_t* ctx,
                         const char* task_input,
                         langchain_execution_result_t* result) {
     if (!ctx || !result) return -1;
+    if (!ctx->llm_callback) return -5;
 
     langchain_agent_instance_t* found = NULL;
     if (agent_id) {
@@ -428,24 +403,31 @@ int langchain_agent_run(langchain_adapter_context_t* ctx,
     char resp_text[LC_MAX_RESPONSE_LEN];
     memset(resp_text, 0, sizeof(resp_text));
     size_t tool_cnt = (found && found->tool_count > 0) ? found->tool_count : ctx->tool_count;
-    lc_generate_chain_response(task_input, tool_cnt,
+    int rc = lc_generate_chain_response(ctx, task_input, tool_cnt,
                                true, resp_text, sizeof(resp_text));
 
-    int input_tokens = lc_word_count(task_input);
-    int output_tokens = lc_word_count(resp_text);
+    if (rc == 0 && resp_text[0]) {
+        int input_tokens = lc_word_count(task_input);
+        int output_tokens = lc_word_count(resp_text);
 
-    char output_buf[LC_MAX_RESPONSE_LEN + 256];
-    snprintf(output_buf, sizeof(output_buf),
-        "{\"agent_response\":\"%.1800s\","
-        "\"reasoning_steps\":%d,\"tools_used\":%zu,"
-        "\"input_tokens\":%d,\"output_tokens\":%d,"
-        "\"model\":\"%s\"}",
-        resp_text,
-        (int)(tool_cnt > 0 ? tool_cnt + 2 : 3),
-        tool_cnt,
-        input_tokens, output_tokens,
-        ctx->config.default_llm_model ? ctx->config.default_llm_model : "gpt-4o");
-    result->output_json = strdup(output_buf);
+        char output_buf[LC_MAX_RESPONSE_LEN + 256];
+        snprintf(output_buf, sizeof(output_buf),
+            "{\"agent_response\":\"%.1800s\","
+            "\"reasoning_steps\":%d,\"tools_used\":%zu,"
+            "\"input_tokens\":%d,\"output_tokens\":%d,"
+            "\"model\":\"%s\"}",
+            resp_text,
+            (int)(tool_cnt > 0 ? tool_cnt + 2 : 3),
+            tool_cnt,
+            input_tokens, output_tokens,
+            ctx->config.default_llm_model ? ctx->config.default_llm_model : "gpt-4o");
+        result->output_json = strdup(output_buf);
+    } else {
+        result->output_json = strdup("{\"status\":\"error\",\"message\":\"LLM callback unavailable\"}");
+        result->success = false;
+        result->error_message = strdup("No LLM callback configured");
+        return -5;
+    }
 
     result->execution_time_ms = difftime(time(NULL), start) * 1000.0;
     if (result->execution_time_ms < 1.0) result->execution_time_ms = 1.0;
@@ -547,6 +529,15 @@ int langchain_set_trace_handler(langchain_adapter_context_t* ctx,
     if (!ctx) return -1;
     ctx->trace_handler = handler;
     ctx->trace_user_data = user_data;
+    return 0;
+}
+
+int langchain_set_llm_callback(langchain_adapter_context_t* ctx,
+                                langchain_llm_callback_fn callback,
+                                void* user_data) {
+    if (!ctx) return -1;
+    ctx->llm_callback = callback;
+    ctx->llm_callback_data = user_data;
     return 0;
 }
 

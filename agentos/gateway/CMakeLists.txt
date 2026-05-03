@@ -68,6 +68,7 @@ include_directories(${SYSCALL_DIR}/include)
 set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
 include_directories(
     ${COMMONS_DIR}
+    ${COMMONS_DIR}/platform/include
     ${COMMONS_DIR}/utils/error/include
     ${COMMONS_DIR}/utils/logging/include
     ${COMMONS_DIR}/utils/memory/include
@@ -128,6 +129,7 @@ target_include_directories(gateway
 
 target_link_libraries(gateway PRIVATE
     agentos_protocols
+    agentos_common
 )
 
 # 条件链接依赖库

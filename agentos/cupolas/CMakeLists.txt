@@ -16,6 +16,11 @@ if(BUILD_WITH_LOGGING)
     add_definitions(-DCUPOLAS_ENABLE_LOGGING=1)
 endif()
 
+# 配置文件路径定义
+add_definitions(-DAGENTOS_CONFIG_DIR="/etc/agentos")
+add_definitions(-DAGENTOS_LOG_DIR="/var/log/agentos")
+add_definitions(-DAGENTOS_TMP_DIR="/tmp/agentos")
+
 find_package(PkgConfig QUIET)
 
 if(PKG_CONFIG_FOUND)
@@ -158,6 +163,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 # 条件包含OpenSSL目录
 if(OpenSSL_FOUND)
     target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_compile_definitions(${PROJECT_NAME} PRIVATE CUPOLAS_USE_OPENSSL)
 endif()
 
 # 链接 commons 模块

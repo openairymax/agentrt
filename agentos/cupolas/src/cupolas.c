@@ -41,14 +41,14 @@ static void cupolas_internal_config_init_defaults(cupolas_internal_config_t* cfg
     memset(cfg, 0, sizeof(*cfg));
 #ifdef _WIN32
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
-             "C:\\ProgramData\\agentos\\cupolas\\permission_rules.yaml");
+             AGENTOS_CONFIG_DIR "\\cupolas\\permission_rules.yaml");
     snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir),
-             "C:\\ProgramData\\agentos\\cupolas\\logs");
+             AGENTOS_LOG_DIR "\\cupolas");
 #else
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
-             "/etc/agentos/cupolas/permission_rules.yaml");
+             AGENTOS_CONFIG_DIR "/cupolas/permission_rules.yaml");
     snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir),
-             "/var/log/agentos/cupolas");
+             AGENTOS_LOG_DIR "/cupolas");
 #endif
 }
 

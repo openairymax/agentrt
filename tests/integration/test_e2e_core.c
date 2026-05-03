@@ -385,12 +385,12 @@ static void e2e_scenario_6_multithread_integration(void)
 
     for (int i = 0; i < THREAD_COUNT; i++) {
         ids[i] = i;
-        agentos_thread_create(&threads[i], concurrent_thread_fn, &ids[i]);
+        agentos_platform_thread_create(&threads[i], concurrent_thread_fn, &ids[i]);
     }
     TEST_ASSERT(1, "Step 1: 创建6个并发线程");
 
     for (int i = 0; i < THREAD_COUNT; i++) {
-        agentos_thread_join(threads[i], NULL);
+        agentos_platform_thread_join(threads[i], NULL);
     }
     TEST_ASSERT(1, "Step 2: 所有线程安全退出");
 

@@ -15,9 +15,7 @@
 #include <math.h>
 
 static uint64_t rec_timestamp_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+    return agentos_time_ms();
 }
 
 static double rec_jitter(float ratio) {

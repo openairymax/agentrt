@@ -546,53 +546,73 @@ const config_value_t* config_context_get(const config_context_t* ctx, const char
     if (!ctx || !key) {
         return NULL;
     }
-    
+
+    agentos_mutex_lock((agentos_mutex_t*)&ctx->mutex);
     int index = find_item_index(ctx, key);
-    return index >= 0 ? ctx->items[index].value : NULL;
+    const config_value_t* result = index >= 0 ? ctx->items[index].value : NULL;
+    agentos_mutex_unlock((agentos_mutex_t*)&ctx->mutex);
+    return result;
 }
 
 config_error_t config_context_delete(config_context_t* ctx, const char* key) {
-    if (!ctx || !key || ctx->locked) {
+    if (!ctx || !key) {
         return CONFIG_ERROR_INVALID_ARG;
     }
-    
+
+    if (ctx->locked) {
+        return CONFIG_ERROR_LOCKED;
+    }
+
+    agentos_mutex_lock(&ctx->mutex);
+
     int index = find_item_index(ctx, key);
     if (index < 0) {
+        agentos_mutex_unlock(&ctx->mutex);
         return CONFIG_ERROR_NOT_FOUND;
     }
-    
-    // 删除项
+
     AGENTOS_FREE(ctx->items[index].key);
     config_value_destroy(ctx->items[index].value);
-    
-    // 移动后续项
+
     for (size_t i = index + 1; i < ctx->count; i++) {
         ctx->items[i - 1] = ctx->items[i];
     }
-    
+
     ctx->count--;
+    agentos_mutex_unlock(&ctx->mutex);
     return CONFIG_SUCCESS;
 }
 
 bool config_context_has(const config_context_t* ctx, const char* key) {
-    return find_item_index(ctx, key) >= 0;
+    if (!ctx || !key) return false;
+    agentos_mutex_lock((agentos_mutex_t*)&ctx->mutex);
+    bool result = find_item_index(ctx, key) >= 0;
+    agentos_mutex_unlock((agentos_mutex_t*)&ctx->mutex);
+    return result;
 }
 
 void config_context_clear(config_context_t* ctx) {
-    if (!ctx || ctx->locked) {
-        return;
-    }
-    
+    if (!ctx) return;
+
+    if (ctx->locked) return;
+
+    agentos_mutex_lock(&ctx->mutex);
+
     for (size_t i = 0; i < ctx->count; i++) {
         AGENTOS_FREE(ctx->items[i].key);
         config_value_destroy(ctx->items[i].value);
     }
     
     ctx->count = 0;
+    agentos_mutex_unlock(&ctx->mutex);
 }
 
 size_t config_context_count(const config_context_t* ctx) {
-    return ctx ? ctx->count : 0;
+    if (!ctx) return 0;
+    agentos_mutex_lock((agentos_mutex_t*)&ctx->mutex);
+    size_t result = ctx->count;
+    agentos_mutex_unlock((agentos_mutex_t*)&ctx->mutex);
+    return result;
 }
 
 config_error_t config_context_lock(config_context_t* ctx) {

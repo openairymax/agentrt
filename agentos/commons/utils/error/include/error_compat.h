@@ -15,7 +15,8 @@
 #ifndef AGENTOS_UTILS_ERROR_COMPAT_H
 #define AGENTOS_UTILS_ERROR_COMPAT_H
 
-#include "error.h"  /* 包含统一错误处理模块 */
+#include "error.h"
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -170,19 +171,17 @@ static inline agentos_compat_error_category_t agentos_compat_error_get_category(
  * @param handler 错误处理回调函数
  * @note 统一模块使用不同的错误处理机制，此函数提供基本兼容
  */
+static agentos_compat_error_handler_t g_compat_error_handler = NULL;
+static agentos_compat_error_info_handler_t g_compat_error_info_handler = NULL;
+
 static inline void agentos_compat_error_set_handler(agentos_compat_error_handler_t handler)
 {
-    /* 统一模块使用错误链机制，此处记录回调但不直接使用 */
-    (void)handler; /* 暂时忽略，后续实现完整映射 */
+    g_compat_error_handler = handler;
 }
 
-/**
- * @brief 设置结构化错误处理回调（兼容接口）
- * @param handler 结构化错误处理回调函数
- */
 static inline void agentos_compat_error_set_info_handler(agentos_compat_error_info_handler_t handler)
 {
-    (void)handler; /* 暂时忽略，后续实现完整映射 */
+    g_compat_error_info_handler = handler;
 }
 
 /**
@@ -225,7 +224,14 @@ static inline void agentos_compat_error_handle_with_context(
     void* user_data,
     const char* fmt, ...)
 {
-    (void)user_data; /* 暂时忽略用户数据 */
+    if (g_compat_error_info_handler && err != AGENTOS_OK) {
+        char buffer[512];
+        va_list args2;
+        va_start(args2, fmt);
+        vsnprintf(buffer, sizeof(buffer), fmt, args2);
+        va_end(args2);
+        g_compat_error_info_handler(err, function, file, line, user_data, buffer);
+    }
     
     if (err != AGENTOS_OK) {
         char buffer[512];

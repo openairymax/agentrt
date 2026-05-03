@@ -84,9 +84,7 @@ static void ensure_mutex_initialized(void) {
 }
 
 static uint64_t get_monotonic_ns(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+    return agentos_time_ns();
 }
 
 void agentos_resource_track_alloc(void* resource, const char* type, const char* file, int line) {

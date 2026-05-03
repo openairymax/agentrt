@@ -23,6 +23,7 @@
 #include "error.h"
 #include "agentos_time.h"
 #include "observability.h"
+#include "platform.h"
 #include <stdlib.h>
 
 /* ==================== 前向声明（不在头文件中的函数） ==================== */
@@ -356,11 +357,11 @@ static void test_task_create_join(void)
     int shared_val = 0;
     agentos_thread_t thread;
 
-    err = agentos_thread_create(&thread, simple_task_entry, &shared_val);
+    err = agentos_platform_thread_create(&thread, simple_task_entry, &shared_val);
     TEST_ASSERT_EQ(err, AGENTOS_SUCCESS, "thread_create 成功");
 
     void* retval = NULL;
-    err = agentos_thread_join(thread, &retval);
+    err = agentos_platform_thread_join(thread, &retval);
     TEST_ASSERT_EQ(err, AGENTOS_SUCCESS, "thread_join 成功");
     TEST_ASSERT(retval == &shared_val, "返回值为传入的参数");
     TEST_ASSERT(g_task_entry_called > 0, "任务入口函数被执行");
@@ -380,12 +381,12 @@ static void test_task_cleanup_full(void)
     int vals[4] = {0};
 
     for (int i = 0; i < 4; i++) {
-        err = agentos_thread_create(&threads[i], simple_task_entry, &vals[i]);
+        err = agentos_platform_thread_create(&threads[i], simple_task_entry, &vals[i]);
         TEST_ASSERT_EQ(err, AGENTOS_SUCCESS, "创建多个任务成功");
     }
 
     for (int i = 0; i < 4; i++) {
-        agentos_thread_join(threads[i], NULL);
+        agentos_platform_thread_join(threads[i], NULL);
     }
 
     agentos_task_cleanup();
@@ -454,12 +455,12 @@ static void test_event_signal_wait(void)
     static int wait_result = -1;
 
     wait_arg_t warg = { .evt = event, .result = &wait_result };
-    agentos_thread_create(&waiter_thread, waiter_fn, &warg);
+    agentos_platform_thread_create(&waiter_thread, waiter_fn, &warg);
 
     agentos_time_sleep_ms(100);
     agentos_event_signal(event);
 
-    agentos_thread_join(waiter_thread, NULL);
+    agentos_platform_thread_join(waiter_thread, NULL);
     TEST_ASSERT_EQ(wait_result, AGENTOS_SUCCESS, "事件等待者收到信号并返回SUCCESS");
 
     agentos_event_destroy(event);
@@ -618,7 +619,7 @@ static void test_metric_counter(void)
     TEST_ASSERT_EQ(err, AGENTOS_SUCCESS, "记录指标样本成功");
 
     char buf[4096];
-    int written = agentos_metrics_export_prometheus(buf, sizeof(buf));
+    int written = agentos_observability_export_prometheus(buf, sizeof(buf));
     TEST_ASSERT(written > 0, "Prometheus导出产生输出");
     TEST_ASSERT(strstr(buf, "requests_total") != NULL, "导出包含指标名称");
 

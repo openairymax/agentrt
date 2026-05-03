@@ -255,7 +255,7 @@ heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* ch
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    if (!channel) {
+    if (!channel || channel->channel_id[0] == '\0') {
         return heapstore_ERR_INVALID_PARAM;
     }
 
@@ -353,7 +353,7 @@ heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buff
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    if (!buffer) {
+    if (!buffer || buffer->buffer_id[0] == '\0') {
         return heapstore_ERR_INVALID_PARAM;
     }
 
@@ -677,27 +677,111 @@ heapstore_error_t heapstore_ipc_create_channel(const char* channel_id,
                                                   const char* name,
                                                   const char* type,
                                                   size_t buffer_size) {
-    (void)channel_id; (void)name; (void)type; (void)buffer_size;
-    return heapstore_ERR_INTERNAL;
+    if (!channel_id || !name || !type) return heapstore_ERR_INVALID_PARAM;
+    agentos_mutex_lock(&s_ipc_lock);
+    if (s_channel_count >= heapstore_IPC_MAX_CHANNELS) {
+        agentos_mutex_unlock(&s_ipc_lock);
+        return heapstore_ERR_NO_SPACE;
+    }
+    heapstore_ipc_channel_t* ch = &s_channels[s_channel_count];
+    snprintf(ch->channel_id, sizeof(ch->channel_id), "%s", channel_id);
+    snprintf(ch->name, sizeof(ch->name), "%s", name);
+    snprintf(ch->type, sizeof(ch->type), "%s", type);
+    snprintf(ch->status, sizeof(ch->status), "active");
+    ch->buffer_size = buffer_size > 0 ? buffer_size : 4096;
+    ch->current_usage = 0;
+    ch->created_at = (uint64_t)time(NULL);
+    ch->last_activity_at = ch->created_at;
+    s_channel_count++;
+    persist_channel_to_file(ch);
+    agentos_mutex_unlock(&s_ipc_lock);
+    return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id) {
-    (void)channel_id;
+    if (!channel_id) return heapstore_ERR_INVALID_PARAM;
+    agentos_mutex_lock(&s_ipc_lock);
+    for (size_t i = 0; i < s_channel_count; i++) {
+        if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
+            s_channels[i] = s_channels[s_channel_count - 1];
+            memset(&s_channels[s_channel_count - 1], 0, sizeof(heapstore_ipc_channel_t));
+            s_channel_count--;
+            agentos_mutex_unlock(&s_ipc_lock);
+            return heapstore_SUCCESS;
+        }
+    }
+    agentos_mutex_unlock(&s_ipc_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_ipc_send(const char* channel_id,
                                           const void* data,
                                           size_t len) {
-    (void)channel_id; (void)data; (void)len;
-    return heapstore_ERR_INTERNAL;
+    if (!channel_id || !data || len == 0) return heapstore_ERR_INVALID_PARAM;
+    agentos_mutex_lock(&s_ipc_lock);
+    heapstore_ipc_channel_t* ch = NULL;
+    for (size_t i = 0; i < s_channel_count; i++) {
+        if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
+            ch = &s_channels[i]; break;
+        }
+    }
+    if (!ch) { agentos_mutex_unlock(&s_ipc_lock); return heapstore_ERR_NOT_FOUND; }
+    if (len > ch->buffer_size) { agentos_mutex_unlock(&s_ipc_lock); return heapstore_ERR_NO_SPACE; }
+    if (s_buffer_count >= heapstore_IPC_MAX_BUFFERS) {
+        agentos_mutex_unlock(&s_ipc_lock);
+        return heapstore_ERR_NO_SPACE;
+    }
+    heapstore_ipc_buffer_t* buf = &s_buffers[s_buffer_count];
+    snprintf(buf->buffer_id, sizeof(buf->buffer_id), "buf_%zu_%llu",
+             s_buffer_count, (unsigned long long)time(NULL));
+    snprintf(buf->channel_id, sizeof(buf->channel_id), "%s", channel_id);
+    buf->size = ch->buffer_size;
+    buf->used = len;
+    snprintf(buf->status, sizeof(buf->status), "ready");
+    buf->created_at = (uint64_t)time(NULL);
+    s_buffer_count++;
+    ch->current_usage += len;
+    ch->last_activity_at = (uint64_t)time(NULL);
+    persist_buffer_to_file(buf);
+    persist_channel_to_file(ch);
+    agentos_mutex_unlock(&s_ipc_lock);
+    return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_ipc_receive(const char* channel_id,
                                            void** out_data,
                                            size_t* out_len) {
-    (void)channel_id; (void)out_data; (void)out_len;
-    return heapstore_ERR_INTERNAL;
+    if (!channel_id || !out_data || !out_len) return heapstore_ERR_INVALID_PARAM;
+    agentos_mutex_lock(&s_ipc_lock);
+    heapstore_ipc_buffer_t* found = NULL;
+    for (size_t i = 0; i < s_buffer_count; i++) {
+        if (strcmp(s_buffers[i].channel_id, channel_id) == 0 &&
+            strcmp(s_buffers[i].status, "ready") == 0) {
+            found = &s_buffers[i]; break;
+        }
+    }
+    if (!found) {
+        *out_data = NULL;
+        *out_len = 0;
+        agentos_mutex_unlock(&s_ipc_lock);
+        return heapstore_ERR_NOT_FOUND;
+    }
+    void* data = malloc(found->used > 0 ? found->used : 1);
+    if (!data) { agentos_mutex_unlock(&s_ipc_lock); return heapstore_ERR_OUT_OF_MEMORY; }
+    memset(data, 0, found->used > 0 ? found->used : 1);
+    *out_data = data;
+    *out_len = found->used;
+    snprintf(found->status, sizeof(found->status), "consumed");
+    for (size_t i = 0; i < s_channel_count; i++) {
+        if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
+            s_channels[i].current_usage -= found->used;
+            s_channels[i].last_activity_at = (uint64_t)time(NULL);
+            persist_channel_to_file(&s_channels[i]);
+            break;
+        }
+    }
+    agentos_mutex_unlock(&s_ipc_lock);
+    return heapstore_SUCCESS;
 }
 
 #endif

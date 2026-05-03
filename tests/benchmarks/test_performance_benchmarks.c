@@ -470,12 +470,12 @@ static void test_benchmark_concurrent(void)
         ctxs[i].thread_id = i;
         ctxs[i].total_alloc_time_ns = 0;
         ctxs[i].alloc_count = 0;
-        agentos_thread_create(&threads[i], bm_concurrent_thread_fn, &ctxs[i]);
+        agentos_platform_thread_create(&threads[i], bm_concurrent_thread_fn, &ctxs[i]);
     }
 
     uint64_t total_ops = 0;
     for (int i = 0; i < BM_THREAD_COUNT; i++) {
-        agentos_thread_join(threads[i], NULL);
+        agentos_platform_thread_join(threads[i], NULL);
         total_ops += ctxs[i].alloc_count;
     }
 

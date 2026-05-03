@@ -9,7 +9,7 @@
 # 配置归属（按双重责任模型）
 _owner:
   module: "manager"
-  contact: "manager-team@spharx.cn"
+  contact: "manager-team@example.com"
   path: "AgentOS/manager"
   description: "内容定义责任和管理责任均归属 Manager 模块（自管理配置）"
 

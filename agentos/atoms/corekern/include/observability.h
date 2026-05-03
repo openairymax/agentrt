@@ -214,7 +214,7 @@ AGENTOS_API int agentos_performance_get_metrics(double* out_cpu_usage,
  * @param buffer_size 缓冲区大小
  * @return 成功返回写入的字节数，失败返回负数
  */
-AGENTOS_API int agentos_metrics_export_prometheus(char* buffer, size_t buffer_size);
+AGENTOS_API int agentos_observability_export_prometheus(char* buffer, size_t buffer_size);
 
 /**
  * @brief 导出健康检查状态

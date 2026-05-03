@@ -12,14 +12,14 @@
 #include "logging_compat.h"
 #include "logging.h"
 #include <stdlib.h>
-#include <unistd.h>
 
-/* Unified base library compatibility layer */
 #include "include/memory_compat.h"
+#include "utils/include/atomic_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
+#include "platform.h"
 
 static size_t log_get_registered_module_count(void) { return 0; }
 static void log_get_registered_modules(void* out_modules, int max_modules) { (void)out_modules; (void)max_modules; }
@@ -96,7 +96,7 @@ static const char* generate_old_trace_id(void)
     time_t now = time(NULL);
     
     snprintf(trace_id, sizeof(trace_id), "trace-%d-%ld-%d",
-             pid, now, __atomic_fetch_add(&counter, 1, __ATOMIC_RELAXED));
+             pid, now, atomic_fetch_add(&counter, 1));
     
     return trace_id;
 }
@@ -110,15 +110,15 @@ static const char* generate_old_trace_id(void)
 static void record_api_call(const char* api_name)
 {
     /* 更新统计信息 */
-    __atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_write_calls, 1, __ATOMIC_RELAXED);
+    atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_write_calls, 1);
     
     /* 记录具体API调用（按API名称分类统计） */
     if (strstr(api_name, "agentos_log_write")) {
-        __atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_write_calls, 1, __ATOMIC_RELAXED);
+        atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_write_calls, 1);
     } else if (strstr(api_name, "set_trace_id")) {
-        __atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_set_trace_id_calls, 1, __ATOMIC_RELAXED);
+        atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_set_trace_id_calls, 1);
     } else if (strstr(api_name, "get_trace_id")) {
-        __atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_get_trace_id_calls, 1, __ATOMIC_RELAXED);
+        atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_get_trace_id_calls, 1);
     }
     
     /* 如果启用API映射日志，输出调试信�?*/
@@ -174,16 +174,18 @@ const char* agentos_log_set_trace_id(const char* trace_id)
         strncpy(g_thread_trace_id, trace_id, sizeof(g_thread_trace_id) - 1);
         g_thread_trace_id[sizeof(g_thread_trace_id) - 1] = '\0';
     } else {
-        /* 自动生成追踪ID */
         if (g_compat_config.behavior.emulate_old_trace_id) {
-            /* 使用旧的追踪ID生成算法 */
             const char* old_id = generate_old_trace_id();
-            strncpy(g_thread_trace_id, old_id, sizeof(g_thread_trace_id) - 1);
+            if (old_id) {
+                strncpy(g_thread_trace_id, old_id, sizeof(g_thread_trace_id) - 1);
+            }
         } else {
-            /* 使用新架构的追踪ID生成 */
             const char* new_id = log_set_trace_id(NULL);
-            strncpy(g_thread_trace_id, new_id, sizeof(g_thread_trace_id) - 1);
+            if (new_id) {
+                strncpy(g_thread_trace_id, new_id, sizeof(g_thread_trace_id) - 1);
+            }
         }
+        g_thread_trace_id[sizeof(g_thread_trace_id) - 1] = '\0';
     }
     
     /* 同时设置到新架构的追踪ID管理�?*/
@@ -398,7 +400,7 @@ int logging_migrate_module(const char* module_name, const migration_options_t* o
     LOG_INFO("Starting migration for module: %s", module_name);
     
     /* 更新迁移进度统计 */
-    __atomic_fetch_add(&g_compat_stats.migration_progress.migrating_modules, 1, __ATOMIC_RELAXED);
+    atomic_fetch_add(&g_compat_stats.migration_progress.migrating_modules, 1);
     
     return 0;
 }

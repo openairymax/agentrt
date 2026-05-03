@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <ctype.h>
+#include "platform.h"
 #define ROUTER_MAX_PARAMS 16
 #define ROUTER_PARAM_NAME_LEN 64
 #define ROUTER_PARAM_VAL_LEN 256
@@ -145,11 +146,7 @@ int protocol_router_route(protocol_router_handle_t router,
     struct protocol_router_s* r = (struct protocol_router_s*)router;
     r->total_messages_routed++;
     
-    uint64_t start_time = 0;
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-        start_time = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-    }
+    uint64_t start_time = agentos_time_ns();
     
     // 收集所有规则到临时数组供决策函数使用
     protocol_rule_t* rule_array = NULL;
@@ -190,8 +187,8 @@ int protocol_router_route(protocol_router_handle_t router,
         *transformed = *message;
         transformed->protocol = r->default_protocol;
         
-        if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-            uint64_t end_time = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+        {
+            uint64_t end_time = agentos_time_ns();
             if (start_time > 0) {
                 r->total_conversion_time_ns += (end_time - start_time);
             }
@@ -220,8 +217,8 @@ int protocol_router_route(protocol_router_handle_t router,
         }
     }
     
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-        uint64_t end_time = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+    uint64_t end_time = agentos_time_ns();
+        if (1) {
         if (start_time > 0) {
             r->total_conversion_time_ns += (end_time - start_time);
         }
@@ -356,8 +353,25 @@ int protocol_transformer_default(const unified_message_t* source,
     if (!source || !target) {
         return -1;
     }
-    
+
     *target = *source;
+
+    if (source->payload && source->payload_size > 0) {
+        void* new_payload = malloc(source->payload_size);
+        if (!new_payload) return -1;
+        memcpy(new_payload, source->payload, source->payload_size);
+        target->payload = new_payload;
+    }
+
+    if (source->body && source->body_length > 0) {
+        void* new_body = malloc(source->body_length);
+        if (new_body) {
+            memcpy(new_body, source->body, source->body_length);
+            target->body = new_body;
+        }
+    }
+
+    (void)context;
     return 0;
 }
 
