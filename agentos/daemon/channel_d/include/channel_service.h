@@ -66,7 +66,7 @@ typedef struct {
     .max_channels = CHANNEL_MAX_CHANNELS, \
     .default_buffer_size = 65536, \
     .socket_backlog = 128, \
-    .socket_dir = "/tmp/agentos/channels", \
+    .socket_dir = AGENTOS_TMP_DIR "/channels", \
     .shm_prefix = "/agentos_ch_", \
     .idle_timeout_ms = 30000 }
 

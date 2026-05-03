@@ -105,42 +105,45 @@ agentos_error_t agentos_unbinder_unbind(
     int use_complex = binder->use_complex;
     int Q = (binder->Q && dim > 0) ? (int)binder->Q[0] : 1;
 
-    // 目前只支持已知一个向量的情况
-    if (known_count != 1) return AGENTOS_ENOTSUP;
-
-    float** results = (float**)AGENTOS_MALLOC(sizeof(float*));
+    float** results = (float**)AGENTOS_MALLOC(known_count * sizeof(float*));
     if (!results) return AGENTOS_ENOMEM;
 
-    float* unknown = (float*)AGENTOS_MALLOC(dim * sizeof(float));
-    if (!unknown) {
-        AGENTOS_FREE(results);
-        return AGENTOS_ENOMEM;
-    }
+    memset(results, 0, known_count * sizeof(float*));
 
     agentos_mutex_lock(unbinder->lock);
 
-    if (use_complex) {
-        unbind_complex_op(bound_vector, known_vectors[0], unknown, dim);
-    } else {
-        if (Q == 1 && binder->bind_matrices) {
-            float* g_output = (float*)AGENTOS_MALLOC(dim * sizeof(float));
-            if (!g_output) {
-                memset(unknown, 0, dim * sizeof(float));
-            } else {
-                memset(g_output, 0, dim * sizeof(float));
-                binder->bind_matrices(binder, known_vectors[0], g_output);
-                unbind_real_q1(bound_vector, g_output, unknown, dim, NULL);
-                AGENTOS_FREE(g_output);
-            }
-        } else {
-            memset(unknown, 0, dim * sizeof(float));
+    for (size_t k = 0; k < known_count; k++) {
+        float* unknown = (float*)AGENTOS_MALLOC(dim * sizeof(float));
+        if (!unknown) {
+            for (size_t j = 0; j < k; j++) AGENTOS_FREE(results[j]);
+            AGENTOS_FREE(results);
+            agentos_mutex_unlock(unbinder->lock);
+            return AGENTOS_ENOMEM;
         }
+
+        if (use_complex) {
+            unbind_complex_op(bound_vector, known_vectors[k], unknown, dim);
+        } else {
+            if (Q == 1 && binder->bind_matrices) {
+                float* g_output = (float*)AGENTOS_MALLOC(dim * sizeof(float));
+                if (!g_output) {
+                    memset(unknown, 0, dim * sizeof(float));
+                } else {
+                    memset(g_output, 0, dim * sizeof(float));
+                    binder->bind_matrices(binder, known_vectors[k], g_output);
+                    unbind_real_q1(bound_vector, g_output, unknown, dim, NULL);
+                    AGENTOS_FREE(g_output);
+                }
+            } else {
+                memset(unknown, 0, dim * sizeof(float));
+            }
+        }
+        results[k] = unknown;
     }
 
     agentos_mutex_unlock(unbinder->lock);
 
-    results[0] = unknown;
     *out_vectors = results;
-    *out_count = 1;
+    *out_count = known_count;
     return AGENTOS_SUCCESS;
 }

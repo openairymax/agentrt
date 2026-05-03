@@ -17,6 +17,19 @@ static config_context_t* g_compat_ctx = NULL;
 static config_compat_stats_t g_compat_stats = {0};
 static bool g_compat_initialized = false;
 
+#define MAX_CALLBACKS 16
+#define MAX_SOURCES 8
+#define MAX_ENV_LEN 64
+
+static config_change_callback_t g_callbacks[MAX_CALLBACKS];
+static void* g_callback_user_data[MAX_CALLBACKS];
+static int g_callback_count = 0;
+
+static char g_sources[MAX_SOURCES][128];
+static int g_source_count = 0;
+
+static char g_environment[MAX_ENV_LEN] = "default";
+
 static config_context_t* _get_or_create_ctx(void) {
     if (!g_compat_ctx) {
         g_compat_ctx = config_context_create("compat_default");
@@ -168,6 +181,20 @@ int config_load_file(const char* file_path) {
 int config_save_file(const char* file_path) {
     g_compat_stats.total_calls++;
     if (!file_path) return -1;
+    config_context_t* ctx = _get_or_create_ctx();
+    if (!ctx) return -1;
+    FILE* f = fopen(file_path, "w");
+    if (!f) return -1;
+    size_t count = config_context_count(ctx);
+    for (size_t i = 0; i < count; i++) {
+        const char* key = config_context_get_key_at(ctx, i);
+        const config_value_t* val = config_context_get_value_at(ctx, i);
+        if (!key || !val) continue;
+        fprintf(f, "%s=", key);
+        config_value_print(val, 0);
+        fprintf(f, "\n");
+    }
+    fclose(f);
     return 0;
 }
 
@@ -194,15 +221,25 @@ void config_clear_all(void) {
 
 int config_register_callback(config_change_callback_t callback, void* user_data) {
     g_compat_stats.total_calls++;
-    (void)callback;
-    (void)user_data;
+    if (!callback || g_callback_count >= MAX_CALLBACKS) return -1;
+    g_callbacks[g_callback_count] = callback;
+    g_callback_user_data[g_callback_count] = user_data;
+    g_callback_count++;
     return 0;
 }
 
 int config_unregister_callback(config_change_callback_t callback) {
     g_compat_stats.total_calls++;
-    (void)callback;
-    return 0;
+    if (!callback) return -1;
+    for (int i = 0; i < g_callback_count; i++) {
+        if (g_callbacks[i] == callback) {
+            g_callbacks[i] = g_callbacks[g_callback_count - 1];
+            g_callback_user_data[i] = g_callback_user_data[g_callback_count - 1];
+            g_callback_count--;
+            return 0;
+        }
+    }
+    return -1;
 }
 
 const char* config_get_last_error(void) {
@@ -245,65 +282,149 @@ int config_get_string_with_maxlen(const char* key, const char* default_value,
 }
 
 int config_get_array_size(const char* key) {
-    (void)key;
+    g_compat_stats.total_calls++;
+    config_context_t* ctx = _get_or_create_ctx();
+    if (!ctx || !key) return 0;
+    const config_value_t* val = config_context_get(ctx, key);
+    if (!val || config_value_get_type(val) != CONFIG_TYPE_ARRAY) return 0;
+    char count_key[256];
+    snprintf(count_key, sizeof(count_key), "%s.__array_len", key);
+    const config_value_t* count_val = config_context_get(ctx, count_key);
+    if (count_val) return config_value_get_int(count_val, 0);
     return 0;
 }
 
 int config_get_array_item_int(const char* key, int index, int default_value) {
-    (void)key; (void)index;
-    return default_value;
+    g_compat_stats.total_calls++;
+    if (index < 0) return default_value;
+    char item_key[256];
+    snprintf(item_key, sizeof(item_key), "%s.%d", key, index);
+    return config_get_int(item_key, default_value);
 }
 
 const char* config_get_array_item_string(const char* key, int index, const char* default_value) {
-    (void)key; (void)index;
-    return default_value;
+    g_compat_stats.total_calls++;
+    if (index < 0) return default_value;
+    char item_key[256];
+    snprintf(item_key, sizeof(item_key), "%s.%d", key, index);
+    return config_get_string(item_key, default_value);
 }
 
 int config_set_array_item_int(const char* key, int index, int value) {
-    (void)key; (void)index; (void)value;
-    return 0;
+    g_compat_stats.total_calls++;
+    if (index < 0) return -1;
+    char item_key[256];
+    snprintf(item_key, sizeof(item_key), "%s.%d", key, index);
+    return config_set_int(item_key, value);
 }
 
 int config_set_array_item_string(const char* key, int index, const char* value) {
-    (void)key; (void)index; (void)value;
-    return 0;
+    g_compat_stats.total_calls++;
+    if (index < 0) return -1;
+    char item_key[256];
+    snprintf(item_key, sizeof(item_key), "%s.%d", key, index);
+    return config_set_string(item_key, value);
 }
 
 int config_add_source(const char* source_type, const char* source_config) {
-    (void)source_type; (void)source_config;
+    g_compat_stats.total_calls++;
+    if (!source_type || !source_config) return -1;
+    if (g_source_count >= MAX_SOURCES) return -1;
+    snprintf(g_sources[g_source_count], sizeof(g_sources[g_source_count]),
+             "%s:%s", source_type, source_config);
+    g_source_count++;
+    if (strcmp(source_type, "file") == 0) {
+        return config_load_file(source_config);
+    }
     return 0;
 }
 
 int config_remove_source(const char* source_type) {
-    (void)source_type;
-    return 0;
+    g_compat_stats.total_calls++;
+    if (!source_type) return -1;
+    for (int i = 0; i < g_source_count; i++) {
+        if (strncmp(g_sources[i], source_type, strlen(source_type)) == 0 && g_sources[i][strlen(source_type)] == ':') {
+            g_sources[i][0] = '\0';
+            g_source_count--;
+            if (i < g_source_count) {
+                memcpy(g_sources[i], g_sources[g_source_count], sizeof(g_sources[i]));
+                g_sources[g_source_count][0] = '\0';
+            }
+            return 0;
+        }
+    }
+    return -1;
 }
 
 int config_reload_all_sources(void) {
+    g_compat_stats.total_calls++;
+    for (int i = 0; i < g_source_count; i++) {
+        if (g_sources[i][0] == '\0') continue;
+        if (strncmp(g_sources[i], "file:", 5) == 0) {
+            config_load_file(g_sources[i] + 5);
+        }
+    }
     return 0;
 }
 
 int config_set_environment(const char* environment) {
-    (void)environment;
+    g_compat_stats.total_calls++;
+    if (!environment) return -1;
+    strncpy(g_environment, environment, sizeof(g_environment) - 1);
+    g_environment[sizeof(g_environment) - 1] = '\0';
     return 0;
 }
 
 const char* config_get_current_environment(void) {
-    return "default";
+    return g_environment;
 }
 
 int config_load_environment_config(const char* environment) {
-    (void)environment;
+    g_compat_stats.total_calls++;
+    if (!environment) return -1;
+    char path[512];
+    snprintf(path, sizeof(path), "%s.d/%s.conf", environment, environment);
+    if (config_load_file(path) != 0) {
+        snprintf(path, sizeof(path), "/etc/agentos/%s.conf", environment);
+        config_load_file(path);
+    }
+    config_set_environment(environment);
     return 0;
 }
 
 int config_dump_to_file(const char* file_path, const char* format) {
-    (void)file_path; (void)format;
+    g_compat_stats.total_calls++;
+    if (!file_path) return -1;
+    config_context_t* ctx = _get_or_create_ctx();
+    if (!ctx) return -1;
+    FILE* f = fopen(file_path, "w");
+    if (!f) return -1;
+    size_t count = config_context_count(ctx);
+    for (size_t i = 0; i < count; i++) {
+        const char* key = config_context_get_key_at(ctx, i);
+        const config_value_t* val = config_context_get_value_at(ctx, i);
+        if (!key || !val) continue;
+        if (format && strcmp(format, "json") == 0) {
+            fprintf(f, "\"%s\": ", key);
+            config_value_print(val, 0);
+            if (i < count - 1) fprintf(f, ",");
+            fprintf(f, "\n");
+        } else {
+            fprintf(f, "%s=", key);
+            config_value_print(val, 0);
+            fprintf(f, "\n");
+        }
+    }
+    fclose(f);
     return 0;
 }
 
 int config_validate_schema(const char* schema_file) {
-    (void)schema_file;
+    g_compat_stats.total_calls++;
+    if (!schema_file) return -1;
+    FILE* f = fopen(schema_file, "r");
+    if (!f) return -1;
+    fclose(f);
     return 0;
 }
 

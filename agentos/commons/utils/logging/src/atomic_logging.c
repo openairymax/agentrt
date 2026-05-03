@@ -345,7 +345,6 @@ int atomic_logging_get_stats(atomic_logging_stats_t* stats) {
 
     stats->total_submitted = g_atomic_state.ring_buffer.total_submitted;
     stats->total_acquired = g_atomic_state.ring_buffer.total_consumed;
-    stats->current_queue_size = g_atomic_state.ring_buffer.capacity;
 
     agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
 
@@ -356,6 +355,8 @@ void atomic_logging_cleanup(void) {
     if (!g_atomic_state.initialized) {
         return;
     }
+
+    atomic_logging_flush();
 
     g_atomic_state.flush_thread_running = false;
     agentos_thread_join(g_atomic_state.flush_thread, NULL);

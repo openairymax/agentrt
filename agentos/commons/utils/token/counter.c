@@ -71,29 +71,71 @@ size_t agentos_token_count(const char* text, const agentos_token_config_t* confi
                 }
             }
             i++;
-        } else if (c < 0xE0) {
-            cjk_count++;
-            in_word = false;
-            i += 2;
-        } else if (c < 0xF0) {
-            unsigned char c2 = (i + 1 < length) ? (unsigned char)text[i + 1] : 0;
-            if ((c & 0x0F) == 0x0E && (c2 & 0xC0) == 0x80) {
-                unsigned char c3 = (i + 2 < length) ? (unsigned char)text[i + 2] : 0;
-                unsigned int cp = ((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
-                if (cp >= 0x4E00 && cp <= 0x9FFF) {
+        } else {
+            uint32_t code_point = 0;
+            size_t bytes_consumed = 0;
+
+            if (c >= 0xC2 && c <= 0xDF && i + 1 < length) {
+                unsigned char n1 = (unsigned char)text[i + 1];
+                if ((n1 & 0xC0) == 0x80) {
+                    code_point = ((uint32_t)(c & 0x1F) << 6) | (uint32_t)(n1 & 0x3F);
+                    bytes_consumed = 2;
+                }
+            } else if (c >= 0xE0 && c <= 0xEF && i + 2 < length) {
+                unsigned char n1 = (unsigned char)text[i + 1];
+                unsigned char n2 = (unsigned char)text[i + 2];
+                if ((n1 & 0xC0) == 0x80 && (n2 & 0xC0) == 0x80) {
+                    if (c == 0xE0 && n1 < 0xA0) { i++; continue; }
+                    if (c == 0xED && n1 > 0x9F) { i++; continue; }
+                    code_point = ((uint32_t)(c & 0x0F) << 12) |
+                                 ((uint32_t)(n1 & 0x3F) << 6) |
+                                 (uint32_t)(n2 & 0x3F);
+                    bytes_consumed = 3;
+                }
+            } else if (c >= 0xF0 && c <= 0xF4 && i + 3 < length) {
+                unsigned char n1 = (unsigned char)text[i + 1];
+                unsigned char n2 = (unsigned char)text[i + 2];
+                unsigned char n3 = (unsigned char)text[i + 3];
+                if ((n1 & 0xC0) == 0x80 && (n2 & 0xC0) == 0x80 && (n3 & 0xC0) == 0x80) {
+                    if (c == 0xF0 && n1 < 0x90) { i++; continue; }
+                    if (c == 0xF4 && n1 > 0x8F) { i++; continue; }
+                    code_point = ((uint32_t)(c & 0x07) << 18) |
+                                 ((uint32_t)(n1 & 0x3F) << 12) |
+                                 ((uint32_t)(n2 & 0x3F) << 6) |
+                                 (uint32_t)(n3 & 0x3F);
+                    bytes_consumed = 4;
+                }
+            }
+
+            if (bytes_consumed > 0) {
+                int is_cjk = 0;
+                if (code_point >= 0x4E00 && code_point <= 0x9FFF) is_cjk = 1;
+                else if (code_point >= 0x3400 && code_point <= 0x4DBF) is_cjk = 1;
+                else if (code_point >= 0x20000 && code_point <= 0x2A6DF) is_cjk = 1;
+                else if (code_point >= 0x2A700 && code_point <= 0x2B73F) is_cjk = 1;
+                else if (code_point >= 0x2B740 && code_point <= 0x2B81F) is_cjk = 1;
+                else if (code_point >= 0x2B820 && code_point <= 0x2CEAF) is_cjk = 1;
+                else if (code_point >= 0x2CEB0 && code_point <= 0x2EBEF) is_cjk = 1;
+                else if (code_point >= 0x30000 && code_point <= 0x3134F) is_cjk = 1;
+                else if (code_point >= 0x31350 && code_point <= 0x323AF) is_cjk = 1;
+                else if (code_point >= 0xF900 && code_point <= 0xFAFF) is_cjk = 1;
+                else if (code_point >= 0x2F800 && code_point <= 0x2FA1F) is_cjk = 1;
+                else if (code_point >= 0x3000 && code_point <= 0x303F) is_cjk = 1;
+                else if (code_point >= 0x3040 && code_point <= 0x309F) is_cjk = 1;
+                else if (code_point >= 0x30A0 && code_point <= 0x30FF) is_cjk = 1;
+                else if (code_point >= 0xAC00 && code_point <= 0xD7AF) is_cjk = 1;
+                else if (code_point >= 0xFF00 && code_point <= 0xFFEF) is_cjk = 1;
+
+                if (is_cjk) {
                     cjk_count++;
                 } else {
                     word_count++;
                 }
+                in_word = false;
+                i += bytes_consumed;
             } else {
-                cjk_count++;
+                i++;
             }
-            in_word = false;
-            i += 3;
-        } else {
-            cjk_count++;
-            in_word = false;
-            i += 4;
         }
     }
 

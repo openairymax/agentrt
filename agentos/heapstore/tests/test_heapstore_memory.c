@@ -106,6 +106,9 @@ static void test_memory_allocation_crud(void) {
 static void test_memory_stats(void) {
     printf("Test: memory_stats...");
 
+    heapstore_error_t init_err = heapstore_memory_init();
+    assert(init_err == heapstore_SUCCESS || init_err == heapstore_ERR_ALREADY_INITIALIZED);
+
     uint32_t pool_count = 0;
     uint32_t total_allocations = 0;
     uint64_t total_size = 0;

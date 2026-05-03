@@ -99,6 +99,21 @@ extern "C" {
     #define AGENTOS_PATH_MAX 4096
 #endif
 
+/* ==================== 标准路径常量 (BAN-32合规) ==================== */
+#if AGENTOS_PLATFORM_WINDOWS
+    #define AGENTOS_RUNTIME_DIR "C:\\ProgramData\\agentos\\run"
+    #define AGENTOS_LOG_DIR "C:\\ProgramData\\agentos\\logs"
+    #define AGENTOS_CONFIG_DIR "C:\\ProgramData\\agentos\\config"
+    #define AGENTOS_TMP_DIR "C:\\ProgramData\\agentos\\tmp"
+    #define AGENTOS_CACHE_DIR "C:\\ProgramData\\agentos\\cache"
+#else
+    #define AGENTOS_RUNTIME_DIR "/var/run/agentos"
+    #define AGENTOS_LOG_DIR "/var/log/agentos"
+    #define AGENTOS_CONFIG_DIR "/etc/agentos"
+    #define AGENTOS_TMP_DIR "/tmp/agentos"
+    #define AGENTOS_CACHE_DIR "/var/cache/agentos"
+#endif
+
 /* ==================== 平台头文件包含 ==================== */
 #if AGENTOS_PLATFORM_WINDOWS
     #ifndef WIN32_LEAN_AND_MEAN

@@ -11,6 +11,8 @@
 
 #include "heapstore_registry.h"
 #include "private.h"
+#include "platform.h"
+#include "../include/utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -151,15 +153,20 @@ heapstore_error_t heapstore_registry_init(void) {
         return heapstore_SUCCESS;
     }
 
-    char root_path[256] = "heapstore";
+    const char* configured_root = heapstore_get_root();
+    char root_path[256];
+    if (configured_root && configured_root[0] != '\0') {
+        strncpy(root_path, configured_root, sizeof(root_path) - 1);
+        root_path[sizeof(root_path) - 1] = '\0';
+    } else {
+        const char* tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp";
+        snprintf(root_path, sizeof(root_path), "%s/agentos/heapstore", tmpdir);
+    }
+
     char full_path[512];
     snprintf(full_path, sizeof(full_path), "%s/registry", root_path);
 
-#ifdef _WIN32
-    mkdir(full_path);
-#else
-    mkdir(full_path, 0755);
-#endif
+    heapstore_ensure_directory(full_path);
 
     snprintf(s_registry.db_path, sizeof(s_registry.db_path), "%s/registry.db", full_path);
 

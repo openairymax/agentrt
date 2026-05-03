@@ -138,6 +138,8 @@ INPUT                  = agentos/atoms \
                          agentos/protocols/integrations/china_eco/include \
                          agentos/protocols/integrations/openclaw/include \
                          agentos/protocols/integrations/openjiuwen/include \
+                         agentos/protocols/frameworks/langchain/include \
+                         agentos/protocols/frameworks/autogen/include \
                          agentos/protocols/core \
                          agentos/protocols/common \
                          docs/api/mainpage.dox
@@ -309,6 +311,8 @@ INCLUDE_PATH           = agentos/atoms/corekern/include \
                          agentos/protocols/integrations/china_eco/include \
                          agentos/protocols/integrations/openclaw/include \
                          agentos/protocols/integrations/openjiuwen/include \
+                         agentos/protocols/frameworks/langchain/include \
+                         agentos/protocols/frameworks/autogen/include \
                          agentos/protocols/core \
                          agentos/protocols/common
 

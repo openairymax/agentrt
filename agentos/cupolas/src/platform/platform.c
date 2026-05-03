@@ -336,11 +336,23 @@ int cupolas_process_spawn(cupolas_process_t* proc,
                         char* const argv[],
                         const cupolas_process_attr_t* attr) {
     if (!proc || !path || !argv) return cupolas_ERROR_INVALID_ARG;
-    (void)attr;
 
 #if cupolas_PLATFORM_WINDOWS
     STARTUPINFOA si = { 0 };
     si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+
+    if (attr) {
+        if (attr->redirect_stdin && attr->stdin_pipe != INVALID_HANDLE_VALUE)
+            si.hStdInput = attr->stdin_pipe;
+        if (attr->redirect_stdout && attr->stdout_pipe != INVALID_HANDLE_VALUE)
+            si.hStdOutput = attr->stdout_pipe;
+        if (attr->redirect_stderr && attr->stderr_pipe != INVALID_HANDLE_VALUE)
+            si.hStdError = attr->stderr_pipe;
+    }
 
     PROCESS_INFORMATION pi = { 0 };
     char cmdLine[4096] = { 0 };
@@ -355,8 +367,14 @@ int cupolas_process_spawn(cupolas_process_t* proc,
     }
     cmdLine[offset] = '\0';
 
-    BOOL ok = CreateProcessA(NULL, cmdLine, NULL, NULL, FALSE,
-                              CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    const char* working_dir = (attr && attr->working_dir) ? attr->working_dir : NULL;
+    LPVOID env_block = NULL;
+    if (attr && attr->env) {
+        env_block = (LPVOID)attr->env;
+    }
+
+    BOOL ok = CreateProcessA(NULL, cmdLine, NULL, NULL, TRUE,
+                              CREATE_NO_WINDOW, env_block, working_dir, &si, &pi);
     if (!ok) return cupolas_ERROR_IO;
 
     *proc = pi.hProcess;
@@ -366,7 +384,36 @@ int cupolas_process_spawn(cupolas_process_t* proc,
     pid_t pid = fork();
     if (pid < 0) return cupolas_ERROR_IO;
     if (pid == 0) {
-        execvp(path, argv); /* flawfinder: ignore - path/argv are controlled by cupolas internals */
+        if (attr) {
+            if (attr->working_dir) {
+                if (chdir(attr->working_dir) != 0) {
+                    _exit(126);
+                }
+            }
+            if (attr->redirect_stdin && attr->stdin_pipe[0] >= 0) {
+                dup2(attr->stdin_pipe[0], STDIN_FILENO);
+                close(attr->stdin_pipe[1]);
+            }
+            if (attr->redirect_stdout && attr->stdout_pipe[1] >= 0) {
+                close(attr->stdout_pipe[0]);
+                dup2(attr->stdout_pipe[1], STDOUT_FILENO);
+                close(attr->stdout_pipe[1]);
+            }
+            if (attr->redirect_stderr && attr->stderr_pipe[1] >= 0) {
+                close(attr->stderr_pipe[0]);
+                dup2(attr->stderr_pipe[1], STDERR_FILENO);
+                close(attr->stderr_pipe[1]);
+            }
+            if (attr->env) {
+                extern char** environ;
+                environ = (char**)attr->env;
+            }
+        }
+        if (attr && attr->env) {
+            execve(path, argv, (char* const*)attr->env);
+        } else {
+            execvp(path, argv);
+        }
         _exit(127);
     }
     *proc = pid;
@@ -791,18 +838,18 @@ void cupolas_mem_zero(void* ptr, size_t size) {
 }
 
 void cupolas_mem_lock(void* ptr, size_t size) {
-    (void)ptr;
-    (void)size;
 #if cupolas_PLATFORM_WINDOWS
     VirtualLock(ptr, size);
+#else
+    if (ptr && size > 0) mlock(ptr, size);
 #endif
 }
 
 void cupolas_mem_unlock(void* ptr, size_t size) {
-    (void)ptr;
-    (void)size;
 #if cupolas_PLATFORM_WINDOWS
     VirtualUnlock(ptr, size);
+#else
+    if (ptr && size > 0) munlock(ptr, size);
 #endif
 }
 

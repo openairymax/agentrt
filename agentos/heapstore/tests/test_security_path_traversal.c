@@ -187,14 +187,14 @@ static int test_log_path_traversal_blocked(void) {
         return -1;
     }
 
-    err = heapstore_log_write(heapstore_LOG_INFO, "../etc/passwd", NULL, NULL, 0, "test message");
+    err = heapstore_log_write(HEAPSTORE_LOG_INFO, "../etc/passwd", NULL, NULL, 0, "test message");
     if (err == heapstore_SUCCESS) {
         TEST_FAIL("log_traversal_blocked", "Should reject path traversal in service name");
         heapstore_log_shutdown();
         return -1;
     }
 
-    err = heapstore_log_write(heapstore_LOG_INFO, "service/../../etc/passwd", NULL, NULL, 0, "test message");
+    err = heapstore_log_write(HEAPSTORE_LOG_INFO, "service/../../etc/passwd", NULL, NULL, 0, "test message");
     if (err == heapstore_SUCCESS) {
         TEST_FAIL("log_nested_traversal_blocked", "Should reject nested path traversal");
         heapstore_log_shutdown();
@@ -213,14 +213,14 @@ static int test_log_valid_service_allowed(void) {
         return -1;
     }
 
-    err = heapstore_log_write(heapstore_LOG_INFO, "valid_service", NULL, NULL, 0, "test message");
+    err = heapstore_log_write(HEAPSTORE_LOG_INFO, "valid_service", NULL, NULL, 0, "test message");
     if (err != heapstore_SUCCESS) {
         TEST_FAIL("log_valid_service", "Should accept valid service name");
         heapstore_log_shutdown();
         return -1;
     }
 
-    err = heapstore_log_write(heapstore_LOG_INFO, "service-123_test", NULL, NULL, 0, "test message");
+    err = heapstore_log_write(HEAPSTORE_LOG_INFO, "service-123_test", NULL, NULL, 0, "test message");
     if (err != heapstore_SUCCESS) {
         TEST_FAIL("log_valid_service_complex", "Should accept complex valid name");
         heapstore_log_shutdown();

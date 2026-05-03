@@ -60,12 +60,12 @@ static void benchmark_logging(void) {
     printf("\n=== Logging Benchmark ===\n");
 
     heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
-    heapstore_log_set_level(heapstore_LOG_ERROR);
+    heapstore_log_set_level(HEAPSTORE_LOG_ERROR);
 
     double start = get_time_ms();
 
     for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
-        heapstore_LOG_ERROR("bench_service", "trace_bench", "Benchmark log message %d", i);
+        HEAPSTORE_LOG_ERROR("bench_service", "trace_bench", "Benchmark log message %d", i);
     }
 
     double elapsed = get_time_ms() - start;

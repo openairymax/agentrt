@@ -102,6 +102,9 @@ static void test_ipc_buffer_crud(void) {
 static void test_ipc_stats(void) {
     printf("Test: ipc_stats...");
 
+    heapstore_error_t init_err = heapstore_ipc_init();
+    assert(init_err == heapstore_SUCCESS || init_err == heapstore_ERR_ALREADY_INITIALIZED);
+
     uint32_t channel_count = 0;
     uint32_t buffer_count = 0;
     uint64_t total_size = 0;

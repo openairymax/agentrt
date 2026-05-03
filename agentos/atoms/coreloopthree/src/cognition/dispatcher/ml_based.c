@@ -11,6 +11,7 @@
 #include "cognition.h"
 #include "strategy.h"
 #include "agentos.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "memory_compat.h"
@@ -171,8 +172,8 @@ static agentos_error_t ml_dispatch(
         }
     }
 
-    *out_agent_id = AGENTOS_STRDUP("default");
-    return AGENTOS_SUCCESS;
+    *out_agent_id = NULL;
+    return AGENTOS_ENOENT;
 }
 
 static void ml_destroy(agentos_dispatching_strategy_t* strategy) {
@@ -205,6 +206,33 @@ agentos_dispatching_strategy_t* agentos_dispatching_ml_create(
     data->history_pos = 0;
     data->last_dispatch_time_ns = 0;
     memset(data->last_selected_agent_id, 0, sizeof(data->last_selected_agent_id));
+
+    if (model_path && model_path[0] != '\0') {
+        FILE* f = fopen(model_path, "rb");
+        if (f) {
+            float loaded_weights[ML_FEATURE_COUNT];
+            size_t n = fread(loaded_weights, sizeof(float), ML_FEATURE_COUNT, f);
+            fclose(f);
+            if (n == ML_FEATURE_COUNT) {
+                float sum = 0.0f;
+                for (size_t i = 0; i < ML_FEATURE_COUNT; i++) {
+                    if (loaded_weights[i] < 0.01f) loaded_weights[i] = 0.01f;
+                    if (loaded_weights[i] > 10.0f) loaded_weights[i] = 10.0f;
+                    sum += loaded_weights[i];
+                }
+                if (sum > 0.0f) {
+                    for (size_t i = 0; i < ML_FEATURE_COUNT; i++) {
+                        data->feature_weights[i] = loaded_weights[i] / sum;
+                    }
+                }
+                AGENTOS_LOG_INFO("dispatch.ml", "Loaded ML weights from %s", model_path);
+            } else {
+                AGENTOS_LOG_WARN("dispatch.ml", "Invalid ML model file %s, using defaults", model_path);
+            }
+        } else {
+            AGENTOS_LOG_INFO("dispatch.ml", "ML model file not found: %s, using default weights", model_path);
+        }
+    }
 
     agentos_dispatching_strategy_t* strategy = (agentos_dispatching_strategy_t*)AGENTOS_CALLOC(1, sizeof(agentos_dispatching_strategy_t));
     if (!strategy) {

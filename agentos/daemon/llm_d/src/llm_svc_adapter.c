@@ -24,6 +24,7 @@ typedef struct {
     char* config_path;
     agentos_svc_config_t common_cfg;
     bool owns_service;
+    bool running;
 } llm_adapter_ctx_t;
 
 static llm_adapter_ctx_t* llm_get_ctx(agentos_service_t service) {
@@ -61,6 +62,8 @@ static agentos_error_t llm_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     llm_adapter_ctx_t* ctx = llm_get_ctx(service);
     if (!ctx || !ctx->llm_svc) return AGENTOS_ENOTINIT;
+    if (ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = true;
     svc_logger_info("LLM服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
@@ -69,7 +72,19 @@ static agentos_error_t llm_adapter_stop(agentos_service_t service, bool force) {
     if (!service) return AGENTOS_EINVAL;
     llm_adapter_ctx_t* ctx = llm_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    svc_logger_info("LLM服务适配器已停止");
+    if (!ctx->running) return AGENTOS_SUCCESS;
+    ctx->running = false;
+    if (force) {
+        if (ctx->llm_svc && ctx->owns_service) {
+            llm_service_destroy(ctx->llm_svc);
+            ctx->llm_svc = NULL;
+            ctx->owns_service = false;
+        }
+        if (ctx->config_path) { free(ctx->config_path); ctx->config_path = NULL; }
+        svc_logger_info("LLM服务适配器已强制停止");
+    } else {
+        svc_logger_info("LLM服务适配器已停止");
+    }
     return AGENTOS_SUCCESS;
 }
 
@@ -96,7 +111,16 @@ static agentos_error_t llm_adapter_healthcheck(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     llm_adapter_ctx_t* ctx = llm_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    return ctx->llm_svc ? AGENTOS_SUCCESS : AGENTOS_ENOTINIT;
+    if (!ctx->llm_svc) return AGENTOS_ENOTINIT;
+    if (!ctx->running) return AGENTOS_ENOTINIT;
+    char* stats_json = NULL;
+    int ret = llm_service_stats(ctx->llm_svc, &stats_json);
+    if (ret != 0) {
+        SVC_LOG_WARN("LLM服务健康检查失败: %d", ret);
+        return AGENTOS_ERR_UNKNOWN;
+    }
+    if (stats_json) free(stats_json);
+    return AGENTOS_SUCCESS;
 }
 
 static const agentos_svc_interface_t llm_adapter_iface = {

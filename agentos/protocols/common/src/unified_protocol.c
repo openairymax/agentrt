@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "platform.h"
 
 #define PROTOCOL_WEBSOCKET    (AGENTOS_PROTOCOL_COUNT + 10)
 #define PROTOCOL_GRPC         (AGENTOS_PROTOCOL_COUNT + 11)
@@ -493,7 +494,5 @@ static int validate_message(const unified_message_t* message)
 
 static uint64_t get_current_timestamp(void)
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+    return agentos_time_ns();
 }
