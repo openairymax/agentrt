@@ -82,6 +82,9 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_EPROTO         (-13)   /**< 协议错误 */
 #define AGENTOS_ENOTCONN       (-14)   /**< 未连接 */
 #define AGENTOS_ECONNRESET     (-15)   /**< 连接重置 */
+#define AGENTOS_ENOSYS         (-16)   /**< 函数未实现 */
+#define AGENTOS_EFAIL          (-17)   /**< 通用失败 */
+#define AGENTOS_ENOTFOUND      (-18)   /**< 资源未找到 */
 #define AGENTOS_EUNKNOWN       (-99)   /**< 未知错误 */
 
 /**

@@ -25,6 +25,8 @@
 #include <stdio.h>
 #include <time.h>
 
+typedef struct agentos_monitoring agentos_monitoring_t;
+
 static agentos_error_t agentos_monitoring_stop(agentos_monitoring_t* monitoring);
 
 /* 基础库兼容性层 */
@@ -133,7 +135,6 @@ struct agentos_monitoring {
     int is_running;
     agentos_thread_t* monitoring_thread;
 };
-typedef struct agentos_monitoring agentos_monitoring_t;
 
 /* ==================== 工具函数 ==================== */
 

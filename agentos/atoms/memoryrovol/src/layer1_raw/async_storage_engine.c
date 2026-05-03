@@ -67,7 +67,7 @@ typedef struct storage_engine_inner {
     char* last_error;
     uint64_t last_error_time_ns;
     agentos_observability_t* obs;
-    agentos_resource_manager_t* resource_manager;
+    void* resource_manager;
     char* engine_id;
 
 #ifdef _WIN32
