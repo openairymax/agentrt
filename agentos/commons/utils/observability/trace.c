@@ -122,9 +122,7 @@ static int64_t get_current_time_us(void) {
     uli.HighPart = ft.dwHighDateTime;
     return (int64_t)((uli.QuadPart - 116444736000000000LL) / 10);
 #else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+    return (int64_t)(agentos_time_ns() / 1000);
 #endif
 }
 

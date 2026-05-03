@@ -7,10 +7,11 @@ project(AgentOS VERSION 1.0.0 LANGUAGES C CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
-        "AgentOS in-source builds are not allowed!\n"
-        "Please use an out-of-source build directory:\n"
-        "  mkdir -p ../AgentOS-build && cd ../AgentOS-build\n"
-        "  cmake ../AgentOS\n"
+        "AgentOS in-source builds are not allowed! (BAN-33)\n"
+        "Please use out-of-source build with cmake -B:\n"
+        "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
+        "  cmake --build ../AgentOS-build\n"
+        "  cd ../AgentOS-build && ctest --output-on-failure\n"
         "See BUILD.md for details."
     )
 endif()

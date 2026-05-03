@@ -108,6 +108,7 @@ int agentos_config_parse(agentos_config_t* manager, const char* text) {
         return -1;
     }
 
+    char section[256] = "";
     char* saveptr = NULL;
     char* line = strtok_r(copy, "\n\r", &saveptr);
 
@@ -119,7 +120,25 @@ int agentos_config_parse(agentos_config_t* manager, const char* text) {
             continue;
         }
 
+        if (*line == '[') {
+            line++;
+            char* end_bracket = strchr(line, ']');
+            if (end_bracket) {
+                *end_bracket = '\0';
+                size_t sec_len = strlen(line);
+                while (sec_len > 0 && (line[sec_len-1] == ' ' || line[sec_len-1] == '\t')) {
+                    line[--sec_len] = '\0';
+                }
+                snprintf(section, sizeof(section), "%s", line);
+            }
+            line = strtok_r(NULL, "\n\r", &saveptr);
+            continue;
+        }
+
         char* eq = strchr(line, '=');
+        if (!eq) {
+            eq = strchr(line, ':');
+        }
         if (eq) {
             *eq = '\0';
             char* key = line;
@@ -130,13 +149,26 @@ int agentos_config_parse(agentos_config_t* manager, const char* text) {
 
             while (*val == ' ' || *val == '\t') val++;
 
+            size_t val_len = strlen(val);
+            if (val_len >= 2 && ((*val == '"' && val[val_len-1] == '"') ||
+                (*val == '\'' && val[val_len-1] == '\''))) {
+                val[val_len-1] = '\0';
+                val++;
+            }
+
             end = val + strlen(val) - 1;
             while (end > val && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) {
                 *end = '\0'; end--;
             }
 
             if (key[0] != '\0') {
-                agentos_config_set_string(manager, key, val);
+                char full_key[512];
+                if (section[0]) {
+                    snprintf(full_key, sizeof(full_key), "%s.%s", section, key);
+                } else {
+                    snprintf(full_key, sizeof(full_key), "%s", key);
+                }
+                agentos_config_set_string(manager, full_key, val);
             }
         }
 

@@ -66,11 +66,11 @@ metadata:
 spec:
   tls:
     - hosts:
-        - api.agentos.spharx.cn
-        - ws.agentos.spharx.cn
+        - ${GATEWAY_API_HOST:-api.agentos.example.com}
+        - ${GATEWAY_WS_HOST:-ws.agentos.example.com}
       secretName: agentos-gateway-tls
   rules:
-    - host: api.agentos.spharx.cn
+    - host: ${GATEWAY_API_HOST:-api.agentos.example.com}
       http:
         paths:
           - path: /
@@ -80,7 +80,7 @@ spec:
                 name: agentos-gateway
                 port:
                   number: 8080
-    - host: ws.agentos.spharx.cn
+    - host: ${GATEWAY_WS_HOST:-ws.agentos.example.com}
       http:
         paths:
           - path: /

@@ -95,17 +95,22 @@ static inline int svc_config_get_log_level(const svc_config_t* config) {
 }
 
 static inline const char* svc_config_get_string(const svc_config_t* config, const char* key) {
-    (void)config; (void)key;
+    if (!config) return NULL;
+    if (!key) return NULL;
+    if (strcmp(key, "service_name") == 0) return config->service_name;
+    if (strcmp(key, "listen_addr") == 0) return config->listen_addr;
     return NULL;
 }
 
 static inline int svc_config_get_int(const svc_config_t* config, const char* key) {
-    (void)config; (void)key;
+    if (!config || !key) return 0;
+    if (strcmp(key, "log_level") == 0) return config->log_level;
     return 0;
 }
 
 static inline int svc_config_get_bool(const svc_config_t* config, const char* key) {
-    (void)config; (void)key;
+    if (!config || !key) return 0;
+    if (strcmp(key, "log_level") == 0) return config->log_level > 0;
     return 0;
 }
 

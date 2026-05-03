@@ -22,6 +22,23 @@
 #ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
+
+typedef struct {
+    char* data;
+    size_t size;
+} agntcy_curl_buffer_t;
+
+static size_t agntcy_curl_write_cb(void* ptr, size_t size, size_t nmemb, void* userdata) {
+    agntcy_curl_buffer_t* buf = (agntcy_curl_buffer_t*)userdata;
+    size_t total = size * nmemb;
+    char* new_data = (char*)realloc(buf->data, buf->size + total + 1);
+    if (!new_data) return 0;
+    buf->data = new_data;
+    memcpy(buf->data + buf->size, ptr, total);
+    buf->size += total;
+    buf->data[buf->size] = '\0';
+    return total;
+}
 #endif
 
 struct agntcy_acp_context_s {
@@ -261,22 +278,25 @@ int agntcy_discover_agents(agntcy_acp_context_t* ctx,
     headers = curl_slist_append(headers, auth);
     headers = curl_slist_append(headers, "Accept: application/json");
 
-    char response_buf[65536];
-    memset(response_buf, 0, sizeof(response_buf));
+    agntcy_curl_buffer_t response_buf = { .data = NULL, .size = 0 };
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_buf);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, agntcy_curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_buf);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
 
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) return -12;
+    if (res != CURLE_OK || !response_buf.data) {
+        free(response_buf.data);
+        return -12;
+    }
 
-    cJSON* root = cJSON_Parse(response_buf);
+    cJSON* root = cJSON_Parse(response_buf.data);
+    free(response_buf.data);
     if (!root) return -13;
 
     cJSON* agents_arr = cJSON_GetObjectItem(root, "agents");
@@ -397,15 +417,14 @@ int agntcy_invoke_agent(agntcy_acp_context_t* ctx,
     headers = curl_slist_append(headers, auth);
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
-    char response_buf[AGNTCY_MAX_MESSAGE_LEN];
-    memset(response_buf, 0, sizeof(response_buf));
+    agntcy_curl_buffer_t response_buf = { .data = NULL, .size = 0 };
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, req_str);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_buf);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, agntcy_curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_buf);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)(ctx->config.timeout_ms / 1000));
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
 
@@ -418,12 +437,14 @@ int agntcy_invoke_agent(agntcy_acp_context_t* ctx,
     free(req_str);
 
     if (res != CURLE_OK || http_code != 200) {
+        free(response_buf.data);
         out_run->status = AGNTCY_RUN_FAILED;
         out_run->error_message = strdup("remote invocation failed");
         return -12;
     }
 
-    cJSON* resp = cJSON_Parse(response_buf);
+    cJSON* resp = cJSON_Parse(response_buf.data);
+    free(response_buf.data);
     if (resp) {
         cJSON* output = cJSON_GetObjectItem(resp, "output");
         if (output) {
@@ -508,22 +529,25 @@ int agntcy_get_run_status(agntcy_acp_context_t* ctx,
     headers = curl_slist_append(headers, auth);
     headers = curl_slist_append(headers, "Accept: application/json");
 
-    char response_buf[AGNTCY_MAX_MESSAGE_LEN];
-    memset(response_buf, 0, sizeof(response_buf));
+    agntcy_curl_buffer_t response_buf = { .data = NULL, .size = 0 };
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_buf);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, agntcy_curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_buf);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
 
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) return -12;
+    if (res != CURLE_OK || !response_buf.data) {
+        free(response_buf.data);
+        return -12;
+    }
 
-    cJSON* root = cJSON_Parse(response_buf);
+    cJSON* root = cJSON_Parse(response_buf.data);
+    free(response_buf.data);
     if (!root) return -13;
 
     memset(out_run, 0, sizeof(*out_run));

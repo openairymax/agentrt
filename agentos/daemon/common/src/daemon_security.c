@@ -270,9 +270,9 @@ int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
     }
 
     if (!g_daemon_security.initialized || !g_daemon_security.permission_enabled) {
-        /* If security not initialized, allow but log warning */
-        SVC_LOG_WARN("Permission check bypassed (security not fully initialized)");
-        return 1;
+        SVC_LOG_ERROR("Tool permission check DENIED (security not fully initialized): agent=%s tool=%s action=%s",
+                     agent_id, tool_name, action);
+        return 0;
     }
 
     /* Build resource path for the tool */
@@ -601,7 +601,7 @@ int daemon_security_init(const daemon_security_config_t* config, agentos_error_t
 
     if (g_security_ctx.audit_enabled && g_security_ctx.audit_log_path[0] == '\0') {
         snprintf(g_security_ctx.audit_log_path, sizeof(g_security_ctx.audit_log_path),
-                "/tmp/agentos_daemon_audit.log");
+                AGENTOS_LOG_DIR "/daemon_audit.log");
     }
 
     if (g_security_ctx.audit_enabled) {
@@ -836,7 +836,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
 #ifdef AGENTOS_HAS_OPENSSL
     const char* trusted_keys_dir = getenv("AGENTOS_TRUSTED_KEYS_DIR");
     if (!trusted_keys_dir) {
-        trusted_keys_dir = "/etc/agentos/trusted_keys";
+        trusted_keys_dir = AGENTOS_CONFIG_DIR "/trusted_keys";
     }
 
     DIR* dir = opendir(trusted_keys_dir);

@@ -12,6 +12,7 @@
 #include "heapstore_memory.h"
 #include "private.h"
 #include "utils.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,28 +45,38 @@ heapstore_error_t heapstore_memory_init(void) {
         return heapstore_SUCCESS;
     }
 
-    const char* base_path = "agentos/heapstore/kernel/memory";
+    const char* root = heapstore_get_root();
+    char base_path[512];
+    if (root && root[0]) {
+        snprintf(base_path, sizeof(base_path), "%s/kernel/memory", root);
+    } else {
+        snprintf(base_path, sizeof(base_path), "%s/agentos/heapstore/kernel/memory",
+                 getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+    }
     strncpy(s_memory_path, base_path, sizeof(s_memory_path) - 1);
     s_memory_path[sizeof(s_memory_path) - 1] = '\0';
 
-    heapstore_error_t err;
-    err = heapstore_ensure_directory(s_memory_path);
-    if (err != heapstore_SUCCESS) return err;
+    if (!heapstore_ensure_directory(s_memory_path)) {
+        return heapstore_ERR_DIR_CREATE_FAILED;
+    }
 
     char pools_path[heapstore_MEMORY_MAX_PATH];
     snprintf(pools_path, sizeof(pools_path), "%s/pools", s_memory_path);
-    err = heapstore_ensure_directory(pools_path);
-    if (err != heapstore_SUCCESS) return err;
+    if (!heapstore_ensure_directory(pools_path)) {
+        return heapstore_ERR_DIR_CREATE_FAILED;
+    }
 
     char allocations_path[heapstore_MEMORY_MAX_PATH];
     snprintf(allocations_path, sizeof(allocations_path), "%s/allocations", s_memory_path);
-    err = heapstore_ensure_directory(allocations_path);
-    if (err != heapstore_SUCCESS) return err;
+    if (!heapstore_ensure_directory(allocations_path)) {
+        return heapstore_ERR_DIR_CREATE_FAILED;
+    }
 
     char stats_path[heapstore_MEMORY_MAX_PATH];
     snprintf(stats_path, sizeof(stats_path), "%s/stats", s_memory_path);
-    err = heapstore_ensure_directory(stats_path);
-    if (err != heapstore_SUCCESS) return err;
+    if (!heapstore_ensure_directory(stats_path)) {
+        return heapstore_ERR_DIR_CREATE_FAILED;
+    }
 
     memset(s_pools, 0, sizeof(s_pools));
     memset(s_allocations, 0, sizeof(s_allocations));
@@ -98,7 +109,7 @@ heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* po
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    if (!pool) {
+    if (!pool || pool->pool_id[0] == '\0') {
         return heapstore_ERR_INVALID_PARAM;
     }
 
@@ -177,7 +188,7 @@ heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allo
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    if (!allocation) {
+    if (!allocation || allocation->allocation_id[0] == '\0') {
         return heapstore_ERR_INVALID_PARAM;
     }
 

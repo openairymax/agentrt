@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define DEFAULT_OVERFLOW_DIR "/var/log/cupolas"
+#define DEFAULT_OVERFLOW_DIR AGENTOS_LOG_DIR "/cupolas"
 #define DEFAULT_MAX_FILE_SIZE_MB 100
 #define DEFAULT_FLUSH_INTERVAL_MS 1000
 #define MAX_FILENAME_LEN 256
@@ -199,7 +199,7 @@ overflow_handler_t* overflow_handler_create(const char* overflow_dir,
     handler->flush_interval_ms = flush_interval_ms > 0 ? flush_interval_ms : DEFAULT_FLUSH_INTERVAL_MS;
     
     if (ensure_overflow_dir(handler->overflow_dir) != 0) {
-        snprintf(handler->overflow_dir, sizeof(handler->overflow_dir), "/tmp/cupolas_audit");
+        snprintf(handler->overflow_dir, sizeof(handler->overflow_dir), AGENTOS_TMP_DIR "/cupolas_audit");
         ensure_overflow_dir(handler->overflow_dir);
     }
     

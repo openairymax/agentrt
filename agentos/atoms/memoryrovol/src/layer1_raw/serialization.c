@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <arpa/inet.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
@@ -127,7 +128,7 @@ agentos_error_t agentos_layer1_raw_serialize(
     if (!meta_json) return AGENTOS_ENOMEM;
 
     size_t meta_len = strlen(meta_json);
-    uint32_t meta_len_be = meta_len;  // 网络字节序？暂不处理
+    uint32_t meta_len_be = htonl((uint32_t)meta_len);
 
     size_t total_len = sizeof(uint32_t) + meta_len + data_len;
     void* buf = AGENTOS_MALLOC(total_len);
@@ -166,6 +167,7 @@ agentos_error_t agentos_layer1_raw_deserialize(
 
     uint32_t meta_len;
     memcpy(&meta_len, bytes, sizeof(uint32_t));
+    meta_len = ntohl(meta_len);
     if (sizeof(uint32_t) + meta_len > len) return AGENTOS_EINVAL;
 
     const char* meta_json = (const char*)bytes + sizeof(uint32_t);
