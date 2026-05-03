@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "layer3_structure.h"
+#include "layer3_structure_internal.h"
 #include "platform.h"
 #include <stdlib.h>
 

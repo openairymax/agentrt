@@ -101,7 +101,7 @@ services:
     environment:
       - POSTGRES_DB=agentos_preview
       - POSTGRES_USER=agentos
-      - POSTGRES_PASSWORD=preview_password_change_me
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
     # 数据持久化
     volumes:

@@ -58,6 +58,8 @@ extern "C" {
 #define AGENTOS_ERESOURCE              -15
 #endif
 
+#define AGENTOS_ECYCLE                 -17
+
 /**
  * @brief 功能未实现
  *

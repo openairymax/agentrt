@@ -98,6 +98,8 @@ typedef enum {
 #define PROTO_OPENJIUWEN     AGENTOS_PROTOCOL_OPENJIUWEN
 #define PROTO_OPENCLAW       (AGENTOS_PROTOCOL_COUNT + 1)
 #define PROTO_CLAUDE         (AGENTOS_PROTOCOL_COUNT + 2)
+#define PROTO_AGNTCY         (AGENTOS_PROTOCOL_COUNT + 3)
+#define PROTO_CHINA_ECO      (AGENTOS_PROTOCOL_COUNT + 4)
 
 typedef struct {
     char* data;

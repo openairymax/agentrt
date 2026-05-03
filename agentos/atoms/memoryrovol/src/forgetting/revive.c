@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../include/forgetting.h"
+#include "forgetting_internal.h"
 #include "../include/layer2_feature.h"
 #include "../include/layer1_raw.h"
 #include "agentos.h"

@@ -27,6 +27,8 @@ option(PROTOCOLS_ENABLE_OPENCLAW "Enable OpenClaw integration" ON)
 option(PROTOCOLS_ENABLE_CLAUDE "Enable Claude API integration" ON)
 option(PROTOCOLS_ENABLE_LANGCHAIN "Enable LangChain framework adapter" ON)
 option(PROTOCOLS_ENABLE_AUTOGEN "Enable AutoGen framework adapter" ON)
+option(PROTOCOLS_ENABLE_AGNTCY "Enable AGNTCY ACP protocol adapter" ON)
+option(PROTOCOLS_ENABLE_CHINA_ECO "Enable China domestic ecosystem protocol adapter" ON)
 
 # ============================================================
 # 包含目录 (Include Directories)
@@ -67,6 +69,16 @@ if(PROTOCOLS_ENABLE_AUTOGEN)
         ${CMAKE_CURRENT_SOURCE_DIR}/frameworks/autogen/include)
 endif()
 
+if(PROTOCOLS_ENABLE_AGNTCY)
+    list(APPEND PROTOCOLS_INCLUDE_DIRS
+        ${CMAKE_CURRENT_SOURCE_DIR}/standards/agntcy/include)
+endif()
+
+if(PROTOCOLS_ENABLE_CHINA_ECO)
+    list(APPEND PROTOCOLS_INCLUDE_DIRS
+        ${CMAKE_CURRENT_SOURCE_DIR}/integrations/china_eco/include)
+endif()
+
 include_directories(${PROTOCOLS_INCLUDE_DIRS})
 
 # ============================================================
@@ -92,7 +104,13 @@ set(PROTOCOLS_CORE_SOURCES
 set(PROTOCOLS_STANDARDS_SOURCES
     standards/a2a/src/a2a_v03_adapter.c
     standards/mcp/src/mcp_v1_adapter.c
+    standards/mcp/src/mcp_transport.c
 )
+
+if(PROTOCOLS_ENABLE_AGNTCY)
+    list(APPEND PROTOCOLS_STANDARDS_SOURCES
+        standards/agntcy/src/agntcy_acp_adapter.c)
+endif()
 
 # ============================================================
 # 源文件 (Source Files) — Integrations Layer
@@ -110,6 +128,11 @@ endif()
 if(PROTOCOLS_ENABLE_CLAUDE)
     list(APPEND PROTOCOLS_INTEGRATIONS_SOURCES
         integrations/claude/src/claude_adapter.c)
+endif()
+
+if(PROTOCOLS_ENABLE_CHINA_ECO)
+    list(APPEND PROTOCOLS_INTEGRATIONS_SOURCES
+        integrations/china_eco/src/china_eco_adapter.c)
 endif()
 
 # ============================================================
@@ -163,7 +186,13 @@ set(PROTOCOLS_CORE_HEADERS
 set(PROTOCOLS_STANDARDS_HEADERS
     standards/a2a/include/a2a_v03_adapter.h
     standards/mcp/include/mcp_v1_adapter.h
+    standards/mcp/include/mcp_transport.h
 )
+
+if(PROTOCOLS_ENABLE_AGNTCY)
+    list(APPEND PROTOCOLS_STANDARDS_HEADERS
+        standards/agntcy/include/agntcy_acp_adapter.h)
+endif()
 
 # ============================================================
 # 头文件 (Header Files) — Integrations Layer
@@ -181,6 +210,11 @@ endif()
 if(PROTOCOLS_ENABLE_CLAUDE)
     list(APPEND PROTOCOLS_INTEGRATIONS_HEADERS
         integrations/claude/include/claude_adapter.h)
+endif()
+
+if(PROTOCOLS_ENABLE_CHINA_ECO)
+    list(APPEND PROTOCOLS_INTEGRATIONS_HEADERS
+        integrations/china_eco/include/china_eco_adapter.h)
 endif()
 
 # ============================================================
@@ -265,5 +299,7 @@ message(STATUS "  OpenClaw:         ${PROTOCOLS_ENABLE_OPENCLAW}")
 message(STATUS "  Claude:           ${PROTOCOLS_ENABLE_CLAUDE}")
 message(STATUS "  LangChain:        ${PROTOCOLS_ENABLE_LANGCHAIN}")
 message(STATUS "  AutoGen:          ${PROTOCOLS_ENABLE_AUTOGEN}")
+message(STATUS "  AGNTCY ACP:       ${PROTOCOLS_ENABLE_AGNTCY}")
+message(STATUS "  China Eco:        ${PROTOCOLS_ENABLE_CHINA_ECO}")
 message(STATUS "==============================================")
 message(STATUS "")

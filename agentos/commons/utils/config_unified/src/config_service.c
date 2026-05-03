@@ -58,7 +58,7 @@ typedef struct {
     void* user_data;                 // 用户数据
 } change_callback_item_t;
 
-/** 热更新管理器结构?*/
+/** 热更新管理器结构体 */
 struct config_hot_reload_manager {
     config_context_t* ctx;
     config_source_manager_t* source_manager;
@@ -67,6 +67,8 @@ struct config_hot_reload_manager {
     size_t callback_capacity;
     volatile bool running;
     uint32_t check_interval_ms;
+    uint32_t debounce_ms;
+    uint64_t last_trigger_time_ms;
     void* thread_handle;
     void* lock;
 };
@@ -656,8 +658,11 @@ config_hot_reload_manager_t* config_hot_reload_manager_create(config_context_t* 
     
     manager->ctx = ctx;
     manager->source_manager = source_manager;
-    manager->running = false;
-    manager->check_interval_ms = 5000; // 默认5�?    
+  manager->running = false;
+    manager->check_interval_ms = 5000;
+    manager->debounce_ms = 500;
+    manager->last_trigger_time_ms = 0;
+    
     // 初始回调容量
     manager->callback_capacity = 8;
     manager->callbacks = (change_callback_item_t*)AGENTOS_CALLOC(manager->callback_capacity, sizeof(change_callback_item_t));
@@ -797,6 +802,14 @@ config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
     
     agentos_mutex_lock(manager->lock);
     
+    uint32_t debounce = manager->debounce_ms > 0 ? manager->debounce_ms : 500;
+    uint64_t now_ms = (uint64_t)(time(NULL) * 1000);
+    if (manager->last_trigger_time_ms > 0 &&
+        (now_ms - manager->last_trigger_time_ms) < debounce) {
+        agentos_mutex_unlock(manager->lock);
+        return CONFIG_SUCCESS;
+    }
+    
     size_t source_count = config_source_manager_get_count(manager->source_manager);
     bool changed = false;
     
@@ -813,6 +826,7 @@ config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
     }
     
     if (changed) {
+        manager->last_trigger_time_ms = now_ms;
         for (size_t i = 0; i < manager->callback_count; i++) {
             change_callback_item_t* cb = &manager->callbacks[i];
             if (cb->callback) {

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -24,7 +25,32 @@ static int handle_service_request(const char* method,
     if (!svc || !method || !response_json) return -1;
 
     if (strcmp(method, "ping") == 0) {
-        *response_json = strdup("{\"status\":\"ok\"}");
+        const char* id_start = strstr(params_json, "\"id\"");
+        if (!id_start) {
+            bool healthy = channel_service_is_healthy(svc);
+            char buf[128];
+            snprintf(buf, sizeof(buf), "{\"status\":\"%s\"}", healthy ? "ok" : "degraded");
+            *response_json = strdup(buf);
+            return 0;
+        }
+        char id[128] = {0};
+        const char* p = strchr(id_start + 4, '"');
+        if (p) { p++; const char* e = strchr(p, '"'); if (e) { size_t l = (size_t)(e-p); if (l>127) l=127; memcpy(id,p,l); }}
+        int64_t latency_ms = 0;
+        int rc = channel_service_ping(svc, id, &latency_ms);
+        if (rc != CHANNEL_OK) {
+            char err[256];
+            snprintf(err, sizeof(err), "{\"error\":\"ping failed: %d\",\"latency_ms\":%lld}", rc, (long long)latency_ms);
+            *response_json = strdup(err);
+            return -1;
+        }
+        size_t sz = snprintf(NULL, 0, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}",
+                             id, (long long)latency_ms) + 1;
+        char* buf = (char*)malloc(sz);
+        if (!buf) return -1;
+        snprintf(buf, sz, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}",
+                 id, (long long)latency_ms);
+        *response_json = buf;
         return 0;
     }
 

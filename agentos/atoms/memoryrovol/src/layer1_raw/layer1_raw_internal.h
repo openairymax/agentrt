@@ -41,6 +41,8 @@ struct agentos_layer1_raw {
     uint64_t total_errors;
 
     void* metadata_db;
+
+    void* inner;
 };
 
 #ifdef __cplusplus

@@ -32,6 +32,12 @@
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 /* ==================== 类型适配辅助 ==================== */
 
 /**
@@ -511,6 +517,225 @@ agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state
     *out_state = task_info->state;
 
     release_task_lock();
+    return AGENTOS_SUCCESS;
+}
+
+/* ==================== 调度器高级功能 ==================== */
+
+agentos_error_t agentos_scheduler_resolve_dependencies(
+    const uint64_t* dep_from, const uint64_t* dep_to, size_t edge_count,
+    uint64_t* sorted_tasks, size_t* out_count) {
+
+    if (!dep_from || !dep_to || !sorted_tasks || !out_count)
+        return AGENTOS_EINVAL;
+    if (edge_count == 0) {
+        *out_count = 0;
+        return AGENTOS_SUCCESS;
+    }
+
+    uint64_t* nodes = (uint64_t*)malloc(edge_count * 2 * sizeof(uint64_t));
+    if (!nodes) return AGENTOS_ENOMEM;
+    size_t node_count = 0;
+
+    for (size_t i = 0; i < edge_count; i++) {
+        nodes[node_count++] = dep_from[i];
+        nodes[node_count++] = dep_to[i];
+    }
+
+    for (size_t i = 0; i < node_count; i++) {
+        for (size_t j = i + 1; j < node_count; j++) {
+            if (nodes[i] > nodes[j]) {
+                uint64_t tmp = nodes[i];
+                nodes[i] = nodes[j];
+                nodes[j] = tmp;
+            }
+        }
+    }
+
+    size_t unique_count = 0;
+    for (size_t i = 0; i < node_count; i++) {
+        if (i == 0 || nodes[i] != nodes[unique_count - 1]) {
+            nodes[unique_count++] = nodes[i];
+        }
+    }
+
+    size_t* in_degree = (size_t*)calloc(unique_count, sizeof(size_t));
+    size_t** adj = (size_t**)calloc(unique_count, sizeof(size_t*));
+    size_t* adj_cap = (size_t*)calloc(unique_count, sizeof(size_t));
+    size_t* adj_cnt = (size_t*)calloc(unique_count, sizeof(size_t));
+
+    if (!in_degree || !adj || !adj_cap || !adj_cnt) {
+        free(nodes); free(in_degree); free(adj); free(adj_cap); free(adj_cnt);
+        return AGENTOS_ENOMEM;
+    }
+
+    for (size_t i = 0; i < edge_count; i++) {
+        size_t from_idx = unique_count, to_idx = unique_count;
+        for (size_t j = 0; j < unique_count; j++) {
+            if (nodes[j] == dep_from[i]) from_idx = j;
+            if (nodes[j] == dep_to[i]) to_idx = j;
+        }
+        if (from_idx >= unique_count || to_idx >= unique_count) {
+            free(nodes); free(in_degree);
+            for (size_t k = 0; k < unique_count; k++) free(adj[k]);
+            free(adj); free(adj_cap); free(adj_cnt);
+            return AGENTOS_EINVAL;
+        }
+        if (adj_cnt[from_idx] >= adj_cap[from_idx]) {
+            size_t new_cap = adj_cap[from_idx] ? adj_cap[from_idx] * 2 : 4;
+            size_t* new_adj = (size_t*)realloc(adj[from_idx], new_cap * sizeof(size_t));
+            if (!new_adj) {
+                free(nodes); free(in_degree);
+                for (size_t k = 0; k < unique_count; k++) free(adj[k]);
+                free(adj); free(adj_cap); free(adj_cnt);
+                return AGENTOS_ENOMEM;
+            }
+            adj[from_idx] = new_adj;
+            adj_cap[from_idx] = new_cap;
+        }
+        adj[from_idx][adj_cnt[from_idx]++] = to_idx;
+        in_degree[to_idx]++;
+    }
+
+    size_t* queue = (size_t*)malloc(unique_count * sizeof(size_t));
+    if (!queue) {
+        free(nodes); free(in_degree);
+        for (size_t k = 0; k < unique_count; k++) free(adj[k]);
+        free(adj); free(adj_cap); free(adj_cnt);
+        return AGENTOS_ENOMEM;
+    }
+
+    size_t q_head = 0, q_tail = 0;
+    for (size_t i = 0; i < unique_count; i++) {
+        if (in_degree[i] == 0) queue[q_tail++] = i;
+    }
+
+    *out_count = 0;
+    while (q_head < q_tail) {
+        size_t u = queue[q_head++];
+        sorted_tasks[(*out_count)++] = nodes[u];
+
+        for (size_t j = 0; j < adj_cnt[u]; j++) {
+            size_t v = adj[u][j];
+            if (in_degree[v] == 0) {
+                *out_count = 0;
+                sorted_tasks[0] = 0;
+                free(queue);
+                free(nodes); free(in_degree);
+                for (size_t k = 0; k < unique_count; k++) free(adj[k]);
+                free(adj); free(adj_cap); free(adj_cnt);
+                return AGENTOS_ECYCLE;
+            }
+            in_degree[v]--;
+            if (in_degree[v] == 0) queue[q_tail++] = v;
+        }
+    }
+
+    if (*out_count != unique_count) {
+        *out_count = 0;
+        sorted_tasks[0] = 0;
+        free(queue);
+        free(nodes); free(in_degree);
+        for (size_t k = 0; k < unique_count; k++) free(adj[k]);
+        free(adj); free(adj_cap); free(adj_cnt);
+        return AGENTOS_ECYCLE;
+    }
+
+    free(queue);
+    free(nodes); free(in_degree);
+    for (size_t k = 0; k < unique_count; k++) free(adj[k]);
+    free(adj); free(adj_cap); free(adj_cnt);
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t agentos_scheduler_priority_inherit(
+    agentos_task_id_t blocking_task_id, agentos_task_id_t blocked_task_id) {
+
+    if (blocking_task_id == 0 || blocked_task_id == 0)
+        return AGENTOS_EINVAL;
+
+    task_info_core_t* blocking_task = find_task_by_id(blocking_task_id);
+    if (!blocking_task) {
+        return AGENTOS_EINVAL;
+    }
+
+    task_info_core_t* blocked_task = find_task_by_id(blocked_task_id);
+    if (!blocked_task) {
+        release_task_lock();
+        return AGENTOS_EINVAL;
+    }
+
+    int new_priority = blocking_task->priority;
+    if (blocked_task->priority > new_priority) {
+        new_priority = blocked_task->priority;
+    }
+
+    if (new_priority > AGENTOS_TASK_PRIORITY_MAX)
+        new_priority = AGENTOS_TASK_PRIORITY_MAX;
+
+    if (new_priority != blocking_task->priority) {
+        const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+        if (ops && ops->thread_set_priority) {
+            ops->thread_set_priority(blocking_task->platform_handle, new_priority);
+        }
+        blocking_task->priority = new_priority;
+    }
+
+    release_task_lock();
+    release_task_lock();
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t agentos_scheduler_resource_reserve(
+    size_t est_memory_kb, int est_cpu_cores) {
+
+    if (est_cpu_cores < 1) est_cpu_cores = 1;
+
+    size_t avail_mem_kb = 0;
+    int avail_cpu_cores = 1;
+
+#ifdef _WIN32
+    MEMORYSTATUSEX mem_status;
+    mem_status.dwLength = sizeof(mem_status);
+    if (GlobalMemoryStatusEx(&mem_status)) {
+        avail_mem_kb = (size_t)(mem_status.ullAvailPhys / 1024);
+    }
+    SYSTEM_INFO sys_info;
+    GetSystemInfo(&sys_info);
+    avail_cpu_cores = (int)sys_info.dwNumberOfProcessors;
+#elif defined(__APPLE__)
+    long phys_pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGESIZE);
+    if (phys_pages > 0 && page_size > 0) {
+        avail_mem_kb = (size_t)((phys_pages * page_size) / 1024);
+    }
+    long nproc = sysconf(_SC_NPROCESSORS_ONLN);
+    avail_cpu_cores = (int)(nproc > 0 ? nproc : 1);
+#else
+    long phys_pages = sysconf(_SC_AVPHYS_PAGES);
+    long page_size = sysconf(_SC_PAGESIZE);
+    if (phys_pages > 0 && page_size > 0) {
+        avail_mem_kb = (size_t)((phys_pages * page_size) / 1024);
+    }
+    long nproc = sysconf(_SC_NPROCESSORS_ONLN);
+    avail_cpu_cores = (int)(nproc > 0 ? nproc : 1);
+#endif
+
+    size_t reserved_margin_kb = avail_mem_kb / 10;
+    if (avail_mem_kb > reserved_margin_kb) {
+        avail_mem_kb -= reserved_margin_kb;
+    } else {
+        avail_mem_kb = 0;
+    }
+
+    if (est_memory_kb > avail_mem_kb) {
+        return AGENTOS_ERESOURCE;
+    }
+
+    if (est_cpu_cores > avail_cpu_cores) {
+        return AGENTOS_ERESOURCE;
+    }
+
     return AGENTOS_SUCCESS;
 }
 

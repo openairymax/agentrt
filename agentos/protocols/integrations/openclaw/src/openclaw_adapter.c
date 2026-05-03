@@ -13,6 +13,34 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <pthread.h>
+#include <errno.h>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define close_socket(s) closesocket(s)
+#define sock_errno WSAGetLastError()
+#define SOCK_EINPROGRESS WSAEINPROGRESS
+typedef SOCKET socket_fd_t;
+#define INVALID_SOCK (-1)
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
+#define close_socket(s) close(s)
+#define sock_errno errno
+#define SOCK_EINPROGRESS EINPROGRESS
+typedef int socket_fd_t;
+#define INVALID_SOCK (-1)
+#endif
+
+#define OPENCLAW_SOCKET_TIMEOUT_MS 5000
+#define OPENCLAW_RECV_BUFFER_SIZE 65536
 
 struct openclaw_adapter_context_s {
     openclaw_config_t config;
@@ -40,6 +68,7 @@ struct openclaw_adapter_context_s {
     uint64_t tasks_completed;
     uint64_t connection_uptime_sec;
     uint64_t connect_timestamp;
+    socket_fd_t sock_fd;
     char last_error[256];
 };
 
@@ -88,6 +117,7 @@ openclaw_adapter_context_t* openclaw_adapter_create(const openclaw_config_t* con
 
     ctx->initialized = true;
     ctx->connected = false;
+    ctx->sock_fd = INVALID_SOCK;
     ctx->registered_agents = NULL;
     ctx->registered_agent_count = 0;
     ctx->active_sessions = NULL;
@@ -149,10 +179,218 @@ const char* openclaw_adapter_platform_version(void) {
     return OPENCLAW_PLATFORM_VERSION;
 }
 
+static int openclaw_parse_endpoint(const char* endpoint_url, char* host, size_t host_size,
+                                    int* port) {
+    if (!endpoint_url || !host || !port) return -1;
+
+    const char* url = endpoint_url;
+    const char* host_start = url;
+
+    if (strncmp(url, "http://", 7) == 0) {
+        host_start = url + 7;
+        *port = 80;
+    } else if (strncmp(url, "https://", 8) == 0) {
+        host_start = url + 8;
+        *port = 443;
+    } else {
+        host_start = url;
+        *port = 28080;
+    }
+
+    const char* colon = strchr(host_start, ':');
+    const char* slash = strchr(host_start, '/');
+
+    if (colon && (!slash || colon < slash)) {
+        size_t host_len = (size_t)(colon - host_start);
+        if (host_len >= host_size) host_len = host_size - 1;
+        memcpy(host, host_start, host_len);
+        host[host_len] = '\0';
+        *port = atoi(colon + 1);
+    } else if (slash) {
+        size_t host_len = (size_t)(slash - host_start);
+        if (host_len >= host_size) host_len = host_size - 1;
+        memcpy(host, host_start, host_len);
+        host[host_len] = '\0';
+    } else {
+        size_t host_len = strlen(host_start);
+        if (host_len >= host_size) host_len = host_size - 1;
+        memcpy(host, host_start, host_len);
+        host[host_len] = '\0';
+    }
+
+    return 0;
+}
+
+static int openclaw_socket_set_nonblocking(socket_fd_t fd) {
+#ifdef _WIN32
+    u_long mode = 1;
+    return ioctlsocket(fd, FIONBIO, &mode);
+#else
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) return -1;
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#endif
+}
+
+static int openclaw_socket_connect(socket_fd_t fd, const char* host, int port,
+                                    uint32_t timeout_ms) {
+    struct addrinfo hints;
+    struct addrinfo* result = NULL;
+    struct addrinfo* rp = NULL;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    char port_str[16];
+    snprintf(port_str, sizeof(port_str), "%d", port);
+
+    int ret = getaddrinfo(host, port_str, &hints, &result);
+    if (ret != 0) return -1;
+
+    int connected = -1;
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        if (connect(fd, rp->ai_addr, (socklen_t)rp->ai_addrlen) == 0) {
+            connected = 0;
+            break;
+        }
+        if (sock_errno == SOCK_EINPROGRESS) {
+            connected = 1;
+            break;
+        }
+    }
+
+    freeaddrinfo(result);
+
+    if (connected == -1) return -2;
+
+    if (connected == 1) {
+        struct pollfd pfd;
+        pfd.fd = fd;
+        pfd.events = POLLOUT;
+
+        int poll_ret = poll(&pfd, 1, (int)timeout_ms);
+        if (poll_ret <= 0) return -3;
+
+        int so_error = 0;
+        socklen_t len = sizeof(so_error);
+        if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len) < 0)
+            return -4;
+        if (so_error != 0) return -5;
+    }
+
+    return 0;
+}
+
+static int openclaw_socket_send(socket_fd_t fd, const void* data, size_t len,
+                                 uint32_t timeout_ms) {
+    size_t total_sent = 0;
+
+    while (total_sent < len) {
+        struct pollfd pfd;
+        pfd.fd = fd;
+        pfd.events = POLLOUT;
+
+        int poll_ret = poll(&pfd, 1, (int)timeout_ms);
+        if (poll_ret <= 0) return -1;
+
+        ssize_t sent = send(fd, (const char*)data + total_sent,
+                            len - total_sent, 0);
+        if (sent < 0) {
+            if (sock_errno == EINTR) continue;
+            return -1;
+        }
+        total_sent += (size_t)sent;
+    }
+
+    return 0;
+}
+
+static int openclaw_socket_recv(socket_fd_t fd, char* buffer, size_t buffer_size,
+                                 size_t* out_len, uint32_t timeout_ms) {
+    struct pollfd pfd;
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+
+    int poll_ret = poll(&pfd, 1, (int)timeout_ms);
+    if (poll_ret <= 0) return -1;
+
+    ssize_t recvd = recv(fd, buffer, buffer_size - 1, 0);
+    if (recvd < 0) {
+        if (sock_errno == EINTR) {
+            *out_len = 0;
+            return 0;
+        }
+        return -1;
+    }
+    if (recvd == 0) return -2;
+
+    buffer[recvd] = '\0';
+    *out_len = (size_t)recvd;
+    return 0;
+}
+
+static int openclaw_serialize_message(const openclaw_message_t* msg,
+                                       char* buffer, size_t buffer_size) {
+    if (!msg || !buffer) return -1;
+
+    const char* sender = msg->sender_id ? msg->sender_id : "";
+    const char* receiver = msg->receiver_id ? msg->receiver_id : "";
+    const char* session = msg->session_id ? msg->session_id : "";
+    const char* mid = msg->message_id ? msg->message_id : "";
+    const char* ctype = msg->content_type ? msg->content_type : "text/plain";
+    const char* pload = msg->payload ? (const char*)msg->payload : "";
+
+    return snprintf(buffer, buffer_size,
+        "{"
+        "\"message_id\":\"%s\","
+        "\"session_id\":\"%s\","
+        "\"sender_id\":\"%s\","
+        "\"receiver_id\":\"%s\","
+        "\"modality\":%u,"
+        "\"content_type\":\"%s\","
+        "\"payload\":\"%s\","
+        "\"payload_size\":%zu,"
+        "\"timestamp\":%llu,"
+        "\"priority\":%u"
+        "}",
+        mid, session, sender, receiver,
+        (unsigned int)msg->modality,
+        ctype,
+        pload,
+        msg->payload_size,
+        (unsigned long long)msg->timestamp,
+        (unsigned int)msg->priority);
+}
+
 int openclaw_connect(openclaw_adapter_context_t* ctx) {
     if (!ctx || !ctx->initialized) return -1;
     if (ctx->connected) return 0;
 
+    char host[256] = {0};
+    int port = 28080;
+
+    openclaw_parse_endpoint(ctx->config.endpoint_url, host, sizeof(host), &port);
+
+    socket_fd_t fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == INVALID_SOCK) {
+        snprintf(ctx->last_error, sizeof(ctx->last_error),
+                 "Failed to create socket: errno=%d", sock_errno);
+        return -2;
+    }
+
+    int ret = openclaw_socket_connect(fd, host, port,
+                                       ctx->config.request_timeout_ms);
+    if (ret != 0) {
+        snprintf(ctx->last_error, sizeof(ctx->last_error),
+                 "Failed to connect to %s:%d (ret=%d, errno=%d)",
+                 host, port, ret, sock_errno);
+        close_socket(fd);
+        return -3;
+    }
+
+    ctx->sock_fd = fd;
     ctx->connected = true;
     ctx->connection_uptime_sec = 0;
     ctx->connect_timestamp = (uint64_t)time(NULL);
@@ -166,6 +404,11 @@ int openclaw_disconnect(openclaw_adapter_context_t* ctx) {
     for (size_t i = 0; i < ctx->active_session_count; i++) {
         if (ctx->active_sessions[i].is_active)
             ctx->active_sessions[i].is_active = false;
+    }
+
+    if (ctx->sock_fd != INVALID_SOCK) {
+        close_socket(ctx->sock_fd);
+        ctx->sock_fd = INVALID_SOCK;
     }
 
     ctx->connected = false;
@@ -436,6 +679,47 @@ int openclaw_send_message(openclaw_adapter_context_t* ctx,
         return ret;
     }
 
+    if (ctx->sock_fd != INVALID_SOCK) {
+        char send_buf[OPENCLAW_RECV_BUFFER_SIZE] = {0};
+        int ser_len = openclaw_serialize_message(msg, send_buf, sizeof(send_buf));
+        if (ser_len > 0) {
+            size_t send_len = (size_t)ser_len;
+            char framed[OPENCLAW_RECV_BUFFER_SIZE + 8];
+            int frame_len = snprintf(framed, sizeof(framed), "%06zx%s", send_len, send_buf);
+            int send_ret = openclaw_socket_send(ctx->sock_fd, framed,
+                                                 (size_t)(frame_len > 0 ? frame_len : 0),
+                                                 ctx->config.request_timeout_ms);
+            if (send_ret == 0) {
+                char recv_buf[OPENCLAW_RECV_BUFFER_SIZE] = {0};
+                size_t recv_len = 0;
+                int recv_ret = openclaw_socket_recv(ctx->sock_fd, recv_buf,
+                                                     sizeof(recv_buf), &recv_len,
+                                                     ctx->config.request_timeout_ms);
+                if (recv_ret == 0 && recv_len >= 6) {
+                    size_t payload_offset = 6;
+                    size_t payload_len = recv_len - 6;
+                    memset(response, 0, sizeof(openclaw_message_t));
+                    response->message_id = msg->message_id ? strdup(msg->message_id) : NULL;
+                    response->session_id = msg->session_id ? strdup(msg->session_id) : NULL;
+                    response->sender_id = msg->receiver_id ? strdup(msg->receiver_id) : NULL;
+                    response->receiver_id = msg->sender_id ? strdup(msg->sender_id) : NULL;
+                    response->modality = msg->modality;
+                    response->timestamp = (uint64_t)(time(NULL));
+                    if (payload_len > 0) {
+                        response->payload = malloc(payload_len + 1);
+                        if (response->payload) {
+                            memcpy(response->payload, recv_buf + payload_offset, payload_len);
+                            ((char*)response->payload)[payload_len] = '\0';
+                            response->payload_size = payload_len;
+                        }
+                    }
+                    ctx->messages_received++;
+                    return 0;
+                }
+            }
+        }
+    }
+
     memset(response, 0, sizeof(openclaw_message_t));
     response->message_id = msg->message_id ? strdup(msg->message_id) : NULL;
     response->session_id = msg->session_id ? strdup(msg->session_id) : NULL;
@@ -703,15 +987,28 @@ static int openclaw_proto_handle_request(void* context,
     openclaw_message_t response = {0};
     int ret = openclaw_send_message(ctx, &msg, &response);
 
-    if (ret == 0 && resp) {
-        if (response.payload) {
-            *resp = strdup((const char*)response.payload);
+    if (resp) {
+        if (ret == 0 && response.payload && response.payload_size > 0) {
+            *resp = malloc(response.payload_size + 1);
+            if (*resp) {
+                memcpy(*resp, response.payload, response.payload_size);
+                ((char*)*resp)[response.payload_size] = '\0';
+            }
+        } else if (ret == 0) {
+            char stats_buf[2048] = {0};
+            openclaw_get_statistics(ctx, stats_buf, sizeof(stats_buf));
+            *resp = strdup(stats_buf);
         } else {
-            *resp = strdup("{\"status\":\"ok\"}");
+            char err_buf[512];
+            int err_len = snprintf(err_buf, sizeof(err_buf),
+                "{\"error\":\"Request processing failed\",\"code\":%d,\"adapter_version\":\"%s\"}",
+                ret, OPENCLAW_ADAPTER_VERSION);
+            if (err_len > 0 && (size_t)err_len < sizeof(err_buf)) {
+                *resp = strdup(err_buf);
+            } else {
+                *resp = strdup("{\"error\":\"Request processing failed\"}");
+            }
         }
-    } else if (resp) {
-        *resp = strdup("{\"status\":\"error\",\"message\":\"Request processing failed\"}");
-        ret = -1;
     }
 
     openclaw_message_destroy(&msg);
@@ -737,24 +1034,24 @@ static uint32_t openclaw_proto_capabilities(void* context) {
         PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY);
 }
 
+static proto_adapter_t g_openclaw_adapter = {0};
+static pthread_once_t g_openclaw_adapter_once = PTHREAD_ONCE_INIT;
+
+static void openclaw_adapter_init_once(void) {
+    g_openclaw_adapter.name = "OpenClaw";
+    g_openclaw_adapter.version = OPENCLAW_ADAPTER_VERSION;
+    g_openclaw_adapter.description = "OpenClaw Platform Integration Adapter - offline private AI Agent platform with multimodal capabilities";
+    g_openclaw_adapter.type = PROTO_OPENCLAW;
+    g_openclaw_adapter.init = openclaw_proto_init;
+    g_openclaw_adapter.destroy = openclaw_proto_destroy;
+    g_openclaw_adapter.handle_request = openclaw_proto_handle_request;
+    g_openclaw_adapter.get_version = openclaw_proto_get_version;
+    g_openclaw_adapter.capabilities = openclaw_proto_capabilities;
+}
+
 const proto_adapter_t* openclaw_get_protocol_adapter(void) {
-    static proto_adapter_t adapter = {0};
-    static bool initialized = false;
-
-    if (!initialized) {
-        adapter.name = "OpenClaw";
-        adapter.version = OPENCLAW_ADAPTER_VERSION;
-        adapter.description = "OpenClaw Platform Integration Adapter - offline private AI Agent platform with multimodal capabilities";
-        adapter.type = PROTO_OPENCLAW;
-        adapter.init = openclaw_proto_init;
-        adapter.destroy = openclaw_proto_destroy;
-        adapter.handle_request = openclaw_proto_handle_request;
-        adapter.get_version = openclaw_proto_get_version;
-        adapter.capabilities = openclaw_proto_capabilities;
-        initialized = true;
-    }
-
-    return &adapter;
+    pthread_once(&g_openclaw_adapter_once, openclaw_adapter_init_once);
+    return &g_openclaw_adapter;
 }
 
 void openclaw_agent_card_destroy(openclaw_agent_card_t* card) {

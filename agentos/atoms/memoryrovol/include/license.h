@@ -81,6 +81,7 @@ int agentos_license_is_trial(void);
 int agentos_license_trial_check_write(void);
 uint32_t agentos_license_trial_record_count(void);
 int agentos_license_trial_expired(void);
+void agentos_license_trial_delay(void);
 
 #ifdef __cplusplus
 }

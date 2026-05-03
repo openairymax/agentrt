@@ -17,25 +17,27 @@
  * 6. 错误恢复：解析失败时的降级策略
  */
 
-#include "cognition.h"
 #include "agentos.h"
-#include "logger.h"
-#include "id_utils.h"
+#include "cognition.h"
 #include "error_utils.h"
-#include "../../../commons/utils/observability/include/observability_compat.h"
+#include "id_utils.h"
+#include "logger.h"
 
 /* 辅助模块（已拆分，以下内部函数为历史遗留副本，计划在未来版本移除） */
-#include "intent_utils.h"      /* to_lowercase, contains_ignore_case, string_similarity 等 */
-#include "entity_extractor.h"  /* 实体提取功能 */
-#include <stdlib.h>
+#include "entity_extractor.h" /* 实体提取功能 */
+#include "intent_utils.h"     /* to_lowercase, contains_ignore_case, string_similarity 等 */
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
-#include <string.h>
-#include <stdio.h>
-#include <ctype.h>
+
 #include <cjson/cJSON.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "../../../commons/utils/observability/include/observability_compat.h"
 
 /* ==================== 内部常量定义 ==================== */
 
@@ -63,40 +65,40 @@
  * @brief 意图分类规则结构
  */
 typedef struct intent_rule {
-    char* pattern;                     /**< 模式字符串 */
-    size_t pattern_len;                /**< 模式长度 */
-    char* intent_name;                 /**< 意图名称 */
-    float confidence;                  /**< 基础置信度 */
-    uint32_t flags;                    /**< 标志位 */
-    struct intent_rule* next;          /**< 下一个规则 */
+    char *pattern;            /**< 模式字符串 */
+    size_t pattern_len;       /**< 模式长度 */
+    char *intent_name;        /**< 意图名称 */
+    float confidence;         /**< 基础置信度 */
+    uint32_t flags;           /**< 标志位 */
+    struct intent_rule *next; /**< 下一个规则 */
 } intent_rule_t;
 
 /**
  * @brief 实体提取结果
  */
 typedef struct extracted_entity {
-    char* type;                        /**< 实体类型 */
-    char* value;                       /**< 实体值 */
-    size_t value_len;                  /**< 值长度 */
-    int start_pos;                     /**< 起始位置 */
-    int end_pos;                       /**< 结束位置 */
-    float confidence;                  /**< 置信度 */
+    char *type;       /**< 实体类型 */
+    char *value;      /**< 实体值 */
+    size_t value_len; /**< 值长度 */
+    int start_pos;    /**< 起始位置 */
+    int end_pos;      /**< 结束位置 */
+    float confidence; /**< 置信度 */
 } extracted_entity_t;
 
 /**
  * @brief 意图解析器内部状态
  */
 struct agentos_intent_parser {
-    intent_rule_t* rule_list;          /**< 规则链表 */
-    agentos_mutex_t* lock;             /**< 线程锁 */
-    uint64_t total_parsed;             /**< 总解析次数 */
-    uint64_t success_count;            /**< 成功次数 */
-    uint64_t failure_count;            /**< 失败次数 */
-    uint64_t total_time_ns;            /**< 总耗时（纳秒） */
-    void* obs;                         /**< 可观测性句柄（预留） */
-    char* parser_id;                   /**< 解析器 ID */
-    uint8_t* keyword_trie;             /**< 关键词 Trie 树 */
-    size_t keyword_count;              /**< 关键词数量 */
+    intent_rule_t *rule_list; /**< 规则链表 */
+    agentos_mutex_t *lock;    /**< 线程锁 */
+    uint64_t total_parsed;    /**< 总解析次数 */
+    uint64_t success_count;   /**< 成功次数 */
+    uint64_t failure_count;   /**< 失败次数 */
+    uint64_t total_time_ns;   /**< 总耗时（纳秒） */
+    void *obs;                /**< 可观测性句柄（预留） */
+    char *parser_id;          /**< 解析器 ID */
+    uint8_t *keyword_trie;    /**< 关键词 Trie 树 */
+    size_t keyword_count;     /**< 关键词数量 */
 };
 
 /* ==================== 内部工具函数 ==================== */
@@ -113,9 +115,11 @@ struct agentos_intent_parser {
  * 新代码请使用 intent_utils.h 中声明的函数。
  * ============================================================ */
 
-static char* to_lowercase(char* str) {
-    if (!str) return NULL;
-    for (char* p = str; *p; ++p) {
+static char *to_lowercase(char *str)
+{
+    if (!str)
+        return NULL;
+    for (char *p = str; *p; ++p) {
         *p = tolower(*p);
     }
     return str;
@@ -127,13 +131,16 @@ static char* to_lowercase(char* str) {
  * @param needle 子串
  * @return 1 表示包含，0 表示不包含
  */
-static int contains_ignore_case(const char* haystack, const char* needle) {
-    if (!haystack || !needle) return 0;
+static int contains_ignore_case(const char *haystack, const char *needle)
+{
+    if (!haystack || !needle)
+        return 0;
 
     size_t haystack_len = strlen(haystack);
     size_t needle_len = strlen(needle);
 
-    if (needle_len > haystack_len) return 0;
+    if (needle_len > haystack_len)
+        return 0;
 
     for (size_t i = 0; i <= haystack_len - needle_len; i++) {
         int match = 1;
@@ -143,7 +150,8 @@ static int contains_ignore_case(const char* haystack, const char* needle) {
                 break;
             }
         }
-        if (match) return 1;
+        if (match)
+            return 1;
     }
     return 0;
 }
@@ -154,8 +162,10 @@ static int contains_ignore_case(const char* haystack, const char* needle) {
  * @param s2 字符串 2
  * @return 相似度得分（0-1）
  */
-static float string_similarity(const char* s1, const char* s2) {
-    if (!s1 || !s2) return 0.0f;
+static float string_similarity(const char *s1, const char *s2)
+{
+    if (!s1 || !s2)
+        return 0.0f;
 
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);
@@ -165,11 +175,11 @@ static float string_similarity(const char* s1, const char* s2) {
     for (size_t i = 0; i < len1; i++) {
         for (size_t j = 0; j < len2; j++) {
             size_t k = 0;
-            while (i + k < len1 && j + k < len2 &&
-                   tolower(s1[i + k]) == tolower(s2[j + k])) {
+            while (i + k < len1 && j + k < len2 && tolower(s1[i + k]) == tolower(s2[j + k])) {
                 k++;
             }
-            if (k > (size_t)commons) commons = (int)k;
+            if (k > (size_t)commons)
+                commons = (int)k;
         }
     }
 
@@ -183,15 +193,18 @@ static float string_similarity(const char* s1, const char* s2) {
  * @param max_keywords 最大关键词数
  * @return 提取的关键词数量
  */
-static size_t extract_keywords(const char* text, char** keywords, size_t max_keywords) {
-    if (!text || !keywords || max_keywords == 0) return 0;
+static size_t extract_keywords(const char *text, char **keywords, size_t max_keywords)
+{
+    if (!text || !keywords || max_keywords == 0)
+        return 0;
 
     // 基于空格和标点符号分割提取关键词
     size_t count = 0;
-    char* copy = AGENTOS_STRDUP(text);
-    if (!copy) return 0;
+    char *copy = AGENTOS_STRDUP(text);
+    if (!copy)
+        return 0;
 
-    char* token = strtok(copy, " ,.!?;:\t\n\r");
+    char *token = strtok(copy, " ,.!?;:\t\n\r");
     while (token && count < max_keywords) {
         // 过滤短词
         if (strlen(token) > 2) {
@@ -213,10 +226,13 @@ static size_t extract_keywords(const char* text, char** keywords, size_t max_key
  * @param keywords 关键词数组
  * @param count 关键词数量
  */
-static void free_keywords(char** keywords, size_t count) {
-    if (!keywords) return;
+static void free_keywords(char **keywords, size_t count)
+{
+    if (!keywords)
+        return;
     for (size_t i = 0; i < count; i++) {
-        if (keywords[i]) AGENTOS_FREE(keywords[i]);
+        if (keywords[i])
+            AGENTOS_FREE(keywords[i]);
     }
 }
 
@@ -230,11 +246,13 @@ static void free_keywords(char** keywords, size_t count) {
  * @param flags 标志位
  * @return 新规则对象，失败返回 NULL
  */
-static intent_rule_t* create_intent_rule(const char* pattern, const char* intent_name,
-                                         float confidence, uint32_t flags) {
-    if (!pattern || !intent_name) return NULL;
+static intent_rule_t *create_intent_rule(const char *pattern, const char *intent_name,
+                                         float confidence, uint32_t flags)
+{
+    if (!pattern || !intent_name)
+        return NULL;
 
-    intent_rule_t* rule = (intent_rule_t*)AGENTOS_CALLOC(1, sizeof(intent_rule_t));
+    intent_rule_t *rule = (intent_rule_t *)AGENTOS_CALLOC(1, sizeof(intent_rule_t));
     if (!rule) {
         AGENTOS_LOG_ERROR("Failed to allocate intent rule");
         return NULL;
@@ -248,8 +266,10 @@ static intent_rule_t* create_intent_rule(const char* pattern, const char* intent
     rule->next = NULL;
 
     if (!rule->pattern || !rule->intent_name) {
-        if (rule->pattern) AGENTOS_FREE(rule->pattern);
-        if (rule->intent_name) AGENTOS_FREE(rule->intent_name);
+        if (rule->pattern)
+            AGENTOS_FREE(rule->pattern);
+        if (rule->intent_name)
+            AGENTOS_FREE(rule->intent_name);
         AGENTOS_FREE(rule);
         AGENTOS_LOG_ERROR("Failed to duplicate strings for intent rule");
         return NULL;
@@ -265,10 +285,14 @@ static intent_rule_t* create_intent_rule(const char* pattern, const char* intent
  * @brief 释放意图规则
  * @param rule 规则对象
  */
-static void free_intent_rule(intent_rule_t* rule) {
-    if (!rule) return;
-    if (rule->pattern) AGENTOS_FREE(rule->pattern);
-    if (rule->intent_name) AGENTOS_FREE(rule->intent_name);
+static void free_intent_rule(intent_rule_t *rule)
+{
+    if (!rule)
+        return;
+    if (rule->pattern)
+        AGENTOS_FREE(rule->pattern);
+    if (rule->intent_name)
+        AGENTOS_FREE(rule->intent_name);
     AGENTOS_FREE(rule);
 }
 
@@ -276,9 +300,10 @@ static void free_intent_rule(intent_rule_t* rule) {
  * @brief 释放规则链表
  * @param head 链表头
  */
-static void free_rule_list(intent_rule_t* head) {
+static void free_rule_list(intent_rule_t *head)
+{
     while (head) {
-        intent_rule_t* next = head->next;
+        intent_rule_t *next = head->next;
         free_intent_rule(head);
         head = next;
     }
@@ -290,8 +315,10 @@ static void free_rule_list(intent_rule_t* head) {
  * @param rule 规则
  * @return AGENTOS_SUCCESS 成功，其他为错误码
  */
-static agentos_error_t add_rule_to_parser(agentos_intent_parser_t* parser, intent_rule_t* rule) {
-    if (!parser || !rule) return AGENTOS_EINVAL;
+static agentos_error_t add_rule_to_parser(agentos_intent_parser_t *parser, intent_rule_t *rule)
+{
+    if (!parser || !rule)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(parser->lock);
 
@@ -315,30 +342,31 @@ static agentos_error_t add_rule_to_parser(agentos_intent_parser_t* parser, inten
  * @param out_confidence 输出置信度
  * @return AGENTOS_SUCCESS 找到匹配，其他为未找到
  */
-static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
-                                             const char* text,
-                                             char** out_intent_name,
-                                             float* out_confidence) {
+static agentos_error_t match_intent_by_rules(agentos_intent_parser_t *parser, const char *text,
+                                             char **out_intent_name, float *out_confidence)
+{
     if (!parser || !text || !out_intent_name || !out_confidence) {
         return AGENTOS_EINVAL;
     }
 
-    char* lower_text = AGENTOS_STRDUP(text);
-    if (!lower_text) return AGENTOS_ENOMEM;
+    char *lower_text = AGENTOS_STRDUP(text);
+    if (!lower_text)
+        return AGENTOS_ENOMEM;
     to_lowercase(lower_text);
 
     agentos_mutex_lock(parser->lock);
-    intent_rule_t* rule = parser->rule_list;
+    intent_rule_t *rule = parser->rule_list;
 
     float best_confidence = 0.0f;
-    char* best_intent = NULL;
+    char *best_intent = NULL;
 
     while (rule) {
         // 检查直接包含
         if (contains_ignore_case(lower_text, rule->pattern)) {
             if (rule->confidence > best_confidence) {
                 best_confidence = rule->confidence;
-                if (best_intent) AGENTOS_FREE(best_intent);
+                if (best_intent)
+                    AGENTOS_FREE(best_intent);
                 best_intent = AGENTOS_STRDUP(rule->intent_name);
                 if (!best_intent) {
                     AGENTOS_FREE(lower_text);
@@ -351,9 +379,11 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
         else {
             float similarity = string_similarity(lower_text, rule->pattern);
             float adjusted_confidence = similarity * rule->confidence;
-            if (adjusted_confidence > best_confidence && adjusted_confidence > MIN_CONFIDENCE_THRESHOLD) {
+            if (adjusted_confidence > best_confidence &&
+                adjusted_confidence > MIN_CONFIDENCE_THRESHOLD) {
                 best_confidence = adjusted_confidence;
-                if (best_intent) AGENTOS_FREE(best_intent);
+                if (best_intent)
+                    AGENTOS_FREE(best_intent);
                 best_intent = AGENTOS_STRDUP(rule->intent_name);
                 if (!best_intent) {
                     AGENTOS_FREE(lower_text);
@@ -375,7 +405,8 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
         return AGENTOS_SUCCESS;
     }
 
-    if (best_intent) AGENTOS_FREE(best_intent);
+    if (best_intent)
+        AGENTOS_FREE(best_intent);
     return AGENTOS_ENOENT;
 }
 
@@ -392,20 +423,22 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
  * 计划在 v2.0 统一为 entity_extractor 模块的公开API。
  * ============================================================ */
 
-static size_t extract_entities_from_text(const char* text, extracted_entity_t* entities,
-                                         size_t max_entries) {
-    if (!text || !entities || max_entries == 0) return 0;
+static size_t extract_entities_from_text(const char *text, extracted_entity_t *entities,
+                                         size_t max_entries)
+{
+    if (!text || !entities || max_entries == 0)
+        return 0;
 
     // 基于预定义关键词词典的实体提取
     // 生产环境应使用 NER 模型
 
     size_t count = 0;
-    char* keywords[MAX_KEYWORDS];
+    char *keywords[MAX_KEYWORDS];
     size_t keyword_count = extract_keywords(text, keywords, MAX_KEYWORDS);
 
     for (size_t i = 0; i < keyword_count && count < max_entries; i++) {
-        const char* keyword = keywords[i];
-        char* type = NULL;
+        const char *keyword = keywords[i];
+        char *type = NULL;
         float confidence = 0.5f;  // 基础置信度
 
         // 检查是否为数字
@@ -422,13 +455,10 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
             confidence = 0.9f;
         }
         // 检查是否为时间相关
-        else if (contains_ignore_case(keyword, "time") ||
-                 contains_ignore_case(keyword, "hour") ||
+        else if (contains_ignore_case(keyword, "time") || contains_ignore_case(keyword, "hour") ||
                  contains_ignore_case(keyword, "minute") ||
-                 contains_ignore_case(keyword, "second") ||
-                 contains_ignore_case(keyword, "day") ||
-                 contains_ignore_case(keyword, "week") ||
-                 contains_ignore_case(keyword, "month") ||
+                 contains_ignore_case(keyword, "second") || contains_ignore_case(keyword, "day") ||
+                 contains_ignore_case(keyword, "week") || contains_ignore_case(keyword, "month") ||
                  contains_ignore_case(keyword, "year")) {
             type = "time";
             confidence = 0.8f;
@@ -436,8 +466,7 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
         // 检查是否为文件相关
         else if (contains_ignore_case(keyword, "file") ||
                  contains_ignore_case(keyword, "document") ||
-                 contains_ignore_case(keyword, "report") ||
-                 contains_ignore_case(keyword, "data")) {
+                 contains_ignore_case(keyword, "report") || contains_ignore_case(keyword, "data")) {
             type = "file";
             confidence = 0.7f;
         }
@@ -453,7 +482,7 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
             entities[count].value_len = strlen(keyword);
             entities[count].confidence = confidence;
             /* 计算关键词在原文中的位置 */
-            const char* pos = strstr(text, keyword);
+            const char *pos = strstr(text, keyword);
             if (pos) {
                 entities[count].start_pos = (size_t)(pos - text);
                 entities[count].end_pos = entities[count].start_pos + strlen(keyword);
@@ -476,10 +505,13 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
  * @param out_parser 输出解析器句柄
  * @return agentos_error_t
  */
-agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t** out_parser) {
-    if (!out_parser) return AGENTOS_EINVAL;
+agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t **out_parser)
+{
+    if (!out_parser)
+        return AGENTOS_EINVAL;
 
-    agentos_intent_parser_t* parser = (agentos_intent_parser_t*)AGENTOS_CALLOC(1, sizeof(agentos_intent_parser_t));
+    agentos_intent_parser_t *parser =
+        (agentos_intent_parser_t *)AGENTOS_CALLOC(1, sizeof(agentos_intent_parser_t));
     if (!parser) {
         AGENTOS_LOG_ERROR("Failed to allocate intent parser");
         return AGENTOS_ENOMEM;
@@ -507,47 +539,59 @@ agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t** out_parse
     // 初始化可观测性
 
     // 添加默认规则
-    intent_rule_t* rule;
+    intent_rule_t *rule;
 
     // 文件操作意图
     rule = create_intent_rule("read file", "file_read", 0.9f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     rule = create_intent_rule("write file", "file_write", 0.9f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     rule = create_intent_rule("create file", "file_create", 0.9f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     rule = create_intent_rule("delete file", "file_delete", 0.9f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     // 数据分析意图
     rule = create_intent_rule("analyze data", "data_analyze", 0.8f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     rule = create_intent_rule("process data", "data_process", 0.8f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     rule = create_intent_rule("summarize report", "report_summarize", 0.85f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     // 网络操作意图
     rule = create_intent_rule("download", "network_download", 0.9f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     rule = create_intent_rule("upload", "network_upload", 0.9f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     rule = create_intent_rule("send email", "email_send", 0.95f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     // 通用意图
     rule = create_intent_rule("help", "general_help", 0.95f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     rule = create_intent_rule("what can you do", "general_capabilities", 0.9f, 0);
-    if (rule) add_rule_to_parser(parser, rule);
+    if (rule)
+        add_rule_to_parser(parser, rule);
 
     *out_parser = parser;
 
@@ -559,8 +603,10 @@ agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t** out_parse
  * @brief 销毁意图解析器
  * @param parser 解析器句柄
  */
-void agentos_intent_parser_destroy(agentos_intent_parser_t* parser) {
-    if (!parser) return;
+void agentos_intent_parser_destroy(agentos_intent_parser_t *parser)
+{
+    if (!parser)
+        return;
 
     AGENTOS_LOG_DEBUG("Destroying intent parser: %s", parser->parser_id);
 
@@ -585,10 +631,9 @@ void agentos_intent_parser_destroy(agentos_intent_parser_t* parser) {
  * @param out_intent 输出意图结构
  * @return agentos_error_t
  */
-agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
-                                            const char* input,
-                                            size_t input_len,
-                                            agentos_intent_t** out_intent) {
+agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser, const char *input,
+                                            size_t input_len, agentos_intent_t **out_intent)
+{
     if (!parser || !input || !out_intent) {
         return AGENTOS_EINVAL;
     }
@@ -599,14 +644,14 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
     // 更新统计
     parser->total_parsed++;
 
-    agentos_intent_t* intent = (agentos_intent_t*)AGENTOS_CALLOC(1, sizeof(agentos_intent_t));
+    agentos_intent_t *intent = (agentos_intent_t *)AGENTOS_CALLOC(1, sizeof(agentos_intent_t));
     if (!intent) {
         AGENTOS_LOG_ERROR("Failed to allocate intent structure");
         parser->failure_count++;
         return AGENTOS_ENOMEM;
     }
 
-    intent->intent_raw_text = (char*)AGENTOS_MALLOC(input_len + 1);
+    intent->intent_raw_text = (char *)AGENTOS_MALLOC(input_len + 1);
     if (!intent->intent_raw_text) {
         AGENTOS_LOG_ERROR("Failed to allocate raw text buffer");
         AGENTOS_FREE(intent);
@@ -618,7 +663,7 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
     intent->intent_raw_len = input_len;
 
     // 提取意图名称和置信度
-    char* intent_name = NULL;
+    char *intent_name = NULL;
     float confidence = 0.0f;
     agentos_error_t match_result = match_intent_by_rules(parser, input, &intent_name, &confidence);
 
@@ -638,11 +683,11 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
 
         if (entity_count > 0) {
             // 创建上下文 JSON
-            cJSON* context_json = cJSON_CreateObject();
+            cJSON *context_json = cJSON_CreateObject();
             if (context_json) {
-                cJSON* entities_array = cJSON_CreateArray();
+                cJSON *entities_array = cJSON_CreateArray();
                 for (size_t i = 0; i < entity_count; i++) {
-                    cJSON* entity_obj = cJSON_CreateObject();
+                    cJSON *entity_obj = cJSON_CreateObject();
                     cJSON_AddStringToObject(entity_obj, "type", entities[i].type);
                     cJSON_AddStringToObject(entity_obj, "value", entities[i].value);
                     cJSON_AddNumberToObject(entity_obj, "confidence", entities[i].confidence);
@@ -653,7 +698,7 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
                 }
                 cJSON_AddItemToObject(context_json, "entities", entities_array);
 
-                char* context_str = cJSON_PrintUnformatted(context_json);
+                char *context_str = cJSON_PrintUnformatted(context_json);
                 if (context_str) {
                     intent->intent_context = context_str;
                 }
@@ -666,8 +711,8 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
             // 已经在添加到 JSON 时释放了
         }
 
-        AGENTOS_LOG_DEBUG("Intent parsed successfully: %s (confidence: %.2f)",
-                         intent_name, confidence);
+        AGENTOS_LOG_DEBUG("Intent parsed successfully: %s (confidence: %.2f)", intent_name,
+                          confidence);
 
         parser->success_count++;
     } else {
@@ -694,8 +739,8 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
     if (match_result == AGENTOS_SUCCESS) {
         char feedback_json[256];
         snprintf(feedback_json, sizeof(feedback_json),
-                "{\"intent\":\"%s\",\"confidence\":%.2f,\"duration_ns\":%llu}",
-                intent_name, confidence, (unsigned long long)duration_ns);
+                 "{\"intent\":\"%s\",\"confidence\":%.2f,\"duration_ns\":%llu}", intent_name,
+                 confidence, (unsigned long long)duration_ns);
     }
 
     return AGENTOS_SUCCESS;
@@ -705,12 +750,17 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
  * @brief 释放意图结构
  * @param intent 意图结构
  */
-void agentos_intent_free(agentos_intent_t* intent) {
-    if (!intent) return;
+void agentos_intent_free(agentos_intent_t *intent)
+{
+    if (!intent)
+        return;
 
-    if (intent->intent_raw_text) AGENTOS_FREE(intent->intent_raw_text);
-    if (intent->intent_goal) AGENTOS_FREE(intent->intent_goal);
-    if (intent->intent_context) AGENTOS_FREE(intent->intent_context);
+    if (intent->intent_raw_text)
+        AGENTOS_FREE(intent->intent_raw_text);
+    if (intent->intent_goal)
+        AGENTOS_FREE(intent->intent_goal);
+    if (intent->intent_context)
+        AGENTOS_FREE(intent->intent_context);
 
     AGENTOS_FREE(intent);
 }
@@ -724,19 +774,19 @@ void agentos_intent_free(agentos_intent_t* intent) {
  * @param flags 标志位
  * @return agentos_error_t
  */
-agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t* parser,
-                                               const char* pattern,
-                                               const char* intent_name,
-                                               float confidence,
-                                               uint32_t flags) {
-    if (!parser || !pattern || !intent_name) return AGENTOS_EINVAL;
+agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t *parser, const char *pattern,
+                                               const char *intent_name, float confidence,
+                                               uint32_t flags)
+{
+    if (!parser || !pattern || !intent_name)
+        return AGENTOS_EINVAL;
 
     if (confidence < 0.0f || confidence > 1.0f) {
         AGENTOS_LOG_ERROR("Confidence must be between 0.0 and 1.0");
         return AGENTOS_EINVAL;
     }
 
-    intent_rule_t* rule = create_intent_rule(pattern, intent_name, confidence, flags);
+    intent_rule_t *rule = create_intent_rule(pattern, intent_name, confidence, flags);
     if (!rule) {
         AGENTOS_LOG_ERROR("Failed to create intent rule");
         return AGENTOS_ENOMEM;
@@ -756,12 +806,14 @@ agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t* parser,
  * @param out_stats 输出统计 JSON 字符串
  * @return agentos_error_t
  */
-agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t* parser,
-                                            char** out_stats) {
-    if (!parser || !out_stats) return AGENTOS_EINVAL;
+agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t *parser, char **out_stats)
+{
+    if (!parser || !out_stats)
+        return AGENTOS_EINVAL;
 
-    cJSON* stats_json = cJSON_CreateObject();
-    if (!stats_json) return AGENTOS_ENOMEM;
+    cJSON *stats_json = cJSON_CreateObject();
+    if (!stats_json)
+        return AGENTOS_ENOMEM;
 
     agentos_mutex_lock(parser->lock);
 
@@ -772,18 +824,19 @@ agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t* parser,
     cJSON_AddNumberToObject(stats_json, "total_time_ns", parser->total_time_ns);
 
     // 计算平均耗时
-    double avg_time_ns = parser->total_parsed > 0 ?
-                        (double)parser->total_time_ns / parser->total_parsed : 0.0;
+    double avg_time_ns =
+        parser->total_parsed > 0 ? (double)parser->total_time_ns / parser->total_parsed : 0.0;
     cJSON_AddNumberToObject(stats_json, "avg_time_ns", avg_time_ns);
 
     // 计算成功率
-    double success_rate = parser->total_parsed > 0 ?
-                         (double)parser->success_count / parser->total_parsed * 100.0 : 0.0;
+    double success_rate = parser->total_parsed > 0
+                              ? (double)parser->success_count / parser->total_parsed * 100.0
+                              : 0.0;
     cJSON_AddNumberToObject(stats_json, "success_rate_percent", success_rate);
 
     // 统计规则数量
     int rule_count = 0;
-    intent_rule_t* rule = parser->rule_list;
+    intent_rule_t *rule = parser->rule_list;
     while (rule) {
         rule_count++;
         rule = rule->next;
@@ -792,10 +845,11 @@ agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t* parser,
 
     agentos_mutex_unlock(parser->lock);
 
-    char* stats_str = cJSON_PrintUnformatted(stats_json);
+    char *stats_str = cJSON_PrintUnformatted(stats_json);
     cJSON_Delete(stats_json);
 
-    if (!stats_str) return AGENTOS_ENOMEM;
+    if (!stats_str)
+        return AGENTOS_ENOMEM;
 
     *out_stats = stats_str;
     return AGENTOS_SUCCESS;
@@ -805,8 +859,10 @@ agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t* parser,
  * @brief 重置解析器统计信息
  * @param parser 解析器
  */
-void agentos_intent_parser_reset_stats(agentos_intent_parser_t* parser) {
-    if (!parser) return;
+void agentos_intent_parser_reset_stats(agentos_intent_parser_t *parser)
+{
+    if (!parser)
+        return;
 
     agentos_mutex_lock(parser->lock);
 
@@ -826,12 +882,14 @@ void agentos_intent_parser_reset_stats(agentos_intent_parser_t* parser) {
  * @param out_json 输出健康状态 JSON
  * @return agentos_error_t
  */
-agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t* parser,
-                                                   char** out_json) {
-    if (!parser || !out_json) return AGENTOS_EINVAL;
+agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t *parser, char **out_json)
+{
+    if (!parser || !out_json)
+        return AGENTOS_EINVAL;
 
-    cJSON* health_json = cJSON_CreateObject();
-    if (!health_json) return AGENTOS_ENOMEM;
+    cJSON *health_json = cJSON_CreateObject();
+    if (!health_json)
+        return AGENTOS_ENOMEM;
 
     agentos_mutex_lock(parser->lock);
 
@@ -839,23 +897,28 @@ agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t* pars
     cJSON_AddStringToObject(health_json, "parser_id", parser->parser_id);
     cJSON_AddStringToObject(health_json, "status", "healthy");
     size_t rule_count = 0;
-    intent_rule_t* r = parser->rule_list;
-    while (r) { rule_count++; r = r->next; }
+    intent_rule_t *r = parser->rule_list;
+    while (r) {
+        rule_count++;
+        r = r->next;
+    }
     cJSON_AddNumberToObject(health_json, "rule_count", (double)rule_count);
 
     // 检查资源
     int resources_ok = 1;
-    if (!parser->lock) resources_ok = 0;
+    if (!parser->lock)
+        resources_ok = 0;
 
     cJSON_AddBoolToObject(health_json, "resources_ok", resources_ok);
     cJSON_AddNumberToObject(health_json, "timestamp_ns", agentos_get_monotonic_time_ns());
 
     agentos_mutex_unlock(parser->lock);
 
-    char* health_str = cJSON_PrintUnformatted(health_json);
+    char *health_str = cJSON_PrintUnformatted(health_json);
     cJSON_Delete(health_json);
 
-    if (!health_str) return AGENTOS_ENOMEM;
+    if (!health_str)
+        return AGENTOS_ENOMEM;
 
     *out_json = health_str;
     return AGENTOS_SUCCESS;

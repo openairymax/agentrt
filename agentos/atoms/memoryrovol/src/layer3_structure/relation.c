@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "layer3_structure.h"
+#include "layer3_structure_internal.h"
 #include "agentos.h"
 #include "logger.h"
 #include "platform.h"
@@ -173,13 +173,114 @@ agentos_error_t agentos_relation_encode_triple(
     return AGENTOS_SUCCESS;
 }
 
-// 注意：relation_encode_event 需要从记忆系统获取向量，这里保持原有实现（略）
+static float* vector_from_id(const char* id, size_t dim) {
+    if (!id || dim == 0) return NULL;
+
+    float* vec = (float*)AGENTOS_CALLOC(dim, sizeof(float));
+    if (!vec) return NULL;
+
+    uint32_t seed = 0;
+    for (const char* p = id; *p; p++) {
+        seed = seed * 31 + (uint32_t)(unsigned char)*p;
+    }
+
+    for (size_t i = 0; i < dim; i++) {
+        seed = seed * 1103515245u + 12345u;
+        uint32_t r = (seed >> 16) & 0x7FFF;
+        vec[i] = (float)r / 32768.0f * 2.0f - 1.0f;
+    }
+
+    float norm = 0;
+    for (size_t i = 0; i < dim; i++) norm += vec[i] * vec[i];
+    if (norm > 0) {
+        float inv = 1.0f / sqrtf(norm);
+        for (size_t i = 0; i < dim; i++) vec[i] *= inv;
+    }
+
+    return vec;
+}
+
+static float* vector_from_relation_type(agentos_relation_type_t type, size_t dim) {
+    const char* type_names[] = {
+        "REL_BEFORE",
+        "REL_AFTER",
+        "REL_CAUSES",
+        "REL_ENABLED_BY",
+        "REL_MEMBERS_OF",
+        "REL_SIMILAR_TO"
+    };
+
+    int idx = (int)type;
+    if (idx < 0 || idx >= 6) idx = 0;
+    return vector_from_id(type_names[idx], dim);
+}
+
 agentos_error_t agentos_relation_encode_event(
     agentos_relation_encoder_t* enc,
     const agentos_relation_t** relations,
     size_t count,
     float** out_event) {
-    return AGENTOS_ENOTSUP;
+
+    if (!enc || !relations || !out_event) return AGENTOS_EINVAL;
+    if (count == 0) return AGENTOS_EINVAL;
+
+#ifndef MEMORYROVOL_OSS
+    if (!MR_LICENSE_CHECK(AGENTOS_FEATURE_L3_STRUCTURE)) return AGENTOS_ELICENSE;
+#endif
+
+    size_t dim = enc->binder->dimension;
+
+    float* event = (float*)AGENTOS_CALLOC(dim, sizeof(float));
+    if (!event) return AGENTOS_ENOMEM;
+
+    for (size_t r = 0; r < count; r++) {
+        const agentos_relation_t* rel = relations[r];
+        if (!rel) continue;
+
+        float* subj_vec = vector_from_id(rel->from_id, dim);
+        float* pred_vec = vector_from_relation_type(rel->type, dim);
+        float* obj_vec = vector_from_id(rel->to_id, dim);
+
+        if (!subj_vec || !pred_vec || !obj_vec) {
+            AGENTOS_FREE(subj_vec);
+            AGENTOS_FREE(pred_vec);
+            AGENTOS_FREE(obj_vec);
+            AGENTOS_FREE(event);
+            return AGENTOS_ENOMEM;
+        }
+
+        float* triple_vec = NULL;
+        agentos_error_t err = agentos_relation_encode_triple(
+            enc, subj_vec, pred_vec, obj_vec, &triple_vec);
+
+        AGENTOS_FREE(subj_vec);
+        AGENTOS_FREE(pred_vec);
+        AGENTOS_FREE(obj_vec);
+
+        if (err != AGENTOS_SUCCESS || !triple_vec) {
+            AGENTOS_FREE(event);
+            return err;
+        }
+
+        float w = rel->weight;
+        if (w <= 0.0f) w = 1.0f;
+
+        for (size_t i = 0; i < dim; i++) {
+            event[i] += w * triple_vec[i];
+        }
+
+        AGENTOS_FREE(triple_vec);
+    }
+
+    float norm = 0;
+    for (size_t i = 0; i < dim; i++) norm += event[i] * event[i];
+    if (norm > 0) {
+        float inv = 1.0f / sqrtf(norm);
+        for (size_t i = 0; i < dim; i++) event[i] *= inv;
+    }
+
+    *out_event = event;
+    return AGENTOS_SUCCESS;
 }
 
 agentos_relation_t* agentos_relation_copy(const agentos_relation_t* src) {

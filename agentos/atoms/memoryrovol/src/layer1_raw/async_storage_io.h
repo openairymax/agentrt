@@ -8,6 +8,7 @@
 #define ASYNC_STORAGE_IO_H
 
 #include "memory_compat.h"
+#include "types.h"
 #include <stddef.h>
 
 #ifdef __cplusplus

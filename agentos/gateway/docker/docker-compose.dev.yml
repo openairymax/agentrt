@@ -43,8 +43,8 @@ services:
       - AGENTOS_POSTGRES_PORT=5432
       - AGENTOS_POSTGRES_DB=agentos
       - AGENTOS_POSTGRES_USER=agentos
-      - AGENTOS_POSTGRES_PASSWORD=agentos_dev
-      - AGENTOS_JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-prod}
+      - AGENTOS_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - AGENTOS_JWT_SECRET=${JWT_SECRET}
       - AGENTOS_ENABLE_AUTH=${ENABLE_AUTH:-false}
       - AGENTOS_MCP_ENABLED=true
       - AGENTOS_A2A_ENABLED=true
@@ -96,7 +96,7 @@ services:
     environment:
       - POSTGRES_DB=agentos
       - POSTGRES_USER=agentos
-      - POSTGRES_PASSWORD=agentos_dev
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -138,7 +138,7 @@ services:
       - "${GRAFANA_PORT:-3000}:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer

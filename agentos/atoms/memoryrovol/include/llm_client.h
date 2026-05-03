@@ -55,6 +55,8 @@ typedef struct agentos_llm_response {
 
 /* ==================== 双思考系统接口 (DS-004) ==================== */
 
+#ifndef MEMORYROVOL_OSS
+
 /**
  * @brief 双思考会话配置
  *
@@ -123,6 +125,8 @@ agentos_error_t agentos_llm_dual_think_simple(
     agentos_llm_service_t* service,
     const char* user_prompt,
     char** out_response);
+
+#endif /* MEMORYROVOL_OSS */
 
 /**
  * @brief 创建LLM服务
