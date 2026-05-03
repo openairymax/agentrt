@@ -21,6 +21,7 @@
 #include "layer4_pattern.h"
 #include "retrieval.h"
 #include "forgetting.h"
+#include "license.h"
 #include "agentos.h"
 #include "platform.h"
 #include <stdlib.h>
@@ -118,19 +119,29 @@ agentos_error_t agentos_memoryrov_init(
 
     err = agentos_knowledge_graph_create(&handle->l3_struct);
     if (err != AGENTOS_SUCCESS || !handle->l3_struct) {
-        agentos_layer2_feature_destroy(handle->l2_feature);
-        agentos_layer1_raw_destroy(handle->l1_raw);
-        AGENTOS_FREE(handle);
-        return AGENTOS_ENOMEM;
+#ifndef MEMORYROVOL_OSS
+        if (MR_LICENSE_CHECK(AGENTOS_FEATURE_L3_STRUCTURE)) {
+            agentos_layer2_feature_destroy(handle->l2_feature);
+            agentos_layer1_raw_destroy(handle->l1_raw);
+            AGENTOS_FREE(handle);
+            return AGENTOS_ENOMEM;
+        }
+#endif
+        handle->l3_struct = NULL;
     }
 
     err = agentos_rule_generator_create(NULL, &handle->l4_pattern);
     if (err != AGENTOS_SUCCESS || !handle->l4_pattern) {
-        agentos_knowledge_graph_destroy(handle->l3_struct);
-        agentos_layer2_feature_destroy(handle->l2_feature);
-        agentos_layer1_raw_destroy(handle->l1_raw);
-        AGENTOS_FREE(handle);
-        return AGENTOS_ENOMEM;
+#ifndef MEMORYROVOL_OSS
+        if (MR_LICENSE_CHECK(AGENTOS_FEATURE_L4_PATTERN)) {
+            agentos_knowledge_graph_destroy(handle->l3_struct);
+            agentos_layer2_feature_destroy(handle->l2_feature);
+            agentos_layer1_raw_destroy(handle->l1_raw);
+            AGENTOS_FREE(handle);
+            return AGENTOS_ENOMEM;
+        }
+#endif
+        handle->l4_pattern = NULL;
     }
 
     agentos_forgetting_config_t forget_config = {
@@ -143,12 +154,17 @@ agentos_error_t agentos_memoryrov_init(
     };
     err = agentos_forgetting_create(&forget_config, handle->l1_raw, handle->l2_feature, &handle->forgetting);
     if (err != AGENTOS_SUCCESS || !handle->forgetting) {
-        agentos_rule_generator_destroy(handle->l4_pattern);
-        agentos_knowledge_graph_destroy(handle->l3_struct);
-        agentos_layer2_feature_destroy(handle->l2_feature);
-        agentos_layer1_raw_destroy(handle->l1_raw);
-        AGENTOS_FREE(handle);
-        return AGENTOS_ENOMEM;
+#ifndef MEMORYROVOL_OSS
+        if (MR_LICENSE_CHECK(AGENTOS_FEATURE_FORGETTING)) {
+            agentos_rule_generator_destroy(handle->l4_pattern);
+            agentos_knowledge_graph_destroy(handle->l3_struct);
+            agentos_layer2_feature_destroy(handle->l2_feature);
+            agentos_layer1_raw_destroy(handle->l1_raw);
+            AGENTOS_FREE(handle);
+            return AGENTOS_ENOMEM;
+        }
+#endif
+        handle->forgetting = NULL;
     }
 
     handle->initialized = 1;
@@ -196,20 +212,30 @@ agentos_memoryrov_handle_t* agentos_memoryrov_create(void) {
     /* 创建 L3 结构层（知识图谱） */
     err = agentos_knowledge_graph_create(&handle->l3_struct);
     if (err != AGENTOS_SUCCESS || !handle->l3_struct) {
-        agentos_layer2_feature_destroy(handle->l2_feature);
-        agentos_layer1_raw_destroy(handle->l1_raw);
-        AGENTOS_FREE(handle);
-        return NULL;
+#ifndef MEMORYROVOL_OSS
+        if (MR_LICENSE_CHECK(AGENTOS_FEATURE_L3_STRUCTURE)) {
+            agentos_layer2_feature_destroy(handle->l2_feature);
+            agentos_layer1_raw_destroy(handle->l1_raw);
+            AGENTOS_FREE(handle);
+            return NULL;
+        }
+#endif
+        handle->l3_struct = NULL;
     }
 
     /* 创建 L4 模式层（规则生成器） */
     err = agentos_rule_generator_create(NULL, &handle->l4_pattern);
     if (err != AGENTOS_SUCCESS || !handle->l4_pattern) {
-        agentos_knowledge_graph_destroy(handle->l3_struct);
-        agentos_layer2_feature_destroy(handle->l2_feature);
-        agentos_layer1_raw_destroy(handle->l1_raw);
-        AGENTOS_FREE(handle);
-        return NULL;
+#ifndef MEMORYROVOL_OSS
+        if (MR_LICENSE_CHECK(AGENTOS_FEATURE_L4_PATTERN)) {
+            agentos_knowledge_graph_destroy(handle->l3_struct);
+            agentos_layer2_feature_destroy(handle->l2_feature);
+            agentos_layer1_raw_destroy(handle->l1_raw);
+            AGENTOS_FREE(handle);
+            return NULL;
+        }
+#endif
+        handle->l4_pattern = NULL;
     }
 
     /* 创建遗忘引擎 */
@@ -223,12 +249,17 @@ agentos_memoryrov_handle_t* agentos_memoryrov_create(void) {
     };
     err = agentos_forgetting_create(&forget_config, handle->l1_raw, handle->l2_feature, &handle->forgetting);
     if (err != AGENTOS_SUCCESS || !handle->forgetting) {
-        agentos_rule_generator_destroy(handle->l4_pattern);
-        agentos_knowledge_graph_destroy(handle->l3_struct);
-        agentos_layer2_feature_destroy(handle->l2_feature);
-        agentos_layer1_raw_destroy(handle->l1_raw);
-        AGENTOS_FREE(handle);
-        return NULL;
+#ifndef MEMORYROVOL_OSS
+        if (MR_LICENSE_CHECK(AGENTOS_FEATURE_FORGETTING)) {
+            agentos_rule_generator_destroy(handle->l4_pattern);
+            agentos_knowledge_graph_destroy(handle->l3_struct);
+            agentos_layer2_feature_destroy(handle->l2_feature);
+            agentos_layer1_raw_destroy(handle->l1_raw);
+            AGENTOS_FREE(handle);
+            return NULL;
+        }
+#endif
+        handle->forgetting = NULL;
     }
 
     handle->initialized = 1;
@@ -273,6 +304,14 @@ agentos_error_t agentos_memoryrov_add_memory(agentos_memoryrov_handle_t* handle,
         return AGENTOS_EINVAL;
     }
 
+#ifndef MEMORYROVOL_OSS
+    if (agentos_license_is_trial()) {
+        if (agentos_license_trial_expired()) return AGENTOS_ELICENSE;
+        if (agentos_license_trial_check_write() != 0) return AGENTOS_ELICENSE;
+        agentos_license_trial_delay();
+    }
+#endif
+
     /* 生成唯一 ID - 使用 UUID 生成器 */
     char id[64];
     
@@ -298,9 +337,11 @@ agentos_error_t agentos_memoryrov_add_memory(agentos_memoryrov_handle_t* handle,
     }
 
     /* 添加到 L3 结构层（作为实体） */
-    err = agentos_knowledge_graph_add_entity(handle->l3_struct, id);
-    if (err != AGENTOS_SUCCESS) {
-        return err;
+    if (handle->l3_struct) {
+        err = agentos_knowledge_graph_add_entity(handle->l3_struct, id);
+        if (err != AGENTOS_SUCCESS) {
+            return err;
+        }
     }
 
     return AGENTOS_SUCCESS;
@@ -319,6 +360,7 @@ agentos_error_t agentos_memoryrov_evolve(agentos_memoryrov_handle_t* handle, int
     }
 
     /* ========== L3 语义关系抽取 ========== */
+    if (handle->l3_struct) {
     for (size_t i = 0; i < count; i++) {
         void* data_i = NULL;
         size_t len_i = 0;
@@ -399,6 +441,7 @@ agentos_error_t agentos_memoryrov_evolve(agentos_memoryrov_handle_t* handle, int
 
         AGENTOS_FREE(data_i);
     }
+    } /* end if (handle->l3_struct) */
 
     /* ========== L4 规则挖掘 ========== */
     if (handle->l4_pattern && count >= 3) {
@@ -431,7 +474,7 @@ agentos_error_t agentos_memoryrov_evolve(agentos_memoryrov_handle_t* handle, int
     }
 
     /* ========== 遗忘裁剪 ========== */
-    if (!force) {
+    if (!force && handle->forgetting) {
         uint32_t pruned = 0;
         agentos_forgetting_prune(handle->forgetting, &pruned);
     }
@@ -538,6 +581,10 @@ agentos_error_t agentos_memoryrov_forget(agentos_memoryrov_handle_t* handle) {
         return AGENTOS_EINVAL;
     }
 
+    if (!handle->forgetting) {
+        return AGENTOS_ELICENSE;
+    }
+
     uint32_t pruned_count = 0;
     return agentos_forgetting_prune(handle->forgetting, &pruned_count);
 }
@@ -551,6 +598,14 @@ agentos_error_t agentos_memoryrov_write_raw(
     if (!handle || !data || len == 0 || !out_record_id || !handle->initialized) {
         return AGENTOS_EINVAL;
     }
+
+#ifndef MEMORYROVOL_OSS
+    if (agentos_license_is_trial()) {
+        if (agentos_license_trial_expired()) return AGENTOS_ELICENSE;
+        if (agentos_license_trial_check_write() != 0) return AGENTOS_ELICENSE;
+        agentos_license_trial_delay();
+    }
+#endif
     char id[64];
 #ifdef AGENTOS_HAS_UUID
     agentos_uuid_error_t uuid_err = agentos_uuid_with_prefix("raw_", id, sizeof(id));

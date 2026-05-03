@@ -10,13 +10,18 @@
 #include "config_source.h"
 #include "core_config.h"
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#ifdef __linux__
+#include <sys/inotify.h>
+#endif
 
 /* Unified base library compatibility layer */
 #include "include/memory_compat.h"
 #include "string_compat.h"
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
 
 /* ==================== 内部数据结构 ==================== */
 
@@ -32,14 +37,26 @@ struct config_source {
     config_source_attr_t attributes;
 };
 
-/** 文件配置源私有数�?*/
+/** 文件配置源私有数?*/
 typedef struct {
     char* file_path;                 // 文件路径
     char* format;                    // 文件格式
     char* encoding;                  // 文件编码
     bool auto_reload;                // 是否自动重载
     uint32_t reload_interval_ms;     // 重载间隔
-    uint64_t last_modified;          // 最后修改时�?    FILE* file_handle;               // 文件句柄（如果需要保持打开�?} file_source_priv_t;
+    uint64_t last_modified;          // 最后修改时?    FILE* file_handle;               // 文件句柄（如果需要保持打开?#ifdef __linux__
+    int inotify_fd;                  // inotify 文件描述符
+    int inotify_wd;                  // inotify 监视描述符
+    bool inotify_enabled;            // inotify 是否启用
+#elif defined(__APPLE__)
+    int kqueue_fd;                   // kqueue 文件描述符
+    bool kqueue_enabled;             // kqueue 是否启用
+#elif defined(_WIN32)
+    void* dir_handle;                // Windows 目录句柄
+    uint8_t rdcw_buffer[4096];      // ReadDirectoryChangesW 缓冲区
+    bool rdcw_enabled;              // ReadDirectoryChangesW 是否启用
+#endif
+} file_source_priv_t;
 
 /** 环境变量配置源私有数�?*/
 typedef struct {
@@ -72,15 +89,15 @@ typedef struct {
     char** keys;                     // 键数�?    char** values;                   // 值数�?    size_t count;                    // 键值对数量
 } defaults_source_priv_t;
 
-/** 配置源管理器结构�?*/
+/** 配置源管理器结构?*/
 struct config_source_manager {
-    /** 配置源数�?*/
+    /** 配置源数?*/
     config_source_t** sources;
     
-    /** 配置源数�?*/
+    /** 配置源数?*/
     size_t count;
     
-    /** 配置源容�?*/
+    /** 配置源容?*/
     size_t capacity;
     
     /** 变化回调函数 */
@@ -94,6 +111,12 @@ struct config_source_manager {
     
     /** 互斥锁保护管理器 */
     agentos_mutex_t internal_mutex;
+
+    /** 防抖上次通知时间（毫秒，CLOCK_MONOTONIC） */
+    uint64_t last_notify_time_ms;
+
+    /** 防抖间隔（毫秒，默认500） */
+    uint64_t debounce_ms;
 };
 
 /* ==================== 内部辅助函数 ==================== */
@@ -812,6 +835,198 @@ static bool check_file_modified(const char* file_path, uint64_t last_modified) {
     return mod_time > last_modified;
 }
 
+#ifdef __linux__
+static int file_source_init_inotify(file_source_priv_t* priv) {
+    if (!priv || !priv->file_path) return -1;
+    priv->inotify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+    if (priv->inotify_fd < 0) {
+        priv->inotify_enabled = false;
+        return -1;
+    }
+    priv->inotify_wd = inotify_add_watch(priv->inotify_fd, priv->file_path,
+                                          IN_MODIFY | IN_CLOSE_WRITE | IN_MOVE_SELF | IN_DELETE_SELF);
+    if (priv->inotify_wd < 0) {
+        close(priv->inotify_fd);
+        priv->inotify_fd = -1;
+        priv->inotify_enabled = false;
+        return -1;
+    }
+    priv->inotify_enabled = true;
+    return 0;
+}
+
+static bool file_source_check_inotify(file_source_priv_t* priv) {
+    if (!priv || !priv->inotify_enabled || priv->inotify_fd < 0) return false;
+    char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+    ssize_t len = read(priv->inotify_fd, buf, sizeof(buf));
+    if (len > 0) {
+        const struct inotify_event *event;
+        for (char *ptr = buf; ptr < buf + len;
+             ptr += sizeof(struct inotify_event) + event->len) {
+            event = (const struct inotify_event *)ptr;
+            if (event->mask & (IN_MODIFY | IN_CLOSE_WRITE)) {
+                return true;
+            }
+            if (event->mask & (IN_DELETE_SELF | IN_MOVE_SELF)) {
+                inotify_rm_watch(priv->inotify_fd, priv->inotify_wd);
+                close(priv->inotify_fd);
+                priv->inotify_enabled = false;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static void file_source_close_inotify(file_source_priv_t* priv) {
+    if (!priv) return;
+    if (priv->inotify_enabled) {
+        if (priv->inotify_wd >= 0) inotify_rm_watch(priv->inotify_fd, priv->inotify_wd);
+        if (priv->inotify_fd >= 0) close(priv->inotify_fd);
+        priv->inotify_fd = -1;
+        priv->inotify_wd = -1;
+        priv->inotify_enabled = false;
+    }
+}
+#endif
+
+#ifdef __APPLE__
+#include <sys/event.h>
+#include <fcntl.h>
+
+static int file_source_init_kqueue(file_source_priv_t* priv) {
+    if (!priv || !priv->file_path) return -1;
+    priv->kqueue_fd = kqueue();
+    if (priv->kqueue_fd < 0) {
+        priv->kqueue_enabled = false;
+        return -1;
+    }
+
+    int fd = open(priv->file_path, O_RDONLY);
+    if (fd < 0) {
+        close(priv->kqueue_fd);
+        priv->kqueue_fd = -1;
+        priv->kqueue_enabled = false;
+        return -1;
+    }
+
+    struct kevent ev;
+    EV_SET(&ev, fd, EVFILT_VNODE, EV_ADD | EV_CLEAR | EV_ENABLE,
+           NOTE_WRITE | NOTE_DELETE | NOTE_RENAME, 0, NULL);
+    if (kevent(priv->kqueue_fd, &ev, 1, NULL, 0, NULL) < 0) {
+        close(fd);
+        close(priv->kqueue_fd);
+        priv->kqueue_fd = -1;
+        priv->kqueue_enabled = false;
+        return -1;
+    }
+
+    close(fd);
+    priv->kqueue_enabled = true;
+    return 0;
+}
+
+static bool file_source_check_kqueue(file_source_priv_t* priv) {
+    if (!priv || !priv->kqueue_enabled || priv->kqueue_fd < 0) return false;
+    struct kevent ev;
+    struct timespec ts = {0, 0};
+    int n = kevent(priv->kqueue_fd, NULL, 0, &ev, 1, &ts);
+    if (n > 0) {
+        if (ev.fflags & (NOTE_DELETE | NOTE_RENAME)) {
+            close(priv->kqueue_fd);
+            priv->kqueue_fd = -1;
+            priv->kqueue_enabled = false;
+        }
+        return true;
+    }
+    return false;
+}
+
+static void file_source_close_kqueue(file_source_priv_t* priv) {
+    if (!priv) return;
+    if (priv->kqueue_enabled && priv->kqueue_fd >= 0) {
+        close(priv->kqueue_fd);
+        priv->kqueue_fd = -1;
+        priv->kqueue_enabled = false;
+    }
+}
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
+
+static int file_source_init_rdcw(file_source_priv_t* priv) {
+    if (!priv || !priv->file_path) return -1;
+
+    char dir_path[MAX_PATH];
+    size_t len = strlen(priv->file_path);
+    if (len >= MAX_PATH) return -1;
+    memcpy(dir_path, priv->file_path, len + 1);
+
+    char* last_sep = strrchr(dir_path, '\\');
+    if (!last_sep) last_sep = strrchr(dir_path, '/');
+    if (last_sep) {
+        *last_sep = '\0';
+        priv->dir_handle = CreateFileA(
+            dir_path,
+            FILE_LIST_DIRECTORY,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+            NULL
+        );
+    } else {
+        priv->dir_handle = CreateFileA(
+            ".",
+            FILE_LIST_DIRECTORY,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+            NULL
+        );
+    }
+
+    if (priv->dir_handle == INVALID_HANDLE_VALUE) {
+        priv->dir_handle = NULL;
+        priv->rdcw_enabled = false;
+        return -1;
+    }
+
+    priv->rdcw_enabled = true;
+    return 0;
+}
+
+static bool file_source_check_rdcw(file_source_priv_t* priv) {
+    if (!priv || !priv->rdcw_enabled || !priv->dir_handle) return false;
+    DWORD bytes_returned = 0;
+    uint8_t buf[4096];
+    BOOL success = ReadDirectoryChangesW(
+        priv->dir_handle,
+        buf, sizeof(buf),
+        FALSE,
+        FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME,
+        &bytes_returned,
+        NULL,
+        NULL
+    );
+    if (success && bytes_returned > 0) {
+        return true;
+    }
+    return false;
+}
+
+static void file_source_close_rdcw(file_source_priv_t* priv) {
+    if (!priv) return;
+    if (priv->rdcw_enabled && priv->dir_handle) {
+        CloseHandle(priv->dir_handle);
+        priv->dir_handle = NULL;
+        priv->rdcw_enabled = false;
+    }
+}
+#endif
+
 /* ==================== 文件配置源适配�?==================== */
 
 /**
@@ -926,6 +1141,19 @@ static bool file_source_has_changed(config_source_t* source) {
     file_source_priv_t* priv = (file_source_priv_t*)source->priv_data;
     if (!priv || !priv->file_path) return false;
     
+#ifdef __linux__
+    if (priv->inotify_enabled) {
+        return file_source_check_inotify(priv);
+    }
+#elif defined(__APPLE__)
+    if (priv->kqueue_enabled) {
+        return file_source_check_kqueue(priv);
+    }
+#elif defined(_WIN32)
+    if (priv->rdcw_enabled) {
+        return file_source_check_rdcw(priv);
+    }
+#endif
     return check_file_modified(priv->file_path, priv->last_modified);
 }
 
@@ -947,6 +1175,13 @@ static void file_source_destroy(config_source_t* source) {
     
     file_source_priv_t* priv = (file_source_priv_t*)source->priv_data;
     if (priv) {
+#ifdef __linux__
+        file_source_close_inotify(priv);
+#elif defined(__APPLE__)
+        file_source_close_kqueue(priv);
+#elif defined(_WIN32)
+        file_source_close_rdcw(priv);
+#endif
         if (priv->file_path) AGENTOS_FREE(priv->file_path);
         if (priv->format) AGENTOS_FREE(priv->format);
         if (priv->encoding) AGENTOS_FREE(priv->encoding);
@@ -1357,6 +1592,93 @@ static const config_source_adapter_t defaults_source_adapter = {
     .destroy = defaults_source_destroy
 };
 
+
+/** remote source private data */
+typedef struct {
+    char* url;
+    char* token;
+    char* namespace_name;
+    uint32_t poll_interval_ms;
+    uint64_t last_etag_hash;
+    uint64_t last_poll_time_ms;
+    char* last_response;
+    size_t last_response_len;
+} remote_source_priv_t;
+
+static config_error_t remote_source_load(config_source_t* source, config_context_t* ctx) {
+    if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
+    remote_source_priv_t* priv = (remote_source_priv_t*)source->priv_data;
+    if (!priv || !priv->url) return CONFIG_ERROR_INVALID_ARG;
+    
+    if (!priv->last_response || priv->last_response_len == 0) {
+        return CONFIG_SUCCESS;
+    }
+    
+    config_parser_t* parser = config_parser_get_by_format("json");
+    if (!parser || !parser->parse) return CONFIG_ERROR_UNSUPPORTED;
+    
+    return parser->parse(priv->last_response, priv->last_response_len, ctx);
+}
+
+static config_error_t remote_source_save(config_source_t* source, const config_context_t* ctx) {
+    (void)source;
+    (void)ctx;
+    return CONFIG_ERROR_UNSUPPORTED;
+}
+
+static bool remote_source_has_changed(config_source_t* source) {
+    if (!source) return false;
+    remote_source_priv_t* priv = (remote_source_priv_t*)source->priv_data;
+    if (!priv || !priv->url) return false;
+
+    uint64_t now_ms;
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+        now_ms = (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+    } else {
+        now_ms = (uint64_t)time(NULL) * 1000;
+    }
+
+    if (priv->last_poll_time_ms == 0) {
+        priv->last_poll_time_ms = now_ms;
+        return true;
+    }
+
+    if (now_ms - priv->last_poll_time_ms >= (uint64_t)priv->poll_interval_ms) {
+        priv->last_poll_time_ms = now_ms;
+        return true;
+    }
+
+    return false;
+}
+
+static const config_source_attr_t* remote_source_get_attributes(config_source_t* source) {
+    if (!source) return NULL;
+    return &source->attributes;
+}
+
+static void remote_source_destroy(config_source_t* source) {
+    if (!source) return;
+    remote_source_priv_t* priv = (remote_source_priv_t*)source->priv_data;
+    if (priv) {
+        if (priv->url) AGENTOS_FREE(priv->url);
+        if (priv->token) AGENTOS_FREE(priv->token);
+        if (priv->namespace_name) AGENTOS_FREE(priv->namespace_name);
+        if (priv->last_response) AGENTOS_FREE(priv->last_response);
+        AGENTOS_FREE(priv);
+    }
+    config_source_free_base(source);
+}
+
+static const config_source_adapter_t remote_source_adapter = {
+    .load = remote_source_load,
+    .save = remote_source_save,
+    .has_changed = remote_source_has_changed,
+    .get_attributes = remote_source_get_attributes,
+    .destroy = remote_source_destroy
+};
+
+
 /* ==================== 公共API实现 ==================== */
 
 config_source_t* config_source_create_file(const config_file_source_options_t* options) {
@@ -1393,9 +1715,24 @@ config_source_t* config_source_create_file(const config_file_source_options_t* o
         return NULL;
     }
     
-    // 更新属�?    source->priv_data = priv;
+    // 更新属?    source->priv_data = priv;
     source->attributes.watchable = options->auto_reload;
-    source->attributes.read_only = false; // 文件配置源可以保�?    
+    source->attributes.read_only = false; // 文件配置源可以保?
+
+#ifdef __linux__
+    if (options->auto_reload) {
+        file_source_init_inotify(priv);
+    }
+#elif defined(__APPLE__)
+    if (options->auto_reload) {
+        file_source_init_kqueue(priv);
+    }
+#elif defined(_WIN32)
+    if (options->auto_reload) {
+        file_source_init_rdcw(priv);
+    }
+#endif
+    
     return source;
 }
 
@@ -1549,6 +1886,37 @@ config_source_t* config_source_create_defaults(const char* const* default_values
     return source;
 }
 
+config_source_t* config_source_create_remote(const char* url, const char* token,
+                                               const char* ns, uint32_t poll_interval_ms) {
+    if (!url) return NULL;
+    
+    config_source_t* source = config_source_create_base(CONFIG_SOURCE_NETWORK,
+                                                       "remote",
+                                                       &remote_source_adapter);
+    if (!source) return NULL;
+    
+    remote_source_priv_t* priv = (remote_source_priv_t*)AGENTOS_CALLOC(1, sizeof(remote_source_priv_t));
+    if (!priv) {
+        config_source_free_base(source);
+        return NULL;
+    }
+    
+    priv->url = duplicate_string(url);
+    priv->token = token ? duplicate_string(token) : NULL;
+    priv->namespace_name = ns ? duplicate_string(ns) : duplicate_string("default");
+    priv->poll_interval_ms = poll_interval_ms > 0 ? poll_interval_ms : 30000;
+    priv->last_etag_hash = 0;
+    priv->last_response = NULL;
+    priv->last_response_len = 0;
+    
+    source->priv_data = priv;
+    source->attributes.read_only = true;
+    source->attributes.watchable = true;
+    
+    return source;
+}
+
+
 void config_source_destroy(config_source_t* source) {
     if (!source) return;
     
@@ -1619,6 +1987,8 @@ config_source_manager_t* config_source_manager_create(void) {
     manager->change_callback = NULL;
     manager->callback_user_data = NULL;
     manager->watching = false;
+    manager->last_notify_time_ms = 0;
+    manager->debounce_ms = 500;
     agentos_mutex_init(&manager->internal_mutex);
     return manager;
 }
@@ -1730,6 +2100,75 @@ config_error_t config_source_manager_watch(config_source_manager_t* manager,
     manager->watching = (callback != NULL);
     
     return CONFIG_SUCCESS;
+}
+
+int config_source_manager_poll_changes(config_source_manager_t* manager) {
+    if (!manager) return 0;
+
+    agentos_mutex_lock(&manager->internal_mutex);
+
+    if (!manager->watching || !manager->change_callback) {
+        agentos_mutex_unlock(&manager->internal_mutex);
+        return 0;
+    }
+
+    uint64_t now_ms;
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+        now_ms = (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+    } else {
+        now_ms = (uint64_t)time(NULL) * 1000;
+        agentos_mutex_unlock(&manager->internal_mutex);
+        return 0;
+    }
+
+    if (manager->last_notify_time_ms > 0 &&
+        now_ms - manager->last_notify_time_ms < manager->debounce_ms) {
+        agentos_mutex_unlock(&manager->internal_mutex);
+        return 0;
+    }
+
+    int change_count = 0;
+    int first_changed_idx = -1;
+
+    for (size_t i = 0; i < manager->count; i++) {
+        config_source_t* source = manager->sources[i];
+        if (!source) continue;
+
+        const config_source_attr_t* attr = config_source_get_attributes(source);
+        if (!attr || !attr->watchable) continue;
+
+        if (config_source_has_changed(source)) {
+            change_count++;
+            if (first_changed_idx < 0) {
+                first_changed_idx = (int)i;
+            }
+        }
+    }
+
+    if (change_count > 0) {
+        manager->last_notify_time_ms = now_ms;
+
+        void (*cb)(config_source_t*, void*) = manager->change_callback;
+        void* ud = manager->callback_user_data;
+
+        agentos_mutex_unlock(&manager->internal_mutex);
+
+        for (size_t i = 0; i < manager->count; i++) {
+            config_source_t* source = manager->sources[i];
+            if (!source) continue;
+            const config_source_attr_t* attr = config_source_get_attributes(source);
+            if (!attr || !attr->watchable) continue;
+            if (config_source_has_changed(source)) {
+                cb(source, ud);
+            }
+        }
+
+        return change_count;
+    }
+
+    agentos_mutex_unlock(&manager->internal_mutex);
+    return 0;
 }
 
 /* ==================== 工具函数实现 ==================== */

@@ -2,40 +2,41 @@
 
 #include "multi_agent_collaboration.h"
 #include "platform.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int g_tests_run    = 0;
+static int g_tests_run = 0;
 static int g_tests_passed = 0;
 static int g_tests_failed = 0;
 
-#define TEST_PASS(name)                                                                                                \
-    do {                                                                                                               \
-        g_tests_passed++;                                                                                              \
-        printf("[PASS] %s\n", name);                                                                                   \
+#define TEST_PASS(name)              \
+    do {                             \
+        g_tests_passed++;            \
+        printf("[PASS] %s\n", name); \
     } while (0)
-#define TEST_FAIL(name, msg)                                                                                           \
-    do {                                                                                                               \
-        g_tests_failed++;                                                                                              \
-        printf("[FAIL] %s: %s\n", name, msg);                                                                          \
+#define TEST_FAIL(name, msg)                  \
+    do {                                      \
+        g_tests_failed++;                     \
+        printf("[FAIL] %s: %s\n", name, msg); \
     } while (0)
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        g_tests_run++;                                                                                                 \
-        func();                                                                                                        \
+#define RUN_TEST(func) \
+    do {               \
+        g_tests_run++; \
+        func();        \
     } while (0)
 
 static void register_test_agents(mac_framework_t *fw, int count, const char *prefix)
 {
     mac_agent_info_t agent;
     memset(&agent, 0, sizeof(agent));
-    agent.performance_score    = 0.9;
-    agent.reliability_score    = 0.95;
+    agent.performance_score = 0.9;
+    agent.reliability_score = 0.95;
     agent.max_concurrent_tasks = 8;
-    agent.available            = true;
-    agent.capabilities_json    = NULL;
+    agent.available = true;
+    agent.capabilities_json = NULL;
     for (int i = 0; i < count; i++) {
         snprintf(agent.id, sizeof(agent.id), "%s_%03d", prefix, i);
         snprintf(agent.name, sizeof(agent.name), "%s_%03d", prefix, i);
@@ -60,10 +61,10 @@ static void test_mac_register_unregister(void)
     memset(&agent, 0, sizeof(agent));
     snprintf(agent.id, sizeof(agent.id), "test_agent_001");
     snprintf(agent.name, sizeof(agent.name), "TestAgent");
-    agent.performance_score    = 0.8;
-    agent.reliability_score    = 0.9;
+    agent.performance_score = 0.8;
+    agent.reliability_score = 0.9;
     agent.max_concurrent_tasks = 4;
-    agent.available            = true;
+    agent.available = true;
 
     int rc = mac_framework_register_agent(fw, &agent);
     assert(rc == 0);
@@ -109,7 +110,8 @@ static void test_consensus_majority_approve(void)
     register_test_agents(fw, 10, "maj_agent");
 
     char *cid = NULL;
-    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY, &cid);
+    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY,
+                                  &cid);
     assert(cid != NULL);
 
     for (int i = 0; i < 7; i++) {
@@ -142,7 +144,8 @@ static void test_consensus_majority_reject(void)
     register_test_agents(fw, 10, "majr_agent");
 
     char *cid = NULL;
-    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY, &cid);
+    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY,
+                                  &cid);
 
     for (int i = 0; i < 3; i++) {
         char agent_id[32], vote[64];
@@ -174,7 +177,8 @@ static void test_consensus_unanimous_approve(void)
     register_test_agents(fw, 5, "unan_agent");
 
     char *cid = NULL;
-    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_UNANIMOUS, &cid);
+    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_UNANIMOUS,
+                                  &cid);
 
     for (int i = 0; i < 5; i++) {
         char agent_id[32], vote[64];
@@ -200,7 +204,8 @@ static void test_consensus_unanimous_reject(void)
     register_test_agents(fw, 5, "unanr_agent");
 
     char *cid = NULL;
-    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_UNANIMOUS, &cid);
+    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_UNANIMOUS,
+                                  &cid);
 
     for (int i = 0; i < 4; i++) {
         char agent_id[32], vote[64];
@@ -231,8 +236,8 @@ static void test_consensus_weighted_approve(void)
     mac_agent_info_t agent;
     memset(&agent, 0, sizeof(agent));
     agent.max_concurrent_tasks = 8;
-    agent.available            = true;
-    agent.capabilities_json    = NULL;
+    agent.available = true;
+    agent.capabilities_json = NULL;
 
     snprintf(agent.id, sizeof(agent.id), "whi_000");
     snprintf(agent.name, sizeof(agent.name), "HighPerf");
@@ -247,7 +252,8 @@ static void test_consensus_weighted_approve(void)
     mac_framework_register_agent(fw, &agent);
 
     char *cid = NULL;
-    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_WEIGHTED, &cid);
+    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_WEIGHTED,
+                                  &cid);
 
     char vote1[64], vote2[64];
     snprintf(vote1, sizeof(vote1), "{\"agent_id\":\"whi_000\",\"vote\":\"approve\"}");
@@ -346,7 +352,8 @@ static void test_consensus_zero_votes(void)
     register_test_agents(fw, 5, "zero_agent");
 
     char *cid = NULL;
-    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY, &cid);
+    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY,
+                                  &cid);
 
     char *result = NULL;
     mac_framework_resolve_consensus(fw, cid, &result);
@@ -365,7 +372,8 @@ static void test_consensus_vote_after_resolve(void)
     register_test_agents(fw, 5, "resolved_agent");
 
     char *cid = NULL;
-    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY, &cid);
+    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY,
+                                  &cid);
 
     char vote[64];
     snprintf(vote, sizeof(vote), "{\"agent_id\":\"resolved_agent_000\",\"vote\":\"approve\"}");
@@ -391,7 +399,8 @@ static void test_consensus_pure_text_vote(void)
     register_test_agents(fw, 5, "text_agent");
 
     char *cid = NULL;
-    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY, &cid);
+    mac_framework_start_consensus(fw, NULL, "{\"action\":\"deploy\"}", MAC_CONSENSUS_MAJORITY,
+                                  &cid);
 
     for (int i = 0; i < 4; i++) {
         char agent_id[32];
@@ -431,7 +440,8 @@ int main(void)
     RUN_TEST(test_consensus_pure_text_vote);
 
     printf("\n========================================\n");
-    printf("  Results: %d run, %d passed, %d failed\n", g_tests_run, g_tests_passed, g_tests_failed);
+    printf("  Results: %d run, %d passed, %d failed\n", g_tests_run, g_tests_passed,
+           g_tests_failed);
     printf("========================================\n");
 
     return g_tests_failed > 0 ? 1 : 0;

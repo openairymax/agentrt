@@ -42,6 +42,19 @@ typedef struct {
 
 static proto_gateway_impl_t* g_gw_impl = NULL;
 
+static uint32_t agentos_proto_gw_get_timeout(const proto_gateway_iface_t* gw)
+{
+    if (!gw) return 30000;
+    return 30000;
+}
+
+static void agentos_proto_gw_log(const proto_gateway_iface_t* gw, const char* operation)
+{
+    if (gw) {
+        fprintf(stderr, "[proto_gw:%p] %s\n", (const void*)gw, operation ? operation : "unknown");
+    }
+}
+
 /* I-L2: Standard Router Implementation */
 proto_router_iface_t* proto_router_standard_create(void) {
     proto_router_impl_t* impl = calloc(1, sizeof(proto_router_impl_t));
@@ -92,7 +105,7 @@ proto_gateway_iface_t* proto_gateway_standard_create(void) {
 }
 
 void proto_gateway_standard_destroy(proto_gateway_iface_t* gw) {
-    (void)gw;
+    agentos_proto_gw_log(gw, "destroy");
     free(g_gw_impl);
     g_gw_impl = NULL;
     free(gw);
@@ -110,7 +123,8 @@ static gw_protocol_entry_t* gw_find_protocol(const char* name) {
 static int gw_std_register_protocol(proto_gateway_iface_t* gw,
                                      const char* name,
                                      const proto_adapter_vtable_t* adapter) {
-    (void)gw;
+    uint32_t timeout = agentos_proto_gw_get_timeout(gw);
+    (void)timeout;
     if (!name || !adapter) return -1;
     if (!g_gw_impl) return -2;
     if (g_gw_impl->protocol_count >= GW_MAX_PROTOCOLS) return -3;
@@ -126,7 +140,7 @@ static int gw_std_register_protocol(proto_gateway_iface_t* gw,
 }
 
 static int gw_std_unregister_protocol(proto_gateway_iface_t* gw, const char* name) {
-    (void)gw;
+    agentos_proto_gw_log(gw, "unregister_protocol");
     if (!name) return -1;
     if (!g_gw_impl) return -2;
 
@@ -149,7 +163,8 @@ static int gw_std_handle_request(proto_gateway_iface_t* gw,
                                   char** response,
                                   size_t* response_size,
                                   char** response_content_type) {
-    (void)gw;
+    uint32_t timeout = agentos_proto_gw_get_timeout(gw);
+    (void)timeout;
     if (!raw_request) return -1;
 
     char* detected_proto = NULL;
@@ -192,7 +207,7 @@ static int gw_std_handle_request(proto_gateway_iface_t* gw,
 }
 
 static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, size_t len, char** detected) {
-    (void)gw;
+    agentos_proto_gw_log(gw, "detect_protocol");
     if (!data || !len || !detected) return -1;
 
     const char* result = NULL;
@@ -222,7 +237,8 @@ static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, s
 static int gw_std_set_request_handler(proto_gateway_iface_t* gw,
                                       proto_gateway_request_cb handler,
                                       void* user_data) {
-    (void)gw;
+    uint32_t timeout = agentos_proto_gw_get_timeout(gw);
+    (void)timeout;
     if (!handler) return -1;
     if (!g_gw_impl) return -2;
 
@@ -236,7 +252,7 @@ static int gw_std_set_request_handler(proto_gateway_iface_t* gw,
 static int gw_std_set_event_callback(proto_gateway_iface_t* gw,
                                      proto_gateway_event_cb callback,
                                      void* user_data) {
-    (void)gw;
+    agentos_proto_gw_log(gw, "set_event_callback");
     if (!callback) return -1;
     if (!g_gw_impl) return -2;
 
@@ -248,21 +264,42 @@ static int gw_std_set_event_callback(proto_gateway_iface_t* gw,
 }
 
 static int gw_std_list_protocols(proto_gateway_iface_t* gw, char** protocols_json) {
-    (void)gw;
-    (void)g_gw_impl;
-    if (protocols_json)
-        *protocols_json = strdup(
-            "{\"protocols\":["
-            "\"jsonrpc\",\"mcp\",\"a2a\",\"openai\","
-            "\"openjiuwen\",\"openclaw\",\"claude\""
-            "]}");
+    uint32_t timeout = agentos_proto_gw_get_timeout(gw);
+    (void)timeout;
+    if (!protocols_json) return -1;
+
+    size_t buf_size = 256;
+    if (g_gw_impl && g_gw_impl->protocol_count > 0) {
+        buf_size += g_gw_impl->protocol_count * 64;
+    } else {
+        buf_size += 256;
+    }
+
+    char* buf = (char*)malloc(buf_size);
+    if (!buf) return -1;
+
+    size_t offset = snprintf(buf, buf_size, "{\"protocols\":[");
+    if (g_gw_impl && g_gw_impl->protocol_count > 0) {
+        for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
+            if (i > 0) offset += snprintf(buf + offset, buf_size - offset, ",");
+            offset += snprintf(buf + offset, buf_size - offset,
+                "\"%s\"", g_gw_impl->protocols[i].name);
+        }
+    } else {
+        offset += snprintf(buf + offset, buf_size - offset,
+            "\"jsonrpc\",\"mcp\",\"a2a\",\"openai\"");
+    }
+    offset += snprintf(buf + offset, buf_size - offset, "],\"count\":%zu}",
+        g_gw_impl ? g_gw_impl->protocol_count : 0);
+
+    *protocols_json = buf;
     return 0;
 }
 
 static int gw_std_get_protocol_stats(proto_gateway_iface_t* gw,
                                      const char* name,
                                      proto_stats_t* stats) {
-    (void)gw;
+    agentos_proto_gw_log(gw, "get_protocol_stats");
     if (!stats) return -1;
     memset(stats, 0, sizeof(*stats));
 

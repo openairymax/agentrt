@@ -23,7 +23,8 @@ static const char* error_strings[] = {
     /* AGENTOS_EBADF (-13) */           "Bad file descriptor",
     /* AGENTOS_ENOTINIT (-14) */        "Not initialized",
     /* AGENTOS_ERESOURCE (-15) */       "Resource exhausted",
-    /* AGENTOS_ENOSYS (-16) */           "Function not implemented"
+    /* AGENTOS_ENOSYS (-16) */           "Function not implemented",
+    /* AGENTOS_ECYCLE (-17) */           "Dependency cycle detected"
 };
 
 #define ERROR_COUNT (sizeof(error_strings) / sizeof(error_strings[0]))
