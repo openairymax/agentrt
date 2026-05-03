@@ -11,7 +11,7 @@ services:
       context: ../../
       dockerfile: scripts/deploy/docker/Dockerfile.service
       target: preview
-    image: spharx/agentos-preview:latest
+    image: ${DOCKER_REGISTRY:-spharx}/agentos-preview:latest
     container_name: agentos-preview
     hostname: agentos-preview
     restart: unless-stopped

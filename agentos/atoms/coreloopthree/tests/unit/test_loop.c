@@ -213,6 +213,76 @@ static void test_api_version_constants(void)
     TEST_PASS("API version constants defined");
 }
 
+/* ==================== Checkpoint 集成测试 ==================== */
+
+static void test_loop_config_checkpoint_defaults(void)
+{
+    agentos_loop_config_t config;
+    memset(&config, 0, sizeof(config));
+
+    assert(config.loop_config_checkpoint_enabled == 0);
+    assert(config.loop_config_checkpoint_path[0] == '\0');
+    assert(config.loop_config_checkpoint_interval_ms == 0);
+
+    TEST_PASS("loop_config checkpoint fields zero-initialized");
+}
+
+static void test_loop_config_checkpoint_custom(void)
+{
+    agentos_loop_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.loop_config_checkpoint_enabled = 1;
+    snprintf(config.loop_config_checkpoint_path,
+             sizeof(config.loop_config_checkpoint_path),
+             "/tmp/agentos/test_checkpoints");
+    config.loop_config_checkpoint_interval_ms = 5000;
+
+    assert(config.loop_config_checkpoint_enabled == 1);
+    assert(strcmp(config.loop_config_checkpoint_path, "/tmp/agentos/test_checkpoints") == 0);
+    assert(config.loop_config_checkpoint_interval_ms == 5000);
+
+    TEST_PASS("loop_config checkpoint custom values set correctly");
+}
+
+static void test_loop_checkpoint_disabled_by_default(void)
+{
+    agentos_core_loop_t *loop = NULL;
+    agentos_error_t err       = agentos_loop_create(NULL, &loop);
+    if (err != AGENTOS_SUCCESS || !loop) {
+        TEST_FAIL("checkpoint disabled", "create failed");
+        return;
+    }
+
+    agentos_error_t list_err = agentos_loop_list_checkpoints(loop, NULL, NULL);
+    if (list_err == AGENTOS_ENOTINIT) {
+        TEST_PASS("checkpoint is disabled by default (ENOTINIT)");
+    } else {
+        TEST_FAIL("checkpoint disabled", "should return ENOTINIT when not initialized");
+    }
+
+    agentos_loop_destroy(loop);
+}
+
+static void test_loop_restore_without_checkpoint(void)
+{
+    agentos_core_loop_t *loop = NULL;
+    agentos_error_t err       = agentos_loop_create(NULL, &loop);
+    if (err != AGENTOS_SUCCESS || !loop) {
+        TEST_FAIL("restore no checkpoint", "create failed");
+        return;
+    }
+
+    char* restored_id = NULL;
+    agentos_error_t restore_err = agentos_loop_restore_task(loop, "nonexistent_task", &restored_id);
+    if (restore_err == AGENTOS_ENOENT || restore_err == AGENTOS_ENOTINIT) {
+        TEST_PASS("restore returns error when checkpoint not found");
+    } else {
+        TEST_FAIL("restore no checkpoint", "should return ENOENT or ENOTINIT");
+    }
+
+    agentos_loop_destroy(loop);
+}
+
 /* ==================== 主函数 ==================== */
 
 int main(void)
@@ -241,6 +311,12 @@ int main(void)
     RUN_TEST(test_loop_get_engines_all);
     RUN_TEST(test_loop_get_engines_partial);
     RUN_TEST(test_loop_get_engines_null_loop);
+
+    /* Checkpoint 集成 */
+    RUN_TEST(test_loop_config_checkpoint_defaults);
+    RUN_TEST(test_loop_config_checkpoint_custom);
+    RUN_TEST(test_loop_checkpoint_disabled_by_default);
+    RUN_TEST(test_loop_restore_without_checkpoint);
 
     printf("\n========================================\n");
     printf("  测试结果: %d 运行, %d 通过, %d 失败\n", tests_run, tests_passed, tests_failed);

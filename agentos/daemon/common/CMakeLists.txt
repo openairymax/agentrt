@@ -163,7 +163,7 @@ elseif(UNIX)
         AGENTOS_PLATFORM_LINUX=1
     )
     target_link_libraries(svc_common PRIVATE
-        pthread
+        Threads::Threads
         rt
     )
 endif()

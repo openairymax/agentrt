@@ -108,9 +108,26 @@ agentos_error_t agentos_pattern_analyze(
     char** out_pattern) {
     if (!memory_ids || count == 0 || !out_pattern) return AGENTOS_EINVAL;
 
+    size_t unique_count = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (memory_ids[i]) unique_count++;
+    }
+
+    double confidence = 0.0;
+    if (unique_count >= 10) {
+        confidence = 0.95;
+    } else if (unique_count >= 5) {
+        confidence = 0.85;
+    } else if (unique_count >= 2) {
+        confidence = 0.7;
+    } else {
+        confidence = 0.5;
+    }
+
     char pattern[1024] = {0};
     snprintf(pattern, sizeof(pattern),
-        "{\"type\":\"cluster\",\"count\":%zu,\"confidence\":0.85}", count);
+        "{\"type\":\"cluster\",\"count\":%zu,\"unique\":%zu,\"confidence\":%.2f}",
+        count, unique_count, confidence);
 
     *out_pattern = AGENTOS_STRDUP(pattern);
     return *out_pattern ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
@@ -136,7 +153,22 @@ agentos_error_t agentos_pattern_match(
     const char* memory_id,
     int* out_matches) {
     if (!rule || !memory_id || !out_matches) return AGENTOS_EINVAL;
-    *out_matches = 1;
+
+    *out_matches = 0;
+
+    const char* cond = strstr(rule, "\"condition\"");
+    if (cond) {
+        const char* id_ref = strstr(cond, memory_id);
+        if (id_ref) {
+            *out_matches = 1;
+            return AGENTOS_SUCCESS;
+        }
+    }
+
+    if (strstr(rule, "\"type\":\"cluster\"") != NULL) {
+        *out_matches = 1;
+    }
+
     return AGENTOS_SUCCESS;
 }
 

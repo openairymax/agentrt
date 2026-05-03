@@ -185,7 +185,10 @@ typedef struct {
     
     /** @brief 线程追踪ID，用于请求跟踪 */
     const char* trace_id;
-    
+
+    /** @brief Span ID，用于OpenTelemetry链路追踪 */
+    const char* span_id;
+
     /** @brief 日志消息内容 */
     const char* message;
     
@@ -315,6 +318,24 @@ const char* log_set_trace_id(const char* trace_id);
  * @return 追踪ID字符串，未设置返回NULL
  */
 const char* log_get_trace_id(void);
+
+/**
+ * @brief 设置当前线程的Span ID
+ *
+ * 为当前线程设置OpenTelemetry Span ID，所有后续日志都会包含此ID。
+ * 用于链路追踪中的跨度标识。
+ *
+ * @param span_id Span ID字符串，为NULL时清除
+ * @return 实际设置的Span ID（内部存储，无需释放）
+ */
+const char* log_set_span_id(const char* span_id);
+
+/**
+ * @brief 获取当前线程的Span ID
+ *
+ * @return Span ID字符串，未设置返回NULL
+ */
+const char* log_get_span_id(void);
 
 /**
  * @brief 设置模块日志级别

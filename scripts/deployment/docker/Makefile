@@ -6,8 +6,9 @@
 
 # 变量定义
 VERSION := 1.0.0.5
-KERNEL_IMAGE := spharx/agentos-kernel
-SERVICE_IMAGE := spharx/agentos-services
+DOCKER_REGISTRY := ${DOCKER_REGISTRY:-spharx}
+KERNEL_IMAGE := $(DOCKER_REGISTRY)/agentos-kernel
+SERVICE_IMAGE := $(DOCKER_REGISTRY)/agentos-services
 DOCKER_COMPOSE := docker-compose
 
 # 默认目标

@@ -184,17 +184,34 @@ typedef struct {
 }
 
 /**
+ * @brief 资源使用情况
+ */
+typedef struct {
+    size_t tokens_used_per_minute;    ///< 当前分钟已使用Token数
+    size_t tokens_used_per_hour;      ///< 当前小时已使用Token数
+    size_t tokens_used_per_day;       ///< 当前天已使用Token数
+    size_t requests_used_per_minute;  ///< 当前分钟已使用请求数
+    size_t requests_used_per_hour;    ///< 当前小时已使用请求数
+    size_t requests_used_per_day;     ///< 当前天已使用请求数
+} agentos_token_usage_t;
+
+/**
  * @brief 检查资源配额是否足够
- * 
+ *
+ * 逐级检查所有配额限制：单次请求、分钟级、小时级、日级。
+ * 当 current_usage 为 NULL 时，仅检查单次请求限制。
+ *
  * @param quota 配额限制
  * @param requested_tokens 请求的 Token 数量
- * @param current_usage 当前使用情况
- * @return 足够返回 0，超出配额返回错误码
+ * @param current_usage 当前使用情况（可为 NULL）
+ * @return 0 配额足够，1 超出单次请求限制，2 超出分钟Token限制，
+ *         3 超出小时Token限制，4 超出日Token限制，
+ *         5 超出分钟请求限制，6 超出小时请求限制，7 超出日请求限制
  */
 int agentos_token_check_quota(
     const agentos_token_quota_t* quota,
     size_t requested_tokens,
-    const void* current_usage  ///< 使用情况数据结构（未来扩展）
+    const agentos_token_usage_t* current_usage
 );
 
 #ifdef __cplusplus

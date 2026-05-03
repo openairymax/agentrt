@@ -48,6 +48,7 @@ CI_MODULE="${CI_MODULE:-all}"
 CI_PARALLEL="${CI_PARALLEL:-auto}"
 CI_ARTIFACT_DIR="${CI_ARTIFACT_DIR:-${PROJECT_ROOT}/ci-artifacts}"
 CI_LOG_DIR="${CI_LOG_DIR:-${PROJECT_ROOT}/ci-logs}"
+CI_BUILD_DIR="${AGENTOS_BUILD_DIR:-${PROJECT_ROOT}/../AgentOS-build}"
 
 # 时间统计
 declare -A PHASE_TIMINGS
@@ -212,13 +213,6 @@ phase_build() {
 }
 
 build_modules_fallback() {
-    local modules=()
-    if [[ "$CI_MODULE" == "all" ]]; then
-        modules=("daemon" "atoms" "commons" "cupolas" "gateway" "heapstore")
-    else
-        IFS=',' read -ra modules <<< "$CI_MODULE"
-    fi
-
     local parallel_jobs
     if [[ "$CI_PARALLEL" == "auto" ]]; then
         parallel_jobs=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo "4")
@@ -226,44 +220,23 @@ build_modules_fallback() {
         parallel_jobs="$CI_PARALLEL"
     fi
 
-    for module in "${modules[@]}"; do
-        local module_path="${PROJECT_ROOT}/agentos/${module}"
-        if [[ ! -d "$module_path" ]]; then
-            log_warn "Module directory not found: $module, skipping"
-            continue
-        fi
+    log_info "Building with unified build directory: $CI_BUILD_DIR"
 
-        log_info "Building module: $module"
+    if ! cmake -S "$PROJECT_ROOT" -B "$CI_BUILD_DIR" \
+        -DCMAKE_BUILD_TYPE="${CI_BUILD_TYPE}" \
+        -DBUILD_TESTS=ON \
+        -DBUILD_DAEMON=ON \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON; then
+        log_error "CMake configuration failed"
+        return 1
+    fi
 
-        local build_dir="${PROJECT_ROOT}/build-${module}"
-        mkdir -p "$build_dir"
-        cd "$build_dir"
+    if ! cmake --build "$CI_BUILD_DIR" --parallel "$parallel_jobs"; then
+        log_error "Build failed"
+        return 1
+    fi
 
-        local cmake_args=(
-            "$module_path"
-            "-DCMAKE_BUILD_TYPE=${CI_BUILD_TYPE}"
-            "-DBUILD_TESTS=ON"
-        )
-
-        # macOS OpenSSL 路径
-        if [[ "$CI_OS" == "macos" ]] && command -v brew &>/dev/null; then
-            cmake_args+=("-DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3 2>/dev/null || brew --prefix openssl 2>/dev/null)")
-        fi
-
-        if ! cmake "${cmake_args[@]}" >> "${CI_LOG_DIR}/${module}-cmake.log" 2>&1; then
-            log_error "CMake configuration failed for $module"
-            continue
-        fi
-
-        if ! cmake --build . --parallel "$parallel_jobs" >> "${CI_LOG_DIR}/${module}-build.log" 2>&1; then
-            log_error "Build failed for $module"
-            return 1
-        fi
-
-        log_ok "Module $module built successfully"
-    done
-
-    cd "$PROJECT_ROOT"
+    log_ok "Build completed successfully in $CI_BUILD_DIR"
 }
 
 ###############################################################################
@@ -294,57 +267,35 @@ phase_test() {
 }
 
 run_tests_fallback() {
-    local modules=()
-    if [[ "$CI_MODULE" == "all" ]]; then
-        modules=("daemon" "atoms" "commons")
-    else
-        IFS=',' read -ra modules <<< "$CI_MODULE"
+    local build_dir="$CI_BUILD_DIR"
+
+    if [[ ! -d "$build_dir" ]] || [[ ! -f "${build_dir}/CTestTestfile.cmake" ]]; then
+        log_warn "No tests found in $build_dir"
+        return 0
     fi
 
-    local total_passed=0
-    local total_failed=0
-    local total_skipped=0
+    log_info "Running tests from: $build_dir"
+    cd "$build_dir"
 
-    for module in "${modules[@]}"; do
-        local build_dir="${PROJECT_ROOT}/build-${module}"
-        if [[ ! -d "$build_dir" ]] || [[ ! -f "${build_dir}/CTestTestfile.cmake" ]]; then
-            log_warn "No tests found for module: $module"
-            ((total_skipped++))
-            continue
-        fi
+    local test_output
+    if test_output=$(ctest --output-on-failure --timeout 300 \
+        -j"$(nproc 2>/dev/null || echo '4')" \
+        --no-compress-output -T Test 2>&1); then
 
-        log_info "Running tests for module: $module"
-        cd "$build_dir"
+        local passed=$(echo "$test_output" | grep -c "Passed" || true)
+        local failed=$(echo "$test_output" | grep -c "Failed" || true)
 
-        local test_output
-        if test_output=$(ctest --output-on-failure --timeout 300 \
-            -j"$(nproc 2>/dev/null || echo '4')" \
-            --no-compress-output -T Test 2>&1); then
-
-            local passed=$(echo "$test_output" | grep -c "Passed" || true)
-            local failed=$(echo "$test_output" | grep -c "Failed" || true)
-
-            ((total_passed += passed))
-            ((total_failed += failed))
-
-            if [[ $failed -eq 0 ]]; then
-                log_ok "Module $module: All tests passed ($passed tests)"
-            else
-                log_error "Module $module: $failed test(s) failed"
-            fi
+        if [[ $failed -eq 0 ]]; then
+            log_ok "All tests passed ($passed tests)"
         else
-            log_error "ctest execution failed for $module"
-            ((total_failed++))
+            log_error "$failed test(s) failed"
         fi
-    done
-
-    cd "$PROJECT_ROOT"
-
-    log_info "Test Summary: ${total_passed} passed, ${total_failed} failed, ${total_skipped} skipped"
-
-    if [[ $total_failed -gt 0 ]]; then
+    else
+        log_error "ctest execution failed"
         return 1
     fi
+
+    cd "$PROJECT_ROOT"
 }
 
 ###############################################################################
