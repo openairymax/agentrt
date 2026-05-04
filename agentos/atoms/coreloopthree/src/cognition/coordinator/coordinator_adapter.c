@@ -120,7 +120,7 @@ agentos_coordinator_strategy_t *agentos_dual_model_coordinator_create(const char
     if (!adapter)
         return NULL;
     adapter->base = base;
-    adapter->base->llm = llm;
+    adapter->base->llm = (struct agentos_llm_service *)llm;
 
     return wrap_base_to_strategy(base);
 }
@@ -135,7 +135,7 @@ agentos_coordinator_strategy_t *agentos_majority_coordinator_create(const char *
     if (err != AGENTOS_SUCCESS || !base)
         return NULL;
 
-    base->llm = llm;
+    base->llm = (struct agentos_llm_service *)llm;
 
     return wrap_base_to_strategy(base);
 }
