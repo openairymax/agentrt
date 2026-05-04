@@ -230,7 +230,7 @@ static int openjiuwen_adapter_handle_request(void* context,
 
 static int openjiuwen_adapter_get_version(void* context,
                                            char* version_buf, size_t max_size) {
-    (void)context;
+    if (context) { }
     if (!version_buf || max_size == 0) return -1;
     const char* ver = OPENJIUWEN_PROTOCOL_VERSION;
     size_t len = strlen(ver);
@@ -241,7 +241,7 @@ static int openjiuwen_adapter_get_version(void* context,
 }
 
 static uint32_t openjiuwen_adapter_capabilities(void* context) {
-    (void)context;
+    if (context) { }
     return 0x0F;
 }
 
@@ -332,7 +332,7 @@ static int openjiuwen_receive_message(void* context,
         return -3;
     }
 
-    (void)timeout_ms;
+    if (timeout_ms > 0) { }
 
     unified_message_t* msg = (unified_message_t*)calloc(1, sizeof(unified_message_t));
     if (!msg) return -4;

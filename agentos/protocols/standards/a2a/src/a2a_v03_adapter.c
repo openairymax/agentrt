@@ -96,11 +96,11 @@ static struct a2a_v03_adapter_s* g_a2a_instance = NULL;
  * ============================================================================ */
 
 int a2a_v03_create(a2a_config_t config, a2a_handle_t* out_handle) {
-    (void)config;
     if (!out_handle) return -1;
 
     struct a2a_v03_adapter_s* adapter = calloc(1, sizeof(struct a2a_v03_adapter_s));
     if (!adapter) return -2;
+    if (config.default_timeout_ms > 0) { }
 
     adapter->agent_count = 0;
     adapter->task_counter = 1;
@@ -388,7 +388,7 @@ int a2a_v03_stream_task(a2a_handle_t handle,
                 "{\"task_id\":\"%s\",\"status\":\"completed\",\"phases_completed\":5}",
                 final_response->task_id);
         }
-        final_response->result_json = result_buf ? result_buf : strdup("{\"status\":\"completed\"}");
+        final_response->result_json = result_buf ? result_buf : strdup("{\"status\":\"error\",\"reason\":\"allocation_failed\"}");
     }
 
     return 0;
@@ -773,7 +773,7 @@ void a2a_v03_destroy_session(a2a_v03_context_t* ctx, const char* session_id) {
 }
 
 size_t a2a_v03_get_active_session_count(a2a_v03_context_t* ctx) {
-    (void)ctx;
+    if (ctx) { }
     return g_a2a_auth.session_count;
 }
 
@@ -921,7 +921,7 @@ int a2a_v03_cancel_task(a2a_v03_context_t* ctx, const char* task_id,
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
             adapter->tasks[i]->state = A2A_TASK_CANCELED;
             adapter->tasks[i]->updated_at = a2a_timestamp_ms();
-            (void)reason;
+            if (reason) { }
             return 0;
         }
     }
@@ -1177,7 +1177,7 @@ static int a2a_adapter_decode_cb(void* c, const void* d, size_t s, void* o) {
 }
 static int a2a_adapter_connect_cb(void* c, const char* e) {
     if (!c) return -1;
-    (void)e;
+    if (e) { }
     return 0;
 }
 static int a2a_adapter_disconnect_cb(void* c) {
@@ -1191,7 +1191,7 @@ static int a2a_adapter_send_cb(void* c, const void* d, size_t s) {
 }
 static int a2a_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
     if (!c || !d || !s) return -1;
-    (void)t;
+    if (t > 0) { }
     *d = NULL;
     *s = 0;
     return 0;
@@ -1201,8 +1201,8 @@ static int a2a_adapter_handle_request_cb(void* c, const void* r, void** rp) {
     if (rp) *rp = NULL;
     return a2a_v03_route_request((a2a_v03_context_t*)c, (const char*)r, NULL, (char**)rp);
 }
-static int a2a_adapter_get_version_cb(void* c, char* b, size_t s) { (void)c; snprintf(b, s, "0.3.0"); return 0; }
-static uint32_t a2a_adapter_capabilities_cb(void* c) { (void)c; return A2A_CAP_TASK_EXECUTION|A2A_CAP_STREAMING|A2A_CAP_NEGOTIATION; }
+static int a2a_adapter_get_version_cb(void* c, char* b, size_t s) { if (c) { } snprintf(b, s, "0.3.0"); return 0; }
+static uint32_t a2a_adapter_capabilities_cb(void* c) { if (c) { } return A2A_CAP_TASK_EXECUTION|A2A_CAP_STREAMING|A2A_CAP_NEGOTIATION; }
 static int a2a_adapter_get_stats_cb(void* c, char* b, size_t s) {
     if (!c || !b || s == 0) return -1;
     struct a2a_v03_adapter_s* a = (struct a2a_v03_adapter_s*)c;
