@@ -159,11 +159,6 @@ static void free_pricing_rules(pricing_rule_t* rules, int count) {
 /* ---------- 创建服务 ---------- */
 
 llm_service_t* llm_service_create(const char* config_path) {
-    if (!config_path) {
-        SVC_LOG_ERROR("manager path is NULL");
-        return NULL;
-    }
-    
     llm_service_t* svc = (llm_service_t*)calloc(1, sizeof(llm_service_t));
     if (!svc) {
         SVC_LOG_ERROR("Failed to allocate service context");
@@ -185,8 +180,9 @@ llm_service_t* llm_service_create(const char* config_path) {
     base_cfg.timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
 
     /* 解析定价规则（使用 cJSON） */
-    FILE* f = fopen(config_path, "rb");
-    if (f) {
+    if (config_path) {
+        FILE* f = fopen(config_path, "rb");
+        if (f) {
         fseek(f, 0, SEEK_END);
         long yaml_len = ftell(f);
         fseek(f, 0, SEEK_SET);
@@ -216,6 +212,7 @@ llm_service_t* llm_service_create(const char* config_path) {
             SVC_LOG_ERROR("Failed to allocate memory for manager content");
         }
         fclose(f);
+        }
     }
 
     /* 创建提供商注册表 */
