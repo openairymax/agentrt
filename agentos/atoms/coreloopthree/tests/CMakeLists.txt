@@ -19,6 +19,7 @@ set(CL3_TEST_SOURCES
     unit/test_cognitive_evolution.c
     unit/test_context_processor.c
     unit/test_parallel_dispatcher.c
+    unit/test_multi_agent.c
 )
 
 set(CL3_BENCH_SOURCES

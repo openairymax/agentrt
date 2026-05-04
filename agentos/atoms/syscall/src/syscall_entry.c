@@ -7,7 +7,6 @@
 #include "syscalls.h"
 #include "agentos.h"
 #include "cognition.h"
-#include "memoryrovol.h"
 #include "memory_provider.h"
 #include "logger.h"
 #include "memory_compat.h"

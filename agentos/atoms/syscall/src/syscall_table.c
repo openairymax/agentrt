@@ -88,6 +88,6 @@ static syscall_func_t syscall_table[SYS_MAX] = {
 void* agentos_syscall_invoke(int syscall_num, void** args, int argc) {
     if (syscall_num < 1 || syscall_num >= SYS_MAX) return (void*)(intptr_t)AGENTOS_EINVAL;
     syscall_func_t func = syscall_table[syscall_num];
-    if (!func) return (void*)(intptr_t)AGENTOS_ENOTSUP;
+    if (!func) return (void*)(intptr_t)AGENTOS_EPROTONOSUPPORT;
     return func(args, argc);
 }

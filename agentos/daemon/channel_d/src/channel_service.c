@@ -339,16 +339,25 @@ int channel_service_send(channel_service_t* svc,
             client_addr.sun_path[sizeof(client_addr.sun_path) - 1] = '\0';
             int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
             if (client_fd < 0) { agentos_mutex_unlock(&svc->lock); return -3; }
+            {
+                struct timeval tv;
+                tv.tv_sec = 3;
+                tv.tv_usec = 0;
+                setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+            }
             if (connect(client_fd, (struct sockaddr*)&client_addr, sizeof(client_addr)) < 0) {
                 close(client_fd);
                 agentos_mutex_unlock(&svc->lock);
-                return -3;
+                return (errno == EAGAIN || errno == ETIMEDOUT) ? CHANNEL_ERR_TIMEOUT : CHANNEL_ERR_IO;
             }
             uint32_t net_len = htonl((uint32_t)data_len);
             ssize_t w1 = write(client_fd, &net_len, sizeof(net_len));
             ssize_t w2 = write(client_fd, data, data_len);
             close(client_fd);
-            if (w1 < 0 || w2 < 0) { agentos_mutex_unlock(&svc->lock); return -3; }
+            if (w1 < 0 || w2 < 0) {
+                agentos_mutex_unlock(&svc->lock);
+                return (errno == EAGAIN || errno == ETIMEDOUT) ? CHANNEL_ERR_TIMEOUT : CHANNEL_ERR_IO;
+            }
             break;
         }
         case CHANNEL_TYPE_SHM: {
@@ -539,6 +548,91 @@ int channel_service_set_callback(channel_service_t* svc,
     entry->callback_user_data = user_data;
     agentos_mutex_unlock(&svc->lock);
     return 0;
+}
+
+int channel_service_ping(channel_service_t* svc,
+                           const char* channel_id,
+                           int64_t* out_latency_ms)
+{
+    if (!svc || !channel_id || !out_latency_ms) return CHANNEL_ERR_PARAM;
+
+    agentos_mutex_lock(&svc->lock);
+    channel_entry_t* entry = find_channel(svc, channel_id);
+    if (!entry) {
+        agentos_mutex_unlock(&svc->lock);
+        return CHANNEL_ERR_NOT_FOUND;
+    }
+
+    uint64_t start_ms = get_time_ms();
+    int rc = CHANNEL_OK;
+
+    switch (entry->info.type) {
+        case CHANNEL_TYPE_SOCKET: {
+            if (entry->socket_fd < 0 || entry->info.endpoint[0] == '\0') {
+                rc = CHANNEL_ERR_IO;
+                break;
+            }
+
+            int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+            if (sock_fd < 0) { rc = CHANNEL_ERR_IO; break; }
+
+            struct sockaddr_un addr;
+            memset(&addr, 0, sizeof(addr));
+            addr.sun_family = AF_UNIX;
+            strncpy(addr.sun_path, entry->info.endpoint, sizeof(addr.sun_path) - 1);
+
+            {
+                struct timeval tv;
+                tv.tv_sec = 3;
+                tv.tv_usec = 0;
+                setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+                setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+            }
+
+            if (connect(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+                close(sock_fd);
+                rc = (errno == EAGAIN || errno == ETIMEDOUT || errno == EINPROGRESS)
+                     ? CHANNEL_ERR_TIMEOUT : CHANNEL_ERR_IO;
+                break;
+            }
+
+            close(sock_fd);
+            break;
+        }
+        case CHANNEL_TYPE_SHM: {
+            if (!entry->shm_ptr) { rc = CHANNEL_ERR_IO; break; }
+            volatile uint32_t* header = (volatile uint32_t*)entry->shm_ptr;
+            __sync_synchronize();
+            (void)header[0];
+            break;
+        }
+        case CHANNEL_TYPE_PIPE: {
+            if (entry->info.endpoint[0]) {
+                int fd = open(entry->info.endpoint, O_RDONLY | O_NONBLOCK);
+                if (fd < 0) {
+                    rc = CHANNEL_ERR_IO;
+                } else {
+                    close(fd);
+                }
+            } else {
+                rc = CHANNEL_ERR_IO;
+            }
+            break;
+        }
+        default:
+            rc = CHANNEL_ERR_REJECTED;
+            break;
+    }
+
+    uint64_t end_ms = get_time_ms();
+    *out_latency_ms = (int64_t)(end_ms - start_ms);
+
+    if (rc == CHANNEL_OK) {
+        entry->info.last_activity = end_ms;
+    }
+
+    agentos_mutex_unlock(&svc->lock);
+    return rc;
 }
 
 bool channel_service_is_healthy(channel_service_t* svc)

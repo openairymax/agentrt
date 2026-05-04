@@ -44,6 +44,9 @@ static const struct {
     {AGENTOS_EDEADLK, "EDEADLK", "死锁"},
     {AGENTOS_EAGAIN, "EAGAIN", "资源暂时不可用"},
     {AGENTOS_EINTR, "EINTR", "操作被中断"},
+    {AGENTOS_EPLATFORM, "EPLATFORM", "平台未初始化"},
+    {AGENTOS_EPROTONOSUPPORT, "EPROTONOSUPPORT", "协议/命令不支持"},
+    {AGENTOS_ESERVICE, "ESERVICE", "服务不可用"},
     {AGENTOS_EUNKNOWN, "UNKNOWN", "未知错误"}
 };
 

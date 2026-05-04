@@ -2,35 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file agntcy_acp_adapter.h
- * @brief AGNTCY Agent Connect Protocol (ACP) Adapter for AgentOS
+ * @brief AGNTCY Agent Communication Protocol Adapter for AgentOS
  *
- * AGNTCY 是 Linux Foundation 下的开源项目，致力于构建"Agent 互联网"。
- * 本适配器实现 AGNTCY ACP 协议，支持：
- * - OASF Agent 描述与注册
- * - Agent Directory 发现服务
- * - ACP 远程调用与配置
- * - SLIM 安全消息传输
- * - 去中心化身份验证
+ * AGNTCY ACP 是面向智能体间通信的开放标准协议，定义：
+ * 1. agent/discover — 智能体注册与发现（capability card）
+ * 2. channel/open — 智能体间安全通道建立（mutual TLS + token）
+ * 3. message/exchange — 结构化消息交换（同步/异步/广播）
+ * 4. task/orchestrate — 跨智能体任务编排（工作流定义）
+ * 5. ack/agreement — 服务等级确认与资源承诺
  *
- * ACP 核心能力:
- * 1. Agent 注册与发现 — OASF schema 描述 + Directory 查询
- * 2. 远程 Agent 调用 — REST API invoke/run
- * 3. 流式输出 — SSE streaming
- * 4. 多轮会话 — 会话管理与上下文保持
- * 5. 安全认证 — OAuth2 / mTLS / API Key
- *
- * @since 2.1.0
+ * @since 3.0.0
  * @see unified_protocol.h
- * @see agentos_protocol_interface.h
- * @see https://docs.agntcy.org/
- * @see https://github.com/agntcy/acp-spec
  */
 
 #ifndef AGENTOS_AGNTCY_ACP_ADAPTER_H
 #define AGENTOS_AGNTCY_ACP_ADAPTER_H
 
 #include "unified_protocol.h"
-#include "agentos_protocol_interface.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -39,176 +27,134 @@
 extern "C" {
 #endif
 
-#define AGNTCY_ACP_VERSION          "0.1.0"
-#define AGNTCY_ADAPTER_VERSION      "1.0.0"
-#define AGNTCY_MAX_AGENTS           128
-#define AGNTCY_MAX_CAPABILITIES     32
-#define AGNTCY_MAX_INPUTS           16
-#define AGNTCY_MAX_OUTPUTS          16
-#define AGNTCY_MAX_SESSIONS         64
-#define AGNTCY_MAX_MESSAGE_LEN      16384
-#define AGNTCY_DEFAULT_TIMEOUT_MS   30000
-#define AGNTCY_HEARTBEAT_INTERVAL   30
+#define AGNTCY_ACP_VERSION              "0.1.0"
+#define AGNTCY_ACP_PROTOCOL_NAME        "agntcy"
+#define AGNTCY_ACP_MAX_AGENTS           512
+#define AGNTCY_ACP_MAX_CAPABILITIES     128
+#define AGNTCY_ACP_MAX_TASKS            2048
+#define AGNTCY_ACP_MAX_CHANNELS         256
+#define AGNTCY_ACP_MAX_MESSAGE_SIZE     (8 * 1024 * 1024)
+#define AGNTCY_ACP_DEFAULT_TIMEOUT_MS   30000
+#define AGNTCY_ACP_TOKEN_SIZE           64
+#define AGNTCY_ACP_CHANNEL_ID_SIZE      48
 
 typedef enum {
-    AGNTCY_AUTH_NONE = 0,
-    AGNTCY_AUTH_API_KEY,
-    AGNTCY_AUTH_OAUTH2,
-    AGNTCY_AUTH_MTLS
-} agntcy_auth_type_t;
+    AGNTCY_CAP_DISCOVERY    = 0x01,
+    AGNTCY_CAP_CHANNEL      = 0x02,
+    AGNTCY_CAP_MESSAGING    = 0x04,
+    AGNTCY_CAP_ORCHESTRATE  = 0x08,
+    AGNTCY_CAP_BROADCAST    = 0x10,
+    AGNTCY_CAP_ACK          = 0x20
+} agntcy_capability_t;
 
 typedef enum {
-    AGNTCY_AGENT_STATE_UNKNOWN = 0,
-    AGNTCY_AGENT_STATE_AVAILABLE,
-    AGNTCY_AGENT_STATE_BUSY,
-    AGNTCY_AGENT_STATE_OFFLINE,
-    AGNTCY_AGENT_STATE_ERROR
-} agntcy_agent_state_t;
+    AGNTCY_MSG_SYNC   = 0,
+    AGNTCY_MSG_ASYNC  = 1,
+    AGNTCY_MSG_BROADCAST = 2,
+    AGNTCY_MSG_STREAM = 3
+} agntcy_message_mode_t;
 
 typedef enum {
-    AGNTCY_RUN_PENDING = 0,
-    AGNTCY_RUN_RUNNING,
-    AGNTCY_RUN_COMPLETED,
-    AGNTCY_RUN_FAILED,
-    AGNTCY_RUN_CANCELLED,
-    AGNTCY_RUN_REQUIRES_INPUT
-} agntcy_run_status_t;
+    AGNTCY_TASK_PENDING    = 0,
+    AGNTCY_TASK_DISPATCHED = 1,
+    AGNTCY_TASK_RUNNING    = 2,
+    AGNTCY_TASK_COMPLETED  = 3,
+    AGNTCY_TASK_FAILED     = 4,
+    AGNTCY_TASK_CANCELLED  = 5
+} agntcy_task_state_t;
 
 typedef struct {
-    char* name;
-    char* description;
-    char* type;
-    bool required;
-} agntcy_io_spec_t;
+    char agent_id[64];
+    char name[128];
+    uint32_t capabilities_mask;
+    char endpoint_url[512];
+    char public_key_pem[2048];
+    int protocol_version;
+    uint64_t registered_at;
+    bool online;
+} agntcy_agent_card_t;
 
 typedef struct {
-    char* name;
-    char* description;
-    char* version;
-    char* framework;
-    char** capabilities;
-    size_t capability_count;
-    agntcy_io_spec_t* inputs;
-    size_t input_count;
-    agntcy_io_spec_t* outputs;
-    size_t output_count;
-    char* endpoint_url;
-    agntcy_agent_state_t state;
-    char* owner_org;
-    char* license;
-} agntcy_agent_descriptor_t;
+    char channel_id[AGNTCY_ACP_CHANNEL_ID_SIZE];
+    char initiator_id[64];
+    char responder_id[64];
+    char session_token[AGNTCY_ACP_TOKEN_SIZE];
+    uint64_t established_at;
+    uint64_t expires_at;
+    bool encrypted;
+} agntcy_channel_t;
 
 typedef struct {
-    char* directory_url;
-    char* local_agent_endpoint;
-    agntcy_auth_type_t auth_type;
-    char* api_key;
-    char* oauth2_token_endpoint;
-    char* oauth2_client_id;
-    char* oauth2_client_secret;
-    char* mtls_cert_path;
-    char* mtls_key_path;
-    uint32_t timeout_ms;
-    int max_retries;
-    bool enable_discovery;
-    bool enable_heartbeat;
-    uint32_t heartbeat_interval_sec;
-} agntcy_acp_config_t;
+    char message_id[64];
+    agntcy_message_mode_t mode;
+    char sender_id[64];
+    char receiver_id[64];
+    char channel_id[AGNTCY_ACP_CHANNEL_ID_SIZE];
+    char* payload;
+    size_t payload_size;
+    char content_type[64];
+    int priority;
+    uint64_t timestamp;
+} agntcy_message_t;
 
 typedef struct {
-    char* run_id;
-    char* agent_id;
-    agntcy_run_status_t status;
-    char* input_json;
-    char* output_json;
-    char* error_message;
+    char task_id[64];
+    char name[128];
+    char* workflow_json;
+    char assigned_agent_ids[AGNTCY_ACP_MAX_AGENTS][64];
+    size_t assigned_count;
+    agntcy_task_state_t state;
+    int priority;
     uint64_t created_at;
-    uint64_t completed_at;
-} agntcy_run_t;
+    uint64_t deadline_at;
+} agntcy_task_t;
 
 typedef struct {
-    char* session_id;
-    char* agent_id;
-    char** message_history;
-    size_t message_count;
-    uint64_t created_at;
-    uint64_t last_active;
-} agntcy_session_t;
+    char resource_type[64];
+    size_t requested_amount;
+    size_t guaranteed_amount;
+    int cpu_cores;
+    size_t memory_kb;
+    uint64_t valid_until;
+    bool committed;
+} agntcy_ack_t;
 
 typedef struct {
-    char* event_type;
-    char* data_json;
-    bool is_final;
-} agntcy_stream_event_t;
+    agntcy_agent_card_t agents[AGNTCY_ACP_MAX_AGENTS];
+    size_t agent_count;
+    agntcy_channel_t channels[AGNTCY_ACP_MAX_CHANNELS];
+    size_t channel_count;
+    agntcy_task_t* tasks[AGNTCY_ACP_MAX_TASKS];
+    size_t task_count;
+    uint64_t message_counter;
+    uint64_t task_counter;
+    bool initialized;
+} agntcy_handle_t;
 
-typedef void (*agntcy_stream_handler_t)(const agntcy_stream_event_t* event,
-                                         void* user_data);
+int agntcy_acp_create(agntcy_handle_t** handle);
+void agntcy_acp_destroy(agntcy_handle_t* handle);
 
-typedef struct agntcy_acp_context_s agntcy_acp_context_t;
+int agntcy_agent_register(agntcy_handle_t* h, const agntcy_agent_card_t* card);
+int agntcy_agent_unregister(agntcy_handle_t* h, const char* agent_id);
+int agntcy_agent_discover(agntcy_handle_t* h, uint32_t cap_mask,
+                          agntcy_agent_card_t* results, size_t* count);
 
-agntcy_acp_config_t agntcy_acp_config_default(void);
+int agntcy_channel_open(agntcy_handle_t* h, const char* initiator_id,
+                         const char* responder_id, agntcy_channel_t* channel);
+int agntcy_channel_close(agntcy_handle_t* h, const char* channel_id);
 
-agntcy_acp_context_t* agntcy_acp_context_create(const agntcy_acp_config_t* config);
-void agntcy_acp_context_destroy(agntcy_acp_context_t* ctx);
+int agntcy_message_send(agntcy_handle_t* h, const agntcy_message_t* msg,
+                         char* response, size_t* resp_size);
+int agntcy_message_broadcast(agntcy_handle_t* h, const agntcy_message_t* msg);
 
-bool agntcy_acp_is_initialized(const agntcy_acp_context_t* ctx);
-const char* agntcy_acp_adapter_version(void);
+int agntcy_task_orchestrate(agntcy_handle_t* h, const char* task_id,
+                             const char* workflow_json);
+int agntcy_task_get_state(agntcy_handle_t* h, const char* task_id,
+                          agntcy_task_state_t* state);
 
-int agntcy_register_agent(agntcy_acp_context_t* ctx,
-                             const agntcy_agent_descriptor_t* descriptor);
-
-int agntcy_unregister_agent(agntcy_acp_context_t* ctx,
-                              const char* agent_id);
-
-int agntcy_discover_agents(agntcy_acp_context_t* ctx,
-                              const char* capability_filter,
-                              agntcy_agent_descriptor_t** out_agents,
-                              size_t* out_count);
-
-int agntcy_get_agent(agntcy_acp_context_t* ctx,
-                       const char* agent_id,
-                       agntcy_agent_descriptor_t* out_descriptor);
-
-int agntcy_invoke_agent(agntcy_acp_context_t* ctx,
-                          const char* agent_id,
-                          const char* input_json,
-                          agntcy_run_t* out_run);
-
-int agntcy_invoke_agent_streaming(agntcy_acp_context_t* ctx,
-                                    const char* agent_id,
-                                    const char* input_json,
-                                    agntcy_stream_handler_t handler,
-                                    void* user_data,
-                                    agntcy_run_t* out_run);
-
-int agntcy_get_run_status(agntcy_acp_context_t* ctx,
-                            const char* run_id,
-                            agntcy_run_t* out_run);
-
-int agntcy_cancel_run(agntcy_acp_context_t* ctx,
-                        const char* run_id);
-
-int agntcy_create_session(agntcy_acp_context_t* ctx,
-                            const char* agent_id,
-                            agntcy_session_t* out_session);
-
-int agntcy_session_send(agntcy_acp_context_t* ctx,
-                          const char* session_id,
-                          const char* message_json,
-                          agntcy_run_t* out_run);
-
-int agntcy_session_close(agntcy_acp_context_t* ctx,
-                           const char* session_id);
-
-int agntcy_list_local_agents(agntcy_acp_context_t* ctx,
-                                agntcy_agent_descriptor_t** out_agents,
-                                size_t* out_count);
-
-const proto_adapter_t* agntcy_acp_get_adapter(void);
-
-void agntcy_agent_descriptor_destroy(agntcy_agent_descriptor_t* desc);
-void agntcy_run_destroy(agntcy_run_t* run);
-void agntcy_session_destroy(agntcy_session_t* session);
+int agntcy_ack_negotiate(agntcy_handle_t* h, const char* agent_id,
+                          const agntcy_ack_t* ack_request,
+                          agntcy_ack_t* ack_response);
 
 #ifdef __cplusplus
 }

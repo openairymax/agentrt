@@ -481,7 +481,7 @@ static agentos_error_t llm_build_dynamic_plan(
     if (!ctx || !intent || !out_plan) return AGENTOS_EINVAL;
 
     if (!ctx->llm || !agentos_llm_service_is_available(ctx->llm)) {
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_ESERVICE;
     }
 
     char prompt[2048];

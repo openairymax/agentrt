@@ -283,7 +283,7 @@ int transformer_jsonrpc_to_a2a_discover(const unified_message_t* source,
             strncpy(target->metadata.trace_id, ctx->trace_id, sizeof(target->metadata.trace_id) - 1);
     }
 
-    (void)source;
+    if (source) { }
 
     target->payload = strdup("{}");
     target->payload_size = 3;
