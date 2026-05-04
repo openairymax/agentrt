@@ -1017,7 +1017,7 @@ static int openclaw_proto_handle_request(void* context,
 }
 
 static int openclaw_proto_get_version(void* context, char* buf, size_t max_size) {
-    (void)context;
+    if (context) { }
     if (!buf || max_size == 0) return -1;
     const char* ver = openclaw_adapter_version();
     size_t len = strlen(ver);
@@ -1028,7 +1028,7 @@ static int openclaw_proto_get_version(void* context, char* buf, size_t max_size)
 }
 
 static uint32_t openclaw_proto_capabilities(void* context) {
-    (void)context;
+    if (context) { }
     return (uint32_t)(
         PROTO_CAP_MULTIMODAL | PROTO_CAP_STREAMING |
         PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY);
