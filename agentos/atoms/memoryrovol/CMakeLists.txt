@@ -53,6 +53,7 @@ if(MEMORYROVOL_SOURCE AND NOT MEMORYROVOL_PRO_MODE)
     set(AGENTOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." CACHE PATH "AgentOS root directory")
 
     set(BUILD_TESTS ON)
+    set(MEMORYROVOL_EMBEDDED ON CACHE BOOL "MemoryRovol is embedded in AgentOS build")
 
     add_subdirectory(${MEMORYROVOL_DIR} ${CMAKE_BINARY_DIR}/memoryrovol-build)
 
