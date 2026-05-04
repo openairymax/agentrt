@@ -441,6 +441,8 @@ int proto_registry_initialize_builtins(protocol_registry_t* registry) {
         {"OpenJiuwen", "1.0",  "OpenJiuwen自定义二进制协议",       PROTO_CAT_INTEGRATION,  PROTO_OPENJIUWEN,PROTO_CAP_BINARY | PROTO_CAP_LOW_LATENCY | PROTO_CAP_CRC_CHECKSUM},
         {"OpenClaw",   "1.0",  "OpenClaw九问平台集成适配器",       PROTO_CAT_INTEGRATION,  PROTO_OPENCLAW,  PROTO_CAP_MULTIMODAL | PROTO_CAP_STREAMING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_TOOL_CALLING},
         {"Claude",     "1.0",  "Anthropic Claude API适配器",        PROTO_CAT_INTEGRATION,  PROTO_CLAUDE,    PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_VISION | PROTO_CAP_EXTENDED_THINKING},
+        {"AGNTCY",     "1.0",  "AGNTCY Agent Connect Protocol",    PROTO_CAT_STANDARD,     PROTO_AGNTCY,    PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING},
+        {"ChinaEco",   "1.0",  "国内大模型生态统一兼容适配器",       PROTO_CAT_INTEGRATION,  PROTO_CHINA_ECO, PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_EMBEDDINGS},
     };
 
     static const int builtin_count = (int)(sizeof(builtins) / sizeof(builtins[0]));

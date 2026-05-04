@@ -137,7 +137,6 @@ add_library(svc_common STATIC ${SVC_COMMON_SOURCES})
 find_package(OpenSSL QUIET)
 target_link_libraries(svc_common PUBLIC
     agentos_common
-    agentos_memoryrovol
     ${OPENSSL_CRYPTO_LIBRARY}
 )
 
@@ -196,9 +195,9 @@ target_include_directories(svc_common PUBLIC
 )
 
 target_include_directories(svc_common PUBLIC
-    $<BUILD_INTERFACE:${ATOMS_DIR}/memoryrovol/include>
     $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/include>
     $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/src/cognition>
+    $<BUILD_INTERFACE:${ATOMS_DIR}/memory>
 )
 if(LIBCURL_FOUND)
     target_compile_definitions(svc_common PUBLIC AGENTOS_HAS_CURL)

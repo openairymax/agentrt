@@ -20,6 +20,7 @@ target_include_directories(test_e2e_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/utils/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/utils/string/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/utils/cache/include
 )
 
 target_link_libraries(test_e2e_core PRIVATE

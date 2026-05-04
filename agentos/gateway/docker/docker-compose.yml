@@ -40,7 +40,7 @@ services:
       - AGENTOS_METRICS_PORT=9090
       - AGENTOS_REDIS_HOST=redis
       - AGENTOS_REDIS_PORT=6379
-      - AGENTOS_JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - AGENTOS_JWT_SECRET=${JWT_SECRET}
       - AGENTOS_ENABLE_AUTH=${ENABLE_AUTH:-true}
     
     # 配置文件挂载
@@ -168,7 +168,7 @@ services:
     
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=http://localhost:3000
     
