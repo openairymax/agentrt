@@ -588,6 +588,7 @@ int main(void)
     printf("\n========================================\n");
     printf("  测试结果: %d 运行, %d 通过, %d 失败\n", tests_run, tests_passed, tests_failed);
     printf("========================================\n");
-
-    return tests_failed > 0 ? 1 : 0;
+    fflush(stdout);
+    fflush(stderr);
+    _Exit(tests_failed > 0 ? 1 : 0);
 }

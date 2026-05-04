@@ -20,6 +20,7 @@ set(CL3_TEST_SOURCES
     unit/test_context_processor.c
     unit/test_parallel_dispatcher.c
     unit/test_multi_agent.c
+    unit/test_browser.c
 )
 
 set(CL3_BENCH_SOURCES

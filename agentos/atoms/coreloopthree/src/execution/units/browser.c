@@ -129,6 +129,9 @@ static void browser_mgr_shutdown(void)
 int agentos_browser_launch(const char *browser_path, int port, int headless,
                            const char *user_data_dir)
 {
+    if (!browser_path || !browser_path[0])
+        return -1;
+
     browser_mgr_init();
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);

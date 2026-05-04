@@ -28,14 +28,12 @@ typedef struct {
     provider_base_ctx_t base;
 } google_ctx_t;
 
-static provider_ctx_t* google_init(const char* name,
+static provider_ctx_t* google_init(const char* name __attribute__((unused)),
                                    const char* api_key,
                                    const char* api_base,
-                                   const char* organization,
+                                   const char* organization __attribute__((unused)),
                                    double timeout_sec,
                                    int max_retries) {
-    (void)name;
-    (void)organization;
 
     google_ctx_t* ctx = (google_ctx_t*)calloc(1, sizeof(google_ctx_t));
     if (!ctx) {
