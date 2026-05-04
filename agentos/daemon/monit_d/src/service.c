@@ -515,15 +515,12 @@ int monitor_service_generate_report(monitor_service_t* service, char** report) {
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_start_agent_trace(monitor_service_t* service, const char* agent_id,
-                                      const char* task_id, const loop_detection_config_t* loop_config,
+int monitor_service_start_agent_trace(monitor_service_t* service, const char* agent_id __attribute__((unused)),
+                                      const char* task_id __attribute__((unused)), const loop_detection_config_t* loop_config __attribute__((unused)),
                                       agent_execution_trace_t** trace) {
     if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    (void)agent_id;
-    (void)task_id;
-    (void)loop_config;
 
     if (!service->config.enable_tracing) {
         return AGENTOS_ERR_STATE_ERROR;
@@ -659,11 +656,10 @@ int monitor_service_check_loop(monitor_service_t* service,
 
 int monitor_service_end_agent_trace(monitor_service_t* service,
                                     agent_execution_trace_t* trace,
-                                    agent_execution_state_t final_state) {
+                                    agent_execution_state_t final_state __attribute__((unused))) {
     if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    (void)final_state;
 
     agentos_mutex_lock(&service->trace_lock);
     for (size_t i = 0; i < service->trace_count; i++) {

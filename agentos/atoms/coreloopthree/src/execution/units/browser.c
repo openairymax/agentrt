@@ -73,6 +73,9 @@ typedef struct {
 static browser_manager_t g_browser_mgr;
 static int g_browser_mgr_initialized = 0;
 
+static int browser_mgr_init(void);
+static void browser_mgr_shutdown(void);
+
 static uint32_t browser_get_time_ms(void)
 {
     return (uint32_t)(agentos_time_ms() & 0xFFFFFFFF);
@@ -211,6 +214,7 @@ int agentos_browser_close(void)
 
     g_browser_mgr.state = BROWSER_STATE_STOPPED;
     agentos_mutex_unlock(&g_browser_mgr.browser_lock);
+    browser_mgr_shutdown();
     return 0;
 }
 
@@ -1139,52 +1143,141 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
 
         int cdp_ok = 0;
         if (has_cdp) {
-            int cdp_id = cdp_get_id();
             char *escaped_sel = js_escape(sel_buf, strlen(sel_buf));
             if (escaped_sel) {
-                char *escaped_val = js_escape(val_buf, strlen(val_buf));
-                if (escaped_val) {
-                    char cdp_js[8192];
-                    int written = snprintf(cdp_js, sizeof(cdp_js),
-                                           "(function(){var e=document.querySelector('%s');"
-                                           "if(!e)return'not_found';e.focus();var v='%s';"
-                                           "e.value=v;e.dispatchEvent(new Event('input',"
-                                           "{bubbles:true}));return'ok'})()",
-                                           escaped_sel, escaped_val);
-                    AGENTOS_FREE(escaped_val);
-                    if (written > 0 && (size_t)written < sizeof(cdp_js)) {
-                        char cdp_json[16384];
-                        written = snprintf(cdp_json, sizeof(cdp_json),
-                                           "{\"id\":%d,\"method\":\"Runtime.evaluate\","
-                                           "\"params\":{\"expression\":\"%s\","
-                                           "\"returnByValue\":true}}",
-                                           cdp_id, cdp_js);
-                        if (written > 0 && (size_t)written < sizeof(cdp_json)) {
-                            if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
-                                char *resp = NULL;
-                                if (ws_recv_frame(conn->socket_fd, &resp, NULL, 5000) == 0 &&
-                                    resp) {
-                                    if (strstr(resp, "\"result\"")) {
-                                        cdp_ok = 1;
-                                        size_t buf_size =
-                                            256 + strlen(sel_buf) + strlen(val_buf) + 1;
-                                        result_json = (char *)AGENTOS_MALLOC(buf_size);
-                                        if (result_json) {
-                                            snprintf(result_json, buf_size,
-                                                     "{\"status\":\"typed\","
-                                                     "\"selector\":\"%s\","
-                                                     "\"value\":\"%s\","
-                                                     "\"cdp\":true}",
-                                                     sel_buf, val_buf);
-                                        }
-                                    }
-                                    AGENTOS_FREE(resp);
-                                }
-                            }
+                int focus_id = cdp_get_id();
+                char focus_json[8192];
+                int fw = snprintf(focus_json, sizeof(focus_json),
+                                  "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                                  "\"params\":{\"expression\":"
+                                  "\"document.querySelector('%s').focus()\","
+                                  "\"returnByValue\":true}}",
+                                  focus_id, escaped_sel);
+                if (fw > 0 && (size_t)fw < sizeof(focus_json)) {
+                    if (ws_send_frame(conn->socket_fd, focus_json, strlen(focus_json)) == 0) {
+                        char *focus_resp = NULL;
+                        if (ws_recv_frame(conn->socket_fd, &focus_resp, NULL, 3000) == 0 &&
+                            focus_resp) {
+                            AGENTOS_FREE(focus_resp);
                         }
                     }
                 }
                 AGENTOS_FREE(escaped_sel);
+            }
+
+            if (strstr(cmd, "fill") != NULL) {
+                int insert_id = cdp_get_id();
+                char *escaped_val = js_escape(val_buf, strlen(val_buf));
+                if (escaped_val) {
+                    char insert_json[8192];
+                    int iw = snprintf(insert_json, sizeof(insert_json),
+                                      "{\"id\":%d,\"method\":\"Input.insertText\","
+                                      "\"params\":{\"text\":\"%s\"}}",
+                                      insert_id, escaped_val);
+                    AGENTOS_FREE(escaped_val);
+                    if (iw > 0 && (size_t)iw < sizeof(insert_json)) {
+                        if (ws_send_frame(conn->socket_fd, insert_json, strlen(insert_json)) == 0) {
+                            char *ins_resp = NULL;
+                            if (ws_recv_frame(conn->socket_fd, &ins_resp, NULL, 3000) == 0 &&
+                                ins_resp) {
+                                if (strstr(ins_resp, "\"result\"")) {
+                                    cdp_ok = 1;
+                                    size_t buf_size = 256 + strlen(sel_buf) + strlen(val_buf) + 1;
+                                    result_json = (char *)AGENTOS_MALLOC(buf_size);
+                                    if (result_json) {
+                                        snprintf(result_json, buf_size,
+                                                 "{\"status\":\"filled\","
+                                                 "\"selector\":\"%s\","
+                                                 "\"value\":\"%s\","
+                                                 "\"cdp_method\":\"Input.insertText\","
+                                                 "\"cdp\":true}",
+                                                 sel_buf, val_buf);
+                                    }
+                                }
+                                AGENTOS_FREE(ins_resp);
+                            }
+                        }
+                    }
+                }
+            } else {
+                size_t vlen = strlen(val_buf);
+                int all_sent = 1;
+                for (size_t ci = 0; ci < vlen && all_sent; ci++) {
+                    char key_char = val_buf[ci];
+                    char key_str[8];
+                    if (key_char >= 'a' && key_char <= 'z')
+                        snprintf(key_str, sizeof(key_str), "%c", key_char);
+                    else if (key_char >= 'A' && key_char <= 'Z')
+                        snprintf(key_str, sizeof(key_str), "%c", key_char);
+                    else if (key_char >= '0' && key_char <= '9')
+                        snprintf(key_str, sizeof(key_str), "%c", key_char);
+                    else if (key_char == ' ')
+                        snprintf(key_str, sizeof(key_str), " ");
+                    else if (key_char == '\n')
+                        snprintf(key_str, sizeof(key_str), "Enter");
+                    else if (key_char == '\t')
+                        snprintf(key_str, sizeof(key_str), "Tab");
+                    else if (key_char == '\b')
+                        snprintf(key_str, sizeof(key_str), "Backspace");
+                    else if (key_char == '\x1b')
+                        snprintf(key_str, sizeof(key_str), "Escape");
+                    else
+                        snprintf(key_str, sizeof(key_str), "%c", key_char);
+
+                    int kid = cdp_get_id();
+                    char kd_json[4096];
+                    int kw = snprintf(kd_json, sizeof(kd_json),
+                                      "{\"id\":%d,\"method\":\"Input.dispatchKeyEvent\","
+                                      "\"params\":{\"type\":\"keyDown\","
+                                      "\"key\":\"%s\","
+                                      "\"text\":\"%c\"}}",
+                                      kid, key_str, key_char);
+                    if (kw <= 0 || (size_t)kw >= sizeof(kd_json)) {
+                        all_sent = 0;
+                        break;
+                    }
+                    if (ws_send_frame(conn->socket_fd, kd_json, strlen(kd_json)) != 0) {
+                        all_sent = 0;
+                        break;
+                    }
+                    char *kd_resp = NULL;
+                    if (ws_recv_frame(conn->socket_fd, &kd_resp, NULL, 1000) == 0 && kd_resp)
+                        AGENTOS_FREE(kd_resp);
+
+                    int kid2 = cdp_get_id();
+                    char ku_json[2048];
+                    kw = snprintf(ku_json, sizeof(ku_json),
+                                  "{\"id\":%d,\"method\":\"Input.dispatchKeyEvent\","
+                                  "\"params\":{\"type\":\"keyUp\","
+                                  "\"key\":\"%s\"}}",
+                                  kid2, key_str);
+                    if (kw <= 0 || (size_t)kw >= sizeof(ku_json)) {
+                        all_sent = 0;
+                        break;
+                    }
+                    if (ws_send_frame(conn->socket_fd, ku_json, strlen(ku_json)) != 0) {
+                        all_sent = 0;
+                        break;
+                    }
+                    char *ku_resp = NULL;
+                    if (ws_recv_frame(conn->socket_fd, &ku_resp, NULL, 1000) == 0 && ku_resp)
+                        AGENTOS_FREE(ku_resp);
+                }
+
+                if (all_sent && vlen > 0) {
+                    cdp_ok = 1;
+                    size_t buf_size = 256 + strlen(sel_buf) + strlen(val_buf) + 1;
+                    result_json = (char *)AGENTOS_MALLOC(buf_size);
+                    if (result_json) {
+                        snprintf(result_json, buf_size,
+                                 "{\"status\":\"typed\","
+                                 "\"selector\":\"%s\","
+                                 "\"value\":\"%s\","
+                                 "\"cdp_method\":\"Input.dispatchKeyEvent\","
+                                 "\"cdp\":true}",
+                                 sel_buf, val_buf);
+                    }
+                }
             }
         }
 
