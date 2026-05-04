@@ -347,8 +347,8 @@ install-deps.sh 中的重试逻辑:
 
 ### 9.4 关键联系人
 
-- CI/CD维护者: @lidecheng, @wangliren
-- 安全问题: security@spharx.com
+- CI/CD维护者: @devops-team
+- 安全问题: security@spharx.cn
 
 ---
 
