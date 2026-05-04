@@ -266,7 +266,7 @@ static agentos_error_t file_execute(agentos_execution_unit_t *unit, const void *
         return file_do_list_posix(full_path, out_output);
 #endif
     }
-    return AGENTOS_ENOTSUP;
+    return AGENTOS_EPROTONOSUPPORT;
 }
 
 static void file_destroy(agentos_execution_unit_t *unit)

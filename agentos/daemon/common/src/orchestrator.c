@@ -15,7 +15,7 @@
 #include "svc_logger.h"
 #include "svc_common.h"
 #include "ipc_service_bus.h"
-#include "memoryrovol.h"
+#include "memory_provider.h"
 #include "cognition.h"
 #include "circuit_breaker.h"
 #include "metacognition.h"
@@ -67,7 +67,7 @@ struct orchestrator_s {
     uint64_t total_executions;
     uint64_t success_count;
 
-    agentos_memoryrov_handle_t* memory;
+    agentos_memory_provider_t* memory;
     agentos_cognition_engine_t* cognition;
     circuit_breaker_t breaker;
     cb_manager_t cb_mgr;
@@ -131,12 +131,18 @@ orchestrator_t* orchestrator_create(const orch_config_t* config) {
     atomic_store(&orch->active_count, 0);
 
     if (orch->config.enable_thinking_chain) {
-        agentos_error_t mem_err = agentos_memoryrov_init(NULL, &orch->memory);
-        if (mem_err != AGENTOS_SUCCESS) {
-            SVC_LOG_WARN("orchestrator: memory init failed (err=%d), continuing without memory", mem_err);
-            orch->memory = NULL;
+        agentos_memory_provider_t* active = agentos_memory_provider_get_active();
+        if (active) {
+            orch->memory = active;
         } else {
-            SVC_LOG_INFO("orchestrator: memory initialized successfully");
+            agentos_error_t mem_err = agentos_builtin_memory_provider_init(NULL);
+            if (mem_err != AGENTOS_SUCCESS) {
+                SVC_LOG_WARN("orchestrator: memory init failed (err=%d), continuing without memory", mem_err);
+                orch->memory = NULL;
+            } else {
+                orch->memory = agentos_memory_provider_get_active();
+                SVC_LOG_INFO("orchestrator: memory initialized successfully");
+            }
         }
     }
 
@@ -221,7 +227,7 @@ void orchestrator_destroy(orchestrator_t* orch) {
     }
 
     if (orch->pool) thread_pool_destroy(orch->pool);
-    if (orch->memory) agentos_memoryrov_cleanup(orch->memory);
+    if (orch->memory) agentos_memory_provider_unregister();
     if (orch->cognition) agentos_cognition_destroy(orch->cognition);
     if (orch->metacognition) agentos_mc_destroy(orch->metacognition);
     if (orch->calibrator) confidence_calibrator_destroy(orch->calibrator);
@@ -288,26 +294,27 @@ static ipc_service_bus_t g_orch_bus = NULL;
 static agentos_mutex_t g_orch_bus_mutex;
 static int g_orch_bus_mutex_initialized = 0;
 
-static char* memory_query_context(agentos_memoryrov_handle_t* mem, const char* query, uint32_t limit) {
+static char* memory_query_context(agentos_memory_provider_t* mem, const char* query, uint32_t limit) {
     if (!mem || !query) return NULL;
+    if (!mem->query || !mem->get_raw) return NULL;
     char** ids = NULL;
     float* scores = NULL;
     size_t count = 0;
-    agentos_error_t err = agentos_memoryrov_query(mem, query, limit, &ids, &scores, &count);
+    agentos_error_t err = mem->query(mem, query, limit, &ids, &scores, &count);
     if (err != AGENTOS_SUCCESS || count == 0) {
-        if (ids) free(ids);
+        if (ids) { for (size_t i = 0; i < count; i++) free(ids[i]); free(ids); }
         if (scores) free(scores);
         return NULL;
     }
     size_t buf_sz = count * 256 + 64;
     char* context = (char*)malloc(buf_sz);
-    if (!context) { free(ids); free(scores); return NULL; }
+    if (!context) { for (size_t i = 0; i < count; i++) free(ids[i]); free(ids); free(scores); return NULL; }
     size_t pos = 0;
     pos += snprintf(context + pos, buf_sz - pos, "{\"memory_context\":[");
     for (size_t i = 0; i < count && pos < buf_sz - 2; i++) {
         void* data = NULL;
         size_t data_len = 0;
-        if (agentos_memoryrov_get_raw(mem, ids[i], &data, &data_len) == AGENTOS_SUCCESS && data) {
+        if (mem->get_raw(mem, ids[i], &data, &data_len) == AGENTOS_SUCCESS && data) {
             if (i > 0) pos += snprintf(context + pos, buf_sz - pos, ",");
             size_t copy_len = data_len < 200 ? data_len : 200;
             pos += snprintf(context + pos, buf_sz - pos, "{\"id\":\"%s\",\"score\":%.2f,\"data\":\"%.*s\"}",
@@ -322,29 +329,29 @@ static char* memory_query_context(agentos_memoryrov_handle_t* mem, const char* q
     return context;
 }
 
-static void memory_write_step(agentos_memoryrov_handle_t* mem,
+static void memory_write_step(agentos_memory_provider_t* mem,
                                const char* phase_name,
                                const char* content,
                                const char* metadata_extra) {
-    if (!mem || !content) return;
+    if (!mem || !content || !mem->write_raw) return;
     char meta[512];
     snprintf(meta, sizeof(meta), "{\"source\":\"orchestrator\",\"phase\":\"%s\"%s%s}",
         phase_name,
         metadata_extra ? "," : "",
         metadata_extra ? metadata_extra : "");
     char* record_id = NULL;
-    agentos_memoryrov_write_raw(mem, content, strlen(content), meta, &record_id);
+    mem->write_raw(mem, content, strlen(content), meta, &record_id);
     if (record_id) {
         SVC_LOG_INFO("orchestrator: memory write step %s -> %s", phase_name, record_id);
         free(record_id);
     }
 }
 
-static void memory_inform_evaluation(agentos_memoryrov_handle_t* mem,
+static void memory_inform_evaluation(agentos_memory_provider_t* mem,
                                       const char* phase,
                                       float score,
                                       bool passed) {
-    if (!mem) return;
+    if (!mem || !mem->write_raw) return;
     char eval_data[256];
     snprintf(eval_data, sizeof(eval_data),
         "{\"evaluation\":{\"phase\":\"%s\",\"score\":%.3f,\"passed\":%s}}",
@@ -352,39 +359,43 @@ static void memory_inform_evaluation(agentos_memoryrov_handle_t* mem,
     char meta[256];
     snprintf(meta, sizeof(meta), "{\"source\":\"metacognition\",\"type\":\"evaluation\",\"phase\":\"%s\"}", phase);
     char* record_id = NULL;
-    agentos_memoryrov_write_raw(mem, eval_data, strlen(eval_data), meta, &record_id);
+    mem->write_raw(mem, eval_data, strlen(eval_data), meta, &record_id);
     if (record_id) free(record_id);
 }
 
-static void memory_sync_persistent(agentos_memoryrov_handle_t* mem) {
-    if (!mem) return;
-    agentos_memoryrov_evolve(mem, 0);
+static void memory_sync_persistent(agentos_memory_provider_t* mem) {
+    if (!mem || !mem->evolve) return;
+    mem->evolve(mem, 0);
     SVC_LOG_INFO("orchestrator: memory evolution triggered");
 }
 
-static char* memory_retrieve_for_generation(agentos_memoryrov_handle_t* mem, const char* topic) {
-    if (!mem || !topic) return NULL;
-    agentos_memory_t* results = NULL;
+static char* memory_retrieve_for_generation(agentos_memory_provider_t* mem, const char* topic) {
+    if (!mem || !topic || !mem->retrieve) return NULL;
+    char** ids = NULL;
+    float* scores = NULL;
     size_t count = 0;
-    agentos_error_t err = agentos_memoryrov_retrieve(mem, topic, 5, &results, &count);
-    if (err != AGENTOS_SUCCESS || count == 0 || !results) {
-        if (results) free(results);
+    agentos_error_t err = mem->retrieve(mem, topic, 5, &ids, &scores, &count);
+    if (err != AGENTOS_SUCCESS || count == 0 || !ids) {
+        if (ids) { for (size_t i = 0; i < count; i++) free(ids[i]); free(ids); }
+        if (scores) free(scores);
         return NULL;
     }
     size_t buf_sz = count * 256 + 64;
     char* context = (char*)malloc(buf_sz);
-    if (!context) { free(results); return NULL; }
+    if (!context) { for (size_t i = 0; i < count; i++) free(ids[i]); free(ids); free(scores); return NULL; }
     size_t pos = 0;
     pos += snprintf(context + pos, buf_sz - pos, "{\"retrieved\":[");
     for (size_t i = 0; i < count && pos < buf_sz - 2; i++) {
         if (i > 0) pos += snprintf(context + pos, buf_sz - pos, ",");
         pos += snprintf(context + pos, buf_sz - pos,
             "{\"id\":\"%s\",\"score\":%.2f}",
-            results[i].record_id ? results[i].record_id : "",
-            results[i].score);
+            ids[i] ? ids[i] : "",
+            scores ? scores[i] : 0.0f);
     }
     pos += snprintf(context + pos, buf_sz - pos, "]}");
-    free(results);
+    for (size_t i = 0; i < count; i++) free(ids[i]);
+    free(ids);
+    free(scores);
     return context;
 }
 
@@ -1335,43 +1346,24 @@ int orchestrator_execute(orchestrator_t* orch,
     orch->task_count = 0;
 
     if (orch->memory && orch->cognition && orch->metacognition) {
-        agentos_memory_t* vol_results = NULL;
-        size_t vol_count = 0;
-        agentos_error_t qerr = agentos_memoryrov_retrieve(
-            orch->memory, input, 8, &vol_results, &vol_count);
-        if (qerr == AGENTOS_SUCCESS && vol_count > 0 && vol_results) {
-            SVC_LOG_INFO("orchestrator: loaded %zu memory volumes for dual-thinking context", vol_count);
-            size_t ctx_len = 0;
-            for (size_t v = 0; v < vol_count; v++) {
-                if (vol_results[v].data)
-                    ctx_len += strlen((char*)vol_results[v].data) + 64;
-            }
-            if (ctx_len > 0) {
-                char* vol_ctx = (char*)malloc(ctx_len + 128);
-                if (vol_ctx) {
-                    size_t vp = snprintf(vol_ctx, ctx_len + 128,
-                        "[MEMORY_VOLUME_CONTEXT entries=%zu]\n", vol_count);
-                    for (size_t v = 0; v < vol_count && vp < ctx_len + 100; v++) {
-                        if (vol_results[v].data) {
-                            vp += snprintf(vol_ctx + vp, ctx_len + 128 - vp,
-                                "  [vol_%zu score=%.2f id=%s]: %s\n",
-                                v + 1, vol_results[v].score,
-                                vol_results[v].record_id ? vol_results[v].record_id : "?",
-                                (const char*)vol_results[v].data);
-                        }
-                    }
-                    agentos_memoryrov_mount(orch->memory, "orch_volume_context", vol_ctx);
-                    SVC_LOG_DEBUG("orchestrator: volume context mounted to memory (%zu bytes)",
-                                strlen(vol_ctx));
-                    free(vol_ctx);
+        if (orch->memory->retrieve) {
+            char** vol_ids = NULL;
+            float* vol_scores = NULL;
+            size_t vol_count = 0;
+            agentos_error_t qerr = orch->memory->retrieve(
+                orch->memory, input, 8, &vol_ids, &vol_scores, &vol_count);
+            if (qerr == AGENTOS_SUCCESS && vol_count > 0 && vol_ids) {
+                SVC_LOG_INFO("orchestrator: loaded %zu memory volumes for dual-thinking context", vol_count);
+                if (orch->memory->mount) {
+                    orch->memory->mount(orch->memory, "orch_volume_context", input);
+                    SVC_LOG_DEBUG("orchestrator: volume context mounted to memory");
                 }
+                for (size_t v = 0; v < vol_count; v++) {
+                    free(vol_ids[v]);
+                }
+                free(vol_ids);
+                free(vol_scores);
             }
-            for (size_t v = 0; v < vol_count; v++) {
-                free(vol_results[v].record_id);
-                free(vol_results[v].metadata);
-                free(vol_results[v].data);
-            }
-            free(vol_results);
         }
     }
 
@@ -1417,7 +1409,8 @@ int orchestrator_execute(orchestrator_t* orch,
 
     if (completed >= ORCH_PHASE_MAX - 1 && orch->memory && results[completed - 1].output) {
         char* final_out = results[completed - 1].output;
-        agentos_memoryrov_add_memory(orch->memory, final_out, strlen(final_out));
+        if (orch->memory->add_memory)
+            orch->memory->add_memory(orch->memory, final_out, strlen(final_out));
         SVC_LOG_DEBUG("orchestrator: execution result written back to memory volume");
     }
 

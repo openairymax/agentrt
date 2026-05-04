@@ -108,7 +108,7 @@ AgentOS 社区治理采用三层架构：
 | 渠道 | 用途 | 响应时间 |
 |------|------|---------|
 | conduct@spharx.cn | 行为准则违规举报 | 48小时内确认 |
-| wangliren@spharx.cn | 安全问题举报 | 24小时内确认 |
+| security@spharx.cn | 安全问题举报 | 24小时内确认 |
 | GitHub/Gitee Issue | 公开技术问题 | 社区响应 |
 
 #### 8.2 举报要求
@@ -231,10 +231,10 @@ AgentOS 社区治理采用三层架构：
 
 | 用途 | 联系方式 |
 |------|---------|
-| 行为准则事务 | zhaochen@spharx.cn |
-| 安全问题 | wangliren@spharx.cn |
-| 技术支持 | lidecheng@spharx.cn |
-| 商务合作 | zhouzhixian@spharx.cn |
+| 行为准则事务 | conduct@spharx.cn |
+| 安全问题 | security@spharx.cn |
+| 技术支持 | support@spharx.cn |
+| 商务合作 | business@spharx.cn |
 | 官方网站 | https://spharx.cn |
 
 ---

@@ -24,6 +24,18 @@ extern "C" {
 #define CHANNEL_MAX_ENDPOINT 512
 #define CHANNEL_MAX_CHANNELS 256
 
+#define CHANNEL_OK             0
+#define CHANNEL_ERR_PARAM     -1
+#define CHANNEL_ERR_FULL      -2
+#define CHANNEL_ERR_EXISTS    -3
+#define CHANNEL_ERR_CREATE    -4
+#define CHANNEL_ERR_MEMORY    -5
+#define CHANNEL_ERR_TIMEOUT   -6
+#define CHANNEL_ERR_IO        -7
+#define CHANNEL_ERR_REJECTED  -8
+#define CHANNEL_ERR_NOT_FOUND -9
+#define CHANNEL_ERR_NOT_OPEN  -10
+
 typedef enum {
     CHANNEL_TYPE_SOCKET = 0,
     CHANNEL_TYPE_SHM = 1,
@@ -113,6 +125,10 @@ int channel_service_set_callback(channel_service_t* svc,
                                    const char* channel_id,
                                    channel_message_cb_t callback,
                                    void* user_data);
+
+int channel_service_ping(channel_service_t* svc,
+                           const char* channel_id,
+                           int64_t* out_latency_ms);
 
 bool channel_service_is_healthy(channel_service_t* svc);
 
