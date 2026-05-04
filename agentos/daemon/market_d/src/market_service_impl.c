@@ -25,7 +25,14 @@ struct market_service {
 };
 
 int market_service_create(const market_config_t* config, market_service_t** service) {
-    if (!config || !service) return -1;
+    market_config_t default_cfg;
+    if (!service) return -1;
+    if (!config) {
+        memset(&default_cfg, 0, sizeof(default_cfg));
+        default_cfg.cache_ttl_ms = 3600000;
+        default_cfg.sync_interval_ms = 30000;
+        config = &default_cfg;
+    }
 
     market_service_t* svc = (market_service_t*)calloc(1, sizeof(market_service_t));
     if (!svc) return -2;
@@ -87,14 +94,14 @@ int market_service_register_agent(market_service_t* service, const agent_info_t*
             free(service->agents[i]->repository);
             free(service->agents[i]->dependencies);
 
-            service->agents[i]->name = strdup(agent_info->name);
-            service->agents[i]->version = strdup(agent_info->version);
-            service->agents[i]->description = strdup(agent_info->description);
+            service->agents[i]->name = agent_info->name ? strdup(agent_info->name) : NULL;
+            service->agents[i]->version = agent_info->version ? strdup(agent_info->version) : NULL;
+            service->agents[i]->description = agent_info->description ? strdup(agent_info->description) : NULL;
             service->agents[i]->type = agent_info->type;
             service->agents[i]->status = agent_info->status;
-            service->agents[i]->author = strdup(agent_info->author);
-            service->agents[i]->repository = strdup(agent_info->repository);
-            service->agents[i]->dependencies = strdup(agent_info->dependencies);
+            service->agents[i]->author = agent_info->author ? strdup(agent_info->author) : NULL;
+            service->agents[i]->repository = agent_info->repository ? strdup(agent_info->repository) : NULL;
+            service->agents[i]->dependencies = agent_info->dependencies ? strdup(agent_info->dependencies) : NULL;
             service->agents[i]->rating = agent_info->rating;
             service->agents[i]->download_count = agent_info->download_count;
             service->agents[i]->last_updated = (uint64_t)time(NULL);
@@ -105,15 +112,15 @@ int market_service_register_agent(market_service_t* service, const agent_info_t*
     agent_info_t* new_agent = (agent_info_t*)calloc(1, sizeof(agent_info_t));
     if (!new_agent) return -3;
 
-    new_agent->agent_id = strdup(agent_info->agent_id);
-    new_agent->name = strdup(agent_info->name);
-    new_agent->version = strdup(agent_info->version);
-    new_agent->description = strdup(agent_info->description);
+    new_agent->agent_id = agent_info->agent_id ? strdup(agent_info->agent_id) : NULL;
+    new_agent->name = agent_info->name ? strdup(agent_info->name) : NULL;
+    new_agent->version = agent_info->version ? strdup(agent_info->version) : NULL;
+    new_agent->description = agent_info->description ? strdup(agent_info->description) : NULL;
     new_agent->type = agent_info->type;
     new_agent->status = agent_info->status;
-    new_agent->author = strdup(agent_info->author);
-    new_agent->repository = strdup(agent_info->repository);
-    new_agent->dependencies = strdup(agent_info->dependencies);
+    new_agent->author = agent_info->author ? strdup(agent_info->author) : NULL;
+    new_agent->repository = agent_info->repository ? strdup(agent_info->repository) : NULL;
+    new_agent->dependencies = agent_info->dependencies ? strdup(agent_info->dependencies) : NULL;
     new_agent->rating = agent_info->rating;
     new_agent->download_count = agent_info->download_count;
     new_agent->last_updated = (uint64_t)time(NULL);
@@ -135,13 +142,13 @@ int market_service_register_skill(market_service_t* service, const skill_info_t*
             free(service->skills[i]->repository);
             free(service->skills[i]->dependencies);
 
-            service->skills[i]->name = strdup(skill_info->name);
-            service->skills[i]->version = strdup(skill_info->version);
-            service->skills[i]->description = strdup(skill_info->description);
+            service->skills[i]->name = skill_info->name ? strdup(skill_info->name) : NULL;
+            service->skills[i]->version = skill_info->version ? strdup(skill_info->version) : NULL;
+            service->skills[i]->description = skill_info->description ? strdup(skill_info->description) : NULL;
             service->skills[i]->type = skill_info->type;
-            service->skills[i]->author = strdup(skill_info->author);
-            service->skills[i]->repository = strdup(skill_info->repository);
-            service->skills[i]->dependencies = strdup(skill_info->dependencies);
+            service->skills[i]->author = skill_info->author ? strdup(skill_info->author) : NULL;
+            service->skills[i]->repository = skill_info->repository ? strdup(skill_info->repository) : NULL;
+            service->skills[i]->dependencies = skill_info->dependencies ? strdup(skill_info->dependencies) : NULL;
             service->skills[i]->rating = skill_info->rating;
             service->skills[i]->download_count = skill_info->download_count;
             service->skills[i]->last_updated = (uint64_t)time(NULL);
@@ -152,17 +159,15 @@ int market_service_register_skill(market_service_t* service, const skill_info_t*
     skill_info_t* new_skill = (skill_info_t*)calloc(1, sizeof(skill_info_t));
     if (!new_skill) return -3;
 
-    new_skill->skill_id = strdup(skill_info->skill_id);
-    new_skill->name = strdup(skill_info->name);
-    new_skill->version = strdup(skill_info->version);
-    new_skill->description = strdup(skill_info->description);
+    new_skill->skill_id = skill_info->skill_id ? strdup(skill_info->skill_id) : NULL;
+    new_skill->name = skill_info->name ? strdup(skill_info->name) : NULL;
+    new_skill->version = skill_info->version ? strdup(skill_info->version) : NULL;
+    new_skill->description = skill_info->description ? strdup(skill_info->description) : NULL;
     new_skill->type = skill_info->type;
-    new_skill->author = strdup(skill_info->author);
-    new_skill->repository = strdup(skill_info->repository);
-    new_skill->dependencies = strdup(skill_info->dependencies);
-    if (!new_skill->skill_id || !new_skill->name || !new_skill->version ||
-        !new_skill->description || !new_skill->author ||
-        !new_skill->repository || !new_skill->dependencies) {
+    new_skill->author = skill_info->author ? strdup(skill_info->author) : NULL;
+    new_skill->repository = skill_info->repository ? strdup(skill_info->repository) : NULL;
+    new_skill->dependencies = skill_info->dependencies ? strdup(skill_info->dependencies) : NULL;
+    if (!new_skill->skill_id || !new_skill->name || !new_skill->version) {
         free(new_skill->skill_id);
         free(new_skill->name);
         free(new_skill->version);
