@@ -194,7 +194,7 @@ services:
     environment:
       - POSTGRES_DB=agentos
       - POSTGRES_USER=agentos
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-agentos123}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
     # 数据持久化
     volumes:

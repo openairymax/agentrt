@@ -179,7 +179,7 @@ show_next_steps() {
     echo "4. 获取支持:"
     echo "   - Gitee Issues: https://gitee.com/spharx/agentos/issues"
     echo "   - GitHub Issues: https://github.com/SpharxTeam/AgentOS/issues"
-    echo "   - 官方邮箱：lidecheng@spharx.cn, wangliren@spharx.cn"
+    echo "   - 官方邮箱：support@spharx.cn"
     echo ""
     echo "=========================================="
 }

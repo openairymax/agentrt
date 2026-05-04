@@ -128,7 +128,6 @@ add_custom_target(agentos-all
 # 安装配置
 install(DIRECTORY atoms/corekern/include/ DESTINATION include/agentos/corekern)
 install(DIRECTORY atoms/coreloopthree/include/ DESTINATION include/agentos/coreloopthree)
-install(DIRECTORY atoms/memoryrovol/include/ DESTINATION include/agentos/memoryrovol)
 install(DIRECTORY atoms/syscall/include/ DESTINATION include/agentos/syscall)
 install(DIRECTORY commons/utils/memory/include/ DESTINATION include/agentos/commons/memory)
 install(DIRECTORY commons/utils/string/include/ DESTINATION include/agentos/commons/string)
