@@ -31,6 +31,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <unistd.h>
 #include <time.h>
 
 #ifdef AGENTOS_HAS_CURL
@@ -78,6 +80,8 @@ typedef struct agentos_service_internal {
 
     /* 并发支持 */
     void* thread_pool;
+    pthread_t* threads;
+    size_t thread_count;
 
     /* 链表支持 */
     struct agentos_service_internal* next;
@@ -324,6 +328,10 @@ agentos_error_t agentos_service_create(
     /* 复制接口 */
     memcpy(&service->iface, iface, sizeof(agentos_svc_interface_t));
     
+    /* 初始化线程追踪 */
+    service->threads = NULL;
+    service->thread_count = 0;
+    
     /* 初始化统计信息 */
     memset(&service->stats, 0, sizeof(agentos_svc_stats_t));
     
@@ -350,24 +358,36 @@ void agentos_service_destroy(agentos_service_t svc) {
     
     agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
     
-    /* 如果服务还在运行，先停止 */
+    /* 如果服务还在运行，先强制停止（带5秒超时保护） */
     if (service->state == AGENTOS_SVC_STATE_RUNNING || 
         service->state == AGENTOS_SVC_STATE_PAUSED) {
-        agentos_service_stop((agentos_service_t)service, true);  /* 强制停止 */
+        agentos_service_stop((agentos_service_t)service, true);
     }
     
-    /* 从注册表注销 */
-    unregister_service_internal(service);
+    /* 从注册表注销（即使部分资源已损坏，继续清理） */
+    {
+        agentos_error_t unreg_err = unregister_service_internal(service);
+        if (unreg_err != AGENTOS_SUCCESS && unreg_err != AGENTOS_ENOENT) {
+            LOG_WARN("Service '%s' unregister during destroy returned %d - continuing cleanup",
+                     service->name, unreg_err);
+        }
+    }
     
-    /* 调用服务的销毁函数（如果提供） */
+    /* 调用服务的销毁函数（容错：失败不阻塞后续清理） */
     if (service->iface.destroy) {
         service->iface.destroy(svc);
     }
     
-    /* 清理资源 */
+    /* 清理资源：跳过已损坏/已释放的资源 */
     agentos_mutex_destroy(&service->state_mutex);
     agentos_mutex_destroy(&service->stats_mutex);
     
+    /* 释放内存：无论前面是否出错，内存必须释放 */
+    if (service->threads) {
+        AGENTOS_FREE(service->threads);
+        service->threads = NULL;
+        service->thread_count = 0;
+    }
     AGENTOS_FREE(service);
     
     LOG_INFO("Service destroyed");
@@ -426,7 +446,8 @@ agentos_error_t agentos_service_start(agentos_service_t svc) {
     /* 状态检查 */
     if (service->state != AGENTOS_SVC_STATE_READY && 
         service->state != AGENTOS_SVC_STATE_STOPPED &&
-        service->state != AGENTOS_SVC_STATE_PAUSED) {
+        service->state != AGENTOS_SVC_STATE_PAUSED &&
+        service->state != AGENTOS_SVC_STATE_ZOMBIE) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot start from state %d", 
                  service->name, service->state);
@@ -458,6 +479,16 @@ agentos_error_t agentos_service_start(agentos_service_t svc) {
     return AGENTOS_SUCCESS;
 }
 
+#define FORCE_STOP_TIMEOUT_SEC 5
+
+static volatile sig_atomic_t g_svc_stop_timeout_flag = 0;
+
+static void svc_stop_timeout_handler(int signum)
+{
+    (void)signum;
+    g_svc_stop_timeout_flag = 1;
+}
+
 agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
     if (!svc) {
         return AGENTOS_EINVAL;
@@ -482,15 +513,61 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
     
     /* 调用服务的停止函数 */
     agentos_error_t err = AGENTOS_SUCCESS;
+    bool zombie = false;
+    
     if (service->iface.stop) {
+        struct sigaction old_act, new_act;
+        if (force) {
+            g_svc_stop_timeout_flag = 0;
+            memset(&new_act, 0, sizeof(new_act));
+            new_act.sa_handler = svc_stop_timeout_handler;
+            sigemptyset(&new_act.sa_mask);
+            new_act.sa_flags = SA_RESETHAND;
+            sigaction(SIGALRM, &new_act, &old_act);
+            alarm(FORCE_STOP_TIMEOUT_SEC);
+        }
+        
         err = service->iface.stop(svc, force);
+        
+        if (force) {
+            alarm(0);
+            sigaction(SIGALRM, &old_act, NULL);
+            if (g_svc_stop_timeout_flag) {
+                zombie = true;
+                LOG_ERROR("Service '%s' force stop timed out after %d seconds - marking ZOMBIE",
+                         service->name, FORCE_STOP_TIMEOUT_SEC);
+
+#ifdef AGENTOS_OS_UNIX
+                if (service->threads && service->thread_count > 0) {
+                    LOG_WARN("Service '%s' attempting deadlock recovery for %d threads",
+                             service->name, (int)service->thread_count);
+                    for (size_t i = 0; i < service->thread_count; i++) {
+                        pthread_t tid = service->threads[i];
+                        if (tid) {
+                            void* retval = NULL;
+                            int join_rc = pthread_tryjoin_np(tid, &retval);
+                            if (join_rc == EBUSY) {
+                                LOG_ERROR("Service '%s' thread[%zu] deadlocked - cancelling",
+                                         service->name, i);
+                                pthread_cancel(tid);
+                                pthread_join(tid, NULL);
+                            } else if (join_rc == 0) {
+                                LOG_INFO("Service '%s' thread[%zu] joined with retval=%p",
+                                        service->name, i, retval);
+                            }
+                        }
+                    }
+                }
+#endif
+            }
+        }
     }
     
     agentos_mutex_lock(&service->state_mutex);
     if (err == AGENTOS_SUCCESS || force) {
-        service->state = AGENTOS_SVC_STATE_STOPPED;
+        service->state = zombie ? AGENTOS_SVC_STATE_ZOMBIE : AGENTOS_SVC_STATE_STOPPED;
         LOG_INFO("Service '%s' stopped %s", 
-                service->name, force ? "(forced)" : "gracefully");
+                service->name, force ? (zombie ? "(ZOMBIE)" : "(forced)") : "gracefully");
     } else {
         service->state = AGENTOS_SVC_STATE_ERROR;
         LOG_ERROR("Service '%s' stop failed: %d", service->name, err);
@@ -598,7 +675,7 @@ agentos_error_t agentos_service_pause(agentos_service_t svc) {
     if (!(service->capabilities & AGENTOS_SVC_CAP_PAUSEABLE)) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' does not support pause", service->name);
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_EPROTONOSUPPORT;
     }
     
     /* 更新状态 */
@@ -784,6 +861,7 @@ const char* agentos_svc_state_to_string(agentos_svc_state_t state) {
         "PAUSED",
         "STOPPING",
         "STOPPED",
+        "ZOMBIE",
         "ERROR"
     };
     
@@ -811,6 +889,7 @@ agentos_svc_state_t agentos_svc_state_from_string(const char* str) {
         {"PAUSED", AGENTOS_SVC_STATE_PAUSED},
         {"STOPPING", AGENTOS_SVC_STATE_STOPPING},
         {"STOPPED", AGENTOS_SVC_STATE_STOPPED},
+        {"ZOMBIE", AGENTOS_SVC_STATE_ZOMBIE},
         {"ERROR", AGENTOS_SVC_STATE_ERROR},
         {NULL, AGENTOS_SVC_STATE_NONE}
     };
@@ -1833,7 +1912,7 @@ static agentos_error_t http_client_call(
         }
 
         LOG_WARN("Service '%s' has no handle_request callback", service_name);
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_ESERVICE;
     }
 
     char url[768];
@@ -1928,7 +2007,7 @@ static agentos_error_t http_client_stream(
 
         const char* err_json = "{\"error\":\"no_stream_handler\"}";
         callback(err_json, strlen(err_json), user_data);
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_ESERVICE;
     }
 
     return AGENTOS_ENOENT;
@@ -1968,7 +2047,7 @@ static agentos_error_t memory_client_call(
         }
 
         LOG_WARN("Service '%s' has no handle_request callback", service_name);
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_ESERVICE;
     }
 
     LOG_INFO("Memory client: service '%s' not found locally, trying IPC RPC", service_name);
@@ -2021,7 +2100,7 @@ static agentos_error_t memory_client_stream(
 
     const char* err_json = "{\"error\":\"no_stream_handler\"}";
     callback(err_json, strlen(err_json), user_data);
-    return AGENTOS_ENOTSUP;
+    return AGENTOS_ESERVICE;
 }
 
 agentos_error_t agentos_service_client_create(

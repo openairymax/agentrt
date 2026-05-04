@@ -958,9 +958,9 @@ _（v1.0.0.5 为首次公开发布版本，无破坏性变更）_
 
 - **Gitee**: https://gitee.com/spharx/agentos
 - **GitHub**: https://github.com/SpharxTeam/AgentOS
-- **技术支持**: lidecheng@spharx.cn
-- **安全问题**: wangliren@spharx.cn
-- **商务合作**: zhouzhixian@spharx.cn
+- **技术支持**: support@spharx.cn
+- **安全问题**: security@spharx.cn
+- **商务合作**: business@spharx.cn
 - **官网**: https://spharx.cn
 
 ---

@@ -74,7 +74,6 @@ static void test_market_search_agents(void) {
     ret = market_service_search_agents(svc, &params, &agents, &count);
     if (ret == 0) {
         printf("    Found %zu agents\n", count);
-        for (size_t i = 0; i < count; i++) free(agents[i]);
         free(agents);
     } else {
         printf("    Search returned %d (may be expected)\n", ret);
@@ -114,7 +113,6 @@ static void test_market_get_installed_agents(void) {
     ret = market_service_get_installed_agents(svc, &agents, &count);
     if (ret == 0) {
         printf("    Installed agents: %zu\n", count);
-        for (size_t i = 0; i < count; i++) free(agents[i]);
         free(agents);
     }
 

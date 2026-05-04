@@ -47,23 +47,24 @@ extern "C" {
  * 操作被信号中断
  */
 #ifndef AGENTOS_EINTR
-#define AGENTOS_EINTR                  -11
+#define AGENTOS_EINTR                  -31
 #endif
 
 #ifndef AGENTOS_EBADF
-#define AGENTOS_EBADF                  -13
+#define AGENTOS_EBADF                  -32
 #endif
 
 #ifndef AGENTOS_ERESOURCE
-#define AGENTOS_ERESOURCE              -15
+#define AGENTOS_ERESOURCE              -33
 #endif
 
-/**
- * @brief 功能未实现
- *
- * 请求的功能未在此平台实现
- */
-#define AGENTOS_ENOSYS                 -16
+#ifndef AGENTOS_ENOSYS
+#define AGENTOS_ENOSYS                 -34
+#endif
+
+#define AGENTOS_ECYCLE                 -35
+
+#define AGENTOS_EFAIL                  -36
 
 /* AGENTOS_ERROR 已统一为 AGENTOS_EUNKNOWN（见agentos_types.h） */
 

@@ -56,7 +56,7 @@ static agentos_error_t tool_execute(agentos_execution_unit_t *unit, const void *
     }
 
     *out_output = AGENTOS_STRDUP("{\"error\":\"unsupported_tool_command\",\"status\":\"failed\"}");
-    return *out_output ? AGENTOS_ENOTSUP : AGENTOS_ENOMEM;
+    return *out_output ? AGENTOS_EPROTONOSUPPORT : AGENTOS_ENOMEM;
 }
 
 static void tool_destroy(agentos_execution_unit_t *unit)

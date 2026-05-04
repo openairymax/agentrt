@@ -144,6 +144,17 @@ config_source_t* config_source_create_memory(const config_memory_source_options_
  */
 config_source_t* config_source_create_defaults(const char* const* default_values, size_t count);
 
+/**
+ * @brief 创建远程配置源
+ * @param url 配置中心URL
+ * @param token 认证令牌（可为NULL）
+ * @param ns 命名空间（可为NULL）
+ * @param poll_interval_ms 轮询间隔毫秒（0使用默认30000ms）
+ * @return 配置源对象，失败返回NULL
+ */
+config_source_t* config_source_create_remote(const char* url, const char* token,
+                                             const char* ns, uint32_t poll_interval_ms);
+
 /* ==================== 通用配置源API ==================== */
 
 /**
@@ -250,6 +261,18 @@ config_error_t config_source_manager_load_all(config_source_manager_t* manager,
 config_error_t config_source_manager_watch(config_source_manager_t* manager,
                                            void (*callback)(config_source_t* source, void* user_data),
                                            void* user_data);
+
+/**
+ * @brief 轮询检查所有可监控配置源的变化并通知回调
+ *
+ * 检查所有 watchable 的配置源是否有变化。若检测到变化，在防抖间隔后
+ * 依次调用注册的回调函数通知每个变更的配置源。
+ * 防抖默认 500ms，即 500ms 内的多次变更合并为一次通知。
+ *
+ * @param manager 配置源管理器
+ * @return 发生变化的配置源数量，0表示无变化，-1表示错误
+ */
+int config_source_manager_poll_changes(config_source_manager_t* manager);
 
 /* ==================== 工具函数 ==================== */
 

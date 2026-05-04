@@ -122,8 +122,8 @@ static int claude_generate_response(const char* user_msg,
                                     const char* system_ctx,
                                     char* out_buf, size_t buf_len) {
 #ifndef AGENTOS_HAS_CURL
-    (void)user_msg;
-    (void)system_ctx;
+    if (user_msg) { }
+    if (system_ctx) { }
     if (out_buf && buf_len > 0) out_buf[0] = '\0';
     return -1;
 #else
@@ -152,8 +152,8 @@ static int claude_generate_response(const char* user_msg,
         cJSON_AddStringToObject(req, "system", system_ctx);
 
     char* req_json = cJSON_PrintUnformatted(req);
-    int result = claude_api_call(g_claude_ctx->config.api_key,
-                                 g_claude_ctx->config.base_url,
+    int result = claude_api_call(ctx->config.api_key,
+                                 ctx->config.base_url,
                                  req_json, out_buf, buf_len);
     free(req_json);
     cJSON_Delete(req);
@@ -283,7 +283,7 @@ static int claude_proto_handle_request(void* context,
 }
 
 static int claude_proto_get_version(void* context, char* buf, size_t max_size) {
-    (void)context;
+    if (context) { }
     if (!buf || max_size == 0) return -1;
     const char* ver = claude_adapter_version();
     size_t len = strlen(ver);
@@ -294,7 +294,7 @@ static int claude_proto_get_version(void* context, char* buf, size_t max_size) {
 }
 
 static uint32_t claude_proto_capabilities(void* context) {
-    (void)context;
+    if (context) { }
     return (uint32_t)(
         PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING |
         PROTO_CAP_VISION | PROTO_CAP_EXTENDED_THINKING);
@@ -631,8 +631,9 @@ int claude_messages_stream(claude_adapter_context_t* ctx,
 
     char full_response[CLAUDE_MAX_RESPONSE_LEN];
     memset(full_response, 0, sizeof(full_response));
-    claude_generate_response(user_content, sys_ctx,
+    int gen_result = claude_generate_response(user_content, sys_ctx,
                               full_response, sizeof(full_response));
+    if (gen_result < 0) return gen_result;
 
     size_t resp_len = strlen(full_response);
     size_t pos = 0;

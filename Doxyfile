@@ -142,6 +142,7 @@ INPUT                  = agentos/atoms \
                          agentos/protocols/frameworks/autogen/include \
                          agentos/protocols/core \
                          agentos/protocols/common \
+                         agentos/atoms/memoryrovol/include \
                          docs/api/mainpage.dox
 
 FILE_PATTERNS          = *.c \
