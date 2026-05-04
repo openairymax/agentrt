@@ -10,12 +10,15 @@
 #include "../../include/id_utils.h"
 #include "agentos.h"
 #include "logging_compat.h"
+#include "platform.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -24,7 +27,6 @@
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
-
 #include "platform.h"
 
 typedef struct task_control_block {
@@ -73,7 +75,7 @@ static size_t task_hash(const char *task_id, size_t table_size)
 {
     size_t hash = 5381;
     while (*task_id) {
-        hash = ((hash << 5) + hash) + (unsigned char) *task_id++;
+        hash = ((hash << 5) + hash) + (unsigned char)*task_id++;
     }
     return hash % table_size;
 }
@@ -83,12 +85,12 @@ static size_t task_hash(const char *task_id, size_t table_size)
  */
 static task_hash_table_t *task_hash_table_create(size_t size)
 {
-    task_hash_table_t *table = (task_hash_table_t *) AGENTOS_CALLOC(1, sizeof(task_hash_table_t));
+    task_hash_table_t *table = (task_hash_table_t *)AGENTOS_CALLOC(1, sizeof(task_hash_table_t));
     if (!table)
         return NULL;
 
-    table->size    = size;
-    table->buckets = (task_tcb_t **) AGENTOS_CALLOC(size, sizeof(task_tcb_t *));
+    table->size = size;
+    table->buckets = (task_tcb_t **)AGENTOS_CALLOC(size, sizeof(task_tcb_t *));
     if (!table->buckets) {
         AGENTOS_FREE(table);
         return NULL;
@@ -117,7 +119,7 @@ static void task_hash_table_destroy(task_hash_table_t *table)
         task_tcb_t *tcb = table->buckets[i];
         while (tcb) {
             task_tcb_t *next = tcb->hash_next;
-            tcb->hash_next   = NULL;
+            tcb->hash_next = NULL;
             tcb_release(tcb);
             tcb = next;
         }
@@ -142,7 +144,7 @@ static void task_hash_table_insert(task_hash_table_t *table, task_tcb_t *tcb)
 
     size_t index = task_hash(tcb->task_id, table->size);
     agentos_mutex_lock(table->lock);
-    tcb->hash_next        = table->buckets[index];
+    tcb->hash_next = table->buckets[index];
     table->buckets[index] = tcb;
     agentos_mutex_unlock(table->lock);
 }
@@ -186,8 +188,8 @@ static void task_hash_table_remove(task_hash_table_t *table, const char *task_id
     while (*p) {
         if (strcmp((*p)->task_id, task_id) == 0) {
             task_tcb_t *tcb = *p;
-            *p              = tcb->hash_next;
-            tcb->hash_next  = NULL;
+            *p = tcb->hash_next;
+            tcb->hash_next = NULL;
             agentos_mutex_unlock(table->lock);
             tcb_release(tcb);
             return;
@@ -206,7 +208,7 @@ static void remove_tcb_from_list(task_tcb_t **list, task_tcb_t *target)
     task_tcb_t **p = list;
     while (*p) {
         if (*p == target) {
-            *p           = target->next;
+            *p = target->next;
             target->next = NULL;
             return;
         }
@@ -266,7 +268,7 @@ static void tcb_release(task_tcb_t *tcb)
  */
 static agentos_task_t *task_desc_deep_copy(const agentos_task_t *task)
 {
-    agentos_task_t *copy = (agentos_task_t *) AGENTOS_CALLOC(1, sizeof(agentos_task_t));
+    agentos_task_t *copy = (agentos_task_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_t));
     if (!copy)
         return NULL;
 
@@ -281,7 +283,7 @@ static agentos_task_t *task_desc_deep_copy(const agentos_task_t *task)
             goto fail;
     }
     if (task->task_input) {
-        size_t input_len = strnlen((const char *) task->task_input, 65536);
+        size_t input_len = strnlen((const char *)task->task_input, 65536);
         copy->task_input = AGENTOS_MALLOC(input_len + 1);
         if (!copy->task_input)
             goto fail;
@@ -306,7 +308,7 @@ fail:
  */
 static agentos_task_t *task_result_deep_copy(const task_tcb_t *tcb)
 {
-    agentos_task_t *result = (agentos_task_t *) AGENTOS_CALLOC(1, sizeof(agentos_task_t));
+    agentos_task_t *result = (agentos_task_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_t));
     if (!result)
         return NULL;
 
@@ -342,53 +344,58 @@ fail:
  */
 static void *worker_thread_func(void *arg)
 {
-    agentos_execution_engine_t *engine = (agentos_execution_engine_t *) arg;
+    agentos_execution_engine_t *engine = (agentos_execution_engine_t *)arg;
 
-    while (engine->running) {
+    while (1) {
         task_tcb_t *tcb = NULL;
         agentos_mutex_lock(engine->queue_lock);
         while (engine->task_queue == NULL && engine->running) {
             agentos_cond_wait(engine->task_available_cond, engine->queue_lock);
         }
-        if (!engine->running) {
+        if (!engine->running && engine->task_queue == NULL) {
             agentos_mutex_unlock(engine->queue_lock);
             break;
         }
-        tcb                = engine->task_queue;
+        if (engine->task_queue == NULL) {
+            agentos_mutex_unlock(engine->queue_lock);
+            continue;
+        }
+        tcb = engine->task_queue;
         engine->task_queue = tcb->next;
-        tcb->next          = NULL;
+        tcb->next = NULL;
         agentos_mutex_unlock(engine->queue_lock);
 
         agentos_mutex_lock(engine->running_lock);
         engine->current_concurrency++;
-        tcb->next             = engine->running_tasks;
+        tcb->next = engine->running_tasks;
         engine->running_tasks = tcb;
         agentos_mutex_unlock(engine->running_lock);
 
         agentos_mutex_lock(tcb->tcb_lock);
         tcb->start_time_ns = agentos_time_monotonic_ns();
-        tcb->status        = TASK_STATUS_RUNNING;
+        tcb->status = TASK_STATUS_RUNNING;
         agentos_mutex_unlock(tcb->tcb_lock);
 
         agentos_execution_unit_t *unit = agentos_registry_get_unit(tcb->task_desc->task_agent_id);
-        void *output                   = NULL;
-        size_t output_len              = 0;
+        void *output = NULL;
+        size_t output_len = 0;
         agentos_error_t exec_err;
         if (unit) {
             exec_err = unit->execution_unit_execute(unit, tcb->task_desc->task_input, &output);
             if (output) {
-                output_len = strlen((const char *) output);
+                output_len = strlen((const char *)output);
             }
         } else {
             exec_err = AGENTOS_ENOENT;
-            AGENTOS_LOG_ERROR("No execution unit found for agent %s", tcb->task_desc->task_agent_id);
+            AGENTOS_LOG_ERROR("No execution unit found for agent %s",
+                              tcb->task_desc->task_agent_id);
         }
 
         agentos_mutex_lock(tcb->tcb_lock);
         tcb->end_time_ns = agentos_time_monotonic_ns();
-        tcb->status      = (exec_err == AGENTOS_SUCCESS) ? TASK_STATUS_SUCCEEDED : TASK_STATUS_FAILED;
-        tcb->result      = output;
-        tcb->result_len  = output_len;
+        tcb->status = (exec_err == AGENTOS_SUCCESS) ? TASK_STATUS_SUCCEEDED : TASK_STATUS_FAILED;
+        tcb->result = output;
+        tcb->result_len = output_len;
         agentos_cond_signal(tcb->completed_cond);
         agentos_mutex_unlock(tcb->tcb_lock);
 
@@ -418,7 +425,8 @@ static void *worker_thread_func(void *arg)
  *
  * @warning 调用者负责释放返回的执行引擎（使�?agentos_execution_destroy�?
  */
-agentos_error_t agentos_execution_create(uint32_t max_concurrency, agentos_execution_engine_t **out_engine)
+agentos_error_t agentos_execution_create(uint32_t max_concurrency,
+                                         agentos_execution_engine_t **out_engine)
 {
 
     if (!out_engine)
@@ -427,15 +435,15 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency, agentos_execu
         max_concurrency = 1;
 
     agentos_execution_engine_t *engine =
-        (agentos_execution_engine_t *) AGENTOS_CALLOC(1, sizeof(agentos_execution_engine_t));
+        (agentos_execution_engine_t *)AGENTOS_CALLOC(1, sizeof(agentos_execution_engine_t));
     if (!engine) {
         AGENTOS_LOG_ERROR("Failed to allocate execution engine");
         return AGENTOS_ENOMEM;
     }
 
-    engine->max_concurrency     = max_concurrency;
-    engine->queue_lock          = agentos_mutex_create();
-    engine->running_lock        = agentos_mutex_create();
+    engine->max_concurrency = max_concurrency;
+    engine->queue_lock = agentos_mutex_create();
+    engine->running_lock = agentos_mutex_create();
     engine->task_available_cond = agentos_cond_create();
     if (!engine->queue_lock || !engine->running_lock || !engine->task_available_cond) {
         if (engine->queue_lock)
@@ -449,9 +457,10 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency, agentos_execu
         return AGENTOS_ENOMEM;
     }
 
-    engine->running        = 1;
-    engine->worker_count   = max_concurrency;
-    engine->worker_threads = (agentos_thread_t *) AGENTOS_MALLOC(engine->worker_count * sizeof(agentos_thread_t));
+    engine->running = 1;
+    engine->worker_count = max_concurrency;
+    engine->worker_threads =
+        (agentos_thread_t *)AGENTOS_MALLOC(engine->worker_count * sizeof(agentos_thread_t));
     if (!engine->worker_threads) {
         agentos_mutex_destroy(engine->queue_lock);
         agentos_mutex_destroy(engine->running_lock);
@@ -474,10 +483,11 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency, agentos_execu
     }
 
     for (size_t i = 0; i < engine->worker_count; i++) {
-        if (agentos_thread_create(&engine->worker_threads[i], worker_thread_func, engine) != AGENTOS_SUCCESS) {
+        if (agentos_platform_thread_create(&engine->worker_threads[i], worker_thread_func,
+                                           engine) != AGENTOS_SUCCESS) {
             engine->running = 0;
             for (size_t j = 0; j < i; j++) {
-                agentos_thread_join(engine->worker_threads[j], NULL);
+                agentos_platform_thread_join(engine->worker_threads[j], NULL);
             }
             AGENTOS_FREE(engine->worker_threads);
             agentos_mutex_destroy(engine->queue_lock);
@@ -497,11 +507,14 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
 {
     if (!engine)
         return;
+
+    agentos_mutex_lock(engine->queue_lock);
     engine->running = 0;
     agentos_cond_broadcast(engine->task_available_cond);
+    agentos_mutex_unlock(engine->queue_lock);
 
     for (size_t i = 0; i < engine->worker_count; i++) {
-        agentos_thread_join(engine->worker_threads[i], NULL);
+        agentos_platform_thread_join(engine->worker_threads[i], NULL);
     }
     AGENTOS_FREE(engine->worker_threads);
 
@@ -510,7 +523,7 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
     task_tcb_t *tcb = engine->task_queue;
     while (tcb) {
         task_tcb_t *next = tcb->next;
-        tcb_release(tcb); // 释放引用（将递减引用计数并可能释放）
+        tcb_release(tcb);  // 释放引用（将递减引用计数并可能释放）
         tcb = next;
     }
     engine->task_queue = NULL;
@@ -553,13 +566,14 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
  *
  * @warning 返回的任务ID需要调用者使�?AGENTOS_FREE() 释放
  */
-agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine, const agentos_task_t *task,
-                                         char **out_task_id)
+agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
+                                         const agentos_task_t *task, char **out_task_id)
 {
 
     if (!engine || !task || !out_task_id) {
-        AGENTOS_LOG_ERROR("Invalid parameters to execution_submit: engine=%p, task=%p, out_task_id=%p", (void *) engine,
-                          (void *) task, (void *) out_task_id);
+        AGENTOS_LOG_ERROR(
+            "Invalid parameters to execution_submit: engine=%p, task=%p, out_task_id=%p",
+            (void *)engine, (void *)task, (void *)out_task_id);
         return AGENTOS_EINVAL;
     }
 
@@ -569,27 +583,27 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine, con
         return AGENTOS_ENOMEM;
     }
 
-    task_tcb_t *tcb = (task_tcb_t *) AGENTOS_CALLOC(1, sizeof(task_tcb_t));
+    task_tcb_t *tcb = (task_tcb_t *)AGENTOS_CALLOC(1, sizeof(task_tcb_t));
     if (!tcb) {
         AGENTOS_FREE(task_copy);
-        AGENTOS_LOG_ERROR("Failed to allocate task control block: %s (code %d)", agentos_error_string(AGENTOS_ENOMEM),
-                          AGENTOS_ENOMEM);
+        AGENTOS_LOG_ERROR("Failed to allocate task control block: %s (code %d)",
+                          agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
         return AGENTOS_ENOMEM;
     }
 
     char id_buf[64];
     agentos_generate_task_id("task", id_buf, sizeof(id_buf));
-    tcb->task_id        = AGENTOS_STRDUP(id_buf);
-    tcb->task_desc      = task_copy;
-    tcb->status         = TASK_STATUS_PENDING;
+    tcb->task_id = AGENTOS_STRDUP(id_buf);
+    tcb->task_desc = task_copy;
+    tcb->status = TASK_STATUS_PENDING;
     tcb->submit_time_ns = agentos_time_monotonic_ns();
     tcb->completed_cond = agentos_cond_create();
-    tcb->tcb_lock       = agentos_mutex_create();
-    tcb->ref_count      = 1; // 初始引用
+    tcb->tcb_lock = agentos_mutex_create();
+    tcb->ref_count = 1;  // 初始引用
 
     if (!tcb->task_id || !tcb->completed_cond || !tcb->tcb_lock) {
-        AGENTOS_LOG_ERROR("Failed to create task resources: task_id=%p, cond=%p, lock=%p", (void *) tcb->task_id,
-                          (void *) tcb->completed_cond, (void *) tcb->tcb_lock);
+        AGENTOS_LOG_ERROR("Failed to create task resources: task_id=%p, cond=%p, lock=%p",
+                          (void *)tcb->task_id, (void *)tcb->completed_cond, (void *)tcb->tcb_lock);
         if (tcb->task_id)
             AGENTOS_FREE(tcb->task_id);
         if (tcb->completed_cond)
@@ -602,7 +616,7 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine, con
     }
 
     agentos_mutex_lock(engine->queue_lock);
-    tcb->next          = engine->task_queue;
+    tcb->next = engine->task_queue;
     engine->task_queue = tcb;
     agentos_cond_signal(engine->task_available_cond);
     agentos_mutex_unlock(engine->queue_lock);
@@ -638,8 +652,8 @@ agentos_error_t agentos_execution_query(agentos_execution_engine_t *engine, cons
     return AGENTOS_ENOENT;
 }
 
-agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const char *task_id, uint32_t timeout_ms,
-                                       agentos_task_t **out_result)
+agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const char *task_id,
+                                       uint32_t timeout_ms, agentos_task_t **out_result)
 {
 
     if (!engine || !task_id)
@@ -650,7 +664,7 @@ agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const
     if (!tcb)
         return AGENTOS_ENOENT;
 
-    tcb_retain(tcb); // 增加引用，防止等待期间被释放
+    tcb_retain(tcb);  // 增加引用，防止等待期间被释放
 
     agentos_cond_t *cond = tcb->completed_cond;
     agentos_mutex_lock(tcb->tcb_lock);
@@ -697,7 +711,7 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
     task_tcb_t **p = &engine->task_queue;
     while (*p) {
         if (*p == tcb) {
-            *p        = tcb->next;
+            *p = tcb->next;
             tcb->next = NULL;
             agentos_mutex_unlock(engine->queue_lock);
 
@@ -706,7 +720,7 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
 
             tcb_retain(tcb);
             agentos_mutex_lock(tcb->tcb_lock);
-            tcb->status      = TASK_STATUS_CANCELLED;
+            tcb->status = TASK_STATUS_CANCELLED;
             tcb->end_time_ns = agentos_time_monotonic_ns();
             agentos_cond_signal(tcb->completed_cond);
             agentos_mutex_unlock(tcb->tcb_lock);
@@ -719,8 +733,8 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
     return AGENTOS_ENOENT;
 }
 
-agentos_error_t agentos_execution_get_result(agentos_execution_engine_t *engine, const char *task_id,
-                                             agentos_task_t **out_result)
+agentos_error_t agentos_execution_get_result(agentos_execution_engine_t *engine,
+                                             const char *task_id, agentos_task_t **out_result)
 {
 
     if (!engine || !task_id || !out_result)
@@ -779,7 +793,7 @@ agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engin
 
     agentos_mutex_lock(engine->queue_lock);
     size_t queue_len = 0;
-    task_tcb_t *t    = engine->task_queue;
+    task_tcb_t *t = engine->task_queue;
     while (t) {
         queue_len++;
         t = t->next;
@@ -788,7 +802,7 @@ agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engin
 
     agentos_mutex_lock(engine->running_lock);
     size_t running_len = 0;
-    t                  = engine->running_tasks;
+    t = engine->running_tasks;
     while (t) {
         running_len++;
         t = t->next;

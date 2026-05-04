@@ -44,14 +44,9 @@ struct agentos_core_loop {
     char current_session_id[128];
 };
 
-/* 内存池优化 - 用于循环结构体分配 */
-static memory_pool_t *g_loop_memory_pool = NULL;
-static agentos_mutex_t *g_pool_mutex = NULL;
-
 /* 辅助函数声明 - 用于重构降低圈复杂度 */
 static agentos_error_t validate_loop_parameters(const agentos_loop_config_t *manager,
                                                 agentos_core_loop_t **out_loop);
-static memory_pool_t *get_loop_memory_pool(void);
 static agentos_core_loop_t *allocate_loop_memory(void);
 static agentos_error_t initialize_loop_resources(agentos_core_loop_t *loop,
                                                  const agentos_loop_config_t *manager);
@@ -117,58 +112,6 @@ static agentos_error_t validate_loop_parameters(const agentos_loop_config_t *man
     return AGENTOS_SUCCESS;
 }
 
-/**
- * @brief 获取循环结构体的内存池（线程安全）
- * @return 内存池指针，失败返回 NULL
- */
-static memory_pool_t *get_loop_memory_pool(void)
-{
-    if (g_loop_memory_pool != NULL) {
-        return g_loop_memory_pool;
-    }
-
-    if (g_pool_mutex == NULL) {
-        agentos_mutex_t *new_mutex = agentos_mutex_create();
-        if (new_mutex == NULL) {
-            /* AgentOS 核心未初始化，跳过内存池，使用普通分配 */
-            return NULL;
-        }
-#ifdef _WIN32
-        if (InterlockedCompareExchangePointer((void *volatile *)&g_pool_mutex, new_mutex, NULL) ==
-            NULL) {
-#else
-        if (__sync_bool_compare_and_swap(&g_pool_mutex, NULL, new_mutex)) {
-#endif
-            g_pool_mutex = new_mutex;
-        } else {
-            agentos_mutex_free(new_mutex);
-        }
-    }
-
-    if (agentos_mutex_lock(g_pool_mutex) != AGENTOS_SUCCESS) {
-        return NULL;
-    }
-    if (g_loop_memory_pool == NULL) {
-        memory_pool_config_t options = {.block_size = sizeof(agentos_core_loop_t),
-                                        .block_count = 8,
-                                        .strategy = MEMORY_STRATEGY_DEFAULT,
-                                        .thread_safe = true};
-        static memory_pool_t pool_storage;
-        g_loop_memory_pool = &pool_storage;
-        agentos_error_t pool_err = memory_pool_init(g_loop_memory_pool, &options);
-        if (pool_err != AGENTOS_SUCCESS) {
-            AGENTOS_LOG_ERROR("Failed to init loop memory pool");
-            g_loop_memory_pool = NULL;
-        }
-    }
-    agentos_mutex_unlock(g_pool_mutex);
-    return g_loop_memory_pool;
-}
-
-/**
- * @brief 分配循环内存（使用内存池）
- * @return 分配的循环结构体指针，失败返回 NULL
- */
 static agentos_core_loop_t *allocate_loop_memory(void)
 {
     agentos_core_loop_t *loop =

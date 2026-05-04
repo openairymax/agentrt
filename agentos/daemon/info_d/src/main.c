@@ -62,7 +62,7 @@ static info_d_service_t g_service = {0};
 static volatile int g_shutdown = 0;
 
 static void info_d_signal_handler(int sig) {
-    (void)sig;
+    
     g_shutdown = 1;
 }
 
@@ -358,9 +358,7 @@ static void info_d_handle_request(info_d_service_t* svc, agentos_socket_t client
     agentos_socket_close(client_fd);
 }
 
-int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
+int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) {
 
 #ifdef _WIN32
     SetConsoleCtrlHandler(NULL, TRUE);
