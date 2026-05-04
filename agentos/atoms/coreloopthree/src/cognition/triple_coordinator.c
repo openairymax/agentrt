@@ -270,7 +270,7 @@ agentos_error_t tc3_coordinator_execute(
     tc3_s2_generate_fn s2_fn = coord->config.s2_generate;
     if (!s2_fn) {
         coord->active = 0;
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_ESERVICE;
     }
 
     char* s2_output = NULL;

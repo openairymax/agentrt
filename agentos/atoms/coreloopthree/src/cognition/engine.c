@@ -280,7 +280,7 @@ agentos_error_t agentos_cognition_process(
 
     /* ========== Phase 1: Planning (S2 + S1 pre-validation) ========== */
     agentos_task_plan_t* plan = NULL;
-    agentos_error_t err = AGENTOS_ENOTSUP;
+    agentos_error_t err = AGENTOS_EUNKNOWN;
 
     agentos_plan_strategy_t* plan_strat = NULL;
     agentos_plan_strategy_t* fallback_strat = NULL;

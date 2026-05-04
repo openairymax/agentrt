@@ -64,7 +64,9 @@ typedef enum {
     MCP_LOG_NOTICE,
     MCP_LOG_WARNING,
     MCP_LOG_ERROR,
-    MCP_LOG_CRITICAL
+    MCP_LOG_CRITICAL,
+    MCP_LOG_ALERT,
+    MCP_LOG_EMERGENCY
 } mcp_log_level_t;
 
 typedef struct {
@@ -344,6 +346,11 @@ uint32_t mcp_v1_get_capabilities(mcp_v1_context_t* ctx);
 void mcp_content_destroy(mcp_content_t* content, size_t count);
 void mcp_sampling_result_destroy(mcp_sampling_result_t* result);
 void mcp_completion_result_destroy(mcp_completion_result_t* result);
+
+#include "mcp_transport.h"
+
+int mcp_v1_set_transport(mcp_v1_context_t* ctx, mcp_transport_t* transport);
+mcp_transport_t* mcp_v1_get_transport(mcp_v1_context_t* ctx);
 
 #ifdef __cplusplus
 }

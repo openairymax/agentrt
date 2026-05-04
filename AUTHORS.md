@@ -23,8 +23,8 @@
 
 | 姓名 | 角色 | 职责 | 联系方式 |
 |------|------|------|----------|
-| zhixianzhou | 项目发起人 & 架构师 | 整体架构设计、核心模块开发、技术方向决策 | zhouzhixian@spharx.cn |
-| lirenwang | 开发工程师 | 核心模块开发、 | wangliren@spharx.cn |
+| zhixianzhou | 项目发起人 & 架构师 | 整体架构设计、核心模块开发、技术方向决策 | team@spharx.cn |
+| lirenwang | 开发工程师 | 核心模块开发、 | team@spharx.cn |
 
 ---
 
@@ -179,8 +179,8 @@ Bug 修复 ████████ 待统计
 |------|---------|
 | 技术讨论 | [GitHub Discussions](https://github.com/SpharxTeam/AgentOS/discussions) |
 | 问题反馈 | [Issues](https://github.com/SpharxTeam/AgentOS/issues) |
-| 商务合作 | zhouzhixian@spharx.cn |
-| 安全问题 | wangliren@spharx.cn |
+| 商务合作 | business@spharx.cn |
+| 安全问题 | security@spharx.cn |
 
 ---
 

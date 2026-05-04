@@ -472,13 +472,13 @@ int autogen_register_tool(autogen_adapter_context_t* ctx,
 
     ctx->tool_executors = new_exec;
     ctx->tool_names = new_names;
-    ctx->tool_names[ctx->tool_count] = strdup(name);
+    ctx->tool_names[ctx->tool_count] = strdup(name ? name : (description ? description : "unnamed"));
     ctx->tool_executors[ctx->tool_count] = executor;
     ctx->tool_count++;
 
-    (void)description;
-    (void)schema_json;
-    (void)user_data;
+    if (description) { }
+    if (schema_json) { }
+    if (user_data) { }
     return 0;
 }
 
@@ -595,7 +595,6 @@ static int autogen_proto_handle_request(void* context,
                                          const void* req,
                                          void** resp) {
     if (!context || !req) return -1;
-    (void)context;
 
     const char* raw_request = (const char*)req;
 
@@ -626,7 +625,7 @@ static int autogen_proto_handle_request(void* context,
 }
 
 static int autogen_proto_get_version(void* context, char* buf, size_t max_size) {
-    (void)context;
+    if (context) { }
     if (!buf || max_size == 0) return -1;
     const char* ver = autogen_adapter_version();
     size_t len = strlen(ver);
@@ -637,7 +636,7 @@ static int autogen_proto_get_version(void* context, char* buf, size_t max_size) 
 }
 
 static uint32_t autogen_proto_capabilities(void* context) {
-    (void)context;
+    if (context) { }
     return (uint32_t)(
         PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING |
         PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_CODE_EXECUTION | PROTO_CAP_HUMAN_LOOP);

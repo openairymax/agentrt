@@ -242,6 +242,12 @@ typedef struct {
     
     /** @brief 是否启用性能统计 */
     bool enable_statistics;
+
+    /** @brief 是否启用日志节流（相同消息限流） */
+    bool enable_throttling;
+
+    /** @brief 每秒最大相同消息数（节流阈值），默认100 */
+    uint32_t throttle_max_per_sec;
 } log_config_t;
 
 /* ==================== 核心API函数 ==================== */
@@ -433,6 +439,44 @@ void log_cleanup(void);
             log_write(level, __FILE__, __LINE__, fmt, ##__VA_ARGS__); \
         } \
     } while(0)
+
+/* ==================== 日志采样与节流 ==================== */
+
+/**
+ * @brief 启用日志节流
+ *
+ * @param enable 是否启用
+ * @param max_per_sec 每秒最大相同消息数（0使用默认值100）
+ */
+void log_set_throttle(bool enable, uint32_t max_per_sec);
+
+/**
+ * @brief 采样日志宏
+ *
+ * 根据日志级别的采样率（ERROR=100%, WARN=10%, INFO=1%, DEBUG=0.1%）
+ * 概率性地记录日志。
+ *
+ * @param level 日志级别（LOG_LEVEL_*）
+ * @param fmt 格式化字符串
+ * @param ... 格式化参数
+ */
+#define LOG_SAMPLE(level, fmt, ...) \
+    do { \
+        if (log_should_sample(level)) { \
+            log_write(level, __FILE__, __LINE__, fmt, ##__VA_ARGS__); \
+        } \
+    } while(0)
+
+/**
+ * @brief 检查当前日志是否应被采样输出
+ *
+ * 基于日志级别的采样率进行概率性判断。
+ * ERROR/FATAL 始终返回true（100%采样）。
+ *
+ * @param level 日志级别
+ * @return true 应输出，false 跳过
+ */
+bool log_should_sample(log_level_t level);
 
 #ifdef __cplusplus
 }
