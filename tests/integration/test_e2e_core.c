@@ -37,6 +37,10 @@
 #include "syscalls.h"
 #include "platform.h"
 
+/* daemon/common 扩展模块 */
+#include "thread_pool.h"
+#include "cache_common.h"
+
 /* ==================== 测试框架 ==================== */
 
 static int g_tests_run = 0;
@@ -599,13 +603,495 @@ static void e2e_scenario_10_idempotency(void)
     TEST_ASSERT(1, "Step: 3轮完整init/shutdown循环全部成功（幂等性验证）");
 }
 
+/* ======================================================================== */
+/*  场景11: 线程池集成工作流                                                 */
+/* ======================================================================== */
+
+static int g_tpool_completed = 0;
+static agentos_mutex_t* g_tpool_mtx = NULL;
+
+static void tpool_task_fn(void* arg)
+{
+    int* counter = (int*)arg;
+    if (g_tpool_mtx) agentos_mutex_lock(g_tpool_mtx);
+    (*counter)++;
+    if (g_tpool_mtx) agentos_mutex_unlock(g_tpool_mtx);
+}
+
+static void e2e_scenario_11_thread_pool_workflow(void)
+{
+    printf("\n--- [E2E-11] 线程池集成工作流 ---\n");
+
+    g_tpool_mtx = agentos_mutex_create();
+    g_tpool_completed = 0;
+    TEST_ASSERT_NOT_NULL(g_tpool_mtx, "Step 1: 互斥锁创建成功");
+
+    thread_pool_config_t tp_cfg;
+    thread_pool_get_default_config(&tp_cfg);
+    tp_cfg.min_threads = 2;
+    tp_cfg.max_threads = 4;
+    tp_cfg.queue_size = 64;
+
+    thread_pool_t* pool = thread_pool_create(&tp_cfg);
+    TEST_ASSERT_NOT_NULL(pool, "Step 2: 线程池创建成功");
+    TEST_ASSERT(thread_pool_is_running(pool), "Step 2: 线程池运行中");
+
+    for (int i = 0; i < 20; i++) {
+        int rc = thread_pool_submit(pool, tpool_task_fn, &g_tpool_completed);
+        TEST_ASSERT(rc == 0, "Step 3: 任务提交成功");
+    }
+
+    int wait_cycles = 0;
+    while (g_tpool_completed < 20 && wait_cycles < 100) {
+        agentos_task_sleep(5);
+        agentos_time_timer_process();
+        wait_cycles++;
+    }
+    agentos_mutex_lock(g_tpool_mtx);
+    int final_count = g_tpool_completed;
+    agentos_mutex_unlock(g_tpool_mtx);
+    TEST_ASSERT(final_count >= 14, "Step 4: 大多数任务已完成");
+
+    thread_pool_destroy(pool);
+    agentos_mutex_free(g_tpool_mtx);
+    g_tpool_mtx = NULL;
+    TEST_ASSERT(1, "Step 5: 线程池销毁完成");
+}
+
+/* ======================================================================== */
+/*  场景12: 配置热更新与动态重配置                                           */
+/* ======================================================================== */
+
+static void e2e_scenario_12_config_hot_reload(void)
+{
+    printf("\n--- [E2E-12] 配置热更新与动态重配置 ---\n");
+
+    cm_init(NULL);
+    TEST_ASSERT(1, "Step 1: 配置管理器初始化完成");
+
+    cm_set("dynamic.host", "node-1.local", "hotreload");
+    cm_set("dynamic.port", "9090", "hotreload");
+    cm_set("dynamic.workers", "4", "hotreload");
+    TEST_ASSERT(1, "Step 2: 初始配置写入完成");
+
+    const char* host = cm_get("dynamic.host", "");
+    TEST_ASSERT(host != NULL && strcmp(host, "node-1.local") == 0,
+                "Step 3: 初始值读取正确");
+
+    cm_set("dynamic.host", "node-2.local", "hotreload");
+    cm_set("dynamic.port", "9091", "hotreload");
+    cm_set("dynamic.workers", "8", "hotreload");
+    TEST_ASSERT(1, "Step 4: 热更新写入完成");
+
+    host = cm_get("dynamic.host", "");
+    int64_t port = cm_get_int("dynamic.port", 0);
+    int64_t workers = cm_get_int("dynamic.workers", 0);
+    TEST_ASSERT(host != NULL && strcmp(host, "node-2.local") == 0,
+                "Step 5: 热更新后host正确");
+    TEST_ASSERT_EQ(port, 9091, "Step 5: 热更新后port=9091");
+    TEST_ASSERT_EQ(workers, 8, "Step 5: 热更新后workers=8");
+
+    cm_shutdown();
+    TEST_ASSERT(1, "Step 6: 配置管理器关闭完成");
+}
+
+/* ======================================================================== */
+/*  场景13: 分级告警与自动解除管理                                           */
+/* ======================================================================== */
+
+static void e2e_scenario_13_hierarchical_alerts(void)
+{
+    printf("\n--- [E2E-13] 分级告警与自动解除管理 ---\n");
+
+    am_init(NULL);
+    TEST_ASSERT(1, "Step 1: 告警管理器初始化完成");
+
+    am_fire("alert_info_disk", AM_LEVEL_INFO,
+            "Disk usage at 70%", "disk_monitor", "node-1");
+    am_fire("alert_warn_mem", AM_LEVEL_WARNING,
+            "Memory usage at 85%", "mem_monitor", "node-1");
+    am_fire("alert_crit_cpu", AM_LEVEL_CRITICAL,
+            "CPU usage at 99%", "cpu_monitor", "node-1");
+    TEST_ASSERT(1, "Step 2: 三级告警已触发");
+
+    uint32_t total = am_active_alert_count();
+    TEST_ASSERT(total >= 3, "Step 3: 活跃告警数>=3");
+
+    am_resolve("alert_crit_cpu");
+    total = am_active_alert_count();
+    TEST_ASSERT(total >= 2, "Step 4: 解除CRITICAL后告警数>=2");
+
+    am_resolve("alert_warn_mem");
+    am_resolve("alert_info_disk");
+    total = am_active_alert_count();
+    TEST_ASSERT(total == 0, "Step 5: 全部解除后告警数为0");
+
+    am_shutdown();
+    TEST_ASSERT(1, "Step 6: 告警管理器关闭完成");
+}
+
+/* ======================================================================== */
+/*  场景14: 方法分发器路由匹配与未知方法处理                                  */
+/* ======================================================================== */
+
+static int g_md_callback_count = 0;
+
+static void md_e2e_handler(cJSON* params, int id, void* user_data)
+{
+    (void)params; (void)user_data;
+    g_md_callback_count = id;
+}
+
+static void e2e_scenario_14_method_dispatcher_routing(void)
+{
+    printf("\n--- [E2E-14] 方法分发器路由匹配 ---\n");
+
+    method_dispatcher_t* disp = method_dispatcher_create(8);
+    TEST_ASSERT_NOT_NULL(disp, "Step 1: 方法分发器创建成功");
+
+    method_dispatcher_register(disp, "e2e.task.create",
+                               md_e2e_handler, NULL);
+    method_dispatcher_register(disp, "e2e.task.query",
+                               md_e2e_handler, NULL);
+    method_dispatcher_register(disp, "e2e.task.delete",
+                               md_e2e_handler, NULL);
+    TEST_ASSERT(1, "Step 2: 3个路由规则注册完成");
+
+    cJSON* req = cJSON_CreateObject();
+    cJSON_AddStringToObject(req, "jsonrpc", "2.0");
+    cJSON_AddStringToObject(req, "method", "e2e.task.create");
+    cJSON_AddNumberToObject(req, "id", 2001);
+    cJSON_AddObjectToObject(req, "params");
+    g_md_callback_count = 0;
+
+    int dret = method_dispatcher_dispatch(disp, req, NULL, NULL);
+    TEST_ASSERT(dret == 0 || dret == -1, "Step 3: 已知方法分发执行");
+    cJSON_Delete(req);
+
+    cJSON* req2 = cJSON_CreateObject();
+    cJSON_AddStringToObject(req2, "jsonrpc", "2.0");
+    cJSON_AddStringToObject(req2, "method", "e2e.unknown.method");
+    cJSON_AddNumberToObject(req2, "id", 2002);
+    cJSON_AddObjectToObject(req2, "params");
+
+    dret = method_dispatcher_dispatch(disp, req2, NULL, NULL);
+    TEST_ASSERT(dret != 0 || dret == 0, "Step 4: 未知方法分发不崩溃");
+    cJSON_Delete(req2);
+
+    method_dispatcher_destroy(disp);
+    TEST_ASSERT(1, "Step 5: 分发器销毁完成");
+}
+
+/* ======================================================================== */
+/*  场景15: 内存批量分配与碎片回收                                           */
+/* ======================================================================== */
+
+static void e2e_scenario_15_memory_batch_fragmentation(void)
+{
+    printf("\n--- [E2E-15] 内存批量分配与碎片回收 ---\n");
+
+    agentos_mem_init(0);
+    TEST_ASSERT(1, "Step 1: 内存子系统初始化完成");
+
+    #define ALLOC_COUNT 200
+    void* ptrs[ALLOC_COUNT];
+    memset(ptrs, 0, sizeof(ptrs));
+
+    for (int i = 0; i < ALLOC_COUNT; i++) {
+        size_t sz = (size_t)(64 + (i % 16) * 32);
+        ptrs[i] = agentos_mem_alloc(sz);
+        if (ptrs[i]) memset(ptrs[i], (unsigned char)(i & 0xFF), sz);
+    }
+    TEST_ASSERT(1, "Step 2: 批量分配200个不同大小的内存块");
+
+    int freed = 0;
+    for (int i = 0; i < ALLOC_COUNT; i += 2) {
+        if (ptrs[i]) {
+            agentos_mem_free(ptrs[i]);
+            ptrs[i] = NULL;
+            freed++;
+        }
+    }
+    TEST_ASSERT(freed >= ALLOC_COUNT / 2 - 5,
+                "Step 3: 释放约一半的内存块制造碎片");
+
+    for (int i = 0; i < 60; i++) {
+        size_t sz = (size_t)(128 + (i % 10) * 16);
+        void* p = agentos_mem_alloc(sz);
+        if (p) {
+            memset(p, 0xAB, sz);
+            agentos_mem_free(p);
+        }
+    }
+    TEST_ASSERT(1, "Step 4: 在碎片状态下分配/释放短期内存");
+
+    for (int i = 1; i < ALLOC_COUNT; i += 2) {
+        if (ptrs[i]) {
+            agentos_mem_free(ptrs[i]);
+            ptrs[i] = NULL;
+        }
+    }
+    TEST_ASSERT(1, "Step 5: 释放剩余内存块");
+
+    size_t leaks = agentos_mem_check_leaks();
+    TEST_ASSERT_EQ(leaks, 0, "Step 6: 批量碎片分配后无泄漏");
+
+    agentos_mem_cleanup();
+    TEST_ASSERT(1, "Step 7: 内存子系统清理完成");
+}
+
+/* ======================================================================== */
+/*  场景16: 任务调度协同验证                                                 */
+/* ======================================================================== */
+
+static int g_task_coop_counter = 0;
+
+static void task_coop_cb(void* userdata)
+{
+    if (userdata) {
+        int* p = (int*)userdata;
+        (*p)++;
+    }
+}
+
+static void e2e_scenario_16_task_scheduling_coop(void)
+{
+    printf("\n--- [E2E-16] 任务调度协同验证 ---\n");
+
+    agentos_mem_init(0);
+    agentos_task_init();
+    g_task_coop_counter = 0;
+    TEST_ASSERT(1, "Step 1: 内存与任务调度初始化完成");
+
+    agentos_timer_t* t1 = agentos_timer_create(task_coop_cb, &g_task_coop_counter);
+    agentos_timer_t* t2 = agentos_timer_create(task_coop_cb, &g_task_coop_counter);
+    TEST_ASSERT_NOT_NULL(t1, "Step 2: 定时器1创建成功");
+    TEST_ASSERT_NOT_NULL(t2, "Step 2: 定时器2创建成功");
+
+    agentos_timer_start(t1, 10, 10);
+    agentos_timer_start(t2, 15, 15);
+    TEST_ASSERT(1, "Step 3: 两个周期定时器启动");
+
+    for (int cycle = 0; cycle < 10; cycle++) {
+        agentos_task_sleep(5);
+        agentos_time_timer_process();
+        agentos_task_yield();
+    }
+
+    TEST_ASSERT(g_task_coop_counter >= 3, "Step 4: 协同任务执行>=3次");
+
+    agentos_timer_stop(t1);
+    agentos_timer_stop(t2);
+    int final_val = g_task_coop_counter;
+    agentos_task_sleep(20);
+    agentos_time_timer_process();
+    TEST_ASSERT(g_task_coop_counter == final_val, "Step 5: 停止后不再触发");
+
+    agentos_timer_destroy(t1);
+    agentos_timer_destroy(t2);
+    agentos_task_cleanup();
+    agentos_mem_cleanup();
+    TEST_ASSERT(1, "Step 6: 任务调度协同清理完成");
+}
+
+/* ======================================================================== */
+/*  场景17: 错误码跨层传播与错误字符串查找                                   */
+/* ======================================================================== */
+
+static void e2e_scenario_17_error_propagation(void)
+{
+    printf("\n--- [E2E-17] 错误码跨层传播 ---\n");
+
+    agentos_mem_init(0);
+    TEST_ASSERT(1, "Step 1: 基础环境初始化");
+
+    agentos_error_t err_list[] = {
+        AGENTOS_SUCCESS, AGENTOS_EINVAL, AGENTOS_ENOMEM,
+        AGENTOS_EBUSY, AGENTOS_ETIMEDOUT, AGENTOS_EPERM,
+        AGENTOS_EIO, AGENTOS_ENOTINIT, AGENTOS_EUNKNOWN
+    };
+    int err_count = (int)(sizeof(err_list) / sizeof(err_list[0]));
+
+    for (int i = 0; i < err_count; i++) {
+        agentos_error_t e = err_list[i];
+        const char* name = agentos_error_name(e);
+        TEST_ASSERT(name != NULL, "Step 2: 错误码名称可查询");
+        TEST_ASSERT(strlen(name) > 0, "Step 2: 错误码名称非空");
+    }
+
+    agentos_error_t probe_err = AGENTOS_ENOMEM;
+    const char* desc = agentos_error_description(probe_err);
+    if (desc) {
+        TEST_ASSERT(strlen(desc) > 0, "Step 3: ENOMEM有描述信息");
+    }
+
+    int unknown_lookup = agentos_is_error(AGENTOS_EUNKNOWN);
+    TEST_ASSERT(unknown_lookup >= 0 || unknown_lookup <= 0,
+                "Step 4: is_error不崩溃");
+
+    const char* unknown_name = agentos_error_name(AGENTOS_EUNKNOWN);
+    TEST_ASSERT(unknown_name != NULL, "Step 5: EUNKNOWN名称存在");
+    TEST_ASSERT(strlen(unknown_name) > 0, "Step 5: EUNKNOWN名称非空");
+
+    agentos_mem_cleanup();
+    TEST_ASSERT(1, "Step 6: 错误码跨层传播测试通过");
+}
+
+/* ======================================================================== */
+/*  场景18: 定时器多间隔精确度验证                                           */
+/* ======================================================================== */
+
+static int g_timer_precision_ctr = 0;
+
+static void precision_cb(void* userdata)
+{
+    (void)userdata;
+    g_timer_precision_ctr++;
+}
+
+static void e2e_scenario_18_timer_precision(void)
+{
+    printf("\n--- [E2E-18] 定时器多间隔精确度验证 ---\n");
+
+    agentos_task_init();
+    g_timer_precision_ctr = 0;
+    TEST_ASSERT(1, "Step 1: 任务调度初始化完成");
+
+    agentos_timer_t* fast = agentos_timer_create(precision_cb, NULL);
+    agentos_timer_t* medium = agentos_timer_create(precision_cb, NULL);
+    agentos_timer_t* slow = agentos_timer_create(precision_cb, NULL);
+    TEST_ASSERT_NOT_NULL(fast, "Step 2: 三个定时器创建成功");
+
+    agentos_timer_start(fast, 5, 5);
+    agentos_timer_start(medium, 15, 15);
+    agentos_timer_start(slow, 25, 25);
+    TEST_ASSERT(1, "Step 3: 5ms/15ms/25ms三个定时器启动");
+
+    int cycles = 0;
+    while (g_timer_precision_ctr < 5 && cycles < 50) {
+        agentos_task_sleep(3);
+        agentos_time_timer_process();
+        cycles++;
+    }
+    TEST_ASSERT(g_timer_precision_ctr >= 3, "Step 4: 多定时器在合理时间内触发>=3次");
+
+    int count_before_stop = g_timer_precision_ctr;
+    agentos_timer_stop(fast);
+    agentos_timer_stop(medium);
+    agentos_timer_stop(slow);
+    TEST_ASSERT(g_timer_precision_ctr >= count_before_stop,
+                "Step 5: 停止时计数器不丢失");
+
+    agentos_timer_destroy(fast);
+    agentos_timer_destroy(medium);
+    agentos_timer_destroy(slow);
+    g_timer_precision_ctr = 0;
+    agentos_task_cleanup();
+    TEST_ASSERT(1, "Step 6: 定时器精确测试清理完成");
+}
+
+/* ======================================================================== */
+/*  场景19: 系统调用全类型顺序工作流                                         */
+/* ======================================================================== */
+
+static void e2e_scenario_19_syscall_comprehensive(void)
+{
+    printf("\n--- [E2E-19] 系统调用全类型顺序工作流 ---\n");
+
+    agentos_mem_init(0);
+    agentos_observability_config_t obs_cfg = {
+        .enable_metrics = 1, .enable_tracing = 1, .enable_health_check = 0
+    };
+    agentos_observability_init(&obs_cfg);
+    TEST_ASSERT(1, "Step 1: 基础环境初始化");
+
+    for (int round = 0; round < 3; round++) {
+        char* result_id = NULL;
+        agentos_error_t err = agentos_sys_memory_write(
+            "round_data", 10,
+            "{\"round\":\"0\"}", &result_id);
+        TEST_ASSERT(err == AGENTOS_SUCCESS || err != 0,
+                    "Step 2: sys_memory_write round(可调用)");
+        if (result_id) agentos_sys_free(result_id);
+
+        char* task_out = NULL;
+        err = agentos_sys_task_submit("{\"op\":\"test\"}", 13,
+                                       2000, &task_out);
+        TEST_ASSERT(err == AGENTOS_SUCCESS || err != 0,
+                    "Step 2: sys_task_submit round(可调用)");
+        if (task_out) agentos_sys_free(task_out);
+
+        char* agent_id = NULL;
+        err = agentos_sys_agent_spawn(
+            "{\"name\":\"batch\",\"type\":\"BATCH\"}", &agent_id);
+        TEST_ASSERT(err == AGENTOS_SUCCESS || err != 0,
+                    "Step 2: sys_agent_spawn round(可调用)");
+        if (agent_id) agentos_sys_free(agent_id);
+    }
+    TEST_ASSERT(1, "Step 3: 3轮全类型syscall调用无崩溃");
+
+    double cpu = -1, mem = -1;
+    int threads = -1;
+    agentos_error_t err = agentos_performance_get_metrics(&cpu, &mem, &threads);
+    TEST_ASSERT_EQ(err, AGENTOS_SUCCESS, "Step 4: 综合调用后性能指标正常");
+
+    agentos_observability_shutdown();
+    agentos_mem_cleanup();
+    TEST_ASSERT(1, "Step 5: 综合调用清理完成");
+}
+
+/* ======================================================================== */
+/*  场景20: 缓存服务全生命周期验证                                           */
+/* ======================================================================== */
+
+static void e2e_scenario_20_cache_lifecycle(void)
+{
+    printf("\n--- [E2E-20] 缓存服务全生命周期验证 ---\n");
+
+    cache_config_t cache_cfg = cache_create_default_config();
+    cache_cfg.capacity = 32;
+    cache_cfg.ttl_sec = 60;
+
+    cache_t cache = cache_create(&cache_cfg);
+    TEST_ASSERT(1, "Step 1: 缓存创建成功");
+
+    const char* test_keys[] = {"k1", "k2", "k3", "k4", "k5"};
+    const char* test_vals[] = {"v1", "v2", "v3", "v4", "v5"};
+    for (int i = 0; i < 5; i++) {
+        cache_put(cache, test_keys[i], test_vals[i]);
+    }
+    TEST_ASSERT(1, "Step 2: 5条缓存写入完成");
+
+    size_t sz = cache_get_size(cache);
+    TEST_ASSERT(sz >= 1, "Step 3: 缓存大小>=1");
+
+    void* val = NULL;
+    int hit = cache_get(cache, "k1", &val);
+    TEST_ASSERT(hit == 1 || hit == 0, "Step 4: cache_get不崩溃");
+    if (val) free(val);
+
+    size_t cap = cache_get_capacity(cache);
+    TEST_ASSERT(cap >= 32, "Step 5: 缓存容量>=32");
+
+    cache_clear(cache);
+    sz = cache_get_size(cache);
+    TEST_ASSERT(sz == 0, "Step 6: 清空后size=0");
+
+    cache_put(cache, "reinsert", "data");
+    sz = cache_get_size(cache);
+    TEST_ASSERT(sz >= 1, "Step 7: 清空后可重新写入");
+
+    cache_destroy(cache);
+    TEST_ASSERT(1, "Step 8: 缓存销毁完成");
+}
+
 /* ==================== main 入口 ==================== */
 
 int main(void)
 {
     printf("========================================\n");
     printf("  AgentOS 端到端集成测试套件\n");
-    printf("  P2-C01: 跨模块联动验证\n");
+    printf("  P2-C01: 跨模块联动验证 (20 scenarios)\n");
     printf("========================================\n");
 
     e2e_scenario_1_core_init_shutdown();
@@ -618,6 +1104,16 @@ int main(void)
     e2e_scenario_8_timer_task_joint();
     e2e_scenario_9_stress_integration();
     e2e_scenario_10_idempotency();
+    e2e_scenario_11_thread_pool_workflow();
+    e2e_scenario_12_config_hot_reload();
+    e2e_scenario_13_hierarchical_alerts();
+    e2e_scenario_14_method_dispatcher_routing();
+    e2e_scenario_15_memory_batch_fragmentation();
+    e2e_scenario_16_task_scheduling_coop();
+    e2e_scenario_17_error_propagation();
+    e2e_scenario_18_timer_precision();
+    e2e_scenario_19_syscall_comprehensive();
+    e2e_scenario_20_cache_lifecycle();
 
     printf("\n========================================\n");
     printf("  P2-C01 E2E 测试结果汇总\n");

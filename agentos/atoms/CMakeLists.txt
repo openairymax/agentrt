@@ -261,7 +261,6 @@ set(AGENTOS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/memory
-    ${CMAKE_CURRENT_SOURCE_DIR}/memoryrovol/include
     ${CMAKE_CURRENT_SOURCE_DIR}/syscall/include
     # commons 基础库头文件 (完整覆盖所有子模块)
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
@@ -318,7 +317,6 @@ endif()
 # 子模块头文件安装
 install(DIRECTORY corekern/include/ DESTINATION include/agentos/corekern)
 install(DIRECTORY coreloopthree/include/ DESTINATION include/agentos/coreloopthree)
-install(DIRECTORY memoryrovol/include/ DESTINATION include/agentos/memoryrovol)
 install(DIRECTORY syscall/include/ DESTINATION include/agentos/syscall)
 
 # 创建目标导出集

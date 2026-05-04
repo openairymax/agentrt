@@ -379,21 +379,8 @@ void agentos_service_destroy(agentos_service_t svc) {
     }
     
     /* 清理资源：跳过已损坏/已释放的资源 */
-    /* 销毁互斥锁：先检查是否可能已损坏 */
-    {
-        agentos_error_t st_err = agentos_mutex_destroy(&service->state_mutex);
-        if (st_err != AGENTOS_SUCCESS) {
-            LOG_WARN("Service '%s' state_mutex cleanup during destroy: %d",
-                     service->name, st_err);
-        }
-    }
-    {
-        agentos_error_t stats_err = agentos_mutex_destroy(&service->stats_mutex);
-        if (stats_err != AGENTOS_SUCCESS) {
-            LOG_WARN("Service '%s' stats_mutex cleanup during destroy: %d",
-                     service->name, stats_err);
-        }
-    }
+    agentos_mutex_destroy(&service->state_mutex);
+    agentos_mutex_destroy(&service->stats_mutex);
     
     /* 释放内存：无论前面是否出错，内存必须释放 */
     if (service->threads) {
@@ -688,7 +675,7 @@ agentos_error_t agentos_service_pause(agentos_service_t svc) {
     if (!(service->capabilities & AGENTOS_SVC_CAP_PAUSEABLE)) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' does not support pause", service->name);
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_EPROTONOSUPPORT;
     }
     
     /* 更新状态 */
@@ -1925,7 +1912,7 @@ static agentos_error_t http_client_call(
         }
 
         LOG_WARN("Service '%s' has no handle_request callback", service_name);
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_ESERVICE;
     }
 
     char url[768];
@@ -2020,7 +2007,7 @@ static agentos_error_t http_client_stream(
 
         const char* err_json = "{\"error\":\"no_stream_handler\"}";
         callback(err_json, strlen(err_json), user_data);
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_ESERVICE;
     }
 
     return AGENTOS_ENOENT;
@@ -2060,7 +2047,7 @@ static agentos_error_t memory_client_call(
         }
 
         LOG_WARN("Service '%s' has no handle_request callback", service_name);
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_ESERVICE;
     }
 
     LOG_INFO("Memory client: service '%s' not found locally, trying IPC RPC", service_name);
@@ -2113,7 +2100,7 @@ static agentos_error_t memory_client_stream(
 
     const char* err_json = "{\"error\":\"no_stream_handler\"}";
     callback(err_json, strlen(err_json), user_data);
-    return AGENTOS_ENOTSUP;
+    return AGENTOS_ESERVICE;
 }
 
 agentos_error_t agentos_service_client_create(

@@ -1192,7 +1192,7 @@ static int mcp_adapter_receive(void* context, void** data, size_t* size) {
 }
 
 static int mcp_adapter_get_stats(void* context, char* stats_json, size_t max_size) {
-    (void)context;
+    if (context) { }
     if (!stats_json || max_size < 64) return -1;
     int written = snprintf(stats_json, max_size,
         "{\"adapter_version\":\"%s\",\"protocol\":\"mcp\"}", MCP_V1_VERSION);
@@ -1223,7 +1223,7 @@ static int mcp_adapter_handle_request(void* context,
 }
 
 static int mcp_adapter_get_version(void* context, char* buf, size_t max_size) {
-    (void)context;
+    if (context) { }
     if (!buf || max_size == 0) return -1;
     size_t len = strlen(MCP_V1_VERSION);
     if (len >= max_size) len = max_size - 1;
@@ -1233,7 +1233,7 @@ static int mcp_adapter_get_version(void* context, char* buf, size_t max_size) {
 }
 
 static uint32_t mcp_adapter_capabilities(void* context) {
-    (void)context;
+    if (context) { }
     return (uint32_t)(MCP_CAP_TOOLS | MCP_CAP_RESOURCES | MCP_CAP_PROMPTS | MCP_CAP_LOGGING | MCP_CAP_SAMPLING);
 }
 

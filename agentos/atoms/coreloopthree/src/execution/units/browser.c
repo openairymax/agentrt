@@ -650,6 +650,122 @@ static int cdp_get_id(void)
     return s_cdp_id;
 }
 
+static char *js_escape(const char *src, size_t src_len)
+{
+    if (!src || src_len == 0)
+        return AGENTOS_STRDUP("");
+
+    size_t est = src_len * 2 + 4;
+    char *dst = (char *)AGENTOS_MALLOC(est);
+    if (!dst)
+        return NULL;
+
+    size_t dp = 0;
+    for (size_t i = 0; i < src_len; i++) {
+        char ch = src[i];
+        if (ch == '\\') {
+            if (dp + 2 >= est) {
+                est *= 2;
+                char *n = (char *)AGENTOS_MALLOC(est);
+                if (!n) {
+                    AGENTOS_FREE(dst);
+                    return NULL;
+                }
+                memcpy(n, dst, dp);
+                AGENTOS_FREE(dst);
+                dst = n;
+            }
+            dst[dp++] = '\\';
+            dst[dp++] = '\\';
+        } else if (ch == '\'') {
+            if (dp + 2 >= est) {
+                est *= 2;
+                char *n = (char *)AGENTOS_MALLOC(est);
+                if (!n) {
+                    AGENTOS_FREE(dst);
+                    return NULL;
+                }
+                memcpy(n, dst, dp);
+                AGENTOS_FREE(dst);
+                dst = n;
+            }
+            dst[dp++] = '\\';
+            dst[dp++] = '\'';
+        } else if (ch == '"') {
+            if (dp + 2 >= est) {
+                est *= 2;
+                char *n = (char *)AGENTOS_MALLOC(est);
+                if (!n) {
+                    AGENTOS_FREE(dst);
+                    return NULL;
+                }
+                memcpy(n, dst, dp);
+                AGENTOS_FREE(dst);
+                dst = n;
+            }
+            dst[dp++] = '\\';
+            dst[dp++] = '"';
+        } else if (ch == '\n') {
+            if (dp + 2 >= est) {
+                est *= 2;
+                char *n = (char *)AGENTOS_MALLOC(est);
+                if (!n) {
+                    AGENTOS_FREE(dst);
+                    return NULL;
+                }
+                memcpy(n, dst, dp);
+                AGENTOS_FREE(dst);
+                dst = n;
+            }
+            dst[dp++] = '\\';
+            dst[dp++] = 'n';
+        } else if (ch == '\r') {
+            if (dp + 2 >= est) {
+                est *= 2;
+                char *n = (char *)AGENTOS_MALLOC(est);
+                if (!n) {
+                    AGENTOS_FREE(dst);
+                    return NULL;
+                }
+                memcpy(n, dst, dp);
+                AGENTOS_FREE(dst);
+                dst = n;
+            }
+            dst[dp++] = '\\';
+            dst[dp++] = 'r';
+        } else if (ch == '\t') {
+            if (dp + 2 >= est) {
+                est *= 2;
+                char *n = (char *)AGENTOS_MALLOC(est);
+                if (!n) {
+                    AGENTOS_FREE(dst);
+                    return NULL;
+                }
+                memcpy(n, dst, dp);
+                AGENTOS_FREE(dst);
+                dst = n;
+            }
+            dst[dp++] = '\\';
+            dst[dp++] = 't';
+        } else {
+            if (dp + 1 >= est) {
+                est *= 2;
+                char *n = (char *)AGENTOS_MALLOC(est);
+                if (!n) {
+                    AGENTOS_FREE(dst);
+                    return NULL;
+                }
+                memcpy(n, dst, dp);
+                AGENTOS_FREE(dst);
+                dst = n;
+            }
+            dst[dp++] = ch;
+        }
+    }
+    dst[dp] = '\0';
+    return dst;
+}
+
 static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const void *input,
                                        void **out_output)
 {
@@ -802,32 +918,8 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
         int cdp_ok = 0;
         if (has_cdp && script_len > 0) {
             int cdp_id = cdp_get_id();
-            char *escaped_script = (char *)AGENTOS_MALLOC(script_len * 2 + 4);
+            char *escaped_script = js_escape(script, script_len);
             if (escaped_script) {
-                size_t ep = 0;
-                for (size_t i = 0; i < script_len; i++) {
-                    char ch = script[i];
-                    if (ch == '\\') {
-                        escaped_script[ep++] = '\\';
-                        escaped_script[ep++] = '\\';
-                    } else if (ch == '"') {
-                        escaped_script[ep++] = '\\';
-                        escaped_script[ep++] = '"';
-                    } else if (ch == '\n') {
-                        escaped_script[ep++] = '\\';
-                        escaped_script[ep++] = 'n';
-                    } else if (ch == '\r') {
-                        escaped_script[ep++] = '\\';
-                        escaped_script[ep++] = 'r';
-                    } else if (ch == '\t') {
-                        escaped_script[ep++] = '\\';
-                        escaped_script[ep++] = 't';
-                    } else {
-                        escaped_script[ep++] = ch;
-                    }
-                }
-                escaped_script[ep] = '\0';
-
                 char cdp_json[16384];
                 int written = snprintf(cdp_json, sizeof(cdp_json),
                                        "{\"id\":%d,\"method\":\"Runtime.evaluate\",\"params\":"
@@ -895,31 +987,36 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
         int cdp_ok = 0;
         if (has_cdp && sel_copy) {
             int cdp_id = cdp_get_id();
-            char cdp_script[4096];
-            int written = snprintf(cdp_script, sizeof(cdp_script),
-                                   "document.querySelector('%s').click()", sel_copy);
-            if (written > 0 && (size_t)written < sizeof(cdp_script)) {
-                char cdp_json[8192];
-                written = snprintf(cdp_json, sizeof(cdp_json),
-                                   "{\"id\":%d,\"method\":\"Runtime.evaluate\","
-                                   "\"params\":{\"expression\":\"%s\",\"returnByValue\":true}}",
-                                   cdp_id, cdp_script);
-                if (written > 0 && (size_t)written < sizeof(cdp_json)) {
-                    if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
-                        char *resp = NULL;
-                        if (ws_recv_frame(conn->socket_fd, &resp, NULL, 5000) == 0 && resp) {
-                            if (strstr(resp, "\"result\"")) {
-                                cdp_ok = 1;
-                                size_t buf_size = 128 + strlen(sel_copy) + 1;
-                                result_json = (char *)AGENTOS_MALLOC(buf_size);
-                                if (result_json) {
-                                    snprintf(result_json, buf_size,
-                                             "{\"status\":\"clicked\",\"selector\":"
-                                             "\"%s\",\"cdp\":true}",
-                                             sel_copy);
+            char *escaped_sel = js_escape(sel_copy, strlen(sel_copy));
+            if (escaped_sel) {
+                char cdp_script[4096];
+                int written = snprintf(cdp_script, sizeof(cdp_script),
+                                       "document.querySelector('%s').click()", escaped_sel);
+                AGENTOS_FREE(escaped_sel);
+                if (written > 0 && (size_t)written < sizeof(cdp_script)) {
+                    char cdp_json[8192];
+                    written = snprintf(cdp_json, sizeof(cdp_json),
+                                       "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                                       "\"params\":{\"expression\":\"%s\","
+                                       "\"returnByValue\":true}}",
+                                       cdp_id, cdp_script);
+                    if (written > 0 && (size_t)written < sizeof(cdp_json)) {
+                        if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
+                            char *resp = NULL;
+                            if (ws_recv_frame(conn->socket_fd, &resp, NULL, 5000) == 0 && resp) {
+                                if (strstr(resp, "\"result\"")) {
+                                    cdp_ok = 1;
+                                    size_t buf_size = 128 + strlen(sel_copy) + 1;
+                                    result_json = (char *)AGENTOS_MALLOC(buf_size);
+                                    if (result_json) {
+                                        snprintf(result_json, buf_size,
+                                                 "{\"status\":\"clicked\",\"selector\":"
+                                                 "\"%s\",\"cdp\":true}",
+                                                 sel_copy);
+                                    }
                                 }
+                                AGENTOS_FREE(resp);
                             }
-                            AGENTOS_FREE(resp);
                         }
                     }
                 }
@@ -1043,41 +1140,51 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
         int cdp_ok = 0;
         if (has_cdp) {
             int cdp_id = cdp_get_id();
-            char cdp_js[8192];
-            int written = snprintf(cdp_js, sizeof(cdp_js),
-                                   "(function(){var e=document.querySelector('%s');if(!e)"
-                                   "return'not_found';e.focus();var v='%s';"
-                                   "e.value=v;e.dispatchEvent(new Event('input',"
-                                   "{bubbles:true}));return'ok'})()",
-                                   sel_buf, val_buf);
-            if (written > 0 && (size_t)written < sizeof(cdp_js)) {
-                char cdp_json[16384];
-                written = snprintf(cdp_json, sizeof(cdp_json),
-                                   "{\"id\":%d,\"method\":\"Runtime.evaluate\","
-                                   "\"params\":{\"expression\":\"%s\","
-                                   "\"returnByValue\":true}}",
-                                   cdp_id, cdp_js);
-                if (written > 0 && (size_t)written < sizeof(cdp_json)) {
-                    if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
-                        char *resp = NULL;
-                        if (ws_recv_frame(conn->socket_fd, &resp, NULL, 5000) == 0 && resp) {
-                            if (strstr(resp, "\"result\"")) {
-                                cdp_ok = 1;
-                                size_t buf_size = 256 + strlen(sel_buf) + strlen(val_buf) + 1;
-                                result_json = (char *)AGENTOS_MALLOC(buf_size);
-                                if (result_json) {
-                                    snprintf(result_json, buf_size,
-                                             "{\"status\":\"typed\","
-                                             "\"selector\":\"%s\","
-                                             "\"value\":\"%s\","
-                                             "\"cdp\":true}",
-                                             sel_buf, val_buf);
+            char *escaped_sel = js_escape(sel_buf, strlen(sel_buf));
+            if (escaped_sel) {
+                char *escaped_val = js_escape(val_buf, strlen(val_buf));
+                if (escaped_val) {
+                    char cdp_js[8192];
+                    int written = snprintf(cdp_js, sizeof(cdp_js),
+                                           "(function(){var e=document.querySelector('%s');"
+                                           "if(!e)return'not_found';e.focus();var v='%s';"
+                                           "e.value=v;e.dispatchEvent(new Event('input',"
+                                           "{bubbles:true}));return'ok'})()",
+                                           escaped_sel, escaped_val);
+                    AGENTOS_FREE(escaped_val);
+                    if (written > 0 && (size_t)written < sizeof(cdp_js)) {
+                        char cdp_json[16384];
+                        written = snprintf(cdp_json, sizeof(cdp_json),
+                                           "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                                           "\"params\":{\"expression\":\"%s\","
+                                           "\"returnByValue\":true}}",
+                                           cdp_id, cdp_js);
+                        if (written > 0 && (size_t)written < sizeof(cdp_json)) {
+                            if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
+                                char *resp = NULL;
+                                if (ws_recv_frame(conn->socket_fd, &resp, NULL, 5000) == 0 &&
+                                    resp) {
+                                    if (strstr(resp, "\"result\"")) {
+                                        cdp_ok = 1;
+                                        size_t buf_size =
+                                            256 + strlen(sel_buf) + strlen(val_buf) + 1;
+                                        result_json = (char *)AGENTOS_MALLOC(buf_size);
+                                        if (result_json) {
+                                            snprintf(result_json, buf_size,
+                                                     "{\"status\":\"typed\","
+                                                     "\"selector\":\"%s\","
+                                                     "\"value\":\"%s\","
+                                                     "\"cdp\":true}",
+                                                     sel_buf, val_buf);
+                                        }
+                                    }
+                                    AGENTOS_FREE(resp);
                                 }
                             }
-                            AGENTOS_FREE(resp);
                         }
                     }
                 }
+                AGENTOS_FREE(escaped_sel);
             }
         }
 
@@ -1106,6 +1213,118 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 timeout_ms = 5000;
         }
 
+        int cdp_ok = 0;
+        if (has_cdp) {
+            int cdp_id = cdp_get_id();
+            char cdp_js[4096];
+            int written;
+
+            if (wait_selector) {
+                wait_selector += strlen("selector=");
+                size_t sel_len = strlen(wait_selector);
+                char *sel_copy = (char *)AGENTOS_MALLOC(sel_len + 1);
+                if (!sel_copy) {
+                    ret = AGENTOS_ENOMEM;
+                    goto cleanup;
+                }
+                memcpy(sel_copy, wait_selector, sel_len + 1);
+                for (char *p = sel_copy; *p; p++) {
+                    if (*p == ' ' || *p == '\n' || *p == '\r' || *p == ',') {
+                        *p = '\0';
+                        break;
+                    }
+                }
+                char *escaped_sel = js_escape(sel_copy, strlen(sel_copy));
+                AGENTOS_FREE(sel_copy);
+                if (escaped_sel) {
+                    written = snprintf(cdp_js, sizeof(cdp_js),
+                                       "(function(){var s='%s';var t=%u;"
+                                       "return new Promise(function(r){"
+                                       "var st=Date.now();"
+                                       "var chk=function(){"
+                                       "if(document.querySelector(s)){r('found');}"
+                                       "else if(Date.now()-st>t){r('timeout');}"
+                                       "else{setTimeout(chk,100);}};"
+                                       "chk();})})()",
+                                       escaped_sel, timeout_ms);
+                    AGENTOS_FREE(escaped_sel);
+                } else {
+                    goto cdpskip;
+                }
+            } else {
+                written = snprintf(cdp_js, sizeof(cdp_js),
+                                   "new Promise(function(r){"
+                                   "setTimeout(function(){r('waited');},%u);})",
+                                   timeout_ms);
+            }
+
+            if (written > 0 && (size_t)written < sizeof(cdp_js)) {
+                char cdp_json[8192];
+                int w2 = snprintf(cdp_json, sizeof(cdp_json),
+                                  "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                                  "\"params\":{\"expression\":\"%s\","
+                                  "\"returnByValue\":true,\"awaitPromise\":true}}",
+                                  cdp_id, cdp_js);
+                if (w2 > 0 && (size_t)w2 < sizeof(cdp_json)) {
+                    if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
+                        char *resp = NULL;
+                        uint32_t recv_to = timeout_ms + 10000;
+                        if (ws_recv_frame(conn->socket_fd, &resp, NULL, recv_to) == 0 && resp) {
+                            if (strstr(resp, "\"result\"")) {
+                                cdp_ok = 1;
+                            }
+                            AGENTOS_FREE(resp);
+                        }
+                    }
+                }
+            }
+        }
+
+    cdpskip:
+        if (cdp_ok) {
+            if (wait_selector) {
+                wait_selector += strlen("selector=");
+                size_t sel_len = strlen(wait_selector);
+                char *sel_copy = (char *)AGENTOS_MALLOC(sel_len + 1);
+                if (!sel_copy) {
+                    ret = AGENTOS_ENOMEM;
+                    goto cleanup;
+                }
+                memcpy(sel_copy, wait_selector, sel_len + 1);
+                for (char *p = sel_copy; *p; p++) {
+                    if (*p == ' ' || *p == '\n' || *p == '\r' || *p == ',') {
+                        *p = '\0';
+                        break;
+                    }
+                }
+                size_t buf_size = 160 + strlen(sel_copy) + 1;
+                result_json = (char *)AGENTOS_MALLOC(buf_size);
+                if (!result_json) {
+                    AGENTOS_FREE(sel_copy);
+                    ret = AGENTOS_ENOMEM;
+                    goto cleanup;
+                }
+                snprintf(result_json, buf_size,
+                         "{\"status\":\"waited\",\"selector\":\"%s\","
+                         "\"timeout_ms\":%u,\"cdp\":true}",
+                         sel_copy, timeout_ms);
+                AGENTOS_FREE(sel_copy);
+            } else {
+                size_t buf_size = 160;
+                result_json = (char *)AGENTOS_MALLOC(buf_size);
+                if (!result_json) {
+                    ret = AGENTOS_ENOMEM;
+                    goto cleanup;
+                }
+                snprintf(result_json, buf_size,
+                         "{\"status\":\"waited\",\"timeout_ms\":%u,"
+                         "\"cdp\":true}",
+                         timeout_ms);
+            }
+            *out_output = result_json;
+            goto cleanup;
+        }
+
         if (wait_selector) {
             wait_selector += strlen("selector=");
             size_t sel_len = strlen(wait_selector);
@@ -1130,7 +1349,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
             }
             snprintf(result_json, buf_size,
                      "{\"status\":\"waited\",\"selector\":\"%s\","
-                     "\"timeout_ms\":%u}",
+                     "\"timeout_ms\":%u,\"simulated\":true}",
                      sel_copy, timeout_ms);
             AGENTOS_FREE(sel_copy);
         } else {
@@ -1140,14 +1359,16 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 ret = AGENTOS_ENOMEM;
                 goto cleanup;
             }
-            snprintf(result_json, buf_size, "{\"status\":\"waited\",\"timeout_ms\":%u}",
+            snprintf(result_json, buf_size,
+                     "{\"status\":\"waited\",\"timeout_ms\":%u,"
+                     "\"simulated\":true}",
                      timeout_ms);
         }
         *out_output = result_json;
         goto cleanup;
     }
 
-    ret = AGENTOS_ENOTSUP;
+    ret = AGENTOS_EPROTONOSUPPORT;
     *out_output = AGENTOS_STRDUP("{\"error\":\"unsupported_command\",\"status\":\"failed\"}");
     if (!*out_output)
         ret = AGENTOS_ENOMEM;

@@ -1,42 +1,32 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
-# MemoryRovol 模块顶层构建文件
+# MemoryRovol AgentOS 集成层构建文件
 #
-# 注意：本文件中的宏定义与顶层 agentos/atoms/CMakeLists.txt 保持一致，
-#       统一使用 AGENTOS_HAS_* 前缀
+# 本文件仅负责：
+#   1. 安装 MemoryRovol 公共头文件到 AgentOS
+#   2. 通过 MEMORYROVOL_SOURCE 选项决定集成方式：
+#      - ON  (默认): 从 MemoryRovol 独立仓库源码编译
+#      - OFF:        链接预编译商业静态库 (.a/.lib)
+#
+# MemoryRovol 的所有源代码实现位于独立仓库：
+#   ${MEMORYROVOL_DIR} (默认: ../../../../../MemoryRovol)
+#
+# BAN-35 合规：AgentOS 仓库中不含任何 MemoryRovol 实现源码
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-memoryrovol VERSION 1.0.0.5 LANGUAGES C)
 
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
-    message(FATAL_ERROR
-        "MemoryRovol in-source builds are not allowed!\n"
-        "Please use an out-of-source build directory:\n"
-        "  mkdir -p ../MemoryRovol-build && cd ../MemoryRovol-build\n"
-        "  cmake ../MemoryRovol\n"
-    )
-endif()
+option(MEMORYROVOL_SOURCE "Build MemoryRovol from source (independent repo)" ON)
 
-# 选项
-option(BUILD_TESTS "Build tests" OFF)
-option(ENABLE_TRACING "Enable OpenTelemetry tracing" OFF)
-option(USE_SENTENCE_TRANSFORMERS "Enable Sentence Transformers support" OFF)
-option(MEMORYROVOL_OSS "Build open-source edition (L1+L2 only, no L3/L4/forgetting)" OFF)
-
-# MEMORYROVOL_PRO_LIB: path to precompiled commercial static library (.a/.lib)
-# When set, links against the precompiled PRO library instead of compiling from source
 if(DEFINED MEMORYROVOL_PRO_LIB)
-    if(MEMORYROVOL_OSS)
-        message(FATAL_ERROR
-            "MEMORYROVOL_OSS and MEMORYROVOL_PRO_LIB are mutually exclusive.\n"
-            "OSS mode builds only L1+L2 from source; PRO_LIB mode links a precompiled\n"
-            "commercial library with full L1-L4+forgetting support.\n"
-            "Set only one of these options."
+    if(MEMORYROVOL_SOURCE)
+        message(WARNING
+            "MEMORYROVOL_PRO_LIB is set, overriding MEMORYROVOL_SOURCE=ON.\n"
+            "Will link against precompiled PRO library instead of building from source."
         )
+        set(MEMORYROVOL_SOURCE OFF)
     endif()
     if(NOT EXISTS "${MEMORYROVOL_PRO_LIB}")
         message(FATAL_ERROR
-            "MEMORYROVOL_PRO_LIB specified but file not found: ${MEMORYROVOL_PRO_LIB}\n"
-            "Please provide a valid path to the precompiled MemoryRovol PRO library."
+            "MEMORYROVOL_PRO_LIB specified but file not found: ${MEMORYROVOL_PRO_LIB}"
         )
     endif()
     message(STATUS "MemoryRovol PRO mode: linking precompiled library ${MEMORYROVOL_PRO_LIB}")
@@ -45,159 +35,41 @@ else()
     set(MEMORYROVOL_PRO_MODE OFF)
 endif()
 
-if(MEMORYROVOL_OSS)
-    message(STATUS "MemoryRovol OSS mode: building L1+L2 only (no L3/L4/forgetting)")
-elseif(NOT MEMORYROVOL_PRO_MODE)
-    message(STATUS "MemoryRovol PRO mode: building full L1+L2+L3+L4+forgetting from source")
-endif()
-
-if(AGENTOS_ROOT)
-    message(STATUS "AGENTOS_ROOT set: ${AGENTOS_ROOT} (standalone build mode)")
-    set(AGENTOS_INCLUDE_DIR "${AGENTOS_ROOT}/agentos")
-    set(AGENTOS_ATOMS_DIR "${AGENTOS_ROOT}/agentos/atoms")
-else()
-    message(STATUS "AGENTOS_ROOT not set (embedded build mode, assuming part of AgentOS tree)")
-    set(AGENTOS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
-    set(AGENTOS_ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
-endif()
-
-# 查找依赖
-find_package(PkgConfig QUIET)
-find_package(OpenSSL QUIET)
-find_package(Threads REQUIRED)
-
-# 查找 FAISS（与顶层 CMakeLists.txt 保持一致的宏命名）
-if(PkgConfig_FOUND)
-    pkg_check_modules(FAISS QUIET faiss)
-    if(FAISS_FOUND)
-        message(STATUS "FAISS found: ${FAISS_VERSION}")
-        add_definitions(-DAGENTOS_HAS_FAISS=1)
-    else()
-        message(WARNING "FAISS not found, some vector search features may be limited")
-    endif()
-else()
-    message(WARNING "PkgConfig not found, cannot check for FAISS")
-endif()
-
-# 查找 libcurl（与顶层 CMakeLists.txt 保持一致的宏命名）
-if(PkgConfig_FOUND)
-    pkg_check_modules(LIBCURL QUIET libcurl)
-    if(LIBCURL_FOUND)
-        message(STATUS "libcurl found: ${LIBCURL_VERSION}")
-        add_definitions(-DAGENTOS_HAS_CURL=1)
-    else()
-        message(WARNING "libcurl not found, network features may be limited")
-    endif()
-else()
-    message(WARNING "PkgConfig not found, cannot check for libcurl")
-endif()
-
-# 查找 cJSON（与顶层 CMakeLists.txt 保持一致的宏命名）
-if(PkgConfig_FOUND)
-    pkg_check_modules(CJSON QUIET libcjson)
-    if(CJSON_FOUND)
-        message(STATUS "cJSON found: ${CJSON_VERSION}")
-        add_definitions(-DAGENTOS_HAS_CJSON=1)
-    else()
-        message(WARNING "cJSON not found, JSON features may be limited")
-    endif()
-else()
-    message(WARNING "PkgConfig not found, cannot check for cJSON")
-endif()
-
-# 查找 libyaml（与顶层 CMakeLists.txt 保持一致的宏命名）
-if(PkgConfig_FOUND)
-    pkg_check_modules(YAML QUIET yaml-0.1)
-    if(YAML_FOUND)
-        message(STATUS "libyaml found: ${YAML_VERSION}")
-        add_definitions(-DAGENTOS_HAS_YAML=1)
-    else()
-        message(WARNING "libyaml not found, YAML features may be limited")
-    endif()
-else()
-    message(WARNING "PkgConfig not found, cannot check for libyaml")
-endif()
-
-# 查找 SQLite3（与顶层 CMakeLists.txt 保持一致的宏命名）
-if(PkgConfig_FOUND)
-    pkg_check_modules(SQLITE3 QUIET sqlite3)
-    if(SQLITE3_FOUND)
-        message(STATUS "SQLite3 found: ${SQLITE3_VERSION}")
-        add_definitions(-DAGENTOS_HAS_SQLITE3=1)
-    else()
-        message(WARNING "SQLite3 not found, storage features may be limited")
-    endif()
-else()
-    message(WARNING "PkgConfig not found, cannot check for SQLite3")
-endif()
-
-# 可选：Sentence Transformers
-if(USE_SENTENCE_TRANSFORMERS AND PkgConfig_FOUND)
-    pkg_check_modules(SENTENCE_TRANSFORMERS sentence_transformers)
-    if(SENTENCE_TRANSFORMERS_FOUND)
-        add_definitions(-DAGENTOS_HAS_SENTENCE_TRANSFORMERS=1)
-    else()
-        message(WARNING "Sentence Transformers not found, disabling support")
-    endif()
-endif()
-
-# 包含子目录
-add_subdirectory(src)
-
-if(NOT MEMORYROVOL_OSS AND NOT MEMORYROVOL_PRO_MODE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools")
-    add_subdirectory(tools)
-endif()
-
-# 安全编译选项（基于AgentOS C编码风格指南附录A）
-if(TARGET agentos_memoryrovol)
-    if(MSVC)
-        target_compile_options(agentos_memoryrovol PRIVATE /W4 /WX)
-        target_compile_definitions(agentos_memoryrovol PRIVATE _CRT_SECURE_NO_WARNINGS)
-        target_compile_options(agentos_memoryrovol PRIVATE /GS)
-        target_compile_options(agentos_memoryrovol PRIVATE /sdl)
-        target_compile_options(agentos_memoryrovol PRIVATE /guard:cf)
-    else()
-        target_compile_options(agentos_memoryrovol PRIVATE -Wall -Wextra -Wpedantic )
-        target_compile_options(agentos_memoryrovol PRIVATE -fstack-protector-strong)
-        target_compile_options(agentos_memoryrovol PRIVATE -D_FORTIFY_SOURCE=2)
-        target_compile_options(agentos_memoryrovol PRIVATE -fPIE)
-        target_compile_options(agentos_memoryrovol PRIVATE -Wformat -Wformat-security)
-        target_compile_options(agentos_memoryrovol PRIVATE -fno-omit-frame-pointer)
+if(MEMORYROVOL_SOURCE AND NOT MEMORYROVOL_PRO_MODE)
+    if(NOT DEFINED MEMORYROVOL_DIR)
+        set(MEMORYROVOL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../MemoryRovol")
     endif()
 
-    # 链接器安全选项
-    if(UNIX AND NOT APPLE)
-        target_link_options(agentos_memoryrovol PRIVATE -Wl,-z,relro -Wl,-z,now -pie)
-    elseif(APPLE)
-        target_link_options(agentos_memoryrovol PRIVATE -Wl,-dead_strip -pie)
+    if(NOT EXISTS "${MEMORYROVOL_DIR}/CMakeLists.txt")
+        message(FATAL_ERROR
+            "MemoryRovol source directory not found: ${MEMORYROVOL_DIR}\n"
+            "Please set MEMORYROVOL_DIR to the MemoryRovol independent repository path,\n"
+            "or set MEMORYROVOL_PRO_LIB to link a precompiled library."
+        )
     endif()
 
-    # 安装头文件（根据构建模式选择安装范围）
-    if(MEMORYROVOL_OSS)
-        install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol
-                PATTERN "layer3_structure.h" EXCLUDE
-                PATTERN "layer4_pattern.h" EXCLUDE
-                PATTERN "forgetting.h" EXCLUDE
-                PATTERN "llm_client.h" EXCLUDE
-                PATTERN "binder.h" EXCLUDE
-                PATTERN "unbinder.h" EXCLUDE
-                PATTERN "relation.h" EXCLUDE
-                PATTERN "sequence.h" EXCLUDE)
-    else()
-        install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol)
-    endif()
+    message(STATUS "MemoryRovol SOURCE mode: building from ${MEMORYROVOL_DIR}")
 
-    # 安装库
-    install(TARGETS agentos_memoryrovol DESTINATION lib)
+    set(AGENTOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." CACHE PATH "AgentOS root directory")
+
+    set(BUILD_TESTS ON)
+
+    add_subdirectory(${MEMORYROVOL_DIR} ${CMAKE_BINARY_DIR}/memoryrovol-build)
+
 elseif(MEMORYROVOL_PRO_MODE)
-    install(FILES "${MEMORYROVOL_PRO_LIB}" DESTINATION lib)
-    install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol)
+    add_library(agentos_memoryrovol STATIC IMPORTED)
+    set_target_properties(agentos_memoryrovol PROPERTIES
+        IMPORTED_LOCATION "${MEMORYROVOL_PRO_LIB}"
+    )
+    target_include_directories(agentos_memoryrovol INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include/agentos/memoryrovol>
+    )
+else()
+    message(FATAL_ERROR
+        "No MemoryRovol integration mode selected.\n"
+        "Set either MEMORYROVOL_SOURCE=ON (default) or MEMORYROVOL_PRO_LIB=<path>."
+    )
 endif()
 
-# 单元测试
-if(BUILD_TESTS)
-    enable_testing()
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
-        add_subdirectory(tests)
-    endif()
-endif()
+install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol)

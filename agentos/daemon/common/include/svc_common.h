@@ -41,6 +41,7 @@ typedef enum {
     AGENTOS_SVC_STATE_PAUSED,         /**< 已暂停 */
     AGENTOS_SVC_STATE_STOPPING,       /**< 停止中 */
     AGENTOS_SVC_STATE_STOPPED,        /**< 已停止 */
+    AGENTOS_SVC_STATE_ZOMBIE,         /**< 僵尸状态（stop超时/部分清理） */
     AGENTOS_SVC_STATE_ERROR           /**< 错误状态 */
 } agentos_svc_state_t;
 

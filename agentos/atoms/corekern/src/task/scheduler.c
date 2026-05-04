@@ -192,7 +192,7 @@ int agentos_thread_create(
     /* 获取平台适配器操作集 */
     const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
     if (!ops) {
-        return AGENTOS_ENOSYS;  /* 不支持的系统 */
+        return AGENTOS_EPLATFORM;
     }
 
     /* 生成任务ID */
@@ -289,7 +289,7 @@ agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval)
 
     const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
     if (!ops) {
-        return AGENTOS_ENOSYS;
+        return AGENTOS_EPLATFORM;
     }
 
     scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
@@ -451,7 +451,7 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
     const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
     if (!ops) {
         release_task_lock();
-        return AGENTOS_ENOSYS;
+        return AGENTOS_EPLATFORM;
     }
 
     int result = ops->thread_set_priority(task_info->platform_handle, priority);
