@@ -10,6 +10,7 @@ import json
 import hashlib
 import time
 import logging
+import tempfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
@@ -104,6 +105,8 @@ class CheckpointManager:
         Example:
             >>> mgr = CheckpointManager("/var/lib/agentos/checkpoints")
         """
+        if storage_path is None:
+            storage_path = os.path.join(tempfile.gettempdir(), "agentos_checkpoints")
         self.storage_path = Path(storage_path)
         self.storage_path.mkdir(parents=True, exist_ok=True)
         
