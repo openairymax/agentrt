@@ -556,6 +556,7 @@ int monitor_service_start_agent_trace(monitor_service_t* service, const char* ag
     if (t) {
         t->agent_id = agent_id ? strdup(agent_id) : NULL;
         t->task_id = task_id ? strdup(task_id) : NULL;
+        t->current_state = AGENT_STATE_INITIALIZING;
     }
 
     *trace = t;

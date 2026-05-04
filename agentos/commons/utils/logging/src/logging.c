@@ -52,6 +52,125 @@ static const log_format_t DEFAULT_LOG_FORMAT = LOG_FORMAT_TEXT;
 /** 最大消息长度 */
 static const size_t MAX_MESSAGE_LEN = 4096;
 
+/* ==================== 日志节流（Throttling）内部数据结构 ==================== */
+
+/** 节流哈希桶数量 */
+#define THROTTLE_BUCKET_COUNT 256
+
+/** 节流哈希桶 */
+typedef struct {
+    uint64_t hash_key;
+    uint64_t last_second;
+    uint32_t count;
+} throttle_bucket_t;
+
+static throttle_bucket_t g_throttle_buckets[THROTTLE_BUCKET_COUNT];
+static volatile uint32_t g_throttle_enabled = 0;
+static volatile uint32_t g_throttle_max_per_sec = 100;
+static agentos_mutex_t g_throttle_mutex;
+static bool g_throttle_mutex_init = false;
+
+/* ==================== 日志采样（Sampling）内部数据结构 ==================== */
+
+static volatile uint32_t g_sample_counter_debug = 0;
+static volatile uint32_t g_sample_counter_info = 0;
+static volatile uint32_t g_sample_counter_warn = 0;
+
+/**
+ * @brief 计算消息哈希（用于节流去重）
+ */
+static uint64_t throttle_hash(const char* module, int line, const char* message)
+{
+    uint64_t h = 14695981039346656037ULL;
+    const char* p;
+
+    if (module) {
+        for (p = module; *p; p++) {
+            h ^= (uint64_t)(unsigned char)*p;
+            h *= 1099511628211ULL;
+        }
+    }
+
+    h ^= (uint64_t)line;
+    h *= 1099511628211ULL;
+
+    if (message) {
+        for (p = message; *p; p++) {
+            h ^= (uint64_t)(unsigned char)*p;
+            h *= 1099511628211ULL;
+        }
+    }
+
+    return h;
+}
+
+/**
+ * @brief 检查日志是否应被节流抑制
+ *
+ * @param module 模块名
+ * @param line 行号
+ * @param message 日志消息
+ * @param now_sec 当前时间（秒）
+ * @return true 应抑制（跳过），false 应输出
+ */
+static bool throttle_should_suppress(const char* module, int line,
+                                     const char* message, uint64_t now_sec)
+{
+    if (!g_throttle_enabled) return false;
+    if (!g_throttle_mutex_init) return false;
+
+    uint64_t h = throttle_hash(module, line, message);
+    uint32_t bucket_idx = (uint32_t)(h % THROTTLE_BUCKET_COUNT);
+
+    agentos_mutex_lock(&g_throttle_mutex);
+
+    throttle_bucket_t* bucket = &g_throttle_buckets[bucket_idx];
+
+    if (bucket->last_second != now_sec) {
+        if (bucket->last_second > 0 && bucket->count > g_throttle_max_per_sec) {
+            agentos_mutex_unlock(&g_throttle_mutex);
+            return false;
+        }
+        bucket->last_second = now_sec;
+        bucket->hash_key = h;
+        bucket->count = 1;
+        agentos_mutex_unlock(&g_throttle_mutex);
+        return false;
+    }
+
+    if (bucket->hash_key == h) {
+        if (bucket->count >= g_throttle_max_per_sec) {
+            bucket->count++;
+            uint32_t suppressed = bucket->count - g_throttle_max_per_sec;
+            agentos_mutex_unlock(&g_throttle_mutex);
+
+            if (suppressed == 1) {
+                fprintf(stderr, "[THROTTLE] Suppressing further identical messages: %s:%d\n",
+                        module ? module : "?", line);
+            }
+            return true;
+        }
+        bucket->count++;
+        agentos_mutex_unlock(&g_throttle_mutex);
+        return false;
+    }
+
+    if (bucket->count > g_throttle_max_per_sec) {
+        uint32_t old_suppressed = bucket->count - g_throttle_max_per_sec;
+        if (old_suppressed > 0) {
+            agentos_mutex_unlock(&g_throttle_mutex);
+            fprintf(stderr, "[THROTTLE] Previous bucket flushed: %u messages suppressed\n",
+                    old_suppressed);
+            agentos_mutex_lock(&g_throttle_mutex);
+        }
+    }
+    bucket->hash_key = h;
+    bucket->count = 1;
+    agentos_mutex_unlock(&g_throttle_mutex);
+    return false;
+}
+
+
 /* ==================== 内部数据结构 ==================== */
 
 /** 日志系统全局状�?*/
@@ -253,6 +372,12 @@ int log_init(const log_config_t* manager) {
         return -1;
     }
 
+    if (!g_throttle_mutex_init) {
+        if (agentos_mutex_init(&g_throttle_mutex) == 0) {
+            g_throttle_mutex_init = true;
+        }
+    }
+
     g_tls_trace_id[0] = '\0';
     g_tls_span_id[0] = '\0';
 
@@ -285,15 +410,15 @@ int log_set_default_config(const log_config_t* manager) {
 
 void log_write(log_level_t level, const char* module, int line, const char* fmt, ...) {
     if (!g_logging_state.initialized) {
-        // 自动使用默认配置初始�?
+        // 自动使用默认配置初始?
         log_init(NULL);
     }
     
-    // 检查日志级�?
+    // 检查日志级?
     if (!should_log(level, module)) {
         return;
     }
-    
+
     // 获取追踪ID和Span ID
     const char* trace_id = log_get_trace_id();
     const char* span_id = log_get_span_id();
@@ -304,6 +429,12 @@ void log_write(log_level_t level, const char* module, int line, const char* fmt,
     va_start(args, fmt);
     vsnprintf(message_buffer, sizeof(message_buffer), fmt, args); /* flawfinder: ignore - variadic logging wrapper */
     va_end(args);
+
+    /* 节流检查：相同消息1秒内最多输出 N 次 */
+    uint64_t now_sec = (uint64_t)(get_current_timestamp() / 1000);
+    if (throttle_should_suppress(module, line, message_buffer, now_sec)) {
+        return;
+    }
 
     // 构建日志记录
     log_record_t record = {
@@ -495,9 +626,44 @@ int log_reload_config(const char* config_path) {
 }
 
 void log_flush(void) {
-    // 控制台输出立即刷�?
+    // 控制台输出立即刷?
     fflush(stdout);
     fflush(stderr);
+}
+
+void log_set_throttle(bool enable, uint32_t max_per_sec)
+{
+    g_throttle_enabled = enable ? 1 : 0;
+    if (max_per_sec > 0) {
+        g_throttle_max_per_sec = max_per_sec;
+    } else if (max_per_sec == 0 && enable) {
+        g_throttle_max_per_sec = 100;
+    }
+}
+
+bool log_should_sample(log_level_t level)
+{
+    uint32_t counter;
+
+    switch (level) {
+        case LOG_LEVEL_DEBUG: {
+            counter = __sync_fetch_and_add(&g_sample_counter_debug, 1);
+            return (counter % 1000) == 0; /* 0.1% */
+        }
+        case LOG_LEVEL_INFO: {
+            counter = __sync_fetch_and_add(&g_sample_counter_info, 1);
+            return (counter % 100) == 0; /* 1% */
+        }
+        case LOG_LEVEL_WARN: {
+            counter = __sync_fetch_and_add(&g_sample_counter_warn, 1);
+            return (counter % 10) == 0; /* 10% */
+        }
+        case LOG_LEVEL_ERROR:
+        case LOG_LEVEL_FATAL:
+            return true; /* 100% */
+        default:
+            return true;
+    }
 }
 
 void log_cleanup(void) {

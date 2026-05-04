@@ -96,7 +96,7 @@
 
 ### 联系商业支持
 
-- **邮箱**: lidecheng@spharx.cn
+- **邮箱**: business@spharx.cn
 
 ---
 
@@ -104,20 +104,20 @@
 
 ### 技术支持
 
-- **邮箱**: lidecheng@spharx.cn
+- **邮箱**: support@spharx.cn
 - **响应时间**: 24 小时内回复
 - **适用场景**: 技术问题、Bug 报告、使用咨询
 
 ### 安全问题
 
-- **邮箱**: wangliren@spharx.cn
+- **邮箱**: security@spharx.cn
 - **响应时间**: 24 小时内确认，5 个工作日内提供评估
 - **适用场景**: 安全漏洞报告、安全咨询
 - **加密**: 支持 PGP 加密，密钥可通过邮件索取
 
 ### 商务合作
 
-- **邮箱**: zhouzhixian@spharx.cn
+- **邮箱**: business@spharx.cn
 - **响应时间**: 2 个工作日内回复
 - **适用场景**: 商业合作、企业采购、战略合作
 

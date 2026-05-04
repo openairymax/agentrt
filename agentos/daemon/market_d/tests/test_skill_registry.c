@@ -58,7 +58,6 @@ static void test_market_search_skills(void) {
     ret = market_service_search_skills(svc, &params, &skills, &count);
     if (ret == 0) {
         printf("    Found %zu skills\n", count);
-        for (size_t i = 0; i < count; i++) free(skills[i]);
         free(skills);
     } else {
         printf("    Search returned %d\n", ret);
@@ -98,7 +97,6 @@ static void test_market_get_installed_skills(void) {
     ret = market_service_get_installed_skills(svc, &skills, &count);
     if (ret == 0) {
         printf("    Installed skills: %zu\n", count);
-        for (size_t i = 0; i < count; i++) free(skills[i]);
         free(skills);
     }
 

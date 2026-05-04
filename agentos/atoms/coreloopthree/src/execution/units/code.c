@@ -288,7 +288,7 @@ static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *
 
     if (strcmp(data->language, "python") != 0 && strcmp(data->language, "javascript") != 0 &&
         strcmp(data->language, "node") != 0) {
-        return AGENTOS_ENOTSUP;
+        return AGENTOS_EPROTONOSUPPORT;
     }
 
     const char *suffix      = NULL;

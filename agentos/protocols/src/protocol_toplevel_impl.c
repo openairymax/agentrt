@@ -83,6 +83,7 @@ const char* protocol_type_name(agentos_protocol_type_t type) {
         case AGENTOS_PROTOCOL_CLAUDE: return "Claude";
         case AGENTOS_PROTOCOL_AGNTCY: return "AGNTCY";
         case AGENTOS_PROTOCOL_CHINA_ECO: return "ChinaEco";
+        case AGENTOS_PROTOCOL_OPENCLAW: return "OpenClaw";
         default: return "Unknown";
     }
 }

@@ -40,6 +40,9 @@ add_subdirectory(monit_d)
 add_subdirectory(sched_d)
 add_subdirectory(market_d)
 add_subdirectory(channel_d)
+add_subdirectory(info_d)
+add_subdirectory(notify_d)
+add_subdirectory(observe_d)
 
 # 全局测试支持
 if(BUILD_TESTS)
@@ -98,6 +101,10 @@ message(STATUS "  - tool_d    : ${CMAKE_CURRENT_SOURCE_DIR}/tool_d")
 message(STATUS "  - monit_d   : ${CMAKE_CURRENT_SOURCE_DIR}/monit_d")
 message(STATUS "  - sched_d   : ${CMAKE_CURRENT_SOURCE_DIR}/sched_d")
 message(STATUS "  - market_d  : ${CMAKE_CURRENT_SOURCE_DIR}/market_d")
+message(STATUS "  - channel_d : ${CMAKE_CURRENT_SOURCE_DIR}/channel_d")
+message(STATUS "  - info_d    : ${CMAKE_CURRENT_SOURCE_DIR}/info_d")
+message(STATUS "  - notify_d  : ${CMAKE_CURRENT_SOURCE_DIR}/notify_d")
+message(STATUS "  - observe_d : ${CMAKE_CURRENT_SOURCE_DIR}/observe_d")
 message(STATUS "")
 
 # 安装支持
@@ -138,9 +145,12 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/market_d/include/
 
 # 导出项目配置
 if(TARGET svc_common AND TARGET agentos-gateway-d AND TARGET agentos-llm-d AND TARGET agentos-tool-d
-   AND TARGET agentos-monit-d AND TARGET agentos-sched-d AND TARGET agentos-market-d)
+   AND TARGET agentos-monit-d AND TARGET agentos-sched-d AND TARGET agentos-market-d
+   AND TARGET agentos-channel-d AND TARGET agentos-info-d AND TARGET agentos-notify-d
+   AND TARGET agentos-observe-d)
     export(TARGETS svc_common agentos-gateway-d agentos-llm-d agentos-tool-d 
-                  agentos-monit-d agentos-sched-d agentos-market-d
+                  agentos-monit-d agentos-sched-d agentos-market-d agentos-channel-d
+                  agentos-info-d agentos-notify-d agentos-observe-d
         FILE "${CMAKE_CURRENT_BINARY_DIR}/agentos-daemon-targets.cmake"
     )
     export(PACKAGE agentos-daemon)

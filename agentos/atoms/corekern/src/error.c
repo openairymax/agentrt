@@ -1,29 +1,51 @@
 /**
  * @file error.c
- * @brief 错误码转字符串实现
+ * @brief Error code lookup table
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "error.h"
 
+#define ERR_BEGIN 0
+
 static const char* error_strings[] = {
-    /* AGENTOS_SUCCESS (0) */           "Success",
-    /* AGENTOS_EINVAL (-1) */           "Invalid argument",
-    /* AGENTOS_ENOMEM (-2) */           "Out of memory",
-    /* AGENTOS_EBUSY (-3) */            "Resource busy",
-    /* AGENTOS_ENOENT (-4) */           "No such entry",
-    /* AGENTOS_EPERM (-5) */            "Permission denied",
-    /* AGENTOS_ETIMEDOUT (-6) */        "Operation timed out",
-    /* AGENTOS_EEXIST (-7) */           "Already exists",
-    /* AGENTOS_ECANCELED (-8) */        "Operation canceled",
-    /* AGENTOS_ENOTSUP (-9) */          "Not supported",
-    /* AGENTOS_EIO (-10) */             "I/O error",
-    /* AGENTOS_EINTR (-11) */           "Interrupted",
-    /* AGENTOS_EOVERFLOW (-12) */       "Value overflow",
-    /* AGENTOS_EBADF (-13) */           "Bad file descriptor",
-    /* AGENTOS_ENOTINIT (-14) */        "Not initialized",
-    /* AGENTOS_ERESOURCE (-15) */       "Resource exhausted",
-    /* AGENTOS_ENOSYS (-16) */           "Function not implemented"
+    [0]         "Success",
+    [1]         "Invalid argument",
+    [2]         "Out of memory",
+    [3]         "Resource busy",
+    [4]         "No such entry",
+    [5]         "Permission denied",
+    [6]         "Operation timed out",
+    [7]         "I/O error",
+    [8]         "Already exists",
+    [9]         "Not initialized",
+    [10]        "Operation cancelled",
+    [11]        "Not supported",
+    [12]        "Value overflow",
+    [13]        "Protocol error",
+    [14]        "Not connected",
+    [15]        "Connection reset",
+    [16]        "Access denied",
+    [17]        "Connection refused",
+    [18]        "Message too large",
+    [19]        "No space left",
+    [20]        "Range error",
+    [21]        "Deadlock detected",
+    [22]        "Try again",
+    [23]        "Argument too long",
+    [24]        "Already in progress",
+    [25]        "Unavailable",
+    [26]        "Quota exceeded",
+    [27]        "Platform not initialized",
+    [28]        "Protocol not supported",
+    [29]        "Service unavailable",
+    [30]        NULL,
+    [31]        "Interrupted",
+    [32]        "Bad descriptor",
+    [33]        "Resource exhausted",
+    [34]        "Function not implemented",
+    [35]        "Dependency cycle",
+    [36]        "General failure",
 };
 
 #define ERROR_COUNT (sizeof(error_strings) / sizeof(error_strings[0]))
@@ -32,8 +54,9 @@ const char* agentos_strerror(agentos_error_t err) {
     if (err == AGENTOS_EUNKNOWN) {
         return "Generic error";
     }
-    if (err > 0 || err <= -(agentos_error_t)ERROR_COUNT) {
+    if (err > ERR_BEGIN || err <= -(agentos_error_t)ERROR_COUNT) {
         return "Unknown error";
     }
-    return error_strings[-err];
+    const char* s = error_strings[-err];
+    return s ? s : "Unknown error";
 }

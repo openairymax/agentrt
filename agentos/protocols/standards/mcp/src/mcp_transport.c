@@ -34,6 +34,7 @@ struct mcp_transport {
     int input_fd;
     int output_fd;
     char* base_url;
+    char* host_header;
     char* api_key;
     char* sse_endpoint;
     char* post_endpoint;
@@ -184,6 +185,18 @@ mcp_transport_t* mcp_transport_create(const mcp_transport_config_t* config) {
     } else if (t->type == MCP_TRANSPORT_HTTP_SSE) {
         if (config->config.http.base_url) {
             t->base_url = strdup(config->config.http.base_url);
+            const char* url = config->config.http.base_url;
+            const char* host_start = url;
+            if (strncmp(url, "http://", 7) == 0) host_start = url + 7;
+            else if (strncmp(url, "https://", 8) == 0) host_start = url + 8;
+            const char* path_start = strchr(host_start, '/');
+            size_t host_len = path_start ? (size_t)(path_start - host_start) : strlen(host_start);
+            char* host = (char*)malloc(host_len + 1);
+            if (host) {
+                memcpy(host, host_start, host_len);
+                host[host_len] = '\0';
+                t->host_header = host;
+            }
         }
         if (config->config.http.api_key) {
             t->api_key = strdup(config->config.http.api_key);
@@ -214,6 +227,7 @@ void mcp_transport_destroy(mcp_transport_t* transport) {
     }
 
     free(transport->base_url);
+    free(transport->host_header);
     free(transport->api_key);
     free(transport->sse_endpoint);
     free(transport->post_endpoint);
@@ -381,7 +395,7 @@ int mcp_transport_send(mcp_transport_t* transport,
             "%s%s%s"
             "\r\n",
             path,
-            transport->base_url ? transport->base_url : "localhost",
+            transport->host_header ? transport->host_header : "localhost",
             length,
             transport->api_key ? "Authorization: Bearer " : "",
             transport->api_key ? transport->api_key : "",
