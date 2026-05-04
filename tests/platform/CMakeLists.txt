@@ -44,3 +44,28 @@ target_compile_options(test_platform_compat PRIVATE
 )
 
 message(STATUS "  [platform] test_platform_compat: P2-C04 configured")
+
+add_executable(test_mkdir_recursive test_mkdir_recursive.c)
+
+target_include_directories(test_mkdir_recursive PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../unit/utils
+)
+
+target_compile_features(test_mkdir_recursive PRIVATE c_std_11)
+target_compile_options(test_mkdir_recursive PRIVATE
+    -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
+)
+
+target_link_libraries(test_mkdir_recursive PRIVATE
+    Threads::Threads
+    rt
+)
+
+add_test(
+    NAME "platform_test_mkdir_recursive"
+    COMMAND test_mkdir_recursive
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+message(STATUS "  [platform] test_mkdir_recursive: R-09-87 configured")

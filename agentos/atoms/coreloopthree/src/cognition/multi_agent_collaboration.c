@@ -195,6 +195,7 @@ int mac_framework_create_group(mac_framework_t *fw, const char *name, mac_collab
 
     generate_id(group->id, sizeof(group->id), "grp");
     strncpy(group->name, name, sizeof(group->name) - 1);
+    group->name[sizeof(group->name) - 1] = '\0';
     group->mode = mode;
     group->created_at = agentos_time_ms();
 
@@ -216,6 +217,7 @@ int mac_framework_create_group(mac_framework_t *fw, const char *name, mac_collab
                             strdup(members[valid_count].capabilities_json);
                     if (valid_count == 0) {
                         strncpy(group->leader_id, fw->agents[j].id, sizeof(group->leader_id) - 1);
+                        group->leader_id[sizeof(group->leader_id) - 1] = '\0';
                     }
                     valid_count++;
                     break;
@@ -339,10 +341,13 @@ int mac_framework_delegate_task(mac_framework_t *fw, const char *group_id,
     slot->input_json = task->input_json ? strdup(task->input_json) : NULL;
     slot->output_json = NULL;
     strncpy(slot->assigned_agent_id, agent->id, sizeof(slot->assigned_agent_id) - 1);
+    slot->assigned_agent_id[sizeof(slot->assigned_agent_id) - 1] = '\0';
     slot->status = MAC_TASK_STATUS_ASSIGNED;
     slot->created_at = agentos_time_ms();
-    if (group_id)
+    if (group_id) {
         strncpy(slot->group_id, group_id, sizeof(slot->group_id) - 1);
+        slot->group_id[sizeof(slot->group_id) - 1] = '\0';
+    }
 
     agent->current_tasks++;
     fw->task_count++;
@@ -392,6 +397,13 @@ int mac_framework_collect_results(mac_framework_t *fw, const char *group_id, con
             out = new_out;
         }
         out[count] = t->output_json ? strdup(t->output_json) : strdup("{}");
+        if (!out[count]) {
+            for (size_t j = 0; j < count; j++)
+                free(out[j]);
+            free(out);
+            agentos_mutex_unlock(&fw->lock);
+            return -3;
+        }
         count++;
     }
 
@@ -431,8 +443,10 @@ int mac_framework_start_consensus(mac_framework_t *fw, const char *group_id,
     memset(c, 0, sizeof(mac_consensus_t));
 
     generate_id(c->id, sizeof(c->id), "cns");
-    if (group_id)
+    if (group_id) {
         strncpy(c->group_id, group_id, sizeof(c->group_id) - 1);
+        c->group_id[sizeof(c->group_id) - 1] = '\0';
+    }
     c->strategy = strategy;
     c->proposal_json = strdup(proposal_json);
     c->votes = NULL;
@@ -478,12 +492,12 @@ int mac_framework_vote(mac_framework_t *fw, const char *consensus_id, const char
                 agentos_mutex_unlock(&fw->lock);
                 return -3;
             }
+            c->votes = new_votes;
             char **new_voter_ids = (char **)realloc(c->voter_ids, new_count * sizeof(char *));
             if (!new_voter_ids) {
                 agentos_mutex_unlock(&fw->lock);
                 return -3;
             }
-            c->votes = new_votes;
             c->voter_ids = new_voter_ids;
             c->votes[c->vote_count] = strdup(vote_json);
             c->voter_ids[c->vote_count] = strdup(agent_id);

@@ -20,6 +20,7 @@ set(TEST_SOURCES
     test_jsonrpc_helpers.c
     test_safe_string_utils.c
     test_input_validator.c
+    test_svc_stop.c
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})
