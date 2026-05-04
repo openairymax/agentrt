@@ -303,3 +303,78 @@ message(STATUS "  AGNTCY ACP:       ${PROTOCOLS_ENABLE_AGNTCY}")
 message(STATUS "  China Eco:        ${PROTOCOLS_ENABLE_CHINA_ECO}")
 message(STATUS "==============================================")
 message(STATUS "")
+
+# ============================================================
+# Unit Tests
+# ============================================================
+if(BUILD_TESTS)
+    set(PROTOCOL_TEST_INCLUDE_DIRS
+        ${CMAKE_CURRENT_SOURCE_DIR}/common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/integrations/openclaw/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/standards/agntcy/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/integrations/china_eco/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/core/transformers/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/core/router/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/core/adapter/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/core/registry/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/standards/a2a/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/standards/mcp/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/integrations/openai/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/integrations/openjiuwen/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/types/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/observability/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
+    )
+
+    if(PROTOCOLS_ENABLE_OPENCLAW)
+        add_executable(test_openclaw_adapter
+            tests/test_openclaw_adapter.c
+            integrations/openclaw/src/openclaw_adapter.c
+            common/src/unified_protocol.c
+            core/transformers/src/protocol_transformers.c
+        )
+        target_include_directories(test_openclaw_adapter PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})
+        target_link_libraries(test_openclaw_adapter PRIVATE agentos_common m)
+        if(UNIX)
+            target_link_libraries(test_openclaw_adapter PRIVATE pthread)
+            target_link_options(test_openclaw_adapter PRIVATE -Wl,--allow-multiple-definition)
+        endif()
+        add_test(NAME test_openclaw_adapter COMMAND test_openclaw_adapter)
+    endif()
+
+    if(PROTOCOLS_ENABLE_AGNTCY)
+        add_executable(test_agntcy_acp
+            tests/test_agntcy_acp.c
+            standards/agntcy/src/agntcy_acp_adapter.c
+            common/src/unified_protocol.c
+            core/transformers/src/protocol_transformers.c
+        )
+        target_include_directories(test_agntcy_acp PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})
+        target_link_libraries(test_agntcy_acp PRIVATE agentos_common m)
+        if(UNIX)
+            target_link_libraries(test_agntcy_acp PRIVATE pthread)
+            target_link_options(test_agntcy_acp PRIVATE -Wl,--allow-multiple-definition)
+        endif()
+        add_test(NAME test_agntcy_acp COMMAND test_agntcy_acp)
+    endif()
+
+    if(PROTOCOLS_ENABLE_CHINA_ECO)
+        add_executable(test_china_eco_crypto
+            tests/test_china_eco_crypto.c
+            integrations/china_eco/src/china_eco_adapter.c
+            common/src/unified_protocol.c
+            core/transformers/src/protocol_transformers.c
+        )
+        target_include_directories(test_china_eco_crypto PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})
+        target_link_libraries(test_china_eco_crypto PRIVATE agentos_common m)
+        if(UNIX)
+            target_link_libraries(test_china_eco_crypto PRIVATE pthread)
+            target_link_options(test_china_eco_crypto PRIVATE -Wl,--allow-multiple-definition)
+        endif()
+        add_test(NAME test_china_eco_crypto COMMAND test_china_eco_crypto)
+    endif()
+endif()

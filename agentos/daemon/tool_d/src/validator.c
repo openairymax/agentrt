@@ -145,11 +145,10 @@ cleanup:
     return valid;
 }
 
-int tool_validator_validate(tool_validator_t* val,
+int tool_validator_validate(tool_validator_t* val __attribute__((unused)),
                             const tool_metadata_t* meta,
                             const char* params_json) {
     if (!meta || !params_json) return -1;
-    (void)val;
 
     cJSON* root = cJSON_Parse(params_json);
     if (!root) {
