@@ -148,7 +148,7 @@ cleanup:
 int tool_validator_validate(tool_validator_t* val,
                             const tool_metadata_t* meta,
                             const char* params_json) {
-    if (!meta || !params_json) return 0;
+    if (!meta || !params_json) return -1;
     (void)val;
 
     cJSON* root = cJSON_Parse(params_json);

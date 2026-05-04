@@ -1,8 +1,11 @@
 # AgentOS Code Ownership — SPHARX Ltd
 #
-# All code in this repository is owned by SPHARX Ltd.
+# All source code, documentation, and assets in this repository
+# are the exclusive intellectual property of SPHARX Ltd.
+# Unauthorized use, reproduction, or distribution is strictly prohibited.
+#
 # Internal team assignments are for code review routing only.
-# Last updated: 2026-04-26
+# Ownership notice last updated: 2026-05-04
 
 # Default reviewers for all changes
 * @spharx-org/reviewers
