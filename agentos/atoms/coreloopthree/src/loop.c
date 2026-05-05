@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 /**
  * @brief 核心循环结构体
@@ -42,6 +44,10 @@ struct agentos_core_loop {
     uint64_t checkpoint_seq;
     char current_task_id[128];
     char current_session_id[128];
+    char **completed_node_ids;
+    size_t completed_node_count;
+    size_t completed_node_capacity;
+    char *persistent_original_input;
 };
 
 /* 辅助函数声明 - 用于重构降低圈复杂度 */
@@ -60,6 +66,10 @@ static char *build_enhanced_input(const char *input, size_t input_len,
                                   size_t max_memories);
 static void free_memories(agentos_memory_record_t **records, size_t record_count);
 static void loop_checkpoint_auto_hook(const char *task_id, const char *state_json, void *user_data);
+static void add_completed_node(agentos_core_loop_t *loop, const char *node_id);
+static void clear_completed_nodes(agentos_core_loop_t *loop);
+static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, const char *task_id,
+                                                    const char *session_id, const char *node_id);
 
 /* 默认配置 */
 static void init_default_config(agentos_loop_config_t *manager)
@@ -324,6 +334,10 @@ AGENTOS_API agentos_error_t agentos_loop_create(const agentos_loop_config_t *man
     loop->checkpoint_seq = 0;
     memset(loop->current_task_id, 0, sizeof(loop->current_task_id));
     memset(loop->current_session_id, 0, sizeof(loop->current_session_id));
+    loop->completed_node_ids = NULL;
+    loop->completed_node_count = 0;
+    loop->completed_node_capacity = 0;
+    loop->persistent_original_input = NULL;
 
     if (loop->manager.loop_config_checkpoint_enabled) {
         const char *cp_path = loop->manager.loop_config_checkpoint_path;
@@ -355,8 +369,16 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t *loop)
     }
 
     if (loop->checkpoint_initialized) {
+        agentos_checkpoint_cleanup(86400, 100);
         agentos_checkpoint_shutdown();
         loop->checkpoint_initialized = 0;
+    }
+
+    clear_completed_nodes(loop);
+
+    if (loop->persistent_original_input) {
+        AGENTOS_FREE(loop->persistent_original_input);
+        loop->persistent_original_input = NULL;
     }
 
     if (loop->memory) {
@@ -638,25 +660,37 @@ static void loop_checkpoint_auto_hook(const char *task_id, const char *state_jso
     if (!loop || !loop->checkpoint_initialized || !task_id)
         return;
 
-    char state[4096];
+    char state[8192];
     if (state_json && state_json[0]) {
         snprintf(state, sizeof(state), "%s", state_json);
     } else {
-        snprintf(state, sizeof(state),
-                 "{\"state\":\"auto\",\"task_id\":\"%s\",\"session_id\":\"%s\"}", task_id,
-                 loop->current_session_id);
+        int written = snprintf(state, sizeof(state),
+                               "{\"type\":\"auto\",\"task_id\":\"%s\","
+                               "\"session_id\":\"%s\","
+                               "\"completed_nodes\":%zu,"
+                               "\"checkpoint_seq\":%lu}",
+                               task_id,
+                               loop->current_session_id,
+                               loop->completed_node_count,
+                               (unsigned long)loop->checkpoint_seq);
+        if (written <= 0 || (size_t)written >= sizeof(state)) {
+            snprintf(state, sizeof(state),
+                     "{\"state\":\"auto\",\"task_id\":\"%s\",\"session_id\":\"%s\"}", task_id,
+                     loop->current_session_id);
+        }
     }
 
     loop->checkpoint_seq++;
     agentos_task_checkpoint_t *checkpoint = NULL;
     agentos_error_t err =
         agentos_checkpoint_create(task_id, loop->current_session_id, loop->checkpoint_seq, state,
-                                  NULL, 0, NULL, 0, &checkpoint);
+                                  loop->completed_node_ids, loop->completed_node_count,
+                                  NULL, 0, &checkpoint);
     if (err == AGENTOS_SUCCESS && checkpoint) {
         err = agentos_checkpoint_save(checkpoint);
         if (err == AGENTOS_SUCCESS) {
-            AGENTOS_LOG_INFO("Auto-checkpoint saved for task %s (seq=%lu)", task_id,
-                             (unsigned long)loop->checkpoint_seq);
+            AGENTOS_LOG_INFO("Auto-checkpoint saved for task %s (seq=%lu, completed=%zu)", task_id,
+                             (unsigned long)loop->checkpoint_seq, loop->completed_node_count);
         }
         agentos_checkpoint_destroy(checkpoint);
     }
@@ -757,6 +791,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
                  (unsigned long)(agentos_time_ns() & 0xFFFFFFFF));
     }
     loop->checkpoint_seq = 0;
+    clear_completed_nodes(loop);
     agentos_mutex_unlock(loop->lock);
 
     agentos_memory_query_t query = {0};
@@ -812,6 +847,11 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
 
     if (loop->checkpoint_initialized) {
         save_plan_checkpoint(loop, plan, task_id_buf, loop->current_session_id, process_input);
+
+        if (loop->persistent_original_input) {
+            AGENTOS_FREE(loop->persistent_original_input);
+        }
+        loop->persistent_original_input = AGENTOS_STRDUP(process_input);
     }
 
     agentos_error_t first_err = AGENTOS_SUCCESS;
@@ -834,6 +874,13 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
         }
         if (node_task_id)
             AGENTOS_FREE(node_task_id);
+
+        if (err == AGENTOS_SUCCESS && loop->checkpoint_initialized &&
+            node->task_node_id) {
+            add_completed_node(loop, node->task_node_id);
+            save_incremental_checkpoint(loop, task_id_buf, loop->current_session_id,
+                                        node->task_node_id);
+        }
     }
 
     if (first_err == AGENTOS_SUCCESS) {
@@ -915,9 +962,19 @@ AGENTOS_API agentos_error_t agentos_loop_restore_task(agentos_core_loop_t *loop,
     snprintf(loop->current_task_id, sizeof(loop->current_task_id), "%s", restored_id);
     snprintf(loop->current_session_id, sizeof(loop->current_session_id), "%s", latest->session_id);
     loop->checkpoint_seq = latest->sequence_num;
+    clear_completed_nodes(loop);
+    for (size_t i = 0; i < latest->completed_count; i++) {
+        if (latest->completed_nodes && latest->completed_nodes[i])
+            add_completed_node(loop, latest->completed_nodes[i]);
+    }
     agentos_mutex_unlock(loop->lock);
 
     char *recovered_input = NULL;
+    if (loop->persistent_original_input) {
+        AGENTOS_FREE(loop->persistent_original_input);
+        loop->persistent_original_input = NULL;
+    }
+
     if (latest->state_json) {
         const char *input_tag = "\"original_input\":\"";
         char *input_pos = strstr(latest->state_json, input_tag);
@@ -930,6 +987,7 @@ AGENTOS_API agentos_error_t agentos_loop_restore_task(agentos_core_loop_t *loop,
                 if (recovered_input) {
                     memcpy(recovered_input, input_pos, input_len);
                     recovered_input[input_len] = '\0';
+                    loop->persistent_original_input = AGENTOS_STRDUP(recovered_input);
                 }
             }
         }
@@ -984,26 +1042,151 @@ AGENTOS_API agentos_error_t agentos_loop_list_checkpoints(agentos_core_loop_t *l
     if (!loop->checkpoint_initialized)
         return AGENTOS_ENOTINIT;
 
-    agentos_checkpoint_stats_t stats;
-    memset(&stats, 0, sizeof(stats));
-    agentos_error_t err = agentos_checkpoint_get_stats(&stats);
-    if (err != AGENTOS_SUCCESS)
-        return err;
-
     *out_count = 0;
     *out_task_ids = NULL;
 
-    if (stats.total_checkpoints == 0)
+    const char *cp_dir = loop->manager.loop_config_checkpoint_path;
+    if (cp_dir[0] == '\0')
+        cp_dir = "./data/checkpoints";
+
+    DIR *dir = opendir(cp_dir);
+    if (!dir)
         return AGENTOS_SUCCESS;
 
-    *out_task_ids = (char **)AGENTOS_CALLOC(1, sizeof(char *));
-    if (!*out_task_ids)
+    size_t capacity = 16;
+    char **ids = (char **)AGENTOS_CALLOC(capacity, sizeof(char *));
+    if (!ids) {
+        closedir(dir);
         return AGENTOS_ENOMEM;
-
-    if (loop->current_task_id[0] != '\0') {
-        (*out_task_ids)[0] = AGENTOS_STRDUP(loop->current_task_id);
-        *out_count = 1;
     }
 
+    size_t count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        const char *name = entry->d_name;
+        size_t nlen = strlen(name);
+
+        if (nlen < 6 || strcmp(name + nlen - 5, ".json") != 0)
+            continue;
+
+        if (strncmp(name, "checkpoint_", 11) != 0)
+            continue;
+
+        char tid[128] = {0};
+        size_t tid_len = nlen - 5 - 11;
+        if (tid_len >= sizeof(tid))
+            tid_len = sizeof(tid) - 1;
+        memcpy(tid, name + 11, tid_len);
+        tid[tid_len] = '\0';
+
+        int dup = 0;
+        for (size_t j = 0; j < count; j++) {
+            if (ids[j] && strcmp(ids[j], tid) == 0) {
+                dup = 1;
+                break;
+            }
+        }
+        if (dup)
+            continue;
+
+        if (count >= capacity) {
+            capacity *= 2;
+            char **new_ids = (char **)AGENTOS_REALLOC(ids, capacity * sizeof(char *));
+            if (!new_ids) {
+                for (size_t j = 0; j < count; j++)
+                    AGENTOS_FREE(ids[j]);
+                AGENTOS_FREE(ids);
+                closedir(dir);
+                return AGENTOS_ENOMEM;
+            }
+            ids = new_ids;
+            memset(ids + count, 0, (capacity - count) * sizeof(char *));
+        }
+
+        ids[count] = AGENTOS_STRDUP(tid);
+        if (ids[count])
+            count++;
+    }
+    closedir(dir);
+
+    *out_task_ids = ids;
+    *out_count = count;
     return AGENTOS_SUCCESS;
+}
+
+static void add_completed_node(agentos_core_loop_t *loop, const char *node_id)
+{
+    if (!loop || !node_id)
+        return;
+
+    if (loop->completed_node_count >= loop->completed_node_capacity) {
+        size_t new_cap = loop->completed_node_capacity == 0 ? 16 : loop->completed_node_capacity * 2;
+        char **new_arr = (char **)AGENTOS_REALLOC(loop->completed_node_ids, new_cap * sizeof(char *));
+        if (!new_arr)
+            return;
+        loop->completed_node_ids = new_arr;
+        memset(loop->completed_node_ids + loop->completed_node_capacity, 0,
+               (new_cap - loop->completed_node_capacity) * sizeof(char *));
+        loop->completed_node_capacity = new_cap;
+    }
+
+    loop->completed_node_ids[loop->completed_node_count] = AGENTOS_STRDUP(node_id);
+    if (loop->completed_node_ids[loop->completed_node_count])
+        loop->completed_node_count++;
+}
+
+static void clear_completed_nodes(agentos_core_loop_t *loop)
+{
+    if (!loop)
+        return;
+
+    if (loop->completed_node_ids) {
+        for (size_t i = 0; i < loop->completed_node_count; i++) {
+            AGENTOS_FREE(loop->completed_node_ids[i]);
+        }
+        AGENTOS_FREE(loop->completed_node_ids);
+        loop->completed_node_ids = NULL;
+    }
+    loop->completed_node_count = 0;
+    loop->completed_node_capacity = 0;
+}
+
+static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, const char *task_id,
+                                                    const char *session_id, const char *node_id)
+{
+    if (!loop || !loop->checkpoint_initialized || !task_id)
+        return AGENTOS_EINVAL;
+
+    char state_json[8192];
+    int json_len = snprintf(state_json, sizeof(state_json),
+                            "{\"type\":\"incremental\",\"task_id\":\"%s\","
+                            "\"session_id\":\"%s\",\"completed_node\":\"%s\","
+                            "\"total_completed\":%zu}",
+                            task_id, session_id ? session_id : "",
+                            node_id ? node_id : "",
+                            loop->completed_node_count);
+
+    if (json_len <= 0 || (size_t)json_len >= sizeof(state_json))
+        return AGENTOS_EOVERFLOW;
+
+    loop->checkpoint_seq++;
+    agentos_task_checkpoint_t *checkpoint = NULL;
+    agentos_error_t err = agentos_checkpoint_create(
+        task_id, session_id ? session_id : "default", loop->checkpoint_seq, state_json,
+        loop->completed_node_ids, loop->completed_node_count,
+        NULL, 0, &checkpoint);
+
+    if (err == AGENTOS_SUCCESS && checkpoint) {
+        err = agentos_checkpoint_save(checkpoint);
+        if (err == AGENTOS_SUCCESS) {
+            AGENTOS_LOG_INFO("Incremental checkpoint saved for task %s node %s (seq=%lu, completed=%zu)",
+                             task_id, node_id ? node_id : "",
+                             (unsigned long)loop->checkpoint_seq,
+                             loop->completed_node_count);
+        }
+        agentos_checkpoint_destroy(checkpoint);
+    }
+
+    loop->last_checkpoint_time_ms = get_time_ms();
+    return err;
 }
