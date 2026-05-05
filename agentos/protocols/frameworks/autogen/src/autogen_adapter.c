@@ -242,7 +242,7 @@ typedef struct {
     int suffix_count;
 } autogen_response_role_t;
 
-static const autogen_response_role_t g_autogen_roles[] = {
+static const autogen_response_role_t __attribute__((unused)) g_autogen_roles[] = {
     { {"As ", "From a ", "In my capacity as "}, 3,
       {"I've analyzed your request and prepared a response based on my role.",
        "Processing through the multi-agent framework, here's my assessment.",
@@ -476,9 +476,9 @@ int autogen_register_tool(autogen_adapter_context_t* ctx,
     ctx->tool_executors[ctx->tool_count] = executor;
     ctx->tool_count++;
 
-    if (description) { }
-    if (schema_json) { }
-    if (user_data) { }
+    (void)description;
+    (void)schema_json;
+    (void)user_data;
     return 0;
 }
 
@@ -625,7 +625,7 @@ static int autogen_proto_handle_request(void* context,
 }
 
 static int autogen_proto_get_version(void* context, char* buf, size_t max_size) {
-    if (context) { }
+    (void)context;
     if (!buf || max_size == 0) return -1;
     const char* ver = autogen_adapter_version();
     size_t len = strlen(ver);
@@ -636,7 +636,7 @@ static int autogen_proto_get_version(void* context, char* buf, size_t max_size) 
 }
 
 static uint32_t autogen_proto_capabilities(void* context) {
-    if (context) { }
+    (void)context;
     return (uint32_t)(
         PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING |
         PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_CODE_EXECUTION | PROTO_CAP_HUMAN_LOOP);

@@ -613,7 +613,7 @@ void agentos_intent_parser_destroy(agentos_intent_parser_t *parser)
     free_rule_list(parser->rule_list);
 
     if (parser->lock) {
-        agentos_mutex_destroy(parser->lock);
+        agentos_mutex_free(parser->lock);
     }
 
     if (parser->parser_id) {

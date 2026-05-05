@@ -9,6 +9,11 @@
 #include "execution.h"
 #include "memory.h"
 #include <assert.h>
+#ifndef NDEBUG
+#else
+#undef assert
+#define assert(x) ((void)(x))
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -378,14 +383,17 @@ static void test_strategy_interfaces_exist(void)
     assert(plan_strat.plan == NULL);
     assert(plan_strat.destroy == NULL);
     assert(plan_strat.data == NULL);
+    (void)plan_strat;
 
     agentos_coordinator_strategy_t coord_strat = {0};
     assert(coord_strat.coordinate == NULL);
     assert(coord_strat.destroy == NULL);
+    (void)coord_strat;
 
     agentos_dispatching_strategy_t disp_strat = {0};
     assert(disp_strat.dispatch == NULL);
     assert(disp_strat.destroy == NULL);
+    (void)disp_strat;
 
     TEST_PASS("strategy interfaces have correct fields");
 }

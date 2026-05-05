@@ -483,9 +483,8 @@ agentos_error_t agentos_service_start(agentos_service_t svc) {
 
 static volatile sig_atomic_t g_svc_stop_timeout_flag = 0;
 
-static void svc_stop_timeout_handler(int signum)
+static void svc_stop_timeout_handler(int signum __attribute__((unused)))
 {
-    (void)signum;
     g_svc_stop_timeout_flag = 1;
 }
 

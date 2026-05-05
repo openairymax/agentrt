@@ -183,9 +183,8 @@ int mcp_server_register_prompt(mcp_server_t server, const char* name,
     return 0;
 }
 
-static int handle_initialize(mcp_server_t server, const cJSON* params,
+static int handle_initialize(mcp_server_t server, const cJSON* params __attribute__((unused)),
                              cJSON** response) {
-    (void)params;
 
     cJSON* caps = NULL;
     mcp_server_get_capabilities(&caps);
@@ -209,10 +208,8 @@ static int handle_initialize(mcp_server_t server, const cJSON* params,
     return 0;
 }
 
-static int handle_ping(mcp_server_t server, const cJSON* params,
+static int handle_ping(mcp_server_t server __attribute__((unused)), const cJSON* params __attribute__((unused)),
                        cJSON** response) {
-    (void)server;
-    (void)params;
 
     cJSON* content_arr = cJSON_CreateArray();
     cJSON* text_content = cJSON_CreateObject();
@@ -225,9 +222,8 @@ static int handle_ping(mcp_server_t server, const cJSON* params,
     return 0;
 }
 
-static int handle_tools_list(mcp_server_t server, const cJSON* params,
+static int handle_tools_list(mcp_server_t server, const cJSON* params __attribute__((unused)),
                               cJSON** response) {
-    (void)params;
 
     cJSON* tools_arr = cJSON_CreateArray();
 
@@ -315,9 +311,8 @@ static int handle_tools_call(mcp_server_t server, const cJSON* params,
     return 0;
 }
 
-static int handle_resources_list(mcp_server_t server, const cJSON* params,
+static int handle_resources_list(mcp_server_t server, const cJSON* params __attribute__((unused)),
                                  cJSON** response) {
-    (void)params;
 
     cJSON* res_arr = cJSON_CreateArray();
 
@@ -380,9 +375,8 @@ static int handle_resources_read(mcp_server_t server, const cJSON* params,
     return MCP_ERROR_METHOD_NOT_FOUND;
 }
 
-static int handle_prompts_list(mcp_server_t server, const cJSON* params,
+static int handle_prompts_list(mcp_server_t server, const cJSON* params __attribute__((unused)),
                                cJSON** response) {
-    (void)params;
 
     cJSON* prom_arr = cJSON_CreateArray();
 

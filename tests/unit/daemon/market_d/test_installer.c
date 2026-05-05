@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "platform.h"
 #include <assert.h>
 #include "market_service.h"
 
@@ -25,8 +26,8 @@ static void test_installer_config(void) {
     printf("  test_installer_config...\n");
 
     installer_config_t manager = {
-        .install_dir = "/tmp/agentos/test",
-        .temp_dir = "/tmp/agentos/temp",
+        .install_dir = AGENTOS_TMP_DIR "/agentos/test",
+        .temp_dir = AGENTOS_TMP_DIR "/agentos/temp",
         .verify_signature = 1,
         .max_retries = 3
     };
@@ -49,7 +50,7 @@ static void test_installer_prepare_request(void) {
     memset(&request, 0, sizeof(request));
     request.package_id = "test_package_001";
     request.version = "1.0.0";
-    request.install_path = "/tmp/test_install";
+    request.install_path = AGENTOS_TMP_DIR "/test_install";
 
     int ret = installer_prepare_request(inst, &request);
     assert(ret == 0 || ret == AGENTOS_ERR_INVALID_PARAM);

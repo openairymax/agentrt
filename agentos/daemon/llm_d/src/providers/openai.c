@@ -269,13 +269,12 @@ static int openai_http_request_with_retry(
 
 /* ---------- 生命周期 ---------- */
 
-static provider_ctx_t* openai_init(const char* name,
+static provider_ctx_t* openai_init(const char* name __attribute__((unused)),
                                   const char* api_key,
                                   const char* api_base,
                                   const char* organization,
                                   double timeout_sec,
                                   int max_retries) {
-    (void)name;
 
     openai_ctx_t* ctx = (openai_ctx_t*)calloc(1, sizeof(openai_ctx_t));
     if (!ctx) {

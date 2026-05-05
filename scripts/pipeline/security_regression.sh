@@ -83,7 +83,7 @@ fi
 section "3. cppcheck Static Analysis"
 CPPCHECK_ERRORS=$(cppcheck --enable=all --suppress=missingInclude --suppress=unusedFunction \
     --error-exitcode=0 \
-    atoms/corekern/ atoms/coreloopthree/ atoms/memoryrovol/ atoms/syscall/ atoms/commons/ \
+    atoms/corekern/ atoms/coreloopthree/ atoms/syscall/ atoms/commons/ \
     2>&1 | grep -c "error:" || true)
 
 if [ "$CPPCHECK_ERRORS" -eq 0 ]; then
@@ -112,7 +112,8 @@ SHELL_CMD_ALLOWED=$(grep -c "is_shell_command_allowed" "$AGENTOS_ROOT/agentos/at
 PATH_TRAVERSAL_CHECK=$(grep -c "is_path_component_safe\|is_path_traversal_attempt" "$AGENTOS_ROOT/agentos/atoms/coreloopthree/src/execution/units/file.c" 2>/dev/null || echo "0")
 SQL_INJECTION_CHECK=$(grep -c "DANGEROUS_SQL_KEYWORDS\|is_safe_query" "$AGENTOS_ROOT/agentos/atoms/coreloopthree/src/execution/units/db.c" 2>/dev/null || echo "0")
 SSRF_CHECK=$(grep -c "is_private_ip\|is_safe_url" "$AGENTOS_ROOT/agentos/atoms/coreloopthree/src/execution/units/browser.c" 2>/dev/null || echo "0")
-MEMORYROV_PATH_CHECK=$(grep -c "is_path_component_safe" "$AGENTOS_ROOT/agentos/atoms/memoryrovol/src/layer1_raw/storage.c" 2>/dev/null || echo "0")
+# R-09-01-6: memoryrovol migrated, storage.c path check deprecated
+# MEMORYROV_PATH_CHECK=$(grep -c "is_path_component_safe" "$AGENTOS_ROOT/agentos/atoms/memoryrovol/src/layer1_raw/storage.c" 2>/dev/null || echo "0")
 
 if [ "$SHELL_CMD_ALLOWED" -ge 1 ]; then pass "shell.c: Command whitelist validation present"; else warn "shell.c: Missing command validation (file may not exist yet)"; fi
 if [ "$PATH_TRAVERSAL_CHECK" -ge 1 ]; then pass "file.c: Path traversal protection present"; else warn "file.c: Missing path traversal check (file may not exist yet)"; fi
