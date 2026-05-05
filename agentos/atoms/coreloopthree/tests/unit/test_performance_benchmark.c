@@ -7,6 +7,11 @@
 #include "platform.h"
 
 #include <assert.h>
+#ifndef NDEBUG
+#else
+#undef assert
+#define assert(x) ((void)(x))
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -214,6 +219,7 @@ static void bench_mac_register_1000(void)
     printf("    registered: %zu\n", mac_framework_get_agent_count(fw));
 
     mac_framework_destroy(fw);
+    free(agent.capabilities_json);
     BENCH_PASS("MultiAgent register 1024 agents");
 }
 

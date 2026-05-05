@@ -68,7 +68,7 @@ void agentos_registry_cleanup(void) {
     }
     g_registry = NULL;
     agentos_mutex_unlock(g_registry_lock);
-    agentos_mutex_destroy(g_registry_lock);
+    agentos_mutex_free(g_registry_lock);
     g_registry_lock = NULL;
 }
 

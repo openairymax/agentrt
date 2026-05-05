@@ -52,7 +52,7 @@ static const char* g_storage_endpoint_urls[] = {
     [CHINA_ECO_OSS_HUAWEI]  = "https://obs.cn-north-4.myhuaweicloud.com"
 };
 
-static const char* g_storage_names[] = {
+static const char* __attribute__((unused)) g_storage_names[] = {
     [CHINA_ECO_OSS_ALIYUN]  = "oss",
     [CHINA_ECO_OSS_TENCENT] = "cos",
     [CHINA_ECO_OSS_BAIDU]   = "bos",
@@ -208,7 +208,7 @@ int china_eco_storage_download(china_eco_handle_t* h,
                                 void** data, size_t* size) {
     if (!h || !object_key || !data || !size) return -1;
 
-    if (storage_type) { }
+    (void)storage_type;
     *data = NULL;
     *size = 0;
     return 0;
@@ -575,7 +575,7 @@ int china_eco_sm4_decrypt(china_eco_sm4_context_t* ctx,
 }
 
 static int china_eco_proto_init(void* context, const void* config) {
-    if (config) { }
+    (void)config;
     china_eco_handle_t* h = (china_eco_handle_t*)context;
     if (!h) {
         if (china_eco_create(&h) != 0) return -1;
@@ -586,7 +586,7 @@ static int china_eco_proto_init(void* context, const void* config) {
 }
 
 static int china_eco_proto_destroy(void* context) {
-    if (context) { }
+    (void)context;
     g_china_eco_state.proto_initialized = false;
     return 0;
 }
@@ -594,7 +594,7 @@ static int china_eco_proto_destroy(void* context) {
 static int china_eco_proto_handle_request(void* context,
                                            const void* req,
                                            void** resp) {
-    if (context) { }
+    (void)context;
     if (!req || !resp) return -1;
 
     char buf[4096];
@@ -618,14 +618,17 @@ static int china_eco_proto_handle_request(void* context,
     return 0;
 }
 
-static const char* china_eco_proto_get_version(void* context) {
-    if (context) { }
-    return CHINA_ECO_VERSION;
+static int china_eco_proto_get_version(void* context, char* version_buf, size_t max_size) {
+    (void)context;
+    if (version_buf && max_size > 0) {
+        snprintf(version_buf, max_size, "%s", CHINA_ECO_VERSION);
+    }
+    return 0;
 }
 
-static uint64_t china_eco_proto_capabilities(void* context) {
-    if (context) { }
-    return (uint64_t)(
+static uint32_t china_eco_proto_capabilities(void* context) {
+    (void)context;
+    return (uint32_t)(
         CHINA_ECO_CAP_LLM_BRIDGE |
         CHINA_ECO_CAP_OBJECT_STORAGE |
         CHINA_ECO_CAP_SM_CRYPTO |

@@ -108,8 +108,8 @@ int langchain_register_tool(langchain_adapter_context_t* ctx,
     ctx->tools[ctx->tool_count].tool_type = tool->tool_type;
     ctx->tools[ctx->tool_count].is_async = tool->is_async;
 
-    if (executor) { }
-    if (user_data) { }
+    (void)executor;
+    (void)user_data;
 
     ctx->tool_count++;
     return 0;
@@ -193,7 +193,7 @@ typedef struct {
     int tdcount;
 } lc_chain_template_t;
 
-static const lc_chain_template_t g_lc_chains[] = {
+static const lc_chain_template_t __attribute__((unused)) g_lc_chains[] = {
     { {"query", "search", "find", "lookup", "retrieve"}, 5,
       {"Executing retrieval-augmented chain: ", "Running RAG pipeline: ", }, 2,
       {"Document indexing complete. Found relevant passages matching the query context.",
@@ -613,7 +613,7 @@ static int langchain_proto_handle_request(void* context,
 }
 
 static int langchain_proto_get_version(void* context, char* buf, size_t max_size) {
-    if (context) { }
+    (void)context;
     if (!buf || max_size == 0) return -1;
     const char* ver = LANGCHAIN_ADAPTER_VERSION;
     size_t len = strlen(ver);
@@ -624,7 +624,7 @@ static int langchain_proto_get_version(void* context, char* buf, size_t max_size
 }
 
 static uint32_t langchain_proto_capabilities(void* context) {
-    if (context) { }
+    (void)context;
     return (uint32_t)(PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_RESOURCE_ACCESS);
 }
 

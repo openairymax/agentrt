@@ -87,7 +87,7 @@ static void test_stop_from_wrong_state(void)
     };
 
     agentos_service_t svc = NULL;
-    agentos_error_t err = agentos_service_create(&svc, "test_stop_wrong", &iface, &g_test_config);
+    agentos_error_t err = agentos_service_create(&svc, "test_stop_wrong", &iface, NULL);
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
@@ -111,7 +111,7 @@ static void test_stop_normal_flow(void)
     };
 
     agentos_service_t svc = NULL;
-    agentos_error_t err = agentos_service_create(&svc, "test_stop_normal", &iface, &g_test_config);
+    agentos_error_t err = agentos_service_create(&svc, "test_stop_normal", &iface, NULL);
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
@@ -145,7 +145,7 @@ static void test_stop_then_start_again(void)
     };
 
     agentos_service_t svc = NULL;
-    agentos_error_t err = agentos_service_create(&svc, "test_restart", &iface, &g_test_config);
+    agentos_error_t err = agentos_service_create(&svc, "test_restart", &iface, NULL);
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
@@ -174,7 +174,7 @@ static void test_start_from_zombie_state(void)
     };
 
     agentos_service_t svc = NULL;
-    agentos_error_t err = agentos_service_create(&svc, "test_zombie_start", &iface, &g_test_config);
+    agentos_error_t err = agentos_service_create(&svc, "test_zombie_start", &iface, NULL);
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
@@ -219,7 +219,7 @@ static void test_service_create_and_destroy(void)
     };
 
     agentos_service_t svc = NULL;
-    agentos_error_t err = agentos_service_create(&svc, "test_lifecycle", &iface, &g_test_config);
+    agentos_error_t err = agentos_service_create(&svc, "test_lifecycle", &iface, NULL);
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 

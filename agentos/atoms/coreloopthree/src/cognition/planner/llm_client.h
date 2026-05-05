@@ -3,11 +3,11 @@
  * @brief LLM客户端接口 - CoreLoopThree本地副本
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
- * 本文件是 memoryrovol/include/llm_client.h 的公共接口子集，
+ * 本文件是 llm_client 的公共接口，
  * 仅包含 CoreLoopThree 所需的类型声明和函数原型。
  * 实现位于 MemoryRovol 独立仓库或内置 LLM 适配器中。
  *
- * BAN-35 合规：CoreLoopThree 不直接依赖 memoryrovol 源码目录
+ * BAN-35 合规：CoreLoopThree 使用内置 memory 子系统
  */
 
 #ifndef AGENTOS_LLM_CLIENT_H

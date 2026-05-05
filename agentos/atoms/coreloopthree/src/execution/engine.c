@@ -127,7 +127,7 @@ static void task_hash_table_destroy(task_hash_table_t *table)
     }
     agentos_mutex_unlock(table->lock);
 
-    agentos_mutex_destroy(table->lock);
+    agentos_mutex_free(table->lock);
     AGENTOS_FREE(table->buckets);
     AGENTOS_FREE(table);
 }
@@ -263,9 +263,9 @@ static void tcb_release(task_tcb_t *tcb)
         if (tcb->result)
             AGENTOS_FREE(tcb->result);
         if (tcb->completed_cond)
-            agentos_cond_destroy(tcb->completed_cond);
+            agentos_cond_free(tcb->completed_cond);
         if (tcb->tcb_lock)
-            agentos_mutex_destroy(tcb->tcb_lock);
+            agentos_mutex_free(tcb->tcb_lock);
         AGENTOS_FREE(tcb);
     }
 }
@@ -460,11 +460,11 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
     engine->task_available_cond = agentos_cond_create();
     if (!engine->queue_lock || !engine->running_lock || !engine->task_available_cond) {
         if (engine->queue_lock)
-            agentos_mutex_destroy(engine->queue_lock);
+            agentos_mutex_free(engine->queue_lock);
         if (engine->running_lock)
-            agentos_mutex_destroy(engine->running_lock);
+            agentos_mutex_free(engine->running_lock);
         if (engine->task_available_cond)
-            agentos_cond_destroy(engine->task_available_cond);
+            agentos_cond_free(engine->task_available_cond);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to create synchronization primitives");
         return AGENTOS_ENOMEM;
@@ -475,9 +475,9 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
     engine->worker_threads =
         (agentos_thread_t *)AGENTOS_MALLOC(engine->worker_count * sizeof(agentos_thread_t));
     if (!engine->worker_threads) {
-        agentos_mutex_destroy(engine->queue_lock);
-        agentos_mutex_destroy(engine->running_lock);
-        agentos_cond_destroy(engine->task_available_cond);
+        agentos_mutex_free(engine->queue_lock);
+        agentos_mutex_free(engine->running_lock);
+        agentos_cond_free(engine->task_available_cond);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to allocate worker threads array");
         return AGENTOS_ENOMEM;
@@ -487,9 +487,9 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
     engine->task_map = task_hash_table_create(max_concurrency * 2);
     if (!engine->task_map) {
         AGENTOS_FREE(engine->worker_threads);
-        agentos_mutex_destroy(engine->queue_lock);
-        agentos_mutex_destroy(engine->running_lock);
-        agentos_cond_destroy(engine->task_available_cond);
+        agentos_mutex_free(engine->queue_lock);
+        agentos_mutex_free(engine->running_lock);
+        agentos_cond_free(engine->task_available_cond);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to create task hash table");
         return AGENTOS_ENOMEM;
@@ -503,9 +503,9 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
                 agentos_platform_thread_join(engine->worker_threads[j], NULL);
             }
             AGENTOS_FREE(engine->worker_threads);
-            agentos_mutex_destroy(engine->queue_lock);
-            agentos_mutex_destroy(engine->running_lock);
-            agentos_cond_destroy(engine->task_available_cond);
+            agentos_mutex_free(engine->queue_lock);
+            agentos_mutex_free(engine->running_lock);
+            agentos_cond_free(engine->task_available_cond);
             AGENTOS_FREE(engine);
             AGENTOS_LOG_ERROR("Failed to create worker thread %zu", i);
             return AGENTOS_ENOMEM;
@@ -557,9 +557,9 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
     task_hash_table_destroy(engine->task_map);
     engine->task_map = NULL;
 
-    agentos_mutex_destroy(engine->queue_lock);
-    agentos_mutex_destroy(engine->running_lock);
-    agentos_cond_destroy(engine->task_available_cond);
+    agentos_mutex_free(engine->queue_lock);
+    agentos_mutex_free(engine->running_lock);
+    agentos_cond_free(engine->task_available_cond);
     AGENTOS_FREE(engine);
 }
 
@@ -623,9 +623,9 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
         if (tcb->task_id)
             AGENTOS_FREE(tcb->task_id);
         if (tcb->completed_cond)
-            agentos_cond_destroy(tcb->completed_cond);
+            agentos_cond_free(tcb->completed_cond);
         if (tcb->tcb_lock)
-            agentos_mutex_destroy(tcb->tcb_lock);
+            agentos_mutex_free(tcb->tcb_lock);
         AGENTOS_FREE(tcb);
         AGENTOS_FREE(task_copy);
         return AGENTOS_ENOMEM;

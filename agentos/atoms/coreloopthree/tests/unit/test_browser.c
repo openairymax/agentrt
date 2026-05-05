@@ -8,6 +8,11 @@
 #include "execution.h"
 #include "memory_compat.h"
 #include <assert.h>
+#ifndef NDEBUG
+#else
+#undef assert
+#define assert(x) ((void)(x))
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -61,7 +61,7 @@ agentos_error_t agentos_compensation_compensate(agentos_compensation_t *mgr, con
     return AGENTOS_SUCCESS;
 }
 
-/* memory provider stubs - using provider interface instead of direct memoryrovol calls */
+/* memory provider stubs - using built-in memory subsystem */
 static int g_memory_provider_initialized = 0;
 
 /* syscall stubs */

@@ -86,6 +86,7 @@ include_directories(${PROTOCOLS_INCLUDE_DIRS})
 # ============================================================
 set(PROTOCOLS_COMMON_SOURCES
     common/src/unified_protocol.c
+    ../daemon/common/src/safe_string_utils.c
 )
 
 # ============================================================
@@ -263,6 +264,9 @@ set_target_properties(agentos_protocols PROPERTIES
 # 链接依赖
 if(TARGET commons)
     target_link_libraries(agentos_protocols commons)
+endif()
+if(TARGET svc_common)
+    target_link_libraries(agentos_protocols svc_common)
 endif()
 
 # 编译定义
