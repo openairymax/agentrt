@@ -52,7 +52,7 @@ static const char* g_storage_endpoint_urls[] = {
     [CHINA_ECO_OSS_HUAWEI]  = "https://obs.cn-north-4.myhuaweicloud.com"
 };
 
-static const char* __attribute__((unused)) g_storage_names[] = {
+static const char* g_storage_names[] = {
     [CHINA_ECO_OSS_ALIYUN]  = "oss",
     [CHINA_ECO_OSS_TENCENT] = "cos",
     [CHINA_ECO_OSS_BAIDU]   = "bos",
@@ -618,17 +618,14 @@ static int china_eco_proto_handle_request(void* context,
     return 0;
 }
 
-static int china_eco_proto_get_version(void* context, char* version_buf, size_t max_size) {
+static const char* china_eco_proto_get_version(void* context) {
     (void)context;
-    if (version_buf && max_size > 0) {
-        snprintf(version_buf, max_size, "%s", CHINA_ECO_VERSION);
-    }
-    return 0;
+    return CHINA_ECO_VERSION;
 }
 
-static uint32_t china_eco_proto_capabilities(void* context) {
+static uint64_t china_eco_proto_capabilities(void* context) {
     (void)context;
-    return (uint32_t)(
+    return (uint64_t)(
         CHINA_ECO_CAP_LLM_BRIDGE |
         CHINA_ECO_CAP_OBJECT_STORAGE |
         CHINA_ECO_CAP_SM_CRYPTO |

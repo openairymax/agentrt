@@ -64,7 +64,9 @@ extern "C" {
 
 #define AGENTOS_ECYCLE                 -35
 
+#ifndef AGENTOS_EFAIL
 #define AGENTOS_EFAIL                  -36
+#endif
 
 /* AGENTOS_ERROR 已统一为 AGENTOS_EUNKNOWN（见agentos_types.h） */
 

@@ -13,8 +13,8 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../..)
+# R-09-124: converted to target_include_directories
+# R-09-124: converted to target_include_directories
 
 set(heapstore_SOURCES
     src/heapstore_core.c

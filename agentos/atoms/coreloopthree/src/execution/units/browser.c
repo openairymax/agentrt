@@ -13,6 +13,10 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <errno.h>
+#include <fcntl.h>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -29,6 +33,9 @@
 #define BROWSER_CDP_PORT_FIRST 9222
 #define BROWSER_LAUNCH_TIMEOUT_MS 15000
 #define BROWSER_CDP_CONNECT_TIMEOUT_MS 5000
+#define BROWSER_STOP_TIMEOUT_MS 5000
+#define CDP_WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define CDP_WS_KEY_LEN 24
 
 typedef enum {
     BROWSER_STATE_STOPPED = 0,
@@ -79,6 +86,129 @@ static void browser_mgr_shutdown(void);
 static uint32_t browser_get_time_ms(void)
 {
     return (uint32_t)(agentos_time_ms() & 0xFFFFFFFF);
+}
+
+static void base64_encode(const unsigned char *src, size_t src_len, char *dst, size_t dst_size)
+{
+    static const char b64[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    size_t out_pos = 0;
+
+    for (size_t i = 0; i < src_len; i += 3) {
+        unsigned int triple = ((unsigned int)src[i]) << 16;
+        if (i + 1 < src_len) triple |= ((unsigned int)src[i + 1]) << 8;
+        if (i + 2 < src_len) triple |= (unsigned int)src[i + 2];
+
+        for (int j = 0; j < 4 && out_pos < dst_size - 1; j++) {
+            if (i / 3 * 4 + j < (src_len * 4 + 2) / 3) {
+                dst[out_pos++] = b64[(triple >> (18 - j * 6)) & 0x3F];
+            } else {
+                dst[out_pos++] = '=';
+            }
+        }
+    }
+    dst[out_pos] = '\0';
+}
+
+static int cdp_ws_connect(const char *ws_url, int *out_fd)
+{
+    if (!ws_url || !out_fd)
+        return -1;
+
+    const char *host_start = strstr(ws_url, "://");
+    if (!host_start)
+        return -1;
+    host_start += 3;
+
+    int port = BROWSER_CDP_PORT_FIRST;
+    const char *port_start = strchr(host_start, ':');
+    const char *path_start = strchr(host_start, '/');
+
+    char host[128] = "127.0.0.1";
+    if (port_start && (!path_start || port_start < path_start)) {
+        size_t host_len = (size_t)(port_start - host_start);
+        if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
+        memcpy(host, host_start, host_len);
+        host[host_len] = '\0';
+        port = (int)strtol(port_start + 1, NULL, 10);
+    } else if (path_start) {
+        size_t host_len = (size_t)(path_start - host_start);
+        if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
+        memcpy(host, host_start, host_len);
+        host[host_len] = '\0';
+    }
+
+    const char *path = "/";
+    if (path_start)
+        path = path_start;
+
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0)
+        return -1;
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons((uint16_t)port);
+    addr.sin_addr.s_addr = inet_addr(host);
+
+    struct timeval tv;
+    tv.tv_sec = (time_t)(BROWSER_CDP_CONNECT_TIMEOUT_MS / 1000);
+    tv.tv_usec = (suseconds_t)((BROWSER_CDP_CONNECT_TIMEOUT_MS % 1000) * 1000);
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(fd);
+        return -1;
+    }
+
+    unsigned char nonce[16];
+    for (int i = 0; i < 16; i++)
+        nonce[i] = (unsigned char)((rand() >> (i % 4)) & 0xFF);
+    char key_b64[CDP_WS_KEY_LEN + 1];
+    base64_encode(nonce, 16, key_b64, sizeof(key_b64));
+
+    char req[2048];
+    int req_len = snprintf(req, sizeof(req),
+                           "GET %s HTTP/1.1\r\n"
+                           "Host: %s:%d\r\n"
+                           "Upgrade: websocket\r\n"
+                           "Connection: Upgrade\r\n"
+                           "Sec-WebSocket-Key: %s\r\n"
+                           "Sec-WebSocket-Version: 13\r\n"
+                           "\r\n",
+                           path, host, port, key_b64);
+    if (req_len <= 0 || (size_t)req_len >= sizeof(req)) {
+        close(fd);
+        return -1;
+    }
+
+    if (send(fd, req, (size_t)req_len, 0) != (ssize_t)req_len) {
+        close(fd);
+        return -1;
+    }
+
+    char resp[4096];
+    ssize_t n = recv(fd, resp, sizeof(resp) - 1, 0);
+    if (n <= 0) {
+        close(fd);
+        return -1;
+    }
+    resp[n] = '\0';
+
+    if (strstr(resp, "101") == NULL || strstr(resp, "Upgrade") == NULL) {
+        close(fd);
+        return -1;
+    }
+
+    struct timeval tv_default;
+    tv_default.tv_sec = 5;
+    tv_default.tv_usec = 0;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv_default, sizeof(tv_default));
+
+    *out_fd = fd;
+    return 0;
 }
 
 static int browser_mgr_init(void)
@@ -141,9 +271,8 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
         return -1;
     }
 
-    if (browser_path && browser_path[0])
-        snprintf(g_browser_mgr.browser_path, sizeof(g_browser_mgr.browser_path), "%s",
-                 browser_path);
+    snprintf(g_browser_mgr.browser_path, sizeof(g_browser_mgr.browser_path), "%s",
+             browser_path);
     if (port > 0)
         g_browser_mgr.remote_debugging_port = port;
     g_browser_mgr.headless = (uint32_t)(headless ? 1 : 0);
@@ -154,10 +283,135 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
     g_browser_mgr.state = BROWSER_STATE_LAUNCHING;
     g_browser_mgr.launch_time_ms = browser_get_time_ms();
 
-    snprintf(g_browser_mgr.remote_debugging_url, sizeof(g_browser_mgr.remote_debugging_url),
-             "ws://127.0.0.1:%d/devtools/browser", g_browser_mgr.remote_debugging_port);
+    int pipe_fd[2];
+    if (pipe(pipe_fd) != 0) {
+        g_browser_mgr.state = BROWSER_STATE_ERROR;
+        agentos_mutex_unlock(&g_browser_mgr.browser_lock);
+        return -1;
+    }
 
-    g_browser_mgr.state = BROWSER_STATE_RUNNING;
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
+        g_browser_mgr.state = BROWSER_STATE_ERROR;
+        agentos_mutex_unlock(&g_browser_mgr.browser_lock);
+        return -1;
+    }
+
+    if (pid == 0) {
+        close(pipe_fd[0]);
+        dup2(pipe_fd[1], STDERR_FILENO);
+        close(pipe_fd[1]);
+
+        char port_arg[48];
+        snprintf(port_arg, sizeof(port_arg), "--remote-debugging-port=%d",
+                 g_browser_mgr.remote_debugging_port);
+
+        char *argv[16];
+        int argc = 0;
+        argv[argc++] = (char *)browser_path;
+        argv[argc++] = port_arg;
+        if (g_browser_mgr.headless) {
+            argv[argc++] = "--headless=new";
+            argv[argc++] = "--disable-gpu";
+        }
+        argv[argc++] = "--no-sandbox";
+        argv[argc++] = "--disable-dev-shm-usage";
+        argv[argc++] = "--disable-extensions";
+        argv[argc++] = "--disable-background-networking";
+        argv[argc++] = "--disable-sync";
+        argv[argc++] = "--no-first-run";
+        argv[argc++] = "--no-default-browser-check";
+
+        char udd_arg[1024];
+        snprintf(udd_arg, sizeof(udd_arg), "--user-data-dir=%s",
+                 g_browser_mgr.user_data_dir);
+        argv[argc++] = udd_arg;
+
+        argv[argc] = NULL;
+
+        execvp(browser_path, argv);
+        _exit(127);
+    }
+
+    close(pipe_fd[1]);
+    g_browser_mgr.browser_pid = pid;
+
+    int flags = fcntl(pipe_fd[0], F_GETFL, 0);
+    fcntl(pipe_fd[0], F_SETFL, flags | O_NONBLOCK);
+
+    char stderr_buf[4096];
+    memset(stderr_buf, 0, sizeof(stderr_buf));
+    char ws_url[256] = {0};
+    uint32_t start_ms = browser_get_time_ms();
+    ssize_t total = 0;
+
+    while ((browser_get_time_ms() - start_ms) < BROWSER_LAUNCH_TIMEOUT_MS) {
+        if (total < (ssize_t)(sizeof(stderr_buf) - 1)) {
+            ssize_t n = read(pipe_fd[0], stderr_buf + total,
+                             sizeof(stderr_buf) - (size_t)total - 1);
+            if (n > 0) {
+                total += n;
+                stderr_buf[total] = '\0';
+
+                const char *listen_tag = strstr(stderr_buf, "DevTools listening on ");
+                if (listen_tag) {
+                    listen_tag += strlen("DevTools listening on ");
+                    size_t i = 0;
+                    while (listen_tag[i] && listen_tag[i] != '\n' &&
+                           listen_tag[i] != '\r' && i < sizeof(ws_url) - 1) {
+                        ws_url[i] = listen_tag[i];
+                        i++;
+                    }
+                    ws_url[i] = '\0';
+                    break;
+                }
+            }
+        }
+
+        if (ws_url[0] == '\0') {
+            int test_fd = socket(AF_INET, SOCK_STREAM, 0);
+            if (test_fd >= 0) {
+                struct sockaddr_in test_addr;
+                memset(&test_addr, 0, sizeof(test_addr));
+                test_addr.sin_family = AF_INET;
+                test_addr.sin_port = htons((uint16_t)g_browser_mgr.remote_debugging_port);
+                test_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+                struct timeval ct;
+                ct.tv_sec = 0;
+                ct.tv_usec = 200000;
+                setsockopt(test_fd, SOL_SOCKET, SO_SNDTIMEO, &ct, sizeof(ct));
+
+                if (connect(test_fd, (struct sockaddr *)&test_addr, sizeof(test_addr)) == 0) {
+                    snprintf(ws_url, sizeof(ws_url),
+                             "ws://127.0.0.1:%d/devtools/browser",
+                             g_browser_mgr.remote_debugging_port);
+                    close(test_fd);
+                    break;
+                }
+                close(test_fd);
+            }
+        }
+
+        usleep(50000);
+    }
+
+    close(pipe_fd[0]);
+
+    if (ws_url[0] != '\0') {
+        snprintf(g_browser_mgr.remote_debugging_url,
+                 sizeof(g_browser_mgr.remote_debugging_url), "%s", ws_url);
+        g_browser_mgr.state = BROWSER_STATE_RUNNING;
+    } else {
+        snprintf(g_browser_mgr.remote_debugging_url,
+                 sizeof(g_browser_mgr.remote_debugging_url),
+                 "ws://127.0.0.1:%d/devtools/browser",
+                 g_browser_mgr.remote_debugging_port);
+        g_browser_mgr.state = BROWSER_STATE_RUNNING;
+    }
+
     agentos_mutex_unlock(&g_browser_mgr.browser_lock);
     return 0;
 }
@@ -215,6 +469,35 @@ int agentos_browser_close(void)
     g_browser_mgr.context_count = 0;
     agentos_mutex_unlock(&g_browser_mgr.pool_lock);
 
+    if (g_browser_mgr.browser_pid > 0) {
+        pid_t bp = g_browser_mgr.browser_pid;
+        g_browser_mgr.browser_pid = 0;
+
+        kill(bp, SIGTERM);
+
+        int waited = 0;
+        uint32_t stop_start = browser_get_time_ms();
+        while ((browser_get_time_ms() - stop_start) < BROWSER_STOP_TIMEOUT_MS) {
+            int wstatus = 0;
+            pid_t wp = waitpid(bp, &wstatus, WNOHANG);
+            if (wp == bp) {
+                waited = 1;
+                break;
+            }
+            if (wp < 0 && errno == ECHILD) {
+                waited = 1;
+                break;
+            }
+            usleep(50000);
+        }
+
+        if (!waited) {
+            kill(bp, SIGKILL);
+            int wstatus = 0;
+            waitpid(bp, &wstatus, 0);
+        }
+    }
+
     g_browser_mgr.state = BROWSER_STATE_STOPPED;
     agentos_mutex_unlock(&g_browser_mgr.browser_lock);
     browser_mgr_shutdown();
@@ -255,7 +538,19 @@ static int cdp_pool_acquire(const char *agent_id, const char *endpoint, cdp_conn
 
     snprintf(g_browser_mgr.connections[idx].agent_id,
              sizeof(g_browser_mgr.connections[idx].agent_id), "%s", agent_id);
-    g_browser_mgr.connections[idx].socket_fd = -1;
+
+    const char *conn_url = NULL;
+    if (endpoint && endpoint[0])
+        conn_url = endpoint;
+    else if (g_browser_mgr.remote_debugging_url[0])
+        conn_url = g_browser_mgr.remote_debugging_url;
+
+    int ws_fd = -1;
+    if (conn_url) {
+        cdp_ws_connect(conn_url, &ws_fd);
+    }
+
+    g_browser_mgr.connections[idx].socket_fd = ws_fd;
     g_browser_mgr.connections[idx].in_use = 1;
     g_browser_mgr.connections[idx].last_active_ms = browser_get_time_ms();
 
@@ -1169,6 +1464,30 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
             }
 
             if (strstr(cmd, "fill") != NULL) {
+                int clear_id = cdp_get_id();
+                char *escaped_sel_fill = js_escape(sel_buf, strlen(sel_buf));
+                if (escaped_sel_fill) {
+                    char clear_js[2048];
+                    snprintf(clear_js, sizeof(clear_js),
+                             "var e=document.querySelector('%s');if(e){e.value='';}",
+                             escaped_sel_fill);
+                    char clear_json[4096];
+                    int cw = snprintf(clear_json, sizeof(clear_json),
+                                      "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                                      "\"params\":{\"expression\":\"%s\","
+                                      "\"returnByValue\":true}}",
+                                      clear_id, clear_js);
+                    if (cw > 0 && (size_t)cw < sizeof(clear_json)) {
+                        if (ws_send_frame(conn->socket_fd, clear_json,
+                                          strlen(clear_json)) == 0) {
+                            char *cr = NULL;
+                            if (ws_recv_frame(conn->socket_fd, &cr, NULL, 3000) == 0 && cr)
+                                AGENTOS_FREE(cr);
+                        }
+                    }
+                    AGENTOS_FREE(escaped_sel_fill);
+                }
+
                 int insert_id = cdp_get_id();
                 char *escaped_val = js_escape(val_buf, strlen(val_buf));
                 if (escaped_val) {
@@ -1201,6 +1520,57 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                             }
                         }
                     }
+                }
+
+                if (!cdp_ok && val_buf[0]) {
+                    int set_val_id = cdp_get_id();
+                    char *es_sel = js_escape(sel_buf, strlen(sel_buf));
+                    char *es_val = js_escape(val_buf, strlen(val_buf));
+                    if (es_sel && es_val) {
+                        char set_val_js[4096];
+                        int svl = snprintf(set_val_js, sizeof(set_val_js),
+                                           "var e=document.querySelector('%s');if(e){"
+                                           "e.value='%s';"
+                                           "e.dispatchEvent(new Event('input',"
+                                           "{bubbles:true}));"
+                                           "e.dispatchEvent(new Event('change',"
+                                           "{bubbles:true}));}",
+                                           es_sel, es_val);
+                        char set_val_json[8192];
+                        int svw = snprintf(set_val_json, sizeof(set_val_json),
+                                           "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                                           "\"params\":{\"expression\":\"%s\","
+                                           "\"returnByValue\":true}}",
+                                           set_val_id, set_val_js);
+                        if (svl > 0 && (size_t)svl < sizeof(set_val_js) &&
+                            svw > 0 && (size_t)svw < sizeof(set_val_json)) {
+                            if (ws_send_frame(conn->socket_fd, set_val_json,
+                                              strlen(set_val_json)) == 0) {
+                                char *svr = NULL;
+                                if (ws_recv_frame(conn->socket_fd, &svr, NULL, 3000) == 0 && svr) {
+                                    if (strstr(svr, "\"result\"")) {
+                                        cdp_ok = 1;
+                                        size_t buf_size = 256 + strlen(sel_buf) +
+                                            strlen(val_buf) + 1;
+                                        result_json = (char *)AGENTOS_MALLOC(buf_size);
+                                        if (result_json) {
+                                            snprintf(result_json, buf_size,
+                                                     "{\"status\":\"filled\","
+                                                     "\"selector\":\"%s\","
+                                                     "\"value\":\"%s\","
+                                                     "\"cdp_method\":"
+                                                     "\"DOM.setAttributeValue\","
+                                                     "\"cdp\":true}",
+                                                     sel_buf, val_buf);
+                                        }
+                                    }
+                                    AGENTOS_FREE(svr);
+                                }
+                            }
+                        }
+                    }
+                    AGENTOS_FREE(es_sel);
+                    AGENTOS_FREE(es_val);
                 }
             } else {
                 size_t vlen = strlen(val_buf);
@@ -1311,6 +1681,16 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
 
         int cdp_ok = 0;
         if (has_cdp) {
+            int pe_id = cdp_get_id();
+            char pe_json[256];
+            snprintf(pe_json, sizeof(pe_json),
+                     "{\"id\":%d,\"method\":\"Page.enable\"}", pe_id);
+            if (ws_send_frame(conn->socket_fd, pe_json, strlen(pe_json)) == 0) {
+                char *pe_resp = NULL;
+                if (ws_recv_frame(conn->socket_fd, &pe_resp, NULL, 5000) == 0 && pe_resp)
+                    AGENTOS_FREE(pe_resp);
+            }
+
             int cdp_id = cdp_get_id();
             char cdp_js[4096];
             int written;
@@ -1348,10 +1728,38 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                     goto cdpskip;
                 }
             } else {
-                written = snprintf(cdp_js, sizeof(cdp_js),
-                                   "new Promise(function(r){"
-                                   "setTimeout(function(){r('waited');},%u);})",
-                                   timeout_ms);
+                int check_page_load =
+                    (strstr(cmd, "load") != NULL || strstr(cmd, "page") != NULL ||
+                     strstr(cmd, "ready") != NULL);
+                int check_network =
+                    (strstr(cmd, "network") != NULL || strstr(cmd, "idle") != NULL);
+
+                if (check_page_load || check_network) {
+                    written = snprintf(cdp_js, sizeof(cdp_js),
+                                       "(function(){return new Promise(function(r){"
+                                       "var st=Date.now();var mt=%u;"
+                                       "var lastAct=Date.now();"
+                                       "var pending=0;"
+                                       "var origXHR=XMLHttpRequest.prototype.send;"
+                                       "XMLHttpRequest.prototype.send=function(){"
+                                       "pending++;lastAct=Date.now();"
+                                       "this.addEventListener('loadend',function(){"
+                                       "pending--;lastAct=Date.now();});"
+                                       "return origXHR.apply(this,arguments);};"
+                                       "var chk=function(){"
+                                       "if(document.readyState==='complete'&&"
+                                       "pending===0&&"
+                                       "(Date.now()-lastAct)>500){r('ready');}"
+                                       "else if(Date.now()-st>mt){r('timeout');}"
+                                       "else{setTimeout(chk,100);}};"
+                                       "chk();})})()",
+                                       timeout_ms);
+                } else {
+                    written = snprintf(cdp_js, sizeof(cdp_js),
+                                       "new Promise(function(r){"
+                                       "setTimeout(function(){r('waited');},%u);})",
+                                       timeout_ms);
+                }
             }
 
             if (written > 0 && (size_t)written < sizeof(cdp_js)) {
