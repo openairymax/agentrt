@@ -33,7 +33,7 @@ static void rr_destroy(agentos_dispatching_strategy_t* strategy)
     struct agentos_round_robin_dispatch* rr =
         (struct agentos_round_robin_dispatch*)strategy->data;
     if (rr) {
-        agentos_mutex_destroy(rr->lock);
+        agentos_mutex_free(rr->lock);
         AGENTOS_FREE(rr);
     }
     AGENTOS_FREE(strategy);

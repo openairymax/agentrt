@@ -10,6 +10,7 @@ import json
 import hashlib
 import time
 import logging
+import tempfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
@@ -78,7 +79,7 @@ class CheckpointManager:
         - 容易失败且恢复成本高的任务
     
     Example:
-        >>> mgr = CheckpointManager("/tmp/checkpoints")
+        >>> mgr = CheckpointManager()
         >>> 
         >>> # 创建检查点
         >>> checkpoint = mgr.create_checkpoint(
@@ -94,16 +95,9 @@ class CheckpointManager:
         >>>     print(f"从步骤 {start_step} 继续执行")
     """
     
-    def __init__(self, storage_path: str = "/tmp/agentos_checkpoints"):
-        """
-        初始化检查点管理器
-        
-        Args:
-            storage_path: 检查点存储路径
-        
-        Example:
-            >>> mgr = CheckpointManager("/var/lib/agentos/checkpoints")
-        """
+    def __init__(self, storage_path: Optional[str] = None):
+        if storage_path is None:
+            storage_path = os.path.join(tempfile.gettempdir(), "agentos_checkpoints")
         self.storage_path = Path(storage_path)
         self.storage_path.mkdir(parents=True, exist_ok=True)
         

@@ -69,7 +69,7 @@ static void reactive_destroy(agentos_plan_strategy_t* strategy) {
     reactive_data_t* data = (reactive_data_t*)strategy->data;
     if (data) {
         if (data->model_name) AGENTOS_FREE(data->model_name);
-        if (data->lock) agentos_mutex_destroy(data->lock);
+        if (data->lock) agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
     AGENTOS_FREE(strategy);

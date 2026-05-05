@@ -588,7 +588,7 @@ agentos_error_t agentos_mc_stats(agentos_metacognition_t *mc, char **out_json)
         return AGENTOS_EINVAL;
 
     char buf[1024];
-    (void)snprintf(
+    int written = snprintf(
         buf, sizeof(buf),
         "{\"evaluations\":%llu,"
         "\"corrections\":%llu,"
@@ -604,6 +604,9 @@ agentos_error_t agentos_mc_stats(agentos_metacognition_t *mc, char **out_json)
             ? mc->calibrator.calibration_sum / (float)mc->calibrator.calibration_count
             : 0.0f,
         mc->calibrator.overconfidence_rate, mc->calibrator.underconfidence_rate, mc->record_count);
+
+    if (written < 0 || (size_t)written >= sizeof(buf))
+        return AGENTOS_ERANGE;
 
     char *result = AGENTOS_STRDUP(buf);
     if (!result)

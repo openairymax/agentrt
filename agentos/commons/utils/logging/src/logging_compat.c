@@ -245,7 +245,7 @@ void agentos_log_write_va(int level, const char* file, int line, const char* fmt
     log_write_va(new_level, file, line, fmt, args);
 }
 
-int svc_logger_init(const void* manager)
+int svc_logger_init(const void* manager __attribute__((unused)))
 {
     ensure_compat_initialized();
     record_api_call("svc_logger_init");
@@ -253,8 +253,6 @@ int svc_logger_init(const void* manager)
     /* 服务日志初始化兼容实�?*/
     LOG_INFO("Service logger initialized via compatibility layer");
     
-    /* 解析config并映射到新架构配置参数 */
-    (void)manager;
     LOG_INFO("Service logger initialized with legacy config compatibility");
     return 0;
 }

@@ -18,7 +18,7 @@
  * 集成架构：
  * ```
  * syscall/ ──────────▶ heapstore（注册表、追踪数据存储）
- * memoryrovol/ ──────▶ heapstore（记忆数据持久化）
+ * memory/ ────────▶ heapstore（记忆数据持久化）
  * corekern/ipc/ ─────▶ heapstore（IPC 数据存储）
  * agentos/commons/logging/ ──▶ heapstore（日志存储）
  * ```
@@ -178,10 +178,10 @@ AGENTOS_API agentos_error_t heapstore_syscall_trace_save(
  */
 AGENTOS_API agentos_error_t heapstore_syscall_trace_export(char** out_traces);
 
-/* ==================== memoryrovol 层集成 ==================== */
+/* ====================== memory (built-in) 层集成 ====================== */
 
 /**
- * @brief 为 memoryrovol 层提供原始记忆数据存储接口
+ * @brief 为 memory (built-in) 层提供原始记忆数据存储接口
  *
  * @param data [in] 原始数据
  * @param len [in] 数据长度
@@ -193,14 +193,14 @@ AGENTOS_API agentos_error_t heapstore_syscall_trace_export(char** out_traces);
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_memoryrovol_save(
+AGENTOS_API agentos_error_t heapstore_memory_raw_save(
     const void* data,
     size_t len,
     const char* metadata,
     char** out_record_id);
 
 /**
- * @brief 为 memoryrovol 层提供原始记忆数据加载接口
+ * @brief 为 memory (built-in) 层提供原始记忆数据加载接口
  *
  * @param record_id [in] 记录 ID
  * @param out_data [out] 输出数据（需调用者释放）
@@ -212,14 +212,14 @@ AGENTOS_API agentos_error_t heapstore_memoryrovol_save(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_memoryrovol_load(
+AGENTOS_API agentos_error_t heapstore_memory_raw_load(
     const char* record_id,
     void** out_data,
     size_t* out_len,
     char** out_metadata);
 
 /**
- * @brief 为 memoryrovol 层提供原始记忆数据删除接口
+ * @brief 为 memory (built-in) 层提供原始记忆数据删除接口
  *
  * @param record_id [in] 记录 ID
  * @return agentos_error_t 错误码
@@ -227,7 +227,7 @@ AGENTOS_API agentos_error_t heapstore_memoryrovol_load(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_memoryrovol_delete(const char* record_id);
+AGENTOS_API agentos_error_t heapstore_memory_raw_delete(const char* record_id);
 
 /* ==================== corekern IPC 层集成 ==================== */
 
