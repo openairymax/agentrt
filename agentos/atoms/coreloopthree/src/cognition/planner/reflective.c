@@ -21,8 +21,8 @@
 #include <string.h>
 #include <stdio.h>
 
-/* LLM客户端接口（通过cognition.h间接引用） */
-#include "../../../../memoryrovol/include/llm_client.h"
+/* LLM客户端接口 — BAN-35合规：使用本地副本 */
+#include "llm_client.h"
 
 typedef struct {
     agentos_thinking_chain_t* chain;

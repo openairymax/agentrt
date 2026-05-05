@@ -58,34 +58,39 @@ endif()
 
 # 核心头文件路径
 set(COREKERN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern")
-include_directories(${COREKERN_DIR}/include)
+# R-09-124: merged into target_include_directories(gateway)
+# include_directories(${COREKERN_DIR}/include)
 
 # syscall 模块
 set(SYSCALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/syscall")
-include_directories(${SYSCALL_DIR}/include)
+# R-09-124: 
+# include_directories(${SYSCALL_DIR}/include)
 
 # commons 模块（基础工具库）
 set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
-include_directories(
-    ${COMMONS_DIR}
-    ${COMMONS_DIR}/platform/include
-    ${COMMONS_DIR}/utils/error/include
-    ${COMMONS_DIR}/utils/logging/include
-    ${COMMONS_DIR}/utils/memory/include
-    ${COMMONS_DIR}/utils/sync/include
-)
+# R-09-124: 
+# include_directories(
+#     ${COMMONS_DIR}
+#     ${COMMONS_DIR}/platform/include
+#     ${COMMONS_DIR}/utils/error/include
+#     ${COMMONS_DIR}/utils/logging/include
+#     ${COMMONS_DIR}/utils/memory/include
+#     ${COMMONS_DIR}/utils/sync/include
+# )
 
 # protocols 模块（统一协议栈）
 set(PROTOCOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../protocols")
-include_directories(
-    ${PROTOCOLS_DIR}/include
-    ${PROTOCOLS_DIR}/protocol/include
-)
+# R-09-124: merged into target_include_directories(gateway)
+# include_directories(
+#     ${PROTOCOLS_DIR}/include
+#     ${PROTOCOLS_DIR}/protocol/include
+# )
 
 # gateway内部工具头文件
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
-)
+# R-09-124: 
+# include_directories(
+#     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
+# )
 
 # ========== 源文件 ==========
 set(GATEWAY_SOURCES
@@ -125,6 +130,18 @@ target_include_directories(gateway
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COREKERN_DIR}/include
+        ${SYSCALL_DIR}/include
+        ${COMMONS_DIR}
+        ${COMMONS_DIR}/platform/include
+        ${COMMONS_DIR}/utils/error/include
+        ${COMMONS_DIR}/utils/logging/include
+        ${COMMONS_DIR}/utils/memory/include
+        ${COMMONS_DIR}/utils/sync/include
+        ${PROTOCOLS_DIR}/include
+        ${PROTOCOLS_DIR}/protocol/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/network_helper
 )
 
 target_link_libraries(gateway PRIVATE

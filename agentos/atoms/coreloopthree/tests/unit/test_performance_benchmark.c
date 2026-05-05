@@ -7,6 +7,11 @@
 #include "platform.h"
 
 #include <assert.h>
+#ifndef NDEBUG
+#else
+#undef assert
+#define assert(x) ((void)(x))
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -214,6 +219,7 @@ static void bench_mac_register_1000(void)
     printf("    registered: %zu\n", mac_framework_get_agent_count(fw));
 
     mac_framework_destroy(fw);
+    free(agent.capabilities_json);
     BENCH_PASS("MultiAgent register 1024 agents");
 }
 
@@ -449,6 +455,73 @@ static void bench_mac_1000_agents_no_crash(void)
     BENCH_PASS("MultiAgent 1000-agent parallel");
 }
 
+static void bench_mac_batch_register_1000(void)
+{
+    BENCH_RUN("MultiAgent batch register 1000 agents");
+    mac_framework_t *fw = mac_framework_create(MAC_MODE_COLLABORATIVE);
+    assert(fw != NULL);
+
+    mac_agent_info_t agents[1000];
+    for (int i = 0; i < 1000; i++) {
+        memset(&agents[i], 0, sizeof(mac_agent_info_t));
+        snprintf(agents[i].id, sizeof(agents[i].id), "batch_%04d", i);
+        snprintf(agents[i].name, sizeof(agents[i].name), "BatchAgent_%04d", i);
+        agents[i].performance_score = 0.8f + (float)(i % 20) * 0.01f;
+        agents[i].reliability_score = 0.85f + (float)(i % 15) * 0.01f;
+        agents[i].max_concurrent_tasks = 4;
+        agents[i].available = true;
+    }
+
+    size_t registered = 0;
+    uint64_t t_start = bench_time_ns();
+    mac_framework_register_agents_batch(fw, agents, 1000, &registered);
+    uint64_t t_end = bench_time_ns();
+
+    printf("    Batch registered: %zu / 1000\n", registered);
+    print_ns(t_end - t_start, "total batch");
+    printf("    per-agent: %lu ns\n",
+           (unsigned long)((t_end - t_start) / (registered ? registered : 1)));
+
+    mac_framework_destroy(fw);
+    BENCH_PASS("MultiAgent batch register 1000 agents");
+}
+
+static void bench_mac_hash_lookup_1000(void)
+{
+    BENCH_RUN("MultiAgent hash lookup 1000 agents (10000 lookups)");
+    mac_framework_t *fw = mac_framework_create(MAC_MODE_COLLABORATIVE);
+    assert(fw != NULL);
+
+    mac_agent_info_t agents[1000];
+    for (int i = 0; i < 1000; i++) {
+        memset(&agents[i], 0, sizeof(mac_agent_info_t));
+        snprintf(agents[i].id, sizeof(agents[i].id), "hagent_%04d", i);
+        snprintf(agents[i].name, sizeof(agents[i].name), "HashAgent_%04d", i);
+        agents[i].performance_score = 0.9;
+        agents[i].reliability_score = 0.95;
+        agents[i].max_concurrent_tasks = 4;
+        agents[i].available = true;
+    }
+    size_t reg_count = 0;
+    mac_framework_register_agents_batch(fw, agents, 1000, &reg_count);
+
+    const int n_lookups = 10000;
+    uint64_t t_start = bench_time_ns();
+    for (int i = 0; i < n_lookups; i++) {
+        char lookup_id[32];
+        snprintf(lookup_id, sizeof(lookup_id), "hagent_%04d", i % 1000);
+        mac_framework_unregister_agent(fw, lookup_id);
+        mac_framework_register_agent(fw, &agents[i % 1000]);
+    }
+    uint64_t t_end = bench_time_ns();
+
+    print_ns(t_end - t_start, "total 10000 unregister+re-register");
+    printf("    per-lookup: %lu ns\n", (unsigned long)((t_end - t_start) / n_lookups));
+
+    mac_framework_destroy(fw);
+    BENCH_PASS("MultiAgent hash lookup 1000 agents");
+}
+
 static void bench_mutex_lock_unlock(void)
 {
     BENCH_RUN("mutex lock/unlock pair (1000000 iters)");
@@ -480,6 +553,8 @@ int main(void)
     bench_delegate_create_destroy();
     bench_delegate_assign_collect();
     bench_mac_register_1000();
+    bench_mac_batch_register_1000();
+    bench_mac_hash_lookup_1000();
     bench_mac_consensus_100_votes();
     bench_mac_delegate_10_agents();
     bench_mac_consensus_100_accuracy();

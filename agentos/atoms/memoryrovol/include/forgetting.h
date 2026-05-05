@@ -33,11 +33,13 @@ typedef struct agentos_forgetting_config {
 } agentos_forgetting_config_t;
 
 typedef struct agentos_forgetting_engine agentos_forgetting_engine_t;
+typedef struct agentos_raw_metadata_db agentos_raw_metadata_db_t;
 
 agentos_error_t agentos_forgetting_create(
     const agentos_forgetting_config_t* manager,
     void* layer1,
     void* layer2,
+    agentos_raw_metadata_db_t* meta_db,
     agentos_forgetting_engine_t** out_engine);
 
 void agentos_forgetting_destroy(agentos_forgetting_engine_t* engine);

@@ -983,8 +983,8 @@ int a2a_v03_negotiate(a2a_v03_context_t* ctx, const a2a_negotiation_t* proposal,
                                              adapter->negotiation_handler_user_data);
     }
 
-    if (response_action) *response_action = A2A_NEGOTIATE_ACCEPT;
-    if (response_terms) *response_terms = strdup("{\"accepted\":true}");
+    if (response_action) *response_action = A2A_NEGOTIATE_REJECT;
+    if (response_terms) *response_terms = NULL;
     return 0;
 }
 

@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/mman.h>
 
 #if cupolas_PLATFORM_WINDOWS
     #include <io.h>
