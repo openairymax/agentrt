@@ -79,7 +79,7 @@ if(PROTOCOLS_ENABLE_CHINA_ECO)
         ${CMAKE_CURRENT_SOURCE_DIR}/integrations/china_eco/include)
 endif()
 
-# R-09-124: converted to target_include_directories
+# R-09-124: all includes moved to target_include_directories below
 
 # ============================================================
 # 源文件 (Source Files) — Common Layer
@@ -249,7 +249,7 @@ set(PROTOCOLS_ALL_HEADERS
 # 创建库目标
 # ============================================================
 add_library(agentos_protocols ${PROTOCOLS_ALL_SOURCES})
-target_include_directories(agentos_protocols PUBLIC common/include)
+target_include_directories(agentos_protocols PUBLIC ${PROTOCOLS_INCLUDE_DIRS})
 
 # 库属性
 set_target_properties(agentos_protocols PROPERTIES
