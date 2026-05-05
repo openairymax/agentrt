@@ -31,14 +31,12 @@ typedef struct {
 
 /* ---------- 生命周期 ---------- */
 
-static provider_ctx_t* anthropic_init(const char* name,
+static provider_ctx_t* anthropic_init(const char* name __attribute__((unused)),
                                      const char* api_key,
                                      const char* api_base,
-                                     const char* organization,
+                                     const char* organization __attribute__((unused)),
                                      double timeout_sec,
                                      int max_retries) {
-    (void)name;
-    (void)organization;
 
     anthropic_ctx_t* ctx = (anthropic_ctx_t*)calloc(1, sizeof(anthropic_ctx_t));
     if (!ctx) {

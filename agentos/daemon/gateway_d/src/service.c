@@ -167,10 +167,9 @@ agentos_error_t gateway_service_start(gateway_service_t service) {
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t gateway_service_stop(gateway_service_t service, bool force) {
+agentos_error_t gateway_service_stop(gateway_service_t service, bool force __attribute__((unused))) {
     if (!service) return AGENTOS_EINVAL;
     if (service->state != GW_STATE_RUNNING) return AGENTOS_SUCCESS;
-    (void)force;
 #ifdef GATEWAY_HAS_HTTP
     if (service->http_gateway) {
         http_gateway_destroy(service->http_gateway);

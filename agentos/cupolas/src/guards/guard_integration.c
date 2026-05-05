@@ -13,6 +13,7 @@
 
 #include "guard_core.h"
 #include "../../include/cupolas.h"
+#include "platform.h"
 #include "../permission/permission.h"
 #include "../sanitizer/sanitizer.h"
 #include "../workbench/workbench.h"

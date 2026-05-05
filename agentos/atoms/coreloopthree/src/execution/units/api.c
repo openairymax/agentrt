@@ -321,7 +321,7 @@ static void api_destroy(agentos_execution_unit_t* unit) {
             AGENTOS_FREE(data->cached_responses);
         }
 
-        if (data->lock) agentos_mutex_destroy(data->lock);
+        if (data->lock) agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
 

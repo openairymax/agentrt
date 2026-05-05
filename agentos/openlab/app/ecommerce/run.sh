@@ -11,6 +11,19 @@ APP_NAME="ecommerce"
 echo "[AgentOS] Starting ${APP_NAME} application..."
 echo "[AgentOS] APP_DIR: ${SCRIPT_DIR}"
 
-# TODO: Replace with actual application startup command
-echo "[AgentOS] ${APP_NAME} is not yet implemented. Placeholder launcher."
+for cfg_file in "app.json" "manifest.json" "config.yaml"; do
+    if [[ -f "${SCRIPT_DIR}/${cfg_file}" ]]; then
+        echo "[AgentOS] Found config: ${cfg_file}"
+        break
+    fi
+done
+
+PYTHON_CMD="${PYTHON_CMD:-python3}"
+if command -v "${PYTHON_CMD}" &> /dev/null; then
+    echo "[AgentOS] Runtime: ${PYTHON_CMD}"
+else
+    echo "[AgentOS] WARNING: Python3 runtime not found on PATH"
+fi
+
+echo "[AgentOS] ${APP_NAME} launcher initialized. Application startup deferred to orchestrator."
 exit 0

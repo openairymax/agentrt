@@ -33,7 +33,7 @@ static void weighted_destroy(agentos_coordinator_base_t* base) {
         }
         AGENTOS_FREE(data->model_names);
         AGENTOS_FREE(data->weights);
-        if (data->lock) agentos_mutex_destroy(data->lock);
+        if (data->lock) agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
     AGENTOS_FREE(base);
@@ -107,7 +107,7 @@ agentos_error_t agentos_coordinator_weighted_create(
     // 复制模型名称
     data->model_names = (char**)AGENTOS_CALLOC(model_count, sizeof(char*));
     if (!data->model_names) {
-        agentos_mutex_destroy(data->lock);
+        agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
         AGENTOS_FREE(base);
         return AGENTOS_ENOMEM;
@@ -120,7 +120,7 @@ agentos_error_t agentos_coordinator_weighted_create(
                 AGENTOS_FREE(data->model_names[j]);
             }
             AGENTOS_FREE(data->model_names);
-            agentos_mutex_destroy(data->lock);
+            agentos_mutex_free(data->lock);
             AGENTOS_FREE(data);
             AGENTOS_FREE(base);
             return AGENTOS_ENOMEM;
@@ -134,7 +134,7 @@ agentos_error_t agentos_coordinator_weighted_create(
             AGENTOS_FREE(data->model_names[i]);
         }
         AGENTOS_FREE(data->model_names);
-        agentos_mutex_destroy(data->lock);
+        agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
         AGENTOS_FREE(base);
         return AGENTOS_ENOMEM;

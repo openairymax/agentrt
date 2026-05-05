@@ -20,6 +20,7 @@ set(TEST_SOURCES
     test_jsonrpc_helpers.c
     test_safe_string_utils.c
     test_input_validator.c
+    test_svc_stop.c
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})
@@ -66,6 +67,10 @@ foreach(TEST_SRC ${TEST_SOURCES})
 endforeach()
 
 message(STATUS "  svc_common_tests: ${TEST_SOURCES}")
+
+target_include_directories(svc_test_svc_stop PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../tests/unit/utils
+)
 
 # ===== P1-C06 深度单元测试 (test_daemon_common.c) =====
 add_executable(svc_test_daemon_common test_daemon_common.c)

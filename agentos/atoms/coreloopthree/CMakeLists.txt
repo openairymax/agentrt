@@ -46,6 +46,7 @@ add_library(agentos_coreloopthree STATIC
     src/config_loader.c
     src/cognition/semantic_unit.c
     src/cognition/triple_coordinator.c
+    src/utils/id_utils.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/src/checkpoint.c
 )
 # 使用统一的头文件路径管理

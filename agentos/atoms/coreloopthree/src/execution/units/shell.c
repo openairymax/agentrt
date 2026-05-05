@@ -7,6 +7,7 @@
 #include "agentos.h"
 #include "execution.h"
 #include "memory_compat.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,9 +24,9 @@ typedef struct shell_unit_data {
     char *metadata_json;
 } shell_unit_data_t;
 
-static const char *ALLOWED_SHELL_COMMANDS[] = {"ls", "cat",  "echo",   "pwd",   "whoami", "date", "hostname", "df",
-                                               "du", "free", "uptime", "uname", "id",     "env",  "head",     "tail",
-                                               "wc", "sort", "uniq",   "grep",  "find",   NULL};
+static const char *ALLOWED_SHELL_COMMANDS[] = {
+    "ls",    "cat", "echo", "pwd",  "whoami", "date", "hostname", "df",   "du",   "free", "uptime",
+    "uname", "id",  "env",  "head", "tail",   "wc",   "sort",     "uniq", "grep", "find", NULL};
 
 static int is_shell_command_allowed(const char *cmd)
 {
@@ -41,9 +42,10 @@ static int is_shell_command_allowed(const char *cmd)
         size_t len = strlen(ALLOWED_SHELL_COMMANDS[i]);
         if (strncmp(cmd, ALLOWED_SHELL_COMMANDS[i], len) == 0) {
             if (cmd[len] == ' ' || cmd[len] == '\0' || cmd[len] == '\t' || cmd[len] == '\n') {
-                if (!strchr(cmd, ';') && !strstr(cmd, "&&") && !strstr(cmd, "||") && !strchr(cmd, '|') &&
-                    !strstr(cmd, "$(") && !strstr(cmd, "${") && !strchr(cmd, '`') && !strchr(cmd, '>') &&
-                    !strchr(cmd, '<') && !strchr(cmd, '&') && !strchr(cmd, '\n') && !strchr(cmd, '\r') &&
+                if (!strchr(cmd, ';') && !strstr(cmd, "&&") && !strstr(cmd, "||") &&
+                    !strchr(cmd, '|') && !strstr(cmd, "$(") && !strstr(cmd, "${") &&
+                    !strchr(cmd, '`') && !strchr(cmd, '>') && !strchr(cmd, '<') &&
+                    !strchr(cmd, '&') && !strchr(cmd, '\n') && !strchr(cmd, '\r') &&
                     !strstr(cmd, "..")) {
                     return 1;
                 }
@@ -53,10 +55,12 @@ static int is_shell_command_allowed(const char *cmd)
     return 0;
 }
 
-static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void *input, void **out_output)
+static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void *input,
+                                     void **out_output)
 {
-    (void) unit;
-    const char *cmd = (const char *) input;
+    if (!unit || !unit->execution_unit_data)
+        return AGENTOS_EINVAL;
+    const char *cmd = (const char *)input;
     if (!cmd || !out_output)
         return AGENTOS_EINVAL;
 
@@ -72,27 +76,27 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
         return AGENTOS_EIO;
 
     STARTUPINFOA si = {0};
-    si.cb           = sizeof(si);
-    si.dwFlags      = STARTF_USESTDHANDLES;
-    si.hStdError    = hWritePipe;
-    si.hStdOutput   = hWritePipe;
-    si.hStdInput    = GetStdHandle(STD_INPUT_HANDLE);
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdError = hWritePipe;
+    si.hStdOutput = hWritePipe;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
     PROCESS_INFORMATION pi = {0};
     char cmdBuf[4096];
     snprintf(cmdBuf, sizeof(cmdBuf), "cmd /c %s", cmd);
 
-    if (!CreateProcessA(NULL, cmdBuf, NULL, NULL, TRUE, CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS, NULL, NULL, &si,
-                        &pi)) {
+    if (!CreateProcessA(NULL, cmdBuf, NULL, NULL, TRUE, CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS,
+                        NULL, NULL, &si, &pi)) {
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
         return AGENTOS_EIO;
     }
     CloseHandle(hWritePipe);
 
-    size_t cap   = 4096;
-    size_t pos   = 0;
-    char *output = (char *) AGENTOS_MALLOC(cap);
+    size_t cap = 4096;
+    size_t pos = 0;
+    char *output = (char *)AGENTOS_MALLOC(cap);
     if (!output) {
         CloseHandle(hReadPipe);
         TerminateProcess(pi.hProcess, 1);
@@ -106,10 +110,10 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
     DWORD bytesRead;
     while (ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0) {
         buffer[bytesRead] = '\0';
-        size_t len        = bytesRead;
+        size_t len = bytesRead;
         if (pos + len + 1 > cap) {
             cap *= 2;
-            char *new_out = (char *) AGENTOS_REALLOC(output, cap);
+            char *new_out = (char *)AGENTOS_REALLOC(output, cap);
             if (!new_out) {
                 AGENTOS_FREE(output);
                 CloseHandle(hReadPipe);
@@ -164,17 +168,18 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
         dup2(pipe_err[1], STDERR_FILENO);
         close(pipe_out[1]);
         close(pipe_err[1]);
-        /* flawfinder: ignore - cmd validated by is_shell_command_allowed (whitelist + metachar rejection) */
-        execl("/bin/sh", "sh", "-c", cmd, (char *) NULL);
+        /* flawfinder: ignore - cmd validated by is_shell_command_allowed (whitelist + metachar
+         * rejection) */
+        execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
         _exit(127);
     }
 
     close(pipe_out[1]);
     close(pipe_err[1]);
 
-    size_t cap   = 4096;
-    size_t pos   = 0;
-    char *output = (char *) AGENTOS_MALLOC(cap);
+    size_t cap = 4096;
+    size_t pos = 0;
+    char *output = (char *)AGENTOS_MALLOC(cap);
     if (!output) {
         close(pipe_out[0]);
         close(pipe_err[0]);
@@ -188,10 +193,10 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
     ssize_t bytes_read;
     while ((bytes_read = read(pipe_out[0], buffer, sizeof(buffer) - 1)) > 0) {
         buffer[bytes_read] = '\0';
-        size_t len         = (size_t) bytes_read;
+        size_t len = (size_t)bytes_read;
         if (pos + len + 1 > cap) {
             cap *= 2;
-            char *new_out = (char *) AGENTOS_REALLOC(output, cap);
+            char *new_out = (char *)AGENTOS_REALLOC(output, cap);
             if (!new_out) {
                 AGENTOS_FREE(output);
                 close(pipe_out[0]);
@@ -220,7 +225,7 @@ static void shell_destroy(agentos_execution_unit_t *unit)
 {
     if (!unit)
         return;
-    shell_unit_data_t *data = (shell_unit_data_t *) unit->execution_unit_data;
+    shell_unit_data_t *data = (shell_unit_data_t *)unit->execution_unit_data;
     if (data) {
         if (data->metadata_json)
             AGENTOS_FREE(data->metadata_json);
@@ -231,11 +236,12 @@ static void shell_destroy(agentos_execution_unit_t *unit)
 
 agentos_execution_unit_t *agentos_shell_unit_create(void)
 {
-    agentos_execution_unit_t *unit = (agentos_execution_unit_t *) AGENTOS_CALLOC(1, sizeof(agentos_execution_unit_t));
+    agentos_execution_unit_t *unit =
+        (agentos_execution_unit_t *)AGENTOS_CALLOC(1, sizeof(agentos_execution_unit_t));
     if (!unit)
         return NULL;
 
-    shell_unit_data_t *data = (shell_unit_data_t *) AGENTOS_CALLOC(1, sizeof(shell_unit_data_t));
+    shell_unit_data_t *data = (shell_unit_data_t *)AGENTOS_CALLOC(1, sizeof(shell_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
         return NULL;
@@ -248,7 +254,7 @@ agentos_execution_unit_t *agentos_shell_unit_create(void)
         return NULL;
     }
 
-    unit->execution_unit_data    = data;
+    unit->execution_unit_data = data;
     unit->execution_unit_execute = shell_execute;
     unit->execution_unit_destroy = shell_destroy;
 

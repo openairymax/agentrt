@@ -59,8 +59,8 @@ static memory_state_t g_state = {
         .fail_callback = NULL,
         .fail_callback_user_data = NULL
     },
-    .stats = {0},
-    .lock = {0},
+    .stats = {{0}},
+    .lock = {{0}},
     .debug_list_head = NULL,
     .fail_callback = NULL,
     .fail_callback_user_data = NULL
@@ -457,6 +457,7 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
     struct memory_debug_info* debug_info = memory_find_debug_info(ptr);
     size_t old_size = debug_info ? debug_info->size : 0;
     
+    void* old_ptr = ptr;
     void* new_ptr = realloc(ptr, new_size);
     if (new_ptr == NULL) {
         memory_handle_fail(new_size, tag);
@@ -474,7 +475,7 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
         
         // 更新调试信息
         if (g_state.debug_enabled) {
-            memory_remove_debug_info(ptr);
+            memory_remove_debug_info(old_ptr);
             memory_add_debug_info(new_ptr, new_size, tag, __FILE__, __LINE__, __func__);
         }
     } else {

@@ -532,8 +532,7 @@ static void ws_gateway_destroy(void* gateway_impl) {
     free(gateway);
 }
 
-static const char* ws_gateway_get_name(void* gateway_impl) {
-    (void)gateway_impl;
+static const char* ws_gateway_get_name(void* gateway_impl __attribute__((unused))) {
     return "WebSocket Gateway";
 }
 
@@ -659,9 +658,7 @@ gateway_t* ws_gateway_create(const char* host, uint16_t port) {
 
 #ifndef GATEWAY_HAS_WS
 
-gateway_t* ws_gateway_create(const char* host, uint16_t port) {
-    (void)host;
-    (void)port;
+gateway_t* ws_gateway_create(const char* host __attribute__((unused)), uint16_t port __attribute__((unused))) {
     return NULL;
 }
 

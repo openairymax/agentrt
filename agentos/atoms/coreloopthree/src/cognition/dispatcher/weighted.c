@@ -74,7 +74,7 @@ static void weighted_destroy(agentos_dispatching_strategy_t* strategy)
     if (!strategy) return;
     weighted_data_t* data = (weighted_data_t*)strategy->data;
     if (data) {
-        if (data->lock) agentos_mutex_destroy(data->lock);
+        if (data->lock) agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
     AGENTOS_FREE(strategy);
@@ -176,7 +176,7 @@ agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
     agentos_dispatching_strategy_t* strategy =
         (agentos_dispatching_strategy_t*)AGENTOS_CALLOC(1, sizeof(*strategy));
     if (!strategy) {
-        if (data->lock) agentos_mutex_destroy(data->lock);
+        if (data->lock) agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
         return NULL;
     }

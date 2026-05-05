@@ -32,15 +32,12 @@ typedef struct {
 
 /* ---------- 生命周期 ---------- */
 
-static provider_ctx_t* local_init(const char* name,
-                                   const char* api_key,
+static provider_ctx_t* local_init(const char* name __attribute__((unused)),
+                                   const char* api_key __attribute__((unused)),
                                    const char* api_base,
-                                   const char* organization,
+                                   const char* organization __attribute__((unused)),
                                    double timeout_sec,
                                    int max_retries) {
-    (void)name;
-    (void)api_key;
-    (void)organization;
 
     local_ctx_t* ctx = (local_ctx_t*)calloc(1, sizeof(local_ctx_t));
     if (!ctx) {

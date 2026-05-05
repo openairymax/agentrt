@@ -26,9 +26,8 @@
 #include <stdlib.h>
 
 /* MHD header iterator callback (same as http_gateway.c) */
-static int parse_headers(void* cls, enum MHD_ValueKind kind,
-                         const char* key, const char* value) {
-    (void)cls; (void)kind; (void)key; (void)value;
+static int parse_headers(void* cls __attribute__((unused)), enum MHD_ValueKind kind __attribute__((unused)),
+                         const char* key __attribute__((unused)), const char* value __attribute__((unused))) {
     return MHD_YES;
 }
 
@@ -51,9 +50,8 @@ static int parse_headers(void* cls, enum MHD_ValueKind kind,
  * @brief 处理 JSON-RPC POST 请求 (CC=3)
  */
 int handle_post_jsonrpc(http_gateway_t* gateway,
-                                struct MHD_Connection* connection,
+                                struct MHD_Connection* connection __attribute__((unused)),
                                 http_request_context_t* context) {
-    (void)connection;
     
     char* json_response = handle_jsonrpc_request(gateway, context);
     if (!json_response) {
@@ -66,7 +64,7 @@ int handle_post_jsonrpc(http_gateway_t* gateway,
     struct MHD_Response* response = create_http_response(200, json_response, strlen(json_response));
     
     uint64_t response_time_ns = gateway_time_ns() - context->start_time_ns;
-    (void)response_time_ns;  /* 可用于日志记录 */
+    LOG_DEBUG("请求处理耗时: %lu ns", response_time_ns);
     
     atomic_fetch_add(&gateway->requests_total, 1);
     atomic_fetch_add(&gateway->bytes_received, context->upload_data_size);
@@ -84,10 +82,9 @@ int handle_post_jsonrpc(http_gateway_t* gateway,
 /**
  * @brief 处理 OPTIONS 请求（CORS 预检）(CC=2)
  */
-int handle_options_preflight(http_gateway_t* gateway,
+int handle_options_preflight(http_gateway_t* gateway __attribute__((unused)),
                                      struct MHD_Connection* connection,
                                      http_request_context_t* context) {
-    (void)gateway;
     
     /* 安全清理：如果之前有 POST 数据部分处理，释放残留的 json_request */
     if (context->json_request) {
@@ -119,8 +116,7 @@ int handle_options_preflight(http_gateway_t* gateway,
  * @param gateway 网关实例
  * @return true 验证通过，false 拒绝访问
  */
-static bool gateway_verify_api_key(struct MHD_Connection* connection, http_gateway_t* gateway) {
-    (void)gateway;
+static bool gateway_verify_api_key(struct MHD_Connection* connection, http_gateway_t* gateway __attribute__((unused))) {
 
     const char* env_key = getenv("GATEWAY_API_KEY");
     if (!env_key || !env_key[0]) return false;
@@ -165,8 +161,7 @@ static bool gateway_is_url_safe(const char* url) {
  */
 int handle_health_check(http_gateway_t* gateway,
                                 struct MHD_Connection* connection,
-                                http_request_context_t* context) {
-    (void)context;
+                                http_request_context_t* context __attribute__((unused))) {
 
     const char* health_json = "{\"status\":\"healthy\",\"service\":\"gateway\"}";
     struct MHD_Response* response = create_http_response(200, health_json, strlen(health_json));
@@ -185,8 +180,7 @@ int handle_health_check(http_gateway_t* gateway,
  */
 int handle_metrics_export(http_gateway_t* gateway,
                                   struct MHD_Connection* connection,
-                                  http_request_context_t* context) {
-    (void)context;
+                                  http_request_context_t* context __attribute__((unused))) {
 
     if (!gateway_verify_api_key(connection, gateway)) {
         const char* err_json = "{\"error\":{\"code\":-32001,\"message\":\"Unauthorized: API key required\"}}";
@@ -220,10 +214,9 @@ int handle_metrics_export(http_gateway_t* gateway,
 /**
  * @brief 处理 404 Not Found (CC=2)
  */
-int handle_not_found(http_gateway_t* gateway,
+int handle_not_found(http_gateway_t* gateway __attribute__((unused)),
                              struct MHD_Connection* connection,
                              http_request_context_t* context) {
-    (void)gateway;
     
     char* error_response = jsonrpc_create_error_response(NULL, -32601, "Not Found", NULL);
     struct MHD_Response* response = create_http_response(404, error_response, strlen(error_response));
@@ -243,9 +236,8 @@ int handle_not_found(http_gateway_t* gateway,
  */
 int handle_request_too_large(http_gateway_t* gateway,
                                      struct MHD_Connection* connection,
-                                     http_request_context_t* context,
+                                     http_request_context_t* context __attribute__((unused)),
                                      size_t data_size) {
-    (void)context;
     
     char* error_response = jsonrpc_create_error_response(NULL, -413, "Request too large", NULL);
     struct MHD_Response* response = create_http_response(413, error_response, strlen(error_response));
@@ -266,9 +258,8 @@ int handle_request_too_large(http_gateway_t* gateway,
  */
 int handle_parse_error(http_gateway_t* gateway,
                                struct MHD_Connection* connection,
-                               http_request_context_t* context,
+                               http_request_context_t* context __attribute__((unused)),
                                size_t data_size) {
-    (void)context;
     
     char* error_response = jsonrpc_create_error_response(NULL, -32700, "Parse error", NULL);
     struct MHD_Response* response = create_http_response(400, error_response, strlen(error_response));
@@ -333,12 +324,10 @@ static http_route_handler_t find_http_route(const char* method, const char* path
  */
 int handle_http_request(void* cls, struct MHD_Connection* connection,
                         const char* url, const char* method,
-                        const char* version, const char* upload_data,
+                        const char* version __attribute__((unused)), const char* upload_data,
                         size_t* upload_data_size, void** con_cls) {
     http_gateway_t* gateway = (http_gateway_t*)cls;
     http_request_context_t* context = (http_request_context_t*)*con_cls;
-    
-    (void)version;
     
     /* 速率限制检查（在早期阶段进行） */
     if (gateway->rate_limiter) {

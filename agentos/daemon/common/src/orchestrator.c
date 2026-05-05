@@ -178,7 +178,7 @@ orchestrator_t* orchestrator_create(const orch_config_t* config) {
 
     if (orch->cognition) {
         agentos_cognition_set_context(orch->cognition,
-            orch->memory ? "memoryrovol_integrated" : "standalone",
+            orch->memory ? "memory_integrated" : "standalone",
             orch->metacognition ? "dual_thinking_enabled" : "single_thinking");
     }
 

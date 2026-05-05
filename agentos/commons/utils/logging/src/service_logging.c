@@ -162,8 +162,7 @@ void service_log_output_record(const log_record_t* record) {
     agentos_mutex_unlock(&g_service_state.mutex);
 }
 
-void service_log_process_queue(int thread_idx) {
-    (void)thread_idx;
+void service_log_process_queue(int thread_idx __attribute__((unused))) {
 }
 
 static void* worker_thread_func(void* arg) {

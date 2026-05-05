@@ -73,32 +73,26 @@ static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
  */
 
 static void on_register_agent_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_register_agent(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_search_agents_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_search_agents(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_install_agent_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_install_agent(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_register_skill_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_register_skill(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_search_skills_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_search_skills(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_health_check_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_health_check(id, *(agentos_socket_t*)user_data);
 }
 
@@ -355,8 +349,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
 /* ==================== 帮助信息 ==================== */
 
-static void signal_handler(int signum) {
-    (void)signum;
+static void signal_handler(int signum __attribute__((unused))) {
     g_running = 0;
     SVC_LOG_INFO("Received shutdown signal");
 }
