@@ -52,7 +52,7 @@ static agentos_error_t ensure_trace_init(void)
     if (!g_current_lock) {
         g_current_lock = agentos_mutex_create();
         if (!g_current_lock) {
-            agentos_mutex_destroy(g_trace_lock);
+            agentos_mutex_free(g_trace_lock);
             g_trace_lock = NULL;
             return AGENTOS_ENOMEM;
         }
@@ -87,7 +87,7 @@ agentos_error_t agentos_trace_init(void)
     if (!g_current_lock) {
         g_current_lock = agentos_mutex_create();
         if (!g_current_lock) {
-            agentos_mutex_destroy(g_trace_lock);
+            agentos_mutex_free(g_trace_lock);
             g_trace_lock = NULL;
             return AGENTOS_ENOMEM;
         }
@@ -116,10 +116,10 @@ void agentos_trace_shutdown(void)
     }
     g_trace_spans = NULL;
     agentos_mutex_unlock(g_trace_lock);
-    agentos_mutex_destroy(g_trace_lock);
+    agentos_mutex_free(g_trace_lock);
     g_trace_lock = NULL;
 
-    agentos_mutex_destroy(g_current_lock);
+    agentos_mutex_free(g_current_lock);
     g_current_lock = NULL;
     g_current_span = NULL;
 }

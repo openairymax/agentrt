@@ -20,8 +20,7 @@
 
 /* ---------- 工具服务创建 ---------- */
 
-tool_service_t* tool_service_create(const char* config_path) {
-    (void)config_path;  /* 目前未使用配置文件 */
+tool_service_t* tool_service_create(const char* config_path __attribute__((unused))) {
     
     tool_service_t* svc = (tool_service_t*)calloc(1, sizeof(tool_service_t));
     if (!svc) {

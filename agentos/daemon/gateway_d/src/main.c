@@ -43,8 +43,7 @@ static agentos_mutex_t g_running_lock;
 /**
  * @brief 信号处理函数（线程安全，使用互斥锁保护运行标志）
  */
-static void signal_handler(int sig) {
-    (void)sig;
+static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
     g_running = 0;
     agentos_mutex_unlock(&g_running_lock);
