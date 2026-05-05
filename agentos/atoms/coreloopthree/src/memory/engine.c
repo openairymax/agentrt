@@ -50,7 +50,7 @@ agentos_error_t agentos_memory_create(
     if (!engine->provider) {
         agentos_error_t err = agentos_builtin_memory_provider_init(NULL);
         if (err != AGENTOS_SUCCESS) {
-            agentos_mutex_destroy(engine->lock);
+            agentos_mutex_free(engine->lock);
             if (engine->config_path) AGENTOS_FREE(engine->config_path);
             AGENTOS_FREE(engine);
             return err;
@@ -59,7 +59,7 @@ agentos_error_t agentos_memory_create(
     }
 
     if (!engine->provider) {
-        agentos_mutex_destroy(engine->lock);
+        agentos_mutex_free(engine->lock);
         if (engine->config_path) AGENTOS_FREE(engine->config_path);
         AGENTOS_FREE(engine);
         return AGENTOS_ENOTINIT;
@@ -68,7 +68,7 @@ agentos_error_t agentos_memory_create(
     if (engine->provider->init) {
         agentos_error_t err = engine->provider->init(engine->provider, config_path);
         if (err != AGENTOS_SUCCESS) {
-            agentos_mutex_destroy(engine->lock);
+            agentos_mutex_free(engine->lock);
             if (engine->config_path) AGENTOS_FREE(engine->config_path);
             AGENTOS_FREE(engine);
             return err;
@@ -87,7 +87,7 @@ void agentos_memory_destroy(agentos_memory_engine_t* engine) {
     }
     engine->provider = NULL;
     agentos_mutex_unlock(engine->lock);
-    agentos_mutex_destroy(engine->lock);
+    agentos_mutex_free(engine->lock);
     if (engine->config_path) AGENTOS_FREE(engine->config_path);
     AGENTOS_FREE(engine);
 }

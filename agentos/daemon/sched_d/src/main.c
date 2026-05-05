@@ -76,7 +76,6 @@ static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
  * @param client_fd 客户端描述符
  */
 static void on_register_agent_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_register_agent(params, id, *(agentos_socket_t*)user_data);
 }
 
@@ -84,15 +83,13 @@ static void on_register_agent_method(cJSON* params, int id, void* user_data) {
  * @brief 处理 schedule_task 方法
  */
 static void on_schedule_task_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_schedule_task(params, id, *(agentos_socket_t*)user_data);
 }
 
 /**
  * @brief 处理 get_stats 方法
  */
-static void on_get_stats_method(cJSON* params, int id, void* user_data) {
-    (void)params;
+static void on_get_stats_method(cJSON* params __attribute__((unused)), int id, void* user_data) {
     handle_get_stats(id, *(agentos_socket_t*)user_data);
 }
 
@@ -100,7 +97,7 @@ static void on_get_stats_method(cJSON* params, int id, void* user_data) {
  * @brief 处理 health_check 方法
  */
 static void on_health_check_method(cJSON* params, int id, void* user_data) {
-    (void)params;
+    
     handle_health_check(id, *(agentos_socket_t*)user_data);
 }
 
@@ -309,8 +306,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
 /* ==================== 帮助信息 ==================== */
 
-static void signal_handler(int signum) {
-    (void)signum;
+static void signal_handler(int signum __attribute__((unused))) {
     g_running = 0;
     SVC_LOG_INFO("Received shutdown signal");
 }

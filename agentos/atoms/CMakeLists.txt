@@ -297,7 +297,8 @@ target_include_directories(agentos_atoms INTERFACE
 add_subdirectory(corekern)
 add_subdirectory(coreloopthree)
 add_subdirectory(memory)
-add_subdirectory(memoryrovol)
+# memoryrovol migrated to independent repo (R-09-01-6)
+# add_subdirectory(memoryrovol)
 add_subdirectory(syscall)
 add_subdirectory(taskflow)
 

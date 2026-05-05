@@ -31,7 +31,7 @@ agentos_error_t agentos_compensation_create(agentos_compensation_t **out_manager
     mgr->human_queue_capacity = 16;
     mgr->human_queue          = (char **) AGENTOS_MALLOC(mgr->human_queue_capacity * sizeof(char *));
     if (!mgr->human_queue) {
-        agentos_mutex_destroy(mgr->lock);
+        agentos_mutex_free(mgr->lock);
         AGENTOS_FREE(mgr);
         return AGENTOS_ENOMEM;
     }
@@ -76,7 +76,7 @@ void agentos_compensation_destroy(agentos_compensation_t *manager)
 
     agentos_mutex_unlock(manager->lock);
 
-    agentos_mutex_destroy(manager->lock);
+    agentos_mutex_free(manager->lock);
     AGENTOS_FREE(manager);
 }
 

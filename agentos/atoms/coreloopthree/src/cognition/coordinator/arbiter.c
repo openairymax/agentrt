@@ -28,7 +28,7 @@ static void arbiter_destroy(agentos_coordinator_base_t* base) {
     arbiter_data_t* data = (arbiter_data_t*)base->data;
     if (data) {
         if (data->arbiter_model) AGENTOS_FREE(data->arbiter_model);
-        if (data->lock) agentos_mutex_destroy(data->lock);
+        if (data->lock) agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
     AGENTOS_FREE(base);
@@ -124,7 +124,7 @@ agentos_error_t agentos_coordinator_arbiter_create(
     if (arbiter_model) {
         data->arbiter_model = AGENTOS_STRDUP(arbiter_model);
         if (!data->arbiter_model) {
-            agentos_mutex_destroy(data->lock);
+            agentos_mutex_free(data->lock);
             AGENTOS_FREE(data);
             AGENTOS_FREE(base);
             return AGENTOS_ENOMEM;

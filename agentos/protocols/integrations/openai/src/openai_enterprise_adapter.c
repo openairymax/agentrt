@@ -1167,7 +1167,10 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
             if (json) snprintf(json, sz, "{\"result\":\"%s\"}", content);
             *response_json = json;
         } else {
-            *response_json = strdup("{\"error\":\"chat completion failed\"}");
+            size_t err_sz = 256;
+            char* err_json = (char*)malloc(err_sz);
+            if (err_json) snprintf(err_json, err_sz, "{\"error\":{\"message\":\"chat completion failed\",\"type\":\"api_error\",\"code\":null}}");
+            *response_json = err_json;
         }
         free(msg.content);
         return rc;
@@ -1178,7 +1181,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         memset(&emb_resp, 0, sizeof(emb_resp));
         int rc = openai_enterprise_embeddings(ctx, "text-embedding-ada-002", inputs, 1, &emb_resp);
         if (rc != 0) {
-            *response_json = strdup("{\"error\":\"embedding request failed\"}");
+            *response_json = NULL;
             return rc;
         }
         size_t json_sz = 512 + (emb_resp.embedding_dim > 0 ? emb_resp.embedding_dim * 16 : 0);
@@ -1207,7 +1210,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         size_t count = 0;
         int rc = openai_enterprise_list_models(ctx, &models, &count);
         if (rc != 0) {
-            *response_json = strdup("{\"error\":\"list models failed\"}");
+            *response_json = NULL;
             return rc;
         }
         size_t json_sz = 256 + count * 256;
@@ -1232,7 +1235,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         *response_json = json;
         return 0;
     }
-    *response_json = strdup("{\"error\":\"unknown endpoint\"}");
+    *response_json = NULL;
     return -10;
 }
 
