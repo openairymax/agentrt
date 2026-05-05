@@ -190,7 +190,7 @@ int agntcy_message_broadcast(agntcy_handle_t* h, const agntcy_message_t* msg) {
     for (size_t i = 0; i < h->agent_count; i++) {
         if (h->agents[i].online &&
             strcmp(h->agents[i].agent_id, msg->sender_id) != 0) {
-            (void)i;
+            if (i) { }
         }
     }
 
@@ -282,7 +282,8 @@ int agntcy_ack_negotiate(agntcy_handle_t* h, const char* agent_id,
     return 0;
 }
 
-static int agntcy_proto_init(void* context) {
+static int agntcy_proto_init(void* context, const void* config) {
+    if (config) { }
     agntcy_handle_t* h = (agntcy_handle_t*)context;
     if (!h) {
         if (agntcy_acp_create(&h) != 0) return -1;
@@ -293,7 +294,7 @@ static int agntcy_proto_init(void* context) {
 }
 
 static int agntcy_proto_destroy(void* context) {
-    (void)context;
+    if (context) { }
     g_agntcy_state.proto_initialized = false;
     return 0;
 }
@@ -301,9 +302,10 @@ static int agntcy_proto_destroy(void* context) {
 static int agntcy_proto_handle_request(void* context,
                                         const void* req,
                                         void** resp) {
-    (void)context;
+    if (context) { }
     if (!req || !resp) return -1;
 
+    const char* raw = (const char*)req;
     char buf[4096];
     snprintf(buf, sizeof(buf),
         "{"
@@ -325,12 +327,12 @@ static int agntcy_proto_handle_request(void* context,
 }
 
 static const char* agntcy_proto_get_version(void* context) {
-    (void)context;
+    if (context) { }
     return AGNTCY_ACP_VERSION;
 }
 
 static uint64_t agntcy_proto_capabilities(void* context) {
-    (void)context;
+    if (context) { }
     return (uint64_t)(
         AGNTCY_CAP_DISCOVERY |
         AGNTCY_CAP_CHANNEL |

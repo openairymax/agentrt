@@ -153,7 +153,7 @@ static agentos_error_t builtin_query(
     return builtin_index_search(impl->index, query_text, limit, out_record_ids, out_scores, out_count);
 }
 
-static agentos_error_t __attribute__((unused)) builtin_retrieve_fn(
+static agentos_error_t builtin_retrieve_fn(
     agentos_memory_provider_t* provider,
     const char* query_text,
     uint32_t limit,
@@ -268,13 +268,13 @@ static agentos_error_t builtin_add_memory(
 static agentos_error_t builtin_retrieve(
     agentos_memory_provider_t* provider,
     const char* query,
-    uint32_t limit,
+    size_t limit,
     char*** out_record_ids,
     float** out_scores,
     size_t* out_count) {
     if (!provider || !provider->impl || !query) return AGENTOS_EINVAL;
     builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
-    return builtin_index_search(impl->index, query, limit, out_record_ids, out_scores, out_count);
+    return builtin_index_search(impl->index, query, (uint32_t)limit, out_record_ids, out_scores, out_count);
 }
 
 /* ========== 全局提供商注册 ========== */

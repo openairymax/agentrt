@@ -11,7 +11,6 @@
 
 #include "heapstore_registry.h"
 #include "private.h"
-#pragma GCC diagnostic ignored "-Wformat-truncation"
 #include "platform.h"
 #include "../include/utils.h"
 

@@ -595,7 +595,7 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t* ctx,
     for (size_t i = 0; i < message_count && i < 100; i++) {
         if (i > 0) offset += snprintf(buf + offset, buf_size - offset, ",");
         char* role = json_string_escape(messages[i].role);
-        char* content = json_string_escape(messages[i].content ? messages[i].content : (const char*)"");
+        char* content = json_string_escape(messages[i].content ? messages[i].content : "");
         offset += snprintf(buf + offset, buf_size - offset,
             "{\"role\":%s,\"content\":{\"type\":\"text\",\"text\":\"%s\"}}", role, content);
         free(role);
@@ -656,7 +656,7 @@ typedef struct {
     bool active;
 } mcp_stream_state_t;
 
-static mcp_stream_state_t* __attribute__((unused)) get_stream_state(mcp_v1_context_t* ctx) {
+static mcp_stream_state_t* get_stream_state(mcp_v1_context_t* ctx) {
     if (!ctx) return NULL;
     static mcp_stream_state_t fallback = {
         .config = { .enabled = true, .chunk_size = 4096, .max_buffer_size = (10 * 1024 * 1024), .flush_interval_ms = 50 },
@@ -1164,7 +1164,7 @@ static int mcp_adapter_is_connected(void* context) {
     if (!context) return 0;
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
     if (ctx->transport) {
-        return mcp_transport_get_state(ctx->transport) == MCP_TRANSPORT_CONNECTED ? 1 : 0;
+        return mcp_transport_is_connected(ctx->transport) ? 1 : 0;
     }
     return (ctx->tool_count > 0 || ctx->resource_count > 0) ? 1 : 0;
 }
@@ -1176,14 +1176,14 @@ static int mcp_adapter_send(void* context, const void* data, size_t size) {
     return mcp_transport_send(ctx->transport, (const char*)data, size);
 }
 
-static int mcp_adapter_receive(void* context, void** data, size_t* size, uint32_t timeout_ms) {
+static int mcp_adapter_receive(void* context, void** data, size_t* size) {
     if (!context || !data || !size) return -1;
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
     if (!ctx->transport) return -2;
     char* msg = NULL;
     size_t msg_len = 0;
     int ret = mcp_transport_receive(ctx->transport, &msg, &msg_len,
-                                     timeout_ms > 0 ? timeout_ms : ctx->config.default_timeout_ms);
+                                     ctx->config.default_timeout_ms);
     if (ret == 0 && msg) {
         *data = msg;
         *size = msg_len;
@@ -1192,7 +1192,7 @@ static int mcp_adapter_receive(void* context, void** data, size_t* size, uint32_
 }
 
 static int mcp_adapter_get_stats(void* context, char* stats_json, size_t max_size) {
-    (void)context;
+    if (context) { }
     if (!stats_json || max_size < 64) return -1;
     int written = snprintf(stats_json, max_size,
         "{\"adapter_version\":\"%s\",\"protocol\":\"mcp\"}", MCP_V1_VERSION);
@@ -1223,7 +1223,7 @@ static int mcp_adapter_handle_request(void* context,
 }
 
 static int mcp_adapter_get_version(void* context, char* buf, size_t max_size) {
-    (void)context;
+    if (context) { }
     if (!buf || max_size == 0) return -1;
     size_t len = strlen(MCP_V1_VERSION);
     if (len >= max_size) len = max_size - 1;
@@ -1233,7 +1233,7 @@ static int mcp_adapter_get_version(void* context, char* buf, size_t max_size) {
 }
 
 static uint32_t mcp_adapter_capabilities(void* context) {
-    (void)context;
+    if (context) { }
     return (uint32_t)(MCP_CAP_TOOLS | MCP_CAP_RESOURCES | MCP_CAP_PROMPTS | MCP_CAP_LOGGING | MCP_CAP_SAMPLING);
 }
 

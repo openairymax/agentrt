@@ -79,7 +79,7 @@ cd ../AgentOS-build && ctest --output-on-failure
 <footer>
 ```
 **类型**: feat/fix/refactor/docs/test/chore
-**范围**: checkpoint/multiagent/memory/coreloopthree/daemon/commons
+**范围**: checkpoint/multiagent/memoryrovol/coreloopthree/daemon/commons
 
 ### 审查清单
 - [ ] 代码符合 .clang-format 规范

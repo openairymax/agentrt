@@ -599,7 +599,7 @@
 |------|---------|---------|---------|
 | corekern | ~9,000 LOC | 95% | 15 |
 | coreloopthree | ~15,000 LOC | 92% | 28 |
-| memory        | ~20,000 LOC | 90% | 35 |
+| memoryrovol | ~20,000 LOC | 90% | 35 |
 | syscall | ~3,000 LOC | 100% | 12 |
 | cupolas | ~12,000 LOC | 88% | 20 |
 | daemon | ~25,000 LOC | 85% | 30 |
