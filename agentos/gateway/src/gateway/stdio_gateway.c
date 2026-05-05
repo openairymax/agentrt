@@ -284,8 +284,7 @@ static void stdio_gateway_destroy(void* gateway_impl) {
     free(gateway);
 }
 
-static const char* stdio_gateway_get_name(void* gateway_impl) {
-    (void)gateway_impl;
+static const char* stdio_gateway_get_name(void* gateway_impl __attribute__((unused))) {
     return "Stdio Gateway";
 }
 

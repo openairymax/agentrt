@@ -208,7 +208,7 @@ int china_eco_storage_download(china_eco_handle_t* h,
                                 void** data, size_t* size) {
     if (!h || !object_key || !data || !size) return -1;
 
-    if (storage_type) { }
+    (void)storage_type;
     *data = NULL;
     *size = 0;
     return 0;
@@ -575,7 +575,7 @@ int china_eco_sm4_decrypt(china_eco_sm4_context_t* ctx,
 }
 
 static int china_eco_proto_init(void* context, const void* config) {
-    if (config) { }
+    (void)config;
     china_eco_handle_t* h = (china_eco_handle_t*)context;
     if (!h) {
         if (china_eco_create(&h) != 0) return -1;
@@ -586,7 +586,7 @@ static int china_eco_proto_init(void* context, const void* config) {
 }
 
 static int china_eco_proto_destroy(void* context) {
-    if (context) { }
+    (void)context;
     g_china_eco_state.proto_initialized = false;
     return 0;
 }
@@ -594,7 +594,7 @@ static int china_eco_proto_destroy(void* context) {
 static int china_eco_proto_handle_request(void* context,
                                            const void* req,
                                            void** resp) {
-    if (context) { }
+    (void)context;
     if (!req || !resp) return -1;
 
     char buf[4096];
@@ -619,12 +619,12 @@ static int china_eco_proto_handle_request(void* context,
 }
 
 static const char* china_eco_proto_get_version(void* context) {
-    if (context) { }
+    (void)context;
     return CHINA_ECO_VERSION;
 }
 
 static uint64_t china_eco_proto_capabilities(void* context) {
-    if (context) { }
+    (void)context;
     return (uint64_t)(
         CHINA_ECO_CAP_LLM_BRIDGE |
         CHINA_ECO_CAP_OBJECT_STORAGE |

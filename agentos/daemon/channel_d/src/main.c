@@ -9,9 +9,8 @@
 static volatile int g_running = 1;
 static channel_service_t* g_svc __attribute__((unused)) = NULL;
 
-static void signal_handler(int sig)
+static void signal_handler(int sig __attribute__((unused)))
 {
-    (void)sig;
     g_running = 0;
 }
 

@@ -18,7 +18,7 @@
  * 4. 可组合：框架间可自由组合编排
  *
  * @see coreloopthree.h Agent核心循环
- * @see memoryrovol.h 记忆系统
+ * @see memory_provider.h 内置记忆子系统
  * @see corekern.h 微内核
  * @see cupolas.h 安全穹顶
  */

@@ -43,7 +43,7 @@ if(UNIX)
     )
     target_compile_definitions(channel_d PRIVATE
         _GNU_SOURCE
-        AGENTOS_TMP_DIR="/tmp/agentos"
+        # R-09-119: use platform.h default
         AGENTOS_CONFIG_DIR="/etc/agentos"
         AGENTOS_LOG_DIR="/var/log/agentos"
     )
@@ -96,7 +96,7 @@ else()
     target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
     target_compile_definitions(test_channel_e2e PRIVATE
         USE_CMOCKA_STUB
-        AGENTOS_TMP_DIR="/tmp/agentos"
+        # R-09-119: use platform.h default
         AGENTOS_CONFIG_DIR="/etc/agentos"
         AGENTOS_LOG_DIR="/var/log/agentos"
     )

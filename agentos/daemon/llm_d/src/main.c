@@ -61,8 +61,7 @@ static llm_daemon_config_t g_config = {0};
 
 /* ==================== 信号处理 ==================== */
 
-static void signal_handler(int sig) {
-    (void)sig;
+static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
     g_running = 0;
     agentos_mutex_unlock(&g_running_lock);
@@ -214,8 +213,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
 /**
  * @brief complete 方法的包装器（适配 method_dispatcher 接口）
  */
-static void on_complete_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
+static void on_complete_method(cJSON* params, int id, void* user_data __attribute__((unused))) {
     char* response = handle_complete(params, id);
     if (response) {
         agentos_socket_t client_fd = *(agentos_socket_t*)user_data;
@@ -227,8 +225,7 @@ static void on_complete_method(cJSON* params, int id, void* user_data) {
 /**
  * @brief complete_stream 方法的包装器
  */
-static void on_complete_stream_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
+static void on_complete_stream_method(cJSON* params, int id, void* user_data __attribute__((unused))) {
     agentos_socket_t client_fd = *(agentos_socket_t*)user_data;
     char* response = handle_complete_stream(params, id, client_fd);
     if (response) {
