@@ -114,8 +114,9 @@ agentos_error_t builtin_storage_write(
     storage_record_t* rec = &st->records[st->record_count];
     generate_record_id(rec->record_id, sizeof(rec->record_id));
 
-    snprintf(rec->file_path, sizeof(rec->file_path), "%s/data/%s.bin",
+    int n = snprintf(rec->file_path, sizeof(rec->file_path), "%s/data/%s.bin",
         st->base_path, rec->record_id);
+    if (n < 0 || (size_t)n >= sizeof(rec->file_path)) return AGENTOS_ENOMEM;
 
     FILE* fp = fopen(rec->file_path, "wb");
     if (!fp) return AGENTOS_EIO;

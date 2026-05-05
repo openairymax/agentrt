@@ -90,7 +90,7 @@ class MockClient(APIClient):
         self.calls["post"].append({"path": path, "body": body, "opts": opts})
         if self._post_handler is not None:
             return self._post_handler(path, body, opts)
-        raise NotImplementedError("Mock POST handler not configured")
+        raise ValueError("Mock POST handler not configured — set mock.post_handler before calling mock.post()")
 
     def put(self, path: str, body: Any = None, opts: Optional[RequestOptions] = None) -> APIResponse:
         """
@@ -129,7 +129,7 @@ class MockClient(APIClient):
         self.calls["delete"].append({"path": path, "opts": opts})
         if self._delete_handler is not None:
             return self._delete_handler(path, opts)
-        raise NotImplementedError("Mock DELETE handler not configured")
+        raise ValueError("Mock DELETE handler not configured — set mock.delete_handler before calling mock.delete()")
 
     def reset(self) -> None:
         """

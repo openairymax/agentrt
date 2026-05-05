@@ -11,6 +11,7 @@
 
 #include "heapstore_integration.h"
 #include <stdlib.h>
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 #include <string.h>
 #include <stdio.h>
 

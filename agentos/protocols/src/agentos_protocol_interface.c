@@ -124,7 +124,7 @@ static int gw_std_register_protocol(proto_gateway_iface_t* gw,
                                      const char* name,
                                      const proto_adapter_vtable_t* adapter) {
     uint32_t timeout = agentos_proto_gw_get_timeout(gw);
-    if (timeout > 0) { }
+    (void)timeout;
     if (!name || !adapter) return -1;
     if (!g_gw_impl) return -2;
     if (g_gw_impl->protocol_count >= GW_MAX_PROTOCOLS) return -3;
@@ -164,7 +164,7 @@ static int gw_std_handle_request(proto_gateway_iface_t* gw,
                                   size_t* response_size,
                                   char** response_content_type) {
     uint32_t timeout = agentos_proto_gw_get_timeout(gw);
-    if (timeout > 0) { }
+    (void)timeout;
     if (!raw_request) return -1;
 
     char* detected_proto = NULL;
@@ -238,7 +238,7 @@ static int gw_std_set_request_handler(proto_gateway_iface_t* gw,
                                       proto_gateway_request_cb handler,
                                       void* user_data) {
     uint32_t timeout = agentos_proto_gw_get_timeout(gw);
-    if (timeout > 0) { }
+    (void)timeout;
     if (!handler) return -1;
     if (!g_gw_impl) return -2;
 
@@ -265,7 +265,7 @@ static int gw_std_set_event_callback(proto_gateway_iface_t* gw,
 
 static int gw_std_list_protocols(proto_gateway_iface_t* gw, char** protocols_json) {
     uint32_t timeout = agentos_proto_gw_get_timeout(gw);
-    if (timeout > 0) { }
+    (void)timeout;
     if (!protocols_json) return -1;
 
     size_t buf_size = 256;

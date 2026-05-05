@@ -346,7 +346,7 @@ gate_ban_audit() {
     local ban17_hits
     ban17_hits=$(grep -rn "简化实现\|简化版\|简化处理\|simplified implementation\|simplified" \
         --include="*.c" --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
-        | grep -v "test_\|tests/" | grep -v "memoryrovol/" | wc -l)
+        | grep -v "test_\|tests/" | grep -v "atoms/memoryrovol/" | grep -v "tests/unit/atoms/memoryrovol/" | wc -l)  # R-09-01-6: memoryrovol deprecated, kept exclusion for stale files
     if [[ $ban17_hits -gt 0 ]]; then
         record_issue "critical" "BAN-17" "agentos/" "$ban17_hits simplified implementation(s) found"
         log_error "  BAN-17: $ban17_hits simplified implementation(s)"

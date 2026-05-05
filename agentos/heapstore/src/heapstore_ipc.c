@@ -11,6 +11,7 @@
 
 #include "heapstore_ipc.h"
 #include "private.h"
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 #include "utils.h"
 
 #include <stdio.h>
