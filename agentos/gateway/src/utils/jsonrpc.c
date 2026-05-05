@@ -76,12 +76,11 @@ int jsonrpc_validate_request(const cJSON* json) {
 
     return 0;
 #else
-    (void)json;
     return -1; /* 无cJSON时返回无效 */
 #endif
 }
 
-const char* jsonrpc_get_method(const cJSON* json) {
+const char* jsonrpc_get_method(const cJSON* json __attribute__((unused))) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
@@ -92,38 +91,35 @@ const char* jsonrpc_get_method(const cJSON* json) {
     }
     return method->valuestring;
 #else
-    (void)json;
     return NULL;
 #endif
 }
 
-const cJSON* jsonrpc_get_params(const cJSON* json) {
+const cJSON* jsonrpc_get_params(const cJSON* json __attribute__((unused))) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
     }
     return cJSON_GetObjectItemCaseSensitive(json, "params");
 #else
-    (void)json;
     return NULL;
 #endif
 }
 
-const cJSON* jsonrpc_get_id(const cJSON* json) {
+const cJSON* jsonrpc_get_id(const cJSON* json __attribute__((unused))) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
     }
     return cJSON_GetObjectItemCaseSensitive(json, "id");
 #else
-    (void)json;
     return NULL;
 #endif
 }
 
 /* ==================== 响应生成 ==================== */
 
-char* jsonrpc_create_success_response(const cJSON* id, cJSON* result) {
+char* jsonrpc_create_success_response(const cJSON* id __attribute__((unused)), cJSON* result __attribute__((unused))) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
     if (!response) {
@@ -153,17 +149,15 @@ char* jsonrpc_create_success_response(const cJSON* id, cJSON* result) {
 
     return json_str;
 #else
-    (void)id;
-    (void)result;
     return NULL;
 #endif
 }
 
 char* jsonrpc_create_error_response(
-    const cJSON* id,
-    int code,
-    const char* message,
-    cJSON* data
+    const cJSON* id __attribute__((unused)),
+    int code __attribute__((unused)),
+    const char* message __attribute__((unused)),
+    cJSON* data __attribute__((unused))
 ) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
@@ -210,15 +204,9 @@ char* jsonrpc_create_error_response(
 
     return json_str;
 #else
-    (void)id;
-    (void)code;
-    (void)message;
-    (void)data;
     return NULL;
 #endif
 }
-
-/* ==================== 便捷响应函数 ==================== */
 
 char* jsonrpc_create_parse_error_response(void) {
     return jsonrpc_create_error_response(NULL, JSONRPC_PARSE_ERROR, NULL, NULL);
@@ -240,13 +228,11 @@ char* jsonrpc_create_invalid_params_response(const cJSON* id, const char* detail
     }
     return jsonrpc_create_error_response(id, JSONRPC_INVALID_PARAMS, NULL, data);
 #else
-    (void)id;
-    (void)detail;
     return NULL;
 #endif
 }
 
-char* jsonrpc_create_internal_error_response(const cJSON* id, const char* detail) {
+char* jsonrpc_create_internal_error_response(const cJSON* id __attribute__((unused)), const char* detail __attribute__((unused))) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* data = NULL;
     if (detail) {
@@ -254,8 +240,6 @@ char* jsonrpc_create_internal_error_response(const cJSON* id, const char* detail
     }
     return jsonrpc_create_error_response(id, JSONRPC_INTERNAL_ERROR, NULL, data);
 #else
-    (void)id;
-    (void)detail;
     return NULL;
 #endif
 }
@@ -296,7 +280,7 @@ const char* jsonrpc_get_error_message(int code) {
 
 /* ==================== Batch Requests (PROTO-004) ==================== */
 
-int jsonrpc_validate_batch_request(const cJSON* batch_json, size_t* out_count) {
+int jsonrpc_validate_batch_request(const cJSON* batch_json __attribute__((unused)), size_t* out_count __attribute__((unused))) {
 #ifdef GATEWAY_HAS_CJSON
     if (!batch_json || !out_count) return -1;
     *out_count = 0;
@@ -319,16 +303,14 @@ int jsonrpc_validate_batch_request(const cJSON* batch_json, size_t* out_count) {
 
     return has_invalid ? -4 : 0;
 #else
-    (void)batch_json;
-    (void)out_count;
     return -1;
 #endif
 }
 
 char* jsonrpc_process_batch(
-    const cJSON* batch_json,
-    char* (*handler)(const cJSON* request, void* user_data),
-    void* user_data
+    const cJSON* batch_json __attribute__((unused)),
+    char* (*handler)(const cJSON* request, void* user_data) __attribute__((unused)),
+    void* user_data __attribute__((unused))
 ) {
 #ifdef GATEWAY_HAS_CJSON
     if (!batch_json || !handler || !cJSON_IsArray(batch_json)) {
@@ -411,16 +393,13 @@ char* jsonrpc_process_batch(
     cJSON_Delete(responses);
     return result;
 #else
-    (void)batch_json;
-    (void)handler;
-    (void)user_data;
     return NULL;
 #endif
 }
 
 /* ==================== Notifications (PROTO-004) ==================== */
 
-char* jsonrpc_create_notification(const char* method, cJSON* params) {
+char* jsonrpc_create_notification(const char* method __attribute__((unused)), cJSON* params __attribute__((unused))) {
 #ifdef GATEWAY_HAS_CJSON
     if (!method || strlen(method) == 0) return NULL;
 
@@ -442,26 +421,23 @@ char* jsonrpc_create_notification(const char* method, cJSON* params) {
 
     return json_str;
 #else
-    (void)method;
-    (void)params;
     return NULL;
 #endif
 }
 
-bool jsonrpc_is_notification(const cJSON* json) {
+bool jsonrpc_is_notification(const cJSON* json __attribute__((unused))) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json || !cJSON_IsObject(json)) return false;
 
     return !cJSON_HasObjectItem(json, "id");
 #else
-    (void)json;
     return false;
 #endif
 }
 
 char* jsonrpc_create_notification_params(
-    const char* method,
-    const char* params_json
+    const char* method __attribute__((unused)),
+    const char* params_json __attribute__((unused))
 ) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* params = NULL;
@@ -472,8 +448,6 @@ char* jsonrpc_create_notification_params(
 
     return jsonrpc_create_notification(method, params);
 #else
-    (void)method;
-    (void)params_json;
     return NULL;
 #endif
 }

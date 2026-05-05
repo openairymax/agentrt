@@ -136,6 +136,7 @@ cmake-build-coverage/
 # 所有构建产物统一输出到此目录，保持源码仓库纯净
 AgentOS-build/
 AgentOS-build-*/
+ci-artifacts/
 
 # CMake 构建输出目录（库和可执行文件）
 agentos/lib/

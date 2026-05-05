@@ -14,19 +14,46 @@
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/utsname.h>
+#include <sys/sysinfo.h>
+#include <sys/statvfs.h>
 #endif
 
 #define INFO_D_DEFAULT_PORT 8083
 #define INFO_D_MAX_BUFFER 65536
 #define INFO_D_DEFAULT_SOCKET AGENTOS_RUNTIME_DIR "/info.sock"
+#define INFO_D_COLLECT_INTERVAL_SEC 5
+#define INFO_D_HISTORY_SIZE 64
+
+typedef struct {
+    double cpu_usage_pct;
+    uint64_t total_memory_kb;
+    uint64_t free_memory_kb;
+    uint64_t used_memory_kb;
+    double memory_usage_pct;
+    uint64_t disk_total_kb;
+    uint64_t disk_free_kb;
+    uint64_t disk_used_kb;
+    double disk_usage_pct;
+    int cpu_cores;
+    uint64_t uptime_sec;
+    uint64_t timestamp;
+} system_info_snapshot_t;
 
 typedef struct {
     agentos_socket_t server_fd;
     agentos_mutex_t lock;
+    agentos_thread_t collect_thread;
     volatile int running;
+    volatile int collect_running;
+    volatile int force_stop;
     uint64_t start_time;
     uint64_t request_count;
     uint64_t error_count;
+    uint64_t last_collect_time;
+    system_info_snapshot_t latest_snapshot;
+    system_info_snapshot_t history[INFO_D_HISTORY_SIZE];
+    size_t history_count;
+    size_t history_head;
     int tcp_port;
     char* socket_path;
 } info_d_service_t;
@@ -35,8 +62,111 @@ static info_d_service_t g_service = {0};
 static volatile int g_shutdown = 0;
 
 static void info_d_signal_handler(int sig) {
-    (void)sig;
+    
     g_shutdown = 1;
+}
+
+static int info_d_collect_system_info(system_info_snapshot_t* snap) {
+    if (!snap) return -1;
+    memset(snap, 0, sizeof(*snap));
+    snap->timestamp = (uint64_t)time(NULL);
+
+#ifdef _WIN32
+    SYSTEM_INFO sys_info;
+    GetSystemInfo(&sys_info);
+    snap->cpu_cores = (int)sys_info.dwNumberOfProcessors;
+
+    MEMORYSTATUSEX mem_status;
+    mem_status.dwLength = sizeof(mem_status);
+    if (GlobalMemoryStatusEx(&mem_status)) {
+        snap->total_memory_kb = (uint64_t)(mem_status.ullTotalPhys / 1024);
+        snap->free_memory_kb = (uint64_t)(mem_status.ullAvailPhys / 1024);
+        snap->used_memory_kb = snap->total_memory_kb - snap->free_memory_kb;
+        if (snap->total_memory_kb > 0)
+            snap->memory_usage_pct = (double)snap->used_memory_kb / (double)snap->total_memory_kb * 100.0;
+    }
+
+    ULARGE_INTEGER total_bytes, free_bytes, avail_bytes;
+    if (GetDiskFreeSpaceExW(L"C:\\", &avail_bytes, &total_bytes, &free_bytes)) {
+        snap->disk_total_kb = (uint64_t)(total_bytes.QuadPart / 1024);
+        snap->disk_free_kb = (uint64_t)(free_bytes.QuadPart / 1024);
+        snap->disk_used_kb = snap->disk_total_kb - snap->disk_free_kb;
+        if (snap->disk_total_kb > 0)
+            snap->disk_usage_pct = (double)snap->disk_used_kb / (double)snap->disk_total_kb * 100.0;
+    }
+#else
+    long nproc = sysconf(_SC_NPROCESSORS_ONLN);
+    snap->cpu_cores = (int)(nproc > 0 ? nproc : 1);
+
+    struct sysinfo si;
+    if (sysinfo(&si) == 0) {
+        snap->total_memory_kb = (uint64_t)(si.totalram / 1024);
+        snap->free_memory_kb = (uint64_t)(si.freeram / 1024);
+        snap->used_memory_kb = snap->total_memory_kb - snap->free_memory_kb;
+        if (snap->total_memory_kb > 0)
+            snap->memory_usage_pct = (double)snap->used_memory_kb / (double)snap->total_memory_kb * 100.0;
+        snap->uptime_sec = (uint64_t)si.uptime;
+    }
+
+    struct statvfs vfs;
+    if (statvfs("/", &vfs) == 0) {
+        snap->disk_total_kb = (uint64_t)(vfs.f_blocks * vfs.f_frsize / 1024);
+        snap->disk_free_kb = (uint64_t)(vfs.f_bfree * vfs.f_frsize / 1024);
+        snap->disk_used_kb = snap->disk_total_kb - snap->disk_free_kb;
+        if (snap->disk_total_kb > 0)
+            snap->disk_usage_pct = (double)snap->disk_used_kb / (double)snap->disk_total_kb * 100.0;
+    }
+
+    long clk_tck = sysconf(_SC_CLK_TCK);
+    if (clk_tck <= 0) clk_tck = 100;
+    snap->cpu_usage_pct = 0.0;
+#endif
+
+    return 0;
+}
+
+#ifdef _WIN32
+static DWORD WINAPI info_d_collect_loop(LPVOID arg) {
+#else
+static void* info_d_collect_loop(void* arg) {
+#endif
+    info_d_service_t* svc = (info_d_service_t*)arg;
+    if (!svc) {
+#ifdef _WIN32
+        return 1;
+#else
+        return NULL;
+#endif
+    }
+
+    while (svc->collect_running) {
+        system_info_snapshot_t snap;
+        info_d_collect_system_info(&snap);
+
+        agentos_mutex_lock(&svc->lock);
+        memcpy(&svc->latest_snapshot, &snap, sizeof(snap));
+        svc->last_collect_time = snap.timestamp;
+
+        svc->history[svc->history_head] = snap;
+        svc->history_head = (svc->history_head + 1) % INFO_D_HISTORY_SIZE;
+        if (svc->history_count < INFO_D_HISTORY_SIZE)
+            svc->history_count++;
+        agentos_mutex_unlock(&svc->lock);
+
+        for (int i = 0; i < INFO_D_COLLECT_INTERVAL_SEC && svc->collect_running; i++) {
+#ifdef _WIN32
+            Sleep(1000);
+#else
+            sleep(1);
+#endif
+        }
+    }
+
+#ifdef _WIN32
+    return 0;
+#else
+    return NULL;
+#endif
 }
 
 static int info_d_init(info_d_service_t* svc, int port, const char* sock) {
@@ -50,7 +180,10 @@ static int info_d_init(info_d_service_t* svc, int port, const char* sock) {
     agentos_mutex_init(&svc->lock);
     agentos_socket_init();
 
-    SVC_LOG_INFO("info_d: init complete");
+    info_d_collect_system_info(&svc->latest_snapshot);
+    svc->last_collect_time = svc->latest_snapshot.timestamp;
+
+    SVC_LOG_INFO("info_d: init complete (cpu_cores=%d)", svc->latest_snapshot.cpu_cores);
     return AGENTOS_SUCCESS;
 }
 
@@ -73,7 +206,12 @@ static int info_d_start(info_d_service_t* svc) {
 #endif
 
     svc->running = 1;
-    SVC_LOG_INFO("info_d: service started");
+    svc->collect_running = 1;
+    svc->force_stop = 0;
+
+    agentos_thread_create(&svc->collect_thread, info_d_collect_loop, svc);
+
+    SVC_LOG_INFO("info_d: service started (collect_interval=%ds)", INFO_D_COLLECT_INTERVAL_SEC);
     return AGENTOS_SUCCESS;
 }
 
@@ -82,7 +220,15 @@ static int info_d_stop(info_d_service_t* svc, int force) {
 
     agentos_mutex_lock(&svc->lock);
     svc->running = 0;
+    svc->collect_running = 0;
+    if (force) svc->force_stop = 1;
     agentos_mutex_unlock(&svc->lock);
+
+    if (force) {
+        agentos_thread_join(svc->collect_thread, NULL);
+    } else {
+        agentos_thread_join(svc->collect_thread, NULL);
+    }
 
     if (svc->server_fd != AGENTOS_INVALID_SOCKET) {
         agentos_socket_close(svc->server_fd);
@@ -95,7 +241,8 @@ static int info_d_stop(info_d_service_t* svc, int force) {
 #endif
     }
 
-    SVC_LOG_INFO("info_d: service stopped (force=%d)", force);
+    SVC_LOG_INFO("info_d: service stopped (force=%d, collections=%zu)",
+                 force, svc->history_count);
     return AGENTOS_SUCCESS;
 }
 
@@ -113,15 +260,22 @@ static int info_d_destroy(info_d_service_t* svc) {
     return AGENTOS_SUCCESS;
 }
 
-static int info_d_healthcheck(info_d_service_t* svc) {
+static uint64_t info_d_healthcheck(info_d_service_t* svc) {
     if (!svc) return 0;
-    int healthy = svc->running ? 1 : 0;
 
-    if (svc->error_count > svc->request_count / 2 && svc->request_count > 10) {
-        healthy = 0;
-    }
+    uint64_t last_time = 0;
+    agentos_mutex_lock(&svc->lock);
+    last_time = svc->last_collect_time;
+    agentos_mutex_unlock(&svc->lock);
 
-    return healthy;
+    if (!svc->running) return 0;
+
+    uint64_t now = (uint64_t)time(NULL);
+    uint64_t staleness = now > last_time ? now - last_time : 0;
+    if (staleness > (uint64_t)(INFO_D_COLLECT_INTERVAL_SEC * 3))
+        return 0;
+
+    return last_time;
 }
 
 static void info_d_handle_request(info_d_service_t* svc, agentos_socket_t client_fd) {
@@ -135,48 +289,76 @@ static void info_d_handle_request(info_d_service_t* svc, agentos_socket_t client
 
     agentos_mutex_lock(&svc->lock);
     svc->request_count++;
+    system_info_snapshot_t snap = svc->latest_snapshot;
     agentos_mutex_unlock(&svc->lock);
 
-    char response[4096];
+    char response[8192];
 #ifdef _WIN32
-    SYSTEM_INFO sys_info;
-    GetSystemInfo(&sys_info);
-    int cores = (int)sys_info.dwNumberOfProcessors;
     const char* platform_name = "Windows";
 #else
     struct utsname uts;
-    int cores = 1;
     const char* platform_name = "Linux";
     if (uname(&uts) == 0) {
         platform_name = uts.sysname;
     }
 #endif
 
-    uint64_t uptime = (uint64_t)time(NULL) - svc->start_time;
+    uint64_t service_uptime = (uint64_t)time(NULL) - svc->start_time;
+    uint64_t last_collect = info_d_healthcheck(svc);
+
     snprintf(response, sizeof(response),
         "{"
         "\"service\":\"info_d\","
         "\"status\":\"ok\","
         "\"platform\":\"%s\","
-        "\"cpu_cores\":%d,"
-        "\"uptime_sec\":%llu,"
+        "\"service_uptime_sec\":%llu,"
         "\"requests\":%llu,"
         "\"errors\":%llu,"
-        "\"healthy\":%d"
+        "\"healthy\":%s,"
+        "\"system\":{"
+            "\"cpu_cores\":%d,"
+            "\"cpu_usage_pct\":%.2f,"
+            "\"total_memory_kb\":%llu,"
+            "\"free_memory_kb\":%llu,"
+            "\"used_memory_kb\":%llu,"
+            "\"memory_usage_pct\":%.2f,"
+            "\"disk_total_kb\":%llu,"
+            "\"disk_free_kb\":%llu,"
+            "\"disk_used_kb\":%llu,"
+            "\"disk_usage_pct\":%.2f,"
+            "\"system_uptime_sec\":%llu"
+        "},"
+        "\"collection\":{"
+            "\"interval_sec\":%d,"
+            "\"last_collect_time\":%llu,"
+            "\"history_count\":%zu"
+        "}"
         "}",
-        platform_name, cores,
-        (unsigned long long)uptime,
+        platform_name,
+        (unsigned long long)service_uptime,
         (unsigned long long)svc->request_count,
         (unsigned long long)svc->error_count,
-        info_d_healthcheck(svc));
+        last_collect > 0 ? "true" : "false",
+        snap.cpu_cores,
+        snap.cpu_usage_pct,
+        (unsigned long long)snap.total_memory_kb,
+        (unsigned long long)snap.free_memory_kb,
+        (unsigned long long)snap.used_memory_kb,
+        snap.memory_usage_pct,
+        (unsigned long long)snap.disk_total_kb,
+        (unsigned long long)snap.disk_free_kb,
+        (unsigned long long)snap.disk_used_kb,
+        snap.disk_usage_pct,
+        (unsigned long long)snap.uptime_sec,
+        INFO_D_COLLECT_INTERVAL_SEC,
+        (unsigned long long)last_collect,
+        svc->history_count);
 
     agentos_socket_send(client_fd, response, strlen(response));
     agentos_socket_close(client_fd);
 }
 
-int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
+int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) {
 
 #ifdef _WIN32
     SetConsoleCtrlHandler(NULL, TRUE);
@@ -200,7 +382,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    info_d_stop(&g_service, 0);
+    info_d_stop(&g_service, g_shutdown ? 1 : 0);
     info_d_destroy(&g_service);
     return 0;
 }

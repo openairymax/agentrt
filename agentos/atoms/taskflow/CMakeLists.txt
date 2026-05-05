@@ -48,11 +48,11 @@ endif()
 set(TASKFLOW_COMMONS_MEMORY_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include)
 set(TASKFLOW_COMMONS_PLATFORM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include)
 
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
-    ${TASKFLOW_COMMONS_PLATFORM_INCLUDE}
-)
+# include_directories(
+#     ${CMAKE_CURRENT_SOURCE_DIR}/include
+#     ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
+#     ${TASKFLOW_COMMONS_PLATFORM_INCLUDE}
+# )
 
 # ========================================================================
 # 核心源文件
@@ -83,6 +83,11 @@ set(TASKFLOW_HEADERS
 
 # 主库
 add_library(agentos_taskflow STATIC ${TASKFLOW_CORE_SOURCES})
+    target_include_directories(agentos_taskflow PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
+        ${TASKFLOW_COMMONS_PLATFORM_INCLUDE}
+    )
 
 # 头文件包含路径
 target_include_directories(agentos_taskflow PUBLIC

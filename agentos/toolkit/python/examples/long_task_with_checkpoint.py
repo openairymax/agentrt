@@ -31,7 +31,7 @@ def long_running_task_example(
     """
     # 初始化客户端和检查点管理器
     client = Client()
-    checkpoint_mgr = CheckpointManager("/tmp/agentos_checkpoints")
+    checkpoint_mgr = CheckpointManager()
     
     # 尝试恢复上次的进度
     last_checkpoint = checkpoint_mgr.load_checkpoint(task_id)

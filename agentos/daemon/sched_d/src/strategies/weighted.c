@@ -67,8 +67,7 @@ static int select_by_weight(weighted_data_t* data) {
 
 /* ==================== strategy_interface_t 实现 ==================== */
 
-static int weighted_create(const sched_config_t* manager, void** out_data) {
-    (void)manager;
+static int weighted_create(const sched_config_t* manager __attribute__((unused)), void** out_data) {
     weighted_data_t* data = (weighted_data_t*)calloc(1, sizeof(weighted_data_t));
     if (!data) return AGENTOS_ERR_OUT_OF_MEMORY;
     if (agentos_mutex_init(&data->lock) != 0) { free(data); return AGENTOS_ERR_UNKNOWN; }
@@ -145,8 +144,7 @@ static int weighted_update_agent_status(void* raw_data, const agent_info_t* agen
     return AGENTOS_OK;
 }
 
-static int weighted_schedule(void* raw_data, const task_info_t* task_info, sched_result_t** out_result) {
-    (void)task_info;
+static int weighted_schedule(void* raw_data, const task_info_t* task_info __attribute__((unused)), sched_result_t** out_result) {
     if (!raw_data || !out_result) return AGENTOS_ERR_INVALID_PARAM;
     weighted_data_t* data = (weighted_data_t*)raw_data;
     agentos_mutex_lock(&data->lock);

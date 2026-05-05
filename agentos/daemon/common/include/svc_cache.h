@@ -92,8 +92,7 @@ static inline int svc_cache_get(svc_cache_t* cache, const char* key, void** out_
  * @return 0 表示成功，非 0 表示错误
  * @deprecated 请使用 cache_put()
  */
-static inline int svc_cache_put(svc_cache_t* cache, const char* key, const void* value, size_t value_size) {
-    (void)value_size;  /* commons 版本存储指针，不需要大小 */
+static inline int svc_cache_put(svc_cache_t* cache, const char* key, const void* value, size_t value_size __attribute__((unused))) {
     cache_put(cache, key, value);
     return 0;
 }

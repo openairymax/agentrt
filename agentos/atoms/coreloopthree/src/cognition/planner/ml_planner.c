@@ -46,7 +46,7 @@ static void ml_planner_destroy(agentos_plan_strategy_t* strategy) {
             AGENTOS_FREE(data->model);
         }
         if (data->model_path) AGENTOS_FREE(data->model_path);
-        if (data->lock) agentos_mutex_destroy(data->lock);
+        if (data->lock) agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
     AGENTOS_FREE(strategy);

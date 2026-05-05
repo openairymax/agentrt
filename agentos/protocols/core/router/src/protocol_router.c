@@ -371,7 +371,7 @@ int protocol_transformer_default(const unified_message_t* source,
         }
     }
 
-    if (context) { }
+    (void)context;
     return 0;
 }
 

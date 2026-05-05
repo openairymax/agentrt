@@ -19,7 +19,7 @@ endif()
 # 配置文件路径定义
 add_definitions(-DAGENTOS_CONFIG_DIR="/etc/agentos")
 add_definitions(-DAGENTOS_LOG_DIR="/var/log/agentos")
-add_definitions(-DAGENTOS_TMP_DIR="/tmp/agentos")
+# R-09-119: use platform.h FHS 3.0 definition (/var/tmp/agentos)
 
 find_package(PkgConfig QUIET)
 

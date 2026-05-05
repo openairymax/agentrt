@@ -255,7 +255,7 @@ typedef enum {
 #endif
 
 /**
- * @brief 记忆句柄类型 - forward declaration (full definition in memoryrovol.h)
+ * @brief 记忆句柄类型 - forward declaration (defined in memory_provider.h)
  */
 struct agentos_memory;
 typedef struct agentos_memory agentos_memory_t;

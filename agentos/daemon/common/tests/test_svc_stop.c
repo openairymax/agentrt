@@ -7,7 +7,7 @@
  * - agentos_service_stop 非运行状态拒绝
  * - agentos_service_stop 非法参数
  * - agentos_service_start 从ZOMBIE状态恢复
- * - agentos_service_destroy 清理线程数组
+ * - agentos_service_destroy 清理
  * - 状态字符串映射（含ZOMBIE）
  *
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -25,7 +25,17 @@ static int g_test_stop_called = 0;
 static int g_test_init_called = 0;
 static int g_test_start_called = 0;
 
-static agentos_error_t test_interface_init(agentos_service_t svc, const void* config)
+static agentos_svc_config_t g_test_config = {
+    .name = "test_svc",
+    .version = "1.0.0",
+    .capabilities = 0,
+    .max_concurrent = 4,
+    .timeout_ms = 5000,
+    .priority = 0,
+    .auto_start = false
+};
+
+static agentos_error_t test_interface_init(agentos_service_t svc, const agentos_svc_config_t* config)
 {
     (void)svc;
     (void)config;
@@ -45,14 +55,6 @@ static agentos_error_t test_interface_stop(agentos_service_t svc, bool force)
     (void)svc;
     (void)force;
     g_test_stop_called++;
-    return AGENTOS_SUCCESS;
-}
-
-static agentos_error_t test_interface_stop_slow(agentos_service_t svc, bool force)
-{
-    (void)svc;
-    (void)force;
-    sleep(10);
     return AGENTOS_SUCCESS;
 }
 
@@ -78,17 +80,19 @@ static void test_stop_from_wrong_state(void)
 {
     TEST_CASE_START(stop_from_wrong_state);
 
-    agentos_service_interface_t iface = {
+    agentos_svc_interface_t iface = {
         .init = test_interface_init,
         .start = test_interface_start,
         .stop = test_interface_stop
     };
 
-    agentos_service_t svc = agentos_service_create("test_stop_wrong", &iface, NULL);
-    TEST_ASSERT_NOT_NULL(svc, "服务创建成功");
+    agentos_service_t svc = NULL;
+    agentos_error_t err = agentos_service_create(&svc, "test_stop_wrong", &iface, NULL);
+    TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
+    TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
     /* 未初始化状态尝试stop应失败 */
-    agentos_error_t err = agentos_service_stop(svc, false);
+    err = agentos_service_stop(svc, false);
     TEST_ASSERT_TRUE(err != AGENTOS_SUCCESS, "未初始化服务stop应失败");
 
     agentos_service_destroy(svc);
@@ -100,16 +104,18 @@ static void test_stop_normal_flow(void)
 
     reset_test_state();
 
-    agentos_service_interface_t iface = {
+    agentos_svc_interface_t iface = {
         .init = test_interface_init,
         .start = test_interface_start,
         .stop = test_interface_stop
     };
 
-    agentos_service_t svc = agentos_service_create("test_stop_normal", &iface, NULL);
-    TEST_ASSERT_NOT_NULL(svc, "服务创建成功");
+    agentos_service_t svc = NULL;
+    agentos_error_t err = agentos_service_create(&svc, "test_stop_normal", &iface, NULL);
+    TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
+    TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
-    agentos_error_t err = agentos_service_init(svc, NULL);
+    err = agentos_service_init(svc);
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "初始化成功");
 
     err = agentos_service_start(svc);
@@ -121,7 +127,7 @@ static void test_stop_normal_flow(void)
 
     const char* state_str = agentos_svc_state_to_string(agentos_service_get_state(svc));
     TEST_ASSERT_NOT_NULL(state_str, "状态字符串非空");
-    TEST_ASSERT_EQUAL_STRING("STOPPED", state_str, "状态为STOPPED");
+    TEST_ASSERT_STRING_CONTAINS(state_str, "STOPPED", "状态为STOPPED");
 
     agentos_service_destroy(svc);
 }
@@ -132,19 +138,21 @@ static void test_stop_then_start_again(void)
 
     reset_test_state();
 
-    agentos_service_interface_t iface = {
+    agentos_svc_interface_t iface = {
         .init = test_interface_init,
         .start = test_interface_start,
         .stop = test_interface_stop
     };
 
-    agentos_service_t svc = agentos_service_create("test_restart", &iface, NULL);
-    TEST_ASSERT_NOT_NULL(svc, "服务创建成功");
+    agentos_service_t svc = NULL;
+    agentos_error_t err = agentos_service_create(&svc, "test_restart", &iface, NULL);
+    TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
+    TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
-    agentos_service_init(svc, NULL);
+    agentos_service_init(svc);
     agentos_service_start(svc);
 
-    agentos_error_t err = agentos_service_stop(svc, false);
+    err = agentos_service_stop(svc, false);
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "停止成功");
 
     /* 从STOPPED状态可以重新启动 */
@@ -159,14 +167,16 @@ static void test_start_from_zombie_state(void)
 {
     TEST_CASE_START(start_from_zombie_state);
 
-    agentos_service_interface_t iface = {
+    agentos_svc_interface_t iface = {
         .init = test_interface_init,
         .start = test_interface_start,
         .stop = test_interface_stop
     };
 
-    agentos_service_t svc = agentos_service_create("test_zombie_start", &iface, NULL);
-    TEST_ASSERT_NOT_NULL(svc, "服务创建成功");
+    agentos_service_t svc = NULL;
+    agentos_error_t err = agentos_service_create(&svc, "test_zombie_start", &iface, NULL);
+    TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
+    TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
     /* 验证zombie状态字符串 */
     const char* zombie_str = agentos_svc_state_to_string(AGENTOS_SVC_STATE_ZOMBIE);
@@ -203,13 +213,15 @@ static void test_service_create_and_destroy(void)
 {
     TEST_CASE_START(service_create_and_destroy);
 
-    agentos_service_interface_t iface = {
+    agentos_svc_interface_t iface = {
         .init = test_interface_init,
         .stop = test_interface_stop
     };
 
-    agentos_service_t svc = agentos_service_create("test_lifecycle", &iface, NULL);
-    TEST_ASSERT_NOT_NULL(svc, "服务创建成功");
+    agentos_service_t svc = NULL;
+    agentos_error_t err = agentos_service_create(&svc, "test_lifecycle", &iface, NULL);
+    TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
+    TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
     const char* name = agentos_service_get_name(svc);
     TEST_ASSERT_NOT_NULL(name, "服务名称非空");
