@@ -52,8 +52,7 @@ typedef struct {
 
 /* ==================== 兼容性函数包装 ==================== */
 
-static inline int svc_config_load(const char* path, svc_config_t** out_config) {
-    (void)path;
+static inline int svc_config_load(const char* path __attribute__((unused)), svc_config_t** out_config) {
     if (!out_config) return SVC_ERR_INVALID_PARAM;
 
     *out_config = NULL;

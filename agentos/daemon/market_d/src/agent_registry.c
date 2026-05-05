@@ -61,8 +61,7 @@ static char* safe_strdup(const char* str) {
     return copy;
 }
 
-int agent_registry_init(const char* db_path) {
-    (void)db_path;
+int agent_registry_init(const char* db_path __attribute__((unused))) {
     if (g_registry.initialized) return AGENTOS_OK;
     agentos_mutex_init(&g_registry.lock);
     g_registry.entry_count = 0;

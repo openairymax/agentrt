@@ -45,16 +45,14 @@ static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
 
 /* ==================== 信号处理 ==================== */
 
-static void signal_handler(int sig) {
-    (void)sig;
+static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
     g_running = 0;
     agentos_mutex_unlock(&g_running_lock);
 }
 
 #ifdef _WIN32
-static BOOL WINAPI console_handler(DWORD ctrl_type) {
-    (void)ctrl_type;
+static BOOL WINAPI console_handler(DWORD ctrl_type __attribute__((unused))) {
     signal_handler(SIGINT);
     return TRUE;
 }
@@ -89,32 +87,26 @@ static void handle_generate_report(int id, agentos_socket_t client_fd);
  * @brief 方法处理器包装函数
  */
 static void on_record_metric_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_record_metric(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_get_metrics_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_get_metrics(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_trigger_alert_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_trigger_alert(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_get_alerts_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_get_alerts(id, *(agentos_socket_t*)user_data);
 }
 
 static void on_health_check_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_health_check(params, id, *(agentos_socket_t*)user_data);
 }
 
 static void on_generate_report_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_generate_report(id, *(agentos_socket_t*)user_data);
 }
 

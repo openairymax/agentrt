@@ -304,7 +304,7 @@ static TestStats g_test_stats = {0, 0, 0};
 /**
  * @brief 断言宏 - 检查字符串包含子串
  */
-#define TEST_ASSERT_STRING_CONTAINS haystack, needle, message \
+#define TEST_ASSERT_STRING_CONTAINS(haystack, needle, message) \
     do { \
         g_test_stats.total++; \
         if (strstr((haystack), (needle)) != NULL) { \

@@ -158,20 +158,16 @@ typedef struct {
 
 #ifndef ATOMIC_COMPAT_HAS_32
 #define ATOMIC_COMPAT_HAS_32
-static inline long atomic_load_32(volatile long* ptr, long order) {
-    (void)order;
+static inline long atomic_load_32(volatile long* ptr, long order __attribute__((unused))) {
     return __sync_val_compare_and_swap(ptr, 0, 0);
 }
 static inline void atomic_store_32(volatile long* ptr, long val, long order) {
-    (void)order;
     __sync_lock_test_and_set(ptr, val);
 }
 static inline long atomic_fetch_add_32(volatile long* ptr, long val, long order) {
-    (void)order;
     return __sync_add_and_fetch(ptr, val);
 }
 static inline long atomic_fetch_sub_32(volatile long* ptr, long val, long order) {
-    (void)order;
     return __sync_sub_and_fetch(ptr, val);
 }
 #endif

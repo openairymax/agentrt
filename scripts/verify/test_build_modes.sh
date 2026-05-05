@@ -2,19 +2,19 @@
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: Apache-2.0
 #
-# MemoryRovol 三种构建模式集成测试脚本
+# MemoryRovol 独立仓库构建模式集成测试脚本
+# R-09-01-6: memoryrovol migrated to independent repo
 #
 # 验证场景:
-#   S1 - OSS模式: MEMORYROVOL_OSS=ON, 仅编译L1+L2, 排除商业头文件
+#   S1 - OSS模式: MEMORYROVOL_OSS=ON, 仅编译L1+L2
 #   S2 - PRO模式(默认): 编译完整L1+L2+L3+L4+forgetting
-#   S3 - PRO_LIB模式: 指定预编译库路径链接
+#   S3 - PRO_LIB模式: 预编译库路径链接
 #   S4 - 互斥检测: OSS + PRO_LIB 同时设置应失败
 #   S5 - PRO_LIB文件不存在应失败
 #   S6 - in-source build 应被阻止
 #
-# 用法: ./test_build_modes.sh [--standalone|--embedded] [--keep]
-#   --standalone  测试独立版 MemoryRovol (默认)
-#   --embedded    测试嵌入式版 (AgentOS/atoms/memoryrovol)
+# 用法: ./test_build_modes.sh [--standalone] [--keep]
+#   --standalone  测试独立 MemoryRovol 仓库（默认）
 #   --keep        保留构建产物（默认清理）
 
 set -euo pipefail
@@ -22,7 +22,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 STANDALONE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)/MemoryRovol"
-EMBEDDED_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)/AgentOS/agentos/atoms/memoryrovol"
 
 TEST_MODE="standalone"
 KEEP_BUILD=false
@@ -30,18 +29,12 @@ KEEP_BUILD=false
 for arg in "$@"; do
     case "$arg" in
         --standalone) TEST_MODE="standalone" ;;
-        --embedded)   TEST_MODE="embedded" ;;
         --keep)       KEEP_BUILD=true ;;
     esac
 done
 
-if [ "$TEST_MODE" = "standalone" ]; then
-    MR_DIR="$STANDALONE_DIR"
-    LABEL="MemoryRovol (Standalone)"
-else
-    MR_DIR="$EMBEDDED_DIR"
-    LABEL="MemoryRovol (Embedded)"
-fi
+MR_DIR="$STANDALONE_DIR"
+LABEL="MemoryRovol (Independent Repo)"
 
 PASS=0
 FAIL=0

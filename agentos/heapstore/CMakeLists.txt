@@ -13,8 +13,8 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../..)
+# R-09-124: converted to target_include_directories
+# R-09-124: converted to target_include_directories
 
 set(heapstore_SOURCES
     src/heapstore_core.c
@@ -81,7 +81,7 @@ if(NOT DEFINED SQLITE3_FOUND)
     if(SQLITE3_FOUND)
         target_include_directories(agentos_heapstore PRIVATE ${SQLITE3_INCLUDE_DIRS})
         target_link_libraries(agentos_heapstore PRIVATE ${SQLITE3_LIBRARIES})
-        target_compile_definitions(agentos_heapstore -Dheapstore_HAS_SQLITE3)
+        target_compile_definitions(agentos_heapstore PRIVATE heapstore_HAS_SQLITE3)
         message(STATUS "SQLite3 found: ${SQLITE3_LIBRARIES}")
     else()
         message(WARNING "SQLite3 not found, registry features disabled")

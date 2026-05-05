@@ -60,8 +60,7 @@ static tool_daemon_config_t g_config = {0};
  * @brief 信号处理函数
  * @param sig 信号值
  */
-static void signal_handler(int sig) {
-    (void)sig;
+static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
     g_running = 0;
     agentos_mutex_unlock(&g_running_lock);
@@ -124,7 +123,6 @@ static void handle_execute(cJSON* params, int id, agentos_socket_t fd);
  * @brief register 方法的包装器
  */
 static void on_register_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_register(params, id, *(agentos_socket_t*)user_data);
 }
 
@@ -132,7 +130,6 @@ static void on_register_method(cJSON* params, int id, void* user_data) {
  * @brief list 方法的包装器
  */
 static void on_list_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_list(id, *(agentos_socket_t*)user_data);
 }
 
@@ -140,7 +137,6 @@ static void on_list_method(cJSON* params, int id, void* user_data) {
  * @brief get 方法的包装器
  */
 static void on_get_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_get(params, id, *(agentos_socket_t*)user_data);
 }
 
@@ -148,7 +144,6 @@ static void on_get_method(cJSON* params, int id, void* user_data) {
  * @brief execute 方法的包装器
  */
 static void on_execute_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
     handle_execute(params, id, *(agentos_socket_t*)user_data);
 }
 

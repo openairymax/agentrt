@@ -5,9 +5,10 @@
  */
 
 #include "cognition.h"
-#include <string.h>
+
 #include <ctype.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
@@ -18,9 +19,11 @@
  * @param str 输入字符串
  * @return 转换后的字符串
  */
-char* intent_to_lowercase(char* str) {
-    if (!str) return NULL;
-    for (char* p = str; *p; ++p) {
+char *intent_to_lowercase(char *str)
+{
+    if (!str)
+        return NULL;
+    for (char *p = str; *p; ++p) {
         *p = tolower(*p);
     }
     return str;
@@ -32,13 +35,16 @@ char* intent_to_lowercase(char* str) {
  * @param needle 子串
  * @return 1 表示包含，0 表示不包含
  */
-int intent_contains_ignore_case(const char* haystack, const char* needle) {
-    if (!haystack || !needle) return 0;
+int intent_contains_ignore_case(const char *haystack, const char *needle)
+{
+    if (!haystack || !needle)
+        return 0;
 
     size_t haystack_len = strlen(haystack);
     size_t needle_len = strlen(needle);
 
-    if (needle_len > haystack_len) return 0;
+    if (needle_len > haystack_len)
+        return 0;
 
     for (size_t i = 0; i <= haystack_len - needle_len; i++) {
         int match = 1;
@@ -48,7 +54,8 @@ int intent_contains_ignore_case(const char* haystack, const char* needle) {
                 break;
             }
         }
-        if (match) return 1;
+        if (match)
+            return 1;
     }
     return 0;
 }
@@ -59,22 +66,24 @@ int intent_contains_ignore_case(const char* haystack, const char* needle) {
  * @param s2 字符串 2
  * @return 相似度得分（0-1）
  */
-float intent_string_similarity(const char* s1, const char* s2) {
-    if (!s1 || !s2) return 0.0f;
+float intent_string_similarity(const char *s1, const char *s2)
+{
+    if (!s1 || !s2)
+        return 0.0f;
 
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);
 
     // 基于最长公共子串算法计算意图相似度
-    int commons = 0;
+    size_t commons = 0;
     for (size_t i = 0; i < len1; i++) {
         for (size_t j = 0; j < len2; j++) {
             size_t k = 0;
-            while (i + k < len1 && j + k < len2 &&
-                   tolower(s1[i + k]) == tolower(s2[j + k])) {
+            while (i + k < len1 && j + k < len2 && tolower(s1[i + k]) == tolower(s2[j + k])) {
                 k++;
             }
-            if (k > commons) commons = k;
+            if (k > commons)
+                commons = k;
         }
     }
 
@@ -88,15 +97,18 @@ float intent_string_similarity(const char* s1, const char* s2) {
  * @param max_keywords 最大关键词数
  * @return 提取的关键词数量
  */
-size_t intent_extract_keywords(const char* text, char** keywords, size_t max_keywords) {
-    if (!text || !keywords || max_keywords == 0) return 0;
+size_t intent_extract_keywords(const char *text, char **keywords, size_t max_keywords)
+{
+    if (!text || !keywords || max_keywords == 0)
+        return 0;
 
     // 基于空格和标点符号分割提取关键词
     size_t count = 0;
-    char* copy = AGENTOS_STRDUP(text);
-    if (!copy) return 0;
+    char *copy = AGENTOS_STRDUP(text);
+    if (!copy)
+        return 0;
 
-    char* token = strtok(copy, " ,.!?;:\t\n\r");
+    char *token = strtok(copy, " ,.!?;:\t\n\r");
     while (token && count < max_keywords) {
         // 过滤短词
         if (strlen(token) > 2) {
@@ -118,9 +130,12 @@ size_t intent_extract_keywords(const char* text, char** keywords, size_t max_key
  * @param keywords 关键词数组
  * @param count 关键词数量
  */
-void intent_free_keywords(char** keywords, size_t count) {
-    if (!keywords) return;
+void intent_free_keywords(char **keywords, size_t count)
+{
+    if (!keywords)
+        return;
     for (size_t i = 0; i < count; i++) {
-        if (keywords[i]) AGENTOS_FREE(keywords[i]);
+        if (keywords[i])
+            AGENTOS_FREE(keywords[i]);
     }
 }

@@ -7,6 +7,11 @@
 
 #include "execution.h"
 #include <assert.h>
+#ifndef NDEBUG
+#else
+#undef assert
+#define assert(x) ((void)(x))
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,7 +30,7 @@ static int tests_failed = 0;
         tests_passed++;                                                                                                \
     } while (0)
 
-static int g_mock_unit_data = 123;
+static int g_mock_unit_data __attribute__((unused)) = 123;
 static agentos_error_t mock_execute(agentos_execution_unit_t *u, const void *in, void **out)
 {
     (void) u;

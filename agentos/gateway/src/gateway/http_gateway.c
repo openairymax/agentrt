@@ -106,11 +106,10 @@ static bool is_cors_origin_allowed(const http_gateway_t* gateway, const char* or
 static struct MHD_Response* __attribute__((unused)) create_http_response_ex(
     http_gateway_t* gateway,
     struct MHD_Connection* connection,
-    int status_code, 
+    int status_code __attribute__((unused)), 
     const char* content, 
     size_t content_len
 ) {
-    (void)status_code;
     
     struct MHD_Response* response = MHD_create_response_from_buffer(
         content_len, (void*)content, MHD_RESPMEM_MUST_COPY);
@@ -180,11 +179,10 @@ struct MHD_Response* create_http_response(int status_code, const char* content, 
 /**
  * @brief 解析HTTP请求头
  */
-static int __attribute__((unused)) parse_headers(void* cls, enum MHD_ValueKind kind, const char* key, const char* value) {
-    (void)cls;
-    (void)kind;
-    (void)key;
-    (void)value;
+static int parse_headers(void* cls __attribute__((unused)),
+                         enum MHD_ValueKind kind __attribute__((unused)),
+                         const char* key __attribute__((unused)),
+                         const char* value __attribute__((unused))) {
     return MHD_YES;
 }
 
@@ -338,11 +336,9 @@ char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* co
 /* handle_http_request() 函数已迁移至 http_gateway_routes.c */
 /* ========== 网关操作表 ========== */
 
-static void http_request_completed_callback(void* cls, struct MHD_Connection* connection,
-                                              void** con_cls, enum MHD_RequestTerminationCode toe) {
-    (void)cls;
-    (void)connection;
-    (void)toe;
+static void http_request_completed_callback(void* cls __attribute__((unused)),
+                                              struct MHD_Connection* connection __attribute__((unused)),
+                                              void** con_cls, enum MHD_RequestTerminationCode toe __attribute__((unused))) {
     if (con_cls && *con_cls) {
         http_request_context_t* ctx = (http_request_context_t*)*con_cls;
         free(ctx);
@@ -440,8 +436,7 @@ static void http_gateway_destroy(void* gateway_impl) {
 
     free(gateway);
 }
-static const char* http_gateway_get_name(void* gateway_impl) {
-    (void)gateway_impl;
+static const char* http_gateway_get_name(void* gateway_impl __attribute__((unused))) {
     return "HTTP Gateway";
 }
 static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_json) {
@@ -634,9 +629,7 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
 
 #ifndef GATEWAY_HAS_HTTP
 
-gateway_t* http_gateway_create(const char* host, uint16_t port) {
-    (void)host;
-    (void)port;
+gateway_t* http_gateway_create(const char* host __attribute__((unused)), uint16_t port __attribute__((unused))) {
     return NULL;
 }
 

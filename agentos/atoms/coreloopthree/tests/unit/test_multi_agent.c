@@ -70,7 +70,7 @@ static void test_mac_register_unregister(void)
     assert(rc == 0);
     assert(mac_framework_get_agent_count(fw) == 1);
 
-    int rc2 = mac_framework_unregister_agent(fw, "test_agent_001");
+    int rc2 __attribute__((unused)) = mac_framework_unregister_agent(fw, "test_agent_001");
     assert(rc2 == 0);
     assert(mac_framework_get_agent_count(fw) == 0);
 

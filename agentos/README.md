@@ -33,7 +33,7 @@ agentos/
 ├── atoms/              # 微内核原子组件层 — 系统的最底层基础
 │   ├── corekern/       #     微内核核心 — IPC/Binder、内存管理、任务调度、定时器
 │   ├── coreloopthree/  #     三环核心运行时 — 认知环/执行环/学习环
-│   ├── memoryrovol/    #     记忆系统 — L1-L4 四级记忆层次
+│   ├── memory/         #      内置记忆子系统（R-09-01）
 │   ├── syscall/        #     系统调用接口 — 任务/内存/会话/遥测/Agent
 │   ├── taskflow/       #     任务流引擎 — DAG 编排、优先级队列
 │   └── frameworks/     #     框架适配器 — LangChain/MCP/A2A/OpenAI

@@ -18,8 +18,6 @@ build/
 CMakeFiles/
 cmake_install.cmake
 CMakeCache.txt
-*.cmake
-Makefile
 CTestTestfile.cmake
 _deps/
 

@@ -7,6 +7,11 @@
 
 #include "memory.h"
 #include <assert.h>
+#ifndef NDEBUG
+#else
+#undef assert
+#define assert(x) ((void)(x))
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -323,7 +328,7 @@ static void test_memory_write_all_types(void)
         return;
     }
 
-    const char *types[]                 = {"RAW", "FEATURE", "STRUCTURE", "PATTERN"};
+    const char *types[] __attribute__((unused)) = {"RAW", "FEATURE", "STRUCTURE", "PATTERN"};
     agentos_memory_type_t type_values[] = {AGENTOS_MEMTYPE_TEXT, AGENTOS_MEMTYPE_EMBEDDING, AGENTOS_MEMTYPE_STRUCTURED,
                                            AGENTOS_MEMTYPE_BINARY};
 
