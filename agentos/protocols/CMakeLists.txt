@@ -79,7 +79,7 @@ if(PROTOCOLS_ENABLE_CHINA_ECO)
         ${CMAKE_CURRENT_SOURCE_DIR}/integrations/china_eco/include)
 endif()
 
-include_directories(${PROTOCOLS_INCLUDE_DIRS})
+# R-09-124: converted to target_include_directories
 
 # ============================================================
 # 源文件 (Source Files) — Common Layer

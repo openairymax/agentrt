@@ -34,7 +34,7 @@
 
 ### 团队 A - 核心内核组
 
-负责模块：`corekern`, `coreloopthree`, `memory`, `syscall`, `commons`
+负责模块：`corekern`, `coreloopthree`, `memoryrovol`, `syscall`, `commons`
 
 | 贡献者 | 主要贡献 | 活跃状态 |
 |--------|----------|----------|
@@ -66,7 +66,7 @@
 |------|--------|----------|
 | `atoms/corekern` | *待添加* | 微内核核心机制 |
 | `atoms/coreloopthree` | *待添加* | 三层认知循环 |
-| `atoms/memory`       | *待添加*    | 内置记忆子系统（R-09-01-6） |
+| `atoms/memoryrovol` | *待添加* | 四层记忆系统 |
 | `atoms/syscall` | *待添加* | 系统调用层 |
 | `cupolas` | *待添加* | 安全穹顶 |
 | `daemon` | *待添加* | 守护进程服务 |

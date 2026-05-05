@@ -6,9 +6,6 @@
 
 #include "error.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-
 #define ERR_BEGIN 0
 
 static const char* error_strings[] = {
@@ -50,8 +47,6 @@ static const char* error_strings[] = {
     [35]        "Dependency cycle",
     [36]        "General failure",
 };
-
-#pragma GCC diagnostic pop
 
 #define ERROR_COUNT (sizeof(error_strings) / sizeof(error_strings[0]))
 
