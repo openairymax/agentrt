@@ -107,10 +107,10 @@ extern "C" {
     #define AGENTOS_TMP_DIR "C:\\ProgramData\\agentos\\tmp"
     #define AGENTOS_CACHE_DIR "C:\\ProgramData\\agentos\\cache"
 #else
-    #define AGENTOS_RUNTIME_DIR "/var/run/agentos"
+    #define AGENTOS_RUNTIME_DIR "/run/agentos"
     #define AGENTOS_LOG_DIR "/var/log/agentos"
     #define AGENTOS_CONFIG_DIR "/etc/agentos"
-    #define AGENTOS_TMP_DIR "/tmp/agentos"
+    #define AGENTOS_TMP_DIR "/var/tmp/agentos"
     #define AGENTOS_CACHE_DIR "/var/cache/agentos"
 #endif
 

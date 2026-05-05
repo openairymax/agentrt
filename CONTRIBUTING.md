@@ -62,7 +62,7 @@
 |------|------|--------|
 | [架构设计原则 V1.8](./docs/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系 | 必读 |
 | [CoreLoopThree 架构](./agentos/atoms/coreloopthree/README.md) | 三层认知循环 | 必读 |
-| [MemoryRovol 架构](./agentos/atoms/memoryrovol/README.md) | 四层记忆系统 | 必读 |
+| [Memory 内置子系统](./agentos/atoms/memory/README.md) | 四层记忆系统 | 必读 |
 | [cupolas 安全穹顶](./agentos/cupolas/README.md) | 安全机制 | 必读 |
 | [API 规范](./docs/Capital_API/README.md) | 系统调用接口 | 按需 |
 | [编码标准](./docs/Capital_Specifications/coding_standard/) | 各语言编码规范 | 必读 |
@@ -508,7 +508,7 @@ pub fn memory_write(data: &[u8], opts: Option<WriteOptions>) -> Result<String, A
 |------|-----------|
 | atoms/corekern | ≥95% |
 | atoms/coreloopthree | ≥92% |
-| atoms/memoryrovol | ≥90% |
+| atoms/memory        | ≥90% |
 | atoms/syscall | ≥95% |
 | atoms/taskflow | ≥90% |
 | cupolas | ≥88% |
@@ -612,7 +612,7 @@ AgentOS 采用 **Conventional Commits** 规范（S-06 合规）。
 |-------|----------|
 | `corekern` | 微内核核心 |
 | `coreloopthree` | 三层认知循环 |
-| `memoryrovol` | 记忆卷载系统 |
+| `memory`             | 内置记忆子系统（R-09-01-6） |
 | `syscall` | 系统调用层 |
 | `taskflow` | 任务流 |
 | `cupolas` | 安全穹顶 |
@@ -639,7 +639,7 @@ AgentOS 采用 **Conventional Commits** 规范（S-06 合规）。
 **示例**：
 
 ```
-feat(memoryrovol): add L4 pattern mining algorithm
+feat(memory): add pattern mining via built-in memory subsystem
 
 Implement persistent homology analysis for pattern detection
 in the MemoryRovol system, enabling automatic knowledge

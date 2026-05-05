@@ -10,6 +10,11 @@
 #include "cognition/delegate.h"
 #include "cognition/parallel_dispatcher.h"
 #include <assert.h>
+#ifndef NDEBUG
+#else
+#undef assert
+#define assert(x) ((void)(x))
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -345,14 +350,14 @@ static void test_dispatcher_cancel_null(void)
 
 static void test_dispatcher_is_cancelled_null(void)
 {
-    bool cancelled = agentos_parallel_dispatcher_is_cancelled(NULL);
+    bool cancelled __attribute__((unused)) = agentos_parallel_dispatcher_is_cancelled(NULL);
     assert(!cancelled);
     TEST_PASS("dispatcher is_cancelled NULL returns false");
 }
 
 static void test_delegate_get_state_null(void)
 {
-    agentos_delegate_state_t state = agentos_delegate_get_state(NULL);
+    agentos_delegate_state_t state __attribute__((unused)) = agentos_delegate_get_state(NULL);
     assert(state == AGENTOS_DELEGATE_IDLE);
     TEST_PASS("delegate get_state NULL returns IDLE");
 }
