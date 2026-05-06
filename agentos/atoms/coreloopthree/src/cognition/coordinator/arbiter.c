@@ -39,11 +39,10 @@ static void arbiter_destroy(agentos_coordinator_base_t* base) {
  */
 static agentos_error_t arbiter_coordinate(
     agentos_coordinator_base_t* base,
-    const agentos_coordination_context_t* context,
+    const agentos_coordination_context_t __attribute__((unused)) *context,
     const char** inputs,
     size_t input_count,
     char** out_result) {
-    (void)context;
     if (!base || !out_result) return AGENTOS_EINVAL;
 
     arbiter_data_t* data = (arbiter_data_t*)base->data;
