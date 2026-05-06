@@ -44,11 +44,10 @@ static void weighted_destroy(agentos_coordinator_base_t* base) {
  */
 static agentos_error_t weighted_coordinate(
     agentos_coordinator_base_t* base,
-    const agentos_coordination_context_t* context,
+    const agentos_coordination_context_t __attribute__((unused)) *context,
     const char** inputs,
     size_t input_count,
     char** out_result) {
-    (void)context;
     if (!base || !out_result) return AGENTOS_EINVAL;
 
     weighted_data_t* data = (weighted_data_t*)base->data;
