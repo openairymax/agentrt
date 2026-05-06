@@ -445,8 +445,7 @@ int mac_framework_delegate_task(mac_framework_t *fw, const char *group_id,
     memcpy(slot, task, sizeof(mac_collab_task_t));
     slot->input_json = task->input_json ? strdup(task->input_json) : NULL;
     slot->output_json = NULL;
-    strncpy(slot->assigned_agent_id, agent->id, sizeof(slot->assigned_agent_id) - 1);
-    slot->assigned_agent_id[sizeof(slot->assigned_agent_id) - 1] = '\0';
+    snprintf(slot->assigned_agent_id, sizeof(slot->assigned_agent_id), "%s", agent->id);
     slot->status = MAC_TASK_STATUS_ASSIGNED;
     slot->created_at = agentos_time_ms();
     if (group_id) {

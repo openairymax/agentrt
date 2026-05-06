@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include "platform.h"
 #include <unistd.h>
 #include <time.h>
 #include <assert.h>
@@ -163,7 +164,7 @@ static void test_fuzz_config_params(void) {
         memset(&config, 0, sizeof(config));
         
         /* 生成随机但合理的配置 */
-        config.root_path = "/tmp/agentos_heapstore_test";
+        config.root_path = AGENTOS_TMP_DIR "/agentos_heapstore_test";
         config.max_log_size_mb = rand() % 10000 + 1;  /* 1-10000 MB */
         config.log_retention_days = rand() % 3650 + 1;  /* 1-3650 days */
         config.trace_retention_days = rand() % 3650 + 1;
@@ -350,7 +351,7 @@ static void test_concurrent_init_shutdown_race(void) {
     /* 多次快速初始化/关闭循环 */
     for (int round = 0; round < 100; round++) {
         heapstore_config_t config = {
-            .root_path = "/tmp/agentos_heapstore_race_test",
+            .root_path = AGENTOS_TMP_DIR "/agentos_heapstore_race_test",
             .max_log_size_mb = 10,
             .log_retention_days = 7,
             .trace_retention_days = 3,
@@ -425,7 +426,7 @@ int main(int argc, char* argv[]) {
     /* 初始化模块 */
     printf("--- Initializing heapstore module ---\n");
     heapstore_config_t config = {
-        .root_path = "/tmp/agentos_heapstore_fuzz_test",
+        .root_path = AGENTOS_TMP_DIR "/agentos_heapstore_fuzz_test",
         .max_log_size_mb = 50,
         .log_retention_days = 1,
         .trace_retention_days = 1,
