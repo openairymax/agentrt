@@ -22,7 +22,8 @@
 
 #include "channel_service.h"
 
-#define TEST_SOCKET_DIR "/tmp/agentos/channel_e2e_test"
+#include "platform.h"
+#define TEST_SOCKET_DIR AGENTOS_TMP_DIR "/channel_e2e_test"
 #define TEST_CHANNEL_ID  "e2e_test_ch_001"
 #define TEST_CHANNEL_NAME "E2E-TestChannel"
 #define TEST_DATA_PAYLOAD "Hello from E2E test! This is a payload for latency measurement."
