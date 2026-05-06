@@ -194,10 +194,9 @@ static void ml_destroy(agentos_dispatching_strategy_t *strategy)
 }
 
 agentos_dispatching_strategy_t *
-agentos_dispatching_ml_create(const char *model_path, void *registry_ctx,
+agentos_dispatching_ml_create(const char __attribute__((unused)) *model_path, void *registry_ctx,
                               agent_registry_get_agents_func get_agents_func)
 {
-    (void)model_path;
 
     ml_dispatch_data_t *data = (ml_dispatch_data_t *)AGENTOS_CALLOC(1, sizeof(ml_dispatch_data_t));
     if (!data)
