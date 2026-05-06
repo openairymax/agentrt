@@ -52,7 +52,7 @@ heapstore_error_t heapstore_memory_init(void) {
         snprintf(base_path, sizeof(base_path), "%s/kernel/memory", root);
     } else {
         snprintf(base_path, sizeof(base_path), "%s/agentos/heapstore/kernel/memory",
-                 getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+                 getenv("TMPDIR") ? getenv("TMPDIR") : AGENTOS_TMP_DIR);
     }
     strncpy(s_memory_path, base_path, sizeof(s_memory_path) - 1);
     s_memory_path[sizeof(s_memory_path) - 1] = '\0';
