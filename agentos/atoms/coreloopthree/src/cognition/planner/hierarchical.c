@@ -70,10 +70,9 @@ static const domain_rule_t* match_domain(const char* goal) {
 }
 
 static agentos_error_t hierarchical_plan_func(
-    const agentos_intent_t* intent,
+    const agentos_intent_t __attribute__((unused)) *intent,
     void* context,
     agentos_task_plan_t** out_plan) {
-    (void)intent;
     if (!context || !out_plan) return AGENTOS_EINVAL;
 
     hierarchical_data_t* data = (hierarchical_data_t*)context;
@@ -107,7 +106,7 @@ static agentos_error_t hierarchical_plan_func(
         plan->task_plan_node_count = actual_count;
     }
 
-    (void)data;
+    (void __attribute__((unused)))data;
     *out_plan = plan;
     return AGENTOS_SUCCESS;
 }
@@ -119,9 +118,8 @@ static void hierarchical_destroy(agentos_plan_strategy_t* strategy) {
 }
 
 agentos_plan_strategy_t* agentos_plan_hierarchical_create(
-    agentos_llm_service_t* llm,
+    agentos_llm_service_t __attribute__((unused)) *llm,
     int max_depth) {
-    (void)llm;
 
     hierarchical_data_t* data = (hierarchical_data_t*)AGENTOS_CALLOC(1, sizeof(hierarchical_data_t));
     if (!data) return NULL;

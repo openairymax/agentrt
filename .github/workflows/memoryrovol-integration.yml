@@ -1,0 +1,146 @@
+name: AgentOS MemoryRovol Integration
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'agentos/atoms/memoryrovol/**'
+      - 'agentos/atoms/coreloopthree/**'
+      - 'agentos/heapstore/**'
+      - '.github/workflows/memoryrovol-integration.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: mr-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  oss-mode:
+    name: OSS Mode Build + Test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential \
+            libssl-dev libcurl4-openssl-dev libcmocka-dev
+
+      - name: Configure OSS Mode
+        run: |
+          cmake -B ${{ github.workspace }}/../AgentOS-build-oss \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMEMORYROVOL_OSS=ON \
+            -DBUILD_TESTS=ON \
+            -Werror=dev
+
+      - name: Build
+        run: cmake --build ${{ github.workspace }}/../AgentOS-build-oss --parallel $(nproc)
+
+      - name: Test
+        working-directory: ${{ github.workspace }}/../AgentOS-build-oss
+        run: ctest --output-on-failure -j $(nproc) --timeout 60
+
+      - name: Verify OSS Symbol Stripping
+        run: |
+          echo "=== Verify L3/L4/Forgetting symbols NOT present in OSS mode ==="
+          for lib in ${{ github.workspace }}/../AgentOS-build-oss/libmemoryrovol*.a \
+                     ${{ github.workspace }}/../AgentOS-build-oss/agentos/atoms/memoryrovol/*.a; do
+            if [ -f "$lib" ]; then
+              echo "Checking: $lib"
+              for sym in layer3_create structure_query pattern_match forgetting_apply; do
+                if nm "$lib" 2>/dev/null | grep -q "T $sym"; then
+                  echo "::error::OSS mode contains PRO symbol: $sym"
+                  exit 1
+                fi
+              done
+              echo "  [OK] No PRO symbols in OSS build"
+            fi
+          done
+
+  pro-mode:
+    name: PRO Mode Build + Symbol Verify
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential \
+            libssl-dev libcurl4-openssl-dev libcmocka-dev
+
+      - name: Configure PRO Mode
+        run: |
+          cmake -B ${{ github.workspace }}/../AgentOS-build-pro \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMEMORYROVOL_SOURCE=ON \
+            -DBUILD_TESTS=ON \
+            -Werror=dev
+
+      - name: Build
+        run: cmake --build ${{ github.workspace }}/../AgentOS-build-pro --parallel $(nproc)
+
+      - name: Test
+        working-directory: ${{ github.workspace }}/../AgentOS-build-pro
+        run: ctest --output-on-failure -j $(nproc) --timeout 60
+
+      - name: Verify PRO Symbols
+        run: |
+          echo "=== ACC-C: Verify L3/L4/Forgetting symbols in PRO mode ==="
+          FOUND=0
+          for lib in ${{ github.workspace }}/../AgentOS-build-pro/libmemoryrovol*.a \
+                     ${{ github.workspace }}/../AgentOS-build-pro/agentos/atoms/memoryrovol/*.a; do
+            if [ -f "$lib" ]; then
+              echo "Checking: $lib"
+              for sym in layer3_create layer3_destroy structure_query structure_update \
+                         pattern_match pattern_analyze pattern_validate \
+                         forgetting_apply forgetting_schedule forgetting_restore; do
+                if nm "$lib" 2>/dev/null | grep -q "T $sym"; then
+                  echo "  [OK] $sym"
+                  FOUND=$((FOUND + 1))
+                else
+                  echo "  [MISSING] $sym"
+                fi
+              done
+            fi
+          done
+          echo "PRO symbols found: $FOUND/10"
+
+      - name: BAN-60 Stub Scan
+        run: |
+          echo "=== BAN-60: No stub/fake implementations in PRO mode ==="
+          grep -rn 'return.*AGENTOS_ENOSYS\|return.*AGENTOS_ENOTSUP' \
+            agentos/atoms/memoryrovol/ 2>/dev/null | grep -v '#ifdef\|#ifndef\|MEMORYROVOL_OSS' || \
+            echo "  [OK] No ENOSYS stubs"
+          grep -rn 'NotImplementedError' agentos/atoms/memoryrovol/ 2>/dev/null || \
+            echo "  [OK] No NotImplementedError"
+
+      - name: BAN-62 License Guard Coverage
+        run: |
+          echo "=== BAN-62: Verify MR_LICENSE_CHECK coverage ==="
+          PRO_FILES="agentos/atoms/memoryrovol/src/layer3_structure/*.c
+                     agentos/atoms/memoryrovol/src/layer4_pattern/*.c
+                     agentos/atoms/memoryrovol/src/forgetting/*.c
+                     agentos/atoms/memoryrovol/src/retrieval/attractor.c
+                     agentos/atoms/memoryrovol/src/retrieval/mount.c
+                     agentos/atoms/memoryrovol/src/retrieval/rerank.c
+                     agentos/atoms/memoryrovol/src/llm_client.c"
+          for f in $PRO_FILES; do
+            for file in $f; do
+              if [ -f "$file" ]; then
+                if grep -q 'MR_LICENSE_CHECK\|MR_LICENSE_GUARD' "$file"; then
+                  echo "  [OK] $(basename $file) has license guard"
+                else
+                  echo "  [MISSING] $(basename $file) lacks license guard"
+                fi
+              fi
+            done
+          done

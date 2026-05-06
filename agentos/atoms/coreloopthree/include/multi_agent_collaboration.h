@@ -121,6 +121,9 @@ AGENTOS_API int mac_framework_set_aggregate_fn(mac_framework_t *fw, mac_result_a
                                                void *user_data);
 AGENTOS_API size_t mac_framework_get_agent_count(mac_framework_t *fw);
 AGENTOS_API size_t mac_framework_get_group_count(mac_framework_t *fw);
+AGENTOS_API int mac_framework_register_agents_batch(mac_framework_t *fw,
+                                                     const mac_agent_info_t *agents,
+                                                     size_t count, size_t *registered_count);
 
 #ifdef __cplusplus
 }
