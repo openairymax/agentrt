@@ -128,6 +128,7 @@ target_include_directories(gateway
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/utils>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COREKERN_DIR}/include

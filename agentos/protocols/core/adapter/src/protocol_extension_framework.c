@@ -622,7 +622,6 @@ int proto_ext_load_from_config(proto_ext_framework_t* fw, const char* config_jso
 static proto_ext_framework_t* g_framework_instance = NULL;
 
 static int fw_adapter_init(void* ctx) {
-    (void)ctx;
     if (!g_framework_instance) {
         g_framework_instance = proto_ext_framework_create();
     }
@@ -630,7 +629,6 @@ static int fw_adapter_init(void* ctx) {
 }
 
 static int fw_adapter_destroy(void* ctx) {
-    (void)ctx;
     if (g_framework_instance) {
         proto_ext_framework_destroy(g_framework_instance);
         g_framework_instance = NULL;
@@ -639,7 +637,6 @@ static int fw_adapter_destroy(void* ctx) {
 }
 
 static int fw_adapter_encode(void* ctx, const void* msg, void** out_data, size_t* out_size) {
-    (void)ctx;
     if (!msg || !out_data || !out_size) return -1;
     unified_message_t* umsg = (unified_message_t*)msg;
     size_t in_len = umsg->payload_size ? umsg->payload_size : (umsg->payload ? strlen(umsg->payload) : 0);
@@ -653,7 +650,6 @@ static int fw_adapter_encode(void* ctx, const void* msg, void** out_data, size_t
 }
 
 static int fw_adapter_decode(void* ctx, const void* data, size_t size, void* out_msg) {
-    (void)ctx;
     if (!data || !out_msg || size == 0) return -1;
 
     unified_message_t* msg = (unified_message_t*)out_msg;
@@ -667,12 +663,10 @@ static int fw_adapter_decode(void* ctx, const void* data, size_t size, void* out
 }
 
 static int fw_adapter_is_connected(void* ctx) {
-    (void)ctx;
     return g_framework_instance != NULL ? 1 : 0;
 }
 
 static int fw_adapter_get_stats(void* ctx, char* stats_json, size_t max_size) {
-    (void)ctx;
     if (!stats_json || max_size < 64) return -1;
     int written = snprintf(stats_json, max_size,
         "{\"adapter\":\"protocol_extension_framework\",\"status\":\"active\"}");
@@ -680,7 +674,6 @@ static int fw_adapter_get_stats(void* ctx, char* stats_json, size_t max_size) {
 }
 
 static int fw_adapter_connect(void* ctx, const char* endpoint) {
-    (void)ctx;
     if (!endpoint) return -1;
     if (!g_framework_instance) return -2;
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
@@ -694,7 +687,6 @@ static int fw_adapter_connect(void* ctx, const char* endpoint) {
 }
 
 static int fw_adapter_disconnect(void* ctx) {
-    (void)ctx;
     if (!g_framework_instance) return -2;
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
         if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {
@@ -705,7 +697,6 @@ static int fw_adapter_disconnect(void* ctx) {
 }
 
 static int fw_adapter_send(void* ctx, const void* data, size_t size) {
-    (void)ctx;
     if (!data || size == 0) return -1;
     if (!g_framework_instance) return -2;
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
@@ -720,8 +711,6 @@ static int fw_adapter_send(void* ctx, const void* data, size_t size) {
 }
 
 static int fw_adapter_receive(void* ctx, void** data, size_t* size, uint32_t timeout_ms) {
-    (void)ctx;
-    (void)timeout_ms;
     if (!data || !size) return -1;
     if (!g_framework_instance) return -2;
     *data = NULL;
@@ -735,7 +724,6 @@ static int fw_adapter_receive(void* ctx, void** data, size_t* size, uint32_t tim
 }
 
 static int fw_adapter_handle_request(void* ctx, const void* req, void** resp) {
-    (void)ctx;
     if (!req || !resp) return -1;
     if (!g_framework_instance) return -2;
     size_t running = 0;
@@ -763,7 +751,6 @@ static int fw_adapter_handle_request(void* ctx, const void* req, void** resp) {
 }
 
 static int fw_adapter_get_version(void* ctx, char* buf, size_t max_size) {
-    (void)ctx;
     if (!buf || max_size == 0) return -1;
     const char* ver = "1.0.0";
     size_t len = strlen(ver);
@@ -774,7 +761,6 @@ static int fw_adapter_get_version(void* ctx, char* buf, size_t max_size) {
 }
 
 static uint32_t fw_adapter_capabilities(void* ctx) {
-    (void)ctx;
     return (uint32_t)(PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING);
 }
 
