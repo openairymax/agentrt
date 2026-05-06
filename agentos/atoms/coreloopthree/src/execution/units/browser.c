@@ -1591,7 +1591,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                     else if (key_char == '\t')
                         snprintf(key_str, sizeof(key_str), "Tab");
                     else if (key_char == '\b')
-                        snprintf(key_str, sizeof(key_str), "Backspace");
+                        snprintf(key_str, sizeof(key_str), "Bksp");
                     else if (key_char == '\x1b')
                         snprintf(key_str, sizeof(key_str), "Escape");
                     else

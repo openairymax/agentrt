@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include "config_manager.h"
 #include "safe_string_utils.h"
+#include "platform.h"
 
 static int test_count = 0;
 static int pass_count = 0;
@@ -156,7 +157,7 @@ static void test_config_load_json(void) {
 
     cm_init(NULL);
 
-    FILE* fp = fopen("/tmp/test_agentos_config.json", "w");
+    FILE* fp = fopen(AGENTOS_TMP_DIR "/test_agentos_config.json", "w");
     TEST_ASSERT(fp != NULL, "create temp config file");
     if (!fp) { cm_shutdown(); return; }
 
@@ -167,7 +168,7 @@ static void test_config_load_json(void) {
     fprintf(fp, "debug.enabled=true\n");
     fclose(fp);
 
-    int count = cm_load_json("/tmp/test_agentos_config.json", "jsonns");
+    int count = cm_load_json(AGENTOS_TMP_DIR "/test_agentos_config.json", "jsonns");
     TEST_ASSERT(count >= 3, "loaded entries from JSON");
 
     const char* name = cm_get("jsonns.app.name", NULL);
@@ -176,7 +177,7 @@ static void test_config_load_json(void) {
     int64_t port = cm_get_int("jsonns.server.port", 0);
     TEST_ASSERT(port == 9090, "JSON loaded port");
 
-    unlink("/tmp/test_agentos_config.json");
+    unlink(AGENTOS_TMP_DIR "/test_agentos_config.json");
     cm_shutdown();
     printf("    PASSED\n");
 }
