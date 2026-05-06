@@ -202,6 +202,8 @@ target_include_directories(gateway_lib_obj PUBLIC
     ${COMMONS_DIR}/utils/logging/include
     ${COMMONS_DIR}/utils/error/include
     ${COMMONS_DIR}/utils/sync/include
+    ${PROTOCOLS_INCLUDE_DIR}
+    ${PROTOCOLS_COMMON_INCLUDE_DIR}
 )
 
 # 查找 gateway 所需的外部库

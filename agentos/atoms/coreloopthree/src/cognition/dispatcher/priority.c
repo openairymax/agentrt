@@ -46,13 +46,12 @@ static void priority_destroy(agentos_dispatching_strategy_t* strategy)
  * @return AGENTOS_SUCCESS 成功
  */
 static agentos_error_t priority_select(
-    const agentos_task_node_t* task,
+    const agentos_task_node_t __attribute__((unused)) *task,
     const void** candidates,
     size_t count,
     void* context,
     char** out_agent_id)
 {
-    (void)task;
 
     struct agentos_priority_dispatch* priority =
         (struct agentos_priority_dispatch*)context;
