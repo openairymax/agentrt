@@ -20,8 +20,8 @@
 #define GATEWAY_PROTOCOL_HANDLER_H
 
 #include "gateway_rpc_handler.h"
-#include "protocols/include/unified_protocol.h"
-#include "protocols/include/protocol_router.h"
+#include "unified_protocol.h"
+#include "protocol_router.h"
 #include <stddef.h>
 
 #ifdef __cplusplus
