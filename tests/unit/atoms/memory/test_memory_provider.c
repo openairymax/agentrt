@@ -5,16 +5,26 @@
  */
 
 #include "memory_provider.h"
+#include "platform.h"
 #include <agentos.h>
+#include "platform.h"
 #include <stdio.h>
+#include "platform.h"
 #include <stdlib.h>
+#include "platform.h"
 #include <string.h>
+#include "platform.h"
 #include <assert.h>
+#include "platform.h"
 #include <sys/stat.h>
+#include "platform.h"
 #include <unistd.h>
+#include "platform.h"
 
 #include "memory_compat.h"
+#include "platform.h"
 #include "string_compat.h"
+#include "platform.h"
 
 static int test_count = 0;
 static int pass_count = 0;
@@ -25,7 +35,7 @@ static int pass_count = 0;
     else { printf("  FAIL: %s (line %d)\n", msg, __LINE__); } \
 } while(0)
 
-#define TEST_DIR "/tmp/agentos_provider_test_XXXXXX"
+#define TEST_DIR AGENTOS_TMP_DIR "/agentos_provider_test_XXXXXX"
 
 static char test_dir[256];
 

@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "platform.h"
 #define TEST_PASS(name)      printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
@@ -239,11 +240,11 @@ static void test_loop_config_checkpoint_custom(void)
     config.loop_config_checkpoint_enabled = 1;
     snprintf(config.loop_config_checkpoint_path,
              sizeof(config.loop_config_checkpoint_path),
-             "/tmp/agentos/test_checkpoints");
+             AGENTOS_TMP_DIR "/test_checkpoints");
     config.loop_config_checkpoint_interval_ms = 5000;
 
     assert(config.loop_config_checkpoint_enabled == 1);
-    assert(strcmp(config.loop_config_checkpoint_path, "/tmp/agentos/test_checkpoints") == 0);
+    assert(strcmp(config.loop_config_checkpoint_path, AGENTOS_TMP_DIR "/test_checkpoints") == 0);
     assert(config.loop_config_checkpoint_interval_ms == 5000);
 
     TEST_PASS("loop_config checkpoint custom values set correctly");

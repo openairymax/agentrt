@@ -63,8 +63,7 @@ static agentos_error_t default_s1_verify(
     const char* content, size_t content_len,
     float* out_score, int* out_acceptable,
     char** out_critique, size_t* out_critique_len,
-    void* user_data) {
-    (void)user_data;
+    void* __attribute__((unused)) user_data) {
     if (!content || !out_score) return AGENTOS_EINVAL;
 
     float score = 0.5f;
