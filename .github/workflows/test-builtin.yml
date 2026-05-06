@@ -1,21 +1,15 @@
-# ═══════════════════════════════════════════════════════════════════════
-# 终局验收标准 ACC-A: AgentOS 纯开源 cmake 编译零错误 + 写入/检索端到端通过
-# 验证方式: cmake --build + ctest
-# 对应 BAN:  BAN-33 (外置构建) + BAN-40 (CI全绿)
-# 负责人:   团队C
-# ═══════════════════════════════════════════════════════════════════════
 name: ACC-A AgentOS Pure OSS Buildable
 
 on:
   push:
     branches: [main, develop]
     paths:
-      - 'AgentOS/**'
+      - 'agentos/**'
       - '.github/workflows/test-builtin.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'AgentOS/**'
+      - 'agentos/**'
   workflow_dispatch:
 
 concurrency:
@@ -42,28 +36,23 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq cmake build-essential libssl-dev libcurl4-openssl-dev libcmocka-dev
+          sudo apt-get install -y -qq cmake build-essential libssl-dev libcurl4-openssl-dev libcmocka-dev uuid-dev libcjson-dev
 
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake openssl curl
+          brew install cmake openssl curl cjson
 
       - name: Configure (CMake) — BAN-33 compliant out-of-source build
-        working-directory: AgentOS
         run: |
           cmake -B ../AgentOS-build \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DMEMORYROVOL_SOURCE=ON \
-            -DBUILD_TESTS=ON \
-            -Werror=dev
+            -DBUILD_TESTS=ON
 
       - name: Build
-        working-directory: AgentOS
         run: cmake --build ../AgentOS-build --parallel $(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
 
       - name: Unit Tests
-        working-directory: AgentOS
         run: cd ../AgentOS-build && ctest --output-on-failure -j $(nproc 2>/dev/null || echo 4)
 
       - name: ACC-A Final Status

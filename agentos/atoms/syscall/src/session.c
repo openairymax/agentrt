@@ -42,7 +42,9 @@ static agentos_error_t heapstore_syscall_session_delete(const char* sid) {
 #include "check.h"
 #include "logging_compat.h"
 #include <string.h>
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 
 /* 持久化策略配置（内部类型，不导出） */
 typedef struct {
@@ -324,6 +326,7 @@ agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info)
     while (s) {
         if (strcmp(s->session_id, session_id) == 0) {
             s->last_active_ns = agentos_time_monotonic_ns();
+#ifndef AGENTOS_NO_CJSON
             cJSON* root = cJSON_CreateObject();
             if (!root) {
                 agentos_mutex_unlock(session_lock);
@@ -338,6 +341,31 @@ agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info)
             agentos_mutex_unlock(session_lock);
             *out_info = json;
             return json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+#else
+            char buf[1024];
+            int len;
+            if (s->metadata) {
+                len = snprintf(buf, sizeof(buf),
+                    "{\"session_id\":\"%s\",\"metadata\":\"%s\","
+                    "\"created_ns\":%llu,\"last_active_ns\":%llu}",
+                    s->session_id, s->metadata,
+                    (unsigned long long)s->created_ns,
+                    (unsigned long long)s->last_active_ns);
+            } else {
+                len = snprintf(buf, sizeof(buf),
+                    "{\"session_id\":\"%s\","
+                    "\"created_ns\":%llu,\"last_active_ns\":%llu}",
+                    s->session_id,
+                    (unsigned long long)s->created_ns,
+                    (unsigned long long)s->last_active_ns);
+            }
+            agentos_mutex_unlock(session_lock);
+            char* json = (char*)AGENTOS_MALLOC(len + 1);
+            if (!json) return AGENTOS_ENOMEM;
+            memcpy(json, buf, len + 1);
+            *out_info = json;
+            return AGENTOS_SUCCESS;
+#endif
         }
         s = s->next;
     }

@@ -339,6 +339,7 @@ if(BUILD_TESTS)
             tests/test_openclaw_adapter.c
             integrations/openclaw/src/openclaw_adapter.c
             common/src/unified_protocol.c
+            ../daemon/common/src/safe_string_utils.c
             core/transformers/src/protocol_transformers.c
         )
         target_include_directories(test_openclaw_adapter PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})
@@ -355,6 +356,7 @@ if(BUILD_TESTS)
             tests/test_agntcy_acp.c
             standards/agntcy/src/agntcy_acp_adapter.c
             common/src/unified_protocol.c
+            ../daemon/common/src/safe_string_utils.c
             core/transformers/src/protocol_transformers.c
         )
         target_include_directories(test_agntcy_acp PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})
@@ -371,6 +373,7 @@ if(BUILD_TESTS)
             tests/test_china_eco_crypto.c
             integrations/china_eco/src/china_eco_adapter.c
             common/src/unified_protocol.c
+            ../daemon/common/src/safe_string_utils.c
             core/transformers/src/protocol_transformers.c
         )
         target_include_directories(test_china_eco_crypto PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})

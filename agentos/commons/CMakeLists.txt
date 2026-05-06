@@ -143,7 +143,7 @@ target_include_directories(agentos_common PUBLIC
 
 target_compile_definitions(agentos_common PRIVATE _CRT_SECURE_NO_WARNINGS)
 if(NOT CJSON_FOUND)
-    target_compile_definitions(agentos_common PRIVATE AGENTOS_NO_CJSON)
+    target_compile_definitions(agentos_common PUBLIC AGENTOS_NO_CJSON)
 endif()
 
 target_link_libraries(agentos_common

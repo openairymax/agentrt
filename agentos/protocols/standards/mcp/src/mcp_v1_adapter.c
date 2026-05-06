@@ -8,7 +8,9 @@
 #include "mcp_v1_adapter.h"
 #include "mcp_transport.h"
 #include "unified_protocol.h"
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -947,6 +949,7 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
     } else if (strcmp(method, "tools/call") == 0) {
         char tool_name[256] = {0};
         if (params_json) {
+#ifndef AGENTOS_NO_CJSON
             cJSON* pj = cJSON_Parse(params_json);
             if (pj) {
                 cJSON* name_item = cJSON_GetObjectItem(pj, "name");
@@ -956,6 +959,22 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
                 }
                 cJSON_Delete(pj);
             }
+#else
+            char* name_start = strstr(params_json, "\"name\"");
+            if (name_start) {
+                char* val_start = strchr(name_start + 6, '"');
+                if (val_start) {
+                    val_start++;
+                    char* val_end = strchr(val_start, '"');
+                    if (val_end) {
+                        size_t len = (size_t)(val_end - val_start);
+                        if (len >= sizeof(tool_name)) len = sizeof(tool_name) - 1;
+                        memcpy(tool_name, val_start, len);
+                        tool_name[len] = '\0';
+                    }
+                }
+            }
+#endif
         }
         return mcp_v1_handle_tools_call(ctx, tool_name[0] ? tool_name : "unknown",
                                         params_json, response_json);
@@ -964,6 +983,7 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
     } else if (strcmp(method, "resources/read") == 0) {
         char resource_uri[512] = {0};
         if (params_json) {
+#ifndef AGENTOS_NO_CJSON
             cJSON* pj = cJSON_Parse(params_json);
             if (pj) {
                 cJSON* uri_item = cJSON_GetObjectItem(pj, "uri");
@@ -972,6 +992,22 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
                 }
                 cJSON_Delete(pj);
             }
+#else
+            char* uri_start = strstr(params_json, "\"uri\"");
+            if (uri_start) {
+                char* val_start = strchr(uri_start + 5, '"');
+                if (val_start) {
+                    val_start++;
+                    char* val_end = strchr(val_start, '"');
+                    if (val_end) {
+                        size_t len = (size_t)(val_end - val_start);
+                        if (len >= sizeof(resource_uri)) len = sizeof(resource_uri) - 1;
+                        memcpy(resource_uri, val_start, len);
+                        resource_uri[len] = '\0';
+                    }
+                }
+            }
+#endif
         }
         return mcp_v1_handle_resources_read(ctx, resource_uri[0] ? resource_uri : "unknown",
                                             response_json);
@@ -982,6 +1018,7 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
     } else if (strcmp(method, "prompts/get") == 0) {
         char prompt_name[256] = {0};
         if (params_json) {
+#ifndef AGENTOS_NO_CJSON
             cJSON* pj = cJSON_Parse(params_json);
             if (pj) {
                 cJSON* name_item = cJSON_GetObjectItem(pj, "name");
@@ -990,6 +1027,22 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
                 }
                 cJSON_Delete(pj);
             }
+#else
+            char* name_start = strstr(params_json, "\"name\"");
+            if (name_start) {
+                char* val_start = strchr(name_start + 6, '"');
+                if (val_start) {
+                    val_start++;
+                    char* val_end = strchr(val_start, '"');
+                    if (val_end) {
+                        size_t len = (size_t)(val_end - val_start);
+                        if (len >= sizeof(prompt_name)) len = sizeof(prompt_name) - 1;
+                        memcpy(prompt_name, val_start, len);
+                        prompt_name[len] = '\0';
+                    }
+                }
+            }
+#endif
         }
         return mcp_v1_handle_prompts_get(ctx, prompt_name[0] ? prompt_name : "unknown",
                                          params_json, response_json);

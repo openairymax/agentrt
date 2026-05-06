@@ -31,7 +31,9 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -682,7 +684,7 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser, con
         size_t entity_count = extract_entities_from_text(input, entities, MAX_ENTITIES);
 
         if (entity_count > 0) {
-            // 创建上下文 JSON
+#ifndef AGENTOS_NO_CJSON
             cJSON *context_json = cJSON_CreateObject();
             if (context_json) {
                 cJSON *entities_array = cJSON_CreateArray();
@@ -704,6 +706,21 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser, con
                 }
                 cJSON_Delete(context_json);
             }
+#else
+            char buf[2048];
+            int off = 0;
+            off += snprintf(buf + off, sizeof(buf) - off, "{\"entities\":[");
+            for (size_t i = 0; i < entity_count; i++) {
+                if (i > 0) off += snprintf(buf + off, sizeof(buf) - off, ",");
+                off += snprintf(buf + off, sizeof(buf) - off,
+                    "{\"type\":\"%s\",\"value\":\"%s\",\"confidence\":%.2f}",
+                    entities[i].type, entities[i].value, entities[i].confidence);
+                AGENTOS_FREE(entities[i].type);
+                AGENTOS_FREE(entities[i].value);
+            }
+            off += snprintf(buf + off, sizeof(buf) - off, "]}");
+            intent->intent_context = AGENTOS_STRDUP(buf);
+#endif
         }
 
         // 清理实体数组
@@ -811,6 +828,7 @@ agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t *parser, cha
     if (!parser || !out_stats)
         return AGENTOS_EINVAL;
 
+#ifndef AGENTOS_NO_CJSON
     cJSON *stats_json = cJSON_CreateObject();
     if (!stats_json)
         return AGENTOS_ENOMEM;
@@ -823,18 +841,15 @@ agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t *parser, cha
     cJSON_AddNumberToObject(stats_json, "failure_count", parser->failure_count);
     cJSON_AddNumberToObject(stats_json, "total_time_ns", parser->total_time_ns);
 
-    // 计算平均耗时
     double avg_time_ns =
         parser->total_parsed > 0 ? (double)parser->total_time_ns / parser->total_parsed : 0.0;
     cJSON_AddNumberToObject(stats_json, "avg_time_ns", avg_time_ns);
 
-    // 计算成功率
     double success_rate = parser->total_parsed > 0
                               ? (double)parser->success_count / parser->total_parsed * 100.0
                               : 0.0;
     cJSON_AddNumberToObject(stats_json, "success_rate_percent", success_rate);
 
-    // 统计规则数量
     int rule_count = 0;
     intent_rule_t *rule = parser->rule_list;
     while (rule) {
@@ -853,6 +868,39 @@ agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t *parser, cha
 
     *out_stats = stats_str;
     return AGENTOS_SUCCESS;
+#else
+    agentos_mutex_lock(parser->lock);
+
+    uint64_t total_parsed = parser->total_parsed;
+    uint64_t success_count = parser->success_count;
+    uint64_t failure_count = parser->failure_count;
+    uint64_t total_time_ns = parser->total_time_ns;
+    double avg_time_ns = total_parsed > 0 ? (double)total_time_ns / total_parsed : 0.0;
+    double success_rate = total_parsed > 0 ? (double)success_count / total_parsed * 100.0 : 0.0;
+    int rule_count = 0;
+    intent_rule_t *rule = parser->rule_list;
+    while (rule) { rule_count++; rule = rule->next; }
+
+    agentos_mutex_unlock(parser->lock);
+
+    char buf[512];
+    int len = snprintf(buf, sizeof(buf),
+        "{\"parser_id\":\"%s\",\"total_parsed\":%llu,\"success_count\":%llu,"
+        "\"failure_count\":%llu,\"total_time_ns\":%llu,\"avg_time_ns\":%.2f,"
+        "\"success_rate_percent\":%.2f,\"rule_count\":%d}",
+        parser->parser_id,
+        (unsigned long long)total_parsed,
+        (unsigned long long)success_count,
+        (unsigned long long)failure_count,
+        (unsigned long long)total_time_ns,
+        avg_time_ns, success_rate, rule_count);
+
+    char *result = (char *)AGENTOS_MALLOC(len + 1);
+    if (!result) return AGENTOS_ENOMEM;
+    memcpy(result, buf, len + 1);
+    *out_stats = result;
+    return AGENTOS_SUCCESS;
+#endif
 }
 
 /**
@@ -887,6 +935,7 @@ agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t *pars
     if (!parser || !out_json)
         return AGENTOS_EINVAL;
 
+#ifndef AGENTOS_NO_CJSON
     cJSON *health_json = cJSON_CreateObject();
     if (!health_json)
         return AGENTOS_ENOMEM;
@@ -904,7 +953,6 @@ agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t *pars
     }
     cJSON_AddNumberToObject(health_json, "rule_count", (double)rule_count);
 
-    // 检查资源
     int resources_ok = 1;
     if (!parser->lock)
         resources_ok = 0;
@@ -922,4 +970,28 @@ agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t *pars
 
     *out_json = health_str;
     return AGENTOS_SUCCESS;
+#else
+    agentos_mutex_lock(parser->lock);
+    size_t rule_count = 0;
+    intent_rule_t *r = parser->rule_list;
+    while (r) { rule_count++; r = r->next; }
+    int resources_ok = (parser->lock != NULL) ? 1 : 0;
+    uint64_t ts = agentos_get_monotonic_time_ns();
+    agentos_mutex_unlock(parser->lock);
+
+    char buf[512];
+    int len = snprintf(buf, sizeof(buf),
+        "{\"component\":\"intent_parser\",\"parser_id\":\"%s\","
+        "\"status\":\"healthy\",\"rule_count\":%zu,"
+        "\"resources_ok\":%s,\"timestamp_ns\":%llu}",
+        parser->parser_id, rule_count,
+        resources_ok ? "true" : "false",
+        (unsigned long long)ts);
+
+    char *result = (char *)AGENTOS_MALLOC(len + 1);
+    if (!result) return AGENTOS_ENOMEM;
+    memcpy(result, buf, len + 1);
+    *out_json = result;
+    return AGENTOS_SUCCESS;
+#endif
 }

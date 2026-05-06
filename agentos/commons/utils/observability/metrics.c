@@ -12,7 +12,9 @@
 #include "include/memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 #include <stdint.h>
 
 typedef struct metric_counter {
@@ -129,6 +131,7 @@ void agentos_metrics_timing(agentos_metrics_t* metrics, const char* name, double
 
 char* agentos_metrics_export(agentos_metrics_t* metrics) {
     if (!metrics) return NULL;
+#ifndef AGENTOS_NO_CJSON
     cJSON* root = cJSON_CreateObject();
     if (!root) return NULL;
 
@@ -162,6 +165,18 @@ char* agentos_metrics_export(agentos_metrics_t* metrics) {
     char* json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     return json;
+#else
+    size_t buf_size = 1024;
+    char* buf = (char*)AGENTOS_MALLOC(buf_size);
+    if (!buf) return NULL;
+    int pos = snprintf(buf, buf_size,
+        "{\"counters\":{},\"gauges\":{},\"timings\":{}}");
+    if (pos < 0 || (size_t)pos >= buf_size) {
+        AGENTOS_FREE(buf);
+        return NULL;
+    }
+    return buf;
+#endif
 }
 
 static int sanitize_metric_name(const char* name, char* out, size_t out_size) {

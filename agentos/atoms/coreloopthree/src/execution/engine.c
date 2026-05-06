@@ -23,7 +23,9 @@
 #include <string.h>
 
 /* JSON解析库 */
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
@@ -801,6 +803,7 @@ agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engin
     if (!engine || !out_json)
         return AGENTOS_EINVAL;
 
+#ifndef AGENTOS_NO_CJSON
     cJSON *root = cJSON_CreateObject();
     if (!root)
         return AGENTOS_ENOMEM;
@@ -838,4 +841,32 @@ agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engin
 
     *out_json = json;
     return AGENTOS_SUCCESS;
+#else
+    agentos_mutex_lock(engine->queue_lock);
+    size_t queue_len = 0;
+    task_tcb_t *t = engine->task_queue;
+    while (t) { queue_len++; t = t->next; }
+    agentos_mutex_unlock(engine->queue_lock);
+
+    agentos_mutex_lock(engine->running_lock);
+    size_t running_len = 0;
+    t = engine->running_tasks;
+    while (t) { running_len++; t = t->next; }
+    uint32_t cur = engine->current_concurrency;
+    agentos_mutex_unlock(engine->running_lock);
+
+    char buf[512];
+    int len = snprintf(buf, sizeof(buf),
+        "{\"status\":\"healthy\",\"task_queue_length\":%zu,"
+        "\"running_tasks\":%zu,\"current_concurrency\":%u,"
+        "\"max_concurrency\":%u,\"running\":%d}",
+        queue_len, running_len, cur,
+        engine->max_concurrency, engine->running);
+
+    char *json = (char *)AGENTOS_MALLOC(len + 1);
+    if (!json) return AGENTOS_ENOMEM;
+    memcpy(json, buf, len + 1);
+    *out_json = json;
+    return AGENTOS_SUCCESS;
+#endif
 }

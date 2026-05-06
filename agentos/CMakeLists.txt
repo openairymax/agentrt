@@ -66,6 +66,18 @@ else()
     message(WARNING "commons module not found or disabled")
 endif()
 
+find_package(cJSON QUIET)
+if(NOT cJSON_FOUND)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(CJSON QUIET libcjson)
+    endif()
+endif()
+if(NOT CJSON_FOUND)
+    add_compile_definitions(AGENTOS_NO_CJSON)
+    message(STATUS "cJSON not found globally - AGENTOS_NO_CJSON defined")
+endif()
+
 # protocols模块（gateway依赖）
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/protocols/CMakeLists.txt")
     add_subdirectory(protocols)

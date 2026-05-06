@@ -21,7 +21,9 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 
 #include "atomic_compat.h"
 
@@ -671,6 +673,7 @@ agentos_error_t agentos_cognition_health_check(
 
     if (!engine || !out_json) return AGENTOS_EINVAL;
 
+#ifndef AGENTOS_NO_CJSON
     cJSON* root = cJSON_CreateObject();
     if (!root) return AGENTOS_ENOMEM;
 
@@ -696,4 +699,35 @@ agentos_error_t agentos_cognition_health_check(
 
     *out_json = json;
     return AGENTOS_SUCCESS;
+#else
+    agentos_mutex_lock(engine->lock);
+    uint32_t processed = engine->stats_processed;
+    uint64_t avg_ns = (processed > 0) ? (engine->stats_total_time_ns / processed) : 0;
+    int dual = engine->enable_dual_thinking;
+    size_t anomaly_count = 0;
+    int has_critical = 0;
+    if (engine->chain) {
+        agentos_tc_chain_health_check(engine->chain, &anomaly_count, &has_critical);
+    }
+    agentos_mutex_unlock(engine->lock);
+
+    char buf[512];
+    int len = snprintf(buf, sizeof(buf),
+        "{\"status\":\"healthy\",\"processed\":%u,\"avg_time_ns\":%llu,"
+        "\"dual_thinking_enabled\":%s",
+        processed, (unsigned long long)avg_ns,
+        dual ? "true" : "false");
+    if (anomaly_count > 0 || has_critical) {
+        len += snprintf(buf + len, sizeof(buf) - len,
+            ",\"chain_anomalies\":%zu,\"chain_critical\":%s",
+            anomaly_count, has_critical ? "true" : "false");
+    }
+    len += snprintf(buf + len, sizeof(buf) - len, "}");
+
+    char* json = (char*)AGENTOS_MALLOC(len + 1);
+    if (!json) return AGENTOS_ENOMEM;
+    memcpy(json, buf, len + 1);
+    *out_json = json;
+    return AGENTOS_SUCCESS;
+#endif
 }

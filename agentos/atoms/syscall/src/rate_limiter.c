@@ -29,7 +29,9 @@
 #include <time.h>
 
 /* JSON解析库 */
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 
 /**
  * @brief 令牌桶限流器
@@ -110,6 +112,7 @@ agentos_error_t agentos_sys_rate_limiter_get_status(char** out_json) {
 
     agentos_mutex_lock(g_rate_limiter->lock);
 
+#ifndef AGENTOS_NO_CJSON
     cJSON* status = cJSON_CreateObject();
     cJSON_AddNumberToObject(status, "tokens", g_rate_limiter->tokens);
     cJSON_AddNumberToObject(status, "capacity", g_rate_limiter->capacity);
@@ -124,6 +127,25 @@ agentos_error_t agentos_sys_rate_limiter_get_status(char** out_json) {
     if (!json_str) return AGENTOS_ENOMEM;
     *out_json = json_str;
     return AGENTOS_SUCCESS;
+#else
+    int tokens = g_rate_limiter->tokens;
+    int capacity = g_rate_limiter->capacity;
+    double refill_rate = g_rate_limiter->refill_rate;
+    time_t last_refill = g_rate_limiter->last_refill;
+
+    agentos_mutex_unlock(g_rate_limiter->lock);
+
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf),
+        "{\"tokens\":%d,\"capacity\":%d,\"refill_rate\":%.2f,\"last_refill\":%lld}",
+        tokens, capacity, refill_rate, (long long)last_refill);
+
+    char* json_str = (char*)AGENTOS_MALLOC(len + 1);
+    if (!json_str) return AGENTOS_ENOMEM;
+    memcpy(json_str, buf, len + 1);
+    *out_json = json_str;
+    return AGENTOS_SUCCESS;
+#endif
 }
 
 /**

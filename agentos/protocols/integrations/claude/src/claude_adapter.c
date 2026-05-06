@@ -25,7 +25,9 @@
 
 #ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 #endif
 
 #define CLAUDE_MAX_RESPONSE_LEN 4096

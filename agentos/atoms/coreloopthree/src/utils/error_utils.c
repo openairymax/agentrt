@@ -13,7 +13,9 @@
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
+#ifndef AGENTOS_NO_CJSON
 #include <cjson/cJSON.h>
+#endif
 
 /**
  * @brief 错误码与信息映射表
@@ -68,10 +70,6 @@ agentos_error_t agentos_error_to_json(
 
     if (!out_json) return AGENTOS_EINVAL;
 
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return AGENTOS_ENOMEM;
-
-    // 查找错误信息
     const char* err_name = "UNKNOWN";
     const char* err_msg = "未知错误";
     for (size_t i = 0; i < ERROR_MAP_SIZE; i++) {
@@ -81,6 +79,10 @@ agentos_error_t agentos_error_to_json(
             break;
         }
     }
+
+#ifndef AGENTOS_NO_CJSON
+    cJSON* root = cJSON_CreateObject();
+    if (!root) return AGENTOS_ENOMEM;
 
     cJSON_AddNumberToObject(root, "code", err);
     cJSON_AddStringToObject(root, "name", err_name);
@@ -97,6 +99,25 @@ agentos_error_t agentos_error_to_json(
 
     *out_json = json;
     return AGENTOS_SUCCESS;
+#else
+    char buf[1024];
+    int len;
+    if (message) {
+        len = snprintf(buf, sizeof(buf),
+            "{\"code\":%d,\"name\":\"%s\",\"message\":\"%s\",\"detail\":\"%s\"}",
+            (int)err, err_name, err_msg, message);
+    } else {
+        len = snprintf(buf, sizeof(buf),
+            "{\"code\":%d,\"name\":\"%s\",\"message\":\"%s\"}",
+            (int)err, err_name, err_msg);
+    }
+
+    char* json = (char*)AGENTOS_MALLOC(len + 1);
+    if (!json) return AGENTOS_ENOMEM;
+    memcpy(json, buf, len + 1);
+    *out_json = json;
+    return AGENTOS_SUCCESS;
+#endif
 }
 
 agentos_error_t agentos_error_context_create(
@@ -163,10 +184,6 @@ agentos_error_t agentos_error_context_to_json(
 
     if (!context || !out_json) return AGENTOS_EINVAL;
 
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return AGENTOS_ENOMEM;
-
-    // 查找错误信息
     const char* err_name = "UNKNOWN";
     const char* err_msg = "未知错误";
     for (size_t i = 0; i < ERROR_MAP_SIZE; i++) {
@@ -176,6 +193,10 @@ agentos_error_t agentos_error_context_to_json(
             break;
         }
     }
+
+#ifndef AGENTOS_NO_CJSON
+    cJSON* root = cJSON_CreateObject();
+    if (!root) return AGENTOS_ENOMEM;
 
     cJSON_AddNumberToObject(root, "code", context->code);
     cJSON_AddStringToObject(root, "name", err_name);
@@ -204,4 +225,33 @@ agentos_error_t agentos_error_context_to_json(
 
     *out_json = json;
     return AGENTOS_SUCCESS;
+#else
+    char buf[1024];
+    int len = snprintf(buf, sizeof(buf),
+        "{\"code\":%d,\"name\":\"%s\",\"message\":\"%s\"",
+        (int)context->code, err_name, err_msg);
+
+    if (context->message) {
+        len += snprintf(buf + len, sizeof(buf) - len,
+            ",\"detail\":\"%s\"", context->message);
+    }
+    if (context->file) {
+        len += snprintf(buf + len, sizeof(buf) - len,
+            ",\"file\":\"%s\"", context->file);
+    }
+    len += snprintf(buf + len, sizeof(buf) - len,
+        ",\"line\":%d", context->line);
+    if (context->function) {
+        len += snprintf(buf + len, sizeof(buf) - len,
+            ",\"function\":\"%s\"", context->function);
+    }
+    len += snprintf(buf + len, sizeof(buf) - len,
+        ",\"timestamp_ns\":%llu}", (unsigned long long)context->timestamp_ns);
+
+    char* json = (char*)AGENTOS_MALLOC(len + 1);
+    if (!json) return AGENTOS_ENOMEM;
+    memcpy(json, buf, len + 1);
+    *out_json = json;
+    return AGENTOS_SUCCESS;
+#endif
 }

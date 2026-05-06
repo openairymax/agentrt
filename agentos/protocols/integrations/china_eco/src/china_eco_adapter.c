@@ -327,7 +327,8 @@ static void sm3_compress(uint32_t digest[8], const uint8_t block[64]) {
 
 int china_eco_sm3_hash(const void* data, size_t size,
                        uint8_t digest[CHINA_ECO_SM3_DIGEST_SIZE]) {
-    if (!data || !digest) return -1;
+    if (!digest) return -1;
+    if (!data && size > 0) return -1;
     if (size == 0) {
         memset(digest, 0, CHINA_ECO_SM3_DIGEST_SIZE);
         return 0;
@@ -551,6 +552,7 @@ int china_eco_sm4_decrypt(china_eco_sm4_context_t* ctx,
     const uint8_t* ct = (const uint8_t*)ciphertext;
     uint8_t prev_block[CHINA_ECO_SM4_BLOCK_SIZE];
     uint8_t decrypted[CHINA_ECO_SM4_BLOCK_SIZE];
+    size_t last_copy_size = CHINA_ECO_SM4_BLOCK_SIZE;
 
     memcpy(prev_block, ctx->iv, CHINA_ECO_SM4_BLOCK_SIZE);
 
@@ -562,15 +564,21 @@ int china_eco_sm4_decrypt(china_eco_sm4_context_t* ctx,
 
         size_t copy_size = CHINA_ECO_SM4_BLOCK_SIZE;
         if (offset + CHINA_ECO_SM4_BLOCK_SIZE >= ct_size) {
-            copy_size = (size_t)(CHINA_ECO_SM4_BLOCK_SIZE - decrypted[CHINA_ECO_SM4_BLOCK_SIZE - 1]);
-            if (copy_size > CHINA_ECO_SM4_BLOCK_SIZE) copy_size = CHINA_ECO_SM4_BLOCK_SIZE;
+            uint8_t pad_val = decrypted[CHINA_ECO_SM4_BLOCK_SIZE - 1];
+            if (pad_val > 0 && pad_val <= CHINA_ECO_SM4_BLOCK_SIZE) {
+                copy_size = CHINA_ECO_SM4_BLOCK_SIZE - pad_val;
+            }
+            last_copy_size = copy_size;
         }
 
-        memcpy(pt + offset - (CHINA_ECO_SM4_BLOCK_SIZE - copy_size), decrypted, copy_size);
+        memcpy(pt + offset, decrypted, copy_size);
         memcpy(prev_block, ct + offset, CHINA_ECO_SM4_BLOCK_SIZE);
     }
 
     *pt_size = ct_size;
+    if (ct_size > 0 && last_copy_size < CHINA_ECO_SM4_BLOCK_SIZE) {
+        *pt_size = ct_size - (CHINA_ECO_SM4_BLOCK_SIZE - last_copy_size);
+    }
     return 0;
 }
 
