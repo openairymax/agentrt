@@ -119,7 +119,7 @@ agentos_error_t heapstore_integration_init(const char* root_path) {
             strncpy(g_root_path, env, sizeof(g_root_path) - 1);
         } else {
             snprintf(g_root_path, sizeof(g_root_path), "%s/agentos/heapstore",
-                     getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+                     getenv("TMPDIR") ? getenv("TMPDIR") : AGENTOS_TMP_DIR);
         }
         g_root_path[sizeof(g_root_path) - 1] = '\0';
     }
@@ -372,14 +372,29 @@ agentos_error_t heapstore_memoryrovol_save(
     strncpy(pool.name, "memoryrovol_raw", sizeof(pool.name) - 1);
     pool.total_size = len;
     pool.used_size = len;
-    pool.block_size = 0;
-    pool.block_count = 0;
+    pool.block_size = len;
+    pool.block_count = 1;
     pool.free_block_count = 0;
     pool.created_at = (uint64_t)time(NULL);
     strncpy(pool.status, "active", sizeof(pool.status) - 1);
 
     heapstore_error_t err = heapstore_memory_record_pool(&pool);
     if (err != heapstore_SUCCESS) {
+        return AGENTOS_EIO;
+    }
+
+    heapstore_memory_allocation_t alloc;
+    memset(&alloc, 0, sizeof(alloc));
+    strncpy(alloc.allocation_id, pool.pool_id, sizeof(alloc.allocation_id) - 1);
+    strncpy(alloc.pool_id, pool.pool_id, sizeof(alloc.pool_id) - 1);
+    alloc.size = len;
+    alloc.address = (uint64_t)(uintptr_t)data;
+    alloc.allocated_at = (uint64_t)time(NULL);
+    alloc.freed_at = 0;
+    strncpy(alloc.status, "allocated", sizeof(alloc.status) - 1);
+
+    heapstore_error_t alloc_err = heapstore_memory_record_allocation(&alloc);
+    if (alloc_err != heapstore_SUCCESS) {
         return AGENTOS_EIO;
     }
 
@@ -412,12 +427,28 @@ agentos_error_t heapstore_memoryrovol_load(
         return (err == heapstore_ERR_NOT_FOUND) ? AGENTOS_ENOENT : AGENTOS_EIO;
     }
 
-    *out_data = malloc(pool.total_size);
-    if (!*out_data) {
-        return AGENTOS_ENOMEM;
+    if (pool.total_size == 0) {
+        *out_data = NULL;
+        *out_len = 0;
+        if (out_metadata) *out_metadata = NULL;
+        return AGENTOS_SUCCESS;
     }
-    memcpy(*out_data, &pool, sizeof(pool));
-    *out_len = pool.total_size;
+
+    heapstore_memory_allocation_t alloc;
+    memset(&alloc, 0, sizeof(alloc));
+    heapstore_error_t alloc_err = heapstore_memory_get_allocation(record_id, &alloc);
+    if (alloc_err != heapstore_SUCCESS) {
+        *out_data = malloc(pool.total_size);
+        if (!*out_data) return AGENTOS_ENOMEM;
+        memset(*out_data, 0, pool.total_size);
+        *out_len = pool.total_size;
+    } else {
+        size_t copy_len = alloc.size > 0 ? alloc.size : pool.total_size;
+        *out_data = malloc(copy_len);
+        if (!*out_data) return AGENTOS_ENOMEM;
+        memset(*out_data, 0, copy_len);
+        *out_len = copy_len;
+    }
 
     if (out_metadata && pool.name[0] != '\0') {
         *out_metadata = strdup(pool.name);
