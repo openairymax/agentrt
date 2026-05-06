@@ -488,7 +488,7 @@ static void bench_mac_batch_register_1000(void)
 
 static void bench_mac_hash_lookup_1000(void)
 {
-    BENCH_RUN("MultiAgent hash lookup 1000 agents (10000 lookups)");
+    BENCH_RUN("MultiAgent hash ops 1000 agents (10000 unregister+register)");
     mac_framework_t *fw = mac_framework_create(MAC_MODE_COLLABORATIVE);
     assert(fw != NULL);
 
@@ -516,10 +516,10 @@ static void bench_mac_hash_lookup_1000(void)
     uint64_t t_end = bench_time_ns();
 
     print_ns(t_end - t_start, "total 10000 unregister+re-register");
-    printf("    per-lookup: %lu ns\n", (unsigned long)((t_end - t_start) / n_lookups));
+    printf("    per-op: %lu ns\n", (unsigned long)((t_end - t_start) / n_lookups));
 
     mac_framework_destroy(fw);
-    BENCH_PASS("MultiAgent hash lookup 1000 agents");
+    BENCH_PASS("MultiAgent hash ops 1000 agents");
 }
 
 static void bench_mutex_lock_unlock(void)
