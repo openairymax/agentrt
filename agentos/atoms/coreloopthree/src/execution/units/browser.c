@@ -1559,7 +1559,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                                      "\"selector\":\"%s\","
                                                      "\"value\":\"%s\","
                                                      "\"cdp_method\":"
-                                                     "\"DOM.setAttributeValue\","
+                                                     "\"Runtime.evaluate\","
                                                      "\"cdp\":true}",
                                                      sel_buf, val_buf);
                                         }
