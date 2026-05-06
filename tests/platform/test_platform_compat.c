@@ -521,7 +521,7 @@ static void pt_config_paths(void)
     cm_init(NULL);
 
     /* Unix风格路径 */
-    cm_set("unix.path", "/tmp/agentos/config.json", "pt");
+    cm_set("unix.path", AGENTOS_TMP_DIR "/config.json", "pt");
     const char* upath = cm_get("unix.path", NULL);
     TEST_ASSERT(upath != NULL && upath[0] == '/',
                 "Unix绝对路径存储正确");
