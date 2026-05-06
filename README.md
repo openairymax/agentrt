@@ -1,3 +1,5 @@
+[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)  
+
 <div align="center">
 
 # Agent OS  

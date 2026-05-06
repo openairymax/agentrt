@@ -1,3 +1,5 @@
+[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)  
+
 <div align="center">
 
 # Agent OS  
@@ -6,7 +8,7 @@ Powered by OpenAirymax
 
 > 成为人类计算工程史上，第四个"操作系统哲学"
 
-中文 | [English](README.md)  
+中文 | [English](README.md)   
 
 [![AtomGit](https://atomgit.com/openairymax/agentos/star/badge.svg)](https://atomgit.com/openairymax/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
@@ -309,6 +311,16 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 ---
 
-## ⭐️ Github Star History
+## GitHub Star History
 
 [![Star History Chart](https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left)](https://star-history.com/#SpharxTeam/AgentOS)
+
+## Star History Global Rank
+
+<a href="https://www.star-history.com/spharxteam/agentos">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1" />
+ </picture>
+</a>

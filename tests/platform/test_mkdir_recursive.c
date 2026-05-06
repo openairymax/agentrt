@@ -15,16 +15,24 @@
  */
 
 #include <stdio.h>
+#include "platform.h"
 #include <stdlib.h>
+#include "platform.h"
 #include <string.h>
+#include "platform.h"
 #include <sys/stat.h>
+#include "platform.h"
 #include <sys/types.h>
+#include "platform.h"
 #include <unistd.h>
+#include "platform.h"
 #include <errno.h>
+#include "platform.h"
 
 #include "test_macros.h"
+#include "platform.h"
 
-#define TEST_BASE_DIR "/tmp/agentos_test_mkdir_XXXXXX"
+#define TEST_BASE_DIR AGENTOS_TMP_DIR "/agentos_test_mkdir_XXXXXX"
 
 static char g_test_dir[256];
 

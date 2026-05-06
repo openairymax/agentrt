@@ -9,15 +9,24 @@
  */
 
 #include <stdio.h>
+#include "platform.h"
 #include <stdlib.h>
+#include "platform.h"
 #include <string.h>
+#include "platform.h"
 #include <assert.h>
+#include "platform.h"
 #include <time.h>
+#include "platform.h"
 
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "platform.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "platform.h"
 #include "syscalls.h"
+#include "platform.h"
 #include "agentos.h"
+#include "platform.h"
 
 int test_syscall_table_lookup(void) {
     printf("  测试系统调用表查找...\n");
@@ -262,7 +271,7 @@ int test_sandbox_permission_check(void) {
     agentos_sandbox_t* sandbox = NULL;
     agentos_sandbox_create(&sandbox);
 
-    int allowed = agentos_sandbox_check_permission(sandbox, AGENTOS_SYSCALL_FILE_READ, "/tmp/test.txt");
+    int allowed = agentos_sandbox_check_permission(sandbox, AGENTOS_SYSCALL_FILE_READ, AGENTOS_TMP_DIR "/test.txt");
     if (allowed < 0) {
         printf("    权限检查失败\n");
         agentos_sandbox_destroy(sandbox);
