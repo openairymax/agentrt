@@ -653,7 +653,7 @@ static agentos_task_plan_t* build_fallback_plan(
         agentos_task_node_t* node = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
         if (!node) break;
 
-        char nid[128]; snprintf(nid, sizeof(nid), "%s_%s", plan_id, defaults[s].name);
+        char nid[256]; snprintf(nid, sizeof(nid), "%s_%s", plan_id, defaults[s].name);
         node->task_node_id = AGENTOS_STRDUP(nid);
         node->task_node_agent_role = AGENTOS_STRDUP(defaults[s].role);
         node->task_node_timeout_ms = defaults[s].to;
@@ -673,7 +673,7 @@ static agentos_task_plan_t* build_fallback_plan(
     if (!audit_passed) {
         agentos_task_node_t* cn = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
         if (cn) {
-            char cid[128]; snprintf(cid, sizeof(cid), "%s_reaudit", plan_id);
+            char cid[256]; snprintf(cid, sizeof(cid), "%s_reaudit", plan_id);
             cn->task_node_id = AGENTOS_STRDUP(cid);
             cn->task_node_agent_role = AGENTOS_STRDUP("corrector");
             cn->task_node_timeout_ms = 20000;
@@ -691,7 +691,7 @@ static agentos_task_plan_t* build_fallback_plan(
     if (!aligned) {
         agentos_task_node_t* rn = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
         if (rn) {
-            char rid[128]; snprintf(rid, sizeof(rid), "%s_realign", plan_id);
+            char rid[256]; snprintf(rid, sizeof(rid), "%s_realign", plan_id);
             rn->task_node_id = AGENTOS_STRDUP(rid);
             rn->task_node_agent_role = AGENTOS_STRDUP("realigner");
             rn->task_node_timeout_ms = 15000;
