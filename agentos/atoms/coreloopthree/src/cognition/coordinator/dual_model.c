@@ -254,9 +254,8 @@ static void record_decision(performance_stats_t *stats, const char *model_name, 
  * @return 调整后的阈值
  */
 static float adaptive_threshold_adjust(dual_model_coordinator_t *coordinator,
-                                       float current_similarity)
+                                       float __attribute__((unused)) current_similarity)
 {
-    (void)current_similarity;
     if (!coordinator)
         return 0.5f;
     if (!coordinator->enable_adaptive_learning) {
