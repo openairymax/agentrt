@@ -80,11 +80,10 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t window_trimmer_process(agentos_context_processor_t *self,
+static agentos_error_t window_trimmer_process(agentos_context_processor_t __attribute__((unused)) *self,
                                               agentos_model_context_t *context,
                                               const agentos_context_processor_config_t *config)
 {
-    (void)self;
     if (!context || !config)
         return AGENTOS_EINVAL;
 
@@ -131,11 +130,10 @@ static agentos_error_t window_trimmer_process(agentos_context_processor_t *self,
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t compressor_process(agentos_context_processor_t *self,
+static agentos_error_t compressor_process(agentos_context_processor_t __attribute__((unused)) *self,
                                           agentos_model_context_t *context,
                                           const agentos_context_processor_config_t *config)
 {
-    (void)self;
     if (!context || !config)
         return AGENTOS_EINVAL;
 
@@ -179,11 +177,10 @@ static agentos_error_t compressor_process(agentos_context_processor_t *self,
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t summarizer_process(agentos_context_processor_t *self,
+static agentos_error_t summarizer_process(agentos_context_processor_t __attribute__((unused)) *self,
                                           agentos_model_context_t *context,
                                           const agentos_context_processor_config_t *config)
 {
-    (void)self;
     if (!context || !config)
         return AGENTOS_EINVAL;
 
@@ -203,10 +200,9 @@ static agentos_error_t summarizer_process(agentos_context_processor_t *self,
                     "[Summary of %zu earlier entries: ", context->entry_count - 1);
     for (size_t i = 0; i < context->entry_count - 1 && pos < summary_max - 64; i++) {
         agentos_context_entry_t *e = &context->entries[i];
-        size_t preview = e->content_len < 50 ? e->content_len : 50;
+        size_t __attribute__((unused)) preview = e->content_len < 50 ? e->content_len : 50;
         pos +=
             snprintf(summary + pos, summary_max - pos, "\"%.50s\"; ", e->content ? e->content : "");
-        (void)preview;
     }
     pos += snprintf(summary + pos, summary_max - pos, "]");
 
@@ -231,11 +227,10 @@ static agentos_error_t summarizer_process(agentos_context_processor_t *self,
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t memory_augmenter_process(agentos_context_processor_t *self,
+static agentos_error_t memory_augmenter_process(agentos_context_processor_t __attribute__((unused)) *self,
                                                 agentos_model_context_t *context,
                                                 const agentos_context_processor_config_t *config)
 {
-    (void)self;
     if (!context || !config)
         return AGENTOS_EINVAL;
     if (context->entry_count == 0)

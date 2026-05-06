@@ -128,8 +128,7 @@ static int real_s1_verify(const char* content, size_t len,
  * 反思式规划实现
  * ============================================================================ */
 
-static agentos_error_t reflective_plan_init(void** out_context) {
-    (void)reflective_plan_init;
+static __attribute__((unused)) agentos_error_t reflective_plan_init(void** out_context) {
     if (!out_context) return AGENTOS_EINVAL;
 
     reflective_context_t* ctx = (reflective_context_t*)AGENTOS_CALLOC(1, sizeof(reflective_context_t));

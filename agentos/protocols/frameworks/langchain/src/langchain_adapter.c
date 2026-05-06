@@ -108,8 +108,6 @@ int langchain_register_tool(langchain_adapter_context_t* ctx,
     ctx->tools[ctx->tool_count].tool_type = tool->tool_type;
     ctx->tools[ctx->tool_count].is_async = tool->is_async;
 
-    (void)executor;
-    (void)user_data;
 
     ctx->tool_count++;
     return 0;
@@ -613,7 +611,6 @@ static int langchain_proto_handle_request(void* context,
 }
 
 static int langchain_proto_get_version(void* context, char* buf, size_t max_size) {
-    (void)context;
     if (!buf || max_size == 0) return -1;
     const char* ver = LANGCHAIN_ADAPTER_VERSION;
     size_t len = strlen(ver);
@@ -624,7 +621,6 @@ static int langchain_proto_get_version(void* context, char* buf, size_t max_size
 }
 
 static uint32_t langchain_proto_capabilities(void* context) {
-    (void)context;
     return (uint32_t)(PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_RESOURCE_ACCESS);
 }
 
