@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "platform.h"
 #include "../include/heapstore.h"
 #include "../include/heapstore_registry.h"
 
@@ -40,7 +41,7 @@ static int test_single_insert_performance(void) {
     printf("\n=== 测试：单条插入性能（基准） ===\n\n");
 
     heapstore_config_t config = {0};
-    config.root_path = "/tmp/heapstore_perf_test";
+    config.root_path = AGENTOS_TMP_DIR "/heapstore_perf_test";
     config.enable_auto_cleanup = false;
 
     heapstore_error_t err = heapstore_init(&config);
@@ -81,7 +82,7 @@ static int test_batch_insert_performance(void) {
     printf("\n=== 测试：批量插入性能（事务优化） ===\n\n");
 
     heapstore_config_t config = {0};
-    config.root_path = "/tmp/heapstore_perf_test_batch";
+    config.root_path = AGENTOS_TMP_DIR "/heapstore_perf_test_batch";
     config.enable_auto_cleanup = false;
 
     heapstore_error_t err = heapstore_init(&config);

@@ -172,7 +172,7 @@ agentos_error_t agentos_tc_context_window_stats(
     if (!window || !out_json) return AGENTOS_EINVAL;
 
     char buf[512];
-    int len = snprintf(buf, sizeof(buf),
+    int __attribute__((unused)) len = snprintf(buf, sizeof(buf),
         "{\"max_tokens\":%zu,\"used_tokens\":%zu,"
         "\"generated\":%llu,\"corrections\":%llu,"
         "\"steps\":{\"total\":%u,\"completed\":%u},"
