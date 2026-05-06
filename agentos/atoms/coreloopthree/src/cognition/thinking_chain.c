@@ -182,7 +182,6 @@ agentos_error_t agentos_tc_context_window_stats(
         (unsigned long long)window->total_corrections,
         window->total_steps, window->completed_steps,
         window->max_tokens > 0 ? (float)window->used_tokens / (float)window->max_tokens * 100.0f : 0.0f);
-    (void)len;
 
     char* result = AGENTOS_STRDUP(buf);
     if (!result) return AGENTOS_ENOMEM;

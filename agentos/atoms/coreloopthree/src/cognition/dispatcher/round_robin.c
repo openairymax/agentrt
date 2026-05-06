@@ -50,13 +50,12 @@ static void rr_destroy(agentos_dispatching_strategy_t* strategy)
  * @return AGENTOS_SUCCESS 成功
  */
 static agentos_error_t rr_select(
-    const agentos_task_node_t* task,
+    const agentos_task_node_t __attribute__((unused)) *task,
     const void** candidates,
     size_t count,
     void* context,
     char** out_agent_id)
 {
-    (void)task;
 
     struct agentos_round_robin_dispatch* rr =
         (struct agentos_round_robin_dispatch*)context;
