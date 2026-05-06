@@ -67,11 +67,12 @@ int cupolas_signature_init(const cupolas_sig_config_t* config) {
         memcpy(&g_sig_ctx.config, config, sizeof(cupolas_sig_config_t));
     } else {
         g_sig_ctx.config.check_cert_chain = true;
-        g_sig_ctx.config.check_revocation = false;
+        g_sig_ctx.config.check_revocation = true;
         g_sig_ctx.config.check_timestamp = true;
         g_sig_ctx.config.allow_self_signed = false;
         g_sig_ctx.config.allow_expired_test = false;
         g_sig_ctx.config.max_chain_depth = 10;
+        g_sig_ctx.config.crl_path = getenv("AGENTOS_CRL_PATH");
     }
 
     cupolas_rwlock_init(&g_sig_ctx.lock);
