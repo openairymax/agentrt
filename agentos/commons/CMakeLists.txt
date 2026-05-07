@@ -117,6 +117,8 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/memory
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/string
+    # R-09-124: migrated from root global include_directories
+    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
 )
 
 target_include_directories(agentos_common PUBLIC

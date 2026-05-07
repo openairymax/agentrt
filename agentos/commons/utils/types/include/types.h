@@ -37,7 +37,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "../../../platform/include/platform.h"
-#include "../../include/agentos_types.h"
+#include "../../../include/agentos_types.h"
 
 #ifdef __cplusplus
 extern "C" {
