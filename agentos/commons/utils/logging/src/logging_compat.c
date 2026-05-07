@@ -13,8 +13,8 @@
 #include "logging.h"
 #include <stdlib.h>
 
-#include "include/memory_compat.h"
-#include "utils/include/atomic_compat.h"
+#include "memory_compat.h"
+#include "atomic_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <time.h>
