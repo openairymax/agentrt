@@ -23,7 +23,7 @@
 #ifdef GATEWAY_HAS_HTTP
 
 #include <microhttpd.h>
-#include <cJSON.h>
+#include <cjson/cJSON.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
