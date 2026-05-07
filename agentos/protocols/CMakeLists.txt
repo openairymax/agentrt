@@ -17,7 +17,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(protocols
-    VERSION 2.1.0
+    VERSION 0.0.5
     DESCRIPTION "AgentOS Unified Protocols Framework - Multi-Protocol Ecosystem"
     LANGUAGES C
 )
@@ -259,7 +259,7 @@ target_include_directories(agentos_protocols PUBLIC ${PROTOCOLS_INCLUDE_DIRS})
 # 库属性
 set_target_properties(agentos_protocols PROPERTIES
     VERSION ${PROJECT_VERSION}
-    SOVERSION 2
+    SOVERSION 0
     OUTPUT_NAME agentos_protocols
     C_STANDARD 11
     C_STANDARD_REQUIRED ON

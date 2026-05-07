@@ -9,7 +9,7 @@
 # - ipc_client.c: IPC 客户端实现
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-svc-commons VERSION 3.2.0 LANGUAGES C)
+project(agentos-svc-commons VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -252,7 +252,7 @@ endif()
 # 导出符号
 set_target_properties(svc_common PROPERTIES
     VERSION ${PROJECT_VERSION}
-    SOVERSION 3
+    SOVERSION 0
     POSITION_INDEPENDENT_CODE ON
 )
 

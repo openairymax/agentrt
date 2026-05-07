@@ -524,15 +524,17 @@ agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state
 
 agentos_error_t agentos_scheduler_resolve_dependencies(
     const uint64_t* dep_from, const uint64_t* dep_to, size_t edge_count,
-    uint64_t* sorted_tasks, size_t* out_count) {
+    agentos_dep_result_t* out_result) {
 
-    if (!dep_from || !dep_to || !sorted_tasks || !out_count)
+    if (!dep_from || !dep_to || !out_result)
         return AGENTOS_EINVAL;
-    if (edge_count == 0) {
-        *out_count = 0;
-        return AGENTOS_SUCCESS;
-    }
 
+    memset(out_result, 0, sizeof(agentos_dep_result_t));
+
+    if (edge_count == 0)
+        return AGENTOS_SUCCESS;
+
+    /* 收集所有唯一节点 */
     uint64_t* nodes = (uint64_t*)malloc(edge_count * 2 * sizeof(uint64_t));
     if (!nodes) return AGENTOS_ENOMEM;
     size_t node_count = 0;
@@ -542,6 +544,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
         nodes[node_count++] = dep_to[i];
     }
 
+    /* 排序去重 */
     for (size_t i = 0; i < node_count; i++) {
         for (size_t j = i + 1; j < node_count; j++) {
             if (nodes[i] > nodes[j]) {
@@ -559,13 +562,20 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
         }
     }
 
+    /* 建图: in_degree, adjacency list, 反向邻接表 (用于循环检测路径追踪) */
     size_t* in_degree = (size_t*)calloc(unique_count, sizeof(size_t));
     size_t** adj = (size_t**)calloc(unique_count, sizeof(size_t*));
     size_t* adj_cap = (size_t*)calloc(unique_count, sizeof(size_t));
     size_t* adj_cnt = (size_t*)calloc(unique_count, sizeof(size_t));
 
-    if (!in_degree || !adj || !adj_cap || !adj_cnt) {
+    size_t** rev_adj = (size_t**)calloc(unique_count, sizeof(size_t*));
+    size_t* rev_cap = (size_t*)calloc(unique_count, sizeof(size_t));
+    size_t* rev_cnt = (size_t*)calloc(unique_count, sizeof(size_t));
+
+    if (!in_degree || !adj || !adj_cap || !adj_cnt ||
+        !rev_adj || !rev_cap || !rev_cnt) {
         free(nodes); free(in_degree); free(adj); free(adj_cap); free(adj_cnt);
+        free(rev_adj); free(rev_cap); free(rev_cnt);
         return AGENTOS_ENOMEM;
     }
 
@@ -576,76 +586,192 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
             if (nodes[j] == dep_to[i]) to_idx = j;
         }
         if (from_idx >= unique_count || to_idx >= unique_count) {
-            free(nodes); free(in_degree);
-            for (size_t k = 0; k < unique_count; k++) free(adj[k]);
-            free(adj); free(adj_cap); free(adj_cnt);
-            return AGENTOS_EINVAL;
+            goto cleanup_fail;
         }
+
+        /* forward: from -> to */
         if (adj_cnt[from_idx] >= adj_cap[from_idx]) {
             size_t new_cap = adj_cap[from_idx] ? adj_cap[from_idx] * 2 : 4;
             size_t* new_adj = (size_t*)realloc(adj[from_idx], new_cap * sizeof(size_t));
-            if (!new_adj) {
-                free(nodes); free(in_degree);
-                for (size_t k = 0; k < unique_count; k++) free(adj[k]);
-                free(adj); free(adj_cap); free(adj_cnt);
-                return AGENTOS_ENOMEM;
-            }
+            if (!new_adj) goto cleanup_oom;
             adj[from_idx] = new_adj;
             adj_cap[from_idx] = new_cap;
         }
         adj[from_idx][adj_cnt[from_idx]++] = to_idx;
         in_degree[to_idx]++;
+
+        /* reverse: to -> from (for cycle backtracking) */
+        if (rev_cnt[to_idx] >= rev_cap[to_idx]) {
+            size_t new_cap = rev_cap[to_idx] ? rev_cap[to_idx] * 2 : 4;
+            size_t* new_rev = (size_t*)realloc(rev_adj[to_idx], new_cap * sizeof(size_t));
+            if (!new_rev) goto cleanup_oom;
+            rev_adj[to_idx] = new_rev;
+            rev_cap[to_idx] = new_cap;
+        }
+        rev_adj[to_idx][rev_cnt[to_idx]++] = from_idx;
     }
 
+    /* Kahn 拓扑排序 + 循环参与者追踪 */
     size_t* queue = (size_t*)malloc(unique_count * sizeof(size_t));
-    if (!queue) {
-        free(nodes); free(in_degree);
-        for (size_t k = 0; k < unique_count; k++) free(adj[k]);
-        free(adj); free(adj_cap); free(adj_cnt);
-        return AGENTOS_ENOMEM;
+    if (!queue) goto cleanup_oom;
+
+    size_t* in_degree_copy = (size_t*)malloc(unique_count * sizeof(size_t));
+    if (!in_degree_copy) {
+        free(queue);
+        goto cleanup_oom;
     }
+    memcpy(in_degree_copy, in_degree, unique_count * sizeof(size_t));
 
     size_t q_head = 0, q_tail = 0;
     for (size_t i = 0; i < unique_count; i++) {
-        if (in_degree[i] == 0) queue[q_tail++] = i;
+        if (in_degree_copy[i] == 0) queue[q_tail++] = i;
     }
 
-    *out_count = 0;
+    out_result->sorted_tasks = (uint64_t*)malloc(unique_count * sizeof(uint64_t));
+    if (!out_result->sorted_tasks) {
+        free(queue); free(in_degree_copy);
+        goto cleanup_oom;
+    }
+
+    size_t sorted_cnt = 0;
     while (q_head < q_tail) {
         size_t u = queue[q_head++];
-        sorted_tasks[(*out_count)++] = nodes[u];
+        out_result->sorted_tasks[sorted_cnt++] = nodes[u];
 
         for (size_t j = 0; j < adj_cnt[u]; j++) {
             size_t v = adj[u][j];
-            if (in_degree[v] == 0) {
-                *out_count = 0;
-                sorted_tasks[0] = 0;
-                free(queue);
-                free(nodes); free(in_degree);
-                for (size_t k = 0; k < unique_count; k++) free(adj[k]);
-                free(adj); free(adj_cap); free(adj_cnt);
-                return AGENTOS_ECYCLE;
-            }
-            in_degree[v]--;
-            if (in_degree[v] == 0) queue[q_tail++] = v;
+            in_degree_copy[v]--;
+            if (in_degree_copy[v] == 0) queue[q_tail++] = v;
         }
     }
 
-    if (*out_count != unique_count) {
-        *out_count = 0;
-        sorted_tasks[0] = 0;
-        free(queue);
-        free(nodes); free(in_degree);
+    out_result->sorted_count = sorted_cnt;
+    free(queue);
+
+    /* 循环检测: 若 sorted_cnt < unique_count，收集参与循环的节点 */
+    if (sorted_cnt < unique_count) {
+        /* in_degree_copy 仍在手: 入度 > 0 的节点即循环参与者 */
+        size_t cycle_count = 0;
+        for (size_t i = 0; i < unique_count; i++) {
+            if (in_degree_copy[i] > 0) cycle_count++;
+        }
+
+        if (cycle_count > 0) {
+            out_result->cycle = (agentos_cycle_report_t*)AGENTOS_CALLOC(
+                1, sizeof(agentos_cycle_report_t));
+            if (out_result->cycle) {
+                out_result->cycle->cycle_nodes =
+                    (uint64_t*)malloc(cycle_count * sizeof(uint64_t));
+                if (out_result->cycle->cycle_nodes) {
+                    out_result->cycle->cycle_node_count = cycle_count;
+                    size_t ci = 0;
+                    for (size_t i = 0; i < unique_count; i++) {
+                        if (in_degree_copy[i] > 0)
+                            out_result->cycle->cycle_nodes[ci++] = nodes[i];
+                    }
+
+                    char desc_buf[256];
+                    int dl = snprintf(desc_buf, sizeof(desc_buf),
+                        "Cycle detected: %zu nodes in dependency loop",
+                        cycle_count);
+                    out_result->cycle->description =
+                        (char*)AGENTOS_MALLOC((size_t)dl + 1);
+                    if (out_result->cycle->description) {
+                        memcpy(out_result->cycle->description, desc_buf, (size_t)dl);
+                        out_result->cycle->description[dl] = '\0';
+                        out_result->cycle->description_len = (size_t)dl;
+                    }
+                }
+            }
+        }
+        free(in_degree_copy);
+
+        /* 释放排序结果（循环时无有效排序） */
+        AGENTOS_FREE(out_result->sorted_tasks);
+        out_result->sorted_tasks = NULL;
+        out_result->sorted_count = 0;
+
+        /* 清理并返回循环错误 */
         for (size_t k = 0; k < unique_count; k++) free(adj[k]);
         free(adj); free(adj_cap); free(adj_cnt);
+        for (size_t k = 0; k < unique_count; k++) free(rev_adj[k]);
+        free(rev_adj); free(rev_cap); free(rev_cnt);
+        free(nodes); free(in_degree);
         return AGENTOS_ECYCLE;
     }
 
-    free(queue);
-    free(nodes); free(in_degree);
+    /* 优先级组继承: 对于每条边 from->to，将 from 在排序中的位置优先级传递 */
+    out_result->inherited_priorities =
+        (int*)malloc(sorted_cnt * sizeof(int));
+    if (out_result->inherited_priorities) {
+        for (size_t i = 0; i < sorted_cnt; i++)
+            out_result->inherited_priorities[i] = AGENTOS_TASK_PRIORITY_NORMAL;
+
+        /* 从后向前遍历排序列表，传递优先级（依赖者继承被依赖者的优先级） */
+        int* base_prio = (int*)malloc(sorted_cnt * sizeof(int));
+        if (base_prio) {
+            for (size_t i = 0; i < sorted_cnt; i++)
+                base_prio[i] = AGENTOS_TASK_PRIORITY_NORMAL;
+            for (size_t i = 0; i < edge_count; i++) {
+                size_t from_pos = sorted_cnt, to_pos = sorted_cnt;
+                for (size_t j = 0; j < sorted_cnt; j++) {
+                    if (out_result->sorted_tasks[j] == dep_from[i]) from_pos = j;
+                    if (out_result->sorted_tasks[j] == dep_to[i]) to_pos = j;
+                }
+                /* from depends on to, so from should inherit to's priority if higher */
+                if (from_pos < sorted_cnt && to_pos < sorted_cnt) {
+                    if (base_prio[to_pos] > base_prio[from_pos])
+                        base_prio[from_pos] = base_prio[to_pos];
+                }
+            }
+            memcpy(out_result->inherited_priorities, base_prio,
+                   sorted_cnt * sizeof(int));
+            free(base_prio);
+        }
+        out_result->priority_count = sorted_cnt;
+    }
+
+    /* 清理内存 */
     for (size_t k = 0; k < unique_count; k++) free(adj[k]);
     free(adj); free(adj_cap); free(adj_cnt);
+    for (size_t k = 0; k < unique_count; k++) free(rev_adj[k]);
+    free(rev_adj); free(rev_cap); free(rev_cnt);
+    free(nodes); free(in_degree);
+
     return AGENTOS_SUCCESS;
+
+cleanup_oom:
+    for (size_t k = 0; k < unique_count; k++) free(adj[k]);
+    free(adj); free(adj_cap); free(adj_cnt);
+    for (size_t k = 0; k < unique_count; k++) free(rev_adj[k]);
+    free(rev_adj); free(rev_cap); free(rev_cnt);
+    free(nodes); free(in_degree);
+    return AGENTOS_ENOMEM;
+
+cleanup_fail:
+    for (size_t k = 0; k < unique_count; k++) free(adj[k]);
+    free(adj); free(adj_cap); free(adj_cnt);
+    for (size_t k = 0; k < unique_count; k++) free(rev_adj[k]);
+    free(rev_adj); free(rev_cap); free(rev_cnt);
+    free(nodes); free(in_degree);
+    return AGENTOS_EINVAL;
+}
+
+void agentos_scheduler_dep_result_free(agentos_dep_result_t* result)
+{
+    if (!result) return;
+    if (result->sorted_tasks)
+        AGENTOS_FREE(result->sorted_tasks);
+    if (result->inherited_priorities)
+        AGENTOS_FREE(result->inherited_priorities);
+    if (result->cycle) {
+        if (result->cycle->cycle_nodes)
+            AGENTOS_FREE(result->cycle->cycle_nodes);
+        if (result->cycle->description)
+            AGENTOS_FREE(result->cycle->description);
+        AGENTOS_FREE(result->cycle);
+    }
+    memset(result, 0, sizeof(agentos_dep_result_t));
 }
 
 agentos_error_t agentos_scheduler_priority_inherit(

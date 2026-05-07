@@ -2,7 +2,7 @@
 # AgentOS 内核顶层 CMakeLists.txt
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-kernel VERSION 1.0.0.6 LANGUAGES C CXX)
+project(agentos-kernel VERSION 0.0.5 LANGUAGES C CXX)
 
 # 设置默认构建类型
 if(NOT CMAKE_BUILD_TYPE)
@@ -297,8 +297,9 @@ target_include_directories(agentos_atoms INTERFACE
 add_subdirectory(corekern)
 add_subdirectory(coreloopthree)
 add_subdirectory(memory)
-# memoryrovol migrated to independent repo (R-09-01-6)
-# add_subdirectory(memoryrovol)
+if(AGENTOS_WITH_MEMORYROVOL OR EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/memoryrovol/CMakeLists.txt")
+    add_subdirectory(memoryrovol)
+endif()
 add_subdirectory(syscall)
 add_subdirectory(taskflow)
 
