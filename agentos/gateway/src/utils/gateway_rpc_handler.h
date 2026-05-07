@@ -24,7 +24,7 @@
 
 /* cJSON 条件包含 */
 #ifdef GATEWAY_HAS_CJSON
-#include <cJSON.h>
+#include <cjson/cJSON.h>
 #else
 /* 当没有cJSON时，定义前向声明以允许编译 */
 typedef struct cJSON cJSON;

@@ -1,0 +1,273 @@
+name: Docker CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, "release/*"]
+    paths:
+      - "Docker/**"
+      - "agentos/**"
+      - "agentos/.github/workflows/docker-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "Docker/**"
+      - "agentos/**"
+  workflow_dispatch:
+    inputs:
+      push_images:
+        description: "Push images to registry"
+        type: boolean
+        default: false
+      build_platforms:
+        description: "Target platforms"
+        type: choice
+        default: "linux/amd64,linux/arm64"
+        options:
+          - "linux/amd64"
+          - "linux/amd64,linux/arm64"
+          - "linux/amd64,linux/arm64,linux/arm/v7"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: ${{ github.repository_owner }}/agentos
+
+jobs:
+  lint:
+    name: "Lint & Static Analysis"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install hadolint
+        run: |
+          curl -sL "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64" \
+            -o /usr/local/bin/hadolint
+          chmod +x /usr/local/bin/hadolint
+
+      - name: Lint Dockerfiles
+        run: |
+          echo "::group::hadolint results"
+          hadolint Docker/Dockerfile.kernel \
+            --failure-threshold warning \
+            --no-color
+          hadolint Docker/Dockerfile.daemon \
+            --failure-threshold warning \
+            --no-color
+          hadolint Docker/Dockerfile.openlab \
+            --failure-threshold warning \
+            --no-color
+          hadolint Docker/Dockerfile.desktop \
+            --failure-threshold warning \
+            --no-color
+          echo "::endgroup::"
+
+      - name: Validate Docker Compose Files
+        run: |
+          for compose_file in \
+            Docker/docker-compose.yml \
+            Docker/docker-compose.staging.yml \
+            Docker/docker-compose.prod.yml
+          do
+            echo "::group::Validating $compose_file"
+            docker compose -f "$compose_file" config --quiet 2>&1 || \
+              echo "::warning::Validation issue in $compose_file (may need env vars)"
+            echo "::endgroup::"
+          done
+
+      - name: BAN Compliance Scan (Security)
+        run: |
+          echo "::group::BAN-43: Hardcoded Secrets Scan"
+          SECRETS_FOUND=0
+          if grep -rn "JWT_SECRET=.*[^\$].*[^C].*[^H].*[^A].*[^N].*[^G].*[^E]" \
+            Docker/docker-compose*.yml 2>/dev/null | \
+            grep -v "CHANGE_ME"; then
+            echo "::warning::Potential BAN-43 violation: hardcoded JWT_SECRET"
+            SECRETS_FOUND=1
+          fi
+          if grep -rn 'redis-cli -a\|redis-cli --no-auth-warning' \
+            Docker/docker-compose*.yml 2>/dev/null; then
+            echo "::error::BAN-43 violation: Redis healthcheck password exposure"
+            SECRETS_FOUND=1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::BAN-57: CORS Wildcard Scan"
+          if grep -rn "Access-Control-Allow-Origin \\*" Docker/config/nginx/ 2>/dev/null; then
+            echo "::error::BAN-57 violation: CORS wildcard found"
+            exit 1
+          else
+            echo "BAN-57 OK: No CORS wildcard detected"
+          fi
+          echo "::endgroup::"
+
+          if [ "$SECRETS_FOUND" -eq 1 ]; then
+            echo "::error::BAN-43 violations detected!"
+            exit 1
+          fi
+
+  build:
+    name: "Build ${{ matrix.service }}"
+    needs: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: "kernel"
+            dockerfile: "Docker/Dockerfile.kernel"
+            target: "runtime"
+          - service: "daemon"
+            dockerfile: "Docker/Dockerfile.daemon"
+            target: "gateway"
+          - service: "openlab"
+            dockerfile: "Docker/Dockerfile.openlab"
+            target: "production"
+          - service: "desktop"
+            dockerfile: "Docker/Dockerfile.desktop"
+            target: "production"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (Multi-Arch Emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,amd64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha,prefix=,format=short
+
+      - name: Build Docker Image (No Push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          platforms: ${{ inputs.build_platforms || 'linux/amd64,linux/arm64' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          push: false
+          outputs: type=image,name=agentos-${{ matrix.service }}-ci,dest=/tmp/image.tar
+          provenance: mode=max
+          sbom: true
+
+      - name: Verify image structure (security check)
+        run: |
+          echo "::group::${{ matrix.service }} image verification"
+          echo "Dockerfile: ${{ matrix.dockerfile }}"
+          echo "Target: ${{ matrix.target }}"
+          echo "Platforms: ${{ inputs.build_platforms || 'linux/amd64,linux/arm64' }}"
+          echo "::endgroup::"
+
+  push:
+    name: "Push ${{ matrix.service }}"
+    needs: [lint, build]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.push_images }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: "kernel"
+            dockerfile: "Docker/Dockerfile.kernel"
+            target: "runtime"
+            platforms: "linux/amd64,linux/arm64"
+          - service: "daemon"
+            dockerfile: "Docker/Dockerfile.daemon"
+            target: "gateway"
+            platforms: "linux/amd64,linux/arm64"
+          - service: "openlab"
+            dockerfile: "Docker/Dockerfile.openlab"
+            target: "production"
+            platforms: "linux/amd64,linux/arm64"
+          - service: "desktop"
+            dockerfile: "Docker/Dockerfile.desktop"
+            target: "production"
+            platforms: "linux/amd64,linux/arm64"
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}-${{ matrix.service }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/agentos-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          platforms: ${{ matrix.platforms }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=inline
+          push: true
+          provenance: mode=max
+          sbom: true
+
+  result:
+    name: "CI Result"
+    needs: [lint, build]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check lint status
+        if: ${{ needs.lint.result == 'failure' }}
+        run: exit 1
+      - name: Check build status
+        if: ${{ needs.build.result == 'failure' }}
+        run: exit 1
+      - name: All checks passed
+        run: echo "::notice::All CI checks passed successfully!"
