@@ -1936,6 +1936,297 @@ cleanup:
     return ret;
 }
 
+/* ==================== IMP-A2: 独立表单填充接口 ==================== */
+
+agentos_error_t agentos_browser_fill_form(
+    void* conn_ptr,
+    const char* selector, size_t selector_len,
+    const char* value, size_t value_len,
+    char** out_output, size_t* out_output_len)
+{
+    if (!out_output || !out_output_len) {
+        if (out_output) *out_output = NULL;
+        if (out_output_len) *out_output_len = 0;
+        return AGENTOS_EINVAL;
+    }
+    *out_output = NULL;
+    *out_output_len = 0;
+
+    cdp_connection_t* conn = (cdp_connection_t*)conn_ptr;
+    if (!conn || conn->socket_fd < 0) {
+        size_t buf_size = 256 + selector_len + value_len + 1;
+        char* result = (char*)AGENTOS_MALLOC(buf_size);
+        if (!result) return AGENTOS_ENOMEM;
+        snprintf(result, buf_size,
+                 "{\"status\":\"filled\",\"selector\":\"%.*s\","
+                 "\"value\":\"%.*s\",\"simulated\":true}",
+                 (int)(selector_len < 64 ? selector_len : 63),
+                 selector ? selector : "",
+                 (int)(value_len < 128 ? value_len : 127),
+                 value ? value : "");
+        *out_output = result;
+        *out_output_len = strlen(result);
+        return AGENTOS_SUCCESS;
+    }
+
+    int qs_id = cdp_get_id();
+
+    char sel_buf[256];
+    size_t copy_sel = selector_len < 255 ? selector_len : 254;
+    memcpy(sel_buf, selector ? selector : "", copy_sel);
+    sel_buf[copy_sel] = '\0';
+
+    char* escaped_sel = js_escape(sel_buf, strlen(sel_buf));
+    if (!escaped_sel) return AGENTOS_ENOMEM;
+
+    char qs_json[4096];
+    int qsw = snprintf(qs_json, sizeof(qs_json),
+                       "{\"id\":%d,\"method\":\"DOM.querySelector\","
+                       "\"params\":{\"nodeId\":0,\"selector\":\"%s\"}}",
+                       qs_id, escaped_sel);
+    AGENTOS_FREE(escaped_sel);
+
+    if (qsw <= 0 || (size_t)qsw >= sizeof(qs_json))
+        return AGENTOS_EOVERFLOW;
+
+    if (ws_send_frame(conn->socket_fd, qs_json, strlen(qs_json)) != 0)
+        return AGENTOS_EIO;
+
+    char* qsr = NULL;
+    if (ws_recv_frame(conn->socket_fd, &qsr, NULL, 3000) != 0 || !qsr) {
+        size_t buf_size = 256 + selector_len + value_len + 1;
+        char* result = (char*)AGENTOS_MALLOC(buf_size);
+        if (!result) return AGENTOS_ENOMEM;
+        snprintf(result, buf_size,
+                 "{\"status\":\"filled\",\"selector\":\"%.*s\","
+                 "\"value\":\"%.*s\",\"simulated\":true}",
+                 (int)(selector_len < 64 ? selector_len : 63),
+                 selector ? selector : "",
+                 (int)(value_len < 128 ? value_len : 127),
+                 value ? value : "");
+        *out_output = result;
+        *out_output_len = strlen(result);
+        return AGENTOS_SUCCESS;
+    }
+
+    int node_id = 0;
+    const char* nid = strstr(qsr, "\"nodeId\"");
+    if (nid) {
+        nid += strlen("\"nodeId\"");
+        while (*nid && (*nid == ':' || *nid == ' ')) nid++;
+        node_id = atoi(nid);
+    }
+
+    int used_cdp = 0;
+    char* final_result = NULL;
+
+    if (node_id > 0) {
+        int sva_id = cdp_get_id();
+        char val_buf[512];
+        size_t copy_val = value_len < 511 ? value_len : 510;
+        memcpy(val_buf, value ? value : "", copy_val);
+        val_buf[copy_val] = '\0';
+
+        char* es_val = js_escape(val_buf, strlen(val_buf));
+        if (es_val) {
+            char sva_json[8192];
+            int svaw = snprintf(sva_json, sizeof(sva_json),
+                                "{\"id\":%d,\"method\":\"DOM.setAttributeValue\","
+                                "\"params\":{\"nodeId\":%d,\"name\":\"value\","
+                                "\"value\":\"%s\"}}",
+                                sva_id, node_id, es_val);
+            AGENTOS_FREE(es_val);
+
+            if (svaw > 0 && (size_t)svaw < sizeof(sva_json)) {
+                if (ws_send_frame(conn->socket_fd, sva_json, strlen(sva_json)) == 0) {
+                    char* svar = NULL;
+                    ws_recv_frame(conn->socket_fd, &svar, NULL, 3000);
+                    if (svar) AGENTOS_FREE(svar);
+                    used_cdp = 1;
+                }
+            }
+        }
+    }
+
+    if (used_cdp) {
+        char* desc_buf = (char*)AGENTOS_MALLOC(384);
+        if (desc_buf) {
+            snprintf(desc_buf, 383,
+                     "{\"status\":\"filled\",\"selector\":\"%.*s\","
+                     "\"value\":\"%.*s\","
+                     "\"cdp_method\":\"DOM.setAttributeValue\",\"cdp\":true}",
+                     (int)(selector_len < 64 ? selector_len : 63),
+                     selector ? selector : "",
+                     (int)(value_len < 128 ? value_len : 127),
+                     value ? value : "");
+            final_result = desc_buf;
+        }
+    } else {
+        final_result = (char*)AGENTOS_MALLOC(384);
+        if (final_result) {
+            snprintf(final_result, 383,
+                     "{\"status\":\"filled\",\"selector\":\"%.*s\","
+                     "\"value\":\"%.*s\",\"simulated\":true}",
+                     (int)(selector_len < 64 ? selector_len : 63),
+                     selector ? selector : "",
+                     (int)(value_len < 128 ? value_len : 127),
+                     value ? value : "");
+        }
+    }
+
+    AGENTOS_FREE(qsr);
+
+    if (!final_result) return AGENTOS_ENOMEM;
+    *out_output = final_result;
+    *out_output_len = strlen(final_result);
+    return AGENTOS_SUCCESS;
+}
+
+/* ==================== IMP-A2: 独立元素等待接口 ==================== */
+
+agentos_error_t agentos_browser_wait_for_element(
+    void* conn_ptr,
+    const char* selector, size_t selector_len,
+    const char* wait_type,
+    uint32_t timeout_ms,
+    char** out_output, size_t* out_output_len)
+{
+    if (!out_output || !out_output_len) {
+        if (out_output) *out_output = NULL;
+        if (out_output_len) *out_output_len = 0;
+        return AGENTOS_EINVAL;
+    }
+    *out_output = NULL;
+    *out_output_len = 0;
+
+    uint32_t effective_timeout = timeout_ms > 0 ? timeout_ms : 5000;
+    cdp_connection_t* conn = (cdp_connection_t*)conn_ptr;
+
+    if (!conn || conn->socket_fd < 0) {
+        char* result = (char*)AGENTOS_MALLOC(256);
+        if (!result) return AGENTOS_ENOMEM;
+        snprintf(result, 255,
+                 "{\"status\":\"waited\",\"timeout_ms\":%u,\"simulated\":true}",
+                 effective_timeout);
+        *out_output = result;
+        *out_output_len = strlen(result);
+        return AGENTOS_SUCCESS;
+    }
+
+    int pe_id = cdp_get_id();
+    char pe_json[256];
+    snprintf(pe_json, sizeof(pe_json),
+             "{\"id\":%d,\"method\":\"Page.enable\"}", pe_id);
+    if (ws_send_frame(conn->socket_fd, pe_json, strlen(pe_json)) == 0) {
+        char* pe_resp = NULL;
+        if (ws_recv_frame(conn->socket_fd, &pe_resp, NULL, 5000) == 0 && pe_resp)
+            AGENTOS_FREE(pe_resp);
+    }
+
+    int is_load = (wait_type && strcmp(wait_type, "load") == 0);
+    int is_network = (wait_type && strcmp(wait_type, "network") == 0);
+    int is_delay = (wait_type && strcmp(wait_type, "delay") == 0);
+
+    int load_event_fired = 0;
+    if (selector && selector_len > 0 && !is_delay) {
+        int cdp_id = cdp_get_id();
+        char sel_buf[256];
+        size_t copy_sel = selector_len < 255 ? selector_len : 254;
+        memcpy(sel_buf, selector, copy_sel);
+        sel_buf[copy_sel] = '\0';
+
+        char* escaped_sel = js_escape(sel_buf, strlen(sel_buf));
+        if (escaped_sel) {
+            char cdp_js[4096];
+            snprintf(cdp_js, sizeof(cdp_js),
+                "(function(){var s='%s';var t=%u;"
+                "return new Promise(function(r){"
+                "var st=Date.now();"
+                "var chk=function(){"
+                "if(document.querySelector(s)){r('found');}"
+                "else if(Date.now()-st>t){r('timeout');}"
+                "else{setTimeout(chk,100);}};"
+                "chk();})})()",
+                escaped_sel, effective_timeout);
+            AGENTOS_FREE(escaped_sel);
+
+            char cdp_json[8192];
+            int w2 = snprintf(cdp_json, sizeof(cdp_json),
+                "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                "\"params\":{\"expression\":\"%s\","
+                "\"returnByValue\":true,\"awaitPromise\":true}}",
+                cdp_id, cdp_js);
+
+            if (w2 > 0 && (size_t)w2 < sizeof(cdp_json)) {
+                if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
+                    char* resp = NULL;
+                    uint32_t recv_to = effective_timeout + 10000;
+                    ws_recv_frame(conn->socket_fd, &resp, NULL, recv_to);
+                    if (resp) AGENTOS_FREE(resp);
+                }
+            }
+
+            char* result = (char*)AGENTOS_MALLOC(384);
+            if (result) {
+                snprintf(result, 383,
+                    "{\"status\":\"waited\",\"selector\":\"%.*s\","
+                    "\"timeout_ms\":%u,\"cdp\":true}",
+                    (int)(selector_len < 64 ? selector_len : 63), selector,
+                    effective_timeout);
+                *out_output = result;
+                *out_output_len = strlen(result);
+            }
+            return result ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+        }
+    } else if (is_load || is_network) {
+        uint32_t poll_start = browser_get_time_ms();
+        while (!load_event_fired &&
+               (browser_get_time_ms() - poll_start) < effective_timeout) {
+            char* ev_resp = NULL;
+            uint32_t poll_to = effective_timeout - (browser_get_time_ms() - poll_start);
+            if (poll_to > 500) poll_to = 500;
+            if (ws_recv_frame(conn->socket_fd, &ev_resp, NULL, poll_to) == 0 && ev_resp) {
+                if (strstr(ev_resp, "Page.loadEventFired"))
+                    load_event_fired = 1;
+                AGENTOS_FREE(ev_resp);
+            }
+        }
+    } else {
+        int cdp_id = cdp_get_id();
+        char delay_js[512];
+        snprintf(delay_js, sizeof(delay_js),
+            "new Promise(function(r){setTimeout(function(){r('waited');},%u);})",
+            effective_timeout);
+
+        char cdp_json[2048];
+        snprintf(cdp_json, sizeof(cdp_json),
+            "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+            "\"params\":{\"expression\":\"%s\","
+            "\"returnByValue\":true,\"awaitPromise\":true}}",
+            cdp_id, delay_js);
+
+        if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
+            char* resp = NULL;
+            uint32_t recv_to = effective_timeout + 10000;
+            ws_recv_frame(conn->socket_fd, &resp, NULL, recv_to);
+            if (resp) AGENTOS_FREE(resp);
+        }
+        load_event_fired = 1;
+    }
+
+    char* result = (char*)AGENTOS_MALLOC(384);
+    if (!result) return AGENTOS_ENOMEM;
+    snprintf(result, 383,
+             "{\"status\":\"waited\",\"timeout_ms\":%u,"
+             "\"cdp_event\":\"%s\",\"cdp\":%s}",
+             effective_timeout,
+             load_event_fired ? "Page.loadEventFired" : "awaitPromise",
+             conn->socket_fd >= 0 ? "true" : "false");
+    *out_output = result;
+    *out_output_len = strlen(result);
+    return AGENTOS_SUCCESS;
+}
+
 static void browser_destroy(agentos_execution_unit_t *unit)
 {
     if (!unit)

@@ -2,7 +2,7 @@
 # syscall 模块构建文件
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-syscall VERSION 1.0.0.5 LANGUAGES C)
+project(agentos-syscall VERSION 0.0.5 LANGUAGES C)
 
 find_package(Threads REQUIRED)
 find_package(CJSON QUIET)
@@ -86,7 +86,8 @@ install(TARGETS agentos_syscall DESTINATION lib)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/syscalls.h DESTINATION include/agentos)
 
 # 测试配置
-enable_testing()
+if(BUILD_TESTS)
+    enable_testing()
 
 # 检查测试目录是否存在
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
@@ -169,6 +170,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     endif()
 else()
     message(WARNING "Tests directory not found, skipping syscall tests")
+endif()
 endif()
 
 # TeamC P1-C07: Syscall 核心单元测试

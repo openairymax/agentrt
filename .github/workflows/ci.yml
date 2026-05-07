@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, develop]
     paths:
-      - 'agentos/**'
+      - 'AgentOS/agentos/**'
       - 'tests/**'
       - 'CMakeLists.txt'
       - 'vcpkg.json'
@@ -56,7 +56,7 @@ jobs:
 
       - name: Configure — BAN-33 out-of-source build
         run: |
-          cmake -B ${{ github.workspace }}/../AgentOS-build \
+          cmake -S AgentOS -B ${{ github.workspace }}/../AgentOS-build \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_C_COMPILER=${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }} \
             -DCMAKE_CXX_COMPILER=${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }} \
@@ -89,29 +89,29 @@ jobs:
           cppcheck --enable=warning,performance,portability \
             --suppress=missingInclude \
             --error-exitcode=0 \
-            -I agentos/commons/include \
-            -I agentos/atoms/coreloopthree/include \
-            -I agentos/atoms/memoryrovol/include \
-            agentos/ 2>&1 | tee cppcheck-report.txt || true
+            -I AgentOS/agentos/commons/include \
+            -I AgentOS/agentos/atoms/coreloopthree/include \
+            -I AgentOS/agentos/atoms/memoryrovol/include \
+            AgentOS/agentos/ 2>&1 | tee cppcheck-report.txt
 
       - name: BAN-58/59 Path Audit
         run: |
           echo "=== BAN-58: Hardcoded local path check ==="
           grep -rn '/home/\|/Users/' --include='*.c' --include='*.h' --include='*.py' --include='*.sh' \
-            agentos/ scripts/ tests/ 2>/dev/null | grep -v test_ | grep -v '/home/user/' || echo "  [OK] No hardcoded local paths"
+            AgentOS/agentos/ scripts/ tests/ 2>/dev/null | grep -v test_ | grep -v '/home/user/' || echo "  [OK] No hardcoded local paths"
 
           echo ""
           echo "=== BAN-59: Obsolete POSIX path check ==="
           grep -rn '/var/run/agentos\|/tmp/agentos' --include='*.c' --include='*.h' --include='*.py' \
-            agentos/ 2>/dev/null || echo "  [OK] No obsolete POSIX paths in production code"
+            AgentOS/agentos/ 2>/dev/null || echo "  [OK] No obsolete POSIX paths in production code"
 
       - name: BAN-60 Stub Audit
         run: |
           echo "=== BAN-60: Stub/fake implementation check ==="
           grep -rn 'return.*AGENTOS_ENOSYS\|return.*AGENTOS_ENOTSUP' --include='*.c' \
-            agentos/ 2>/dev/null | grep -v '#ifdef\|#ifndef\|MEMORYROVOL_OSS' || echo "  [OK] No ENOSYS stubs in production code"
+            AgentOS/agentos/ 2>/dev/null | grep -v '#ifdef\|#ifndef\|MEMORYROVOL_OSS' || echo "  [OK] No ENOSYS stubs in production code"
           grep -rn 'NotImplementedError' --include='*.py' \
-            agentos/ 2>/dev/null || echo "  [OK] No NotImplementedError in Python code"
+            AgentOS/agentos/ 2>/dev/null || echo "  [OK] No NotImplementedError in Python code"
 
   path-hardening:
     name: Path & Config Hardening
@@ -123,9 +123,9 @@ jobs:
 
       - name: Verify no in-source build artifacts
         run: |
-          if [ -d "build" ] || [ -f "CMakeCache.txt" ]; then
+          if [ -d "AgentOS/build" ] || [ -f "AgentOS/CMakeCache.txt" ]; then
             echo "::error::In-source build artifacts found! Violates BAN-33"
-            ls -la build/ CMakeCache.txt 2>/dev/null
+            ls -la AgentOS/build/ AgentOS/CMakeCache.txt 2>/dev/null
             exit 1
           fi
           echo "  [OK] No in-source build artifacts"
@@ -133,7 +133,7 @@ jobs:
       - name: Verify .gitignore covers build outputs
         run: |
           for pattern in "build/" "ci-artifacts/" "CMakeCache.txt" "*.o" "*.so" "*.a"; do
-            if grep -q "$pattern" .gitignore 2>/dev/null; then
+            if grep -q "$pattern" AgentOS/.gitignore 2>/dev/null; then
               echo "  [OK] .gitignore covers: $pattern"
             else
               echo "::warning::.gitignore missing: $pattern"
@@ -142,7 +142,7 @@ jobs:
 
       - name: Verify CMakeLists.txt in-source build guard
         run: |
-          if grep -q 'CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR' CMakeLists.txt; then
+          if grep -q 'CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR' AgentOS/CMakeLists.txt; then
             echo "  [OK] Root CMakeLists.txt has in-source build guard"
           else
             echo "::error::Root CMakeLists.txt missing in-source build guard (BAN-63)"

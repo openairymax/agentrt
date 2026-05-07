@@ -2,7 +2,7 @@
 # commons 模块构建文件 - 统一基础库
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-commons VERSION 1.0.0.7 LANGUAGES C)
+project(agentos-commons VERSION 0.0.5 LANGUAGES C)
 
 # 导出编译命令数据库（供 clangd/IDE 使用）
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

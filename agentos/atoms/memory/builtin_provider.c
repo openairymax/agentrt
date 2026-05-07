@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 typedef struct builtin_storage builtin_storage_t;
 typedef struct builtin_index builtin_index_t;
@@ -23,6 +24,9 @@ extern void builtin_storage_destroy(builtin_storage_t* st);
 extern agentos_error_t builtin_storage_write(builtin_storage_t* st, const void* data, size_t len, const char* metadata_json, char** out_record_id);
 extern agentos_error_t builtin_storage_get(const builtin_storage_t* st, const char* record_id, void** out_data, size_t* out_len);
 extern agentos_error_t builtin_storage_delete(builtin_storage_t* st, const char* record_id);
+extern size_t builtin_storage_count(const builtin_storage_t* st);
+extern const char* builtin_storage_get_record_id(const builtin_storage_t* st, size_t index);
+extern time_t builtin_storage_get_updated_at(const builtin_storage_t* st, size_t index);
 
 extern builtin_index_t* builtin_index_create(void);
 extern void builtin_index_destroy(builtin_index_t* idx);
@@ -72,7 +76,7 @@ static agentos_error_t builtin_init(
 
     memset(&impl->stats, 0, sizeof(impl->stats));
     snprintf(impl->stats.provider_name, sizeof(impl->stats.provider_name), "builtin");
-    snprintf(impl->stats.provider_version, sizeof(impl->stats.provider_version), "1.0.0");
+    snprintf(impl->stats.provider_version, sizeof(impl->stats.provider_version), "0.0.5");
 
     printf("[AgentOS] using built-in provider (free) - storage: %s\n", path);
 
@@ -184,17 +188,63 @@ static agentos_error_t builtin_forget(
     if (!provider || !provider->impl) return AGENTOS_EINVAL;
     builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
 
-    if (impl->stats.total_records > 0 && impl->stats.l1_count > 0) {
-        double forget_ratio = 0.1;
-        size_t forget_count = (size_t)(impl->stats.l1_count * forget_ratio);
-        if (forget_count < 1) forget_count = 1;
+    size_t total = builtin_storage_count(impl->storage);
+    if (total == 0) return AGENTOS_SUCCESS;
 
-        for (size_t i = 0; i < forget_count && impl->stats.l1_count > 0; i++) {
-            impl->stats.l1_count--;
-            if (impl->stats.total_records > 0) impl->stats.total_records--;
+    double forget_ratio = 0.1;
+    size_t forget_count = (size_t)(total * forget_ratio);
+    if (forget_count < 1) forget_count = 1;
+    if (forget_count > total) forget_count = total;
+
+    typedef struct {
+        size_t index;
+        time_t updated_at;
+    } record_age_t;
+
+    record_age_t* ages = (record_age_t*)malloc(total * sizeof(record_age_t));
+    if (!ages) return AGENTOS_ENOMEM;
+
+    for (size_t i = 0; i < total; i++) {
+        ages[i].index = i;
+        ages[i].updated_at = builtin_storage_get_updated_at(impl->storage, i);
+    }
+
+    for (size_t i = 0; i < forget_count && i < total; i++) {
+        size_t min_idx = i;
+        for (size_t j = i + 1; j < total; j++) {
+            if (ages[j].updated_at < ages[min_idx].updated_at) {
+                min_idx = j;
+            }
+        }
+        if (min_idx != i) {
+            record_age_t tmp = ages[i];
+            ages[i] = ages[min_idx];
+            ages[min_idx] = tmp;
         }
     }
 
+    size_t actually_forgotten = 0;
+    for (size_t i = 0; i < forget_count; i++) {
+        const char* rid_ptr = builtin_storage_get_record_id(impl->storage, ages[i].index);
+        if (!rid_ptr) continue;
+
+        char record_id[64];
+        snprintf(record_id, sizeof(record_id), "%s", rid_ptr);
+
+        agentos_error_t del_err = builtin_storage_delete(impl->storage, record_id);
+        if (del_err == AGENTOS_SUCCESS) {
+            builtin_index_remove(impl->index, record_id);
+            actually_forgotten++;
+        }
+    }
+
+    free(ages);
+
+    impl->stats.total_records = builtin_storage_count(impl->storage);
+    impl->stats.l1_count = impl->stats.total_records;
+    impl->stats.l2_indexed = builtin_index_total_docs(impl->index);
+
+    (void)actually_forgotten;
     return AGENTOS_SUCCESS;
 }
 
@@ -351,7 +401,7 @@ agentos_error_t agentos_builtin_memory_provider_init(const char* storage_path) {
     }
 
     provider->name = "builtin";
-    provider->version = "1.0.0";
+    provider->version = "0.0.5";
     provider->impl = impl;
 
     setup_provider_capabilities(provider);
@@ -393,7 +443,7 @@ agentos_memory_provider_t* agentos_builtin_provider_create(void) {
     }
 
     provider->name = "builtin";
-    provider->version = "1.0.0";
+    provider->version = "0.0.5";
     provider->impl = impl;
 
     setup_provider_capabilities(provider);
