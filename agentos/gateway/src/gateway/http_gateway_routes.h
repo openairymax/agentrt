@@ -17,7 +17,7 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <cJSON.h>
+#include <cjson/cJSON.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"

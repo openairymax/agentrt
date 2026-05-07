@@ -3,7 +3,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-core VERSION 1.0.0 LANGUAGES C CXX)
+project(agentos-core VERSION 0.0.5 LANGUAGES C CXX)
 
 # CTest必须在此处启用，以便子目录测试能传播到根CTest
 if(BUILD_TESTS)
@@ -34,8 +34,8 @@ endif()
 option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
 option(BUILD_COMMONS "Build commons module (common utilities)" ON)
 option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
-option(BUILD_DAEMON "Build daemon modules (system services)" OFF)  # Windows上暂时禁用，需要PkgConfig
-option(BUILD_GATEWAY "Build gateway module (API gateway)" OFF)  # Windows上暂时禁用，需要cJSON
+option(BUILD_DAEMON "Build daemon modules (system services)" ON)  # R-09-124: 启用服务编译
+option(BUILD_GATEWAY "Build gateway module (API gateway)" ON)  # R-09-124: 启用网关编译
 option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" ON)
 option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)  # 默认关闭，需要额外配置
 
