@@ -154,20 +154,10 @@ endif()
 if(AGENTOS_BUILD_ALL)
     message(STATUS "Building AgentOS core components...")
 
-    # 全局include路径（确保所有模块都能找到commons的头文件）
-    include_directories(
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/memory/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/logging/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/error/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/platform/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/atoms/corekern/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/protocols/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/daemon/common/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/gateway/src
-    )
+    # R-09-124: 全局include已迁移至各模块target_include_directories
+    # 原始全局路径（保留参考，已迁移）：
+    #   agentos/commons, utils/{include,memory/include,string/include,logging/include,error/include}
+    #   platform/include, atoms/corekern/include, protocols/, daemon/common/include, gateway/src
 
     # 主要AgentOS组件
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentos")
