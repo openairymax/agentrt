@@ -11,9 +11,6 @@ add_library(agentos_memory STATIC
 target_include_directories(agentos_memory PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
-    # R-09-124: migrated from root global include_directories
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/corekern/include
 )
 
 if(MSVC)
