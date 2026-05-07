@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 #ifdef GATEWAY_HAS_CJSON
-#include <cJSON.h>
+#include <cjson/cJSON.h>
 #endif
 
 /* ==================== 标准错误消息 ==================== */

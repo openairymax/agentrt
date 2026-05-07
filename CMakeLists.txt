@@ -3,7 +3,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
-project(AgentOS VERSION 1.0.0 LANGUAGES C CXX)
+project(AgentOS VERSION 0.0.5 LANGUAGES C CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
@@ -28,6 +28,7 @@ option(BUILD_TESTS "Build unit tests" OFF)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)
+option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 if(BUILD_TESTS)
@@ -81,7 +82,7 @@ else()
         add_compile_options(-Werror)
     endif()
     add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
-    add_compile_definitions(-D_FORTIFY_SOURCE=2)
+    add_compile_definitions(_FORTIFY_SOURCE=2)
 
     # 链接器安全选项
     if(UNIX AND NOT APPLE)
@@ -154,10 +155,20 @@ endif()
 if(AGENTOS_BUILD_ALL)
     message(STATUS "Building AgentOS core components...")
 
-    # R-09-124: 全局include已迁移至各模块target_include_directories
-    # 原始全局路径（保留参考，已迁移）：
-    #   agentos/commons, utils/{include,memory/include,string/include,logging/include,error/include}
-    #   platform/include, atoms/corekern/include, protocols/, daemon/common/include, gateway/src
+    # 全局include路径（确保所有模块都能找到commons的头文件）
+    include_directories(
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/string/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/logging/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/platform/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/atoms/corekern/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/protocols/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/daemon/common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/gateway/src
+    )
 
     # 主要AgentOS组件
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentos")
