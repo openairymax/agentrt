@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(AgentOSheapstore VERSION 1.0.0.6 LANGUAGES C)
+project(AgentOSheapstore VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

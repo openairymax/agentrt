@@ -29,6 +29,7 @@
 #include "metacognition.h"
 #include "semantic_unit.h"
 #include "triple_coordinator.h"
+#include "stream_critic.h"
 
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -65,6 +66,8 @@ struct agentos_cognition_engine {
     size_t align_history_count;
     int align_drift_detected;
     uint32_t align_replan_count;
+
+    sc_stream_critic_t* stream_critic;
 };
 
 static void trigger_feedback(
@@ -151,6 +154,15 @@ agentos_error_t agentos_cognition_create_ex(
         engine->enable_dual_thinking = 0;
     }
 
+    sc_config_t sc_cfg = SC_CONFIG_DEFAULTS;
+    sc_cfg.enable_output_correct = 1;
+    sc_cfg.enable_memory_confirm = 1;
+    agentos_error_t sc_err = sc_stream_critic_create(&sc_cfg, &engine->stream_critic);
+    if (sc_err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_WARN("Stream critic init failed: err=%d, proceeding without critic", (int)sc_err);
+        engine->stream_critic = NULL;
+    }
+
     *out_engine = engine;
     trigger_feedback(engine, 2, "engine_created", "{\"status\":\"initialized\"}");
     return AGENTOS_SUCCESS;
@@ -164,6 +176,9 @@ void agentos_cognition_destroy(agentos_cognition_engine_t* engine) {
     }
     if (engine->meta) {
         agentos_mc_destroy(engine->meta);
+    }
+    if (engine->stream_critic) {
+        sc_stream_critic_destroy(engine->stream_critic);
     }
     if (engine->context && engine->context_destroy) {
         engine->context_destroy(engine->context);
@@ -232,6 +247,26 @@ agentos_error_t agentos_cognition_process(
     intent.intent_context = engine->context;
 
     uint64_t start_ns = agentos_time_monotonic_ns();
+
+    /* ========== Stream Critic Phase 0: Intent Classification ========== */
+    sc_intent_result_t sc_intent;
+    memset(&sc_intent, 0, sizeof(sc_intent));
+    if (engine->stream_critic) {
+        agentos_error_t ic_err = sc_intent_classifier(
+            engine->stream_critic, input, input_len, &sc_intent);
+        if (ic_err == AGENTOS_SUCCESS) {
+            if (sc_intent.is_urgent)
+                intent.intent_flags |= 0x04;
+            if (sc_intent.requires_multi_step)
+                intent.intent_flags |= 0x08;
+            char ic_fb[256];
+            snprintf(ic_fb, sizeof(ic_fb),
+                "{\"category\":\"%s\",\"confidence\":%.2f,\"urgent\":%d,\"multi_step\":%d}",
+                sc_intent.category_name, sc_intent.confidence,
+                sc_intent.is_urgent, sc_intent.requires_multi_step);
+            trigger_feedback(engine, 0, "intent_classified", ic_fb);
+        }
+    }
 
     /* ========== Phase 0: Instruction Decomposition (S1) ========== */
     if (engine->enable_dual_thinking && engine->meta) {
@@ -577,6 +612,51 @@ agentos_error_t agentos_cognition_process(
 
             agentos_mc_detect_patterns(engine->meta, NULL, NULL);
             agentos_mc_adapt_threshold(engine->meta);
+        }
+    }
+
+    /* ========== Stream Critic Phase 3+4: Output Correction + Memory Confirmation ========== */
+    if (engine->stream_critic && plan) {
+        char* pipeline_input = (char*)input;
+        size_t pipeline_input_len = input_len;
+        char* pipeline_output = NULL;
+        size_t pipeline_output_len = 0;
+
+        if (engine->chain && engine->chain->ctx_window) {
+            agentos_tc_context_window_get_recent(
+                engine->chain->ctx_window, 2000,
+                &pipeline_output, &pipeline_output_len);
+        }
+
+        if (!pipeline_output || pipeline_output_len == 0) {
+            pipeline_output = AGENTOS_STRDUP(input);
+            pipeline_output_len = input_len;
+        }
+
+        char* final_output = NULL;
+        size_t final_output_len = 0;
+        float final_quality = 0.0f;
+
+        agentos_error_t scp_err = sc_stream_critic_pipeline(
+            engine->stream_critic,
+            pipeline_input, pipeline_input_len,
+            pipeline_output, pipeline_output_len,
+            engine->memory,
+            &final_output, &final_output_len, &final_quality);
+
+        if (scp_err == AGENTOS_SUCCESS && final_output) {
+            char scp_fb[384];
+            snprintf(scp_fb, sizeof(scp_fb),
+                "{\"quality\":%.2f,\"output_len\":%zu}",
+                final_quality, final_output_len);
+            trigger_feedback(engine, 2, "stream_critic_complete", scp_fb);
+            AGENTOS_FREE(final_output);
+        } else if (scp_err != AGENTOS_SUCCESS) {
+            AGENTOS_LOG_WARN("Stream critic pipeline failed: err=%d", (int)scp_err);
+        }
+
+        if (pipeline_output && pipeline_output != input) {
+            AGENTOS_FREE(pipeline_output);
         }
     }
 

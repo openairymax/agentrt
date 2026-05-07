@@ -2,7 +2,7 @@
 # Scheduler 服务构建文件
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-sched-d VERSION 3.0.0 LANGUAGES C)
+project(agentos-sched-d VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
