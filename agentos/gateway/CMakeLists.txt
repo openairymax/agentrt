@@ -34,10 +34,6 @@ find_package(Threads REQUIRED)
 if(cJSON_FOUND)
     message(STATUS "cJSON found: ${cJSON_VERSION}")
     add_definitions(-DGATEWAY_HAS_CJSON=1)
-    # cJSON头文件在 /usr/include/cjson/cJSON.h
-    if(CJSON_INCLUDE_DIRS)
-        include_directories(${CJSON_INCLUDE_DIRS}/cjson)
-    endif()
 else()
     message(WARNING "cJSON not found, JSON functionality may be limited")
 endif()
@@ -134,6 +130,7 @@ target_include_directories(gateway
         ${COREKERN_DIR}/include
         ${SYSCALL_DIR}/include
         ${COMMONS_DIR}
+        ${COMMONS_DIR}/utils/include
         ${COMMONS_DIR}/platform/include
         ${COMMONS_DIR}/utils/error/include
         ${COMMONS_DIR}/utils/logging/include
@@ -143,6 +140,8 @@ target_include_directories(gateway
         ${PROTOCOLS_DIR}/protocol/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src/network_helper
+        # R-09-124: cjson (system library)
+        ${CJSON_INCLUDE_DIRS}/cjson
 )
 
 target_link_libraries(gateway PRIVATE
