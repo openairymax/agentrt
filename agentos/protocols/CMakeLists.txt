@@ -46,7 +46,12 @@ set(PROTOCOLS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/integrations/openjiuwen/include
     ${AGENTOS_COMMONS_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../daemon/common/include
+    # R-09-124: migrated from root global include_directories
+    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
 )
 
 if(PROTOCOLS_ENABLE_OPENCLAW)
