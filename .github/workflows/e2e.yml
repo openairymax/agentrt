@@ -74,11 +74,11 @@ jobs:
         run: docker compose config --quiet
 
       - name: Build Services
-        run: docker compose build --parallel 2>&1 | tail -20 || echo "[INFO] Limited build in CI"
+        run: docker compose build --parallel 2>&1 | tail -20
 
       - name: Start Services
         run: |
-          docker compose up -d --wait --wait-timeout 120 2>&1 || true
+          docker compose up -d --wait --wait-timeout 120 2>&1
           echo "=== Service Status ==="
           docker compose ps --format json 2>/dev/null | python3 -m json.tool || docker compose ps
 

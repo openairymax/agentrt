@@ -52,9 +52,9 @@ target_include_directories(agentos_heapstore PUBLIC
 )
 
 target_compile_definitions(agentos_heapstore PRIVATE
-    -DAGENTOS_heapstore_VERSION_MAJOR=1
-    -DAGENTOS_heapstore_VERSION_MINOR=0
-    -DAGENTOS_heapstore_VERSION_PATCH=6
+    -Dagentos_heapstore_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    -Dagentos_heapstore_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    -Dagentos_heapstore_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
 find_package(Threads REQUIRED)

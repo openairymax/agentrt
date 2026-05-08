@@ -11,9 +11,43 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+#include <libgen.h>
+#include <ftw.h>
+#include <unistd.h>
 
 #define MAX_AGENTS 256
 #define MAX_SKILLS 256
+
+static int nftw_remove_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
+    (void)sb;
+    (void)ftwbuf;
+    if (typeflag == FTW_DP || typeflag == FTW_D) {
+        return rmdir(fpath);
+    }
+    return remove(fpath);
+}
+
+static int recursive_remove(const char *path) {
+    return nftw(path, nftw_remove_cb, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+static int is_safe_for_shell(const char *str) {
+    if (!str) return 0;
+    const char *dangerous = ";|&$`'\"\\(){}[]!#~<>\n\r";
+    for (size_t i = 0; i < strlen(dangerous); i++) {
+        if (strchr(str, dangerous[i])) return 0;
+    }
+    return 1;
+}
+
+static int is_valid_url(const char *url) {
+    if (!url || strlen(url) == 0) return 0;
+    if (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0) return 0;
+    return is_safe_for_shell(url);
+}
 
 struct market_service {
     market_config_t config;
@@ -280,10 +314,8 @@ int market_service_install_agent(market_service_t* service, const install_reques
     snprintf(install_dir, sizeof(install_dir), "%s/%s", base_path, request->id);
 
     {
-        char mkdir_cmd[2048];
-        snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", install_dir);
-        int mkret = system(mkdir_cmd);
-        if (mkret != 0) {
+        int mkret = mkdir(install_dir, 0755);
+        if (mkret != 0 && errno != EEXIST) {
             res->success = false;
             res->message = strdup("Failed to create install directory");
             res->error_code = -4;
@@ -310,7 +342,7 @@ int market_service_install_agent(market_service_t* service, const install_reques
         fclose(meta_fp);
     }
 
-    if (target->repository && strlen(target->repository) > 0) {
+    if (target->repository && strlen(target->repository) > 0 && is_valid_url(target->repository)) {
         char download_path[1024];
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
@@ -389,9 +421,7 @@ int market_service_uninstall_agent(market_service_t* service, const char* agent_
             char install_dir[1024];
             snprintf(install_dir, sizeof(install_dir), "%s/%s", storage, agent_id);
 
-            char rm_cmd[2048];
-            snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf '%s'", install_dir);
-            int rm_ret = system(rm_cmd);
+            int rm_ret = recursive_remove(install_dir);
             if (rm_ret != 0) {
                 SVC_LOG_WARN("Failed to remove install directory: %s (ret=%d)",
                            install_dir, rm_ret);
@@ -536,6 +566,11 @@ int market_service_sync_registry(market_service_t* service) {
     char mkdir_cmd[2048];
     snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", storage);
     (void)system(mkdir_cmd);
+
+    if (!is_safe_for_shell(service->config.registry_url)) {
+        SVC_LOG_WARN("Sync registry: invalid registry_url, possible injection detected");
+        return 0;
+    }
 
     char url[2048];
     if (strncmp(service->config.registry_url, "http", 4) == 0) {

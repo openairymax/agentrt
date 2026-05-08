@@ -13,6 +13,7 @@
  */
 
 #include "../include/checkpoint.h"
+#include "../include/svc_logger.h"
 #include "agentos.h"
 #include "daemon_errors.h"
 #include "platform.h"

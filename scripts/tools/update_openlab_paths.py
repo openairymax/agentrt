@@ -58,7 +58,8 @@ def update_file(file_path):
 
 def main():
     """主函数"""
-    base_dir = "d:/SPHARX-CN/SpharxWorks/AgentOS/agentos/manager"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.join(script_dir, "../../agentos/manager")
     
     # 需要更新的文件
     files_to_update = [

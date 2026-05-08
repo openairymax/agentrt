@@ -61,8 +61,10 @@ static char* make_cache_key(const llm_request_config_t* manager) {
     /* 计算所需缓冲区大小 */
     size_t len = strlen(manager->model) + 2;
     for (size_t i = 0; i < manager->message_count; ++i) {
-        len += strlen(manager->messages[i].role) + 1 +
-               strlen(manager->messages[i].content) + 1;
+        const char* role = manager->messages[i].role ? manager->messages[i].role : "";
+        const char* content = manager->messages[i].content ? manager->messages[i].content : "";
+        len += strlen(role) + 1 +
+               strlen(content) + 1;
     }
     
     char* key = (char*)malloc(len);
@@ -78,9 +80,10 @@ static char* make_cache_key(const llm_request_config_t* manager) {
     *p++ = '|';
     
     for (size_t i = 0; i < manager->message_count; ++i) {
+        const char* role = manager->messages[i].role ? manager->messages[i].role : "";
+        const char* content = manager->messages[i].content ? manager->messages[i].content : "";
         written = snprintf(p, len - (p - key), "%s:%s|",
-                          manager->messages[i].role,
-                          manager->messages[i].content);
+                          role, content);
         p += written;
     }
     
@@ -187,6 +190,11 @@ llm_service_t* llm_service_create(const char* config_path) {
         long yaml_len = ftell(f);
         fseek(f, 0, SEEK_SET);
         
+        if (yaml_len <= 0) {
+            fclose(f);
+            return svc;
+        }
+
         char* yaml_content = (char*)malloc((size_t)yaml_len + 1);
         if (yaml_content) {
             size_t read_len = fread(yaml_content, 1, (size_t)yaml_len, f);

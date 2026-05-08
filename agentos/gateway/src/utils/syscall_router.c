@@ -597,7 +597,7 @@ static void ht_remove(hash_table_t* ht, const char* key) {
     }
 }
 
-static void ht_update(hash_table_t* ht, const char* key, size_t new_index) {
+static void __attribute__((unused)) ht_update(hash_table_t* ht, const char* key, size_t new_index) {
     ssize_t idx = ht_lookup(ht, key);
     if (idx >= 0) {
         ht->entries[(size_t)idx].index = new_index;
