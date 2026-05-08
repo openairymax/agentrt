@@ -24,6 +24,7 @@
 #include "method_dispatcher.h"
 #include "param_validator.h"
 #include "thread_pool.h"
+#include "daemon_event_driver.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +39,7 @@ static void handle_schedule_task(cJSON* params, int id, agentos_socket_t client_
 static void handle_get_stats(int id, agentos_socket_t client_fd);
 static void handle_health_check(int id, agentos_socket_t client_fd);
 static void signal_handler(int signum);
+static void handle_client(agentos_socket_t client_fd);
 
 /* ==================== 配置常量 ==================== */
 
@@ -51,7 +53,8 @@ static void signal_handler(int signum);
 static sched_service_t* g_service = NULL;
 static volatile int g_running = 1;
 static agentos_mutex_t g_running_lock;
-static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
+static method_dispatcher_t* g_dispatcher = NULL;
+static daemon_event_driver_t* g_event_driver = NULL;
 
 /* ==================== 错误码定义（统一使用 AGENTOS_ERR_*） ==================== */
 #define SCHED_ERR_INVALID_PARAM    AGENTOS_ERR_INVALID_PARAM
@@ -101,22 +104,9 @@ static void on_health_check_method(cJSON* params, int id, void* user_data) {
     handle_health_check(id, *(agentos_socket_t*)user_data);
 }
 
-/**
- * @brief 注册所有 JSON-RPC 方法
- */
-static int register_rpc_methods(void) {
-    g_dispatcher = method_dispatcher_create(16);
-    if (!g_dispatcher) {
-        SVC_LOG_ERROR("Failed to create method dispatcher");
-        return -1;
-    }
-    
-    method_dispatcher_register(g_dispatcher, "register_agent", on_register_agent_method, NULL);
-    method_dispatcher_register(g_dispatcher, "schedule_task", on_schedule_task_method, NULL);
-    method_dispatcher_register(g_dispatcher, "get_stats", on_get_stats_method, NULL);
-    method_dispatcher_register(g_dispatcher, "health_check", on_health_check_method, NULL);
-    
-    SVC_LOG_INFO("Registered %d RPC methods", 4);
+static int sched_on_client(void* service_ctx, agentos_socket_t client_fd) {
+    (void)service_ctx;
+    handle_client(client_fd);
     return 0;
 }
 
@@ -309,6 +299,7 @@ static void handle_client(agentos_socket_t client_fd) {
 static void signal_handler(int signum __attribute__((unused))) {
     g_running = 0;
     SVC_LOG_INFO("Received shutdown signal");
+    if (g_event_driver) daemon_event_driver_stop(g_event_driver);
 }
 
 /**
@@ -384,15 +375,6 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    /* 注册 RPC 方法 */
-    if (register_rpc_methods() != 0) {
-        SVC_LOG_ERROR("Failed to register RPC methods");
-        sched_service_destroy(g_service);
-        agentos_mutex_destroy(&g_running_lock);
-        agentos_socket_cleanup();
-        return 1;
-    }
-    
     SVC_LOG_INFO("Scheduler service created with strategy: round_robin");
 
     /* 创建服务器 Socket */
@@ -426,14 +408,19 @@ int main(int argc, char** argv) {
 
     SVC_LOG_INFO("Scheduler service started successfully");
 
-    thread_pool_config_t tp_config;
-    tp_config.min_threads = 4;
-    tp_config.max_threads = 8;
-    tp_config.queue_size = 256;
-    tp_config.idle_timeout_ms = 30000;
-    thread_pool_t* pool = thread_pool_create(&tp_config);
-    if (!pool) {
-        SVC_LOG_ERROR("Failed to create thread pool");
+    daemon_event_config_t ev_config;
+    memset(&ev_config, 0, sizeof(ev_config));
+    ev_config.max_events = 64;
+    ev_config.thread_pool_min = 4;
+    ev_config.thread_pool_max = 8;
+    ev_config.thread_pool_queue_size = 256;
+    ev_config.use_jsonrpc = true;
+    ev_config.on_client = sched_on_client;
+    ev_config.service_ctx = NULL;
+
+    g_event_driver = daemon_event_driver_create(&ev_config);
+    if (!g_event_driver) {
+        SVC_LOG_ERROR("Failed to create event driver");
         agentos_socket_close(server_fd);
         sched_service_destroy(g_service);
         agentos_mutex_destroy(&g_running_lock);
@@ -441,27 +428,31 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    /* 主事件循环 */
-    while (g_running) {
-        agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
+    g_dispatcher = daemon_event_driver_get_dispatcher(g_event_driver);
+    method_dispatcher_register(g_dispatcher, "register_agent", on_register_agent_method, NULL);
+    method_dispatcher_register(g_dispatcher, "schedule_task", on_schedule_task_method, NULL);
+    method_dispatcher_register(g_dispatcher, "get_stats", on_get_stats_method, NULL);
+    method_dispatcher_register(g_dispatcher, "health_check", on_health_check_method, NULL);
+    SVC_LOG_INFO("Registered %d RPC methods", 4);
 
-        if (client_fd == AGENTOS_INVALID_SOCKET) {
-            continue;
-        }
-
-        /* 并发处理客户端请求 */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-        thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
-#pragma GCC diagnostic pop
+    if (daemon_event_driver_add_server_fd(g_event_driver, (int)server_fd) != 0) {
+        SVC_LOG_ERROR("Failed to add server fd to event driver");
+        daemon_event_driver_destroy(g_event_driver);
+        agentos_socket_close(server_fd);
+        sched_service_destroy(g_service);
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
     }
+
+    SVC_LOG_INFO("Scheduler service running (event-driven mode)");
+    daemon_event_driver_run(g_event_driver);
 
     /* 清理资源 */
     SVC_LOG_INFO("Scheduler service stopping...");
-    thread_pool_destroy(pool);
+    daemon_event_driver_destroy(g_event_driver);
     agentos_socket_close(server_fd);
     sched_service_destroy(g_service);
-    if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();
 

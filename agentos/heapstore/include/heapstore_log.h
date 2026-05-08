@@ -38,7 +38,7 @@ typedef enum {
 typedef enum {
     HEAPSTORE_LOG_HANDLER_FILE = 0,
     HEAPSTORE_LOG_HANDLER_STDOUT = 1,
-    heapstore_LOG_HANDLER_STDERR = 2
+    HEAPSTORE_LOG_HANDLER_STDERR = 2
 } heapstore_log_handler_type_t;
 
 /**

@@ -5,6 +5,7 @@
 #include "platform.h"
 #include "error.h"
 #include "svc_logger.h"
+#include "agentos_event_loop.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,10 +61,26 @@ typedef struct {
 
 static info_d_service_t g_service = {0};
 static volatile int g_shutdown = 0;
+static agentos_event_loop_t* g_event_loop = NULL;
 
 static void info_d_signal_handler(int sig) {
-    
+    (void)sig;
     g_shutdown = 1;
+    if (g_event_loop) agentos_event_loop_stop(g_event_loop);
+}
+
+static void info_d_handle_request(info_d_service_t* svc, agentos_socket_t client_fd);
+
+static int info_d_on_client(int fd, uint32_t events, void* user_data) {
+    (void)events;
+    info_d_service_t* svc = (info_d_service_t*)user_data;
+    if (!svc || !svc->running) return -1;
+
+    agentos_socket_t client = agentos_socket_accept(fd, 0);
+    if (client != AGENTOS_INVALID_SOCKET) {
+        info_d_handle_request(svc, client);
+    }
+    return 0;
 }
 
 static int info_d_collect_system_info(system_info_snapshot_t* snap) {
@@ -375,12 +392,23 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
         return 1;
     }
 
-    while (!g_shutdown && g_service.running) {
-        agentos_socket_t client = agentos_socket_accept(g_service.server_fd, 1000);
-        if (client != AGENTOS_INVALID_SOCKET) {
-            info_d_handle_request(&g_service, client);
-        }
+    g_event_loop = agentos_event_loop_create(64);
+    if (!g_event_loop) {
+        LOG_ERROR("Failed to create event loop");
+        info_d_stop(&g_service, 1);
+        info_d_destroy(&g_service);
+        return 1;
     }
+
+    agentos_event_loop_add_fd(g_event_loop, (int)g_service.server_fd,
+                               AGENTOS_EVENT_TYPE_READ,
+                               info_d_on_client, &g_service);
+
+    LOG_INFO("info_d running with epoll event loop on fd=%d", (int)g_service.server_fd);
+    agentos_event_loop_run(g_event_loop);
+
+    agentos_event_loop_destroy(g_event_loop);
+    g_event_loop = NULL;
 
     info_d_stop(&g_service, g_shutdown ? 1 : 0);
     info_d_destroy(&g_service);

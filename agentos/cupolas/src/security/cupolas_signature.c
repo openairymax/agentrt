@@ -15,7 +15,7 @@
 #include <time.h>
 
 /* OpenSSL 头文件 */
-#ifdef cupolas_USE_OPENSSL
+#ifdef CUPOLAS_USE_OPENSSL
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 #include <openssl/ec.h>
@@ -77,7 +77,7 @@ int cupolas_signature_init(const cupolas_sig_config_t* config) {
 
     cupolas_rwlock_init(&g_sig_ctx.lock);
 
-#ifdef cupolas_USE_OPENSSL
+#ifdef CUPOLAS_USE_OPENSSL
     OpenSSL_add_all_algorithms();
     ERR_load_crypto_strings();
 #endif
@@ -104,7 +104,7 @@ void cupolas_signature_cleanup(void) {
     cupolas_rwlock_unlock(&g_sig_ctx.lock);
     cupolas_rwlock_destroy(&g_sig_ctx.lock);
 
-#ifdef cupolas_USE_OPENSSL
+#ifdef CUPOLAS_USE_OPENSSL
     EVP_cleanup();
     ERR_free_strings();
 #endif
@@ -126,7 +126,7 @@ int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
         return CUPOLAS_SIG_INVALID;
     }
 
-#ifdef cupolas_USE_OPENSSL
+#ifdef CUPOLAS_USE_OPENSSL
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
 
@@ -198,7 +198,7 @@ int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
         return CUPOLAS_SIG_INVALID;
     }
 
-#ifdef cupolas_USE_OPENSSL
+#ifdef CUPOLAS_USE_OPENSSL
     EVP_PKEY* pkey = NULL;
     BIO* bio = BIO_new_mem_buf(public_key, -1);
     if (!bio) {
@@ -389,7 +389,7 @@ int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
         return CUPOLAS_SIG_INVALID;
     }
 
-#ifdef cupolas_USE_OPENSSL
+#ifdef CUPOLAS_USE_OPENSSL
     EVP_PKEY* pkey = NULL;
     BIO* bio = BIO_new_mem_buf(private_key, -1);
     if (!bio) {

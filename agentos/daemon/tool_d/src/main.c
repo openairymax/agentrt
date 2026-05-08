@@ -22,6 +22,7 @@
 #include "method_dispatcher.h"
 #include "param_validator.h"
 #include "thread_pool.h"
+#include "daemon_event_driver.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,8 @@
 #include <cjson/cJSON.h>
 
 /* ==================== 配置常量 ==================== */
+
+static void handle_client(agentos_socket_t client_fd);
 
 #define DEFAULT_SOCKET_PATH_UNIX AGENTOS_RUNTIME_DIR "/tool.sock"
 #define DEFAULT_SOCKET_PATH_WIN "\\\\.\\pipe\\agentos_tool"
@@ -41,7 +44,8 @@
 static tool_service_t* g_service = NULL;
 static volatile int g_running = 1;
 static agentos_mutex_t g_running_lock;
-static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
+static method_dispatcher_t* g_dispatcher = NULL;
+static daemon_event_driver_t* g_event_driver = NULL;
 
 /* 服务配置 */
 typedef struct {
@@ -64,6 +68,7 @@ static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
     g_running = 0;
     agentos_mutex_unlock(&g_running_lock);
+    if (g_event_driver) daemon_event_driver_stop(g_event_driver);
 }
 
 #ifdef _WIN32
@@ -147,22 +152,9 @@ static void on_execute_method(cJSON* params, int id, void* user_data) {
     handle_execute(params, id, *(agentos_socket_t*)user_data);
 }
 
-/**
- * @brief 注册所有 JSON-RPC 方法
- */
-static int register_rpc_methods(void) {
-    g_dispatcher = method_dispatcher_create(16);
-    if (!g_dispatcher) {
-        SVC_LOG_ERROR("Failed to create method dispatcher");
-        return -1;
-    }
-    
-    method_dispatcher_register(g_dispatcher, "register", on_register_method, NULL);
-    method_dispatcher_register(g_dispatcher, "list_tools", on_list_method, NULL);
-    method_dispatcher_register(g_dispatcher, "get_tool", on_get_method, NULL);
-    method_dispatcher_register(g_dispatcher, "execute_tool", on_execute_method, NULL);
-    
-    SVC_LOG_INFO("Registered %d RPC methods", 4);
+static int tool_on_client(void* service_ctx, agentos_socket_t client_fd) {
+    (void)service_ctx;
+    handle_client(client_fd);
     return 0;
 }
 
@@ -547,16 +539,6 @@ int main(int argc, char** argv) {
         agentos_socket_cleanup();
         return 1;
     }
-    
-    /* 注册 RPC 方法 */
-    if (register_rpc_methods() != 0) {
-        SVC_LOG_ERROR("Failed to register RPC methods");
-        tool_service_destroy(g_service);
-        free_daemon_config();
-        agentos_mutex_destroy(&g_running_lock);
-        agentos_socket_cleanup();
-        return 1;
-    }
 
     /* 创建服务器 Socket */
     agentos_socket_t server_fd;
@@ -590,16 +572,20 @@ int main(int argc, char** argv) {
         SVC_LOG_INFO("Listening on %s", g_config.socket_path);
     }
 
-    SVC_LOG_INFO("Tool service started successfully");
+    /* 创建事件驱动框架 */
+    daemon_event_config_t ev_config;
+    memset(&ev_config, 0, sizeof(ev_config));
+    ev_config.max_events = 64;
+    ev_config.thread_pool_min = 4;
+    ev_config.thread_pool_max = 8;
+    ev_config.thread_pool_queue_size = 256;
+    ev_config.use_jsonrpc = true;
+    ev_config.on_client = tool_on_client;
+    ev_config.service_ctx = NULL;
 
-    thread_pool_config_t tp_config;
-    tp_config.min_threads = 4;
-    tp_config.max_threads = 8;
-    tp_config.queue_size = 256;
-    tp_config.idle_timeout_ms = 30000;
-    thread_pool_t* pool = thread_pool_create(&tp_config);
-    if (!pool) {
-        SVC_LOG_ERROR("Failed to create thread pool");
+    g_event_driver = daemon_event_driver_create(&ev_config);
+    if (!g_event_driver) {
+        SVC_LOG_ERROR("Failed to create event driver");
         agentos_socket_close(server_fd);
         tool_service_destroy(g_service);
         free_daemon_config();
@@ -608,26 +594,32 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    /* 主事件循环 */
-    while (g_running) {
-        agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
+    g_dispatcher = daemon_event_driver_get_dispatcher(g_event_driver);
+    method_dispatcher_register(g_dispatcher, "register", on_register_method, NULL);
+    method_dispatcher_register(g_dispatcher, "list_tools", on_list_method, NULL);
+    method_dispatcher_register(g_dispatcher, "get_tool", on_get_method, NULL);
+    method_dispatcher_register(g_dispatcher, "execute_tool", on_execute_method, NULL);
+    SVC_LOG_INFO("Registered %d RPC methods", 4);
 
-        if (client_fd == AGENTOS_INVALID_SOCKET) {
-            continue;
-        }
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-        thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
-#pragma GCC diagnostic pop
+    if (daemon_event_driver_add_server_fd(g_event_driver, (int)server_fd) != 0) {
+        SVC_LOG_ERROR("Failed to add server fd to event driver");
+        daemon_event_driver_destroy(g_event_driver);
+        agentos_socket_close(server_fd);
+        tool_service_destroy(g_service);
+        free_daemon_config();
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
     }
+
+    SVC_LOG_INFO("Tool service running (event-driven mode)");
+    daemon_event_driver_run(g_event_driver);
 
     /* 清理资源 */
     SVC_LOG_INFO("Tool service stopping...");
-    thread_pool_destroy(pool);
+    daemon_event_driver_destroy(g_event_driver);
     agentos_socket_close(server_fd);
     tool_service_destroy(g_service);
-    if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
     free_daemon_config();
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();

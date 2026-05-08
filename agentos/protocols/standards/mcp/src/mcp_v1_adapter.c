@@ -656,7 +656,7 @@ typedef struct {
     bool active;
 } mcp_stream_state_t;
 
-static mcp_stream_state_t* get_stream_state(mcp_v1_context_t* ctx) {
+static mcp_stream_state_t* __attribute__((unused)) get_stream_state(mcp_v1_context_t* ctx) {
     if (!ctx) return NULL;
     static mcp_stream_state_t fallback = {
         .config = { .enabled = true, .chunk_size = 4096, .max_buffer_size = (10 * 1024 * 1024), .flush_interval_ms = 50 },
@@ -1164,7 +1164,7 @@ static int mcp_adapter_is_connected(void* context) {
     if (!context) return 0;
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
     if (ctx->transport) {
-        return mcp_transport_is_connected(ctx->transport) ? 1 : 0;
+        return mcp_transport_get_state(ctx->transport) == MCP_TRANSPORT_CONNECTED ? 1 : 0;
     }
     return (ctx->tool_count > 0 || ctx->resource_count > 0) ? 1 : 0;
 }

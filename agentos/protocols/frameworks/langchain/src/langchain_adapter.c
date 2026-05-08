@@ -166,7 +166,7 @@ int langchain_create_chain(langchain_adapter_context_t* ctx,
     return 0;
 }
 
-static uint64_t lc_hash(const char* s) {
+static uint64_t __attribute__((unused)) lc_hash(const char* s) {
     uint64_t h = 14695981039346656037ULL;
     if (!s) return h;
     for (; *s; s++) { h ^= (unsigned char)*s; h *= 1099511628211ULL; }
