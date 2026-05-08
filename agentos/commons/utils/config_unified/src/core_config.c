@@ -371,6 +371,23 @@ void config_value_destroy(config_value_t* value) {
     AGENTOS_FREE(value);
 }
 
+config_error_t config_value_array_append(config_value_t* array, config_value_t* item) {
+    if (!array || !item) return CONFIG_ERROR_INVALID_PARAM;
+    if (array->type != CONFIG_TYPE_ARRAY) return CONFIG_ERROR_TYPE_MISMATCH;
+
+    if (array->data.array_value.count >= array->data.array_value.capacity) {
+        size_t new_cap = array->data.array_value.capacity * 2;
+        config_value_t** new_items = (config_value_t**)AGENTOS_REALLOC(
+            array->data.array_value.items, new_cap * sizeof(config_value_t*));
+        if (!new_items) return CONFIG_ERROR_OUT_OF_MEMORY;
+        array->data.array_value.items = new_items;
+        array->data.array_value.capacity = new_cap;
+    }
+
+    array->data.array_value.items[array->data.array_value.count++] = item;
+    return CONFIG_SUCCESS;
+}
+
 config_value_type_t config_value_get_type(const config_value_t* value) {
     return value ? value->type : CONFIG_TYPE_NULL;
 }

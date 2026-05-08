@@ -67,7 +67,12 @@ void builtin_index_destroy(builtin_index_t* idx) {
         token_entry_t* t = idx->token_table[i];
         while (t) {
             token_entry_t* next = t->next;
-            if (t->record_ids) free(t->record_ids);
+            if (t->record_ids) {
+                for (size_t j = 0; j < t->record_count; j++) {
+                    free(t->record_ids[j]);
+                }
+                free(t->record_ids);
+            }
             free(t);
             t = next;
         }
@@ -319,7 +324,41 @@ size_t builtin_index_total_docs(const builtin_index_t* idx) {
     return idx ? idx->total_docs : 0;
 }
 
-void builtin_index_compact(builtin_index_t* idx) {
-    if (!idx) return;
-    (void)idx;
+agentos_error_t builtin_index_compact(builtin_index_t* idx) {
+    if (!idx) return AGENTOS_EINVAL;
+
+    for (size_t b = 0; b < HASH_TABLE_SIZE; b++) {
+        index_entry_t** prev = &idx->id_table[b];
+        index_entry_t* cur = idx->id_table[b];
+        while (cur) {
+            if (cur->record_id[0] == '\0') {
+                *prev = cur->next;
+                index_entry_t* dead = cur;
+                cur = cur->next;
+                free(dead);
+            } else {
+                prev = &cur->next;
+                cur = cur->next;
+            }
+        }
+    }
+
+    for (size_t b = 0; b < HASH_TABLE_SIZE; b++) {
+        token_entry_t** prev = &idx->token_table[b];
+        token_entry_t* cur = idx->token_table[b];
+        while (cur) {
+            if (cur->record_count == 0) {
+                *prev = cur->next;
+                token_entry_t* dead = cur;
+                cur = cur->next;
+                free(dead->record_ids);
+                free(dead);
+            } else {
+                prev = &cur->next;
+                cur = cur->next;
+            }
+        }
+    }
+
+    return AGENTOS_SUCCESS;
 }

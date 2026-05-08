@@ -110,7 +110,11 @@ static void lru_move_to_head(cache_t* cache, cache_entry_t* e) {
 }
 
 static void evict_lru(cache_t* cache) {
-    if (!cache->lru_tail) return;
+    agentos_mutex_lock(&cache->lru_lock);
+    if (!cache->lru_tail) {
+        agentos_mutex_unlock(&cache->lru_lock);
+        return;
+    }
     cache_entry_t* victim = cache->lru_tail;
     unsigned int idx = hash_key(victim->key);
 
@@ -128,6 +132,7 @@ static void evict_lru(cache_t* cache) {
     lru_remove(cache, victim);
     entry_memory_safe_free(victim);
     cache->size--;
+    agentos_mutex_unlock(&cache->lru_lock);
 }
 
 cache_t* cache_create(size_t capacity, int ttl_sec) {
@@ -169,20 +174,25 @@ int cache_get(cache_t* cache, const char* key, char** out_value) {
         if (strcmp(e->key, key) == 0) break;
         e = e->hnext;
     }
-    agentos_mutex_unlock(&cache->buckets[idx].lock);
 
-    if (!e) return 0;
+    if (!e) {
+        agentos_mutex_unlock(&cache->buckets[idx].lock);
+        return 0;
+    }
 
     if (cache->ttl_sec > 0 && (time(NULL) - e->timestamp) > cache->ttl_sec) {
+        agentos_mutex_unlock(&cache->buckets[idx].lock);
         cache_put(cache, key, NULL);
         return 0;
     }
+
+    *out_value = memory_safe_strdup(e->value);
+    agentos_mutex_unlock(&cache->buckets[idx].lock);
 
     agentos_mutex_lock(&cache->lru_lock);
     lru_move_to_head(cache, e);
     agentos_mutex_unlock(&cache->lru_lock);
 
-    *out_value = memory_safe_strdup(e->value);
     return 1;
 }
 
@@ -253,7 +263,7 @@ void cache_clear(cache_t* cache) {
         cache->buckets[i].head = NULL;
         agentos_mutex_unlock(&cache->buckets[i].lock);
     }
-    agentos_mutex_unlock(&cache->lru_lock);
+    agentos_mutex_lock(&cache->lru_lock);
     cache->lru_head = cache->lru_tail = NULL;
     cache->size = 0;
     agentos_mutex_unlock(&cache->lru_lock);

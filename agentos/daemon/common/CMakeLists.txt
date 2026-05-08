@@ -118,6 +118,8 @@ set(SVC_COMMON_SOURCES
     src/param_validator.c
     src/log_sanitizer.c
     src/platform_compat.c     # 平台兼容层实现
+    src/agentos_event_loop.c  # 事件驱动循环
+    src/daemon_event_driver.c # 统一事件驱动框架
     src/api_recovery.c        # API恢复系统
     src/orchestrator.c        # 流程编排器
     src/thread_pool.c         # 工作线程池
@@ -299,5 +301,7 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/orchestrator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_defaults.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/parallel_dispatcher.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/agentos_event_loop.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_event_driver.h
     DESTINATION include/agentos
 )

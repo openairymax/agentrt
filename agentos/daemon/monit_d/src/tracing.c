@@ -405,9 +405,16 @@ int tracing_add_span_attribute(const char* trace_id, const char* span_id,
         if (strcmp(trace->spans[i].span_id, span_id) == 0) {
             span_t* span = &trace->spans[i];
             if (span->attribute_count < MAX_SPAN_ATTRIBUTES) {
-                span->attributes[span->attribute_count].key = strdup(key);
-                span->attributes[span->attribute_count].value = strdup(value);
-                span->attribute_count++;
+                char* dup_key = strdup(key);
+                char* dup_value = strdup(value);
+                if (dup_key && dup_value) {
+                    span->attributes[span->attribute_count].key = dup_key;
+                    span->attributes[span->attribute_count].value = dup_value;
+                    span->attribute_count++;
+                } else {
+                    free(dup_key);
+                    free(dup_value);
+                }
             }
             break;
         }
@@ -445,10 +452,13 @@ int tracing_add_span_event(const char* trace_id, const char* span_id,
         if (strcmp(trace->spans[i].span_id, span_id) == 0) {
             span_t* span = &trace->spans[i];
             if (span->event_count < MAX_SPAN_EVENTS) {
-                span->events[span->event_count].name = strdup(event_name);
-                span->events[span->event_count].timestamp = (uint64_t)time(NULL) * 1000000;
-                span->events[span->event_count].attribute_count = 0;
-                span->event_count++;
+                char* dup_name = strdup(event_name);
+                if (dup_name) {
+                    span->events[span->event_count].name = dup_name;
+                    span->events[span->event_count].timestamp = (uint64_t)time(NULL) * 1000000;
+                    span->events[span->event_count].attribute_count = 0;
+                    span->event_count++;
+                }
             }
             break;
         }

@@ -142,7 +142,8 @@ def scan_openlab_files() -> List[Path]:
     """
     扫描openlab模块中的文件
     """
-    openlab_root = Path("d:/SPHARX-CN/SpharxWorks/AgentOS/agentos/openlab")
+    script_dir = Path(__file__).resolve().parent
+    openlab_root = script_dir / "../../../agentos/openlab"
     
     if not openlab_root.exists():
         print(f"❌ Openlab目录不存在: {openlab_root}")
@@ -196,7 +197,8 @@ def main():
             return 1
     else:
         # 默认扫描openlab目录
-        root_dir = Path("d:/SPHARX-CN/SpharxWorks/AgentOS/agentos/openlab")
+        script_dir = Path(__file__).resolve().parent
+        root_dir = script_dir / "../../../agentos/openlab"
     
     # 查找文件
     if root_dir.name == 'openlab':

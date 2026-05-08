@@ -19,6 +19,7 @@
 #include "gateway_utils.h"
 #include "gateway_rate_limiter.h"
 #include "syscalls.h"
+#include "logging.h"
 
 #include <microhttpd.h>
 #include <cjson/cJSON.h>
@@ -73,9 +74,6 @@ int handle_post_jsonrpc(http_gateway_t* gateway,
     int ret = MHD_queue_response(connection, 200, response);
     MHD_destroy_response(response);
     free(json_response);
-    cJSON_Delete(context->json_request);
-    free(context);
-    
     return ret;
 }
 
@@ -84,14 +82,8 @@ int handle_post_jsonrpc(http_gateway_t* gateway,
  */
 int handle_options_preflight(http_gateway_t* gateway __attribute__((unused)),
                                      struct MHD_Connection* connection,
-                                     http_request_context_t* context) {
+                                     http_request_context_t* context __attribute__((unused))) {
     
-    /* 安全清理：如果之前有 POST 数据部分处理，释放残留的 json_request */
-    if (context->json_request) {
-        cJSON_Delete(context->json_request);
-        context->json_request = NULL;
-    }
-
     struct MHD_Response* response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
 
     MHD_add_response_header(response, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
@@ -105,7 +97,6 @@ int handle_options_preflight(http_gateway_t* gateway __attribute__((unused)),
     
     int ret = MHD_queue_response(connection, 200, response);
     MHD_destroy_response(response);
-    free(context);
     
     return ret;
 }
@@ -170,7 +161,6 @@ int handle_health_check(http_gateway_t* gateway,
 
     int ret = MHD_queue_response(connection, 200, response);
     MHD_destroy_response(response);
-    free(context);
 
     return ret;
 }
@@ -187,7 +177,6 @@ int handle_metrics_export(http_gateway_t* gateway,
         struct MHD_Response* response = create_http_response(401, err_json, strlen(err_json));
         int ret = MHD_queue_response(connection, 401, response);
         MHD_destroy_response(response);
-        free(context);
         atomic_fetch_add(&gateway->requests_failed, 1);
         return ret;
     }
@@ -206,7 +195,6 @@ int handle_metrics_export(http_gateway_t* gateway,
     
     int ret = MHD_queue_response(connection, 200, response);
     MHD_destroy_response(response);
-    free(context);
     
     return ret;
 }
@@ -226,7 +214,6 @@ int handle_not_found(http_gateway_t* gateway __attribute__((unused)),
     
     int ret = MHD_queue_response(connection, 404, response);
     MHD_destroy_response(response);
-    free(context);
     
     return ret;
 }
@@ -248,7 +235,6 @@ int handle_request_too_large(http_gateway_t* gateway,
     
     int ret = MHD_queue_response(connection, 413, response);
     MHD_destroy_response(response);
-    free(context);
     
     return ret;
 }
@@ -270,7 +256,6 @@ int handle_parse_error(http_gateway_t* gateway,
     
     int ret = MHD_queue_response(connection, 400, response);
     MHD_destroy_response(response);
-    free(context);
     
     return ret;
 }

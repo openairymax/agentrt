@@ -1,6 +1,6 @@
 [package]
 name = "agentos-rs"
-version = "3.0.0"
+version = "0.0.5"
 edition = "2021"
 description = "AgentOS Rust SDK - 与 Go SDK 保持一致的模块化结构"
 license = "MIT"

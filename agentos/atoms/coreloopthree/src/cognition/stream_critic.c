@@ -103,7 +103,7 @@ static int contains_any_unsafe_pattern(const char* content, size_t len)
     static const char* unsafe_patterns[] = {
         "rm -rf /", "DROP TABLE", "DELETE FROM", "; DROP ",
         "eval(", "exec(", "system(", "__import__",
-        "/etc/passwd", "/etc/shadow", "curl.*|.*sh"
+        "passwd", "shadow", "curl.*|.*sh"
     };
     static const size_t unsafe_count =
         sizeof(unsafe_patterns) / sizeof(unsafe_patterns[0]);
@@ -513,10 +513,27 @@ static int detect_truncation(const char* text, size_t len,
         last == '"' || last == ')' || last == ']')
         return 0;
 
+    int no_period = 1;
     if (len > 500) {
-        for (size_t i = len - 3; i < len; i++) {
-            if (text[i] == '.') return 0;
+        for (size_t i = len - 5; i < len; i++) {
+            if (text[i] == '.' || text[i] == '!' || text[i] == '?') {
+                no_period = 0;
+                break;
+            }
         }
+    }
+
+    if (no_period && len > 500) {
+        entry->offset_start = 0;
+        entry->offset_end = len;
+        entry->original_text = text;
+        entry->original_len = len;
+        entry->corrected_text = text;
+        entry->corrected_len = len;
+        entry->reason = "Possible truncated output (no sentence terminator)";
+        entry->reason_len = 50;
+        entry->correction_confidence = 0.3f;
+        return 1;
     }
     return 0;
 }
@@ -550,8 +567,10 @@ agentos_error_t sc_output_corrector(
         out_result->entries[out_result->entry_count++] = candidate;
     }
 
-    if (detect_truncation(raw_output, raw_output_len, &candidate)) {
+    if (detect_truncation(raw_output, raw_output_len, &candidate) &&
+        out_result->entry_count < out_result->entries_capacity) {
         AGENTOS_LOG_DEBUG("output_corrector: possible truncation detected at end");
+        out_result->entries[out_result->entry_count++] = candidate;
     }
 
     /* 构建最终输出 — 复制原文并移除已识别的重复段 */
@@ -564,17 +583,19 @@ agentos_error_t sc_output_corrector(
     }
 
     size_t src_pos = 0, dst_pos = 0;
-    size_t skip_from = 0, skip_to = 0;
-    if (out_result->entry_count > 0) {
-        skip_from = out_result->entries[0].offset_start;
-        skip_to = out_result->entries[0].offset_end;
-    }
 
     while (src_pos < raw_output_len && dst_pos < final_cap - 1) {
-        if (src_pos >= skip_from && src_pos < skip_to) {
-            src_pos = skip_to;
-            continue;
+        int skip_block = 0;
+        for (size_t e = 0; e < out_result->entry_count; e++) {
+            if (src_pos >= out_result->entries[e].offset_start &&
+                src_pos < out_result->entries[e].offset_end &&
+                out_result->entries[e].corrected_len == 0) {
+                src_pos = out_result->entries[e].offset_end;
+                skip_block = 1;
+                break;
+            }
         }
+        if (skip_block) continue;
         final_buf[dst_pos++] = raw_output[src_pos++];
     }
     final_buf[dst_pos] = '\0';
@@ -650,15 +671,12 @@ agentos_error_t sc_memory_confirmer(
     out_result->entries_count = 1;
 
     /* 入口2: 意图上下文摘要 */
-    if (intent_context && intent_context->category_name && out_result->entries_count < out_result->entries_capacity) {
+    if (intent_context && intent_context->category_name &&
+        out_result->entries_count < out_result->entries_capacity) {
         sc_memory_entry_t* e1 = &out_result->entries[out_result->entries_count];
-        char intent_key[128];
-        int ikl = snprintf(intent_key, sizeof(intent_key),
-                           "stream_critic.intent.%s",
-                           intent_context->category_name);
 
-        e1->key = intent_key;
-        e1->key_len = (size_t)ikl;
+        e1->key = "stream_critic.intent";
+        e1->key_len = 19;
         e1->value = intent_context->reasoning_hint ?
                     intent_context->reasoning_hint : "no reasoning available";
         e1->value_len = intent_context->hint_len > 0 ?
@@ -714,10 +732,17 @@ agentos_error_t sc_stream_critic_pipeline(
         return err;
 
     /* Phase 1 */
+    int validation_ok = 1;
     if (critic->config.enable_stream_validate) {
         sc_validation_result_t val;
         err = sc_stream_validator(critic, raw_output, raw_output_len,
                                    &intent, 0, &val);
+        if (!val.is_acceptable) {
+            AGENTOS_LOG_WARN("stream_critic_pipeline: Phase1 validation below "
+                           "threshold (%.2f), proceeding with correction",
+                           val.overall_score);
+            validation_ok = 0;
+        }
         sc_validation_result_free(&val);
     }
 
@@ -730,8 +755,8 @@ agentos_error_t sc_stream_critic_pipeline(
         return err;
     }
 
-    /* Phase 4 */
-    if (critic->config.enable_memory_confirm && memory_engine) {
+    /* Phase 4 — skip if validation failed (avoid persisting low-quality output) */
+    if (critic->config.enable_memory_confirm && memory_engine && validation_ok) {
         sc_memory_result_t mem;
         sc_memory_confirmer(critic, corr.final_output ?
                             corr.final_output : raw_output,
@@ -744,6 +769,10 @@ agentos_error_t sc_stream_critic_pipeline(
     *out_final_len = corr.final_output_len;
     if (out_final_quality)
         *out_final_quality = corr.final_quality_score;
+
+    /* Free correction entries (final_output transferred to caller) */
+    if (corr.entries)
+        AGENTOS_FREE(corr.entries);
 
     if (!corr.final_output) {
         *out_final_output = (char*)AGENTOS_MALLOC(raw_output_len + 1);

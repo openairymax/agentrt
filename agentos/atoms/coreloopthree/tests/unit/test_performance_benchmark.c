@@ -32,14 +32,13 @@ static int g_tests_passed = 0;
 
 static int g_exec_count = 0;
 
-static agentos_error_t mock_executor(const char *tool_name, const char *arguments,
-                                     size_t arguments_len, char **out_output,
-                                     size_t *out_output_len, void *user_data)
+static agentos_error_t mock_executor(const char *tool_name __attribute__((unused)),
+                                     const char *arguments __attribute__((unused)),
+                                     size_t arguments_len __attribute__((unused)),
+                                     char **out_output,
+                                     size_t *out_output_len,
+                                     void *user_data __attribute__((unused)))
 {
-    (void)user_data;
-    (void)tool_name;
-    (void)arguments;
-    (void)arguments_len;
     g_exec_count++;
     *out_output = strdup("{\"result\":\"ok\"}");
     if (out_output_len)

@@ -116,7 +116,7 @@ int main(void) {
     /* 1. 创建服务配置 */
     agentos_svc_config_t config = {
         .name = "example-service",
-        .version = "1.0.0",
+        .version = "0.0.5",
         .capabilities = AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_PAUSEABLE,
         .max_concurrent = 10,
         .timeout_ms = 5000,

@@ -128,10 +128,10 @@ int log_store_service_store_entry(heapstore_log_level_t level,
     // 写入日志条目
     const char* level_str = "UNKNOWN";
     switch (level) {
-        case heapstore_LOG_ERROR: level_str = "ERROR"; break;
-        case heapstore_LOG_WARN:  level_str = "WARN";  break;
-        case heapstore_LOG_INFO:  level_str = "INFO";  break;
-        case heapstore_LOG_DEBUG: level_str = "DEBUG"; break;
+        case HEAPSTORE_LOG_ERROR: level_str = "ERROR"; break;
+        case HEAPSTORE_LOG_WARN:  level_str = "WARN";  break;
+        case HEAPSTORE_LOG_INFO:  level_str = "INFO";  break;
+        case HEAPSTORE_LOG_DEBUG: level_str = "DEBUG"; break;
     }
     
     char time_buf[64];
@@ -140,7 +140,7 @@ int log_store_service_store_entry(heapstore_log_level_t level,
     fprintf(f, "[%s] [%s] [%s] %s\n", time_buf, level_str, component, message);
     fclose(f);
     
-    log_store_service_check_rotation(current_file);
+    log_store_service_check_rotation(filename);
     
     return 0;
 }
@@ -261,10 +261,10 @@ int log_store_service_query_entries(const time_t* start_time,
                 continue;
             }
 
-            heapstore_log_level_t entry_level = heapstore_LOG_INFO;
-            if (strcmp(level_str, "ERROR") == 0) entry_level = heapstore_LOG_ERROR;
-            else if (strcmp(level_str, "WARN") == 0) entry_level = heapstore_LOG_WARN;
-            else if (strcmp(level_str, "DEBUG") == 0) entry_level = heapstore_LOG_DEBUG;
+            heapstore_log_level_t entry_level = HEAPSTORE_LOG_INFO;
+            if (strcmp(level_str, "ERROR") == 0) entry_level = HEAPSTORE_LOG_ERROR;
+            else if (strcmp(level_str, "WARN") == 0) entry_level = HEAPSTORE_LOG_WARN;
+            else if (strcmp(level_str, "DEBUG") == 0) entry_level = HEAPSTORE_LOG_DEBUG;
 
             if (level != -1 && entry_level != level) {
                 continue;
