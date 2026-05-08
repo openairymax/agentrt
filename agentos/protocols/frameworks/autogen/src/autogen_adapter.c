@@ -216,7 +216,7 @@ int autogen_create_group_chat(autogen_adapter_context_t* ctx,
     return 0;
 }
 
-static uint64_t autogen_hash_str(const char* s) {
+static uint64_t __attribute__((unused)) autogen_hash_str(const char* s) {
     uint64_t h = 14695981039346656037ULL;
     if (!s) return h;
     for (; *s; s++) { h = (h ^ (unsigned char)*s) * 1099511628211ULL; }

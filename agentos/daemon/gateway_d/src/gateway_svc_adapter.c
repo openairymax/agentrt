@@ -255,7 +255,7 @@ agentos_error_t gateway_service_adapter_create(
     } else {
         // 使用默认配置
         ctx->common_cfg.name = "gateway_d";
-        ctx->common_cfg.version = "1.0.0";
+        ctx->common_cfg.version = "0.0.5";
         ctx->common_cfg.capabilities = AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_STREAMING;
         ctx->common_cfg.max_concurrent = 1000;
         ctx->common_cfg.timeout_ms = 30000;
@@ -343,7 +343,7 @@ agentos_error_t gateway_service_adapter_wrap(
     } else {
         // 从网关服务获取配置信息
         ctx->common_cfg.name = "gateway_d";
-        ctx->common_cfg.version = "1.0.0";
+        ctx->common_cfg.version = "0.0.5";
         ctx->common_cfg.capabilities = AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_STREAMING;
         ctx->common_cfg.max_concurrent = 1000;
         ctx->common_cfg.timeout_ms = 30000;
@@ -544,7 +544,7 @@ agentos_error_t gateway_service_adapter_create_from_config(
     agentos_svc_config_t config;
     memset(&config, 0, sizeof(config));
     config.name = "gateway_d";
-    config.version = "1.0.0";
+    config.version = "0.0.5";
     config.capabilities = AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_STREAMING;
     config.max_concurrent = 1000;
     config.timeout_ms = 30000;

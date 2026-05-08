@@ -124,8 +124,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /opt/agentos/services/bin/* /usr/local/bin/
-COPY --from=builder /opt/agentos/services/lib/* /usr/local/lib/
+COPY --from=builder /opt/agentos/services/bin/* ${AGENTOS_SERVICES_ROOT}/bin/
+COPY --from=builder /opt/agentos/services/lib/* ${AGENTOS_SERVICES_ROOT}/lib/
 
 # 创建目录结构
 RUN mkdir -p ${AGENTOS_SERVICES_ROOT}/{bin,lib,etc,var} \
