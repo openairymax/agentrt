@@ -59,8 +59,8 @@ static memory_state_t g_state = {
         .fail_callback = NULL,
         .fail_callback_user_data = NULL
     },
-    .stats = {{0}},
-    .lock = {{0}},
+    .stats = {0},
+    .lock = {0},
     .debug_list_head = NULL,
     .fail_callback = NULL,
     .fail_callback_user_data = NULL
@@ -453,11 +453,24 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
     
     memory_lock();
     
-    // 查找原始分配信息
     struct memory_debug_info* debug_info = memory_find_debug_info(ptr);
     size_t old_size = debug_info ? debug_info->size : 0;
     
     void* old_ptr = ptr;
+    bool debug_info_saved = false;
+    char saved_tag[64] = {0};
+    char saved_file[128] = {0};
+    char saved_func[64] = {0};
+    int saved_line = 0;
+    if (debug_info && g_state.debug_enabled) {
+        debug_info_saved = true;
+        if (debug_info->tag) strncpy(saved_tag, debug_info->tag, sizeof(saved_tag) - 1);
+        if (debug_info->file) strncpy(saved_file, debug_info->file, sizeof(saved_file) - 1);
+        if (debug_info->function) strncpy(saved_func, debug_info->function, sizeof(saved_func) - 1);
+        saved_line = debug_info->line;
+        memory_remove_debug_info(old_ptr);
+    }
+    
     void* new_ptr = realloc(ptr, new_size);
     if (new_ptr == NULL) {
         memory_handle_fail(new_size, tag);
@@ -465,18 +478,21 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
         return NULL;
     }
     
-    // 更新统计信息
     if (new_ptr != ptr) {
-        // 释放旧指针，分配新指针
         if (old_size > 0) {
             memory_update_stats_free(old_size);
         }
         memory_update_stats_alloc(new_size);
         
-        // 更新调试信息
         if (g_state.debug_enabled) {
-            memory_remove_debug_info(old_ptr);
-            memory_add_debug_info(new_ptr, new_size, tag, __FILE__, __LINE__, __func__);
+            if (debug_info_saved) {
+                memory_add_debug_info(new_ptr, new_size, saved_tag[0] ? saved_tag : tag,
+                                      saved_file[0] ? saved_file : __FILE__,
+                                      saved_line > 0 ? saved_line : __LINE__,
+                                      saved_func[0] ? saved_func : __func__);
+            } else {
+                memory_add_debug_info(new_ptr, new_size, tag, __FILE__, __LINE__, __func__);
+            }
         }
     } else {
         // 同一地址，大小可能改变

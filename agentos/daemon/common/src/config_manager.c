@@ -582,7 +582,7 @@ AGENTOS_API int cm_rollback(const char* key, uint64_t version) {
         cm_change_record_t* rec = &g_cm.history[idx];
 
         if (strcmp(rec->key, key) == 0) {
-            if (version == 0 || true) {
+            if (version == 0 || rec->timestamp == version) {
                 agentos_mutex_unlock(&g_cm.mutex);
                 return cm_set(key, rec->old_value, "rollback");
             }

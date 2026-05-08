@@ -73,6 +73,7 @@ typedef struct agentos_memory_provider {
     const char* version;
     agentos_memory_capabilities_t capabilities;
     void* impl;
+    struct agentos_memory_provider* sync_target;
 
     agentos_error_t (*init)(struct agentos_memory_provider* provider, const char* config_path);
     void (*destroy)(struct agentos_memory_provider* provider);
@@ -132,6 +133,18 @@ typedef struct agentos_memory_provider {
         struct agentos_memory_provider* provider,
         const char* content,
         size_t content_len);
+
+    agentos_error_t (*sync_push)(
+        struct agentos_memory_provider* provider,
+        const char* record_id);
+
+    agentos_error_t (*sync_pull)(
+        struct agentos_memory_provider* provider,
+        const char* filter_json,
+        char*** out_record_ids,
+        size_t* out_count);
+
+    int (*has_active_sync)(struct agentos_memory_provider* provider);
 
 } agentos_memory_provider_t;
 
