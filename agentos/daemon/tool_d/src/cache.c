@@ -81,7 +81,11 @@ static void lru_move_to_head(tool_cache_t* cache, cache_entry_t* e) {
 }
 
 static void evict_lru(tool_cache_t* cache) {
-    if (!cache->lru_tail) return;
+    agentos_mutex_lock(&cache->lru_lock);
+    if (!cache->lru_tail) {
+        agentos_mutex_unlock(&cache->lru_lock);
+        return;
+    }
     cache_entry_t* victim = cache->lru_tail;
     unsigned int idx = hash_key(victim->key);
 
@@ -99,6 +103,7 @@ static void evict_lru(tool_cache_t* cache) {
     lru_remove(cache, victim);
     entry_memory_safe_free(victim);
     cache->size--;
+    agentos_mutex_unlock(&cache->lru_lock);
 }
 
 tool_cache_t* tool_cache_create(size_t capacity, int ttl_sec) {

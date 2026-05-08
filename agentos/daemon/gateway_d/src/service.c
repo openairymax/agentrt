@@ -26,7 +26,7 @@ struct gateway_service_s {
     uint64_t requests_total;
     uint64_t requests_failed;
 #ifdef GATEWAY_HAS_HTTP
-    void* http_gateway;
+    gateway_t* http_gateway;
 #endif
 };
 
@@ -89,7 +89,8 @@ agentos_error_t gateway_service_load_config(
         if (strcmp(key, "http.port") == 0) {
             config->http.port = (uint16_t)atoi(val);
         } else if (strcmp(key, "http.host") == 0) {
-            config->http.host = val;
+            free((void*)config->http.host);
+            config->http.host = strdup(val);
         } else if (strcmp(key, "http.enabled") == 0) {
             config->http.enabled = (strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
         } else if (strcmp(key, "stdio.max_request_size") == 0) {
@@ -132,7 +133,7 @@ void gateway_service_destroy(gateway_service_t service) {
     }
 #ifdef GATEWAY_HAS_HTTP
     if (service->http_gateway) {
-        http_gateway_destroy(service->http_gateway);
+        gateway_destroy(service->http_gateway);
     }
 #endif
     free(service);
@@ -162,6 +163,7 @@ agentos_error_t gateway_service_start(gateway_service_t service) {
             service->state = GW_STATE_STOPPED;
             return AGENTOS_ENOMEM;
         }
+        gateway_start(service->http_gateway);
     }
 #endif
     return AGENTOS_SUCCESS;
@@ -172,7 +174,7 @@ agentos_error_t gateway_service_stop(gateway_service_t service, bool force __att
     if (service->state != GW_STATE_RUNNING) return AGENTOS_SUCCESS;
 #ifdef GATEWAY_HAS_HTTP
     if (service->http_gateway) {
-        http_gateway_destroy(service->http_gateway);
+        gateway_destroy(service->http_gateway);
         service->http_gateway = NULL;
     }
 #endif

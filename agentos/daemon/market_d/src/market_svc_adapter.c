@@ -156,7 +156,7 @@ agentos_error_t market_service_adapter_create(
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "market_d";
-        ctx->common_cfg.version = "1.0.0";
+        ctx->common_cfg.version = "0.0.5";
         ctx->common_cfg.enable_metrics = true;
     }
 
@@ -199,7 +199,7 @@ agentos_error_t market_service_adapter_wrap(
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "market_d";
-        ctx->common_cfg.version = "1.0.0";
+        ctx->common_cfg.version = "0.0.5";
     }
 
     agentos_service_t svc_handle = NULL;

@@ -23,12 +23,23 @@
 #include "param_validator.h"
 #include "svc_logger.h"
 #include "daemon_errors.h"
+#include "daemon_event_driver.h"
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <cjson/cJSON.h>
 #include <time.h>
+
+/* ==================== 事件驱动适配器 ==================== */
+
+static void handle_client(agentos_socket_t client_fd);
+
+static int llm_on_client(void* service_ctx, agentos_socket_t client_fd) {
+    (void)service_ctx;
+    handle_client(client_fd);
+    return 0;
+}
 
 /* ==================== 配置常量 ==================== */
 
@@ -45,7 +56,8 @@
 static llm_service_t* g_service = NULL;
 static volatile int g_running = 1;
 static agentos_mutex_t g_running_lock;
-static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
+static method_dispatcher_t* g_dispatcher = NULL;
+static daemon_event_driver_t* g_event_driver = NULL;
 
 /* 服务配置 */
 typedef struct {
@@ -65,6 +77,7 @@ static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
     g_running = 0;
     agentos_mutex_unlock(&g_running_lock);
+    if (g_event_driver) daemon_event_driver_stop(g_event_driver);
 }
 
 /* ==================== JSON-RPC 错误码 ==================== */
@@ -232,23 +245,6 @@ static void on_complete_stream_method(cJSON* params, int id, void* user_data __a
         agentos_socket_send(client_fd, response, strlen(response));
         free(response);
     }
-}
-
-/**
- * @brief 注册所有 JSON-RPC 方法
- */
-static int register_rpc_methods(void) {
-    g_dispatcher = method_dispatcher_create(16);  /* 预留 16 个方法 */
-    if (!g_dispatcher) {
-        SVC_LOG_ERROR("Failed to create method dispatcher");
-        return -1;
-    }
-    
-    method_dispatcher_register(g_dispatcher, "complete", on_complete_method, NULL);
-    method_dispatcher_register(g_dispatcher, "complete_stream", on_complete_stream_method, NULL);
-    
-    SVC_LOG_INFO("Registered %d RPC methods", 2);
-    return 0;
 }
 
 /* ==================== 请求处理 ==================== */
@@ -539,15 +535,6 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    /* 注册 RPC 方法 */
-    if (register_rpc_methods() != 0) {
-        fprintf(stderr, "Failed to register RPC methods\n");
-        llm_service_destroy(g_service);
-        free_daemon_config();
-        agentos_socket_cleanup();
-        return 1;
-    }
-    
     /* 创建服务器 Socket */
     agentos_socket_t server_fd;
     
@@ -578,15 +565,20 @@ int main(int argc, char** argv) {
         printf("Listening on %s\n", g_config.socket_path);
     }
     
-    /* 创建线程池 */
-    thread_pool_config_t tp_config;
-    tp_config.min_threads = g_config.max_threads > 0 ? g_config.max_threads : 4;
-    tp_config.max_threads = g_config.max_threads > 0 ? g_config.max_threads : 8;
-    tp_config.queue_size = 256;
-    tp_config.idle_timeout_ms = 30000;
-    thread_pool_t* pool = thread_pool_create(&tp_config);
-    if (!pool) {
-        fprintf(stderr, "Failed to create thread pool\n");
+    /* 创建事件驱动框架 */
+    daemon_event_config_t ev_config;
+    memset(&ev_config, 0, sizeof(ev_config));
+    ev_config.max_events = 64;
+    ev_config.thread_pool_min = g_config.max_threads > 0 ? g_config.max_threads : 4;
+    ev_config.thread_pool_max = g_config.max_threads > 0 ? g_config.max_threads : 8;
+    ev_config.thread_pool_queue_size = 256;
+    ev_config.use_jsonrpc = true;
+    ev_config.on_client = llm_on_client;
+    ev_config.service_ctx = NULL;
+
+    g_event_driver = daemon_event_driver_create(&ev_config);
+    if (!g_event_driver) {
+        fprintf(stderr, "Failed to create event driver\n");
         agentos_socket_close(server_fd);
         llm_service_destroy(g_service);
         free_daemon_config();
@@ -595,26 +587,30 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    /* 主事件循环 */
-    while (g_running) {
-        agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
-        
-        if (client_fd == AGENTOS_INVALID_SOCKET) {
-            continue;
-        }
-        
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-        thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
-#pragma GCC diagnostic pop
+    g_dispatcher = daemon_event_driver_get_dispatcher(g_event_driver);
+    method_dispatcher_register(g_dispatcher, "complete", on_complete_method, NULL);
+    method_dispatcher_register(g_dispatcher, "complete_stream", on_complete_stream_method, NULL);
+    SVC_LOG_INFO("Registered %d RPC methods", 2);
+
+    if (daemon_event_driver_add_server_fd(g_event_driver, (int)server_fd) != 0) {
+        fprintf(stderr, "Failed to add server fd to event driver\n");
+        daemon_event_driver_destroy(g_event_driver);
+        agentos_socket_close(server_fd);
+        llm_service_destroy(g_service);
+        free_daemon_config();
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
     }
+
+    SVC_LOG_INFO("LLM service running (event-driven mode)");
+    daemon_event_driver_run(g_event_driver);
     
     /* 清理 */
     printf("LLM service stopping...\n");
-    thread_pool_destroy(pool);
+    daemon_event_driver_destroy(g_event_driver);
     agentos_socket_close(server_fd);
     llm_service_destroy(g_service);
-    if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
     free_daemon_config();
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();

@@ -38,17 +38,23 @@ struct config_validator {
 
 /** 配置Schema项内部结�?*/
 typedef struct {
-    char* key;                       // 配置�?    config_value_type_t type;        // 配置类型
-    bool required;                   // 是否必需
-    char* description;               // 描述
-    char* default_value;             // 默认�?    config_validator_t* validator;   // 验证�?} schema_item_internal_t;
+    char* key;
+    config_value_type_t type;
+    bool required;
+    char* description;
+    char* default_value;
+    config_validator_t* validator;
+} schema_item_internal_t;
 
 /** 配置Schema结构�?*/
 struct config_schema {
-    char* name;                      // Schema名称
-    schema_item_internal_t* items;   // Schema项数�?    size_t count;                    // Schema项数�?    size_t capacity;                 // Schema项容�?    char** errors;                   // 验证错误信息
-    size_t error_count;              // 验证错误数量
-    size_t error_capacity;           // 验证错误容量
+    char* name;
+    schema_item_internal_t* items;
+    size_t count;
+    size_t capacity;
+    char** errors;
+    size_t error_count;
+    size_t error_capacity;
 };
 
 /** 配置变化回调�?*/
@@ -75,17 +81,21 @@ struct config_hot_reload_manager {
 
 /** 配置版本�?*/
 typedef struct {
-    uint32_t version;               // 版本�?    uint64_t timestamp;             // 时间�?    char* author;                   // 作�?    char* description;              // 描述
-    config_context_t* snapshot;     // 配置快照
+    uint32_t version;
+    uint64_t timestamp;
+    char* author;
+    char* description;
+    config_context_t* snapshot;
 } config_version_item_t;
 
 /** 版本管理器结构体 */
 struct config_version_manager {
-    config_context_t* ctx;          // 当前配置上下�?    config_version_item_t* versions; // 版本数组
-    size_t count;                   // 版本数量
-    size_t capacity;                // 版本容量
-    size_t max_versions;            // 最大版本数
-    uint32_t next_version;          // 下一个版本号
+    config_context_t* ctx;
+    config_version_item_t* versions;
+    size_t count;
+    size_t capacity;
+    size_t max_versions;
+    uint32_t next_version;
 };
 
 /* ==================== 内部辅助函数 ==================== */
@@ -673,12 +683,13 @@ config_hot_reload_manager_t* config_hot_reload_manager_create(config_context_t* 
     
     manager->callback_count = 0;
     manager->thread_handle = NULL;
-    manager->lock = agentos_mutex_create();
+    manager->lock = (void*)AGENTOS_CALLOC(1, sizeof(agentos_mutex_t));
     if (!manager->lock) {
         AGENTOS_FREE(manager->callbacks);
         AGENTOS_FREE(manager);
         return NULL;
     }
+    agentos_mutex_init((agentos_mutex_t*)manager->lock);
     
     return manager;
 }
@@ -694,7 +705,10 @@ void config_hot_reload_manager_destroy(config_hot_reload_manager_t* manager) {
     }
     
     if (manager->callbacks) AGENTOS_FREE(manager->callbacks);
-    if (manager->lock) agentos_mutex_free(manager->lock);
+    if (manager->lock) {
+        agentos_mutex_destroy((agentos_mutex_t*)manager->lock);
+        AGENTOS_FREE(manager->lock);
+    }
     AGENTOS_FREE(manager);
 }
 
@@ -800,27 +814,29 @@ config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
     
     if (!manager->source_manager) return CONFIG_ERROR_INVALID_ARG;
     
-    agentos_mutex_lock(manager->lock);
+    agentos_mutex_lock((agentos_mutex_t*)manager->lock);
     
     uint32_t debounce = manager->debounce_ms > 0 ? manager->debounce_ms : 500;
     uint64_t now_ms = (uint64_t)(time(NULL) * 1000);
     if (manager->last_trigger_time_ms > 0 &&
         (now_ms - manager->last_trigger_time_ms) < debounce) {
-        agentos_mutex_unlock(manager->lock);
+        agentos_mutex_unlock((agentos_mutex_t*)manager->lock);
         return CONFIG_SUCCESS;
     }
     
-    size_t source_count = config_source_manager_get_count(manager->source_manager);
+    size_t source_count = 0;
     bool changed = false;
-    
-    for (size_t i = 0; i < source_count; i++) {
-        config_source_t* source = config_source_manager_get_at(manager->source_manager, i);
-        if (source && config_source_check_changed(source)) {
-            changed = true;
-            config_error_t err = config_source_reload(source);
-            if (err != CONFIG_SUCCESS) {
-                agentos_mutex_unlock(manager->lock);
-                return err;
+
+    if (manager->source_manager) {
+        for (size_t i = 0; i < source_count; i++) {
+            config_source_t* source = NULL;
+            if (source && config_source_has_changed(source)) {
+                changed = true;
+                config_error_t err = config_source_load(source, manager->ctx);
+                if (err != CONFIG_SUCCESS) {
+                    agentos_mutex_unlock((agentos_mutex_t*)manager->lock);
+                    return err;
+                }
             }
         }
     }
@@ -835,7 +851,7 @@ config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
         }
     }
     
-    agentos_mutex_unlock(manager->lock);
+    agentos_mutex_unlock((agentos_mutex_t*)manager->lock);
     return CONFIG_SUCCESS;
 }
     
@@ -1478,9 +1494,8 @@ config_error_t config_service_get_status(config_context_t* ctx,
     
     // 生成状态JSON
     snprintf(status_json, status_size,
-             '{"status":"ok","service":"%s","sources":%zu}',
-             ctx ? config_context_get_name(ctx) : "unknown",
-             source_count);
+             "{\"status\":\"ok\",\"service\":\"%s\"}",
+             "config_service");
 
     return CONFIG_SUCCESS;
 }

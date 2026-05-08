@@ -1,1 +1,63 @@
-# Copyright (c) 2026 SPHARX. All Rights Reserved.\n# "From data intelligence emerges."\n\n"""\nOpenLab Docker Image\n\nMulti-stage Docker build for OpenLab AgentOS.\n"""\n\nFROM python:3.11-slim as base\n\nENV PYTHONUNBUFFERED=1 \\n    PYTHONDONTWRITEBYTECODE=1 \\n    PIP_NO_CACHE_DIR=1 \\n    PIP_DISABLE_PIP_VERSION_CHECK=1\n\nWORKDIR /app\n\nRUN apt-get update && apt-get install -y --no-install-recommends \\n    build-essential \\n    curl \\n    git \\n    && rm -rf /var/lib/apt/lists/*\n\nFROM base as builder\n\nRUN python -m venv /opt/venv\nENV PATH="/opt/venv/bin:$PATH"\n\nCOPY pyproject.toml ./\nRUN pip install --upgrade pip && \\n    pip install --no-cache-dir .\n\nFROM base as production\n\nCOPY --from=builder /opt/venv /opt/venv\nENV PATH="/opt/venv/bin:$PATH" \\n    PYTHONUNBUFFERED=1\n\nRUN mkdir -p /app/uploads /app/output /app/temp\nENV UPLOAD_DIR=/app/uploads \\n    OUTPUT_DIR=/app/output \\n    TEMP_DIR=/app/temp\n\nCOPY --from=builder /app /app\n\nEXPOSE 8000 8001\n\nHEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\n    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"\n\nCMD ["python", "-m", "uvicorn", "openlab.main:app", "--host", "0.0.0.0", "--port", "8000"]\n\nFROM base as development\n\nCOPY --from=builder /opt/venv /opt/venv\nENV PATH="/opt/venv/bin:$PATH"\n\nCOPY . .\n\nCMD ["python", "-m", "uvicorn", "openlab.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]\n
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# "From data intelligence emerges."
+
+"""
+OpenLab Docker Image
+
+Multi-stage Docker build for OpenLab AgentOS.
+"""
+
+FROM python:3.11-slim AS base
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential=12.9 \
+    curl=7.88.1-* \
+    git=1:2.39.* \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base AS builder
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY pyproject.toml ./
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir .
+
+FROM base AS production
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
+
+RUN mkdir -p /app/uploads /app/output /app/temp
+ENV UPLOAD_DIR=/app/uploads \
+    OUTPUT_DIR=/app/output \
+    TEMP_DIR=/app/temp
+
+COPY --from=builder /app /app
+
+EXPOSE 8000 8001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+
+CMD ["python", "-m", "uvicorn", "openlab.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+FROM base AS development
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY . .
+
+CMD ["python", "-m", "uvicorn", "openlab.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

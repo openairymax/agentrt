@@ -1,5 +1,5 @@
 #define GATEWAY_API_IMPLEMENTATION
-#include "gateway.h"
+#include "gateway_internal.h"
 #include "http_gateway.h"
 #include "ws_gateway.h"
 #include "stdio_gateway.h"

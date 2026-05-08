@@ -115,6 +115,8 @@ build/
 _build/
 build_test/
 build-test/
+build_clean/
+build_warn/
 build_test_protocol/
 build_no_daemon/
 

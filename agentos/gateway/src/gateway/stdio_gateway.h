@@ -12,7 +12,7 @@
 #ifndef AGENTOS_GATEWAY_STDIO_H
 #define AGENTOS_GATEWAY_STDIO_H
 
-#include "gateway.h"
+#include "gateway_internal.h"
 
 #ifdef __cplusplus
 extern "C" {

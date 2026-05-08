@@ -174,7 +174,7 @@ agentos_error_t tool_service_adapter_create(
         }
     } else {
         ctx->common_cfg.name = "tool_d";
-        ctx->common_cfg.version = "1.0.0";
+        ctx->common_cfg.version = "0.0.5";
         ctx->common_cfg.capabilities = AGENTOS_SVC_CAP_ASYNC;
         ctx->common_cfg.enable_metrics = true;
     }
@@ -229,7 +229,7 @@ agentos_error_t tool_service_adapter_wrap(
         ctx->common_cfg.enable_tracing = config->enable_tracing;
     } else {
         ctx->common_cfg.name = "tool_d";
-        ctx->common_cfg.version = "1.0.0";
+        ctx->common_cfg.version = "0.0.5";
     }
 
     agentos_service_t svc_handle = NULL;
