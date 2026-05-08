@@ -25,6 +25,7 @@ struct cost_tracker {
 };
 
 static int match_rule(const char* model, const pricing_rule_t* rule) {
+    if (!rule || !rule->model_pattern || !model) return 0;
     size_t len = strlen(rule->model_pattern);
     if (rule->model_pattern[len - 1] == '*') {
         return strncmp(model, rule->model_pattern, len - 1) == 0;

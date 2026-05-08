@@ -21,8 +21,21 @@
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <fcntl.h>
 #include <unistd.h>
 #define MKDIR(p) mkdir(p, 0755)
+
+static unsigned short secure_random_short(void) {
+    int fd = open("/dev/urandom", O_RDONLY);
+    unsigned short val = 0;
+    if (fd >= 0) {
+        ssize_t n = read(fd, &val, sizeof(val));
+        close(fd);
+        if (n == sizeof(val)) return val;
+    }
+    unsigned short fallback = (unsigned short)(time(NULL) ^ ((size_t)&val >> 4));
+    return fallback ? fallback : 1;
+}
 #endif
 
 #define AGENTOS_STORAGE_VERSION "1.0.0"
@@ -63,7 +76,7 @@ static void ensure_dir(const char* path) {
 static void generate_record_id(char* out, size_t out_size) {
     snprintf(out, out_size, "rec-%lld-%04x",
         (long long)time(NULL),
-        (unsigned)(rand() & 0xFFFF));
+        (unsigned)secure_random_short());
 }
 
 builtin_storage_t* builtin_storage_create(const char* base_path) {
@@ -105,6 +118,7 @@ agentos_error_t builtin_storage_write(
     if (st->record_count >= st->record_capacity) {
         size_t new_cap = st->record_capacity * 2;
         if (new_cap > AGENTOS_MAX_RECORDS) return AGENTOS_ENOMEM;
+        if (new_cap > SIZE_MAX / sizeof(storage_record_t)) return AGENTOS_ENOMEM;
         storage_record_t* tmp = (storage_record_t*)realloc(st->records, new_cap * sizeof(storage_record_t));
         if (!tmp) return AGENTOS_ENOMEM;
         st->records = tmp;
@@ -158,6 +172,7 @@ agentos_error_t builtin_storage_get(
             if (!fp) return AGENTOS_EIO;
 
             size_t fsize = st->records[i].data_len;
+            if (fsize == 0) { *out_data = NULL; *out_len = 0; return AGENTOS_SUCCESS; }
             void* buf = malloc(fsize);
             if (!buf) { fclose(fp); return AGENTOS_ENOMEM; }
 
@@ -216,4 +231,25 @@ const char* builtin_storage_get_metadata(
         }
     }
     return NULL;
+}
+
+const char* builtin_storage_get_record_id(const builtin_storage_t* st, size_t index) {
+    if (!st || index >= st->record_count) return NULL;
+    return st->records[index].record_id;
+}
+
+time_t builtin_storage_get_updated_at(const builtin_storage_t* st, size_t index) {
+    if (!st || index >= st->record_count) return 0;
+    return st->records[index].updated_at;
+}
+
+agentos_error_t builtin_storage_touch(builtin_storage_t* st, const char* record_id) {
+    if (!st || !record_id) return AGENTOS_EINVAL;
+    for (size_t i = 0; i < st->record_count; i++) {
+        if (strcmp(st->records[i].record_id, record_id) == 0) {
+            st->records[i].updated_at = time(NULL);
+            return AGENTOS_SUCCESS;
+        }
+    }
+    return AGENTOS_ENOENT;
 }

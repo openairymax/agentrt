@@ -12,7 +12,7 @@
 #ifndef AGENTOS_GATEWAY_WS_H
 #define AGENTOS_GATEWAY_WS_H
 
-#include "gateway.h"
+#include "gateway_internal.h"
 #include <stdint.h>
 
 #ifdef __cplusplus

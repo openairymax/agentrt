@@ -79,7 +79,7 @@ mcp_server_t mcp_server_create(const mcp_server_config_t* config) {
         server->config = *config;
     } else {
         server->config.name = "agentos-mcp";
-        server->config.version = "1.0.0";
+        server->config.version = "0.0.5";
         server->config.enable_tools = true;
         server->config.enable_resources = true;
         server->config.enable_prompts = true;

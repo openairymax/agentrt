@@ -87,11 +87,9 @@ agentos_error_t sandbox_permission_add(agentos_sandbox_t* sandbox, int syscall_n
 
 permission_type_t sandbox_permission_check(agentos_sandbox_t* sandbox,
                                           int syscall_num,
-                                          void** args, int argc) {
+                                          void** args __attribute__((unused)),
+                                          int argc __attribute__((unused))) {
     if (!sandbox) return PERM_DENY;
-
-    (void)args;  /* 未使用 */
-    (void)argc;  /* 未使用 */
 
     agentos_mutex_lock(sandbox->lock);
 

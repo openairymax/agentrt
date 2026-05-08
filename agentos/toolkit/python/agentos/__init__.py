@@ -41,7 +41,7 @@ Version History:
     v3.0.0 (2026-04-05): 全面优化，生产就绪
 """
 
-__version__ = "3.0.0"
+__version__ = "0.0.5"
 __author__ = "Spharx AgentOS Team"
 __license__ = "MIT"
 
