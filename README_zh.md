@@ -1,10 +1,10 @@
-# AgentOS / 极境OS  
+[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)   
 
+# AgentOS   
+Powered by OpenAirymax   
 > 成为人类计算工程史上，第四个"操作系统哲学"  
 
-Langua: 中文 | [English](README.md)  
-
-[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)  
+Langua: 中文 | [English](README.md)   
 
 [![AtomGit](https://atomgit.com/openairymax/agentos/star/badge.svg)](https://atomgit.com/openairymax/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
