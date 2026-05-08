@@ -943,7 +943,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
                  "marking as unverified (size=%lld bytes)",
                  package_path, (long long)st.st_size);
     *is_valid = false;
-    return AGENTOS_OK;
+    return AGENTOS_ENOTSUP;
 #endif
 }
 

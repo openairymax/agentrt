@@ -9,6 +9,7 @@
 
 #include "config_source.h"
 #include "core_config.h"
+#include "observability.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -72,8 +73,10 @@ typedef struct {
 /** 命令行配置源私有数据 */
 typedef struct {
     int argc;                        // 参数数量
-    char** argv;                     // 参数数组（不拥有所有权�?    char* prefix;                    // 参数前缀
-    char* assign_char;               // 赋值字�?    bool allow_positional;           // 是否允许位置参数
+    char** argv;                     // 参数数组（不拥有所有权）
+    char* prefix;                    // 参数前缀
+    char* assign_char;               // 赋值字符
+    bool allow_positional;           // 是否允许位置参数
 } args_source_priv_t;
 
 /** 内存配置源私有数�?*/
@@ -277,7 +280,7 @@ static config_error_t parse_json_value(const char** pp, const char* end, config_
         if (!sub_ctx) return CONFIG_ERROR_OUT_OF_MEMORY;
         config_error_t err = parse_json_object(pp, end, sub_ctx, NULL);
         if (err != CONFIG_SUCCESS) { config_context_destroy(sub_ctx); return err; }
-        *out = config_value_create_object();
+        *out = config_value_create_object(16);
         if (!*out) { config_context_destroy(sub_ctx); return CONFIG_ERROR_OUT_OF_MEMORY; }
         config_context_destroy(sub_ctx);
         return CONFIG_SUCCESS;
@@ -288,7 +291,7 @@ static config_error_t parse_json_value(const char** pp, const char* end, config_
 static config_error_t parse_json_array(const char** pp, const char* end, config_value_t** out) {
     if (**pp != '[') return CONFIG_ERROR_PARSE;
     (*pp)++;
-    *out = config_value_create_array();
+    *out = config_value_create_array(16);
     if (!*out) return CONFIG_ERROR_OUT_OF_MEMORY;
 
     while (*pp < end) {
@@ -1201,7 +1204,9 @@ static const config_source_adapter_t file_source_adapter = {
     .destroy = file_source_destroy
 };
 
-/* ==================== 环境变量配置源适配�?==================== */
+/* ==================== 环境变量配置源适配器 ===================== */
+
+static uint64_t compute_env_hash(env_source_priv_t *priv);
 
 /**
  * @brief 环境变量配置源加载函�? * 
@@ -1250,7 +1255,7 @@ static config_error_t env_source_load(config_source_t* source, config_context_t*
 static config_error_t env_source_save(config_source_t* source, const config_context_t* ctx) {
     (void)source;
     (void)ctx;
-    LOG_WARN("环境变量配置源为只读，不支持保存操作");
+    AGENTOS_LOG_WARN("环境变量配置源为只读，不支持保存操作");
     return CONFIG_ERROR_UNSUPPORTED;
 }
 
@@ -1373,7 +1378,7 @@ static config_error_t args_source_load(config_source_t* source, config_context_t
 static config_error_t args_source_save(config_source_t* source, const config_context_t* ctx) {
     (void)source;
     (void)ctx;
-    LOG_WARN("命令行配置源为只读，不支持保存操作");
+    AGENTOS_LOG_WARN("命令行配置源为只读，不支持保存操作");
     return CONFIG_ERROR_UNSUPPORTED;
 }
 
@@ -1458,7 +1463,7 @@ static config_error_t memory_source_save(config_source_t* source, const config_c
     memory_source_priv_t* priv = (memory_source_priv_t*)source->priv_data;
     if (!priv || !priv->data) return CONFIG_ERROR_NO_DATA;
     source->attributes.dirty = false;
-    LOG_INFO("内存配置源保存成功 (len=%zu)", priv->data_len);
+    AGENTOS_LOG_INFO("内存配置源保存成功 (len=%zu)", priv->data_len);
     return CONFIG_ERROR_NONE;
 }
 
@@ -1534,7 +1539,7 @@ static config_error_t defaults_source_load(config_source_t* source, config_conte
 static config_error_t defaults_source_save(config_source_t* source, const config_context_t* ctx) {
     (void)source;
     (void)ctx;
-    LOG_WARN("默认值配置源为只读，不支持保存操作");
+    AGENTOS_LOG_WARN("默认值配置源为只读，不支持保存操作");
     return CONFIG_ERROR_UNSUPPORTED;
 }
 

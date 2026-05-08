@@ -27,6 +27,7 @@ extern agentos_error_t builtin_storage_delete(builtin_storage_t* st, const char*
 extern size_t builtin_storage_count(const builtin_storage_t* st);
 extern const char* builtin_storage_get_record_id(const builtin_storage_t* st, size_t index);
 extern time_t builtin_storage_get_updated_at(const builtin_storage_t* st, size_t index);
+extern agentos_error_t builtin_storage_touch(builtin_storage_t* st, const char* record_id);
 
 extern builtin_index_t* builtin_index_create(void);
 extern void builtin_index_destroy(builtin_index_t* idx);
@@ -34,7 +35,7 @@ extern void builtin_index_add(builtin_index_t* idx, const char* record_id, const
 extern void builtin_index_remove(builtin_index_t* idx, const char* record_id);
 extern agentos_error_t builtin_index_search(const builtin_index_t* idx, const char* query_text, uint32_t limit, char*** out_record_ids, float** out_scores, size_t* out_count);
 extern size_t builtin_index_total_docs(const builtin_index_t* idx);
-extern void builtin_index_compact(builtin_index_t* idx);
+extern agentos_error_t builtin_index_compact(builtin_index_t* idx);
 
 extern builtin_retrieval_t* builtin_retrieval_create(void);
 extern void builtin_retrieval_destroy(builtin_retrieval_t* ret);
@@ -157,7 +158,7 @@ static agentos_error_t builtin_query(
     return builtin_index_search(impl->index, query_text, limit, out_record_ids, out_scores, out_count);
 }
 
-static agentos_error_t builtin_retrieve_fn(
+static agentos_error_t __attribute__((unused)) builtin_retrieve_fn(
     agentos_memory_provider_t* provider,
     const char* query_text,
     uint32_t limit,
@@ -177,7 +178,8 @@ static agentos_error_t builtin_evolve(
     builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
 
     if (impl->index) {
-        builtin_index_compact(impl->index);
+        agentos_error_t err = builtin_index_compact(impl->index);
+        if (err != AGENTOS_SUCCESS) return err;
     }
 
     return AGENTOS_SUCCESS;
@@ -275,6 +277,8 @@ static agentos_error_t builtin_mount(
     if (err != AGENTOS_SUCCESS) return err;
     if (data) free(data);
 
+    builtin_storage_touch(impl->storage, record_id);
+
     return AGENTOS_SUCCESS;
 }
 
@@ -315,16 +319,97 @@ static agentos_error_t builtin_add_memory(
     return AGENTOS_SUCCESS;
 }
 
+static agentos_error_t builtin_sync_push(
+    agentos_memory_provider_t* provider,
+    const char* record_id) {
+    if (!provider || !provider->impl) return AGENTOS_EINVAL;
+    if (!record_id) return AGENTOS_EINVAL;
+    if (!provider->sync_target) return AGENTOS_ENOTSUP;
+
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
+
+    void* data = NULL;
+    size_t data_len = 0;
+    agentos_error_t err = builtin_storage_get(impl->storage, record_id, &data, &data_len);
+    if (err != AGENTOS_SUCCESS || !data) return err;
+
+    char* target_id = NULL;
+    err = provider->sync_target->write_raw(provider->sync_target, data, data_len, NULL, &target_id);
+    free(data);
+    free(target_id);
+    return err;
+}
+
+static agentos_error_t builtin_sync_pull(
+    agentos_memory_provider_t* provider,
+    const char* filter_json,
+    char*** out_record_ids,
+    size_t* out_count) {
+    if (!provider || !provider->impl) return AGENTOS_EINVAL;
+    if (!out_record_ids || !out_count) return AGENTOS_EINVAL;
+    if (!provider->sync_target) return AGENTOS_ENOTSUP;
+
+    builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
+
+    char** source_ids = NULL;
+    float* scores = NULL;
+    size_t source_count = 0;
+    agentos_error_t err = provider->sync_target->query(
+        provider->sync_target, filter_json ? filter_json : "*", 100,
+        &source_ids, &scores, &source_count);
+    if (err != AGENTOS_SUCCESS) {
+        agentos_memory_provider_free_query_results(source_ids, scores, source_count);
+        return err;
+    }
+
+    size_t pulled = 0;
+    char** pulled_ids = (char**)calloc(source_count, sizeof(char*));
+    if (!pulled_ids) {
+        agentos_memory_provider_free_query_results(source_ids, scores, source_count);
+        return AGENTOS_ENOMEM;
+    }
+
+    for (size_t i = 0; i < source_count; i++) {
+        void* data = NULL;
+        size_t data_len = 0;
+        err = provider->sync_target->get_raw(provider->sync_target, source_ids[i], &data, &data_len);
+        if (err != AGENTOS_SUCCESS || !data) {
+            free(data);
+            continue;
+        }
+        char* new_id = NULL;
+        err = builtin_storage_write(impl->storage, data, data_len, NULL, &new_id);
+        if (err == AGENTOS_SUCCESS && new_id) {
+            builtin_index_add(impl->index, new_id, "", data_len);
+            pulled_ids[pulled] = source_ids[i];
+            source_ids[i] = NULL;
+            pulled++;
+        }
+        free(data);
+        free(new_id);
+    }
+
+    agentos_memory_provider_free_query_results(source_ids, scores, source_count);
+    *out_record_ids = pulled_ids;
+    *out_count = pulled;
+    return AGENTOS_SUCCESS;
+}
+
+static int builtin_has_active_sync(agentos_memory_provider_t* provider) {
+    if (!provider) return 0;
+    return provider->sync_target ? 1 : 0;
+}
+
 static agentos_error_t builtin_retrieve(
     agentos_memory_provider_t* provider,
     const char* query,
-    size_t limit,
+    uint32_t limit,
     char*** out_record_ids,
     float** out_scores,
     size_t* out_count) {
     if (!provider || !provider->impl || !query) return AGENTOS_EINVAL;
     builtin_provider_impl_t* impl = (builtin_provider_impl_t*)provider->impl;
-    return builtin_index_search(impl->index, query, (uint32_t)limit, out_record_ids, out_scores, out_count);
+    return builtin_index_search(impl->index, query, limit, out_record_ids, out_scores, out_count);
 }
 
 /* ========== 全局提供商注册 ========== */
@@ -371,6 +456,10 @@ static void setup_provider_vtable(agentos_memory_provider_t* provider) {
     provider->mount = builtin_mount;
     provider->health_check = builtin_health_check;
     provider->add_memory = builtin_add_memory;
+    provider->sync_push = builtin_sync_push;
+    provider->sync_pull = builtin_sync_pull;
+    provider->has_active_sync = builtin_has_active_sync;
+    provider->sync_target = NULL;
 }
 
 static void setup_provider_capabilities(agentos_memory_provider_t* provider) {

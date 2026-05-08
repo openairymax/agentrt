@@ -294,6 +294,13 @@ static ipc_service_bus_t g_orch_bus = NULL;
 static agentos_mutex_t g_orch_bus_mutex;
 static int g_orch_bus_mutex_initialized = 0;
 
+static void ensure_orch_bus_mutex(void) {
+    if (!g_orch_bus_mutex_initialized) {
+        agentos_mutex_init(&g_orch_bus_mutex);
+        g_orch_bus_mutex_initialized = 1;
+    }
+}
+
 static char* memory_query_context(agentos_memory_provider_t* mem, const char* query, uint32_t limit) {
     if (!mem || !query) return NULL;
     if (!mem->query || !mem->get_raw) return NULL;
@@ -402,6 +409,7 @@ static char* memory_retrieve_for_generation(agentos_memory_provider_t* mem, cons
 static char* call_llm_service(const char* prompt, const char* system_role) {
     if (!prompt) return NULL;
 
+    ensure_orch_bus_mutex();
     agentos_mutex_lock(&g_orch_bus_mutex);
     if (!g_orch_bus) {
         g_orch_bus = ipc_service_bus_create("orchestrator_bus", NULL);
@@ -524,12 +532,12 @@ static float extract_score_from_json(const char* json) {
     if (!json) return 0.0f;
     const char* key = "\"score\"";
     const char* p = strstr(json, key);
-    if (!p) return 0.5f;
+    if (!p) return 0.0f;
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
     char* end = NULL;
     float val = strtof(p, &end);
-    if (end == p) return 0.5f;
+    if (end == p) return 0.0f;
     if (val < 0.0f) val = 0.0f;
     if (val > 1.0f) val = 1.0f;
     return val;

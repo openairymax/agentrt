@@ -341,8 +341,11 @@ static void http_request_completed_callback(void* cls __attribute__((unused)),
                                               void** con_cls, enum MHD_RequestTerminationCode toe __attribute__((unused))) {
     if (con_cls && *con_cls) {
         http_request_context_t* ctx = (http_request_context_t*)*con_cls;
+        if (ctx->json_request) {
+            cJSON_Delete(ctx->json_request);
+            ctx->json_request = NULL;
+        }
         free(ctx);
-        *con_cls = NULL;
         *con_cls = NULL;
     }
 }

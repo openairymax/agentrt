@@ -93,17 +93,17 @@ static void init_static_adapters(void) {
     if (s_adapters_init) return;
     s_http_adapter.type = PROTOCOL_HTTP;
     s_http_adapter.name = "http";
-    s_http_adapter.version = "1.0";
+    s_http_adapter.version = "0.0.5";
     s_http_adapter.description = "HTTP Protocol Adapter";
 
     s_ws_adapter.type = PROTOCOL_HTTP;
     s_ws_adapter.name = "websocket";
-    s_ws_adapter.version = "1.0";
+    s_ws_adapter.version = "0.0.5";
     s_ws_adapter.description = "WebSocket Protocol Adapter";
 
     s_grpc_adapter.type = PROTOCOL_GRPC;
     s_grpc_adapter.name = "grpc";
-    s_grpc_adapter.version = "1.0";
+    s_grpc_adapter.version = "0.0.5";
     s_grpc_adapter.description = "gRPC Protocol Adapter (HTTP/2 framing)";
 
     s_mqtt_adapter.type = PROTOCOL_MQTT;

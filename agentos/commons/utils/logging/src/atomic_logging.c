@@ -47,12 +47,6 @@ static void atomic_sleep_ms(uint32_t ms) {
 /* ==================== 内部数据结构 ==================== */
 
 typedef struct {
-    log_record_t* records;
-    size_t write_pos;
-    size_t capacity;
-} thread_local_buffer_t;
-
-typedef struct {
     AtomicLogRecordNode* nodes;
     size_t capacity;
     size_t producer_pos;
@@ -79,15 +73,16 @@ static atomic_logging_state_t g_atomic_state = {
 
 /* ==================== 内部辅助函数 ==================== */
 
-static thread_local_buffer_t* get_thread_local_buffer(void) {
+static ThreadLocalBuffer* get_thread_local_buffer(void) {
     if (!g_tls_log_buffer) {
-        g_tls_log_buffer = (thread_local_buffer_t*)AGENTOS_CALLOC(1, sizeof(thread_local_buffer_t));
+        g_tls_log_buffer = (ThreadLocalBuffer*)AGENTOS_CALLOC(1, sizeof(ThreadLocalBuffer));
         if (g_tls_log_buffer) {
             g_tls_log_buffer->capacity = g_atomic_state.manager.batch_commit_threshold;
-            g_tls_log_buffer->records = (log_record_t*)AGENTOS_MALLOC(g_tls_log_buffer->capacity * sizeof(log_record_t));
-            g_tls_log_buffer->write_pos = 0;
+            g_tls_log_buffer->buffer = (log_record_t*)AGENTOS_MALLOC(g_tls_log_buffer->capacity * sizeof(log_record_t));
+            g_tls_log_buffer->position = 0;
+            g_tls_log_buffer->thread_id = (uint64_t)agentos_thread_id();
 
-            if (!g_tls_log_buffer->records) {
+            if (!g_tls_log_buffer->buffer) {
                 AGENTOS_FREE(g_tls_log_buffer);
                 g_tls_log_buffer = NULL;
                 return NULL;
@@ -98,9 +93,9 @@ static thread_local_buffer_t* get_thread_local_buffer(void) {
     return g_tls_log_buffer;
 }
 
-static void free_thread_local_buffer(thread_local_buffer_t* buffer) {
+static void free_thread_local_buffer(ThreadLocalBuffer* buffer) {
     if (buffer) {
-        AGENTOS_FREE(buffer->records);
+        AGENTOS_FREE(buffer->buffer);
         AGENTOS_FREE(buffer);
     }
 }
@@ -269,7 +264,7 @@ int atomic_logging_submit(const log_record_t* record, bool non_blocking) {
         return -1;
     }
 
-    thread_local_buffer_t* buffer = get_thread_local_buffer();
+    ThreadLocalBuffer* buffer = get_thread_local_buffer();
     if (!buffer) {
         return -2;
     }
@@ -303,12 +298,12 @@ int atomic_logging_flush(void) {
         return -1;
     }
 
-    thread_local_buffer_t* buffer = get_thread_local_buffer();
-    if (buffer && buffer->write_pos > 0) {
-        for (size_t i = 0; i < buffer->write_pos; i++) {
-            submit_to_ring_buffer(&buffer->records[i]);
+    ThreadLocalBuffer* buffer = get_thread_local_buffer();
+    if (buffer && buffer->position > 0) {
+        for (size_t i = 0; i < buffer->position; i++) {
+            submit_to_ring_buffer(&buffer->buffer[i]);
         }
-        buffer->write_pos = 0;
+        buffer->position = 0;
     }
 
     int max_wait = 100;
@@ -370,4 +365,74 @@ void atomic_logging_cleanup(void) {
     AGENTOS_FREE(g_atomic_state.ring_buffer.nodes);
 
     memset(&g_atomic_state, 0, sizeof(g_atomic_state));
+}
+
+ThreadLocalBuffer* atomic_logging_get_thread_local_buffer(void) {
+    return get_thread_local_buffer();
+}
+
+int atomic_logging_flush_thread_local_buffer(ThreadLocalBuffer* buffer) {
+    if (!buffer || buffer->position == 0) return 0;
+
+    int submitted = 0;
+    for (size_t i = 0; i < buffer->position; i++) {
+        if (submit_to_ring_buffer(&buffer->buffer[i]) == 0) {
+            submitted++;
+        }
+    }
+    buffer->position = 0;
+    return submitted;
+}
+
+int atomic_logging_submit_mutex(const log_record_t* record) {
+    if (!record) return -1;
+    agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
+    int result = submit_to_ring_buffer(record);
+    agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+    return result;
+}
+
+int atomic_logging_submit_batch(const log_record_t* records, size_t count) {
+    if (!records || count == 0) return -1;
+    int submitted = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (submit_to_ring_buffer(&records[i]) == 0) {
+            submitted++;
+        }
+    }
+    return submitted;
+}
+
+int atomic_logging_acquire(log_record_t* record, int timeout_ms) {
+    if (!record) return -1;
+
+    if (timeout_ms > 0) {
+        agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
+        int waited = 0;
+        while (g_atomic_state.ring_buffer.consumer_pos == g_atomic_state.ring_buffer.producer_pos && waited < timeout_ms) {
+            agentos_cond_timedwait(&g_atomic_state.ring_buffer.not_full, &g_atomic_state.ring_buffer.mutex, 10);
+            waited += 10;
+        }
+        agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+    }
+
+    return consume_from_ring_buffer(record) ? 0 : -1;
+}
+
+int atomic_logging_acquire_batch(log_record_t* records, size_t max_count, int timeout_ms) {
+    if (!records || max_count == 0) return -1;
+
+    size_t acquired = 0;
+    for (size_t i = 0; i < max_count; i++) {
+        if (atomic_logging_acquire(&records[i], (i == 0) ? timeout_ms : 0) != 0) {
+            break;
+        }
+        acquired++;
+    }
+    return (int)acquired;
+}
+
+int atomic_logging_release(const log_record_t* record) {
+    (void)record;
+    return 0;
 }
