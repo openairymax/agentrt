@@ -767,7 +767,7 @@ static uint32_t fw_adapter_capabilities(void* ctx) {
 static protocol_adapter_t proto_ext_framework_adapter_internal = {
     .type = PROTOCOL_CUSTOM,
     .name = "Protocol Extension Framework Adapter",
-    .version = "1.0.0",
+    .version = "0.0.5",
     .description = "Built-in protocol extension framework adapter",
     .init = fw_adapter_init,
     .destroy = fw_adapter_destroy,

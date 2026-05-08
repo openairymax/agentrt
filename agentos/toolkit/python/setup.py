@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="agentos",
-    version="3.0.0",
+    version="0.0.5",
     description="AgentOS Python SDK - 官方多语言 SDK 集合",
     long_description=open("README.md", "r", encoding="utf-8").read() if __name__ == "__main__" else "",
     long_description_content_type="text/markdown",

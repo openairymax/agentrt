@@ -38,12 +38,14 @@ endif()
 
 message(STATUS "MemoryRovol source found: ${MEMORYROVOL_DIR}")
 
-# Propagate AgentOS include paths to MemoryRovol build
-set(AGENTOS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE PATH "AgentOS atoms include directory")
-set(AGENTOS_ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "AgentOS atoms source directory")
+# Propagate AgentOS workspace root and include paths to MemoryRovol build
+set(AGENTOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." CACHE PATH "AgentOS workspace root directory" FORCE)
+set(AGENTOS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." CACHE PATH "AgentOS agentos/ directory (includes daemon, atoms, etc.)" FORCE)
+set(AGENTOS_ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE PATH "AgentOS atoms source directory" FORCE)
 
-# Inherit AgentOS build settings
+# Inherit AgentOS build settings — build full PRO from source (not OSS)
 set(MEMORYROVOL_OSS OFF CACHE BOOL "Build MemoryRovol in OSS mode (L1+L2 only)" FORCE)
+set(MEMORYROVOL_EMBEDDED ON CACHE BOOL "MemoryRovol embedded in AgentOS tree" FORCE)
 
 # Add MemoryRovol as subdirectory with binary dir under AgentOS build tree
 add_subdirectory("${MEMORYROVOL_DIR}" "${CMAKE_BINARY_DIR}/memoryrovol")

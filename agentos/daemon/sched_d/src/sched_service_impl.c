@@ -70,8 +70,15 @@ int sched_service_register_agent(sched_service_t* service, const agent_info_t* a
     agent_info_t* new_agent = (agent_info_t*)calloc(1, sizeof(agent_info_t));
     if (!new_agent) return -3;
 
+    if (!agent_info->agent_id) { free(new_agent); return -1; }
     new_agent->agent_id = strdup(agent_info->agent_id);
-    new_agent->agent_name = strdup(agent_info->agent_name);
+    new_agent->agent_name = agent_info->agent_name ? strdup(agent_info->agent_name) : strdup("");
+    if (!new_agent->agent_id || !new_agent->agent_name) {
+        free(new_agent->agent_id);
+        free(new_agent->agent_name);
+        free(new_agent);
+        return -3;
+    }
     new_agent->load_factor = agent_info->load_factor;
     new_agent->success_rate = agent_info->success_rate;
     new_agent->avg_response_time_ms = agent_info->avg_response_time_ms;
@@ -136,9 +143,13 @@ int sched_service_schedule_task(sched_service_t* service, const task_info_t* tas
                         (1.0f - service->agents[i]->load_factor);
                 break;
             case SCHED_STRATEGY_ROUND_ROBIN:
-                score = (float)(service->total_tasks_scheduled % service->agent_count);
-                if ((size_t)score == i) score = 100.0f;
-                else score = 0.0f;
+                if (service->agent_count == 0) {
+                    score = 0.0f;
+                } else {
+                    score = (float)(service->total_tasks_scheduled % service->agent_count);
+                    if ((size_t)score == i) score = 100.0f;
+                    else score = 0.0f;
+                }
                 break;
             case SCHED_STRATEGY_ML_BASED:
                 score = service->agents[i]->success_rate * (1.0f - service->agents[i]->load_factor);
