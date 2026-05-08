@@ -479,8 +479,9 @@ AGENTOS_API agentos_error_t ipc_service_bus_broadcast(
 
     agentos_mutex_unlock(&bus->mutex);
 
-    LOG_DEBUG("Bus '%s': broadcast to %u endpoints", bus->name, target_count);
-    return AGENTOS_SUCCESS;
+    LOG_WARN("Bus '%s': ipc_service_bus_broadcast to %u endpoints not yet implemented",
+             bus->name, target_count);
+    return AGENTOS_ENOTSUP;
 }
 
 AGENTOS_API agentos_error_t ipc_service_bus_notify(

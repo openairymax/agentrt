@@ -62,7 +62,7 @@ static void notify_error(mcp_transport_t* t, int code, const char* msg) {
     }
 }
 
-static void notify_message(mcp_transport_t* t, const char* msg, size_t len) {
+static void __attribute__((unused)) notify_message(mcp_transport_t* t, const char* msg, size_t len) {
     if (t && t->on_message) {
         t->on_message(msg, len, t->user_data);
     }
