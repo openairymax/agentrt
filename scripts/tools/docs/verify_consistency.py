@@ -66,7 +66,8 @@ def verify_file(file_path):
         return False, [f"❌ Error reading file: {e}"]
 
 def main():
-    docs_dir = Path(r'd:\SPHARX-CN\SpharxWorks\AgentOS\docs')
+    script_dir = Path(__file__).resolve().parent
+    docs_dir = script_dir / "../../../docs"
 
     # Exclude Basic_Theories as per user request
     exclude_dirs = {'Basic_Theories', '.git'}

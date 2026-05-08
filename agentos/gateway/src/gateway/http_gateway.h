@@ -12,7 +12,7 @@
 #ifndef AGENTOS_GATEWAY_HTTP_H
 #define AGENTOS_GATEWAY_HTTP_H
 
-#include "gateway.h"
+#include "gateway_internal.h"
 #include <stdint.h>
 #include <cJSON.h>
 

@@ -173,7 +173,7 @@ static agentos_error_t lb_weighted(
     }
     if (total_weight == 0) return AGENTOS_ENOENT;
 
-    uint32_t random_val = (uint32_t)(agentos_platform_get_time_ms() % total_weight);
+    uint32_t random_val = (uint32_t)(rand() % total_weight);
     uint32_t cumulative = 0;
     for (uint32_t i = 0; i < entry->instance_count; i++) {
         if (!entry->instances[i].healthy) continue;
@@ -223,7 +223,7 @@ static agentos_error_t lb_random(
     }
     if (healthy_count == 0) return AGENTOS_ENOENT;
 
-    uint32_t idx = (uint32_t)(agentos_platform_get_time_ms() % healthy_count);
+    uint32_t idx = (uint32_t)(rand() % healthy_count);
     uint32_t count = 0;
     for (uint32_t i = 0; i < entry->instance_count; i++) {
         if (entry->instances[i].healthy) {
@@ -276,6 +276,12 @@ AGENTOS_API sd_config_t sd_create_default_config(void) {
 }
 
 AGENTOS_API service_discovery_t sd_create(const sd_config_t* config) {
+    static int rng_seeded = 0;
+    if (!rng_seeded) {
+        srand((unsigned int)time(NULL) ^ (unsigned int)(uintptr_t)&rng_seeded);
+        rng_seeded = 1;
+    }
+
     sd_internal_t* sd = (sd_internal_t*)AGENTOS_CALLOC(1, sizeof(sd_internal_t));
     if (!sd) return NULL;
 

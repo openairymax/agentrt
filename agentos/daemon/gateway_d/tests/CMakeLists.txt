@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-project(gateway_d_tests VERSION 1.0.0 LANGUAGES C)
+project(gateway_d_tests VERSION 0.0.5 LANGUAGES C)
 
 set(GATEWAY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../gateway)
 set(GATEWAY_INCLUDE_DIR ${GATEWAY_DIR}/include)
