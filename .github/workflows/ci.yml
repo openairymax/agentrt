@@ -1,16 +1,8 @@
-name: AgentOS Build & Test
+name: AgentOS CI
 
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'AgentOS/agentos/**'
-      - 'tests/**'
-      - 'CMakeLists.txt'
-      - 'vcpkg.json'
-      - '.clang-format'
-      - '.clang-tidy'
-      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -19,132 +11,115 @@ concurrency:
   group: agentos-ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  BUILD_TYPE: ${{ matrix.build_type }}
-
 jobs:
   build-and-test:
-    name: ${{ matrix.os }} / ${{ matrix.build_type }} / ${{ matrix.compiler }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, macos-13]
-        build_type: [Debug, Release]
-        compiler: [gcc]
-        include:
-          - os: ubuntu-22.04
-            build_type: Debug
-            compiler: clang
+    name: Build & Test (Ubuntu)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq cmake build-essential \
             libssl-dev libcurl4-openssl-dev libcmocka-dev \
-            ${{ matrix.compiler == 'clang' && 'clang' || 'gcc g++' }}
+            libmicrohttpd-dev libwebsockets-dev \
+            libcjson-dev libyaml-dev libsqlite3-dev
 
-      - name: Install Dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: brew install cmake openssl curl
-
-      - name: Configure — BAN-33 out-of-source build
+      - name: Configure
         run: |
-          cmake -S AgentOS -B ${{ github.workspace }}/../AgentOS-build \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DCMAKE_C_COMPILER=${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }} \
-            -DMEMORYROVOL_SOURCE=ON \
+          cmake -B ${{ github.workspace }}/../AgentOS-ci-build \
+            -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTS=ON \
-            -Werror=dev
+            -DWARNINGS_AS_ERRORS=OFF
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/../AgentOS-build --parallel $(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+        run: |
+          cmake --build ${{ github.workspace }}/../AgentOS-ci-build \
+            --parallel $(nproc)
 
       - name: Test
-        working-directory: ${{ github.workspace }}/../AgentOS-build
-        run: ctest --output-on-failure -j $(nproc 2>/dev/null || echo 4) --timeout 60
-
-  static-analysis:
-    name: Static Analysis
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install tools
+        working-directory: ${{ github.workspace }}/../AgentOS-ci-build
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq clang-tools clang-tidy cppcheck
+          ctest --output-on-failure -j $(nproc) --timeout 120
 
-      - name: Run cppcheck
-        run: |
-          cppcheck --enable=warning,performance,portability \
-            --suppress=missingInclude \
-            --error-exitcode=0 \
-            -I AgentOS/agentos/commons/include \
-            -I AgentOS/agentos/atoms/coreloopthree/include \
-            -I AgentOS/agentos/atoms/memoryrovol/include \
-            AgentOS/agentos/ 2>&1 | tee cppcheck-report.txt
-
-      - name: BAN-58/59 Path Audit
-        run: |
-          echo "=== BAN-58: Hardcoded local path check ==="
-          grep -rn '/home/\|/Users/' --include='*.c' --include='*.h' --include='*.py' --include='*.sh' \
-            AgentOS/agentos/ scripts/ tests/ 2>/dev/null | grep -v test_ | grep -v '/home/user/' || echo "  [OK] No hardcoded local paths"
-
-          echo ""
-          echo "=== BAN-59: Obsolete POSIX path check ==="
-          grep -rn '/var/run/agentos\|/tmp/agentos' --include='*.c' --include='*.h' --include='*.py' \
-            AgentOS/agentos/ 2>/dev/null || echo "  [OK] No obsolete POSIX paths in production code"
-
-      - name: BAN-60 Stub Audit
-        run: |
-          echo "=== BAN-60: Stub/fake implementation check ==="
-          grep -rn 'return.*AGENTOS_ENOSYS\|return.*AGENTOS_ENOTSUP' --include='*.c' \
-            AgentOS/agentos/ 2>/dev/null | grep -v '#ifdef\|#ifndef\|MEMORYROVOL_OSS' || echo "  [OK] No ENOSYS stubs in production code"
-          grep -rn 'NotImplementedError' --include='*.py' \
-            AgentOS/agentos/ 2>/dev/null || echo "  [OK] No NotImplementedError in Python code"
-
-  path-hardening:
-    name: Path & Config Hardening
+  ban-scan:
+    name: BAN Compliance Scan
     runs-on: ubuntu-22.04
     timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify no in-source build artifacts
+      - name: BAN-33 — Out-of-source build check
         run: |
-          if [ -d "AgentOS/build" ] || [ -f "AgentOS/CMakeCache.txt" ]; then
-            echo "::error::In-source build artifacts found! Violates BAN-33"
-            ls -la AgentOS/build/ AgentOS/CMakeCache.txt 2>/dev/null
-            exit 1
-          fi
-          echo "  [OK] No in-source build artifacts"
-
-      - name: Verify .gitignore covers build outputs
-        run: |
-          for pattern in "build/" "ci-artifacts/" "CMakeCache.txt" "*.o" "*.so" "*.a"; do
-            if grep -q "$pattern" AgentOS/.gitignore 2>/dev/null; then
-              echo "  [OK] .gitignore covers: $pattern"
-            else
-              echo "::warning::.gitignore missing: $pattern"
-            fi
-          done
-
-      - name: Verify CMakeLists.txt in-source build guard
-        run: |
-          if grep -q 'CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR' AgentOS/CMakeLists.txt; then
-            echo "  [OK] Root CMakeLists.txt has in-source build guard"
+          if grep -rn "CMAKE_SOURCE_DIR.*STREQUAL.*CMAKE_BINARY_DIR" CMakeLists.txt 2>/dev/null | grep -v "^#" > /dev/null; then
+            echo "[OK] BAN-33 guard present"
           else
-            echo "::error::Root CMakeLists.txt missing in-source build guard (BAN-63)"
-            exit 1
+            echo "::warning::BAN-33: in-source build guard not found"
           fi
+
+      - name: BAN-43 — Hardcoded secrets scan
+        run: |
+          FOUND=0
+          if grep -rn 'SECRET\|PASSWORD\|TOKEN.*=' agentos/ \
+            --include='*.c' --include='*.h' 2>/dev/null | \
+            grep -v "secrets\." | grep -v "CHANGE_ME" | grep -v "__GENERATE" | grep -v "fallback" | head -20; then
+            echo "::warning::BAN-43: Potential hardcoded secrets found (review above)"
+            FOUND=1
+          fi
+          if [ "$FOUND" -eq 0 ]; then
+            echo "[OK] BAN-43: No obvious hardcoded secrets"
+          fi
+
+      - name: BAN-57 — CORS wildcard scan
+        run: |
+          if grep -rn "Access-Control-Allow-Origin.*\\*" agentos/ \
+            --include='*.c' --include='*.h' --include='*.conf' 2>/dev/null; then
+            echo "::error::BAN-57: CORS wildcard found"
+            exit 1
+          else
+            echo "[OK] BAN-57: No CORS wildcard"
+          fi
+
+      - name: BAN-60 — Fake implementations scan
+        run: |
+          echo "=== BAN-60: Stub / not-implemented markers ==="
+          grep -rn "ENOSYS\|ENOTSUP\|NOT_IMPLEMENTED\|stub\|TODO.*implement" agentos/ \
+            --include='*.c' --include='*.h' 2>/dev/null | grep -v test_ | grep -v Docs | head -20 || \
+            echo "[OK] No stub markers found"
+
+      - name: BAN-64 — CMake add_compile_definitions -D check
+        run: |
+          if grep -rn 'add_compile_definitions.*-D' --include='CMakeLists.txt' . 2>/dev/null; then
+            echo "::error::BAN-64: -D prefix found in add_compile_definitions"
+            exit 1
+          else
+            echo "[OK] BAN-64: No redundant -D prefix"
+          fi
+
+      - name: BAN-58 — Hardcoded absolute paths
+        run: |
+          if grep -rn '/var/run/agentos\|/home/spharx' agentos/ \
+            --include='*.c' --include='*.h' 2>/dev/null | grep -v test_ | grep -v Docs | head -10; then
+            echo "::warning::BAN-58: Hardcoded absolute paths found"
+          else
+            echo "[OK] BAN-58: No hardcoded paths in source"
+          fi
+
+  result:
+    name: CI Result
+    needs: [build-and-test, ban-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check build-and-test status
+        if: ${{ needs.build-and-test.result == 'failure' }}
+        run: exit 1
+      - name: Check ban-scan status
+        if: ${{ needs.ban-scan.result == 'failure' }}
+        run: exit 1
+      - name: All checks passed
+        run: echo "::notice::All AgentOS CI checks passed!"

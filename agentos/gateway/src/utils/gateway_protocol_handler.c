@@ -43,24 +43,24 @@ struct gateway_protocol_handler_s {
 // 协议检测特征常量
 // ============================================================================
 
-static const char* JSONRPC_SIGNATURES[] = {
+static const char* JSONRPC_SIGNATURES[] __attribute__((unused)) = {
     "\"jsonrpc\"", "\"method\"", "\"params\"", "\"id\"",
     NULL
 };
 
-static const char* MCP_SIGNATURES[] = {
+static const char* MCP_SIGNATURES[] __attribute__((unused)) = {
     "\"jsonrpc\": \"2.0\"", "\"method\"", "\"params\"",
     "\"MCP\"", "\"mcp\"",
     NULL
 };
 
-static const char* OPENAI_SIGNATURES[] = {
+static const char* OPENAI_SIGNATURES[] __attribute__((unused)) = {
     "\"model\"", "\"messages\"", "\"prompt\"",
     "\"/v1/chat/completions\"", "\"/v1/completions\"",
     NULL
 };
 
-static const char* A2A_SIGNATURES[] = {
+static const char* A2A_SIGNATURES[] __attribute__((unused)) = {
     "\"agent_id\"", "\"task_id\"", "\"message\"",
     "\"a2a\"", "\"agent-to-agent\"",
     NULL
