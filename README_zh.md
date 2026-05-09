@@ -1,4 +1,6 @@
 [![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)   
+<a href="https://www.producthunt.com/products/airymaxagentos?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-airymaxagentos" target="_blank" rel="noopener noreferrer"><img alt="AirymaxAgentOS - 200K++ context &amp; 10M memory，1000h tasks at 99.10% accuracy | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1142077&amp;theme=light&amp;t=1778311722570"></a>  
+
 
 # AgentOS   
 Powered by OpenAirymax   
