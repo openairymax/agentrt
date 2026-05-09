@@ -85,7 +85,7 @@ agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t* sandbox, int syscall_
 
     /* 添加条目 */
     if (sandbox->audit_count < sandbox->audit_capacity) {
-        audit_entry_t* entry = &sandbox->audit_log[sandbox->audit_count];
+        audit_entry_t* entry = (audit_entry_t*)sandbox->audit_log + sandbox->audit_count;
         entry->timestamp_ns = get_timestamp_ns();
         entry->sandbox_id = sandbox->sandbox_id;
         entry->syscall_num = syscall_num;
