@@ -1,34 +1,31 @@
 [![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)  
+<a href="https://www.producthunt.com/products/airymaxagentos?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-airymaxagentos" target="_blank" rel="noopener noreferrer"><img alt="AirymaxAgentOS - 200K++ context &amp; 10M memory，1000h tasks at 99.10% accuracy | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1142077&amp;theme=light&amp;t=1778311722570"></a>
 
-<div align="center">
 
-# Agent OS  
-
-Powered by OpenAirymax  
-
+# Agent OS
+Powered by OpenAirymax
 > The seminal fourth "Operating System Philosophy" in human computing history.
 
-English | [简体中文](README_CN.md)
+English | [简体中文](README_zh.md)
 
 [![AtomGit](https://atomgit.com/openairymax/agentos/star/badge.svg)](https://atomgit.com/openairymax/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
 [![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS/stargazers)
 
-[![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
+[![Version](https://img.shields.io/badge/version-0.0.5-5a6b7e)](https://atomgit.com/openairymax/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
-[![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/spharx/agentos)
+[![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/openairymax/agentos)
 
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org)
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)  
+[![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-</div>  
 
----
+***
 
-## 🎉 Preview Released  
+## 🎉 Preview Released
 
 | User Type | Product | Version | Download |
 |:---------:|:-------:|:-------:|:--------:|
@@ -52,11 +49,11 @@ Personal Client Preview
 
 <div align="center">
 
-⚡️  
+⚡️
 
-**Foundational [Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**  
+**Foundational [Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**
 
-</div>  
+</div>
 
 - **Pure Kernel**: Only atomic mechanisms, ensuring purity and efficiency.
 - **Cognitive Loop**: Perception, Planning, Action.
@@ -77,14 +74,14 @@ Personal Client Preview
 - Continuously optimizes execution effectiveness
 
 <p align="center">
-  <strong> ✨ </strong>  
+  <strong> ✨ </strong>
   <p align="center">
-  <strong> Brand New Architecture · Inherent Security · Intelligence Emergence </strong>  
+  <strong> Brand New Architecture · Inherent Security · Intelligence Emergence </strong>
 </p>
 
 ## 🏗️ System Architecture
 
-**Architecture Design**  
+**Architecture Design**
   Complete architecture from kernel to application:
 
 ```
@@ -93,10 +90,10 @@ Personal Client Preview
 ⇅ Kernel Layer (atoms)
 ⇅ Security Layer (cupolas)
 ⇅ Support Layer (commons)
-⬆️ SDK Layer (toolkit)  
+⬆️ SDK Layer (toolkit)
 ```
 
-**Design Principles**  
+**Design Principles**
   Built upon [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md):
 - **System Perspective**: Feedback loops · Layered decomposition · Holistic design · Emergence management → Real-time response <10ms
 - **Kernel Perspective**: Minimalist kernel · Contractual interfaces · Service isolation · Pluggable strategies → Kernel ~25K LOC
@@ -117,7 +114,7 @@ Personal Client Preview
 
 ```ctext
 # 1. Clone repository
-git clone https://atomgit.com/spharx/agentos.git && cd agentos
+git clone https://atomgit.com/openairymax/agentos.git && cd agentos
 
 # 2. Install dependencies (Ubuntu)
 sudo apt install -y build-essential cmake gcc g++ libssl-dev libsqlite3-dev ninja-build
@@ -128,7 +125,7 @@ cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build . --parallel $(nproc)
 
 # 4. Run tests
-ctest --output-on-failure  
+ctest --output-on-failure
 ```
 
 ### Docker Quick Start
@@ -231,40 +228,40 @@ We are walking into the future: "Intelligence emergence, and nothing less, is th
 ### The Power of Belief
 
 <p align="center">
-  <strong> ☀️ </strong>  
+  <strong> ☀️ </strong>
   <p align="center">
-  <strong> This is not humanity's sunset, but the dawn of a new world </strong>  
+  <strong> This is not humanity's sunset, but the dawn of a new world </strong>
 </p>
 
 **Believe**
 
-  The spirit of open source can maximize the wisdom of the group;  
+  The spirit of open source can maximize the wisdom of the group;
   Collaboration will propel humanity to new heights.
 
 **Witness**
 
-  Every day of our work is part of history;  
+  Every day of our work is part of history;
   It will surely be engraved on the monument of human civilization's development.
 
 ### Ways to Contribute
 
 Whether you are an experienced developer or just starting out:
 
-**Find Issues**  
+**Find Issues**
 Report bugs, help us improve quality
 
-**Share Ideas**  
+**Share Ideas**
 Suggest new features, make the project stronger
 
-**Share Knowledge**  
+**Share Knowledge**
 Improve documentation, help more people understand AgentOS
 
-**Write Code**  
+**Write Code**
 Submit PRs, jointly create history
 
-<p align="center">  
-  <strong> 🔥 </strong>  
-  <p align="center">  
+<p align="center">
+  <strong> 🔥 </strong>
+  <p align="center">
   <strong> A faint light cannot illuminate the entire path, yet it guides our direction forward </strong>
 </p>
 
@@ -276,7 +273,7 @@ See [Contributing Guide](CONTRIBUTING.md)
 Fork Project → Create Branch → Develop & Test → Submit PR → Code Review → Merge to Main
 ```
 
-**Main Platforms**: [AtomGit](https://atomgit.com/openairymax/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+**Main Platforms**: [AtomGit](https://atomgit.com/spharx/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
 
 ### Contributors
 
@@ -286,7 +283,7 @@ See [AUTHORS.md](AUTHORS.md) for the list of contributors.
 
 This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) file for details.
 
----
+***
 
 <div align="center">
 
@@ -294,17 +291,24 @@ This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE
 
 <img src="scripts/source_other/feishu-community-qr.png" width="200" />
 
-<a href="https://atomgit.com/openairymax/agentos">AtomGit</a> ·
-<a href="https://gitee.com/spharx/agentos">Gitee</a> ·
-<a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·
-<a href="https://spharx.cn">Official Website</a>
+<a href="https://atomgit.com/spharx/agentos">AtomGit</a> · <a href="https://gitee.com/spharx/agentos">Gitee</a> · <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> · <a href="https://spharx.cn">Official Website</a>
 
 © 2026 SPHARX Ltd. All Rights Reserved.
 
 </div>
 
----
+***
 
 ## ⭐️ Github Star History
 
 [![Star History Chart](https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left)](https://star-history.com/#SpharxTeam/AgentOS)
+
+## Global Rank
+
+<a href="https://www.star-history.com/spharxteam/agentos">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1" />
+ </picture>
+</a>
