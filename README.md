@@ -1,8 +1,6 @@
-[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)  
-<a href="https://www.producthunt.com/products/airymaxagentos?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-airymaxagentos" target="_blank" rel="noopener noreferrer"><img alt="AirymaxAgentOS - 200K++ context &amp; 10M memory，1000h tasks at 99.10% accuracy | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1142077&amp;theme=light&amp;t=1778311722570"></a>
+[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)   
 
-
-# Agent OS
+# AgentOS
 Powered by OpenAirymax
 > The seminal fourth "Operating System Philosophy" in human computing history.
 
@@ -22,15 +20,14 @@ English | [简体中文](README_zh.md)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-
-***
+---
 
 ## 🎉 Preview Released
 
 | User Type | Product | Version | Download |
 |:---------:|:-------:|:-------:|:--------:|
-|  **Pro Users** | Docker | `v0.0.4` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.0.4) |
-|  **Personal Users** | Desktop | `v0.0.4` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.4) |
+|  **Pro Users** | Docker | `v0.0.5` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.0.5) |
+|  **Personal Users** | Desktop | `v0.0.5` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.5) |  
 
 
 ## 🌟 Introduction
