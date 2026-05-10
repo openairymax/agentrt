@@ -1,12 +1,10 @@
 [![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)   
-<a href="https://www.producthunt.com/products/airymaxagentos?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-airymaxagentos" target="_blank" rel="noopener noreferrer"><img alt="AirymaxAgentOS - 200K++ context &amp; 10M memory，1000h tasks at 99.10% accuracy | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1142077&amp;theme=light&amp;t=1778311722570"></a>  
-
 
 # AgentOS   
 Powered by OpenAirymax   
 > 成为人类计算工程史上，第四个"操作系统哲学"  
 
-Langua: 中文 | [English](README.md)   
+**Langua：** 中文 | [English](README.md)   
 
 [![AtomGit](https://atomgit.com/openairymax/agentos/star/badge.svg)](https://atomgit.com/openairymax/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
@@ -22,15 +20,14 @@ Langua: 中文 | [English](README.md)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-DEA584?logo=rust\&logoColor=white)](https://www.rust-lang.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript\&logoColor=white)](https://www.typescriptlang.org)
 
-
-***
+---
 
 ## 🎉 预览版已发布
 
 |   用户类型   |    产品   |    版本    |                                     下载                                    |
 | :------: | :-----: | :------: | :-----------------------------------------------------------------------: |
-| **专业用户** |  Docker | `v0.0.4` |   [📦 获取 Docker](https://atomgit.com/openairymax/docker/releases/v0.0.4)  |
-| **个人用户** | Desktop | `v0.0.4` | [🖥️ 获取 Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.4) |
+| **专业用户** |  Docker | `v0.0.5` |   [📦 获取 Docker](https://atomgit.com/openairymax/docker/releases/v0.0.5)  |
+| **个人用户** | Desktop | `v0.0.5` | [🖥️ 获取 Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.5) |
 
 ## 1️⃣ 项目简介
 
