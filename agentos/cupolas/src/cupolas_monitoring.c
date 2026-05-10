@@ -30,6 +30,7 @@
 #if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
 #include <winsock2.h>
+#include <psapi.h>
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>

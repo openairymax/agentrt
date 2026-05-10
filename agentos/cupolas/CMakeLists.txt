@@ -75,13 +75,7 @@ set(CUPOLAS_SOURCES
     src/workbench/workbench_process_core.c
     src/workbench/workbench_container.c
     src/workbench/workbench_limits.c
-    src/security/cupolas_signature.c
-    src/security/cupolas_vault.c
-    src/security/cupolas_entitlements.c
-    src/security/cupolas_runtime_protection.c
-    src/security/cupolas_network_security.c
     src/security/cupolas_error.c
-    src/security/network/tls_security.c
     src/security/network/http_security.c
     src/security/network/dns_security.c
     src/security/network/network_filter.c
@@ -91,6 +85,17 @@ set(CUPOLAS_SOURCES
     src/circuit_breaker.c
     src/yaml_minimal.c
 )
+# OpenSSL-dependent sources
+if(OpenSSL_FOUND)
+    list(APPEND CUPOLAS_SOURCES
+        src/security/cupolas_signature.c
+        src/security/cupolas_vault.c
+        src/security/cupolas_entitlements.c
+        src/security/cupolas_runtime_protection.c
+        src/security/cupolas_network_security.c
+        src/security/network/tls_security.c
+    )
+endif()
 
 set(CUPOLAS_HEADERS
     include/cupolas.h
@@ -183,11 +188,12 @@ if(CJSON_FOUND)
 endif()
 
 if(MSVC)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32 advapi32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32 advapi32 psapi)
+
+    target_compile_definitions(${PROJECT_NAME} PRIVATE CUPOLAS_BUILDING_DLL)
 
     target_compile_options(${PROJECT_NAME} PRIVATE
         /W4
-        $<$<CONFIG:Release>:/Guard:cf /guard:ehcont>
     )
 else()
     find_package(Threads REQUIRED)
