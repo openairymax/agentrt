@@ -20,6 +20,7 @@
 #include "circuit_breaker.h"
 #include "metacognition.h"
 #include "confidence_calibrator.h"
+#include "safe_string_utils.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -794,7 +795,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         char* enhanced = (char*)realloc(prompt, new_len);
                         if (enhanced) {
                             prompt = enhanced;
-                            strcat(prompt, "\n\nCognition engine context:\n");
+                            safe_strcat(prompt, "\n\nCognition engine context:\n", new_len);
                             for (size_t n = 0; n < gen_plan->task_plan_node_count; n++) {
                                 agentos_task_node_t* nd = gen_plan->task_plan_nodes[n];
                                 if (nd && nd->task_node_output) {

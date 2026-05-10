@@ -52,7 +52,7 @@ static const char* g_storage_endpoint_urls[] = {
     [CHINA_ECO_OSS_HUAWEI]  = "https://obs.cn-north-4.myhuaweicloud.com"
 };
 
-static const char* g_storage_names[] __attribute__((unused)) = {
+static const char* g_storage_names[] = {
     [CHINA_ECO_OSS_ALIYUN]  = "oss",
     [CHINA_ECO_OSS_TENCENT] = "cos",
     [CHINA_ECO_OSS_BAIDU]   = "bos",

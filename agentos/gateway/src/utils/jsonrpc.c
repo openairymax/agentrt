@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
@@ -80,7 +80,7 @@ int jsonrpc_validate_request(const cJSON* json) {
 #endif
 }
 
-const char* jsonrpc_get_method(const cJSON* json __attribute__((unused))) {
+const char* jsonrpc_get_method(const cJSON* json AGENTOS_UNUSED) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
@@ -95,7 +95,7 @@ const char* jsonrpc_get_method(const cJSON* json __attribute__((unused))) {
 #endif
 }
 
-const cJSON* jsonrpc_get_params(const cJSON* json __attribute__((unused))) {
+const cJSON* jsonrpc_get_params(const cJSON* json AGENTOS_UNUSED) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
@@ -106,7 +106,7 @@ const cJSON* jsonrpc_get_params(const cJSON* json __attribute__((unused))) {
 #endif
 }
 
-const cJSON* jsonrpc_get_id(const cJSON* json __attribute__((unused))) {
+const cJSON* jsonrpc_get_id(const cJSON* json AGENTOS_UNUSED) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
@@ -119,7 +119,7 @@ const cJSON* jsonrpc_get_id(const cJSON* json __attribute__((unused))) {
 
 /* ==================== 响应生成 ==================== */
 
-char* jsonrpc_create_success_response(const cJSON* id __attribute__((unused)), cJSON* result __attribute__((unused))) {
+char* jsonrpc_create_success_response(const cJSON* id AGENTOS_UNUSED, cJSON* result AGENTOS_UNUSED) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
     if (!response) {
@@ -154,10 +154,10 @@ char* jsonrpc_create_success_response(const cJSON* id __attribute__((unused)), c
 }
 
 char* jsonrpc_create_error_response(
-    const cJSON* id __attribute__((unused)),
-    int code __attribute__((unused)),
-    const char* message __attribute__((unused)),
-    cJSON* data __attribute__((unused))
+    const cJSON* id AGENTOS_UNUSED,
+    int code AGENTOS_UNUSED,
+    const char* message AGENTOS_UNUSED,
+    cJSON* data AGENTOS_UNUSED
 ) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
@@ -232,7 +232,7 @@ char* jsonrpc_create_invalid_params_response(const cJSON* id, const char* detail
 #endif
 }
 
-char* jsonrpc_create_internal_error_response(const cJSON* id __attribute__((unused)), const char* detail __attribute__((unused))) {
+char* jsonrpc_create_internal_error_response(const cJSON* id AGENTOS_UNUSED, const char* detail AGENTOS_UNUSED) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* data = NULL;
     if (detail) {
@@ -280,7 +280,7 @@ const char* jsonrpc_get_error_message(int code) {
 
 /* ==================== Batch Requests (PROTO-004) ==================== */
 
-int jsonrpc_validate_batch_request(const cJSON* batch_json __attribute__((unused)), size_t* out_count __attribute__((unused))) {
+int jsonrpc_validate_batch_request(const cJSON* batch_json AGENTOS_UNUSED, size_t* out_count AGENTOS_UNUSED) {
 #ifdef GATEWAY_HAS_CJSON
     if (!batch_json || !out_count) return -1;
     *out_count = 0;
@@ -308,9 +308,9 @@ int jsonrpc_validate_batch_request(const cJSON* batch_json __attribute__((unused
 }
 
 char* jsonrpc_process_batch(
-    const cJSON* batch_json __attribute__((unused)),
-    char* (*handler)(const cJSON* request, void* user_data) __attribute__((unused)),
-    void* user_data __attribute__((unused))
+    const cJSON* batch_json AGENTOS_UNUSED,
+    char* (*handler)(const cJSON* request, void* user_data) AGENTOS_UNUSED,
+    void* user_data AGENTOS_UNUSED
 ) {
 #ifdef GATEWAY_HAS_CJSON
     if (!batch_json || !handler || !cJSON_IsArray(batch_json)) {
@@ -399,7 +399,7 @@ char* jsonrpc_process_batch(
 
 /* ==================== Notifications (PROTO-004) ==================== */
 
-char* jsonrpc_create_notification(const char* method __attribute__((unused)), cJSON* params __attribute__((unused))) {
+char* jsonrpc_create_notification(const char* method AGENTOS_UNUSED, cJSON* params AGENTOS_UNUSED) {
 #ifdef GATEWAY_HAS_CJSON
     if (!method || strlen(method) == 0) return NULL;
 
@@ -425,7 +425,7 @@ char* jsonrpc_create_notification(const char* method __attribute__((unused)), cJ
 #endif
 }
 
-bool jsonrpc_is_notification(const cJSON* json __attribute__((unused))) {
+bool jsonrpc_is_notification(const cJSON* json AGENTOS_UNUSED) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json || !cJSON_IsObject(json)) return false;
 
@@ -436,8 +436,8 @@ bool jsonrpc_is_notification(const cJSON* json __attribute__((unused))) {
 }
 
 char* jsonrpc_create_notification_params(
-    const char* method __attribute__((unused)),
-    const char* params_json __attribute__((unused))
+    const char* method AGENTOS_UNUSED,
+    const char* params_json AGENTOS_UNUSED
 ) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* params = NULL;

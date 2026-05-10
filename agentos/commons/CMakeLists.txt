@@ -96,9 +96,11 @@ set(SOURCES
     utils/strategy/strategy_common.c
     # 网络通信模块
     utils/network/network_common.c
-    # 进程间通信模块
-    utils/ipc/ipc_common.c
+    # 进程间通信模块（Unix Domain Sockets，Windows不支持）
 )
+if(NOT WIN32)
+    list(APPEND SOURCES utils/ipc/ipc_common.c)
+endif()
 
 add_library(agentos_common STATIC ${SOURCES})
 

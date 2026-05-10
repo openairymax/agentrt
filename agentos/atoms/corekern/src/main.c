@@ -6,12 +6,17 @@
 
 #include "agentos.h"
 
-static volatile int g_core_initialized = 0;
+static volatile long g_core_initialized = 0;
 
 int agentos_core_init(void) {
-    int expected = 0;
+    long expected = 0;
+#ifdef _MSC_VER
+    long prev = InterlockedCompareExchange(&g_core_initialized, 1, expected);
+    if (prev != 0) {
+#else
     if (!__atomic_compare_exchange_n(&g_core_initialized, &expected, 1,
                                      0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+#endif
         return AGENTOS_SUCCESS;
     }
 
@@ -38,14 +43,23 @@ cleanup_task:
 cleanup_mem:
     agentos_mem_cleanup();
 fail:
+#ifdef _MSC_VER
+    InterlockedExchange(&g_core_initialized, 0);
+#else
     __atomic_store_n(&g_core_initialized, 0, __ATOMIC_SEQ_CST);
+#endif
     return ret;
 }
 
 void agentos_core_shutdown(void) {
-    int expected = 1;
+    long expected = 1;
+#ifdef _MSC_VER
+    long prev = InterlockedCompareExchange(&g_core_initialized, 0, expected);
+    if (prev != 1) {
+#else
     if (!__atomic_compare_exchange_n(&g_core_initialized, &expected, 0,
                                      0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+#endif
         return;
     }
 

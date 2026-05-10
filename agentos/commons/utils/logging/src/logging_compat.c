@@ -11,6 +11,16 @@
 
 #include "logging_compat.h"
 #include "logging.h"
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef _WINSOCKAPI_
+#define _WINSOCKAPI_
+#endif
+#include <windows.h>
+#endif
+
 #include <stdlib.h>
 
 #include "memory_compat.h"
@@ -92,11 +102,15 @@ static const char* generate_old_trace_id(void)
     static int counter = 0;
     
     /* 根据现有实现，追踪ID格式�?trace-<pid>-<timestamp>-<counter>" */
+    #ifdef _WIN32
+    DWORD pid = GetCurrentProcessId();
+#else
     pid_t pid = getpid();
+#endif
     time_t now = time(NULL);
     
-    snprintf(trace_id, sizeof(trace_id), "trace-%d-%ld-%d",
-             pid, now, atomic_fetch_add(&counter, 1));
+    snprintf(trace_id, sizeof(trace_id), "trace-%lu-%lld-%d",
+             (unsigned long)pid, (long long)now, atomic_fetch_add(&counter, 1));
     
     return trace_id;
 }
@@ -221,7 +235,7 @@ void agentos_log_write(int level, const char* file, int line, const char* fmt, .
     }
     
     /* 转换日志级别 */
-    log_level_t new_level __attribute__((unused)) = convert_old_level_to_new(level);
+    log_level_t new_level = convert_old_level_to_new(level);
     
     /* 准备可变参数 */
     va_list args;
@@ -239,13 +253,13 @@ void agentos_log_write_va(int level, const char* file, int line, const char* fmt
     record_api_call("agentos_log_write_va");
     
     /* 转换日志级别 */
-    log_level_t new_level __attribute__((unused)) = convert_old_level_to_new(level);
+    log_level_t new_level = convert_old_level_to_new(level);
     
     /* 调用新架构的日志写入函数 */
     log_write_va(new_level, file, line, fmt, args);
 }
 
-int svc_logger_init(const void* manager __attribute__((unused)))
+int svc_logger_init(const void* manager)
 {
     ensure_compat_initialized();
     record_api_call("svc_logger_init");

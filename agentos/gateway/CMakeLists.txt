@@ -59,12 +59,12 @@ set(COREKERN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern")
 
 # syscall 模块
 set(SYSCALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/syscall")
-# R-09-124: 
+# R-09-124:
 # include_directories(${SYSCALL_DIR}/include)
 
 # commons 模块（基础工具库）
 set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
-# R-09-124: 
+# R-09-124:
 # include_directories(
 #     ${COMMONS_DIR}
 #     ${COMMONS_DIR}/platform/include
@@ -83,12 +83,14 @@ set(PROTOCOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../protocols")
 # )
 
 # gateway内部工具头文件
-# R-09-124: 
+# R-09-124:
 # include_directories(
 #     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
 # )
 
 # ========== 源文件 ==========
+# gateway 核心文件大量依赖 cJSON（实体成员访问），不可用时跳过整个库
+if(cJSON_FOUND)
 set(GATEWAY_SOURCES
     src/gateway/gateway_api.c
     src/gateway/http_gateway.c
@@ -98,9 +100,9 @@ set(GATEWAY_SOURCES
     src/utils/jsonrpc.c
     src/utils/syscall_router.c
     src/utils/gateway_rpc_handler.c
+    src/utils/gateway_rate_limiter.c
     src/utils/gateway_protocol_handler.c
     src/utils/mcp_server.c
-    src/utils/gateway_rate_limiter.c
 )
 
 # ========== 头文件 ==========
@@ -131,11 +133,14 @@ target_include_directories(gateway
         ${SYSCALL_DIR}/include
         ${COMMONS_DIR}
         ${COMMONS_DIR}/utils/include
+        ${COMMONS_DIR}/utils/compat/include
         ${COMMONS_DIR}/platform/include
         ${COMMONS_DIR}/utils/error/include
         ${COMMONS_DIR}/utils/logging/include
         ${COMMONS_DIR}/utils/memory/include
         ${COMMONS_DIR}/utils/sync/include
+        ${COMMONS_DIR}/utils/compat/include
+        ${COMMONS_DIR}/utils/include
         ${PROTOCOLS_DIR}/include
         ${PROTOCOLS_DIR}/protocol/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -150,9 +155,7 @@ target_link_libraries(gateway PRIVATE
 )
 
 # 条件链接依赖库
-if(cJSON_FOUND)
-    target_link_libraries(gateway PUBLIC cjson)
-endif()
+target_link_libraries(gateway PUBLIC cjson)
 
 if(libmicrohttpd_FOUND)
     target_link_libraries(gateway PRIVATE microhttpd)
@@ -259,3 +262,6 @@ if(CPPCHECK)
         COMMENT "Running cppcheck static analysis"
     )
 endif()
+else()
+    message(STATUS "gateway: SKIPPED (cJSON not found, required for JSON protocol handling)")
+endif() # cJSON_FOUND

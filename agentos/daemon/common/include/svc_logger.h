@@ -179,7 +179,7 @@ static inline void agentos_log_shutdown(void) {
  * @brief 设置全局日志级别
  * @param level [in] 日志级别
  */
-static inline void agentos_log_set_level(agentos_log_level_t level __attribute__((unused))) {
+static inline void agentos_log_set_level(agentos_log_level_t level AGENTOS_UNUSED) {
 }
 
 /**
@@ -282,7 +282,7 @@ static inline agentos_logger_t agentos_logger_default(void) {
  * @param config [in] 配置
  * @return 日志记录器句柄
  */
-static inline agentos_logger_t agentos_logger_create(const agentos_logger_config_t* config __attribute__((unused))) {
+static inline agentos_logger_t agentos_logger_create(const agentos_logger_config_t* config AGENTOS_UNUSED) {
     return agentos_logger_default();
 }
 
@@ -290,7 +290,7 @@ static inline agentos_logger_t agentos_logger_create(const agentos_logger_config
  * @brief 销毁日志记录器
  * @param logger [in] 日志记录器句柄
  */
-static inline void agentos_logger_destroy(agentos_logger_t logger __attribute__((unused))) {
+static inline void agentos_logger_destroy(agentos_logger_t logger AGENTOS_UNUSED) {
 }
 
 /**
@@ -298,7 +298,7 @@ static inline void agentos_logger_destroy(agentos_logger_t logger __attribute__(
  * @param logger [in] 日志记录器句柄
  * @param level [in] 日志级别
  */
-static inline void agentos_logger_set_level(agentos_logger_t logger __attribute__((unused)), agentos_log_level_t level __attribute__((unused))) {
+static inline void agentos_logger_set_level(agentos_logger_t logger AGENTOS_UNUSED, agentos_log_level_t level AGENTOS_UNUSED) {
 }
 
 /**
@@ -311,11 +311,11 @@ static inline void agentos_logger_set_level(agentos_logger_t logger __attribute_
  * @param fmt [in] 格式化消息
  * @param ... [in] 可变参数
  */
-static inline void agentos_logger_log(agentos_logger_t logger __attribute__((unused)),
+static inline void agentos_logger_log(agentos_logger_t logger AGENTOS_UNUSED,
                                       agentos_log_level_t level,
                                       const char* file,
                                       int line,
-                                      const char* func __attribute__((unused)),
+                                      const char* func AGENTOS_UNUSED,
                                       const char* fmt, ...) {
     
     va_list args;
@@ -327,12 +327,12 @@ static inline void agentos_logger_log(agentos_logger_t logger __attribute__((unu
 /**
  * @brief 写入带追踪上下文的日志
  */
-static inline void agentos_logger_log_with_trace(agentos_logger_t logger __attribute__((unused)),
+static inline void agentos_logger_log_with_trace(agentos_logger_t logger AGENTOS_UNUSED,
                                                   agentos_log_level_t level,
                                                   const agentos_trace_context_t* trace_ctx,
                                                   const char* file,
                                                   int line,
-                                                  const char* func __attribute__((unused)),
+                                                  const char* func AGENTOS_UNUSED,
                                                   const char* fmt, ...) {
     
     /* 设置 trace_id */

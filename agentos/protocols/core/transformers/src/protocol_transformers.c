@@ -8,6 +8,7 @@
  */
 
 #include "protocol_transformers.h"
+#include <compat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

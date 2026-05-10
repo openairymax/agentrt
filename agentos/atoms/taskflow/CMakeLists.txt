@@ -154,15 +154,29 @@ if(BUILD_TESTS)
 
     target_link_libraries(test_taskflow_advanced
         agentos_taskflow
-        -Wl,--whole-archive
-        agentos_coreloopthree
-        -Wl,--no-whole-archive
         agentos_core
         agentos_common
-        Threads::Threads
-        dl
-        m
     )
+
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(test_taskflow_advanced
+            -Wl,--whole-archive
+            agentos_coreloopthree
+            -Wl,--no-whole-archive
+            dl
+            m
+        )
+    elseif(WIN32)
+        target_link_libraries(test_taskflow_advanced
+            agentos_coreloopthree
+        )
+    else()
+        target_link_libraries(test_taskflow_advanced
+            agentos_coreloopthree
+        )
+    endif()
+    find_package(Threads REQUIRED)
+    target_link_libraries(test_taskflow_advanced Threads::Threads)
 
     if(UNIX)
         target_link_options(test_taskflow_advanced PRIVATE

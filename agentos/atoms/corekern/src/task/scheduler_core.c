@@ -103,7 +103,11 @@ scheduler_core_ctx_t* scheduler_core_get_ctx(void) {
 }
 
 int scheduler_core_init(void) {
+#ifdef _MSC_VER
+    if (InterlockedCompareExchangePointer((PVOID volatile*)&g_core_ctx, NULL, NULL)) {
+#else
     if (__atomic_load_n(&g_core_ctx, __ATOMIC_ACQUIRE)) {
+#endif
         return 0;
     }
 
@@ -124,7 +128,11 @@ int scheduler_core_init(void) {
 
     agentos_mutex_lock(g_ctx_init_lock);
 
+    #ifdef _MSC_VER
+    if (InterlockedCompareExchangePointer((PVOID volatile*)&g_core_ctx, NULL, NULL)) {
+#else
     if (__atomic_load_n(&g_core_ctx, __ATOMIC_ACQUIRE)) {
+#endif
         agentos_mutex_unlock(g_ctx_init_lock);
         return 0;
     }
@@ -136,7 +144,11 @@ int scheduler_core_init(void) {
     }
 
     atomic_store_int(&g_core_ctx->initialized, 1);
+#ifdef _MSC_VER
+    MemoryBarrier();
+#else
     __atomic_thread_fence(__ATOMIC_RELEASE);
+#endif
 
     agentos_mutex_unlock(g_ctx_init_lock);
     return 0;

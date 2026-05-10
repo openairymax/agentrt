@@ -23,12 +23,22 @@ project(protocols
 )
 
 # 编译选项
-option(PROTOCOLS_ENABLE_OPENCLAW "Enable OpenClaw integration" ON)
+option(PROTOCOLS_ENABLE_OPENCLAW "Enable OpenClaw integration" OFF)
 option(PROTOCOLS_ENABLE_CLAUDE "Enable Claude API integration" ON)
 option(PROTOCOLS_ENABLE_LANGCHAIN "Enable LangChain framework adapter" ON)
 option(PROTOCOLS_ENABLE_AUTOGEN "Enable AutoGen framework adapter" ON)
 option(PROTOCOLS_ENABLE_AGNTCY "Enable AGNTCY ACP protocol adapter" ON)
 option(PROTOCOLS_ENABLE_CHINA_ECO "Enable China domestic ecosystem protocol adapter" ON)
+
+if(WIN32)
+    set(PROTOCOLS_ENABLE_OPENCLAW OFF CACHE BOOL "OpenClaw requires Unix sockets" FORCE)
+    set(PROTOCOLS_ENABLE_CHINA_ECO OFF CACHE BOOL "China Eco requires Unix" FORCE)
+endif()
+
+option(PROTOCOLS_ENABLE_MCP "Enable MCP protocol adapter" ON)
+if(WIN32)
+    set(PROTOCOLS_ENABLE_MCP OFF CACHE BOOL "MCP requires cJSON/unistd.h" FORCE)
+endif()
 
 # ============================================================
 # 包含目录 (Include Directories)
@@ -48,6 +58,7 @@ set(PROTOCOLS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compat/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../daemon/common/include
     # R-09-124: migrated from root global include_directories
@@ -109,9 +120,12 @@ set(PROTOCOLS_CORE_SOURCES
 # ============================================================
 set(PROTOCOLS_STANDARDS_SOURCES
     standards/a2a/src/a2a_v03_adapter.c
-    standards/mcp/src/mcp_v1_adapter.c
-    standards/mcp/src/mcp_transport.c
 )
+if(PROTOCOLS_ENABLE_MCP)
+    list(APPEND PROTOCOLS_STANDARDS_SOURCES
+        standards/mcp/src/mcp_v1_adapter.c
+        standards/mcp/src/mcp_transport.c)
+endif()
 
 if(PROTOCOLS_ENABLE_AGNTCY)
     list(APPEND PROTOCOLS_STANDARDS_SOURCES
@@ -267,8 +281,8 @@ set_target_properties(agentos_protocols PROPERTIES
 )
 
 # 链接依赖
-if(TARGET commons)
-    target_link_libraries(agentos_protocols commons)
+if(TARGET agentos_common)
+    target_link_libraries(agentos_protocols agentos_common)
 endif()
 if(TARGET svc_common)
     target_link_libraries(agentos_protocols svc_common)
@@ -279,6 +293,9 @@ target_compile_definitions(agentos_protocols PRIVATE
     PROTOCOLS_VERSION="${PROJECT_VERSION}"
     PROTO_REGISTRY_MAX_ADAPTERS=32
 )
+if(MSVC)
+    target_compile_options(agentos_protocols PRIVATE /wd4100 /wd4189)
+endif()
 
 # 安装目标 — 库
 install(TARGETS agentos_protocols
@@ -335,6 +352,7 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compat/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/observability/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
     )

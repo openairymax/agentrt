@@ -52,8 +52,14 @@ agentos_error_t agentos_timer_start(
         if (!new_lock) return AGENTOS_ENOMEM;
 
         agentos_mutex_t* expected = NULL;
+#ifdef _MSC_VER
+        agentos_mutex_t* prev = InterlockedCompareExchangePointer(
+            (PVOID volatile*)&timer_lock, new_lock, NULL);
+        if (prev != NULL) {
+#else
         if (!__atomic_compare_exchange_n(&timer_lock, &expected, new_lock,
                                          0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+#endif
             agentos_mutex_free(new_lock);
         }
     }

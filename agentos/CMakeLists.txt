@@ -30,6 +30,11 @@ elseif(APPLE)
     message(STATUS "POSIX feature test macros enabled for macOS")
 endif()
 
+if(MSVC)
+    message(STATUS "AgentOS: Windows MSVC force-include enabled")
+    add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
+endif()
+
 # 选项设置
 option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
 option(BUILD_COMMONS "Build commons module (common utilities)" ON)

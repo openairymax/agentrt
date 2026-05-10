@@ -40,6 +40,40 @@ void (*agentos_get_assert_handler(void))(const char*, const char*,
 
 /* ==================== 安全字符串函数实现 ==================== */
 
+int agentos_strlcpy(char* dest, const char* src, size_t dest_size) {
+    if (!dest || !src || dest_size == 0) {
+        return -1;
+    }
+    
+    size_t src_len = strlen(src);
+    size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
+    
+    memcpy(dest, src, copy_len);
+    dest[copy_len] = '\0';
+    
+    return (int)(src_len >= dest_size);
+}
+
+int agentos_strlcat(char* dest, const char* src, size_t dest_size) {
+    if (!dest || !src || dest_size == 0) {
+        return -1;
+    }
+    
+    size_t dest_len = strlen(dest);
+    if (dest_len >= dest_size) {
+        return -1;
+    }
+    
+    size_t src_len = strlen(src);
+    size_t remaining = dest_size - dest_len - 1;
+    size_t copy_len = (src_len < remaining) ? src_len : remaining;
+    
+    memcpy(dest + dest_len, src, copy_len);
+    dest[dest_len + copy_len] = '\0';
+    
+    return (int)(src_len > remaining);
+}
+
 char* agentos_strncpy_safe(char* dest, const char* src, size_t dest_size) {
     if (!dest || !src || dest_size == 0) {
         return dest;
@@ -200,46 +234,22 @@ int gethostname(char* name, size_t len)
 long sysconf(int name)
 {
     switch (name) {
-    case _SC_PAGESIZE: {
+    case AGENTOS_SC_PAGESIZE: {
         SYSTEM_INFO si;
         GetSystemInfo(&si);
         return (long)si.dwPageSize;
     }
-    case _SC_NPROCESSORS_ONLN: {
+    case AGENTOS_SC_NPROCESSORS_ONLN: {
         SYSTEM_INFO si;
         GetSystemInfo(&si);
         return (long)si.dwNumberOfProcessors;
     }
-    case _SC_OPEN_MAX:
+    case AGENTOS_SC_OPEN_MAX:
         return 512;
-    case _SC_CLK_TCK:
+    case AGENTOS_SC_CLK_TCK:
         return 1000;
     default:
         return -1;
     }
-}
-
-int nanosleep(const struct timespec* ts, struct timespec* rem)
-{
-    (void)rem;
-    DWORD ms = (DWORD)(ts->tv_sec * 1000 + ts->tv_nsec / 1000000);
-    Sleep(ms);
-    return 0;
-}
-
-char* strndup(const char* s, size_t n)
-{
-    size_t len = 0;
-    const char* p = s;
-    while (len < n && *p) { len++; p++; }
-    char* dup = (char*)malloc(len + 1);
-    if (dup) { memcpy(dup, s, len); dup[len] = '\0'; }
-    return dup;
-}
-
-struct tm* localtime_r(const time_t* timer, struct tm* buf)
-{
-    if (localtime_s(buf, timer) == 0) return buf;
-    return NULL;
 }
 #endif
