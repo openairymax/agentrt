@@ -9,7 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#ifndef _WIN32
 #include <strings.h>
+#endif
 #include "memory_compat.h"
 #include <sqlite3.h>
 

@@ -25,7 +25,7 @@
 int cupolas_process_spawn(cupolas_process_t* proc, 
                         const char* path, 
                         char* const argv[],
-                        const cupolas_process_attr_t* attr) {
+                        cupolas_process_attr_t* attr) {
     if (!proc || !path) return cupolas_ERROR_INVALID_ARG;
     
     HANDLE hStdinRead = NULL, hStdinWrite = NULL;
@@ -134,16 +134,13 @@ int cupolas_process_spawn(cupolas_process_t* proc,
     CloseHandle(pi.hThread);
     
     if (attr && attr->redirect_stdin) {
-        attr->stdin_pipe[0] = NULL;
-        attr->stdin_pipe[1] = hStdinWrite;
+        attr->stdin_pipe = hStdinWrite;
     }
     if (attr && attr->redirect_stdout) {
-        attr->stdout_pipe[0] = hStdoutRead;
-        attr->stdout_pipe[1] = NULL;
+        attr->stdout_pipe = hStdoutRead;
     }
     if (attr && attr->redirect_stderr) {
-        attr->stderr_pipe[0] = hStderrRead;
-        attr->stderr_pipe[1] = NULL;
+        attr->stderr_pipe = hStderrRead;
     }
     
     *proc = pi.hProcess;

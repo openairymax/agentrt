@@ -361,7 +361,7 @@ typedef struct cupolas_process_attr {
 int cupolas_process_spawn(cupolas_process_t* proc,
                         const char* path,
                         char* const argv[],
-                        const cupolas_process_attr_t* attr);
+                        cupolas_process_attr_t* attr);
 
 /**
  * @brief Wait for process

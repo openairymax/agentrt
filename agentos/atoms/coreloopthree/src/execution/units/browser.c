@@ -11,10 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <strings.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
+#else
+#include <io.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 

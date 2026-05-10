@@ -179,6 +179,8 @@ target_include_directories(svc_common PUBLIC
 
 # 包含 commons 的头文件目录
 target_include_directories(svc_common PUBLIC
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/compat/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}>
     $<BUILD_INTERFACE:${COMMONS_DIR}/platform/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/error/include>
@@ -191,8 +193,6 @@ target_include_directories(svc_common PUBLIC
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/io/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/types/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/cache/include>
-    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/compat/include>
-    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/include>
     # 新增网络和IPC模块
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/network/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/ipc/include>
@@ -229,6 +229,7 @@ endif()
 
 # 编译选项
 if(BUILD_COVERAGE)
+    if(NOT MSVC)
     target_compile_options(svc_common PRIVATE
         -Wall
         -Wextra
@@ -241,7 +242,9 @@ if(BUILD_COVERAGE)
     target_link_options(svc_common PRIVATE
         --coverage
     )
+    endif()
 else()
+    if(NOT MSVC)
     target_compile_options(svc_common PRIVATE
         -Wall
         -Wextra
@@ -251,6 +254,7 @@ else()
         $<$<CONFIG:Debug>:-g -O0>
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
     )
+    endif()
 endif()
 
 # 导出符号

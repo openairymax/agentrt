@@ -22,6 +22,7 @@
 #include <windows.h>
 #include <direct.h>
 #include <io.h>
+#include <platform.h>
 #define mkdir(path, mode) _mkdir(path)
 #define F_OK 0
 #define access _access
@@ -31,7 +32,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <errno.h>
-#include "platform.h"
+#include <platform.h>
 #endif
 
 #define heapstore_IPC_MAX_CHANNELS 256

@@ -266,6 +266,7 @@ if(LIBWEBSOCKETS_FOUND)
 endif()
 
 # ==================== 编译选项 ====================
+if(NOT MSVC)
 target_compile_options(gateway_d PRIVATE
     -Wall
     -Wextra
@@ -275,6 +276,7 @@ target_compile_options(gateway_d PRIVATE
     $<$<CONFIG:Debug>:-g -O0>
     $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
+endif()
 
 # ==================== 安装 ====================
 install(TARGETS gateway_d

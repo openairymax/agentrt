@@ -49,6 +49,7 @@ if(UNIX)
     )
 endif()
 
+if(NOT MSVC)
 target_compile_options(channel_d PRIVATE
     -Wall
     -Wextra
@@ -58,6 +59,7 @@ target_compile_options(channel_d PRIVATE
     $<$<CONFIG:Debug>:-g -O0>
     $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
+endif()
 
 install(TARGETS channel_d
     RUNTIME DESTINATION bin

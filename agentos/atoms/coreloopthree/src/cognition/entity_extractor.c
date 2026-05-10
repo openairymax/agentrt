@@ -10,7 +10,9 @@
 #include "memory_compat.h"
 
 #include <ctype.h>
+#ifndef _WIN32
 #include <regex.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -205,6 +207,7 @@ static void extract_numbers(const char *input, size_t input_len,
 }
 
 /* 提取 URL 实体 */
+#ifndef _WIN32
 static void extract_urls(const char *input, size_t input_len, agentos_extraction_result_t *result)
 {
     regex_t regex;
@@ -330,6 +333,11 @@ static void extract_filepaths(const char *input, size_t input_len,
 
     regfree(&regex);
 }
+#else
+static void extract_urls(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
+static void extract_emails(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
+static void extract_filepaths(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
+#endif
 
 int agentos_entity_extract(const char *input, size_t input_len, agentos_extraction_result_t *result)
 {

@@ -21,7 +21,9 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+#ifdef CORELOOPTHREE_HAS_CJSON
 #include <cjson/cJSON.h>
+#endif
 
 #include "atomic_compat.h"
 
