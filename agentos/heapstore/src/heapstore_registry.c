@@ -80,6 +80,7 @@ void heapstore_registry_shutdown(void) {
 
 #else
 
+#ifdef heapstore_HAS_SQLITE3
 #include <sqlite3.h>
 
 typedef struct {
@@ -1135,4 +1136,5 @@ bool heapstore_registry_is_healthy(void) {
     return s_registry.initialized && s_registry.db != NULL;
 }
 
+#endif /* heapstore_HAS_SQLITE3 */
 #endif

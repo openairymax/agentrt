@@ -26,6 +26,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
+#include <sys/stat.h>
 #define mkdir(path, mode) _mkdir(path)
 #else
 #include <unistd.h>

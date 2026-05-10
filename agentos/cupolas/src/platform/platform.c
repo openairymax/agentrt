@@ -14,7 +14,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#ifndef _WIN32
 #include <sys/mman.h>
+#endif
 
 #if cupolas_PLATFORM_WINDOWS
     #include <io.h>
