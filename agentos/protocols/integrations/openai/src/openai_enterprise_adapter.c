@@ -453,7 +453,7 @@ static openai_rate_result_t openai_check_rate_limit(
     return OPENAI_RATE_OK;
 }
 
-static void __attribute__((unused)) openai_record_request(struct openai_enterprise_adapter_s* adapter,
+static void openai_record_request(struct openai_enterprise_adapter_s* adapter,
                                    uint32_t input_tokens, uint32_t output_tokens) {
     adapter->rate_window_requests++;
     adapter->rate_window_tokens += input_tokens + output_tokens;
@@ -475,7 +475,7 @@ static void openai_on_429(struct openai_enterprise_adapter_s* adapter) {
     adapter->rate_backoff_until = now + delay_sec;
 }
 
-static int __attribute__((unused))
+static int
 openai_compute_retry_delay_ms(struct openai_enterprise_adapter_s* adapter,
                               int attempt) {
     uint32_t base_delay = (uint32_t)(OPENAI_RETRY_BASE_DELAY_MS *

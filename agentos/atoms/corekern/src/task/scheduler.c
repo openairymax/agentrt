@@ -31,9 +31,13 @@
 #include <string.h>
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
-
-#ifdef _WIN32
+#ifdef _MSC_VER
+#include <winsock2.h>
+#endif
 #include <windows.h>
+#include "compat.h"
+#ifdef _MSC_VER
+#include <ws2tcpip.h>
 #else
 #include <unistd.h>
 #endif
@@ -48,7 +52,7 @@
  * @return 始终返回NULL（用户函数无返回值）
  * @note [INFRA] 线程适配器 - 保留供未来线程模型扩展使用
  */
-static void* __attribute__((unused)) user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
+static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
 {
     /* 用户函数是 void (*func)(void*)，我们调用它并返回NULL */
     user_func(arg);
@@ -101,7 +105,7 @@ static int ensure_scheduler_fully_initialized(void)
  * @param platform_handle 平台特定句柄
  * @return 任务信息指针，未找到返回NULL
  */
-static task_info_core_t* __attribute__((unused)) find_task_by_platform_handle(void* platform_handle)
+static task_info_core_t* AGENTOS_UNUSED find_task_by_platform_handle(void* platform_handle)
 {
     scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
     if (!ctx) {

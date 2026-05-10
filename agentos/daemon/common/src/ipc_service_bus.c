@@ -479,9 +479,25 @@ AGENTOS_API agentos_error_t ipc_service_bus_broadcast(
 
     agentos_mutex_unlock(&bus->mutex);
 
-    LOG_WARN("Bus '%s': ipc_service_bus_broadcast to %u endpoints not yet implemented",
-             bus->name, target_count);
-    return AGENTOS_ENOTSUP;
+    agentos_error_t first_error = AGENTOS_SUCCESS;
+    uint32_t sent_count = 0;
+    for (uint32_t i = 0; i < bus->endpoint_count; i++) {
+        if (bus->endpoints[i].healthy) {
+            agentos_error_t err = ipc_service_bus_send(
+                bus_handle,
+                bus->endpoints[i].service_name,
+                message);
+            if (err == AGENTOS_SUCCESS) {
+                sent_count++;
+            } else if (first_error == AGENTOS_SUCCESS) {
+                first_error = err;
+            }
+        }
+    }
+
+    LOG_DEBUG("Bus '%s': broadcast to %u/%u endpoints succeeded",
+              bus->name, sent_count, target_count);
+    return (sent_count > 0) ? AGENTOS_SUCCESS : first_error;
 }
 
 AGENTOS_API agentos_error_t ipc_service_bus_notify(

@@ -9,9 +9,16 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # 查找依赖
 find_package(Threads REQUIRED)
-find_package(PkgConfig REQUIRED)
+find_package(PkgConfig QUIET)
 
-pkg_check_modules(CJSON REQUIRED libcjson)
+if(PkgConfig_FOUND)
+    pkg_check_modules(CJSON QUIET libcjson)
+else()
+    set(CJSON_FOUND FALSE)
+endif()
+if(NOT CJSON_FOUND)
+    message(STATUS "libcjson not found, JSON features may be limited")
+endif()
 pkg_check_modules(YAML QUIET yaml-0.1)
 if(NOT YAML_FOUND)
     message(STATUS "libyaml not found, YAML config support will be disabled")

@@ -63,6 +63,7 @@ extern "C" {
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <compat.h>
 
 /* ==================== 日志级别定义 ==================== */
 

@@ -271,7 +271,10 @@ if(BUILD_TESTS)
     target_link_libraries(test_stress_concurrent ${PROJECT_NAME})
 
     if(MSVC)
-        add_custom_command(TARGET test_cupolas_core POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE> $<TARGET_FILE_DIR>)
+        add_custom_command(TARGET test_cupolas_core POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:cupolas>
+                $<TARGET_FILE_DIR:test_cupolas_core>)
     endif()
 
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)

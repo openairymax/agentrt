@@ -31,7 +31,8 @@ extern "C" {
  */
 
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && \
-    !defined(_WIN32) && !defined(AGENTOS_NO_STDATOMIC)
+    !defined(_WIN32) && !defined(AGENTOS_NO_STDATOMIC) && \
+    !defined(_MSC_VER)
 
 /* C11 环境：使用标准 stdatomic.h */
 #include <stdatomic.h>
