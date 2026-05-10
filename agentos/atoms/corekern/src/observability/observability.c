@@ -97,8 +97,14 @@ int agentos_observability_init(const agentos_observability_config_t* config) {
         if (!new_lock) return AGENTOS_ENOMEM;
 
         agentos_mutex_t* expected = NULL;
+#ifdef _MSC_VER
+        agentos_mutex_t* prev = InterlockedCompareExchangePointer(
+            (PVOID volatile*)&g_obs.lock, new_lock, NULL);
+        if (prev != NULL) {
+#else
         if (!__atomic_compare_exchange_n(&g_obs.lock, &expected, new_lock,
                                          0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+#endif
             agentos_mutex_free(new_lock);
         }
     }

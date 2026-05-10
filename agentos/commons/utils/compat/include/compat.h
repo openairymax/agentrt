@@ -12,6 +12,16 @@
 #ifndef AGENTOS_UTILS_COMPAT_H
 #define AGENTOS_UTILS_COMPAT_H
 
+/* ==================== Windows 平台专用定义 ==================== */
+
+#ifdef _WIN32
+    #ifndef _SSIZE_T_DEFINED
+    #define _SSIZE_T_DEFINED
+    #include <BaseTsd.h>
+    typedef SSIZE_T ssize_t;
+    #endif
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -21,6 +31,7 @@ extern "C" {
 
 /* ==================== 导出宏 ==================== */
 
+#ifndef AGENTOS_API
 #ifdef _WIN32
     #ifdef AGENTOS_BUILD_SHARED
         #define AGENTOS_API __declspec(dllexport)
@@ -32,6 +43,7 @@ extern "C" {
 #else
     #define AGENTOS_API __attribute__((visibility("default")))
 #endif
+#endif /* AGENTOS_API */
 
 /* ==================== 编译器检测 ==================== */
 
@@ -72,9 +84,13 @@ extern "C" {
 /* ==================== 编译器属性宏 ==================== */
 
 #if defined(AGENTOS_COMPILER_GCC) || defined(AGENTOS_COMPILER_CLANG)
+    #ifndef AGENTOS_INLINE
     #define AGENTOS_INLINE          static inline __attribute__((always_inline))
+    #endif
     #define AGENTOS_NOINLINE        __attribute__((noinline))
+    #ifndef AGENTOS_UNUSED
     #define AGENTOS_UNUSED          __attribute__((unused))
+    #endif
     #define AGENTOS_USED            __attribute__((used))
     #define AGENTOS_WEAK            __attribute__((weak))
     #define AGENTOS_PACKED          __attribute__((packed))
@@ -89,9 +105,13 @@ extern "C" {
     #define AGENTOS_UNREACHABLE()   __builtin_unreachable()
     #define AGENTOS_ASSUME(x)       do { if (!(x)) __builtin_unreachable(); } while (0)
 #elif defined(AGENTOS_COMPILER_MSVC)
+    #ifndef AGENTOS_INLINE
     #define AGENTOS_INLINE          static __forceinline
+    #endif
     #define AGENTOS_NOINLINE        __declspec(noinline)
+    #ifndef AGENTOS_UNUSED
     #define AGENTOS_UNUSED
+    #endif
     #define AGENTOS_USED
     #define AGENTOS_WEAK
     #define AGENTOS_PACKED
@@ -106,9 +126,13 @@ extern "C" {
     #define AGENTOS_UNREACHABLE()   __assume(0)
     #define AGENTOS_ASSUME(x)       __assume(x)
 #else
+    #ifndef AGENTOS_INLINE
     #define AGENTOS_INLINE          static inline
+    #endif
     #define AGENTOS_NOINLINE
+    #ifndef AGENTOS_UNUSED
     #define AGENTOS_UNUSED
+    #endif
     #define AGENTOS_USED
     #define AGENTOS_WEAK
     #define AGENTOS_PACKED
@@ -130,6 +154,61 @@ extern "C" {
     #define AGENTOS_THREAD_LOCAL __declspec(thread)
 #else
     #define AGENTOS_THREAD_LOCAL __thread
+#endif
+
+/* ==================== POSIX函数Windows兼容映射 ==================== */
+
+#if defined(AGENTOS_PLATFORM_WINDOWS)
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+    #ifndef _WINSOCKAPI_
+    #define _WINSOCKAPI_
+    #endif
+
+    #define strcasecmp      _stricmp
+    #define strncasecmp     _strnicmp
+    #define strdup          _strdup
+
+    #include <time.h>
+    #include <windows.h>
+
+    AGENTOS_API int nanosleep(const struct timespec* ts, struct timespec* rem);
+    AGENTOS_API char* strndup(const char* s, size_t n);
+    AGENTOS_API struct tm* localtime_r(const time_t* timer, struct tm* buf);
+
+    #ifdef AGENTOS_COMPILER_MSVC
+        #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
+            InterlockedExchangeAdd((LONG volatile*)(ptr), (LONG)(val))
+        #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
+            InterlockedExchangeAdd64((LONGLONG volatile*)(ptr), (LONGLONG)(val))
+    #else
+        #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
+            __sync_fetch_and_add(ptr, val)
+        #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
+            __sync_fetch_and_add(ptr, val)
+    #endif
+
+    #ifndef _SC_PAGESIZE
+    #define _SC_PAGESIZE            1
+    #endif
+    #ifndef _SC_NPROCESSORS_ONLN
+    #define _SC_NPROCESSORS_ONLN    2
+    #endif
+    #ifndef _SC_OPEN_MAX
+    #define _SC_OPEN_MAX            3
+    #endif
+    #ifndef _SC_CLK_TCK
+    #define _SC_CLK_TCK             4
+    #endif
+#else
+    #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
+        __sync_fetch_and_add(ptr, val)
+    #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
+        __sync_fetch_and_add(ptr, val)
 #endif
 
 /* ==================== 路径分隔符 ==================== */
@@ -471,10 +550,10 @@ AGENTOS_API void agentos_debug_break(void);
 
 /* ==================== 版本信息 ==================== */
 
-#define AGENTOS_VERSION_MAJOR  1
+#define AGENTOS_VERSION_MAJOR  0
 #define AGENTOS_VERSION_MINOR  0
-#define AGENTOS_VERSION_PATCH  0
-#define AGENTOS_VERSION_STRING "1.0.0"
+#define AGENTOS_VERSION_PATCH  5
+#define AGENTOS_VERSION_STRING "0.0.5"
 
 /**
  * @brief 获取版本字符串

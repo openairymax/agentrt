@@ -44,28 +44,53 @@ static const scheduler_platform_ops_t* detect_platform_ops(void)
 
 void scheduler_platform_register_ops(const scheduler_platform_ops_t* ops)
 {
+#ifdef _MSC_VER
+    if (InterlockedCompareExchangePointer((PVOID volatile*)&g_platform_initialized, NULL, NULL)) {
+#else
     if (__atomic_load_n(&g_platform_initialized, __ATOMIC_ACQUIRE)) {
+#endif
         return;
     }
 
     const scheduler_platform_ops_t* expected = NULL;
+#ifdef _MSC_VER
+    InterlockedCompareExchangePointer(
+        (PVOID volatile*)&g_current_platform_ops, (PVOID)ops, NULL);
+#else
     __atomic_compare_exchange_n(&g_current_platform_ops, &expected, ops,
                                 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+#endif
 }
 
 const scheduler_platform_ops_t* scheduler_platform_get_ops(void)
 {
+#ifdef _MSC_VER
+    const scheduler_platform_ops_t* ops = (const scheduler_platform_ops_t*)
+        InterlockedCompareExchangePointer((PVOID volatile*)&g_current_platform_ops, NULL, NULL);
+#else
     const scheduler_platform_ops_t* ops = __atomic_load_n(&g_current_platform_ops, __ATOMIC_ACQUIRE);
+#endif
     if (!ops) {
         const scheduler_platform_ops_t* new_ops = detect_platform_ops();
         if (new_ops) {
             const scheduler_platform_ops_t* expected = NULL;
+#ifdef _MSC_VER
+            const scheduler_platform_ops_t* prev = (const scheduler_platform_ops_t*)
+                InterlockedCompareExchangePointer(
+                    (PVOID volatile*)&g_current_platform_ops, (PVOID)new_ops, NULL);
+            if (prev == NULL) {
+                ops = new_ops;
+            } else {
+                ops = prev;
+            }
+#else
             if (__atomic_compare_exchange_n(&g_current_platform_ops, &expected, new_ops,
                                             0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
                 ops = new_ops;
             } else {
                 ops = expected;
             }
+#endif
         }
     }
 
@@ -116,12 +141,22 @@ void scheduler_platform_cleanup(void)
         return;
     }
 
-    const scheduler_platform_ops_t* ops = __atomic_load_n(&g_current_platform_ops, __ATOMIC_ACQUIRE);
+    const scheduler_platform_ops_t* ops =
+#ifdef _MSC_VER
+    (const scheduler_platform_ops_t*)
+        InterlockedCompareExchangePointer((PVOID volatile*)&g_current_platform_ops, NULL, NULL);
+#else
+    __atomic_load_n(&g_current_platform_ops, __ATOMIC_ACQUIRE);
+#endif
     if (ops && ops->cleanup) {
         ops->cleanup();
     }
 
+    #ifdef _MSC_VER
+    InterlockedExchangePointer((PVOID volatile*)&g_current_platform_ops, NULL);
+#else
     __atomic_store_n(&g_current_platform_ops, NULL, __ATOMIC_SEQ_CST);
+#endif
 }
 
 const char* scheduler_platform_get_name(void)

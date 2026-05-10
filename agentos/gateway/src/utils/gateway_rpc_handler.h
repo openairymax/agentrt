@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0

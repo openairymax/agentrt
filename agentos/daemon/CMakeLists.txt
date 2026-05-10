@@ -13,9 +13,9 @@ option(BUILD_COVERAGE "Build with code coverage support" OFF)
 option(BUILD_ALL_PLATFORMS "Build for all platforms (cross-compile)" OFF)
 
 # 版本信息
-set(DAEMON_VERSION_MAJOR 1)
+set(DAEMON_VERSION_MAJOR 0)
 set(DAEMON_VERSION_MINOR 0)
-set(DAEMON_VERSION_PATCH 0)
+set(DAEMON_VERSION_PATCH 5)
 set(DAEMON_VERSION "${DAEMON_VERSION_MAJOR}.${DAEMON_VERSION_MINOR}.${DAEMON_VERSION_PATCH}")
 
 # 打印构建配置

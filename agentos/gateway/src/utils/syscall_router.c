@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
@@ -15,7 +15,9 @@
 #include "jsonrpc.h"
 #include "syscalls.h"
 #include "platform.h"
+#ifdef GATEWAY_HAS_CJSON
 #include <cjson/cJSON.h>
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
