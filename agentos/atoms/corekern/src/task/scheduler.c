@@ -33,14 +33,12 @@
 #include "atomic_compat.h"
 #ifdef _MSC_VER
 #include <winsock2.h>
-#endif
 #include <windows.h>
-#include "compat.h"
-#ifdef _MSC_VER
 #include <ws2tcpip.h>
 #else
 #include <unistd.h>
 #endif
+#include "compat.h"
 
 /* ==================== 类型适配辅助 ==================== */
 
@@ -105,8 +103,9 @@ static int ensure_scheduler_fully_initialized(void)
  * @param platform_handle 平台特定句柄
  * @return 任务信息指针，未找到返回NULL
  */
-static task_info_core_t* AGENTOS_UNUSED find_task_by_platform_handle(void* platform_handle)
+static task_info_core_t* find_task_by_platform_handle(void* platform_handle)
 {
+    (void)platform_handle;
     scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
     if (!ctx) {
         return NULL;

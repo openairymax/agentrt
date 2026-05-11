@@ -4,8 +4,8 @@
  * @file netdb.h
  * @brief Windows compatibility shim for POSIX <netdb.h>
  *
- * Provides minimal netdb API using Winsock2.
- * Note: winsock2.h must be included before this header.
+ * Provides minimal netdb API using Winsock2 on Windows.
+ * On non-Windows platforms, this header simply includes the system <netdb.h>.
  */
 
 #ifndef AGENTOS_COMPAT_NETDB_H
@@ -15,8 +15,16 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
+
+#else
+
+#include_next <netdb.h>
+
+#endif /* _WIN32 */
 
 #ifdef __cplusplus
 }
