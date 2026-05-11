@@ -23,7 +23,7 @@
 #include <string.h>
 
 /* JSON解析库 */
-#ifdef CORELOOPTHREE_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
 

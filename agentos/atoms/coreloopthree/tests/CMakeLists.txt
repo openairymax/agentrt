@@ -80,11 +80,9 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
         -Wall -Wextra -g -Wno-unused-function
     )
 
-    if(UNIX)
-        target_link_options(test_cl3_${TEST_SHORT_NAME} PRIVATE
-            -Wl,--allow-multiple-definition
-        )
-    endif()
+    target_link_options(test_cl3_${TEST_SHORT_NAME} PRIVATE
+        -Wl,--allow-multiple-definition
+    )
 
     add_test(NAME cl3_${TEST_SHORT_NAME} COMMAND test_cl3_${TEST_SHORT_NAME})
 endforeach()
@@ -125,11 +123,9 @@ foreach(BENCH_SRC ${CL3_BENCH_SOURCES})
         -Wall -Wextra -g -Wno-unused-function
     )
 
-    if(UNIX)
-        target_link_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
-            -Wl,--allow-multiple-definition
-        )
-    endif()
+    target_link_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
+        -Wl,--allow-multiple-definition
+    )
 
     add_test(NAME cl3_${BENCH_SHORT_NAME} COMMAND test_cl3_${BENCH_SHORT_NAME})
 endforeach()

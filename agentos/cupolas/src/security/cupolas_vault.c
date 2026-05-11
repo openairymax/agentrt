@@ -23,9 +23,12 @@
 
 #ifdef CUPOLAS_USE_OPENSSL
 #include <openssl/evp.h>
+#include <openssl/rsa.h>
 #include <openssl/aes.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
+#include <openssl/pem.h>
+#include <openssl/bio.h>
 #endif
 
 /* ============================================================================

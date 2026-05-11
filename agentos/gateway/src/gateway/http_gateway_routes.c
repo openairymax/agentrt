@@ -22,7 +22,7 @@
 #include "logging.h"
 
 #include <microhttpd.h>
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
 #include <string.h>

@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#ifdef CORELOOPTHREE_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
 
@@ -753,6 +753,7 @@ agentos_error_t agentos_cognition_health_check(
 
     if (!engine || !out_json) return AGENTOS_EINVAL;
 
+#ifdef AGENTOS_HAS_CJSON
     cJSON* root = cJSON_CreateObject();
     if (!root) return AGENTOS_ENOMEM;
 
@@ -778,4 +779,9 @@ agentos_error_t agentos_cognition_health_check(
 
     *out_json = json;
     return AGENTOS_SUCCESS;
+#else
+    (void)engine;
+    *out_json = NULL;
+    return AGENTOS_ENOTSUP;
+#endif
 }

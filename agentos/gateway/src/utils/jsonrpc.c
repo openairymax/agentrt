@@ -13,7 +13,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
 
@@ -33,7 +33,7 @@ static const char* const g_custom_error_messages[] = {
 };
 
 int jsonrpc_validate_request(const cJSON* json) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     if (!json) {
         return -1;
     }
@@ -74,7 +74,7 @@ int jsonrpc_validate_request(const cJSON* json) {
 }
 
 const char* jsonrpc_get_method(const cJSON* json) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     if (!json) {
         return NULL;
     }
@@ -90,7 +90,7 @@ const char* jsonrpc_get_method(const cJSON* json) {
 }
 
 const cJSON* jsonrpc_get_params(const cJSON* json) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     if (!json) {
         return NULL;
     }
@@ -102,7 +102,7 @@ const cJSON* jsonrpc_get_params(const cJSON* json) {
 }
 
 const cJSON* jsonrpc_get_id(const cJSON* json) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     if (!json) {
         return NULL;
     }
@@ -114,7 +114,7 @@ const cJSON* jsonrpc_get_id(const cJSON* json) {
 }
 
 char* jsonrpc_create_success_response(const cJSON* id, cJSON* result) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
     if (!response) {
         if (result) cJSON_Delete(result);
@@ -151,7 +151,7 @@ char* jsonrpc_create_error_response(
     const char* message,
     cJSON* data
 ) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
     if (!response) {
         if (data) cJSON_Delete(data);
@@ -209,7 +209,7 @@ char* jsonrpc_create_method_not_found_response(const cJSON* id) {
 }
 
 char* jsonrpc_create_invalid_params_response(const cJSON* id, const char* detail) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     cJSON* data = NULL;
     if (detail) {
         data = cJSON_CreateString(detail);
@@ -222,7 +222,7 @@ char* jsonrpc_create_invalid_params_response(const cJSON* id, const char* detail
 }
 
 char* jsonrpc_create_internal_error_response(const cJSON* id, const char* detail) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     cJSON* data = NULL;
     if (detail) {
         data = cJSON_CreateString(detail);
@@ -265,7 +265,7 @@ const char* jsonrpc_get_error_message(int code) {
 }
 
 int jsonrpc_validate_batch_request(const cJSON* batch_json, size_t* out_count) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     if (!batch_json || !out_count) return -1;
     *out_count = 0;
 
@@ -297,7 +297,7 @@ char* jsonrpc_process_batch(
     char* (*handler)(const cJSON* request, void* user_data),
     void* user_data
 ) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     if (!batch_json || !handler || !cJSON_IsArray(batch_json)) {
         return NULL;
     }
@@ -384,7 +384,7 @@ char* jsonrpc_process_batch(
 }
 
 char* jsonrpc_create_notification(const char* method, cJSON* params) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     if (!method || strlen(method) == 0) return NULL;
 
     cJSON* notif = cJSON_CreateObject();
@@ -411,7 +411,7 @@ char* jsonrpc_create_notification(const char* method, cJSON* params) {
 }
 
 bool jsonrpc_is_notification(const cJSON* json) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     if (!json || !cJSON_IsObject(json)) return false;
 
     return !cJSON_HasObjectItem(json, "id");
@@ -425,7 +425,7 @@ char* jsonrpc_create_notification_params(
     const char* method,
     const char* params_json
 ) {
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
     cJSON* params = NULL;
     if (params_json && strlen(params_json) > 0) {
         params = cJSON_Parse(params_json);

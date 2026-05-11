@@ -118,6 +118,26 @@ static int claude_api_call(const char* api_key, const char* base_url,
 
 #endif
 
+static void* g_claude_proto_context = NULL;
+
+struct claude_adapter_context_s {
+    claude_config_t config;
+    bool initialized;
+    claude_message_handler_t message_handler;
+    void* message_handler_data;
+    claude_stream_handler_t stream_handler;
+    void* stream_handler_data;
+    claude_tool_use_handler_t tool_use_handler;
+    void* tool_use_handler_data;
+    uint64_t total_requests;
+    uint64_t total_tokens_in;
+    uint64_t total_tokens_out;
+    uint64_t total_tool_calls;
+    char last_error[256];
+};
+
+static const char* claude_model_id_to_api_name(claude_model_id_t id);
+
 static int claude_generate_response(const char* user_msg,
                                     const char* system_ctx,
                                     char* out_buf, size_t buf_len) {
@@ -129,14 +149,14 @@ static int claude_generate_response(const char* user_msg,
 #else
     if (!user_msg || !out_buf || buf_len == 0) return -1;
 
-    extern claude_adapter_context_t* g_claude_ctx;
-    if (!g_claude_ctx || !g_claude_ctx->config.api_key ||
-        !g_claude_ctx->config.api_key[0]) return -2;
+    if (!g_claude_proto_context) return -2;
+    claude_adapter_context_t* ctx = (claude_adapter_context_t*)g_claude_proto_context;
+    if (!ctx->config.api_key || !ctx->config.api_key[0]) return -2;
 
     cJSON* req = cJSON_CreateObject();
     cJSON_AddStringToObject(req, "model",
-                            claude_model_id_to_api_name(g_claude_ctx->config.default_model));
-    cJSON_AddNumberToObject(req, "max_tokens", g_claude_ctx->config.max_tokens);
+                            claude_model_id_to_api_name(ctx->config.default_model));
+    cJSON_AddNumberToObject(req, "max_tokens", ctx->config.max_tokens);
     cJSON* msgs = cJSON_CreateArray();
     cJSON* msg = cJSON_CreateObject();
     cJSON_AddStringToObject(msg, "role", "user");
@@ -172,24 +192,6 @@ static int claude_estimate_tokens(const char* text) {
     }
     return count > 0 ? count : 1;
 }
-
-static void* g_claude_proto_context = NULL;
-
-struct claude_adapter_context_s {
-    claude_config_t config;
-    bool initialized;
-    claude_message_handler_t message_handler;
-    void* message_handler_data;
-    claude_stream_handler_t stream_handler;
-    void* stream_handler_data;
-    claude_tool_use_handler_t tool_use_handler;
-    void* tool_use_handler_data;
-    uint64_t total_requests;
-    uint64_t total_tokens_in;
-    uint64_t total_tokens_out;
-    uint64_t total_tool_calls;
-    char last_error[256];
-};
 
 static int claude_proto_init(void* context) {
     if (!context) return -1;
