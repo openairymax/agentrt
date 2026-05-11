@@ -37,10 +37,6 @@ if(TARGET cjson OR cjson_FOUND)
     target_link_libraries(test_e2e_core PRIVATE cjson)
 endif()
 
-if(UNIX AND NOT APPLE)
-    target_link_options(test_e2e_core PRIVATE -Wl,--allow-multiple-definition)
-endif()
-
 target_compile_features(test_e2e_core PRIVATE c_std_11)
 target_compile_options(test_e2e_core PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable

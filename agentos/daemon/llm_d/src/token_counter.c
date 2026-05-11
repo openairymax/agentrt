@@ -95,8 +95,8 @@ void token_counter_destroy(token_counter_t* tc) {
 }
 
 size_t token_counter_count(token_counter_t* tc, const char* text) {
-    if (!tc || !text) return (size_t)-1;
-    if (text[0] == '\0') return 0;
+    if (!tc) return (size_t)-1;
+    if (!text || text[0] == '\0') return 0;
 
     size_t count = agentos_token_standard_count(text, 0, &tc->config);
 

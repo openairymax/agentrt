@@ -257,8 +257,7 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
     }
 
     free(msg);
-
-    /* HMAC-SHA256: H(K XOR opad || H(K XOR ipad || message)) */
+    msg = NULL;
     size_t key_len = strlen(key);
     unsigned char k_ipad[64], k_opad[64];
 

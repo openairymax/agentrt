@@ -26,15 +26,16 @@
 #include <sys/stat.h>
 #endif
 
+#ifdef AGENTOS_HAS_SQLITE3
 #define heapstore_SQLITE_IMPLEMENTATION
+#endif
 
 #ifndef heapstore_SQLITE_IMPLEMENTATION
 
-typedef struct {
-    heapstore_registry_type_t type;
+typedef struct registry_node {
     void* data;
-    size_t size;
-    void* next;
+    size_t data_size;
+    struct registry_node* next;
 } registry_node_t;
 
 typedef struct {
@@ -44,43 +45,297 @@ typedef struct {
     size_t agent_count;
     size_t skill_count;
     size_t session_count;
+    int initialized;
 } registry_db_t;
+
+struct heapstore_registry_iter {
+    registry_node_t* current;
+    int type;
+};
 
 static registry_db_t s_registry = {0};
 
+static registry_node_t* find_node_by_id(registry_node_t* head, const char* id, size_t id_offset) {
+    registry_node_t* node = head;
+    while (node) {
+        if (node->data) {
+            const char* node_id = (const char*)((char*)node->data + id_offset);
+            if (node_id && strcmp(node_id, id) == 0) {
+                return node;
+            }
+        }
+        node = node->next;
+    }
+    return NULL;
+}
+
+static void free_node_list(registry_node_t** head) {
+    registry_node_t* node = *head;
+    while (node) {
+        registry_node_t* next = node->next;
+        free(node->data);
+        free(node);
+        node = next;
+    }
+    *head = NULL;
+}
+
 heapstore_error_t heapstore_registry_init(void) {
     memset(&s_registry, 0, sizeof(s_registry));
+    s_registry.initialized = 1;
     return heapstore_SUCCESS;
 }
 
 void heapstore_registry_shutdown(void) {
-    registry_node_t* node = s_registry.agents;
-    while (node) {
-        registry_node_t* next = node->next;
-        free(node->data);
-        free(node);
-        node = next;
-    }
-    node = s_registry.skills;
-    while (node) {
-        registry_node_t* next = node->next;
-        free(node->data);
-        free(node);
-        node = next;
-    }
-    node = s_registry.sessions;
-    while (node) {
-        registry_node_t* next = node->next;
-        free(node->data);
-        free(node);
-        node = next;
-    }
+    free_node_list(&s_registry.agents);
+    free_node_list(&s_registry.skills);
+    free_node_list(&s_registry.sessions);
     memset(&s_registry, 0, sizeof(s_registry));
+}
+
+heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t* record) {
+    if (!record || record->id[0] == '\0') return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    if (find_node_by_id(s_registry.agents, record->id, offsetof(heapstore_agent_record_t, id))) {
+        return heapstore_ERR_ALREADY_INITIALIZED;
+    }
+    registry_node_t* node = calloc(1, sizeof(registry_node_t));
+    if (!node) return heapstore_ERR_OUT_OF_MEMORY;
+    node->data = malloc(sizeof(heapstore_agent_record_t));
+    if (!node->data) { free(node); return heapstore_ERR_OUT_OF_MEMORY; }
+    memcpy(node->data, record, sizeof(heapstore_agent_record_t));
+    node->data_size = sizeof(heapstore_agent_record_t);
+    node->next = s_registry.agents;
+    s_registry.agents = node;
+    s_registry.agent_count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_record_t* record) {
+    if (!id || !record) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    registry_node_t* node = find_node_by_id(s_registry.agents, id, offsetof(heapstore_agent_record_t, id));
+    if (!node) return heapstore_ERR_NOT_FOUND;
+    memcpy(record, node->data, sizeof(heapstore_agent_record_t));
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t* record) {
+    if (!record || record->id[0] == '\0') return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    registry_node_t* node = find_node_by_id(s_registry.agents, record->id, offsetof(heapstore_agent_record_t, id));
+    if (!node) return heapstore_ERR_NOT_FOUND;
+    memcpy(node->data, record, sizeof(heapstore_agent_record_t));
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_delete_agent(const char* id) {
+    if (!id) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    registry_node_t** pp = &s_registry.agents;
+    while (*pp) {
+        const char* node_id = (const char*)((char*)(*pp)->data + offsetof(heapstore_agent_record_t, id));
+        if (strcmp(node_id, id) == 0) {
+            registry_node_t* victim = *pp;
+            *pp = victim->next;
+            free(victim->data);
+            free(victim);
+            s_registry.agent_count--;
+            return heapstore_SUCCESS;
+        }
+        pp = &(*pp)->next;
+    }
+    return heapstore_ERR_NOT_FOUND;
+}
+
+heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const char* filter_status, heapstore_registry_iter_t** iter) {
+    if (!iter) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    heapstore_registry_iter_t* it = calloc(1, sizeof(heapstore_registry_iter_t));
+    if (!it) return heapstore_ERR_OUT_OF_MEMORY;
+    it->current = s_registry.agents;
+    it->type = 0;
+    *iter = it;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* record) {
+    if (!record || record->id[0] == '\0') return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    if (find_node_by_id(s_registry.skills, record->id, offsetof(heapstore_skill_record_t, id))) {
+        return heapstore_ERR_ALREADY_INITIALIZED;
+    }
+    registry_node_t* node = calloc(1, sizeof(registry_node_t));
+    if (!node) return heapstore_ERR_OUT_OF_MEMORY;
+    node->data = malloc(sizeof(heapstore_skill_record_t));
+    if (!node->data) { free(node); return heapstore_ERR_OUT_OF_MEMORY; }
+    memcpy(node->data, record, sizeof(heapstore_skill_record_t));
+    node->data_size = sizeof(heapstore_skill_record_t);
+    node->next = s_registry.skills;
+    s_registry.skills = node;
+    s_registry.skill_count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_get_skill(const char* id, heapstore_skill_record_t* record) {
+    if (!id || !record) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    registry_node_t* node = find_node_by_id(s_registry.skills, id, offsetof(heapstore_skill_record_t, id));
+    if (!node) return heapstore_ERR_NOT_FOUND;
+    memcpy(record, node->data, sizeof(heapstore_skill_record_t));
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_delete_skill(const char* id) {
+    if (!id) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    registry_node_t** pp = &s_registry.skills;
+    while (*pp) {
+        const char* node_id = (const char*)((char*)(*pp)->data + offsetof(heapstore_skill_record_t, id));
+        if (strcmp(node_id, id) == 0) {
+            registry_node_t* victim = *pp;
+            *pp = victim->next;
+            free(victim->data);
+            free(victim);
+            s_registry.skill_count--;
+            return heapstore_SUCCESS;
+        }
+        pp = &(*pp)->next;
+    }
+    return heapstore_ERR_NOT_FOUND;
+}
+
+heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** iter) {
+    if (!iter) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    heapstore_registry_iter_t* it = calloc(1, sizeof(heapstore_registry_iter_t));
+    if (!it) return heapstore_ERR_OUT_OF_MEMORY;
+    it->current = s_registry.skills;
+    it->type = 1;
+    *iter = it;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_t* record) {
+    if (!record || record->id[0] == '\0') return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    if (find_node_by_id(s_registry.sessions, record->id, offsetof(heapstore_session_record_t, id))) {
+        return heapstore_ERR_ALREADY_INITIALIZED;
+    }
+    registry_node_t* node = calloc(1, sizeof(registry_node_t));
+    if (!node) return heapstore_ERR_OUT_OF_MEMORY;
+    node->data = malloc(sizeof(heapstore_session_record_t));
+    if (!node->data) { free(node); return heapstore_ERR_OUT_OF_MEMORY; }
+    memcpy(node->data, record, sizeof(heapstore_session_record_t));
+    node->data_size = sizeof(heapstore_session_record_t);
+    node->next = s_registry.sessions;
+    s_registry.sessions = node;
+    s_registry.session_count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_get_session(const char* id, heapstore_session_record_t* record) {
+    if (!id || !record) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    registry_node_t* node = find_node_by_id(s_registry.sessions, id, offsetof(heapstore_session_record_t, id));
+    if (!node) return heapstore_ERR_NOT_FOUND;
+    memcpy(record, node->data, sizeof(heapstore_session_record_t));
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_update_session(const heapstore_session_record_t* record) {
+    if (!record || record->id[0] == '\0') return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    registry_node_t* node = find_node_by_id(s_registry.sessions, record->id, offsetof(heapstore_session_record_t, id));
+    if (!node) return heapstore_ERR_NOT_FOUND;
+    memcpy(node->data, record, sizeof(heapstore_session_record_t));
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_delete_session(const char* id) {
+    if (!id) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    registry_node_t** pp = &s_registry.sessions;
+    while (*pp) {
+        const char* node_id = (const char*)((char*)(*pp)->data + offsetof(heapstore_session_record_t, id));
+        if (strcmp(node_id, id) == 0) {
+            registry_node_t* victim = *pp;
+            *pp = victim->next;
+            free(victim->data);
+            free(victim);
+            s_registry.session_count--;
+            return heapstore_SUCCESS;
+        }
+        pp = &(*pp)->next;
+    }
+    return heapstore_ERR_NOT_FOUND;
+}
+
+heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, heapstore_registry_iter_t** iter) {
+    if (!iter) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    heapstore_registry_iter_t* it = calloc(1, sizeof(heapstore_registry_iter_t));
+    if (!it) return heapstore_ERR_OUT_OF_MEMORY;
+    it->current = s_registry.sessions;
+    it->type = 2;
+    *iter = it;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t* iter, void* record) {
+    if (!iter || !record) return heapstore_ERR_INVALID_PARAM;
+    if (!iter->current) return heapstore_ERR_NOT_FOUND;
+    memcpy(record, iter->current->data, iter->current->data_size);
+    iter->current = iter->current->next;
+    return heapstore_SUCCESS;
+}
+
+void heapstore_registry_iter_destroy(heapstore_registry_iter_t* iter) {
+    free(iter);
+}
+
+heapstore_error_t heapstore_registry_vacuum(void) {
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_record_t* records, size_t count) {
+    if (!records || count == 0) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    for (size_t i = 0; i < count; i++) {
+        heapstore_error_t err = heapstore_registry_add_agent(&records[i]);
+        if (err != heapstore_SUCCESS) return err;
+    }
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_batch_insert_sessions(const heapstore_session_record_t* records, size_t count) {
+    if (!records || count == 0) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    for (size_t i = 0; i < count; i++) {
+        heapstore_error_t err = heapstore_registry_add_session(&records[i]);
+        if (err != heapstore_SUCCESS) return err;
+    }
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_batch_insert_skills(const heapstore_skill_record_t* records, size_t count) {
+    if (!records || count == 0) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized) return heapstore_ERR_NOT_INITIALIZED;
+    for (size_t i = 0; i < count; i++) {
+        heapstore_error_t err = heapstore_registry_add_skill(&records[i]);
+        if (err != heapstore_SUCCESS) return err;
+    }
+    return heapstore_SUCCESS;
+}
+
+bool heapstore_registry_is_healthy(void) {
+    return s_registry.initialized != 0;
 }
 
 #else
 
-#ifdef heapstore_HAS_SQLITE3
+#ifdef AGENTOS_HAS_SQLITE3
 #include <sqlite3.h>
 
 typedef struct {
@@ -1136,5 +1391,5 @@ bool heapstore_registry_is_healthy(void) {
     return s_registry.initialized && s_registry.db != NULL;
 }
 
-#endif /* heapstore_HAS_SQLITE3 */
+#endif /* AGENTOS_HAS_SQLITE3 */
 #endif

@@ -38,6 +38,7 @@ typedef enum {
     heapstore_ERR_CIRCUIT_OPEN = -15,
     heapstore_ERR_TIMEOUT = -16,
     heapstore_ERR_NO_SPACE = -17,
+    heapstore_ERR_NOT_SUPPORTED = -18,
     heapstore_ERR_INTERNAL = -99
 } heapstore_error_t;
 

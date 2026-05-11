@@ -17,13 +17,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
-
-#ifdef GATEWAY_HAS_CJSON
 #include <cjson/cJSON.h>
-#else
-struct cJSON;
-typedef struct cJSON cJSON;
-#endif
 
 /* ==================== JSON-RPC 2.0 标准错误码 ==================== */
 

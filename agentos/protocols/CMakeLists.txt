@@ -270,7 +270,6 @@ set(PROTOCOLS_ALL_HEADERS
 add_library(agentos_protocols ${PROTOCOLS_ALL_SOURCES})
 target_include_directories(agentos_protocols PUBLIC ${PROTOCOLS_INCLUDE_DIRS})
 
-# 库属性
 set_target_properties(agentos_protocols PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION 0
@@ -280,15 +279,32 @@ set_target_properties(agentos_protocols PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-# 链接依赖
 if(TARGET agentos_common)
-    target_link_libraries(agentos_protocols agentos_common)
+    target_link_libraries(agentos_protocols PRIVATE agentos_common)
 endif()
 if(TARGET svc_common)
-    target_link_libraries(agentos_protocols svc_common)
+    target_link_libraries(agentos_protocols PRIVATE svc_common)
+endif()
+target_link_libraries(agentos_protocols PUBLIC agentos_compile_defs)
+
+if(AGENTOS_HAS_CURL)
+    if(CURL_FOUND)
+        target_link_libraries(agentos_protocols PRIVATE ${CURL_LIBRARIES})
+        target_include_directories(agentos_protocols PRIVATE ${CURL_INCLUDE_DIRS})
+    elseif(LIBCURL_FOUND)
+        target_link_libraries(agentos_protocols PRIVATE ${LIBCURL_LIBRARIES})
+        target_include_directories(agentos_protocols PRIVATE ${LIBCURL_INCLUDE_DIRS})
+    endif()
+endif()
+if(AGENTOS_HAS_CJSON)
+    if(cJSON_FOUND)
+        target_link_libraries(agentos_protocols PRIVATE cjson)
+    elseif(CJSON_FOUND)
+        target_link_libraries(agentos_protocols PRIVATE ${CJSON_LIBRARIES})
+        target_include_directories(agentos_protocols PRIVATE ${CJSON_INCLUDE_DIRS})
+    endif()
 endif()
 
-# 编译定义
 target_compile_definitions(agentos_protocols PRIVATE
     PROTOCOLS_VERSION="${PROJECT_VERSION}"
     PROTO_REGISTRY_MAX_ADAPTERS=32
@@ -368,7 +384,6 @@ if(BUILD_TESTS)
         target_link_libraries(test_openclaw_adapter PRIVATE agentos_common svc_common m)
         if(UNIX)
             target_link_libraries(test_openclaw_adapter PRIVATE pthread)
-            target_link_options(test_openclaw_adapter PRIVATE -Wl,--allow-multiple-definition)
         endif()
         add_test(NAME test_openclaw_adapter COMMAND test_openclaw_adapter)
     endif()
@@ -384,7 +399,6 @@ if(BUILD_TESTS)
         target_link_libraries(test_agntcy_acp PRIVATE agentos_common svc_common m)
         if(UNIX)
             target_link_libraries(test_agntcy_acp PRIVATE pthread)
-            target_link_options(test_agntcy_acp PRIVATE -Wl,--allow-multiple-definition)
         endif()
         add_test(NAME test_agntcy_acp COMMAND test_agntcy_acp)
     endif()
@@ -400,7 +414,6 @@ if(BUILD_TESTS)
         target_link_libraries(test_china_eco_crypto PRIVATE agentos_common svc_common m)
         if(UNIX)
             target_link_libraries(test_china_eco_crypto PRIVATE pthread)
-            target_link_options(test_china_eco_crypto PRIVATE -Wl,--allow-multiple-definition)
         endif()
         add_test(NAME test_china_eco_crypto COMMAND test_china_eco_crypto)
     endif()

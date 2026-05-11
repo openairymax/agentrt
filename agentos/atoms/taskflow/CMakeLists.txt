@@ -178,10 +178,8 @@ if(BUILD_TESTS)
     find_package(Threads REQUIRED)
     target_link_libraries(test_taskflow_advanced Threads::Threads)
 
-    if(UNIX)
-        target_link_options(test_taskflow_advanced PRIVATE
-            -Wl,--allow-multiple-definition)
-    endif()
+    target_link_options(test_taskflow_advanced PRIVATE
+        -Wl,--allow-multiple-definition)
 
     add_test(NAME taskflow_advanced_test COMMAND test_taskflow_advanced)
 endif()

@@ -17,7 +17,7 @@
 
 #include <string.h>
 #include <stdlib.h>
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #else
 struct cJSON;

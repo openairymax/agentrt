@@ -15,8 +15,6 @@ target_compile_options(test_kernel_state PRIVATE
     -Wall -Wextra -Wpedantic -Werror=vla -Wno-address
 )
 
-# 链接agentos_core（它依赖agentos_common）
-# 由于项目架构原因两个库有部分符号重复，测试使用--allow-multiple-definition处理
 target_link_libraries(test_kernel_state
     PRIVATE -Wl,--allow-multiple-definition
     PRIVATE agentos_core

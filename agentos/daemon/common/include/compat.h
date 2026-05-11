@@ -13,7 +13,6 @@
 #ifndef AGENTOS_DAEMON_COMMON_COMPAT_H
 #define AGENTOS_DAEMON_COMMON_COMPAT_H
 
-/* 包含 commons 的统一兼容性定义 */
 #include <compat.h>
 #include <stdlib.h>
 
