@@ -133,17 +133,23 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/string/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cache/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/compat/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/config_unified/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cognition/include
-    # 策略模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/strategy/include
-    # 网络通信模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/network/include
-    # 进程间通信模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/ipc/include
 )
+
+if(WIN32)
+    target_include_directories(agentos_common PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/compat/include
+    )
+else()
+    target_include_directories(agentos_common PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/compat/include
+    )
+endif()
 
 target_compile_definitions(agentos_common PRIVATE _CRT_SECURE_NO_WARNINGS)
 if(NOT CJSON_FOUND)
