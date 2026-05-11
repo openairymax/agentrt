@@ -14,8 +14,8 @@
 
 #include "gateway_internal.h"
 #include <stdint.h>
-#ifdef GATEWAY_HAS_CJSON
-#include <cJSON.h>
+#ifdef AGENTOS_HAS_CJSON
+#include <cjson/cJSON.h>
 #else
 struct cJSON;
 typedef struct cJSON cJSON;

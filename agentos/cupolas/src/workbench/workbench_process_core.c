@@ -25,7 +25,7 @@
 int cupolas_process_spawn(cupolas_process_t* proc, 
                         const char* path, 
                         char* const argv[],
-                        cupolas_process_attr_t* attr) {
+                        const cupolas_process_attr_t* attr) {
     if (!proc || !path) return cupolas_ERROR_INVALID_ARG;
     
     HANDLE hStdinRead = NULL, hStdinWrite = NULL;

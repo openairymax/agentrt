@@ -305,6 +305,8 @@ void cupolas_signature_free_signer_info(cupolas_signer_info_t* info) {
     free(info->subject_ou);
     free(info->issuer_cn);
     free(info->serial_number);
+    free(info->key_id);
+    free(info->algorithm);
     memset(info, 0, sizeof(cupolas_signer_info_t));
 }
 

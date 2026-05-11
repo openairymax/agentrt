@@ -34,10 +34,6 @@ if(TARGET cjson OR cjson_FOUND)
     target_link_libraries(test_platform_compat PRIVATE cjson)
 endif()
 
-if(UNIX AND NOT APPLE)
-    target_link_options(test_platform_compat PRIVATE -Wl,--allow-multiple-definition)
-endif()
-
 target_compile_features(test_platform_compat PRIVATE c_std_11)
 target_compile_options(test_platform_compat PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable

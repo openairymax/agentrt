@@ -444,6 +444,11 @@ static inline double atomic_exchange_double_fn(_Atomic double* ptr, double desir
     return atomic_exchange_explicit(ptr, desired, order);
 }
 
+#define atomic_fetch_add_double(ptr, val, ord) atomic_fetch_add_double_fn(ptr, val, ord)
+#define atomic_load_double(ptr, ord) atomic_load_double_fn(ptr, ord)
+#define atomic_store_double(ptr, val, ord) atomic_store_double_fn(ptr, val, ord)
+#define atomic_exchange_double(ptr, val, ord) atomic_exchange_double_fn(ptr, val, ord)
+
 #else
 
 typedef volatile int atomic_int;

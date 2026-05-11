@@ -13,7 +13,7 @@
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
-#ifdef CORELOOPTHREE_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
 
@@ -63,7 +63,7 @@ const char* agentos_error_string(agentos_error_t err) {
     return "未知错误";
 }
 
-#ifdef CORELOOPTHREE_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 agentos_error_t agentos_error_to_json(
     agentos_error_t err,
     const char* message,
@@ -101,7 +101,7 @@ agentos_error_t agentos_error_to_json(
     *out_json = json;
     return AGENTOS_SUCCESS;
 }
-#endif /* CORELOOPTHREE_HAS_CJSON */
+#endif /* AGENTOS_HAS_CJSON */
 
 agentos_error_t agentos_error_context_create(
     agentos_error_t code,
@@ -161,7 +161,7 @@ void agentos_error_context_free(agentos_error_context_t* context) {
     AGENTOS_FREE(context);
 }
 
-#ifdef CORELOOPTHREE_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 agentos_error_t agentos_error_context_to_json(
     const agentos_error_context_t* context,
     char** out_json) {
@@ -210,4 +210,4 @@ agentos_error_t agentos_error_context_to_json(
     *out_json = json;
     return AGENTOS_SUCCESS;
 }
-#endif /* CORELOOPTHREE_HAS_CJSON */
+#endif /* AGENTOS_HAS_CJSON */

@@ -22,6 +22,14 @@
 #include <math.h>
 #include <ctype.h>
 
+#ifdef AGENTOS_HAS_CURL
+#include <curl/curl.h>
+#endif
+
+#ifdef AGENTOS_HAS_CJSON
+#include <cjson/cJSON.h>
+#endif
+
 typedef void* openai_handle_t;
 
 #ifndef OPENAI_MAX_MODELS

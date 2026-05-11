@@ -34,10 +34,6 @@ if(TARGET cjson OR cjson_FOUND)
     target_link_libraries(test_security_audit PRIVATE cjson)
 endif()
 
-if(UNIX AND NOT APPLE)
-    target_link_options(test_security_audit PRIVATE -Wl,--allow-multiple-definition)
-endif()
-
 target_compile_features(test_security_audit PRIVATE c_std_11)
 target_compile_options(test_security_audit PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
@@ -72,10 +68,6 @@ target_link_libraries(test_sec017_compliance PRIVATE
 find_package(cjson QUIET)
 if(TARGET cjson OR cjson_FOUND)
     target_link_libraries(test_sec017_compliance PRIVATE cjson)
-endif()
-
-if(UNIX AND NOT APPLE)
-    target_link_options(test_sec017_compliance PRIVATE -Wl,--allow-multiple-definition)
 endif()
 
 target_compile_features(test_sec017_compliance PRIVATE c_std_11)

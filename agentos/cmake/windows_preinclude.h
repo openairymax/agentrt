@@ -86,7 +86,7 @@ typedef SSIZE_T ssize_t;
 #define SHUT_RDWR       SD_BOTH
 #endif
 
-#ifndef CORELOOPTHREE_HAS_CJSON
+#ifndef AGENTOS_HAS_CJSON
 struct cJSON { int type; char *valuestring; double valuedouble; int valueint; char *string; struct cJSON *next; struct cJSON *prev; struct cJSON *child; };
 typedef struct cJSON cJSON;
 static inline cJSON* cJSON_CreateObject(void) { return (cJSON*)calloc(1, sizeof(cJSON)); }

@@ -17,7 +17,7 @@
 #include "../utils/syscall_router.h"
 #include "../utils/gateway_utils.h"
 #include "../utils/gateway_rpc_handler.h"
-#ifdef GATEWAY_HAS_CJSON
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
 

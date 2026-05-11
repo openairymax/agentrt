@@ -28,15 +28,17 @@
  * signature verification in the cupolas security framework.
  */
 typedef struct {
-    char* subject_cn;               /**< Common name (heap allocated) */
-    char* subject_org;              /**< Organization (heap allocated) */
-    char* subject_ou;               /**< Organizational unit (heap allocated) */
-    char* issuer_cn;                /**< Issuer CN (heap allocated) */
-    char* serial_number;            /**< Serial number (heap allocated) */
-    uint64_t not_before;            /**< Validity start (Unix epoch) */
-    uint64_t not_after;             /**< Validity end (Unix epoch) */
-    bool is_ca;                     /**< Is CA certificate */
-    uint32_t key_usage;             /**< Key usage flags (RFC 5280) */
+    char* subject_cn;
+    char* subject_org;
+    char* subject_ou;
+    char* issuer_cn;
+    char* serial_number;
+    char* key_id;
+    char* algorithm;
+    uint64_t not_before;
+    uint64_t not_after;
+    bool is_ca;
+    uint32_t key_usage;
 } cupolas_signer_info_t;
 
 #endif /* CUPOLAS_SIGNER_INFO_H */

@@ -1,20 +1,21 @@
-# Copyright (c) 2026 SPHARX. All Rights Reserved.
-# 行动层构建文件
-
 cmake_minimum_required(VERSION 3.20)
-project(agentos-execution)
 
-file(GLOB EXECUTION_SOURCES
-    "engine.c"
-    "registry.c"
-    "compensation.c"
-    "trace.c"
-    "units/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../utils/error_utils.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../utils/id_utils.c"
+add_library(agentos_execution STATIC
+    engine.c
+    registry.c
+    compensation.c
+    trace.c
+    units/api.c
+    units/browser.c
+    units/code.c
+    units/db.c
+    units/file.c
+    units/shell.c
+    units/tool.c
+    units/weighted.c
+    ../utils/error_utils.c
+    ../utils/id_utils.c
 )
-
-add_library(agentos_execution STATIC ${EXECUTION_SOURCES})
 
 target_include_directories(agentos_execution PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
@@ -29,6 +30,12 @@ target_link_libraries(agentos_execution
 
 if(UNIX AND NOT APPLE)
     target_link_libraries(agentos_execution PUBLIC uuid)
+endif()
+
+if(AGENTOS_CJSON_FOUND)
+    target_compile_definitions(agentos_execution PRIVATE AGENTOS_HAS_CJSON=1)
+    target_include_directories(agentos_execution PRIVATE ${AGENTOS_CJSON_INCLUDE_DIRS})
+    target_link_libraries(agentos_execution ${AGENTOS_CJSON_LIBRARIES})
 endif()
 
 if(WIN32)
