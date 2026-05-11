@@ -6,6 +6,9 @@
  *
  * Provides Windows equivalents for common POSIX unistd functions/types
  * used across the AgentOS commons module.
+ *
+ * On non-Windows platforms, this header simply includes the system <unistd.h>.
+ * On Windows, it provides shims for POSIX functions using Win32/Winsock APIs.
  */
 
 #ifndef AGENTOS_COMPAT_UNISTD_H
@@ -14,6 +17,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#ifdef _WIN32
 
 #include <stddef.h>
 #include <stdint.h>
@@ -24,7 +29,6 @@ extern "C" {
 #include <direct.h>
 #include <fcntl.h>
 
-/* Standard file descriptors */
 #ifndef STDIN_FILENO
 #define STDIN_FILENO  0
 #endif
@@ -35,7 +39,6 @@ extern "C" {
 #define STDERR_FILENO  2
 #endif
 
-/* File access modes */
 #ifndef F_OK
 #define F_OK 0
 #endif
@@ -49,7 +52,6 @@ extern "C" {
 #define X_OK 1
 #endif
 
-/* Process ID type and getter */
 #ifndef pid_t
 #define pid_t int
 #endif
@@ -58,20 +60,16 @@ extern "C" {
 #define geteuid()   ((uid_t)0)
 #define getppid()   ((pid_t)0)
 
-/* Signed size type */
 #ifndef ssize_t
 #define ssize_t SSIZE_T
 #endif
 
-/* Sleep functions */
 #define usleep(us)  Sleep(((us) + 999) / 1000)
 #define sleep(s)    Sleep((s) * 1000)
 
-/* Path and working directory */
 #define chdir(d)    _chdir(d)
 #define getcwd(b,s) _getcwd(b,s)
 
-/* File operations */
 #define read(f,b,c)   _read(f,b,c)
 #define write(f,b,c)  _write(f,b,c)
 #define close(f)      _close(f)
@@ -81,20 +79,16 @@ extern "C" {
 #define lseek(f,o,w)  _lseek(f,o,w)
 #define isatty(f)     _isatty(f)
 
-/* Process execution */
 #define execv(p,a)    _execv(p,(const char* const*)a)
 #define execvp(f,a)   _execvp(f,(const char* const*)a)
 #define execl(p,a,...) _execl(p,a,__VA_ARGS__)
 
-/* Pipe */
 #define pipe(fds)     _pipe(fds, 4096, _O_BINARY)
 
-/* Environment */
 #ifndef environ
 #define environ _environ
 #endif
 
-/* Configurable system variables (sysconf stubs) */
 #define _SC_PAGESIZE            1
 #define _SC_NPROCESSORS_ONLN    2
 #define _SC_OPEN_MAX            3
@@ -102,43 +96,41 @@ extern "C" {
 
 long sysconf(int name);
 
-/* Hostname (declared by winsock2.h on Windows) */
 #define HOST_NAME_MAX 256
 
-/* Cryptographically-secure random (fallback to BCryptGenRandom via platform.c) */
 #include <stdlib.h>
 long agentos_platform_getentropy(void* buf, size_t len);
 #ifndef getentropy
 #define getentropy(buf, len) agentos_platform_getentropy(buf, len)
 #endif
 
-/* Read/write link (not available on Windows) */
 #define readlink(p,b,s)  (-1)
 #define symlink(o,n)     (-1)
 
-/* Truncate */
 #define ftruncate(f,l)   _chsize(f,l)
 #define truncate(p,l)    (-1)
 
-/* Fork / exec stubs (not available on Windows) */
 #define fork()           (-1)
 #define setsid()         (-1)
 
-/* File sync */
 #define fsync(f)         _commit(f)
 #define fdatasync(f)     _commit(f)
 
-/* Terminal */
 #define ttyname(f)       (NULL)
 #define ttyname_r(f,b,s) (-1)
 
-/* User info types */
 #ifndef uid_t
 #define uid_t int
 #endif
 #ifndef gid_t
 #define gid_t int
 #endif
+
+#else
+
+#include_next <unistd.h>
+
+#endif /* _WIN32 */
 
 #ifdef __cplusplus
 }

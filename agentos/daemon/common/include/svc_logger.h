@@ -179,7 +179,8 @@ static inline void agentos_log_shutdown(void) {
  * @brief 设置全局日志级别
  * @param level [in] 日志级别
  */
-static inline void agentos_log_set_level(agentos_log_level_t level AGENTOS_UNUSED) {
+static inline void agentos_log_set_level(agentos_log_level_t level) {
+    (void)level;
 }
 
 /**
@@ -282,7 +283,8 @@ static inline agentos_logger_t agentos_logger_default(void) {
  * @param config [in] 配置
  * @return 日志记录器句柄
  */
-static inline agentos_logger_t agentos_logger_create(const agentos_logger_config_t* config AGENTOS_UNUSED) {
+static inline agentos_logger_t agentos_logger_create(const agentos_logger_config_t* config) {
+    (void)config;
     return agentos_logger_default();
 }
 
@@ -290,7 +292,8 @@ static inline agentos_logger_t agentos_logger_create(const agentos_logger_config
  * @brief 销毁日志记录器
  * @param logger [in] 日志记录器句柄
  */
-static inline void agentos_logger_destroy(agentos_logger_t logger AGENTOS_UNUSED) {
+static inline void agentos_logger_destroy(agentos_logger_t logger) {
+    (void)logger;
 }
 
 /**
@@ -298,7 +301,8 @@ static inline void agentos_logger_destroy(agentos_logger_t logger AGENTOS_UNUSED
  * @param logger [in] 日志记录器句柄
  * @param level [in] 日志级别
  */
-static inline void agentos_logger_set_level(agentos_logger_t logger AGENTOS_UNUSED, agentos_log_level_t level AGENTOS_UNUSED) {
+static inline void agentos_logger_set_level(agentos_logger_t logger, agentos_log_level_t level) {
+    (void)logger; (void)level;
 }
 
 /**
@@ -311,13 +315,13 @@ static inline void agentos_logger_set_level(agentos_logger_t logger AGENTOS_UNUS
  * @param fmt [in] 格式化消息
  * @param ... [in] 可变参数
  */
-static inline void agentos_logger_log(agentos_logger_t logger AGENTOS_UNUSED,
+static inline void agentos_logger_log(agentos_logger_t logger,
                                       agentos_log_level_t level,
                                       const char* file,
                                       int line,
-                                      const char* func AGENTOS_UNUSED,
+                                      const char* func,
                                       const char* fmt, ...) {
-    
+    (void)logger; (void)func;
     va_list args;
     va_start(args, fmt);
     log_write_va((log_level_t)level, file, line, fmt, args);
@@ -327,14 +331,14 @@ static inline void agentos_logger_log(agentos_logger_t logger AGENTOS_UNUSED,
 /**
  * @brief 写入带追踪上下文的日志
  */
-static inline void agentos_logger_log_with_trace(agentos_logger_t logger AGENTOS_UNUSED,
+static inline void agentos_logger_log_with_trace(agentos_logger_t logger,
                                                   agentos_log_level_t level,
                                                   const agentos_trace_context_t* trace_ctx,
                                                   const char* file,
                                                   int line,
-                                                  const char* func AGENTOS_UNUSED,
+                                                  const char* func,
                                                   const char* fmt, ...) {
-    
+    (void)logger; (void)func;
     /* 设置 trace_id */
     if (trace_ctx && trace_ctx->trace_id[0]) {
         log_set_trace_id(trace_ctx->trace_id);

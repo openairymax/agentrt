@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2026 SPHARX.
+// SPDX-FileCopyrightText: 2026 SPHARX.
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file gateway_protocol_handler.c
@@ -12,9 +12,7 @@
 #include "jsonrpc.h"
 #include "syscall_router.h"
 #include "safe_string_utils.h"
-#ifdef GATEWAY_HAS_CJSON
 #include <cjson/cJSON.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

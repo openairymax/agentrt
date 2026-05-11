@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
@@ -17,8 +17,6 @@
 #include <cjson/cJSON.h>
 #endif
 
-/* ==================== 标准错误消息 ==================== */
-
 static const char* const g_error_messages[] = {
     [JSONRPC_PARSE_ERROR + 32700]     = "Parse error",
     [JSONRPC_INVALID_REQUEST + 32700] = "Invalid Request",
@@ -34,15 +32,12 @@ static const char* const g_custom_error_messages[] = {
     "Service unavailable"
 };
 
-/* ==================== 请求验证 ==================== */
-
 int jsonrpc_validate_request(const cJSON* json) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return -1;
     }
 
-    /* 检查必需字段 */
     if (!cJSON_HasObjectItem(json, "jsonrpc") ||
         !cJSON_HasObjectItem(json, "method") ||
         !cJSON_HasObjectItem(json, "id")) {
@@ -53,7 +48,6 @@ int jsonrpc_validate_request(const cJSON* json) {
     const cJSON* method = cJSON_GetObjectItemCaseSensitive(json, "method");
     const cJSON* id = cJSON_GetObjectItemCaseSensitive(json, "id");
 
-    /* 验证 jsonrpc 字段 */
     if (!cJSON_IsString(jsonrpc)) {
         return -2;
     }
@@ -61,7 +55,6 @@ int jsonrpc_validate_request(const cJSON* json) {
         return -3;
     }
 
-    /* 验证 method 字段 */
     if (!cJSON_IsString(method)) {
         return -2;
     }
@@ -69,18 +62,18 @@ int jsonrpc_validate_request(const cJSON* json) {
         return -1;
     }
 
-    /* 验证 id 字段（可以是数字、字符串或 null） */
     if (!cJSON_IsNumber(id) && !cJSON_IsString(id) && !cJSON_IsNull(id)) {
         return -2;
     }
 
     return 0;
 #else
-    return -1; /* 无cJSON时返回无效 */
+    (void)json;
+    return -1;
 #endif
 }
 
-const char* jsonrpc_get_method(const cJSON* json AGENTOS_UNUSED) {
+const char* jsonrpc_get_method(const cJSON* json) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
@@ -91,35 +84,36 @@ const char* jsonrpc_get_method(const cJSON* json AGENTOS_UNUSED) {
     }
     return method->valuestring;
 #else
+    (void)json;
     return NULL;
 #endif
 }
 
-const cJSON* jsonrpc_get_params(const cJSON* json AGENTOS_UNUSED) {
+const cJSON* jsonrpc_get_params(const cJSON* json) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
     }
     return cJSON_GetObjectItemCaseSensitive(json, "params");
 #else
+    (void)json;
     return NULL;
 #endif
 }
 
-const cJSON* jsonrpc_get_id(const cJSON* json AGENTOS_UNUSED) {
+const cJSON* jsonrpc_get_id(const cJSON* json) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
     }
     return cJSON_GetObjectItemCaseSensitive(json, "id");
 #else
+    (void)json;
     return NULL;
 #endif
 }
 
-/* ==================== 响应生成 ==================== */
-
-char* jsonrpc_create_success_response(const cJSON* id AGENTOS_UNUSED, cJSON* result AGENTOS_UNUSED) {
+char* jsonrpc_create_success_response(const cJSON* id, cJSON* result) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
     if (!response) {
@@ -127,17 +121,14 @@ char* jsonrpc_create_success_response(const cJSON* id AGENTOS_UNUSED, cJSON* res
         return NULL;
     }
 
-    /* 添加 jsonrpc 版本 */
     cJSON_AddStringToObject(response, "jsonrpc", "2.0");
 
-    /* 添加结果 */
     if (result) {
         cJSON_AddItemToObject(response, "result", result);
     } else {
         cJSON_AddNullToObject(response, "result");
     }
 
-    /* 添加 ID */
     if (id) {
         cJSON_AddItemToObject(response, "id", cJSON_Duplicate(id, 1));
     } else {
@@ -149,15 +140,16 @@ char* jsonrpc_create_success_response(const cJSON* id AGENTOS_UNUSED, cJSON* res
 
     return json_str;
 #else
+    (void)id; (void)result;
     return NULL;
 #endif
 }
 
 char* jsonrpc_create_error_response(
-    const cJSON* id AGENTOS_UNUSED,
-    int code AGENTOS_UNUSED,
-    const char* message AGENTOS_UNUSED,
-    cJSON* data AGENTOS_UNUSED
+    const cJSON* id,
+    int code,
+    const char* message,
+    cJSON* data
 ) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
@@ -173,26 +165,21 @@ char* jsonrpc_create_error_response(
         return NULL;
     }
 
-    /* 添加错误码 */
     cJSON_AddNumberToObject(error, "code", code);
 
-    /* 添加错误消息 */
     const char* msg = message;
     if (!msg) {
         msg = jsonrpc_get_error_message(code);
     }
     cJSON_AddStringToObject(error, "message", msg ? msg : "Internal error");
 
-    /* 添加错误数据（可选） */
     if (data) {
         cJSON_AddItemToObject(error, "data", data);
     }
 
-    /* 构建响应 */
     cJSON_AddStringToObject(response, "jsonrpc", "2.0");
     cJSON_AddItemToObject(response, "error", error);
 
-    /* 添加 ID */
     if (id) {
         cJSON_AddItemToObject(response, "id", cJSON_Duplicate(id, 1));
     } else {
@@ -204,6 +191,7 @@ char* jsonrpc_create_error_response(
 
     return json_str;
 #else
+    (void)id; (void)code; (void)message; (void)data;
     return NULL;
 #endif
 }
@@ -228,11 +216,12 @@ char* jsonrpc_create_invalid_params_response(const cJSON* id, const char* detail
     }
     return jsonrpc_create_error_response(id, JSONRPC_INVALID_PARAMS, NULL, data);
 #else
+    (void)id; (void)detail;
     return NULL;
 #endif
 }
 
-char* jsonrpc_create_internal_error_response(const cJSON* id AGENTOS_UNUSED, const char* detail AGENTOS_UNUSED) {
+char* jsonrpc_create_internal_error_response(const cJSON* id, const char* detail) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* data = NULL;
     if (detail) {
@@ -240,6 +229,7 @@ char* jsonrpc_create_internal_error_response(const cJSON* id AGENTOS_UNUSED, con
     }
     return jsonrpc_create_error_response(id, JSONRPC_INTERNAL_ERROR, NULL, data);
 #else
+    (void)id; (void)detail;
     return NULL;
 #endif
 }
@@ -252,10 +242,7 @@ char* jsonrpc_create_auth_failed_response(const cJSON* id) {
     return jsonrpc_create_error_response(id, JSONRPC_AUTH_FAILED, NULL, NULL);
 }
 
-/* ==================== 错误消息获取 ==================== */
-
 const char* jsonrpc_get_error_message(int code) {
-    /* 标准错误码 */
     if (code >= -32700 && code <= -32600) {
         int idx = code + 32700;
         if (idx >= 0 && idx < (int)(sizeof(g_error_messages) / sizeof(g_error_messages[0]))) {
@@ -263,7 +250,6 @@ const char* jsonrpc_get_error_message(int code) {
         }
     }
 
-    /* 自定义错误码 */
     int cidx = -1;
     switch (code) {
         case JSONRPC_RATE_LIMITED:      cidx = 0; break;
@@ -278,9 +264,7 @@ const char* jsonrpc_get_error_message(int code) {
     return "Unknown error";
 }
 
-/* ==================== Batch Requests (PROTO-004) ==================== */
-
-int jsonrpc_validate_batch_request(const cJSON* batch_json AGENTOS_UNUSED, size_t* out_count AGENTOS_UNUSED) {
+int jsonrpc_validate_batch_request(const cJSON* batch_json, size_t* out_count) {
 #ifdef GATEWAY_HAS_CJSON
     if (!batch_json || !out_count) return -1;
     *out_count = 0;
@@ -303,14 +287,15 @@ int jsonrpc_validate_batch_request(const cJSON* batch_json AGENTOS_UNUSED, size_
 
     return has_invalid ? -4 : 0;
 #else
+    (void)batch_json; (void)out_count;
     return -1;
 #endif
 }
 
 char* jsonrpc_process_batch(
-    const cJSON* batch_json AGENTOS_UNUSED,
-    char* (*handler)(const cJSON* request, void* user_data) AGENTOS_UNUSED,
-    void* user_data AGENTOS_UNUSED
+    const cJSON* batch_json,
+    char* (*handler)(const cJSON* request, void* user_data),
+    void* user_data
 ) {
 #ifdef GATEWAY_HAS_CJSON
     if (!batch_json || !handler || !cJSON_IsArray(batch_json)) {
@@ -393,13 +378,12 @@ char* jsonrpc_process_batch(
     cJSON_Delete(responses);
     return result;
 #else
+    (void)batch_json; (void)handler; (void)user_data;
     return NULL;
 #endif
 }
 
-/* ==================== Notifications (PROTO-004) ==================== */
-
-char* jsonrpc_create_notification(const char* method AGENTOS_UNUSED, cJSON* params AGENTOS_UNUSED) {
+char* jsonrpc_create_notification(const char* method, cJSON* params) {
 #ifdef GATEWAY_HAS_CJSON
     if (!method || strlen(method) == 0) return NULL;
 
@@ -421,23 +405,25 @@ char* jsonrpc_create_notification(const char* method AGENTOS_UNUSED, cJSON* para
 
     return json_str;
 #else
+    (void)method; (void)params;
     return NULL;
 #endif
 }
 
-bool jsonrpc_is_notification(const cJSON* json AGENTOS_UNUSED) {
+bool jsonrpc_is_notification(const cJSON* json) {
 #ifdef GATEWAY_HAS_CJSON
     if (!json || !cJSON_IsObject(json)) return false;
 
     return !cJSON_HasObjectItem(json, "id");
 #else
+    (void)json;
     return false;
 #endif
 }
 
 char* jsonrpc_create_notification_params(
-    const char* method AGENTOS_UNUSED,
-    const char* params_json AGENTOS_UNUSED
+    const char* method,
+    const char* params_json
 ) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* params = NULL;
@@ -448,6 +434,7 @@ char* jsonrpc_create_notification_params(
 
     return jsonrpc_create_notification(method, params);
 #else
+    (void)method; (void)params_json;
     return NULL;
 #endif
 }
