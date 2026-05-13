@@ -77,9 +77,10 @@ static agentos_mutex_t g_resource_mutex;
 static int g_resource_mutex_initialized = 0;
 
 static void ensure_mutex_initialized(void) {
-    if (!g_resource_mutex_initialized) {
+    int expected = 0;
+    if (__atomic_compare_exchange_n(&g_resource_mutex_initialized, &expected, 1,
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         agentos_mutex_init(&g_resource_mutex);
-        g_resource_mutex_initialized = 1;
     }
 }
 
