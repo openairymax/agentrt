@@ -28,7 +28,7 @@ target_link_libraries(test_e2e_core PRIVATE
     agentos_syscall
     svc_common
     Threads::Threads
-    rt
+    agentos_platform_libs
     m
 )
 

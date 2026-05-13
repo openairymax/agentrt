@@ -309,6 +309,27 @@ if(AGENTOS_HAS_LIBEVENT)
     target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_LIBEVENT)
 endif()
 
+# ============================================================
+# 跨平台系统库统一管理（BAN-15: 禁止硬编码平台库）
+# agentos_platform_libs, dl, pthread, m, ws2_32 等通过此 INTERFACE 库统一提供
+# ============================================================
+add_library(agentos_platform_libs INTERFACE)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(agentos_platform_libs INTERFACE agentos_platform_libs dl)
+endif()
+if(WIN32)
+    target_link_libraries(agentos_platform_libs INTERFACE ws2_32)
+endif()
+
+# ============================================================
+# 测试链接选项统一管理（BAN-26: 禁止硬编码链接器标志）
+# --allow-multiple-definition 仅在 Linux/GNU ld 下有效
+# ============================================================
+add_library(agentos_test_ldflags INTERFACE)
+if(UNIX AND NOT APPLE)
+    target_link_options(agentos_test_ldflags INTERFACE -Wl,--allow-multiple-definition)
+endif()
+
 # 包含子目录
 if(AGENTOS_BUILD_ALL)
     message(STATUS "Building AgentOS core components...")

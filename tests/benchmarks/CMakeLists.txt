@@ -25,7 +25,7 @@ target_link_libraries(test_performance_benchmarks PRIVATE
     agentos_syscall
     svc_common
     Threads::Threads
-    rt
+    agentos_platform_libs
     m
 )
 
