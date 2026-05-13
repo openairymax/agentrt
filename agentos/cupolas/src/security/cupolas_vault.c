@@ -40,6 +40,7 @@
 #define MAX_CREDENTIALS 1024
 #define AES_KEY_SIZE 32
 #define AES_IV_SIZE 16
+#define AES_GCM_TAG_SIZE 16
 #define SALT_SIZE 32
 
 /* ============================================================================
@@ -52,6 +53,7 @@ typedef struct {
     uint8_t* encrypted_data;
     size_t encrypted_len;
     uint8_t iv[AES_IV_SIZE];
+    uint8_t tag[AES_GCM_TAG_SIZE];
     uint8_t salt[SALT_SIZE];
     cupolas_vault_acl_t acl;
     cupolas_vault_metadata_t metadata;
@@ -146,8 +148,12 @@ int cupolas_vault_open(const char* vault_id, const char* password, cupolas_vault
     if (password) {
 #ifdef CUPOLAS_USE_OPENSSL
         uint8_t salt[SALT_SIZE] = {0};
-        PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
-                          100000, EVP_sha256(), AES_KEY_SIZE, v->master_key);
+        if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
+                              100000, EVP_sha256(), AES_KEY_SIZE, v->master_key) != 1) {
+            cupolas_rwlock_destroy(&v->lock);
+            free(v);
+            return -1;
+        }
 #else
         size_t pw_len = strlen(password);
         for (size_t i = 0; i < AES_KEY_SIZE; i++) {
@@ -214,8 +220,11 @@ int cupolas_vault_unlock(cupolas_vault_t* vault, const char* password) {
 
 #ifdef CUPOLAS_USE_OPENSSL
     uint8_t salt[SALT_SIZE] = {0};
-    PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
-                      100000, EVP_sha256(), AES_KEY_SIZE, vault->master_key);
+    if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
+                          100000, EVP_sha256(), AES_KEY_SIZE, vault->master_key) != 1) {
+        cupolas_rwlock_unlock(&vault->lock);
+        return -1;
+    }
 #else
     if (!password || strlen(password) == 0) {
         cupolas_rwlock_unlock(&vault->lock);
@@ -302,8 +311,11 @@ int cupolas_vault_store(cupolas_vault_t* vault,
     entry->metadata.updated_at = entry->metadata.created_at;
 
 #ifdef CUPOLAS_USE_OPENSSL
-    RAND_bytes(entry->iv, AES_IV_SIZE);
-    RAND_bytes(entry->salt, SALT_SIZE);
+    if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1 ||
+        RAND_bytes(entry->salt, SALT_SIZE) != 1) {
+        cupolas_rwlock_unlock(&vault->lock);
+        return -4;
+    }
 
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
@@ -320,9 +332,19 @@ int cupolas_vault_store(cupolas_vault_t* vault,
         return -4;
     }
 
-    EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv);
-    EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len);
-    EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len);
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1 ||
+        EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len) != 1 ||
+        EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        cupolas_rwlock_unlock(&vault->lock);
+        return -4;
+    }
+
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        cupolas_rwlock_unlock(&vault->lock);
+        return -4;
+    }
 
     entry->encrypted_len = data_len;
     EVP_CIPHER_CTX_free(ctx);
@@ -396,9 +418,26 @@ int cupolas_vault_retrieve(cupolas_vault_t* vault,
     }
 
     int len;
-    EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv);
-    EVP_DecryptUpdate(ctx, data_out, &len, entry->encrypted_data, entry->encrypted_len);
-    EVP_DecryptFinal_ex(ctx, data_out + len, &len);
+    if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        cupolas_rwlock_unlock(&vault->lock);
+        return -6;
+    }
+    if (EVP_DecryptUpdate(ctx, data_out, &len, entry->encrypted_data, entry->encrypted_len) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        cupolas_rwlock_unlock(&vault->lock);
+        return -6;
+    }
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        cupolas_rwlock_unlock(&vault->lock);
+        return -6;
+    }
+    if (EVP_DecryptFinal_ex(ctx, data_out + len, &len) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        cupolas_rwlock_unlock(&vault->lock);
+        return -6;
+    }
 
     *data_len = entry->encrypted_len;
     EVP_CIPHER_CTX_free(ctx);
@@ -484,7 +523,10 @@ int cupolas_vault_update(cupolas_vault_t* vault,
     free(entry->encrypted_data);
 
 #ifdef CUPOLAS_USE_OPENSSL
-    RAND_bytes(entry->iv, AES_IV_SIZE);
+    if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1) {
+        cupolas_rwlock_unlock(&vault->lock);
+        return -4;
+    }
 
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
@@ -500,9 +542,19 @@ int cupolas_vault_update(cupolas_vault_t* vault,
         return -4;
     }
 
-    EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv);
-    EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len);
-    EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len);
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1 ||
+        EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len) != 1 ||
+        EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        cupolas_rwlock_unlock(&vault->lock);
+        return -4;
+    }
+
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        cupolas_rwlock_unlock(&vault->lock);
+        return -4;
+    }
 
     entry->encrypted_len = data_len;
     EVP_CIPHER_CTX_free(ctx);
@@ -826,7 +878,10 @@ int cupolas_vault_generate_password(char* password_out, size_t length) {
 #ifdef CUPOLAS_USE_OPENSSL
     for (size_t i = 0; i < length - 1; i++) {
         unsigned char c;
-        RAND_bytes(&c, 1);
+        if (RAND_bytes(&c, 1) != 1) {
+            password_out[length - 1] = '\0';
+            return -2;
+        }
         password_out[i] = charset[c % charset_len];
     }
 #else
@@ -870,19 +925,41 @@ int cupolas_vault_generate_keypair(char* public_key_out, size_t* pub_len,
         return -2;
     }
 
-    EVP_PKEY_keygen_init(ctx);
-    EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048);
-    EVP_PKEY_keygen(ctx, &pkey);
+    if (EVP_PKEY_keygen_init(ctx) <= 0 ||
+        EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048) <= 0 ||
+        EVP_PKEY_keygen(ctx, &pkey) <= 0) {
+        EVP_PKEY_CTX_free(ctx);
+        return -2;
+    }
     EVP_PKEY_CTX_free(ctx);
 
     BIO* pub_bio = BIO_new(BIO_s_mem());
     BIO* priv_bio = BIO_new(BIO_s_mem());
+    if (!pub_bio || !priv_bio) {
+        BIO_free(pub_bio);
+        BIO_free(priv_bio);
+        EVP_PKEY_free(pkey);
+        return -2;
+    }
 
-    PEM_write_bio_PUBKEY(pub_bio, pkey);
-    PEM_write_bio_PrivateKey(priv_bio, pkey, NULL, NULL, 0, NULL, NULL);
+    if (PEM_write_bio_PUBKEY(pub_bio, pkey) != 1 ||
+        PEM_write_bio_PrivateKey(priv_bio, pkey, NULL, NULL, 0, NULL, NULL) != 1) {
+        BIO_free(pub_bio);
+        BIO_free(priv_bio);
+        EVP_PKEY_free(pkey);
+        return -2;
+    }
 
-    *pub_len = BIO_read(pub_bio, public_key_out, *pub_len);
-    *priv_len = BIO_read(priv_bio, private_key_out, *priv_len);
+    int pub_read = BIO_read(pub_bio, public_key_out, (int)*pub_len);
+    int priv_read = BIO_read(priv_bio, private_key_out, (int)*priv_len);
+    if (pub_read <= 0 || priv_read <= 0) {
+        BIO_free(pub_bio);
+        BIO_free(priv_bio);
+        EVP_PKEY_free(pkey);
+        return -2;
+    }
+    *pub_len = (size_t)pub_read;
+    *priv_len = (size_t)priv_read;
 
     BIO_free(pub_bio);
     BIO_free(priv_bio);

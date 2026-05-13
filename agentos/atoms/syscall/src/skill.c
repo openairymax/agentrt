@@ -307,7 +307,7 @@ agentos_error_t agentos_sys_skill_install(const char* skill_url, char** out_skil
 
     char id_buf[64];
     static int counter = 0;
-    snprintf(id_buf, sizeof(id_buf), "skill_%d", __sync_fetch_and_add(&counter, 1));
+    snprintf(id_buf, sizeof(id_buf), "skill_%d", __atomic_fetch_add(&counter, 1, __ATOMIC_SEQ_CST));
 
     skill_entry_t* entry = (skill_entry_t*)AGENTOS_CALLOC(1, sizeof(skill_entry_t));
     if (!entry) return AGENTOS_ENOMEM;

@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
 
-project(cupolas VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
@@ -13,13 +11,13 @@ option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
 option(BUILD_WITH_LOGGING "Enable detailed logging" ON)
 
 if(BUILD_WITH_LOGGING)
-    add_definitions(-DCUPOLAS_ENABLE_LOGGING=1)
+    target_compile_definitions(cupolas PRIVATE CUPOLAS_ENABLE_LOGGING=1)
 endif()
 
-# 配置文件路径定义
-add_definitions(-DAGENTOS_CONFIG_DIR="/etc/agentos")
-add_definitions(-DAGENTOS_LOG_DIR="/var/log/agentos")
-# R-09-119: use platform.h FHS 3.0 definition (/var/tmp/agentos)
+target_compile_definitions(cupolas PRIVATE
+    AGENTOS_CONFIG_DIR="/etc/agentos"
+    AGENTOS_LOG_DIR="/var/log/agentos"
+)
 
 find_package(PkgConfig QUIET)
 

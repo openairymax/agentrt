@@ -14,9 +14,7 @@
 # 5. 分布式图分区与通信
 # ========================================================================
 
-cmake_minimum_required(VERSION 3.20)
 
-project(agentos-taskflow
     VERSION 1.0.0
     DESCRIPTION "AgentOS TaskFlow Graph Execution System"
     LANGUAGES C
@@ -33,12 +31,11 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 # 定义构建共享库时的宏
 if(BUILD_SHARED_LIBS)
-    add_definitions(-DAGENTOS_BUILDING_SHARED -DTASKFLOW_BUILDING_SHARED)
+    target_compile_definitions(agentos_taskflow PRIVATE AGENTOS_BUILDING_SHARED TASKFLOW_BUILDING_SHARED)
 endif()
 
-# 跨平台编译选项
 if(WIN32)
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
+    target_compile_definitions(agentos_taskflow PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3")
 else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")

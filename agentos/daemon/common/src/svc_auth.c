@@ -147,9 +147,12 @@ static void hmac_openssl(const char* key, const char* message,
                         uint8_t* output, size_t* out_len) {
     unsigned int len = 0;
     unsigned int max_len = (unsigned int)(*out_len);
-    HMAC(EVP_sha256(), (const unsigned char*)key, (int)strlen(key),
-         (const unsigned char*)message, strlen(message),
-         output, &len);
+    if (HMAC(EVP_sha256(), (const unsigned char*)key, (int)strlen(key),
+             (const unsigned char*)message, strlen(message),
+             output, &len) == NULL) {
+        *out_len = 0;
+        return;
+    }
     *out_len = (size_t)(len < max_len ? len : max_len);
 }
 #define HMAC_IMPL_NAME "OpenSSL"

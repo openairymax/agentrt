@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 add_library(agentos_cognition STATIC
     engine.c

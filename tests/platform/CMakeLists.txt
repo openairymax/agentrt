@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 跨平台兼容性测试 (TeamC P2-C04)
 

@@ -242,13 +242,14 @@ int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value) {
 static int g_socket_initialized = 0;
 
 int agentos_socket_init(void) {
-    if (g_socket_initialized) return 0;
-    g_socket_initialized = 1;
+    int expected = 0;
+    __atomic_compare_exchange_n(&g_socket_initialized, &expected, 1,
+                                 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return 0;
 }
 
 void agentos_socket_cleanup(void) {
-    g_socket_initialized = 0;
+    __atomic_store_n(&g_socket_initialized, 0, __ATOMIC_SEQ_CST);
 }
 
 agentos_socket_t agentos_socket_create_tcp_server(const char* host, uint16_t port) {

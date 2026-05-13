@@ -1,7 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Monitor 服务测试构建文件
 
-cmake_minimum_required(VERSION 3.20)
 
 set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons)
 set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../atoms)

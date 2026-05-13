@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
-project(agentos-commons VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

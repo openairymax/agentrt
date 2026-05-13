@@ -8,8 +8,6 @@
 # - svc_common.h: 服务框架接口
 # - ipc_client.c: IPC 客户端实现
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-svc-commons VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

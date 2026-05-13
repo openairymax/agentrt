@@ -9,9 +9,7 @@
 #
 #   依赖链：gateway_d --> gateway (静态库) --> agentos/atoms/syscall + agentos/atoms/corekern
 
-cmake_minimum_required(VERSION 3.20)
 
-project(gateway_d VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

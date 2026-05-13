@@ -2,8 +2,6 @@
 # agentos/CMakeLists.txt
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-core VERSION 0.0.5 LANGUAGES C CXX)
 
 # CTest必须在此处启用，以便子目录测试能传播到根CTest
 if(BUILD_TESTS)

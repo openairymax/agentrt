@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 安全审计测试 (TeamC P2-C03)
 

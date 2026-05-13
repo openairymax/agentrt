@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # MemoryRovol bridge: integrates external MemoryRovol repo into AgentOS atoms tree
 # Per R-09-01-6, MemoryRovol migrated to independent repository.

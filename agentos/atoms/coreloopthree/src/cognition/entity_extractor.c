@@ -53,17 +53,15 @@ const char *agentos_entity_type_name(agentos_entity_type_t type)
 
 int agentos_entity_extractor_init(void)
 {
-    if (g_extractor_initialized) {
-        return 0;
-    }
-
-    g_extractor_initialized = 1;
+    int expected = 0;
+    __atomic_compare_exchange_n(&g_extractor_initialized, &expected, 1,
+                                 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return 0;
 }
 
 void agentos_entity_extractor_cleanup(void)
 {
-    g_extractor_initialized = 0;
+    __atomic_store_n(&g_extractor_initialized, 0, __ATOMIC_SEQ_CST);
 }
 
 agentos_extraction_result_t *agentos_extraction_result_create(size_t initial_capacity)
@@ -345,7 +343,7 @@ int agentos_entity_extract(const char *input, size_t input_len, agentos_extracti
         return -1;
     }
 
-    if (!g_extractor_initialized) {
+    if (!__atomic_load_n(&g_extractor_initialized, __ATOMIC_ACQUIRE)) {
         agentos_entity_extractor_init();
     }
 
