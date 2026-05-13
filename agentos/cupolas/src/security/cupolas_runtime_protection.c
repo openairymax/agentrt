@@ -22,7 +22,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <sys/mman.h>
+#include "agentos_mman.h"
 #include <unistd.h>
 #include <dlfcn.h>
 #include <fcntl.h>

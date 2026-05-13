@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <dirent.h>
+#include "agentos_dirent.h"
 #include <sys/stat.h>
 
 /**
