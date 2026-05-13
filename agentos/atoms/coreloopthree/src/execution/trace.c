@@ -33,15 +33,11 @@ static trace_span_t *g_trace_spans      = NULL;
 static agentos_mutex_t *g_trace_lock    = NULL;
 static agentos_mutex_t *g_current_lock  = NULL;
 static trace_span_t *g_current_span     = NULL;
-static volatile int g_trace_initialized = 0;
+static int g_trace_initialized = 0;
 
-/**
- * @brief 确保trace系统已初始化（线程安全）
- * @return AGENTOS_SUCCESS 成功，AGENTOS_ENOMEM 内存不足
- */
 static agentos_error_t ensure_trace_init(void)
 {
-    if (g_trace_initialized)
+    if (__atomic_load_n(&g_trace_initialized, __ATOMIC_ACQUIRE))
         return AGENTOS_SUCCESS;
 
     if (!g_trace_lock) {
@@ -57,7 +53,7 @@ static agentos_error_t ensure_trace_init(void)
             return AGENTOS_ENOMEM;
         }
     }
-    g_trace_initialized = 1;
+    __atomic_store_n(&g_trace_initialized, 1, __ATOMIC_SEQ_CST);
     return AGENTOS_SUCCESS;
 }
 

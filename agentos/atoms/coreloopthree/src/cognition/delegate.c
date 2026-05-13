@@ -10,9 +10,10 @@ static int g_delegate_depth = 0;
 static uint64_t g_task_counter = 0;
 
 static void ensure_mutex_init(void) {
-    if (!g_delegate_mutex_initialized) {
+    int expected = 0;
+    if (__atomic_compare_exchange_n(&g_delegate_mutex_initialized, &expected, 1,
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         agentos_mutex_init(&g_delegate_mutex);
-        g_delegate_mutex_initialized = 1;
     }
 }
 

@@ -296,9 +296,10 @@ static agentos_mutex_t g_orch_bus_mutex;
 static int g_orch_bus_mutex_initialized = 0;
 
 static void ensure_orch_bus_mutex(void) {
-    if (!g_orch_bus_mutex_initialized) {
+    int expected = 0;
+    if (__atomic_compare_exchange_n(&g_orch_bus_mutex_initialized, &expected, 1,
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         agentos_mutex_init(&g_orch_bus_mutex);
-        g_orch_bus_mutex_initialized = 1;
     }
 }
 
@@ -1230,9 +1231,12 @@ static int execute_single_phase(orchestrator_t* orch,
 
                 float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
 
-                if (!g_align_mutex_initialized) {
-                    agentos_mutex_init(&g_align_mutex);
-                    g_align_mutex_initialized = 1;
+                {
+                    int expected = 0;
+                    if (__atomic_compare_exchange_n(&g_align_mutex_initialized, &expected, 1,
+                                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+                        agentos_mutex_init(&g_align_mutex);
+                    }
                 }
 
                 agentos_mutex_lock(&g_align_mutex);

@@ -265,28 +265,33 @@ agentos_error_t agentos_checkpoint_init(const char *storage_path)
     memcpy(g_checkpoint_storage_path, path, len);
     g_checkpoint_storage_path[len] = '\0';
 
-    if (!g_checkpoint_mutex_initialized) {
-        if (agentos_mutex_init(&g_checkpoint_mutex) != 0)
-            return AGENTOS_EINIT;
-        g_checkpoint_mutex_initialized = 1;
+    {
+        int expected = 0;
+        if (__atomic_compare_exchange_n(&g_checkpoint_mutex_initialized, &expected, 1,
+                                         0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+            if (agentos_mutex_init(&g_checkpoint_mutex) != 0) {
+                __atomic_store_n(&g_checkpoint_mutex_initialized, 0, __ATOMIC_SEQ_CST);
+                return AGENTOS_EINIT;
+            }
+        }
     }
 
     memset(&g_checkpoint_stats, 0, sizeof(g_checkpoint_stats));
-    g_checkpoint_initialized = 1;
+    __atomic_store_n(&g_checkpoint_initialized, 1, __ATOMIC_SEQ_CST);
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_shutdown(void)
 {
-    if (!g_checkpoint_initialized)
+    if (!__atomic_load_n(&g_checkpoint_initialized, __ATOMIC_ACQUIRE))
         return AGENTOS_SUCCESS;
-    if (g_checkpoint_mutex_initialized) {
+    if (__atomic_load_n(&g_checkpoint_mutex_initialized, __ATOMIC_ACQUIRE)) {
         agentos_mutex_destroy(&g_checkpoint_mutex);
-        g_checkpoint_mutex_initialized = 0;
+        __atomic_store_n(&g_checkpoint_mutex_initialized, 0, __ATOMIC_SEQ_CST);
     }
     g_auto_hook              = NULL;
     g_auto_hook_user_data    = NULL;
-    g_checkpoint_initialized = 0;
+    __atomic_store_n(&g_checkpoint_initialized, 0, __ATOMIC_SEQ_CST);
     return AGENTOS_SUCCESS;
 }
 

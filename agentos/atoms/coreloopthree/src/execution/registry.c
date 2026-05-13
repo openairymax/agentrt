@@ -24,18 +24,15 @@ typedef struct registry_entry {
 
 static registry_entry_t* g_registry = NULL;
 static agentos_mutex_t* g_registry_lock = NULL;
-static volatile int g_registry_initialized = 0;
+static int g_registry_initialized = 0;
 
-/**
- * @brief 确保注册表已初始化（线程安全）
- */
 static agentos_error_t ensure_registry_init(void) {
-    if (g_registry_initialized) return AGENTOS_SUCCESS;
+    if (__atomic_load_n(&g_registry_initialized, __ATOMIC_ACQUIRE)) return AGENTOS_SUCCESS;
     if (!g_registry_lock) {
         g_registry_lock = agentos_mutex_create();
         if (!g_registry_lock) return AGENTOS_ENOMEM;
     }
-    g_registry_initialized = 1;
+    __atomic_store_n(&g_registry_initialized, 1, __ATOMIC_SEQ_CST);
     return AGENTOS_SUCCESS;
 }
 

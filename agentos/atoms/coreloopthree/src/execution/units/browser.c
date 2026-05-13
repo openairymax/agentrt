@@ -82,7 +82,7 @@ typedef struct {
 } browser_manager_t;
 
 static browser_manager_t g_browser_mgr;
-static int g_browser_mgr_initialized = 0;
+static int __atomic_store_n(&g_browser_mgr_initialized, 0, __ATOMIC_SEQ_CST);
 
 static int browser_mgr_init(void);
 static void browser_mgr_shutdown(void);
@@ -217,7 +217,9 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
 
 static int browser_mgr_init(void)
 {
-    if (g_browser_mgr_initialized)
+    int expected = 0;
+    if (!__atomic_compare_exchange_n(&g_browser_mgr_initialized, &expected, 1,
+                                      0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
         return 0;
 
     memset(&g_browser_mgr, 0, sizeof(g_browser_mgr));
@@ -230,13 +232,12 @@ static int browser_mgr_init(void)
 
     agentos_mutex_init(&g_browser_mgr.pool_lock);
     agentos_mutex_init(&g_browser_mgr.browser_lock);
-    g_browser_mgr_initialized = 1;
     return 0;
 }
 
 static void browser_mgr_shutdown(void)
 {
-    if (!g_browser_mgr_initialized)
+    if (!__atomic_load_n(&g_browser_mgr_initialized, __ATOMIC_ACQUIRE))
         return;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);
@@ -257,7 +258,7 @@ static void browser_mgr_shutdown(void)
 
     agentos_mutex_destroy(&g_browser_mgr.pool_lock);
     agentos_mutex_destroy(&g_browser_mgr.browser_lock);
-    g_browser_mgr_initialized = 0;
+    __atomic_store_n(&g_browser_mgr_initialized, 0, __ATOMIC_SEQ_CST);
 }
 
 int agentos_browser_launch(const char *browser_path, int port, int headless,
@@ -442,7 +443,7 @@ int agentos_browser_attach(const char *debugging_url)
 
 int agentos_browser_close(void)
 {
-    if (!g_browser_mgr_initialized)
+    if (!__atomic_load_n(&g_browser_mgr_initialized, __ATOMIC_ACQUIRE))
         return -1;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);
@@ -510,7 +511,7 @@ int agentos_browser_close(void)
 
 int agentos_browser_get_state(void)
 {
-    if (!g_browser_mgr_initialized)
+    if (!__atomic_load_n(&g_browser_mgr_initialized, __ATOMIC_ACQUIRE))
         return BROWSER_STATE_STOPPED;
     return (int)g_browser_mgr.state;
 }
@@ -650,7 +651,7 @@ int agentos_browser_destroy_context(const char *context_id)
 
 int agentos_browser_get_context_count(void)
 {
-    if (!g_browser_mgr_initialized)
+    if (!__atomic_load_n(&g_browser_mgr_initialized, __ATOMIC_ACQUIRE))
         return 0;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);

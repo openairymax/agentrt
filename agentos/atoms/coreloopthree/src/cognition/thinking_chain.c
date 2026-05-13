@@ -1104,8 +1104,6 @@ typedef struct tc_checkpoint {
 
 static tc_checkpoint_t* get_checkpoint_storage(agentos_thinking_chain_t* chain) {
     static tc_checkpoint_t s_checkpoints[TC_MAX_CHECKPOINTS] = {{0}};
-    static int initialized = 0;
-    if (!initialized) { memset(s_checkpoints, 0, sizeof(s_checkpoints)); initialized = 1; }
     return s_checkpoints;
 }
 
