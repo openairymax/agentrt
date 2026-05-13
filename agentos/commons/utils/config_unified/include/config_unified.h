@@ -282,14 +282,15 @@
  */
 #define CONFIG_COMPAT_AUTO_INIT() do { \
     static int _config_compat_initialized = 0; \
-    if (!_config_compat_initialized) { \
+    int _expected = 0; \
+    if (__atomic_compare_exchange_n(&_config_compat_initialized, &_expected, 1, \
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) { \
         config_compat_config_t manager = { \
             .mode = COMPAT_MODE_MIXED, \
             .auto_init = true, \
             .lazy_load = true \
         }; \
         config_compat_init(&manager); \
-        _config_compat_initialized = 1; \
     } \
 } while(0)
 

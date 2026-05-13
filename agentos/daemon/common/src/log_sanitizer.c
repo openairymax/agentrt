@@ -38,9 +38,10 @@ static agentos_mutex_t g_mutex;
 static int g_mutex_initialized = 0;
 
 static void ensure_mutex_init(void) {
-    if (!g_mutex_initialized) {
+    int expected = 0;
+    if (__atomic_compare_exchange_n(&g_mutex_initialized, &expected, 1,
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         agentos_mutex_init(&g_mutex);
-        g_mutex_initialized = 1;
     }
 }
 static int g_initialized = 0;
