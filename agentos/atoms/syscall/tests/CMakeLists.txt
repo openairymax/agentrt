@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # Syscall 模块单元测试 (TeamC P1-C07)
 # 覆盖: init/cleanup, invoke分发, 参数验证, 边界条件

@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # corekern模块单元测试
 # 使用agentos_core.a + agentos_common.a

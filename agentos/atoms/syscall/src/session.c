@@ -214,7 +214,7 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
 
     static uint64_t counter = 0;
     char id_buf[64];
-    snprintf(id_buf, sizeof(id_buf), "sess_%llu", (unsigned long long)__sync_fetch_and_add(&counter, 1));
+    snprintf(id_buf, sizeof(id_buf), "sess_%llu", (unsigned long long)__atomic_fetch_add(&counter, 1, __ATOMIC_SEQ_CST));
     
     char* id = NULL;
     session_t* s = NULL;

@@ -25,6 +25,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include "platform.h"
+#include "atomic_compat.h"
 
 /* ==================== 内部常量定义 ==================== */
 
@@ -65,16 +66,16 @@ typedef struct {
 } throttle_bucket_t;
 
 static throttle_bucket_t g_throttle_buckets[THROTTLE_BUCKET_COUNT];
-static volatile uint32_t g_throttle_enabled = 0;
-static volatile uint32_t g_throttle_max_per_sec = 100;
+static atomic_uint g_throttle_enabled = 0;
+static atomic_uint g_throttle_max_per_sec = 100;
 static agentos_mutex_t g_throttle_mutex;
 static bool g_throttle_mutex_init = false;
 
 /* ==================== 日志采样（Sampling）内部数据结构 ==================== */
 
-static volatile uint32_t g_sample_counter_debug = 0;
-static volatile uint32_t g_sample_counter_info = 0;
-static volatile uint32_t g_sample_counter_warn = 0;
+static atomic_uint g_sample_counter_debug = 0;
+static atomic_uint g_sample_counter_info = 0;
+static atomic_uint g_sample_counter_warn = 0;
 
 /**
  * @brief 计算消息哈希（用于节流去重）

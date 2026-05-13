@@ -46,17 +46,15 @@ static const char *g_farewell_keywords[] = {"bye",  "goodbye", "see you", "farew
 
 int agentos_intent_classifier_init(void)
 {
-    if (g_classifier_initialized) {
-        return 0;
-    }
-
-    g_classifier_initialized = 1;
+    int expected = 0;
+    __atomic_compare_exchange_n(&g_classifier_initialized, &expected, 1,
+                                 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return 0;
 }
 
 void agentos_intent_classifier_cleanup(void)
 {
-    g_classifier_initialized = 0;
+    __atomic_store_n(&g_classifier_initialized, 0, __ATOMIC_SEQ_CST);
 }
 
 const char *agentos_intent_type_name(agentos_intent_type_t type)
@@ -177,7 +175,7 @@ int agentos_intent_classify(const char *input, size_t input_len,
         return -1;
     }
 
-    if (!g_classifier_initialized) {
+    if (!__atomic_load_n(&g_classifier_initialized, __ATOMIC_ACQUIRE)) {
         agentos_intent_classifier_init();
     }
 

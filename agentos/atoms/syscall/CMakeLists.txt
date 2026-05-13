@@ -1,8 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # syscall 模块构建文件
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-syscall VERSION 0.0.5 LANGUAGES C)
 
 find_package(Threads REQUIRED)
 # 符号导出管理
@@ -12,7 +10,7 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 # 定义构建共享库时的宏
 if(BUILD_SHARED_LIBS)
-    add_definitions(-DAGENTOS_BUILDING_SHARED)
+    target_compile_definitions(agentos_syscall PRIVATE AGENTOS_BUILDING_SHARED)
 endif()
 
 set(SOURCES

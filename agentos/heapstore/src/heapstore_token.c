@@ -121,30 +121,28 @@ static int allocate_budget_entry(void) {
 /* ==================== 公共 API 实现 ==================== */
 
 heapstore_error_t heapstore_token_init(void) {
-    if (g_token_initialized) {
-        return heapstore_SUCCESS;
+    int expected = 0;
+    if (__atomic_compare_exchange_n(&g_token_initialized, &expected, 1,
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+        token_mutex_init();
+        memset(g_budget_table, 0, sizeof(g_budget_table));
+        g_budget_count = 0;
+
+        atomic_init(&g_total_prompt_tokens, 0);
+        atomic_init(&g_total_completion_tokens, 0);
+        atomic_init(&g_total_system_tokens, 0);
+        atomic_init(&g_total_user_tokens, 0);
+        atomic_init(&g_tokens_saved_by_cache, 0);
+        atomic_init(&g_total_write_ops, 0);
+        atomic_init(&g_total_read_ops, 0);
+        atomic_init(&g_total_batch_ops, 0);
+        atomic_init(&g_last_operation_time, 0);
     }
-
-    token_mutex_init();
-    memset(g_budget_table, 0, sizeof(g_budget_table));
-    g_budget_count = 0;
-
-    atomic_init(&g_total_prompt_tokens, 0);
-    atomic_init(&g_total_completion_tokens, 0);
-    atomic_init(&g_total_system_tokens, 0);
-    atomic_init(&g_total_user_tokens, 0);
-    atomic_init(&g_tokens_saved_by_cache, 0);
-    atomic_init(&g_total_write_ops, 0);
-    atomic_init(&g_total_read_ops, 0);
-    atomic_init(&g_total_batch_ops, 0);
-    atomic_init(&g_last_operation_time, 0);
-
-    g_token_initialized = 1;
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_token_shutdown(void) {
-    if (!g_token_initialized) {
+    if (!__atomic_load_n(&g_token_initialized, __ATOMIC_ACQUIRE)) {
         return heapstore_SUCCESS;
     }
 
@@ -154,7 +152,7 @@ heapstore_error_t heapstore_token_shutdown(void) {
     token_mutex_unlock();
 
     token_mutex_destroy();
-    g_token_initialized = 0;
+    __atomic_store_n(&g_token_initialized, 0, __ATOMIC_SEQ_CST);
     return heapstore_SUCCESS;
 }
 

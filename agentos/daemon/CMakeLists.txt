@@ -1,8 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # AgentOS Daemon 模块顶层构建文件
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-daemon VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -13,10 +11,7 @@ option(BUILD_COVERAGE "Build with code coverage support" OFF)
 option(BUILD_ALL_PLATFORMS "Build for all platforms (cross-compile)" OFF)
 
 # 版本信息
-set(DAEMON_VERSION_MAJOR 0)
-set(DAEMON_VERSION_MINOR 0)
-set(DAEMON_VERSION_PATCH 5)
-set(DAEMON_VERSION "${DAEMON_VERSION_MAJOR}.${DAEMON_VERSION_MINOR}.${DAEMON_VERSION_PATCH}")
+set(DAEMON_VERSION "${PROJECT_VERSION}")
 
 # 打印构建配置
 message(STATUS "========================================")

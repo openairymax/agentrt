@@ -1,7 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # CoreLoopThree 测试套件构建文件
 
-cmake_minimum_required(VERSION 3.20)
 
 set(CORELOOPTHREE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons)
