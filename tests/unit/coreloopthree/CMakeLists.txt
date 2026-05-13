@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
 
-project(coreloopthree_tests)
 
 # 包含核心模块的头文件
 # R-09-124: converted to target_include_directories

@@ -367,7 +367,7 @@ int channel_service_send(channel_service_t* svc,
             volatile uint32_t* msg_flag = (volatile uint32_t*)((char*)entry->shm_ptr + sizeof(uint32_t));
             *msg_len = (uint32_t)data_len;
             memcpy((char*)entry->shm_ptr + header_size, data, data_len);
-            __sync_synchronize();
+            __atomic_thread_fence(__ATOMIC_SEQ_CST);
             *msg_flag = 1;
             break;
         }
@@ -445,14 +445,14 @@ int channel_service_receive(channel_service_t* svc,
             if (!entry->shm_ptr) { agentos_mutex_unlock(&svc->lock); return -3; }
             volatile uint32_t* msg_len = (volatile uint32_t*)entry->shm_ptr;
             volatile uint32_t* msg_flag = (volatile uint32_t*)((char*)entry->shm_ptr + sizeof(uint32_t));
-            __sync_synchronize();
+            __atomic_thread_fence(__ATOMIC_SEQ_CST);
             if (*msg_flag != 1) { agentos_mutex_unlock(&svc->lock); return 0; }
             uint32_t len = *msg_len;
             if (len == 0 || len > entry->shm_size - sizeof(uint32_t) * 2) { agentos_mutex_unlock(&svc->lock); return -4; }
             void* buf = malloc(len);
             if (!buf) { agentos_mutex_unlock(&svc->lock); return -5; }
             memcpy(buf, (char*)entry->shm_ptr + sizeof(uint32_t) * 2, len);
-            __sync_synchronize();
+            __atomic_thread_fence(__ATOMIC_SEQ_CST);
             *msg_flag = 0;
             *out_data = buf;
             *out_len = len;
@@ -601,7 +601,7 @@ int channel_service_ping(channel_service_t* svc,
         case CHANNEL_TYPE_SHM: {
             if (!entry->shm_ptr) { rc = CHANNEL_ERR_IO; break; }
             volatile uint32_t* header = (volatile uint32_t*)entry->shm_ptr;
-            __sync_synchronize();
+            __atomic_thread_fence(__ATOMIC_SEQ_CST);
             (void)header[0];
             break;
         }

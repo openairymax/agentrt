@@ -158,7 +158,7 @@ static void remove_timer_from_list(agentos_timer_t* target) {
 void agentos_time_timer_process(void) {
     if (!timer_lock) return;
 
-    if (__sync_val_compare_and_swap(&timer_processing, 0, 1) != 0) {
+    if (__atomic_compare_exchange_n(&timer_processing, &(int){0}, 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST) != 0) {
         return;
     }
 
@@ -172,7 +172,7 @@ void agentos_time_timer_process(void) {
     int capacity = 64;
     fire_entry_t* to_fire = (fire_entry_t*)AGENTOS_CALLOC(capacity, sizeof(fire_entry_t));
     if (!to_fire) {
-        __sync_fetch_and_and(&timer_processing, 0);
+        __atomic_store_n(&timer_processing, 0, __ATOMIC_SEQ_CST);
         return;
     }
     int fire_count = 0;
@@ -223,7 +223,7 @@ void agentos_time_timer_process(void) {
     }
 
     AGENTOS_FREE(to_fire);
-    __sync_fetch_and_and(&timer_processing, 0);
+    __atomic_store_n(&timer_processing, 0, __ATOMIC_SEQ_CST);
 }
 
 void agentos_time_timer_cleanup(void) {

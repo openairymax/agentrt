@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 端到端集成测试 (TeamC P2-C01)
 # 覆盖: corekern+daemon+syscall 跨模块联动

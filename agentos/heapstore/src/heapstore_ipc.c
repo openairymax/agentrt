@@ -605,7 +605,7 @@ heapstore_error_t heapstore_ipc_send(const char* channel_id,
 
     *msg_len = (uint32_t)len;
     memcpy((char*)ac->shm->mapped + header_size, data, len);
-    __sync_synchronize();
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
     *msg_ready = 1;
     ac->data_len = len;
 
@@ -639,7 +639,7 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
     }
 
     volatile uint32_t* msg_ready = (volatile uint32_t*)((char*)ac->shm->mapped + sizeof(uint32_t));
-    __sync_synchronize();
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
 
     if (*msg_ready != 1) {
         agentos_mutex_unlock(&s_ipc_lock);
@@ -660,7 +660,7 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
     }
 
     memcpy(buf, (char*)ac->shm->mapped + sizeof(uint32_t) * 2, len);
-    __sync_synchronize();
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
     *msg_ready = 0;
     *msg_len = 0;
     ac->data_len = 0;

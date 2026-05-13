@@ -187,9 +187,9 @@ extern "C" {
             InterlockedExchangeAdd64((LONGLONG volatile*)(ptr), (LONGLONG)(val))
     #else
         #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
-            __sync_fetch_and_add(ptr, val)
+            __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
         #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
-            __sync_fetch_and_add(ptr, val)
+            __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
     #endif
 
     #ifndef _SC_PAGESIZE
@@ -206,9 +206,9 @@ extern "C" {
     #endif
 #else
     #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
-        __sync_fetch_and_add(ptr, val)
+        __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
     #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
-        __sync_fetch_and_add(ptr, val)
+        __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
 #endif
 
 /* ==================== 路径分隔符 ==================== */

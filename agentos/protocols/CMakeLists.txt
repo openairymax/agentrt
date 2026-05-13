@@ -14,9 +14,7 @@
 # 6. 统一接口定义 (Interfaces Layer)
 # ========================================================================
 
-cmake_minimum_required(VERSION 3.20)
 
-project(protocols
     VERSION 0.0.5
     DESCRIPTION "AgentOS Unified Protocols Framework - Multi-Protocol Ecosystem"
     LANGUAGES C

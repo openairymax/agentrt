@@ -30,10 +30,10 @@
 #endif
 
 // 全局计数器用于生成唯一ID（使用统一原子类型）
-static volatile long task_counter = 0;
-static volatile long plan_counter = 0;
-static volatile long record_counter = 0;
-static volatile long session_counter = 0;
+static atomic_long task_counter = 0;
+static atomic_long plan_counter = 0;
+static atomic_long record_counter = 0;
+static atomic_long session_counter = 0;
 
 __attribute__((used))
 void agentos_generate_task_id(const char* prefix, char* buf, size_t len) {

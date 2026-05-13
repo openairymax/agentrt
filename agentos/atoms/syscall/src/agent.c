@@ -250,7 +250,7 @@ agentos_error_t agentos_sys_agent_spawn(const char* agent_spec, char** out_agent
 
     char id_buf[64];
     static int counter = 0;
-    snprintf(id_buf, sizeof(id_buf), "agent_%d", __sync_fetch_and_add(&counter, 1));
+    snprintf(id_buf, sizeof(id_buf), "agent_%d", __atomic_fetch_add(&counter, 1, __ATOMIC_SEQ_CST));
 
     agent_instance_t* inst = (agent_instance_t*)AGENTOS_CALLOC(1, sizeof(agent_instance_t));
     if (!inst) return AGENTOS_ENOMEM;

@@ -266,22 +266,22 @@ static int cupolas_parse_entitlements_content(const char* content, cupolas_entit
 }
 
 int cupolas_entitlements_init(void) {
-    if (g_initialized) return 0;
-    
-    OpenSSL_add_all_algorithms();
-    ERR_load_crypto_strings();
-    
-    g_initialized = 1;
+    int expected = 0;
+    if (__atomic_compare_exchange_n(&g_initialized, &expected, 1,
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+        OpenSSL_add_all_algorithms();
+        ERR_load_crypto_strings();
+    }
     return 0;
 }
 
 void cupolas_entitlements_cleanup(void) {
-    if (!g_initialized) return;
+    if (!__atomic_load_n(&g_initialized, __ATOMIC_ACQUIRE)) return;
     
     EVP_cleanup();
     ERR_free_strings();
     
-    g_initialized = 0;
+    __atomic_store_n(&g_initialized, 0, __ATOMIC_SEQ_CST);
 }
 
 int cupolas_entitlements_load(const char* yaml_path, cupolas_entitlements_t** entitlements) {
