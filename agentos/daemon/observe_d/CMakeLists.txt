@@ -35,7 +35,7 @@ elseif(UNIX)
     target_link_libraries(agentos-observe-d PRIVATE
         agentos_common
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
 endif()
 

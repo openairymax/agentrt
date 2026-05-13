@@ -55,6 +55,10 @@
 #ifndef AGENTOS_COMMON_LOGGING_H
 #define AGENTOS_COMMON_LOGGING_H
 
+#ifdef LOGGING_COMMON_H
+#error "logging.h conflicts with logging_common.h. Include only logging.h."
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

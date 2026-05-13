@@ -656,8 +656,6 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         size_t expected_sig_len = 32;
         uint8_t computed_hmac[32];
         g_hmac_impl(g_jwt.config.secret, sig_input, computed_hmac, &expected_sig_len);
-        for(size_t _d=0;_d<expected_sig_len&&_d<8;_d++) fprintf(stderr,"%02x",computed_hmac[_d]);
-        fprintf(stderr,"...\n");
 
         size_t sig_padded_len = sig_b64_len + ((4 - (sig_b64_len % 4)) % 4);
         char* sig_padded = (char*)malloc(sig_padded_len + 1);

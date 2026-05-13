@@ -56,7 +56,7 @@
 #else
     #include <unistd.h>
     #include <sys/time.h>
-    #include <sys/mman.h>
+    #include "agentos_mman.h"
     #include <sys/socket.h>
     #include <sys/un.h>
     #include <netinet/in.h>

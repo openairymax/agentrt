@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/mman.h>
+#include "agentos_mman.h"
 
 typedef struct {
     channel_info_t info;

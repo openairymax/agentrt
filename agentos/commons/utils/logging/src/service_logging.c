@@ -155,10 +155,10 @@ void service_log_output_record(const log_record_t* record) {
                 o->output(o, record);
             }
         }
-        g_service_state.stats.records_output++;
+        g_service_state.stats.throughput.total_records++;
     }
 
-    g_service_state.stats.records_processed++;
+    g_service_state.stats.throughput.total_records++;
     agentos_mutex_unlock(&g_service_state.mutex);
 }
 

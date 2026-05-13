@@ -26,7 +26,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <dirent.h>
+#include "agentos_dirent.h"
 #include <sys/stat.h>
 #endif
 

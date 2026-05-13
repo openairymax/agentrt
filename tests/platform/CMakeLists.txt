@@ -25,7 +25,7 @@ target_link_libraries(test_platform_compat PRIVATE
     agentos_syscall
     svc_common
     Threads::Threads
-    rt
+    agentos_platform_libs
     m
 )
 
@@ -55,7 +55,7 @@ target_compile_options(test_mkdir_recursive PRIVATE
 
 target_link_libraries(test_mkdir_recursive PRIVATE
     Threads::Threads
-    rt
+    agentos_platform_libs
 )
 
 add_test(

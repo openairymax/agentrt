@@ -18,7 +18,7 @@
 #include <string.h>
 #include "platform.h"
 
-static AGENTOS_THREAD_LOCAL thread_local_buffer_t* g_tls_log_buffer = NULL;
+static AGENTOS_THREAD_LOCAL ThreadLocalBuffer* g_tls_log_buffer = NULL;
 
 /* ==================== 内部常量定义 ==================== */
 

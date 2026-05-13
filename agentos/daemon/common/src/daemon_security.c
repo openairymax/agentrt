@@ -498,7 +498,7 @@ int daemon_security_get_status(int* sanitizer_status, int* permission_status,
 #include <time.h>
 #include <ctype.h>
 #include <sys/stat.h>
-#include <dirent.h>
+#include "agentos_dirent.h"
 #include "cupolas_vault_cred_type.h"
 #include "cupolas_signer_info.h"
 

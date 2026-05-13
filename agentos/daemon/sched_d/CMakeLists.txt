@@ -61,7 +61,7 @@ elseif(UNIX)
     target_link_libraries(agentos-sched-d PRIVATE
         agentos_common
         Threads::Threads
-        rt
+        agentos_platform_libs
         m
     )
 endif()

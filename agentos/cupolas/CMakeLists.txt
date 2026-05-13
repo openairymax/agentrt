@@ -32,10 +32,8 @@ endif()
 find_package(OpenSSL QUIET)
 if(OpenSSL_FOUND)
     message(STATUS "Found OpenSSL: ${OpenSSL_VERSION}")
-    add_definitions(-DCUPOLAS_HAS_OPENSSL=1)
 else()
     message(WARNING "OpenSSL not found, some security features may be limited")
-    # 在没有OpenSSL的情况下，可以编译但某些功能受限
 endif()
 
 if(YAML_FOUND OR YAML_LIBRARIES)

@@ -25,7 +25,7 @@ target_link_libraries(test_security_audit PRIVATE
     agentos_syscall
     svc_common
     Threads::Threads
-    rt
+    agentos_platform_libs
     m
 )
 
@@ -61,7 +61,7 @@ target_link_libraries(test_sec017_compliance PRIVATE
     agentos_syscall
     svc_common
     Threads::Threads
-    rt
+    agentos_platform_libs
     m
 )
 

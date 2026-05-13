@@ -66,6 +66,7 @@ add_library(svc_common STATIC ${SVC_COMMON_SOURCES})
 find_package(OpenSSL QUIET)
 target_link_libraries(svc_common PUBLIC
     agentos_common
+    agentos_compile_defs
 )
 if(OpenSSL_FOUND)
     target_link_libraries(svc_common PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
@@ -94,7 +95,7 @@ elseif(UNIX)
     )
     target_link_libraries(svc_common PRIVATE
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
 endif()
 

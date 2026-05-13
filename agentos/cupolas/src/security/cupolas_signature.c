@@ -139,7 +139,8 @@ int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
 
     SHA256_Final(hash_out, &sha256);
 #else
-    memset(hash_out, 0, 32);
+    fclose(f);
+    return CUPOLAS_SIG_ALGO_UNSUPPORTED;
 #endif
 
     fclose(f);

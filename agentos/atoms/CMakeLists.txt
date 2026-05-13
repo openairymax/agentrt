@@ -1,17 +1,6 @@
 add_library(agentos_atoms INTERFACE)
 
-if(AGENTOS_HAS_OPENSSL)
-    target_compile_definitions(agentos_atoms INTERFACE AGENTOS_HAS_OPENSSL)
-endif()
-if(AGENTOS_HAS_SQLITE3)
-    target_compile_definitions(agentos_atoms INTERFACE AGENTOS_HAS_SQLITE3)
-endif()
-if(AGENTOS_HAS_CJSON)
-    target_compile_definitions(agentos_atoms INTERFACE AGENTOS_HAS_CJSON)
-endif()
-if(AGENTOS_HAS_LIBEVENT)
-    target_compile_definitions(agentos_atoms INTERFACE AGENTOS_HAS_LIBEVENT)
-endif()
+target_link_libraries(agentos_atoms INTERFACE agentos_compile_defs)
 
 target_compile_definitions(agentos_atoms INTERFACE AGENTOS_VERSION="${PROJECT_VERSION}")
 

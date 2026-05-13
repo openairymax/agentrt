@@ -5,14 +5,6 @@ cmake_minimum_required(VERSION 3.20)
 project(agentos-syscall VERSION 0.0.5 LANGUAGES C)
 
 find_package(Threads REQUIRED)
-find_package(CJSON QUIET)
-if(CJSON_FOUND)
-    message(STATUS "CJSON found: ${CJSON_VERSION}")
-    add_definitions(-DAGENTOS_HAS_CJSON=1)
-else()
-    message(WARNING "CJSON not found, JSON functionality may be limited")
-endif()
-
 # 符号导出管理
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -158,10 +150,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
             agentos_common
             Threads::Threads
             uuid
-            rt
+            agentos_platform_libs
             m
         )
-        target_link_options(test_syscall_extended PRIVATE -Wl,--allow-multiple-definition)
+        target_link_libraries(test_syscall_extended PRIVATE agentos_test_ldflags)
         target_compile_options(test_syscall_extended PRIVATE -g -O0 -fno-lto)
         add_test(NAME test_syscall_extended COMMAND test_syscall_extended)
         message(STATUS "  syscall_tests: test_syscall_extended configured (P1-C07 extended)")
@@ -198,7 +190,7 @@ if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscalls.c")
             ${CMAKE_BINARY_DIR}/agentos/atoms/coreloopthree/CMakeFiles/agentos_coreloopthree.dir/src/utils/id_utils.c.o
         )
     endif()
-    target_link_options(test_syscalls PRIVATE -Wl,--allow-multiple-definition)
+    target_link_libraries(test_syscalls PRIVATE agentos_test_ldflags)
     add_test(NAME syscalls_test COMMAND test_syscalls)
     message(STATUS "  syscall_tests: test_syscalls configured (P1-C07)")
 endif()

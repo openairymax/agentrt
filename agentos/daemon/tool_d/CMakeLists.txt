@@ -19,11 +19,6 @@ endif()
 if(NOT CJSON_FOUND)
     message(STATUS "libcjson not found, JSON features may be limited")
 endif()
-pkg_check_modules(YAML QUIET yaml-0.1)
-if(NOT YAML_FOUND)
-    message(STATUS "libyaml not found, YAML config support will be disabled")
-    add_definitions(-DNO_YAML_SUPPORT=1)
-endif()
 
 # ==================== 路径设置 ====================
 # agentos/daemon/common 兼容层路径
@@ -65,7 +60,7 @@ elseif(UNIX)
     target_link_libraries(agentos-tool-d PRIVATE
         agentos_common
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
 endif()
 

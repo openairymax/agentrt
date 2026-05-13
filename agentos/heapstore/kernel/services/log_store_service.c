@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <dirent.h>
+#include "agentos_dirent.h"
 #include <errno.h>
 
 #ifdef _WIN32

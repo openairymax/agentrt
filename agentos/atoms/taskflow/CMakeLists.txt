@@ -152,34 +152,32 @@ if(BUILD_TESTS)
         ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
     )
 
-    target_link_libraries(test_taskflow_advanced
+    target_link_libraries(test_taskflow_advanced PRIVATE
         agentos_taskflow
         agentos_core
         agentos_common
     )
 
     if(UNIX AND NOT APPLE)
-        target_link_libraries(test_taskflow_advanced
+        target_link_libraries(test_taskflow_advanced PRIVATE
             -Wl,--whole-archive
             agentos_coreloopthree
             -Wl,--no-whole-archive
-            dl
-            m
+            agentos_platform_libs
         )
     elseif(WIN32)
-        target_link_libraries(test_taskflow_advanced
+        target_link_libraries(test_taskflow_advanced PRIVATE
             agentos_coreloopthree
         )
     else()
-        target_link_libraries(test_taskflow_advanced
+        target_link_libraries(test_taskflow_advanced PRIVATE
             agentos_coreloopthree
         )
     endif()
     find_package(Threads REQUIRED)
-    target_link_libraries(test_taskflow_advanced Threads::Threads)
+    target_link_libraries(test_taskflow_advanced PRIVATE Threads::Threads)
 
-    target_link_options(test_taskflow_advanced PRIVATE
-        -Wl,--allow-multiple-definition)
+    target_link_libraries(test_taskflow_advanced PRIVATE agentos_test_ldflags)
 
     add_test(NAME taskflow_advanced_test COMMAND test_taskflow_advanced)
 endif()

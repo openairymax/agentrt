@@ -73,16 +73,14 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
     )
 
     if(UNIX)
-        target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE rt)
+        target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE agentos_platform_libs)
     endif()
 
     target_compile_options(test_cl3_${TEST_SHORT_NAME} PRIVATE
         -Wall -Wextra -g -Wno-unused-function
     )
 
-    target_link_options(test_cl3_${TEST_SHORT_NAME} PRIVATE
-        -Wl,--allow-multiple-definition
-    )
+    target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE agentos_test_ldflags)
 
     add_test(NAME cl3_${TEST_SHORT_NAME} COMMAND test_cl3_${TEST_SHORT_NAME})
 endforeach()
@@ -116,16 +114,14 @@ foreach(BENCH_SRC ${CL3_BENCH_SOURCES})
     )
 
     if(UNIX)
-        target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE rt)
+        target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE agentos_platform_libs)
     endif()
 
     target_compile_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
         -Wall -Wextra -g -Wno-unused-function
     )
 
-    target_link_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
-        -Wl,--allow-multiple-definition
-    )
+    target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE agentos_test_ldflags)
 
     add_test(NAME cl3_${BENCH_SHORT_NAME} COMMAND test_cl3_${BENCH_SHORT_NAME})
 endforeach()

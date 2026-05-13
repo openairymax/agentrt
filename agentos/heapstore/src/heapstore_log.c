@@ -20,7 +20,7 @@
 #include <stdarg.h>
 #include <time.h>
 #ifndef _WIN32
-#include <dirent.h>
+#include "agentos_dirent.h"
 #endif
 
 #ifdef _WIN32
