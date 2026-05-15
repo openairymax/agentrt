@@ -13,7 +13,7 @@
 #include "atomic_logging.h"
 #include <stdlib.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include "platform.h"
@@ -430,9 +430,4 @@ int atomic_logging_acquire_batch(log_record_t* records, size_t max_count, int ti
         acquired++;
     }
     return (int)acquired;
-}
-
-int atomic_logging_release(const log_record_t* record) {
-    (void)record;
-    return 0;
 }

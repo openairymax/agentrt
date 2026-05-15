@@ -13,7 +13,7 @@
 #include "error.h"
 #include "safe_string_utils.h"
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -309,6 +309,7 @@ AGENTOS_API int cm_load_json(const char* path, const char* namespace_) {
 
     size_t bytes_read = fread(data, 1, file_size, fp);
     fclose(fp);
+    if (bytes_read != (size_t)file_size) { free(data); return -1; }
     data[bytes_read] = '\0';
 
     int count = 0;

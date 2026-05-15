@@ -267,6 +267,7 @@ static int handle_tools_call(mcp_server_t server, const cJSON* params,
     }
 
     if (!tool_name) {
+        if (owns_arguments) cJSON_Delete(arguments);
         *response = mcp_make_result(
             mcp_make_error(MCP_ERROR_INVALID_PARAMS, "Missing tool name", NULL));
         return MCP_ERROR_INVALID_PARAMS;

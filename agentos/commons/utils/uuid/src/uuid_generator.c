@@ -30,23 +30,23 @@
 #include "../../string/include/string_compat.h"
 #include "../../include/atomic_compat.h"
 
-static int g_uuid_initialized = 0;
+static atomic_int g_uuid_initialized = 0;
 static atomic_uint64_t g_uuid_counter = 0;
 
 agentos_uuid_error_t agentos_uuid_init(void) {
     int expected = 0;
-    if (__atomic_compare_exchange_n(&g_uuid_initialized, &expected, 1,
-                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    if (atomic_compare_exchange_strong_explicit(&g_uuid_initialized, &expected, 1,
+                                     memory_order_seq_cst, memory_order_seq_cst)) {
 #if defined(_WIN32) || defined(_WIN64)
         RPC_STATUS status = UuidCreateSequential(NULL);
         if (status != RPC_S_OK && status != RPC_S_UUID_LOCAL_ONLY) {
-            __atomic_store_n(&g_uuid_initialized, 0, __ATOMIC_SEQ_CST);
+            atomic_store_explicit(&g_uuid_initialized, 0, memory_order_seq_cst);
             return AGENTOS_UUID_EUNAVAIL;
         }
 #elif defined(__linux__) || defined(__APPLE__)
         int fd = open("/dev/urandom", O_RDONLY);
         if (fd < 0) {
-            __atomic_store_n(&g_uuid_initialized, 0, __ATOMIC_SEQ_CST);
+            atomic_store_explicit(&g_uuid_initialized, 0, memory_order_seq_cst);
             return AGENTOS_UUID_EUNAVAIL;
         }
         close(fd);
@@ -58,7 +58,7 @@ agentos_uuid_error_t agentos_uuid_init(void) {
 }
 
 void agentos_uuid_cleanup(void) {
-    __atomic_store_n(&g_uuid_initialized, 0, __ATOMIC_SEQ_CST);
+    atomic_store_explicit(&g_uuid_initialized, 0, memory_order_seq_cst);
     g_uuid_counter = 0;
 }
 
@@ -67,7 +67,7 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
         return AGENTOS_UUID_EINVALID;
     }
 
-    if (!__atomic_load_n(&g_uuid_initialized, __ATOMIC_ACQUIRE)) {
+    if (!atomic_load_explicit(&g_uuid_initialized, memory_order_acquire)) {
         agentos_uuid_error_t err = agentos_uuid_init();
         if (err != AGENTOS_UUID_SUCCESS) {
             return err;

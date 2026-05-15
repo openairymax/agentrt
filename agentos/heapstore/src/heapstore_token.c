@@ -35,7 +35,7 @@
 
 /* ==================== 内部状态 ==================== */
 
-static int g_token_initialized = 0;
+static atomic_int g_token_initialized = 0;
 
 static atomic_uint_fast64_t g_total_prompt_tokens = 0;
 static atomic_uint_fast64_t g_total_completion_tokens = 0;
@@ -122,8 +122,8 @@ static int allocate_budget_entry(void) {
 
 heapstore_error_t heapstore_token_init(void) {
     int expected = 0;
-    if (__atomic_compare_exchange_n(&g_token_initialized, &expected, 1,
-                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    if (atomic_compare_exchange_strong_explicit(&g_token_initialized, &expected, 1,
+                                     memory_order_seq_cst, memory_order_seq_cst)) {
         token_mutex_init();
         memset(g_budget_table, 0, sizeof(g_budget_table));
         g_budget_count = 0;
@@ -142,7 +142,7 @@ heapstore_error_t heapstore_token_init(void) {
 }
 
 heapstore_error_t heapstore_token_shutdown(void) {
-    if (!__atomic_load_n(&g_token_initialized, __ATOMIC_ACQUIRE)) {
+    if (!atomic_load_explicit(&g_token_initialized, memory_order_acquire)) {
         return heapstore_SUCCESS;
     }
 
@@ -152,7 +152,7 @@ heapstore_error_t heapstore_token_shutdown(void) {
     token_mutex_unlock();
 
     token_mutex_destroy();
-    __atomic_store_n(&g_token_initialized, 0, __ATOMIC_SEQ_CST);
+    atomic_store_explicit(&g_token_initialized, 0, memory_order_seq_cst);
     return heapstore_SUCCESS;
 }
 

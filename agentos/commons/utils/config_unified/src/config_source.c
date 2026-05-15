@@ -21,7 +21,7 @@
 #endif
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /* ==================== 内部数据结构 ==================== */
@@ -45,7 +45,9 @@ typedef struct {
     char* encoding;                  // 文件编码
     bool auto_reload;                // 是否自动重载
     uint32_t reload_interval_ms;     // 重载间隔
-    uint64_t last_modified;          // 最后修改时?    FILE* file_handle;               // 文件句柄（如果需要保持打开?#ifdef __linux__
+    uint64_t last_modified;          // 最后修改时间
+    FILE* file_handle;               // 文件句柄（如果需要保持打开）
+#ifdef __linux__
     int inotify_fd;                  // inotify 文件描述符
     int inotify_wd;                  // inotify 监视描述符
     bool inotify_enabled;            // inotify 是否启用
@@ -89,7 +91,9 @@ typedef struct {
 
 /** 默认值配置源私有数据 */
 typedef struct {
-    char** keys;                     // 键数�?    char** values;                   // 值数�?    size_t count;                    // 键值对数量
+    char** keys;
+    char** vals;
+    size_t num_entries;
 } defaults_source_priv_t;
 
 /** 配置源管理器结构?*/
@@ -136,10 +140,12 @@ static config_source_t* config_source_create_base(config_source_type_t type,
     config_source_t* source = (config_source_t*)AGENTOS_CALLOC(1, sizeof(config_source_t));
     if (!source) return NULL;
     
-    // 初始化属�?    source->adapter = adapter;
+    // 初始化属�
+    source->adapter = adapter;
     source->attributes.type = type;
     source->attributes.name = name ? AGENTOS_STRDUP(name) : NULL;
-    source->attributes.priority = 50; // 默认优先�?    source->attributes.read_only = false;
+    source->attributes.priority = 50; // 默认优先�
+    source->attributes.read_only = false;
     source->attributes.watchable = false;
     source->attributes.timestamp = (uint64_t)time(NULL);
     source->attributes.version = 1;
@@ -1115,7 +1121,7 @@ static config_error_t file_source_save(config_source_t* source, const config_con
             const config_value_t* val = config_context_get(ctx, key);
             if (!key || !val) continue;
             if (i > 0) fprintf(f, ",\n");
-            const char* str_val = config_value_as_string(val);
+            const char* str_val = config_value_get_string(val, "");
             fprintf(f, "  \"%s\": \"%s\"", key, str_val ? str_val : "");
         }
         fprintf(f, "\n}\n");
@@ -1125,7 +1131,7 @@ static config_error_t file_source_save(config_source_t* source, const config_con
             const char* key = NULL;
             const config_value_t* val = config_context_get(ctx, key);
             if (!key || !val) continue;
-            const char* str_val = config_value_as_string(val);
+            const char* str_val = config_value_get_string(val, "");
             fprintf(f, "%s=%s\n", key, str_val ? str_val : "");
         }
     }
@@ -1387,7 +1393,8 @@ static config_error_t args_source_save(config_source_t* source, const config_con
  * 命令行参数不会变化�? * 
  * @param source 配置�? * @return 是否已修�? */
 static bool args_source_has_changed(config_source_t* source) {
-    // 命令行参数不会变�?    (void)source;
+    // 命令行参数不会变�
+    (void)source;
     return false;
 }
 
@@ -1458,13 +1465,12 @@ static config_error_t memory_source_load(config_source_t* source, config_context
  * 内存配置源不支持保存�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t memory_source_save(config_source_t* source, const config_context_t* ctx) {
-    if (!source) return CONFIG_ERROR_INVALID_PARAM;
+    if (!source) return CONFIG_ERROR_INVALID_ARG;
     (void)ctx;
     memory_source_priv_t* priv = (memory_source_priv_t*)source->priv_data;
-    if (!priv || !priv->data) return CONFIG_ERROR_NO_DATA;
-    source->attributes.dirty = false;
+    if (!priv || !priv->data) return CONFIG_ERROR_IO;
     AGENTOS_LOG_INFO("内存配置源保存成功 (len=%zu)", priv->data_len);
-    return CONFIG_ERROR_NONE;
+    return CONFIG_SUCCESS;
 }
 
 /**
@@ -1472,7 +1478,8 @@ static config_error_t memory_source_save(config_source_t* source, const config_c
  * 内存配置源不会自动变化�? * 
  * @param source 配置�? * @return 是否已修�? */
 static bool memory_source_has_changed(config_source_t* source) {
-    // 内存配置源需要外部触发变�?    (void)source;
+    // 内存配置源需要外部触发变�
+    (void)source;
     return false;
 }
 
@@ -1522,9 +1529,9 @@ static config_error_t defaults_source_load(config_source_t* source, config_conte
     if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
     defaults_source_priv_t* priv = (defaults_source_priv_t*)source->priv_data;
     if (!priv) return CONFIG_ERROR_INVALID_ARG;
-    for (size_t idx = 0; idx < priv->count; idx++) {
-        if (priv->keys[idx] && priv->values[idx]) {
-            config_value_t* cv = config_value_create_string(priv->values[idx]);
+    for (size_t idx = 0; idx < priv->num_entries; idx++) {
+        if (priv->keys[idx] && priv->vals[idx]) {
+            config_value_t* cv = config_value_create_string(priv->vals[idx]);
             if (cv) config_context_set(ctx, priv->keys[idx], cv);
         }
     }
@@ -1548,7 +1555,8 @@ static config_error_t defaults_source_save(config_source_t* source, const config
  * 默认值不会变化�? * 
  * @param source 配置�? * @return 是否已修�? */
 static bool defaults_source_has_changed(config_source_t* source) {
-    // 默认值不会变�?    (void)source;
+    // 默认值不会变�
+    (void)source;
     return false;
 }
 
@@ -1571,16 +1579,16 @@ static void defaults_source_destroy(config_source_t* source) {
     defaults_source_priv_t* priv = (defaults_source_priv_t*)source->priv_data;
     if (priv) {
         if (priv->keys) {
-            for (size_t i = 0; i < priv->count; i++) {
+            for (size_t i = 0; i < priv->num_entries; i++) {
                 if (priv->keys[i]) AGENTOS_FREE(priv->keys[i]);
             }
             AGENTOS_FREE(priv->keys);
         }
-        if (priv->values) {
-            for (size_t i = 0; i < priv->count; i++) {
-                if (priv->values[i]) AGENTOS_FREE(priv->values[i]);
+        if (priv->vals) {
+            for (size_t i = 0; i < priv->num_entries; i++) {
+                if (priv->vals[i]) AGENTOS_FREE(priv->vals[i]);
             }
-            AGENTOS_FREE(priv->values);
+            AGENTOS_FREE(priv->vals);
         }
         AGENTOS_FREE(priv);
     }
@@ -1619,10 +1627,7 @@ static config_error_t remote_source_load(config_source_t* source, config_context
         return CONFIG_SUCCESS;
     }
     
-    config_parser_t* parser = config_parser_get_by_format("json");
-    if (!parser || !parser->parse) return CONFIG_ERROR_UNSUPPORTED;
-    
-    return parser->parse(priv->last_response, priv->last_response_len, ctx);
+    return parse_json_full(priv->last_response, priv->last_response_len, ctx);
 }
 
 static config_error_t remote_source_save(config_source_t* source, const config_context_t* ctx) {
@@ -1711,7 +1716,8 @@ config_source_t* config_source_create_file(const config_file_source_options_t* o
     priv->last_modified = 0;
     priv->file_handle = NULL;
     
-    // 检查资源分配是否成�?    if (!priv->file_path || !priv->format || !priv->encoding) {
+    // 检查资源分配是否成�
+    if (!priv->file_path || !priv->format || !priv->encoding) {
         if (priv->file_path) AGENTOS_FREE(priv->file_path);
         if (priv->format) AGENTOS_FREE(priv->format);
         if (priv->encoding) AGENTOS_FREE(priv->encoding);
@@ -1720,7 +1726,8 @@ config_source_t* config_source_create_file(const config_file_source_options_t* o
         return NULL;
     }
     
-    // 更新属?    source->priv_data = priv;
+    // 更新属
+    source->priv_data = priv;
     source->attributes.watchable = options->auto_reload;
     source->attributes.read_only = false; // 文件配置源可以保?
 
@@ -1766,16 +1773,19 @@ config_source_t* config_source_create_env(const config_env_source_options_t* opt
     priv->env_keys = NULL;
     priv->env_count = 0;
     
-    // 检查资源分配是否成�?    if (options->separator && !priv->separator) {
+    // 检查资源分配是否成�
+    if (options->separator && !priv->separator) {
         if (priv->prefix) AGENTOS_FREE(priv->prefix);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
         return NULL;
     }
     
-    // 更新属�?    source->priv_data = priv;
+    // 更新属�
+    source->priv_data = priv;
     source->attributes.read_only = true; // 环境变量只读
-    source->attributes.watchable = false; // 环境变量变化检测复�?    
+    source->attributes.watchable = false; // 环境变量变化检测复�
+     
     return source;
 }
 
@@ -1803,15 +1813,18 @@ config_source_t* config_source_create_args(const config_args_source_options_t* o
     priv->assign_char = options->assign_char ? duplicate_string(options->assign_char) : duplicate_string("=");
     priv->allow_positional = options->allow_positional;
     
-    // 检查资源分配是否成�?    if (!priv->assign_char) {
+    // 检查资源分配是否成�
+    if (!priv->assign_char) {
         if (priv->prefix) AGENTOS_FREE(priv->prefix);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
         return NULL;
     }
     
-    // 更新属�?    source->priv_data = priv;
-    source->attributes.read_only = true; // 命令行参数只�?    source->attributes.watchable = false; // 命令行参数不会变�?    
+    // 更新属�
+    source->priv_data = priv;
+    source->attributes.read_only = true; // 命令行参数只�
+    source->attributes.watchable = false; // 命令行参数不会变�?    
     return source;
 }
 
@@ -1837,7 +1850,8 @@ config_source_t* config_source_create_memory(const config_memory_source_options_
     priv->format = options->format ? duplicate_string(options->format) : duplicate_string("json");
     priv->owns_data = true;
     
-    // 检查资源分配是否成�?    if (!priv->data || !priv->format) {
+    // 检查资源分配是否成�
+    if (!priv->data || !priv->format) {
         if (priv->data) AGENTOS_FREE(priv->data);
         if (priv->format) AGENTOS_FREE(priv->format);
         AGENTOS_FREE(priv);
@@ -1845,9 +1859,11 @@ config_source_t* config_source_create_memory(const config_memory_source_options_
         return NULL;
     }
     
-    // 更新属�?    source->priv_data = priv;
+    // 更新属�
+    source->priv_data = priv;
     source->attributes.read_only = true; // 内存配置源通常只读
-    source->attributes.watchable = false; // 需要外部触发变�?    
+    source->attributes.watchable = false; // 需要外部触发变�
+     
     return source;
 }
 
@@ -1869,25 +1885,27 @@ config_source_t* config_source_create_defaults(const char* const* default_values
     
     // 分配键值对数组
     priv->keys = (char**)AGENTOS_CALLOC(count, sizeof(char*));
-    priv->values = (char**)AGENTOS_CALLOC(count, sizeof(char*));
-    if (!priv->keys || !priv->values) {
+    priv->vals = (char**)AGENTOS_CALLOC(count, sizeof(char*));
+    if (!priv->keys || !priv->vals) {
         if (priv->keys) AGENTOS_FREE(priv->keys);
-        if (priv->values) AGENTOS_FREE(priv->values);
+        if (priv->vals) AGENTOS_FREE(priv->vals);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
         return NULL;
     }
     
-    // 复制键值对（假设default_values是[key, value, key, value, ...]格式�?    priv->count = count / 2; // 每对键值算一个配置项
+    priv->num_entries = count / 2;
     for (size_t i = 0; i < count; i += 2) {
         if (i + 1 < count) {
             priv->keys[i/2] = default_values[i] ? duplicate_string(default_values[i]) : NULL;
-            priv->values[i/2] = default_values[i+1] ? duplicate_string(default_values[i+1]) : NULL;
+            priv->vals[i/2] = default_values[i+1] ? duplicate_string(default_values[i+1]) : NULL;
         }
     }
     
-    // 更新属�?    source->priv_data = priv;
-    source->attributes.read_only = true; // 默认值只�?    source->attributes.watchable = false; // 默认值不会变�?    
+    // 更新属�
+    source->priv_data = priv;
+    source->attributes.read_only = true; // 默认值只�
+    source->attributes.watchable = false; // 默认值不会变�?    
     return source;
 }
 
@@ -2016,7 +2034,8 @@ void config_source_manager_destroy(config_source_manager_t* manager) {
 config_error_t config_source_manager_add(config_source_manager_t* manager, config_source_t* source) {
     if (!manager || !source) return CONFIG_ERROR_INVALID_ARG;
     
-    // 检查容量，必要时扩�?    if (manager->count >= manager->capacity) {
+    // 检查容量，必要时扩�
+    if (manager->count >= manager->capacity) {
         size_t new_capacity = manager->capacity * 2;
         config_source_t** new_sources = (config_source_t**)AGENTOS_REALLOC(manager->sources, 
                                                                   new_capacity * sizeof(config_source_t*));
@@ -2026,10 +2045,12 @@ config_error_t config_source_manager_add(config_source_manager_t* manager, confi
         manager->capacity = new_capacity;
     }
     
-    // 添加配置�?    manager->sources[manager->count] = source;
+    // 添加配置�
+    manager->sources[manager->count] = source;
     manager->count++;
     
-    // 更新时间�?    if (source->adapter && source->adapter->get_attributes) {
+    // 更新时间�
+    if (source->adapter && source->adapter->get_attributes) {
         const config_source_attr_t* attr = source->adapter->get_attributes(source);
         if (attr) {
             // 这里可以记录添加时间
@@ -2042,7 +2063,8 @@ config_error_t config_source_manager_add(config_source_manager_t* manager, confi
 config_error_t config_source_manager_remove(config_source_manager_t* manager, config_source_t* source) {
     if (!manager || !source) return CONFIG_ERROR_INVALID_ARG;
     
-    // 查找配置�?    for (size_t i = 0; i < manager->count; i++) {
+    // 查找配置�
+    for (size_t i = 0; i < manager->count; i++) {
         if (manager->sources[i] == source) {
             // 移动后续元素
             for (size_t j = i; j < manager->count - 1; j++) {

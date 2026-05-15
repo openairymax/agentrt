@@ -33,9 +33,9 @@ struct agentos_core_loop {
     agentos_execution_engine_t *execution;
     agentos_memory_engine_t *memory;
     agentos_loop_config_t manager;
-    volatile int running;
-    volatile int stop_requested;
-    volatile int task_pending;
+    atomic_int running;
+    atomic_int stop_requested;
+    atomic_int task_pending;
     agentos_mutex_t *lock;
     agentos_cond_t *cond;
 

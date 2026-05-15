@@ -24,6 +24,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "atomic_compat.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -180,19 +181,12 @@ extern "C" {
     AGENTOS_API char* strndup(const char* s, size_t n);
     AGENTOS_API struct tm* localtime_r(const time_t* timer, struct tm* buf);
 
-    #ifdef AGENTOS_COMPILER_MSVC
-        #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
-            InterlockedExchangeAdd((LONG volatile*)(ptr), (LONG)(val))
-        #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
-            InterlockedExchangeAdd64((LONGLONG volatile*)(ptr), (LONGLONG)(val))
-    #else
-        #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
-            __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
-        #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
-            __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
-    #endif
+    #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
+        atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
+    #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
+        atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
 
-    #ifndef _SC_PAGESIZE
+#ifndef _SC_PAGESIZE
     #define _SC_PAGESIZE            1
     #endif
     #ifndef _SC_NPROCESSORS_ONLN
@@ -206,9 +200,9 @@ extern "C" {
     #endif
 #else
     #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
-        __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
+        atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
     #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
-        __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
+        atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
 #endif
 
 /* ==================== 路径分隔符 ==================== */

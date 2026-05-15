@@ -6,7 +6,7 @@
 
 #include "io.h"
 #include "../memory/include/agentos_memory.h"
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

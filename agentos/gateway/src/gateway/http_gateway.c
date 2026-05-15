@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
@@ -439,6 +439,18 @@ static void http_gateway_destroy(void* gateway_impl) {
         gateway->protocol_handler = NULL;
     }
 
+    /* 清理动态端点 */
+    if (gateway->dynamic_endpoints) {
+        for (size_t i = 0; i < gateway->dynamic_endpoint_count; i++) {
+            free(gateway->dynamic_endpoints[i].method);
+            free(gateway->dynamic_endpoints[i].path);
+        }
+        free(gateway->dynamic_endpoints);
+        gateway->dynamic_endpoints = NULL;
+    }
+    gateway->dynamic_endpoint_count = 0;
+    gateway->dynamic_endpoint_capacity = 0;
+
     free(gateway);
 }
 static const char* http_gateway_get_name(void* gateway_impl __attribute__((unused))) {
@@ -618,6 +630,20 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
     
     gateway_t* gw = malloc(sizeof(gateway_t));
     if (!gw) {
+        free(gateway->cors.allowed_methods);
+        free(gateway->cors.allowed_headers);
+        if (gateway->cors.allowed_origins) {
+            for (size_t i = 0; i < gateway->cors.allowed_origins_count; i++) {
+                free(gateway->cors.allowed_origins[i]);
+            }
+            free(gateway->cors.allowed_origins);
+        }
+        if (gateway->protocol_handler) {
+            gateway_protocol_handler_destroy(gateway->protocol_handler);
+        }
+        if (gateway->rate_limiter) {
+            gateway_rate_limiter_destroy(gateway->rate_limiter);
+        }
         free(gateway->host);
         free(gateway);
         return NULL;
@@ -628,6 +654,44 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
     gw->type = GATEWAY_TYPE_HTTP;
     
     return gw;
+}
+
+int http_gateway_register_endpoint(http_gateway_t* gateway,
+                                    const char* method,
+                                    const char* path,
+                                    gateway_endpoint_handler_t handler,
+                                    void* user_data) {
+    if (!gateway || !method || !path || !handler) {
+        return -1;
+    }
+
+    if (gateway->dynamic_endpoint_count >= gateway->dynamic_endpoint_capacity) {
+        size_t new_cap = gateway->dynamic_endpoint_capacity == 0
+                             ? 8
+                             : gateway->dynamic_endpoint_capacity * 2;
+        http_dynamic_endpoint_t* new_arr = realloc(
+            gateway->dynamic_endpoints, new_cap * sizeof(http_dynamic_endpoint_t));
+        if (!new_arr) {
+            return -2;
+        }
+        gateway->dynamic_endpoints = new_arr;
+        gateway->dynamic_endpoint_capacity = new_cap;
+    }
+
+    http_dynamic_endpoint_t* slot = &gateway->dynamic_endpoints[gateway->dynamic_endpoint_count];
+    slot->method = strdup(method);
+    slot->path = strdup(path);
+    if (!slot->method || !slot->path) {
+        free(slot->method);
+        free(slot->path);
+        return -2;
+    }
+    slot->handler = handler;
+    slot->user_data = user_data;
+
+    gateway->dynamic_endpoint_count++;
+
+    return 0;
 }
 
 #endif /* GATEWAY_HAS_HTTP */

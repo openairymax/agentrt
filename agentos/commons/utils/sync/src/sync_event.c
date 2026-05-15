@@ -11,6 +11,9 @@
  */
 
 #include "sync_platform.h"
+#include "sync_internal.h"
+#include <string.h>
+#include <time.h>
 
 sync_result_t sync_event_create(sync_event_t* event,
                               bool manual_reset,
@@ -42,15 +45,15 @@ sync_result_t sync_event_create(sync_event_t* event,
         return SYNC_ERROR_UNKNOWN;
     }
 #else
-    int result1 = pthread_mutex_init(&e->mutex, NULL);
+    int result1 = pthread_mutex_init(&e->event.mutex, NULL);
     if (result1 != 0) {
         AGENTOS_FREE(e->name);
         AGENTOS_FREE(e);
         return sync_internal_posix_error_to_result(result1);
     }
-    int result2 = pthread_cond_init(&e->cond, NULL);
+    int result2 = pthread_cond_init(&e->event.cond, NULL);
     if (result2 != 0) {
-        pthread_mutex_destroy(&e->mutex);
+        pthread_mutex_destroy(&e->event.mutex);
         AGENTOS_FREE(e->name);
         AGENTOS_FREE(e);
         return sync_internal_posix_error_to_result(result2);
@@ -62,7 +65,7 @@ sync_result_t sync_event_create(sync_event_t* event,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_event_destroy(sync_event_t event) {
+sync_result_t sync_event_free(sync_event_t event) {
     if (event == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -76,8 +79,8 @@ sync_result_t sync_event_destroy(sync_event_t event) {
 #ifdef _WIN32
     CloseHandle(event->event);
 #else
-    pthread_cond_destroy(&event->cond);
-    pthread_mutex_destroy(&event->mutex);
+    pthread_cond_destroy(&event->event.cond);
+    pthread_mutex_destroy(&event->event.mutex);
 #endif
 
     AGENTOS_FREE(event->name);
@@ -85,7 +88,7 @@ sync_result_t sync_event_destroy(sync_event_t event) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_event_wait(sync_event_t event, const sync_timeout_t* timeout) {
+sync_result_t sync_event_wait_ex(sync_event_t event, const sync_timeout_t* timeout) {
     if (event == NULL || !event->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -104,12 +107,12 @@ sync_result_t sync_event_wait(sync_event_t event, const sync_timeout_t* timeout)
         ResetEvent(event->event);
     }
 #else
-    pthread_mutex_lock(&event->mutex);
+    pthread_mutex_lock(&event->event.mutex);
     while (!event->signaled) {
         if (timeout == NULL) {
-            int rc = pthread_cond_wait(&event->cond, &event->mutex);
+            int rc = pthread_cond_wait(&event->event.cond, &event->event.mutex);
             if (rc != 0) {
-                pthread_mutex_unlock(&event->mutex);
+                pthread_mutex_unlock(&event->event.mutex);
                 return sync_internal_posix_error_to_result(rc);
             }
         } else {
@@ -121,14 +124,14 @@ sync_result_t sync_event_wait(sync_event_t event, const sync_timeout_t* timeout)
                 ts.tv_sec++;
                 ts.tv_nsec -= 1000000000;
             }
-            int rc = pthread_cond_timedwait(&event->cond, &event->mutex, &ts);
+            int rc = pthread_cond_timedwait(&event->event.cond, &event->event.mutex, &ts);
             if (rc == ETIMEDOUT) {
-                pthread_mutex_unlock(&event->mutex);
+                pthread_mutex_unlock(&event->event.mutex);
                 sync_internal_update_stats_timeout(&event->stats);
                 return SYNC_ERROR_TIMEOUT;
             }
             if (rc != 0) {
-                pthread_mutex_unlock(&event->mutex);
+                pthread_mutex_unlock(&event->event.mutex);
                 return sync_internal_posix_error_to_result(rc);
             }
         }
@@ -136,14 +139,14 @@ sync_result_t sync_event_wait(sync_event_t event, const sync_timeout_t* timeout)
     if (!event->manual_reset) {
         event->signaled = false;
     }
-    pthread_mutex_unlock(&event->mutex);
+    pthread_mutex_unlock(&event->event.mutex);
 #endif
 
     sync_internal_update_stats_wait(&event->stats, 0);
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_event_signal(sync_event_t event) {
+sync_result_t sync_event_set_ex(sync_event_t event) {
     if (event == NULL || !event->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -151,10 +154,10 @@ sync_result_t sync_event_signal(sync_event_t event) {
 #ifdef _WIN32
     SetEvent(event->event);
 #else
-    pthread_mutex_lock(&event->mutex);
+    pthread_mutex_lock(&event->event.mutex);
     event->signaled = true;
-    pthread_cond_broadcast(&event->cond);
-    pthread_mutex_unlock(&event->mutex);
+    pthread_cond_broadcast(&event->event.cond);
+    pthread_mutex_unlock(&event->event.mutex);
 #endif
 
     return SYNC_SUCCESS;
@@ -168,9 +171,9 @@ sync_result_t sync_event_reset(sync_event_t event) {
 #ifdef _WIN32
     ResetEvent(event->event);
 #else
-    pthread_mutex_lock(&event->mutex);
+    pthread_mutex_lock(&event->event.mutex);
     event->signaled = false;
-    pthread_mutex_unlock(&event->mutex);
+    pthread_mutex_unlock(&event->event.mutex);
 #endif
 
     return SYNC_SUCCESS;

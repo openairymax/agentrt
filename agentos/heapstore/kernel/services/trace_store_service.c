@@ -12,6 +12,7 @@
 #include "../../include/heapstore_trace.h"
 #include "../../include/heapstore.h"
 #include "../../include/utils.h"
+#include "atomic_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,7 +69,7 @@ typedef struct {
     char storage_path[512];
     uint64_t max_storage_bytes;
     uint32_t sampling_rate;  // 采样率，每N个追踪点存储1个
-    volatile uint32_t is_initialized;
+    atomic_uint_fast32_t is_initialized;
     uint64_t total_traces_stored;
     uint64_t total_bytes_stored;
 } trace_store_service_ctx_t;
@@ -91,7 +92,7 @@ int trace_store_service_init(const char* storage_path,
         return -1;
     }
     
-    if (g_ctx.is_initialized) {
+    if (atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) {
         return 0;
     }
     
@@ -121,7 +122,7 @@ int trace_store_service_init(const char* storage_path,
     }
 #endif
     
-    g_ctx.is_initialized = 1;
+    atomic_store_explicit(&g_ctx.is_initialized, 1, memory_order_release);
     return 0;
 }
 
@@ -133,7 +134,7 @@ int trace_store_service_init(const char* storage_path,
  */
 int trace_store_service_store_point(const heapstore_trace_point_t* trace_point)
 {
-    if (!g_ctx.is_initialized || !trace_point) {
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire) || !trace_point) {
         return -1;
     }
     
@@ -190,7 +191,7 @@ int trace_store_service_store_point(const heapstore_trace_point_t* trace_point)
  */
 int trace_store_service_store_batch(const heapstore_trace_point_t* trace_points, int count)
 {
-    if (!g_ctx.is_initialized || !trace_points || count <= 0) {
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire) || !trace_points || count <= 0) {
         return -1;
     }
     
@@ -242,7 +243,7 @@ int trace_store_service_query_traces(const heapstore_trace_query_t* query,
         return -1;
     }
 
-    if (!g_ctx.is_initialized) {
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -353,7 +354,7 @@ int trace_store_service_export_traces(const time_t* start_time,
                                       const char* export_path)
 {
     if (!export_format || !export_path) return -1;
-    if (!g_ctx.is_initialized) return -1;
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) return -1;
 
     FILE* f = fopen(export_path, "w");
     if (!f) return -2;
@@ -433,7 +434,7 @@ int trace_store_service_get_stats(uint64_t* out_total_traces,
                                   uint64_t* out_total_bytes,
                                   uint32_t* out_sampling_rate)
 {
-    if (!g_ctx.is_initialized) {
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) {
         return -1;
     }
     
@@ -452,7 +453,7 @@ int trace_store_service_get_stats(uint64_t* out_total_traces,
  */
 int trace_store_service_cleanup_old_files(int days_to_keep)
 {
-    if (!g_ctx.is_initialized) return -1;
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) return -1;
     if (days_to_keep <= 0) {
         days_to_keep = 7;
     }
@@ -491,7 +492,7 @@ int trace_store_service_cleanup_old_files(int days_to_keep)
  */
 void trace_store_service_shutdown(void)
 {
-    if (!g_ctx.is_initialized) {
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) {
         return;
     }
     
