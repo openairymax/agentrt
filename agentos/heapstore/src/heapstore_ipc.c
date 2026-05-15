@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "atomic_compat.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -457,7 +458,7 @@ typedef struct {
     char channel_id[128];
     ipc_shm_region_t* shm;
     size_t data_len;
-    volatile uint32_t ready_flag;
+    atomic_uint_fast32_t ready_flag;
 } ipc_active_channel_t;
 
 #define IPC_ACTIVE_MAX 64
@@ -485,7 +486,7 @@ static ipc_active_channel_t* create_active_channel(const char* channel_id, size_
     if (!ac->shm) return NULL;
 
     ac->data_len = 0;
-    ac->ready_flag = 0;
+    atomic_store_explicit(&ac->ready_flag, 0, memory_order_release);
     s_active_count++;
     return ac;
 }
@@ -605,7 +606,7 @@ heapstore_error_t heapstore_ipc_send(const char* channel_id,
 
     *msg_len = (uint32_t)len;
     memcpy((char*)ac->shm->mapped + header_size, data, len);
-    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+    atomic_thread_fence(memory_order_seq_cst);
     *msg_ready = 1;
     ac->data_len = len;
 
@@ -639,7 +640,7 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
     }
 
     volatile uint32_t* msg_ready = (volatile uint32_t*)((char*)ac->shm->mapped + sizeof(uint32_t));
-    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+    atomic_thread_fence(memory_order_seq_cst);
 
     if (*msg_ready != 1) {
         agentos_mutex_unlock(&s_ipc_lock);
@@ -660,7 +661,7 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
     }
 
     memcpy(buf, (char*)ac->shm->mapped + sizeof(uint32_t) * 2, len);
-    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+    atomic_thread_fence(memory_order_seq_cst);
     *msg_ready = 0;
     *msg_len = 0;
     ac->data_len = 0;

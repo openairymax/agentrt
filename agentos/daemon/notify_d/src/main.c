@@ -2,6 +2,7 @@
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "atomic_compat.h"
 #include "platform.h"
 #include "error.h"
 #include "svc_logger.h"
@@ -53,9 +54,9 @@ typedef struct {
     agentos_socket_t server_fd;
     agentos_mutex_t lock;
     agentos_thread_t event_thread;
-    volatile int running;
-    volatile int event_running;
-    volatile int force_stop;
+    atomic_int running;
+    atomic_int event_running;
+    atomic_int force_stop;
     uint64_t start_time;
     uint64_t notified_count;
     uint64_t error_count;
@@ -70,11 +71,11 @@ typedef struct {
 } notify_d_service_t;
 
 static notify_d_service_t g_service = {0};
-static volatile int g_shutdown = 0;
+static atomic_int g_shutdown = 0;
 
 static void notify_d_signal_handler(int sig) {
     
-    g_shutdown = 1;
+    atomic_store_explicit(&g_shutdown, 1, memory_order_seq_cst);
 }
 
 static int notify_d_compute_ws_accept_key(const char* client_key,
@@ -550,7 +551,7 @@ static void notify_d_handle_request(notify_d_service_t* svc,
             }
         }
         client->channel = strdup(channel);
-        if (channel != "inbound") free((void*)channel);
+        if (strcmp(channel, "inbound") != 0) free((void*)channel);
         svc->client_count++;
 
         int ret = notify_d_enqueue(svc, buffer, client->channel, NULL);

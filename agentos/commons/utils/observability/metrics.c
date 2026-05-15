@@ -9,7 +9,7 @@
 #include <stdio.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #ifndef AGENTOS_NO_CJSON

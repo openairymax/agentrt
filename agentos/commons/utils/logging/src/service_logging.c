@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <time.h>
@@ -23,7 +23,6 @@
 #define MAX_OUTPUTTERS 16
 #define MAX_FILTERS 32
 
-static const int DEFAULT_WORKER_THREADS = 2;
 static const int DEFAULT_CONFIG_RELOAD_INTERVAL = 30;
 
 typedef log_monitoring_stats_t service_logging_stats_t;
@@ -51,11 +50,7 @@ typedef struct {
     int outputter_count;
     filter_t* filters[MAX_FILTERS];
     int filter_count;
-    agentos_thread_t* worker_threads;
-    bool* worker_running;
     agentos_mutex_t mutex;
-    agentos_mutex_t worker_mutex;
-    agentos_cond_t worker_cond;
     service_logging_stats_t stats;
     log_rotation_config_t rotation_config;
     log_transport_config_t transport_config;
@@ -101,7 +96,6 @@ static int file_outputter_output(outputter_t* self, const log_record_t* record) 
 
     const char* level_str = "UNKNOWN";
     switch (record->level) {
-        case LOG_LEVEL_TRACE: level_str = "TRACE"; break;
         case LOG_LEVEL_DEBUG: level_str = "DEBUG"; break;
         case LOG_LEVEL_INFO:  level_str = "INFO";  break;
         case LOG_LEVEL_WARN:  level_str = "WARN";  break;
@@ -162,27 +156,6 @@ void service_log_output_record(const log_record_t* record) {
     agentos_mutex_unlock(&g_service_state.mutex);
 }
 
-void service_log_process_queue(int thread_idx __attribute__((unused))) {
-}
-
-static void* worker_thread_func(void* arg) {
-    int thread_idx = *(int*)arg;
-    AGENTOS_FREE(arg);
-
-    agentos_mutex_lock(&g_service_state.worker_mutex);
-    while (g_service_state.worker_running && g_service_state.worker_running[thread_idx]) {
-        agentos_cond_timedwait(&g_service_state.worker_cond,
-                               &g_service_state.worker_mutex, 1000);
-
-        if (!g_service_state.worker_running || !g_service_state.worker_running[thread_idx]) break;
-
-        service_log_process_queue(thread_idx);
-    }
-    agentos_mutex_unlock(&g_service_state.worker_mutex);
-
-    return NULL;
-}
-
 int service_logging_init(const service_logging_config_t* manager) {
     if (g_service_state.initialized) {
         return -1;
@@ -190,17 +163,6 @@ int service_logging_init(const service_logging_config_t* manager) {
 
     if (agentos_mutex_init(&g_service_state.mutex) != 0) {
         return -2;
-    }
-
-    if (agentos_mutex_init(&g_service_state.worker_mutex) != 0) {
-        agentos_mutex_destroy(&g_service_state.mutex);
-        return -3;
-    }
-
-    if (agentos_cond_init(&g_service_state.worker_cond) != 0) {
-        agentos_mutex_destroy(&g_service_state.worker_mutex);
-        agentos_mutex_destroy(&g_service_state.mutex);
-        return -4;
     }
 
     if (manager) {
@@ -211,7 +173,7 @@ int service_logging_init(const service_logging_config_t* manager) {
         g_service_state.manager.enable_transport = false;
         g_service_state.manager.enable_monitoring = false;
         g_service_state.manager.enable_management = false;
-        g_service_state.manager.worker_threads = DEFAULT_WORKER_THREADS;
+        g_service_state.manager.worker_threads = 0;
         g_service_state.manager.max_outputters = MAX_OUTPUTTERS;
         g_service_state.manager.max_filters = MAX_FILTERS;
         g_service_state.manager.config_reload_interval = DEFAULT_CONFIG_RELOAD_INTERVAL;
@@ -226,31 +188,6 @@ int service_logging_init(const service_logging_config_t* manager) {
         console_outputter->output = console_outputter_output;
         console_outputter->destroy = console_outputter_destroy;
         g_service_state.outputters[g_service_state.outputter_count++] = console_outputter;
-    }
-
-    int worker_count = g_service_state.manager.worker_threads;
-    if (worker_count > 0) {
-        g_service_state.worker_threads = (agentos_thread_t*)AGENTOS_CALLOC(worker_count, sizeof(agentos_thread_t));
-        g_service_state.worker_running = (bool*)AGENTOS_CALLOC(worker_count, sizeof(bool));
-
-        if (g_service_state.worker_threads && g_service_state.worker_running) {
-            for (int i = 0; i < worker_count; i++) {
-                g_service_state.worker_running[i] = true;
-
-                int* thread_idx = (int*)AGENTOS_MALLOC(sizeof(int));
-                if (!thread_idx) {
-                    g_service_state.worker_running[i] = false;
-                    continue;
-                }
-                *thread_idx = i;
-
-                if (agentos_thread_create(&g_service_state.worker_threads[i],
-                                          worker_thread_func, thread_idx) != 0) {
-                    g_service_state.worker_running[i] = false;
-                    AGENTOS_FREE(thread_idx);
-                }
-            }
-        }
     }
 
     g_service_state.initialized = true;
@@ -371,8 +308,7 @@ int service_logging_process_record(const log_record_t* record) {
         }
     }
 
-    g_service_state.stats.records_processed++;
-    g_service_state.stats.records_output += success_count;
+    g_service_state.stats.throughput.total_records++;
     agentos_mutex_unlock(&g_service_state.mutex);
 
     return success_count > 0 ? 0 : -2;
@@ -427,26 +363,6 @@ void service_logging_cleanup(void) {
 
     agentos_mutex_lock(&g_service_state.mutex);
 
-    if (g_service_state.worker_running) {
-        int worker_count = g_service_state.manager.worker_threads;
-        for (int i = 0; i < worker_count; i++) {
-            g_service_state.worker_running[i] = false;
-        }
-
-        agentos_cond_broadcast(&g_service_state.worker_cond);
-        agentos_mutex_unlock(&g_service_state.mutex);
-
-        for (int i = 0; i < worker_count; i++) {
-            agentos_thread_join(g_service_state.worker_threads[i], NULL);
-        }
-
-        agentos_mutex_lock(&g_service_state.mutex);
-        AGENTOS_FREE(g_service_state.worker_threads);
-        AGENTOS_FREE(g_service_state.worker_running);
-        g_service_state.worker_threads = NULL;
-        g_service_state.worker_running = NULL;
-    }
-
     for (int i = 0; i < g_service_state.outputter_count; i++) {
         outputter_t* outputter = g_service_state.outputters[i];
         if (outputter && outputter->destroy) {
@@ -465,8 +381,6 @@ void service_logging_cleanup(void) {
 
     agentos_mutex_unlock(&g_service_state.mutex);
 
-    agentos_cond_destroy(&g_service_state.worker_cond);
-    agentos_mutex_destroy(&g_service_state.worker_mutex);
     agentos_mutex_destroy(&g_service_state.mutex);
 
     memset(&g_service_state, 0, sizeof(g_service_state));

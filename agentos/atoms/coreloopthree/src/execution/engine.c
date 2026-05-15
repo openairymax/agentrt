@@ -64,7 +64,7 @@ struct agentos_execution_engine {
     agentos_cond_t *task_available_cond;
     agentos_thread_t *worker_threads;
     size_t worker_count;
-    volatile int running;
+    atomic_int running;
 };
 
 static void tcb_retain(task_tcb_t *tcb);

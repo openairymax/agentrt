@@ -3,6 +3,7 @@
 #include "agentos.h"
 #include "delegate.h"
 #include "platform.h"
+#include "atomic_compat.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +23,7 @@ struct agentos_parallel_dispatcher {
     agentos_tool_execute_fn executor;
     void *executor_user_data;
     agentos_mutex_t mutex;
-    volatile int cancelled;
+    atomic_int cancelled;
 };
 
 static int has_path_conflict(const agentos_tool_call_t *a, const agentos_tool_call_t *b)

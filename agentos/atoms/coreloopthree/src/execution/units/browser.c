@@ -7,6 +7,7 @@
 #include "agentos.h"
 #include "execution.h"
 #include "memory_compat.h"
+#include "atomic_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,7 +83,7 @@ typedef struct {
 } browser_manager_t;
 
 static browser_manager_t g_browser_mgr;
-static int __atomic_store_n(&g_browser_mgr_initialized, 0, __ATOMIC_SEQ_CST);
+static atomic_int g_browser_mgr_initialized = 0;
 
 static int browser_mgr_init(void);
 static void browser_mgr_shutdown(void);
@@ -218,8 +219,8 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
 static int browser_mgr_init(void)
 {
     int expected = 0;
-    if (!__atomic_compare_exchange_n(&g_browser_mgr_initialized, &expected, 1,
-                                      0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
+    if (!atomic_compare_exchange_strong_explicit(&g_browser_mgr_initialized, &expected, 1,
+                                                  memory_order_seq_cst, memory_order_seq_cst))
         return 0;
 
     memset(&g_browser_mgr, 0, sizeof(g_browser_mgr));
@@ -237,7 +238,7 @@ static int browser_mgr_init(void)
 
 static void browser_mgr_shutdown(void)
 {
-    if (!__atomic_load_n(&g_browser_mgr_initialized, __ATOMIC_ACQUIRE))
+    if (!atomic_load_explicit(&g_browser_mgr_initialized, memory_order_acquire))
         return;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);
@@ -258,7 +259,7 @@ static void browser_mgr_shutdown(void)
 
     agentos_mutex_destroy(&g_browser_mgr.pool_lock);
     agentos_mutex_destroy(&g_browser_mgr.browser_lock);
-    __atomic_store_n(&g_browser_mgr_initialized, 0, __ATOMIC_SEQ_CST);
+    atomic_store_explicit(&g_browser_mgr_initialized, 0, memory_order_seq_cst);
 }
 
 int agentos_browser_launch(const char *browser_path, int port, int headless,
@@ -443,7 +444,7 @@ int agentos_browser_attach(const char *debugging_url)
 
 int agentos_browser_close(void)
 {
-    if (!__atomic_load_n(&g_browser_mgr_initialized, __ATOMIC_ACQUIRE))
+    if (!atomic_load_explicit(&g_browser_mgr_initialized, memory_order_acquire))
         return -1;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);
@@ -511,7 +512,7 @@ int agentos_browser_close(void)
 
 int agentos_browser_get_state(void)
 {
-    if (!__atomic_load_n(&g_browser_mgr_initialized, __ATOMIC_ACQUIRE))
+    if (!atomic_load_explicit(&g_browser_mgr_initialized, memory_order_acquire))
         return BROWSER_STATE_STOPPED;
     return (int)g_browser_mgr.state;
 }
@@ -651,7 +652,7 @@ int agentos_browser_destroy_context(const char *context_id)
 
 int agentos_browser_get_context_count(void)
 {
-    if (!__atomic_load_n(&g_browser_mgr_initialized, __ATOMIC_ACQUIRE))
+    if (!atomic_load_explicit(&g_browser_mgr_initialized, memory_order_acquire))
         return 0;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);

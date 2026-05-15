@@ -13,12 +13,13 @@
 #include "ipc_service_bus.h"
 #include "svc_logger.h"
 #include "platform.h"
+#include "atomic_compat.h"
 #include "error.h"
 #include "safe_string_utils.h"
 #include "svc_common.h"
 #include "ipc_client.h"
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -47,7 +48,7 @@ typedef struct {
 typedef struct {
     uint64_t msg_id;
     ipc_bus_message_t* response;
-    volatile int completed;
+    atomic_int completed;
     agentos_mutex_t mutex;
     agentos_cond_t cond;
 } pending_request_t;

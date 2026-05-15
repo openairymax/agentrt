@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
@@ -285,7 +285,7 @@ static const http_route_t http_routes[] = {
  *
  * @param method HTTP 方法（如 "POST", "GET"）
  * @param path URL 路径（如 "/", "/health"）
- * @return 匹配的路由处理函数
+ * @return 匹配的路由处理函数，未匹配返回 NULL
  */
 static http_route_handler_t find_http_route(const char* method, const char* path) {
     for (const http_route_t* route = http_routes; route->method != NULL; route++) {
@@ -295,7 +295,88 @@ static http_route_handler_t find_http_route(const char* method, const char* path
             }
         }
     }
-    return handle_not_found;
+    return NULL;
+}
+
+/**
+ * @brief 搜索并处理动态注册的端点 (CC=4)
+ *
+ * 将 MHD 请求/响应桥接到 gateway_endpoint_request_t / gateway_endpoint_response_t，
+ * 调用用户注册的 handler，再将响应桥接回 MHD。
+ *
+ * @param gateway HTTP网关实例
+ * @param connection MHD连接对象
+ * @param context 请求上下文
+ * @param method HTTP方法
+ * @param url 请求URL
+ * @return MHD_YES/MHD_NO
+ */
+static int handle_dynamic_endpoint_route(http_gateway_t* gateway,
+                                         struct MHD_Connection* connection,
+                                         http_request_context_t* context,
+                                         const char* method,
+                                         const char* url) {
+    const http_dynamic_endpoint_t* matched = NULL;
+
+    for (size_t i = 0; i < gateway->dynamic_endpoint_count; i++) {
+        const http_dynamic_endpoint_t* ep = &gateway->dynamic_endpoints[i];
+        if (strcmp(method, ep->method) == 0 && strcmp(url, ep->path) == 0) {
+            matched = ep;
+            break;
+        }
+    }
+
+    if (!matched) {
+        return MHD_NO;
+    }
+
+    gateway_endpoint_request_t req = {
+        .method = method,
+        .path = url,
+        .body = context->upload_data,
+        .body_len = context->upload_data_size,
+        .user_data = matched->user_data
+    };
+
+    gateway_endpoint_response_t resp = {
+        .status_code = 500,
+        .content_type = "application/json",
+        .body = NULL,
+        .body_len = 0
+    };
+
+    int handler_ret = matched->handler(&req, &resp);
+
+    struct MHD_Response* response = NULL;
+    int ret = MHD_NO;
+
+    if (handler_ret == 0 && resp.body) {
+        response = MHD_create_response_from_buffer(
+            resp.body_len, (void*)resp.body, MHD_RESPMEM_MUST_COPY);
+        if (response) {
+            MHD_add_response_header(response, "Content-Type", resp.content_type);
+            gateway_apply_security_headers(response);
+            ret = MHD_queue_response(connection, resp.status_code, response);
+            MHD_destroy_response(response);
+        }
+        atomic_fetch_add(&gateway->requests_total, 1);
+        atomic_fetch_add(&gateway->bytes_sent, resp.body_len);
+    } else {
+        const char* err_body = "{\"error\":\"Internal server error\"}";
+        response = MHD_create_response_from_buffer(
+            strlen(err_body), (void*)err_body, MHD_RESPMEM_PERSISTENT);
+        if (response) {
+            MHD_add_response_header(response, "Content-Type", "application/json");
+            gateway_apply_security_headers(response);
+            ret = MHD_queue_response(connection, 500, response);
+            MHD_destroy_response(response);
+        }
+        atomic_fetch_add(&gateway->requests_failed, 1);
+    }
+
+    free(resp.body);
+
+    return ret;
 }
 
 /* ========== 重构后的主请求处理函数 (CC=8) ========== */
@@ -404,9 +485,20 @@ int handle_http_request(void* cls, struct MHD_Connection* connection,
         return handle_post_jsonrpc(gateway, connection, context);
     }
     
-    /* 阶段 4: 路由到其他处理函数 */
+    /* 阶段 4: 路由到其他处理函数（动态端点优先） */
+    int dynamic_ret = handle_dynamic_endpoint_route(gateway, connection, context, method, url);
+    if (dynamic_ret != MHD_NO) {
+        return dynamic_ret;
+    }
+
+    /* 阶段 5: 静态路由表 */
     int (*route_handler)(http_gateway_t*, struct MHD_Connection*, http_request_context_t*) = 
         find_http_route(method, url);
     
-    return route_handler(gateway, connection, context);
+    if (route_handler) {
+        return route_handler(gateway, connection, context);
+    }
+
+    /* 阶段 6: 404 Not Found */
+    return handle_not_found(gateway, connection, context);
 }

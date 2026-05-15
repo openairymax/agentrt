@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "atomic_compat.h"
 
 /* ==================== 核心接口实现 ==================== */
 
@@ -74,12 +75,12 @@ typedef struct agentos_resource_record {
 
 static agentos_resource_record_t* g_resource_head = NULL;
 static agentos_mutex_t g_resource_mutex;
-static int g_resource_mutex_initialized = 0;
+static atomic_int g_resource_mutex_initialized = 0;
 
 static void ensure_mutex_initialized(void) {
     int expected = 0;
-    if (__atomic_compare_exchange_n(&g_resource_mutex_initialized, &expected, 1,
-                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    if (atomic_compare_exchange_strong_explicit(&g_resource_mutex_initialized, &expected, 1,
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         agentos_mutex_init(&g_resource_mutex);
     }
 }

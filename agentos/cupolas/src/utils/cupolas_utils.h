@@ -331,8 +331,9 @@ extern "C" {
 /** @brief Disabled logging noop (compiles to nothing) */
 #define CUPOLAS_LOG(fmt, ...) ((void)0)
 
-/** @brief Disabled error logging noop */
-#define CUPOLAS_LOG_ERROR(fmt, ...) ((void)0)
+/** @brief Error logging always enabled even in release builds */
+#define CUPOLAS_LOG_ERROR(fmt, ...) \
+    fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
 
 /** @brief Disabled debug logging noop */
 #define CUPOLAS_LOG_DEBUG(fmt, ...) ((void)0)

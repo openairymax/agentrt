@@ -33,11 +33,11 @@ static trace_span_t *g_trace_spans      = NULL;
 static agentos_mutex_t *g_trace_lock    = NULL;
 static agentos_mutex_t *g_current_lock  = NULL;
 static trace_span_t *g_current_span     = NULL;
-static int g_trace_initialized = 0;
+static atomic_int g_trace_initialized = 0;
 
 static agentos_error_t ensure_trace_init(void)
 {
-    if (__atomic_load_n(&g_trace_initialized, __ATOMIC_ACQUIRE))
+    if (atomic_load_explicit(&g_trace_initialized, memory_order_acquire))
         return AGENTOS_SUCCESS;
 
     if (!g_trace_lock) {
@@ -53,25 +53,16 @@ static agentos_error_t ensure_trace_init(void)
             return AGENTOS_ENOMEM;
         }
     }
-    __atomic_store_n(&g_trace_initialized, 1, __ATOMIC_SEQ_CST);
+    atomic_store_explicit(&g_trace_initialized, 1, memory_order_seq_cst);
     return AGENTOS_SUCCESS;
 }
 
-#ifdef _WIN32
-static volatile LONG span_counter = 0;
-static void generate_span_id(char *buf, size_t len)
-{
-    LONG id = InterlockedIncrement(&span_counter);
-    snprintf(buf, len, "span_%ld", id);
-}
-#else
 static atomic_uint64_t span_counter = 0;
 static void generate_span_id(char *buf, size_t len)
 {
-    uint64_t id = (uint64_t) atomic_fetch_add(&span_counter, 1);
+    uint64_t id = atomic_fetch_add_explicit(&span_counter, 1, memory_order_seq_cst);
     snprintf(buf, len, "span_%llu", (unsigned long long) id);
 }
-#endif
 
 agentos_error_t agentos_trace_init(void)
 {

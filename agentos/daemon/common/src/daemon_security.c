@@ -823,7 +823,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
         return AGENTOS_OK;
     }
 
-    uint8_t signature[256];
+    uint8_t signature[256] = {0};
     size_t sig_len = fread(signature, 1, sizeof(signature), sig_fp);
     fclose(sig_fp);
 

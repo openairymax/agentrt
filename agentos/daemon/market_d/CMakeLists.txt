@@ -36,6 +36,7 @@ set(MARKET_D_SOURCES
     src/publisher.c
     src/market_service_impl.c
     src/market_svc_adapter.c
+    src/agent_registry_core.c
 )
 
 # 创建可执行文件
