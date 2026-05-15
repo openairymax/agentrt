@@ -23,8 +23,11 @@ set(SOURCES
     utils/logging/src/service_logging.c
     utils/logging/logging_common.c
     utils/memory/src/memory.c
+    utils/memory/src/memory_pool.c
+    utils/memory/src/memory_debug.c
     utils/memory/memory_common.c
     utils/string/string_common.c
+    utils/string/src/string.c
     utils/sync/src/sync.c
     utils/sync/src/sync_platform.c
     utils/sync/src/sync_internal.c

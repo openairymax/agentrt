@@ -21,6 +21,7 @@ set(GATEWAY_SOURCES
     src/gateway/http_gateway_routes.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
+    src/gateway/gateway_protocol_bridge.c
     src/utils/jsonrpc.c
     src/utils/syscall_router.c
     src/utils/gateway_rpc_handler.c
@@ -65,6 +66,12 @@ target_include_directories(gateway
         ${COMMONS_DIR}/utils/sync/include
         ${COMMONS_DIR}/utils/compat/include
         ${COMMONS_DIR}/utils/include
+        ${PROTOCOLS_DIR}/core/router/include
+        ${PROTOCOLS_DIR}/core/registry/include
+        ${PROTOCOLS_DIR}/core/adapter/include
+        ${PROTOCOLS_DIR}/core/transformers/include
+        ${PROTOCOLS_DIR}/common/include
+        ${PROTOCOLS_DIR}/src
         ${PROTOCOLS_DIR}/include
         ${PROTOCOLS_DIR}/protocol/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include

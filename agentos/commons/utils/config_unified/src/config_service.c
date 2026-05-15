@@ -1084,11 +1084,12 @@ static config_value_t* config_decrypt_string_value(const char* hex_data,
     AGENTOS_FREE(plaintext);
     return result;
 #else
+    errno = ENOSYS;
     return NULL;
 #endif
 }
 
-config_value_t* config_encrypt_value(const config_value_t* value, const encryption_config_t* manager) {
+config_value_t* config_decrypt_value(const config_value_t* value, const encryption_config_t* manager) {
     if (!value) return NULL;
     if (!manager || manager->algorithm == ENCRYPTION_NONE) {
         return config_value_clone(value);
@@ -1477,17 +1478,16 @@ config_context_t* config_service_create(const char* service_name,
     if (!ctx) return NULL;
 
     if (schema) {
-        ctx->schema = schema;
+        config_context_set_schema(ctx, schema);
         config_schema_apply_defaults(schema, ctx);
     }
 
     if (enable_hot_reload) {
-        ctx->hot_reload_enabled = true;
-        ctx->reload_interval_ms = 5000;
+        config_context_set_hot_reload(ctx, true, 5000);
     }
 
     if (enable_encryption) {
-        ctx->encryption_enabled = true;
+        config_context_set_encryption(ctx, true);
     }
 
     return ctx;
