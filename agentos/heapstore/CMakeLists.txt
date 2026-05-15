@@ -9,6 +9,8 @@ set(heapstore_SOURCES
     src/heapstore_token.c
     src/heapstore_integration.c
     src/utils.c
+    kernel/services/trace_store_service.c
+    kernel/services/log_store_service.c
 )
 
 set(heapstore_HEADERS

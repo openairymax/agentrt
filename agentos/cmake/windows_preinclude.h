@@ -92,12 +92,12 @@ typedef struct cJSON cJSON;
 static inline cJSON* cJSON_CreateObject(void) { return (cJSON*)calloc(1, sizeof(cJSON)); }
 static inline cJSON* cJSON_CreateArray(void) { return (cJSON*)calloc(1, sizeof(cJSON)); }
 static inline void cJSON_Delete(cJSON* c) { free(c); }
-static inline char* cJSON_PrintUnformatted(cJSON* c) { (void)c; return _strdup("{}"); }
-static inline void cJSON_AddNumberToObject(cJSON* o, const char* n, double d) { (void)o;(void)n;(void)d; }
-static inline void cJSON_AddStringToObject(cJSON* o, const char* n, const char* s) { (void)o;(void)n;(void)s; }
-static inline void cJSON_AddBoolToObject(cJSON* o, const char* n, int b) { (void)o;(void)n;(void)b; }
-static inline void cJSON_AddItemToArray(cJSON* a, cJSON* i) { (void)a;(void)i; }
-static inline void cJSON_AddItemToObject(cJSON* o, const char* n, cJSON* i) { (void)o;(void)n;(void)i; }
+static inline char* cJSON_PrintUnformatted(cJSON* c) { (void)c; errno = ENOSYS; return NULL; }
+static inline void cJSON_AddNumberToObject(cJSON* o, const char* n, double d) { (void)o;(void)n;(void)d; errno = ENOSYS; }
+static inline void cJSON_AddStringToObject(cJSON* o, const char* n, const char* s) { (void)o;(void)n;(void)s; errno = ENOSYS; }
+static inline void cJSON_AddBoolToObject(cJSON* o, const char* n, int b) { (void)o;(void)n;(void)b; errno = ENOSYS; }
+static inline void cJSON_AddItemToArray(cJSON* a, cJSON* i) { (void)a;(void)i; errno = ENOSYS; }
+static inline void cJSON_AddItemToObject(cJSON* o, const char* n, cJSON* i) { (void)o;(void)n;(void)i; errno = ENOSYS; }
 #endif
 
 #endif /* _MSC_VER */

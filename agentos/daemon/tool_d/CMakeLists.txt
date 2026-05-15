@@ -31,10 +31,12 @@ set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 set(TOOL_D_SOURCES
     src/main.c
     src/service.c
+    src/config.c
     src/registry.c
     src/executor.c
     src/validator.c
     src/cache.c
+    src/tool_svc_adapter.c
     src/utils/tool_helpers.c
 )
 

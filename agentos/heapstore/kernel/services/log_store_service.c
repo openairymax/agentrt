@@ -18,8 +18,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "agentos_dirent.h"
 #include <errno.h>
+#include <sys/stat.h>
+
+static void log_store_service_check_rotation(const char* current_file);
+#include "agentos_dirent.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -129,6 +132,7 @@ int log_store_service_store_entry(heapstore_log_level_t level,
     // 写入日志条目
     const char* level_str = "UNKNOWN";
     switch (level) {
+        case HEAPSTORE_LOG_FATAL: level_str = "FATAL"; break;
         case HEAPSTORE_LOG_ERROR: level_str = "ERROR"; break;
         case HEAPSTORE_LOG_WARN:  level_str = "WARN";  break;
         case HEAPSTORE_LOG_INFO:  level_str = "INFO";  break;
@@ -267,7 +271,7 @@ int log_store_service_query_entries(const time_t* start_time,
             else if (strcmp(level_str, "WARN") == 0) entry_level = HEAPSTORE_LOG_WARN;
             else if (strcmp(level_str, "DEBUG") == 0) entry_level = HEAPSTORE_LOG_DEBUG;
 
-            if (level != -1 && entry_level != level) {
+            if (level != (heapstore_log_level_t)-1 && entry_level != level) {
                 continue;
             }
 

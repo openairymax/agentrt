@@ -11,6 +11,7 @@
 agentos_event_loop_t* agentos_event_loop_create(int max_events) {
     (void)max_events;
     LOG_ERROR("agentos_event_loop: epoll not available on Windows");
+    errno = ENOSYS;
     return NULL;
 }
 
@@ -18,28 +19,28 @@ void agentos_event_loop_destroy(agentos_event_loop_t* loop) { (void)loop; }
 int agentos_event_loop_add_fd(agentos_event_loop_t* loop, int fd, uint32_t events,
                                agentos_event_callback_t cb, void* user_data) {
     (void)loop; (void)fd; (void)events; (void)cb; (void)user_data;
-    return -1;
+    return -ENOSYS;
 }
 int agentos_event_loop_add_fd_lt(agentos_event_loop_t* loop, int fd, uint32_t events,
                                   agentos_event_callback_t cb, void* user_data) {
     (void)loop; (void)fd; (void)events; (void)cb; (void)user_data;
-    return -1;
+    return -ENOSYS;
 }
 int agentos_event_loop_mod_fd(agentos_event_loop_t* loop, int fd, uint32_t events) {
-    (void)loop; (void)fd; (void)events; return -1;
+    (void)loop; (void)fd; (void)events; return -ENOSYS;
 }
 void agentos_event_loop_remove_fd(agentos_event_loop_t* loop, int fd) { (void)loop; (void)fd; }
 uint64_t agentos_event_loop_add_timer(agentos_event_loop_t* loop, uint64_t interval_ms,
                                        agentos_timer_callback_t cb, void* user_data) {
-    (void)loop; (void)interval_ms; (void)cb; (void)user_data; return 0;
+    (void)loop; (void)interval_ms; (void)cb; (void)user_data; errno = ENOSYS; return 0;
 }
 int agentos_event_loop_cancel_timer(agentos_event_loop_t* loop, uint64_t timer_id) {
-    (void)loop; (void)timer_id; return -1;
+    (void)loop; (void)timer_id; return -ENOSYS;
 }
-int agentos_event_loop_run(agentos_event_loop_t* loop) { (void)loop; return -1; }
+int agentos_event_loop_run(agentos_event_loop_t* loop) { (void)loop; return -ENOSYS; }
 void agentos_event_loop_stop(agentos_event_loop_t* loop) { (void)loop; }
-int agentos_event_loop_wakeup(agentos_event_loop_t* loop) { (void)loop; return -1; }
-int agentos_event_loop_get_fd_count(agentos_event_loop_t* loop) { (void)loop; return 0; }
+int agentos_event_loop_wakeup(agentos_event_loop_t* loop) { (void)loop; return -ENOSYS; }
+int agentos_event_loop_get_fd_count(agentos_event_loop_t* loop) { (void)loop; return -ENOSYS; }
 
 #else
 

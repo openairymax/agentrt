@@ -142,10 +142,10 @@ static int claude_generate_response(const char* user_msg,
                                     const char* system_ctx,
                                     char* out_buf, size_t buf_len) {
 #ifndef AGENTOS_HAS_CURL
-    if (user_msg) { }
-    if (system_ctx) { }
+    (void)user_msg;
+    (void)system_ctx;
     if (out_buf && buf_len > 0) out_buf[0] = '\0';
-    return -1;
+    return -ENOSYS;
 #else
     if (!user_msg || !out_buf || buf_len == 0) return -1;
 
@@ -604,7 +604,7 @@ int claude_messages_create(claude_adapter_context_t* ctx,
     ctx->total_tokens_out += response->output_tokens;
     return 0;
 #else
-    return -10;
+    return -ENOSYS;
 #endif
 }
 
