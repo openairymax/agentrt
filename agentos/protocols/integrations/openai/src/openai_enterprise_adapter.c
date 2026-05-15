@@ -537,8 +537,8 @@ int openai_chat_completion(openai_handle_t handle,
 
 #ifndef AGENTOS_HAS_CURL
     openai_record_latency(adapter, 0.0);
-    if (request) { }
-    return -10;
+    (void)request;
+    return -ENOSYS;
 #else
     if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
 
@@ -661,10 +661,10 @@ int openai_chat_completion_streaming(
     if (!adapter->initialized) return -2;
 
 #ifndef AGENTOS_HAS_CURL
-    if (request) { }
-    if (on_chunk) { }
-    if (user_data) { }
-    return -10;
+    (void)request;
+    (void)on_chunk;
+    (void)user_data;
+    return -ENOSYS;
 #else
     if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
 

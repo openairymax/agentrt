@@ -40,6 +40,7 @@ set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 set(LLM_D_SOURCES
     src/main.c
     src/service.c
+    src/llm_svc_adapter.c
     src/providers/registry.c
     src/providers/openai.c
     src/providers/anthropic.c

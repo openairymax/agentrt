@@ -112,6 +112,7 @@ int cupolas_vault_init(const cupolas_vault_config_t* config) {
     }
 
     while (atomic_load(&g_vault_ctx.initialized) != VLT_INIT_COMPLETE) {
+        sched_yield();
     }
     return 0;
 }

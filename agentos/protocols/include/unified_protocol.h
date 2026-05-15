@@ -100,6 +100,15 @@ typedef enum {
 #define PROTO_CLAUDE         (AGENTOS_PROTOCOL_COUNT + 2)
 #define PROTO_AGNTCY         (AGENTOS_PROTOCOL_COUNT + 3)
 #define PROTO_CHINA_ECO      (AGENTOS_PROTOCOL_COUNT + 4)
+#define PROTOCOL_WEBSOCKET    (AGENTOS_PROTOCOL_COUNT + 10)
+#define PROTOCOL_GRPC         (AGENTOS_PROTOCOL_COUNT + 11)
+#define PROTOCOL_MQTT         (AGENTOS_PROTOCOL_COUNT + 12)
+#define PROTOCOL_AMQP         (AGENTOS_PROTOCOL_COUNT + 13)
+#define PROTOCOL_RAW_TCP      (AGENTOS_PROTOCOL_COUNT + 14)
+#define PROTOCOL_RAW_UDP      (AGENTOS_PROTOCOL_COUNT + 15)
+#define PROTOCOL_STDIO        (AGENTOS_PROTOCOL_COUNT + 16)
+#define PROTOCOL_IPC          (AGENTOS_PROTOCOL_COUNT + 17)
+#define ENCODING_BINARY       1
 
 typedef struct {
     char* data;
@@ -155,9 +164,44 @@ int protocol_adapter_send(protocol_adapter_t adapter, const agentos_message_t* m
  */
 int protocol_adapter_recv(protocol_adapter_t adapter, agentos_message_t* msg, size_t max_len);
 
-/**
- * @brief 获取协议类型名称
- */
+typedef struct protocol_stack_s protocol_stack_s;
+typedef struct protocol_stack_s* protocol_stack_handle_t;
+
+typedef struct {
+    char name[128];
+    uint32_t max_adapters;
+    bool enable_logging;
+    agentos_protocol_type_t default_protocol;
+    uint32_t max_message_size;
+    uint32_t timeout_ms;
+    bool enable_compression;
+    bool enable_encryption;
+    void* custom_config;
+} protocol_stack_config_t;
+
+protocol_stack_handle_t protocol_stack_create(const protocol_stack_config_t* config);
+void protocol_stack_destroy(protocol_stack_handle_t handle);
+int protocol_stack_register_adapter(protocol_stack_handle_t handle, protocol_adapter_t adapter);
+int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t* message);
+int protocol_stack_receive(protocol_stack_handle_t handle, unified_message_t* message, uint32_t timeout_ms);
+int protocol_stack_set_callback(protocol_stack_handle_t handle,
+                                void (*callback)(const unified_message_t* message, void* user_data),
+                                void* user_data);
+int protocol_stack_get_stats(protocol_stack_handle_t handle, void* stats);
+
+unified_message_t unified_message_create(protocol_type_t protocol,
+                                         message_direction_t direction,
+                                         const char* endpoint,
+                                         const void* payload,
+                                         size_t payload_size);
+void unified_message_destroy(unified_message_t* message);
+const char* protocol_type_to_string(protocol_type_t type);
+protocol_type_t protocol_type_from_string(const char* str);
+
+int protocol_auto_transform(const unified_message_t* source,
+                           unified_message_t* target,
+                           const char* target_protocol_name);
+
 const char* protocol_type_name(agentos_protocol_type_t type);
 
 #ifdef __cplusplus

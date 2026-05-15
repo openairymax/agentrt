@@ -39,6 +39,7 @@ endif()
 set(PROTOCOLS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/core/router/include
     ${CMAKE_CURRENT_SOURCE_DIR}/core/adapter/include
     ${CMAKE_CURRENT_SOURCE_DIR}/core/transformers/include
@@ -95,6 +96,9 @@ endif()
 # ============================================================
 set(PROTOCOLS_COMMON_SOURCES
     common/src/unified_protocol.c
+    common/src/protocols_impl.c
+    src/agentos_protocol_interface.c
+    src/protocol_toplevel_impl.c
     ../daemon/common/src/safe_string_utils.c
 )
 
