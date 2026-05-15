@@ -3,15 +3,9 @@
 
 
 find_package(Threads REQUIRED)
-# 符号导出管理
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-
-# 定义构建共享库时的宏
-if(BUILD_SHARED_LIBS)
-    target_compile_definitions(agentos_syscall PRIVATE AGENTOS_BUILDING_SHARED)
-endif()
 
 set(SOURCES
     src/task.c
@@ -32,7 +26,10 @@ set(SOURCES
 
 add_library(agentos_syscall STATIC ${SOURCES})
 
-# 使用统一的头文件路径管理
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(agentos_syscall PRIVATE AGENTOS_BUILDING_SHARED)
+endif()
+
 target_link_libraries(agentos_syscall PUBLIC agentos_atoms)
 
 target_include_directories(agentos_syscall PUBLIC

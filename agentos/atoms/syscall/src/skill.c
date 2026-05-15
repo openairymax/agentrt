@@ -11,7 +11,7 @@
 #include "sandbox_permission.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
+#include "atomic_compat.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
@@ -34,14 +34,14 @@ static agentos_mutex_t* skill_lock = NULL;
  * @brief 线程安全地确保技能锁已初始化
  */
 static void ensure_skill_lock(void) {
-    agentos_mutex_t* current = __atomic_load_n(&skill_lock, __ATOMIC_ACQUIRE);
+    agentos_mutex_t* current = (agentos_mutex_t*)atomic_load_ptr((void* volatile*)&skill_lock, memory_order_acquire);
     if (!current) {
         agentos_mutex_t* new_lock = agentos_mutex_create();
         if (!new_lock) return;
 
         agentos_mutex_t* expected = NULL;
-        if (!__atomic_compare_exchange_n(&skill_lock, &expected, new_lock,
-                                          false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+        if (!atomic_compare_exchange_strong_ptr((void* volatile*)&skill_lock, (void**)&expected, (void*)new_lock,
+                                                 memory_order_acq_rel, memory_order_acquire)) {
             agentos_mutex_destroy(new_lock);
         }
     }
@@ -306,8 +306,8 @@ agentos_error_t agentos_sys_skill_install(const char* skill_url, char** out_skil
     ensure_skill_lock();
 
     char id_buf[64];
-    static int counter = 0;
-    snprintf(id_buf, sizeof(id_buf), "skill_%d", __atomic_fetch_add(&counter, 1, __ATOMIC_SEQ_CST));
+    static atomic_int counter = 0;
+    snprintf(id_buf, sizeof(id_buf), "skill_%d", atomic_fetch_add_explicit(&counter, 1, memory_order_seq_cst));
 
     skill_entry_t* entry = (skill_entry_t*)AGENTOS_CALLOC(1, sizeof(skill_entry_t));
     if (!entry) return AGENTOS_ENOMEM;
@@ -331,20 +331,20 @@ agentos_error_t agentos_sys_skill_install(const char* skill_url, char** out_skil
     entry->execute_count = 0;
     entry->total_execute_ms = 0;
 
-    agentos_mutex_lock(__atomic_load_n(&skill_lock, __ATOMIC_ACQUIRE));
+    agentos_mutex_lock((agentos_mutex_t*)atomic_load_ptr((void* volatile*)&skill_lock, memory_order_acquire));
     entry->next = skill_list;
     skill_list = entry;
     agentos_mutex_unlock(skill_lock);
 
     *out_skill_id = AGENTOS_STRDUP(entry->skill_id);
     if (!*out_skill_id) {
-        agentos_mutex_lock(__atomic_load_n(&skill_lock, __ATOMIC_ACQUIRE));
+        agentos_mutex_lock((agentos_mutex_t*)atomic_load_ptr((void* volatile*)&skill_lock, memory_order_acquire));
         skill_entry_t** pp = &skill_list;
         while (*pp) {
             if (*pp == entry) { *pp = entry->next; break; }
             pp = &(*pp)->next;
         }
-        agentos_mutex_unlock(__atomic_load_n(&skill_lock, __ATOMIC_ACQUIRE));
+        agentos_mutex_unlock((agentos_mutex_t*)atomic_load_ptr((void* volatile*)&skill_lock, memory_order_acquire));
         AGENTOS_FREE(entry->skill_id);
         AGENTOS_FREE(entry->url);
         AGENTOS_FREE(entry->skill_type);

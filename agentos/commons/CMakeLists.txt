@@ -16,21 +16,35 @@ set(SOURCES
     utils/io/file_utils.c
     utils/security/input_validator.c
     utils/resource/resource_guard.c
+    utils/resource/resource_quota.c
     utils/logging/src/logging.c
     utils/logging/src/logging_compat.c
+    utils/logging/src/atomic_logging.c
+    utils/logging/src/service_logging.c
     utils/logging/logging_common.c
     utils/memory/src/memory.c
     utils/memory/memory_common.c
     utils/string/string_common.c
     utils/sync/src/sync.c
     utils/sync/src/sync_platform.c
+    utils/sync/src/sync_internal.c
+    utils/sync/src/sync_spinlock.c
+    utils/sync/src/sync_mutex.c
+    utils/sync/src/sync_rwlock.c
+    utils/sync/src/sync_semaphore.c
+    utils/sync/src/sync_condition.c
+    utils/sync/src/sync_event.c
+    utils/sync/src/sync_barrier.c
+    utils/sync/src/sync_recursive_mutex.c
     utils/sync/sync_common.c
     utils/cache/cache_common.c
     utils/compat/src/compat.c
+    utils/compat/src/compat2.c
     utils/cognition/cognition_common.c
     utils/execution/execution_common.c
     utils/strategy/strategy_common.c
     utils/network/network_common.c
+    utils/uuid/src/uuid_generator.c
 )
 if(NOT WIN32)
     list(APPEND SOURCES utils/ipc/ipc_common.c)
@@ -69,6 +83,9 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/strategy/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/network/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/ipc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/uuid/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/config/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/resource/include
 )
 
 target_compile_definitions(agentos_common PRIVATE _CRT_SECURE_NO_WARNINGS)

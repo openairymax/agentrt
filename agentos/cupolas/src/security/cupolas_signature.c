@@ -164,7 +164,7 @@ int cupolas_signature_verify_file(const char* file_path,
 
     *result = CUPOLAS_SIG_NO_SIGNATURE;
 
-    uint8_t hash[32];
+    uint8_t hash[32] = {0};
     int ret = cupolas_signature_compute_hash(file_path, hash);
     if (ret != CUPOLAS_SIG_OK) {
         return ret;
@@ -373,7 +373,7 @@ int cupolas_signature_sign_file(const char* file_path,
         return CUPOLAS_SIG_INVALID;
     }
 
-    uint8_t hash[32];
+    uint8_t hash[32] = {0};
     int ret = cupolas_signature_compute_hash(file_path, hash);
     if (ret != CUPOLAS_SIG_OK) {
         return ret;

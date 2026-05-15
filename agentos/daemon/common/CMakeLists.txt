@@ -49,6 +49,7 @@ set(SVC_COMMON_SOURCES
     src/orchestrator.c        # 流程编排器
     src/thread_pool.c         # 工作线程池
     src/parallel_dispatcher.c # 工具并行执行引擎
+    src/checkpoint.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/metacognition.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/confidence_calibrator.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/thinking_chain.c

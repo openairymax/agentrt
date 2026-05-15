@@ -1,18 +1,19 @@
 #include "delegate.h"
 #include "agentos.h"
 #include "platform.h"
+#include "atomic_compat.h"
 #include <stdlib.h>
 #include <string.h>
 
 static agentos_mutex_t g_delegate_mutex;
-static int g_delegate_mutex_initialized = 0;
+static atomic_int g_delegate_mutex_initialized = 0;
 static int g_delegate_depth = 0;
 static uint64_t g_task_counter = 0;
 
 static void ensure_mutex_init(void) {
     int expected = 0;
-    if (__atomic_compare_exchange_n(&g_delegate_mutex_initialized, &expected, 1,
-                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    if (atomic_compare_exchange_strong_explicit(&g_delegate_mutex_initialized, &expected, 1,
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         agentos_mutex_init(&g_delegate_mutex);
     }
 }
@@ -86,9 +87,11 @@ agentos_delegate_task_t* agentos_delegate_create(
     agentos_mutex_unlock(&g_delegate_mutex);
 
     task->task_id = (char*)malloc(64);
-    if (task->task_id) {
-        snprintf(task->task_id, 64, "delegate_%lu", (unsigned long)my_id);
+    if (!task->task_id) {
+        free(task);
+        return NULL;
     }
+    snprintf(task->task_id, 64, "delegate_%lu", (unsigned long)my_id);
 
     task->description = delegate_strdup(task_description);
     if (!task->description) {
@@ -106,6 +109,12 @@ agentos_delegate_task_t* agentos_delegate_create(
 
     if (config) {
         task->config.focus_prompt = delegate_strdup(config->focus_prompt);
+        if (config->focus_prompt && !task->config.focus_prompt) {
+            free(task->task_id);
+            free(task->description);
+            free(task);
+            return NULL;
+        }
         task->config.allowed_tool_count = config->allowed_tool_count;
         task->config.allowed_tools = config->allowed_tools;
         task->owned_tools = delegate_deep_copy_tools(

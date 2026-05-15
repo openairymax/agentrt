@@ -12,6 +12,8 @@
 
 #include "sync_platform.h"
 #include <time.h>
+#include "sync_internal.h"
+#include <string.h>
 
 sync_result_t sync_mutex_create(sync_mutex_t* mutex, const sync_attr_t* attr) {
     if (mutex == NULL) {
@@ -51,7 +53,7 @@ sync_result_t sync_mutex_create(sync_mutex_t* mutex, const sync_attr_t* attr) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_mutex_destroy(sync_mutex_t mutex) {
+sync_result_t sync_mutex_free(sync_mutex_t mutex) {
     if (mutex == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -73,7 +75,7 @@ sync_result_t sync_mutex_destroy(sync_mutex_t mutex) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_mutex_lock(sync_mutex_t mutex, const sync_timeout_t* timeout) {
+sync_result_t sync_mutex_lock_ex(sync_mutex_t mutex, const sync_timeout_t* timeout) {
     if (mutex == NULL || !mutex->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -84,14 +86,18 @@ sync_result_t sync_mutex_lock(sync_mutex_t mutex, const sync_timeout_t* timeout)
     }
 
 #ifdef _WIN32
-    DWORD wait_ms = (timeout == NULL) ? INFINITE : (DWORD)timeout->timeout_ms;
-    DWORD result = WaitForSingleObject(mutex->mutex, wait_ms);
-    if (result == WAIT_TIMEOUT) {
-        sync_internal_update_stats_timeout(&mutex->stats);
-        return SYNC_ERROR_TIMEOUT;
-    }
-    if (result != WAIT_OBJECT_0) {
-        return SYNC_ERROR_UNKNOWN;
+    if (timeout == NULL || timeout->timeout_ms == 0) {
+        EnterCriticalSection(&mutex->mutex);
+    } else {
+        DWORD wait_ms = (DWORD)timeout->timeout_ms;
+        DWORD start_tick = GetTickCount();
+        while (!TryEnterCriticalSection(&mutex->mutex)) {
+            if (GetTickCount() - start_tick >= wait_ms) {
+                sync_internal_update_stats_timeout(&mutex->stats);
+                return SYNC_ERROR_TIMEOUT;
+            }
+            Sleep(1);
+        }
     }
 #else
     int rc;
@@ -149,7 +155,7 @@ sync_result_t sync_mutex_try_lock(sync_mutex_t mutex) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_mutex_unlock(sync_mutex_t mutex) {
+sync_result_t sync_mutex_unlock_ex(sync_mutex_t mutex) {
     if (mutex == NULL || !mutex->initialized) {
         return SYNC_ERROR_INVALID;
     }

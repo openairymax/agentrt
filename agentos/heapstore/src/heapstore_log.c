@@ -102,6 +102,9 @@ static FILE* get_main_log_file(void) {
     snprintf(filepath, sizeof(filepath), "%s/kernel/agentos.log", base);
 
     s_main_log_file = fopen(filepath, "a");
+    if (!s_main_log_file) {
+        return NULL;
+    }
     return s_main_log_file;
 }
 

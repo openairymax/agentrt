@@ -8,6 +8,7 @@
 #include "task.h"
 #include <stdlib.h>
 
+#include "atomic_compat.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
@@ -24,7 +25,7 @@ typedef struct agentos_timer {
 
 static agentos_timer_t* timer_list = NULL;
 static agentos_mutex_t* timer_lock = NULL;
-static volatile int timer_processing = 0;
+static atomic_int timer_processing = 0;
 
 agentos_timer_t* agentos_timer_create(
     agentos_timer_callback_t callback,
@@ -52,14 +53,9 @@ agentos_error_t agentos_timer_start(
         if (!new_lock) return AGENTOS_ENOMEM;
 
         agentos_mutex_t* expected = NULL;
-#ifdef _MSC_VER
-        agentos_mutex_t* prev = InterlockedCompareExchangePointer(
-            (PVOID volatile*)&timer_lock, new_lock, NULL);
-        if (prev != NULL) {
-#else
-        if (!__atomic_compare_exchange_n(&timer_lock, &expected, new_lock,
-                                         0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
-#endif
+        if (!atomic_compare_exchange_strong_ptr(
+                (void* volatile*)&timer_lock, (void**)&expected, (void*)new_lock,
+                memory_order_seq_cst, memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
     }
@@ -158,7 +154,9 @@ static void remove_timer_from_list(agentos_timer_t* target) {
 void agentos_time_timer_process(void) {
     if (!timer_lock) return;
 
-    if (__atomic_compare_exchange_n(&timer_processing, &(int){0}, 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST) != 0) {
+    int expected = 0;
+    if (!atomic_compare_exchange_strong_explicit(&timer_processing, &expected, 1,
+                                                  memory_order_seq_cst, memory_order_seq_cst)) {
         return;
     }
 
@@ -172,7 +170,7 @@ void agentos_time_timer_process(void) {
     int capacity = 64;
     fire_entry_t* to_fire = (fire_entry_t*)AGENTOS_CALLOC(capacity, sizeof(fire_entry_t));
     if (!to_fire) {
-        __atomic_store_n(&timer_processing, 0, __ATOMIC_SEQ_CST);
+        atomic_store_explicit(&timer_processing, 0, memory_order_seq_cst);
         return;
     }
     int fire_count = 0;
@@ -223,7 +221,7 @@ void agentos_time_timer_process(void) {
     }
 
     AGENTOS_FREE(to_fire);
-    __atomic_store_n(&timer_processing, 0, __ATOMIC_SEQ_CST);
+    atomic_store_explicit(&timer_processing, 0, memory_order_seq_cst);
 }
 
 void agentos_time_timer_cleanup(void) {

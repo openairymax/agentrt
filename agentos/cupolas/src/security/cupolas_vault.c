@@ -15,6 +15,7 @@
 #include "cupolas_vault.h"
 #include "cupolas_error.h"
 #include "utils/cupolas_utils.h"
+#include "atomic_compat.h"
 #include "../platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,7 +72,7 @@ struct cupolas_vault {
 };
 
 typedef struct {
-    bool initialized;
+    atomic_int initialized;
     cupolas_vault_config_t default_config;
     cupolas_rwlock_t global_lock;
 } vault_global_ctx_t;
@@ -82,30 +83,41 @@ static vault_global_ctx_t g_vault_ctx = {0};
  * 初始化/清理
  * ============================================================================ */
 
+#define VLT_INIT_UNINIT   0
+#define VLT_INIT_PROGRESS 1
+#define VLT_INIT_COMPLETE 2
+
 int cupolas_vault_init(const cupolas_vault_config_t* config) {
-    if (g_vault_ctx.initialized) {
+    if (atomic_load(&g_vault_ctx.initialized) == VLT_INIT_COMPLETE) {
         return 0;
     }
 
-    memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
+    int expected = VLT_INIT_UNINIT;
+    if (atomic_compare_exchange_strong(&g_vault_ctx.initialized, &expected, VLT_INIT_PROGRESS)) {
+        memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 
-    if (config) {
-        memcpy(&g_vault_ctx.default_config, config, sizeof(cupolas_vault_config_t));
-    } else {
-        g_vault_ctx.default_config.enable_audit = true;
-        g_vault_ctx.default_config.enable_auto_lock = true;
-        g_vault_ctx.default_config.auto_lock_seconds = 300;
-        g_vault_ctx.default_config.max_retry_count = 3;
+        if (config) {
+            memcpy(&g_vault_ctx.default_config, config, sizeof(cupolas_vault_config_t));
+        } else {
+            g_vault_ctx.default_config.enable_audit = true;
+            g_vault_ctx.default_config.enable_auto_lock = true;
+            g_vault_ctx.default_config.auto_lock_seconds = 300;
+            g_vault_ctx.default_config.max_retry_count = 3;
+        }
+
+        cupolas_rwlock_init(&g_vault_ctx.global_lock);
+
+        atomic_store(&g_vault_ctx.initialized, VLT_INIT_COMPLETE);
+        return 0;
     }
 
-    cupolas_rwlock_init(&g_vault_ctx.global_lock);
-    g_vault_ctx.initialized = true;
-
+    while (atomic_load(&g_vault_ctx.initialized) != VLT_INIT_COMPLETE) {
+    }
     return 0;
 }
 
 void cupolas_vault_cleanup(void) {
-    if (!g_vault_ctx.initialized) {
+    if (atomic_load(&g_vault_ctx.initialized) != VLT_INIT_COMPLETE) {
         return;
     }
 
@@ -118,7 +130,7 @@ int cupolas_vault_open(const char* vault_id, const char* password, cupolas_vault
         return -1;
     }
 
-    if (!g_vault_ctx.initialized) {
+    if (atomic_load(&g_vault_ctx.initialized) != VLT_INIT_COMPLETE) {
         cupolas_vault_init(NULL);
     }
 
@@ -148,17 +160,23 @@ int cupolas_vault_open(const char* vault_id, const char* password, cupolas_vault
     if (password) {
 #ifdef CUPOLAS_USE_OPENSSL
         uint8_t salt[SALT_SIZE] = {0};
+        uint8_t id_hash[SHA256_DIGEST_LENGTH];
+        SHA256((const unsigned char*)vault_id, strlen(vault_id), id_hash);
+        memcpy(salt, id_hash, SALT_SIZE);
         if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
                               100000, EVP_sha256(), AES_KEY_SIZE, v->master_key) != 1) {
             cupolas_rwlock_destroy(&v->lock);
+            free(v->entries);
+            free(v->vault_id);
             free(v);
             return -1;
         }
 #else
-        size_t pw_len = strlen(password);
-        for (size_t i = 0; i < AES_KEY_SIZE; i++) {
-            v->master_key[i] = (uint8_t)(password[i % pw_len] ^ (i & 0xFF));
-        }
+        cupolas_rwlock_destroy(&v->lock);
+        free(v->entries);
+        free(v->vault_id);
+        free(v);
+        return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
         v->is_locked = false;
     }
@@ -220,20 +238,17 @@ int cupolas_vault_unlock(cupolas_vault_t* vault, const char* password) {
 
 #ifdef CUPOLAS_USE_OPENSSL
     uint8_t salt[SALT_SIZE] = {0};
+    uint8_t id_hash[SHA256_DIGEST_LENGTH];
+    SHA256((const unsigned char*)vault->vault_id, strlen(vault->vault_id), id_hash);
+    memcpy(salt, id_hash, SALT_SIZE);
     if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
                           100000, EVP_sha256(), AES_KEY_SIZE, vault->master_key) != 1) {
         cupolas_rwlock_unlock(&vault->lock);
         return -1;
     }
 #else
-    if (!password || strlen(password) == 0) {
-        cupolas_rwlock_unlock(&vault->lock);
-        return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
-    }
-    size_t pw_len = strlen(password);
-    for (size_t i = 0; i < AES_KEY_SIZE; i++) {
-        vault->master_key[i] = (uint8_t)(password[i % pw_len] ^ (i & 0xFF));
-    }
+    cupolas_rwlock_unlock(&vault->lock);
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
     vault->is_locked = false;
@@ -295,11 +310,12 @@ int cupolas_vault_store(cupolas_vault_t* vault,
     }
 
     credential_entry_t* entry = find_entry(vault, cred_id);
+    int existed = (entry != NULL);
     if (entry) {
         free(entry->encrypted_data);
         free(entry->metadata.cred_id);
     } else {
-        entry = &vault->entries[vault->entry_count++];
+        entry = &vault->entries[vault->entry_count];
         memset(entry, 0, sizeof(credential_entry_t));
         entry->cred_id = strdup(cred_id);
     }
@@ -313,21 +329,40 @@ int cupolas_vault_store(cupolas_vault_t* vault,
 #ifdef CUPOLAS_USE_OPENSSL
     if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1 ||
         RAND_bytes(entry->salt, SALT_SIZE) != 1) {
+        if (!existed) {
+            free(entry->cred_id);
+            free(entry->metadata.cred_id);
+            memset(entry, 0, sizeof(credential_entry_t));
+        }
         cupolas_rwlock_unlock(&vault->lock);
         return -4;
     }
 
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
+        if (!existed) {
+            free(entry->cred_id);
+            free(entry->metadata.cred_id);
+            memset(entry, 0, sizeof(credential_entry_t));
+        } else {
+            entry->encrypted_data = NULL;
+        }
         cupolas_rwlock_unlock(&vault->lock);
         return -4;
     }
 
-    int len;
+    int len = 0;
     size_t ciphertext_len = data_len + AES_BLOCK_SIZE;
     entry->encrypted_data = (uint8_t*)malloc(ciphertext_len);
     if (!entry->encrypted_data) {
         EVP_CIPHER_CTX_free(ctx);
+        if (!existed) {
+            free(entry->cred_id);
+            free(entry->metadata.cred_id);
+            memset(entry, 0, sizeof(credential_entry_t));
+        } else {
+            entry->encrypted_data = NULL;
+        }
         cupolas_rwlock_unlock(&vault->lock);
         return -4;
     }
@@ -335,13 +370,31 @@ int cupolas_vault_store(cupolas_vault_t* vault,
     if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1 ||
         EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len) != 1 ||
         EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len) != 1) {
+        free(entry->encrypted_data);
+        entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
+        if (!existed) {
+            free(entry->cred_id);
+            free(entry->metadata.cred_id);
+            memset(entry, 0, sizeof(credential_entry_t));
+        } else {
+            entry->encrypted_data = NULL;
+        }
         cupolas_rwlock_unlock(&vault->lock);
         return -4;
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
+        free(entry->encrypted_data);
+        entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
+        if (!existed) {
+            free(entry->cred_id);
+            free(entry->metadata.cred_id);
+            memset(entry, 0, sizeof(credential_entry_t));
+        } else {
+            entry->encrypted_data = NULL;
+        }
         cupolas_rwlock_unlock(&vault->lock);
         return -4;
     }
@@ -349,15 +402,16 @@ int cupolas_vault_store(cupolas_vault_t* vault,
     entry->encrypted_len = data_len;
     EVP_CIPHER_CTX_free(ctx);
 #else
-    entry->encrypted_data = (uint8_t*)malloc(data_len);
-    if (!entry->encrypted_data) {
-        cupolas_rwlock_unlock(&vault->lock);
-        return -4;
+    free(entry->metadata.cred_id);
+    entry->metadata.cred_id = NULL;
+    if (!existed) {
+        free(entry->cred_id);
+        entry->cred_id = NULL;
+    } else {
+        entry->encrypted_data = NULL;
     }
-    for (size_t i = 0; i < data_len; i++) {
-        entry->encrypted_data[i] = data[i] ^ vault->master_key[i % 32];
-    }
-    entry->encrypted_len = data_len;
+    cupolas_rwlock_unlock(&vault->lock);
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
     if (acl) {
@@ -365,14 +419,48 @@ int cupolas_vault_store(cupolas_vault_t* vault,
         entry->acl.entries = (cupolas_vault_acl_entry_t*)malloc(
             acl->count * sizeof(cupolas_vault_acl_entry_t));
         if (!entry->acl.entries) {
+            free(entry->encrypted_data);
+            entry->encrypted_data = NULL;
+            entry->encrypted_len = 0;
+            free(entry->metadata.cred_id);
+            entry->metadata.cred_id = NULL;
+            if (!existed) {
+                free(entry->cred_id);
+                entry->cred_id = NULL;
+            } else {
+                entry->encrypted_data = NULL;
+            }
             cupolas_rwlock_unlock(&vault->lock);
             return -4;
         }
         for (size_t i = 0; i < acl->count; i++) {
             entry->acl.entries[i].agent_id = strdup(acl->entries[i].agent_id);
+            if (!entry->acl.entries[i].agent_id) {
+                for (size_t j = 0; j < i; j++) {
+                    free(entry->acl.entries[j].agent_id);
+                }
+                free(entry->acl.entries);
+                entry->acl.entries = NULL;
+                entry->acl.count = 0;
+                free(entry->encrypted_data);
+                entry->encrypted_data = NULL;
+                entry->encrypted_len = 0;
+                free(entry->metadata.cred_id);
+                entry->metadata.cred_id = NULL;
+                if (!existed) {
+                    free(entry->cred_id);
+                    entry->cred_id = NULL;
+                }
+                cupolas_rwlock_unlock(&vault->lock);
+                return -4;
+            }
             entry->acl.entries[i].operations = acl->entries[i].operations;
             entry->acl.entries[i].expires_at = acl->entries[i].expires_at;
         }
+    }
+
+    if (!existed) {
+        vault->entry_count++;
     }
 
     cupolas_rwlock_unlock(&vault->lock);
@@ -417,7 +505,7 @@ int cupolas_vault_retrieve(cupolas_vault_t* vault,
         return -6;
     }
 
-    int len;
+    int len = 0;
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1) {
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
@@ -442,10 +530,9 @@ int cupolas_vault_retrieve(cupolas_vault_t* vault,
     *data_len = entry->encrypted_len;
     EVP_CIPHER_CTX_free(ctx);
 #else
-    for (size_t i = 0; i < entry->encrypted_len; i++) {
-        data_out[i] = entry->encrypted_data[i] ^ vault->master_key[i % 32];
-    }
-    *data_len = entry->encrypted_len;
+    (void)data_out;
+    cupolas_rwlock_unlock(&vault->lock);
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
     cupolas_rwlock_unlock(&vault->lock);
@@ -521,6 +608,8 @@ int cupolas_vault_update(cupolas_vault_t* vault,
     }
 
     free(entry->encrypted_data);
+    entry->encrypted_data = NULL;
+    entry->encrypted_len = 0;
 
 #ifdef CUPOLAS_USE_OPENSSL
     if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1) {
@@ -534,7 +623,7 @@ int cupolas_vault_update(cupolas_vault_t* vault,
         return -4;
     }
 
-    int len;
+    int len = 0;
     entry->encrypted_data = (uint8_t*)malloc(data_len + AES_BLOCK_SIZE);
     if (!entry->encrypted_data) {
         EVP_CIPHER_CTX_free(ctx);
@@ -545,12 +634,16 @@ int cupolas_vault_update(cupolas_vault_t* vault,
     if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1 ||
         EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len) != 1 ||
         EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len) != 1) {
+        free(entry->encrypted_data);
+        entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return -4;
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
+        free(entry->encrypted_data);
+        entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return -4;
@@ -559,15 +652,8 @@ int cupolas_vault_update(cupolas_vault_t* vault,
     entry->encrypted_len = data_len;
     EVP_CIPHER_CTX_free(ctx);
 #else
-    entry->encrypted_data = (uint8_t*)malloc(data_len);
-    if (!entry->encrypted_data) {
-        cupolas_rwlock_unlock(&vault->lock);
-        return -4;
-    }
-    for (size_t i = 0; i < data_len; i++) {
-        entry->encrypted_data[i] = data[i] ^ vault->master_key[i % 32];
-    }
-    entry->encrypted_len = data_len;
+    cupolas_rwlock_unlock(&vault->lock);
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
     entry->metadata.updated_at = (uint64_t)time(NULL);
@@ -898,13 +984,8 @@ int cupolas_vault_generate_password(char* password_out, size_t length) {
         }
         fclose(urandom);
     } else {
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        unsigned int seed = (unsigned int)(ts.tv_sec ^ ts.tv_nsec ^ (uintptr_t)password_out);
-        srand(seed);
-        for (size_t i = 0; i < length - 1; i++) {
-            password_out[i] = charset[rand() % charset_len];
-        }
+        password_out[length - 1] = '\0';
+        return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
     }
 #endif
 
@@ -966,6 +1047,7 @@ int cupolas_vault_generate_keypair(char* public_key_out, size_t* pub_len,
     EVP_PKEY_free(pkey);
 
     return 0;
+
 #else
     return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
@@ -983,23 +1065,28 @@ int cupolas_vault_export(cupolas_vault_t* vault,
         return -2;
     }
 
+#define VAULT_FWRITE(ptr, sz, cnt, fp) do { \
+    if (fwrite(ptr, sz, cnt, fp) != (cnt)) { \
+        goto export_fail; \
+    } \
+} while(0)
+
 #ifdef CUPOLAS_USE_OPENSSL
     FILE* f = fopen(export_path, "wb");
     if (!f) {
         return -3;
     }
 
-    uint8_t file_salt[SALT_SIZE];
+    uint8_t file_salt[SALT_SIZE] = {0};
     if (RAND_bytes(file_salt, SALT_SIZE) != 1) {
         fclose(f);
         return -4;
     }
 
-    uint8_t derived_key_iv[AES_KEY_SIZE + AES_IV_SIZE];
-    memset(derived_key_iv, 0, sizeof(derived_key_iv));
+    uint8_t derived_key_iv[AES_KEY_SIZE + AES_IV_SIZE] = {0};
 
     if (PKCS5_PBKDF2_HMAC(password, strlen(password),
-                           file_salt, SALT_SIZE, 10000,
+                           file_salt, SALT_SIZE, 100000,
                            EVP_sha256(), AES_KEY_SIZE + AES_IV_SIZE,
                            derived_key_iv) != 1) {
         fclose(f);
@@ -1026,34 +1113,34 @@ int cupolas_vault_export(cupolas_vault_t* vault,
 
     uint32_t magic = VAULT_MAGIC;
     uint32_t version = VAULT_VERSION;
-    fwrite(&magic, sizeof(magic), 1, f);
-    fwrite(&version, sizeof(version), 1, f);
-    fwrite(file_salt, SALT_SIZE, 1, f);
+    VAULT_FWRITE(&magic, sizeof(magic), 1, f);
+    VAULT_FWRITE(&version, sizeof(version), 1, f);
+    VAULT_FWRITE(file_salt, SALT_SIZE, 1, f);
 
     time_t now = time(NULL);
-    fwrite(&now, sizeof(time_t), 1, f);
+    VAULT_FWRITE(&now, sizeof(time_t), 1, f);
 
     if (agent_id) {
         size_t agent_len = strlen(agent_id);
-        fwrite(&agent_len, sizeof(size_t), 1, f);
-        fwrite(agent_id, 1, agent_len, f);
+        VAULT_FWRITE(&agent_len, sizeof(size_t), 1, f);
+        VAULT_FWRITE(agent_id, 1, agent_len, f);
     } else {
         size_t zero = 0;
-        fwrite(&zero, sizeof(size_t), 1, f);
+        VAULT_FWRITE(&zero, sizeof(size_t), 1, f);
     }
 
     uint32_t cred_count = (uint32_t)vault->entry_count;
-    fwrite(&cred_count, sizeof(uint32_t), 1, f);
+    VAULT_FWRITE(&cred_count, sizeof(uint32_t), 1, f);
 
     for (size_t i = 0; i < vault->entry_count; i++) {
         credential_entry_t* entry = &vault->entries[i];
 
         size_t id_len = strlen(entry->cred_id);
-        fwrite(&id_len, sizeof(size_t), 1, f);
-        fwrite(entry->cred_id, 1, id_len, f);
+        VAULT_FWRITE(&id_len, sizeof(size_t), 1, f);
+        VAULT_FWRITE(entry->cred_id, 1, id_len, f);
 
-        fwrite(&entry->type, sizeof(cupolas_vault_cred_type_t), 1, f);
-        fwrite(&entry->encrypted_len, sizeof(size_t), 1, f);
+        VAULT_FWRITE(&entry->type, sizeof(cupolas_vault_cred_type_t), 1, f);
+        VAULT_FWRITE(&entry->encrypted_len, sizeof(size_t), 1, f);
 
         int out_len = 0;
         int final_len = 0;
@@ -1076,14 +1163,14 @@ int cupolas_vault_export(cupolas_vault_t* vault,
         }
 
         size_t total_encrypted = out_len + final_len;
-        fwrite(&total_encrypted, sizeof(size_t), 1, f);
-        fwrite(encrypted_buf, 1, total_encrypted, f);
+        VAULT_FWRITE(&total_encrypted, sizeof(size_t), 1, f);
+        VAULT_FWRITE(encrypted_buf, 1, total_encrypted, f);
         free(encrypted_buf);
 
-        fwrite(entry->iv, AES_IV_SIZE, 1, f);
-        fwrite(entry->salt, SALT_SIZE, 1, f);
-        fwrite(&entry->acl, sizeof(cupolas_vault_acl_t), 1, f);
-        fwrite(&entry->metadata, sizeof(cupolas_vault_metadata_t), 1, f);
+        VAULT_FWRITE(entry->iv, AES_IV_SIZE, 1, f);
+        VAULT_FWRITE(entry->salt, SALT_SIZE, 1, f);
+        VAULT_FWRITE(&entry->acl, sizeof(cupolas_vault_acl_t), 1, f);
+        VAULT_FWRITE(&entry->metadata, sizeof(cupolas_vault_metadata_t), 1, f);
     }
 
     EVP_CIPHER_CTX_free(ctx);
@@ -1095,6 +1182,13 @@ int cupolas_vault_export(cupolas_vault_t* vault,
     }
 
     return 0;
+
+export_fail:
+    EVP_CIPHER_CTX_free(ctx);
+    fclose(f);
+    remove(export_path);
+    return -10;
+
 #else
     (void)agent_id;
     return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
@@ -1131,26 +1225,39 @@ int cupolas_vault_import(cupolas_vault_t* vault,
         return -5;
     }
 
-    uint8_t file_salt[SALT_SIZE];
+    uint8_t file_salt[SALT_SIZE] = {0};
     if (fread(file_salt, SALT_SIZE, 1, f) != 1) {
         fclose(f);
         return -6;
     }
 
     time_t export_time = 0;
-    fread(&export_time, sizeof(time_t), 1, f);
+    if (fread(&export_time, sizeof(time_t), 1, f) != 1) {
+        fclose(f);
+        return -6;
+    }
 
     size_t agent_len = 0;
-    fread(&agent_len, sizeof(size_t), 1, f);
-    if (agent_len > 0) {
+    if (fread(&agent_len, sizeof(size_t), 1, f) != 1) {
+        fclose(f);
+        return -6;
+    }
+    if (agent_len > 0 && agent_len < 65536) {
         char* file_agent_id = (char*)malloc(agent_len + 1);
         if (file_agent_id) {
-            fread(file_agent_id, 1, agent_len, f);
+            if (fread(file_agent_id, 1, agent_len, f) != agent_len) {
+                free(file_agent_id);
+                fclose(f);
+                return -6;
+            }
             file_agent_id[agent_len] = '\0';
             free(file_agent_id);
         } else {
             fseek(f, agent_len, SEEK_CUR);
         }
+    } else if (agent_len >= 65536) {
+        fclose(f);
+        return -6;
     }
 
     uint32_t cred_count = 0;
@@ -1159,11 +1266,10 @@ int cupolas_vault_import(cupolas_vault_t* vault,
         return -7;
     }
 
-    uint8_t derived_key_iv[AES_KEY_SIZE + AES_IV_SIZE];
-    memset(derived_key_iv, 0, sizeof(derived_key_iv));
+    uint8_t derived_key_iv[AES_KEY_SIZE + AES_IV_SIZE] = {0};
 
     if (PKCS5_PBKDF2_HMAC(password, strlen(password),
-                           file_salt, SALT_SIZE, 10000,
+                           file_salt, SALT_SIZE, 100000,
                            EVP_sha256(), AES_KEY_SIZE + AES_IV_SIZE,
                            derived_key_iv) != 1) {
         fclose(f);
@@ -1211,7 +1317,7 @@ int cupolas_vault_import(cupolas_vault_t* vault,
         }
 
         uint8_t* enc_data = (uint8_t*)malloc(enc_len);
-        if (!enc_data || fread(enc_data, 1, enc_len, f) != 1) {
+        if (!enc_data || fread(enc_data, 1, enc_len, f) != enc_len) {
             free(cred_id);
             free(enc_data);
             break;
@@ -1246,6 +1352,7 @@ int cupolas_vault_import(cupolas_vault_t* vault,
         }
 
         credential_entry_t* entry = &vault->entries[vault->entry_count];
+        memset(entry, 0, sizeof(credential_entry_t));
         entry->cred_id = cred_id;
         entry->type = type;
         entry->encrypted_data = (uint8_t*)malloc(total_decrypted);
@@ -1257,10 +1364,17 @@ int cupolas_vault_import(cupolas_vault_t* vault,
             entry->encrypted_len = 0;
         }
 
-        fread(entry->iv, AES_IV_SIZE, 1, f);
-        fread(entry->salt, SALT_SIZE, 1, f);
-        fread(&entry->acl, sizeof(cupolas_vault_acl_t), 1, f);
-        fread(&entry->metadata, sizeof(cupolas_vault_metadata_t), 1, f);
+        if (fread(entry->iv, AES_IV_SIZE, 1, f) != 1 ||
+            fread(entry->salt, SALT_SIZE, 1, f) != 1 ||
+            fread(&entry->acl, sizeof(cupolas_vault_acl_t), 1, f) != 1 ||
+            fread(&entry->metadata, sizeof(cupolas_vault_metadata_t), 1, f) != 1) {
+            free(entry->encrypted_data);
+            entry->encrypted_data = NULL;
+            entry->encrypted_len = 0;
+            free(enc_data);
+            free(decrypted);
+            continue;
+        }
 
         vault->entry_count++;
         imported++;

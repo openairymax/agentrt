@@ -17,7 +17,7 @@
 #define AGENTOS_SYNC_TYPES_H
 
 #include "sync.h"
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "sync_platform.h"
 
 #ifdef __cplusplus

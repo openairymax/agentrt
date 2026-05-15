@@ -15,11 +15,6 @@
 # ========================================================================
 
 
-    VERSION 0.0.5
-    DESCRIPTION "AgentOS Unified Protocols Framework - Multi-Protocol Ecosystem"
-    LANGUAGES C
-)
-
 # 编译选项
 option(PROTOCOLS_ENABLE_OPENCLAW "Enable OpenClaw integration" OFF)
 option(PROTOCOLS_ENABLE_CLAUDE "Enable Claude API integration" ON)

@@ -1,12 +1,10 @@
 /**
  * @file stdatomic.h
- * @brief Redirect <stdatomic.h> for MSVC compatibility.
+ * @brief Redirect <stdatomic.h> for cross-platform compatibility.
  *
- * On GCC/Clang with C11 support: include the system <stdatomic.h> directly.
- * On MSVC (which lacks <stdatomic.h>): redirect to atomic_compat.h.
- *
- * This file is placed in corekern include dir to provide MSVC compatibility,
- * but must NOT shadow the system <stdatomic.h> on GCC/Clang platforms.
+ * On MSVC: delegate entirely to atomic_compat.h.
+ * On GCC/Clang: include system stdatomic.h first, then atomic_compat.h
+ * for compat functions (atomic_load_32 etc.) that system headers lack.
  */
 #ifndef AGENTOS_COREKERN_STDATOMIC_SHIM
 #define AGENTOS_COREKERN_STDATOMIC_SHIM
@@ -15,6 +13,7 @@
 #include "atomic_compat.h"
 #else
 #include_next <stdatomic.h>
+#include "atomic_compat.h"
 #endif
 
 #endif

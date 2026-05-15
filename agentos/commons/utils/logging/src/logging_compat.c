@@ -37,7 +37,7 @@ static void log_get_registered_modules(void* out_modules, int max_modules) { (vo
 /* ==================== 内部全局状态 ===================== */
 
 /** @brief 兼容层初始化状�?*/
-static int __atomic_store_n(&g_compat_initialized, 0, __ATOMIC_SEQ_CST);
+static atomic_int g_compat_initialized = 0;
 
 /** @brief 兼容层配�?*/
 static logging_compat_config_t g_compat_config = {
@@ -146,7 +146,7 @@ static void record_api_call(const char* api_name)
  * 如果兼容层未初始化，使用默认配置初始化�? */
 static void ensure_compat_initialized(void)
 {
-    if (!__atomic_load_n(&g_compat_initialized, __ATOMIC_ACQUIRE)) {
+    if (!atomic_load_explicit(&g_compat_initialized, memory_order_acquire)) {
         logging_compat_init(NULL);
     }
 }
@@ -155,7 +155,7 @@ static void ensure_compat_initialized(void)
 
 int logging_compat_init(const logging_compat_config_t* manager)
 {
-    if (__atomic_load_n(&g_compat_initialized, __ATOMIC_ACQUIRE)) {
+    if (atomic_load_explicit(&g_compat_initialized, memory_order_acquire)) {
         return 0;  /* 已经初始�?*/
     }
     
@@ -168,7 +168,7 @@ int logging_compat_init(const logging_compat_config_t* manager)
     memset(&g_compat_stats, 0, sizeof(g_compat_stats));
     
     /* 标记为已初始�?*/
-    int _exp = 0; __atomic_compare_exchange_n(&g_compat_initialized, &_exp, 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    int _exp = 0; atomic_compare_exchange_strong_explicit(&g_compat_initialized, &_exp, 1, memory_order_seq_cst, memory_order_seq_cst);
     
     /* 如果启用迁移检测，记录初始化事�?*/
     if (g_compat_config.enable_migration_detection) {
@@ -376,7 +376,7 @@ int logging_compat_get_migration_list(migration_module_info_t* out_modules, int 
 
 void logging_compat_cleanup(void)
 {
-    if (!__atomic_load_n(&g_compat_initialized, __ATOMIC_ACQUIRE)) {
+    if (!atomic_load_explicit(&g_compat_initialized, memory_order_acquire)) {
         return;
     }
     
@@ -387,7 +387,7 @@ void logging_compat_cleanup(void)
     
     /* 清理资源 */
     memset(&g_compat_stats, 0, sizeof(g_compat_stats));
-    __atomic_store_n(&g_compat_initialized, 0, __ATOMIC_SEQ_CST);
+    atomic_store_explicit(&g_compat_initialized, 0, memory_order_seq_cst);
     
     LOG_INFO("Logging compatibility layer cleaned up");
 }

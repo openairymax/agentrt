@@ -12,7 +12,7 @@
  */
 
 #include "config.h"
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include "common/include/safe_string_utils.h"
 #include <stdlib.h>
@@ -202,6 +202,7 @@ int agentos_config_load_file(agentos_config_t* manager, const char* path) {
 
     size_t bytes_read = fread(buf, 1, file_size, fp);
     fclose(fp);
+    if (bytes_read != (size_t)file_size) { AGENTOS_FREE(buf); return -1; }
     buf[bytes_read] = '\0';
 
     int result = agentos_config_parse(manager, buf);

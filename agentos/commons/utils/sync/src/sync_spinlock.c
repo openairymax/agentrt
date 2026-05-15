@@ -12,6 +12,8 @@
 
 #include "sync_platform.h"
 #include "check.h"
+#include "sync_internal.h"
+#include <string.h>
 
 sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock,
                                   const sync_attr_t* attr) {
@@ -43,7 +45,7 @@ sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_spinlock_destroy(sync_spinlock_t spinlock) {
+sync_result_t sync_spinlock_free(sync_spinlock_t spinlock) {
     CHECK_NULL_RET(spinlock, SYNC_ERROR_INVALID);
 
     if (!spinlock->initialized) {
@@ -61,15 +63,16 @@ sync_result_t sync_spinlock_destroy(sync_spinlock_t spinlock) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_spinlock_lock(sync_spinlock_t spinlock) {
+sync_result_t sync_spinlock_lock_ex(sync_spinlock_t spinlock) {
     if (spinlock == NULL || !spinlock->initialized) {
         return SYNC_ERROR_INVALID;
     }
 
 #ifdef _WIN32
-    while (InterlockedExchange(&spinlock->lock, 1) != 0) {
-        while (spinlock->lock != 0) {
-        }
+    int expected = 0;
+    while (!atomic_compare_exchange_strong_explicit(&spinlock->lock, &expected, 1,
+                                                     memory_order_acquire, memory_order_relaxed)) {
+        expected = 0;
     }
 #else
     int rc = pthread_spin_lock(&spinlock->lock);
@@ -88,8 +91,9 @@ sync_result_t sync_spinlock_try_lock(sync_spinlock_t spinlock) {
     }
 
 #ifdef _WIN32
-    LONG expected = 0;
-    if (InterlockedCompareExchange(&spinlock->lock, 1, expected) != expected) {
+    int expected = 0;
+    if (!atomic_compare_exchange_strong_explicit(&spinlock->lock, &expected, 1,
+                                                  memory_order_acquire, memory_order_relaxed)) {
         return SYNC_ERROR_BUSY;
     }
 #else
@@ -106,13 +110,13 @@ sync_result_t sync_spinlock_try_lock(sync_spinlock_t spinlock) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_spinlock_unlock(sync_spinlock_t spinlock) {
+sync_result_t sync_spinlock_unlock_ex(sync_spinlock_t spinlock) {
     if (spinlock == NULL || !spinlock->initialized) {
         return SYNC_ERROR_INVALID;
     }
 
 #ifdef _WIN32
-    InterlockedExchange(&spinlock->lock, 0);
+    atomic_store_explicit(&spinlock->lock, 0, memory_order_release);
 #else
     int rc = pthread_spin_unlock(&spinlock->lock);
     if (rc != 0) {

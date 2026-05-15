@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <ctype.h>
@@ -132,9 +132,9 @@ int string_copy(char* dest, const char* src, size_t dest_size) {
     size_t src_len = string_safe_strlen(src, dest_size - 1);
     
     if (src_len >= dest_size) {
-        // 缓冲区不足，复制尽可能多的字�?        memcpy(dest, src, dest_size - 1);
+        memcpy(dest, src, dest_size - 1);
         dest[dest_size - 1] = '\0';
-        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "缓冲区大小不�?);
+        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return -1;
     }
     
@@ -156,12 +156,13 @@ int string_copy_n(char* dest, const char* src, size_t count, size_t dest_size) {
     size_t copy_len = (src_len < count) ? src_len : count;
     
     if (copy_len >= dest_size) {
-        // 缓冲区不足，复制尽可能多的字�?        size_t actual_copy = (dest_size > 0) ? dest_size - 1 : 0;
+        // 缓冲区不足，复制尽可能多的字
+        size_t actual_copy = (dest_size > 0) ? dest_size - 1 : 0;
         memcpy(dest, src, actual_copy);
         if (dest_size > 0) {
             dest[actual_copy] = '\0';
         }
-        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "缓冲区大小不�?);
+        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return -1;
     }
     
@@ -183,12 +184,13 @@ int string_concat(char* dest, const char* src, size_t dest_size) {
     size_t src_len = string_safe_strlen(src, dest_size - dest_len);
     
     if (dest_len + src_len >= dest_size) {
-        // 缓冲区不足，连接尽可能多的字�?        size_t available = dest_size - dest_len - 1;
+        // 缓冲区不足，连接尽可能多的字
+        size_t available = dest_size - dest_len - 1;
         if (available > 0) {
             memcpy(dest + dest_len, src, available);
             dest[dest_len + available] = '\0';
         }
-        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "缓冲区大小不�?);
+        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return -1;
     }
     
@@ -211,12 +213,13 @@ int string_concat_n(char* dest, const char* src, size_t count, size_t dest_size)
     size_t copy_len = (src_len < count) ? src_len : count;
     
     if (dest_len + copy_len >= dest_size) {
-        // 缓冲区不足，连接尽可能多的字�?        size_t available = dest_size - dest_len - 1;
+        // 缓冲区不足，连接尽可能多的字
+        size_t available = dest_size - dest_len - 1;
         if (available > 0) {
             memcpy(dest + dest_len, src, available);
             dest[dest_len + available] = '\0';
         }
-        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "缓冲区大小不�?);
+        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return -1;
     }
     
@@ -247,10 +250,9 @@ int string_compare(const char* str1, const char* str2, int options) {
         return strcasecmp(str1, str2);
 #endif
     } else {
-        // 区分大小写比�?        return strcmp(str1, str2);
+        return strcmp(str1, str2);
     }
-    
-    // 当前实现基本功能
+}
 
 int string_compare_n(const char* str1, const char* str2, size_t len, int options) {
     if (str1 == str2 || len == 0) {
@@ -273,7 +275,8 @@ int string_compare_n(const char* str1, const char* str2, size_t len, int options
         return strncasecmp(str1, str2, len);
 #endif
     } else {
-        // 区分大小写比�?        return strncmp(str1, str2, len);
+        // 区分大小写比
+        return strncmp(str1, str2, len);
     }
 }
 
@@ -304,7 +307,8 @@ const char* string_find(const char* haystack, const char* needle, int options) {
         
         return NULL;
     } else {
-        // 区分大小写查�?        return strstr(haystack, needle);
+        // 区分大小写查
+        return strstr(haystack, needle);
     }
 }
 
@@ -360,12 +364,14 @@ char* string_trim(char* str) {
         end--;
     }
     
-    // 再修剪开�?    char* start = str;
+    // 再修剪开
+    char* start = str;
     while (*start != '\0' && string_is_whitespace_char(*start)) {
         start++;
     }
     
-    // 移动字符串到开�?    if (start != str) {
+    // 移动字符串到开
+    if (start != str) {
         size_t len = strlen(start) + 1;
         memmove(str, start, len);
     }
@@ -383,7 +389,8 @@ char* string_trim_start(char* str) {
         start++;
     }
     
-    // 移动字符串到开�?    if (start != str) {
+    // 移动字符串到开
+    if (start != str) {
         size_t len = strlen(start) + 1;
         memmove(str, start, len);
     }
@@ -459,7 +466,8 @@ int string_replace(const char* str, const char* old_substr, const char* new_subs
     result_len += strlen(current);
     
     if (result_len >= result_size) {
-        // 缓冲区不�?        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "缓冲区大小不�?);
+        // 缓冲区不
+        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return -1;
     }
     
@@ -473,7 +481,8 @@ int string_replace(const char* str, const char* old_substr, const char* new_subs
         memcpy(dest, current, copy_len);
         dest += copy_len;
         
-        // 复制新子字符�?        memcpy(dest, new_substr, new_len);
+        // 复制新子字符
+        memcpy(dest, new_substr, new_len);
         dest += new_len;
         
         current = next + old_len;
@@ -515,7 +524,8 @@ string_list_t string_split(const char* str, const char* delimiter, int options, 
         const char* token_end = end;
         
         if (options & STRING_SPLIT_TRIM_WHITESPACE) {
-            // 修剪开头空�?            while (token_start < token_end && string_is_whitespace_char(*token_start)) {
+            // 修剪开头空
+            while (token_start < token_end && string_is_whitespace_char(*token_start)) {
                 token_start++;
             }
             
@@ -548,7 +558,8 @@ string_list_t string_split(const char* str, const char* delimiter, int options, 
         const char* token_end = start + token_len;
         
         if (options & STRING_SPLIT_TRIM_WHITESPACE) {
-            // 修剪开头空�?            while (token_start < token_end && string_is_whitespace_char(*token_start)) {
+            // 修剪开头空
+            while (token_start < token_end && string_is_whitespace_char(*token_start)) {
                 token_start++;
             }
             
@@ -578,7 +589,8 @@ int string_join(const string_list_t* list, const char* delimiter,
     
     size_t delimiter_len = (delimiter != NULL) ? strlen(delimiter) : 0;
     
-    // 计算总长�?    size_t total_len = 0;
+    // 计算总长
+    size_t total_len = 0;
     for (size_t i = 0; i < list->count; i++) {
         total_len += list->items[i].length;
         if (i < list->count - 1 && delimiter_len > 0) {
@@ -587,7 +599,7 @@ int string_join(const string_list_t* list, const char* delimiter,
     }
     
     if (total_len >= result_size) {
-        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "缓冲区大小不�?);
+        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return -1;
     }
     
@@ -596,7 +608,8 @@ int string_join(const string_list_t* list, const char* delimiter,
     for (size_t i = 0; i < list->count; i++) {
         const string_view_t* item = &list->items[i];
         
-        // 复制�?        memcpy(dest, item->data, item->length);
+        // 复制
+        memcpy(dest, item->data, item->length);
         dest += item->length;
         
         // 复制分隔符（除了最后一项）
@@ -832,20 +845,22 @@ int string_format_v(char* buffer, size_t buffer_size, const char* format, va_lis
         return -1;
     }
     
-    // 使用vsnprintf进行格式�?    va_list args_copy;
+    // 使用vsnprintf进行格式
+    va_list args_copy;
     va_copy(args_copy, args);
     
     int result = vsnprintf(buffer, buffer_size, format, args_copy);
     va_end(args_copy);
     
     if (result < 0) {
-        string_set_error(STRING_ERROR_FORMAT, "格式化失�?);
+        string_set_error(STRING_ERROR_FORMAT, "format failed");
         return -1;
     }
     
     if ((size_t)result >= buffer_size) {
-        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "缓冲区大小不�?);
-        // 缓冲区被截断，但已正确以空字符结�?        return -1;
+        string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
+        // 缓冲区被截断，但已正确以空字符结
+        return -1;
     }
     
     return result;
@@ -876,7 +891,7 @@ char* string_alloc_format_v(const char* format, va_list args) {
     va_end(args_copy);
     
     if (needed < 0) {
-        string_set_error(STRING_ERROR_FORMAT, "格式化失�?);
+        string_set_error(STRING_ERROR_FORMAT, "format failed");
         return NULL;
     }
     
@@ -894,7 +909,7 @@ char* string_alloc_format_v(const char* format, va_list args) {
     
     if (result < 0) {
         AGENTOS_FREE(buffer);
-        string_set_error(STRING_ERROR_FORMAT, "格式化失�?);
+        string_set_error(STRING_ERROR_FORMAT, "format failed");
         return NULL;
     }
     
@@ -1016,9 +1031,11 @@ bool string_buffer_append_n(string_buffer_t* buffer, const char* str, size_t len
         return false;
     }
     
-    // 检查是否需要扩�?    size_t new_length = buffer->length + len;
+    // 检查是否需要扩
+    size_t new_length = buffer->length + len;
     if (new_length >= buffer->capacity) {
-        // 计算新容�?        size_t new_capacity = buffer->capacity * 2;
+        // 计算新容
+        size_t new_capacity = buffer->capacity * 2;
         while (new_capacity <= new_length) {
             new_capacity *= 2;
         }
@@ -1032,7 +1049,8 @@ bool string_buffer_append_n(string_buffer_t* buffer, const char* str, size_t len
         buffer->capacity = new_capacity;
     }
     
-    // 追加字符�?    memcpy(buffer->data + buffer->length, str, len);
+    // 追加字符
+    memcpy(buffer->data + buffer->length, str, len);
     buffer->length = new_length;
     buffer->data[buffer->length] = '\0';
     
@@ -1058,7 +1076,8 @@ bool string_buffer_append_format(string_buffer_t* buffer, const char* format, ..
         return false;
     }
     
-    // 检查是否需要扩�?    size_t new_length = buffer->length + (size_t)needed;
+    // 检查是否需要扩
+    size_t new_length = buffer->length + (size_t)needed;
     if (new_length >= buffer->capacity) {
         size_t new_capacity = buffer->capacity;
         while (new_capacity <= new_length) {
@@ -1075,7 +1094,8 @@ bool string_buffer_append_format(string_buffer_t* buffer, const char* format, ..
         buffer->capacity = new_capacity;
     }
     
-    // 格式化到缓冲�?    int result = vsnprintf(buffer->data + buffer->length, 
+    // 格式化到缓冲
+    int result = vsnprintf(buffer->data + buffer->length, 
                           buffer->capacity - buffer->length,
                           format, args);
     va_end(args);
@@ -1093,7 +1113,8 @@ bool string_buffer_append_char(string_buffer_t* buffer, char ch) {
         return false;
     }
     
-    // 检查是否需要扩�?    if (buffer->length + 1 >= buffer->capacity) {
+    // 检查是否需要扩
+    if (buffer->length + 1 >= buffer->capacity) {
         size_t new_capacity = buffer->capacity * 2;
         char* new_data = (char*)AGENTOS_REALLOC(buffer->data, new_capacity);
         if (new_data == NULL) {
@@ -1172,7 +1193,8 @@ int string_view_compare(const string_view_t* view1, const string_view_t* view2, 
         return 1;
     }
     
-    // 使用较短的长�?    size_t min_len = (view1->length < view2->length) ? view1->length : view2->length;
+    // 使用较短的长
+    size_t min_len = (view1->length < view2->length) ? view1->length : view2->length;
     
     int result = 0;
     if (options & STRING_COMPARE_CASE_INSENSITIVE) {
@@ -1187,7 +1209,8 @@ int string_view_compare(const string_view_t* view1, const string_view_t* view2, 
             }
         }
     } else {
-        // 区分大小写比�?        result = memcmp(view1->data, view2->data, min_len);
+        // 区分大小写比
+        result = memcmp(view1->data, view2->data, min_len);
     }
     
     // 如果前min_len个字符相同，比较长度
@@ -1271,7 +1294,8 @@ bool string_list_add(string_list_t* list, const string_view_t* item) {
         return false;
     }
     
-    // 检查是否需要扩�?    if (list->count >= list->capacity) {
+    // 检查是否需要扩
+    if (list->count >= list->capacity) {
         size_t new_capacity = (list->capacity == 0) ? 8 : list->capacity * 2;
         string_view_t* new_items = (string_view_t*)AGENTOS_REALLOC(list->items, 
                                                           new_capacity * sizeof(string_view_t));
@@ -1327,19 +1351,21 @@ string_view_t string_list_get(const string_list_t* list, size_t index) {
 
 int string_convert_encoding(const char* src, string_encoding_t src_encoding,
                            char* dest, size_t dest_size, string_encoding_t dest_encoding) {
-    // 支持ASCII和UTF-8编码之间的转�?    if (src == NULL || dest == NULL || dest_size == 0) {
+    // 支持ASCII和UTF-8编码之间的转
+    if (src == NULL || dest == NULL || dest_size == 0) {
         string_set_error(STRING_ERROR_INVALID_ARGUMENT, "无效参数");
         return -1;
     }
     
     if (src_encoding == dest_encoding) {
-        // 编码相同，直接复�?        return string_copy(dest, src, dest_size);
+        // 编码相同，直接复
+        return string_copy(dest, src, dest_size);
     }
     
     // 这里实现简单的编码转换
     // 实际实现可能需要使用libiconv或其他编码库
     
-    string_set_error(STRING_ERROR_ENCODING_CONVERSION, "编码转换未完全实�?);
+    string_set_error(STRING_ERROR_ENCODING_CONVERSION, "encoding conversion not implemented");
     return -1;
 }
 
@@ -1439,7 +1465,8 @@ size_t string_utf8_next_char(const char* str, uint32_t* ch) {
 
 bool string_utf8_validate(const char* str, size_t len) {
     if (str == NULL) {
-        return true; // 空指针视为有�?    }
+    return true;
+    }
     
     size_t i = 0;
     while (i < len && str[i] != '\0') {
@@ -1451,7 +1478,8 @@ bool string_utf8_validate(const char* str, size_t len) {
             continue;
         }
         
-        // 多字节字�?        size_t char_len = 0;
+        // 多字节字
+        size_t char_len = 0;
         
         // 双字节字�?(110xxxxx)
         if ((first & 0xE0) == 0xC0) {
@@ -1470,7 +1498,8 @@ bool string_utf8_validate(const char* str, size_t len) {
             return false;
         }
         
-        // 检查是否有足够的字�?        if (i + char_len > len) {
+        // 检查是否有足够的字
+        if (i + char_len > len) {
             return false;
         }
         
@@ -1482,12 +1511,14 @@ bool string_utf8_validate(const char* str, size_t len) {
             }
         }
         
-        // 检查过长的编码（如0xC0 0x80编码U+0000，这是无效的�?        if (char_len == 2 && first == 0xC0 && (unsigned char)str[i + 1] == 0x80) {
+        // 检查过长的编码（如0xC0 0x80编码U+0000，这是无效的
+        if (char_len == 2 && first == 0xC0 && (unsigned char)str[i + 1] == 0x80) {
             return false;
         }
         
         // 检查Unicode码点是否在有效范围内
         // 当前检查方式
+        uint32_t code_point = 0;
         if (char_len == 2) {
             code_point = ((first & 0x1F) << 6) | (str[i + 1] & 0x3F);
         } else if (char_len == 3) {
@@ -1497,17 +1528,16 @@ bool string_utf8_validate(const char* str, size_t len) {
                          ((str[i + 2] & 0x3F) << 6) | (str[i + 3] & 0x3F);
         }
         
-        // 检查码点是否在有效范围�?        if (code_point > 0x10FFFF) {
+        // 检查码点是否在有效范围
+        if (code_point > 0x10FFFF) {
             return false;
         }
         
-        // 检查是否为代理对（U+D800到U+DFFF�?        if (code_point >= 0xD800 && code_point <= 0xDFFF) {
+        // 检查是否为代理对（U+D800到U+DFFF
+        if (code_point >= 0xD800 && code_point <= 0xDFFF) {
             return false;
         }
         
-        // 检查过大的码点�? 0x10FFFF�?        if (code_point > 0x10FFFF) {
-            return false;
-        }
         
         i += char_len;
     }

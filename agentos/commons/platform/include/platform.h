@@ -538,9 +538,8 @@ int agentos_get_sysinfo(agentos_sysinfo_t* info);
 
 #ifndef AGENTOS_ATOMIC_INT_T_DEFINED
 #define AGENTOS_ATOMIC_INT_T_DEFINED
-typedef struct {
-    volatile int value;
-} agentos_atomic_int_t;
+#include "atomic_compat.h"
+typedef atomic_int agentos_atomic_int_t;
 #endif
 
 int agentos_atomic_load(agentos_atomic_int_t* atomic);

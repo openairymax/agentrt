@@ -111,3 +111,10 @@ const char* gateway_get_name(gateway_t* gw) {
     if (!gw || !gw->ops || !gw->ops->get_name) return "unknown";
     return gw->ops->get_name(gw->impl);
 }
+
+int gateway_register_endpoint(gateway_t* gw, const char* method, const char* path,
+                              gateway_endpoint_handler_t handler, void* user_data) {
+    if (!gw || !method || !path || !handler) return -1;
+    if (gw->type != GATEWAY_TYPE_HTTP) return -1;
+    return http_gateway_register_endpoint((http_gateway_t*)gw->impl, method, path, handler, user_data);
+}

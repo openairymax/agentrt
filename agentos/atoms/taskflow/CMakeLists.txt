@@ -15,11 +15,6 @@
 # ========================================================================
 
 
-    VERSION 1.0.0
-    DESCRIPTION "AgentOS TaskFlow Graph Execution System"
-    LANGUAGES C
-)
-
 # 设置输出路径
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -29,13 +24,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
-# 定义构建共享库时的宏
-if(BUILD_SHARED_LIBS)
-    target_compile_definitions(agentos_taskflow PRIVATE AGENTOS_BUILDING_SHARED TASKFLOW_BUILDING_SHARED)
-endif()
-
 if(WIN32)
-    target_compile_definitions(agentos_taskflow PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3")
 else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
@@ -80,11 +69,20 @@ set(TASKFLOW_HEADERS
 
 # 主库
 add_library(agentos_taskflow STATIC ${TASKFLOW_CORE_SOURCES})
-    target_include_directories(agentos_taskflow PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
-        ${TASKFLOW_COMMONS_PLATFORM_INCLUDE}
-    )
+
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(agentos_taskflow PRIVATE AGENTOS_BUILDING_SHARED TASKFLOW_BUILDING_SHARED)
+endif()
+
+if(WIN32)
+    target_compile_definitions(agentos_taskflow PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
+endif()
+
+target_include_directories(agentos_taskflow PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
+    ${TASKFLOW_COMMONS_PLATFORM_INCLUDE}
+)
 
 # 头文件包含路径
 target_include_directories(agentos_taskflow PUBLIC

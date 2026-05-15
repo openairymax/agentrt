@@ -12,6 +12,7 @@
 #include "../../include/heapstore_log.h"
 #include "../../include/heapstore.h"
 #include "../../include/utils.h"
+#include "atomic_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +38,7 @@ typedef struct {
     char storage_path[512];
     uint64_t max_storage_bytes;
     uint32_t rotation_count;
-    volatile uint32_t is_initialized;
+    atomic_uint_fast32_t is_initialized;
 } log_store_service_ctx_t;
 
 static log_store_service_ctx_t g_ctx = {0};
@@ -55,7 +56,7 @@ int log_store_service_init(const char* storage_path, uint64_t max_storage_bytes)
         return -1;
     }
     
-    if (g_ctx.is_initialized) {
+    if (atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) {
         return 0;
     }
     
@@ -83,7 +84,7 @@ int log_store_service_init(const char* storage_path, uint64_t max_storage_bytes)
     }
 #endif
     
-    g_ctx.is_initialized = 1;
+    atomic_store_explicit(&g_ctx.is_initialized, 1, memory_order_release);
     return 0;
 }
 
@@ -101,7 +102,7 @@ int log_store_service_store_entry(heapstore_log_level_t level,
                                   const char* message,
                                   const time_t* timestamp)
 {
-    if (!g_ctx.is_initialized || !component || !message) {
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire) || !component || !message) {
         return -1;
     }
     
@@ -197,7 +198,7 @@ int log_store_service_query_entries(const time_t* start_time,
         return -1;
     }
 
-    if (!g_ctx.is_initialized) {
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -343,7 +344,7 @@ void log_store_service_free_entries(char** entries, int count)
  */
 int log_store_service_cleanup_old_files(int days_to_keep)
 {
-    if (!g_ctx.is_initialized) return -1;
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) return -1;
     if (days_to_keep <= 0) {
         days_to_keep = 30;
     }
@@ -380,7 +381,7 @@ int log_store_service_get_status(uint64_t* out_total_bytes,
                                  uint32_t* out_file_count,
                                  time_t* out_oldest_timestamp)
 {
-    if (!g_ctx.is_initialized) return -1;
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) return -1;
 
     uint64_t total_bytes = 0;
     uint32_t file_count = 0;
@@ -420,7 +421,7 @@ int log_store_service_get_status(uint64_t* out_total_bytes,
  */
 void log_store_service_shutdown(void)
 {
-    if (!g_ctx.is_initialized) {
+    if (!atomic_load_explicit(&g_ctx.is_initialized, memory_order_acquire)) {
         return;
     }
     

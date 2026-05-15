@@ -7,7 +7,7 @@
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "include/strategy_common.h"
+#include "strategy_common.h"
 #include <stdio.h>
 #include <float.h>
 

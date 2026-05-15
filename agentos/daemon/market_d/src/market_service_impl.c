@@ -627,8 +627,8 @@ int market_service_sync_registry(market_service_t* service) {
         return -2;
     }
     size_t nread = fread(idx_data, 1, (size_t)fsize, idx_fp);
-    (void)nread;
-    idx_data[fsize] = '\0';
+    if (nread != (size_t)fsize) { free(idx_data); fclose(idx_fp); return -2; }
+    idx_data[nread] = '\0';
     fclose(idx_fp);
 
     char* entry = strstr(idx_data, "\"agent_id\"");

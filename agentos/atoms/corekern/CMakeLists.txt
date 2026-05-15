@@ -3,7 +3,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(COREKERN_SOURCES
-    src/main.c
+    src/core_init.c
     src/error.c
     src/ipc/binder.c
     src/ipc/buffer.c
