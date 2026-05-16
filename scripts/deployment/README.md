@@ -1,38 +1,53 @@
-# 部署脚本
+# 部署配置
 
 `scripts/deployment/`
 
 ## 概述
 
-`deployment/` 目录提供 AgentOS 的生产环境部署管理脚本，支持 Kubernetes 集群部署、Docker Compose 本地部署、环境配置管理等场景，实现一键部署和灰度发布。
+`deployment/` 目录提供 AgentOS 的部署配置，当前仅包含 Docker 相关部署方案。所有实际部署内容位于 `docker/` 子目录中。
 
-## 脚本列表
+## 目录结构
 
-| 脚本 | 说明 |
-|------|------|
-| `deploy.sh` | 通用部署入口，支持多种部署环境 |
-| `k8s_deploy.sh` | Kubernetes 集群部署管理 |
-| `rollback.sh` | 版本回滚操作 |
-| `env_setup.sh` | 环境配置与初始化 |
-
-## 使用示例
-
-```bash
-# 部署到 Kubernetes
-./deployment/deploy.sh --env production --namespace agentos
-
-# 回滚到上一版本
-./deployment/rollback.sh --revision previous
-
-# 环境初始化
-./deployment/env_setup.sh --env staging
+```
+deployment/
+└── docker/               # Docker 部署配置
+    ├── Dockerfile.kernel      # 内核服务镜像构建
+    ├── Dockerfile.service     # 应用服务镜像构建
+    ├── docker-compose.yml     # 开发环境编排
+    ├── docker-compose.staging.yml  # 预发布环境编排
+    ├── docker-compose.prod.yml     # 生产环境编排
+    ├── docker-compose.preview.yml  # 预览环境编排
+    ├── build.sh               # 镜像构建脚本
+    ├── check_config.sh        # 配置检查脚本
+    ├── quickstart.sh          # 快速启动脚本
+    ├── Makefile               # 构建和管理快捷命令
+    ├── .env.example           # 环境变量示例
+    ├── .gitignore             # Git 忽略规则
+    ├── secrets/               # 密钥目录（.gitkeep）
+    └── README.md              # Docker 部署详细说明
 ```
 
-## 部署模式
+## 使用方式
 
-- **Kubernetes 部署**: 生产环境推荐，支持 HPA 自动扩缩容、滚动更新、健康检查
-- **Docker Compose 部署**: 开发测试环境，快速启动完整服务栈（详见 `docker/` 子目录）
-- **裸机部署**: 适用于资源受限环境或嵌入式场景
+```bash
+# 快速启动（开发环境）
+cd scripts/deployment/docker
+./quickstart.sh
+
+# 构建镜像
+./build.sh
+
+# 配置检查
+./check_config.sh
+
+# 使用 docker-compose 启动
+docker-compose up -d
+
+# 生产环境部署
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+详细配置说明请参阅 [docker/README.md](docker/README.md)。
 
 ---
 

@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # 导入演示所需模块
 try:
-    from tools.unified_quality_analyzer import UnifiedQualityAnalyzer, Language, IssueSeverity
+    from code_quality.unified_quality_analyzer import UnifiedQualityAnalyzer, Language, IssueSeverity
     from tutorial.tutorial_engine import TutorialEngine, TutorialRole
     from benchmark.benchmark_core import BenchmarkRegistry, BenchmarkRunner, BenchmarkContext
     from benchmark.example_coreloopthree_benchmark import (

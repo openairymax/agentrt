@@ -2,7 +2,7 @@
 
 # AgentOS 代码质量检查脚本
 # 用于在提交前检查代码重复率和圈复杂度
-# 使用方法: ./scripts/tools/check-quality.sh [目录路径]
+# 使用方法: ./scripts/code-quality/check-quality.sh [目录路径]
 
 set -e
 

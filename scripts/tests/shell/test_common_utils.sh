@@ -9,8 +9,8 @@ source "$AGENTOS_TEST_DIR/test_framework.sh"
 
 # 加载被测模块
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_TEST_DIR")"
-# shellcheck source=../lib/commons.sh
-source "$AGENTOS_SCRIPTS_DIR/lib/commons.sh"
+# shellcheck source=../library/common.sh
+source "$AGENTOS_SCRIPTS_DIR/library/common.sh"
 
 ###############################################################################
 # 测试：字符串工具
