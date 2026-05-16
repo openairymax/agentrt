@@ -158,7 +158,7 @@ static agentos_error_t builtin_query(
     return builtin_index_search(impl->index, query_text, limit, out_record_ids, out_scores, out_count);
 }
 
-static agentos_error_t __attribute__((unused)) builtin_retrieve_fn(
+static agentos_error_t builtin_retrieve_fn(
     agentos_memory_provider_t* provider,
     const char* query_text,
     uint32_t limit,

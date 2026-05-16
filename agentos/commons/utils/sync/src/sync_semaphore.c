@@ -13,6 +13,8 @@
 #include "sync_platform.h"
 #include "check.h"
 #include <time.h>
+#include "sync_internal.h"
+#include <string.h>
 
 sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
                                    unsigned int initial_value,
@@ -52,7 +54,7 @@ sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_semaphore_destroy(sync_semaphore_t semaphore) {
+sync_result_t sync_semaphore_free(sync_semaphore_t semaphore) {
     if (semaphore == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -74,7 +76,7 @@ sync_result_t sync_semaphore_destroy(sync_semaphore_t semaphore) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_semaphore_wait(sync_semaphore_t semaphore,
+sync_result_t sync_semaphore_wait_ex(sync_semaphore_t semaphore,
                                 const sync_timeout_t* timeout) {
     if (semaphore == NULL || !semaphore->initialized) {
         return SYNC_ERROR_INVALID;
@@ -154,7 +156,7 @@ sync_result_t sync_semaphore_try_wait(sync_semaphore_t semaphore) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_semaphore_post(sync_semaphore_t semaphore) {
+sync_result_t sync_semaphore_post_ex(sync_semaphore_t semaphore) {
     if (semaphore == NULL || !semaphore->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -186,9 +188,10 @@ sync_result_t sync_semaphore_get_value(sync_semaphore_t semaphore,
     }
     *value = (unsigned int)val;
 #else
-    int val = sem_getvalue(&semaphore->semaphore, &val);
-    if (val != 0) {
-        return sync_internal_posix_error_to_result(val);
+    int val;
+    int rc = sem_getvalue(&semaphore->semaphore, &val);
+    if (rc != 0) {
+        return sync_internal_posix_error_to_result(errno);
     }
     *value = (unsigned int)val;
 #endif

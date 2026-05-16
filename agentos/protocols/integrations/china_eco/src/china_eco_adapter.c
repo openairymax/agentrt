@@ -52,7 +52,7 @@ static const char* g_storage_endpoint_urls[] = {
     [CHINA_ECO_OSS_HUAWEI]  = "https://obs.cn-north-4.myhuaweicloud.com"
 };
 
-static const char* g_storage_names[] __attribute__((unused)) = {
+static const char* g_storage_names[] = {
     [CHINA_ECO_OSS_ALIYUN]  = "oss",
     [CHINA_ECO_OSS_TENCENT] = "cos",
     [CHINA_ECO_OSS_BAIDU]   = "bos",
@@ -326,8 +326,9 @@ static void sm3_compress(uint32_t digest[8], const uint8_t block[64]) {
 
 int china_eco_sm3_hash(const void* data, size_t size,
                        uint8_t digest[CHINA_ECO_SM3_DIGEST_SIZE]) {
-    if (!data || !digest) return -1;
-    if (size == 0) {
+    if (!digest) return -1;
+    if (!data && size > 0) return -1;
+    if (!data || size == 0) {
         memset(digest, 0, CHINA_ECO_SM3_DIGEST_SIZE);
         return 0;
     }
@@ -474,7 +475,7 @@ static void sm4_encrypt_block(const uint32_t rk[32], const uint8_t plaintext[16]
     }
 
     for (int i = 0; i < 32; i++) {
-        X[i + 4] = sm4_F(X[i + 1], X[i + 2], X[i + 3], X[i], rk[i]);
+        X[i + 4] = sm4_F(X[i], X[i + 1], X[i + 2], X[i + 3], rk[i]);
     }
 
     for (int i = 0; i < 4; i++) {
@@ -483,6 +484,29 @@ static void sm4_encrypt_block(const uint32_t rk[32], const uint8_t plaintext[16]
         ciphertext[i * 4 + 1] = (uint8_t)(val >> 16);
         ciphertext[i * 4 + 2] = (uint8_t)(val >> 8);
         ciphertext[i * 4 + 3] = (uint8_t)(val);
+    }
+}
+
+static void sm4_decrypt_block(const uint32_t rk[32], const uint8_t ciphertext[16],
+                               uint8_t plaintext[16]) {
+    uint32_t X[36];
+    for (int i = 0; i < 4; i++) {
+        X[i] = ((uint32_t)ciphertext[i * 4] << 24) |
+               ((uint32_t)ciphertext[i * 4 + 1] << 16) |
+               ((uint32_t)ciphertext[i * 4 + 2] << 8) |
+               ((uint32_t)ciphertext[i * 4 + 3]);
+    }
+
+    for (int i = 0; i < 32; i++) {
+        X[i + 4] = sm4_F(X[i], X[i + 1], X[i + 2], X[i + 3], rk[i]);
+    }
+
+    for (int i = 0; i < 4; i++) {
+        uint32_t val = X[35 - i];
+        plaintext[i * 4]     = (uint8_t)(val >> 24);
+        plaintext[i * 4 + 1] = (uint8_t)(val >> 16);
+        plaintext[i * 4 + 2] = (uint8_t)(val >> 8);
+        plaintext[i * 4 + 3] = (uint8_t)(val);
     }
 }
 
@@ -539,6 +563,7 @@ int china_eco_sm4_decrypt(china_eco_sm4_context_t* ctx,
     if (!ctx->initialized) return -2;
 
     if (ct_size % CHINA_ECO_SM4_BLOCK_SIZE != 0) return -3;
+    if (ct_size == 0) { *pt_size = 0; return 0; }
 
     uint32_t rk[32];
     sm4_key_schedule(ctx->key, rk);
@@ -550,30 +575,33 @@ int china_eco_sm4_decrypt(china_eco_sm4_context_t* ctx,
     const uint8_t* ct = (const uint8_t*)ciphertext;
     uint8_t prev_block[CHINA_ECO_SM4_BLOCK_SIZE];
     uint8_t decrypted[CHINA_ECO_SM4_BLOCK_SIZE];
+    uint8_t pad_len = 0;
 
     memcpy(prev_block, ctx->iv, CHINA_ECO_SM4_BLOCK_SIZE);
 
     for (size_t offset = 0; offset < ct_size; offset += CHINA_ECO_SM4_BLOCK_SIZE) {
-        sm4_encrypt_block(decrypt_rk, ct + offset, decrypted);
+        sm4_decrypt_block(decrypt_rk, ct + offset, decrypted);
 
         for (size_t j = 0; j < CHINA_ECO_SM4_BLOCK_SIZE; j++)
             decrypted[j] ^= prev_block[j];
 
         size_t copy_size = CHINA_ECO_SM4_BLOCK_SIZE;
         if (offset + CHINA_ECO_SM4_BLOCK_SIZE >= ct_size) {
-            copy_size = (size_t)(CHINA_ECO_SM4_BLOCK_SIZE - decrypted[CHINA_ECO_SM4_BLOCK_SIZE - 1]);
-            if (copy_size > CHINA_ECO_SM4_BLOCK_SIZE) copy_size = CHINA_ECO_SM4_BLOCK_SIZE;
+            pad_len = decrypted[CHINA_ECO_SM4_BLOCK_SIZE - 1];
+            if (pad_len > 0 && pad_len <= CHINA_ECO_SM4_BLOCK_SIZE) {
+                copy_size = CHINA_ECO_SM4_BLOCK_SIZE - pad_len;
+            }
         }
 
-        memcpy(pt + offset - (CHINA_ECO_SM4_BLOCK_SIZE - copy_size), decrypted, copy_size);
+        memcpy(pt + offset, decrypted, copy_size);
         memcpy(prev_block, ct + offset, CHINA_ECO_SM4_BLOCK_SIZE);
     }
 
-    *pt_size = ct_size;
+    *pt_size = ct_size - pad_len;
     return 0;
 }
 
-static int china_eco_proto_init(void* context, const void* config) {
+static int china_eco_proto_init(void* context) {
     china_eco_handle_t* h = (china_eco_handle_t*)context;
     if (!h) {
         if (china_eco_create(&h) != 0) return -1;
@@ -614,12 +642,15 @@ static int china_eco_proto_handle_request(void* context,
     return 0;
 }
 
-static const char* china_eco_proto_get_version(void* context) {
-    return CHINA_ECO_VERSION;
+static int china_eco_proto_get_version(void* context, char* version_buf, size_t max_size) {
+    (void)context;
+    if (!version_buf || max_size == 0) return -1;
+    snprintf(version_buf, max_size, "%s", CHINA_ECO_VERSION);
+    return 0;
 }
 
-static uint64_t china_eco_proto_capabilities(void* context) {
-    return (uint64_t)(
+static uint32_t china_eco_proto_capabilities(void* context) {
+    return (uint32_t)(
         CHINA_ECO_CAP_LLM_BRIDGE |
         CHINA_ECO_CAP_OBJECT_STORAGE |
         CHINA_ECO_CAP_SM_CRYPTO |

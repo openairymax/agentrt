@@ -9,25 +9,205 @@
  */
 
 #include "agentos_protocol_interface.h"
+#include "protocol_registry.h"
+#include "../core/router/include/protocol_router.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stddef.h>
+#include <errno.h>
 
 static proto_adapter_entry_t* g_adapter_registry = NULL;
 static size_t g_adapter_count = 0;
 
-/* Internal implementation contexts (separate from interface vtables in header) */
+/* ============================================================================
+ * I-L2: Standard Router Implementation
+ * ============================================================================ */
+
 typedef struct {
-    void* internal_router;
+    protocol_router_handle_t handle;
+    protocol_type_t default_protocol;
 } proto_router_impl_t;
+
+typedef struct {
+    proto_router_impl_t impl;
+    proto_router_iface_t iface;
+} proto_router_full_t;
+
+static proto_router_impl_t* router_get_impl(proto_router_iface_t* iface) {
+    if (!iface) return NULL;
+    proto_router_full_t* full = (proto_router_full_t*)((char*)iface - offsetof(proto_router_full_t, iface));
+    return &full->impl;
+}
+
+static int router_std_add_route(proto_router_iface_t* router,
+                                const char* source_pattern,
+                                protocol_type_t source_proto,
+                                const char* target_endpoint,
+                                protocol_type_t target_proto,
+                                int priority) {
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl || !impl->handle) return -1;
+
+    protocol_rule_t rule;
+    memset(&rule, 0, sizeof(rule));
+    rule.source_protocol = source_proto;
+    rule.target_protocol = target_proto;
+    rule.source_endpoint = source_pattern;
+    rule.target_endpoint = target_endpoint;
+    rule.priority = (uint32_t)priority;
+    rule.transformer_context = NULL;
+
+    return protocol_router_add_rule(impl->handle, &rule, NULL);
+}
+
+static int router_std_remove_route(proto_router_iface_t* router,
+                                   const char* source_pattern) {
+    if (!router || !source_pattern) return -1;
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl || !impl->handle) return -1;
+    return -2;
+}
+
+static int router_std_route(proto_router_iface_t* router,
+                            const unified_message_t* message,
+                            route_decision_t* decision) {
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl || !impl->handle || !message || !decision) return -1;
+
+    unified_message_t transformed;
+    memset(&transformed, 0, sizeof(transformed));
+
+    int result = protocol_router_route(impl->handle, message, &transformed);
+    if (result == 0) {
+        decision->adapter_name = NULL;
+        decision->target_protocol = transformed.protocol_type;
+        decision->confidence = 100;
+        decision->needs_transformation = (message->protocol_type != transformed.protocol_type);
+        decision->transformer_name = NULL;
+    }
+    return result;
+}
+
+static int router_std_transform(proto_router_iface_t* router,
+                                const unified_message_t* source,
+                                unified_message_t* target,
+                                const char* transformer_name) {
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl || !impl->handle || !source || !target) return -1;
+    (void)transformer_name;
+
+    return protocol_router_route(impl->handle, source, target);
+}
+
+static int router_std_batch_route(proto_router_iface_t* router,
+                                  const unified_message_t* messages,
+                                  size_t count,
+                                  route_decision_t* decisions) {
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl || !impl->handle || !messages || !decisions || count == 0) return -1;
+
+    unified_message_t* transformed = (unified_message_t*)calloc(count, sizeof(unified_message_t));
+    if (!transformed) return -1;
+
+    int result = protocol_router_route_batch(impl->handle, messages, count, transformed);
+    if (result >= 0) {
+        for (int i = 0; i < result; i++) {
+            decisions[i].adapter_name = NULL;
+            decisions[i].target_protocol = transformed[i].protocol_type;
+            decisions[i].confidence = 100;
+            decisions[i].needs_transformation = (messages[i].protocol_type != transformed[i].protocol_type);
+            decisions[i].transformer_name = NULL;
+        }
+    }
+    free(transformed);
+    return result;
+}
+
+static int router_std_set_default_protocol(proto_router_iface_t* router,
+                                           protocol_type_t proto) {
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl) return -1;
+    impl->default_protocol = proto;
+    return 0;
+}
+
+static int router_std_list_routes(proto_router_iface_t* router,
+                                  char** routes_json) {
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl || !impl->handle || !routes_json) return -1;
+
+    return protocol_router_get_stats(impl->handle, routes_json);
+}
+
+static int router_std_get_stats(proto_router_iface_t* router,
+                                char** stats_json) {
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl || !impl->handle || !stats_json) return -1;
+
+    return protocol_router_get_stats(impl->handle, stats_json);
+}
+
+proto_router_iface_t* proto_router_standard_create(void) {
+    proto_router_full_t* full = (proto_router_full_t*)calloc(1, sizeof(proto_router_full_t));
+    if (!full) return NULL;
+
+    full->impl.handle = protocol_router_create(PROTOCOL_HTTP);
+    if (!full->impl.handle) {
+        free(full);
+        return NULL;
+    }
+    full->impl.default_protocol = PROTOCOL_HTTP;
+
+    full->iface.add_route = router_std_add_route;
+    full->iface.remove_route = router_std_remove_route;
+    full->iface.route = router_std_route;
+    full->iface.transform = router_std_transform;
+    full->iface.batch_route = router_std_batch_route;
+    full->iface.set_default_protocol = router_std_set_default_protocol;
+    full->iface.list_routes = router_std_list_routes;
+    full->iface.get_stats = router_std_get_stats;
+
+    return &full->iface;
+}
+
+void proto_router_standard_destroy(proto_router_iface_t* router) {
+    if (!router) return;
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (impl && impl->handle) {
+        protocol_router_destroy(impl->handle);
+    }
+    proto_router_full_t* full = (proto_router_full_t*)((char*)router - offsetof(proto_router_full_t, iface));
+    free(full);
+}
+
+/* ============================================================================
+ * I-L3: Standard Gateway Implementation
+ * ============================================================================ */
+
+typedef int (*gw_internal_request_cb)(
+    const char* raw_request,
+    size_t request_size,
+    const char* content_type,
+    char** response,
+    size_t* response_size,
+    char** response_content_type,
+    void* user_data
+);
+
+typedef struct {
+    proto_gateway_request_cb public_cb;
+    void* public_user_data;
+} gw_request_adapter_ctx_t;
 
 #define GW_MAX_PROTOCOLS 32
 
 typedef struct {
     char name[64];
     const proto_adapter_vtable_t* vtable;
-    proto_gateway_request_cb request_handler;
-    void* request_handler_data;
+    gw_internal_request_cb raw_handler;
+    void* raw_handler_data;
+    gw_request_adapter_ctx_t* adapter_ctx;
     proto_gateway_event_cb event_callback;
     void* event_callback_data;
     uint64_t request_count;
@@ -42,12 +222,6 @@ typedef struct {
 
 static proto_gateway_impl_t* g_gw_impl = NULL;
 
-static uint32_t agentos_proto_gw_get_timeout(const proto_gateway_iface_t* gw)
-{
-    if (!gw) return 30000;
-    return 30000;
-}
-
 static void agentos_proto_gw_log(const proto_gateway_iface_t* gw, const char* operation)
 {
     if (gw) {
@@ -55,60 +229,33 @@ static void agentos_proto_gw_log(const proto_gateway_iface_t* gw, const char* op
     }
 }
 
-/* I-L2: Standard Router Implementation */
-proto_router_iface_t* proto_router_standard_create(void) {
-    proto_router_impl_t* impl = calloc(1, sizeof(proto_router_impl_t));
-    if (!impl) return NULL;
+static int gw_request_adapter_trampoline(
+    const char* raw_request,
+    size_t request_size,
+    const char* content_type,
+    char** response,
+    size_t* response_size,
+    char** response_content_type,
+    void* user_data) {
+    gw_request_adapter_ctx_t* ctx = (gw_request_adapter_ctx_t*)user_data;
+    if (!ctx || !ctx->public_cb) return -1;
 
-    impl->internal_router = protocol_router_create(PROTOCOL_HTTP);
-    if (!impl->internal_router) { free(impl); return NULL; }
+    char* response_json = NULL;
+    char request_buf[4096];
+    size_t copy_len = request_size < sizeof(request_buf) - 1 ? request_size : sizeof(request_buf) - 1;
+    memcpy(request_buf, raw_request, copy_len);
+    request_buf[copy_len] = '\0';
 
-    proto_router_iface_t* iface = calloc(1, sizeof(proto_router_iface_t));
-    if (!iface) {
-        protocol_router_destroy(impl->internal_router);
-        free(impl);
-        return NULL;
+    int result = ctx->public_cb("unknown", "handle", request_buf, &response_json, ctx->public_user_data);
+    if (result == 0 && response_json) {
+        if (response) *response = response_json;
+        if (response_size) *response_size = strlen(response_json);
+        if (response_content_type) *response_content_type = strdup("application/json");
+    } else {
+        free(response_json);
     }
-    iface->add_route = router_std_add_route;
-    iface->remove_route = router_std_remove_route;
-    iface->route = router_std_route;
-    iface->transform = router_std_transform;
-    iface->batch_route = router_std_batch_route;
-    iface->set_default_protocol = router_std_set_default_protocol;
-    iface->list_routes = router_std_list_routes;
-    iface->get_stats = router_std_get_stats;
-    return iface;
-}
-
-void proto_router_standard_destroy(proto_router_iface_t* router) {
-    if (!router) return;
-    free(router);
-}
-
-/* I-L3: Standard Gateway Implementation */
-proto_gateway_iface_t* proto_gateway_standard_create(void) {
-    g_gw_impl = calloc(1, sizeof(proto_gateway_impl_t));
-    if (!g_gw_impl) return NULL;
-
-    proto_gateway_iface_t* iface = calloc(1, sizeof(proto_gateway_iface_t));
-    if (!iface) { free(g_gw_impl); g_gw_impl = NULL; return NULL; }
-
-    iface->register_protocol = gw_std_register_protocol;
-    iface->unregister_protocol = gw_std_unregister_protocol;
-    iface->handle_request = gw_std_handle_request;
-    iface->detect_protocol = gw_std_detect_protocol;
-    iface->set_request_handler = gw_std_set_request_handler;
-    iface->set_event_callback = gw_std_set_event_callback;
-    iface->list_protocols = gw_std_list_protocols;
-    iface->get_protocol_stats = gw_std_get_protocol_stats;
-    return iface;
-}
-
-void proto_gateway_standard_destroy(proto_gateway_iface_t* gw) {
-    agentos_proto_gw_log(gw, "destroy");
-    free(g_gw_impl);
-    g_gw_impl = NULL;
-    free(gw);
+    (void)content_type;
+    return result;
 }
 
 static gw_protocol_entry_t* gw_find_protocol(const char* name) {
@@ -123,7 +270,6 @@ static gw_protocol_entry_t* gw_find_protocol(const char* name) {
 static int gw_std_register_protocol(proto_gateway_iface_t* gw,
                                      const char* name,
                                      const proto_adapter_vtable_t* adapter) {
-    uint32_t timeout = agentos_proto_gw_get_timeout(gw);
     if (!name || !adapter) return -1;
     if (!g_gw_impl) return -2;
     if (g_gw_impl->protocol_count >= GW_MAX_PROTOCOLS) return -3;
@@ -145,6 +291,8 @@ static int gw_std_unregister_protocol(proto_gateway_iface_t* gw, const char* nam
 
     for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
         if (strcmp(g_gw_impl->protocols[i].name, name) == 0) {
+            free(g_gw_impl->protocols[i].adapter_ctx);
+            g_gw_impl->protocols[i].adapter_ctx = NULL;
             memmove(&g_gw_impl->protocols[i], &g_gw_impl->protocols[i + 1],
                     (g_gw_impl->protocol_count - i - 1) * sizeof(gw_protocol_entry_t));
             g_gw_impl->protocol_count--;
@@ -153,55 +301,6 @@ static int gw_std_unregister_protocol(proto_gateway_iface_t* gw, const char* nam
         }
     }
     return -2;
-}
-
-static int gw_std_handle_request(proto_gateway_iface_t* gw,
-                                  const char* raw_request,
-                                  size_t request_size,
-                                  const char* content_type,
-                                  char** response,
-                                  size_t* response_size,
-                                  char** response_content_type) {
-    uint32_t timeout = agentos_proto_gw_get_timeout(gw);
-    if (!raw_request) return -1;
-
-    char* detected_proto = NULL;
-    int detect_result = gw_std_detect_protocol(gw, raw_request, request_size, &detected_proto);
-    if (detect_result != 0 || !detected_proto) {
-        if (response) *response = strdup("{\"error\":\"Protocol detection failed\"}");
-        if (response_size) *response_size = response ? strlen(*response) : 0;
-        if (response_content_type) *response_content_type = strdup("application/json");
-        free(detected_proto);
-        return -2;
-    }
-
-    gw_protocol_entry_t* entry = gw_find_protocol(detected_proto);
-    free(detected_proto);
-
-    if (entry && entry->request_handler) {
-        int result = entry->request_handler(
-            raw_request, request_size, content_type,
-            response, response_size, response_content_type,
-            entry->request_handler_data);
-        entry->request_count++;
-        entry->total_bytes += request_size;
-        if (result != 0) entry->error_count++;
-        return result;
-    }
-
-    if (entry && entry->vtable && entry->vtable->handle_request) {
-        int result = entry->vtable->handle_request(
-            raw_request, request_size, content_type,
-            response, response_size, response_content_type);
-        entry->request_count++;
-        entry->total_bytes += request_size;
-        return result;
-    }
-
-    if (response) *response = strdup("{\"error\":\"No handler for protocol\"}");
-    if (response_size) *response_size = response ? strlen(*response) : 0;
-    if (response_content_type) *response_content_type = strdup("application/json");
-    return -3;
 }
 
 static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, size_t len, char** detected) {
@@ -232,16 +331,63 @@ static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, s
     return (*detected) ? 0 : -1;
 }
 
+static int gw_std_handle_request(proto_gateway_iface_t* gw,
+                                  const char* raw_request,
+                                  size_t request_size,
+                                  const char* content_type,
+                                  char** response,
+                                  size_t* response_size,
+                                  char** response_content_type) {
+    if (!raw_request) return -1;
+
+    char* detected_proto = NULL;
+    int detect_result = gw_std_detect_protocol(gw, raw_request, request_size, &detected_proto);
+    if (detect_result != 0 || !detected_proto) {
+        if (response) *response = strdup("{\"error\":\"Protocol detection failed\"}");
+        if (response_size) *response_size = response ? strlen(*response) : 0;
+        if (response_content_type) *response_content_type = strdup("application/json");
+        free(detected_proto);
+        return -2;
+    }
+
+    gw_protocol_entry_t* entry = gw_find_protocol(detected_proto);
+    free(detected_proto);
+
+    if (entry && entry->raw_handler) {
+        int result = entry->raw_handler(
+            raw_request, request_size, content_type,
+            response, response_size, response_content_type,
+            entry->raw_handler_data);
+        entry->request_count++;
+        entry->total_bytes += request_size;
+        if (result != 0) entry->error_count++;
+        return result;
+    }
+
+    if (response) *response = strdup("{\"error\":\"No handler for protocol\"}");
+    if (response_size) *response_size = response ? strlen(*response) : 0;
+    if (response_content_type) *response_content_type = strdup("application/json");
+    return -3;
+}
+
 static int gw_std_set_request_handler(proto_gateway_iface_t* gw,
                                       proto_gateway_request_cb handler,
                                       void* user_data) {
-    uint32_t timeout = agentos_proto_gw_get_timeout(gw);
     if (!handler) return -1;
     if (!g_gw_impl) return -2;
 
     for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
-        g_gw_impl->protocols[i].request_handler = handler;
-        g_gw_impl->protocols[i].request_handler_data = user_data;
+        gw_protocol_entry_t* entry = &g_gw_impl->protocols[i];
+
+        if (!entry->adapter_ctx) {
+            entry->adapter_ctx = (gw_request_adapter_ctx_t*)calloc(1, sizeof(gw_request_adapter_ctx_t));
+            if (!entry->adapter_ctx) return -3;
+        }
+
+        entry->adapter_ctx->public_cb = handler;
+        entry->adapter_ctx->public_user_data = user_data;
+        entry->raw_handler = gw_request_adapter_trampoline;
+        entry->raw_handler_data = entry->adapter_ctx;
     }
     return 0;
 }
@@ -261,7 +407,6 @@ static int gw_std_set_event_callback(proto_gateway_iface_t* gw,
 }
 
 static int gw_std_list_protocols(proto_gateway_iface_t* gw, char** protocols_json) {
-    uint32_t timeout = agentos_proto_gw_get_timeout(gw);
     if (!protocols_json) return -1;
 
     size_t buf_size = 256;
@@ -304,22 +449,28 @@ static int gw_std_get_protocol_stats(proto_gateway_iface_t* gw,
     if (name) {
         gw_protocol_entry_t* entry = gw_find_protocol(name);
         if (!entry) return -3;
-        stats->request_count = entry->request_count;
-        stats->error_count = entry->error_count;
-        stats->total_bytes = entry->total_bytes;
+        stats->messages_sent = entry->request_count;
+        stats->errors_total = entry->error_count;
+        stats->bytes_sent = entry->total_bytes / 2;
+        stats->bytes_received = entry->total_bytes - stats->bytes_sent;
     } else {
         for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
-            stats->request_count += g_gw_impl->protocols[i].request_count;
-            stats->error_count += g_gw_impl->protocols[i].error_count;
-            stats->total_bytes += g_gw_impl->protocols[i].total_bytes;
+            stats->messages_sent += g_gw_impl->protocols[i].request_count;
+            stats->errors_total += g_gw_impl->protocols[i].error_count;
+            uint64_t half_bytes = g_gw_impl->protocols[i].total_bytes / 2;
+            stats->bytes_sent += half_bytes;
+            stats->bytes_received += g_gw_impl->protocols[i].total_bytes - half_bytes;
         }
     }
     return 0;
 }
 
 proto_gateway_iface_t* proto_gateway_standard_create(void) {
-    proto_gateway_iface_t* iface = calloc(1, sizeof(proto_gateway_iface_t));
-    if (!iface) return NULL;
+    g_gw_impl = (proto_gateway_impl_t*)calloc(1, sizeof(proto_gateway_impl_t));
+    if (!g_gw_impl) return NULL;
+
+    proto_gateway_iface_t* iface = (proto_gateway_iface_t*)calloc(1, sizeof(proto_gateway_iface_t));
+    if (!iface) { free(g_gw_impl); g_gw_impl = NULL; return NULL; }
 
     iface->register_protocol = gw_std_register_protocol;
     iface->unregister_protocol = gw_std_unregister_protocol;
@@ -335,6 +486,15 @@ proto_gateway_iface_t* proto_gateway_standard_create(void) {
 
 void proto_gateway_standard_destroy(proto_gateway_iface_t* gw) {
     if (!gw) return;
+    agentos_proto_gw_log(gw, "destroy");
+    if (g_gw_impl) {
+        for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
+            free(g_gw_impl->protocols[i].adapter_ctx);
+            g_gw_impl->protocols[i].adapter_ctx = NULL;
+        }
+        free(g_gw_impl);
+        g_gw_impl = NULL;
+    }
     free(gw);
 }
 
@@ -407,11 +567,12 @@ int proto_interface_list_all(char** json_output) {
 const char* proto_interface_type_name(protocol_type_t type) {
     switch (type) {
         case PROTOCOL_HTTP:       return "HTTP";
-        case PROTOCOL_WEBSOCKET:  return "WebSocket";
-        case PROTOCOL_STDIO:      return "Stdio";
-        case PROTOCOL_IPC:        return "IPC";
         case PROTOCOL_CUSTOM:     return "Custom";
-        default:                  return "Unknown";
+        default:
+            if (type == PROTOCOL_WEBSOCKET) return "WebSocket";
+            if (type == PROTOCOL_STDIO) return "Stdio";
+            if (type == PROTOCOL_IPC) return "IPC";
+            return "Unknown";
     }
 }
 

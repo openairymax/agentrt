@@ -18,6 +18,7 @@
 #include "agentos_time.h"
 #include <stdlib.h>
 
+#include "atomic_compat.h"
 #include "memory_compat.h"
 #include <string.h>
 #include <stdio.h>
@@ -65,26 +66,10 @@ static inline void agentos_cond_destroy_compat(agentos_cond_t* c) {
 
 /* ==================== 平台相关宏定义 ==================== */
 
-#if defined(_WIN32) || defined(_WIN64)
-#include <windows.h>
-#define ATOMIC_ADD(ptr, val)  InterlockedAdd((volatile LONG*)(ptr), (val))
-#define ATOMIC_SUB(ptr, val)  InterlockedAdd((volatile LONG*)(ptr), -(val))
-#define ATOMIC_LOAD(ptr)      (*(volatile int*)(ptr))
-#define ATOMIC_STORE(ptr, v)  (*(volatile int*)(ptr)) = (v)
-static volatile uint64_t next_msg_id = 1;
+static atomic_uint64_t next_msg_id = 1;
 static uint64_t generate_msg_id(void) {
-    return InterlockedIncrement64((volatile LONG64*)&next_msg_id) - 1;
+    return atomic_fetch_add_explicit(&next_msg_id, 1, memory_order_seq_cst);
 }
-#else
-#define ATOMIC_ADD(ptr, val)  __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST)
-#define ATOMIC_SUB(ptr, val)  __atomic_sub_fetch(ptr, val, __ATOMIC_SEQ_CST)
-#define ATOMIC_LOAD(ptr)      __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
-#define ATOMIC_STORE(ptr, v)  __atomic_store_n(ptr, v, __ATOMIC_SEQ_CST)
-static volatile uint64_t next_msg_id = 1;
-static uint64_t generate_msg_id(void) {
-    return __atomic_fetch_add(&next_msg_id, 1, __ATOMIC_SEQ_CST);
-}
-#endif
 
 /* ==================== 常量定义 ==================== */
 
@@ -98,7 +83,7 @@ typedef struct binder_node {
     void* userdata;
     agentos_ipc_channel_t* channel;
     struct binder_node* next;
-    volatile int ref_count;
+    atomic_int ref_count;
 } binder_node_t;
 
 typedef struct pending_call {
@@ -106,7 +91,7 @@ typedef struct pending_call {
     void* response_buf;
     size_t response_capacity;
     size_t* response_size_ptr;
-    volatile int completed;
+    atomic_int completed;
     struct pending_call* next;
 
     agentos_cond_t cond;
@@ -143,10 +128,11 @@ static int ensure_binder_lock(void) {
     agentos_mutex_t* lock = agentos_mutex_create();
     if (!lock) return AGENTOS_ENOMEM;
     agentos_mutex_t* expected = NULL;
-    if (__atomic_compare_exchange_n(&binder_global_lock, &expected, lock, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
-        return AGENTOS_SUCCESS;
+    if (!atomic_compare_exchange_strong_ptr(
+            (_Atomic void**)&binder_global_lock, (void**)&expected, (void*)lock,
+            memory_order_acq_rel, memory_order_acquire)) {
+        agentos_mutex_destroy_ptr(lock);
     }
-    agentos_mutex_destroy_ptr(lock);
     return AGENTOS_SUCCESS;
 }
 
@@ -228,8 +214,9 @@ agentos_error_t agentos_ipc_init(void) {
         if (!new_lock) return AGENTOS_ENOMEM;
 
         agentos_mutex_t* expected = NULL;
-        if (!__atomic_compare_exchange_n(&binder_global_lock, &expected, new_lock,
-                                         0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+        if (!atomic_compare_exchange_strong_ptr(
+                (_Atomic void**)&binder_global_lock, (void**)&expected, (void*)new_lock,
+                memory_order_seq_cst, memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
     }
@@ -361,11 +348,11 @@ agentos_error_t agentos_ipc_connect(
     ch->name[MAX_CHANNEL_NAME - 1] = '\0';
     ch->remote_target = target;
     ch->fd = -1;
-    ATOMIC_ADD(&target->ref_count, 1);
+    atomic_fetch_add_explicit(&target->ref_count, 1, memory_order_seq_cst);
 
     ch->lock = agentos_mutex_create();
     if (!ch->lock) {
-        ATOMIC_SUB(&target->ref_count, 1);
+        atomic_fetch_sub_explicit(&target->ref_count, 1, memory_order_seq_cst);
         AGENTOS_FREE(ch);
         agentos_mutex_unlock(binder_global_lock);
         return AGENTOS_ENOMEM;
@@ -374,7 +361,7 @@ agentos_error_t agentos_ipc_connect(
     ch->cond = agentos_cond_create();
     if (!ch->cond) {
         agentos_mutex_destroy_ptr(ch->lock);
-        ATOMIC_SUB(&target->ref_count, 1);
+        atomic_fetch_sub_explicit(&target->ref_count, 1, memory_order_seq_cst);
         AGENTOS_FREE(ch);
         agentos_mutex_unlock(binder_global_lock);
         return AGENTOS_ENOMEM;
@@ -436,7 +423,7 @@ agentos_error_t agentos_ipc_call(
     agentos_mutex_lock(&pc->cond_lock);
 
     uint64_t start_time = agentos_time_monotonic_ms();
-    while (!ATOMIC_LOAD(&pc->completed)) {
+    while (!atomic_load_explicit(&pc->completed, memory_order_seq_cst)) {
         uint64_t elapsed = agentos_time_monotonic_ms() - start_time;
         if (elapsed >= timeout_ms) {
             agentos_mutex_unlock(&pc->cond_lock);
@@ -539,7 +526,7 @@ agentos_error_t agentos_ipc_reply(
         *pc->response_size_ptr = msg->size;
     }
 
-    ATOMIC_STORE(&pc->completed, 1);
+    atomic_store_explicit(&pc->completed, 1, memory_order_seq_cst);
 
     agentos_cond_signal(&pc->cond);
 
@@ -588,7 +575,7 @@ agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel) {
     if (err != AGENTOS_SUCCESS) return err;
 
     if (channel->remote_target) {
-        if (ATOMIC_SUB(&channel->remote_target->ref_count, 1) == 0) {
+        if (atomic_fetch_sub_explicit(&channel->remote_target->ref_count, 1, memory_order_seq_cst) == 1) {
             agentos_mutex_lock(binder_global_lock);
             binder_node_t** pp = &root_nodes;
             while (*pp) {

@@ -14,13 +14,6 @@
 # 5. 分布式图分区与通信
 # ========================================================================
 
-cmake_minimum_required(VERSION 3.20)
-
-project(agentos-taskflow
-    VERSION 1.0.0
-    DESCRIPTION "AgentOS TaskFlow Graph Execution System"
-    LANGUAGES C
-)
 
 # 设置输出路径
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -31,14 +24,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
-# 定义构建共享库时的宏
-if(BUILD_SHARED_LIBS)
-    add_definitions(-DAGENTOS_BUILDING_SHARED -DTASKFLOW_BUILDING_SHARED)
-endif()
-
-# 跨平台编译选项
 if(WIN32)
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3")
 else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
@@ -83,11 +69,20 @@ set(TASKFLOW_HEADERS
 
 # 主库
 add_library(agentos_taskflow STATIC ${TASKFLOW_CORE_SOURCES})
-    target_include_directories(agentos_taskflow PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
-        ${TASKFLOW_COMMONS_PLATFORM_INCLUDE}
-    )
+
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(agentos_taskflow PRIVATE AGENTOS_BUILDING_SHARED TASKFLOW_BUILDING_SHARED)
+endif()
+
+if(WIN32)
+    target_compile_definitions(agentos_taskflow PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
+endif()
+
+target_include_directories(agentos_taskflow PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
+    ${TASKFLOW_COMMONS_PLATFORM_INCLUDE}
+)
 
 # 头文件包含路径
 target_include_directories(agentos_taskflow PUBLIC
@@ -152,22 +147,32 @@ if(BUILD_TESTS)
         ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
     )
 
-    target_link_libraries(test_taskflow_advanced
+    target_link_libraries(test_taskflow_advanced PRIVATE
         agentos_taskflow
-        -Wl,--whole-archive
-        agentos_coreloopthree
-        -Wl,--no-whole-archive
         agentos_core
         agentos_common
-        Threads::Threads
-        dl
-        m
     )
 
-    if(UNIX)
-        target_link_options(test_taskflow_advanced PRIVATE
-            -Wl,--allow-multiple-definition)
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(test_taskflow_advanced PRIVATE
+            -Wl,--whole-archive
+            agentos_coreloopthree
+            -Wl,--no-whole-archive
+            agentos_platform_libs
+        )
+    elseif(WIN32)
+        target_link_libraries(test_taskflow_advanced PRIVATE
+            agentos_coreloopthree
+        )
+    else()
+        target_link_libraries(test_taskflow_advanced PRIVATE
+            agentos_coreloopthree
+        )
     endif()
+    find_package(Threads REQUIRED)
+    target_link_libraries(test_taskflow_advanced PRIVATE Threads::Threads)
+
+    target_link_libraries(test_taskflow_advanced PRIVATE agentos_test_ldflags)
 
     add_test(NAME taskflow_advanced_test COMMAND test_taskflow_advanced)
 endif()

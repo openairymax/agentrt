@@ -32,7 +32,6 @@ from typing import Any, Callable, Dict, List, Optional, Type
 
 
 class PluginState(Enum):
-    """插件状态枚举"""
     UNLOADED = "unloaded"
     LOADING = "loading"
     LOADED = "loaded"
@@ -44,7 +43,6 @@ class PluginState(Enum):
 
 @dataclass
 class PluginMetadata:
-    """插件元数据"""
     name: str
     version: str
     author: str = ""
@@ -58,7 +56,6 @@ class PluginMetadata:
 
 @dataclass
 class PluginContext:
-    """插件执行上下文"""
     plugin_id: str
     working_dir: str
     environment: Dict[str, str] = field(default_factory=dict)
@@ -73,7 +70,6 @@ class PluginContext:
 
 @dataclass
 class PluginResult:
-    """插件执行结果"""
     plugin_id: str
     success: bool
     output: Any = None
@@ -83,8 +79,6 @@ class PluginResult:
 
 
 class Plugin(ABC):
-    """插件基类"""
-
     metadata: PluginMetadata
 
     def __init__(self):
@@ -93,21 +87,17 @@ class Plugin(ABC):
 
     @abstractmethod
     def initialize(self, manager: Dict[str, Any]) -> bool:
-        """初始化插件"""
         pass
 
     @abstractmethod
     def execute(self, ctx: PluginContext) -> PluginResult:
-        """执行插件主逻辑"""
         pass
 
     @abstractmethod
     def shutdown(self) -> None:
-        """关闭插件，释放资源"""
         pass
 
     def health_check(self) -> bool:
-        """健康检查"""
         return self._state == PluginState.LOADED
 
     @property
@@ -124,8 +114,6 @@ class Plugin(ABC):
 
 
 class PluginRegistry:
-    """插件注册表"""
-
     def __init__(self):
         self._plugins: Dict[str, Plugin] = {}
         self._metadata: Dict[str, PluginMetadata] = {}
@@ -139,12 +127,10 @@ class PluginRegistry:
         }
 
     def register_hook(self, event: str, callback: Callable) -> None:
-        """注册钩子回调"""
         if event in self._hooks:
             self._hooks[event].append(callback)
 
     def _trigger_hooks(self, event: str, *args, **kwargs) -> None:
-        """触发钩子"""
         for callback in self._hooks.get(event, []):
             try:
                 callback(*args, **kwargs)
@@ -152,7 +138,6 @@ class PluginRegistry:
                 print(f"Hook {event} failed: {e}")
 
     def register(self, plugin: Plugin) -> bool:
-        """注册插件"""
         name = plugin.metadata.name
 
         if name in self._plugins:
@@ -165,7 +150,6 @@ class PluginRegistry:
         return True
 
     def unregister(self, name: str) -> bool:
-        """注销插件"""
         if name not in self._plugins:
             return False
 
@@ -183,15 +167,12 @@ class PluginRegistry:
             return False
 
     def get(self, name: str) -> Optional[Plugin]:
-        """获取插件"""
         return self._plugins.get(name)
 
     def list_plugins(self) -> List[PluginMetadata]:
-        """列出所有插件"""
         return list(self._metadata.values())
 
     def discover_plugins(self, path: str) -> List[PluginMetadata]:
-        """发现目录下的插件"""
         discovered = []
         plugin_dir = Path(path)
 
@@ -218,7 +199,6 @@ class PluginRegistry:
         return discovered
 
     def load_plugin_from_module(self, module_path: str, class_name: str = "Plugin") -> Optional[Plugin]:
-        """从模块路径加载插件"""
         try:
             spec = importlib.util.spec_from_file_location("dynamic_plugin", module_path)
             if not spec or not spec.loader:
@@ -243,7 +223,6 @@ class PluginRegistry:
         return None
 
     def execute_plugin(self, name: str, manager: Dict[str, Any] = None) -> Optional[PluginResult]:
-        """执行插件"""
         plugin = self.get(name)
         if not plugin:
             print(f"Plugin {name} not found")
@@ -277,7 +256,6 @@ _global_registry: Optional[PluginRegistry] = None
 
 
 def get_registry() -> PluginRegistry:
-    """获取全局插件注册表"""
     global _global_registry
     if _global_registry is None:
         _global_registry = PluginRegistry()

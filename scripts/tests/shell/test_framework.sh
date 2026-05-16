@@ -11,8 +11,8 @@ AGENTOS_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_TEST_DIR")"
 
 # 加载依赖
-# shellcheck source=../lib/commons.sh
-source "$AGENTOS_SCRIPTS_DIR/lib/commons.sh"
+# shellcheck source=../library/common.sh
+source "$AGENTOS_SCRIPTS_DIR/library/common.sh"
 
 ###############################################################################
 # 测试配置

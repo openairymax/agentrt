@@ -5,102 +5,29 @@
 # SPDX-FileCopyrightText: 2026 SPHARX.
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.16)
 
-project(gateway
-    VERSION 1.0.0
-    DESCRIPTION "AgentOS Gateway Module - Protocol Translation Layer"
-    LANGUAGES C
-)
-
-# ========== 编译选项 ==========
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-if(MSVC)
-    add_compile_options(/W4 /WX- /utf-8)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# ========== 依赖 ==========
-# 使用与根项目一致的依赖查找方式
-find_package(cJSON QUIET)
-find_package(libmicrohttpd QUIET)
-find_package(libwebsockets QUIET)
-find_package(Threads REQUIRED)
-
-# 条件定义和消息
-if(cJSON_FOUND)
-    message(STATUS "cJSON found: ${cJSON_VERSION}")
-    add_definitions(-DGATEWAY_HAS_CJSON=1)
-else()
-    message(WARNING "cJSON not found, JSON functionality may be limited")
-endif()
-
-if(libmicrohttpd_FOUND)
-    message(STATUS "libmicrohttpd found")
-    add_definitions(-DGATEWAY_HAS_LIBMICROHTTPD=1)
-else()
-    message(WARNING "libmicrohttpd not found, HTTP gateway may be limited")
-endif()
-
-if(libwebsockets_FOUND)
-    message(STATUS "libwebsockets found")
-    add_definitions(-DGATEWAY_HAS_LIBWEBSOCKETS=1)
-else()
-    message(WARNING "libwebsockets not found, WebSocket gateway may be limited")
-endif()
-
-# 核心头文件路径
 set(COREKERN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern")
-# R-09-124: merged into target_include_directories(gateway)
-# include_directories(${COREKERN_DIR}/include)
-
-# syscall 模块
 set(SYSCALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/syscall")
-# R-09-124: 
-# include_directories(${SYSCALL_DIR}/include)
-
-# commons 模块（基础工具库）
 set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
-# R-09-124: 
-# include_directories(
-#     ${COMMONS_DIR}
-#     ${COMMONS_DIR}/platform/include
-#     ${COMMONS_DIR}/utils/error/include
-#     ${COMMONS_DIR}/utils/logging/include
-#     ${COMMONS_DIR}/utils/memory/include
-#     ${COMMONS_DIR}/utils/sync/include
-# )
-
-# protocols 模块（统一协议栈）
 set(PROTOCOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../protocols")
-# R-09-124: merged into target_include_directories(gateway)
-# include_directories(
-#     ${PROTOCOLS_DIR}/include
-#     ${PROTOCOLS_DIR}/protocol/include
-# )
 
-# gateway内部工具头文件
-# R-09-124: 
-# include_directories(
-#     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
-# )
-
-# ========== 源文件 ==========
+if(AGENTOS_HAS_CJSON)
 set(GATEWAY_SOURCES
     src/gateway/gateway_api.c
     src/gateway/http_gateway.c
     src/gateway/http_gateway_routes.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
+    src/gateway/gateway_protocol_bridge.c
     src/utils/jsonrpc.c
     src/utils/syscall_router.c
     src/utils/gateway_rpc_handler.c
+    src/utils/gateway_rate_limiter.c
     src/utils/gateway_protocol_handler.c
     src/utils/mcp_server.c
-    src/utils/gateway_rate_limiter.c
 )
 
 # ========== 头文件 ==========
@@ -131,11 +58,20 @@ target_include_directories(gateway
         ${SYSCALL_DIR}/include
         ${COMMONS_DIR}
         ${COMMONS_DIR}/utils/include
+        ${COMMONS_DIR}/utils/compat/include
         ${COMMONS_DIR}/platform/include
         ${COMMONS_DIR}/utils/error/include
         ${COMMONS_DIR}/utils/logging/include
         ${COMMONS_DIR}/utils/memory/include
         ${COMMONS_DIR}/utils/sync/include
+        ${COMMONS_DIR}/utils/compat/include
+        ${COMMONS_DIR}/utils/include
+        ${PROTOCOLS_DIR}/core/router/include
+        ${PROTOCOLS_DIR}/core/registry/include
+        ${PROTOCOLS_DIR}/core/adapter/include
+        ${PROTOCOLS_DIR}/core/transformers/include
+        ${PROTOCOLS_DIR}/common/include
+        ${PROTOCOLS_DIR}/src
         ${PROTOCOLS_DIR}/include
         ${PROTOCOLS_DIR}/protocol/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -149,17 +85,28 @@ target_link_libraries(gateway PRIVATE
     agentos_common
 )
 
-# 条件链接依赖库
-if(cJSON_FOUND)
-    target_link_libraries(gateway PUBLIC cjson)
+if(AGENTOS_HAS_CJSON)
+    if(cJSON_FOUND)
+        target_link_libraries(gateway PUBLIC cjson)
+    elseif(CJSON_FOUND)
+        target_link_libraries(gateway PUBLIC ${CJSON_LIBRARIES})
+    endif()
 endif()
 
-if(libmicrohttpd_FOUND)
-    target_link_libraries(gateway PRIVATE microhttpd)
+if(AGENTOS_HAS_MICROHTTPD)
+    if(libmicrohttpd_FOUND)
+        target_link_libraries(gateway PRIVATE microhttpd)
+    elseif(MICROHTTPD_FOUND)
+        target_link_libraries(gateway PRIVATE ${MICROHTTPD_LIBRARIES})
+    endif()
 endif()
 
-if(libwebsockets_FOUND)
-    target_link_libraries(gateway PRIVATE websockets)
+if(AGENTOS_HAS_LIBWEBSOCKETS)
+    if(libwebsockets_FOUND)
+        target_link_libraries(gateway PRIVATE websockets)
+    elseif(LIBWEBSOCKETS_FOUND)
+        target_link_libraries(gateway PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
+    endif()
 endif()
 
 # ========== 安装 ==========
@@ -259,3 +206,6 @@ if(CPPCHECK)
         COMMENT "Running cppcheck static analysis"
     )
 endif()
+else()
+    message(STATUS "gateway: SKIPPED (cJSON not found, required for JSON protocol handling)")
+endif() # AGENTOS_HAS_CJSON

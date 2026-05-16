@@ -13,6 +13,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <libgen.h>
 #include <ftw.h>
@@ -348,19 +349,34 @@ int market_service_install_agent(market_service_t* service, const install_reques
 #pragma GCC diagnostic ignored "-Wformat-truncation"
         snprintf(download_path, sizeof(download_path), "%s/package.tar.gz", install_dir);
 #pragma GCC diagnostic pop
-        char curl_cmd[4096];
-        snprintf(curl_cmd, sizeof(curl_cmd),
-                "curl -sfL -o '%s' '%s' 2>/dev/null", download_path, target->repository);
-        int curl_ret = system(curl_cmd);
-        if (curl_ret != 0) {
-            SVC_LOG_WARN("Download failed for agent %s from %s (curl_ret=%d), metadata only install",
-                        request->id, target->repository, curl_ret);
+
+        pid_t curl_pid = fork();
+        if (curl_pid == 0) {
+            execlp("curl", "curl", "-sfL", "-o", download_path,
+                   target->repository, (char*)NULL);
+            _exit(127);
+        } else if (curl_pid > 0) {
+            int curl_status = 0;
+            waitpid(curl_pid, &curl_status, 0);
+            int curl_ret = WIFEXITED(curl_status) ? WEXITSTATUS(curl_status) : -1;
+            if (curl_ret != 0) {
+                SVC_LOG_WARN("Download failed for agent %s from %s (curl_ret=%d), metadata only install",
+                            request->id, target->repository, curl_ret);
+            } else {
+                pid_t tar_pid = fork();
+                if (tar_pid == 0) {
+                    execlp("tar", "tar", "-xzf", download_path, "-C",
+                           install_dir, (char*)NULL);
+                    _exit(127);
+                } else if (tar_pid > 0) {
+                    int tar_status = 0;
+                    waitpid(tar_pid, &tar_status, 0);
+                }
+                remove(download_path);
+            }
         } else {
-            char extract_cmd[4096];
-            snprintf(extract_cmd, sizeof(extract_cmd),
-                    "tar -xzf '%s' -C '%s' 2>/dev/null", download_path, install_dir);
-            (void)system(extract_cmd);
-            remove(download_path);
+            SVC_LOG_WARN("fork failed for agent %s download: %s",
+                        request->id, strerror(errno));
         }
     }
 
@@ -611,8 +627,8 @@ int market_service_sync_registry(market_service_t* service) {
         return -2;
     }
     size_t nread = fread(idx_data, 1, (size_t)fsize, idx_fp);
-    (void)nread;
-    idx_data[fsize] = '\0';
+    if (nread != (size_t)fsize) { free(idx_data); fclose(idx_fp); return -2; }
+    idx_data[nread] = '\0';
     fclose(idx_fp);
 
     char* entry = strstr(idx_data, "\"agent_id\"");

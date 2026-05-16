@@ -152,6 +152,7 @@ int config_load_file(const char* file_path) {
     if (!buf) { fclose(f); return -1; }
     size_t nread = fread(buf, 1, fsize, f);
     fclose(f);
+    if (nread != (size_t)fsize) { free(buf); return -1; }
     buf[nread] = '\0';
     char* line = buf;
     while (line && *line) {

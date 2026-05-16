@@ -11,6 +11,16 @@
 
 #include "logging_compat.h"
 #include "logging.h"
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef _WINSOCKAPI_
+#define _WINSOCKAPI_
+#endif
+#include <windows.h>
+#endif
+
 #include <stdlib.h>
 
 #include "memory_compat.h"
@@ -27,7 +37,7 @@ static void log_get_registered_modules(void* out_modules, int max_modules) { (vo
 /* ==================== 内部全局状态 ===================== */
 
 /** @brief 兼容层初始化状�?*/
-static int g_compat_initialized = 0;
+static atomic_int g_compat_initialized = 0;
 
 /** @brief 兼容层配�?*/
 static logging_compat_config_t g_compat_config = {
@@ -92,11 +102,15 @@ static const char* generate_old_trace_id(void)
     static int counter = 0;
     
     /* 根据现有实现，追踪ID格式�?trace-<pid>-<timestamp>-<counter>" */
+    #ifdef _WIN32
+    DWORD pid = GetCurrentProcessId();
+#else
     pid_t pid = getpid();
+#endif
     time_t now = time(NULL);
     
-    snprintf(trace_id, sizeof(trace_id), "trace-%d-%ld-%d",
-             pid, now, atomic_fetch_add(&counter, 1));
+    snprintf(trace_id, sizeof(trace_id), "trace-%lu-%lld-%d",
+             (unsigned long)pid, (long long)now, atomic_fetch_add(&counter, 1));
     
     return trace_id;
 }
@@ -132,7 +146,7 @@ static void record_api_call(const char* api_name)
  * 如果兼容层未初始化，使用默认配置初始化�? */
 static void ensure_compat_initialized(void)
 {
-    if (!g_compat_initialized) {
+    if (!atomic_load_explicit(&g_compat_initialized, memory_order_acquire)) {
         logging_compat_init(NULL);
     }
 }
@@ -141,7 +155,7 @@ static void ensure_compat_initialized(void)
 
 int logging_compat_init(const logging_compat_config_t* manager)
 {
-    if (g_compat_initialized) {
+    if (atomic_load_explicit(&g_compat_initialized, memory_order_acquire)) {
         return 0;  /* 已经初始�?*/
     }
     
@@ -154,7 +168,7 @@ int logging_compat_init(const logging_compat_config_t* manager)
     memset(&g_compat_stats, 0, sizeof(g_compat_stats));
     
     /* 标记为已初始�?*/
-    g_compat_initialized = 1;
+    int _exp = 0; atomic_compare_exchange_strong_explicit(&g_compat_initialized, &_exp, 1, memory_order_seq_cst, memory_order_seq_cst);
     
     /* 如果启用迁移检测，记录初始化事�?*/
     if (g_compat_config.enable_migration_detection) {
@@ -221,7 +235,7 @@ void agentos_log_write(int level, const char* file, int line, const char* fmt, .
     }
     
     /* 转换日志级别 */
-    log_level_t new_level __attribute__((unused)) = convert_old_level_to_new(level);
+    log_level_t new_level = convert_old_level_to_new(level);
     
     /* 准备可变参数 */
     va_list args;
@@ -239,13 +253,13 @@ void agentos_log_write_va(int level, const char* file, int line, const char* fmt
     record_api_call("agentos_log_write_va");
     
     /* 转换日志级别 */
-    log_level_t new_level __attribute__((unused)) = convert_old_level_to_new(level);
+    log_level_t new_level = convert_old_level_to_new(level);
     
     /* 调用新架构的日志写入函数 */
     log_write_va(new_level, file, line, fmt, args);
 }
 
-int svc_logger_init(const void* manager __attribute__((unused)))
+int svc_logger_init(const void* manager)
 {
     ensure_compat_initialized();
     record_api_call("svc_logger_init");
@@ -362,7 +376,7 @@ int logging_compat_get_migration_list(migration_module_info_t* out_modules, int 
 
 void logging_compat_cleanup(void)
 {
-    if (!g_compat_initialized) {
+    if (!atomic_load_explicit(&g_compat_initialized, memory_order_acquire)) {
         return;
     }
     
@@ -373,7 +387,7 @@ void logging_compat_cleanup(void)
     
     /* 清理资源 */
     memset(&g_compat_stats, 0, sizeof(g_compat_stats));
-    g_compat_initialized = 0;
+    atomic_store_explicit(&g_compat_initialized, 0, memory_order_seq_cst);
     
     LOG_INFO("Logging compatibility layer cleaned up");
 }

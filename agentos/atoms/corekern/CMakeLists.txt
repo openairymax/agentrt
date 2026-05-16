@@ -1,11 +1,9 @@
-cmake_minimum_required(VERSION 3.15)
-project(agentos_core VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(COREKERN_SOURCES
-    src/main.c
+    src/core_init.c
     src/error.c
     src/ipc/binder.c
     src/ipc/buffer.c
@@ -60,7 +58,7 @@ endif()
 
 # 链接器安全选项
 if(UNIX AND NOT APPLE)
-    target_link_libraries(agentos_core PUBLIC Threads::Threads rt)
+    target_link_libraries(agentos_core PUBLIC Threads::Threads agentos_platform_libs)
     target_link_options(agentos_core PRIVATE -Wl,-z,relro -Wl,-z,now -pie)
 elseif(APPLE)
     target_link_libraries(agentos_core PUBLIC Threads::Threads)

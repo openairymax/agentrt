@@ -12,6 +12,8 @@
 
 #include "sync_platform.h"
 #include <time.h>
+#include "sync_internal.h"
+#include <string.h>
 
 sync_result_t sync_condition_create(sync_condition_t* condition,
                                  const sync_attr_t* attr) {
@@ -47,7 +49,7 @@ sync_result_t sync_condition_create(sync_condition_t* condition,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_condition_destroy(sync_condition_t condition) {
+sync_result_t sync_condition_free(sync_condition_t condition) {
     if (condition == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -67,7 +69,7 @@ sync_result_t sync_condition_destroy(sync_condition_t condition) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_condition_wait(sync_condition_t condition,
+sync_result_t sync_condition_wait_ex(sync_condition_t condition,
                                sync_mutex_t mutex,
                                const sync_timeout_t* timeout) {
     if (condition == NULL || mutex == NULL || !condition->initialized) {
@@ -117,7 +119,7 @@ sync_result_t sync_condition_wait(sync_condition_t condition,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_condition_signal(sync_condition_t condition) {
+sync_result_t sync_condition_signal_ex(sync_condition_t condition) {
     if (condition == NULL || !condition->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -134,7 +136,7 @@ sync_result_t sync_condition_signal(sync_condition_t condition) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_condition_broadcast(sync_condition_t condition) {
+sync_result_t sync_condition_broadcast_ex(sync_condition_t condition) {
     if (condition == NULL || !condition->initialized) {
         return SYNC_ERROR_INVALID;
     }

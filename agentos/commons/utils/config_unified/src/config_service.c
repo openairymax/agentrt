@@ -16,10 +16,11 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
-#include "utils/string/include/string_compat.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <time.h>
 
 #ifdef HAVE_OPENSSL
@@ -31,8 +32,14 @@
 
 /** 配置验证器结构体 */
 struct config_validator {
-    validator_type_t type;           // 验证器类�?    char* pattern;                   // 模式（正则表达式或范围）
-    char** enum_values;              // 枚举值数�?    size_t enum_count;               // 枚举值数�?    config_validator_cb_t custom_cb; // 自定义验证回�?    void* user_data;                 // 用户数据
+    validator_type_t type;           // 验证器类�
+    char* pattern;                   // 模式（正则表达式或范围）
+    char** enum_values;              // 枚举值数�
+    size_t enum_count;
+    // 枚举值数�?
+    config_validator_cb_t custom_cb; // 自定义验证回�?
+    void* user_data;
+    // 用户数据
     char* error_message;             // 错误信息
 };
 
@@ -128,7 +135,8 @@ static char* duplicate_string(const char* str) {
 static bool add_schema_error(config_schema_t* schema, const char* format, ...) {
     if (!schema || !format) return false;
     
-    // 确保错误数组有足够容�?    if (schema->error_count >= schema->error_capacity) {
+    // 确保错误数组有足够容�
+    if (schema->error_count >= schema->error_capacity) {
         size_t new_capacity = schema->error_capacity == 0 ? 8 : schema->error_capacity * 2;
         char** new_errors = (char**)AGENTOS_REALLOC(schema->errors, new_capacity * sizeof(char*));
         if (!new_errors) return false;
@@ -137,7 +145,8 @@ static bool add_schema_error(config_schema_t* schema, const char* format, ...) {
         schema->error_capacity = new_capacity;
     }
     
-    // 格式化错误信�?    char buffer[1024];
+    // 格式化错误信�
+    char buffer[1024];
     va_list args;
     va_start(args, format);
     int len = vsnprintf(buffer, sizeof(buffer), format, args); /* flawfinder: ignore - variadic wrapper with bounded buffer */
@@ -267,7 +276,8 @@ config_validator_t* config_validator_create(const validator_options_t* options) 
     validator->custom_cb = options->custom_cb;
     validator->user_data = options->user_data;
     
-    // 复制模式字符�?    if (options->pattern) {
+    // 复制模式字符�
+    if (options->pattern) {
         validator->pattern = duplicate_string(options->pattern);
         if (!validator->pattern) {
             AGENTOS_FREE(validator);
@@ -275,7 +285,8 @@ config_validator_t* config_validator_create(const validator_options_t* options) 
         }
     }
     
-    // 复制枚举�?    if (options->enum_values && options->enum_count > 0) {
+    // 复制枚举�
+    if (options->enum_values && options->enum_count > 0) {
         validator->enum_values = (char**)AGENTOS_CALLOC(options->enum_count, sizeof(char*));
         if (!validator->enum_values) {
             if (validator->pattern) AGENTOS_FREE(validator->pattern);
@@ -325,7 +336,8 @@ void config_validator_destroy(config_validator_t* validator) {
 bool config_validator_validate(config_validator_t* validator, const char* key, const config_value_t* value) {
     if (!validator || !value) return false;
     
-    // 根据验证器类型进行验�?    switch (validator->type) {
+    // 根据验证器类型进行验�
+    switch (validator->type) {
         case VALIDATOR_TYPE_RANGE:
             if (!validator->pattern) return false;
             {
@@ -476,7 +488,8 @@ void config_schema_destroy(config_schema_t* schema) {
     
     if (schema->name) AGENTOS_FREE(schema->name);
     
-    // 释放Schema�?    for (size_t i = 0; i < schema->count; i++) {
+    // 释放Schema�
+    for (size_t i = 0; i < schema->count; i++) {
         schema_item_internal_t* item = &schema->items[i];
         if (item->key) AGENTOS_FREE(item->key);
         if (item->description) AGENTOS_FREE(item->description);
@@ -496,11 +509,13 @@ void config_schema_destroy(config_schema_t* schema) {
 config_error_t config_schema_add_item(config_schema_t* schema, const config_schema_item_t* item) {
     if (!schema || !item || !item->key) return CONFIG_ERROR_INVALID_ARG;
     
-    // 检查是否已存在相同�?    if (find_schema_item(schema, item->key) >= 0) {
+    // 检查是否已存在相同�
+    if (find_schema_item(schema, item->key) >= 0) {
         return CONFIG_ERROR_INVALID_ARG;
     }
     
-    // 确保有足够容�?    if (schema->count >= schema->capacity) {
+    // 确保有足够容�
+    if (schema->count >= schema->capacity) {
         size_t new_capacity = schema->capacity * 2;
         schema_item_internal_t* new_items = (schema_item_internal_t*)AGENTOS_REALLOC(
             schema->items, new_capacity * sizeof(schema_item_internal_t));
@@ -510,7 +525,8 @@ config_error_t config_schema_add_item(config_schema_t* schema, const config_sche
         schema->capacity = new_capacity;
     }
     
-    // 复制Schema�?    schema_item_internal_t* new_item = &schema->items[schema->count];
+    // 复制Schema�
+    schema_item_internal_t* new_item = &schema->items[schema->count];
     memset(new_item, 0, sizeof(schema_item_internal_t));
     
     new_item->key = duplicate_string(item->key);
@@ -536,7 +552,8 @@ config_error_t config_schema_add_item(config_schema_t* schema, const config_sche
         }
     }
     
-    // 复制验证器（引用计数，不复制�?    new_item->validator = item->validator;
+    // 复制验证器（引用计数，不复制�
+    new_item->validator = item->validator;
     
     schema->count++;
     return CONFIG_SUCCESS;
@@ -548,11 +565,13 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
     clear_schema_errors(schema);
     bool valid = true;
     
-    // 验证每个Schema�?    for (size_t i = 0; i < schema->count; i++) {
+    // 验证每个Schema�
+    for (size_t i = 0; i < schema->count; i++) {
         schema_item_internal_t* item = &schema->items[i];
         
-        // 查找配置�?        // 从配置上下文中获取值
-        config_value_t* value = config_context_get(ctx, item->key);
+        // 查找配置�
+        // 从配置上下文中获取值
+        const config_value_t* value = config_context_get(ctx, item->key);
         
         if (item->required && !value) {
             add_schema_error(schema, "Required configuration item '%s' is missing", item->key);
@@ -567,7 +586,8 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
                 valid = false;
             }
             
-            // 验证�?            if (item->validator && !config_validator_validate(item->validator, item->key, value)) {
+            // 验证�
+            if (item->validator && !config_validator_validate(item->validator, item->key, value)) {
                 add_schema_error(schema, "Configuration item '%s' failed validation", item->key);
                 valid = false;
             }
@@ -610,19 +630,23 @@ const char* config_schema_get_error(config_schema_t* schema, int index) {
 config_error_t config_schema_apply_defaults(config_schema_t* schema, config_context_t* ctx) {
     if (!schema || !ctx) return CONFIG_ERROR_INVALID_ARG;
     
-    // 为每个有默认值的Schema项设置默认�?    for (size_t i = 0; i < schema->count; i++) {
+    // 为每个有默认值的Schema项设置默认�
+    for (size_t i = 0; i < schema->count; i++) {
         schema_item_internal_t* item = &schema->items[i];
         
         if (item->default_value) {
-            // 检查是否已存在配置�?            // 检查配置键是否存在
+            // 检查是否已存在配置�
+            // 检查配置键是否存在
             bool has_key = config_context_has(ctx, item->key);
             
             if (!has_key) {
-                // 根据类型创建配置�?                config_value_t* default_value = NULL;
+                // 根据类型创建配置�
+                config_value_t* default_value = NULL;
                 
                 switch (item->type) {
                     case CONFIG_TYPE_BOOL:
-                        // 解析布尔�?                        default_value = config_value_create_bool(strcasecmp(item->default_value, "true") == 0);
+                        // 解析布尔�
+                        default_value = config_value_create_bool(strcasecmp(item->default_value, "true") == 0);
                         break;
                         
                     case CONFIG_TYPE_INT:
@@ -647,7 +671,8 @@ config_error_t config_schema_apply_defaults(config_schema_t* schema, config_cont
                 }
                 
                 if (default_value) {
-                    // 设置配置�?                    // config_context_set_value(ctx, item->key, default_value);
+                    // 设置配置�
+                    // config_context_set_value(ctx, item->key, default_value);
                     config_value_destroy(default_value);
                 }
             }
@@ -718,7 +743,8 @@ config_error_t config_hot_reload_register_callback(config_hot_reload_manager_t* 
                                                     void* user_data) {
     if (!manager || !callback) return CONFIG_ERROR_INVALID_ARG;
     
-    // 确保有足够容�?    if (manager->callback_count >= manager->callback_capacity) {
+    // 确保有足够容�
+    if (manager->callback_count >= manager->callback_capacity) {
         size_t new_capacity = manager->callback_capacity * 2;
         change_callback_item_t* new_callbacks = (change_callback_item_t*)AGENTOS_REALLOC(
             manager->callbacks, new_capacity * sizeof(change_callback_item_t));
@@ -846,7 +872,7 @@ config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
         for (size_t i = 0; i < manager->callback_count; i++) {
             change_callback_item_t* cb = &manager->callbacks[i];
             if (cb->callback) {
-                cb->callback(manager->ctx, cb->key, cb->user_data);
+                cb->callback(manager->ctx, cb->key, NULL, NULL, cb->user_data);
             }
         }
     }
@@ -1058,6 +1084,7 @@ static config_value_t* config_decrypt_string_value(const char* hex_data,
     AGENTOS_FREE(plaintext);
     return result;
 #else
+    errno = ENOSYS;
     return NULL;
 #endif
 }
@@ -1149,7 +1176,8 @@ uint32_t config_version_create_snapshot(config_version_manager_t* manager,
                                          const char* description) {
     if (!manager) return 0;
     
-    // 确保有足够容�?    if (manager->count >= manager->capacity) {
+    // 确保有足够容�
+    if (manager->count >= manager->capacity) {
         size_t new_capacity = manager->capacity * 2;
         config_version_item_t* new_versions = (config_version_item_t*)AGENTOS_REALLOC(
             manager->versions, new_capacity * sizeof(config_version_item_t));
@@ -1159,7 +1187,8 @@ uint32_t config_version_create_snapshot(config_version_manager_t* manager,
         manager->capacity = new_capacity;
     }
     
-    // 创建版本�?    config_version_item_t* version = &manager->versions[manager->count];
+    // 创建版本�
+    config_version_item_t* version = &manager->versions[manager->count];
     memset(version, 0, sizeof(config_version_item_t));
     
     version->version = manager->next_version++;
@@ -1449,17 +1478,16 @@ config_context_t* config_service_create(const char* service_name,
     if (!ctx) return NULL;
 
     if (schema) {
-        ctx->schema = schema;
+        config_context_set_schema(ctx, schema);
         config_schema_apply_defaults(schema, ctx);
     }
 
     if (enable_hot_reload) {
-        ctx->hot_reload_enabled = true;
-        ctx->reload_interval_ms = 5000;
+        config_context_set_hot_reload(ctx, true, 5000);
     }
 
     if (enable_encryption) {
-        ctx->encryption_enabled = true;
+        config_context_set_encryption(ctx, true);
     }
 
     return ctx;

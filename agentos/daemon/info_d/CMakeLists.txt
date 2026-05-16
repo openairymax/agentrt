@@ -1,8 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Info 服务构建文件
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-info-d VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -35,7 +33,7 @@ elseif(UNIX)
     target_link_libraries(agentos-info-d PRIVATE
         agentos_common
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
 endif()
 

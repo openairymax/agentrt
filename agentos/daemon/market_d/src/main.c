@@ -13,6 +13,7 @@
  * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
+#include "atomic_compat.h"
 #include "market_service.h"
 #include "platform.h"
 #include "error.h"
@@ -48,7 +49,7 @@ static void signal_handler(int signum);
 /* ==================== 全局状态 ==================== */
 
 static market_service_t* g_service = NULL;
-static volatile int g_running = 1;
+static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
 
@@ -350,7 +351,7 @@ static void handle_client(agentos_socket_t client_fd) {
 /* ==================== 帮助信息 ==================== */
 
 static void signal_handler(int signum __attribute__((unused))) {
-    g_running = 0;
+    atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     SVC_LOG_INFO("Received shutdown signal");
 }
 
@@ -479,7 +480,7 @@ int main(int argc, char** argv) {
     }
 
     /* 主事件循环 */
-    while (g_running) {
+    while (atomic_load_explicit(&g_running, memory_order_acquire)) {
         agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
         if (client_fd == AGENTOS_INVALID_SOCKET) continue;
 

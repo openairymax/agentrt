@@ -35,6 +35,7 @@ jobs:
         run: |
           cmake -B ${{ github.workspace }}/../AgentOS-build-oss \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DAGENTOS_WITH_MEMORYROVOL=ON \
             -DMEMORYROVOL_OSS=ON \
             -DBUILD_TESTS=ON \
             -Werror=dev
@@ -81,7 +82,7 @@ jobs:
         run: |
           cmake -B ${{ github.workspace }}/../AgentOS-build-pro \
             -DCMAKE_BUILD_TYPE=Release \
-            -DMEMORYROVOL_SOURCE=ON \
+            -DAGENTOS_WITH_MEMORYROVOL=ON \
             -DBUILD_TESTS=ON \
             -Werror=dev
 

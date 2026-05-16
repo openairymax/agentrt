@@ -96,8 +96,8 @@ static void test_route_task_methods(void) {
     cJSON_AddStringToObject(params, "name", "test_task");
     cJSON* request = create_jsonrpc_request_with_params("agentos_sys_task_submit", params);
     
-    char* response = gateway_syscall_route("agentos_sys_task_submit", params, 
-                                            jsonrpc_get_id(request));
+    char* response = gateway_syscall_route("agentos_sys_task_submit", params,
+                                            (cJSON*)jsonrpc_get_id(request));
     ASSERT_NOT_NULL(response);
     /* 响应应该是有效的 JSON */
     cJSON* resp_json = cJSON_Parse(response);

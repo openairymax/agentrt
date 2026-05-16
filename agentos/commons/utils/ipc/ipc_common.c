@@ -28,6 +28,7 @@
 
 #include "ipc_common.h"
 #include "platform.h"
+#include "string_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,7 +57,7 @@
 #else
     #include <unistd.h>
     #include <sys/time.h>
-    #include <sys/mman.h>
+    #include "agentos_mman.h"
     #include <sys/socket.h>
     #include <sys/un.h>
     #include <netinet/in.h>
@@ -2007,7 +2008,8 @@ ipc_message_t* ipc_message_create(ipc_msg_type_t type, const void* payload, size
             memcpy(msg->payload, payload, payload_len);
             msg->payload_size = payload_len;
         } else {
-            msg->payload_size = 0;
+            free(msg);
+            return NULL;
         }
     } else {
         msg->payload = NULL;

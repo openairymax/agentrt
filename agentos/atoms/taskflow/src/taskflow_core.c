@@ -10,6 +10,7 @@
 #include "taskflow.h"
 #include "graph_engine.h"
 #include "pregel_engine.h"
+#undef AGENTOS_USE_SCHEDULER_THREAD_IMPL
 #include "platform.h"
 #include <stdlib.h>
 #include <string.h>

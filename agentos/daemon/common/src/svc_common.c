@@ -22,12 +22,13 @@
 #include "svc_common.h"
 #include "svc_logger.h"
 #include "platform.h"
+#include "atomic_compat.h"
 #include "error.h"
 #include "ipc_client.h"
 #include "safe_string_utils.h"
 #include "thread_pool.h"
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1425,6 +1426,7 @@ agentos_error_t agentos_config_load(
 
     size_t bytes_read = fread(cfg->raw_config, 1, file_size, fp);
     fclose(fp);
+    if (bytes_read != (size_t)file_size) { AGENTOS_FREE(cfg->raw_config); AGENTOS_FREE(cfg); return AGENTOS_EIO; }
 
     cfg->config_size = bytes_read;
     cfg->raw_config[bytes_read] = '\0';
@@ -1547,7 +1549,7 @@ typedef struct {
     uint64_t next_restart_time;
     bool degraded;
     agentos_thread_t monitor_thread;
-    volatile int stop_requested;
+    atomic_int stop_requested;
 } monitored_service_t;
 
 static struct {

@@ -100,7 +100,9 @@ int a2a_v03_create(a2a_config_t config, a2a_handle_t* out_handle) {
 
     struct a2a_v03_adapter_s* adapter = calloc(1, sizeof(struct a2a_v03_adapter_s));
     if (!adapter) return -2;
-    if (config.default_timeout_ms > 0) { }
+    if (config.default_timeout_ms > 0) {
+        adapter->config.default_timeout_ms = config.default_timeout_ms;
+    }
 
     adapter->agent_count = 0;
     adapter->task_counter = 1;
@@ -773,7 +775,7 @@ void a2a_v03_destroy_session(a2a_v03_context_t* ctx, const char* session_id) {
 }
 
 size_t a2a_v03_get_active_session_count(a2a_v03_context_t* ctx) {
-    if (ctx) { }
+    (void)ctx;
     return g_a2a_auth.session_count;
 }
 
@@ -921,7 +923,10 @@ int a2a_v03_cancel_task(a2a_v03_context_t* ctx, const char* task_id,
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
             adapter->tasks[i]->state = A2A_TASK_CANCELED;
             adapter->tasks[i]->updated_at = a2a_timestamp_ms();
-            if (reason) { }
+            if (reason) {
+                free(adapter->tasks[i]->error_message);
+                adapter->tasks[i]->error_message = strdup(reason);
+            }
             return 0;
         }
     }
@@ -1177,7 +1182,7 @@ static int a2a_adapter_decode_cb(void* c, const void* d, size_t s, void* o) {
 }
 static int a2a_adapter_connect_cb(void* c, const char* e) {
     if (!c) return -1;
-    if (e) { }
+    (void)e;
     return 0;
 }
 static int a2a_adapter_disconnect_cb(void* c) {
@@ -1187,22 +1192,22 @@ static int a2a_adapter_disconnect_cb(void* c) {
 static int a2a_adapter_is_connected_cb(void* c) { return c ? 1 : 0; }
 static int a2a_adapter_send_cb(void* c, const void* d, size_t s) {
     if (!c || !d || s == 0) return -1;
-    return 0;
+    return -1;
 }
 static int a2a_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
     if (!c || !d || !s) return -1;
-    if (t > 0) { }
+    (void)t;
     *d = NULL;
     *s = 0;
-    return 0;
+    return -1;
 }
 static int a2a_adapter_handle_request_cb(void* c, const void* r, void** rp) {
     if (!c || !r) return -1;
     if (rp) *rp = NULL;
     return a2a_v03_route_request((a2a_v03_context_t*)c, (const char*)r, NULL, (char**)rp);
 }
-static int a2a_adapter_get_version_cb(void* c, char* b, size_t s) { if (c) { } snprintf(b, s, "0.3.0"); return 0; }
-static uint32_t a2a_adapter_capabilities_cb(void* c) { if (c) { } return A2A_CAP_TASK_EXECUTION|A2A_CAP_STREAMING|A2A_CAP_NEGOTIATION; }
+static int a2a_adapter_get_version_cb(void* c, char* b, size_t s) { (void)c; snprintf(b, s, "0.3.0"); return 0; }
+static uint32_t a2a_adapter_capabilities_cb(void* c) { (void)c; return A2A_CAP_TASK_EXECUTION|A2A_CAP_STREAMING|A2A_CAP_NEGOTIATION; }
 static int a2a_adapter_get_stats_cb(void* c, char* b, size_t s) {
     if (!c || !b || s == 0) return -1;
     struct a2a_v03_adapter_s* a = (struct a2a_v03_adapter_s*)c;

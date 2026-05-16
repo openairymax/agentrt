@@ -66,12 +66,13 @@ extern "C" {
 /* Thread Handle Types */
 #if cupolas_PLATFORM_WINDOWS
     #include <windows.h>
+    #include "atomic_compat.h"
     typedef HANDLE cupolas_thread_t;
     typedef DWORD cupolas_thread_id_t;
     typedef CRITICAL_SECTION cupolas_mutex_t;
     typedef struct {
         SRWLOCK lock;
-        volatile long state;
+        atomic_long state;
     } cupolas_rwlock_t;
     typedef CONDITION_VARIABLE cupolas_cond_t;
 #else

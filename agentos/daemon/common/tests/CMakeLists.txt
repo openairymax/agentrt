@@ -2,9 +2,7 @@
 # agentos/daemon/common 单元测试 (TeamC)
 # 对齐: 看板v14.0 C-W1-003 / 规范手册v13.0 TEST-01~06
 
-cmake_minimum_required(VERSION 3.20)
 
-project(svc_common_tests VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

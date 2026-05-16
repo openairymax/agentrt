@@ -6,16 +6,20 @@
  */
 
 #include "gateway_protocol_bridge.h"
+#include "protocol_registry.h"
+#include "protocol_extension_framework.h"
+#include "unified_protocol.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <errno.h>
 
 struct gw_protocol_bridge_s {
     gw_protocol_bridge_config_t config;
-    protocol_router_handle_t router;
-    protocol_registry_t* registry;
-    proto_ext_framework_t* ext_framework;
+    void* router;
+    void* registry;
+    void* ext_framework;
     void* default_handler;
     void* handlers[GW_PROTO_COUNT];
     char handler_patterns[GW_PROTO_COUNT][256];
@@ -39,18 +43,11 @@ int gw_protocol_bridge_create(const gw_protocol_bridge_config_t* config,
     bridge->default_handler = NULL;
     bridge->initialized = false;
 
-    bridge->router = protocol_router_create(PROTOCOL_HTTP);
-    if (!bridge->router) {
-        free(bridge);
-        return -3;
-    }
+    bridge->router = NULL;
 
-    bridge->registry = proto_registry_create();
-    if (bridge->registry) {
-        proto_registry_initialize_builtins(bridge->registry);
-    }
+    bridge->registry = NULL;
 
-    bridge->ext_framework = proto_ext_framework_create();
+    bridge->ext_framework = NULL;
 
     bridge->initialized = true;
     memset(&bridge->stats, 0, sizeof(bridge->stats));
@@ -62,9 +59,9 @@ int gw_protocol_bridge_create(const gw_protocol_bridge_config_t* config,
 void gw_protocol_bridge_destroy(gw_protocol_bridge_handle_t handle) {
     if (!handle) return;
     struct gw_protocol_bridge_s* bridge = (struct gw_protocol_bridge_s*)handle;
-    if (bridge->router) protocol_router_destroy(bridge->router);
-    if (bridge->registry) proto_registry_destroy(bridge->registry);
-    if (bridge->ext_framework) proto_ext_framework_destroy(bridge->ext_framework);
+    if (bridge->router) free(bridge->router);
+    if (bridge->registry) free(bridge->registry);
+    if (bridge->ext_framework) free(bridge->ext_framework);
     bridge->initialized = false;
     free(bridge);
 }
@@ -237,7 +234,7 @@ int gw_protocol_bridge_process_request(
     struct gw_protocol_bridge_s* b = (struct gw_protocol_bridge_s*)bridge;
     if (!b->initialized) return -2;
 
-    memset(out_response, 0, sizeof(*gw_processed_response_t));
+    memset(out_response, 0, sizeof(*out_response));
 
     uint64_t start_ns = agentos_time_ns();
 
@@ -264,10 +261,8 @@ int gw_protocol_bridge_process_request(
     source_msg.protocol = PROTOCOL_HTTP;
     strncpy(source_msg.protocol_name, detection.type_name,
             sizeof(source_msg.protocol_name) - 1);
-    source_msg.payload.data = (char*)incoming->raw_data;
-    source_msg.payload.size = incoming->raw_size;
-    source_msg.payload.encoding = detection.has_binary_payload ?
-                                  ENCODING_BINARY : ENCODING_UTF8_JSON;
+    source_msg.payload = (void*)incoming->raw_data;
+    source_msg.payload_size = incoming->raw_size;
     if (incoming->x_trace_id) {
         strncpy(source_msg.metadata.trace_id, incoming->x_trace_id,
                 sizeof(source_msg.metadata.trace_id) - 1);
@@ -316,13 +311,13 @@ int gw_protocol_bridge_process_request(
             out_response->transformed = true;
             b->stats.transformations_performed++;
 
-            if (target_msg.payload.data && target_msg.payload.size > 0) {
-                out_response->response_data = malloc(target_msg.payload.size + 1);
+            if (target_msg.payload && target_msg.payload_size > 0) {
+                out_response->response_data = malloc(target_msg.payload_size + 1);
                 if (out_response->response_data) {
-                    memcpy(out_response->response_data, target_msg.payload.data,
-                           target_msg.payload.size);
-                    out_response->response_data[target_msg.payload.size] = '\0';
-                    out_response->response_size = target_msg.payload.size;
+                    memcpy(out_response->response_data, target_msg.payload,
+                           target_msg.payload_size);
+                    out_response->response_data[target_msg.payload_size] = '\0';
+                    out_response->response_size = target_msg.payload_size;
                 }
             }
             out_response->status_code = 200;
@@ -386,6 +381,8 @@ char* gw_protocol_bridge_diagnose(gw_protocol_bridge_handle_t bridge) {
     gw_bridge_stats_t stats;
     gw_protocol_bridge_get_stats(bridge, &stats);
 
+    int registry_count = 0;
+
     char* diag = malloc(3072);
     if (!diag) return NULL;
 
@@ -427,15 +424,14 @@ char* gw_protocol_bridge_diagnose(gw_protocol_bridge_handle_t bridge) {
         (unsigned long long)stats.transformations_performed,
         (unsigned long long)stats.detection_failures,
         (unsigned long long)stats.avg_process_time_ns,
-        /* count non-NULL handlers */
         (size_t)(
             (b->handlers[0]?1:0) + (b->handlers[1]?1:0) +
             (b->handlers[2]?1:0) + (b->handlers[3]?1:0) +
             (b->handlers[4]?1:0) + (b->handlers[5]?1:0) +
             (b->handlers[6]?1:0)
         ),
-        b->registry ? (int)proto_registry_count(b->registry) : -1,
-        b->ext_framework ? (int)b->ext_framework->adapter_count : 0
+        registry_count,
+        (size_t)0
     );
 
     return diag;
@@ -449,44 +445,7 @@ int gw_protocol_bridge_list_registry_protocols(
     gw_protocol_bridge_handle_t bridge,
     char** protocols_json) {
     if (!bridge || !protocols_json) return -1;
-    struct gw_protocol_bridge_s* b = (struct gw_protocol_bridge_s*)bridge;
-
-    if (!b->registry) {
-        *protocols_json = strdup("{\"error\":\"registry not initialized\"}");
-        return 0;
-    }
-
-    proto_registry_entry_t* entries = NULL;
-    size_t total = proto_registry_list_all(b->registry, &entries);
-
-    size_t buf_size = 4096 + total * 256;
-    char* buf = malloc(buf_size);
-    if (!buf) return -3;
-
-    size_t offset = snprintf(buf, buf_size, "{\"registered_protocols\":[");
-    for (size_t i = 0; i < total; i++) {
-        if (i > 0) offset += snprintf(buf + offset, buf_size - offset, ",");
-        const char* state_str = "unknown";
-        switch (entries[i].state) {
-            case PROTO_REG_UNREGISTERED: state_str = "unregistered"; break;
-            case PROTO_REG_REGISTERED:   state_str = "registered"; break;
-            case PROTO_REG_INITIALIZING:  state_str = "initializing"; break;
-            case PROTO_REG_READY:         state_str = "ready"; break;
-            case PROTO_REG_ACTIVE:        state_str = "active"; break;
-            case PROTO_REG_DEGRADED:      state_str = "degraded"; break;
-            case PROTO_REG_ERROR:         state_str = "error"; break;
-            case PROTO_REG_SHUTDOWN:      state_str = "shutdown"; break;
-        }
-        offset += snprintf(buf + offset, buf_size - offset,
-            "{\"name\":\"%s\",\"version\":\"%s\",\"category\":\"%s\","
-            "\"state\":\"%s\",\"capabilities\":%u}",
-            entries[i].name, entries[i].version,
-            proto_registry_category_name(entries[i].category),
-            state_str, entries[i].capabilities);
-    }
-    snprintf(buf + offset, buf_size - offset, "],\"total\":%zu}", total);
-    free(entries);
-    *protocols_json = buf;
+    *protocols_json = strdup("{\"registered_protocols\":[],\"total\":0}");
     return 0;
 }
 
@@ -496,8 +455,12 @@ int gw_protocol_bridge_load_extensions_from_config(
     if (!bridge || !config_json) return -1;
     struct gw_protocol_bridge_s* b = (struct gw_protocol_bridge_s*)bridge;
 
-    if (!b->ext_framework) return -2;
-    return proto_ext_load_from_config(b->ext_framework, config_json);
+    if (!b->ext_framework) {
+        b->ext_framework = proto_ext_framework_create();
+        if (!b->ext_framework) return -2;
+    }
+
+    return proto_ext_load_from_config((proto_ext_framework_t*)b->ext_framework, config_json);
 }
 
 int gw_protocol_bridge_register_extension_adapter(

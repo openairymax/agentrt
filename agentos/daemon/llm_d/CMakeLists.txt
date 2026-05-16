@@ -1,8 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # LLM 服务构建文件
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-llm-d VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -13,14 +11,20 @@ option(BUILD_COVERAGE "Build with code coverage" OFF)
 
 # 查找依赖
 find_package(Threads REQUIRED)
-find_package(PkgConfig REQUIRED)
+find_package(PkgConfig QUIET)
 
-pkg_check_modules(CURL REQUIRED libcurl)
-pkg_check_modules(CJSON REQUIRED libcjson)
-pkg_check_modules(YAML QUIET yaml-0.1)
-if(NOT YAML_FOUND)
-    message(STATUS "libyaml not found, YAML config support will be disabled")
-    add_definitions(-DNO_YAML_SUPPORT=1)
+if(PkgConfig_FOUND)
+    pkg_check_modules(CURL QUIET libcurl)
+    pkg_check_modules(CJSON QUIET libcjson)
+else()
+    set(CURL_FOUND FALSE)
+    set(CJSON_FOUND FALSE)
+endif()
+if(NOT CURL_FOUND)
+    message(STATUS "libcurl not found, LLM remote API features may be limited")
+endif()
+if(NOT CJSON_FOUND)
+    message(STATUS "libcjson not found, JSON features may be limited")
 endif()
 
 # ==================== 路径设置 ====================
@@ -36,6 +40,7 @@ set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 set(LLM_D_SOURCES
     src/main.c
     src/service.c
+    src/llm_svc_adapter.c
     src/providers/registry.c
     src/providers/openai.c
     src/providers/anthropic.c
@@ -69,7 +74,7 @@ elseif(UNIX)
     target_link_libraries(agentos-llm-d PRIVATE
         agentos_common
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
 endif()
 

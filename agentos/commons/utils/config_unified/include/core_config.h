@@ -177,6 +177,20 @@ double config_value_get_double(const config_value_t* value, double default_value
  */
 const char* config_value_get_string(const config_value_t* value, const char* default_value);
 
+config_error_t config_value_array_append(config_value_t* array, config_value_t* item);
+
+typedef struct {
+    const char* key;
+    const config_value_t* value;
+} config_context_entry_t;
+
+typedef struct config_iterator config_iterator_t;
+
+const config_iterator_t* config_context_iterator(const config_context_t* ctx);
+void config_iterator_reset(const config_iterator_t* it);
+bool config_iterator_has_next(const config_iterator_t* it);
+const char* config_iterator_next_key(const config_iterator_t* it);
+
 /* ==================== 核心API：配置上下文操作 ==================== */
 
 /**
@@ -259,6 +273,12 @@ config_error_t config_context_copy(config_context_t* dst, const config_context_t
 const char* config_context_get_key_at(const config_context_t* ctx, size_t index);
 
 const config_value_t* config_context_get_value_at(const config_context_t* ctx, size_t index);
+
+typedef struct config_schema config_schema_t;
+
+void config_context_set_schema(config_context_t* ctx, config_schema_t* schema);
+void config_context_set_hot_reload(config_context_t* ctx, bool enabled, uint32_t interval_ms);
+void config_context_set_encryption(config_context_t* ctx, bool enabled);
 
 /* ==================== 工具函数 ==================== */
 

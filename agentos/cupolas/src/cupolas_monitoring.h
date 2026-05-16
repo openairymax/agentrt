@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef struct gateway gateway_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -307,19 +309,6 @@ monitoring_config_t* monitoring_config_create_opentelemetry(const char* endpoint
                                                             const char* service_name);
 
 /**
- * @brief Create default StatsD configuration
- * @param[in] host StatsD server hostname
- * @param[in] port StatsD server port
- * @param[in] prefix Metric name prefix
- * @return Configuration structure (caller must free with monitoring_config_destroy())
- * @note Thread-safe: Safe to call from multiple threads
- * @reentrant Yes
- * @ownership Returns owned pointer: caller must call monitoring_config_destroy()
- */
-monitoring_config_t* monitoring_config_create_statsd(const char* host, uint16_t port,
-                                                     const char* prefix);
-
-/**
  * @brief Destroy configuration structure
  * @param[in] config Configuration to destroy (may be NULL)
  * @note Thread-safe: Safe to call from multiple threads
@@ -378,6 +367,27 @@ int cupolas_monitoring_init_instance(const monitoring_config_t* config);
  * @reentrant No
  */
 void cupolas_monitoring_shutdown_instance(void);
+
+/**
+ * @brief Register monitoring endpoints with a gateway instance
+ *
+ * Registers /metrics, /health, and /monitoring endpoints with the
+ * specified gateway. After registration, the gateway's HTTP server
+ * will serve monitoring data, eliminating the need for a separate
+ * HTTP server in the monitoring module.
+ *
+ * @param[in] mgr Monitoring manager handle
+ * @param[in] gw Gateway instance (must be GATEWAY_TYPE_HTTP)
+ * @return 0 on success, negative on failure
+ *
+ * @note Must be called after cupolas_monitoring_start() and before gateway_start()
+ * @note Thread-safe: Safe to call from main thread only
+ * @reentrant No
+ * @ownership mgr and gw: caller retains ownership
+ *
+ * @since 0.0.5
+ */
+int cupolas_monitoring_register_endpoints(cupolas_monitoring_t* mgr, gateway_t* gw);
 
 #ifdef __cplusplus
 }

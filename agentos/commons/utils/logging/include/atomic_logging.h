@@ -210,16 +210,27 @@ int atomic_logging_acquire(log_record_t* record, int timeout_ms);
  */
 int atomic_logging_acquire_batch(log_record_t* records, size_t max_count, int timeout_ms);
 
+/* ==================== 性能监控结构体 ==================== */
+
 /**
- * @brief 释放日志记录节点
+ * @brief 原子层统计信息
  * 
- * 释放已处理的日志记录节点，允许重用。
- * 必须在处理完日志记录后调用。
- * 
- * @param record 已处理的日志记录
- * @return 0 成功，负值表示错误
+ * 原子层的运行时性能统计信息。
  */
-int atomic_logging_release(const log_record_t* record);
+typedef struct atomic_logging_stats {
+    uint64_t total_submitted;
+    uint64_t total_acquired;
+    size_t current_queue_size;
+    float queue_max_usage;
+    uint64_t submit_avg_latency_ns;
+    uint64_t acquire_avg_latency_ns;
+    uint64_t submit_collisions;
+    uint64_t memory_pool_allocations;
+    uint64_t memory_pool_frees;
+    size_t thread_local_buffers;
+    uint64_t batch_submits;
+    uint64_t batch_acquires;
+} atomic_logging_stats_t;
 
 /**
  * @brief 获取原子层统计信息
@@ -229,7 +240,7 @@ int atomic_logging_release(const log_record_t* record);
  * @param out_stats 输出参数，接收统计信息
  * @return 0 成功，负值表示错误
  */
-int atomic_logging_get_stats(struct atomic_logging_stats* out_stats);
+int atomic_logging_get_stats(atomic_logging_stats_t* out_stats);
 
 /**
  * @brief 获取线程本地缓冲
@@ -268,51 +279,6 @@ int atomic_logging_flush(void);
  */
 void atomic_logging_cleanup(void);
 
-/* ==================== 性能监控结构体 ==================== */
-
-/**
- * @brief 原子层统计信息
- * 
- * 原子层的运行时性能统计信息。
- */
-typedef struct atomic_logging_stats {
-    /** @brief 总提交记录数 */
-    uint64_t total_submitted;
-    
-    /** @brief 总获取记录数 */
-    uint64_t total_acquired;
-    
-    /** @brief 当前队列中的记录数 */
-    size_t current_queue_size;
-    
-    /** @brief 队列最大使用率（百分比） */
-    float queue_max_usage;
-    
-    /** @brief 提交操作平均延迟（纳秒） */
-    uint64_t submit_avg_latency_ns;
-    
-    /** @brief 获取操作平均延迟（纳秒） */
-    uint64_t acquire_avg_latency_ns;
-    
-    /** @brief 提交冲突次数（无锁模式） */
-    uint64_t submit_collisions;
-    
-    /** @brief 内存池分配次数 */
-    uint64_t memory_pool_allocations;
-    
-    /** @brief 内存池释放次数 */
-    uint64_t memory_pool_frees;
-    
-    /** @brief 线程本地缓冲数量 */
-    size_t thread_local_buffers;
-    
-    /** @brief 批量提交次数 */
-    uint64_t batch_submits;
-    
-    /** @brief 批量获取次数 */
-    uint64_t batch_acquires;
-} atomic_logging_stats_t;
-
 /* ==================== 内部使用的原子操作包装 ==================== */
 
 /**
@@ -322,13 +288,7 @@ typedef struct atomic_logging_stats {
  * 在写入共享数据后调用。
  */
 static inline void atomic_write_barrier(void) {
-#if defined(__GNUC__) || defined(__clang__)
-    __atomic_thread_fence(__ATOMIC_RELEASE);
-#elif defined(_MSC_VER)
-    _WriteBarrier();
-#else
-    #error "Unsupported compiler for atomic operations"
-#endif
+    atomic_thread_fence(memory_order_release);
 }
 
 /**
@@ -338,13 +298,7 @@ static inline void atomic_write_barrier(void) {
  * 在读取共享数据前调用。
  */
 static inline void atomic_read_barrier(void) {
-#if defined(__GNUC__) || defined(__clang__)
-    __atomic_thread_fence(__ATOMIC_ACQUIRE);
-#elif defined(_MSC_VER)
-    _ReadBarrier();
-#else
-    #error "Unsupported compiler for atomic operations"
-#endif
+    atomic_thread_fence(memory_order_acquire);
 }
 
 /**
@@ -358,13 +312,8 @@ static inline void atomic_read_barrier(void) {
  * @return true 操作成功，false 操作失败
  */
 static inline bool agentos_atomic_cas_weak(volatile uint64_t* ptr, uint64_t* expected, uint64_t desired) {
-#if defined(__GNUC__) || defined(__clang__)
-    return __atomic_compare_exchange_n(ptr, expected, desired, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
-#elif defined(_MSC_VER)
-    return _InterlockedCompareExchange64((volatile __int64*)ptr, desired, *expected) == *expected;
-#else
-    #error "Unsupported compiler for atomic operations"
-#endif
+    return atomic_compare_exchange_strong_64((volatile _Atomic int64_t*)ptr, (int64_t*)expected, (int64_t)desired,
+                                              memory_order_acq_rel, memory_order_acquire);
 }
 
 #ifdef __cplusplus

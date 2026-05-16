@@ -13,6 +13,7 @@
  * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
+#include "atomic_compat.h"
 #include "gateway_service.h"
 #include "svc_common.h"
 #include "svc_logger.h"
@@ -35,7 +36,7 @@
 /* ==================== 全局状态 ==================== */
 
 static gateway_service_t g_service = NULL;
-static volatile int g_running = 1;
+static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 
 /* ==================== 信号处理 ==================== */
@@ -45,7 +46,7 @@ static agentos_mutex_t g_running_lock;
  */
 static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
-    g_running = 0;
+    atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     agentos_mutex_unlock(&g_running_lock);
 
     if (g_service) {
@@ -218,7 +219,7 @@ int main(int argc, char* argv[]) {
     int loop_count = 0;
     const int HEALTH_CHECK_INTERVAL = 30;
 
-    while (g_running) {
+    while (atomic_load_explicit(&g_running, memory_order_acquire)) {
         if (!gateway_service_is_running(g_service)) {
             SVC_LOG_WARN("Gateway service stopped unexpectedly");
             break;
