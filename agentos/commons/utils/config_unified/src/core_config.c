@@ -229,10 +229,7 @@ config_value_t* config_value_create_object(size_t capacity) {
     config_value_t* val = config_value_alloc(CONFIG_TYPE_OBJECT);
     if (val) {
         val->data.object_value.capacity = capacity > 0 ? capacity : 16;
-        val->data.object_value.items = (struct {
-            char* key;
-            config_value_t* value;
-        }*)AGENTOS_CALLOC(val->data.object_value.capacity, sizeof(val->data.object_value.items[0]));
+        val->data.object_value.items = AGENTOS_CALLOC(val->data.object_value.capacity, sizeof(val->data.object_value.items[0]));
         if (!val->data.object_value.items) {
             AGENTOS_FREE(val);
             return NULL;
@@ -483,10 +480,7 @@ config_context_t* config_context_create(const char* name) {
     }
     
     ctx->capacity = 16;
-    ctx->items = (struct {
-        char* key;
-        config_value_t* value;
-    }*)AGENTOS_CALLOC(ctx->capacity, sizeof(ctx->items[0]));
+    ctx->items = AGENTOS_CALLOC(ctx->capacity, sizeof(ctx->items[0]));
     
     if (!ctx->items) {
         AGENTOS_FREE(ctx->name);

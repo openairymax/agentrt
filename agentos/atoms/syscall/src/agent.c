@@ -33,12 +33,12 @@ static agentos_mutex_t* agent_lock = NULL;
  * @brief 线程安全地确保 agent 锁已初始化
  */
 static void ensure_agent_lock(void) {
-    agentos_mutex_t* current = (agentos_mutex_t*)atomic_load_ptr((void* volatile*)&agent_lock, memory_order_acquire);
+    agentos_mutex_t* current = (agentos_mutex_t*)atomic_load_ptr((_Atomic void**)&agent_lock, memory_order_acquire);
     if (!current) {
         agentos_mutex_t* new_lock = agentos_mutex_create();
         if (!new_lock) return;
         agentos_mutex_t* expected = NULL;
-        if (!atomic_compare_exchange_strong_ptr((void* volatile*)&agent_lock, (void**)&expected, (void*)new_lock,
+        if (!atomic_compare_exchange_strong_ptr((_Atomic void**)&agent_lock, (void**)&expected, (void*)new_lock,
                                                  memory_order_acq_rel, memory_order_acquire)) {
             agentos_mutex_destroy(new_lock);
         }

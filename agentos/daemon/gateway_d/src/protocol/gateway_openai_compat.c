@@ -313,7 +313,7 @@ static int handle_embeddings(gw_openai_compat_t* compat,
                 }
             } else {
                 input_start++;
-                const char* end = strchr(input_start, '"');
+                char* end = strchr(input_start, '"');
                 if (end) input_start = end + 1;
             }
             size_t len = (size_t)(input_start - start);

@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：9.1.0
-# 最后更新：2026-04-28
+# 版本：10.0.0
+# 最后更新：2026-05-16
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -12,46 +12,57 @@
 # 5. 项目必需文件使用否定规则明确保留
 # 6. 通配符规则限定作用范围，避免意外排除项目必需文件
 #
+# V10.0.0更新（v0.0.5发行准备 — scripts/重构 + 根目录规范化）：
+# - scripts/ 目录全面重构：deploy/→deployment/, tools/→code_quality/,
+#   source_other/→assets/, core/→toolkit/, cmake/移入scripts/cmake/
+# - 根目录配置文件：.clang-format/.clang-tidy/.clangd/.editorconfig/
+#   .jscpd.json/.lizardrc/.pre-commit-config.yaml/vcpkg.json/Doxyfile
+#   全部从scripts/development/config/提升至项目根目录
+# - 移除所有指向已不存在路径的规则（deploy/docker/, docker/, scripts/deploy/）
+# - 源码和产物严格分离：agentos/仅含源码，构建产物输出至AgentOS-build/
+# - 新增scripts/cmake/、scripts/code_quality/、scripts/assets/否定规则
+#
 # V9.1.0更新（脚本整理与文档优化版）：
 # - 添加 scripts/release/ 目录否定规则（保留发布脚本）
 # - 优化 Visual Studio 规则避免误匹配 scripts/release/
-# - 确保所有文档使用相对路径（BUILD.md 已更新）
-# - 完善项目文档追踪规则
 #
-# V9.0.0更新（全面强化版）：
-# - 强化构建产物排除规则
-# - 增加本地文档/临时脚本防护
-# - 明确项目必需文件白名单
-# - 防止意外追踪非源码文件
-#
-# V8.3.0更新：
-# - 添加 **/CTestTestfile.cmake 排除CMake测试配置文件
-# - 添加 agentos/daemon/*/agentos-* 排除daemon编译可执行文件
-# - 添加 agentos/daemon/gateway_d/gateway_d 排除gateway可执行文件
-#
-# 项目模块结构（2026-04-14 V8.1 校正后）：
-# 核心模块 (agentos/)
-#   - atoms/       : 原子内核 (40,917行, A+评级)
+# 项目模块结构（2026-05-16 V10.0 当前）：
+# 核心源码 (agentos/) — 仅含源码，构建产物严禁在此外
+#   - atoms/       : 原子内核
 #   - atomslite/   : 轻量级原子模块
-#   - commons/     : 统一基础库 (S级, 97.1分)
-#   - cupolas/     : 安全穹顶 (A++评级, 97.5分)
-#   - daemon/      : 用户态服务 (S+评级, 96.5分)
-#   - gateway/     : 统一网关 (A+评级)
-#   - heapstore/   : 运行时数据存储 (A评级, 98%生产就绪)
+#   - commons/     : 统一基础库
+#   - cupolas/     : 安全穹顶
+#   - daemon/      : 用户态服务
+#   - gateway/     : 统一网关
+#   - heapstore/   : 运行时数据存储
 #   - manager/     : 统一配置管理
-#   - openlab/     : 开放生态 (已移动到 agentos/)
+#   - openlab/     : 开放生态
 #   - protocols/   : 行业协议适配
-#   - toolkit/     : 多语言 SDK 工具 (35,638行, 4语言)
+#   - toolkit/     : 多语言 SDK 工具
 #   - interfaces/  : 统一接口定义
 #
-# 文档模块
-#   - docs/        : 项目文档 (原 manuals/)
+# 脚本与构建 (scripts/) — 构建、CI/CD、部署、代码质量全部集中
+#   - cmake/           : CMake 预包含头文件
+#   - code_quality/    : 代码质量工具 (Lizard, JSCPD, 编码风格)
+#   - demo/            : 技术演示脚本
+#   - deployment/      : Docker 部署配置 & 编排
+#   - development/     : 开发辅助 (quickstart, validate)
+#   - library/         : 第三方依赖引用
+#   - pipeline/        : CI/CD 流水线脚本
+#   - release/         : 发布脚本
+#   - tests/           : 集成测试脚本
+#   - toolkit/         : 构建工具链
+#   - verify/          : 构建验证脚本
 #
-# 辅助模块
-#   - scripts/     : 构建和运维脚本
-#     - desktop-client/ : 桌面客户端 (Tauri)
-#   - tests/       : 测试框架 (A+认证, 98.5分)
-#   - .gitcode/    : CI/CD配置 (V3.0优化后，统一管理)
+# 项目根目录配置文件
+#   - .clang-format / .clang-tidy / .clangd : C/C++ 格式化与诊断
+#   - .editorconfig                        : 跨IDE基础规范
+#   - .env.example                         : 环境变量模板
+#   - .gitattributes                       : Git 换行符处理
+#   - .jscpd.json / .lizardrc              : 代码质量分析
+#   - .pre-commit-config.yaml             : Pre-commit 钩子
+#   - vcpkg.json                           : C++ 依赖清单
+#   - Doxyfile                             : API 文档生成
 # =============================================================================
 
 # =============================================================================
@@ -579,18 +590,15 @@ agentos/heapstore/models/*.onnx
 /data/
 /datasets/
 
-# 压缩包（仅排除构建和部署目录下的）
-deploy/**/*.tar.gz
-deploy/**/*.tar.bz2
-deploy/**/*.tar.xz
-deploy/**/*.zip
-deploy/**/*.rar
-deploy/**/*.7z
+# 压缩包（部署目录下的）
+scripts/deployment/**/*.tar.gz
+scripts/deployment/**/*.tar.bz2
+scripts/deployment/**/*.tar.xz
+scripts/deployment/**/*.zip
+scripts/deployment/**/*.rar
+scripts/deployment/**/*.7z
 
-# Docker 和 Kubernetes
-deploy/docker/*.tar
-deploy/docker/*.tar.gz
-deploy/docker/.docker-*/
+# Docker 覆盖和集群配置
 docker-compose.override.yml
 .docker/
 *.kubeconfig
@@ -600,10 +608,8 @@ docker-compose.override.yml
 # 16. 部署和安装（构建产物，不追踪）
 # =============================================================================
 
-deploy/artifacts/
-deploy/packages/
-scripts/deploy/artifacts/
-scripts/deploy/packages/
+scripts/deployment/artifacts/
+scripts/deployment/packages/
 install/
 installed/
 VERSION
@@ -616,7 +622,6 @@ build_version.txt
 
 .pre-commit-manager.local.yaml
 .eslintcache
-tools/eslint/.eslintcache
 .prettierrc.local
 .prettierignore.local
 .flake8
@@ -713,15 +718,8 @@ scripts/desktop-client/.env.local
 scripts/desktop-client/.env.production.local
 
 # =============================================================================
-# 20. docker/ 和 docs/ 目录（保留配置文件，排除运行时产物）
+# 20. docs/ 目录（保留源文件，排除构建产物）
 # =============================================================================
-
-# docker/ 目录（保留配置文件，排除运行时产物）
-docker/*.log
-docker/*.tar
-docker/*.tar.gz
-docker/volumes/
-docker/.docker-*/
 
 # docs/ 目录（保留源文件，排除构建产物）
 docs/_build/
@@ -748,6 +746,18 @@ docs/api/man/
 # 环境模板
 !.env.example
 
+# =============================================================================
+# 21a. 根目录配置文件（V10.0: 提升至项目根目录）
+# =============================================================================
+!.clang-format
+!.clang-tidy
+!.clangd
+!.editorconfig
+!.gitattributes
+!.pre-commit-config.yaml
+!vcpkg.json
+!Doxyfile
+
 # agentos/manager/ 配置文件
 !agentos/manager/*.yaml
 !agentos/manager/*.yml
@@ -768,16 +778,38 @@ docs/api/man/
 !NOTICE
 !ACKNOWLEDGMENTS.md
 
-# 构建和运维脚本
+# =============================================================================
+# 21b. scripts/ 脚本文件 — 按子目录管理
+# =============================================================================
+
+# scripts/ 通用脚本
 !scripts/**/*.sh
 !scripts/**/*.py
 !scripts/**/*.bat
 !scripts/**/*.ps1
 !scripts/**/*.yml
 !scripts/**/*.yaml
-!scripts/deploy/docker/.gitignore
 
-# scripts/release/ 发布脚本和清理脚本（保留脚本，排除发布产物）
+# scripts/cmake/ — CMake 预包含头文件
+!scripts/cmake/*.h
+
+# scripts/code_quality/ — 代码质量工具
+!scripts/code_quality/**/*.py
+!scripts/code_quality/**/*.sh
+!scripts/code_quality/.jscpd.json
+!scripts/code_quality/.lizardrc
+
+# scripts/deployment/ — Docker 部署
+!scripts/deployment/docker/.gitignore
+!scripts/deployment/docker/Dockerfile*
+!scripts/deployment/docker/*.sh
+!scripts/deployment/docker/Makefile
+
+# scripts/development/ — 开发辅助脚本
+!scripts/development/quickstart.sh
+!scripts/development/validate.sh
+
+# scripts/release/ — 发布脚本（排除发布产物）
 !scripts/release/release.sh
 !scripts/release/cleanup_builds.sh
 scripts/release/artifacts/
@@ -785,18 +817,42 @@ scripts/release/packages/
 scripts/release/*.tar.gz
 scripts/release/*.zip
 
-# scripts/development/ 开发配置
-!scripts/development/config/.clang-format
-!scripts/development/config/.clangd
-!scripts/development/config/.editorconfig
-!scripts/development/config/.lizardrc
-!scripts/development/config/.jscpd.json
-!scripts/development/config/.pre-commit-config.yaml
-!scripts/development/config/vcpkg.json
-!scripts/development/quickstart.sh
-!scripts/development/validate.sh
+# scripts/pipeline/ — CI/CD 流水线脚本
+!scripts/pipeline/*.sh
+!scripts/pipeline/*.py
 
-# 测试框架
+# scripts/toolkit/ — 构建工具链
+!scripts/toolkit/**/*.sh
+!scripts/toolkit/**/*.py
+
+# scripts/library/ — 第三方依赖引用
+!scripts/library/**/*.cmake
+!scripts/library/**/*.txt
+
+# scripts/assets/ — 其他资源
+!scripts/assets/**/*.sh
+!scripts/assets/**/*.py
+!scripts/assets/**/*.json
+!scripts/assets/**/*.yaml
+!scripts/assets/**/*.yml
+
+# scripts/demo/ — 演示脚本
+!scripts/demo/**/*.py
+!scripts/demo/**/*.sh
+
+# scripts/tests/ — 集成测试
+!scripts/tests/**/*.sh
+!scripts/tests/**/*.py
+!scripts/tests/**/*.yaml
+
+# scripts/verify/ — 验证脚本
+!scripts/verify/**/*.sh
+!scripts/verify/**/*.py
+
+# =============================================================================
+# 21c. tests/ 测试目录
+# =============================================================================
+
 !tests/**/*.py
 !tests/**/*.sh
 !tests/**/*.yaml
@@ -813,22 +869,26 @@ scripts/release/*.zip
 !tests/unit/sdk/rust/.gitkeep
 !tests/unit/services/llm_d/.gitkeep
 !tests/unit/services/tool_d/.gitkeep
+
 # 手写Makefile（非CMake生成，需保留）
 !tests/Makefile
 !scripts/deployment/docker/Makefile
 
-# Docker 配置
+# =============================================================================
+# 21d. Docker 和部署配置
+# =============================================================================
+
 !Dockerfile*
 !docker-compose*.yml
-!deploy/docker/Dockerfile*
+!scripts/deployment/docker/Dockerfile*
 !agentos/openlab/Dockerfile
 !agentos/gateway/docker/Dockerfile*
 !agentos/daemon/Dockerfile.ci
-!scripts/deploy/docker/Dockerfile*
-!docker/Dockerfile*
-!docker/docker-compose*.yml
 
-# CMake 构建配置
+# =============================================================================
+# 21e. CMake 构建配置
+# =============================================================================
+
 !agentos/atoms/**/CMakeLists.txt
 !agentos/atomslite/**/CMakeLists.txt
 !agentos/commons/**/CMakeLists.txt
@@ -842,7 +902,10 @@ scripts/release/*.zip
 # 根目录项目配置
 !pyproject.toml
 
-# agentos/toolkit/ 配置文件
+# =============================================================================
+# 21f. toolkit/ 语言 SDK 配置
+# =============================================================================
+
 !agentos/toolkit/python/pyproject.toml
 !agentos/toolkit/python/setup.py
 !agentos/toolkit/go/go.mod
@@ -851,22 +914,23 @@ scripts/release/*.zip
 !agentos/toolkit/typescript/tsconfig.json
 !agentos/toolkit/typescript/jest.config.js
 
-# openlab/ 配置文件
+# =============================================================================
+# 21g. 其他
+# =============================================================================
+
 !agentos/openlab/pyproject.toml
 !agentos/openlab/requirements.txt
-
-# 空目录 .gitkeep
 !agentos/commons/utils/types/.gitkeep
 
 # =============================================================================
-# 22. 平台模板目录（项目必需，保留）
+# 22. GitHub 平台模板目录（项目必需，保留）
 # =============================================================================
 
-# .gitcode/ 是平台模板目录，随仓库同步
+# .github/ 是 GitHub 平台配置目录，随仓库同步
 # 包含 CI/CD 工作流、Issue 模板、PR 模板等
 
 # =============================================================================
-# 23. 强化防护规则（V9.0新增）
+# 23. 强化防护规则（V10.0更新）
 # =============================================================================
 
 # 23.1 防止意外追踪非源码文件（白名单模式）
@@ -904,23 +968,17 @@ scripts/release/*.zip
 !LICENSE
 !NOTICE
 !.gitattributes
-!.gitcode/CODEOWNERS
+!.github/CODEOWNERS
 
 # =============================================================================
 # 结束
 # =============================================================================
 #
-# V9.1.0 维护说明：
-# 1. 添加新规则时，必须验证不会误排除项目必需文件
-# 2. 使用 git check-ignore -v <file> 验证规则生效
-# 3. 定期运行 git status --porcelain 检查是否有意外追踪的文件
-# 4. 项目必需文件必须在第21节有明确的否定规则(!前缀)
-# 5. scripts/ 目录已按功能分类（setup/verify/release/cli）
-# 6. 所有文档应使用相对路径，禁止硬编码本地开发路径
-#
-# V9.0.0 维护说明：
-# 1. 添加新规则时，必须验证不会误排除项目必需文件
-# 2. 使用 git check-ignore -v <file> 验证规则生效
-# 3. 定期运行 git status --porcelain 检查是否有意外追踪的文件
-# 4. 项目必需文件必须在第21节有明确的否定规则(!前缀)
-#
+# V10.0.0 维护说明：
+# 1. scripts/ 子目录变更时需同步更新第21b节的否定规则
+# 2. 根目录新增配置文件时需在第21a节添加否定规则
+# 3. 添加新规则时，必须验证不会误排除项目必需文件
+# 4. 使用 git check-ignore -v <file> 验证规则生效
+# 5. 定期运行 git status --porcelain 检查是否有意外追踪的文件
+# 6. 项目必需文件必须在第21节有明确的否定规则(!前缀)
+# 7. agentos/ 路径仅含源码，构建产物输出至项目根目录外的 AgentOS-build/

@@ -143,10 +143,10 @@ static void request_context_destroy(request_context_t* ctx) {
  * @return 0 成功，非0 失败
  */
 static void parse_params_cleanup(request_context_t* ctx, llm_request_config_t* cfg) {
-    if (cfg->model) { free(cfg->model); cfg->model = NULL; }
+    if (cfg->model) { free((void*)cfg->model); cfg->model = NULL; }
     for (size_t i = 0; i < ctx->message_count; i++) {
-        free(ctx->messages[i].role);
-        free(ctx->messages[i].content);
+        free((void*)ctx->messages[i].role);
+        free((void*)ctx->messages[i].content);
     }
     ctx->message_count = 0;
 }

@@ -157,7 +157,10 @@ static void test_ipc_not_found(void) {
     heapstore_error_t err = heapstore_ipc_get_channel("nonexistent_id", &channel);
     assert(err == heapstore_ERR_NOT_FOUND);
 
-    err = heapstore_ipc_get_buffer("nonexistent_id", &channel);
+    heapstore_ipc_buffer_t buffer;
+    memset(&buffer, 0, sizeof(buffer));
+
+    err = heapstore_ipc_get_buffer("nonexistent_id", &buffer);
     assert(err == heapstore_ERR_NOT_FOUND);
 
     err = heapstore_ipc_update_channel_activity("nonexistent_id");

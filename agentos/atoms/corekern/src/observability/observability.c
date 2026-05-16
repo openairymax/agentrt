@@ -100,7 +100,7 @@ int agentos_observability_init(const agentos_observability_config_t* config) {
 
         agentos_mutex_t* expected = NULL;
         if (!atomic_compare_exchange_strong_ptr(
-                (void* volatile*)&g_obs.lock, (void**)&expected, (void*)new_lock,
+                (_Atomic void**)&g_obs.lock, (void**)&expected, (void*)new_lock,
                 memory_order_seq_cst, memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
