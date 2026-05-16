@@ -13,6 +13,7 @@
  * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
+#include "atomic_compat.h"
 #include "llm_service.h"
 #include "platform.h"
 #include "thread_pool.h"
@@ -54,7 +55,7 @@ static int llm_on_client(void* service_ctx, agentos_socket_t client_fd) {
 /* ==================== 全局状态 ==================== */
 
 static llm_service_t* g_service = NULL;
-static volatile int g_running = 1;
+static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t* g_dispatcher = NULL;
 static daemon_event_driver_t* g_event_driver = NULL;
@@ -75,7 +76,7 @@ static llm_daemon_config_t g_config = {0};
 
 static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
-    g_running = 0;
+    atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     agentos_mutex_unlock(&g_running_lock);
     if (g_event_driver) daemon_event_driver_stop(g_event_driver);
 }
@@ -141,10 +142,18 @@ static void request_context_destroy(request_context_t* ctx) {
  * @param cfg 输出配置
  * @return 0 成功，非0 失败
  */
+static void parse_params_cleanup(request_context_t* ctx, llm_request_config_t* cfg) {
+    if (cfg->model) { free(cfg->model); cfg->model = NULL; }
+    for (size_t i = 0; i < ctx->message_count; i++) {
+        free(ctx->messages[i].role);
+        free(ctx->messages[i].content);
+    }
+    ctx->message_count = 0;
+}
+
 static int parse_params(cJSON* params, request_context_t* ctx, llm_request_config_t* cfg) {
     memset(cfg, 0, sizeof(llm_request_config_t));
     
-    /* 解析模型 */
     cJSON* model = cJSON_GetObjectItem(params, "model");
     if (!cJSON_IsString(model)) {
         return -1;
@@ -152,11 +161,11 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
     cfg->model = strdup(model->valuestring);
     if (!cfg->model) return -1;
     
-    /* 解析消息 */
     cJSON* messages = cJSON_GetObjectItem(params, "messages");
     if (cJSON_IsArray(messages)) {
         size_t count = cJSON_GetArraySize(messages);
         if (count > MAX_MESSAGES_PER_REQUEST) {
+            parse_params_cleanup(ctx, cfg);
             return -1;
         }
         
@@ -170,14 +179,16 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
             cJSON* content = cJSON_GetObjectItem(item, "content");
             
             if (!cJSON_IsString(role) || !cJSON_IsString(content)) {
+                parse_params_cleanup(ctx, cfg);
                 return -1;
             }
             
-            /* 复制字符串到上下文 */
             ctx->messages[i].role = strdup(role->valuestring);
             ctx->messages[i].content = strdup(content->valuestring);
             
             if (!ctx->messages[i].role || !ctx->messages[i].content) {
+                ctx->message_count = i;
+                parse_params_cleanup(ctx, cfg);
                 return -1;
             }
         }
@@ -444,7 +455,7 @@ static int load_daemon_config(const char* config_path) {
             char* content = (char*)malloc(len + 1);
             if (content) {
                 size_t nread = fread(content, 1, len, f);
-                (void)nread;
+                if (nread == (size_t)len) {
                 content[len] = '\0';
                 
                 cJSON* root = cJSON_Parse(content);
@@ -469,6 +480,7 @@ static int load_daemon_config(const char* config_path) {
                         }
                     }
                     cJSON_Delete(root);
+                }
                 }
                 free(content);
             }

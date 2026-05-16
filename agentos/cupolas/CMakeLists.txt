@@ -1,25 +1,11 @@
-cmake_minimum_required(VERSION 3.10)
 
-project(cupolas VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
-# 使用父项目的全局编译选项，避免重复设置
-# 父项目已设置全局安全编译选项
-
 option(BUILD_TESTS "Build tests" OFF)
 option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
 option(BUILD_WITH_LOGGING "Enable detailed logging" ON)
-
-if(BUILD_WITH_LOGGING)
-    add_definitions(-DCUPOLAS_ENABLE_LOGGING=1)
-endif()
-
-# 配置文件路径定义
-add_definitions(-DAGENTOS_CONFIG_DIR="/etc/agentos")
-add_definitions(-DAGENTOS_LOG_DIR="/var/log/agentos")
-# R-09-119: use platform.h FHS 3.0 definition (/var/tmp/agentos)
 
 find_package(PkgConfig QUIET)
 
@@ -32,10 +18,8 @@ endif()
 find_package(OpenSSL QUIET)
 if(OpenSSL_FOUND)
     message(STATUS "Found OpenSSL: ${OpenSSL_VERSION}")
-    add_definitions(-DCUPOLAS_HAS_OPENSSL=1)
 else()
     message(WARNING "OpenSSL not found, some security features may be limited")
-    # 在没有OpenSSL的情况下，可以编译但某些功能受限
 endif()
 
 if(YAML_FOUND OR YAML_LIBRARIES)
@@ -75,13 +59,7 @@ set(CUPOLAS_SOURCES
     src/workbench/workbench_process_core.c
     src/workbench/workbench_container.c
     src/workbench/workbench_limits.c
-    src/security/cupolas_signature.c
-    src/security/cupolas_vault.c
-    src/security/cupolas_entitlements.c
-    src/security/cupolas_runtime_protection.c
-    src/security/cupolas_network_security.c
     src/security/cupolas_error.c
-    src/security/network/tls_security.c
     src/security/network/http_security.c
     src/security/network/dns_security.c
     src/security/network/network_filter.c
@@ -91,6 +69,17 @@ set(CUPOLAS_SOURCES
     src/circuit_breaker.c
     src/yaml_minimal.c
 )
+# OpenSSL-dependent sources
+if(OpenSSL_FOUND)
+    list(APPEND CUPOLAS_SOURCES
+        src/security/cupolas_signature.c
+        src/security/cupolas_vault.c
+        src/security/cupolas_entitlements.c
+        src/security/cupolas_runtime_protection.c
+        src/security/cupolas_network_security.c
+        src/security/network/tls_security.c
+    )
+endif()
 
 set(CUPOLAS_HEADERS
     include/cupolas.h
@@ -145,55 +134,63 @@ set(COMMON_INCLUDE_DIRS
 
 add_library(cupolas STATIC ${CUPOLAS_SOURCES} ${CUPOLAS_HEADERS})
 
-target_include_directories(${PROJECT_NAME} PUBLIC
+if(BUILD_WITH_LOGGING)
+    target_compile_definitions(cupolas PRIVATE CUPOLAS_ENABLE_LOGGING=1)
+endif()
+
+target_compile_definitions(cupolas PRIVATE
+    AGENTOS_CONFIG_DIR="/etc/agentos"
+    AGENTOS_LOG_DIR="/var/log/agentos"
+)
+
+target_include_directories(cupolas PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
     $<INSTALL_INTERFACE:include/cupolas>
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE
+target_include_directories(cupolas PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/agentos/gateway/include
 )
 
-target_include_directories(${PROJECT_NAME} PUBLIC
+target_include_directories(cupolas PUBLIC
     ${COMMON_INCLUDE_DIRS}
 )
 
-# 条件包含OpenSSL目录
 if(OpenSSL_FOUND)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR})
-    target_compile_definitions(${PROJECT_NAME} PRIVATE CUPOLAS_USE_OPENSSL)
+    target_include_directories(cupolas PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_compile_definitions(cupolas PRIVATE CUPOLAS_USE_OPENSSL)
 endif()
 
-# 链接 commons 模块
-target_link_libraries(${PROJECT_NAME} PRIVATE agentos_common)
+target_link_libraries(cupolas PRIVATE agentos_common)
 
-# 条件链接OpenSSL库
 if(OpenSSL_FOUND)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${OPENSSL_LIBRARIES})
+    target_link_libraries(cupolas PRIVATE ${OPENSSL_LIBRARIES})
 endif()
 
 if(YAML_FOUND)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${YAML_INCLUDE_DIRS})
+    target_include_directories(cupolas PRIVATE ${YAML_INCLUDE_DIRS})
 endif()
 
 if(CJSON_FOUND)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${CJSON_INCLUDE_DIRS})
+    target_include_directories(cupolas PRIVATE ${CJSON_INCLUDE_DIRS})
 endif()
 
 if(MSVC)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32 advapi32)
+    target_link_libraries(cupolas PRIVATE ws2_32 advapi32 psapi)
 
-    target_compile_options(${PROJECT_NAME} PRIVATE
+    target_compile_definitions(cupolas PRIVATE CUPOLAS_BUILDING_DLL)
+
+    target_compile_options(cupolas PRIVATE
         /W4
-        $<$<CONFIG:Release>:/Guard:cf /guard:ehcont>
     )
 else()
     find_package(Threads REQUIRED)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_THREAD_LIBS_LIBRARY} m)
+    target_link_libraries(cupolas PRIVATE ${CMAKE_THREAD_LIBS_LIBRARY} m)
 
-    target_compile_options(${PROJECT_NAME} PRIVATE
+    target_compile_options(cupolas PRIVATE
         -Wall -Wextra -Wpedantic
         -Wformat=2 -Wformat-security
         -fstack-protector-strong
@@ -202,29 +199,29 @@ else()
         -fvisibility=hidden
     )
 
-    target_link_options(${PROJECT_NAME} PRIVATE
+    target_link_options(cupolas PRIVATE
         -Wl,-z,relro
         -Wl,-z,now
         -Wl,-z,noexecstack
     )
 
     if(BUILD_WITH_SANITIZERS)
-        target_compile_options(${PROJECT_NAME} PRIVATE
+        target_compile_options(cupolas PRIVATE
             -fsanitize=address,undefined,leak
             -fno-omit-frame-pointer
         )
-        target_link_options(${PROJECT_NAME} PRIVATE
+        target_link_options(cupolas PRIVATE
             -fsanitize=address,undefined,leak
         )
     endif()
 endif()
 
 if(YAML_FOUND)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${YAML_LIBRARIES})
+    target_link_libraries(cupolas PRIVATE ${YAML_LIBRARIES})
 endif()
 
 if(CJSON_FOUND)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${CJSON_LIBRARIES})
+    target_link_libraries(cupolas PRIVATE ${CJSON_LIBRARIES})
 endif()
 
 if(BUILD_TESTS)
@@ -236,7 +233,7 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMON_INCLUDE_DIRS}
     )
-    target_link_libraries(test_cupolas_core ${PROJECT_NAME})
+    target_link_libraries(test_cupolas_core cupolas)
 
     add_executable(test_cupolas_integration tests/integration/test_cupolas_integration.c)
     target_include_directories(test_cupolas_integration PRIVATE
@@ -244,7 +241,7 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMON_INCLUDE_DIRS}
     )
-    target_link_libraries(test_cupolas_integration ${PROJECT_NAME})
+    target_link_libraries(test_cupolas_integration cupolas)
 
     add_executable(test_cupolas_signature tests/unit/test_cupolas_signature.c)
     target_include_directories(test_cupolas_signature PRIVATE
@@ -252,7 +249,7 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMON_INCLUDE_DIRS}
     )
-    target_link_libraries(test_cupolas_signature ${PROJECT_NAME})
+    target_link_libraries(test_cupolas_signature cupolas)
 
     add_executable(test_cupolas_vault tests/unit/test_cupolas_vault.c)
     target_include_directories(test_cupolas_vault PRIVATE
@@ -260,7 +257,7 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMON_INCLUDE_DIRS}
     )
-    target_link_libraries(test_cupolas_vault ${PROJECT_NAME})
+    target_link_libraries(test_cupolas_vault cupolas)
 
     add_executable(test_stress_concurrent tests/stress/test_stress_concurrent.c)
     target_include_directories(test_stress_concurrent PRIVATE
@@ -268,10 +265,13 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMON_INCLUDE_DIRS}
     )
-    target_link_libraries(test_stress_concurrent ${PROJECT_NAME})
+    target_link_libraries(test_stress_concurrent cupolas)
 
     if(MSVC)
-        add_custom_command(TARGET test_cupolas_core POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE> $<TARGET_FILE_DIR>)
+        add_custom_command(TARGET test_cupolas_core POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:cupolas>
+                $<TARGET_FILE_DIR:test_cupolas_core>)
     endif()
 
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)
@@ -281,7 +281,7 @@ if(BUILD_TESTS)
     add_test(NAME cupolas_stress_tests COMMAND test_stress_concurrent)
 endif()
 
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS cupolas
     EXPORT cupolas-targets
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib

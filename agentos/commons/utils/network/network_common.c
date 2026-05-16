@@ -36,6 +36,7 @@
 #define strdup _strdup
 #endif
 #include <stdarg.h>
+#include "atomic_compat.h"
 
 #ifndef _WIN32
     #include <sys/socket.h>
@@ -89,13 +90,15 @@ struct network_pool {
  */
 static int network_init_winsock(void) {
 #ifdef _WIN32
-    static int initialized = 0;
-    if (!initialized) {
+    static atomic_int initialized = 0;
+    int expected = 0;
+    if (atomic_compare_exchange_strong_explicit(&initialized, &expected, 1,
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         WSADATA wsaData;
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+            atomic_store_explicit(&initialized, 0, memory_order_seq_cst);
             return -1;
         }
-        initialized = 1;
     }
 #endif
     return 0;

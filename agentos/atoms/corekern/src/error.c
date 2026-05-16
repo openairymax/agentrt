@@ -9,43 +9,43 @@
 #define ERR_BEGIN 0
 
 static const char* error_strings[] = {
-    [0]         "Success",
-    [1]         "Invalid argument",
-    [2]         "Out of memory",
-    [3]         "Resource busy",
-    [4]         "No such entry",
-    [5]         "Permission denied",
-    [6]         "Operation timed out",
-    [7]         "I/O error",
-    [8]         "Already exists",
-    [9]         "Not initialized",
-    [10]        "Operation cancelled",
-    [11]        "Not supported",
-    [12]        "Value overflow",
-    [13]        "Protocol error",
-    [14]        "Not connected",
-    [15]        "Connection reset",
-    [16]        "Access denied",
-    [17]        "Connection refused",
-    [18]        "Message too large",
-    [19]        "No space left",
-    [20]        "Range error",
-    [21]        "Deadlock detected",
-    [22]        "Try again",
-    [23]        "Argument too long",
-    [24]        "Already in progress",
-    [25]        "Unavailable",
-    [26]        "Quota exceeded",
-    [27]        "Platform not initialized",
-    [28]        "Protocol not supported",
-    [29]        "Service unavailable",
-    [30]        NULL,
-    [31]        "Interrupted",
-    [32]        "Bad descriptor",
-    [33]        "Resource exhausted",
-    [34]        "Function not implemented",
-    [35]        "Dependency cycle",
-    [36]        "General failure",
+    "Success",              /* 0  */
+    "Invalid argument",     /* 1  */
+    "Out of memory",        /* 2  */
+    "Resource busy",        /* 3  */
+    "No such entry",        /* 4  */
+    "Permission denied",    /* 5  */
+    "Operation timed out",  /* 6  */
+    "I/O error",            /* 7  */
+    "Already exists",       /* 8  */
+    "Not initialized",      /* 9  */
+    "Operation cancelled",  /* 10 */
+    "Not supported",        /* 11 */
+    "Value overflow",       /* 12 */
+    "Protocol error",       /* 13 */
+    "Not connected",        /* 14 */
+    "Connection reset",     /* 15 */
+    "Access denied",        /* 16 */
+    "Connection refused",   /* 17 */
+    "Message too large",    /* 18 */
+    "No space left",        /* 19 */
+    "Range error",          /* 20 */
+    "Deadlock detected",    /* 21 */
+    "Try again",            /* 22 */
+    "Argument too long",    /* 23 */
+    "Already in progress",  /* 24 */
+    "Unavailable",          /* 25 */
+    "Quota exceeded",       /* 26 */
+    "Platform not initialized", /* 27 */
+    "Protocol not supported",   /* 28 */
+    "Service unavailable",      /* 29 */
+    NULL,                   /* 30 */
+    "Interrupted",          /* 31 */
+    "Bad descriptor",       /* 32 */
+    "Resource exhausted",   /* 33 */
+    "Function not implemented", /* 34 */
+    "Dependency cycle",     /* 35 */
+    "General failure",      /* 36 */
 };
 
 #define ERROR_COUNT (sizeof(error_strings) / sizeof(error_strings[0]))

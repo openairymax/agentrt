@@ -18,7 +18,7 @@
 #include <string.h>
 
 typedef struct {
-    tool_service_t tool_svc;
+    tool_service_t* tool_svc;
     char* config_path;
     agentos_svc_config_t common_cfg;
     bool owns_service;
@@ -55,8 +55,8 @@ static agentos_error_t tool_adapter_init(
         const char* path = ctx->config_path ? ctx->config_path : "tool_config.json";
         ctx->tool_svc = tool_service_create(path);
         if (!ctx->tool_svc) {
-            svc_logger_error("工具服务创建失败");
-            return AGENTOS_ERROR;
+            SVC_LOG_ERROR("工具服务创建失败");
+            return AGENTOS_ERR_UNKNOWN;
         }
         ctx->owns_service = true;
     }
@@ -70,7 +70,7 @@ static agentos_error_t tool_adapter_start(agentos_service_t service) {
     if (!ctx || !ctx->tool_svc) return AGENTOS_ENOTINIT;
     if (ctx->running) return AGENTOS_SUCCESS;
     ctx->running = true;
-    svc_logger_info("工具服务适配器已启动");
+    SVC_LOG_INFO("工具服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
@@ -87,9 +87,9 @@ static agentos_error_t tool_adapter_stop(agentos_service_t service, bool force) 
             ctx->owns_service = false;
         }
         if (ctx->config_path) { free(ctx->config_path); ctx->config_path = NULL; }
-        svc_logger_info("工具服务适配器已强制停止");
+        SVC_LOG_INFO("工具服务适配器已强制停止");
     } else {
-        svc_logger_info("工具服务适配器已停止");
+        SVC_LOG_INFO("工具服务适配器已停止");
     }
     return AGENTOS_SUCCESS;
 }
@@ -205,7 +205,7 @@ agentos_error_t tool_service_adapter_create(
 
 agentos_error_t tool_service_adapter_wrap(
     agentos_service_t* out_service,
-    tool_service_t tool_svc,
+    tool_service_t* tool_svc,
     const agentos_svc_config_t* config
 ) {
     if (!out_service || !tool_svc) return AGENTOS_EINVAL;
@@ -252,7 +252,7 @@ agentos_error_t tool_service_adapter_wrap(
     return AGENTOS_SUCCESS;
 }
 
-tool_service_t tool_service_adapter_get_original(agentos_service_t service) {
+tool_service_t* tool_service_adapter_get_original(agentos_service_t service) {
     if (!service) return NULL;
     tool_adapter_ctx_t* ctx = tool_get_ctx(service);
     return ctx ? ctx->tool_svc : NULL;

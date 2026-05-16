@@ -12,7 +12,7 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
@@ -59,26 +59,25 @@ struct config_value {
 
 /** 配置上下文结构体 */
 struct config_context {
-    /** 上下文名�?*/
     char* name;
     
-    /** 配置项数�?*/
     struct {
         char* key;
         config_value_t* value;
     }* items;
     
-    /** 配置项数�?*/
     size_t count;
     
-    /** 配置项容�?*/
     size_t capacity;
     
-    /** 是否被锁�?*/
     bool locked;
     
-    /** 互斥锁保护上下文 */
     agentos_mutex_t mutex;
+
+    config_schema_t* schema;
+    bool hot_reload_enabled;
+    uint32_t reload_interval_ms;
+    bool encryption_enabled;
 };
 
 /* ==================== 内部辅助函数 ==================== */
@@ -372,7 +371,7 @@ void config_value_destroy(config_value_t* value) {
 }
 
 config_error_t config_value_array_append(config_value_t* array, config_value_t* item) {
-    if (!array || !item) return CONFIG_ERROR_INVALID_PARAM;
+    if (!array || !item) return CONFIG_ERROR_INVALID_ARG;
     if (array->type != CONFIG_TYPE_ARRAY) return CONFIG_ERROR_TYPE_MISMATCH;
 
     if (array->data.array_value.count >= array->data.array_value.capacity) {
@@ -724,6 +723,53 @@ const char* config_context_get_key_at(const config_context_t* ctx, size_t index)
 const config_value_t* config_context_get_value_at(const config_context_t* ctx, size_t index) {
     if (!ctx || index >= ctx->count) return NULL;
     return ctx->items[index].value;
+}
+
+struct config_iterator {
+    const config_context_t* ctx;
+    size_t pos;
+};
+
+const config_iterator_t* config_context_iterator(const config_context_t* ctx) {
+    if (!ctx) return NULL;
+    config_iterator_t* it = (config_iterator_t*)AGENTOS_CALLOC(1, sizeof(config_iterator_t));
+    if (!it) return NULL;
+    it->ctx = ctx;
+    it->pos = 0;
+    return it;
+}
+
+void config_iterator_reset(const config_iterator_t* it) {
+    if (!it) return;
+    ((config_iterator_t*)it)->pos = 0;
+}
+
+bool config_iterator_has_next(const config_iterator_t* it) {
+    if (!it || !it->ctx) return false;
+    return it->pos < it->ctx->count;
+}
+
+const char* config_iterator_next_key(const config_iterator_t* it) {
+    if (!it || !it->ctx || it->pos >= it->ctx->count) return NULL;
+    const char* key = it->ctx->items[it->pos].key;
+    ((config_iterator_t*)it)->pos++;
+    return key;
+}
+
+void config_context_set_schema(config_context_t* ctx, config_schema_t* schema) {
+    if (!ctx) return;
+    ctx->schema = schema;
+}
+
+void config_context_set_hot_reload(config_context_t* ctx, bool enabled, uint32_t interval_ms) {
+    if (!ctx) return;
+    ctx->hot_reload_enabled = enabled;
+    ctx->reload_interval_ms = interval_ms;
+}
+
+void config_context_set_encryption(config_context_t* ctx, bool enabled) {
+    if (!ctx) return;
+    ctx->encryption_enabled = enabled;
 }
 
 /* ==================== 工具函数实现 ==================== */

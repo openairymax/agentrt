@@ -15,8 +15,6 @@
 #include "gateway_rpc_handler.h"
 #include "jsonrpc.h"
 #include "syscall_router.h"
-
-#include <cjson/cJSON.h>
 #include <stdlib.h>
 #include <string.h>
 

@@ -7,6 +7,7 @@
 
 #include "log_sanitizer.h"
 #include "platform.h"
+#include "atomic_compat.h"
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -35,15 +36,16 @@ static sensitive_field_t* g_patterns = NULL;
 static size_t g_pattern_count = 0;
 static size_t g_pattern_capacity = 0;
 static agentos_mutex_t g_mutex;
-static int g_mutex_initialized = 0;
+static atomic_int g_mutex_initialized = 0;
 
 static void ensure_mutex_init(void) {
-    if (!g_mutex_initialized) {
+    int expected = 0;
+    if (atomic_compare_exchange_strong_explicit(&g_mutex_initialized, &expected, 1,
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         agentos_mutex_init(&g_mutex);
-        g_mutex_initialized = 1;
     }
 }
-static int g_initialized = 0;
+static atomic_int g_initialized = 0;
 
 /* 默认替换字符串 */
 #define DEFAULT_REPLACEMENT "***"
