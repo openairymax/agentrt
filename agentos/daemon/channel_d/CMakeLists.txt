@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
 
-project(channel_d VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -39,7 +37,7 @@ if(UNIX)
         svc_common
         agentos_common
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
     target_compile_definitions(channel_d PRIVATE
         _GNU_SOURCE
@@ -49,6 +47,7 @@ if(UNIX)
     )
 endif()
 
+if(NOT MSVC)
 target_compile_options(channel_d PRIVATE
     -Wall
     -Wextra
@@ -58,6 +57,7 @@ target_compile_options(channel_d PRIVATE
     $<$<CONFIG:Debug>:-g -O0>
     $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
+endif()
 
 install(TARGETS channel_d
     RUNTIME DESTINATION bin
@@ -80,7 +80,7 @@ if(CMOCKA_FOUND OR TARGET cmocka)
         ${CMOCKA_LIBRARIES}
         svc_common
         agentos_common
-        Threads::Threads rt
+        Threads::Threads agentos_platform_libs
     )
     target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
     add_test(NAME channel_e2e COMMAND test_channel_e2e)
@@ -92,7 +92,7 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMONS_DIR}/tests/utils
     )
-    target_link_libraries(test_channel_e2e PRIVATE Threads::Threads rt svc_common agentos_common)
+    target_link_libraries(test_channel_e2e PRIVATE Threads::Threads agentos_platform_libs svc_common agentos_common)
     target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
     target_compile_definitions(test_channel_e2e PRIVATE
         USE_CMOCKA_STUB

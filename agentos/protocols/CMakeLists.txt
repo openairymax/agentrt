@@ -14,21 +14,24 @@
 # 6. 统一接口定义 (Interfaces Layer)
 # ========================================================================
 
-cmake_minimum_required(VERSION 3.20)
-
-project(protocols
-    VERSION 0.0.5
-    DESCRIPTION "AgentOS Unified Protocols Framework - Multi-Protocol Ecosystem"
-    LANGUAGES C
-)
 
 # 编译选项
-option(PROTOCOLS_ENABLE_OPENCLAW "Enable OpenClaw integration" ON)
+option(PROTOCOLS_ENABLE_OPENCLAW "Enable OpenClaw integration" OFF)
 option(PROTOCOLS_ENABLE_CLAUDE "Enable Claude API integration" ON)
 option(PROTOCOLS_ENABLE_LANGCHAIN "Enable LangChain framework adapter" ON)
 option(PROTOCOLS_ENABLE_AUTOGEN "Enable AutoGen framework adapter" ON)
 option(PROTOCOLS_ENABLE_AGNTCY "Enable AGNTCY ACP protocol adapter" ON)
 option(PROTOCOLS_ENABLE_CHINA_ECO "Enable China domestic ecosystem protocol adapter" ON)
+
+if(WIN32)
+    set(PROTOCOLS_ENABLE_OPENCLAW OFF CACHE BOOL "OpenClaw requires Unix sockets" FORCE)
+    set(PROTOCOLS_ENABLE_CHINA_ECO OFF CACHE BOOL "China Eco requires Unix" FORCE)
+endif()
+
+option(PROTOCOLS_ENABLE_MCP "Enable MCP protocol adapter" ON)
+if(WIN32)
+    set(PROTOCOLS_ENABLE_MCP OFF CACHE BOOL "MCP requires cJSON/unistd.h" FORCE)
+endif()
 
 # ============================================================
 # 包含目录 (Include Directories)
@@ -36,6 +39,7 @@ option(PROTOCOLS_ENABLE_CHINA_ECO "Enable China domestic ecosystem protocol adap
 set(PROTOCOLS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/core/router/include
     ${CMAKE_CURRENT_SOURCE_DIR}/core/adapter/include
     ${CMAKE_CURRENT_SOURCE_DIR}/core/transformers/include
@@ -48,6 +52,7 @@ set(PROTOCOLS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compat/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../daemon/common/include
     # R-09-124: migrated from root global include_directories
@@ -91,6 +96,9 @@ endif()
 # ============================================================
 set(PROTOCOLS_COMMON_SOURCES
     common/src/unified_protocol.c
+    common/src/protocols_impl.c
+    src/agentos_protocol_interface.c
+    src/protocol_toplevel_impl.c
     ../daemon/common/src/safe_string_utils.c
 )
 
@@ -109,9 +117,12 @@ set(PROTOCOLS_CORE_SOURCES
 # ============================================================
 set(PROTOCOLS_STANDARDS_SOURCES
     standards/a2a/src/a2a_v03_adapter.c
-    standards/mcp/src/mcp_v1_adapter.c
-    standards/mcp/src/mcp_transport.c
 )
+if(PROTOCOLS_ENABLE_MCP)
+    list(APPEND PROTOCOLS_STANDARDS_SOURCES
+        standards/mcp/src/mcp_v1_adapter.c
+        standards/mcp/src/mcp_transport.c)
+endif()
 
 if(PROTOCOLS_ENABLE_AGNTCY)
     list(APPEND PROTOCOLS_STANDARDS_SOURCES
@@ -256,7 +267,6 @@ set(PROTOCOLS_ALL_HEADERS
 add_library(agentos_protocols ${PROTOCOLS_ALL_SOURCES})
 target_include_directories(agentos_protocols PUBLIC ${PROTOCOLS_INCLUDE_DIRS})
 
-# 库属性
 set_target_properties(agentos_protocols PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION 0
@@ -266,19 +276,39 @@ set_target_properties(agentos_protocols PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-# 链接依赖
-if(TARGET commons)
-    target_link_libraries(agentos_protocols commons)
+if(TARGET agentos_common)
+    target_link_libraries(agentos_protocols PRIVATE agentos_common)
 endif()
 if(TARGET svc_common)
-    target_link_libraries(agentos_protocols svc_common)
+    target_link_libraries(agentos_protocols PRIVATE svc_common)
+endif()
+target_link_libraries(agentos_protocols PUBLIC agentos_compile_defs)
+
+if(AGENTOS_HAS_CURL)
+    if(CURL_FOUND)
+        target_link_libraries(agentos_protocols PRIVATE ${CURL_LIBRARIES})
+        target_include_directories(agentos_protocols PRIVATE ${CURL_INCLUDE_DIRS})
+    elseif(LIBCURL_FOUND)
+        target_link_libraries(agentos_protocols PRIVATE ${LIBCURL_LIBRARIES})
+        target_include_directories(agentos_protocols PRIVATE ${LIBCURL_INCLUDE_DIRS})
+    endif()
+endif()
+if(AGENTOS_HAS_CJSON)
+    if(cJSON_FOUND)
+        target_link_libraries(agentos_protocols PRIVATE cjson)
+    elseif(CJSON_FOUND)
+        target_link_libraries(agentos_protocols PRIVATE ${CJSON_LIBRARIES})
+        target_include_directories(agentos_protocols PRIVATE ${CJSON_INCLUDE_DIRS})
+    endif()
 endif()
 
-# 编译定义
 target_compile_definitions(agentos_protocols PRIVATE
     PROTOCOLS_VERSION="${PROJECT_VERSION}"
     PROTO_REGISTRY_MAX_ADAPTERS=32
 )
+if(MSVC)
+    target_compile_options(agentos_protocols PRIVATE /wd4100 /wd4189)
+endif()
 
 # 安装目标 — 库
 install(TARGETS agentos_protocols
@@ -335,6 +365,7 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compat/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/observability/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
     )
@@ -350,7 +381,6 @@ if(BUILD_TESTS)
         target_link_libraries(test_openclaw_adapter PRIVATE agentos_common svc_common m)
         if(UNIX)
             target_link_libraries(test_openclaw_adapter PRIVATE pthread)
-            target_link_options(test_openclaw_adapter PRIVATE -Wl,--allow-multiple-definition)
         endif()
         add_test(NAME test_openclaw_adapter COMMAND test_openclaw_adapter)
     endif()
@@ -366,7 +396,6 @@ if(BUILD_TESTS)
         target_link_libraries(test_agntcy_acp PRIVATE agentos_common svc_common m)
         if(UNIX)
             target_link_libraries(test_agntcy_acp PRIVATE pthread)
-            target_link_options(test_agntcy_acp PRIVATE -Wl,--allow-multiple-definition)
         endif()
         add_test(NAME test_agntcy_acp COMMAND test_agntcy_acp)
     endif()
@@ -382,7 +411,6 @@ if(BUILD_TESTS)
         target_link_libraries(test_china_eco_crypto PRIVATE agentos_common svc_common m)
         if(UNIX)
             target_link_libraries(test_china_eco_crypto PRIVATE pthread)
-            target_link_options(test_china_eco_crypto PRIVATE -Wl,--allow-multiple-definition)
         endif()
         add_test(NAME test_china_eco_crypto COMMAND test_china_eco_crypto)
     endif()

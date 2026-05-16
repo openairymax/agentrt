@@ -23,7 +23,7 @@
 #else
 #include <sys/stat.h>
 #include <unistd.h>
-#include <dirent.h>
+#include "agentos_dirent.h"
 #endif
 
 bool heapstore_ensure_directory(const char* path) {

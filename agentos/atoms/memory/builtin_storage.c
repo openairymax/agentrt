@@ -18,6 +18,16 @@
 #include <direct.h>
 #include <io.h>
 #define MKDIR(p) _mkdir(p)
+
+static unsigned short secure_random_short(void) {
+    unsigned int val = 0;
+    if (rand_s(&val) == 0) {
+        unsigned short result = (unsigned short)(val & 0xFFFF);
+        return result ? result : 1;
+    }
+    unsigned short fallback = (unsigned short)(time(NULL) ^ ((size_t)&val >> 4));
+    return fallback ? fallback : 1;
+}
 #else
 #include <sys/stat.h>
 #include <sys/types.h>

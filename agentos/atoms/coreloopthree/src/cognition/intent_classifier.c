@@ -7,13 +7,14 @@
 #include "intent_classifier.h"
 
 #include "intent_utils.h"
+#include "atomic_compat.h"
 #include "memory_compat.h"
 
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int g_classifier_initialized = 0;
+static atomic_int g_classifier_initialized = 0;
 
 /* 查询关键词 */
 static const char *g_query_keywords[] = {"what", "where", "when", "why",    "how",
@@ -46,17 +47,15 @@ static const char *g_farewell_keywords[] = {"bye",  "goodbye", "see you", "farew
 
 int agentos_intent_classifier_init(void)
 {
-    if (g_classifier_initialized) {
-        return 0;
-    }
-
-    g_classifier_initialized = 1;
+    int expected = 0;
+    atomic_compare_exchange_strong_explicit(&g_classifier_initialized, &expected, 1,
+                                 memory_order_seq_cst, memory_order_seq_cst);
     return 0;
 }
 
 void agentos_intent_classifier_cleanup(void)
 {
-    g_classifier_initialized = 0;
+    atomic_store_explicit(&g_classifier_initialized, 0, memory_order_seq_cst);
 }
 
 const char *agentos_intent_type_name(agentos_intent_type_t type)
@@ -177,7 +176,7 @@ int agentos_intent_classify(const char *input, size_t input_len,
         return -1;
     }
 
-    if (!g_classifier_initialized) {
+    if (!atomic_load_explicit(&g_classifier_initialized, memory_order_acquire)) {
         agentos_intent_classifier_init();
     }
 

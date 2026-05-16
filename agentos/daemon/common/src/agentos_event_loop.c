@@ -7,39 +7,324 @@
 
 #ifdef _WIN32
 #include "platform.h"
+#include "svc_logger.h"
+
+typedef struct {
+    uint64_t id;
+    uint64_t interval_ms;
+    uint64_t next_fire_ms;
+    agentos_timer_callback_t cb;
+    void* user_data;
+    bool active;
+} timer_entry_t;
+
+typedef struct {
+    SOCKET fd;
+    WSAEVENT wsa_event;
+    uint32_t events;
+    agentos_event_callback_t cb;
+    void* user_data;
+    bool level_triggered;
+    bool in_use;
+} fd_entry_t;
+
+struct agentos_event_loop {
+    fd_entry_t* fd_entries;
+    int fd_count;
+    int fd_capacity;
+    int max_events;
+    HANDLE wakeup_event;
+    timer_entry_t timers[AGENTOS_EVENT_LOOP_MAX_TIMERS];
+    uint64_t next_timer_id;
+    uint64_t current_time_ms;
+    volatile bool running;
+    volatile bool stop_requested;
+};
+
+static uint64_t get_time_ms(void) {
+    return agentos_time_ms();
+}
+
+static int find_fd_entry(agentos_event_loop_t* loop, SOCKET sock) {
+    for (int i = 0; i < loop->fd_capacity; i++) {
+        if (loop->fd_entries[i].in_use && loop->fd_entries[i].fd == sock)
+            return i;
+    }
+    return -1;
+}
+
+static long events_to_wsa(uint32_t events) {
+    long wsa = 0;
+    if (events & AGENTOS_EVENT_TYPE_READ)  wsa |= FD_READ | FD_ACCEPT | FD_CLOSE;
+    if (events & AGENTOS_EVENT_TYPE_WRITE) wsa |= FD_WRITE | FD_CONNECT;
+    return wsa;
+}
+
+static uint32_t wsa_to_events(long wsa_events) {
+    uint32_t ev = 0;
+    if (wsa_events & (FD_READ | FD_ACCEPT | FD_CLOSE)) ev |= AGENTOS_EVENT_TYPE_READ;
+    if (wsa_events & (FD_WRITE | FD_CONNECT)) ev |= AGENTOS_EVENT_TYPE_WRITE;
+    return ev;
+}
+
+static int add_fd_internal(agentos_event_loop_t* loop, int fd, uint32_t events,
+                            agentos_event_callback_t cb, void* user_data, bool level_triggered) {
+    if (!loop || fd < 0 || !cb) return -1;
+
+    SOCKET sock = (SOCKET)fd;
+    int idx = find_fd_entry(loop, sock);
+
+    if (idx >= 0) {
+        loop->fd_entries[idx].events = events;
+        loop->fd_entries[idx].cb = cb;
+        loop->fd_entries[idx].user_data = user_data;
+        loop->fd_entries[idx].level_triggered = level_triggered;
+
+        long wsa_events = events_to_wsa(events);
+        if (WSAEventSelect(sock, loop->fd_entries[idx].wsa_event, wsa_events) != 0) {
+            LOG_DEBUG("WSAEventSelect MOD failed for fd=%d: %d", fd, WSAGetLastError());
+            return -1;
+        }
+        return 0;
+    }
+
+    if (loop->fd_count >= loop->fd_capacity) {
+        LOG_DEBUG("fd capacity reached (%d), cannot add fd=%d", loop->fd_capacity, fd);
+        return -1;
+    }
+
+    int free_idx = -1;
+    for (int i = 0; i < loop->fd_capacity; i++) {
+        if (!loop->fd_entries[i].in_use) { free_idx = i; break; }
+    }
+    if (free_idx < 0) return -1;
+
+    WSAEVENT wsa_event = WSACreateEvent();
+    if (wsa_event == WSA_INVALID_EVENT) {
+        LOG_DEBUG("WSACreateEvent failed for fd=%d: %d", fd, WSAGetLastError());
+        return -1;
+    }
+
+    long wsa_events = events_to_wsa(events);
+    if (WSAEventSelect(sock, wsa_event, wsa_events) != 0) {
+        LOG_DEBUG("WSAEventSelect ADD failed for fd=%d: %d", fd, WSAGetLastError());
+        WSACloseEvent(wsa_event);
+        return -1;
+    }
+
+    loop->fd_entries[free_idx].fd = sock;
+    loop->fd_entries[free_idx].wsa_event = wsa_event;
+    loop->fd_entries[free_idx].events = events;
+    loop->fd_entries[free_idx].cb = cb;
+    loop->fd_entries[free_idx].user_data = user_data;
+    loop->fd_entries[free_idx].level_triggered = level_triggered;
+    loop->fd_entries[free_idx].in_use = true;
+    loop->fd_count++;
+
+    return 0;
+}
 
 agentos_event_loop_t* agentos_event_loop_create(int max_events) {
-    (void)max_events;
-    LOG_ERROR("agentos_event_loop: epoll not available on Windows");
-    return NULL;
+    agentos_event_loop_t* loop = (agentos_event_loop_t*)calloc(1, sizeof(agentos_event_loop_t));
+    if (!loop) return NULL;
+
+    if (max_events <= 0) max_events = AGENTOS_EVENT_LOOP_MAX_EVENTS;
+
+    loop->max_events = max_events;
+    loop->fd_capacity = max_events;
+    loop->fd_entries = (fd_entry_t*)calloc((size_t)max_events, sizeof(fd_entry_t));
+    if (!loop->fd_entries) { free(loop); return NULL; }
+
+    loop->wakeup_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (!loop->wakeup_event) { free(loop->fd_entries); free(loop); return NULL; }
+
+    loop->next_timer_id = 1;
+    for (int i = 0; i < AGENTOS_EVENT_LOOP_MAX_TIMERS; i++)
+        loop->timers[i].active = false;
+
+    LOG_DEBUG("Event loop created (max_events=%d)", max_events);
+    return loop;
 }
 
-void agentos_event_loop_destroy(agentos_event_loop_t* loop) { (void)loop; }
+void agentos_event_loop_destroy(agentos_event_loop_t* loop) {
+    if (!loop) return;
+    for (int i = 0; i < loop->fd_capacity; i++) {
+        if (loop->fd_entries[i].in_use) {
+            WSAEventSelect(loop->fd_entries[i].fd, loop->fd_entries[i].wsa_event, 0);
+            WSACloseEvent(loop->fd_entries[i].wsa_event);
+        }
+    }
+    if (loop->wakeup_event) CloseHandle(loop->wakeup_event);
+    free(loop->fd_entries);
+    free(loop);
+}
+
 int agentos_event_loop_add_fd(agentos_event_loop_t* loop, int fd, uint32_t events,
                                agentos_event_callback_t cb, void* user_data) {
-    (void)loop; (void)fd; (void)events; (void)cb; (void)user_data;
-    return -1;
+    return add_fd_internal(loop, fd, events, cb, user_data, false);
 }
+
 int agentos_event_loop_add_fd_lt(agentos_event_loop_t* loop, int fd, uint32_t events,
                                   agentos_event_callback_t cb, void* user_data) {
-    (void)loop; (void)fd; (void)events; (void)cb; (void)user_data;
-    return -1;
+    return add_fd_internal(loop, fd, events, cb, user_data, true);
 }
+
 int agentos_event_loop_mod_fd(agentos_event_loop_t* loop, int fd, uint32_t events) {
-    (void)loop; (void)fd; (void)events; return -1;
+    if (!loop || fd < 0) return -1;
+    SOCKET sock = (SOCKET)fd;
+    int idx = find_fd_entry(loop, sock);
+    if (idx < 0) return -1;
+
+    long wsa_events = events_to_wsa(events);
+    if (WSAEventSelect(sock, loop->fd_entries[idx].wsa_event, wsa_events) != 0) {
+        LOG_DEBUG("WSAEventSelect MOD failed for fd=%d: %d", fd, WSAGetLastError());
+        return -1;
+    }
+    loop->fd_entries[idx].events = events;
+    return 0;
 }
-void agentos_event_loop_remove_fd(agentos_event_loop_t* loop, int fd) { (void)loop; (void)fd; }
+
+void agentos_event_loop_remove_fd(agentos_event_loop_t* loop, int fd) {
+    if (!loop || fd < 0) return;
+    SOCKET sock = (SOCKET)fd;
+    int idx = find_fd_entry(loop, sock);
+    if (idx < 0) return;
+
+    WSAEventSelect(sock, loop->fd_entries[idx].wsa_event, 0);
+    WSACloseEvent(loop->fd_entries[idx].wsa_event);
+    memset(&loop->fd_entries[idx], 0, sizeof(fd_entry_t));
+    loop->fd_count--;
+}
+
 uint64_t agentos_event_loop_add_timer(agentos_event_loop_t* loop, uint64_t interval_ms,
                                        agentos_timer_callback_t cb, void* user_data) {
-    (void)loop; (void)interval_ms; (void)cb; (void)user_data; return 0;
+    if (!loop || !cb) return 0;
+    for (int i = 0; i < AGENTOS_EVENT_LOOP_MAX_TIMERS; i++) {
+        if (!loop->timers[i].active) {
+            loop->timers[i].id = loop->next_timer_id++;
+            loop->timers[i].interval_ms = interval_ms;
+            loop->timers[i].next_fire_ms = loop->current_time_ms + interval_ms;
+            loop->timers[i].cb = cb;
+            loop->timers[i].user_data = user_data;
+            loop->timers[i].active = true;
+            return loop->timers[i].id;
+        }
+    }
+    return 0;
 }
+
 int agentos_event_loop_cancel_timer(agentos_event_loop_t* loop, uint64_t timer_id) {
-    (void)loop; (void)timer_id; return -1;
+    if (!loop || timer_id == 0) return -1;
+    for (int i = 0; i < AGENTOS_EVENT_LOOP_MAX_TIMERS; i++) {
+        if (loop->timers[i].active && loop->timers[i].id == timer_id) {
+            loop->timers[i].active = false;
+            return 0;
+        }
+    }
+    return -1;
 }
-int agentos_event_loop_run(agentos_event_loop_t* loop) { (void)loop; return -1; }
-void agentos_event_loop_stop(agentos_event_loop_t* loop) { (void)loop; }
-int agentos_event_loop_wakeup(agentos_event_loop_t* loop) { (void)loop; return -1; }
-int agentos_event_loop_get_fd_count(agentos_event_loop_t* loop) { (void)loop; return 0; }
+
+static void process_timers(agentos_event_loop_t* loop) {
+    loop->current_time_ms = get_time_ms();
+    for (int i = 0; i < AGENTOS_EVENT_LOOP_MAX_TIMERS; i++) {
+        if (loop->timers[i].active && loop->current_time_ms >= loop->timers[i].next_fire_ms) {
+            loop->timers[i].cb(loop, loop->timers[i].id, loop->timers[i].user_data);
+            if (loop->timers[i].active)
+                loop->timers[i].next_fire_ms = loop->current_time_ms + loop->timers[i].interval_ms;
+        }
+    }
+}
+
+int agentos_event_loop_run(agentos_event_loop_t* loop) {
+    if (!loop) return -1;
+
+    loop->running = true;
+    loop->stop_requested = false;
+    LOG_INFO("Event loop started (max_events=%d)", loop->max_events);
+
+    while (!loop->stop_requested) {
+        WSAEVENT wait_events[WSA_MAXIMUM_WAIT_EVENTS];
+        int fd_map[WSA_MAXIMUM_WAIT_EVENTS];
+        int event_count = 0;
+
+        wait_events[event_count] = (WSAEVENT)loop->wakeup_event;
+        fd_map[event_count] = -1;
+        event_count++;
+
+        for (int i = 0; i < loop->fd_capacity && event_count < WSA_MAXIMUM_WAIT_EVENTS; i++) {
+            if (loop->fd_entries[i].in_use) {
+                wait_events[event_count] = loop->fd_entries[i].wsa_event;
+                fd_map[event_count] = i;
+                event_count++;
+            }
+        }
+
+        DWORD wait_result = WSAWaitForMultipleEvents(
+            (DWORD)event_count, wait_events, FALSE, 100, FALSE);
+
+        process_timers(loop);
+
+        if (wait_result == WSA_WAIT_FAILED) {
+            LOG_DEBUG("WSAWaitForMultipleEvents failed: %d", WSAGetLastError());
+            continue;
+        }
+        if (wait_result == WSA_WAIT_TIMEOUT) continue;
+
+        int start_idx = (int)(wait_result - WSA_WAIT_EVENT_0);
+        for (int ei = start_idx; ei < event_count; ei++) {
+            if (WaitForSingleObject(wait_events[ei], 0) != WAIT_OBJECT_0)
+                continue;
+
+            if (fd_map[ei] < 0) {
+                ResetEvent(loop->wakeup_event);
+                continue;
+            }
+
+            int fi = fd_map[ei];
+            if (!loop->fd_entries[fi].in_use) continue;
+
+            WSANETWORKEVENTS net_events;
+            if (WSAEnumNetworkEvents(loop->fd_entries[fi].fd,
+                                      loop->fd_entries[fi].wsa_event,
+                                      &net_events) != 0) {
+                LOG_DEBUG("WSAEnumNetworkEvents failed for fd=%d: %d",
+                          (int)loop->fd_entries[fi].fd, WSAGetLastError());
+                continue;
+            }
+
+            uint32_t user_events = wsa_to_events(net_events.lNetworkEvents);
+            if (net_events.lNetworkEvents & FD_CLOSE)
+                user_events |= AGENTOS_EVENT_TYPE_READ;
+
+            if (user_events && loop->fd_entries[fi].cb) {
+                loop->fd_entries[fi].cb((int)loop->fd_entries[fi].fd,
+                                         user_events,
+                                         loop->fd_entries[fi].user_data);
+            }
+        }
+    }
+
+    loop->running = false;
+    LOG_INFO("Event loop stopped");
+    return 0;
+}
+
+void agentos_event_loop_stop(agentos_event_loop_t* loop) {
+    if (!loop) return;
+    loop->stop_requested = true;
+    if (loop->wakeup_event) SetEvent(loop->wakeup_event);
+}
+
+int agentos_event_loop_wakeup(agentos_event_loop_t* loop) {
+    if (!loop || !loop->wakeup_event) return -1;
+    if (!SetEvent(loop->wakeup_event)) return -1;
+    return 0;
+}
+
+int agentos_event_loop_get_fd_count(agentos_event_loop_t* loop) {
+    if (!loop) return 0;
+    return loop->fd_count;
+}
 
 #else
 

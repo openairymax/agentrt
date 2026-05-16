@@ -12,6 +12,7 @@
 #include "graph_engine.h"
 #include "taskflow.h"
 #include "taskflow_types.h"
+#undef AGENTOS_USE_SCHEDULER_THREAD_IMPL
 #include "platform.h"
 #include <memory_compat.h>
 #include <stdlib.h>

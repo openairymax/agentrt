@@ -13,6 +13,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <stdio.h>
 #include <time.h>
 #include "platform.h"
@@ -52,11 +55,15 @@ static int openjiuwen_reconnect(openjiuwen_adapter_t* adapter) {
         AGENTOS_LOG_WARN("OpenJiuwen: reconnect attempt %u/%u, waiting %ums",
                      attempt + 1, max_attempts, delay);
 
-        struct timespec ts = {
-            .tv_sec = delay / 1000,
-            .tv_nsec = (delay % 1000) * 1000000LL
-        };
-        nanosleep(&ts, NULL);
+        #ifdef _WIN32
+            Sleep(delay);
+#else
+            struct timespec ts = {
+                .tv_sec = delay / 1000,
+                .tv_nsec = (delay % 1000) * 1000000LL
+            };
+            nanosleep(&ts, NULL);
+#endif
 
         int verify = openjiuwen_verify_connection(&adapter->base);
         if (verify == 0) {

@@ -1,9 +1,7 @@
 # Gateway Daemon Tests (TeamC)
 # Copyright (C) 2026 SPHARX. All Rights Reserved.
 
-cmake_minimum_required(VERSION 3.16)
 
-project(gateway_d_tests VERSION 0.0.5 LANGUAGES C)
 
 set(GATEWAY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../gateway)
 set(GATEWAY_INCLUDE_DIR ${GATEWAY_DIR}/include)

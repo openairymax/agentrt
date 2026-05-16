@@ -13,6 +13,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "atomic_compat.h"
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -97,8 +99,9 @@ int agentos_observability_init(const agentos_observability_config_t* config) {
         if (!new_lock) return AGENTOS_ENOMEM;
 
         agentos_mutex_t* expected = NULL;
-        if (!__atomic_compare_exchange_n(&g_obs.lock, &expected, new_lock,
-                                         0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+        if (!atomic_compare_exchange_strong_ptr(
+                (_Atomic void**)&g_obs.lock, (void**)&expected, (void*)new_lock,
+                memory_order_seq_cst, memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
     }

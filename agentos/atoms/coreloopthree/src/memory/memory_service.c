@@ -4,18 +4,17 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "agentos_memory.h"
-#include "logger.h"
-#include <stdlib.h>
-
+#include "memory.h"
 #include "memory_compat.h"
-#include "string_compat.h"
+#include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
+#include <stdio.h>
 
 typedef struct async_write_req {
     agentos_memory_engine_t* engine;
     agentos_memory_record_t* record;
-    void (*callback)(agentos_error_t err, const char* record_id, void* userdata);
+    void (*callback)(int err, const char* record_id, void* userdata);
     void* userdata;
 } async_write_req_t;
 
@@ -61,12 +60,12 @@ fail:
     return NULL;
 }
 
-static void async_write_thread(void* arg) {
+static void* async_write_thread(void* arg) {
     async_write_req_t* req = (async_write_req_t*)arg;
-    if (!req) return;
+    if (!req) return NULL;
 
     char* record_id = NULL;
-    agentos_error_t err = agentos_memory_write(req->engine, req->record, &record_id);
+    int err = agentos_memory_write(req->engine, req->record, &record_id);
 
     if (req->callback) {
         req->callback(err, record_id, req->userdata);
@@ -75,12 +74,13 @@ static void async_write_thread(void* arg) {
 
     free_record_copy(req->record);
     AGENTOS_FREE(req);
+    return NULL;
 }
 
-agentos_error_t agentos_memory_write_async(
+int agentos_memory_write_async(
     agentos_memory_engine_t* engine,
     const agentos_memory_record_t* record,
-    void (*callback)(agentos_error_t err, const char* record_id, void* userdata),
+    void (*callback)(int err, const char* record_id, void* userdata),
     void* userdata) {
 
     if (!engine || !record) return AGENTOS_EINVAL;
@@ -99,16 +99,16 @@ agentos_error_t agentos_memory_write_async(
     req->callback = callback;
     req->userdata = userdata;
 
-    agentos_thread_t thread;
-    agentos_error_t err = agentos_thread_create(&thread, async_write_thread, req);
-    if (err != AGENTOS_SUCCESS) {
+    pthread_t thread;
+    int rc = pthread_create(&thread, NULL, async_write_thread, req);
+    if (rc != 0) {
         free_record_copy(rec_copy);
         AGENTOS_FREE(req);
-        return err;
+        return AGENTOS_EINVAL;
     }
-    agentos_error_t detach_err = agentos_thread_detach(thread);
-    if (detach_err != AGENTOS_SUCCESS) {
-        AGENTOS_LOG_WARN("Failed to detach memory service thread");
+    rc = pthread_detach(thread);
+    if (rc != 0) {
+        fprintf(stderr, "[memory_service] Failed to detach write thread\n");
     }
     return AGENTOS_SUCCESS;
 }

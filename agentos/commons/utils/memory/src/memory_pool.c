@@ -10,12 +10,17 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
-#include "platform.h"
+#include <pthread.h>
+typedef pthread_mutex_t agentos_mutex_t;
+extern int agentos_mutex_init(agentos_mutex_t* mutex);
+extern void agentos_mutex_destroy(agentos_mutex_t* mutex);
+extern int agentos_mutex_lock(agentos_mutex_t* mutex);
+extern int agentos_mutex_unlock(agentos_mutex_t* mutex);
 #include <stdint.h>
 
 /**
@@ -35,12 +40,14 @@ struct memory_pool {
     // 配置选项
     memory_pool_options_t options;       /**< 内存池选项 */
     
-    // 内存块管�?    void* memory_area;                   /**< 整个内存区域指针 */
+    // 内存块管
+    void* memory_area;                   /**< 整个内存区域指针 */
     size_t memory_area_size;             /**< 内存区域总大�?*/
     memory_pool_block_t** blocks;        /**< 所有块的指针数�?*/
     size_t blocks_capacity;              /**< 块数组容�?*/
     
-    // 空闲块管�?    memory_pool_block_t* free_list;      /**< 空闲块链表头 */
+    // 空闲块管
+    memory_pool_block_t* free_list;      /**< 空闲块链表头 */
     
     // 统计信息
     memory_pool_stats_t stats;           /**< 内存池统计信�?*/
@@ -129,7 +136,8 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
         return false;
     }
     
-    // 计算对齐后的块大小（包括块头�?    size_t aligned_block_size = memory_pool_align_size(
+    // 计算对齐后的块大小（包括块头
+    size_t aligned_block_size = memory_pool_align_size(
         sizeof(memory_pool_block_t) + pool->options.block_size,
         sizeof(void*)
     );
@@ -140,7 +148,8 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
     }
     size_t total_size = block_count * aligned_block_size;
     
-    // 检查是否超过最大限�?    if (pool->options.max_blocks > 0 && 
+    // 检查是否超过最大限
+    if (pool->options.max_blocks > 0 && 
         pool->stats.total_blocks + block_count > pool->options.max_blocks) {
         return false;
     }
@@ -196,10 +205,12 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
         block->index = pool->stats.total_blocks + i;
         block->pool = pool;
         
-        // 将块添加到空闲链�?        block->next = pool->free_list;
+        // 将块添加到空闲链
+        block->next = pool->free_list;
         pool->free_list = block;
         
-        // 存储块指�?        pool->blocks[pool->stats.total_blocks + i] = block;
+        // 存储块指
+        pool->blocks[pool->stats.total_blocks + i] = block;
         
         // 移动到下一个块
         memory_ptr += aligned_block_size;
@@ -247,7 +258,8 @@ memory_pool_t* memory_pool_create(const memory_pool_options_t* options) {
         return NULL;
     }
     
-    // 分配内存池结�?    memory_pool_t* pool = memory_calloc(sizeof(memory_pool_t), "memory_pool_instance");
+    // 分配内存池结
+    memory_pool_t* pool = memory_calloc(sizeof(memory_pool_t), "memory_pool_instance");
     if (pool == NULL) {
         return NULL;
     }
@@ -255,7 +267,8 @@ memory_pool_t* memory_pool_create(const memory_pool_options_t* options) {
     // 复制选项
     memcpy(&pool->options, options, sizeof(memory_pool_options_t));
     
-    // 设置默认�?    if (pool->options.initial_blocks == 0) {
+    // 设置默认
+    if (pool->options.initial_blocks == 0) {
         pool->options.initial_blocks = 16;
     }
     
@@ -263,7 +276,8 @@ memory_pool_t* memory_pool_create(const memory_pool_options_t* options) {
         pool->options.expansion_size = 8;
     }
     
-    // 初始化统计信�?    memset(&pool->stats, 0, sizeof(memory_pool_stats_t));
+    // 初始化统计信
+    memset(&pool->stats, 0, sizeof(memory_pool_stats_t));
     pool->stats.block_size = pool->options.block_size;
     
     // 初始化锁
@@ -334,7 +348,8 @@ void memory_pool_destroy(memory_pool_t* pool) {
         memory_free(pool->name);
     }
     
-    // 释放池结构本�?    memory_free(pool);
+    // 释放池结构本
+    memory_free(pool);
 }
 
 void* memory_pool_alloc(memory_pool_t* pool) {
@@ -406,7 +421,8 @@ void memory_pool_free(memory_pool_t* pool, void* ptr) {
     // 标记为未分配
     block->allocated = false;
     
-    // 添加到空闲链�?    block->next = pool->free_list;
+    // 添加到空闲链
+    block->next = pool->free_list;
     pool->free_list = block;
     
     // 更新统计信息
@@ -465,12 +481,14 @@ void memory_pool_clear(memory_pool_t* pool) {
     
     memory_pool_lock(pool);
     
-    // 只清空空闲块，已分配块不受影�?    // 重新组织内存�?    
+    // 只清空空闲块，已分配块不受影
+    // 重新组织内存�?    
     // 计算需要保留的块数（已分配块）
     size_t blocks_to_keep = pool->stats.allocated_blocks;
     
     if (blocks_to_keep == 0) {
-        // 如果没有已分配块，可以直接释放整个内存区�?        memory_pool_free_blocks(pool);
+        // 如果没有已分配块，可以直接释放整个内存区
+        memory_pool_free_blocks(pool);
         
         // 重新创建最小内存池
         if (pool->options.initial_blocks > 0) {
@@ -563,10 +581,6 @@ size_t memory_pool_shrink(memory_pool_t* pool, size_t blocks_to_keep) {
         current = next;
     }
 
-    if (freed > 0) {
-        pool->stats.peak_usage = pool->stats.allocated_blocks;
-    }
-
     memory_pool_unlock(pool);
     return freed;
 }
@@ -580,7 +594,8 @@ bool memory_pool_validate(memory_pool_t* pool) {
     
     bool valid = true;
     
-    // 检查统计信息一致�?    if (pool->stats.total_blocks != pool->stats.allocated_blocks + pool->stats.free_blocks) {
+    // 检查统计信息一致
+    if (pool->stats.total_blocks != pool->stats.allocated_blocks + pool->stats.free_blocks) {
         valid = false;
     }
     
@@ -593,12 +608,14 @@ bool memory_pool_validate(memory_pool_t* pool) {
         valid = false;
     }
     
-    // 检查空闲链�?    size_t free_count = 0;
+    // 检查空闲链
+    size_t free_count = 0;
     memory_pool_block_t* current = pool->free_list;
     while (current != NULL) {
         free_count++;
         
-        // 检查块是否确实未分�?        if (current->allocated) {
+        // 检查块是否确实未分
+        if (current->allocated) {
             valid = false;
             break;
         }
@@ -651,12 +668,14 @@ void memory_pool_set_name(memory_pool_t* pool, const char* name) {
     
     memory_pool_lock(pool);
     
-    // 释放旧名�?    if (pool->name != NULL) {
+    // 释放旧名
+    if (pool->name != NULL) {
         memory_free(pool->name);
         pool->name = NULL;
     }
     
-    // 设置新名�?    if (name != NULL) {
+    // 设置新名
+    if (name != NULL) {
         pool->name = memory_calloc(strlen(name) + 1, "memory_pool_name");
         if (pool->name != NULL) {
             memcpy(pool->name, name, strlen(name) + 1);

@@ -11,7 +11,7 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
@@ -21,14 +21,20 @@
 #include <dbghelp.h>
 #else
 #include <execinfo.h>
-#include "platform.h"
+#include <pthread.h>
+#include <sys/time.h>
+typedef pthread_mutex_t agentos_mutex_t;
+extern int agentos_mutex_init(agentos_mutex_t* mutex);
+extern void agentos_mutex_destroy(agentos_mutex_t* mutex);
+extern int agentos_mutex_lock(agentos_mutex_t* mutex);
+extern int agentos_mutex_unlock(agentos_mutex_t* mutex);
 #include <stdint.h>
 #endif
 
 /**
  * @brief 内存调试块头（红区）
  */
-typedef struct {
+typedef struct memory_debug_block {
     size_t magic;                         /**< 魔数，用于验�?*/
     size_t size;                          /**< 原始分配大小 */
     size_t redzone_size;                  /**< 红区大小 */
@@ -222,13 +228,13 @@ static void memory_debug_record_error(memory_error_type_t type,
             }
         }
         
-        fprintf(log, "[内存错误] 类型�?d, 地址�?p, 大小�?zu\n",
+        fprintf(log, "[内存错误] 类型%d, 地址%p, 大小%zu\n",
                type, addr, size);
         if (description != NULL) {
-            fprintf(log, "描述�?s\n", description);
+            fprintf(log, "描述%s\n", description);
         }
         if (file != NULL && function != NULL) {
-            fprintf(log, "位置�?s:%d (%s)\n", file, line, function);
+            fprintf(log, "位置%s:%d (%s)\n", file, line, function);
         }
         
         if (log != stderr) {
@@ -496,8 +502,8 @@ size_t memory_debug_check_leaks(memory_leak_report_t* report, bool dump_to_log) 
         }
         
         fprintf(log, "=== 内存泄漏检测报�?===\n");
-        fprintf(log, "时间�?llu\n", (unsigned long long)memory_debug_get_timestamp());
-        fprintf(log, "泄漏块数�?zu\n", leak_count);
+        fprintf(log, "时间%llu\n", (unsigned long long)memory_debug_get_timestamp());
+        fprintf(log, "泄漏块数%zu\n", leak_count);
         fprintf(log, "泄漏字节数：%zu\n", total_leaked_bytes);
         
         if (g_debug_state.options.verbosity_level >= 2) {
@@ -550,7 +556,7 @@ bool memory_debug_validate(void* ptr, memory_error_report_t* error) {
     if (ptr == NULL) {
         if (error != NULL) {
             memset(error, 0, sizeof(memory_error_report_t));
-            error->type = MEMORY_ERROR_NULL_POINTER;
+            error->type = MEMORY_ERROR_INVALID_FREE;
         }
         return false;
     }
@@ -664,16 +670,16 @@ void memory_debug_dump_info(const char* file, bool include_stack_trace) {
     }
     
     fprintf(output, "=== 内存调试信息转储 ===\n");
-    fprintf(output, "时间�?llu\n", (unsigned long long)memory_debug_get_timestamp());
+    fprintf(output, "时间%llu\n", (unsigned long long)memory_debug_get_timestamp());
     fprintf(output, "总分配次数：%zu\n", g_debug_state.total_allocations);
     fprintf(output, "总释放次数：%zu\n", g_debug_state.total_frees);
-    fprintf(output, "当前分配块数�?zu\n", g_debug_state.block_count);
-    fprintf(output, "错误数量�?zu\n", g_debug_state.error_count);
+    fprintf(output, "当前分配块数%zu\n", g_debug_state.block_count);
+    fprintf(output, "错误数量%zu\n", g_debug_state.error_count);
     fprintf(output, "调试选项：\n");
     fprintf(output, "  泄漏检查：%s\n", g_debug_state.options.enable_leak_check ? "启用" : "禁用");
     fprintf(output, "  边界检查：%s\n", g_debug_state.options.enable_boundary_check ? "启用" : "禁用");
-    fprintf(output, "  红区大小�?zu字节\n", g_debug_state.options.redzone_size);
-    fprintf(output, "堆栈跟踪�?s\n", g_debug_state.stack_trace_enabled ? "启用" : "禁用");
+    fprintf(output, "  红区大小%zu字节\n", g_debug_state.options.redzone_size);
+    fprintf(output, "堆栈跟踪%s\n", g_debug_state.stack_trace_enabled ? "启用" : "禁用");
     
     fprintf(output, "当前分配块：\n");
     
@@ -685,14 +691,14 @@ void memory_debug_dump_info(const char* file, bool include_stack_trace) {
         void* user_ptr = (uint8_t*)current + g_debug_state.options.redzone_size;
         
         fprintf(output, "�?#%zu:\n", count);
-        fprintf(output, "  用户地址�?p\n", user_ptr);
-        fprintf(output, "  块地址�?p\n", current);
-        fprintf(output, "  大小�?zu字节\n", current->size);
-        fprintf(output, "  已分配：%s\n", current->allocated ? "�? : "�?);
-        fprintf(output, "  标签�?s\n", current->tag ? current->tag : "(null)");
+        fprintf(output, "  用户地址%p\n", user_ptr);
+        fprintf(output, "  块地址%p\n", current);
+        fprintf(output, "  大小%zu字节\n", current->size);
+        fprintf(output, "  已分配：%s\n", current->allocated ? "yes" : "no");
+        fprintf(output, "  标签%s\n", current->tag ? current->tag : "(null)");
         
         if (current->file != NULL) {
-            fprintf(output, "  位置�?s:%d", current->file, current->line);
+            fprintf(output, "  位置%s:%d", current->file, current->line);
             if (current->function != NULL) {
                 fprintf(output, " (%s)", current->function);
             }
@@ -702,12 +708,12 @@ void memory_debug_dump_info(const char* file, bool include_stack_trace) {
         fprintf(output, "  时间戳：%llu\n", (unsigned long long)current->timestamp);
         
         if (include_stack_trace && current->stack_depth > 0) {
-            fprintf(output, "  堆栈跟踪�?zu帧）：\n", current->stack_depth);
+            fprintf(output, "  堆栈跟踪%zu帧）：\n", current->stack_depth);
             for (size_t i = 0; i < current->stack_depth && i < 8; i++) {
                 fprintf(output, "    [%zu] %p\n", i, current->stack_trace[i]);
             }
             if (current->stack_depth > 8) {
-                fprintf(output, "    ...�?zu更多帧）\n", current->stack_depth - 8);
+                fprintf(output, "    ...%zu更多帧）\n", current->stack_depth - 8);
             }
         }
         

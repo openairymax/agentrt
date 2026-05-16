@@ -7,15 +7,18 @@
 #include "entity_extractor.h"
 
 #include "intent_utils.h"
+#include "atomic_compat.h"
 #include "memory_compat.h"
 
 #include <ctype.h>
+#ifndef _WIN32
 #include <regex.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int g_extractor_initialized = 0;
+static atomic_int g_extractor_initialized = 0;
 
 const char *agentos_entity_type_name(agentos_entity_type_t type)
 {
@@ -51,17 +54,15 @@ const char *agentos_entity_type_name(agentos_entity_type_t type)
 
 int agentos_entity_extractor_init(void)
 {
-    if (g_extractor_initialized) {
-        return 0;
-    }
-
-    g_extractor_initialized = 1;
+    int expected = 0;
+    atomic_compare_exchange_strong_explicit(&g_extractor_initialized, &expected, 1,
+                                 memory_order_seq_cst, memory_order_seq_cst);
     return 0;
 }
 
 void agentos_entity_extractor_cleanup(void)
 {
-    g_extractor_initialized = 0;
+    atomic_store_explicit(&g_extractor_initialized, 0, memory_order_seq_cst);
 }
 
 agentos_extraction_result_t *agentos_extraction_result_create(size_t initial_capacity)
@@ -205,6 +206,7 @@ static void extract_numbers(const char *input, size_t input_len,
 }
 
 /* 提取 URL 实体 */
+#ifndef _WIN32
 static void extract_urls(const char *input, size_t input_len, agentos_extraction_result_t *result)
 {
     regex_t regex;
@@ -330,6 +332,11 @@ static void extract_filepaths(const char *input, size_t input_len,
 
     regfree(&regex);
 }
+#else
+static void extract_urls(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
+static void extract_emails(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
+static void extract_filepaths(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
+#endif
 
 int agentos_entity_extract(const char *input, size_t input_len, agentos_extraction_result_t *result)
 {
@@ -337,7 +344,7 @@ int agentos_entity_extract(const char *input, size_t input_len, agentos_extracti
         return -1;
     }
 
-    if (!g_extractor_initialized) {
+    if (!atomic_load_explicit(&g_extractor_initialized, memory_order_acquire)) {
         agentos_entity_extractor_init();
     }
 
