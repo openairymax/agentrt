@@ -571,7 +571,7 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
         
         // 查找配置�
         // 从配置上下文中获取值
-        config_value_t* value = config_context_get(ctx, item->key);
+        const config_value_t* value = config_context_get(ctx, item->key);
         
         if (item->required && !value) {
             add_schema_error(schema, "Required configuration item '%s' is missing", item->key);

@@ -455,8 +455,12 @@ int gw_protocol_bridge_load_extensions_from_config(
     if (!bridge || !config_json) return -1;
     struct gw_protocol_bridge_s* b = (struct gw_protocol_bridge_s*)bridge;
 
-    if (!b->ext_framework) return -ENOSYS;
-    return -ENOSYS;
+    if (!b->ext_framework) {
+        b->ext_framework = proto_ext_framework_create();
+        if (!b->ext_framework) return -2;
+    }
+
+    return proto_ext_load_from_config((proto_ext_framework_t*)b->ext_framework, config_json);
 }
 
 int gw_protocol_bridge_register_extension_adapter(

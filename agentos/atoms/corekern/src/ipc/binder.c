@@ -129,7 +129,7 @@ static int ensure_binder_lock(void) {
     if (!lock) return AGENTOS_ENOMEM;
     agentos_mutex_t* expected = NULL;
     if (!atomic_compare_exchange_strong_ptr(
-            (void* volatile*)&binder_global_lock, (void**)&expected, (void*)lock,
+            (_Atomic void**)&binder_global_lock, (void**)&expected, (void*)lock,
             memory_order_acq_rel, memory_order_acquire)) {
         agentos_mutex_destroy_ptr(lock);
     }
@@ -215,7 +215,7 @@ agentos_error_t agentos_ipc_init(void) {
 
         agentos_mutex_t* expected = NULL;
         if (!atomic_compare_exchange_strong_ptr(
-                (void* volatile*)&binder_global_lock, (void**)&expected, (void*)new_lock,
+                (_Atomic void**)&binder_global_lock, (void**)&expected, (void*)new_lock,
                 memory_order_seq_cst, memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }

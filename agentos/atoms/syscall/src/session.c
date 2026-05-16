@@ -196,12 +196,12 @@ static agentos_error_t persist_delete_with_retry(const char* session_id) {
 }
 
 static void ensure_lock(void) {
-    agentos_mutex_t* current = (agentos_mutex_t*)atomic_load_ptr((void* volatile*)&session_lock, memory_order_acquire);
+    agentos_mutex_t* current = (agentos_mutex_t*)atomic_load_ptr((_Atomic void**)&session_lock, memory_order_acquire);
     if (!current) {
         agentos_mutex_t* new_lock = agentos_mutex_create();
         if (!new_lock) return;
         agentos_mutex_t* expected = NULL;
-        if (!atomic_compare_exchange_strong_ptr((void* volatile*)&session_lock, (void**)&expected, (void*)new_lock,
+        if (!atomic_compare_exchange_strong_ptr((_Atomic void**)&session_lock, (void**)&expected, (void*)new_lock,
                                                  memory_order_acq_rel, memory_order_acquire)) {
             agentos_mutex_free(new_lock);
         }

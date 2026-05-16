@@ -293,6 +293,10 @@ static int agntcy_proto_init(void* context, const void* config) {
     return 0;
 }
 
+static int agntcy_proto_init_adapter(void* context) {
+    return agntcy_proto_init(context, NULL);
+}
+
 static int agntcy_proto_destroy(void* context) {
     (void)context;
     g_agntcy_state.proto_initialized = false;
@@ -331,6 +335,13 @@ static const char* agntcy_proto_get_version(void* context) {
     return AGNTCY_ACP_VERSION;
 }
 
+static int agntcy_proto_get_version_adapter(void* context, char* version_buf, size_t max_size) {
+    const char* ver = agntcy_proto_get_version(context);
+    if (!version_buf || max_size == 0) return -1;
+    snprintf(version_buf, max_size, "%s", ver);
+    return 0;
+}
+
 static uint64_t agntcy_proto_capabilities(void* context) {
     (void)context;
     return (uint64_t)(
@@ -342,6 +353,10 @@ static uint64_t agntcy_proto_capabilities(void* context) {
         AGNTCY_CAP_ACK);
 }
 
+static uint32_t agntcy_proto_capabilities_adapter(void* context) {
+    return (uint32_t)agntcy_proto_capabilities(context);
+}
+
 const proto_adapter_t* agntcy_get_protocol_adapter(void) {
     static proto_adapter_t adapter = {0};
     static bool initialized = false;
@@ -351,11 +366,11 @@ const proto_adapter_t* agntcy_get_protocol_adapter(void) {
         adapter.version = AGNTCY_ACP_VERSION;
         adapter.description = "Agent Communication Protocol - open standard for agent-to-agent communication";
         adapter.type = PROTO_AGNTCY;
-        adapter.init = agntcy_proto_init;
+        adapter.init = agntcy_proto_init_adapter;
         adapter.destroy = agntcy_proto_destroy;
         adapter.handle_request = agntcy_proto_handle_request;
-        adapter.get_version = agntcy_proto_get_version;
-        adapter.capabilities = agntcy_proto_capabilities;
+        adapter.get_version = agntcy_proto_get_version_adapter;
+        adapter.capabilities = agntcy_proto_capabilities_adapter;
         initialized = true;
     }
 
