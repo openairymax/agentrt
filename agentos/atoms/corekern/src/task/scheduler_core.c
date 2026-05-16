@@ -84,7 +84,7 @@ scheduler_core_ctx_t* scheduler_core_get_ctx(void) {
 }
 
 int scheduler_core_init(void) {
-    if (atomic_load_ptr((void* volatile*)&g_core_ctx, memory_order_acquire)) {
+    if (atomic_load_ptr((_Atomic void**)&g_core_ctx, memory_order_acquire)) {
         return 0;
     }
 
@@ -94,7 +94,7 @@ int scheduler_core_init(void) {
 
         void* expected = NULL;
         if (!atomic_compare_exchange_strong_ptr(
-                (void* volatile*)&g_ctx_init_lock, &expected, new_lock,
+                (_Atomic void**)&g_ctx_init_lock, &expected, new_lock,
                 memory_order_seq_cst, memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
@@ -102,7 +102,7 @@ int scheduler_core_init(void) {
 
     agentos_mutex_lock(g_ctx_init_lock);
 
-    if (atomic_load_ptr((void* volatile*)&g_core_ctx, memory_order_acquire)) {
+    if (atomic_load_ptr((_Atomic void**)&g_core_ctx, memory_order_acquire)) {
         agentos_mutex_unlock(g_ctx_init_lock);
         return 0;
     }

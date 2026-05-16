@@ -48,6 +48,10 @@ set(SOURCES
     utils/strategy/strategy_common.c
     utils/network/network_common.c
     utils/uuid/src/uuid_generator.c
+    utils/config_unified/src/config_service.c
+    utils/config_unified/src/core_config.c
+    utils/config_unified/src/config_source.c
+    utils/config_unified/src/config_compat.c
 )
 if(NOT WIN32)
     list(APPEND SOURCES utils/ipc/ipc_common.c)

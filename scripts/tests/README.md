@@ -1,54 +1,50 @@
-# 测试脚本
+# 脚本测试套件
 
 `scripts/tests/`
 
 ## 概述
 
-`tests/` 目录包含 AgentOS 项目的各类测试执行脚本，提供功能测试、集成测试、端到端测试的统一运行入口，支持 CI/CD 流水线自动化和本地手动测试。
+`tests/` 目录包含 AgentOS 脚本工具的测试套件，分为 Python 测试和 Shell 测试两个子目录，分别使用 pytest 和 Shell 测试框架执行。
 
-## 脚本列表
+## 目录结构
 
-| 脚本 | 说明 |
-|------|------|
-| `run_tests.sh` | 测试执行入口，支持选择测试范围和模式 |
-| `run_integration.sh` | 集成测试，验证多组件协同工作 |
-| `run_e2e.sh` | 端到端测试，模拟真实用户场景 |
-| `test_report.sh` | 测试报告生成与汇总 |
-
-## 使用示例
-
-```bash
-# 运行所有测试
-./tests/run_tests.sh
-
-# 仅运行单元测试
-./tests/run_tests.sh --type unit
-
-# 运行集成测试
-./tests/run_tests.sh --type integration
-
-# 生成测试报告
-./tests/test_report.sh --format html --output ./reports/
+```
+tests/
+├── python/                    # Python 测试
+│   ├── conftest.py            # pytest 配置和公共 fixture
+│   ├── test_core.py           # 核心功能测试
+│   ├── test_token_counter.py  # Token 计数器测试
+│   ├── test_token_budget.py   # Token 预算测试
+│   ├── test_memory_manager.py # 内存管理器测试
+│   └── test_checkpoint_manager.py  # 检查点管理器测试
+└── shell/                     # Shell 测试
+    ├── test_framework.sh      # Shell 测试框架
+    └── test_common_utils.sh   # 公共工具函数测试
 ```
 
-## 测试类型
+## 使用方式
 
-| 类型 | 说明 | 覆盖范围 |
-|------|------|----------|
-| 单元测试 | 验证单个函数或模块的正确性 | C (CMockery2), Python (pytest) |
-| 集成测试 | 验证多组件间的数据流和协议交互 | 跨守护进程通信 |
-| E2E 测试 | 模拟用户从入口到返回的全链路场景 | 完整系统流程 |
+### Python 测试
 
-## CI/CD 集成
+```bash
+# 运行所有 Python 测试
+pytest scripts/tests/python/
 
-```yaml
-# GitLab CI 示例
-test:
-  script:
-    - scripts/tests/run_tests.sh --ci
-  artifacts:
-    reports:
-      junit: reports/junit.xml
+# 运行指定测试模块
+pytest scripts/tests/python/test_core.py
+
+# 带覆盖率报告
+pytest scripts/tests/python/ --cov=scripts/toolkit
+```
+
+### Shell 测试
+
+```bash
+# 运行 Shell 测试框架
+bash scripts/tests/shell/test_framework.sh
+
+# 运行公共工具测试
+bash scripts/tests/shell/test_common_utils.sh
 ```
 
 ---

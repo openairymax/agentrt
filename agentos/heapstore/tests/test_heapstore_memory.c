@@ -165,7 +165,10 @@ static void test_memory_not_found(void) {
     heapstore_error_t err = heapstore_memory_get_pool("nonexistent_id", &pool);
     assert(err == heapstore_ERR_NOT_FOUND);
 
-    err = heapstore_memory_get_allocation("nonexistent_id", &pool);
+    heapstore_memory_allocation_t allocation;
+    memset(&allocation, 0, sizeof(allocation));
+
+    err = heapstore_memory_get_allocation("nonexistent_id", &allocation);
     assert(err == heapstore_ERR_NOT_FOUND);
 
     err = heapstore_memory_update_pool_usage("nonexistent_id", 0, 0);

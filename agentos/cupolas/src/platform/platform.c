@@ -863,15 +863,15 @@ void cupolas_mem_unlock(void* ptr, size_t size) {
  * ============================================================================ */
 
 int32_t cupolas_atomic_load32(volatile int32_t* ptr) {
-    return (int32_t)atomic_load_32((volatile long*)ptr, memory_order_seq_cst);
+    return (int32_t)atomic_load_32((volatile _Atomic long*)ptr, memory_order_seq_cst);
 }
 
 void cupolas_atomic_store32(volatile int32_t* ptr, int32_t val) {
-    atomic_store_32((volatile long*)ptr, (long)val, memory_order_seq_cst);
+    atomic_store_32((volatile _Atomic long*)ptr, (long)val, memory_order_seq_cst);
 }
 
 int32_t cupolas_atomic_add32(volatile int32_t* ptr, int32_t delta) {
-    return (int32_t)(atomic_fetch_add_32((volatile long*)ptr, (long)delta, memory_order_seq_cst) + delta);
+    return (int32_t)(atomic_fetch_add_32((volatile _Atomic long*)ptr, (long)delta, memory_order_seq_cst) + delta);
 }
 
 int32_t cupolas_atomic_sub32(volatile int32_t* ptr, int32_t delta) {
@@ -888,20 +888,20 @@ int32_t cupolas_atomic_dec32(volatile int32_t* ptr) {
 
 bool cupolas_atomic_cas32(volatile int32_t* ptr, int32_t expected, int32_t desired) {
     long exp = (long)expected;
-    return atomic_compare_exchange_strong_32((volatile long*)ptr, &exp, (long)desired,
+    return atomic_compare_exchange_strong_32((volatile _Atomic long*)ptr, &exp, (long)desired,
                                               memory_order_seq_cst, memory_order_seq_cst);
 }
 
 int64_t cupolas_atomic_load64(volatile int64_t* ptr) {
-    return atomic_load_64((volatile int64_t*)ptr, memory_order_seq_cst);
+    return atomic_load_64((volatile _Atomic int64_t*)ptr, memory_order_seq_cst);
 }
 
 void cupolas_atomic_store64(volatile int64_t* ptr, int64_t val) {
-    atomic_store_64((volatile int64_t*)ptr, val, memory_order_seq_cst);
+    atomic_store_64((volatile _Atomic int64_t*)ptr, val, memory_order_seq_cst);
 }
 
 int64_t cupolas_atomic_add64(volatile int64_t* ptr, int64_t delta) {
-    return atomic_fetch_add_64((volatile int64_t*)ptr, delta, memory_order_seq_cst) + delta;
+    return atomic_fetch_add_64((volatile _Atomic int64_t*)ptr, delta, memory_order_seq_cst) + delta;
 }
 
 int64_t cupolas_atomic_sub64(volatile int64_t* ptr, int64_t delta) {
@@ -910,20 +910,20 @@ int64_t cupolas_atomic_sub64(volatile int64_t* ptr, int64_t delta) {
 
 bool cupolas_atomic_cas64(volatile int64_t* ptr, int64_t expected, int64_t desired) {
     int64_t exp = expected;
-    return atomic_compare_exchange_strong_64((volatile int64_t*)ptr, &exp, desired,
+    return atomic_compare_exchange_strong_64((volatile _Atomic int64_t*)ptr, &exp, desired,
                                               memory_order_seq_cst, memory_order_seq_cst);
 }
 
 void* cupolas_atomic_load_ptr(volatile void** ptr) {
-    return atomic_load_ptr((void* volatile*)ptr, memory_order_seq_cst);
+    return atomic_load_ptr((_Atomic void**)ptr, memory_order_seq_cst);
 }
 
 void cupolas_atomic_store_ptr(volatile void** ptr, void* val) {
-    atomic_store_ptr((void* volatile*)ptr, val, memory_order_seq_cst);
+    atomic_store_ptr((_Atomic void**)ptr, val, memory_order_seq_cst);
 }
 
 bool cupolas_atomic_cas_ptr(volatile void** ptr, void* expected, void* desired) {
-    return atomic_compare_exchange_strong_ptr((void* volatile*)ptr, &expected, desired,
+    return atomic_compare_exchange_strong_ptr((_Atomic void**)ptr, &expected, desired,
                                                memory_order_seq_cst, memory_order_seq_cst);
 }
 

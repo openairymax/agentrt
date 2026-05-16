@@ -39,7 +39,7 @@ English | [简体中文](README_zh.md)
 Personal Client Preview
 
 <div align="center">
-<img src="scripts/source_other/AgentOS-desktop-preview.gif" alt="AgentOS Preview" width="800">
+<img src="scripts/assets/AgentOS-desktop-preview.gif" alt="AgentOS Preview" width="800">
 </div>
 
 ## 💡 Innovation Highlights
@@ -286,7 +286,7 @@ This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE
 
 **"From data intelligence emerges."**
 
-<img src="scripts/source_other/feishu-community-qr.png" width="200" />
+<img src="scripts/assets/feishu-community-qr.png" width="200" />
 
 <a href="https://atomgit.com/spharx/agentos">AtomGit</a> · <a href="https://gitee.com/spharx/agentos">Gitee</a> · <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> · <a href="https://spharx.cn">Official Website</a>
 
