@@ -46,6 +46,7 @@ agentos_error_t agentos_config_load(const char* path, char** out_json) {
     }
 
     size_t read = fread(buffer, 1, (size_t)size, file);
+    if (read != (size_t)size) { free(buffer); fclose(file); return AGENTOS_EIO; }
     buffer[read] = '\0';
     fclose(file);
 

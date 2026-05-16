@@ -20,6 +20,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include "atomic_compat.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -55,7 +56,7 @@ struct cupolas_entitlements {
 #endif
 };
 
-static int g_initialized = 0;
+static atomic_int g_initialized = 0;
 
 static char* cupolas_str_trim(char* str) {
     if (!str) return NULL;
@@ -266,22 +267,22 @@ static int cupolas_parse_entitlements_content(const char* content, cupolas_entit
 }
 
 int cupolas_entitlements_init(void) {
-    if (g_initialized) return 0;
-    
-    OpenSSL_add_all_algorithms();
-    ERR_load_crypto_strings();
-    
-    g_initialized = 1;
+    int expected = 0;
+    if (atomic_compare_exchange_strong_explicit(&g_initialized, &expected, 1,
+                                     memory_order_seq_cst, memory_order_seq_cst)) {
+        OpenSSL_add_all_algorithms();
+        ERR_load_crypto_strings();
+    }
     return 0;
 }
 
 void cupolas_entitlements_cleanup(void) {
-    if (!g_initialized) return;
+    if (!atomic_load_explicit(&g_initialized, memory_order_acquire)) return;
     
     EVP_cleanup();
     ERR_free_strings();
     
-    g_initialized = 0;
+    atomic_store_explicit(&g_initialized, 0, memory_order_seq_cst);
 }
 
 int cupolas_entitlements_load(const char* yaml_path, cupolas_entitlements_t** entitlements) {
@@ -299,6 +300,7 @@ int cupolas_entitlements_load(const char* yaml_path, cupolas_entitlements_t** en
     
     size_t read_size = fread(content, 1, size, f);
     fclose(f);
+    if (read_size != (size_t)size) { free(content); return CUPOLAS_ENT_PARSE_ERROR; }
     content[read_size] = '\0';
     
     int result = cupolas_entitlements_load_string(content, entitlements);
@@ -322,6 +324,7 @@ int cupolas_entitlements_load_json(const char* json_path, cupolas_entitlements_t
     
     size_t read_size = fread(content, 1, size, f);
     fclose(f);
+    if (read_size != (size_t)size) { free(content); return CUPOLAS_ENT_PARSE_ERROR; }
     content[read_size] = '\0';
     
     int result = cupolas_entitlements_load_string(content, entitlements);
@@ -624,10 +627,6 @@ int cupolas_entitlements_get_info(cupolas_entitlements_t* entitlements, cupolas_
     
     *info = entitlements->info;
     return CUPOLAS_ENT_OK;
-}
-
-void cupolas_entitlements_free_info(cupolas_entitlements_info_t* info) {
-    (void)info;
 }
 
 const char* cupolas_entitlements_get_agent_id(cupolas_entitlements_t* entitlements) {

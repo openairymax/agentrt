@@ -1,14 +1,4 @@
-/**
- * @file sync_common.c
- * @brief Synchronization primitives - common implementation
- *
- * Provides mutex, condition variable, semaphore, and rwlock
- * implementations using the platform abstraction layer.
- *
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
- */
-
-#include "include/sync_common.h"
+#include "sync_common.h"
 #include "src/sync_platform.h"
 #include <stdlib.h>
 #include <string.h>

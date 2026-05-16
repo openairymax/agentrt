@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <cJSON.h>
+#include <cjson/cJSON.h>
 
 #ifdef __cplusplus
 extern "C" {

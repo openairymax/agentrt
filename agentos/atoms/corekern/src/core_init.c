@@ -1,17 +1,18 @@
 /**
- * @file main.c
+ * @file core_init.c
  * @brief 内核入口点（初始化与关闭）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "agentos.h"
+#include "atomic_compat.h"
 
-static volatile int g_core_initialized = 0;
+static atomic_long g_core_initialized = 0;
 
 int agentos_core_init(void) {
-    int expected = 0;
-    if (!__atomic_compare_exchange_n(&g_core_initialized, &expected, 1,
-                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    long expected = 0;
+    if (!atomic_compare_exchange_strong_explicit(&g_core_initialized, &expected, 1,
+                                                  memory_order_seq_cst, memory_order_seq_cst)) {
         return AGENTOS_SUCCESS;
     }
 
@@ -38,14 +39,14 @@ cleanup_task:
 cleanup_mem:
     agentos_mem_cleanup();
 fail:
-    __atomic_store_n(&g_core_initialized, 0, __ATOMIC_SEQ_CST);
+    atomic_store_explicit(&g_core_initialized, 0, memory_order_seq_cst);
     return ret;
 }
 
 void agentos_core_shutdown(void) {
-    int expected = 1;
-    if (!__atomic_compare_exchange_n(&g_core_initialized, &expected, 0,
-                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    long expected = 1;
+    if (!atomic_compare_exchange_strong_explicit(&g_core_initialized, &expected, 0,
+                                                  memory_order_seq_cst, memory_order_seq_cst)) {
         return;
     }
 

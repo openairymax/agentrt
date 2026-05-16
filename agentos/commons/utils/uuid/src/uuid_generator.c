@@ -28,35 +28,37 @@
 /* Unified base library compatibility layer */
 #include "../../memory/include/memory_compat.h"
 #include "../../string/include/string_compat.h"
+#include "../../include/atomic_compat.h"
 
-static int g_uuid_initialized = 0;
-static uint64_t g_uuid_counter = 0;
+static atomic_int g_uuid_initialized = 0;
+static atomic_uint64_t g_uuid_counter = 0;
 
 agentos_uuid_error_t agentos_uuid_init(void) {
-    if (g_uuid_initialized) {
-        return AGENTOS_UUID_SUCCESS;
-    }
-
+    int expected = 0;
+    if (atomic_compare_exchange_strong_explicit(&g_uuid_initialized, &expected, 1,
+                                     memory_order_seq_cst, memory_order_seq_cst)) {
 #if defined(_WIN32) || defined(_WIN64)
-    RPC_STATUS status = UuidCreateSequential(NULL);
-    if (status != RPC_S_OK && status != RPC_S_UUID_LOCAL_ONLY) {
-        return AGENTOS_UUID_EUNAVAIL;
-    }
+        RPC_STATUS status = UuidCreateSequential(NULL);
+        if (status != RPC_S_OK && status != RPC_S_UUID_LOCAL_ONLY) {
+            atomic_store_explicit(&g_uuid_initialized, 0, memory_order_seq_cst);
+            return AGENTOS_UUID_EUNAVAIL;
+        }
 #elif defined(__linux__) || defined(__APPLE__)
-    int fd = open("/dev/urandom", O_RDONLY);
-    if (fd < 0) {
-        return AGENTOS_UUID_EUNAVAIL;
-    }
-    close(fd);
+        int fd = open("/dev/urandom", O_RDONLY);
+        if (fd < 0) {
+            atomic_store_explicit(&g_uuid_initialized, 0, memory_order_seq_cst);
+            return AGENTOS_UUID_EUNAVAIL;
+        }
+        close(fd);
 #endif
 
-    g_uuid_counter = (uint64_t)time(NULL) ^ 0x123456789ABCDEF0ULL;
-    g_uuid_initialized = 1;
+        g_uuid_counter = (uint64_t)time(NULL) ^ 0x123456789ABCDEF0ULL;
+    }
     return AGENTOS_UUID_SUCCESS;
 }
 
 void agentos_uuid_cleanup(void) {
-    g_uuid_initialized = 0;
+    atomic_store_explicit(&g_uuid_initialized, 0, memory_order_seq_cst);
     g_uuid_counter = 0;
 }
 
@@ -65,7 +67,7 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
         return AGENTOS_UUID_EINVALID;
     }
 
-    if (!g_uuid_initialized) {
+    if (!atomic_load_explicit(&g_uuid_initialized, memory_order_acquire)) {
         agentos_uuid_error_t err = agentos_uuid_init();
         if (err != AGENTOS_UUID_SUCCESS) {
             return err;
@@ -128,7 +130,7 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
         uuid[8], uuid[9],
         uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
 
-    g_uuid_counter++;
+    atomic_fetch_add(&g_uuid_counter, 1);
     return AGENTOS_UUID_SUCCESS;
 }
 

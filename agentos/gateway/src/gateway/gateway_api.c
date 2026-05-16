@@ -5,7 +5,11 @@
 #include "stdio_gateway.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <time.h>
+#ifdef AGENTOS_HAS_CJSON
+#include <cjson/cJSON.h>
+#endif
 
 gateway_t* gateway_http_create(const char* host, uint16_t port) {
     return http_gateway_create(host, port);
@@ -66,6 +70,7 @@ int gateway_get_stats(gateway_t* gw, char** out_json) {
 
     double uptime_seconds = difftime(time(NULL), g_gateway_stats.start_time);
 
+#ifdef AGENTOS_HAS_CJSON
     cJSON* stats = cJSON_CreateObject();
     cJSON_AddStringToObject(stats, "status", g_gateway_stats.running ? "running" : "stopped");
     cJSON_AddNumberToObject(stats, "uptime_seconds", uptime_seconds);
@@ -74,6 +79,14 @@ int gateway_get_stats(gateway_t* gw, char** out_json) {
 
     *out_json = cJSON_PrintUnformatted(stats);
     cJSON_Delete(stats);
+#else
+    static char buf[256];
+    snprintf(buf, sizeof(buf),
+        "{\"status\":\"%s\",\"uptime_seconds\":%.1f,\"total_connections\":%llu,\"active_connections\":%llu}",
+        g_gateway_stats.running ? "running" : "stopped", uptime_seconds,
+        (unsigned long long)g_gateway_stats.total_connections, (unsigned long long)g_gateway_stats.active_connections);
+    *out_json = strdup(buf);
+#endif
     return 0;
 }
 
@@ -97,4 +110,11 @@ gateway_type_t gateway_get_type(gateway_t* gw) {
 const char* gateway_get_name(gateway_t* gw) {
     if (!gw || !gw->ops || !gw->ops->get_name) return "unknown";
     return gw->ops->get_name(gw->impl);
+}
+
+int gateway_register_endpoint(gateway_t* gw, const char* method, const char* path,
+                              gateway_endpoint_handler_t handler, void* user_data) {
+    if (!gw || !method || !path || !handler) return -1;
+    if (gw->type != GATEWAY_TYPE_HTTP) return -1;
+    return http_gateway_register_endpoint((http_gateway_t*)gw->impl, method, path, handler, user_data);
 }

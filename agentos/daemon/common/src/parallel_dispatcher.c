@@ -1,7 +1,8 @@
 #include "parallel_dispatcher.h"
 #include "ipc_service_bus.h"
 #include "platform.h"
-#include "include/memory_compat.h"
+#include "atomic_compat.h"
+#include "memory_compat.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -21,9 +22,9 @@ typedef struct {
     parallel_result_t* results;
     dispatch_context_t* contexts;
     size_t task_count;
-    volatile int completed_count;
-    volatile int error_count;
-    volatile int cancel_flag;
+    atomic_int completed_count;
+    atomic_int error_count;
+    atomic_int cancel_flag;
     parallel_complete_cb_t on_complete;
     void* cb_user_data;
     parallel_dispatcher_t* dispatcher;

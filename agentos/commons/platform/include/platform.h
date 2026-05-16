@@ -30,6 +30,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <compat.h>
 /* 注意：不在此处包含 <time.h>，因为项目的 corekern/include/time.h 会覆盖系统 time.h */
 /* 需要使用 time.h 定义的代码（如 clockid_t, CLOCK_MONOTONIC）应在 .c 文件中 */
 /* 在包含 platform.h 之前先包含系统的 <time.h> */
@@ -78,7 +79,9 @@ extern "C" {
 
 /* ==================== 内联函数 ==================== */
 #if defined(_WIN32) || defined(_WIN64)
+    #ifndef AGENTOS_INLINE
     #define AGENTOS_INLINE __forceinline
+    #endif
 #else
     #define AGENTOS_INLINE static inline __attribute__((always_inline))
 #endif
@@ -535,9 +538,8 @@ int agentos_get_sysinfo(agentos_sysinfo_t* info);
 
 #ifndef AGENTOS_ATOMIC_INT_T_DEFINED
 #define AGENTOS_ATOMIC_INT_T_DEFINED
-typedef struct {
-    volatile int value;
-} agentos_atomic_int_t;
+#include "atomic_compat.h"
+typedef atomic_int agentos_atomic_int_t;
 #endif
 
 int agentos_atomic_load(agentos_atomic_int_t* atomic);

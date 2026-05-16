@@ -139,7 +139,8 @@ int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
 
     SHA256_Final(hash_out, &sha256);
 #else
-    memset(hash_out, 0, 32);
+    fclose(f);
+    return CUPOLAS_SIG_ALGO_UNSUPPORTED;
 #endif
 
     fclose(f);
@@ -163,7 +164,7 @@ int cupolas_signature_verify_file(const char* file_path,
 
     *result = CUPOLAS_SIG_NO_SIGNATURE;
 
-    uint8_t hash[32];
+    uint8_t hash[32] = {0};
     int ret = cupolas_signature_compute_hash(file_path, hash);
     if (ret != CUPOLAS_SIG_OK) {
         return ret;
@@ -305,6 +306,8 @@ void cupolas_signature_free_signer_info(cupolas_signer_info_t* info) {
     free(info->subject_ou);
     free(info->issuer_cn);
     free(info->serial_number);
+    free(info->key_id);
+    free(info->algorithm);
     memset(info, 0, sizeof(cupolas_signer_info_t));
 }
 
@@ -370,7 +373,7 @@ int cupolas_signature_sign_file(const char* file_path,
         return CUPOLAS_SIG_INVALID;
     }
 
-    uint8_t hash[32];
+    uint8_t hash[32] = {0};
     int ret = cupolas_signature_compute_hash(file_path, hash);
     if (ret != CUPOLAS_SIG_OK) {
         return ret;

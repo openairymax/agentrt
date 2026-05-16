@@ -8,95 +8,20 @@
 # - svc_common.h: 服务框架接口
 # - ipc_client.c: IPC 客户端实现
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-svc-commons VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# 测试支持选项
 option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_COVERAGE "Build with code coverage" OFF)
 
-# 查找依赖
-find_package(Threads REQUIRED)
-
-# 使用与根项目一致的依赖查找方式
-# 在Windows上，PkgConfig通常不可用，使用find_package替代
-if(WIN32)
-    find_package(PkgConfig QUIET)
-else()
-    find_package(PkgConfig)
-endif()
-
-# libcurl查找
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(LIBCURL QUIET libcurl)
-endif()
-if(NOT LIBCURL_FOUND)
-    # 尝试使用CMake的find_package
-    find_package(CURL QUIET)
-    if(CURL_FOUND)
-        set(LIBCURL_FOUND TRUE)
-        set(LIBCURL_LIBRARIES ${CURL_LIBRARIES})
-        set(LIBCURL_INCLUDE_DIRS ${CURL_INCLUDE_DIRS})
-        message(STATUS "libcurl found via find_package")
-    else()
-        message(WARNING "libcurl not found, some network features may be limited")
-    endif()
-endif()
-
-# libyaml查找
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(YAML QUIET yaml-0.1)
-endif()
-if(NOT YAML_FOUND)
-    find_package(YAML QUIET)
-    if(YAML_FOUND)
-        message(STATUS "libyaml found via find_package")
-    else()
-        message(WARNING "libyaml not found, YAML functionality may be limited")
-    endif()
-endif()
-
-# cJSON查找
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(CJSON QUIET libcjson)
-endif()
-if(NOT CJSON_FOUND)
-    find_package(cJSON QUIET)
-    if(cJSON_FOUND)
-        set(CJSON_FOUND TRUE)
-        set(CJSON_LIBRARIES cjson)
-        set(CJSON_INCLUDE_DIRS ${cJSON_INCLUDE_DIRS})
-        message(STATUS "cJSON found via find_package")
-    else()
-        message(WARNING "cJSON not found, JSON functionality may be limited")
-    endif()
-endif()
-
-# ==================== 重要: 添加 commons 依赖 ====================
-# 设置 commons 路径
 set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../commons")
-
-# 检查 commons 是否存在
 if(NOT EXISTS "${COMMONS_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "commons module not found at ${COMMONS_DIR}. Please ensure commons is available.")
 endif()
-
-# 包含 commons 目录（如果作为子项目构建）
 if(NOT TARGET agentos_common)
     add_subdirectory(${COMMONS_DIR} ${CMAKE_BINARY_DIR}/commons)
 endif()
-
-# ==================== daemon 特有源文件 ====================
-# 只保留 daemon 特有的实现文件
-# 已迁移到 commons:
-# - error.c -> agentos/commons/utils/error
-# - platform.c -> agentos/commons/platform
-# - logger.c -> agentos/commons/utils/logging
-# - config.c -> agentos/commons/utils/config_unified
-# - svc_cache.c -> agentos/commons/utils/cache
 
 set(ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../atoms")
 
@@ -124,6 +49,7 @@ set(SVC_COMMON_SOURCES
     src/orchestrator.c        # 流程编排器
     src/thread_pool.c         # 工作线程池
     src/parallel_dispatcher.c # 工具并行执行引擎
+    src/checkpoint.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/metacognition.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/confidence_calibrator.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/thinking_chain.c
@@ -139,8 +65,11 @@ add_library(svc_common STATIC ${SVC_COMMON_SOURCES})
 find_package(OpenSSL QUIET)
 target_link_libraries(svc_common PUBLIC
     agentos_common
-    ${OPENSSL_CRYPTO_LIBRARY}
+    agentos_compile_defs
 )
+if(OpenSSL_FOUND)
+    target_link_libraries(svc_common PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
+endif()
 
 # 平台特定配置
 if(WIN32)
@@ -165,7 +94,7 @@ elseif(UNIX)
     )
     target_link_libraries(svc_common PRIVATE
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
 endif()
 
@@ -177,6 +106,8 @@ target_include_directories(svc_common PUBLIC
 
 # 包含 commons 的头文件目录
 target_include_directories(svc_common PUBLIC
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/compat/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}>
     $<BUILD_INTERFACE:${COMMONS_DIR}/platform/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/error/include>
@@ -189,8 +120,6 @@ target_include_directories(svc_common PUBLIC
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/io/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/types/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/cache/include>
-    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/compat/include>
-    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/include>
     # 新增网络和IPC模块
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/network/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/ipc/include>
@@ -201,32 +130,34 @@ target_include_directories(svc_common PUBLIC
     $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/src/cognition>
     $<BUILD_INTERFACE:${ATOMS_DIR}/memory>
 )
-if(LIBCURL_FOUND)
+if(AGENTOS_HAS_CURL)
     target_compile_definitions(svc_common PUBLIC AGENTOS_HAS_CURL)
-    target_include_directories(svc_common PRIVATE ${LIBCURL_INCLUDE_DIRS})
+    if(CURL_FOUND)
+        target_include_directories(svc_common PRIVATE ${CURL_INCLUDE_DIRS})
+        target_link_libraries(svc_common PUBLIC ${CURL_LIBRARIES})
+    elseif(LIBCURL_FOUND)
+        target_include_directories(svc_common PRIVATE ${LIBCURL_INCLUDE_DIRS})
+        target_link_libraries(svc_common PUBLIC ${LIBCURL_LIBRARIES})
+    endif()
 endif()
-if(YAML_FOUND)
+if(AGENTOS_HAS_YAML AND YAML_FOUND)
     target_include_directories(svc_common PRIVATE ${YAML_INCLUDE_DIRS})
-endif()
-if(CJSON_FOUND)
-    target_include_directories(svc_common PRIVATE ${CJSON_INCLUDE_DIRS})
-endif()
-
-# 链接外部库
-target_link_libraries(svc_common PUBLIC Threads::Threads)
-
-if(LIBCURL_FOUND)
-    target_link_libraries(svc_common PUBLIC ${LIBCURL_LIBRARIES})
-endif()
-if(YAML_FOUND)
     target_link_libraries(svc_common PUBLIC ${YAML_LIBRARIES})
 endif()
-if(CJSON_FOUND)
-    target_link_libraries(svc_common PUBLIC ${CJSON_LIBRARIES})
+if(AGENTOS_HAS_CJSON)
+    if(cJSON_FOUND)
+        target_link_libraries(svc_common PUBLIC cjson)
+    elseif(CJSON_FOUND)
+        target_include_directories(svc_common PRIVATE ${CJSON_INCLUDE_DIRS})
+        target_link_libraries(svc_common PUBLIC ${CJSON_LIBRARIES})
+    endif()
 endif()
+
+target_link_libraries(svc_common PUBLIC Threads::Threads)
 
 # 编译选项
 if(BUILD_COVERAGE)
+    if(NOT MSVC)
     target_compile_options(svc_common PRIVATE
         -Wall
         -Wextra
@@ -239,7 +170,9 @@ if(BUILD_COVERAGE)
     target_link_options(svc_common PRIVATE
         --coverage
     )
+    endif()
 else()
+    if(NOT MSVC)
     target_compile_options(svc_common PRIVATE
         -Wall
         -Wextra
@@ -249,6 +182,7 @@ else()
         $<$<CONFIG:Debug>:-g -O0>
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
     )
+    endif()
 endif()
 
 # 导出符号

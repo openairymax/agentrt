@@ -216,8 +216,8 @@ int cupolas_check_permission(const char* agent_id, const char* action,
     if (result > 0 && cupolas_guards_is_enabled()) {
         guard_manager_t* guard_manager = cupolas_guards_get_manager();
         if (guard_manager) {
-            const size_t max_results = 8;
-            guard_result_t results[max_results];
+            #define MAX_RESULTS 8
+            guard_result_t results[MAX_RESULTS];
             size_t actual_results = 0;
 
             guard_context_t guard_ctx = {
@@ -232,7 +232,7 @@ int cupolas_check_permission(const char* agent_id, const char* action,
             };
 
             int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
-                                                   results, max_results, &actual_results);
+                                                   results, MAX_RESULTS, &actual_results);
             if (guard_ret == 0) {
                 for (size_t i = 0; i < actual_results; i++) {
                     guard_result_t* gr = &results[i];
@@ -297,8 +297,8 @@ int cupolas_sanitize_input(const char* input, char* output, size_t output_size) 
     if (result == SANITIZE_OK && cupolas_guards_is_enabled()) {
         guard_manager_t* guard_manager = cupolas_guards_get_manager();
         if (guard_manager) {
-            const size_t max_results = 8;
-            guard_result_t results[max_results];
+            #define MAX_RESULTS 8
+            guard_result_t results[MAX_RESULTS];
             size_t actual_results = 0;
 
             guard_context_t guard_ctx = {
@@ -313,7 +313,7 @@ int cupolas_sanitize_input(const char* input, char* output, size_t output_size) 
             };
 
             int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
-                                                   results, max_results, &actual_results);
+                                                   results, MAX_RESULTS, &actual_results);
             if (guard_ret == 0) {
                 for (size_t i = 0; i < actual_results; i++) {
                     guard_result_t* gr = &results[i];
@@ -369,8 +369,8 @@ int cupolas_execute_command(const char* command, char* const argv[],
                 }
             }
 
-            const size_t max_results = 8;
-            guard_result_t results[max_results];
+            #define MAX_RESULTS 8
+            guard_result_t results[MAX_RESULTS];
             size_t actual_results = 0;
 
             guard_context_t guard_ctx = {
@@ -385,7 +385,7 @@ int cupolas_execute_command(const char* command, char* const argv[],
             };
 
             int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
-                                                   results, max_results, &actual_results);
+                                                   results, MAX_RESULTS, &actual_results);
             if (guard_ret == 0) {
                 for (size_t i = 0; i < actual_results; i++) {
                     guard_result_t* gr = &results[i];

@@ -9,35 +9,16 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
+#include "atomic_compat.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 
 /* ==================== 静态全局状态 ==================== */
 
-/** @brief 调度器核心上下文（单例） */
 static scheduler_core_ctx_t* g_core_ctx = NULL;
 
-/** @brief 上下文初始化锁（用于双重检查锁定） */
 static void* g_ctx_init_lock = NULL;
-
-#ifdef _WIN32
-static inline void atomic_store_int(volatile int* ptr, int val) {
-    InterlockedExchange((volatile LONG*)ptr, (LONG)val);
-}
-static inline int atomic_load_int(volatile int* ptr) {
-    return (int)InterlockedCompareExchange((volatile LONG*)ptr, 0, 0);
-}
-#define atomic_init_int(ptr, val) (*(ptr) = (val))
-#else
-#define atomic_init_int(ptr, val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
-static inline void atomic_store_int(volatile int* ptr, int val) {
-    __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
-}
-static inline int atomic_load_int(volatile int* ptr) {
-    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
-}
-#endif
 
 /* ==================== 内部辅助函数 ==================== */
 
@@ -56,7 +37,7 @@ static scheduler_core_ctx_t* create_core_ctx(void) {
     }
 
     /* 初始化原子状态 */
-    atomic_init_int(&ctx->initialized, 0);
+    atomic_init(&ctx->initialized, 0);
     ctx->next_task_id = 1;
     ctx->task_count = 0;
 
@@ -103,7 +84,7 @@ scheduler_core_ctx_t* scheduler_core_get_ctx(void) {
 }
 
 int scheduler_core_init(void) {
-    if (__atomic_load_n(&g_core_ctx, __ATOMIC_ACQUIRE)) {
+    if (atomic_load_ptr((void* volatile*)&g_core_ctx, memory_order_acquire)) {
         return 0;
     }
 
@@ -112,19 +93,16 @@ int scheduler_core_init(void) {
         if (!new_lock) return -1;
 
         void* expected = NULL;
-#ifdef _WIN32
-        if (!atomic_compare_exchange_strong_ptr(&g_ctx_init_lock, &expected, new_lock, memory_order_seq_cst, memory_order_seq_cst)) {
-#else
-        if (!__atomic_compare_exchange_n(&g_ctx_init_lock, &expected, new_lock,
-                                         0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
-#endif
+        if (!atomic_compare_exchange_strong_ptr(
+                (void* volatile*)&g_ctx_init_lock, &expected, new_lock,
+                memory_order_seq_cst, memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
     }
 
     agentos_mutex_lock(g_ctx_init_lock);
 
-    if (__atomic_load_n(&g_core_ctx, __ATOMIC_ACQUIRE)) {
+    if (atomic_load_ptr((void* volatile*)&g_core_ctx, memory_order_acquire)) {
         agentos_mutex_unlock(g_ctx_init_lock);
         return 0;
     }
@@ -135,8 +113,8 @@ int scheduler_core_init(void) {
         return -1;
     }
 
-    atomic_store_int(&g_core_ctx->initialized, 1);
-    __atomic_thread_fence(__ATOMIC_RELEASE);
+    atomic_store_explicit(&g_core_ctx->initialized, 1, memory_order_release);
+    atomic_thread_fence(memory_order_release);
 
     agentos_mutex_unlock(g_ctx_init_lock);
     return 0;
@@ -157,17 +135,12 @@ void scheduler_core_destroy(void) {
 }
 
 int scheduler_core_is_initialized(void) {
-    return g_core_ctx && (atomic_load_int(&g_core_ctx->initialized) == 1);
+    return g_core_ctx && (atomic_load_explicit(&g_core_ctx->initialized, memory_order_acquire) == 1);
 }
 
 uint64_t scheduler_core_fetch_add_task_id(void) {
     if (!g_core_ctx) return 0;
-
-#ifdef _WIN32
-    return (uint64_t)InterlockedExchangeAdd64((volatile LONGLONG*)&g_core_ctx->next_task_id, 1);
-#else
-    return __atomic_fetch_add(&g_core_ctx->next_task_id, 1, __ATOMIC_SEQ_CST);
-#endif
+    return atomic_fetch_add_explicit(&g_core_ctx->next_task_id, 1, memory_order_seq_cst);
 }
 
 void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t* info) {
