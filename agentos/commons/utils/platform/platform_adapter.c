@@ -40,7 +40,7 @@
     #define PLATFORM_SLASH '/'
 #endif
 
-#include "include/platform_adapter.h"
+#include "platform_adapter.h"
 
 /* 确保系统头文件声明在项目头文件之后仍然可用 */
 #include <string.h>

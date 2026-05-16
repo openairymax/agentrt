@@ -2,6 +2,7 @@
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "atomic_compat.h"
 #include "platform.h"
 #include "error.h"
 #include "svc_logger.h"
@@ -44,9 +45,9 @@ typedef struct {
     agentos_socket_t server_fd;
     agentos_mutex_t lock;
     agentos_thread_t collect_thread;
-    volatile int running;
-    volatile int collect_running;
-    volatile int force_stop;
+    atomic_int running;
+    atomic_int collect_running;
+    atomic_int force_stop;
     uint64_t start_time;
     uint64_t request_count;
     uint64_t error_count;
@@ -60,12 +61,12 @@ typedef struct {
 } info_d_service_t;
 
 static info_d_service_t g_service = {0};
-static volatile int g_shutdown = 0;
+static atomic_int g_shutdown = 0;
 static agentos_event_loop_t* g_event_loop = NULL;
 
 static void info_d_signal_handler(int sig) {
     (void)sig;
-    g_shutdown = 1;
+    atomic_store_explicit(&g_shutdown, 1, memory_order_seq_cst);
     if (g_event_loop) agentos_event_loop_stop(g_event_loop);
 }
 

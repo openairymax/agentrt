@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 端到端集成测试 (TeamC P2-C01)
 # 覆盖: corekern+daemon+syscall 跨模块联动
@@ -28,17 +27,13 @@ target_link_libraries(test_e2e_core PRIVATE
     agentos_syscall
     svc_common
     Threads::Threads
-    rt
+    agentos_platform_libs
     m
 )
 
 find_package(cjson QUIET)
 if(TARGET cjson OR cjson_FOUND)
     target_link_libraries(test_e2e_core PRIVATE cjson)
-endif()
-
-if(UNIX AND NOT APPLE)
-    target_link_options(test_e2e_core PRIVATE -Wl,--allow-multiple-definition)
 endif()
 
 target_compile_features(test_e2e_core PRIVATE c_std_11)

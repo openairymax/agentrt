@@ -17,7 +17,12 @@
 
 #include <string.h>
 #include <stdlib.h>
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
+#else
+struct cJSON;
+typedef struct cJSON cJSON;
+#endif
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"

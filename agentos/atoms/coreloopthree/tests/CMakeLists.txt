@@ -1,7 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # CoreLoopThree 测试套件构建文件
 
-cmake_minimum_required(VERSION 3.20)
 
 set(CORELOOPTHREE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons)
@@ -73,18 +72,14 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
     )
 
     if(UNIX)
-        target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE rt)
+        target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE agentos_platform_libs)
     endif()
 
     target_compile_options(test_cl3_${TEST_SHORT_NAME} PRIVATE
         -Wall -Wextra -g -Wno-unused-function
     )
 
-    if(UNIX)
-        target_link_options(test_cl3_${TEST_SHORT_NAME} PRIVATE
-            -Wl,--allow-multiple-definition
-        )
-    endif()
+    target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE agentos_test_ldflags)
 
     add_test(NAME cl3_${TEST_SHORT_NAME} COMMAND test_cl3_${TEST_SHORT_NAME})
 endforeach()
@@ -118,18 +113,14 @@ foreach(BENCH_SRC ${CL3_BENCH_SOURCES})
     )
 
     if(UNIX)
-        target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE rt)
+        target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE agentos_platform_libs)
     endif()
 
     target_compile_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
         -Wall -Wextra -g -Wno-unused-function
     )
 
-    if(UNIX)
-        target_link_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
-            -Wl,--allow-multiple-definition
-        )
-    endif()
+    target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE agentos_test_ldflags)
 
     add_test(NAME cl3_${BENCH_SHORT_NAME} COMMAND test_cl3_${BENCH_SHORT_NAME})
 endforeach()

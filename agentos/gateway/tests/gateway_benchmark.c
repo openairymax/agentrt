@@ -42,6 +42,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <unistd.h>
+#include <stdatomic.h>
 
 #ifdef USE_CURL
 #include <curl/curl.h>
@@ -92,10 +93,10 @@ typedef struct {
     int warmup_count;
     int verbose;
 
-    volatile int running;
-    volatile int completed_requests;
-    volatile int success_count;
-    volatile int error_count;
+    atomic_int running;
+    atomic_int completed_requests;
+    atomic_int success_count;
+    atomic_int error_count;
     
     struct timeval start_time;
     struct timeval end_time;

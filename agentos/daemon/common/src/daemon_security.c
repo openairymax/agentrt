@@ -498,7 +498,7 @@ int daemon_security_get_status(int* sanitizer_status, int* permission_status,
 #include <time.h>
 #include <ctype.h>
 #include <sys/stat.h>
-#include <dirent.h>
+#include "agentos_dirent.h"
 #include "cupolas_vault_cred_type.h"
 #include "cupolas_signer_info.h"
 
@@ -541,8 +541,8 @@ static struct {
     FILE* audit_fp;
     char audit_log_path[256];
 } g_security_ctx = {
-    {false, SANITIZE_LEVEL_NORMAL, true, true, true, true},
-    {{0}}, 0, {{0}}, 0, NULL, {0}
+    false, SANITIZE_LEVEL_NORMAL, true, true, true, true,
+    {0}, 0, {0}, 0, NULL, {0}
 };
 
 static const char* DANGEROUS_PATTERNS[] = {
@@ -823,7 +823,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
         return AGENTOS_OK;
     }
 
-    uint8_t signature[256];
+    uint8_t signature[256] = {0};
     size_t sig_len = fread(signature, 1, sizeof(signature), sig_fp);
     fclose(sig_fp);
 
@@ -921,7 +921,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
                 if (id_len >= sizeof(signer_info->key_id)) id_len = sizeof(signer_info->key_id) - 1;
                 memcpy(signer_info->key_id, entry->d_name, id_len);
                 signer_info->key_id[id_len] = '\0';
-                signer_info->algorithm = 6;
+                signer_info->algorithm = strdup("ED25519");
             }
             SVC_LOG_INFO("Package signature VERIFIED (ED25519): %s with key %s",
                         package_path, entry->d_name);

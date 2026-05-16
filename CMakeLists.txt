@@ -144,11 +144,190 @@ endif()
 
 # 查找必需的系统依赖
 if(WIN32)
-    # Windows平台线程支持
     message(STATUS "Using Windows built-in thread support")
 else()
     find_package(Threads REQUIRED)
     message(STATUS "Threads found: ${CMAKE_THREAD_LIBS_INIT}")
+endif()
+
+# ============================================================
+# 集中化第三方依赖检测（BAN-12: 单一依赖检测点）
+# 所有子模块通过 target_link_libraries 获取依赖，
+# 禁止在子模块中重复 find_package / pkg_check_modules
+# ============================================================
+find_package(PkgConfig QUIET)
+
+# --- SQLite3 ---
+find_package(SQLite3 QUIET)
+if(NOT SQLite3_FOUND AND PkgConfig_FOUND)
+    pkg_check_modules(SQLITE3 QUIET sqlite3)
+endif()
+if(NOT SQLite3_FOUND AND NOT SQLITE3_FOUND)
+    find_path(_SQLITE3_INCLUDE_DIR sqlite3.h)
+    find_library(_SQLITE3_LIBRARY sqlite3)
+    if(_SQLITE3_INCLUDE_DIR AND _SQLITE3_LIBRARY)
+        set(SQLite3_INCLUDE_DIRS ${_SQLITE3_INCLUDE_DIR})
+        set(SQLite3_LIBRARIES ${_SQLITE3_LIBRARY})
+        set(SQLite3_FOUND TRUE)
+    endif()
+endif()
+if(SQLite3_FOUND OR SQLITE3_FOUND)
+    set(AGENTOS_HAS_SQLITE3 TRUE CACHE BOOL "SQLite3 available")
+    message(STATUS "SQLite3 found: ${SQLite3_LIBRARIES}${SQLITE3_LIBRARIES}")
+else()
+    set(AGENTOS_HAS_SQLITE3 FALSE CACHE BOOL "SQLite3 available")
+    message(STATUS "SQLite3 not found, registry/vector-store features disabled")
+endif()
+
+# --- cJSON ---
+find_package(cJSON QUIET)
+if(NOT cJSON_FOUND AND PkgConfig_FOUND)
+    pkg_check_modules(CJSON QUIET libcjson)
+endif()
+if(cJSON_FOUND OR CJSON_FOUND)
+    set(AGENTOS_HAS_CJSON TRUE CACHE BOOL "cJSON available")
+    message(STATUS "cJSON found: ${cJSON_VERSION}${CJSON_VERSION}")
+else()
+    set(AGENTOS_HAS_CJSON FALSE CACHE BOOL "cJSON available")
+    message(STATUS "cJSON not found, JSON features disabled")
+endif()
+
+# --- libyaml ---
+find_package(YAML QUIET)
+if(NOT YAML_FOUND AND PkgConfig_FOUND)
+    pkg_check_modules(YAML QUIET yaml-0.1)
+endif()
+if(NOT YAML_FOUND AND PkgConfig_FOUND)
+    pkg_check_modules(YAML QUIET libyaml)
+endif()
+if(YAML_FOUND)
+    set(AGENTOS_HAS_YAML TRUE CACHE BOOL "libyaml available")
+    message(STATUS "libyaml found: ${YAML_LIBRARIES}")
+else()
+    set(AGENTOS_HAS_YAML FALSE CACHE BOOL "libyaml available")
+    message(STATUS "libyaml not found, YAML config features disabled")
+endif()
+
+# --- OpenSSL ---
+find_package(OpenSSL QUIET)
+if(OpenSSL_FOUND)
+    set(AGENTOS_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available")
+    message(STATUS "OpenSSL found: ${OpenSSL_VERSION}")
+else()
+    set(AGENTOS_HAS_OPENSSL FALSE CACHE BOOL "OpenSSL available")
+    message(STATUS "OpenSSL not found, crypto features disabled")
+endif()
+
+# --- libcurl ---
+find_package(CURL QUIET)
+if(NOT CURL_FOUND AND PkgConfig_FOUND)
+    pkg_check_modules(LIBCURL QUIET libcurl)
+endif()
+if(CURL_FOUND OR LIBCURL_FOUND)
+    set(AGENTOS_HAS_CURL TRUE CACHE BOOL "libcurl available")
+    message(STATUS "libcurl found: ${CURL_LIBRARIES}${LIBCURL_LIBRARIES}")
+else()
+    set(AGENTOS_HAS_CURL FALSE CACHE BOOL "libcurl available")
+    message(STATUS "libcurl not found, HTTP client features disabled")
+endif()
+
+# --- libmicrohttpd ---
+find_package(libmicrohttpd QUIET)
+if(NOT libmicrohttpd_FOUND AND PkgConfig_FOUND)
+    pkg_check_modules(MICROHTTPD QUIET libmicrohttpd)
+endif()
+if(libmicrohttpd_FOUND OR MICROHTTPD_FOUND)
+    set(AGENTOS_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available")
+    message(STATUS "libmicrohttpd found")
+else()
+    set(AGENTOS_HAS_MICROHTTPD FALSE CACHE BOOL "libmicrohttpd available")
+    message(STATUS "libmicrohttpd not found, HTTP gateway may be limited")
+endif()
+
+# --- libwebsockets ---
+find_package(libwebsockets QUIET)
+if(NOT libwebsockets_FOUND AND PkgConfig_FOUND)
+    pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
+endif()
+if(libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
+    set(AGENTOS_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available")
+    message(STATUS "libwebsockets found")
+else()
+    set(AGENTOS_HAS_LIBWEBSOCKETS FALSE CACHE BOOL "libwebsockets available")
+    message(STATUS "libwebsockets not found, WebSocket features disabled")
+endif()
+
+# --- libevent ---
+find_package(libevent CONFIG QUIET)
+if(NOT libevent_FOUND AND PkgConfig_FOUND)
+    pkg_check_modules(LIBEVENT QUIET libevent)
+endif()
+if(libevent_FOUND OR LIBEVENT_FOUND)
+    set(AGENTOS_HAS_LIBEVENT TRUE CACHE BOOL "libevent available")
+    message(STATUS "libevent found")
+else()
+    set(AGENTOS_HAS_LIBEVENT FALSE CACHE BOOL "libevent available")
+    message(STATUS "libevent not found, event-loop features disabled")
+endif()
+
+# --- GTest ---
+if(BUILD_TESTS)
+    find_package(GTest QUIET)
+    if(GTest_FOUND)
+        set(AGENTOS_HAS_GTEST TRUE CACHE BOOL "GTest available")
+        message(STATUS "GTest found: ${GTEST_LIBRARIES}")
+    else()
+        set(AGENTOS_HAS_GTEST FALSE CACHE BOOL "GTest available")
+        message(STATUS "GTest not found, tests will use custom framework")
+    endif()
+endif()
+
+# 创建 INTERFACE 库用于传递全局依赖编译定义
+add_library(agentos_compile_defs INTERFACE)
+if(AGENTOS_HAS_SQLITE3)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_SQLITE3)
+endif()
+if(AGENTOS_HAS_CJSON)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_CJSON)
+endif()
+if(AGENTOS_HAS_YAML)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_YAML)
+endif()
+if(AGENTOS_HAS_OPENSSL)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_OPENSSL)
+endif()
+if(AGENTOS_HAS_CURL)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_CURL)
+endif()
+if(AGENTOS_HAS_MICROHTTPD)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_MICROHTTPD)
+endif()
+if(AGENTOS_HAS_LIBWEBSOCKETS)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_LIBWEBSOCKETS)
+endif()
+if(AGENTOS_HAS_LIBEVENT)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_LIBEVENT)
+endif()
+
+# ============================================================
+# 跨平台系统库统一管理（BAN-15: 禁止硬编码平台库）
+# agentos_platform_libs, dl, pthread, m, ws2_32 等通过此 INTERFACE 库统一提供
+# ============================================================
+add_library(agentos_platform_libs INTERFACE)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(agentos_platform_libs INTERFACE agentos_platform_libs dl)
+endif()
+if(WIN32)
+    target_link_libraries(agentos_platform_libs INTERFACE ws2_32)
+endif()
+
+# ============================================================
+# 测试链接选项统一管理（BAN-26: 禁止硬编码链接器标志）
+# --allow-multiple-definition 仅在 Linux/GNU ld 下有效
+# ============================================================
+add_library(agentos_test_ldflags INTERFACE)
+if(UNIX AND NOT APPLE)
+    target_link_options(agentos_test_ldflags INTERFACE -Wl,--allow-multiple-definition)
 endif()
 
 # 包含子目录
@@ -159,6 +338,7 @@ if(AGENTOS_BUILD_ALL)
     include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons
         ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/compat/include
         ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/memory/include
         ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/string/include
         ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/logging/include

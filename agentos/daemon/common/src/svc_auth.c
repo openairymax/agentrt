@@ -98,7 +98,7 @@ static int base64_encode(const uint8_t* data, size_t len,
     if (*out_len < needed + 1) return AGENTOS_ERR_INVALID_PARAM;
 
     size_t i = 0, j = 0;
-    uint8_t arr3[3], arr4[4];
+    uint8_t arr3[3] = {0}, arr4[4] = {0};
 
     while (i < len) {
         arr3[0] = (i < len) ? data[i++] : 0;
@@ -147,9 +147,12 @@ static void hmac_openssl(const char* key, const char* message,
                         uint8_t* output, size_t* out_len) {
     unsigned int len = 0;
     unsigned int max_len = (unsigned int)(*out_len);
-    HMAC(EVP_sha256(), (const unsigned char*)key, (int)strlen(key),
-         (const unsigned char*)message, strlen(message),
-         output, &len);
+    if (HMAC(EVP_sha256(), (const unsigned char*)key, (int)strlen(key),
+             (const unsigned char*)message, strlen(message),
+             output, &len) == NULL) {
+        *out_len = 0;
+        return;
+    }
     *out_len = (size_t)(len < max_len ? len : max_len);
 }
 #define HMAC_IMPL_NAME "OpenSSL"
@@ -235,7 +238,7 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
     }
 
     for (size_t chunk = 0; chunk < new_len / 64; chunk++) {
-        uint32_t w[64];
+        uint32_t w[64]; memset(w, 0, sizeof(w));
         for (int i = 0; i < 16; i++) {
             w[i] = ((uint32_t)msg[chunk*64+i*4]<<24) |
                    ((uint32_t)msg[chunk*64+i*4+1]<<16) |
@@ -257,8 +260,7 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
     }
 
     free(msg);
-
-    /* HMAC-SHA256: H(K XOR opad || H(K XOR ipad || message)) */
+    msg = NULL;
     size_t key_len = strlen(key);
     unsigned char k_ipad[64], k_opad[64];
 
@@ -345,6 +347,10 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
     size_t olen = 64 + 32;
     size_t outer_padded = ((olen + 8) / 64 + 1) * 64;
     unsigned char* outer = calloc(outer_padded + 64, 1);
+    if (!outer) {
+        free(inner);
+        return;
+    }
     memcpy(outer, k_opad, 64);
     for (int i = 0; i < 8; i++) {
         outer[64+i*4]=(ih[i]>>24)&0xFF; outer[64+i*4+1]=(ih[i]>>16)&0xFF;
@@ -478,14 +484,23 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
     if (!sign_input) { free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     snprintf(sign_input, sign_input_size, "%s.%s", header_b64, payload_b64);
 
-    uint8_t hmac_output[32];
+    uint8_t hmac_output[32] = {0};
     size_t hmac_len = sizeof(hmac_output);
     g_hmac_impl(g_jwt.config.secret, sign_input, hmac_output, &hmac_len);
+    if (hmac_len == 0) {
+        free(sign_input); free(payload_b64);
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    }
 
     size_t sig_b64_size = 128;
     char* sig_b64 = (char*)malloc(sig_b64_size);
     if (!sig_b64) { free(sign_input); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
-    base64_encode(hmac_output, hmac_len, sig_b64, &sig_b64_size);
+    if (base64_encode(hmac_output, hmac_len, sig_b64, &sig_b64_size) != AGENTOS_SUCCESS) {
+        free(sign_input); free(sig_b64); free(payload_b64);
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    }
 
     /* 组合 Token */
     size_t token_size = sign_input_size + sig_b64_size + 10;
@@ -525,6 +540,10 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     /* 解析 Payload */
     size_t payload_len = (size_t)(dot2 - dot1 - 1);
     char* payload_b64 = (char*)malloc(payload_len + 1);
+    if (!payload_b64) {
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    }
     strncpy(payload_b64, dot1 + 1, payload_len);
     payload_b64[payload_len] = '\0';
 
@@ -655,10 +674,15 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         }
 
         size_t expected_sig_len = 32;
-        uint8_t computed_hmac[32];
+        uint8_t computed_hmac[32] = {0};
         g_hmac_impl(g_jwt.config.secret, sig_input, computed_hmac, &expected_sig_len);
-        for(size_t _d=0;_d<expected_sig_len&&_d<8;_d++) fprintf(stderr,"%02x",computed_hmac[_d]);
-        fprintf(stderr,"...\n");
+        if (expected_sig_len == 0) {
+            free(sig_input); free(sig_b64);
+            result->error_message = "HMAC computation failed";
+            cJSON_Delete(payload);
+            agentos_mutex_unlock(&g_jwt.lock);
+            return AUTH_TOKEN_INVALID;
+        }
 
         size_t sig_padded_len = sig_b64_len + ((4 - (sig_b64_len % 4)) % 4);
         char* sig_padded = (char*)malloc(sig_padded_len + 1);
@@ -785,6 +809,11 @@ int auth_apikey_init(const apikey_config_t* config) {
         memset(&g_apikey.config, 0, sizeof(apikey_config_t));
         g_apikey.capacity = 10;
         g_apikey.keys = (char**)calloc(g_apikey.capacity, sizeof(*g_apikey.keys));
+        if (!g_apikey.keys) {
+            g_apikey.capacity = 0;
+            agentos_mutex_unlock(&g_apikey.lock);
+            return AUTH_FAILED;
+        }
     }
 
     g_apikey.initialized = 1;

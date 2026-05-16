@@ -171,7 +171,10 @@ int platform_spinlock_destroy(platform_spinlock_t* spinlock) {
 
 int platform_spinlock_lock(platform_spinlock_t* spinlock) {
 #ifdef _WIN32
-    while (InterlockedCompareExchange(spinlock, 1, 0) != 0) {
+    int expected = 0;
+    while (!atomic_compare_exchange_strong_explicit(spinlock, &expected, 1,
+                                                     memory_order_acquire, memory_order_relaxed)) {
+        expected = 0;
         SwitchToThread();
     }
     return 0;
@@ -182,7 +185,7 @@ int platform_spinlock_lock(platform_spinlock_t* spinlock) {
 
 int platform_spinlock_unlock(platform_spinlock_t* spinlock) {
 #ifdef _WIN32
-    InterlockedExchange(spinlock, 0);
+    atomic_store_explicit(spinlock, 0, memory_order_release);
     return 0;
 #else
     return pthread_spin_unlock(spinlock);
