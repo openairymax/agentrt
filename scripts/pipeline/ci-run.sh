@@ -12,7 +12,7 @@ set -euo pipefail
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-LIB_DIR="${SCRIPT_DIR}/../lib"
+LIB_DIR="${SCRIPT_DIR}/../library"
 CI_DIR="${SCRIPT_DIR}"
 
 ###############################################################################
