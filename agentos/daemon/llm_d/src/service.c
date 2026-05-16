@@ -198,6 +198,8 @@ llm_service_t* llm_service_create(const char* config_path) {
         char* yaml_content = (char*)malloc((size_t)yaml_len + 1);
         if (yaml_content) {
             size_t read_len = fread(yaml_content, 1, (size_t)yaml_len, f);
+            if (read_len != (size_t)yaml_len) { free(yaml_content); yaml_content = NULL; }
+            if (yaml_content) {
             yaml_content[read_len] = '\0';
             
             cJSON* root = cJSON_Parse(yaml_content);
@@ -214,6 +216,7 @@ llm_service_t* llm_service_create(const char* config_path) {
                 cJSON_Delete(root);
             } else {
                 SVC_LOG_WARN("Failed to parse pricing rules from manager");
+            }
             }
             free(yaml_content);
         } else {
@@ -551,6 +554,7 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     }
     
     size_t read_len = fread(content, 1, (size_t)len, f);
+    if (read_len != (size_t)len) { free(content); fclose(f); return AGENTOS_ERR_IO; }
     content[read_len] = '\0';
     fclose(f);
     

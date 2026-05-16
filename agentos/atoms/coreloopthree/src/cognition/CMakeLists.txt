@@ -1,18 +1,36 @@
-# Copyright (c) 2026 SPHARX. All Rights Reserved.
-# 认知层构建文件
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-cognition)
-
-file(GLOB COGNITION_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/planner/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/coordinator/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/dispatcher/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../memory/engine.c"
+add_library(agentos_cognition STATIC
+    engine.c
+    intent_parser.c
+    intent_classifier.c
+    intent_utils.c
+    entity_extractor.c
+    context_processor.c
+    delegate.c
+    multi_agent_collaboration.c
+    confidence_calibrator.c
+    cognitive_evolution.c
+    triple_coordinator.c
+    metacognition.c
+    semantic_unit.c
+    thinking_chain.c
+    stream_critic.c
+    parallel_dispatcher.c
+    planner/reactive.c
+    planner/hierarchical.c
+    planner/reflective.c
+    planner/ml_planner.c
+    coordinator/arbiter.c
+    coordinator/majority.c
+    coordinator/weighted.c
+    coordinator/dual_model.c
+    coordinator/coordinator_adapter.c
+    dispatcher/round_robin.c
+    dispatcher/priority.c
+    dispatcher/weighted.c
+    dispatcher/ml_based.c
+    ../memory/engine.c
 )
-
-add_library(agentos_cognition STATIC ${COGNITION_SOURCES})
 
 target_include_directories(agentos_cognition PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -28,6 +46,12 @@ target_link_libraries(agentos_cognition
     agentos_memory
     m
 )
+
+if(AGENTOS_CJSON_FOUND)
+    target_compile_definitions(agentos_cognition PRIVATE AGENTOS_HAS_CJSON=1)
+    target_include_directories(agentos_cognition PRIVATE ${AGENTOS_CJSON_INCLUDE_DIRS})
+    target_link_libraries(agentos_cognition ${AGENTOS_CJSON_LIBRARIES})
+endif()
 
 if(WIN32)
     target_compile_options(agentos_cognition PRIVATE /W3 /O2)

@@ -22,7 +22,8 @@ extern "C" {
 /* ==================== 兼容模式定义 ==================== */
 
 typedef enum {
-    COMPAT_MODE_NONE = 0,          // 无兼容模�?    COMPAT_MODE_AGENTOS_CONFIG = 1, // 兼容 agentos_config_* API
+    COMPAT_MODE_NONE = 0,          // 无兼容模�
+    COMPAT_MODE_AGENTOS_CONFIG = 1, // 兼容 agentos_config_* API
     COMPAT_MODE_SVC_CONFIG = 2,    // 兼容 svc_config_* API
     COMPAT_MODE_MIXED = 3          // 混合兼容模式
 } config_compat_mode_t;
@@ -31,15 +32,19 @@ typedef enum {
 
 typedef struct {
     config_compat_mode_t mode;     // 兼容模式
-    bool auto_init;                // 是否自动初始�?    bool lazy_load;                // 是否延迟加载
+    bool auto_init;                // 是否自动初始�
+    bool lazy_load;                // 是否延迟加载
     const char* default_config_path; // 默认配置文件路径
     const char* env_prefix;        // 环境变量前缀
-    int argc;                      // 命令行参数数�?    char** argv;                   // 命令行参数数�?} config_compat_config_t;
+    int argc;                      // 命令行参数数�
+    char** argv;
+} config_compat_config_t;
 
 /* ==================== 兼容层统计信�?==================== */
 
 typedef struct {
-    size_t total_calls;           // 总调用次�?    size_t agentos_config_calls;  // agentos_config_* 调用次数
+    size_t total_calls;           // 总调用次�
+    size_t agentos_config_calls;  // agentos_config_* 调用次数
     size_t svc_config_calls;      // svc_config_* 调用次数
     size_t migration_count;       // 已迁移配置项数量
     size_t error_count;           // 错误次数
@@ -270,6 +275,20 @@ int svc_config_delete(void* ctx, const char* key);
  * @brief 兼容层代理：svc_config_count
  * @param ctx 服务配置上下�? * @return 配置项数�? */
 size_t svc_config_count(void* ctx);
+
+/* ==================== 事务和回调兼容API ==================== */
+
+typedef void (*config_change_callback_t)(const char* key, const char* old_value, const char* new_value, void* user_data);
+
+int config_register_callback(config_change_callback_t callback, void* user_data);
+int config_unregister_callback(config_change_callback_t callback);
+
+config_error_t config_save(config_context_t* ctx);
+config_error_t config_reload(config_context_t* ctx);
+
+int config_begin_transaction(void);
+int config_commit_transaction(void);
+int config_rollback_transaction(void);
 
 /* ==================== 迁移辅助函数 ==================== */
 

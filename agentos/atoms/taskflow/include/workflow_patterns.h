@@ -69,7 +69,7 @@ typedef struct {
     edge_id_t edge_id;                  /**< 边ID */
     vertex_id_t source_node;            /**< 源节点ID */
     vertex_id_t target_node;            /**< 目标节点ID */
-    bool (*condition_func)(void* ctx);  /**< 条件函数（可选） */
+    workflow_condition_func_t condition_func;
     void* condition_context;            /**< 条件上下文 */
     char* edge_label;                   /**< 边标签（用于调试） */
 } workflow_edge_t;

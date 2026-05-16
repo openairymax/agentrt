@@ -1,7 +1,11 @@
 /**
  * @file logger.h
- * @brief 日志接口
+ * @brief AgentOS 统一日志接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ *
+ * 日志级别值定义（与 logging.h 统一）：
+ *   DEBUG=0, INFO=1, WARN=2, ERROR=3, FATAL=4
+ * 值越大越严重，与 syslog/Linux 内核惯例一致。
  */
 
 #ifndef AGENTOS_UTILS_LOGGER_H
@@ -11,40 +15,22 @@
 extern "C" {
 #endif
 
-#ifndef AGENTOS_LOG_LEVEL_ERROR_DEFINED
-#define AGENTOS_LOG_LEVEL_ERROR_DEFINED
-#define AGENTOS_LOG_LEVEL_ERROR 1
+/* 统一日志级别常量 — 值越大越严重 */
+#ifndef AGENTOS_LOG_LEVEL_DEBUG_DEFINED
+#define AGENTOS_LOG_LEVEL_DEBUG_DEFINED
+#define AGENTOS_LOG_LEVEL_DEBUG 0
+#define AGENTOS_LOG_LEVEL_INFO  1
 #define AGENTOS_LOG_LEVEL_WARN  2
-#define AGENTOS_LOG_LEVEL_INFO  3
-#define AGENTOS_LOG_LEVEL_DEBUG 4
-#endif /* AGENTOS_LOG_LEVEL_ERROR_DEFINED */
+#define AGENTOS_LOG_LEVEL_ERROR 3
+#define AGENTOS_LOG_LEVEL_FATAL 4
+#endif
 
 #ifndef AGENTOS_LOG_LEVEL
 #define AGENTOS_LOG_LEVEL AGENTOS_LOG_LEVEL_INFO
 #endif
 
-/**
- * @brief 设置当前线程的追踪ID
- * @param trace_id 追踪ID，若为NULL则自动生成
- // From data intelligence emerges. by spharx
- * @return 实际设置的追踪ID（静态内存，无需释放）
- */
 const char* agentos_log_set_trace_id(const char* trace_id);
-
-/**
- * @brief 获取当前线程的追踪ID
- * @return 追踪ID，可能为NULL
- */
 const char* agentos_log_get_trace_id(void);
-
-/**
- * @brief 记录日志
- * @param level 日志级别
- * @param file 文件名（通常用 __FILE__）
- * @param line 行号
- * @param fmt 格式字符串
- * @param ... 参数
- */
 void agentos_log_write(int level, const char* file, int line, const char* fmt, ...);
 
 #ifndef AGENTOS_LOG_ERROR
@@ -63,6 +49,13 @@ void agentos_log_write(int level, const char* file, int line, const char* fmt, .
 #else
 #define AGENTOS_LOG_DEBUG(fmt, ...) ((void)0)
 #endif
+#endif
+
+#ifndef AGENTOS_LOG_FATAL
+#define AGENTOS_LOG_FATAL(fmt, ...) do { \
+    agentos_log_write(AGENTOS_LOG_LEVEL_FATAL, __FILE__, __LINE__, fmt, ##__VA_ARGS__); \
+    abort(); \
+} while(0)
 #endif
 
 #ifdef __cplusplus

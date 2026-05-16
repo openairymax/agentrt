@@ -28,6 +28,7 @@ extern "C" {
 #ifdef _WIN32
 #include <windows.h>
 #include <synchapi.h>
+#include "atomic_compat.h"
 
 /** Windows平台互斥锁类型 */
 typedef CRITICAL_SECTION platform_mutex_t;
@@ -39,7 +40,7 @@ typedef CRITICAL_SECTION platform_recursive_mutex_t;
 typedef SRWLOCK platform_rwlock_t;
 
 /** Windows平台自旋锁类型 */
-typedef LONG platform_spinlock_t;
+typedef atomic_int platform_spinlock_t;
 
 /** Windows平台信号量类型 */
 typedef HANDLE platform_semaphore_t;

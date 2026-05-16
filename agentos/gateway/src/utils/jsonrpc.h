@@ -17,10 +17,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
-
-/* 前向声明 cJSON 类型 */
-struct cJSON;
-typedef struct cJSON cJSON;
+#include <cjson/cJSON.h>
 
 /* ==================== JSON-RPC 2.0 标准错误码 ==================== */
 

@@ -78,7 +78,7 @@ static int __attribute__((unused)) permission_guard_hook(const char* agent_id, c
     };
     
     // 执行安全检测
-    const size_t MAX_RESULTS = 8;
+    #define MAX_RESULTS 8
     guard_result_t results[MAX_RESULTS];
     size_t actual_results = 0;
     
@@ -166,7 +166,7 @@ static int __attribute__((unused)) command_execution_guard_hook(const char* comm
     };
     
     // 执行安全检测
-    const size_t MAX_RESULTS = 8;
+    #define MAX_RESULTS 8
     guard_result_t results[MAX_RESULTS];
     size_t actual_results = 0;
     
@@ -246,7 +246,7 @@ static int __attribute__((unused)) sanitizer_guard_hook(const char* input,
     };
     
     // 执行安全检测
-    const size_t MAX_RESULTS = 8;
+    #define MAX_RESULTS 8
     guard_result_t results[MAX_RESULTS];
     size_t actual_results = 0;
     

@@ -14,7 +14,12 @@
 
 #include "gateway_internal.h"
 #include <stdint.h>
-#include <cJSON.h>
+#ifdef AGENTOS_HAS_CJSON
+#include <cjson/cJSON.h>
+#else
+struct cJSON;
+typedef struct cJSON cJSON;
+#endif
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
@@ -57,6 +62,13 @@ typedef struct http_request_context {
     uint64_t start_time_ns;          /**< 请求开始时间 */
 } http_request_context_t;
 
+typedef struct {
+    char* method;                            /**< HTTP方法（拥有所有权） */
+    char* path;                              /**< URL路径（拥有所有权） */
+    gateway_endpoint_handler_t handler;      /**< 端点处理回调 */
+    void* user_data;                         /**< 回调用户数据 */
+} http_dynamic_endpoint_t;
+
 typedef struct http_gateway {
     struct MHD_Daemon* daemon;       /**< MHD守护进程 */
     uint16_t port;                   /**< 监听端口 */
@@ -80,6 +92,10 @@ typedef struct http_gateway {
     gateway_rate_limiter_t* rate_limiter; /**< 速率限制器 */
     
     gateway_protocol_handler_t protocol_handler; /**< 多协议处理器 */
+
+    http_dynamic_endpoint_t* dynamic_endpoints; /**< 动态端点数组 */
+    size_t dynamic_endpoint_count;    /**< 动态端点数量 */
+    size_t dynamic_endpoint_capacity; /**< 动态端点容量 */
 } http_gateway_t;
 
 /**
@@ -139,6 +155,22 @@ void gateway_apply_security_headers(struct MHD_Response* response);
  */
 int parse_json_request(http_gateway_t* gateway, http_request_context_t* context, 
                        const char* data, size_t size);
+
+/**
+ * @brief 注册动态端点到HTTP网关
+ *
+ * @param gateway HTTP网关实例
+ * @param method HTTP方法（将内部复制）
+ * @param path URL路径（将内部复制）
+ * @param handler 端点处理回调
+ * @param user_data 传递给回调的用户数据
+ * @return 0 成功，-1 参数无效，-2 内存不足
+ */
+int http_gateway_register_endpoint(http_gateway_t* gateway,
+                                    const char* method,
+                                    const char* path,
+                                    gateway_endpoint_handler_t handler,
+                                    void* user_data);
 
 #ifdef __cplusplus
 }

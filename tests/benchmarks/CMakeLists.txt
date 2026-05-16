@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 性能基准测试 (TeamC P2-C02)
 
@@ -25,17 +24,13 @@ target_link_libraries(test_performance_benchmarks PRIVATE
     agentos_syscall
     svc_common
     Threads::Threads
-    rt
+    agentos_platform_libs
     m
 )
 
 find_package(cjson QUIET)
 if(TARGET cjson OR cjson_FOUND)
     target_link_libraries(test_performance_benchmarks PRIVATE cjson)
-endif()
-
-if(UNIX AND NOT APPLE)
-    target_link_options(test_performance_benchmarks PRIVATE -Wl,--allow-multiple-definition)
 endif()
 
 target_compile_features(test_performance_benchmarks PRIVATE c_std_11)

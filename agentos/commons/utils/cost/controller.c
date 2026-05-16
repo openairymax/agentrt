@@ -13,7 +13,7 @@
 #include "cost.h"
 #include <stdlib.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <time.h>

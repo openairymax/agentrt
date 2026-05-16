@@ -6,7 +6,7 @@
 
 #include "io.h"
 #include "../memory/include/agentos_memory.h"
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +19,7 @@
 #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
 #define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
 #else
-#include <dirent.h>
+#include "agentos_dirent.h"
 #include <unistd.h>
 #endif
 

@@ -158,7 +158,10 @@ const char* protocol_get_last_error(void) {
 protocol_stack_config_t protocol_stack_config_default(const char* name) {
     protocol_stack_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.name = name;
+    if (name) {
+        strncpy(cfg.name, name, sizeof(cfg.name) - 1);
+        cfg.name[sizeof(cfg.name) - 1] = '\0';
+    }
     cfg.default_protocol = PROTOCOL_HTTP;
     cfg.max_message_size = 65536;
     cfg.timeout_ms = 30000;

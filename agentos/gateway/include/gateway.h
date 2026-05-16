@@ -175,7 +175,7 @@ void gateway_destroy(gateway_t* gw);
  * @threadsafe 安全
  * @since 1.0.0
  */
-agentos_error_t gateway_start(gateway_t* gw);
+int gateway_start(gateway_t* gw);
 
 /**
  * @brief 停止网关
@@ -190,7 +190,7 @@ agentos_error_t gateway_start(gateway_t* gw);
  * @threadsafe 安全
  * @since 1.0.0
  */
-agentos_error_t gateway_stop(gateway_t* gw);
+int gateway_stop(gateway_t* gw);
 
 /**
  * @brief 设置自定义请求处理回调
@@ -208,10 +208,50 @@ agentos_error_t gateway_stop(gateway_t* gw);
  * @threadsafe 安全（原子设置）
  * @since 1.0.0
  */
-agentos_error_t gateway_set_handler(
+int gateway_set_handler(
     gateway_t* gw,
     gateway_request_handler_t handler,
     void* user_data
+);
+
+/* ========== 端点注册类型 ========== */
+
+/**
+ * @brief 端点请求结构（动态注册端点使用）
+ */
+typedef struct gateway_endpoint_request {
+    const char* method;              /**< HTTP 方法 */
+    const char* path;                /**< URL 路径 */
+    const char* body;                /**< 请求体（可为 NULL） */
+    size_t body_len;                 /**< 请求体长度 */
+    void* user_data;                 /**< 注册时传入的用户数据 */
+} gateway_endpoint_request_t;
+
+/**
+ * @brief 端点响应结构（动态注册端点使用）
+ *
+ * handler 负责分配 body（strdup/strndup），桥接层负责释放。
+ * content_type 指向静态字符串字面量，桥接层不释放。
+ */
+typedef struct gateway_endpoint_response {
+    int status_code;                 /**< HTTP 状态码 */
+    const char* content_type;        /**< Content-Type（静态字符串） */
+    char* body;                      /**< 响应体（handler 分配，桥接层释放） */
+    size_t body_len;                 /**< 响应体长度 */
+} gateway_endpoint_response_t;
+
+/**
+ * @brief 动态端点处理回调函数类型
+ *
+ * @param[in] req 请求信息
+ * @param[out] resp 响应信息（handler 填充）
+ * @return 0 成功，非0 失败
+ *
+ * @ownership resp->body 由 handler 分配（malloc/strdup），桥接层负责 free
+ */
+typedef int (*gateway_endpoint_handler_t)(
+    const gateway_endpoint_request_t* req,
+    gateway_endpoint_response_t* resp
 );
 
 /* ========== 通用接口 - 查询操作 ========== */
@@ -261,7 +301,7 @@ bool gateway_is_running(gateway_t* gw);
  * }
  * @endcode
  */
-agentos_error_t gateway_get_stats(gateway_t* gw, char** out_json);
+int gateway_get_stats(gateway_t* gw, char** out_json);
 
 /**
  * @brief 获取网关名称
@@ -273,6 +313,34 @@ agentos_error_t gateway_get_stats(gateway_t* gw, char** out_json);
  * @since 1.0.0
  */
 const char* gateway_get_name(gateway_t* gw);
+
+/**
+ * @brief 注册动态 HTTP 端点
+ *
+ * 将自定义端点处理函数注册到网关的 HTTP 服务器。
+ * 注册的端点优先于静态路由表中的同名路径。
+ * 仅 HTTP 网关支持端点注册，其他类型返回 AGENTOS_EINVAL。
+ *
+ * @param[in] gw 网关句柄
+ * @param[in] method HTTP 方法（如 "GET", "POST"），不能为 NULL
+ * @param[in] path URL 路径（如 "/metrics"），不能为 NULL
+ * @param[in] handler 端点处理回调函数，不能为 NULL
+ * @param[in] user_data 传递给回调的用户数据（可为 NULL）
+ * @return AGENTOS_SUCCESS 成功
+ * @return AGENTOS_EINVAL 参数无效或网关类型不支持
+ * @return AGENTOS_ENOMEM 内存不足
+ *
+ * @note 应在 gateway_start() 之前调用，运行时注册需确保线程安全
+ * @threadsafe 注册操作本身安全，但与请求处理并发时需注意
+ * @since 0.0.5
+ */
+int gateway_register_endpoint(
+    gateway_t* gw,
+    const char* method,
+    const char* path,
+    gateway_endpoint_handler_t handler,
+    void* user_data
+);
 
 #ifdef __cplusplus
 }

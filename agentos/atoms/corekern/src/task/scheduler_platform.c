@@ -9,6 +9,7 @@
  */
 
 #include "scheduler_platform.h"
+#include "atomic_compat.h"
 #include <stddef.h>
 
 /* ==================== 平台适配器操作集声明 ==================== */
@@ -25,7 +26,7 @@ extern const scheduler_platform_ops_t* scheduler_platform_get_posix_ops(void);
 
 static const scheduler_platform_ops_t* g_current_platform_ops = NULL;
 
-static volatile int g_platform_initialized = 0;
+static atomic_int g_platform_initialized = 0;
 
 /* ==================== 内部辅助函数 ==================== */
 
@@ -44,24 +45,27 @@ static const scheduler_platform_ops_t* detect_platform_ops(void)
 
 void scheduler_platform_register_ops(const scheduler_platform_ops_t* ops)
 {
-    if (__atomic_load_n(&g_platform_initialized, __ATOMIC_ACQUIRE)) {
+    if (atomic_load_explicit(&g_platform_initialized, memory_order_acquire)) {
         return;
     }
 
     const scheduler_platform_ops_t* expected = NULL;
-    __atomic_compare_exchange_n(&g_current_platform_ops, &expected, ops,
-                                0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    atomic_compare_exchange_strong_ptr(
+        (void* volatile*)&g_current_platform_ops, (void**)&expected, (void*)ops,
+        memory_order_seq_cst, memory_order_seq_cst);
 }
 
 const scheduler_platform_ops_t* scheduler_platform_get_ops(void)
 {
-    const scheduler_platform_ops_t* ops = __atomic_load_n(&g_current_platform_ops, __ATOMIC_ACQUIRE);
+    const scheduler_platform_ops_t* ops = atomic_load_ptr(
+        (void* volatile*)&g_current_platform_ops, memory_order_acquire);
     if (!ops) {
         const scheduler_platform_ops_t* new_ops = detect_platform_ops();
         if (new_ops) {
             const scheduler_platform_ops_t* expected = NULL;
-            if (__atomic_compare_exchange_n(&g_current_platform_ops, &expected, new_ops,
-                                            0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+            if (atomic_compare_exchange_strong_ptr(
+                    (void* volatile*)&g_current_platform_ops, (void**)&expected, (void*)new_ops,
+                    memory_order_seq_cst, memory_order_seq_cst)) {
                 ops = new_ops;
             } else {
                 ops = expected;
@@ -75,14 +79,14 @@ const scheduler_platform_ops_t* scheduler_platform_get_ops(void)
 int scheduler_platform_auto_init(void)
 {
     int expected = 0;
-    if (!__atomic_compare_exchange_n(&g_platform_initialized, &expected, 1,
-                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    if (!atomic_compare_exchange_strong_explicit(&g_platform_initialized, &expected, 1,
+                                                  memory_order_seq_cst, memory_order_seq_cst)) {
         return 0;
     }
 
     const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
     if (!ops) {
-        __atomic_store_n(&g_platform_initialized, 0, __ATOMIC_SEQ_CST);
+        atomic_store_explicit(&g_platform_initialized, 0, memory_order_seq_cst);
         return -1;
     }
 
@@ -91,12 +95,12 @@ int scheduler_platform_auto_init(void)
         !ops->get_current_thread_id || !ops->get_thread_system_id ||
         !ops->thread_sleep || !ops->thread_yield ||
         !ops->cleanup_platform_resources || !ops->get_name) {
-        __atomic_store_n(&g_platform_initialized, 0, __ATOMIC_SEQ_CST);
+        atomic_store_explicit(&g_platform_initialized, 0, memory_order_seq_cst);
         return -1;
     }
 
     if (ops->init() != 0) {
-        __atomic_store_n(&g_platform_initialized, 0, __ATOMIC_SEQ_CST);
+        atomic_store_explicit(&g_platform_initialized, 0, memory_order_seq_cst);
         return -1;
     }
 
@@ -105,23 +109,24 @@ int scheduler_platform_auto_init(void)
 
 int scheduler_platform_is_initialized(void)
 {
-    return __atomic_load_n(&g_platform_initialized, __ATOMIC_ACQUIRE);
+    return atomic_load_explicit(&g_platform_initialized, memory_order_acquire);
 }
 
 void scheduler_platform_cleanup(void)
 {
     int expected = 1;
-    if (!__atomic_compare_exchange_n(&g_platform_initialized, &expected, 0,
-                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    if (!atomic_compare_exchange_strong_explicit(&g_platform_initialized, &expected, 0,
+                                                  memory_order_seq_cst, memory_order_seq_cst)) {
         return;
     }
 
-    const scheduler_platform_ops_t* ops = __atomic_load_n(&g_current_platform_ops, __ATOMIC_ACQUIRE);
+    const scheduler_platform_ops_t* ops =
+        atomic_load_ptr((void* volatile*)&g_current_platform_ops, memory_order_acquire);
     if (ops && ops->cleanup) {
         ops->cleanup();
     }
 
-    __atomic_store_n(&g_current_platform_ops, NULL, __ATOMIC_SEQ_CST);
+    atomic_store_ptr((void* volatile*)&g_current_platform_ops, NULL, memory_order_seq_cst);
 }
 
 const char* scheduler_platform_get_name(void)

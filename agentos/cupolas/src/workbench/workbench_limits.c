@@ -26,6 +26,7 @@
 
 #if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
+#include <psapi.h>
 #include <jobapi.h>
 #else
 #include <unistd.h>
@@ -116,26 +117,26 @@ static int setup_windows_job(limit_context_t* ctx) {
         return cupolas_ERROR_UNKNOWN;
     }
 
-    JOBOBJECT_BASIC_LIMIT_INFORMATION limits = {0};
-    limits.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {0};
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_MEMORY;
 
     if (ctx->memory_limit > 0) {
-        limits.LimitFlags |= JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+        limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_PROCESS_MEMORY;
         limits.ProcessMemoryLimit = ctx->memory_limit;
     }
 
     if (ctx->cpu_time_limit_ms > 0) {
-        limits.LimitFlags |= JOB_OBJECT_LIMIT_JOB_TIME;
-        limits.PerJobUserTimeLimit.QuadPart = (ULONGLONG)ctx->cpu_time_limit_ms * 10000;
+        limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_JOB_TIME;
+        limits.BasicLimitInformation.PerJobUserTimeLimit.QuadPart = (ULONGLONG)ctx->cpu_time_limit_ms * 10000;
     }
 
     if (ctx->processes_limit > 0) {
-        limits.LimitFlags |= JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
-        limits.ActiveProcessLimit = ctx->processes_limit;
+        limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
+        limits.BasicLimitInformation.ActiveProcessLimit = ctx->processes_limit;
     }
 
     if (!SetInformationJobObject(ctx->job_handle,
-                                JobObjectBasicLimitInformation,
+                                JobObjectExtendedLimitInformation,
                                 &limits,
                                 sizeof(limits))) {
         CloseHandle(ctx->job_handle);
@@ -144,7 +145,10 @@ static int setup_windows_job(limit_context_t* ctx) {
     }
 
     JOBOBJECT_SECURITY_LIMIT_INFORMATION secInfo = {0};
-    secInfo.SecurityLimitFlags = JOB_OBJECT_SECURITY_NO_ADMIN | JOB_OBJECT_SECURITY_RESTRICT_TOKEN;
+    secInfo.SecurityLimitFlags = JOB_OBJECT_SECURITY_NO_ADMIN;
+#ifdef JOB_OBJECT_SECURITY_RESTRICT_TOKEN
+    secInfo.SecurityLimitFlags |= JOB_OBJECT_SECURITY_RESTRICT_TOKEN;
+#endif
     SetInformationJobObject(ctx->job_handle,
                            JobObjectSecurityLimitInformation,
                            &secInfo,
@@ -196,22 +200,22 @@ int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mod
 
 #if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
-        JOBOBJECT_BASIC_LIMIT_INFORMATION limits = {0};
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {0};
         DWORD size = sizeof(limits);
 
         if (!QueryInformationJobObject(ctx->job_handle,
-                                      JobObjectBasicLimitInformation,
+                                      JobObjectExtendedLimitInformation,
                                       &limits,
                                       size,
                                       NULL)) {
             return cupolas_ERROR_IO;
         }
 
-        limits.LimitFlags |= JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+        limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_PROCESS_MEMORY;
         limits.ProcessMemoryLimit = limit_bytes;
 
         if (!SetInformationJobObject(ctx->job_handle,
-                                    JobObjectBasicLimitInformation,
+                                    JobObjectExtendedLimitInformation,
                                     &limits,
                                     sizeof(limits))) {
             return cupolas_ERROR_IO;
@@ -493,10 +497,12 @@ int limits_enforce(limit_context_t* ctx) {
                                       &ui_restrictions,
                                       sizeof(ui_restrictions),
                                       NULL)) {
+#ifdef JOB_OBJECT_UILIMIT_JOB_TIME
             if (ui_restrictions.UIRestrictionsClass & JOB_OBJECT_UILIMIT_JOB_TIME) {
                 TerminateJobObject(ctx->job_handle, 0);
                 killed++;
             }
+#endif
         }
     }
 #else

@@ -1187,14 +1187,14 @@ static int a2a_adapter_disconnect_cb(void* c) {
 static int a2a_adapter_is_connected_cb(void* c) { return c ? 1 : 0; }
 static int a2a_adapter_send_cb(void* c, const void* d, size_t s) {
     if (!c || !d || s == 0) return -1;
-    return 0;
+    return -1;
 }
 static int a2a_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
     if (!c || !d || !s) return -1;
     if (t > 0) { }
     *d = NULL;
     *s = 0;
-    return 0;
+    return -1;
 }
 static int a2a_adapter_handle_request_cb(void* c, const void* r, void** rp) {
     if (!c || !r) return -1;

@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "atomic_compat.h"
 
 // ============================================================================
 // 内部数据结构
@@ -416,8 +417,8 @@ uint64_t guard_manager_check_async(
 
     guard_manager_private_t* priv = (guard_manager_private_t*)manager;
 
-    static uint64_t next_request_id = 1;
-    uint64_t request_id = __atomic_fetch_add(&next_request_id, 1, __ATOMIC_RELAXED);
+    static atomic_uint64_t next_request_id = 1;
+    uint64_t request_id = atomic_fetch_add_explicit(&next_request_id, 1, memory_order_relaxed);
 
     async_request_t* req = (async_request_t*)calloc(1, sizeof(async_request_t));
     if (!req) return 0;

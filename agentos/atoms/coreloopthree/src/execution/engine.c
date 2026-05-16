@@ -23,7 +23,9 @@
 #include <string.h>
 
 /* JSON解析库 */
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
+#endif
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
@@ -62,7 +64,7 @@ struct agentos_execution_engine {
     agentos_cond_t *task_available_cond;
     agentos_thread_t *worker_threads;
     size_t worker_count;
-    volatile int running;
+    atomic_int running;
 };
 
 static void tcb_retain(task_tcb_t *tcb);
