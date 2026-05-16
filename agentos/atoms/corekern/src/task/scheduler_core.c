@@ -7,7 +7,6 @@
 #include "scheduler_core.h"
 #include "mem.h"
 #include <stdlib.h>
-#include <stdio.h>
 
 /* Unified base library compatibility layer */
 #include "atomic_compat.h"
@@ -85,55 +84,39 @@ scheduler_core_ctx_t* scheduler_core_get_ctx(void) {
 }
 
 int scheduler_core_init(void) {
-    fprintf(stderr, "[DBG] scheduler_core_init: entry, g_core_ctx=%p\n", (void*)g_core_ctx); fflush(stderr);
     if (atomic_load_ptr((void* volatile*)&g_core_ctx, memory_order_acquire)) {
-        fprintf(stderr, "[DBG] scheduler_core_init: already initialized, returning 0\n"); fflush(stderr);
         return 0;
     }
 
-    fprintf(stderr, "[DBG] scheduler_core_init: checking g_ctx_init_lock=%p\n", (void*)g_ctx_init_lock); fflush(stderr);
     if (!g_ctx_init_lock) {
-        fprintf(stderr, "[DBG] scheduler_core_init: creating mutex\n"); fflush(stderr);
         void* new_lock = agentos_mutex_create();
-        fprintf(stderr, "[DBG] scheduler_core_init: mutex created=%p\n", new_lock); fflush(stderr);
         if (!new_lock) return -1;
 
         void* expected = NULL;
         if (!atomic_compare_exchange_strong_ptr(
                 (void* volatile*)&g_ctx_init_lock, &expected, new_lock,
                 memory_order_seq_cst, memory_order_seq_cst)) {
-            fprintf(stderr, "[DBG] scheduler_core_init: CAS failed, freeing mutex\n"); fflush(stderr);
             agentos_mutex_free(new_lock);
         }
     }
 
-    fprintf(stderr, "[DBG] scheduler_core_init: locking g_ctx_init_lock\n"); fflush(stderr);
     agentos_mutex_lock(g_ctx_init_lock);
-    fprintf(stderr, "[DBG] scheduler_core_init: locked\n"); fflush(stderr);
 
     if (atomic_load_ptr((void* volatile*)&g_core_ctx, memory_order_acquire)) {
-        fprintf(stderr, "[DBG] scheduler_core_init: already initialized (under lock), returning 0\n"); fflush(stderr);
         agentos_mutex_unlock(g_ctx_init_lock);
         return 0;
     }
 
-    fprintf(stderr, "[DBG] scheduler_core_init: creating core ctx\n"); fflush(stderr);
     g_core_ctx = create_core_ctx();
-    fprintf(stderr, "[DBG] scheduler_core_init: core ctx=%p\n", (void*)g_core_ctx); fflush(stderr);
     if (!g_core_ctx) {
         agentos_mutex_unlock(g_ctx_init_lock);
         return -1;
     }
 
-    fprintf(stderr, "[DBG] scheduler_core_init: before atomic_store\n"); fflush(stderr);
     atomic_store_explicit(&g_core_ctx->initialized, 1, memory_order_release);
-    fprintf(stderr, "[DBG] scheduler_core_init: after atomic_store\n"); fflush(stderr);
-    /* atomic_thread_fence(memory_order_release); -- temporarily disabled for debugging */
-    write(2, "[DBG] fence skipped\n", 20);
+    atomic_thread_fence(memory_order_release);
 
-    fprintf(stderr, "[DBG] scheduler_core_init: unlocking\n"); fflush(stderr);
     agentos_mutex_unlock(g_ctx_init_lock);
-    fprintf(stderr, "[DBG] scheduler_core_init: done, returning 0\n"); fflush(stderr);
     return 0;
 }
 
