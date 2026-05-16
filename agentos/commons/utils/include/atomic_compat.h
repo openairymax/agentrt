@@ -113,16 +113,16 @@ static inline _Bool atomic_compare_exchange_strong_16(volatile _Atomic short* pt
     return atomic_compare_exchange_strong_explicit(ptr, expected, desired, succ, fail);
 }
 
-static inline intptr_t atomic_load_ptr(volatile _Atomic intptr_t* ptr, memory_order order) {
+static inline void* atomic_load_ptr(_Atomic void** ptr, memory_order order) {
     return atomic_load_explicit(ptr, order);
 }
-static inline void atomic_store_ptr(volatile _Atomic intptr_t* ptr, intptr_t val, memory_order order) {
+static inline void atomic_store_ptr(_Atomic void** ptr, void* val, memory_order order) {
     atomic_store_explicit(ptr, val, order);
 }
-static inline intptr_t atomic_exchange_ptr(volatile _Atomic intptr_t* ptr, intptr_t val, memory_order order) {
+static inline void* atomic_exchange_ptr(_Atomic void** ptr, void* val, memory_order order) {
     return atomic_exchange_explicit(ptr, val, order);
 }
-static inline _Bool atomic_compare_exchange_strong_ptr(volatile _Atomic intptr_t* ptr, intptr_t* expected, intptr_t desired, memory_order succ, memory_order fail) {
+static inline _Bool atomic_compare_exchange_strong_ptr(_Atomic void** ptr, void** expected, void* desired, memory_order succ, memory_order fail) {
     return atomic_compare_exchange_strong_explicit(ptr, expected, desired, succ, fail);
 }
 

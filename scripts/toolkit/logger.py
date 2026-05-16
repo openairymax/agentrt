@@ -9,7 +9,7 @@ Provides terminal color/style constants, formatted output, progress bars,
 spinners, and table rendering for CLI applications.
 
 Usage:
-    from core.logger import Color, Style, Logger, OutputFormatter, ProgressBar, Spinner, Table
+    from toolkit.logger import Color, Style, Logger, OutputFormatter, ProgressBar, Spinner, Table
 """
 
 import itertools
@@ -21,7 +21,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 class Color(Enum):
-    """Terminal color codes"""
     BLACK = "30"
     RED = "31"
     GREEN = "32"
@@ -42,7 +41,6 @@ class Color(Enum):
 
 
 class Style(Enum):
-    """Text style constants mapped to color combinations"""
     INFO = (Color.CYAN, None)
     SUCCESS = (Color.GREEN, None)
     WARNING = (Color.YELLOW, None)
@@ -55,8 +53,6 @@ class Style(Enum):
 
 
 class OutputFormatter:
-    """Formats text with colors and styles for terminal output"""
-
     def __init__(self, use_color: bool = True):
         self.use_color = use_color and sys.stdout.isatty()
 
@@ -118,8 +114,6 @@ class OutputFormatter:
 
 
 class Logger:
-    """Structured logger with levels and colored output"""
-
     LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40}
 
     def __init__(self, name: str = "agentos",
@@ -159,8 +153,6 @@ class Logger:
 
 
 class ProgressBar:
-    """Terminal progress bar with percentage and ETA"""
-
     CHARS_FILLED = "█"
     CHARS_EMPTY = "░"
     WIDTH = 40
@@ -211,8 +203,6 @@ class ProgressBar:
 
 
 class Spinner:
-    """Animated spinner for long-running operations"""
-
     FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
     def __init__(self, message: str = "",
@@ -262,8 +252,6 @@ class Spinner:
 
 
 class Table:
-    """Renders aligned tabular data in the terminal"""
-
     def __init__(self, headers: List[str],
                  rows: List[List[str]],
                  padding: int = 2):
