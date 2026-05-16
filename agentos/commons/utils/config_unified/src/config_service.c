@@ -1089,7 +1089,7 @@ static config_value_t* config_decrypt_string_value(const char* hex_data,
 #endif
 }
 
-config_value_t* config_decrypt_value(const config_value_t* value, const encryption_config_t* manager) {
+config_value_t* config_encrypt_value(const config_value_t* value, const encryption_config_t* manager) {
     if (!value) return NULL;
     if (!manager || manager->algorithm == ENCRYPTION_NONE) {
         return config_value_clone(value);
