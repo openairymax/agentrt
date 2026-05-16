@@ -43,9 +43,6 @@ endif()
 add_library(agentos_coreloopthree STATIC
     src/loop.c
     src/config_loader.c
-    src/cognition/semantic_unit.c
-    src/cognition/triple_coordinator.c
-    src/utils/id_utils.c
     src/memory/memory_service.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/src/checkpoint.c
 )

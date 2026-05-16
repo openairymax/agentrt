@@ -51,20 +51,20 @@ void scheduler_platform_register_ops(const scheduler_platform_ops_t* ops)
 
     const scheduler_platform_ops_t* expected = NULL;
     atomic_compare_exchange_strong_ptr(
-        (void* volatile*)&g_current_platform_ops, (void**)&expected, (void*)ops,
+        (_Atomic void**)&g_current_platform_ops, (void**)&expected, (void*)ops,
         memory_order_seq_cst, memory_order_seq_cst);
 }
 
 const scheduler_platform_ops_t* scheduler_platform_get_ops(void)
 {
     const scheduler_platform_ops_t* ops = atomic_load_ptr(
-        (void* volatile*)&g_current_platform_ops, memory_order_acquire);
+        (_Atomic void**)&g_current_platform_ops, memory_order_acquire);
     if (!ops) {
         const scheduler_platform_ops_t* new_ops = detect_platform_ops();
         if (new_ops) {
             const scheduler_platform_ops_t* expected = NULL;
             if (atomic_compare_exchange_strong_ptr(
-                    (void* volatile*)&g_current_platform_ops, (void**)&expected, (void*)new_ops,
+                    (_Atomic void**)&g_current_platform_ops, (void**)&expected, (void*)new_ops,
                     memory_order_seq_cst, memory_order_seq_cst)) {
                 ops = new_ops;
             } else {
@@ -121,12 +121,12 @@ void scheduler_platform_cleanup(void)
     }
 
     const scheduler_platform_ops_t* ops =
-        atomic_load_ptr((void* volatile*)&g_current_platform_ops, memory_order_acquire);
+        atomic_load_ptr((_Atomic void**)&g_current_platform_ops, memory_order_acquire);
     if (ops && ops->cleanup) {
         ops->cleanup();
     }
 
-    atomic_store_ptr((void* volatile*)&g_current_platform_ops, NULL, memory_order_seq_cst);
+    atomic_store_ptr((_Atomic void**)&g_current_platform_ops, NULL, memory_order_seq_cst);
 }
 
 const char* scheduler_platform_get_name(void)
