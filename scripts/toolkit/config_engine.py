@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Configuration Template Engine
-# Migrated from scripts/core/config.py
 
 """
 AgentOS Configuration Template Engine

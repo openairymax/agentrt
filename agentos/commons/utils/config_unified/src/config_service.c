@@ -571,7 +571,7 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
         
         // 查找配置�
         // 从配置上下文中获取值
-        config_value_t* value = config_context_get(ctx, item->key);
+        const config_value_t* value = config_context_get(ctx, item->key);
         
         if (item->required && !value) {
             add_schema_error(schema, "Required configuration item '%s' is missing", item->key);
@@ -1089,7 +1089,7 @@ static config_value_t* config_decrypt_string_value(const char* hex_data,
 #endif
 }
 
-config_value_t* config_decrypt_value(const config_value_t* value, const encryption_config_t* manager) {
+config_value_t* config_encrypt_value(const config_value_t* value, const encryption_config_t* manager) {
     if (!value) return NULL;
     if (!manager || manager->algorithm == ENCRYPTION_NONE) {
         return config_value_clone(value);
