@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # corekern模块单元测试
 # 使用agentos_core.a + agentos_common.a
@@ -15,12 +14,10 @@ target_compile_options(test_kernel_state PRIVATE
     -Wall -Wextra -Wpedantic -Werror=vla -Wno-address
 )
 
-# 链接agentos_core（它依赖agentos_common）
-# 由于项目架构原因两个库有部分符号重复，测试使用--allow-multiple-definition处理
 target_link_libraries(test_kernel_state
-    PRIVATE -Wl,--allow-multiple-definition
+    PRIVATE agentos_test_ldflags
     PRIVATE agentos_core
-    PRIVATE pthread rt m
+    PRIVATE Threads::Threads agentos_platform_libs
 )
 
 add_test(NAME kernel_state COMMAND test_kernel_state)
@@ -38,9 +35,9 @@ target_compile_options(test_corekern PRIVATE
 )
 
 target_link_libraries(test_corekern
-    PRIVATE -Wl,--allow-multiple-definition
+    PRIVATE agentos_test_ldflags
     PRIVATE agentos_core
-    PRIVATE pthread rt m
+    PRIVATE Threads::Threads agentos_platform_libs
 )
 
 add_test(NAME corekern_deep COMMAND test_corekern)

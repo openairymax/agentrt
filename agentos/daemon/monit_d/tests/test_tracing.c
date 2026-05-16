@@ -172,12 +172,16 @@ static void test_agent_state_enum(void) {
     assert(AGENT_STATE_CREATED == 0);
     assert(AGENT_STATE_INITIALIZING == 1);
     assert(AGENT_STATE_READY == 2);
-    assert(AGENT_STATE_EXECUTING == 3);
-    assert(AGENT_STATE_PAUSED == 4);
-    assert(AGENT_STATE_COMPLETED == 5);
-    assert(AGENT_STATE_FAILED == 6);
-    assert(AGENT_STATE_CANCELLED == 7);
-    assert(AGENT_STATE_STUCK == 8);
+    assert(AGENT_STATE_RUNNING == 3);
+    assert(AGENT_STATE_WAITING == 4);
+    assert(AGENT_STATE_THINKING == 5);
+    assert(AGENT_STATE_EXECUTING == 6);
+    assert(AGENT_STATE_EXECUTING_TOOL == 7);
+    assert(AGENT_STATE_PAUSED == 8);
+    assert(AGENT_STATE_COMPLETED == 9);
+    assert(AGENT_STATE_FAILED == 10);
+    assert(AGENT_STATE_CANCELLED == 11);
+    assert(AGENT_STATE_STUCK == 12);
 
     printf("    PASSED\n");
 }

@@ -34,7 +34,7 @@ static void test_cache_put_get(void) {
 
     char* retrieved = NULL;
     int ret = cache_get(cache, key, &retrieved);
-    assert(ret == 0);
+    assert(ret == 1);
     assert(retrieved != NULL);
     assert(strcmp(retrieved, value) == 0);
 

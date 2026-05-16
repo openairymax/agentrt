@@ -30,64 +30,38 @@
 #endif
 
 // 全局计数器用于生成唯一ID（使用统一原子类型）
-static volatile long task_counter = 0;
-static volatile long plan_counter = 0;
-static volatile long record_counter = 0;
-static volatile long session_counter = 0;
+static atomic_long task_counter = 0;
+static atomic_long plan_counter = 0;
+static atomic_long record_counter = 0;
+static atomic_long session_counter = 0;
 
 __attribute__((used))
 void agentos_generate_task_id(const char* prefix, char* buf, size_t len) {
     if (!buf || len == 0) return;
-
-#ifdef _WIN32
-    LONG id = InterlockedIncrement(&task_counter);
-    snprintf(buf, len, "%s_%ld", prefix ? prefix : "task", id);
-#else
-    unsigned long long id = atomic_fetch_add(&task_counter, 1);
+    unsigned long long id = atomic_fetch_add(&task_counter, 1) + 1;
     snprintf(buf, len, "%s_%llu", prefix ? prefix : "task", id);
-#endif
 }
 
 __attribute__((used))
 void agentos_generate_plan_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
-
-#ifdef _WIN32
-    LONG id = InterlockedIncrement(&plan_counter);
-    snprintf(buf, len, "plan_%ld", id);
-#else
-    unsigned long long id = atomic_fetch_add(&plan_counter, 1);
+    unsigned long long id = atomic_fetch_add(&plan_counter, 1) + 1;
     snprintf(buf, len, "plan_%llu", id);
-#endif
 }
 
 __attribute__((used))
 void agentos_generate_record_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
-
-#ifdef _WIN32
-    LONG id = InterlockedIncrement(&record_counter);
-    snprintf(buf, len, "record_%ld", id);
-#else
-    unsigned long long id = atomic_fetch_add(&record_counter, 1);
+    unsigned long long id = atomic_fetch_add(&record_counter, 1) + 1;
     snprintf(buf, len, "record_%llu", id);
-#endif
 }
 
 __attribute__((used))
 void agentos_generate_session_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
-
-    // 使用时间戳和计数器生成会话ID
     time_t now = (time_t)(agentos_time_ms() / 1000ULL);
-
-#ifdef _WIN32
-    LONG id = InterlockedIncrement(&session_counter);
-    snprintf(buf, len, "session_%lld_%ld", (long long)now, id);
-#else
-    unsigned long long id = atomic_fetch_add(&session_counter, 1);
+    unsigned long long id = atomic_fetch_add(&session_counter, 1) + 1;
     snprintf(buf, len, "session_%lld_%llu", (long long)now, id);
-#endif
 }
 
 __attribute__((used))

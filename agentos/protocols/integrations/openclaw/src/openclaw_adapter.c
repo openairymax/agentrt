@@ -13,7 +13,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include <errno.h>
 
 #ifdef _WIN32

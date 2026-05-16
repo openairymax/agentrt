@@ -31,7 +31,9 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
+#endif
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>

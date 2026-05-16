@@ -36,7 +36,7 @@ static agentos_error_t heapstore_syscall_session_delete(const char* sid) {
 }
 #endif
 
-/* Unified base library compatibility layer */
+#include "atomic_compat.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 #include "check.h"
@@ -196,13 +196,13 @@ static agentos_error_t persist_delete_with_retry(const char* session_id) {
 }
 
 static void ensure_lock(void) {
-    agentos_mutex_t* current = __atomic_load_n(&session_lock, __ATOMIC_ACQUIRE);
+    agentos_mutex_t* current = (agentos_mutex_t*)atomic_load_ptr((void* volatile*)&session_lock, memory_order_acquire);
     if (!current) {
         agentos_mutex_t* new_lock = agentos_mutex_create();
         if (!new_lock) return;
         agentos_mutex_t* expected = NULL;
-        if (!__atomic_compare_exchange_n(&session_lock, &expected, new_lock,
-                                          false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+        if (!atomic_compare_exchange_strong_ptr((void* volatile*)&session_lock, (void**)&expected, (void*)new_lock,
+                                                 memory_order_acq_rel, memory_order_acquire)) {
             agentos_mutex_free(new_lock);
         }
     }
@@ -212,9 +212,9 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     CHECK_NULL(out_session_id);
     ensure_lock();
 
-    static uint64_t counter = 0;
+    static atomic_uint64_t counter = 0;
     char id_buf[64];
-    snprintf(id_buf, sizeof(id_buf), "sess_%llu", (unsigned long long)__sync_fetch_and_add(&counter, 1));
+    snprintf(id_buf, sizeof(id_buf), "sess_%llu", (unsigned long long)atomic_fetch_add_explicit(&counter, 1, memory_order_seq_cst));
     
     char* id = NULL;
     session_t* s = NULL;

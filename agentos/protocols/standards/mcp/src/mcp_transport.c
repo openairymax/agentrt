@@ -20,6 +20,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include "atomic_compat.h"
 
 struct mcp_transport {
     mcp_transport_type_t type;
@@ -44,7 +45,7 @@ struct mcp_transport {
     char* recv_buffer;
     size_t recv_buffer_size;
     size_t recv_buffer_capacity;
-    volatile int running;
+    atomic_int running;
 };
 
 static void set_state(mcp_transport_t* t, mcp_transport_state_t new_state) {
@@ -167,7 +168,7 @@ mcp_transport_t* mcp_transport_create(const mcp_transport_config_t* config) {
     t->read_timeout_ms = config->read_timeout_ms > 0 ? config->read_timeout_ms : 30000;
     t->write_timeout_ms = config->write_timeout_ms > 0 ? config->write_timeout_ms : 30000;
     t->max_message_size = config->max_message_size > 0 ? config->max_message_size : (10 * 1024 * 1024);
-    t->running = 0;
+    atomic_init(&t->running, 0);
 
     t->recv_buffer_capacity = 65536;
     t->recv_buffer = (char*)malloc(t->recv_buffer_capacity);
@@ -218,7 +219,7 @@ mcp_transport_t* mcp_transport_create(const mcp_transport_config_t* config) {
 void mcp_transport_destroy(mcp_transport_t* transport) {
     if (!transport) return;
 
-    if (transport->running) {
+    if (atomic_load_explicit(&transport->running, memory_order_acquire)) {
         mcp_transport_stop(transport);
     }
 
@@ -246,7 +247,7 @@ int mcp_transport_start(mcp_transport_t* transport) {
         if (flags >= 0) {
             fcntl(transport->input_fd, F_SETFL, flags & ~O_NONBLOCK);
         }
-        transport->running = 1;
+        atomic_store_explicit(&transport->running, 1, memory_order_seq_cst);
         set_state(transport, MCP_TRANSPORT_CONNECTED);
         return 0;
     }
@@ -330,7 +331,7 @@ int mcp_transport_start(mcp_transport_t* transport) {
 
         freeaddrinfo(result);
         transport->http_socket = sock;
-        transport->running = 1;
+        atomic_store_explicit(&transport->running, 1, memory_order_seq_cst);
         set_state(transport, MCP_TRANSPORT_CONNECTED);
         return 0;
     }
@@ -342,7 +343,7 @@ int mcp_transport_start(mcp_transport_t* transport) {
 int mcp_transport_stop(mcp_transport_t* transport) {
     if (!transport) return -1;
 
-    transport->running = 0;
+    atomic_store_explicit(&transport->running, 0, memory_order_seq_cst);
 
     if (transport->http_socket >= 0) {
         close(transport->http_socket);

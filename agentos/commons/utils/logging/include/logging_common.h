@@ -1,10 +1,14 @@
 #ifndef LOGGING_COMMON_H
 #define LOGGING_COMMON_H
 
+#ifdef AGENTOS_COMMON_LOGGING_H
+#error "logging_common.h conflicts with logging.h. Include only logging.h."
+#endif
+
 #include <error.h>
 
 /**
- * @brief 日志级别枚举
+ * @brief 日志级别枚举（已弃用，请使用 logging.h）
  */
 typedef enum {
     LOG_LEVEL_DEBUG = 0,

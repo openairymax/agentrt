@@ -51,7 +51,7 @@ typedef struct {
 /**
  * @brief 全局同步模块状态
  */
-sync_global_state_t g_sync_state = {NULL, NULL, false};
+static sync_global_state_t g_sync_state = {NULL, NULL, false};
 
 static bool g_initialized = false;
 

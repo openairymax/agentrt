@@ -10,11 +10,15 @@
  */
 
 #include "platform.h"
+#include "atomic_compat.h"
+#include "string_compat.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <sys/mman.h>
+#ifndef _WIN32
+#include "agentos_mman.h"
+#endif
 
 #if cupolas_PLATFORM_WINDOWS
     #include <io.h>
@@ -116,7 +120,7 @@ int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock) {
 int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
     AcquireSRWLockShared(&rwlock->lock);
-    InterlockedIncrement(&rwlock->state);
+    atomic_fetch_add_32(&rwlock->state, 1, memory_order_seq_cst);
     return 0;
 #else
     return pthread_rwlock_rdlock(rwlock) == 0 ? 0 : -1;
@@ -126,7 +130,7 @@ int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock) {
 int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
     AcquireSRWLockExclusive(&rwlock->lock);
-    InterlockedExchange(&rwlock->state, -1);
+    atomic_exchange_32(&rwlock->state, -1, memory_order_seq_cst);
     return 0;
 #else
     return pthread_rwlock_wrlock(rwlock) == 0 ? 0 : -1;
@@ -136,7 +140,7 @@ int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock) {
 int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
     if (!TryAcquireSRWLockShared(&rwlock->lock)) return cupolas_ERROR_BUSY;
-    InterlockedIncrement(&rwlock->state);
+    atomic_fetch_add_32(&rwlock->state, 1, memory_order_seq_cst);
     return 0;
 #else
     int ret = pthread_rwlock_tryrdlock(rwlock);
@@ -149,7 +153,7 @@ int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock) {
 int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
     if (!TryAcquireSRWLockExclusive(&rwlock->lock)) return cupolas_ERROR_BUSY;
-    InterlockedExchange(&rwlock->state, -1);
+    atomic_exchange_32(&rwlock->state, -1, memory_order_seq_cst);
     return 0;
 #else
     int ret = pthread_rwlock_trywrlock(rwlock);
@@ -161,12 +165,12 @@ int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock) {
 
 int cupolas_rwlock_unlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
-    long s = InterlockedExchangeAdd(&rwlock->state, 0);
+    long s = atomic_fetch_add_32(&rwlock->state, 0, memory_order_seq_cst);
     if (s < 0) {
-        InterlockedExchange(&rwlock->state, 0);
+        atomic_exchange_32(&rwlock->state, 0, memory_order_seq_cst);
         ReleaseSRWLockExclusive(&rwlock->lock);
     } else {
-        InterlockedDecrement(&rwlock->state);
+        atomic_fetch_sub_32(&rwlock->state, 1, memory_order_seq_cst);
         ReleaseSRWLockShared(&rwlock->lock);
     }
     return 0;
@@ -859,33 +863,15 @@ void cupolas_mem_unlock(void* ptr, size_t size) {
  * ============================================================================ */
 
 int32_t cupolas_atomic_load32(volatile int32_t* ptr) {
-#if cupolas_PLATFORM_WINDOWS
-    return InterlockedCompareExchange((volatile LONG*)ptr, 0, 0);
-#elif defined(__GNUC__) || defined(__clang__)
-    return (int32_t)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
-#else
-    return *ptr;
-#endif
+    return (int32_t)atomic_load_32((volatile long*)ptr, memory_order_seq_cst);
 }
 
 void cupolas_atomic_store32(volatile int32_t* ptr, int32_t val) {
-#if cupolas_PLATFORM_WINDOWS
-    InterlockedExchange((volatile LONG*)ptr, val);
-#elif defined(__GNUC__) || defined(__clang__)
-    __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
-#else
-    *ptr = val;
-#endif
+    atomic_store_32((volatile long*)ptr, (long)val, memory_order_seq_cst);
 }
 
 int32_t cupolas_atomic_add32(volatile int32_t* ptr, int32_t delta) {
-#if cupolas_PLATFORM_WINDOWS
-    return InterlockedExchangeAdd((volatile LONG*)ptr, delta) + delta;
-#elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_add_fetch(ptr, delta, __ATOMIC_SEQ_CST);
-#else
-    return (*ptr += delta);
-#endif
+    return (int32_t)(atomic_fetch_add_32((volatile long*)ptr, (long)delta, memory_order_seq_cst) + delta);
 }
 
 int32_t cupolas_atomic_sub32(volatile int32_t* ptr, int32_t delta) {
@@ -901,44 +887,21 @@ int32_t cupolas_atomic_dec32(volatile int32_t* ptr) {
 }
 
 bool cupolas_atomic_cas32(volatile int32_t* ptr, int32_t expected, int32_t desired) {
-#if cupolas_PLATFORM_WINDOWS
-    return InterlockedCompareExchange((volatile LONG*)ptr, desired, expected) == expected;
-#elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_compare_exchange_n(ptr, &expected, desired, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-#else
-    if (*ptr == expected) { *ptr = desired; return true; }
-    return false;
-#endif
+    long exp = (long)expected;
+    return atomic_compare_exchange_strong_32((volatile long*)ptr, &exp, (long)desired,
+                                              memory_order_seq_cst, memory_order_seq_cst);
 }
 
 int64_t cupolas_atomic_load64(volatile int64_t* ptr) {
-#if cupolas_PLATFORM_WINDOWS
-    return InterlockedCompareExchange64((volatile LONGLONG*)ptr, 0, 0);
-#elif defined(__GNUC__) || defined(__clang__)
-    return (int64_t)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
-#else
-    return *ptr;
-#endif
+    return atomic_load_64((volatile int64_t*)ptr, memory_order_seq_cst);
 }
 
 void cupolas_atomic_store64(volatile int64_t* ptr, int64_t val) {
-#if cupolas_PLATFORM_WINDOWS
-    InterlockedExchange64((volatile LONGLONG*)ptr, val);
-#elif defined(__GNUC__) || defined(__clang__)
-    __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
-#else
-    *ptr = val;
-#endif
+    atomic_store_64((volatile int64_t*)ptr, val, memory_order_seq_cst);
 }
 
 int64_t cupolas_atomic_add64(volatile int64_t* ptr, int64_t delta) {
-#if cupolas_PLATFORM_WINDOWS
-    return InterlockedExchangeAdd64((volatile LONGLONG*)ptr, delta) + delta;
-#elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_add_fetch(ptr, delta, __ATOMIC_SEQ_CST);
-#else
-    return (*ptr += delta);
-#endif
+    return atomic_fetch_add_64((volatile int64_t*)ptr, delta, memory_order_seq_cst) + delta;
 }
 
 int64_t cupolas_atomic_sub64(volatile int64_t* ptr, int64_t delta) {
@@ -946,45 +909,22 @@ int64_t cupolas_atomic_sub64(volatile int64_t* ptr, int64_t delta) {
 }
 
 bool cupolas_atomic_cas64(volatile int64_t* ptr, int64_t expected, int64_t desired) {
-#if cupolas_PLATFORM_WINDOWS
-    return InterlockedCompareExchange64((volatile LONGLONG*)ptr, desired, expected) == expected;
-#elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_compare_exchange_n(ptr, &expected, desired, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-#else
-    if (*ptr == expected) { *ptr = desired; return true; }
-    return false;
-#endif
+    int64_t exp = expected;
+    return atomic_compare_exchange_strong_64((volatile int64_t*)ptr, &exp, desired,
+                                              memory_order_seq_cst, memory_order_seq_cst);
 }
 
 void* cupolas_atomic_load_ptr(volatile void** ptr) {
-#if cupolas_PLATFORM_WINDOWS
-    return InterlockedCompareExchangePointer((volatile PVOID*)ptr, NULL, NULL);
-#elif defined(__GNUC__) || defined(__clang__)
-    return (void*)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
-#else
-    return *(void**)ptr;
-#endif
+    return atomic_load_ptr((void* volatile*)ptr, memory_order_seq_cst);
 }
 
 void cupolas_atomic_store_ptr(volatile void** ptr, void* val) {
-#if cupolas_PLATFORM_WINDOWS
-    InterlockedExchangePointer((volatile PVOID*)ptr, val);
-#elif defined(__GNUC__) || defined(__clang__)
-    __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
-#else
-    *(void**)ptr = val;
-#endif
+    atomic_store_ptr((void* volatile*)ptr, val, memory_order_seq_cst);
 }
 
 bool cupolas_atomic_cas_ptr(volatile void** ptr, void* expected, void* desired) {
-#if cupolas_PLATFORM_WINDOWS
-    return InterlockedCompareExchangePointer((volatile PVOID*)ptr, desired, expected) == expected;
-#elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_compare_exchange_n(ptr, &expected, desired, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-#else
-    if (*(void**)ptr == expected) { *(void**)ptr = desired; return true; }
-    return false;
-#endif
+    return atomic_compare_exchange_strong_ptr((void* volatile*)ptr, &expected, desired,
+                                               memory_order_seq_cst, memory_order_seq_cst);
 }
 
 /* ============================================================================
