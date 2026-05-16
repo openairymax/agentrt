@@ -21,7 +21,6 @@
 #include "scheduler_platform.h"
 #include "mem.h"
 #include <stdlib.h>
-#include <stdio.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
@@ -83,19 +82,13 @@ static void* (*wrap_user_thread_entry(agentos_thread_func_t user_func))(void*)
  */
 static int ensure_scheduler_fully_initialized(void)
 {
-    fprintf(stderr, "[DBG] ensure_scheduler_fully_initialized: calling scheduler_core_init\n"); fflush(stderr);
     if (scheduler_core_init() != 0) {
-        fprintf(stderr, "[DBG] ensure_scheduler_fully_initialized: scheduler_core_init FAILED\n"); fflush(stderr);
         return -1;
     }
-    fprintf(stderr, "[DBG] ensure_scheduler_fully_initialized: scheduler_core_init OK\n"); fflush(stderr);
 
-    fprintf(stderr, "[DBG] ensure_scheduler_fully_initialized: calling scheduler_platform_auto_init\n"); fflush(stderr);
     if (scheduler_platform_auto_init() != 0) {
-        fprintf(stderr, "[DBG] ensure_scheduler_fully_initialized: scheduler_platform_auto_init FAILED\n"); fflush(stderr);
         return -1;
     }
-    fprintf(stderr, "[DBG] ensure_scheduler_fully_initialized: scheduler_platform_auto_init OK\n"); fflush(stderr);
 
     return 0;
 }

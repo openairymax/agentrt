@@ -678,9 +678,14 @@ static inline int atomic_exchange_bool(volatile int* ptr, int desired, memory_or
 
 #if AGENTOS_USE_STDATOMIC
 
-static inline void atomic_thread_fence(memory_order order) {
-    __atomic_thread_fence((int)order);
-}
+/* When using system <stdatomic.h>, atomic_thread_fence is already provided
+ * as a macro: #define atomic_thread_fence(MO) __atomic_thread_fence(MO)
+ * Do NOT redefine it as a static inline function here, because the macro
+ * would expand the function name, creating infinite recursion:
+ *   static inline void __atomic_thread_fence(memory_order order) {
+ *       __atomic_thread_fence((int)order);  // calls itself!
+ *   }
+ */
 
 #elif defined(_WIN32)
 
