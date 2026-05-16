@@ -1191,6 +1191,11 @@ static int mcp_adapter_receive(void* context, void** data, size_t* size) {
     return ret;
 }
 
+static int mcp_adapter_receive_adapter(void* context, void** data, size_t* size, uint32_t timeout_ms) {
+    (void)timeout_ms;
+    return mcp_adapter_receive(context, data, size);
+}
+
 static int mcp_adapter_get_stats(void* context, char* stats_json, size_t max_size) {
     (void)context;
     if (!stats_json || max_size < 64) return -1;
@@ -1250,7 +1255,7 @@ static protocol_adapter_t mcp_v1_adapter_internal = {
     .disconnect = mcp_adapter_disconnect,
     .is_connected = mcp_adapter_is_connected,
     .send = mcp_adapter_send,
-    .receive = mcp_adapter_receive,
+    .receive = mcp_adapter_receive_adapter,
     .handle_request = mcp_adapter_handle_request,
     .get_version = mcp_adapter_get_version,
     .capabilities = mcp_adapter_capabilities,

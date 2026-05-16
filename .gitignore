@@ -754,8 +754,6 @@ docs/api/man/
 !.clangd
 !.editorconfig
 !.gitattributes
-!.jscpd.json
-!.lizardrc
 !.pre-commit-config.yaml
 !vcpkg.json
 !Doxyfile
@@ -798,6 +796,8 @@ docs/api/man/
 # scripts/code_quality/ — 代码质量工具
 !scripts/code_quality/**/*.py
 !scripts/code_quality/**/*.sh
+!scripts/code_quality/.jscpd.json
+!scripts/code_quality/.lizardrc
 
 # scripts/deployment/ — Docker 部署
 !scripts/deployment/docker/.gitignore

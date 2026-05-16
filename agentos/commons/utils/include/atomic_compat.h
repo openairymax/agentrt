@@ -41,86 +41,86 @@ extern "C" {
 #define AGENTOS_USE_STDATOMIC 1
 
 static inline long atomic_load_32(volatile _Atomic long* ptr, memory_order order) {
-    return atomic_load_explicit(ptr, order);
+    return (long)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_32(volatile _Atomic long* ptr, long val, memory_order order) {
     atomic_store_explicit(ptr, val, order);
 }
 static inline long atomic_fetch_add_32(volatile _Atomic long* ptr, long val, memory_order order) {
-    return atomic_fetch_add_explicit(ptr, val, order);
+    return (long)atomic_fetch_add_explicit(ptr, val, order);
 }
 static inline long atomic_fetch_sub_32(volatile _Atomic long* ptr, long val, memory_order order) {
-    return atomic_fetch_sub_explicit(ptr, val, order);
+    return (long)atomic_fetch_sub_explicit(ptr, val, order);
 }
 static inline long atomic_exchange_32(volatile _Atomic long* ptr, long val, memory_order order) {
-    return atomic_exchange_explicit(ptr, val, order);
+    return (long)atomic_exchange_explicit(ptr, val, order);
 }
 static inline _Bool atomic_compare_exchange_strong_32(volatile _Atomic long* ptr, long* expected, long desired, memory_order succ, memory_order fail) {
     return atomic_compare_exchange_strong_explicit(ptr, expected, desired, succ, fail);
 }
 static inline int64_t atomic_load_64(volatile _Atomic int64_t* ptr, memory_order order) {
-    return atomic_load_explicit(ptr, order);
+    return (int64_t)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_64(volatile _Atomic int64_t* ptr, int64_t val, memory_order order) {
     atomic_store_explicit(ptr, val, order);
 }
 static inline int64_t atomic_fetch_add_64(volatile _Atomic int64_t* ptr, int64_t val, memory_order order) {
-    return atomic_fetch_add_explicit(ptr, val, order);
+    return (int64_t)atomic_fetch_add_explicit(ptr, val, order);
 }
 static inline int64_t atomic_fetch_sub_64(volatile _Atomic int64_t* ptr, int64_t val, memory_order order) {
-    return atomic_fetch_sub_explicit(ptr, val, order);
+    return (int64_t)atomic_fetch_sub_explicit(ptr, val, order);
 }
 static inline int64_t atomic_exchange_64(volatile _Atomic int64_t* ptr, int64_t val, memory_order order) {
-    return atomic_exchange_explicit(ptr, val, order);
+    return (int64_t)atomic_exchange_explicit(ptr, val, order);
 }
 static inline _Bool atomic_compare_exchange_strong_64(volatile _Atomic int64_t* ptr, int64_t* expected, int64_t desired, memory_order succ, memory_order fail) {
     return atomic_compare_exchange_strong_explicit(ptr, expected, desired, succ, fail);
 }
 static inline char atomic_load_8(volatile _Atomic char* ptr, memory_order order) {
-    return atomic_load_explicit(ptr, order);
+    return (char)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_8(volatile _Atomic char* ptr, char val, memory_order order) {
     atomic_store_explicit(ptr, val, order);
 }
 static inline char atomic_fetch_add_8(volatile _Atomic char* ptr, char val, memory_order order) {
-    return atomic_fetch_add_explicit(ptr, val, order);
+    return (char)atomic_fetch_add_explicit(ptr, val, order);
 }
 static inline char atomic_fetch_sub_8(volatile _Atomic char* ptr, char val, memory_order order) {
-    return atomic_fetch_sub_explicit(ptr, val, order);
+    return (char)atomic_fetch_sub_explicit(ptr, val, order);
 }
 static inline char atomic_exchange_8(volatile _Atomic char* ptr, char val, memory_order order) {
-    return atomic_exchange_explicit(ptr, val, order);
+    return (char)atomic_exchange_explicit(ptr, val, order);
 }
 static inline _Bool atomic_compare_exchange_strong_8(volatile _Atomic char* ptr, char* expected, char desired, memory_order succ, memory_order fail) {
     return atomic_compare_exchange_strong_explicit(ptr, expected, desired, succ, fail);
 }
 static inline short atomic_load_16(volatile _Atomic short* ptr, memory_order order) {
-    return atomic_load_explicit(ptr, order);
+    return (short)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_16(volatile _Atomic short* ptr, short val, memory_order order) {
     atomic_store_explicit(ptr, val, order);
 }
 static inline short atomic_fetch_add_16(volatile _Atomic short* ptr, short val, memory_order order) {
-    return atomic_fetch_add_explicit(ptr, val, order);
+    return (short)atomic_fetch_add_explicit(ptr, val, order);
 }
 static inline short atomic_fetch_sub_16(volatile _Atomic short* ptr, short val, memory_order order) {
-    return atomic_fetch_sub_explicit(ptr, val, order);
+    return (short)atomic_fetch_sub_explicit(ptr, val, order);
 }
 static inline short atomic_exchange_16(volatile _Atomic short* ptr, short val, memory_order order) {
-    return atomic_exchange_explicit(ptr, val, order);
+    return (short)atomic_exchange_explicit(ptr, val, order);
 }
 static inline _Bool atomic_compare_exchange_strong_16(volatile _Atomic short* ptr, short* expected, short desired, memory_order succ, memory_order fail) {
     return atomic_compare_exchange_strong_explicit(ptr, expected, desired, succ, fail);
 }
 
 static inline void* atomic_load_ptr(_Atomic void** ptr, memory_order order) {
-    return atomic_load_explicit(ptr, order);
+    return (void*)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_ptr(_Atomic void** ptr, void* val, memory_order order) {
     atomic_store_explicit(ptr, val, order);
 }
 static inline void* atomic_exchange_ptr(_Atomic void** ptr, void* val, memory_order order) {
-    return atomic_exchange_explicit(ptr, val, order);
+    return (void*)atomic_exchange_explicit(ptr, val, order);
 }
 static inline _Bool atomic_compare_exchange_strong_ptr(_Atomic void** ptr, void** expected, void* desired, memory_order succ, memory_order fail) {
     return atomic_compare_exchange_strong_explicit(ptr, expected, desired, succ, fail);
@@ -518,13 +518,13 @@ typedef _Atomic unsigned long atomic_uint_fast32_t;
 
 /* C11 double 原子操作补充 */
 static inline double atomic_load_double_fn(_Atomic double* ptr, memory_order order) {
-    return atomic_load_explicit(ptr, order);
+    return (double)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_double_fn(_Atomic double* ptr, double value, memory_order order) {
     atomic_store_explicit(ptr, value, order);
 }
 static inline double atomic_fetch_add_double_fn(_Atomic double* ptr, double value, memory_order order) {
-    double old = atomic_load_explicit(ptr, memory_order_relaxed);
+    double old = (double)atomic_load_explicit(ptr, memory_order_relaxed);
     double new_val;
     do {
         new_val = old + value;
@@ -532,7 +532,7 @@ static inline double atomic_fetch_add_double_fn(_Atomic double* ptr, double valu
     return old;
 }
 static inline double atomic_exchange_double_fn(_Atomic double* ptr, double desired, memory_order order) {
-    return atomic_exchange_explicit(ptr, desired, order);
+    return (double)atomic_exchange_explicit(ptr, desired, order);
 }
 
 #define atomic_fetch_add_double(ptr, val, ord) atomic_fetch_add_double_fn(ptr, val, ord)
@@ -566,7 +566,7 @@ typedef volatile int atomic_bool;
 #if AGENTOS_USE_STDATOMIC
 
 static inline _Bool atomic_load_bool(_Atomic _Bool* ptr, memory_order order) {
-    return atomic_load_explicit(ptr, order);
+    return (_Bool)atomic_load_explicit(ptr, order);
 }
 
 static inline void atomic_store_bool(_Atomic _Bool* ptr, _Bool value, memory_order order) {
@@ -574,7 +574,7 @@ static inline void atomic_store_bool(_Atomic _Bool* ptr, _Bool value, memory_ord
 }
 
 static inline _Bool atomic_exchange_bool(_Atomic _Bool* ptr, _Bool desired, memory_order order) {
-    return atomic_exchange_explicit(ptr, desired, order);
+    return (_Bool)atomic_exchange_explicit(ptr, desired, order);
 }
 
 #elif defined(_WIN32)
