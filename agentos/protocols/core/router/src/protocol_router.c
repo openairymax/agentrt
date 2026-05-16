@@ -545,7 +545,7 @@ static int match_endpoint(const char* pattern, const char* endpoint)
     return 0;
 }
 
-static int __attribute__((unused)) match_endpoint_extract(const char* pattern,
+static int match_endpoint_extract(const char* pattern,
                                    const char* endpoint,
                                    route_match_info_t* info)
 {

@@ -14,8 +14,8 @@
 #include "syscall_router.h"
 #include "jsonrpc.h"
 #include "syscalls.h"
+#include "string_compat.h"
 #include "platform.h"
-#include <cjson/cJSON.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -535,10 +535,15 @@ static unsigned long hash_fn(const char* str) {
     return h;
 }
 
-static void ht_init(hash_table_t* ht, size_t capacity) {
+static int ht_init(hash_table_t* ht, size_t capacity) {
     ht->entries = (hash_entry_t*)calloc(capacity, sizeof(hash_entry_t));
+    if (!ht->entries) {
+        ht->capacity = 0;
+        return -1;
+    }
     ht->capacity = capacity;
     ht->count = 0;
+    return 0;
 }
 
 static void ht_destroy(hash_table_t* ht) {
@@ -690,10 +695,24 @@ static void __attribute__((constructor)) runtime_init(void) {
         g_runtime.agents = NULL;
         return;
     }
-    ht_init(&g_runtime.task_index, g_max_tasks * 2);
-    ht_init(&g_runtime.record_index, g_max_records * 2);
-    ht_init(&g_runtime.session_index, g_max_sessions * 2);
-    ht_init(&g_runtime.agent_index, g_max_agents * 2);
+    if (ht_init(&g_runtime.task_index, g_max_tasks * 2) != 0 ||
+        ht_init(&g_runtime.record_index, g_max_records * 2) != 0 ||
+        ht_init(&g_runtime.session_index, g_max_sessions * 2) != 0 ||
+        ht_init(&g_runtime.agent_index, g_max_agents * 2) != 0) {
+        ht_destroy(&g_runtime.task_index);
+        ht_destroy(&g_runtime.record_index);
+        ht_destroy(&g_runtime.session_index);
+        ht_destroy(&g_runtime.agent_index);
+        free(g_runtime.tasks);
+        free(g_runtime.records);
+        free(g_runtime.sessions);
+        free(g_runtime.agents);
+        g_runtime.tasks = NULL;
+        g_runtime.records = NULL;
+        g_runtime.sessions = NULL;
+        g_runtime.agents = NULL;
+        return;
+    }
     g_runtime.initialized = true;
 }
 

@@ -1,3 +1,4 @@
+#include "atomic_compat.h"
 #include "channel_service.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,12 +7,12 @@
 #include <signal.h>
 #include <unistd.h>
 
-static volatile int g_running = 1;
+static atomic_int g_running = 1;
 static channel_service_t* g_svc __attribute__((unused)) = NULL;
 
 static void signal_handler(int sig __attribute__((unused)))
 {
-    g_running = 0;
+    atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
 }
 
 __attribute__((used))
@@ -218,7 +219,7 @@ int main(int argc, char* argv[])
     fprintf(stdout, "channel_d started (max_channels=%u, socket_dir=%s)\n",
             config.max_channels, config.socket_dir);
 
-    while (g_running) {
+    while (atomic_load_explicit(&g_running, memory_order_acquire)) {
         sleep(1);
     }
 

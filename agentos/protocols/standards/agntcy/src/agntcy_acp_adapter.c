@@ -190,7 +190,7 @@ int agntcy_message_broadcast(agntcy_handle_t* h, const agntcy_message_t* msg) {
     for (size_t i = 0; i < h->agent_count; i++) {
         if (h->agents[i].online &&
             strcmp(h->agents[i].agent_id, msg->sender_id) != 0) {
-            if (i) { }
+            (void)i;
         }
     }
 
@@ -283,7 +283,7 @@ int agntcy_ack_negotiate(agntcy_handle_t* h, const char* agent_id,
 }
 
 static int agntcy_proto_init(void* context, const void* config) {
-    if (config) { }
+    (void)config;
     agntcy_handle_t* h = (agntcy_handle_t*)context;
     if (!h) {
         if (agntcy_acp_create(&h) != 0) return -1;
@@ -293,8 +293,12 @@ static int agntcy_proto_init(void* context, const void* config) {
     return 0;
 }
 
+static int agntcy_proto_init_adapter(void* context) {
+    return agntcy_proto_init(context, NULL);
+}
+
 static int agntcy_proto_destroy(void* context) {
-    if (context) { }
+    (void)context;
     g_agntcy_state.proto_initialized = false;
     return 0;
 }
@@ -302,7 +306,7 @@ static int agntcy_proto_destroy(void* context) {
 static int agntcy_proto_handle_request(void* context,
                                         const void* req,
                                         void** resp) {
-    if (context) { }
+    (void)context;
     if (!req || !resp) return -1;
 
     const char* raw = (const char*)req;
@@ -327,12 +331,19 @@ static int agntcy_proto_handle_request(void* context,
 }
 
 static const char* agntcy_proto_get_version(void* context) {
-    if (context) { }
+    (void)context;
     return AGNTCY_ACP_VERSION;
 }
 
+static int agntcy_proto_get_version_adapter(void* context, char* version_buf, size_t max_size) {
+    const char* ver = agntcy_proto_get_version(context);
+    if (!version_buf || max_size == 0) return -1;
+    snprintf(version_buf, max_size, "%s", ver);
+    return 0;
+}
+
 static uint64_t agntcy_proto_capabilities(void* context) {
-    if (context) { }
+    (void)context;
     return (uint64_t)(
         AGNTCY_CAP_DISCOVERY |
         AGNTCY_CAP_CHANNEL |
@@ -340,6 +351,10 @@ static uint64_t agntcy_proto_capabilities(void* context) {
         AGNTCY_CAP_ORCHESTRATE |
         AGNTCY_CAP_BROADCAST |
         AGNTCY_CAP_ACK);
+}
+
+static uint32_t agntcy_proto_capabilities_adapter(void* context) {
+    return (uint32_t)agntcy_proto_capabilities(context);
 }
 
 const proto_adapter_t* agntcy_get_protocol_adapter(void) {
@@ -351,11 +366,11 @@ const proto_adapter_t* agntcy_get_protocol_adapter(void) {
         adapter.version = AGNTCY_ACP_VERSION;
         adapter.description = "Agent Communication Protocol - open standard for agent-to-agent communication";
         adapter.type = PROTO_AGNTCY;
-        adapter.init = agntcy_proto_init;
+        adapter.init = agntcy_proto_init_adapter;
         adapter.destroy = agntcy_proto_destroy;
         adapter.handle_request = agntcy_proto_handle_request;
-        adapter.get_version = agntcy_proto_get_version;
-        adapter.capabilities = agntcy_proto_capabilities;
+        adapter.get_version = agntcy_proto_get_version_adapter;
+        adapter.capabilities = agntcy_proto_capabilities_adapter;
         initialized = true;
     }
 

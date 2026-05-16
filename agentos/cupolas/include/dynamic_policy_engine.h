@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+/** @note This API is planned for v2.0.0. Enable with AGENTOS_ENABLE_V2_API to access. */
 /**
  * @file dynamic_policy_engine.h
  * @brief Dynamic Policy Engine for AgentOS SafetyGuard
@@ -90,6 +91,8 @@ typedef struct dpolicy_engine_s dpolicy_engine_t;
 typedef void (*dpolicy_change_callback_t)(const dpolicy_change_record_t* record,
                                             void* user_data);
 
+#ifdef AGENTOS_ENABLE_V2_API
+
 dpolicy_engine_t* dpolicy_engine_create(dpolicy_conflict_strategy_t default_strategy);
 void dpolicy_engine_destroy(dpolicy_engine_t* engine);
 
@@ -126,6 +129,8 @@ int dpolicy_engine_validate_compliance(dpolicy_engine_t* engine,
 
 size_t dpolicy_engine_get_rule_count(dpolicy_engine_t* engine);
 size_t dpolicy_engine_get_version_count(dpolicy_engine_t* engine);
+
+#endif /* AGENTOS_ENABLE_V2_API */
 
 #ifdef __cplusplus
 }

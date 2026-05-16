@@ -19,12 +19,13 @@
 #include <unistd.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <time.h>
 #include <stdarg.h>
 #include "platform.h"
+#include "atomic_compat.h"
 
 /* ==================== 内部常量定义 ==================== */
 
@@ -50,7 +51,7 @@ static const log_level_t DEFAULT_LOG_LEVEL = LOG_LEVEL_INFO;
 static const log_format_t DEFAULT_LOG_FORMAT = LOG_FORMAT_TEXT;
 
 /** 最大消息长度 */
-static const size_t MAX_MESSAGE_LEN = 4096;
+#define MAX_MESSAGE_LEN 4096
 
 /* ==================== 日志节流（Throttling）内部数据结构 ==================== */
 
@@ -65,16 +66,16 @@ typedef struct {
 } throttle_bucket_t;
 
 static throttle_bucket_t g_throttle_buckets[THROTTLE_BUCKET_COUNT];
-static volatile uint32_t g_throttle_enabled = 0;
-static volatile uint32_t g_throttle_max_per_sec = 100;
+static atomic_uint g_throttle_enabled = 0;
+static atomic_uint g_throttle_max_per_sec = 100;
 static agentos_mutex_t g_throttle_mutex;
 static bool g_throttle_mutex_init = false;
 
 /* ==================== 日志采样（Sampling）内部数据结构 ==================== */
 
-static volatile uint32_t g_sample_counter_debug = 0;
-static volatile uint32_t g_sample_counter_info = 0;
-static volatile uint32_t g_sample_counter_warn = 0;
+static atomic_uint g_sample_counter_debug = 0;
+static atomic_uint g_sample_counter_info = 0;
+static atomic_uint g_sample_counter_warn = 0;
 
 /**
  * @brief 计算消息哈希（用于节流去重）
@@ -647,15 +648,15 @@ bool log_should_sample(log_level_t level)
 
     switch (level) {
         case LOG_LEVEL_DEBUG: {
-            counter = __sync_fetch_and_add(&g_sample_counter_debug, 1);
+            counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_debug, 1);
             return (counter % 1000) == 0; /* 0.1% */
         }
         case LOG_LEVEL_INFO: {
-            counter = __sync_fetch_and_add(&g_sample_counter_info, 1);
+            counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_info, 1);
             return (counter % 100) == 0; /* 1% */
         }
         case LOG_LEVEL_WARN: {
-            counter = __sync_fetch_and_add(&g_sample_counter_warn, 1);
+            counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_warn, 1);
             return (counter % 10) == 0; /* 10% */
         }
         case LOG_LEVEL_ERROR:

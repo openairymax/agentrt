@@ -13,6 +13,7 @@
  * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
+#include "atomic_compat.h"
 #include "monitor_service.h"
 #include "platform.h"
 #include "thread_pool.h"
@@ -40,7 +41,7 @@
 /* ==================== 全局状态 ==================== */
 
 static monitor_service_t* g_service = NULL;
-static volatile int g_running = 1;
+static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t* g_dispatcher = NULL;
 static daemon_event_driver_t* g_event_driver = NULL;
@@ -49,7 +50,7 @@ static daemon_event_driver_t* g_event_driver = NULL;
 
 static void signal_handler(int sig __attribute__((unused))) {
     agentos_mutex_lock(&g_running_lock);
-    g_running = 0;
+    atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     agentos_mutex_unlock(&g_running_lock);
     if (g_event_driver) daemon_event_driver_stop(g_event_driver);
 }

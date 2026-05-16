@@ -1,21 +1,3 @@
-cmake_minimum_required(VERSION 3.15)
-project(AgentOSheapstore VERSION 0.0.5 LANGUAGES C)
-
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-
-option(BUILD_TESTS "Build heapstore tests" ON)
-option(BUILD_SHARED_LIBS "Build shared library" OFF)
-
-if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
-    add_compile_options(/W4 /WX-)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# R-09-124: converted to target_include_directories
-# R-09-124: converted to target_include_directories
-
 set(heapstore_SOURCES
     src/heapstore_core.c
     src/heapstore_registry.c
@@ -27,6 +9,8 @@ set(heapstore_SOURCES
     src/heapstore_token.c
     src/heapstore_integration.c
     src/utils.c
+    kernel/services/trace_store_service.c
+    kernel/services/log_store_service.c
 )
 
 set(heapstore_HEADERS
@@ -48,44 +32,38 @@ add_library(agentos_heapstore STATIC ${heapstore_SOURCES} ${heapstore_HEADERS})
 target_include_directories(agentos_heapstore PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compat/include>
     $<INSTALL_INTERFACE:include>
 )
 
 target_compile_definitions(agentos_heapstore PRIVATE
-    -Dagentos_heapstore_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-    -Dagentos_heapstore_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-    -Dagentos_heapstore_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    agentos_heapstore_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    agentos_heapstore_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    agentos_heapstore_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
-find_package(Threads REQUIRED)
-target_link_libraries(agentos_heapstore PRIVATE Threads::Threads)
+target_link_libraries(agentos_heapstore
+    PRIVATE Threads::Threads
+    PUBLIC agentos_compile_defs
+)
 
 if(TARGET agentos_common)
     target_link_libraries(agentos_heapstore PUBLIC agentos_common)
 endif()
 
-if(NOT DEFINED SQLITE3_FOUND)
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(SQLITE3 sqlite3)
-    endif()
-    if(NOT SQLITE3_FOUND)
-        find_path(SQLITE3_INCLUDE_DIR sqlite3.h)
-        find_library(SQLITE3_LIBRARY sqlite3)
-        if(SQLITE3_INCLUDE_DIR AND SQLITE3_LIBRARY)
-            set(SQLITE3_INCLUDE_DIRS ${SQLITE3_INCLUDE_DIR})
-            set(SQLITE3_LIBRARIES ${SQLITE3_LIBRARY})
-            set(SQLITE3_FOUND TRUE)
-        endif()
-    endif()
-    if(SQLITE3_FOUND)
+if(AGENTOS_HAS_SQLITE3)
+    if(SQLite3_FOUND)
+        target_include_directories(agentos_heapstore PRIVATE ${SQLite3_INCLUDE_DIRS})
+        target_link_libraries(agentos_heapstore PRIVATE ${SQLite3_LIBRARIES})
+    elseif(SQLITE3_FOUND)
         target_include_directories(agentos_heapstore PRIVATE ${SQLITE3_INCLUDE_DIRS})
         target_link_libraries(agentos_heapstore PRIVATE ${SQLITE3_LIBRARIES})
-        target_compile_definitions(agentos_heapstore PRIVATE heapstore_HAS_SQLITE3)
-        message(STATUS "SQLite3 found: ${SQLITE3_LIBRARIES}")
-    else()
-        message(WARNING "SQLite3 not found, registry features disabled")
     endif()
+    message(STATUS "heapstore: SQLite3 registry backend enabled")
+else()
+    message(STATUS "heapstore: using in-memory registry backend (no SQLite3)")
 endif()
 
 install(TARGETS agentos_heapstore
@@ -99,13 +77,9 @@ install(FILES ${heapstore_HEADERS}
 )
 
 if(BUILD_TESTS)
-    enable_testing()
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         add_subdirectory(tests)
     endif()
 endif()
 
 message(STATUS "AgentOS heapstore v${PROJECT_VERSION}")
-message(STATUS "  Build tests: ${BUILD_TESTS}")
-message(STATUS "  Build shared libs: ${BUILD_SHARED_LIBS}")
-

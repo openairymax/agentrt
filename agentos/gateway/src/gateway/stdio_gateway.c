@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
@@ -17,7 +17,9 @@
 #include "../utils/syscall_router.h"
 #include "../utils/gateway_utils.h"
 #include "../utils/gateway_rpc_handler.h"
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>

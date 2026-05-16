@@ -44,6 +44,8 @@
 #ifndef AGENTOS_CONFIG_UNIFIED_H
 #define AGENTOS_CONFIG_UNIFIED_H
 
+#include "atomic_compat.h"
+
 /* ==================== 核心层 ==================== */
 #include "core_config.h"
 
@@ -281,15 +283,16 @@
  * @brief 自动初始化配置兼容层
  */
 #define CONFIG_COMPAT_AUTO_INIT() do { \
-    static int _config_compat_initialized = 0; \
-    if (!_config_compat_initialized) { \
+    static atomic_int _config_compat_initialized = 0; \
+    int _expected = 0; \
+    if (atomic_compare_exchange_strong_explicit(&_config_compat_initialized, &_expected, 1, \
+                                                 memory_order_seq_cst, memory_order_seq_cst)) { \
         config_compat_config_t manager = { \
             .mode = COMPAT_MODE_MIXED, \
             .auto_init = true, \
             .lazy_load = true \
         }; \
         config_compat_init(&manager); \
-        _config_compat_initialized = 1; \
     } \
 } while(0)
 
