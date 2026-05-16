@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+/** @note This API is planned for v2.0.0. Enable with AGENTOS_ENABLE_V2_API to access. */
 /**
  * @file safety_guard.h
  * @brief SafetyGuard - AgentOS细粒度安全守卫框架
@@ -169,6 +170,8 @@ typedef void (*safety_policy_change_callback_t)(
     const char* change_type,
     void* user_data);
 
+#ifdef AGENTOS_ENABLE_V2_API
+
 safety_guard_context_t* safety_guard_create(void);
 void safety_guard_destroy(safety_guard_context_t* ctx);
 
@@ -252,6 +255,8 @@ int safety_guard_emergency_release(safety_guard_context_t* ctx);
 size_t safety_guard_get_guard_count(safety_guard_context_t* ctx);
 size_t safety_guard_get_policy_count(safety_guard_context_t* ctx);
 size_t safety_guard_get_audit_count(safety_guard_context_t* ctx);
+
+#endif /* AGENTOS_ENABLE_V2_API */
 
 #ifdef __cplusplus
 }
