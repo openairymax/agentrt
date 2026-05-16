@@ -4,13 +4,13 @@ on:
   push:
     branches: [main, develop, "release/*"]
     paths:
-      - "Docker/**"
+      - "scripts/deployment/docker/**"
       - "agentos/**"
-      - "agentos/.github/workflows/docker-ci.yml"
+      - ".github/workflows/docker-ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
-      - "Docker/**"
+      - "scripts/deployment/docker/**"
       - "agentos/**"
   workflow_dispatch:
     inputs:
@@ -30,6 +30,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: ${{ github.repository_owner }}/agentos
+  DOCKER_DIR: scripts/deployment/docker
 
 jobs:
   lint:
@@ -49,16 +50,10 @@ jobs:
       - name: Lint Dockerfiles
         run: |
           echo "::group::hadolint results"
-          hadolint Docker/Dockerfile.kernel \
+          hadolint $DOCKER_DIR/Dockerfile.kernel \
             --failure-threshold warning \
             --no-color
-          hadolint Docker/Dockerfile.daemon \
-            --failure-threshold warning \
-            --no-color
-          hadolint Docker/Dockerfile.openlab \
-            --failure-threshold warning \
-            --no-color
-          hadolint Docker/Dockerfile.desktop \
+          hadolint $DOCKER_DIR/Dockerfile.service \
             --failure-threshold warning \
             --no-color
           echo "::endgroup::"
@@ -66,9 +61,9 @@ jobs:
       - name: Validate Docker Compose Files
         run: |
           for compose_file in \
-            Docker/docker-compose.yml \
-            Docker/docker-compose.staging.yml \
-            Docker/docker-compose.prod.yml
+            $DOCKER_DIR/docker-compose.yml \
+            $DOCKER_DIR/docker-compose.staging.yml \
+            $DOCKER_DIR/docker-compose.prod.yml
           do
             echo "::group::Validating $compose_file"
             docker compose -f "$compose_file" config --quiet 2>&1 || \
@@ -81,20 +76,20 @@ jobs:
           echo "::group::BAN-43: Hardcoded Secrets Scan"
           SECRETS_FOUND=0
           if grep -rn "JWT_SECRET=.*[^\$].*[^C].*[^H].*[^A].*[^N].*[^G].*[^E]" \
-            Docker/docker-compose*.yml 2>/dev/null | \
+            $DOCKER_DIR/docker-compose*.yml 2>/dev/null | \
             grep -v "CHANGE_ME"; then
             echo "::warning::Potential BAN-43 violation: hardcoded JWT_SECRET"
             SECRETS_FOUND=1
           fi
           if grep -rn 'redis-cli -a\|redis-cli --no-auth-warning' \
-            Docker/docker-compose*.yml 2>/dev/null; then
+            $DOCKER_DIR/docker-compose*.yml 2>/dev/null; then
             echo "::error::BAN-43 violation: Redis healthcheck password exposure"
             SECRETS_FOUND=1
           fi
           echo "::endgroup::"
 
           echo "::group::BAN-57: CORS Wildcard Scan"
-          if grep -rn "Access-Control-Allow-Origin \\*" Docker/config/nginx/ 2>/dev/null; then
+          if grep -rn "Access-Control-Allow-Origin \\*" $DOCKER_DIR/ 2>/dev/null; then
             echo "::error::BAN-57 violation: CORS wildcard found"
             exit 1
           else
@@ -117,17 +112,11 @@ jobs:
       matrix:
         include:
           - service: "kernel"
-            dockerfile: "Docker/Dockerfile.kernel"
+            dockerfile: "scripts/deployment/docker/Dockerfile.kernel"
             target: "runtime"
-          - service: "daemon"
-            dockerfile: "Docker/Dockerfile.daemon"
+          - service: "service"
+            dockerfile: "scripts/deployment/docker/Dockerfile.service"
             target: "gateway"
-          - service: "openlab"
-            dockerfile: "Docker/Dockerfile.openlab"
-            target: "production"
-          - service: "desktop"
-            dockerfile: "Docker/Dockerfile.desktop"
-            target: "production"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -188,20 +177,12 @@ jobs:
       matrix:
         include:
           - service: "kernel"
-            dockerfile: "Docker/Dockerfile.kernel"
+            dockerfile: "scripts/deployment/docker/Dockerfile.kernel"
             target: "runtime"
             platforms: "linux/amd64,linux/arm64"
-          - service: "daemon"
-            dockerfile: "Docker/Dockerfile.daemon"
+          - service: "service"
+            dockerfile: "scripts/deployment/docker/Dockerfile.service"
             target: "gateway"
-            platforms: "linux/amd64,linux/arm64"
-          - service: "openlab"
-            dockerfile: "Docker/Dockerfile.openlab"
-            target: "production"
-            platforms: "linux/amd64,linux/arm64"
-          - service: "desktop"
-            dockerfile: "Docker/Dockerfile.desktop"
-            target: "production"
             platforms: "linux/amd64,linux/arm64"
     permissions:
       contents: read

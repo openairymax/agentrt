@@ -1275,7 +1275,7 @@ static int openai_adapter_destroy_cb(void* context) {
 
 static int openai_adapter_encode_cb(void* c, const void* m, void** o, size_t* s) {
     if (!m || !o || !s) return -1;
-    if (c) { }
+    (void)c;
     const char* msg = (const char*)m;
     size_t len = strlen(msg) + 1;
     char* buf = (char*)malloc(len);
@@ -1288,7 +1288,7 @@ static int openai_adapter_encode_cb(void* c, const void* m, void** o, size_t* s)
 
 static int openai_adapter_decode_cb(void* c, const void* d, size_t s, void* o) {
     if (!d || !o || s == 0) return -1;
-    if (c) { }
+    (void)c;
     memcpy(o, d, s);
     return 0;
 }
@@ -1355,7 +1355,7 @@ static int openai_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t) {
         return 0;
     }
 
-    if (t) { }
+    (void)t;
     *d = NULL;
     *s = 0;
     return 0;
@@ -1401,13 +1401,13 @@ static int openai_adapter_handle_request_cb(void *c, const void *r, void **rp) {
 }
 
 static int openai_adapter_get_version_cb(void* c, char* b, size_t s) {
-    if (c) { }
+    (void)c;
     snprintf(b, s, "%s", OPENAI_ADAPTER_VERSION);
     return 0;
 }
 
 static uint32_t openai_adapter_capabilities_cb(void* c) {
-    if (c) { }
+    (void)c;
     return 0x07;
 }
 
