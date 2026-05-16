@@ -285,7 +285,7 @@ static int claude_proto_handle_request(void* context,
 }
 
 static int claude_proto_get_version(void* context, char* buf, size_t max_size) {
-    if (context) { }
+    (void)context;
     if (!buf || max_size == 0) return -1;
     const char* ver = claude_adapter_version();
     size_t len = strlen(ver);
@@ -296,7 +296,7 @@ static int claude_proto_get_version(void* context, char* buf, size_t max_size) {
 }
 
 static uint32_t claude_proto_capabilities(void* context) {
-    if (context) { }
+    (void)context;
     return (uint32_t)(
         PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING |
         PROTO_CAP_VISION | PROTO_CAP_EXTENDED_THINKING);
