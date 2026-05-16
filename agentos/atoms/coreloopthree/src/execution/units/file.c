@@ -17,7 +17,7 @@
 #include <io.h>
 #define PATH_SEPARATOR "\\"
 #else
-#include <dirent.h>
+#include "agentos_dirent.h"
 #include <limits.h>
 #include <unistd.h>
 #define PATH_SEPARATOR "/"

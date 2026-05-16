@@ -18,14 +18,22 @@ extern "C" {
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
     #ifdef AGENTOS_BUILDING_DLL
+        #ifndef AGENTOS_API
         #define AGENTOS_API __declspec(dllexport)
+        #endif
     #else
+        #ifndef AGENTOS_API
         #define AGENTOS_API __declspec(dllimport)
+        #endif
     #endif
 #elif defined(__GNUC__) || defined(__clang__)
+    #ifndef AGENTOS_API
     #define AGENTOS_API __attribute__((visibility("default")))
+    #endif
 #else
+    #ifndef AGENTOS_API
     #define AGENTOS_API
+    #endif
 #endif
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)

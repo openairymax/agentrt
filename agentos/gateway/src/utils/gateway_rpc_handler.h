@@ -21,14 +21,7 @@
 #define GATEWAY_RPC_HANDLER_H
 
 #include <stddef.h>
-
-/* cJSON 条件包含 */
-#ifdef GATEWAY_HAS_CJSON
 #include <cjson/cJSON.h>
-#else
-/* 当没有cJSON时，定义前向声明以允许编译 */
-typedef struct cJSON cJSON;
-#endif
 
 /**
  * @brief RPC处理结果结构

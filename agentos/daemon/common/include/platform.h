@@ -13,6 +13,8 @@
 #ifndef AGENTOS_DAEMON_COMMON_PLATFORM_H
 #define AGENTOS_DAEMON_COMMON_PLATFORM_H
 
+#include "compat.h"
+
 /* ==================== 基本类型 ==================== */
 #include <stddef.h>
 #include <stdint.h>
@@ -148,34 +150,12 @@ typedef struct {
 int agentos_get_sysinfo(agentos_sysinfo_t* info);
 
 /* ==================== 原子操作兼容 ==================== */
-
-#ifndef AGENTOS_ATOMIC_INT_T_DEFINED
-#define AGENTOS_ATOMIC_INT_T_DEFINED
-typedef struct {
-    volatile int value;
-} agentos_atomic_int_t;
-#endif
+/* atomic_load_32/atomic_store_32/atomic_fetch_add_32/atomic_fetch_sub_32
+   are provided by atomic_compat.h — do NOT redefine here */
 
 #ifndef ATOMIC_COMPAT_HAS_32
-#define ATOMIC_COMPAT_HAS_32
-static inline long atomic_load_32(volatile long* ptr, long order __attribute__((unused))) {
-    return __sync_val_compare_and_swap(ptr, 0, 0);
-}
-static inline void atomic_store_32(volatile long* ptr, long val, long order) {
-    __sync_lock_test_and_set(ptr, val);
-}
-static inline long atomic_fetch_add_32(volatile long* ptr, long val, long order) {
-    return __sync_add_and_fetch(ptr, val);
-}
-static inline long atomic_fetch_sub_32(volatile long* ptr, long val, long order) {
-    return __sync_sub_and_fetch(ptr, val);
-}
+/* Fallback only if atomic_compat.h doesn't provide them */
 #endif
-
-int agentos_atomic_load(agentos_atomic_int_t* atomic);
-void agentos_atomic_store(agentos_atomic_int_t* atomic, int value);
-int agentos_atomic_fetch_add(agentos_atomic_int_t* atomic, int value);
-int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value);
 
 /* ==================== 服务器端 Socket 兼容 ==================== */
 

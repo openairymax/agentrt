@@ -346,15 +346,6 @@ int cupolas_entitlements_get_info(cupolas_entitlements_t* entitlements,
                                  cupolas_entitlements_info_t* info);
 
 /**
- * @brief Free entitlements info structure
- * @param[in] info Info pointer (may be NULL)
- * @note Thread-safe: Safe to call from multiple threads
- * @reentrant No
- * @ownership info: transferred to this function, will be freed
- */
-void cupolas_entitlements_free_info(cupolas_entitlements_info_t* info);
-
-/**
  * @brief Get Agent ID
  * @param[in] entitlements Entitlements context
  * @return Agent ID string (static, do not free)

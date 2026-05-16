@@ -224,7 +224,7 @@ sync_result_t sync_mutex_create(sync_mutex_t* mutex, const sync_attr_t* attr);
  * @param[in] mutex 互斥锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_mutex_destroy(sync_mutex_t mutex);
+sync_result_t sync_mutex_free(sync_mutex_t mutex);
 
 /**
  * @brief 加锁互斥锁
@@ -233,7 +233,7 @@ sync_result_t sync_mutex_destroy(sync_mutex_t mutex);
  * @param[in] timeout 超时设置（可选，NULL表示无限等待）
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_mutex_lock(sync_mutex_t mutex, const sync_timeout_t* timeout);
+sync_result_t sync_mutex_lock_ex(sync_mutex_t mutex, const sync_timeout_t* timeout);
 
 /**
  * @brief 尝试加锁互斥锁
@@ -249,7 +249,7 @@ sync_result_t sync_mutex_try_lock(sync_mutex_t mutex);
  * @param[in] mutex 互斥锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_mutex_unlock(sync_mutex_t mutex);
+sync_result_t sync_mutex_unlock_ex(sync_mutex_t mutex);
 
 /**
  * @brief 创建递归互斥锁
@@ -267,7 +267,7 @@ sync_result_t sync_recursive_mutex_create(sync_recursive_mutex_t* mutex,
  * @param[in] mutex 递归互斥锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_recursive_mutex_destroy(sync_recursive_mutex_t mutex);
+sync_result_t sync_recursive_mutex_free(sync_recursive_mutex_t mutex);
 
 /**
  * @brief 加锁递归互斥锁
@@ -276,7 +276,7 @@ sync_result_t sync_recursive_mutex_destroy(sync_recursive_mutex_t mutex);
  * @param[in] timeout 超时设置（可选）
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_recursive_mutex_lock(sync_recursive_mutex_t mutex, 
+sync_result_t sync_recursive_mutex_lock_ex(sync_recursive_mutex_t mutex, 
                                        const sync_timeout_t* timeout);
 
 /**
@@ -285,7 +285,7 @@ sync_result_t sync_recursive_mutex_lock(sync_recursive_mutex_t mutex,
  * @param[in] mutex 递归互斥锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_recursive_mutex_unlock(sync_recursive_mutex_t mutex);
+sync_result_t sync_recursive_mutex_unlock_ex(sync_recursive_mutex_t mutex);
 
 /**
  * @brief 获取递归互斥锁的递归计数
@@ -312,7 +312,7 @@ sync_result_t sync_rwlock_create(sync_rwlock_t* rwlock, const sync_attr_t* attr)
  * @param[in] rwlock 读写锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_rwlock_destroy(sync_rwlock_t rwlock);
+sync_result_t sync_rwlock_free(sync_rwlock_t rwlock);
 
 /**
  * @brief 获取读锁（共享锁）
@@ -321,7 +321,7 @@ sync_result_t sync_rwlock_destroy(sync_rwlock_t rwlock);
  * @param[in] timeout 超时设置（可选）
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_rwlock_read_lock(sync_rwlock_t rwlock, 
+sync_result_t sync_rwlock_read_lock_ex(sync_rwlock_t rwlock, 
                                    const sync_timeout_t* timeout);
 
 /**
@@ -339,7 +339,7 @@ sync_result_t sync_rwlock_try_read_lock(sync_rwlock_t rwlock);
  * @param[in] timeout 超时设置（可选）
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_rwlock_write_lock(sync_rwlock_t rwlock, 
+sync_result_t sync_rwlock_write_lock_ex(sync_rwlock_t rwlock, 
                                     const sync_timeout_t* timeout);
 
 /**
@@ -356,7 +356,7 @@ sync_result_t sync_rwlock_try_write_lock(sync_rwlock_t rwlock);
  * @param[in] rwlock 读写锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_rwlock_unlock(sync_rwlock_t rwlock);
+sync_result_t sync_rwlock_unlock_ex(sync_rwlock_t rwlock);
 
 /**
  * @brief 创建自旋锁
@@ -374,7 +374,7 @@ sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock,
  * @param[in] spinlock 自旋锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_spinlock_destroy(sync_spinlock_t spinlock);
+sync_result_t sync_spinlock_free(sync_spinlock_t spinlock);
 
 /**
  * @brief 加锁自旋锁
@@ -382,7 +382,7 @@ sync_result_t sync_spinlock_destroy(sync_spinlock_t spinlock);
  * @param[in] spinlock 自旋锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_spinlock_lock(sync_spinlock_t spinlock);
+sync_result_t sync_spinlock_lock_ex(sync_spinlock_t spinlock);
 
 /**
  * @brief 尝试加锁自旋锁
@@ -398,7 +398,7 @@ sync_result_t sync_spinlock_try_lock(sync_spinlock_t spinlock);
  * @param[in] spinlock 自旋锁句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_spinlock_unlock(sync_spinlock_t spinlock);
+sync_result_t sync_spinlock_unlock_ex(sync_spinlock_t spinlock);
 
 /**
  * @brief 创建信号量
@@ -420,7 +420,7 @@ sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
  * @param[in] semaphore 信号量句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_semaphore_destroy(sync_semaphore_t semaphore);
+sync_result_t sync_semaphore_free(sync_semaphore_t semaphore);
 
 /**
  * @brief 等待信号量
@@ -429,7 +429,7 @@ sync_result_t sync_semaphore_destroy(sync_semaphore_t semaphore);
  * @param[in] timeout 超时设置（可选）
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_semaphore_wait(sync_semaphore_t semaphore, 
+sync_result_t sync_semaphore_wait_ex(sync_semaphore_t semaphore, 
                                  const sync_timeout_t* timeout);
 
 /**
@@ -446,7 +446,7 @@ sync_result_t sync_semaphore_try_wait(sync_semaphore_t semaphore);
  * @param[in] semaphore 信号量句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_semaphore_post(sync_semaphore_t semaphore);
+sync_result_t sync_semaphore_post_ex(sync_semaphore_t semaphore);
 
 /**
  * @brief 获取信号量当前值
@@ -474,7 +474,7 @@ sync_result_t sync_condition_create(sync_condition_t* condition,
  * @param[in] condition 条件变量句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_condition_destroy(sync_condition_t condition);
+sync_result_t sync_condition_free(sync_condition_t condition);
 
 /**
  * @brief 等待条件变量
@@ -484,7 +484,7 @@ sync_result_t sync_condition_destroy(sync_condition_t condition);
  * @param[in] timeout 超时设置（可选）
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_condition_wait(sync_condition_t condition, 
+sync_result_t sync_condition_wait_ex(sync_condition_t condition, 
                                  sync_mutex_t mutex,
                                  const sync_timeout_t* timeout);
 
@@ -494,7 +494,7 @@ sync_result_t sync_condition_wait(sync_condition_t condition,
  * @param[in] condition 条件变量句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_condition_signal(sync_condition_t condition);
+sync_result_t sync_condition_signal_ex(sync_condition_t condition);
 
 /**
  * @brief 唤醒所有等待条件变量的线程
@@ -502,7 +502,7 @@ sync_result_t sync_condition_signal(sync_condition_t condition);
  * @param[in] condition 条件变量句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_condition_broadcast(sync_condition_t condition);
+sync_result_t sync_condition_broadcast_ex(sync_condition_t condition);
 
 /**
  * @brief 创建屏障
@@ -522,7 +522,7 @@ sync_result_t sync_barrier_create(sync_barrier_t* barrier,
  * @param[in] barrier 屏障句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_barrier_destroy(sync_barrier_t barrier);
+sync_result_t sync_barrier_free(sync_barrier_t barrier);
 
 /**
  * @brief 等待屏障
@@ -531,7 +531,7 @@ sync_result_t sync_barrier_destroy(sync_barrier_t barrier);
  * @param[in] timeout 超时设置（可选）
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_barrier_wait(sync_barrier_t barrier, 
+sync_result_t sync_barrier_wait_ex(sync_barrier_t barrier, 
                                const sync_timeout_t* timeout);
 
 /**
@@ -563,7 +563,7 @@ sync_result_t sync_event_create(sync_event_t* event,
  * @param[in] event 事件句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_event_destroy(sync_event_t event);
+sync_result_t sync_event_free(sync_event_t event);
 
 /**
  * @brief 设置事件为有信号状态
@@ -571,7 +571,7 @@ sync_result_t sync_event_destroy(sync_event_t event);
  * @param[in] event 事件句柄
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_event_set(sync_event_t event);
+sync_result_t sync_event_set_ex(sync_event_t event);
 
 /**
  * @brief 重置事件为无信号状态
@@ -588,7 +588,7 @@ sync_result_t sync_event_reset(sync_event_t event);
  * @param[in] timeout 超时设置（可选）
  * @return 成功返回SYNC_SUCCESS，失败返回错误码
  */
-sync_result_t sync_event_wait(sync_event_t event, 
+sync_result_t sync_event_wait_ex(sync_event_t event, 
                              const sync_timeout_t* timeout);
 
 /**

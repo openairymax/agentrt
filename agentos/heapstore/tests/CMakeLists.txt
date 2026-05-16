@@ -1,30 +1,3 @@
-cmake_minimum_required(VERSION 3.15)
-
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-
-if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
-    add_compile_options(/W4 /WX-)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic -g -O0)
-endif()
-
-# R-09-124: converted to target_include_directories
-
-# 查找SQLite3依赖
-find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND)
-    pkg_check_modules(SQLITE3 sqlite3)
-endif()
-if(NOT SQLITE3_FOUND)
-    find_library(SQLITE3_LIB sqlite3)
-    if(SQLITE3_LIB)
-        set(SQLITE3_LIBRARIES ${SQLITE3_LIB})
-        set(SQLITE3_FOUND TRUE)
-    endif()
-endif()
-
-# 单独编译每个测试文件为独立可执行文件
 set(TEST_FILES
     test_heapstore_core
     test_heapstore_registry
@@ -42,8 +15,14 @@ foreach(test ${TEST_FILES})
         target_link_libraries(${test}
             PRIVATE agentos_heapstore
             Threads::Threads
-            ${SQLITE3_LIBRARIES}
         )
+        if(AGENTOS_HAS_SQLITE3)
+            if(SQLite3_FOUND)
+                target_link_libraries(${test} PRIVATE ${SQLite3_LIBRARIES})
+            elseif(SQLITE3_FOUND)
+                target_link_libraries(${test} PRIVATE ${SQLITE3_LIBRARIES})
+            endif()
+        endif()
         add_test(NAME ${test} COMMAND ${test})
     endif()
 endforeach()
@@ -56,8 +35,14 @@ if(BUILD_BENCHMARK)
     target_link_libraries(heapstore_benchmark
         PRIVATE agentos_heapstore
         Threads::Threads
-        ${SQLITE3_LIBRARIES}
     )
+    if(AGENTOS_HAS_SQLITE3)
+        if(SQLite3_FOUND)
+            target_link_libraries(heapstore_benchmark PRIVATE ${SQLite3_LIBRARIES})
+        elseif(SQLITE3_FOUND)
+            target_link_libraries(heapstore_benchmark PRIVATE ${SQLITE3_LIBRARIES})
+        endif()
+    endif()
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/test_output)

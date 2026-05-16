@@ -20,12 +20,13 @@
 #include <stdarg.h>
 #include <time.h>
 #ifndef _WIN32
-#include <dirent.h>
+#include "agentos_dirent.h"
 #endif
 
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
+#include <sys/stat.h>
 #define mkdir(path, mode) _mkdir(path)
 #else
 #include <unistd.h>
@@ -101,6 +102,9 @@ static FILE* get_main_log_file(void) {
     snprintf(filepath, sizeof(filepath), "%s/kernel/agentos.log", base);
 
     s_main_log_file = fopen(filepath, "a");
+    if (!s_main_log_file) {
+        return NULL;
+    }
     return s_main_log_file;
 }
 

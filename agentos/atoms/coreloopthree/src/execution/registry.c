@@ -8,7 +8,7 @@
 #include "agentos.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
+#include "atomic_compat.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
@@ -24,18 +24,15 @@ typedef struct registry_entry {
 
 static registry_entry_t* g_registry = NULL;
 static agentos_mutex_t* g_registry_lock = NULL;
-static volatile int g_registry_initialized = 0;
+static atomic_int g_registry_initialized = 0;
 
-/**
- * @brief 确保注册表已初始化（线程安全）
- */
 static agentos_error_t ensure_registry_init(void) {
-    if (g_registry_initialized) return AGENTOS_SUCCESS;
+    if (atomic_load_explicit(&g_registry_initialized, memory_order_acquire)) return AGENTOS_SUCCESS;
     if (!g_registry_lock) {
         g_registry_lock = agentos_mutex_create();
         if (!g_registry_lock) return AGENTOS_ENOMEM;
     }
-    g_registry_initialized = 1;
+    atomic_store_explicit(&g_registry_initialized, 1, memory_order_seq_cst);
     return AGENTOS_SUCCESS;
 }
 

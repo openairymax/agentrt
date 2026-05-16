@@ -1,21 +1,21 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Tool 服务构建文件
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-tool-d VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # 查找依赖
 find_package(Threads REQUIRED)
-find_package(PkgConfig REQUIRED)
+find_package(PkgConfig QUIET)
 
-pkg_check_modules(CJSON REQUIRED libcjson)
-pkg_check_modules(YAML QUIET yaml-0.1)
-if(NOT YAML_FOUND)
-    message(STATUS "libyaml not found, YAML config support will be disabled")
-    add_definitions(-DNO_YAML_SUPPORT=1)
+if(PkgConfig_FOUND)
+    pkg_check_modules(CJSON QUIET libcjson)
+else()
+    set(CJSON_FOUND FALSE)
+endif()
+if(NOT CJSON_FOUND)
+    message(STATUS "libcjson not found, JSON features may be limited")
 endif()
 
 # ==================== 路径设置 ====================
@@ -31,10 +31,12 @@ set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 set(TOOL_D_SOURCES
     src/main.c
     src/service.c
+    src/config.c
     src/registry.c
     src/executor.c
     src/validator.c
     src/cache.c
+    src/tool_svc_adapter.c
     src/utils/tool_helpers.c
 )
 
@@ -58,7 +60,7 @@ elseif(UNIX)
     target_link_libraries(agentos-tool-d PRIVATE
         agentos_common
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
 endif()
 

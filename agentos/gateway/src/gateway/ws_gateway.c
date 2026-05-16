@@ -26,7 +26,7 @@
 #ifdef GATEWAY_HAS_WS
 
 #include <libwebsockets.h>
-#include <cJSON.h>
+#include <cjson/cJSON.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

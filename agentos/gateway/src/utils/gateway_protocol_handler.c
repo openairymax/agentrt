@@ -392,7 +392,9 @@ rpc_result_t gateway_protocol_handle_request(
                     id_str = strdup("null");
                 }
 
-                converted_params = cJSON_Parse(cJSON_PrintUnformatted(cJSON_GetObjectItem(json_rpc, "params")));
+                char* params_str = cJSON_PrintUnformatted(cJSON_GetObjectItem(json_rpc, "params"));
+                converted_params = cJSON_Parse(params_str);
+                free(params_str);
                 cJSON_Delete(json_rpc);
             }
             break;
@@ -446,7 +448,6 @@ rpc_result_t gateway_protocol_handle_request(
             cJSON* id_parsed = cJSON_Parse(id_str);
             if (id_parsed) {
                 cJSON_AddItemToObject(jsonrpc_req, "id", id_parsed);
-                cJSON_Delete(id_parsed);
             } else {
                 cJSON_AddNullToObject(jsonrpc_req, "id");
             }
@@ -697,7 +698,6 @@ int gateway_protocol_convert_to_jsonrpc(
         cJSON* parsed_id = cJSON_Parse(id_str);
         if (parsed_id) {
             cJSON_AddItemToObject(jsonrpc_req, "id", parsed_id);
-            cJSON_Delete(parsed_id);
         } else {
             cJSON_AddNullToObject(jsonrpc_req, "id");
         }
@@ -736,13 +736,17 @@ int gateway_protocol_convert_from_jsonrpc(
                 cJSON* openai = cJSON_CreateObject();
                 cJSON* choices = cJSON_CreateArray();
                 cJSON* choice = cJSON_CreateObject();
-                cJSON_AddItemToObject(choice, "message", cJSON_Parse(cJSON_PrintUnformatted(result)));
+                char* msg_str = cJSON_PrintUnformatted(result);
+                cJSON_AddItemToObject(choice, "message", cJSON_Parse(msg_str));
+                free(msg_str);
                 cJSON_AddItemToArray(choices, choice);
                 cJSON_AddItemToObject(openai, "choices", choices);
 
                 cJSON* model = cJSON_GetObjectItem(result, "model");
                 if (model) {
-                    cJSON_AddItemToObject(openai, "model", cJSON_Parse(cJSON_PrintUnformatted(model)));
+                    char* model_str = cJSON_PrintUnformatted(model);
+                    cJSON_AddItemToObject(openai, "model", cJSON_Parse(model_str));
+                    free(model_str);
                 } else {
                     cJSON_AddStringToObject(openai, "model", "default");
                 }
@@ -756,7 +760,9 @@ int gateway_protocol_convert_from_jsonrpc(
         case AGENTOS_PROTOCOL_MCP:
             {
                 cJSON* mcp = cJSON_CreateObject();
-                cJSON_AddItemToObject(mcp, "content", cJSON_Parse(cJSON_PrintUnformatted(result)));
+                char* content_str = cJSON_PrintUnformatted(result);
+                cJSON_AddItemToObject(mcp, "content", cJSON_Parse(content_str));
+                free(content_str);
                 cJSON_AddBoolToObject(mcp, "isError", 0);
 
                 *target_response = cJSON_PrintUnformatted(mcp);

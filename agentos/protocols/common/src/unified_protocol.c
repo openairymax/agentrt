@@ -14,14 +14,6 @@
 #include <time.h>
 #include "platform.h"
 
-#define PROTOCOL_WEBSOCKET    (AGENTOS_PROTOCOL_COUNT + 10)
-#define PROTOCOL_GRPC         (AGENTOS_PROTOCOL_COUNT + 11)
-#define PROTOCOL_MQTT         (AGENTOS_PROTOCOL_COUNT + 12)
-#define PROTOCOL_AMQP         (AGENTOS_PROTOCOL_COUNT + 13)
-#define PROTOCOL_RAW_TCP      (AGENTOS_PROTOCOL_COUNT + 14)
-#define PROTOCOL_RAW_UDP      (AGENTOS_PROTOCOL_COUNT + 15)
-#define PROTOCOL_HTTP         AGENTOS_PROTOCOL_JSON_RPC
-
 typedef struct {
     agentos_protocol_type_t type;
     const char* name;
@@ -33,15 +25,6 @@ typedef struct {
     int (*send)(void* context, const void* data, size_t size);
     int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
 } adapter_impl_t;
-
-typedef struct {
-    char name[128];
-    uint32_t max_adapters;
-    bool enable_logging;
-    void* custom_config;
-} protocol_stack_config_t;
-
-typedef struct protocol_stack_s* protocol_stack_handle_t;
 
 // ============================================================================
 // 内部数据结构

@@ -22,6 +22,14 @@
 #include <math.h>
 #include <ctype.h>
 
+#ifdef AGENTOS_HAS_CURL
+#include <curl/curl.h>
+#endif
+
+#ifdef AGENTOS_HAS_CJSON
+#include <cjson/cJSON.h>
+#endif
+
 typedef void* openai_handle_t;
 
 #ifndef OPENAI_MAX_MODELS
@@ -453,7 +461,7 @@ static openai_rate_result_t openai_check_rate_limit(
     return OPENAI_RATE_OK;
 }
 
-static void __attribute__((unused)) openai_record_request(struct openai_enterprise_adapter_s* adapter,
+static void openai_record_request(struct openai_enterprise_adapter_s* adapter,
                                    uint32_t input_tokens, uint32_t output_tokens) {
     adapter->rate_window_requests++;
     adapter->rate_window_tokens += input_tokens + output_tokens;
@@ -475,7 +483,7 @@ static void openai_on_429(struct openai_enterprise_adapter_s* adapter) {
     adapter->rate_backoff_until = now + delay_sec;
 }
 
-static int __attribute__((unused))
+static int
 openai_compute_retry_delay_ms(struct openai_enterprise_adapter_s* adapter,
                               int attempt) {
     uint32_t base_delay = (uint32_t)(OPENAI_RETRY_BASE_DELAY_MS *
@@ -529,8 +537,8 @@ int openai_chat_completion(openai_handle_t handle,
 
 #ifndef AGENTOS_HAS_CURL
     openai_record_latency(adapter, 0.0);
-    if (request) { }
-    return -10;
+    (void)request;
+    return -ENOSYS;
 #else
     if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
 
@@ -653,10 +661,10 @@ int openai_chat_completion_streaming(
     if (!adapter->initialized) return -2;
 
 #ifndef AGENTOS_HAS_CURL
-    if (request) { }
-    if (on_chunk) { }
-    if (user_data) { }
-    return -10;
+    (void)request;
+    (void)on_chunk;
+    (void)user_data;
+    return -ENOSYS;
 #else
     if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
 

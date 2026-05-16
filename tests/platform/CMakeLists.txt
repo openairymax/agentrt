@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 跨平台兼容性测试 (TeamC P2-C04)
 
@@ -25,17 +24,13 @@ target_link_libraries(test_platform_compat PRIVATE
     agentos_syscall
     svc_common
     Threads::Threads
-    rt
+    agentos_platform_libs
     m
 )
 
 find_package(cjson QUIET)
 if(TARGET cjson OR cjson_FOUND)
     target_link_libraries(test_platform_compat PRIVATE cjson)
-endif()
-
-if(UNIX AND NOT APPLE)
-    target_link_options(test_platform_compat PRIVATE -Wl,--allow-multiple-definition)
 endif()
 
 target_compile_features(test_platform_compat PRIVATE c_std_11)
@@ -59,7 +54,7 @@ target_compile_options(test_mkdir_recursive PRIVATE
 
 target_link_libraries(test_mkdir_recursive PRIVATE
     Threads::Threads
-    rt
+    agentos_platform_libs
 )
 
 add_test(

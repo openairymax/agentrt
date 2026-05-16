@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
 
 # AgentOS 顶层测试入口
 # 包含各子模块测试和集成测试

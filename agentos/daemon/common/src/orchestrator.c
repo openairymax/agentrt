@@ -20,12 +20,14 @@
 #include "circuit_breaker.h"
 #include "metacognition.h"
 #include "confidence_calibrator.h"
+#include "safe_string_utils.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include <stdatomic.h>
+#include "atomic_compat.h"
+#include "string_compat.h"
 #include <math.h>
 #include "platform.h"
 
@@ -292,12 +294,13 @@ static task_entry_t* find_or_create_task(orchestrator_t* orch,
 
 static ipc_service_bus_t g_orch_bus = NULL;
 static agentos_mutex_t g_orch_bus_mutex;
-static int g_orch_bus_mutex_initialized = 0;
+static atomic_int g_orch_bus_mutex_initialized = 0;
 
 static void ensure_orch_bus_mutex(void) {
-    if (!g_orch_bus_mutex_initialized) {
+    int expected = 0;
+    if (atomic_compare_exchange_strong_explicit(&g_orch_bus_mutex_initialized, &expected, 1,
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         agentos_mutex_init(&g_orch_bus_mutex);
-        g_orch_bus_mutex_initialized = 1;
     }
 }
 
@@ -587,7 +590,7 @@ static char* extract_field_string(const char* json, const char* field) {
 static float align_history[ORCH_ALIGN_HISTORY_SIZE];
 static int align_history_count = 0;
 static agentos_mutex_t g_align_mutex;
-static int g_align_mutex_initialized = 0;
+static atomic_int g_align_mutex_initialized = 0;
 
 static int execute_single_phase(orchestrator_t* orch,
                                 orch_phase_t phase,
@@ -720,6 +723,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         SVC_LOG_ERROR("orchestrator: decomposition failed - no LLM, no cognition output");
                         task->status = ORCH_TASK_FAILED;
                         task->error_code = -1;
+                        if (mem_ctx) free(mem_ctx);
                         goto done;
                     }
                 }
@@ -794,7 +798,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         char* enhanced = (char*)realloc(prompt, new_len);
                         if (enhanced) {
                             prompt = enhanced;
-                            strcat(prompt, "\n\nCognition engine context:\n");
+                            safe_strcat(prompt, "\n\nCognition engine context:\n", new_len);
                             for (size_t n = 0; n < gen_plan->task_plan_node_count; n++) {
                                 agentos_task_node_t* nd = gen_plan->task_plan_nodes[n];
                                 if (nd && nd->task_node_output) {
@@ -987,6 +991,7 @@ static int execute_single_phase(orchestrator_t* orch,
                                      round, round_score);
                         free(current_output);
                         current_output = NULL;
+                        if (final_critique_text) { free(final_critique_text); final_critique_text = NULL; }
                         task->status = ORCH_TASK_FAILED;
                         task->error_code = -4;
                         goto done;
@@ -1229,9 +1234,12 @@ static int execute_single_phase(orchestrator_t* orch,
 
                 float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
 
-                if (!g_align_mutex_initialized) {
-                    agentos_mutex_init(&g_align_mutex);
-                    g_align_mutex_initialized = 1;
+                {
+                    int expected = 0;
+                    if (atomic_compare_exchange_strong_explicit(&g_align_mutex_initialized, &expected, 1,
+                                                                 memory_order_seq_cst, memory_order_seq_cst)) {
+                        agentos_mutex_init(&g_align_mutex);
+                    }
                 }
 
                 agentos_mutex_lock(&g_align_mutex);

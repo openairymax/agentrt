@@ -12,6 +12,8 @@
 
 #include "sync_platform.h"
 #include <time.h>
+#include "sync_internal.h"
+#include <string.h>
 
 sync_result_t sync_barrier_create(sync_barrier_t* barrier,
                                 unsigned int count,
@@ -33,8 +35,8 @@ sync_result_t sync_barrier_create(sync_barrier_t* barrier,
     memset(&b->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
-    InitializeCriticalSection(&b->cs);
-    InitializeConditionVariable(&b->cond);
+    InitializeCriticalSection(&b->barrier.cs);
+    InitializeConditionVariable(&b->barrier.cond);
     b->count = count;
     b->current = 0;
     b->generation = 0;
@@ -52,7 +54,7 @@ sync_result_t sync_barrier_create(sync_barrier_t* barrier,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_barrier_destroy(sync_barrier_t barrier) {
+sync_result_t sync_barrier_free(sync_barrier_t barrier) {
     if (barrier == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -64,7 +66,7 @@ sync_result_t sync_barrier_destroy(sync_barrier_t barrier) {
     }
 
 #ifdef _WIN32
-    DeleteCriticalSection(&barrier->cs);
+    DeleteCriticalSection(&barrier->barrier.cs);
 #else
     pthread_barrier_destroy(&barrier->barrier);
 #endif
@@ -74,20 +76,20 @@ sync_result_t sync_barrier_destroy(sync_barrier_t barrier) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_barrier_wait(sync_barrier_t barrier, const sync_timeout_t* timeout) {
+sync_result_t sync_barrier_wait_ex(sync_barrier_t barrier, const sync_timeout_t* timeout) {
     if (barrier == NULL || !barrier->initialized) {
         return SYNC_ERROR_INVALID;
     }
 
 #ifdef _WIN32
-    EnterCriticalSection(&barrier->cs);
+    EnterCriticalSection(&barrier->barrier.cs);
     barrier->current++;
 
     if (barrier->current >= barrier->count) {
         barrier->current = 0;
         barrier->generation++;
-        WakeAllConditionVariable(&barrier->cond);
-        LeaveCriticalSection(&barrier->cs);
+        WakeAllConditionVariable(&barrier->barrier.cond);
+        LeaveCriticalSection(&barrier->barrier.cs);
         return SYNC_SUCCESS;
     }
 
@@ -95,14 +97,14 @@ sync_result_t sync_barrier_wait(sync_barrier_t barrier, const sync_timeout_t* ti
     DWORD wait_ms = (timeout == NULL) ? INFINITE : (DWORD)timeout->timeout_ms;
 
     while (barrier->generation == gen) {
-        if (!SleepConditionVariableCS(&barrier->cond, &barrier->cs, wait_ms)) {
+        if (!SleepConditionVariableCS(&barrier->barrier.cond, &barrier->barrier.cs, wait_ms)) {
             if (GetLastError() == ERROR_TIMEOUT) {
-                LeaveCriticalSection(&barrier->cs);
+                LeaveCriticalSection(&barrier->barrier.cs);
                 return SYNC_ERROR_TIMEOUT;
             }
         }
     }
-    LeaveCriticalSection(&barrier->cs);
+    LeaveCriticalSection(&barrier->barrier.cs);
     return SYNC_SUCCESS;
 #else
     int rc = pthread_barrier_wait(&barrier->barrier);
@@ -121,13 +123,13 @@ sync_result_t sync_barrier_reset(sync_barrier_t barrier, unsigned int new_count)
     }
 
 #ifdef _WIN32
-    EnterCriticalSection(&barrier->cs);
+    EnterCriticalSection(&barrier->barrier.cs);
     if (new_count > 0) {
         barrier->count = new_count;
     }
     barrier->current = 0;
     barrier->generation++;
-    LeaveCriticalSection(&barrier->cs);
+    LeaveCriticalSection(&barrier->barrier.cs);
     return SYNC_SUCCESS;
 #else
     (void)new_count;

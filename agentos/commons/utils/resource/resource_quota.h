@@ -11,7 +11,8 @@
 #ifndef RESOURCE_QUOTA_H
 #define RESOURCE_QUOTA_H
 
-#include "../../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "memory_compat.h"
+#include "error.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -29,6 +30,7 @@ typedef struct agentos_resource_quota {
 
 typedef struct agentos_resource_usage {
     size_t current_memory_bytes;
+    size_t peak_usage;
     uint64_t total_cpu_time_ms;
     size_t total_io_ops;
     size_t total_network_bytes;

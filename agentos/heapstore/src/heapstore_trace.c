@@ -27,7 +27,7 @@
 #else
 #include <unistd.h>
 #include <sys/stat.h>
-#include <dirent.h>
+#include "agentos_dirent.h"
 #include "platform.h"
 #endif
 

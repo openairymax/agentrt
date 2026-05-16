@@ -2,8 +2,6 @@
 # agentos/CMakeLists.txt
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-core VERSION 0.0.5 LANGUAGES C CXX)
 
 # CTest必须在此处启用，以便子目录测试能传播到根CTest
 if(BUILD_TESTS)
@@ -28,6 +26,11 @@ elseif(APPLE)
         _DARWIN_C_SOURCE
     )
     message(STATUS "POSIX feature test macros enabled for macOS")
+endif()
+
+if(MSVC)
+    message(STATUS "AgentOS: Windows MSVC force-include enabled")
+    add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
 endif()
 
 # 选项设置

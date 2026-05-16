@@ -13,6 +13,7 @@
  * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
+#include "atomic_compat.h"
 #include "scheduler_service.h"
 #include "strategy_interface.h"
 #include "../../monit_d/include/monitor_service.h"
@@ -51,7 +52,7 @@ static void handle_client(agentos_socket_t client_fd);
 /* ==================== 全局状态 ==================== */
 
 static sched_service_t* g_service = NULL;
-static volatile int g_running = 1;
+static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t* g_dispatcher = NULL;
 static daemon_event_driver_t* g_event_driver = NULL;
@@ -297,7 +298,7 @@ static void handle_client(agentos_socket_t client_fd) {
 /* ==================== 帮助信息 ==================== */
 
 static void signal_handler(int signum __attribute__((unused))) {
-    g_running = 0;
+    atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     SVC_LOG_INFO("Received shutdown signal");
     if (g_event_driver) daemon_event_driver_stop(g_event_driver);
 }

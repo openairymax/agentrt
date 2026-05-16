@@ -9,9 +9,7 @@
 #
 #   依赖链：gateway_d --> gateway (静态库) --> agentos/atoms/syscall + agentos/atoms/corekern
 
-cmake_minimum_required(VERSION 3.20)
 
-project(gateway_d VERSION 0.0.5 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -119,7 +117,7 @@ elseif(UNIX)
     target_link_libraries(gateway_d PRIVATE
         agentos_common
         Threads::Threads
-        rt
+        agentos_platform_libs
     )
 endif()
 
@@ -175,6 +173,8 @@ target_include_directories(gateway_d PRIVATE
 #   gateway_d 自行编译 gateway 源码并链接（见下方）
 
 # 将 gateway 库的源文件直接加入编译（确保符号可解析）
+# gateway 库大量依赖 cJSON，不可用时整个库跳过
+if(CJSON_FOUND)
 set(GATEWAY_LIB_SOURCES
     ${GATEWAY_SRC_DIR}/gateway/gateway_api.c
     ${GATEWAY_SRC_DIR}/gateway/http_gateway.c
@@ -202,9 +202,14 @@ target_include_directories(gateway_lib_obj PUBLIC
     ${COMMONS_DIR}/utils/logging/include
     ${COMMONS_DIR}/utils/error/include
     ${COMMONS_DIR}/utils/sync/include
-    ${PROTOCOLS_INCLUDE_DIR}
-    ${PROTOCOLS_COMMON_INCLUDE_DIR}
+    ${COMMONS_DIR}/utils/compat/include
+     ${COMMONS_DIR}/utils/include
+     ${DAEMON_COMMON_INCLUDE_DIR}
+     ${DAEMON_COMMON_DIR}/src
+     ${PROTOCOLS_INCLUDE_DIR}
+     ${PROTOCOLS_COMMON_INCLUDE_DIR}
 )
+endif()
 
 # 查找 gateway 所需的外部库
 # PkgConfig 已在前面查找过，使用 PKG_CONFIG_FOUND 变量
@@ -235,11 +240,15 @@ else()
 endif()
 
 target_link_libraries(gateway_d PRIVATE
-    $<TARGET_OBJECTS:gateway_lib_obj>
     svc_common
     agentos_common
     Threads::Threads
 )
+if(CJSON_FOUND)
+    target_link_libraries(gateway_d PRIVATE
+        $<TARGET_OBJECTS:gateway_lib_obj>
+    )
+endif()
 
 # 条件链接CJSON库
 if(CJSON_FOUND)
@@ -255,6 +264,7 @@ if(LIBWEBSOCKETS_FOUND)
 endif()
 
 # ==================== 编译选项 ====================
+if(NOT MSVC)
 target_compile_options(gateway_d PRIVATE
     -Wall
     -Wextra
@@ -264,6 +274,7 @@ target_compile_options(gateway_d PRIVATE
     $<$<CONFIG:Debug>:-g -O0>
     $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
+endif()
 
 # ==================== 安装 ====================
 install(TARGETS gateway_d

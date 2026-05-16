@@ -40,7 +40,7 @@
     #define S_ISDIR(m) (((m) & _S_IFDIR) == _S_IFDIR)
 #else
     #include <unistd.h>
-    #include <dirent.h>
+    #include "agentos_dirent.h"
     #include <sys/resource.h>
 #endif
 

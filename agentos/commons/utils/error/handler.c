@@ -11,14 +11,15 @@
  */
 
 /* 使用明确的相对路径确保包含commons的error.h */
-#include "include/error.h"
+#include "error.h"
+#include "atomic_compat.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <time.h>
 
@@ -47,10 +48,12 @@ static struct {
 
 #ifdef _WIN32
 static agentos_mutex_t g_error_stats_mutex;
-static volatile LONG g_error_stats_initialized = 0;
+static atomic_int g_error_stats_initialized = 0;
 
 static void ensure_stats_init(void) {
-    if (InterlockedCompareExchange(&g_error_stats_initialized, 1, 0) == 0) {
+    int expected = 0;
+    if (atomic_compare_exchange_strong_explicit(&g_error_stats_initialized, &expected, 1,
+                                                 memory_order_acq_rel, memory_order_acquire) == 0) {
         agentos_mutex_init(&g_error_stats_mutex);
     }
 }

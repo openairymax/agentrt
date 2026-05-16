@@ -1,4 +1,5 @@
 #include "platform.h"
+#include "atomic_compat.h"
 #include <time.h>
 #include <stdio.h>
 #include <limits.h>
@@ -208,22 +209,22 @@ int agentos_get_sysinfo(agentos_sysinfo_t* info) {
 
 int agentos_atomic_load(agentos_atomic_int_t* atomic) {
     if (!atomic) return 0;
-    return __atomic_load_n(&atomic->value, __ATOMIC_SEQ_CST);
+    return atomic_load_explicit(atomic, memory_order_seq_cst);
 }
 
 void agentos_atomic_store(agentos_atomic_int_t* atomic, int value) {
     if (!atomic) return;
-    __atomic_store_n(&atomic->value, value, __ATOMIC_SEQ_CST);
+    atomic_store_explicit(atomic, value, memory_order_seq_cst);
 }
 
 int agentos_atomic_fetch_add(agentos_atomic_int_t* atomic, int value) {
     if (!atomic) return 0;
-    return __atomic_fetch_add(&atomic->value, value, __ATOMIC_SEQ_CST);
+    return atomic_fetch_add_explicit(atomic, value, memory_order_seq_cst);
 }
 
 int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value) {
     if (!atomic) return 0;
-    return __atomic_fetch_sub(&atomic->value, value, __ATOMIC_SEQ_CST);
+    return atomic_fetch_sub_explicit(atomic, value, memory_order_seq_cst);
 }
 
 /* ==================== Socket 兼容层（生产级真实实现） ==================== */
@@ -239,16 +240,17 @@ int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value) {
 #include <fcntl.h>
 #include <errno.h>
 
-static int g_socket_initialized = 0;
+static atomic_int g_socket_initialized = 0;
 
 int agentos_socket_init(void) {
-    if (g_socket_initialized) return 0;
-    g_socket_initialized = 1;
+    int expected = 0;
+    atomic_compare_exchange_strong_explicit(&g_socket_initialized, &expected, 1,
+                                             memory_order_seq_cst, memory_order_seq_cst);
     return 0;
 }
 
 void agentos_socket_cleanup(void) {
-    g_socket_initialized = 0;
+    atomic_store_explicit(&g_socket_initialized, 0, memory_order_seq_cst);
 }
 
 agentos_socket_t agentos_socket_create_tcp_server(const char* host, uint16_t port) {
