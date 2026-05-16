@@ -99,7 +99,7 @@ protocol_handler_route_result_t protocol_handler_router_register(protocol_handle
                                                                      const char* protocol_name,
                                                                      void* handler_context) {
     if (!router || !protocol_name) return PROTOCOL_HANDLER_ROUTE_ERR_INVALID_ARG;
-    if (router->handler_count >= MAX_HANDLERS) return PROTOCOL_HANDLER_ROUTE_ERR_NO_HANDLER;
+    if (router->handler_count >= MAX_HANDLERS) return PROTOCOL_HANDLER_ROUTE_NO_HANDLER;
 
     for (size_t i = 0; i < router->handler_count; i++) {
         if (strcmp(router->handlers[i].name, protocol_name) == 0) {

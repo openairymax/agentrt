@@ -14,6 +14,12 @@ Consolidated Python utilities for AgentOS, including:
 - Benchmark: Performance measurement
 - ValidateContracts: Interface contract validation
 - ConfigEngine: Jinja2-based template rendering
+- Plugin: Plugin system framework
+- Events: Event bus system
+- Security: Input validation and security
+- Telemetry: Metrics collection
+- CLI: Interactive CLI/TUI
+- Logger: ProgressBar/Spinner/Table
 
 Usage:
     from scripts.toolkit import (
@@ -22,6 +28,10 @@ Usage:
         MemoryManager,
         TokenCounter,
         TokenBudget,
+        PluginRegistry,
+        EventBus,
+        SecurityManager,
+        MetricsCollector,
     )
 """
 
@@ -33,6 +43,12 @@ from .token_utils import TokenCounter, TokenBudget, get_token_counter, get_token
 from .benchmark import AgentOSBenchmark, BenchmarkReporter
 from .validate_contracts import ContractValidator
 from .config_engine import ConfigEngine, Environment, create_default_engine
+from .plugin import PluginRegistry, Plugin, PluginMetadata
+from .events import EventBus, Event, EventHandler
+from .security import SecurityManager, InputValidator
+from .telemetry import MetricsCollector, Metric
+from .cli import AgentOSCLI
+from .logger import Color, Style, Logger, OutputFormatter, ProgressBar, Spinner, Table
 
 __version__ = "1.0.0"
 __author__ = "SPHARX Ltd."
@@ -52,4 +68,22 @@ __all__ = [
     "ConfigEngine",
     "Environment",
     "create_default_engine",
+    "PluginRegistry",
+    "Plugin",
+    "PluginMetadata",
+    "EventBus",
+    "Event",
+    "EventHandler",
+    "SecurityManager",
+    "InputValidator",
+    "MetricsCollector",
+    "Metric",
+    "AgentOSCLI",
+    "Color",
+    "Style",
+    "Logger",
+    "OutputFormatter",
+    "ProgressBar",
+    "Spinner",
+    "Table",
 ]

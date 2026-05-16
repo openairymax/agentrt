@@ -32,7 +32,6 @@ from uuid import uuid4
 
 
 class EventType(Enum):
-    """事件类型枚举"""
     BUILD_STARTED = "build.started"
     BUILD_COMPLETED = "build.completed"
     BUILD_FAILED = "build.failed"
@@ -50,7 +49,6 @@ class EventType(Enum):
 
 
 class EventPriority(Enum):
-    """事件优先级"""
     LOW = 0
     NORMAL = 1
     HIGH = 2
@@ -59,7 +57,6 @@ class EventPriority(Enum):
 
 @dataclass
 class Event:
-    """事件数据模型"""
     id: str = field(default_factory=lambda: str(uuid4()))
     type: EventType = EventType.CUSTOM
     priority: EventPriority = EventPriority.NORMAL
@@ -102,8 +99,6 @@ class Event:
 
 
 class EventHandler(ABC):
-    """事件处理器基类"""
-
     def __init__(self, name: str, event_types: List[EventType] = None):
         self.name = name
         self.event_types: Set[EventType] = set(event_types or [])
@@ -111,11 +106,9 @@ class EventHandler(ABC):
 
     @abstractmethod
     def handle(self, event: Event) -> bool:
-        """处理事件，返回是否处理成功"""
         pass
 
     def can_handle(self, event: Event) -> bool:
-        """检查是否能处理此事件"""
         if not self.enabled:
             return False
         if not self.event_types:
@@ -123,13 +116,11 @@ class EventHandler(ABC):
         return event.type in self.event_types
 
     def filter(self, event: Event) -> bool:
-        """过滤事件，返回是否应该处理"""
         return self.can_handle(event)
 
 
 @dataclass
 class EventSubscription:
-    """事件订阅"""
     handler: EventHandler
     event_types: Set[EventType]
     async_handler: bool = False
@@ -137,8 +128,6 @@ class EventSubscription:
 
 
 class EventBus:
-    """事件总线"""
-
     def __init__(self, max_history: int = 1000):
         self._subscriptions: List[EventSubscription] = []
         self._history: deque = deque(maxlen=max_history)
@@ -148,7 +137,6 @@ class EventBus:
         self._processing = False
 
     def subscribe(self, handler: EventHandler, async_handler: bool = False) -> None:
-        """订阅事件"""
         with self._lock:
             subscription = EventSubscription(
                 handler=handler,
@@ -158,7 +146,6 @@ class EventBus:
             self._subscriptions.append(subscription)
 
     def unsubscribe(self, handler_name: str) -> None:
-        """取消订阅"""
         with self._lock:
             self._subscriptions = [
                 s for s in self._subscriptions
@@ -166,7 +153,6 @@ class EventBus:
             ]
 
     def publish(self, event: Event) -> None:
-        """发布事件（同步）"""
         with self._lock:
             self._history.append(event)
 
@@ -181,11 +167,9 @@ class EventBus:
                     print(f"Handler {subscription.handler.name} failed: {e}")
 
     async def publish_async(self, event: Event) -> None:
-        """发布事件（异步）"""
         self.publish(event)
 
     async def _async_handle(self, subscription: EventSubscription, event: Event) -> None:
-        """异步处理"""
         try:
             if asyncio.iscoroutinefunction(subscription.handler.handle):
                 await subscription.handler.handle(event)
@@ -199,7 +183,6 @@ class EventBus:
         event_type: EventType = None,
         limit: int = 100
     ) -> List[Event]:
-        """获取事件历史"""
         with self._lock:
             history = list(self._history)
 
@@ -209,12 +192,10 @@ class EventBus:
         return history[-limit:]
 
     def clear_history(self) -> None:
-        """清除事件历史"""
         with self._lock:
             self._history.clear()
 
     def start_async_processing(self) -> None:
-        """启动异步事件处理"""
         if self._async_mode:
             return
 
@@ -223,7 +204,6 @@ class EventBus:
         asyncio.create_task(self._process_events())
 
     async def _process_events(self) -> None:
-        """事件处理循环"""
         self._processing = True
         while self._processing:
             try:
@@ -235,11 +215,9 @@ class EventBus:
                 print(f"Event processing error: {e}")
 
     def stop_async_processing(self) -> None:
-        """停止异步事件处理"""
         self._processing = False
 
     def get_statistics(self) -> Dict[str, Any]:
-        """获取事件统计"""
         with self._lock:
             stats = {
                 "total_events": len(self._history),
@@ -255,8 +233,6 @@ class EventBus:
 
 
 class TelemetryEventHandler(EventHandler):
-    """遥测事件处理器"""
-
     def __init__(self):
         super().__init__("telemetry", [EventType.METRIC_RECORDED, EventType.ERROR_OCCURRED])
         self._metrics: Dict[str, List[float]] = defaultdict(list)
@@ -273,7 +249,6 @@ class TelemetryEventHandler(EventHandler):
         return True
 
     def get_metrics(self) -> Dict[str, Dict[str, float]]:
-        """获取指标统计"""
         result = {}
         for name, values in self._metrics.items():
             if values:
@@ -291,7 +266,6 @@ _global_event_bus: Optional[EventBus] = None
 
 
 def get_event_bus() -> EventBus:
-    """获取全局事件总线"""
     global _global_event_bus
     if _global_event_bus is None:
         _global_event_bus = EventBus()

@@ -30,7 +30,7 @@ endif()
 
 if(MSVC)
     message(STATUS "AgentOS: Windows MSVC force-include enabled")
-    add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
+    add_compile_options(/FI"${CMAKE_SOURCE_DIR}/scripts/cmake/windows_preinclude.h")
 endif()
 
 # 选项设置

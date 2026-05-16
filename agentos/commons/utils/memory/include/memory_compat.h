@@ -78,8 +78,8 @@ static inline void* agentos_realloc(void* ptr, size_t new_size) {
  * 
  * @param[in] ptr 要释放的指针
  */
-static inline void agentos_free(void* ptr) {
-    memory_free(ptr);
+static inline void agentos_free(const void* ptr) {
+    memory_free((void*)ptr);
 }
 
 /**

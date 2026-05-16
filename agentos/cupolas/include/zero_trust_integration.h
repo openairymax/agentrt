@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+/** @note This API is planned for v2.0.0. Enable with AGENTOS_ENABLE_V2_API to access. */
 /**
  * @file zero_trust_integration.h
  * @brief Zero Trust Architecture Integration for AgentOS
@@ -107,6 +108,8 @@ typedef void (*zta_session_callback_t)(const zta_session_t* session,
                                          const char* event_type,
                                          void* user_data);
 
+#ifdef AGENTOS_ENABLE_V2_API
+
 zta_context_t* zta_context_create(void);
 void zta_context_destroy(zta_context_t* ctx);
 
@@ -151,6 +154,8 @@ int zta_set_session_callback(zta_context_t* ctx, zta_session_callback_t callback
 size_t zta_get_identity_count(zta_context_t* ctx);
 size_t zta_get_session_count(zta_context_t* ctx);
 size_t zta_get_policy_count(zta_context_t* ctx);
+
+#endif /* AGENTOS_ENABLE_V2_API */
 
 #ifdef __cplusplus
 }

@@ -54,7 +54,7 @@ agentos_error_t agentos_timer_start(
 
         agentos_mutex_t* expected = NULL;
         if (!atomic_compare_exchange_strong_ptr(
-                (void* volatile*)&timer_lock, (void**)&expected, (void*)new_lock,
+                (_Atomic void**)&timer_lock, (void**)&expected, (void*)new_lock,
                 memory_order_seq_cst, memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }

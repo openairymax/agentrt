@@ -312,7 +312,7 @@ static inline void atomic_read_barrier(void) {
  * @return true 操作成功，false 操作失败
  */
 static inline bool agentos_atomic_cas_weak(volatile uint64_t* ptr, uint64_t* expected, uint64_t desired) {
-    return atomic_compare_exchange_strong_64((volatile int64_t*)ptr, (int64_t*)expected, (int64_t)desired,
+    return atomic_compare_exchange_strong_64((volatile _Atomic int64_t*)ptr, (int64_t*)expected, (int64_t)desired,
                                               memory_order_acq_rel, memory_order_acquire);
 }
 

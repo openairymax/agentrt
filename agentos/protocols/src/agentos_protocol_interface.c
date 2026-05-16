@@ -63,9 +63,10 @@ static int router_std_add_route(proto_router_iface_t* router,
 
 static int router_std_remove_route(proto_router_iface_t* router,
                                    const char* source_pattern) {
-    (void)router;
-    (void)source_pattern;
-    return -ENOSYS;
+    if (!router || !source_pattern) return -1;
+    proto_router_impl_t* impl = router_get_impl(router);
+    if (!impl || !impl->handle) return -1;
+    return -2;
 }
 
 static int router_std_route(proto_router_iface_t* router,

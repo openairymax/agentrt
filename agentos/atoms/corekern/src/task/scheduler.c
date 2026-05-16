@@ -82,12 +82,10 @@ static void* (*wrap_user_thread_entry(agentos_thread_func_t user_func))(void*)
  */
 static int ensure_scheduler_fully_initialized(void)
 {
-    /* 初始化调度器核心层 */
     if (scheduler_core_init() != 0) {
         return -1;
     }
 
-    /* 初始化平台适配器 */
     if (scheduler_platform_auto_init() != 0) {
         return -1;
     }
