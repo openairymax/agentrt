@@ -864,9 +864,11 @@ int a2a_v03_create_task(a2a_v03_context_t* ctx, const char* agent_id,
     a2a_task_t* t = (a2a_task_t*)calloc(1, sizeof(a2a_task_t));
     if (!t) return -4;
 
-    snprintf(t->id, sizeof(t->id), "task_%zu_%u", adapter->task_count,
+    t->id = (char*)malloc(A2A_TASK_ID_SIZE);
+    if (!t->id) { free(t); return -5; }
+    snprintf(t->id, A2A_TASK_ID_SIZE, "task_%zu_%u", adapter->task_count,
              (unsigned int)(a2a_timestamp_ms() % 100000));
-    if (agent_id) strncpy(t->agent_id, agent_id, sizeof(t->agent_id) - 1);
+    t->agent_id = agent_id ? strdup(agent_id) : NULL;
     t->description = description ? strdup(description) : NULL;
     t->input_json = input_json ? strdup(input_json) : NULL;
     t->output_json = NULL;

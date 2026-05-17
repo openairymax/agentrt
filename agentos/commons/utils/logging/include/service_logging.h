@@ -467,7 +467,23 @@ bool service_logging_test_filter_rule(int rule_id, const log_record_t* record);
  * 
  * @return 成功发送的记录数，负值表示错误
  */
+/* ==================== 前向声明 ==================== */
+
+typedef struct log_monitoring_stats log_monitoring_stats_t;
+
+/* ==================== 服务层 API ==================== */
+
 int service_logging_flush_transport(void);
+
+/**
+ * @brief 输出单条日志记录
+ * 
+ * 通过已注册的outputter输出单条日志记录。
+ * 由atomic_logging层调用，实现分层日志桥接。
+ * 
+ * @param record 日志记录指针
+ */
+void service_log_output_record(const log_record_t* record);
 
 /**
  * @brief 获取监控统计
