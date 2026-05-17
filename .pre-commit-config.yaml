@@ -99,15 +99,15 @@ repos:
       - id: check-symlinks
 
   # 许可证检查
-  - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.4.2
-    hooks:
-      - id: insert-license
-        files: \.(py|cpp|c|h|hpp)$
-        args:
-          - --license-filepath
-          - .github/LICENSE_HEADER.txt
-          - --use-current-year
+  # - repo: https://github.com/Lucas-C/pre-commit-hooks
+  #   rev: v1.4.2
+  #   hooks:
+  #     - id: insert-license
+  #       files: \.(py|cpp|c|h|hpp)$
+  #       args:
+  #         - --license-filepath
+  #         - .github/LICENSE_HEADER.txt
+  #         - --use-current-year
 
   # 提交信息格式检查（可选）
   # - repo: https://github.com/commitizen-agentos/toolkit/commitizen

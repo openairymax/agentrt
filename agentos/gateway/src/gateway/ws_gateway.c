@@ -218,6 +218,15 @@ static int ws_send_message(struct lws* wsi, ws_message_t* msg) {
 
 /* ========== RPC处理（使用统一处理器） ========== */
 
+static int ws_rpc_handler_adapter(const char* request_json, char** response_json, void* ctx) {
+    ws_gateway_t* gw = (ws_gateway_t*)ctx;
+    if (!gw || !gw->handler) return -1;
+    char* result = gw->handler((void*)request_json, gw->handler_data);
+    if (!result) return -1;
+    *response_json = result;
+    return 0;
+}
+
 /**
  * @brief 处理RPC请求（使用统一RPC处理器）
  *
@@ -235,8 +244,8 @@ static char* handle_rpc_request(ws_gateway_t* gateway, cJSON* request) {
 
     rpc_result_t result = gateway_rpc_handle_request(
         request,
-        (int (*)(const char*, char**, void*))gateway->handler,
-        gateway->handler_data
+        ws_rpc_handler_adapter,
+        gateway
     );
 
     if (result.error_code != 0 || !result.response_json) {
