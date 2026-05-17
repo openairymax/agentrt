@@ -21,7 +21,7 @@ jobs:
     name: Desktop Build + Lint
     runs-on: ubuntu-22.04
     timeout-minutes: 15
-    if: false
+    if: github.event.repository.private != true
 
     steps:
       - uses: actions/checkout@v4
