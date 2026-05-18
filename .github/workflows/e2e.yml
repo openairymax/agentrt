@@ -43,7 +43,7 @@ jobs:
 
       - name: Lint
         working-directory: agentos/toolkit/typescript
-        run: npx eslint src/ --max-warnings 0 || echo "[INFO] Lint warnings treated as informational"
+        run: npx eslint src/ --max-warnings 0
 
       - name: Build
         working-directory: agentos/toolkit/typescript
