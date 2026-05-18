@@ -134,7 +134,7 @@ static void sec_sandbox_real_dispatch(void)
     const char* agentos_root = getenv("AGENTOS_ROOT");
     if (!agentos_root) {
         const char* try_paths[] = {
-            ".", "..", "../..", NULL
+            ".", "..", "../..", "../../..", "../../../..", NULL
         };
         agentos_root = ".";
         for (int i = 0; try_paths[i]; i++) {
