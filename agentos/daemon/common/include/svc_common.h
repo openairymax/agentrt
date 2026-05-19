@@ -693,15 +693,12 @@ typedef int (*agentos_stream_callback_t)(
  * @brief 通信协议类型（daemon服务层专用）
  * @note 使用 SVC_ 前缀避免与 commons/types.h 的 AGENTOS_PROTO_* 冲突
  */
-#ifndef AGENTOS_PROTOCOL_TYPE_T_DEFINED
-#define AGENTOS_PROTOCOL_TYPE_T_DEFINED
 typedef enum {
     SVC_PROTO_HTTP = 0,
     SVC_PROTO_GRPC,
     SVC_PROTO_IPC,
     SVC_PROTO_MEMORY
-} agentos_protocol_type_t;
-#endif
+} agentos_svc_protocol_type_t;
 
 /**
  * @brief 服务通信客户端接口
@@ -732,7 +729,7 @@ typedef struct {
  * @return 0成功，非0失败
  */
 AGENTOS_API agentos_error_t agentos_service_client_create(
-    agentos_protocol_type_t protocol,
+    agentos_svc_protocol_type_t protocol,
     const char* config,
     agentos_service_client_t** client
 );
