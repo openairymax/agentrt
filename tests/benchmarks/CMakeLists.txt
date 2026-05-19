@@ -38,4 +38,6 @@ target_compile_options(test_performance_benchmarks PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
 )
 
+add_test(NAME performance_benchmarks COMMAND test_performance_benchmarks)
+
 message(STATUS "  [benchmarks] test_performance_benchmarks: P2-C02 configured")
