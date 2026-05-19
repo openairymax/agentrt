@@ -18,7 +18,7 @@
 PROJECT_NAME           = "cupolas - AgentOS 安全穹顶"
 
 # 项目版本号
-PROJECT_NUMBER         = "1.0.0"
+PROJECT_NUMBER         = "0.0.5"
 
 # 项目简要描述
 PROJECT_BRIEF          = "四重防护安全子系统：虚拟工位 · 权限裁决 · 输入净化 · 审计追踪"

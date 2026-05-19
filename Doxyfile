@@ -15,7 +15,7 @@
 
 PROJECT_NAME           = "AgentOS"
 
-PROJECT_NUMBER         = "2.0.0"
+PROJECT_NUMBER         = "0.0.5"
 
 PROJECT_BRIEF          = "多体控制论智能操作系统 — 微内核架构 · 五大框架 · 多协议网关"
 

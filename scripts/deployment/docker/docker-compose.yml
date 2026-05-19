@@ -9,9 +9,9 @@ services:
   agentos-kernel:
     build:
       context: ../../
-      dockerfile: scripts/docker/Dockerfile.kernel
+      dockerfile: scripts/deployment/docker/Dockerfile.kernel
       target: runtime
-    image: ${DOCKER_REGISTRY:-spharx}/agentos-kernel:${AGENTOS_VERSION:-1.0.0.5}
+    image: ${DOCKER_REGISTRY:-spharx}/agentos-kernel:${AGENTOS_VERSION:-0.0.5}
     container_name: agentos-kernel
     hostname: agentos-kernel
     restart: unless-stopped
@@ -76,8 +76,8 @@ services:
   agentos-services:
     build:
       context: ../../
-      dockerfile: scripts/docker/Dockerfile.service
-    image: ${DOCKER_REGISTRY:-spharx}/agentos-services:${AGENTOS_VERSION:-1.0.0.5}
+      dockerfile: scripts/deployment/docker/Dockerfile.service
+    image: ${DOCKER_REGISTRY:-spharx}/agentos-services:${AGENTOS_VERSION:-0.0.5}
     container_name: agentos-services
     hostname: agentos-services
     restart: unless-stopped
@@ -277,6 +277,6 @@ networks:
   agentos-network:
     driver: bridge
     ipam:
-      manager:
+      config:
         - subnet: 172.28.0.0/16
 
