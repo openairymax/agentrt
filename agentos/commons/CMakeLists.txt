@@ -147,7 +147,7 @@ install(DIRECTORY utils/cognition/include/ DESTINATION include/agentos/utils/cog
 install(DIRECTORY utils/execution/include/ DESTINATION include/agentos/utils/execution)
 install(DIRECTORY utils/strategy/include/ DESTINATION include/agentos/utils/strategy)
 
-option(BUILD_TESTS "Build unit tests" OFF)
+option(BUILD_TESTS "Build unit tests" ON)
 if(BUILD_TESTS)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         add_subdirectory(tests)

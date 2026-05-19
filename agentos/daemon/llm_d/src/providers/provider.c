@@ -21,6 +21,40 @@
 
 /* ---------- 通用上下文初始化 ---------- */
 
+static const char* resolve_api_key(const char* api_key) {
+    if (!api_key || api_key[0] == '\0') return NULL;
+
+    if (strncmp(api_key, "env:", 4) == 0) {
+        const char* env_name = api_key + 4;
+        const char* env_val = getenv(env_name);
+        if (env_val && env_val[0]) {
+            return env_val;
+        }
+        SVC_LOG_WARN("Environment variable '%s' not set or empty", env_name);
+        return NULL;
+    }
+
+    return api_key;
+}
+
+static const char* fallback_env_key(const char* provider_name) {
+    if (!provider_name) return NULL;
+    if (strcmp(provider_name, "openai") == 0) return getenv("OPENAI_API_KEY");
+    if (strcmp(provider_name, "anthropic") == 0) return getenv("ANTHROPIC_API_KEY");
+    if (strcmp(provider_name, "deepseek") == 0) return getenv("DEEPSEEK_API_KEY");
+    if (strcmp(provider_name, "google") == 0) return getenv("GOOGLE_AI_API_KEY");
+    return NULL;
+}
+
+static const char* guess_provider_from_url(const char* url) {
+    if (!url) return NULL;
+    if (strstr(url, "openai.com")) return "openai";
+    if (strstr(url, "anthropic.com")) return "anthropic";
+    if (strstr(url, "deepseek.com")) return "deepseek";
+    if (strstr(url, "googleapis.com")) return "google";
+    return NULL;
+}
+
 void provider_base_init(provider_base_ctx_t* base_ctx,
                         const char* api_key,
                         const char* api_base,
@@ -32,10 +66,16 @@ void provider_base_init(provider_base_ctx_t* base_ctx,
 
     memset(base_ctx, 0, sizeof(provider_base_ctx_t));
 
-    if (api_key) {
-        size_t key_len = strlen(api_key);
+    const char* resolved_key = resolve_api_key(api_key);
+    if (!resolved_key || resolved_key[0] == '\0') {
+        const char* guessed = guess_provider_from_url(api_base ? api_base : default_base);
+        resolved_key = fallback_env_key(guessed);
+    }
+
+    if (resolved_key) {
+        size_t key_len = strlen(resolved_key);
         if (key_len < sizeof(base_ctx->api_key)) {
-            memcpy(base_ctx->api_key, api_key, key_len + 1);
+            memcpy(base_ctx->api_key, resolved_key, key_len + 1);
         }
     }
 

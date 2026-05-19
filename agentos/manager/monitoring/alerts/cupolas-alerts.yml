@@ -1,6 +1,6 @@
 # =============================================================================
 # AgentOS cupolas Module Monitoring Configuration
-# Version: 1.0.0
+# Version: 0.0.5
 # Description: Prometheus alerting rules and Grafana dashboard configuration
 # =============================================================================
 
