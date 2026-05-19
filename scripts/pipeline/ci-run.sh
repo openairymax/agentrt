@@ -556,7 +556,7 @@ main() {
     phase_deps     || { overall_exit_code=1; log_error "Deps phase failed"; }
     phase_build    || { overall_exit_code=2; log_error "Build phase failed"; }
     phase_test     || { overall_exit_code=3; log_error "Test phase failed"; }
-    phase_quality  || true  # 质量门禁不阻塞主流程
+    phase_quality  || { overall_exit_code=5; log_error "Quality gate failed"; }
     phase_deploy   || true  # 部署失败不阻塞
 
     # 输出计时摘要

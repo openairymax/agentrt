@@ -36,6 +36,8 @@ typedef struct {
 typedef struct provider_registry provider_registry_t;
 
 provider_registry_t* provider_registry_create(const service_config_t* cfg);
+provider_registry_t* provider_registry_create_from_config(const service_config_t* cfg,
+                                                           const char* config_path);
 void provider_registry_destroy(provider_registry_t* reg);
 const provider_t* provider_registry_find(provider_registry_t* reg, const char* model);
 

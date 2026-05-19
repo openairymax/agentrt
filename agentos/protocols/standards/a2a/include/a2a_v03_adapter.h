@@ -46,6 +46,7 @@ extern "C" {
 #define A2A_CRYPTO_TAG_SIZE        16
 #define A2A_CRYPTO_KEY_SIZE        32
 #define A2A_SESSION_ID_SIZE        36
+#define A2A_TASK_ID_SIZE           40
 #define A2A_MAX_FAILED_AUTH_ATTEMPTS 5
 #define A2A_TOKEN_EXPIRY_SEC       3600
 

@@ -10,7 +10,7 @@ metadata:
   labels:
     app.kubernetes.io/name: agentos-gateway
     app.kubernetes.io/component: gateway
-    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/version: "0.0.5"
 spec:
   replicas: 3
   selector:
