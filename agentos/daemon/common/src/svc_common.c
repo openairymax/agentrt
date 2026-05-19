@@ -1838,7 +1838,7 @@ agentos_error_t agentos_service_set_degradation_handler(
 /* ==================== 服务间通信客户端（Phase 3.2） ==================== */
 
 typedef struct {
-    agentos_protocol_type_t protocol;
+    agentos_svc_protocol_type_t protocol;
     char base_url[512];
     uint32_t default_timeout_ms;
 } client_internal_t;
@@ -2105,7 +2105,7 @@ static agentos_error_t memory_client_stream(
 }
 
 agentos_error_t agentos_service_client_create(
-    agentos_protocol_type_t protocol,
+    agentos_svc_protocol_type_t protocol,
     const char* config,
     agentos_service_client_t** client
 ) {

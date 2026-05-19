@@ -24,7 +24,7 @@ endif()
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" ON)
 option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)  # 暂时关闭，待解决现有警告后启用
-option(BUILD_TESTS "Build unit tests" OFF)
+option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)

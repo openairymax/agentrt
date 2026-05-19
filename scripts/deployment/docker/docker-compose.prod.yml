@@ -1,6 +1,6 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker Compose Configuration - Production Environment
-# Version: 1.0.0
+# Version: 0.0.5
 # Description: Production-grade deployment with high availability, security, and monitoring
 
 version: '3.8'

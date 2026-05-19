@@ -5,7 +5,7 @@
 FROM ubuntu:22.04 AS base
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
-LABEL version="1.0.0.5"
+LABEL version="0.0.5"
 LABEL description="AgentOS Kernel Base Image"
 
 # 环境变量设置
@@ -44,10 +44,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libevent-dev \
     # 线程库
     libpthread-stubs0-dev \
-    # FAISS 依赖 (向量检索)
-    libfaiss-dev \
-    libblas-dev \
-    liblapack-dev \
     # SQLite3 (元数据存储)
     libsqlite3-dev \
     sqlite3 \
@@ -55,8 +51,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     # JSON 解析
     libcjson-dev \
+    # YAML 解析
+    libyaml-dev \
+    # HTTP 服务器
+    libmicrohttpd-dev \
+    # WebSocket
+    libwebsockets-dev \
     # 开发工具
-    pkg-manager \
+    pkg-config \
     gdb \
     valgrind \
     clang \
@@ -91,21 +93,16 @@ WORKDIR /workspace
 # === 5. 构建阶段 ===
 FROM base AS builder
 
-WORKDIR /workspace/agentos
+WORKDIR /workspace
 
 # 复制源代码
-COPY atoms/ ./atoms/
-COPY daemon/ ./daemon/
-COPY CMakeLists.txt ./
-COPY LICENSE ./
-COPY README.md ./
+COPY . ./AgentOS/
 
 # 创建构建目录
 RUN mkdir -p build && cd build \
-    && cmake .. \
+    && cmake -S ../AgentOS -B . \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_TESTS=ON \
-    -DENABLE_TRACING=ON \
+    -DBUILD_TESTS=OFF \
     -DCMAKE_INSTALL_PREFIX=/opt/agentos \
     -G Ninja \
     && cmake --build . --parallel $(nproc) \
@@ -115,7 +112,7 @@ RUN mkdir -p build && cd build \
 FROM ubuntu:22.04 AS runtime
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
-LABEL version="1.0.0.5"
+LABEL version="0.0.5"
 LABEL description="AgentOS Kernel Runtime Image"
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -130,11 +127,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libevent-2.1-7 \
-    libfaiss1 \
-    libblas3 \
-    liblapack3 \
     libsqlite3-0 \
     libcjson1 \
+    libcurl4 \
+    libyaml-0-2 \
+    libmicrohttpd12 \
+    libwebsockets19 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
