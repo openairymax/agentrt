@@ -15,6 +15,7 @@
 
 #include "memory_compat.h"
 #include "string_compat.h"
+#include "service_logging.h"
 #include <string.h>
 #include "platform.h"
 
