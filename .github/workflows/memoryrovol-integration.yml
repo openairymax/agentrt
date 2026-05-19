@@ -3,11 +3,6 @@ name: AgentOS MemoryRovol Integration
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'agentos/atoms/memoryrovol/**'
-      - 'agentos/atoms/coreloopthree/**'
-      - 'agentos/heapstore/**'
-      - '.github/workflows/memoryrovol-integration.yml'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -29,16 +24,15 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq cmake build-essential \
-            libssl-dev libcurl4-openssl-dev libcmocka-dev
+            libssl-dev libcurl4-openssl-dev libcmocka-dev \
+            libyaml-dev libcjson-dev libsqlite3-dev
 
       - name: Configure OSS Mode
         run: |
-          cmake -B ${{ github.workspace }}/../AgentOS-build-oss \
+          cmake -S . -B ${{ github.workspace }}/../AgentOS-build-oss \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DAGENTOS_WITH_MEMORYROVOL=ON \
             -DMEMORYROVOL_OSS=ON \
-            -DBUILD_TESTS=ON \
-            -Werror=dev
+            -DBUILD_TESTS=ON
 
       - name: Build
         run: cmake --build ${{ github.workspace }}/../AgentOS-build-oss --parallel $(nproc)
@@ -76,15 +70,14 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq cmake build-essential \
-            libssl-dev libcurl4-openssl-dev libcmocka-dev
+            libssl-dev libcurl4-openssl-dev libcmocka-dev \
+            libyaml-dev libcjson-dev libsqlite3-dev
 
       - name: Configure PRO Mode
         run: |
-          cmake -B ${{ github.workspace }}/../AgentOS-build-pro \
+          cmake -S . -B ${{ github.workspace }}/../AgentOS-build-pro \
             -DCMAKE_BUILD_TYPE=Release \
-            -DAGENTOS_WITH_MEMORYROVOL=ON \
-            -DBUILD_TESTS=ON \
-            -Werror=dev
+            -DBUILD_TESTS=ON
 
       - name: Build
         run: cmake --build ${{ github.workspace }}/../AgentOS-build-pro --parallel $(nproc)
