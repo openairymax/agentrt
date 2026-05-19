@@ -67,8 +67,12 @@ set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 # protocols 协议栈路径
 set(PROTOCOLS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../protocols)
 set(PROTOCOLS_INCLUDE_DIR ${PROTOCOLS_DIR}/include)
-set(PROTOCOLS_MCP_DIR ${PROTOCOLS_DIR}/mcp)
+set(PROTOCOLS_MCP_DIR ${PROTOCOLS_DIR}/standards/mcp)
 set(PROTOCOLS_MCP_INCLUDE_DIR ${PROTOCOLS_MCP_DIR}/include)
+set(PROTOCOLS_A2A_DIR ${PROTOCOLS_DIR}/standards/a2a)
+set(PROTOCOLS_A2A_INCLUDE_DIR ${PROTOCOLS_A2A_DIR}/include)
+set(PROTOCOLS_OPENAI_DIR ${PROTOCOLS_DIR}/integrations/openai)
+set(PROTOCOLS_OPENAI_INCLUDE_DIR ${PROTOCOLS_OPENAI_DIR}/include)
 set(PROTOCOLS_COMMON_INCLUDE_DIR ${PROTOCOLS_DIR}/common/include)
 
 # ==================== 协议栈开关 ====================
@@ -97,7 +101,7 @@ endif()
 add_executable(gateway_d ${GATEWAY_D_SOURCES})
 
 if(AGENTOS_ENABLE_PROTOCOLS)
-    target_compile_definitions(gateway_d PRIVATE AGENTOS_PROTOCOLS_ENABLED=1)
+    target_compile_definitions(gateway_d PRIVATE AGENTOS_HAS_PROTOCOLS=1)
 endif()
 
 # ==================== 平台特定配置 ====================
@@ -156,6 +160,8 @@ target_include_directories(gateway_d PRIVATE
     ${PROTOCOLS_INCLUDE_DIR}
     ${PROTOCOLS_COMMON_INCLUDE_DIR}
     ${PROTOCOLS_MCP_DIR}/include
+    ${PROTOCOLS_A2A_INCLUDE_DIR}
+    ${PROTOCOLS_OPENAI_INCLUDE_DIR}
     # 外部依赖
     ${CJSON_INCLUDE_DIRS}
 )
@@ -242,6 +248,7 @@ endif()
 target_link_libraries(gateway_d PRIVATE
     svc_common
     agentos_common
+    agentos_protocols
     Threads::Threads
 )
 if(CJSON_FOUND)

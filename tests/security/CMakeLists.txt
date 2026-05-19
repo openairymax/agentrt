@@ -72,6 +72,9 @@ if(TARGET cjson OR cjson_FOUND)
 endif()
 
 target_compile_features(test_sec017_compliance PRIVATE c_std_11)
+target_compile_definitions(test_sec017_compliance PRIVATE
+    AGENTOS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
 target_compile_options(test_sec017_compliance PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
 )
