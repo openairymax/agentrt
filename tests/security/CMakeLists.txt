@@ -38,6 +38,8 @@ target_compile_options(test_security_audit PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
 )
 
+add_test(NAME security_audit COMMAND test_security_audit)
+
 message(STATUS "  [security] test_security_audit: P2-C03 configured")
 
 # AgentOS SEC-017 桩函数合规验证测试 (TeamC P2-C05)
@@ -70,8 +72,13 @@ if(TARGET cjson OR cjson_FOUND)
 endif()
 
 target_compile_features(test_sec017_compliance PRIVATE c_std_11)
+target_compile_definitions(test_sec017_compliance PRIVATE
+    AGENTOS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
 target_compile_options(test_sec017_compliance PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
 )
+
+add_test(NAME sec017_compliance COMMAND test_sec017_compliance)
 
 message(STATUS "  [security] test_sec017_compliance: P2-C05 configured")

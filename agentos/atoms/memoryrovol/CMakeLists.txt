@@ -55,11 +55,37 @@ if(NOT TARGET agentos_memoryrovol)
     return()
 endif()
 
+# Propagate AgentOS include paths to MemoryRovol source files
+# The MemoryRovol external repo needs AgentOS headers for:
+#   - memory_compat.h  (AGENTOS_MALLOC/CALLOC/FREE)
+#   - service_logging.h (service_log_output_record)
+#   - platform.h        (agentos_sleep_ms, agentos_thread_*)
+target_include_directories(agentos_memoryrovol PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
+)
+
+# Force-include AgentOS compat headers for MemoryRovol sources
+# that lack explicit #include of these headers
+target_compile_options(agentos_memoryrovol PRIVATE
+    -include
+    agentos_mr_force_includes.h
+)
+
 # Create interface library that links MemoryRovol into AgentOS atoms
 add_library(agentos_memoryrovol_bridge INTERFACE)
 target_link_libraries(agentos_memoryrovol_bridge INTERFACE agentos_memoryrovol)
 target_include_directories(agentos_memoryrovol_bridge INTERFACE
     ${MEMORYROVOL_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
 )
 
 # Link MemoryRovol into the atoms aggregate

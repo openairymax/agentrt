@@ -20,7 +20,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       args:
-        BUILD_VERSION: ${BUILD_VERSION:-2.0.0}
+        BUILD_VERSION: ${BUILD_VERSION:-0.0.5}
         BUILD_DATE: ${BUILD_DATE:-2026-04-12}
       target: runtime
     image: ghcr.io/spharx/agentos/gateway:${BUILD_VERSION:-latest}
