@@ -24,6 +24,14 @@
 #include <yaml.h>
 #endif
 
+static int ends_with(const char* str, const char* suffix) {
+    if (!str || !suffix) return 0;
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    if (suffix_len > str_len) return 0;
+    return strcmp(str + str_len - suffix_len, suffix) == 0;
+}
+
 /* ---------- 缓存键生成（便携版本） ---------- */
 
 /**
@@ -528,10 +536,23 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     if (!cfg || !config_path) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    
+
+    if (ends_with(config_path, ".yaml") || ends_with(config_path, ".yml")) {
+#ifdef HAVE_YAML
+        return svc_config_load_yaml(config_path, cfg);
+#else
+        SVC_LOG_WARN("YAML support not compiled, cannot load '%s'", config_path);
+        memset(cfg, 0, sizeof(service_config_t));
+        cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
+        cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
+        cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
+        cfg->timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
+        return 0;
+#endif
+    }
+
     memset(cfg, 0, sizeof(service_config_t));
     
-    /* 设置默认值 */
     cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
     cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
     cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
@@ -600,6 +621,431 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     
     cJSON_Delete(root);
     return AGENTOS_OK;
+}
+
+#ifdef HAVE_YAML
+
+typedef struct {
+    char key[128];
+    char value[512];
+} yaml_kv_t;
+
+typedef struct {
+    yaml_kv_t* pairs;
+    size_t count;
+    size_t capacity;
+} yaml_map_t;
+
+static void yaml_map_init(yaml_map_t* m) {
+    m->pairs = NULL;
+    m->count = 0;
+    m->capacity = 0;
+}
+
+static void yaml_map_add(yaml_map_t* m, const char* key, const char* value) {
+    if (!key || !value) return;
+    if (m->count >= m->capacity) {
+        size_t new_cap = m->capacity == 0 ? 16 : m->capacity * 2;
+        yaml_kv_t* new_pairs = (yaml_kv_t*)realloc(m->pairs, new_cap * sizeof(yaml_kv_t));
+        if (!new_pairs) return;
+        m->pairs = new_pairs;
+        m->capacity = new_cap;
+    }
+    strncpy(m->pairs[m->count].key, key, sizeof(m->pairs[m->count].key) - 1);
+    m->pairs[m->count].key[sizeof(m->pairs[m->count].key) - 1] = '\0';
+    strncpy(m->pairs[m->count].value, value, sizeof(m->pairs[m->count].value) - 1);
+    m->pairs[m->count].value[sizeof(m->pairs[m->count].value) - 1] = '\0';
+    m->count++;
+}
+
+static const char* yaml_map_get(const yaml_map_t* m, const char* key) {
+    if (!m || !key) return NULL;
+    for (size_t i = 0; i < m->count; ++i) {
+        if (strcmp(m->pairs[i].key, key) == 0) return m->pairs[i].value;
+    }
+    return NULL;
+}
+
+static void yaml_map_free(yaml_map_t* m) {
+    free(m->pairs);
+    m->pairs = NULL;
+    m->count = 0;
+    m->capacity = 0;
+}
+
+int svc_config_load_yaml(const char* config_path, service_config_t* cfg) {
+    if (!cfg || !config_path) return AGENTOS_ERR_INVALID_PARAM;
+
+    memset(cfg, 0, sizeof(service_config_t));
+    cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
+    cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
+    cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
+    cfg->timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
+
+    FILE* f = fopen(config_path, "rb");
+    if (!f) {
+        SVC_LOG_WARN("Cannot open YAML config '%s', using defaults", config_path);
+        return 0;
+    }
+
+    yaml_parser_t parser;
+    if (!yaml_parser_initialize(&parser)) {
+        fclose(f);
+        SVC_LOG_WARN("Failed to init YAML parser");
+        return 0;
+    }
+    yaml_parser_set_input_file(&parser, f);
+
+    yaml_event_t event;
+    yaml_map_t current_map;
+    yaml_map_init(&current_map);
+    int in_global = 0;
+    int done = 0;
+
+    while (!done) {
+        if (!yaml_parser_parse(&parser, &event)) {
+            SVC_LOG_WARN("YAML parse error in '%s'", config_path);
+            break;
+        }
+        if (event.type == YAML_STREAM_END_EVENT) {
+            done = 1;
+        } else if (event.type == YAML_SCALAR_EVENT) {
+            const char* val = (const char*)event.data.scalar.value;
+            if (val && strcmp(val, "global") == 0) {
+                in_global = 1;
+            } else if (in_global && val) {
+                char key_buf[128];
+                strncpy(key_buf, val, sizeof(key_buf) - 1);
+                key_buf[sizeof(key_buf) - 1] = '\0';
+
+                yaml_event_t val_event;
+                if (yaml_parser_parse(&parser, &val_event)) {
+                    if (val_event.type == YAML_SCALAR_EVENT) {
+                        const char* v = (const char*)val_event.data.scalar.value;
+                        if (v) yaml_map_add(&current_map, key_buf, v);
+                    }
+                    yaml_event_delete(&val_event);
+                }
+            }
+        } else if (event.type == YAML_MAPPING_END_EVENT) {
+            in_global = 0;
+        }
+        yaml_event_delete(&event);
+    }
+
+    yaml_parser_delete(&parser);
+    fclose(f);
+
+    const char* val;
+    if ((val = yaml_map_get(&current_map, "cache_capacity"))) {
+        cfg->cache_capacity = (size_t)atol(val);
+    }
+    if ((val = yaml_map_get(&current_map, "cache_ttl_sec"))) {
+        cfg->cache_ttl_sec = (uint32_t)atol(val);
+    }
+    if ((val = yaml_map_get(&current_map, "max_retries"))) {
+        cfg->max_retries = atoi(val);
+    }
+    if ((val = yaml_map_get(&current_map, "timeout_ms"))) {
+        cfg->timeout_ms = (uint32_t)atol(val);
+    }
+    if ((val = yaml_map_get(&current_map, "token_encoding"))) {
+        size_t enc_len = strlen(val);
+        if (enc_len < sizeof(cfg->token_encoding)) {
+            memcpy((char*)cfg->token_encoding, val, enc_len + 1);
+        }
+    }
+
+    yaml_map_free(&current_map);
+    SVC_LOG_INFO("Loaded YAML config from '%s'", config_path);
+    return AGENTOS_OK;
+}
+
+typedef struct {
+    char name[128];
+    char provider[64];
+    char api_key_env[128];
+    char endpoint[512];
+    int timeout_sec;
+    int max_retries;
+} model_entry_t;
+
+int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_providers, size_t* out_count) {
+    if (!config_path || !out_providers || !out_count) return AGENTOS_ERR_INVALID_PARAM;
+
+    *out_providers = NULL;
+    *out_count = 0;
+
+    FILE* f = fopen(config_path, "rb");
+    if (!f) {
+        SVC_LOG_WARN("Cannot open model config '%s'", config_path);
+        return 0;
+    }
+
+    yaml_parser_t parser;
+    if (!yaml_parser_initialize(&parser)) {
+        fclose(f);
+        SVC_LOG_WARN("Failed to init YAML parser for model config");
+        return 0;
+    }
+    yaml_parser_set_input_file(&parser, f);
+
+    yaml_event_t event;
+    model_entry_t models[64];
+    size_t model_count = 0;
+    int in_models = 0;
+    int in_model_item = 0;
+    yaml_map_t item_map;
+    yaml_map_init(&item_map);
+    int done = 0;
+
+    while (!done) {
+        if (!yaml_parser_parse(&parser, &event)) break;
+        if (event.type == YAML_STREAM_END_EVENT) {
+            done = 1;
+        } else if (event.type == YAML_SCALAR_EVENT) {
+            const char* val = (const char*)event.data.scalar.value;
+            if (val && strcmp(val, "models") == 0 && !in_models) {
+                in_models = 1;
+                continue;
+            }
+            if (in_models && val) {
+                char key_buf[128];
+                strncpy(key_buf, val, sizeof(key_buf) - 1);
+                key_buf[sizeof(key_buf) - 1] = '\0';
+
+                yaml_event_t val_event;
+                if (yaml_parser_parse(&parser, &val_event)) {
+                    if (val_event.type == YAML_SCALAR_EVENT) {
+                        const char* v = (const char*)val_event.data.scalar.value;
+                        if (v) yaml_map_add(&item_map, key_buf, v);
+                    }
+                    yaml_event_delete(&val_event);
+                }
+            }
+        } else if (event.type == YAML_MAPPING_START_EVENT && in_models) {
+            in_model_item++;
+            if (in_model_item == 1) {
+                yaml_map_free(&item_map);
+                yaml_map_init(&item_map);
+            }
+        } else if (event.type == YAML_MAPPING_END_EVENT && in_models) {
+            in_model_item--;
+            if (in_model_item == 0 && model_count < 64) {
+                const char* n = yaml_map_get(&item_map, "name");
+                const char* p = yaml_map_get(&item_map, "provider");
+                const char* e = yaml_map_get(&item_map, "api_key_env");
+                const char* ep = yaml_map_get(&item_map, "endpoint");
+                const char* t = yaml_map_get(&item_map, "timeout_sec");
+                const char* r = yaml_map_get(&item_map, "max_retries");
+
+                if (n && p) {
+                    memset(&models[model_count], 0, sizeof(model_entry_t));
+                    strncpy(models[model_count].name, n, sizeof(models[model_count].name) - 1);
+                    strncpy(models[model_count].provider, p, sizeof(models[model_count].provider) - 1);
+                    if (e) strncpy(models[model_count].api_key_env, e, sizeof(models[model_count].api_key_env) - 1);
+                    if (ep) strncpy(models[model_count].endpoint, ep, sizeof(models[model_count].endpoint) - 1);
+                    if (t) models[model_count].timeout_sec = atoi(t);
+                    if (r) models[model_count].max_retries = atoi(r);
+                    model_count++;
+                }
+            }
+        } else if (event.type == YAML_SEQUENCE_END_EVENT && in_models) {
+            in_models = 0;
+        }
+        yaml_event_delete(&event);
+    }
+
+    yaml_parser_delete(&parser);
+    fclose(f);
+    yaml_map_free(&item_map);
+
+    if (model_count == 0) {
+        SVC_LOG_WARN("No models found in '%s'", config_path);
+        return 0;
+    }
+
+    typedef struct {
+        char name[64];
+        char api_key_env[128];
+        char base_url[512];
+        int timeout_sec;
+        int max_retries;
+        char* model_names[64];
+        size_t model_count;
+    } provider_agg_t;
+
+    provider_agg_t provs[16];
+    size_t prov_count = 0;
+
+    for (size_t i = 0; i < model_count; ++i) {
+        size_t j = 0;
+        for (; j < prov_count; ++j) {
+            if (strcmp(provs[j].name, models[i].provider) == 0) break;
+        }
+        if (j == prov_count) {
+            if (prov_count >= 16) break;
+            memset(&provs[prov_count], 0, sizeof(provider_agg_t));
+            strncpy(provs[prov_count].name, models[i].provider, sizeof(provs[prov_count].name) - 1);
+            if (models[i].api_key_env[0])
+                strncpy(provs[prov_count].api_key_env, models[i].api_key_env, sizeof(provs[prov_count].api_key_env) - 1);
+            prov_count++;
+        }
+        if (provs[j].model_count < 64) {
+            provs[j].model_names[provs[j].model_count++] = strdup(models[i].name);
+        }
+        if (!provs[j].base_url[0] && models[i].endpoint[0]) {
+            strncpy(provs[j].base_url, models[i].endpoint, sizeof(provs[j].base_url) - 1);
+        }
+        if (models[i].timeout_sec > provs[j].timeout_sec)
+            provs[j].timeout_sec = models[i].timeout_sec;
+        if (models[i].max_retries > provs[j].max_retries)
+            provs[j].max_retries = models[i].max_retries;
+    }
+
+    provider_config_t* result = (provider_config_t*)calloc(prov_count + 1, sizeof(provider_config_t));
+    if (!result) return AGENTOS_ERR_OUT_OF_MEMORY;
+
+    for (size_t i = 0; i < prov_count; ++i) {
+        result[i].name = strdup(provs[i].name);
+        if (provs[i].api_key_env[0]) {
+            char env_prefix[8] = "env:";
+            size_t env_key_len = strlen(provs[i].api_key_env);
+            char* key_buf = (char*)malloc(4 + env_key_len + 1);
+            if (key_buf) {
+                memcpy(key_buf, env_prefix, 4);
+                memcpy(key_buf + 4, provs[i].api_key_env, env_key_len + 1);
+                result[i].api_key = key_buf;
+            }
+        }
+        if (provs[i].base_url[0]) result[i].api_base = strdup(provs[i].base_url);
+        result[i].timeout_sec = (double)provs[i].timeout_sec;
+        result[i].max_retries = provs[i].max_retries;
+        if (provs[i].model_count > 0) {
+            char** marr = (char**)calloc(provs[i].model_count + 1, sizeof(char*));
+            if (marr) {
+                for (size_t k = 0; k < provs[i].model_count; ++k)
+                    marr[k] = provs[i].model_names[k];
+                marr[provs[i].model_count] = NULL;
+            }
+            result[i].models = marr;
+        }
+    }
+
+    *out_providers = result;
+    *out_count = prov_count;
+    SVC_LOG_INFO("Loaded %zu providers from YAML model config '%s'", prov_count, config_path);
+    return AGENTOS_OK;
+}
+
+#endif /* HAVE_YAML */
+
+static int svc_load_model_config_json(const char* config_path, provider_config_t** out_providers, size_t* out_count) {
+    if (!config_path || !out_providers || !out_count) return AGENTOS_ERR_INVALID_PARAM;
+
+    *out_providers = NULL;
+    *out_count = 0;
+
+    FILE* f = fopen(config_path, "rb");
+    if (!f) {
+        SVC_LOG_WARN("Cannot open model config '%s'", config_path);
+        return 0;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char* content = (char*)malloc((size_t)len + 1);
+    if (!content) { fclose(f); return AGENTOS_ERR_OUT_OF_MEMORY; }
+
+    size_t read_len = fread(content, 1, (size_t)len, f);
+    content[read_len] = '\0';
+    fclose(f);
+
+    cJSON* root = cJSON_Parse(content);
+    free(content);
+    if (!root) {
+        SVC_LOG_WARN("Failed to parse model config JSON");
+        return 0;
+    }
+
+    cJSON* providers_arr = cJSON_GetObjectItem(root, "providers");
+    if (!providers_arr || !cJSON_IsArray(providers_arr)) {
+        cJSON_Delete(root);
+        SVC_LOG_WARN("No 'providers' array in model config");
+        return 0;
+    }
+
+    int n = cJSON_GetArraySize(providers_arr);
+    if (n <= 0) { cJSON_Delete(root); return 0; }
+
+    provider_config_t* result = (provider_config_t*)calloc((size_t)n + 1, sizeof(provider_config_t));
+    if (!result) { cJSON_Delete(root); return AGENTOS_ERR_OUT_OF_MEMORY; }
+
+    size_t valid_count = 0;
+    for (int i = 0; i < n; ++i) {
+        cJSON* pitem = cJSON_GetArrayItem(providers_arr, i);
+        cJSON* pname = cJSON_GetObjectItem(pitem, "name");
+        cJSON* pkey_env = cJSON_GetObjectItem(pitem, "api_key_env");
+        cJSON* pbase = cJSON_GetObjectItem(pitem, "base_url");
+        cJSON* ptimeout = cJSON_GetObjectItem(pitem, "timeout_sec");
+        cJSON* pretries = cJSON_GetObjectItem(pitem, "max_retries");
+        cJSON* pmodels = cJSON_GetObjectItem(pitem, "models");
+
+        if (!cJSON_IsString(pname)) continue;
+
+        provider_config_t* pcfg = &result[valid_count];
+        pcfg->name = strdup(pname->valuestring);
+
+        if (cJSON_IsString(pkey_env) && pkey_env->valuestring[0]) {
+            size_t env_len = strlen(pkey_env->valuestring);
+            char* key_buf = (char*)malloc(4 + env_len + 1);
+            if (key_buf) {
+                memcpy(key_buf, "env:", 4);
+                memcpy(key_buf + 4, pkey_env->valuestring, env_len + 1);
+                pcfg->api_key = key_buf;
+            }
+        }
+
+        if (cJSON_IsString(pbase)) pcfg->api_base = strdup(pbase->valuestring);
+        if (cJSON_IsNumber(ptimeout)) pcfg->timeout_sec = ptimeout->valuedouble;
+        if (cJSON_IsNumber(pretries)) pcfg->max_retries = pretries->valueint;
+
+        if (cJSON_IsArray(pmodels)) {
+            int mcount = cJSON_GetArraySize(pmodels);
+            char** marr = (char**)calloc((size_t)mcount + 1, sizeof(char*));
+            if (marr) {
+                for (int j = 0; j < mcount; ++j) {
+                    cJSON* mitem = cJSON_GetArrayItem(pmodels, j);
+                    if (cJSON_IsString(mitem)) marr[j] = strdup(mitem->valuestring);
+                }
+                marr[mcount] = NULL;
+                pcfg->models = marr;
+            }
+        }
+        valid_count++;
+    }
+
+    cJSON_Delete(root);
+    *out_providers = result;
+    *out_count = valid_count;
+    SVC_LOG_INFO("Loaded %zu providers from JSON model config '%s'", valid_count, config_path);
+    return AGENTOS_OK;
+}
+
+int svc_load_model_config(const char* config_path, provider_config_t** out_providers, size_t* out_count) {
+    if (!config_path || !out_providers || !out_count) return AGENTOS_ERR_INVALID_PARAM;
+
+    if (ends_with(config_path, ".yaml") || ends_with(config_path, ".yml")) {
+#ifdef HAVE_YAML
+        return svc_load_model_config_yaml(config_path, out_providers, out_count);
+#else
+        SVC_LOG_ERROR("YAML support not compiled, cannot load '%s'", config_path);
+        return AGENTOS_ERR_NOT_SUPPORTED;
+#endif
+    }
+    return svc_load_model_config_json(config_path, out_providers, out_count);
 }
 
 void llm_response_free(llm_response_t* resp) {
