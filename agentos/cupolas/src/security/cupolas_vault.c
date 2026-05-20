@@ -43,6 +43,7 @@
 #define AES_IV_SIZE 16
 #define AES_GCM_TAG_SIZE 16
 #define SALT_SIZE 32
+#define MAX_ACL_ENTRIES_PER_CREDENTIAL 64
 
 /* ============================================================================
  * 内部结构
@@ -1170,8 +1171,39 @@ int cupolas_vault_export(cupolas_vault_t* vault,
 
         VAULT_FWRITE(entry->iv, AES_IV_SIZE, 1, f);
         VAULT_FWRITE(entry->salt, SALT_SIZE, 1, f);
-        VAULT_FWRITE(&entry->acl, sizeof(cupolas_vault_acl_t), 1, f);
-        VAULT_FWRITE(&entry->metadata, sizeof(cupolas_vault_metadata_t), 1, f);
+
+        VAULT_FWRITE(&entry->acl.count, sizeof(size_t), 1, f);
+        for (size_t k = 0; k < entry->acl.count; k++) {
+            size_t agent_id_len = entry->acl.entries[k].agent_id ?
+                strlen(entry->acl.entries[k].agent_id) : 0;
+            VAULT_FWRITE(&agent_id_len, sizeof(size_t), 1, f);
+            if (agent_id_len > 0) {
+                VAULT_FWRITE(entry->acl.entries[k].agent_id, 1, agent_id_len, f);
+            }
+            VAULT_FWRITE(&entry->acl.entries[k].operations, sizeof(uint32_t), 1, f);
+            VAULT_FWRITE(&entry->acl.entries[k].expires_at, sizeof(uint64_t), 1, f);
+            VAULT_FWRITE(&entry->acl.entries[k].access_count, sizeof(uint32_t), 1, f);
+            VAULT_FWRITE(&entry->acl.entries[k].max_access_count, sizeof(uint32_t), 1, f);
+        }
+
+        {
+            const char* meta_fields[] = {
+                entry->metadata.cred_id, entry->metadata.description,
+                entry->metadata.service, entry->metadata.account
+            };
+            for (int m = 0; m < 4; m++) {
+                size_t field_len = meta_fields[m] ? strlen(meta_fields[m]) : 0;
+                VAULT_FWRITE(&field_len, sizeof(size_t), 1, f);
+                if (field_len > 0) {
+                    VAULT_FWRITE(meta_fields[m], 1, field_len, f);
+                }
+            }
+            VAULT_FWRITE(&entry->metadata.type, sizeof(cupolas_vault_cred_type_t), 1, f);
+            VAULT_FWRITE(&entry->metadata.created_at, sizeof(uint64_t), 1, f);
+            VAULT_FWRITE(&entry->metadata.updated_at, sizeof(uint64_t), 1, f);
+            VAULT_FWRITE(&entry->metadata.expires_at, sizeof(uint64_t), 1, f);
+            VAULT_FWRITE(&entry->metadata.is_accessible, sizeof(bool), 1, f);
+        }
     }
 
     EVP_CIPHER_CTX_free(ctx);
@@ -1366,15 +1398,81 @@ int cupolas_vault_import(cupolas_vault_t* vault,
         }
 
         if (fread(entry->iv, AES_IV_SIZE, 1, f) != 1 ||
-            fread(entry->salt, SALT_SIZE, 1, f) != 1 ||
-            fread(&entry->acl, sizeof(cupolas_vault_acl_t), 1, f) != 1 ||
-            fread(&entry->metadata, sizeof(cupolas_vault_metadata_t), 1, f) != 1) {
+            fread(entry->salt, SALT_SIZE, 1, f) != 1) {
             free(entry->encrypted_data);
             entry->encrypted_data = NULL;
             entry->encrypted_len = 0;
             free(enc_data);
             free(decrypted);
             continue;
+        }
+
+        {
+            size_t acl_count = 0;
+            if (fread(&acl_count, sizeof(size_t), 1, f) != 1 ||
+                acl_count > MAX_ACL_ENTRIES_PER_CREDENTIAL) {
+                free(entry->encrypted_data);
+                entry->encrypted_data = NULL;
+                entry->encrypted_len = 0;
+                free(enc_data);
+                free(decrypted);
+                continue;
+            }
+            entry->acl.count = acl_count;
+            if (acl_count > 0) {
+                entry->acl.entries = (cupolas_vault_acl_entry_t*)calloc(
+                    acl_count, sizeof(cupolas_vault_acl_entry_t));
+                if (!entry->acl.entries) {
+                    continue;
+                }
+                for (size_t k = 0; k < acl_count; k++) {
+                    size_t agent_id_len = 0;
+                    if (fread(&agent_id_len, sizeof(size_t), 1, f) != 1) break;
+                    if (agent_id_len > 0 && agent_id_len < 65536) {
+                        entry->acl.entries[k].agent_id = (char*)malloc(agent_id_len + 1);
+                        if (entry->acl.entries[k].agent_id) {
+                            if (fread(entry->acl.entries[k].agent_id, 1, agent_id_len, f) != agent_id_len) {
+                                free(entry->acl.entries[k].agent_id);
+                                entry->acl.entries[k].agent_id = NULL;
+                            }
+                            entry->acl.entries[k].agent_id[agent_id_len] = '\0';
+                        }
+                    }
+                    fread(&entry->acl.entries[k].operations, sizeof(uint32_t), 1, f);
+                    fread(&entry->acl.entries[k].expires_at, sizeof(uint64_t), 1, f);
+                    fread(&entry->acl.entries[k].access_count, sizeof(uint32_t), 1, f);
+                    fread(&entry->acl.entries[k].max_access_count, sizeof(uint32_t), 1, f);
+                }
+            }
+        }
+
+        {
+            memset(&entry->metadata, 0, sizeof(entry->metadata));
+            char* meta_ptrs[4] = {NULL, NULL, NULL, NULL};
+            for (int m = 0; m < 4; m++) {
+                size_t field_len = 0;
+                if (fread(&field_len, sizeof(size_t), 1, f) != 1) continue;
+                if (field_len > 0 && field_len < 65536) {
+                    meta_ptrs[m] = (char*)malloc(field_len + 1);
+                    if (meta_ptrs[m]) {
+                        if (fread(meta_ptrs[m], 1, field_len, f) == field_len) {
+                            meta_ptrs[m][field_len] = '\0';
+                        } else {
+                            free(meta_ptrs[m]);
+                            meta_ptrs[m] = NULL;
+                        }
+                    }
+                }
+            }
+            entry->metadata.cred_id = meta_ptrs[0];
+            entry->metadata.description = meta_ptrs[1];
+            entry->metadata.service = meta_ptrs[2];
+            entry->metadata.account = meta_ptrs[3];
+            fread(&entry->metadata.type, sizeof(cupolas_vault_cred_type_t), 1, f);
+            fread(&entry->metadata.created_at, sizeof(uint64_t), 1, f);
+            fread(&entry->metadata.updated_at, sizeof(uint64_t), 1, f);
+            fread(&entry->metadata.expires_at, sizeof(uint64_t), 1, f);
+            fread(&entry->metadata.is_accessible, sizeof(bool), 1, f);
         }
 
         vault->entry_count++;

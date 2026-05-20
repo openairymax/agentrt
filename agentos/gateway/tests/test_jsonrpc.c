@@ -49,7 +49,7 @@ static int g_tests_passed = 0;
     do { \
         if (!(cond)) { \
             TEST_FAIL(#cond); \
-            return; \
+            return 0; \
         } \
     } while(0)
 

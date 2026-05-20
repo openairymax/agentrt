@@ -1114,7 +1114,7 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
 
     char* response_json = NULL;
     int result = mcp_v1_route_request(ctx, method, input_copy, &response_json);
-    if (method != "tools/call") free((void*)method);
+    if (strcmp(method, "tools/call") != 0) free((void*)method);
     free(input_copy);
 
     if (result == 0 && response_json) {
