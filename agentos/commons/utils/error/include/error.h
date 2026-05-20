@@ -62,9 +62,8 @@ typedef int32_t agentos_error_t;
 #ifndef AGENTOS_ENOENT
 #define AGENTOS_ENOENT                AGENTOS_ERR_NOT_FOUND
 #endif
-#ifndef AGENTOS_EPERM
+#undef AGENTOS_EPERM
 #define AGENTOS_EPERM                 AGENTOS_ERR_PERMISSION_DENIED
-#endif
 #ifndef AGENTOS_ETIMEDOUT
 #define AGENTOS_ETIMEDOUT             AGENTOS_ERR_TIMEOUT
 #endif
