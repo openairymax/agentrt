@@ -180,7 +180,8 @@ static uint64_t memory_debug_get_timestamp(void) {
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
     uint64_t ts = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-    return ts / 10000; // 转换为毫�?#else
+    return ts / 10000;
+#else
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (uint64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
@@ -196,7 +197,7 @@ static uint64_t memory_debug_get_timestamp(void) {
  * @param[in] description 错误描述
  * @param[in] file 文件�? * @param[in] line 行号
  * @param[in] function 函数�? */
-static void memory_debug_record_error(memory_error_type_t type,
+static void __attribute__((unused)) memory_debug_record_error(memory_error_type_t type,
                                      void* addr, size_t size,
                                      const char* description,
                                      const char* file, int line,
@@ -388,7 +389,7 @@ static bool memory_debug_validate_block(memory_debug_block_t* block,
  * 
  * @param[out] frames 堆栈帧输出缓冲区
  * @param[in] max_frames 最大帧�? * @return 实际获取的帧�? */
-static size_t memory_debug_capture_stack_trace(void** frames, size_t max_frames) {
+static size_t __attribute__((unused)) memory_debug_capture_stack_trace(void** frames, size_t max_frames) {
     if (!g_debug_state.stack_trace_enabled || max_frames == 0) {
         return 0;
     }

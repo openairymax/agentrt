@@ -49,7 +49,7 @@ static int g_tests_passed = 0;
     do { \
         if (!(cond)) { \
             TEST_FAIL(#cond); \
-            return 0; \
+            return; \
         } \
     } while(0)
 
@@ -62,9 +62,9 @@ static int g_tests_passed = 0;
 /* ========== 辅助函数 ========== */
 
 static cJSON* parse_json(const char* json_str) {
-    ASSERT_NOT_NULL(json_str);
+    if (!json_str) return NULL;
     cJSON* json = cJSON_Parse(json_str);
-    ASSERT_NOT_NULL(json);
+    if (!json) return NULL;
     return json;
 }
 

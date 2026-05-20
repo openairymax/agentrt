@@ -30,12 +30,12 @@
 /**
  * @brief 空白字符定义
  */
-static const char* WHITESPACE_CHARS = " \t\n\r\v\f";
+static const char* __attribute__((unused)) WHITESPACE_CHARS = " \t\n\r\v\f";
 
 /**
  * @brief 默认字符串格式化选项
  */
-static const string_format_options_t DEFAULT_FORMAT_OPTIONS = {
+static const string_format_options_t __attribute__((unused)) DEFAULT_FORMAT_OPTIONS = {
     .initial_buffer_size = 256,
     .max_buffer_size = 0,
     .locale_aware = false,
@@ -448,7 +448,6 @@ int string_replace(const char* str, const char* old_substr, const char* new_subs
         return -1;
     }
     
-    size_t str_len = strlen(str);
     size_t old_len = strlen(old_substr);
     size_t new_len = strlen(new_substr);
     
@@ -517,9 +516,6 @@ string_list_t string_split(const char* str, const char* delimiter, int options, 
             end = str + strlen(str);
         }
         
-        size_t token_len = end - start;
-        
-        // 应用修剪选项
         const char* token_start = start;
         const char* token_end = end;
         

@@ -10,6 +10,8 @@
 #ifndef AGENTOS_CMOCKA_STUB_H
 #define AGENTOS_CMOCKA_STUB_H
 
+#include <stdlib.h>
+#include <unistd.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <setjmp.h>

@@ -926,7 +926,7 @@ static int execute_single_phase(orchestrator_t* orch,
 
                 const char* original_input = orch->tasks[0].input ? orch->tasks[0].input : "";
                 const char* gen_output = orch->tasks[2].output ? orch->tasks[2].output : (input ? input : "");
-                size_t gen_out_len = strlen(gen_output);
+                size_t gen_out_len __attribute__((unused)) = strlen(gen_output);
 
                 uint32_t max_critique_rounds = orch->config.critique_max_rounds > 0 ?
                     orch->config.critique_max_rounds : 3;
@@ -1063,7 +1063,7 @@ static int execute_single_phase(orchestrator_t* orch,
                                   (current_output ? strlen(current_output) : 0);
                 char* cbuf = (char*)malloc(cbuf_sz);
                 if (cbuf) {
-                    int clen = snprintf(cbuf, cbuf_sz,
+                    int clen __attribute__((unused)) = snprintf(cbuf, cbuf_sz,
                         "{\"phase\":\"critique\","
                         "\"accepted\":%s,"
                         "\"score\":%.4f,"

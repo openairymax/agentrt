@@ -536,8 +536,6 @@ int openai_chat_completion(openai_handle_t handle,
     uint64_t ts_start_ms = agentos_time_ms();
 
 #ifndef AGENTOS_HAS_CURL
-    openai_record_latency(adapter, 0.0);
-    (void)request;
     return -ENOSYS;
 #else
     if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
@@ -750,7 +748,9 @@ int openai_chat_completion_streaming(
         chunk_buf[chunk_len] = '\0';
         pos += chunk_len;
 
-        on_chunk(chunk_buf, chunk_len, (pos >= response_len), user_data);
+        on_chunk(chunk_buf, request->model,
+                 (pos >= response_len) ? OPENAI_FINISH_STOP : OPENAI_FINISH_LENGTH,
+                 user_data);
     }
 
     uint64_t ts_end_ms = agentos_time_ms();

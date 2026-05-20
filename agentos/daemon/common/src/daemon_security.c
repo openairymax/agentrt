@@ -44,7 +44,7 @@ static struct {
     bool signature_enabled;
     bool vault_enabled;
     bool audit_enabled;
-} g_daemon_security = {false, SANITIZE_LEVEL_NORMAL, false, false, false, false};
+} g_daemon_security __attribute__((unused)) = {false, SANITIZE_LEVEL_NORMAL, false, false, false, false};
 
 /* ---------- Initialization and Shutdown ---------- */
 
@@ -543,7 +543,7 @@ static struct {
     char audit_log_path[256];
 } g_security_ctx = {
     false, SANITIZE_LEVEL_NORMAL, true, true, true, true,
-    {0}, 0, {0}, 0, NULL, {0}
+    {{0}}, 0, {{0}}, 0, NULL, {0}
 };
 
 static pthread_mutex_t g_security_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -1060,6 +1060,12 @@ int daemon_audit_log_event(const char* service_name, const char* operation,
         daemon_security_init(NULL, NULL);
     }
 
+    pthread_mutex_lock(&g_security_mutex);
+    if (!g_security_ctx.audit_enabled) {
+        pthread_mutex_unlock(&g_security_mutex);
+        return 0;
+    }
+
     time_t now = time(NULL);
     struct tm tm_info;
     localtime_r(&now, &tm_info);
@@ -1087,6 +1093,7 @@ int daemon_audit_log_event(const char* service_name, const char* operation,
             SVC_LOG_WARN("[AUDIT] %s", log_msg);
         }
     }
+    pthread_mutex_unlock(&g_security_mutex);
 
     return AGENTOS_OK;
 }
