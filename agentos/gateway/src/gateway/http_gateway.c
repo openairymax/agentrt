@@ -181,7 +181,7 @@ struct MHD_Response* create_http_response(int status_code, const char* content, 
 /**
  * @brief 解析HTTP请求头
  */
-static int parse_headers(void* cls __attribute__((unused)),
+static int __attribute__((unused)) parse_headers(void* cls __attribute__((unused)),
                          enum MHD_ValueKind kind __attribute__((unused)),
                          const char* key __attribute__((unused)),
                          const char* value __attribute__((unused))) {
