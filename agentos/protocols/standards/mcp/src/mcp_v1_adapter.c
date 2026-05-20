@@ -595,7 +595,7 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t* ctx,
     for (size_t i = 0; i < message_count && i < 100; i++) {
         if (i > 0) offset += snprintf(buf + offset, buf_size - offset, ",");
         char* role = json_string_escape(messages[i].role);
-        char* content = json_string_escape(messages[i].content ? messages[i].content : (const char*)"");
+        char* content = json_string_escape(messages[i].content ? (const char*)messages[i].content : "");
         offset += snprintf(buf + offset, buf_size - offset,
             "{\"role\":%s,\"content\":{\"type\":\"text\",\"text\":\"%s\"}}", role, content);
         free(role);
@@ -655,21 +655,6 @@ typedef struct {
     mcp_stream_config_t config;
     bool active;
 } mcp_stream_state_t;
-
-static mcp_stream_state_t* __attribute__((unused)) get_stream_state(mcp_v1_context_t* ctx) {
-    if (!ctx) return NULL;
-    static mcp_stream_state_t fallback = {
-        .config = { .enabled = true, .chunk_size = 4096, .max_buffer_size = (10 * 1024 * 1024), .flush_interval_ms = 50 },
-        .active = false
-    };
-    if (ctx->stream_config.chunk_size == 0) {
-        ctx->stream_config = fallback.config;
-        ctx->stream_active = 0;
-    }
-    fallback.config = ctx->stream_config;
-    fallback.active = ctx->stream_active;
-    return &fallback;
-}
 
 int mcp_v1_stream_config(mcp_v1_context_t* ctx, const mcp_stream_config_t* config) {
     if (!ctx) return -1;
@@ -750,10 +735,12 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
     }
 
     if (!found) {
+        char* name_esc = json_string_escape(name);
         char error_json[512];
         snprintf(error_json, sizeof(error_json),
             "{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"Tool not found: %s\"}]}",
-            name);
+            name_esc);
+        free(name_esc);
         emit_sse_event(callback, user_data, "tools/call/result", error_json);
 
         mcp_stream_event_t done_event;
@@ -893,12 +880,13 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
                     chunk_buf[chunk_size] = '\0';
 
                     char* escaped_chunk = json_string_escape(chunk_buf);
+                    char* model_esc = json_string_escape(result.model ? result.model : "unknown");
                     char sse_data[512];
                     snprintf(sse_data, sizeof(sse_data),
-                        "{\"model\":\"%s\",\"delta\":{\"type\":\"text\",\"text\":\"%s\"},\"index\":%zu}",
-                        result.model ? result.model : "unknown",
-                        escaped_chunk, i);
+                        "{\"model\":%s,\"delta\":{\"type\":\"text\",\"text\":\"%s\"},\"index\":%zu}",
+                        model_esc, escaped_chunk, i);
                     free(escaped_chunk);
+                    free(model_esc);
                     emit_sse_event(callback, user_data, "sampling/chunk", sse_data);
 
                     offset += chunk_size;
@@ -915,12 +903,15 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
         }
     }
 
+    char* model_esc = json_string_escape(result.model ? result.model : "unknown");
+    char* stop_esc = json_string_escape(result.stop_reason ? result.stop_reason : "end_turn");
     char final_result[2048];
     snprintf(final_result, sizeof(final_result),
-        "{\"model\":\"%s\",\"stopReason\":\"%s\",\"stoppedEarly\":%s}",
-        result.model ? result.model : "unknown",
-        result.stop_reason ? result.stop_reason : "end_turn",
+        "{\"model\":%s,\"stopReason\":%s,\"stoppedEarly\":%s}",
+        model_esc, stop_esc,
         result.stopped_early ? "true" : "false");
+    free(model_esc);
+    free(stop_esc);
     emit_sse_event(callback, user_data, "sampling/result", final_result);
 
     mcp_stream_event_t done_event;

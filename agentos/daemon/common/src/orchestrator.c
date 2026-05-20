@@ -1004,7 +1004,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         char* corr_input = (char*)malloc(corr_input_sz);
                         if (!corr_input) break;
 
-                        int cpos = snprintf(corr_input, corr_input_sz,
+                        (void)snprintf(corr_input, corr_input_sz,
                             "[ORIGINAL REQUEST]\n%s\n\n"
                             "[CURRENT OUTPUT - round %u, score=%.2f]\n%s\n\n"
                             "[S1 CRITIQUE - %s]\n%s\n\n"

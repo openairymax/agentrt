@@ -24,40 +24,18 @@
 extern "C" {
 #endif
 
-#ifndef AGENTOS_EINIT
-#define AGENTOS_EINIT    (-100)
-#endif
-
-#ifndef AGENTOS_ESTATE
-#define AGENTOS_ESTATE   (-101)
-#endif
-
-#ifndef AGENTOS_EHEALTH
-#define AGENTOS_EHEALTH  (-102)
-#endif
-
-#ifndef AGENTOS_EDEPEND
-#define AGENTOS_EDEPEND  (-103)
-#endif
-
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL   (-104)
-#endif
+#define DAEMON_EINIT    (-300)
+#define DAEMON_ESTATE   (-301)
+#define DAEMON_EHEALTH  (-302)
+#define DAEMON_EDEPEND  (-303)
+#define DAEMON_EFAIL    (-304)
 
 #ifndef CUPOLAS_ERR_INVALID_PARAM
 #define CUPOLAS_ERR_INVALID_PARAM (-2001)
 #endif
 
-#ifndef AGENTOS_ERR_NOT_SUPPORTED
-#define AGENTOS_ERR_NOT_SUPPORTED  (-105)
-#endif
-
 #ifndef AGENTOS_ERR_PERMISSION_DENIED
 #define AGENTOS_ERR_PERMISSION_DENIED  (-10)
-#endif
-
-#ifndef AGENTOS_ERR_ALREADY_EXISTS
-#define AGENTOS_ERR_ALREADY_EXISTS     (-11)
 #endif
 
 #ifndef AGENTOS_OK
@@ -74,14 +52,6 @@ extern "C" {
 
 #ifndef AGENTOS_ERR_OVERFLOW
 #define AGENTOS_ERR_OVERFLOW            (-14)
-#endif
-
-#ifndef AGENTOS_ERR_PARSE_ERROR
-#define AGENTOS_ERR_PARSE_ERROR          (-16)
-#endif
-
-#ifndef AGENTOS_ERR_UNKNOWN
-#define AGENTOS_ERR_UNKNOWN             (-17)
 #endif
 
 /**

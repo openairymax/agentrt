@@ -18,7 +18,7 @@
 static void test_trace_init_shutdown(void) {
     printf("Test: trace_init_shutdown...");
 
-    heapstore_error_t err = heapstore_trace_init();
+    heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
     assert(err == heapstore_SUCCESS);
 
     heapstore_trace_shutdown();
@@ -29,7 +29,7 @@ static void test_trace_init_shutdown(void) {
 static void test_trace_write_span(void) {
     printf("Test: trace_write_span...");
 
-    heapstore_error_t err = heapstore_trace_init();
+    heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t span;
@@ -37,14 +37,14 @@ static void test_trace_write_span(void) {
 
     snprintf(span.trace_id, sizeof(span.trace_id), "trace_%ld", (long)time(NULL));
     snprintf(span.span_id, sizeof(span.span_id), "span_001");
-    snprintf(span.parent_span_id, sizeof(span.parent_span_id), "");
+    span.parent_span_id[0] = '\0';
     snprintf(span.name, sizeof(span.name), "test_operation");
     span.start_time_ns = (uint64_t)time(NULL) * 1000000000;
     span.end_time_ns = span.start_time_ns + 100000000;
     snprintf(span.service_name, sizeof(span.service_name), "test_service");
     snprintf(span.status, sizeof(span.status), "OK");
 
-    err = heapstore_trace_write_span(&span);
+    err __attribute__((unused)) = heapstore_trace_write_span(&span);
     assert(err == heapstore_SUCCESS);
 
     heapstore_trace_shutdown();

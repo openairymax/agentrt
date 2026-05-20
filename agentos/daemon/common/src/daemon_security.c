@@ -541,10 +541,7 @@ static struct {
     size_t acl_count;
     FILE* audit_fp;
     char audit_log_path[256];
-} g_security_ctx = {
-    false, SANITIZE_LEVEL_NORMAL, true, true, true, true,
-    {{{0}}}, 0, {{{0}}}, 0, NULL, {0}
-};
+} g_security_ctx = {0};
 
 static pthread_mutex_t g_security_mutex = PTHREAD_MUTEX_INITIALIZER;
 
