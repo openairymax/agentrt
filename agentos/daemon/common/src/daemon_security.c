@@ -34,6 +34,7 @@
 #include "svc_logger.h"
 #include "error.h"
 #include "platform.h"
+#include <pthread.h>
 
 /* Internal state structure */
 static struct {
@@ -43,7 +44,7 @@ static struct {
     bool signature_enabled;
     bool vault_enabled;
     bool audit_enabled;
-} g_daemon_security __attribute__((unused)) = {false, SANITIZE_LEVEL_NORMAL, false, false, false, false};
+} g_daemon_security = {false, SANITIZE_LEVEL_NORMAL, false, false, false, false};
 
 /* ---------- Initialization and Shutdown ---------- */
 
@@ -545,6 +546,8 @@ static struct {
     {0}, 0, {0}, 0, NULL, {0}
 };
 
+static pthread_mutex_t g_security_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static const char* DANGEROUS_PATTERNS[] = {
     ";", "|", "`", "$(", "${", "&&", "||", ">", ">>", "<", "<<",
     "\\", "\n", "\r", "\0", NULL
@@ -574,7 +577,9 @@ static void sanitize_string(char* output, const char* input, size_t max_len) {
 }
 
 int daemon_security_init(const daemon_security_config_t* config, agentos_error_t* error) {
+    pthread_mutex_lock(&g_security_mutex);
     if (g_security_ctx.initialized) {
+        pthread_mutex_unlock(&g_security_mutex);
         SVC_LOG_INFO("Daemon security: already initialized");
         return 0;
     }
@@ -613,13 +618,18 @@ int daemon_security_init(const daemon_security_config_t* config, agentos_error_t
     }
 
     g_security_ctx.initialized = true;
+    pthread_mutex_unlock(&g_security_mutex);
     SVC_LOG_INFO("Daemon security: initialized in production mode (sanitize_level=%d)",
                 g_security_ctx.current_sanitize_level);
     return 0;
 }
 
 void daemon_security_shutdown(void) {
-    if (!g_security_ctx.initialized) return;
+    pthread_mutex_lock(&g_security_mutex);
+    if (!g_security_ctx.initialized) {
+        pthread_mutex_unlock(&g_security_mutex);
+        return;
+    }
 
     for (size_t i = 0; i < g_security_ctx.cred_count; i++) {
         free(g_security_ctx.credentials[i].cred_id);
@@ -632,7 +642,8 @@ void daemon_security_shutdown(void) {
         g_security_ctx.audit_fp = NULL;
     }
 
-    memset(&g_security_ctx, 0, sizeof(g_security_ctx));
+    g_security_ctx.initialized = false;
+    pthread_mutex_unlock(&g_security_mutex);
     SVC_LOG_INFO("Daemon security: shutdown complete");
 }
 
@@ -958,11 +969,15 @@ int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_
         daemon_security_init(NULL, NULL);
     }
 
+    pthread_mutex_lock(&g_security_mutex);
+
     if (!g_security_ctx.vault_enabled) {
+        pthread_mutex_unlock(&g_security_mutex);
         return AGENTOS_ERR_NOT_SUPPORTED;
     }
 
     if (g_security_ctx.cred_count >= MAX_CREDENTIALS) {
+        pthread_mutex_unlock(&g_security_mutex);
         SVC_LOG_ERROR("Credential storage full (max=%d)", MAX_CREDENTIALS);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
@@ -971,9 +986,13 @@ int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_
         if (strcmp(g_security_ctx.credentials[i].cred_id, cred_id) == 0) {
             free(g_security_ctx.credentials[i].data);
             g_security_ctx.credentials[i].data = (uint8_t*)malloc(data_len);
-            if (!g_security_ctx.credentials[i].data) return AGENTOS_ERR_OUT_OF_MEMORY;
+            if (!g_security_ctx.credentials[i].data) {
+                pthread_mutex_unlock(&g_security_mutex);
+                return AGENTOS_ERR_OUT_OF_MEMORY;
+            }
             memcpy(g_security_ctx.credentials[i].data, data, data_len);
             g_security_ctx.credentials[i].data_len = data_len;
+            pthread_mutex_unlock(&g_security_mutex);
             SVC_LOG_INFO("Credential updated: %s (type=%d, %zu bytes)",
                         cred_id, cred_type, data_len);
             return AGENTOS_OK;
@@ -984,11 +1003,15 @@ int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_
     entry->cred_id = strdup(cred_id);
     entry->type = cred_type;
     entry->data = (uint8_t*)malloc(data_len);
-    if (!entry->data) return AGENTOS_ERR_OUT_OF_MEMORY;
+    if (!entry->data) {
+        pthread_mutex_unlock(&g_security_mutex);
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
     memcpy(entry->data, data, data_len);
     entry->data_len = data_len;
     entry->owner_agent_id = agent_id ? strdup(agent_id) : strdup("system");
 
+    pthread_mutex_unlock(&g_security_mutex);
     SVC_LOG_INFO("Credential stored: %s (type=%d, %zu bytes, total=%zu)",
                 cred_id, cred_type, data_len, g_security_ctx.cred_count);
     return AGENTOS_OK;

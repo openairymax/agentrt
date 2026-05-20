@@ -483,7 +483,7 @@ static void openai_on_429(struct openai_enterprise_adapter_s* adapter) {
     adapter->rate_backoff_until = now + delay_sec;
 }
 
-static int
+static int __attribute__((unused))
 openai_compute_retry_delay_ms(struct openai_enterprise_adapter_s* adapter,
                               int attempt) {
     uint32_t base_delay = (uint32_t)(OPENAI_RETRY_BASE_DELAY_MS *
