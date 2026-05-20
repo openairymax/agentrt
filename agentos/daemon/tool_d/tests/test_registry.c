@@ -42,7 +42,7 @@ static void test_registry_add(void) {
     meta.timeout_sec = 30;
     meta.cacheable = 1;
 
-    int ret = tool_registry_add(reg, &meta);
+    int ret __attribute__((unused)) = tool_registry_add(reg, &meta);
     assert(ret == 0);
 
     tool_registry_destroy(reg);
@@ -65,7 +65,7 @@ static void test_registry_add_duplicate(void) {
     meta.name = "Duplicate Tool";
     meta.executable = "/usr/bin/echo";
 
-    int ret = tool_registry_add(reg, &meta);
+    int ret __attribute__((unused)) = tool_registry_add(reg, &meta);
     assert(ret == 0);
 
     ret = tool_registry_add(reg, &meta);
@@ -114,7 +114,7 @@ static void test_registry_get_nonexistent(void) {
     tool_registry_t* reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
-    tool_metadata_t* retrieved = tool_registry_get(reg, "nonexistent_tool");
+    tool_metadata_t* retrieved __attribute__((unused)) = tool_registry_get(reg, "nonexistent_tool");
     assert(retrieved == NULL);
 
     tool_registry_destroy(reg);
@@ -139,10 +139,10 @@ static void test_registry_remove(void) {
 
     tool_registry_add(reg, &meta);
 
-    int ret = tool_registry_remove(reg, "remove_test_tool");
+    int ret __attribute__((unused)) = tool_registry_remove(reg, "remove_test_tool");
     assert(ret == 0);
 
-    tool_metadata_t* retrieved = tool_registry_get(reg, "remove_test_tool");
+    tool_metadata_t* retrieved __attribute__((unused)) = tool_registry_get(reg, "remove_test_tool");
     assert(retrieved == NULL);
 
     tool_registry_destroy(reg);
@@ -159,7 +159,7 @@ static void test_registry_remove_nonexistent(void) {
     tool_registry_t* reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
-    int ret = tool_registry_remove(reg, "nonexistent_tool");
+    int ret __attribute__((unused)) = tool_registry_remove(reg, "nonexistent_tool");
     assert(ret != 0);
 
     tool_registry_destroy(reg);
@@ -227,7 +227,7 @@ static void test_registry_list_json_empty(void) {
 static void test_registry_null_param(void) {
     printf("  test_registry_null_param...\n");
 
-    int ret = tool_registry_add(NULL, NULL);
+    int ret __attribute__((unused)) = tool_registry_add(NULL, NULL);
     assert(ret != 0);
 
     tool_metadata_t meta;
@@ -238,7 +238,7 @@ static void test_registry_null_param(void) {
     ret = tool_registry_add(reg, &meta);
     assert(ret != 0);
 
-    tool_metadata_t* retrieved = tool_registry_get(NULL, "test");
+    tool_metadata_t* retrieved __attribute__((unused)) = tool_registry_get(NULL, "test");
     assert(retrieved == NULL);
 
     retrieved = tool_registry_get(reg, NULL);
@@ -273,10 +273,10 @@ static void test_registry_tool_with_params(void) {
     meta.params = params;
     meta.param_count = 2;
 
-    int ret = tool_registry_add(reg, &meta);
+    int ret __attribute__((unused)) = tool_registry_add(reg, &meta);
     assert(ret == 0);
 
-    tool_metadata_t* retrieved = tool_registry_get(reg, "param_tool");
+    tool_metadata_t* retrieved __attribute__((unused)) = tool_registry_get(reg, "param_tool");
     assert(retrieved != NULL);
     assert(retrieved->param_count == 2);
     assert(strcmp(retrieved->params[0].name, "input_file") == 0);

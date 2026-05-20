@@ -60,7 +60,7 @@ static int g_tests_passed = 0;
 
 /* ========== 辅助函数：创建 JSON-RPC 请求 ========== */
 
-static cJSON* __attribute__((unused)) create_jsonrpc_request(const char* method) {
+static cJSON* __attribute__((used)) create_jsonrpc_request(const char* method) {
     cJSON* request = cJSON_CreateObject();
     if (!request) return NULL;
     

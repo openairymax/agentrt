@@ -39,7 +39,7 @@ static void test_cache_key_generation(void) {
 static void test_cache_key_null_inputs(void) {
     printf("  test_cache_key_null_inputs...\n");
 
-    char* key = tool_cache_key(NULL, "params");
+    char* key __attribute__((unused)) = tool_cache_key(NULL, "params");
     assert(key == NULL);
 
     key = tool_cache_key("tool_id", NULL);
@@ -63,7 +63,7 @@ static void test_cache_put_get(void) {
     tool_cache_put(cache, key, value);
 
     char* retrieved = NULL;
-    int ret = tool_cache_get(cache, key, &retrieved);
+    int ret __attribute__((unused)) = tool_cache_get(cache, key, &retrieved);
     assert(ret == 1);
     assert(retrieved != NULL);
     assert(strcmp(retrieved, value) == 0);
@@ -81,7 +81,7 @@ static void test_cache_miss(void) {
     assert(cache != NULL);
 
     char* retrieved = NULL;
-    int ret = tool_cache_get(cache, "nonexistent_key", &retrieved);
+    int ret __attribute__((unused)) = tool_cache_get(cache, "nonexistent_key", &retrieved);
     assert(ret == 0);
 
     tool_cache_destroy(cache);
@@ -101,7 +101,7 @@ static void test_cache_clear(void) {
 
     cache_clear(cache);
 
-    char* retrieved = NULL;
+    char* retrieved __attribute__((unused)) = NULL;
     assert(tool_cache_get(cache, "key1", &retrieved) == 0);
     assert(tool_cache_get(cache, "key2", &retrieved) == 0);
     assert(tool_cache_get(cache, "key3", &retrieved) == 0);
