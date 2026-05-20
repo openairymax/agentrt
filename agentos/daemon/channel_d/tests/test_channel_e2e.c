@@ -38,7 +38,7 @@ static uint64_t get_time_ns(void) {
 static void cleanup_test_dir(void) {
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "mkdir -p %s && rm -rf %s", TEST_SOCKET_DIR, TEST_SOCKET_DIR);
-    system(cmd);
+    { int __rc __attribute__((unused)) = system(cmd); }
 }
 
 /* ========================================================================
@@ -268,7 +268,7 @@ static void test_send_receive_shm_roundtrip(void **state) {
 
     uint64_t t0 = get_time_ns();
     int rc = channel_service_send(svc, ch_id, send_data, send_len);
-    uint64_t t1 = get_time_ns();
+    uint64_t t1 __attribute__((unused)) = get_time_ns();
 
     assert_int_equal(rc, 0);
 

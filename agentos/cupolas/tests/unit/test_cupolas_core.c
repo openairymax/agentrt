@@ -147,7 +147,7 @@ static void test_audit_queue(void) {
     audit_queue_t* queue = audit_queue_create(100);
     assert(queue != NULL);
     
-    audit_entry_t* entry1 = audit_entry_create(AUDIT_EVENT_PERMISSION, "agent1", "read", "/data", NULL, 1);
+    audit_entry_t* entry1 __attribute__((unused)) = audit_entry_create(AUDIT_EVENT_PERMISSION, "agent1", "read", "/data", NULL, 1);
     assert(entry1 != NULL);
     
     assert(audit_queue_push(queue, entry1) == cupolas_OK);
@@ -171,8 +171,8 @@ static void test_audit_queue(void) {
 static void test_sanitizer(void) {
     sanitizer_t* san = sanitizer_create(NULL);
     assert(san != NULL);
-    
-    char output[256];
+
+    char output[256] __attribute__((unused));
     sanitize_context_t ctx;
     sanitizer_default_context(&ctx);
     
@@ -255,7 +255,7 @@ static void test_cupolas_permission(void) {
 static void test_cupolas_sanitize(void) {
     assert(cupolas_init(NULL, NULL) == cupolas_OK);
     
-    char output[256];
+    char output[256] __attribute__((unused));
     assert(cupolas_sanitize_input("hello", output, sizeof(output)) == cupolas_OK);
     assert(strcmp(output, "hello") == 0);
     

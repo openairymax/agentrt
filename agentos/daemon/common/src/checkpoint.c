@@ -272,7 +272,7 @@ agentos_error_t agentos_checkpoint_init(const char *storage_path)
                                          memory_order_seq_cst, memory_order_seq_cst)) {
             if (agentos_mutex_init(&g_checkpoint_mutex) != 0) {
                 atomic_store_explicit(&g_checkpoint_mutex_initialized, 0, memory_order_seq_cst);
-                return AGENTOS_EINIT;
+                return DAEMON_EINIT;
             }
         }
     }

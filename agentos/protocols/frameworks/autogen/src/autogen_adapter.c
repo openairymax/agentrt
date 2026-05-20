@@ -223,7 +223,7 @@ static uint64_t __attribute__((unused)) autogen_hash_str(const char* s) {
     return h;
 }
 
-static int autogen_count_words(const char* t) {
+static int __attribute__((used)) autogen_count_words(const char* t) {
     if (!t || !*t) return 0;
     int c = 0, in = 0;
     for (; *t; t++) {

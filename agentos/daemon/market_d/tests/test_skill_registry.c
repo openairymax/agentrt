@@ -14,7 +14,7 @@ static void test_market_register_skill(void) {
     printf("  test_market_register_skill...\n");
 
     market_service_t* svc = NULL;
-    int ret = market_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
     skill_info_t info;
@@ -109,7 +109,7 @@ static void test_market_uninstall_skill(void) {
     printf("  test_market_uninstall_skill...\n");
 
     market_service_t* svc = NULL;
-    int ret = market_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
     skill_info_t info;

@@ -15,7 +15,7 @@ static void test_monitor_service_create_destroy(void) {
     printf("  test_monitor_service_create_destroy...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
     assert(svc != NULL);
 
@@ -29,7 +29,7 @@ static void test_alert_trigger(void) {
     printf("  test_alert_trigger...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
     alert_info_t alert;
@@ -64,7 +64,7 @@ static void test_alert_resolve(void) {
     printf("  test_alert_resolve...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
     alert_info_t alert;

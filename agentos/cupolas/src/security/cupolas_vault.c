@@ -1438,10 +1438,10 @@ int cupolas_vault_import(cupolas_vault_t* vault,
                             entry->acl.entries[k].agent_id[agent_id_len] = '\0';
                         }
                     }
-                    (void)fread(&entry->acl.entries[k].operations, sizeof(uint32_t), 1, f);
-                    (void)fread(&entry->acl.entries[k].expires_at, sizeof(uint64_t), 1, f);
-                    (void)fread(&entry->acl.entries[k].access_count, sizeof(uint32_t), 1, f);
-                    (void)fread(&entry->acl.entries[k].max_access_count, sizeof(uint32_t), 1, f);
+                    { size_t __attribute__((unused)) _fr; _fr = fread(&entry->acl.entries[k].operations, sizeof(uint32_t), 1, f); }
+                    { size_t __attribute__((unused)) _fr; _fr = fread(&entry->acl.entries[k].expires_at, sizeof(uint64_t), 1, f); }
+                    { size_t __attribute__((unused)) _fr; _fr = fread(&entry->acl.entries[k].access_count, sizeof(uint32_t), 1, f); }
+                    { size_t __attribute__((unused)) _fr; _fr = fread(&entry->acl.entries[k].max_access_count, sizeof(uint32_t), 1, f); }
                 }
             }
         }
@@ -1469,10 +1469,10 @@ int cupolas_vault_import(cupolas_vault_t* vault,
             entry->metadata.service = meta_ptrs[2];
             entry->metadata.account = meta_ptrs[3];
             (void)fread(&entry->metadata.type, sizeof(cupolas_vault_cred_type_t), 1, f);
-            (void)fread(&entry->metadata.created_at, sizeof(uint64_t), 1, f);
-            (void)fread(&entry->metadata.updated_at, sizeof(uint64_t), 1, f);
-            (void)fread(&entry->metadata.expires_at, sizeof(uint64_t), 1, f);
-            (void)fread(&entry->metadata.is_accessible, sizeof(bool), 1, f);
+            { size_t __attribute__((unused)) _fr; _fr = fread(&entry->metadata.created_at, sizeof(uint64_t), 1, f); }
+            { size_t __attribute__((unused)) _fr; _fr = fread(&entry->metadata.updated_at, sizeof(uint64_t), 1, f); }
+            { size_t __attribute__((unused)) _fr; _fr = fread(&entry->metadata.expires_at, sizeof(uint64_t), 1, f); }
+            { size_t __attribute__((unused)) _fr; _fr = fread(&entry->metadata.is_accessible, sizeof(bool), 1, f); }
         }
 
         vault->entry_count++;

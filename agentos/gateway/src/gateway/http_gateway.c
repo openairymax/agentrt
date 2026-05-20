@@ -105,7 +105,7 @@ static bool is_cors_origin_allowed(const http_gateway_t* gateway, const char* or
  * @param content_len 内容长度
  * @return MHD 响应对象
  */
-static struct MHD_Response* __attribute__((unused)) create_http_response_ex(
+static struct MHD_Response* __attribute__((used)) create_http_response_ex(
     http_gateway_t* gateway,
     struct MHD_Connection* connection,
     int status_code __attribute__((unused)), 
@@ -240,7 +240,7 @@ typedef struct {
  * @param user_data 指向 http_handler_adapter_t 的指针
  * @return JSON 响应字符串（需调用者 free），或 NULL
  */
-static char* __attribute__((unused)) http_handler_adapter(void* request, void* user_data) {
+static char* __attribute__((used)) http_handler_adapter(void* request, void* user_data) {
     http_handler_adapter_t* adapter = (http_handler_adapter_t*)user_data;
     if (!adapter || !adapter->public_handler) return NULL;
 
