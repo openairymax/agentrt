@@ -943,10 +943,12 @@ static void test_mutex_basic(void)
     TEST_ASSERT_NOT_NULL(mtx, "mutex_create 成功");
 
     agentos_mutex_lock(mtx);
-    TEST_ASSERT(1, "mutex_lock 成功（非阻塞场景）");
+    int lock_rc = agentos_mutex_lock(mtx);
+    TEST_ASSERT(lock_rc == 0, "mutex_lock 返回0（递归/重入锁）");
 
     agentos_mutex_unlock(mtx);
-    TEST_ASSERT(1, "mutex_unlock 成功");
+    int unlock_rc = agentos_mutex_unlock(mtx);
+    TEST_ASSERT(unlock_rc == 0, "mutex_unlock 返回0");
 
     agentos_mutex_lock(mtx);
     agentos_mutex_unlock(mtx);

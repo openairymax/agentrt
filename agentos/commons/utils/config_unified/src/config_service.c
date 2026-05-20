@@ -883,7 +883,7 @@ config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
     
 /* ==================== 配置加密实现 ==================== */
 
-static char* config_bytes_to_hex(const unsigned char* data, size_t len) {
+static char* __attribute__((unused)) config_bytes_to_hex(const unsigned char* data, size_t len) {
     char* hex = (char*)AGENTOS_CALLOC(1, len * 2 + 1);
     if (!hex) return NULL;
     for (size_t i = 0; i < len; i++) {

@@ -595,7 +595,7 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t* ctx,
     for (size_t i = 0; i < message_count && i < 100; i++) {
         if (i > 0) offset += snprintf(buf + offset, buf_size - offset, ",");
         char* role = json_string_escape(messages[i].role);
-        char* content = json_string_escape(messages[i].content ? messages[i].content : "");
+        char* content = json_string_escape(messages[i].content ? messages[i].content : (const char*)"");
         offset += snprintf(buf + offset, buf_size - offset,
             "{\"role\":%s,\"content\":{\"type\":\"text\",\"text\":\"%s\"}}", role, content);
         free(role);

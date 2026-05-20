@@ -101,6 +101,7 @@ static int file_outputter_output(outputter_t* self, const log_record_t* record) 
         case LOG_LEVEL_WARN:  level_str = "WARN";  break;
         case LOG_LEVEL_ERROR: level_str = "ERROR"; break;
         case LOG_LEVEL_FATAL: level_str = "FATAL"; break;
+        case LOG_LEVEL_COUNT: level_str = "UNKNOWN"; break;
     }
 
     fprintf(fp, "[%s] [%s] %s:%d - %s\n",
