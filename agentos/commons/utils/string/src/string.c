@@ -1461,7 +1461,7 @@ size_t string_utf8_next_char(const char* str, uint32_t* ch) {
 
 bool string_utf8_validate(const char* str, size_t len) {
     if (str == NULL) {
-    return true;
+        return false;
     }
     
     size_t i = 0;

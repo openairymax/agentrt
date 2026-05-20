@@ -1094,6 +1094,7 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
     input_copy[data_size] = '\0';
 
     char* method = "tools/call";
+    bool method_allocated = false;
     char* method_start = strstr(input_copy, "\"method\"");
     if (method_start) {
         method_start = strchr(method_start + 8, '"');
@@ -1107,6 +1108,7 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
                     memcpy(method_buf, method_start, method_len);
                     method_buf[method_len] = '\0';
                     method = method_buf;
+                    method_allocated = true;
                 }
             }
         }
@@ -1114,7 +1116,7 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
 
     char* response_json = NULL;
     int result = mcp_v1_route_request(ctx, method, input_copy, &response_json);
-    if (strcmp(method, "tools/call") != 0) free((void*)method);
+    if (method_allocated) free((void*)method);
     free(input_copy);
 
     if (result == 0 && response_json) {

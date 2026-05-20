@@ -265,8 +265,7 @@ static inline const char* daemon_strerror(int error_code) {
  * @return true 如果是 JSON-RPC 标准错误
  */
 static inline bool daemon_is_jsonrpc_error(int error_code) {
-    return (error_code <= DAEMON_JSONRPC_PARSE_ERROR &&
-            error_code >= DAEMON_JSONRPC_INVALID_REQUEST &&
+    return (error_code >= DAEMON_JSONRPC_PARSE_ERROR &&
             error_code <= DAEMON_JSONRPC_INTERNAL_ERROR);
 }
 
