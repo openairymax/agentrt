@@ -1,6 +1,6 @@
 /**
  * @file guard.c
- * @brief 内存守卫（边界检测，Debug 构建使用�?
+ * @brief 内存守卫（边界检测，Debug 构建使用?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

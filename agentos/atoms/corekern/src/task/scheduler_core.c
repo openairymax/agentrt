@@ -23,7 +23,7 @@ static void* g_ctx_init_lock = NULL;
 /* ==================== 内部辅助函数 ==================== */
 
 /**
- * @brief 创建并初始化核心上下�? * @return 新创建的上下文，失败返回NULL
+ * @brief 创建并初始化核心上下? * @return 新创建的上下文，失败返回NULL
  */
 static scheduler_core_ctx_t* create_core_ctx(void) {
     scheduler_core_ctx_t* ctx = (scheduler_core_ctx_t*)AGENTOS_CALLOC(1, sizeof(scheduler_core_ctx_t));
@@ -41,7 +41,7 @@ static scheduler_core_ctx_t* create_core_ctx(void) {
     ctx->next_task_id = 1;
     ctx->task_count = 0;
 
-    /* 清零哈希�?*/
+    /* 清零哈希?*/
     memset(ctx->id_hash_table, 0, sizeof(ctx->id_hash_table));
 
     return ctx;
@@ -49,7 +49,7 @@ static scheduler_core_ctx_t* create_core_ctx(void) {
 
 /**
  * @brief 销毁核心上下文
- * @param ctx 要销毁的上下�? */
+ * @param ctx 要销毁的上下? */
 static void destroy_core_ctx(scheduler_core_ctx_t* ctx) {
     if (!ctx) return;
 
@@ -63,14 +63,14 @@ static void destroy_core_ctx(scheduler_core_ctx_t* ctx) {
         }
     }
 
-    /* 销毁任务表互斥�?*/
+    /* 销毁任务表互斥?*/
     if (ctx->task_table_lock) {
         agentos_mutex_free(ctx->task_table_lock);
     }
 
     /* 清理任务表（任务信息本身由适配器清理） */
     for (uint32_t i = 0; i < ctx->task_count; i++) {
-        /* 任务信息结构由适配器负责清理，这里只置�?*/
+        /* 任务信息结构由适配器负责清理，这里只置?*/
         ctx->task_table[i] = NULL;
     }
 
@@ -228,7 +228,7 @@ task_info_core_t* scheduler_core_task_info_create(
 void scheduler_core_task_info_destroy(task_info_core_t* info) {
     if (!info) return;
 
-    /* 注意：platform_handle和platform_data由平台适配器清�?*/
+    /* 注意：platform_handle和platform_data由平台适配器清?*/
     AGENTOS_FREE(info);
 }
 
@@ -236,7 +236,7 @@ int scheduler_core_task_table_add(task_info_core_t* info) {
     if (!g_core_ctx || !info) return -1;
 
     if (g_core_ctx->task_count >= TASK_TABLE_CAPACITY) {
-        return -1;  /* 表已�?*/
+        return -1;  /* 表已?*/
     }
 
     g_core_ctx->task_table[g_core_ctx->task_count++] = info;

@@ -36,7 +36,7 @@ enum {
 
 typedef void* (*syscall_func_t)(void** args, int argc);
 
-/* 函数声明（实现位�?syscall_entry.c�?*/
+/* 函数声明（实现位?syscall_entry.c?*/
 extern void* sys_task_submit(void** args, int argc);
 extern void* sys_task_query(void** args, int argc);
 extern void* sys_task_wait(void** args, int argc);

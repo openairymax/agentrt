@@ -32,7 +32,7 @@
  * ============================================================================ */
 
 static void test_platform_mutex(void) {
-    cupolas_mutex_t mutex;
+    cupolas_mutex_t __attribute__((unused)) mutex;
     
     assert(cupolas_mutex_init(&mutex) == CUPOLAS_OK);
     assert(cupolas_mutex_lock(&mutex) == CUPOLAS_OK);
@@ -43,7 +43,7 @@ static void test_platform_mutex(void) {
 }
 
 static void test_platform_rwlock(void) {
-    cupolas_rwlock_t rwlock;
+    cupolas_rwlock_t __attribute__((unused)) rwlock;
     
     assert(cupolas_rwlock_init(&rwlock) == CUPOLAS_OK);
     assert(cupolas_rwlock_rdlock(&rwlock) == CUPOLAS_OK);
@@ -56,12 +56,12 @@ static void test_platform_rwlock(void) {
 }
 
 static void test_platform_time(void) {
-    cupolas_timestamp_t ts;
+    cupolas_timestamp_t __attribute__((unused)) ts;
     
     assert(cupolas_time_now(&ts) == cupolas_OK);
     assert(ts.sec > 0);
     
-    uint64_t ms = cupolas_time_ms();
+    uint64_t __attribute__((unused)) ms = cupolas_time_ms();
     assert(ms > 0);
     
     TEST_PASS("platform_time");
