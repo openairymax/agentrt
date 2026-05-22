@@ -1,13 +1,13 @@
 /**
  * @file config_service.c
- * @brief 统一配置模块 - 服务层实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 统一配置模块 - 服务层实? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 本文件实现统一配置模块的服务层功能，提供：
  * 1. 配置验证和Schema定义
  * 2. 热更新和变化通知
- * 3. 配置加密和安全存�? * 4. 配置版本管理和回�? * 5. 配置模板和变量展开
+ * 3. 配置加密和安全存? * 4. 配置版本管理和回? * 5. 配置模板和变量展开
  *
- * �? */
+ * ? */
 
 #include "config_service.h"
 #include "core_config.h"
@@ -32,18 +32,18 @@
 
 /** 配置验证器结构体 */
 struct config_validator {
-    validator_type_t type;           // 验证器类�
+    validator_type_t type;           // 验证器类
     char* pattern;                   // 模式（正则表达式或范围）
-    char** enum_values;              // 枚举值数�
+    char** enum_values;              // 枚举值数量
     size_t enum_count;
-    // 枚举值数�?
-    config_validator_cb_t custom_cb; // 自定义验证回�?
+    // 枚举值数?
+    config_validator_cb_t custom_cb; // 自定义验证回?
     void* user_data;
     // 用户数据
     char* error_message;             // 错误信息
 };
 
-/** 配置Schema项内部结�?*/
+/** 配置Schema项内部结?*/
 typedef struct {
     char* key;
     config_value_type_t type;
@@ -53,7 +53,7 @@ typedef struct {
     config_validator_t* validator;
 } schema_item_internal_t;
 
-/** 配置Schema结构�?*/
+/** 配置Schema结构?*/
 struct config_schema {
     char* name;
     schema_item_internal_t* items;
@@ -64,7 +64,7 @@ struct config_schema {
     size_t error_capacity;
 };
 
-/** 配置变化回调�?*/
+/** 配置变化回调?*/
 typedef struct {
     char* key;                       // 配置键（NULL表示所有）
     config_change_cb_t callback;     // 回调函数
@@ -86,7 +86,7 @@ struct config_hot_reload_manager {
     void* lock;
 };
 
-/** 配置版本�?*/
+/** 配置版本?*/
 typedef struct {
     uint32_t version;
     uint64_t timestamp;
@@ -108,8 +108,8 @@ struct config_version_manager {
 /* ==================== 内部辅助函数 ==================== */
 
 /**
- * @brief 复制字符�? * 
- * 安全复制字符串，处理NULL情况�? * 
+ * @brief 复制字符? * 
+ * 安全复制字符串，处理NULL情况? * 
  * @param str 源字符串
  * @return 新分配的字符串，失败返回NULL
  */
@@ -127,15 +127,15 @@ static char* duplicate_string(const char* str) {
 /**
  * @brief 添加验证错误
  * 
- * 向Schema添加验证错误信息�? * 
+ * 向Schema添加验证错误信息? * 
  * @param schema Schema对象
- * @param format 错误格式字符�? * @param ... 可变参数
+ * @param format 错误格式字符? * @param ... 可变参数
  * @return 是否成功
  */
 static bool add_schema_error(config_schema_t* schema, const char* format, ...) {
     if (!schema || !format) return false;
     
-    // 确保错误数组有足够容�
+    // 确保错误数组有足够容
     if (schema->error_count >= schema->error_capacity) {
         size_t new_capacity = schema->error_capacity == 0 ? 8 : schema->error_capacity * 2;
         char** new_errors = (char**)AGENTOS_REALLOC(schema->errors, new_capacity * sizeof(char*));
@@ -145,7 +145,7 @@ static bool add_schema_error(config_schema_t* schema, const char* format, ...) {
         schema->error_capacity = new_capacity;
     }
     
-    // 格式化错误信�
+    // 格式化错误信息
     char buffer[1024];
     va_list args;
     va_start(args, format);
@@ -167,7 +167,7 @@ static bool add_schema_error(config_schema_t* schema, const char* format, ...) {
 /**
  * @brief 清除验证错误
  * 
- * 清除Schema中的所有验证错误�? * 
+ * 清除Schema中的所有验证错误? * 
  * @param schema Schema对象
  */
 static void clear_schema_errors(config_schema_t* schema) {
@@ -181,9 +181,9 @@ static void clear_schema_errors(config_schema_t* schema) {
 }
 
 /**
- * @brief 验证配置值类�? * 
- * 验证配置值是否符合指定类型�? * 
- * @param value 配置�? * @param expected_type 期望类型
+ * @brief 验证配置值类? * 
+ * 验证配置值是否符合指定类型? * 
+ * @param value 配置? * @param expected_type 期望类型
  * @return 是否类型匹配
  */
 static bool validate_value_type(const config_value_t* value, config_value_type_t expected_type) {
@@ -194,8 +194,8 @@ static bool validate_value_type(const config_value_t* value, config_value_type_t
 /**
  * @brief 验证范围
  * 
- * 验证数值是否在指定范围内�? * 
- * @param value 配置�? * @param min_str 最小值字符串
+ * 验证数值是否在指定范围内? * 
+ * @param value 配置? * @param min_str 最小值字符串
  * @param max_str 最大值字符串
  * @return 是否在范围内
  */
@@ -225,9 +225,9 @@ static bool validate_range(const config_value_t* value, const char* min_str, con
 }
 
 /**
- * @brief 验证枚举�? * 
- * 验证字符串是否在枚举值列表中�? * 
- * @param value 配置�? * @param enum_values 枚举值数�? * @param enum_count 枚举值数�? * @return 是否在枚举值中
+ * @brief 验证枚举? * 
+ * 验证字符串是否在枚举值列表中? * 
+ * @param value 配置? * @param enum_values 枚举值数? * @param enum_count 枚举值数? * @return 是否在枚举值中
  */
 static bool validate_enum(const config_value_t* value, const char** enum_values, size_t enum_count) {
     if (!value || config_value_get_type(value) != CONFIG_TYPE_STRING || !enum_values || enum_count == 0) {
@@ -247,10 +247,10 @@ static bool validate_enum(const config_value_t* value, const char** enum_values,
 }
 
 /**
- * @brief 查找Schema�? * 
- * 根据键查找Schema项�? * 
+ * @brief 查找Schema? * 
+ * 根据键查找Schema项? * 
  * @param schema Schema对象
- * @param key 配置�? * @return Schema项索引，未找到返�?1
+ * @param key 配置? * @return Schema项索引，未找到返回值1
  */
 static int find_schema_item(const config_schema_t* schema, const char* key) {
     if (!schema || !key) return -1;
@@ -264,7 +264,7 @@ static int find_schema_item(const config_schema_t* schema, const char* key) {
     return -1;
 }
 
-/* ==================== 配置验证器实�?==================== */
+/* ==================== 配置验证器实?==================== */
 
 config_validator_t* config_validator_create(const validator_options_t* options) {
     if (!options) return NULL;
@@ -276,7 +276,7 @@ config_validator_t* config_validator_create(const validator_options_t* options) 
     validator->custom_cb = options->custom_cb;
     validator->user_data = options->user_data;
     
-    // 复制模式字符�
+    // 复制模式字符
     if (options->pattern) {
         validator->pattern = duplicate_string(options->pattern);
         if (!validator->pattern) {
@@ -285,7 +285,7 @@ config_validator_t* config_validator_create(const validator_options_t* options) 
         }
     }
     
-    // 复制枚举�
+    // 复制枚举
     if (options->enum_values && options->enum_count > 0) {
         validator->enum_values = (char**)AGENTOS_CALLOC(options->enum_count, sizeof(char*));
         if (!validator->enum_values) {
@@ -336,7 +336,7 @@ void config_validator_destroy(config_validator_t* validator) {
 bool config_validator_validate(config_validator_t* validator, const char* key, const config_value_t* value) {
     if (!validator || !value) return false;
     
-    // 根据验证器类型进行验�
+    // 根据验证器类型进行验证
     switch (validator->type) {
         case VALIDATOR_TYPE_RANGE:
             if (!validator->pattern) return false;
@@ -401,7 +401,7 @@ config_validator_t* config_validator_create_range(const char* min, const char* m
         .user_data = NULL
     };
     
-    // 构建范围模式字符�?"min,max"
+    // 构建范围模式字符?"min,max"
     size_t pattern_len = strlen(min) + strlen(max) + 2;
     char* pattern = (char*)AGENTOS_MALLOC(pattern_len);
     if (!pattern) return NULL;
@@ -488,7 +488,7 @@ void config_schema_destroy(config_schema_t* schema) {
     
     if (schema->name) AGENTOS_FREE(schema->name);
     
-    // 释放Schema�
+    // 释放Schema
     for (size_t i = 0; i < schema->count; i++) {
         schema_item_internal_t* item = &schema->items[i];
         if (item->key) AGENTOS_FREE(item->key);
@@ -509,12 +509,12 @@ void config_schema_destroy(config_schema_t* schema) {
 config_error_t config_schema_add_item(config_schema_t* schema, const config_schema_item_t* item) {
     if (!schema || !item || !item->key) return CONFIG_ERROR_INVALID_ARG;
     
-    // 检查是否已存在相同�
+    // 检查是否已存在相同
     if (find_schema_item(schema, item->key) >= 0) {
         return CONFIG_ERROR_INVALID_ARG;
     }
     
-    // 确保有足够容�
+    // 确保有足够容
     if (schema->count >= schema->capacity) {
         size_t new_capacity = schema->capacity * 2;
         schema_item_internal_t* new_items = (schema_item_internal_t*)AGENTOS_REALLOC(
@@ -525,7 +525,7 @@ config_error_t config_schema_add_item(config_schema_t* schema, const config_sche
         schema->capacity = new_capacity;
     }
     
-    // 复制Schema�
+    // 复制Schema
     schema_item_internal_t* new_item = &schema->items[schema->count];
     memset(new_item, 0, sizeof(schema_item_internal_t));
     
@@ -552,7 +552,7 @@ config_error_t config_schema_add_item(config_schema_t* schema, const config_sche
         }
     }
     
-    // 复制验证器（引用计数，不复制�
+    // 复制验证器（引用计数，不复制
     new_item->validator = item->validator;
     
     schema->count++;
@@ -565,11 +565,11 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
     clear_schema_errors(schema);
     bool valid = true;
     
-    // 验证每个Schema�
+    // 验证每个Schema
     for (size_t i = 0; i < schema->count; i++) {
         schema_item_internal_t* item = &schema->items[i];
         
-        // 查找配置�
+        // 查找配配置
         // 从配置上下文中获取值
         const config_value_t* value = config_context_get(ctx, item->key);
         
@@ -586,7 +586,7 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
                 valid = false;
             }
             
-            // 验证�
+            // 验验证
             if (item->validator && !config_validator_validate(item->validator, item->key, value)) {
                 add_schema_error(schema, "Configuration item '%s' failed validation", item->key);
                 valid = false;
@@ -630,22 +630,22 @@ const char* config_schema_get_error(config_schema_t* schema, int index) {
 config_error_t config_schema_apply_defaults(config_schema_t* schema, config_context_t* ctx) {
     if (!schema || !ctx) return CONFIG_ERROR_INVALID_ARG;
     
-    // 为每个有默认值的Schema项设置默认�
+    // 为每个有默认值的Schema项设置默认
     for (size_t i = 0; i < schema->count; i++) {
         schema_item_internal_t* item = &schema->items[i];
         
         if (item->default_value) {
-            // 检查是否已存在配置�
+            // 检查是否已存在配配置
             // 检查配置键是否存在
             bool has_key = config_context_has(ctx, item->key);
             
             if (!has_key) {
-                // 根据类型创建配置�
+                // 根据类型创建配配置
                 config_value_t* default_value = NULL;
                 
                 switch (item->type) {
                     case CONFIG_TYPE_BOOL:
-                        // 解析布尔�
+                        // 解析布尔
                         default_value = config_value_create_bool(strcasecmp(item->default_value, "true") == 0);
                         break;
                         
@@ -671,7 +671,7 @@ config_error_t config_schema_apply_defaults(config_schema_t* schema, config_cont
                 }
                 
                 if (default_value) {
-                    // 设置配置�
+                    // 设置配配置
                     // config_context_set_value(ctx, item->key, default_value);
                     config_value_destroy(default_value);
                 }
@@ -682,7 +682,7 @@ config_error_t config_schema_apply_defaults(config_schema_t* schema, config_cont
     return CONFIG_SUCCESS;
 }
 
-/* ==================== 配置热更新实�?==================== */
+/* ==================== 配置热更新实?==================== */
 
 config_hot_reload_manager_t* config_hot_reload_manager_create(config_context_t* ctx,
                                                                config_source_manager_t* source_manager) {
@@ -743,7 +743,7 @@ config_error_t config_hot_reload_register_callback(config_hot_reload_manager_t* 
                                                     void* user_data) {
     if (!manager || !callback) return CONFIG_ERROR_INVALID_ARG;
     
-    // 确保有足够容�
+    // 确保有足够容
     if (manager->callback_count >= manager->callback_capacity) {
         size_t new_capacity = manager->callback_capacity * 2;
         change_callback_item_t* new_callbacks = (change_callback_item_t*)AGENTOS_REALLOC(
@@ -883,7 +883,9 @@ config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
     
 /* ==================== 配置加密实现 ==================== */
 
-static char* __attribute__((unused)) config_bytes_to_hex(const unsigned char* data, size_t len) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static char* config_bytes_to_hex(const unsigned char* data, size_t len) {
     char* hex = (char*)AGENTOS_CALLOC(1, len * 2 + 1);
     if (!hex) return NULL;
     for (size_t i = 0; i < len; i++) {
@@ -909,6 +911,7 @@ static unsigned char* config_hex_to_bytes(const char* hex, size_t* out_len) {
     *out_len = byte_len;
     return bytes;
 }
+#pragma GCC diagnostic pop
 
 static config_value_t* config_encrypt_string_value(const char* plaintext, size_t plaintext_len,
                                                     const encryption_config_t* enc) {
@@ -1176,7 +1179,7 @@ uint32_t config_version_create_snapshot(config_version_manager_t* manager,
                                          const char* description) {
     if (!manager) return 0;
     
-    // 确保有足够容�
+    // 确保有足够容
     if (manager->count >= manager->capacity) {
         size_t new_capacity = manager->capacity * 2;
         config_version_item_t* new_versions = (config_version_item_t*)AGENTOS_REALLOC(
@@ -1187,7 +1190,7 @@ uint32_t config_version_create_snapshot(config_version_manager_t* manager,
         manager->capacity = new_capacity;
     }
     
-    // 创建版本�
+    // 创建版本
     config_version_item_t* version = &manager->versions[manager->count];
     memset(version, 0, sizeof(config_version_item_t));
     

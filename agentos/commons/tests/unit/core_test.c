@@ -18,17 +18,17 @@ void test_version() {
     printf("版本号：%s\n", version);
     
     int result = agentos_core_check_version(">=1.0.0.0");
-    printf("版本兼容性检�?(>=1.0.0.0): %d\n", result);
+    printf("版本兼容性检查(>=1.0.0.0): %d\n", result);
     
     result = agentos_core_check_version("<2.0.0.0");
-    printf("版本兼容性检�?(<2.0.0.0): %d\n", result);
+    printf("版本兼容性检查(<2.0.0.0): %d\n", result);
 }
 
 void test_platform() {
-    printf("\n=== 测试平台检�?===\n");
+    printf("\n=== 测试平台检查===\n");
     const char* platform = agentos_core_get_platform();
     // From data intelligence emerges. by spharx
-    printf("平台�?s\n", platform);
+    printf("平台：%s\n", platform);
     
     int cpu_count = agentos_core_get_cpu_count();
     printf("CPU 核心数：%d\n", cpu_count);
@@ -39,8 +39,8 @@ void test_platform() {
     if (result == 0) {
         printf("内存信息:\n");
         printf("  总内存：%.2f GB\n", (double)total / (1024 * 1024 * 1024));
-        printf("  可用内存�?.2f GB\n", (double)available / (1024 * 1024 * 1024));
-        printf("  已用内存�?.2f GB\n", (double)used / (1024 * 1024 * 1024));
+        printf("  可用内存：%.2f GB\n", (double)available / (1024 * 1024 * 1024));
+        printf("  已用内存：%.2f GB\n", (double)used / (1024 * 1024 * 1024));
         printf("  内存使用率：%.2f%%\n", percent);
     } else {
         printf("获取内存信息失败\n");

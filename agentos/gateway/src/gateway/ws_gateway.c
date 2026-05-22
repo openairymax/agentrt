@@ -60,8 +60,10 @@ static const struct lws_protocols ws_protocols[] = {
         sizeof(void*),
         4096,
         0,
+        NULL,
+        0,
     },
-    { NULL, NULL, 0, 0, 0 }
+    { NULL, NULL, 0, 0, 0, NULL, 0 }
 };
 
 /* ========== WebSocket网关内部结构 ========== */

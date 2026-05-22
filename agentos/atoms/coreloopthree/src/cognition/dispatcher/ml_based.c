@@ -234,13 +234,13 @@ agentos_dispatching_ml_create(const char __attribute__((unused)) *model_path, vo
                         data->feature_weights[i] = loaded_weights[i] / sum;
                     }
                 }
-                AGENTOS_LOG_INFO("dispatch.ml", "Loaded ML weights from %s", model_path);
+                AGENTOS_LOG_INFO("dispatch.ml: Loaded ML weights from %s", model_path);
             } else {
-                AGENTOS_LOG_WARN("dispatch.ml", "Invalid ML model file %s, using defaults",
+                AGENTOS_LOG_WARN("dispatch.ml: Invalid ML model file %s, using defaults",
                                  model_path);
             }
         } else {
-            AGENTOS_LOG_INFO("dispatch.ml", "ML model file not found: %s, using default weights",
+            AGENTOS_LOG_INFO("dispatch.ml: ML model file not found: %s, using default weights",
                              model_path);
         }
     }

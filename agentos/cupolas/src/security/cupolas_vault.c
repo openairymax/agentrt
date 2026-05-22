@@ -1468,7 +1468,7 @@ int cupolas_vault_import(cupolas_vault_t* vault,
             entry->metadata.description = meta_ptrs[1];
             entry->metadata.service = meta_ptrs[2];
             entry->metadata.account = meta_ptrs[3];
-            (void)fread(&entry->metadata.type, sizeof(cupolas_vault_cred_type_t), 1, f);
+            { size_t __attribute__((unused)) _fr; _fr = fread(&entry->metadata.type, sizeof(cupolas_vault_cred_type_t), 1, f); }
             { size_t __attribute__((unused)) _fr; _fr = fread(&entry->metadata.created_at, sizeof(uint64_t), 1, f); }
             { size_t __attribute__((unused)) _fr; _fr = fread(&entry->metadata.updated_at, sizeof(uint64_t), 1, f); }
             { size_t __attribute__((unused)) _fr; _fr = fread(&entry->metadata.expires_at, sizeof(uint64_t), 1, f); }

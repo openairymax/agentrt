@@ -1,6 +1,6 @@
 /**
  * @file file_utils.c
- * @brief 文件操作实现（跨平台�?
+ * @brief 文件操作实现（跨平台?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

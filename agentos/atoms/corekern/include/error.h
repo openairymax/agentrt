@@ -125,12 +125,12 @@ extern "C" {
 
 #ifndef AGENTOS_LOG_INFO
 #define AGENTOS_LOG_INFO(fmt, ...) \
-    fprintf(stderr, "[INFO] " fmt "\n", ##__VA_ARGS__)
+    do { fprintf(stderr, "[INFO] " fmt "\n", ##__VA_ARGS__); } while(0)
 #endif
 
 #ifndef AGENTOS_LOG_WARN
 #define AGENTOS_LOG_WARN(fmt, ...) \
-    fprintf(stderr, "[WARN] " fmt "\n", ##__VA_ARGS__)
+    do { fprintf(stderr, "[WARN] " fmt "\n", ##__VA_ARGS__); } while(0)
 #endif
 
 #ifndef AGENTOS_LOG_ERROR

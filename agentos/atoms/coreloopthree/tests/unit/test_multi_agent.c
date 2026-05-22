@@ -66,7 +66,7 @@ static void test_mac_register_unregister(void)
     agent.max_concurrent_tasks = 4;
     agent.available = true;
 
-    int rc = mac_framework_register_agent(fw, &agent);
+    int __attribute__((unused)) rc = mac_framework_register_agent(fw, &agent);
     assert(rc == 0);
     assert(mac_framework_get_agent_count(fw) == 1);
 
@@ -91,7 +91,7 @@ static void test_mac_group_create_disband(void)
     }
 
     char *gid = NULL;
-    int rc = mac_framework_create_group(fw, "test_group", MAC_MODE_CONSENSUS, ids, 5, &gid);
+    int __attribute__((unused)) rc = mac_framework_create_group(fw, "test_group", MAC_MODE_CONSENSUS, ids, 5, &gid);
     assert(rc == 0);
     assert(gid != NULL);
     assert(mac_framework_get_group_count(fw) == 1);
@@ -385,7 +385,7 @@ static void test_consensus_vote_after_resolve(void)
 
     char vote2[64];
     snprintf(vote2, sizeof(vote2), "{\"agent_id\":\"resolved_agent_001\",\"vote\":\"approve\"}");
-    int rc = mac_framework_vote(fw, cid, "resolved_agent_001", vote2);
+    int __attribute__((unused)) rc = mac_framework_vote(fw, cid, "resolved_agent_001", vote2);
     assert(rc == -2);
 
     free(cid);
