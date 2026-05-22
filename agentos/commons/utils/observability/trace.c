@@ -1,13 +1,13 @@
 /**
  * @file trace.c
- * @brief 链路追踪实现（跨平台�?
+ * @brief 链路追踪实现（跨平台?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
- * 本模块实现分布式链路追踪功能�?
+ * 本模块实现分布式链路追踪功能?
  * - 支持Span的创建和生命周期管理
- * - 提供事件注解和属性添�?
- * - 支持JSON格式的追踪导�?
+ * - 提供事件注解和属性添?
+ * - 支持JSON格式的追踪导?
  * - 符合OpenTelemetry追踪规范
  */
 
@@ -42,9 +42,9 @@
  */
 typedef struct trace_event {
     char name[128];                      /**< 事件名称 */
-    int64_t timestamp;                 /**< 事件时间戳（微秒�?*/
-    char attributes[512];                /**< 事件属�?*/
-    struct trace_event* next;           /**< 下一个事�?*/
+    int64_t timestamp;                 /**< 事件时间戳（微秒?*/
+    char attributes[512];                /**< 事件属?*/
+    struct trace_event* next;           /**< 下一个事?*/
 } trace_event_t;
 
 /**
@@ -88,30 +88,30 @@ struct agentos_trace_span {
     char span_id[MAX_SPAN_ID_LEN];      /**< Span ID */
     char parent_id[MAX_SPAN_ID_LEN];    /**< 父Span ID */
     char name[128];                      /**< Span名称 */
-    int64_t start_time;                 /**< 开始时间（微秒�?*/
+    int64_t start_time;                 /**< 开始时间（微秒?*/
     int64_t end_time;                   /**< 结束时间（微秒） */
-    atomic_int status;                 /**< 状态：0=运行�? 1=完成, 2=错误 */
+    atomic_int status;                 /**< 状态：0=运行? 1=完成, 2=错误 */
     trace_event_t* events;             /**< 事件链表 */
-    trace_event_t* events_tail;         /**< 事件链表�?*/
+    trace_event_t* events_tail;         /**< 事件链表?*/
     int event_count;                    /**< 事件数量 */
-    trace_mutex_t mutex;               /**< 互斥�?*/
+    trace_mutex_t mutex;               /**< 互斥?*/
     struct agentos_trace_span* next;   /**< 下一个Span */
 };
 
 /**
- * @brief 全局追踪状�?
+ * @brief 全局追踪状?
  */
 static struct {
-    atomic_uint64_t span_counter;      /**< Span计数�?*/
-    atomic_uint64_t trace_counter;     /**< 追踪计数�?*/
-    agentos_trace_span_t* head;        /**< Span链表�?*/
-    agentos_trace_span_t* tail;        /**< Span链表�?*/
-    trace_mutex_t mutex;               /**< 互斥�?*/
-    int initialized;                   /**< 初始化标�?*/
+    atomic_uint64_t span_counter;      /**< Span计数?*/
+    atomic_uint64_t trace_counter;     /**< 追踪计数?*/
+    agentos_trace_span_t* head;        /**< Span链表?*/
+    agentos_trace_span_t* tail;        /**< Span链表?*/
+    trace_mutex_t mutex;               /**< 互斥?*/
+    int initialized;                   /**< 初始化标?*/
 } g_trace_state;
 
 /**
- * @brief 获取当前时间戳（微秒�? 跨平台实�?
+ * @brief 获取当前时间戳（微秒? 跨平台实?
  */
 static int64_t get_current_time_us(void) {
 #ifdef _WIN32
@@ -127,7 +127,7 @@ static int64_t get_current_time_us(void) {
 }
 
 /**
- * @brief 初始化追踪系�?
+ * @brief 初始化追踪系?
  */
 static int init_trace_system(void) {
     if (g_trace_state.initialized) {

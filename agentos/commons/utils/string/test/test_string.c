@@ -1,7 +1,7 @@
 /**
  * @file test_string.c
- * @brief 统一字符串处理模块单元测�? * 
- * 测试字符串模块的基本功能：安全复制、连接、比较、格式化等�? * 
+ * @brief 统一字符串处理模块单元测? * 
+ * 测试字符串模块的基本功能：安全复制、连接、比较、格式化等? * 
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -16,11 +16,11 @@
 #include "../../include/string.h"
 
 /**
- * @brief 测试安全字符串复制功�? * 
- * @return 成功返回0，失败返�?
+ * @brief 测试安全字符串复制功? * 
+ * @return 成功返回0，失败返回值
  */
 static int test_string_copy(void) {
-    printf("测试安全字符串复�?..\n");
+    printf("测试安全字符串复：%..\n");
     
     char dest[32];
     
@@ -35,9 +35,9 @@ static int test_string_copy(void) {
         return 1;
     }
     
-    // 测试缓冲区溢出保�?    result = string_copy(dest, "This is a very long string that should be truncated", sizeof(dest));
+    // 测试缓冲区溢出保?    result = string_copy(dest, "This is a very long string that should be truncated", sizeof(dest));
     if (result != -1) {
-        printf("  错误：缓冲区溢出未检测到，返�?%d\n", result);
+        printf("  错误：缓冲区溢出未检测到，返：%d\n", result);
         return 1;
     }
     
@@ -57,11 +57,11 @@ static int test_string_copy(void) {
 }
 
 /**
- * @brief 测试安全字符串连接功�? * 
- * @return 成功返回0，失败返�?
+ * @brief 测试安全字符串连接功? * 
+ * @return 成功返回0，失败返回值
  */
 static int test_string_concat(void) {
-    printf("测试安全字符串连�?..\n");
+    printf("测试安全字符串连：%..\n");
     
     char dest[32] = "Hello";
     
@@ -76,10 +76,10 @@ static int test_string_concat(void) {
         return 1;
     }
     
-    // 测试缓冲区溢出保�?    char small_dest[10] = "Test";
+    // 测试缓冲区溢出保?    char small_dest[10] = "Test";
     result = string_concat(small_dest, "VeryLongString", sizeof(small_dest));
     if (result != -1) {
-        printf("  错误：缓冲区溢出未检测到，返�?%d\n", result);
+        printf("  错误：缓冲区溢出未检测到，返：%d\n", result);
         return 1;
     }
     if (strcmp(small_dest, "Test") != 0) {
@@ -92,15 +92,15 @@ static int test_string_concat(void) {
 }
 
 /**
- * @brief 测试字符串比较功�? * 
- * @return 成功返回0，失败返�?
+ * @brief 测试字符串比较功? * 
+ * @return 成功返回0，失败返回值
  */
 static int test_string_compare(void) {
-    printf("测试字符串比�?..\n");
+    printf("测试字符串比：%..\n");
     
-    // 测试区分大小写比�?    int result = string_compare("Hello", "Hello", STRING_COMPARE_CASE_SENSITIVE);
+    // 测试区分大小写比?    int result = string_compare("Hello", "Hello", STRING_COMPARE_CASE_SENSITIVE);
     if (result != 0) {
-        printf("  错误：相同字符串比较失败，返�?%d\n", result);
+        printf("  错误：相同字符串比较失败，返：%d\n", result);
         return 1;
     }
     
@@ -130,7 +130,7 @@ static int test_string_compare(void) {
 /**
  * @brief 测试字符串格式化功能
  * 
- * @return 成功返回0，失败返�?
+ * @return 成功返回0，失败返回值
  */
 static int test_string_format(void) {
     printf("测试字符串格式化...\n");
@@ -140,28 +140,28 @@ static int test_string_format(void) {
     // 测试简单格式化
     int result = string_format(buffer, sizeof(buffer), "Hello %s!", "World");
     if (result != 12) {
-        printf("  错误：简单格式化失败，返�?%d\n", result);
+        printf("  错误：简单格式化失败，返：%d\n", result);
         return 1;
     }
     if (strcmp(buffer, "Hello World!") != 0) {
-        printf("  错误：格式化结果不匹�? %s\n", buffer);
+        printf("  错误：格式化结果不匹： %s\n", buffer);
         return 1;
     }
     
-    // 测试数字格式�?    result = string_format(buffer, sizeof(buffer), "Number: %d", 42);
+    // 测试数字格式?    result = string_format(buffer, sizeof(buffer), "Number: %d", 42);
     if (result != 11) {
-        printf("  错误：数字格式化失败，返�?%d\n", result);
+        printf("  错误：数字格式化失败，返：%d\n", result);
         return 1;
     }
     if (strcmp(buffer, "Number: 42") != 0) {
-        printf("  错误：数字格式化结果不匹�? %s\n", buffer);
+        printf("  错误：数字格式化结果不匹： %s\n", buffer);
         return 1;
     }
     
-    // 测试缓冲区溢出保�?    char small_buffer[10];
+    // 测试缓冲区溢出保?    char small_buffer[10];
     result = string_format(small_buffer, sizeof(small_buffer), "This is a very long string %d", 12345);
     if (result != -1) {
-        printf("  错误：缓冲区溢出未检测到，返�?%d\n", result);
+        printf("  错误：缓冲区溢出未检测到，返：%d\n", result);
         return 1;
     }
     
@@ -170,11 +170,11 @@ static int test_string_format(void) {
 }
 
 /**
- * @brief 测试字符串查找功�? * 
- * @return 成功返回0，失败返�?
+ * @brief 测试字符串查找功? * 
+ * @return 成功返回0，失败返回值
  */
 static int test_string_find(void) {
-    printf("测试字符串查�?..\n");
+    printf("测试字符串查：%..\n");
     
     const char* str = "Hello World";
     
@@ -212,15 +212,15 @@ static int test_string_find(void) {
 }
 
 /**
- * @brief 测试字符串分割功�? * 
- * @return 成功返回0，失败返�?
+ * @brief 测试字符串分割功? * 
+ * @return 成功返回0，失败返回值
  */
 static int test_string_split(void) {
-    printf("测试字符串分�?..\n");
+    printf("测试字符串分：%..\n");
     
     const char* str = "apple,banana,cherry";
     
-    // 测试分割字符�?    string_list_t list = {0};
+    // 测试分割字符?    string_list_t list = {0};
     if (!string_split(str, ",", 0, &list)) {
         printf("  错误：字符串分割失败\n");
         return 1;
@@ -259,7 +259,7 @@ static int test_string_split(void) {
 /**
  * @brief 测试字符串缓冲区功能
  * 
- * @return 成功返回0，失败返�?
+ * @return 成功返回0，失败返回值
  */
 static int test_string_buffer(void) {
     printf("测试字符串缓冲区...\n");
@@ -272,20 +272,20 @@ static int test_string_buffer(void) {
         return 1;
     }
     
-    // 测试追加字符�?    if (!string_buffer_append(&buffer, "Hello")) {
+    // 测试追加字符?    if (!string_buffer_append(&buffer, "Hello")) {
         printf("  错误：追加字符串失败\n");
         string_buffer_clear(&buffer);
         return 1;
     }
     
     if (buffer.length != 5) {
-        printf("  错误：缓冲区长度不正�? %zu\n", buffer.length);
+        printf("  错误：缓冲区长度不正： %zu\n", buffer.length);
         string_buffer_clear(&buffer);
         return 1;
     }
     
     if (strcmp(buffer.data, "Hello") != 0) {
-        printf("  错误：缓冲区内容不正�? %s\n", buffer.data);
+        printf("  错误：缓冲区内容不正： %s\n", buffer.data);
         string_buffer_clear(&buffer);
         return 1;
     }
@@ -298,7 +298,7 @@ static int test_string_buffer(void) {
     }
     
     if (strcmp(buffer.data, "Hello World") != 0) {
-        printf("  错误：最终缓冲区内容不正�? %s\n", buffer.data);
+        printf("  错误：最终缓冲区内容不正： %s\n", buffer.data);
         string_buffer_clear(&buffer);
         return 1;
     }
@@ -309,8 +309,8 @@ static int test_string_buffer(void) {
 }
 
 /**
- * @brief 主测试函�? * 
- * @return 成功返回0，失败返�?
+ * @brief 主测试函? * 
+ * @return 成功返回0，失败返回值
  */
 int main(void) {
     printf("开始统一字符串模块单元测试\n");
@@ -318,7 +318,7 @@ int main(void) {
     
     int total_failures = 0;
     
-    // 运行所有测�?    total_failures += test_string_copy();
+    // 运行所有测?    total_failures += test_string_copy();
     total_failures += test_string_concat();
     total_failures += test_string_compare();
     total_failures += test_string_format();
@@ -331,7 +331,7 @@ int main(void) {
         printf("所有测试通过！\n");
         return 0;
     } else {
-        printf("测试失败�?d 个测试未通过\n", total_failures);
+        printf("测试失败：%d 个测试未通过\n", total_failures);
         return 1;
     }
 }

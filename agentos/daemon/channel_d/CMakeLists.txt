@@ -68,8 +68,7 @@ install(FILES
     DESTINATION include/agentos/daemon/channel_d
 )
 
-find_package(Cmocka QUIET)
-if(CMOCKA_FOUND OR TARGET cmocka)
+if(AGENTOS_HAS_CMOCKA)
     enable_testing()
     add_executable(test_channel_e2e tests/test_channel_e2e.c src/channel_service.c)
     target_include_directories(test_channel_e2e PRIVATE

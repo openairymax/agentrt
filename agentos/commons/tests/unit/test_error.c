@@ -12,12 +12,12 @@
 #include "agentos_types.h"
 #include "agentos_memory.h"
 
-/* ==================== 测试辅助�?==================== */
+/* ==================== 测试辅助?==================== */
 
 #define TEST_ASSERT(condition, message) \
     do { \
         if (!(condition)) { \
-            fprintf(stderr, "�?FAIL: %s\n", message); \
+            fprintf(stderr, "✗FAIL: %s\n", message); \
             return 1; \
         } \
     } while (0)
@@ -26,10 +26,10 @@
     do { \
         printf("🧪 Running %s...\n", #test_func); \
         if (test_func() != 0) { \
-            fprintf(stderr, "�?Test failed: %s\n", #test_func); \
+            fprintf(stderr, "✗Test failed: %s\n", #test_func); \
             failed_tests++; \
         } else { \
-            printf("�?PASS: %s\n", #test_func); \
+            printf("✔PASS: %s\n", #test_func); \
             passed_tests++; \
         } \
     } while (0)
@@ -40,7 +40,7 @@ static int failed_tests = 0;
 /* ==================== 测试用例 ==================== */
 
 /**
- * @brief 测试错误码定�?
+ * @brief 测试错误码定?
  */
 static int test_error_codes(void) {
     TEST_ASSERT(AGENTOS_SUCCESS == 0, "AGENTOS_SUCCESS should be 0");
@@ -53,7 +53,7 @@ static int test_error_codes(void) {
 }
 
 /**
- * @brief 测试错误字符串转�?
+ * @brief 测试错误字符串转?
  */
 static int test_error_strings(void) {
     const char* str;

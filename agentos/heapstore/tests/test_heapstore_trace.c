@@ -44,7 +44,7 @@ static void test_trace_write_span(void) {
     snprintf(span.service_name, sizeof(span.service_name), "test_service");
     snprintf(span.status, sizeof(span.status), "OK");
 
-    err __attribute__((unused)) = heapstore_trace_write_span(&span);
+    err = heapstore_trace_write_span(&span);
     assert(err == heapstore_SUCCESS);
 
     heapstore_trace_shutdown();
@@ -55,7 +55,7 @@ static void test_trace_write_span(void) {
 static void test_trace_write_batch(void) {
     printf("Test: trace_write_batch...");
 
-    heapstore_error_t err = heapstore_trace_init();
+    heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t spans[5];
@@ -82,7 +82,7 @@ static void test_trace_write_batch(void) {
 static void test_trace_flush(void) {
     printf("Test: trace_flush...");
 
-    heapstore_error_t err = heapstore_trace_init();
+    heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t span;
@@ -110,7 +110,7 @@ static void test_trace_flush(void) {
 static void test_trace_invalid_params(void) {
     printf("Test: trace_invalid_params...");
 
-    heapstore_error_t err = heapstore_trace_init();
+    heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
     assert(err == heapstore_SUCCESS);
 
     err = heapstore_trace_write_span(NULL);
@@ -135,7 +135,7 @@ static void test_trace_invalid_params(void) {
 static void test_trace_stats(void) {
     printf("Test: trace_stats...");
 
-    heapstore_error_t err = heapstore_trace_init();
+    heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
     assert(err == heapstore_SUCCESS);
 
     uint64_t total = 0, pending = 0, size = 0;

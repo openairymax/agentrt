@@ -1,7 +1,7 @@
 /**
  * @file string.c
- * @brief 统一字符串处理模�?- 核心层实�? * 
- * 实现安全、高效、统一的字符串处理功能，提供完整的字符串操作API�? * 包括字符串复制、连接、比较、查找、分割、格式化等常用功能�? * 
+ * @brief 统一字符串处理模?- 核心层实? * 
+ * 实现安全、高效、统一的字符串处理功能，提供完整的字符串操作API? * 包括字符串复制、连接、比较、查找、分割、格式化等常用功能? * 
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -57,7 +57,7 @@ typedef enum {
 } string_error_t;
 
 /**
- * @brief 内部上下文结�? */
+ * @brief 内部上下文结? */
 typedef struct {
     string_error_t last_error;
     char error_message[256];
@@ -65,7 +65,7 @@ typedef struct {
 } string_context_t;
 
 /**
- * @brief 全局上下文实�? */
+ * @brief 全局上下文实? */
 static string_context_t g_context = {
     .last_error = STRING_ERROR_NONE,
     .error_message = {0},
@@ -95,8 +95,8 @@ static void string_clear_error(void) {
 }
 
 /**
- * @brief 安全计算字符串长�? * 
- * @param[in] str 字符�? * @param[in] max_len 最大检查长�? * @return 字符串长�? */
+ * @brief 安全计算字符串长? * 
+ * @param[in] str 字符? * @param[in] max_len 最大检查长? * @return 字符串长? */
 static size_t string_safe_strlen(const char* str, size_t max_len) {
     if (str == NULL) {
         return 0;
@@ -1398,13 +1398,13 @@ size_t string_utf8_next_char(const char* str, uint32_t* ch) {
         return 0;
     }
     
-    // 单字节字�?(0xxxxxxx)
+    // 单字节字?(0xxxxxxx)
     if (first < 0x80) {
         *ch = first;
         return 1;
     }
     
-    // 双字节字�?(110xxxxx)
+    // 双字节字?(110xxxxx)
     if ((first & 0xE0) == 0xC0) {
         if (str[1] == 0) {
             return 0;
@@ -1419,7 +1419,7 @@ size_t string_utf8_next_char(const char* str, uint32_t* ch) {
         return 2;
     }
     
-    // 三字节字�?(1110xxxx)
+    // 三字节字?(1110xxxx)
     if ((first & 0xF0) == 0xE0) {
         if (str[1] == 0 || str[2] == 0) {
             return 0;
@@ -1436,7 +1436,7 @@ size_t string_utf8_next_char(const char* str, uint32_t* ch) {
         return 3;
     }
     
-    // 四字节字�?(11110xxx)
+    // 四字节字?(11110xxx)
     if ((first & 0xF8) == 0xF0) {
         if (str[1] == 0 || str[2] == 0 || str[3] == 0) {
             return 0;
@@ -1468,7 +1468,7 @@ bool string_utf8_validate(const char* str, size_t len) {
     while (i < len && str[i] != '\0') {
         unsigned char first = (unsigned char)str[i];
         
-        // 单字节字�?(0xxxxxxx)
+        // 单字节字?(0xxxxxxx)
         if (first < 0x80) {
             i++;
             continue;
@@ -1477,15 +1477,15 @@ bool string_utf8_validate(const char* str, size_t len) {
         // 多字节字
         size_t char_len = 0;
         
-        // 双字节字�?(110xxxxx)
+        // 双字节字?(110xxxxx)
         if ((first & 0xE0) == 0xC0) {
             char_len = 2;
         }
-        // 三字节字�?(1110xxxx)
+        // 三字节字?(1110xxxx)
         else if ((first & 0xF0) == 0xE0) {
             char_len = 3;
         }
-        // 四字节字�?(11110xxx)
+        // 四字节字?(11110xxx)
         else if ((first & 0xF8) == 0xF0) {
             char_len = 4;
         }

@@ -21,7 +21,7 @@ void test_file_operations() {
 
     // 测试文件写入
     int result = agentos_io_write_file(test_file, test_content, strlen(test_content));
-    printf("写入文件�?d\n", result);
+    printf("写入文件：%d\n", result);
 
     // 测试文件读取
     char* content = NULL;
@@ -30,7 +30,7 @@ void test_file_operations() {
     // From data intelligence emerges. by spharx
     if (content) {
         printf("读取文件成功，长度：%zu\n", len);
-        printf("文件内容�?%s'\n", content);
+        printf("文件内容：%s'\n", content);
         AGENTOS_FREE(content);
     } else {
         printf("读取文件失败\n");
@@ -44,7 +44,7 @@ void test_file_operations() {
     char** files = NULL;
     size_t count = 0;
     result = agentos_io_list_files(".", &files, &count);
-    printf("列出文件�?d, 数量�?zu\n", result, count);
+    printf("列出文件：%d, 数量：%zu\n", result, count);
     if (files) {
         agentos_io_free_list(files, count);
     }
