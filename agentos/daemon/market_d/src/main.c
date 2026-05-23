@@ -305,6 +305,12 @@ static void handle_health_check(int id, agentos_socket_t client_fd) {
 
 /* ==================== 客户端连接处理 ==================== */
 
+static void handle_client(agentos_socket_t client_fd);
+
+static void handle_client_wrapper(void* arg) {
+    handle_client((agentos_socket_t)(uintptr_t)arg);
+}
+
 static void handle_client(agentos_socket_t client_fd) {
     char buffer[MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
@@ -485,10 +491,7 @@ int main(int argc, char** argv) {
         if (client_fd == AGENTOS_INVALID_SOCKET) continue;
 
         /* 并发处理客户端请求 */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-        thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
-#pragma GCC diagnostic pop
+        thread_pool_submit(pool, handle_client_wrapper, (void*)(uintptr_t)client_fd);
     }
 
     /* 清理资源 */
