@@ -896,7 +896,7 @@ AGENTOS_API agentos_error_t sd_check_dependencies(
         safe_strcpy(missing_deps, missing, (uint32_t)max_len);
     }
 
-    return missing_len > 0 ? AGENTOS_EDEPEND : AGENTOS_SUCCESS;
+    return missing_len > 0 ? DAEMON_EDEPEND : AGENTOS_SUCCESS;
 }
 
 /* ==================== 事件与统计 ==================== */

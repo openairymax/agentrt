@@ -60,9 +60,9 @@ static int g_tests_passed = 0;
 
 /* ========== 辅助函数：创建 JSON-RPC 请求 ========== */
 
-static cJSON* create_jsonrpc_request(const char* method) {
+static cJSON* __attribute__((used)) create_jsonrpc_request(const char* method) {
     cJSON* request = cJSON_CreateObject();
-    ASSERT_NOT_NULL(request);
+    if (!request) return NULL;
     
     cJSON_AddStringToObject(request, "jsonrpc", "2.0");
     cJSON_AddStringToObject(request, "method", method);
@@ -73,7 +73,7 @@ static cJSON* create_jsonrpc_request(const char* method) {
 
 static cJSON* create_jsonrpc_request_with_params(const char* method, cJSON* params) {
     cJSON* request = cJSON_CreateObject();
-    ASSERT_NOT_NULL(request);
+    if (!request) return NULL;
     
     cJSON_AddStringToObject(request, "jsonrpc", "2.0");
     cJSON_AddStringToObject(request, "method", method);

@@ -62,12 +62,11 @@ set(SVC_COMMON_SOURCES
 add_library(svc_common STATIC ${SVC_COMMON_SOURCES})
 
 # 链接 commons 库
-find_package(OpenSSL QUIET)
 target_link_libraries(svc_common PUBLIC
     agentos_common
     agentos_compile_defs
 )
-if(OpenSSL_FOUND)
+if(AGENTOS_HAS_OPENSSL)
     target_link_libraries(svc_common PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 endif()
 

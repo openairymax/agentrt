@@ -15,8 +15,8 @@ set(TOOL_IMPL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/registry.c
 )
 
-find_package(yaml QUIET)
-if(YAML_FOUND OR yaml_FOUND)
+# YAML found by root CMakeLists.txt (AGENTOS_HAS_YAML)
+if(AGENTOS_HAS_YAML)
     list(APPEND TOOL_IMPL_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/config.c)
 endif()
 
@@ -58,12 +58,12 @@ foreach(TEST_SRC ${TOOL_TEST_SOURCES})
         Threads::Threads
     )
 
-    find_package(cjson QUIET)
-    if(TARGET cjson OR cjson_FOUND)
+    # cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
+    if(AGENTOS_HAS_CJSON)
         target_link_libraries(test_tool_${TEST_NAME} PRIVATE cjson)
     endif()
 
-    if(YAML_FOUND OR yaml_FOUND)
+    if(AGENTOS_HAS_YAML)
         target_link_libraries(test_tool_${TEST_NAME} PRIVATE yaml)
     endif()
 

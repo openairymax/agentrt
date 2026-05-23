@@ -319,7 +319,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_send(
 
     if (!bus->running) {
         agentos_mutex_unlock(&bus->mutex);
-        return AGENTOS_ESTATE;
+        return DAEMON_ESTATE;
     }
 
     bus->stats.messages_sent++;
@@ -350,7 +350,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
 
     if (!bus->running) {
         agentos_mutex_unlock(&bus->mutex);
-        return AGENTOS_ESTATE;
+        return DAEMON_ESTATE;
     }
 
     if (bus->pending_count >= IPC_BUS_MAX_PENDING) {
@@ -467,7 +467,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_broadcast(
 
     if (!bus->running) {
         agentos_mutex_unlock(&bus->mutex);
-        return AGENTOS_ESTATE;
+        return DAEMON_ESTATE;
     }
 
     uint32_t target_count = 0;

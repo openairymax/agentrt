@@ -44,7 +44,10 @@ static inline long atomic_load_32(volatile _Atomic long* ptr, memory_order order
     return (long)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_32(volatile _Atomic long* ptr, long val, memory_order order) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
     atomic_store_explicit(ptr, val, order);
+#pragma GCC diagnostic pop
 }
 static inline long atomic_fetch_add_32(volatile _Atomic long* ptr, long val, memory_order order) {
     return (long)atomic_fetch_add_explicit(ptr, val, order);
@@ -62,7 +65,10 @@ static inline int64_t atomic_load_64(volatile _Atomic int64_t* ptr, memory_order
     return (int64_t)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_64(volatile _Atomic int64_t* ptr, int64_t val, memory_order order) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
     atomic_store_explicit(ptr, val, order);
+#pragma GCC diagnostic pop
 }
 static inline int64_t atomic_fetch_add_64(volatile _Atomic int64_t* ptr, int64_t val, memory_order order) {
     return (int64_t)atomic_fetch_add_explicit(ptr, val, order);
@@ -80,7 +86,10 @@ static inline char atomic_load_8(volatile _Atomic char* ptr, memory_order order)
     return (char)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_8(volatile _Atomic char* ptr, char val, memory_order order) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
     atomic_store_explicit(ptr, val, order);
+#pragma GCC diagnostic pop
 }
 static inline char atomic_fetch_add_8(volatile _Atomic char* ptr, char val, memory_order order) {
     return (char)atomic_fetch_add_explicit(ptr, val, order);
@@ -98,7 +107,10 @@ static inline short atomic_load_16(volatile _Atomic short* ptr, memory_order ord
     return (short)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_16(volatile _Atomic short* ptr, short val, memory_order order) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
     atomic_store_explicit(ptr, val, order);
+#pragma GCC diagnostic pop
 }
 static inline short atomic_fetch_add_16(volatile _Atomic short* ptr, short val, memory_order order) {
     return (short)atomic_fetch_add_explicit(ptr, val, order);
@@ -117,7 +129,10 @@ static inline void* atomic_load_ptr(_Atomic void** ptr, memory_order order) {
     return (void*)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_ptr(_Atomic void** ptr, void* val, memory_order order) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
     atomic_store_explicit(ptr, val, order);
+#pragma GCC diagnostic pop
 }
 static inline void* atomic_exchange_ptr(_Atomic void** ptr, void* val, memory_order order) {
     return (void*)atomic_exchange_explicit(ptr, val, order);
@@ -521,7 +536,10 @@ static inline double atomic_load_double_fn(_Atomic double* ptr, memory_order ord
     return (double)atomic_load_explicit(ptr, order);
 }
 static inline void atomic_store_double_fn(_Atomic double* ptr, double value, memory_order order) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
     atomic_store_explicit(ptr, value, order);
+#pragma GCC diagnostic pop
 }
 static inline double atomic_fetch_add_double_fn(_Atomic double* ptr, double value, memory_order order) {
     double old = (double)atomic_load_explicit(ptr, memory_order_relaxed);
@@ -570,7 +588,10 @@ static inline _Bool atomic_load_bool(_Atomic _Bool* ptr, memory_order order) {
 }
 
 static inline void atomic_store_bool(_Atomic _Bool* ptr, _Bool value, memory_order order) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
     atomic_store_explicit(ptr, value, order);
+#pragma GCC diagnostic pop
 }
 
 static inline _Bool atomic_exchange_bool(_Atomic _Bool* ptr, _Bool desired, memory_order order) {
