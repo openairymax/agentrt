@@ -5,31 +5,13 @@
  */
 
 #include "sandbox_permission.h"
+#include "sandbox_internal.h"
 #include "agentos.h"
 #include "logger.h"
 
 /* 基础库兼容性层 */
 #include "memory_compat.h"
 #include "string_compat.h"
-
-/* 沙箱内部结构 */
-struct agentos_sandbox {
-    uint64_t sandbox_id;
-    char* sandbox_name;
-    char* owner_id;
-    void* state;
-    void* manager;
-    permission_rule_t* rules;
-    uint32_t rule_count;
-    agentos_mutex_t* lock;
-    uint64_t create_time_ns;
-    uint64_t last_active_ns;
-    uint64_t call_count;
-    uint64_t violation_count;
-    void* audit_log;
-    size_t audit_count;
-    size_t audit_capacity;
-};
 
 /* ==================== 权限规则管理 ==================== */
 
