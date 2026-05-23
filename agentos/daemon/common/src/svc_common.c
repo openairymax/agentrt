@@ -639,10 +639,7 @@ int agentos_service_handle_request_async(
     ctx->user_data = user_data;
 
     if (svc->thread_pool) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
         int rc = thread_pool_submit(svc->thread_pool, async_request_worker, ctx);
-#pragma GCC diagnostic pop
         if (rc != 0) {
             free(ctx->method); free(ctx->params_json); free(ctx);
             return rc;

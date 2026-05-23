@@ -11,7 +11,6 @@
 
 #include "heapstore_memory.h"
 #include "private.h"
-#pragma GCC diagnostic ignored "-Wformat-truncation"
 #include "utils.h"
 #include "platform.h"
 
@@ -41,6 +40,8 @@ static heapstore_memory_allocation_t s_allocations[heapstore_MEMORY_MAX_ALLOCATI
 static size_t s_allocation_count = 0;
 static char s_memory_path[heapstore_MEMORY_MAX_PATH] = {0};
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 heapstore_error_t heapstore_memory_init(void) {
     if (s_initialized) {
         return heapstore_SUCCESS;
@@ -88,6 +89,7 @@ heapstore_error_t heapstore_memory_init(void) {
 
     return heapstore_SUCCESS;
 }
+#pragma GCC diagnostic pop
 
 void heapstore_memory_shutdown(void) {
     if (!s_initialized) {
