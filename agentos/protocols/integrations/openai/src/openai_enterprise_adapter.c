@@ -1088,7 +1088,10 @@ int openai_enterprise_embeddings(openai_enterprise_context_t* ctx,
     req.input_text = (inputs && input_count > 0 && inputs[0]) ? strdup(inputs[0]) : strdup("");
     req.embedding_dim = 1536;
     req.model = model ? strdup(model) : strdup("text-embedding-3-small");
-    return openai_create_embedding(ctx->handle, &req, response);
+    int result = openai_create_embedding(ctx->handle, &req, response);
+    free(req.input_text);
+    free(req.model);
+    return result;
 }
 
 int openai_enterprise_list_models(openai_enterprise_context_t* ctx,
@@ -1180,6 +1183,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
             if (err_json) snprintf(err_json, err_sz, "{\"error\":{\"message\":\"chat completion failed\",\"type\":\"api_error\",\"code\":null}}");
             *response_json = err_json;
         }
+        openai_free_chat_response(&resp);
         free(msg.content);
         return rc;
     }
@@ -1190,11 +1194,12 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         int rc = openai_enterprise_embeddings(ctx, "text-embedding-ada-002", inputs, 1, &emb_resp);
         if (rc != 0) {
             *response_json = NULL;
+            openai_embedding_response_destroy(&emb_resp);
             return rc;
         }
         size_t json_sz = 512 + (emb_resp.embedding_dim > 0 ? emb_resp.embedding_dim * 16 : 0);
         char* json = (char*)malloc(json_sz);
-        if (!json) return -1;
+        if (!json) { openai_embedding_response_destroy(&emb_resp); return -1; }
         size_t pos = 0;
         pos += snprintf(json + pos, json_sz - pos,
             "{\"object\":\"list\",\"model\":\"%s\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[",
@@ -1211,6 +1216,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         pos += snprintf(json + pos, json_sz - pos, "]}],\"usage\":{\"prompt_tokens\":%zu,\"total_tokens\":%zu}}",
             (size_t)emb_resp.usage.prompt_tokens, (size_t)emb_resp.usage.total_tokens);
         *response_json = json;
+        openai_embedding_response_destroy(&emb_resp);
         return 0;
     }
     if (strcmp(path, "/v1/models") == 0) {
@@ -1373,8 +1379,11 @@ static int openai_adapter_handle_request_cb(void *c, const void *r, void **rp) {
 
     const char *request_json = (const char *)r;
     char *response_json = NULL;
+    struct openai_enterprise_context_s ctx_local;
+    memset(&ctx_local, 0, sizeof(ctx_local));
+    ctx_local.handle = (openai_handle_t)adapter;
     int rc = openai_enterprise_route_request(
-        (openai_enterprise_context_t *)adapter,
+        &ctx_local,
         "/v1/chat/completions",
         "POST",
         request_json,
