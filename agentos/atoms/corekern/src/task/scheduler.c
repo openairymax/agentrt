@@ -460,7 +460,6 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
 
     int result = ops->thread_set_priority(task_info->platform_handle, priority);
     if (result != 0) {
-        task_info->priority = priority;
         release_task_lock();
         return AGENTOS_EINVAL;
     }
