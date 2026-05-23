@@ -5,6 +5,7 @@
  */
 
 #include "sandbox_utils.h"
+#include "sandbox_internal.h"
 #include "sandbox_quota.h"
 #include "agentos.h"
 #include "logger.h"
@@ -15,37 +16,7 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 
-/* 沙箱内部结构（需要知道布局） */
-struct agentos_sandbox {
-    uint64_t sandbox_id;
-    char* sandbox_name;
-    char* owner_id;
-    void* state;
-    void* manager;
-    void* rules;
-    uint32_t rule_count;
-    agentos_mutex_t* lock;
-    uint64_t create_time_ns;
-    uint64_t last_active_ns;
-    uint64_t call_count;
-    uint64_t violation_count;
-    void* audit_log;
-    size_t audit_count;
-    size_t audit_capacity;
-};
-
-typedef struct audit_entry {
-    uint64_t timestamp_ns;
-    uint64_t sandbox_id;
-    int syscall_num;
-    char* caller_id;
-    char* args_hash;
-    int result_code;
-    uint64_t duration_ns;
-    char* details;
-} audit_entry_t;
-
-/* ==================== 工具函数 ==================== */
+/* ==================== 审计日志管理 ==================== */
 
 uint64_t sandbox_simple_hash(const char* str) {
     if (!str) return 0;
@@ -86,14 +57,19 @@ agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t* sandbox, int syscall_
     /* 添加条目 */
     if (sandbox->audit_count < sandbox->audit_capacity) {
         audit_entry_t* entry = (audit_entry_t*)sandbox->audit_log + sandbox->audit_count;
-        entry->timestamp_ns = get_timestamp_ns();
-        entry->sandbox_id = sandbox->sandbox_id;
+        entry->timestamp = get_timestamp_ns();
+        entry->event_type = 0;
         entry->syscall_num = syscall_num;
-        entry->caller_id = caller_id ? AGENTOS_STRDUP(caller_id) : NULL;
-        entry->args_hash = NULL;
-        entry->result_code = result_code;
-        entry->duration_ns = duration_ns;
-        entry->details = details ? AGENTOS_STRDUP(details) : NULL;
+        entry->result = result_code;
+        entry->resource_usage_before = 0;
+        entry->resource_usage_after = duration_ns;
+        entry->severity = (result_code != 0) ? 2 : 0;
+        entry->syscall_name[0] = '\0';
+        snprintf(entry->message, sizeof(entry->message),
+                 "caller=%s dur=%llu %s",
+                 caller_id ? caller_id : "?",
+                 (unsigned long long)duration_ns,
+                 details ? details : "");
 
         sandbox->audit_count++;
     }

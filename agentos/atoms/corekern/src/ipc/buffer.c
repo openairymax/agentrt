@@ -1,6 +1,6 @@
 /**
  * @file buffer.c
- * @brief IPC 消息缓冲�?
+ * @brief IPC 消息缓冲?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

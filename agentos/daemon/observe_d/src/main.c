@@ -195,7 +195,7 @@ static int observe_d_handle_http_request(observe_d_service_t* svc,
                 break;
             }
         }
-        int content_len = health_len - content_start;
+        (void)(health_len - content_start);
 
         char final_buf[1024];
         int final_len = snprintf(final_buf, sizeof(final_buf),

@@ -127,6 +127,8 @@ int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
     }
 
 #ifdef CUPOLAS_USE_OPENSSL
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
 
@@ -138,6 +140,7 @@ int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
     }
 
     SHA256_Final(hash_out, &sha256);
+#pragma GCC diagnostic pop
 #else
     fclose(f);
     return CUPOLAS_SIG_ALGO_UNSUPPORTED;

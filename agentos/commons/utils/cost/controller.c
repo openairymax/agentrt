@@ -5,9 +5,9 @@
  *
  * @details
  * 本模块实现成本预算控制功能：
- * - 支持周期性能耗统�?
- * - 提供预算预警和限�?
- * - 线程安全的预算操�?
+ * - 支持周期性能耗统?
+ * - 提供预算预警和限?
+ * - 线程安全的预算操?
  */
 
 #include "cost.h"
@@ -82,18 +82,18 @@ static void budget_ctrl_mutex_unlock(budget_ctrl_mutex_t* mutex) {
 }
 
 /**
- * @brief 预算控制器内部结�?
+ * @brief 预算控制器内部结?
  */
 struct agentos_budget_controller {
-    double max_cost_usd;                     /**< 最大成本预算（美元�?*/
+    double max_cost_usd;                     /**< 最大成本预算（美元?*/
     double warning_threshold;                /**< 警告阈值（百分比） */
-    atomic_double consumed_cost;             /**< 已消耗成�?*/
-    atomic_double period_cost;              /**< 周期内消�?*/
+    atomic_double consumed_cost;             /**< 已消耗成?*/
+    atomic_double period_cost;              /**< 周期内消?*/
     atomic_uint64_t request_count;         /**< 请求计数 */
     atomic_uint64_t denied_count;          /**< 拒绝计数 */
-    budget_ctrl_mutex_t mutex;                 /**< 互斥�?*/
-    time_t period_start;                   /**< 周期开始时�?*/
-    uint32_t period_seconds;               /**< 周期时长（秒�?*/
+    budget_ctrl_mutex_t mutex;                 /**< 互斥?*/
+    time_t period_start;                   /**< 周期开始时?*/
+    uint32_t period_seconds;               /**< 周期时长（秒?*/
     double average_cost;                   /**< 平均成本 */
 };
 

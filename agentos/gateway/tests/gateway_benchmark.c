@@ -540,7 +540,7 @@ static int parse_args(int argc, char* argv[]) {
                 g_config.payload_size = ftell(pf);
                 fseek(pf, 0, SEEK_SET);
                 g_config.payload = (char*)malloc(g_config.payload_size + 1);
-                fread(g_config.payload, 1, g_config.payload_size, pf);
+                { size_t __attribute__((unused)) _fr; _fr = fread(g_config.payload, 1, g_config.payload_size, pf); }
                 g_config.payload[g_config.payload_size] = '\0';
                 fclose(pf);
             }

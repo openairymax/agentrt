@@ -33,7 +33,7 @@ static void test_logger_init_shutdown(void) {
 
     agentos_logger_config_t config = {
         .name = "test_agentos",
-        .level = LOG_LEVEL_DEBUG,
+        .level = (int)LOG_LEVEL_DEBUG,
         .targets = NULL,
         .target_count = 0,
         .include_source = true,
@@ -44,7 +44,7 @@ static void test_logger_init_shutdown(void) {
     int ret = agentos_log_init(&config);
     assert(ret == 0);
 
-    agentos_log_set_level(LOG_LEVEL_DEBUG);
+    agentos_log_set_level((agentos_log_level_t)LOG_LEVEL_DEBUG);
 
     agentos_log_shutdown();
 
@@ -77,7 +77,7 @@ static void test_logger_macros(void) {
 
     agentos_logger_config_t config = {
         .name = "test_agentos",
-        .level = LOG_LEVEL_DEBUG,
+        .level = (int)LOG_LEVEL_DEBUG,
         .targets = NULL,
         .target_count = 0,
         .include_source = true,

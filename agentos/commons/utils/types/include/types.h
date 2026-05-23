@@ -71,7 +71,9 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ENOMEM         (-2)    /**< 内存不足 */
 #define AGENTOS_EBUSY          (-3)    /**< 资源忙碌 */
 #define AGENTOS_ENOENT         (-4)    /**< 资源不存在 */
+#ifndef AGENTOS_EPERM
 #define AGENTOS_EPERM          (-5)    /**< 权限不足 */
+#endif
 #define AGENTOS_ETIMEDOUT      (-6)    /**< 操作超时 */
 #define AGENTOS_EIO            (-7)    /**< I/O 错误 */
 #define AGENTOS_EEXIST         (-8)    /**< 资源已存在 */

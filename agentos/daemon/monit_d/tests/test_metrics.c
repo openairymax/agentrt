@@ -15,7 +15,7 @@ static void test_monitor_service_create_destroy(void) {
     printf("  test_monitor_service_create_destroy...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
     assert(svc != NULL);
 
@@ -29,7 +29,7 @@ static void test_monitor_record_metric(void) {
     printf("  test_monitor_record_metric...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
     metric_info_t metric;
@@ -51,7 +51,7 @@ static void test_monitor_gauge_metric(void) {
     printf("  test_monitor_gauge_metric...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
     metric_info_t metric;
@@ -73,7 +73,7 @@ static void test_monitor_histogram_metric(void) {
     printf("  test_monitor_histogram_metric...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
     metric_info_t metric;
@@ -95,7 +95,7 @@ static void test_monitor_get_metrics(void) {
     printf("  test_monitor_get_metrics...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
     metric_info_t metric;
@@ -123,7 +123,7 @@ static void test_monitor_labels(void) {
     printf("  test_monitor_labels...\n");
 
     monitor_service_t* svc = NULL;
-    int ret = monitor_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
     char* labels[] = {"service:llm_d", "model:gpt-4"};

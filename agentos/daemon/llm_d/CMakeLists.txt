@@ -10,20 +10,14 @@ option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_COVERAGE "Build with code coverage" OFF)
 
 # 查找依赖
-find_package(Threads REQUIRED)
-find_package(PkgConfig QUIET)
-
-if(PkgConfig_FOUND)
-    pkg_check_modules(CURL QUIET libcurl)
-    pkg_check_modules(CJSON QUIET libcjson)
-else()
-    set(CURL_FOUND FALSE)
-    set(CJSON_FOUND FALSE)
-endif()
-if(NOT CURL_FOUND)
+# Threads found by root CMakeLists.txt
+# PkgConfig found by root CMakeLists.txt
+# cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
+# CURL found by root CMakeLists.txt (AGENTOS_HAS_CURL)
+if(NOT AGENTOS_HAS_CURL)
     message(STATUS "libcurl not found, LLM remote API features may be limited")
 endif()
-if(NOT CJSON_FOUND)
+if(NOT AGENTOS_HAS_CJSON)
     message(STATUS "libcjson not found, JSON features may be limited")
 endif()
 
