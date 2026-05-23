@@ -11,7 +11,6 @@
 
 #include "heapstore_trace.h"
 #include "private.h"
-#pragma GCC diagnostic ignored "-Wformat-truncation"
 #include "utils.h"
 #include "platform.h"
 
@@ -42,6 +41,8 @@ static heapstore_span_t* s_span_buffer = NULL;
 static size_t s_span_count = 0;
 static heapstore_trace_exporter_config_t s_exporter_config = {0};
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 heapstore_error_t heapstore_trace_init(void) {
     if (s_initialized) {
         return heapstore_SUCCESS;
@@ -73,6 +74,7 @@ heapstore_error_t heapstore_trace_init(void) {
 
     return heapstore_SUCCESS;
 }
+#pragma GCC diagnostic pop
 
 void heapstore_trace_shutdown(void) {
     if (!s_initialized) {
@@ -259,6 +261,8 @@ heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter
     return heapstore_SUCCESS;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 heapstore_error_t heapstore_trace_flush(void) {
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
@@ -304,6 +308,7 @@ heapstore_error_t heapstore_trace_flush(void) {
 
     return heapstore_SUCCESS;
 }
+#pragma GCC diagnostic pop
 
 heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pending_spans, uint64_t* total_size_bytes) {
     if (!s_initialized) {
@@ -327,6 +332,8 @@ heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pen
     return heapstore_SUCCESS;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_bytes) {
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
@@ -405,6 +412,7 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
 
     return heapstore_SUCCESS;
 }
+#pragma GCC diagnostic pop
 
 bool heapstore_trace_is_healthy(void) {
     return s_initialized && s_span_buffer != NULL;
@@ -415,6 +423,8 @@ bool heapstore_trace_is_healthy(void) {
  *
  * 生成符合 OpenTelemetry 兼容格式的 JSON 数组
  */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_events) {
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
@@ -502,3 +512,4 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
 
     return heapstore_SUCCESS;
 }
+#pragma GCC diagnostic pop

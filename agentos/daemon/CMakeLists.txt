@@ -44,9 +44,10 @@ if(BUILD_TESTS)
     enable_testing()
     message(STATUS "  Unit tests:  ENABLED")
     
-    # 收集所有测试
-    find_package(GTest QUIET)
-    if(NOT GTest_FOUND)
+    # 收集所有测试（GTest 已在根 CMakeLists.txt 中查找）
+    if(AGENTOS_HAS_GTEST)
+        message(STATUS "  GTest:       FOUND")
+    else()
         message(STATUS "  GTest:       NOT FOUND (tests may use custom framework)")
     endif()
 else()

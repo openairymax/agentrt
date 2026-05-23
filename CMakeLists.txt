@@ -17,16 +17,33 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 endif()
 
 # BAN-33强化：禁止在源码树内任何子目录构建
-string(FIND "${CMAKE_BINARY_DIR}" "${CMAKE_SOURCE_DIR}" _BAN33_BUILD_INSIDE)
-if(_BAN33_BUILD_INSIDE EQUAL 0 AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
-    message(FATAL_ERROR
-        "AgentOS build directory MUST be outside the source tree! (BAN-33)\n"
-        "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
-        "Please use an out-of-source build directory:\n"
-        "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
-        "  cmake --build ../AgentOS-build\n"
-        "See BUILD.md for details."
-    )
+# 使用 cmake_path 进行路径前缀检测（避免 "AgentOS-build" 误匹配 "AgentOS"）
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.20")
+    cmake_path(IS_PREFIX CMAKE_SOURCE_DIR "${CMAKE_BINARY_DIR}" _BAN33_IS_SUBDIR)
+    cmake_path(IS_PREFIX CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}" _BAN33_IS_SAME_OR_PARENT)
+    if((NOT _BAN33_IS_SAME_OR_PARENT) AND (_BAN33_IS_SUBDIR OR CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR))
+        message(FATAL_ERROR
+            "AgentOS build directory MUST be outside the source tree! (BAN-33)\n"
+            "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
+            "Please use an out-of-source build directory:\n"
+            "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
+            "  cmake --build ../AgentOS-build\n"
+            "See BUILD.md for details."
+        )
+    endif()
+else()
+    # 旧版 CMake 回退方案：用路径分隔符防止子串误匹配
+    string(FIND "${CMAKE_BINARY_DIR}/" "${CMAKE_SOURCE_DIR}/" _BAN33_BUILD_INSIDE)
+    if(_BAN33_BUILD_INSIDE EQUAL 0 AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+        message(FATAL_ERROR
+            "AgentOS build directory MUST be outside the source tree! (BAN-33)\n"
+            "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
+            "Please use an out-of-source build directory:\n"
+            "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
+            "  cmake --build ../AgentOS-build\n"
+            "See BUILD.md for details."
+        )
+    endif()
 endif()
 
 # 设置默认构建类型
@@ -138,7 +155,8 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(/O2 /Ob2 /Oi /Ot /GL)  # 优化选项
         add_link_options(/LTCG)  # 链接时代码生成
     else()
-        add_compile_options(-O3 -flto -DNDEBUG)  # 优化，链接时优化，禁用断言
+        add_compile_options(-O3 -flto)
+        add_compile_definitions(NDEBUG)
         add_link_options(-flto)
     endif()
 endif()
