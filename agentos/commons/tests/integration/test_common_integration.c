@@ -22,7 +22,7 @@
 #define TEST_ASSERT(condition, message) \
     do { \
         if (!(condition)) { \
-            fprintf(stderr, "�?FAIL: %s\n", message); \
+            fprintf(stderr, "✗FAIL: %s\n", message); \
             return 1; \
         } \
     } while (0)
@@ -31,10 +31,10 @@
     do { \
         printf("🧪 Running %s...\n", #test_func); \
         if (test_func() != 0) { \
-            fprintf(stderr, "�?Test failed: %s\n", #test_func); \
+            fprintf(stderr, "✗Test failed: %s\n", #test_func); \
             failed_tests++; \
         } else { \
-            printf("�?PASS: %s\n", #test_func); \
+            printf("✔PASS: %s\n", #test_func); \
             passed_tests++; \
         } \
     } while (0)
@@ -43,7 +43,7 @@ static int passed_tests = 0;
 static int failed_tests = 0;
 
 /**
- * @brief 测试完整工作�?
+ * @brief 测试完整工作?
  */
 static int test_full_workflow(void) {
     printf("  Step 1: Initialize logging...\n");
@@ -82,7 +82,7 @@ static int test_full_workflow(void) {
 }
 
 /**
- * @brief 测试跨平台兼容�?
+ * @brief 测试跨平台兼容?
  */
 static int test_cross_platform(void) {
     /* 测试时间函数 */
@@ -107,13 +107,13 @@ static int test_cross_platform(void) {
 }
 
 /**
- * @brief 测试错误处理�?
+ * @brief 测试错误处理?
  */
 static int test_error_handling_chain(void) {
     agentos_error_chain_t* chain = agentos_error_chain_create();
     TEST_ASSERT(chain != NULL, "Error chain creation should succeed");
     
-    /* 模拟错误�?*/
+    /* 模拟错误?*/
     agentos_error_chain_add(chain, AGENTOS_ERR_INVALID_PARAM, "file1.c", 10, "func1", "First error");
     agentos_error_chain_add(chain, AGENTOS_ERR_OUT_OF_MEMORY, "file2.c", 20, "func2", "Second error");
     
@@ -136,7 +136,7 @@ int main(void) {
     TEST_RUN(test_error_handling_chain);
     
     printf("\n===========================================\n");
-    printf("  测试结果�?d 通过�?d 失败\n", passed_tests, failed_tests);
+    printf("  测试结果：%d 通过：%d 失败\n", passed_tests, failed_tests);
     printf("===========================================\n");
     
     return failed_tests > 0 ? 1 : 0;

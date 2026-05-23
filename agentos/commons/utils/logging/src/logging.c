@@ -174,7 +174,7 @@ static bool throttle_should_suppress(const char* module, int line,
 
 /* ==================== 内部数据结构 ==================== */
 
-/** 日志系统全局状�?*/
+/** 日志系统全局状?*/
 typedef struct {
     /** 当前配置 */
     log_config_t manager;
@@ -182,7 +182,7 @@ typedef struct {
     /** 是否已初始化 */
     bool initialized;
     
-    /** 互斥锁保护配置和状�?*/
+    /** 互斥锁保护配置和状?*/
     agentos_mutex_t mutex;
     
     log_config_t default_config;
@@ -192,13 +192,13 @@ typedef struct {
         log_level_t level;
     } module_levels[32];
     
-    /** 模块级别过滤器数�?*/
+    /** 模块级别过滤器数?*/
     size_t module_level_count;
 } logging_state_t;
 
-/* ==================== 全局状态变�?==================== */
+/* ==================== 全局状态变?==================== */
 
-/** 日志系统全局状态实�?*/
+/** 日志系统全局状态实?*/
 static logging_state_t g_logging_state = {
     .initialized = false,
     .module_level_count = 0
@@ -207,11 +207,11 @@ static logging_state_t g_logging_state = {
 /* ==================== 内部辅助函数 ==================== */
 
 /**
- * @brief 获取当前时间戳（毫秒�?
+ * @brief 获取当前时间戳（毫秒?
  * 
- * 获取当前时间的Unix时间戳，毫秒精度�?
+ * 获取当前时间的Unix时间戳，毫秒精度?
  * 
- * @return 当前时间戳（毫秒�?
+ * @return 当前时间戳（毫秒?
  */
 static uint64_t get_current_timestamp(void) {
     return agentos_time_ms();
@@ -220,7 +220,7 @@ static uint64_t get_current_timestamp(void) {
 /**
  * @brief 获取当前线程ID
  * 
- * 获取当前线程的ID，用于日志记录�?
+ * 获取当前线程的ID，用于日志记录?
  * 
  * @return 线程ID
  */
@@ -231,7 +231,7 @@ static uint64_t get_current_thread_id(void) {
 /**
  * @brief 获取当前进程ID
  * 
- * 获取当前进程的ID，用于日志记录�?
+ * 获取当前进程的ID，用于日志记录?
  * 
  * @return 进程ID
  */
@@ -240,13 +240,13 @@ static uint32_t get_current_process_id(void) {
 }
 
 /**
- * @brief 格式化日志消�?
+ * @brief 格式化日志消?
  * 
- * 将日志记录格式化为字符串，根据配置的格式�?
+ * 将日志记录格式化为字符串，根据配置的格式?
  * 
  * @param record 日志记录
- * @param buffer 输出缓冲�?
- * @param buffer_size 缓冲区大�?
+ * @param buffer 输出缓冲?
+ * @param buffer_size 缓冲区大?
  * @return 格式化后的字符串长度
  */
 static size_t format_log_message(const log_record_t* record, char* buffer, size_t buffer_size) {
@@ -254,7 +254,7 @@ static size_t format_log_message(const log_record_t* record, char* buffer, size_
         return 0;
     }
     
-    // 简单文本格式实�?
+    // 简单文本格式实?
     time_t sec = record->timestamp / 1000;
     int ms = record->timestamp % 1000;
     struct tm tm_storage;
@@ -303,7 +303,7 @@ static size_t format_log_message(const log_record_t* record, char* buffer, size_
 /**
  * @brief 检查日志是否应该被记录
  * 
- * 根据全局级别和模块级别检查日志是否应该被记录�?
+ * 根据全局级别和模块级别检查日志是否应该被记录?
  * 
  * @param level 日志级别
  * @param module 模块名称
@@ -354,7 +354,7 @@ log_level_t log_level_from_string(const char* str) {
         }
     }
     
-    // 尝试解析为数�?
+    // 尝试解析为数?
     char* endptr;
     long value = strtol(str, &endptr, 10);
     if (endptr != str && *endptr == '\0' && value >= 0 && (size_t)value < LEVEL_NAMES_COUNT) {
@@ -450,13 +450,13 @@ void log_write(log_level_t level, const char* module, int line, const char* fmt,
         .process_id = get_current_process_id()
     };
     
-    // 格式化输�?
+    // 格式化输?
     char formatted_buffer[MAX_MESSAGE_LEN * 2];
     size_t formatted_len = format_log_message(&record, formatted_buffer, sizeof(formatted_buffer));
     
-    // 输出到控制台�?
+    // 输出到控制台?
     if (formatted_len > 0) {
-        // 根据级别选择输出�?
+        // 根据级别选择输出?
         FILE* stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
         fwrite(formatted_buffer, 1, formatted_len, stream);
         fflush(stream);
@@ -492,7 +492,7 @@ void log_write_va(log_level_t level, const char* module, int line, const char* f
         .process_id = get_current_process_id()
     };
     
-    // 格式化输�?
+    // 格式化输?
     char formatted_buffer[MAX_MESSAGE_LEN * 2];
     size_t formatted_len = format_log_message(&record, formatted_buffer, sizeof(formatted_buffer));
     
@@ -556,7 +556,7 @@ int log_set_module_level(const char* module_pattern, log_level_t level) {
         }
     }
     
-    // 添加新模�?
+    // 添加新模?
     if (g_logging_state.module_level_count < sizeof(g_logging_state.module_levels) / sizeof(g_logging_state.module_levels[0])) {
         strncpy(g_logging_state.module_levels[g_logging_state.module_level_count].pattern,
                 module_pattern,
@@ -570,7 +570,7 @@ int log_set_module_level(const char* module_pattern, log_level_t level) {
     }
     
     agentos_mutex_unlock(&g_logging_state.mutex);
-    return -2; // 表已�?
+    return -2; // 表已?
 }
 
 int log_reload_config(const char* config_path) {

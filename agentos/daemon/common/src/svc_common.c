@@ -118,7 +118,7 @@ static agentos_error_t svc_common_module_init(void) {
     err = agentos_mutex_init(&g_registry.registry_mutex);
     if (err != AGENTOS_SUCCESS) {
         LOG_ERROR("Failed to initialize registry mutex: %d", err);
-        return AGENTOS_EINIT;
+        return DAEMON_EINIT;
     }
     
     g_registry.initialized = 1;
@@ -408,7 +408,7 @@ agentos_error_t agentos_service_init(agentos_service_t svc) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot initialize from state %d", 
                  service->name, service->state);
-        return AGENTOS_ESTATE;
+        return DAEMON_ESTATE;
     }
     
     /* 更新状态 */
@@ -452,7 +452,7 @@ agentos_error_t agentos_service_start(agentos_service_t svc) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot start from state %d", 
                  service->name, service->state);
-        return AGENTOS_ESTATE;
+        return DAEMON_ESTATE;
     }
     
     /* 更新状态 */
@@ -504,7 +504,7 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_WARN("Service '%s' cannot stop from state %d", 
                 service->name, service->state);
-        return AGENTOS_ESTATE;
+        return DAEMON_ESTATE;
     }
     
     /* 更新状态 */
@@ -639,10 +639,7 @@ int agentos_service_handle_request_async(
     ctx->user_data = user_data;
 
     if (svc->thread_pool) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
         int rc = thread_pool_submit(svc->thread_pool, async_request_worker, ctx);
-#pragma GCC diagnostic pop
         if (rc != 0) {
             free(ctx->method); free(ctx->params_json); free(ctx);
             return rc;
@@ -668,7 +665,7 @@ agentos_error_t agentos_service_pause(agentos_service_t svc) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot pause from state %d", 
                  service->name, service->state);
-        return AGENTOS_ESTATE;
+        return DAEMON_ESTATE;
     }
     
     /* 检查是否支持暂停 */
@@ -701,7 +698,7 @@ agentos_error_t agentos_service_resume(agentos_service_t svc) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot resume from state %d", 
                  service->name, service->state);
-        return AGENTOS_ESTATE;
+        return DAEMON_ESTATE;
     }
     
     /* 更新状态 */
@@ -828,10 +825,10 @@ agentos_error_t agentos_service_healthcheck(agentos_service_t svc) {
             return AGENTOS_SUCCESS;
             
         case AGENTOS_SVC_STATE_ERROR:
-            return AGENTOS_EHEALTH;
+            return DAEMON_EHEALTH;
             
         default:
-            return AGENTOS_ESTATE;
+            return DAEMON_ESTATE;
     }
 }
 
@@ -1689,7 +1686,7 @@ agentos_error_t agentos_service_monitor_start(
                 agentos_mutex_unlock(&g_monitor.mutex);
                 LOG_ERROR("Failed to create monitor thread for service '%s'",
                          agentos_service_get_name(service));
-                return AGENTOS_EINIT;
+                return DAEMON_EINIT;
             }
 
             agentos_mutex_unlock(&g_monitor.mutex);
@@ -1728,7 +1725,7 @@ agentos_error_t agentos_service_monitor_start(
         agentos_mutex_unlock(&g_monitor.mutex);
         LOG_ERROR("Failed to create monitor thread for service '%s'",
                  agentos_service_get_name(service));
-        return AGENTOS_EINIT;
+        return DAEMON_EINIT;
     }
 
     g_monitor.count++;
@@ -1909,7 +1906,7 @@ static agentos_error_t http_client_call(
         if (state != AGENTOS_SVC_STATE_RUNNING) {
             LOG_WARN("Service '%s' not running (state=%s), cannot handle request",
                      service_name, agentos_svc_state_to_string(state));
-            return AGENTOS_ESTATE;
+            return DAEMON_ESTATE;
         }
 
         LOG_WARN("Service '%s' has no handle_request callback", service_name);
@@ -1923,7 +1920,7 @@ static agentos_error_t http_client_call(
     CURL* curl = curl_easy_init();
     if (!curl) {
         LOG_ERROR("Failed to initialize CURL for remote call to '%s'", service_name);
-        return AGENTOS_EINIT;
+        return DAEMON_EINIT;
     }
 
     struct curl_slist* headers = NULL;

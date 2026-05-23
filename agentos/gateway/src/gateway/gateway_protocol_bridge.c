@@ -84,7 +84,7 @@ int gw_protocol_bridge_register_handler(
     struct gw_protocol_bridge_s* b = (struct gw_protocol_bridge_s*)bridge;
     if (!b->initialized) return -2;
 
-    b->handlers[proto_type] = (void*)handler;
+    b->handlers[proto_type] = (void*)(uintptr_t)handler;
     if (endpoint_pattern) {
         strncpy(b->handler_patterns[proto_type], endpoint_pattern,
                 sizeof(b->handler_patterns[proto_type]) - 1);
@@ -98,7 +98,7 @@ int gw_protocol_bridge_set_default_handler(
 {
     if (!bridge) return -1;
     struct gw_protocol_bridge_s* b = (struct gw_protocol_bridge_s*)bridge;
-    b->default_handler = (void*)handler;
+    b->default_handler = (void*)(uintptr_t)handler;
     return 0;
 }
 
@@ -141,8 +141,8 @@ int gw_protocol_bridge_detect_protocol(
                        strstr(data, "\"messages\"")) {
                 detected = GW_PROTO_OPENAI;
                 confidence += 25.0;
-            } else if (strstr(data, "\"tools\"") ||
-                       strstr(data, "\"method\"") && strstr(data, "\"params\"")) {
+            } else if ((strstr(data, "\"tools\"")) ||
+                       (strstr(data, "\"method\"") && strstr(data, "\"params\""))) {
                 detected = GW_PROTO_MCP;
                 confidence += 15.0;
             } else if (strstr(data, "\"agent\"") ||
@@ -270,7 +270,7 @@ int gw_protocol_bridge_process_request(
 
     if (b->handlers[detection.detected_type]) {
         void* (*handler_fn)(const void*, size_t, size_t*) =
-            (void* (*)(const void*, size_t, size_t*))b->handlers[detection.detected_type];
+            (void* (*)(const void*, size_t, size_t*))(uintptr_t)b->handlers[detection.detected_type];
         size_t resp_size = 0;
         void* result = handler_fn(incoming->raw_data, incoming->raw_size, &resp_size);
 
@@ -287,7 +287,7 @@ int gw_protocol_bridge_process_request(
         out_response->transformed = false;
     } else if (b->default_handler) {
         void* (*def_handler)(const void*, size_t, size_t*) =
-            (void* (*)(const void*, size_t, size_t*))b->default_handler;
+            (void* (*)(const void*, size_t, size_t*))(uintptr_t)b->default_handler;
         size_t resp_size = 0;
         void* result = def_handler(incoming->raw_data, incoming->raw_size, &resp_size);
 

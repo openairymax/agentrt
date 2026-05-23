@@ -329,7 +329,7 @@ char* jsonrpc_process_batch(
 
         int valid = jsonrpc_validate_request(item);
         if (valid != 0) {
-            const cJSON* id = jsonrpc_get_id(item);
+            (void)jsonrpc_get_id(item);
             char* err_resp = NULL;
             switch (valid) {
                 case -3: err_resp = jsonrpc_create_parse_error_response(); break;

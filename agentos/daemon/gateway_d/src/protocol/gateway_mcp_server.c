@@ -222,7 +222,7 @@ static char* extract_jsonrpc_method(const char* body)
     return method;
 }
 
-static char* extract_jsonrpc_id(const char* body)
+static char* __attribute__((used)) extract_jsonrpc_id(const char* body)
 {
     if (!body) return NULL;
     const char* key = "\"id\"";

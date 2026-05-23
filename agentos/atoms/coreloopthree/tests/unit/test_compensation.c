@@ -38,7 +38,7 @@ static void test_compensation_lifecycle(void)
     agentos_error_t err         = agentos_compensation_create(&mgr);
 
     if (err == AGENTOS_SUCCESS && mgr != NULL) {
-        assert(mgr->entries == NULL || mgr->entry_count >= 0);
+        assert(mgr->entries == NULL || mgr->entry_count <= 1000);
         TEST_PASS("compensation lifecycle: create OK");
         agentos_compensation_destroy(mgr);
         TEST_PASS("compensation lifecycle: destroy OK");

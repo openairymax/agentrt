@@ -309,7 +309,7 @@ agentos_error_t ipc_init(void) {
     WSADATA wsa_data;
     int wsa_err = WSAStartup(MAKEWORD(2, 2), &wsa_data);
     if (wsa_err != 0) {
-        return AGENTOS_EINIT;
+        return DAEMON_EINIT;
     }
 #endif
 

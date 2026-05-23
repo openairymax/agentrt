@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 #include "cache.h"
 
 static void test_cache_create_destroy(void) {
@@ -33,7 +34,7 @@ static void test_cache_put_get(void) {
     cache_put(cache, key, value);
 
     char* retrieved = NULL;
-    int ret = cache_get(cache, key, &retrieved);
+    int ret __attribute__((unused)) = cache_get(cache, key, &retrieved);
     assert(ret == 1);
     assert(retrieved != NULL);
     assert(strcmp(retrieved, value) == 0);
@@ -51,7 +52,7 @@ static void test_cache_miss(void) {
     assert(cache != NULL);
 
     char* retrieved = NULL;
-    int ret = cache_get(cache, "nonexistent_key", &retrieved);
+    int ret __attribute__((unused)) = cache_get(cache, "nonexistent_key", &retrieved);
     assert(ret != 0 || retrieved == NULL);
 
     cache_destroy(cache);
@@ -71,7 +72,7 @@ static void test_cache_clear(void) {
 
     cache_clear(cache);
 
-    char* retrieved = NULL;
+    char* retrieved __attribute__((unused)) = NULL;
     assert(cache_get(cache, "key1", &retrieved) != 0 || retrieved == NULL);
     assert(cache_get(cache, "key2", &retrieved) != 0 || retrieved == NULL);
     assert(cache_get(cache, "key3", &retrieved) != 0 || retrieved == NULL);

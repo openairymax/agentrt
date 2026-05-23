@@ -563,7 +563,7 @@ AGENTOS_API agentos_error_t cb_execute_failover(
     if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
 
     cb_failover_config_t* fc = &cb->failover_config;
-    agentos_error_t err = AGENTOS_EFAIL;
+    agentos_error_t err = DAEMON_EFAIL;
 
     switch (fc->strategy) {
         case CB_FAILOVER_RETRY:

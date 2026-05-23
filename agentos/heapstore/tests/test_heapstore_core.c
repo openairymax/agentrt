@@ -131,7 +131,7 @@ static void test_get_stats_not_initialized(void) {
     heapstore_stats_t stats;
     memset(&stats, 0, sizeof(stats));
 
-    heapstore_error_t err = heapstore_get_stats(&stats);
+    heapstore_error_t err __attribute__((unused)) = heapstore_get_stats(&stats);
     assert(err == heapstore_ERR_NOT_INITIALIZED);
 
     printf("PASS\n");
@@ -206,7 +206,7 @@ static void test_reload_config_not_initialized(void) {
     heapstore_config_t manager = {0};
     manager.max_log_size_mb = 100;
 
-    heapstore_error_t err = heapstore_reload_config(&manager);
+    heapstore_error_t err __attribute__((unused)) = heapstore_reload_config(&manager);
     assert(err == heapstore_ERR_NOT_INITIALIZED);
 
     printf("PASS\n");
@@ -232,7 +232,7 @@ static void test_flush(void) {
 static void test_flush_not_initialized(void) {
     printf("Test: flush_not_initialized...");
 
-    heapstore_error_t err = heapstore_flush();
+    heapstore_error_t err __attribute__((unused)) = heapstore_flush();
     assert(err == heapstore_ERR_NOT_INITIALIZED);
 
     printf("PASS\n");

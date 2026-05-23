@@ -18,7 +18,7 @@
 static void test_ipc_init_shutdown(void) {
     printf("Test: ipc_init_shutdown...");
 
-    heapstore_error_t err = heapstore_ipc_init();
+    heapstore_error_t err __attribute__((unused)) = heapstore_ipc_init();
     assert(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED);
 
     heapstore_ipc_shutdown();
@@ -102,14 +102,14 @@ static void test_ipc_buffer_crud(void) {
 static void test_ipc_stats(void) {
     printf("Test: ipc_stats...");
 
-    heapstore_error_t init_err = heapstore_ipc_init();
+    heapstore_error_t init_err __attribute__((unused)) = heapstore_ipc_init();
     assert(init_err == heapstore_SUCCESS || init_err == heapstore_ERR_ALREADY_INITIALIZED);
 
     uint32_t channel_count = 0;
     uint32_t buffer_count = 0;
     uint64_t total_size = 0;
 
-    heapstore_error_t err = heapstore_ipc_get_stats(&channel_count, &buffer_count, &total_size);
+    heapstore_error_t err __attribute__((unused)) = heapstore_ipc_get_stats(&channel_count, &buffer_count, &total_size);
     assert(err == heapstore_SUCCESS);
 
     printf("  Channels: %u, Buffers: %u, Total Size: %lu\n", channel_count, buffer_count, (unsigned long)total_size);
@@ -120,7 +120,7 @@ static void test_ipc_stats(void) {
 static void test_ipc_invalid_params(void) {
     printf("Test: ipc_invalid_params...");
 
-    heapstore_error_t err = heapstore_ipc_record_channel(NULL);
+    heapstore_error_t err __attribute__((unused)) = heapstore_ipc_record_channel(NULL);
     assert(err == heapstore_ERR_INVALID_PARAM);
 
     heapstore_ipc_channel_t invalid_ch;
@@ -154,7 +154,7 @@ static void test_ipc_not_found(void) {
     heapstore_ipc_channel_t channel;
     memset(&channel, 0, sizeof(channel));
 
-    heapstore_error_t err = heapstore_ipc_get_channel("nonexistent_id", &channel);
+    heapstore_error_t err __attribute__((unused)) = heapstore_ipc_get_channel("nonexistent_id", &channel);
     assert(err == heapstore_ERR_NOT_FOUND);
 
     heapstore_ipc_buffer_t buffer;
@@ -182,7 +182,7 @@ static void test_ipc_multiple_channels(void) {
         channel.created_at = (uint64_t)time(NULL);
         snprintf(channel.status, sizeof(channel.status), "active");
 
-        heapstore_error_t err = heapstore_ipc_record_channel(&channel);
+        heapstore_error_t err __attribute__((unused)) = heapstore_ipc_record_channel(&channel);
         assert(err == heapstore_SUCCESS || err == heapstore_ERR_OUT_OF_MEMORY);
     }
 

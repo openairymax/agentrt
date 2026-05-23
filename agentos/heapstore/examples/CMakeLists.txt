@@ -15,7 +15,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # )
 
 # Find required libraries
-find_package(Threads REQUIRED)
+# Threads found by root CMakeLists.txt
 
 # Example executables
 add_executable(quick_start quick_start.c)

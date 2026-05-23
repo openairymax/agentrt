@@ -5,7 +5,7 @@
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-find_package(Threads REQUIRED)
+# Threads found by root CMakeLists.txt
 
 set(DAEMON_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)

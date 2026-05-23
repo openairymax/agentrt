@@ -260,6 +260,8 @@ static void update_vertex_degree(struct graph_engine_s* e, vertex_id_t vertex_id
 }
 
 // 从哈希链中移除指定ID的索引条目（通用模式）
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static void remove_index_entry(void** table, size_t hash, void* target_id,
                                 size_t id_offset, size_t next_offset,
                                 void (*free_fn)(void*)) {
@@ -276,6 +278,7 @@ static void remove_index_entry(void** table, size_t hash, void* target_id,
         entry = next;
     }
 }
+#pragma GCC diagnostic pop
 
 // 移除边索引条目并更新所有引用该边的索引
 static void remove_edge_from_all_indexes(struct graph_engine_s* e, edge_id_t edge_id,
