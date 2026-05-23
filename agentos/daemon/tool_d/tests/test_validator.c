@@ -37,7 +37,7 @@ static void test_validator_string_type(void) {
     const char* valid_params = "{\"input\": \"Hello, World!\"}";
     const char* invalid_params = "{\"input\": \"\"}";
 
-    int ret = tool_validator_validate(validator, &meta, valid_params);
+    int ret __attribute__((unused)) = tool_validator_validate(validator, &meta, valid_params);
     assert(ret == 0 || ret != 0);
 
     ret = tool_validator_validate(validator, &meta, invalid_params);
@@ -63,7 +63,7 @@ static void test_validator_number_type(void) {
     const char* valid_params = "{\"value\": 50}";
     const char* invalid_params = "{\"value\": 150}";
 
-    int ret = tool_validator_validate(validator, &meta, valid_params);
+    int ret __attribute__((unused)) = tool_validator_validate(validator, &meta, valid_params);
     assert(ret == 0 || ret != 0);
 
     ret = tool_validator_validate(validator, &meta, invalid_params);
@@ -89,7 +89,7 @@ static void test_validator_object_type(void) {
     const char* valid_params = "{\"name\": \"test\"}";
     const char* invalid_params = "{}";
 
-    int ret = tool_validator_validate(validator, &meta, valid_params);
+    int ret __attribute__((unused)) = tool_validator_validate(validator, &meta, valid_params);
     assert(ret == 0 || ret != 0);
 
     ret = tool_validator_validate(validator, &meta, invalid_params);
@@ -106,7 +106,7 @@ static void test_validator_null_input(void) {
     tool_validator_t* validator = tool_validator_create();
     assert(validator != NULL);
 
-    int ret = tool_validator_validate(validator, NULL, NULL);
+    int ret __attribute__((unused)) = tool_validator_validate(validator, NULL, NULL);
     assert(ret != 0);
 
     tool_validator_destroy(validator);

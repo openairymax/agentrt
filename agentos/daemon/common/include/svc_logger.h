@@ -367,7 +367,7 @@ static inline void agentos_logger_log_with_trace(agentos_logger_t logger,
 #define AGENTOS_LOG_TRACE_IMPL(logger, level, trace_ctx, ...) \
     do { \
         (void)(logger); \
-        if ((trace_ctx) && (trace_ctx)->trace_id[0]) { \
+        if ((trace_ctx) != NULL && (trace_ctx)->trace_id[0]) { \
             log_set_trace_id((trace_ctx)->trace_id); \
         } \
         log_write((level), __FILE__, __LINE__, __VA_ARGS__); \

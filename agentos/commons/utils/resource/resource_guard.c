@@ -1,6 +1,6 @@
 /**
  * @file resource_guard.c
- * @brief 资源作用域守卫实�?- RAII 模式
+ * @brief 资源作用域守卫实?- RAII 模式
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

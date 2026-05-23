@@ -1,13 +1,13 @@
 /**
  * @file estimator.c
- * @brief 成本预估器实�?
+ * @brief 成本预估器实?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
  * @details
- * 本模块实现LLM调用成本预估功能�?
- * - 基于模型配置的成本计�?
- * - 支持自定义费率配�?
- * - 提供成本分析和报告接�?
+ * 本模块实现LLM调用成本预估功能?
+ * - 基于模型配置的成本计?
+ * - 支持自定义费率配?
+ * - 提供成本分析和报告接?
  */
 
 #include "cost.h"
@@ -30,19 +30,19 @@
  */
 typedef struct {
     char model_name[MAX_MODEL_NAME];     /**< 模型名称 */
-    double input_cost_per_1k;         /**< 输入成本（美�?1K Token�?*/
-    double output_cost_per_1k;         /**< 输出成本（美�?1K Token�?*/
+    double input_cost_per_1k;         /**< 输入成本（美?1K Token?*/
+    double output_cost_per_1k;         /**< 输出成本（美?1K Token?*/
     int max_input_tokens;             /**< 最大输入Token */
     int max_output_tokens;            /**< 最大输出Token */
 } model_cost_config_t;
 
 /**
- * @brief 成本预估器内部结�?
+ * @brief 成本预估器内部结?
  */
 struct agentos_cost_estimator {
     model_cost_config_t configs[MAX_CONFIG_ENTRIES];  /**< 模型配置数组 */
     int config_count;                                 /**< 配置数量 */
-    agentos_mutex_t mutex;                           /**< 互斥�?*/
+    agentos_mutex_t mutex;                           /**< 互斥?*/
     double total_cost;                               /**< 累计成本 */
     size_t total_input_tokens;                       /**< 累计输入Token */
     size_t total_output_tokens;                      /**< 累计输出Token */
@@ -90,7 +90,7 @@ static const model_cost_config_t* find_model_config(agentos_cost_estimator_t* es
 }
 
 /**
- * @brief 规范化模型名�?
+ * @brief 规范化模型名?
  */
 static void normalize_model_name(const char* input, char* output, size_t output_size) {
     if (!input || !output) {

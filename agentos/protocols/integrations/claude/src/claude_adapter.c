@@ -512,6 +512,7 @@ int claude_messages_create(claude_adapter_context_t* ctx,
             break;
         }
     }
+    (void)user_content;
 
     cJSON* req = cJSON_CreateObject();
     cJSON_AddStringToObject(req, "model", model_name);

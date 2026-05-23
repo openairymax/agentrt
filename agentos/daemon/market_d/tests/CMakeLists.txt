@@ -53,8 +53,8 @@ foreach(TEST_SRC ${MARKET_TEST_SOURCES})
         Threads::Threads
     )
 
-    find_package(cjson QUIET)
-    if(TARGET cjson OR cjson_FOUND)
+    # cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
+    if(AGENTOS_HAS_CJSON)
         target_link_libraries(test_market_${TEST_NAME} PRIVATE cjson)
     endif()
 

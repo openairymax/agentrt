@@ -16,6 +16,36 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     )
 endif()
 
+# BAN-33强化：禁止在源码树内任何子目录构建
+# 使用 cmake_path 进行路径前缀检测（避免 "AgentOS-build" 误匹配 "AgentOS"）
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.20")
+    cmake_path(IS_PREFIX CMAKE_SOURCE_DIR "${CMAKE_BINARY_DIR}" _BAN33_IS_SUBDIR)
+    cmake_path(IS_PREFIX CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}" _BAN33_IS_SAME_OR_PARENT)
+    if((NOT _BAN33_IS_SAME_OR_PARENT) AND (_BAN33_IS_SUBDIR OR CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR))
+        message(FATAL_ERROR
+            "AgentOS build directory MUST be outside the source tree! (BAN-33)\n"
+            "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
+            "Please use an out-of-source build directory:\n"
+            "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
+            "  cmake --build ../AgentOS-build\n"
+            "See BUILD.md for details."
+        )
+    endif()
+else()
+    # 旧版 CMake 回退方案：用路径分隔符防止子串误匹配
+    string(FIND "${CMAKE_BINARY_DIR}/" "${CMAKE_SOURCE_DIR}/" _BAN33_BUILD_INSIDE)
+    if(_BAN33_BUILD_INSIDE EQUAL 0 AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+        message(FATAL_ERROR
+            "AgentOS build directory MUST be outside the source tree! (BAN-33)\n"
+            "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
+            "Please use an out-of-source build directory:\n"
+            "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
+            "  cmake --build ../AgentOS-build\n"
+            "See BUILD.md for details."
+        )
+    endif()
+endif()
+
 # 设置默认构建类型
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)
@@ -77,7 +107,7 @@ if(MSVC)
     add_link_options(/DYNAMICBASE /NXCOMPAT /GUARD:CF)
 else()
     # GCC/Clang安全选项
-    add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter)
+    add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-stringop-overflow)
     if(WARNINGS_AS_ERRORS)
         add_compile_options(-Werror)
     endif()
@@ -90,6 +120,7 @@ else()
     elseif(APPLE)
         add_link_options(-Wl,-dead_strip)
     endif()
+    add_link_options(-Wno-stringop-overflow)
 endif()
 
 # Sanitizer支持（仅GCC/Clang）
@@ -124,7 +155,8 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(/O2 /Ob2 /Oi /Ot /GL)  # 优化选项
         add_link_options(/LTCG)  # 链接时代码生成
     else()
-        add_compile_options(-O3 -flto -DNDEBUG)  # 优化，链接时优化，禁用断言
+        add_compile_options(-O3 -flto)
+        add_compile_definitions(NDEBUG)
         add_link_options(-flto)
     endif()
 endif()
@@ -282,6 +314,27 @@ if(BUILD_TESTS)
     endif()
 endif()
 
+# --- CMocka ---
+if(BUILD_TESTS)
+    find_package(cmocka QUIET)
+    if(NOT cmocka_FOUND)
+        find_package(Cmocka QUIET)
+    endif()
+    if(cmocka_FOUND OR CMOCKA_FOUND)
+        set(AGENTOS_HAS_CMOCKA TRUE CACHE BOOL "cmocka available")
+        if(NOT CMOCKA_LIBRARIES)
+            set(CMOCKA_LIBRARIES ${cmocka_LIBRARIES} CACHE STRING "cmocka libraries" FORCE)
+        endif()
+        if(NOT CMOCKA_INCLUDE_DIRS)
+            set(CMOCKA_INCLUDE_DIRS ${cmocka_INCLUDE_DIRS} CACHE STRING "cmocka include dirs" FORCE)
+        endif()
+        message(STATUS "cmocka found")
+    else()
+        set(AGENTOS_HAS_CMOCKA FALSE CACHE BOOL "cmocka available")
+        message(STATUS "cmocka not found, some tests may use stub framework")
+    endif()
+endif()
+
 # 创建 INTERFACE 库用于传递全局依赖编译定义
 add_library(agentos_compile_defs INTERFACE)
 if(AGENTOS_HAS_SQLITE3)
@@ -315,7 +368,7 @@ endif()
 # ============================================================
 add_library(agentos_platform_libs INTERFACE)
 if(UNIX AND NOT APPLE)
-    target_link_libraries(agentos_platform_libs INTERFACE agentos_platform_libs dl)
+    target_link_libraries(agentos_platform_libs INTERFACE dl)
 endif()
 if(WIN32)
     target_link_libraries(agentos_platform_libs INTERFACE ws2_32)

@@ -22,7 +22,7 @@
 #define TEST_ASSERT(condition, message) \
     do { \
         if (!(condition)) { \
-            fprintf(stderr, "�?FAIL: %s\n", message); \
+            fprintf(stderr, "✗FAIL: %s\n", message); \
             return 1; \
         } \
     } while (0)
@@ -31,10 +31,10 @@
     do { \
         printf("🧪 Running %s...\n", #test_func); \
         if (test_func() != 0) { \
-            fprintf(stderr, "�?Test failed: %s\n", #test_func); \
+            fprintf(stderr, "✗Test failed: %s\n", #test_func); \
             failed_tests++; \
         } else { \
-            printf("�?PASS: %s\n", #test_func); \
+            printf("✔PASS: %s\n", #test_func); \
             passed_tests++; \
         } \
     } while (0)
@@ -92,7 +92,7 @@ static int test_memory_allocation(void) {
     void* ptr2 = agentos_mem_alloc(512);
     TEST_ASSERT(ptr2 != NULL, "Second allocation should succeed");
     
-    /* 测试零大小分�?*/
+    /* 测试零大小分?*/
     void* ptr3 = agentos_mem_alloc(0);
     TEST_ASSERT(ptr3 == NULL || ptr3 != NULL,
                  "Zero-size allocation: implementation-defined (NULL or unique pointer)");
@@ -106,7 +106,7 @@ static int test_memory_allocation(void) {
 }
 
 /**
- * @brief 测试字符串函�?
+ * @brief 测试字符串函?
  */
 static int test_string_functions(void) {
     char buffer[64];
@@ -194,7 +194,7 @@ static int test_network_functions(void) {
     return 0;
 }
 
-/* ==================== 主函�?==================== */
+/* ==================== 主函?==================== */
 
 int main(void) {
     printf("===========================================\n");

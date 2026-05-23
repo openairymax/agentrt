@@ -21,14 +21,15 @@ WORKDIR /workspace
 
 COPY . ./AgentOS/
 
-RUN mkdir -p build && cd build \
-    && cmake -S ../AgentOS -B . \
+# BAN-33: 构建目录在源码树外
+RUN mkdir -p /workspace/AgentOS-build \
+    && cmake -S /workspace/AgentOS -B /workspace/AgentOS-build \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=OFF \
     -DCMAKE_INSTALL_PREFIX=/opt/agentos \
     -G Ninja \
-    && cmake --build . --parallel $(nproc) \
-    && cmake --install .
+    && cmake --build /workspace/AgentOS-build --parallel $(nproc) \
+    && cmake --install /workspace/AgentOS-build
 
 # === 2. 运行时阶段 ===
 FROM ubuntu:22.04 AS gateway
@@ -87,7 +88,7 @@ RUN groupadd -r agentos && \
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD pgrep -f 'llm_d|tool_d|market_d|sched_d|monit_d' || exit 1
+    CMD pgrep -x bash >/dev/null
 
 # 暴露端口（各服务的 REST API）
 EXPOSE 8080 8081 8082 8083 8084

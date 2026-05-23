@@ -17,7 +17,7 @@
 #define TEST_ASSERT(condition, message) \
     do { \
         if (!(condition)) { \
-            fprintf(stderr, "�?FAIL: %s\n", message); \
+            fprintf(stderr, "✗FAIL: %s\n", message); \
             return 1; \
         } \
     } while (0)
@@ -26,10 +26,10 @@
     do { \
         printf("🧪 Running %s...\n", #test_func); \
         if (test_func() != 0) { \
-            fprintf(stderr, "�?Test failed: %s\n", #test_func); \
+            fprintf(stderr, "✗Test failed: %s\n", #test_func); \
             failed_tests++; \
         } else { \
-            printf("�?PASS: %s\n", #test_func); \
+            printf("✔PASS: %s\n", #test_func); \
             passed_tests++; \
         } \
     } while (0)
@@ -69,7 +69,7 @@ int main(void) {
     TEST_RUN(test_trace_id);
     
     printf("\n===========================================\n");
-    printf("  测试结果�?d 通过�?d 失败\n", passed_tests, failed_tests);
+    printf("  测试结果：%d 通过，%d 失败\n", passed_tests, failed_tests);
     printf("===========================================\n");
     
     return failed_tests > 0 ? 1 : 0;

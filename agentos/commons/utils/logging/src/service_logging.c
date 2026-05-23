@@ -101,6 +101,7 @@ static int file_outputter_output(outputter_t* self, const log_record_t* record) 
         case LOG_LEVEL_WARN:  level_str = "WARN";  break;
         case LOG_LEVEL_ERROR: level_str = "ERROR"; break;
         case LOG_LEVEL_FATAL: level_str = "FATAL"; break;
+        case LOG_LEVEL_COUNT: level_str = "UNKNOWN"; break;
     }
 
     fprintf(fp, "[%s] [%s] %s:%d - %s\n",
@@ -121,7 +122,7 @@ static bool level_filter_filter(filter_t* self, const log_record_t* record) {
     if (!self || !record) return false;
     int min_level = (int)(intptr_t)self->user_data;
     if (min_level <= 0) min_level = LOG_LEVEL_INFO;
-    return record->level >= min_level;
+    return (int)record->level >= min_level;
 }
 
 static void level_filter_destroy(filter_t* self) {
