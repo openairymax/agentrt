@@ -1,6 +1,6 @@
 /**
  * @file input_validator.c
- * @brief 输入验证工具库实�?
+ * @brief 输入验证工具库实?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -32,7 +32,7 @@ static const char* DANGEROUS_COMMANDS[] = {
     NULL
 };
 
-/** @brief SQL危险关键�?*/
+/** @brief SQL危险关键?*/
 static const char* SQL_DANGEROUS_KEYWORDS[] = {
     "DROP", "TRUNCATE", "ALTER", "DELETE FROM",
     "--", "/*", "*/", "; --", "UNION SELECT",
@@ -69,7 +69,7 @@ static const char* PRIVATE_IP_PREFIXES[] = {
 #endif
 
 /**
- * @brief 检查字符串是否以指定前缀开头（不区分大小写�?
+ * @brief 检查字符串是否以指定前缀开头（不区分大小写?
  */
 static int starts_with_case(const char* str, const char* prefix) {
     if (!str || !prefix) return 0;
@@ -97,10 +97,10 @@ static int contains_case(const char* str, const char* substr) {
     return 0;
 }
 
-/* ==================== 字符串验证实�?==================== */
+/* ==================== 字符串验证实?==================== */
 
 /**
- * @brief 验证字符串长�?
+ * @brief 验证字符串长?
  */
 void agentos_validate_string_length(
     const char* str,
@@ -183,7 +183,7 @@ void agentos_validate_string_charset(
 }
 
 /**
- * @brief 验证标识�?
+ * @brief 验证标识?
  */
 void agentos_validate_identifier(
     const char* str,
@@ -240,7 +240,7 @@ void agentos_validate_identifier(
 }
 
 /**
- * @brief 验证JSON字符�?
+ * @brief 验证JSON字符?
  */
 void agentos_validate_json_string(
     const char* str,
@@ -328,7 +328,7 @@ void agentos_validate_json_string(
 /* ==================== 路径验证实现 ==================== */
 
 /**
- * @brief 验证文件路径安全�?
+ * @brief 验证文件路径安全?
  */
 void agentos_validate_file_path(
     const char* path,
@@ -390,7 +390,7 @@ void agentos_validate_file_path(
 }
 
 /**
- * @brief 规范化路�?
+ * @brief 规范化路?
  */
 agentos_error_t agentos_normalize_path(
     const char* path,
@@ -424,7 +424,7 @@ agentos_error_t agentos_normalize_path(
 /* ==================== 命令验证实现 ==================== */
 
 /**
- * @brief 验证Shell命令安全�?
+ * @brief 验证Shell命令安全?
  */
 void agentos_validate_shell_command(
     const char* cmd,
@@ -522,7 +522,7 @@ agentos_error_t agentos_sanitize_shell_param(
 /* ==================== SQL验证实现 ==================== */
 
 /**
- * @brief 验证SQL查询安全�?
+ * @brief 验证SQL查询安全?
  */
 void agentos_validate_sql_query(
     const char* sql,
@@ -567,7 +567,7 @@ void agentos_validate_sql_query(
 }
 
 /**
- * @brief 净化SQL标识�?
+ * @brief 净化SQL标识?
  */
 agentos_error_t agentos_sanitize_sql_identifier(
     const char* identifier,
@@ -598,7 +598,7 @@ agentos_error_t agentos_sanitize_sql_identifier(
 /* ==================== URL验证实现 ==================== */
 
 /**
- * @brief 验证URL安全�?
+ * @brief 验证URL安全?
  */
 void agentos_validate_url(
     const char* url,
@@ -729,7 +729,7 @@ agentos_error_t agentos_parse_url(
     return AGENTOS_SUCCESS;
 }
 
-/* ==================== 数值验证实�?==================== */
+/* ==================== 数值验证实?==================== */
 
 /**
  * @brief 验证整数范围
@@ -765,7 +765,7 @@ void agentos_validate_int_range(
 }
 
 /**
- * @brief 验证浮点数范�?
+ * @brief 验证浮点数范?
  */
 void agentos_validate_float_range(
     double value,
@@ -797,7 +797,7 @@ void agentos_validate_float_range(
     result->is_valid = 1;
 }
 
-/* ==================== 缓冲区验证实�?==================== */
+/* ==================== 缓冲区验证实?==================== */
 
 /**
  * @brief 安全内存复制
@@ -816,7 +816,7 @@ agentos_error_t agentos_safe_memcpy(
 }
 
 /**
- * @brief 安全字符串复�?
+ * @brief 安全字符串复?
  */
 agentos_error_t agentos_safe_strcpy(
     char* dest,
@@ -834,7 +834,7 @@ agentos_error_t agentos_safe_strcpy(
 }
 
 /**
- * @brief 安全字符串拼�?
+ * @brief 安全字符串拼?
  */
 agentos_error_t agentos_safe_strcat(
     char* dest,

@@ -129,7 +129,7 @@ static int parse_args(int argc, char* argv[], gateway_service_config_t* config) 
             pid_t pid = fork();
             if (pid < 0) { SVC_LOG_ERROR("Failed to fork"); return -1; }
             if (pid > 0) exit(0);
-            setsid(); umask(022); chdir("/");
+            setsid(); umask(022); { int __rc __attribute__((unused)) = chdir("/"); }
             fclose(stdin); fclose(stdout); fclose(stderr);
             SVC_LOG_INFO("Gateway daemonized");
 #else

@@ -1,6 +1,6 @@
 /**
  * @file engine.c
- * @brief 行动层执行引擎核心实�?
+ * @brief 行动层执行引擎核心实?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -71,7 +71,7 @@ static void tcb_retain(task_tcb_t *tcb);
 static void tcb_release(task_tcb_t *tcb);
 
 /**
- * @brief 哈希函数（djb2 变体�?
+ * @brief 哈希函数（djb2 变体?
  */
 static size_t task_hash(const char *task_id, size_t table_size)
 {
@@ -83,7 +83,7 @@ static size_t task_hash(const char *task_id, size_t table_size)
 }
 
 /**
- * @brief 创建哈希�?
+ * @brief 创建哈希?
  */
 static task_hash_table_t *task_hash_table_create(size_t size)
 {
@@ -109,7 +109,7 @@ static task_hash_table_t *task_hash_table_create(size_t size)
 }
 
 /**
- * @brief 销毁哈希表，释放所有持有引�?
+ * @brief 销毁哈希表，释放所有持有引?
  */
 static void task_hash_table_destroy(task_hash_table_t *table)
 {
@@ -177,7 +177,7 @@ static task_tcb_t *task_hash_table_find(task_hash_table_t *table, const char *ta
 }
 
 /**
- * @brief 从哈希表中移除任务（减少引用计数�?
+ * @brief 从哈希表中移除任务（减少引用计数?
  */
 static void task_hash_table_remove(task_hash_table_t *table, const char *task_id)
 {
@@ -273,7 +273,7 @@ static void tcb_release(task_tcb_t *tcb)
 }
 
 /**
- * @brief 深拷贝任务描�?
+ * @brief 深拷贝任务描?
  */
 static agentos_task_t *task_desc_deep_copy(const agentos_task_t *task)
 {
@@ -313,7 +313,7 @@ fail:
 }
 
 /**
- * @brief 深拷贝任务结�?
+ * @brief 深拷贝任务结?
  */
 static agentos_task_t *task_result_deep_copy(const task_tcb_t *tcb)
 {
@@ -349,7 +349,7 @@ fail:
 }
 
 /**
- * @brief 工作线程主函�?
+ * @brief 工作线程主函?
  */
 static void *worker_thread_func(void *arg)
 {
@@ -428,17 +428,17 @@ static void *worker_thread_func(void *arg)
 /**
  * @brief 创建执行引擎
  *
- * @param max_concurrency 最大并发任务数�?表示使用默认�?�?
+ * @param max_concurrency 最大并发任务数?表示使用默认??
  * @param out_engine 输出执行引擎指针
- * @return agentos_error_t 错误�?
+ * @return agentos_error_t 错误?
  *
- * @note 执行引擎负责�?
- *       1. 接收并执行任�?
- *       2. 管理任务队列和状�?
- *       3. 提供任务查询和结果获取接�?
+ * @note 执行引擎负责?
+ *       1. 接收并执行任?
+ *       2. 管理任务队列和状?
+ *       3. 提供任务查询和结果获取接?
  *       4. 使用哈希表实现O(1)任务查找
  *
- * @warning 调用者负责释放返回的执行引擎（使�?agentos_execution_destroy�?
+ * @warning 调用者负责释放返回的执行引擎（使?agentos_execution_destroy?
  */
 agentos_error_t agentos_execution_create(uint32_t max_concurrency,
                                          agentos_execution_engine_t **out_engine)
@@ -485,7 +485,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
         return AGENTOS_ENOMEM;
     }
 
-    // 创建任务哈希表，大小为最大并发数�?倍，减少冲突
+    // 创建任务哈希表，大小为最大并发数?倍，减少冲突
     engine->task_map = task_hash_table_create(max_concurrency * 2);
     if (!engine->task_map) {
         AGENTOS_FREE(engine->worker_threads);
@@ -566,23 +566,23 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
 }
 
 /**
- * @brief 提交任务到执行引�?
+ * @brief 提交任务到执行引?
  *
  * @param engine 执行引擎
  * @param task 任务描述
  * @param out_task_id 输出任务ID（需调用者释放）
- * @return agentos_error_t 错误�?
+ * @return agentos_error_t 错误?
  *
- * @note 提交流程�?
+ * @note 提交流程?
  *       1. 参数验证
  *       2. 复制任务描述
- *       3. 创建任务控制块（TCB�?
+ *       3. 创建任务控制块（TCB?
  *       4. 生成唯一任务ID
  *       5. 初始化任务状态和资源
  *       6. 将任务添加到队列和哈希表
  *       7. 通知工作线程有新任务
  *
- * @warning 返回的任务ID需要调用者使�?AGENTOS_FREE() 释放
+ * @warning 返回的任务ID需要调用者使?AGENTOS_FREE() 释放
  */
 agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
                                          const agentos_task_t *task, char **out_task_id)
@@ -658,7 +658,7 @@ agentos_error_t agentos_execution_query(agentos_execution_engine_t *engine, cons
     if (!engine || !task_id || !out_status)
         return AGENTOS_EINVAL;
 
-    // 使用哈希表快速查找任�?
+    // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (tcb) {
         agentos_mutex_lock(tcb->tcb_lock);
@@ -678,7 +678,7 @@ agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const
     if (!engine || !task_id)
         return AGENTOS_EINVAL;
 
-    // 使用哈希表快速查找任�?
+    // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (!tcb)
         return AGENTOS_ENOENT;
@@ -718,12 +718,12 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
     if (!engine || !task_id)
         return AGENTOS_EINVAL;
 
-    // 使用哈希表快速查找任�?
+    // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (!tcb)
         return AGENTOS_ENOENT;
 
-    // 检查任务是否在队列�?
+    // 检查任务是否在队列?
     agentos_mutex_lock(engine->queue_lock);
     task_tcb_t **p = &engine->task_queue;
     while (*p) {
@@ -732,7 +732,7 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
             tcb->next = NULL;
             agentos_mutex_unlock(engine->queue_lock);
 
-            // 从哈希表中移除任�?
+            // 从哈希表中移除任?
             task_hash_table_remove(engine->task_map, task_id);
 
             agentos_mutex_lock(tcb->tcb_lock);
@@ -758,7 +758,7 @@ agentos_error_t agentos_execution_get_result(agentos_execution_engine_t *engine,
     if (!engine || !task_id || !out_result)
         return AGENTOS_EINVAL;
 
-    // 使用哈希表快速查找任�?
+    // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (!tcb)
         return AGENTOS_ENOENT;

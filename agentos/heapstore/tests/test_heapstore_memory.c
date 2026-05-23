@@ -18,7 +18,7 @@
 static void test_memory_init_shutdown(void) {
     printf("Test: memory_init_shutdown...");
 
-    heapstore_error_t err = heapstore_memory_init();
+    heapstore_error_t err __attribute__((unused)) = heapstore_memory_init();
     assert(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED);
 
     heapstore_memory_shutdown();
@@ -106,14 +106,14 @@ static void test_memory_allocation_crud(void) {
 static void test_memory_stats(void) {
     printf("Test: memory_stats...");
 
-    heapstore_error_t init_err = heapstore_memory_init();
+    heapstore_error_t init_err __attribute__((unused)) = heapstore_memory_init();
     assert(init_err == heapstore_SUCCESS || init_err == heapstore_ERR_ALREADY_INITIALIZED);
 
     uint32_t pool_count = 0;
     uint32_t total_allocations = 0;
     uint64_t total_size = 0;
 
-    heapstore_error_t err = heapstore_memory_get_stats(&pool_count, &total_allocations, &total_size);
+    heapstore_error_t err __attribute__((unused)) = heapstore_memory_get_stats(&pool_count, &total_allocations, &total_size);
     assert(err == heapstore_SUCCESS);
 
     printf("  Pools: %u, Allocations: %u, Total Size: %lu\n",
@@ -125,7 +125,7 @@ static void test_memory_stats(void) {
 static void test_memory_invalid_params(void) {
     printf("Test: memory_invalid_params...");
 
-    heapstore_error_t err = heapstore_memory_record_pool(NULL);
+    heapstore_error_t err __attribute__((unused)) = heapstore_memory_record_pool(NULL);
     assert(err == heapstore_ERR_INVALID_PARAM);
 
     heapstore_memory_pool_t invalid_pool;
@@ -162,7 +162,7 @@ static void test_memory_not_found(void) {
     heapstore_memory_pool_t pool;
     memset(&pool, 0, sizeof(pool));
 
-    heapstore_error_t err = heapstore_memory_get_pool("nonexistent_id", &pool);
+    heapstore_error_t err __attribute__((unused)) = heapstore_memory_get_pool("nonexistent_id", &pool);
     assert(err == heapstore_ERR_NOT_FOUND);
 
     heapstore_memory_allocation_t allocation;

@@ -504,6 +504,8 @@ int service_logging_get_monitoring_stats(struct log_monitoring_stats* out_stats)
  */
 int service_logging_reset_monitoring_stats(void);
 
+struct log_query;
+
 /**
  * @brief 查询日志
  * 

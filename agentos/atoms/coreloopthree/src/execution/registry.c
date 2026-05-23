@@ -1,6 +1,6 @@
 /**
  * @file registry.c
- * @brief 执行单元注册表独立实�?
+ * @brief 执行单元注册表独立实?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -14,12 +14,12 @@
 #include <string.h>
 
 /**
- * @brief 注册表条�?
+ * @brief 注册表条?
  */
 typedef struct registry_entry {
-    char* unit_id;                        /**< 单元唯一标识（对�?agent_id�?*/
+    char* unit_id;                        /**< 单元唯一标识（对?agent_id?*/
     agentos_execution_unit_t* unit;        /**< 执行单元对象 */
-    struct registry_entry* next;           /**< 链表下一�?*/
+    struct registry_entry* next;           /**< 链表下一?*/
 } registry_entry_t;
 
 static registry_entry_t* g_registry = NULL;
@@ -37,7 +37,7 @@ static agentos_error_t ensure_registry_init(void) {
 }
 
 /**
- * @brief 初始化注册表（需在程序启动时调用�?
+ * @brief 初始化注册表（需在程序启动时调用?
  */
 agentos_error_t agentos_registry_init(void) {
     if (!g_registry_lock) {
@@ -48,7 +48,7 @@ agentos_error_t agentos_registry_init(void) {
 }
 
 /**
- * @brief 清理注册�?
+ * @brief 清理注册?
  */
 void agentos_registry_cleanup(void) {
     if (!g_registry_lock) return;
@@ -58,7 +58,7 @@ void agentos_registry_cleanup(void) {
         registry_entry_t* next = entry->next;
         if (entry->unit_id) AGENTOS_FREE(entry->unit_id);
         if (entry->unit) {
-            // 单元对象�?destroy 由外部调用者负责？通常单元由创建者管理，这里不自动销毁�?
+            // 单元对象?destroy 由外部调用者负责？通常单元由创建者管理，这里不自动销毁?
         }
         AGENTOS_FREE(entry);
         entry = next;
@@ -87,7 +87,7 @@ agentos_error_t agentos_registry_register_unit(const char* unit_id, agentos_exec
         entry = entry->next;
     }
 
-    // 创建新条�?
+    // 创建新条?
     entry = (registry_entry_t*)AGENTOS_MALLOC(sizeof(registry_entry_t));
     if (!entry) {
         agentos_mutex_unlock(g_registry_lock);

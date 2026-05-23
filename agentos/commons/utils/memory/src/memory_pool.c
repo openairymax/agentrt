@@ -1,7 +1,7 @@
 /**
  * @file memory_pool.c
- * @brief 统一内存管理模块 - 内存池管理实�? * 
- * 实现高效的内存池管理功能，减少内存碎片和分配开销�? * 使用链表管理空闲块，支持线程安全和动态扩展�? * 
+ * @brief 统一内存管理模块 - 内存池管理实? * 
+ * 实现高效的内存池管理功能，减少内存碎片和分配开销? * 使用链表管理空闲块，支持线程安全和动态扩展? * 
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -35,34 +35,34 @@ typedef struct memory_pool_block {
 } memory_pool_block_t;
 
 /**
- * @brief 内存池内部结�? */
+ * @brief 内存池内部结? */
 struct memory_pool {
     // 配置选项
     memory_pool_options_t options;       /**< 内存池选项 */
     
     // 内存块管
     void* memory_area;                   /**< 整个内存区域指针 */
-    size_t memory_area_size;             /**< 内存区域总大�?*/
-    memory_pool_block_t** blocks;        /**< 所有块的指针数�?*/
-    size_t blocks_capacity;              /**< 块数组容�?*/
+    size_t memory_area_size;             /**< 内存区域总大?*/
+    memory_pool_block_t** blocks;        /**< 所有块的指针数?*/
+    size_t blocks_capacity;              /**< 块数组容?*/
     
     // 空闲块管
     memory_pool_block_t* free_list;      /**< 空闲块链表头 */
     
     // 统计信息
-    memory_pool_stats_t stats;           /**< 内存池统计信�?*/
+    memory_pool_stats_t stats;           /**< 内存池统计信?*/
     
     // 线程同步
     agentos_mutex_t lock;                /**< 平台抽象互斥锁 */
     
     // 名称（用于调试）
-    char* name;                          /**< 内存池名�?*/
+    char* name;                          /**< 内存池名?*/
 };
 
 /**
  * @brief 内部锁初始化
  * 
- * @param[in] pool 内存�? * @return 成功返回true，失败返回false
+ * @param[in] pool 内存? * @return 成功返回true，失败返回false
  */
 static bool memory_pool_lock_init(memory_pool_t* pool) {
     if (!pool->options.thread_safe) {
@@ -129,7 +129,7 @@ static size_t memory_pool_align_size(size_t size, size_t alignment) {
 /**
  * @brief 分配新的内存区域
  * 
- * @param[in] pool 内存�? * @param[in] block_count 块数�? * @return 成功返回true，失败返回false
+ * @param[in] pool 内存? * @param[in] block_count 块数? * @return 成功返回true，失败返回false
  */
 static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count) {
     if (pool == NULL || block_count == 0) {
@@ -227,7 +227,7 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
 /**
  * @brief 释放内存区域
  * 
- * @param[in] pool 内存�? */
+ * @param[in] pool 内存? */
 static void memory_pool_free_blocks(memory_pool_t* pool) {
     if (pool == NULL) {
         return;
@@ -482,7 +482,7 @@ void memory_pool_clear(memory_pool_t* pool) {
     memory_pool_lock(pool);
     
     // 只清空空闲块，已分配块不受影
-    // 重新组织内存�?    
+    // 重新组织内存?    
     // 计算需要保留的块数（已分配块）
     size_t blocks_to_keep = pool->stats.allocated_blocks;
     

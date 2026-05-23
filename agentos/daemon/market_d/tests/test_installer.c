@@ -137,7 +137,7 @@ static void test_installer_reload_config(void) {
     printf("  test_installer_reload_config...\n");
 
     market_service_t* svc = NULL;
-    int ret = market_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
     market_config_t new_config;

@@ -7,16 +7,15 @@ option(BUILD_TESTS "Build tests" ON)
 option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
 option(BUILD_WITH_LOGGING "Enable detailed logging" ON)
 
-find_package(PkgConfig QUIET)
+# 使用根级依赖检测结果 (BAN-12: 单一依赖检测点)
+# 所有 find_package 已在根 CMakeLists.txt 中完成，此处仅引用缓存变量
 
-if(PKG_CONFIG_FOUND)
+if(PkgConfig_FOUND)
     pkg_check_modules(YAML QUIET libyaml)
     pkg_check_modules(CJSON QUIET libcjson)
 endif()
 
-# OpenSSL查找（与根项目保持一致）
-find_package(OpenSSL QUIET)
-if(OpenSSL_FOUND)
+if(AGENTOS_HAS_OPENSSL)
     message(STATUS "Found OpenSSL: ${OpenSSL_VERSION}")
 else()
     message(WARNING "OpenSSL not found, some security features may be limited")
@@ -70,7 +69,7 @@ set(CUPOLAS_SOURCES
     src/yaml_minimal.c
 )
 # OpenSSL-dependent sources
-if(OpenSSL_FOUND)
+if(AGENTOS_HAS_OPENSSL)
     list(APPEND CUPOLAS_SOURCES
         src/security/cupolas_signature.c
         src/security/cupolas_vault.c
@@ -159,14 +158,14 @@ target_include_directories(cupolas PUBLIC
     ${COMMON_INCLUDE_DIRS}
 )
 
-if(OpenSSL_FOUND)
+if(AGENTOS_HAS_OPENSSL)
     target_include_directories(cupolas PRIVATE ${OPENSSL_INCLUDE_DIR})
     target_compile_definitions(cupolas PRIVATE CUPOLAS_USE_OPENSSL)
 endif()
 
 target_link_libraries(cupolas PRIVATE agentos_common)
 
-if(OpenSSL_FOUND)
+if(AGENTOS_HAS_OPENSSL)
     target_link_libraries(cupolas PRIVATE ${OPENSSL_LIBRARIES})
 endif()
 
@@ -187,8 +186,7 @@ if(MSVC)
         /W4
     )
 else()
-    find_package(Threads REQUIRED)
-    target_link_libraries(cupolas PRIVATE ${CMAKE_THREAD_LIBS_LIBRARY} m)
+    target_link_libraries(cupolas PRIVATE Threads::Threads m)
 
     target_compile_options(cupolas PRIVATE
         -Wall -Wextra -Wpedantic

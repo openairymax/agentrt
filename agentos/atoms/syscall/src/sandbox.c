@@ -52,104 +52,9 @@ void* agentos_syscall_invoke(int syscall_num, void** args, int argc);
 #define MAX_INPUT_LENGTH 4096         /* 最大输入长度限制 */
 #define SANITIZATION_PATTERN_SIZE 128 /* 净化模式匹配缓冲区大小 */
 
-/* ==================== 数据结构 ==================== */
+#include "sandbox_internal.h"
 
-/**
- * @brief 沙箱状态枚举
- */
-typedef enum {
-    SANDBOX_STATE_IDLE = 0,
-    SANDBOX_STATE_ACTIVE,
-    SANDBOX_STATE_SUSPENDED,
-    SANDBOX_STATE_TERMINATED
-} sandbox_state_t;
-
-/**
- * @brief 审计日志条目（增强版）
- */
-typedef struct audit_entry {
-    uint64_t timestamp;              /* 事件时间戳 */
-    int event_type;                   /* 事件类型（系统调用/违规/资源使用） */
-    char syscall_name[32];            /* 系统调用名称 */
-    int syscall_num;                  /* 系统调用号 */
-    int result;                       /* 执行结果（0=成功，非0=错误） */
-    char message[AUDIT_LOG_BUFFER_SIZE]; /* 详细信息 */
-    uint64_t resource_usage_before;   /* 资源使用量（操作前） */
-    uint64_t resource_usage_after;    /* 资源使用量（操作后） */
-    int severity;                     /* 严重级别（0=info, 1=warn, 2=error, 3=critical） */
-} audit_entry_t;
-
-/**
- * @brief 安全策略配置
- */
-typedef struct security_policy {
-    uint32_t version;                 /* 策略版本号 */
-    time_t last_updated;              /* 最后更新时间 */
-    char updated_by[64];              /* 更新者标识 */
-    int allow_dynamic_update;         /* 是否允许动态更新 */
-    int strict_mode;                  /* 严格模式（所有未明确允许的操作都拒绝） */
-    int audit_level;                  /* 审计级别（0=最小, 1=标准, 2=详细, 3=完整） */
-    float risk_threshold;             /* 风险阈值（0.0-1.0，超过此值触发警报） */
-} security_policy_t;
-
-/**
- * @brief 沙箱性能统计
- */
-typedef struct sandbox_performance_stats {
-    uint64_t total_syscalls;          /* 总系统调用次数 */
-    uint64_t successful_calls;        /* 成功调用次数 */
-    uint64_t failed_calls;            /* 失败调用次数 */
-    uint64_t blocked_calls;           /* 被阻止的调用次数 */
-    uint64_t total_cpu_time_ns;       /* 总CPU时间（纳秒） */
-    uint64_t max_memory_bytes;        /* 最大内存使用量 */
-    uint64_t current_memory_bytes;    /* 当前内存使用量 */
-    double avg_response_time_ns;      /* 平均响应时间（纳秒） */
-    uint64_t violations_since_reset;  /* 重置后的违规次数 */
-    time_t stats_reset_time;          /* 统计重置时间 */
-} sandbox_perf_stats_t;
-
-/**
- * @brief 沙箱配置结构
- */
-typedef struct sandbox_config {
-    char* sandbox_name;
-    char* owner_id;
-    uint32_t priority;
-    uint32_t timeout_ms;
-    uint32_t flags;
-    resource_quota_t quota;
-} sandbox_config_t;
-
-/**
- * @brief 沙箱内部结构
- */
-struct agentos_sandbox {
-    uint64_t sandbox_id;
-    char* sandbox_name;
-    char* owner_id;
-    sandbox_state_t state;
-    sandbox_config_t manager;
-    permission_rule_t* rules;
-    uint32_t rule_count;
-    agentos_mutex_t* lock;
-    uint64_t create_time_ns;
-    uint64_t last_active_ns;
-    uint64_t call_count;
-    uint64_t violation_count;
-    
-    /* 增强功能 */
-    audit_entry_t* audit_log;           /* 增强型审计日志数组 */
-    size_t audit_count;                 /* 当前审计条目数 */
-    size_t audit_capacity;              /* 审计日志容量 */
-    size_t audit_write_index;           /* 写入索引（环形缓冲） */
-    
-    security_policy_t policy;            /* 安全策略配置 */
-    sandbox_perf_stats_t perf_stats;     /* 性能统计 */
-    resource_quota_t quota;              /* 资源配额 */
-    
-    int enable_input_sanitization;       /* 是否启用输入净化 */
-    int enable_resource_monitoring;      /* 是否启用资源监控 */
-};
+/* 保留本地常量 */
 
 /**
  * @brief 沙箱管理器结构
@@ -363,8 +268,9 @@ void agentos_sandbox_destroy(agentos_sandbox_t* sandbox) {
         agentos_mutex_destroy(sandbox->lock);
     }
 
+    uint64_t sandbox_id = sandbox->sandbox_id;
     AGENTOS_FREE(sandbox);
-    AGENTOS_LOG_DEBUG("Sandbox %llu destroyed", (unsigned long long)sandbox->sandbox_id);
+    AGENTOS_LOG_DEBUG("Sandbox %llu destroyed", (unsigned long long)sandbox_id);
 }
 
 /* ==================== 沙箱操作 ==================== */
@@ -379,9 +285,14 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
     /* 记录调用开始时间用于性能统计 */
     uint64_t start_time = agentos_time_ns();
 
+    agentos_mutex_lock(sandbox->lock);
     sandbox->call_count++;
+    agentos_mutex_unlock(sandbox->lock);
+
     if (g_sandbox_manager) {
+        agentos_mutex_lock(g_manager_lock);
         g_sandbox_manager->total_calls++;
+        agentos_mutex_unlock(g_manager_lock);
     }
 
     agentos_mutex_lock(sandbox->lock);
@@ -402,9 +313,13 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
 
     permission_type_t perm = sandbox_permission_check(sandbox, syscall_num, args, argc);
     if (perm == PERM_DENY) {
+        agentos_mutex_lock(sandbox->lock);
         sandbox->violation_count++;
+        agentos_mutex_unlock(sandbox->lock);
         if (g_sandbox_manager) {
+            agentos_mutex_lock(g_manager_lock);
             g_sandbox_manager->total_violations++;
+            agentos_mutex_unlock(g_manager_lock);
         }
         sandbox_add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_EACCES, 0, "Permission denied");
 
@@ -428,15 +343,14 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
     /* 更新性能统计（使用start_time计算耗时） */
     uint64_t end_time = agentos_time_ns();
     uint64_t elapsed_ns = end_time - start_time;
-    
+
+    agentos_mutex_lock(sandbox->lock);
     sandbox->perf_stats.total_syscalls++;
     sandbox->perf_stats.total_cpu_time_ns += elapsed_ns;
     if (elapsed_ns > 0) {
         double avg = (double)sandbox->perf_stats.total_cpu_time_ns / sandbox->perf_stats.total_syscalls;
         sandbox->perf_stats.avg_response_time_ns = avg;
     }
-
-    agentos_mutex_lock(sandbox->lock);
     sandbox->state = SANDBOX_STATE_IDLE;
     agentos_mutex_unlock(sandbox->lock);
 
@@ -456,6 +370,7 @@ agentos_error_t agentos_sandbox_get_stats(agentos_sandbox_t* sandbox, char** out
     char* stats = (char*)AGENTOS_MALLOC(STATS_BUFFER_SIZE);
     if (!stats) return AGENTOS_ENOMEM;
 
+    agentos_mutex_lock(sandbox->lock);
     snprintf(stats, STATS_BUFFER_SIZE,
              "{\"sandbox_id\":%llu,\"calls\":%llu,\"violations\":%llu,"
              "\"memory_usage\":%.2f,\"cpu_usage\":%.2f,\"io_usage\":%.2f}",
@@ -465,6 +380,7 @@ agentos_error_t agentos_sandbox_get_stats(agentos_sandbox_t* sandbox, char** out
              sandbox_quota_get_usage_ratio(sandbox, RESOURCE_MEMORY) * 100.0,
              sandbox_quota_get_usage_ratio(sandbox, RESOURCE_CPU) * 100.0,
              sandbox_quota_get_usage_ratio(sandbox, RESOURCE_IO) * 100.0);
+    agentos_mutex_unlock(sandbox->lock);
 
     *out_stats = stats;
     return AGENTOS_SUCCESS;
@@ -481,11 +397,13 @@ agentos_error_t agentos_sandbox_manager_get_stats(char** out_stats) {
     char* stats = (char*)AGENTOS_MALLOC(MANAGER_STATS_BUFFER_SIZE);
     if (!stats) return AGENTOS_ENOMEM;
 
+    agentos_mutex_lock(g_manager_lock);
     snprintf(stats, MANAGER_STATS_BUFFER_SIZE,
              "{\"sandboxes\":%u,\"total_calls\":%llu,\"total_violations\":%llu}",
              g_sandbox_manager->sandbox_count,
              (unsigned long long)g_sandbox_manager->total_calls,
              (unsigned long long)g_sandbox_manager->total_violations);
+    agentos_mutex_unlock(g_manager_lock);
 
     *out_stats = stats;
     return AGENTOS_SUCCESS;

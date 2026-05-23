@@ -2,7 +2,7 @@
 # syscall 模块构建文件
 
 
-find_package(Threads REQUIRED)
+# Threads found by root CMakeLists.txt
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)

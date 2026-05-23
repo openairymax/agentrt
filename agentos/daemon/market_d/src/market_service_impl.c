@@ -581,7 +581,7 @@ int market_service_sync_registry(market_service_t* service) {
 
     char mkdir_cmd[2048];
     snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", storage);
-    (void)system(mkdir_cmd);
+    { int __rc __attribute__((unused)) = system(mkdir_cmd); }
 
     if (!is_safe_for_shell(service->config.registry_url)) {
         SVC_LOG_WARN("Sync registry: invalid registry_url, possible injection detected");
