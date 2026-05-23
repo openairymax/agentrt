@@ -471,7 +471,7 @@ static int notify_d_healthcheck(notify_d_service_t* svc) {
     for (size_t i = 0; i < svc->client_count; i++) {
         if (svc->clients[i].active) active_clients++;
     }
-    size_t queue_depth = svc->pending_count;
+    (void)svc->pending_count;
     agentos_mutex_unlock(&svc->lock);
 
     if (svc->pending_count >= NOTIFY_D_MAX_PENDING) healthy = 0;

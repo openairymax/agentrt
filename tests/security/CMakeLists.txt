@@ -28,8 +28,7 @@ target_link_libraries(test_security_audit PRIVATE
     m
 )
 
-find_package(cjson QUIET)
-if(TARGET cjson OR cjson_FOUND)
+if(AGENTOS_HAS_CJSON)
     target_link_libraries(test_security_audit PRIVATE cjson)
 endif()
 
@@ -66,8 +65,7 @@ target_link_libraries(test_sec017_compliance PRIVATE
     m
 )
 
-find_package(cjson QUIET)
-if(TARGET cjson OR cjson_FOUND)
+if(AGENTOS_HAS_CJSON)
     target_link_libraries(test_sec017_compliance PRIVATE cjson)
 endif()
 

@@ -37,7 +37,7 @@ static config_context_t* _get_or_create_ctx(void) {
     return g_compat_ctx;
 }
 
-static void _ensure_manager_ctx(void** manager) {
+static void __attribute__((unused)) _ensure_manager_ctx(void** manager) {
     if (!manager) return;
     if (!*manager) {
         *manager = _get_or_create_ctx();

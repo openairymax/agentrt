@@ -164,7 +164,7 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
 }
 
 /**
- * 执行单个任务节点，返回输出字符串（需释放�?
+ * 执行单个任务节点，返回输出字符串（需释放?
  */
 static char* execute_node(agentos_task_node_t* node, uint32_t timeout_ms) {
     agentos_task_t task;
@@ -225,7 +225,7 @@ agentos_error_t agentos_sys_task_submit(const char* input, size_t input_len,
         return AGENTOS_EINVAL;
     }
 
-    // 按顺序执行节�?
+    // 按顺序执行节?
     cJSON* result_obj = cJSON_CreateObject();
     for (size_t i = 0; i < order_count; i++) {
         int idx = order[i];

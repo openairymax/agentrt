@@ -1,12 +1,12 @@
 /**
  * @file core_config.c
- * @brief 统一配置模块 - 核心层实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 统一配置模块 - 核心层实? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 本文件实现统一配置模块的核心层功能，提供：
  * 1. 统一的配置数据模型和基础接口
- * 2. 类型安全的配置访问接�? * 3. 内存所有权明确，避免内存泄�? * 4. 线程安全的基础操作
+ * 2. 类型安全的配置访问接? * 3. 内存所有权明确，避免内存泄? * 4. 线程安全的基础操作
  *
- * �? * �? */
+ * ? * ? */
 
 #include "core_config.h"
 #include <stdlib.h>
@@ -24,7 +24,7 @@
 
 /** 配置值结构体 */
 struct config_value {
-    /** 配置值类�?*/
+    /** 配置值类?*/
     config_value_type_t type;
     
     /** 配置值数据（联合体） */
@@ -83,9 +83,9 @@ struct config_context {
 /* ==================== 内部辅助函数 ==================== */
 
 /**
- * @brief 分配配置值内�? * 
- * 分配配置值内存并初始化基本字段�? * 
- * @param type 配置值类�? * @return 配置值对象，失败返回NULL
+ * @brief 分配配置值内? * 
+ * 分配配置值内存并初始化基本字段? * 
+ * @param type 配置值类? * @return 配置值对象，失败返回NULL
  */
 static config_value_t* config_value_alloc(config_value_type_t type) {
     config_value_t* value = (config_value_t*)AGENTOS_CALLOC(1, sizeof(config_value_t));
@@ -96,8 +96,8 @@ static config_value_t* config_value_alloc(config_value_type_t type) {
 }
 
 /**
- * @brief 复制字符�? * 
- * 安全复制字符串，返回新分配的字符串�? * 
+ * @brief 复制字符? * 
+ * 安全复制字符串，返回新分配的字符串? * 
  * @param str 源字符串
  * @return 新分配的字符串，失败返回NULL
  */
@@ -115,9 +115,9 @@ static char* duplicate_string(const char* str) {
 }
 
 /**
- * @brief 查找配置项索�? * 
- * 在配置上下文中查找指定键的索引�? * 
- * @param ctx 配置上下�? * @param key 配置�? * @return 索引，未找到返回-1
+ * @brief 查找配置项索? * 
+ * 在配置上下文中查找指定键的索引? * 
+ * @param ctx 配置上下? * @param key 配置? * @return 索引，未找到返回-1
  */
 static int find_item_index(const config_context_t* ctx, const char* key) {
     if (!ctx || !key) {
@@ -134,9 +134,9 @@ static int find_item_index(const config_context_t* ctx, const char* key) {
 }
 
 /**
- * @brief 扩展配置上下文容�? * 
- * 扩展配置上下文的容量以容纳更多配置项�? * 
- * @param ctx 配置上下�? * @return 错误�? */
+ * @brief 扩展配置上下文容? * 
+ * 扩展配置上下文的容量以容纳更多配置项? * 
+ * @param ctx 配置上下? * @return 错误? */
 static config_error_t expand_context_capacity(config_context_t* ctx) {
     if (!ctx) {
         return CONFIG_ERROR_INVALID_ARG;
