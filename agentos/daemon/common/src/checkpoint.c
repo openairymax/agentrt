@@ -244,12 +244,17 @@ static char *json_extract_string(const char *json, const char *key)
 
 static uint64_t json_extract_uint64(const char *json, const char *key)
 {
-    char *s = json_extract_string(json, key);
-    if (!s)
-        return 0;
+    char search[128];
+    snprintf(search, sizeof(search), "\"%s\"", key);
+    const char *p = strstr(json, search);
+    if (!p) return 0;
+    p += strlen(search);
+    while (*p && (*p == ' ' || *p == '\t' || *p == ':' || *p == '\n' || *p == '\r')) p++;
     uint64_t v = 0;
-    sscanf(s, "%lu", (unsigned long *) &v);
-    AGENTOS_FREE(s);
+    while (*p >= '0' && *p <= '9') {
+        v = v * 10 + (uint64_t)(*p - '0');
+        p++;
+    }
     return v;
 }
 
@@ -346,6 +351,15 @@ static void write_json_escaped_str(FILE *fp, const char *str) {
     }
 }
 
+static void fprintf_sanitized(FILE *fp, const char *label, const char *str) {
+    fprintf(fp, "%s: ", label);
+    if (!str) { fputc('\n', fp); return; }
+    for (const char *p = str; *p; p++) {
+        fputc((*p == '\n' || *p == '\r') ? ' ' : *p, fp);
+    }
+    fputc('\n', fp);
+}
+
 agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t *cp)
 {
     if (!g_checkpoint_initialized)
@@ -418,8 +432,8 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t *cp)
     fprintf(fp, "}\n");
     fclose(fp);
 
-    cp->state = CHECKPOINT_STATE_COMPLETED;
     agentos_mutex_lock(&g_checkpoint_mutex);
+    cp->state = CHECKPOINT_STATE_COMPLETED;
     g_checkpoint_stats.successful_checkpoints++;
     g_checkpoint_stats.total_checkpoints++;
     g_checkpoint_stats.last_checkpoint_time = cp->timestamp;
@@ -520,7 +534,14 @@ agentos_error_t agentos_checkpoint_delete(const char *task_id, uint64_t seq_num)
     if (build_filepath(task_id, filepath, sizeof(filepath)) != 0)
         return AGENTOS_EINVAL;
 
-    if (unlink(filepath) == 0)
+    agentos_mutex_lock(&g_checkpoint_mutex);
+    int result = unlink(filepath);
+    if (result == 0) {
+        g_checkpoint_stats.total_checkpoints--;
+    }
+    agentos_mutex_unlock(&g_checkpoint_mutex);
+
+    if (result == 0)
         return AGENTOS_SUCCESS;
     return AGENTOS_ENOENT;
 }
@@ -542,7 +563,7 @@ agentos_error_t agentos_checkpoint_list(const char *task_id, agentos_task_checkp
         return err;
 
     *out_cps = (agentos_task_checkpoint_t **) AGENTOS_MALLOC(sizeof(agentos_task_checkpoint_t *));
-    if (!out_cps) {
+    if (!*out_cps) {
         agentos_checkpoint_destroy(cp);
         return AGENTOS_ENOMEM;
     }
@@ -677,8 +698,8 @@ agentos_error_t agentos_snapshot_create(const char *task_id, const char *snap_pa
     }
 
     fprintf(fp, "SNAPSHOT_V1\n");
-    fprintf(fp, "TaskID: %s\n", cp->task_id);
-    fprintf(fp, "SessionID: %s\n", cp->session_id);
+    fprintf_sanitized(fp, "TaskID", cp->task_id);
+    fprintf_sanitized(fp, "SessionID", cp->session_id);
     fprintf(fp, "SequenceNum: %lu\n", (unsigned long) cp->sequence_num);
     fprintf(fp, "Timestamp: %lu\n", (unsigned long) cp->timestamp);
     fprintf(fp, "StateSize: %zu\n", cp->state_size);
@@ -735,9 +756,11 @@ agentos_error_t agentos_checkpoint_set_auto_hook(agentos_checkpoint_hook_fn hook
 
     if (!g_checkpoint_initialized)
         return AGENTOS_ENOTINIT;
+    agentos_mutex_lock(&g_checkpoint_mutex);
     g_auto_hook           = hook;
     g_auto_hook_user_data = user_data;
     g_auto_interval_ms    = interval_ms;
+    agentos_mutex_unlock(&g_checkpoint_mutex);
     return AGENTOS_SUCCESS;
 }
 
@@ -745,9 +768,15 @@ agentos_error_t agentos_checkpoint_trigger_auto(const char *task_id)
 {
     if (!g_checkpoint_initialized)
         return AGENTOS_ENOTINIT;
-    if (!g_auto_hook || !task_id)
+
+    agentos_mutex_lock(&g_checkpoint_mutex);
+    agentos_checkpoint_hook_fn hook = g_auto_hook;
+    void *hook_udata = g_auto_hook_user_data;
+    agentos_mutex_unlock(&g_checkpoint_mutex);
+
+    if (!hook || !task_id)
         return AGENTOS_EINVAL;
 
-    g_auto_hook(task_id, NULL, g_auto_hook_user_data);
+    hook(task_id, NULL, hook_udata);
     return AGENTOS_SUCCESS;
 }

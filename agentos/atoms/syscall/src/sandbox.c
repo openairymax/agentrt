@@ -222,6 +222,7 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
     if (!sandbox->lock) {
         if (sandbox->sandbox_name) AGENTOS_FREE(sandbox->sandbox_name);
         if (sandbox->owner_id) AGENTOS_FREE(sandbox->owner_id);
+        if (sandbox->audit_log) AGENTOS_FREE(sandbox->audit_log);
         AGENTOS_FREE(sandbox);
         agentos_mutex_unlock(g_manager_lock);
         return AGENTOS_ENOMEM;
@@ -331,6 +332,10 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
 
     if (!sandbox_quota_check(sandbox, RESOURCE_CPU, 1)) {
         sandbox_add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_EQUOTA, 0, "CPU quota exceeded");
+
+        agentos_mutex_lock(sandbox->lock);
+        sandbox->state = SANDBOX_STATE_IDLE;
+        agentos_mutex_unlock(sandbox->lock);
         return AGENTOS_EQUOTA;
     }
 
@@ -411,7 +416,9 @@ agentos_error_t agentos_sandbox_manager_get_stats(char** out_stats) {
 
 void agentos_sandbox_reset_quota(agentos_sandbox_t* sandbox) {
     if (sandbox) {
+        agentos_mutex_lock(sandbox->lock);
         sandbox_quota_reset(sandbox);
+        agentos_mutex_unlock(sandbox->lock);
     }
 }
 
@@ -419,7 +426,7 @@ agentos_error_t agentos_sandbox_suspend(agentos_sandbox_t* sandbox) {
     CHECK_NULL(sandbox);
 
     agentos_mutex_lock(sandbox->lock);
-    if (sandbox->state != SANDBOX_STATE_ACTIVE) {
+    if (sandbox->state == SANDBOX_STATE_ACTIVE) {
         sandbox->state = SANDBOX_STATE_SUSPENDED;
         AGENTOS_LOG_INFO("Sandbox %llu suspended", (unsigned long long)sandbox->sandbox_id);
     }
@@ -455,8 +462,13 @@ agentos_error_t agentos_sandbox_terminate(agentos_sandbox_t* sandbox) {
 agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** out_json) {
     if (!sandbox || !out_json) return AGENTOS_EINVAL;
 
+    agentos_mutex_lock(sandbox->lock);
+    sandbox_state_t state = sandbox->state;
+    uint64_t sandbox_id = sandbox->sandbox_id;
+    agentos_mutex_unlock(sandbox->lock);
+
     const char* state_str = "unknown";
-    switch (sandbox->state) {
+    switch (state) {
         case SANDBOX_STATE_IDLE: state_str = "idle"; break;
         case SANDBOX_STATE_ACTIVE: state_str = "active"; break;
         case SANDBOX_STATE_SUSPENDED: state_str = "suspended"; break;
@@ -468,9 +480,9 @@ agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** 
 
     snprintf(json, HEALTH_CHECK_BUFFER_SIZE,
              "{\"id\":%llu,\"state\":\"%s\",\"healthy\":%s}",
-             (unsigned long long)sandbox->sandbox_id,
+             (unsigned long long)sandbox_id,
              state_str,
-             (sandbox->state != SANDBOX_STATE_TERMINATED) ? "true" : "false");
+             (state != SANDBOX_STATE_TERMINATED) ? "true" : "false");
 
     *out_json = json;
     return AGENTOS_SUCCESS;
@@ -529,8 +541,8 @@ int agentos_sandbox_capability_check(agentos_sandbox_t* sandbox,
         rule = sandbox->rules;
         while (rule) {
             if (rule->syscall_num == capability_id && rule->perm_type == PERM_ALLOW) {
-                if (!rule->condition || !resource ||
-                    strstr(resource, rule->condition) != NULL) {
+                if (rule->condition && resource &&
+                    strcmp(resource, rule->condition) == 0) {
                     has_capability = 1;
                     break;
                 }
@@ -552,11 +564,8 @@ agentos_error_t agentos_sandbox_validate_syscall(int syscall_num,
         if (!args[i]) continue;
 
         char* str_arg = (char*)args[i];
-        size_t arg_len = 0;
+        size_t arg_len = strnlen(str_arg, MAX_INPUT_LENGTH);
         int safe = 1;
-        while (arg_len < MAX_INPUT_LENGTH && str_arg[arg_len] != '\0') {
-            arg_len++;
-        }
         if (arg_len >= MAX_INPUT_LENGTH) {
             safe = 0;
         } else {
@@ -570,6 +579,22 @@ agentos_error_t agentos_sandbox_validate_syscall(int syscall_num,
     }
 
     return AGENTOS_SUCCESS;
+}
+
+static size_t json_escape_into(char* dst, size_t dst_size, const char* src) {
+    size_t written = 0;
+    for (const char* p = src; *p && written + 6 < dst_size; p++) {
+        switch (*p) {
+        case '"':  written += snprintf(dst + written, dst_size - written, "\\\""); break;
+        case '\\': written += snprintf(dst + written, dst_size - written, "\\\\"); break;
+        case '\n': written += snprintf(dst + written, dst_size - written, "\\n"); break;
+        case '\r': written += snprintf(dst + written, dst_size - written, "\\r"); break;
+        case '\t': written += snprintf(dst + written, dst_size - written, "\\t"); break;
+        default:   dst[written++] = *p; break;
+        }
+    }
+    dst[written] = '\0';
+    return written;
 }
 
 /**
@@ -593,6 +618,8 @@ static void sandbox_add_enhanced_audit_entry(
     
     /* 如果审计日志未初始化，跳过 */
     if (sandbox->audit_capacity == 0) return;
+
+    agentos_mutex_lock(sandbox->lock);
     
     audit_entry_t* entry = &sandbox->audit_log[sandbox->audit_write_index];
     
@@ -624,6 +651,8 @@ static void sandbox_add_enhanced_audit_entry(
     if (sandbox->audit_count < sandbox->audit_capacity) {
         sandbox->audit_count++;
     }
+
+    agentos_mutex_unlock(sandbox->lock);
 }
 
 /**
@@ -638,12 +667,13 @@ agentos_error_t agentos_sandbox_update_security_policy(
     
     if (!sandbox || !new_policy) return AGENTOS_EINVAL;
     
+    agentos_mutex_lock(sandbox->lock);
+
     /* 检查是否允许动态更新 */
     if (!sandbox->policy.allow_dynamic_update) {
+        agentos_mutex_unlock(sandbox->lock);
         return AGENTOS_EPERM;
     }
-    
-    agentos_mutex_lock(sandbox->lock);
     
     /* 验证策略参数有效性 */
     if (new_policy->risk_threshold < 0.0f || new_policy->risk_threshold > 1.0f) {
@@ -742,7 +772,9 @@ agentos_error_t agentos_sandbox_set_input_sanitization(
     
     if (!sandbox) return AGENTOS_EINVAL;
     
+    agentos_mutex_lock(sandbox->lock);
     sandbox->enable_input_sanitization = enable ? 1 : 0;
+    agentos_mutex_unlock(sandbox->lock);
     
     return AGENTOS_SUCCESS;
 }
@@ -758,22 +790,33 @@ agentos_error_t agentos_sandbox_export_audit_log_json(
     char** out_json) {
     
     if (!sandbox || !out_json) return AGENTOS_EINVAL;
-    
+
+    agentos_mutex_lock(sandbox->lock);
+
     if (!sandbox->audit_log || sandbox->audit_count == 0) {
+        agentos_mutex_unlock(sandbox->lock);
         *out_json = AGENTOS_STRDUP("[]");
         return AGENTOS_SUCCESS;
     }
     
-    /* 分配足够大的缓冲区（每条约300字节） */
-    size_t buffer_size = sandbox->audit_count * 400 + 100;
+    size_t audit_count = sandbox->audit_count;
+    size_t buffer_size = audit_count * 400 + 100;
     char* json = (char*)AGENTOS_MALLOC(buffer_size);
-    if (!json) return AGENTOS_ENOMEM;
-    
+    if (!json) {
+        agentos_mutex_unlock(sandbox->lock);
+        return AGENTOS_ENOMEM;
+    }
+
+    char esc_buf[512];
     size_t pos = 0;
     pos += snprintf(json + pos, buffer_size - pos, "[\n");
     
-    for (size_t i = 0; i < sandbox->audit_count && pos < buffer_size - 500; i++) {
+    for (size_t i = 0; i < audit_count && pos < buffer_size - 500; i++) {
         audit_entry_t* entry = &sandbox->audit_log[i];
+
+        json_escape_into(esc_buf, sizeof(esc_buf), entry->syscall_name);
+        char esc_msg[512];
+        json_escape_into(esc_msg, sizeof(esc_msg), entry->message);
         
         pos += snprintf(json + pos, buffer_size - pos,
                        "  {\n"
@@ -787,15 +830,17 @@ agentos_error_t agentos_sandbox_export_audit_log_json(
                        "  }%s\n",
                        (unsigned long long)entry->timestamp,
                        entry->event_type,
-                       entry->syscall_name,
+                       esc_buf,
                        entry->syscall_num,
                        entry->result,
                        entry->severity,
-                       entry->message,
-                       (i < sandbox->audit_count - 1) ? "," : "");
+                       esc_msg,
+                       (i < audit_count - 1) ? "," : "");
     }
     
     pos += snprintf(json + pos, buffer_size - pos, "]");
+
+    agentos_mutex_unlock(sandbox->lock);
     
     *out_json = json;
     return AGENTOS_SUCCESS;
