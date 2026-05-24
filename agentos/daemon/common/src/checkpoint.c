@@ -371,7 +371,10 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t *cp)
     if (build_filepath(cp->task_id, filepath, sizeof(filepath)) != 0)
         return AGENTOS_EINVAL;
 
-    FILE *fp = fopen(filepath, "w");
+    char tmppath[MAX_CHECKPOINT_PATH];
+    snprintf(tmppath, sizeof(tmppath), "%s.tmp", filepath);
+
+    FILE *fp = fopen(tmppath, "w");
     if (!fp) {
         agentos_mutex_lock(&g_checkpoint_mutex);
         g_checkpoint_stats.failed_checkpoints++;
@@ -431,6 +434,14 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t *cp)
     fputs("\"\n", fp);
     fprintf(fp, "}\n");
     fclose(fp);
+
+    if (rename(tmppath, filepath) != 0) {
+        unlink(tmppath);
+        agentos_mutex_lock(&g_checkpoint_mutex);
+        g_checkpoint_stats.failed_checkpoints++;
+        agentos_mutex_unlock(&g_checkpoint_mutex);
+        return AGENTOS_EIO;
+    }
 
     agentos_mutex_lock(&g_checkpoint_mutex);
     cp->state = CHECKPOINT_STATE_COMPLETED;
@@ -510,6 +521,7 @@ agentos_error_t agentos_checkpoint_restore(const char *task_id, uint64_t sequenc
     char *sid = json_extract_string(json_buf, "session_id");
     if (sid) {
         strncpy(cp->session_id, sid, sizeof(cp->session_id) - 1);
+        cp->session_id[sizeof(cp->session_id) - 1] = '\0';
         AGENTOS_FREE(sid);
     }
     cp->sequence_num = json_extract_uint64(json_buf, "sequence_num");

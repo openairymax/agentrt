@@ -429,6 +429,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
     if (elapsed >= (uint64_t)timeout_ms && !pending->completed) {
         bus->stats.timeouts++;
         bus->pending_count--;
+        if (resp_json) free(resp_json);
         agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ETIMEDOUT;
     }

@@ -99,16 +99,17 @@ int agentos_memory_write_async(
     req->callback = callback;
     req->userdata = userdata;
 
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
     pthread_t thread;
-    int rc = pthread_create(&thread, NULL, async_write_thread, req);
+    int rc = pthread_create(&thread, &attr, async_write_thread, req);
+    pthread_attr_destroy(&attr);
     if (rc != 0) {
         free_record_copy(rec_copy);
         AGENTOS_FREE(req);
         return AGENTOS_EINVAL;
-    }
-    rc = pthread_detach(thread);
-    if (rc != 0) {
-        fprintf(stderr, "[memory_service] Failed to detach write thread\n");
     }
     return AGENTOS_SUCCESS;
 }

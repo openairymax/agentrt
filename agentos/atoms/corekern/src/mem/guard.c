@@ -23,7 +23,6 @@ typedef struct {
     uint8_t front[GUARD_SIZE];
     uint8_t* user_ptr;
     size_t   user_size;
-    uint8_t back[GUARD_SIZE];
 } guard_block_t;
 
 static void fill_guard(uint8_t guard[GUARD_SIZE]) {
@@ -41,14 +40,14 @@ static int check_guard(const uint8_t guard[GUARD_SIZE]) {
 }
 
 static guard_block_t* create_guarded_block(size_t size) {
-    size_t total = sizeof(guard_block_t) + size;
+    size_t total = sizeof(guard_block_t) + size + GUARD_SIZE;
     guard_block_t* block = (guard_block_t*)AGENTOS_MALLOC(total);
     if (!block) return NULL;
 
     fill_guard(block->front);
     block->user_size = size;
     block->user_ptr = (uint8_t*)block + sizeof(guard_block_t);
-    fill_guard(block->back);
+    fill_guard(block->user_ptr + size);
 
     memset(block->user_ptr, 0xCD, size);
     return block;
@@ -66,7 +65,8 @@ static void validate_guard(guard_block_t* block, const char* operation) {
                operation, (void*)block);
 #endif
     }
-    if (!check_guard(block->back)) {
+    uint8_t* back_guard = block->user_ptr + block->user_size;
+    if (!check_guard(back_guard)) {
 #ifdef AGENTOS_ENABLE_MEMORY_DEBUG
         printf("GUARD VIOLATION [%s]: back guard corrupted (overflow) at %p, size=%zu\n",
                operation, (void*)block, block->user_size);
@@ -128,7 +128,7 @@ int agentos_mem_guard_check(void* ptr) {
         return 0;
     }
     
-    return check_guard(block->front) && check_guard(block->back);
+    return check_guard(block->front) && check_guard(block->user_ptr + block->user_size);
 }
 
 size_t agentos_mem_guard_usable_size(void* ptr) {

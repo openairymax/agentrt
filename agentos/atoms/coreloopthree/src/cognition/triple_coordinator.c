@@ -261,7 +261,10 @@ agentos_error_t tc3_coordinator_execute(
     uint64_t start_ns = agentos_time_monotonic_ns();
 
     agentos_error_t err = su_stream_detector_reset(coord->detector);
-    if (err != AGENTOS_SUCCESS) return err;
+    if (err != AGENTOS_SUCCESS) {
+        coord->active = 0;
+        return err;
+    }
 
     char* full_output = NULL;
     size_t full_output_len = 0;
@@ -276,6 +279,7 @@ agentos_error_t tc3_coordinator_execute(
     size_t s2_output_len = 0;
     err = s2_fn(input, input_len, &s2_output, &s2_output_len, coord->config.s2_user_data);
     if (err != AGENTOS_SUCCESS || !s2_output) {
+        if (s2_output) AGENTOS_FREE(s2_output);
         coord->active = 0;
         return err ? err : AGENTOS_EUNKNOWN;
     }

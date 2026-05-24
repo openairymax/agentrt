@@ -356,6 +356,13 @@ agentos_error_t agentos_mc_evaluate_step(agentos_metacognition_t *mc, agentos_th
         rec->step_id = step->step_id;
         rec->timestamp_ns = mc_time_now();
         memcpy(&rec->result, out_result, sizeof(mc_evaluation_result_t));
+        if (out_result->critique_text) {
+            rec->result.critique_text = (char *)AGENTOS_MALLOC(out_result->critique_len + 1);
+            if (rec->result.critique_text) {
+                memcpy((char *)rec->result.critique_text, out_result->critique_text,
+                       out_result->critique_len + 1);
+            }
+        }
         rec->original_content = content;
         rec->corrected_content = NULL;
 
