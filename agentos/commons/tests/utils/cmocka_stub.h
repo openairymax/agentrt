@@ -10,6 +10,8 @@
 #ifndef AGENTOS_CMOCKA_STUB_H
 #define AGENTOS_CMOCKA_STUB_H
 
+#include <stdlib.h>
+#include <unistd.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <setjmp.h>
@@ -165,7 +167,7 @@ static inline int cmocka_run_group_tests(const struct CMUnitTest* tests,
 
     printf("Running %zu tests...\n", num_tests);
 
-    int failed = 0;
+    int failed __attribute__((unused)) = 0;
     for (size_t i = 0; i < num_tests; i++) {
         printf("  [TEST] %s...", tests[i].name);
         tests[i].test_func(NULL);

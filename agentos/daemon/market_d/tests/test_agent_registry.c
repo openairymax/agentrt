@@ -14,7 +14,7 @@ static void test_market_create_destroy(void) {
     printf("  test_market_create_destroy...\n");
 
     market_service_t* svc = NULL;
-    int ret = market_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 || svc != NULL);
 
     if (svc) {
@@ -29,7 +29,7 @@ static void test_market_register_agent(void) {
     printf("  test_market_register_agent...\n");
 
     market_service_t* svc = NULL;
-    int ret = market_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
     agent_info_t info;
@@ -125,7 +125,7 @@ static void test_market_uninstall_agent(void) {
     printf("  test_market_uninstall_agent...\n");
 
     market_service_t* svc = NULL;
-    int ret = market_service_create(NULL, &svc);
+    int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
     agent_info_t info;

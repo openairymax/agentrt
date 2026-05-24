@@ -506,7 +506,39 @@ heapstore_error_t heapstore_log_get_stats(uint32_t* total_files, uint64_t* total
 
     *total_files = 0;
     *total_size_bytes = 0;
-    *oldest_timestamp = 0;
+    if (oldest_timestamp) *oldest_timestamp = 0;
+
+    DIR* dir = opendir(get_log_base_path());
+    if (!dir) {
+        return heapstore_SUCCESS;
+    }
+
+    time_t oldest = (oldest_timestamp) ? time(NULL) : 0;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type != DT_REG) {
+            continue;
+        }
+
+        char filepath[heapstore_LOG_MAX_PATH];
+        snprintf(filepath, sizeof(filepath), "%s/%s", get_log_base_path(), entry->d_name);
+
+        struct stat st;
+        if (stat(filepath, &st) == 0) {
+            (*total_files)++;
+            *total_size_bytes += (uint64_t)st.st_size;
+            if (oldest_timestamp && st.st_mtime < oldest) {
+                oldest = st.st_mtime;
+            }
+        }
+    }
+
+    closedir(dir);
+
+    if (oldest_timestamp && *total_files > 0) {
+        *oldest_timestamp = oldest;
+    }
 
     return heapstore_SUCCESS;
 }

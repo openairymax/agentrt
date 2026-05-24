@@ -1,11 +1,11 @@
 /**
  * @file config_source.c
- * @brief 统一配置模块 - 源适配层实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 统一配置模块 - 源适配层实? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
- * 本文件实现统一配置模块的源适配层功能，提供�? * 1. 多种配置源的统一适配接口
- * 2. 文件、环境变量、命令行参数、内存等配置源实�? * 3. 配置源管理器和监控功�? * 4. 统一的错误处理和资源管理
+ * 本文件实现统一配置模块的源适配层功能，提供? * 1. 多种配置源的统一适配接口
+ * 2. 文件、环境变量、命令行参数、内存等配置源实? * 3. 配置源管理器和监控功? * 4. 统一的错误处理和资源管理
  *
- * �? */
+ * ? */
 
 #include "config_source.h"
 #include "core_config.h"
@@ -26,15 +26,15 @@
 
 /* ==================== 内部数据结构 ==================== */
 
-/** 配置源基础结构�?*/
+/** 配置源基础结构?*/
 struct config_source {
-    /** 配置源适配器接�?*/
+    /** 配置源适配器接?*/
     const config_source_adapter_t* adapter;
     
-    /** 配置源私有数�?*/
+    /** 配置源私有数?*/
     void* priv_data;
     
-    /** 配置源属�?*/
+    /** 配置源属?*/
     config_source_attr_t attributes;
 };
 
@@ -61,7 +61,7 @@ typedef struct {
 #endif
 } file_source_priv_t;
 
-/** 环境变量配置源私有数�?*/
+/** 环境变量配置源私有数?*/
 typedef struct {
     char *prefix;
     bool case_sensitive;
@@ -81,7 +81,7 @@ typedef struct {
     bool allow_positional;           // 是否允许位置参数
 } args_source_priv_t;
 
-/** 内存配置源私有数�?*/
+/** 内存配置源私有数?*/
 typedef struct {
     char* data;                      // 配置数据
     size_t data_len;                 // 数据长度
@@ -131,8 +131,8 @@ struct config_source_manager {
 /**
  * @brief 创建配置源基础对象
  * 
- * 创建配置源基础对象并初始化属性�? * 
- * @param type 配置源类�? * @param name 配置源名�? * @param adapter 适配器接�? * @return 配置源对象，失败返回NULL
+ * 创建配置源基础对象并初始化属性? * 
+ * @param type 配置源类? * @param name 配置源名? * @param adapter 适配器接? * @return 配置源对象，失败返回NULL
  */
 static config_source_t* config_source_create_base(config_source_type_t type, 
                                                   const char* name,
@@ -140,11 +140,11 @@ static config_source_t* config_source_create_base(config_source_type_t type,
     config_source_t* source = (config_source_t*)AGENTOS_CALLOC(1, sizeof(config_source_t));
     if (!source) return NULL;
     
-    // 初始化属�
+    // 初始化属
     source->adapter = adapter;
     source->attributes.type = type;
     source->attributes.name = name ? AGENTOS_STRDUP(name) : NULL;
-    source->attributes.priority = 50; // 默认优先�
+    source->attributes.priority = 50; // 默认优先
     source->attributes.read_only = false;
     source->attributes.watchable = false;
     source->attributes.timestamp = (uint64_t)time(NULL);
@@ -156,8 +156,8 @@ static config_source_t* config_source_create_base(config_source_type_t type,
 /**
  * @brief 释放配置源基础资源
  * 
- * 释放配置源名称等基础资源�? * 
- * @param source 配置源对�? */
+ * 释放配置源名称等基础资源? * 
+ * @param source 配置源对? */
 static void config_source_free_base(config_source_t* source) {
     if (!source) return;
     
@@ -170,8 +170,8 @@ static void config_source_free_base(config_source_t* source) {
 }
 
 /**
- * @brief 复制字符�? * 
- * 安全复制字符串，处理NULL情况�? * 
+ * @brief 复制字符? * 
+ * 安全复制字符串，处理NULL情况? * 
  * @param str 源字符串
  * @return 新分配的字符串，失败返回NULL
  */
@@ -192,7 +192,7 @@ static char* duplicate_string(const char* str) {
  * 使用cJSON库进行JSON配置解析。
  * @param data JSON数据
  * @param data_len 数据长度
- * @param ctx 配置上下�? * @return 错误�? */
+ * @param ctx 配置上下? * @return 错误? */
 static config_error_t parse_json_value(const char** pp, const char* end, config_value_t** out);
 static config_error_t parse_json_object(const char** pp, const char* end, config_context_t* ctx, const char* prefix);
 static config_error_t parse_json_array(const char** pp, const char* end, config_value_t** out);
@@ -370,7 +370,7 @@ static config_error_t parse_json_full(const char* data, size_t data_len, config_
  * 支持基本的键值对和节(section)解析。
  * @param data INI数据
  * @param data_len 数据长度
- * @param ctx 配置上下�? * @return 错误�? */
+ * @param ctx 配置上下? * @return 错误? */
 static config_error_t parse_ini_simple(const char* data, size_t data_len, config_context_t* ctx) {
     if (!data || data_len == 0 || !ctx) return CONFIG_ERROR_INVALID_ARG;
     char section[256] = "";
@@ -831,11 +831,11 @@ static config_error_t parse_yaml_full(const char* data, size_t data_len, config_
 }
 
 /**
- * @brief 检查文件是否修�? * 
- * 通过文件修改时间检查文件是否修改�? * 
+ * @brief 检查文件是否修? * 
+ * 通过文件修改时间检查文件是否修改? * 
  * @param file_path 文件路径
  * @param last_modified 上次修改时间
- * @return 是否已修�? */
+ * @return 是否已修? */
 static bool check_file_modified(const char* file_path, uint64_t last_modified) {
     if (!file_path) return false;
     struct stat st;
@@ -1036,12 +1036,12 @@ static void file_source_close_rdcw(file_source_priv_t* priv) {
 }
 #endif
 
-/* ==================== 文件配置源适配�?==================== */
+/* ==================== 文件配置源适配?==================== */
 
 /**
- * @brief 文件配置源加载函�? * 
- * 从文件加载配置�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * @brief 文件配置源加载函? * 
+ * 从文件加载配置? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t file_source_load(config_source_t* source, config_context_t* ctx) {
     if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
     
@@ -1098,9 +1098,9 @@ static config_error_t file_source_load(config_source_t* source, config_context_t
 }
 
 /**
- * @brief 文件配置源保存函�? * 
- * 保存配置到文件�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * @brief 文件配置源保存函? * 
+ * 保存配置到文件? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t file_source_save(config_source_t* source, const config_context_t* ctx) {
     if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
 
@@ -1141,9 +1141,9 @@ static config_error_t file_source_save(config_source_t* source, const config_con
 }
 
 /**
- * @brief 文件配置源检查变化函�? * 
- * 检查文件是否已修改�? * 
- * @param source 配置�? * @return 是否已修�? */
+ * @brief 文件配置源检查变化函? * 
+ * 检查文件是否已修改? * 
+ * @param source 配置? * @return 是否已修? */
 static bool file_source_has_changed(config_source_t* source) {
     if (!source) return false;
     
@@ -1167,18 +1167,18 @@ static bool file_source_has_changed(config_source_t* source) {
 }
 
 /**
- * @brief 文件配置源获取属性函�? * 
- * 获取文件配置源属性�? * 
- * @param source 配置�? * @return 配置源属�? */
+ * @brief 文件配置源获取属性函? * 
+ * 获取文件配置源属性? * 
+ * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t* file_source_get_attributes(config_source_t* source) {
     if (!source) return NULL;
     return &source->attributes;
 }
 
 /**
- * @brief 文件配置源销毁函�? * 
- * 销毁文件配置源资源�? * 
- * @param source 配置�? */
+ * @brief 文件配置源销毁函? * 
+ * 销毁文件配置源资源? * 
+ * @param source 配置? */
 static void file_source_destroy(config_source_t* source) {
     if (!source) return;
     
@@ -1201,7 +1201,7 @@ static void file_source_destroy(config_source_t* source) {
     config_source_free_base(source);
 }
 
-/** 文件配置源适配�?*/
+/** 文件配置源适配?*/
 static const config_source_adapter_t file_source_adapter = {
     .load = file_source_load,
     .save = file_source_save,
@@ -1215,9 +1215,9 @@ static const config_source_adapter_t file_source_adapter = {
 static uint64_t compute_env_hash(env_source_priv_t *priv);
 
 /**
- * @brief 环境变量配置源加载函�? * 
- * 从环境变量加载配置�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * @brief 环境变量配置源加载函? * 
+ * 从环境变量加载配置? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t env_source_load(config_source_t* source, config_context_t* ctx) {
     if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
     env_source_priv_t* priv = (env_source_priv_t*)source->priv_data;
@@ -1255,9 +1255,9 @@ static config_error_t env_source_load(config_source_t* source, config_context_t*
 }
 
 /**
- * @brief 环境变量配置源保存函�? * 
- * 保存配置到环境变量�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * @brief 环境变量配置源保存函? * 
+ * 保存配置到环境变量? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t env_source_save(config_source_t* source, const config_context_t* ctx) {
     (void)source;
     (void)ctx;
@@ -1266,9 +1266,9 @@ static config_error_t env_source_save(config_source_t* source, const config_cont
 }
 
 /**
- * @brief 环境变量配置源检查变化函�? * 
- * 环境变量通常不会变化�? * 
- * @param source 配置�? * @return 是否已修�? */
+ * @brief 环境变量配置源检查变化函? * 
+ * 环境变量通常不会变化? * 
+ * @param source 配置? * @return 是否已修? */
 static uint64_t compute_env_hash(env_source_priv_t *priv) {
     extern char **environ;
     char **env = environ;
@@ -1305,18 +1305,18 @@ static bool env_source_has_changed(config_source_t *source) {
 }
 
 /**
- * @brief 环境变量配置源获取属性函�? * 
- * 获取环境变量配置源属性�? * 
- * @param source 配置�? * @return 配置源属�? */
+ * @brief 环境变量配置源获取属性函? * 
+ * 获取环境变量配置源属性? * 
+ * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t* env_source_get_attributes(config_source_t* source) {
     if (!source) return NULL;
     return &source->attributes;
 }
 
 /**
- * @brief 环境变量配置源销毁函�? * 
- * 销毁环境变量配置源资源�? * 
- * @param source 配置�? */
+ * @brief 环境变量配置源销毁函? * 
+ * 销毁环境变量配置源资源? * 
+ * @param source 配置? */
 static void env_source_destroy(config_source_t* source) {
     if (!source) return;
     
@@ -1336,7 +1336,7 @@ static void env_source_destroy(config_source_t* source) {
     config_source_free_base(source);
 }
 
-/** 环境变量配置源适配�?*/
+/** 环境变量配置源适配?*/
 static const config_source_adapter_t env_source_adapter = {
     .load = env_source_load,
     .save = env_source_save,
@@ -1345,13 +1345,13 @@ static const config_source_adapter_t env_source_adapter = {
     .destroy = env_source_destroy
 };
 
-/* ==================== 命令行配置源适配�?==================== */
+/* ==================== 命令行配置源适配?==================== */
 
 /**
  * @brief 命令行配置源加载函数
  * 
- * 从命令行参数加载配置�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * 从命令行参数加载配置? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t args_source_load(config_source_t* source, config_context_t* ctx) {
     if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
     args_source_priv_t* priv = (args_source_priv_t*)source->priv_data;
@@ -1379,8 +1379,8 @@ static config_error_t args_source_load(config_source_t* source, config_context_t
 /**
  * @brief 命令行配置源保存函数
  * 
- * 命令行配置源不支持保存�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * 命令行配置源不支持保存? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t args_source_save(config_source_t* source, const config_context_t* ctx) {
     (void)source;
     (void)ctx;
@@ -1389,28 +1389,28 @@ static config_error_t args_source_save(config_source_t* source, const config_con
 }
 
 /**
- * @brief 命令行配置源检查变化函�? * 
- * 命令行参数不会变化�? * 
- * @param source 配置�? * @return 是否已修�? */
+ * @brief 命令行配置源检查变化函? * 
+ * 命令行参数不会变化? * 
+ * @param source 配置? * @return 是否已修? */
 static bool args_source_has_changed(config_source_t* source) {
-    // 命令行参数不会变�
+    // 命令行参数不会变
     (void)source;
     return false;
 }
 
 /**
- * @brief 命令行配置源获取属性函�? * 
- * 获取命令行配置源属性�? * 
- * @param source 配置�? * @return 配置源属�? */
+ * @brief 命令行配置源获取属性函? * 
+ * 获取命令行配置源属性? * 
+ * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t* args_source_get_attributes(config_source_t* source) {
     if (!source) return NULL;
     return &source->attributes;
 }
 
 /**
- * @brief 命令行配置源销毁函�? * 
- * 销毁命令行配置源资源�? * 
- * @param source 配置�? */
+ * @brief 命令行配置源销毁函? * 
+ * 销毁命令行配置源资源? * 
+ * @param source 配置? */
 static void args_source_destroy(config_source_t* source) {
     if (!source) return;
     
@@ -1425,7 +1425,7 @@ static void args_source_destroy(config_source_t* source) {
     config_source_free_base(source);
 }
 
-/** 命令行配置源适配�?*/
+/** 命令行配置源适配?*/
 static const config_source_adapter_t args_source_adapter = {
     .load = args_source_load,
     .save = args_source_save,
@@ -1434,12 +1434,12 @@ static const config_source_adapter_t args_source_adapter = {
     .destroy = args_source_destroy
 };
 
-/* ==================== 内存配置源适配�?==================== */
+/* ==================== 内存配置源适配?==================== */
 
 /**
- * @brief 内存配置源加载函�? * 
- * 从内存数据加载配置�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * @brief 内存配置源加载函? * 
+ * 从内存数据加载配置? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t memory_source_load(config_source_t* source, config_context_t* ctx) {
     if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
     
@@ -1461,9 +1461,9 @@ static config_error_t memory_source_load(config_source_t* source, config_context
 }
 
 /**
- * @brief 内存配置源保存函�? * 
- * 内存配置源不支持保存�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * @brief 内存配置源保存函? * 
+ * 内存配置源不支持保存? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t memory_source_save(config_source_t* source, const config_context_t* ctx) {
     if (!source) return CONFIG_ERROR_INVALID_ARG;
     (void)ctx;
@@ -1474,28 +1474,28 @@ static config_error_t memory_source_save(config_source_t* source, const config_c
 }
 
 /**
- * @brief 内存配置源检查变化函�? * 
- * 内存配置源不会自动变化�? * 
- * @param source 配置�? * @return 是否已修�? */
+ * @brief 内存配置源检查变化函? * 
+ * 内存配置源不会自动变化? * 
+ * @param source 配置? * @return 是否已修? */
 static bool memory_source_has_changed(config_source_t* source) {
-    // 内存配置源需要外部触发变�
+    // 内存配置源需要外部触发变
     (void)source;
     return false;
 }
 
 /**
- * @brief 内存配置源获取属性函�? * 
- * 获取内存配置源属性�? * 
- * @param source 配置�? * @return 配置源属�? */
+ * @brief 内存配置源获取属性函? * 
+ * 获取内存配置源属性? * 
+ * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t* memory_source_get_attributes(config_source_t* source) {
     if (!source) return NULL;
     return &source->attributes;
 }
 
 /**
- * @brief 内存配置源销毁函�? * 
- * 销毁内存配置源资源�? * 
- * @param source 配置�? */
+ * @brief 内存配置源销毁函? * 
+ * 销毁内存配置源资源? * 
+ * @param source 配置? */
 static void memory_source_destroy(config_source_t* source) {
     if (!source) return;
     
@@ -1509,7 +1509,7 @@ static void memory_source_destroy(config_source_t* source) {
     config_source_free_base(source);
 }
 
-/** 内存配置源适配�?*/
+/** 内存配置源适配?*/
 static const config_source_adapter_t memory_source_adapter = {
     .load = memory_source_load,
     .save = memory_source_save,
@@ -1518,13 +1518,13 @@ static const config_source_adapter_t memory_source_adapter = {
     .destroy = memory_source_destroy
 };
 
-/* ==================== 默认值配置源适配�?==================== */
+/* ==================== 默认值配置源适配?==================== */
 
 /**
  * @brief 默认值配置源加载函数
  * 
- * 从默认值加载配置�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * 从默认值加载配置? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t defaults_source_load(config_source_t* source, config_context_t* ctx) {
     if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
     defaults_source_priv_t* priv = (defaults_source_priv_t*)source->priv_data;
@@ -1541,8 +1541,8 @@ static config_error_t defaults_source_load(config_source_t* source, config_conte
 /**
  * @brief 默认值配置源保存函数
  * 
- * 默认值配置源不支持保存�? * 
- * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
+ * 默认值配置源不支持保存? * 
+ * @param source 配置? * @param ctx 配置上下? * @return 错误? */
 static config_error_t defaults_source_save(config_source_t* source, const config_context_t* ctx) {
     (void)source;
     (void)ctx;
@@ -1551,28 +1551,28 @@ static config_error_t defaults_source_save(config_source_t* source, const config
 }
 
 /**
- * @brief 默认值配置源检查变化函�? * 
- * 默认值不会变化�? * 
- * @param source 配置�? * @return 是否已修�? */
+ * @brief 默认值配置源检查变化函? * 
+ * 默认值不会变化? * 
+ * @param source 配置? * @return 是否已修? */
 static bool defaults_source_has_changed(config_source_t* source) {
-    // 默认值不会变�
+    // 默认值不会变
     (void)source;
     return false;
 }
 
 /**
- * @brief 默认值配置源获取属性函�? * 
- * 获取默认值配置源属性�? * 
- * @param source 配置�? * @return 配置源属�? */
+ * @brief 默认值配置源获取属性函? * 
+ * 获取默认值配置源属性? * 
+ * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t* defaults_source_get_attributes(config_source_t* source) {
     if (!source) return NULL;
     return &source->attributes;
 }
 
 /**
- * @brief 默认值配置源销毁函�? * 
- * 销毁默认值配置源资源�? * 
- * @param source 配置�? */
+ * @brief 默认值配置源销毁函? * 
+ * 销毁默认值配置源资源? * 
+ * @param source 配置? */
 static void defaults_source_destroy(config_source_t* source) {
     if (!source) return;
     
@@ -1596,7 +1596,7 @@ static void defaults_source_destroy(config_source_t* source) {
     config_source_free_base(source);
 }
 
-/** 默认值配置源适配�?*/
+/** 默认值配置源适配?*/
 static const config_source_adapter_t defaults_source_adapter = {
     .load = defaults_source_load,
     .save = defaults_source_save,
@@ -1716,7 +1716,7 @@ config_source_t* config_source_create_file(const config_file_source_options_t* o
     priv->last_modified = 0;
     priv->file_handle = NULL;
     
-    // 检查资源分配是否成�
+    // 检查资源分配是否成功
     if (!priv->file_path || !priv->format || !priv->encoding) {
         if (priv->file_path) AGENTOS_FREE(priv->file_path);
         if (priv->format) AGENTOS_FREE(priv->format);
@@ -1773,7 +1773,7 @@ config_source_t* config_source_create_env(const config_env_source_options_t* opt
     priv->env_keys = NULL;
     priv->env_count = 0;
     
-    // 检查资源分配是否成�
+    // 检查资源分配是否成功
     if (options->separator && !priv->separator) {
         if (priv->prefix) AGENTOS_FREE(priv->prefix);
         AGENTOS_FREE(priv);
@@ -1781,10 +1781,10 @@ config_source_t* config_source_create_env(const config_env_source_options_t* opt
         return NULL;
     }
     
-    // 更新属�
+    // 更新属
     source->priv_data = priv;
     source->attributes.read_only = true; // 环境变量只读
-    source->attributes.watchable = false; // 环境变量变化检测复�
+    source->attributes.watchable = false; // 环境变量变化检测复制
      
     return source;
 }
@@ -1813,7 +1813,7 @@ config_source_t* config_source_create_args(const config_args_source_options_t* o
     priv->assign_char = options->assign_char ? duplicate_string(options->assign_char) : duplicate_string("=");
     priv->allow_positional = options->allow_positional;
     
-    // 检查资源分配是否成�
+    // 检查资源分配是否成功
     if (!priv->assign_char) {
         if (priv->prefix) AGENTOS_FREE(priv->prefix);
         AGENTOS_FREE(priv);
@@ -1821,10 +1821,10 @@ config_source_t* config_source_create_args(const config_args_source_options_t* o
         return NULL;
     }
     
-    // 更新属�
+    // 更新属
     source->priv_data = priv;
-    source->attributes.read_only = true; // 命令行参数只�
-    source->attributes.watchable = false; // 命令行参数不会变�?    
+    source->attributes.read_only = true; // 命令行参数只
+    source->attributes.watchable = false; // 命令行参数不会变?    
     return source;
 }
 
@@ -1850,7 +1850,7 @@ config_source_t* config_source_create_memory(const config_memory_source_options_
     priv->format = options->format ? duplicate_string(options->format) : duplicate_string("json");
     priv->owns_data = true;
     
-    // 检查资源分配是否成�
+    // 检查资源分配是否成功
     if (!priv->data || !priv->format) {
         if (priv->data) AGENTOS_FREE(priv->data);
         if (priv->format) AGENTOS_FREE(priv->format);
@@ -1859,10 +1859,10 @@ config_source_t* config_source_create_memory(const config_memory_source_options_
         return NULL;
     }
     
-    // 更新属�
+    // 更新属
     source->priv_data = priv;
     source->attributes.read_only = true; // 内存配置源通常只读
-    source->attributes.watchable = false; // 需要外部触发变�
+    source->attributes.watchable = false; // 需要外部触发变
      
     return source;
 }
@@ -1902,10 +1902,10 @@ config_source_t* config_source_create_defaults(const char* const* default_values
         }
     }
     
-    // 更新属�
+    // 更新属
     source->priv_data = priv;
-    source->attributes.read_only = true; // 默认值只�
-    source->attributes.watchable = false; // 默认值不会变�?    
+    source->attributes.read_only = true; // 默认值只
+    source->attributes.watchable = false; // 默认值不会变?    
     return source;
 }
 
@@ -2034,7 +2034,7 @@ void config_source_manager_destroy(config_source_manager_t* manager) {
 config_error_t config_source_manager_add(config_source_manager_t* manager, config_source_t* source) {
     if (!manager || !source) return CONFIG_ERROR_INVALID_ARG;
     
-    // 检查容量，必要时扩�
+    // 检查容量，必要时扩
     if (manager->count >= manager->capacity) {
         size_t new_capacity = manager->capacity * 2;
         config_source_t** new_sources = (config_source_t**)AGENTOS_REALLOC(manager->sources, 
@@ -2045,11 +2045,11 @@ config_error_t config_source_manager_add(config_source_manager_t* manager, confi
         manager->capacity = new_capacity;
     }
     
-    // 添加配置�
+    // 添加配配置
     manager->sources[manager->count] = source;
     manager->count++;
     
-    // 更新时间�
+    // 更新时时间
     if (source->adapter && source->adapter->get_attributes) {
         const config_source_attr_t* attr = source->adapter->get_attributes(source);
         if (attr) {
@@ -2063,7 +2063,7 @@ config_error_t config_source_manager_add(config_source_manager_t* manager, confi
 config_error_t config_source_manager_remove(config_source_manager_t* manager, config_source_t* source) {
     if (!manager || !source) return CONFIG_ERROR_INVALID_ARG;
     
-    // 查找配置�
+    // 查找配配置
     for (size_t i = 0; i < manager->count; i++) {
         if (manager->sources[i] == source) {
             // 移动后续元素

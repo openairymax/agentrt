@@ -28,8 +28,7 @@ target_link_libraries(test_performance_benchmarks PRIVATE
     m
 )
 
-find_package(cjson QUIET)
-if(TARGET cjson OR cjson_FOUND)
+if(AGENTOS_HAS_CJSON)
     target_link_libraries(test_performance_benchmarks PRIVATE cjson)
 endif()
 

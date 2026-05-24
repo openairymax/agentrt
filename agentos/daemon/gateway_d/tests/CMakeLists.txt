@@ -11,13 +11,7 @@ set(SYSCALL_INCLUDE_DIR ${ATOMIC_DIR}/syscall/include)
 set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons)
 
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(MICROHTTPD QUIET libmicrohttpd)
-    pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
-else()
-    find_package(libmicrohttpd QUIET)
-    find_package(libwebsockets QUIET)
-endif()
+# libmicrohttpd/libwebsockets found by root CMakeLists.txt
 
 set(TEST_SOURCES
     test_service.c
@@ -60,14 +54,22 @@ foreach(TEST_SRC ${TEST_SOURCES})
             Threads::Threads
     )
 
-    if(MICROHTTPD_FOUND)
-        target_include_directories(${TEST_NAME} PRIVATE ${MICROHTTPD_INCLUDE_DIRS})
-        target_link_libraries(${TEST_NAME} PRIVATE ${MICROHTTPD_LIBRARIES})
+    if(AGENTOS_HAS_MICROHTTPD)
+        if(libmicrohttpd_FOUND)
+            target_link_libraries(${TEST_NAME} PRIVATE microhttpd)
+        elseif(MICROHTTPD_FOUND)
+            target_include_directories(${TEST_NAME} PRIVATE ${MICROHTTPD_INCLUDE_DIRS})
+            target_link_libraries(${TEST_NAME} PRIVATE ${MICROHTTPD_LIBRARIES})
+        endif()
     endif()
 
-    if(LIBWEBSOCKETS_FOUND)
-        target_include_directories(${TEST_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})
-        target_link_libraries(${TEST_NAME} PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
+    if(AGENTOS_HAS_LIBWEBSOCKETS)
+        if(libwebsockets_FOUND)
+            target_link_libraries(${TEST_NAME} PRIVATE websockets)
+        elseif(LIBWEBSOCKETS_FOUND)
+            target_include_directories(${TEST_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})
+            target_link_libraries(${TEST_NAME} PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
+        endif()
     endif()
 
     target_compile_options(${TEST_NAME} PRIVATE -Wall -Wextra -g -Wno-unused-function)

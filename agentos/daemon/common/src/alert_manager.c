@@ -470,7 +470,7 @@ static bool evaluate_trend(const char* metric_name, am_comparison_t op, double t
             uint32_t idx = (g_am.metric_history[i].head + j) % 8;
             sum += g_am.metric_history[i].values[idx];
         }
-        double avg = sum / n;
+        double avg __attribute__((unused)) = sum / n;
 
         double first_half_sum = 0.0, second_half_sum = 0.0;
         uint32_t half = n / 2;

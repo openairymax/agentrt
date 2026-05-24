@@ -143,10 +143,10 @@ static void test_response_from_json(void) {
 static void test_response_null_handling(void) {
     printf("  test_response_null_handling...\n");
 
-    char* json = response_to_json(NULL);
+    char* json __attribute__((unused)) = response_to_json(NULL);
     assert(json == NULL);
 
-    llm_response_t* resp = response_from_json(NULL);
+    llm_response_t* resp __attribute__((unused)) = response_from_json(NULL);
     assert(resp == NULL);
 
     printf("    PASSED\n");

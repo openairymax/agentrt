@@ -169,7 +169,7 @@ if(BUILD_TESTS)
             agentos_coreloopthree
         )
     endif()
-    find_package(Threads REQUIRED)
+    # Threads found by root CMakeLists.txt
     target_link_libraries(test_taskflow_advanced PRIVATE Threads::Threads)
 
     target_link_libraries(test_taskflow_advanced PRIVATE agentos_test_ldflags)

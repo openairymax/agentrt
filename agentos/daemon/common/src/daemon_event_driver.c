@@ -17,6 +17,10 @@ struct daemon_event_driver {
     uint64_t health_timer_id;
 };
 
+static void socket_close_wrapper(void* arg) {
+    agentos_socket_close((agentos_socket_t)(uintptr_t)arg);
+}
+
 static int on_server_fd_event(int fd, uint32_t events, void* user_data) {
     daemon_event_driver_t* driver = (daemon_event_driver_t*)user_data;
     if (!driver) return -1;
@@ -30,11 +34,8 @@ static int on_server_fd_event(int fd, uint32_t events, void* user_data) {
         if (driver->on_client) {
             driver->on_client(driver->service_ctx, client_fd);
         } else if (driver->pool) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-            thread_pool_submit(driver->pool, (thread_task_fn_t)agentos_socket_close,
+thread_pool_submit(driver->pool, socket_close_wrapper,
                                (void*)(uintptr_t)client_fd);
-#pragma GCC diagnostic pop
         } else {
             agentos_socket_close(client_fd);
         }

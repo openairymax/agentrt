@@ -14,35 +14,9 @@
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# ==================== 查找外部依赖 ====================
-find_package(Threads REQUIRED)
-
-# 使用与根项目一致的依赖查找方式
-# 在Windows上，PkgConfig通常不可用，使用find_package替代
-if(WIN32)
-    find_package(PkgConfig QUIET)
-else()
-    find_package(PkgConfig)
-endif()
-
-# cJSON查找
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(CJSON QUIET libcjson)
-endif()
-if(NOT CJSON_FOUND)
-    find_package(cJSON QUIET)
-    if(cJSON_FOUND)
-        set(CJSON_FOUND TRUE)
-        set(CJSON_LIBRARIES cjson)
-        set(CJSON_INCLUDE_DIRS ${cJSON_INCLUDE_DIRS})
-        message(STATUS "cJSON found via find_package")
-    else()
-        message(WARNING "cJSON not found, JSON functionality may be limited")
-        set(CJSON_FOUND FALSE)
-        set(CJSON_LIBRARIES "")
-        set(CJSON_INCLUDE_DIRS "")
-    endif()
-endif()
+# 使用根级依赖检测结果 (BAN-12: 单一依赖检测点)
+# Threads, PkgConfig, OpenSSL, cJSON, libmicrohttpd, libwebsockets
+# 已在根 CMakeLists.txt 中统一查找
 
 # ==================== 路径设置 ====================
 
@@ -180,7 +154,7 @@ target_include_directories(gateway_d PRIVATE
 
 # 将 gateway 库的源文件直接加入编译（确保符号可解析）
 # gateway 库大量依赖 cJSON，不可用时整个库跳过
-if(CJSON_FOUND)
+if(AGENTOS_HAS_CJSON)
 set(GATEWAY_LIB_SOURCES
     ${GATEWAY_SRC_DIR}/gateway/gateway_api.c
     ${GATEWAY_SRC_DIR}/gateway/http_gateway.c
@@ -217,32 +191,29 @@ target_include_directories(gateway_lib_obj PUBLIC
 )
 endif()
 
-# 查找 gateway 所需的外部库
-# PkgConfig 已在前面查找过，使用 PKG_CONFIG_FOUND 变量
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(MICROHTTPD QUIET libmicrohttpd)
-    pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
-else()
-    # 尝试使用 CMake 的 find_package 查找这些库
-    find_package(libmicrohttpd QUIET)
-    find_package(libwebsockets QUIET)
-endif()
-
-# 条件包含外部库头文件和定义
-if(MICROHTTPD_FOUND)
-    target_include_directories(gateway_lib_obj PUBLIC ${MICROHTTPD_INCLUDE_DIRS})
+# 条件包含外部库头文件和定义（使用根级缓存变量）
+if(AGENTOS_HAS_MICROHTTPD)
+    if(libmicrohttpd_FOUND)
+        target_include_directories(gateway_lib_obj PUBLIC ${libmicrohttpd_INCLUDE_DIRS})
+    elseif(MICROHTTPD_FOUND)
+        target_include_directories(gateway_lib_obj PUBLIC ${MICROHTTPD_INCLUDE_DIRS})
+    endif()
     target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
     target_compile_definitions(gateway_d PRIVATE GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
 else()
-    message(WARNING "libmicrohttpd not found, HTTP gateway may not compile.")
+    message(STATUS "libmicrohttpd not found, HTTP gateway may not compile.")
 endif()
 
-if(LIBWEBSOCKETS_FOUND)
-    target_include_directories(gateway_lib_obj PUBLIC ${LIBWEBSOCKETS_INCLUDE_DIRS})
+if(AGENTOS_HAS_LIBWEBSOCKETS)
+    if(libwebsockets_FOUND)
+        target_include_directories(gateway_lib_obj PUBLIC ${libwebsockets_INCLUDE_DIRS})
+    elseif(LIBWEBSOCKETS_FOUND)
+        target_include_directories(gateway_lib_obj PUBLIC ${LIBWEBSOCKETS_INCLUDE_DIRS})
+    endif()
     target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_WS=1)
     target_compile_definitions(gateway_d PRIVATE GATEWAY_HAS_WS=1)
 else()
-    message(WARNING "libwebsockets not found, WebSocket gateway may not compile.")
+    message(STATUS "libwebsockets not found, WebSocket gateway may not compile.")
 endif()
 
 target_link_libraries(gateway_d PRIVATE
@@ -251,23 +222,33 @@ target_link_libraries(gateway_d PRIVATE
     agentos_protocols
     Threads::Threads
 )
-if(CJSON_FOUND)
+if(AGENTOS_HAS_CJSON)
     target_link_libraries(gateway_d PRIVATE
         $<TARGET_OBJECTS:gateway_lib_obj>
     )
 endif()
 
-# 条件链接CJSON库
-if(CJSON_FOUND)
-    target_link_libraries(gateway_d PRIVATE ${CJSON_LIBRARIES})
+if(AGENTOS_HAS_CJSON)
+    if(cJSON_FOUND)
+        target_link_libraries(gateway_d PRIVATE cjson)
+    elseif(CJSON_FOUND)
+        target_link_libraries(gateway_d PRIVATE ${CJSON_LIBRARIES})
+    endif()
 endif()
 
-# 如果找到了 HTTP/WS 库，也链接它们
-if(MICROHTTPD_FOUND)
-    target_link_libraries(gateway_d PRIVATE ${MICROHTTPD_LIBRARIES})
+if(AGENTOS_HAS_MICROHTTPD)
+    if(libmicrohttpd_FOUND)
+        target_link_libraries(gateway_d PRIVATE microhttpd)
+    elseif(MICROHTTPD_FOUND)
+        target_link_libraries(gateway_d PRIVATE ${MICROHTTPD_LIBRARIES})
+    endif()
 endif()
-if(LIBWEBSOCKETS_FOUND)
-    target_link_libraries(gateway_d PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
+if(AGENTOS_HAS_LIBWEBSOCKETS)
+    if(libwebsockets_FOUND)
+        target_link_libraries(gateway_d PRIVATE websockets)
+    elseif(LIBWEBSOCKETS_FOUND)
+        target_link_libraries(gateway_d PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
+    endif()
 endif()
 
 # ==================== 编译选项 ====================

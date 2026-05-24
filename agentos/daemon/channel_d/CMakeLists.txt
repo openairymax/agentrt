@@ -3,8 +3,6 @@
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-find_package(Threads REQUIRED)
-
 set(DAEMON_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
 
@@ -68,8 +66,7 @@ install(FILES
     DESTINATION include/agentos/daemon/channel_d
 )
 
-find_package(Cmocka QUIET)
-if(CMOCKA_FOUND OR TARGET cmocka)
+if(AGENTOS_HAS_CMOCKA)
     enable_testing()
     add_executable(test_channel_e2e tests/test_channel_e2e.c src/channel_service.c)
     target_include_directories(test_channel_e2e PRIVATE

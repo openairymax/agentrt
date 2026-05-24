@@ -48,23 +48,7 @@ typedef struct {
 /**
  * @brief 全局模块状态实例
  */
-static memory_state_t g_state = {
-    .initialized = false,
-    .debug_enabled = false,
-    .options = {
-        .alignment = 0,
-        .zero_memory = true,
-        .tag = NULL,
-        .fail_strategy = MEMORY_FAIL_STRATEGY_RETURN_NULL,
-        .fail_callback = NULL,
-        .fail_callback_user_data = NULL
-    },
-    .stats = {0},
-    .lock = {0},
-    .debug_list_head = NULL,
-    .fail_callback = NULL,
-    .fail_callback_user_data = NULL
-};
+static memory_state_t g_state = {0};
 
 /**
  * @brief 内部锁初始化
@@ -150,8 +134,8 @@ static void memory_handle_fail(size_t size, const char* tag) {
  * @param[in] addr 内存地址
  * @param[in] size 分配大小
  * @param[in] tag 分配标签
- * @param[in] file 源文�? * @param[in] line 行号
- * @param[in] function 函数�? */
+ * @param[in] file 源文? * @param[in] line 行号
+ * @param[in] function 函数? */
 static void memory_add_debug_info(void* addr, size_t size, const char* tag,
                                   const char* file, int line, const char* function) {
     if (!g_state.debug_enabled || addr == NULL) {
@@ -259,7 +243,7 @@ static void memory_update_stats_free(size_t size) {
  * @param[in] tag 分配标签
  * @param[in] zero 是否清零
  * @param[in] alignment 对齐要求
- * @return 分配的内存指�? */
+ * @return 分配的内存指? */
 static void* memory_allocate_internal(size_t size, const char* tag, bool zero, size_t alignment) {
     if (size == 0) {
         return NULL;
@@ -319,7 +303,7 @@ bool memory_init(const memory_options_t* options) {
         memcpy(&g_state.options, options, sizeof(memory_options_t));
     }
     
-    // 初始化统计信�?    memset(&g_state.stats, 0, sizeof(memory_stats_t));
+    // 初始化统计信?    memset(&g_state.stats, 0, sizeof(memory_stats_t));
     
     g_state.initialized = true;
     g_state.debug_enabled = false;

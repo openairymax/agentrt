@@ -1108,7 +1108,7 @@ int a2a_v03_route_request(a2a_v03_context_t* ctx, const char* method,
                            "%s{\"id\":\"%s\",\"name\":\"%s\"}",
                            i > 0 ? "," : "",
                            adapter->agents[i].id,
-                           adapter->agents[i].name ? adapter->agents[i].name : "");
+                           adapter->agents[i].name[0] ? adapter->agents[i].name : "");
         }
         snprintf(buf + pos, buf_size - (size_t)pos, "]}");
         *response_json = buf;

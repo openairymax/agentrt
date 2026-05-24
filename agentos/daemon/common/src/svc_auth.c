@@ -101,9 +101,11 @@ static int base64_encode(const uint8_t* data, size_t len,
     uint8_t arr3[3] = {0}, arr4[4] = {0};
 
     while (i < len) {
+        size_t group_start = i;
         arr3[0] = (i < len) ? data[i++] : 0;
         arr3[1] = (i < len) ? data[i++] : 0;
         arr3[2] = (i < len) ? data[i++] : 0;
+        size_t consumed = i - group_start;
 
         arr4[0] = (arr3[0] & 0xFC) >> 2;
         arr4[1] = ((arr3[0] & 0x03) << 4) | ((arr3[1] & 0xF0) >> 4);
@@ -112,8 +114,8 @@ static int base64_encode(const uint8_t* data, size_t len,
 
         output[j++] = table[arr4[0]];
         output[j++] = table[arr4[1]];
-        output[j++] = (i <= len) ? table[arr4[2]] : '=';
-        output[j++] = (i <= len) ? table[arr4[3]] : '=';
+        output[j++] = (consumed > 1) ? table[arr4[2]] : '=';
+        output[j++] = (consumed > 2) ? table[arr4[3]] : '=';
     }
 
     output[j] = '\0';
@@ -467,12 +469,12 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
     char* payload_json = cJSON_PrintUnformatted(payload);
     cJSON_Delete(payload);
 
-    if (!payload_json) return AUTH_TOKEN_INVALID;
+    if (!payload_json) { agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
 
     /* Base64 编码 Payload */
     size_t payload_b64_size = strlen(payload_json) * 2 + 100;
     char* payload_b64 = (char*)malloc(payload_b64_size);
-    if (!payload_b64) { free(payload_json); return AUTH_TOKEN_INVALID; }
+    if (!payload_b64) { free(payload_json); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
 
     base64_encode((const uint8_t*)payload_json, strlen(payload_json),
                   payload_b64, &payload_b64_size);
@@ -811,7 +813,6 @@ int auth_apikey_init(const apikey_config_t* config) {
         g_apikey.keys = (char**)calloc(g_apikey.capacity, sizeof(*g_apikey.keys));
         if (!g_apikey.keys) {
             g_apikey.capacity = 0;
-            agentos_mutex_unlock(&g_apikey.lock);
             return AUTH_FAILED;
         }
     }
