@@ -2,6 +2,8 @@
 
 `cupolas/src/workbench/` 提供安全策略的交互式测试与验证环境，允许安全管理员在正式部署前验证安全规则的有效性。
 
+> Part of AgentOS v0.0.5
+
 ## 设计目标
 
 - **安全策略模拟**：在不影响生产环境的情况下测试安全策略
@@ -62,6 +64,16 @@ test_samples:
   - input: "SELECT * FROM users"
     expected: "allow"
 ```
+
+## 相关子系统
+
+| 子系统 | 关系 |
+|--------|------|
+| [Permission](../permission/README.md) | 工作台可模拟权限策略的判定结果 |
+| [Sanitizer](../sanitizer/README.md) | 工作台可测试输入清洗规则的效果 |
+| [Audit](../audit/README.md) | 策略测试结果可导出审计日志 |
+| [Security](../security/README.md) | 工作台可验证安全防护引擎的规则 |
+| [Guards](#) | 工作台可测试安全守卫的检测效果 |
 
 ---
 

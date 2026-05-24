@@ -1,4 +1,4 @@
-[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)   
+[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)
 
 # AgentOS
 Powered by OpenAirymax
@@ -27,7 +27,7 @@ English | [简体中文](README_zh.md)
 | User Type | Product | Version | Download |
 |:---------:|:-------:|:-------:|:--------:|
 |  **Pro Users** | Docker | `v0.0.5` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.0.5) |
-|  **Personal Users** | Desktop | `v0.0.5` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.5) |  
+|  **Personal Users** | Desktop | `v0.0.5` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.5) |
 
 
 ## 🌟 Introduction
@@ -48,13 +48,13 @@ Personal Client Preview
 
 ⚡️
 
-**Foundational [Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**
+**Foundational [Multibody Cybernetic Intelligent System](#)**
 
 </div>
 
 - **Pure Kernel**: Only atomic mechanisms, ensuring purity and efficiency.
 - **Cognitive Loop**: Perception, Planning, Action.
-- **Memory Stratification**: L1 Raw → L2 Features → L3 Structures → L4 Patterns.
+- **Memory Stratification**: L1 Raw → L2 Features → L3 Structures → L4 Patterns (OSS: L1+L2 built-in, PRO: L1-L4 via MemoryRovol).
 - **Inherent Security**: Sandbox Isolation, Permission Arbitration, Input Sanitization, Audit Trail.
 - **Token Efficiency**: Saves approximately **500%** tokens compared to traditional frameworks.
 - **Comprehensive SDKs**: Native support for Go / Python / Rust / TypeScript.
@@ -71,8 +71,7 @@ Personal Client Preview
 - Continuously optimizes execution effectiveness
 
 <p align="center">
-  <strong> ✨ </strong>
-  <p align="center">
+  <strong> ✨ </strong><br>
   <strong> Brand New Architecture · Inherent Security · Intelligence Emergence </strong>
 </p>
 
@@ -83,17 +82,20 @@ Personal Client Preview
 
 ```
 ⬇️ Application Layer (openlab)
-⇅ Service Layer (daemon)
-⇅ Kernel Layer (atoms)
-⇅ Security Layer (cupolas)
-⇅ Support Layer (commons)
+⇅ Service Layer (daemon) — 10+ daemon services
+⇅ Protocol Layer (protocols) — 5-layer unified protocol stack
+⇅ Gateway Layer (gateway) — HTTP/WS/Stdio → JSON-RPC 2.0
+⇅ Storage Layer (heapstore) — Runtime data persistence
+⇅ Security Layer (cupolas) — 4-layer inherent security
+⇅ Kernel Layer (atoms) — 7 atomic modules
+⇅ Support Layer (commons) — Unified foundation library
 ⬆️ SDK Layer (toolkit)
 ```
 
 **Design Principles**
-  Built upon [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md):
+  Built upon [ARCHITECTURAL_PRINCIPLES](#):
 - **System Perspective**: Feedback loops · Layered decomposition · Holistic design · Emergence management → Real-time response <10ms
-- **Kernel Perspective**: Minimalist kernel · Contractual interfaces · Service isolation · Pluggable strategies → Kernel ~25K LOC
+- **Kernel Perspective**: Minimalist kernel · Contractual interfaces · Service isolation · Pluggable strategies → Kernel ~6K LOC (~478K LOC total)
 - **Cognitive Perspective**: Dual-system synergy · Incremental evolution · Memory stratification · Forgetting mechanism → Token savings 500%
 - **Engineering Perspective**: Security built-in · Observability · Resource determinism · Cross-platform consistency → Test coverage >90%
 - **Design Aesthetics**: Simplicity first · Extreme attention to detail · Human-centric · Perfectionism → API <50/module
@@ -109,16 +111,16 @@ Personal Client Preview
 
 ### Installation & Build
 
-```ctext
+```bash
 # 1. Clone repository
 git clone https://atomgit.com/openairymax/agentos.git && cd agentos
 
 # 2. Install dependencies (Ubuntu)
 sudo apt install -y build-essential cmake gcc g++ libssl-dev libsqlite3-dev ninja-build
 
-# 3. Build kernel
-mkdir build && cd build
-cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+# 3. Build kernel (out-of-source build required by BAN-33)
+mkdir /tmp/AgentOS-build && cd /tmp/AgentOS-build
+cmake /path/to/AgentOS -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build . --parallel $(nproc)
 
 # 4. Run tests
@@ -129,7 +131,7 @@ ctest --output-on-failure
 
 ```text
 # Build image
-docker build -f scripts/deploy/docker/Dockerfile.kernel -t agentos:latest .
+docker build -f scripts/deployment/docker/Dockerfile.kernel -t agentos:latest .
 
 # Run container
 docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
@@ -137,7 +139,6 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 
 ### Usage Methods
 
-```
 | Language | Usage Method |
 |:-----|:---------|
 | C/C++ | Develop via `syscalls.h` system call interface |
@@ -145,17 +146,18 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 | Go | Use `import "github.com/spharx/agentos/toolkit/go"` |
 | Rust | Use `use agentos_toolkit::prelude::*;` |
 | TypeScript | Install via `npm install @spharx/agentos-toolkit` then directly import |
-```
 
 ### Reading Navigation
 
 | Document | Core Content |
 |:-----|:---------|
-| [📘 Architectural Principles](docs/ARCHITECTURAL_PRINCIPLES.md) | Five-dimensional orthogonal system, 24 core principles |
-| [🚀 Quick Start](docs/guides/quickstart.md) | 5-minute getting-started guide |
-| [⚙️ Build Guide](docs/guides/build.md) | Detailed build steps and options |
-| [🧪 Testing Guide](docs/guides/testing.md) | Unit/Integration/Contract testing |
-| [🐳 Deployment Guide](docs/guides/deployment.md) | Docker/Kubernetes deployment |
+| [📘 Architectural Principles](#) | Five-dimensional orthogonal system, 24 core principles |
+| [🚀 Quick Start](#) | 5-minute getting-started guide |
+| [⚙️ Build Guide](#) | Detailed build steps and options |
+| [🧪 Testing Guide](#) | Unit/Integration/Contract testing |
+| [🐳 Deployment Guide](#) | Docker/Kubernetes deployment |
+
+> 📝 **Note**: Documentation is coming soon. Links will be updated when available.
 
 ### Common Questions
 
@@ -214,7 +216,7 @@ See [cupolas security documentation](agentos/cupolas/README.md)
 | **System Developer** | C/C++, OS fundamentals | 1-2 weeks |
 | **Architect** | Microkernel, distributed systems | 1 month |
 
-**Recommended Path**: [Quick Start](agentos/manuals/guides/quickstart.md) → [Architectural Principles](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](agentos/manuals/architecture/coreloopthree.md)
+**Recommended Path**: [Quick Start](#) → [Architectural Principles](#) → [CoreLoopThree](#)
 
 </details>
 
@@ -225,8 +227,7 @@ We are walking into the future: "Intelligence emergence, and nothing less, is th
 ### The Power of Belief
 
 <p align="center">
-  <strong> ☀️ </strong>
-  <p align="center">
+  <strong> ☀️ </strong><br>
   <strong> This is not humanity's sunset, but the dawn of a new world </strong>
 </p>
 
@@ -257,8 +258,7 @@ Improve documentation, help more people understand AgentOS
 Submit PRs, jointly create history
 
 <p align="center">
-  <strong> 🔥 </strong>
-  <p align="center">
+  <strong> 🔥 </strong><br>
   <strong> A faint light cannot illuminate the entire path, yet it guides our direction forward </strong>
 </p>
 

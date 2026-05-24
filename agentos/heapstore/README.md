@@ -5,17 +5,18 @@
 ## 设计目标
 
 - **高性能写入**：针对高频写入场景优化，最小化写入延迟
-- **混合存储**：结合 LMDB、SQLite 和 Redis 满足不同场景需求
+- **混合存储**：结合 SQLite 和内存后端满足不同场景需求
 - **数据可观测**：提供数据查看和查询能力（heap_viewer）
 - **低开销**：最小化对主业务逻辑的性能影响
 
 ## 存储架构
 
-| 存储组件 | 用途 | 特点 |
+| 存储后端 | 用途 | 特点 |
 |----------|------|------|
-| **LMDB** | 高性能键值存储 | 内存映射文件，读写极快 |
-| **SQLite** | 结构化数据存储 | 支持 SQL 查询，事务支持 |
-| **Redis** | 缓存和实时数据 | 内存存储，支持 TTL |
+| **SQLite** | 主存储引擎与可选注册表后端 | 支持 SQL 查询，WAL 模式事务支持 |
+| **内存后端** | 无 SQLite3 时的回退方案 | 纯内存存储，进程退出后数据丢失 |
+
+> **条件编译说明**：SQLite3 为可选依赖。若构建时未检测到 SQLite3 开发库，heapstore 将自动回退到内存后端（memory backend），功能完整但数据不持久化。
 
 ## 数据模型
 
@@ -30,6 +31,14 @@
 ### 链路追踪 (heap_trace)
 
 分布式链路追踪数据存储，记录请求在各服务间的传播路径和耗时。
+
+### Token 管理 (heapstore_token)
+
+Token 生命周期管理，包括 Token 的创建、刷新、吊销和用量追踪。
+
+### 批量操作 (heapstore_batch)
+
+批量数据写入与查询操作，支持事务性批量提交，减少高频写入场景下的 I/O 开销。
 
 ## 数据查看器
 
@@ -78,17 +87,10 @@ heap_result_t* result = heap_store_query(store, &query);
 {
     "heapstore": {
         "data_dir": "/var/lib/agentos/heapstore",
-        "lmdb": {
-            "map_size": "10GB",
-            "max_readers": 128
-        },
+        "backend": "sqlite",
         "sqlite": {
             "journal_mode": "WAL",
             "cache_size": 64000
-        },
-        "redis": {
-            "host": "localhost",
-            "port": 6379
         }
     }
 }
