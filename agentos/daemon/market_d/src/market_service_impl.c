@@ -50,6 +50,13 @@ static int is_valid_url(const char *url) {
     return is_safe_for_shell(url);
 }
 
+static int is_safe_path_component(const char *str) {
+    if (!str || strlen(str) == 0) return 0;
+    if (strchr(str, '/') || strchr(str, '\\')) return 0;
+    if (strstr(str, "..")) return 0;
+    return 1;
+}
+
 struct market_service {
     market_config_t config;
     agent_info_t* agents[MAX_AGENTS];
@@ -156,6 +163,17 @@ int market_service_register_agent(market_service_t* service, const agent_info_t*
     new_agent->author = agent_info->author ? strdup(agent_info->author) : NULL;
     new_agent->repository = agent_info->repository ? strdup(agent_info->repository) : NULL;
     new_agent->dependencies = agent_info->dependencies ? strdup(agent_info->dependencies) : NULL;
+    if (!new_agent->agent_id || !new_agent->name || !new_agent->version) {
+        free(new_agent->agent_id);
+        free(new_agent->name);
+        free(new_agent->version);
+        free(new_agent->description);
+        free(new_agent->author);
+        free(new_agent->repository);
+        free(new_agent->dependencies);
+        free(new_agent);
+        return -3;
+    }
     new_agent->rating = agent_info->rating;
     new_agent->download_count = agent_info->download_count;
     new_agent->last_updated = (uint64_t)time(NULL);
@@ -289,6 +307,7 @@ int market_service_search_skills(market_service_t* service, const search_params_
 
 int market_service_install_agent(market_service_t* service, const install_request_t* request, install_result_t** result) {
     if (!service || !request || !result || !service->initialized) return -1;
+    if (!is_safe_path_component(request->id)) return -1;
 
     install_result_t* res = (install_result_t*)calloc(1, sizeof(install_result_t));
     if (!res) return -2;
@@ -429,6 +448,7 @@ int market_service_install_skill(market_service_t* service, const install_reques
 
 int market_service_uninstall_agent(market_service_t* service, const char* agent_id) {
     if (!service || !agent_id || !service->initialized) return -1;
+    if (!is_safe_path_component(agent_id)) return -1;
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_id) == 0) {
@@ -554,10 +574,18 @@ int market_service_reload_config(market_service_t* service, const market_config_
 
     free((void*)service->config.registry_url);
     free((void*)service->config.storage_path);
+    service->config.registry_url = NULL;
+    service->config.storage_path = NULL;
 
     memcpy(&service->config, config, sizeof(market_config_t));
-    if (config->registry_url) service->config.registry_url = strdup(config->registry_url);
-    if (config->storage_path) service->config.storage_path = strdup(config->storage_path);
+    if (config->registry_url) {
+        service->config.registry_url = strdup(config->registry_url);
+        if (!service->config.registry_url) return -2;
+    }
+    if (config->storage_path) {
+        service->config.storage_path = strdup(config->storage_path);
+        if (!service->config.storage_path) return -2;
+    }
 
     return 0;
 }
@@ -576,12 +604,25 @@ int market_service_sync_registry(market_service_t* service) {
 
     const char* storage = service->config.storage_path ?
                           service->config.storage_path : AGENTOS_CACHE_DIR;
+
+    {
+        size_t pos = 0;
+        char tmp[1024];
+        strncpy(tmp, storage, sizeof(tmp) - 1);
+        tmp[sizeof(tmp) - 1] = '\0';
+        while (tmp[pos]) {
+            if (tmp[pos] == '/' && pos > 0) {
+                tmp[pos] = '\0';
+                mkdir(tmp, 0755);
+                tmp[pos] = '/';
+            }
+            pos++;
+        }
+        mkdir(tmp, 0755);
+    }
+
     char index_path[1024];
     snprintf(index_path, sizeof(index_path), "%s/registry_index.json", storage);
-
-    char mkdir_cmd[2048];
-    snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", storage);
-    { int __rc __attribute__((unused)) = system(mkdir_cmd); }
 
     if (!is_safe_for_shell(service->config.registry_url)) {
         SVC_LOG_WARN("Sync registry: invalid registry_url, possible injection detected");
@@ -595,14 +636,22 @@ int market_service_sync_registry(market_service_t* service) {
         snprintf(url, sizeof(url), "https://%s/index.json", service->config.registry_url);
     }
 
-    char curl_cmd[4096];
-    snprintf(curl_cmd, sizeof(curl_cmd),
-            "curl -sfL -o '%s' '%s' --connect-timeout 10 --max-time 60 2>/dev/null",
-            index_path, url);
-    int curl_ret = system(curl_cmd);
-    if (curl_ret != 0) {
-        SVC_LOG_WARN("Sync registry: download failed from %s (curl_ret=%d)", url, curl_ret);
-        return 0;
+    pid_t curl_pid = fork();
+    if (curl_pid == 0) {
+        execlp("curl", "curl", "-sfL", "-o", index_path, url,
+               "--connect-timeout", "10", "--max-time", "60", (char*)NULL);
+        _exit(127);
+    } else if (curl_pid > 0) {
+        int curl_status = 0;
+        waitpid(curl_pid, &curl_status, 0);
+        int curl_ret = WIFEXITED(curl_status) ? WEXITSTATUS(curl_status) : -1;
+        if (curl_ret != 0) {
+            SVC_LOG_WARN("Sync registry: download failed from %s (curl_ret=%d)", url, curl_ret);
+            return 0;
+        }
+    } else {
+        SVC_LOG_WARN("Sync registry: fork failed: %s", strerror(errno));
+        return -2;
     }
 
     FILE* idx_fp = fopen(index_path, "r");

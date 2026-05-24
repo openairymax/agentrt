@@ -51,6 +51,12 @@ static cache_entry_t* entry_create(const char* key, const char* value) {
     if (!e) return NULL;
     e->key = memory_safe_strdup(key);
     e->value = memory_safe_strdup(value);
+    if (!e->key || !e->value) {
+        memory_safe_free(e->key);
+        memory_safe_free(e->value);
+        memory_safe_free(e);
+        return NULL;
+    }
     e->timestamp = time(NULL);
     e->prev = e->next = e->hnext = NULL;
     return e;

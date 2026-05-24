@@ -200,37 +200,36 @@ llm_service_t* llm_service_create(const char* config_path) {
         
         if (yaml_len <= 0) {
             fclose(f);
-            return svc;
-        }
-
-        char* yaml_content = (char*)malloc((size_t)yaml_len + 1);
-        if (yaml_content) {
-            size_t read_len = fread(yaml_content, 1, (size_t)yaml_len, f);
-            if (read_len != (size_t)yaml_len) { free(yaml_content); yaml_content = NULL; }
-            if (yaml_content) {
-            yaml_content[read_len] = '\0';
-            
-            cJSON* root = cJSON_Parse(yaml_content);
-            if (root) {
-                int rule_count = 0;
-                pricing_rule_t* rules = load_pricing_rules(root, &rule_count);
-                if (rules && rule_count > 0) {
-                    svc->rules = (void**)rules;
-                    svc->rule_count = rule_count;
-                    SVC_LOG_INFO("Loaded %d pricing rules", rule_count);
-                } else if (rules) {
-                    free(rules);
-                }
-                cJSON_Delete(root);
-            } else {
-                SVC_LOG_WARN("Failed to parse pricing rules from manager");
-            }
-            }
-            free(yaml_content);
         } else {
-            SVC_LOG_ERROR("Failed to allocate memory for manager content");
+            char* yaml_content = (char*)malloc((size_t)yaml_len + 1);
+            if (yaml_content) {
+                size_t read_len = fread(yaml_content, 1, (size_t)yaml_len, f);
+                if (read_len != (size_t)yaml_len) { free(yaml_content); yaml_content = NULL; }
+                if (yaml_content) {
+                yaml_content[read_len] = '\0';
+                
+                cJSON* root = cJSON_Parse(yaml_content);
+                if (root) {
+                    int rule_count = 0;
+                    pricing_rule_t* rules = load_pricing_rules(root, &rule_count);
+                    if (rules && rule_count > 0) {
+                        svc->rules = (void**)rules;
+                        svc->rule_count = rule_count;
+                        SVC_LOG_INFO("Loaded %d pricing rules", rule_count);
+                    } else if (rules) {
+                        free(rules);
+                    }
+                    cJSON_Delete(root);
+                } else {
+                    SVC_LOG_WARN("Failed to parse pricing rules from manager");
+                }
+                }
+                free(yaml_content);
+            } else {
+                SVC_LOG_ERROR("Failed to allocate memory for manager content");
+            }
+            fclose(f);
         }
-        fclose(f);
         }
     }
 

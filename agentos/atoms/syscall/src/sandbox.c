@@ -800,6 +800,7 @@ agentos_error_t agentos_sandbox_export_audit_log_json(
     }
     
     size_t audit_count = sandbox->audit_count;
+    size_t audit_capacity = sandbox->audit_capacity;
     size_t buffer_size = audit_count * 400 + 100;
     char* json = (char*)AGENTOS_MALLOC(buffer_size);
     if (!json) {
@@ -807,12 +808,17 @@ agentos_error_t agentos_sandbox_export_audit_log_json(
         return AGENTOS_ENOMEM;
     }
 
+    size_t start_idx = (audit_capacity > 0)
+        ? (sandbox->audit_write_index - audit_count + audit_capacity) % audit_capacity
+        : 0;
+
     char esc_buf[512];
     size_t pos = 0;
     pos += snprintf(json + pos, buffer_size - pos, "[\n");
     
     for (size_t i = 0; i < audit_count && pos < buffer_size - 500; i++) {
-        audit_entry_t* entry = &sandbox->audit_log[i];
+        size_t idx = (start_idx + i) % audit_capacity;
+        audit_entry_t* entry = &sandbox->audit_log[idx];
 
         json_escape_into(esc_buf, sizeof(esc_buf), entry->syscall_name);
         char esc_msg[512];
