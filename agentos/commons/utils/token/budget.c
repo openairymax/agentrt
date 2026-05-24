@@ -1,13 +1,13 @@
 /**
  * @file budget.c
- * @brief Token预算管理实现（跨平台�?
+ * @brief Token预算管理实现（跨平台?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
- * 本模块实现Token预算管理功能�?
+ * 本模块实现Token预算管理功能?
  * - 支持输入/输出Token分离统计
- * - 提供预算重置和查询接�?
- * - 线程安全的预算操�?
+ * - 提供预算重置和查询接?
+ * - 线程安全的预算操?
  */
 
 #include "token.h"
@@ -87,18 +87,18 @@ static void budget_mutex_unlock(budget_mutex_t* mutex) {
  */
 struct agentos_token_budget {
     size_t max_tokens;                    /**< 最大Token配额 */
-    atomic_size_t used_tokens;          /**< 已使用Token�?*/
-    atomic_size_t input_tokens;          /**< 输入Token�?*/
-    atomic_size_t output_tokens;        /**< 输出Token�?*/
+    atomic_size_t used_tokens;          /**< 已使用Token?*/
+    atomic_size_t input_tokens;          /**< 输入Token?*/
+    atomic_size_t output_tokens;        /**< 输出Token?*/
     atomic_uint request_count;          /**< 请求计数 */
     atomic_uint denied_count;            /**< 拒绝计数 */
-    budget_mutex_t mutex;               /**< 互斥�?*/
+    budget_mutex_t mutex;               /**< 互斥?*/
     time_t reset_time;                  /**< 重置时间 */
-    size_t window_seconds;              /**< 时间窗口（秒�?*/
+    size_t window_seconds;              /**< 时间窗口（秒?*/
 };
 
 /**
- * @brief 检查预算是否充�?
+ * @brief 检查预算是否充?
  */
 static int check_budget_available(agentos_token_budget_t* budget, size_t input, size_t output) {
     if (!budget) {

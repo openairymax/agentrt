@@ -60,13 +60,13 @@ foreach(TEST_SRC ${LLM_TEST_SOURCES})
         Threads::Threads
     )
 
-    find_package(cjson QUIET)
-    if(TARGET cjson OR cjson_FOUND)
+    # cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
+    if(AGENTOS_HAS_CJSON)
         target_link_libraries(test_llm_${TEST_NAME} PRIVATE cjson)
     endif()
 
-    find_package(CURL QUIET)
-    if(CURL_FOUND)
+    # CURL found by root CMakeLists.txt (AGENTOS_HAS_CURL)
+    if(AGENTOS_HAS_CURL)
         target_include_directories(test_llm_${TEST_NAME} PRIVATE ${CURL_INCLUDE_DIRS})
         target_link_libraries(test_llm_${TEST_NAME} PRIVATE ${CURL_LIBRARIES})
     endif()

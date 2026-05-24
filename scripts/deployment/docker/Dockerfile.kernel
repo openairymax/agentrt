@@ -98,15 +98,15 @@ WORKDIR /workspace
 # 复制源代码
 COPY . ./AgentOS/
 
-# 创建构建目录
-RUN mkdir -p build && cd build \
-    && cmake -S ../AgentOS -B . \
+# BAN-33: 构建目录在源码树外
+RUN mkdir -p /workspace/AgentOS-build \
+    && cmake -S /workspace/AgentOS -B /workspace/AgentOS-build \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=OFF \
     -DCMAKE_INSTALL_PREFIX=/opt/agentos \
     -G Ninja \
-    && cmake --build . --parallel $(nproc) \
-    && cmake --install .
+    && cmake --build /workspace/AgentOS-build --parallel $(nproc) \
+    && cmake --install /workspace/AgentOS-build
 
 # === 6. 运行时阶段 ===
 FROM ubuntu:22.04 AS runtime

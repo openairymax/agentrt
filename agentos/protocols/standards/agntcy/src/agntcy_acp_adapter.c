@@ -309,7 +309,7 @@ static int agntcy_proto_handle_request(void* context,
     (void)context;
     if (!req || !resp) return -1;
 
-    const char* raw = (const char*)req;
+    const char* __attribute__((unused)) raw = (const char*)req;
     char buf[4096];
     snprintf(buf, sizeof(buf),
         "{"

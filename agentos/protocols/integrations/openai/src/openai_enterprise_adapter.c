@@ -483,7 +483,7 @@ static void openai_on_429(struct openai_enterprise_adapter_s* adapter) {
     adapter->rate_backoff_until = now + delay_sec;
 }
 
-static int
+static int __attribute__((unused))
 openai_compute_retry_delay_ms(struct openai_enterprise_adapter_s* adapter,
                               int attempt) {
     uint32_t base_delay = (uint32_t)(OPENAI_RETRY_BASE_DELAY_MS *
@@ -536,8 +536,6 @@ int openai_chat_completion(openai_handle_t handle,
     uint64_t ts_start_ms = agentos_time_ms();
 
 #ifndef AGENTOS_HAS_CURL
-    openai_record_latency(adapter, 0.0);
-    (void)request;
     return -ENOSYS;
 #else
     if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
@@ -750,7 +748,9 @@ int openai_chat_completion_streaming(
         chunk_buf[chunk_len] = '\0';
         pos += chunk_len;
 
-        on_chunk(chunk_buf, chunk_len, (pos >= response_len), user_data);
+        on_chunk(chunk_buf, request->model,
+                 (pos >= response_len) ? OPENAI_FINISH_STOP : OPENAI_FINISH_LENGTH,
+                 user_data);
     }
 
     uint64_t ts_end_ms = agentos_time_ms();
@@ -1088,7 +1088,10 @@ int openai_enterprise_embeddings(openai_enterprise_context_t* ctx,
     req.input_text = (inputs && input_count > 0 && inputs[0]) ? strdup(inputs[0]) : strdup("");
     req.embedding_dim = 1536;
     req.model = model ? strdup(model) : strdup("text-embedding-3-small");
-    return openai_create_embedding(ctx->handle, &req, response);
+    int result = openai_create_embedding(ctx->handle, &req, response);
+    free(req.input_text);
+    free(req.model);
+    return result;
 }
 
 int openai_enterprise_list_models(openai_enterprise_context_t* ctx,
@@ -1180,6 +1183,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
             if (err_json) snprintf(err_json, err_sz, "{\"error\":{\"message\":\"chat completion failed\",\"type\":\"api_error\",\"code\":null}}");
             *response_json = err_json;
         }
+        openai_free_chat_response(&resp);
         free(msg.content);
         return rc;
     }
@@ -1190,11 +1194,12 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         int rc = openai_enterprise_embeddings(ctx, "text-embedding-ada-002", inputs, 1, &emb_resp);
         if (rc != 0) {
             *response_json = NULL;
+            openai_embedding_response_destroy(&emb_resp);
             return rc;
         }
         size_t json_sz = 512 + (emb_resp.embedding_dim > 0 ? emb_resp.embedding_dim * 16 : 0);
         char* json = (char*)malloc(json_sz);
-        if (!json) return -1;
+        if (!json) { openai_embedding_response_destroy(&emb_resp); return -1; }
         size_t pos = 0;
         pos += snprintf(json + pos, json_sz - pos,
             "{\"object\":\"list\",\"model\":\"%s\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[",
@@ -1211,6 +1216,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         pos += snprintf(json + pos, json_sz - pos, "]}],\"usage\":{\"prompt_tokens\":%zu,\"total_tokens\":%zu}}",
             (size_t)emb_resp.usage.prompt_tokens, (size_t)emb_resp.usage.total_tokens);
         *response_json = json;
+        openai_embedding_response_destroy(&emb_resp);
         return 0;
     }
     if (strcmp(path, "/v1/models") == 0) {
@@ -1373,8 +1379,11 @@ static int openai_adapter_handle_request_cb(void *c, const void *r, void **rp) {
 
     const char *request_json = (const char *)r;
     char *response_json = NULL;
+    struct openai_enterprise_context_s ctx_local;
+    memset(&ctx_local, 0, sizeof(ctx_local));
+    ctx_local.handle = (openai_handle_t)adapter;
     int rc = openai_enterprise_route_request(
-        (openai_enterprise_context_t *)adapter,
+        &ctx_local,
         "/v1/chat/completions",
         "POST",
         request_json,

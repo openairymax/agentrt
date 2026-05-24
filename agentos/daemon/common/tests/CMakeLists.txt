@@ -43,13 +43,13 @@ foreach(TEST_SRC ${TEST_SOURCES})
         Threads::Threads
     )
     
-    find_package(cjson QUIET)
-    if(TARGET cjson OR cjson_FOUND)
+    # cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
+    if(AGENTOS_HAS_CJSON)
         target_link_libraries(${TARGET_NAME} PRIVATE cjson)
     endif()
     
-    find_package(CURL QUIET)
-    if(CURL_FOUND)
+    # CURL found by root CMakeLists.txt (AGENTOS_HAS_CURL)
+    if(AGENTOS_HAS_CURL)
         target_include_directories(${TARGET_NAME} PRIVATE ${CURL_INCLUDE_DIRS})
         target_link_libraries(${TARGET_NAME} PRIVATE ${CURL_LIBRARIES})
     endif()
@@ -84,13 +84,13 @@ target_link_libraries(svc_test_daemon_common PRIVATE
     Threads::Threads
 )
 
-find_package(cjson QUIET)
-if(TARGET cjson OR cjson_FOUND)
+# cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
+if(AGENTOS_HAS_CJSON)
     target_link_libraries(svc_test_daemon_common PRIVATE cjson)
 endif()
 
-find_package(CURL QUIET)
-if(CURL_FOUND)
+# CURL found by root CMakeLists.txt (AGENTOS_HAS_CURL)
+if(AGENTOS_HAS_CURL)
     target_include_directories(svc_test_daemon_common PRIVATE ${CURL_INCLUDE_DIRS})
     target_link_libraries(svc_test_daemon_common PRIVATE ${CURL_LIBRARIES})
 endif()

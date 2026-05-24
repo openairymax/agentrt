@@ -168,7 +168,12 @@ void agentos_mutex_free(agentos_mutex_t* mutex) {
 #else
 
 int agentos_mutex_init(agentos_mutex_t* mutex) {
-    return pthread_mutex_init(mutex, NULL);
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    int ret = pthread_mutex_init(mutex, &attr);
+    pthread_mutexattr_destroy(&attr);
+    return ret;
 }
 
 int agentos_mutex_lock(agentos_mutex_t* mutex) {
