@@ -12,7 +12,7 @@
 
 static int test_create_destroy(void) {
     agntcy_handle_t* h = NULL;
-    int ret = agntcy_acp_create(&h);
+    int ret __attribute__((unused)) = agntcy_acp_create(&h);
     assert(ret == 0);
     assert(h != NULL);
     assert(h->initialized == true);
@@ -24,7 +24,7 @@ static int test_create_destroy(void) {
 }
 
 static int test_create_null(void) {
-    int ret = agntcy_acp_create(NULL);
+    int ret __attribute__((unused)) = agntcy_acp_create(NULL);
     assert(ret == -1);
     return 0;
 }
@@ -39,7 +39,7 @@ static int test_agent_register(void) {
     card.capabilities_mask = AGNTCY_CAP_DISCOVERY | AGNTCY_CAP_MESSAGING;
     strcpy(card.endpoint_url, "http://localhost:9001");
 
-    int ret = agntcy_agent_register(h, &card);
+    int ret __attribute__((unused)) = agntcy_agent_register(h, &card);
     assert(ret == 0);
     assert(h->agent_count == 1);
     assert(strcmp(h->agents[0].agent_id, "agent-001") == 0);
@@ -87,7 +87,7 @@ static int test_agent_unregister(void) {
     agntcy_agent_register(h, &card2);
     assert(h->agent_count == 2);
 
-    int ret = agntcy_agent_unregister(h, "agent-001");
+    int ret __attribute__((unused)) = agntcy_agent_unregister(h, "agent-001");
     assert(ret == 0);
     assert(h->agent_count == 1);
     assert(strcmp(h->agents[0].agent_id, "agent-002") == 0);
@@ -118,7 +118,7 @@ static int test_agent_discover(void) {
     agntcy_agent_card_t results[10];
     size_t count = 10;
 
-    int ret = agntcy_agent_discover(h, AGNTCY_CAP_CHANNEL, results, &count);
+    int ret __attribute__((unused)) = agntcy_agent_discover(h, AGNTCY_CAP_CHANNEL, results, &count);
     assert(ret == 0);
     assert(count == 1);
     assert(strcmp(results[0].agent_id, "agent-disc") == 0);
@@ -144,7 +144,7 @@ static int test_channel_open_close(void) {
     agntcy_agent_register(h, &responder);
 
     agntcy_channel_t channel = {0};
-    int ret = agntcy_channel_open(h, "init-01", "resp-01", &channel);
+    int ret __attribute__((unused)) = agntcy_channel_open(h, "init-01", "resp-01", &channel);
     assert(ret == 0);
     assert(channel.encrypted == true);
     assert(strlen(channel.session_token) == AGNTCY_ACP_TOKEN_SIZE - 1);
@@ -187,7 +187,7 @@ static int test_message_send(void) {
     char resp[4096] = {0};
     size_t resp_size = sizeof(resp);
 
-    int ret = agntcy_message_send(h, &msg, resp, &resp_size);
+    int ret __attribute__((unused)) = agntcy_message_send(h, &msg, resp, &resp_size);
     assert(ret == 0);
     assert(resp_size > 0);
     assert(strstr(resp, "msg-001") != NULL);
@@ -206,7 +206,7 @@ static int test_task_orchestrate(void) {
     worker.online = true;
     agntcy_agent_register(h, &worker);
 
-    int ret = agntcy_task_orchestrate(h, "task-001",
+    int ret __attribute__((unused)) = agntcy_task_orchestrate(h, "task-001",
         "{\"steps\":[{\"id\":\"step1\",\"action\":\"process\"}]}");
     assert(ret == 0);
     assert(h->task_count == 1);
@@ -239,7 +239,7 @@ static int test_ack_negotiate(void) {
     req.requested_amount = 500 * 1024 * 1024;
     req.cpu_cores = 2;
 
-    int ret = agntcy_ack_negotiate(h, "agent-ack", &req, &resp);
+    int ret __attribute__((unused)) = agntcy_ack_negotiate(h, "agent-ack", &req, &resp);
     assert(ret == 0);
     assert(resp.committed == true);
     assert(resp.cpu_cores == 2);

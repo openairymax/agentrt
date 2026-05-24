@@ -76,7 +76,7 @@ sync_result_t sync_condition_wait_ex(sync_condition_t condition,
         return SYNC_ERROR_INVALID;
     }
 
-    int64_t start_time = 0;
+    int64_t start_time __attribute__((unused)) = 0;
     if (timeout != NULL && timeout->timeout_ms > 0) {
         start_time = (int64_t)clock();
     }

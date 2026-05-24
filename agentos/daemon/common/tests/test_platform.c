@@ -32,7 +32,7 @@ static void test_mutex_operations(void) {
     printf("  test_mutex_operations...\n");
 
     agentos_mutex_t mutex;
-    int ret = agentos_mutex_init(&mutex);
+    int ret __attribute__((unused)) = agentos_mutex_init(&mutex);
     assert(ret == 0);
 
     ret = agentos_mutex_lock(&mutex);

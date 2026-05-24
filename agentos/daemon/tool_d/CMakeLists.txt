@@ -6,15 +6,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # 查找依赖
-find_package(Threads REQUIRED)
-find_package(PkgConfig QUIET)
-
-if(PkgConfig_FOUND)
-    pkg_check_modules(CJSON QUIET libcjson)
-else()
-    set(CJSON_FOUND FALSE)
-endif()
-if(NOT CJSON_FOUND)
+# Threads found by root CMakeLists.txt
+# PkgConfig found by root CMakeLists.txt
+# cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
+if(NOT AGENTOS_HAS_CJSON)
     message(STATUS "libcjson not found, JSON features may be limited")
 endif()
 

@@ -1,12 +1,12 @@
 /**
  * @file logging_compat.c
- * @brief 统一分层日志系统向后兼容层实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 统一分层日志系统向后兼容层实? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
  * @details
  * 本模块实现统一分层日志系统的向后兼容层，提供：
- * 1. 现有日志API到新架构的映�? * 2. 追踪ID管理的兼容实�? * 3. 服务日志API的部分兼�? * 4. 迁移进度监控和统�? * 
- * 实现策略�? * - 最小化性能开销：使用直接函数调用而非间接跳转
- * - 保持行为一致：严格模拟现有API的行为特�? * - 支持渐进迁移：提供迁移辅助工具和监控
+ * 1. 现有日志API到新架构的映? * 2. 追踪ID管理的兼容实? * 3. 服务日志API的部分兼? * 4. 迁移进度监控和统? * 
+ * 实现策略? * - 最小化性能开销：使用直接函数调用而非间接跳转
+ * - 保持行为一致：严格模拟现有API的行为特? * - 支持渐进迁移：提供迁移辅助工具和监控
  */
 
 #include "logging_compat.h"
@@ -36,10 +36,10 @@ static void log_get_registered_modules(void* out_modules, int max_modules) { (vo
 
 /* ==================== 内部全局状态 ===================== */
 
-/** @brief 兼容层初始化状�?*/
+/** @brief 兼容层初始化状?*/
 static atomic_int g_compat_initialized = 0;
 
-/** @brief 兼容层配�?*/
+/** @brief 兼容层配?*/
 static logging_compat_config_t g_compat_config = {
     .strict_compatibility = false,
     .enable_perf_optimization = true,
@@ -53,23 +53,23 @@ static logging_compat_config_t g_compat_config = {
     }
 };
 
-/** @brief 兼容层统计信�?*/
+/** @brief 兼容层统计信?*/
 static logging_compat_stats_t g_compat_stats = {0};
 
-/** @brief 线程本地存储键（用于追踪ID�?*/
+/** @brief 线程本地存储键（用于追踪ID?*/
 static _Thread_local char g_thread_trace_id[64] = {0};
 
 /* ==================== 内部辅助函数 ==================== */
 
 /**
- * @brief 转换旧日志级别到新日志级�? * 
- * 将现有API的整数日志级别转换为新架构的枚举值�? * 
- * @param old_level 旧日志级�? * @return 新日志级别，转换失败返回LOG_LEVEL_INFO
+ * @brief 转换旧日志级别到新日志级? * 
+ * 将现有API的整数日志级别转换为新架构的枚举值? * 
+ * @param old_level 旧日志级? * @return 新日志级别，转换失败返回LOG_LEVEL_INFO
  */
 static log_level_t convert_old_level_to_new(int old_level)
 {
     switch (old_level) {
-        case 0:  /* ERROR级别，根据现有实�?*/
+        case 0:  /* ERROR级别，根据现有实?*/
             return LOG_LEVEL_ERROR;
         case 1:  /* WARN级别 */
             return LOG_LEVEL_WARN;
@@ -78,7 +78,7 @@ static log_level_t convert_old_level_to_new(int old_level)
         case 3:  /* DEBUG级别 */
             return LOG_LEVEL_DEBUG;
         default:
-            /* 未知级别，根据值映�?*/
+            /* 未知级别，根据值映?*/
             if (old_level <= 0) {
                 return LOG_LEVEL_ERROR;
             } else if (old_level == 1) {
@@ -94,14 +94,14 @@ static log_level_t convert_old_level_to_new(int old_level)
 /**
  * @brief 生成旧的追踪ID格式
  * 
- * 根据现有实现生成追踪ID，保持格式一致�? * 
- * @return 追踪ID字符串（静态内存，无需释放�? */
+ * 根据现有实现生成追踪ID，保持格式一致? * 
+ * @return 追踪ID字符串（静态内存，无需释放? */
 static const char* generate_old_trace_id(void)
 {
     static char trace_id[32];
     static int counter = 0;
     
-    /* 根据现有实现，追踪ID格式�?trace-<pid>-<timestamp>-<counter>" */
+    /* 根据现有实现，追踪ID格式?trace-<pid>-<timestamp>-<counter>" */
     #ifdef _WIN32
     DWORD pid = GetCurrentProcessId();
 #else
@@ -118,7 +118,7 @@ static const char* generate_old_trace_id(void)
 /**
  * @brief 记录API映射调用
  * 
- * 记录兼容层API的调用情况，用于迁移监控�? * 
+ * 记录兼容层API的调用情况，用于迁移监控? * 
  * @param api_name API名称
  */
 static void record_api_call(const char* api_name)
@@ -135,15 +135,15 @@ static void record_api_call(const char* api_name)
         atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_get_trace_id_calls, 1);
     }
     
-    /* 如果启用API映射日志，输出调试信�?*/
+    /* 如果启用API映射日志，输出调试信?*/
     if (g_compat_config.enable_api_mapping_log) {
         fprintf(stderr, "[LOGGING_COMPAT] API call: %s\n", api_name);
     }
 }
 
 /**
- * @brief 确保兼容层已初始�? * 
- * 如果兼容层未初始化，使用默认配置初始化�? */
+ * @brief 确保兼容层已初始? * 
+ * 如果兼容层未初始化，使用默认配置初始化? */
 static void ensure_compat_initialized(void)
 {
     if (!atomic_load_explicit(&g_compat_initialized, memory_order_acquire)) {
@@ -156,7 +156,7 @@ static void ensure_compat_initialized(void)
 int logging_compat_init(const logging_compat_config_t* manager)
 {
     if (atomic_load_explicit(&g_compat_initialized, memory_order_acquire)) {
-        return 0;  /* 已经初始�?*/
+        return 0;  /* 已经初始?*/
     }
     
     /* 应用配置 */
@@ -164,13 +164,13 @@ int logging_compat_init(const logging_compat_config_t* manager)
         memcpy(&g_compat_config, manager, sizeof(g_compat_config));
     }
     
-    /* 初始化统计信�?*/
+    /* 初始化统计信?*/
     memset(&g_compat_stats, 0, sizeof(g_compat_stats));
     
-    /* 标记为已初始�?*/
+    /* 标记为已初始?*/
     int _exp = 0; atomic_compare_exchange_strong_explicit(&g_compat_initialized, &_exp, 1, memory_order_seq_cst, memory_order_seq_cst);
     
-    /* 如果启用迁移检测，记录初始化事�?*/
+    /* 如果启用迁移检测，记录初始化事?*/
     if (g_compat_config.enable_migration_detection) {
         LOG_INFO("Logging compatibility layer initialized, migration detection enabled");
     }
@@ -202,7 +202,7 @@ const char* agentos_log_set_trace_id(const char* trace_id)
         g_thread_trace_id[sizeof(g_thread_trace_id) - 1] = '\0';
     }
     
-    /* 同时设置到新架构的追踪ID管理�?*/
+    /* 同时设置到新架构的追踪ID管理?*/
     log_set_trace_id(g_thread_trace_id);
     
     return g_thread_trace_id;
@@ -264,7 +264,7 @@ int svc_logger_init(const void* manager)
     ensure_compat_initialized();
     record_api_call("svc_logger_init");
     
-    /* 服务日志初始化兼容实�?*/
+    /* 服务日志初始化兼容实?*/
     LOG_INFO("Service logger initialized via compatibility layer");
     
     LOG_INFO("Service logger initialized with legacy config compatibility");
@@ -285,7 +285,7 @@ int svc_logger_set_level(int level)
     ensure_compat_initialized();
     record_api_call("svc_logger_set_level");
     
-    /* 转换日志级别并设�?*/
+    /* 转换日志级别并设?*/
     log_level_t new_level = convert_old_level_to_new(level);
     
     /* 映射到新架构的全局级别设置 */
@@ -307,7 +307,7 @@ void svc_logger_log(int level, const char* module, const char* fmt, ...)
     va_list args;
     va_start(args, fmt);
     
-    /* 调用新架构的日志写入函数，使用模块名作为文件�?*/
+    /* 调用新架构的日志写入函数，使用模块名作为文件?*/
     log_write_va(new_level, module, 0, fmt, args);
     
     va_end(args);
@@ -324,10 +324,10 @@ int logging_compat_get_stats(logging_compat_stats_t* out_stats)
     /* 复制统计信息（使用原子操作确保一致性） */
     memcpy(out_stats, &g_compat_stats, sizeof(g_compat_stats));
     
-    /* 更新动态统计信�?*/
-    out_stats->migration_progress.total_modules = 10;  /* 示例�?*/
-    out_stats->migration_progress.migrated_modules = 2;  /* 示例�?*/
-    out_stats->migration_progress.pending_modules = 8;  /* 示例�?*/
+    /* 更新动态统计信?*/
+    out_stats->migration_progress.total_modules = 10;  /* 示例?*/
+    out_stats->migration_progress.migrated_modules = 2;  /* 示例?*/
+    out_stats->migration_progress.pending_modules = 8;  /* 示例?*/
     
     return 0;
 }
@@ -402,7 +402,7 @@ int logging_migrate_module(const char* module_name, const migration_options_t* o
     
     LOG_INFO("Starting migration of module: %s", module_name);
     
-    /* 迁移步骤�?     * 1. 分析模块中的旧API使用情况
+    /* 迁移步骤?     * 1. 分析模块中的旧API使用情况
      * 2. 生成迁移计划
      * 3. 执行自动迁移（如果可能）
      * 4. 生成迁移报告
@@ -427,7 +427,7 @@ int logging_generate_migration_report(const char* report_path)
         return -1;
     }
     
-    /* 生成JSON格式的迁移报�?*/
+    /* 生成JSON格式的迁移报?*/
     fprintf(fp, "{\n");
     fprintf(fp, "  \"report_type\": \"logging_migration\",\n");
     fprintf(fp, "  \"timestamp\": %ld,\n", (long)time(NULL));

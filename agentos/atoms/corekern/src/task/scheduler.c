@@ -50,15 +50,18 @@
  * @return 始终返回NULL（用户函数无返回值）
  * @note [INFRA] 线程适配器 - 保留供未来线程模型扩展使用
  */
-static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void* __attribute__((used)) user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
 {
     /* 用户函数是 void (*func)(void*)，我们调用它并返回NULL */
     user_func(arg);
     return NULL;
 }
+#pragma GCC diagnostic pop
 
 /**
- * @brief 包装用户线程入口函数
+ * @brief 创建适配器函数指针
  *
  * 创建适配器函数指针，用于核心层调用
  *
@@ -101,7 +104,7 @@ static int ensure_scheduler_fully_initialized(void)
  * @param platform_handle 平台特定句柄
  * @return 任务信息指针，未找到返回NULL
  */
-static task_info_core_t* find_task_by_platform_handle(void* platform_handle)
+static task_info_core_t* __attribute__((used)) find_task_by_platform_handle(void* platform_handle)
 {
     (void)platform_handle;
     scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
@@ -457,7 +460,6 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
 
     int result = ops->thread_set_priority(task_info->platform_handle, priority);
     if (result != 0) {
-        task_info->priority = priority;
         release_task_lock();
         return AGENTOS_EINVAL;
     }

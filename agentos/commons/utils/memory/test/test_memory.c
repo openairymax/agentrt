@@ -2,7 +2,7 @@
  * @file test_memory.c
  * @brief 统一内存管理模块单元测试
  * 
- * 测试内存模块的基本功能：分配、释放、统计、调试等�? * 
+ * 测试内存模块的基本功能：分配、释放、统计、调试等? * 
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -17,13 +17,13 @@
 #include "../../include/memory.h"
 
 /**
- * @brief 测试基础内存分配和释�? * 
- * @return 成功返回0，失败返�?
+ * @brief 测试基础内存分配和释? * 
+ * @return 成功返回0，失败返回值
  */
 static int test_basic_allocation(void) {
-    printf("测试基础内存分配和释�?..\n");
+    printf("测试基础内存分配和释：%..\n");
     
-    // 初始化内存模�?    memory_options_t options = {
+    // 初始化内存模?    memory_options_t options = {
         .alignment = 0,
         .zero_memory = true,
         .tag = "test_basic_allocation",
@@ -84,8 +84,8 @@ static int test_basic_allocation(void) {
         return 1;
     }
     
-    // 检查对�?    if (((uintptr_t)ptr3 & 0xF) != 0) {
-        printf("  错误：内存未对齐�?6字节边界\n");
+    // 检查对?    if (((uintptr_t)ptr3 & 0xF) != 0) {
+        printf("  错误：内存未对齐：6字节边界\n");
         memory_free(ptr3);
         memory_cleanup();
         return 1;
@@ -101,7 +101,7 @@ static int test_basic_allocation(void) {
         return 1;
     }
     
-    printf("  统计信息：分配次�?%zu，释放次�?%zu\n", 
+    printf("  统计信息：分配次：%zu，释放次：%zu\n", 
            stats.allocation_count, stats.free_count);
     
     // 清理
@@ -112,11 +112,11 @@ static int test_basic_allocation(void) {
 }
 
 /**
- * @brief 测试内存池功�? * 
- * @return 成功返回0，失败返�?
+ * @brief 测试内存池功? * 
+ * @return 成功返回0，失败返回值
  */
 static int test_memory_pool(void) {
-    printf("测试内存池功�?..\n");
+    printf("测试内存池功：%..\n");
     
     memory_options_t options = {
         .alignment = 0,
@@ -131,7 +131,7 @@ static int test_memory_pool(void) {
     }
     
     // 注意：这里直接使用内存池API，需要包含memory_pool.h
-    // 但为了简化，这里仅演示概�?    
+    // 但为了简化，这里仅演示概?    
     memory_cleanup();
     
     printf("  通过！\n");
@@ -141,7 +141,7 @@ static int test_memory_pool(void) {
 /**
  * @brief 测试内存调试功能
  * 
- * @return 成功返回0，失败返�?
+ * @return 成功返回0，失败返回值
  */
 static int test_memory_debug(void) {
     printf("测试内存调试功能...\n");
@@ -165,7 +165,7 @@ static int test_memory_debug(void) {
         return 1;
     }
     
-    // 分配一些内�?    void* ptr1 = memory_alloc(64, "debug_block_1");
+    // 分配一些内?    void* ptr1 = memory_alloc(64, "debug_block_1");
     void* ptr2 = memory_alloc(128, "debug_block_2");
     void* ptr3 = memory_alloc(256, "debug_block_3");
     
@@ -178,7 +178,7 @@ static int test_memory_debug(void) {
         return 1;
     }
     
-    // 检查泄�?    size_t leaked_bytes = memory_check_leaks(false);
+    // 检查泄?    size_t leaked_bytes = memory_check_leaks(false);
     if (leaked_bytes == 0) {
         printf("  错误：应检测到泄漏但未检测到\n");
         memory_free(ptr1);
@@ -188,14 +188,14 @@ static int test_memory_debug(void) {
         return 1;
     }
     
-    printf("  检测到泄漏�?zu字节\n", leaked_bytes);
+    printf("  检测到泄漏：%zu字节\n", leaked_bytes);
     
     // 释放内存
     memory_free(ptr1);
     memory_free(ptr2);
     memory_free(ptr3);
     
-    // 再次检查泄�?    leaked_bytes = memory_check_leaks(false);
+    // 再次检查泄?    leaked_bytes = memory_check_leaks(false);
     if (leaked_bytes != 0) {
         printf("  错误：内存释放后仍检测到泄漏\n");
         memory_cleanup();
@@ -218,7 +218,7 @@ static int test_memory_debug(void) {
 /**
  * @brief 测试内存分配失败处理
  * 
- * @return 成功返回0，失败返�?
+ * @return 成功返回0，失败返回值
  */
 static int test_allocation_failure(void) {
     printf("测试内存分配失败处理...\n");
@@ -252,15 +252,15 @@ static int test_allocation_failure(void) {
 }
 
 /**
- * @brief 主测试函�? * 
- * @return 成功返回0，失败返�?
+ * @brief 主测试函? * 
+ * @return 成功返回0，失败返回值
  */
 int main(void) {
     printf("=== 统一内存管理模块单元测试 ===\n");
     
     int result = 0;
     
-    // 运行所有测�?    result |= test_basic_allocation();
+    // 运行所有测?    result |= test_basic_allocation();
     result |= test_memory_pool();
     result |= test_memory_debug();
     result |= test_allocation_failure();

@@ -55,7 +55,7 @@ static void test_round_robin_strategy(void) {
         printf("    Selected agent: %s\n", result->selected_agent_id);
     }
 
-    size_t agent_count = strategy->get_available_agent_count(data);
+    size_t agent_count __attribute__((unused)) = strategy->get_available_agent_count(data);
     assert(agent_count >= 1);
 
     strategy->destroy(data);
@@ -164,7 +164,7 @@ static void test_priority_based_strategy(void) {
     config.strategy = SCHED_STRATEGY_ROUND_ROBIN;
     config.max_agents = 10;
 
-    int ret = strategy->create(&config, &data);
+    int ret __attribute__((unused)) = strategy->create(&config, &data);
     assert(ret == 0);
     assert(data != NULL);
 

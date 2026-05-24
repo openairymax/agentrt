@@ -402,7 +402,7 @@ static void merge_mapping_into(yaml_document_t* doc, struct yaml_node* target, s
 
     target->mapping = (struct yaml_mapping_entry*)yaml_safe_realloc(
         target->mapping, cap * sizeof(struct yaml_mapping_entry));
-    if (!target->mapping) return NULL;
+    if (!target->mapping) return;
 
     for (size_t i = 0; i < src_sz; i++) {
         bool found = false;
@@ -419,7 +419,7 @@ static void merge_mapping_into(yaml_document_t* doc, struct yaml_node* target, s
                 cap *= 2;
                 target->mapping = (struct yaml_mapping_entry*)yaml_safe_realloc(
                     target->mapping, cap * sizeof(struct yaml_mapping_entry));
-                if (!target->mapping) return NULL;
+                if (!target->mapping) return;
             }
             target->mapping[tgt_current].key = strdup(source->mapping[i].key);
             target->mapping[tgt_current].value = deep_copy_node(doc, source->mapping[i].value);
