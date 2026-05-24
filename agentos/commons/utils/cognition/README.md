@@ -37,7 +37,43 @@
 
 ## 使用示例
 
-### Agent 信息注册与查询
+### C API
+
+```c
+#include "cognition/cognition_common.h"
+
+agent_info_t agents[3];
+agent_info_init(&agents[0], "agent-001");
+agent_info_init(&agents[1], "agent-002");
+agent_info_init(&agents[2], "agent-003");
+
+agent_info_update_stats(&agents[0], true, 120);
+agent_info_update_stats(&agents[1], false, 350);
+agent_info_update_stats(&agents[2], true, 80);
+
+task_info_t task;
+task_info_init(&task, "task-001", "code_review", "Review PR #42");
+
+dispatch_result_t dispatch;
+cognition_select_best_agent(agents, 3, &task, &dispatch);
+if (dispatch.success) {
+    printf("Selected: %s (confidence: %.2f)\n",
+           dispatch.selected_agent, dispatch.confidence);
+}
+
+plan_result_t plan;
+cognition_generate_plan(&task, &plan);
+if (plan.success) {
+    printf("Plan: %s\n", plan.plan);
+}
+
+dispatch_result_cleanup(&dispatch);
+plan_result_cleanup(&plan);
+task_info_cleanup(&task);
+for (int i = 0; i < 3; i++) agent_info_cleanup(&agents[i]);
+```
+
+### Python API
 
 ```python
 from cognition import AgentInfoManager

@@ -21,7 +21,35 @@
 
 ## 使用场景
 
-### 负载均衡
+### C API
+
+```c
+#include "strategy/strategy_common.h"
+
+strategy_agent_info_t agents[] = {
+    { .cost_estimate = 0.3, .success_rate = 0.95, .trust_score = 0.8, .name = "node-1" },
+    { .cost_estimate = 0.5, .success_rate = 0.90, .trust_score = 0.9, .name = "node-2" },
+    { .cost_estimate = 0.2, .success_rate = 0.85, .trust_score = 0.7, .name = "node-3" },
+};
+
+weighted_config_t config = strategy_create_default_weighted_config();
+config.cost_weight  = 0.3f;
+config.perf_weight  = 0.4f;
+config.trust_weight = 0.3f;
+
+if (!strategy_validate_weighted_config(&config)) {
+    config = strategy_normalize_weights(&config);
+}
+
+strategy_result_t result;
+strategy_select_best_agent(agents, 3, &config, &result);
+if (result.success) {
+    printf("Selected: %s (score: %.3f)\n",
+           agents[result.selected_index].name, result.best_score);
+}
+```
+
+### 负载均衡（Python）
 
 选择最合适的服务节点处理请求：
 

@@ -54,6 +54,7 @@ static struct {
     size_t capacity;
     agentos_mutex_t lock;
     int initialized;
+    char subject_buf[512];
 } g_apikey = { .initialized = 0 };
 
 /* ==================== 速率限制内部状态 ==================== */
@@ -160,6 +161,7 @@ static void hmac_openssl(const char* key, const char* message,
 #define HMAC_IMPL_NAME "OpenSSL"
 
 #if defined(AUTH_USE_OPENSSL)
+/* 
  * ═══════════════════════════════════════════════════════════════
  * 模式 2: mbedTLS HMAC-SHA256 (嵌入式环境)
  * ═══════════════════════════════════════════════════════════════
@@ -176,8 +178,8 @@ static void hmac_mbedtls(const char* key, const char* message,
         (const unsigned char*)key, strlen(key));
     mbedtls_md_hmac_update(&ctx,
         (const unsigned char*)message, strlen(message));
-    mbedtls_md_hmac_finish(ctx, output);
-    mbedtls_md_free(ctx);
+    mbedtls_md_hmac_finish(&ctx, output);
+    mbedtls_md_free(&ctx);
     if (*out_len > 32) *out_len = 32;
 }
 #define HMAC_IMPL_NAME "mbedTLS"
@@ -228,6 +230,7 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
                      0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
 
     size_t msg_len = strlen(message);
+    if (msg_len > SIZE_MAX - 72) { *out_len = 0; return; }
     size_t new_len = ((msg_len + 8) / 64 + 1) * 64;
     unsigned char* msg = (unsigned char*)calloc(new_len + 64, 1);
     if (!msg) { *out_len = 0; return; }
@@ -350,7 +353,6 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
     size_t outer_padded = ((olen + 8) / 64 + 1) * 64;
     unsigned char* outer = calloc(outer_padded + 64, 1);
     if (!outer) {
-        free(inner);
         return;
     }
     memcpy(outer, k_opad, 64);
@@ -430,7 +432,7 @@ int auth_jwt_init(const jwt_config_t* config) {
 #elif defined(AUTH_USE_MBEDTLS)
     g_hmac_impl = hmac_mbedtls;
 #else
-    g_hmac_impl = hmac_openssl;
+    g_hmac_impl = hmac_builtin;
 #endif
 
     g_jwt.initialized = 1;
@@ -619,6 +621,10 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     if (cJSON_IsString(sub)) {
         strncpy(g_jwt.subject_buf, sub->valuestring, MAX_SUBJECT_SIZE - 1);
         g_jwt.subject_buf[MAX_SUBJECT_SIZE - 1] = '\0';
+        if (strlen(sub->valuestring) >= MAX_SUBJECT_SIZE) {
+            SVC_LOG_WARN("JWT subject truncated to %d chars: original length=%zu",
+                         MAX_SUBJECT_SIZE, strlen(sub->valuestring));
+        }
         result->subject = g_jwt.subject_buf;
     }
     if (cJSON_IsString(role)) {
@@ -781,6 +787,7 @@ void auth_jwt_cleanup(void) {
         SVC_LOG_INFO("JWT authentication module cleaned up");
     }
     agentos_mutex_unlock(&g_jwt.lock);
+    agentos_mutex_destroy(&g_jwt.lock);
 }
 
 /* ==================== API Key 实现 ==================== */
@@ -840,7 +847,9 @@ int auth_apikey_verify(const char* api_key, auth_result_t* result) {
 
             result->status = AUTH_SUCCESS;
             result->error_message = NULL;
-            result->subject = api_key;  /* API Key 作为标识 */
+            strncpy(g_apikey.subject_buf, api_key, sizeof(g_apikey.subject_buf) - 1);
+            g_apikey.subject_buf[sizeof(g_apikey.subject_buf) - 1] = '\0';
+            result->subject = g_apikey.subject_buf;
             result->role = "api_user";
 
             agentos_mutex_unlock(&g_apikey.lock);
@@ -1104,6 +1113,8 @@ void auth_ratelimit_cleanup(void) {
 
 int auth_init(const auth_config_t* config) {
     int ret = 0;
+
+    if (!config) return AUTH_FAILED;
 
     if (config->enable_jwt) {
         const jwt_config_t* jwt_cfg = &config->jwt;
