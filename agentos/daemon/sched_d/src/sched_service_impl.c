@@ -219,9 +219,13 @@ int sched_service_reload_config(sched_service_t* service, const sched_config_t* 
     if (!service || !config || !service->initialized) return -1;
 
     free((void*)service->config.ml_model_path);
+    service->config.ml_model_path = NULL;
 
     memcpy(&service->config, config, sizeof(sched_config_t));
-    if (config->ml_model_path) service->config.ml_model_path = strdup(config->ml_model_path);
+    if (config->ml_model_path) {
+        service->config.ml_model_path = strdup(config->ml_model_path);
+        if (!service->config.ml_model_path) return -3;
+    }
 
     return 0;
 }

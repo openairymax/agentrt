@@ -479,20 +479,20 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
             }
         }
     } else {
-        // 同一地址，大小可能改变
         if (new_size > old_size) {
             memory_update_stats_alloc(new_size - old_size);
-            
-            // 更新调试信息大小
-            if (debug_info != NULL) {
-                debug_info->size = new_size;
-            }
         } else if (new_size < old_size) {
             memory_update_stats_free(old_size - new_size);
-            
-            // 更新调试信息大小
-            if (debug_info != NULL) {
-                debug_info->size = new_size;
+        }
+
+        if (g_state.debug_enabled) {
+            if (debug_info_saved) {
+                memory_add_debug_info(new_ptr, new_size, saved_tag[0] ? saved_tag : tag,
+                                      saved_file[0] ? saved_file : __FILE__,
+                                      saved_line > 0 ? saved_line : __LINE__,
+                                      saved_func[0] ? saved_func : __func__);
+            } else {
+                memory_add_debug_info(new_ptr, new_size, tag, __FILE__, __LINE__, __func__);
             }
         }
     }

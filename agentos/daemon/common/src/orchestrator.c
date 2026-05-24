@@ -531,12 +531,16 @@ static char* build_correction_prompt(const char* output, const char* critique) {
     return prompt;
 }
 
-static float extract_score_from_json(const char* json) {
-    if (!json) return 0.0f;
-    const char* key = "\"score\"";
+static float extract_score_for_field(const char* json, const char* field) {
+    if (!json || !field) return 0.0f;
+    size_t flen = strlen(field) + 4;
+    char* key = (char*)malloc(flen);
+    if (!key) return 0.0f;
+    snprintf(key, flen, "\"%s\"", field);
     const char* p = strstr(json, key);
+    free(key);
     if (!p) return 0.0f;
-    p += strlen(key);
+    p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
     char* end = NULL;
     float val = strtof(p, &end);
@@ -544,6 +548,10 @@ static float extract_score_from_json(const char* json) {
     if (val < 0.0f) val = 0.0f;
     if (val > 1.0f) val = 1.0f;
     return val;
+}
+
+static float extract_score_from_json(const char* json) {
+    return extract_score_for_field(json, "score");
 }
 
 static bool extract_bool_from_json(const char* json, const char* field) {
@@ -1223,12 +1231,9 @@ static int execute_single_phase(orchestrator_t* orch,
                 char* align_result = call_llm_service(align_prompt,
                     "You are an alignment scoring agent.");
                 if (align_result) {
-                    logic_score = extract_score_from_json(
-                        strstr(align_result, "logic_score") ? align_result : NULL);
-                    fact_score = extract_score_from_json(
-                        strstr(align_result, "fact_score") ? align_result : NULL);
-                    goal_score = extract_score_from_json(
-                        strstr(align_result, "goal_score") ? align_result : NULL);
+                    logic_score = extract_score_for_field(align_result, "logic_score");
+                    fact_score = extract_score_for_field(align_result, "fact_score");
+                    goal_score = extract_score_for_field(align_result, "goal_score");
                     free(align_result);
                 }
 

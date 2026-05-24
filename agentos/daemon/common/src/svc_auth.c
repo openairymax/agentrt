@@ -1000,6 +1000,7 @@ int auth_ratelimit_check(const char* client_id) {
     if (!entry && free_slot != SIZE_MAX) {
         entry = &g_ratelimit.entries[free_slot];
         strncpy(entry->client_id, client_id, sizeof(entry->client_id) - 1);
+        entry->client_id[sizeof(entry->client_id) - 1] = '\0';
         entry->max_tokens = (double)g_ratelimit.config.burst_size;
         entry->tokens = entry->max_tokens;
         entry->refill_rate = (double)g_ratelimit.config.requests_per_sec;
@@ -1024,6 +1025,7 @@ int auth_ratelimit_check(const char* client_id) {
         entry = &g_ratelimit.entries[oldest_idx];
         SVC_LOG_DEBUG("Rate limit: evicting stale client: %s", entry->client_id);
         strncpy(entry->client_id, client_id, sizeof(entry->client_id) - 1);
+        entry->client_id[sizeof(entry->client_id) - 1] = '\0';
         entry->max_tokens = (double)g_ratelimit.config.burst_size;
         entry->tokens = entry->max_tokens;  /* 重置令牌，不继承旧值 */
         entry->refill_rate = (double)g_ratelimit.config.requests_per_sec;
