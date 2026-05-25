@@ -2,6 +2,8 @@
 
 `agentos/openlab/contrib/skills/github_skill/`
 
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+
 ## 概述
 
 GitHub 技能模块为 AgentOS 提供全面的 GitHub 平台集成能力，支持版本仓库管理、Issue 跟踪、代码审查、CI/CD 操作等核心功能。该模块通过 GitHub REST API 和 GraphQL API 实现与 GitHub 生态的深度交互。

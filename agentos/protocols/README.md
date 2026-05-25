@@ -8,29 +8,71 @@ Protocols 层是 AgentOS 的**通信协议规范集合**，定义系统内部模
 
 ## 协议层次
 
-AgentOS 的协议体系分为三个层次：
+AgentOS 的协议体系分为五个层次：
 
 ```
-┌─────────────────────────────────────────────────────┐
-│           External Protocols (外部协议)               │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌────────┐ │
-│  │ HTTP    │  │WebSocket│  │   MQTT  │  │ gRPC   │ │
-│  │ RESTful │  │         │  │         │  │        │ │
-│  └─────────┘  └─────────┘  └─────────┘  └────────┘ │
-├─────────────────────────────────────────────────────┤
-│          Inter-Service Protocols (服务间协议)         │
-│  ┌───────────────────────────────────────────────┐  │
-│  │           JSON-RPC 2.0 over IPC                │  │
-│  │  服务注册 · 服务发现 · 远程调用 · 事件广播      │  │
-│  └───────────────────────────────────────────────┘  │
-├─────────────────────────────────────────────────────┤
-│            Internal IPC (内部进程间通信)              │
-│  ┌───────────────────────────────────────────────┐  │
-│  │              Binder Protocol                    │  │
-│  │  消息头 + 负载 · 同步/异步 · 零拷贝传输        │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                     Frameworks Layer (框架适配层)                     │
+│  ┌──────────────────┐  ┌──────────────────┐                        │
+│  │ langchain_adapter │  │  autogen_adapter  │                        │
+│  └──────────────────┘  └──────────────────┘                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                  Integrations Layer (集成适配层)                      │
+│  ┌───────────────┐ ┌──────────────┐ ┌─────────────┐ ┌───────────┐ │
+│  │openai_enterprise│ │openjiuwen    │ │ openclaw    │ │  claude   │ │
+│  │   _adapter     │ │  _adapter    │ │  _adapter   │ │ _adapter  │ │
+│  └───────────────┘ └──────────────┘ └─────────────┘ └───────────┘ │
+│  ┌───────────────┐                                                  │
+│  │ china_eco     │                                                  │
+│  │  _adapter     │                                                  │
+│  └───────────────┘                                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                   Standards Layer (标准协议层)                        │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌───────────┐ │
+│  │a2a_v03       │ │ mcp_v1       │ │ mcp_transport│ │ agntcy_acp│ │
+│  │  _adapter    │ │  _adapter    │ │              │ │  _adapter │ │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └───────────┘ │
+├─────────────────────────────────────────────────────────────────────┤
+│                     Core Layer (核心层)                              │
+│  ┌──────────────┐ ┌──────────────────────┐ ┌───────────────────┐  │
+│  │protocol_router│ │protocol_extension    │ │protocol_          │  │
+│  │              │ │   _framework         │ │  transformers     │  │
+│  └──────────────┘ └──────────────────────┘ └───────────────────┘  │
+│  ┌──────────────┐                                                   │
+│  │protocol_     │                                                   │
+│  │  registry    │                                                   │
+│  └──────────────┘                                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Common Layer (公共层)                              │
+│  ┌──────────────────────┐  ┌──────────────────┐                    │
+│  │ unified_protocol.c   │  │ protocols_impl.c │                    │
+│  └──────────────────────┘  └──────────────────┘                    │
+└─────────────────────────────────────────────────────────────────────┘
 ```
+
+### 各层说明
+
+| 层次 | 组件 | 职责 |
+|------|------|------|
+| **Common Layer** | `unified_protocol.c`, `protocols_impl.c` | 统一协议接口与公共实现 |
+| **Core Layer** | `protocol_router.c`, `protocol_extension_framework.c`, `protocol_transformers.c`, `protocol_registry.c` | 协议路由、扩展框架、数据转换与注册中心 |
+| **Standards Layer** | `a2a_v03_adapter.c`, `mcp_v1_adapter.c`, `mcp_transport.c`, `agntcy_acp_adapter.c` | A2A、MCP、AGNTCY ACP 等标准协议适配 |
+| **Integrations Layer** | `openai_enterprise_adapter.c`, `openjiuwen_adapter.c`, `openclaw_adapter.c`, `claude_adapter.c`, `china_eco_adapter.c` | 主流 AI 平台与生态集成适配 |
+| **Frameworks Layer** | `langchain_adapter.c`, `autogen_adapter.c` | LangChain、AutoGen 等框架适配 |
+
+## 构建选项
+
+协议层支持通过 CMake 选项控制各适配器的编译：
+
+| 选项 | 默认值 | 说明 |
+|------|--------|------|
+| `PROTOCOLS_ENABLE_OPENCLAW` | OFF | OpenClaw 协议适配器 |
+| `PROTOCOLS_ENABLE_CLAUDE` | ON | Claude 协议适配器 |
+| `PROTOCOLS_ENABLE_LANGCHAIN` | ON | LangChain 框架适配器 |
+| `PROTOCOLS_ENABLE_AUTOGEN` | ON | AutoGen 框架适配器 |
+| `PROTOCOLS_ENABLE_AGNTCY` | ON | AGNTCY ACP 协议适配器 |
+| `PROTOCOLS_ENABLE_CHINA_ECO` | ON | 中国 AI 生态适配器 |
+| `PROTOCOLS_ENABLE_MCP` | ON（Windows 上为 OFF） | MCP 协议适配器 |
 
 ---
 

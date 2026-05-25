@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file cost_tracker.c
  * @brief 成本跟踪实现（根据配置规则匹配）
@@ -47,12 +48,12 @@ static void get_price(const cost_tracker_t* ct, const char* model,
 }
 
 cost_tracker_t* cost_tracker_create(const pricing_rule_t* rules, int rule_count) {
-    cost_tracker_t* ct = calloc(1, sizeof(cost_tracker_t));
+    cost_tracker_t* ct = AGENTOS_CALLOC(1, sizeof(cost_tracker_t));
     if (!ct) return NULL;
     if (rule_count > 0) {
-        ct->rules = malloc(rule_count * sizeof(pricing_rule_t));
+        ct->rules = AGENTOS_MALLOC(rule_count * sizeof(pricing_rule_t));
         if (!ct->rules) {
-            free(ct);
+            AGENTOS_FREE(ct);
             return NULL;
         }
         memcpy(ct->rules, rules, rule_count * sizeof(pricing_rule_t));
@@ -68,14 +69,14 @@ void cost_tracker_destroy(cost_tracker_t* ct) {
     model_cost_t* m = ct->models;
     while (m) {
         model_cost_t* next = m->next;
-        free(m->model);
-        free(m);
+        AGENTOS_FREE(m->model);
+        AGENTOS_FREE(m);
         m = next;
     }
     agentos_mutex_unlock(&ct->lock);
     agentos_mutex_destroy(&ct->lock);
-    free(ct->rules);
-    free(ct);
+    AGENTOS_FREE(ct->rules);
+    AGENTOS_FREE(ct);
 }
 
 void cost_tracker_add(cost_tracker_t* ct, const char* model,
@@ -88,12 +89,12 @@ void cost_tracker_add(cost_tracker_t* ct, const char* model,
         m = m->next;
     }
     if (!m) {
-        m = calloc(1, sizeof(model_cost_t));
+        m = AGENTOS_CALLOC(1, sizeof(model_cost_t));
         if (!m) {
             agentos_mutex_unlock(&ct->lock);
             return;
         }
-        m->model = strdup(model);
+        m->model = AGENTOS_STRDUP(model);
         m->next = ct->models;
         ct->models = m;
     }

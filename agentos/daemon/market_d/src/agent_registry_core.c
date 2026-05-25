@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file agent_registry_core.c
  * @brief Agent注册表核心功能实现
@@ -20,7 +21,7 @@ struct agent_registry {
 };
 
 agent_registry_t* agent_registry_core_create(void) {
-    agent_registry_t* reg = (agent_registry_t*)calloc(1, sizeof(agent_registry_t));
+    agent_registry_t* reg = (agent_registry_t*)AGENTOS_CALLOC(1, sizeof(agent_registry_t));
     if (!reg) return NULL;
     agentos_mutex_init(&reg->lock);
     reg->initialized = 0;
@@ -31,12 +32,12 @@ void agent_registry_core_destroy(agent_registry_t* registry) {
     if (!registry) return;
     if (registry->initialized) agent_registry_core_shutdown(registry);
     agentos_mutex_destroy(&registry->lock);
-    free(registry);
+    AGENTOS_FREE(registry);
 }
 
 int agent_registry_core_init(agent_registry_t* registry, const char* db_path) {
     if (!registry || registry->initialized) return -1;
-    if (db_path) registry->db_path = strdup(db_path);
+    if (db_path) registry->db_path = AGENTOS_STRDUP(db_path);
     registry->entry_count = 0;
     registry->initialized = 1;
     return 0;
@@ -46,11 +47,11 @@ void agent_registry_core_shutdown(agent_registry_t* registry) {
     if (!registry || !registry->initialized) return;
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
-        free(registry->entries[i].description);
-        free(registry->entries[i].author);
+        AGENTOS_FREE(registry->entries[i].description);
+        AGENTOS_FREE(registry->entries[i].author);
     }
     registry->entry_count = 0;
-    free(registry->db_path);
+    AGENTOS_FREE(registry->db_path);
     registry->db_path = NULL;
     registry->initialized = 0;
     agentos_mutex_unlock(&registry->lock);
@@ -66,8 +67,8 @@ int agent_registry_core_add(agent_registry_t* registry, const agent_entry_t* reg
     memset(entry, 0, sizeof(agent_entry_t));
     strncpy(entry->id, reg->id, sizeof(entry->id) - 1);
     strncpy(entry->name, reg->name, sizeof(entry->name) - 1);
-    if (reg->description) entry->description = strdup(reg->description);
-    if (reg->author) entry->author = strdup(reg->author);
+    if (reg->description) entry->description = AGENTOS_STRDUP(reg->description);
+    if (reg->author) entry->author = AGENTOS_STRDUP(reg->author);
     entry->created_at = (uint64_t)time(NULL);
     entry->updated_at = entry->created_at;
     entry->verified = reg->verified;
@@ -82,8 +83,8 @@ int agent_registry_core_remove(agent_registry_t* registry, const char* agent_id)
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
         if (strcmp(registry->entries[i].id, agent_id) == 0) {
-            free(registry->entries[i].description);
-            free(registry->entries[i].author);
+            AGENTOS_FREE(registry->entries[i].description);
+            AGENTOS_FREE(registry->entries[i].author);
             for (size_t j = i; j < registry->entry_count - 1; j++) {
                 registry->entries[j] = registry->entries[j + 1];
             }

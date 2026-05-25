@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file manager.c
  * @brief 工具服务配置加载（YAML）
@@ -11,13 +12,13 @@
 #include <string.h>
 
 static void free_tool_def(tool_def_t* def) {
-    free(def->name);
-    free(def->executable);
+    AGENTOS_FREE(def->name);
+    AGENTOS_FREE(def->executable);
     if (def->params) {
-        for (char** p = def->params; *p; ++p) free(*p);
-        free(def->params);
+        for (char** p = def->params; *p; ++p) AGENTOS_FREE(*p);
+        AGENTOS_FREE(def->params);
     }
-    free(def->permission_rule);
+    AGENTOS_FREE(def->permission_rule);
 }
 
 tool_config_t* tool_config_load(const char* path) {
@@ -32,7 +33,7 @@ tool_config_t* tool_config_load(const char* path) {
     yaml_parser_initialize(&parser);
     yaml_parser_set_input_file(&parser, f);
 
-    tool_config_t* cfg = calloc(1, sizeof(tool_config_t));
+    tool_config_t* cfg = AGENTOS_CALLOC(1, sizeof(tool_config_t));
     if (!cfg) {
         fclose(f);
         yaml_parser_delete(&parser);
@@ -43,7 +44,7 @@ tool_config_t* tool_config_load(const char* path) {
     cfg->cache_capacity = 100;
     cfg->cache_ttl_sec = 300;
     cfg->executor_workers = 4;
-    cfg->workbench_type = strdup("process");
+    cfg->workbench_type = AGENTOS_STRDUP("process");
 
     /* 解析状态机 */
     enum { STATE_ROOT, STATE_TOOLS, STATE_TOOL } state = STATE_ROOT;
@@ -66,10 +67,10 @@ tool_config_t* tool_config_load(const char* path) {
             } else if (state == STATE_TOOL) {
                 if (strcmp(val, "name") == 0) {
                     yaml_parser_parse(&parser, &event);
-                    cur_tool.name = strdup((const char*)event.data.scalar.value);
+                    cur_tool.name = AGENTOS_STRDUP((const char*)event.data.scalar.value);
                 } else if (strcmp(val, "executable") == 0) {
                     yaml_parser_parse(&parser, &event);
-                    cur_tool.executable = strdup((const char*)event.data.scalar.value);
+                    cur_tool.executable = AGENTOS_STRDUP((const char*)event.data.scalar.value);
                 } else if (strcmp(val, "params") == 0) {
                     /* 进入参数列表 */
                 } else if (strcmp(val, "-") == 0 && in_tools_list) {
@@ -78,14 +79,14 @@ tool_config_t* tool_config_load(const char* path) {
                     const char* param = (const char*)event.data.scalar.value;
                     if (params_cnt + 1 >= params_cap) {
                         params_cap = params_cap ? params_cap * 2 : 4;
-                        char** new_params = realloc(params, params_cap * sizeof(*params));
+                        char** new_params = AGENTOS_REALLOC(params, params_cap * sizeof(*params));
                         if (!new_params) {
                             SVC_LOG_ERROR("Out of memory");
                             goto error;
                         }
                         params = new_params;
                     }
-                    params[params_cnt++] = strdup(param);
+                    params[params_cnt++] = AGENTOS_STRDUP(param);
                 } else if (strcmp(val, "timeout_sec") == 0) {
                     yaml_parser_parse(&parser, &event);
                     cur_tool.timeout_sec = atoi((const char*)event.data.scalar.value);
@@ -94,7 +95,7 @@ tool_config_t* tool_config_load(const char* path) {
                     cur_tool.cacheable = atoi((const char*)event.data.scalar.value);
                 } else if (strcmp(val, "permission_rule") == 0) {
                     yaml_parser_parse(&parser, &event);
-                    cur_tool.permission_rule = strdup((const char*)event.data.scalar.value);
+                    cur_tool.permission_rule = AGENTOS_STRDUP((const char*)event.data.scalar.value);
                 } else if (strcmp(val, "cache_capacity") == 0 && state == STATE_ROOT) {
                     yaml_parser_parse(&parser, &event);
                     cfg->cache_capacity = atoi((const char*)event.data.scalar.value);
@@ -106,11 +107,11 @@ tool_config_t* tool_config_load(const char* path) {
                     cfg->executor_workers = atoi((const char*)event.data.scalar.value);
                 } else if (strcmp(val, "workbench_type") == 0 && state == STATE_ROOT) {
                     yaml_parser_parse(&parser, &event);
-                    free(cfg->workbench_type);
-                    cfg->workbench_type = strdup((const char*)event.data.scalar.value);
+                    AGENTOS_FREE(cfg->workbench_type);
+                    cfg->workbench_type = AGENTOS_STRDUP((const char*)event.data.scalar.value);
                 } else if (strcmp(val, "container_image") == 0 && state == STATE_ROOT) {
                     yaml_parser_parse(&parser, &event);
-                    cfg->container_image = strdup((const char*)event.data.scalar.value);
+                    cfg->container_image = AGENTOS_STRDUP((const char*)event.data.scalar.value);
                 }
             }
         } else if (event.type == YAML_MAPPING_END_EVENT) {
@@ -126,7 +127,7 @@ tool_config_t* tool_config_load(const char* path) {
                 /* 添加到 cfg->tools 数组 */
                 size_t cur_cnt = 0;
                 while (cfg->tools && cfg->tools[cur_cnt].name) cur_cnt++;
-                tool_def_t* new_tools = realloc(cfg->tools, (cur_cnt + 2) * sizeof(tool_def_t));
+                tool_def_t* new_tools = AGENTOS_REALLOC(cfg->tools, (cur_cnt + 2) * sizeof(tool_def_t));
                 if (!new_tools) {
                     SVC_LOG_ERROR("Out of memory");
                     goto error;
@@ -158,8 +159,8 @@ error:
     tool_config_free(cfg);
     free_tool_def(&cur_tool);
     if (params) {
-        for (size_t i = 0; i < params_cnt; ++i) free(params[i]);
-        free(params);
+        for (size_t i = 0; i < params_cnt; ++i) AGENTOS_FREE(params[i]);
+        AGENTOS_FREE(params);
     }
     return NULL;
 }
@@ -170,9 +171,9 @@ void tool_config_free(tool_config_t* cfg) {
         for (tool_def_t* t = cfg->tools; t->name; ++t) {
             free_tool_def(t);
         }
-        free(cfg->tools);
+        AGENTOS_FREE(cfg->tools);
     }
-    free(cfg->workbench_type);
-    free(cfg->container_image);
-    free(cfg);
+    AGENTOS_FREE(cfg->workbench_type);
+    AGENTOS_FREE(cfg->container_image);
+    AGENTOS_FREE(cfg);
 }

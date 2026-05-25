@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file round_robin.c
  * @brief 轮询调度策略实现
@@ -41,7 +42,7 @@ static char* safe_strdup(const char* src) {
     if (!src) {
         return NULL;
     }
-    char* dest = strdup(src);
+    char* dest = AGENTOS_STRDUP(src);
     return dest;
 }
 
@@ -52,14 +53,14 @@ static char* safe_strdup(const char* src) {
 static void free_agent_info(agent_info_t* agent) {
     if (!agent) return;
     if (agent->agent_id) {
-        free(agent->agent_id);
+        AGENTOS_FREE(agent->agent_id);
         agent->agent_id = NULL;
     }
     if (agent->agent_name) {
-        free(agent->agent_name);
+        AGENTOS_FREE(agent->agent_name);
         agent->agent_name = NULL;
     }
-    free(agent);
+    AGENTOS_FREE(agent);
 }
 
 /**
@@ -72,7 +73,7 @@ static agent_info_t* clone_agent_info(const agent_info_t* src) {
         return NULL;
     }
 
-    agent_info_t* dest = (agent_info_t*)malloc(sizeof(agent_info_t));
+    agent_info_t* dest = (agent_info_t*)AGENTOS_MALLOC(sizeof(agent_info_t));
     if (!dest) {
         return NULL;
     }
@@ -81,7 +82,7 @@ static agent_info_t* clone_agent_info(const agent_info_t* src) {
     if (src->agent_id) {
         dest->agent_id = safe_strdup(src->agent_id);
         if (!dest->agent_id) {
-            free(dest);
+            AGENTOS_FREE(dest);
             return NULL;
         }
     }
@@ -89,8 +90,8 @@ static agent_info_t* clone_agent_info(const agent_info_t* src) {
     if (src->agent_name) {
         dest->agent_name = safe_strdup(src->agent_name);
         if (!dest->agent_name) {
-            free(dest->agent_id);
-            free(dest);
+            AGENTOS_FREE(dest->agent_id);
+            AGENTOS_FREE(dest);
             return NULL;
         }
     }
@@ -117,16 +118,16 @@ static int round_robin_create(const sched_config_t* config, void** data) {
 
     *data = NULL;
 
-    round_robin_data_t* rrd = (round_robin_data_t*)malloc(sizeof(round_robin_data_t));
+    round_robin_data_t* rrd = (round_robin_data_t*)AGENTOS_MALLOC(sizeof(round_robin_data_t));
     if (!rrd) {
         return ROUND_ROBIN_ERROR_MEMORY;
     }
     memset(rrd, 0, sizeof(round_robin_data_t));
 
     rrd->max_agents = config->max_agents > 0 ? config->max_agents : 100;
-    rrd->agents = (agent_info_t**)malloc(sizeof(agent_info_t*) * rrd->max_agents);
+    rrd->agents = (agent_info_t**)AGENTOS_MALLOC(sizeof(agent_info_t*) * rrd->max_agents);
     if (!rrd->agents) {
-        free(rrd);
+        AGENTOS_FREE(rrd);
         return ROUND_ROBIN_ERROR_MEMORY;
     }
     memset(rrd->agents, 0, sizeof(agent_info_t*) * rrd->max_agents);
@@ -155,11 +156,11 @@ static int round_robin_destroy(void* data) {
             free_agent_info(rrd->agents[i]);
             rrd->agents[i] = NULL;
         }
-        free(rrd->agents);
+        AGENTOS_FREE(rrd->agents);
         rrd->agents = NULL;
     }
 
-    free(rrd);
+    AGENTOS_FREE(rrd);
     return ROUND_ROBIN_SUCCESS;
 }
 
@@ -188,7 +189,7 @@ static int round_robin_register_agent(void* data, const agent_info_t* agent_info
         if (rrd->agents[i] && rrd->agents[i]->agent_id &&
             strcmp(rrd->agents[i]->agent_id, agent_info->agent_id) == 0) {
             if (rrd->agents[i]->agent_name) {
-                free(rrd->agents[i]->agent_name);
+                AGENTOS_FREE(rrd->agents[i]->agent_name);
                 rrd->agents[i]->agent_name = NULL;
             }
             if (agent_info->agent_name) {
@@ -287,7 +288,7 @@ static int round_robin_schedule(void* data, const task_info_t* task_info, sched_
         agent_info_t* agent = rrd->agents[rrd->current_index];
 
         if (agent && agent->is_available && agent->load_factor < 0.9) {
-            sched_result_t* res = (sched_result_t*)malloc(sizeof(sched_result_t));
+            sched_result_t* res = (sched_result_t*)AGENTOS_MALLOC(sizeof(sched_result_t));
             if (!res) {
                 return ROUND_ROBIN_ERROR_MEMORY;
             }
@@ -296,7 +297,7 @@ static int round_robin_schedule(void* data, const task_info_t* task_info, sched_
             if (agent->agent_id) {
                 res->selected_agent_id = safe_strdup(agent->agent_id);
                 if (!res->selected_agent_id) {
-                    free(res);
+                    AGENTOS_FREE(res);
                     return ROUND_ROBIN_ERROR_MEMORY;
                 }
             } else {

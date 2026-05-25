@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file openai.c
  * @brief OpenAI 适配器实现（含生产级Rate Limiting）
@@ -276,7 +277,7 @@ static provider_ctx_t* openai_init(const char* name __attribute__((unused)),
                                   double timeout_sec,
                                   int max_retries) {
 
-    openai_ctx_t* ctx = (openai_ctx_t*)calloc(1, sizeof(openai_ctx_t));
+    openai_ctx_t* ctx = (openai_ctx_t*)AGENTOS_CALLOC(1, sizeof(openai_ctx_t));
     if (!ctx) {
         return NULL;
     }
@@ -298,7 +299,7 @@ static void openai_destroy(provider_ctx_t* ctx_ptr) {
     if (ctx_ptr) {
         openai_ctx_t* ctx = (openai_ctx_t*)ctx_ptr;
         openai_rl_destroy(&ctx->rl);
-        free(ctx_ptr);
+        AGENTOS_FREE(ctx_ptr);
     }
 }
 
@@ -337,7 +338,7 @@ static int openai_complete(provider_ctx_t* ctx_ptr,
                                               &http_code, &http_resp);
 
     curl_slist_free_all(headers);
-    free(req_body);
+    AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
         if (http_code == 429) {
@@ -378,14 +379,14 @@ static int oai_stream_on_chunk(const char* json_line, void* userdata) {
     if (!acc->resp_id) {
         cJSON* id = cJSON_GetObjectItem(root, "id");
         if (cJSON_IsString(id) && id->valuestring) {
-            acc->resp_id = strdup(id->valuestring);
+            acc->resp_id = AGENTOS_STRDUP(id->valuestring);
         }
     }
 
     if (!acc->resp_model) {
         cJSON* model = cJSON_GetObjectItem(root, "model");
         if (cJSON_IsString(model) && model->valuestring) {
-            acc->resp_model = strdup(model->valuestring);
+            acc->resp_model = AGENTOS_STRDUP(model->valuestring);
         }
     }
 
@@ -413,7 +414,7 @@ static int oai_stream_on_chunk(const char* json_line, void* userdata) {
                     if (needed > acc->acc_cap) {
                         size_t new_cap = acc->acc_cap * 2;
                         while (new_cap < needed) new_cap *= 2;
-                        char* ptr = (char*)realloc(acc->acc_content, new_cap);
+                        char* ptr = (char*)AGENTOS_REALLOC(acc->acc_content, new_cap);
                         if (ptr) { acc->acc_content = ptr; acc->acc_cap = new_cap; }
                     }
                     if (acc->acc_content && acc->acc_len + tlen < acc->acc_cap) {
@@ -428,8 +429,8 @@ static int oai_stream_on_chunk(const char* json_line, void* userdata) {
         cJSON* fr = cJSON_GetObjectItem(choice, "finish_reason");
         if (cJSON_IsString(fr) && fr->valuestring &&
             strcmp(fr->valuestring, "null") != 0) {
-            free(acc->finish_reason);
-            acc->finish_reason = strdup(fr->valuestring);
+            AGENTOS_FREE(acc->finish_reason);
+            acc->finish_reason = AGENTOS_STRDUP(fr->valuestring);
         }
     }
 
@@ -438,23 +439,23 @@ static int oai_stream_on_chunk(const char* json_line, void* userdata) {
 }
 
 static llm_response_t* oai_build_stream_response(oai_stream_acc_t* acc) {
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t* resp = (llm_response_t*)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) return NULL;
 
     if (acc->resp_id) resp->id = acc->resp_id;
-    else resp->id = strdup("");
+    else resp->id = AGENTOS_STRDUP("");
     acc->resp_id = NULL;
 
     if (acc->resp_model) resp->model = acc->resp_model;
-    else resp->model = strdup("unknown");
+    else resp->model = AGENTOS_STRDUP("unknown");
     acc->resp_model = NULL;
 
     resp->created = acc->resp_created;
 
-    resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
+    resp->choices = (llm_message_t*)AGENTOS_CALLOC(1, sizeof(llm_message_t));
     if (resp->choices) {
         resp->choice_count = 1;
-        resp->choices[0].role = strdup("assistant");
+        resp->choices[0].role = AGENTOS_STRDUP("assistant");
         resp->choices[0].content = acc->acc_content;
         acc->acc_content = NULL;
     } else {
@@ -465,7 +466,7 @@ static llm_response_t* oai_build_stream_response(oai_stream_acc_t* acc) {
         resp->finish_reason = acc->finish_reason;
         acc->finish_reason = NULL;
     } else {
-        resp->finish_reason = strdup("stop");
+        resp->finish_reason = AGENTOS_STRDUP("stop");
     }
 
     return resp;
@@ -507,7 +508,7 @@ static int openai_complete_stream(provider_ctx_t* ctx_ptr,
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;
-    acc.acc_content = (char*)malloc(acc.acc_cap);
+    acc.acc_content = (char*)AGENTOS_MALLOC(acc.acc_cap);
 
     long http_code = 0;
     int ret = provider_http_post_stream(url, headers, req_body,
@@ -516,7 +517,7 @@ static int openai_complete_stream(provider_ctx_t* ctx_ptr,
                                         &http_code);
 
     curl_slist_free_all(headers);
-    free(req_body);
+    AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
         if (http_code == 429) {
@@ -524,18 +525,18 @@ static int openai_complete_stream(provider_ctx_t* ctx_ptr,
         } else {
             SVC_LOG_ERROR("openai: Stream HTTP error, status=%ld", http_code);
         }
-        free(acc.acc_content);
-        free(acc.resp_id);
-        free(acc.resp_model);
-        free(acc.finish_reason);
+        AGENTOS_FREE(acc.acc_content);
+        AGENTOS_FREE(acc.resp_id);
+        AGENTOS_FREE(acc.resp_model);
+        AGENTOS_FREE(acc.finish_reason);
         return ret;
     }
 
     llm_response_t* resp = oai_build_stream_response(&acc);
-    free(acc.acc_content);
-    free(acc.resp_id);
-    free(acc.resp_model);
-    free(acc.finish_reason);
+    AGENTOS_FREE(acc.acc_content);
+    AGENTOS_FREE(acc.resp_id);
+    AGENTOS_FREE(acc.resp_model);
+    AGENTOS_FREE(acc.finish_reason);
 
     if (out_response) {
         *out_response = resp;

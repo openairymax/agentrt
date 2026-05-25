@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "gateway_mcp_server.h"
 #include <stdlib.h>
 #include <string.h>
@@ -44,7 +45,7 @@ static int handle_mcp_request(const char* method,
 
 gw_mcp_server_t* gw_mcp_server_create(const gw_mcp_server_config_t* config)
 {
-    gw_mcp_server_t* server = (gw_mcp_server_t*)calloc(1, sizeof(gw_mcp_server_t));
+    gw_mcp_server_t* server = (gw_mcp_server_t*)AGENTOS_CALLOC(1, sizeof(gw_mcp_server_t));
     if (!server) return NULL;
     if (config) {
         server->config = *config;
@@ -61,7 +62,7 @@ void gw_mcp_server_destroy(gw_mcp_server_t* server)
     if (server->initialized) {
         gw_mcp_server_shutdown(server);
     }
-    free(server);
+    AGENTOS_FREE(server);
 }
 
 int gw_mcp_server_init(gw_mcp_server_t* server)
@@ -167,7 +168,7 @@ static gw_mcp_resource_entry_t* find_resource(gw_mcp_server_t* server, const cha
 static char* build_tools_list_json(gw_mcp_server_t* server)
 {
     size_t buf_size = 4096 + server->tool_count * 1024;
-    char* buf = (char*)malloc(buf_size);
+    char* buf = (char*)AGENTOS_MALLOC(buf_size);
     if (!buf) return NULL;
 
     size_t pos = 0;
@@ -186,7 +187,7 @@ static char* build_tools_list_json(gw_mcp_server_t* server)
 static char* build_resources_list_json(gw_mcp_server_t* server)
 {
     size_t buf_size = 4096 + server->resource_count * 1024;
-    char* buf = (char*)malloc(buf_size);
+    char* buf = (char*)AGENTOS_MALLOC(buf_size);
     if (!buf) return NULL;
 
     size_t pos = 0;
@@ -215,7 +216,7 @@ static char* extract_jsonrpc_method(const char* body)
     const char* end = strchr(p, '"');
     if (!end) return NULL;
     size_t len = (size_t)(end - p);
-    char* method = (char*)malloc(len + 1);
+    char* method = (char*)AGENTOS_MALLOC(len + 1);
     if (!method) return NULL;
     memcpy(method, p, len);
     method[len] = '\0';
@@ -235,7 +236,7 @@ static char* __attribute__((used)) extract_jsonrpc_id(const char* body)
         const char* end = strchr(p, '"');
         if (!end) return NULL;
         size_t len = (size_t)(end - p);
-        char* id = (char*)malloc(len + 1);
+        char* id = (char*)AGENTOS_MALLOC(len + 1);
         if (!id) return NULL;
         memcpy(id, p, len);
         id[len] = '\0';
@@ -244,7 +245,7 @@ static char* __attribute__((used)) extract_jsonrpc_id(const char* body)
     char* endptr = NULL;
     long val = strtol(p, &endptr, 10);
     if (endptr == p) return NULL;
-    char* id = (char*)malloc(32);
+    char* id = (char*)AGENTOS_MALLOC(32);
     if (!id) return NULL;
     snprintf(id, 32, "%ld", val);
     return id;
@@ -255,10 +256,10 @@ static char* extract_jsonrpc_params(const char* body)
     if (!body) return NULL;
     const char* key = "\"params\"";
     const char* p = strstr(body, key);
-    if (!p) return strdup("{}");
+    if (!p) return AGENTOS_STRDUP("{}");
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
-    if (*p != '{' && *p != '[') return strdup("{}");
+    if (*p != '{' && *p != '[') return AGENTOS_STRDUP("{}");
     char open = *p;
     char close = (open == '{') ? '}' : ']';
     int depth = 0;
@@ -270,8 +271,8 @@ static char* extract_jsonrpc_params(const char* body)
             if (depth == 0) {
                 p++;
                 size_t len = (size_t)(p - start);
-                char* params = (char*)malloc(len + 1);
-                if (!params) return strdup("{}");
+                char* params = (char*)AGENTOS_MALLOC(len + 1);
+                if (!params) return AGENTOS_STRDUP("{}");
                 memcpy(params, start, len);
                 params[len] = '\0';
                 return params;
@@ -279,7 +280,7 @@ static char* extract_jsonrpc_params(const char* body)
         }
         p++;
     }
-    return strdup("{}");
+    return AGENTOS_STRDUP("{}");
 }
 
 static char* extract_tool_name_from_params(const char* params_json)
@@ -295,7 +296,7 @@ static char* extract_tool_name_from_params(const char* params_json)
     const char* end = strchr(p, '"');
     if (!end) return NULL;
     size_t len = (size_t)(end - p);
-    char* name = (char*)malloc(len + 1);
+    char* name = (char*)AGENTOS_MALLOC(len + 1);
     if (!name) return NULL;
     memcpy(name, p, len);
     name[len] = '\0';
@@ -304,13 +305,13 @@ static char* extract_tool_name_from_params(const char* params_json)
 
 static char* extract_tool_args_from_params(const char* params_json)
 {
-    if (!params_json) return strdup("{}");
+    if (!params_json) return AGENTOS_STRDUP("{}");
     const char* key = "\"arguments\"";
     const char* p = strstr(params_json, key);
-    if (!p) return strdup("{}");
+    if (!p) return AGENTOS_STRDUP("{}");
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
-    if (*p != '{' && *p != '[') return strdup("{}");
+    if (*p != '{' && *p != '[') return AGENTOS_STRDUP("{}");
     char open = *p;
     char close = (open == '{') ? '}' : ']';
     int depth = 0;
@@ -322,8 +323,8 @@ static char* extract_tool_args_from_params(const char* params_json)
             if (depth == 0) {
                 p++;
                 size_t len = (size_t)(p - start);
-                char* args = (char*)malloc(len + 1);
-                if (!args) return strdup("{}");
+                char* args = (char*)AGENTOS_MALLOC(len + 1);
+                if (!args) return AGENTOS_STRDUP("{}");
                 memcpy(args, start, len);
                 args[len] = '\0';
                 return args;
@@ -331,7 +332,7 @@ static char* extract_tool_args_from_params(const char* params_json)
         }
         p++;
     }
-    return strdup("{}");
+    return AGENTOS_STRDUP("{}");
 }
 
 static char* extract_resource_uri_from_params(const char* params_json)
@@ -347,7 +348,7 @@ static char* extract_resource_uri_from_params(const char* params_json)
     const char* end = strchr(p, '"');
     if (!end) return NULL;
     size_t len = (size_t)(end - p);
-    char* uri = (char*)malloc(len + 1);
+    char* uri = (char*)AGENTOS_MALLOC(len + 1);
     if (!uri) return NULL;
     memcpy(uri, p, len);
     uri[len] = '\0';
@@ -369,7 +370,7 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t* server,
             "\"resources\":{\"subscribe\":true,\"listChanged\":true}},"
             "\"serverInfo\":{\"name\":\"%s\",\"version\":\"%s\"}}}";
         size_t len = snprintf(NULL, 0, resp, server->config.server_name, server->config.server_version);
-        char* buf = (char*)malloc(len + 1);
+        char* buf = (char*)AGENTOS_MALLOC(len + 1);
         if (!buf) { server->error_count++; return -1; }
         snprintf(buf, len + 1, resp, server->config.server_name, server->config.server_version);
         *response_json = buf;
@@ -386,7 +387,7 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t* server,
         char* tool_name = extract_tool_name_from_params(params_json);
         char* tool_args = extract_tool_args_from_params(params_json);
         if (!tool_name) {
-            free(tool_args);
+            AGENTOS_FREE(tool_args);
             server->error_count++;
             return -1;
         }
@@ -395,33 +396,33 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t* server,
             const char* err = "{\"jsonrpc\":\"2.0\",\"error\":"
                 "{\"code\":-32601,\"message\":\"Tool not found: %s\"}}";
             size_t elen = snprintf(NULL, 0, err, tool_name);
-            char* ebuf = (char*)malloc(elen + 1);
+            char* ebuf = (char*)AGENTOS_MALLOC(elen + 1);
             if (ebuf) snprintf(ebuf, elen + 1, err, tool_name);
             *response_json = ebuf;
-            free(tool_name);
-            free(tool_args);
+            AGENTOS_FREE(tool_name);
+            AGENTOS_FREE(tool_args);
             server->error_count++;
             return -2;
         }
         char* tool_result = NULL;
         int rc = tool->exec_fn(tool_name, tool_args, &tool_result, tool->user_data);
-        free(tool_name);
-        free(tool_args);
+        AGENTOS_FREE(tool_name);
+        AGENTOS_FREE(tool_args);
         if (rc != 0 || !tool_result) {
             const char* err = "{\"jsonrpc\":\"2.0\",\"error\":"
                 "{\"code\":-32603,\"message\":\"Tool execution failed\"}}";
-            *response_json = strdup(err);
-            free(tool_result);
+            *response_json = AGENTOS_STRDUP(err);
+            AGENTOS_FREE(tool_result);
             server->error_count++;
             return -3;
         }
         const char* resp_fmt = "{\"jsonrpc\":\"2.0\",\"result\":{"
             "\"content\":[{\"type\":\"text\",\"text\":%s}]}}";
         size_t rlen = snprintf(NULL, 0, resp_fmt, tool_result);
-        char* buf = (char*)malloc(rlen + 1);
+        char* buf = (char*)AGENTOS_MALLOC(rlen + 1);
         if (buf) snprintf(buf, rlen + 1, resp_fmt, tool_result);
         *response_json = buf;
-        free(tool_result);
+        AGENTOS_FREE(tool_result);
         return 0;
     }
 
@@ -436,17 +437,17 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t* server,
         if (!uri) { server->error_count++; return -1; }
         gw_mcp_resource_entry_t* res = find_resource(server, uri);
         if (!res) {
-            free(uri);
+            AGENTOS_FREE(uri);
             server->error_count++;
             return -2;
         }
         char* content = NULL;
         char* mime = NULL;
         int rc = res->read_fn(uri, &content, &mime, res->user_data);
-        free(uri);
+        AGENTOS_FREE(uri);
         if (rc != 0 || !content) {
-            free(content);
-            free(mime);
+            AGENTOS_FREE(content);
+            AGENTOS_FREE(mime);
             server->error_count++;
             return -3;
         }
@@ -454,17 +455,17 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t* server,
             "\"contents\":[{\"uri\":\"%s\",\"mimeType\":\"%s\",\"text\":%s}]}}";
         size_t rlen = snprintf(NULL, 0, resp_fmt, res->uri,
                                 mime ? mime : "text/plain", content);
-        char* buf = (char*)malloc(rlen + 1);
+        char* buf = (char*)AGENTOS_MALLOC(rlen + 1);
         if (buf) snprintf(buf, rlen + 1, resp_fmt, res->uri,
                            mime ? mime : "text/plain", content);
         *response_json = buf;
-        free(content);
-        free(mime);
+        AGENTOS_FREE(content);
+        AGENTOS_FREE(mime);
         return 0;
     }
 
     if (strcmp(method, "ping") == 0) {
-        *response_json = strdup("{\"jsonrpc\":\"2.0\",\"result\":{}}");
+        *response_json = AGENTOS_STRDUP("{\"jsonrpc\":\"2.0\",\"result\":{}}");
         return 0;
     }
 
@@ -488,8 +489,8 @@ int gw_mcp_server_handle_request(gw_mcp_server_t* server,
 
     char* rpc_params = extract_jsonrpc_params(body_json);
     int rc = gw_mcp_server_handle_jsonrpc(server, rpc_method, rpc_params, response_json);
-    free(rpc_method);
-    free(rpc_params);
+    AGENTOS_FREE(rpc_method);
+    AGENTOS_FREE(rpc_params);
     return rc;
 }
 

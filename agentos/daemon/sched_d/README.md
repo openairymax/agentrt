@@ -1,5 +1,7 @@
 # Scheduler Daemon — 任务调度守护进程
 
+> **Version**: AgentOS v0.0.5 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
+
 `daemon/sched_d/` 是 AgentOS 的任务调度守护进程，负责任务的分发、调度策略执行和任务状态管理。
 
 ## 核心职责

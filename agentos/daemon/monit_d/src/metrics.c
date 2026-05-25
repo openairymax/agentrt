@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file metrics.c
  * @brief 监控指标采集实现（生产级版本）
@@ -153,8 +154,8 @@ static int create_series(metric_t* metric, const metric_label_t* labels, size_t 
     series->label_count = label_count;
     
     for (size_t i = 0; i < label_count; i++) {
-        series->labels[i].key = strdup(labels[i].key);
-        series->labels[i].value = strdup(labels[i].value);
+        series->labels[i].key = AGENTOS_STRDUP(labels[i].key);
+        series->labels[i].value = AGENTOS_STRDUP(labels[i].value);
     }
     
     series->value = 0.0;
@@ -235,22 +236,22 @@ void metrics_shutdown(void) {
         
         agentos_mutex_lock(&metric->lock);
         
-        free(metric->name);
-        free(metric->description);
-        free(metric->unit);
+        AGENTOS_FREE(metric->name);
+        AGENTOS_FREE(metric->description);
+        AGENTOS_FREE(metric->unit);
         
         /* 释放时间序列 */
         for (size_t j = 0; j < metric->series_count; j++) {
             metric_series_t* series = &metric->series[j];
             for (size_t k = 0; k < series->label_count; k++) {
-                free(series->labels[k].key);
-                free(series->labels[k].value);
+                AGENTOS_FREE(series->labels[k].key);
+                AGENTOS_FREE(series->labels[k].value);
             }
         }
         
         /* 释放直方图桶 */
         if (metric->histogram.buckets) {
-            free(metric->histogram.buckets);
+            AGENTOS_FREE(metric->histogram.buckets);
         }
         
         agentos_mutex_unlock(&metric->lock);
@@ -297,16 +298,16 @@ int metrics_register(const char* name,
     
     /* 创建指标 */
     metric_t* metric = &g_metrics.metrics[g_metrics.metric_count];
-    metric->name = strdup(name);
-    metric->description = description ? strdup(description) : NULL;
-    metric->unit = unit ? strdup(unit) : NULL;
+    metric->name = AGENTOS_STRDUP(name);
+    metric->description = description ? AGENTOS_STRDUP(description) : NULL;
+    metric->unit = unit ? AGENTOS_STRDUP(unit) : NULL;
     metric->type = type;
     metric->series_count = 0;
     metric->initialized = 1;
     
     /* 初始化直方图 */
     if (type == METRIC_TYPE_HISTOGRAM && histogram_buckets && bucket_count > 0) {
-        metric->histogram.buckets = (histogram_bucket_t*)malloc(
+        metric->histogram.buckets = (histogram_bucket_t*)AGENTOS_MALLOC(
             sizeof(histogram_bucket_t) * bucket_count);
         if (metric->histogram.buckets) {
             for (size_t i = 0; i < bucket_count; i++) {
@@ -486,7 +487,7 @@ char* metrics_export_prometheus(void) {
     }
     
     size_t buf_size = 64 * 1024;  /* 64KB */
-    char* buf = (char*)malloc(buf_size);
+    char* buf = (char*)AGENTOS_MALLOC(buf_size);
     if (!buf) return NULL;
     
     size_t pos = 0;

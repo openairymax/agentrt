@@ -24,15 +24,19 @@ typedef struct registry_entry {
 
 static registry_entry_t* g_registry = NULL;
 static agentos_mutex_t* g_registry_lock = NULL;
-static atomic_int g_registry_initialized = 0;
 
 static agentos_error_t ensure_registry_init(void) {
-    if (atomic_load_explicit(&g_registry_initialized, memory_order_acquire)) return AGENTOS_SUCCESS;
-    if (!g_registry_lock) {
-        g_registry_lock = agentos_mutex_create();
-        if (!g_registry_lock) return AGENTOS_ENOMEM;
+    agentos_mutex_t* current = (agentos_mutex_t*)atomic_load_ptr((_Atomic void**)&g_registry_lock, memory_order_acquire);
+    if (current) return AGENTOS_SUCCESS;
+
+    agentos_mutex_t* new_lock = agentos_mutex_create();
+    if (!new_lock) return AGENTOS_ENOMEM;
+
+    agentos_mutex_t* expected = NULL;
+    if (!atomic_compare_exchange_strong_ptr((_Atomic void**)&g_registry_lock, (void**)&expected, (void*)new_lock,
+                                             memory_order_acq_rel, memory_order_acquire)) {
+        agentos_mutex_free(new_lock);
     }
-    atomic_store_explicit(&g_registry_initialized, 1, memory_order_seq_cst);
     return AGENTOS_SUCCESS;
 }
 
@@ -40,33 +44,29 @@ static agentos_error_t ensure_registry_init(void) {
  * @brief 初始化注册表（需在程序启动时调用?
  */
 agentos_error_t agentos_registry_init(void) {
-    if (!g_registry_lock) {
-        g_registry_lock = agentos_mutex_create();
-        if (!g_registry_lock) return AGENTOS_ENOMEM;
-    }
-    return AGENTOS_SUCCESS;
+    return ensure_registry_init();
 }
 
 /**
  * @brief 清理注册?
  */
 void agentos_registry_cleanup(void) {
-    if (!g_registry_lock) return;
-    agentos_mutex_lock(g_registry_lock);
+    agentos_mutex_t* lock = (agentos_mutex_t*)atomic_load_ptr((_Atomic void**)&g_registry_lock, memory_order_acquire);
+    if (!lock) return;
+    agentos_mutex_lock(lock);
     registry_entry_t* entry = g_registry;
     while (entry) {
         registry_entry_t* next = entry->next;
         if (entry->unit_id) AGENTOS_FREE(entry->unit_id);
         if (entry->unit) {
-            // 单元对象?destroy 由外部调用者负责？通常单元由创建者管理，这里不自动销毁?
         }
         AGENTOS_FREE(entry);
         entry = next;
     }
     g_registry = NULL;
-    agentos_mutex_unlock(g_registry_lock);
-    agentos_mutex_free(g_registry_lock);
-    g_registry_lock = NULL;
+    agentos_mutex_unlock(lock);
+    agentos_mutex_free(lock);
+    atomic_store_ptr((_Atomic void**)&g_registry_lock, NULL, memory_order_release);
 }
 
 agentos_error_t agentos_registry_register_unit(const char* unit_id, agentos_execution_unit_t* unit) {
