@@ -1,10 +1,10 @@
-[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)   
+[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)
 
-# AgentOS   
-Powered by OpenAirymax   
-> 成为人类计算工程史上，第四个"操作系统哲学"  
+# AgentOS
+Powered by OpenAirymax
+> 成为人类计算工程史上，第四个"操作系统哲学"
 
-**Langua：** 中文 | [English](README.md)   
+**语言：** 中文 | [English](README.md)
 
 [![AtomGit](https://atomgit.com/openairymax/agentos/star/badge.svg)](https://atomgit.com/openairymax/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
@@ -14,11 +14,11 @@ Powered by OpenAirymax
 [![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/openairymax/agentos)
 
-[![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?logo=c%2B%2B\&logoColor=white)](https://isocpp.org)
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python\&logoColor=white)](https://www.python.org)
-[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go\&logoColor=white)](https://go.dev)
-[![Rust](https://img.shields.io/badge/Rust-1.70+-DEA584?logo=rust\&logoColor=white)](https://www.rust-lang.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript\&logoColor=white)](https://www.typescriptlang.org)
+[![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
 ---
 
@@ -33,7 +33,7 @@ Powered by OpenAirymax
 
 **AgentOS** 是一个智能体底层操作系统，为驱动智能体团队提供完整的操作系统级支持。
 
-**1.1  项目预览**    
+**1.1  项目预览**
 
 个人用户客户端预告
 
@@ -47,24 +47,24 @@ Powered by OpenAirymax
 
 ⚡️
 
-**基石理论** **[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**
+**基石理论** **[《体系并行论》](#)**
 
 </div>
 
 - 纯净内核：内核仅提供原子机制，纯净高效
 - 认知循环：认知，规划，行动
-- 记忆卷载：原始层，特征层，结构层，模式层
+- 记忆卷载：L1 原始层 → L2 特征层 → L3 结构层 → L4 模式层（OSS：L1+L2 内置，PRO：L1-L4 通过 MemoryRovol）
 - 安全内生：沙箱隔离，权限裁决，输入净化，审计追踪
 - 高效 Token：工程级比传统框架节省约500%
 - 丰富 SDK：原生支持 Go 、Python 、Rust 、TypeScript
 
 ## 3️⃣ 基本理念
 
-**3.1  团队驱动**   
+**3.1  团队驱动**
 - 精准协调多 Agent 协作
 - 高效完成复杂任务编排与资源调度
 
-**3.2  自主演进**  
+**3.2  自主演进**
 - 具备自我进化能力
 - 动态调整策略
 - 持续优化执行效果
@@ -73,32 +73,32 @@ Powered by OpenAirymax
 
 
 <p align="center">
-  <strong> ✨ </strong>  
-  <p align="center">
-  <strong> 全新架构 · 安全内生 · 智能涌现 </strong>  
+  <strong> ✨ </strong><br>
+  <strong> 全新架构 · 安全内生 · 智能涌现 </strong>
 </p>
 
 
-**4.1  架构设计**    
+**4.1  架构设计**
 从内核到应用的完整架构：
 ```
-应用层
- (openlab)
-↱ 服务层 ⇣
-⇡ 内核层 ⇣
-⇡ 安全层 ⇣
-⇡ 支撑层 ↲
-SDK 层 
-(toolkit)  
+⬇️ 应用层 (openlab)
+⇅ 服务层 (daemon) — 10+ 守护进程服务
+⇅ 协议层 (protocols) — 5 层统一协议栈
+⇅ 网关层 (gateway) — HTTP/WS/Stdio → JSON-RPC 2.0
+⇅ 存储层 (heapstore) — 运行时数据持久化
+⇅ 安全层 (cupolas) — 4 重内生安全
+⇅ 内核层 (atoms) — 7 个原子模块
+⇅ 支撑层 (commons) — 统一基础库
+⬆️ SDK 层 (toolkit)
 ```
 
-**4.2  设计原则**    
-基于 [ARCHITECTURAL\_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md) 构建：
+**4.2  设计原则**
+基于 [ARCHITECTURAL_PRINCIPLES](#) 构建：
 
 - 系统观：实时响应 <10ms
       反馈闭环，层次分解
       总体设计，涌现管理
-- 内核观：内核 ~6K LOC
+- 内核观：内核 ~6K LOC（全仓 ~478K LOC）
       内核极简，接口契约化
       服务隔离，可插拔策略
 - 认知观：Token 节省 80%
@@ -113,44 +113,43 @@ SDK 层
 
 ## 5️⃣ 快速上手
 
-**5.1  环境要求**     
+**5.1  环境要求**
 
 - **操作系统**：Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
 - **编译器**：GCC 11+ / Clang 14+ (C11/C++17)
 - **构建工具**：CMake 3.20+, Ninja
 - **Python**：3.10+ (OpenLab 需要)
 
-**5.2  安装与构建**    
+**5.2  安装与构建**
 
-```ctext
+```bash
 # 1. 克隆仓库
 git clone https://atomgit.com/openairymax/agentos.git && cd agentos
 
 # 2. 安装依赖（Ubuntu）
 sudo apt install -y build-essential cmake gcc g++ libssl-dev libsqlite3-dev ninja-build
 
-# 3. 构建内核
-mkdir build && cd build
-cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+# 3. 构建内核（BAN-33 要求源外构建）
+mkdir /tmp/AgentOS-build && cd /tmp/AgentOS-build
+cmake /path/to/AgentOS -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build . --parallel $(nproc)
 
 # 4. 运行测试
-ctest --output-on-failure  
+ctest --output-on-failure
 ```
 
-**5.3  Docker快速启动**    
+**5.3  Docker快速启动**
 
 ```text
 # 构建镜像
-docker build -f scripts/deploy/docker/Dockerfile.kernel -t agentos:latest .
+docker build -f scripts/deployment/docker/Dockerfile.kernel -t agentos:latest .
 
 # 运行容器
 docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 ```
 
-**5.4  使用方式**    
+**5.4  使用方式**
 
-```
 | 语言 | 使用方式 |
 |:-----|:---------|
 | C/C++ | 通过 `syscalls.h` 系统调用接口开发 |
@@ -158,20 +157,19 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 | Go | 通过 `import "github.com/spharx/agentos/toolkit/go"` |
 | Rust | 通过 `use agentos_toolkit::prelude::*;` |
 | TypeScript | 通过 `npm install @spharx/agentos-toolkit` 后直接 import |
-```
 
-**5.5  阅读导航**    
+**5.5  阅读导航**
 
 | 文档                                          | 核心内容                 |
 | :------------------------------------------ | :------------------- |
-| [📘 架构原则](docs/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系，24 条核心原则      |
-| [🚀 快速开始](docs/guides/quickstart.md)        | 5 分钟上手指南             |
-| [⚙️ 编译指南](docs/guides/build.md)             | 详细构建步骤和选项            |
-| [🧪 测试指南](docs/guides/testing.md)           | 单元/集成/契约测试           |
-| [🐳 部署指南](docs/guides/deployment.md)        | Docker/Kubernetes 部署 |  
+| [📘 架构原则](#) | 五维正交体系，24 条核心原则      |
+| [🚀 快速开始](#)        | 5 分钟上手指南             |
+| [⚙️ 编译指南](#)             | 详细构建步骤和选项            |
+| [🧪 测试指南](#)           | 单元/集成/契约测试           |
+| [🐳 部署指南](#)        | Docker/Kubernetes 部署 |
 
 
-**5.6  常见问题**    
+**5.6  常见问题**
 
 <details>
 <summary>👉 Q1: AgentOS 与传统 AI Agent 框架有什么区别？</summary>
@@ -230,9 +228,9 @@ AgentOS 是操作系统级产品，而非单一框架：
 | 系统开发者 | C/C++, 操作系统基础 | 1-2 周深入 |
 | 架构师   | 微内核，分布式系统     | 1 月精通   |
 
-推荐路径：[快速开始](agentos/manuals/guides/quickstart.md) → [架构原则](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](agentos/manuals/architecture/coreloopthree.md)
+推荐路径：[快速开始](#) → [架构原则](#) → [CoreLoopThree](#)
 
-</details>  
+</details>
 
 ## 6️⃣ 参与贡献
 
@@ -246,48 +244,47 @@ AgentOS 是操作系统级产品，而非单一框架：
 
 这不是人类的日落，而是新世界的曙光
 
-</div>  
+</div>
 
-**相信：**    
-开源的精神能最大发挥群体的智慧；  
-协作，推动人类族群走上新的高度。  
+**相信：**
+开源的精神能最大发挥群体的智慧；
+协作，推动人类族群走上新的高度。
 
-**见证：**    
-我们每一天的工作都是历史的一部分；  
+**见证：**
+我们每一天的工作都是历史的一部分；
 必将铭刻在人类文明发展史的丰碑上。
 
-**贡献：**    
+**贡献：**
 无论你是经验丰富的开发者，还是刚刚起步的新手：
 
-**发现：**    
+**发现：**
 报告 Bug，帮助我们改进质量
 
-**想法：**    
+**想法：**
 新功能建议，让项目更加强大
 
-**分享：**    
+**分享：**
 完善文档，帮助更多人了解 AgentOS
 
-**编码：**    
+**编码：**
 提交 PR，共同创造历史
 
-<p align="center">  
-  <strong> 🔥 </strong>  
-  <p align="center">  
+<p align="center">
+  <strong> 🔥 </strong><br>
   <strong> 微微的灯火，照不亮前路，但能指引前行的方向 </strong>
-</p>  
+</p>
 
-**6.1  贡献流程：**     
+**6.1  贡献流程：**
 详见 [贡献指南](CONTRIBUTING.md)
 
-```bash
+```text
 Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
 ```
 
 **主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
 
-**6.2  贡献者名单：**     
-详见 [AUTHORS.md](AUTHORS.md)  
+**6.2  贡献者名单：**
+详见 [AUTHORS.md](AUTHORS.md)
 
 ## 7️⃣ 许可证
 
@@ -306,13 +303,13 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 © 2026 SPHARX Ltd. All Rights Reserved.
 
-</div>  
+</div>
 
 ***
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/chart?repos=SpharxTeam/AgentOS\&type=date\&legend=top-left)](https://star-history.com/#SpharxTeam/AgentOS)
+[![Star History Chart](https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left)](https://star-history.com/#SpharxTeam/AgentOS)
 
 ## Global Rank
 

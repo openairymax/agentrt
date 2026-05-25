@@ -11,8 +11,12 @@ static atomic_long g_core_initialized = 0;
 
 int agentos_core_init(void) {
     long expected = 0;
-    if (!atomic_compare_exchange_strong_explicit(&g_core_initialized, &expected, 1,
+    if (!atomic_compare_exchange_strong_explicit(&g_core_initialized, &expected, 2,
                                                   memory_order_seq_cst, memory_order_seq_cst)) {
+        if (expected == 2) {
+            while (atomic_load_explicit(&g_core_initialized, memory_order_seq_cst) == 2) {
+            }
+        }
         return AGENTOS_SUCCESS;
     }
 
@@ -30,6 +34,7 @@ int agentos_core_init(void) {
     ret = agentos_time_eventloop_init();
     if (ret != 0) goto cleanup_ipc;
 
+    atomic_store_explicit(&g_core_initialized, 1, memory_order_seq_cst);
     return AGENTOS_SUCCESS;
 
 cleanup_ipc:

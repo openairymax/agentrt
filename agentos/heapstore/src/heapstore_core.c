@@ -535,12 +535,17 @@ heapstore_error_t heapstore_log_write_fast(const char* service, int level, const
 
     bool is_failed = false;
 
-    heapstore_log_write(level, service, NULL, NULL, 0, message);
-    circuit_breaker_record_success();
+    if (!s_initialized) {
+        is_failed = true;
+        circuit_breaker_record_failure();
+    } else {
+        heapstore_log_write(level, service, NULL, NULL, 0, message);
+        circuit_breaker_record_success();
+    }
 
     update_metrics(0, true, is_failed);
 
-    return heapstore_SUCCESS;
+    return is_failed ? heapstore_ERR_NOT_INITIALIZED : heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_log_write_slow(const char* service, int level, const char* message, const char* trace_id, uint32_t timeout_ms) {
@@ -558,12 +563,17 @@ heapstore_error_t heapstore_log_write_slow(const char* service, int level, const
 
     bool is_failed = false;
 
-    heapstore_log_write(level, service, trace_id, NULL, 0, message);
-    circuit_breaker_record_success();
+    if (!s_initialized) {
+        is_failed = true;
+        circuit_breaker_record_failure();
+    } else {
+        heapstore_log_write(level, service, trace_id, NULL, 0, message);
+        circuit_breaker_record_success();
+    }
 
     update_metrics(0, false, is_failed);
 
-    return heapstore_SUCCESS;
+    return is_failed ? heapstore_ERR_NOT_INITIALIZED : heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_cleanup(bool dry_run, uint64_t* freed_bytes) {
