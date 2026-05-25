@@ -22,7 +22,7 @@ AgentOS 采用自底向上的四层分层架构，每层职责明确、接口清
 │  gateway / heapstore / manager / cupolas / commons           │
 ├───────────────────────────────────────────────────────────┤
 │                    Atoms 微内核层                            │
-│  CoreKern / CoreLoopThree / MemoryRovol / Syscall / ...     │
+│  CoreKern / CoreLoopThree / Memory / MemoryRovol / Syscall / ... │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -33,7 +33,8 @@ agentos/
 ├── atoms/              # 微内核原子组件层 — 系统的最底层基础
 │   ├── corekern/       #     微内核核心 — IPC/Binder、内存管理、任务调度、定时器
 │   ├── coreloopthree/  #     三环核心运行时 — 认知环/执行环/学习环
-│   ├── memory/         #      内置记忆子系统（R-09-01）
+│   ├── memory/         #     内置记忆子系统（L1+L2）
+│   ├── memoryrovol/    #     MemoryRovol PRO 桥接（L1-L4，需 -DAGENTOS_WITH_MEMORYROVOL=ON）
 │   ├── syscall/        #     系统调用接口 — 任务/内存/会话/遥测/Agent
 │   ├── taskflow/       #     任务流引擎 — DAG 编排、优先级队列
 │   └── frameworks/     #     框架适配器 — LangChain/MCP/A2A/OpenAI
@@ -56,13 +57,17 @@ agentos/
 │   │   ├── workbench/  #     安全工作台
 │   │   └── utils/      #     安全工具库
 │   └── include/        #     公共头文件
-├── daemon/             # 用户态守护进程层 — 8 个核心服务
+├── daemon/             # 用户态守护进程层 — 10+ 核心服务
 │   ├── gateway_d/      #     API 网关守护进程
 │   ├── llm_d/          #     LLM 服务守护进程（多 Provider 支持）
 │   ├── tool_d/         #     工具执行守护进程
 │   ├── sched_d/        #     任务调度守护进程
 │   ├── market_d/       #     应用市场守护进程
 │   ├── monit_d/        #     监控告警守护进程
+│   ├── channel_d/      #     通道服务守护进程
+│   ├── info_d/         #     信息服务守护进程
+│   ├── notify_d/       #     通知服务守护进程
+│   ├── observe_d/      #     观测服务守护进程
 │   └── common/         #     公共服务库（18 个组件）
 ├── gateway/            # 协议网关层 — HTTP/WS/Stdio → JSON-RPC 2.0
 │   ├── src/            #     网关实现
@@ -91,7 +96,7 @@ agentos/
 │   ├── app/            #     应用（DocGen/E-Commerce/Research/VideoEdit）
 │   ├── contrib/        #     社区贡献（Skills/Strategies/Agents）
 │   └── markets/        #     应用市场模板
-├── protocols/          # 通信协议定义 — Binder/JSON-RPC/HTTP/WS/MQTT/gRPC
+├── protocols/          # 统一协议栈 — 五层架构（Common/Core/Standards/Integrations/Frameworks）
 └── CMakeLists.txt      # 顶层构建配置
 ```
 
@@ -99,13 +104,14 @@ agentos/
 
 ### Atoms 微内核层
 
-Atoms 层是 AgentOS 的最底层基础，包含 6 个核心微内核组件：
+Atoms 层是 AgentOS 的最底层基础，包含 7 个核心微内核组件：
 
 | 模块 | 说明 | 关键特性 |
 |------|------|----------|
 | **CoreKern** | 微内核核心 | IPC/Binder、内存管理、任务调度、定时器、插件管理 |
 | **CoreLoopThree** | 三环运行时 | 认知环/执行环/学习环、System 1/System 2 双处理理论 |
-| **MemoryRovol** | 记忆系统 | L1-L4 四级记忆层次、吸引子网络检索、混合搜索策略 |
+| **Memory** | 内置记忆子系统 | L1 原始层+L2 特征层，无外部依赖 |
+| **MemoryRovol** | 商业记忆桥接 | L1-L4 全功能，需外部 MemoryRovol 仓库 |
 | **Syscall** | 系统调用接口 | 5 类接口、4 层保护、线程安全（Mutex + RCU） |
 | **TaskFlow** | 任务流引擎 | DAG 编排、5 级优先级队列、SQLite 持久化 |
 | **Frameworks** | 框架适配器 | LangChain/MCP/A2A/OpenAI 适配器、框架管理器 |
@@ -139,7 +145,7 @@ Cupolas 提供全方位的安全防护体系：
 
 ### Daemon 服务层
 
-Daemon 层包含 8 个用户态守护进程，通过 IPC 进行通信：
+Daemon 层包含 10+ 个用户态守护进程，通过 IPC 进行通信：
 
 | 模块 | 说明 | 通信方式 |
 |------|------|----------|
@@ -149,6 +155,10 @@ Daemon 层包含 8 个用户态守护进程，通过 IPC 进行通信：
 | **sched_d** | 任务调度 — 5 种策略（轮询/加权/优先级/亲和/自定义） | IPC → Dispatcher |
 | **market_d** | 应用市场 — Agent/Skill/Tool/Template 资源管理 | IPC → Registry |
 | **monit_d** | 监控告警 — 指标采集、健康检查、告警管理 | IPC → Metrics Collector |
+| **channel_d** | 通道服务 — 多通道消息路由与分发 | IPC → Channel Router |
+| **info_d** | 信息服务 — 系统信息查询与聚合 | IPC → Info Aggregator |
+| **notify_d** | 通知服务 — 多渠道通知推送与管理 | IPC → Notify Dispatcher |
+| **observe_d** | 观测服务 — 链路追踪、性能剖析、可观测性 | IPC → Observe Collector |
 | **common** | 公共服务库 — 18 个共享组件 | 静态链接 |
 
 ### Gateway 网关层
@@ -196,10 +206,10 @@ Manager 是统一配置管理中心：
 
 | 语言 | 版本 | 目录 |
 |------|------|------|
-| Python | v1.0.0.9 | `toolkit/python/` |
-| Go | v1.0.0.9 | `toolkit/go/` |
-| Rust | v1.0.0.9 | `toolkit/rust/` |
-| TypeScript | v1.0.0.9 | `toolkit/typescript/` |
+| Python | v0.0.5 | `toolkit/python/` |
+| Go | v0.0.5 | `toolkit/go/` |
+| Rust | v0.0.5 | `toolkit/rust/` |
+| TypeScript | v0.0.5 | `toolkit/typescript/` |
 
 所有 SDK 提供统一的 API 接口，涵盖 Agent/Task/Session/Memory/Skill/Syscall/Telemetry 七大核心功能。
 
@@ -227,18 +237,18 @@ AgentOS 采用三层协议体系：
 ## 构建说明
 
 ```bash
-# 配置构建
-mkdir build && cd build
-cmake ..
-
-# 编译
-make -j$(nproc)
+# Out-of-source 构建
+mkdir /tmp/AgentOS-build && cd /tmp/AgentOS-build
+cmake /path/to/agentos -DCMAKE_BUILD_TYPE=Release
+cmake --build . --parallel $(nproc)
 
 # 运行测试
 ctest --output-on-failure
 ```
 
 ### 依赖要求
+
+> **注意**：所有外部依赖由根 CMakeLists.txt 集中检测（BAN-12），子模块不得独立调用 `find_package`。
 
 | 依赖 | 版本 | 用途 |
 |------|------|------|

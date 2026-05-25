@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "channel_service.h"
 #include "platform.h"
 #include "atomic_compat.h"
@@ -142,7 +143,7 @@ static void destroy_channel(channel_entry_t* entry)
     }
 
     if (entry->recv_buffer) {
-        free(entry->recv_buffer);
+        AGENTOS_FREE(entry->recv_buffer);
         entry->recv_buffer = NULL;
     }
     entry->recv_buffer_size = 0;
@@ -151,7 +152,7 @@ static void destroy_channel(channel_entry_t* entry)
 
 channel_service_t* channel_service_create(const channel_config_t* config)
 {
-    channel_service_t* svc = (channel_service_t*)calloc(1, sizeof(channel_service_t));
+    channel_service_t* svc = (channel_service_t*)AGENTOS_CALLOC(1, sizeof(channel_service_t));
     if (!svc) return NULL;
 
     if (config) {
@@ -184,7 +185,7 @@ void channel_service_destroy(channel_service_t* svc)
     }
 
     agentos_mutex_destroy(&svc->lock);
-    free(svc);
+    AGENTOS_FREE(svc);
 }
 
 int channel_service_start(channel_service_t* svc)
@@ -279,7 +280,7 @@ int channel_service_open(channel_service_t* svc,
     }
 
     entry->recv_buffer_size = entry->info.buffer_size;
-    entry->recv_buffer = (uint8_t*)calloc(1, entry->recv_buffer_size);
+    entry->recv_buffer = (uint8_t*)AGENTOS_CALLOC(1, entry->recv_buffer_size);
     if (!entry->recv_buffer) {
         destroy_channel(entry);
         agentos_mutex_unlock(&svc->lock);
@@ -434,11 +435,11 @@ int channel_service_receive(channel_service_t* svc,
                 agentos_mutex_unlock(&svc->lock);
                 return -4;
             }
-            void* buf = malloc(msg_len);
+            void* buf = AGENTOS_MALLOC(msg_len);
             if (!buf) { close(client_fd); agentos_mutex_unlock(&svc->lock); return -5; }
             ssize_t r2 = read(client_fd, buf, msg_len);
             close(client_fd);
-            if (r2 <= 0) { free(buf); agentos_mutex_unlock(&svc->lock); return -3; }
+            if (r2 <= 0) { AGENTOS_FREE(buf); agentos_mutex_unlock(&svc->lock); return -3; }
             *out_data = buf;
             *out_len = (size_t)r2;
             break;
@@ -451,7 +452,7 @@ int channel_service_receive(channel_service_t* svc,
             if (*msg_flag != 1) { agentos_mutex_unlock(&svc->lock); return 0; }
             uint32_t len = *msg_len;
             if (len == 0 || len > entry->shm_size - sizeof(uint32_t) * 2) { agentos_mutex_unlock(&svc->lock); return -4; }
-            void* buf = malloc(len);
+            void* buf = AGENTOS_MALLOC(len);
             if (!buf) { agentos_mutex_unlock(&svc->lock); return -5; }
             memcpy(buf, (char*)entry->shm_ptr + sizeof(uint32_t) * 2, len);
             atomic_thread_fence(memory_order_seq_cst);
@@ -469,11 +470,11 @@ int channel_service_receive(channel_service_t* svc,
                 if (r1 <= 0) { close(fd); agentos_mutex_unlock(&svc->lock); return 0; }
                 uint32_t msg_len = ntohl(net_len);
                 if (msg_len == 0) { close(fd); agentos_mutex_unlock(&svc->lock); return 0; }
-                void* buf = malloc(msg_len);
+                void* buf = AGENTOS_MALLOC(msg_len);
                 if (!buf) { close(fd); agentos_mutex_unlock(&svc->lock); return -5; }
                 ssize_t r2 = read(fd, buf, msg_len);
                 close(fd);
-                if (r2 <= 0) { free(buf); agentos_mutex_unlock(&svc->lock); return 0; }
+                if (r2 <= 0) { AGENTOS_FREE(buf); agentos_mutex_unlock(&svc->lock); return 0; }
                 *out_data = buf;
                 *out_len = (size_t)r2;
             } else {

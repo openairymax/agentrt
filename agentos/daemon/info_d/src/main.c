@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -192,7 +193,7 @@ static int info_d_init(info_d_service_t* svc, int port, const char* sock) {
 
     memset(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : INFO_D_DEFAULT_PORT;
-    svc->socket_path = sock ? strdup(sock) : strdup(INFO_D_DEFAULT_SOCKET);
+    svc->socket_path = sock ? AGENTOS_STRDUP(sock) : AGENTOS_STRDUP(INFO_D_DEFAULT_SOCKET);
     svc->start_time = (uint64_t)time(NULL);
 
     agentos_mutex_init(&svc->lock);
@@ -272,7 +273,7 @@ static int info_d_destroy(info_d_service_t* svc) {
     }
     agentos_socket_cleanup();
     agentos_mutex_destroy(&svc->lock);
-    free(svc->socket_path);
+    AGENTOS_FREE(svc->socket_path);
     memset(svc, 0, sizeof(*svc));
     SVC_LOG_INFO("info_d: service destroyed");
     return AGENTOS_SUCCESS;

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "gateway_protocol_router.h"
 #include "gateway_mcp_server.h"
 #include "gateway_a2a_handler.h"
@@ -73,7 +74,7 @@ static gw_proto_detect_result_t detect_from_body(const char* body)
 
 gw_proto_router_t* gw_proto_router_create(void)
 {
-    gw_proto_router_t* router = (gw_proto_router_t*)calloc(1, sizeof(gw_proto_router_t));
+    gw_proto_router_t* router = (gw_proto_router_t*)AGENTOS_CALLOC(1, sizeof(gw_proto_router_t));
     if (!router) return NULL;
     router->adapter_count = 0;
     router->initialized = false;
@@ -90,7 +91,7 @@ void gw_proto_router_destroy(gw_proto_router_t* router)
     if (router->initialized) {
         gw_proto_router_shutdown(router);
     }
-    free(router);
+    AGENTOS_FREE(router);
 }
 
 int gw_proto_router_init(gw_proto_router_t* router)

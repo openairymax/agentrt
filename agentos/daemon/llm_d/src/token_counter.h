@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef LLM_TOKEN_COUNTER_H
-#define LLM_TOKEN_COUNTER_H
+#ifndef AGENTOS_LLM_TOKEN_COUNTER_H
+#define AGENTOS_LLM_TOKEN_COUNTER_H
 
 #include <stddef.h>
 #ifdef HAVE_TIKTOKEN
@@ -26,4 +26,4 @@ size_t token_counter_count(token_counter_t* tc, const char* text);
 }
 #endif
 
-#endif /* LLM_TOKEN_COUNTER_H */
+#endif /* AGENTOS_LLM_TOKEN_COUNTER_H */

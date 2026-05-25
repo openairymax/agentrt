@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file market_service_impl.c
  * @brief 市场服务核心实现
@@ -50,6 +51,13 @@ static int is_valid_url(const char *url) {
     return is_safe_for_shell(url);
 }
 
+static int is_safe_path_component(const char *str) {
+    if (!str || strlen(str) == 0) return 0;
+    if (strchr(str, '/') || strchr(str, '\\')) return 0;
+    if (strstr(str, "..")) return 0;
+    return 1;
+}
+
 struct market_service {
     market_config_t config;
     agent_info_t* agents[MAX_AGENTS];
@@ -69,12 +77,12 @@ int market_service_create(const market_config_t* config, market_service_t** serv
         config = &default_cfg;
     }
 
-    market_service_t* svc = (market_service_t*)calloc(1, sizeof(market_service_t));
+    market_service_t* svc = (market_service_t*)AGENTOS_CALLOC(1, sizeof(market_service_t));
     if (!svc) return -2;
 
     memcpy(&svc->config, config, sizeof(market_config_t));
-    if (config->registry_url) svc->config.registry_url = strdup(config->registry_url);
-    if (config->storage_path) svc->config.storage_path = strdup(config->storage_path);
+    if (config->registry_url) svc->config.registry_url = AGENTOS_STRDUP(config->registry_url);
+    if (config->storage_path) svc->config.storage_path = AGENTOS_STRDUP(config->storage_path);
 
     svc->initialized = 1;
     *service = svc;
@@ -86,33 +94,33 @@ int market_service_destroy(market_service_t* service) {
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (service->agents[i]) {
-            free(service->agents[i]->agent_id);
-            free(service->agents[i]->name);
-            free(service->agents[i]->version);
-            free(service->agents[i]->description);
-            free(service->agents[i]->author);
-            free(service->agents[i]->repository);
-            free(service->agents[i]->dependencies);
-            free(service->agents[i]);
+            AGENTOS_FREE(service->agents[i]->agent_id);
+            AGENTOS_FREE(service->agents[i]->name);
+            AGENTOS_FREE(service->agents[i]->version);
+            AGENTOS_FREE(service->agents[i]->description);
+            AGENTOS_FREE(service->agents[i]->author);
+            AGENTOS_FREE(service->agents[i]->repository);
+            AGENTOS_FREE(service->agents[i]->dependencies);
+            AGENTOS_FREE(service->agents[i]);
         }
     }
 
     for (size_t i = 0; i < service->skill_count; i++) {
         if (service->skills[i]) {
-            free(service->skills[i]->skill_id);
-            free(service->skills[i]->name);
-            free(service->skills[i]->version);
-            free(service->skills[i]->description);
-            free(service->skills[i]->author);
-            free(service->skills[i]->repository);
-            free(service->skills[i]->dependencies);
-            free(service->skills[i]);
+            AGENTOS_FREE(service->skills[i]->skill_id);
+            AGENTOS_FREE(service->skills[i]->name);
+            AGENTOS_FREE(service->skills[i]->version);
+            AGENTOS_FREE(service->skills[i]->description);
+            AGENTOS_FREE(service->skills[i]->author);
+            AGENTOS_FREE(service->skills[i]->repository);
+            AGENTOS_FREE(service->skills[i]->dependencies);
+            AGENTOS_FREE(service->skills[i]);
         }
     }
 
-    free((void*)service->config.registry_url);
-    free((void*)service->config.storage_path);
-    free(service);
+    AGENTOS_FREE((void*)service->config.registry_url);
+    AGENTOS_FREE((void*)service->config.storage_path);
+    AGENTOS_FREE(service);
     return 0;
 }
 
@@ -122,21 +130,21 @@ int market_service_register_agent(market_service_t* service, const agent_info_t*
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_info->agent_id) == 0) {
-            free(service->agents[i]->name);
-            free(service->agents[i]->version);
-            free(service->agents[i]->description);
-            free(service->agents[i]->author);
-            free(service->agents[i]->repository);
-            free(service->agents[i]->dependencies);
+            AGENTOS_FREE(service->agents[i]->name);
+            AGENTOS_FREE(service->agents[i]->version);
+            AGENTOS_FREE(service->agents[i]->description);
+            AGENTOS_FREE(service->agents[i]->author);
+            AGENTOS_FREE(service->agents[i]->repository);
+            AGENTOS_FREE(service->agents[i]->dependencies);
 
-            service->agents[i]->name = agent_info->name ? strdup(agent_info->name) : NULL;
-            service->agents[i]->version = agent_info->version ? strdup(agent_info->version) : NULL;
-            service->agents[i]->description = agent_info->description ? strdup(agent_info->description) : NULL;
+            service->agents[i]->name = agent_info->name ? AGENTOS_STRDUP(agent_info->name) : NULL;
+            service->agents[i]->version = agent_info->version ? AGENTOS_STRDUP(agent_info->version) : NULL;
+            service->agents[i]->description = agent_info->description ? AGENTOS_STRDUP(agent_info->description) : NULL;
             service->agents[i]->type = agent_info->type;
             service->agents[i]->status = agent_info->status;
-            service->agents[i]->author = agent_info->author ? strdup(agent_info->author) : NULL;
-            service->agents[i]->repository = agent_info->repository ? strdup(agent_info->repository) : NULL;
-            service->agents[i]->dependencies = agent_info->dependencies ? strdup(agent_info->dependencies) : NULL;
+            service->agents[i]->author = agent_info->author ? AGENTOS_STRDUP(agent_info->author) : NULL;
+            service->agents[i]->repository = agent_info->repository ? AGENTOS_STRDUP(agent_info->repository) : NULL;
+            service->agents[i]->dependencies = agent_info->dependencies ? AGENTOS_STRDUP(agent_info->dependencies) : NULL;
             service->agents[i]->rating = agent_info->rating;
             service->agents[i]->download_count = agent_info->download_count;
             service->agents[i]->last_updated = (uint64_t)time(NULL);
@@ -144,18 +152,29 @@ int market_service_register_agent(market_service_t* service, const agent_info_t*
         }
     }
 
-    agent_info_t* new_agent = (agent_info_t*)calloc(1, sizeof(agent_info_t));
+    agent_info_t* new_agent = (agent_info_t*)AGENTOS_CALLOC(1, sizeof(agent_info_t));
     if (!new_agent) return -3;
 
-    new_agent->agent_id = agent_info->agent_id ? strdup(agent_info->agent_id) : NULL;
-    new_agent->name = agent_info->name ? strdup(agent_info->name) : NULL;
-    new_agent->version = agent_info->version ? strdup(agent_info->version) : NULL;
-    new_agent->description = agent_info->description ? strdup(agent_info->description) : NULL;
+    new_agent->agent_id = agent_info->agent_id ? AGENTOS_STRDUP(agent_info->agent_id) : NULL;
+    new_agent->name = agent_info->name ? AGENTOS_STRDUP(agent_info->name) : NULL;
+    new_agent->version = agent_info->version ? AGENTOS_STRDUP(agent_info->version) : NULL;
+    new_agent->description = agent_info->description ? AGENTOS_STRDUP(agent_info->description) : NULL;
     new_agent->type = agent_info->type;
     new_agent->status = agent_info->status;
-    new_agent->author = agent_info->author ? strdup(agent_info->author) : NULL;
-    new_agent->repository = agent_info->repository ? strdup(agent_info->repository) : NULL;
-    new_agent->dependencies = agent_info->dependencies ? strdup(agent_info->dependencies) : NULL;
+    new_agent->author = agent_info->author ? AGENTOS_STRDUP(agent_info->author) : NULL;
+    new_agent->repository = agent_info->repository ? AGENTOS_STRDUP(agent_info->repository) : NULL;
+    new_agent->dependencies = agent_info->dependencies ? AGENTOS_STRDUP(agent_info->dependencies) : NULL;
+    if (!new_agent->agent_id || !new_agent->name || !new_agent->version) {
+        AGENTOS_FREE(new_agent->agent_id);
+        AGENTOS_FREE(new_agent->name);
+        AGENTOS_FREE(new_agent->version);
+        AGENTOS_FREE(new_agent->description);
+        AGENTOS_FREE(new_agent->author);
+        AGENTOS_FREE(new_agent->repository);
+        AGENTOS_FREE(new_agent->dependencies);
+        AGENTOS_FREE(new_agent);
+        return -3;
+    }
     new_agent->rating = agent_info->rating;
     new_agent->download_count = agent_info->download_count;
     new_agent->last_updated = (uint64_t)time(NULL);
@@ -170,20 +189,20 @@ int market_service_register_skill(market_service_t* service, const skill_info_t*
 
     for (size_t i = 0; i < service->skill_count; i++) {
         if (strcmp(service->skills[i]->skill_id, skill_info->skill_id) == 0) {
-            free(service->skills[i]->name);
-            free(service->skills[i]->version);
-            free(service->skills[i]->description);
-            free(service->skills[i]->author);
-            free(service->skills[i]->repository);
-            free(service->skills[i]->dependencies);
+            AGENTOS_FREE(service->skills[i]->name);
+            AGENTOS_FREE(service->skills[i]->version);
+            AGENTOS_FREE(service->skills[i]->description);
+            AGENTOS_FREE(service->skills[i]->author);
+            AGENTOS_FREE(service->skills[i]->repository);
+            AGENTOS_FREE(service->skills[i]->dependencies);
 
-            service->skills[i]->name = skill_info->name ? strdup(skill_info->name) : NULL;
-            service->skills[i]->version = skill_info->version ? strdup(skill_info->version) : NULL;
-            service->skills[i]->description = skill_info->description ? strdup(skill_info->description) : NULL;
+            service->skills[i]->name = skill_info->name ? AGENTOS_STRDUP(skill_info->name) : NULL;
+            service->skills[i]->version = skill_info->version ? AGENTOS_STRDUP(skill_info->version) : NULL;
+            service->skills[i]->description = skill_info->description ? AGENTOS_STRDUP(skill_info->description) : NULL;
             service->skills[i]->type = skill_info->type;
-            service->skills[i]->author = skill_info->author ? strdup(skill_info->author) : NULL;
-            service->skills[i]->repository = skill_info->repository ? strdup(skill_info->repository) : NULL;
-            service->skills[i]->dependencies = skill_info->dependencies ? strdup(skill_info->dependencies) : NULL;
+            service->skills[i]->author = skill_info->author ? AGENTOS_STRDUP(skill_info->author) : NULL;
+            service->skills[i]->repository = skill_info->repository ? AGENTOS_STRDUP(skill_info->repository) : NULL;
+            service->skills[i]->dependencies = skill_info->dependencies ? AGENTOS_STRDUP(skill_info->dependencies) : NULL;
             service->skills[i]->rating = skill_info->rating;
             service->skills[i]->download_count = skill_info->download_count;
             service->skills[i]->last_updated = (uint64_t)time(NULL);
@@ -191,26 +210,26 @@ int market_service_register_skill(market_service_t* service, const skill_info_t*
         }
     }
 
-    skill_info_t* new_skill = (skill_info_t*)calloc(1, sizeof(skill_info_t));
+    skill_info_t* new_skill = (skill_info_t*)AGENTOS_CALLOC(1, sizeof(skill_info_t));
     if (!new_skill) return -3;
 
-    new_skill->skill_id = skill_info->skill_id ? strdup(skill_info->skill_id) : NULL;
-    new_skill->name = skill_info->name ? strdup(skill_info->name) : NULL;
-    new_skill->version = skill_info->version ? strdup(skill_info->version) : NULL;
-    new_skill->description = skill_info->description ? strdup(skill_info->description) : NULL;
+    new_skill->skill_id = skill_info->skill_id ? AGENTOS_STRDUP(skill_info->skill_id) : NULL;
+    new_skill->name = skill_info->name ? AGENTOS_STRDUP(skill_info->name) : NULL;
+    new_skill->version = skill_info->version ? AGENTOS_STRDUP(skill_info->version) : NULL;
+    new_skill->description = skill_info->description ? AGENTOS_STRDUP(skill_info->description) : NULL;
     new_skill->type = skill_info->type;
-    new_skill->author = skill_info->author ? strdup(skill_info->author) : NULL;
-    new_skill->repository = skill_info->repository ? strdup(skill_info->repository) : NULL;
-    new_skill->dependencies = skill_info->dependencies ? strdup(skill_info->dependencies) : NULL;
+    new_skill->author = skill_info->author ? AGENTOS_STRDUP(skill_info->author) : NULL;
+    new_skill->repository = skill_info->repository ? AGENTOS_STRDUP(skill_info->repository) : NULL;
+    new_skill->dependencies = skill_info->dependencies ? AGENTOS_STRDUP(skill_info->dependencies) : NULL;
     if (!new_skill->skill_id || !new_skill->name || !new_skill->version) {
-        free(new_skill->skill_id);
-        free(new_skill->name);
-        free(new_skill->version);
-        free(new_skill->description);
-        free(new_skill->author);
-        free(new_skill->repository);
-        free(new_skill->dependencies);
-        free(new_skill);
+        AGENTOS_FREE(new_skill->skill_id);
+        AGENTOS_FREE(new_skill->name);
+        AGENTOS_FREE(new_skill->version);
+        AGENTOS_FREE(new_skill->description);
+        AGENTOS_FREE(new_skill->author);
+        AGENTOS_FREE(new_skill->repository);
+        AGENTOS_FREE(new_skill->dependencies);
+        AGENTOS_FREE(new_skill);
         return -3;
     }
     new_skill->rating = skill_info->rating;
@@ -225,7 +244,7 @@ int market_service_search_agents(market_service_t* service, const search_params_
     if (!service || !params || !agents || !count || !service->initialized) return -1;
 
     size_t results_size = 16;
-    agent_info_t** results = (agent_info_t**)malloc(sizeof(agent_info_t*) * results_size);
+    agent_info_t** results = (agent_info_t**)AGENTOS_MALLOC(sizeof(agent_info_t*) * results_size);
     if (!results) return -2;
 
     size_t found = 0;
@@ -240,8 +259,8 @@ int market_service_search_agents(market_service_t* service, const search_params_
 
         if (found >= results_size) {
             results_size *= 2;
-            agent_info_t** tmp = (agent_info_t**)realloc(results, sizeof(agent_info_t*) * results_size);
-            if (!tmp) { free(results); return -2; }
+            agent_info_t** tmp = (agent_info_t**)AGENTOS_REALLOC(results, sizeof(agent_info_t*) * results_size);
+            if (!tmp) { AGENTOS_FREE(results); return -2; }
             results = tmp;
         }
 
@@ -258,7 +277,7 @@ int market_service_search_skills(market_service_t* service, const search_params_
     if (!service || !params || !skills || !count || !service->initialized) return -1;
 
     size_t results_size = 16;
-    skill_info_t** results = (skill_info_t**)malloc(sizeof(skill_info_t*) * results_size);
+    skill_info_t** results = (skill_info_t**)AGENTOS_MALLOC(sizeof(skill_info_t*) * results_size);
     if (!results) return -2;
 
     size_t found = 0;
@@ -273,8 +292,8 @@ int market_service_search_skills(market_service_t* service, const search_params_
 
         if (found >= results_size) {
             results_size *= 2;
-            skill_info_t** tmp = (skill_info_t**)realloc(results, sizeof(skill_info_t*) * results_size);
-            if (!tmp) { free(results); return -2; }
+            skill_info_t** tmp = (skill_info_t**)AGENTOS_REALLOC(results, sizeof(skill_info_t*) * results_size);
+            if (!tmp) { AGENTOS_FREE(results); return -2; }
             results = tmp;
         }
 
@@ -289,8 +308,9 @@ int market_service_search_skills(market_service_t* service, const search_params_
 
 int market_service_install_agent(market_service_t* service, const install_request_t* request, install_result_t** result) {
     if (!service || !request || !result || !service->initialized) return -1;
+    if (!is_safe_path_component(request->id)) return -1;
 
-    install_result_t* res = (install_result_t*)calloc(1, sizeof(install_result_t));
+    install_result_t* res = (install_result_t*)AGENTOS_CALLOC(1, sizeof(install_result_t));
     if (!res) return -2;
 
     agent_info_t* target = NULL;
@@ -303,7 +323,7 @@ int market_service_install_agent(market_service_t* service, const install_reques
 
     if (!target) {
         res->success = false;
-        res->message = strdup("Agent not found");
+        res->message = AGENTOS_STRDUP("Agent not found");
         res->error_code = -3;
         *result = res;
         return 0;
@@ -318,7 +338,7 @@ int market_service_install_agent(market_service_t* service, const install_reques
         int mkret = mkdir(install_dir, 0755);
         if (mkret != 0 && errno != EEXIST) {
             res->success = false;
-            res->message = strdup("Failed to create install directory");
+            res->message = AGENTOS_STRDUP("Failed to create install directory");
             res->error_code = -4;
             *result = res;
             return 0;
@@ -384,9 +404,9 @@ int market_service_install_agent(market_service_t* service, const install_reques
     target->download_count++;
 
     res->success = true;
-    res->message = strdup("Agent installed successfully");
-    res->installed_version = strdup(request->version ? request->version : target->version);
-    res->install_path = strdup(install_dir);
+    res->message = AGENTOS_STRDUP("Agent installed successfully");
+    res->installed_version = AGENTOS_STRDUP(request->version ? request->version : target->version);
+    res->install_path = AGENTOS_STRDUP(install_dir);
     res->error_code = 0;
 
     *result = res;
@@ -396,7 +416,7 @@ int market_service_install_agent(market_service_t* service, const install_reques
 int market_service_install_skill(market_service_t* service, const install_request_t* request, install_result_t** result) {
     if (!service || !request || !result || !service->initialized) return -1;
 
-    install_result_t* res = (install_result_t*)calloc(1, sizeof(install_result_t));
+    install_result_t* res = (install_result_t*)AGENTOS_CALLOC(1, sizeof(install_result_t));
     if (!res) return -2;
 
     skill_info_t* target = NULL;
@@ -409,7 +429,7 @@ int market_service_install_skill(market_service_t* service, const install_reques
 
     if (!target) {
         res->success = false;
-        res->message = strdup("Skill not found");
+        res->message = AGENTOS_STRDUP("Skill not found");
         res->error_code = -3;
         *result = res;
         return 0;
@@ -418,9 +438,9 @@ int market_service_install_skill(market_service_t* service, const install_reques
     target->download_count++;
 
     res->success = true;
-    res->message = strdup("Skill installed successfully");
-    res->installed_version = strdup(request->version ? request->version : target->version);
-    res->install_path = strdup(request->install_path ? request->install_path : "./skills");
+    res->message = AGENTOS_STRDUP("Skill installed successfully");
+    res->installed_version = AGENTOS_STRDUP(request->version ? request->version : target->version);
+    res->install_path = AGENTOS_STRDUP(request->install_path ? request->install_path : "./skills");
     res->error_code = 0;
 
     *result = res;
@@ -429,6 +449,7 @@ int market_service_install_skill(market_service_t* service, const install_reques
 
 int market_service_uninstall_agent(market_service_t* service, const char* agent_id) {
     if (!service || !agent_id || !service->initialized) return -1;
+    if (!is_safe_path_component(agent_id)) return -1;
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_id) == 0) {
@@ -455,14 +476,14 @@ int market_service_uninstall_skill(market_service_t* service, const char* skill_
 
     for (size_t i = 0; i < service->skill_count; i++) {
         if (strcmp(service->skills[i]->skill_id, skill_id) == 0) {
-            free(service->skills[i]->skill_id);
-            free(service->skills[i]->name);
-            free(service->skills[i]->version);
-            free(service->skills[i]->description);
-            free(service->skills[i]->author);
-            free(service->skills[i]->repository);
-            free(service->skills[i]->dependencies);
-            free(service->skills[i]);
+            AGENTOS_FREE(service->skills[i]->skill_id);
+            AGENTOS_FREE(service->skills[i]->name);
+            AGENTOS_FREE(service->skills[i]->version);
+            AGENTOS_FREE(service->skills[i]->description);
+            AGENTOS_FREE(service->skills[i]->author);
+            AGENTOS_FREE(service->skills[i]->repository);
+            AGENTOS_FREE(service->skills[i]->dependencies);
+            AGENTOS_FREE(service->skills[i]);
 
             for (size_t j = i; j < service->skill_count - 1; j++) {
                 service->skills[j] = service->skills[j + 1];
@@ -478,7 +499,7 @@ int market_service_get_installed_agents(market_service_t* service, agent_info_t*
     if (!service || !agents || !count || !service->initialized) return -1;
 
     size_t results_size = 16;
-    agent_info_t** results = (agent_info_t**)malloc(sizeof(agent_info_t*) * results_size);
+    agent_info_t** results = (agent_info_t**)AGENTOS_MALLOC(sizeof(agent_info_t*) * results_size);
     if (!results) return -2;
 
     size_t found = 0;
@@ -488,8 +509,8 @@ int market_service_get_installed_agents(market_service_t* service, agent_info_t*
 
             if (found >= results_size) {
                 results_size *= 2;
-                agent_info_t** tmp = (agent_info_t**)realloc(results, sizeof(agent_info_t*) * results_size);
-                if (!tmp) { free(results); return -2; }
+                agent_info_t** tmp = (agent_info_t**)AGENTOS_REALLOC(results, sizeof(agent_info_t*) * results_size);
+                if (!tmp) { AGENTOS_FREE(results); return -2; }
                 results = tmp;
             }
 
@@ -506,15 +527,15 @@ int market_service_get_installed_skills(market_service_t* service, skill_info_t*
     if (!service || !skills || !count || !service->initialized) return -1;
 
     size_t results_size = 16;
-    skill_info_t** results = (skill_info_t**)malloc(sizeof(skill_info_t*) * results_size);
+    skill_info_t** results = (skill_info_t**)AGENTOS_MALLOC(sizeof(skill_info_t*) * results_size);
     if (!results) return -2;
 
     size_t found = 0;
     for (size_t i = 0; i < service->skill_count; i++) {
         if (found >= results_size) {
             results_size *= 2;
-            skill_info_t** tmp = (skill_info_t**)realloc(results, sizeof(skill_info_t*) * results_size);
-            if (!tmp) { free(results); return -2; }
+            skill_info_t** tmp = (skill_info_t**)AGENTOS_REALLOC(results, sizeof(skill_info_t*) * results_size);
+            if (!tmp) { AGENTOS_FREE(results); return -2; }
             results = tmp;
         }
 
@@ -533,14 +554,14 @@ int market_service_check_update(market_service_t* service, const char* id, bool*
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, id) == 0) {
-            *latest_version = strdup(service->agents[i]->version);
+            *latest_version = AGENTOS_STRDUP(service->agents[i]->version);
             return 0;
         }
     }
 
     for (size_t i = 0; i < service->skill_count; i++) {
         if (strcmp(service->skills[i]->skill_id, id) == 0) {
-            *latest_version = strdup(service->skills[i]->version);
+            *latest_version = AGENTOS_STRDUP(service->skills[i]->version);
             return 0;
         }
     }
@@ -552,12 +573,20 @@ int market_service_check_update(market_service_t* service, const char* id, bool*
 int market_service_reload_config(market_service_t* service, const market_config_t* config) {
     if (!service || !config || !service->initialized) return -1;
 
-    free((void*)service->config.registry_url);
-    free((void*)service->config.storage_path);
+    AGENTOS_FREE((void*)service->config.registry_url);
+    AGENTOS_FREE((void*)service->config.storage_path);
+    service->config.registry_url = NULL;
+    service->config.storage_path = NULL;
 
     memcpy(&service->config, config, sizeof(market_config_t));
-    if (config->registry_url) service->config.registry_url = strdup(config->registry_url);
-    if (config->storage_path) service->config.storage_path = strdup(config->storage_path);
+    if (config->registry_url) {
+        service->config.registry_url = AGENTOS_STRDUP(config->registry_url);
+        if (!service->config.registry_url) return -2;
+    }
+    if (config->storage_path) {
+        service->config.storage_path = AGENTOS_STRDUP(config->storage_path);
+        if (!service->config.storage_path) return -2;
+    }
 
     return 0;
 }
@@ -576,12 +605,25 @@ int market_service_sync_registry(market_service_t* service) {
 
     const char* storage = service->config.storage_path ?
                           service->config.storage_path : AGENTOS_CACHE_DIR;
+
+    {
+        size_t pos = 0;
+        char tmp[1024];
+        strncpy(tmp, storage, sizeof(tmp) - 1);
+        tmp[sizeof(tmp) - 1] = '\0';
+        while (tmp[pos]) {
+            if (tmp[pos] == '/' && pos > 0) {
+                tmp[pos] = '\0';
+                mkdir(tmp, 0755);
+                tmp[pos] = '/';
+            }
+            pos++;
+        }
+        mkdir(tmp, 0755);
+    }
+
     char index_path[1024];
     snprintf(index_path, sizeof(index_path), "%s/registry_index.json", storage);
-
-    char mkdir_cmd[2048];
-    snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", storage);
-    { int __rc __attribute__((unused)) = system(mkdir_cmd); }
 
     if (!is_safe_for_shell(service->config.registry_url)) {
         SVC_LOG_WARN("Sync registry: invalid registry_url, possible injection detected");
@@ -595,14 +637,22 @@ int market_service_sync_registry(market_service_t* service) {
         snprintf(url, sizeof(url), "https://%s/index.json", service->config.registry_url);
     }
 
-    char curl_cmd[4096];
-    snprintf(curl_cmd, sizeof(curl_cmd),
-            "curl -sfL -o '%s' '%s' --connect-timeout 10 --max-time 60 2>/dev/null",
-            index_path, url);
-    int curl_ret = system(curl_cmd);
-    if (curl_ret != 0) {
-        SVC_LOG_WARN("Sync registry: download failed from %s (curl_ret=%d)", url, curl_ret);
-        return 0;
+    pid_t curl_pid = fork();
+    if (curl_pid == 0) {
+        execlp("curl", "curl", "-sfL", "-o", index_path, url,
+               "--connect-timeout", "10", "--max-time", "60", (char*)NULL);
+        _exit(127);
+    } else if (curl_pid > 0) {
+        int curl_status = 0;
+        waitpid(curl_pid, &curl_status, 0);
+        int curl_ret = WIFEXITED(curl_status) ? WEXITSTATUS(curl_status) : -1;
+        if (curl_ret != 0) {
+            SVC_LOG_WARN("Sync registry: download failed from %s (curl_ret=%d)", url, curl_ret);
+            return 0;
+        }
+    } else {
+        SVC_LOG_WARN("Sync registry: fork failed: %s", strerror(errno));
+        return -2;
     }
 
     FILE* idx_fp = fopen(index_path, "r");
@@ -621,13 +671,13 @@ int market_service_sync_registry(market_service_t* service) {
         return 0;
     }
 
-    char* idx_data = (char*)malloc((size_t)fsize + 1);
+    char* idx_data = (char*)AGENTOS_MALLOC((size_t)fsize + 1);
     if (!idx_data) {
         fclose(idx_fp);
         return -2;
     }
     size_t nread = fread(idx_data, 1, (size_t)fsize, idx_fp);
-    if (nread != (size_t)fsize) { free(idx_data); fclose(idx_fp); return -2; }
+    if (nread != (size_t)fsize) { AGENTOS_FREE(idx_data); fclose(idx_fp); return -2; }
     idx_data[nread] = '\0';
     fclose(idx_fp);
 
@@ -656,11 +706,11 @@ int market_service_sync_registry(market_service_t* service) {
             }
 
             if (!already_exists && service->agent_count < MAX_AGENTS) {
-                agent_info_t* new_agent = (agent_info_t*)calloc(1, sizeof(agent_info_t));
+                agent_info_t* new_agent = (agent_info_t*)AGENTOS_CALLOC(1, sizeof(agent_info_t));
                 if (new_agent) {
-                    new_agent->agent_id = strdup(found_id);
-                    new_agent->name = strdup(found_id);
-                    new_agent->version = strdup("latest");
+                    new_agent->agent_id = AGENTOS_STRDUP(found_id);
+                    new_agent->name = AGENTOS_STRDUP(found_id);
+                    new_agent->version = AGENTOS_STRDUP("latest");
                     new_agent->status = AGENT_STATUS_AVAILABLE;
                     service->agents[service->agent_count++] = new_agent;
                     synced++;
@@ -671,7 +721,7 @@ int market_service_sync_registry(market_service_t* service) {
         entry = strstr(id_end + 1, "\"agent_id\"");
     }
 
-    free(idx_data);
+    AGENTOS_FREE(idx_data);
     SVC_LOG_INFO("Sync registry: synced %d new agents from %s", synced, url);
     return 0;
 }

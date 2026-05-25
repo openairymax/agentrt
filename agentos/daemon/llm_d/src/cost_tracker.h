@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef LLM_COST_TRACKER_H
-#define LLM_COST_TRACKER_H
+#ifndef AGENTOS_LLM_COST_TRACKER_H
+#define AGENTOS_LLM_COST_TRACKER_H
 
 #include <stdint.h>
 #include <cjson/cJSON.h>
@@ -32,4 +32,4 @@ cJSON* cost_tracker_export(cost_tracker_t* ct);
 }
 #endif
 
-#endif /* LLM_COST_TRACKER_H */
+#endif /* AGENTOS_LLM_COST_TRACKER_H */

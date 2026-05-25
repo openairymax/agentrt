@@ -8,6 +8,7 @@
 #include "mcp_v1_adapter.h"
 #include "mcp_transport.h"
 #include "unified_protocol.h"
+#include "memory_compat.h"
 #include <cjson/cJSON.h>
 #include <stdlib.h>
 #include <string.h>
@@ -74,10 +75,10 @@ struct mcp_v1_context_s {
 };
 
 static char* json_string_escape(const char* str) {
-    if (!str) return strdup("null");
+    if (!str) return AGENTOS_STRDUP("null");
     size_t len = strlen(str);
     size_t escaped_len = len * 2 + 3;
-    char* escaped = malloc(escaped_len);
+    char* escaped = AGENTOS_MALLOC(escaped_len);
     if (!escaped) return NULL;
     size_t j = 0;
     escaped[j++] = '"';
@@ -97,7 +98,7 @@ static char* json_string_escape(const char* str) {
 }
 
 static char* strdup_safe(const char* s) {
-    return s ? strdup(s) : NULL;
+    return s ? AGENTOS_STRDUP(s) : NULL;
 }
 
 mcp_v1_config_t mcp_v1_config_default(void) {
@@ -116,7 +117,7 @@ mcp_v1_config_t mcp_v1_config_default(void) {
 }
 
 mcp_v1_context_t* mcp_v1_context_create(const mcp_v1_config_t* config) {
-    mcp_v1_context_t* ctx = calloc(1, sizeof(mcp_v1_context_t));
+    mcp_v1_context_t* ctx = AGENTOS_CALLOC(1, sizeof(mcp_v1_context_t));
     if (!ctx) return NULL;
 
     if (config) {
@@ -128,20 +129,20 @@ mcp_v1_context_t* mcp_v1_context_create(const mcp_v1_config_t* config) {
     }
 
     ctx->tool_capacity = 32;
-    ctx->tools = calloc(ctx->tool_capacity, sizeof(mcp_tool_entry_t));
-    if (!ctx->tools) { free(ctx); return NULL; }
+    ctx->tools = AGENTOS_CALLOC(ctx->tool_capacity, sizeof(mcp_tool_entry_t));
+    if (!ctx->tools) { AGENTOS_FREE(ctx); return NULL; }
 
     ctx->resource_capacity = 16;
-    ctx->resources = calloc(ctx->resource_capacity, sizeof(mcp_resource_entry_t));
-    if (!ctx->resources) { free(ctx->tools); free(ctx); return NULL; }
+    ctx->resources = AGENTOS_CALLOC(ctx->resource_capacity, sizeof(mcp_resource_entry_t));
+    if (!ctx->resources) { AGENTOS_FREE(ctx->tools); AGENTOS_FREE(ctx); return NULL; }
 
     ctx->template_capacity = 16;
-    ctx->resource_templates = calloc(ctx->template_capacity, sizeof(mcp_resource_template_t));
-    if (!ctx->resource_templates) { free(ctx->resources); free(ctx->tools); free(ctx); return NULL; }
+    ctx->resource_templates = AGENTOS_CALLOC(ctx->template_capacity, sizeof(mcp_resource_template_t));
+    if (!ctx->resource_templates) { AGENTOS_FREE(ctx->resources); AGENTOS_FREE(ctx->tools); AGENTOS_FREE(ctx); return NULL; }
 
     ctx->prompt_capacity = 16;
-    ctx->prompts = calloc(ctx->prompt_capacity, sizeof(mcp_prompt_entry_t));
-    if (!ctx->prompts) { free(ctx->resource_templates); free(ctx->resources); free(ctx->tools); free(ctx); return NULL; }
+    ctx->prompts = AGENTOS_CALLOC(ctx->prompt_capacity, sizeof(mcp_prompt_entry_t));
+    if (!ctx->prompts) { AGENTOS_FREE(ctx->resource_templates); AGENTOS_FREE(ctx->resources); AGENTOS_FREE(ctx->tools); AGENTOS_FREE(ctx); return NULL; }
 
     ctx->log_level = MCP_LOG_INFO;
     ctx->request_counter = 0;
@@ -153,38 +154,38 @@ void mcp_v1_context_destroy(mcp_v1_context_t* ctx) {
     if (!ctx) return;
 
     for (size_t i = 0; i < ctx->tool_count; i++) {
-        free(ctx->tools[i].tool.name);
-        free(ctx->tools[i].tool.description);
-        free(ctx->tools[i].tool.input_schema_json);
+        AGENTOS_FREE(ctx->tools[i].tool.name);
+        AGENTOS_FREE(ctx->tools[i].tool.description);
+        AGENTOS_FREE(ctx->tools[i].tool.input_schema_json);
     }
-    free(ctx->tools);
+    AGENTOS_FREE(ctx->tools);
 
     for (size_t i = 0; i < ctx->resource_count; i++) {
-        free(ctx->resources[i].resource.uri);
-        free(ctx->resources[i].resource.name);
-        free(ctx->resources[i].resource.description);
-        free(ctx->resources[i].resource.mime_type);
+        AGENTOS_FREE(ctx->resources[i].resource.uri);
+        AGENTOS_FREE(ctx->resources[i].resource.name);
+        AGENTOS_FREE(ctx->resources[i].resource.description);
+        AGENTOS_FREE(ctx->resources[i].resource.mime_type);
     }
-    free(ctx->resources);
+    AGENTOS_FREE(ctx->resources);
 
     for (size_t i = 0; i < ctx->template_count; i++) {
-        free(ctx->resource_templates[i].uri_template);
-        free(ctx->resource_templates[i].name);
-        free(ctx->resource_templates[i].description);
-        free(ctx->resource_templates[i].mime_type);
+        AGENTOS_FREE(ctx->resource_templates[i].uri_template);
+        AGENTOS_FREE(ctx->resource_templates[i].name);
+        AGENTOS_FREE(ctx->resource_templates[i].description);
+        AGENTOS_FREE(ctx->resource_templates[i].mime_type);
     }
-    free(ctx->resource_templates);
+    AGENTOS_FREE(ctx->resource_templates);
 
     for (size_t i = 0; i < ctx->prompt_count; i++) {
-        free(ctx->prompts[i].prompt.name);
-        free(ctx->prompts[i].prompt.description);
-        free(ctx->prompts[i].prompt.arguments_schema_json);
+        AGENTOS_FREE(ctx->prompts[i].prompt.name);
+        AGENTOS_FREE(ctx->prompts[i].prompt.description);
+        AGENTOS_FREE(ctx->prompts[i].prompt.arguments_schema_json);
     }
-    free(ctx->prompts);
+    AGENTOS_FREE(ctx->prompts);
 
-    free(ctx->config.server_name);
-    free(ctx->config.server_version);
-    free(ctx);
+    AGENTOS_FREE(ctx->config.server_name);
+    AGENTOS_FREE(ctx->config.server_version);
+    AGENTOS_FREE(ctx);
 }
 
 int mcp_v1_register_tool(mcp_v1_context_t* ctx,
@@ -196,7 +197,7 @@ int mcp_v1_register_tool(mcp_v1_context_t* ctx,
 
     if (ctx->tool_count >= ctx->tool_capacity) {
         size_t new_cap = ctx->tool_capacity * 2;
-        mcp_tool_entry_t* new_tools = realloc(ctx->tools, new_cap * sizeof(mcp_tool_entry_t));
+        mcp_tool_entry_t* new_tools = AGENTOS_REALLOC(ctx->tools, new_cap * sizeof(mcp_tool_entry_t));
         if (!new_tools) return -3;
         ctx->tools = new_tools;
         ctx->tool_capacity = new_cap;
@@ -223,7 +224,7 @@ int mcp_v1_register_resource(mcp_v1_context_t* ctx,
 
     if (ctx->resource_count >= ctx->resource_capacity) {
         size_t new_cap = ctx->resource_capacity * 2;
-        mcp_resource_entry_t* new_res = realloc(ctx->resources, new_cap * sizeof(mcp_resource_entry_t));
+        mcp_resource_entry_t* new_res = AGENTOS_REALLOC(ctx->resources, new_cap * sizeof(mcp_resource_entry_t));
         if (!new_res) return -3;
         ctx->resources = new_res;
         ctx->resource_capacity = new_cap;
@@ -247,7 +248,7 @@ int mcp_v1_register_resource_template(mcp_v1_context_t* ctx,
 
     if (ctx->template_count >= ctx->template_capacity) {
         size_t new_cap = ctx->template_capacity * 2;
-        mcp_resource_template_t* new_tpl = realloc(ctx->resource_templates, new_cap * sizeof(mcp_resource_template_t));
+        mcp_resource_template_t* new_tpl = AGENTOS_REALLOC(ctx->resource_templates, new_cap * sizeof(mcp_resource_template_t));
         if (!new_tpl) return -3;
         ctx->resource_templates = new_tpl;
         ctx->template_capacity = new_cap;
@@ -272,7 +273,7 @@ int mcp_v1_register_prompt(mcp_v1_context_t* ctx,
 
     if (ctx->prompt_count >= ctx->prompt_capacity) {
         size_t new_cap = ctx->prompt_capacity * 2;
-        mcp_prompt_entry_t* new_prompts = realloc(ctx->prompts, new_cap * sizeof(mcp_prompt_entry_t));
+        mcp_prompt_entry_t* new_prompts = AGENTOS_REALLOC(ctx->prompts, new_cap * sizeof(mcp_prompt_entry_t));
         if (!new_prompts) return -3;
         ctx->prompts = new_prompts;
         ctx->prompt_capacity = new_cap;
@@ -337,7 +338,7 @@ int mcp_v1_handle_tools_list(mcp_v1_context_t* ctx, char** response_json) {
     if (!ctx || !response_json) return -1;
 
     size_t buf_size = 4096 + ctx->tool_count * 512;
-    char* buf = malloc(buf_size);
+    char* buf = AGENTOS_MALLOC(buf_size);
     if (!buf) return -3;
 
     size_t offset = 0;
@@ -352,8 +353,8 @@ int mcp_v1_handle_tools_list(mcp_v1_context_t* ctx, char** response_json) {
             "{\"name\":%s,\"description\":%s,\"inputSchema\":%s}",
             name, desc,
             ctx->tools[i].tool.input_schema_json ? ctx->tools[i].tool.input_schema_json : "{}");
-        free(name);
-        free(desc);
+        AGENTOS_FREE(name);
+        AGENTOS_FREE(desc);
     }
 
     offset += snprintf(buf + offset, buf_size - offset, "]}");
@@ -381,13 +382,13 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t* ctx,
         size_t len = snprintf(NULL, 0,
             "{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"Tool not found: %s\"}]}",
             safe_name);
-        char* resp = malloc(len + 1);
+        char* resp = AGENTOS_MALLOC(len + 1);
         if (resp) {
             snprintf(resp, len + 1,
                 "{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"Tool not found: %s\"}]}",
                 safe_name);
         }
-        free(name_esc);
+        AGENTOS_FREE(name_esc);
         *response_json = resp;
         return -2;
     }
@@ -399,7 +400,7 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t* ctx,
     found->handler(name, arguments_json, &results, &result_count, &is_error, found->user_data);
 
     size_t buf_size = 4096 + result_count * 1024;
-    char* buf = malloc(buf_size);
+    char* buf = AGENTOS_MALLOC(buf_size);
     if (!buf) {
         mcp_content_destroy(results, result_count);
         return -3;
@@ -421,7 +422,7 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t* ctx,
         char* text_esc = json_string_escape(results[i].text);
         offset += snprintf(buf + offset, buf_size - offset,
             "{\"type\":\"%s\",\"text\":%s}", type_str, text_esc);
-        free(text_esc);
+        AGENTOS_FREE(text_esc);
     }
 
     offset += snprintf(buf + offset, buf_size - offset, "]}");
@@ -435,7 +436,7 @@ int mcp_v1_handle_resources_list(mcp_v1_context_t* ctx, char** response_json) {
     if (!ctx || !response_json) return -1;
 
     size_t buf_size = 4096 + ctx->resource_count * 512;
-    char* buf = malloc(buf_size);
+    char* buf = AGENTOS_MALLOC(buf_size);
     if (!buf) return -3;
 
     size_t offset = 0;
@@ -450,7 +451,7 @@ int mcp_v1_handle_resources_list(mcp_v1_context_t* ctx, char** response_json) {
         offset += snprintf(buf + offset, buf_size - offset,
             "{\"uri\":%s,\"name\":%s,\"description\":%s,\"mimeType\":%s}",
             uri, name, desc, mime);
-        free(uri); free(name); free(desc); free(mime);
+        AGENTOS_FREE(uri); AGENTOS_FREE(name); AGENTOS_FREE(desc); AGENTOS_FREE(mime);
     }
 
     offset += snprintf(buf + offset, buf_size - offset, "]}");
@@ -476,11 +477,11 @@ int mcp_v1_handle_resources_read(mcp_v1_context_t* ctx,
         size_t len = snprintf(NULL, 0,
             "{\"contents\":[{\"uri\":%s,\"text\":\"Resource not found\"}]}",
             uri_esc);
-        char* resp = malloc(len + 1);
+        char* resp = AGENTOS_MALLOC(len + 1);
         if (resp) snprintf(resp, len + 1,
             "{\"contents\":[{\"uri\":%s,\"text\":\"Resource not found\"}]}",
             uri_esc);
-        free(uri_esc);
+        AGENTOS_FREE(uri_esc);
         *response_json = resp;
         return -2;
     }
@@ -496,13 +497,13 @@ int mcp_v1_handle_resources_read(mcp_v1_context_t* ctx,
     size_t len = snprintf(NULL, 0,
         "{\"contents\":[{\"uri\":%s,\"mimeType\":%s,\"text\":%s}]}",
         uri_esc, mime_esc, content_esc);
-    char* resp = malloc(len + 1);
+    char* resp = AGENTOS_MALLOC(len + 1);
     if (resp) snprintf(resp, len + 1,
         "{\"contents\":[{\"uri\":%s,\"mimeType\":%s,\"text\":%s}]}",
         uri_esc, mime_esc, content_esc);
 
-    free(uri_esc); free(content_esc); free(mime_esc);
-    free(content); free(mime_type);
+    AGENTOS_FREE(uri_esc); AGENTOS_FREE(content_esc); AGENTOS_FREE(mime_esc);
+    AGENTOS_FREE(content); AGENTOS_FREE(mime_type);
     *response_json = resp;
     return 0;
 }
@@ -511,7 +512,7 @@ int mcp_v1_handle_resources_templates(mcp_v1_context_t* ctx, char** response_jso
     if (!ctx || !response_json) return -1;
 
     size_t buf_size = 4096 + ctx->template_count * 512;
-    char* buf = malloc(buf_size);
+    char* buf = AGENTOS_MALLOC(buf_size);
     if (!buf) return -3;
 
     size_t offset = 0;
@@ -525,7 +526,7 @@ int mcp_v1_handle_resources_templates(mcp_v1_context_t* ctx, char** response_jso
         offset += snprintf(buf + offset, buf_size - offset,
             "{\"uriTemplate\":%s,\"name\":%s,\"description\":%s}",
             uri, name, desc);
-        free(uri); free(name); free(desc);
+        AGENTOS_FREE(uri); AGENTOS_FREE(name); AGENTOS_FREE(desc);
     }
 
     offset += snprintf(buf + offset, buf_size - offset, "]}");
@@ -537,7 +538,7 @@ int mcp_v1_handle_prompts_list(mcp_v1_context_t* ctx, char** response_json) {
     if (!ctx || !response_json) return -1;
 
     size_t buf_size = 4096 + ctx->prompt_count * 512;
-    char* buf = malloc(buf_size);
+    char* buf = AGENTOS_MALLOC(buf_size);
     if (!buf) return -3;
 
     size_t offset = 0;
@@ -551,7 +552,7 @@ int mcp_v1_handle_prompts_list(mcp_v1_context_t* ctx, char** response_json) {
             "{\"name\":%s,\"description\":%s,\"arguments\":%s}",
             name, desc,
             ctx->prompts[i].prompt.arguments_schema_json ? ctx->prompts[i].prompt.arguments_schema_json : "[]");
-        free(name); free(desc);
+        AGENTOS_FREE(name); AGENTOS_FREE(desc);
     }
 
     offset += snprintf(buf + offset, buf_size - offset, "]}");
@@ -574,7 +575,7 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t* ctx,
     }
 
     if (!found || !found->handler) {
-        *response_json = strdup("{\"description\":\"Prompt not found\",\"messages\":[]}");
+        *response_json = AGENTOS_STRDUP("{\"description\":\"Prompt not found\",\"messages\":[]}");
         return -2;
     }
 
@@ -583,14 +584,14 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t* ctx,
     found->handler(name, arguments_json, &messages, &message_count, found->user_data);
 
     size_t buf_size = 4096 + message_count * 1024;
-    char* buf = malloc(buf_size);
+    char* buf = AGENTOS_MALLOC(buf_size);
     if (!buf) return -3;
 
     size_t offset = 0;
     char* name_esc = json_string_escape(name);
     offset += snprintf(buf + offset, buf_size - offset,
         "{\"description\":\"Prompt: %s\",\"messages\":[", name_esc);
-    free(name_esc);
+    AGENTOS_FREE(name_esc);
 
     for (size_t i = 0; i < message_count && i < 100; i++) {
         if (i > 0) offset += snprintf(buf + offset, buf_size - offset, ",");
@@ -598,8 +599,8 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t* ctx,
         char* content = json_string_escape(messages[i].content ? (const char*)messages[i].content : "");
         offset += snprintf(buf + offset, buf_size - offset,
             "{\"role\":%s,\"content\":{\"type\":\"text\",\"text\":\"%s\"}}", role, content);
-        free(role);
-        free(content);
+        AGENTOS_FREE(role);
+        AGENTOS_FREE(content);
     }
 
     offset += snprintf(buf + offset, buf_size - offset, "]}");
@@ -681,7 +682,7 @@ void mcp_stream_event_init(mcp_stream_event_t* event,
     if (!event) return;
     memset(event, 0, sizeof(*event));
     event->type = type;
-    event->event_data = data ? strdup(data) : NULL;
+    event->event_data = data ? AGENTOS_STRDUP(data) : NULL;
     event->data_size = data ? strlen(data) : 0;
 }
 
@@ -690,13 +691,13 @@ static void emit_sse_line(mcp_stream_callback_t callback, void* user_data,
     if (!callback) return;
 
     size_t len = strlen(field) + (value ? strlen(value) : 0) + 16;
-    char* sse_line = malloc(len);
+    char* sse_line = AGENTOS_MALLOC(len);
     if (sse_line) {
         snprintf(sse_line, len, "%s: %s\n", field, value ? value : "");
         mcp_stream_event_t event;
         mcp_stream_event_init(&event, MCP_STREAM_EVENT_CONTENT, sse_line);
         callback(&event, user_data);
-        free(sse_line);
+        AGENTOS_FREE(sse_line);
     }
 }
 
@@ -724,7 +725,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
     start_event.progress = 0;
     start_event.total = 100;
     callback(&start_event, user_data);
-    free(start_event.event_data);
+    AGENTOS_FREE(start_event.event_data);
 
     mcp_tool_entry_t* found = NULL;
     for (size_t i = 0; i < ctx->tool_count; i++) {
@@ -740,7 +741,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
         snprintf(error_json, sizeof(error_json),
             "{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"Tool not found: %s\"}]}",
             name_esc);
-        free(name_esc);
+        AGENTOS_FREE(name_esc);
         emit_sse_event(callback, user_data, "tools/call/result", error_json);
 
         mcp_stream_event_t done_event;
@@ -748,7 +749,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
         done_event.progress = 0;
         done_event.total = 100;
         callback(&done_event, user_data);
-        free(done_event.event_data);
+        AGENTOS_FREE(done_event.event_data);
         return -2;
     }
 
@@ -760,7 +761,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
 
     for (size_t i = 0; i < result_count; i++) {
         size_t buf_size = 512 + (results[i].text ? strlen(results[i].text) : 0);
-        char* chunk_json = malloc(buf_size);
+        char* chunk_json = AGENTOS_MALLOC(buf_size);
         if (chunk_json) {
             const char* type_str = "text";
             switch (results[i].type) {
@@ -789,7 +790,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
                     "%s{\"delta\":{\"text\":\"%s\"}}",
                     offset == 0 ? chunk_json : "",
                     escaped_chunk);
-                free(escaped_chunk);
+                AGENTOS_FREE(escaped_chunk);
 
                 emit_sse_event(callback, user_data, "tools/call/chunk", sse_data);
                 offset += chunk_size;
@@ -800,15 +801,15 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
                 progress_evt.progress = pct;
                 progress_evt.total = 100;
                 callback(&progress_evt, user_data);
-                free(progress_evt.event_data);
+                AGENTOS_FREE(progress_evt.event_data);
             }
 
-            free(chunk_json);
+            AGENTOS_FREE(chunk_json);
         }
     }
 
     size_t final_buf_size = 4096 + result_count * 1024;
-    char* final_json = malloc(final_buf_size);
+    char* final_json = AGENTOS_MALLOC(final_buf_size);
     if (final_json) {
         size_t offset = 0;
         offset += snprintf(final_json + offset, final_buf_size - offset,
@@ -825,12 +826,12 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
             char* text_esc = json_string_escape(results[i].text);
             offset += snprintf(final_json + offset, final_buf_size - offset,
                 "{\"type\":\"%s\",\"text\":%s}", type_str, text_esc);
-            free(text_esc);
+            AGENTOS_FREE(text_esc);
         }
         offset += snprintf(final_json + offset, final_buf_size - offset, "]}");
 
         emit_sse_event(callback, user_data, "tools/call/result", final_json);
-        free(final_json);
+        AGENTOS_FREE(final_json);
     }
 
     mcp_stream_event_t done_event;
@@ -839,7 +840,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
     done_event.progress = 100;
     done_event.total = 100;
     callback(&done_event, user_data);
-    free(done_event.event_data);
+    AGENTOS_FREE(done_event.event_data);
 
     mcp_content_destroy(results, result_count);
     return 0;
@@ -859,7 +860,7 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
     start_event.progress = 0;
     start_event.total = 100;
     callback(&start_event, user_data);
-    free(start_event.event_data);
+    AGENTOS_FREE(start_event.event_data);
 
     mcp_sampling_result_t result;
     memset(&result, 0, sizeof(result));
@@ -885,8 +886,8 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
                     snprintf(sse_data, sizeof(sse_data),
                         "{\"model\":%s,\"delta\":{\"type\":\"text\",\"text\":\"%s\"},\"index\":%zu}",
                         model_esc, escaped_chunk, i);
-                    free(escaped_chunk);
-                    free(model_esc);
+                    AGENTOS_FREE(escaped_chunk);
+                    AGENTOS_FREE(model_esc);
                     emit_sse_event(callback, user_data, "sampling/chunk", sse_data);
 
                     offset += chunk_size;
@@ -897,7 +898,7 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
                     progress_evt.progress = pct;
                     progress_evt.total = 100;
                     callback(&progress_evt, user_data);
-                    free(progress_evt.event_data);
+                    AGENTOS_FREE(progress_evt.event_data);
                 }
             }
         }
@@ -910,8 +911,8 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
         "{\"model\":%s,\"stopReason\":%s,\"stoppedEarly\":%s}",
         model_esc, stop_esc,
         result.stopped_early ? "true" : "false");
-    free(model_esc);
-    free(stop_esc);
+    AGENTOS_FREE(model_esc);
+    AGENTOS_FREE(stop_esc);
     emit_sse_event(callback, user_data, "sampling/result", final_result);
 
     mcp_stream_event_t done_event;
@@ -919,7 +920,7 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
     done_event.progress = 100;
     done_event.total = 100;
     callback(&done_event, user_data);
-    free(done_event.event_data);
+    AGENTOS_FREE(done_event.event_data);
 
     mcp_sampling_result_destroy(&result);
     return 0;
@@ -1014,7 +1015,7 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
             (ctx->config.capabilities & MCP_CAP_LOGGING) ? "true" : "false",
             ctx->config.server_name ? ctx->config.server_name : "AgentOS",
             ctx->config.server_version ? ctx->config.server_version : MCP_V1_VERSION);
-        char* resp = malloc(len + 1);
+        char* resp = AGENTOS_MALLOC(len + 1);
         if (resp) snprintf(resp, len + 1,
             "{\"protocolVersion\":\"%s\",\"capabilities\":{\"tools\":%s,\"resources\":%s,\"prompts\":%s,\"sampling\":%s,\"logging\":%s},\"serverInfo\":{\"name\":\"%s\",\"version\":\"%s\"}}",
             MCP_V1_VERSION,
@@ -1029,7 +1030,7 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
         return 0;
     }
 
-    *response_json = strdup("{\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}");
+    *response_json = AGENTOS_STRDUP("{\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}");
     return -2;
 }
 
@@ -1040,7 +1041,7 @@ static int mcp_adapter_init(void* context) {
     mcp_v1_context_t* new_ctx = mcp_v1_context_create(&config);
     if (!new_ctx) return -2;
     memcpy(ctx, new_ctx, sizeof(mcp_v1_context_t));
-    free(new_ctx);
+    AGENTOS_FREE(new_ctx);
     return 0;
 }
 
@@ -1079,7 +1080,7 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
     unified_message_t* msg = (unified_message_t*)out_msg;
 
-    char* input_copy = malloc(data_size + 1);
+    char* input_copy = AGENTOS_MALLOC(data_size + 1);
     if (!input_copy) return -3;
     memcpy(input_copy, data, data_size);
     input_copy[data_size] = '\0';
@@ -1094,7 +1095,7 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
             char* method_end = strchr(method_start, '"');
             if (method_end) {
                 size_t method_len = (size_t)(method_end - method_start);
-                char* method_buf = malloc(method_len + 1);
+                char* method_buf = AGENTOS_MALLOC(method_len + 1);
                 if (method_buf) {
                     memcpy(method_buf, method_start, method_len);
                     method_buf[method_len] = '\0';
@@ -1107,8 +1108,8 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
 
     char* response_json = NULL;
     int result = mcp_v1_route_request(ctx, method, input_copy, &response_json);
-    if (method_allocated) free((void*)method);
-    free(input_copy);
+    if (method_allocated) AGENTOS_FREE((void*)method);
+    AGENTOS_FREE(input_copy);
 
     if (result == 0 && response_json) {
         msg->payload = response_json;
@@ -1126,8 +1127,8 @@ static int mcp_adapter_connect(void* context, const char* address) {
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
     if (address) {
         char* old_name = (char*)ctx->config.server_name;
-        ctx->config.server_name = strdup(address);
-        free(old_name);
+        ctx->config.server_name = AGENTOS_STRDUP(address);
+        AGENTOS_FREE(old_name);
     }
     if (ctx->transport) {
         mcp_transport_config_t tcfg;
@@ -1147,7 +1148,7 @@ static int mcp_adapter_disconnect(void* context) {
     if (!context) return -1;
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
     if (ctx->config.server_name) {
-        free((void*)ctx->config.server_name);
+        AGENTOS_FREE((void*)ctx->config.server_name);
         ctx->config.server_name = NULL;
     }
     return 0;
@@ -1213,8 +1214,8 @@ static int mcp_adapter_handle_request(void* context,
     if (result == 0 && response_json) {
         *resp = response_json;
     } else {
-        free(response_json);
-        *resp = strdup("{\"error\":\"request failed\"}");
+        AGENTOS_FREE(response_json);
+        *resp = AGENTOS_STRDUP("{\"error\":\"request failed\"}");
         result = -1;
     }
     return result;
@@ -1291,25 +1292,25 @@ uint32_t mcp_v1_get_capabilities(mcp_v1_context_t* ctx) {
 void mcp_content_destroy(mcp_content_t* content, size_t count) {
     if (!content) return;
     for (size_t i = 0; i < count; i++) {
-        free(content[i].text);
-        free(content[i].mime_type);
-        free(content[i].uri);
-        free(content[i].data);
+        AGENTOS_FREE(content[i].text);
+        AGENTOS_FREE(content[i].mime_type);
+        AGENTOS_FREE(content[i].uri);
+        AGENTOS_FREE(content[i].data);
     }
-    free(content);
+    AGENTOS_FREE(content);
 }
 
 void mcp_sampling_result_destroy(mcp_sampling_result_t* result) {
     if (!result) return;
-    free(result->model);
-    free(result->stop_reason);
+    AGENTOS_FREE(result->model);
+    AGENTOS_FREE(result->stop_reason);
     mcp_content_destroy(result->content, result->content_count);
 }
 
 void mcp_completion_result_destroy(mcp_completion_result_t* result) {
     if (!result) return;
     for (size_t i = 0; i < result->value_count; i++) {
-        free(result->values[i]);
+        AGENTOS_FREE(result->values[i]);
     }
-    free(result->values);
+    AGENTOS_FREE(result->values);
 }

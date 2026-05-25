@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef LLM_PROVIDER_REGISTRY_H
-#define LLM_PROVIDER_REGISTRY_H
+#ifndef AGENTOS_LLM_PROVIDER_REGISTRY_H
+#define AGENTOS_LLM_PROVIDER_REGISTRY_H
 
 #include "provider.h"
 
@@ -45,4 +45,4 @@ const provider_t* provider_registry_find(provider_registry_t* reg, const char* m
 }
 #endif
 
-#endif /* LLM_PROVIDER_REGISTRY_H */
+#endif /* AGENTOS_LLM_PROVIDER_REGISTRY_H */

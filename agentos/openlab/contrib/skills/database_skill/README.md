@@ -1,5 +1,7 @@
 # Database Skill — 数据库技能
 
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+
 `openlab/contrib/skills/database_skill/` 提供智能体的数据库操作能力，支持多种数据库的连接查询和数据管理。
 
 ## 核心能力

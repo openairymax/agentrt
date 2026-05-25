@@ -6,6 +6,7 @@
 
 #include "memory.h"
 #include "memory_compat.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -99,16 +100,15 @@ int agentos_memory_write_async(
     req->callback = callback;
     req->userdata = userdata;
 
-    pthread_t thread;
-    int rc = pthread_create(&thread, NULL, async_write_thread, req);
+    agentos_thread_t thread;
+    int rc = agentos_thread_create(&thread, async_write_thread, req);
+    if (rc == 0) {
+        pthread_detach(thread);
+    }
     if (rc != 0) {
         free_record_copy(rec_copy);
         AGENTOS_FREE(req);
         return AGENTOS_EINVAL;
-    }
-    rc = pthread_detach(thread);
-    if (rc != 0) {
-        fprintf(stderr, "[memory_service] Failed to detach write thread\n");
     }
     return AGENTOS_SUCCESS;
 }

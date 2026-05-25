@@ -68,10 +68,10 @@ class ValidationReport:
     def add(self, r: ValidationResult):
         self.results.append(r)
         self.total_checks += 1
-        {ValidationStatus.PASS: lambda s: setattr(s, 's', s.passed + 1),
-         ValidationStatus.FAIL: lambda s: setattr(s, 's', s.failed + 1),
-         ValidationStatus.WARN: lambda s: setattr(s, 's', s.warnings + 1),
-         ValidationStatus.SKIP: lambda s: setattr(s, 's', s.skipped + 1)}[r.status](self)
+        {ValidationStatus.PASS: lambda s: setattr(s, 'passed', s.passed + 1),
+         ValidationStatus.FAIL: lambda s: setattr(s, 'failed', s.failed + 1),
+         ValidationStatus.WARN: lambda s: setattr(s, 'warnings', s.warnings + 1),
+         ValidationStatus.SKIP: lambda s: setattr(s, 'skipped', s.skipped + 1)}[r.status](self)
 
     def is_success(self) -> bool:
         return self.failed == 0

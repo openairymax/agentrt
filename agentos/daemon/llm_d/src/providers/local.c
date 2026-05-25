@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include <cjson/cJSON.h>
 /**
  * @file local.c
@@ -39,7 +40,7 @@ static provider_ctx_t* local_init(const char* name __attribute__((unused)),
                                    double timeout_sec,
                                    int max_retries) {
 
-    local_ctx_t* ctx = (local_ctx_t*)calloc(1, sizeof(local_ctx_t));
+    local_ctx_t* ctx = (local_ctx_t*)AGENTOS_CALLOC(1, sizeof(local_ctx_t));
     if (!ctx) {
         return NULL;
     }
@@ -53,7 +54,7 @@ static provider_ctx_t* local_init(const char* name __attribute__((unused)),
 
 static void local_destroy(provider_ctx_t* ctx_ptr) {
     if (ctx_ptr) {
-        free(ctx_ptr);
+        AGENTOS_FREE(ctx_ptr);
     }
 }
 
@@ -88,7 +89,7 @@ static int local_complete(provider_ctx_t* ctx_ptr,
                                &http_resp, &http_code);
 
     curl_slist_free_all(headers);
-    free(req_body);
+    AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
         SVC_LOG_ERROR("local: HTTP request failed, status=%ld", http_code);
@@ -130,13 +131,13 @@ static int loc_stream_on_chunk(const char* json_line, void* userdata) {
     if (!acc->resp_id) {
         cJSON* id = cJSON_GetObjectItem(root, "id");
         if (cJSON_IsString(id) && id->valuestring)
-            acc->resp_id = strdup(id->valuestring);
+            acc->resp_id = AGENTOS_STRDUP(id->valuestring);
     }
 
     if (!acc->resp_model) {
         cJSON* model = cJSON_GetObjectItem(root, "model");
         if (cJSON_IsString(model) && model->valuestring)
-            acc->resp_model = strdup(model->valuestring);
+            acc->resp_model = AGENTOS_STRDUP(model->valuestring);
     }
 
     cJSON* created = cJSON_GetObjectItem(root, "created");
@@ -161,7 +162,7 @@ static int loc_stream_on_chunk(const char* json_line, void* userdata) {
                     if (needed > acc->acc_cap) {
                         size_t new_cap = acc->acc_cap * 2;
                         while (new_cap < needed) new_cap *= 2;
-                        char* ptr = (char*)realloc(acc->acc_content, new_cap);
+                        char* ptr = (char*)AGENTOS_REALLOC(acc->acc_content, new_cap);
                         if (ptr) { acc->acc_content = ptr; acc->acc_cap = new_cap; }
                     }
                     if (acc->acc_content && acc->acc_len + tlen < acc->acc_cap) {
@@ -176,8 +177,8 @@ static int loc_stream_on_chunk(const char* json_line, void* userdata) {
         cJSON* fr = cJSON_GetObjectItem(choice, "finish_reason");
         if (cJSON_IsString(fr) && fr->valuestring &&
             strcmp(fr->valuestring, "null") != 0) {
-            free(acc->finish_reason);
-            acc->finish_reason = strdup(fr->valuestring);
+            AGENTOS_FREE(acc->finish_reason);
+            acc->finish_reason = AGENTOS_STRDUP(fr->valuestring);
         }
     }
 
@@ -186,24 +187,24 @@ static int loc_stream_on_chunk(const char* json_line, void* userdata) {
 }
 
 static llm_response_t* loc_build_stream_response(loc_stream_acc_t* acc) {
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t* resp = (llm_response_t*)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) return NULL;
 
-    resp->id = acc->resp_id ? acc->resp_id : strdup("");
+    resp->id = acc->resp_id ? acc->resp_id : AGENTOS_STRDUP("");
     acc->resp_id = NULL;
-    resp->model = acc->resp_model ? acc->resp_model : strdup("unknown");
+    resp->model = acc->resp_model ? acc->resp_model : AGENTOS_STRDUP("unknown");
     acc->resp_model = NULL;
     resp->created = acc->resp_created;
-    resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
+    resp->choices = (llm_message_t*)AGENTOS_CALLOC(1, sizeof(llm_message_t));
     if (resp->choices) {
         resp->choice_count = 1;
-        resp->choices[0].role = strdup("assistant");
+        resp->choices[0].role = AGENTOS_STRDUP("assistant");
         resp->choices[0].content = acc->acc_content;
         acc->acc_content = NULL;
     } else {
         resp->choice_count = 0;
     }
-    resp->finish_reason = acc->finish_reason ? acc->finish_reason : strdup("stop");
+    resp->finish_reason = acc->finish_reason ? acc->finish_reason : AGENTOS_STRDUP("stop");
     acc->finish_reason = NULL;
     return resp;
 }
@@ -236,7 +237,7 @@ static int local_complete_stream(provider_ctx_t* ctx_ptr,
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;
-    acc.acc_content = (char*)malloc(acc.acc_cap);
+    acc.acc_content = (char*)AGENTOS_MALLOC(acc.acc_cap);
 
     long http_code = 0;
     int ret = provider_http_post_stream(url, headers, req_body,
@@ -245,18 +246,18 @@ static int local_complete_stream(provider_ctx_t* ctx_ptr,
                                         &http_code);
 
     curl_slist_free_all(headers);
-    free(req_body);
+    AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
         SVC_LOG_ERROR("local: Stream HTTP error, status=%ld", http_code);
-        free(acc.acc_content); free(acc.resp_id);
-        free(acc.resp_model); free(acc.finish_reason);
+        AGENTOS_FREE(acc.acc_content); AGENTOS_FREE(acc.resp_id);
+        AGENTOS_FREE(acc.resp_model); AGENTOS_FREE(acc.finish_reason);
         return ret;
     }
 
     llm_response_t* resp = loc_build_stream_response(&acc);
-    free(acc.acc_content); free(acc.resp_id);
-    free(acc.resp_model); free(acc.finish_reason);
+    AGENTOS_FREE(acc.acc_content); AGENTOS_FREE(acc.resp_id);
+    AGENTOS_FREE(acc.resp_model); AGENTOS_FREE(acc.finish_reason);
 
     if (out_response) *out_response = resp;
     else if (resp) llm_response_free(resp);

@@ -25,3 +25,6 @@ mypy>=1.0.0
 # Development utilities
 ipython>=8.0.0
 jupyter>=1.0.0
+
+# Token counting (optional, used by token_utils.py for precise BPE counting)
+tiktoken>=0.5.0

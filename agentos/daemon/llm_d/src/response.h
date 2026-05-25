@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef LLM_RESPONSE_H
-#define LLM_RESPONSE_H
+#ifndef AGENTOS_LLM_RESPONSE_H
+#define AGENTOS_LLM_RESPONSE_H
 
 #include "llm_service.h"
 #include <cjson/cJSON.h>
@@ -21,4 +21,4 @@ llm_response_t* response_from_json(const char* json);
 }
 #endif
 
-#endif /* LLM_RESPONSE_H */
+#endif /* AGENTOS_LLM_RESPONSE_H */

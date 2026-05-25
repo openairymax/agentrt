@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file api_recovery.c
  * @brief API错误恢复系统实现 — 多凭证池 + 降级策略 + 熔断集成
@@ -62,7 +63,7 @@ static api_rec_error_code_t classify_http_error(long http_code) {
 /* ==================== Lifecycle ==================== */
 
 api_rec_pool_t* api_rec_pool_create(const char* name) {
-    api_rec_pool_t* pool = calloc(1, sizeof(api_rec_pool_t));
+    api_rec_pool_t* pool = AGENTOS_CALLOC(1, sizeof(api_rec_pool_t));
     if (!pool) return NULL;
 
     if (name) {
@@ -99,7 +100,7 @@ void api_rec_pool_destroy(api_rec_pool_t* pool) {
                  (unsigned long long)pool->total_calls,
                  (unsigned long long)pool->recovered_calls,
                  pool->recovery_rate * 100.0);
-    free(pool);
+    AGENTOS_FREE(pool);
 }
 
 /* ==================== Credential Pool ==================== */
@@ -364,7 +365,7 @@ int api_rec_execute_with_recovery(api_rec_pool_t* pool,
             }
         }
 
-        free(resp_body);
+        AGENTOS_FREE(resp_body);
         resp_body = NULL;
         http_code = 0;
 
@@ -420,7 +421,7 @@ done:
         }
         ret = 0;
     } else {
-        free(resp_body);
+        AGENTOS_FREE(resp_body);
         pool->failed_calls++;
         if (out_result) {
             if (!out_result->rec_code)

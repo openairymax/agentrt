@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef LLM_PROVIDER_H
-#define LLM_PROVIDER_H
+#ifndef AGENTOS_LLM_PROVIDER_H
+#define AGENTOS_LLM_PROVIDER_H
 
 #include "llm_service.h"
 #include <curl/curl.h>
@@ -101,4 +101,4 @@ int provider_http_post_stream(const char* url,
 }
 #endif
 
-#endif /* LLM_PROVIDER_H */
+#endif /* AGENTOS_LLM_PROVIDER_H */

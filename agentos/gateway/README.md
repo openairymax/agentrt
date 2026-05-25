@@ -16,7 +16,8 @@
   │
   ├─ HTTP REST ───→ gateway_svc_adapter ──→ JSON-RPC 2.0 ──→ 后端服务
   ├─ WebSocket ──→ gateway_svc_adapter ──→ JSON-RPC 2.0 ──→ 后端服务
-  └─ Stdio ──────→ gateway_svc_adapter ──→ JSON-RPC 2.0 ──→ 后端服务
+  ├─ Stdio ──────→ gateway_svc_adapter ──→ JSON-RPC 2.0 ──→ 后端服务
+  └─ MCP ────────→ mcp_server ──────────→ JSON-RPC 2.0 ──→ 后端服务
                          │
                     gateway_service
                     (路由/限流/鉴权)
@@ -30,7 +31,10 @@
 |------|------|------|
 | 服务适配器 | `gateway_svc_adapter.c/h` | 外部协议解析与内部协议转换 |
 | 核心服务 | `gateway_service.c/h` | 请求路由、限流、鉴权、监控 |
+| MCP 服务器 | `mcp_server.c/h` | MCP 协议服务端实现，支持工具调用与资源访问 |
 | 主程序 | `gateway_main.c` | 服务入口、组件初始化和关闭 |
+
+> **依赖说明**：Gateway 依赖 cJSON 库进行 JSON 解析。若构建时未检测到 cJSON，整个 Gateway 模块将被跳过（不参与编译）。
 
 ## API 接口
 
