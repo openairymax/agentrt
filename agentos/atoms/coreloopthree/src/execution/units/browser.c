@@ -22,6 +22,28 @@
 #endif
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h>
+#include <stdio.h>
+
+static int secure_random_bytes(unsigned char* buf, size_t len) {
+#ifdef _WIN32
+    HCRYPTPROV prov;
+    if (!CryptAcquireContext(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
+        return -1;
+    if (!CryptGenRandom(prov, (DWORD)len, buf)) {
+        CryptReleaseContext(prov, 0);
+        return -1;
+    }
+    CryptReleaseContext(prov, 0);
+    return 0;
+#else
+    FILE* f = fopen("/dev/urandom", "rb");
+    if (!f) return -1;
+    size_t n = fread(buf, 1, len, f);
+    fclose(f);
+    return (n == len) ? 0 : -1;
+#endif
+}
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -169,8 +191,8 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
     }
 
     unsigned char nonce[16];
-    for (int i = 0; i < 16; i++)
-        nonce[i] = (unsigned char)((rand() >> (i % 4)) & 0xFF);
+    if (secure_random_bytes(nonce, sizeof(nonce)) != 0)
+        memset(nonce, 0, sizeof(nonce));
     char key_b64[CDP_WS_KEY_LEN + 1];
     base64_encode(nonce, 16, key_b64, sizeof(key_b64));
 
@@ -846,10 +868,8 @@ static int ws_send_frame(int fd, const char *payload, size_t payload_len)
     }
 
     uint8_t mask_key[4];
-    mask_key[0] = (uint8_t)(rand() & 0xFF);
-    mask_key[1] = (uint8_t)(rand() & 0xFF);
-    mask_key[2] = (uint8_t)(rand() & 0xFF);
-    mask_key[3] = (uint8_t)(rand() & 0xFF);
+    if (secure_random_bytes(mask_key, sizeof(mask_key)) != 0)
+        memset(mask_key, 0, sizeof(mask_key));
     memcpy(&header[header_size], mask_key, 4);
     header_size += 4;
 

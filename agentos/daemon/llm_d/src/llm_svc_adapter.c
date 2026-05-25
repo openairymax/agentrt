@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -80,7 +81,7 @@ static agentos_error_t llm_adapter_stop(agentos_service_t service, bool force) {
             ctx->llm_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->config_path) { free(ctx->config_path); ctx->config_path = NULL; }
+        if (ctx->config_path) { AGENTOS_FREE(ctx->config_path); ctx->config_path = NULL; }
         SVC_LOG_INFO("LLM服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("LLM服务适配器已停止");
@@ -99,12 +100,12 @@ static void llm_adapter_destroy(agentos_service_t service) {
     }
 
     if (ctx->config_path) {
-        free(ctx->config_path);
+        AGENTOS_FREE(ctx->config_path);
         ctx->config_path = NULL;
     }
 
     agentos_service_set_user_data(service, NULL);
-    free(ctx);
+    AGENTOS_FREE(ctx);
 }
 
 static agentos_error_t llm_adapter_healthcheck(agentos_service_t service) {
@@ -119,7 +120,7 @@ static agentos_error_t llm_adapter_healthcheck(agentos_service_t service) {
         SVC_LOG_WARN("LLM服务健康检查失败: %d", ret);
         return AGENTOS_ERR_UNKNOWN;
     }
-    if (stats_json) free(stats_json);
+    if (stats_json) AGENTOS_FREE(stats_json);
     return AGENTOS_SUCCESS;
 }
 
@@ -137,14 +138,14 @@ agentos_error_t llm_service_adapter_create(
 ) {
     if (!out_service) return AGENTOS_EINVAL;
 
-    llm_adapter_ctx_t* ctx = calloc(1, sizeof(llm_adapter_ctx_t));
+    llm_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(llm_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     if (config) {
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
         if (config->name) {
             size_t path_len = strlen(config->name) + strlen("_config.json") + 1;
-            ctx->config_path = calloc(1, path_len);
+            ctx->config_path = AGENTOS_CALLOC(1, path_len);
             if (ctx->config_path) {
                 snprintf(ctx->config_path, path_len, "%s_config.json", config->name);
             }
@@ -166,16 +167,16 @@ agentos_error_t llm_service_adapter_create(
         &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx->config_path);
-        free(ctx);
+        AGENTOS_FREE(ctx->config_path);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx->config_path);
-        free(ctx);
+        AGENTOS_FREE(ctx->config_path);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
@@ -190,7 +191,7 @@ agentos_error_t llm_service_adapter_wrap(
 ) {
     if (!out_service || !llm_svc) return AGENTOS_EINVAL;
 
-    llm_adapter_ctx_t* ctx = calloc(1, sizeof(llm_adapter_ctx_t));
+    llm_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(llm_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     ctx->llm_svc = llm_svc;
@@ -211,14 +212,14 @@ agentos_error_t llm_service_adapter_wrap(
         &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 

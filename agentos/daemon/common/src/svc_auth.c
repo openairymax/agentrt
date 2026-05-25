@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file svc_auth.c
  * @brief Daemon 服务层认证中间件实现
@@ -232,7 +233,7 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
     size_t msg_len = strlen(message);
     if (msg_len > SIZE_MAX - 72) { *out_len = 0; return; }
     size_t new_len = ((msg_len + 8) / 64 + 1) * 64;
-    unsigned char* msg = (unsigned char*)calloc(new_len + 64, 1);
+    unsigned char* msg = (unsigned char*)AGENTOS_CALLOC(new_len + 64, 1);
     if (!msg) { *out_len = 0; return; }
     memcpy(msg, message, msg_len);
     msg[msg_len] = 0x80;
@@ -264,7 +265,7 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
         h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=hh;
     }
 
-    free(msg);
+    AGENTOS_FREE(msg);
     msg = NULL;
     size_t key_len = strlen(key);
     unsigned char k_ipad[64], k_opad[64];
@@ -277,8 +278,8 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
                          0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
         size_t padded_len = 64 * 2;
         if (key_len + 1 + 8 > padded_len) padded_len = ((key_len + 1 + 8 + 63) / 64) * 64;
-        unsigned char* km = calloc(padded_len, 1);
-        if (!km) { free(msg); return; }
+        unsigned char* km = AGENTOS_CALLOC(padded_len, 1);
+        if (!km) { AGENTOS_FREE(msg); return; }
         memcpy(km, key, key_len);
         km[key_len] = 0x80;
         size_t bit_len = key_len * 8;
@@ -300,7 +301,7 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
             kh[0]+=wa; kh[1]+=wb; kh[2]+=wc; kh[3]+=wd;
             kh[4]+=we; kh[5]+=wf; kh[6]+=wg; kh[7]+=whh;
         }
-        free(km);
+        AGENTOS_FREE(km);
         for (int i = 0; i < 8; i++) {
             k_ipad[i*4]=(kh[i]>>24)&0xFF; k_ipad[i*4+1]=(kh[i]>>16)&0xFF;
             k_ipad[i*4+2]=(kh[i]>>8)&0xFF; k_ipad[i*4+3]=kh[i]&0xFF;
@@ -317,8 +318,8 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
     /* Inner hash - 正确处理多块 */
     size_t ilen = 64 + msg_len;
     size_t inner_padded = ((ilen + 8) / 64 + 1) * 64;
-    unsigned char* inner = calloc(inner_padded + 64, 1);
-    if (!inner) { free(msg); return; }
+    unsigned char* inner = AGENTOS_CALLOC(inner_padded + 64, 1);
+    if (!inner) { AGENTOS_FREE(msg); return; }
     memcpy(inner, k_ipad, 64);
     memcpy(inner + 64, message, msg_len);
     inner[ilen] = 0x80;
@@ -346,12 +347,12 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
         }
         ih[0]+=a;ih[1]+=b;ih[2]+=c;ih[3]+=d;ih[4]+=e;ih[5]+=f;ih[6]+=g;ih[7]+=hh;
     }
-    free(inner);
+    AGENTOS_FREE(inner);
 
     /* Outer hash - 正确处理多块 */
     size_t olen = 64 + 32;
     size_t outer_padded = ((olen + 8) / 64 + 1) * 64;
-    unsigned char* outer = calloc(outer_padded + 64, 1);
+    unsigned char* outer = AGENTOS_CALLOC(outer_padded + 64, 1);
     if (!outer) {
         return;
     }
@@ -475,46 +476,46 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
 
     /* Base64 编码 Payload */
     size_t payload_b64_size = strlen(payload_json) * 2 + 100;
-    char* payload_b64 = (char*)malloc(payload_b64_size);
-    if (!payload_b64) { free(payload_json); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    char* payload_b64 = (char*)AGENTOS_MALLOC(payload_b64_size);
+    if (!payload_b64) { AGENTOS_FREE(payload_json); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
 
     base64_encode((const uint8_t*)payload_json, strlen(payload_json),
                   payload_b64, &payload_b64_size);
-    free(payload_json);
+    AGENTOS_FREE(payload_json);
 
     /* 构建签名部分 */
     size_t sign_input_size = strlen(header_b64) + 1 + payload_b64_size + 100;
-    char* sign_input = (char*)malloc(sign_input_size);
-    if (!sign_input) { free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    char* sign_input = (char*)AGENTOS_MALLOC(sign_input_size);
+    if (!sign_input) { AGENTOS_FREE(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     snprintf(sign_input, sign_input_size, "%s.%s", header_b64, payload_b64);
 
     uint8_t hmac_output[32] = {0};
     size_t hmac_len = sizeof(hmac_output);
     g_hmac_impl(g_jwt.config.secret, sign_input, hmac_output, &hmac_len);
     if (hmac_len == 0) {
-        free(sign_input); free(payload_b64);
+        AGENTOS_FREE(sign_input); AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
 
     size_t sig_b64_size = 128;
-    char* sig_b64 = (char*)malloc(sig_b64_size);
-    if (!sig_b64) { free(sign_input); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    char* sig_b64 = (char*)AGENTOS_MALLOC(sig_b64_size);
+    if (!sig_b64) { AGENTOS_FREE(sign_input); AGENTOS_FREE(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     if (base64_encode(hmac_output, hmac_len, sig_b64, &sig_b64_size) != AGENTOS_SUCCESS) {
-        free(sign_input); free(sig_b64); free(payload_b64);
+        AGENTOS_FREE(sign_input); AGENTOS_FREE(sig_b64); AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
 
     /* 组合 Token */
     size_t token_size = sign_input_size + sig_b64_size + 10;
-    *out_token = (char*)malloc(token_size);
-    if (!*out_token) { free(sign_input); free(sig_b64); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    *out_token = (char*)AGENTOS_MALLOC(token_size);
+    if (!*out_token) { AGENTOS_FREE(sign_input); AGENTOS_FREE(sig_b64); AGENTOS_FREE(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     snprintf(*out_token, token_size, "%s.%s", sign_input, sig_b64);
 
-    free(sign_input);
-    free(payload_b64);
-    free(sig_b64);
+    AGENTOS_FREE(sign_input);
+    AGENTOS_FREE(payload_b64);
+    AGENTOS_FREE(sig_b64);
 
     SVC_LOG_DEBUG("JWT token generated for subject=%s", subject);
     agentos_mutex_unlock(&g_jwt.lock);
@@ -543,7 +544,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
 
     /* 解析 Payload */
     size_t payload_len = (size_t)(dot2 - dot1 - 1);
-    char* payload_b64 = (char*)malloc(payload_len + 1);
+    char* payload_b64 = (char*)AGENTOS_MALLOC(payload_len + 1);
     if (!payload_b64) {
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
@@ -553,9 +554,9 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
 
     /* Base64 URL-safe 解码 */
     size_t decoded_len = (payload_len * 3) / 4 + 4;
-    unsigned char* payload_decoded = (unsigned char*)malloc(decoded_len);
+    unsigned char* payload_decoded = (unsigned char*)AGENTOS_MALLOC(decoded_len);
     if (!payload_decoded) {
-        free(payload_b64);
+        AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
@@ -567,10 +568,10 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     }
     /* 补齐 padding */
     size_t pad = (4 - (payload_len % 4)) % 4;
-    char* payload_padded = (char*)malloc(payload_len + pad + 1);
+    char* payload_padded = (char*)AGENTOS_MALLOC(payload_len + pad + 1);
     if (!payload_padded) {
-        free(payload_decoded);
-        free(payload_b64);
+        AGENTOS_FREE(payload_decoded);
+        AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
@@ -601,11 +602,11 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         if (payload_padded[i+3] != '=') payload_decoded[out_idx++] = ((c & 0x3) << 6) | d;
     }
     payload_decoded[out_idx] = '\0';
-    free(payload_padded);
-    free(payload_b64);
+    AGENTOS_FREE(payload_padded);
+    AGENTOS_FREE(payload_b64);
 
     cJSON* payload = cJSON_Parse((const char*)payload_decoded);
-    free(payload_decoded);
+    AGENTOS_FREE(payload_decoded);
 
     if (!payload) {
         result->error_message = "Invalid token payload";
@@ -652,7 +653,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     {
         size_t header_len = (size_t)(dot1 - token);
         size_t sig_input_len = header_len + 1 + payload_len;
-        char* sig_input = (char*)malloc(sig_input_len + 1);
+        char* sig_input = (char*)AGENTOS_MALLOC(sig_input_len + 1);
         if (!sig_input) {
             result->error_message = "Memory allocation failed for signature verification";
             cJSON_Delete(payload);
@@ -665,9 +666,9 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         sig_input[sig_input_len] = '\0';
 
         size_t sig_b64_len = strlen(dot2 + 1);
-        char* sig_b64 = (char*)malloc(sig_b64_len + 1);
+        char* sig_b64 = (char*)AGENTOS_MALLOC(sig_b64_len + 1);
         if (!sig_b64) {
-            free(sig_input);
+            AGENTOS_FREE(sig_input);
             result->error_message = "Memory allocation failed";
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
@@ -685,7 +686,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         uint8_t computed_hmac[32] = {0};
         g_hmac_impl(g_jwt.config.secret, sig_input, computed_hmac, &expected_sig_len);
         if (expected_sig_len == 0) {
-            free(sig_input); free(sig_b64);
+            AGENTOS_FREE(sig_input); AGENTOS_FREE(sig_b64);
             result->error_message = "HMAC computation failed";
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
@@ -693,9 +694,9 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         }
 
         size_t sig_padded_len = sig_b64_len + ((4 - (sig_b64_len % 4)) % 4);
-        char* sig_padded = (char*)malloc(sig_padded_len + 1);
+        char* sig_padded = (char*)AGENTOS_MALLOC(sig_padded_len + 1);
         if (!sig_padded) {
-            free(sig_input); free(sig_b64);
+            AGENTOS_FREE(sig_input); AGENTOS_FREE(sig_b64);
             result->error_message = "Memory allocation failed";
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
@@ -706,9 +707,9 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         for (size_t i = 0; i < sig_pad; i++) sig_padded[sig_b64_len + i] = '=';
         sig_padded[sig_padded_len] = '\0';
 
-        unsigned char* provided_sig = (unsigned char*)malloc(32);
+        unsigned char* provided_sig = (unsigned char*)AGENTOS_MALLOC(32);
         if (!provided_sig) {
-            free(sig_input); free(sig_b64); free(sig_padded);
+            AGENTOS_FREE(sig_input); AGENTOS_FREE(sig_b64); AGENTOS_FREE(sig_padded);
             result->error_message = "Memory allocation failed";
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
@@ -740,7 +741,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
             sig_match = (acc == 0);
         }
 
-        free(sig_input); free(sig_b64); free(sig_padded); free(provided_sig);
+        AGENTOS_FREE(sig_input); AGENTOS_FREE(sig_b64); AGENTOS_FREE(sig_padded); AGENTOS_FREE(provided_sig);
 
         if (!sig_match) {
             result->status = AUTH_FAILED;
@@ -803,11 +804,11 @@ int auth_apikey_init(const apikey_config_t* config) {
         /* 复制允许的 Key 列表 */
         if (config->allowed_keys && config->key_count > 0) {
             g_apikey.capacity = config->key_count + 10;
-            g_apikey.keys = (char**)calloc(g_apikey.capacity, sizeof(*g_apikey.keys));
+            g_apikey.keys = (char**)AGENTOS_CALLOC(g_apikey.capacity, sizeof(*g_apikey.keys));
             if (g_apikey.keys) {
                 for (size_t i = 0; i < config->key_count; i++) {
                     if (config->allowed_keys[i]) {
-                        g_apikey.keys[i] = strdup(config->allowed_keys[i]);
+                        g_apikey.keys[i] = AGENTOS_STRDUP(config->allowed_keys[i]);
                         g_apikey.config.key_count++;
                     }
                 }
@@ -817,7 +818,7 @@ int auth_apikey_init(const apikey_config_t* config) {
         /* 默认空配置 */
         memset(&g_apikey.config, 0, sizeof(apikey_config_t));
         g_apikey.capacity = 10;
-        g_apikey.keys = (char**)calloc(g_apikey.capacity, sizeof(*g_apikey.keys));
+        g_apikey.keys = (char**)AGENTOS_CALLOC(g_apikey.capacity, sizeof(*g_apikey.keys));
         if (!g_apikey.keys) {
             g_apikey.capacity = 0;
             return AUTH_FAILED;
@@ -881,7 +882,7 @@ int auth_apikey_add(const char* new_key) {
     /* 扩容检查 */
     if (g_apikey.config.key_count >= g_apikey.capacity) {
         size_t new_cap = g_apikey.capacity * 2;
-        char** new_keys = (char**)realloc(g_apikey.keys, new_cap * sizeof(*g_apikey.keys));
+        char** new_keys = (char**)AGENTOS_REALLOC(g_apikey.keys, new_cap * sizeof(*g_apikey.keys));
         if (!new_keys) {
             agentos_mutex_unlock(&g_apikey.lock);
             return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -890,7 +891,7 @@ int auth_apikey_add(const char* new_key) {
         g_apikey.capacity = new_cap;
     }
 
-    g_apikey.keys[g_apikey.config.key_count++] = strdup(new_key);
+    g_apikey.keys[g_apikey.config.key_count++] = AGENTOS_STRDUP(new_key);
     agentos_mutex_unlock(&g_apikey.lock);
 
     SVC_LOG_INFO("New API Key added (total=%zu)", g_apikey.config.key_count);
@@ -906,7 +907,7 @@ int auth_apikey_remove(const char* key) {
 
     for (size_t i = 0; i < g_apikey.config.key_count; i++) {
         if (g_apikey.keys[i] && strcmp(key, g_apikey.keys[i]) == 0) {
-            free(g_apikey.keys[i]);
+            AGENTOS_FREE(g_apikey.keys[i]);
             g_apikey.keys[i] = NULL;
 
             /* 压缩数组: 将后续元素前移，消除空洞 */
@@ -931,9 +932,9 @@ void auth_apikey_cleanup(void) {
         agentos_mutex_lock(&g_apikey.lock);
         if (g_apikey.keys) {
             for (size_t i = 0; i < g_apikey.config.key_count; i++) {
-                free(g_apikey.keys[i]);
+                AGENTOS_FREE(g_apikey.keys[i]);
             }
-            free(g_apikey.keys);
+            AGENTOS_FREE(g_apikey.keys);
             g_apikey.keys = NULL;
         }
         g_apikey.config.key_count = 0;

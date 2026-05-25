@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -144,7 +145,7 @@ static void handle_record_metric(cJSON* params, int id, agentos_socket_t client_
         return;
     }
 
-    metric.name = strdup(mname);
+    metric.name = AGENTOS_STRDUP(mname);
     metric.description = (char*)get_string_field(metric_json, "description", NULL);
     metric.type = (metric_type_t)get_int_field(metric_json, "type", 0);
     metric.value = get_double_field(metric_json, "value", 0.0);
@@ -153,7 +154,7 @@ static void handle_record_metric(cJSON* params, int id, agentos_socket_t client_
 
     int ret = monitor_service_record_metric(g_service, &metric);
 
-    free((void*)metric.name);
+    AGENTOS_FREE((void*)metric.name);
 
     if (ret != AGENTOS_SUCCESS) {
         JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Record metric failed", id);
@@ -197,7 +198,7 @@ static void handle_get_metrics(cJSON* params, int id, agentos_socket_t client_fd
         cJSON_AddItemToArray(arr, m);
     }
 
-    free(metrics);
+    AGENTOS_FREE(metrics);
 
     JSONRPC_SEND_SUCCESS(client_fd, arr, id);
 }
@@ -267,7 +268,7 @@ static void handle_get_alerts(int id, agentos_socket_t client_fd) {
         cJSON_AddItemToArray(arr, a);
     }
 
-    free(alerts);
+    AGENTOS_FREE(alerts);
 
     JSONRPC_SEND_SUCCESS(client_fd, arr, id);
 }
@@ -298,9 +299,9 @@ static void handle_health_check(cJSON* params, int id, agentos_socket_t client_f
 
     JSONRPC_SEND_SUCCESS(client_fd, res_obj, id);
 
-    free(result->service_name);
-    free(result->status_message);
-    free(result);
+    AGENTOS_FREE(result->service_name);
+    AGENTOS_FREE(result->status_message);
+    AGENTOS_FREE(result);
 }
 
 /**
@@ -320,7 +321,7 @@ static void handle_generate_report(int id, agentos_socket_t client_fd) {
     cJSON* result = cJSON_CreateObject();
     cJSON_AddStringToObject(result, "report", report);
     cJSON_AddNumberToObject(result, "generated_at", (double)(uint64_t)time(NULL) * 1000);
-    free(report);
+    AGENTOS_FREE(report);
 
     JSONRPC_SEND_SUCCESS(client_fd, result, id);
 }

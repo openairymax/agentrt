@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file jsonrpc_helpers.c
  * @brief JSON-RPC 2.0 公共辅助函数实现
@@ -68,7 +69,7 @@ int jsonrpc_parse_request(const char* raw, char** out_method, cJSON** out_params
     
     cJSON* method_obj = cJSON_GetObjectItem(req, "method");
     if (method_obj && cJSON_IsString(method_obj)) {
-        *out_method = strdup(method_obj->valuestring);
+        *out_method = AGENTOS_STRDUP(method_obj->valuestring);
     }
     
     cJSON* params_obj = cJSON_GetObjectItem(req, "params");
@@ -96,7 +97,7 @@ int jsonrpc_parse_request_ptr(cJSON* req, char** out_method, cJSON** out_params,
     
     cJSON* method_obj = cJSON_GetObjectItem(req, "method");
     if (method_obj && cJSON_IsString(method_obj)) {
-        *out_method = strdup(method_obj->valuestring);
+        *out_method = AGENTOS_STRDUP(method_obj->valuestring);
     }
     
     cJSON* params_obj = cJSON_GetObjectItem(req, "params");

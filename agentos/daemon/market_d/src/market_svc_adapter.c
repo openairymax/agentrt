@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -40,8 +41,8 @@ static void market_config_from_common(
     market_cfg->cache_ttl_ms = 300000;
     market_cfg->enable_remote_registry = true;
     market_cfg->enable_auto_update = false;
-    market_cfg->registry_url = strdup("https://registry.agentos.io");
-    market_cfg->storage_path = strdup("./market_data");
+    market_cfg->registry_url = AGENTOS_STRDUP("https://registry.agentos.io");
+    market_cfg->storage_path = AGENTOS_STRDUP("./market_data");
 }
 
 static agentos_error_t market_adapter_init(
@@ -91,8 +92,8 @@ static agentos_error_t market_adapter_stop(agentos_service_t service, bool force
             ctx->market_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->market_cfg.registry_url) { free((void*)ctx->market_cfg.registry_url); ctx->market_cfg.registry_url = NULL; }
-        if (ctx->market_cfg.storage_path) { free((void*)ctx->market_cfg.storage_path); ctx->market_cfg.storage_path = NULL; }
+        if (ctx->market_cfg.registry_url) { AGENTOS_FREE((void*)ctx->market_cfg.registry_url); ctx->market_cfg.registry_url = NULL; }
+        if (ctx->market_cfg.storage_path) { AGENTOS_FREE((void*)ctx->market_cfg.storage_path); ctx->market_cfg.storage_path = NULL; }
         SVC_LOG_INFO("市场服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("市场服务适配器已停止");
@@ -110,11 +111,11 @@ static void market_adapter_destroy(agentos_service_t service) {
         ctx->market_svc = NULL;
     }
 
-    if (ctx->market_cfg.registry_url) free((void*)ctx->market_cfg.registry_url);
-    if (ctx->market_cfg.storage_path) free((void*)ctx->market_cfg.storage_path);
+    if (ctx->market_cfg.registry_url) AGENTOS_FREE((void*)ctx->market_cfg.registry_url);
+    if (ctx->market_cfg.storage_path) AGENTOS_FREE((void*)ctx->market_cfg.storage_path);
 
     agentos_service_set_user_data(service, NULL);
-    free(ctx);
+    AGENTOS_FREE(ctx);
 }
 
 static agentos_error_t market_adapter_healthcheck(agentos_service_t service) {
@@ -131,7 +132,7 @@ static agentos_error_t market_adapter_healthcheck(agentos_service_t service) {
         SVC_LOG_WARN("市场服务健康检查失败: %d", ret);
         return AGENTOS_ERR_UNKNOWN;
     }
-    if (agents) free(agents);
+    if (agents) AGENTOS_FREE(agents);
     return AGENTOS_SUCCESS;
 }
 
@@ -149,7 +150,7 @@ agentos_error_t market_service_adapter_create(
 ) {
     if (!out_service) return AGENTOS_EINVAL;
 
-    market_adapter_ctx_t* ctx = calloc(1, sizeof(market_adapter_ctx_t));
+    market_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(market_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     if (config) {
@@ -167,14 +168,14 @@ agentos_error_t market_service_adapter_create(
         &svc_handle, ctx->common_cfg.name, &market_adapter_iface, &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
@@ -189,7 +190,7 @@ agentos_error_t market_service_adapter_wrap(
 ) {
     if (!out_service || !market_svc) return AGENTOS_EINVAL;
 
-    market_adapter_ctx_t* ctx = calloc(1, sizeof(market_adapter_ctx_t));
+    market_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(market_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     ctx->market_svc = market_svc;
@@ -207,14 +208,14 @@ agentos_error_t market_service_adapter_wrap(
         &svc_handle, ctx->common_cfg.name, &market_adapter_iface, &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 

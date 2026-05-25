@@ -148,7 +148,7 @@ AGENTOS_API int cm_init(const cm_config_t* config) {
     }
 
     agentos_error_t err = agentos_mutex_init(&g_cm.mutex);
-    if (err != AGENTOS_SUCCESS) return -1;
+    if (err != AGENTOS_SUCCESS) { agentos_error_push_ex(AGENTOS_ERR_DAEMON_INIT_FAILED, __FILE__, __LINE__, __func__, "mutex init failed (err=%d)", err); return -1; }
 
     g_cm.global_version = 1;
     g_cm.initialized = true;
@@ -248,6 +248,7 @@ AGENTOS_API int cm_set(const char* key, const char* value, const char* source) {
 
     if (g_cm.entry_count >= CM_MAX_ENTRIES) {
         agentos_mutex_unlock(&g_cm.mutex);
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "entry_count overflow: %u >= %u", g_cm.entry_count, CM_MAX_ENTRIES);
         return -1;
     }
 
@@ -309,7 +310,7 @@ AGENTOS_API int cm_load_json(const char* path, const char* namespace_) {
 
     size_t bytes_read = fread(data, 1, file_size, fp);
     fclose(fp);
-    if (bytes_read != (size_t)file_size) { free(data); return -1; }
+    if (bytes_read != (size_t)file_size) { AGENTOS_FREE(data); return -1; }
     data[bytes_read] = '\0';
 
     int count = 0;
@@ -642,6 +643,7 @@ AGENTOS_API char* cm_export_json(const char* namespace_) {
     char* buf = (char*)AGENTOS_MALLOC(buf_size);
     if (!buf) {
         agentos_mutex_unlock(&g_cm.mutex);
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "cm_export_json alloc failed");
         return NULL;
     }
     size_t pos = 0;

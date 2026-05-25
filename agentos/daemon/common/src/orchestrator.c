@@ -21,6 +21,8 @@
 #include "metacognition.h"
 #include "confidence_calibrator.h"
 #include "safe_string_utils.h"
+#include "memory_compat.h"
+#include "error.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -107,8 +109,8 @@ static const char* status_name(orch_task_status_t s) {
 }
 
 orchestrator_t* orchestrator_create(const orch_config_t* config) {
-    orchestrator_t* orch = (orchestrator_t*)calloc(1, sizeof(orchestrator_t));
-    if (!orch) return NULL;
+    orchestrator_t* orch = (orchestrator_t*)AGENTOS_CALLOC(1, sizeof(orchestrator_t));
+    if (!orch) { agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "orchestrator alloc failed"); return NULL; }
 
     if (config) {
         memcpy(&orch->config, config, sizeof(orch_config_t));
@@ -224,8 +226,8 @@ void orchestrator_destroy(orchestrator_t* orch) {
     orchestrator_cancel_all(orch);
 
     for (uint32_t i = 0; i < orch->task_count; i++) {
-        free(orch->tasks[i].input);
-        free(orch->tasks[i].output);
+        AGENTOS_FREE(orch->tasks[i].input);
+        AGENTOS_FREE(orch->tasks[i].output);
     }
 
     if (orch->pool) thread_pool_destroy(orch->pool);
@@ -240,15 +242,15 @@ void orchestrator_destroy(orchestrator_t* orch) {
                  (unsigned long long)orch->total_executions,
                  (unsigned long long)orch->success_count);
 
-    free(orch);
+    AGENTOS_FREE(orch);
 }
 
 orch_pipeline_t* orchestrator_pipeline_create(orchestrator_t* orch,
                                               const char* name) {
     if (!orch) return NULL;
 
-    orch_pipeline_t* p = (orch_pipeline_t*)calloc(1, sizeof(orch_pipeline_t));
-    if (!p) return NULL;
+    orch_pipeline_t* p = (orch_pipeline_t*)AGENTOS_CALLOC(1, sizeof(orch_pipeline_t));
+    if (!p) { agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "pipeline alloc failed"); return NULL; }
 
     if (name) strncpy(p->name, name, sizeof(p->name) - 1);
     else snprintf(p->name, sizeof(p->name), "pipeline-%u", orch->task_count);
@@ -258,7 +260,7 @@ orch_pipeline_t* orchestrator_pipeline_create(orchestrator_t* orch,
 }
 
 void orchestrator_pipeline_destroy(orch_pipeline_t* pipeline) {
-    free(pipeline);
+    AGENTOS_FREE(pipeline);
 }
 
 int orchestrator_pipeline_add_step(orch_pipeline_t* pipeline,
@@ -274,14 +276,14 @@ int orchestrator_pipeline_add_step(orch_pipeline_t* pipeline,
 static task_entry_t* find_or_create_task(orchestrator_t* orch,
                                          orch_phase_t phase,
                                          const char* input) {
-    if (orch->task_count >= ORCH_MAX_TASKS) return NULL;
+    if (orch->task_count >= ORCH_MAX_TASKS) { agentos_error_push_ex(AGENTOS_ERR_DAEMON_INIT_FAILED, __FILE__, __LINE__, __func__, "task_count overflow: %u >= %u", orch->task_count, ORCH_MAX_TASKS); return NULL; }
 
     task_entry_t* t = &orch->tasks[orch->task_count++];
     memset(t, 0, sizeof(*t));
     generate_task_id(t->id, sizeof(t->id));
     t->phase = phase;
     t->status = ORCH_TASK_PENDING;
-    t->input = input ? strdup(input) : strdup("");
+    t->input = input ? AGENTOS_STRDUP(input) : AGENTOS_STRDUP("");
     t->start_time = time(NULL);
 
     if (orch->config.enable_thinking_chain) {
@@ -312,13 +314,13 @@ static char* memory_query_context(agentos_memory_provider_t* mem, const char* qu
     size_t count = 0;
     agentos_error_t err = mem->query(mem, query, limit, &ids, &scores, &count);
     if (err != AGENTOS_SUCCESS || count == 0) {
-        if (ids) { for (size_t i = 0; i < count; i++) free(ids[i]); free(ids); }
-        if (scores) free(scores);
+        if (ids) { for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]); AGENTOS_FREE(ids); }
+        if (scores) AGENTOS_FREE(scores);
         return NULL;
     }
     size_t buf_sz = count * 256 + 64;
-    char* context = (char*)malloc(buf_sz);
-    if (!context) { for (size_t i = 0; i < count; i++) free(ids[i]); free(ids); free(scores); return NULL; }
+    char* context = (char*)AGENTOS_MALLOC(buf_sz);
+    if (!context) { for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]); AGENTOS_FREE(ids); AGENTOS_FREE(scores); agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "memory_query_context alloc failed (size=%zu)", buf_sz); return NULL; }
     size_t pos = 0;
     pos += snprintf(context + pos, buf_sz - pos, "{\"memory_context\":[");
     for (size_t i = 0; i < count && pos < buf_sz - 2; i++) {
@@ -329,13 +331,13 @@ static char* memory_query_context(agentos_memory_provider_t* mem, const char* qu
             size_t copy_len = data_len < 200 ? data_len : 200;
             pos += snprintf(context + pos, buf_sz - pos, "{\"id\":\"%s\",\"score\":%.2f,\"data\":\"%.*s\"}",
                 ids[i], scores[i], (int)copy_len, (const char*)data);
-            free(data);
+            AGENTOS_FREE(data);
         }
-        free(ids[i]);
+        AGENTOS_FREE(ids[i]);
     }
     pos += snprintf(context + pos, buf_sz - pos, "]}");
-    free(ids);
-    free(scores);
+    AGENTOS_FREE(ids);
+    AGENTOS_FREE(scores);
     return context;
 }
 
@@ -353,7 +355,7 @@ static void memory_write_step(agentos_memory_provider_t* mem,
     mem->write_raw(mem, content, strlen(content), meta, &record_id);
     if (record_id) {
         SVC_LOG_INFO("orchestrator: memory write step %s -> %s", phase_name, record_id);
-        free(record_id);
+        AGENTOS_FREE(record_id);
     }
 }
 
@@ -370,7 +372,7 @@ static void memory_inform_evaluation(agentos_memory_provider_t* mem,
     snprintf(meta, sizeof(meta), "{\"source\":\"metacognition\",\"type\":\"evaluation\",\"phase\":\"%s\"}", phase);
     char* record_id = NULL;
     mem->write_raw(mem, eval_data, strlen(eval_data), meta, &record_id);
-    if (record_id) free(record_id);
+    if (record_id) AGENTOS_FREE(record_id);
 }
 
 static void memory_sync_persistent(agentos_memory_provider_t* mem) {
@@ -386,13 +388,13 @@ static char* memory_retrieve_for_generation(agentos_memory_provider_t* mem, cons
     size_t count = 0;
     agentos_error_t err = mem->retrieve(mem, topic, 5, &ids, &scores, &count);
     if (err != AGENTOS_SUCCESS || count == 0 || !ids) {
-        if (ids) { for (size_t i = 0; i < count; i++) free(ids[i]); free(ids); }
-        if (scores) free(scores);
+        if (ids) { for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]); AGENTOS_FREE(ids); }
+        if (scores) AGENTOS_FREE(scores);
         return NULL;
     }
     size_t buf_sz = count * 256 + 64;
-    char* context = (char*)malloc(buf_sz);
-    if (!context) { for (size_t i = 0; i < count; i++) free(ids[i]); free(ids); free(scores); return NULL; }
+    char* context = (char*)AGENTOS_MALLOC(buf_sz);
+    if (!context) { for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]); AGENTOS_FREE(ids); AGENTOS_FREE(scores); agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "memory_retrieve_for_generation alloc failed (size=%zu)", buf_sz); return NULL; }
     size_t pos = 0;
     pos += snprintf(context + pos, buf_sz - pos, "{\"retrieved\":[");
     for (size_t i = 0; i < count && pos < buf_sz - 2; i++) {
@@ -403,9 +405,9 @@ static char* memory_retrieve_for_generation(agentos_memory_provider_t* mem, cons
             scores ? scores[i] : 0.0f);
     }
     pos += snprintf(context + pos, buf_sz - pos, "]}");
-    for (size_t i = 0; i < count; i++) free(ids[i]);
-    free(ids);
-    free(scores);
+    for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]);
+    AGENTOS_FREE(ids);
+    AGENTOS_FREE(scores);
     return context;
 }
 
@@ -419,6 +421,7 @@ static char* call_llm_service(const char* prompt, const char* system_role) {
         if (!g_orch_bus) {
             agentos_mutex_unlock(&g_orch_bus_mutex);
             SVC_LOG_WARN("orchestrator: IPC bus creation failed, using local fallback");
+            agentos_error_push_ex(AGENTOS_ERR_DAEMON_INIT_FAILED, __FILE__, __LINE__, __func__, "IPC service bus creation failed");
             return NULL;
         }
         ipc_service_bus_start(g_orch_bus);
@@ -453,18 +456,19 @@ static char* call_llm_service(const char* prompt, const char* system_role) {
                                                     &request, &response, 30000);
     if (err != AGENTOS_SUCCESS || !response.payload) {
         SVC_LOG_WARN("orchestrator: LLM call failed (err=%d), using fallback", err);
-        if (response.payload) free(response.payload);
+        if (response.payload) AGENTOS_FREE(response.payload);
+        agentos_error_push_ex(AGENTOS_ERR_LLM_PROVIDER_FAIL, __FILE__, __LINE__, __func__, "LLM service call failed (err=%d)", err);
         return NULL;
     }
 
-    char* result = strdup((const char*)response.payload);
-    free(response.payload);
+    char* result = AGENTOS_STRDUP((const char*)response.payload);
+    AGENTOS_FREE(response.payload);
     return result;
 }
 
 static char* build_decomposition_prompt(const char* input) {
     size_t len = strlen(input) + 512;
-    char* prompt = (char*)malloc(len);
+    char* prompt = (char*)AGENTOS_MALLOC(len);
     if (!prompt) return NULL;
     snprintf(prompt, len,
         "Decompose the following task into subtasks. "
@@ -475,7 +479,7 @@ static char* build_decomposition_prompt(const char* input) {
 
 static char* build_planning_prompt(const char* decomposed) {
     size_t len = strlen(decomposed) + 512;
-    char* prompt = (char*)malloc(len);
+    char* prompt = (char*)AGENTOS_MALLOC(len);
     if (!prompt) return NULL;
     snprintf(prompt, len,
         "Create an execution plan for these subtasks. "
@@ -487,7 +491,7 @@ static char* build_planning_prompt(const char* decomposed) {
 
 static char* build_generation_prompt(const char* plan) {
     size_t len = strlen(plan) + 512;
-    char* prompt = (char*)malloc(len);
+    char* prompt = (char*)AGENTOS_MALLOC(len);
     if (!prompt) return NULL;
     snprintf(prompt, len,
         "Execute the following plan and produce the final output. "
@@ -498,7 +502,7 @@ static char* build_generation_prompt(const char* plan) {
 
 static char* build_verification_prompt(const char* original, const char* generated) {
     size_t len = strlen(original) + strlen(generated) + 512;
-    char* prompt = (char*)malloc(len);
+    char* prompt = (char*)AGENTOS_MALLOC(len);
     if (!prompt) return NULL;
     snprintf(prompt, len,
         "Verify the following output against the original task. "
@@ -510,7 +514,7 @@ static char* build_verification_prompt(const char* original, const char* generat
 
 static char* build_audit_prompt(const char* output, const char* verification) {
     size_t len = strlen(output) + strlen(verification) + 512;
-    char* prompt = (char*)malloc(len);
+    char* prompt = (char*)AGENTOS_MALLOC(len);
     if (!prompt) return NULL;
     snprintf(prompt, len,
         "Audit this output for correctness, completeness, and safety. "
@@ -522,7 +526,7 @@ static char* build_audit_prompt(const char* output, const char* verification) {
 
 static char* build_correction_prompt(const char* output, const char* critique) {
     size_t len = strlen(output) + strlen(critique) + 512;
-    char* prompt = (char*)malloc(len);
+    char* prompt = (char*)AGENTOS_MALLOC(len);
     if (!prompt) return NULL;
     snprintf(prompt, len,
         "Improve the following output based on the critique. "
@@ -534,11 +538,11 @@ static char* build_correction_prompt(const char* output, const char* critique) {
 static float extract_score_for_field(const char* json, const char* field) {
     if (!json || !field) return 0.0f;
     size_t flen = strlen(field) + 4;
-    char* key = (char*)malloc(flen);
+    char* key = (char*)AGENTOS_MALLOC(flen);
     if (!key) return 0.0f;
     snprintf(key, flen, "\"%s\"", field);
     const char* p = strstr(json, key);
-    free(key);
+    AGENTOS_FREE(key);
     if (!p) return 0.0f;
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
@@ -557,11 +561,11 @@ static float extract_score_from_json(const char* json) {
 static bool extract_bool_from_json(const char* json, const char* field) {
     if (!json || !field) return false;
     size_t flen = strlen(field) + 4;
-    char* key = (char*)malloc(flen);
+    char* key = (char*)AGENTOS_MALLOC(flen);
     if (!key) return false;
     snprintf(key, flen, "\"%s\"", field);
     const char* p = strstr(json, key);
-    free(key);
+    AGENTOS_FREE(key);
     if (!p) return false;
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
@@ -571,11 +575,11 @@ static bool extract_bool_from_json(const char* json, const char* field) {
 static char* extract_field_string(const char* json, const char* field) {
     if (!json || !field) return NULL;
     size_t flen = strlen(field) + 4;
-    char* key = (char*)malloc(flen);
+    char* key = (char*)AGENTOS_MALLOC(flen);
     if (!key) return NULL;
     snprintf(key, flen, "\"%s\"", field);
     const char* p = strstr(json, key);
-    free(key);
+    AGENTOS_FREE(key);
     if (!p) return NULL;
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
@@ -584,7 +588,7 @@ static char* extract_field_string(const char* json, const char* field) {
     const char* end = strchr(p, '"');
     if (!end) return NULL;
     size_t len = (size_t)(end - p);
-    char* val = (char*)malloc(len + 1);
+    char* val = (char*)AGENTOS_MALLOC(len + 1);
     if (!val) return NULL;
     memcpy(val, p, len);
     val[len] = '\0';
@@ -627,6 +631,7 @@ static int execute_single_phase(orchestrator_t* orch,
                      cb_state_to_string(cb_get_state(orch->breaker)));
         task->status = ORCH_TASK_FAILED;
         task->error_code = -2;
+        agentos_error_push_ex(AGENTOS_ERR_SVC_BUSY, __FILE__, __LINE__, __func__, "phase %s rejected by circuit breaker (state=%s)", phase_name(phase), cb_state_to_string(cb_get_state(orch->breaker)));
         goto done;
     }
 
@@ -643,7 +648,7 @@ static int execute_single_phase(orchestrator_t* orch,
                 };
                 nanosleep(&ts, NULL);
             }
-            if (task->output) { free(task->output); task->output = NULL; }
+            if (task->output) { AGENTOS_FREE(task->output); task->output = NULL; }
             task->status = ORCH_TASK_RUNNING;
         }
 
@@ -671,7 +676,7 @@ static int execute_single_phase(orchestrator_t* orch,
 
                 if (cognition_produced_plan && cog_plan) {
                     size_t buf_sz = cog_plan->task_plan_node_count * 384 + 128;
-                    char* plan_json = (char*)malloc(buf_sz);
+                    char* plan_json = (char*)AGENTOS_MALLOC(buf_sz);
                     if (plan_json) {
                         size_t pos = snprintf(plan_json, buf_sz,
                             "{\"source\":\"cognition\",\"plan_id\":\"%.*s\",\"subtasks\":[",
@@ -706,7 +711,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         pos += snprintf(plan_json + pos, buf_sz - pos, "]}");
                         task->output = plan_json;
                     } else {
-                        task->output = strdup("{\"error\":\"memory_allocation_failed\","
+                        task->output = AGENTOS_STRDUP("{\"error\":\"memory_allocation_failed\","
                             "\"code\":-2,\"phase\":\"decomposition\"}");
                     }
                     agentos_task_plan_free(cog_plan);
@@ -716,12 +721,12 @@ static int execute_single_phase(orchestrator_t* orch,
 
                     char* prompt = build_decomposition_prompt(input ? input : "");
                     char* llm_result = call_llm_service(prompt, "You are a task decomposition expert.");
-                    free(prompt);
+                    AGENTOS_FREE(prompt);
 
                     if (llm_result) {
                         task->output = llm_result;
                     } else {
-                        task->output = strdup(
+                        task->output = AGENTOS_STRDUP(
                             "{\"error\":\"decomposition_failed\","
                             "\"code\":-1,"
                             "\"reason\":\"llm_service_unavailable\","
@@ -731,12 +736,12 @@ static int execute_single_phase(orchestrator_t* orch,
                         SVC_LOG_ERROR("orchestrator: decomposition failed - no LLM, no cognition output");
                         task->status = ORCH_TASK_FAILED;
                         task->error_code = -1;
-                        if (mem_ctx) free(mem_ctx);
+                        if (mem_ctx) AGENTOS_FREE(mem_ctx);
                         goto done;
                     }
                 }
                 memory_write_step(orch->memory, "decomposition", task->output, NULL);
-                if (mem_ctx) free(mem_ctx);
+                if (mem_ctx) AGENTOS_FREE(mem_ctx);
                 task->output_len = strlen(task->output);
                 task->status = ORCH_TASK_COMPLETED;
             }
@@ -746,12 +751,12 @@ static int execute_single_phase(orchestrator_t* orch,
             {
                 char* prompt = build_planning_prompt(input ? input : "{}");
                 char* llm_result = call_llm_service(prompt, "You are a planning expert.");
-                free(prompt);
+                AGENTOS_FREE(prompt);
 
                 if (llm_result) {
                     task->output = llm_result;
                 } else {
-                    task->output = strdup(
+                    task->output = AGENTOS_STRDUP(
                         "{\"error\":\"planning_failed\","
                         "\"code\":-1,"
                         "\"reason\":\"llm_service_unavailable\","
@@ -803,7 +808,7 @@ static int execute_single_phase(orchestrator_t* orch,
                     }
                     if (hint_len > 0) {
                         size_t new_len = strlen(prompt) + hint_len + 128;
-                        char* enhanced = (char*)realloc(prompt, new_len);
+                        char* enhanced = (char*)AGENTOS_REALLOC(prompt, new_len);
                         if (enhanced) {
                             prompt = enhanced;
                             safe_strcat(prompt, "\n\nCognition engine context:\n", new_len);
@@ -822,7 +827,7 @@ static int execute_single_phase(orchestrator_t* orch,
                 }
 
                 char* t2_output = call_llm_service(prompt, "You are an expert assistant. Provide thorough, accurate output.");
-                free(prompt);
+                AGENTOS_FREE(prompt);
 
                 if (!t2_output) {
                     if (gen_cog_has_output && gen_plan) {
@@ -832,7 +837,7 @@ static int execute_single_phase(orchestrator_t* orch,
                             if (nd && nd->task_node_output)
                                 cbuf_sz += strlen((char*)nd->task_node_output) + 64;
                         }
-                        char* cog_fallback = (char*)malloc(cbuf_sz);
+                        char* cog_fallback = (char*)AGENTOS_MALLOC(cbuf_sz);
                         if (cog_fallback) {
                             size_t cp = snprintf(cog_fallback, cbuf_sz,
                                 "{\"generated\":\"cognition_fallback\","
@@ -852,10 +857,10 @@ static int execute_single_phase(orchestrator_t* orch,
                             t2_output = cog_fallback;
                             SVC_LOG_WARN("orchestrator: generation using cognition fallback (LLM unavailable)");
                         } else {
-                            t2_output = strdup("{\"generated\":null,\"error\":\"llm_unavailable_and_alloc_failed\",\"mode\":\"t2_no_llm\"}");
+                            t2_output = AGENTOS_STRDUP("{\"generated\":null,\"error\":\"llm_unavailable_and_alloc_failed\",\"mode\":\"t2_no_llm\"}");
                         }
                     } else {
-                        t2_output = strdup("{\"generated\":null,\"error\":\"llm_unavailable\",\"mode\":\"t2_no_llm\"}");
+                        t2_output = AGENTOS_STRDUP("{\"generated\":null,\"error\":\"llm_unavailable\",\"mode\":\"t2_no_llm\"}");
                     }
                 }
 
@@ -865,7 +870,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         t2_output);
                     char* t1f_result = call_llm_service(verify_prompt,
                         "You are a fast verification agent (t1-f). Verify quickly.");
-                    free(verify_prompt);
+                    AGENTOS_FREE(verify_prompt);
 
                     float score = 0.0f;
                     bool verified = false;
@@ -877,7 +882,7 @@ static int execute_single_phase(orchestrator_t* orch,
                     if (verified && score >= ORCH_VERIFY_THRESHOLD) {
                         SVC_LOG_INFO("orchestrator: generation verified (round=%d, score=%.2f)",
                                     round, score);
-                        free(t1f_result);
+                        AGENTOS_FREE(t1f_result);
                         t1f_result = NULL;
                         break;
                     }
@@ -887,14 +892,14 @@ static int execute_single_phase(orchestrator_t* orch,
 
                     char* correction_prompt = build_correction_prompt(t2_output,
                         t1f_result ? t1f_result : "Quality too low, improve output");
-                    free(t1f_result);
+                    AGENTOS_FREE(t1f_result);
                     t1f_result = NULL;
                     char* corrected = call_llm_service(correction_prompt,
                         "You are a correction agent. Improve the output.");
-                    free(correction_prompt);
+                    AGENTOS_FREE(correction_prompt);
 
                     if (corrected) {
-                        free(t2_output);
+                        AGENTOS_FREE(t2_output);
                         t2_output = corrected;
                     }
                 }
@@ -902,7 +907,7 @@ static int execute_single_phase(orchestrator_t* orch,
                 if (gen_plan) { agentos_task_plan_free(gen_plan); gen_plan = NULL; }
 
                 size_t meta_sz = strlen(t2_output) + 256;
-                char* meta_buf = (char*)malloc(meta_sz);
+                char* meta_buf = (char*)AGENTOS_MALLOC(meta_sz);
                 if (meta_buf) {
                     snprintf(meta_buf, meta_sz,
                         "{\"phase\":\"generation\",\"mode\":\"t2_streaming\","
@@ -910,13 +915,13 @@ static int execute_single_phase(orchestrator_t* orch,
                         "\"content\":%s}",
                         ORCH_VERIFY_MAX_ROUNDS, t2_output);
                     task->output = meta_buf;
-                    free(t2_output);
+                    AGENTOS_FREE(t2_output);
                 } else {
                     task->output = t2_output;
                 }
                 memory_write_step(orch->memory, "generation", task->output,
                     ",\"critical_loop\":true");
-                if (mem_retrieved) free(mem_retrieved);
+                if (mem_retrieved) AGENTOS_FREE(mem_retrieved);
                 task->output_len = strlen(task->output);
                 task->status = ORCH_TASK_COMPLETED;
             }
@@ -926,7 +931,7 @@ static int execute_single_phase(orchestrator_t* orch,
             {
                 if (!orch->metacognition) {
                     SVC_LOG_WARN("orchestrator: critique phase skipped - metacognition not initialized");
-                    task->output = strdup("{\"critique\":\"skipped\",\"reason\":\"metacognition_unavailable\"}");
+                    task->output = AGENTOS_STRDUP("{\"critique\":\"skipped\",\"reason\":\"metacognition_unavailable\"}");
                     task->output_len = strlen(task->output);
                     task->status = ORCH_TASK_COMPLETED;
                     break;
@@ -941,7 +946,7 @@ static int execute_single_phase(orchestrator_t* orch,
                 float accept_thresh = orch->config.critique_acceptance_threshold > 0 ?
                     orch->config.critique_acceptance_threshold : 0.7f;
 
-                char* current_output = strdup(gen_output);
+                char* current_output = AGENTOS_STRDUP(gen_output);
                 float best_score = 0.0f;
                 int critique_accepted = 0;
                 int total_critique_rounds = 0;
@@ -970,7 +975,7 @@ static int execute_single_phase(orchestrator_t* orch,
                     if (mc_err != AGENTOS_SUCCESS) {
                         SVC_LOG_WARN("orchestrator: critique round %u - metacognition evaluate failed (err=%d)",
                                     round, mc_err);
-                        if (mc_result.critique_text) free(mc_result.critique_text);
+                        if (mc_result.critique_text) AGENTOS_FREE(mc_result.critique_text);
                         break;
                     }
 
@@ -981,14 +986,14 @@ static int execute_single_phase(orchestrator_t* orch,
                                 round, round_score, mc_result.is_acceptable,
                                 mc_result.strategy, mc_result.severity);
 
-                    if (final_critique_text) free(final_critique_text);
-                    final_critique_text = mc_result.critique_text ? strdup(mc_result.critique_text) : NULL;
-                    if (mc_result.critique_text) { free(mc_result.critique_text); mc_result.critique_text = NULL; }
+                    if (final_critique_text) AGENTOS_FREE(final_critique_text);
+                    final_critique_text = mc_result.critique_text ? AGENTOS_STRDUP(mc_result.critique_text) : NULL;
+                    if (mc_result.critique_text) { AGENTOS_FREE(mc_result.critique_text); mc_result.critique_text = NULL; }
 
                     if (mc_result.is_acceptable || round_score >= accept_thresh) {
                         critique_accepted = 1;
                         if (round > 0) {
-                            free(current_output);
+                            AGENTOS_FREE(current_output);
                             current_output = NULL;
                         }
                         break;
@@ -997,9 +1002,9 @@ static int execute_single_phase(orchestrator_t* orch,
                     if (mc_result.strategy == MC_CORRECT_ESCALATE) {
                         SVC_LOG_ERROR("orchestrator: critique ESCALATE at round %u (score=%.3f)",
                                      round, round_score);
-                        free(current_output);
+                        AGENTOS_FREE(current_output);
                         current_output = NULL;
-                        if (final_critique_text) { free(final_critique_text); final_critique_text = NULL; }
+                        if (final_critique_text) { AGENTOS_FREE(final_critique_text); final_critique_text = NULL; }
                         task->status = ORCH_TASK_FAILED;
                         task->error_code = -4;
                         goto done;
@@ -1009,7 +1014,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         size_t corr_input_sz = strlen(original_input) + strlen(current_output) + 256;
                         if (mc_result.critique_text)
                             corr_input_sz += strlen(mc_result.critique_text);
-                        char* corr_input = (char*)malloc(corr_input_sz);
+                        char* corr_input = (char*)AGENTOS_MALLOC(corr_input_sz);
                         if (!corr_input) break;
 
                         (void)snprintf(corr_input, corr_input_sz,
@@ -1026,10 +1031,10 @@ static int execute_single_phase(orchestrator_t* orch,
 
                         char* corrected = call_llm_service(corr_input,
                             "You are a self-correction agent. Critically improve the given output based on the S1 evaluation.");
-                        free(corr_input);
+                        AGENTOS_FREE(corr_input);
 
                         if (corrected) {
-                            free(current_output);
+                            AGENTOS_FREE(current_output);
                             current_output = corrected;
 
                             if (orch->calibrator) {
@@ -1069,7 +1074,7 @@ static int execute_single_phase(orchestrator_t* orch,
 
                 size_t cbuf_sz = 512 + (final_critique_text ? strlen(final_critique_text) : 0) +
                                   (current_output ? strlen(current_output) : 0);
-                char* cbuf = (char*)malloc(cbuf_sz);
+                char* cbuf = (char*)AGENTOS_MALLOC(cbuf_sz);
                 if (cbuf) {
                     int clen __attribute__((unused)) = snprintf(cbuf, cbuf_sz,
                         "{\"phase\":\"critique\","
@@ -1090,12 +1095,12 @@ static int execute_single_phase(orchestrator_t* orch,
                         final_critique_text ? final_critique_text : "null");
                     task->output = cbuf;
                 } else {
-                    task->output = strdup(
+                    task->output = AGENTOS_STRDUP(
                         "{\"phase\":\"critique\",\"error\":\"alloc_failed\"}");
                 }
 
-                if (final_critique_text) free(final_critique_text);
-                if (current_output) free(current_output);
+                if (final_critique_text) AGENTOS_FREE(final_critique_text);
+                if (current_output) AGENTOS_FREE(current_output);
 
                 memory_write_step(orch->memory, "critique", task->output, NULL);
                 task->output_len = strlen(task->output);
@@ -1108,15 +1113,15 @@ static int execute_single_phase(orchestrator_t* orch,
         case ORCH_PHASE_VERIFICATION:
             {
                 char* content = extract_field_string(input ? input : "", "content");
-                if (!content) content = strdup(input ? input : "");
+                if (!content) content = AGENTOS_STRDUP(input ? input : "");
 
                 char* verify_prompt = build_verification_prompt(
                     orch->tasks[0].input ? orch->tasks[0].input : "",
                     content);
                 char* t1f_result = call_llm_service(verify_prompt,
                     "You are a t1-f fast verification agent. Score 0.0-1.0.");
-                free(verify_prompt);
-                free(content);
+                AGENTOS_FREE(verify_prompt);
+                AGENTOS_FREE(content);
 
                 float score = 0.5f;
                 bool verified = false;
@@ -1131,9 +1136,9 @@ static int execute_single_phase(orchestrator_t* orch,
                         t1f_result ? t1f_result : "Verification failed");
                     char* corrected = call_llm_service(correction_prompt,
                         "You are a correction agent.");
-                    free(correction_prompt);
+                    AGENTOS_FREE(correction_prompt);
                     if (corrected) {
-                        free(t1f_result);
+                        AGENTOS_FREE(t1f_result);
                         t1f_result = corrected;
                         score = ORCH_VERIFY_THRESHOLD;
                         verified = true;
@@ -1149,10 +1154,10 @@ static int execute_single_phase(orchestrator_t* orch,
                     verified ? 0 : 1);
 
                 if (t1f_result) {
-                    free(t1f_result);
+                    AGENTOS_FREE(t1f_result);
                 }
 
-                task->output = strdup(vbuf);
+                task->output = AGENTOS_STRDUP(vbuf);
                 task->output_len = (vlen > 0 && (size_t)vlen < sizeof(vbuf)) ? (size_t)vlen : strlen(task->output);
                 task->status = verified ? ORCH_TASK_COMPLETED : ORCH_TASK_FAILED;
                 memory_inform_evaluation(orch->memory, "verification", score, verified);
@@ -1168,7 +1173,7 @@ static int execute_single_phase(orchestrator_t* orch,
                     prev_output);
                 char* audit_result = call_llm_service(audit_prompt,
                     "You are a t1-p expert audit agent. Check for correctness, completeness, safety.");
-                free(audit_prompt);
+                AGENTOS_FREE(audit_prompt);
 
                 bool audit_passed = false;
                 char* severity = NULL;
@@ -1188,7 +1193,7 @@ static int execute_single_phase(orchestrator_t* orch,
                 }
 
                 size_t abuf_sz = (audit_result ? strlen(audit_result) : 0) + 256;
-                char* abuf = (char*)malloc(abuf_sz);
+                char* abuf = (char*)AGENTOS_MALLOC(abuf_sz);
                 if (abuf) {
                     snprintf(abuf, abuf_sz,
                         "{\"audit_passed\":%s,\"severity\":\"%s\","
@@ -1198,7 +1203,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         audit_result ? audit_result : "null");
                     task->output = abuf;
                 } else {
-                    task->output = strdup(audit_passed ?
+                    task->output = AGENTOS_STRDUP(audit_passed ?
                         "{\"audit_passed\":true}" : "{\"audit_passed\":false}");
                 }
                 task->output_len = strlen(task->output);
@@ -1206,8 +1211,8 @@ static int execute_single_phase(orchestrator_t* orch,
                 memory_inform_evaluation(orch->memory, "audit",
                     audit_passed ? 0.9f : 0.3f, audit_passed);
                 memory_write_step(orch->memory, "audit", task->output, NULL);
-                free(audit_result);
-                free(severity);
+                AGENTOS_FREE(audit_result);
+                AGENTOS_FREE(severity);
             }
             break;
 
@@ -1234,7 +1239,7 @@ static int execute_single_phase(orchestrator_t* orch,
                     logic_score = extract_score_for_field(align_result, "logic_score");
                     fact_score = extract_score_for_field(align_result, "fact_score");
                     goal_score = extract_score_for_field(align_result, "goal_score");
-                    free(align_result);
+                    AGENTOS_FREE(align_result);
                 }
 
                 float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
@@ -1281,7 +1286,7 @@ static int execute_single_phase(orchestrator_t* orch,
                     logic_score, fact_score, goal_score,
                     drift_value, drift_detected ? "true" : "false");
 
-                task->output = strdup(albuf);
+                task->output = AGENTOS_STRDUP(albuf);
                 task->output_len = (allen > 0 && (size_t)allen < sizeof(albuf)) ? (size_t)allen : strlen(task->output);
                 task->status = aligned ? ORCH_TASK_COMPLETED : ORCH_TASK_FAILED;
                 memory_inform_evaluation(orch->memory, "alignment", overall, aligned);
@@ -1336,16 +1341,18 @@ done:
     }
 
     if (out_result) {
-        orch_result_t* r = (orch_result_t*)calloc(1, sizeof(orch_result_t));
+        orch_result_t* r = (orch_result_t*)AGENTOS_CALLOC(1, sizeof(orch_result_t));
         if (r) {
-            r->task_id = strdup(task->id);
-            r->output = task->output ? strdup(task->output) : strdup("");
+            r->task_id = AGENTOS_STRDUP(task->id);
+            r->output = task->output ? AGENTOS_STRDUP(task->output) : AGENTOS_STRDUP("");
             r->output_len = task->output_len;
             r->status = task->status;
             r->error_code = task->error_code;
             r->duration_ms = task->duration_ms;
-            r->thinking_chain_id = strdup(task->thinking_chain_id);
+            r->thinking_chain_id = AGENTOS_STRDUP(task->thinking_chain_id);
             *out_result = r;
+        } else {
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "phase result alloc failed");
         }
     }
 
@@ -1380,10 +1387,10 @@ int orchestrator_execute(orchestrator_t* orch,
                     SVC_LOG_DEBUG("orchestrator: volume context mounted to memory");
                 }
                 for (size_t v = 0; v < vol_count; v++) {
-                    free(vol_ids[v]);
+                    AGENTOS_FREE(vol_ids[v]);
                 }
-                free(vol_ids);
-                free(vol_scores);
+                AGENTOS_FREE(vol_ids);
+                AGENTOS_FREE(vol_scores);
             }
         }
     }
@@ -1399,8 +1406,8 @@ int orchestrator_execute(orchestrator_t* orch,
     };
 
     size_t phase_count = sizeof(default_phases) / sizeof(default_phases[0]);
-    orch_result_t* results = (orch_result_t*)calloc(phase_count, sizeof(orch_result_t));
-    if (!results) return -2;
+    orch_result_t* results = (orch_result_t*)AGENTOS_CALLOC(phase_count, sizeof(orch_result_t));
+    if (!results) { agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "orchestrator_execute results alloc failed"); return -2; }
 
     size_t completed = 0;
     const char* current_input = input;
@@ -1410,15 +1417,16 @@ int orchestrator_execute(orchestrator_t* orch,
         int ret = execute_single_phase(orch, default_phases[i],
                                        current_input, &phase_result);
         if (ret != 0 || !phase_result) {
+            agentos_error_push_ex(AGENTOS_ERR_KERN_TASK, __FILE__, __LINE__, __func__, "phase %s execution failed (ret=%d)", phase_name(default_phases[i]), ret);
             for (size_t j = 0; j < completed; j++) {
                 orchestrator_result_free(&results[j]);
             }
-            free(results);
+            AGENTOS_FREE(results);
             return -3;
         }
 
         results[completed] = *phase_result;
-        free(phase_result);
+        AGENTOS_FREE(phase_result);
         completed++;
 
         if (results[completed - 1].status != ORCH_TASK_COMPLETED) {
@@ -1449,9 +1457,9 @@ int orchestrator_execute_pipeline(orchestrator_t* orch,
 
     orch->task_count = 0;
 
-    orch_result_t* results = (orch_result_t*)calloc(pipeline->step_count,
+    orch_result_t* results = (orch_result_t*)AGENTOS_CALLOC(pipeline->step_count,
                                                      sizeof(orch_result_t));
-    if (!results) return -2;
+    if (!results) { agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "orchestrator_execute_pipeline results alloc failed"); return -2; }
 
     size_t completed = 0;
     const char* current_input = input;
@@ -1460,9 +1468,9 @@ int orchestrator_execute_pipeline(orchestrator_t* orch,
         orch_pipeline_step_t* step = &pipeline->steps[i];
 
         if (step->condition_fn && !step->condition_fn(current_input, step->condition_data)) {
-            results[completed].task_id = strdup("skipped");
+            results[completed].task_id = AGENTOS_STRDUP("skipped");
             results[completed].status = ORCH_TASK_CANCELLED;
-            results[completed].output = strdup("");
+            results[completed].output = AGENTOS_STRDUP("");
             completed++;
             continue;
         }
@@ -1471,15 +1479,16 @@ int orchestrator_execute_pipeline(orchestrator_t* orch,
         int ret = execute_single_phase(orch, step->phase,
                                        current_input, &phase_result);
         if (ret != 0 || !phase_result) {
+            agentos_error_push_ex(AGENTOS_ERR_KERN_TASK, __FILE__, __LINE__, __func__, "pipeline step %u phase %d failed (ret=%d)", i, step->phase, ret);
             for (size_t j = 0; j < completed; j++) {
                 orchestrator_result_free(&results[j]);
             }
-            free(results);
+            AGENTOS_FREE(results);
             return -3;
         }
 
         results[completed] = *phase_result;
-        free(phase_result);
+        AGENTOS_FREE(phase_result);
         completed++;
 
         if (results[completed - 1].status != ORCH_TASK_COMPLETED) {
@@ -1527,15 +1536,15 @@ orch_result_t* orchestrator_get_result(orchestrator_t* orch,
 
     for (uint32_t i = 0; i < orch->task_count; i++) {
         if (strcmp(orch->tasks[i].id, task_id) == 0) {
-            orch_result_t* r = (orch_result_t*)calloc(1, sizeof(orch_result_t));
-            if (!r) return NULL;
-            r->task_id = strdup(orch->tasks[i].id);
-            r->output = orch->tasks[i].output ? strdup(orch->tasks[i].output) : strdup("");
+            orch_result_t* r = (orch_result_t*)AGENTOS_CALLOC(1, sizeof(orch_result_t));
+            if (!r) { agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "get_result alloc failed"); return NULL; }
+            r->task_id = AGENTOS_STRDUP(orch->tasks[i].id);
+            r->output = orch->tasks[i].output ? AGENTOS_STRDUP(orch->tasks[i].output) : AGENTOS_STRDUP("");
             r->output_len = orch->tasks[i].output_len;
             r->status = orch->tasks[i].status;
             r->error_code = orch->tasks[i].error_code;
             r->duration_ms = orch->tasks[i].duration_ms;
-            r->thinking_chain_id = strdup(orch->tasks[i].thinking_chain_id);
+            r->thinking_chain_id = AGENTOS_STRDUP(orch->tasks[i].thinking_chain_id);
             return r;
         }
     }
@@ -1544,9 +1553,9 @@ orch_result_t* orchestrator_get_result(orchestrator_t* orch,
 
 void orchestrator_result_free(orch_result_t* result) {
     if (!result) return;
-    free(result->task_id);
-    free(result->output);
-    free(result->thinking_chain_id);
+    AGENTOS_FREE(result->task_id);
+    AGENTOS_FREE(result->output);
+    AGENTOS_FREE(result->thinking_chain_id);
 }
 
 uint32_t orchestrator_active_count(orchestrator_t* orch) {

@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef LLM_CACHE_H
-#define LLM_CACHE_H
+#ifndef AGENTOS_LLM_CACHE_H
+#define AGENTOS_LLM_CACHE_H
 
 #include <stddef.h>
 
@@ -28,4 +28,4 @@ size_t cache_capacity(cache_t* cache);
 }
 #endif
 
-#endif /* LLM_CACHE_H */
+#endif /* AGENTOS_LLM_CACHE_H */

@@ -390,7 +390,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
 
     if (svc_err == AGENTOS_SUCCESS && resp_json) {
         size_t resp_len = strlen(resp_json) + 1;
-        pending->response = (ipc_bus_message_t*)calloc(1, sizeof(ipc_bus_message_t));
+        pending->response = (ipc_bus_message_t*)AGENTOS_CALLOC(1, sizeof(ipc_bus_message_t));
         if (pending->response) {
             pending->response->header.msg_type = IPC_BUS_MSG_RESPONSE;
             pending->response->header.protocol = request->header.protocol;
@@ -402,16 +402,16 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
             pending->response->payload_size = resp_len;
             pending->completed = 1;
         } else {
-            free(resp_json);
+            AGENTOS_FREE(resp_json);
             pending->completed = 0;
         }
     } else {
         size_t err_len = 128;
-        char* err_payload = (char*)malloc(err_len);
+        char* err_payload = (char*)AGENTOS_MALLOC(err_len);
         if (err_payload) {
             int elen = snprintf(err_payload, err_len,
                 "{\"error\":{\"code\":%d,\"message\":\"service_call_failed\"}}", svc_err);
-            pending->response = (ipc_bus_message_t*)calloc(1, sizeof(ipc_bus_message_t));
+            pending->response = (ipc_bus_message_t*)AGENTOS_CALLOC(1, sizeof(ipc_bus_message_t));
             if (pending->response) {
                 pending->response->header.msg_type = IPC_BUS_MSG_RESPONSE;
                 pending->response->header.protocol = request->header.protocol;
@@ -419,17 +419,17 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
                 pending->response->payload_size = (size_t)(elen > 0 ? elen : 0) + 1;
                 pending->completed = 1;
             } else {
-                free(err_payload);
+                AGENTOS_FREE(err_payload);
             }
         }
-        if (resp_json) free(resp_json);
+        if (resp_json) AGENTOS_FREE(resp_json);
     }
 
     uint64_t elapsed = agentos_platform_get_time_ms() - start_time;
     if (elapsed >= (uint64_t)timeout_ms && !pending->completed) {
         bus->stats.timeouts++;
         bus->pending_count--;
-        if (resp_json) free(resp_json);
+        if (resp_json) AGENTOS_FREE(resp_json);
         agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ETIMEDOUT;
     }

@@ -279,6 +279,23 @@ static uint64_t openai_fnv1a_hash(const char* str) {
     return hash;
 }
 
+static void json_escape_string(const char* src, char* dst, size_t dst_size) {
+    if (!src || !dst || dst_size == 0) return;
+    size_t si = 0, di = 0;
+    while (src[si] && di < dst_size - 1) {
+        switch (src[si]) {
+            case '"':  if (di + 1 < dst_size - 1) { dst[di++] = '\\'; dst[di++] = '"'; } break;
+            case '\\': if (di + 1 < dst_size - 1) { dst[di++] = '\\'; dst[di++] = '\\'; } break;
+            case '\n': if (di + 1 < dst_size - 1) { dst[di++] = '\\'; dst[di++] = 'n'; } break;
+            case '\r': if (di + 1 < dst_size - 1) { dst[di++] = '\\'; dst[di++] = 'r'; } break;
+            case '\t': if (di + 1 < dst_size - 1) { dst[di++] = '\\'; dst[di++] = 't'; } break;
+            default:   dst[di++] = src[si]; break;
+        }
+        si++;
+    }
+    dst[di] = '\0';
+}
+
 static int openai_estimate_tokens(const char* text) {
     if (!text || !*text) return 0;
     int count = 0;
@@ -1173,10 +1190,22 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         int rc = openai_enterprise_chat_completion(ctx, NULL, &msg, 1, NULL, 0, 0.7, 1.0, 4096, &resp);
         if (rc == 0 && resp.choices && resp.choice_count > 0) {
             const char* content = resp.choices[0].content ? resp.choices[0].content : "";
-            size_t sz = 512 + strlen(content);
-            char* json = malloc(sz);
-            if (json) snprintf(json, sz, "{\"result\":\"%s\"}", content);
-            *response_json = json;
+            size_t content_len = strlen(content);
+            size_t escaped_cap = content_len * 2 + 128;
+            char* escaped_content = (char*)malloc(escaped_cap);
+            if (escaped_content) {
+                json_escape_string(content, escaped_content, escaped_cap);
+                size_t sz = 64 + strlen(escaped_content);
+                char* json = (char*)malloc(sz);
+                if (json) snprintf(json, sz, "{\"result\":\"%s\"}", escaped_content);
+                *response_json = json;
+                free(escaped_content);
+            } else {
+                size_t sz = 64;
+                char* json = (char*)malloc(sz);
+                if (json) snprintf(json, sz, "{\"result\":\"\"}");
+                *response_json = json;
+            }
         } else {
             size_t err_sz = 256;
             char* err_json = (char*)malloc(err_sz);
@@ -1198,12 +1227,16 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
             return rc;
         }
         size_t json_sz = 512 + (emb_resp.embedding_dim > 0 ? emb_resp.embedding_dim * 16 : 0);
+        const char* model_name = emb_resp.model ? emb_resp.model : "text-embedding-ada-002";
+        char escaped_model[256];
+        json_escape_string(model_name, escaped_model, sizeof(escaped_model));
+        json_sz += strlen(escaped_model);
         char* json = (char*)malloc(json_sz);
         if (!json) { openai_embedding_response_destroy(&emb_resp); return -1; }
         size_t pos = 0;
         pos += snprintf(json + pos, json_sz - pos,
             "{\"object\":\"list\",\"model\":\"%s\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[",
-            emb_resp.model ? emb_resp.model : "text-embedding-ada-002");
+            escaped_model);
         if (emb_resp.embeddings && emb_resp.embedding_dim > 0) {
             size_t show_dim = emb_resp.embedding_dim < 8 ? emb_resp.embedding_dim : 8;
             for (size_t j = 0; j < show_dim && pos < json_sz - 64; j++) {
@@ -1238,10 +1271,15 @@ int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
         pos += snprintf(json + pos, json_sz - pos, "{\"object\":\"list\",\"data\":[");
         for (size_t i = 0; i < count && pos < json_sz - 128; i++) {
             if (i > 0) pos += snprintf(json + pos, json_sz - pos, ",");
+            char escaped_id[256];
+            char escaped_owned_by[256];
+            const char* model_id = models[i].id ? models[i].id : "";
+            const char* owned_by = models[i].owned_by ? models[i].owned_by : "";
+            json_escape_string(model_id, escaped_id, sizeof(escaped_id));
+            json_escape_string(owned_by, escaped_owned_by, sizeof(escaped_owned_by));
             pos += snprintf(json + pos, json_sz - pos,
                 "{\"id\":\"%s\",\"object\":\"model\",\"owned_by\":\"%s\"}",
-                models[i].id ? models[i].id : "",
-                models[i].owned_by ? models[i].owned_by : "");
+                escaped_id, escaped_owned_by);
             free(models[i].id); free(models[i].name); free(models[i].owned_by);
         }
         free(models);

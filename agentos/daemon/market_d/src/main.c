@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -188,7 +189,7 @@ static void handle_search_agents(cJSON* params, int id, agentos_socket_t client_
         cJSON_AddBoolToObject(a, "installed", agents[i]->status == AGENT_STATUS_AVAILABLE);
         cJSON_AddItemToArray(arr, a);
     }
-    free(agents);
+    AGENTOS_FREE(agents);
 
     JSONRPC_SEND_SUCCESS(client_fd, arr, id);
 }
@@ -286,7 +287,7 @@ static void handle_search_skills(cJSON* params, int id, agentos_socket_t client_
         if (skills[i]->description) cJSON_AddStringToObject(s, "description", skills[i]->description);
         cJSON_AddItemToArray(arr, s);
     }
-    free(skills);
+    AGENTOS_FREE(skills);
 
     JSONRPC_SEND_SUCCESS(client_fd, arr, id);
 }

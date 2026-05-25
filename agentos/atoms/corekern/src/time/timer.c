@@ -133,18 +133,6 @@ void agentos_timer_destroy(agentos_timer_t* timer) {
     AGENTOS_FREE(timer);
 }
 
-static void remove_timer_from_list(agentos_timer_t* target) {
-    agentos_timer_t** pp = &timer_list;
-    while (*pp) {
-        if (*pp == target) {
-            *pp = target->next;
-            target->next = NULL;
-            break;
-        }
-        pp = &(*pp)->next;
-    }
-}
-
 void agentos_time_timer_process(void) {
     if (!timer_lock) return;
 
@@ -194,7 +182,6 @@ void agentos_time_timer_process(void) {
             fire_count++;
 
             if (timer->one_shot) {
-                remove_timer_from_list(timer);
                 timer->active = 0;
             } else {
                 timer->next_fire_ns = now + (uint64_t)timer->interval_ms * 1000000ULL;
@@ -208,10 +195,6 @@ void agentos_time_timer_process(void) {
 
     for (int i = 0; i < fire_count; i++) {
         to_fire[i].callback(to_fire[i].userdata);
-
-        if (to_fire[i].is_one_shot) {
-            AGENTOS_FREE(to_fire[i].source);
-        }
     }
 
     AGENTOS_FREE(to_fire);

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file ml_based.c
  * @brief 基于机器学习的调度策略实现（生产级）
@@ -103,11 +104,11 @@ static void record_prediction(ml_based_data_t* mld, const char* agent_id,
     size_t idx = mld->history_count % HISTORY_WINDOW;
     ml_history_entry_t* entry = &mld->history[idx];
 
-    free(entry->agent_id);
+    AGENTOS_FREE(entry->agent_id);
     entry->task_id = mld->total_predictions + 1;
     mld->total_predictions++;
     entry->timestamp = (time_t)(agentos_time_ms() / 1000ULL);
-    entry->agent_id = strdup(agent_id);
+    entry->agent_id = AGENTOS_STRDUP(agent_id);
     entry->predicted_score = pred_score;
     entry->actual_score = success ? 1.0f : 0.0f;
     entry->response_time_ms = resp_time_ms;
@@ -126,15 +127,15 @@ static void record_prediction(ml_based_data_t* mld, const char* agent_id,
 static int ml_based_create(const sched_config_t* manager, void** data) {
     if (!manager || !data) return -1;
 
-    ml_based_data_t* mld = (ml_based_data_t*)calloc(1, sizeof(ml_based_data_t));
+    ml_based_data_t* mld = (ml_based_data_t*)AGENTOS_CALLOC(1, sizeof(ml_based_data_t));
     if (!mld) return -2;
 
     mld->max_agents = manager->max_agents > 0 ? manager->max_agents : 128;
-    mld->agents = (agent_info_t**)calloc(mld->max_agents, sizeof(agent_info_t*));
-    if (!mld->agents) { free(mld); return -3; }
+    mld->agents = (agent_info_t**)AGENTOS_CALLOC(mld->max_agents, sizeof(agent_info_t*));
+    if (!mld->agents) { AGENTOS_FREE(mld); return -3; }
 
     mld->agent_count = 0;
-    mld->model_path = manager->ml_model_path ? strdup(manager->ml_model_path) : NULL;
+    mld->model_path = manager->ml_model_path ? AGENTOS_STRDUP(manager->ml_model_path) : NULL;
     mld->model_loaded = false;
     mld->total_predictions = 0;
     mld->correct_predictions = 0;
@@ -162,7 +163,7 @@ static int ml_based_create(const sched_config_t* manager, void** data) {
             size_t bytes_read = fread(&file_header, sizeof(ml_model_header_t), 1, model_file);
             fclose(model_file);
 
-            mld->model = calloc(1, sizeof(ml_model_header_t));
+            mld->model = AGENTOS_CALLOC(1, sizeof(ml_model_header_t));
             if (mld->model) {
                 ml_model_header_t* header = (ml_model_header_t*)mld->model;
                 if (bytes_read == 1 &&
@@ -209,20 +210,20 @@ static int ml_based_destroy(void* data) {
 
     for (size_t i = 0; i < mld->agent_count; i++) {
         if (mld->agents[i]) {
-            free(mld->agents[i]->agent_id);
-            free(mld->agents[i]->agent_name);
-            free(mld->agents[i]);
+            AGENTOS_FREE(mld->agents[i]->agent_id);
+            AGENTOS_FREE(mld->agents[i]->agent_name);
+            AGENTOS_FREE(mld->agents[i]);
         }
     }
-    free(mld->agents);
+    AGENTOS_FREE(mld->agents);
 
     for (size_t i = 0; i < HISTORY_WINDOW; i++) {
-        free(mld->history[i].agent_id);
+        AGENTOS_FREE(mld->history[i].agent_id);
     }
 
-    free(mld->model_path);
-    free(mld->model);
-    free(mld);
+    AGENTOS_FREE(mld->model_path);
+    AGENTOS_FREE(mld->model);
+    AGENTOS_FREE(mld);
     return 0;
 }
 
@@ -235,10 +236,10 @@ static int ml_based_register_agent(void* data, const agent_info_t* agent_info) {
 
     for (size_t i = 0; i < mld->agent_count; i++) {
         if (strcmp(mld->agents[i]->agent_id, agent_info->agent_id) == 0) {
-            free(mld->agents[i]->agent_id);
-            free(mld->agents[i]->agent_name);
-            mld->agents[i]->agent_id = strdup(agent_info->agent_id);
-            mld->agents[i]->agent_name = strdup(agent_info->agent_name);
+            AGENTOS_FREE(mld->agents[i]->agent_id);
+            AGENTOS_FREE(mld->agents[i]->agent_name);
+            mld->agents[i]->agent_id = AGENTOS_STRDUP(agent_info->agent_id);
+            mld->agents[i]->agent_name = AGENTOS_STRDUP(agent_info->agent_name);
             mld->agents[i]->load_factor = agent_info->load_factor;
             mld->agents[i]->success_rate = agent_info->success_rate;
             mld->agents[i]->avg_response_time_ms = agent_info->avg_response_time_ms;
@@ -248,11 +249,11 @@ static int ml_based_register_agent(void* data, const agent_info_t* agent_info) {
         }
     }
 
-    agent_info_t* new_agent = (agent_info_t*)calloc(1, sizeof(agent_info_t));
+    agent_info_t* new_agent = (agent_info_t*)AGENTOS_CALLOC(1, sizeof(agent_info_t));
     if (!new_agent) return -3;
 
-    new_agent->agent_id = strdup(agent_info->agent_id);
-    new_agent->agent_name = strdup(agent_info->agent_name);
+    new_agent->agent_id = AGENTOS_STRDUP(agent_info->agent_id);
+    new_agent->agent_name = AGENTOS_STRDUP(agent_info->agent_name);
     new_agent->load_factor = agent_info->load_factor;
     new_agent->success_rate = agent_info->success_rate;
     new_agent->avg_response_time_ms = agent_info->avg_response_time_ms;
@@ -270,9 +271,9 @@ static int ml_based_unregister_agent(void* data, const char* agent_id) {
 
     for (size_t i = 0; i < mld->agent_count; i++) {
         if (strcmp(mld->agents[i]->agent_id, agent_id) == 0) {
-            free(mld->agents[i]->agent_id);
-            free(mld->agents[i]->agent_name);
-            free(mld->agents[i]);
+            AGENTOS_FREE(mld->agents[i]->agent_id);
+            AGENTOS_FREE(mld->agents[i]->agent_name);
+            AGENTOS_FREE(mld->agents[i]);
             for (size_t j = i; j < mld->agent_count - 1; j++) {
                 mld->agents[j] = mld->agents[j + 1];
             }
@@ -313,10 +314,10 @@ static int ml_based_schedule(void* data, const task_info_t* task_info, sched_res
 
     if (!best_agent) return -3;
 
-    sched_result_t* res = (sched_result_t*)calloc(1, sizeof(sched_result_t));
+    sched_result_t* res = (sched_result_t*)AGENTOS_CALLOC(1, sizeof(sched_result_t));
     if (!res) return -4;
 
-    res->selected_agent_id = strdup(best_agent->agent_id);
+    res->selected_agent_id = AGENTOS_STRDUP(best_agent->agent_id);
     res->confidence = fminf(best_score, 1.0f);
     res->estimated_time_ms = (uint32_t)(best_agent->avg_response_time_ms * (1.0f + best_agent->load_factor));
 

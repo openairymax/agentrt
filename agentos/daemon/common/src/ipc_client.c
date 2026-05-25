@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file ipc_client.c
  * @brief IPC 客户端实现（线程安全版本）
@@ -72,7 +73,7 @@ static int g_curl_initialized = 0;
  */
 static int buffer_init(ipc_response_buffer_t* buf) {
     buf->capacity = 4096;
-    buf->data = (char*)malloc(buf->capacity);
+    buf->data = (char*)AGENTOS_MALLOC(buf->capacity);
     if (!buf->data) {
         return -1;
     }
@@ -86,7 +87,7 @@ static int buffer_init(ipc_response_buffer_t* buf) {
  */
 static void buffer_free(ipc_response_buffer_t* buf) {
     if (buf->data) {
-        free(buf->data);
+        AGENTOS_FREE(buf->data);
         buf->data = NULL;
     }
     buf->size = 0;
@@ -113,7 +114,7 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, void* us
             new_capacity = new_size;
         }
         
-        char* new_data = (char*)realloc(buf->data, new_capacity);
+        char* new_data = (char*)AGENTOS_REALLOC(buf->data, new_capacity);
         if (!new_data) {
             return 0;
         }
@@ -280,23 +281,23 @@ int svc_ipc_init(const char* baseruntime_url) {
     }
     
     /* 创建客户端上下文 */
-    client = (struct ipc_client*)calloc(1, sizeof(struct ipc_client));
+    client = (struct ipc_client*)AGENTOS_CALLOC(1, sizeof(struct ipc_client));
     if (!client) {
         agentos_mutex_unlock(&g_init_lock);
         SVC_ERROR(SVC_ERR_OUT_OF_MEMORY, "Failed to allocate IPC client");
     }
     
-    client->base_url = strdup(baseruntime_url);
+    client->base_url = AGENTOS_STRDUP(baseruntime_url);
     if (!client->base_url) {
-        free(client);
+        AGENTOS_FREE(client);
         agentos_mutex_unlock(&g_init_lock);
         SVC_ERROR(SVC_ERR_OUT_OF_MEMORY, "Failed to duplicate base URL");
     }
     
     client->default_timeout_ms = IPC_DEFAULT_TIMEOUT_MS;
     if (agentos_mutex_init(&client->pool_lock) != 0) {
-        free(client->base_url);
-        free(client);
+        AGENTOS_FREE(client->base_url);
+        AGENTOS_FREE(client);
         agentos_mutex_unlock(&g_init_lock);
         SVC_ERROR(SVC_ERR_OUT_OF_MEMORY, "Failed to initialize pool mutex");
     }
@@ -332,8 +333,8 @@ int svc_ipc_init(const char* baseruntime_url) {
             agentos_mutex_destroy(&client->pool[j].lock);
         }
         agentos_mutex_destroy(&client->pool_lock);
-        free(client->base_url);
-        free(client);
+        AGENTOS_FREE(client->base_url);
+        AGENTOS_FREE(client);
         agentos_mutex_unlock(&g_init_lock);
         return SVC_ERR_OUT_OF_MEMORY;
     }
@@ -360,8 +361,8 @@ void svc_ipc_cleanup(void) {
         }
         
         agentos_mutex_destroy(&g_ipc_client->pool_lock);
-        free(g_ipc_client->base_url);
-        free(g_ipc_client);
+        AGENTOS_FREE(g_ipc_client->base_url);
+        AGENTOS_FREE(g_ipc_client);
         g_ipc_client = NULL;
     }
     
@@ -418,7 +419,7 @@ int svc_rpc_call(const char* method, const char* params, char** out_result, uint
     /* 初始化响应缓冲区 */
     ipc_response_buffer_t response;
     if (buffer_init(&response) != 0) {
-        free(request);
+        AGENTOS_FREE(request);
         pool_release(g_ipc_client, entry);
         return SVC_ERR_OUT_OF_MEMORY;
     }
@@ -431,7 +432,7 @@ int svc_rpc_call(const char* method, const char* params, char** out_result, uint
     int ret = do_rpc_call(entry, g_ipc_client->base_url, request, 
                           &response, timeout_ms, IPC_MAX_RETRIES);
     
-    free(request);
+    AGENTOS_FREE(request);
     
     if (ret != SVC_OK) {
         buffer_free(&response);

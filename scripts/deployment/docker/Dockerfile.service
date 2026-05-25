@@ -87,8 +87,8 @@ RUN groupadd -r agentos && \
     && chown -R agentos:agentos ${AGENTOS_SERVICES_ROOT}
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD pgrep -x bash >/dev/null
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD nc -z localhost 8080 || nc -z localhost 8081 || exit 1
 
 # 暴露端口（各服务的 REST API）
 EXPOSE 8080 8081 8082 8083 8084

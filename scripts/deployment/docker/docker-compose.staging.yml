@@ -9,7 +9,7 @@ services:
   agentos-scripts:
     build:
       context: ../../
-      dockerfile: scripts/deploy/docker/Dockerfile.service
+      dockerfile: scripts/deployment/docker/Dockerfile.service
       target: runtime
     image: ${DOCKER_REGISTRY:-spharx}/agentos-scripts:staging
     container_name: agentos-scripts
@@ -199,5 +199,5 @@ networks:
   agentos-staging-network:
     driver: bridge
     ipam:
-      manager:
+      config:
         - subnet: 172.29.0.0/16

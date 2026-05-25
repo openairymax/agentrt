@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file priority_based.c
  * @brief 基于优先级的调度策略实现
@@ -30,15 +31,15 @@ typedef struct {
  * @return 0 表示成功，非 0 表示错误码
  */
 static int priority_based_create(const sched_config_t* manager, void** data) {
-    priority_based_data_t* pbd = (priority_based_data_t*)malloc(sizeof(priority_based_data_t));
+    priority_based_data_t* pbd = (priority_based_data_t*)AGENTOS_MALLOC(sizeof(priority_based_data_t));
     if (!pbd) {
         return -1;
     }
 
     pbd->max_agents = manager->max_agents;
-    pbd->agents = (agent_info_t**)malloc(sizeof(agent_info_t*) * pbd->max_agents);
+    pbd->agents = (agent_info_t**)AGENTOS_MALLOC(sizeof(agent_info_t*) * pbd->max_agents);
     if (!pbd->agents) {
-        free(pbd);
+        AGENTOS_FREE(pbd);
         return -1;
     }
 
@@ -46,7 +47,7 @@ static int priority_based_create(const sched_config_t* manager, void** data) {
     
     // 初始化优先级权重表（默认：优先级越高，权重越大）
     pbd->priority_levels = 10; // 假设有10个优先级级别
-    pbd->priority_weights = (float*)malloc(sizeof(float) * pbd->priority_levels);
+    pbd->priority_weights = (float*)AGENTOS_MALLOC(sizeof(float) * pbd->priority_levels);
     if (pbd->priority_weights) {
         for (size_t i = 0; i < pbd->priority_levels; i++) {
             // 指数权重：优先级越高，权重增长越快
@@ -73,19 +74,19 @@ static int priority_based_destroy(void* data) {
     if (pbd->agents) {
         for (size_t i = 0; i < pbd->agent_count; i++) {
             if (pbd->agents[i]) {
-                free(pbd->agents[i]->agent_id);
-                free(pbd->agents[i]->agent_name);
-                free(pbd->agents[i]);
+                AGENTOS_FREE(pbd->agents[i]->agent_id);
+                AGENTOS_FREE(pbd->agents[i]->agent_name);
+                AGENTOS_FREE(pbd->agents[i]);
             }
         }
-        free(pbd->agents);
+        AGENTOS_FREE(pbd->agents);
     }
 
     if (pbd->priority_weights) {
-        free(pbd->priority_weights);
+        AGENTOS_FREE(pbd->priority_weights);
     }
 
-    free(pbd);
+    AGENTOS_FREE(pbd);
     return 0;
 }
 
@@ -110,14 +111,14 @@ static int priority_based_register_agent(void* data, const agent_info_t* agent_i
     for (size_t i = 0; i < pbd->agent_count; i++) {
         if (strcmp(pbd->agents[i]->agent_id, agent_info->agent_id) == 0) {
             // 更新现有 Agent
-            free(pbd->agents[i]->agent_id);
-            free(pbd->agents[i]->agent_name);
+            AGENTOS_FREE(pbd->agents[i]->agent_id);
+            AGENTOS_FREE(pbd->agents[i]->agent_name);
 
-            pbd->agents[i]->agent_id = strdup(agent_info->agent_id);
-            pbd->agents[i]->agent_name = strdup(agent_info->agent_name);
+            pbd->agents[i]->agent_id = AGENTOS_STRDUP(agent_info->agent_id);
+            pbd->agents[i]->agent_name = AGENTOS_STRDUP(agent_info->agent_name);
             if (!pbd->agents[i]->agent_id || !pbd->agents[i]->agent_name) {
-                free(pbd->agents[i]->agent_id);
-                free(pbd->agents[i]->agent_name);
+                AGENTOS_FREE(pbd->agents[i]->agent_id);
+                AGENTOS_FREE(pbd->agents[i]->agent_name);
                 pbd->agents[i]->agent_id = NULL;
                 pbd->agents[i]->agent_name = NULL;
                 return -1;
@@ -133,17 +134,17 @@ static int priority_based_register_agent(void* data, const agent_info_t* agent_i
     }
 
     // 添加新 Agent
-    agent_info_t* new_agent = (agent_info_t*)malloc(sizeof(agent_info_t));
+    agent_info_t* new_agent = (agent_info_t*)AGENTOS_MALLOC(sizeof(agent_info_t));
     if (!new_agent) {
         return -1;
     }
 
-    new_agent->agent_id = strdup(agent_info->agent_id);
-    new_agent->agent_name = strdup(agent_info->agent_name);
+    new_agent->agent_id = AGENTOS_STRDUP(agent_info->agent_id);
+    new_agent->agent_name = AGENTOS_STRDUP(agent_info->agent_name);
     if (!new_agent->agent_id || !new_agent->agent_name) {
-        free(new_agent->agent_id);
-        free(new_agent->agent_name);
-        free(new_agent);
+        AGENTOS_FREE(new_agent->agent_id);
+        AGENTOS_FREE(new_agent->agent_name);
+        AGENTOS_FREE(new_agent);
         return -1;
     }
     new_agent->load_factor = agent_info->load_factor;
@@ -172,9 +173,9 @@ static int priority_based_unregister_agent(void* data, const char* agent_id) {
     for (size_t i = 0; i < pbd->agent_count; i++) {
         if (strcmp(pbd->agents[i]->agent_id, agent_id) == 0) {
             // 释放 Agent 资源
-            free(pbd->agents[i]->agent_id);
-            free(pbd->agents[i]->agent_name);
-            free(pbd->agents[i]);
+            AGENTOS_FREE(pbd->agents[i]->agent_id);
+            AGENTOS_FREE(pbd->agents[i]->agent_name);
+            AGENTOS_FREE(pbd->agents[i]);
 
             // 移动剩余 Agent
             for (size_t j = i; j < pbd->agent_count - 1; j++) {
@@ -284,12 +285,12 @@ static int priority_based_schedule(void* data, const task_info_t* task_info, sch
     }
 
     // 创建调度结果
-    sched_result_t* res = (sched_result_t*)malloc(sizeof(sched_result_t));
+    sched_result_t* res = (sched_result_t*)AGENTOS_MALLOC(sizeof(sched_result_t));
     if (!res) {
         return -1;
     }
 
-    res->selected_agent_id = strdup(best_agent->agent_id);
+    res->selected_agent_id = AGENTOS_STRDUP(best_agent->agent_id);
     res->confidence = best_score;
     res->estimated_time_ms = best_agent->avg_response_time_ms;
 

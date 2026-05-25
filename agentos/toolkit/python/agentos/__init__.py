@@ -109,9 +109,9 @@ from .exceptions import (
     CODE_CORRUPTED_DATA,
 )
 
-# 向后兼容别名（不推荐使用新名称）
-TimeoutError = AgentOSTimeoutError
-MemoryError = AgentOSMemoryError
+# 向后兼容别名 — 使用 AgentOS_ 前缀避免遮蔽 Python 内置异常
+AgentOS_TimeoutError = AgentOSTimeoutError
+AgentOS_MemoryError = AgentOSMemoryError
 
 # ============================================================
 # 新模块化架构导入（v3.0.0）

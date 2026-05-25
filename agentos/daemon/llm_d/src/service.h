@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef LLM_SERVICE_INTERNAL_H
-#define LLM_SERVICE_INTERNAL_H
+#ifndef AGENTOS_LLM_SERVICE_INTERNAL_H
+#define AGENTOS_LLM_SERVICE_INTERNAL_H
 
 #include "llm_service.h"
 #include "providers/registry.h"
@@ -24,4 +24,4 @@ struct llm_service {
     size_t rule_count;
 };
 
-#endif /* LLM_SERVICE_INTERNAL_H */
+#endif /* AGENTOS_LLM_SERVICE_INTERNAL_H */

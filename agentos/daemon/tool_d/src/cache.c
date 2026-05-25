@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file cache.c
  * @brief 工具结果缓存实现（LRU?
@@ -113,7 +114,7 @@ static void evict_lru(tool_cache_t* cache) {
 }
 
 tool_cache_t* tool_cache_create(size_t capacity, int ttl_sec) {
-    tool_cache_t* cache = calloc(1, sizeof(tool_cache_t));
+    tool_cache_t* cache = AGENTOS_CALLOC(1, sizeof(tool_cache_t));
     if (!cache) return NULL;
     cache->capacity = capacity;
     cache->ttl_sec = ttl_sec;
@@ -261,7 +262,7 @@ char* tool_cache_key(const char* tool_id, const char* params_json) {
 tool_result_t* tool_result_from_json(const char* json) {
     cJSON* root = cJSON_Parse(json);
     if (!root) return NULL;
-    tool_result_t* res = calloc(1, sizeof(tool_result_t));
+    tool_result_t* res = AGENTOS_CALLOC(1, sizeof(tool_result_t));
     if (!res) {
         cJSON_Delete(root);
         return NULL;
