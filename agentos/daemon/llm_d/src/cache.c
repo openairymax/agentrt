@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file cache.c
  * @brief LRU 缓存实现（双链表 + 哈希表）
@@ -136,7 +137,7 @@ static void evict_lru(cache_t* cache) {
 }
 
 cache_t* cache_create(size_t capacity, int ttl_sec) {
-    cache_t* cache = calloc(1, sizeof(cache_t));
+    cache_t* cache = AGENTOS_CALLOC(1, sizeof(cache_t));
     if (!cache) return NULL;
     cache->capacity = capacity;
     cache->ttl_sec = ttl_sec;

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -197,8 +198,8 @@ static void handle_schedule_task(cJSON* params, int id, agentos_socket_t client_
     SVC_LOG_INFO("Task scheduled: %s -> Agent: %s (Confidence: %.2f)",
                 task.task_id, result->selected_agent_id, result->confidence);
 
-    free(result->selected_agent_id);
-    free(result);
+    AGENTOS_FREE(result->selected_agent_id);
+    AGENTOS_FREE(result);
 }
 
 /**
@@ -216,7 +217,7 @@ static void handle_get_stats(int id, agentos_socket_t client_fd) {
     }
 
     cJSON* report_json = cJSON_Parse((char*)stats_data);
-    free(stats_data);
+    AGENTOS_FREE(stats_data);
 
     if (!report_json) {
         JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Invalid report data", id);

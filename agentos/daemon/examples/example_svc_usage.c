@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
 /**

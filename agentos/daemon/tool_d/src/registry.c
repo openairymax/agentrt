@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file registry.c
  * @brief 工具注册表实现（内存哈希表）
@@ -31,25 +32,25 @@ static unsigned int hash(const char* id) {
 }
 
 static tool_metadata_t* dup_metadata(const tool_metadata_t* src) {
-    tool_metadata_t* dst = calloc(1, sizeof(tool_metadata_t));
+    tool_metadata_t* dst = AGENTOS_CALLOC(1, sizeof(tool_metadata_t));
     if (!dst) return NULL;
-    dst->id = strdup(src->id);
-    dst->name = strdup(src->name);
-    dst->description = src->description ? strdup(src->description) : NULL;
-    dst->executable = strdup(src->executable);
+    dst->id = AGENTOS_STRDUP(src->id);
+    dst->name = AGENTOS_STRDUP(src->name);
+    dst->description = src->description ? AGENTOS_STRDUP(src->description) : NULL;
+    dst->executable = AGENTOS_STRDUP(src->executable);
     dst->timeout_sec = src->timeout_sec;
     dst->cacheable = src->cacheable;
-    dst->permission_rule = src->permission_rule ? strdup(src->permission_rule) : NULL;
+    dst->permission_rule = src->permission_rule ? AGENTOS_STRDUP(src->permission_rule) : NULL;
     if (src->param_count > 0) {
-        dst->params = calloc(src->param_count, sizeof(tool_param_t));
+        dst->params = AGENTOS_CALLOC(src->param_count, sizeof(tool_param_t));
         if (!dst->params) {
-            free(dst->id); free(dst->name); free(dst->description);
-            free(dst->executable); free(dst->permission_rule); free(dst);
+            AGENTOS_FREE(dst->id); AGENTOS_FREE(dst->name); AGENTOS_FREE(dst->description);
+            AGENTOS_FREE(dst->executable); AGENTOS_FREE(dst->permission_rule); AGENTOS_FREE(dst);
             return NULL;
         }
         for (size_t i = 0; i < src->param_count; ++i) {
-            dst->params[i].name = strdup(src->params[i].name);
-            dst->params[i].schema = strdup(src->params[i].schema);
+            dst->params[i].name = AGENTOS_STRDUP(src->params[i].name);
+            dst->params[i].schema = AGENTOS_STRDUP(src->params[i].schema);
         }
         dst->param_count = src->param_count;
     }
@@ -57,7 +58,7 @@ static tool_metadata_t* dup_metadata(const tool_metadata_t* src) {
 }
 
 tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
-    tool_registry_t* reg = calloc(1, sizeof(tool_registry_t));
+    tool_registry_t* reg = AGENTOS_CALLOC(1, sizeof(tool_registry_t));
     if (!reg) return NULL;
     agentos_mutex_init(&reg->lock);
 
@@ -75,10 +76,10 @@ tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
                 size_t cnt = 0;
                 while (def->params[cnt]) cnt++;
                 if (cnt > 0) {
-                    tool_param_t* params = calloc(cnt, sizeof(tool_param_t));
+                    tool_param_t* params = AGENTOS_CALLOC(cnt, sizeof(tool_param_t));
                     if (params) {
                         for (size_t i = 0; i < cnt; ++i) {
-                            params[i].name = strdup(def->params[i]);
+                            params[i].name = AGENTOS_STRDUP(def->params[i]);
                             const char* pname = def->params[i];
                             size_t pname_len = pname ? strlen(pname) : 0;
                             char schema[128];
@@ -99,7 +100,7 @@ tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
                             } else {
                                 snprintf(schema, sizeof(schema), "{}");
                             }
-                            params[i].schema = strdup(schema);
+                            params[i].schema = AGENTOS_STRDUP(schema);
                         }
                         meta.params = params;
                         meta.param_count = cnt;
@@ -109,10 +110,10 @@ tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
             tool_registry_add(reg, &meta);
             if (meta.params) {
                 for (size_t i = 0; i < meta.param_count; ++i) {
-                    free((void*)meta.params[i].name);
-                    free((void*)meta.params[i].schema);
+                    AGENTOS_FREE((void*)meta.params[i].name);
+                    AGENTOS_FREE((void*)meta.params[i].schema);
                 }
-                free((void*)meta.params);
+                AGENTOS_FREE((void*)meta.params);
             }
         }
     }
@@ -121,18 +122,20 @@ tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
 
 void tool_registry_destroy(tool_registry_t* reg) {
     if (!reg) return;
+    agentos_mutex_lock(&reg->lock);
     for (int i = 0; i < HASH_SIZE; ++i) {
         registry_entry_t* e = reg->buckets[i];
         while (e) {
             registry_entry_t* next = e->next;
-            free(e->id);
+            AGENTOS_FREE(e->id);
             tool_metadata_free(e->meta);
-            free(e);
+            AGENTOS_FREE(e);
             e = next;
         }
     }
+    agentos_mutex_unlock(&reg->lock);
     agentos_mutex_destroy(&reg->lock);
-    free(reg);
+    AGENTOS_FREE(reg);
 }
 
 int tool_registry_add(tool_registry_t* reg, const tool_metadata_t* meta) {
@@ -145,17 +148,17 @@ int tool_registry_add(tool_registry_t* reg, const tool_metadata_t* meta) {
             return -1;
         }
     }
-    registry_entry_t* e = calloc(1, sizeof(registry_entry_t));
+    registry_entry_t* e = AGENTOS_CALLOC(1, sizeof(registry_entry_t));
     if (!e) {
         agentos_mutex_unlock(&reg->lock);
         return -1;
     }
-    e->id = strdup(meta->id);
+    e->id = AGENTOS_STRDUP(meta->id);
     e->meta = dup_metadata(meta);
     if (!e->id || !e->meta) {
-        free(e->id);
-        free(e->meta);
-        free(e);
+        AGENTOS_FREE(e->id);
+        AGENTOS_FREE(e->meta);
+        AGENTOS_FREE(e);
         agentos_mutex_unlock(&reg->lock);
         return -1;
     }
@@ -174,9 +177,9 @@ int tool_registry_remove(tool_registry_t* reg, const char* tool_id) {
         if (strcmp((*p)->id, tool_id) == 0) {
             registry_entry_t* victim = *p;
             *p = victim->next;
-            free(victim->id);
+            AGENTOS_FREE(victim->id);
             tool_metadata_free(victim->meta);
-            free(victim);
+            AGENTOS_FREE(victim);
             agentos_mutex_unlock(&reg->lock);
             return 0;
         }
@@ -202,7 +205,7 @@ tool_metadata_t* tool_registry_get(tool_registry_t* reg, const char* tool_id) {
 }
 
 char* tool_registry_list_json(tool_registry_t* reg) {
-    if (!reg) return strdup("[]");
+    if (!reg) return AGENTOS_STRDUP("[]");
     agentos_mutex_lock(&reg->lock);
     cJSON* arr = cJSON_CreateArray();
     for (int i = 0; i < HASH_SIZE; ++i) {

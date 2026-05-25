@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file service.c
  * @brief LLM 服务核心逻辑实现
@@ -75,7 +76,7 @@ static char* make_cache_key(const llm_request_config_t* manager) {
                strlen(content) + 1;
     }
     
-    char* key = (char*)malloc(len);
+    char* key = (char*)AGENTOS_MALLOC(len);
     if (!key) return NULL;
     
     /* 构建缓存键 */
@@ -126,7 +127,7 @@ static pricing_rule_t* load_pricing_rules(cJSON* root, int* count) {
     }
 
     int n = cJSON_GetArraySize(pricing);
-    pricing_rule_t* rules = (pricing_rule_t*)calloc((size_t)n, sizeof(pricing_rule_t));
+    pricing_rule_t* rules = (pricing_rule_t*)AGENTOS_CALLOC((size_t)n, sizeof(pricing_rule_t));
     if (!rules) return NULL;
 
     for (int i = 0; i < n; ++i) {
@@ -136,13 +137,13 @@ static pricing_rule_t* load_pricing_rules(cJSON* root, int* count) {
         cJSON* output = cJSON_GetObjectItem(item, "output_price_per_k");
 
         if (cJSON_IsString(pattern) && cJSON_IsNumber(input) && cJSON_IsNumber(output)) {
-            rules[i].model_pattern = strdup(pattern->valuestring);
+            rules[i].model_pattern = AGENTOS_STRDUP(pattern->valuestring);
             if (!rules[i].model_pattern) {
                 /* 内存分配失败，清理已分配的 */
                 for (int j = 0; j < i; ++j) {
-                    free((void*)rules[j].model_pattern);
+                    AGENTOS_FREE((void*)rules[j].model_pattern);
                 }
-                free(rules);
+                AGENTOS_FREE(rules);
                 *count = 0;
                 return NULL;
             }
@@ -162,15 +163,15 @@ static pricing_rule_t* load_pricing_rules(cJSON* root, int* count) {
 static void free_pricing_rules(pricing_rule_t* rules, int count) {
     if (!rules) return;
     for (int i = 0; i < count; ++i) {
-        free((void*)rules[i].model_pattern);
+        AGENTOS_FREE((void*)rules[i].model_pattern);
     }
-    free(rules);
+    AGENTOS_FREE(rules);
 }
 
 /* ---------- 创建服务 ---------- */
 
 llm_service_t* llm_service_create(const char* config_path) {
-    llm_service_t* svc = (llm_service_t*)calloc(1, sizeof(llm_service_t));
+    llm_service_t* svc = (llm_service_t*)AGENTOS_CALLOC(1, sizeof(llm_service_t));
     if (!svc) {
         SVC_LOG_ERROR("Failed to allocate service context");
         return NULL;
@@ -178,7 +179,7 @@ llm_service_t* llm_service_create(const char* config_path) {
     
     if (agentos_mutex_init(&svc->lock) != 0) {
         SVC_LOG_ERROR("Failed to initialize service lock");
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -201,10 +202,10 @@ llm_service_t* llm_service_create(const char* config_path) {
         if (yaml_len <= 0) {
             fclose(f);
         } else {
-            char* yaml_content = (char*)malloc((size_t)yaml_len + 1);
+            char* yaml_content = (char*)AGENTOS_MALLOC((size_t)yaml_len + 1);
             if (yaml_content) {
                 size_t read_len = fread(yaml_content, 1, (size_t)yaml_len, f);
-                if (read_len != (size_t)yaml_len) { free(yaml_content); yaml_content = NULL; }
+                if (read_len != (size_t)yaml_len) { AGENTOS_FREE(yaml_content); yaml_content = NULL; }
                 if (yaml_content) {
                 yaml_content[read_len] = '\0';
                 
@@ -217,14 +218,14 @@ llm_service_t* llm_service_create(const char* config_path) {
                         svc->rule_count = rule_count;
                         SVC_LOG_INFO("Loaded %d pricing rules", rule_count);
                     } else if (rules) {
-                        free(rules);
+                        AGENTOS_FREE(rules);
                     }
                     cJSON_Delete(root);
                 } else {
                     SVC_LOG_WARN("Failed to parse pricing rules from manager");
                 }
                 }
-                free(yaml_content);
+                AGENTOS_FREE(yaml_content);
             } else {
                 SVC_LOG_ERROR("Failed to allocate memory for manager content");
             }
@@ -238,7 +239,7 @@ llm_service_t* llm_service_create(const char* config_path) {
     if (!svc->registry) {
         SVC_LOG_ERROR("Failed to create provider registry");
         agentos_mutex_destroy(&svc->lock);
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -248,7 +249,7 @@ llm_service_t* llm_service_create(const char* config_path) {
         SVC_LOG_ERROR("Failed to create cache");
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -259,7 +260,7 @@ llm_service_t* llm_service_create(const char* config_path) {
         cache_destroy(svc->cache);
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -271,7 +272,7 @@ llm_service_t* llm_service_create(const char* config_path) {
         cache_destroy(svc->cache);
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -311,7 +312,7 @@ void llm_service_destroy(llm_service_t* svc) {
     }
     
     agentos_mutex_destroy(&svc->lock);
-    free(svc);
+    AGENTOS_FREE(svc);
 }
 
 /* ---------- 辅助函数（降低 llm_service_complete 复杂度） ---------- */
@@ -329,7 +330,7 @@ static int get_cached_response(llm_service_t* svc,
     char* cached_json = NULL;
     if (cache_get(svc->cache, cache_key, &cached_json) == 1 && cached_json) {
         llm_response_t* cached_resp = response_from_json(cached_json);
-        free(cached_json);
+        AGENTOS_FREE(cached_json);
         cached_json = NULL;
 
         if (cached_resp) {
@@ -369,7 +370,7 @@ static void cache_response(llm_service_t* svc, const char* cache_key, llm_respon
     char* resp_json = response_to_json(resp);
     if (resp_json) {
         cache_put(svc->cache, cache_key, resp_json);
-        free(resp_json);
+        AGENTOS_FREE(resp_json);
         resp_json = NULL;
     }
 }
@@ -412,7 +413,7 @@ int llm_service_complete(llm_service_t* svc,
     llm_response_t* cached_resp = NULL;
     int cache_status = get_cached_response(svc, cache_key, &cached_resp);
     if (cache_status > 0 && cached_resp) {
-        free(cache_key);
+        AGENTOS_FREE(cache_key);
         *out_response = cached_resp;
         return AGENTOS_OK;
     }
@@ -421,7 +422,7 @@ int llm_service_complete(llm_service_t* svc,
     const provider_t* prov = find_provider(svc, manager->model);
     if (!prov) {
         SVC_LOG_ERROR("No provider for model '%s'", manager->model);
-        free(cache_key);
+        AGENTOS_FREE(cache_key);
         cache_key = NULL;
         return AGENTOS_ERR_LLM_INVALID_MODEL;
     }
@@ -432,7 +433,7 @@ int llm_service_complete(llm_service_t* svc,
     if (ret != 0) {
         SVC_LOG_ERROR("Provider '%s' failed for model '%s': error %d",
                      prov->name, manager->model, ret);
-        free(cache_key);
+        AGENTOS_FREE(cache_key);
         cache_key = NULL;
         return ret;
     }
@@ -442,7 +443,7 @@ int llm_service_complete(llm_service_t* svc,
     cache_response(svc, cache_key, resp);
 
     *out_response = resp;
-    free(cache_key);
+    AGENTOS_FREE(cache_key);
     cache_key = NULL;
     return AGENTOS_OK;
 }
@@ -567,20 +568,20 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
     
-    char* content = (char*)malloc((size_t)len + 1);
+    char* content = (char*)AGENTOS_MALLOC((size_t)len + 1);
     if (!content) {
         fclose(f);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     
     size_t read_len = fread(content, 1, (size_t)len, f);
-    if (read_len != (size_t)len) { free(content); fclose(f); return AGENTOS_ERR_IO; }
+    if (read_len != (size_t)len) { AGENTOS_FREE(content); fclose(f); return AGENTOS_ERR_IO; }
     content[read_len] = '\0';
     fclose(f);
     
     /* 使用 cJSON 解析（配置文件实际上是 JSON） */
     cJSON* root = cJSON_Parse(content);
-    free(content);
+    AGENTOS_FREE(content);
     
     if (!root) {
         SVC_LOG_WARN("Failed to parse manager file, using defaults");
@@ -645,7 +646,7 @@ static void yaml_map_add(yaml_map_t* m, const char* key, const char* value) {
     if (!key || !value) return;
     if (m->count >= m->capacity) {
         size_t new_cap = m->capacity == 0 ? 16 : m->capacity * 2;
-        yaml_kv_t* new_pairs = (yaml_kv_t*)realloc(m->pairs, new_cap * sizeof(yaml_kv_t));
+        yaml_kv_t* new_pairs = (yaml_kv_t*)AGENTOS_REALLOC(m->pairs, new_cap * sizeof(yaml_kv_t));
         if (!new_pairs) return;
         m->pairs = new_pairs;
         m->capacity = new_cap;
@@ -666,7 +667,7 @@ static const char* yaml_map_get(const yaml_map_t* m, const char* key) {
 }
 
 static void yaml_map_free(yaml_map_t* m) {
-    free(m->pairs);
+    AGENTOS_FREE(m->pairs);
     m->pairs = NULL;
     m->count = 0;
     m->capacity = 0;
@@ -891,7 +892,7 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
             prov_count++;
         }
         if (provs[j].model_count < 64) {
-            provs[j].model_names[provs[j].model_count++] = strdup(models[i].name);
+            provs[j].model_names[provs[j].model_count++] = AGENTOS_STRDUP(models[i].name);
         }
         if (!provs[j].base_url[0] && models[i].endpoint[0]) {
             strncpy(provs[j].base_url, models[i].endpoint, sizeof(provs[j].base_url) - 1);
@@ -902,26 +903,26 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
             provs[j].max_retries = models[i].max_retries;
     }
 
-    provider_config_t* result = (provider_config_t*)calloc(prov_count + 1, sizeof(provider_config_t));
+    provider_config_t* result = (provider_config_t*)AGENTOS_CALLOC(prov_count + 1, sizeof(provider_config_t));
     if (!result) return AGENTOS_ERR_OUT_OF_MEMORY;
 
     for (size_t i = 0; i < prov_count; ++i) {
-        result[i].name = strdup(provs[i].name);
+        result[i].name = AGENTOS_STRDUP(provs[i].name);
         if (provs[i].api_key_env[0]) {
             char env_prefix[8] = "env:";
             size_t env_key_len = strlen(provs[i].api_key_env);
-            char* key_buf = (char*)malloc(4 + env_key_len + 1);
+            char* key_buf = (char*)AGENTOS_MALLOC(4 + env_key_len + 1);
             if (key_buf) {
                 memcpy(key_buf, env_prefix, 4);
                 memcpy(key_buf + 4, provs[i].api_key_env, env_key_len + 1);
                 result[i].api_key = key_buf;
             }
         }
-        if (provs[i].base_url[0]) result[i].api_base = strdup(provs[i].base_url);
+        if (provs[i].base_url[0]) result[i].api_base = AGENTOS_STRDUP(provs[i].base_url);
         result[i].timeout_sec = (double)provs[i].timeout_sec;
         result[i].max_retries = provs[i].max_retries;
         if (provs[i].model_count > 0) {
-            char** marr = (char**)calloc(provs[i].model_count + 1, sizeof(char*));
+            char** marr = (char**)AGENTOS_CALLOC(provs[i].model_count + 1, sizeof(char*));
             if (marr) {
                 for (size_t k = 0; k < provs[i].model_count; ++k)
                     marr[k] = provs[i].model_names[k];
@@ -955,7 +956,7 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char* content = (char*)malloc((size_t)len + 1);
+    char* content = (char*)AGENTOS_MALLOC((size_t)len + 1);
     if (!content) { fclose(f); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     size_t read_len = fread(content, 1, (size_t)len, f);
@@ -963,7 +964,7 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
     fclose(f);
 
     cJSON* root = cJSON_Parse(content);
-    free(content);
+    AGENTOS_FREE(content);
     if (!root) {
         SVC_LOG_WARN("Failed to parse model config JSON");
         return 0;
@@ -979,7 +980,7 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
     int n = cJSON_GetArraySize(providers_arr);
     if (n <= 0) { cJSON_Delete(root); return 0; }
 
-    provider_config_t* result = (provider_config_t*)calloc((size_t)n + 1, sizeof(provider_config_t));
+    provider_config_t* result = (provider_config_t*)AGENTOS_CALLOC((size_t)n + 1, sizeof(provider_config_t));
     if (!result) { cJSON_Delete(root); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     size_t valid_count = 0;
@@ -995,11 +996,11 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
         if (!cJSON_IsString(pname)) continue;
 
         provider_config_t* pcfg = &result[valid_count];
-        pcfg->name = strdup(pname->valuestring);
+        pcfg->name = AGENTOS_STRDUP(pname->valuestring);
 
         if (cJSON_IsString(pkey_env) && pkey_env->valuestring[0]) {
             size_t env_len = strlen(pkey_env->valuestring);
-            char* key_buf = (char*)malloc(4 + env_len + 1);
+            char* key_buf = (char*)AGENTOS_MALLOC(4 + env_len + 1);
             if (key_buf) {
                 memcpy(key_buf, "env:", 4);
                 memcpy(key_buf + 4, pkey_env->valuestring, env_len + 1);
@@ -1007,17 +1008,17 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
             }
         }
 
-        if (cJSON_IsString(pbase)) pcfg->api_base = strdup(pbase->valuestring);
+        if (cJSON_IsString(pbase)) pcfg->api_base = AGENTOS_STRDUP(pbase->valuestring);
         if (cJSON_IsNumber(ptimeout)) pcfg->timeout_sec = ptimeout->valuedouble;
         if (cJSON_IsNumber(pretries)) pcfg->max_retries = pretries->valueint;
 
         if (cJSON_IsArray(pmodels)) {
             int mcount = cJSON_GetArraySize(pmodels);
-            char** marr = (char**)calloc((size_t)mcount + 1, sizeof(char*));
+            char** marr = (char**)AGENTOS_CALLOC((size_t)mcount + 1, sizeof(char*));
             if (marr) {
                 for (int j = 0; j < mcount; ++j) {
                     cJSON* mitem = cJSON_GetArrayItem(pmodels, j);
-                    if (cJSON_IsString(mitem)) marr[j] = strdup(mitem->valuestring);
+                    if (cJSON_IsString(mitem)) marr[j] = AGENTOS_STRDUP(mitem->valuestring);
                 }
                 marr[mcount] = NULL;
                 pcfg->models = marr;
@@ -1049,15 +1050,15 @@ int svc_load_model_config(const char* config_path, provider_config_t** out_provi
 
 void llm_response_free(llm_response_t* resp) {
     if (!resp) return;
-    free(resp->id);
-    free(resp->model);
-    free(resp->finish_reason);
+    AGENTOS_FREE(resp->id);
+    AGENTOS_FREE(resp->model);
+    AGENTOS_FREE(resp->finish_reason);
     if (resp->choices) {
         for (size_t i = 0; i < resp->choice_count; i++) {
-            free((void*)resp->choices[i].role);
-            free((void*)resp->choices[i].content);
+            AGENTOS_FREE((void*)resp->choices[i].role);
+            AGENTOS_FREE((void*)resp->choices[i].content);
         }
-        free(resp->choices);
+        AGENTOS_FREE(resp->choices);
     }
-    free(resp);
+    AGENTOS_FREE(resp);
 }

@@ -63,8 +63,11 @@ static agentos_error_t default_s1_verify(
     const char* content, size_t content_len,
     float* out_score, int* out_acceptable,
     char** out_critique, size_t* out_critique_len,
-    void* __attribute__((unused)) user_data) {
+    void* user_data) {
     if (!content || !out_score) return AGENTOS_EINVAL;
+
+    const tc3_config_t* config = (const tc3_config_t*)user_data;
+    float accept_threshold = config ? config->accept_threshold : TC3_ACCEPT_THRESHOLD;
 
     float score = 0.5f;
     if (content_len > 20) score += 0.1f;
@@ -74,15 +77,15 @@ static agentos_error_t default_s1_verify(
 
     if (score > 1.0f) score = 1.0f;
     *out_score = score;
-    if (out_acceptable) *out_acceptable = (score >= TC3_ACCEPT_THRESHOLD) ? 1 : 0;
+    if (out_acceptable) *out_acceptable = (score >= accept_threshold) ? 1 : 0;
 
     if (out_critique && out_critique_len) {
-        if (score < TC3_ACCEPT_THRESHOLD) {
+        if (score < accept_threshold) {
             const char* tmpl = "Quality below threshold (%.2f < %.2f). Needs improvement.";
             size_t buf_sz = 128;
             char* buf = (char*)AGENTOS_MALLOC(buf_sz);
             if (buf) {
-                snprintf(buf, buf_sz, tmpl, score, TC3_ACCEPT_THRESHOLD);
+                snprintf(buf, buf_sz, tmpl, score, (double)accept_threshold);
                 *out_critique = buf;
                 *out_critique_len = strlen(buf);
             }
@@ -130,21 +133,32 @@ static agentos_error_t verify_with_metacognition(
         }
     }
 
-    float fallback_score = 0.0f;
-    int fallback_acceptable = 0;
-    agentos_error_t fb_err = default_s1_verify(content, content_len,
-                             &fallback_score, &fallback_acceptable,
-                             out_critique, out_critique_len, NULL);
-    if (fb_err == AGENTOS_SUCCESS && coord->calibrator) {
-        double calibrated = confidence_calibrator_calibrate(
-            coord->calibrator, (double)fallback_score, CC_DIM_ACCURACY);
-        *out_score = (float)calibrated;
-        *out_acceptable = fallback_acceptable;
-    } else if (fb_err == AGENTOS_SUCCESS) {
-        *out_score = fallback_score;
-        *out_acceptable = fallback_acceptable;
+    float raw_score = 0.0f;
+    int raw_acceptable = 0;
+    agentos_error_t vfy_err;
+
+    if (coord->config.s1_verify) {
+        vfy_err = coord->config.s1_verify(content, content_len,
+                       &raw_score, &raw_acceptable,
+                       out_critique, out_critique_len,
+                       coord->config.s1_user_data);
+    } else {
+        vfy_err = default_s1_verify(content, content_len,
+                       &raw_score, &raw_acceptable,
+                       out_critique, out_critique_len,
+                       (void*)&coord->config);
     }
-    return fb_err;
+
+    if (vfy_err == AGENTOS_SUCCESS && coord->calibrator) {
+        double calibrated = confidence_calibrator_calibrate(
+            coord->calibrator, (double)raw_score, CC_DIM_ACCURACY);
+        *out_score = (float)calibrated;
+        *out_acceptable = raw_acceptable;
+    } else if (vfy_err == AGENTOS_SUCCESS) {
+        *out_score = raw_score;
+        *out_acceptable = raw_acceptable;
+    }
+    return vfy_err;
 }
 
 static agentos_error_t build_correction_prompt(
@@ -329,6 +343,7 @@ agentos_error_t tc3_coordinator_execute(
 
         tc3_verdict_t verdict = score_to_verdict(score, &coord->config);
         uint32_t correction_attempts = 0;
+        tc3_role_t verified_by = TC3_ROLE_T1F;
 
         char* current_text = unit.text;
         size_t current_len = unit.text_len;
@@ -337,7 +352,7 @@ agentos_error_t tc3_coordinator_execute(
         while (verdict != TC3_RESULT_ACCEPT && verdict != TC3_RESULT_REJECT &&
                correction_attempts < coord->config.max_verify_rounds) {
 
-            if (verdict == TC3_RESULT_ESCALATE && coord->config.s1_expert) {
+            if (verdict == TC3_RESULT_MAJOR_FIX && coord->config.s1_expert) {
                 float expert_score = 0.0f;
                 tc3_verdict_t expert_verdict = TC3_RESULT_REJECT;
                 char* expert_opinion = NULL;
@@ -353,6 +368,7 @@ agentos_error_t tc3_coordinator_execute(
                 if (exp_err == AGENTOS_SUCCESS) {
                     verdict = expert_verdict;
                     score = expert_score;
+                    verified_by = TC3_ROLE_T1P;
                     if (expert_opinion) AGENTOS_FREE(expert_opinion);
                 }
                 coord->stats.escalated_units++;
@@ -402,7 +418,7 @@ agentos_error_t tc3_coordinator_execute(
             .score = score,
             .critique = critique,
             .critique_len = critique_len,
-            .verified_by = (verdict == TC3_RESULT_ESCALATE) ? TC3_ROLE_T1P : TC3_ROLE_T1F,
+            .verified_by = verified_by,
             .correction_attempts = correction_attempts
         };
         record_unit_result(coord, &result);

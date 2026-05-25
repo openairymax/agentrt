@@ -674,7 +674,7 @@ def cmd_protocol_capabilities(args):
         print(f"    - {f}")
 
     if "models" in meta:
-        print(f"\n  {BOLD}Available Models ({len(meta['models'])):{RESET}")
+        print(f"\n  {BOLD}Available Models ({len(meta['models'])}):{RESET}")
         for m in meta["models"]:
             print(f"    - {m}")
 

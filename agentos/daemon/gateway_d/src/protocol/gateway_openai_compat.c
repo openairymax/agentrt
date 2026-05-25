@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "gateway_openai_compat.h"
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +28,7 @@ static int handle_openai_request(const char* method,
 
 gw_openai_compat_t* gw_openai_compat_create(const gw_openai_compat_config_t* config)
 {
-    gw_openai_compat_t* compat = (gw_openai_compat_t*)calloc(1, sizeof(gw_openai_compat_t));
+    gw_openai_compat_t* compat = (gw_openai_compat_t*)AGENTOS_CALLOC(1, sizeof(gw_openai_compat_t));
     if (!compat) return NULL;
     if (config) {
         compat->config = *config;
@@ -44,7 +45,7 @@ void gw_openai_compat_destroy(gw_openai_compat_t* compat)
     if (compat->initialized) {
         gw_openai_compat_shutdown(compat);
     }
-    free(compat);
+    AGENTOS_FREE(compat);
 }
 
 int gw_openai_compat_init(gw_openai_compat_t* compat)
@@ -107,11 +108,11 @@ static char* extract_json_field_string(const char* json, const char* field)
 {
     if (!json || !field) return NULL;
     size_t flen = strlen(field) + 4;
-    char* key = (char*)malloc(flen);
+    char* key = (char*)AGENTOS_MALLOC(flen);
     if (!key) return NULL;
     snprintf(key, flen, "\"%s\"", field);
     const char* p = strstr(json, key);
-    free(key);
+    AGENTOS_FREE(key);
     if (!p) return NULL;
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
@@ -120,7 +121,7 @@ static char* extract_json_field_string(const char* json, const char* field)
     const char* end = strchr(p, '"');
     if (!end) return NULL;
     size_t len = (size_t)(end - p);
-    char* val = (char*)malloc(len + 1);
+    char* val = (char*)AGENTOS_MALLOC(len + 1);
     if (!val) return NULL;
     memcpy(val, p, len);
     val[len] = '\0';
@@ -131,11 +132,11 @@ static double extract_json_field_number(const char* json, const char* field, dou
 {
     if (!json || !field) return default_val;
     size_t flen = strlen(field) + 4;
-    char* key = (char*)malloc(flen);
+    char* key = (char*)AGENTOS_MALLOC(flen);
     if (!key) return default_val;
     snprintf(key, flen, "\"%s\"", field);
     const char* p = strstr(json, key);
-    free(key);
+    AGENTOS_FREE(key);
     if (!p) return default_val;
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
@@ -149,11 +150,11 @@ static int extract_json_field_int(const char* json, const char* field, int defau
 {
     if (!json || !field) return default_val;
     size_t flen = strlen(field) + 4;
-    char* key = (char*)malloc(flen);
+    char* key = (char*)AGENTOS_MALLOC(flen);
     if (!key) return default_val;
     snprintf(key, flen, "\"%s\"", field);
     const char* p = strstr(json, key);
-    free(key);
+    AGENTOS_FREE(key);
     if (!p) return default_val;
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
@@ -181,7 +182,7 @@ static char* extract_messages_array(const char* json)
             if (depth == 0) {
                 p++;
                 size_t len = (size_t)(p - start);
-                char* arr = (char*)malloc(len + 1);
+                char* arr = (char*)AGENTOS_MALLOC(len + 1);
                 if (!arr) return NULL;
                 memcpy(arr, start, len);
                 arr[len] = '\0';
@@ -215,7 +216,7 @@ static char* extract_functions_array(const char* json)
             if (depth == 0) {
                 p++;
                 size_t len = (size_t)(p - start);
-                char* arr = (char*)malloc(len + 1);
+                char* arr = (char*)AGENTOS_MALLOC(len + 1);
                 if (!arr) return NULL;
                 memcpy(arr, start, len);
                 arr[len] = '\0';
@@ -232,14 +233,14 @@ static int handle_chat_completions(gw_openai_compat_t* compat,
                                     char** response_json)
 {
     if (!compat->llm_call_fn) {
-        *response_json = strdup("{\"error\":{\"message\":\"No LLM backend configured\","
+        *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"No LLM backend configured\","
             "\"type\":\"server_error\",\"code\":503}}");
         compat->error_count++;
         return -1;
     }
 
     if (!check_rate_limit(compat)) {
-        *response_json = strdup("{\"error\":{\"message\":\"Rate limit exceeded\","
+        *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"Rate limit exceeded\","
             "\"type\":\"rate_limit_error\",\"code\":429}}");
         compat->error_count++;
         return -2;
@@ -264,13 +265,13 @@ static int handle_chat_completions(gw_openai_compat_t* compat,
         &llm_response,
         compat->llm_call_data);
 
-    free(model);
-    free(messages);
-    free(functions);
+    AGENTOS_FREE(model);
+    AGENTOS_FREE(messages);
+    AGENTOS_FREE(functions);
 
     if (rc != 0 || !llm_response) {
-        free(llm_response);
-        *response_json = strdup("{\"error\":{\"message\":\"LLM call failed\","
+        AGENTOS_FREE(llm_response);
+        *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"LLM call failed\","
             "\"type\":\"server_error\",\"code\":500}}");
         compat->error_count++;
         return -3;
@@ -286,7 +287,7 @@ static int handle_embeddings(gw_openai_compat_t* compat,
                               char** response_json)
 {
     if (!compat->embed_fn) {
-        *response_json = strdup("{\"error\":{\"message\":\"No embedding backend configured\","
+        *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"No embedding backend configured\","
             "\"type\":\"server_error\",\"code\":503}}");
         compat->error_count++;
         return -1;
@@ -317,7 +318,7 @@ static int handle_embeddings(gw_openai_compat_t* compat,
                 if (end) input_start = end + 1;
             }
             size_t len = (size_t)(input_start - start);
-            input_json = (char*)malloc(len + 1);
+            input_json = (char*)AGENTOS_MALLOC(len + 1);
             if (input_json) {
                 memcpy(input_json, start, len);
                 input_json[len] = '\0';
@@ -332,12 +333,12 @@ static int handle_embeddings(gw_openai_compat_t* compat,
         &embed_response,
         compat->embed_data);
 
-    free(model);
-    free(input_json);
+    AGENTOS_FREE(model);
+    AGENTOS_FREE(input_json);
 
     if (rc != 0 || !embed_response) {
-        free(embed_response);
-        *response_json = strdup("{\"error\":{\"message\":\"Embedding failed\","
+        AGENTOS_FREE(embed_response);
+        *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"Embedding failed\","
             "\"type\":\"server_error\",\"code\":500}}");
         compat->error_count++;
         return -2;
@@ -353,7 +354,7 @@ static int handle_models_list(gw_openai_compat_t* compat,
     const char* resp = "{\"object\":\"list\",\"data\":["
         "{\"id\":\"%s\",\"object\":\"model\",\"owned_by\":\"agentos\"}]}";
     size_t len = snprintf(NULL, 0, resp, compat->config.default_model);
-    char* buf = (char*)malloc(len + 1);
+    char* buf = (char*)AGENTOS_MALLOC(len + 1);
     if (!buf) return -1;
     snprintf(buf, len + 1, resp, compat->config.default_model);
     *response_json = buf;
@@ -378,7 +379,7 @@ int gw_openai_compat_handle_request(gw_openai_compat_t* compat,
     if (path && (strcmp(path, "/v1/chat/completions") == 0 ||
                   strcmp(path, "/openai/v1/chat/completions") == 0)) {
         if (!body_json) {
-            *response_json = strdup("{\"error\":{\"message\":\"Empty body\","
+            *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"Empty body\","
                 "\"type\":\"invalid_request_error\",\"code\":400}}");
             compat->error_count++;
             return -1;
@@ -389,7 +390,7 @@ int gw_openai_compat_handle_request(gw_openai_compat_t* compat,
     if (path && (strcmp(path, "/v1/embeddings") == 0 ||
                   strcmp(path, "/openai/v1/embeddings") == 0)) {
         if (!body_json) {
-            *response_json = strdup("{\"error\":{\"message\":\"Empty body\","
+            *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"Empty body\","
                 "\"type\":\"invalid_request_error\",\"code\":400}}");
             compat->error_count++;
             return -1;
@@ -401,7 +402,7 @@ int gw_openai_compat_handle_request(gw_openai_compat_t* compat,
         return handle_chat_completions(compat, body_json, response_json);
     }
 
-    *response_json = strdup("{\"error\":{\"message\":\"Unknown OpenAI endpoint\","
+    *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"Unknown OpenAI endpoint\","
         "\"type\":\"invalid_request_error\",\"code\":404}}");
     compat->error_count++;
     return -1;
