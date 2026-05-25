@@ -22,6 +22,41 @@
 
 ## 使用示例
 
+### C API
+
+```c
+#include "execution/execution_common.h"
+
+execution_config_t config;
+execution_config_init(&config);
+config.capture_output = true;
+config.timeout_enabled = true;
+config.timeout_ms = 30000;
+
+execution_result_t result;
+execution_result_init(&result);
+
+if (!execution_validate_command("ls -la /tmp")) {
+    fprintf(stderr, "Command rejected by security check\n");
+    return;
+}
+
+int rc = execution_execute_command("ls -la /tmp", &config, &result);
+if (rc == 0 && result.status == 0) {
+    printf("Output: %.*s\n", (int)result.output_size, result.output);
+} else {
+    fprintf(stderr, "Error: %.*s\n", (int)result.error_size, result.error);
+}
+
+char* json = execution_format_result_json(&result);
+printf("Result JSON: %s\n", json);
+AGENTOS_FREE(json);
+
+execution_result_cleanup(&result);
+```
+
+### Python API
+
 ```python
 from execution import CommandExecutor
 
