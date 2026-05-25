@@ -59,6 +59,33 @@
 
 ## 使用示例
 
+### C API
+
+```c
+#include "config_unified/config_service.h"
+
+config_context_t* ctx = config_service_create("agentos_config.json", NULL, true, false);
+config_service_load(ctx, NULL, 0);
+
+const char* host = config_get_string(ctx, "server.host", "0.0.0.0");
+int port = config_get_int(ctx, "server.port", 8080);
+
+config_change_cb_t on_change = [](config_context_t* c, const char* key,
+                                   const config_value_t* old_val,
+                                   const config_value_t* new_val, void* ud) {
+    printf("Config changed: %s\n", key);
+};
+config_hot_reload_manager_t* hrm = config_hot_reload_manager_create(ctx, NULL);
+config_hot_reload_register_callback(hrm, "logging.level", on_change, NULL);
+config_hot_reload_start(hrm, 30000);
+
+config_service_save(ctx, NULL);
+config_hot_reload_manager_destroy(hrm);
+config_service_destroy(ctx);
+```
+
+### Python API
+
 ```python
 from config_unified import ConfigUnified, ConfigSource
 

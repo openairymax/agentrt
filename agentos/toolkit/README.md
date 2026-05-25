@@ -13,10 +13,12 @@
 
 | 语言 | 目录 | 版本 |
 |------|------|------|
-| **Python** | `python/` | v1.0.0.9 |
-| **Go** | `go/` | v1.0.0.9 |
-| **Rust** | `rust/` | v1.0.0.9 |
-| **TypeScript** | `typescript/` | v1.0.0.9 |
+| **Python** | `python/` | v0.0.5 |
+| **Go** | `go/` | v0.0.5 |
+| **Rust** | `rust/` | v0.0.5 |
+| **TypeScript** | `typescript/` | v0.0.5 |
+
+> **注意**：所有 SDK 模块当前处于预览状态（Preview），默认不参与构建，需要额外配置才能启用。
 
 ## 核心功能
 

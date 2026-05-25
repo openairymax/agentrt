@@ -2,6 +2,8 @@
 
 `agentos/openlab/markets/templates/rust-skill/`
 
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+
 ## 概述
 
 Rust Skill 模板是 AgentOS 生态市场中提供的标准化 Skill 开发模板，帮助开发者使用 Rust 语言创建高性能的系统级技能。该模板利用 Rust 的内存安全特性和零成本抽象，适用于对性能和安全要求较高的场景。

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -40,8 +41,8 @@ static void monit_config_from_common(
                                            ? common_cfg->timeout_ms : 10000;
     monit_cfg->log_flush_interval_ms = 1000;
     monit_cfg->alert_check_interval_ms = 5000;
-    monit_cfg->log_file_path = strdup("./logs/monitor.log");
-    monit_cfg->metrics_storage_path = strdup("./metrics");
+    monit_cfg->log_file_path = AGENTOS_STRDUP("./logs/monitor.log");
+    monit_cfg->metrics_storage_path = AGENTOS_STRDUP("./metrics");
     monit_cfg->enable_tracing = (common_cfg && common_cfg->enable_tracing);
     monit_cfg->enable_alerting = true;
 }
@@ -93,8 +94,8 @@ static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force)
             ctx->monit_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->monit_cfg.log_file_path) { free((void*)ctx->monit_cfg.log_file_path); ctx->monit_cfg.log_file_path = NULL; }
-        if (ctx->monit_cfg.metrics_storage_path) { free((void*)ctx->monit_cfg.metrics_storage_path); ctx->monit_cfg.metrics_storage_path = NULL; }
+        if (ctx->monit_cfg.log_file_path) { AGENTOS_FREE((void*)ctx->monit_cfg.log_file_path); ctx->monit_cfg.log_file_path = NULL; }
+        if (ctx->monit_cfg.metrics_storage_path) { AGENTOS_FREE((void*)ctx->monit_cfg.metrics_storage_path); ctx->monit_cfg.metrics_storage_path = NULL; }
         SVC_LOG_INFO("监控服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("监控服务适配器已停止");
@@ -112,11 +113,11 @@ static void monit_adapter_destroy(agentos_service_t service) {
         ctx->monit_svc = NULL;
     }
 
-    if (ctx->monit_cfg.log_file_path) free((void*)ctx->monit_cfg.log_file_path);
-    if (ctx->monit_cfg.metrics_storage_path) free((void*)ctx->monit_cfg.metrics_storage_path);
+    if (ctx->monit_cfg.log_file_path) AGENTOS_FREE((void*)ctx->monit_cfg.log_file_path);
+    if (ctx->monit_cfg.metrics_storage_path) AGENTOS_FREE((void*)ctx->monit_cfg.metrics_storage_path);
 
     agentos_service_set_user_data(service, NULL);
-    free(ctx);
+    AGENTOS_FREE(ctx);
 }
 
 static agentos_error_t monit_adapter_healthcheck(agentos_service_t service) {
@@ -135,9 +136,9 @@ static agentos_error_t monit_adapter_healthcheck(agentos_service_t service) {
 
     agentos_error_t err = result->is_healthy ? AGENTOS_SUCCESS : AGENTOS_ERR_UNKNOWN;
 
-    free(result->service_name);
-    free(result->status_message);
-    free(result);
+    AGENTOS_FREE(result->service_name);
+    AGENTOS_FREE(result->status_message);
+    AGENTOS_FREE(result);
 
     return err;
 }
@@ -156,7 +157,7 @@ agentos_error_t monit_service_adapter_create(
 ) {
     if (!out_service) return AGENTOS_EINVAL;
 
-    monit_adapter_ctx_t* ctx = calloc(1, sizeof(monit_adapter_ctx_t));
+    monit_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(monit_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     if (config) {
@@ -175,14 +176,14 @@ agentos_error_t monit_service_adapter_create(
         &svc_handle, ctx->common_cfg.name, &monit_adapter_iface, &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
@@ -197,7 +198,7 @@ agentos_error_t monit_service_adapter_wrap(
 ) {
     if (!out_service || !monit_svc) return AGENTOS_EINVAL;
 
-    monit_adapter_ctx_t* ctx = calloc(1, sizeof(monit_adapter_ctx_t));
+    monit_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(monit_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     ctx->monit_svc = monit_svc;
@@ -215,14 +216,14 @@ agentos_error_t monit_service_adapter_wrap(
         &svc_handle, ctx->common_cfg.name, &monit_adapter_iface, &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 

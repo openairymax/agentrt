@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -195,7 +196,7 @@ static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
     cJSON* params_arr = cJSON_GetObjectItem(tool, "params");
     if (cJSON_IsArray(params_arr)) {
         size_t cnt = cJSON_GetArraySize(params_arr);
-        tool_param_t* p = (tool_param_t*)calloc(cnt, sizeof(tool_param_t));
+        tool_param_t* p = (tool_param_t*)AGENTOS_CALLOC(cnt, sizeof(tool_param_t));
         if (p) {
             for (size_t i = 0; i < cnt; ++i) {
                 cJSON* item = cJSON_GetArrayItem(params_arr, i);
@@ -210,7 +211,7 @@ static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
     }
 
     int ret = tool_service_register(g_service, &meta);
-    free((void*)meta.params);
+    AGENTOS_FREE((void*)meta.params);
 
     if (ret != AGENTOS_SUCCESS) {
         JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Register failed", id);
@@ -234,7 +235,7 @@ static void handle_list(int id, agentos_socket_t client_fd) {
     }
 
     cJSON* result = cJSON_Parse(list_json);
-    free(list_json);
+    AGENTOS_FREE(list_json);
 
     if (!result) {
         JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Invalid JSON from list", id);
@@ -316,7 +317,7 @@ static void handle_execute(cJSON* params, int id, agentos_socket_t client_fd) {
 
     tool_result_t* res = NULL;
     int ret = tool_service_execute(g_service, &req, &res);
-    free((void*)params_json);
+    AGENTOS_FREE((void*)params_json);
 
     if (ret != AGENTOS_SUCCESS || !res) {
         JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Execution failed", id);
@@ -342,7 +343,7 @@ static void handle_execute(cJSON* params, int id, agentos_socket_t client_fd) {
  * @param client_fd 客户端描述符
  */
 static void handle_client(agentos_socket_t client_fd) {
-    char* buffer = (char*)malloc(MAX_BUFFER);
+    char* buffer = (char*)AGENTOS_MALLOC(MAX_BUFFER);
     if (!buffer) {
         agentos_socket_close(client_fd);
         return;
@@ -350,7 +351,7 @@ static void handle_client(agentos_socket_t client_fd) {
     ssize_t n = agentos_socket_recv(client_fd, buffer, MAX_BUFFER - 1);
 
     if (n <= 0) {
-        free(buffer);
+        AGENTOS_FREE(buffer);
         agentos_socket_close(client_fd);
         return;
     }
@@ -358,7 +359,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     if ((size_t)n >= (size_t)(MAX_BUFFER - 1)) {
         JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
-        free(buffer);
+        AGENTOS_FREE(buffer);
         agentos_socket_close(client_fd);
         return;
     }
@@ -366,7 +367,7 @@ static void handle_client(agentos_socket_t client_fd) {
     cJSON* req = cJSON_Parse(buffer);
     if (!req) {
         JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error: invalid JSON", -1);
-        free(buffer);
+        AGENTOS_FREE(buffer);
         agentos_socket_close(client_fd);
         return;
     }
@@ -380,7 +381,7 @@ static void handle_client(agentos_socket_t client_fd) {
         !cJSON_IsString(method) || !id) {
         JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request: missing jsonrpc/method/id", -1);
         cJSON_Delete(req);
-        free(buffer);
+        AGENTOS_FREE(buffer);
         agentos_socket_close(client_fd);
         return;
     }
@@ -392,7 +393,7 @@ static void handle_client(agentos_socket_t client_fd) {
     method_dispatcher_dispatch(g_dispatcher, req, jsonrpc_build_error, &client_fd);
 
     cJSON_Delete(req);
-    free(buffer);
+    AGENTOS_FREE(buffer);
     agentos_socket_close(client_fd);
 }
 
@@ -409,11 +410,11 @@ static int load_daemon_config(const char* config_path) {
     g_config.max_clients = MAX_CLIENTS;
 
 #if defined(AGENTOS_PLATFORM_WINDOWS)
-    g_config.socket_path = strdup(DEFAULT_SOCKET_PATH_WIN);
-    g_config.tcp_host = strdup("127.0.0.1");
+    g_config.socket_path = AGENTOS_STRDUP(DEFAULT_SOCKET_PATH_WIN);
+    g_config.tcp_host = AGENTOS_STRDUP("127.0.0.1");
 #else
-    g_config.socket_path = strdup(DEFAULT_SOCKET_PATH_UNIX);
-    g_config.tcp_host = strdup("127.0.0.1");
+    g_config.socket_path = AGENTOS_STRDUP(DEFAULT_SOCKET_PATH_UNIX);
+    g_config.tcp_host = AGENTOS_STRDUP("127.0.0.1");
 #endif
     g_config.tcp_port = DEFAULT_TCP_PORT;
 
@@ -426,7 +427,7 @@ static int load_daemon_config(const char* config_path) {
             fseek(f, 0, SEEK_SET);
 
             if (len > 0 && len < 1024 * 1024) { /* 限制配置文件大小为 1MB */
-                char* content = (char*)malloc((size_t)len + 1);
+                char* content = (char*)AGENTOS_MALLOC((size_t)len + 1);
                 if (content) {
                     size_t read_len = fread(content, 1, (size_t)len, f);
                     if (read_len == (size_t)len) {
@@ -438,8 +439,8 @@ static int load_daemon_config(const char* config_path) {
                         if (daemon_cfg) {
                             cJSON* socket_path = cJSON_GetObjectItem(daemon_cfg, "socket_path");
                             if (cJSON_IsString(socket_path)) {
-                                free(g_config.socket_path);
-                                g_config.socket_path = strdup(socket_path->valuestring);
+                                AGENTOS_FREE(g_config.socket_path);
+                                g_config.socket_path = AGENTOS_STRDUP(socket_path->valuestring);
                             }
 
                             cJSON* tcp_port = cJSON_GetObjectItem(daemon_cfg, "tcp_port");
@@ -456,7 +457,7 @@ static int load_daemon_config(const char* config_path) {
                         cJSON_Delete(root);
                     }
                     }
-                    free(content);
+                    AGENTOS_FREE(content);
                 }
             }
             fclose(f);
@@ -470,8 +471,8 @@ static int load_daemon_config(const char* config_path) {
  * @brief 释放配置资源
  */
 static void free_daemon_config(void) {
-    free(g_config.socket_path);
-    free(g_config.tcp_host);
+    AGENTOS_FREE(g_config.socket_path);
+    AGENTOS_FREE(g_config.tcp_host);
     memset(&g_config, 0, sizeof(g_config));
 }
 

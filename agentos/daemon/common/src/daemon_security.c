@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /* SPDX-License-Identifier: Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -629,11 +630,11 @@ void daemon_security_shutdown(void) {
     }
 
     for (size_t i = 0; i < g_security_ctx.cred_count; i++) {
-        free(g_security_ctx.credentials[i].cred_id);
+        AGENTOS_FREE(g_security_ctx.credentials[i].cred_id);
         g_security_ctx.credentials[i].cred_id = NULL;
-        free(g_security_ctx.credentials[i].data);
+        AGENTOS_FREE(g_security_ctx.credentials[i].data);
         g_security_ctx.credentials[i].data = NULL;
-        free(g_security_ctx.credentials[i].owner_agent_id);
+        AGENTOS_FREE(g_security_ctx.credentials[i].owner_agent_id);
         g_security_ctx.credentials[i].owner_agent_id = NULL;
     }
     g_security_ctx.cred_count = 0;
@@ -903,7 +904,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
         return AGENTOS_OK;
     }
 
-    uint8_t* pkg_data = (uint8_t*)malloc((size_t)st.st_size);
+    uint8_t* pkg_data = (uint8_t*)AGENTOS_MALLOC((size_t)st.st_size);
     if (!pkg_data) {
         fclose(pkg_fp);
         closedir(dir);
@@ -913,7 +914,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
     fclose(pkg_fp);
 
     if (pkg_read != (size_t)st.st_size) {
-        free(pkg_data);
+        AGENTOS_FREE(pkg_data);
         closedir(dir);
         SVC_LOG_ERROR("Failed to read entire package: %s", package_path);
         *is_valid = false;
@@ -970,7 +971,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
                 if (id_len >= sizeof(signer_info->key_id)) id_len = sizeof(signer_info->key_id) - 1;
                 memcpy(signer_info->key_id, entry->d_name, id_len);
                 signer_info->key_id[id_len] = '\0';
-                signer_info->algorithm = strdup("ED25519");
+                signer_info->algorithm = AGENTOS_STRDUP("ED25519");
             }
             SVC_LOG_INFO("Package signature VERIFIED (ED25519): %s with key %s",
                         package_path, entry->d_name);
@@ -979,7 +980,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
     }
 
     closedir(dir);
-    free(pkg_data);
+    AGENTOS_FREE(pkg_data);
 
     *is_valid = verified;
     if (!verified) {
@@ -1023,8 +1024,8 @@ int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_
 
     for (size_t i = 0; i < g_security_ctx.cred_count; i++) {
         if (strcmp(g_security_ctx.credentials[i].cred_id, cred_id) == 0) {
-            free(g_security_ctx.credentials[i].data);
-            g_security_ctx.credentials[i].data = (uint8_t*)malloc(data_len);
+            AGENTOS_FREE(g_security_ctx.credentials[i].data);
+            g_security_ctx.credentials[i].data = (uint8_t*)AGENTOS_MALLOC(data_len);
             if (!g_security_ctx.credentials[i].data) {
                 pthread_mutex_unlock(&g_security_mutex);
                 return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -1039,16 +1040,16 @@ int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_
     }
 
     credential_entry_t* entry = &g_security_ctx.credentials[g_security_ctx.cred_count++];
-    entry->cred_id = strdup(cred_id);
+    entry->cred_id = AGENTOS_STRDUP(cred_id);
     entry->type = cred_type;
-    entry->data = (uint8_t*)malloc(data_len);
+    entry->data = (uint8_t*)AGENTOS_MALLOC(data_len);
     if (!entry->data) {
         pthread_mutex_unlock(&g_security_mutex);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     memcpy(entry->data, data, data_len);
     entry->data_len = data_len;
-    entry->owner_agent_id = agent_id ? strdup(agent_id) : strdup("system");
+    entry->owner_agent_id = agent_id ? AGENTOS_STRDUP(agent_id) : AGENTOS_STRDUP("system");
 
     pthread_mutex_unlock(&g_security_mutex);
     SVC_LOG_INFO("Credential stored: %s (type=%d, %zu bytes, total=%zu)",
