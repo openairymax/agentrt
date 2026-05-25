@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -93,7 +94,7 @@ static int notify_d_compute_ws_accept_key(const char* client_key,
 
     size_t msg_len = strlen(combined);
     size_t padded_len = ((msg_len + 8) / 64 + 1) * 64;
-    unsigned char* padded = (unsigned char*)calloc(1, padded_len);
+    unsigned char* padded = (unsigned char*)AGENTOS_CALLOC(1, padded_len);
     if (!padded) return -1;
     memcpy(padded, combined, msg_len);
     padded[msg_len] = 0x80;
@@ -126,7 +127,7 @@ static int notify_d_compute_ws_accept_key(const char* client_key,
         }
         h0 += a; h1 += b; h2 += c; h3 += d; h4 += e;
     }
-    free(padded);
+    AGENTOS_FREE(padded);
 
     sha1[0] = (unsigned char)(h0 >> 24); sha1[1] = (unsigned char)(h0 >> 16);
     sha1[2] = (unsigned char)(h0 >> 8); sha1[3] = (unsigned char)(h0);
@@ -301,10 +302,10 @@ static DWORD WINAPI notify_d_event_loop(LPVOID arg) {
 
             notify_d_broadcast_event(svc, event);
 
-            free(event->message);
-            free(event->channel);
-            free(event->event_type);
-            free(event);
+            AGENTOS_FREE(event->message);
+            AGENTOS_FREE(event->channel);
+            AGENTOS_FREE(event->event_type);
+            AGENTOS_FREE(event);
         } else {
             agentos_mutex_unlock(&svc->lock);
 #ifndef _WIN32
@@ -327,12 +328,12 @@ static int notify_d_enqueue(notify_d_service_t* svc, const char* msg,
     if (!svc || !msg) return -1;
     if (svc->pending_count >= NOTIFY_D_MAX_PENDING) return -2;
 
-    notify_event_t* event = (notify_event_t*)calloc(1, sizeof(notify_event_t));
+    notify_event_t* event = (notify_event_t*)AGENTOS_CALLOC(1, sizeof(notify_event_t));
     if (!event) return -3;
 
-    event->message = strdup(msg);
-    event->channel = channel ? strdup(channel) : strdup("default");
-    event->event_type = event_type ? strdup(event_type) : strdup("message");
+    event->message = AGENTOS_STRDUP(msg);
+    event->channel = channel ? AGENTOS_STRDUP(channel) : AGENTOS_STRDUP("default");
+    event->event_type = event_type ? AGENTOS_STRDUP(event_type) : AGENTOS_STRDUP("message");
     event->timestamp = (uint64_t)time(NULL);
 
     svc->pending[svc->pending_tail] = event;
@@ -356,7 +357,7 @@ static int notify_d_init(notify_d_service_t* svc, int port, const char* sock) {
 
     memset(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : NOTIFY_D_DEFAULT_PORT;
-    svc->socket_path = sock ? strdup(sock) : strdup(NOTIFY_D_DEFAULT_SOCKET);
+    svc->socket_path = sock ? AGENTOS_STRDUP(sock) : AGENTOS_STRDUP(NOTIFY_D_DEFAULT_SOCKET);
     svc->start_time = (uint64_t)time(NULL);
 
     agentos_mutex_init(&svc->lock);
@@ -420,10 +421,10 @@ static int notify_d_stop(notify_d_service_t* svc, int force) {
     if (force) {
         for (size_t i = 0; i < svc->pending_count; i++) {
             size_t idx = (svc->pending_head + i) % NOTIFY_D_MAX_PENDING;
-            free(svc->pending[idx]->message);
-            free(svc->pending[idx]->channel);
-            free(svc->pending[idx]->event_type);
-            free(svc->pending[idx]);
+            AGENTOS_FREE(svc->pending[idx]->message);
+            AGENTOS_FREE(svc->pending[idx]->channel);
+            AGENTOS_FREE(svc->pending[idx]->event_type);
+            AGENTOS_FREE(svc->pending[idx]);
         }
         svc->pending_count = 0;
         svc->pending_head = 0;
@@ -452,11 +453,11 @@ static int notify_d_destroy(notify_d_service_t* svc) {
     notify_d_stop(svc, 1);
 
     for (size_t i = 0; i < svc->client_count; i++) {
-        free(svc->clients[i].channel);
+        AGENTOS_FREE(svc->clients[i].channel);
     }
     agentos_socket_cleanup();
     agentos_mutex_destroy(&svc->lock);
-    free(svc->socket_path);
+    AGENTOS_FREE(svc->socket_path);
     memset(svc, 0, sizeof(*svc));
     SVC_LOG_INFO("notify_d: service destroyed");
     return AGENTOS_SUCCESS;
@@ -542,7 +543,7 @@ static void notify_d_handle_request(notify_d_service_t* svc,
             const char* che = strstr(ch + strlen(channel_hdr), "\r\n");
             if (che) {
                 size_t clen = (size_t)(che - (ch + strlen(channel_hdr)));
-                char* cn = (char*)malloc(clen + 1);
+                char* cn = (char*)AGENTOS_MALLOC(clen + 1);
                 if (cn) {
                     memcpy(cn, ch + strlen(channel_hdr), clen);
                     cn[clen] = '\0';
@@ -550,8 +551,8 @@ static void notify_d_handle_request(notify_d_service_t* svc,
                 }
             }
         }
-        client->channel = strdup(channel);
-        if (strcmp(channel, "inbound") != 0) free((void*)channel);
+        client->channel = AGENTOS_STRDUP(channel);
+        if (strcmp(channel, "inbound") != 0) AGENTOS_FREE((void*)channel);
         svc->client_count++;
 
         int ret = notify_d_enqueue(svc, buffer, client->channel, NULL);

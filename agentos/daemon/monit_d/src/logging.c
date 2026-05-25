@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -377,7 +378,7 @@ int structured_log_query(log_level_t level_filter, const char* service_filter,
         return AGENTOS_SUCCESS;
     }
 
-    char** res = (char**)calloc(match_count, sizeof(char*));
+    char** res = (char**)AGENTOS_CALLOC(match_count, sizeof(char*));
     size_t idx_out = 0;
 
     for (size_t i = 0; i < g_structured_log.entry_count && idx_out < match_count; i++) {
@@ -391,7 +392,7 @@ int structured_log_query(log_level_t level_filter, const char* service_filter,
         if (start_time > 0 && entry->timestamp < start_time) continue;
         if (end_time > 0 && entry->timestamp > end_time) continue;
 
-        char* json = (char*)malloc(MAX_LOG_MESSAGE_LEN + 1024);
+        char* json = (char*)AGENTOS_MALLOC(MAX_LOG_MESSAGE_LEN + 1024);
         if (json) {
             format_json_log(entry, json, MAX_LOG_MESSAGE_LEN + 1024);
             res[idx_out++] = json;
@@ -413,7 +414,7 @@ size_t structured_log_get_entry_count(void) {
 void structured_log_free_results(char** results, size_t count) {
     if (!results) return;
     for (size_t i = 0; i < count; i++) {
-        free(results[i]);
+        AGENTOS_FREE(results[i]);
     }
-    free(results);
+    AGENTOS_FREE(results);
 }

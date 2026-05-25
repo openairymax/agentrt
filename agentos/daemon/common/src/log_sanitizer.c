@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file log_sanitizer.c
  * @brief 日志脱敏过滤器实现
@@ -65,7 +66,7 @@ static void ensure_initialized(void) {
     }
 
     g_pattern_capacity = 32;
-    g_patterns = calloc(g_pattern_capacity, sizeof(sensitive_field_t));
+    g_patterns = AGENTOS_CALLOC(g_pattern_capacity, sizeof(sensitive_field_t));
     if (!g_patterns) {
         agentos_mutex_unlock(&g_mutex);
         return;
@@ -231,11 +232,11 @@ void log_sanitizer_init(size_t max_fields) {
     agentos_mutex_lock(&g_mutex);
 
     if (g_patterns) {
-        free(g_patterns);
+        AGENTOS_FREE(g_patterns);
     }
 
     g_pattern_capacity = max_fields > 0 ? max_fields : 32;
-    g_patterns = calloc(g_pattern_capacity, sizeof(sensitive_field_t));
+    g_patterns = AGENTOS_CALLOC(g_pattern_capacity, sizeof(sensitive_field_t));
     g_pattern_count = 0;
 
     for (size_t i = 0; i < sizeof(default_patterns) / sizeof(default_patterns[0]); i++) {
@@ -253,7 +254,7 @@ void log_sanitizer_destroy(void) {
     agentos_mutex_lock(&g_mutex);
 
     if (g_patterns) {
-        free(g_patterns);
+        AGENTOS_FREE(g_patterns);
         g_patterns = NULL;
     }
     g_pattern_count = 0;
@@ -294,12 +295,12 @@ char* log_sanitize_dup(const char* message) {
     size_t alloc_size = strlen(message) + 1;
     if (alloc_size < MAX_LINE_LENGTH) alloc_size = MAX_LINE_LENGTH;
     
-    char* buffer = malloc(alloc_size);
+    char* buffer = AGENTOS_MALLOC(alloc_size);
     if (!buffer) return NULL;
     
     int result = sanitize_core(message, buffer, alloc_size);
     if (result < 0) {
-        free(buffer);
+        AGENTOS_FREE(buffer);
         return NULL;
     }
     

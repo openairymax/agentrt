@@ -319,8 +319,7 @@ AGENTOS_API bool cb_allow_request(circuit_breaker_t breaker) {
         case CB_STATE_OPEN: {
             uint64_t now = agentos_platform_get_time_ms();
             if (now - cb->state_changed_at >= cb->config.timeout_ms) {
-                cb_manager_internal_t* mgr = NULL;
-                transition_state(cb, mgr, CB_STATE_HALF_OPEN);
+                transition_state(cb, cb->manager, CB_STATE_HALF_OPEN);
                 agentos_mutex_unlock(&cb->mutex);
                 return true;
             }
@@ -373,7 +372,7 @@ AGENTOS_API void cb_record_success(circuit_breaker_t breaker, uint32_t duration_
 
     if (cb->state == CB_STATE_HALF_OPEN) {
         if (cb->stats.consecutive_successes >= cb->config.success_threshold) {
-            transition_state(cb, NULL, CB_STATE_CLOSED);
+            transition_state(cb, cb->manager, CB_STATE_CLOSED);
         }
     }
 
@@ -405,10 +404,10 @@ AGENTOS_API void cb_record_failure(circuit_breaker_t breaker, int32_t error_code
 
     if (cb->state == CB_STATE_CLOSED) {
         if (should_trip(cb)) {
-            transition_state(cb, NULL, CB_STATE_OPEN);
+            transition_state(cb, cb->manager, CB_STATE_OPEN);
         }
     } else if (cb->state == CB_STATE_HALF_OPEN) {
-        transition_state(cb, NULL, CB_STATE_OPEN);
+        transition_state(cb, cb->manager, CB_STATE_OPEN);
     }
 
     agentos_mutex_unlock(&cb->mutex);
@@ -443,10 +442,10 @@ AGENTOS_API void cb_record_timeout(circuit_breaker_t breaker) {
 
     if (cb->state == CB_STATE_CLOSED) {
         if (should_trip(cb)) {
-            transition_state(cb, NULL, CB_STATE_OPEN);
+            transition_state(cb, cb->manager, CB_STATE_OPEN);
         }
     } else if (cb->state == CB_STATE_HALF_OPEN) {
-        transition_state(cb, NULL, CB_STATE_OPEN);
+        transition_state(cb, cb->manager, CB_STATE_OPEN);
     }
 
     agentos_mutex_unlock(&cb->mutex);
@@ -515,7 +514,7 @@ AGENTOS_API void cb_force_open(circuit_breaker_t breaker) {
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return; }
-    transition_state(cb, NULL, CB_STATE_OPEN);
+    transition_state(cb, cb->manager, CB_STATE_OPEN);
     agentos_mutex_unlock(&cb->mutex);
 }
 
@@ -525,7 +524,7 @@ AGENTOS_API void cb_force_close(circuit_breaker_t breaker) {
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return; }
-    transition_state(cb, NULL, CB_STATE_CLOSED);
+    transition_state(cb, cb->manager, CB_STATE_CLOSED);
     agentos_mutex_unlock(&cb->mutex);
 }
 

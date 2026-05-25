@@ -20,6 +20,7 @@ set(CL3_TEST_SOURCES
     unit/test_parallel_dispatcher.c
     unit/test_multi_agent.c
     unit/test_browser.c
+    unit/test_triple_coordinator.c
 )
 
 set(CL3_BENCH_SOURCES
@@ -29,6 +30,7 @@ set(CL3_BENCH_SOURCES
 set(CL3_COMMON_INCLUDES
     ${CORELOOPTHREE_DIR}/include
     ${CORELOOPTHREE_DIR}/src
+    ${CORELOOPTHREE_DIR}/src/cognition
     ${COREKERN_INCLUDE_DIR}
     ${COMMONS_DIR}/platform/include
     ${COMMONS_DIR}/utils/core/include

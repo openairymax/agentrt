@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -40,8 +41,8 @@ static agentos_error_t tool_adapter_init(
 
     if (config) {
         memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
-        ctx->common_cfg.name = config->name ? strdup(config->name) : NULL;
-        ctx->common_cfg.version = config->version ? strdup(config->version) : NULL;
+        ctx->common_cfg.name = config->name ? AGENTOS_STRDUP(config->name) : NULL;
+        ctx->common_cfg.version = config->version ? AGENTOS_STRDUP(config->version) : NULL;
         ctx->common_cfg.capabilities = config->capabilities;
         ctx->common_cfg.max_concurrent = config->max_concurrent;
         ctx->common_cfg.timeout_ms = config->timeout_ms;
@@ -86,7 +87,7 @@ static agentos_error_t tool_adapter_stop(agentos_service_t service, bool force) 
             ctx->tool_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->config_path) { free(ctx->config_path); ctx->config_path = NULL; }
+        if (ctx->config_path) { AGENTOS_FREE(ctx->config_path); ctx->config_path = NULL; }
         SVC_LOG_INFO("工具服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("工具服务适配器已停止");
@@ -105,21 +106,21 @@ static void tool_adapter_destroy(agentos_service_t service) {
     }
 
     if (ctx->config_path) {
-        free(ctx->config_path);
+        AGENTOS_FREE(ctx->config_path);
         ctx->config_path = NULL;
     }
 
     if (ctx->common_cfg.name && ctx->common_cfg.name[0] != '\0') {
-        free((void*)ctx->common_cfg.name);
+        AGENTOS_FREE((void*)ctx->common_cfg.name);
         ctx->common_cfg.name = NULL;
     }
     if (ctx->common_cfg.version && ctx->common_cfg.version[0] != '\0') {
-        free((void*)ctx->common_cfg.version);
+        AGENTOS_FREE((void*)ctx->common_cfg.version);
         ctx->common_cfg.version = NULL;
     }
 
     agentos_service_set_user_data(service, NULL);
-    free(ctx);
+    AGENTOS_FREE(ctx);
 }
 
 static agentos_error_t tool_adapter_healthcheck(agentos_service_t service) {
@@ -133,7 +134,7 @@ static agentos_error_t tool_adapter_healthcheck(agentos_service_t service) {
         SVC_LOG_WARN("工具服务健康检查失败: 无法获取工具列表");
         return AGENTOS_ERR_UNKNOWN;
     }
-    free(list_json);
+    AGENTOS_FREE(list_json);
     return AGENTOS_SUCCESS;
 }
 
@@ -151,13 +152,13 @@ agentos_error_t tool_service_adapter_create(
 ) {
     if (!out_service) return AGENTOS_EINVAL;
 
-    tool_adapter_ctx_t* ctx = calloc(1, sizeof(tool_adapter_ctx_t));
+    tool_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(tool_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     if (config) {
         memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
-        ctx->common_cfg.name = config->name ? strdup(config->name) : NULL;
-        ctx->common_cfg.version = config->version ? strdup(config->version) : NULL;
+        ctx->common_cfg.name = config->name ? AGENTOS_STRDUP(config->name) : NULL;
+        ctx->common_cfg.version = config->version ? AGENTOS_STRDUP(config->version) : NULL;
         ctx->common_cfg.capabilities = config->capabilities;
         ctx->common_cfg.max_concurrent = config->max_concurrent;
         ctx->common_cfg.timeout_ms = config->timeout_ms;
@@ -167,7 +168,7 @@ agentos_error_t tool_service_adapter_create(
         ctx->common_cfg.enable_tracing = config->enable_tracing;
         if (config->name) {
             size_t path_len = strlen(config->name) + strlen("_config.json") + 1;
-            ctx->config_path = calloc(1, path_len);
+            ctx->config_path = AGENTOS_CALLOC(1, path_len);
             if (ctx->config_path) {
                 snprintf(ctx->config_path, path_len, "%s_config.json", config->name);
             }
@@ -186,16 +187,16 @@ agentos_error_t tool_service_adapter_create(
         &svc_handle, ctx->common_cfg.name, &tool_adapter_iface, &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx->config_path);
-        free(ctx);
+        AGENTOS_FREE(ctx->config_path);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx->config_path);
-        free(ctx);
+        AGENTOS_FREE(ctx->config_path);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
@@ -210,7 +211,7 @@ agentos_error_t tool_service_adapter_wrap(
 ) {
     if (!out_service || !tool_svc) return AGENTOS_EINVAL;
 
-    tool_adapter_ctx_t* ctx = calloc(1, sizeof(tool_adapter_ctx_t));
+    tool_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(tool_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     ctx->tool_svc = tool_svc;
@@ -218,8 +219,8 @@ agentos_error_t tool_service_adapter_wrap(
 
     if (config) {
         memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
-        ctx->common_cfg.name = config->name ? strdup(config->name) : NULL;
-        ctx->common_cfg.version = config->version ? strdup(config->version) : NULL;
+        ctx->common_cfg.name = config->name ? AGENTOS_STRDUP(config->name) : NULL;
+        ctx->common_cfg.version = config->version ? AGENTOS_STRDUP(config->version) : NULL;
         ctx->common_cfg.capabilities = config->capabilities;
         ctx->common_cfg.max_concurrent = config->max_concurrent;
         ctx->common_cfg.timeout_ms = config->timeout_ms;
@@ -237,14 +238,14 @@ agentos_error_t tool_service_adapter_wrap(
         &svc_handle, ctx->common_cfg.name, &tool_adapter_iface, &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 

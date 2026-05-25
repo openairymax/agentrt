@@ -603,12 +603,12 @@ static void async_request_worker(void* arg) {
     if (ctx->on_complete) {
         ctx->on_complete(ctx->service, ctx->method, err, response_json, ctx->user_data);
     } else {
-        if (response_json) free(response_json);
+        if (response_json) AGENTOS_FREE(response_json);
     }
 
-    free(ctx->method);
-    free(ctx->params_json);
-    free(ctx);
+    AGENTOS_FREE(ctx->method);
+    AGENTOS_FREE(ctx->params_json);
+    AGENTOS_FREE(ctx);
 }
 
 agentos_error_t agentos_service_set_thread_pool(agentos_service_t svc, void* pool) {
@@ -629,19 +629,19 @@ int agentos_service_handle_request_async(
 
     agentos_service_internal_t* svc = (agentos_service_internal_t*)service;
 
-    async_request_context_t* ctx = (async_request_context_t*)calloc(1, sizeof(*ctx));
+    async_request_context_t* ctx = (async_request_context_t*)AGENTOS_CALLOC(1, sizeof(*ctx));
     if (!ctx) return -2;
 
     ctx->service = service;
-    ctx->method = strdup(method);
-    ctx->params_json = params_json ? strdup(params_json) : NULL;
+    ctx->method = AGENTOS_STRDUP(method);
+    ctx->params_json = params_json ? AGENTOS_STRDUP(params_json) : NULL;
     ctx->on_complete = on_complete;
     ctx->user_data = user_data;
 
     if (svc->thread_pool) {
         int rc = thread_pool_submit(svc->thread_pool, async_request_worker, ctx);
         if (rc != 0) {
-            free(ctx->method); free(ctx->params_json); free(ctx);
+            AGENTOS_FREE(ctx->method); AGENTOS_FREE(ctx->params_json); AGENTOS_FREE(ctx);
             return rc;
         }
         return 0;

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file service.c
  * @brief 网关服务核心实现
@@ -89,8 +90,8 @@ agentos_error_t gateway_service_load_config(
         if (strcmp(key, "http.port") == 0) {
             config->http.port = (uint16_t)atoi(val);
         } else if (strcmp(key, "http.host") == 0) {
-            free((void*)config->http.host);
-            config->http.host = strdup(val);
+            AGENTOS_FREE((void*)config->http.host);
+            config->http.host = AGENTOS_STRDUP(val);
         } else if (strcmp(key, "http.enabled") == 0) {
             config->http.enabled = (strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
         } else if (strcmp(key, "stdio.max_request_size") == 0) {
@@ -114,7 +115,7 @@ agentos_error_t gateway_service_create(
     gateway_service_t* service,
     const gateway_service_config_t* config) {
     if (!service) return AGENTOS_EINVAL;
-    gateway_service_t svc = (gateway_service_t)calloc(1, sizeof(struct gateway_service_s));
+    gateway_service_t svc = (gateway_service_t)AGENTOS_CALLOC(1, sizeof(struct gateway_service_s));
     if (!svc) return AGENTOS_ENOMEM;
     if (config) {
         memcpy(&svc->config, config, sizeof(gateway_service_config_t));
@@ -136,7 +137,7 @@ void gateway_service_destroy(gateway_service_t service) {
         gateway_destroy(service->http_gateway);
     }
 #endif
-    free(service);
+    AGENTOS_FREE(service);
 }
 
 agentos_error_t gateway_service_init(gateway_service_t service) {

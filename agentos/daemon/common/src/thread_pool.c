@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "thread_pool.h"
 #include <platform.h>
 #include <stdlib.h>
@@ -52,7 +53,7 @@ static void* worker_thread_func(void* arg)
 
         if (task) {
             task->fn(task->arg);
-            free(task);
+            AGENTOS_FREE(task);
 
             agentos_mutex_lock(&pool->lock);
             pool->active_count--;
@@ -65,7 +66,7 @@ static void* worker_thread_func(void* arg)
 
 thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
 {
-    thread_pool_t* pool = (thread_pool_t*)calloc(1, sizeof(thread_pool_t));
+    thread_pool_t* pool = (thread_pool_t*)AGENTOS_CALLOC(1, sizeof(thread_pool_t));
     if (!pool) return NULL;
 
     if (config) {
@@ -79,10 +80,10 @@ thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
         pool->config = defaults;
     }
 
-    pool->threads = (agentos_thread_t*)calloc(
+    pool->threads = (agentos_thread_t*)AGENTOS_CALLOC(
         pool->config.max_threads, sizeof(agentos_thread_t));
     if (!pool->threads) {
-        free(pool);
+        AGENTOS_FREE(pool);
         return NULL;
     }
 
@@ -111,8 +112,8 @@ thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
     if (pool->thread_count == 0) {
         agentos_mutex_destroy(&pool->lock);
         agentos_cond_destroy(&pool->notify);
-        free(pool->threads);
-        free(pool);
+        AGENTOS_FREE(pool->threads);
+        AGENTOS_FREE(pool);
         return NULL;
     }
 
@@ -135,14 +136,14 @@ void thread_pool_destroy(thread_pool_t* pool)
     task_node_t* node = pool->queue_head;
     while (node) {
         task_node_t* next = node->next;
-        free(node);
+        AGENTOS_FREE(node);
         node = next;
     }
 
     agentos_mutex_destroy(&pool->lock);
     agentos_cond_destroy(&pool->notify);
-    free(pool->threads);
-    free(pool);
+    AGENTOS_FREE(pool->threads);
+    AGENTOS_FREE(pool);
 }
 
 int thread_pool_submit(thread_pool_t* pool,
@@ -152,7 +153,7 @@ int thread_pool_submit(thread_pool_t* pool,
     if (!pool || !task) return -1;
     if (!pool->running) return -2;
 
-    task_node_t* node = (task_node_t*)calloc(1, sizeof(task_node_t));
+    task_node_t* node = (task_node_t*)AGENTOS_CALLOC(1, sizeof(task_node_t));
     if (!node) return -3;
 
     node->fn = task;
@@ -163,13 +164,13 @@ int thread_pool_submit(thread_pool_t* pool,
 
     if (pool->shutdown) {
         agentos_mutex_unlock(&pool->lock);
-        free(node);
+        AGENTOS_FREE(node);
         return -4;
     }
 
     if (pool->queue_count >= pool->config.queue_size) {
         agentos_mutex_unlock(&pool->lock);
-        free(node);
+        AGENTOS_FREE(node);
         return -5;
     }
 

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file anthropic.c
  * @brief Anthropic 适配器实现
@@ -38,7 +39,7 @@ static provider_ctx_t* anthropic_init(const char* name __attribute__((unused)),
                                      double timeout_sec,
                                      int max_retries) {
 
-    anthropic_ctx_t* ctx = (anthropic_ctx_t*)calloc(1, sizeof(anthropic_ctx_t));
+    anthropic_ctx_t* ctx = (anthropic_ctx_t*)AGENTOS_CALLOC(1, sizeof(anthropic_ctx_t));
     if (!ctx) {
         return NULL;
     }
@@ -51,7 +52,7 @@ static provider_ctx_t* anthropic_init(const char* name __attribute__((unused)),
 
 static void anthropic_destroy(provider_ctx_t* ctx_ptr) {
     if (ctx_ptr) {
-        free(ctx_ptr);
+        AGENTOS_FREE(ctx_ptr);
     }
 }
 
@@ -82,7 +83,7 @@ static char* anthropic_build_request(const llm_request_config_t* manager) {
     for (size_t i = 0; i < manager->message_count; ++i) {
         if (manager->messages[i].role &&
             strcmp(manager->messages[i].role, "system") == 0) {
-            system_prompt = strdup(manager->messages[i].content ?
+            system_prompt = AGENTOS_STRDUP(manager->messages[i].content ?
                                    manager->messages[i].content : "");
         } else {
             cJSON* msg = cJSON_CreateObject();
@@ -96,7 +97,7 @@ static char* anthropic_build_request(const llm_request_config_t* manager) {
 
     if (system_prompt) {
         cJSON_AddStringToObject(root, "system", system_prompt);
-        free(system_prompt);
+        AGENTOS_FREE(system_prompt);
     }
 
     cJSON_AddItemToObject(root, "messages", messages);
@@ -118,7 +119,7 @@ static int anthropic_parse_response(const char* body, llm_response_t** out) {
         return AGENTOS_ERR_PARSE_ERROR;
     }
 
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t* resp = (llm_response_t*)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
         cJSON_Delete(root);
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -126,12 +127,12 @@ static int anthropic_parse_response(const char* body, llm_response_t** out) {
 
     cJSON* id = cJSON_GetObjectItem(root, "id");
     if (cJSON_IsString(id) && id->valuestring) {
-        resp->id = strdup(id->valuestring);
+        resp->id = AGENTOS_STRDUP(id->valuestring);
     }
 
     cJSON* model = cJSON_GetObjectItem(root, "model");
     if (cJSON_IsString(model) && model->valuestring) {
-        resp->model = strdup(model->valuestring);
+        resp->model = AGENTOS_STRDUP(model->valuestring);
     }
 
     cJSON* content = cJSON_GetObjectItem(root, "content");
@@ -139,7 +140,7 @@ static int anthropic_parse_response(const char* body, llm_response_t** out) {
         cJSON* first = cJSON_GetArrayItem(content, 0);
         cJSON* text = cJSON_GetObjectItem(first, "text");
         if (cJSON_IsString(text) && text->valuestring) {
-            resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
+            resp->choices = (llm_message_t*)AGENTOS_CALLOC(1, sizeof(llm_message_t));
             if (!resp->choices) {
                 resp->choice_count = 0;
                 cJSON_Delete(root);
@@ -147,8 +148,8 @@ static int anthropic_parse_response(const char* body, llm_response_t** out) {
                 return AGENTOS_ERR_OUT_OF_MEMORY;
             }
             resp->choice_count = 1;
-            resp->choices[0].role = strdup("assistant");
-            resp->choices[0].content = strdup(text->valuestring);
+            resp->choices[0].role = AGENTOS_STRDUP("assistant");
+            resp->choices[0].content = AGENTOS_STRDUP(text->valuestring);
         }
     }
 
@@ -203,7 +204,7 @@ static int anthropic_complete(provider_ctx_t* ctx_ptr,
                                 &http_resp, &http_code);
 
     curl_slist_free_all(headers);
-    free(req_body);
+    AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
         SVC_LOG_ERROR("anthropic: HTTP request failed, status=%ld", http_code);
@@ -243,12 +244,12 @@ typedef struct {
 static void ant_sse_init(ant_sse_ctx_t* s, ant_stream_acc_t* a) {
     memset(s, 0, sizeof(*s));
     s->line_cap = 4096;
-    s->line_buf = (char*)malloc(s->line_cap);
+    s->line_buf = (char*)AGENTOS_MALLOC(s->line_cap);
     s->acc = a;
 }
 
 static void ant_sse_destroy(ant_sse_ctx_t* s) {
-    if (s) { free(s->line_buf); s->line_buf = NULL; }
+    if (s) { AGENTOS_FREE(s->line_buf); s->line_buf = NULL; }
 }
 
 static int ant_feed_sse_event(ant_sse_ctx_t* s, const char* event,
@@ -269,10 +270,10 @@ static int ant_feed_sse_event(ant_sse_ctx_t* s, const char* event,
         if (msg) {
             cJSON* id = cJSON_GetObjectItem(msg, "id");
             if (cJSON_IsString(id) && id->valuestring)
-                acc->resp_id = strdup(id->valuestring);
+                acc->resp_id = AGENTOS_STRDUP(id->valuestring);
             cJSON* model = cJSON_GetObjectItem(msg, "model");
             if (cJSON_IsString(model) && model->valuestring)
-                acc->resp_model = strdup(model->valuestring);
+                acc->resp_model = AGENTOS_STRDUP(model->valuestring);
             cJSON* usage = cJSON_GetObjectItem(msg, "usage");
             if (usage) {
                 cJSON* iptok = cJSON_GetObjectItem(usage, "input_tokens");
@@ -300,7 +301,7 @@ static int ant_feed_sse_event(ant_sse_ctx_t* s, const char* event,
                     if (needed > acc->acc_cap) {
                         size_t nc = acc->acc_cap * 2;
                         while (nc < needed) nc *= 2;
-                        char* p = (char*)realloc(acc->acc_content, nc);
+                        char* p = (char*)AGENTOS_REALLOC(acc->acc_content, nc);
                         if (p) { acc->acc_content = p; acc->acc_cap = nc; }
                     }
                     if (acc->acc_content && acc->acc_len + tlen < acc->acc_cap) {
@@ -317,8 +318,8 @@ static int ant_feed_sse_event(ant_sse_ctx_t* s, const char* event,
         if (delta) {
             cJSON* fr = cJSON_GetObjectItem(delta, "stop_reason");
             if (cJSON_IsString(fr) && fr->valuestring) {
-                free(acc->finish_reason);
-                acc->finish_reason = strdup(fr->valuestring);
+                AGENTOS_FREE(acc->finish_reason);
+                acc->finish_reason = AGENTOS_STRDUP(fr->valuestring);
             }
         }
         cJSON* usage = cJSON_GetObjectItem(root, "usage");
@@ -389,7 +390,7 @@ static size_t ant_sse_write_cb(void* contents, size_t size, size_t nmemb,
     if (needed > s->line_cap) {
         size_t nc = s->line_cap * 2;
         while (nc < needed) nc *= 2;
-        char* ptr = (char*)realloc(s->line_buf, nc);
+        char* ptr = (char*)AGENTOS_REALLOC(s->line_buf, nc);
         if (!ptr) return 0;
         s->line_buf = ptr; s->line_cap = nc;
     }
@@ -403,26 +404,26 @@ static size_t ant_sse_write_cb(void* contents, size_t size, size_t nmemb,
 }
 
 static llm_response_t* ant_build_stream_response(ant_stream_acc_t* acc) {
-    llm_response_t* r = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t* r = (llm_response_t*)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!r) return NULL;
 
-    r->id = acc->resp_id ? acc->resp_id : strdup("");
+    r->id = acc->resp_id ? acc->resp_id : AGENTOS_STRDUP("");
     acc->resp_id = NULL;
-    r->model = acc->resp_model ? acc->resp_model : strdup("unknown");
+    r->model = acc->resp_model ? acc->resp_model : AGENTOS_STRDUP("unknown");
     acc->resp_model = NULL;
     r->prompt_tokens = acc->prompt_tokens;
     r->completion_tokens = acc->completion_tokens;
     r->total_tokens = r->prompt_tokens + r->completion_tokens;
-    r->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
+    r->choices = (llm_message_t*)AGENTOS_CALLOC(1, sizeof(llm_message_t));
     if (r->choices) {
         r->choice_count = 1;
-        r->choices[0].role = strdup("assistant");
+        r->choices[0].role = AGENTOS_STRDUP("assistant");
         r->choices[0].content = acc->acc_content;
         acc->acc_content = NULL;
     } else {
         r->choice_count = 0;
     }
-    r->finish_reason = acc->finish_reason ? acc->finish_reason : strdup("end_turn");
+    r->finish_reason = acc->finish_reason ? acc->finish_reason : AGENTOS_STRDUP("end_turn");
     acc->finish_reason = NULL;
     return r;
 }
@@ -461,13 +462,13 @@ static int anthropic_complete_stream(provider_ctx_t* ctx_ptr,
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;
-    acc.acc_content = (char*)malloc(acc.acc_cap);
+    acc.acc_content = (char*)AGENTOS_MALLOC(acc.acc_cap);
 
     ant_sse_ctx_t sse;
     ant_sse_init(&sse, &acc);
     if (!sse.line_buf) {
-        free(req_body); curl_slist_free_all(headers);
-        free(acc.acc_content);
+        AGENTOS_FREE(req_body); curl_slist_free_all(headers);
+        AGENTOS_FREE(acc.acc_content);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -500,18 +501,18 @@ static int anthropic_complete_stream(provider_ctx_t* ctx_ptr,
 
     ant_sse_destroy(&sse);
     curl_slist_free_all(headers);
-    free(req_body);
+    AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
         SVC_LOG_ERROR("anthropic: Stream HTTP error, status=%ld", http_code);
-        free(acc.acc_content); free(acc.resp_id);
-        free(acc.resp_model); free(acc.finish_reason);
+        AGENTOS_FREE(acc.acc_content); AGENTOS_FREE(acc.resp_id);
+        AGENTOS_FREE(acc.resp_model); AGENTOS_FREE(acc.finish_reason);
         return ret;
     }
 
     llm_response_t* resp = ant_build_stream_response(&acc);
-    free(acc.acc_content); free(acc.resp_id);
-    free(acc.resp_model); free(acc.finish_reason);
+    AGENTOS_FREE(acc.acc_content); AGENTOS_FREE(acc.resp_id);
+    AGENTOS_FREE(acc.resp_model); AGENTOS_FREE(acc.finish_reason);
 
     if (out_response) *out_response = resp;
     else if (resp) llm_response_free(resp);

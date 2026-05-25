@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "agentos_event_loop.h"
 
 #include <stdlib.h>
@@ -125,18 +126,18 @@ static int add_fd_internal(agentos_event_loop_t* loop, int fd, uint32_t events,
 }
 
 agentos_event_loop_t* agentos_event_loop_create(int max_events) {
-    agentos_event_loop_t* loop = (agentos_event_loop_t*)calloc(1, sizeof(agentos_event_loop_t));
+    agentos_event_loop_t* loop = (agentos_event_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_event_loop_t));
     if (!loop) return NULL;
 
     if (max_events <= 0) max_events = AGENTOS_EVENT_LOOP_MAX_EVENTS;
 
     loop->max_events = max_events;
     loop->fd_capacity = max_events;
-    loop->fd_entries = (fd_entry_t*)calloc((size_t)max_events, sizeof(fd_entry_t));
-    if (!loop->fd_entries) { free(loop); return NULL; }
+    loop->fd_entries = (fd_entry_t*)AGENTOS_CALLOC((size_t)max_events, sizeof(fd_entry_t));
+    if (!loop->fd_entries) { AGENTOS_FREE(loop); return NULL; }
 
     loop->wakeup_event = CreateEventW(NULL, TRUE, FALSE, NULL);
-    if (!loop->wakeup_event) { free(loop->fd_entries); free(loop); return NULL; }
+    if (!loop->wakeup_event) { AGENTOS_FREE(loop->fd_entries); AGENTOS_FREE(loop); return NULL; }
 
     loop->next_timer_id = 1;
     for (int i = 0; i < AGENTOS_EVENT_LOOP_MAX_TIMERS; i++)
@@ -155,8 +156,8 @@ void agentos_event_loop_destroy(agentos_event_loop_t* loop) {
         }
     }
     if (loop->wakeup_event) CloseHandle(loop->wakeup_event);
-    free(loop->fd_entries);
-    free(loop);
+    AGENTOS_FREE(loop->fd_entries);
+    AGENTOS_FREE(loop);
 }
 
 int agentos_event_loop_add_fd(agentos_event_loop_t* loop, int fd, uint32_t events,
@@ -410,26 +411,26 @@ static int add_fd_internal(agentos_event_loop_t* loop, int fd, uint32_t events,
 }
 
 agentos_event_loop_t* agentos_event_loop_create(int max_events) {
-    agentos_event_loop_t* loop = (agentos_event_loop_t*)calloc(1, sizeof(agentos_event_loop_t));
+    agentos_event_loop_t* loop = (agentos_event_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_event_loop_t));
     if (!loop) return NULL;
 
     if (max_events <= 0) max_events = AGENTOS_EVENT_LOOP_MAX_EVENTS;
 
     loop->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if (loop->epoll_fd < 0) {
-        free(loop);
+        AGENTOS_FREE(loop);
         return NULL;
     }
 
     loop->max_events = max_events;
-    loop->epoll_events = (struct epoll_event*)calloc((size_t)max_events, sizeof(struct epoll_event));
-    loop->fd_entries = (fd_entry_t*)calloc((size_t)max_events, sizeof(fd_entry_t));
+    loop->epoll_events = (struct epoll_event*)AGENTOS_CALLOC((size_t)max_events, sizeof(struct epoll_event));
+    loop->fd_entries = (fd_entry_t*)AGENTOS_CALLOC((size_t)max_events, sizeof(fd_entry_t));
 
     if (!loop->epoll_events || !loop->fd_entries) {
         close(loop->epoll_fd);
-        free(loop->epoll_events);
-        free(loop->fd_entries);
-        free(loop);
+        AGENTOS_FREE(loop->epoll_events);
+        AGENTOS_FREE(loop->fd_entries);
+        AGENTOS_FREE(loop);
         return NULL;
     }
 
@@ -462,9 +463,9 @@ void agentos_event_loop_destroy(agentos_event_loop_t* loop) {
     if (!loop) return;
     if (loop->wakeup_fd >= 0) close(loop->wakeup_fd);
     close(loop->epoll_fd);
-    free(loop->epoll_events);
-    free(loop->fd_entries);
-    free(loop);
+    AGENTOS_FREE(loop->epoll_events);
+    AGENTOS_FREE(loop->fd_entries);
+    AGENTOS_FREE(loop);
 }
 
 int agentos_event_loop_add_fd(agentos_event_loop_t* loop, int fd, uint32_t events,

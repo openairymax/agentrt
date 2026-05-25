@@ -464,7 +464,7 @@ static void setup_provider_vtable(agentos_memory_provider_t* provider) {
 
 static void setup_provider_capabilities(agentos_memory_provider_t* provider) {
     provider->capabilities.l1_raw = 1;
-    provider->capabilities.l2_feature = 1;
+    provider->capabilities.l2_feature = 0;  /* builtin uses keyword inverted index only, not semantic vector search */
     provider->capabilities.l3_structure = 0;
     provider->capabilities.l4_pattern = 0;
     provider->capabilities.forgetting = 1;

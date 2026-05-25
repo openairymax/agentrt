@@ -20,7 +20,7 @@ import time
 
 class AgentStatus(Enum):
 
-    """Agent 鐘舵佹灇与"""
+    """Agent 状态枚举"""
 
     CREATED = "created"
 
@@ -44,7 +44,7 @@ class AgentStatus(Enum):
 
 class AgentCapability(Enum):
 
-    """Agent 鑳藉姏鏋氫妇"""
+    """Agent 能力枚举"""
 
     ARCHITECTURE_DESIGN = "architecture_design"
 
@@ -66,7 +66,7 @@ class AgentCapability(Enum):
 
 class AgentContext:
 
-    """Agent 鎵ц与婁笅鏂"""
+    """Agent 执行上下文"""
 
     agent_id: str
 
@@ -88,7 +88,7 @@ class AgentContext:
 
 class TaskResult:
 
-    """浠诲姟鎵ц缁撴灉"""
+    """任务执行结果"""
 
     success: bool
 
@@ -108,7 +108,7 @@ class TaskResult:
 
 class Message:
 
-    """Agent 濞戝牊浼呴崺铏硅"""
+    """Agent 消息传递对象"""
 
     
 
@@ -198,7 +198,7 @@ class Agent(ABC):
 
     def status(self) -> AgentStatus:
 
-        """鑾峰彇 Agent 褰撳墠鐘舵"""
+        """获取 Agent 当前状态"""
 
         return self._status
 
@@ -208,7 +208,7 @@ class Agent(ABC):
 
     def status(self, value: AgentStatus) -> None:
 
-        """璁剧疆 Agent 鐘舵"""
+        """设置 Agent 状态"""
 
         self._status = value
 
@@ -220,7 +220,7 @@ class Agent(ABC):
 
     def context(self) -> Optional[AgentContext]:
 
-        """鑾峰彇褰撳墠鎵ц与婁笅鏂"""
+        """获取当前执行上下文"""
 
         return self._context
 
@@ -232,11 +232,11 @@ class Agent(ABC):
 
         """
 
-        閸掓繂顫愰崠?Agent
+        初始化 Agent
 
         
 
-        韫囧懘銆忕圭偟骞囬惃鍕煙濞夋洩绱濋崷?Agent 閸氼垰濮╅弮鎯扮殶閻?        """
+        子类应重写此方法以实现 Agent 的初始化逻辑        """
 
         pass
 
@@ -248,19 +248,19 @@ class Agent(ABC):
 
         """
 
-        閹笛嗩攽娴犺濮
+        执行任务
 
         
 
         Args:
 
-            input_data: 鏉堟挸鍙嗛弫鐗堝祦
+            input_data: 输入数据
 
-            context: 閹笛嗩攽娑撳﹣绗呴弬?            
+            context: 执行上下文            
 
         Returns:
 
-            TaskResult: 娴犺濮熼幍褑顢戠紒鎾寸亯
+            TaskResult: 任务执行结果对象
 
         """
 
@@ -274,11 +274,11 @@ class Agent(ABC):
 
         """
 
-        閸忔娊妫 Agent
+        关闭 Agent
 
         
 
-        濞撳懐鎮婄挧鍕爱閿涘奔绱梿鍛粹偓鈧崙?        """
+        清理资源并优雅关闭 Agent 实例        """
 
         pass
 
@@ -288,19 +288,19 @@ class Agent(ABC):
 
         """
 
-        婢跺嫮鎮婂☉鍫熶紖
+        处理消息
 
         
 
         Args:
 
-            message: 鏉堟挸鍙嗗☉鍫熶紖
+            message: 输入消息
 
             
 
         Returns:
 
-            Optional[Message]: 閸濆秴绨插☉鍫熶紖
+            Optional[Message]: 响应消息，可为空
 
         """
 
@@ -328,15 +328,15 @@ class Agent(ABC):
 
         """
 
-        濞夈劌鍞藉銉ュ徔
+        注册工具
 
         
 
         Args:
 
-            name: 瀹搞儱鍙块崥宥囆
+            name: 工具名称
 
-            tool: 瀹搞儱鍙跨圭偘绶
+            tool: 工具函数或对象
 
         """
 
@@ -348,19 +348,19 @@ class Agent(ABC):
 
         """
 
-        閼惧嘲褰囧銉ュ徔
+        获取已注册的工具
 
         
 
         Args:
 
-            name: 瀹搞儱鍙块崥宥囆
+            name: 工具名称
 
             
 
         Returns:
 
-            Optional[Any]: 瀹搞儱鍙跨圭偘绶
+            Optional[Any]: 工具函数或对象
 
         """
 
