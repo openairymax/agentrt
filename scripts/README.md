@@ -6,6 +6,8 @@
 
 `scripts/` 目录是 AgentOS 项目的脚本工具集合，涵盖环境配置、构建安装、代码质量分析、部署管理、性能基准测试、CI/CD 流水线等全生命周期管理功能。所有脚本按功能分类存放，为开发者提供统一的命令行操作入口。
 
+> **注意**：所有构建脚本遵循 BAN-33 规则（禁止源内构建 / No in-source builds），构建产物必须输出到源码目录之外的独立构建目录中。
+
 ## 目录结构
 
 ```
@@ -67,7 +69,7 @@ scripts/verify/sec017_scan.sh all
 scripts/build/build.sh --release
 
 # 一键发布
-scripts/release/release.sh 2.0.0 stable
+scripts/release/release.sh 0.0.5 stable
 
 # 清理构建产物
 scripts/release/cleanup_builds.sh

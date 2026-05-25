@@ -2,6 +2,8 @@
 
 `cupolas/src/audit/` 提供安全审计日志记录与事件追踪能力，确保所有安全相关操作的完整可追溯性。
 
+> Part of AgentOS v0.0.5
+
 ## 设计目标
 
 - **完整记录**：记录所有安全相关事件，不遗漏任何关键操作
@@ -44,14 +46,14 @@
         "geo_location": "CN-Beijing",
         "device": "Chrome/120.0"
     },
-    "hmac": "a1b2c3d4e5f6..."  // 防篡改签名
+    "hmac": "a1b2c3d4e5f6..."
 }
 ```
 
 ## 使用示例
 
 ```c
-#include "cupolas/src/audit/audit.h"
+#include "cupolas/audit.h"
 
 // 创建审计器
 audit_t* audit = audit_create("security-audit.log");
@@ -86,7 +88,7 @@ audit_query_t query = {
 
 audit_result_t* results = audit_query(audit, &query);
 for (int i = 0; i < results->count; i++) {
-    printf("[%s] %s: %s", 
+    printf("[%s] %s: %s",
         results->events[i].timestamp,
         results->events[i].event,
         results->events[i].detail);
@@ -111,6 +113,16 @@ if (!valid) {
 ```
 
 任何中间日志被篡改都会导致后续所有日志的 HMAC 校验失败。
+
+## 相关子系统
+
+| 子系统 | 关系 |
+|--------|------|
+| [Permission](../permission/README.md) | 权限拒绝事件写入审计日志 |
+| [Sanitizer](../sanitizer/README.md) | 输入清洗拒绝事件写入审计日志 |
+| [Security](../security/README.md) | 安全防护事件（签名验证、运行时违规等）写入审计日志 |
+| [Guards](#) | 守卫检测结果写入审计日志 |
+| [Workbench](../workbench/README.md) | 策略测试结果可导出审计日志 |
 
 ---
 

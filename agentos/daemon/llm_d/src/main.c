@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -103,13 +104,13 @@ typedef struct {
  * @brief 创建请求上下文
  */
 static request_context_t* request_context_create(void) {
-    request_context_t* ctx = (request_context_t*)calloc(1, sizeof(request_context_t));
+    request_context_t* ctx = (request_context_t*)AGENTOS_CALLOC(1, sizeof(request_context_t));
     if (!ctx) return NULL;
     
     ctx->response_capacity = MAX_BUFFER;
-    ctx->response_buffer = (char*)malloc(ctx->response_capacity);
+    ctx->response_buffer = (char*)AGENTOS_MALLOC(ctx->response_capacity);
     if (!ctx->response_buffer) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return NULL;
     }
     ctx->response_buffer[0] = '\0';
@@ -125,12 +126,12 @@ static void request_context_destroy(request_context_t* ctx) {
     if (!ctx) return;
     
     for (size_t i = 0; i < ctx->message_count; i++) {
-        free((void*)ctx->messages[i].role);
-        free((void*)ctx->messages[i].content);
+        AGENTOS_FREE((void*)ctx->messages[i].role);
+        AGENTOS_FREE((void*)ctx->messages[i].content);
     }
     
-    free(ctx->response_buffer);
-    free(ctx);
+    AGENTOS_FREE(ctx->response_buffer);
+    AGENTOS_FREE(ctx);
 }
 
 /* ==================== 参数解析（线程安全） ==================== */
@@ -143,10 +144,10 @@ static void request_context_destroy(request_context_t* ctx) {
  * @return 0 成功，非0 失败
  */
 static void parse_params_cleanup(request_context_t* ctx, llm_request_config_t* cfg) {
-    if (cfg->model) { free((void*)cfg->model); cfg->model = NULL; }
+    if (cfg->model) { AGENTOS_FREE((void*)cfg->model); cfg->model = NULL; }
     for (size_t i = 0; i < ctx->message_count; i++) {
-        free((void*)ctx->messages[i].role);
-        free((void*)ctx->messages[i].content);
+        AGENTOS_FREE((void*)ctx->messages[i].role);
+        AGENTOS_FREE((void*)ctx->messages[i].content);
     }
     ctx->message_count = 0;
 }
@@ -158,7 +159,7 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
     if (!cJSON_IsString(model)) {
         return -1;
     }
-    cfg->model = strdup(model->valuestring);
+    cfg->model = AGENTOS_STRDUP(model->valuestring);
     if (!cfg->model) return -1;
     
     cJSON* messages = cJSON_GetObjectItem(params, "messages");
@@ -183,8 +184,8 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
                 return -1;
             }
             
-            ctx->messages[i].role = strdup(role->valuestring);
-            ctx->messages[i].content = strdup(content->valuestring);
+            ctx->messages[i].role = AGENTOS_STRDUP(role->valuestring);
+            ctx->messages[i].content = AGENTOS_STRDUP(content->valuestring);
             
             if (!ctx->messages[i].role || !ctx->messages[i].content) {
                 ctx->message_count = i;
@@ -242,7 +243,7 @@ static void on_complete_method(cJSON* params, int id, void* user_data __attribut
     if (response) {
         agentos_socket_t client_fd = *(agentos_socket_t*)user_data;
         agentos_socket_send(client_fd, response, strlen(response));
-        free(response);
+        AGENTOS_FREE(response);
     }
 }
 
@@ -254,7 +255,7 @@ static void on_complete_stream_method(cJSON* params, int id, void* user_data __a
     char* response = handle_complete_stream(params, id, client_fd);
     if (response) {
         agentos_socket_send(client_fd, response, strlen(response));
-        free(response);
+        AGENTOS_FREE(response);
     }
 }
 
@@ -302,14 +303,14 @@ static char* handle_complete(cJSON* params, int id) {
         SVC_LOG_ERROR("LLM complete failed after %d attempts (total %llums)",
                       LLM_MAX_RETRIES + 1,
                       (unsigned long long)(end_time - start_time));
-        free((void*)cfg.model);
+        AGENTOS_FREE((void*)cfg.model);
         request_context_destroy(ctx);
         return jsonrpc_build_error(INTERNAL_ERROR, "LLM service unavailable after retries", id);
     }
     
     char* resp_json = response_to_json(resp);
     llm_response_free(resp);
-    free((void*)cfg.model);
+    AGENTOS_FREE((void*)cfg.model);
     
     if (!resp_json) {
         request_context_destroy(ctx);
@@ -317,7 +318,7 @@ static char* handle_complete(cJSON* params, int id) {
     }
     
     cJSON* result = cJSON_Parse(resp_json);
-    free(resp_json);
+    AGENTOS_FREE(resp_json);
     
     if (!result) {
         request_context_destroy(ctx);
@@ -363,7 +364,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
     int ret = llm_service_complete_stream(g_service, &cfg, llm_stream_callback, &stream_ctx, &resp);
     
     if (ret != 0) {
-        free((void*)cfg.model);
+        AGENTOS_FREE((void*)cfg.model);
         request_context_destroy(ctx);
         return jsonrpc_build_error(INTERNAL_ERROR, "Service error", id);
     }
@@ -372,7 +373,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
         llm_response_free(resp);
     }
     
-    free((void*)cfg.model);
+    AGENTOS_FREE((void*)cfg.model);
     request_context_destroy(ctx);
     return NULL;
 }
@@ -436,11 +437,11 @@ static int load_daemon_config(const char* config_path) {
     g_config.max_clients = MAX_CLIENTS;
     
 #if defined(AGENTOS_PLATFORM_WINDOWS)
-    g_config.socket_path = strdup(DEFAULT_SOCKET_PATH_WIN);
-    g_config.tcp_host = strdup("127.0.0.1");
+    g_config.socket_path = AGENTOS_STRDUP(DEFAULT_SOCKET_PATH_WIN);
+    g_config.tcp_host = AGENTOS_STRDUP("127.0.0.1");
 #else
-    g_config.socket_path = strdup(DEFAULT_SOCKET_PATH_UNIX);
-    g_config.tcp_host = strdup("127.0.0.1");
+    g_config.socket_path = AGENTOS_STRDUP(DEFAULT_SOCKET_PATH_UNIX);
+    g_config.tcp_host = AGENTOS_STRDUP("127.0.0.1");
 #endif
     g_config.tcp_port = DEFAULT_TCP_PORT;
     
@@ -452,7 +453,7 @@ static int load_daemon_config(const char* config_path) {
             long len = ftell(f);
             fseek(f, 0, SEEK_SET);
             
-            char* content = (char*)malloc(len + 1);
+            char* content = (char*)AGENTOS_MALLOC(len + 1);
             if (content) {
                 size_t nread = fread(content, 1, len, f);
                 if (nread == (size_t)len) {
@@ -464,8 +465,8 @@ static int load_daemon_config(const char* config_path) {
                     if (daemon) {
                         cJSON* socket_path = cJSON_GetObjectItem(daemon, "socket_path");
                         if (cJSON_IsString(socket_path)) {
-                            free(g_config.socket_path);
-                            g_config.socket_path = strdup(socket_path->valuestring);
+                            AGENTOS_FREE(g_config.socket_path);
+                            g_config.socket_path = AGENTOS_STRDUP(socket_path->valuestring);
                         }
                         
                         cJSON* tcp_port = cJSON_GetObjectItem(daemon, "tcp_port");
@@ -482,7 +483,7 @@ static int load_daemon_config(const char* config_path) {
                     cJSON_Delete(root);
                 }
                 }
-                free(content);
+                AGENTOS_FREE(content);
             }
             fclose(f);
         }
@@ -495,8 +496,8 @@ static int load_daemon_config(const char* config_path) {
  * @brief 释放配置资源
  */
 static void free_daemon_config(void) {
-    free(g_config.socket_path);
-    free(g_config.tcp_host);
+    AGENTOS_FREE(g_config.socket_path);
+    AGENTOS_FREE(g_config.tcp_host);
     memset(&g_config, 0, sizeof(g_config));
 }
 
@@ -536,12 +537,12 @@ int main(int argc, char** argv) {
     /* 加载配置 */
     load_daemon_config(config_path);
     
-    printf("LLM service starting, manager=%s\n", config_path ? config_path : "default");
+    SVC_LOG_INFO("LLM service starting, manager=%s", config_path ? config_path : "default");
     
     /* 创建 LLM 服务 */
     g_service = llm_service_create(config_path);
     if (!g_service) {
-        fprintf(stderr, "Failed to create service\n");
+        SVC_LOG_ERROR("Failed to create service");
         free_daemon_config();
         agentos_socket_cleanup();
         return 1;
@@ -553,14 +554,14 @@ int main(int argc, char** argv) {
     if (g_config.use_tcp) {
         server_fd = agentos_socket_create_tcp_server(g_config.tcp_host, g_config.tcp_port);
         if (server_fd == AGENTOS_INVALID_SOCKET) {
-            fprintf(stderr, "Failed to create TCP server on %s:%d\n", 
+            SVC_LOG_ERROR("Failed to create TCP server on %s:%d", 
                     g_config.tcp_host, g_config.tcp_port);
             llm_service_destroy(g_service);
             free_daemon_config();
             agentos_socket_cleanup();
             return 1;
         }
-        printf("Listening on TCP %s:%d\n", g_config.tcp_host, g_config.tcp_port);
+        SVC_LOG_INFO("Listening on TCP %s:%d", g_config.tcp_host, g_config.tcp_port);
     } else {
 #if defined(AGENTOS_PLATFORM_WINDOWS)
         server_fd = agentos_socket_create_named_pipe_server(g_config.socket_path);
@@ -568,13 +569,13 @@ int main(int argc, char** argv) {
         server_fd = agentos_socket_create_unix_server(g_config.socket_path);
 #endif
         if (server_fd == AGENTOS_INVALID_SOCKET) {
-            fprintf(stderr, "Failed to create socket at %s\n", g_config.socket_path);
+            SVC_LOG_ERROR("Failed to create socket at %s", g_config.socket_path);
             llm_service_destroy(g_service);
             free_daemon_config();
             agentos_socket_cleanup();
             return 1;
         }
-        printf("Listening on %s\n", g_config.socket_path);
+        SVC_LOG_INFO("Listening on %s", g_config.socket_path);
     }
     
     /* 创建事件驱动框架 */
@@ -590,7 +591,7 @@ int main(int argc, char** argv) {
 
     g_event_driver = daemon_event_driver_create(&ev_config);
     if (!g_event_driver) {
-        fprintf(stderr, "Failed to create event driver\n");
+        SVC_LOG_ERROR("Failed to create event driver");
         agentos_socket_close(server_fd);
         llm_service_destroy(g_service);
         free_daemon_config();
@@ -605,7 +606,7 @@ int main(int argc, char** argv) {
     SVC_LOG_INFO("Registered %d RPC methods", 2);
 
     if (daemon_event_driver_add_server_fd(g_event_driver, (int)server_fd) != 0) {
-        fprintf(stderr, "Failed to add server fd to event driver\n");
+        SVC_LOG_ERROR("Failed to add server fd to event driver");
         daemon_event_driver_destroy(g_event_driver);
         agentos_socket_close(server_fd);
         llm_service_destroy(g_service);
@@ -619,7 +620,7 @@ int main(int argc, char** argv) {
     daemon_event_driver_run(g_event_driver);
     
     /* 清理 */
-    printf("LLM service stopping...\n");
+    SVC_LOG_INFO("LLM service stopping...");
     daemon_event_driver_destroy(g_event_driver);
     agentos_socket_close(server_fd);
     llm_service_destroy(g_service);
@@ -627,6 +628,6 @@ int main(int argc, char** argv) {
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();
     
-    printf("LLM service stopped\n");
+    SVC_LOG_INFO("LLM service stopped");
     return 0;
 }

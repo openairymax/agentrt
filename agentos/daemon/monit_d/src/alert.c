@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -152,20 +153,20 @@ void alert_system_shutdown(void) {
     agentos_mutex_lock(&g_alert_mgr.lock);
 
     for (size_t i = 0; i < g_alert_mgr.rule_count; i++) {
-        free(g_alert_mgr.rules[i].rule.threshold.rule_id);
-        free(g_alert_mgr.rules[i].rule.threshold.metric_name);
-        free(g_alert_mgr.rules[i].rule.threshold.message_template);
+        AGENTOS_FREE(g_alert_mgr.rules[i].rule.threshold.rule_id);
+        AGENTOS_FREE(g_alert_mgr.rules[i].rule.threshold.metric_name);
+        AGENTOS_FREE(g_alert_mgr.rules[i].rule.threshold.message_template);
     }
 
     for (size_t i = 0; i < g_alert_mgr.history_count; i++) {
-        free(g_alert_mgr.history[i].alert.alert_id);
-        free(g_alert_mgr.history[i].alert.message);
-        free(g_alert_mgr.history[i].alert.service_name);
-        free(g_alert_mgr.history[i].alert.resource_id);
+        AGENTOS_FREE(g_alert_mgr.history[i].alert.alert_id);
+        AGENTOS_FREE(g_alert_mgr.history[i].alert.message);
+        AGENTOS_FREE(g_alert_mgr.history[i].alert.service_name);
+        AGENTOS_FREE(g_alert_mgr.history[i].alert.resource_id);
     }
 
     for (size_t i = 0; i < g_alert_mgr.suppression_count; i++) {
-        free(g_alert_mgr.suppressions[i].group_key_pattern);
+        AGENTOS_FREE(g_alert_mgr.suppressions[i].group_key_pattern);
     }
 
     g_alert_mgr.rule_count = 0;
@@ -199,12 +200,12 @@ int alert_add_threshold_rule(const char* rule_id, const char* metric_name,
 
     alert_rule_t* rule = &g_alert_mgr.rules[g_alert_mgr.rule_count];
     rule->type = ALERT_RULE_THRESHOLD;
-    rule->rule.threshold.rule_id = strdup(rule_id);
-    rule->rule.threshold.metric_name = strdup(metric_name);
+    rule->rule.threshold.rule_id = AGENTOS_STRDUP(rule_id);
+    rule->rule.threshold.metric_name = AGENTOS_STRDUP(metric_name);
     rule->rule.threshold.op = op;
     rule->rule.threshold.threshold = threshold;
     rule->rule.threshold.level = level;
-    rule->rule.threshold.message_template = message_template ? strdup(message_template) : NULL;
+    rule->rule.threshold.message_template = message_template ? AGENTOS_STRDUP(message_template) : NULL;
     rule->rule.threshold.evaluation_interval_ms = 10000;
     rule->rule.threshold.consecutive_count = consecutive_count > 0 ? consecutive_count : 1;
     rule->rule.threshold.current_count = 0;
@@ -297,10 +298,10 @@ static void notify_channels(const alert_info_t* alert) {
 
 static void add_to_history(const alert_info_t* alert) {
     if (g_alert_mgr.history_count >= MAX_ALERT_HISTORY) {
-        free(g_alert_mgr.history[0].alert.alert_id);
-        free(g_alert_mgr.history[0].alert.message);
-        free(g_alert_mgr.history[0].alert.service_name);
-        free(g_alert_mgr.history[0].alert.resource_id);
+        AGENTOS_FREE(g_alert_mgr.history[0].alert.alert_id);
+        AGENTOS_FREE(g_alert_mgr.history[0].alert.message);
+        AGENTOS_FREE(g_alert_mgr.history[0].alert.service_name);
+        AGENTOS_FREE(g_alert_mgr.history[0].alert.resource_id);
         memmove(&g_alert_mgr.history[0], &g_alert_mgr.history[1],
                 (g_alert_mgr.history_count - 1) * sizeof(grouped_alert_t));
         g_alert_mgr.history_count--;
@@ -309,11 +310,11 @@ static void add_to_history(const alert_info_t* alert) {
     grouped_alert_t* entry = &g_alert_mgr.history[g_alert_mgr.history_count];
     memset(entry, 0, sizeof(grouped_alert_t));
 
-    entry->alert.alert_id = alert->alert_id ? strdup(alert->alert_id) : NULL;
-    entry->alert.message = alert->message ? strdup(alert->message) : NULL;
+    entry->alert.alert_id = alert->alert_id ? AGENTOS_STRDUP(alert->alert_id) : NULL;
+    entry->alert.message = alert->message ? AGENTOS_STRDUP(alert->message) : NULL;
     entry->alert.level = alert->level;
-    entry->alert.service_name = alert->service_name ? strdup(alert->service_name) : NULL;
-    entry->alert.resource_id = alert->resource_id ? strdup(alert->resource_id) : NULL;
+    entry->alert.service_name = alert->service_name ? AGENTOS_STRDUP(alert->service_name) : NULL;
+    entry->alert.resource_id = alert->resource_id ? AGENTOS_STRDUP(alert->resource_id) : NULL;
     entry->alert.timestamp = alert->timestamp ? alert->timestamp : (uint64_t)time(NULL) * 1000;
     entry->alert.is_resolved = false;
     entry->occurrence_count = 1;

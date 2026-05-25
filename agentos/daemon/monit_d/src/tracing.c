@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -158,17 +159,17 @@ void tracing_shutdown(void) {
         agentos_mutex_lock(&trace->lock);
         for (size_t j = 0; j < trace->span_count; j++) {
             span_t* span = &trace->spans[j];
-            free(span->operation_name);
-            free(span->status_message);
+            AGENTOS_FREE(span->operation_name);
+            AGENTOS_FREE(span->status_message);
             for (size_t k = 0; k < span->attribute_count; k++) {
-                free(span->attributes[k].key);
-                free(span->attributes[k].value);
+                AGENTOS_FREE(span->attributes[k].key);
+                AGENTOS_FREE(span->attributes[k].value);
             }
             for (size_t k = 0; k < span->event_count; k++) {
-                free(span->events[k].name);
+                AGENTOS_FREE(span->events[k].name);
                 for (size_t l = 0; l < span->events[k].attribute_count; l++) {
-                    free(span->events[k].attributes[l].key);
-                    free(span->events[k].attributes[l].value);
+                    AGENTOS_FREE(span->events[k].attributes[l].key);
+                    AGENTOS_FREE(span->events[k].attributes[l].value);
                 }
             }
         }
@@ -210,8 +211,8 @@ int tracing_start_trace(const char* operation_name, const char* parent_trace_id,
         trace_t* old = &g_tracing.traces[oldest];
         agentos_mutex_lock(&old->lock);
         for (size_t j = 0; j < old->span_count; j++) {
-            free(old->spans[j].operation_name);
-            free(old->spans[j].status_message);
+            AGENTOS_FREE(old->spans[j].operation_name);
+            AGENTOS_FREE(old->spans[j].status_message);
         }
         old->span_count = 0;
         old->finished = 0;
@@ -244,7 +245,7 @@ int tracing_start_trace(const char* operation_name, const char* parent_trace_id,
     span_t* root_span = &trace->spans[0];
     generate_hex_id(root_span->span_id, SPAN_ID_LEN);
     root_span->parent_span_id[0] = '\0';
-    root_span->operation_name = strdup(operation_name);
+    root_span->operation_name = AGENTOS_STRDUP(operation_name);
     if (!root_span->operation_name) {
         g_tracing.traces[g_tracing.trace_count].trace_id[0] = '\0';
         return -1;
@@ -310,7 +311,7 @@ int tracing_start_span(const char* trace_id, const char* operation_name,
         span->parent_span_id[0] = '\0';
     }
 
-    span->operation_name = strdup(operation_name);
+    span->operation_name = AGENTOS_STRDUP(operation_name);
     span->kind = kind;
     span->start_time = (uint64_t)time(NULL) * 1000000;
     span->end_time = 0;
@@ -355,7 +356,7 @@ int tracing_end_span(const char* trace_id, const char* span_id,
         if (strcmp(trace->spans[i].span_id, span_id) == 0) {
             trace->spans[i].end_time = (uint64_t)time(NULL) * 1000000;
             trace->spans[i].status_code = status_code;
-            trace->spans[i].status_message = status_message ? strdup(status_message) : NULL;
+            trace->spans[i].status_message = status_message ? AGENTOS_STRDUP(status_message) : NULL;
             break;
         }
     }
@@ -405,15 +406,15 @@ int tracing_add_span_attribute(const char* trace_id, const char* span_id,
         if (strcmp(trace->spans[i].span_id, span_id) == 0) {
             span_t* span = &trace->spans[i];
             if (span->attribute_count < MAX_SPAN_ATTRIBUTES) {
-                char* dup_key = strdup(key);
-                char* dup_value = strdup(value);
+                char* dup_key = AGENTOS_STRDUP(key);
+                char* dup_value = AGENTOS_STRDUP(value);
                 if (dup_key && dup_value) {
                     span->attributes[span->attribute_count].key = dup_key;
                     span->attributes[span->attribute_count].value = dup_value;
                     span->attribute_count++;
                 } else {
-                    free(dup_key);
-                    free(dup_value);
+                    AGENTOS_FREE(dup_key);
+                    AGENTOS_FREE(dup_value);
                 }
             }
             break;
@@ -452,7 +453,7 @@ int tracing_add_span_event(const char* trace_id, const char* span_id,
         if (strcmp(trace->spans[i].span_id, span_id) == 0) {
             span_t* span = &trace->spans[i];
             if (span->event_count < MAX_SPAN_EVENTS) {
-                char* dup_name = strdup(event_name);
+                char* dup_name = AGENTOS_STRDUP(event_name);
                 if (dup_name) {
                     span->events[span->event_count].name = dup_name;
                     span->events[span->event_count].timestamp = (uint64_t)time(NULL) * 1000000;
@@ -489,7 +490,7 @@ char* tracing_export_json(const char* trace_id) {
     agentos_mutex_lock(&trace->lock);
     agentos_mutex_unlock(&g_tracing.global_lock);
 
-    char* buf = (char*)malloc(MAX_TRACE_EXPORT_SIZE);
+    char* buf = (char*)AGENTOS_MALLOC(MAX_TRACE_EXPORT_SIZE);
     if (!buf) {
         agentos_mutex_unlock(&trace->lock);
         return NULL;

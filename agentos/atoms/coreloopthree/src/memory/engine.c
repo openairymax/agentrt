@@ -165,7 +165,7 @@ agentos_error_t agentos_memory_query(
             res->memory_result_items[i] = (agentos_memory_result_item_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_result_item_t));
             if (!res->memory_result_items[i]) {
                 for (size_t j = 0; j < i; j++) {
-                    AGENTOS_FREE(res->memory_result_items[j]->memory_result_item_record_id);
+                    res->memory_result_items[j]->memory_result_item_record_id = NULL;
                     AGENTOS_FREE(res->memory_result_items[j]);
                 }
                 agentos_memory_provider_free_query_results(results, scores, count);

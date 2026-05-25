@@ -4,7 +4,7 @@
 
 ## 概述
 
-`tests/` 目录是 AgentOS 项目的集中测试套件，涵盖从底层内核到上层应用的完整测试体系。测试框架采用 C（CMockery2）和 Python（pytest）双语言实现，支持单元测试、集成测试、契约测试、性能基准测试和安全测试等多层次验证。
+`tests/` 目录是 AgentOS 项目的集中测试套件，涵盖从底层内核到上层应用的完整测试体系。测试框架采用 C（CMocka）和 Python（pytest）双语言实现，支持单元测试、集成测试、契约测试、性能基准测试和安全测试等多层次验证。
 
 ## 目录结构
 
@@ -31,7 +31,7 @@ tests/
 
 | 层级 | 语言 | 框架 | 目标 |
 |------|------|------|------|
-| 单元测试 | C / Python | CMockery2 / pytest | 验证单个函数或模块的正确性 |
+| 单元测试 | C / Python | CMocka / pytest | 验证单个函数或模块的正确性 |
 | 集成测试 | Python | pytest | 验证多组件间的数据流和协议交互 |
 | 契约测试 | Python | pytest | 确保接口契约的一致性 |
 | 基准测试 | Python | pytest-benchmark | 性能指标监控与回归检测 |
@@ -98,13 +98,13 @@ pytest -v -n auto
 
 ## 编写测试
 
-### C 单元测试（CMockery2）
+### C 单元测试（CMocka）
 
 ```c
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
-#include <cmockery.h>
+#include <cmocka.h>
 
 static void test_example(void **state) {
     int result = function_under_test(42);
@@ -144,5 +144,7 @@ class TestTaskFlow:
 ```
 
 ---
+
+> **注意**：当前有 6 个 commons 测试处于禁用状态：`test_config`、`test_types`、`test_ipc`、`test_network`、`test_common_integration`、`test_unified_modules`。
 
 © 2026 SPHARX Ltd. All Rights Reserved.

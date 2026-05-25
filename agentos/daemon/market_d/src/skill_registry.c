@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file skill_registry.c
  * @brief Skill 注册管理模块
@@ -35,7 +36,7 @@ skill_info_t* skill_registry_find(market_service_t* service, const char* skill_i
     }
 
     skill_info_t* found = results[0];
-    free(results);
+    AGENTOS_FREE(results);
     return found;
 }
 

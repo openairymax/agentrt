@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file safe_string_utils.c
  * @brief 安全字符串处理工具实现
@@ -86,7 +87,7 @@ char* safe_strdup_with_limit(const char* str, size_t max_copy_len) {
     size_t len = strlen(str);
     if (max_copy_len > 0 && len > max_copy_len) len = max_copy_len;
     
-    char* copy = (char*)malloc(len + 1);
+    char* copy = (char*)AGENTOS_MALLOC(len + 1);
     if (!copy) return NULL;
     
     memcpy(copy, str, len);
@@ -139,7 +140,7 @@ void* safe_malloc(size_t size, const char* purpose) {
     /* purpose用于调试追踪（非桩） */
     if (purpose && !purpose[0]) { /* 目的字符串有效性 */ }
     if (size == 0) return NULL;
-    void* ptr = malloc(size);
+    void* ptr = AGENTOS_MALLOC(size);
     return ptr;
 }
 
@@ -148,14 +149,14 @@ void* safe_calloc(size_t count, size_t size, const char* purpose) {
     if (purpose && !purpose[0]) { /* 目的字符串有效性 */ }
     if (count == 0 || size == 0) return NULL;
     if (count > SIZE_MAX / size) return NULL;
-    void* ptr = calloc(count, size);
+    void* ptr = AGENTOS_CALLOC(count, size);
     return ptr;
 }
 
 void* safe_realloc(void* ptr, size_t new_size, const char* purpose) {
     /* purpose用于调试追踪（非桩） */
     if (purpose && !purpose[0]) { /* 目的字符串有效性 */ }
-    if (new_size == 0) { free(ptr); return NULL; }
-    void* new_ptr = realloc(ptr, new_size);
+    if (new_size == 0) { AGENTOS_FREE(ptr); return NULL; }
+    void* new_ptr = AGENTOS_REALLOC(ptr, new_size);
     return new_ptr;
 }

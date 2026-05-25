@@ -12,6 +12,8 @@
 #define EXECUTION_API_VERSION_MINOR 0
 #define EXECUTION_API_VERSION_PATCH 0
 
+#define AGENTOS_EXEC_MAX_OUTPUT_LEN 65536
+
 // ABI 兼容性声明
 // 在相同 MAJOR 版本内保证 ABI 兼容
 // 破坏性更改需递增 MAJOR 并发布迁移说明

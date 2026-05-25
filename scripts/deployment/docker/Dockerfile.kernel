@@ -8,15 +8,18 @@ LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="0.0.5"
 LABEL description="AgentOS Kernel Base Image"
 
+# CUDA 路径配置（可通过 --build-arg CUDA_HOME=... 覆盖）
+ARG CUDA_HOME=/usr/local/cuda
+
 # 环境变量设置
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Shanghai \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
-    PATH=/usr/local/cuda/bin:$PATH \
-    CUDA_HOME=/usr/local/cuda \
     CMAKE_VERSION=3.28.0 \
-    NINJA_VERSION=1.11.1
+    NINJA_VERSION=1.11.1 \
+    CUDA_HOME=${CUDA_HOME} \
+    PATH=${CUDA_HOME}/bin:$PATH
 
 # 时区设置
 RUN ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \

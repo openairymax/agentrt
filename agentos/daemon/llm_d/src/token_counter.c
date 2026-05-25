@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file token_counter.c
  * @brief Token 计数实现
@@ -23,23 +24,23 @@ struct token_counter {
 };
 
 token_counter_t* token_counter_create(const char* encoding_name) {
-    token_counter_t* tc = calloc(1, sizeof(token_counter_t));
+    token_counter_t* tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
     if (!tc) return NULL;
     tc->enc = tiktoken_get_encoding(encoding_name);
     if (!tc->enc) {
         SVC_LOG_ERROR("Failed to get encoding %s", encoding_name);
-        free(tc);
+        AGENTOS_FREE(tc);
         return NULL;
     }
-    tc->encoding_name = strdup(encoding_name);
+    tc->encoding_name = AGENTOS_STRDUP(encoding_name);
     return tc;
 }
 
 void token_counter_destroy(token_counter_t* tc) {
     if (!tc) return;
     tiktoken_free(tc->enc);
-    free(tc->encoding_name);
-    free(tc);
+    AGENTOS_FREE(tc->encoding_name);
+    AGENTOS_FREE(tc);
 }
 
 size_t token_counter_count(token_counter_t* tc, const char* text) {
@@ -70,10 +71,10 @@ static agentos_token_model_t encoding_to_model_type(const char* enc) {
 }
 
 token_counter_t* token_counter_create(const char* encoding_name) {
-    token_counter_t* tc = calloc(1, sizeof(token_counter_t));
+    token_counter_t* tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
     if (!tc) return NULL;
 
-    tc->encoding_name = strdup(encoding_name ? encoding_name : "cl100k_base");
+    tc->encoding_name = AGENTOS_STRDUP(encoding_name ? encoding_name : "cl100k_base");
 
     memset(&tc->config, 0, sizeof(tc->config));
     tc->config.model_type = encoding_to_model_type(encoding_name);
@@ -90,8 +91,8 @@ token_counter_t* token_counter_create(const char* encoding_name) {
 
 void token_counter_destroy(token_counter_t* tc) {
     if (!tc) return;
-    free(tc->encoding_name);
-    free(tc);
+    AGENTOS_FREE(tc->encoding_name);
+    AGENTOS_FREE(tc);
 }
 
 size_t token_counter_count(token_counter_t* tc, const char* text) {

@@ -250,20 +250,28 @@ class SecurityManager:
         "/etc/agentos",
     ]
 
+    # Shell metacharacters that are dangerous in command context
+    # but are valid filename characters on Linux and should NOT be
+    # blocked during path validation. Use shlex.quote() for shell safety.
+    SHELL_METACHARACTERS = [
+        r"~",        # Home directory / brace expansion
+        r"\$",       # Environment variable / command substitution
+        r"`",        # Command substitution (backtick form)
+        r"\|",       # Pipe
+        r";",        # Command separator
+        r"&&",       # Command chaining (AND)
+        r"\|\|",     # Command chaining (OR)
+        r">",        # Output redirection
+        r"<",        # Input redirection
+    ]
+
+    # Patterns that indicate genuine filesystem-level attacks.
+    # These are NOT valid filename components and should always be rejected.
     DANGEROUS_PATTERNS = [
-        r"\.\.",
-        r"~",
-        r"\$",
-        r"`",
-        r"\|",
-        r";",
-        r"&&",
-        r"\|\|",
-        r">",
-        r"<",
-        r"\n",
-        r"\r",
-        r"\x00",
+        r"\.\.",     # Directory traversal (e.g., ../../../etc/passwd)
+        r"\n",       # Newline injection (pollutes logs, truncates output)
+        r"\r",       # Carriage return injection (hides path in logs)
+        r"\x00",     # Null byte injection (C-string truncation)
     ]
 
     def __init__(self, manager: SecurityConfig = None):

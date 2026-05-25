@@ -562,27 +562,27 @@ heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_r
     if (rc == SQLITE_ROW) {
         const char* text;
         text = (const char*)sqlite3_column_text(stmt, 0);
-        if (text) strncpy(record->id, text, sizeof(record->id) - 1);
+        if (text) { strncpy(record->id, text, sizeof(record->id) - 1); record->id[sizeof(record->id) - 1] = '\0'; }
         else record->id[0] = '\0';
 
         text = (const char*)sqlite3_column_text(stmt, 1);
-        if (text) strncpy(record->name, text, sizeof(record->name) - 1);
+        if (text) { strncpy(record->name, text, sizeof(record->name) - 1); record->name[sizeof(record->name) - 1] = '\0'; }
         else record->name[0] = '\0';
 
         text = (const char*)sqlite3_column_text(stmt, 2);
-        if (text) strncpy(record->type, text, sizeof(record->type) - 1);
+        if (text) { strncpy(record->type, text, sizeof(record->type) - 1); record->type[sizeof(record->type) - 1] = '\0'; }
         else record->type[0] = '\0';
 
         text = (const char*)sqlite3_column_text(stmt, 3);
-        if (text) strncpy(record->version, text, sizeof(record->version) - 1);
+        if (text) { strncpy(record->version, text, sizeof(record->version) - 1); record->version[sizeof(record->version) - 1] = '\0'; }
         else record->version[0] = '\0';
 
         text = (const char*)sqlite3_column_text(stmt, 4);
-        if (text) strncpy(record->status, text, sizeof(record->status) - 1);
+        if (text) { strncpy(record->status, text, sizeof(record->status) - 1); record->status[sizeof(record->status) - 1] = '\0'; }
         else record->status[0] = '\0';
 
         text = (const char*)sqlite3_column_text(stmt, 5);
-        if (text) strncpy(record->config_path, text, sizeof(record->config_path) - 1);
+        if (text) { strncpy(record->config_path, text, sizeof(record->config_path) - 1); record->config_path[sizeof(record->config_path) - 1] = '\0'; }
         else record->config_path[0] = '\0';
 
         record->created_at = sqlite3_column_int64(stmt, 6);
@@ -788,15 +788,15 @@ heapstore_error_t heapstore_registry_get_skill(const char* id, heapstore_skill_r
     if (rc == SQLITE_ROW) {
         const char* text;
         text = (const char*)sqlite3_column_text(stmt, 0);
-        if (text) strncpy(record->id, text, sizeof(record->id) - 1);
+        if (text) { strncpy(record->id, text, sizeof(record->id) - 1); record->id[sizeof(record->id) - 1] = '\0'; }
         text = (const char*)sqlite3_column_text(stmt, 1);
-        if (text) strncpy(record->name, text, sizeof(record->name) - 1);
+        if (text) { strncpy(record->name, text, sizeof(record->name) - 1); record->name[sizeof(record->name) - 1] = '\0'; }
         text = (const char*)sqlite3_column_text(stmt, 2);
-        if (text) strncpy(record->version, text, sizeof(record->version) - 1);
+        if (text) { strncpy(record->version, text, sizeof(record->version) - 1); record->version[sizeof(record->version) - 1] = '\0'; }
         text = (const char*)sqlite3_column_text(stmt, 3);
-        if (text) strncpy(record->library_path, text, sizeof(record->library_path) - 1);
+        if (text) { strncpy(record->library_path, text, sizeof(record->library_path) - 1); record->library_path[sizeof(record->library_path) - 1] = '\0'; }
         text = (const char*)sqlite3_column_text(stmt, 4);
-        if (text) strncpy(record->manifest_path, text, sizeof(record->manifest_path) - 1);
+        if (text) { strncpy(record->manifest_path, text, sizeof(record->manifest_path) - 1); record->manifest_path[sizeof(record->manifest_path) - 1] = '\0'; }
         record->installed_at = sqlite3_column_int64(stmt, 5);
         sqlite3_finalize(stmt);
         agentos_mutex_unlock(&s_registry.lock);
@@ -908,14 +908,14 @@ heapstore_error_t heapstore_registry_get_session(const char* id, heapstore_sessi
     if (rc == SQLITE_ROW) {
         const char* text;
         text = (const char*)sqlite3_column_text(stmt, 0);
-        if (text) strncpy(record->id, text, sizeof(record->id) - 1);
+        if (text) { strncpy(record->id, text, sizeof(record->id) - 1); record->id[sizeof(record->id) - 1] = '\0'; }
         text = (const char*)sqlite3_column_text(stmt, 1);
-        if (text) strncpy(record->user_id, text, sizeof(record->user_id) - 1);
+        if (text) { strncpy(record->user_id, text, sizeof(record->user_id) - 1); record->user_id[sizeof(record->user_id) - 1] = '\0'; }
         record->created_at = sqlite3_column_int64(stmt, 2);
         record->last_active_at = sqlite3_column_int64(stmt, 3);
         record->ttl_seconds = sqlite3_column_int(stmt, 4);
         text = (const char*)sqlite3_column_text(stmt, 5);
-        if (text) strncpy(record->status, text, sizeof(record->status) - 1);
+        if (text) { strncpy(record->status, text, sizeof(record->status) - 1); record->status[sizeof(record->status) - 1] = '\0'; }
         sqlite3_finalize(stmt);
         agentos_mutex_unlock(&s_registry.lock);
         return heapstore_SUCCESS;
