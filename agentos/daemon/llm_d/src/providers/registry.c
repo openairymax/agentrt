@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file registry.c
  * @brief 提供商注册表实现
@@ -6,6 +7,7 @@
 
 #include "registry.h"
 #include "svc_logger.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -20,6 +22,7 @@ extern const provider_ops_t local_ops;
 
 struct provider_registry {
     provider_t* providers;
+    agentos_mutex_t lock;
 };
 
 static const provider_ops_t* get_ops_by_name(const char* name) {
@@ -32,16 +35,17 @@ static const provider_ops_t* get_ops_by_name(const char* name) {
 }
 
 provider_registry_t* provider_registry_create(const service_config_t* cfg) {
-    provider_registry_t* reg = calloc(1, sizeof(provider_registry_t));
+    provider_registry_t* reg = AGENTOS_CALLOC(1, sizeof(provider_registry_t));
     if (!reg) return NULL;
+    agentos_mutex_init(&reg->lock);
 
     size_t count = 0;
     while (cfg->providers && cfg->providers[count].name) count++;
     if (count == 0) return reg;
 
-    reg->providers = calloc(count + 1, sizeof(provider_t));
+    reg->providers = AGENTOS_CALLOC(count + 1, sizeof(provider_t));
     if (!reg->providers) {
-        free(reg);
+        AGENTOS_FREE(reg);
         return NULL;
     }
 
@@ -65,14 +69,14 @@ provider_registry_t* provider_registry_create(const service_config_t* cfg) {
         size_t model_cnt = 0;
         if (pcfg->models) {
             while (pcfg->models[model_cnt]) model_cnt++;
-            models = calloc(model_cnt + 1, sizeof(*models));
+            models = AGENTOS_CALLOC(model_cnt + 1, sizeof(*models));
             if (models) {
                 for (size_t j = 0; j < model_cnt; ++j)
-                    models[j] = strdup(pcfg->models[j]);
+                    models[j] = AGENTOS_STRDUP(pcfg->models[j]);
             }
         }
 
-        reg->providers[i].name = strdup(pcfg->name);
+        reg->providers[i].name = AGENTOS_STRDUP(pcfg->name);
         reg->providers[i].ops = ops;
         reg->providers[i].ctx = ctx;
         reg->providers[i].models = models;
@@ -100,7 +104,7 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
 
     if (len <= 0) { fclose(f); return reg; }
 
-    char* content = (char*)malloc((size_t)len + 1);
+    char* content = (char*)AGENTOS_MALLOC((size_t)len + 1);
     if (!content) { fclose(f); return reg; }
 
     size_t read_len = fread(content, 1, (size_t)len, f);
@@ -108,7 +112,7 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
     fclose(f);
 
     cJSON* root = cJSON_Parse(content);
-    free(content);
+    AGENTOS_FREE(content);
     if (!root) {
         SVC_LOG_WARN("Failed to parse provider config '%s'", config_path);
         return reg;
@@ -124,18 +128,20 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
     int n = cJSON_GetArraySize(providers_arr);
     if (n <= 0) { cJSON_Delete(root); return reg; }
 
+    agentos_mutex_lock(&reg->lock);
+
     size_t old_count = 0;
     if (reg->providers) {
         while (reg->providers[old_count].name) old_count++;
     }
 
     size_t new_count = (size_t)n;
-    provider_t* new_provs = (provider_t*)calloc(old_count + new_count + 1, sizeof(provider_t));
-    if (!new_provs) { cJSON_Delete(root); return reg; }
+    provider_t* new_provs = (provider_t*)AGENTOS_CALLOC(old_count + new_count + 1, sizeof(provider_t));
+    if (!new_provs) { agentos_mutex_unlock(&reg->lock); cJSON_Delete(root); return reg; }
 
     if (reg->providers) {
         memcpy(new_provs, reg->providers, old_count * sizeof(provider_t));
-        free(reg->providers);
+        AGENTOS_FREE(reg->providers);
     }
     reg->providers = new_provs;
 
@@ -188,22 +194,24 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
         char** models = NULL;
         if (cJSON_IsArray(pmodels)) {
             int mcount = cJSON_GetArraySize(pmodels);
-            models = (char**)calloc((size_t)mcount + 1, sizeof(char*));
+            models = (char**)AGENTOS_CALLOC((size_t)mcount + 1, sizeof(char*));
             if (models) {
                 for (int j = 0; j < mcount; ++j) {
                     cJSON* mitem = cJSON_GetArrayItem(pmodels, j);
-                    if (cJSON_IsString(mitem)) models[j] = strdup(mitem->valuestring);
+                    if (cJSON_IsString(mitem)) models[j] = AGENTOS_STRDUP(mitem->valuestring);
                 }
                 models[mcount] = NULL;
             }
         }
 
-        reg->providers[valid_idx].name = strdup(name_str);
+        reg->providers[valid_idx].name = AGENTOS_STRDUP(name_str);
         reg->providers[valid_idx].ops = ops;
         reg->providers[valid_idx].ctx = ctx;
         reg->providers[valid_idx].models = models;
         valid_idx++;
     }
+
+    agentos_mutex_unlock(&reg->lock);
 
     cJSON_Delete(root);
     SVC_LOG_INFO("Loaded %zu providers from config '%s'", valid_idx - old_count, config_path);
@@ -212,27 +220,40 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
 
 void provider_registry_destroy(provider_registry_t* reg) {
     if (!reg) return;
+    agentos_mutex_lock(&reg->lock);
     if (reg->providers) {
         for (provider_t* p = reg->providers; p->name; ++p) {
             p->ops->destroy(p->ctx);
-            free((void*)p->name);
+            AGENTOS_FREE((void*)p->name);
             if (p->models) {
-                for (char** m = p->models; *m; ++m) free(*m);
-                free(p->models);
+                for (char** m = p->models; *m; ++m) AGENTOS_FREE(*m);
+                AGENTOS_FREE(p->models);
             }
         }
-        free(reg->providers);
+        AGENTOS_FREE(reg->providers);
+        reg->providers = NULL;
     }
-    free(reg);
+    agentos_mutex_unlock(&reg->lock);
+    agentos_mutex_destroy(&reg->lock);
+    AGENTOS_FREE(reg);
 }
 
 const provider_t* provider_registry_find(provider_registry_t* reg, const char* model) {
-    if (!reg || !reg->providers) return NULL;
+    if (!reg) return NULL;
+    agentos_mutex_lock(&reg->lock);
+    if (!reg->providers) {
+        agentos_mutex_unlock(&reg->lock);
+        return NULL;
+    }
     for (provider_t* p = reg->providers; p->name; ++p) {
         if (!p->models) continue;
         for (char** m = p->models; *m; ++m) {
-            if (strcmp(*m, model) == 0) return p;
+            if (strcmp(*m, model) == 0) {
+                agentos_mutex_unlock(&reg->lock);
+                return p;
+            }
         }
     }
+    agentos_mutex_unlock(&reg->lock);
     return NULL;
 }

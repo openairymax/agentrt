@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file provider.c
  * @brief 提供商通用工具实现
@@ -106,8 +107,8 @@ void provider_base_init(provider_base_ctx_t* base_ctx,
 
 void provider_http_resp_free(provider_http_resp_t* resp) {
     if (resp) {
-        free(resp->data);
-        free(resp);
+        AGENTOS_FREE(resp->data);
+        AGENTOS_FREE(resp);
     }
 }
 
@@ -122,7 +123,7 @@ static size_t http_write_callback(void* contents, size_t size, size_t nmemb, voi
         size_t new_cap = mem->capacity * 2;
         if (new_cap < new_size) new_cap = new_size;
 
-        char* ptr = (char*)realloc(mem->data, new_cap);
+        char* ptr = (char*)AGENTOS_REALLOC(mem->data, new_cap);
         if (!ptr) return 0;
 
         mem->data = ptr;
@@ -149,7 +150,7 @@ int provider_http_post(const char* url,
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    provider_http_resp_t* resp = (provider_http_resp_t*)calloc(1, sizeof(provider_http_resp_t));
+    provider_http_resp_t* resp = (provider_http_resp_t*)AGENTOS_CALLOC(1, sizeof(provider_http_resp_t));
     if (!resp) return AGENTOS_ERR_OUT_OF_MEMORY;
 
     CURL* curl = NULL;
@@ -191,7 +192,7 @@ int provider_http_post(const char* url,
         retry++;
         curl_easy_cleanup(curl);
         if (retry <= max_retries) {
-            free(resp->data);
+            AGENTOS_FREE(resp->data);
             resp->data = NULL;
             resp->size = 0;
             resp->capacity = 0;
@@ -278,7 +279,7 @@ int provider_parse_openai_response(const char* body, llm_response_t** out) {
         return AGENTOS_ERR_PARSE_ERROR;
     }
 
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t* resp = (llm_response_t*)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
         cJSON_Delete(root);
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -286,12 +287,12 @@ int provider_parse_openai_response(const char* body, llm_response_t** out) {
 
     cJSON* id = cJSON_GetObjectItem(root, "id");
     if (cJSON_IsString(id) && id->valuestring) {
-        resp->id = strdup(id->valuestring);
+        resp->id = AGENTOS_STRDUP(id->valuestring);
     }
 
     cJSON* model = cJSON_GetObjectItem(root, "model");
     if (cJSON_IsString(model) && model->valuestring) {
-        resp->model = strdup(model->valuestring);
+        resp->model = AGENTOS_STRDUP(model->valuestring);
     }
 
     cJSON* created = cJSON_GetObjectItem(root, "created");
@@ -303,7 +304,7 @@ int provider_parse_openai_response(const char* body, llm_response_t** out) {
     if (cJSON_IsArray(choices)) {
         int size = cJSON_GetArraySize(choices);
         resp->choice_count = (size_t)size;
-        resp->choices = (llm_message_t*)calloc((size_t)size, sizeof(llm_message_t));
+        resp->choices = (llm_message_t*)AGENTOS_CALLOC((size_t)size, sizeof(llm_message_t));
 
         if (!resp->choices) {
             cJSON_Delete(root);
@@ -318,15 +319,15 @@ int provider_parse_openai_response(const char* body, llm_response_t** out) {
                 cJSON* role = cJSON_GetObjectItem(message, "role");
                 cJSON* content = cJSON_GetObjectItem(message, "content");
                 if (cJSON_IsString(role) && role->valuestring) {
-                    resp->choices[i].role = strdup(role->valuestring);
+                    resp->choices[i].role = AGENTOS_STRDUP(role->valuestring);
                 }
                 if (cJSON_IsString(content) && content->valuestring) {
-                    resp->choices[i].content = strdup(content->valuestring);
+                    resp->choices[i].content = AGENTOS_STRDUP(content->valuestring);
                 }
             }
             cJSON* finish = cJSON_GetObjectItem(choice, "finish_reason");
             if (cJSON_IsString(finish) && finish->valuestring && !resp->finish_reason) {
-                resp->finish_reason = strdup(finish->valuestring);
+                resp->finish_reason = AGENTOS_STRDUP(finish->valuestring);
             }
         }
     }
@@ -362,14 +363,14 @@ static void sse_ctx_init(sse_stream_ctx_t* sse,
                          void* user_data) {
     memset(sse, 0, sizeof(*sse));
     sse->line_cap = 4096;
-    sse->line_buf = (char*)malloc(sse->line_cap);
+    sse->line_buf = (char*)AGENTOS_MALLOC(sse->line_cap);
     sse->on_chunk = cb;
     sse->chunk_user_data = user_data;
 }
 
 static void sse_ctx_destroy(sse_stream_ctx_t* sse) {
     if (sse) {
-        free(sse->line_buf);
+        AGENTOS_FREE(sse->line_buf);
         sse->line_buf = NULL;
     }
 }
@@ -388,12 +389,12 @@ static int sse_feed_line(sse_stream_ctx_t* sse, const char* line, size_t len) {
         }
 
         if (sse->on_chunk) {
-            char* tmp = (char*)malloc(data_len + 1);
+            char* tmp = (char*)AGENTOS_MALLOC(data_len + 1);
             if (tmp) {
                 memcpy(tmp, data_start, data_len);
                 tmp[data_len] = '\0';
                 int ret = sse->on_chunk(tmp, sse->chunk_user_data);
-                free(tmp);
+                AGENTOS_FREE(tmp);
                 if (ret != 0) {
                     sse->cancelled = 1;
                     return ret;
@@ -446,7 +447,7 @@ static size_t sse_write_callback(void* contents, size_t size, size_t nmemb,
     if (needed > sse->line_cap) {
         size_t new_cap = sse->line_cap * 2;
         while (new_cap < needed) new_cap *= 2;
-        char* ptr = (char*)realloc(sse->line_buf, new_cap);
+        char* ptr = (char*)AGENTOS_REALLOC(sse->line_buf, new_cap);
         if (!ptr) return 0;
         sse->line_buf = ptr;
         sse->line_cap = new_cap;

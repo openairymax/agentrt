@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "daemon_event_driver.h"
 #include "svc_logger.h"
 #include "method_dispatcher.h"
@@ -56,13 +57,13 @@ static void on_health_timer(agentos_event_loop_t* loop, uint64_t timer_id, void*
 daemon_event_driver_t* daemon_event_driver_create(const daemon_event_config_t* config) {
     if (!config) return NULL;
 
-    daemon_event_driver_t* driver = (daemon_event_driver_t*)calloc(1, sizeof(daemon_event_driver_t));
+    daemon_event_driver_t* driver = (daemon_event_driver_t*)AGENTOS_CALLOC(1, sizeof(daemon_event_driver_t));
     if (!driver) return NULL;
 
     int max_events = config->max_events > 0 ? config->max_events : 64;
     driver->loop = agentos_event_loop_create(max_events);
     if (!driver->loop) {
-        free(driver);
+        AGENTOS_FREE(driver);
         return NULL;
     }
 
@@ -85,7 +86,7 @@ daemon_event_driver_t* daemon_event_driver_create(const daemon_event_config_t* c
             SVC_LOG_ERROR("Failed to create method dispatcher for JSON-RPC");
             if (driver->pool) thread_pool_destroy(driver->pool);
             agentos_event_loop_destroy(driver->loop);
-            free(driver);
+            AGENTOS_FREE(driver);
             return NULL;
         }
     }
@@ -116,7 +117,7 @@ void daemon_event_driver_destroy(daemon_event_driver_t* driver) {
     if (driver->pool) thread_pool_destroy(driver->pool);
     if (driver->dispatcher) method_dispatcher_destroy(driver->dispatcher);
     if (driver->loop) agentos_event_loop_destroy(driver->loop);
-    free(driver);
+    AGENTOS_FREE(driver);
 }
 
 int daemon_event_driver_add_server_fd(daemon_event_driver_t* driver, int fd) {

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file method_dispatcher.c
  * @brief JSON-RPC 方法分发器实现
@@ -33,12 +34,12 @@ static int find_method_index(method_dispatcher_t* disp, const char* method) {
 method_dispatcher_t* method_dispatcher_create(size_t max_methods) {
     if (max_methods == 0) return NULL;
     
-    method_dispatcher_t* disp = (method_dispatcher_t*)calloc(1, sizeof(method_dispatcher_t));
+    method_dispatcher_t* disp = (method_dispatcher_t*)AGENTOS_CALLOC(1, sizeof(method_dispatcher_t));
     if (!disp) return NULL;
     
-    disp->handlers = (struct method_handler*)calloc(max_methods, sizeof(struct method_handler));
+    disp->handlers = (struct method_handler*)AGENTOS_CALLOC(max_methods, sizeof(struct method_handler));
     if (!disp->handlers) {
-        free(disp);
+        AGENTOS_FREE(disp);
         return NULL;
     }
     
@@ -53,11 +54,11 @@ void method_dispatcher_destroy(method_dispatcher_t* disp) {
     if (!disp) return;
     
     for (size_t i = 0; i < disp->method_count; i++) {
-        free(disp->handlers[i].method);
+        AGENTOS_FREE(disp->handlers[i].method);
     }
-    free(disp->handlers);
+    AGENTOS_FREE(disp->handlers);
     agentos_mutex_destroy(&disp->lock);
-    free(disp);
+    AGENTOS_FREE(disp);
 }
 
 int method_dispatcher_register(method_dispatcher_t* disp, const char* method, method_fn handler, void* user_data) {
@@ -67,7 +68,7 @@ int method_dispatcher_register(method_dispatcher_t* disp, const char* method, me
     int existing = find_method_index(disp, method);
     if (existing >= 0) return -1;
     
-    disp->handlers[disp->method_count].method = strdup(method);
+    disp->handlers[disp->method_count].method = AGENTOS_STRDUP(method);
     disp->handlers[disp->method_count].handler = handler;
     disp->handlers[disp->method_count].user_data = user_data;
     disp->method_count++;
@@ -86,7 +87,7 @@ int method_dispatcher_dispatch(method_dispatcher_t* disp, cJSON* request,
     if (jsonrpc_parse_request_ptr(request, &method, &params, &id) != 0) {
         if (error_response_fn) {
             char* err = error_response_fn(JSONRPC_INVALID_REQUEST, "Invalid request", id);
-            free(err);
+            AGENTOS_FREE(err);
         }
         return -1;
     }
@@ -95,9 +96,9 @@ int method_dispatcher_dispatch(method_dispatcher_t* disp, cJSON* request,
     if (index < 0) {
         if (error_response_fn) {
             char* err = error_response_fn(JSONRPC_METHOD_NOT_FOUND, "Method not found", id);
-            free(err);
+            AGENTOS_FREE(err);
         }
-        free(method);
+        AGENTOS_FREE(method);
         if (params) cJSON_Delete(params);
         return -1;
     }
@@ -107,7 +108,7 @@ int method_dispatcher_dispatch(method_dispatcher_t* disp, cJSON* request,
     
     handler(params, id, data);
     
-    free(method);
+    AGENTOS_FREE(method);
     if (params) cJSON_Delete(params);
     
     return 0;

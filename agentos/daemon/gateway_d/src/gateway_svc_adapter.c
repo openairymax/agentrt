@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -180,13 +181,13 @@ static void gateway_adapter_destroy(agentos_service_t service) {
     
     // 释放动态分配的资源
     if (ctx->gateway_cfg.http.host && strcmp(ctx->gateway_cfg.http.host, "0.0.0.0") != 0) {
-        free((void*)ctx->gateway_cfg.http.host);
+        AGENTOS_FREE((void*)ctx->gateway_cfg.http.host);
     }
     if (ctx->gateway_cfg.ws.host && strcmp(ctx->gateway_cfg.ws.host, "0.0.0.0") != 0) {
-        free((void*)ctx->gateway_cfg.ws.host);
+        AGENTOS_FREE((void*)ctx->gateway_cfg.ws.host);
     }
     
-    free(ctx);
+    AGENTOS_FREE(ctx);
     
     agentos_service_set_user_data(service, NULL);
 }
@@ -244,7 +245,7 @@ agentos_error_t gateway_service_adapter_create(
     }
     
     // 分配适配器上下文
-    gateway_adapter_ctx_t* ctx = calloc(1, sizeof(gateway_adapter_ctx_t));
+    gateway_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(gateway_adapter_ctx_t));
     if (!ctx) {
         return AGENTOS_ENOMEM;
     }
@@ -275,7 +276,7 @@ agentos_error_t gateway_service_adapter_create(
     );
     
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
     
@@ -285,7 +286,7 @@ agentos_error_t gateway_service_adapter_create(
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
     
@@ -330,7 +331,7 @@ agentos_error_t gateway_service_adapter_wrap(
     }
     
     // 分配适配器上下文
-    gateway_adapter_ctx_t* ctx = calloc(1, sizeof(gateway_adapter_ctx_t));
+    gateway_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(gateway_adapter_ctx_t));
     if (!ctx) {
         return AGENTOS_ENOMEM;
     }
@@ -361,7 +362,7 @@ agentos_error_t gateway_service_adapter_wrap(
     );
     
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
     
@@ -369,7 +370,7 @@ agentos_error_t gateway_service_adapter_wrap(
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
     

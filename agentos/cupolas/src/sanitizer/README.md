@@ -2,6 +2,8 @@
 
 `cupolas/src/sanitizer/` 是输入校验与注入防护引擎，对所有进入系统的外部数据进行安全清洗。
 
+> Part of AgentOS v0.0.5
+
 ## 设计目标
 
 - **多层级校验**：从格式、类型、语义多个维度校验输入
@@ -35,7 +37,7 @@
 ## 使用示例
 
 ```c
-#include "cupolas/src/sanitizer/sanitizer.h"
+#include "cupolas/sanitizer.h"
 
 // 创建清洗器
 sanitizer_t* sanitizer = sanitizer_create();
@@ -77,6 +79,15 @@ if (result.action == SANITIZER_ACTION_PASS) {
     }
 }
 ```
+
+## 相关子系统
+
+| 子系统 | 关系 |
+|--------|------|
+| [Permission](../permission/README.md) | 清洗后的输入仍需通过权限检查 |
+| [Audit](../audit/README.md) | 被拒绝的输入会记录审计日志 |
+| [Security](../security/README.md) | 安全防护引擎调用清洗器进行输入预处理 |
+| [Guards](#) | 安全守卫可对清洗结果进行二次检测 |
 
 ---
 

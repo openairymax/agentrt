@@ -49,6 +49,11 @@
 - **日志聚合**：合并、去重、排序
 - **实时告警**：基于日志内容触发告警规则
 - **日志查询**：按时间、级别、模块等维度检索
+- **监控统计**：吞吐量统计、延迟监控（P50/P90/P99）、错误率告警、队列与资源使用
+
+> Service 层 API 定义在 `service_logging.h` 中，提供日志轮转、过滤、传输、监控统计和查询等高级功能。Service 层是可选的，简单应用可以只使用 Core 层和 Atomic 层。
+
+> Atomic 层和 Service 层的原子计数器均基于 `atomic_compat.h` 实现跨平台原子操作（C11 stdatomic / Windows Interlocked / POSIX `__atomic` builtins 三后端）。
 
 ## 日志级别
 
@@ -75,15 +80,15 @@ logging_warn(logger, "内存使用率超过阈值: %.1f%%", 85.5);
 logging_error(logger, "连接失败: %s", error_message);
 
 // 结构化日志（JSON）
-logging_json(logger, LOG_LEVEL_INFO, "request_complete", 
-    "duration_ms", 150, 
-    "status_code", 200, 
+logging_json(logger, LOG_LEVEL_INFO, "request_complete",
+    "duration_ms", 150,
+    "status_code", 200,
     "bytes_sent", 4096);
 
 // 安全审计日志（不可篡改）
-logging_audit(logger, "user_login", 
-    "user", "admin", 
-    "ip", "192.168.1.100", 
+logging_audit(logger, "user_login",
+    "user", "admin",
+    "ip", "192.168.1.100",
     "result", "success");
 
 // 动态调整日志级别

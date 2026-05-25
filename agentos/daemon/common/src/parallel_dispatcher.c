@@ -95,7 +95,7 @@ static void dispatch_worker(void* arg) {
     agentos_mutex_lock(&session->lock);
     if (session->cancel_flag) {
         ctx->result_slot->success = 0;
-        ctx->result_slot->error = strdup("cancelled");
+        ctx->result_slot->error = AGENTOS_STRDUP("cancelled");
         ctx->result_slot->task_index = ctx->task_index;
         session->completed_count++;
         session->error_count++;
@@ -154,15 +154,15 @@ static void dispatch_worker(void* arg) {
             if (error_str) {
                 ctx->result_slot->error = error_str;
             }
-            free(response.payload);
+            AGENTOS_FREE(response.payload);
         } else {
             char errbuf[128];
             snprintf(errbuf, sizeof(errbuf), "IPC request failed: error=%d", err);
-            ctx->result_slot->error = strdup(errbuf);
+            ctx->result_slot->error = AGENTOS_STRDUP(errbuf);
         }
     } else {
         ctx->result_slot->success = 0;
-        ctx->result_slot->error = strdup("no IPC bus available");
+        ctx->result_slot->error = AGENTOS_STRDUP("no IPC bus available");
     }
 
     ctx->result_slot->duration_ms = time_ms() - start;
@@ -306,7 +306,7 @@ int parallel_dispatcher_execute(
         int rc = thread_pool_submit(dispatcher->pool, dispatch_worker, &session->contexts[i]);
         if (rc != 0) {
             session->contexts[i].result_slot->success = 0;
-            session->contexts[i].result_slot->error = strdup("submit failed");
+            session->contexts[i].result_slot->error = AGENTOS_STRDUP("submit failed");
             session->contexts[i].result_slot->task_index = i;
             agentos_mutex_lock(&session->lock);
             session->completed_count++;
@@ -380,7 +380,7 @@ int parallel_dispatcher_execute_async(
             submitted++;
         } else {
             results[i].success = 0;
-            results[i].error = strdup("submit failed");
+            results[i].error = AGENTOS_STRDUP("submit failed");
             results[i].task_index = i;
             if (on_complete) on_complete(i, &results[i], user_data);
             agentos_mutex_lock(&session->lock);
@@ -414,8 +414,8 @@ void parallel_result_free(parallel_result_t* results, size_t count) {
 parallel_task_t parallel_task_create(const char* tool_id, const char* params_json) {
     parallel_task_t task;
     memset(&task, 0, sizeof(task));
-    task.tool_id = tool_id ? strdup(tool_id) : NULL;
-    task.params_json = params_json ? strdup(params_json) : NULL;
+    task.tool_id = tool_id ? AGENTOS_STRDUP(tool_id) : NULL;
+    task.params_json = params_json ? AGENTOS_STRDUP(params_json) : NULL;
     task.user_data = NULL;
     return task;
 }

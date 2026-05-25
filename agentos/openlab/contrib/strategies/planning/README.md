@@ -1,5 +1,7 @@
 # Planning — 规划策略
 
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+
 `openlab/contrib/strategies/planning/` 提供智能体的任务规划策略，负责将复杂目标分解为可执行的步骤序列。
 
 ## 核心能力

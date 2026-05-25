@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -92,7 +93,7 @@ static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force)
             ctx->sched_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->sched_cfg.ml_model_path) { free((void*)ctx->sched_cfg.ml_model_path); ctx->sched_cfg.ml_model_path = NULL; }
+        if (ctx->sched_cfg.ml_model_path) { AGENTOS_FREE((void*)ctx->sched_cfg.ml_model_path); ctx->sched_cfg.ml_model_path = NULL; }
         SVC_LOG_INFO("调度器服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("调度器服务适配器已停止");
@@ -110,10 +111,10 @@ static void sched_adapter_destroy(agentos_service_t service) {
         ctx->sched_svc = NULL;
     }
 
-    if (ctx->sched_cfg.ml_model_path) free((void*)ctx->sched_cfg.ml_model_path);
+    if (ctx->sched_cfg.ml_model_path) AGENTOS_FREE((void*)ctx->sched_cfg.ml_model_path);
 
     agentos_service_set_user_data(service, NULL);
-    free(ctx);
+    AGENTOS_FREE(ctx);
 }
 
 static agentos_error_t sched_adapter_healthcheck(agentos_service_t service) {
@@ -144,7 +145,7 @@ agentos_error_t sched_service_adapter_create(
 ) {
     if (!out_service) return AGENTOS_EINVAL;
 
-    sched_adapter_ctx_t* ctx = calloc(1, sizeof(sched_adapter_ctx_t));
+    sched_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(sched_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     if (config) {
@@ -162,14 +163,14 @@ agentos_error_t sched_service_adapter_create(
         &svc_handle, ctx->common_cfg.name, &sched_adapter_iface, &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
@@ -184,7 +185,7 @@ agentos_error_t sched_service_adapter_wrap(
 ) {
     if (!out_service || !sched_svc) return AGENTOS_EINVAL;
 
-    sched_adapter_ctx_t* ctx = calloc(1, sizeof(sched_adapter_ctx_t));
+    sched_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(sched_adapter_ctx_t));
     if (!ctx) return AGENTOS_ENOMEM;
 
     ctx->sched_svc = sched_svc;
@@ -202,14 +203,14 @@ agentos_error_t sched_service_adapter_wrap(
         &svc_handle, ctx->common_cfg.name, &sched_adapter_iface, &ctx->common_cfg
     );
     if (err != AGENTOS_SUCCESS) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
         agentos_service_destroy(svc_handle);
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return err;
     }
 

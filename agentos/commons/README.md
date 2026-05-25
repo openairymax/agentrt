@@ -21,11 +21,19 @@
 | **统一配置** | `config_unified/` | 三层配置模型（core→source→service），热重载、Schema 校验 |
 | **内存管理** | `memory/` | 内存池、引用计数智能指针、零拷贝缓冲区 |
 | **可观测性** | `observability/` | 基于 OpenTelemetry 的指标、追踪、健康检查 |
-| **令牌管理** | `token/` | API Key / JWT 令牌的生命周期管理、轮换与校验 |
+| **令牌管理** | `token/` | API Key / JWT 令牌的生命周期管理、计数、预算与标准 |
 | **IPC 抽象** | `ipc/` | 跨进程通信抽象层（共享内存、Unix Socket、命名管道） |
-| **同步原语** | `sync/` | 互斥锁、读写锁、信号量、屏障、无锁队列 |
+| **同步原语** | `sync/` | 互斥锁、读写锁、信号量、屏障、自旋锁、条件变量等 8+ 种 |
 | **网络工具** | `network/` | HTTP 客户端、URI 解析、连接池、重试策略 |
 | **算法工具集** | `algorithm/` | 常用算法与数据结构（LRU Cache、Bloom Filter、限流器） |
+| **缓存管理** | `cache/` | 缓存管理，LRU/TTL 等策略 |
+| **兼容层** | `compat/` | 跨版本/跨平台兼容性适配 |
+| **UUID 生成器** | `uuid/` | UUID 生成与解析 |
+| **字符串工具** | `string/` | 字符串操作与格式化工具 |
+| **文件 I/O 工具** | `io/` | 文件读写、路径操作等 I/O 工具 |
+| **输入验证** | `security/` | 输入校验与安全过滤 |
+| **资源保护与配额** | `resource/` | 资源保护、配额限制与守卫 |
+| **成本估算** | `cost/` | 成本估算与控制器 |
 
 ## 架构分层
 
@@ -37,11 +45,39 @@
 +----------------+------------+-------------+-------------+---------+
 |  配置  |  日志  |  错误  |  内存  |  可观测性  |  令牌  |  IPC  |  同步  |
 +--------+--------+--------+--------+-----------+-------+-------+-------+
+| cache | compat | uuid | string | io | security | resource | cost |
++-------+--------+------+--------+----+----------+----------+------+
 |  平台抽象层（Platform Abstraction Layer）                           |
 +------------------------------------------------------------------+
 |  操作系统内核（Linux / Windows / MacOS）                            |
 +------------------------------------------------------------------+
 ```
+
+## 跨平台兼容性
+
+### 原子操作兼容层
+
+Commons 提供 `atomic_compat.h`（位于 `utils/include/`）实现跨平台原子操作，支持三种后端：
+
+| 后端 | 适用环境 | 实现方式 |
+|------|----------|----------|
+| C11 stdatomic | Linux / macOS（C11+ 编译器） | `<stdatomic.h>` |
+| Windows Interlocked | Windows（MSVC / MinGW） | `<intrin.h>` Interlocked API |
+| POSIX fallback | 旧版 GCC/Clang 环境 | `__atomic` builtins |
+
+统一类型系统覆盖：`atomic_bool`、`atomic_int`、`atomic_uint`、`atomic_long`、`atomic_ulong`、`atomic_int64_t`、`atomic_uint64_t`、`atomic_size_t`、`atomic_uint_fast64_t`、`atomic_uint_fast32_t`、`atomic_double`。
+
+### 统一内存管理
+
+Commons 通过 `memory_compat.h` 提供统一的内存管理宏，所有模块应使用以下宏替代标准库函数：
+
+| 宏 | 替代 | 说明 |
+|------|------|------|
+| `AGENTOS_MALLOC(size)` | `malloc(size)` | 统一内存分配 |
+| `AGENTOS_CALLOC(num, size)` | `calloc(num, size)` | 统一零初始化分配 |
+| `AGENTOS_FREE(ptr)` | `free(ptr)` | 统一内存释放 |
+
+> **BAN-12**：外部依赖（libyaml、cJSON 等）由根 `CMakeLists.txt` 集中检测，子模块不得独立调用 `find_package`。检测结果通过 `AGENTOS_HAS_CJSON` 等 CMake 缓存变量传递给子模块。
 
 ## 模块详解
 
@@ -90,7 +126,7 @@
 
 1. **Core 层**：日志核心，格式化、级别过滤、缓冲区管理
 2. **Atomic 层**：原子写入、环形缓冲区、无锁队列
-3. **Service 层**：远程日志聚合、结构化日志（JSON）、实时告警
+3. **Service 层**：远程日志聚合、结构化日志（JSON）、实时告警、监控统计与查询
 
 支持同步/异步/安全三种写入模式，可动态切换。
 
@@ -127,6 +163,7 @@ API Key 和 JWT 令牌的完整生命周期管理：
 - **存储**：哈希存储（bcrypt/argon2），不保存明文
 - **校验**：快速验证缓存 + 定期同步黑名单
 - **轮换**：自动过期、平滑轮换、旧令牌宽限期
+- **计数与预算**：Token 计数器、预算控制、标准定义
 
 ### IPC 抽象
 
@@ -143,6 +180,9 @@ API Key 和 JWT 令牌的完整生命周期管理：
 - **读写锁**：偏向读/偏向写可配置
 - **信号量**：计数信号量，支持超时
 - **屏障**：多线程同步屏障
+- **自旋锁**：低延迟自旋等待
+- **条件变量**：线程间通知与等待
+- **事件**：线程间事件信号
 - **无锁队列**：基于 CAS 的 MPSC / SPMC / MPMC 队列
 
 ### 网络工具

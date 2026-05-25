@@ -2,6 +2,8 @@
 
 `agentos/openlab/markets/templates/python-agent/`
 
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+
 ## 概述
 
 Python Agent 模板是 AgentOS 生态市场中提供的标准化 Agent 开发模板，帮助开发者快速创建基于 Python 的智能 Agent 应用。该模板遵循 AgentOS 的组件规范和通信协议，开箱即用。

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "atomic_compat.h"
 #include "channel_service.h"
 #include <stdio.h>
@@ -30,7 +31,7 @@ static int handle_service_request(const char* method,
             bool healthy = channel_service_is_healthy(svc);
             char buf[128];
             snprintf(buf, sizeof(buf), "{\"status\":\"%s\"}", healthy ? "ok" : "degraded");
-            *response_json = strdup(buf);
+            *response_json = AGENTOS_STRDUP(buf);
             return 0;
         }
         char id[128] = {0};
@@ -41,12 +42,12 @@ static int handle_service_request(const char* method,
         if (rc != CHANNEL_OK) {
             char err[256];
             snprintf(err, sizeof(err), "{\"error\":\"ping failed: %d\",\"latency_ms\":%lld}", rc, (long long)latency_ms);
-            *response_json = strdup(err);
+            *response_json = AGENTOS_STRDUP(err);
             return -1;
         }
         size_t sz = snprintf(NULL, 0, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}",
                              id, (long long)latency_ms) + 1;
-        char* buf = (char*)malloc(sz);
+        char* buf = (char*)AGENTOS_MALLOC(sz);
         if (!buf) return -1;
         snprintf(buf, sz, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}",
                  id, (long long)latency_ms);
@@ -59,12 +60,12 @@ static int handle_service_request(const char* method,
         size_t count = 0;
         int rc = channel_service_list(svc, info_list, CHANNEL_MAX_CHANNELS, &count);
         if (rc != 0) {
-            *response_json = strdup("{\"error\":\"list failed\"}");
+            *response_json = AGENTOS_STRDUP("{\"error\":\"list failed\"}");
             return -1;
         }
 
         size_t buf_size = 4096 + count * 1024;
-        char* buf = (char*)malloc(buf_size);
+        char* buf = (char*)AGENTOS_MALLOC(buf_size);
         if (!buf) return -1;
 
         size_t pos = 0;
@@ -88,7 +89,7 @@ static int handle_service_request(const char* method,
         const char* type_start = strstr(params_json, "\"type\"");
 
         if (!id_start || !name_start) {
-            *response_json = strdup("{\"error\":\"missing id or name\"}");
+            *response_json = AGENTOS_STRDUP("{\"error\":\"missing id or name\"}");
             return -1;
         }
 
@@ -112,18 +113,18 @@ static int handle_service_request(const char* method,
         if (rc != 0) {
             char err[256];
             snprintf(err, sizeof(err), "{\"error\":\"open failed: %d\"}", rc);
-            *response_json = strdup(err);
+            *response_json = AGENTOS_STRDUP(err);
             return -1;
         }
 
-        *response_json = strdup("{\"status\":\"opened\"}");
+        *response_json = AGENTOS_STRDUP("{\"status\":\"opened\"}");
         return 0;
     }
 
     if (strcmp(method, "close") == 0) {
         const char* id_start = strstr(params_json, "\"id\"");
         if (!id_start) {
-            *response_json = strdup("{\"error\":\"missing id\"}");
+            *response_json = AGENTOS_STRDUP("{\"error\":\"missing id\"}");
             return -1;
         }
         char id[128] = {0};
@@ -132,10 +133,10 @@ static int handle_service_request(const char* method,
 
         int rc = channel_service_close(svc, id);
         if (rc != 0) {
-            *response_json = strdup("{\"error\":\"close failed\"}");
+            *response_json = AGENTOS_STRDUP("{\"error\":\"close failed\"}");
             return -1;
         }
-        *response_json = strdup("{\"status\":\"closed\"}");
+        *response_json = AGENTOS_STRDUP("{\"status\":\"closed\"}");
         return 0;
     }
 
@@ -143,7 +144,7 @@ static int handle_service_request(const char* method,
         const char* id_start = strstr(params_json, "\"id\"");
         const char* data_start = strstr(params_json, "\"data\"");
         if (!id_start || !data_start) {
-            *response_json = strdup("{\"error\":\"missing id or data\"}");
+            *response_json = AGENTOS_STRDUP("{\"error\":\"missing id or data\"}");
             return -1;
         }
         char id[128] = {0};
@@ -159,21 +160,21 @@ static int handle_service_request(const char* method,
             if (rc != 0) {
                 char err[256];
                 snprintf(err, sizeof(err), "{\"error\":\"send failed: %d\"}", rc);
-                *response_json = strdup(err);
+                *response_json = AGENTOS_STRDUP(err);
                 return -1;
             }
         }
-        *response_json = strdup("{\"status\":\"sent\"}");
+        *response_json = AGENTOS_STRDUP("{\"status\":\"sent\"}");
         return 0;
     }
 
     if (strcmp(method, "health") == 0) {
         bool healthy = channel_service_is_healthy(svc);
-        *response_json = strdup(healthy ? "{\"healthy\":true}" : "{\"healthy\":false}");
+        *response_json = AGENTOS_STRDUP(healthy ? "{\"healthy\":true}" : "{\"healthy\":false}");
         return 0;
     }
 
-    *response_json = strdup("{\"error\":\"unknown method\"}");
+    *response_json = AGENTOS_STRDUP("{\"error\":\"unknown method\"}");
     return -1;
 }
 

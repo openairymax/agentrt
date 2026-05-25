@@ -10,7 +10,7 @@ services:
   agentos-atoms:
     build:
       context: ../../
-      dockerfile: scripts/deploy/docker/Dockerfile.kernel
+      dockerfile: scripts/deployment/docker/Dockerfile.kernel
       target: production
     image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-atoms:${VERSION:-latest}
     container_name: agentos-atoms
@@ -96,7 +96,8 @@ services:
   agentos-gateway:
     build:
       context: ../../
-      dockerfile: scripts/deploy/docker/Dockerfile.gateway
+      # FIXME: Dockerfile.gateway does not exist, using service image fallback
+      dockerfile: scripts/deployment/docker/Dockerfile.service
       target: production
     image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-gateway:${VERSION:-latest}
     container_name: agentos-gateway
@@ -160,7 +161,7 @@ services:
   agentos-daemon:
     build:
       context: ../../
-      dockerfile: scripts/deploy/docker/Dockerfile.service
+      dockerfile: scripts/deployment/docker/Dockerfile.service
       target: production
     image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-daemon:${VERSION:-latest}
     container_name: agentos-daemon
@@ -222,7 +223,8 @@ services:
   agentos-openlab:
     build:
       context: ../../
-      dockerfile: scripts/deploy/docker/Dockerfile.openlab
+      # FIXME: Dockerfile.openlab does not exist, using service image fallback
+      dockerfile: scripts/deployment/docker/Dockerfile.service
       target: production
     image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-openlab:${VERSION:-latest}
     container_name: agentos-openlab
@@ -670,7 +672,7 @@ networks:
   agentos-production-network:
     driver: bridge
     ipam:
-      manager:
+      config:
         - subnet: 172.30.0.0/16
     driver_opts:
       com.docker.network.bridge.name: br-production
@@ -680,7 +682,7 @@ networks:
     driver: bridge
     internal: false
     ipam:
-      manager:
+      config:
         - subnet: 172.31.0.0/16
     driver_opts:
       com.docker.network.bridge.name: br-internal

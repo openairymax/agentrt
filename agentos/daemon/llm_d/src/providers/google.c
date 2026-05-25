@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file google.c
  * @brief Google Gemini 适配器实现
@@ -35,7 +36,7 @@ static provider_ctx_t* google_init(const char* name __attribute__((unused)),
                                    double timeout_sec,
                                    int max_retries) {
 
-    google_ctx_t* ctx = (google_ctx_t*)calloc(1, sizeof(google_ctx_t));
+    google_ctx_t* ctx = (google_ctx_t*)AGENTOS_CALLOC(1, sizeof(google_ctx_t));
     if (!ctx) {
         return NULL;
     }
@@ -48,7 +49,7 @@ static provider_ctx_t* google_init(const char* name __attribute__((unused)),
 
 static void google_destroy(provider_ctx_t* ctx_ptr) {
     if (ctx_ptr) {
-        free(ctx_ptr);
+        AGENTOS_FREE(ctx_ptr);
     }
 }
 
@@ -66,7 +67,7 @@ static char* google_build_request(const llm_request_config_t* manager) {
         const char* content = manager->messages[i].content ? manager->messages[i].content : "";
 
         if (strcmp(role, "system") == 0) {
-            system_instruction_text = strdup(content);
+            system_instruction_text = AGENTOS_STRDUP(content);
             continue;
         }
 
@@ -92,7 +93,7 @@ static char* google_build_request(const llm_request_config_t* manager) {
         cJSON_AddItemToArray(si_parts, si_part);
         cJSON_AddItemToObject(si, "parts", si_parts);
         cJSON_AddItemToObject(root, "systemInstruction", si);
-        free(system_instruction_text);
+        AGENTOS_FREE(system_instruction_text);
     }
 
     cJSON* gen_config = cJSON_CreateObject();
@@ -119,7 +120,7 @@ static int google_parse_response(const char* body, llm_response_t** out) {
         return AGENTOS_ERR_PARSE_ERROR;
     }
 
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t* resp = (llm_response_t*)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
         cJSON_Delete(root);
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -135,18 +136,18 @@ static int google_parse_response(const char* body, llm_response_t** out) {
                 cJSON* part0 = cJSON_GetArrayItem(parts, 0);
                 cJSON* text = cJSON_GetObjectItem(part0, "text");
                 if (cJSON_IsString(text) && text->valuestring) {
-                    resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
+                    resp->choices = (llm_message_t*)AGENTOS_CALLOC(1, sizeof(llm_message_t));
                     if (resp->choices) {
-                        char* role_copy = strdup("assistant");
-                        char* content_copy = strdup(text->valuestring);
+                        char* role_copy = AGENTOS_STRDUP("assistant");
+                        char* content_copy = AGENTOS_STRDUP(text->valuestring);
                         if (role_copy && content_copy) {
                             resp->choices[0].role = role_copy;
                             resp->choices[0].content = content_copy;
                             resp->choice_count = 1;
                         } else {
-                            free(role_copy);
-                            free(content_copy);
-                            free(resp->choices);
+                            AGENTOS_FREE(role_copy);
+                            AGENTOS_FREE(content_copy);
+                            AGENTOS_FREE(resp->choices);
                             resp->choices = NULL;
                             resp->choice_count = 0;
                         }
@@ -161,20 +162,20 @@ static int google_parse_response(const char* body, llm_response_t** out) {
         if (cJSON_IsString(finish) && finish->valuestring) {
             const char* fr = finish->valuestring;
             if (strcmp(fr, "STOP") == 0) {
-                resp->finish_reason = strdup("stop");
+                resp->finish_reason = AGENTOS_STRDUP("stop");
             } else if (strcmp(fr, "MAX_TOKENS") == 0) {
-                resp->finish_reason = strdup("length");
+                resp->finish_reason = AGENTOS_STRDUP("length");
             } else if (strcmp(fr, "SAFETY") == 0) {
-                resp->finish_reason = strdup("content_filter");
+                resp->finish_reason = AGENTOS_STRDUP("content_filter");
             } else {
-                resp->finish_reason = strdup(fr);
+                resp->finish_reason = AGENTOS_STRDUP(fr);
             }
         }
     }
 
     cJSON* model = cJSON_GetObjectItem(root, "modelVersion");
     if (cJSON_IsString(model) && model->valuestring) {
-        resp->model = strdup(model->valuestring);
+        resp->model = AGENTOS_STRDUP(model->valuestring);
     }
 
     cJSON* usage = cJSON_GetObjectItem(root, "usageMetadata");
@@ -229,7 +230,7 @@ static int google_complete(provider_ctx_t* ctx_ptr,
                                 &http_resp, &http_code);
 
     curl_slist_free_all(headers);
-    free(req_body);
+    AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
         SVC_LOG_ERROR("google: HTTP request failed, status=%ld", http_code);
@@ -271,12 +272,12 @@ typedef struct {
 static void gg_sse_init(gg_sse_ctx_t* s, gg_stream_acc_t* a) {
     memset(s, 0, sizeof(*s));
     s->line_cap = 4096;
-    s->line_buf = (char*)malloc(s->line_cap);
+    s->line_buf = (char*)AGENTOS_MALLOC(s->line_cap);
     s->acc = a;
 }
 
 static void gg_sse_destroy(gg_sse_ctx_t* s) {
-    if (s) { free(s->line_buf); s->line_buf = NULL; }
+    if (s) { AGENTOS_FREE(s->line_buf); s->line_buf = NULL; }
 }
 
 static int gg_feed_sse_data(gg_sse_ctx_t* s, const char* data, size_t data_len) {
@@ -309,7 +310,7 @@ static int gg_feed_sse_data(gg_sse_ctx_t* s, const char* data, size_t data_len) 
                             if (needed > acc->acc_cap) {
                                 size_t nc = acc->acc_cap * 2;
                                 while (nc < needed) nc *= 2;
-                                char* p = (char*)realloc(acc->acc_content, nc);
+                                char* p = (char*)AGENTOS_REALLOC(acc->acc_content, nc);
                                 if (p) { acc->acc_content = p; acc->acc_cap = nc; }
                             }
                             if (acc->acc_content && acc->acc_len + clen < acc->acc_cap) {
@@ -325,14 +326,14 @@ static int gg_feed_sse_data(gg_sse_ctx_t* s, const char* data, size_t data_len) 
 
         cJSON* finish = cJSON_GetObjectItem(first, "finishReason");
         if (cJSON_IsString(finish) && finish->valuestring) {
-            free(acc->finish_reason);
+            AGENTOS_FREE(acc->finish_reason);
             const char* fr = finish->valuestring;
             if (strcmp(fr, "STOP") == 0) {
-                acc->finish_reason = strdup("stop");
+                acc->finish_reason = AGENTOS_STRDUP("stop");
             } else if (strcmp(fr, "MAX_TOKENS") == 0) {
-                acc->finish_reason = strdup("length");
+                acc->finish_reason = AGENTOS_STRDUP("length");
             } else {
-                acc->finish_reason = strdup(fr);
+                acc->finish_reason = AGENTOS_STRDUP(fr);
             }
         }
     }
@@ -347,7 +348,7 @@ static int gg_feed_sse_data(gg_sse_ctx_t* s, const char* data, size_t data_len) 
 
     cJSON* mv = cJSON_GetObjectItem(root, "modelVersion");
     if (cJSON_IsString(mv) && mv->valuestring && !acc->resp_model) {
-        acc->resp_model = strdup(mv->valuestring);
+        acc->resp_model = AGENTOS_STRDUP(mv->valuestring);
     }
 
     cJSON_Delete(root);
@@ -371,12 +372,12 @@ static void gg_process_buffer(gg_sse_ctx_t* s) {
             const char* ds = p + 5;
             while (*ds == ' ' || *ds == '\t') ds++;
             size_t dlen = llen - (size_t)(ds - p);
-            char* data_copy = (char*)malloc(dlen + 1);
+            char* data_copy = (char*)AGENTOS_MALLOC(dlen + 1);
             if (data_copy) {
                 memcpy(data_copy, ds, dlen);
                 data_copy[dlen] = '\0';
                 gg_feed_sse_data(s, data_copy, dlen);
-                free(data_copy);
+                AGENTOS_FREE(data_copy);
             }
         }
 
@@ -402,7 +403,7 @@ static size_t gg_sse_write_cb(void* contents, size_t size, size_t nmemb,
     if (needed > s->line_cap) {
         size_t nc = s->line_cap * 2;
         while (nc < needed) nc *= 2;
-        char* ptr = (char*)realloc(s->line_buf, nc);
+        char* ptr = (char*)AGENTOS_REALLOC(s->line_buf, nc);
         if (!ptr) return 0;
         s->line_buf = ptr; s->line_cap = nc;
     }
@@ -416,32 +417,32 @@ static size_t gg_sse_write_cb(void* contents, size_t size, size_t nmemb,
 }
 
 static llm_response_t* gg_build_stream_response(gg_stream_acc_t* acc) {
-    llm_response_t* r = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t* r = (llm_response_t*)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!r) return NULL;
 
-    r->id = strdup("");
-    r->model = acc->resp_model ? acc->resp_model : strdup("unknown");
+    r->id = AGENTOS_STRDUP("");
+    r->model = acc->resp_model ? acc->resp_model : AGENTOS_STRDUP("unknown");
     acc->resp_model = NULL;
     r->prompt_tokens = acc->prompt_tokens;
     r->completion_tokens = acc->completion_tokens;
     r->total_tokens = r->prompt_tokens + r->completion_tokens;
-    r->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
+    r->choices = (llm_message_t*)AGENTOS_CALLOC(1, sizeof(llm_message_t));
     if (r->choices) {
-        char* role_copy = strdup("assistant");
+        char* role_copy = AGENTOS_STRDUP("assistant");
         if (role_copy) {
             r->choices[0].role = role_copy;
             r->choices[0].content = acc->acc_content;
             acc->acc_content = NULL;
             r->choice_count = 1;
         } else {
-            free(r->choices);
+            AGENTOS_FREE(r->choices);
             r->choices = NULL;
             r->choice_count = 0;
         }
     } else {
         r->choice_count = 0;
     }
-    r->finish_reason = acc->finish_reason ? acc->finish_reason : strdup("stop");
+    r->finish_reason = acc->finish_reason ? acc->finish_reason : AGENTOS_STRDUP("stop");
     acc->finish_reason = NULL;
     return r;
 }
@@ -483,13 +484,13 @@ static int google_complete_stream(provider_ctx_t* ctx_ptr,
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;
-    acc.acc_content = (char*)malloc(acc.acc_cap);
+    acc.acc_content = (char*)AGENTOS_MALLOC(acc.acc_cap);
 
     gg_sse_ctx_t sse;
     gg_sse_init(&sse, &acc);
     if (!sse.line_buf) {
-        free(req_body); curl_slist_free_all(headers);
-        free(acc.acc_content);
+        AGENTOS_FREE(req_body); curl_slist_free_all(headers);
+        AGENTOS_FREE(acc.acc_content);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -522,18 +523,18 @@ static int google_complete_stream(provider_ctx_t* ctx_ptr,
 
     gg_sse_destroy(&sse);
     curl_slist_free_all(headers);
-    free(req_body);
+    AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
         SVC_LOG_ERROR("google: Stream HTTP error, status=%ld", http_code);
-        free(acc.acc_content); free(acc.resp_model);
-        free(acc.finish_reason);
+        AGENTOS_FREE(acc.acc_content); AGENTOS_FREE(acc.resp_model);
+        AGENTOS_FREE(acc.finish_reason);
         return ret;
     }
 
     llm_response_t* resp = gg_build_stream_response(&acc);
-    free(acc.acc_content); free(acc.resp_model);
-    free(acc.finish_reason);
+    AGENTOS_FREE(acc.acc_content); AGENTOS_FREE(acc.resp_model);
+    AGENTOS_FREE(acc.finish_reason);
 
     if (out_response) *out_response = resp;
     else if (resp) llm_response_free(resp);

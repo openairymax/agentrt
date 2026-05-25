@@ -2,6 +2,8 @@
 
 `cupolas/src/permission/` 提供基于 RBAC（基于角色的访问控制）和 ABAC（基于属性的访问控制）的权限管理引擎。
 
+> Part of AgentOS v0.0.5
+
 ## 设计目标
 
 - **双模授权**：同时支持 RBAC 和 ABAC，灵活适应不同场景
@@ -63,7 +65,7 @@
 ## 使用示例
 
 ```c
-#include "cupolas/src/permission/permission.h"
+#include "cupolas/permission.h"
 
 // 初始化权限引擎
 permission_engine_t* engine = permission_engine_create();
@@ -104,6 +106,15 @@ if (result == PERMISSION_GRANTED) {
 | 用户角色 | 300s | 角色变更时主动失效 |
 | 角色权限 | 600s | 权限变更时主动失效 |
 | ABAC 策略 | 60s | 策略变更时主动失效 |
+
+## 相关子系统
+
+| 子系统 | 关系 |
+|--------|------|
+| [Sanitizer](../sanitizer/README.md) | 输入清洗后的请求进入权限检查 |
+| [Audit](../audit/README.md) | 权限拒绝事件会记录审计日志 |
+| [Security](../security/README.md) | 安全防护引擎中的 Entitlements 提供声明式权限（需 OpenSSL） |
+| [Guards](#) | 安全守卫可拦截越权操作 |
 
 ---
 

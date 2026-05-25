@@ -392,7 +392,7 @@ static void *worker_thread_func(void *arg)
         if (unit) {
             exec_err = unit->execution_unit_execute(unit, tcb->task_desc->task_input, &output);
             if (output) {
-                output_len = strlen((const char *)output);
+                output_len = strnlen((const char *)output, AGENTOS_EXEC_MAX_OUTPUT_LEN);
             }
         } else {
             exec_err = AGENTOS_ENOENT;
@@ -740,7 +740,6 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
             tcb->end_time_ns = agentos_time_monotonic_ns();
             agentos_cond_signal(tcb->completed_cond);
             agentos_mutex_unlock(tcb->tcb_lock);
-            tcb_release(tcb);
             tcb_release(tcb);
             return AGENTOS_SUCCESS;
         }

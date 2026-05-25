@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file response.c
  * @brief 响应序列化实现
@@ -40,17 +41,17 @@ llm_response_t* response_from_json(const char* json) {
     cJSON* root = cJSON_Parse(json);
     if (!root) return NULL;
 
-    llm_response_t* resp = calloc(1, sizeof(llm_response_t));
+    llm_response_t* resp = AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
         cJSON_Delete(root);
         return NULL;
     }
 
     cJSON* id = cJSON_GetObjectItem(root, "id");
-    if (cJSON_IsString(id)) resp->id = strdup(id->valuestring);
+    if (cJSON_IsString(id)) resp->id = AGENTOS_STRDUP(id->valuestring);
 
     cJSON* model = cJSON_GetObjectItem(root, "model");
-    if (cJSON_IsString(model)) resp->model = strdup(model->valuestring);
+    if (cJSON_IsString(model)) resp->model = AGENTOS_STRDUP(model->valuestring);
 
     cJSON* created = cJSON_GetObjectItem(root, "created");
     if (cJSON_IsNumber(created)) resp->created = (uint64_t)created->valuedouble;
@@ -65,18 +66,18 @@ llm_response_t* response_from_json(const char* json) {
     if (cJSON_IsNumber(total_tokens)) resp->total_tokens = (uint32_t)total_tokens->valuedouble;
 
     cJSON* finish_reason = cJSON_GetObjectItem(root, "finish_reason");
-    if (cJSON_IsString(finish_reason)) resp->finish_reason = strdup(finish_reason->valuestring);
+    if (cJSON_IsString(finish_reason)) resp->finish_reason = AGENTOS_STRDUP(finish_reason->valuestring);
 
     cJSON* choices = cJSON_GetObjectItem(root, "choices");
     if (cJSON_IsArray(choices)) {
         resp->choice_count = cJSON_GetArraySize(choices);
-        resp->choices = calloc(resp->choice_count, sizeof(llm_message_t));
+        resp->choices = AGENTOS_CALLOC(resp->choice_count, sizeof(llm_message_t));
         for (size_t i = 0; i < resp->choice_count; ++i) {
             cJSON* choice = cJSON_GetArrayItem(choices, i);
             cJSON* role = cJSON_GetObjectItem(choice, "role");
             cJSON* content = cJSON_GetObjectItem(choice, "content");
-            if (cJSON_IsString(role)) resp->choices[i].role = strdup(role->valuestring);
-            if (cJSON_IsString(content)) resp->choices[i].content = strdup(content->valuestring);
+            if (cJSON_IsString(role)) resp->choices[i].role = AGENTOS_STRDUP(role->valuestring);
+            if (cJSON_IsString(content)) resp->choices[i].content = AGENTOS_STRDUP(content->valuestring);
         }
     }
 

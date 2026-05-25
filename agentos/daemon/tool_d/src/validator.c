@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file validator.c
  * @brief 工具参数验证器实现（基于 cJSON Schema 验证）
@@ -20,13 +21,13 @@ struct tool_validator {
 };
 
 tool_validator_t* tool_validator_create(void) {
-    tool_validator_t* val = calloc(1, sizeof(tool_validator_t));
+    tool_validator_t* val = AGENTOS_CALLOC(1, sizeof(tool_validator_t));
     if (val) val->strict_mode = 1;
     return val;
 }
 
 void tool_validator_destroy(tool_validator_t* val) {
-    free(val);
+    AGENTOS_FREE(val);
 }
 
 static int validate_type_mismatch(const char* param_name,
