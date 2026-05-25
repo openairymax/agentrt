@@ -41,17 +41,14 @@ jobs:
       - name: TypeScript Check
         working-directory: agentos/toolkit/typescript
         run: npx tsc --noEmit
-        continue-on-error: true
 
       - name: Lint
         working-directory: agentos/toolkit/typescript
         run: npx eslint src/ --max-warnings 0
-        continue-on-error: true
 
       - name: Build
         working-directory: agentos/toolkit/typescript
         run: npm run build
-        continue-on-error: true
 
       - name: Verify Build Output
         working-directory: agentos/toolkit/typescript

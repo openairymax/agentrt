@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file sched_service_impl.c
  * @brief 调度服务核心实现
@@ -25,11 +26,11 @@ struct sched_service {
 int sched_service_create(const sched_config_t* config, sched_service_t** service) {
     if (!config || !service) return -1;
 
-    sched_service_t* svc = (sched_service_t*)calloc(1, sizeof(sched_service_t));
+    sched_service_t* svc = (sched_service_t*)AGENTOS_CALLOC(1, sizeof(sched_service_t));
     if (!svc) return -2;
 
     memcpy(&svc->config, config, sizeof(sched_config_t));
-    if (config->ml_model_path) svc->config.ml_model_path = strdup(config->ml_model_path);
+    if (config->ml_model_path) svc->config.ml_model_path = AGENTOS_STRDUP(config->ml_model_path);
 
     svc->initialized = 1;
     *service = svc;
@@ -41,14 +42,14 @@ int sched_service_destroy(sched_service_t* service) {
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (service->agents[i]) {
-            free(service->agents[i]->agent_id);
-            free(service->agents[i]->agent_name);
-            free(service->agents[i]);
+            AGENTOS_FREE(service->agents[i]->agent_id);
+            AGENTOS_FREE(service->agents[i]->agent_name);
+            AGENTOS_FREE(service->agents[i]);
         }
     }
 
-    free((void*)service->config.ml_model_path);
-    free(service);
+    AGENTOS_FREE((void*)service->config.ml_model_path);
+    AGENTOS_FREE(service);
     return 0;
 }
 
@@ -67,16 +68,16 @@ int sched_service_register_agent(sched_service_t* service, const agent_info_t* a
         }
     }
 
-    agent_info_t* new_agent = (agent_info_t*)calloc(1, sizeof(agent_info_t));
+    agent_info_t* new_agent = (agent_info_t*)AGENTOS_CALLOC(1, sizeof(agent_info_t));
     if (!new_agent) return -3;
 
-    if (!agent_info->agent_id) { free(new_agent); return -1; }
-    new_agent->agent_id = strdup(agent_info->agent_id);
-    new_agent->agent_name = agent_info->agent_name ? strdup(agent_info->agent_name) : strdup("");
+    if (!agent_info->agent_id) { AGENTOS_FREE(new_agent); return -1; }
+    new_agent->agent_id = AGENTOS_STRDUP(agent_info->agent_id);
+    new_agent->agent_name = agent_info->agent_name ? AGENTOS_STRDUP(agent_info->agent_name) : AGENTOS_STRDUP("");
     if (!new_agent->agent_id || !new_agent->agent_name) {
-        free(new_agent->agent_id);
-        free(new_agent->agent_name);
-        free(new_agent);
+        AGENTOS_FREE(new_agent->agent_id);
+        AGENTOS_FREE(new_agent->agent_name);
+        AGENTOS_FREE(new_agent);
         return -3;
     }
     new_agent->load_factor = agent_info->load_factor;
@@ -94,9 +95,9 @@ int sched_service_unregister_agent(sched_service_t* service, const char* agent_i
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_id) == 0) {
-            free(service->agents[i]->agent_id);
-            free(service->agents[i]->agent_name);
-            free(service->agents[i]);
+            AGENTOS_FREE(service->agents[i]->agent_id);
+            AGENTOS_FREE(service->agents[i]->agent_name);
+            AGENTOS_FREE(service->agents[i]);
 
             for (size_t j = i; j < service->agent_count - 1; j++) {
                 service->agents[j] = service->agents[j + 1];
@@ -127,7 +128,7 @@ int sched_service_update_agent_status(sched_service_t* service, const agent_info
 int sched_service_schedule_task(sched_service_t* service, const task_info_t* task_info, sched_result_t** result) {
     if (!service || !task_info || !result || !service->initialized) return -1;
 
-    sched_result_t* res = (sched_result_t*)calloc(1, sizeof(sched_result_t));
+    sched_result_t* res = (sched_result_t*)AGENTOS_CALLOC(1, sizeof(sched_result_t));
     if (!res) return -2;
 
     agent_info_t* best_agent = NULL;
@@ -168,7 +169,7 @@ int sched_service_schedule_task(sched_service_t* service, const task_info_t* tas
     service->total_tasks_scheduled++;
 
     if (best_agent) {
-        res->selected_agent_id = strdup(best_agent->agent_id);
+        res->selected_agent_id = AGENTOS_STRDUP(best_agent->agent_id);
         res->confidence = best_score > 0 ? (best_score > 1.0f ? 1.0f : best_score) : 0.5f;
         res->estimated_time_ms = best_agent->avg_response_time_ms;
         service->total_success++;
@@ -185,7 +186,7 @@ int sched_service_schedule_task(sched_service_t* service, const task_info_t* tas
 int sched_service_get_stats(sched_service_t* service, void** stats) {
     if (!service || !stats || !service->initialized) return -1;
 
-    char* json_stats = (char*)malloc(512);
+    char* json_stats = (char*)AGENTOS_MALLOC(512);
     if (!json_stats) return -2;
 
     snprintf(json_stats, 512,
@@ -218,12 +219,12 @@ int sched_service_health_check(sched_service_t* service, bool* health_status) {
 int sched_service_reload_config(sched_service_t* service, const sched_config_t* config) {
     if (!service || !config || !service->initialized) return -1;
 
-    free((void*)service->config.ml_model_path);
+    AGENTOS_FREE((void*)service->config.ml_model_path);
     service->config.ml_model_path = NULL;
 
     memcpy(&service->config, config, sizeof(sched_config_t));
     if (config->ml_model_path) {
-        service->config.ml_model_path = strdup(config->ml_model_path);
+        service->config.ml_model_path = AGENTOS_STRDUP(config->ml_model_path);
         if (!service->config.ml_model_path) return -3;
     }
 

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file executor.c
  * @brief 工具执行器实现（生产级进程管理）
@@ -31,7 +32,7 @@ tool_executor_t* tool_executor_create(const tool_executor_config_t* cfg) {
         cfg = &local_cfg;
     }
 
-    tool_executor_t* exec = (tool_executor_t*)calloc(1, sizeof(tool_executor_t));
+    tool_executor_t* exec = (tool_executor_t*)AGENTOS_CALLOC(1, sizeof(tool_executor_t));
     if (!exec) return NULL;
 
     exec->manager = *cfg;
@@ -39,7 +40,7 @@ tool_executor_t* tool_executor_create(const tool_executor_config_t* cfg) {
         exec->manager.timeout_sec = 30;
     }
     if (agentos_mutex_init(&exec->lock) != 0) {
-        free(exec);
+        AGENTOS_FREE(exec);
         return NULL;
     }
     exec->total_executions = 0;
@@ -57,7 +58,7 @@ void tool_executor_destroy(tool_executor_t* exec) {
                 (unsigned long long)exec->total_executions,
                 (unsigned long long)exec->success_count);
     agentos_mutex_destroy(&exec->lock);
-    free(exec);
+    AGENTOS_FREE(exec);
 }
 
 int tool_executor_run(tool_executor_t* exec,
@@ -70,7 +71,7 @@ int tool_executor_run(tool_executor_t* exec,
 
     *out_result = NULL;
 
-    tool_result_t* result = (tool_result_t*)calloc(1, sizeof(tool_result_t));
+    tool_result_t* result = (tool_result_t*)AGENTOS_CALLOC(1, sizeof(tool_result_t));
     if (!result) return AGENTOS_ERR_OUT_OF_MEMORY;
 
     agentos_mutex_lock(&exec->lock);
@@ -79,8 +80,8 @@ int tool_executor_run(tool_executor_t* exec,
 
     if (!meta->executable || strlen(meta->executable) == 0) {
         result->success = 0;
-        result->output = strdup("");
-        result->error = strdup("No executable specified in tool metadata");
+        result->output = AGENTOS_STRDUP("");
+        result->error = AGENTOS_STRDUP("No executable specified in tool metadata");
         result->exit_code = -1;
         result->duration_ms = 0;
         *out_result = result;
@@ -96,8 +97,8 @@ int tool_executor_run(tool_executor_t* exec,
         for (const char* dc = dangerous_chars; *dc; dc++) {
             if (strchr(check_inputs[ci], *dc)) {
                 result->success = 0;
-                result->output = strdup("");
-                result->error = strdup("Command rejected: contains prohibited shell metacharacters");
+                result->output = AGENTOS_STRDUP("");
+                result->error = AGENTOS_STRDUP("Command rejected: contains prohibited shell metacharacters");
                 result->exit_code = -1;
                 result->duration_ms = 0;
                 *out_result = result;
@@ -118,8 +119,8 @@ int tool_executor_run(tool_executor_t* exec,
     FILE* pipe = popen(full_command, "r");
     if (!pipe) {
         result->success = 0;
-        result->output = strdup("");
-        result->error = strdup("Failed to execute command: popen failed");
+        result->output = AGENTOS_STRDUP("");
+        result->error = AGENTOS_STRDUP("Failed to execute command: popen failed");
         result->exit_code = -1;
         result->duration_ms = (uint32_t)((time(NULL) - start_time) * 1000);
         *out_result = result;
@@ -129,12 +130,12 @@ int tool_executor_run(tool_executor_t* exec,
 
     size_t output_size = 4096;
     size_t output_len = 0;
-    char* output_buffer = (char*)malloc(output_size);
+    char* output_buffer = (char*)AGENTOS_MALLOC(output_size);
     if (!output_buffer) {
         pclose(pipe);
         result->success = 0;
-        result->output = strdup("");
-        result->error = strdup("Memory allocation failed for output buffer");
+        result->output = AGENTOS_STRDUP("");
+        result->error = AGENTOS_STRDUP("Memory allocation failed for output buffer");
         result->exit_code = -1;
         result->duration_ms = (uint32_t)((time(NULL) - start_time) * 1000);
         *out_result = result;
@@ -148,7 +149,7 @@ int tool_executor_run(tool_executor_t* exec,
         output_len += bytes_read;
         if (output_len >= output_size - 256) {
             output_size *= 2;
-            char* new_buf = (char*)realloc(output_buffer, output_size);
+            char* new_buf = (char*)AGENTOS_REALLOC(output_buffer, output_size);
             if (!new_buf) break;
             output_buffer = new_buf;
         }
@@ -165,15 +166,15 @@ int tool_executor_run(tool_executor_t* exec,
         if (WIFEXITED(exit_status)) {
             char err_msg[256];
             snprintf(err_msg, sizeof(err_msg), "Command exited with code %d", WEXITSTATUS(exit_status));
-            result->error = strdup(err_msg);
+            result->error = AGENTOS_STRDUP(err_msg);
             result->exit_code = WEXITSTATUS(exit_status);
         } else if (WIFSIGNALED(exit_status)) {
             char err_msg[256];
             snprintf(err_msg, sizeof(err_msg), "Command killed by signal %d", WTERMSIG(exit_status));
-            result->error = strdup(err_msg);
+            result->error = AGENTOS_STRDUP(err_msg);
             result->exit_code = -WTERMSIG(exit_status);
         } else {
-            result->error = strdup("Unknown execution error");
+            result->error = AGENTOS_STRDUP("Unknown execution error");
             result->exit_code = -1;
         }
     } else {

@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file weighted.c
  * @brief 加权调度策略实现（基于实际API定义）
@@ -68,9 +69,9 @@ static int select_by_weight(weighted_data_t* data) {
 /* ==================== strategy_interface_t 实现 ==================== */
 
 static int weighted_create(const sched_config_t* manager __attribute__((unused)), void** out_data) {
-    weighted_data_t* data = (weighted_data_t*)calloc(1, sizeof(weighted_data_t));
+    weighted_data_t* data = (weighted_data_t*)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
     if (!data) return AGENTOS_ERR_OUT_OF_MEMORY;
-    if (agentos_mutex_init(&data->lock) != 0) { free(data); return AGENTOS_ERR_UNKNOWN; }
+    if (agentos_mutex_init(&data->lock) != 0) { AGENTOS_FREE(data); return AGENTOS_ERR_UNKNOWN; }
     data->total_weight = 0.0;
     *out_data = data;
     return AGENTOS_OK;
@@ -80,10 +81,10 @@ static int weighted_destroy(void* raw_data) {
     if (!raw_data) return AGENTOS_ERR_INVALID_PARAM;
     weighted_data_t* data = (weighted_data_t*)raw_data;
     agentos_mutex_lock(&data->lock);
-    for (size_t i = 0; i < data->agent_count; i++) free(data->agents[i].agent_id);
+    for (size_t i = 0; i < data->agent_count; i++) AGENTOS_FREE(data->agents[i].agent_id);
     agentos_mutex_unlock(&data->lock);
     agentos_mutex_destroy(&data->lock);
-    free(data);
+    AGENTOS_FREE(data);
     return AGENTOS_OK;
 }
 
@@ -100,7 +101,7 @@ static int weighted_register_agent(void* raw_data, const agent_info_t* agent) {
         return AGENTOS_ERR_OVERFLOW;
     }
     size_t idx = data->agent_count;
-    data->agents[idx].agent_id = strdup(agent->agent_id);
+    data->agents[idx].agent_id = AGENTOS_STRDUP(agent->agent_id);
     if (!data->agents[idx].agent_id) {
         agentos_mutex_unlock(&data->lock);
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -122,7 +123,7 @@ static int weighted_unregister_agent(void* raw_data, const char* agent_id) {
     agentos_mutex_lock(&data->lock);
     int idx = find_agent_index(data, agent_id);
     if (idx < 0) { agentos_mutex_unlock(&data->lock); return AGENTOS_ERR_NOT_FOUND; }
-    free(data->agents[idx].agent_id);
+    AGENTOS_FREE(data->agents[idx].agent_id);
     for (size_t i = (size_t)idx; i < data->agent_count - 1; i++)
         data->agents[i] = data->agents[i + 1];
     memset(&data->agents[--data->agent_count], 0, sizeof(agent_weight_t));
@@ -151,9 +152,9 @@ static int weighted_schedule(void* raw_data, const task_info_t* task_info __attr
     if (data->agent_count == 0) { agentos_mutex_unlock(&data->lock); return AGENTOS_ERR_SCHED_NO_AGENT; }
     int idx = select_by_weight(data);
     if (idx < 0) { agentos_mutex_unlock(&data->lock); return AGENTOS_ERR_SCHED_NO_AGENT; }
-    sched_result_t* result = (sched_result_t*)calloc(1, sizeof(sched_result_t));
+    sched_result_t* result = (sched_result_t*)AGENTOS_CALLOC(1, sizeof(sched_result_t));
     if (!result) { agentos_mutex_unlock(&data->lock); return AGENTOS_ERR_OUT_OF_MEMORY; }
-    result->selected_agent_id = strdup(data->agents[idx].agent_id);
+    result->selected_agent_id = AGENTOS_STRDUP(data->agents[idx].agent_id);
     result->confidence = (float)(data->agents[idx].weight / data->total_weight);
     result->estimated_time_ms = (uint32_t)data->agents[idx].avg_latency_ms;
     *out_result = result;

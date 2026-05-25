@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file service.c
  * @brief 工具服务核心逻辑
@@ -22,7 +23,7 @@
 
 tool_service_t* tool_service_create(const char* config_path __attribute__((unused))) {
     
-    tool_service_t* svc = (tool_service_t*)calloc(1, sizeof(tool_service_t));
+    tool_service_t* svc = (tool_service_t*)AGENTOS_CALLOC(1, sizeof(tool_service_t));
     if (!svc) {
         SVC_LOG_ERROR("Failed to allocate tool service");
         return NULL;
@@ -30,7 +31,7 @@ tool_service_t* tool_service_create(const char* config_path __attribute__((unuse
     
     if (agentos_mutex_init(&svc->lock) != 0) {
         SVC_LOG_ERROR("Failed to initialize service lock");
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -39,7 +40,7 @@ tool_service_t* tool_service_create(const char* config_path __attribute__((unuse
     if (!svc->registry) {
         SVC_LOG_ERROR("Failed to create registry");
         agentos_mutex_destroy(&svc->lock);
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -53,7 +54,7 @@ tool_service_t* tool_service_create(const char* config_path __attribute__((unuse
         SVC_LOG_ERROR("Failed to create executor");
         tool_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -64,7 +65,7 @@ tool_service_t* tool_service_create(const char* config_path __attribute__((unuse
         tool_executor_destroy(svc->executor);
         tool_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
-        free(svc);
+        AGENTOS_FREE(svc);
         return NULL;
     }
 
@@ -104,7 +105,7 @@ void tool_service_destroy(tool_service_t* svc) {
     }
     
     agentos_mutex_destroy(&svc->lock);
-    free(svc);
+    AGENTOS_FREE(svc);
 }
 
 /* ---------- 工具注册 ---------- */
@@ -223,17 +224,17 @@ static tool_result_t* get_cached_result(tool_service_t* svc,
     char* cached = NULL;
     if (tool_cache_get(svc->cache, cache_key, &cached) == 1 && cached) {
         tool_result_t* res = tool_result_from_json(cached);
-        free(cached);
+        AGENTOS_FREE(cached);
         cached = NULL;
         if (res) {
             SVC_LOG_DEBUG("Cache hit for tool: %s", tool_id);
-            free(cache_key);
+            AGENTOS_FREE(cache_key);
             return res;
         }
         SVC_LOG_WARN("Failed to parse cached result for tool: %s", tool_id);
     }
 
-    free(cache_key);
+    AGENTOS_FREE(cache_key);
     cache_key = NULL;
     return NULL;
 }
@@ -262,11 +263,11 @@ static void cache_tool_result(tool_service_t* svc,
     char* res_json = tool_result_to_json(res);
     if (res_json) {
         tool_cache_put(svc->cache, cache_key, res_json);
-        free(res_json);
+        AGENTOS_FREE(res_json);
         res_json = NULL;
     }
 
-    free(cache_key);
+    AGENTOS_FREE(cache_key);
     cache_key = NULL;
 }
 
@@ -429,26 +430,26 @@ int tool_service_execute_stream(tool_service_t* svc,
 
 void tool_result_free(tool_result_t* res) {
     if (!res) return;
-    free(res->output);
-    free(res->error);
-    free(res);
+    AGENTOS_FREE(res->output);
+    AGENTOS_FREE(res->error);
+    AGENTOS_FREE(res);
 }
 
 /* ---------- 工具元数据释放 ---------- */
 
 void tool_metadata_free(tool_metadata_t* meta) {
     if (!meta) return;
-    free(meta->id);
-    free(meta->name);
-    free(meta->description);
-    free(meta->executable);
+    AGENTOS_FREE(meta->id);
+    AGENTOS_FREE(meta->name);
+    AGENTOS_FREE(meta->description);
+    AGENTOS_FREE(meta->executable);
     
     for (size_t i = 0; i < meta->param_count; ++i) {
-        free((void*)meta->params[i].name);
-        free((void*)meta->params[i].schema);
+        AGENTOS_FREE((void*)meta->params[i].name);
+        AGENTOS_FREE((void*)meta->params[i].schema);
     }
-    free(meta->params);
+    AGENTOS_FREE(meta->params);
     
-    free(meta->permission_rule);
-    free(meta);
+    AGENTOS_FREE(meta->permission_rule);
+    AGENTOS_FREE(meta);
 }
