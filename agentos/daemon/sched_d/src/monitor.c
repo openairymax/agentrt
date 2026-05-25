@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file monitor.c
  * @brief 监控模块实现
@@ -31,7 +32,7 @@ typedef struct {
  * @return 0 表示成功，非 0 表示错误码
  */
 int monitor_create(void** data) {
-    monitor_data_t* md = (monitor_data_t*)malloc(sizeof(monitor_data_t));
+    monitor_data_t* md = (monitor_data_t*)AGENTOS_MALLOC(sizeof(monitor_data_t));
     if (!md) {
         return -1;
     }
@@ -59,7 +60,7 @@ int monitor_destroy(void* data) {
         return 0;
     }
 
-    free(data);
+    AGENTOS_FREE(data);
     return 0;
 }
 
@@ -163,7 +164,7 @@ int monitor_get_stats(void* data, void** stats) {
     monitor_data_t* md = (monitor_data_t*)data;
 
     // 创建统计信息字符串
-    char* stats_str = (char*)malloc(512);
+    char* stats_str = (char*)AGENTOS_MALLOC(512);
     if (!stats_str) {
         return -1;
     }
@@ -219,7 +220,7 @@ int monitor_generate_report(void* data) {
         printf("\n=== Scheduler Stats Report ===\n");
         printf("%s\n", (char*)stats);
         printf("=============================\n");
-        free(stats);
+        AGENTOS_FREE(stats);
     }
 
     // 更新最后报告时间

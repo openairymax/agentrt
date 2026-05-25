@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 #include "gateway_a2a_handler.h"
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,7 @@ static int handle_a2a_request(const char* method,
 
 gw_a2a_handler_t* gw_a2a_handler_create(const gw_a2a_handler_config_t* config)
 {
-    gw_a2a_handler_t* handler = (gw_a2a_handler_t*)calloc(1, sizeof(gw_a2a_handler_t));
+    gw_a2a_handler_t* handler = (gw_a2a_handler_t*)AGENTOS_CALLOC(1, sizeof(gw_a2a_handler_t));
     if (!handler) return NULL;
     if (config) {
         handler->config = *config;
@@ -46,7 +47,7 @@ void gw_a2a_handler_destroy(gw_a2a_handler_t* handler)
     if (handler->initialized) {
         gw_a2a_handler_shutdown(handler);
     }
-    free(handler);
+    AGENTOS_FREE(handler);
 }
 
 int gw_a2a_handler_init(gw_a2a_handler_t* handler)
@@ -114,7 +115,7 @@ int gw_a2a_handler_get_agent_card(gw_a2a_handler_t* handler,
         (caps & 0x10) ? fmt_bool : "false",
         (caps & 0x20) ? fmt_bool : "false");
 
-    char* buf = (char*)malloc(len + 1);
+    char* buf = (char*)AGENTOS_MALLOC(len + 1);
     if (!buf) return -1;
     snprintf(buf, len + 1, fmt,
         handler->config.agent_name,
@@ -146,11 +147,11 @@ static char* extract_a2a_field(const char* json, const char* field_name)
 {
     if (!json || !field_name) return NULL;
     size_t flen = strlen(field_name) + 4;
-    char* key = (char*)malloc(flen);
+    char* key = (char*)AGENTOS_MALLOC(flen);
     if (!key) return NULL;
     snprintf(key, flen, "\"%s\"", field_name);
     const char* p = strstr(json, key);
-    free(key);
+    AGENTOS_FREE(key);
     if (!p) return NULL;
     p += strlen(field_name) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t')) p++;
@@ -159,7 +160,7 @@ static char* extract_a2a_field(const char* json, const char* field_name)
     const char* end = strchr(p, '"');
     if (!end) return NULL;
     size_t len = (size_t)(end - p);
-    char* val = (char*)malloc(len + 1);
+    char* val = (char*)AGENTOS_MALLOC(len + 1);
     if (!val) return NULL;
     memcpy(val, p, len);
     val[len] = '\0';
@@ -185,8 +186,8 @@ int gw_a2a_handler_handle_request(gw_a2a_handler_t* handler,
         char* input_json = extract_a2a_field(body_json, "input");
 
         if (!task_type) {
-            free(task_id);
-            free(input_json);
+            AGENTOS_FREE(task_id);
+            AGENTOS_FREE(input_json);
             handler->error_count++;
             return -1;
         }
@@ -195,12 +196,12 @@ int gw_a2a_handler_handle_request(gw_a2a_handler_t* handler,
         if (!entry) {
             const char* err = "{\"error\":{\"code\":-32601,\"message\":\"Unknown task type: %s\"}}";
             size_t elen = snprintf(NULL, 0, err, task_type);
-            char* ebuf = (char*)malloc(elen + 1);
+            char* ebuf = (char*)AGENTOS_MALLOC(elen + 1);
             if (ebuf) snprintf(ebuf, elen + 1, err, task_type);
             *response_json = ebuf;
-            free(task_type);
-            free(task_id);
-            free(input_json);
+            AGENTOS_FREE(task_type);
+            AGENTOS_FREE(task_id);
+            AGENTOS_FREE(input_json);
             handler->error_count++;
             return -2;
         }
@@ -213,22 +214,22 @@ int gw_a2a_handler_handle_request(gw_a2a_handler_t* handler,
             &output,
             entry->user_data);
 
-        free(task_type);
-        free(task_id);
-        free(input_json);
+        AGENTOS_FREE(task_type);
+        AGENTOS_FREE(task_id);
+        AGENTOS_FREE(input_json);
 
         if (rc != 0 || !output) {
-            free(output);
+            AGENTOS_FREE(output);
             handler->error_count++;
             return -3;
         }
 
         const char* resp_fmt = "{\"result\":{\"status\":\"completed\",\"output\":%s}}";
         size_t rlen = snprintf(NULL, 0, resp_fmt, output);
-        char* buf = (char*)malloc(rlen + 1);
+        char* buf = (char*)AGENTOS_MALLOC(rlen + 1);
         if (buf) snprintf(buf, rlen + 1, resp_fmt, output);
         *response_json = buf;
-        free(output);
+        AGENTOS_FREE(output);
         return 0;
     }
 

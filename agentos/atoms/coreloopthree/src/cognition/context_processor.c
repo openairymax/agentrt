@@ -6,6 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern agentos_error_t agentos_sys_memory_search(const char *query, uint32_t limit,
+                                                 char ***out_record_ids, float **out_scores,
+                                                 size_t *out_count);
+extern void agentos_sys_free(void *);
+
 agentos_model_context_t *agentos_model_context_create(size_t capacity)
 {
     agentos_model_context_t *ctx =
@@ -236,9 +241,6 @@ static agentos_error_t memory_augmenter_process(agentos_context_processor_t __at
     if (context->entry_count == 0)
         return AGENTOS_SUCCESS;
 
-    extern agentos_error_t agentos_sys_memory_search(const char *query, uint32_t limit,
-                                                     char ***out_record_ids, float **out_scores,
-                                                     size_t *out_count);
     char **record_ids = NULL;
     float *scores = NULL;
     size_t count = 0;
@@ -250,11 +252,9 @@ static agentos_error_t memory_augmenter_process(agentos_context_processor_t __at
     agentos_error_t err = agentos_sys_memory_search(query, 3, &record_ids, &scores, &count);
     if (err != AGENTOS_SUCCESS || count == 0 || !record_ids) {
         if (record_ids) {
-            extern void agentos_sys_free(void *);
             agentos_sys_free(record_ids);
         }
         if (scores) {
-            extern void agentos_sys_free(void *);
             agentos_sys_free(scores);
         }
         return AGENTOS_SUCCESS;
@@ -263,7 +263,6 @@ static agentos_error_t memory_augmenter_process(agentos_context_processor_t __at
     size_t aug_max = 256 + count * 128;
     char *aug_content = (char *)malloc(aug_max);
     if (!aug_content) {
-        extern void agentos_sys_free(void *);
         agentos_sys_free(record_ids);
         agentos_sys_free(scores);
         return AGENTOS_ENOMEM;
@@ -280,7 +279,6 @@ static agentos_error_t memory_augmenter_process(agentos_context_processor_t __at
     agentos_model_context_add_entry(context, aug_content, pos, "memory_augmenter", 10);
     free(aug_content);
 
-    extern void agentos_sys_free(void *);
     agentos_sys_free(record_ids);
     agentos_sys_free(scores);
     return AGENTOS_SUCCESS;

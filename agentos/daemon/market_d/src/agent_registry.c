@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /**
  * @file agent_registry.c
  * @brief Agent 注册表实现（基于实际market_service.h API）
@@ -38,13 +39,13 @@ static int find_agent_index(const char* agent_id) {
 
 static void free_agent_info(agent_info_t* info) {
     if (!info) return;
-    free(info->agent_id);
-    free(info->name);
-    free(info->version);
-    free(info->description);
-    free(info->author);
-    free(info->repository);
-    free(info->dependencies);
+    AGENTOS_FREE(info->agent_id);
+    AGENTOS_FREE(info->name);
+    AGENTOS_FREE(info->version);
+    AGENTOS_FREE(info->description);
+    AGENTOS_FREE(info->author);
+    AGENTOS_FREE(info->repository);
+    AGENTOS_FREE(info->dependencies);
     memset(info, 0, sizeof(agent_info_t));
 }
 
@@ -56,7 +57,7 @@ static void free_agent_entry(agent_entry_t* entry) {
 static char* safe_strdup(const char* str) {
     if (!str) return NULL;
     size_t len = strlen(str);
-    char* copy = (char*)malloc(len + 1);
+    char* copy = (char*)AGENTOS_MALLOC(len + 1);
     if (copy) memcpy(copy, str, len + 1);
     return copy;
 }
@@ -178,7 +179,7 @@ int agent_registry_search(const search_params_t* params, agent_info_t*** results
 
     if (match_count == 0) { agentos_mutex_unlock(&g_registry.lock); return AGENTOS_OK; }
 
-    *results = (agent_info_t**)calloc(match_count, sizeof(agent_info_t*));
+    *results = (agent_info_t**)AGENTOS_CALLOC(match_count, sizeof(agent_info_t*));
     if (!*results) { agentos_mutex_unlock(&g_registry.lock); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     size_t result_idx = 0;
@@ -189,7 +190,7 @@ int agent_registry_search(const search_params_t* params, agent_info_t*** results
             (entry->info.name && strstr(entry->info.name, query)) ||
             (entry->info.description && strstr(entry->info.description, query))) {
 
-            (*results)[result_idx] = (agent_info_t*)calloc(1, sizeof(agent_info_t));
+            (*results)[result_idx] = (agent_info_t*)AGENTOS_CALLOC(1, sizeof(agent_info_t));
             if ((*results)[result_idx]) {
                 agent_registry_get(entry->info.agent_id, (*results)[result_idx]);
                 result_idx++;
@@ -211,7 +212,7 @@ int agent_registry_add_version(const char* agent_id, const char* version_str) {
     if (idx < 0) { agentos_mutex_unlock(&g_registry.lock); return AGENTOS_ERR_NOT_FOUND; }
 
     agent_entry_t* entry = &g_registry.entries[idx];
-    free(entry->info.version);
+    AGENTOS_FREE(entry->info.version);
     entry->info.version = safe_strdup(version_str);
     entry->info.last_updated = (uint64_t)time(NULL);
 
@@ -227,7 +228,7 @@ void agent_info_free(agent_info_t* info) {
 void agent_search_results_free(agent_info_t** results, size_t count) {
     if (!results) return;
     for (size_t i = 0; i < count; i++) {
-        if (results[i]) { agent_info_free(results[i]); free(results[i]); }
+        if (results[i]) { agent_info_free(results[i]); AGENTOS_FREE(results[i]); }
     }
-    free(results);
+    AGENTOS_FREE(results);
 }

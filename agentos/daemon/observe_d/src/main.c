@@ -1,3 +1,4 @@
+#include "memory_compat.h"
 /*
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -78,11 +79,11 @@ static observe_metric_t* observe_d_find_or_create_metric(observe_d_service_t* sv
     if (svc->metric_count >= OBSERVE_D_MAX_METRICS) return NULL;
 
     observe_metric_t* m = &svc->metrics[svc->metric_count];
-    m->name = strdup(name);
-    m->help = strdup(name);
+    m->name = AGENTOS_STRDUP(name);
+    m->help = AGENTOS_STRDUP(name);
     m->type = OBSERVE_METRIC_GAUGE;
     m->value = 0.0;
-    m->unit = strdup("count");
+    m->unit = AGENTOS_STRDUP("count");
     m->updated_at = (uint64_t)time(NULL);
     svc->metric_count++;
     return m;
@@ -108,8 +109,8 @@ static int observe_d_record_metric(observe_d_service_t* svc, const char* name,
     m->type = type;
     m->updated_at = (uint64_t)time(NULL);
     if (unit) {
-        free(m->unit);
-        m->unit = strdup(unit);
+        AGENTOS_FREE(m->unit);
+        m->unit = AGENTOS_STRDUP(unit);
     }
     agentos_mutex_unlock(&svc->lock);
     return 0;
@@ -259,7 +260,7 @@ static int observe_d_init(observe_d_service_t* svc, int port, const char* sock) 
     memset(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : OBSERVE_D_DEFAULT_PORT;
     svc->metrics_port = OBSERVE_D_METRICS_PORT;
-    svc->socket_path = sock ? strdup(sock) : strdup(OBSERVE_D_DEFAULT_SOCKET);
+    svc->socket_path = sock ? AGENTOS_STRDUP(sock) : AGENTOS_STRDUP(OBSERVE_D_DEFAULT_SOCKET);
     svc->start_time = (uint64_t)time(NULL);
 
     agentos_mutex_init(&svc->lock);
@@ -400,16 +401,16 @@ static int observe_d_destroy(observe_d_service_t* svc) {
     }
 
     for (size_t i = 0; i < svc->metric_count; i++) {
-        free(svc->metrics[i].name);
-        free(svc->metrics[i].help);
-        free(svc->metrics[i].unit);
+        AGENTOS_FREE(svc->metrics[i].name);
+        AGENTOS_FREE(svc->metrics[i].help);
+        AGENTOS_FREE(svc->metrics[i].unit);
     }
     if (svc->server_fd != AGENTOS_INVALID_SOCKET) {
         agentos_socket_close(svc->server_fd);
     }
     agentos_socket_cleanup();
     agentos_mutex_destroy(&svc->lock);
-    free(svc->socket_path);
+    AGENTOS_FREE(svc->socket_path);
     memset(svc, 0, sizeof(*svc));
     SVC_LOG_INFO("observe_d: service destroyed");
     return AGENTOS_SUCCESS;
