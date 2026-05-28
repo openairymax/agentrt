@@ -4,16 +4,18 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "svc_common.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "svc_common.h"
 
 /**
  * @brief 测试IPC初始化空参数
  */
-static void test_ipc_init_null_param(void) {
+static void test_ipc_init_null_param(void)
+{
     printf("  test_ipc_init_null_param...\n");
 
     int ret = svc_ipc_init(NULL);
@@ -25,7 +27,8 @@ static void test_ipc_init_null_param(void) {
 /**
  * @brief 测试IPC初始化和清理
  */
-static void test_ipc_init_cleanup(void) {
+static void test_ipc_init_cleanup(void)
+{
     printf("  test_ipc_init_cleanup...\n");
 
     int ret = svc_ipc_init("http://localhost:8080/rpc");
@@ -39,12 +42,13 @@ static void test_ipc_init_cleanup(void) {
 /**
  * @brief 测试IPC重复初始化
  */
-static void test_ipc_double_init(void) {
+static void test_ipc_double_init(void)
+{
     printf("  test_ipc_double_init...\n");
 
     int ret1 = svc_ipc_init("http://localhost:8080/rpc");
     int ret2 = svc_ipc_init("http://localhost:8081/rpc");
-    
+
     assert(ret1 == SVC_OK);
     assert(ret2 == SVC_OK);
 
@@ -56,12 +60,13 @@ static void test_ipc_double_init(void) {
 /**
  * @brief 测试RPC调用空参数
  */
-static void test_rpc_call_null_param(void) {
+static void test_rpc_call_null_param(void)
+{
     printf("  test_rpc_call_null_param...\n");
 
     svc_ipc_init("http://localhost:8080/rpc");
 
-    char* result = NULL;
+    char *result = NULL;
     int ret = svc_rpc_call(NULL, NULL, &result, 0);
     assert(ret == SVC_ERR_INVALID_PARAM);
 
@@ -76,10 +81,11 @@ static void test_rpc_call_null_param(void) {
 /**
  * @brief 测试IPC未初始化时调用
  */
-static void test_rpc_call_without_init(void) {
+static void test_rpc_call_without_init(void)
+{
     printf("  test_rpc_call_without_init...\n");
 
-    char* result = NULL;
+    char *result = NULL;
     int ret = svc_rpc_call("test_method", NULL, &result, 0);
     assert(ret == SVC_ERR_RPC);
 
@@ -89,7 +95,8 @@ static void test_rpc_call_without_init(void) {
 /**
  * @brief 测试设置超时时间
  */
-static void test_ipc_set_timeout(void) {
+static void test_ipc_set_timeout(void)
+{
     printf("  test_ipc_set_timeout...\n");
 
     svc_ipc_init("http://localhost:8080/rpc");
@@ -108,7 +115,8 @@ static void test_ipc_set_timeout(void) {
 /**
  * @brief 测试获取连接池状态
  */
-static void test_ipc_get_pool_status(void) {
+static void test_ipc_get_pool_status(void)
+{
     printf("  test_ipc_get_pool_status...\n");
 
     svc_ipc_init("http://localhost:8080/rpc");
@@ -129,7 +137,8 @@ static void test_ipc_get_pool_status(void) {
 /**
  * @brief 测试IPC清理后调用
  */
-static void test_ipc_after_cleanup(void) {
+static void test_ipc_after_cleanup(void)
+{
     printf("  test_ipc_after_cleanup...\n");
 
     svc_ipc_init("http://localhost:8080/rpc");
@@ -141,7 +150,8 @@ static void test_ipc_after_cleanup(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  IPC Client Module Unit Tests\n");
     printf("=========================================\n");

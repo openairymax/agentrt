@@ -6,16 +6,17 @@
  * "From data intelligence emerges."
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <time.h>
-
 #include "heapstore.h"
 #include "heapstore_log.h"
 
-static void test_log_init_shutdown(void) {
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+static void test_log_init_shutdown(void)
+{
     printf("Test: log_init_shutdown...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -28,7 +29,8 @@ static void test_log_init_shutdown(void) {
     printf("PASS\n");
 }
 
-static void test_log_write(void) {
+static void test_log_write(void)
+{
     printf("Test: log_write...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -46,7 +48,8 @@ static void test_log_write(void) {
     printf("PASS\n");
 }
 
-static void test_log_level_filter(void) {
+static void test_log_level_filter(void)
+{
     printf("Test: log_level_filter...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -67,7 +70,8 @@ static void test_log_level_filter(void) {
     printf("PASS\n");
 }
 
-static void test_log_get_set_level(void) {
+static void test_log_get_set_level(void)
+{
     printf("Test: log_get_set_level...");
 
     heapstore_log_set_level(HEAPSTORE_LOG_ERROR);
@@ -85,7 +89,8 @@ static void test_log_get_set_level(void) {
     printf("PASS\n");
 }
 
-static void test_log_get_service_path(void) {
+static void test_log_get_service_path(void)
+{
     printf("Test: log_get_service_path...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -109,7 +114,8 @@ static void test_log_get_service_path(void) {
     printf("PASS\n");
 }
 
-static void test_log_rotate(void) {
+static void test_log_rotate(void)
+{
     printf("Test: log_rotate...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -125,7 +131,8 @@ static void test_log_rotate(void) {
     printf("PASS\n");
 }
 
-static void test_log_cleanup(void) {
+static void test_log_cleanup(void)
+{
     printf("Test: log_cleanup...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -141,7 +148,8 @@ static void test_log_cleanup(void) {
     printf("PASS\n");
 }
 
-static void test_log_get_file_info(void) {
+static void test_log_get_file_info(void)
+{
     printf("Test: log_get_file_info...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -164,7 +172,8 @@ static void test_log_get_file_info(void) {
     printf("PASS\n");
 }
 
-static void test_log_get_stats(void) {
+static void test_log_get_stats(void)
+{
     printf("Test: log_get_stats...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -185,7 +194,8 @@ static void test_log_get_stats(void) {
     printf("PASS\n");
 }
 
-static void test_log_multiple_services(void) {
+static void test_log_multiple_services(void)
+{
     printf("Test: log_multiple_services...");
 
     heapstore_error_t err = heapstore_log_init();
@@ -212,7 +222,8 @@ static void test_log_multiple_services(void) {
     printf("PASS\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=== AgentOS heapstore Log Unit Tests ===\n\n");
 
     test_log_init_shutdown();
@@ -229,4 +240,3 @@ int main(void) {
     printf("\n=== All Log Tests Passed ===\n");
     return 0;
 }
-

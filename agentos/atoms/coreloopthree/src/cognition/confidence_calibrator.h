@@ -10,8 +10,9 @@
 #define AGENTOS_CONFIDENCE_CALIBRATOR_H
 
 #include "agentos.h"
-#include <stdint.h>
+
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,31 +41,23 @@ typedef struct {
     uint32_t recent_index[CC_MAX_DIMENSIONS];
 } confidence_calibrator_t;
 
-confidence_calibrator_t* confidence_calibrator_create(double decay_factor);
+confidence_calibrator_t *confidence_calibrator_create(double decay_factor);
 
-void confidence_calibrator_destroy(confidence_calibrator_t* calibrator);
+void confidence_calibrator_destroy(confidence_calibrator_t *calibrator);
 
-double confidence_calibrator_calibrate(
-    confidence_calibrator_t* calibrator,
-    double raw_score,
-    cc_dimension_t dimension);
+double confidence_calibrator_calibrate(confidence_calibrator_t *calibrator, double raw_score,
+                                       cc_dimension_t dimension);
 
-void confidence_calibrator_update(
-    confidence_calibrator_t* calibrator,
-    double actual_accuracy,
-    double predicted_confidence,
-    cc_dimension_t dimension);
+void confidence_calibrator_update(confidence_calibrator_t *calibrator, double actual_accuracy,
+                                  double predicted_confidence, cc_dimension_t dimension);
 
-double confidence_calibrator_get_bias(
-    confidence_calibrator_t* calibrator,
-    cc_dimension_t dimension);
+double confidence_calibrator_get_bias(confidence_calibrator_t *calibrator,
+                                      cc_dimension_t dimension);
 
-int confidence_calibrator_check_convergence(
-    confidence_calibrator_t* calibrator,
-    cc_dimension_t dimension,
-    double threshold);
+int confidence_calibrator_check_convergence(confidence_calibrator_t *calibrator,
+                                            cc_dimension_t dimension, double threshold);
 
-void confidence_calibrator_reset(confidence_calibrator_t* calibrator);
+void confidence_calibrator_reset(confidence_calibrator_t *calibrator);
 
 #ifdef __cplusplus
 }

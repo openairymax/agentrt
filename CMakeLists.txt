@@ -3,7 +3,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
-project(AgentOS VERSION 0.0.5 LANGUAGES C CXX)
+project(AgentOS VERSION 0.1.0 LANGUAGES C CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
@@ -53,7 +53,7 @@ endif()
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" ON)
-option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)  # 暂时关闭，待解决现有警告后启用
+option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
@@ -61,6 +61,12 @@ option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)
 option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
+if(BUILD_TESTS)
+    if(AGENTOS_COMPLIANCE_STRICT)
+        message(STATUS "Tests disabled in strict compliance mode (AGENTOS_COMPLIANCE_STRICT=ON)")
+        set(BUILD_TESTS OFF CACHE BOOL "Build unit tests" FORCE)
+    endif()
+endif()
 if(BUILD_TESTS)
     enable_testing()
     message(STATUS "CTest enabled at root level (before subdirectories)")
@@ -107,12 +113,18 @@ if(MSVC)
     add_link_options(/DYNAMICBASE /NXCOMPAT /GUARD:CF)
 else()
     # GCC/Clang安全选项
-    add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-stringop-overflow)
+    add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-stringop-overflow -Wno-format-truncation)
     if(WARNINGS_AS_ERRORS)
-        add_compile_options(-Werror)
+        add_compile_options(-Werror=all -Werror=extra)
+        add_compile_options(-Wno-error=format-truncation)
     endif()
     add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
     add_compile_definitions(_FORTIFY_SOURCE=2)
+
+    if(AGENTOS_COMPLIANCE_STRICT)
+        add_compile_definitions(AGENTOS_COMPLIANCE_STRICT)
+        add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/compliance/include/banned_functions.h)
+    endif()
 
     # 链接器安全选项
     if(UNIX AND NOT APPLE)

@@ -17,6 +17,7 @@
 // 破坏性更改需递增 MAJOR 并发布迁移说明
 
 #include "agentos.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -43,61 +44,56 @@ typedef struct agentos_intent_parser agentos_intent_parser_t;
  * @param data_len 数据长度
  * @param user_data 用户数据
  */
-typedef void (*agentos_feedback_callback_t)(
-    int level,
-    const char* module,
-    const char* event,
-    const char* data,
-    size_t data_len,
-    void* user_data);
+typedef void (*agentos_feedback_callback_t)(int level, const char *module, const char *event,
+                                            const char *data, size_t data_len, void *user_data);
 
 /**
  * @brief 认知引擎配置
  */
 typedef struct agentos_cognition_config {
-    uint32_t cognition_default_timeout_ms;   /**< 默认任务超时（毫秒） */
-    uint32_t cognition_max_retries;          /**< 最大重试次数 */
+    uint32_t cognition_default_timeout_ms;         /**< 默认任务超时（毫秒） */
+    uint32_t cognition_max_retries;                /**< 最大重试次数 */
     agentos_feedback_callback_t feedback_callback; /**< 反馈回调函数（可选） */
-    void* feedback_user_data;                /**< 反馈回调用户数据 */
+    void *feedback_user_data;                      /**< 反馈回调用户数据 */
 } agentos_cognition_config_t;
 
 /**
  * @brief 意图结构，表示解析后的用户输入
  */
 typedef struct agentos_intent {
-    char* intent_raw_text;                 /**< 原始输入文本 */
-    size_t intent_raw_len;                 /**< 原始文本长度 */
-    char* intent_goal;                     /**< 提取的核心目标 */
-    size_t intent_goal_len;                /**< 目标长度 */
-    uint32_t intent_flags;                 /**< 标志位（如紧急、复杂等） */
-    void* intent_context;                  /**< 附加上下文（需由上层释放） */
+    char *intent_raw_text;  /**< 原始输入文本 */
+    size_t intent_raw_len;  /**< 原始文本长度 */
+    char *intent_goal;      /**< 提取的核心目标 */
+    size_t intent_goal_len; /**< 目标长度 */
+    uint32_t intent_flags;  /**< 标志位（如紧急、复杂等） */
+    void *intent_context;   /**< 附加上下文（需由上层释放） */
 } agentos_intent_t;
 
 /**
  * @brief 任务计划节点（DAG中的一个节点）
  */
 typedef struct agentos_task_node {
-    char* task_node_id;                   /**< 任务ID */
-    size_t task_node_id_len;              /**< ID长度 */
-    char* task_node_agent_role;           /**< 需要的Agent角色 */
-    size_t task_node_role_len;            /**< 角色长度 */
-    char** task_node_depends_on;          /**< 依赖的任务ID数组 */
-    size_t task_node_depends_count;       /**< 依赖数量 */
-    uint32_t task_node_timeout_ms;        /**< 超时时间 */
-    uint8_t task_node_priority;           /**< 优先级 */
-    void* task_node_input;                /**< 输入数据（由策略管理） */
-    void* task_node_output;               /**< 输出数据 */
+    char *task_node_id;             /**< 任务ID */
+    size_t task_node_id_len;        /**< ID长度 */
+    char *task_node_agent_role;     /**< 需要的Agent角色 */
+    size_t task_node_role_len;      /**< 角色长度 */
+    char **task_node_depends_on;    /**< 依赖的任务ID数组 */
+    size_t task_node_depends_count; /**< 依赖数量 */
+    uint32_t task_node_timeout_ms;  /**< 超时时间 */
+    uint8_t task_node_priority;     /**< 优先级 */
+    void *task_node_input;          /**< 输入数据（由策略管理） */
+    void *task_node_output;         /**< 输出数据 */
 } agentos_task_node_t;
 
 /**
  * @brief 任务计划（DAG）
  */
 typedef struct agentos_task_plan {
-    char* task_plan_id;                    /**< 计划ID */
+    char *task_plan_id;                    /**< 计划ID */
     size_t task_plan_id_len;               /**< ID长度 */
-    agentos_task_node_t** task_plan_nodes;  /**< 节点数组 */
+    agentos_task_node_t **task_plan_nodes; /**< 节点数组 */
     size_t task_plan_node_count;           /**< 节点数量 */
-    char** task_plan_entry_points;         /**< 入口点节点ID数组 */
+    char **task_plan_entry_points;         /**< 入口点节点ID数组 */
     size_t task_plan_entry_count;          /**< 入口点数量 */
 } agentos_task_plan_t;
 
@@ -110,24 +106,22 @@ typedef struct agentos_task_plan {
  * @param out_plan 输出计划（需由调用者释放）
  * @return agentos_error_t
  */
-typedef agentos_error_t (*agentos_plan_func_t)(
-    const agentos_intent_t* intent,
-    void* context,
-    agentos_task_plan_t** out_plan);
+typedef agentos_error_t (*agentos_plan_func_t)(const agentos_intent_t *intent, void *context,
+                                               agentos_task_plan_t **out_plan);
 
 /**
  * @brief 规划策略释放函数
  * @param strategy 策略对象
  */
-typedef void (*agentos_plan_destroy_t)(agentos_plan_strategy_t* strategy);
+typedef void (*agentos_plan_destroy_t)(agentos_plan_strategy_t *strategy);
 
 /**
  * @brief 规划策略对象
  */
 struct agentos_plan_strategy {
-    agentos_plan_func_t plan;          /**< 规划函数 */
-    agentos_plan_destroy_t destroy;    /**< 释放函数 */
-    void* data;                         /**< 私有数据 */
+    agentos_plan_func_t plan;       /**< 规划函数 */
+    agentos_plan_destroy_t destroy; /**< 释放函数 */
+    void *data;                     /**< 私有数据 */
 };
 
 /* ==================== 协同策略接口 ==================== */
@@ -140,16 +134,13 @@ struct agentos_plan_strategy {
  * @param out_result 输出协调结果
  * @return agentos_error_t
  */
-typedef agentos_error_t (*agentos_coordinate_func_t)(
-    const char** prompts,
-    size_t count,
-    void* context,
-    char** out_result);
+typedef agentos_error_t (*agentos_coordinate_func_t)(const char **prompts, size_t count,
+                                                     void *context, char **out_result);
 
 /**
  * @brief 协同策略释放函数
  */
-typedef void (*agentos_coordinator_destroy_t)(agentos_coordinator_strategy_t* strategy);
+typedef void (*agentos_coordinator_destroy_t)(agentos_coordinator_strategy_t *strategy);
 
 /**
  * @brief 协同策略对象
@@ -157,7 +148,7 @@ typedef void (*agentos_coordinator_destroy_t)(agentos_coordinator_strategy_t* st
 struct agentos_coordinator_strategy {
     agentos_coordinate_func_t coordinate;
     agentos_coordinator_destroy_t destroy;
-    void* data;
+    void *data;
 };
 
 /* ==================== 调度策略接口 ==================== */
@@ -171,17 +162,14 @@ struct agentos_coordinator_strategy {
  * @param out_agent_id 输出选中的Agent ID
  * @return agentos_error_t
  */
-typedef agentos_error_t (*agentos_dispatch_func_t)(
-    const agentos_task_node_t* task,
-    const void** candidates,
-    size_t count,
-    void* context,
-    char** out_agent_id);
+typedef agentos_error_t (*agentos_dispatch_func_t)(const agentos_task_node_t *task,
+                                                   const void **candidates, size_t count,
+                                                   void *context, char **out_agent_id);
 
 /**
  * @brief 调度策略释放函数
  */
-typedef void (*agentos_dispatch_destroy_t)(agentos_dispatching_strategy_t* strategy);
+typedef void (*agentos_dispatch_destroy_t)(agentos_dispatching_strategy_t *strategy);
 
 /**
  * @brief 调度策略对象
@@ -189,7 +177,7 @@ typedef void (*agentos_dispatch_destroy_t)(agentos_dispatching_strategy_t* strat
 struct agentos_dispatching_strategy {
     agentos_dispatch_func_t dispatch;
     agentos_dispatch_destroy_t destroy;
-    void* data;
+    void *data;
 };
 
 /* ==================== 认知引擎接口 ==================== */
@@ -214,11 +202,10 @@ struct agentos_dispatching_strategy {
  *
  * @see agentos_cognition_create_ex(), agentos_cognition_destroy()
  */
-AGENTOS_API agentos_error_t agentos_cognition_create(
-    agentos_plan_strategy_t* plan_strategy,
-    agentos_coordinator_strategy_t* coord_strategy,
-    agentos_dispatching_strategy_t* disp_strategy,
-    agentos_cognition_engine_t** out_engine);
+AGENTOS_API agentos_error_t agentos_cognition_create(agentos_plan_strategy_t *plan_strategy,
+                                                     agentos_coordinator_strategy_t *coord_strategy,
+                                                     agentos_dispatching_strategy_t *disp_strategy,
+                                                     agentos_cognition_engine_t **out_engine);
 
 /**
  * @brief 创建认知引擎（带配置）
@@ -242,11 +229,9 @@ AGENTOS_API agentos_error_t agentos_cognition_create(
  * @see agentos_cognition_create(), agentos_cognition_destroy()
  */
 AGENTOS_API agentos_error_t agentos_cognition_create_ex(
-    const agentos_cognition_config_t* manager,
-    agentos_plan_strategy_t* plan_strategy,
-    agentos_coordinator_strategy_t* coord_strategy,
-    agentos_dispatching_strategy_t* disp_strategy,
-    agentos_cognition_engine_t** out_engine);
+    const agentos_cognition_config_t *manager, agentos_plan_strategy_t *plan_strategy,
+    agentos_coordinator_strategy_t *coord_strategy, agentos_dispatching_strategy_t *disp_strategy,
+    agentos_cognition_engine_t **out_engine);
 
 /**
  * @brief 销毁认知引擎
@@ -264,7 +249,7 @@ AGENTOS_API agentos_error_t agentos_cognition_create_ex(
  *
  * @see agentos_cognition_create(), agentos_cognition_create_ex()
  */
-AGENTOS_API void agentos_cognition_destroy(agentos_cognition_engine_t* engine);
+AGENTOS_API void agentos_cognition_destroy(agentos_cognition_engine_t *engine);
 
 /**
  * @brief 设置回退规划策略
@@ -276,9 +261,8 @@ AGENTOS_API void agentos_cognition_destroy(agentos_cognition_engine_t* engine);
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
-AGENTOS_API void agentos_cognition_set_fallback_plan(
-    agentos_cognition_engine_t* engine,
-    agentos_plan_strategy_t* fallback);
+AGENTOS_API void agentos_cognition_set_fallback_plan(agentos_cognition_engine_t *engine,
+                                                     agentos_plan_strategy_t *fallback);
 
 /**
  * @brief 处理用户输入，生成任务计划
@@ -300,11 +284,9 @@ AGENTOS_API void agentos_cognition_set_fallback_plan(
  *
  * @see agentos_task_plan_free()
  */
-AGENTOS_API agentos_error_t agentos_cognition_process(
-    agentos_cognition_engine_t* engine,
-    const char* input,
-    size_t input_len,
-    agentos_task_plan_t** out_plan);
+AGENTOS_API agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine,
+                                                      const char *input, size_t input_len,
+                                                      agentos_task_plan_t **out_plan);
 
 /**
  * @brief 释放任务计划
@@ -316,7 +298,7 @@ AGENTOS_API agentos_error_t agentos_cognition_process(
  * @reentrant 否
  * @see agentos_cognition_process()
  */
-AGENTOS_API void agentos_task_plan_free(agentos_task_plan_t* plan);
+AGENTOS_API void agentos_task_plan_free(agentos_task_plan_t *plan);
 
 /**
  * @brief 设置认知引擎的全局上下文
@@ -329,14 +311,11 @@ AGENTOS_API void agentos_task_plan_free(agentos_task_plan_t* plan);
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
-AGENTOS_API void agentos_cognition_set_context(
-    agentos_cognition_engine_t* engine,
-    void* context,
-    void (*destroy)(void*));
+AGENTOS_API void agentos_cognition_set_context(agentos_cognition_engine_t *engine, void *context,
+                                               void (*destroy)(void *));
 
-AGENTOS_API void agentos_cognition_set_memory(
-    agentos_cognition_engine_t* engine,
-    agentos_memory_engine_t* memory);
+AGENTOS_API void agentos_cognition_set_memory(agentos_cognition_engine_t *engine,
+                                              agentos_memory_engine_t *memory);
 
 /**
  * @brief 获取认知引擎的当前统计信息
@@ -350,10 +329,8 @@ AGENTOS_API void agentos_cognition_set_memory(
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_cognition_stats(
-    agentos_cognition_engine_t* engine,
-    char** out_stats,
-    size_t* out_len);
+AGENTOS_API agentos_error_t agentos_cognition_stats(agentos_cognition_engine_t *engine,
+                                                    char **out_stats, size_t *out_len);
 
 /**
  * @brief 获取认知引擎健康状态
@@ -366,9 +343,8 @@ AGENTOS_API agentos_error_t agentos_cognition_stats(
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_cognition_health_check(
-    agentos_cognition_engine_t* engine,
-    char** out_json);
+AGENTOS_API agentos_error_t agentos_cognition_health_check(agentos_cognition_engine_t *engine,
+                                                           char **out_json);
 
 /* ==================== 意图解析器接口 ==================== */
 
@@ -377,13 +353,13 @@ AGENTOS_API agentos_error_t agentos_cognition_health_check(
  * @param out_parser 输出解析器句柄
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t** out_parser);
+AGENTOS_API agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t **out_parser);
 
 /**
  * @brief 销毁意图解析器
  * @param parser 解析器句柄
  */
-AGENTOS_API void agentos_intent_parser_destroy(agentos_intent_parser_t* parser);
+AGENTOS_API void agentos_intent_parser_destroy(agentos_intent_parser_t *parser);
 
 /**
  * @brief 解析用户输入，提取意图
@@ -393,16 +369,15 @@ AGENTOS_API void agentos_intent_parser_destroy(agentos_intent_parser_t* parser);
  * @param out_intent 输出意图结构
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
-                                                        const char* input,
-                                                        size_t input_len,
-                                                        agentos_intent_t** out_intent);
+AGENTOS_API agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser,
+                                                        const char *input, size_t input_len,
+                                                        agentos_intent_t **out_intent);
 
 /**
  * @brief 释放意图结构
  * @param intent 意图结构
  */
-AGENTOS_API void agentos_intent_free(agentos_intent_t* intent);
+AGENTOS_API void agentos_intent_free(agentos_intent_t *intent);
 
 /**
  * @brief 添加自定义意图规则
@@ -413,11 +388,10 @@ AGENTOS_API void agentos_intent_free(agentos_intent_t* intent);
  * @param flags 标志位
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t* parser,
-                                                           const char* pattern,
-                                                           const char* intent_name,
-                                                           float confidence,
-                                                           uint32_t flags);
+AGENTOS_API agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t *parser,
+                                                           const char *pattern,
+                                                           const char *intent_name,
+                                                           float confidence, uint32_t flags);
 
 /**
  * @brief 获取解析器统计信息
@@ -425,14 +399,14 @@ AGENTOS_API agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser
  * @param out_stats 输出统计JSON字符串
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t* parser,
-                                                        char** out_stats);
+AGENTOS_API agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t *parser,
+                                                        char **out_stats);
 
 /**
  * @brief 重置解析器统计信息
  * @param parser 解析器
  */
-AGENTOS_API void agentos_intent_parser_reset_stats(agentos_intent_parser_t* parser);
+AGENTOS_API void agentos_intent_parser_reset_stats(agentos_intent_parser_t *parser);
 
 /**
  * @brief 健康检查
@@ -440,8 +414,8 @@ AGENTOS_API void agentos_intent_parser_reset_stats(agentos_intent_parser_t* pars
  * @param out_json 输出健康状态JSON
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t* parser,
-                                                               char** out_json);
+AGENTOS_API agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t *parser,
+                                                               char **out_json);
 
 #ifdef __cplusplus
 }

@@ -20,9 +20,9 @@
 #ifndef AGENTOS_CHECK_H
 #define AGENTOS_CHECK_H
 
-#include <stdbool.h>
-
 #include "../error/include/error.h"
+
+#include <stdbool.h>
 
 /**
  * @defgroup check_macros 检查宏
@@ -40,11 +40,11 @@
  * @endcode
  */
 #define CHECK_NULL_RET(ptr, err_code) \
-    do { \
-        if ((ptr) == NULL) { \
-            return (err_code); \
-        } \
-    } while(0)
+    do {                              \
+        if ((ptr) == NULL) {          \
+            return (err_code);        \
+        }                             \
+    } while (0)
 
 /**
  * @brief 检查指针是否为NULL，如果是则返回默认错误AGENTOS_EINVAL
@@ -64,11 +64,11 @@
  * @endcode
  */
 #define CHECK_COND_RET(expr, err_code) \
-    do { \
-        if (!(expr)) { \
-            return (err_code); \
-        } \
-    } while(0)
+    do {                               \
+        if (!(expr)) {                 \
+            return (err_code);         \
+        }                              \
+    } while (0)
 
 /**
  * @brief 检查表达式是否为真，如果为假则返回默认错误AGENTOS_EINVAL
@@ -87,13 +87,13 @@
  * CHECK_ERR_RET(agentos_init(), err);
  * @endcode
  */
-#define CHECK_ERR_RET(func_call, err_var) \
-    do { \
+#define CHECK_ERR_RET(func_call, err_var)      \
+    do {                                       \
         agentos_error_t err_var = (func_call); \
-        if (err_var != AGENTOS_SUCCESS) { \
-            return err_var; \
-        } \
-    } while(0)
+        if (err_var != AGENTOS_SUCCESS) {      \
+            return err_var;                    \
+        }                                      \
+    } while (0)
 
 /**
  * @brief 检查函数调用结果，如果失败则跳转到清理标签
@@ -105,12 +105,12 @@
  * @endcode
  */
 #define CHECK_ERR_GOTO(func_call, err_var, label) \
-    do { \
-        agentos_error_t err_var = (func_call); \
-        if (err_var != AGENTOS_SUCCESS) { \
-            goto label; \
-        } \
-    } while(0)
+    do {                                          \
+        agentos_error_t err_var = (func_call);    \
+        if (err_var != AGENTOS_SUCCESS) {         \
+            goto label;                           \
+        }                                         \
+    } while (0)
 
 /**
  * @brief 检查指针是否为NULL，如果是则跳转到清理标签
@@ -122,11 +122,11 @@
  * @endcode
  */
 #define CHECK_NULL_GOTO(ptr, label) \
-    do { \
-        if ((ptr) == NULL) { \
-            goto label; \
-        } \
-    } while(0)
+    do {                            \
+        if ((ptr) == NULL) {        \
+            goto label;             \
+        }                           \
+    } while (0)
 
 /**
  * @brief 安全释放指针并将其置为NULL
@@ -137,13 +137,13 @@
  * SAFE_FREE(buffer);
  * @endcode
  */
-#define SAFE_FREE(ptr) \
-    do { \
-        if ((ptr) != NULL) { \
+#define SAFE_FREE(ptr)         \
+    do {                       \
+        if ((ptr) != NULL) {   \
             AGENTOS_FREE(ptr); \
-            (ptr) = NULL; \
-        } \
-    } while(0)
+            (ptr) = NULL;      \
+        }                      \
+    } while (0)
 
 /**
  * @brief 分配内存并检查结果，失败则跳转到清理标签
@@ -156,10 +156,10 @@
  * @endcode
  */
 #define ALLOC_CHECK(ptr_var, size, label) \
-    do { \
+    do {                                  \
         (ptr_var) = AGENTOS_MALLOC(size); \
-        CHECK_NULL_GOTO(ptr_var, label); \
-    } while(0)
+        CHECK_NULL_GOTO(ptr_var, label);  \
+    } while (0)
 
 /**
  * @brief 分配并清零内存，失败则跳转到清理标签
@@ -173,10 +173,10 @@
  * @endcode
  */
 #define CALLOC_CHECK(ptr_var, count, size, label) \
-    do { \
-        (ptr_var) = AGENTOS_CALLOC(count, size); \
-        CHECK_NULL_GOTO(ptr_var, label); \
-    } while(0)
+    do {                                          \
+        (ptr_var) = AGENTOS_CALLOC(count, size);  \
+        CHECK_NULL_GOTO(ptr_var, label);          \
+    } while (0)
 
 /**
  * @brief 字符串复制检查，失败则跳转到清理标签
@@ -189,10 +189,10 @@
  * @endcode
  */
 #define STRDUP_CHECK(dest, src, label) \
-    do { \
-        (dest) = AGENTOS_STRDUP(src); \
-        CHECK_NULL_GOTO(dest, label); \
-    } while(0)
+    do {                               \
+        (dest) = AGENTOS_STRDUP(src);  \
+        CHECK_NULL_GOTO(dest, label);  \
+    } while (0)
 
 /**
  * @brief 范围检查，确保值在[min, max]范围内
@@ -203,11 +203,11 @@
  * @return 如果值超出范围，返回err_code
  */
 #define CHECK_RANGE_RET(value, min, max, err_code) \
-    do { \
-        if ((value) < (min) || (value) > (max)) { \
-            return (err_code); \
-        } \
-    } while(0)
+    do {                                           \
+        if ((value) < (min) || (value) > (max)) {  \
+            return (err_code);                     \
+        }                                          \
+    } while (0)
 
 /**
  * @brief 非零检查，确保值不为零
@@ -216,11 +216,11 @@
  * @return 如果值为零，返回err_code
  */
 #define CHECK_NONZERO_RET(value, err_code) \
-    do { \
-        if ((value) == 0) { \
-            return (err_code); \
-        } \
-    } while(0)
+    do {                                   \
+        if ((value) == 0) {                \
+            return (err_code);             \
+        }                                  \
+    } while (0)
 
 /**
  * @brief 检查字符串是否为空或NULL
@@ -228,12 +228,12 @@
  * @param err_code 错误码
  * @return 如果字符串为空或NULL，返回err_code
  */
-#define CHECK_STRING_RET(str, err_code) \
-    do { \
+#define CHECK_STRING_RET(str, err_code)          \
+    do {                                         \
         if ((str) == NULL || (str)[0] == '\0') { \
-            return (err_code); \
-        } \
-    } while(0)
+            return (err_code);                   \
+        }                                        \
+    } while (0)
 
 /**
  * @brief 检查指针是否为NULL，如果是则设置错误码并跳转
@@ -247,12 +247,12 @@
  * @endcode
  */
 #define CHECK_NULL_GOTO_ERR(ptr, label, err_var, err_code) \
-    do { \
-        if ((ptr) == NULL) { \
-            (err_var) = (err_code); \
-            goto label; \
-        } \
-    } while(0)
+    do {                                                   \
+        if ((ptr) == NULL) {                               \
+            (err_var) = (err_code);                        \
+            goto label;                                    \
+        }                                                  \
+    } while (0)
 
 /**
  * @brief 字符串复制检查，失败则设置错误码并跳转
@@ -267,10 +267,10 @@
  * @endcode
  */
 #define STRDUP_CHECK_ERR(dest, src, label, err_var, err_code) \
-    do { \
-        (dest) = AGENTOS_STRDUP(src); \
-        CHECK_NULL_GOTO_ERR(dest, label, err_var, err_code); \
-    } while(0)
+    do {                                                      \
+        (dest) = AGENTOS_STRDUP(src);                         \
+        CHECK_NULL_GOTO_ERR(dest, label, err_var, err_code);  \
+    } while (0)
 
 /**
  * @brief 分配内存检查，失败则设置错误码并跳转
@@ -285,10 +285,10 @@
  * @endcode
  */
 #define MALLOC_CHECK_ERR(ptr_var, size, label, err_var, err_code) \
-    do { \
-        (ptr_var) = AGENTOS_MALLOC(size); \
-        CHECK_NULL_GOTO_ERR(ptr_var, label, err_var, err_code); \
-    } while(0)
+    do {                                                          \
+        (ptr_var) = AGENTOS_MALLOC(size);                         \
+        CHECK_NULL_GOTO_ERR(ptr_var, label, err_var, err_code);   \
+    } while (0)
 
 /**
  * @brief 分配并清零内存检查，失败则设置错误码并跳转
@@ -304,11 +304,11 @@
  * @endcode
  */
 #define CALLOC_CHECK_ERR(ptr_var, count, size, label, err_var, err_code) \
-    do { \
-        (ptr_var) = AGENTOS_CALLOC(count, size); \
-        CHECK_NULL_GOTO_ERR(ptr_var, label, err_var, err_code); \
-    } while(0)
+    do {                                                                 \
+        (ptr_var) = AGENTOS_CALLOC(count, size);                         \
+        CHECK_NULL_GOTO_ERR(ptr_var, label, err_var, err_code);          \
+    } while (0)
 
-/** @} */ // end of check_macros
+/** @} */  // end of check_macros
 
 #endif /* AGENTOS_CHECK_H */

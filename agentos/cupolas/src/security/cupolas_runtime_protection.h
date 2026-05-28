@@ -8,9 +8,9 @@
 #ifndef CUPOLAS_RUNTIME_PROTECTION_H
 #define CUPOLAS_RUNTIME_PROTECTION_H
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,7 +18,7 @@ extern "C" {
 
 /**
  * @brief Protection levels
- * 
+ *
  * Design principles:
  * - Layered defense: Multiple security layers
  * - Memory protection: ASLR, DEP, stack canaries
@@ -27,10 +27,10 @@ extern "C" {
  * - Least privilege: Only necessary syscalls allowed
  */
 typedef enum {
-    CUPOLAS_PROTECT_NONE = 0,         /**< No protection */
-    CUPOLAS_PROTECT_BASIC = 1,        /**< Basic protection */
-    CUPOLAS_PROTECT_ENHANCED = 2,     /**< Enhanced protection */
-    CUPOLAS_PROTECT_MAXIMUM = 3       /**< Maximum protection */
+    CUPOLAS_PROTECT_NONE = 0,     /**< No protection */
+    CUPOLAS_PROTECT_BASIC = 1,    /**< Basic protection */
+    CUPOLAS_PROTECT_ENHANCED = 2, /**< Enhanced protection */
+    CUPOLAS_PROTECT_MAXIMUM = 3   /**< Maximum protection */
 } cupolas_protection_level_t;
 
 /**
@@ -48,61 +48,61 @@ typedef enum {
  */
 typedef enum {
     CUPOLAS_VIOLATION_NONE = 0,
-    CUPOLAS_VIOLATION_SYSCALL = 1,        /**< Illegal syscall */
-    CUPOLAS_VIOLATION_MEMORY = 2,         /**< Memory violation */
-    CUPOLAS_VIOLATION_CONTROL_FLOW = 3,   /**< CFI violation */
-    CUPOLAS_VIOLATION_INTEGRITY = 4,      /**< Integrity violation */
-    CUPOLAS_VIOLATION_RESOURCE = 5        /**< Resource violation */
+    CUPOLAS_VIOLATION_SYSCALL = 1,      /**< Illegal syscall */
+    CUPOLAS_VIOLATION_MEMORY = 2,       /**< Memory violation */
+    CUPOLAS_VIOLATION_CONTROL_FLOW = 3, /**< CFI violation */
+    CUPOLAS_VIOLATION_INTEGRITY = 4,    /**< Integrity violation */
+    CUPOLAS_VIOLATION_RESOURCE = 5      /**< Resource violation */
 } cupolas_violation_type_t;
 
 /**
  * @brief Memory protection configuration
  */
 typedef struct {
-    bool enable_aslr;               /**< Address space layout randomization */
-    bool enable_dep;                /**< Data execution prevention (NX bit) */
-    bool enable_stack_protector;    /**< Stack protector (Stack Canary) */
-    bool enable_heap_guard;         /**< Heap guard pages */
-    bool enable_mprotect;           /**< Memory page protection */
-    bool enable_guard_pages;        /**< Guard pages */
-    uint32_t stack_canary_type;     /**< Stack canary type */
+    bool enable_aslr;            /**< Address space layout randomization */
+    bool enable_dep;             /**< Data execution prevention (NX bit) */
+    bool enable_stack_protector; /**< Stack protector (Stack Canary) */
+    bool enable_heap_guard;      /**< Heap guard pages */
+    bool enable_mprotect;        /**< Memory page protection */
+    bool enable_guard_pages;     /**< Guard pages */
+    uint32_t stack_canary_type;  /**< Stack canary type */
 } cupolas_memory_protect_config_t;
 
 /**
  * @brief Control flow integrity configuration
  */
 typedef struct {
-    bool enable_cfi;                /**< Control flow integrity */
-    bool enable_safestack;          /**< SafeStack */
-    bool enable_shadow_stack;       /**< Shadow stack */
-    bool enable_ibt;                /**< Indirect branch tracking */
-    bool enable_cet;                /**< Control-flow enforcement technology */
-    uint32_t cfi_level;             /**< CFI level (1-3) */
+    bool enable_cfi;          /**< Control flow integrity */
+    bool enable_safestack;    /**< SafeStack */
+    bool enable_shadow_stack; /**< Shadow stack */
+    bool enable_ibt;          /**< Indirect branch tracking */
+    bool enable_cet;          /**< Control-flow enforcement technology */
+    uint32_t cfi_level;       /**< CFI level (1-3) */
 } cupolas_cfi_config_t;
 
 /**
  * @brief Syscall filtering configuration
  */
 typedef struct {
-    bool enable_seccomp;            /**< Enable seccomp */
-    bool enable_seccomp_bpf;        /**< Enable BPF filtering */
-    int default_action;             /**< Default action (allow/deny/kill) */
-    const char** allowed_syscalls;  /**< Allowed syscalls list */
-    size_t syscall_count;           /**< Number of syscalls */
-    const char** log_syscalls;      /**< Syscalls to log */
-    size_t log_count;               /**< Log count */
+    bool enable_seccomp;           /**< Enable seccomp */
+    bool enable_seccomp_bpf;       /**< Enable BPF filtering */
+    int default_action;            /**< Default action (allow/deny/kill) */
+    const char **allowed_syscalls; /**< Allowed syscalls list */
+    size_t syscall_count;          /**< Number of syscalls */
+    const char **log_syscalls;     /**< Syscalls to log */
+    size_t log_count;              /**< Log count */
 } cupolas_seccomp_config_t;
 
 /**
  * @brief Integrity checking configuration
  */
 typedef struct {
-    bool enable_code_integrity;     /**< Enable code integrity */
-    bool enable_data_integrity;     /**< Enable data integrity */
-    bool enable_ro_sections;        /**< Enable read-only sections */
-    bool enable_self_check;         /**< Enable self-check */
-    uint32_t check_interval_ms;     /**< Check interval (milliseconds) */
-    uint32_t hash_algorithm;        /**< Hash algorithm */
+    bool enable_code_integrity; /**< Enable code integrity */
+    bool enable_data_integrity; /**< Enable data integrity */
+    bool enable_ro_sections;    /**< Enable read-only sections */
+    bool enable_self_check;     /**< Enable self-check */
+    uint32_t check_interval_ms; /**< Check interval (milliseconds) */
+    uint32_t hash_algorithm;    /**< Hash algorithm */
 } cupolas_integrity_config_t;
 
 /**
@@ -110,15 +110,15 @@ typedef struct {
  */
 typedef struct {
     cupolas_protection_level_t level;
-    
+
     cupolas_memory_protect_config_t memory;
     cupolas_cfi_config_t cfi;
     cupolas_seccomp_config_t seccomp;
     cupolas_integrity_config_t integrity;
-    
-    bool enable_audit;              /**< Enable audit logging */
-    bool enable_violation_handler;  /**< Enable violation handler */
-    void (*violation_callback)(cupolas_violation_type_t type, const char* details);
+
+    bool enable_audit;             /**< Enable audit logging */
+    bool enable_violation_handler; /**< Enable violation handler */
+    void (*violation_callback)(cupolas_violation_type_t type, const char *details);
 } cupolas_runtime_protect_config_t;
 
 /**
@@ -129,9 +129,9 @@ typedef struct {
     uint64_t timestamp;
     uint32_t pid;
     uint32_t tid;
-    char* details;
-    char* syscall_name;
-    void* fault_address;
+    char *details;
+    char *syscall_name;
+    void *fault_address;
     int error_code;
 } cupolas_violation_event_t;
 
@@ -157,11 +157,12 @@ typedef struct {
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t* config);
+int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t *config);
 
 /**
  * @brief Shutdown runtime protection module
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  */
 void cupolas_runtime_protect_cleanup(void);
@@ -170,16 +171,18 @@ void cupolas_runtime_protect_cleanup(void);
  * @brief Enable runtime protection
  * @param[in] config Protection configuration
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t* config);
+int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t *config);
 
 /**
  * @brief Disable runtime protection
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  */
 int cupolas_runtime_protect_disable(void);
@@ -200,17 +203,18 @@ cupolas_protection_status_t cupolas_runtime_protect_get_status(void);
  * @reentrant Yes
  * @ownership config: caller provides buffer, function writes to it
  */
-int cupolas_runtime_protect_get_config(cupolas_runtime_protect_config_t* config);
+int cupolas_runtime_protect_get_config(cupolas_runtime_protect_config_t *config);
 
 /**
  * @brief Enable memory protection
  * @param[in] config Memory protection configuration
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_memory_protect_enable(const cupolas_memory_protect_config_t* config);
+int cupolas_memory_protect_enable(const cupolas_memory_protect_config_t *config);
 
 /**
  * @brief Lock memory pages
@@ -220,7 +224,7 @@ int cupolas_memory_protect_enable(const cupolas_memory_protect_config_t* config)
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
  */
-int cupolas_memory_lock(void* addr, size_t len);
+int cupolas_memory_lock(void *addr, size_t len);
 
 /**
  * @brief Unlock memory pages
@@ -230,7 +234,7 @@ int cupolas_memory_lock(void* addr, size_t len);
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
  */
-int cupolas_memory_unlock(void* addr, size_t len);
+int cupolas_memory_unlock(void *addr, size_t len);
 
 /**
  * @brief Protect memory pages
@@ -241,7 +245,7 @@ int cupolas_memory_unlock(void* addr, size_t len);
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
  */
-int cupolas_memory_protect(void* addr, size_t len, int prot);
+int cupolas_memory_protect(void *addr, size_t len, int prot);
 
 /**
  * @brief Allocate protected memory
@@ -251,7 +255,7 @@ int cupolas_memory_protect(void* addr, size_t len, int prot);
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
  */
-void* cupolas_memory_alloc_protected(size_t size, int prot);
+void *cupolas_memory_alloc_protected(size_t size, int prot);
 
 /**
  * @brief Free protected memory
@@ -259,17 +263,18 @@ void* cupolas_memory_alloc_protected(size_t size, int prot);
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
  */
-void cupolas_memory_free_protected(void* ptr);
+void cupolas_memory_free_protected(void *ptr);
 
 /**
  * @brief Enable control flow integrity
  * @param[in] config CFI configuration
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_cfi_enable(const cupolas_cfi_config_t* config);
+int cupolas_cfi_enable(const cupolas_cfi_config_t *config);
 
 /**
  * @brief Register valid branch target
@@ -279,7 +284,7 @@ int cupolas_cfi_enable(const cupolas_cfi_config_t* config);
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
  */
-int cupolas_cfi_register_target(void* source, void* target);
+int cupolas_cfi_register_target(void *source, void *target);
 
 /**
  * @brief Verify control flow transfer
@@ -289,7 +294,7 @@ int cupolas_cfi_register_target(void* source, void* target);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-int cupolas_cfi_verify_transfer(void* source, void* target);
+int cupolas_cfi_verify_transfer(void *source, void *target);
 
 /**
  * @brief Get CFI statistics
@@ -300,37 +305,40 @@ int cupolas_cfi_verify_transfer(void* source, void* target);
  * @reentrant Yes
  * @ownership checks and violations: caller provides buffers, function writes to them
  */
-int cupolas_cfi_get_stats(uint64_t* checks, uint64_t* violations);
+int cupolas_cfi_get_stats(uint64_t *checks, uint64_t *violations);
 
 /**
  * @brief Enable syscall filtering
  * @param[in] config Seccomp configuration
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_seccomp_enable(const cupolas_seccomp_config_t* config);
+int cupolas_seccomp_enable(const cupolas_seccomp_config_t *config);
 
 /**
  * @brief Allow a syscall
  * @param[in] syscall_name Syscall name
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership syscall_name: caller retains ownership
  */
-int cupolas_seccomp_allow(const char* syscall_name);
+int cupolas_seccomp_allow(const char *syscall_name);
 
 /**
  * @brief Deny a syscall
  * @param[in] syscall_name Syscall name
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership syscall_name: caller retains ownership
  */
-int cupolas_seccomp_deny(const char* syscall_name);
+int cupolas_seccomp_deny(const char *syscall_name);
 
 /**
  * @brief Add syscall rule with argument filtering
@@ -340,15 +348,13 @@ int cupolas_seccomp_deny(const char* syscall_name);
  * @param[in] value Value
  * @param[in] action Action
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership syscall_name and op: caller retains ownership
  */
-int cupolas_seccomp_add_rule(const char* syscall_name, 
-                            uint32_t arg_index,
-                            const char* op,
-                            uint64_t value,
-                            int action);
+int cupolas_seccomp_add_rule(const char *syscall_name, uint32_t arg_index, const char *op,
+                             uint64_t value, int action);
 
 /**
  * @brief Check if syscall is allowed
@@ -358,7 +364,7 @@ int cupolas_seccomp_add_rule(const char* syscall_name,
  * @reentrant Yes
  * @ownership syscall_name: caller retains ownership
  */
-int cupolas_seccomp_check(const char* syscall_name);
+int cupolas_seccomp_check(const char *syscall_name);
 
 /**
  * @brief Get seccomp statistics
@@ -369,17 +375,18 @@ int cupolas_seccomp_check(const char* syscall_name);
  * @reentrant Yes
  * @ownership allowed and denied: caller provides buffers, function writes to them
  */
-int cupolas_seccomp_get_stats(uint64_t* allowed, uint64_t* denied);
+int cupolas_seccomp_get_stats(uint64_t *allowed, uint64_t *denied);
 
 /**
  * @brief Enable integrity checking
  * @param[in] config Integrity configuration
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_integrity_enable(const cupolas_integrity_config_t* config);
+int cupolas_integrity_enable(const cupolas_integrity_config_t *config);
 
 /**
  * @brief Perform integrity check
@@ -397,7 +404,7 @@ int cupolas_integrity_check(void);
  * @reentrant Yes
  * @ownership hash_out: caller provides buffer, function writes to it
  */
-int cupolas_integrity_compute_code_hash(uint8_t* hash_out);
+int cupolas_integrity_compute_code_hash(uint8_t *hash_out);
 
 /**
  * @brief Verify code section integrity
@@ -407,7 +414,7 @@ int cupolas_integrity_compute_code_hash(uint8_t* hash_out);
  * @reentrant Yes
  * @ownership expected_hash: caller retains ownership
  */
-int cupolas_integrity_verify_code(const uint8_t* expected_hash);
+int cupolas_integrity_verify_code(const uint8_t *expected_hash);
 
 /**
  * @brief Verify data section integrity
@@ -417,7 +424,7 @@ int cupolas_integrity_verify_code(const uint8_t* expected_hash);
  * @reentrant Yes
  * @ownership expected_hash: caller retains ownership
  */
-int cupolas_integrity_verify_data(const uint8_t* expected_hash);
+int cupolas_integrity_verify_data(const uint8_t *expected_hash);
 
 /**
  * @brief Set integrity check callback
@@ -435,7 +442,7 @@ int cupolas_integrity_set_callback(void (*callback)(int result));
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
  */
-int cupolas_violation_set_callback(void (*callback)(const cupolas_violation_event_t* event));
+int cupolas_violation_set_callback(void (*callback)(const cupolas_violation_event_t *event));
 
 /**
  * @brief Get last violation event
@@ -445,7 +452,7 @@ int cupolas_violation_set_callback(void (*callback)(const cupolas_violation_even
  * @reentrant Yes
  * @ownership event: caller provides buffer, function writes to it
  */
-int cupolas_violation_get_last(cupolas_violation_event_t* event);
+int cupolas_violation_get_last(cupolas_violation_event_t *event);
 
 /**
  * @brief Clear violation events
@@ -462,7 +469,7 @@ void cupolas_violation_clear(void);
  * @reentrant Yes
  * @ownership stats: caller provides buffer, function writes to it
  */
-int cupolas_violation_get_stats(cupolas_protection_stats_t* stats);
+int cupolas_violation_get_stats(cupolas_protection_stats_t *stats);
 
 /**
  * @brief Get protection level string
@@ -471,7 +478,7 @@ int cupolas_violation_get_stats(cupolas_protection_stats_t* stats);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* cupolas_protection_level_string(cupolas_protection_level_t level);
+const char *cupolas_protection_level_string(cupolas_protection_level_t level);
 
 /**
  * @brief Get protection status string
@@ -480,7 +487,7 @@ const char* cupolas_protection_level_string(cupolas_protection_level_t level);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* cupolas_protection_status_string(cupolas_protection_status_t status);
+const char *cupolas_protection_status_string(cupolas_protection_status_t status);
 
 /**
  * @brief Get violation type string
@@ -489,7 +496,7 @@ const char* cupolas_protection_status_string(cupolas_protection_status_t status)
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* cupolas_violation_type_string(cupolas_violation_type_t type);
+const char *cupolas_violation_type_string(cupolas_violation_type_t type);
 
 /**
  * @brief Check if protection feature is supported
@@ -499,7 +506,7 @@ const char* cupolas_violation_type_string(cupolas_violation_type_t type);
  * @reentrant Yes
  * @ownership feature: caller retains ownership
  */
-bool cupolas_protection_is_supported(const char* feature);
+bool cupolas_protection_is_supported(const char *feature);
 
 /**
  * @brief Get system protection capabilities
@@ -511,7 +518,7 @@ bool cupolas_protection_is_supported(const char* feature);
  * @ownership capabilities: caller provides buffer, function writes to it
  * @ownership count: caller provides buffer, function writes to it
  */
-int cupolas_protection_get_capabilities(char*** capabilities, size_t* count);
+int cupolas_protection_get_capabilities(char ***capabilities, size_t *count);
 
 #ifdef __cplusplus
 }

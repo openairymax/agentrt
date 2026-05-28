@@ -6,41 +6,48 @@
  */
 
 #include "compat.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef void (*assert_handler_fn_t)(const char* cond, const char* file,
-                                     int line, const char* func,
-                                     const char* msg);
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
+
+typedef void (*assert_handler_fn_t)(const char *cond, const char *file, int line, const char *func,
+                                    const char *msg);
 
 static assert_handler_fn_t g_assert_handler = NULL;
 
-void agentos_set_assert_handler(void (*handler)(const char*, const char*,
-                                                  int, const char*,
-                                                  const char*)) {
+void agentos_set_assert_handler(void (*handler)(const char *, const char *, int, const char *,
+                                                const char *))
+{
     g_assert_handler = (assert_handler_fn_t)handler;
 }
 
-void (*agentos_get_assert_handler(void))(const char*, const char*,
-                                          int, const char*,
-                                          const char*) {
-    return (void (*)(const char*, const char*, int, const char*,
-                     const char*))g_assert_handler;
+void (*agentos_get_assert_handler(void))(const char *, const char *, int, const char *,
+                                         const char *)
+{
+    return (void (*)(const char *, const char *, int, const char *, const char *))g_assert_handler;
 }
 
 #ifdef AGENTOS_PLATFORM_WINDOWS
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-    #include <intrin.h>
+#define WIN32_LEAN_AND_MEAN
+#include <intrin.h>
+#include <windows.h>
 #else
-    #include <signal.h>
-    #include <unistd.h>
+#include <signal.h>
+#include <unistd.h>
 #endif
 
-int agentos_strlcpy(char* dest, const char* src, size_t dest_size) {
+int agentos_strlcpy(char *dest, const char *src, size_t dest_size)
+{
     if (!dest || !src || dest_size == 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t src_len = strlen(src);
@@ -52,14 +59,15 @@ int agentos_strlcpy(char* dest, const char* src, size_t dest_size) {
     return (int)(src_len >= dest_size);
 }
 
-int agentos_strlcat(char* dest, const char* src, size_t dest_size) {
+int agentos_strlcat(char *dest, const char *src, size_t dest_size)
+{
     if (!dest || !src || dest_size == 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t dest_len = strlen(dest);
     if (dest_len >= dest_size) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t src_len = strlen(src);
@@ -72,7 +80,8 @@ int agentos_strlcat(char* dest, const char* src, size_t dest_size) {
     return (int)(src_len > remaining);
 }
 
-char* agentos_strncpy_safe(char* dest, const char* src, size_t dest_size) {
+char *agentos_strncpy_safe(char *dest, const char *src, size_t dest_size)
+{
     if (!dest || !src || dest_size == 0) {
         return dest;
     }
@@ -86,29 +95,31 @@ char* agentos_strncpy_safe(char* dest, const char* src, size_t dest_size) {
     return dest;
 }
 
-int agentos_memset_s(void* dest, int c, size_t dest_size, size_t count) {
+int agentos_memset_s(void *dest, int c, size_t dest_size, size_t count)
+{
     if (!dest) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (count > dest_size) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     memset(dest, c, count);
     return 0;
 }
 
-int agentos_memcpy_s(void* dest, size_t dest_size, const void* src, size_t count) {
+int agentos_memcpy_s(void *dest, size_t dest_size, const void *src, size_t count)
+{
     if (!dest || !src) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (count > dest_size) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
-    if ((char*)dest < (const char*)src + count && (const char*)src < (char*)dest + count) {
+    if ((char *)dest < (const char *)src + count && (const char *)src < (char *)dest + count) {
         memmove(dest, src, count);
     } else {
         memcpy(dest, src, count);
@@ -117,20 +128,22 @@ int agentos_memcpy_s(void* dest, size_t dest_size, const void* src, size_t count
     return 0;
 }
 
-int agentos_memmove_s(void* dest, size_t dest_size, const void* src, size_t count) {
+int agentos_memmove_s(void *dest, size_t dest_size, const void *src, size_t count)
+{
     if (!dest || !src) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (count > dest_size) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     memmove(dest, src, count);
     return 0;
 }
 
-void agentos_assert_fail(const char* cond, const char* file, int line, const char* func) {
+void agentos_assert_fail(const char *cond, const char *file, int line, const char *func)
+{
     fprintf(stderr, "Assertion failed: %s\n", cond);
     fprintf(stderr, "  at %s:%d in %s()\n", file, line, func);
 
@@ -150,7 +163,9 @@ void agentos_assert_fail(const char* cond, const char* file, int line, const cha
     abort();
 }
 
-void agentos_assert_fail_msg(const char* cond, const char* file, int line, const char* func, const char* msg) {
+void agentos_assert_fail_msg(const char *cond, const char *file, int line, const char *func,
+                             const char *msg)
+{
     fprintf(stderr, "Assertion failed: %s\n", cond);
     fprintf(stderr, "  Message: %s\n", msg);
     fprintf(stderr, "  at %s:%d in %s()\n", file, line, func);
@@ -171,38 +186,36 @@ void agentos_assert_fail_msg(const char* cond, const char* file, int line, const
     abort();
 }
 
-void agentos_debug_break(void) {
+void agentos_debug_break(void)
+{
 #ifdef AGENTOS_PLATFORM_WINDOWS
     if (IsDebuggerPresent()) {
         DebugBreak();
     }
 #else
-    #ifdef SIGTRAP
-        raise(SIGTRAP);
-    #else
-        raise(SIGABRT);
-    #endif
+#ifdef SIGTRAP
+    raise(SIGTRAP);
+#else
+    raise(SIGABRT);
+#endif
 #endif
 }
 
-static const char* g_version_string = "0.1.0";
+static const char *g_version_string = "0.1.0";
 
-const char* agentos_version_string(void) {
+const char *agentos_version_string(void)
+{
     return g_version_string;
 }
 
-const char* agentos_build_info(void) {
+const char *agentos_build_info(void)
+{
     static char build_info[256] = {0};
 
     if (build_info[0] == '\0') {
         snprintf(build_info, sizeof(build_info),
-            "AgentOS v%s | Compiler: %s | Platform: %s | Build: %s %s",
-            "0.1.0",
-            "gcc",
-            "linux",
-            __DATE__,
-            __TIME__
-        );
+                 "AgentOS v%s | Compiler: %s | Platform: %s | Build: %s %s", "0.1.0", "gcc",
+                 "linux", __DATE__, __TIME__);
     }
 
     return build_info;
@@ -211,20 +224,20 @@ const char* agentos_build_info(void) {
 #ifdef _WIN32
 #include <windows.h>
 
-int gethostname(char* name, size_t len)
+int gethostname(char *name, size_t len)
 {
     DWORD size = (DWORD)len;
     if (!GetComputerNameA(name, &size)) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
     return 0;
 }
 
 enum {
-    AGENTOS_SC_PAGESIZE         = 1,
+    AGENTOS_SC_PAGESIZE = 1,
     AGENTOS_SC_NPROCESSORS_ONLN = 2,
-    AGENTOS_SC_OPEN_MAX         = 3,
-    AGENTOS_SC_CLK_TCK          = 4
+    AGENTOS_SC_OPEN_MAX = 3,
+    AGENTOS_SC_CLK_TCK = 4
 };
 
 long sysconf(int name)
@@ -245,7 +258,7 @@ long sysconf(int name)
     case AGENTOS_SC_CLK_TCK:
         return 1000;
     default:
-        return -1;
+        return AGENTOS_EINVAL;
     }
 }
 #endif

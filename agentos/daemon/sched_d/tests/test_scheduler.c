@@ -5,28 +5,28 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "scheduler_service.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "scheduler_service.h"
 
 /**
  * @brief 测试创建和销毁调度服务
  * @return 0 表示成功，非 0 表示失败
  */
-int test_create_destroy() {
+int test_create_destroy()
+{
     printf("=== Testing create and destroy ===\n");
-    
-    sched_config_t manager = {
-        .strategy = SCHED_STRATEGY_ROUND_ROBIN,
-        .health_check_interval_ms = 5000,
-        .stats_report_interval_ms = 10000,
-        .enable_ml_strategy = false,
-        .ml_model_path = NULL,
-        .max_agents = 10
-    };
 
-    sched_service_t* service = NULL;
+    sched_config_t manager = {.strategy = SCHED_STRATEGY_ROUND_ROBIN,
+                              .health_check_interval_ms = 5000,
+                              .stats_report_interval_ms = 10000,
+                              .enable_ml_strategy = false,
+                              .ml_model_path = NULL,
+                              .max_agents = 10};
+
+    sched_service_t *service = NULL;
     int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
@@ -47,19 +47,18 @@ int test_create_destroy() {
  * @brief 测试注册和注销 Agent
  * @return 0 表示成功，非 0 表示失败
  */
-int test_register_unregister_agent() {
+int test_register_unregister_agent()
+{
     printf("=== Testing register and unregister agent ===\n");
-    
-    sched_config_t manager = {
-        .strategy = SCHED_STRATEGY_ROUND_ROBIN,
-        .health_check_interval_ms = 5000,
-        .stats_report_interval_ms = 10000,
-        .enable_ml_strategy = false,
-        .ml_model_path = NULL,
-        .max_agents = 10
-    };
 
-    sched_service_t* service = NULL;
+    sched_config_t manager = {.strategy = SCHED_STRATEGY_ROUND_ROBIN,
+                              .health_check_interval_ms = 5000,
+                              .stats_report_interval_ms = 10000,
+                              .enable_ml_strategy = false,
+                              .ml_model_path = NULL,
+                              .max_agents = 10};
+
+    sched_service_t *service = NULL;
     int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
@@ -67,15 +66,13 @@ int test_register_unregister_agent() {
     }
 
     // 注册 Agent
-    agent_info_t agent1 = {
-        .agent_id = "agent1",
-        .agent_name = "Agent 1",
-        .load_factor = 0.3,
-        .success_rate = 0.95,
-        .avg_response_time_ms = 100,
-        .is_available = true,
-        .weight = 1.0
-    };
+    agent_info_t agent1 = {.agent_id = "agent1",
+                           .agent_name = "Agent 1",
+                           .load_factor = 0.3,
+                           .success_rate = 0.95,
+                           .avg_response_time_ms = 100,
+                           .is_available = true,
+                           .weight = 1.0};
 
     ret = sched_service_register_agent(service, &agent1);
     if (ret != 0) {
@@ -105,7 +102,8 @@ int test_register_unregister_agent() {
 /**
  * @brief 主测试函数
  */
-int main() {
+int main()
+{
     int ret = 0;
 
     ret |= test_create_destroy();

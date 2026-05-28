@@ -10,15 +10,19 @@
  */
 
 #include "heapstore_integration.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+
+#include "memory_compat.h"
 
 #ifdef _WIN32
 #else
+#include "platform.h"
+
 #include <sys/stat.h>
 #include <unistd.h>
-#include "platform.h"
 #endif
 
 static bool g_integration_initialized = false;
@@ -33,7 +37,8 @@ static agentos_mutex_t g_integration_mutex = {0};
 /**
  * @brief 初始化集成层互斥锁
  */
-static void __attribute__((unused)) integration_lock_init(void) {
+static void __attribute__((unused)) integration_lock_init(void)
+{
 #ifdef _WIN32
     agentos_mutex_init(&g_integration_mutex);
 #endif
@@ -42,7 +47,8 @@ static void __attribute__((unused)) integration_lock_init(void) {
 /**
  * @brief 清理集成层互斥锁
  */
-static void __attribute__((unused)) integration_lock_cleanup(void) {
+static void __attribute__((unused)) integration_lock_cleanup(void)
+{
 #ifdef _WIN32
     agentos_mutex_destroy(&g_integration_mutex);
 #endif
@@ -51,7 +57,8 @@ static void __attribute__((unused)) integration_lock_cleanup(void) {
 /**
  * @brief 获取集成层互斥锁
  */
-static void integration_lock(void) {
+static void integration_lock(void)
+{
 #ifdef _WIN32
     agentos_mutex_lock(&g_integration_mutex);
 #else
@@ -62,7 +69,8 @@ static void integration_lock(void) {
 /**
  * @brief 释放集成层互斥锁
  */
-static void integration_unlock(void) {
+static void integration_unlock(void)
+{
 #ifdef _WIN32
     agentos_mutex_unlock(&g_integration_mutex);
 #else
@@ -70,7 +78,8 @@ static void integration_unlock(void) {
 #endif
 }
 
-agentos_error_t heapstore_integration_init(const char* root_path) {
+agentos_error_t heapstore_integration_init(const char *root_path)
+{
     integration_lock();
 
     if (g_integration_initialized) {
@@ -78,10 +87,10 @@ agentos_error_t heapstore_integration_init(const char* root_path) {
         return AGENTOS_SUCCESS;
     }
 
-    const char* effective_root = root_path;
+    const char *effective_root = root_path;
     char auto_root[512];
     if (!effective_root) {
-        const char* env = getenv("AGENTOS_HEAPSTORE_ROOT");
+        const char *env = getenv("AGENTOS_HEAPSTORE_ROOT");
         if (env && env[0]) {
             effective_root = env;
         } else {
@@ -91,18 +100,16 @@ agentos_error_t heapstore_integration_init(const char* root_path) {
         }
     }
 
-    heapstore_config_t config = {
-        .root_path = effective_root,
-        .max_log_size_mb = 100,
-        .log_retention_days = 7,
-        .trace_retention_days = 3,
-        .enable_auto_cleanup = true,
-        .enable_log_rotation = true,
-        .enable_trace_export = true,
-        .db_vacuum_interval_days = 7,
-        .circuit_breaker_threshold = 5,
-        .circuit_breaker_timeout_sec = 30
-    };
+    heapstore_config_t config = {.root_path = effective_root,
+                                 .max_log_size_mb = 100,
+                                 .log_retention_days = 7,
+                                 .trace_retention_days = 3,
+                                 .enable_auto_cleanup = true,
+                                 .enable_log_rotation = true,
+                                 .enable_trace_export = true,
+                                 .db_vacuum_interval_days = 7,
+                                 .circuit_breaker_threshold = 5,
+                                 .circuit_breaker_timeout_sec = 30};
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
@@ -114,7 +121,7 @@ agentos_error_t heapstore_integration_init(const char* root_path) {
         strncpy(g_root_path, root_path, sizeof(g_root_path) - 1);
         g_root_path[sizeof(g_root_path) - 1] = '\0';
     } else {
-        const char* env = getenv("AGENTOS_HEAPSTORE_ROOT");
+        const char *env = getenv("AGENTOS_HEAPSTORE_ROOT");
         if (env && env[0]) {
             strncpy(g_root_path, env, sizeof(g_root_path) - 1);
         } else {
@@ -130,7 +137,8 @@ agentos_error_t heapstore_integration_init(const char* root_path) {
     return AGENTOS_SUCCESS;
 }
 
-void heapstore_integration_shutdown(void) {
+void heapstore_integration_shutdown(void)
+{
     integration_lock();
 
     if (!g_integration_initialized) {
@@ -145,11 +153,9 @@ void heapstore_integration_shutdown(void) {
     integration_unlock();
 }
 
-agentos_error_t heapstore_syscall_session_save(
-    const char* session_id,
-    const char* metadata,
-    uint64_t created_ns,
-    uint64_t last_active_ns) {
+agentos_error_t heapstore_syscall_session_save(const char *session_id, const char *metadata,
+                                               uint64_t created_ns, uint64_t last_active_ns)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -173,11 +179,10 @@ agentos_error_t heapstore_syscall_session_save(
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
-agentos_error_t heapstore_syscall_session_load(
-    const char* session_id,
-    char** out_metadata,
-    uint64_t* out_created_ns,
-    uint64_t* out_last_active_ns) {
+agentos_error_t heapstore_syscall_session_load(const char *session_id, char **out_metadata,
+                                               uint64_t *out_created_ns,
+                                               uint64_t *out_last_active_ns)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -195,7 +200,7 @@ agentos_error_t heapstore_syscall_session_load(
     }
 
     if (out_metadata) {
-        *out_metadata = strdup(record.user_id);
+        *out_metadata = AGENTOS_STRDUP(record.user_id);
         if (!*out_metadata) {
             return AGENTOS_ENOMEM;
         }
@@ -210,7 +215,8 @@ agentos_error_t heapstore_syscall_session_load(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t heapstore_syscall_session_delete(const char* session_id) {
+agentos_error_t heapstore_syscall_session_delete(const char *session_id)
+{
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
@@ -222,9 +228,8 @@ agentos_error_t heapstore_syscall_session_delete(const char* session_id) {
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
-agentos_error_t heapstore_syscall_session_list(
-    char*** out_sessions,
-    size_t* out_count) {
+agentos_error_t heapstore_syscall_session_list(char ***out_sessions, size_t *out_count)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -236,7 +241,7 @@ agentos_error_t heapstore_syscall_session_list(
     *out_sessions = NULL;
     *out_count = 0;
 
-    heapstore_registry_iter_t* iter = NULL;
+    heapstore_registry_iter_t *iter = NULL;
     heapstore_error_t err = heapstore_registry_query_sessions(NULL, &iter);
     if (err != heapstore_SUCCESS || !iter) {
         return AGENTOS_EIO;
@@ -244,7 +249,7 @@ agentos_error_t heapstore_syscall_session_list(
 
     size_t count = 0;
     size_t capacity = 16;
-    char** sessions = (char**)malloc(capacity * sizeof(char*));
+    char **sessions = (char **)AGENTOS_MALLOC(capacity * sizeof(char *));
     if (!sessions) {
         heapstore_registry_iter_destroy(iter);
         return AGENTOS_ENOMEM;
@@ -262,14 +267,14 @@ agentos_error_t heapstore_syscall_session_list(
 
         if (count >= capacity) {
             capacity *= 2;
-            char** new_sessions = (char**)realloc(sessions, capacity * sizeof(char*));
+            char **new_sessions = (char **)AGENTOS_REALLOC(sessions, capacity * sizeof(char *));
             if (!new_sessions) {
                 goto cleanup_error;
             }
             sessions = new_sessions;
         }
 
-        sessions[count] = strdup(record.id);
+        sessions[count] = AGENTOS_STRDUP(record.id);
         if (!sessions[count]) {
             goto cleanup_error;
         }
@@ -285,22 +290,18 @@ agentos_error_t heapstore_syscall_session_list(
 
 cleanup_error:
     for (size_t i = 0; i < count; i++) {
-        free(sessions[i]);
+        AGENTOS_FREE(sessions[i]);
     }
-    free(sessions);
+    AGENTOS_FREE(sessions);
     heapstore_registry_iter_destroy(iter);
     return (err == heapstore_ERR_NOT_FOUND) ? AGENTOS_EIO : AGENTOS_ENOMEM;
 }
 
-agentos_error_t heapstore_syscall_trace_save(
-    const char* trace_id,
-    const char* span_id,
-    const char* parent_id,
-    const char* name,
-    int64_t start_time_us,
-    int64_t end_time_us,
-    int status,
-    const char* events_json) {
+agentos_error_t heapstore_syscall_trace_save(const char *trace_id, const char *span_id,
+                                             const char *parent_id, const char *name,
+                                             int64_t start_time_us, int64_t end_time_us, int status,
+                                             const char *events_json)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -323,7 +324,7 @@ agentos_error_t heapstore_syscall_trace_save(
     snprintf(record.status, sizeof(record.status), "%d", status);
     if (events_json) {
         if (strlen(events_json) > 0) {
-            record.attributes = strdup(events_json);
+            record.attributes = AGENTOS_STRDUP(events_json);
             if (!record.attributes) {
                 return AGENTOS_ENOMEM;
             }
@@ -334,13 +335,14 @@ agentos_error_t heapstore_syscall_trace_save(
     heapstore_error_t err = heapstore_trace_write_span(&record);
 
     if (record.attributes) {
-        free(record.attributes);
+        AGENTOS_FREE(record.attributes);
     }
 
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
-agentos_error_t heapstore_syscall_trace_export(char** out_traces) {
+agentos_error_t heapstore_syscall_trace_export(char **out_traces)
+{
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
@@ -352,11 +354,9 @@ agentos_error_t heapstore_syscall_trace_export(char** out_traces) {
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
-agentos_error_t heapstore_memoryrovol_save(
-    const void* data,
-    size_t len,
-    const char* metadata,
-    char** out_record_id) {
+agentos_error_t heapstore_memoryrovol_save(const void *data, size_t len, const char *metadata,
+                                           char **out_record_id)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -398,7 +398,7 @@ agentos_error_t heapstore_memoryrovol_save(
         return AGENTOS_EIO;
     }
 
-    *out_record_id = strdup(pool.pool_id);
+    *out_record_id = AGENTOS_STRDUP(pool.pool_id);
     if (!*out_record_id) {
         return AGENTOS_ENOMEM;
     }
@@ -406,11 +406,9 @@ agentos_error_t heapstore_memoryrovol_save(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t heapstore_memoryrovol_load(
-    const char* record_id,
-    void** out_data,
-    size_t* out_len,
-    char** out_metadata) {
+agentos_error_t heapstore_memoryrovol_load(const char *record_id, void **out_data, size_t *out_len,
+                                           char **out_metadata)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -430,7 +428,8 @@ agentos_error_t heapstore_memoryrovol_load(
     if (pool.total_size == 0) {
         *out_data = NULL;
         *out_len = 0;
-        if (out_metadata) *out_metadata = NULL;
+        if (out_metadata)
+            *out_metadata = NULL;
         return AGENTOS_SUCCESS;
     }
 
@@ -438,22 +437,24 @@ agentos_error_t heapstore_memoryrovol_load(
     memset(&alloc, 0, sizeof(alloc));
     heapstore_error_t alloc_err = heapstore_memory_get_allocation(record_id, &alloc);
     if (alloc_err != heapstore_SUCCESS) {
-        *out_data = malloc(pool.total_size);
-        if (!*out_data) return AGENTOS_ENOMEM;
+        *out_data = AGENTOS_MALLOC(pool.total_size);
+        if (!*out_data)
+            return AGENTOS_ENOMEM;
         memset(*out_data, 0, pool.total_size);
         *out_len = pool.total_size;
     } else {
         size_t copy_len = alloc.size > 0 ? alloc.size : pool.total_size;
-        *out_data = malloc(copy_len);
-        if (!*out_data) return AGENTOS_ENOMEM;
+        *out_data = AGENTOS_MALLOC(copy_len);
+        if (!*out_data)
+            return AGENTOS_ENOMEM;
         memset(*out_data, 0, copy_len);
         *out_len = copy_len;
     }
 
     if (out_metadata && pool.name[0] != '\0') {
-        *out_metadata = strdup(pool.name);
+        *out_metadata = AGENTOS_STRDUP(pool.name);
         if (!*out_metadata) {
-            free(*out_data);
+            AGENTOS_FREE(*out_data);
             *out_data = NULL;
             return AGENTOS_ENOMEM;
         }
@@ -462,7 +463,8 @@ agentos_error_t heapstore_memoryrovol_load(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t heapstore_memoryrovol_delete(const char* record_id) {
+agentos_error_t heapstore_memoryrovol_delete(const char *record_id)
+{
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
@@ -485,9 +487,8 @@ agentos_error_t heapstore_memoryrovol_delete(const char* record_id) {
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
-agentos_error_t heapstore_ipc_channel_save(
-    const char* channel_id,
-    const char* state_json) {
+agentos_error_t heapstore_ipc_channel_save(const char *channel_id, const char *state_json)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -510,9 +511,8 @@ agentos_error_t heapstore_ipc_channel_save(
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
-agentos_error_t heapstore_ipc_channel_load(
-    const char* channel_id,
-    char** out_state) {
+agentos_error_t heapstore_ipc_channel_load(const char *channel_id, char **out_state)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -531,26 +531,19 @@ agentos_error_t heapstore_ipc_channel_load(
 
     char buffer[512];
     snprintf(buffer, sizeof(buffer),
-        "{\"channel_id\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"status\":%s,"
-        "\"buffer_size\":%llu,\"current_usage\":%llu}",
-        record.channel_id,
-        record.name,
-        record.type,
-        record.status,
-        (unsigned long long)record.buffer_size,
-        (unsigned long long)record.current_usage);
+             "{\"channel_id\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"status\":%s,"
+             "\"buffer_size\":%llu,\"current_usage\":%llu}",
+             record.channel_id, record.name, record.type, record.status,
+             (unsigned long long)record.buffer_size, (unsigned long long)record.current_usage);
 
-    *out_state = strdup(buffer);
+    *out_state = AGENTOS_STRDUP(buffer);
 
     return *out_state ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }
 
-agentos_error_t heapstore_logging_write(
-    const char* module,
-    int level,
-    const char* trace_id,
-    const char* message,
-    uint64_t timestamp_ns) {
+agentos_error_t heapstore_logging_write(const char *module, int level, const char *trace_id,
+                                        const char *message, uint64_t timestamp_ns)
+{
 
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
@@ -561,11 +554,21 @@ agentos_error_t heapstore_logging_write(
 
     heapstore_log_level_t log_level;
     switch (level) {
-        case 0: log_level = HEAPSTORE_LOG_DEBUG; break;
-        case 1: log_level = HEAPSTORE_LOG_INFO; break;
-        case 2: log_level = HEAPSTORE_LOG_WARN; break;
-        case 3: log_level = HEAPSTORE_LOG_ERROR; break;
-        default: log_level = HEAPSTORE_LOG_INFO; break;
+    case 0:
+        log_level = HEAPSTORE_LOG_DEBUG;
+        break;
+    case 1:
+        log_level = HEAPSTORE_LOG_INFO;
+        break;
+    case 2:
+        log_level = HEAPSTORE_LOG_WARN;
+        break;
+    case 3:
+        log_level = HEAPSTORE_LOG_ERROR;
+        break;
+    default:
+        log_level = HEAPSTORE_LOG_INFO;
+        break;
     }
 
     heapstore_log_file_info_t info;
@@ -576,7 +579,8 @@ agentos_error_t heapstore_logging_write(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t heapstore_integration_health_check(char** out_health_json) {
+agentos_error_t heapstore_integration_health_check(char **out_health_json)
+{
     if (!out_health_json) {
         return AGENTOS_EINVAL;
     }
@@ -590,34 +594,32 @@ agentos_error_t heapstore_integration_health_check(char** out_health_json) {
 
     char buffer[1024];
     snprintf(buffer, sizeof(buffer),
-        "{"
-        "\"initialized\":%s,"
-        "\"registry\":%s,"
-        "\"trace\":%s,"
-        "\"log\":%s,"
-        "\"ipc\":%s,"
-        "\"memory\":%s,"
-        "\"overall\":%s"
-        "}",
-        g_integration_initialized ? "true" : "false",
-        registry_ok ? "true" : "false",
-        trace_ok ? "true" : "false",
-        log_ok ? "true" : "false",
-        ipc_ok ? "true" : "false",
-        memory_ok ? "true" : "false",
-        (g_integration_initialized && registry_ok && trace_ok && log_ok) ? "true" : "false");
+             "{"
+             "\"initialized\":%s,"
+             "\"registry\":%s,"
+             "\"trace\":%s,"
+             "\"log\":%s,"
+             "\"ipc\":%s,"
+             "\"memory\":%s,"
+             "\"overall\":%s"
+             "}",
+             g_integration_initialized ? "true" : "false", registry_ok ? "true" : "false",
+             trace_ok ? "true" : "false", log_ok ? "true" : "false", ipc_ok ? "true" : "false",
+             memory_ok ? "true" : "false",
+             (g_integration_initialized && registry_ok && trace_ok && log_ok) ? "true" : "false");
 
-    *out_health_json = strdup(buffer);
+    *out_health_json = AGENTOS_STRDUP(buffer);
     return *out_health_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }
 
-agentos_error_t heapstore_integration_get_stats(char** out_stats_json) {
+agentos_error_t heapstore_integration_get_stats(char **out_stats_json)
+{
     if (!out_stats_json) {
         return AGENTOS_EINVAL;
     }
 
     if (!g_integration_initialized) {
-        *out_stats_json = strdup("{\"error\":\"not initialized\"}");
+        *out_stats_json = AGENTOS_STRDUP("{\"error\":\"not initialized\"}");
         return *out_stats_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
 
@@ -628,12 +630,13 @@ agentos_error_t heapstore_integration_get_stats(char** out_stats_json) {
     heapstore_error_t err2 = heapstore_get_metrics(&metrics);
 
     if (err1 != heapstore_SUCCESS || err2 != heapstore_SUCCESS) {
-        *out_stats_json = strdup("{\"error\":\"failed to get stats\"}");
+        *out_stats_json = AGENTOS_STRDUP("{\"error\":\"failed to get stats\"}");
         return *out_stats_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
 
     char buffer[2048];
-    snprintf(buffer, sizeof(buffer),
+    snprintf(
+        buffer, sizeof(buffer),
         "{"
         "\"disk_usage\":{"
         "\"total_bytes\":%llu,"
@@ -657,22 +660,16 @@ agentos_error_t heapstore_integration_get_stats(char** out_stats_json) {
         "\"peak_concurrent_ops\":%llu"
         "}"
         "}",
-        (unsigned long long)stats.total_disk_usage_bytes,
-        (unsigned long long)stats.log_usage_bytes,
-        (unsigned long long)stats.registry_usage_bytes,
-        (unsigned long long)stats.trace_usage_bytes,
-        (unsigned long long)stats.ipc_usage_bytes,
-        (unsigned long long)stats.memory_usage_bytes,
-        stats.log_file_count,
-        stats.trace_file_count,
-        (unsigned long long)metrics.total_operations,
+        (unsigned long long)stats.total_disk_usage_bytes, (unsigned long long)stats.log_usage_bytes,
+        (unsigned long long)stats.registry_usage_bytes, (unsigned long long)stats.trace_usage_bytes,
+        (unsigned long long)stats.ipc_usage_bytes, (unsigned long long)stats.memory_usage_bytes,
+        stats.log_file_count, stats.trace_file_count, (unsigned long long)metrics.total_operations,
         (unsigned long long)metrics.failed_operations,
         (unsigned long long)metrics.fast_path_operations,
         (unsigned long long)metrics.slow_path_operations,
-        (unsigned long long)metrics.circuit_breaker_trips,
-        metrics.avg_operation_time_ns,
+        (unsigned long long)metrics.circuit_breaker_trips, metrics.avg_operation_time_ns,
         (unsigned long long)metrics.peak_concurrent_ops);
 
-    *out_stats_json = strdup(buffer);
+    *out_stats_json = AGENTOS_STRDUP(buffer);
     return *out_stats_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }

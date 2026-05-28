@@ -15,6 +15,7 @@
 
 #include "../platform/platform.h"
 #include "audit_queue.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -37,8 +38,8 @@ typedef struct audit_logger audit_logger_t;
  * @reentrant No (create/destroy must be paired)
  * @ownership Returned handle: caller owns, must call audit_logger_destroy
  */
-audit_logger_t* audit_logger_create(const char* log_dir, const char* log_prefix,
-                                     size_t max_file_size, int max_files);
+audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
+                                    size_t max_file_size, int max_files);
 
 /**
  * @brief Destroy audit logger
@@ -49,7 +50,7 @@ audit_logger_t* audit_logger_create(const char* log_dir, const char* log_prefix,
  * @reentrant No
  * @ownership logger: caller transfers ownership
  */
-void audit_logger_destroy(audit_logger_t* logger);
+void audit_logger_destroy(audit_logger_t *logger);
 
 /**
  * @brief Log audit event
@@ -65,9 +66,8 @@ void audit_logger_destroy(audit_logger_t* logger);
  * @reentrant Yes
  * @ownership All input strings: caller retains ownership
  */
-int audit_logger_log(audit_logger_t* logger, audit_event_type_t type,
-                      const char* agent_id, const char* action,
-                      const char* resource, const char* detail, int result);
+int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char *agent_id,
+                     const char *action, const char *resource, const char *detail, int result);
 
 /**
  * @brief Log permission audit event
@@ -81,8 +81,8 @@ int audit_logger_log(audit_logger_t* logger, audit_event_type_t type,
  * @reentrant Yes
  * @ownership All input strings: caller retains ownership
  */
-int audit_logger_log_permission(audit_logger_t* logger, const char* agent_id,
-                                 const char* action, const char* resource, int allowed);
+int audit_logger_log_permission(audit_logger_t *logger, const char *agent_id, const char *action,
+                                const char *resource, int allowed);
 
 /**
  * @brief Log sanitizer audit event
@@ -96,8 +96,8 @@ int audit_logger_log_permission(audit_logger_t* logger, const char* agent_id,
  * @reentrant Yes
  * @ownership All input strings: caller retains ownership
  */
-int audit_logger_log_sanitizer(audit_logger_t* logger, const char* agent_id,
-                                const char* input, const char* output, int passed);
+int audit_logger_log_sanitizer(audit_logger_t *logger, const char *agent_id, const char *input,
+                               const char *output, int passed);
 
 /**
  * @brief Log workbench audit event
@@ -110,8 +110,8 @@ int audit_logger_log_sanitizer(audit_logger_t* logger, const char* agent_id,
  * @reentrant Yes
  * @ownership All input strings: caller retains ownership
  */
-int audit_logger_log_workbench(audit_logger_t* logger, const char* agent_id,
-                                const char* command, int exit_code);
+int audit_logger_log_workbench(audit_logger_t *logger, const char *agent_id, const char *command,
+                               int exit_code);
 
 /**
  * @brief Flush log buffer
@@ -120,7 +120,7 @@ int audit_logger_log_workbench(audit_logger_t* logger, const char* agent_id,
  * @reentrant Yes
  * @post All pending log entries are written to storage
  */
-void audit_logger_flush(audit_logger_t* logger);
+void audit_logger_flush(audit_logger_t *logger);
 
 /**
  * @brief Get log statistics
@@ -131,7 +131,7 @@ void audit_logger_flush(audit_logger_t* logger);
  * @reentrant Yes
  * @ownership total_logged, total_failed: callee writes, caller owns
  */
-void audit_logger_stats(audit_logger_t* logger, uint64_t* total_logged, uint64_t* total_failed);
+void audit_logger_stats(audit_logger_t *logger, uint64_t *total_logged, uint64_t *total_failed);
 
 #ifdef __cplusplus
 }

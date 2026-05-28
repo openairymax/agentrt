@@ -5,16 +5,22 @@
  */
 
 #include "confidence_calibrator.h"
+
 #include "memory_compat.h"
+
 #include <math.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
-confidence_calibrator_t* confidence_calibrator_create(double decay_factor) {
-    confidence_calibrator_t* cb = (confidence_calibrator_t*)AGENTOS_CALLOC(1, sizeof(confidence_calibrator_t));
-    if (!cb) return NULL;
+confidence_calibrator_t *confidence_calibrator_create(double decay_factor)
+{
+    confidence_calibrator_t *cb =
+        (confidence_calibrator_t *)AGENTOS_CALLOC(1, sizeof(confidence_calibrator_t));
+    if (!cb)
+        return NULL;
 
-    cb->decay_factor = (decay_factor > 0.0 && decay_factor < 1.0) ? decay_factor : CC_DEFAULT_DECAY_FACTOR;
+    cb->decay_factor =
+        (decay_factor > 0.0 && decay_factor < 1.0) ? decay_factor : CC_DEFAULT_DECAY_FACTOR;
 
     for (int i = 0; i < CC_MAX_DIMENSIONS; i++) {
         cb->historical_bias[i] = 0.0;
@@ -30,23 +36,28 @@ confidence_calibrator_t* confidence_calibrator_create(double decay_factor) {
     return cb;
 }
 
-void confidence_calibrator_destroy(confidence_calibrator_t* calibrator) {
-    if (calibrator) AGENTOS_FREE(calibrator);
+void confidence_calibrator_destroy(confidence_calibrator_t *calibrator)
+{
+    if (calibrator)
+        AGENTOS_FREE(calibrator);
 }
 
-double confidence_calibrator_calibrate(
-    confidence_calibrator_t* calibrator,
-    double raw_score,
-    cc_dimension_t dimension) {
-    if (!calibrator) return raw_score;
-    if (dimension < 0 || dimension >= CC_DIM_COUNT) return raw_score;
+double confidence_calibrator_calibrate(confidence_calibrator_t *calibrator, double raw_score,
+                                       cc_dimension_t dimension)
+{
+    if (!calibrator)
+        return raw_score;
+    if (dimension < 0 || dimension >= CC_DIM_COUNT)
+        return raw_score;
 
     double bias = calibrator->historical_bias[dimension];
     double factor = calibrator->calibration_factors[dimension];
     double calibrated = raw_score * (1.0 - bias) * factor;
 
-    if (calibrated < 0.0) calibrated = 0.0;
-    if (calibrated > 1.0) calibrated = 1.0;
+    if (calibrated < 0.0)
+        calibrated = 0.0;
+    if (calibrated > 1.0)
+        calibrated = 1.0;
 
     uint32_t idx = calibrator->recent_index[dimension];
     calibrator->recent_raw[dimension][idx % 5] = raw_score;
@@ -56,13 +67,13 @@ double confidence_calibrator_calibrate(
     return calibrated;
 }
 
-void confidence_calibrator_update(
-    confidence_calibrator_t* calibrator,
-    double actual_accuracy,
-    double predicted_confidence,
-    cc_dimension_t dimension) {
-    if (!calibrator) return;
-    if (dimension < 0 || dimension >= CC_DIM_COUNT) return;
+void confidence_calibrator_update(confidence_calibrator_t *calibrator, double actual_accuracy,
+                                  double predicted_confidence, cc_dimension_t dimension)
+{
+    if (!calibrator)
+        return;
+    if (dimension < 0 || dimension >= CC_DIM_COUNT)
+        return;
 
     double error = fabs(actual_accuracy - predicted_confidence);
 
@@ -84,36 +95,40 @@ void confidence_calibrator_update(
     calibrator->sample_count[dimension]++;
 }
 
-double confidence_calibrator_get_bias(
-    confidence_calibrator_t* calibrator,
-    cc_dimension_t dimension) {
-    if (!calibrator || dimension < 0 || dimension >= CC_DIM_COUNT) return 0.0;
+double confidence_calibrator_get_bias(confidence_calibrator_t *calibrator, cc_dimension_t dimension)
+{
+    if (!calibrator || dimension < 0 || dimension >= CC_DIM_COUNT)
+        return 0.0;
     return calibrator->historical_bias[dimension];
 }
 
-int confidence_calibrator_check_convergence(
-    confidence_calibrator_t* calibrator,
-    cc_dimension_t dimension,
-    double threshold) {
-    if (!calibrator || dimension < 0 || dimension >= CC_DIM_COUNT) return 0;
+int confidence_calibrator_check_convergence(confidence_calibrator_t *calibrator,
+                                            cc_dimension_t dimension, double threshold)
+{
+    if (!calibrator || dimension < 0 || dimension >= CC_DIM_COUNT)
+        return 0;
 
     uint32_t idx = calibrator->recent_index[dimension];
-    if (idx < 5) return 0;
+    if (idx < 5)
+        return 0;
 
     double max_diff = 0.0;
     for (int i = 0; i < 5; i++) {
         for (int j = i + 1; j < 5; j++) {
             double diff = fabs(calibrator->recent_calibrated[dimension][i] -
                                calibrator->recent_calibrated[dimension][j]);
-            if (diff > max_diff) max_diff = diff;
+            if (diff > max_diff)
+                max_diff = diff;
         }
     }
 
     return max_diff < threshold ? 1 : 0;
 }
 
-void confidence_calibrator_reset(confidence_calibrator_t* calibrator) {
-    if (!calibrator) return;
+void confidence_calibrator_reset(confidence_calibrator_t *calibrator)
+{
+    if (!calibrator)
+        return;
 
     for (int i = 0; i < CC_MAX_DIMENSIONS; i++) {
         calibrator->historical_bias[i] = 0.0;

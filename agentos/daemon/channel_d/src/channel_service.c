@@ -1,31 +1,35 @@
-#include "memory_compat.h"
 #include "channel_service.h"
-#include "platform.h"
+
+#include "agentos_mman.h"
 #include "atomic_compat.h"
+#include "daemon_errors.h"
+#include "error.h"
+#include "memory_compat.h"
+#include "platform.h"
 #include "string_compat.h"
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/un.h>
+
 #include <arpa/inet.h>
-#include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
-#include "agentos_mman.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <time.h>
+#include <unistd.h>
 
 typedef struct {
     channel_info_t info;
     int socket_fd;
-    void* shm_ptr;
+    void *shm_ptr;
     size_t shm_size;
     char shm_name[128];
     int shm_fd;
     channel_message_cb_t callback;
-    void* callback_user_data;
-    uint8_t* recv_buffer;
+    void *callback_user_data;
+    uint8_t *recv_buffer;
     size_t recv_buffer_size;
     size_t recv_buffer_used;
 } channel_entry_t;
@@ -46,7 +50,7 @@ static uint64_t get_time_ms(void)
     return agentos_time_ms();
 }
 
-static channel_entry_t* find_channel(channel_service_t* svc, const char* channel_id)
+static channel_entry_t *find_channel(channel_service_t *svc, const char *channel_id)
 {
     for (size_t i = 0; i < svc->channel_count; i++) {
         if (strcmp(svc->channels[i].info.channel_id, channel_id) == 0) {
@@ -56,7 +60,7 @@ static channel_entry_t* find_channel(channel_service_t* svc, const char* channel
     return NULL;
 }
 
-static int create_socket_channel(channel_entry_t* entry, const char* endpoint)
+static int create_socket_channel(channel_entry_t *entry, const char *endpoint)
 {
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
@@ -64,19 +68,21 @@ static int create_socket_channel(channel_entry_t* entry, const char* endpoint)
     strncpy(addr.sun_path, endpoint, sizeof(addr.sun_path) - 1);
 
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd < 0) return -1;
+    if (fd < 0) {
+        AGENTOS_ERROR(AGENTOS_ERR_IO, "socket creation failed");
+    }
 
     unlink(endpoint);
 
-    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(fd);
-        return -1;
+        AGENTOS_ERROR(AGENTOS_ERR_IO, "bind failed on endpoint");
     }
 
     if (listen(fd, 128) < 0) {
         close(fd);
         unlink(endpoint);
-        return -1;
+        AGENTOS_ERROR(AGENTOS_ERR_IO, "listen failed on endpoint");
     }
 
     int flags = fcntl(fd, F_GETFL, 0);
@@ -88,27 +94,29 @@ static int create_socket_channel(channel_entry_t* entry, const char* endpoint)
     return 0;
 }
 
-static int create_shm_channel(channel_entry_t* entry, const char* endpoint __attribute__((unused)))
+static int create_shm_channel(channel_entry_t *entry, const char *endpoint __attribute__((unused)))
 {
-    snprintf(entry->shm_name, sizeof(entry->shm_name), "%s%s",
-             "/agentos_ch_", entry->info.channel_id);
+    snprintf(entry->shm_name, sizeof(entry->shm_name), "%s%s", "/agentos_ch_",
+             entry->info.channel_id);
 
     size_t shm_size = entry->info.buffer_size > 0 ? entry->info.buffer_size : 65536;
 
     int fd = shm_open(entry->shm_name, O_CREAT | O_RDWR, 0600);
-    if (fd < 0) return -1;
+    if (fd < 0) {
+        AGENTOS_ERROR(AGENTOS_ERR_IO, "shm_open failed");
+    }
 
     if (ftruncate(fd, (off_t)shm_size) < 0) {
         close(fd);
         shm_unlink(entry->shm_name);
-        return -1;
+        AGENTOS_ERROR(AGENTOS_ERR_IO, "ftruncate failed on shm");
     }
 
-    void* ptr = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void *ptr = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (ptr == MAP_FAILED) {
         close(fd);
         shm_unlink(entry->shm_name);
-        return -1;
+        AGENTOS_ERROR(AGENTOS_ERR_IO, "mmap failed on shm");
     }
 
     memset(ptr, 0, shm_size);
@@ -119,7 +127,7 @@ static int create_shm_channel(channel_entry_t* entry, const char* endpoint __att
     return 0;
 }
 
-static void destroy_channel(channel_entry_t* entry)
+static void destroy_channel(channel_entry_t *entry)
 {
     if (entry->socket_fd >= 0) {
         close(entry->socket_fd);
@@ -150,10 +158,11 @@ static void destroy_channel(channel_entry_t* entry)
     entry->recv_buffer_used = 0;
 }
 
-channel_service_t* channel_service_create(const channel_config_t* config)
+channel_service_t *channel_service_create(const channel_config_t *config)
 {
-    channel_service_t* svc = (channel_service_t*)AGENTOS_CALLOC(1, sizeof(channel_service_t));
-    if (!svc) return NULL;
+    channel_service_t *svc = (channel_service_t *)AGENTOS_CALLOC(1, sizeof(channel_service_t));
+    if (!svc)
+        return NULL;
 
     if (config) {
         svc->config = *config;
@@ -172,9 +181,10 @@ channel_service_t* channel_service_create(const channel_config_t* config)
     return svc;
 }
 
-void channel_service_destroy(channel_service_t* svc)
+void channel_service_destroy(channel_service_t *svc)
 {
-    if (!svc) return;
+    if (!svc)
+        return;
 
     if (svc->running) {
         channel_service_stop(svc);
@@ -188,10 +198,12 @@ void channel_service_destroy(channel_service_t* svc)
     AGENTOS_FREE(svc);
 }
 
-int channel_service_start(channel_service_t* svc)
+int channel_service_start(channel_service_t *svc)
 {
-    if (!svc) return -1;
-    if (svc->running) return 0;
+    if (!svc)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (svc->running)
+        return 0;
 
     if (svc->config.socket_dir[0]) {
         mkdir(svc->config.socket_dir, 0755);
@@ -202,9 +214,10 @@ int channel_service_start(channel_service_t* svc)
     return 0;
 }
 
-int channel_service_stop(channel_service_t* svc)
+int channel_service_stop(channel_service_t *svc)
 {
-    if (!svc || !svc->running) return -1;
+    if (!svc || !svc->running)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     for (size_t i = 0; i < svc->channel_count; i++) {
         destroy_channel(&svc->channels[i]);
@@ -214,22 +227,22 @@ int channel_service_stop(channel_service_t* svc)
     return 0;
 }
 
-int channel_service_open(channel_service_t* svc,
-                          const char* channel_id,
-                          const char* name,
-                          channel_type_t type,
-                          const char* endpoint)
+int channel_service_open(channel_service_t *svc, const char *channel_id, const char *name,
+                         channel_type_t type, const char *endpoint)
 {
-    if (!svc || !channel_id || !name) return -1;
-    if (svc->channel_count >= svc->config.max_channels) return -2;
+    if (!svc || !channel_id || !name)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (svc->channel_count >= svc->config.max_channels) {
+        AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "channel count limit reached");
+    }
 
     agentos_mutex_lock(&svc->lock);
     if (find_channel(svc, channel_id)) {
         agentos_mutex_unlock(&svc->lock);
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "channel already exists");
     }
 
-    channel_entry_t* entry = &svc->channels[svc->channel_count];
+    channel_entry_t *entry = &svc->channels[svc->channel_count];
     memset(entry, 0, sizeof(channel_entry_t));
     entry->socket_fd = -1;
     entry->shm_fd = -1;
@@ -244,11 +257,11 @@ int channel_service_open(channel_service_t* svc,
         strncpy(entry->info.endpoint, endpoint, sizeof(entry->info.endpoint) - 1);
     } else {
         if (type == CHANNEL_TYPE_SOCKET) {
-            snprintf(entry->info.endpoint, sizeof(entry->info.endpoint),
-                     "%s/%s.sock", svc->config.socket_dir, channel_id);
+            snprintf(entry->info.endpoint, sizeof(entry->info.endpoint), "%s/%s.sock",
+                     svc->config.socket_dir, channel_id);
         } else if (type == CHANNEL_TYPE_SHM) {
-            snprintf(entry->info.endpoint, sizeof(entry->info.endpoint),
-                     "%s%s", svc->config.shm_prefix, channel_id);
+            snprintf(entry->info.endpoint, sizeof(entry->info.endpoint), "%s%s",
+                     svc->config.shm_prefix, channel_id);
         }
     }
 
@@ -257,34 +270,37 @@ int channel_service_open(channel_service_t* svc,
 
     int rc = 0;
     switch (type) {
-        case CHANNEL_TYPE_SOCKET:
-            rc = create_socket_channel(entry, entry->info.endpoint);
-            break;
-        case CHANNEL_TYPE_SHM:
-            rc = create_shm_channel(entry, entry->info.endpoint);
-            break;
-        case CHANNEL_TYPE_PIPE:
-            if (entry->info.endpoint[0]) {
-                rc = mkfifo(entry->info.endpoint, 0666);
-                if (rc < 0 && errno != EEXIST) rc = -1; else rc = 0;
-            }
-            break;
-        default:
-            rc = -1;
-            break;
+    case CHANNEL_TYPE_SOCKET:
+        rc = create_socket_channel(entry, entry->info.endpoint);
+        break;
+    case CHANNEL_TYPE_SHM:
+        rc = create_shm_channel(entry, entry->info.endpoint);
+        break;
+    case CHANNEL_TYPE_PIPE:
+        if (entry->info.endpoint[0]) {
+            rc = mkfifo(entry->info.endpoint, 0666);
+            if (rc < 0 && errno != EEXIST)
+                rc = -1;
+            else
+                rc = 0;
+        }
+        break;
+    default:
+        rc = -1;
+        break;
     }
 
     if (rc < 0) {
         agentos_mutex_unlock(&svc->lock);
-        return -4;
+        AGENTOS_ERROR(AGENTOS_ERR_IO, "channel creation failed");
     }
 
     entry->recv_buffer_size = entry->info.buffer_size;
-    entry->recv_buffer = (uint8_t*)AGENTOS_CALLOC(1, entry->recv_buffer_size);
+    entry->recv_buffer = (uint8_t *)AGENTOS_CALLOC(1, entry->recv_buffer_size);
     if (!entry->recv_buffer) {
         destroy_channel(entry);
         agentos_mutex_unlock(&svc->lock);
-        return -5;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     svc->channel_count++;
@@ -292,9 +308,10 @@ int channel_service_open(channel_service_t* svc,
     return 0;
 }
 
-int channel_service_close(channel_service_t* svc, const char* channel_id)
+int channel_service_close(channel_service_t *svc, const char *channel_id)
 {
-    if (!svc || !channel_id) return -1;
+    if (!svc || !channel_id)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&svc->lock);
     for (size_t i = 0; i < svc->channel_count; i++) {
@@ -312,82 +329,105 @@ int channel_service_close(channel_service_t* svc, const char* channel_id)
         }
     }
     agentos_mutex_unlock(&svc->lock);
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "channel not found");
 }
 
-int channel_service_send(channel_service_t* svc,
-                           const char* channel_id,
-                           const void* data,
-                           size_t data_len)
+int channel_service_send(channel_service_t *svc, const char *channel_id, const void *data,
+                         size_t data_len)
 {
-    if (!svc || !channel_id || !data || data_len == 0) return -1;
+    if (!svc || !channel_id || !data || data_len == 0)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&svc->lock);
-    channel_entry_t* entry = find_channel(svc, channel_id);
+    channel_entry_t *entry = find_channel(svc, channel_id);
     if (!entry || entry->info.status != CHANNEL_STATUS_OPEN) {
         agentos_mutex_unlock(&svc->lock);
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "channel not found or not open");
     }
 
     entry->info.last_activity = get_time_ms();
 
     switch (entry->info.type) {
-        case CHANNEL_TYPE_SOCKET: {
-            if (entry->socket_fd < 0) { agentos_mutex_unlock(&svc->lock); return -3; }
-            struct sockaddr_un client_addr;
-            memset(&client_addr, 0, sizeof(client_addr));
-            client_addr.sun_family = AF_UNIX;
-            strncpy(client_addr.sun_path, entry->info.endpoint, sizeof(client_addr.sun_path) - 1);
-            client_addr.sun_path[sizeof(client_addr.sun_path) - 1] = '\0';
-            int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-            if (client_fd < 0) { agentos_mutex_unlock(&svc->lock); return -3; }
-            {
-                struct timeval tv;
-                tv.tv_sec = 3;
-                tv.tv_usec = 0;
-                setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-            }
-            if (connect(client_fd, (struct sockaddr*)&client_addr, sizeof(client_addr)) < 0) {
-                close(client_fd);
+    case CHANNEL_TYPE_SOCKET: {
+        if (entry->socket_fd < 0) {
+            agentos_mutex_unlock(&svc->lock);
+            AGENTOS_ERROR(AGENTOS_ERR_IO, "socket not open for send");
+        }
+        struct sockaddr_un client_addr;
+        memset(&client_addr, 0, sizeof(client_addr));
+        client_addr.sun_family = AF_UNIX;
+        strncpy(client_addr.sun_path, entry->info.endpoint, sizeof(client_addr.sun_path) - 1);
+        client_addr.sun_path[sizeof(client_addr.sun_path) - 1] = '\0';
+        int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (client_fd < 0) {
+            agentos_mutex_unlock(&svc->lock);
+            AGENTOS_ERROR(AGENTOS_ERR_IO, "client socket creation failed");
+        }
+        {
+            struct timeval tv;
+            tv.tv_sec = 3;
+            tv.tv_usec = 0;
+            setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+        }
+        if (connect(client_fd, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
+            close(client_fd);
+            agentos_mutex_unlock(&svc->lock);
+            return (errno == EAGAIN || errno == ETIMEDOUT) ? AGENTOS_ERR_TIMEOUT : AGENTOS_ERR_IO;
+        }
+        uint32_t net_len = htonl((uint32_t)data_len);
+        ssize_t w1 = write(client_fd, &net_len, sizeof(net_len));
+        ssize_t w2 = write(client_fd, data, data_len);
+        close(client_fd);
+        if (w1 < 0 || w2 < 0) {
+            agentos_mutex_unlock(&svc->lock);
+            return (errno == EAGAIN || errno == ETIMEDOUT) ? AGENTOS_ERR_TIMEOUT : AGENTOS_ERR_IO;
+        }
+        break;
+    }
+    case CHANNEL_TYPE_SHM: {
+        if (!entry->shm_ptr) {
+            agentos_mutex_unlock(&svc->lock);
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "shm_ptr is NULL in send");
+        }
+        size_t header_size = sizeof(uint32_t) * 2;
+        if (data_len + header_size > entry->shm_size) {
+            agentos_mutex_unlock(&svc->lock);
+            AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "data exceeds shm buffer size");
+        }
+        volatile uint32_t *msg_len = (volatile uint32_t *)entry->shm_ptr;
+        volatile uint32_t *msg_flag =
+            (volatile uint32_t *)((char *)entry->shm_ptr + sizeof(uint32_t));
+        *msg_len = (uint32_t)data_len;
+        memcpy((char *)entry->shm_ptr + header_size, data, data_len);
+        atomic_thread_fence(memory_order_seq_cst);
+        *msg_flag = 1;
+        break;
+    }
+    case CHANNEL_TYPE_PIPE: {
+        if (entry->info.endpoint[0]) {
+            int fd = open(entry->info.endpoint, O_WRONLY | O_NONBLOCK);
+            if (fd < 0) {
                 agentos_mutex_unlock(&svc->lock);
-                return (errno == EAGAIN || errno == ETIMEDOUT) ? CHANNEL_ERR_TIMEOUT : CHANNEL_ERR_IO;
+                AGENTOS_ERROR(AGENTOS_ERR_IO, "pipe open for write failed");
             }
             uint32_t net_len = htonl((uint32_t)data_len);
-            ssize_t w1 = write(client_fd, &net_len, sizeof(net_len));
-            ssize_t w2 = write(client_fd, data, data_len);
-            close(client_fd);
-            if (w1 < 0 || w2 < 0) {
-                agentos_mutex_unlock(&svc->lock);
-                return (errno == EAGAIN || errno == ETIMEDOUT) ? CHANNEL_ERR_TIMEOUT : CHANNEL_ERR_IO;
-            }
-            break;
-        }
-        case CHANNEL_TYPE_SHM: {
-            if (!entry->shm_ptr) { agentos_mutex_unlock(&svc->lock); return -3; }
-            size_t header_size = sizeof(uint32_t) * 2;
-            if (data_len + header_size > entry->shm_size) { agentos_mutex_unlock(&svc->lock); return -4; }
-            volatile uint32_t* msg_len = (volatile uint32_t*)entry->shm_ptr;
-            volatile uint32_t* msg_flag = (volatile uint32_t*)((char*)entry->shm_ptr + sizeof(uint32_t));
-            *msg_len = (uint32_t)data_len;
-            memcpy((char*)entry->shm_ptr + header_size, data, data_len);
-            atomic_thread_fence(memory_order_seq_cst);
-            *msg_flag = 1;
-            break;
-        }
-        case CHANNEL_TYPE_PIPE: {
-            if (entry->info.endpoint[0]) {
-                int fd = open(entry->info.endpoint, O_WRONLY | O_NONBLOCK);
-                if (fd < 0) { agentos_mutex_unlock(&svc->lock); return -3; }
-                uint32_t net_len = htonl((uint32_t)data_len);
-                if (write(fd, &net_len, sizeof(net_len)) < 0) { close(fd); agentos_mutex_unlock(&svc->lock); return -3; }
-                if (write(fd, data, data_len) < 0) { close(fd); agentos_mutex_unlock(&svc->lock); return -3; }
+            if (write(fd, &net_len, sizeof(net_len)) < 0) {
                 close(fd);
+                agentos_mutex_unlock(&svc->lock);
+                AGENTOS_ERROR(AGENTOS_ERR_IO, "pipe write header failed");
             }
-            break;
+            if (write(fd, data, data_len) < 0) {
+                close(fd);
+                agentos_mutex_unlock(&svc->lock);
+                AGENTOS_ERROR(AGENTOS_ERR_IO, "pipe write data failed");
+            }
+            close(fd);
         }
-        default:
-            agentos_mutex_unlock(&svc->lock);
-            return -3;
+        break;
+    }
+    default:
+        agentos_mutex_unlock(&svc->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "unknown channel type in send");
     }
 
     entry->info.messages_sent++;
@@ -395,7 +435,7 @@ int channel_service_send(channel_service_t* svc,
 
     if (entry->callback) {
         channel_message_cb_t cb = entry->callback;
-        void* ud = entry->callback_user_data;
+        void *ud = entry->callback_user_data;
         agentos_mutex_unlock(&svc->lock);
         cb(channel_id, data, data_len, ud);
         return 0;
@@ -405,87 +445,136 @@ int channel_service_send(channel_service_t* svc,
     return 0;
 }
 
-int channel_service_receive(channel_service_t* svc,
-                              const char* channel_id,
-                              void** out_data,
-                              size_t* out_len)
+int channel_service_receive(channel_service_t *svc, const char *channel_id, void **out_data,
+                            size_t *out_len)
 {
-    if (!svc || !channel_id || !out_data || !out_len) return -1;
+    if (!svc || !channel_id || !out_data || !out_len)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&svc->lock);
-    channel_entry_t* entry = find_channel(svc, channel_id);
+    channel_entry_t *entry = find_channel(svc, channel_id);
     if (!entry || entry->info.status != CHANNEL_STATUS_OPEN) {
         agentos_mutex_unlock(&svc->lock);
-        return -2;
+        return AGENTOS_ERR_NOT_FOUND;
     }
 
     entry->info.last_activity = get_time_ms();
 
     switch (entry->info.type) {
-        case CHANNEL_TYPE_SOCKET: {
-            if (entry->socket_fd < 0) { agentos_mutex_unlock(&svc->lock); return -3; }
-            int client_fd = accept(entry->socket_fd, NULL, NULL);
-            if (client_fd < 0) { agentos_mutex_unlock(&svc->lock); return -3; }
-            uint32_t net_len = 0;
-            ssize_t r1 = read(client_fd, &net_len, sizeof(net_len));
-            if (r1 <= 0) { close(client_fd); agentos_mutex_unlock(&svc->lock); return -3; }
-            uint32_t msg_len = ntohl(net_len);
-            if (msg_len == 0 || msg_len > svc->config.default_buffer_size) {
-                close(client_fd);
-                agentos_mutex_unlock(&svc->lock);
-                return -4;
-            }
-            void* buf = AGENTOS_MALLOC(msg_len);
-            if (!buf) { close(client_fd); agentos_mutex_unlock(&svc->lock); return -5; }
-            ssize_t r2 = read(client_fd, buf, msg_len);
+    case CHANNEL_TYPE_SOCKET: {
+        if (entry->socket_fd < 0) {
+            agentos_mutex_unlock(&svc->lock);
+            return AGENTOS_ERR_IO;
+        }
+        int client_fd = accept(entry->socket_fd, NULL, NULL);
+        if (client_fd < 0) {
+            agentos_mutex_unlock(&svc->lock);
+            return AGENTOS_ERR_IO;
+        }
+        uint32_t net_len = 0;
+        ssize_t r1 = read(client_fd, &net_len, sizeof(net_len));
+        if (r1 <= 0) {
             close(client_fd);
-            if (r2 <= 0) { AGENTOS_FREE(buf); agentos_mutex_unlock(&svc->lock); return -3; }
-            *out_data = buf;
-            *out_len = (size_t)r2;
-            break;
+            agentos_mutex_unlock(&svc->lock);
+            return AGENTOS_ERR_IO;
         }
-        case CHANNEL_TYPE_SHM: {
-            if (!entry->shm_ptr) { agentos_mutex_unlock(&svc->lock); return -3; }
-            volatile uint32_t* msg_len = (volatile uint32_t*)entry->shm_ptr;
-            volatile uint32_t* msg_flag = (volatile uint32_t*)((char*)entry->shm_ptr + sizeof(uint32_t));
-            atomic_thread_fence(memory_order_seq_cst);
-            if (*msg_flag != 1) { agentos_mutex_unlock(&svc->lock); return 0; }
-            uint32_t len = *msg_len;
-            if (len == 0 || len > entry->shm_size - sizeof(uint32_t) * 2) { agentos_mutex_unlock(&svc->lock); return -4; }
-            void* buf = AGENTOS_MALLOC(len);
-            if (!buf) { agentos_mutex_unlock(&svc->lock); return -5; }
-            memcpy(buf, (char*)entry->shm_ptr + sizeof(uint32_t) * 2, len);
-            atomic_thread_fence(memory_order_seq_cst);
-            *msg_flag = 0;
-            *out_data = buf;
-            *out_len = len;
-            break;
+        uint32_t msg_len = ntohl(net_len);
+        if (msg_len == 0 || msg_len > svc->config.default_buffer_size) {
+            close(client_fd);
+            agentos_mutex_unlock(&svc->lock);
+            return AGENTOS_ERR_OVERFLOW;
         }
-        case CHANNEL_TYPE_PIPE: {
-            if (entry->info.endpoint[0]) {
-                int fd = open(entry->info.endpoint, O_RDONLY | O_NONBLOCK);
-                if (fd < 0) { agentos_mutex_unlock(&svc->lock); return 0; }
-                uint32_t net_len = 0;
-                ssize_t r1 = read(fd, &net_len, sizeof(net_len));
-                if (r1 <= 0) { close(fd); agentos_mutex_unlock(&svc->lock); return 0; }
-                uint32_t msg_len = ntohl(net_len);
-                if (msg_len == 0) { close(fd); agentos_mutex_unlock(&svc->lock); return 0; }
-                void* buf = AGENTOS_MALLOC(msg_len);
-                if (!buf) { close(fd); agentos_mutex_unlock(&svc->lock); return -5; }
-                ssize_t r2 = read(fd, buf, msg_len);
-                close(fd);
-                if (r2 <= 0) { AGENTOS_FREE(buf); agentos_mutex_unlock(&svc->lock); return 0; }
-                *out_data = buf;
-                *out_len = (size_t)r2;
-            } else {
+        void *buf = AGENTOS_MALLOC(msg_len);
+        if (!buf) {
+            close(client_fd);
+            agentos_mutex_unlock(&svc->lock);
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
+        ssize_t r2 = read(client_fd, buf, msg_len);
+        close(client_fd);
+        if (r2 <= 0) {
+            AGENTOS_FREE(buf);
+            agentos_mutex_unlock(&svc->lock);
+            return AGENTOS_ERR_IO;
+        }
+        *out_data = buf;
+        *out_len = (size_t)r2;
+        break;
+    }
+    case CHANNEL_TYPE_SHM: {
+        if (!entry->shm_ptr) {
+            agentos_mutex_unlock(&svc->lock);
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "shm_ptr is NULL in receive");
+        }
+        volatile uint32_t *msg_len = (volatile uint32_t *)entry->shm_ptr;
+        volatile uint32_t *msg_flag =
+            (volatile uint32_t *)((char *)entry->shm_ptr + sizeof(uint32_t));
+        atomic_thread_fence(memory_order_seq_cst);
+        if (*msg_flag != 1) {
+            agentos_mutex_unlock(&svc->lock);
+            return 0;
+        }
+        uint32_t len = *msg_len;
+        if (len == 0 || len > entry->shm_size - sizeof(uint32_t) * 2) {
+            agentos_mutex_unlock(&svc->lock);
+            AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "shm message length overflow");
+        }
+        void *buf = AGENTOS_MALLOC(len);
+        if (!buf) {
+            agentos_mutex_unlock(&svc->lock);
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
+        memcpy(buf, (char *)entry->shm_ptr + sizeof(uint32_t) * 2, len);
+        atomic_thread_fence(memory_order_seq_cst);
+        *msg_flag = 0;
+        *out_data = buf;
+        *out_len = len;
+        break;
+    }
+    case CHANNEL_TYPE_PIPE: {
+        if (entry->info.endpoint[0]) {
+            int fd = open(entry->info.endpoint, O_RDONLY | O_NONBLOCK);
+            if (fd < 0) {
                 agentos_mutex_unlock(&svc->lock);
                 return 0;
             }
-            break;
-        }
-        default:
+            uint32_t net_len = 0;
+            ssize_t r1 = read(fd, &net_len, sizeof(net_len));
+            if (r1 <= 0) {
+                close(fd);
+                agentos_mutex_unlock(&svc->lock);
+                return 0;
+            }
+            uint32_t msg_len = ntohl(net_len);
+            if (msg_len == 0) {
+                close(fd);
+                agentos_mutex_unlock(&svc->lock);
+                return 0;
+            }
+            void *buf = AGENTOS_MALLOC(msg_len);
+            if (!buf) {
+                close(fd);
+                agentos_mutex_unlock(&svc->lock);
+                return AGENTOS_ERR_OUT_OF_MEMORY;
+            }
+            ssize_t r2 = read(fd, buf, msg_len);
+            close(fd);
+            if (r2 <= 0) {
+                AGENTOS_FREE(buf);
+                agentos_mutex_unlock(&svc->lock);
+                return 0;
+            }
+            *out_data = buf;
+            *out_len = (size_t)r2;
+        } else {
             agentos_mutex_unlock(&svc->lock);
-            return -3;
+            return 0;
+        }
+        break;
+    }
+    default:
+        agentos_mutex_unlock(&svc->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "unknown channel type in receive");
     }
 
     entry->info.messages_received++;
@@ -494,16 +583,16 @@ int channel_service_receive(channel_service_t* svc,
     return 0;
 }
 
-int channel_service_list(channel_service_t* svc,
-                           channel_info_t* out_list,
-                           size_t list_capacity,
-                           size_t* out_count)
+int channel_service_list(channel_service_t *svc, channel_info_t *out_list, size_t list_capacity,
+                         size_t *out_count)
 {
-    if (!svc || !out_list || !out_count) return -1;
+    if (!svc || !out_list || !out_count)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&svc->lock);
     size_t count = svc->channel_count;
-    if (count > list_capacity) count = list_capacity;
+    if (count > list_capacity)
+        count = list_capacity;
 
     for (size_t i = 0; i < count; i++) {
         out_list[i] = svc->channels[i].info;
@@ -514,17 +603,17 @@ int channel_service_list(channel_service_t* svc,
     return 0;
 }
 
-int channel_service_get_info(channel_service_t* svc,
-                               const char* channel_id,
-                               channel_info_t* out_info)
+int channel_service_get_info(channel_service_t *svc, const char *channel_id,
+                             channel_info_t *out_info)
 {
-    if (!svc || !channel_id || !out_info) return -1;
+    if (!svc || !channel_id || !out_info)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&svc->lock);
-    channel_entry_t* entry = find_channel(svc, channel_id);
+    channel_entry_t *entry = find_channel(svc, channel_id);
     if (!entry) {
         agentos_mutex_unlock(&svc->lock);
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "channel not found");
     }
 
     *out_info = entry->info;
@@ -532,18 +621,17 @@ int channel_service_get_info(channel_service_t* svc,
     return 0;
 }
 
-int channel_service_set_callback(channel_service_t* svc,
-                                   const char* channel_id,
-                                   channel_message_cb_t callback,
-                                   void* user_data)
+int channel_service_set_callback(channel_service_t *svc, const char *channel_id,
+                                 channel_message_cb_t callback, void *user_data)
 {
-    if (!svc || !channel_id) return -1;
+    if (!svc || !channel_id)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&svc->lock);
-    channel_entry_t* entry = find_channel(svc, channel_id);
+    channel_entry_t *entry = find_channel(svc, channel_id);
     if (!entry) {
         agentos_mutex_unlock(&svc->lock);
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "channel not found");
     }
 
     entry->callback = callback;
@@ -552,78 +640,84 @@ int channel_service_set_callback(channel_service_t* svc,
     return 0;
 }
 
-int channel_service_ping(channel_service_t* svc,
-                           const char* channel_id,
-                           int64_t* out_latency_ms)
+int channel_service_ping(channel_service_t *svc, const char *channel_id, int64_t *out_latency_ms)
 {
-    if (!svc || !channel_id || !out_latency_ms) return CHANNEL_ERR_PARAM;
+    if (!svc || !channel_id || !out_latency_ms)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&svc->lock);
-    channel_entry_t* entry = find_channel(svc, channel_id);
+    channel_entry_t *entry = find_channel(svc, channel_id);
     if (!entry) {
         agentos_mutex_unlock(&svc->lock);
-        return CHANNEL_ERR_NOT_FOUND;
+        return AGENTOS_ERR_NOT_FOUND;
     }
 
     uint64_t start_ms = get_time_ms();
     int rc = CHANNEL_OK;
 
     switch (entry->info.type) {
-        case CHANNEL_TYPE_SOCKET: {
-            if (entry->socket_fd < 0 || entry->info.endpoint[0] == '\0') {
-                rc = CHANNEL_ERR_IO;
-                break;
-            }
+    case CHANNEL_TYPE_SOCKET: {
+        if (entry->socket_fd < 0 || entry->info.endpoint[0] == '\0') {
+            rc = AGENTOS_ERR_IO;
+            break;
+        }
 
-            int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-            if (sock_fd < 0) { rc = CHANNEL_ERR_IO; break; }
+        int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (sock_fd < 0) {
+            rc = AGENTOS_ERR_IO;
+            break;
+        }
 
-            struct sockaddr_un addr;
-            memset(&addr, 0, sizeof(addr));
-            addr.sun_family = AF_UNIX;
-            strncpy(addr.sun_path, entry->info.endpoint, sizeof(addr.sun_path) - 1);
+        struct sockaddr_un addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sun_family = AF_UNIX;
+        strncpy(addr.sun_path, entry->info.endpoint, sizeof(addr.sun_path) - 1);
 
-            {
-                struct timeval tv;
-                tv.tv_sec = 3;
-                tv.tv_usec = 0;
-                setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-                setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-            }
+        {
+            struct timeval tv;
+            tv.tv_sec = 3;
+            tv.tv_usec = 0;
+            setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+            setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        }
 
-            if (connect(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-                close(sock_fd);
-                rc = (errno == EAGAIN || errno == ETIMEDOUT || errno == EINPROGRESS)
-                     ? CHANNEL_ERR_TIMEOUT : CHANNEL_ERR_IO;
-                break;
-            }
-
+        if (connect(sock_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
             close(sock_fd);
+            rc = (errno == EAGAIN || errno == ETIMEDOUT || errno == EINPROGRESS)
+                     ? AGENTOS_ERR_TIMEOUT
+                     : AGENTOS_ERR_IO;
             break;
         }
-        case CHANNEL_TYPE_SHM: {
-            if (!entry->shm_ptr) { rc = CHANNEL_ERR_IO; break; }
-            volatile uint32_t* header = (volatile uint32_t*)entry->shm_ptr;
-            atomic_thread_fence(memory_order_seq_cst);
-            (void)header[0];
+
+        close(sock_fd);
+        break;
+    }
+    case CHANNEL_TYPE_SHM: {
+        if (!entry->shm_ptr) {
+            rc = AGENTOS_ERR_IO;
             break;
         }
-        case CHANNEL_TYPE_PIPE: {
-            if (entry->info.endpoint[0]) {
-                int fd = open(entry->info.endpoint, O_RDONLY | O_NONBLOCK);
-                if (fd < 0) {
-                    rc = CHANNEL_ERR_IO;
-                } else {
-                    close(fd);
-                }
+        volatile uint32_t *header = (volatile uint32_t *)entry->shm_ptr;
+        atomic_thread_fence(memory_order_seq_cst);
+        (void)header[0];
+        break;
+    }
+    case CHANNEL_TYPE_PIPE: {
+        if (entry->info.endpoint[0]) {
+            int fd = open(entry->info.endpoint, O_RDONLY | O_NONBLOCK);
+            if (fd < 0) {
+                rc = AGENTOS_ERR_IO;
             } else {
-                rc = CHANNEL_ERR_IO;
+                close(fd);
             }
-            break;
+        } else {
+            rc = AGENTOS_ERR_IO;
         }
-        default:
-            rc = CHANNEL_ERR_REJECTED;
-            break;
+        break;
+    }
+    default:
+        rc = AGENTOS_ERR_PERMISSION_DENIED;
+        break;
     }
 
     uint64_t end_ms = get_time_ms();
@@ -637,8 +731,9 @@ int channel_service_ping(channel_service_t* svc,
     return rc;
 }
 
-bool channel_service_is_healthy(channel_service_t* svc)
+bool channel_service_is_healthy(channel_service_t *svc)
 {
-    if (!svc) return false;
+    if (!svc)
+        return false;
     return svc->healthy;
 }

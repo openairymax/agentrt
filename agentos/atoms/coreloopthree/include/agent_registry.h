@@ -17,12 +17,12 @@ extern "C" {
  * @brief Agent 信息结构（由注册中心提供）
  */
 typedef struct agent_info {
-    char* agent_id;                 /**< Agent 唯一标识 */
-    char* role;                     /**< 角色 */
-    float cost_estimate;            /**< 预估成本（越小越好） */
-    float success_rate;             /**< 成功率（0-1） */
-    float trust_score;              /**< 信任度（0-1） */
-    int priority;                   /**< 优先级（越大越高） */
+    char *agent_id;      /**< Agent 唯一标识 */
+    char *role;          /**< 角色 */
+    float cost_estimate; /**< 预估成本（越小越好） */
+    float success_rate;  /**< 成功率（0-1） */
+    float trust_score;   /**< 信任度（0-1） */
+    int priority;        /**< 优先级（越大越高） */
 } agent_info_t;
 
 /**
@@ -33,11 +33,9 @@ typedef struct agent_info {
  * @param out_count 输出数量
  * @return agentos_error_t
  */
-typedef agentos_error_t (*agent_registry_get_agents_func)(
-    void* ctx,
-    const char* role,
-    agent_info_t*** out_agents,
-    size_t* out_count);
+typedef agentos_error_t (*agent_registry_get_agents_func)(void *ctx, const char *role,
+                                                          agent_info_t ***out_agents,
+                                                          size_t *out_count);
 
 #ifndef AGENTOS_EXECUTION_UNIT_T_DEFINED
 #define AGENTOS_EXECUTION_UNIT_T_DEFINED
@@ -46,9 +44,10 @@ typedef struct agentos_execution_unit agentos_execution_unit_t;
 
 AGENTOS_API agentos_error_t agentos_registry_init(void);
 AGENTOS_API void agentos_registry_cleanup(void);
-AGENTOS_API agentos_error_t agentos_registry_register_unit(const char* unit_id, agentos_execution_unit_t* unit);
-AGENTOS_API void agentos_registry_unregister_unit(const char* unit_id);
-AGENTOS_API agentos_execution_unit_t* agentos_registry_get_unit(const char* unit_id);
+AGENTOS_API agentos_error_t agentos_registry_register_unit(const char *unit_id,
+                                                           agentos_execution_unit_t *unit);
+AGENTOS_API void agentos_registry_unregister_unit(const char *unit_id);
+AGENTOS_API agentos_execution_unit_t *agentos_registry_get_unit(const char *unit_id);
 
 #ifdef __cplusplus
 }

@@ -13,19 +13,23 @@
  */
 
 #include "logging.h"
+
 #include "agentos.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 /* Unified base library compatibility layer */
+#include "atomic_compat.h"
 #include "memory_compat.h"
+#include "platform.h"
 #include "string_compat.h"
+
+#include <stdarg.h>
 #include <string.h>
 #include <time.h>
-#include <stdarg.h>
-#include "platform.h"
-#include "atomic_compat.h"
+#include "../../error/include/error.h"
 
 /* ==================== 内部常量定义 ==================== */
 
@@ -33,13 +37,7 @@ static AGENTOS_THREAD_LOCAL char g_tls_trace_id[128] = {0};
 static AGENTOS_THREAD_LOCAL char g_tls_span_id[64] = {0};
 
 /** 日志级别名称数组 */
-static const char* LEVEL_NAMES[] = {
-    "DEBUG",
-    "INFO",
-    "WARN",
-    "ERROR",
-    "FATAL"
-};
+static const char *LEVEL_NAMES[] = {"DEBUG", "INFO", "WARN", "ERROR", "FATAL"};
 
 /** 日志级别名称数组大小 */
 static const size_t LEVEL_NAMES_COUNT = sizeof(LEVEL_NAMES) / sizeof(LEVEL_NAMES[0]);
@@ -80,10 +78,10 @@ static atomic_uint g_sample_counter_warn = 0;
 /**
  * @brief 计算消息哈希（用于节流去重）
  */
-static uint64_t throttle_hash(const char* module, int line, const char* message)
+static uint64_t throttle_hash(const char *module, int line, const char *message)
 {
     uint64_t h = 14695981039346656037ULL;
-    const char* p;
+    const char *p;
 
     if (module) {
         for (p = module; *p; p++) {
@@ -114,18 +112,20 @@ static uint64_t throttle_hash(const char* module, int line, const char* message)
  * @param now_sec 当前时间（秒）
  * @return true 应抑制（跳过），false 应输出
  */
-static bool throttle_should_suppress(const char* module, int line,
-                                     const char* message, uint64_t now_sec)
+static bool throttle_should_suppress(const char *module, int line, const char *message,
+                                     uint64_t now_sec)
 {
-    if (!g_throttle_enabled) return false;
-    if (!g_throttle_mutex_init) return false;
+    if (!g_throttle_enabled)
+        return false;
+    if (!g_throttle_mutex_init)
+        return false;
 
     uint64_t h = throttle_hash(module, line, message);
     uint32_t bucket_idx = (uint32_t)(h % THROTTLE_BUCKET_COUNT);
 
     agentos_mutex_lock(&g_throttle_mutex);
 
-    throttle_bucket_t* bucket = &g_throttle_buckets[bucket_idx];
+    throttle_bucket_t *bucket = &g_throttle_buckets[bucket_idx];
 
     if (bucket->last_second != now_sec) {
         if (bucket->last_second > 0 && bucket->count > g_throttle_max_per_sec) {
@@ -146,7 +146,7 @@ static bool throttle_should_suppress(const char* module, int line,
             agentos_mutex_unlock(&g_throttle_mutex);
 
             if (suppressed == 1) {
-                fprintf(stderr, "[THROTTLE] Suppressing further identical messages: %s:%d\n",
+                __builtin_fprintf(stderr, "[THROTTLE] Suppressing further identical messages: %s:%d\n",
                         module ? module : "?", line);
             }
             return true;
@@ -160,7 +160,7 @@ static bool throttle_should_suppress(const char* module, int line,
         uint32_t old_suppressed = bucket->count - g_throttle_max_per_sec;
         if (old_suppressed > 0) {
             agentos_mutex_unlock(&g_throttle_mutex);
-            fprintf(stderr, "[THROTTLE] Previous bucket flushed: %u messages suppressed\n",
+            __builtin_fprintf(stderr, "[THROTTLE] Previous bucket flushed: %u messages suppressed\n",
                     old_suppressed);
             agentos_mutex_lock(&g_throttle_mutex);
         }
@@ -171,27 +171,26 @@ static bool throttle_should_suppress(const char* module, int line,
     return false;
 }
 
-
 /* ==================== 内部数据结构 ==================== */
 
 /** 日志系统全局状?*/
 typedef struct {
     /** 当前配置 */
     log_config_t manager;
-    
+
     /** 是否已初始化 */
     bool initialized;
-    
+
     /** 互斥锁保护配置和状?*/
     agentos_mutex_t mutex;
-    
+
     log_config_t default_config;
-    
+
     struct {
         char pattern[128];
         log_level_t level;
     } module_levels[32];
-    
+
     /** 模块级别过滤器数?*/
     size_t module_level_count;
 } logging_state_t;
@@ -199,129 +198,137 @@ typedef struct {
 /* ==================== 全局状态变?==================== */
 
 /** 日志系统全局状态实?*/
-static logging_state_t g_logging_state = {
-    .initialized = false,
-    .module_level_count = 0
-};
+static logging_state_t g_logging_state = {.initialized = false, .module_level_count = 0};
 
 /* ==================== 内部辅助函数 ==================== */
 
 /**
  * @brief 获取当前时间戳（毫秒?
- * 
+ *
  * 获取当前时间的Unix时间戳，毫秒精度?
- * 
+ *
  * @return 当前时间戳（毫秒?
  */
-static uint64_t get_current_timestamp(void) {
+static uint64_t get_current_timestamp(void)
+{
     return agentos_time_ms();
 }
 
 /**
  * @brief 获取当前线程ID
- * 
+ *
  * 获取当前线程的ID，用于日志记录?
- * 
+ *
  * @return 线程ID
  */
-static uint64_t get_current_thread_id(void) {
+static uint64_t get_current_thread_id(void)
+{
     return agentos_thread_id();
 }
 
 /**
  * @brief 获取当前进程ID
- * 
+ *
  * 获取当前进程的ID，用于日志记录?
- * 
+ *
  * @return 进程ID
  */
-static uint32_t get_current_process_id(void) {
+static uint32_t get_current_process_id(void)
+{
     return (uint32_t)getpid();
 }
 
 /**
  * @brief 格式化日志消?
- * 
+ *
  * 将日志记录格式化为字符串，根据配置的格式?
- * 
+ *
  * @param record 日志记录
  * @param buffer 输出缓冲?
  * @param buffer_size 缓冲区大?
  * @return 格式化后的字符串长度
  */
-static size_t format_log_message(const log_record_t* record, char* buffer, size_t buffer_size) {
+static size_t format_log_message(const log_record_t *record, char *buffer, size_t buffer_size)
+{
     if (!record || !buffer || buffer_size == 0) {
         return 0;
     }
-    
+
     // 简单文本格式实?
     time_t sec = record->timestamp / 1000;
     int ms = record->timestamp % 1000;
     struct tm tm_storage;
     localtime_r(&sec, &tm_storage);
-    struct tm* tm_info = &tm_storage;
+    struct tm *tm_info = &tm_storage;
 
-    const char* level_name = log_level_to_string(record->level);
+    const char *level_name = log_level_to_string(record->level);
 
-    int len = snprintf(buffer, buffer_size,
-        "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s] [%s:%d]",
-        tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
-        tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, ms,
-        level_name, record->module, record->line);
-    if (len < 0) return 0;
-    if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
+    int len =
+        snprintf(buffer, buffer_size, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s] [%s:%d]",
+                 tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday, tm_info->tm_hour,
+                 tm_info->tm_min, tm_info->tm_sec, ms, level_name, record->module, record->line);
+    if (len < 0)
+        return 0;
+    if ((size_t)len >= buffer_size)
+        len = (int)buffer_size - 1;
 
     if (record->trace_id && record->trace_id[0] != '\0') {
-        len += snprintf(buffer + len, buffer_size - (size_t)len,
-            " [trace:%s]", record->trace_id);
-        if (len < 0) return 0;
-        if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
+        len += snprintf(buffer + len, buffer_size - (size_t)len, " [trace:%s]", record->trace_id);
+        if (len < 0)
+            return 0;
+        if ((size_t)len >= buffer_size)
+            len = (int)buffer_size - 1;
     }
 
     if (record->span_id && record->span_id[0] != '\0') {
-        len += snprintf(buffer + len, buffer_size - (size_t)len,
-            " [span:%s]", record->span_id);
-        if (len < 0) return 0;
-        if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
+        len += snprintf(buffer + len, buffer_size - (size_t)len, " [span:%s]", record->span_id);
+        if (len < 0)
+            return 0;
+        if ((size_t)len >= buffer_size)
+            len = (int)buffer_size - 1;
     }
 
-    len += snprintf(buffer + len, buffer_size - (size_t)len,
-        " [thread:%llu] [process:%u]",
-        (unsigned long long)record->thread_id,
-        (unsigned)record->process_id);
-    if (len < 0) return 0;
-    if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
+    len += snprintf(buffer + len, buffer_size - (size_t)len, " [thread:%llu] [process:%u]",
+                    (unsigned long long)record->thread_id, (unsigned)record->process_id);
+    if (len < 0)
+        return 0;
+    if ((size_t)len >= buffer_size)
+        len = (int)buffer_size - 1;
 
-    len += snprintf(buffer + len, buffer_size - (size_t)len,
-        " %s\n", record->message);
-    if (len < 0) return 0;
-    if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
-    
+    len += snprintf(buffer + len, buffer_size - (size_t)len, " %s\n", record->message);
+    if (len < 0)
+        return 0;
+    if ((size_t)len >= buffer_size)
+        len = (int)buffer_size - 1;
+
     return (size_t)len;
 }
 
 /**
  * @brief 检查日志是否应该被记录
- * 
+ *
  * 根据全局级别和模块级别检查日志是否应该被记录?
- * 
+ *
  * @param level 日志级别
  * @param module 模块名称
  * @return true 应该记录，false 应该过滤
  */
-static bool should_log(log_level_t level, const char* module) {
+static bool should_log(log_level_t level, const char *module)
+{
     if (level < g_logging_state.manager.level) {
         return false;
     }
 
-    if (!module) return true;
+    if (!module)
+        return true;
 
     for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
-        const char* pattern = g_logging_state.module_levels[i].pattern;
+        const char *pattern = g_logging_state.module_levels[i].pattern;
         if (pattern[0] == '*') {
             size_t plen = strlen(pattern);
-            if (plen == 1) return level >= g_logging_state.module_levels[i].level;
-            const char* suffix = pattern + 1;
+            if (plen == 1)
+                return level >= g_logging_state.module_levels[i].level;
+            const char *suffix = pattern + 1;
             size_t slen = strlen(suffix);
             size_t mlen = strlen(module);
             if (mlen >= slen && strcmp(module + mlen - slen, suffix) == 0)
@@ -336,41 +343,44 @@ static bool should_log(log_level_t level, const char* module) {
 
 /* ==================== 公开API实现 ==================== */
 
-const char* log_level_to_string(log_level_t level) {
+const char *log_level_to_string(log_level_t level)
+{
     if (level >= 0 && level < LEVEL_NAMES_COUNT) {
         return LEVEL_NAMES[level];
     }
     return "UNKNOWN";
 }
 
-log_level_t log_level_from_string(const char* str) {
+log_level_t log_level_from_string(const char *str)
+{
     if (!str) {
         return DEFAULT_LOG_LEVEL;
     }
-    
+
     for (size_t i = 0; i < LEVEL_NAMES_COUNT; i++) {
         if (strcasecmp(str, LEVEL_NAMES[i]) == 0) {
             return (log_level_t)i;
         }
     }
-    
+
     // 尝试解析为数?
-    char* endptr;
+    char *endptr;
     long value = strtol(str, &endptr, 10);
     if (endptr != str && *endptr == '\0' && value >= 0 && (size_t)value < LEVEL_NAMES_COUNT) {
         return (log_level_t)value;
     }
-    
+
     return DEFAULT_LOG_LEVEL;
 }
 
-int log_init(const log_config_t* manager) {
+int log_init(const log_config_t *manager)
+{
     if (g_logging_state.initialized) {
         return 0;
     }
 
     if (agentos_mutex_init(&g_logging_state.mutex) != 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (!g_throttle_mutex_init) {
@@ -397,38 +407,41 @@ int log_init(const log_config_t* manager) {
     return 0;
 }
 
-int log_set_default_config(const log_config_t* manager) {
+int log_set_default_config(const log_config_t *manager)
+{
     if (!manager) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
-    
+
     agentos_mutex_lock(&g_logging_state.mutex);
     memcpy(&g_logging_state.default_config, manager, sizeof(log_config_t));
     agentos_mutex_unlock(&g_logging_state.mutex);
-    
+
     return 0;
 }
 
-void log_write(log_level_t level, const char* module, int line, const char* fmt, ...) {
+void log_write(log_level_t level, const char *module, int line, const char *fmt, ...)
+{
     if (!g_logging_state.initialized) {
         // 自动使用默认配置初始?
         log_init(NULL);
     }
-    
+
     // 检查日志级?
     if (!should_log(level, module)) {
         return;
     }
 
     // 获取追踪ID和Span ID
-    const char* trace_id = log_get_trace_id();
-    const char* span_id = log_get_span_id();
+    const char *trace_id = log_get_trace_id();
+    const char *span_id = log_get_span_id();
 
     // 格式化消息
     char message_buffer[MAX_MESSAGE_LEN];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(message_buffer, sizeof(message_buffer), fmt, args); /* flawfinder: ignore - variadic logging wrapper */
+    vsnprintf(message_buffer, sizeof(message_buffer), fmt,
+              args); /* flawfinder: ignore - variadic logging wrapper */
     va_end(args);
 
     /* 节流检查：相同消息1秒内最多输出 N 次 */
@@ -438,92 +451,96 @@ void log_write(log_level_t level, const char* module, int line, const char* fmt,
     }
 
     // 构建日志记录
-    log_record_t record = {
-        .timestamp = get_current_timestamp(),
-        .level = level,
-        .module = module,
-        .line = line,
-        .trace_id = trace_id,
-        .span_id = span_id,
-        .message = message_buffer,
-        .thread_id = get_current_thread_id(),
-        .process_id = get_current_process_id()
-    };
-    
+    log_record_t record = {.timestamp = get_current_timestamp(),
+                           .level = level,
+                           .module = module,
+                           .line = line,
+                           .trace_id = trace_id,
+                           .span_id = span_id,
+                           .message = message_buffer,
+                           .thread_id = get_current_thread_id(),
+                           .process_id = get_current_process_id()};
+
     // 格式化输?
     char formatted_buffer[MAX_MESSAGE_LEN * 2];
     size_t formatted_len = format_log_message(&record, formatted_buffer, sizeof(formatted_buffer));
-    
+
     // 输出到控制台?
     if (formatted_len > 0) {
         // 根据级别选择输出?
-        FILE* stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
+        FILE *stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
         fwrite(formatted_buffer, 1, formatted_len, stream);
         fflush(stream);
     }
 }
 
-void log_write_va(log_level_t level, const char* module, int line, const char* fmt, va_list args) {
+void log_write_va(log_level_t level, const char *module, int line, const char *fmt, va_list args)
+{
     if (!g_logging_state.initialized) {
         log_init(NULL);
     }
-    
+
     if (!should_log(level, module)) {
         return;
     }
-    
+
     // 获取追踪ID和Span ID
-    const char* trace_id = log_get_trace_id();
-    const char* span_id = log_get_span_id();
+    const char *trace_id = log_get_trace_id();
+    const char *span_id = log_get_span_id();
 
     // 格式化消息
     char message_buffer[MAX_MESSAGE_LEN];
-    vsnprintf(message_buffer, sizeof(message_buffer), fmt, args); /* flawfinder: ignore - variadic logging wrapper */
+    vsnprintf(message_buffer, sizeof(message_buffer), fmt,
+              args); /* flawfinder: ignore - variadic logging wrapper */
     // 构建日志记录
-    log_record_t record = {
-        .timestamp = get_current_timestamp(),
-        .level = level,
-        .module = module,
-        .line = line,
-        .trace_id = trace_id,
-        .span_id = span_id,
-        .message = message_buffer,
-        .thread_id = get_current_thread_id(),
-        .process_id = get_current_process_id()
-    };
-    
+    log_record_t record = {.timestamp = get_current_timestamp(),
+                           .level = level,
+                           .module = module,
+                           .line = line,
+                           .trace_id = trace_id,
+                           .span_id = span_id,
+                           .message = message_buffer,
+                           .thread_id = get_current_thread_id(),
+                           .process_id = get_current_process_id()};
+
     // 格式化输?
     char formatted_buffer[MAX_MESSAGE_LEN * 2];
     size_t formatted_len = format_log_message(&record, formatted_buffer, sizeof(formatted_buffer));
-    
+
     // 输出到控制台
     if (formatted_len > 0) {
-        FILE* stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
+        FILE *stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
         fwrite(formatted_buffer, 1, formatted_len, stream);
         fflush(stream);
     }
 }
 
-const char* log_set_trace_id(const char* trace_id) {
-    if (!g_logging_state.initialized) return NULL;
-    
+const char *log_set_trace_id(const char *trace_id)
+{
+    if (!g_logging_state.initialized)
+        return NULL;
+
     if (trace_id) {
         strncpy(g_tls_trace_id, trace_id, sizeof(g_tls_trace_id) - 1);
         g_tls_trace_id[sizeof(g_tls_trace_id) - 1] = '\0';
     } else {
         g_tls_trace_id[0] = '\0';
     }
-    
+
     return g_tls_trace_id;
 }
 
-const char* log_get_trace_id(void) {
-    if (!g_logging_state.initialized) return NULL;
+const char *log_get_trace_id(void)
+{
+    if (!g_logging_state.initialized)
+        return NULL;
     return g_tls_trace_id[0] ? g_tls_trace_id : NULL;
 }
 
-const char* log_set_span_id(const char* span_id) {
-    if (!g_logging_state.initialized) return NULL;
+const char *log_set_span_id(const char *span_id)
+{
+    if (!g_logging_state.initialized)
+        return NULL;
 
     if (span_id) {
         strncpy(g_tls_span_id, span_id, sizeof(g_tls_span_id) - 1);
@@ -535,18 +552,21 @@ const char* log_set_span_id(const char* span_id) {
     return g_tls_span_id;
 }
 
-const char* log_get_span_id(void) {
-    if (!g_logging_state.initialized) return NULL;
+const char *log_get_span_id(void)
+{
+    if (!g_logging_state.initialized)
+        return NULL;
     return g_tls_span_id[0] ? g_tls_span_id : NULL;
 }
 
-int log_set_module_level(const char* module_pattern, log_level_t level) {
+int log_set_module_level(const char *module_pattern, log_level_t level)
+{
     if (!g_logging_state.initialized || !module_pattern) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
-    
+
     agentos_mutex_lock(&g_logging_state.mutex);
-    
+
     // 查找现有模式
     for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
         if (strcmp(g_logging_state.module_levels[i].pattern, module_pattern) == 0) {
@@ -555,30 +575,31 @@ int log_set_module_level(const char* module_pattern, log_level_t level) {
             return 0;
         }
     }
-    
+
     // 添加新模?
-    if (g_logging_state.module_level_count < sizeof(g_logging_state.module_levels) / sizeof(g_logging_state.module_levels[0])) {
+    if (g_logging_state.module_level_count <
+        sizeof(g_logging_state.module_levels) / sizeof(g_logging_state.module_levels[0])) {
         strncpy(g_logging_state.module_levels[g_logging_state.module_level_count].pattern,
-                module_pattern,
-                sizeof(g_logging_state.module_levels[0].pattern) - 1);
-        g_logging_state.module_levels[g_logging_state.module_level_count].pattern[
-            sizeof(g_logging_state.module_levels[0].pattern) - 1] = '\0';
+                module_pattern, sizeof(g_logging_state.module_levels[0].pattern) - 1);
+        g_logging_state.module_levels[g_logging_state.module_level_count]
+            .pattern[sizeof(g_logging_state.module_levels[0].pattern) - 1] = '\0';
         g_logging_state.module_levels[g_logging_state.module_level_count].level = level;
         g_logging_state.module_level_count++;
         agentos_mutex_unlock(&g_logging_state.mutex);
         return 0;
     }
-    
+
     agentos_mutex_unlock(&g_logging_state.mutex);
-    return -2; // 表已?
+    return AGENTOS_ERR_NOT_FOUND;  // 表已?
 }
 
-int log_reload_config(const char* config_path) {
+int log_reload_config(const char *config_path)
+{
     if (!config_path) {
         return AGENTOS_EINVAL;
     }
 
-    FILE* fp = fopen(config_path, "r");
+    FILE *fp = fopen(config_path, "r");
     if (!fp) {
         return AGENTOS_ENOENT;
     }
@@ -600,13 +621,18 @@ int log_reload_config(const char* config_path) {
                     changes++;
                 }
             } else if (strcmp(key, "output") == 0) {
-                if (strstr(value, "file")) new_config.outputs |= LOG_OUTPUT_FILE;
-                if (strstr(value, "console")) new_config.outputs |= LOG_OUTPUT_CONSOLE;
-                if (strstr(value, "syslog")) new_config.outputs |= LOG_OUTPUT_SYSLOG;
+                if (strstr(value, "file"))
+                    new_config.outputs |= LOG_OUTPUT_FILE;
+                if (strstr(value, "console"))
+                    new_config.outputs |= LOG_OUTPUT_CONSOLE;
+                if (strstr(value, "syslog"))
+                    new_config.outputs |= LOG_OUTPUT_SYSLOG;
                 changes++;
             } else if (strcmp(key, "format") == 0) {
-                if (strcmp(value, "json") == 0) new_config.format = LOG_FORMAT_JSON;
-                else if (strcmp(value, "text") == 0) new_config.format = LOG_FORMAT_TEXT;
+                if (strcmp(value, "json") == 0)
+                    new_config.format = LOG_FORMAT_JSON;
+                else if (strcmp(value, "text") == 0)
+                    new_config.format = LOG_FORMAT_TEXT;
                 changes++;
             }
         }
@@ -619,14 +645,15 @@ int log_reload_config(const char* config_path) {
     agentos_mutex_unlock(&g_logging_state.mutex);
 
     if (changes > 0) {
-        fprintf(stderr, "[LOGGING] Config reloaded from '%s' (%d changes applied)\n",
-                config_path, changes);
+        __builtin_fprintf(stderr, "[LOGGING] Config reloaded from '%s' (%d changes applied)\n", config_path,
+                changes);
     }
 
     return changes > 0 ? 0 : AGENTOS_ENOENT;
 }
 
-void log_flush(void) {
+void log_flush(void)
+{
     // 控制台输出立即刷?
     fflush(stdout);
     fflush(stderr);
@@ -647,27 +674,28 @@ bool log_should_sample(log_level_t level)
     uint32_t counter;
 
     switch (level) {
-        case LOG_LEVEL_DEBUG: {
-            counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_debug, 1);
-            return (counter % 1000) == 0; /* 0.1% */
-        }
-        case LOG_LEVEL_INFO: {
-            counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_info, 1);
-            return (counter % 100) == 0; /* 1% */
-        }
-        case LOG_LEVEL_WARN: {
-            counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_warn, 1);
-            return (counter % 10) == 0; /* 10% */
-        }
-        case LOG_LEVEL_ERROR:
-        case LOG_LEVEL_FATAL:
-            return true; /* 100% */
-        default:
-            return true;
+    case LOG_LEVEL_DEBUG: {
+        counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_debug, 1);
+        return (counter % 1000) == 0; /* 0.1% */
+    }
+    case LOG_LEVEL_INFO: {
+        counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_info, 1);
+        return (counter % 100) == 0; /* 1% */
+    }
+    case LOG_LEVEL_WARN: {
+        counter = AGENTOS_ATOMIC_FETCH_ADD(&g_sample_counter_warn, 1);
+        return (counter % 10) == 0; /* 10% */
+    }
+    case LOG_LEVEL_ERROR:
+    case LOG_LEVEL_FATAL:
+        return true; /* 100% */
+    default:
+        return true;
     }
 }
 
-void log_cleanup(void) {
+void log_cleanup(void)
+{
     if (!g_logging_state.initialized) {
         return;
     }

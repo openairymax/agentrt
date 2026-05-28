@@ -11,22 +11,31 @@
 
 #include "utils.h"
 
-#include <string.h>
-#include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #include <direct.h>
 #include <io.h>
+#include <windows.h>
 #else
+#include "agentos_dirent.h"
+
 #include <sys/stat.h>
 #include <unistd.h>
-#include "agentos_dirent.h"
 #endif
 
-bool heapstore_ensure_directory(const char* path) {
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
+
+bool heapstore_ensure_directory(const char *path)
+{
     if (!path || !path[0]) {
         return false;
     }
@@ -37,7 +46,7 @@ bool heapstore_ensure_directory(const char* path) {
     }
 
     char tmp[1024];
-    char* p = NULL;
+    char *p = NULL;
     size_t len;
 
     strncpy(tmp, path, sizeof(tmp) - 1);
@@ -71,7 +80,7 @@ bool heapstore_ensure_directory(const char* path) {
     }
 
     char tmp[1024];
-    char* p = NULL;
+    char *p = NULL;
     size_t len;
 
     strncpy(tmp, path, sizeof(tmp) - 1);
@@ -100,7 +109,8 @@ bool heapstore_ensure_directory(const char* path) {
 #endif
 }
 
-bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, uint32_t* out_count) {
+bool heapstore_calculate_directory_size(const char *path, uint64_t *out_size, uint32_t *out_count)
+{
     if (!path || !path[0] || !out_size || !out_count) {
         return false;
     }
@@ -121,8 +131,7 @@ bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, ui
     }
 
     do {
-        if (strcmp(find_data.cFileName, ".") == 0 ||
-            strcmp(find_data.cFileName, "..") == 0) {
+        if (strcmp(find_data.cFileName, ".") == 0 || strcmp(find_data.cFileName, "..") == 0) {
             continue;
         }
 
@@ -148,15 +157,14 @@ bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, ui
 
     FindClose(hFind);
 #else
-    DIR* dir = opendir(path);
+    DIR *dir = opendir(path);
     if (!dir) {
         return false;
     }
 
-    struct dirent* entry;
+    struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 ||
-            strcmp(entry->d_name, "..") == 0) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
@@ -188,31 +196,32 @@ bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, ui
     return true;
 }
 
-int heapstore_sanitize_path_component(char* output, const char* input, size_t size) {
+int heapstore_sanitize_path_component(char *output, const char *input, size_t size)
+{
     if (!output || !input || size == 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t input_len = strlen(input);
     if (input_len == 0 || input_len >= size) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (strstr(input, "..") != NULL) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (strchr(input, '/') != NULL) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (strchr(input, '\\') != NULL) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     for (size_t i = 0; i < input_len; i++) {
         if (input[i] == '\0') {
-            return -1;
+            return AGENTOS_EINVAL;
         }
     }
 
@@ -229,7 +238,8 @@ int heapstore_sanitize_path_component(char* output, const char* input, size_t si
     return 0;
 }
 
-bool heapstore_is_safe_identifier(const char* input) {
+bool heapstore_is_safe_identifier(const char *input)
+{
     if (!input || !input[0]) {
         return false;
     }

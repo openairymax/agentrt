@@ -5,38 +5,41 @@
  */
 
 #include "uuid_generator.h"
+
+#include "../../../platform/include/platform.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "../../../platform/include/platform.h"
 
 #if defined(_WIN32) || defined(_WIN64)
-#include <windows.h>
 #include <rpc.h>
+#include <windows.h>
 #pragma comment(lib, "rpcrt4.lib")
 #elif defined(__linux__)
-#include <unistd.h>
 #include <fcntl.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #elif defined(__APPLE__)
 #include <unistd.h>
 #include <uuid/uuid.h>
 #endif
 
 /* Unified base library compatibility layer */
+#include "../../include/atomic_compat.h"
 #include "../../memory/include/memory_compat.h"
 #include "../../string/include/string_compat.h"
-#include "../../include/atomic_compat.h"
 
 static atomic_int g_uuid_initialized = 0;
 static atomic_uint64_t g_uuid_counter = 0;
 
-agentos_uuid_error_t agentos_uuid_init(void) {
+agentos_uuid_error_t agentos_uuid_init(void)
+{
     int expected = 0;
     if (atomic_compare_exchange_strong_explicit(&g_uuid_initialized, &expected, 1,
-                                     memory_order_seq_cst, memory_order_seq_cst)) {
+                                                memory_order_seq_cst, memory_order_seq_cst)) {
 #if defined(_WIN32) || defined(_WIN64)
         RPC_STATUS status = UuidCreateSequential(NULL);
         if (status != RPC_S_OK && status != RPC_S_UUID_LOCAL_ONLY) {
@@ -57,12 +60,14 @@ agentos_uuid_error_t agentos_uuid_init(void) {
     return AGENTOS_UUID_SUCCESS;
 }
 
-void agentos_uuid_cleanup(void) {
+void agentos_uuid_cleanup(void)
+{
     atomic_store_explicit(&g_uuid_initialized, 0, memory_order_seq_cst);
     g_uuid_counter = 0;
 }
 
-agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
+agentos_uuid_error_t agentos_uuid_v4(char *out_buf, size_t buf_len)
+{
     if (!out_buf || buf_len < AGENTOS_UUID_STR_LEN) {
         return AGENTOS_UUID_EINVALID;
     }
@@ -101,7 +106,7 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
 
 #else
     {
-        FILE* urandom = fopen("/dev/urandom", "rb");
+        FILE *urandom = fopen("/dev/urandom", "rb");
         if (urandom) {
             size_t nread = fread(uuid, 1, 16, urandom);
             fclose(urandom);
@@ -109,12 +114,7 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
                 return AGENTOS_UUID_EUNAVAIL;
             }
         } else {
-            uint64_t ns = agentos_time_ns();
-            unsigned int seed = (unsigned int)(ns ^ (uintptr_t)out_buf);
-            srand(seed);
-            for (int i = 0; i < 16; i++) {
-                uuid[i] = (unsigned char)(rand() & 0xFF);
-            }
+            agentos_random_bytes(uuid, 16);
         }
     }
 #endif
@@ -123,18 +123,16 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
     uuid[8] = (uuid[8] & 0x3F) | 0x80;
 
     snprintf(out_buf, buf_len,
-        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-        uuid[0], uuid[1], uuid[2], uuid[3],
-        uuid[4], uuid[5],
-        uuid[6], uuid[7],
-        uuid[8], uuid[9],
-        uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
+             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", uuid[0],
+             uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7], uuid[8], uuid[9],
+             uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
 
     atomic_fetch_add(&g_uuid_counter, 1);
     return AGENTOS_UUID_SUCCESS;
 }
 
-agentos_uuid_error_t agentos_uuid_with_prefix(const char* prefix, char* out_buf, size_t buf_len) {
+agentos_uuid_error_t agentos_uuid_with_prefix(const char *prefix, char *out_buf, size_t buf_len)
+{
     if (!prefix || !out_buf || buf_len < AGENTOS_UUID_PREFIXED_STR_LEN) {
         return AGENTOS_UUID_EINVALID;
     }
@@ -154,7 +152,8 @@ agentos_uuid_error_t agentos_uuid_with_prefix(const char* prefix, char* out_buf,
     return AGENTOS_UUID_SUCCESS;
 }
 
-int agentos_uuid_is_valid(const char* uuid) {
+int agentos_uuid_is_valid(const char *uuid)
+{
     if (!uuid) {
         return 0;
     }
@@ -164,7 +163,7 @@ int agentos_uuid_is_valid(const char* uuid) {
         return 0;
     }
 
-    const char* p = uuid;
+    const char *p = uuid;
     if (p[0] == '{') {
         p++;
     }
@@ -176,9 +175,7 @@ int agentos_uuid_is_valid(const char* uuid) {
                 return 0;
             }
         } else {
-            if (!((c >= '0' && c <= '9') ||
-                  (c >= 'a' && c <= 'f') ||
-                  (c >= 'A' && c <= 'F'))) {
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
                 return 0;
             }
         }
@@ -191,23 +188,23 @@ int agentos_uuid_is_valid(const char* uuid) {
     return (len == 36);
 }
 
-agentos_uuid_error_t agentos_uuid_bin_to_str(const uint8_t* uuid_bin, char* out_buf, size_t buf_len) {
+agentos_uuid_error_t agentos_uuid_bin_to_str(const uint8_t *uuid_bin, char *out_buf, size_t buf_len)
+{
     if (!uuid_bin || !out_buf || buf_len < AGENTOS_UUID_STR_LEN) {
         return AGENTOS_UUID_EINVALID;
     }
 
     snprintf(out_buf, buf_len,
-        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-        uuid_bin[0], uuid_bin[1], uuid_bin[2], uuid_bin[3],
-        uuid_bin[4], uuid_bin[5],
-        uuid_bin[6], uuid_bin[7],
-        uuid_bin[8], uuid_bin[9],
-        uuid_bin[10], uuid_bin[11], uuid_bin[12], uuid_bin[13], uuid_bin[14], uuid_bin[15]);
+             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", uuid_bin[0],
+             uuid_bin[1], uuid_bin[2], uuid_bin[3], uuid_bin[4], uuid_bin[5], uuid_bin[6],
+             uuid_bin[7], uuid_bin[8], uuid_bin[9], uuid_bin[10], uuid_bin[11], uuid_bin[12],
+             uuid_bin[13], uuid_bin[14], uuid_bin[15]);
 
     return AGENTOS_UUID_SUCCESS;
 }
 
-agentos_uuid_error_t agentos_uuid_str_to_bin(const char* uuid_str, uint8_t* out_bin) {
+agentos_uuid_error_t agentos_uuid_str_to_bin(const char *uuid_str, uint8_t *out_bin)
+{
     if (!uuid_str || !out_bin) {
         return AGENTOS_UUID_EINVALID;
     }
@@ -216,7 +213,7 @@ agentos_uuid_error_t agentos_uuid_str_to_bin(const char* uuid_str, uint8_t* out_
         return AGENTOS_UUID_EINVALID;
     }
 
-    const char* p = uuid_str;
+    const char *p = uuid_str;
     if (p[0] == '{') {
         p++;
     }

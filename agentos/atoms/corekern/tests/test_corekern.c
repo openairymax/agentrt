@@ -14,20 +14,20 @@
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "agentos.h"
+#include "agentos_time.h"
+#include "error.h"
+#include "ipc.h"
+#include "mem.h"
+#include "observability.h"
+#include "task.h"
+
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #include <unistd.h>
-
-#include "agentos.h"
-#include "mem.h"
-#include "task.h"
-#include "ipc.h"
-#include "error.h"
-#include "agentos_time.h"
-#include "observability.h"
 
 #ifndef agentos_thread_create
 #define agentos_thread_create agentos_platform_thread_create
@@ -37,11 +37,11 @@
 /* ==================== 前向声明（未在头文件中导出的内部函数） ==================== */
 
 /* Memory Guard APIs (from guard.c) */
-void* agentos_mem_guard_alloc(size_t size);
-void* agentos_mem_guard_alloc_check(size_t size, void** out_block);
-void  agentos_mem_guard_free(void* ptr);
-int   agentos_mem_guard_check(void* ptr);
-size_t agentos_mem_guard_usable_size(void* ptr);
+void *agentos_mem_guard_alloc(size_t size);
+void *agentos_mem_guard_alloc_check(size_t size, void **out_block);
+void agentos_mem_guard_free(void *ptr);
+int agentos_mem_guard_check(void *ptr);
+size_t agentos_mem_guard_usable_size(void *ptr);
 
 /* Timer cleanup (internal, from timer.c) */
 void agentos_time_timer_cleanup(void);
@@ -49,9 +49,9 @@ void agentos_time_timer_cleanup(void);
 /* ==================== 文件作用域回调与全局状态（C99不允许嵌套函数） ==================== */
 
 static int g_timer_fire_count = 0;
-static void* g_timer_last_userdata = NULL;
+static void *g_timer_last_userdata = NULL;
 
-static void timer_counter_cb(void* userdata)
+static void timer_counter_cb(void *userdata)
 {
     g_timer_fire_count++;
     g_timer_last_userdata = userdata;
@@ -59,23 +59,33 @@ static void timer_counter_cb(void* userdata)
 
 static int g_fire_a = 0, g_fire_b = 0;
 
-static void timer_cb_a(void* ud) { (void)ud; g_fire_a++; }
-static void timer_cb_b(void* ud) { (void)ud; g_fire_b++; }
-
-typedef struct { agentos_task_id_t id; } thread_result_t;
-
-static void* get_id_fn(void* arg)
+static void timer_cb_a(void *ud)
 {
-    thread_result_t* r = (thread_result_t*)arg;
+    (void)ud;
+    g_fire_a++;
+}
+static void timer_cb_b(void *ud)
+{
+    (void)ud;
+    g_fire_b++;
+}
+
+typedef struct {
+    agentos_task_id_t id;
+} thread_result_t;
+
+static void *get_id_fn(void *arg)
+{
+    thread_result_t *r = (thread_result_t *)arg;
     r->id = agentos_task_self();
     return arg;
 }
 
 static int g_cond_flag = 0;
-static agentos_mutex_t* g_waiter_mtx = NULL;
-static agentos_cond_t* g_waiter_cv = NULL;
+static agentos_mutex_t *g_waiter_mtx = NULL;
+static agentos_cond_t *g_waiter_cv = NULL;
 
-static void* cond_waiter_fn(void* arg)
+static void *cond_waiter_fn(void *arg)
 {
     (void)arg;
     agentos_mutex_lock(g_waiter_mtx);
@@ -92,38 +102,42 @@ static int g_tests_run = 0;
 static int g_tests_passed = 0;
 static int g_tests_failed = 0;
 
-#define TEST_ASSERT(cond, msg) do { \
-    g_tests_run++; \
-    if (cond) { \
-        g_tests_passed++; \
-        printf("  [PASS] %s\n", msg); \
-    } else { \
-        g_tests_failed++; \
-        printf("  [FAIL] %s (line %d)\n", msg, __LINE__); \
-    } \
-} while(0)
+#define TEST_ASSERT(cond, msg)                                \
+    do {                                                      \
+        g_tests_run++;                                        \
+        if (cond) {                                           \
+            g_tests_passed++;                                 \
+            printf("  [PASS] %s\n", msg);                     \
+        } else {                                              \
+            g_tests_failed++;                                 \
+            printf("  [FAIL] %s (line %d)\n", msg, __LINE__); \
+        }                                                     \
+    } while (0)
 
-#define TEST_ASSERT_EQ(a, b, msg) do { \
-    g_tests_run++; \
-    if ((a) == (b)) { \
-        g_tests_passed++; \
-        printf("  [PASS] %s\n", msg); \
-    } else { \
-        g_tests_failed++; \
-        printf("  [FAIL] %s: expected %ld, got %ld (line %d)\n", msg, (long)(b), (long)(a), __LINE__); \
-    } \
-} while(0)
+#define TEST_ASSERT_EQ(a, b, msg)                                                               \
+    do {                                                                                        \
+        g_tests_run++;                                                                          \
+        if ((a) == (b)) {                                                                       \
+            g_tests_passed++;                                                                   \
+            printf("  [PASS] %s\n", msg);                                                       \
+        } else {                                                                                \
+            g_tests_failed++;                                                                   \
+            printf("  [FAIL] %s: expected %ld, got %ld (line %d)\n", msg, (long)(b), (long)(a), \
+                   __LINE__);                                                                   \
+        }                                                                                       \
+    } while (0)
 
-#define TEST_ASSERT_NEQ(a, b, msg) do { \
-    g_tests_run++; \
-    if ((a) != (b)) { \
-        g_tests_passed++; \
-        printf("  [PASS] %s\n", msg); \
-    } else { \
-        g_tests_failed++; \
-        printf("  [FAIL] %s: values should differ (line %d)\n", msg, __LINE__); \
-    } \
-} while(0)
+#define TEST_ASSERT_NEQ(a, b, msg)                                                  \
+    do {                                                                            \
+        g_tests_run++;                                                              \
+        if ((a) != (b)) {                                                           \
+            g_tests_passed++;                                                       \
+            printf("  [PASS] %s\n", msg);                                           \
+        } else {                                                                    \
+            g_tests_failed++;                                                       \
+            printf("  [FAIL] %s: values should differ (line %d)\n", msg, __LINE__); \
+        }                                                                           \
+    } while (0)
 
 #define TEST_ASSERT_NULL(ptr, msg) TEST_ASSERT((ptr) == NULL, msg)
 #define TEST_ASSERT_NOT_NULL(ptr, msg) TEST_ASSERT((ptr) != NULL, msg)
@@ -138,12 +152,12 @@ static void test_guard_alloc_free(void)
 
     agentos_mem_init(0);
 
-    void* ptr = agentos_mem_guard_alloc(256);
+    void *ptr = agentos_mem_guard_alloc(256);
     TEST_ASSERT_NOT_NULL(ptr, "guard_alloc(256) 返回有效指针");
 
     if (ptr) {
         memset(ptr, 0xAB, 256);
-        unsigned char* data = (unsigned char*)ptr;
+        unsigned char *data = (unsigned char *)ptr;
         TEST_ASSERT(data[0] == 0xAB && data[255] == 0xAB, "guard内存可读写");
 
         int ok = agentos_mem_guard_check(ptr);
@@ -162,9 +176,10 @@ static void test_guard_null_safety(void)
 
     agentos_mem_init(0);
 
-    void* result = agentos_mem_guard_alloc(0);
+    void *result = agentos_mem_guard_alloc(0);
     TEST_ASSERT_NOT_NULL(result, "guard_alloc(0) 返回有效指针");
-    if (result) agentos_mem_guard_free(result);
+    if (result)
+        agentos_mem_guard_free(result);
 
     TEST_ASSERT_EQ(agentos_mem_guard_check(NULL), 0, "guard_check(NULL) 返回0");
     TEST_ASSERT_EQ(agentos_mem_guard_usable_size(NULL), 0, "guard_usable_size(NULL) 返回0");
@@ -181,8 +196,8 @@ static void test_guard_alloc_check(void)
 
     agentos_mem_init(0);
 
-    void* block_handle = NULL;
-    void* user_ptr = agentos_mem_guard_alloc_check(128, &block_handle);
+    void *block_handle = NULL;
+    void *user_ptr = agentos_mem_guard_alloc_check(128, &block_handle);
     TEST_ASSERT_NOT_NULL(user_ptr, "alloc_check 返回用户指针");
     TEST_ASSERT_NOT_NULL(block_handle, "alloc_check 返回block句柄");
 
@@ -197,10 +212,11 @@ static void test_guard_alloc_check(void)
         agentos_mem_guard_free(user_ptr);
     }
 
-    void* null_block = NULL;
-    void* null_user = agentos_mem_guard_alloc_check(64, &null_block);
+    void *null_block = NULL;
+    void *null_user = agentos_mem_guard_alloc_check(64, &null_block);
     TEST_ASSERT_NOT_NULL(null_user, "alloc_check with non-null out_block works");
-    if (null_user) agentos_mem_guard_free(null_user);
+    if (null_user)
+        agentos_mem_guard_free(null_user);
 
     agentos_mem_cleanup();
 }
@@ -211,14 +227,14 @@ static void test_guard_overflow_detection(void)
 
     agentos_mem_init(0);
 
-    void* ptr = agentos_mem_guard_alloc(64);
+    void *ptr = agentos_mem_guard_alloc(64);
     TEST_ASSERT_NOT_NULL(ptr, "分配64字节guard内存");
 
     if (ptr) {
         int ok_before = agentos_mem_guard_check(ptr);
         TEST_ASSERT_EQ(ok_before, 1, "正常时guard检查通过");
 
-        unsigned char* raw = (unsigned char*)ptr;
+        unsigned char *raw = (unsigned char *)ptr;
         raw[63] = 0xFF;
         int ok_after = agentos_mem_guard_check(ptr);
         TEST_ASSERT(ok_after == 0 || ok_after == 1,
@@ -236,12 +252,13 @@ static void test_guard_multiple_blocks(void)
 
     agentos_mem_init(0);
 
-    void* blocks[8];
+    void *blocks[8];
     int all_ok = 1;
 
     for (int i = 0; i < 8; i++) {
         blocks[i] = agentos_mem_guard_alloc(64 + (size_t)i * 32);
-        if (!blocks[i]) all_ok = 0;
+        if (!blocks[i])
+            all_ok = 0;
     }
     TEST_ASSERT(all_ok, "成功分配8个独立的guard块");
 
@@ -253,7 +270,8 @@ static void test_guard_multiple_blocks(void)
     }
 
     for (int i = 7; i >= 0; i--) {
-        if (blocks[i]) agentos_mem_guard_free(blocks[i]);
+        if (blocks[i])
+            agentos_mem_guard_free(blocks[i]);
     }
     TEST_ASSERT(1, "逆序释放所有guard块不崩溃");
 
@@ -270,10 +288,10 @@ static void test_timer_create_destroy(void)
 
     g_timer_fire_count = 0;
 
-    agentos_timer_t* timer = agentos_timer_create(timer_counter_cb, (void*)0xDEAD);
+    agentos_timer_t *timer = agentos_timer_create(timer_counter_cb, (void *)0xDEAD);
     TEST_ASSERT_NOT_NULL(timer, "timer_create 返回有效句柄");
 
-    agentos_timer_t* null_timer = agentos_timer_create(NULL, NULL);
+    agentos_timer_t *null_timer = agentos_timer_create(NULL, NULL);
     TEST_ASSERT_NULL(null_timer, "callback=NULL 时返回 NULL");
 
     agentos_timer_destroy(timer);
@@ -290,7 +308,7 @@ static void test_timer_one_shot(void)
     g_timer_fire_count = 0;
     g_timer_last_userdata = NULL;
 
-    agentos_timer_t* timer = agentos_timer_create(timer_counter_cb, (void*)0xBEEF);
+    agentos_timer_t *timer = agentos_timer_create(timer_counter_cb, (void *)0xBEEF);
     TEST_ASSERT_NOT_NULL(timer, "one_shot timer创建成功");
 
     agentos_error_t err = agentos_timer_start(timer, 10, 1);
@@ -300,7 +318,7 @@ static void test_timer_one_shot(void)
 
     agentos_time_timer_process();
     TEST_ASSERT_EQ(g_timer_fire_count, 1, "单次定时器触发1次");
-    TEST_ASSERT(g_timer_last_userdata == (void*)0xBEEF, "回调收到正确userdata");
+    TEST_ASSERT(g_timer_last_userdata == (void *)0xBEEF, "回调收到正确userdata");
 
     agentos_time_timer_process();
     TEST_ASSERT_EQ(g_timer_fire_count, 1, "再次process不再触发（one_shot已过期）");
@@ -315,7 +333,7 @@ static void test_timer_recurring(void)
 
     g_timer_fire_count = 0;
 
-    agentos_timer_t* timer = agentos_timer_create(timer_counter_cb, (void*)0xCAFE);
+    agentos_timer_t *timer = agentos_timer_create(timer_counter_cb, (void *)0xCAFE);
     TEST_ASSERT_NOT_NULL(timer, "recurring timer创建成功");
 
     agentos_error_t err = agentos_timer_start(timer, 10, 0);
@@ -345,7 +363,7 @@ static void test_timer_start_stop_restart(void)
 
     g_timer_fire_count = 0;
 
-    agentos_timer_t* timer = agentos_timer_create(timer_counter_cb, NULL);
+    agentos_timer_t *timer = agentos_timer_create(timer_counter_cb, NULL);
     TEST_ASSERT_NOT_NULL(timer, "start_stop timer创建成功");
 
     agentos_error_t err = agentos_timer_start(timer, 100, 0);
@@ -378,7 +396,7 @@ static void test_timer_invalid_params(void)
     err = agentos_timer_start(NULL, 100, 0);
     TEST_ASSERT_EQ(err, AGENTOS_EINVAL, "timer_start(NULL) 返回 EINVAL");
 
-    agentos_timer_t* timer = agentos_timer_create(timer_counter_cb, NULL);
+    agentos_timer_t *timer = agentos_timer_create(timer_counter_cb, NULL);
     TEST_ASSERT_NOT_NULL(timer, "invalid_params timer创建成功");
 
     err = agentos_timer_start(timer, 0, 0);
@@ -398,8 +416,8 @@ static void test_timer_multiple_independent(void)
     g_fire_a = 0;
     g_fire_b = 0;
 
-    agentos_timer_t* ta = agentos_timer_create(timer_cb_a, NULL);
-    agentos_timer_t* tb = agentos_timer_create(timer_cb_b, NULL);
+    agentos_timer_t *ta = agentos_timer_create(timer_cb_a, NULL);
+    agentos_timer_t *tb = agentos_timer_create(timer_cb_b, NULL);
     TEST_ASSERT_NOT_NULL(ta, "timer_a 创建成功");
     TEST_ASSERT_NOT_NULL(tb, "timer_b 创建成功");
 
@@ -496,12 +514,10 @@ static void test_task_priority_ops(void)
     }
 
     err = agentos_task_set_priority(tid, 999);
-    TEST_ASSERT(err == AGENTOS_SUCCESS || err == AGENTOS_EINVAL,
-                "越界优先级被接受或拒绝");
+    TEST_ASSERT(err == AGENTOS_SUCCESS || err == AGENTOS_EINVAL, "越界优先级被接受或拒绝");
 
     err = agentos_task_set_priority(99999, AGENTOS_TASK_PRIORITY_NORMAL);
-    TEST_ASSERT(err == AGENTOS_EINVAL || err == AGENTOS_SUCCESS,
-                "无效TID set_priority 处理正确");
+    TEST_ASSERT(err == AGENTOS_EINVAL || err == AGENTOS_SUCCESS, "无效TID set_priority 处理正确");
 
     agentos_task_cleanup();
 }
@@ -520,14 +536,12 @@ static void test_task_state_query(void)
                 "get_state 返回SUCCESS或EINVAL（取决于实现）");
 
     if (err == AGENTOS_SUCCESS) {
-        TEST_ASSERT(state >= AGENTOS_TASK_STATE_CREATED &&
-                    state <= AGENTOS_TASK_STATE_TERMINATED,
+        TEST_ASSERT(state >= AGENTOS_TASK_STATE_CREATED && state <= AGENTOS_TASK_STATE_TERMINATED,
                     "状态值在枚举范围内");
     }
 
     err = agentos_task_get_state(99999, &state);
-    TEST_ASSERT(err == AGENTOS_EINVAL || err == AGENTOS_SUCCESS,
-                "无效TID get_state 处理正确");
+    TEST_ASSERT(err == AGENTOS_EINVAL || err == AGENTOS_SUCCESS, "无效TID get_state 处理正确");
 
     agentos_task_cleanup();
 }
@@ -552,9 +566,11 @@ static void test_task_multi_thread_ids(void)
     int all_unique = 1;
     int nonzero_count = 0;
     for (int i = 0; i < 4; i++) {
-        if (results[i].id != 0) nonzero_count++;
+        if (results[i].id != 0)
+            nonzero_count++;
         for (int j = i + 1; j < 4; j++) {
-            if (results[i].id != 0 && results[i].id == results[j].id) all_unique = 0;
+            if (results[i].id != 0 && results[i].id == results[j].id)
+                all_unique = 0;
         }
     }
     TEST_ASSERT(nonzero_count == 0 || all_unique, "非零线程ID全部唯一");
@@ -566,10 +582,8 @@ static void test_task_multi_thread_ids(void)
 /*  4. IPC消息传递测试                                                      */
 /* ======================================================================== */
 
-static agentos_error_t ipc_test_callback(
-    agentos_ipc_channel_t* channel,
-    const agentos_kernel_ipc_message_t* msg,
-    void* userdata)
+static agentos_error_t ipc_test_callback(agentos_ipc_channel_t *channel,
+                                         const agentos_kernel_ipc_message_t *msg, void *userdata)
 {
     (void)channel;
     (void)msg;
@@ -583,23 +597,18 @@ static void test_ipc_send_recv_basic(void)
 
     agentos_ipc_init();
 
-    agentos_ipc_channel_t* server_ch = NULL;
-    agentos_error_t err = agentos_ipc_create_channel(
-        "test_sr_channel", ipc_test_callback, NULL, &server_ch);
+    agentos_ipc_channel_t *server_ch = NULL;
+    agentos_error_t err =
+        agentos_ipc_create_channel("test_sr_channel", ipc_test_callback, NULL, &server_ch);
     TEST_ASSERT_EQ(err, AGENTOS_SUCCESS, "创建服务端通道成功");
     TEST_ASSERT_NOT_NULL(server_ch, "通道句柄非空");
 
     if (server_ch) {
         (void)agentos_ipc_get_fd(server_ch);
 
-        const char* test_data = "Hello IPC World!";
+        const char *test_data = "Hello IPC World!";
         agentos_kernel_ipc_message_t send_msg = {
-            .code = 0x01,
-            .data = test_data,
-            .size = strlen(test_data) + 1,
-            .fd = -1,
-            .msg_id = 42
-        };
+            .code = 0x01, .data = test_data, .size = strlen(test_data) + 1, .fd = -1, .msg_id = 42};
 
         err = agentos_ipc_send(server_ch, &send_msg);
         TEST_ASSERT(err == AGENTOS_SUCCESS || err == AGENTOS_ENOSYS,
@@ -616,30 +625,24 @@ static void test_ipc_invalid_params(void)
     agentos_error_t err;
 
     err = agentos_ipc_send(NULL, &(agentos_kernel_ipc_message_t){0});
-    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0,
-                "send(channel=NULL) 返回错误");
+    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0, "send(channel=NULL) 返回错误");
 
     agentos_kernel_ipc_message_t empty_msg = {0};
     err = agentos_ipc_recv(NULL, 1000, &empty_msg);
-    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0,
-                "recv(channel=NULL) 返回错误");
+    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0, "recv(channel=NULL) 返回错误");
 
-    agentos_ipc_channel_t* dummy = NULL;
+    agentos_ipc_channel_t *dummy = NULL;
     err = agentos_ipc_create_channel(NULL, NULL, NULL, &dummy);
-    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0,
-                "create_channel(name=NULL) 返回错误");
+    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0, "create_channel(name=NULL) 返回错误");
 
     err = agentos_ipc_connect(NULL, &dummy);
-    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0,
-                "connect(name=NULL) 返回错误");
+    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0, "connect(name=NULL) 返回错误");
 
     err = agentos_ipc_close(NULL);
-    TEST_ASSERT(err == AGENTOS_EINVAL || err == AGENTOS_SUCCESS,
-                "close(NULL) 安全返回");
+    TEST_ASSERT(err == AGENTOS_EINVAL || err == AGENTOS_SUCCESS, "close(NULL) 安全返回");
 
     err = agentos_ipc_call(NULL, &empty_msg, NULL, NULL, 1000);
-    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0,
-                "call(channel=NULL) 返回错误");
+    TEST_ASSERT(err == AGENTOS_EINVAL || err < 0, "call(channel=NULL) 返回错误");
 
     int32_t fd = agentos_ipc_get_fd(NULL);
     TEST_ASSERT(fd <= 0, "get_fd(NULL) 返回无效值");
@@ -653,7 +656,7 @@ static void test_ipc_multiple_channels(void)
 
     agentos_ipc_init();
 
-    agentos_ipc_channel_t* ch1 = NULL, *ch2 = NULL, *ch3 = NULL;
+    agentos_ipc_channel_t *ch1 = NULL, *ch2 = NULL, *ch3 = NULL;
 
     agentos_error_t e1 = agentos_ipc_create_channel("ch_alpha", ipc_test_callback, NULL, &ch1);
     agentos_error_t e2 = agentos_ipc_create_channel("ch_beta", ipc_test_callback, NULL, &ch2);
@@ -670,8 +673,10 @@ static void test_ipc_multiple_channels(void)
         TEST_ASSERT(ch2 != ch3, "不同通道有不同句柄");
     }
 
-    if (ch1) (void)agentos_ipc_get_fd(ch1);
-    if (ch2) (void)agentos_ipc_get_fd(ch2);
+    if (ch1)
+        (void)agentos_ipc_get_fd(ch1);
+    if (ch2)
+        (void)agentos_ipc_get_fd(ch2);
     TEST_ASSERT(1, "多个通道可同时查询fd");
 
     agentos_ipc_cleanup();
@@ -704,14 +709,14 @@ static void test_mem_large_allocation(void)
 
     agentos_mem_init(0);
 
-    void* p1 = agentos_mem_alloc(1024 * 1024);
+    void *p1 = agentos_mem_alloc(1024 * 1024);
     TEST_ASSERT_NOT_NULL(p1, "分配1MB成功");
     if (p1) {
         memset(p1, 0x77, 1024 * 1024);
         agentos_mem_free(p1);
     }
 
-    void* p2 = agentos_mem_alloc(64 * 1024);
+    void *p2 = agentos_mem_alloc(64 * 1024);
     TEST_ASSERT_NOT_NULL(p2, "分配64KB成功");
     if (p2) {
         memset(p2, 0x88, 64 * 1024);
@@ -730,17 +735,18 @@ static void test_mem_alloc_ex(void)
 
     agentos_mem_init(0);
 
-    void* ptr = agentos_mem_alloc_ex(512, __FILE__, __LINE__);
+    void *ptr = agentos_mem_alloc_ex(512, __FILE__, __LINE__);
     TEST_ASSERT_NOT_NULL(ptr, "mem_alloc_ex(512) 成功");
     if (ptr) {
         memset(ptr, 0x33, 512);
         agentos_mem_free(ptr);
     }
 
-    void* ex_null = agentos_mem_alloc_ex(0, "test.c", 99);
+    void *ex_null = agentos_mem_alloc_ex(0, "test.c", 99);
     TEST_ASSERT_NOT_NULL(ex_null, "mem_alloc_ex(0) 有效");
 
-    if (ex_null) agentos_mem_free(ex_null);
+    if (ex_null)
+        agentos_mem_free(ex_null);
 
     agentos_mem_cleanup();
 }
@@ -751,7 +757,7 @@ static void test_mem_aligned_alloc_ex(void)
 
     agentos_mem_init(0);
 
-    void* ptr = agentos_mem_aligned_alloc_ex(256, 128, __FILE__, __LINE__);
+    void *ptr = agentos_mem_aligned_alloc_ex(256, 128, __FILE__, __LINE__);
     TEST_ASSERT_NOT_NULL(ptr, "aligned_alloc_ex(256, 128) 成功");
     if (ptr) {
         uintptr_t addr = (uintptr_t)ptr;
@@ -759,7 +765,7 @@ static void test_mem_aligned_alloc_ex(void)
         agentos_mem_aligned_free(ptr);
     }
 
-    void* p4096 = agentos_mem_aligned_alloc_ex(64, 4096, "align_test.c", 42);
+    void *p4096 = agentos_mem_aligned_alloc_ex(64, 4096, "align_test.c", 42);
     TEST_ASSERT_NOT_NULL(p4096, "4K页面对齐分配成功");
     if (p4096) {
         TEST_ASSERT((uintptr_t)p4096 % 4096 == 0, "地址4KB页对齐");
@@ -775,16 +781,16 @@ static void test_mem_realloc_ex(void)
 
     agentos_mem_init(0);
 
-    void* orig = agentos_mem_alloc_ex(64, __FILE__, 10);
+    void *orig = agentos_mem_alloc_ex(64, __FILE__, 10);
     TEST_ASSERT_NOT_NULL(orig, "realloc_ex 原始分配成功");
-    const char* hello = "Hello _ex realloc";
+    const char *hello = "Hello _ex realloc";
     memcpy(orig, hello, strlen(hello) + 1);
 
-    void* grown = agentos_mem_realloc_ex(orig, 256, __FILE__, 20);
+    void *grown = agentos_mem_realloc_ex(orig, 256, __FILE__, 20);
     TEST_ASSERT_NOT_NULL(grown, "realloc_ex 扩展成功");
-    TEST_ASSERT(strcmp((char*)grown, hello) == 0, "数据保持完整");
+    TEST_ASSERT(strcmp((char *)grown, hello) == 0, "数据保持完整");
 
-    void* shrinked = agentos_mem_realloc_ex(grown, 32, __FILE__, 30);
+    void *shrinked = agentos_mem_realloc_ex(grown, 32, __FILE__, 30);
     TEST_ASSERT_NOT_NULL(shrinked, "realloc_ex 缩小成功");
 
     agentos_mem_free(shrinked);
@@ -799,24 +805,26 @@ static void test_mem_stress_alloc_free(void)
 
     agentos_mem_init(0);
 
-    #define STRESS_COUNT 200
-    #define STRESS_SIZE  1024
+#define STRESS_COUNT 200
+#define STRESS_SIZE 1024
 
-    void* ptrs[STRESS_COUNT];
+    void *ptrs[STRESS_COUNT];
     int alloc_ok = 1;
 
     for (int i = 0; i < STRESS_COUNT; i++) {
         ptrs[i] = agentos_mem_alloc(STRESS_SIZE);
-        if (!ptrs[i]) { alloc_ok = 0; break; }
+        if (!ptrs[i]) {
+            alloc_ok = 0;
+            break;
+        }
         memset(ptrs[i], (unsigned char)(i & 0xFF), STRESS_SIZE);
     }
     TEST_ASSERT(alloc_ok, "连续分配200个1KB块成功");
 
     for (int i = 0; i < STRESS_COUNT; i++) {
         if (ptrs[i]) {
-            unsigned char* p = (unsigned char*)ptrs[i];
-            TEST_ASSERT(p[0] == (unsigned char)(i & 0xFF),
-                        "压力数据完整性验证");
+            unsigned char *p = (unsigned char *)ptrs[i];
+            TEST_ASSERT(p[0] == (unsigned char)(i & 0xFF), "压力数据完整性验证");
             agentos_mem_free(ptrs[i]);
         }
     }
@@ -835,10 +843,7 @@ static void test_obs_double_init_shutdown(void)
     printf("\n--- [Observability] 重复初始化/关闭 ---\n");
 
     agentos_observability_config_t cfg = {
-        .enable_metrics = 1,
-        .enable_tracing = 1,
-        .enable_health_check = 1
-    };
+        .enable_metrics = 1, .enable_tracing = 1, .enable_health_check = 1};
 
     int err1 = agentos_observability_init(&cfg);
     TEST_ASSERT_EQ(err1, AGENTOS_SUCCESS, "首次init成功");
@@ -858,17 +863,14 @@ static void test_metric_edge_values(void)
     printf("\n--- [Observability] 指标边界值 ---\n");
 
     agentos_observability_config_t cfg = {
-        .enable_metrics = 1, .enable_tracing = 0, .enable_health_check = 0
-    };
+        .enable_metrics = 1, .enable_tracing = 0, .enable_health_check = 0};
     agentos_observability_init(&cfg);
 
     int ret = agentos_metric_counter_inc("nonexistent", "foo", 1.0);
-    TEST_ASSERT(ret == AGENTOS_SUCCESS || ret != 0,
-                "递增不存在指标的处理");
+    TEST_ASSERT(ret == AGENTOS_SUCCESS || ret != 0, "递增不存在指标的处理");
 
     ret = agentos_metric_gauge_set("no_such_gauge", "bar", 99.9);
-    TEST_ASSERT(ret == 0 || ret != 0,
-                "设置不存在仪表的处理");
+    TEST_ASSERT(ret == 0 || ret != 0, "设置不存在仪表的处理");
 
     double neg_val = -42.5;
     ret = agentos_metric_gauge_create("neg_gauge", "", neg_val);
@@ -882,8 +884,7 @@ static void test_trace_span_lifecycle_full(void)
     printf("\n--- [Observability] 完整trace生命周期 ---\n");
 
     agentos_observability_config_t cfg = {
-        .enable_metrics = 0, .enable_tracing = 1, .enable_health_check = 0
-    };
+        .enable_metrics = 0, .enable_tracing = 1, .enable_health_check = 0};
     agentos_observability_init(&cfg);
 
     agentos_trace_context_t ctx1, ctx2;
@@ -896,8 +897,7 @@ static void test_trace_span_lifecycle_full(void)
     agentos_trace_log(&ctx1, "Processing request");
 
     agentos_trace_span_start(&ctx2, "svc_B", "op_child");
-    TEST_ASSERT(strcmp(ctx2.trace_id, ctx1.trace_id) == 0 ||
-                ctx2.trace_id[0] != '\0',
+    TEST_ASSERT(strcmp(ctx2.trace_id, ctx1.trace_id) == 0 || ctx2.trace_id[0] != '\0',
                 "子span trace_id有效");
 
     agentos_trace_log(&ctx2, "Child operation executing");
@@ -915,8 +915,7 @@ static void test_performance_metrics_valid_range(void)
     printf("\n--- [Observability] 性能指标合理范围 ---\n");
 
     agentos_observability_config_t cfg = {
-        .enable_metrics = 0, .enable_tracing = 0, .enable_health_check = 1
-    };
+        .enable_metrics = 0, .enable_tracing = 0, .enable_health_check = 1};
     agentos_observability_init(&cfg);
 
     double cpu = -1, mem = -1;
@@ -939,7 +938,7 @@ static void test_mutex_basic(void)
 {
     printf("\n--- [Sync] Mutex基本操作 ---\n");
 
-    agentos_mutex_t* mtx = agentos_mutex_create();
+    agentos_mutex_t *mtx = agentos_mutex_create();
     TEST_ASSERT_NOT_NULL(mtx, "mutex_create 成功");
 
     agentos_mutex_lock(mtx);
@@ -963,8 +962,8 @@ static void test_condvar_signal(void)
 {
     printf("\n--- [Sync] 条件变量信号 ---\n");
 
-    agentos_mutex_t* mtx = agentos_mutex_create();
-    agentos_cond_t* cond = agentos_cond_create();
+    agentos_mutex_t *mtx = agentos_mutex_create();
+    agentos_cond_t *cond = agentos_cond_create();
     TEST_ASSERT_NOT_NULL(mtx, "mutex创建成功");
     TEST_ASSERT_NOT_NULL(cond, "cond创建成功");
 
@@ -1002,7 +1001,7 @@ static void test_sync_null_safety(void)
     agentos_cond_free(NULL);
     TEST_ASSERT(1, "cond_free(NULL) 不崩溃");
 
-    agentos_mutex_t* mtx = agentos_mutex_create();
+    agentos_mutex_t *mtx = agentos_mutex_create();
     if (mtx) {
         agentos_mutex_lock(mtx);
         agentos_mutex_unlock(mtx);

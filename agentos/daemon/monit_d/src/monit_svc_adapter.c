@@ -19,26 +19,27 @@
 #include <string.h>
 
 typedef struct {
-    void* monit_svc;
+    void *monit_svc;
     monitor_config_t monit_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
     bool running;
 } monit_adapter_ctx_t;
 
-static monit_adapter_ctx_t* monit_get_ctx(agentos_service_t service) {
-    if (!service) return NULL;
-    return (monit_adapter_ctx_t*)agentos_service_get_user_data(service);
+static monit_adapter_ctx_t *monit_get_ctx(agentos_service_t service)
+{
+    if (!service)
+        return NULL;
+    return (monit_adapter_ctx_t *)agentos_service_get_user_data(service);
 }
 
-static void monit_config_from_common(
-    monitor_config_t* monit_cfg,
-    const agentos_svc_config_t* common_cfg
-) {
+static void monit_config_from_common(monitor_config_t *monit_cfg,
+                                     const agentos_svc_config_t *common_cfg)
+{
     memset(monit_cfg, 0, sizeof(monitor_config_t));
     monit_cfg->metrics_collection_interval_ms = 5000;
-    monit_cfg->health_check_interval_ms = (common_cfg && common_cfg->timeout_ms > 0)
-                                           ? common_cfg->timeout_ms : 10000;
+    monit_cfg->health_check_interval_ms =
+        (common_cfg && common_cfg->timeout_ms > 0) ? common_cfg->timeout_ms : 10000;
     monit_cfg->log_flush_interval_ms = 1000;
     monit_cfg->alert_check_interval_ms = 5000;
     monit_cfg->log_file_path = AGENTOS_STRDUP("./logs/monitor.log");
@@ -47,13 +48,14 @@ static void monit_config_from_common(
     monit_cfg->enable_alerting = true;
 }
 
-static agentos_error_t monit_adapter_init(
-    agentos_service_t service,
-    const agentos_svc_config_t* config
-) {
-    if (!service) return AGENTOS_EINVAL;
-    monit_adapter_ctx_t* ctx = monit_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
+static agentos_error_t monit_adapter_init(agentos_service_t service,
+                                          const agentos_svc_config_t *config)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    monit_adapter_ctx_t *ctx = monit_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
 
     if (config) {
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
@@ -61,7 +63,7 @@ static agentos_error_t monit_adapter_init(
 
     if (!ctx->monit_svc) {
         monit_config_from_common(&ctx->monit_cfg, &ctx->common_cfg);
-        int ret = monitor_service_create(&ctx->monit_cfg, (monitor_service_t**)&ctx->monit_svc);
+        int ret = monitor_service_create(&ctx->monit_cfg, (monitor_service_t **)&ctx->monit_svc);
         if (ret != 0 || !ctx->monit_svc) {
             SVC_LOG_ERROR("监控服务创建失败: %d", ret);
             return AGENTOS_ERR_UNKNOWN;
@@ -72,21 +74,29 @@ static agentos_error_t monit_adapter_init(
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t monit_adapter_start(agentos_service_t service) {
-    if (!service) return AGENTOS_EINVAL;
-    monit_adapter_ctx_t* ctx = monit_get_ctx(service);
-    if (!ctx || !ctx->monit_svc) return AGENTOS_ENOTINIT;
-    if (ctx->running) return AGENTOS_SUCCESS;
+static agentos_error_t monit_adapter_start(agentos_service_t service)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    monit_adapter_ctx_t *ctx = monit_get_ctx(service);
+    if (!ctx || !ctx->monit_svc)
+        return AGENTOS_ENOTINIT;
+    if (ctx->running)
+        return AGENTOS_SUCCESS;
     ctx->running = true;
     SVC_LOG_INFO("监控服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force) {
-    if (!service) return AGENTOS_EINVAL;
-    monit_adapter_ctx_t* ctx = monit_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
-    if (!ctx->running) return AGENTOS_SUCCESS;
+static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    monit_adapter_ctx_t *ctx = monit_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
+    if (!ctx->running)
+        return AGENTOS_SUCCESS;
     ctx->running = false;
     if (force) {
         if (ctx->monit_svc && ctx->owns_service) {
@@ -94,8 +104,14 @@ static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force)
             ctx->monit_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->monit_cfg.log_file_path) { AGENTOS_FREE((void*)ctx->monit_cfg.log_file_path); ctx->monit_cfg.log_file_path = NULL; }
-        if (ctx->monit_cfg.metrics_storage_path) { AGENTOS_FREE((void*)ctx->monit_cfg.metrics_storage_path); ctx->monit_cfg.metrics_storage_path = NULL; }
+        if (ctx->monit_cfg.log_file_path) {
+            AGENTOS_FREE((void *)ctx->monit_cfg.log_file_path);
+            ctx->monit_cfg.log_file_path = NULL;
+        }
+        if (ctx->monit_cfg.metrics_storage_path) {
+            AGENTOS_FREE((void *)ctx->monit_cfg.metrics_storage_path);
+            ctx->monit_cfg.metrics_storage_path = NULL;
+        }
         SVC_LOG_INFO("监控服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("监控服务适配器已停止");
@@ -103,36 +119,44 @@ static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force)
     return AGENTOS_SUCCESS;
 }
 
-static void monit_adapter_destroy(agentos_service_t service) {
-    if (!service) return;
-    monit_adapter_ctx_t* ctx = monit_get_ctx(service);
-    if (!ctx) return;
+static void monit_adapter_destroy(agentos_service_t service)
+{
+    if (!service)
+        return;
+    monit_adapter_ctx_t *ctx = monit_get_ctx(service);
+    if (!ctx)
+        return;
 
     if (ctx->monit_svc && ctx->owns_service) {
         monitor_service_destroy(ctx->monit_svc);
         ctx->monit_svc = NULL;
     }
 
-    if (ctx->monit_cfg.log_file_path) AGENTOS_FREE((void*)ctx->monit_cfg.log_file_path);
-    if (ctx->monit_cfg.metrics_storage_path) AGENTOS_FREE((void*)ctx->monit_cfg.metrics_storage_path);
+    if (ctx->monit_cfg.log_file_path)
+        AGENTOS_FREE((void *)ctx->monit_cfg.log_file_path);
+    if (ctx->monit_cfg.metrics_storage_path)
+        AGENTOS_FREE((void *)ctx->monit_cfg.metrics_storage_path);
 
     agentos_service_set_user_data(service, NULL);
     AGENTOS_FREE(ctx);
 }
 
-static agentos_error_t monit_adapter_healthcheck(agentos_service_t service) {
-    if (!service) return AGENTOS_EINVAL;
-    monit_adapter_ctx_t* ctx = monit_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
+static agentos_error_t monit_adapter_healthcheck(agentos_service_t service)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    monit_adapter_ctx_t *ctx = monit_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
 
-    if (!ctx->monit_svc) return AGENTOS_ENOTINIT;
+    if (!ctx->monit_svc)
+        return AGENTOS_ENOTINIT;
 
-    health_check_result_t* result = NULL;
-    int ret = monitor_service_health_check(
-        ctx->monit_svc, "monitor_service", &result
-    );
+    health_check_result_t *result = NULL;
+    int ret = monitor_service_health_check(ctx->monit_svc, "monitor_service", &result);
 
-    if (ret != 0 || !result) return AGENTOS_ERR_UNKNOWN;
+    if (ret != 0 || !result)
+        return AGENTOS_ERR_UNKNOWN;
 
     agentos_error_t err = result->is_healthy ? AGENTOS_SUCCESS : AGENTOS_ERR_UNKNOWN;
 
@@ -151,20 +175,21 @@ static const agentos_svc_interface_t monit_adapter_iface = {
     .healthcheck = monit_adapter_healthcheck,
 };
 
-agentos_error_t monit_service_adapter_create(
-    agentos_service_t* out_service,
-    const agentos_svc_config_t* config
-) {
-    if (!out_service) return AGENTOS_EINVAL;
+agentos_error_t monit_service_adapter_create(agentos_service_t *out_service,
+                                             const agentos_svc_config_t *config)
+{
+    if (!out_service)
+        return AGENTOS_EINVAL;
 
-    monit_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(monit_adapter_ctx_t));
-    if (!ctx) return AGENTOS_ENOMEM;
+    monit_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(monit_adapter_ctx_t));
+    if (!ctx)
+        return AGENTOS_ENOMEM;
 
     if (config) {
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "monit_d";
-        ctx->common_cfg.version = "0.0.5";
+        ctx->common_cfg.version = "0.1.0";
         ctx->common_cfg.enable_metrics = true;
         ctx->common_cfg.enable_tracing = true;
     }
@@ -172,9 +197,8 @@ agentos_error_t monit_service_adapter_create(
     ctx->owns_service = true;
 
     agentos_service_t svc_handle = NULL;
-    agentos_error_t err = agentos_service_create(
-        &svc_handle, ctx->common_cfg.name, &monit_adapter_iface, &ctx->common_cfg
-    );
+    agentos_error_t err = agentos_service_create(&svc_handle, ctx->common_cfg.name,
+                                                 &monit_adapter_iface, &ctx->common_cfg);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(ctx);
         return err;
@@ -191,15 +215,15 @@ agentos_error_t monit_service_adapter_create(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t monit_service_adapter_wrap(
-    agentos_service_t* out_service,
-    void* monit_svc,
-    const agentos_svc_config_t* config
-) {
-    if (!out_service || !monit_svc) return AGENTOS_EINVAL;
+agentos_error_t monit_service_adapter_wrap(agentos_service_t *out_service, void *monit_svc,
+                                           const agentos_svc_config_t *config)
+{
+    if (!out_service || !monit_svc)
+        return AGENTOS_EINVAL;
 
-    monit_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(monit_adapter_ctx_t));
-    if (!ctx) return AGENTOS_ENOMEM;
+    monit_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(monit_adapter_ctx_t));
+    if (!ctx)
+        return AGENTOS_ENOMEM;
 
     ctx->monit_svc = monit_svc;
     ctx->owns_service = false;
@@ -208,13 +232,12 @@ agentos_error_t monit_service_adapter_wrap(
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "monit_d";
-        ctx->common_cfg.version = "0.0.5";
+        ctx->common_cfg.version = "0.1.0";
     }
 
     agentos_service_t svc_handle = NULL;
-    agentos_error_t err = agentos_service_create(
-        &svc_handle, ctx->common_cfg.name, &monit_adapter_iface, &ctx->common_cfg
-    );
+    agentos_error_t err = agentos_service_create(&svc_handle, ctx->common_cfg.name,
+                                                 &monit_adapter_iface, &ctx->common_cfg);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(ctx);
         return err;
@@ -231,32 +254,40 @@ agentos_error_t monit_service_adapter_wrap(
     return AGENTOS_SUCCESS;
 }
 
-void* monit_service_adapter_get_original(agentos_service_t service) {
-    if (!service) return NULL;
-    monit_adapter_ctx_t* ctx = monit_get_ctx(service);
+void *monit_service_adapter_get_original(agentos_service_t service)
+{
+    if (!service)
+        return NULL;
+    monit_adapter_ctx_t *ctx = monit_get_ctx(service);
     return ctx ? ctx->monit_svc : NULL;
 }
 
-agentos_error_t monit_service_adapter_init(agentos_service_t service) {
+agentos_error_t monit_service_adapter_init(agentos_service_t service)
+{
     return monit_adapter_init(service, NULL);
 }
 
-agentos_error_t monit_service_adapter_start(agentos_service_t service) {
+agentos_error_t monit_service_adapter_start(agentos_service_t service)
+{
     return monit_adapter_start(service);
 }
 
-agentos_error_t monit_service_adapter_stop(agentos_service_t service, bool force) {
+agentos_error_t monit_service_adapter_stop(agentos_service_t service, bool force)
+{
     return monit_adapter_stop(service, force);
 }
 
-void monit_service_adapter_destroy(agentos_service_t service) {
+void monit_service_adapter_destroy(agentos_service_t service)
+{
     monit_adapter_destroy(service);
 }
 
-agentos_error_t monit_service_adapter_healthcheck(agentos_service_t service) {
+agentos_error_t monit_service_adapter_healthcheck(agentos_service_t service)
+{
     return monit_adapter_healthcheck(service);
 }
 
-const agentos_svc_interface_t* monit_service_adapter_get_interface(void) {
+const agentos_svc_interface_t *monit_service_adapter_get_interface(void)
+{
     return &monit_adapter_iface;
 }
