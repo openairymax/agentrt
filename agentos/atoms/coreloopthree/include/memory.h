@@ -18,6 +18,7 @@
 
 #include "agentos.h"
 #include "types.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -33,46 +34,46 @@ typedef struct agentos_memory_query agentos_memory_query_t;
  * @brief 记忆记录
  */
 typedef struct agentos_memory_record {
-    char* memory_record_id;                     /**< 记录唯一ID */
-    size_t memory_record_id_len;                /**< ID长度 */
-    agentos_memory_type_t memory_record_type;   /**< 记忆类型 */
-    uint64_t memory_record_timestamp_ns;        /**< 时间戳 */
-    char* memory_record_source_agent;           /**< 来源Agent ID */
-    size_t memory_record_source_len;            /**< 来源长度 */
-    char* memory_record_trace_id;               /**< 关联追踪ID */
-    size_t memory_record_trace_len;             /**< 追踪ID长度 */
-    void* memory_record_data;                   /**< 记忆数据 */
-    size_t memory_record_data_len;              /**< 数据长度（字节） */
-    float memory_record_importance;             /**< 重要性（0-1） */
-    uint32_t memory_record_access_count;        /**< 访问次数 */
+    char *memory_record_id;                   /**< 记录唯一ID */
+    size_t memory_record_id_len;              /**< ID长度 */
+    agentos_memory_type_t memory_record_type; /**< 记忆类型 */
+    uint64_t memory_record_timestamp_ns;      /**< 时间戳 */
+    char *memory_record_source_agent;         /**< 来源Agent ID */
+    size_t memory_record_source_len;          /**< 来源长度 */
+    char *memory_record_trace_id;             /**< 关联追踪ID */
+    size_t memory_record_trace_len;           /**< 追踪ID长度 */
+    void *memory_record_data;                 /**< 记忆数据 */
+    size_t memory_record_data_len;            /**< 数据长度（字节） */
+    float memory_record_importance;           /**< 重要性（0-1） */
+    uint32_t memory_record_access_count;      /**< 访问次数 */
 } agentos_memory_record_t;
 
 /**
  * @brief 记忆查询条件
  */
 typedef struct agentos_memory_query {
-    char* memory_query_text;                 /**< 查询文本 */
-    size_t memory_query_text_len;            /**< 文本长度 */
-    uint64_t memory_query_start_time;        /**< 起始时间（0表示不限制） */
-    uint64_t memory_query_end_time;          /**< 结束时间 */
-    char* memory_query_source_agent;         /**< 来源Agent（NULL表示不限） */
-    char* memory_query_trace_id;             /**< 关联追踪ID */
-    uint32_t memory_query_limit;             /**< 返回结果数量上限 */
-    uint32_t memory_query_offset;            /**< 偏移量 */
-    uint8_t memory_query_include_raw;        /**< 是否包含原始数据 */
+    char *memory_query_text;          /**< 查询文本 */
+    size_t memory_query_text_len;     /**< 文本长度 */
+    uint64_t memory_query_start_time; /**< 起始时间（0表示不限制） */
+    uint64_t memory_query_end_time;   /**< 结束时间 */
+    char *memory_query_source_agent;  /**< 来源Agent（NULL表示不限） */
+    char *memory_query_trace_id;      /**< 关联追踪ID */
+    uint32_t memory_query_limit;      /**< 返回结果数量上限 */
+    uint32_t memory_query_offset;     /**< 偏移量 */
+    uint8_t memory_query_include_raw; /**< 是否包含原始数据 */
 } agentos_memory_query_t;
 
 /**
  * @brief 检索结果项
  */
 typedef struct agentos_memory_result_item {
-    char* memory_result_item_record_id;
+    char *memory_result_item_record_id;
     float memory_result_item_score;
-    agentos_memory_record_t* memory_result_item_record;
+    agentos_memory_record_t *memory_result_item_record;
 } agentos_memory_result_item_t;
 
 typedef struct agentos_memory_result_ext {
-    agentos_memory_result_item_t** memory_result_items;
+    agentos_memory_result_item_t **memory_result_items;
     size_t memory_result_count;
     uint64_t memory_result_query_time_ns;
 } agentos_memory_result_ext_t;
@@ -91,9 +92,8 @@ typedef struct agentos_memory_result_ext {
  * @reentrant 否
  * @see agentos_memory_destroy()
  */
-AGENTOS_API agentos_error_t agentos_memory_create(
-    const char* config_path,
-    agentos_memory_engine_t** out_engine);
+AGENTOS_API agentos_error_t agentos_memory_create(const char *config_path,
+                                                  agentos_memory_engine_t **out_engine);
 
 /**
  * @brief 销毁记忆引擎
@@ -105,7 +105,7 @@ AGENTOS_API agentos_error_t agentos_memory_create(
  * @reentrant 否
  * @see agentos_memory_create()
  */
-AGENTOS_API void agentos_memory_destroy(agentos_memory_engine_t* engine);
+AGENTOS_API void agentos_memory_destroy(agentos_memory_engine_t *engine);
 
 /**
  * @brief 写入记忆记录
@@ -119,10 +119,9 @@ AGENTOS_API void agentos_memory_destroy(agentos_memory_engine_t* engine);
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_memory_write(
-    agentos_memory_engine_t* engine,
-    const agentos_memory_record_t* record,
-    char** out_record_id);
+AGENTOS_API agentos_error_t agentos_memory_write(agentos_memory_engine_t *engine,
+                                                 const agentos_memory_record_t *record,
+                                                 char **out_record_id);
 
 /**
  * @brief 查询记忆
@@ -137,10 +136,9 @@ AGENTOS_API agentos_error_t agentos_memory_write(
  * @reentrant 否
  * @see agentos_memory_result_free()
  */
-AGENTOS_API agentos_error_t agentos_memory_query(
-    agentos_memory_engine_t* engine,
-    const agentos_memory_query_t* query,
-    agentos_memory_result_ext_t** out_result);
+AGENTOS_API agentos_error_t agentos_memory_query(agentos_memory_engine_t *engine,
+                                                 const agentos_memory_query_t *query,
+                                                 agentos_memory_result_ext_t **out_result);
 
 /**
  * @brief 根据ID获取记忆记录
@@ -163,11 +161,9 @@ AGENTOS_API agentos_error_t agentos_memory_query(
  *
  * @see agentos_memory_record_free()
  */
-AGENTOS_API agentos_error_t agentos_memory_get(
-    agentos_memory_engine_t* engine,
-    const char* record_id,
-    int include_raw,
-    agentos_memory_record_t** out_record);
+AGENTOS_API agentos_error_t agentos_memory_get(agentos_memory_engine_t *engine,
+                                               const char *record_id, int include_raw,
+                                               agentos_memory_record_t **out_record);
 
 /**
  * @brief 挂载记忆到当前上下文（相当于通知引擎该记忆被使用）
@@ -180,10 +176,8 @@ AGENTOS_API agentos_error_t agentos_memory_get(
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_memory_mount(
-    agentos_memory_engine_t* engine,
-    const char* record_id,
-    const char* context);
+AGENTOS_API agentos_error_t agentos_memory_mount(agentos_memory_engine_t *engine,
+                                                 const char *record_id, const char *context);
 
 /**
  * @brief 释放记忆结果
@@ -195,7 +189,7 @@ AGENTOS_API agentos_error_t agentos_memory_mount(
  * @reentrant 否
  * @see agentos_memory_query()
  */
-AGENTOS_API void agentos_memory_result_free(agentos_memory_result_ext_t* result);
+AGENTOS_API void agentos_memory_result_free(agentos_memory_result_ext_t *result);
 
 /**
  * @brief 释放单个记忆记录
@@ -207,7 +201,7 @@ AGENTOS_API void agentos_memory_result_free(agentos_memory_result_ext_t* result)
  * @reentrant 否
  * @see agentos_memory_get()
  */
-AGENTOS_API void agentos_memory_record_free(agentos_memory_record_t* record);
+AGENTOS_API void agentos_memory_record_free(agentos_memory_record_t *record);
 
 /**
  * @brief 触发记忆进化（模式挖掘）
@@ -219,9 +213,7 @@ AGENTOS_API void agentos_memory_record_free(agentos_memory_record_t* record);
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_memory_evolve(
-    agentos_memory_engine_t* engine,
-    int force);
+AGENTOS_API agentos_error_t agentos_memory_evolve(agentos_memory_engine_t *engine, int force);
 
 /**
  * @brief 获取记忆引擎健康状态
@@ -234,9 +226,8 @@ AGENTOS_API agentos_error_t agentos_memory_evolve(
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_memory_health_check(
-    agentos_memory_engine_t* engine,
-    char** out_json);
+AGENTOS_API agentos_error_t agentos_memory_health_check(agentos_memory_engine_t *engine,
+                                                        char **out_json);
 
 #ifdef __cplusplus
 }

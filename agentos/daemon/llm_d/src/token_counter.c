@@ -5,11 +5,12 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "token_counter.h"
 #include "svc_logger.h"
+#include "token_counter.h"
+
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stddef.h>
 
 #ifndef HAVE_TIKTOKEN
 #include "token_standard.h"
@@ -19,13 +20,15 @@
 #include <tiktoken.h>
 
 struct token_counter {
-    tiktoken_t* enc;
-    char* encoding_name;
+    tiktoken_t *enc;
+    char *encoding_name;
 };
 
-token_counter_t* token_counter_create(const char* encoding_name) {
-    token_counter_t* tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
-    if (!tc) return NULL;
+token_counter_t *token_counter_create(const char *encoding_name)
+{
+    token_counter_t *tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
+    if (!tc)
+        return NULL;
     tc->enc = tiktoken_get_encoding(encoding_name);
     if (!tc->enc) {
         SVC_LOG_ERROR("Failed to get encoding %s", encoding_name);
@@ -36,27 +39,33 @@ token_counter_t* token_counter_create(const char* encoding_name) {
     return tc;
 }
 
-void token_counter_destroy(token_counter_t* tc) {
-    if (!tc) return;
+void token_counter_destroy(token_counter_t *tc)
+{
+    if (!tc)
+        return;
     tiktoken_free(tc->enc);
     AGENTOS_FREE(tc->encoding_name);
     AGENTOS_FREE(tc);
 }
 
-size_t token_counter_count(token_counter_t* tc, const char* text) {
-    if (!tc || !text) return (size_t)-1;
+size_t token_counter_count(token_counter_t *tc, const char *text)
+{
+    if (!tc || !text)
+        return (size_t)-1;
     return tiktoken_count_tokens(tc->enc, text);
 }
 
 #else
 
 struct token_counter {
-    char* encoding_name;
+    char *encoding_name;
     agentos_token_config_t config;
 };
 
-static agentos_token_model_t encoding_to_model_type(const char* enc) {
-    if (!enc) return AGENTOS_TOKEN_MODEL_GPT4;
+static agentos_token_model_t encoding_to_model_type(const char *enc)
+{
+    if (!enc)
+        return AGENTOS_TOKEN_MODEL_GPT4;
 
     if (strstr(enc, "cl100k") || strstr(enc, "o200k"))
         return AGENTOS_TOKEN_MODEL_GPT4;
@@ -70,9 +79,11 @@ static agentos_token_model_t encoding_to_model_type(const char* enc) {
     return AGENTOS_TOKEN_MODEL_GENERIC;
 }
 
-token_counter_t* token_counter_create(const char* encoding_name) {
-    token_counter_t* tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
-    if (!tc) return NULL;
+token_counter_t *token_counter_create(const char *encoding_name)
+{
+    token_counter_t *tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
+    if (!tc)
+        return NULL;
 
     tc->encoding_name = AGENTOS_STRDUP(encoding_name ? encoding_name : "cl100k_base");
 
@@ -89,15 +100,20 @@ token_counter_t* token_counter_create(const char* encoding_name) {
     return tc;
 }
 
-void token_counter_destroy(token_counter_t* tc) {
-    if (!tc) return;
+void token_counter_destroy(token_counter_t *tc)
+{
+    if (!tc)
+        return;
     AGENTOS_FREE(tc->encoding_name);
     AGENTOS_FREE(tc);
 }
 
-size_t token_counter_count(token_counter_t* tc, const char* text) {
-    if (!tc) return (size_t)-1;
-    if (!text || text[0] == '\0') return 0;
+size_t token_counter_count(token_counter_t *tc, const char *text)
+{
+    if (!tc)
+        return (size_t)-1;
+    if (!text || text[0] == '\0')
+        return 0;
 
     size_t count = agentos_token_standard_count(text, 0, &tc->config);
 

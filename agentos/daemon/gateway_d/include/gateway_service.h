@@ -24,6 +24,7 @@
 #define AGENTOS_DAEMON_GATEWAY_SERVICE_H
 
 #include "svc_common.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -37,9 +38,9 @@ extern "C" {
  * @brief 网关类型枚举
  */
 typedef enum {
-    GATEWAY_DAEMON_TYPE_HTTP = 0,   /**< HTTP网关 */
-    GATEWAY_DAEMON_TYPE_WS,         /**< WebSocket网关 */
-    GATEWAY_DAEMON_TYPE_STDIO       /**< Stdio网关 */
+    GATEWAY_DAEMON_TYPE_HTTP = 0, /**< HTTP网关 */
+    GATEWAY_DAEMON_TYPE_WS,       /**< WebSocket网关 */
+    GATEWAY_DAEMON_TYPE_STDIO     /**< Stdio网关 */
 } gateway_daemon_type_t;
 
 /* ==================== 网关配置 ==================== */
@@ -48,28 +49,28 @@ typedef enum {
  * @brief 单个网关配置
  */
 typedef struct {
-    gateway_daemon_type_t type;     /**< 网关类型 */
-    const char* host;               /**< 监听地址 */
-    uint16_t port;                  /**< 监听端口 */
-    bool enabled;                   /**< 是否启用 */
-    size_t max_request_size;        /**< 最大请求大小 */
-    uint32_t timeout_ms;            /**< 超时时间 */
+    gateway_daemon_type_t type; /**< 网关类型 */
+    const char *host;           /**< 监听地址 */
+    uint16_t port;              /**< 监听端口 */
+    bool enabled;               /**< 是否启用 */
+    size_t max_request_size;    /**< 最大请求大小 */
+    uint32_t timeout_ms;        /**< 超时时间 */
 } gateway_daemon_config_t;
 
 /**
  * @brief 网关服务配置
  */
 typedef struct {
-    const char* name;                       /**< 服务名称 */
-    const char* version;                    /**< 服务版本 */
-    
-    gateway_daemon_config_t http;           /**< HTTP网关配置 */
-    gateway_daemon_config_t ws;             /**< WebSocket网关配置 */
-    gateway_daemon_config_t stdio;          /**< Stdio网关配置 */
-    
-    bool enable_metrics;                    /**< 启用指标收集 */
-    bool enable_tracing;                    /**< 启用追踪 */
-    uint32_t shutdown_timeout_ms;           /**< 关闭超时 */
+    const char *name;    /**< 服务名称 */
+    const char *version; /**< 服务版本 */
+
+    gateway_daemon_config_t http;  /**< HTTP网关配置 */
+    gateway_daemon_config_t ws;    /**< WebSocket网关配置 */
+    gateway_daemon_config_t stdio; /**< Stdio网关配置 */
+
+    bool enable_metrics;          /**< 启用指标收集 */
+    bool enable_tracing;          /**< 启用追踪 */
+    uint32_t shutdown_timeout_ms; /**< 关闭超时 */
 } gateway_service_config_t;
 
 /* ==================== 网关服务句柄 ==================== */
@@ -77,7 +78,7 @@ typedef struct {
 /**
  * @brief 网关服务句柄
  */
-typedef struct gateway_service_s* gateway_service_t;
+typedef struct gateway_service_s *gateway_service_t;
 
 /* ==================== 服务生命周期 ==================== */
 
@@ -87,10 +88,8 @@ typedef struct gateway_service_s* gateway_service_t;
  * @param[in] config 服务配置
  * @return AGENTOS_SUCCESS 成功
  */
-AGENTOS_API agentos_error_t gateway_service_create(
-    gateway_service_t* service,
-    const gateway_service_config_t* config
-);
+AGENTOS_API agentos_error_t gateway_service_create(gateway_service_t *service,
+                                                   const gateway_service_config_t *config);
 
 /**
  * @brief 销毁网关服务
@@ -118,10 +117,7 @@ AGENTOS_API agentos_error_t gateway_service_start(gateway_service_t service);
  * @param[in] force 是否强制停止
  * @return AGENTOS_SUCCESS 成功
  */
-AGENTOS_API agentos_error_t gateway_service_stop(
-    gateway_service_t service,
-    bool force
-);
+AGENTOS_API agentos_error_t gateway_service_stop(gateway_service_t service, bool force);
 
 /* ==================== 状态查询 ==================== */
 
@@ -145,10 +141,8 @@ AGENTOS_API bool gateway_service_is_running(gateway_service_t service);
  * @param[out] stats 统计信息输出
  * @return AGENTOS_SUCCESS 成功
  */
-AGENTOS_API agentos_error_t gateway_service_get_stats(
-    gateway_service_t service,
-    agentos_svc_stats_t* stats
-);
+AGENTOS_API agentos_error_t gateway_service_get_stats(gateway_service_t service,
+                                                      agentos_svc_stats_t *stats);
 
 /**
  * @brief 执行健康检查
@@ -165,16 +159,14 @@ AGENTOS_API agentos_error_t gateway_service_healthcheck(gateway_service_t servic
  * @param[in] config_path 配置文件路径
  * @return AGENTOS_SUCCESS 成功
  */
-AGENTOS_API agentos_error_t gateway_service_load_config(
-    gateway_service_config_t* config,
-    const char* config_path
-);
+AGENTOS_API agentos_error_t gateway_service_load_config(gateway_service_config_t *config,
+                                                        const char *config_path);
 
 /**
  * @brief 获取默认配置
  * @param[out] config 配置输出
  */
-AGENTOS_API void gateway_service_get_default_config(gateway_service_config_t* config);
+AGENTOS_API void gateway_service_get_default_config(gateway_service_config_t *config);
 
 #ifdef __cplusplus
 }

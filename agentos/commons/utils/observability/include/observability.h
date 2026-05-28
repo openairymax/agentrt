@@ -26,13 +26,13 @@ extern "C" {
  * @param trace_id 追踪ID（若为NULL则自动生成）
  * @return 设置的追踪ID
  */
-const char* agentos_log_set_trace_id(const char* trace_id);
+const char *agentos_log_set_trace_id(const char *trace_id);
 
 /**
  * @brief 获取当前追踪ID
  * @return 追踪ID，可能为NULL
  */
-const char* agentos_log_get_trace_id(void);
+const char *agentos_log_get_trace_id(void);
 
 /**
  * @brief 记录日志
@@ -42,19 +42,23 @@ const char* agentos_log_get_trace_id(void);
  * @param fmt 格式字符串
  * @param ... 参数
  */
-void agentos_log_write(int level, const char* file, int line, const char* fmt, ...);
+void agentos_log_write(int level, const char *file, int line, const char *fmt, ...);
 
 #ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...) agentos_log_write(AGENTOS_LOG_LEVEL_ERROR, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AGENTOS_LOG_ERROR(fmt, ...) \
+    agentos_log_write(AGENTOS_LOG_LEVEL_ERROR, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #endif
 #ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...)  agentos_log_write(AGENTOS_LOG_LEVEL_WARN, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AGENTOS_LOG_WARN(fmt, ...) \
+    agentos_log_write(AGENTOS_LOG_LEVEL_WARN, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #endif
 #ifndef AGENTOS_LOG_INFO
-#define AGENTOS_LOG_INFO(fmt, ...)  agentos_log_write(AGENTOS_LOG_LEVEL_INFO, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AGENTOS_LOG_INFO(fmt, ...) \
+    agentos_log_write(AGENTOS_LOG_LEVEL_INFO, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #endif
 #ifndef AGENTOS_LOG_DEBUG
-#define AGENTOS_LOG_DEBUG(fmt, ...) agentos_log_write(AGENTOS_LOG_LEVEL_DEBUG, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AGENTOS_LOG_DEBUG(fmt, ...) \
+    agentos_log_write(AGENTOS_LOG_LEVEL_DEBUG, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #endif
 
 /* ==================== 指标 ==================== */
@@ -68,13 +72,13 @@ typedef struct agentos_metrics agentos_metrics_t;
  * @brief 创建指标收集器
  * @return 收集器句柄，失败返回NULL
  */
-agentos_metrics_t* agentos_metrics_create(void);
+agentos_metrics_t *agentos_metrics_create(void);
 
 /**
  * @brief 销毁指标收集器
  * @param metrics 收集器句柄
  */
-void agentos_metrics_destroy(agentos_metrics_t* metrics);
+void agentos_metrics_destroy(agentos_metrics_t *metrics);
 
 /**
  * @brief 增加计数器
@@ -82,7 +86,7 @@ void agentos_metrics_destroy(agentos_metrics_t* metrics);
  * @param name 指标名
  * @param value 增加值
  */
-void agentos_metrics_increment(agentos_metrics_t* metrics, const char* name, uint64_t value);
+void agentos_metrics_increment(agentos_metrics_t *metrics, const char *name, uint64_t value);
 
 /**
  * @brief 设置仪表值
@@ -90,7 +94,7 @@ void agentos_metrics_increment(agentos_metrics_t* metrics, const char* name, uin
  * @param name 指标名
  * @param value 值
  */
-void agentos_metrics_gauge(agentos_metrics_t* metrics, const char* name, double value);
+void agentos_metrics_gauge(agentos_metrics_t *metrics, const char *name, double value);
 
 /**
  * @brief 记录耗时
@@ -98,14 +102,14 @@ void agentos_metrics_gauge(agentos_metrics_t* metrics, const char* name, double 
  * @param name 指标名
  * @param duration_ms 耗时（毫秒）
  */
-void agentos_metrics_timing(agentos_metrics_t* metrics, const char* name, double duration_ms);
+void agentos_metrics_timing(agentos_metrics_t *metrics, const char *name, double duration_ms);
 
 /**
  * @brief 导出指标为JSON
  * @param metrics 收集器
  * @return JSON字符串（需调用者释放），失败返回NULL
  */
-char* agentos_metrics_export(agentos_metrics_t* metrics);
+char *agentos_metrics_export(agentos_metrics_t *metrics);
 
 /* ==================== 追踪 ==================== */
 
@@ -120,13 +124,13 @@ typedef struct agentos_trace_span agentos_trace_span_t;
  * @param parent_id 父跨度ID（可为NULL）
  * @return 跨度句柄，失败返回NULL
  */
-agentos_trace_span_t* agentos_trace_begin(const char* name, const char* parent_id);
+agentos_trace_span_t *agentos_trace_begin(const char *name, const char *parent_id);
 
 /**
  * @brief 结束一个跨度
  * @param span 跨度句柄
  */
-void agentos_trace_end(agentos_trace_span_t* span);
+void agentos_trace_end(agentos_trace_span_t *span);
 
 /**
  * @brief 向跨度添加事件
@@ -134,13 +138,13 @@ void agentos_trace_end(agentos_trace_span_t* span);
  * @param name 事件名
  * @param attributes JSON格式的属性（可为NULL）
  */
-void agentos_trace_add_event(agentos_trace_span_t* span, const char* name, const char* attributes);
+void agentos_trace_add_event(agentos_trace_span_t *span, const char *name, const char *attributes);
 
 /**
  * @brief 导出追踪数据为JSON（通常用于调试）
  * @return JSON字符串（需调用者释放），失败返回NULL
  */
-char* agentos_trace_export(void);
+char *agentos_trace_export(void);
 
 #ifdef __cplusplus
 }

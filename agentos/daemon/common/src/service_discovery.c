@@ -10,20 +10,22 @@
  */
 
 #include "service_discovery.h"
-#include "svc_logger.h"
-#include "platform.h"
-#include "error.h"
-#include "daemon_errors.h"
-#include "safe_string_utils.h"
 
+
+#include "daemon_errors.h"
+#include "error.h"
 #include "memory_compat.h"
+#include "platform.h"
+#include "safe_string_utils.h"
+#include "svc_logger.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 /* ==================== 内部常量 ==================== */
 
-#define SD_MAX_CALLBACKS    8
+#define SD_MAX_CALLBACKS 8
 #define SD_REGISTRY_VERSION 1
 #define SD_SHM_DEFAULT_SIZE (1024 * 1024)
 
@@ -45,7 +47,7 @@ typedef struct {
 
 typedef struct {
     sd_event_callback_t callback;
-    void* user_data;
+    void *user_data;
 } sd_callback_entry_t;
 
 typedef struct service_discovery_s {
@@ -58,56 +60,60 @@ typedef struct service_discovery_s {
     bool running;
     agentos_mutex_t mutex;
     uint32_t rr_counter;
-    void* shm_handle;
-    void* shm_ptr;
+    void *shm_handle;
+    void *shm_ptr;
     bool is_shm_owner;
 } sd_internal_t;
 
 /* ==================== 辅助函数 ==================== */
 
-static int32_t find_service_index(sd_internal_t* sd, const char* name) {
+static int32_t find_service_index(sd_internal_t *sd, const char *name)
+{
     for (uint32_t i = 0; i < sd->service_count; i++) {
         if (strcmp(sd->services[i].name, name) == 0)
             return (int32_t)i;
     }
-    return -1;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "service_discovery: service not found");
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
-static int32_t find_instance_index(sd_service_entry_t* entry, const char* instance_id) {
+static int32_t find_instance_index(sd_service_entry_t *entry, const char *instance_id)
+{
     for (uint32_t i = 0; i < entry->instance_count; i++) {
         if (strcmp(entry->instances[i].instance_id, instance_id) == 0)
             return (int32_t)i;
     }
-    return -1;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "service_discovery: no healthy instances");
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
-static void notify_event(
-    sd_internal_t* sd,
-    sd_event_type_t event,
-    const char* service_name,
-    const sd_instance_t* instance
-) {
+static void notify_event(sd_internal_t *sd, sd_event_type_t event, const char *service_name,
+                         const sd_instance_t *instance)
+{
     for (uint32_t i = 0; i < sd->callback_count; i++) {
         if (sd->callbacks[i].callback) {
-            sd->callbacks[i].callback(event, service_name, instance,
-                                      sd->callbacks[i].user_data);
+            sd->callbacks[i].callback(event, service_name, instance, sd->callbacks[i].user_data);
         }
     }
 }
 
-static bool is_instance_expired(const sd_instance_t* inst, uint32_t expire_ms) {
-    if (expire_ms == 0) return false;
+static bool is_instance_expired(const sd_instance_t *inst, uint32_t expire_ms)
+{
+    if (expire_ms == 0)
+        return false;
     uint64_t now = agentos_platform_get_time_ms();
     return (now - inst->last_heartbeat) > expire_ms;
 }
 
-static void expire_stale_instances(sd_internal_t* sd) {
-    if (!sd->config.enable_auto_expire) return;
+static void expire_stale_instances(sd_internal_t *sd)
+{
+    if (!sd->config.enable_auto_expire)
+        return;
 
     uint64_t now = agentos_platform_get_time_ms();
     for (uint32_t i = 0; i < sd->service_count; i++) {
-        sd_service_entry_t* entry = &sd->services[i];
-        for (uint32_t j = 0; j < entry->instance_count; ) {
+        sd_service_entry_t *entry = &sd->services[i];
+        for (uint32_t j = 0; j < entry->instance_count;) {
             if (is_instance_expired(&entry->instances[j], sd->config.expire_timeout_ms)) {
                 sd_instance_t expired = entry->instances[j];
                 LOG_WARN("Instance '%s' of service '%s' expired (last heartbeat %llums ago)",
@@ -142,12 +148,13 @@ static void expire_stale_instances(sd_internal_t* sd) {
 
 /* ==================== 负载均衡选择 ==================== */
 
-static agentos_error_t lb_round_robin(
-    sd_internal_t* sd,
-    const sd_service_entry_t* entry,
-    sd_instance_t* result
-) {
-    if (entry->instance_count == 0) return AGENTOS_ENOENT;
+static agentos_error_t lb_round_robin(sd_internal_t *sd, const sd_service_entry_t *entry,
+                                      sd_instance_t *result)
+{
+    if (entry->instance_count == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: endpoint not found");
+        return AGENTOS_ENOENT;
+    }
 
     uint32_t start = sd->rr_counter % entry->instance_count;
     for (uint32_t i = 0; i < entry->instance_count; i++) {
@@ -161,22 +168,24 @@ static agentos_error_t lb_round_robin(
     return AGENTOS_ENOENT;
 }
 
-static agentos_error_t lb_weighted(
-    const sd_service_entry_t* entry,
-    sd_instance_t* result
-) {
+static agentos_error_t lb_weighted(const sd_service_entry_t *entry, sd_instance_t *result)
+{
     uint32_t total_weight = 0;
     for (uint32_t i = 0; i < entry->instance_count; i++) {
         if (entry->instances[i].healthy) {
             total_weight += entry->instances[i].weight;
         }
     }
-    if (total_weight == 0) return AGENTOS_ENOENT;
+    if (total_weight == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: no endpoints registered");
+        return AGENTOS_ENOENT;
+    }
 
-    uint32_t random_val = (uint32_t)(rand() % total_weight);
+    uint32_t random_val = agentos_random_uint32(0, total_weight - 1);
     uint32_t cumulative = 0;
     for (uint32_t i = 0; i < entry->instance_count; i++) {
-        if (!entry->instances[i].healthy) continue;
+        if (!entry->instances[i].healthy)
+            continue;
         cumulative += entry->instances[i].weight;
         if (random_val < cumulative) {
             memcpy(result, &entry->instances[i], sizeof(sd_instance_t));
@@ -190,40 +199,43 @@ static agentos_error_t lb_weighted(
             return AGENTOS_SUCCESS;
         }
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: service not registered");
     return AGENTOS_ENOENT;
 }
 
-static agentos_error_t lb_least_connection(
-    const sd_service_entry_t* entry,
-    sd_instance_t* result
-) {
+static agentos_error_t lb_least_connection(const sd_service_entry_t *entry, sd_instance_t *result)
+{
     int32_t best_idx = -1;
     uint32_t min_conn = UINT32_MAX;
 
     for (uint32_t i = 0; i < entry->instance_count; i++) {
-        if (!entry->instances[i].healthy) continue;
+        if (!entry->instances[i].healthy)
+            continue;
         if (entry->instances[i].active_connections < min_conn) {
             min_conn = entry->instances[i].active_connections;
             best_idx = (int32_t)i;
         }
     }
 
-    if (best_idx < 0) return AGENTOS_ENOENT;
+    if (best_idx < 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: health check failed");
+        return AGENTOS_ENOENT;
+    }
     memcpy(result, &entry->instances[best_idx], sizeof(sd_instance_t));
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t lb_random(
-    const sd_service_entry_t* entry,
-    sd_instance_t* result
-) {
+static agentos_error_t lb_random(const sd_service_entry_t *entry, sd_instance_t *result)
+{
     uint32_t healthy_count = 0;
     for (uint32_t i = 0; i < entry->instance_count; i++) {
-        if (entry->instances[i].healthy) healthy_count++;
+        if (entry->instances[i].healthy)
+            healthy_count++;
     }
-    if (healthy_count == 0) return AGENTOS_ENOENT;
+    if (healthy_count == 0)
+        return AGENTOS_ENOENT;
 
-    uint32_t idx = (uint32_t)(rand() % healthy_count);
+    uint32_t idx = agentos_random_uint32(0, healthy_count - 1);
     uint32_t count = 0;
     for (uint32_t i = 0; i < entry->instance_count; i++) {
         if (entry->instances[i].healthy) {
@@ -237,32 +249,34 @@ static agentos_error_t lb_random(
     return AGENTOS_ENOENT;
 }
 
-static agentos_error_t lb_least_load(
-    const sd_service_entry_t* entry,
-    sd_instance_t* result
-) {
+static agentos_error_t lb_least_load(const sd_service_entry_t *entry, sd_instance_t *result)
+{
     int32_t best_idx = -1;
     uint32_t min_load = UINT32_MAX;
 
     for (uint32_t i = 0; i < entry->instance_count; i++) {
-        if (!entry->instances[i].healthy) continue;
-        uint32_t load = entry->instances[i].max_connections > 0
-            ? entry->instances[i].active_connections * 100 / entry->instances[i].max_connections
-            : 0;
+        if (!entry->instances[i].healthy)
+            continue;
+        uint32_t load =
+            entry->instances[i].max_connections > 0
+                ? entry->instances[i].active_connections * 100 / entry->instances[i].max_connections
+                : 0;
         if (load < min_load) {
             min_load = load;
             best_idx = (int32_t)i;
         }
     }
 
-    if (best_idx < 0) return AGENTOS_ENOENT;
+    if (best_idx < 0)
+        return AGENTOS_ENOENT;
     memcpy(result, &entry->instances[best_idx], sizeof(sd_instance_t));
     return AGENTOS_SUCCESS;
 }
 
 /* ==================== 公共API实现 ==================== */
 
-AGENTOS_API sd_config_t sd_create_default_config(void) {
+AGENTOS_API sd_config_t sd_create_default_config(void)
+{
     sd_config_t config;
     memset(&config, 0, sizeof(sd_config_t));
     config.heartbeat_interval_ms = SD_DEFAULT_HEARTBEAT_MS;
@@ -275,15 +289,11 @@ AGENTOS_API sd_config_t sd_create_default_config(void) {
     return config;
 }
 
-AGENTOS_API service_discovery_t sd_create(const sd_config_t* config) {
-    static int rng_seeded = 0;
-    if (!rng_seeded) {
-        srand((unsigned int)time(NULL) ^ (unsigned int)(uintptr_t)&rng_seeded);
-        rng_seeded = 1;
-    }
-
-    sd_internal_t* sd = (sd_internal_t*)AGENTOS_CALLOC(1, sizeof(sd_internal_t));
-    if (!sd) return NULL;
+AGENTOS_API service_discovery_t sd_create(const sd_config_t *config)
+{
+    sd_internal_t *sd = (sd_internal_t *)AGENTOS_CALLOC(1, sizeof(sd_internal_t));
+    if (!sd)
+        return NULL;
 
     if (config) {
         memcpy(&sd->config, config, sizeof(sd_config_t));
@@ -307,10 +317,12 @@ AGENTOS_API service_discovery_t sd_create(const sd_config_t* config) {
     return (service_discovery_t)sd;
 }
 
-AGENTOS_API void sd_destroy(service_discovery_t sd_handle) {
-    if (!sd_handle) return;
+AGENTOS_API void sd_destroy(service_discovery_t sd_handle)
+{
+    if (!sd_handle)
+        return;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     if (sd->running) {
         sd_stop(sd_handle);
@@ -326,10 +338,12 @@ AGENTOS_API void sd_destroy(service_discovery_t sd_handle) {
     LOG_INFO("Service discovery instance destroyed");
 }
 
-AGENTOS_API agentos_error_t sd_start(service_discovery_t sd_handle) {
-    if (!sd_handle) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_start(service_discovery_t sd_handle)
+{
+    if (!sd_handle)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
     if (sd->running) {
@@ -345,10 +359,12 @@ AGENTOS_API agentos_error_t sd_start(service_discovery_t sd_handle) {
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_stop(service_discovery_t sd_handle) {
-    if (!sd_handle) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_stop(service_discovery_t sd_handle)
+{
+    if (!sd_handle)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
     sd->running = false;
@@ -360,23 +376,19 @@ AGENTOS_API agentos_error_t sd_stop(service_discovery_t sd_handle) {
 
 /* ==================== 服务注册 ==================== */
 
-AGENTOS_API agentos_error_t sd_register(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    const char* service_type,
-    const sd_instance_t* instance,
-    const char* tags,
-    const char* dependencies
-) {
+AGENTOS_API agentos_error_t sd_register(service_discovery_t sd_handle, const char *service_name,
+                                        const char *service_type, const sd_instance_t *instance,
+                                        const char *tags, const char *dependencies)
+{
     if (!sd_handle || !service_name || !service_type || !instance)
         return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
-    sd_service_entry_t* entry = NULL;
+    sd_service_entry_t *entry = NULL;
 
     if (svc_idx >= 0) {
         entry = &sd->services[svc_idx];
@@ -391,8 +403,10 @@ AGENTOS_API agentos_error_t sd_register(
         memset(entry, 0, sizeof(sd_service_entry_t));
         safe_strcpy(entry->name, service_name, SD_MAX_NAME_LEN);
         safe_strcpy(entry->service_type, service_type, SD_MAX_TYPE_LEN);
-        if (tags) safe_strcpy(entry->tags, tags, SD_MAX_TAGS_LEN);
-        if (dependencies) safe_strcpy(entry->dependencies, dependencies, SD_MAX_DEPS_LEN);
+        if (tags)
+            safe_strcpy(entry->tags, tags, SD_MAX_TAGS_LEN);
+        if (dependencies)
+            safe_strcpy(entry->dependencies, dependencies, SD_MAX_DEPS_LEN);
         entry->active = true;
         entry->last_updated = agentos_platform_get_time_ms();
         sd->service_count++;
@@ -403,10 +417,9 @@ AGENTOS_API agentos_error_t sd_register(
     if (inst_idx >= 0) {
         memcpy(&entry->instances[inst_idx], instance, sizeof(sd_instance_t));
         entry->instances[inst_idx].last_heartbeat = agentos_platform_get_time_ms();
-        entry->instances[inst_idx].register_time =
-            entry->instances[inst_idx].register_time > 0
-                ? entry->instances[inst_idx].register_time
-                : agentos_platform_get_time_ms();
+        entry->instances[inst_idx].register_time = entry->instances[inst_idx].register_time > 0
+                                                       ? entry->instances[inst_idx].register_time
+                                                       : agentos_platform_get_time_ms();
     } else {
         if (entry->instance_count >= SD_MAX_INSTANCES) {
             agentos_mutex_unlock(&sd->mutex);
@@ -437,19 +450,18 @@ AGENTOS_API agentos_error_t sd_register(
 
     notify_event(sd, SD_EVENT_REGISTERED, service_name, instance);
 
-    LOG_INFO("Service '%s' instance '%s' registered (type=%s, endpoint=%s)",
-             service_name, instance->instance_id, service_type, instance->endpoint);
+    LOG_INFO("Service '%s' instance '%s' registered (type=%s, endpoint=%s)", service_name,
+             instance->instance_id, service_type, instance->endpoint);
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_deregister(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    const char* instance_id
-) {
-    if (!sd_handle || !service_name || !instance_id) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_deregister(service_discovery_t sd_handle, const char *service_name,
+                                          const char *instance_id)
+{
+    if (!sd_handle || !service_name || !instance_id)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -459,7 +471,7 @@ AGENTOS_API agentos_error_t sd_deregister(
         return AGENTOS_ENOENT;
     }
 
-    sd_service_entry_t* entry = &sd->services[svc_idx];
+    sd_service_entry_t *entry = &sd->services[svc_idx];
     int32_t inst_idx = find_instance_index(entry, instance_id);
     if (inst_idx < 0) {
         agentos_mutex_unlock(&sd->mutex);
@@ -488,13 +500,13 @@ AGENTOS_API agentos_error_t sd_deregister(
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_deregister_all(
-    service_discovery_t sd_handle,
-    const char* service_name
-) {
-    if (!sd_handle || !service_name) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_deregister_all(service_discovery_t sd_handle,
+                                              const char *service_name)
+{
+    if (!sd_handle || !service_name)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -515,17 +527,14 @@ AGENTOS_API agentos_error_t sd_deregister_all(
 
 /* ==================== 服务发现 ==================== */
 
-AGENTOS_API agentos_error_t sd_discover(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    sd_instance_t* instances,
-    uint32_t max_count,
-    uint32_t* found_count
-) {
+AGENTOS_API agentos_error_t sd_discover(service_discovery_t sd_handle, const char *service_name,
+                                        sd_instance_t *instances, uint32_t max_count,
+                                        uint32_t *found_count)
+{
     if (!sd_handle || !service_name || !instances || !found_count)
         return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -538,7 +547,7 @@ AGENTOS_API agentos_error_t sd_discover(
         return AGENTOS_ENOENT;
     }
 
-    sd_service_entry_t* entry = &sd->services[svc_idx];
+    sd_service_entry_t *entry = &sd->services[svc_idx];
     uint32_t count = 0;
     for (uint32_t i = 0; i < entry->instance_count && count < max_count; i++) {
         if (entry->instances[i].healthy) {
@@ -556,17 +565,15 @@ AGENTOS_API agentos_error_t sd_discover(
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_discover_by_type(
-    service_discovery_t sd_handle,
-    const char* service_type,
-    sd_service_entry_t* entries,
-    uint32_t max_count,
-    uint32_t* found_count
-) {
+AGENTOS_API agentos_error_t sd_discover_by_type(service_discovery_t sd_handle,
+                                                const char *service_type,
+                                                sd_service_entry_t *entries, uint32_t max_count,
+                                                uint32_t *found_count)
+{
     if (!sd_handle || !service_type || !entries || !found_count)
         return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -588,17 +595,14 @@ AGENTOS_API agentos_error_t sd_discover_by_type(
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_discover_by_tags(
-    service_discovery_t sd_handle,
-    const char* tags,
-    sd_service_entry_t* entries,
-    uint32_t max_count,
-    uint32_t* found_count
-) {
+AGENTOS_API agentos_error_t sd_discover_by_tags(service_discovery_t sd_handle, const char *tags,
+                                                sd_service_entry_t *entries, uint32_t max_count,
+                                                uint32_t *found_count)
+{
     if (!sd_handle || !tags || !entries || !found_count)
         return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -608,11 +612,12 @@ AGENTOS_API agentos_error_t sd_discover_by_tags(
     safe_strcpy(filter_copy, tags, sizeof(filter_copy));
 
     uint32_t count = 0;
-    char* saveptr = NULL;
-    char* token = strtok_r(filter_copy, ",", &saveptr);
+    char *saveptr = NULL;
+    char *token = strtok_r(filter_copy, ",", &saveptr);
 
     while (token && count < max_count) {
-        while (*token == ' ') token++;
+        while (*token == ' ')
+            token++;
 
         for (uint32_t i = 0; i < sd->service_count && count < max_count; i++) {
             if (strstr(sd->services[i].tags, token)) {
@@ -641,15 +646,14 @@ AGENTOS_API agentos_error_t sd_discover_by_tags(
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_select_instance(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    sd_lb_strategy_t strategy,
-    sd_instance_t* instance
-) {
-    if (!sd_handle || !service_name || !instance) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_select_instance(service_discovery_t sd_handle,
+                                               const char *service_name, sd_lb_strategy_t strategy,
+                                               sd_instance_t *instance)
+{
+    if (!sd_handle || !service_name || !instance)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -661,28 +665,28 @@ AGENTOS_API agentos_error_t sd_select_instance(
         return AGENTOS_ENOENT;
     }
 
-    sd_service_entry_t* entry = &sd->services[svc_idx];
+    sd_service_entry_t *entry = &sd->services[svc_idx];
     agentos_error_t err;
 
     switch (strategy) {
-        case SD_LB_ROUND_ROBIN:
-            err = lb_round_robin(sd, entry, instance);
-            break;
-        case SD_LB_WEIGHTED:
-            err = lb_weighted(entry, instance);
-            break;
-        case SD_LB_LEAST_CONNECTION:
-            err = lb_least_connection(entry, instance);
-            break;
-        case SD_LB_RANDOM:
-            err = lb_random(entry, instance);
-            break;
-        case SD_LB_LEAST_LOAD:
-            err = lb_least_load(entry, instance);
-            break;
-        default:
-            err = lb_round_robin(sd, entry, instance);
-            break;
+    case SD_LB_ROUND_ROBIN:
+        err = lb_round_robin(sd, entry, instance);
+        break;
+    case SD_LB_WEIGHTED:
+        err = lb_weighted(entry, instance);
+        break;
+    case SD_LB_LEAST_CONNECTION:
+        err = lb_least_connection(entry, instance);
+        break;
+    case SD_LB_RANDOM:
+        err = lb_random(entry, instance);
+        break;
+    case SD_LB_LEAST_LOAD:
+        err = lb_least_load(entry, instance);
+        break;
+    default:
+        err = lb_round_robin(sd, entry, instance);
+        break;
     }
 
     if (err == AGENTOS_SUCCESS) {
@@ -696,14 +700,13 @@ AGENTOS_API agentos_error_t sd_select_instance(
 
 /* ==================== 心跳与健康 ==================== */
 
-AGENTOS_API agentos_error_t sd_heartbeat(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    const char* instance_id
-) {
-    if (!sd_handle || !service_name || !instance_id) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_heartbeat(service_discovery_t sd_handle, const char *service_name,
+                                         const char *instance_id)
+{
+    if (!sd_handle || !service_name || !instance_id)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -713,7 +716,7 @@ AGENTOS_API agentos_error_t sd_heartbeat(
         return AGENTOS_ENOENT;
     }
 
-    sd_service_entry_t* entry = &sd->services[svc_idx];
+    sd_service_entry_t *entry = &sd->services[svc_idx];
     int32_t inst_idx = find_instance_index(entry, instance_id);
     if (inst_idx < 0) {
         agentos_mutex_unlock(&sd->mutex);
@@ -728,15 +731,14 @@ AGENTOS_API agentos_error_t sd_heartbeat(
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_update_health(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    const char* instance_id,
-    bool healthy
-) {
-    if (!sd_handle || !service_name || !instance_id) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_update_health(service_discovery_t sd_handle,
+                                             const char *service_name, const char *instance_id,
+                                             bool healthy)
+{
+    if (!sd_handle || !service_name || !instance_id)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -746,7 +748,7 @@ AGENTOS_API agentos_error_t sd_update_health(
         return AGENTOS_ENOENT;
     }
 
-    sd_service_entry_t* entry = &sd->services[svc_idx];
+    sd_service_entry_t *entry = &sd->services[svc_idx];
     int32_t inst_idx = find_instance_index(entry, instance_id);
     if (inst_idx < 0) {
         agentos_mutex_unlock(&sd->mutex);
@@ -765,26 +767,23 @@ AGENTOS_API agentos_error_t sd_update_health(
         notify_event(sd, event, service_name, &entry->instances[inst_idx]);
 
         if (!healthy) {
-            LOG_WARN("Instance '%s' of service '%s' became unhealthy",
-                     instance_id, service_name);
+            LOG_WARN("Instance '%s' of service '%s' became unhealthy", instance_id, service_name);
         } else {
-            LOG_INFO("Instance '%s' of service '%s' recovered",
-                     instance_id, service_name);
+            LOG_INFO("Instance '%s' of service '%s' recovered", instance_id, service_name);
         }
     }
 
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_update_connections(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    const char* instance_id,
-    uint32_t active_connections
-) {
-    if (!sd_handle || !service_name || !instance_id) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_update_connections(service_discovery_t sd_handle,
+                                                  const char *service_name, const char *instance_id,
+                                                  uint32_t active_connections)
+{
+    if (!sd_handle || !service_name || !instance_id)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -794,7 +793,7 @@ AGENTOS_API agentos_error_t sd_update_connections(
         return AGENTOS_ENOENT;
     }
 
-    sd_service_entry_t* entry = &sd->services[svc_idx];
+    sd_service_entry_t *entry = &sd->services[svc_idx];
     int32_t inst_idx = find_instance_index(entry, instance_id);
     if (inst_idx < 0) {
         agentos_mutex_unlock(&sd->mutex);
@@ -810,15 +809,14 @@ AGENTOS_API agentos_error_t sd_update_connections(
 
 /* ==================== 依赖管理 ==================== */
 
-AGENTOS_API agentos_error_t sd_get_dependencies(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    char* dependencies,
-    size_t max_len
-) {
-    if (!sd_handle || !service_name || !dependencies) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_get_dependencies(service_discovery_t sd_handle,
+                                                const char *service_name, char *dependencies,
+                                                size_t max_len)
+{
+    if (!sd_handle || !service_name || !dependencies)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -835,15 +833,14 @@ AGENTOS_API agentos_error_t sd_get_dependencies(
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_check_dependencies(
-    service_discovery_t sd_handle,
-    const char* service_name,
-    char* missing_deps,
-    size_t max_len
-) {
-    if (!sd_handle || !service_name) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_check_dependencies(service_discovery_t sd_handle,
+                                                  const char *service_name, char *missing_deps,
+                                                  size_t max_len)
+{
+    if (!sd_handle || !service_name)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -859,10 +856,11 @@ AGENTOS_API agentos_error_t sd_check_dependencies(
     char missing[SD_MAX_DEPS_LEN] = {0};
     size_t missing_len = 0;
 
-    char* saveptr = NULL;
-    char* token = strtok_r(deps_copy, ",", &saveptr);
+    char *saveptr = NULL;
+    char *token = strtok_r(deps_copy, ",", &saveptr);
     while (token) {
-        while (*token == ' ') token++;
+        while (*token == ' ')
+            token++;
 
         int32_t dep_idx = find_service_index(sd, token);
         bool dep_available = false;
@@ -901,14 +899,14 @@ AGENTOS_API agentos_error_t sd_check_dependencies(
 
 /* ==================== 事件与统计 ==================== */
 
-AGENTOS_API agentos_error_t sd_register_event_callback(
-    service_discovery_t sd_handle,
-    sd_event_callback_t callback,
-    void* user_data
-) {
-    if (!sd_handle || !callback) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_register_event_callback(service_discovery_t sd_handle,
+                                                       sd_event_callback_t callback,
+                                                       void *user_data)
+{
+    if (!sd_handle || !callback)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
 
@@ -926,13 +924,12 @@ AGENTOS_API agentos_error_t sd_register_event_callback(
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API agentos_error_t sd_get_stats(
-    service_discovery_t sd_handle,
-    sd_stats_t* stats
-) {
-    if (!sd_handle || !stats) return AGENTOS_EINVAL;
+AGENTOS_API agentos_error_t sd_get_stats(service_discovery_t sd_handle, sd_stats_t *stats)
+{
+    if (!sd_handle || !stats)
+        return AGENTOS_EINVAL;
 
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
     memcpy(stats, &sd->stats, sizeof(sd_stats_t));
@@ -946,9 +943,11 @@ AGENTOS_API agentos_error_t sd_get_stats(
     return AGENTOS_SUCCESS;
 }
 
-AGENTOS_API uint32_t sd_service_count(service_discovery_t sd_handle) {
-    if (!sd_handle) return 0;
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+AGENTOS_API uint32_t sd_service_count(service_discovery_t sd_handle)
+{
+    if (!sd_handle)
+        return 0;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
     uint32_t count = sd->service_count;
@@ -957,21 +956,20 @@ AGENTOS_API uint32_t sd_service_count(service_discovery_t sd_handle) {
     return count;
 }
 
-AGENTOS_API bool sd_is_running(service_discovery_t sd_handle) {
-    if (!sd_handle) return false;
-    sd_internal_t* sd = (sd_internal_t*)sd_handle;
+AGENTOS_API bool sd_is_running(service_discovery_t sd_handle)
+{
+    if (!sd_handle)
+        return false;
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
     return sd->running;
 }
 
-AGENTOS_API const char* sd_lb_strategy_to_string(sd_lb_strategy_t strategy) {
-    static const char* strategy_strings[] = {
-        "ROUND_ROBIN",
-        "WEIGHTED",
-        "LEAST_CONNECTION",
-        "RANDOM",
-        "LEAST_LOAD"
-    };
+AGENTOS_API const char *sd_lb_strategy_to_string(sd_lb_strategy_t strategy)
+{
+    static const char *strategy_strings[] = {"ROUND_ROBIN", "WEIGHTED", "LEAST_CONNECTION",
+                                             "RANDOM", "LEAST_LOAD"};
 
-    if (strategy < 0 || strategy > SD_LB_LEAST_LOAD) return "UNKNOWN";
+    if (strategy < 0 || strategy > SD_LB_LEAST_LOAD)
+        return "UNKNOWN";
     return strategy_strings[strategy];
 }

@@ -33,7 +33,7 @@ typedef enum {
 typedef struct {
     log_level_t min_level;
     log_target_t targets;
-    const char* log_file;
+    const char *log_file;
     size_t max_file_size;
     int max_files;
     bool use_colors;
@@ -45,8 +45,8 @@ typedef struct {
  * @brief 日志上下文结构体
  */
 typedef struct {
-    const char* module;
-    const char* function;
+    const char *module;
+    const char *function;
     int line;
 } log_context_t;
 
@@ -61,7 +61,7 @@ log_config_t log_create_default_config(void);
  * @param manager 日志配置
  * @return 错误码
  */
-agentos_error_t log_init(const log_config_t* manager);
+agentos_error_t log_init(const log_config_t *manager);
 
 /**
  * @brief 清理日志系统
@@ -73,13 +73,13 @@ void log_cleanup(void);
  * @param manager 日志配置
  * @return 错误码
  */
-agentos_error_t log_set_config(const log_config_t* manager);
+agentos_error_t log_set_config(const log_config_t *manager);
 
 /**
  * @brief 获取当前日志配置
  * @param manager 日志配置输出
  */
-void log_get_config(log_config_t* manager);
+void log_get_config(log_config_t *manager);
 
 /**
  * @brief 输出调试日志
@@ -87,7 +87,7 @@ void log_get_config(log_config_t* manager);
  * @param format 日志格式
  * @param ... 可变参数
  */
-void log_debug(const log_context_t* context, const char* format, ...);
+void log_debug(const log_context_t *context, const char *format, ...);
 
 /**
  * @brief 输出信息日志
@@ -95,7 +95,7 @@ void log_debug(const log_context_t* context, const char* format, ...);
  * @param format 日志格式
  * @param ... 可变参数
  */
-void log_info(const log_context_t* context, const char* format, ...);
+void log_info(const log_context_t *context, const char *format, ...);
 
 /**
  * @brief 输出警告日志
@@ -103,7 +103,7 @@ void log_info(const log_context_t* context, const char* format, ...);
  * @param format 日志格式
  * @param ... 可变参数
  */
-void log_warning(const log_context_t* context, const char* format, ...);
+void log_warning(const log_context_t *context, const char *format, ...);
 
 /**
  * @brief 输出错误日志
@@ -111,7 +111,7 @@ void log_warning(const log_context_t* context, const char* format, ...);
  * @param format 日志格式
  * @param ... 可变参数
  */
-void log_error(const log_context_t* context, const char* format, ...);
+void log_error(const log_context_t *context, const char *format, ...);
 
 /**
  * @brief 输出致命日志
@@ -119,7 +119,7 @@ void log_error(const log_context_t* context, const char* format, ...);
  * @param format 日志格式
  * @param ... 可变参数
  */
-void log_fatal(const log_context_t* context, const char* format, ...);
+void log_fatal(const log_context_t *context, const char *format, ...);
 
 /**
  * @brief 检查日志级别是否启用
@@ -148,7 +148,11 @@ void log_flush(void);
 /**
  * @brief 日志上下文宏
  */
-#define LOG_CONTEXT(module) (log_context_t){module, __FUNCTION__, __LINE__}
+#define LOG_CONTEXT(module)            \
+    (log_context_t)                    \
+    {                                  \
+        module, __FUNCTION__, __LINE__ \
+    }
 
 /**
  * @brief 日志宏
@@ -159,4 +163,4 @@ void log_flush(void);
 #define LOG_ERROR(module, format, ...) log_error(&LOG_CONTEXT(module), format, ##__VA_ARGS__)
 #define LOG_FATAL(module, format, ...) log_fatal(&LOG_CONTEXT(module), format, ##__VA_ARGS__)
 
-#endif // LOGGING_COMMON_H
+#endif  // LOGGING_COMMON_H

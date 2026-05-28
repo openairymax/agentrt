@@ -15,23 +15,23 @@
 #ifndef GATEWAY_JSONRPC_H
 #define GATEWAY_JSONRPC_H
 
-#include <stddef.h>
-#include <stdbool.h>
 #include <cjson/cJSON.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 /* ==================== JSON-RPC 2.0 标准错误码 ==================== */
 
-#define JSONRPC_PARSE_ERROR       (-32700)  /**< 解析错误 */
-#define JSONRPC_INVALID_REQUEST   (-32600)  /**< 无效请求 */
-#define JSONRPC_METHOD_NOT_FOUND  (-32601)  /**< 方法未找到 */
-#define JSONRPC_INVALID_PARAMS    (-32602)  /**< 无效参数 */
-#define JSONRPC_INTERNAL_ERROR    (-32603)  /**< 内部错误 */
+#define JSONRPC_PARSE_ERROR (-32700)      /**< 解析错误 */
+#define JSONRPC_INVALID_REQUEST (-32600)  /**< 无效请求 */
+#define JSONRPC_METHOD_NOT_FOUND (-32601) /**< 方法未找到 */
+#define JSONRPC_INVALID_PARAMS (-32602)   /**< 无效参数 */
+#define JSONRPC_INTERNAL_ERROR (-32603)   /**< 内部错误 */
 
 /* 自定义错误码范围：-32000 到 -32099 */
-#define JSONRPC_SERVER_ERROR_BASE (-32000)  /**< 服务器错误基址 */
-#define JSONRPC_RATE_LIMITED      (-32001)  /**< 请求被限流 */
-#define JSONRPC_AUTH_FAILED       (-32002)  /**< 认证失败 */
-#define JSONRPC_SESSION_EXPIRED   (-32003)  /**< 会话过期 */
+#define JSONRPC_SERVER_ERROR_BASE (-32000)   /**< 服务器错误基址 */
+#define JSONRPC_RATE_LIMITED (-32001)        /**< 请求被限流 */
+#define JSONRPC_AUTH_FAILED (-32002)         /**< 认证失败 */
+#define JSONRPC_SESSION_EXPIRED (-32003)     /**< 会话过期 */
 #define JSONRPC_SERVICE_UNAVAILABLE (-32004) /**< 服务不可用 */
 
 /* ==================== 请求验证 ==================== */
@@ -48,7 +48,7 @@
  * @return -2 无效（字段类型错误）
  * @return -3 无效（jsonrpc 版本不是 "2.0"）
  */
-int jsonrpc_validate_request(const cJSON* json);
+int jsonrpc_validate_request(const cJSON *json);
 
 /**
  * @brief 从 JSON-RPC 请求中提取方法名
@@ -57,7 +57,7 @@ int jsonrpc_validate_request(const cJSON* json);
  * @return 方法名字符串指针（不转让所有权）
  * @return NULL 如果请求无效或方法字段不存在
  */
-const char* jsonrpc_get_method(const cJSON* json);
+const char *jsonrpc_get_method(const cJSON *json);
 
 /**
  * @brief 从 JSON-RPC 请求中提取参数
@@ -66,7 +66,7 @@ const char* jsonrpc_get_method(const cJSON* json);
  * @return 参数对象指针（不转让所有权）
  * @return NULL 如果没有参数
  */
-const cJSON* jsonrpc_get_params(const cJSON* json);
+const cJSON *jsonrpc_get_params(const cJSON *json);
 
 /**
  * @brief 从 JSON-RPC 请求中提取 ID
@@ -75,7 +75,7 @@ const cJSON* jsonrpc_get_params(const cJSON* json);
  * @return ID 对象指针（不转让所有权）
  * @return NULL 如果 ID 字段不存在
  */
-const cJSON* jsonrpc_get_id(const cJSON* json);
+const cJSON *jsonrpc_get_id(const cJSON *json);
 
 /* ==================== 响应生成 ==================== */
 
@@ -97,7 +97,7 @@ const cJSON* jsonrpc_get_id(const cJSON* json);
  * @note result 对象的所有权会转移给响应
  * @note 如果 result 为 NULL，响应中会包含 null
  */
-char* jsonrpc_create_success_response(const cJSON* id, cJSON* result);
+char *jsonrpc_create_success_response(const cJSON *id, cJSON *result);
 
 /**
  * @brief 创建 JSON-RPC 2.0 错误响应
@@ -122,49 +122,44 @@ char* jsonrpc_create_success_response(const cJSON* id, cJSON* result);
  *
  * @note data 对象的所有权会转移给响应
  */
-char* jsonrpc_create_error_response(
-    const cJSON* id,
-    int code,
-    const char* message,
-    cJSON* data
-);
+char *jsonrpc_create_error_response(const cJSON *id, int code, const char *message, cJSON *data);
 
 /* ==================== 便捷响应函数 ==================== */
 
 /**
  * @brief 创建解析错误响应
  */
-char* jsonrpc_create_parse_error_response(void);
+char *jsonrpc_create_parse_error_response(void);
 
 /**
  * @brief 创建无效请求响应
  */
-char* jsonrpc_create_invalid_request_response(void);
+char *jsonrpc_create_invalid_request_response(void);
 
 /**
  * @brief 创建方法未找到响应
  */
-char* jsonrpc_create_method_not_found_response(const cJSON* id);
+char *jsonrpc_create_method_not_found_response(const cJSON *id);
 
 /**
  * @brief 创建无效参数响应
  */
-char* jsonrpc_create_invalid_params_response(const cJSON* id, const char* detail);
+char *jsonrpc_create_invalid_params_response(const cJSON *id, const char *detail);
 
 /**
  * @brief 创建内部错误响应
  */
-char* jsonrpc_create_internal_error_response(const cJSON* id, const char* detail);
+char *jsonrpc_create_internal_error_response(const cJSON *id, const char *detail);
 
 /**
  * @brief 创建限流响应
  */
-char* jsonrpc_create_rate_limited_response(const cJSON* id);
+char *jsonrpc_create_rate_limited_response(const cJSON *id);
 
 /**
  * @brief 创建认证失败响应
  */
-char* jsonrpc_create_auth_failed_response(const cJSON* id);
+char *jsonrpc_create_auth_failed_response(const cJSON *id);
 
 /* ==================== 错误消息获取 ==================== */
 
@@ -174,7 +169,7 @@ char* jsonrpc_create_auth_failed_response(const cJSON* id);
  * @param[in] code 错误码
  * @return 错误消息字符串
  */
-const char* jsonrpc_get_error_message(int code);
+const char *jsonrpc_get_error_message(int code);
 
 /* ==================== Batch Requests (PROTO-004) ==================== */
 
@@ -194,7 +189,7 @@ const char* jsonrpc_get_error_message(int code);
  * @return -3 超过最大批量大小
  * @return -4 包含无效子请求（部分成功）
  */
-int jsonrpc_validate_batch_request(const cJSON* batch_json, size_t* out_count);
+int jsonrpc_validate_batch_request(const cJSON *batch_json, size_t *out_count);
 
 /**
  * @brief 处理批量请求，返回响应数组
@@ -207,11 +202,9 @@ int jsonrpc_validate_batch_request(const cJSON* batch_json, size_t* out_count);
  * @param[in] user_data 用户数据传给handler
  * @return JSON响应数组字符串(需free)，失败返回NULL
  */
-char* jsonrpc_process_batch(
-    const cJSON* batch_json,
-    char* (*handler)(const cJSON* request, void* user_data),
-    void* user_data
-);
+char *jsonrpc_process_batch(const cJSON *batch_json,
+                            char *(*handler)(const cJSON *request, void *user_data),
+                            void *user_data);
 
 /* ==================== Notifications (PROTO-004) ==================== */
 
@@ -231,7 +224,7 @@ char* jsonrpc_process_batch(
  * @param[in] params 参数对象（可为NULL）
  * @return JSON通知字符串(需free)，失败返回NULL
  */
-char* jsonrpc_create_notification(const char* method, cJSON* params);
+char *jsonrpc_create_notification(const char *method, cJSON *params);
 
 /**
  * @brief 验证是否为通知（无id字段）
@@ -240,7 +233,7 @@ char* jsonrpc_create_notification(const char* method, cJSON* params);
  * @return true 是通知
  * @return false 不是通知或有id字段
  */
-bool jsonrpc_is_notification(const cJSON* json);
+bool jsonrpc_is_notification(const cJSON *json);
 
 /**
  * @brief 创建参数化通知（便捷函数）
@@ -249,9 +242,6 @@ bool jsonrpc_is_notification(const cJSON* json);
  * @param[in] params_json 参数JSON字符串
  * @return JSON通知字符串(需free)
  */
-char* jsonrpc_create_notification_params(
-    const char* method,
-    const char* params_json
-);
+char *jsonrpc_create_notification_params(const char *method, const char *params_json);
 
 #endif /* GATEWAY_JSONRPC_H */

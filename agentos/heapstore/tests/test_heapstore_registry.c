@@ -6,16 +6,17 @@
  * "From data intelligence emerges."
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <time.h>
-
 #include "heapstore.h"
 #include "heapstore_registry.h"
 
-static void test_registry_init_shutdown(void) {
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+static void test_registry_init_shutdown(void)
+{
     printf("Test: registry_init_shutdown...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_registry_init();
@@ -26,7 +27,8 @@ static void test_registry_init_shutdown(void) {
     printf("PASS\n");
 }
 
-static void test_registry_agent_crud(void) {
+static void test_registry_agent_crud(void)
+{
     printf("Test: registry_agent_crud...");
 
     heapstore_error_t err = heapstore_registry_init();
@@ -69,7 +71,8 @@ static void test_registry_agent_crud(void) {
     printf("PASS\n");
 }
 
-static void test_registry_skill_crud(void) {
+static void test_registry_skill_crud(void)
+{
     printf("Test: registry_skill_crud...");
 
     heapstore_error_t err = heapstore_registry_init();
@@ -101,7 +104,8 @@ static void test_registry_skill_crud(void) {
     printf("PASS\n");
 }
 
-static void test_registry_session_crud(void) {
+static void test_registry_session_crud(void)
+{
     printf("Test: registry_session_crud...");
 
     heapstore_error_t err = heapstore_registry_init();
@@ -138,7 +142,8 @@ static void test_registry_session_crud(void) {
     printf("PASS\n");
 }
 
-static void test_registry_invalid_params(void) {
+static void test_registry_invalid_params(void)
+{
     printf("Test: registry_invalid_params...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_registry_init();
@@ -164,7 +169,8 @@ static void test_registry_invalid_params(void) {
     printf("PASS\n");
 }
 
-static void test_registry_vacuum(void) {
+static void test_registry_vacuum(void)
+{
     printf("Test: registry_vacuum...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_registry_init();
@@ -177,7 +183,8 @@ static void test_registry_vacuum(void) {
     printf("PASS\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=== AgentOS heapstore Registry Unit Tests ===\n\n");
 
     test_registry_init_shutdown();
@@ -190,4 +197,3 @@ int main(void) {
     printf("\n=== All Registry Tests Passed ===\n");
     return 0;
 }
-

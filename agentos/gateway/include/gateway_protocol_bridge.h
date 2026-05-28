@@ -19,9 +19,10 @@
 #include "gateway.h"
 #include "protocol_router.h"
 #include "protocol_transformers.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,10 +47,10 @@ typedef struct {
  * Bridge Handle & Lifecycle
  * ============================================================================ */
 
-typedef struct gw_protocol_bridge_s* gw_protocol_bridge_handle_t;
+typedef struct gw_protocol_bridge_s *gw_protocol_bridge_handle_t;
 
-int gw_protocol_bridge_create(const gw_protocol_bridge_config_t* config,
-                               gw_protocol_bridge_handle_t* out_handle);
+int gw_protocol_bridge_create(const gw_protocol_bridge_config_t *config,
+                              gw_protocol_bridge_handle_t *out_handle);
 
 void gw_protocol_bridge_destroy(gw_protocol_bridge_handle_t handle);
 
@@ -70,46 +71,44 @@ typedef enum {
     GW_PROTO_COUNT
 } gw_proto_type_t;
 
-int gw_protocol_bridge_register_handler(
-    gw_protocol_bridge_handle_t bridge,
-    gw_proto_type_t proto_type,
-    const char* endpoint_pattern,
-    void* (*handler)(const void* request, size_t request_size, size_t* response_size)
-);
+int gw_protocol_bridge_register_handler(gw_protocol_bridge_handle_t bridge,
+                                        gw_proto_type_t proto_type, const char *endpoint_pattern,
+                                        void *(*handler)(const void *request, size_t request_size,
+                                                         size_t *response_size));
 
-int gw_protocol_bridge_set_default_handler(
-    gw_protocol_bridge_handle_t bridge,
-    void* (*handler)(const void* request, size_t request_size, size_t* response_size));
+int gw_protocol_bridge_set_default_handler(gw_protocol_bridge_handle_t bridge,
+                                           void *(*handler)(const void *request,
+                                                            size_t request_size,
+                                                            size_t *response_size));
 
 /* ============================================================================
  * Request Processing Pipeline
  * ============================================================================ */
 
 typedef struct {
-    const char* raw_data;
+    const char *raw_data;
     size_t raw_size;
-    const char* content_type;
-    const char* accept_type;
-    const char* path_info;
-    const char* query_string;
-    const char* x_trace_id;
-    const char* authorization;
+    const char *content_type;
+    const char *accept_type;
+    const char *path_info;
+    const char *query_string;
+    const char *x_trace_id;
+    const char *authorization;
 } gw_incoming_request_t;
 
 typedef struct {
-    char* response_data;
+    char *response_data;
     size_t response_size;
-    char* content_type;
+    char *content_type;
     int status_code;
-    char* detected_protocol;
+    char *detected_protocol;
     uint64_t process_time_ns;
     bool transformed;
 } gw_processed_response_t;
 
-int gw_protocol_bridge_process_request(
-    gw_protocol_bridge_handle_t bridge,
-    const gw_incoming_request_t* incoming,
-    gw_processed_response_t* out_response);
+int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
+                                       const gw_incoming_request_t *incoming,
+                                       gw_processed_response_t *out_response);
 
 /* ============================================================================
  * Auto-Detection
@@ -123,12 +122,9 @@ typedef struct {
     bool has_binary_payload;
 } gw_detection_result_t;
 
-int gw_protocol_bridge_detect_protocol(
-    gw_protocol_bridge_handle_t bridge,
-    const char* data,
-    size_t size,
-    const char* content_type_hint,
-    gw_detection_result_t* out_result);
+int gw_protocol_bridge_detect_protocol(gw_protocol_bridge_handle_t bridge, const char *data,
+                                       size_t size, const char *content_type_hint,
+                                       gw_detection_result_t *out_result);
 
 /* ============================================================================
  * Statistics & Diagnostics
@@ -144,29 +140,24 @@ typedef struct {
     char active_protocols[256];
 } gw_bridge_stats_t;
 
-int gw_protocol_bridge_get_stats(gw_protocol_bridge_handle_t bridge,
-                                 gw_bridge_stats_t* out_stats);
+int gw_protocol_bridge_get_stats(gw_protocol_bridge_handle_t bridge, gw_bridge_stats_t *out_stats);
 
 int gw_protocol_bridge_reset_stats(gw_protocol_bridge_handle_t bridge);
 
-char* gw_protocol_bridge_diagnose(gw_protocol_bridge_handle_t bridge);
+char *gw_protocol_bridge_diagnose(gw_protocol_bridge_handle_t bridge);
 
 /* ============================================================================
  * Registry & Extension Integration
  * ============================================================================ */
 
-int gw_protocol_bridge_list_registry_protocols(
-    gw_protocol_bridge_handle_t bridge,
-    char** protocols_json);
+int gw_protocol_bridge_list_registry_protocols(gw_protocol_bridge_handle_t bridge,
+                                               char **protocols_json);
 
-int gw_protocol_bridge_load_extensions_from_config(
-    gw_protocol_bridge_handle_t bridge,
-    const char* config_json);
+int gw_protocol_bridge_load_extensions_from_config(gw_protocol_bridge_handle_t bridge,
+                                                   const char *config_json);
 
-int gw_protocol_bridge_register_extension_adapter(
-    gw_protocol_bridge_handle_t bridge,
-    gw_proto_type_t proto_type,
-    void* handler);
+int gw_protocol_bridge_register_extension_adapter(gw_protocol_bridge_handle_t bridge,
+                                                  gw_proto_type_t proto_type, void *handler);
 
 #ifdef __cplusplus
 }

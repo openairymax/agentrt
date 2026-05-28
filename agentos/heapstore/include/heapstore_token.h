@@ -15,10 +15,11 @@
 #ifndef AGENTOS_HEAPSTORE_TOKEN_H
 #define AGENTOS_HEAPSTORE_TOKEN_H
 
+#include "heapstore.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include "heapstore.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,14 +50,14 @@ typedef enum {
  * @brief Token 统计数据结构
  */
 typedef struct {
-    uint64_t total_prompt_tokens;         /**< 总 Prompt Token 数 */
+    uint64_t total_prompt_tokens;        /**< 总 Prompt Token 数 */
     uint64_t total_completion_tokens;    /**< 总 Completion Token 数 */
     uint64_t total_system_tokens;        /**< 总 System Token 数 */
     uint64_t total_user_tokens;          /**< 总 User Token 数 */
     uint64_t tokens_saved_by_cache;      /**< 缓存节省的 Token 数 */
-    uint64_t total_write_operations;    /**< 总写入操作次数 */
-    uint64_t total_read_operations;     /**< 总读取操作次数 */
-    uint64_t total_batch_operations;    /**< 总批量操作次数 */
+    uint64_t total_write_operations;     /**< 总写入操作次数 */
+    uint64_t total_read_operations;      /**< 总读取操作次数 */
+    uint64_t total_batch_operations;     /**< 总批量操作次数 */
     uint64_t last_operation_time;        /**< 上次操作时间戳 */
     double average_tokens_per_operation; /**< 平均每次操作的 Token 数 */
 } heapstore_token_stats_t;
@@ -65,10 +66,10 @@ typedef struct {
  * @brief Token 预算配置
  */
 typedef struct {
-    uint64_t max_tokens_per_task;       /**< 任务最大 Token 数 */
-    uint64_t warning_threshold_percent; /**< 警告阈值百分比 */
+    uint64_t max_tokens_per_task;        /**< 任务最大 Token 数 */
+    uint64_t warning_threshold_percent;  /**< 警告阈值百分比 */
     uint64_t critical_threshold_percent; /**< 临界阈值百分比 */
-    bool enable_budget_enforcement;       /**< 是否强制执行预算 */
+    bool enable_budget_enforcement;      /**< 是否强制执行预算 */
 } heapstore_token_budget_t;
 
 /**
@@ -111,10 +112,8 @@ heapstore_error_t heapstore_token_shutdown(void);
  * @see heapstore_token_get_stats()
  * @since v1.0.0.6
  */
-heapstore_error_t heapstore_token_record(
-    heapstore_token_type_t type,
-    uint64_t count,
-    heapstore_token_operation_t operation);
+heapstore_error_t heapstore_token_record(heapstore_token_type_t type, uint64_t count,
+                                         heapstore_token_operation_t operation);
 
 /**
  * @brief 获取 Token 统计信息
@@ -128,7 +127,7 @@ heapstore_error_t heapstore_token_record(
  * @see heapstore_token_record()
  * @since v1.0.0.6
  */
-heapstore_error_t heapstore_token_get_stats(heapstore_token_stats_t* out_stats);
+heapstore_error_t heapstore_token_get_stats(heapstore_token_stats_t *out_stats);
 
 /**
  * @brief 重置 Token 统计
@@ -153,9 +152,8 @@ heapstore_error_t heapstore_token_reset_stats(void);
  * @see heapstore_token_check_budget()
  * @since v1.0.0.6
  */
-heapstore_error_t heapstore_token_set_budget(
-    const char* task_id,
-    const heapstore_token_budget_t* budget);
+heapstore_error_t heapstore_token_set_budget(const char *task_id,
+                                             const heapstore_token_budget_t *budget);
 
 /**
  * @brief 检查任务 Token 预算
@@ -171,10 +169,8 @@ heapstore_error_t heapstore_token_set_budget(
  * @see heapstore_token_set_budget()
  * @since v1.0.0.6
  */
-heapstore_error_t heapstore_token_check_budget(
-    const char* task_id,
-    uint64_t requested_tokens,
-    bool* allowed);
+heapstore_error_t heapstore_token_check_budget(const char *task_id, uint64_t requested_tokens,
+                                               bool *allowed);
 
 /**
  * @brief 获取任务已使用的 Token 数
@@ -186,9 +182,7 @@ heapstore_error_t heapstore_token_check_budget(
  * @threadsafe 是
  * @reentrant 是
  */
-heapstore_error_t heapstore_token_get_task_usage(
-    const char* task_id,
-    uint64_t* out_used);
+heapstore_error_t heapstore_token_get_task_usage(const char *task_id, uint64_t *out_used);
 
 /**
  * @brief 将 Token 类型转换为字符串
@@ -199,7 +193,7 @@ heapstore_error_t heapstore_token_get_task_usage(
  * @threadsafe 是
  * @reentrant 是
  */
-const char* heapstore_token_type_to_string(heapstore_token_type_t type);
+const char *heapstore_token_type_to_string(heapstore_token_type_t type);
 
 /**
  * @brief 将 Token 操作转换为字符串
@@ -210,7 +204,7 @@ const char* heapstore_token_type_to_string(heapstore_token_type_t type);
  * @threadsafe 是
  * @reentrant 是
  */
-const char* heapstore_token_op_to_string(heapstore_token_operation_t operation);
+const char *heapstore_token_op_to_string(heapstore_token_operation_t operation);
 
 #ifdef __cplusplus
 }

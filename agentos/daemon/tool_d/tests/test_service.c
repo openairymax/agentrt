@@ -4,16 +4,18 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "tool_service.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "tool_service.h"
 
-static void test_service_create_destroy(void) {
+static void test_service_create_destroy(void)
+{
     printf("  test_service_create_destroy...\n");
 
-    tool_service_t* svc = tool_service_create(NULL);
+    tool_service_t *svc = tool_service_create(NULL);
     assert(svc != NULL);
 
     tool_service_destroy(svc);
@@ -21,10 +23,11 @@ static void test_service_create_destroy(void) {
     printf("    PASSED\n");
 }
 
-static void test_service_register_tool(void) {
+static void test_service_register_tool(void)
+{
     printf("  test_service_register_tool...\n");
 
-    tool_service_t* svc = tool_service_create(NULL);
+    tool_service_t *svc = tool_service_create(NULL);
     assert(svc != NULL);
 
     tool_metadata_t meta;
@@ -43,10 +46,11 @@ static void test_service_register_tool(void) {
     printf("    PASSED\n");
 }
 
-static void test_service_list_tools(void) {
+static void test_service_list_tools(void)
+{
     printf("  test_service_list_tools...\n");
 
-    tool_service_t* svc = tool_service_create(NULL);
+    tool_service_t *svc = tool_service_create(NULL);
     assert(svc != NULL);
 
     tool_metadata_t meta1;
@@ -66,7 +70,7 @@ static void test_service_list_tools(void) {
     tool_service_register(svc, &meta1);
     tool_service_register(svc, &meta2);
 
-    char* tools_json = tool_service_list(svc);
+    char *tools_json = tool_service_list(svc);
     assert(tools_json != NULL);
     printf("    Tools: %s\n", tools_json);
     free(tools_json);
@@ -76,10 +80,11 @@ static void test_service_list_tools(void) {
     printf("    PASSED\n");
 }
 
-static void test_service_get_tool(void) {
+static void test_service_get_tool(void)
+{
     printf("  test_service_get_tool...\n");
 
-    tool_service_t* svc = tool_service_create(NULL);
+    tool_service_t *svc = tool_service_create(NULL);
     assert(svc != NULL);
 
     tool_metadata_t meta;
@@ -91,7 +96,7 @@ static void test_service_get_tool(void) {
 
     tool_service_register(svc, &meta);
 
-    tool_metadata_t* found __attribute__((unused)) = tool_service_get(svc, "get_test_tool");
+    tool_metadata_t *found __attribute__((unused)) = tool_service_get(svc, "get_test_tool");
     assert(found != NULL);
     assert(strcmp(found->name, "get_test_tool") == 0);
 
@@ -100,10 +105,11 @@ static void test_service_get_tool(void) {
     printf("    PASSED\n");
 }
 
-static void test_service_unregister_tool(void) {
+static void test_service_unregister_tool(void)
+{
     printf("  test_service_unregister_tool...\n");
 
-    tool_service_t* svc = tool_service_create(NULL);
+    tool_service_t *svc = tool_service_create(NULL);
     assert(svc != NULL);
 
     tool_metadata_t meta;
@@ -118,7 +124,7 @@ static void test_service_unregister_tool(void) {
     int ret __attribute__((unused)) = tool_service_unregister(svc, "unregister_test");
     assert(ret == 0);
 
-    tool_metadata_t* found __attribute__((unused)) = tool_service_get(svc, "unregister_test");
+    tool_metadata_t *found __attribute__((unused)) = tool_service_get(svc, "unregister_test");
     assert(found == NULL);
 
     tool_service_destroy(svc);
@@ -126,7 +132,8 @@ static void test_service_unregister_tool(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Tool Service Unit Tests\n");
     printf("=========================================\n");

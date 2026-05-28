@@ -16,16 +16,18 @@
  * 6. 监控指标：限流统计和告警
  */
 
-#include "syscalls.h"
 #include "agentos.h"
 #include "logger.h"
+#include "syscalls.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
-#include <string.h>
+
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 /* JSON解析库 */
@@ -35,23 +37,26 @@
  * @brief 令牌桶限流器
  */
 typedef struct token_bucket {
-    int capacity;              /**< 桶容量（最大令牌数） */
-    int tokens;                /**< 当前令牌数 */
-    double refill_rate;        /**< 令牌补充速率（令牌/秒） */
-    time_t last_refill;        /**< 上次补充时间 */
-    agentos_mutex_t* lock;     /**< 线程锁 */
+    int capacity;          /**< 桶容量（最大令牌数） */
+    int tokens;            /**< 当前令牌数 */
+    double refill_rate;    /**< 令牌补充速率（令牌/秒） */
+    time_t last_refill;    /**< 上次补充时间 */
+    agentos_mutex_t *lock; /**< 线程锁 */
 } token_bucket_t;
 
-static token_bucket_t* g_rate_limiter = NULL;
+static token_bucket_t *g_rate_limiter = NULL;
 
 /**
  * @brief 创建限流器
  */
-agentos_error_t agentos_sys_rate_limiter_create(int capacity, double rate) {
-    if (g_rate_limiter) return AGENTOS_EALREADY;
+agentos_error_t agentos_sys_rate_limiter_create(int capacity, double rate)
+{
+    if (g_rate_limiter)
+        return AGENTOS_EALREADY;
 
-    token_bucket_t* bucket = (token_bucket_t*)AGENTOS_CALLOC(1, sizeof(token_bucket_t));
-    if (!bucket) return AGENTOS_ENOMEM;
+    token_bucket_t *bucket = (token_bucket_t *)AGENTOS_CALLOC(1, sizeof(token_bucket_t));
+    if (!bucket)
+        return AGENTOS_ENOMEM;
 
     bucket->capacity = capacity > 0 ? capacity : 100;
     bucket->tokens = bucket->capacity;
@@ -65,17 +70,20 @@ agentos_error_t agentos_sys_rate_limiter_create(int capacity, double rate) {
     }
 
     g_rate_limiter = bucket;
-    AGENTOS_LOG_INFO("Rate limiter created (capacity=%d, rate=%.2f/s)",
-                    bucket->capacity, bucket->refill_rate);
+    AGENTOS_LOG_INFO("Rate limiter created (capacity=%d, rate=%.2f/s)", bucket->capacity,
+                     bucket->refill_rate);
     return AGENTOS_SUCCESS;
 }
 
 /**
  * @brief 尝试获取令牌
  */
-agentos_error_t agentos_sys_rate_limiter_acquire(int tokens) {
-    if (!g_rate_limiter) return AGENTOS_ENOTINIT;
-    if (tokens <= 0) tokens = 1;
+agentos_error_t agentos_sys_rate_limiter_acquire(int tokens)
+{
+    if (!g_rate_limiter)
+        return AGENTOS_ENOTINIT;
+    if (tokens <= 0)
+        tokens = 1;
 
     agentos_mutex_lock(g_rate_limiter->lock);
 
@@ -84,8 +92,9 @@ agentos_error_t agentos_sys_rate_limiter_acquire(int tokens) {
     double elapsed = difftime(now, g_rate_limiter->last_refill);
     int to_add = (int)(elapsed * g_rate_limiter->refill_rate);
     if (to_add > 0) {
-        g_rate_limiter->tokens = (g_rate_limiter->tokens + to_add > g_rate_limiter->capacity) ?
-                                  g_rate_limiter->capacity : g_rate_limiter->tokens + to_add;
+        g_rate_limiter->tokens = (g_rate_limiter->tokens + to_add > g_rate_limiter->capacity)
+                                     ? g_rate_limiter->capacity
+                                     : g_rate_limiter->tokens + to_add;
         g_rate_limiter->last_refill = now;
     }
 
@@ -97,31 +106,34 @@ agentos_error_t agentos_sys_rate_limiter_acquire(int tokens) {
     }
 
     agentos_mutex_unlock(g_rate_limiter->lock);
-    AGENTOS_LOG_DEBUG("Rate limit exceeded (available=%d, requested=%d)",
-                     g_rate_limiter->tokens, tokens);
+    AGENTOS_LOG_DEBUG("Rate limit exceeded (available=%d, requested=%d)", g_rate_limiter->tokens,
+                      tokens);
     return AGENTOS_EBUSY;
 }
 
 /**
  * @brief 获取限流器状态
  */
-agentos_error_t agentos_sys_rate_limiter_get_status(char** out_json) {
-    if (!g_rate_limiter || !out_json) return AGENTOS_EINVAL;
+agentos_error_t agentos_sys_rate_limiter_get_status(char **out_json)
+{
+    if (!g_rate_limiter || !out_json)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(g_rate_limiter->lock);
 
-    cJSON* status = cJSON_CreateObject();
+    cJSON *status = cJSON_CreateObject();
     cJSON_AddNumberToObject(status, "tokens", g_rate_limiter->tokens);
     cJSON_AddNumberToObject(status, "capacity", g_rate_limiter->capacity);
     cJSON_AddNumberToObject(status, "refill_rate", g_rate_limiter->refill_rate);
     cJSON_AddNumberToObject(status, "last_refill", (double)g_rate_limiter->last_refill);
 
-    char* json_str = cJSON_PrintUnformatted(status);
+    char *json_str = cJSON_PrintUnformatted(status);
     cJSON_Delete(status);
 
     agentos_mutex_unlock(g_rate_limiter->lock);
 
-    if (!json_str) return AGENTOS_ENOMEM;
+    if (!json_str)
+        return AGENTOS_ENOMEM;
     *out_json = json_str;
     return AGENTOS_SUCCESS;
 }
@@ -129,8 +141,10 @@ agentos_error_t agentos_sys_rate_limiter_get_status(char** out_json) {
 /**
  * @brief 重置限流器
  */
-void agentos_sys_rate_limiter_reset(void) {
-    if (!g_rate_limiter) return;
+void agentos_sys_rate_limiter_reset(void)
+{
+    if (!g_rate_limiter)
+        return;
 
     agentos_mutex_lock(g_rate_limiter->lock);
     g_rate_limiter->tokens = g_rate_limiter->capacity;
@@ -143,8 +157,10 @@ void agentos_sys_rate_limiter_reset(void) {
 /**
  * @brief 销毁限流器
  */
-void agentos_sys_rate_limiter_destroy(void) {
-    if (!g_rate_limiter) return;
+void agentos_sys_rate_limiter_destroy(void)
+{
+    if (!g_rate_limiter)
+        return;
 
     AGENTOS_LOG_INFO("Rate limiter destroyed");
 

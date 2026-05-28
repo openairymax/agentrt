@@ -32,7 +32,7 @@
 | S-05 | 统一测试命令 | 使用 `cd ../AgentOS-build && ctest --output-on-failure` | [ ] |
 | S-06 | 统一commit前缀 | `feat:`/`fix:`/`refactor:`/`docs:`/`test:`/`chore:` | [ ] |
 | S-07 | 统一分支命名 | `feature/<name>-<issue>` / `fix/<name>-<issue>` | [ ] |
-| S-08 | 统一BAN检查 | 运行 `scripts/pipeline/quality-gate.sh`，BAN-01~BAN-36 零违规 | [ ] |
+| S-08 | 统一BAN检查 | 运行 `scripts/ci/pipeline/quality-gate.sh`，BAN-01~BAN-36 零违规 | [ ] |
 
 ### BAN 违规检查 (BAN-01~BAN-36)
 

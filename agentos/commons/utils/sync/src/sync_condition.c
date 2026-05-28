@@ -10,19 +10,20 @@
  * @date 2026-04-05
  */
 
-#include "sync_platform.h"
-#include <time.h>
 #include "sync_internal.h"
-#include <string.h>
+#include "sync_platform.h"
 
-sync_result_t sync_condition_create(sync_condition_t* condition,
-                                 const sync_attr_t* attr) {
+#include <string.h>
+#include <time.h>
+
+sync_result_t sync_condition_create(sync_condition_t *condition, const sync_attr_t *attr)
+{
     if (condition == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_condition* c = (struct sync_condition*)AGENTOS_CALLOC(
-        1, sizeof(struct sync_condition));
+    struct sync_condition *c =
+        (struct sync_condition *)AGENTOS_CALLOC(1, sizeof(struct sync_condition));
     if (c == NULL) {
         return SYNC_ERROR_MEMORY;
     }
@@ -49,7 +50,8 @@ sync_result_t sync_condition_create(sync_condition_t* condition,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_condition_free(sync_condition_t condition) {
+sync_result_t sync_condition_free(sync_condition_t condition)
+{
     if (condition == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -69,9 +71,9 @@ sync_result_t sync_condition_free(sync_condition_t condition) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_condition_wait_ex(sync_condition_t condition,
-                               sync_mutex_t mutex,
-                               const sync_timeout_t* timeout) {
+sync_result_t sync_condition_wait_ex(sync_condition_t condition, sync_mutex_t mutex,
+                                     const sync_timeout_t *timeout)
+{
     if (condition == NULL || mutex == NULL || !condition->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -119,7 +121,8 @@ sync_result_t sync_condition_wait_ex(sync_condition_t condition,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_condition_signal_ex(sync_condition_t condition) {
+sync_result_t sync_condition_signal_ex(sync_condition_t condition)
+{
     if (condition == NULL || !condition->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -136,7 +139,8 @@ sync_result_t sync_condition_signal_ex(sync_condition_t condition) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_condition_broadcast_ex(sync_condition_t condition) {
+sync_result_t sync_condition_broadcast_ex(sync_condition_t condition)
+{
     if (condition == NULL || !condition->initialized) {
         return SYNC_ERROR_INVALID;
     }

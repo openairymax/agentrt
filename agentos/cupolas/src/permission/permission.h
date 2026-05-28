@@ -14,6 +14,7 @@
 #define CUPOLAS_PERMISSION_H
 
 #include "../platform/platform.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -33,7 +34,7 @@ typedef struct permission_engine permission_engine_t;
  * @reentrant No (create/destroy must be paired)
  * @ownership Returned handle: caller owns, must call permission_engine_destroy
  */
-permission_engine_t* permission_engine_create(const char* rules_path);
+permission_engine_t *permission_engine_create(const char *rules_path);
 
 /**
  * @brief Destroy permission engine
@@ -44,7 +45,7 @@ permission_engine_t* permission_engine_create(const char* rules_path);
  * @reentrant No
  * @ownership engine: caller transfers ownership
  */
-void permission_engine_destroy(permission_engine_t* engine);
+void permission_engine_destroy(permission_engine_t *engine);
 
 /**
  * @brief Increment reference count
@@ -54,7 +55,7 @@ void permission_engine_destroy(permission_engine_t* engine);
  * @reentrant Yes
  * @ownership engine: caller retains ownership, returns same handle
  */
-permission_engine_t* permission_engine_ref(permission_engine_t* engine);
+permission_engine_t *permission_engine_ref(permission_engine_t *engine);
 
 /**
  * @brief Decrement reference count
@@ -62,7 +63,7 @@ permission_engine_t* permission_engine_ref(permission_engine_t* engine);
  * @note Thread-safe: Yes
  * @reentrant No
  */
-void permission_engine_unref(permission_engine_t* engine);
+void permission_engine_unref(permission_engine_t *engine);
 
 /**
  * @brief Check permission
@@ -76,11 +77,8 @@ void permission_engine_unref(permission_engine_t* engine);
  * @reentrant Yes, but concurrent calls with same params may race on cache
  * @ownership All input strings: caller retains ownership
  */
-int permission_engine_check(permission_engine_t* engine,
-                            const char* agent_id,
-                            const char* action,
-                            const char* resource,
-                            const char* context);
+int permission_engine_check(permission_engine_t *engine, const char *agent_id, const char *action,
+                            const char *resource, const char *context);
 
 /**
  * @brief Reload rules file
@@ -89,7 +87,7 @@ int permission_engine_check(permission_engine_t* engine,
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int permission_engine_reload(permission_engine_t* engine);
+int permission_engine_reload(permission_engine_t *engine);
 
 /**
  * @brief Clear cache
@@ -98,7 +96,7 @@ int permission_engine_reload(permission_engine_t* engine);
  * @reentrant Yes
  * @post All cached permissions are invalidated
  */
-void permission_engine_clear_cache(permission_engine_t* engine);
+void permission_engine_clear_cache(permission_engine_t *engine);
 
 /**
  * @brief Add rule
@@ -113,12 +111,8 @@ void permission_engine_clear_cache(permission_engine_t* engine);
  * @reentrant Yes
  * @ownership All input strings: caller retains ownership
  */
-int permission_engine_add_rule(permission_engine_t* engine,
-                               const char* agent_id,
-                               const char* action,
-                               const char* resource,
-                               int allow,
-                               int priority);
+int permission_engine_add_rule(permission_engine_t *engine, const char *agent_id,
+                               const char *action, const char *resource, int allow, int priority);
 
 /**
  * @brief Get rule count
@@ -127,7 +121,7 @@ int permission_engine_add_rule(permission_engine_t* engine,
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-size_t permission_engine_rule_count(permission_engine_t* engine);
+size_t permission_engine_rule_count(permission_engine_t *engine);
 
 /**
  * @brief Get cache statistics
@@ -138,9 +132,8 @@ size_t permission_engine_rule_count(permission_engine_t* engine);
  * @reentrant Yes
  * @ownership hit_count, miss_count: callee writes, caller owns
  */
-void permission_engine_cache_stats(permission_engine_t* engine,
-                                   uint64_t* hit_count,
-                                   uint64_t* miss_count);
+void permission_engine_cache_stats(permission_engine_t *engine, uint64_t *hit_count,
+                                   uint64_t *miss_count);
 
 #ifdef __cplusplus
 }

@@ -4,16 +4,18 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "market_service.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "market_service.h"
 
-static void test_market_register_skill(void) {
+static void test_market_register_skill(void)
+{
     printf("  test_market_register_skill...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -33,10 +35,11 @@ static void test_market_register_skill(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_search_skills(void) {
+static void test_market_search_skills(void)
+{
     printf("  test_market_search_skills...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -53,7 +56,7 @@ static void test_market_search_skills(void) {
     memset(&params, 0, sizeof(params));
     params.query = "Search Test";
 
-    skill_info_t** skills = NULL;
+    skill_info_t **skills = NULL;
     size_t count = 0;
     ret = market_service_search_skills(svc, &params, &skills, &count);
     if (ret == 0) {
@@ -68,10 +71,11 @@ static void test_market_search_skills(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_get_installed_skills(void) {
+static void test_market_get_installed_skills(void)
+{
     printf("  test_market_get_installed_skills...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -92,7 +96,7 @@ static void test_market_get_installed_skills(void) {
     market_service_register_skill(svc, &info1);
     market_service_register_skill(svc, &info2);
 
-    skill_info_t** skills = NULL;
+    skill_info_t **skills = NULL;
     size_t count = 0;
     ret = market_service_get_installed_skills(svc, &skills, &count);
     if (ret == 0) {
@@ -105,10 +109,11 @@ static void test_market_get_installed_skills(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_uninstall_skill(void) {
+static void test_market_uninstall_skill(void)
+{
     printf("  test_market_uninstall_skill...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -129,10 +134,11 @@ static void test_market_uninstall_skill(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_install_skill(void) {
+static void test_market_install_skill(void)
+{
     printf("  test_market_install_skill...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -141,7 +147,7 @@ static void test_market_install_skill(void) {
     request.id = "install_test_skill";
     request.version = "1.0.0";
 
-    install_result_t* result = NULL;
+    install_result_t *result = NULL;
     ret = market_service_install_skill(svc, &request, &result);
     if (ret == 0 && result != NULL) {
         printf("    Install success: %s\n", result->message ? result->message : "(null)");
@@ -158,7 +164,8 @@ static void test_market_install_skill(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Skill Registry Unit Tests\n");
     printf("=========================================\n");

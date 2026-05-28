@@ -7,6 +7,7 @@
 #include "agentos.h"
 #include "execution.h"
 #include "memory_compat.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,7 @@
 #define PATH_SEPARATOR "\\"
 #else
 #include "agentos_dirent.h"
+
 #include <limits.h>
 #include <unistd.h>
 #define PATH_SEPARATOR "/"
@@ -43,7 +45,8 @@ static int is_path_traversal_attempt(const char *path)
     return 0;
 }
 
-static agentos_error_t file_build_path(file_unit_data_t *data, const char *path, char *out_full, size_t max_len)
+static agentos_error_t file_build_path(file_unit_data_t *data, const char *path, char *out_full,
+                                       size_t max_len)
 {
     if (!data || !path || !out_full)
         return AGENTOS_EINVAL;
@@ -115,14 +118,14 @@ static agentos_error_t file_do_read(const char *full_path, void **out_output)
         return AGENTOS_EIO;
     }
 
-    char *content = (char *) AGENTOS_MALLOC((size_t) size + 1);
+    char *content = (char *)AGENTOS_MALLOC((size_t)size + 1);
     if (!content) {
         fclose(f);
         return AGENTOS_ENOMEM;
     }
 
-    size_t bytes_read = fread(content, 1, (size_t) size, f);
-    if (bytes_read != (size_t) size) {
+    size_t bytes_read = fread(content, 1, (size_t)size, f);
+    if (bytes_read != (size_t)size) {
         AGENTOS_FREE(content);
         fclose(f);
         return AGENTOS_EIO;
@@ -154,8 +157,8 @@ static agentos_error_t file_do_list_win(const char *full_path, void **out_output
     if (hFind == INVALID_HANDLE_VALUE)
         return AGENTOS_ENOENT;
 
-    size_t cap    = 1024;
-    char *listing = (char *) AGENTOS_MALLOC(cap);
+    size_t cap = 1024;
+    char *listing = (char *)AGENTOS_MALLOC(cap);
     if (!listing) {
         FindClose(hFind);
         return AGENTOS_ENOMEM;
@@ -171,7 +174,7 @@ static agentos_error_t file_do_list_win(const char *full_path, void **out_output
             size_t len = strlen(find_data.cFileName);
             if (pos + len + 2 > cap) {
                 cap *= 2;
-                char *new_list = (char *) AGENTOS_REALLOC(listing, cap);
+                char *new_list = (char *)AGENTOS_REALLOC(listing, cap);
                 if (!new_list) {
                     AGENTOS_FREE(listing);
                     FindClose(hFind);
@@ -188,7 +191,7 @@ static agentos_error_t file_do_list_win(const char *full_path, void **out_output
 
     FindClose(hFind);
     listing[pos] = '\0';
-    *out_output  = listing;
+    *out_output = listing;
     return AGENTOS_SUCCESS;
 }
 #else
@@ -199,8 +202,8 @@ static agentos_error_t file_do_list_posix(const char *full_path, void **out_outp
         return AGENTOS_ENOENT;
 
     struct dirent *entry;
-    size_t cap    = 1024;
-    char *listing = (char *) AGENTOS_MALLOC(cap);
+    size_t cap = 1024;
+    char *listing = (char *)AGENTOS_MALLOC(cap);
     if (!listing) {
         closedir(dir);
         return AGENTOS_ENOMEM;
@@ -215,7 +218,7 @@ static agentos_error_t file_do_list_posix(const char *full_path, void **out_outp
         size_t len = strlen(entry->d_name);
         if (pos + len + 2 > cap) {
             cap *= 2;
-            char *new_list = (char *) AGENTOS_REALLOC(listing, cap);
+            char *new_list = (char *)AGENTOS_REALLOC(listing, cap);
             if (!new_list) {
                 AGENTOS_FREE(listing);
                 closedir(dir);
@@ -236,15 +239,16 @@ static agentos_error_t file_do_list_posix(const char *full_path, void **out_outp
 }
 #endif
 
-static agentos_error_t file_execute(agentos_execution_unit_t *unit, const void *input, void **out_output)
+static agentos_error_t file_execute(agentos_execution_unit_t *unit, const void *input,
+                                    void **out_output)
 {
-    file_unit_data_t *data = (file_unit_data_t *) unit->execution_unit_data;
+    file_unit_data_t *data = (file_unit_data_t *)unit->execution_unit_data;
     if (!data || !input)
         return AGENTOS_EINVAL;
 
-    const char *cmd = (const char *) input;
-    char op[32]     = {0};
-    char path[256]  = {0};
+    const char *cmd = (const char *)input;
+    char op[32] = {0};
+    char path[256] = {0};
 
     if (sscanf(cmd, "op=%31[^&]&path=%255[^\n]", op, path) != 2) {
         return AGENTOS_EINVAL;
@@ -273,7 +277,7 @@ static void file_destroy(agentos_execution_unit_t *unit)
 {
     if (!unit)
         return;
-    file_unit_data_t *data = (file_unit_data_t *) unit->execution_unit_data;
+    file_unit_data_t *data = (file_unit_data_t *)unit->execution_unit_data;
     if (data) {
         if (data->root_dir)
             AGENTOS_FREE(data->root_dir);
@@ -286,12 +290,13 @@ static void file_destroy(agentos_execution_unit_t *unit)
 
 agentos_execution_unit_t *agentos_file_unit_create(const char *root_dir)
 {
-    agentos_execution_unit_t *unit = (agentos_execution_unit_t *) AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
+    agentos_execution_unit_t *unit =
+        (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit)
         return NULL;
     memset(unit, 0, sizeof(*unit));
 
-    file_unit_data_t *data = (file_unit_data_t *) AGENTOS_MALLOC(sizeof(file_unit_data_t));
+    file_unit_data_t *data = (file_unit_data_t *)AGENTOS_MALLOC(sizeof(file_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
         return NULL;
@@ -299,7 +304,8 @@ agentos_execution_unit_t *agentos_file_unit_create(const char *root_dir)
 
     data->root_dir = root_dir ? AGENTOS_STRDUP(root_dir) : NULL;
     char meta[256];
-    snprintf(meta, sizeof(meta), "{\"type\":\"file\",\"root_dir\":\"%s\"}", root_dir ? root_dir : "");
+    snprintf(meta, sizeof(meta), "{\"type\":\"file\",\"root_dir\":\"%s\"}",
+             root_dir ? root_dir : "");
     data->metadata_json = AGENTOS_STRDUP(meta);
 
     if (!data->metadata_json || (root_dir && !data->root_dir)) {
@@ -312,7 +318,7 @@ agentos_execution_unit_t *agentos_file_unit_create(const char *root_dir)
         return NULL;
     }
 
-    unit->execution_unit_data    = data;
+    unit->execution_unit_data = data;
     unit->execution_unit_execute = file_execute;
     unit->execution_unit_destroy = file_destroy;
 

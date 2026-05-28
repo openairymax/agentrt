@@ -18,9 +18,9 @@ extern "C" {
 
 typedef struct token_counter token_counter_t;
 
-token_counter_t* token_counter_create(const char* encoding_name);
-void token_counter_destroy(token_counter_t* tc);
-size_t token_counter_count(token_counter_t* tc, const char* text);
+token_counter_t *token_counter_create(const char *encoding_name);
+void token_counter_destroy(token_counter_t *tc);
+size_t token_counter_count(token_counter_t *tc, const char *text);
 
 #ifdef __cplusplus
 }

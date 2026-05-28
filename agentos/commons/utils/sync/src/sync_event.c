@@ -10,21 +10,20 @@
  * @date 2026-04-05
  */
 
-#include "sync_platform.h"
 #include "sync_internal.h"
+#include "sync_platform.h"
+
 #include <string.h>
 #include <time.h>
 
-sync_result_t sync_event_create(sync_event_t* event,
-                              bool manual_reset,
-                              bool initial_state,
-                              const sync_attr_t* attr) {
+sync_result_t sync_event_create(sync_event_t *event, bool manual_reset, bool initial_state,
+                                const sync_attr_t *attr)
+{
     if (event == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_event* e = (struct sync_event*)AGENTOS_CALLOC(
-        1, sizeof(struct sync_event));
+    struct sync_event *e = (struct sync_event *)AGENTOS_CALLOC(1, sizeof(struct sync_event));
     if (e == NULL) {
         return SYNC_ERROR_MEMORY;
     }
@@ -65,7 +64,8 @@ sync_result_t sync_event_create(sync_event_t* event,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_event_free(sync_event_t event) {
+sync_result_t sync_event_free(sync_event_t event)
+{
     if (event == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -88,7 +88,8 @@ sync_result_t sync_event_free(sync_event_t event) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_event_wait_ex(sync_event_t event, const sync_timeout_t* timeout) {
+sync_result_t sync_event_wait_ex(sync_event_t event, const sync_timeout_t *timeout)
+{
     if (event == NULL || !event->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -146,7 +147,8 @@ sync_result_t sync_event_wait_ex(sync_event_t event, const sync_timeout_t* timeo
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_event_set_ex(sync_event_t event) {
+sync_result_t sync_event_set_ex(sync_event_t event)
+{
     if (event == NULL || !event->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -163,7 +165,8 @@ sync_result_t sync_event_set_ex(sync_event_t event) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_event_reset(sync_event_t event) {
+sync_result_t sync_event_reset(sync_event_t event)
+{
     if (event == NULL || !event->initialized) {
         return SYNC_ERROR_INVALID;
     }

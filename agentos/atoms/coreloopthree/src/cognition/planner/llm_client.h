@@ -14,6 +14,7 @@
 #define AGENTOS_LLM_CLIENT_H
 
 #include "agentos.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -24,24 +25,24 @@ extern "C" {
 typedef struct agentos_llm_service agentos_llm_service_t;
 
 typedef struct agentos_llm_config {
-    const char* model_name;
-    const char* api_key;
-    const char* base_url;
+    const char *model_name;
+    const char *api_key;
+    const char *base_url;
     uint32_t timeout_ms;
     float temperature;
     uint32_t max_tokens;
 } agentos_llm_config_t;
 
 typedef struct agentos_llm_request {
-    const char* model;
-    const char* prompt;
+    const char *model;
+    const char *prompt;
     float temperature;
     uint32_t max_tokens;
-    const char* system_prompt;
+    const char *system_prompt;
 } agentos_llm_request_t;
 
 typedef struct agentos_llm_response {
-    char* text;
+    char *text;
     uint32_t usage_tokens;
     uint32_t total_tokens;
     uint32_t finish_reason;
@@ -53,42 +54,35 @@ typedef struct agentos_dual_think_config agentos_dual_think_config_t;
 
 typedef struct agentos_dual_think_result agentos_dual_think_result_t;
 
-agentos_error_t agentos_llm_dual_think(
-    agentos_llm_service_t* service,
-    const agentos_dual_think_config_t* config,
-    const char* user_prompt,
-    agentos_dual_think_result_t** out_result);
+agentos_error_t agentos_llm_dual_think(agentos_llm_service_t *service,
+                                       const agentos_dual_think_config_t *config,
+                                       const char *user_prompt,
+                                       agentos_dual_think_result_t **out_result);
 
-void agentos_llm_dual_result_free(agentos_dual_think_result_t* result);
+void agentos_llm_dual_result_free(agentos_dual_think_result_t *result);
 
-agentos_error_t agentos_llm_dual_think_simple(
-    agentos_llm_service_t* service,
-    const char* user_prompt,
-    char** out_response);
+agentos_error_t agentos_llm_dual_think_simple(agentos_llm_service_t *service,
+                                              const char *user_prompt, char **out_response);
 
-const agentos_dual_think_config_t* agentos_dual_think_config_default(void);
+const agentos_dual_think_config_t *agentos_dual_think_config_default(void);
 
 #endif
 
-agentos_error_t agentos_llm_service_create(
-    const agentos_llm_config_t* manager,
-    agentos_llm_service_t** out_service);
+agentos_error_t agentos_llm_service_create(const agentos_llm_config_t *manager,
+                                           agentos_llm_service_t **out_service);
 
-void agentos_llm_service_destroy(agentos_llm_service_t* service);
+void agentos_llm_service_destroy(agentos_llm_service_t *service);
 
-agentos_error_t agentos_llm_service_call(
-    agentos_llm_service_t* service,
-    const char* prompt,
-    char** out_response);
+agentos_error_t agentos_llm_service_call(agentos_llm_service_t *service, const char *prompt,
+                                         char **out_response);
 
-int agentos_llm_service_is_available(const agentos_llm_service_t* service);
+int agentos_llm_service_is_available(const agentos_llm_service_t *service);
 
-agentos_error_t agentos_llm_complete(
-    agentos_llm_service_t* service,
-    const agentos_llm_request_t* request,
-    agentos_llm_response_t** out_response);
+agentos_error_t agentos_llm_complete(agentos_llm_service_t *service,
+                                     const agentos_llm_request_t *request,
+                                     agentos_llm_response_t **out_response);
 
-void agentos_llm_response_free(agentos_llm_response_t* response);
+void agentos_llm_response_free(agentos_llm_response_t *response);
 
 #ifdef __cplusplus
 }

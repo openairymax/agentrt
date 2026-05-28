@@ -15,6 +15,7 @@
 
 #include "agentos.h"
 #include "agentos_types.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -46,11 +47,10 @@ extern "C" {
  * @ownership out_output 由调用者负责释放
  * @threadsafe 否
  */
-AGENTOS_API agentos_error_t agentos_browser_fill_form(
-    void* conn,
-    const char* selector, size_t selector_len,
-    const char* value, size_t value_len,
-    char** out_output, size_t* out_output_len);
+AGENTOS_API agentos_error_t agentos_browser_fill_form(void *conn, const char *selector,
+                                                      size_t selector_len, const char *value,
+                                                      size_t value_len, char **out_output,
+                                                      size_t *out_output_len);
 
 /* ==================== 元素等待 ==================== */
 
@@ -82,12 +82,11 @@ AGENTOS_API agentos_error_t agentos_browser_fill_form(
  * @ownership out_output 由调用者负责释放
  * @threadsafe 否
  */
-AGENTOS_API agentos_error_t agentos_browser_wait_for_element(
-    void* conn,
-    const char* selector, size_t selector_len,
-    const char* wait_type,
-    uint32_t timeout_ms,
-    char** out_output, size_t* out_output_len);
+AGENTOS_API agentos_error_t agentos_browser_wait_for_element(void *conn, const char *selector,
+                                                             size_t selector_len,
+                                                             const char *wait_type,
+                                                             uint32_t timeout_ms, char **out_output,
+                                                             size_t *out_output_len);
 
 #ifdef __cplusplus
 }

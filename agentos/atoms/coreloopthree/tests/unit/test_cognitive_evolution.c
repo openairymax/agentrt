@@ -8,6 +8,7 @@
  */
 
 #include "cognitive_evolution.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
@@ -18,29 +19,29 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)  \
+    do {                \
+        tests_run++;    \
+        func();         \
+        tests_passed++; \
     } while (0)
 
 static int g_level_change_called = 0;
-static cog_level_t g_old_level   = COG_LEVEL_PERCEPTION;
-static cog_level_t g_new_level   = COG_LEVEL_PERCEPTION;
+static cog_level_t g_old_level = COG_LEVEL_PERCEPTION;
+static cog_level_t g_new_level = COG_LEVEL_PERCEPTION;
 
 /* ==================== 辅助函数 ==================== */
 
 static double sample_reward_fn(const cog_experience_t *exp, void *user_data)
 {
-    (void) user_data;
+    (void)user_data;
     if (!exp)
         return 0.0;
     if (exp->feedback == COG_FEEDBACK_POSITIVE)
@@ -52,23 +53,24 @@ static double sample_reward_fn(const cog_experience_t *exp, void *user_data)
 
 static void sample_level_change_fn(cog_level_t old_level, cog_level_t new_level, void *user_data)
 {
-    (void) user_data;
+    (void)user_data;
     g_level_change_called++;
     g_old_level = old_level;
     g_new_level = new_level;
 }
 
-static cog_experience_t make_experience(const char *domain, const char *action, cog_feedback_t feedback)
+static cog_experience_t make_experience(const char *domain, const char *action,
+                                        cog_feedback_t feedback)
 {
     cog_experience_t exp;
     memset(&exp, 0, sizeof(exp));
     strncpy(exp.id, "exp_001", sizeof(exp.id) - 1);
     strncpy(exp.domain, domain, sizeof(exp.domain) - 1);
-    exp.action_json     = action ? strdup(action) : NULL;
-    exp.outcome_json    = strdup("{\"result\":\"ok\"}");
-    exp.feedback        = feedback;
-    exp.reward          = feedback == COG_FEEDBACK_POSITIVE ? 1.0 : -0.5;
-    exp.timestamp       = 1000000ULL;
+    exp.action_json = action ? strdup(action) : NULL;
+    exp.outcome_json = strdup("{\"result\":\"ok\"}");
+    exp.feedback = feedback;
+    exp.reward = feedback == COG_FEEDBACK_POSITIVE ? 1.0 : -0.5;
+    exp.timestamp = 1000000ULL;
     exp.cognitive_level = COG_LEVEL_LEARNING;
     return exp;
 }
@@ -109,7 +111,7 @@ static void test_create_all_levels(void)
 {
     int ok = 1;
     for (int i = 0; i <= COG_LEVEL_CREATION; i++) {
-        cog_evolution_t *evo = cog_evolution_create((cog_level_t) i);
+        cog_evolution_t *evo = cog_evolution_create((cog_level_t)i);
         if (!evo) {
             ok = 0;
             break;
@@ -139,7 +141,8 @@ static void test_record_single_experience(void)
         return;
     }
 
-    cog_experience_t exp = make_experience("test_domain", "{\"action\":\"search\"}", COG_FEEDBACK_POSITIVE);
+    cog_experience_t exp =
+        make_experience("test_domain", "{\"action\":\"search\"}", COG_FEEDBACK_POSITIVE);
 
     int rc = cog_evolution_record_experience(evo, &exp);
 
@@ -172,13 +175,13 @@ static void test_record_multiple_experiences(void)
         memset(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "exp_%03d", i);
         strncpy(exp.domain, "multi_test", sizeof(exp.domain) - 1);
-        exp.action_json     = strdup("{\"op\":\"test\"}");
-        exp.outcome_json    = strdup("{}");
-        exp.feedback        = (i % 3 == 0)   ? COG_FEEDBACK_POSITIVE
-                              : (i % 3 == 1) ? COG_FEEDBACK_NEGATIVE
-                                             : COG_FEEDBACK_NEUTRAL;
-        exp.reward          = (double) (i + 1) * 0.5;
-        exp.timestamp       = (uint64_t) (i + 1) * 1000;
+        exp.action_json = strdup("{\"op\":\"test\"}");
+        exp.outcome_json = strdup("{}");
+        exp.feedback = (i % 3 == 0)   ? COG_FEEDBACK_POSITIVE
+                       : (i % 3 == 1) ? COG_FEEDBACK_NEGATIVE
+                                      : COG_FEEDBACK_NEUTRAL;
+        exp.reward = (double)(i + 1) * 0.5;
+        exp.timestamp = (uint64_t)(i + 1) * 1000;
         exp.cognitive_level = COG_LEVEL_LEARNING;
 
         int rc = cog_evolution_record_experience(evo, &exp);
@@ -207,8 +210,8 @@ static void test_record_null_params(void)
 
     cog_evolution_destroy(evo);
     TEST_PASS("record validates null params");
-    (void) rc1;
-    (void) rc2;
+    (void)rc1;
+    (void)rc2;
 }
 
 /* ==================== 模式提取 ==================== */
@@ -226,11 +229,11 @@ static void test_extract_patterns_basic(void)
         memset(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "pat_%03d", i);
         strncpy(exp.domain, "pattern_test", sizeof(exp.domain) - 1);
-        exp.action_json     = strdup("{\"type\":\"query\"}");
-        exp.outcome_json    = strdup("{\"status\":\"success\"}");
-        exp.feedback        = (i < 15) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEGATIVE;
-        exp.reward          = (i < 15) ? 1.0 : -0.5;
-        exp.timestamp       = (uint64_t) (i + 1) * 500;
+        exp.action_json = strdup("{\"type\":\"query\"}");
+        exp.outcome_json = strdup("{\"status\":\"success\"}");
+        exp.feedback = (i < 15) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEGATIVE;
+        exp.reward = (i < 15) ? 1.0 : -0.5;
+        exp.timestamp = (uint64_t)(i + 1) * 500;
         exp.cognitive_level = COG_LEVEL_LEARNING;
 
         cog_evolution_record_experience(evo, &exp);
@@ -239,13 +242,13 @@ static void test_extract_patterns_basic(void)
     }
 
     size_t pattern_count = 0;
-    int rc               = cog_evolution_extract_patterns(evo, &pattern_count);
+    int rc = cog_evolution_extract_patterns(evo, &pattern_count);
 
     printf("    Extracted patterns: %zu\n", pattern_count);
     TEST_PASS("extract patterns from experiences");
 
     cog_evolution_destroy(evo);
-    (void) rc;
+    (void)rc;
 }
 
 static void test_extract_patterns_empty(void)
@@ -277,11 +280,11 @@ static void test_evolve_strategies_basic(void)
         memset(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "strat_%03d", i);
         strncpy(exp.domain, "strategy_test", sizeof(exp.domain) - 1);
-        exp.action_json     = strdup("{\"plan\":\"A\"}");
-        exp.outcome_json    = strdup("{\"success\":true}");
-        exp.feedback        = (i % 4 != 0) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEGATIVE;
-        exp.reward          = (i % 4 != 0) ? 1.0 : -0.3;
-        exp.timestamp       = (uint64_t) (i + 1) * 200;
+        exp.action_json = strdup("{\"plan\":\"A\"}");
+        exp.outcome_json = strdup("{\"success\":true}");
+        exp.feedback = (i % 4 != 0) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEGATIVE;
+        exp.reward = (i % 4 != 0) ? 1.0 : -0.3;
+        exp.timestamp = (uint64_t)(i + 1) * 200;
         exp.cognitive_level = COG_LEVEL_LEARNING;
         cog_evolution_record_experience(evo, &exp);
         free(exp.action_json);
@@ -289,13 +292,13 @@ static void test_evolve_strategies_basic(void)
     }
 
     size_t strategy_count = 0;
-    int rc                = cog_evolution_evolve_strategies(evo, &strategy_count);
+    int rc = cog_evolution_evolve_strategies(evo, &strategy_count);
 
     printf("    Evolved strategies: %zu\n", strategy_count);
     TEST_PASS("evolve strategies from experiences");
 
     cog_evolution_destroy(evo);
-    (void) rc;
+    (void)rc;
 }
 
 /* ==================== 策略选择 ==================== */
@@ -308,7 +311,8 @@ static void test_select_strategy_basic(void)
         return;
     }
 
-    cog_experience_t exp = make_experience("web_search", "{\"tool\":\"browser\"}", COG_FEEDBACK_POSITIVE);
+    cog_experience_t exp =
+        make_experience("web_search", "{\"tool\":\"browser\"}", COG_FEEDBACK_POSITIVE);
     cog_evolution_record_experience(evo, &exp);
     free_experience(&exp);
 
@@ -316,7 +320,8 @@ static void test_select_strategy_basic(void)
     cog_evolution_evolve_strategies(evo, &strat_cnt);
 
     cog_strategy_t *selected = NULL;
-    int rc                   = cog_evolution_select_strategy(evo, "web_search", "{\"task\":\"find_info\"}", &selected);
+    int rc =
+        cog_evolution_select_strategy(evo, "web_search", "{\"task\":\"find_info\"}", &selected);
 
     if (selected) {
         printf("    Selected strategy: %.64s (fitness=%.2f)\n", selected->name, selected->fitness);
@@ -326,7 +331,7 @@ static void test_select_strategy_basic(void)
     }
 
     cog_evolution_destroy(evo);
-    (void) rc;
+    (void)rc;
 }
 
 static void test_select_strategy_no_data(void)
@@ -358,12 +363,12 @@ static void test_transfer_knowledge_basic(void)
         memset(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "know_%03d", i);
         strncpy(exp.domain, "source_domain", sizeof(exp.domain) - 1);
-        exp.context_json    = strdup("{\"concept\":\"data_analysis\"}");
-        exp.action_json     = strdup("{\"method\":\"aggregate\"}");
-        exp.outcome_json    = strdup("{\"accuracy\":0.95}");
-        exp.feedback        = COG_FEEDBACK_POSITIVE;
-        exp.reward          = 0.9;
-        exp.timestamp       = (uint64_t) (i + 1) * 300;
+        exp.context_json = strdup("{\"concept\":\"data_analysis\"}");
+        exp.action_json = strdup("{\"method\":\"aggregate\"}");
+        exp.outcome_json = strdup("{\"accuracy\":0.95}");
+        exp.feedback = COG_FEEDBACK_POSITIVE;
+        exp.reward = 0.9;
+        exp.timestamp = (uint64_t)(i + 1) * 300;
         exp.cognitive_level = COG_LEVEL_REASONING;
         cog_evolution_record_experience(evo, &exp);
         free(exp.context_json);
@@ -372,17 +377,18 @@ static void test_transfer_knowledge_basic(void)
     }
 
     cog_knowledge_t *knowledge = NULL;
-    int rc                     = cog_evolution_transfer_knowledge(evo, "source_domain", "target_domain", &knowledge);
+    int rc = cog_evolution_transfer_knowledge(evo, "source_domain", "target_domain", &knowledge);
 
     if (knowledge) {
-        printf("    Transferred: score=%.2f, validated=%d\n", knowledge->transfer_score, knowledge->validated);
+        printf("    Transferred: score=%.2f, validated=%d\n", knowledge->transfer_score,
+               knowledge->validated);
         TEST_PASS("transfer knowledge produces output");
     } else {
         TEST_PASS("transfer knowledge completed");
     }
 
     cog_evolution_destroy(evo);
-    (void) rc;
+    (void)rc;
 }
 
 /* ==================== 认知层级 ==================== */
@@ -417,11 +423,11 @@ static void test_evaluate_level_progression(void)
         memset(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "eval_%03d", i);
         strncpy(exp.domain, "learning_test", sizeof(exp.domain) - 1);
-        exp.action_json     = strdup("{\"learn\":\"true\"}");
-        exp.outcome_json    = strdup("{\"improved\":true}");
-        exp.feedback        = COG_FEEDBACK_POSITIVE;
-        exp.reward          = 0.8 + (i % 5) * 0.04;
-        exp.timestamp       = (uint64_t) (i + 1) * 100;
+        exp.action_json = strdup("{\"learn\":\"true\"}");
+        exp.outcome_json = strdup("{\"improved\":true}");
+        exp.feedback = COG_FEEDBACK_POSITIVE;
+        exp.reward = 0.8 + (i % 5) * 0.04;
+        exp.timestamp = (uint64_t)(i + 1) * 100;
         exp.cognitive_level = COG_LEVEL_LEARNING;
         cog_evolution_record_experience(evo, &exp);
         free(exp.action_json);
@@ -429,7 +435,7 @@ static void test_evaluate_level_progression(void)
     }
 
     cog_level_t new_level = COG_LEVEL_PERCEPTION;
-    int rc                = cog_evolution_evaluate_level(evo, &new_level);
+    int rc = cog_evolution_evaluate_level(evo, &new_level);
 
     printf("    Level evaluation: %d -> %d (rc=%d)\n", COG_LEVEL_PERCEPTION, new_level, rc);
     TEST_PASS("evaluate level computes progression");
@@ -447,7 +453,8 @@ static void test_set_reward_fn(void)
 
     int rc = cog_evolution_set_reward_fn(evo, sample_reward_fn, NULL);
     if (rc >= 0) {
-        cog_experience_t exp = make_experience("callback_test", "{\"a\":\"b\"}", COG_FEEDBACK_POSITIVE);
+        cog_experience_t exp =
+            make_experience("callback_test", "{\"a\":\"b\"}", COG_FEEDBACK_POSITIVE);
         cog_evolution_record_experience(evo, &exp);
         free_experience(&exp);
         TEST_PASS("set reward function works");
@@ -465,7 +472,7 @@ static void test_set_level_change_callback(void)
         return;
 
     g_level_change_called = 0;
-    int rc                = cog_evolution_set_level_change_fn(evo, sample_level_change_fn, NULL);
+    int rc = cog_evolution_set_level_change_fn(evo, sample_level_change_fn, NULL);
     if (rc >= 0) {
         cog_level_t new_level = COG_LEVEL_REACTION;
         cog_evolution_evaluate_level(evo, &new_level);
@@ -493,24 +500,24 @@ static void test_get_counts_and_fitness(void)
         memset(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "stat_%03d", i);
         strncpy(exp.domain, "stats_test", sizeof(exp.domain) - 1);
-        exp.action_json     = strdup("{\"op\":\"count\"}");
-        exp.outcome_json    = strdup("{}");
-        exp.feedback        = (i < 18) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEUTRAL;
-        exp.reward          = (i < 18) ? 1.0 : 0.0;
-        exp.timestamp       = (uint64_t) (i + 1) * 400;
+        exp.action_json = strdup("{\"op\":\"count\"}");
+        exp.outcome_json = strdup("{}");
+        exp.feedback = (i < 18) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEUTRAL;
+        exp.reward = (i < 18) ? 1.0 : 0.0;
+        exp.timestamp = (uint64_t)(i + 1) * 400;
         exp.cognitive_level = COG_LEVEL_LEARNING;
         cog_evolution_record_experience(evo, &exp);
         free(exp.action_json);
         free(exp.outcome_json);
     }
 
-    size_t exp_count   = cog_evolution_get_experience_count(evo);
+    size_t exp_count = cog_evolution_get_experience_count(evo);
     size_t strat_count = cog_evolution_get_strategy_count(evo);
-    size_t pat_count   = cog_evolution_get_pattern_count(evo);
-    double fitness     = cog_evolution_get_fitness(evo);
+    size_t pat_count = cog_evolution_get_pattern_count(evo);
+    double fitness = cog_evolution_get_fitness(evo);
 
-    printf("    Experiences=%zu, Strategies=%zu, Patterns=%zu, Fitness=%.4f\n", exp_count, strat_count, pat_count,
-           fitness);
+    printf("    Experiences=%zu, Strategies=%zu, Patterns=%zu, Fitness=%.4f\n", exp_count,
+           strat_count, pat_count, fitness);
     TEST_PASS("get counts and fitness");
 
     cog_evolution_destroy(evo);
@@ -522,12 +529,13 @@ static void test_counts_empty_system(void)
     if (!evo)
         return;
 
-    size_t exp_count   = cog_evolution_get_experience_count(evo);
+    size_t exp_count = cog_evolution_get_experience_count(evo);
     size_t strat_count = cog_evolution_get_strategy_count(evo);
-    size_t pat_count   = cog_evolution_get_pattern_count(evo);
-    double fitness     = cog_evolution_get_fitness(evo);
+    size_t pat_count = cog_evolution_get_pattern_count(evo);
+    double fitness = cog_evolution_get_fitness(evo);
 
-    printf("    Empty: exp=%zu, strat=%zu, pat=%zu, fit=%.4f\n", exp_count, strat_count, pat_count, fitness);
+    printf("    Empty: exp=%zu, strat=%zu, pat=%zu, fit=%.4f\n", exp_count, strat_count, pat_count,
+           fitness);
     TEST_PASS("empty system counts are zero/valid");
 
     cog_evolution_destroy(evo);
@@ -565,14 +573,15 @@ static void test_constants(void)
 
 static void test_struct_sizes(void)
 {
-    assert(sizeof(cog_experience_t) >= sizeof(char[64]) + sizeof(char[128]) + 3 * sizeof(char *) + sizeof(double) +
-                                           sizeof(uint64_t) + sizeof(cog_level_t));
-    assert(sizeof(cog_strategy_t) >= sizeof(char[64]) + 2 * sizeof(char[128]) + 2 * sizeof(char *) + sizeof(double) +
-                                         3 * sizeof(uint64_t) + sizeof(cog_level_t));
-    assert(sizeof(cog_pattern_t) >=
-           sizeof(char[64]) + sizeof(char[64]) + 2 * sizeof(char *) + sizeof(double) + 2 * sizeof(uint64_t));
-    assert(sizeof(cog_knowledge_t) >=
-           sizeof(char[64]) + 2 * sizeof(char[128]) + 2 * sizeof(char *) + sizeof(double) + sizeof(bool));
+    assert(sizeof(cog_experience_t) >= sizeof(char[64]) + sizeof(char[128]) + 3 * sizeof(char *) +
+                                           sizeof(double) + sizeof(uint64_t) + sizeof(cog_level_t));
+    assert(sizeof(cog_strategy_t) >= sizeof(char[64]) + 2 * sizeof(char[128]) + 2 * sizeof(char *) +
+                                         sizeof(double) + 3 * sizeof(uint64_t) +
+                                         sizeof(cog_level_t));
+    assert(sizeof(cog_pattern_t) >= sizeof(char[64]) + sizeof(char[64]) + 2 * sizeof(char *) +
+                                        sizeof(double) + 2 * sizeof(uint64_t));
+    assert(sizeof(cog_knowledge_t) >= sizeof(char[64]) + 2 * sizeof(char[128]) +
+                                          2 * sizeof(char *) + sizeof(double) + sizeof(bool));
     TEST_PASS("struct sizes adequate");
 }
 
@@ -597,11 +606,13 @@ static void test_full_lifecycle_workflow(void)
         snprintf(exp.id, sizeof(exp.id), "wf_%03d", i);
         strncpy(exp.domain, "workflow_domain", sizeof(exp.domain) - 1);
         exp.context_json = strdup("{\"context\":\"integration\"}");
-        exp.action_json  = strdup("{\"step\":\"process\"}");
+        exp.action_json = strdup("{\"step\":\"process\"}");
         exp.outcome_json = strdup("{\"done\":true}");
-        exp.feedback     = (i < 30) ? COG_FEEDBACK_POSITIVE : (i < 36) ? COG_FEEDBACK_NEUTRAL : COG_FEEDBACK_NEGATIVE;
-        exp.reward       = (i < 30) ? 1.0 : (i < 36) ? 0.1 : -0.5;
-        exp.timestamp    = (uint64_t) (i + 1) * 250;
+        exp.feedback = (i < 30)   ? COG_FEEDBACK_POSITIVE
+                       : (i < 36) ? COG_FEEDBACK_NEUTRAL
+                                  : COG_FEEDBACK_NEGATIVE;
+        exp.reward = (i < 30) ? 1.0 : (i < 36) ? 0.1 : -0.5;
+        exp.timestamp = (uint64_t)(i + 1) * 250;
         exp.cognitive_level = COG_LEVEL_LEARNING;
         cog_evolution_record_experience(evo, &exp);
         free(exp.context_json);
@@ -629,13 +640,14 @@ static void test_full_lifecycle_workflow(void)
 
     printf("    Workflow: exp=%zu, pats=%zu, strats=%zu, "
            "level=%d->%d, fit=%.4f, cb=%d\n",
-           final_exp, pat_count, strat_count, COG_LEVEL_REACTION, final_level, final_fit, g_level_change_called);
+           final_exp, pat_count, strat_count, COG_LEVEL_REACTION, final_level, final_fit,
+           g_level_change_called);
 
     TEST_PASS("full lifecycle workflow");
 
     cog_evolution_destroy(evo);
-    (void) sel;
-    (void) know;
+    (void)sel;
+    (void)know;
 }
 
 /* ==================== 主函数 ==================== */

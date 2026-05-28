@@ -6,29 +6,30 @@
  */
 
 #include "loop.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
 #undef assert
 #define assert(x) ((void)(x))
 #endif
+#include "platform.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "platform.h"
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)  \
+    do {                \
+        tests_run++;    \
+        func();         \
+        tests_passed++; \
     } while (0)
 
 /* ==================== 生命周期测试 ==================== */
@@ -36,7 +37,7 @@ static int tests_failed = 0;
 static void test_loop_create_default_config(void)
 {
     agentos_core_loop_t *loop = NULL;
-    agentos_error_t err       = agentos_loop_create(NULL, &loop);
+    agentos_error_t err = agentos_loop_create(NULL, &loop);
 
     if (err == AGENTOS_SUCCESS && loop != NULL) {
         TEST_PASS("loop_create with default config");
@@ -52,12 +53,12 @@ static void test_loop_create_custom_config(void)
     memset(&config, 0, sizeof(config));
     config.loop_config_cognition_threads = 2;
     config.loop_config_execution_threads = 4;
-    config.loop_config_memory_threads    = 1;
-    config.loop_config_max_queued_tasks  = 500;
+    config.loop_config_memory_threads = 1;
+    config.loop_config_max_queued_tasks = 500;
     config.loop_config_stats_interval_ms = 30000;
 
     agentos_core_loop_t *loop = NULL;
-    agentos_error_t err       = agentos_loop_create(&config, &loop);
+    agentos_error_t err = agentos_loop_create(&config, &loop);
 
     if (err == AGENTOS_SUCCESS && loop != NULL) {
         TEST_PASS("loop_create with custom config");
@@ -73,11 +74,11 @@ static void test_loop_create_invalid_config_too_many_threads(void)
     memset(&config, 0, sizeof(config));
     config.loop_config_cognition_threads = 2000; /* 超过上限1024 */
     config.loop_config_execution_threads = 4;
-    config.loop_config_memory_threads    = 1;
-    config.loop_config_max_queued_tasks  = 100;
+    config.loop_config_memory_threads = 1;
+    config.loop_config_max_queued_tasks = 100;
 
     agentos_core_loop_t *loop = NULL;
-    agentos_error_t err       = agentos_loop_create(&config, &loop);
+    agentos_error_t err = agentos_loop_create(&config, &loop);
 
     if (err != AGENTOS_SUCCESS || loop == NULL) {
         TEST_PASS("loop_create rejects too many threads");
@@ -96,7 +97,7 @@ static void test_loop_create_invalid_zero_queue(void)
     config.loop_config_max_queued_tasks = 0; /* 非法值 */
 
     agentos_core_loop_t *loop = NULL;
-    agentos_error_t err       = agentos_loop_create(&config, &loop);
+    agentos_error_t err = agentos_loop_create(&config, &loop);
 
     if (err != AGENTOS_SUCCESS) {
         TEST_PASS("loop_create rejects zero queue size");
@@ -127,7 +128,7 @@ static void test_loop_destroy_null(void)
 static void test_loop_get_engines_all(void)
 {
     agentos_core_loop_t *loop = NULL;
-    agentos_error_t err       = agentos_loop_create(NULL, &loop);
+    agentos_error_t err = agentos_loop_create(NULL, &loop);
     if (err != AGENTOS_SUCCESS || !loop) {
         TEST_FAIL("get_engines", "create failed");
         return;
@@ -135,7 +136,7 @@ static void test_loop_get_engines_all(void)
 
     agentos_cognition_engine_t *cognition = NULL;
     agentos_execution_engine_t *execution = NULL;
-    agentos_memory_engine_t *memory       = NULL;
+    agentos_memory_engine_t *memory = NULL;
 
     agentos_loop_get_engines(loop, &cognition, &execution, &memory);
 
@@ -151,7 +152,7 @@ static void test_loop_get_engines_all(void)
 static void test_loop_get_engines_partial(void)
 {
     agentos_core_loop_t *loop = NULL;
-    agentos_error_t err       = agentos_loop_create(NULL, &loop);
+    agentos_error_t err = agentos_loop_create(NULL, &loop);
     if (err != AGENTOS_SUCCESS || !loop) {
         TEST_FAIL("get_engines partial", "create failed");
         return;
@@ -173,7 +174,7 @@ static void test_loop_get_engines_null_loop(void)
 {
     agentos_cognition_engine_t *c = NULL;
     agentos_execution_engine_t *e = NULL;
-    agentos_memory_engine_t *m    = NULL;
+    agentos_memory_engine_t *m = NULL;
 
     agentos_loop_get_engines(NULL, &c, &e, &m);
 
@@ -238,8 +239,7 @@ static void test_loop_config_checkpoint_custom(void)
     agentos_loop_config_t config;
     memset(&config, 0, sizeof(config));
     config.loop_config_checkpoint_enabled = 1;
-    snprintf(config.loop_config_checkpoint_path,
-             sizeof(config.loop_config_checkpoint_path),
+    snprintf(config.loop_config_checkpoint_path, sizeof(config.loop_config_checkpoint_path),
              AGENTOS_TMP_DIR "/test_checkpoints");
     config.loop_config_checkpoint_interval_ms = 5000;
 
@@ -253,7 +253,7 @@ static void test_loop_config_checkpoint_custom(void)
 static void test_loop_checkpoint_disabled_by_default(void)
 {
     agentos_core_loop_t *loop = NULL;
-    agentos_error_t err       = agentos_loop_create(NULL, &loop);
+    agentos_error_t err = agentos_loop_create(NULL, &loop);
     if (err != AGENTOS_SUCCESS || !loop) {
         TEST_FAIL("checkpoint disabled", "create failed");
         return;
@@ -272,13 +272,13 @@ static void test_loop_checkpoint_disabled_by_default(void)
 static void test_loop_restore_without_checkpoint(void)
 {
     agentos_core_loop_t *loop = NULL;
-    agentos_error_t err       = agentos_loop_create(NULL, &loop);
+    agentos_error_t err = agentos_loop_create(NULL, &loop);
     if (err != AGENTOS_SUCCESS || !loop) {
         TEST_FAIL("restore no checkpoint", "create failed");
         return;
     }
 
-    char* restored_id = NULL;
+    char *restored_id = NULL;
     agentos_error_t restore_err = agentos_loop_restore_task(loop, "nonexistent_task", &restored_id);
     if (restore_err == AGENTOS_ENOENT || restore_err == AGENTOS_ENOTINIT) {
         TEST_PASS("restore returns error when checkpoint not found");

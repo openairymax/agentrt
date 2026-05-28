@@ -1,9 +1,10 @@
 #include "parallel_dispatcher.h"
 
 #include "agentos.h"
-#include "delegate.h"
-#include "platform.h"
 #include "atomic_compat.h"
+#include "delegate.h"
+#include "memory_compat.h"
+#include "platform.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -92,7 +93,7 @@ static agentos_error_t exec_single_tool(agentos_tool_execute_fn executor, void *
 agentos_parallel_dispatcher_t *agentos_parallel_dispatcher_create(int max_parallel)
 {
     agentos_parallel_dispatcher_t *d =
-        (agentos_parallel_dispatcher_t *)calloc(1, sizeof(agentos_parallel_dispatcher_t));
+        (agentos_parallel_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(agentos_parallel_dispatcher_t));
     if (!d)
         return NULL;
     d->max_parallel = max_parallel > 0 ? max_parallel : 4;
@@ -108,7 +109,7 @@ void agentos_parallel_dispatcher_destroy(agentos_parallel_dispatcher_t *dispatch
     if (!dispatcher)
         return;
     agentos_mutex_destroy(&dispatcher->mutex);
-    free(dispatcher);
+    AGENTOS_FREE(dispatcher);
 }
 
 agentos_error_t agentos_parallel_dispatcher_set_executor(agentos_parallel_dispatcher_t *dispatcher,
@@ -143,12 +144,12 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
     agentos_mutex_unlock(&dispatcher->mutex);
 
     agentos_tool_result_t *results =
-        (agentos_tool_result_t *)calloc(call_count, sizeof(agentos_tool_result_t));
+        (agentos_tool_result_t *)AGENTOS_CALLOC(call_count, sizeof(agentos_tool_result_t));
     if (!results)
         return AGENTOS_ENOMEM;
 
     for (size_t i = 0; i < call_count; i++) {
-        results[i].tool_name = calls[i].tool_name ? strdup(calls[i].tool_name) : NULL;
+        results[i].tool_name = calls[i].tool_name ? AGENTOS_STRDUP(calls[i].tool_name) : NULL;
         results[i].error = AGENTOS_SUCCESS;
         results[i].output = NULL;
         results[i].output_len = 0;
@@ -169,15 +170,15 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
         return AGENTOS_SUCCESS;
     }
 
-    int *group_id = (int *)malloc(call_count * sizeof(int));
-    int *serial_flags = (int *)calloc(call_count, sizeof(int));
+    int *group_id = (int *)AGENTOS_MALLOC(call_count * sizeof(int));
+    int *serial_flags = (int *)AGENTOS_CALLOC(call_count, sizeof(int));
     if (!group_id || !serial_flags) {
-        free(group_id);
-        free(serial_flags);
+        AGENTOS_FREE(group_id);
+        AGENTOS_FREE(serial_flags);
         for (size_t i = 0; i < call_count; i++) {
-            free(results[i].tool_name);
+            AGENTOS_FREE(results[i].tool_name);
         }
-        free(results);
+        AGENTOS_FREE(results);
         return AGENTOS_ENOMEM;
     }
 
@@ -268,7 +269,7 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
             }
 
             tool_exec_context_t *contexts =
-                (tool_exec_context_t *)calloc(parallel_count, sizeof(tool_exec_context_t));
+                (tool_exec_context_t *)AGENTOS_CALLOC(parallel_count, sizeof(tool_exec_context_t));
             if (!contexts) {
                 for (size_t i = 0; i < call_count; i++) {
                     if (group_id[i] != g)
@@ -307,12 +308,12 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
                     contexts[j].joined = 1;
                 }
             }
-            free(contexts);
+            AGENTOS_FREE(contexts);
         }
     }
 
-    free(group_id);
-    free(serial_flags);
+    AGENTOS_FREE(group_id);
+    AGENTOS_FREE(serial_flags);
 
     *out_results = results;
     *out_result_count = call_count;
