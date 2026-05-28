@@ -18,8 +18,8 @@
 #define AGENTOS_UNIFIED_METRICS_H
 
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,18 +27,18 @@ extern "C" {
 
 /* ==================== 常量定义 ==================== */
 
-#define UM_MAX_MODULES          32
-#define UM_MAX_METRICS_PER_MOD  256
-#define UM_MODULE_NAME_LEN      32
-#define UM_METRIC_NAME_LEN      128
+#define UM_MAX_MODULES 32
+#define UM_MAX_METRICS_PER_MOD 256
+#define UM_MODULE_NAME_LEN 32
+#define UM_METRIC_NAME_LEN 128
 
 /* ==================== 指标类型 ==================== */
 
 typedef enum {
-    UM_TYPE_COUNTER   = 0,
-    UM_TYPE_GAUGE     = 1,
+    UM_TYPE_COUNTER = 0,
+    UM_TYPE_GAUGE = 1,
     UM_TYPE_HISTOGRAM = 2,
-    UM_TYPE_SUMMARY   = 3
+    UM_TYPE_SUMMARY = 3
 } um_metric_type_t;
 
 /* ==================== 指标条目 ==================== */
@@ -91,7 +91,7 @@ typedef struct {
  * @param config 配置参数（NULL使用默认）
  * @return 0成功，非0失败
  */
-int um_init(const um_config_t* config);
+int um_init(const um_config_t *config);
 
 /**
  * @brief 关闭统一指标收集器
@@ -112,14 +112,14 @@ bool um_is_initialized(void);
  * @param instance_id 实例ID（NULL使用默认）
  * @return 0成功，非0失败
  */
-int um_register_module(const char* module_name, const char* instance_id);
+int um_register_module(const char *module_name, const char *instance_id);
 
 /**
  * @brief 注销指标模块
  * @param module_name 模块名称
  * @return 0成功，非0失败
  */
-int um_unregister_module(const char* module_name);
+int um_unregister_module(const char *module_name);
 
 /* ==================== 指标操作 ==================== */
 
@@ -132,13 +132,8 @@ int um_unregister_module(const char* module_name);
  * @param labels 标签（如"method=\"GET\",path=\"/api\""）
  * @return 0成功，非0失败
  */
-int um_register_metric(
-    const char* module_name,
-    const char* name,
-    um_metric_type_t type,
-    const char* help,
-    const char* labels
-);
+int um_register_metric(const char *module_name, const char *name, um_metric_type_t type,
+                       const char *help, const char *labels);
 
 /**
  * @brief 增加计数器
@@ -147,7 +142,7 @@ int um_register_metric(
  * @param value 增加值
  * @return 0成功，非0失败
  */
-int um_increment(const char* module_name, const char* name, uint64_t value);
+int um_increment(const char *module_name, const char *name, uint64_t value);
 
 /**
  * @brief 设置仪表值
@@ -156,7 +151,7 @@ int um_increment(const char* module_name, const char* name, uint64_t value);
  * @param value 值
  * @return 0成功，非0失败
  */
-int um_gauge_set(const char* module_name, const char* name, double value);
+int um_gauge_set(const char *module_name, const char *name, double value);
 
 /**
  * @brief 观察直方图/摘要值
@@ -165,7 +160,7 @@ int um_gauge_set(const char* module_name, const char* name, double value);
  * @param value 观察值
  * @return 0成功，非0失败
  */
-int um_observe(const char* module_name, const char* name, double value);
+int um_observe(const char *module_name, const char *name, double value);
 
 /* ==================== 导出 ==================== */
 
@@ -173,20 +168,20 @@ int um_observe(const char* module_name, const char* name, double value);
  * @brief 导出所有指标为Prometheus格式
  * @return Prometheus格式字符串（需调用者释放），失败返回NULL
  */
-char* um_export_prometheus(void);
+char *um_export_prometheus(void);
 
 /**
  * @brief 导出指定模块指标为Prometheus格式
  * @param module_name 模块名称（NULL导出全部）
  * @return Prometheus格式字符串（需调用者释放），失败返回NULL
  */
-char* um_export_prometheus_module(const char* module_name);
+char *um_export_prometheus_module(const char *module_name);
 
 /**
  * @brief 导出所有指标为JSON格式
  * @return JSON字符串（需调用者释放），失败返回NULL
  */
-char* um_export_json(void);
+char *um_export_json(void);
 
 /* ==================== 默认指标 ==================== */
 
@@ -208,7 +203,7 @@ void um_update_default_metrics(void);
  * @param stats [out] 统计信息
  * @return 0成功，非0失败
  */
-int um_get_stats(um_stats_t* stats);
+int um_get_stats(um_stats_t *stats);
 
 /**
  * @brief 创建默认配置

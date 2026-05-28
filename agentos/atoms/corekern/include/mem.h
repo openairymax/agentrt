@@ -14,10 +14,11 @@
 #ifndef AGENTOS_MEM_H
 #define AGENTOS_MEM_H
 
-#include <stddef.h>
-#include <stdint.h>
 #include "error.h"
 #include "export.h"
+
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,11 +30,11 @@ extern "C" {
  * 用于内存追踪和泄漏检测
  */
 typedef struct agentos_mem_alloc_info {
-    void* ptr;                          /**< 分配的内存指针 */
-    size_t size;                        /**< 分配的内存大小（字节） */
-    const char* file;                  /**< 分配所在的源文件 */
-    int line;                           /**< 分配所在的行号 */
-    struct agentos_mem_alloc_info* next; /**< 下一个分配信息节点 */
+    void *ptr;                           /**< 分配的内存指针 */
+    size_t size;                         /**< 分配的内存大小（字节） */
+    const char *file;                    /**< 分配所在的源文件 */
+    int line;                            /**< 分配所在的行号 */
+    struct agentos_mem_alloc_info *next; /**< 下一个分配信息节点 */
 } agentos_mem_alloc_info_t;
 
 /**
@@ -75,7 +76,7 @@ AGENTOS_API agentos_error_t agentos_mem_init(size_t heap_size);
  * @see agentos_mem_free()
  * @see agentos_mem_alloc_ex()
  */
-AGENTOS_API void* agentos_mem_alloc(size_t size);
+AGENTOS_API void *agentos_mem_alloc(size_t size);
 
 /**
  * @brief 分配内存（带调试信息）
@@ -92,7 +93,7 @@ AGENTOS_API void* agentos_mem_alloc(size_t size);
  * @see agentos_mem_alloc()
  * @see agentos_mem_free()
  */
-AGENTOS_API void* agentos_mem_alloc_ex(size_t size, const char* file, int line);
+AGENTOS_API void *agentos_mem_alloc_ex(size_t size, const char *file, int line);
 
 /**
  * @brief 分配对齐的内存块
@@ -107,7 +108,7 @@ AGENTOS_API void* agentos_mem_alloc_ex(size_t size, const char* file, int line);
  *
  * @see agentos_mem_aligned_free()
  */
-AGENTOS_API void* agentos_mem_aligned_alloc(size_t size, size_t alignment);
+AGENTOS_API void *agentos_mem_aligned_alloc(size_t size, size_t alignment);
 
 /**
  * @brief 分配对齐的内存块（带调试信息）
@@ -124,7 +125,8 @@ AGENTOS_API void* agentos_mem_aligned_alloc(size_t size, size_t alignment);
  *
  * @see agentos_mem_aligned_alloc()
  */
-AGENTOS_API void* agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char* file, int line);
+AGENTOS_API void *agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char *file,
+                                               int line);
 
 /**
  * @brief 释放之前分配的内存
@@ -142,7 +144,7 @@ AGENTOS_API void* agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, co
  * @see agentos_mem_alloc()
  * @see agentos_mem_alloc_ex()
  */
-AGENTOS_API void agentos_mem_free(void* ptr);
+AGENTOS_API void agentos_mem_free(void *ptr);
 
 /**
  * @brief 释放对齐的内存
@@ -155,7 +157,7 @@ AGENTOS_API void agentos_mem_free(void* ptr);
  *
  * @see agentos_mem_aligned_alloc()
  */
-AGENTOS_API void agentos_mem_aligned_free(void* ptr);
+AGENTOS_API void agentos_mem_aligned_free(void *ptr);
 
 /**
  * @brief 重新分配内存
@@ -174,7 +176,7 @@ AGENTOS_API void agentos_mem_aligned_free(void* ptr);
  * @see agentos_mem_alloc()
  * @see agentos_mem_free()
  */
-AGENTOS_API void* agentos_mem_realloc(void* ptr, size_t new_size);
+AGENTOS_API void *agentos_mem_realloc(void *ptr, size_t new_size);
 
 /**
  * @brief 重新分配内存（带调试信息）
@@ -191,7 +193,7 @@ AGENTOS_API void* agentos_mem_realloc(void* ptr, size_t new_size);
  *
  * @see agentos_mem_realloc()
  */
-AGENTOS_API void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char* file, int line);
+AGENTOS_API void *agentos_mem_realloc_ex(void *ptr, size_t new_size, const char *file, int line);
 
 /**
  * @brief 创建内存池
@@ -208,7 +210,7 @@ AGENTOS_API void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char*
  * @see agentos_mem_pool_alloc()
  * @see agentos_mem_pool_free()
  */
-AGENTOS_API agentos_mem_pool_t* agentos_mem_pool_create(size_t block_size, uint32_t block_count);
+AGENTOS_API agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_count);
 
 /**
  * @brief 从内存池分配
@@ -223,7 +225,7 @@ AGENTOS_API agentos_mem_pool_t* agentos_mem_pool_create(size_t block_size, uint3
  * @see agentos_mem_pool_create()
  * @see agentos_mem_pool_free()
  */
-AGENTOS_API void* agentos_mem_pool_alloc(agentos_mem_pool_t* pool);
+AGENTOS_API void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool);
 
 /**
  * @brief 释放到内存池
@@ -240,7 +242,7 @@ AGENTOS_API void* agentos_mem_pool_alloc(agentos_mem_pool_t* pool);
  * @see agentos_mem_pool_create()
  * @see agentos_mem_pool_alloc()
  */
-AGENTOS_API agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t* pool, void* ptr);
+AGENTOS_API agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t *pool, void *ptr);
 
 /**
  * @brief 销毁内存池
@@ -252,7 +254,7 @@ AGENTOS_API agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t* pool, void
  *
  * @see agentos_mem_pool_create()
  */
-AGENTOS_API void agentos_mem_pool_destroy(agentos_mem_pool_t* pool);
+AGENTOS_API void agentos_mem_pool_destroy(agentos_mem_pool_t *pool);
 
 /**
  * @brief 获取内存使用统计
@@ -265,7 +267,7 @@ AGENTOS_API void agentos_mem_pool_destroy(agentos_mem_pool_t* pool);
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API void agentos_mem_stats(size_t* out_total, size_t* out_used, size_t* out_peak);
+AGENTOS_API void agentos_mem_stats(size_t *out_total, size_t *out_used, size_t *out_peak);
 
 /**
  * @brief 检查内存泄漏

@@ -43,7 +43,7 @@ add_executable(test_mkdir_recursive test_mkdir_recursive.c)
 
 target_include_directories(test_mkdir_recursive PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/platform/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../unit/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/../unit/commons/unit
 )
 
 target_compile_features(test_mkdir_recursive PRIVATE c_std_11)

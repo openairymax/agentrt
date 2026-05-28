@@ -6,22 +6,31 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "error.h"
+#include "scheduler_service.h"
+#include "strategy_interface.h"
+
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
-#include "scheduler_service.h"
-#include "strategy_interface.h"
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
 
 /**
  * @brief 基于优先级的调度策略数据
  */
 typedef struct {
-    agent_info_t** agents;      /**< Agent 列表 */
-    size_t agent_count;         /**< Agent 数量 */
-    size_t max_agents;          /**< 最大 Agent 数量 */
-    float* priority_weights;    /**< 优先级权重表 */
-    size_t priority_levels;     /**< 优先级级别数量 */
+    agent_info_t **agents;   /**< Agent 列表 */
+    size_t agent_count;      /**< Agent 数量 */
+    size_t max_agents;       /**< 最大 Agent 数量 */
+    float *priority_weights; /**< 优先级权重表 */
+    size_t priority_levels;  /**< 优先级级别数量 */
 } priority_based_data_t;
 
 /**
@@ -30,24 +39,26 @@ typedef struct {
  * @param data 输出参数，返回策略数据
  * @return 0 表示成功，非 0 表示错误码
  */
-static int priority_based_create(const sched_config_t* manager, void** data) {
-    priority_based_data_t* pbd = (priority_based_data_t*)AGENTOS_MALLOC(sizeof(priority_based_data_t));
+static int priority_based_create(const sched_config_t *manager, void **data)
+{
+    priority_based_data_t *pbd =
+        (priority_based_data_t *)AGENTOS_MALLOC(sizeof(priority_based_data_t));
     if (!pbd) {
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     pbd->max_agents = manager->max_agents;
-    pbd->agents = (agent_info_t**)AGENTOS_MALLOC(sizeof(agent_info_t*) * pbd->max_agents);
+    pbd->agents = (agent_info_t **)AGENTOS_MALLOC(sizeof(agent_info_t *) * pbd->max_agents);
     if (!pbd->agents) {
         AGENTOS_FREE(pbd);
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     pbd->agent_count = 0;
-    
+
     // 初始化优先级权重表（默认：优先级越高，权重越大）
-    pbd->priority_levels = 10; // 假设有10个优先级级别
-    pbd->priority_weights = (float*)AGENTOS_MALLOC(sizeof(float) * pbd->priority_levels);
+    pbd->priority_levels = 10;  // 假设有10个优先级级别
+    pbd->priority_weights = (float *)AGENTOS_MALLOC(sizeof(float) * pbd->priority_levels);
     if (pbd->priority_weights) {
         for (size_t i = 0; i < pbd->priority_levels; i++) {
             // 指数权重：优先级越高，权重增长越快
@@ -64,13 +75,14 @@ static int priority_based_create(const sched_config_t* manager, void** data) {
  * @param data 策略数据
  * @return 0 表示成功，非 0 表示错误码
  */
-static int priority_based_destroy(void* data) {
+static int priority_based_destroy(void *data)
+{
     if (!data) {
         return 0;
     }
 
-    priority_based_data_t* pbd = (priority_based_data_t*)data;
-    
+    priority_based_data_t *pbd = (priority_based_data_t *)data;
+
     if (pbd->agents) {
         for (size_t i = 0; i < pbd->agent_count; i++) {
             if (pbd->agents[i]) {
@@ -96,15 +108,16 @@ static int priority_based_destroy(void* data) {
  * @param agent_info Agent 信息
  * @return 0 表示成功，非 0 表示错误码
  */
-static int priority_based_register_agent(void* data, const agent_info_t* agent_info) {
+static int priority_based_register_agent(void *data, const agent_info_t *agent_info)
+{
     if (!data || !agent_info) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    priority_based_data_t* pbd = (priority_based_data_t*)data;
+    priority_based_data_t *pbd = (priority_based_data_t *)data;
 
     if (pbd->agent_count >= pbd->max_agents) {
-        return -2;
+        return AGENTOS_ERR_OVERFLOW;
     }
 
     // 检查是否已存在
@@ -121,22 +134,22 @@ static int priority_based_register_agent(void* data, const agent_info_t* agent_i
                 AGENTOS_FREE(pbd->agents[i]->agent_name);
                 pbd->agents[i]->agent_id = NULL;
                 pbd->agents[i]->agent_name = NULL;
-                return -1;
+                return AGENTOS_ERR_OUT_OF_MEMORY;
             }
             pbd->agents[i]->load_factor = agent_info->load_factor;
             pbd->agents[i]->success_rate = agent_info->success_rate;
             pbd->agents[i]->avg_response_time_ms = agent_info->avg_response_time_ms;
             pbd->agents[i]->is_available = agent_info->is_available;
             pbd->agents[i]->weight = agent_info->weight;
-            
+
             return 0;
         }
     }
 
     // 添加新 Agent
-    agent_info_t* new_agent = (agent_info_t*)AGENTOS_MALLOC(sizeof(agent_info_t));
+    agent_info_t *new_agent = (agent_info_t *)AGENTOS_MALLOC(sizeof(agent_info_t));
     if (!new_agent) {
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     new_agent->agent_id = AGENTOS_STRDUP(agent_info->agent_id);
@@ -145,7 +158,7 @@ static int priority_based_register_agent(void* data, const agent_info_t* agent_i
         AGENTOS_FREE(new_agent->agent_id);
         AGENTOS_FREE(new_agent->agent_name);
         AGENTOS_FREE(new_agent);
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     new_agent->load_factor = agent_info->load_factor;
     new_agent->success_rate = agent_info->success_rate;
@@ -163,12 +176,13 @@ static int priority_based_register_agent(void* data, const agent_info_t* agent_i
  * @param agent_id Agent ID
  * @return 0 表示成功，非 0 表示错误码
  */
-static int priority_based_unregister_agent(void* data, const char* agent_id) {
+static int priority_based_unregister_agent(void *data, const char *agent_id)
+{
     if (!data || !agent_id) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    priority_based_data_t* pbd = (priority_based_data_t*)data;
+    priority_based_data_t *pbd = (priority_based_data_t *)data;
 
     for (size_t i = 0; i < pbd->agent_count; i++) {
         if (strcmp(pbd->agents[i]->agent_id, agent_id) == 0) {
@@ -187,7 +201,7 @@ static int priority_based_unregister_agent(void* data, const char* agent_id) {
         }
     }
 
-    return -2;  // Agent 不存在
+    return AGENTOS_ERR_NOT_FOUND;  // Agent 不存在
 }
 
 /**
@@ -196,7 +210,8 @@ static int priority_based_unregister_agent(void* data, const char* agent_id) {
  * @param agent_info Agent 信息
  * @return 0 表示成功，非 0 表示错误码
  */
-static int priority_based_update_agent_status(void* data, const agent_info_t* agent_info) {
+static int priority_based_update_agent_status(void *data, const agent_info_t *agent_info)
+{
     return priority_based_register_agent(data, agent_info);
 }
 
@@ -207,29 +222,31 @@ static int priority_based_update_agent_status(void* data, const agent_info_t* ag
  * @param priority_weight 优先级权重
  * @return 匹配分数
  */
-static float calculate_match_score(const agent_info_t* agent, const task_info_t* task, float priority_weight) {
+static float calculate_match_score(const agent_info_t *agent, const task_info_t *task,
+                                   float priority_weight)
+{
     if (!agent->is_available || agent->load_factor >= 0.9) {
-        return -1.0f; // 不可用或负载过高
+        return AGENTOS_EINVAL;  // 不可用或负载过高
     }
-    
+
     float score = 0.0f;
-    
+
     // 基础成功率权重
     score += agent->success_rate * 0.4f;
-    
+
     // 负载因子权重（负载越低越好）
     score += (1.0f - agent->load_factor) * 0.3f;
-    
+
     // 响应时间权重（响应时间越短越好）
     float response_factor = 1.0f / (1.0f + agent->avg_response_time_ms / 1000.0f);
     score += response_factor * 0.2f;
-    
+
     // Agent权重（配置的优先级）
     score += agent->weight * 0.1f;
-    
+
     // 应用任务优先级权重
     score *= priority_weight;
-    
+
     return score;
 }
 
@@ -240,40 +257,44 @@ static float calculate_match_score(const agent_info_t* agent, const task_info_t*
  * @param result 输出参数，返回调度结果
  * @return 0 表示成功，非 0 表示错误码
  */
-static int priority_based_schedule(void* data, const task_info_t* task_info, sched_result_t** result) {
+static int priority_based_schedule(void *data, const task_info_t *task_info,
+                                   sched_result_t **result)
+{
     if (!data || !task_info || !result) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    priority_based_data_t* pbd = (priority_based_data_t*)data;
+    priority_based_data_t *pbd = (priority_based_data_t *)data;
 
     if (pbd->agent_count == 0) {
-        return -2;  // 无可用 Agent
+        return AGENTOS_ERR_NOT_FOUND;  // 无可用 Agent
     }
 
     // 获取任务优先级（假设task_info中有priority字段）
     // 如果没有，使用默认优先级
-    int task_priority = 5; // 默认中等优先级
+    int task_priority = 5;  // 默认中等优先级
     if (task_info->priority >= 0) {
         task_priority = task_info->priority;
     }
-    
+
     // 限制优先级在有效范围内
-    if (task_priority < 0) task_priority = 0;
-    if (task_priority >= (int)pbd->priority_levels) task_priority = pbd->priority_levels - 1;
-    
+    if (task_priority < 0)
+        task_priority = 0;
+    if (task_priority >= (int)pbd->priority_levels)
+        task_priority = pbd->priority_levels - 1;
+
     float priority_weight = 1.0f;
     if (pbd->priority_weights && task_priority < (int)pbd->priority_levels) {
         priority_weight = pbd->priority_weights[task_priority];
     }
 
-    agent_info_t* best_agent = NULL;
+    agent_info_t *best_agent = NULL;
     float best_score = -1.0f;
 
     for (size_t i = 0; i < pbd->agent_count; i++) {
-        agent_info_t* agent = pbd->agents[i];
+        agent_info_t *agent = pbd->agents[i];
         float score = calculate_match_score(agent, task_info, priority_weight);
-        
+
         if (score > best_score) {
             best_score = score;
             best_agent = agent;
@@ -281,13 +302,13 @@ static int priority_based_schedule(void* data, const task_info_t* task_info, sch
     }
 
     if (!best_agent) {
-        return -3;  // 无可用 Agent
+        return AGENTOS_ERR_NOT_FOUND;  // 无可用 Agent
     }
 
     // 创建调度结果
-    sched_result_t* res = (sched_result_t*)AGENTOS_MALLOC(sizeof(sched_result_t));
+    sched_result_t *res = (sched_result_t *)AGENTOS_MALLOC(sizeof(sched_result_t));
     if (!res) {
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     res->selected_agent_id = AGENTOS_STRDUP(best_agent->agent_id);
@@ -302,7 +323,8 @@ static int priority_based_schedule(void* data, const task_info_t* task_info, sch
  * @brief 获取基于优先级的调度策略名称
  * @return 策略名称
  */
-static const char* priority_based_get_name() {
+static const char *priority_based_get_name()
+{
     return "priority_based";
 }
 
@@ -311,12 +333,13 @@ static const char* priority_based_get_name() {
  * @param data 策略数据
  * @return 可用 Agent 数量
  */
-static size_t priority_based_get_available_agent_count(void* data) {
+static size_t priority_based_get_available_agent_count(void *data)
+{
     if (!data) {
         return 0;
     }
 
-    priority_based_data_t* pbd = (priority_based_data_t*)data;
+    priority_based_data_t *pbd = (priority_based_data_t *)data;
     size_t count = 0;
 
     for (size_t i = 0; i < pbd->agent_count; i++) {
@@ -333,12 +356,13 @@ static size_t priority_based_get_available_agent_count(void* data) {
  * @param data 策略数据
  * @return 总 Agent 数量
  */
-static size_t priority_based_get_total_agent_count(void* data) {
+static size_t priority_based_get_total_agent_count(void *data)
+{
     if (!data) {
         return 0;
     }
 
-    priority_based_data_t* pbd = (priority_based_data_t*)data;
+    priority_based_data_t *pbd = (priority_based_data_t *)data;
     return pbd->agent_count;
 }
 
@@ -354,13 +378,13 @@ static const strategy_interface_t priority_based_strategy = {
     .schedule = priority_based_schedule,
     .get_name = priority_based_get_name,
     .get_available_agent_count = priority_based_get_available_agent_count,
-    .get_total_agent_count = priority_based_get_total_agent_count
-};
+    .get_total_agent_count = priority_based_get_total_agent_count};
 
 /**
  * @brief 获取基于优先级的调度策略接口
  * @return 基于优先级的调度策略接口
  */
-const strategy_interface_t* get_priority_based_strategy() {
+const strategy_interface_t *get_priority_based_strategy()
+{
     return &priority_based_strategy;
 }

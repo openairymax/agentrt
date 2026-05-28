@@ -12,9 +12,9 @@
 #ifndef AGENTOS_CACHE_COMMON_H
 #define AGENTOS_CACHE_COMMON_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,29 +23,29 @@ extern "C" {
 /**
  * @brief 缓存键值对回调函数类型
  */
-typedef void (*cache_free_func_t)(void* data);
-typedef void* (*cache_copy_func_t)(const void* data);
-typedef int (*cache_compare_func_t)(const void* a, const void* b);
-typedef unsigned int (*cache_hash_func_t)(const void* key);
+typedef void (*cache_free_func_t)(void *data);
+typedef void *(*cache_copy_func_t)(const void *data);
+typedef int (*cache_compare_func_t)(const void *a, const void *b);
+typedef unsigned int (*cache_hash_func_t)(const void *key);
 
 /**
  * @brief 缓存配置结构体
  */
 typedef struct {
-    size_t capacity;           // 缓存容量
-    int ttl_sec;               // 过期时间（秒）
-    cache_hash_func_t hash_func;   // 哈希函数
-    cache_compare_func_t compare_func; // 比较函数
-    cache_free_func_t key_free_func;   // 键释放函数
-    cache_free_func_t value_free_func; // 值释放函数
-    cache_copy_func_t key_copy_func;   // 键复制函数
-    cache_copy_func_t value_copy_func; // 值复制函数
+    size_t capacity;                    // 缓存容量
+    int ttl_sec;                        // 过期时间（秒）
+    cache_hash_func_t hash_func;        // 哈希函数
+    cache_compare_func_t compare_func;  // 比较函数
+    cache_free_func_t key_free_func;    // 键释放函数
+    cache_free_func_t value_free_func;  // 值释放函数
+    cache_copy_func_t key_copy_func;    // 键复制函数
+    cache_copy_func_t value_copy_func;  // 值复制函数
 } cache_config_t;
 
 /**
  * @brief 缓存句柄类型
  */
-typedef struct cache_impl* cache_t;
+typedef struct cache_impl *cache_t;
 
 /**
  * @brief 创建默认缓存配置
@@ -58,7 +58,7 @@ cache_config_t cache_create_default_config(void);
  * @param manager 缓存配置
  * @return 缓存句柄
  */
-cache_t cache_create(const cache_config_t* manager);
+cache_t cache_create(const cache_config_t *manager);
 
 /**
  * @brief 销毁缓存
@@ -73,7 +73,7 @@ void cache_destroy(cache_t cache);
  * @param out_value 输出值
  * @return 1 表示找到值，0 表示未找到，-1 表示错误
  */
-int cache_get(cache_t cache, const void* key, void** out_value);
+int cache_get(cache_t cache, const void *key, void **out_value);
 
 /**
  * @brief 向缓存存入值
@@ -81,14 +81,14 @@ int cache_get(cache_t cache, const void* key, void** out_value);
  * @param key 键
  * @param value 值
  */
-void cache_put(cache_t cache, const void* key, const void* value);
+void cache_put(cache_t cache, const void *key, const void *value);
 
 /**
  * @brief 从缓存删除值
  * @param cache 缓存句柄
  * @param key 键
  */
-void cache_delete(cache_t cache, const void* key);
+void cache_delete(cache_t cache, const void *key);
 
 /**
  * @brief 清空缓存
@@ -136,7 +136,7 @@ void cache_set_ttl(cache_t cache, int ttl_sec);
  * @param key 字符串键
  * @return 哈希值
  */
-unsigned int cache_string_hash(const void* key);
+unsigned int cache_string_hash(const void *key);
 
 /**
  * @brief 字符串键默认比较函数
@@ -144,20 +144,20 @@ unsigned int cache_string_hash(const void* key);
  * @param b 字符串键2
  * @return 比较结果
  */
-int cache_string_compare(const void* a, const void* b);
+int cache_string_compare(const void *a, const void *b);
 
 /**
  * @brief 字符串默认复制函数
  * @param data 字符串
  * @return 复制的字符串
  */
-void* cache_string_copy(const void* data);
+void *cache_string_copy(const void *data);
 
 /**
  * @brief 字符串默认释放函数
  * @param data 字符串
  */
-void cache_string_free(void* data);
+void cache_string_free(void *data);
 
 /**
  * @brief 创建字符串缓存（使用默认字符串处理函数）
@@ -174,7 +174,7 @@ cache_t cache_create_string_cache(size_t capacity, int ttl_sec);
  * @param out_value 输出字符串值
  * @return 1 表示找到值，0 表示未找到，-1 表示错误
  */
-int cache_get_string(cache_t cache, const char* key, char** out_value);
+int cache_get_string(cache_t cache, const char *key, char **out_value);
 
 /**
  * @brief 向字符串缓存存入值
@@ -182,7 +182,7 @@ int cache_get_string(cache_t cache, const char* key, char** out_value);
  * @param key 字符串键
  * @param value 字符串值
  */
-void cache_put_string(cache_t cache, const char* key, const char* value);
+void cache_put_string(cache_t cache, const char *key, const char *value);
 
 #ifdef __cplusplus
 }

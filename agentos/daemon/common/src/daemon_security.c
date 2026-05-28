@@ -29,12 +29,13 @@
 #undef CUPOLAS_AVAILABLE
 
 #ifndef SVC_LOG_SECURITY
-#define SVC_LOG_SECURITY(...)  LOG_WARN(__VA_ARGS__)
+#define SVC_LOG_SECURITY(...) LOG_WARN(__VA_ARGS__)
 #endif
 
-#include "svc_logger.h"
 #include "error.h"
 #include "platform.h"
+#include "svc_logger.h"
+
 #include <pthread.h>
 
 /* Internal state structure */
@@ -45,7 +46,8 @@ static struct {
     bool signature_enabled;
     bool vault_enabled;
     bool audit_enabled;
-} g_daemon_security __attribute__((unused)) = {false, SANITIZE_LEVEL_NORMAL, false, false, false, false};
+} g_daemon_security
+    __attribute__((unused)) = {false, SANITIZE_LEVEL_NORMAL, false, false, false, false};
 
 /* ---------- Initialization and Shutdown ---------- */
 
@@ -54,36 +56,35 @@ static struct {
 /**
  * @brief Initialize daemon security layer (cupolas-backed)
  */
-int daemon_security_init(const daemon_security_config_t* config, agentos_error_t* error) {
+int daemon_security_init(const daemon_security_config_t *config, agentos_error_t *error)
+{
     if (g_daemon_security.initialized) {
         SVC_LOG_WARN("Daemon security already initialized");
         return 0;
     }
 
     /* Set default configuration if not provided */
-    daemon_security_config_t default_config = {
-        .sanitize_level = SANITIZE_LEVEL_NORMAL,
-        .sanitizer_rules_path = NULL,
-        .permission_rules_path = NULL,
-        .enable_permission_cache = true,
-        .enable_signature_verification = true,
-        .trusted_ca_path = NULL,
-        .expected_signer = NULL,
-        .enable_vault = true,
-        .vault_storage_path = NULL,
-        .enable_audit_logging = true,
-        .audit_log_dir = NULL
-    };
+    daemon_security_config_t default_config = {.sanitize_level = SANITIZE_LEVEL_NORMAL,
+                                               .sanitizer_rules_path = NULL,
+                                               .permission_rules_path = NULL,
+                                               .enable_permission_cache = true,
+                                               .enable_signature_verification = true,
+                                               .trusted_ca_path = NULL,
+                                               .expected_signer = NULL,
+                                               .enable_vault = true,
+                                               .vault_storage_path = NULL,
+                                               .enable_audit_logging = true,
+                                               .audit_log_dir = NULL};
 
-    const daemon_security_config_t* cfg = config ? config : &default_config;
+    const daemon_security_config_t *cfg = config ? config : &default_config;
 
     /* 1. Initialize core cupolas module */
     agentos_error_t init_error;
     int ret = cupolas_init(NULL, &init_error);
     if (ret != 0) {
         if (error) {
-            snprintf(error->message, sizeof(error->message),
-                    "Failed to initialize cupolas: %s", init_error.message);
+            snprintf(error->message, sizeof(error->message), "Failed to initialize cupolas: %s",
+                     init_error.message);
             error->code = ret;
         }
         SVC_LOG_ERROR("Failed to initialize cupolas: %s", init_error.message);
@@ -106,15 +107,13 @@ int daemon_security_init(const daemon_security_config_t* config, agentos_error_t
 
     /* 4. Initialize signature verification if enabled */
     if (cfg->enable_signature_verification) {
-        cupolas_sig_config_t sig_cfg = {
-            .check_cert_chain = true,
-            .check_revocation = true,
-            .check_timestamp = true,
-            .allow_self_signed = false,
-            .trusted_ca_path = cfg->trusted_ca_path,
-            .max_chain_depth = 5
-        };
-        
+        cupolas_sig_config_t sig_cfg = {.check_cert_chain = true,
+                                        .check_revocation = true,
+                                        .check_timestamp = true,
+                                        .allow_self_signed = false,
+                                        .trusted_ca_path = cfg->trusted_ca_path,
+                                        .max_chain_depth = 5};
+
         ret = cupolas_signature_init(&sig_cfg);
         if (ret != 0) {
             SVC_LOG_WARN("Signature verification initialization failed, continuing without it");
@@ -127,14 +126,12 @@ int daemon_security_init(const daemon_security_config_t* config, agentos_error_t
 
     /* 5. Open vault if enabled */
     if (cfg->enable_vault) {
-        cupolas_vault_config_t vault_cfg = {
-            .storage_path = cfg->vault_storage_path,
-            .enable_audit = true,
-            .enable_auto_lock = true,
-            .auto_lock_seconds = 300,
-            .max_retry_count = 3
-        };
-        
+        cupolas_vault_config_t vault_cfg = {.storage_path = cfg->vault_storage_path,
+                                            .enable_audit = true,
+                                            .enable_auto_lock = true,
+                                            .auto_lock_seconds = 300,
+                                            .max_retry_count = 3};
+
         ret = cupolas_vault_init(&vault_cfg);
         if (ret != 0) {
             SVC_LOG_WARN("Vault initialization failed, continuing without secure storage");
@@ -164,7 +161,8 @@ int daemon_security_init(const daemon_security_config_t* config, agentos_error_t
 /**
  * @brief Shutdown daemon security layer
  */
-void daemon_security_shutdown(void) {
+void daemon_security_shutdown(void)
+{
     if (!g_daemon_security.initialized) {
         return;
     }
@@ -197,7 +195,8 @@ void daemon_security_shutdown(void) {
 /**
  * @brief Sanitize input string for LLM service requests
  */
-int daemon_sanitize_llm_input(const char* input, char* output, size_t output_size) {
+int daemon_sanitize_llm_input(const char *input, char *output, size_t output_size)
+{
     if (!input || !output || output_size == 0) {
         return CUPOLAS_ERR_INVALID_PARAM;
     }
@@ -209,8 +208,8 @@ int daemon_sanitize_llm_input(const char* input, char* output, size_t output_siz
 
     /* Use strict sanitization for LLM inputs to prevent prompt injection */
     sanitize_level_t level = (g_daemon_security.current_sanitize_level > SANITIZE_LEVEL_STRICT)
-                           ? g_daemon_security.current_sanitize_level
-                           : SANITIZE_LEVEL_STRICT;
+                                 ? g_daemon_security.current_sanitize_level
+                                 : SANITIZE_LEVEL_STRICT;
 
     int ret = cupolas_sanitize_input(input, output, output_size, level);
 
@@ -227,9 +226,9 @@ int daemon_sanitize_llm_input(const char* input, char* output, size_t output_siz
 /**
  * @brief Sanitize tool execution parameters
  */
-int daemon_sanitize_tool_params(const char* tool_name, const char* params,
-                                  char* sanitized_tool, size_t tool_buf_size,
-                                  char* sanitized_params, size_t param_buf_size) {
+int daemon_sanitize_tool_params(const char *tool_name, const char *params, char *sanitized_tool,
+                                size_t tool_buf_size, char *sanitized_params, size_t param_buf_size)
+{
     if (!tool_name || !params || !sanitized_tool || !sanitized_params) {
         return CUPOLAS_ERR_INVALID_PARAM;
     }
@@ -241,15 +240,14 @@ int daemon_sanitize_tool_params(const char* tool_name, const char* params,
 
     /* Sanitize tool name */
     int ret = cupolas_sanitize_input(tool_name, sanitized_tool, tool_buf_size,
-                                      g_daemon_security.current_sanitize_level);
+                                     g_daemon_security.current_sanitize_level);
     if (ret != 0) {
         SVC_LOG_WARN("Tool name sanitization failed (error=%d)", ret);
         return ret;
     }
 
     /* Sanitize parameters (use high level for parameters) */
-    ret = cupolas_sanitize_input(params, sanitized_params, param_buf_size,
-                                  SANITIZE_LEVEL_HIGH);
+    ret = cupolas_sanitize_input(params, sanitized_params, param_buf_size, SANITIZE_LEVEL_HIGH);
     if (ret != 0) {
         SVC_LOG_WARN("Tool params sanitization failed (error=%d)", ret);
         daemon_audit_log_event("tool_d", "sanitize_fail", tool_name, ret, "system");
@@ -265,15 +263,16 @@ int daemon_sanitize_tool_params(const char* tool_name, const char* params,
 /**
  * @brief Check tool execution permission
  */
-int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
-                                 const char* action) {
+int daemon_check_tool_permission(const char *agent_id, const char *tool_name, const char *action)
+{
     if (!agent_id || !tool_name || !action) {
-        return 0;  /* Deny by default for invalid parameters */
+        return 0; /* Deny by default for invalid parameters */
     }
 
     if (!g_daemon_security.initialized || !g_daemon_security.permission_enabled) {
-        SVC_LOG_ERROR("Tool permission check DENIED (security not fully initialized): agent=%s tool=%s action=%s",
-                     agent_id, tool_name, action);
+        SVC_LOG_ERROR("Tool permission check DENIED (security not fully initialized): agent=%s "
+                      "tool=%s action=%s",
+                      agent_id, tool_name, action);
         return 0;
     }
 
@@ -284,12 +283,11 @@ int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
     int allowed = cupolas_check_permission(agent_id, action, resource, NULL);
 
     if (!allowed) {
-        SVC_LOG_INFO("Tool access denied: agent=%s tool=%s action=%s",
-                     agent_id, tool_name, action);
+        SVC_LOG_INFO("Tool access denied: agent=%s tool=%s action=%s", agent_id, tool_name, action);
         daemon_audit_log_event("tool_d", "permission_denied", resource, 0, agent_id);
     } else {
-        SVC_LOG_DEBUG("Tool access allowed: agent=%s tool=%s action=%s",
-                      agent_id, tool_name, action);
+        SVC_LOG_DEBUG("Tool access allowed: agent=%s tool=%s action=%s", agent_id, tool_name,
+                      action);
     }
 
     return allowed;
@@ -298,15 +296,16 @@ int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
 /**
  * @brief Check LLM API call permission
  */
-int daemon_check_llm_permission(const char* agent_id, const char* model_name,
-                                 const char* action) {
+int daemon_check_llm_permission(const char *agent_id, const char *model_name, const char *action)
+{
     if (!agent_id || !model_name || !action) {
-        return 0;  /* Deny by default */
+        return 0; /* Deny by default */
     }
 
     if (!g_daemon_security.initialized || !g_daemon_security.permission_enabled) {
-        SVC_LOG_ERROR("LLM permission check DENIED (security not fully initialized): agent=%s model=%s action=%s",
-                     agent_id, model_name, action);
+        SVC_LOG_ERROR("LLM permission check DENIED (security not fully initialized): agent=%s "
+                      "model=%s action=%s",
+                      agent_id, model_name, action);
         return 0;
     }
 
@@ -317,8 +316,8 @@ int daemon_check_llm_permission(const char* agent_id, const char* model_name,
     int allowed = cupolas_check_permission(agent_id, action, resource, NULL);
 
     if (!allowed) {
-        SVC_LOG_INFO("LLM access denied: agent=%s model=%s action=%s",
-                     agent_id, model_name, action);
+        SVC_LOG_INFO("LLM access denied: agent=%s model=%s action=%s", agent_id, model_name,
+                     action);
         daemon_audit_log_event("llm_d", "permission_denied", resource, 0, agent_id);
     }
 
@@ -330,8 +329,9 @@ int daemon_check_llm_permission(const char* agent_id, const char* model_name,
 /**
  * @brief Verify Agent/Skill package signature
  */
-int daemon_verify_package_signature(const char* package_path, bool* is_valid,
-                                     cupolas_signer_info_t* signer_info) {
+int daemon_verify_package_signature(const char *package_path, bool *is_valid,
+                                    cupolas_signer_info_t *signer_info)
+{
     if (!package_path || !is_valid) {
         return CUPOLAS_ERR_INVALID_PARAM;
     }
@@ -374,9 +374,9 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
 /**
  * @brief Store secure credential in vault
  */
-int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_type,
-                           const uint8_t* data, size_t data_len,
-                           const char* agent_id) {
+int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_type,
+                            const uint8_t *data, size_t data_len, const char *agent_id)
+{
     if (!cred_id || !data || data_len == 0 || !agent_id) {
         return CUPOLAS_ERR_INVALID_PARAM;
     }
@@ -402,8 +402,9 @@ int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_
 /**
  * @brief Retrieve secure credential from vault
  */
-int daemon_retrieve_credential(const char* cred_id, const char* agent_id,
-                                uint8_t* data, size_t* data_len) {
+int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_t *data,
+                               size_t *data_len)
+{
     if (!cred_id || !agent_id || !data || !data_len) {
         return CUPOLAS_ERR_INVALID_PARAM;
     }
@@ -430,9 +431,9 @@ int daemon_retrieve_credential(const char* cred_id, const char* agent_id,
 /**
  * @brief Log audit event for daemon operation
  */
-int daemon_audit_log_event(const char* service_name, const char* operation,
-                             const char* resource, int result,
-                             const char* agent_id) {
+int daemon_audit_log_event(const char *service_name, const char *operation, const char *resource,
+                           int result, const char *agent_id)
+{
     if (!service_name || !operation) {
         return CUPOLAS_ERR_INVALID_PARAM;
     }
@@ -440,16 +441,11 @@ int daemon_audit_log_event(const char* service_name, const char* operation,
     if (!g_daemon_security.initialized || !g_daemon_security.audit_enabled) {
         /* Fallback to service logger if audit not available */
         if (result == 0) {
-            SVC_LOG_INFO("[AUDIT] [%s] %s on %s by %s - SUCCESS",
-                        service_name, operation, 
-                        resource ? resource : "N/A",
-                        agent_id ? agent_id : "system");
+            SVC_LOG_INFO("[AUDIT] [%s] %s on %s by %s - SUCCESS", service_name, operation,
+                         resource ? resource : "N/A", agent_id ? agent_id : "system");
         } else {
-            SVC_LOG_WARN("[AUDIT] [%s] %s on %s by %s - FAILED (code=%d)",
-                         service_name, operation,
-                         resource ? resource : "N/A",
-                         agent_id ? agent_id : "system",
-                         result);
+            SVC_LOG_WARN("[AUDIT] [%s] %s on %s by %s - FAILED (code=%d)", service_name, operation,
+                         resource ? resource : "N/A", agent_id ? agent_id : "system", result);
         }
         return 0;
     }
@@ -457,12 +453,9 @@ int daemon_audit_log_event(const char* service_name, const char* operation,
     /* Use cupolas audit logging */
     /* Note: In production, this would use the internal audit queue API */
     /* For now, we use the public flush interface */
-    
-    SVC_LOG_INFO("[AUDIT] service=%s op=%s resource=%s result=%d agent=%s",
-                 service_name, operation,
-                 resource ? resource : "N/A",
-                 result,
-                 agent_id ? agent_id : "system");
+
+    SVC_LOG_INFO("[AUDIT] service=%s op=%s resource=%s result=%d agent=%s", service_name, operation,
+                 resource ? resource : "N/A", result, agent_id ? agent_id : "system");
 
     return 0;
 }
@@ -472,11 +465,11 @@ int daemon_audit_log_event(const char* service_name, const char* operation,
 /**
  * @brief Get daemon security status
  */
-int daemon_security_get_status(int* sanitizer_status, int* permission_status,
-                               int* signature_status, int* vault_status,
-                               int* audit_status) {
-    if (!sanitizer_status || !permission_status || !signature_status ||
-        !vault_status || !audit_status) {
+int daemon_security_get_status(int *sanitizer_status, int *permission_status, int *signature_status,
+                               int *vault_status, int *audit_status)
+{
+    if (!sanitizer_status || !permission_status || !signature_status || !vault_status ||
+        !audit_status) {
         return CUPOLAS_ERR_INVALID_PARAM;
     }
 
@@ -494,20 +487,21 @@ int daemon_security_get_status(int* sanitizer_status, int* permission_status,
 /* ==================== 生产级安全实现（无cupolas时的独立实现） ==================== */
 /* SEC-017合规：所有函数均为真实实现，无桩函数 */
 
+#include "agentos_dirent.h"
+#include "cupolas_signer_info.h"
+#include "cupolas_vault_cred_type.h"
+
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <ctype.h>
 #include <sys/stat.h>
-#include "agentos_dirent.h"
-#include "cupolas_vault_cred_type.h"
-#include "cupolas_signer_info.h"
+#include <time.h>
 
 #ifdef AGENTOS_HAS_OPENSSL
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
-#include <openssl/err.h>
 #endif
 
 #define MAX_CREDENTIALS 64
@@ -515,11 +509,11 @@ int daemon_security_get_status(int* sanitizer_status, int* permission_status,
 #define MAX_AUDIT_LOG_SIZE 1024
 
 typedef struct {
-    char* cred_id;
+    char *cred_id;
     cupolas_vault_cred_type_t type;
-    uint8_t* data;
+    uint8_t *data;
     size_t data_len;
-    char* owner_agent_id;
+    char *owner_agent_id;
 } credential_entry_t;
 
 typedef struct {
@@ -540,19 +534,19 @@ static struct {
     size_t cred_count;
     acl_entry_t acl_table[MAX_ACL_ENTRIES];
     size_t acl_count;
-    FILE* audit_fp;
+    FILE *audit_fp;
     char audit_log_path[256];
 } g_security_ctx = {0};
 
 static pthread_mutex_t g_security_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static const char* DANGEROUS_PATTERNS[] = {
-    ";", "|", "`", "$(", "${", "&&", "||", ">", ">>", "<", "<<",
-    "\\", "\n", "\r", "\0", NULL
-};
+static const char *DANGEROUS_PATTERNS[] = {";",  "|", "`",  "$(", "${", "&&", "||", ">",
+                                           ">>", "<", "<<", "\\", "\n", "\r", "\0", NULL};
 
-static bool contains_dangerous_pattern(const char* input) {
-    if (!input) return false;
+static bool contains_dangerous_pattern(const char *input)
+{
+    if (!input)
+        return false;
     for (size_t i = 0; DANGEROUS_PATTERNS[i] != NULL; i++) {
         if (strstr(input, DANGEROUS_PATTERNS[i]) != NULL) {
             return true;
@@ -561,8 +555,10 @@ static bool contains_dangerous_pattern(const char* input) {
     return false;
 }
 
-static void sanitize_string(char* output, const char* input, size_t max_len) {
-    if (!output || !input || max_len == 0) return;
+static void sanitize_string(char *output, const char *input, size_t max_len)
+{
+    if (!output || !input || max_len == 0)
+        return;
 
     size_t j = 0;
     for (size_t i = 0; input[i] && j < max_len - 1; i++) {
@@ -574,7 +570,8 @@ static void sanitize_string(char* output, const char* input, size_t max_len) {
     output[j] = '\0';
 }
 
-int daemon_security_init(const daemon_security_config_t* config, agentos_error_t* error) {
+int daemon_security_init(const daemon_security_config_t *config, agentos_error_t *error)
+{
     pthread_mutex_lock(&g_security_mutex);
     if (g_security_ctx.initialized) {
         pthread_mutex_unlock(&g_security_mutex);
@@ -598,31 +595,32 @@ int daemon_security_init(const daemon_security_config_t* config, agentos_error_t
 
         if (config->audit_log_dir && strlen(config->audit_log_dir) > 0) {
             snprintf(g_security_ctx.audit_log_path, sizeof(g_security_ctx.audit_log_path),
-                    "%s/daemon_audit.log", config->audit_log_dir);
+                     "%s/daemon_audit.log", config->audit_log_dir);
         }
     }
 
     if (g_security_ctx.audit_enabled && g_security_ctx.audit_log_path[0] == '\0') {
         snprintf(g_security_ctx.audit_log_path, sizeof(g_security_ctx.audit_log_path),
-                AGENTOS_LOG_DIR "/daemon_audit.log");
+                 AGENTOS_LOG_DIR "/daemon_audit.log");
     }
 
     if (g_security_ctx.audit_enabled) {
         g_security_ctx.audit_fp = fopen(g_security_ctx.audit_log_path, "a");
         if (!g_security_ctx.audit_fp) {
             SVC_LOG_WARN("Cannot open audit log: %s, falling back to syslog",
-                        g_security_ctx.audit_log_path);
+                         g_security_ctx.audit_log_path);
         }
     }
 
     g_security_ctx.initialized = true;
     pthread_mutex_unlock(&g_security_mutex);
     SVC_LOG_INFO("Daemon security: initialized in production mode (sanitize_level=%d)",
-                g_security_ctx.current_sanitize_level);
+                 g_security_ctx.current_sanitize_level);
     return 0;
 }
 
-void daemon_security_shutdown(void) {
+void daemon_security_shutdown(void)
+{
     pthread_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
         pthread_mutex_unlock(&g_security_mutex);
@@ -659,9 +657,11 @@ void daemon_security_shutdown(void) {
     SVC_LOG_INFO("Daemon security: shutdown complete");
 }
 
-int daemon_sanitize_llm_input(const char* input, char* output, size_t output_size) {
+int daemon_sanitize_llm_input(const char *input, char *output, size_t output_size)
+{
     if (!input || !output || output_size == 0) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "sanitize_llm_input: null parameter");
     }
 
     pthread_mutex_lock(&g_security_mutex);
@@ -675,9 +675,11 @@ int daemon_sanitize_llm_input(const char* input, char* output, size_t output_siz
     pthread_mutex_unlock(&g_security_mutex);
 
     if (contains_dangerous_pattern(input)) {
-        SVC_LOG_SECURITY("SEC-011 VIOLATION: LLM input contains shell injection pattern - REJECTED");
+        SVC_LOG_SECURITY(
+            "SEC-011 VIOLATION: LLM input contains shell injection pattern - REJECTED");
         snprintf(output, output_size, "[SANITIZED: input rejected - security violation]");
         return AGENTOS_ERR_PERMISSION_DENIED;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_PERMISSION_DENIED, "sanitize_llm_input: shell injection pattern detected");
     }
 
     sanitize_string(output, input, output_size);
@@ -693,11 +695,12 @@ int daemon_sanitize_llm_input(const char* input, char* output, size_t output_siz
     return AGENTOS_OK;
 }
 
-int daemon_sanitize_tool_params(const char* tool_name, const char* params,
-                                  char* sanitized_tool, size_t tool_buf_size,
-                                  char* sanitized_params, size_t param_buf_size) {
+int daemon_sanitize_tool_params(const char *tool_name, const char *params, char *sanitized_tool,
+                                size_t tool_buf_size, char *sanitized_params, size_t param_buf_size)
+{
     if (!tool_name || !params || !sanitized_tool || !sanitized_params) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "sanitize_tool_params: null parameter");
     }
 
     pthread_mutex_lock(&g_security_mutex);
@@ -714,6 +717,7 @@ int daemon_sanitize_tool_params(const char* tool_name, const char* params,
         SVC_LOG_SECURITY("SEC-014 VIOLATION: Tool params contain dangerous pattern - REJECTED");
         snprintf(sanitized_params, param_buf_size, "[SANITIZED: params rejected]");
         return AGENTOS_ERR_PERMISSION_DENIED;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_PERMISSION_DENIED, "sanitize_tool_params: dangerous pattern detected");
     }
 
     sanitize_string(sanitized_params, params, param_buf_size);
@@ -725,10 +729,11 @@ int daemon_sanitize_tool_params(const char* tool_name, const char* params,
     return AGENTOS_OK;
 }
 
-int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
-                                 const char* action) {
+int daemon_check_tool_permission(const char *agent_id, const char *tool_name, const char *action)
+{
     if (!agent_id || !tool_name || !action) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "check_tool_permission: null parameter");
     }
 
     pthread_mutex_lock(&g_security_mutex);
@@ -741,8 +746,9 @@ int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
     if (!g_security_ctx.permission_enabled) {
         pthread_mutex_unlock(&g_security_mutex);
         SVC_LOG_WARN("Permission check: disabled by configuration, DENYING %s/%s (fail-closed)",
-                    agent_id, tool_name);
+                     agent_id, tool_name);
         return AGENTOS_EPERM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_EPERM, "check_tool_permission: permission disabled, deny by default");
     }
 
     int result = AGENTOS_ERR_PERMISSION_DENIED;
@@ -759,19 +765,20 @@ int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
     pthread_mutex_unlock(&g_security_mutex);
 
     if (result == AGENTOS_OK) {
-        SVC_LOG_DEBUG("Permission GRANTED: agent=%s tool=%s action=%s",
-                    agent_id, tool_name, action);
+        SVC_LOG_DEBUG("Permission GRANTED: agent=%s tool=%s action=%s", agent_id, tool_name,
+                      action);
     } else {
-        SVC_LOG_SECURITY("Permission DENIED (no ACL entry): agent=%s tool=%s action=%s",
-                       agent_id, tool_name, action);
+        SVC_LOG_SECURITY("Permission DENIED (no ACL entry): agent=%s tool=%s action=%s", agent_id,
+                         tool_name, action);
     }
     return result;
 }
 
-int daemon_check_llm_permission(const char* agent_id, const char* model_name,
-                                 const char* action) {
+int daemon_check_llm_permission(const char *agent_id, const char *model_name, const char *action)
+{
     if (!agent_id || !model_name || !action) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "check_llm_permission: null parameter");
     }
 
     pthread_mutex_lock(&g_security_mutex);
@@ -784,8 +791,9 @@ int daemon_check_llm_permission(const char* agent_id, const char* model_name,
     if (!g_security_ctx.permission_enabled) {
         pthread_mutex_unlock(&g_security_mutex);
         SVC_LOG_WARN("LLM permission check: disabled by configuration, DENYING %s/%s (fail-closed)",
-                    agent_id, model_name);
+                     agent_id, model_name);
         return AGENTOS_EPERM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_EPERM, "check_llm_permission: permission disabled, deny by default");
     }
 
     char resource[256];
@@ -805,21 +813,24 @@ int daemon_check_llm_permission(const char* agent_id, const char* model_name,
     pthread_mutex_unlock(&g_security_mutex);
 
     if (result == AGENTOS_OK) {
-        SVC_LOG_DEBUG("LLM Permission GRANTED: agent=%s model=%s action=%s",
-                    agent_id, model_name, action);
+        SVC_LOG_DEBUG("LLM Permission GRANTED: agent=%s model=%s action=%s", agent_id, model_name,
+                      action);
     } else {
-        SVC_LOG_SECURITY("LLM Permission DENIED (no ACL): agent=%s model=%s action=%s",
-                       agent_id, model_name, action);
+        SVC_LOG_SECURITY("LLM Permission DENIED (no ACL): agent=%s model=%s action=%s", agent_id,
+                         model_name, action);
     }
     return result;
 }
 
-int daemon_verify_package_signature(const char* package_path, bool* is_valid,
-                                     cupolas_signer_info_t* signer_info) {
+int daemon_verify_package_signature(const char *package_path, bool *is_valid,
+                                    cupolas_signer_info_t *signer_info)
+{
     if (!package_path || !is_valid) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "verify_package_signature: null parameter");
     }
-    if (signer_info) memset(signer_info, 0, sizeof(cupolas_signer_info_t));
+    if (signer_info)
+        memset(signer_info, 0, sizeof(cupolas_signer_info_t));
 
     *is_valid = false;
 
@@ -842,16 +853,18 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
     if (stat(package_path, &st) != 0) {
         SVC_LOG_ERROR("Package not found: %s", package_path);
         return AGENTOS_ERR_NOT_FOUND;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "verify_package_signature: package not found");
     }
 
     if (st.st_size == 0) {
         SVC_LOG_ERROR("Package is empty: %s", package_path);
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "verify_package_signature: package is empty");
     }
 
     if (st.st_size > 512 * 1024 * 1024) {
-        SVC_LOG_ERROR("Package exceeds size limit: %s (%lld bytes)",
-                     package_path, (long long)st.st_size);
+        SVC_LOG_ERROR("Package exceeds size limit: %s (%lld bytes)", package_path,
+                      (long long)st.st_size);
         *is_valid = false;
         return AGENTOS_OK;
     }
@@ -866,7 +879,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
         return AGENTOS_OK;
     }
 
-    FILE* sig_fp = fopen(sig_path, "rb");
+    FILE *sig_fp = fopen(sig_path, "rb");
     if (!sig_fp) {
         SVC_LOG_ERROR("Cannot open signature file: %s", sig_path);
         *is_valid = false;
@@ -884,19 +897,20 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
     }
 
 #ifdef AGENTOS_HAS_OPENSSL
-    const char* trusted_keys_dir = getenv("AGENTOS_TRUSTED_KEYS_DIR");
+    const char *trusted_keys_dir = getenv("AGENTOS_TRUSTED_KEYS_DIR");
     if (!trusted_keys_dir) {
         trusted_keys_dir = AGENTOS_CONFIG_DIR "/trusted_keys";
     }
 
-    DIR* dir = opendir(trusted_keys_dir);
+    DIR *dir = opendir(trusted_keys_dir);
     if (!dir) {
-        SVC_LOG_WARN("Trusted keys directory not found: %s, cannot verify signature", trusted_keys_dir);
+        SVC_LOG_WARN("Trusted keys directory not found: %s, cannot verify signature",
+                     trusted_keys_dir);
         *is_valid = false;
         return AGENTOS_OK;
     }
 
-    FILE* pkg_fp = fopen(package_path, "rb");
+    FILE *pkg_fp = fopen(package_path, "rb");
     if (!pkg_fp) {
         closedir(dir);
         SVC_LOG_ERROR("Cannot open package file: %s", package_path);
@@ -904,11 +918,11 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
         return AGENTOS_OK;
     }
 
-    uint8_t* pkg_data = (uint8_t*)AGENTOS_MALLOC((size_t)st.st_size);
+    uint8_t *pkg_data = (uint8_t *)AGENTOS_MALLOC((size_t)st.st_size);
     if (!pkg_data) {
         fclose(pkg_fp);
         closedir(dir);
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate package data buffer");
     }
     size_t pkg_read = fread(pkg_data, 1, (size_t)st.st_size, pkg_fp);
     fclose(pkg_fp);
@@ -922,30 +936,34 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
     }
 
     bool verified = false;
-    struct dirent* entry;
+    struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_name[0] == '.') continue;
+        if (entry->d_name[0] == '.')
+            continue;
 
         size_t name_len = strlen(entry->d_name);
-        if (name_len < 5 || strcmp(entry->d_name + name_len - 4, ".pem") != 0) continue;
+        if (name_len < 5 || strcmp(entry->d_name + name_len - 4, ".pem") != 0)
+            continue;
 
         char key_path[1024];
         snprintf(key_path, sizeof(key_path), "%s/%s", trusted_keys_dir, entry->d_name);
 
-        FILE* key_fp = fopen(key_path, "r");
-        if (!key_fp) continue;
+        FILE *key_fp = fopen(key_path, "r");
+        if (!key_fp)
+            continue;
 
-        EVP_PKEY* pkey = PEM_read_PUBKEY(key_fp, NULL, NULL, NULL);
+        EVP_PKEY *pkey = PEM_read_PUBKEY(key_fp, NULL, NULL, NULL);
         fclose(key_fp);
 
-        if (!pkey) continue;
+        if (!pkey)
+            continue;
 
         if (EVP_PKEY_base_id(pkey) != EVP_PKEY_ED25519) {
             EVP_PKEY_free(pkey);
             continue;
         }
 
-        EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
+        EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
         if (!md_ctx) {
             EVP_PKEY_free(pkey);
             continue;
@@ -957,8 +975,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
             continue;
         }
 
-        int verify_result = EVP_DigestVerify(md_ctx, signature, sig_len,
-                                              pkg_data, pkg_read);
+        int verify_result = EVP_DigestVerify(md_ctx, signature, sig_len, pkg_data, pkg_read);
 
         EVP_MD_CTX_free(md_ctx);
         EVP_PKEY_free(pkey);
@@ -966,15 +983,16 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
         if (verify_result == 1) {
             verified = true;
             if (signer_info) {
-                char* dot = strchr(entry->d_name, '.');
+                char *dot = strchr(entry->d_name, '.');
                 size_t id_len = dot ? (size_t)(dot - entry->d_name) : name_len;
-                if (id_len >= sizeof(signer_info->key_id)) id_len = sizeof(signer_info->key_id) - 1;
+                if (id_len >= sizeof(signer_info->key_id))
+                    id_len = sizeof(signer_info->key_id) - 1;
                 memcpy(signer_info->key_id, entry->d_name, id_len);
                 signer_info->key_id[id_len] = '\0';
                 signer_info->algorithm = AGENTOS_STRDUP("ED25519");
             }
-            SVC_LOG_INFO("Package signature VERIFIED (ED25519): %s with key %s",
-                        package_path, entry->d_name);
+            SVC_LOG_INFO("Package signature VERIFIED (ED25519): %s with key %s", package_path,
+                         entry->d_name);
             break;
         }
     }
@@ -997,11 +1015,12 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
 #endif
 }
 
-int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_type,
-                           const uint8_t* data, size_t data_len,
-                           const char* agent_id) {
+int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_type,
+                            const uint8_t *data, size_t data_len, const char *agent_id)
+{
     if (!cred_id || !data || data_len == 0) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "store_credential: null parameter");
     }
 
     pthread_mutex_lock(&g_security_mutex);
@@ -1013,54 +1032,58 @@ int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_
 
     if (!g_security_ctx.vault_enabled) {
         pthread_mutex_unlock(&g_security_mutex);
-        return AGENTOS_ERR_NOT_SUPPORTED;
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_SUPPORTED, "vault is disabled");
     }
 
     if (g_security_ctx.cred_count >= MAX_CREDENTIALS) {
         pthread_mutex_unlock(&g_security_mutex);
         SVC_LOG_ERROR("Credential storage full (max=%d)", MAX_CREDENTIALS);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "store_credential: vault storage full");
     }
 
     for (size_t i = 0; i < g_security_ctx.cred_count; i++) {
         if (strcmp(g_security_ctx.credentials[i].cred_id, cred_id) == 0) {
             AGENTOS_FREE(g_security_ctx.credentials[i].data);
-            g_security_ctx.credentials[i].data = (uint8_t*)AGENTOS_MALLOC(data_len);
+            g_security_ctx.credentials[i].data = (uint8_t *)AGENTOS_MALLOC(data_len);
             if (!g_security_ctx.credentials[i].data) {
                 pthread_mutex_unlock(&g_security_mutex);
-                return AGENTOS_ERR_OUT_OF_MEMORY;
+                AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY,
+                              "failed to allocate credential data buffer");
             }
             memcpy(g_security_ctx.credentials[i].data, data, data_len);
             g_security_ctx.credentials[i].data_len = data_len;
             pthread_mutex_unlock(&g_security_mutex);
-            SVC_LOG_INFO("Credential updated: %s (type=%d, %zu bytes)",
-                        cred_id, cred_type, data_len);
+            SVC_LOG_INFO("Credential updated: %s (type=%d, %zu bytes)", cred_id, cred_type,
+                         data_len);
             return AGENTOS_OK;
         }
     }
 
-    credential_entry_t* entry = &g_security_ctx.credentials[g_security_ctx.cred_count++];
+    credential_entry_t *entry = &g_security_ctx.credentials[g_security_ctx.cred_count++];
     entry->cred_id = AGENTOS_STRDUP(cred_id);
     entry->type = cred_type;
-    entry->data = (uint8_t*)AGENTOS_MALLOC(data_len);
+    entry->data = (uint8_t *)AGENTOS_MALLOC(data_len);
     if (!entry->data) {
         pthread_mutex_unlock(&g_security_mutex);
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate credential data buffer");
     }
     memcpy(entry->data, data, data_len);
     entry->data_len = data_len;
     entry->owner_agent_id = agent_id ? AGENTOS_STRDUP(agent_id) : AGENTOS_STRDUP("system");
 
     pthread_mutex_unlock(&g_security_mutex);
-    SVC_LOG_INFO("Credential stored: %s (type=%d, %zu bytes, total=%zu)",
-                cred_id, cred_type, data_len, g_security_ctx.cred_count);
+    SVC_LOG_INFO("Credential stored: %s (type=%d, %zu bytes, total=%zu)", cred_id, cred_type,
+                 data_len, g_security_ctx.cred_count);
     return AGENTOS_OK;
 }
 
-int daemon_retrieve_credential(const char* cred_id, const char* agent_id,
-                                uint8_t* data, size_t* data_len) {
+int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_t *data,
+                               size_t *data_len)
+{
     if (!cred_id || !data || !data_len) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "retrieve_credential: null parameter");
     }
 
     pthread_mutex_lock(&g_security_mutex);
@@ -1072,7 +1095,7 @@ int daemon_retrieve_credential(const char* cred_id, const char* agent_id,
 
     if (!g_security_ctx.vault_enabled) {
         pthread_mutex_unlock(&g_security_mutex);
-        return AGENTOS_ERR_NOT_SUPPORTED;
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_SUPPORTED, "vault is disabled");
     }
 
     for (size_t i = 0; i < g_security_ctx.cred_count; i++) {
@@ -1082,13 +1105,15 @@ int daemon_retrieve_credential(const char* cred_id, const char* agent_id,
                 strcmp(g_security_ctx.credentials[i].owner_agent_id, agent_id) != 0 &&
                 strcmp(agent_id, "system") != 0) {
                 pthread_mutex_unlock(&g_security_mutex);
-                SVC_LOG_SECURITY("Credential access DENIED: %s (agent=%s not owner=%s)",
-                               cred_id, agent_id, g_security_ctx.credentials[i].owner_agent_id);
+                SVC_LOG_SECURITY("Credential access DENIED: %s (agent=%s not owner=%s)", cred_id,
+                                 agent_id, g_security_ctx.credentials[i].owner_agent_id);
                 return AGENTOS_ERR_PERMISSION_DENIED;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_PERMISSION_DENIED, "retrieve_credential: access denied");
             }
 
             size_t copy_len = g_security_ctx.credentials[i].data_len;
-            if (copy_len > *data_len) copy_len = *data_len;
+            if (copy_len > *data_len)
+                copy_len = *data_len;
             if (g_security_ctx.credentials[i].data) {
                 memcpy(data, g_security_ctx.credentials[i].data, copy_len);
             }
@@ -1101,13 +1126,15 @@ int daemon_retrieve_credential(const char* cred_id, const char* agent_id,
     pthread_mutex_unlock(&g_security_mutex);
     SVC_LOG_WARN("Credential not found: %s", cred_id);
     return AGENTOS_ERR_NOT_FOUND;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "retrieve_credential: credential not found");
 }
 
-int daemon_audit_log_event(const char* service_name, const char* operation,
-                             const char* resource, int result,
-                             const char* agent_id) {
+int daemon_audit_log_event(const char *service_name, const char *operation, const char *resource,
+                           int result, const char *agent_id)
+{
     if (!service_name || !operation) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "audit_log_event: null parameter");
     }
 
     if (!g_security_ctx.initialized) {
@@ -1126,16 +1153,13 @@ int daemon_audit_log_event(const char* service_name, const char* operation,
     char timestamp[32];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S%z", &tm_info);
 
-    const char* result_str = (result == 0) ? "SUCCESS" : "FAILED";
+    const char *result_str = (result == 0) ? "SUCCESS" : "FAILED";
     char log_msg[MAX_AUDIT_LOG_SIZE];
 
     snprintf(log_msg, sizeof(log_msg),
-             "[%s] [%s] service=%s operation=%s resource=%s agent=%s result=%s\n",
-             timestamp, result_str,
-             service_name, operation,
-             resource ? resource : "N/A",
-             agent_id ? agent_id : "system",
-             result_str);
+             "[%s] [%s] service=%s operation=%s resource=%s agent=%s result=%s\n", timestamp,
+             result_str, service_name, operation, resource ? resource : "N/A",
+             agent_id ? agent_id : "system", result_str);
 
     if (g_security_ctx.audit_fp) {
         fwrite(log_msg, 1, strlen(log_msg), g_security_ctx.audit_fp);
@@ -1152,12 +1176,13 @@ int daemon_audit_log_event(const char* service_name, const char* operation,
     return AGENTOS_OK;
 }
 
-int daemon_security_get_status(int* sanitizer_status, int* permission_status,
-                               int* signature_status, int* vault_status,
-                               int* audit_status) {
-    if (!sanitizer_status || !permission_status || !signature_status ||
-        !vault_status || !audit_status) {
+int daemon_security_get_status(int *sanitizer_status, int *permission_status, int *signature_status,
+                               int *vault_status, int *audit_status)
+{
+    if (!sanitizer_status || !permission_status || !signature_status || !vault_status ||
+        !audit_status) {
         return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "security_get_status: null parameter");
     }
 
     pthread_mutex_lock(&g_security_mutex);

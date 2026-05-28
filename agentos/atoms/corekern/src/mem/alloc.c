@@ -1,3 +1,4 @@
+#include "agentos.h"
 /**
  * @file alloc.c
  * @brief 物理内存分配器（带追踪的 malloc/free 封装）
@@ -13,6 +14,7 @@
 
 #include "mem.h"
 #include "task.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -21,8 +23,9 @@
 
 /* Check macros for unified error handling */
 #include "check.h"
-#include <string.h>
+
 #include <stdio.h>
+#include <string.h>
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
@@ -41,16 +44,16 @@ static atomic_size_t peak_allocated = 0;
 static atomic_size_t max_heap_size = 0;
 
 /** @brief 分配记录链表头 */
-static agentos_mem_alloc_info_t* alloc_list = NULL;
+static agentos_mem_alloc_info_t *alloc_list = NULL;
 
 /** @brief 统计数据互斥锁 */
-static agentos_mutex_t* mem_stats_mutex = NULL;
+static agentos_mutex_t *mem_stats_mutex = NULL;
 
 /** @brief 初始化状态标志（原子操作保护） */
 static atomic_int mem_initialized = 0;
 
 /** @brief 初始化锁（用于双重检查锁定） */
-static agentos_mutex_t* init_lock = NULL;
+static agentos_mutex_t *init_lock = NULL;
 
 /* ==================== 内部辅助函数 ==================== */
 
@@ -58,7 +61,8 @@ static agentos_mutex_t* init_lock = NULL;
  * @brief 更新峰值内存使用量
  * @note 必须在持有 mem_stats_mutex 时调用，使用 relaxed 内存顺序
  */
-static void update_peak_unlocked(void) {
+static void update_peak_unlocked(void)
+{
     size_t current = atomic_load_explicit(&used_allocated, memory_order_acquire);
     size_t peak = atomic_load_explicit(&peak_allocated, memory_order_acquire);
     if (current > peak) {
@@ -71,7 +75,8 @@ static void update_peak_unlocked(void) {
  * @return 0 成功，1 失败
  * @note 线程安全的延迟初始化，使用内存屏障保证正确性
  */
-static int ensure_initialized(void) {
+static int ensure_initialized(void)
+{
     /* 快速路径：已初始化（使用 acquire 语义） */
     int state = atomic_load_explicit(&mem_initialized, memory_order_acquire);
     if (state == 1) {
@@ -83,13 +88,12 @@ static int ensure_initialized(void) {
         /* 尝试获取初始化权，使用 0 -> 2 的原子交换 */
         int expected = 0;
         if (atomic_compare_exchange_strong_explicit(&mem_initialized, &expected, 2,
-                                                    memory_order_acq_rel,
-                                                    memory_order_acquire)) {
+                                                    memory_order_acq_rel, memory_order_acquire)) {
             /* 当前线程获得初始化权 */
             init_lock = agentos_mutex_create();
             if (!init_lock) {
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
-                return -1;
+                return AGENTOS_EINVAL;
             }
 
             mem_stats_mutex = agentos_mutex_create();
@@ -97,7 +101,7 @@ static int ensure_initialized(void) {
                 agentos_mutex_free(init_lock);
                 init_lock = NULL;
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
-                return -1;
+                return AGENTOS_EINVAL;
             }
 
             /* 初始化完成，发布状态（使用 release 语义） */
@@ -126,7 +130,8 @@ static int ensure_initialized(void) {
  * @return AGENTOS_SUCCESS 成功，AGENTOS_ENOMEM 内存不足
  * @note 线程安全，可多次调用
  */
-agentos_error_t agentos_mem_init(size_t heap_size) {
+agentos_error_t agentos_mem_init(size_t heap_size)
+{
     /* 设置堆大小上限（0表示无限制） */
     atomic_store_explicit(&max_heap_size, heap_size, memory_order_release);
 
@@ -141,7 +146,8 @@ agentos_error_t agentos_mem_init(size_t heap_size) {
  * @brief 清理内存分配器
  * @note 打印泄漏报告，释放所有资源
  */
-void agentos_mem_cleanup(void) {
+void agentos_mem_cleanup(void)
+{
     /* 确保已初始化 */
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) != 1) {
         return;
@@ -151,7 +157,7 @@ void agentos_mem_cleanup(void) {
 
     agentos_mutex_lock(mem_stats_mutex);
     while (alloc_list) {
-        agentos_mem_alloc_info_t* info = alloc_list;
+        agentos_mem_alloc_info_t *info = alloc_list;
         alloc_list = info->next;
         AGENTOS_FREE(info);
     }
@@ -180,8 +186,10 @@ void agentos_mem_cleanup(void) {
  * @param line 源文件行号
  * @note 必须在持有 mem_stats_mutex 时调用
  */
-static void add_alloc_info_unlocked(void* ptr, size_t size, const char* file, int line) {
-    agentos_mem_alloc_info_t* info = (agentos_mem_alloc_info_t*)AGENTOS_MALLOC(sizeof(agentos_mem_alloc_info_t));
+static void add_alloc_info_unlocked(void *ptr, size_t size, const char *file, int line)
+{
+    agentos_mem_alloc_info_t *info =
+        (agentos_mem_alloc_info_t *)AGENTOS_MALLOC(sizeof(agentos_mem_alloc_info_t));
     if (info) {
         info->ptr = ptr;
         info->size = size;
@@ -197,10 +205,12 @@ static void add_alloc_info_unlocked(void* ptr, size_t size, const char* file, in
  * @param ptr 内存指针
  * @note 必须在持有 mem_stats_mutex 时调用
  */
-static void remove_alloc_info_unlocked(void* ptr) {
-    if (!ptr) return;
-    agentos_mem_alloc_info_t* prev = NULL;
-    agentos_mem_alloc_info_t* curr = alloc_list;
+static void remove_alloc_info_unlocked(void *ptr)
+{
+    if (!ptr)
+        return;
+    agentos_mem_alloc_info_t *prev = NULL;
+    agentos_mem_alloc_info_t *curr = alloc_list;
     while (curr) {
         if (curr->ptr == ptr) {
             if (prev) {
@@ -225,8 +235,9 @@ static void remove_alloc_info_unlocked(void* ptr) {
  * @param line 源文件行号
  * @return 内存指针，失败返回 NULL
  */
-void* agentos_mem_alloc_ex(size_t size, const char* file, int line) {
-    void* ptr = AGENTOS_MALLOC(size);
+void *agentos_mem_alloc_ex(size_t size, const char *file, int line)
+{
+    void *ptr = AGENTOS_MALLOC(size);
     if (!ptr) {
         return NULL;
     }
@@ -257,7 +268,8 @@ void* agentos_mem_alloc_ex(size_t size, const char* file, int line) {
  * @param size 分配大小
  * @return 内存指针，失败返回 NULL
  */
-void* agentos_mem_alloc(size_t size) {
+void *agentos_mem_alloc(size_t size)
+{
     return agentos_mem_alloc_ex(size, __FILE__, __LINE__);
 }
 
@@ -269,12 +281,14 @@ void* agentos_mem_alloc(size_t size) {
  * @param line 源文件行号
  * @return 内存指针，失败返回 NULL
  */
-void* agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char* file, int line) {
-    void* ptr = NULL;
+void *agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char *file, int line)
+{
+    void *ptr = NULL;
 #ifdef _WIN32
     ptr = _aligned_malloc(size, alignment);
 #else
-    if (posix_memalign(&ptr, alignment, size) != 0) ptr = NULL;
+    if (posix_memalign(&ptr, alignment, size) != 0)
+        ptr = NULL;
 #endif
     if (!ptr) {
         return NULL;
@@ -300,7 +314,8 @@ void* agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char* fi
  * @param alignment 对齐字节数
  * @return 内存指针，失败返回 NULL
  */
-void* agentos_mem_aligned_alloc(size_t size, size_t alignment) {
+void *agentos_mem_aligned_alloc(size_t size, size_t alignment)
+{
     return agentos_mem_aligned_alloc_ex(size, alignment, __FILE__, __LINE__);
 }
 
@@ -308,12 +323,14 @@ void* agentos_mem_aligned_alloc(size_t size, size_t alignment) {
  * @brief 释放内存
  * @param ptr 内存指针
  */
-void agentos_mem_free(void* ptr) {
-    if (!ptr) return;
+void agentos_mem_free(void *ptr)
+{
+    if (!ptr)
+        return;
 
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
-        agentos_mem_alloc_info_t* info = alloc_list;
+        agentos_mem_alloc_info_t *info = alloc_list;
         while (info) {
             if (info->ptr == ptr) {
                 atomic_fetch_sub_explicit(&used_allocated, info->size, memory_order_acq_rel);
@@ -331,12 +348,14 @@ void agentos_mem_free(void* ptr) {
  * @brief 释放对齐内存
  * @param ptr 内存指针
  */
-void agentos_mem_aligned_free(void* ptr) {
-    if (!ptr) return;
+void agentos_mem_aligned_free(void *ptr)
+{
+    if (!ptr)
+        return;
 
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
-        agentos_mem_alloc_info_t* info = alloc_list;
+        agentos_mem_alloc_info_t *info = alloc_list;
         while (info) {
             if (info->ptr == ptr) {
                 atomic_fetch_sub_explicit(&used_allocated, info->size, memory_order_acq_rel);
@@ -362,8 +381,10 @@ void agentos_mem_aligned_free(void* ptr) {
  * @param line 源文件行号
  * @return 新内存指针，失败返回 NULL
  */
-void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char* file, int line) {
-    if (!ptr) return agentos_mem_alloc_ex(new_size, file, line);
+void *agentos_mem_realloc_ex(void *ptr, size_t new_size, const char *file, int line)
+{
+    if (!ptr)
+        return agentos_mem_alloc_ex(new_size, file, line);
     if (new_size == 0) {
         agentos_mem_free(ptr);
         return NULL;
@@ -372,7 +393,7 @@ void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char* file, int l
     size_t old_size = 0;
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
-        agentos_mem_alloc_info_t* info = alloc_list;
+        agentos_mem_alloc_info_t *info = alloc_list;
         while (info) {
             if (info->ptr == ptr) {
                 old_size = info->size;
@@ -384,8 +405,9 @@ void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char* file, int l
         agentos_mutex_unlock(mem_stats_mutex);
     }
 
-    void* new_ptr = AGENTOS_REALLOC(ptr, new_size);
-    if (new_ptr && atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
+    void *new_ptr = AGENTOS_REALLOC(ptr, new_size);
+    if (new_ptr && atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 &&
+        mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
         atomic_fetch_sub_explicit(&used_allocated, old_size, memory_order_acq_rel);
         atomic_fetch_add_explicit(&used_allocated, new_size, memory_order_acq_rel);
@@ -403,7 +425,8 @@ void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char* file, int l
  * @param new_size 新大小
  * @return 新内存指针，失败返回 NULL
  */
-void* agentos_mem_realloc(void* ptr, size_t new_size) {
+void *agentos_mem_realloc(void *ptr, size_t new_size)
+{
     return agentos_mem_realloc_ex(ptr, new_size, __FILE__, __LINE__);
 }
 
@@ -415,13 +438,17 @@ void* agentos_mem_realloc(void* ptr, size_t new_size) {
  * @param out_used 当前使用字节数输出
  * @param out_peak 峰值使用字节数输出
  */
-void agentos_mem_stats(size_t* out_total, size_t* out_used, size_t* out_peak) {
+void agentos_mem_stats(size_t *out_total, size_t *out_used, size_t *out_peak)
+{
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
     }
-    if (out_total) *out_total = atomic_load_explicit(&total_allocated, memory_order_acquire);
-    if (out_used) *out_used = atomic_load_explicit(&used_allocated, memory_order_acquire);
-    if (out_peak) *out_peak = atomic_load_explicit(&peak_allocated, memory_order_acquire);
+    if (out_total)
+        *out_total = atomic_load_explicit(&total_allocated, memory_order_acquire);
+    if (out_used)
+        *out_used = atomic_load_explicit(&used_allocated, memory_order_acquire);
+    if (out_peak)
+        *out_peak = atomic_load_explicit(&peak_allocated, memory_order_acquire);
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_unlock(mem_stats_mutex);
     }
@@ -431,7 +458,8 @@ void agentos_mem_stats(size_t* out_total, size_t* out_used, size_t* out_peak) {
  * @brief 检查内存泄漏
  * @return 泄漏的分配数量
  */
-size_t agentos_mem_check_leaks(void) {
+size_t agentos_mem_check_leaks(void)
+{
     size_t leak_count = 0;
     size_t leak_size = 0;
 
@@ -439,20 +467,20 @@ size_t agentos_mem_check_leaks(void) {
         agentos_mutex_lock(mem_stats_mutex);
     }
 
-    agentos_mem_alloc_info_t* info = alloc_list;
+    agentos_mem_alloc_info_t *info = alloc_list;
 #ifdef AGENTOS_ENABLE_MEMORY_DEBUG
     while (info) {
         leak_count++;
         leak_size += info->size;
-        printf("Memory leak: %p, size: %zu, file: %s, line: %d\n",
-               info->ptr, info->size, info->file, info->line);
+        AGENTOS_LOG_ERROR("Memory leak: %p, size: %zu, file: %s, line: %d", info->ptr, info->size,
+                          info->file, info->line);
         info = info->next;
     }
 
     if (leak_count > 0) {
-        printf("Total memory leaks: %zu allocations, %zu bytes\n", leak_count, leak_size);
+        AGENTOS_LOG_ERROR("Total memory leaks: %zu allocations, %zu bytes", leak_count, leak_size);
     } else {
-        printf("No memory leaks detected\n");
+        AGENTOS_LOG_INFO("No memory leaks detected");
     }
 #else
     /* 无调试输出，但仍计数 */

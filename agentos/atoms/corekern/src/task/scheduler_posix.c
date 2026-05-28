@@ -4,19 +4,22 @@
  *
  * @details
  * 本模块实现POSIX平台（Linux、macOS、BSD等）的线程操作适配器，
- * 提供与平台无关核心层的接口? * 通过实现scheduler_platform_ops_t中定义的所有操作，将POSIX线程API封装为统一接口? */
+ * 提供与平台无关核心层的接口? *
+ * 通过实现scheduler_platform_ops_t中定义的所有操作，将POSIX线程API封装为统一接口? */
 
-#include "scheduler_platform.h"
 #include "scheduler_core.h"
+#include "scheduler_platform.h"
+
 #include <pthread.h>
 #include <sched.h>
-#include <unistd.h>
-#include <time.h>
 #include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
+
 #include <string.h>
 
 /* ==================== 内部类型定义 ==================== */
@@ -44,9 +47,9 @@ typedef struct posix_task_data {
  * @param param 参数指针，指向task_info_core_t结构
  * @return 线程退出码指针
  */
-static void* posix_thread_entry_wrapper(void* param)
+static void *posix_thread_entry_wrapper(void *param)
 {
-    task_info_core_t* info = (task_info_core_t*)param;
+    task_info_core_t *info = (task_info_core_t *)param;
 
     /* 设置任务状态为运行?*/
     info->state = AGENTOS_TASK_STATE_RUNNING;
@@ -63,12 +66,13 @@ static void* posix_thread_entry_wrapper(void* param)
 /**
  * @brief 将AgentOS优先级转换为POSIX调度参数
  *
- * AgentOS优先级范围为AGENTOS_TASK_PRIORITY_MIN到AGENTOS_TASK_PRIORITY_MAX? * 需要映射到POSIX调度优先级范围? *
+ * AgentOS优先级范围为AGENTOS_TASK_PRIORITY_MIN到AGENTOS_TASK_PRIORITY_MAX? *
+ * 需要映射到POSIX调度优先级范围? *
  * @param agentos_priority AgentOS优先? * @param sched_policy 调度策略（输出参数）
  * @param sched_param 调度参数（输出参数）
  * @return 0 成功?1 失败
  */
-static int map_priority_to_posix(int agentos_priority, int* sched_policy, struct sched_param* sp)
+static int map_priority_to_posix(int agentos_priority, int *sched_policy, struct sched_param *sp)
 {
     int min_prio, max_prio;
 
@@ -87,13 +91,12 @@ static int map_priority_to_posix(int agentos_priority, int* sched_policy, struct
 
         if (min_prio == -1 || max_prio == -1) {
             /* 如果所有调度策略都不支持优先级，则无法设置优先?*/
-            return -1;
+            return AGENTOS_EINVAL;
         }
     }
 
     /* 将AgentOS优先级映射到POSIX优先级范?*/
-    sp->sched_priority = min_prio + (int)((max_prio - min_prio) *
-                                        (double)agentos_priority / 100.0);
+    sp->sched_priority = min_prio + (int)((max_prio - min_prio) * (double)agentos_priority / 100.0);
 
     return 0;
 }
@@ -124,15 +127,16 @@ static void posix_platform_cleanup(void)
  *
  * 使用POSIX线程API创建线程，并设置线程属性和栈大小? *
  * @param info 任务信息结构，包含线程入口函数和参数
- * @param stack_size 栈大小（0表示使用默认大小? * @return 平台特定句柄（posix_task_data_t指针），失败返回NULL
+ * @param stack_size 栈大小（0表示使用默认大小? * @return
+ * 平台特定句柄（posix_task_data_t指针），失败返回NULL
  */
-static void* posix_thread_create(task_info_core_t* info, size_t stack_size)
+static void *posix_thread_create(task_info_core_t *info, size_t stack_size)
 {
-    posix_task_data_t* data = NULL;
+    posix_task_data_t *data = NULL;
     int ret;
 
     /* 分配平台特定数据 */
-    data = (posix_task_data_t*)AGENTOS_CALLOC(1, sizeof(posix_task_data_t));
+    data = (posix_task_data_t *)AGENTOS_CALLOC(1, sizeof(posix_task_data_t));
     if (!data) {
         return NULL;
     }
@@ -154,8 +158,8 @@ static void* posix_thread_create(task_info_core_t* info, size_t stack_size)
     }
 
     /* 创建POSIX线程 */
-    ret = pthread_create(&data->thread_handle, &data->thread_attr,
-                        posix_thread_entry_wrapper, info);
+    ret =
+        pthread_create(&data->thread_handle, &data->thread_attr, posix_thread_entry_wrapper, info);
 
     if (ret != 0) {
         pthread_attr_destroy(&data->thread_attr);
@@ -182,14 +186,15 @@ static void* posix_thread_create(task_info_core_t* info, size_t stack_size)
  * @brief 等待POSIX线程结束
  *
  * 等待指定的POSIX线程结束，并获取线程返回值? *
- * @param platform_handle 平台特定句柄（posix_task_data_t指针? * @param retval 返回值输出指针（可为NULL? * @return 0 成功?1 失败
+ * @param platform_handle 平台特定句柄（posix_task_data_t指针? * @param retval
+ * 返回值输出指针（可为NULL? * @return 0 成功?1 失败
  */
-static int posix_thread_join(void* platform_handle, void** retval)
+static int posix_thread_join(void *platform_handle, void **retval)
 {
-    posix_task_data_t* data = (posix_task_data_t*)platform_handle;
+    posix_task_data_t *data = (posix_task_data_t *)platform_handle;
 
     if (!data) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     /* 等待线程结束 */
@@ -204,20 +209,20 @@ static int posix_thread_join(void* platform_handle, void** retval)
 /**
  * @brief 设置POSIX线程优先? *
  * 设置指定POSIX线程的优先级? *
- * @param platform_handle 平台特定句柄（posix_task_data_t指针? * @param priority AgentOS优先? * @return 0 成功?1 失败
+ * @param platform_handle 平台特定句柄（posix_task_data_t指针? * @param priority AgentOS优先? *
+ * @return 0 成功?1 失败
  */
-static int posix_thread_set_priority(void* platform_handle, int priority)
+static int posix_thread_set_priority(void *platform_handle, int priority)
 {
-    posix_task_data_t* data = (posix_task_data_t*)platform_handle;
+    posix_task_data_t *data = (posix_task_data_t *)platform_handle;
 
     if (!data) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     /* 验证优先级范?*/
-    if (priority < AGENTOS_TASK_PRIORITY_MIN ||
-        priority > AGENTOS_TASK_PRIORITY_MAX) {
-        return -1;
+    if (priority < AGENTOS_TASK_PRIORITY_MIN || priority > AGENTOS_TASK_PRIORITY_MAX) {
+        return AGENTOS_EINVAL;
     }
 
     /* 映射优先级到POSIX调度参数 */
@@ -225,7 +230,7 @@ static int posix_thread_set_priority(void* platform_handle, int priority)
     struct sched_param sp = {0};
 
     if (map_priority_to_posix(priority, &sched_policy, &sp) != 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     /* 设置调度参数 */
@@ -249,13 +254,13 @@ static uintptr_t posix_get_current_thread_id(void)
 /**
  * @brief 获取POSIX线程的系统线程ID
  *
- * 获取指定POSIX线程的系统线程ID（通常是内核线程ID）? * 注意：POSIX标准没有提供获取系统线程ID的便携方法，
- * 这里返回pthread_t作为系统线程ID的近似? *
+ * 获取指定POSIX线程的系统线程ID（通常是内核线程ID）? *
+ * 注意：POSIX标准没有提供获取系统线程ID的便携方法， 这里返回pthread_t作为系统线程ID的近似? *
  * @param platform_handle 平台特定句柄（posix_task_data_t指针? * @return 系统线程ID，失败返回值
  */
-static uintptr_t posix_get_thread_system_id(void* platform_handle)
+static uintptr_t posix_get_thread_system_id(void *platform_handle)
 {
-    posix_task_data_t* data = (posix_task_data_t*)platform_handle;
+    posix_task_data_t *data = (posix_task_data_t *)platform_handle;
 
     if (!data) {
         return 0;
@@ -295,10 +300,11 @@ static void posix_thread_yield(void)
  * @brief 清理POSIX平台特定资源
  *
  * 清理POSIX线程相关的资源，包括线程属性和内存? *
- * @param platform_handle 平台特定句柄（posix_task_data_t指针? * @param platform_data 平台特定数据（当前未使用? */
-static void posix_cleanup_platform_resources(void* platform_handle, void* platform_data)
+ * @param platform_handle 平台特定句柄（posix_task_data_t指针? * @param platform_data
+ * 平台特定数据（当前未使用? */
+static void posix_cleanup_platform_resources(void *platform_handle, void *platform_data)
 {
-    posix_task_data_t* data = (posix_task_data_t*)platform_handle;
+    posix_task_data_t *data = (posix_task_data_t *)platform_handle;
 
     if (data) {
         /* 清理线程属?*/
@@ -317,7 +323,7 @@ static void posix_cleanup_platform_resources(void* platform_handle, void* platfo
  * 返回POSIX平台适配器的名称字符串? *
  * @return 平台适配器名称字符串
  */
-static const char* posix_get_name(void)
+static const char *posix_get_name(void)
 {
     return "posix";
 }
@@ -339,8 +345,7 @@ static const scheduler_platform_ops_t posix_platform_ops = {
     .thread_sleep = posix_thread_sleep,
     .thread_yield = posix_thread_yield,
     .cleanup_platform_resources = posix_cleanup_platform_resources,
-    .get_name = posix_get_name
-};
+    .get_name = posix_get_name};
 
 /* ==================== 公共接口 ==================== */
 
@@ -350,7 +355,7 @@ static const scheduler_platform_ops_t posix_platform_ops = {
  * 返回POSIX平台适配器操作集的指针? *
  * @return POSIX平台适配器操作集指针
  */
-const scheduler_platform_ops_t* scheduler_platform_get_posix_ops(void)
+const scheduler_platform_ops_t *scheduler_platform_get_posix_ops(void)
 {
     return &posix_platform_ops;
 }

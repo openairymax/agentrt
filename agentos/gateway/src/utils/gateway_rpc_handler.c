@@ -13,8 +13,13 @@
  */
 
 #include "gateway_rpc_handler.h"
+
+#include "error.h"
+#include "gateway_compat.h"
 #include "jsonrpc.h"
+#include "memory_compat.h"
 #include "syscall_router.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,18 +28,24 @@
 /**
  * @brief 验证JSON-RPC请求格式 (CC=3)
  */
-static int validate_rpc_request(const cJSON* request) {
-    if (!request || !cJSON_IsObject(request)) return -1;
+static int validate_rpc_request(const cJSON *request)
+{
+    AGENTOS_CHECK(request != NULL, AGENTOS_EFAIL, "request is NULL");
+    AGENTOS_CHECK(cJSON_IsObject(request), AGENTOS_EFAIL, "request is not a JSON object");
 
-    const cJSON* jsonrpc = cJSON_GetObjectItem(request, "jsonrpc");
-    if (!jsonrpc || !cJSON_IsString(jsonrpc)) return -1;
-    if (strcmp(jsonrpc->valuestring, "2.0") != 0) return -1;
+    const cJSON *jsonrpc = cJSON_GetObjectItem(request, "jsonrpc");
+    AGENTOS_CHECK(jsonrpc != NULL, AGENTOS_EFAIL, "jsonrpc field missing");
+    AGENTOS_CHECK(cJSON_IsString(jsonrpc), AGENTOS_EFAIL, "jsonrpc is not a string");
+    AGENTOS_CHECK(strcmp(jsonrpc->valuestring, "2.0") == 0, AGENTOS_EFAIL,
+                  "jsonrpc version is not 2.0");
 
-    const cJSON* method = cJSON_GetObjectItem(request, "method");
-    if (!method || !cJSON_IsString(method)) return -1;
+    const cJSON *method = cJSON_GetObjectItem(request, "method");
+    AGENTOS_CHECK(method != NULL, AGENTOS_EFAIL, "method field missing");
+    AGENTOS_CHECK(cJSON_IsString(method), AGENTOS_EFAIL, "method is not a string");
 
-    const cJSON* id = cJSON_GetObjectItem(request, "id");
-    if (id && !cJSON_IsNumber(id) && !cJSON_IsString(id) && !cJSON_IsNull(id)) return -1;
+    const cJSON *id = cJSON_GetObjectItem(request, "id");
+    if (id && !cJSON_IsNumber(id) && !cJSON_IsString(id) && !cJSON_IsNull(id))
+        AGENTOS_ERROR(AGENTOS_EFAIL, "id type is invalid");
 
     return 0;
 }
@@ -42,18 +53,21 @@ static int validate_rpc_request(const cJSON* request) {
 /**
  * @brief 提取请求字段 (CC=4)
  */
-static int extract_request_fields(const cJSON* request,
-                                  const char** method_out,
-                                  const cJSON** params_out,
-                                  const cJSON** id_out) {
-    if (!request || !method_out || !params_out || !id_out) return -1;
+static int extract_request_fields(const cJSON *request, const char **method_out,
+                                  const cJSON **params_out, const cJSON **id_out)
+{
+    AGENTOS_CHECK(request != NULL, AGENTOS_EFAIL, "request is NULL");
+    AGENTOS_CHECK(method_out != NULL, AGENTOS_EFAIL, "method_out is NULL");
+    AGENTOS_CHECK(params_out != NULL, AGENTOS_EFAIL, "params_out is NULL");
+    AGENTOS_CHECK(id_out != NULL, AGENTOS_EFAIL, "id_out is NULL");
 
     *method_out = NULL;
     *params_out = NULL;
     *id_out = NULL;
 
-    const cJSON* method = cJSON_GetObjectItem(request, "method");
-    if (!method || !cJSON_IsString(method)) return -1;
+    const cJSON *method = cJSON_GetObjectItem(request, "method");
+    AGENTOS_CHECK(method != NULL, AGENTOS_EFAIL, "method field missing");
+    AGENTOS_CHECK(cJSON_IsString(method), AGENTOS_EFAIL, "method is not a string");
     *method_out = method->valuestring;
 
     *params_out = cJSON_GetObjectItem(request, "params");
@@ -65,9 +79,10 @@ static int extract_request_fields(const cJSON* request,
 
 /* ========== 公共接口实现 ========== */
 
-rpc_result_t gateway_rpc_handle_request(const cJSON* request,
-                                       int (*handler)(const char*, char**, void*),
-                                       void* handler_data) {
+rpc_result_t gateway_rpc_handle_request(const cJSON *request,
+                                        int (*handler)(const char *, char **, void *),
+                                        void *handler_data)
+{
     rpc_result_t result = {NULL, 0, NULL};
 
     /* 1. 参数验证 (CC=1) */
@@ -83,9 +98,9 @@ rpc_result_t gateway_rpc_handle_request(const cJSON* request,
     }
 
     /* 3. 提取字段 (CC=1) */
-    const char* method = NULL;
-    const cJSON* params = NULL;
-    const cJSON* id = NULL;
+    const char *method = NULL;
+    const cJSON *params = NULL;
+    const cJSON *id = NULL;
 
     if (extract_request_fields(request, &method, &params, &id) != 0) {
         result = gateway_rpc_create_error(-32600, "Missing required fields");
@@ -93,18 +108,18 @@ rpc_result_t gateway_rpc_handle_request(const cJSON* request,
     }
 
     /* 4. 调用handler或默认路由 (CC=2) */
-    char* response_str = NULL;
+    char *response_str = NULL;
 
     if (handler) {
         /* 自定义handler优先 */
-        char* request_str = cJSON_PrintUnformatted((cJSON*)request);
+        char *request_str = cJSON_PrintUnformatted((cJSON *)request);
         if (!request_str) {
             result = gateway_rpc_create_error(-32000, "Memory allocation failed");
             return result;
         }
 
         int ret = handler(request_str, &response_str, handler_data);
-        free(request_str);
+        AGENTOS_FREE(request_str);
 
         if (ret != 0 || !response_str) {
             result = gateway_rpc_create_error(-32000, "Handler error");
@@ -112,7 +127,7 @@ rpc_result_t gateway_rpc_handle_request(const cJSON* request,
         }
     } else {
         /* 默认：路由到syscall */
-        response_str = gateway_syscall_route(method, (cJSON*)params, (cJSON*)id);
+        response_str = gateway_syscall_route(method, (cJSON *)params, (cJSON *)id);
 
         if (!response_str) {
             result = gateway_rpc_create_error(-32000, "Internal error");
@@ -128,28 +143,31 @@ rpc_result_t gateway_rpc_handle_request(const cJSON* request,
     return result;
 }
 
-rpc_result_t gateway_rpc_create_error(int code, const char* message) {
+rpc_result_t gateway_rpc_create_error(int code, const char *message)
+{
     rpc_result_t result = {NULL, 0, NULL};
 
-    result.response_json = jsonrpc_create_error_response(
-        NULL, code, message ? message : "Unknown error", NULL);
+    result.response_json =
+        jsonrpc_create_error_response(NULL, code, message ? message : "Unknown error", NULL);
 
     if (result.response_json) {
         result.error_code = code;
         result.error_message = message;
     } else {
-        result.error_code = -32700;  /* 内存分配失败 */
+        result.error_code = -32700; /* 内存分配失败 */
         result.error_message = "Failed to create error response";
     }
 
     return result;
 }
 
-void gateway_rpc_free(rpc_result_t* result) {
-    if (!result) return;
+void gateway_rpc_free(rpc_result_t *result)
+{
+    if (!result)
+        return;
 
     if (result->response_json) {
-        free(result->response_json);
+        AGENTOS_FREE(result->response_json);
         result->response_json = NULL;
     }
 

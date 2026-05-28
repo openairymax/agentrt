@@ -21,8 +21,8 @@
 #ifndef cupolas_CONFIG_H
 #define cupolas_CONFIG_H
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -63,7 +63,7 @@ typedef struct config_version {
     uint32_t minor;
     uint32_t patch;
     uint64_t timestamp_ns;
-    const char* commit_hash;
+    const char *commit_hash;
 } config_version_t;
 
 /* Configuration Change Descriptor */
@@ -72,8 +72,8 @@ typedef struct config_change {
     config_status_t status;
     config_version_t old_version;
     config_version_t new_version;
-    const char* file_path;
-    const char* error_message;
+    const char *file_path;
+    const char *error_message;
 } config_change_t;
 
 /**
@@ -84,14 +84,15 @@ typedef struct config_change {
  * @note Thread-safe: Called from internal lock context
  * @reentrant Yes
  */
-typedef void (*config_observer_t)(config_event_t event, const config_change_t* change, void* user_data);
+typedef void (*config_observer_t)(config_event_t event, const config_change_t *change,
+                                  void *user_data);
 
 /* Configuration Validation Result */
 typedef struct config_validation_result {
     bool valid;
-    const char** errors;
+    const char **errors;
     size_t error_count;
-    const char** warnings;
+    const char **warnings;
     size_t warning_count;
 } config_validation_result_t;
 
@@ -107,7 +108,7 @@ typedef struct cupolas_config cupolas_config_t;
  * @reentrant No (create/destroy must be paired)
  * @ownership Returned handle: caller owns, must call cupolas_config_destroy
  */
-cupolas_config_t* cupolas_config_create(const char* config_dir);
+cupolas_config_t *cupolas_config_create(const char *config_dir);
 
 /**
  * @brief Destroy configuration manager
@@ -118,7 +119,7 @@ cupolas_config_t* cupolas_config_create(const char* config_dir);
  * @reentrant No
  * @ownership cfg: caller transfers ownership
  */
-void cupolas_config_destroy(cupolas_config_t* cfg);
+void cupolas_config_destroy(cupolas_config_t *cfg);
 
 /**
  * @brief Load configuration file
@@ -130,7 +131,7 @@ void cupolas_config_destroy(cupolas_config_t* cfg);
  * @reentrant Yes
  * @ownership file_path: caller retains ownership, may be NULL
  */
-int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* file_path);
+int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *file_path);
 
 /**
  * @brief Reload configuration file
@@ -140,7 +141,7 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_config_reload(cupolas_config_t* cfg, config_type_t type);
+int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type);
 
 /**
  * @brief Validate configuration
@@ -152,8 +153,8 @@ int cupolas_config_reload(cupolas_config_t* cfg, config_type_t type);
  * @reentrant Yes
  * @ownership result: callee writes, caller owns
  */
-int cupolas_config_validate(cupolas_config_t* cfg, config_type_t type,
-                        config_validation_result_t* result);
+int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
+                            config_validation_result_t *result);
 
 /**
  * @brief Apply configuration change
@@ -163,7 +164,7 @@ int cupolas_config_validate(cupolas_config_t* cfg, config_type_t type,
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_config_apply(cupolas_config_t* cfg, config_type_t type);
+int cupolas_config_apply(cupolas_config_t *cfg, config_type_t type);
 
 /**
  * @brief Rollback configuration change
@@ -173,7 +174,7 @@ int cupolas_config_apply(cupolas_config_t* cfg, config_type_t type);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_config_rollback(cupolas_config_t* cfg, config_type_t type);
+int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type);
 
 /**
  * @brief Get configuration version
@@ -185,8 +186,8 @@ int cupolas_config_rollback(cupolas_config_t* cfg, config_type_t type);
  * @reentrant Yes
  * @ownership version: callee writes, caller owns
  */
-int cupolas_config_get_version(cupolas_config_t* cfg, config_type_t type,
-                            config_version_t* version);
+int cupolas_config_get_version(cupolas_config_t *cfg, config_type_t type,
+                               config_version_t *version);
 
 /**
  * @brief Register configuration observer
@@ -199,8 +200,8 @@ int cupolas_config_get_version(cupolas_config_t* cfg, config_type_t type,
  * @reentrant Yes
  * @ownership callback, user_data: caller retains ownership
  */
-int cupolas_config_watch(cupolas_config_t* cfg, config_type_t type,
-                      config_observer_t callback, void* user_data);
+int cupolas_config_watch(cupolas_config_t *cfg, config_type_t type, config_observer_t callback,
+                         void *user_data);
 
 /**
  * @brief Unregister configuration observer
@@ -210,7 +211,7 @@ int cupolas_config_watch(cupolas_config_t* cfg, config_type_t type,
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_config_unwatch(cupolas_config_t* cfg, int watcher_id);
+int cupolas_config_unwatch(cupolas_config_t *cfg, int watcher_id);
 
 /**
  * @brief Get configuration status
@@ -220,7 +221,7 @@ int cupolas_config_unwatch(cupolas_config_t* cfg, int watcher_id);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-config_status_t cupolas_config_get_status(cupolas_config_t* cfg, config_type_t type);
+config_status_t cupolas_config_get_status(cupolas_config_t *cfg, config_type_t type);
 
 /**
  * @brief Set auto-reload interval
@@ -231,8 +232,7 @@ config_status_t cupolas_config_get_status(cupolas_config_t* cfg, config_type_t t
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_config_set_auto_reload(cupolas_config_t* cfg, config_type_t type,
-                                uint32_t interval_ms);
+int cupolas_config_set_auto_reload(cupolas_config_t *cfg, config_type_t type, uint32_t interval_ms);
 
 /**
  * @brief Trigger configuration reload check
@@ -242,7 +242,7 @@ int cupolas_config_set_auto_reload(cupolas_config_t* cfg, config_type_t type,
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_config_check_reload(cupolas_config_t* cfg, config_type_t type);
+int cupolas_config_check_reload(cupolas_config_t *cfg, config_type_t type);
 
 /**
  * @brief Get last error message
@@ -251,7 +251,7 @@ int cupolas_config_check_reload(cupolas_config_t* cfg, config_type_t type);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-const char* cupolas_config_get_last_error(cupolas_config_t* cfg);
+const char *cupolas_config_get_last_error(cupolas_config_t *cfg);
 
 /**
  * @brief Get configuration directory
@@ -260,7 +260,7 @@ const char* cupolas_config_get_last_error(cupolas_config_t* cfg);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-const char* cupolas_config_get_config_dir(cupolas_config_t* cfg);
+const char *cupolas_config_get_config_dir(cupolas_config_t *cfg);
 
 /**
  * @brief Export current configuration as JSON
@@ -273,8 +273,8 @@ const char* cupolas_config_get_config_dir(cupolas_config_t* cfg);
  * @reentrant Yes
  * @ownership buffer: caller owns
  */
-size_t cupolas_config_export_json(cupolas_config_t* cfg, config_type_t type,
-                               char* buffer, size_t size);
+size_t cupolas_config_export_json(cupolas_config_t *cfg, config_type_t type, char *buffer,
+                                  size_t size);
 
 /**
  * @brief Export current configuration as YAML
@@ -287,8 +287,8 @@ size_t cupolas_config_export_json(cupolas_config_t* cfg, config_type_t type,
  * @reentrant Yes
  * @ownership buffer: caller owns
  */
-size_t cupolas_config_export_yaml(cupolas_config_t* cfg, config_type_t type,
-                               char* buffer, size_t size);
+size_t cupolas_config_export_yaml(cupolas_config_t *cfg, config_type_t type, char *buffer,
+                                  size_t size);
 
 /* ============================================================================
  * Convenience Functions
@@ -301,7 +301,7 @@ size_t cupolas_config_export_yaml(cupolas_config_t* cfg, config_type_t type,
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_config_reload_all(cupolas_config_t* cfg);
+int cupolas_config_reload_all(cupolas_config_t *cfg);
 
 /**
  * @brief Validate all configurations
@@ -310,7 +310,7 @@ int cupolas_config_reload_all(cupolas_config_t* cfg);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-bool cupolas_config_validate_all(cupolas_config_t* cfg);
+bool cupolas_config_validate_all(cupolas_config_t *cfg);
 
 /**
  * @brief Get configuration status string
@@ -319,7 +319,7 @@ bool cupolas_config_validate_all(cupolas_config_t* cfg);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-const char* cupolas_config_status_string(config_status_t status);
+const char *cupolas_config_status_string(config_status_t status);
 
 /**
  * @brief Get configuration type string
@@ -328,7 +328,7 @@ const char* cupolas_config_status_string(config_status_t status);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-const char* cupolas_config_type_string(config_type_t type);
+const char *cupolas_config_type_string(config_type_t type);
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,7 @@
  */
 
 #include "cognition/context_processor.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
@@ -18,17 +19,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)  \
+    do {                \
+        tests_run++;    \
+        func();         \
+        tests_passed++; \
     } while (0)
 
 /* ==================== 引擎生命周期 ==================== */
@@ -72,9 +73,10 @@ static void test_model_context_add_entry(void)
     }
 
     const char *content1 = "Hello world, this is a test message";
-    const char *meta1    = "user_input";
+    const char *meta1 = "user_input";
 
-    agentos_error_t err = agentos_model_context_add_entry(ctx, content1, strlen(content1), meta1, 1);
+    agentos_error_t err =
+        agentos_model_context_add_entry(ctx, content1, strlen(content1), meta1, 1);
 
     if (err == AGENTOS_SUCCESS && ctx->entry_count > 0) {
         printf("    Added entry: count=%zu\n", ctx->entry_count);
@@ -97,7 +99,7 @@ static void test_model_context_multiple_entries(void)
         snprintf(buf, sizeof(buf), "Message number %d with some content", i);
         char meta[64];
         snprintf(meta, sizeof(meta), "msg_%d", i);
-        agentos_model_context_add_entry(ctx, buf, strlen(buf), meta, (uint32_t) (i + 1));
+        agentos_model_context_add_entry(ctx, buf, strlen(buf), meta, (uint32_t)(i + 1));
     }
 
     printf("    Total entries: %zu, total_len: %zu\n", ctx->entry_count, ctx->total_content_len);
@@ -109,7 +111,7 @@ static void test_model_context_multiple_entries(void)
 static void test_model_context_null_params(void)
 {
     agentos_error_t err = agentos_model_context_add_entry(NULL, "test", 4, NULL, 0);
-    (void) err;
+    (void)err;
     agentos_model_context_destroy(NULL);
     TEST_PASS("null params handled");
 }
@@ -195,15 +197,15 @@ static void test_register_and_process(void)
                  "This is a longer message that should trigger processing "
                  "when we have many entries. Entry index is %d.",
                  i);
-        agentos_model_context_add_entry(ctx, buf, strlen(buf), "test_msg", (uint32_t) (i + 1));
+        agentos_model_context_add_entry(ctx, buf, strlen(buf), "test_msg", (uint32_t)(i + 1));
     }
 
     agentos_context_processor_config_t config;
     memset(&config, 0, sizeof(config));
-    config.max_tokens        = 4096;
-    config.target_tokens     = 2048;
+    config.max_tokens = 4096;
+    config.target_tokens = 2048;
     config.compression_ratio = 0.5f;
-    config.preserve_recent   = 5;
+    config.preserve_recent = 5;
 
     agentos_error_t err = agentos_context_engine_process(engine, ctx, &config);
     printf("    Process result: %d, entries after: %zu\n", err, ctx->entry_count);
@@ -220,10 +222,10 @@ static void test_config_parameters(void)
     agentos_context_processor_config_t config;
     memset(&config, 0, sizeof(config));
 
-    config.max_tokens           = 8192;
-    config.target_tokens        = 4096;
-    config.compression_ratio    = 0.6f;
-    config.preserve_recent      = 10;
+    config.max_tokens = 8192;
+    config.target_tokens = 4096;
+    config.compression_ratio = 0.6f;
+    config.preserve_recent = 10;
     config.summarization_prompt = "Summarize this conversation";
 
     assert(config.max_tokens == 8192);
@@ -241,9 +243,11 @@ static void test_struct_sizes(void)
            sizeof(size_t) * 2 + sizeof(float) + sizeof(int) + sizeof(const char *));
     assert(sizeof(agentos_context_entry_t) >=
            sizeof(char *) * 2 + sizeof(size_t) * 2 + sizeof(uint64_t) + sizeof(uint32_t));
-    assert(sizeof(agentos_model_context_t) >= sizeof(agentos_context_entry_t *) + sizeof(size_t) * 4);
+    assert(sizeof(agentos_model_context_t) >=
+           sizeof(agentos_context_entry_t *) + sizeof(size_t) * 4);
     assert(sizeof(agentos_context_processor_t) >= sizeof(char *) * 2 + sizeof(void *) * 3);
-    assert(sizeof(agentos_context_engine_t) >= sizeof(agentos_context_processor_t **) + sizeof(size_t) * 2);
+    assert(sizeof(agentos_context_engine_t) >=
+           sizeof(agentos_context_processor_t **) + sizeof(size_t) * 2);
     TEST_PASS("struct sizes adequate");
 }
 

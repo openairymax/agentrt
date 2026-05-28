@@ -8,14 +8,19 @@
 #define LOG_TAG "openclaw_adapter"
 
 #include "openclaw_adapter.h"
+
 #include "protocol_transformers.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
 #ifndef _WIN32
 #include <pthread.h>
 #endif
+#include "memory_compat.h"
+#include "types.h"
+
 #include <errno.h>
 
 #ifdef _WIN32
@@ -27,13 +32,13 @@
 typedef SOCKET socket_fd_t;
 #define INVALID_SOCK (-1)
 #else
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-#include <netdb.h>
-#include <unistd.h>
 #include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <poll.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #define close_socket(s) close(s)
 #define sock_errno errno
 #define SOCK_EINPROGRESS EINPROGRESS
@@ -48,22 +53,22 @@ struct openclaw_adapter_context_s {
     openclaw_config_t config;
     bool initialized;
     bool connected;
-    openclaw_agent_card_t* registered_agents;
+    openclaw_agent_card_t *registered_agents;
     size_t registered_agent_count;
-    openclaw_session_t* active_sessions;
+    openclaw_session_t *active_sessions;
     size_t active_session_count;
-    openclaw_tool_info_t* registered_tools;
+    openclaw_tool_info_t *registered_tools;
     size_t registered_tool_count;
-    openclaw_task_t* tracked_tasks;
+    openclaw_task_t *tracked_tasks;
     size_t tracked_task_count;
     openclaw_message_handler_t message_handler;
-    void* message_handler_data;
+    void *message_handler_data;
     openclaw_task_handler_t task_handler;
-    void* task_handler_data;
+    void *task_handler_data;
     openclaw_event_callback_t event_callback;
-    void* event_callback_data;
+    void *event_callback_data;
     openclaw_status_callback_t status_callback;
-    void* status_callback_data;
+    void *status_callback_data;
     uint64_t messages_sent;
     uint64_t messages_received;
     uint64_t tasks_delegated;
@@ -74,9 +79,10 @@ struct openclaw_adapter_context_s {
     char last_error[256];
 };
 
-static openclaw_adapter_context_t* g_openclaw_instance = NULL;
+static openclaw_adapter_context_t *g_openclaw_instance = NULL;
 
-openclaw_config_t openclaw_config_default(void) {
+openclaw_config_t openclaw_config_default(void)
+{
     openclaw_config_t cfg = {0};
     cfg.endpoint_url = "http://localhost:28080";
     cfg.api_key = NULL;
@@ -98,24 +104,28 @@ openclaw_config_t openclaw_config_default(void) {
     return cfg;
 }
 
-openclaw_adapter_context_t* openclaw_adapter_create(const openclaw_config_t* config) {
-    if (!config) return NULL;
+openclaw_adapter_context_t *openclaw_adapter_create(const openclaw_config_t *config)
+{
+    if (!config)
+        return NULL;
 
-    openclaw_adapter_context_t* ctx = (openclaw_adapter_context_t*)calloc(1, sizeof(openclaw_adapter_context_t));
-    if (!ctx) return NULL;
+    openclaw_adapter_context_t *ctx =
+        (openclaw_adapter_context_t *)AGENTOS_CALLOC(1, sizeof(openclaw_adapter_context_t));
+    if (!ctx)
+        return NULL;
 
     memcpy(&ctx->config, config, sizeof(openclaw_config_t));
 
     if (config->endpoint_url)
-        ctx->config.endpoint_url = strdup(config->endpoint_url);
+        ctx->config.endpoint_url = AGENTOS_STRDUP(config->endpoint_url);
     if (config->api_key)
-        ctx->config.api_key = strdup(config->api_key);
+        ctx->config.api_key = AGENTOS_STRDUP(config->api_key);
     if (config->organization_id)
-        ctx->config.organization_id = strdup(config->organization_id);
+        ctx->config.organization_id = AGENTOS_STRDUP(config->organization_id);
     if (config->cluster_id)
-        ctx->config.cluster_id = strdup(config->cluster_id);
+        ctx->config.cluster_id = AGENTOS_STRDUP(config->cluster_id);
     if (config->custom_headers_json)
-        ctx->config.custom_headers_json = strdup(config->custom_headers_json);
+        ctx->config.custom_headers_json = AGENTOS_STRDUP(config->custom_headers_json);
 
     ctx->initialized = true;
     ctx->connected = false;
@@ -134,8 +144,10 @@ openclaw_adapter_context_t* openclaw_adapter_create(const openclaw_config_t* con
     return ctx;
 }
 
-void openclaw_adapter_destroy(openclaw_adapter_context_t* ctx) {
-    if (!ctx) return;
+void openclaw_adapter_destroy(openclaw_adapter_context_t *ctx)
+{
+    if (!ctx)
+        return;
 
     if (ctx == g_openclaw_instance)
         g_openclaw_instance = NULL;
@@ -143,50 +155,55 @@ void openclaw_adapter_destroy(openclaw_adapter_context_t* ctx) {
     if (ctx->connected)
         openclaw_disconnect(ctx);
 
-    free(ctx->config.endpoint_url);
-    free(ctx->config.api_key);
-    free(ctx->config.organization_id);
-    free(ctx->config.cluster_id);
-    free(ctx->config.custom_headers_json);
+    AGENTOS_FREE(ctx->config.endpoint_url);
+    AGENTOS_FREE(ctx->config.api_key);
+    AGENTOS_FREE(ctx->config.organization_id);
+    AGENTOS_FREE(ctx->config.cluster_id);
+    AGENTOS_FREE(ctx->config.custom_headers_json);
 
     for (size_t i = 0; i < ctx->registered_agent_count; i++)
         openclaw_agent_card_destroy(&ctx->registered_agents[i]);
-    free(ctx->registered_agents);
+    AGENTOS_FREE(ctx->registered_agents);
 
     for (size_t i = 0; i < ctx->active_session_count; i++)
         openclaw_session_destroy(&ctx->active_sessions[i]);
-    free(ctx->active_sessions);
+    AGENTOS_FREE(ctx->active_sessions);
 
     for (size_t i = 0; i < ctx->registered_tool_count; i++)
         openclaw_tool_info_destroy(&ctx->registered_tools[i]);
-    free(ctx->registered_tools);
+    AGENTOS_FREE(ctx->registered_tools);
 
     for (size_t i = 0; i < ctx->tracked_task_count; i++)
         openclaw_task_destroy(&ctx->tracked_tasks[i]);
-    free(ctx->tracked_tasks);
+    AGENTOS_FREE(ctx->tracked_tasks);
 
     memset(ctx, 0, sizeof(openclaw_adapter_context_t));
-    free(ctx);
+    AGENTOS_FREE(ctx);
 }
 
-bool openclaw_adapter_is_initialized(const openclaw_adapter_context_t* ctx) {
+bool openclaw_adapter_is_initialized(const openclaw_adapter_context_t *ctx)
+{
     return ctx && ctx->initialized;
 }
 
-const char* openclaw_adapter_version(void) {
+const char *openclaw_adapter_version(void)
+{
     return OPENCLAW_ADAPTER_VERSION;
 }
 
-const char* openclaw_adapter_platform_version(void) {
+const char *openclaw_adapter_platform_version(void)
+{
     return OPENCLAW_PLATFORM_VERSION;
 }
 
-static int openclaw_parse_endpoint(const char* endpoint_url, char* host, size_t host_size,
-                                    int* port) {
-    if (!endpoint_url || !host || !port) return -1;
+static int openclaw_parse_endpoint(const char *endpoint_url, char *host, size_t host_size,
+                                   int *port)
+{
+    if (!endpoint_url || !host || !port)
+        return AGENTOS_EFAIL;
 
-    const char* url = endpoint_url;
-    const char* host_start = url;
+    const char *url = endpoint_url;
+    const char *host_start = url;
 
     if (strncmp(url, "http://", 7) == 0) {
         host_start = url + 7;
@@ -199,23 +216,26 @@ static int openclaw_parse_endpoint(const char* endpoint_url, char* host, size_t 
         *port = 28080;
     }
 
-    const char* colon = strchr(host_start, ':');
-    const char* slash = strchr(host_start, '/');
+    const char *colon = strchr(host_start, ':');
+    const char *slash = strchr(host_start, '/');
 
     if (colon && (!slash || colon < slash)) {
         size_t host_len = (size_t)(colon - host_start);
-        if (host_len >= host_size) host_len = host_size - 1;
+        if (host_len >= host_size)
+            host_len = host_size - 1;
         memcpy(host, host_start, host_len);
         host[host_len] = '\0';
-        *port = atoi(colon + 1);
+        *port = (int)strtol(colon + 1, NULL, 10);
     } else if (slash) {
         size_t host_len = (size_t)(slash - host_start);
-        if (host_len >= host_size) host_len = host_size - 1;
+        if (host_len >= host_size)
+            host_len = host_size - 1;
         memcpy(host, host_start, host_len);
         host[host_len] = '\0';
     } else {
         size_t host_len = strlen(host_start);
-        if (host_len >= host_size) host_len = host_size - 1;
+        if (host_len >= host_size)
+            host_len = host_size - 1;
         memcpy(host, host_start, host_len);
         host[host_len] = '\0';
     }
@@ -223,22 +243,24 @@ static int openclaw_parse_endpoint(const char* endpoint_url, char* host, size_t 
     return 0;
 }
 
-static int __attribute__((unused)) openclaw_socket_set_nonblocking(socket_fd_t fd) {
+static int __attribute__((unused)) openclaw_socket_set_nonblocking(socket_fd_t fd)
+{
 #ifdef _WIN32
     u_long mode = 1;
     return ioctlsocket(fd, FIONBIO, &mode);
 #else
     int flags = fcntl(fd, F_GETFL, 0);
-    if (flags < 0) return -1;
+    if (flags < 0)
+        return AGENTOS_EFAIL;
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 #endif
 }
 
-static int openclaw_socket_connect(socket_fd_t fd, const char* host, int port,
-                                    uint32_t timeout_ms) {
+static int openclaw_socket_connect(socket_fd_t fd, const char *host, int port, uint32_t timeout_ms)
+{
     struct addrinfo hints;
-    struct addrinfo* result = NULL;
-    struct addrinfo* rp = NULL;
+    struct addrinfo *result = NULL;
+    struct addrinfo *rp = NULL;
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -249,7 +271,8 @@ static int openclaw_socket_connect(socket_fd_t fd, const char* host, int port,
     snprintf(port_str, sizeof(port_str), "%d", port);
 
     int ret = getaddrinfo(host, port_str, &hints, &result);
-    if (ret != 0) return -1;
+    if (ret != 0)
+        return AGENTOS_EFAIL;
 
     int connected = -1;
     for (rp = result; rp != NULL; rp = rp->ai_next) {
@@ -265,7 +288,8 @@ static int openclaw_socket_connect(socket_fd_t fd, const char* host, int port,
 
     freeaddrinfo(result);
 
-    if (connected == -1) return -2;
+    if (connected == -1)
+        return -2;
 
     if (connected == 1) {
         struct pollfd pfd;
@@ -273,20 +297,22 @@ static int openclaw_socket_connect(socket_fd_t fd, const char* host, int port,
         pfd.events = POLLOUT;
 
         int poll_ret = poll(&pfd, 1, (int)timeout_ms);
-        if (poll_ret <= 0) return -3;
+        if (poll_ret <= 0)
+            return -3;
 
         int so_error = 0;
         socklen_t len = sizeof(so_error);
-        if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len) < 0)
+        if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) < 0)
             return -4;
-        if (so_error != 0) return -5;
+        if (so_error != 0)
+            return -5;
     }
 
     return 0;
 }
 
-static int openclaw_socket_send(socket_fd_t fd, const void* data, size_t len,
-                                 uint32_t timeout_ms) {
+static int openclaw_socket_send(socket_fd_t fd, const void *data, size_t len, uint32_t timeout_ms)
+{
     size_t total_sent = 0;
 
     while (total_sent < len) {
@@ -295,13 +321,14 @@ static int openclaw_socket_send(socket_fd_t fd, const void* data, size_t len,
         pfd.events = POLLOUT;
 
         int poll_ret = poll(&pfd, 1, (int)timeout_ms);
-        if (poll_ret <= 0) return -1;
+        if (poll_ret <= 0)
+            return AGENTOS_EFAIL;
 
-        ssize_t sent = send(fd, (const char*)data + total_sent,
-                            len - total_sent, 0);
+        ssize_t sent = send(fd, (const char *)data + total_sent, len - total_sent, 0);
         if (sent < 0) {
-            if (sock_errno == EINTR) continue;
-            return -1;
+            if (sock_errno == EINTR)
+                continue;
+            return AGENTOS_EINVAL;
         }
         total_sent += (size_t)sent;
     }
@@ -309,14 +336,16 @@ static int openclaw_socket_send(socket_fd_t fd, const void* data, size_t len,
     return 0;
 }
 
-static int openclaw_socket_recv(socket_fd_t fd, char* buffer, size_t buffer_size,
-                                 size_t* out_len, uint32_t timeout_ms) {
+static int openclaw_socket_recv(socket_fd_t fd, char *buffer, size_t buffer_size, size_t *out_len,
+                                uint32_t timeout_ms)
+{
     struct pollfd pfd;
     pfd.fd = fd;
     pfd.events = POLLIN;
 
     int poll_ret = poll(&pfd, 1, (int)timeout_ms);
-    if (poll_ret <= 0) return -1;
+    if (poll_ret <= 0)
+        return AGENTOS_EFAIL;
 
     ssize_t recvd = recv(fd, buffer, buffer_size - 1, 0);
     if (recvd < 0) {
@@ -324,51 +353,53 @@ static int openclaw_socket_recv(socket_fd_t fd, char* buffer, size_t buffer_size
             *out_len = 0;
             return 0;
         }
-        return -1;
+        return AGENTOS_EINVAL;
     }
-    if (recvd == 0) return -2;
+    if (recvd == 0)
+        return -2;
 
     buffer[recvd] = '\0';
     *out_len = (size_t)recvd;
     return 0;
 }
 
-static int openclaw_serialize_message(const openclaw_message_t* msg,
-                                       char* buffer, size_t buffer_size) {
-    if (!msg || !buffer) return -1;
+static int openclaw_serialize_message(const openclaw_message_t *msg, char *buffer,
+                                      size_t buffer_size)
+{
+    if (!msg || !buffer)
+        return AGENTOS_EFAIL;
 
-    const char* sender = msg->sender_id ? msg->sender_id : "";
-    const char* receiver = msg->receiver_id ? msg->receiver_id : "";
-    const char* session = msg->session_id ? msg->session_id : "";
-    const char* mid = msg->message_id ? msg->message_id : "";
-    const char* ctype = msg->content_type ? msg->content_type : "text/plain";
-    const char* pload = msg->payload ? (const char*)msg->payload : "";
+    const char *sender = msg->sender_id ? msg->sender_id : "";
+    const char *receiver = msg->receiver_id ? msg->receiver_id : "";
+    const char *session = msg->session_id ? msg->session_id : "";
+    const char *mid = msg->message_id ? msg->message_id : "";
+    const char *ctype = msg->content_type ? msg->content_type : "text/plain";
+    const char *pload = msg->payload ? (const char *)msg->payload : "";
 
     return snprintf(buffer, buffer_size,
-        "{"
-        "\"message_id\":\"%s\","
-        "\"session_id\":\"%s\","
-        "\"sender_id\":\"%s\","
-        "\"receiver_id\":\"%s\","
-        "\"modality\":%u,"
-        "\"content_type\":\"%s\","
-        "\"payload\":\"%s\","
-        "\"payload_size\":%zu,"
-        "\"timestamp\":%llu,"
-        "\"priority\":%u"
-        "}",
-        mid, session, sender, receiver,
-        (unsigned int)msg->modality,
-        ctype,
-        pload,
-        msg->payload_size,
-        (unsigned long long)msg->timestamp,
-        (unsigned int)msg->priority);
+                    "{"
+                    "\"message_id\":\"%s\","
+                    "\"session_id\":\"%s\","
+                    "\"sender_id\":\"%s\","
+                    "\"receiver_id\":\"%s\","
+                    "\"modality\":%u,"
+                    "\"content_type\":\"%s\","
+                    "\"payload\":\"%s\","
+                    "\"payload_size\":%zu,"
+                    "\"timestamp\":%llu,"
+                    "\"priority\":%u"
+                    "}",
+                    mid, session, sender, receiver, (unsigned int)msg->modality, ctype, pload,
+                    msg->payload_size, (unsigned long long)msg->timestamp,
+                    (unsigned int)msg->priority);
 }
 
-int openclaw_connect(openclaw_adapter_context_t* ctx) {
-    if (!ctx || !ctx->initialized) return -1;
-    if (ctx->connected) return 0;
+int openclaw_connect(openclaw_adapter_context_t *ctx)
+{
+    if (!ctx || !ctx->initialized)
+        return AGENTOS_EFAIL;
+    if (ctx->connected)
+        return 0;
 
     char host[256] = {0};
     int port = 28080;
@@ -377,16 +408,15 @@ int openclaw_connect(openclaw_adapter_context_t* ctx) {
 
     socket_fd_t fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == INVALID_SOCK) {
-        snprintf(ctx->last_error, sizeof(ctx->last_error),
-                 "Failed to create socket: errno=%d", sock_errno);
+        snprintf(ctx->last_error, sizeof(ctx->last_error), "Failed to create socket: errno=%d",
+                 sock_errno);
         return -2;
     }
 
-    int ret = openclaw_socket_connect(fd, host, port,
-                                       ctx->config.request_timeout_ms);
+    int ret = openclaw_socket_connect(fd, host, port, ctx->config.request_timeout_ms);
     if (ret != 0) {
-        snprintf(ctx->last_error, sizeof(ctx->last_error),
-                 "Connect failed: %.80s:%d (ret=%d)", host, port, ret);
+        snprintf(ctx->last_error, sizeof(ctx->last_error), "Connect failed: %.80s:%d (ret=%d)",
+                 host, port, ret);
         close_socket(fd);
         return -3;
     }
@@ -399,8 +429,10 @@ int openclaw_connect(openclaw_adapter_context_t* ctx) {
     return 0;
 }
 
-int openclaw_disconnect(openclaw_adapter_context_t* ctx) {
-    if (!ctx || !ctx->connected) return -1;
+int openclaw_disconnect(openclaw_adapter_context_t *ctx)
+{
+    if (!ctx || !ctx->connected)
+        return AGENTOS_EFAIL;
 
     for (size_t i = 0; i < ctx->active_session_count; i++) {
         if (ctx->active_sessions[i].is_active)
@@ -416,13 +448,15 @@ int openclaw_disconnect(openclaw_adapter_context_t* ctx) {
     return 0;
 }
 
-bool openclaw_is_connected(const openclaw_adapter_context_t* ctx) {
+bool openclaw_is_connected(const openclaw_adapter_context_t *ctx)
+{
     return ctx && ctx->connected;
 }
 
-int openclaw_register_agent(openclaw_adapter_context_t* ctx,
-                             const openclaw_agent_card_t* card) {
-    if (!ctx || !card || !card->agent_id) return -1;
+int openclaw_register_agent(openclaw_adapter_context_t *ctx, const openclaw_agent_card_t *card)
+{
+    if (!ctx || !card || !card->agent_id)
+        return AGENTOS_EFAIL;
     if (!ctx->connected) {
         snprintf(ctx->last_error, sizeof(ctx->last_error), "Not connected to OpenClaw platform");
         return -2;
@@ -431,27 +465,31 @@ int openclaw_register_agent(openclaw_adapter_context_t* ctx,
     for (size_t i = 0; i < ctx->registered_agent_count; i++) {
         if (strcmp(ctx->registered_agents[i].agent_id, card->agent_id) == 0) {
             memcpy(&ctx->registered_agents[i], card, sizeof(openclaw_agent_card_t));
-            if (card->agent_id) ctx->registered_agents[i].agent_id = strdup(card->agent_id);
-            if (card->name) ctx->registered_agents[i].name = strdup(card->name);
-            if (card->description) ctx->registered_agents[i].description = strdup(card->description);
-            if (card->version) ctx->registered_agents[i].version = strdup(card->version);
+            if (card->agent_id)
+                ctx->registered_agents[i].agent_id = AGENTOS_STRDUP(card->agent_id);
+            if (card->name)
+                ctx->registered_agents[i].name = AGENTOS_STRDUP(card->name);
+            if (card->description)
+                ctx->registered_agents[i].description = AGENTOS_STRDUP(card->description);
+            if (card->version)
+                ctx->registered_agents[i].version = AGENTOS_STRDUP(card->version);
             return 0;
         }
     }
 
-    openclaw_agent_card_t* new_agents = (openclaw_agent_card_t*)realloc(
-        ctx->registered_agents,
-        (ctx->registered_agent_count + 1) * sizeof(openclaw_agent_card_t));
-    if (!new_agents) return -3;
+    openclaw_agent_card_t *new_agents = (openclaw_agent_card_t *)AGENTOS_REALLOC(
+        ctx->registered_agents, (ctx->registered_agent_count + 1) * sizeof(openclaw_agent_card_t));
+    if (!new_agents)
+        return -3;
 
     ctx->registered_agents = new_agents;
     memset(&ctx->registered_agents[ctx->registered_agent_count], 0, sizeof(openclaw_agent_card_t));
 
-    openclaw_agent_card_t* target = &ctx->registered_agents[ctx->registered_agent_count];
-    target->agent_id = card->agent_id ? strdup(card->agent_id) : NULL;
-    target->name = card->name ? strdup(card->name) : NULL;
-    target->description = card->description ? strdup(card->description) : NULL;
-    target->version = card->version ? strdup(card->version) : NULL;
+    openclaw_agent_card_t *target = &ctx->registered_agents[ctx->registered_agent_count];
+    target->agent_id = card->agent_id ? AGENTOS_STRDUP(card->agent_id) : NULL;
+    target->name = card->name ? AGENTOS_STRDUP(card->name) : NULL;
+    target->description = card->description ? AGENTOS_STRDUP(card->description) : NULL;
+    target->version = card->version ? AGENTOS_STRDUP(card->version) : NULL;
     target->supported_modalities = card->supported_modalities;
     target->security_level = card->security_level;
     target->max_concurrent_tasks = card->max_concurrent_tasks > 0 ? card->max_concurrent_tasks : 8;
@@ -463,39 +501,43 @@ int openclaw_register_agent(openclaw_adapter_context_t* ctx,
     return 0;
 }
 
-int openclaw_discover_agents(openclaw_adapter_context_t* ctx,
-                              const char* capability_filter,
-                              openclaw_security_level_t min_level,
-                              openclaw_agent_card_t** agents,
-                              size_t* count) {
-    if (!ctx || !agents || !count) return -1;
+int openclaw_discover_agents(openclaw_adapter_context_t *ctx, const char *capability_filter,
+                             openclaw_security_level_t min_level, openclaw_agent_card_t **agents,
+                             size_t *count)
+{
+    if (!ctx || !agents || !count)
+        return AGENTOS_EFAIL;
     *agents = NULL;
     *count = 0;
 
-    if (!ctx->connected) return -2;
+    if (!ctx->connected)
+        return -2;
 
     size_t match_count = 0;
     for (size_t i = 0; i < ctx->registered_agent_count; i++) {
-        const openclaw_agent_card_t* card = &ctx->registered_agents[i];
+        const openclaw_agent_card_t *card = &ctx->registered_agents[i];
         if (card->is_active && card->security_level >= min_level) {
             match_count++;
         }
     }
 
-    if (match_count == 0) return 0;
+    if (match_count == 0)
+        return 0;
 
-    *agents = (openclaw_agent_card_t*)calloc(match_count, sizeof(openclaw_agent_card_t));
-    if (!*agents) return -3;
+    *agents = (openclaw_agent_card_t *)AGENTOS_CALLOC(match_count, sizeof(openclaw_agent_card_t));
+    if (!*agents)
+        return -3;
 
     size_t idx = 0;
     for (size_t i = 0; i < ctx->registered_agent_count && idx < match_count; i++) {
-        const openclaw_agent_card_t* card = &ctx->registered_agents[i];
+        const openclaw_agent_card_t *card = &ctx->registered_agents[i];
         if (card->is_active && card->security_level >= min_level) {
             (*agents)[idx] = *card;
-            (*agents)[idx].agent_id = card->agent_id ? strdup(card->agent_id) : NULL;
-            (*agents)[idx].name = card->name ? strdup(card->name) : NULL;
-            (*agents)[idx].description = card->description ? strdup(card->description) : NULL;
-            (*agents)[idx].version = card->version ? strdup(card->version) : NULL;
+            (*agents)[idx].agent_id = card->agent_id ? AGENTOS_STRDUP(card->agent_id) : NULL;
+            (*agents)[idx].name = card->name ? AGENTOS_STRDUP(card->name) : NULL;
+            (*agents)[idx].description =
+                card->description ? AGENTOS_STRDUP(card->description) : NULL;
+            (*agents)[idx].version = card->version ? AGENTOS_STRDUP(card->version) : NULL;
             idx++;
         }
     }
@@ -504,16 +546,16 @@ int openclaw_discover_agents(openclaw_adapter_context_t* ctx,
     return 0;
 }
 
-int openclaw_unregister_agent(openclaw_adapter_context_t* ctx,
-                               const char* agent_id) {
-    if (!ctx || !agent_id) return -1;
+int openclaw_unregister_agent(openclaw_adapter_context_t *ctx, const char *agent_id)
+{
+    if (!ctx || !agent_id)
+        return AGENTOS_EFAIL;
 
     for (size_t i = 0; i < ctx->registered_agent_count; i++) {
         if (strcmp(ctx->registered_agents[i].agent_id, agent_id) == 0) {
             openclaw_agent_card_destroy(&ctx->registered_agents[i]);
             if (i < ctx->registered_agent_count - 1) {
-                memmove(&ctx->registered_agents[i],
-                        &ctx->registered_agents[i + 1],
+                memmove(&ctx->registered_agents[i], &ctx->registered_agents[i + 1],
                         (ctx->registered_agent_count - i - 1) * sizeof(openclaw_agent_card_t));
             }
             ctx->registered_agent_count--;
@@ -523,9 +565,10 @@ int openclaw_unregister_agent(openclaw_adapter_context_t* ctx,
     return -2;
 }
 
-int openclaw_register_tool(openclaw_adapter_context_t* ctx,
-                            const openclaw_tool_info_t* tool) {
-    if (!ctx || !tool || !tool->tool_id) return -1;
+int openclaw_register_tool(openclaw_adapter_context_t *ctx, const openclaw_tool_info_t *tool)
+{
+    if (!ctx || !tool || !tool->tool_id)
+        return AGENTOS_EFAIL;
     if (!ctx->connected) {
         snprintf(ctx->last_error, sizeof(ctx->last_error), "Not connected");
         return -2;
@@ -535,65 +578,79 @@ int openclaw_register_tool(openclaw_adapter_context_t* ctx,
         if (strcmp(ctx->registered_tools[i].tool_id, tool->tool_id) == 0) {
             openclaw_tool_info_destroy(&ctx->registered_tools[i]);
             ctx->registered_tools[i] = *tool;
-            ctx->registered_tools[i].tool_id = tool->tool_id ? strdup(tool->tool_id) : NULL;
-            ctx->registered_tools[i].name = tool->name ? strdup(tool->name) : NULL;
-            ctx->registered_tools[i].description = tool->description ? strdup(tool->description) : NULL;
-            ctx->registered_tools[i].input_schema_json = tool->input_schema_json ? strdup(tool->input_schema_json) : NULL;
-            ctx->registered_tools[i].output_schema_json = tool->output_schema_json ? strdup(tool->output_schema_json) : NULL;
+            ctx->registered_tools[i].tool_id = tool->tool_id ? AGENTOS_STRDUP(tool->tool_id) : NULL;
+            ctx->registered_tools[i].name = tool->name ? AGENTOS_STRDUP(tool->name) : NULL;
+            ctx->registered_tools[i].description =
+                tool->description ? AGENTOS_STRDUP(tool->description) : NULL;
+            ctx->registered_tools[i].input_schema_json =
+                tool->input_schema_json ? AGENTOS_STRDUP(tool->input_schema_json) : NULL;
+            ctx->registered_tools[i].output_schema_json =
+                tool->output_schema_json ? AGENTOS_STRDUP(tool->output_schema_json) : NULL;
             return 0;
         }
     }
 
-    openclaw_tool_info_t* new_tools = (openclaw_tool_info_t*)realloc(
-        ctx->registered_tools,
-        (ctx->registered_tool_count + 1) * sizeof(openclaw_tool_info_t));
-    if (!new_tools) return -3;
+    openclaw_tool_info_t *new_tools = (openclaw_tool_info_t *)AGENTOS_REALLOC(
+        ctx->registered_tools, (ctx->registered_tool_count + 1) * sizeof(openclaw_tool_info_t));
+    if (!new_tools)
+        return -3;
 
     ctx->registered_tools = new_tools;
     memset(&ctx->registered_tools[ctx->registered_tool_count], 0, sizeof(openclaw_tool_info_t));
 
-    openclaw_tool_info_t* target = &ctx->registered_tools[ctx->registered_tool_count];
-    target->tool_id = tool->tool_id ? strdup(tool->tool_id) : NULL;
-    target->name = tool->name ? strdup(tool->name) : NULL;
-    target->description = tool->description ? strdup(tool->description) : NULL;
-    target->input_schema_json = tool->input_schema_json ? strdup(tool->input_schema_json) : NULL;
-    target->output_schema_json = tool->output_schema_json ? strdup(tool->output_schema_json) : NULL;
+    openclaw_tool_info_t *target = &ctx->registered_tools[ctx->registered_tool_count];
+    target->tool_id = tool->tool_id ? AGENTOS_STRDUP(tool->tool_id) : NULL;
+    target->name = tool->name ? AGENTOS_STRDUP(tool->name) : NULL;
+    target->description = tool->description ? AGENTOS_STRDUP(tool->description) : NULL;
+    target->input_schema_json =
+        tool->input_schema_json ? AGENTOS_STRDUP(tool->input_schema_json) : NULL;
+    target->output_schema_json =
+        tool->output_schema_json ? AGENTOS_STRDUP(tool->output_schema_json) : NULL;
 
     ctx->registered_tool_count++;
     return 0;
 }
 
-int openclaw_list_tools(openclaw_adapter_context_t* ctx,
-                        const char* agent_id,
-                        openclaw_tool_info_t** tools,
-                        size_t* count) {
-    if (!ctx || !tools || !count) return -1;
+int openclaw_list_tools(openclaw_adapter_context_t *ctx, const char *agent_id,
+                        openclaw_tool_info_t **tools, size_t *count)
+{
+    if (!ctx || !tools || !count)
+        return AGENTOS_EFAIL;
     *tools = NULL;
     *count = 0;
 
-    if (!ctx->connected) return -2;
+    if (!ctx->connected)
+        return -2;
 
     size_t match_count = 0;
     for (size_t i = 0; i < ctx->registered_tool_count; i++) {
         if (!agent_id || (ctx->registered_tools[i].owner_agent_id &&
-            strcmp(ctx->registered_tools[i].owner_agent_id, agent_id) == 0)) {
+                          strcmp(ctx->registered_tools[i].owner_agent_id, agent_id) == 0)) {
             match_count++;
         }
     }
 
-    if (match_count == 0) return 0;
+    if (match_count == 0)
+        return 0;
 
-    *tools = (openclaw_tool_info_t*)calloc(match_count, sizeof(openclaw_tool_info_t));
-    if (!*tools) return -3;
+    *tools = (openclaw_tool_info_t *)AGENTOS_CALLOC(match_count, sizeof(openclaw_tool_info_t));
+    if (!*tools)
+        return -3;
 
     size_t idx = 0;
     for (size_t i = 0; i < ctx->registered_tool_count && idx < match_count; i++) {
         if (!agent_id || (ctx->registered_tools[i].owner_agent_id &&
-            strcmp(ctx->registered_tools[i].owner_agent_id, agent_id) == 0)) {
+                          strcmp(ctx->registered_tools[i].owner_agent_id, agent_id) == 0)) {
             (*tools)[idx] = ctx->registered_tools[i];
-            (*tools)[idx].tool_id = ctx->registered_tools[i].tool_id ? strdup(ctx->registered_tools[i].tool_id) : NULL;
-            (*tools)[idx].name = ctx->registered_tools[i].name ? strdup(ctx->registered_tools[i].name) : NULL;
-            (*tools)[idx].description = ctx->registered_tools[i].description ? strdup(ctx->registered_tools[i].description) : NULL;
+            (*tools)[idx].tool_id = ctx->registered_tools[i].tool_id
+                                        ? AGENTOS_STRDUP(ctx->registered_tools[i].tool_id)
+                                        : NULL;
+            (*tools)[idx].name = ctx->registered_tools[i].name
+                                     ? AGENTOS_STRDUP(ctx->registered_tools[i].name)
+                                     : NULL;
+            (*tools)[idx].description = ctx->registered_tools[i].description
+                                            ? AGENTOS_STRDUP(ctx->registered_tools[i].description)
+                                            : NULL;
             idx++;
         }
     }
@@ -602,11 +659,14 @@ int openclaw_list_tools(openclaw_adapter_context_t* ctx,
     return 0;
 }
 
-int openclaw_create_session(openclaw_adapter_context_t* ctx,
-                             const openclaw_session_t* session_template,
-                             openclaw_session_t* out_session) {
-    if (!ctx || !out_session) return -1;
-    if (!ctx->connected) return -2;
+int openclaw_create_session(openclaw_adapter_context_t *ctx,
+                            const openclaw_session_t *session_template,
+                            openclaw_session_t *out_session)
+{
+    if (!ctx || !out_session)
+        return AGENTOS_EFAIL;
+    if (!ctx->connected)
+        return -2;
 
     static uint32_t session_counter = 0;
     session_counter++;
@@ -615,10 +675,11 @@ int openclaw_create_session(openclaw_adapter_context_t* ctx,
 
     char sid[64];
     snprintf(sid, sizeof(sid), "oc-session-%08x", session_counter);
-    out_session->session_id = strdup(sid);
+    out_session->session_id = AGENTOS_STRDUP(sid);
 
     if (session_template) {
-        out_session->agent_id = session_template->agent_id ? strdup(session_template->agent_id) : NULL;
+        out_session->agent_id =
+            session_template->agent_id ? AGENTOS_STRDUP(session_template->agent_id) : NULL;
         out_session->modality = session_template->modality;
         out_session->security_level = session_template->security_level;
     } else {
@@ -630,33 +691,33 @@ int openclaw_create_session(openclaw_adapter_context_t* ctx,
     out_session->last_activity = out_session->created_at;
     out_session->is_active = true;
 
-    openclaw_session_t* new_sessions = (openclaw_session_t*)realloc(
-        ctx->active_sessions,
-        (ctx->active_session_count + 1) * sizeof(openclaw_session_t));
+    openclaw_session_t *new_sessions = (openclaw_session_t *)AGENTOS_REALLOC(
+        ctx->active_sessions, (ctx->active_session_count + 1) * sizeof(openclaw_session_t));
     if (new_sessions) {
         ctx->active_sessions = new_sessions;
-        memcpy(&ctx->active_sessions[ctx->active_session_count],
-               out_session, sizeof(openclaw_session_t));
-        ctx->active_sessions[ctx->active_session_count].session_id = strdup(out_session->session_id);
+        memcpy(&ctx->active_sessions[ctx->active_session_count], out_session,
+               sizeof(openclaw_session_t));
+        ctx->active_sessions[ctx->active_session_count].session_id =
+            AGENTOS_STRDUP(out_session->session_id);
         ctx->active_sessions[ctx->active_session_count].agent_id =
-            out_session->agent_id ? strdup(out_session->agent_id) : NULL;
+            out_session->agent_id ? AGENTOS_STRDUP(out_session->agent_id) : NULL;
         ctx->active_session_count++;
     }
 
     return 0;
 }
 
-int openclaw_close_session(openclaw_adapter_context_t* ctx,
-                           const char* session_id) {
-    if (!ctx || !session_id) return -1;
+int openclaw_close_session(openclaw_adapter_context_t *ctx, const char *session_id)
+{
+    if (!ctx || !session_id)
+        return AGENTOS_EFAIL;
 
     for (size_t i = 0; i < ctx->active_session_count; i++) {
         if (strcmp(ctx->active_sessions[i].session_id, session_id) == 0) {
             ctx->active_sessions[i].is_active = false;
             openclaw_session_destroy(&ctx->active_sessions[i]);
             if (i < ctx->active_session_count - 1) {
-                memmove(&ctx->active_sessions[i],
-                        &ctx->active_sessions[i + 1],
+                memmove(&ctx->active_sessions[i], &ctx->active_sessions[i + 1],
                         (ctx->active_session_count - i - 1) * sizeof(openclaw_session_t));
             }
             ctx->active_session_count--;
@@ -666,11 +727,13 @@ int openclaw_close_session(openclaw_adapter_context_t* ctx,
     return -2;
 }
 
-int openclaw_send_message(openclaw_adapter_context_t* ctx,
-                          const openclaw_message_t* msg,
-                          openclaw_message_t* response) {
-    if (!ctx || !msg || !response) return -1;
-    if (!ctx->connected) return -2;
+int openclaw_send_message(openclaw_adapter_context_t *ctx, const openclaw_message_t *msg,
+                          openclaw_message_t *response)
+{
+    if (!ctx || !msg || !response)
+        return AGENTOS_EFAIL;
+    if (!ctx->connected)
+        return -2;
 
     ctx->messages_sent++;
 
@@ -687,30 +750,30 @@ int openclaw_send_message(openclaw_adapter_context_t* ctx,
             size_t send_len = (size_t)ser_len;
             char framed[OPENCLAW_RECV_BUFFER_SIZE + 8];
             int frame_len = snprintf(framed, sizeof(framed), "%06zx%s", send_len, send_buf);
-            int send_ret = openclaw_socket_send(ctx->sock_fd, framed,
-                                                 (size_t)(frame_len > 0 ? frame_len : 0),
-                                                 ctx->config.request_timeout_ms);
+            int send_ret =
+                openclaw_socket_send(ctx->sock_fd, framed, (size_t)(frame_len > 0 ? frame_len : 0),
+                                     ctx->config.request_timeout_ms);
             if (send_ret == 0) {
                 char recv_buf[OPENCLAW_RECV_BUFFER_SIZE] = {0};
                 size_t recv_len = 0;
-                int recv_ret = openclaw_socket_recv(ctx->sock_fd, recv_buf,
-                                                     sizeof(recv_buf), &recv_len,
-                                                     ctx->config.request_timeout_ms);
+                int recv_ret = openclaw_socket_recv(ctx->sock_fd, recv_buf, sizeof(recv_buf),
+                                                    &recv_len, ctx->config.request_timeout_ms);
                 if (recv_ret == 0 && recv_len >= 6) {
                     size_t payload_offset = 6;
                     size_t payload_len = recv_len - 6;
                     memset(response, 0, sizeof(openclaw_message_t));
-                    response->message_id = msg->message_id ? strdup(msg->message_id) : NULL;
-                    response->session_id = msg->session_id ? strdup(msg->session_id) : NULL;
-                    response->sender_id = msg->receiver_id ? strdup(msg->receiver_id) : NULL;
-                    response->receiver_id = msg->sender_id ? strdup(msg->sender_id) : NULL;
+                    response->message_id = msg->message_id ? AGENTOS_STRDUP(msg->message_id) : NULL;
+                    response->session_id = msg->session_id ? AGENTOS_STRDUP(msg->session_id) : NULL;
+                    response->sender_id =
+                        msg->receiver_id ? AGENTOS_STRDUP(msg->receiver_id) : NULL;
+                    response->receiver_id = msg->sender_id ? AGENTOS_STRDUP(msg->sender_id) : NULL;
                     response->modality = msg->modality;
                     response->timestamp = (uint64_t)(time(NULL));
                     if (payload_len > 0) {
-                        response->payload = malloc(payload_len + 1);
+                        response->payload = AGENTOS_MALLOC(payload_len + 1);
                         if (response->payload) {
                             memcpy(response->payload, recv_buf + payload_offset, payload_len);
-                            ((char*)response->payload)[payload_len] = '\0';
+                            ((char *)response->payload)[payload_len] = '\0';
                             response->payload_size = payload_len;
                         }
                     }
@@ -722,10 +785,10 @@ int openclaw_send_message(openclaw_adapter_context_t* ctx,
     }
 
     memset(response, 0, sizeof(openclaw_message_t));
-    response->message_id = msg->message_id ? strdup(msg->message_id) : NULL;
-    response->session_id = msg->session_id ? strdup(msg->session_id) : NULL;
-    response->receiver_id = msg->sender_id ? strdup(msg->sender_id) : NULL;
-    response->sender_id = msg->receiver_id ? strdup(msg->receiver_id) : NULL;
+    response->message_id = msg->message_id ? AGENTOS_STRDUP(msg->message_id) : NULL;
+    response->session_id = msg->session_id ? AGENTOS_STRDUP(msg->session_id) : NULL;
+    response->receiver_id = msg->sender_id ? AGENTOS_STRDUP(msg->sender_id) : NULL;
+    response->sender_id = msg->receiver_id ? AGENTOS_STRDUP(msg->receiver_id) : NULL;
     response->modality = msg->modality;
     response->timestamp = (uint64_t)(time(NULL));
 
@@ -733,18 +796,20 @@ int openclaw_send_message(openclaw_adapter_context_t* ctx,
     return 0;
 }
 
-int openclaw_delegate_task(openclaw_adapter_context_t* ctx,
-                            const openclaw_task_t* task,
-                            const char* target_agent_id,
-                            openclaw_task_t* result) {
-    if (!ctx || !task || !result) return -1;
-    if (!ctx->connected) return -2;
+int openclaw_delegate_task(openclaw_adapter_context_t *ctx, const openclaw_task_t *task,
+                           const char *target_agent_id, openclaw_task_t *result)
+{
+    if (!ctx || !task || !result)
+        return AGENTOS_EFAIL;
+    if (!ctx->connected)
+        return -2;
 
     ctx->tasks_delegated++;
 
     if (ctx->task_handler) {
         int ret = ctx->task_handler(task, result, ctx->task_handler_data);
-        if (ret == 0) ctx->tasks_completed++;
+        if (ret == 0)
+            ctx->tasks_completed++;
         return ret;
     }
 
@@ -754,11 +819,11 @@ int openclaw_delegate_task(openclaw_adapter_context_t* ctx,
     memset(result, 0, sizeof(openclaw_task_t));
     char tid[64];
     snprintf(tid, sizeof(tid), "oc-task-%08x", task_counter);
-    result->task_id = strdup(tid);
-    result->session_id = task->session_id ? strdup(task->session_id) : NULL;
-    result->description = task->description ? strdup(task->description) : NULL;
-    result->input_data_json = task->input_data_json ? strdup(task->input_data_json) : NULL;
-    result->assigned_agent_id = target_agent_id ? strdup(target_agent_id) : NULL;
+    result->task_id = AGENTOS_STRDUP(tid);
+    result->session_id = task->session_id ? AGENTOS_STRDUP(task->session_id) : NULL;
+    result->description = task->description ? AGENTOS_STRDUP(task->description) : NULL;
+    result->input_data_json = task->input_data_json ? AGENTOS_STRDUP(task->input_data_json) : NULL;
+    result->assigned_agent_id = target_agent_id ? AGENTOS_STRDUP(target_agent_id) : NULL;
     result->priority = task->priority > 0 ? task->priority : 5;
     result->state = OPENCLAW_AGENT_STATE_EXECUTING;
     result->progress = 0.0;
@@ -769,39 +834,57 @@ int openclaw_delegate_task(openclaw_adapter_context_t* ctx,
     result->progress = 1.0;
     result->completed_at = (uint64_t)(time(NULL));
 
-    openclaw_task_t* new_tasks = (openclaw_task_t*)realloc(
-        ctx->tracked_tasks,
-        (ctx->tracked_task_count + 1) * sizeof(openclaw_task_t));
+    openclaw_task_t *new_tasks = (openclaw_task_t *)AGENTOS_REALLOC(
+        ctx->tracked_tasks, (ctx->tracked_task_count + 1) * sizeof(openclaw_task_t));
     if (new_tasks) {
         ctx->tracked_tasks = new_tasks;
         ctx->tracked_tasks[ctx->tracked_task_count] = *result;
-        ctx->tracked_tasks[ctx->tracked_task_count].task_id = result->task_id ? strdup(result->task_id) : NULL;
-        ctx->tracked_tasks[ctx->tracked_task_count].session_id = result->session_id ? strdup(result->session_id) : NULL;
-        ctx->tracked_tasks[ctx->tracked_task_count].description = result->description ? strdup(result->description) : NULL;
-        ctx->tracked_tasks[ctx->tracked_task_count].assigned_agent_id = result->assigned_agent_id ? strdup(result->assigned_agent_id) : NULL;
+        ctx->tracked_tasks[ctx->tracked_task_count].task_id =
+            result->task_id ? AGENTOS_STRDUP(result->task_id) : NULL;
+        ctx->tracked_tasks[ctx->tracked_task_count].session_id =
+            result->session_id ? AGENTOS_STRDUP(result->session_id) : NULL;
+        ctx->tracked_tasks[ctx->tracked_task_count].description =
+            result->description ? AGENTOS_STRDUP(result->description) : NULL;
+        ctx->tracked_tasks[ctx->tracked_task_count].assigned_agent_id =
+            result->assigned_agent_id ? AGENTOS_STRDUP(result->assigned_agent_id) : NULL;
         ctx->tracked_task_count++;
     }
 
     return 0;
 }
 
-int openclaw_query_task(openclaw_adapter_context_t* ctx,
-                        const char* task_id,
-                        openclaw_task_t* result) {
-    if (!ctx || !task_id || !result) return -1;
+int openclaw_query_task(openclaw_adapter_context_t *ctx, const char *task_id,
+                        openclaw_task_t *result)
+{
+    if (!ctx || !task_id || !result)
+        return AGENTOS_EFAIL;
     memset(result, 0, sizeof(openclaw_task_t));
 
     for (size_t i = 0; i < ctx->tracked_task_count; i++) {
-        if (ctx->tracked_tasks[i].task_id &&
-            strcmp(ctx->tracked_tasks[i].task_id, task_id) == 0) {
+        if (ctx->tracked_tasks[i].task_id && strcmp(ctx->tracked_tasks[i].task_id, task_id) == 0) {
             *result = ctx->tracked_tasks[i];
-            result->task_id = ctx->tracked_tasks[i].task_id ? strdup(ctx->tracked_tasks[i].task_id) : NULL;
-            result->session_id = ctx->tracked_tasks[i].session_id ? strdup(ctx->tracked_tasks[i].session_id) : NULL;
-            result->description = ctx->tracked_tasks[i].description ? strdup(ctx->tracked_tasks[i].description) : NULL;
-            result->assigned_agent_id = ctx->tracked_tasks[i].assigned_agent_id ? strdup(ctx->tracked_tasks[i].assigned_agent_id) : NULL;
-            result->input_data_json = ctx->tracked_tasks[i].input_data_json ? strdup(ctx->tracked_tasks[i].input_data_json) : NULL;
-            result->result_json = ctx->tracked_tasks[i].result_json ? strdup(ctx->tracked_tasks[i].result_json) : NULL;
-            result->error_message = ctx->tracked_tasks[i].error_message ? strdup(ctx->tracked_tasks[i].error_message) : NULL;
+            result->task_id = ctx->tracked_tasks[i].task_id
+                                  ? AGENTOS_STRDUP(ctx->tracked_tasks[i].task_id)
+                                  : NULL;
+            result->session_id = ctx->tracked_tasks[i].session_id
+                                     ? AGENTOS_STRDUP(ctx->tracked_tasks[i].session_id)
+                                     : NULL;
+            result->description = ctx->tracked_tasks[i].description
+                                      ? AGENTOS_STRDUP(ctx->tracked_tasks[i].description)
+                                      : NULL;
+            result->assigned_agent_id =
+                ctx->tracked_tasks[i].assigned_agent_id
+                    ? AGENTOS_STRDUP(ctx->tracked_tasks[i].assigned_agent_id)
+                    : NULL;
+            result->input_data_json = ctx->tracked_tasks[i].input_data_json
+                                          ? AGENTOS_STRDUP(ctx->tracked_tasks[i].input_data_json)
+                                          : NULL;
+            result->result_json = ctx->tracked_tasks[i].result_json
+                                      ? AGENTOS_STRDUP(ctx->tracked_tasks[i].result_json)
+                                      : NULL;
+            result->error_message = ctx->tracked_tasks[i].error_message
+                                        ? AGENTOS_STRDUP(ctx->tracked_tasks[i].error_message)
+                                        : NULL;
             return 0;
         }
     }
@@ -809,13 +892,13 @@ int openclaw_query_task(openclaw_adapter_context_t* ctx,
     return -2;
 }
 
-int openclaw_cancel_task(openclaw_adapter_context_t* ctx,
-                         const char* task_id) {
-    if (!ctx || !task_id) return -1;
+int openclaw_cancel_task(openclaw_adapter_context_t *ctx, const char *task_id)
+{
+    if (!ctx || !task_id)
+        return AGENTOS_EFAIL;
 
     for (size_t i = 0; i < ctx->tracked_task_count; i++) {
-        if (ctx->tracked_tasks[i].task_id &&
-            strcmp(ctx->tracked_tasks[i].task_id, task_id) == 0) {
+        if (ctx->tracked_tasks[i].task_id && strcmp(ctx->tracked_tasks[i].task_id, task_id) == 0) {
             ctx->tracked_tasks[i].state = OPENCLAW_AGENT_STATE_ERROR;
             if (ctx->event_callback) {
                 ctx->event_callback("task_cancelled", task_id, ctx->event_callback_data);
@@ -827,9 +910,10 @@ int openclaw_cancel_task(openclaw_adapter_context_t* ctx,
     return -2;
 }
 
-int openclaw_get_cluster_status(openclaw_adapter_context_t* ctx,
-                                openclaw_cluster_status_t* status) {
-    if (!ctx || !status) return -1;
+int openclaw_get_cluster_status(openclaw_adapter_context_t *ctx, openclaw_cluster_status_t *status)
+{
+    if (!ctx || !status)
+        return AGENTOS_EFAIL;
 
     memset(status, 0, sizeof(openclaw_cluster_status_t));
     status->node_id = "agentos-node-001";
@@ -841,51 +925,60 @@ int openclaw_get_cluster_status(openclaw_adapter_context_t* ctx,
     status->messages_processed = ctx->messages_sent + ctx->messages_received;
     status->tasks_completed = ctx->tasks_completed;
     status->uptime_seconds = ctx->connection_uptime_sec;
-    status->cpu_usage_pct = (double)(ctx->active_session_count * 2.5 + ctx->registered_agent_count * 0.5);
-    status->memory_usage_mb = (double)(ctx->tracked_task_count * 8.0 + ctx->registered_tool_count * 0.5 + 32.0);
-    status->disk_usage_pct = (double)(ctx->registered_agent_count * 0.1 + ctx->registered_tool_count * 0.05);
+    status->cpu_usage_pct =
+        (double)(ctx->active_session_count * 2.5 + ctx->registered_agent_count * 0.5);
+    status->memory_usage_mb =
+        (double)(ctx->tracked_task_count * 8.0 + ctx->registered_tool_count * 0.5 + 32.0);
+    status->disk_usage_pct =
+        (double)(ctx->registered_agent_count * 0.1 + ctx->registered_tool_count * 0.05);
 
     return 0;
 }
 
-int openclaw_set_message_handler(openclaw_adapter_context_t* ctx,
-                                 openclaw_message_handler_t handler,
-                                 void* user_data) {
-    if (!ctx) return -1;
+int openclaw_set_message_handler(openclaw_adapter_context_t *ctx,
+                                 openclaw_message_handler_t handler, void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
     ctx->message_handler = handler;
     ctx->message_handler_data = user_data;
     return 0;
 }
 
-int openclaw_set_task_handler(openclaw_adapter_context_t* ctx,
-                               openclaw_task_handler_t handler,
-                               void* user_data) {
-    if (!ctx) return -1;
+int openclaw_set_task_handler(openclaw_adapter_context_t *ctx, openclaw_task_handler_t handler,
+                              void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
     ctx->task_handler = handler;
     ctx->task_handler_data = user_data;
     return 0;
 }
 
-int openclaw_set_event_callback(openclaw_adapter_context_t* ctx,
-                                 openclaw_event_callback_t callback,
-                                 void* user_data) {
-    if (!ctx) return -1;
+int openclaw_set_event_callback(openclaw_adapter_context_t *ctx, openclaw_event_callback_t callback,
+                                void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
     ctx->event_callback = callback;
     ctx->event_callback_data = user_data;
     return 0;
 }
 
-int openclaw_set_status_callback(openclaw_adapter_context_t* ctx,
-                                  openclaw_status_callback_t callback,
-                                  void* user_data) {
-    if (!ctx) return -1;
+int openclaw_set_status_callback(openclaw_adapter_context_t *ctx,
+                                 openclaw_status_callback_t callback, void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
     ctx->status_callback = callback;
     ctx->status_callback_data = user_data;
     return 0;
 }
 
-int openclaw_send_heartbeat(openclaw_adapter_context_t* ctx) {
-    if (!ctx || !ctx->connected) return -1;
+int openclaw_send_heartbeat(openclaw_adapter_context_t *ctx)
+{
+    if (!ctx || !ctx->connected)
+        return AGENTOS_EFAIL;
 
     ctx->connection_uptime_sec += ctx->config.heartbeat_interval_sec;
 
@@ -904,15 +997,16 @@ int openclaw_send_heartbeat(openclaw_adapter_context_t* ctx) {
     return 0;
 }
 
-int openclaw_get_statistics(openclaw_adapter_context_t* ctx,
-                            char* stats_json,
-                            size_t buffer_size) {
-    if (!ctx || !stats_json || buffer_size < 64) return -1;
+int openclaw_get_statistics(openclaw_adapter_context_t *ctx, char *stats_json, size_t buffer_size)
+{
+    if (!ctx || !stats_json || buffer_size < 64)
+        return AGENTOS_EFAIL;
 
     openclaw_cluster_status_t status;
     openclaw_get_cluster_status(ctx, &status);
 
-    int written = snprintf(stats_json, buffer_size,
+    int written = snprintf(
+        stats_json, buffer_size,
         "{"
         "\"adapter_version\":\"%s\","
         "\"platform_version\":\"%s\","
@@ -926,61 +1020,57 @@ int openclaw_get_statistics(openclaw_adapter_context_t* ctx,
         "\"tasks_completed\":%llu,"
         "\"uptime_seconds\":%llu,"
         "\"cluster\":{"
-            "\"node_id\":\"%s\","
-            "\"cluster_name\":\"%s\","
-            "\"total_agents\":%llu,"
-            "\"active_sessions\":%llu"
+        "\"node_id\":\"%s\","
+        "\"cluster_name\":\"%s\","
+        "\"total_agents\":%llu,"
+        "\"active_sessions\":%llu"
         "}"
         "}",
-        OPENCLAW_ADAPTER_VERSION,
-        OPENCLAW_PLATFORM_VERSION,
-        ctx->config.mode == OPENCLAW_MODE_STANDALONE ? "standalone" :
-         ctx->config.mode == OPENCLAW_MODE_CLUSTERED ? "clustered" :
-         ctx->config.mode == OPENCLAW_MODE_HYBRID ? "hybrid" : "embedded",
-        ctx->connected ? "true" : "false",
-        ctx->registered_agent_count,
-        ctx->active_session_count,
-        (unsigned long long)ctx->messages_sent,
-        (unsigned long long)ctx->messages_received,
-        (unsigned long long)ctx->tasks_delegated,
-        (unsigned long long)ctx->tasks_completed,
-        (unsigned long long)ctx->connection_uptime_sec,
-        status.node_id ? status.node_id : "",
-        status.cluster_name ? status.cluster_name : "",
-        (unsigned long long)status.total_agents,
-        (unsigned long long)status.active_sessions
-    );
+        OPENCLAW_ADAPTER_VERSION, OPENCLAW_PLATFORM_VERSION,
+        ctx->config.mode == OPENCLAW_MODE_STANDALONE  ? "standalone"
+        : ctx->config.mode == OPENCLAW_MODE_CLUSTERED ? "clustered"
+        : ctx->config.mode == OPENCLAW_MODE_HYBRID    ? "hybrid"
+                                                      : "embedded",
+        ctx->connected ? "true" : "false", ctx->registered_agent_count, ctx->active_session_count,
+        (unsigned long long)ctx->messages_sent, (unsigned long long)ctx->messages_received,
+        (unsigned long long)ctx->tasks_delegated, (unsigned long long)ctx->tasks_completed,
+        (unsigned long long)ctx->connection_uptime_sec, status.node_id ? status.node_id : "",
+        status.cluster_name ? status.cluster_name : "", (unsigned long long)status.total_agents,
+        (unsigned long long)status.active_sessions);
 
     openclaw_cluster_status_destroy(&status);
 
     return (written >= 0 && (size_t)written < buffer_size) ? 0 : -2;
 }
 
-static int openclaw_proto_init(void* context) {
+static int openclaw_proto_init(void *context)
+{
     openclaw_config_t config = openclaw_config_default();
-    openclaw_adapter_context_t* ctx = openclaw_adapter_create(&config);
-    if (!ctx) return -1;
-    *(void**)context = ctx;
+    openclaw_adapter_context_t *ctx = openclaw_adapter_create(&config);
+    if (!ctx)
+        return AGENTOS_EFAIL;
+    *(void **)context = ctx;
     return 0;
 }
 
-static int openclaw_proto_destroy(void* context) {
+static int openclaw_proto_destroy(void *context)
+{
     if (context) {
-        openclaw_adapter_destroy((openclaw_adapter_context_t*)context);
+        openclaw_adapter_destroy((openclaw_adapter_context_t *)context);
     }
     return 0;
 }
 
-static int openclaw_proto_handle_request(void* context,
-                                          const void* req,
-                                          void** resp) {
-    if (!context || !req) return -1;
-    openclaw_adapter_context_t* ctx = (openclaw_adapter_context_t*)context;
+static int openclaw_proto_handle_request(void *context, const void *req, void **resp)
+{
+    if (!context || !req)
+        return AGENTOS_EFAIL;
+    openclaw_adapter_context_t *ctx = (openclaw_adapter_context_t *)context;
 
-    const char* raw_request = (const char*)req;
+    const char *raw_request = (const char *)req;
     openclaw_message_t msg = {0};
     msg.message_id = "proto-req";
-    msg.payload = (void*)raw_request;
+    msg.payload = (void *)raw_request;
     msg.payload_size = raw_request ? strlen(raw_request) : 0;
     msg.modality = OPENCLAW_MODALITY_TEXT;
     msg.timestamp = (uint64_t)(time(NULL));
@@ -990,22 +1080,23 @@ static int openclaw_proto_handle_request(void* context,
 
     if (resp) {
         if (ret == 0 && response.payload && response.payload_size > 0) {
-            *resp = malloc(response.payload_size + 1);
+            *resp = AGENTOS_MALLOC(response.payload_size + 1);
             if (*resp) {
                 memcpy(*resp, response.payload, response.payload_size);
-                ((char*)*resp)[response.payload_size] = '\0';
+                ((char *)*resp)[response.payload_size] = '\0';
             }
         } else if (ret == 0) {
             char stats_buf[2048] = {0};
             openclaw_get_statistics(ctx, stats_buf, sizeof(stats_buf));
-            *resp = strdup(stats_buf);
+            *resp = AGENTOS_STRDUP(stats_buf);
         } else {
             char err_buf[512];
-            int err_len = snprintf(err_buf, sizeof(err_buf),
+            int err_len = snprintf(
+                err_buf, sizeof(err_buf),
                 "{\"error\":\"Request processing failed\",\"code\":%d,\"adapter_version\":\"%s\"}",
                 ret, OPENCLAW_ADAPTER_VERSION);
             if (err_len > 0 && (size_t)err_len < sizeof(err_buf)) {
-                *resp = strdup(err_buf);
+                *resp = AGENTOS_STRDUP(err_buf);
             } else {
                 *resp = NULL;
             }
@@ -1017,29 +1108,34 @@ static int openclaw_proto_handle_request(void* context,
     return ret;
 }
 
-static int openclaw_proto_get_version(void* context, char* buf, size_t max_size) {
-    if (!buf || max_size == 0) return -1;
-    const char* ver = openclaw_adapter_version();
+static int openclaw_proto_get_version(void *context, char *buf, size_t max_size)
+{
+    if (!buf || max_size == 0)
+        return AGENTOS_EFAIL;
+    const char *ver = openclaw_adapter_version();
     size_t len = strlen(ver);
-    if (len >= max_size) len = max_size - 1;
+    if (len >= max_size)
+        len = max_size - 1;
     memcpy(buf, ver, len);
     buf[len] = '\0';
     return 0;
 }
 
-static uint32_t openclaw_proto_capabilities(void* context) {
-    return (uint32_t)(
-        PROTO_CAP_MULTIMODAL | PROTO_CAP_STREAMING |
-        PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY);
+static uint32_t openclaw_proto_capabilities(void *context)
+{
+    return (uint32_t)(PROTO_CAP_MULTIMODAL | PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING |
+                      PROTO_CAP_AGENT_DISCOVERY);
 }
 
 static proto_adapter_t g_openclaw_adapter = {0};
 static pthread_once_t g_openclaw_adapter_once = PTHREAD_ONCE_INIT;
 
-static void openclaw_adapter_init_once(void) {
+static void openclaw_adapter_init_once(void)
+{
     g_openclaw_adapter.name = "OpenClaw";
     g_openclaw_adapter.version = OPENCLAW_ADAPTER_VERSION;
-    g_openclaw_adapter.description = "OpenClaw Platform Integration Adapter - offline private AI Agent platform with multimodal capabilities";
+    g_openclaw_adapter.description = "OpenClaw Platform Integration Adapter - offline private AI "
+                                     "Agent platform with multimodal capabilities";
     g_openclaw_adapter.type = PROTO_OPENCLAW;
     g_openclaw_adapter.init = openclaw_proto_init;
     g_openclaw_adapter.destroy = openclaw_proto_destroy;
@@ -1048,64 +1144,77 @@ static void openclaw_adapter_init_once(void) {
     g_openclaw_adapter.capabilities = openclaw_proto_capabilities;
 }
 
-const proto_adapter_t* openclaw_get_protocol_adapter(void) {
+const proto_adapter_t *openclaw_get_protocol_adapter(void)
+{
     pthread_once(&g_openclaw_adapter_once, openclaw_adapter_init_once);
     return &g_openclaw_adapter;
 }
 
-void openclaw_agent_card_destroy(openclaw_agent_card_t* card) {
-    if (!card) return;
-    free(card->agent_id);
-    free(card->name);
-    free(card->description);
-    free(card->version);
+void openclaw_agent_card_destroy(openclaw_agent_card_t *card)
+{
+    if (!card)
+        return;
+    AGENTOS_FREE(card->agent_id);
+    AGENTOS_FREE(card->name);
+    AGENTOS_FREE(card->description);
+    AGENTOS_FREE(card->version);
     memset(card, 0, sizeof(openclaw_agent_card_t));
 }
 
-void openclaw_tool_info_destroy(openclaw_tool_info_t* tool) {
-    if (!tool) return;
-    free(tool->tool_id);
-    free(tool->name);
-    free(tool->description);
-    free(tool->input_schema_json);
-    free(tool->output_schema_json);
+void openclaw_tool_info_destroy(openclaw_tool_info_t *tool)
+{
+    if (!tool)
+        return;
+    AGENTOS_FREE(tool->tool_id);
+    AGENTOS_FREE(tool->name);
+    AGENTOS_FREE(tool->description);
+    AGENTOS_FREE(tool->input_schema_json);
+    AGENTOS_FREE(tool->output_schema_json);
     memset(tool, 0, sizeof(openclaw_tool_info_t));
 }
 
-void openclaw_session_destroy(openclaw_session_t* session) {
-    if (!session) return;
-    free(session->session_id);
-    free(session->agent_id);
-    free(session->parent_session_id);
+void openclaw_session_destroy(openclaw_session_t *session)
+{
+    if (!session)
+        return;
+    AGENTOS_FREE(session->session_id);
+    AGENTOS_FREE(session->agent_id);
+    AGENTOS_FREE(session->parent_session_id);
     memset(session, 0, sizeof(openclaw_session_t));
 }
 
-void openclaw_message_destroy(openclaw_message_t* msg) {
-    if (!msg) return;
-    free(msg->message_id);
-    free(msg->session_id);
-    free(msg->sender_id);
-    free(msg->receiver_id);
-    free(msg->content_type);
-    free(msg->payload);
+void openclaw_message_destroy(openclaw_message_t *msg)
+{
+    if (!msg)
+        return;
+    AGENTOS_FREE(msg->message_id);
+    AGENTOS_FREE(msg->session_id);
+    AGENTOS_FREE(msg->sender_id);
+    AGENTOS_FREE(msg->receiver_id);
+    AGENTOS_FREE(msg->content_type);
+    AGENTOS_FREE(msg->payload);
     memset(msg, 0, sizeof(openclaw_message_t));
 }
 
-void openclaw_task_destroy(openclaw_task_t* task) {
-    if (!task) return;
-    free(task->task_id);
-    free(task->session_id);
-    free(task->description);
-    free(task->input_data_json);
-    free(task->assigned_agent_id);
-    free(task->result_json);
-    free(task->error_message);
+void openclaw_task_destroy(openclaw_task_t *task)
+{
+    if (!task)
+        return;
+    AGENTOS_FREE(task->task_id);
+    AGENTOS_FREE(task->session_id);
+    AGENTOS_FREE(task->description);
+    AGENTOS_FREE(task->input_data_json);
+    AGENTOS_FREE(task->assigned_agent_id);
+    AGENTOS_FREE(task->result_json);
+    AGENTOS_FREE(task->error_message);
     memset(task, 0, sizeof(openclaw_task_t));
 }
 
-void openclaw_cluster_status_destroy(openclaw_cluster_status_t* status) {
-    if (!status) return;
-    free(status->node_id);
-    free(status->cluster_name);
+void openclaw_cluster_status_destroy(openclaw_cluster_status_t *status)
+{
+    if (!status)
+        return;
+    AGENTOS_FREE(status->node_id);
+    AGENTOS_FREE(status->cluster_name);
     memset(status, 0, sizeof(openclaw_cluster_status_t));
 }

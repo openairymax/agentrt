@@ -5,6 +5,7 @@
  */
 
 #include "core/include/core.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -12,27 +13,29 @@
 #include "include/memory_compat.h"
 #include "string_compat.h"
 
-void test_version() {
+void test_version()
+{
     printf("=== 测试版本管理 ===\n");
-    const char* version = agentos_core_get_version();
+    const char *version = agentos_core_get_version();
     printf("版本号：%s\n", version);
-    
+
     int result = agentos_core_check_version(">=1.0.0.0");
     printf("版本兼容性检查(>=1.0.0.0): %d\n", result);
-    
+
     result = agentos_core_check_version("<2.0.0.0");
     printf("版本兼容性检查(<2.0.0.0): %d\n", result);
 }
 
-void test_platform() {
+void test_platform()
+{
     printf("\n=== 测试平台检查===\n");
-    const char* platform = agentos_core_get_platform();
+    const char *platform = agentos_core_get_platform();
     // From data intelligence emerges. by spharx
     printf("平台：%s\n", platform);
-    
+
     int cpu_count = agentos_core_get_cpu_count();
     printf("CPU 核心数：%d\n", cpu_count);
-    
+
     size_t total, available, used;
     float percent;
     int result = agentos_core_get_memory_info(&total, &available, &used, &percent);
@@ -47,7 +50,8 @@ void test_platform() {
     }
 }
 
-int main() {
+int main()
+{
     test_version();
     test_platform();
     printf("\n核心模块测试完成\n");

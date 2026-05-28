@@ -12,24 +12,33 @@
  */
 
 #include "trace.h"
+
 #include "observability.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
+
+#include <ctype.h>
 #include <string.h>
 #include <time.h>
-#include <ctype.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
-
 #include "platform.h"
 
 #ifndef _WIN32
-#include <unistd.h>
 #include <stdint.h>
+#include <unistd.h>
+#endif
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
 #endif
 
 #define MAX_SPANS 1024
@@ -41,10 +50,10 @@
  * @brief 追踪事件结构
  */
 typedef struct trace_event {
-    char name[128];                      /**< 事件名称 */
-    int64_t timestamp;                 /**< 事件时间戳（微秒?*/
-    char attributes[512];                /**< 事件属?*/
-    struct trace_event* next;           /**< 下一个事?*/
+    char name[128];           /**< 事件名称 */
+    int64_t timestamp;        /**< 事件时间戳（微秒?*/
+    char attributes[512];     /**< 事件属?*/
+    struct trace_event *next; /**< 下一个事?*/
 } trace_event_t;
 
 /**
@@ -55,28 +64,32 @@ typedef agentos_mutex_t trace_mutex_t;
 /**
  * @brief 初始化互斥锁
  */
-static int trace_mutex_init(trace_mutex_t* mutex) {
+static int trace_mutex_init(trace_mutex_t *mutex)
+{
     return agentos_mutex_init(mutex);
 }
 
 /**
  * @brief 销毁互斥锁
  */
-static void trace_mutex_destroy(trace_mutex_t* mutex) {
+static void trace_mutex_destroy(trace_mutex_t *mutex)
+{
     agentos_mutex_destroy(mutex);
 }
 
 /**
  * @brief 加锁
  */
-static void trace_mutex_lock(trace_mutex_t* mutex) {
+static void trace_mutex_lock(trace_mutex_t *mutex)
+{
     agentos_mutex_lock(mutex);
 }
 
 /**
  * @brief 解锁
  */
-static void trace_mutex_unlock(trace_mutex_t* mutex) {
+static void trace_mutex_unlock(trace_mutex_t *mutex)
+{
     agentos_mutex_unlock(mutex);
 }
 
@@ -84,36 +97,37 @@ static void trace_mutex_unlock(trace_mutex_t* mutex) {
  * @brief 追踪Span内部结构
  */
 struct agentos_trace_span {
-    char trace_id[MAX_TRACE_ID_LEN];    /**< 追踪ID */
-    char span_id[MAX_SPAN_ID_LEN];      /**< Span ID */
-    char parent_id[MAX_SPAN_ID_LEN];    /**< 父Span ID */
-    char name[128];                      /**< Span名称 */
-    int64_t start_time;                 /**< 开始时间（微秒?*/
-    int64_t end_time;                   /**< 结束时间（微秒） */
-    atomic_int status;                 /**< 状态：0=运行? 1=完成, 2=错误 */
-    trace_event_t* events;             /**< 事件链表 */
-    trace_event_t* events_tail;         /**< 事件链表?*/
-    int event_count;                    /**< 事件数量 */
-    trace_mutex_t mutex;               /**< 互斥?*/
-    struct agentos_trace_span* next;   /**< 下一个Span */
+    char trace_id[MAX_TRACE_ID_LEN]; /**< 追踪ID */
+    char span_id[MAX_SPAN_ID_LEN];   /**< Span ID */
+    char parent_id[MAX_SPAN_ID_LEN]; /**< 父Span ID */
+    char name[128];                  /**< Span名称 */
+    int64_t start_time;              /**< 开始时间（微秒?*/
+    int64_t end_time;                /**< 结束时间（微秒） */
+    atomic_int status;               /**< 状态：0=运行? 1=完成, 2=错误 */
+    trace_event_t *events;           /**< 事件链表 */
+    trace_event_t *events_tail;      /**< 事件链表?*/
+    int event_count;                 /**< 事件数量 */
+    trace_mutex_t mutex;             /**< 互斥?*/
+    struct agentos_trace_span *next; /**< 下一个Span */
 };
 
 /**
  * @brief 全局追踪状?
  */
 static struct {
-    atomic_uint64_t span_counter;      /**< Span计数?*/
-    atomic_uint64_t trace_counter;     /**< 追踪计数?*/
-    agentos_trace_span_t* head;        /**< Span链表?*/
-    agentos_trace_span_t* tail;        /**< Span链表?*/
-    trace_mutex_t mutex;               /**< 互斥?*/
-    int initialized;                   /**< 初始化标?*/
+    atomic_uint64_t span_counter;  /**< Span计数?*/
+    atomic_uint64_t trace_counter; /**< 追踪计数?*/
+    agentos_trace_span_t *head;    /**< Span链表?*/
+    agentos_trace_span_t *tail;    /**< Span链表?*/
+    trace_mutex_t mutex;           /**< 互斥?*/
+    int initialized;               /**< 初始化标?*/
 } g_trace_state;
 
 /**
  * @brief 获取当前时间戳（微秒? 跨平台实?
  */
-static int64_t get_current_time_us(void) {
+static int64_t get_current_time_us(void)
+{
 #ifdef _WIN32
     FILETIME ft;
     ULARGE_INTEGER uli;
@@ -129,13 +143,14 @@ static int64_t get_current_time_us(void) {
 /**
  * @brief 初始化追踪系?
  */
-static int init_trace_system(void) {
+static int init_trace_system(void)
+{
     if (g_trace_state.initialized) {
         return 0;
     }
 
     if (trace_mutex_init(&g_trace_state.mutex) != 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     atomic_init(&g_trace_state.span_counter, 0);
@@ -149,18 +164,18 @@ static int init_trace_system(void) {
 /**
  * @brief 生成ID
  */
-static void generate_id(char* buffer, size_t size, uint64_t counter, const char* prefix) {
-    snprintf(buffer, size, "%s-%016llx-%08llx",
-             prefix,
-             (unsigned long long)time(NULL),
+static void generate_id(char *buffer, size_t size, uint64_t counter, const char *prefix)
+{
+    snprintf(buffer, size, "%s-%016llx-%08llx", prefix, (unsigned long long)time(NULL),
              (unsigned long long)counter);
 }
 
 /**
  * @brief 创建追踪事件
  */
-static trace_event_t* create_event(const char* name, const char* attributes) {
-    trace_event_t* event = (trace_event_t*)AGENTOS_MALLOC(sizeof(trace_event_t));
+static trace_event_t *create_event(const char *name, const char *attributes)
+{
+    trace_event_t *event = (trace_event_t *)AGENTOS_MALLOC(sizeof(trace_event_t));
     if (!event) {
         return NULL;
     }
@@ -185,15 +200,17 @@ static trace_event_t* create_event(const char* name, const char* attributes) {
 /**
  * @brief 释放事件链表
  */
-static void free_events(trace_event_t* head) {
+static void free_events(trace_event_t *head)
+{
     while (head) {
-        trace_event_t* next = head->next;
+        trace_event_t *next = head->next;
         AGENTOS_FREE(head);
         head = next;
     }
 }
 
-agentos_trace_span_t* agentos_trace_begin(const char* name, const char* parent_id) {
+agentos_trace_span_t *agentos_trace_begin(const char *name, const char *parent_id)
+{
     if (!name) {
         return NULL;
     }
@@ -202,8 +219,8 @@ agentos_trace_span_t* agentos_trace_begin(const char* name, const char* parent_i
         return NULL;
     }
 
-    agentos_trace_span_t* span = (agentos_trace_span_t*)AGENTOS_MALLOC(
-        sizeof(agentos_trace_span_t));
+    agentos_trace_span_t *span =
+        (agentos_trace_span_t *)AGENTOS_MALLOC(sizeof(agentos_trace_span_t));
     if (!span) {
         return NULL;
     }
@@ -254,7 +271,8 @@ agentos_trace_span_t* agentos_trace_begin(const char* name, const char* parent_i
     return span;
 }
 
-void agentos_trace_end(agentos_trace_span_t* span) {
+void agentos_trace_end(agentos_trace_span_t *span)
+{
     if (!span) {
         return;
     }
@@ -272,7 +290,8 @@ void agentos_trace_end(agentos_trace_span_t* span) {
     trace_mutex_unlock(&span->mutex);
 }
 
-void agentos_trace_add_event(agentos_trace_span_t* span, const char* name, const char* attributes) {
+void agentos_trace_add_event(agentos_trace_span_t *span, const char *name, const char *attributes)
+{
     if (!span || !name) {
         return;
     }
@@ -289,7 +308,7 @@ void agentos_trace_add_event(agentos_trace_span_t* span, const char* name, const
         return;
     }
 
-    trace_event_t* event = create_event(name, attributes);
+    trace_event_t *event = create_event(name, attributes);
     if (!event) {
         trace_mutex_unlock(&span->mutex);
         return;
@@ -308,7 +327,8 @@ void agentos_trace_add_event(agentos_trace_span_t* span, const char* name, const
     trace_mutex_unlock(&span->mutex);
 }
 
-char* agentos_trace_export(void) {
+char *agentos_trace_export(void)
+{
     if (init_trace_system() != 0) {
         return NULL;
     }
@@ -316,7 +336,7 @@ char* agentos_trace_export(void) {
     trace_mutex_lock(&g_trace_state.mutex);
 
     size_t buffer_size = 4096;
-    char* buffer = (char*)AGENTOS_MALLOC(buffer_size);
+    char *buffer = (char *)AGENTOS_MALLOC(buffer_size);
     if (!buffer) {
         trace_mutex_unlock(&g_trace_state.mutex);
         return NULL;
@@ -325,7 +345,7 @@ char* agentos_trace_export(void) {
     size_t offset = 0;
     offset += snprintf(buffer + offset, buffer_size - offset, "[\n");
 
-    agentos_trace_span_t* span = g_trace_state.head;
+    agentos_trace_span_t *span = g_trace_state.head;
     int first = 1;
 
     while (span) {
@@ -337,38 +357,38 @@ char* agentos_trace_export(void) {
         first = 0;
 
         offset += snprintf(buffer + offset, buffer_size - offset, "  {\n");
-        offset += snprintf(buffer + offset, buffer_size - offset,
-                          "    \"trace_id\": \"%s\",\n", span->trace_id);
-        offset += snprintf(buffer + offset, buffer_size - offset,
-                          "    \"span_id\": \"%s\",\n", span->span_id);
+        offset += snprintf(buffer + offset, buffer_size - offset, "    \"trace_id\": \"%s\",\n",
+                           span->trace_id);
+        offset += snprintf(buffer + offset, buffer_size - offset, "    \"span_id\": \"%s\",\n",
+                           span->span_id);
 
         if (span->parent_id[0]) {
             offset += snprintf(buffer + offset, buffer_size - offset,
-                              "    \"parent_id\": \"%s\",\n", span->parent_id);
+                               "    \"parent_id\": \"%s\",\n", span->parent_id);
         }
 
-        offset += snprintf(buffer + offset, buffer_size - offset,
-                          "    \"name\": \"%s\",\n", span->name);
-        offset += snprintf(buffer + offset, buffer_size - offset,
-                          "    \"start_time\": %lld,\n", (long long)span->start_time);
+        offset +=
+            snprintf(buffer + offset, buffer_size - offset, "    \"name\": \"%s\",\n", span->name);
+        offset += snprintf(buffer + offset, buffer_size - offset, "    \"start_time\": %lld,\n",
+                           (long long)span->start_time);
 
         if (span->end_time > 0) {
-            offset += snprintf(buffer + offset, buffer_size - offset,
-                              "    \"end_time\": %lld,\n", (long long)span->end_time);
-            offset += snprintf(buffer + offset, buffer_size - offset,
-                              "    \"duration_us\": %lld,\n", (long long)(span->end_time - span->start_time));
+            offset += snprintf(buffer + offset, buffer_size - offset, "    \"end_time\": %lld,\n",
+                               (long long)span->end_time);
+            offset +=
+                snprintf(buffer + offset, buffer_size - offset, "    \"duration_us\": %lld,\n",
+                         (long long)(span->end_time - span->start_time));
         }
 
-        offset += snprintf(buffer + offset, buffer_size - offset,
-                          "    \"status\": \"%s\",\n",
-                          atomic_load(&span->status) == 1 ? "ok" :
-                          atomic_load(&span->status) == 2 ? "error" : "running");
+        offset += snprintf(buffer + offset, buffer_size - offset, "    \"status\": \"%s\",\n",
+                           atomic_load(&span->status) == 1   ? "ok"
+                           : atomic_load(&span->status) == 2 ? "error"
+                                                             : "running");
 
         if (span->event_count > 0) {
-            offset += snprintf(buffer + offset, buffer_size - offset,
-                              "    \"events\": [\n");
+            offset += snprintf(buffer + offset, buffer_size - offset, "    \"events\": [\n");
 
-            trace_event_t* event = span->events;
+            trace_event_t *event = span->events;
             int first_event = 1;
             while (event) {
                 if (!first_event) {
@@ -377,12 +397,12 @@ char* agentos_trace_export(void) {
                 first_event = 0;
 
                 offset += snprintf(buffer + offset, buffer_size - offset,
-                                  "      {\"name\": \"%s\", \"timestamp\": %lld",
-                                  event->name, (long long)event->timestamp);
+                                   "      {\"name\": \"%s\", \"timestamp\": %lld", event->name,
+                                   (long long)event->timestamp);
 
                 if (event->attributes[0]) {
                     offset += snprintf(buffer + offset, buffer_size - offset,
-                                      ", \"attributes\": %s", event->attributes);
+                                       ", \"attributes\": %s", event->attributes);
                 }
 
                 offset += snprintf(buffer + offset, buffer_size - offset, "}");
@@ -400,7 +420,7 @@ char* agentos_trace_export(void) {
 
         if (buffer_size > 512 && offset >= buffer_size - 512) {
             buffer_size *= 2;
-            char* new_buffer = (char*)AGENTOS_REALLOC(buffer, buffer_size);
+            char *new_buffer = (char *)AGENTOS_REALLOC(buffer, buffer_size);
             if (!new_buffer) {
                 trace_mutex_unlock(&g_trace_state.mutex);
                 AGENTOS_FREE(buffer);
@@ -417,16 +437,17 @@ char* agentos_trace_export(void) {
     return buffer;
 }
 
-void agentos_trace_cleanup(void) {
+void agentos_trace_cleanup(void)
+{
     if (!g_trace_state.initialized) {
         return;
     }
 
     trace_mutex_lock(&g_trace_state.mutex);
 
-    agentos_trace_span_t* span = g_trace_state.head;
+    agentos_trace_span_t *span = g_trace_state.head;
     while (span) {
-        agentos_trace_span_t* next = span->next;
+        agentos_trace_span_t *next = span->next;
 
         trace_mutex_lock(&span->mutex);
         span->end_time = get_current_time_us();
@@ -446,7 +467,8 @@ void agentos_trace_cleanup(void) {
     trace_mutex_unlock(&g_trace_state.mutex);
 }
 
-int agentos_trace_get_span_count(void) {
+int agentos_trace_get_span_count(void)
+{
     if (!g_trace_state.initialized) {
         return 0;
     }
@@ -454,7 +476,7 @@ int agentos_trace_get_span_count(void) {
     trace_mutex_lock(&g_trace_state.mutex);
 
     int count = 0;
-    agentos_trace_span_t* span = g_trace_state.head;
+    agentos_trace_span_t *span = g_trace_state.head;
     while (span) {
         count++;
         span = span->next;

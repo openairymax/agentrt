@@ -13,23 +13,24 @@
  * 已统一到 scheduler.c 中（使用三层架构：核心层+平台适配器）
  */
 
-#include "task.h"
 #include "mem.h"
-#include <stdlib.h>
-
 #include "memory_compat.h"
-#include <string.h>
+#include "task.h"
+
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <pthread.h>
-#include <unistd.h>
 #include <sched.h>
+#include <unistd.h>
 #endif
 
-agentos_thread_id_t agentos_thread_self(void) {
+agentos_thread_id_t agentos_thread_self(void)
+{
 #ifdef _WIN32
     return (agentos_thread_id_t)GetCurrentThreadId();
 #else
@@ -37,7 +38,8 @@ agentos_thread_id_t agentos_thread_self(void) {
 #endif
 }
 
-void agentos_thread_sleep(uint32_t ms) {
+void agentos_thread_sleep(uint32_t ms)
+{
 #ifdef _WIN32
     Sleep(ms);
 #else
@@ -45,7 +47,8 @@ void agentos_thread_sleep(uint32_t ms) {
 #endif
 }
 
-void agentos_thread_yield(void) {
+void agentos_thread_yield(void)
+{
 #ifdef _WIN32
     SwitchToThread();
 #else

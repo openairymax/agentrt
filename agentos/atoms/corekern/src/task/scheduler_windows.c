@@ -3,17 +3,20 @@
  * @brief Windows平台调度器适配器实? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
- * 本模块实现Windows平台的线程操作适配器，提供与平台无关核心层的接口? * 通过实现scheduler_platform_ops_t中定义的所有操作，将Windows API封装为统一接口? */
+ * 本模块实现Windows平台的线程操作适配器，提供与平台无关核心层的接口? *
+ * 通过实现scheduler_platform_ops_t中定义的所有操作，将Windows API封装为统一接口? */
 
 #define __STDC_NO_ATOMICS__
 
-#include "scheduler_platform.h"
 #include "scheduler_core.h"
-#include <windows.h>
+#include "scheduler_platform.h"
+
 #include <stdlib.h>
+#include <windows.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
+
 #include <string.h>
 
 /* ==================== 内部类型定义 ==================== */
@@ -30,7 +33,7 @@ typedef struct windows_task_data {
     DWORD thread_id;
 
     /** @brief 线程入口函数包装器，用于转换调用约定 */
-    DWORD (WINAPI *thread_entry_wrapper)(LPVOID);
+    DWORD(WINAPI *thread_entry_wrapper)(LPVOID);
 } windows_task_data_t;
 
 /* ==================== 内部辅助函数 ==================== */
@@ -43,7 +46,7 @@ typedef struct windows_task_data {
  */
 static DWORD WINAPI windows_thread_entry_wrapper(LPVOID param)
 {
-    task_info_core_t* info = (task_info_core_t*)param;
+    task_info_core_t *info = (task_info_core_t *)param;
 
     /* 设置任务状态为运行?*/
     info->state = AGENTOS_TASK_STATE_RUNNING;
@@ -59,7 +62,8 @@ static DWORD WINAPI windows_thread_entry_wrapper(LPVOID param)
 
 /**
  * @brief 将AgentOS优先级转换为Windows优先? *
- * AgentOS优先级范围为AGENTOS_TASK_PRIORITY_MIN到AGENTOS_TASK_PRIORITY_MAX? * 需要映射到Windows的THREAD_PRIORITY_*常量? *
+ * AgentOS优先级范围为AGENTOS_TASK_PRIORITY_MIN到AGENTOS_TASK_PRIORITY_MAX? *
+ * 需要映射到Windows的THREAD_PRIORITY_*常量? *
  * @param agentos_priority AgentOS优先? * @return Windows优先级常? */
 static int map_priority_to_windows(int agentos_priority)
 {
@@ -99,14 +103,15 @@ static void windows_platform_cleanup(void)
  *
  * 使用Windows API创建线程，并设置线程优先级和栈大小? *
  * @param info 任务信息结构，包含线程入口函数和参数
- * @param stack_size 栈大小（0表示使用默认大小? * @return 平台特定句柄（windows_task_data_t指针），失败返回NULL
+ * @param stack_size 栈大小（0表示使用默认大小? * @return
+ * 平台特定句柄（windows_task_data_t指针），失败返回NULL
  */
-static void* windows_thread_create(task_info_core_t* info, size_t stack_size)
+static void *windows_thread_create(task_info_core_t *info, size_t stack_size)
 {
-    windows_task_data_t* data = NULL;
+    windows_task_data_t *data = NULL;
 
     /* 分配平台特定数据 */
-    data = (windows_task_data_t*)AGENTOS_CALLOC(1, sizeof(windows_task_data_t));
+    data = (windows_task_data_t *)AGENTOS_CALLOC(1, sizeof(windows_task_data_t));
     if (!data) {
         return NULL;
     }
@@ -115,13 +120,12 @@ static void* windows_thread_create(task_info_core_t* info, size_t stack_size)
     data->thread_entry_wrapper = windows_thread_entry_wrapper;
 
     /* 创建Windows线程 */
-    data->thread_handle = CreateThread(
-        NULL,                           /* 默认安全属?*/
-        (stack_size > 0) ? (DWORD)stack_size : 0,  /* 栈大?*/
-        windows_thread_entry_wrapper,   /* 线程入口函数 */
-        info,                           /* 参数 */
-        0,                              /* 创建标志（立即运行） */
-        &data->thread_id                /* 线程ID输出 */
+    data->thread_handle = CreateThread(NULL, /* 默认安全属?*/
+                                       (stack_size > 0) ? (DWORD)stack_size : 0, /* 栈大?*/
+                                       windows_thread_entry_wrapper, /* 线程入口函数 */
+                                       info,                         /* 参数 */
+                                       0,               /* 创建标志（立即运行） */
+                                       &data->thread_id /* 线程ID输出 */
     );
 
     if (!data->thread_handle) {
@@ -141,25 +145,27 @@ static void* windows_thread_create(task_info_core_t* info, size_t stack_size)
  * @brief 等待Windows线程结束
  *
  * 等待指定的Windows线程结束，并获取线程返回值? *
- * @param platform_handle 平台特定句柄（windows_task_data_t指针? * @param retval 返回值输出指针（可为NULL? * @return 0 成功?1 失败
+ * @param platform_handle 平台特定句柄（windows_task_data_t指针? * @param retval
+ * 返回值输出指针（可为NULL? * @return 0 成功?1 失败
  */
-static int windows_thread_join(void* platform_handle, void** retval)
+static int windows_thread_join(void *platform_handle, void **retval)
 {
-    windows_task_data_t* data = (windows_task_data_t*)platform_handle;
+    windows_task_data_t *data = (windows_task_data_t *)platform_handle;
 
     if (!data || !data->thread_handle) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     /* 等待线程结束 */
     if (WaitForSingleObject(data->thread_handle, INFINITE) != WAIT_OBJECT_0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     /* 如果调用者请求返回值，需要从任务信息结构中获?*/
     if (retval) {
-        /* 注意：返回值存储在task_info_core_t.retval中，由线程入口函数设?         * 调用者需要自己从任务信息结构中获?*/
-        *retval = NULL;  /* 平台适配器不直接提供返回?*/
+        /* 注意：返回值存储在task_info_core_t.retval中，由线程入口函数设?         *
+         * 调用者需要自己从任务信息结构中获?*/
+        *retval = NULL; /* 平台适配器不直接提供返回?*/
     }
 
     return 0;
@@ -168,20 +174,20 @@ static int windows_thread_join(void* platform_handle, void** retval)
 /**
  * @brief 设置Windows线程优先? *
  * 设置指定Windows线程的优先级? *
- * @param platform_handle 平台特定句柄（windows_task_data_t指针? * @param priority AgentOS优先? * @return 0 成功?1 失败
+ * @param platform_handle 平台特定句柄（windows_task_data_t指针? * @param priority AgentOS优先? *
+ * @return 0 成功?1 失败
  */
-static int windows_thread_set_priority(void* platform_handle, int priority)
+static int windows_thread_set_priority(void *platform_handle, int priority)
 {
-    windows_task_data_t* data = (windows_task_data_t*)platform_handle;
+    windows_task_data_t *data = (windows_task_data_t *)platform_handle;
 
     if (!data || !data->thread_handle) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     /* 验证优先级范?*/
-    if (priority < AGENTOS_TASK_PRIORITY_MIN ||
-        priority > AGENTOS_TASK_PRIORITY_MAX) {
-        return -1;
+    if (priority < AGENTOS_TASK_PRIORITY_MIN || priority > AGENTOS_TASK_PRIORITY_MAX) {
+        return AGENTOS_EINVAL;
     }
 
     /* 映射优先级到Windows常量 */
@@ -189,7 +195,7 @@ static int windows_thread_set_priority(void* platform_handle, int priority)
 
     /* 设置线程优先?*/
     if (!SetThreadPriority(data->thread_handle, win_priority)) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     return 0;
@@ -212,9 +218,9 @@ static uintptr_t windows_get_current_thread_id(void)
  * 获取指定Windows线程的系统线程ID? *
  * @param platform_handle 平台特定句柄（windows_task_data_t指针? * @return 系统线程ID，失败返回值
  */
-static uintptr_t windows_get_thread_system_id(void* platform_handle)
+static uintptr_t windows_get_thread_system_id(void *platform_handle)
 {
-    windows_task_data_t* data = (windows_task_data_t*)platform_handle;
+    windows_task_data_t *data = (windows_task_data_t *)platform_handle;
 
     if (!data) {
         return 0;
@@ -246,10 +252,11 @@ static void windows_thread_yield(void)
  * @brief 清理Windows平台特定资源
  *
  * 清理Windows线程相关的资源，包括关闭句柄和释放内存? *
- * @param platform_handle 平台特定句柄（windows_task_data_t指针? * @param platform_data 平台特定数据（当前未使用? */
-static void windows_cleanup_platform_resources(void* platform_handle, void* platform_data)
+ * @param platform_handle 平台特定句柄（windows_task_data_t指针? * @param platform_data
+ * 平台特定数据（当前未使用? */
+static void windows_cleanup_platform_resources(void *platform_handle, void *platform_data)
 {
-    windows_task_data_t* data = (windows_task_data_t*)platform_handle;
+    windows_task_data_t *data = (windows_task_data_t *)platform_handle;
 
     if (data) {
         /* 关闭线程句柄 */
@@ -270,7 +277,7 @@ static void windows_cleanup_platform_resources(void* platform_handle, void* plat
  * 返回Windows平台适配器的名称字符串? *
  * @return 平台适配器名称字符串
  */
-static const char* windows_get_name(void)
+static const char *windows_get_name(void)
 {
     return "windows";
 }
@@ -292,8 +299,7 @@ static const scheduler_platform_ops_t windows_platform_ops = {
     .thread_sleep = windows_thread_sleep,
     .thread_yield = windows_thread_yield,
     .cleanup_platform_resources = windows_cleanup_platform_resources,
-    .get_name = windows_get_name
-};
+    .get_name = windows_get_name};
 
 /* ==================== 公共接口 ==================== */
 
@@ -303,7 +309,7 @@ static const scheduler_platform_ops_t windows_platform_ops = {
  * 返回Windows平台适配器操作集的指针? *
  * @return Windows平台适配器操作集指针
  */
-const scheduler_platform_ops_t* scheduler_platform_get_windows_ops(void)
+const scheduler_platform_ops_t *scheduler_platform_get_windows_ops(void)
 {
     return &windows_platform_ops;
 }

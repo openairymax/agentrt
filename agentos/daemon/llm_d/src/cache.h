@@ -15,14 +15,14 @@ extern "C" {
 
 typedef struct cache cache_t;
 
-cache_t* cache_create(size_t capacity, int ttl_sec);
-void cache_destroy(cache_t* cache);
-int cache_get(cache_t* cache, const char* key, char** out_value);
-void cache_put(cache_t* cache, const char* key, const char* value);
-void cache_clear(cache_t* cache);
+cache_t *cache_create(size_t capacity, int ttl_sec);
+void cache_destroy(cache_t *cache);
+int cache_get(cache_t *cache, const char *key, char **out_value);
+void cache_put(cache_t *cache, const char *key, const char *value);
+void cache_clear(cache_t *cache);
 
-size_t cache_size(cache_t* cache);
-size_t cache_capacity(cache_t* cache);
+size_t cache_size(cache_t *cache);
+size_t cache_capacity(cache_t *cache);
 
 #ifdef __cplusplus
 }

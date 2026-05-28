@@ -7,20 +7,25 @@
  */
 
 #include "mcp_transport.h"
+
 #include "agentos.h"
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
+#include "atomic_compat.h"
+#include "memory_compat.h"
+#include "types.h"
+
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 #include <time.h>
-#include "atomic_compat.h"
+#include <unistd.h>
+#include "../../../../commons/utils/error/include/error.h"
 
 struct mcp_transport {
     mcp_transport_type_t type;
@@ -28,28 +33,30 @@ struct mcp_transport {
     mcp_transport_message_fn on_message;
     mcp_transport_error_fn on_error;
     mcp_transport_state_fn on_state_change;
-    void* user_data;
+    void *user_data;
     uint32_t read_timeout_ms;
     uint32_t write_timeout_ms;
     size_t max_message_size;
     int input_fd;
     int output_fd;
-    char* base_url;
-    char* host_header;
-    char* api_key;
-    char* sse_endpoint;
-    char* post_endpoint;
+    char *base_url;
+    char *host_header;
+    char *api_key;
+    char *sse_endpoint;
+    char *post_endpoint;
     uint32_t reconnect_interval_ms;
     uint32_t max_reconnect_attempts;
     int http_socket;
-    char* recv_buffer;
+    char *recv_buffer;
     size_t recv_buffer_size;
     size_t recv_buffer_capacity;
     atomic_int running;
 };
 
-static void set_state(mcp_transport_t* t, mcp_transport_state_t new_state) {
-    if (!t) return;
+static void set_state(mcp_transport_t *t, mcp_transport_state_t new_state)
+{
+    if (!t)
+        return;
     mcp_transport_state_t old = t->state;
     t->state = new_state;
     if (t->on_state_change && old != new_state) {
@@ -57,19 +64,22 @@ static void set_state(mcp_transport_t* t, mcp_transport_state_t new_state) {
     }
 }
 
-static void notify_error(mcp_transport_t* t, int code, const char* msg) {
+static void notify_error(mcp_transport_t *t, int code, const char *msg)
+{
     if (t && t->on_error) {
         t->on_error(code, msg, t->user_data);
     }
 }
 
-static void __attribute__((unused)) notify_message(mcp_transport_t* t, const char* msg, size_t len) {
+static void __attribute__((unused)) notify_message(mcp_transport_t *t, const char *msg, size_t len)
+{
     if (t && t->on_message) {
         t->on_message(msg, len, t->user_data);
     }
 }
 
-static int read_line(int fd, char* buf, size_t buf_size, uint32_t timeout_ms) {
+static int read_line(int fd, char *buf, size_t buf_size, uint32_t timeout_ms)
+{
     size_t pos = 0;
     struct timeval tv;
     fd_set fds;
@@ -82,13 +92,15 @@ static int read_line(int fd, char* buf, size_t buf_size, uint32_t timeout_ms) {
 
         int ret = select(fd + 1, &fds, NULL, NULL, &tv);
         if (ret <= 0) {
-            if (ret == 0) return -2;
-            return -1;
+            if (ret == 0)
+                return AGENTOS_ERR_INVALID_PARAM;
+            return AGENTOS_EINVAL;
         }
 
         char c;
         ssize_t n = read(fd, &c, 1);
-        if (n <= 0) return -1;
+        if (n <= 0)
+            return AGENTOS_EFAIL;
 
         if (c == '\n') {
             buf[pos] = '\0';
@@ -102,7 +114,8 @@ static int read_line(int fd, char* buf, size_t buf_size, uint32_t timeout_ms) {
     return (int)pos;
 }
 
-static int write_all(int fd, const char* buf, size_t len, uint32_t timeout_ms) {
+static int write_all(int fd, const char *buf, size_t len, uint32_t timeout_ms)
+{
     struct timeval tv;
     fd_set fds;
     size_t written = 0;
@@ -115,18 +128,21 @@ static int write_all(int fd, const char* buf, size_t len, uint32_t timeout_ms) {
 
         int ret = select(fd + 1, NULL, &fds, NULL, &tv);
         if (ret <= 0) {
-            if (ret == 0) return -2;
-            return -1;
+            if (ret == 0)
+                return AGENTOS_ERR_INVALID_PARAM;
+            return AGENTOS_EINVAL;
         }
 
         ssize_t n = write(fd, buf + written, len - written);
-        if (n <= 0) return -1;
+        if (n <= 0)
+            return AGENTOS_EFAIL;
         written += (size_t)n;
     }
     return 0;
 }
 
-mcp_transport_config_t mcp_transport_config_stdio_default(void) {
+mcp_transport_config_t mcp_transport_config_stdio_default(void)
+{
     mcp_transport_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.type = MCP_TRANSPORT_STDIO;
@@ -138,7 +154,8 @@ mcp_transport_config_t mcp_transport_config_stdio_default(void) {
     return cfg;
 }
 
-mcp_transport_config_t mcp_transport_config_http_default(const char* base_url) {
+mcp_transport_config_t mcp_transport_config_http_default(const char *base_url)
+{
     mcp_transport_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.type = MCP_TRANSPORT_HTTP_SSE;
@@ -153,11 +170,14 @@ mcp_transport_config_t mcp_transport_config_http_default(const char* base_url) {
     return cfg;
 }
 
-mcp_transport_t* mcp_transport_create(const mcp_transport_config_t* config) {
-    if (!config) return NULL;
+mcp_transport_t *mcp_transport_create(const mcp_transport_config_t *config)
+{
+    if (!config)
+        return NULL;
 
-    mcp_transport_t* t = (mcp_transport_t*)calloc(1, sizeof(mcp_transport_t));
-    if (!t) return NULL;
+    mcp_transport_t *t = (mcp_transport_t *)AGENTOS_CALLOC(1, sizeof(mcp_transport_t));
+    if (!t)
+        return NULL;
 
     t->type = config->type;
     t->state = MCP_TRANSPORT_DISCONNECTED;
@@ -167,32 +187,35 @@ mcp_transport_t* mcp_transport_create(const mcp_transport_config_t* config) {
     t->user_data = config->user_data;
     t->read_timeout_ms = config->read_timeout_ms > 0 ? config->read_timeout_ms : 30000;
     t->write_timeout_ms = config->write_timeout_ms > 0 ? config->write_timeout_ms : 30000;
-    t->max_message_size = config->max_message_size > 0 ? config->max_message_size : (10 * 1024 * 1024);
+    t->max_message_size =
+        config->max_message_size > 0 ? config->max_message_size : (10 * 1024 * 1024);
     atomic_init(&t->running, 0);
 
     t->recv_buffer_capacity = 65536;
-    t->recv_buffer = (char*)malloc(t->recv_buffer_capacity);
+    t->recv_buffer = (char *)AGENTOS_MALLOC(t->recv_buffer_capacity);
     if (!t->recv_buffer) {
-        free(t);
+        AGENTOS_FREE(t);
         return NULL;
     }
     t->recv_buffer_size = 0;
 
     if (t->type == MCP_TRANSPORT_STDIO) {
-        t->input_fd = config->config.stdio.input_fd > 0 ?
-            config->config.stdio.input_fd : STDIN_FILENO;
-        t->output_fd = config->config.stdio.output_fd > 0 ?
-            config->config.stdio.output_fd : STDOUT_FILENO;
+        t->input_fd =
+            config->config.stdio.input_fd > 0 ? config->config.stdio.input_fd : STDIN_FILENO;
+        t->output_fd =
+            config->config.stdio.output_fd > 0 ? config->config.stdio.output_fd : STDOUT_FILENO;
     } else if (t->type == MCP_TRANSPORT_HTTP_SSE) {
         if (config->config.http.base_url) {
-            t->base_url = strdup(config->config.http.base_url);
-            const char* url = config->config.http.base_url;
-            const char* host_start = url;
-            if (strncmp(url, "http://", 7) == 0) host_start = url + 7;
-            else if (strncmp(url, "https://", 8) == 0) host_start = url + 8;
-            const char* path_start = strchr(host_start, '/');
+            t->base_url = AGENTOS_STRDUP(config->config.http.base_url);
+            const char *url = config->config.http.base_url;
+            const char *host_start = url;
+            if (strncmp(url, "http://", 7) == 0)
+                host_start = url + 7;
+            else if (strncmp(url, "https://", 8) == 0)
+                host_start = url + 8;
+            const char *path_start = strchr(host_start, '/');
             size_t host_len = path_start ? (size_t)(path_start - host_start) : strlen(host_start);
-            char* host = (char*)malloc(host_len + 1);
+            char *host = (char *)AGENTOS_MALLOC(host_len + 1);
             if (host) {
                 memcpy(host, host_start, host_len);
                 host[host_len] = '\0';
@@ -200,24 +223,30 @@ mcp_transport_t* mcp_transport_create(const mcp_transport_config_t* config) {
             }
         }
         if (config->config.http.api_key) {
-            t->api_key = strdup(config->config.http.api_key);
+            t->api_key = AGENTOS_STRDUP(config->config.http.api_key);
         }
-        t->sse_endpoint = config->config.http.sse_endpoint ?
-            strdup(config->config.http.sse_endpoint) : strdup("/sse");
-        t->post_endpoint = config->config.http.post_endpoint ?
-            strdup(config->config.http.post_endpoint) : strdup("/messages");
-        t->reconnect_interval_ms = config->config.http.reconnect_interval_ms > 0 ?
-            config->config.http.reconnect_interval_ms : 5000;
-        t->max_reconnect_attempts = config->config.http.max_reconnect_attempts > 0 ?
-            config->config.http.max_reconnect_attempts : 10;
+        t->sse_endpoint = config->config.http.sse_endpoint
+                              ? AGENTOS_STRDUP(config->config.http.sse_endpoint)
+                              : AGENTOS_STRDUP("/sse");
+        t->post_endpoint = config->config.http.post_endpoint
+                               ? AGENTOS_STRDUP(config->config.http.post_endpoint)
+                               : AGENTOS_STRDUP("/messages");
+        t->reconnect_interval_ms = config->config.http.reconnect_interval_ms > 0
+                                       ? config->config.http.reconnect_interval_ms
+                                       : 5000;
+        t->max_reconnect_attempts = config->config.http.max_reconnect_attempts > 0
+                                        ? config->config.http.max_reconnect_attempts
+                                        : 10;
         t->http_socket = -1;
     }
 
     return t;
 }
 
-void mcp_transport_destroy(mcp_transport_t* transport) {
-    if (!transport) return;
+void mcp_transport_destroy(mcp_transport_t *transport)
+{
+    if (!transport)
+        return;
 
     if (atomic_load_explicit(&transport->running, memory_order_acquire)) {
         mcp_transport_stop(transport);
@@ -227,18 +256,21 @@ void mcp_transport_destroy(mcp_transport_t* transport) {
         close(transport->http_socket);
     }
 
-    free(transport->base_url);
-    free(transport->host_header);
-    free(transport->api_key);
-    free(transport->sse_endpoint);
-    free(transport->post_endpoint);
-    free(transport->recv_buffer);
-    free(transport);
+    AGENTOS_FREE(transport->base_url);
+    AGENTOS_FREE(transport->host_header);
+    AGENTOS_FREE(transport->api_key);
+    AGENTOS_FREE(transport->sse_endpoint);
+    AGENTOS_FREE(transport->post_endpoint);
+    AGENTOS_FREE(transport->recv_buffer);
+    AGENTOS_FREE(transport);
 }
 
-int mcp_transport_start(mcp_transport_t* transport) {
-    if (!transport) return -1;
-    if (transport->state == MCP_TRANSPORT_CONNECTED) return 0;
+int mcp_transport_start(mcp_transport_t *transport)
+{
+    if (!transport)
+        return AGENTOS_EFAIL;
+    if (transport->state == MCP_TRANSPORT_CONNECTED)
+        return 0;
 
     set_state(transport, MCP_TRANSPORT_CONNECTING);
 
@@ -252,22 +284,23 @@ int mcp_transport_start(mcp_transport_t* transport) {
         return 0;
     }
 
-    if (transport->type == MCP_TRANSPORT_HTTP_SSE || transport->type == MCP_TRANSPORT_STREAMABLE_HTTP) {
+    if (transport->type == MCP_TRANSPORT_HTTP_SSE ||
+        transport->type == MCP_TRANSPORT_STREAMABLE_HTTP) {
         if (!transport->base_url) {
             notify_error(transport, -1, "HTTP transport requires base_url");
             set_state(transport, MCP_TRANSPORT_ERROR);
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
         char host[256] = {0};
         int port = 80;
-        char* url_copy = strdup(transport->base_url);
+        char *url_copy = AGENTOS_STRDUP(transport->base_url);
         if (!url_copy) {
             set_state(transport, MCP_TRANSPORT_ERROR);
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
-        char* host_start = url_copy;
+        char *host_start = url_copy;
         if (strncmp(url_copy, "https://", 8) == 0) {
             host_start = url_copy + 8;
             port = 443;
@@ -275,18 +308,18 @@ int mcp_transport_start(mcp_transport_t* transport) {
             host_start = url_copy + 7;
         }
 
-        char* port_sep = strchr(host_start, ':');
-        char* path_sep = strchr(host_start, '/');
+        char *port_sep = strchr(host_start, ':');
+        char *path_sep = strchr(host_start, '/');
 
         if (port_sep && (!path_sep || port_sep < path_sep)) {
             *port_sep = '\0';
-            port = atoi(port_sep + 1);
+            port = (int)strtol(port_sep + 1, NULL, 10);
         }
         if (path_sep) {
             *path_sep = '\0';
         }
         snprintf(host, sizeof(host), "%s", host_start);
-        free(url_copy);
+        AGENTOS_FREE(url_copy);
 
         struct addrinfo hints, *result;
         memset(&hints, 0, sizeof(hints));
@@ -302,7 +335,7 @@ int mcp_transport_start(mcp_transport_t* transport) {
             snprintf(err_msg, sizeof(err_msg), "DNS resolution failed: %s", gai_strerror(gai_err));
             notify_error(transport, -2, err_msg);
             set_state(transport, MCP_TRANSPORT_ERROR);
-            return -1;
+            return AGENTOS_EIO;
         }
 
         int sock = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
@@ -310,7 +343,7 @@ int mcp_transport_start(mcp_transport_t* transport) {
             notify_error(transport, -3, "Socket creation failed");
             freeaddrinfo(result);
             set_state(transport, MCP_TRANSPORT_ERROR);
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
         struct timeval tv;
@@ -326,7 +359,7 @@ int mcp_transport_start(mcp_transport_t* transport) {
             close(sock);
             freeaddrinfo(result);
             set_state(transport, MCP_TRANSPORT_ERROR);
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
         freeaddrinfo(result);
@@ -337,11 +370,13 @@ int mcp_transport_start(mcp_transport_t* transport) {
     }
 
     set_state(transport, MCP_TRANSPORT_ERROR);
-    return -1;
+    return AGENTOS_EINVAL;
 }
 
-int mcp_transport_stop(mcp_transport_t* transport) {
-    if (!transport) return -1;
+int mcp_transport_stop(mcp_transport_t *transport)
+{
+    if (!transport)
+        return AGENTOS_EFAIL;
 
     atomic_store_explicit(&transport->running, 0, memory_order_seq_cst);
 
@@ -354,29 +389,28 @@ int mcp_transport_stop(mcp_transport_t* transport) {
     return 0;
 }
 
-int mcp_transport_send(mcp_transport_t* transport,
-                       const char* message,
-                       size_t length) {
-    if (!transport || !message || length == 0) return -1;
-    if (transport->state != MCP_TRANSPORT_CONNECTED) return -2;
+int mcp_transport_send(mcp_transport_t *transport, const char *message, size_t length)
+{
+    if (!transport || !message || length == 0)
+        return AGENTOS_EFAIL;
+    if (transport->state != MCP_TRANSPORT_CONNECTED)
+        return AGENTOS_ERR_NOT_FOUND;
 
     if (transport->type == MCP_TRANSPORT_STDIO) {
         char header[32];
-        int header_len = snprintf(header, sizeof(header),
-                                  "Content-Length: %zu\r\n\r\n", length);
+        int header_len = snprintf(header, sizeof(header), "Content-Length: %zu\r\n\r\n", length);
 
         if (write_all(transport->output_fd, header, (size_t)header_len,
                       transport->write_timeout_ms) < 0) {
             notify_error(transport, -10, "Failed to write message header");
             set_state(transport, MCP_TRANSPORT_ERROR);
-            return -3;
+            return AGENTOS_ERR_NULL_POINTER;
         }
 
-        if (write_all(transport->output_fd, message, length,
-                      transport->write_timeout_ms) < 0) {
+        if (write_all(transport->output_fd, message, length, transport->write_timeout_ms) < 0) {
             notify_error(transport, -11, "Failed to write message body");
             set_state(transport, MCP_TRANSPORT_ERROR);
-            return -3;
+            return AGENTOS_ERR_NULL_POINTER;
         }
 
         return 0;
@@ -384,67 +418,66 @@ int mcp_transport_send(mcp_transport_t* transport,
 
     if (transport->type == MCP_TRANSPORT_HTTP_SSE ||
         transport->type == MCP_TRANSPORT_STREAMABLE_HTTP) {
-        if (transport->http_socket < 0) return -3;
+        if (transport->http_socket < 0)
+            return AGENTOS_ERR_NULL_POINTER;
 
         char request[4096];
-        const char* path = transport->post_endpoint ? transport->post_endpoint : "/messages";
+        const char *path = transport->post_endpoint ? transport->post_endpoint : "/messages";
         int req_len = snprintf(request, sizeof(request),
-            "POST %s HTTP/1.1\r\n"
-            "Host: %s\r\n"
-            "Content-Type: application/json\r\n"
-            "Content-Length: %zu\r\n"
-            "%s%s%s"
-            "\r\n",
-            path,
-            transport->host_header ? transport->host_header : "localhost",
-            length,
-            transport->api_key ? "Authorization: Bearer " : "",
-            transport->api_key ? transport->api_key : "",
-            transport->api_key ? "\r\n" : "");
+                               "POST %s HTTP/1.1\r\n"
+                               "Host: %s\r\n"
+                               "Content-Type: application/json\r\n"
+                               "Content-Length: %zu\r\n"
+                               "%s%s%s"
+                               "\r\n",
+                               path, transport->host_header ? transport->host_header : "localhost",
+                               length, transport->api_key ? "Authorization: Bearer " : "",
+                               transport->api_key ? transport->api_key : "",
+                               transport->api_key ? "\r\n" : "");
 
         if (write_all(transport->http_socket, request, (size_t)req_len,
                       transport->write_timeout_ms) < 0) {
             notify_error(transport, -12, "Failed to send HTTP request header");
-            return -3;
+            return AGENTOS_ERR_NULL_POINTER;
         }
 
-        if (write_all(transport->http_socket, message, length,
-                      transport->write_timeout_ms) < 0) {
+        if (write_all(transport->http_socket, message, length, transport->write_timeout_ms) < 0) {
             notify_error(transport, -13, "Failed to send HTTP request body");
-            return -3;
+            return AGENTOS_ERR_INVALID_PARAM;
         }
 
         return 0;
     }
 
-    return -1;
+    return AGENTOS_EINVAL;
 }
 
-int mcp_transport_receive(mcp_transport_t* transport,
-                          char** out_message,
-                          size_t* out_length,
-                          uint32_t timeout_ms) {
-    if (!transport || !out_message || !out_length) return -1;
-    if (transport->state != MCP_TRANSPORT_CONNECTED) return -2;
+int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t *out_length,
+                          uint32_t timeout_ms)
+{
+    if (!transport || !out_message || !out_length)
+        return AGENTOS_EFAIL;
+    if (transport->state != MCP_TRANSPORT_CONNECTED)
+        return AGENTOS_ERR_NOT_FOUND;
 
     *out_message = NULL;
     *out_length = 0;
 
     if (transport->type == MCP_TRANSPORT_STDIO) {
         char header_buf[256];
-        int hdr_result = read_line(transport->input_fd, header_buf,
-                                    sizeof(header_buf), timeout_ms);
+        int hdr_result = read_line(transport->input_fd, header_buf, sizeof(header_buf), timeout_ms);
         if (hdr_result < 0) {
-            if (hdr_result == -2) return -2;
+            if (hdr_result == -2)
+                return AGENTOS_ERR_IO;
             notify_error(transport, -20, "Failed to read message header");
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
         size_t content_length = 0;
         if (strncmp(header_buf, "Content-Length: ", 15) == 0) {
             content_length = (size_t)atol(header_buf + 15);
         } else {
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
         char empty_line[4];
@@ -452,11 +485,12 @@ int mcp_transport_receive(mcp_transport_t* transport,
 
         if (content_length == 0 || content_length > transport->max_message_size) {
             notify_error(transport, -21, "Invalid content length");
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
-        char* body = (char*)malloc(content_length + 1);
-        if (!body) return -1;
+        char *body = (char *)AGENTOS_MALLOC(content_length + 1);
+        if (!body)
+            return AGENTOS_EFAIL;
 
         size_t total_read = 0;
         while (total_read < content_length) {
@@ -469,15 +503,14 @@ int mcp_transport_receive(mcp_transport_t* transport,
 
             int ret = select(transport->input_fd + 1, &fds, NULL, NULL, &tv);
             if (ret <= 0) {
-                free(body);
+                AGENTOS_FREE(body);
                 return ret == 0 ? -2 : -1;
             }
 
-            ssize_t n = read(transport->input_fd, body + total_read,
-                             content_length - total_read);
+            ssize_t n = read(transport->input_fd, body + total_read, content_length - total_read);
             if (n <= 0) {
-                free(body);
-                return -1;
+                AGENTOS_FREE(body);
+                return AGENTOS_EINVAL;
             }
             total_read += (size_t)n;
         }
@@ -490,18 +523,20 @@ int mcp_transport_receive(mcp_transport_t* transport,
 
     if (transport->type == MCP_TRANSPORT_HTTP_SSE ||
         transport->type == MCP_TRANSPORT_STREAMABLE_HTTP) {
-        if (transport->http_socket < 0) return -3;
+        if (transport->http_socket < 0)
+            return AGENTOS_ERR_NULL_POINTER;
 
         char line_buf[8192];
-        int line_result = read_line(transport->http_socket, line_buf,
-                                     sizeof(line_buf), timeout_ms);
-        if (line_result < 0) return -1;
+        int line_result = read_line(transport->http_socket, line_buf, sizeof(line_buf), timeout_ms);
+        if (line_result < 0)
+            return AGENTOS_EFAIL;
 
         if (strncmp(line_buf, "data: ", 6) == 0) {
-            const char* data = line_buf + 6;
+            const char *data = line_buf + 6;
             size_t data_len = strlen(data);
-            char* msg = (char*)malloc(data_len + 1);
-            if (!msg) return -1;
+            char *msg = (char *)AGENTOS_MALLOC(data_len + 1);
+            if (!msg)
+                return AGENTOS_EFAIL;
             memcpy(msg, data, data_len);
             msg[data_len] = '\0';
             *out_message = msg;
@@ -517,37 +552,52 @@ int mcp_transport_receive(mcp_transport_t* transport,
             return mcp_transport_receive(transport, out_message, out_length, timeout_ms);
         }
 
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
-    return -1;
+    return AGENTOS_EINVAL;
 }
 
-mcp_transport_state_t mcp_transport_get_state(const mcp_transport_t* transport) {
-    if (!transport) return MCP_TRANSPORT_DISCONNECTED;
+mcp_transport_state_t mcp_transport_get_state(const mcp_transport_t *transport)
+{
+    if (!transport)
+        return MCP_TRANSPORT_DISCONNECTED;
     return transport->state;
 }
 
-mcp_transport_type_t mcp_transport_get_type(const mcp_transport_t* transport) {
-    if (!transport) return MCP_TRANSPORT_STDIO;
+mcp_transport_type_t mcp_transport_get_type(const mcp_transport_t *transport)
+{
+    if (!transport)
+        return MCP_TRANSPORT_STDIO;
     return transport->type;
 }
 
-const char* mcp_transport_state_string(mcp_transport_state_t state) {
+const char *mcp_transport_state_string(mcp_transport_state_t state)
+{
     switch (state) {
-        case MCP_TRANSPORT_DISCONNECTED: return "disconnected";
-        case MCP_TRANSPORT_CONNECTING:   return "connecting";
-        case MCP_TRANSPORT_CONNECTED:    return "connected";
-        case MCP_TRANSPORT_ERROR:        return "error";
-        default:                         return "unknown";
+    case MCP_TRANSPORT_DISCONNECTED:
+        return "disconnected";
+    case MCP_TRANSPORT_CONNECTING:
+        return "connecting";
+    case MCP_TRANSPORT_CONNECTED:
+        return "connected";
+    case MCP_TRANSPORT_ERROR:
+        return "error";
+    default:
+        return "unknown";
     }
 }
 
-const char* mcp_transport_type_string(mcp_transport_type_t type) {
+const char *mcp_transport_type_string(mcp_transport_type_t type)
+{
     switch (type) {
-        case MCP_TRANSPORT_STDIO:           return "stdio";
-        case MCP_TRANSPORT_HTTP_SSE:        return "http+sse";
-        case MCP_TRANSPORT_STREAMABLE_HTTP: return "streamable-http";
-        default:                            return "unknown";
+    case MCP_TRANSPORT_STDIO:
+        return "stdio";
+    case MCP_TRANSPORT_HTTP_SSE:
+        return "http+sse";
+    case MCP_TRANSPORT_STREAMABLE_HTTP:
+        return "streamable-http";
+    default:
+        return "unknown";
     }
 }

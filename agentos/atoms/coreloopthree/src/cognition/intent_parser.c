@@ -34,12 +34,12 @@
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
+#include "../../../commons/utils/observability/include/observability_compat.h"
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "../../../commons/utils/observability/include/observability_compat.h"
 
 /* ==================== 内部常量定义 ==================== */
 

@@ -10,20 +10,20 @@
  * @date 2026-04-05
  */
 
-#include "sync_platform.h"
 #include "check.h"
-#include <time.h>
 #include "sync_internal.h"
-#include <string.h>
+#include "sync_platform.h"
 
-sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
-                                   unsigned int initial_value,
-                                   unsigned int max_value,
-                                   const sync_attr_t* attr) {
+#include <string.h>
+#include <time.h>
+
+sync_result_t sync_semaphore_create(sync_semaphore_t *semaphore, unsigned int initial_value,
+                                    unsigned int max_value, const sync_attr_t *attr)
+{
     CHECK_NULL_RET(semaphore, SYNC_ERROR_INVALID);
 
-    struct sync_semaphore* s = (struct sync_semaphore*)AGENTOS_CALLOC(
-        1, sizeof(struct sync_semaphore));
+    struct sync_semaphore *s =
+        (struct sync_semaphore *)AGENTOS_CALLOC(1, sizeof(struct sync_semaphore));
     CHECK_NULL_RET(s, SYNC_ERROR_MEMORY);
 
     s->type = SYNC_TYPE_SEMAPHORE;
@@ -54,7 +54,8 @@ sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_semaphore_free(sync_semaphore_t semaphore) {
+sync_result_t sync_semaphore_free(sync_semaphore_t semaphore)
+{
     if (semaphore == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -76,8 +77,8 @@ sync_result_t sync_semaphore_free(sync_semaphore_t semaphore) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_semaphore_wait_ex(sync_semaphore_t semaphore,
-                                const sync_timeout_t* timeout) {
+sync_result_t sync_semaphore_wait_ex(sync_semaphore_t semaphore, const sync_timeout_t *timeout)
+{
     if (semaphore == NULL || !semaphore->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -129,7 +130,8 @@ sync_result_t sync_semaphore_wait_ex(sync_semaphore_t semaphore,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_semaphore_try_wait(sync_semaphore_t semaphore) {
+sync_result_t sync_semaphore_try_wait(sync_semaphore_t semaphore)
+{
     if (semaphore == NULL || !semaphore->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -156,7 +158,8 @@ sync_result_t sync_semaphore_try_wait(sync_semaphore_t semaphore) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_semaphore_post_ex(sync_semaphore_t semaphore) {
+sync_result_t sync_semaphore_post_ex(sync_semaphore_t semaphore)
+{
     if (semaphore == NULL || !semaphore->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -175,8 +178,8 @@ sync_result_t sync_semaphore_post_ex(sync_semaphore_t semaphore) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_semaphore_get_value(sync_semaphore_t semaphore,
-                                      unsigned int* value) {
+sync_result_t sync_semaphore_get_value(sync_semaphore_t semaphore, unsigned int *value)
+{
     if (semaphore == NULL || value == NULL) {
         return SYNC_ERROR_INVALID;
     }

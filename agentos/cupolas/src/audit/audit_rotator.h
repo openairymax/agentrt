@@ -10,6 +10,7 @@
 
 #include "../platform/platform.h"
 #include "audit_queue.h"
+
 #include <stddef.h>
 #include <stdio.h>
 
@@ -19,7 +20,7 @@ extern "C" {
 
 /**
  * @brief Audit log rotator structure
- * 
+ *
  * Design principles:
  * - Automatic log rotation based on file size
  * - Configurable retention policy
@@ -40,17 +41,18 @@ typedef struct audit_rotator audit_rotator_t;
  * @ownership Returns owned pointer: caller must call audit_rotator_destroy()
  * @ownership log_dir and log_prefix: caller retains ownership
  */
-audit_rotator_t* audit_rotator_create(const char* log_dir, const char* log_prefix,
-                                       size_t max_file_size, int max_files);
+audit_rotator_t *audit_rotator_create(const char *log_dir, const char *log_prefix,
+                                      size_t max_file_size, int max_files);
 
 /**
  * @brief Destroy log rotator and free resources
  * @param[in] rotator Rotator handle (may be NULL)
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership rotator: transferred to this function, will be freed
  */
-void audit_rotator_destroy(audit_rotator_t* rotator);
+void audit_rotator_destroy(audit_rotator_t *rotator);
 
 /**
  * @brief Write audit entry to current log file
@@ -61,16 +63,17 @@ void audit_rotator_destroy(audit_rotator_t* rotator);
  * @reentrant No
  * @ownership entry: caller retains ownership
  */
-int audit_rotator_write(audit_rotator_t* rotator, const audit_entry_t* entry);
+int audit_rotator_write(audit_rotator_t *rotator, const audit_entry_t *entry);
 
 /**
  * @brief Force log rotation
  * @param[in] rotator Rotator handle
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  */
-int audit_rotator_rotate(audit_rotator_t* rotator);
+int audit_rotator_rotate(audit_rotator_t *rotator);
 
 /**
  * @brief Get current log file size
@@ -79,7 +82,7 @@ int audit_rotator_rotate(audit_rotator_t* rotator);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-size_t audit_rotator_current_size(audit_rotator_t* rotator);
+size_t audit_rotator_current_size(audit_rotator_t *rotator);
 
 #ifdef __cplusplus
 }

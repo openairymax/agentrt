@@ -1,3 +1,4 @@
+#include "error.h"
 #include "memory_compat.h"
 /**
  * @file sched_service_impl.c
@@ -7,38 +8,45 @@
  */
 
 #include "scheduler_service.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
 
 #define MAX_AGENTS 128
 
 struct sched_service {
     sched_config_t config;
-    agent_info_t* agents[MAX_AGENTS];
+    agent_info_t *agents[MAX_AGENTS];
     size_t agent_count;
     uint64_t total_tasks_scheduled;
     uint64_t total_success;
     int initialized;
 };
 
-int sched_service_create(const sched_config_t* config, sched_service_t** service) {
-    if (!config || !service) return -1;
+int sched_service_create(const sched_config_t *config, sched_service_t **service)
+{
+    if (!config || !service)
+        return AGENTOS_ERR_INVALID_PARAM;
 
-    sched_service_t* svc = (sched_service_t*)AGENTOS_CALLOC(1, sizeof(sched_service_t));
-    if (!svc) return -2;
+    sched_service_t *svc = (sched_service_t *)AGENTOS_CALLOC(1, sizeof(sched_service_t));
+    if (!svc)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
     memcpy(&svc->config, config, sizeof(sched_config_t));
-    if (config->ml_model_path) svc->config.ml_model_path = AGENTOS_STRDUP(config->ml_model_path);
+    if (config->ml_model_path)
+        svc->config.ml_model_path = AGENTOS_STRDUP(config->ml_model_path);
 
     svc->initialized = 1;
     *service = svc;
     return 0;
 }
 
-int sched_service_destroy(sched_service_t* service) {
-    if (!service) return -1;
+int sched_service_destroy(sched_service_t *service)
+{
+    if (!service)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (service->agents[i]) {
@@ -48,14 +56,17 @@ int sched_service_destroy(sched_service_t* service) {
         }
     }
 
-    AGENTOS_FREE((void*)service->config.ml_model_path);
+    AGENTOS_FREE((void *)service->config.ml_model_path);
     AGENTOS_FREE(service);
     return 0;
 }
 
-int sched_service_register_agent(sched_service_t* service, const agent_info_t* agent_info) {
-    if (!service || !agent_info || !service->initialized) return -1;
-    if (service->agent_count >= MAX_AGENTS) return -2;
+int sched_service_register_agent(sched_service_t *service, const agent_info_t *agent_info)
+{
+    if (!service || !agent_info || !service->initialized)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (service->agent_count >= MAX_AGENTS)
+        return AGENTOS_ERR_OVERFLOW;
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_info->agent_id) == 0) {
@@ -68,17 +79,22 @@ int sched_service_register_agent(sched_service_t* service, const agent_info_t* a
         }
     }
 
-    agent_info_t* new_agent = (agent_info_t*)AGENTOS_CALLOC(1, sizeof(agent_info_t));
-    if (!new_agent) return -3;
+    agent_info_t *new_agent = (agent_info_t *)AGENTOS_CALLOC(1, sizeof(agent_info_t));
+    if (!new_agent)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
-    if (!agent_info->agent_id) { AGENTOS_FREE(new_agent); return -1; }
+    if (!agent_info->agent_id) {
+        AGENTOS_FREE(new_agent);
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
     new_agent->agent_id = AGENTOS_STRDUP(agent_info->agent_id);
-    new_agent->agent_name = agent_info->agent_name ? AGENTOS_STRDUP(agent_info->agent_name) : AGENTOS_STRDUP("");
+    new_agent->agent_name =
+        agent_info->agent_name ? AGENTOS_STRDUP(agent_info->agent_name) : AGENTOS_STRDUP("");
     if (!new_agent->agent_id || !new_agent->agent_name) {
         AGENTOS_FREE(new_agent->agent_id);
         AGENTOS_FREE(new_agent->agent_name);
         AGENTOS_FREE(new_agent);
-        return -3;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     new_agent->load_factor = agent_info->load_factor;
     new_agent->success_rate = agent_info->success_rate;
@@ -90,8 +106,10 @@ int sched_service_register_agent(sched_service_t* service, const agent_info_t* a
     return 0;
 }
 
-int sched_service_unregister_agent(sched_service_t* service, const char* agent_id) {
-    if (!service || !agent_id || !service->initialized) return -1;
+int sched_service_unregister_agent(sched_service_t *service, const char *agent_id)
+{
+    if (!service || !agent_id || !service->initialized)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_id) == 0) {
@@ -106,11 +124,13 @@ int sched_service_unregister_agent(sched_service_t* service, const char* agent_i
             return 0;
         }
     }
-    return -3;
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
-int sched_service_update_agent_status(sched_service_t* service, const agent_info_t* agent_info) {
-    if (!service || !agent_info || !service->initialized) return -1;
+int sched_service_update_agent_status(sched_service_t *service, const agent_info_t *agent_info)
+{
+    if (!service || !agent_info || !service->initialized)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_info->agent_id) == 0) {
@@ -122,42 +142,49 @@ int sched_service_update_agent_status(sched_service_t* service, const agent_info
             return 0;
         }
     }
-    return -3;
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
-int sched_service_schedule_task(sched_service_t* service, const task_info_t* task_info, sched_result_t** result) {
-    if (!service || !task_info || !result || !service->initialized) return -1;
+int sched_service_schedule_task(sched_service_t *service, const task_info_t *task_info,
+                                sched_result_t **result)
+{
+    if (!service || !task_info || !result || !service->initialized)
+        return AGENTOS_ERR_INVALID_PARAM;
 
-    sched_result_t* res = (sched_result_t*)AGENTOS_CALLOC(1, sizeof(sched_result_t));
-    if (!res) return -2;
+    sched_result_t *res = (sched_result_t *)AGENTOS_CALLOC(1, sizeof(sched_result_t));
+    if (!res)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
-    agent_info_t* best_agent = NULL;
+    agent_info_t *best_agent = NULL;
     float best_score = -1.0f;
 
     for (size_t i = 0; i < service->agent_count; i++) {
-        if (!service->agents[i]->is_available) continue;
+        if (!service->agents[i]->is_available)
+            continue;
 
         float score = 0.0f;
         switch (service->config.strategy) {
-            case SCHED_STRATEGY_WEIGHTED:
-                score = service->agents[i]->weight * service->agents[i]->success_rate *
-                        (1.0f - service->agents[i]->load_factor);
-                break;
-            case SCHED_STRATEGY_ROUND_ROBIN:
-                if (service->agent_count == 0) {
+        case SCHED_STRATEGY_WEIGHTED:
+            score = service->agents[i]->weight * service->agents[i]->success_rate *
+                    (1.0f - service->agents[i]->load_factor);
+            break;
+        case SCHED_STRATEGY_ROUND_ROBIN:
+            if (service->agent_count == 0) {
+                score = 0.0f;
+            } else {
+                score = (float)(service->total_tasks_scheduled % service->agent_count);
+                if ((size_t)score == i)
+                    score = 100.0f;
+                else
                     score = 0.0f;
-                } else {
-                    score = (float)(service->total_tasks_scheduled % service->agent_count);
-                    if ((size_t)score == i) score = 100.0f;
-                    else score = 0.0f;
-                }
-                break;
-            case SCHED_STRATEGY_ML_BASED:
-                score = service->agents[i]->success_rate * (1.0f - service->agents[i]->load_factor);
-                break;
-            default:
-                score = service->agents[i]->weight;
-                break;
+            }
+            break;
+        case SCHED_STRATEGY_ML_BASED:
+            score = service->agents[i]->success_rate * (1.0f - service->agents[i]->load_factor);
+            break;
+        default:
+            score = service->agents[i]->weight;
+            break;
         }
 
         if (score > best_score) {
@@ -183,26 +210,31 @@ int sched_service_schedule_task(sched_service_t* service, const task_info_t* tas
     return 0;
 }
 
-int sched_service_get_stats(sched_service_t* service, void** stats) {
-    if (!service || !stats || !service->initialized) return -1;
+int sched_service_get_stats(sched_service_t *service, void **stats)
+{
+    if (!service || !stats || !service->initialized)
+        return AGENTOS_ERR_INVALID_PARAM;
 
-    char* json_stats = (char*)AGENTOS_MALLOC(512);
-    if (!json_stats) return -2;
+    char *json_stats = (char *)AGENTOS_MALLOC(512);
+    if (!json_stats)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
     snprintf(json_stats, 512,
-        "{\"agent_count\":%zu,\"total_tasks\":%llu,\"success_rate\":\"%.2f\",\"strategy\":%d}",
-        service->agent_count,
-        (unsigned long long)service->total_tasks_scheduled,
-        service->total_tasks_scheduled > 0 ?
-            (float)service->total_success / (float)service->total_tasks_scheduled : 0.0f,
-        service->config.strategy);
+             "{\"agent_count\":%zu,\"total_tasks\":%llu,\"success_rate\":\"%.2f\",\"strategy\":%d}",
+             service->agent_count, (unsigned long long)service->total_tasks_scheduled,
+             service->total_tasks_scheduled > 0
+                 ? (float)service->total_success / (float)service->total_tasks_scheduled
+                 : 0.0f,
+             service->config.strategy);
 
     *stats = json_stats;
     return 0;
 }
 
-int sched_service_health_check(sched_service_t* service, bool* health_status) {
-    if (!service || !health_status || !service->initialized) return -1;
+int sched_service_health_check(sched_service_t *service, bool *health_status)
+{
+    if (!service || !health_status || !service->initialized)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     bool all_healthy = true;
     for (size_t i = 0; i < service->agent_count; i++) {
@@ -216,16 +248,19 @@ int sched_service_health_check(sched_service_t* service, bool* health_status) {
     return 0;
 }
 
-int sched_service_reload_config(sched_service_t* service, const sched_config_t* config) {
-    if (!service || !config || !service->initialized) return -1;
+int sched_service_reload_config(sched_service_t *service, const sched_config_t *config)
+{
+    if (!service || !config || !service->initialized)
+        return AGENTOS_ERR_INVALID_PARAM;
 
-    AGENTOS_FREE((void*)service->config.ml_model_path);
+    AGENTOS_FREE((void *)service->config.ml_model_path);
     service->config.ml_model_path = NULL;
 
     memcpy(&service->config, config, sizeof(sched_config_t));
     if (config->ml_model_path) {
         service->config.ml_model_path = AGENTOS_STRDUP(config->ml_model_path);
-        if (!service->config.ml_model_path) return -3;
+        if (!service->config.ml_model_path)
+            return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     return 0;

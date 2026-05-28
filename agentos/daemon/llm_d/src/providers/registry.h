@@ -18,28 +18,31 @@ typedef struct service_config {
     uint32_t cache_ttl_sec;
     int max_retries;
     uint32_t timeout_ms;
-    const char* token_encoding;
-    struct { const char* name; const char* enabled; }* providers;
+    const char *token_encoding;
+    struct {
+        const char *name;
+        const char *enabled;
+    } *providers;
     size_t provider_count;
 } service_config_t;
 
 typedef struct {
-    const char* name;
-    const char* api_key;
-    const char* api_base;
-    const char* organization;
+    const char *name;
+    const char *api_key;
+    const char *api_base;
+    const char *organization;
     double timeout_sec;
     int max_retries;
-    char** models;
+    char **models;
 } provider_config_t;
 
 typedef struct provider_registry provider_registry_t;
 
-provider_registry_t* provider_registry_create(const service_config_t* cfg);
-provider_registry_t* provider_registry_create_from_config(const service_config_t* cfg,
-                                                           const char* config_path);
-void provider_registry_destroy(provider_registry_t* reg);
-const provider_t* provider_registry_find(provider_registry_t* reg, const char* model);
+provider_registry_t *provider_registry_create(const service_config_t *cfg);
+provider_registry_t *provider_registry_create_from_config(const service_config_t *cfg,
+                                                          const char *config_path);
+void provider_registry_destroy(provider_registry_t *reg);
+const provider_t *provider_registry_find(provider_registry_t *reg, const char *model);
 
 #ifdef __cplusplus
 }

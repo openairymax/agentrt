@@ -18,8 +18,8 @@
 #ifndef CUPOLAS_SIGNER_INFO_H
 #define CUPOLAS_SIGNER_INFO_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 /**
  * @brief Code signer identity information (full production definition)
@@ -28,13 +28,13 @@
  * signature verification in the cupolas security framework.
  */
 typedef struct {
-    char* subject_cn;
-    char* subject_org;
-    char* subject_ou;
-    char* issuer_cn;
-    char* serial_number;
-    char* key_id;
-    char* algorithm;
+    char *subject_cn;
+    char *subject_org;
+    char *subject_ou;
+    char *issuer_cn;
+    char *serial_number;
+    char *key_id;
+    char *algorithm;
     uint64_t not_before;
     uint64_t not_after;
     bool is_ca;

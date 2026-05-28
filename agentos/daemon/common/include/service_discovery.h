@@ -25,6 +25,7 @@
 #define AGENTOS_SERVICE_DISCOVERY_H
 
 #include "svc_common.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -34,16 +35,16 @@ extern "C" {
 
 /* ==================== 常量定义 ==================== */
 
-#define SD_MAX_SERVICES             128
-#define SD_MAX_NAME_LEN             64
-#define SD_MAX_ENDPOINT_LEN         256
-#define SD_MAX_TYPE_LEN             32
-#define SD_MAX_TAGS_LEN             256
-#define SD_MAX_DEPS_LEN             512
-#define SD_MAX_INSTANCES            8
-#define SD_DEFAULT_HEARTBEAT_MS     10000
-#define SD_DEFAULT_EXPIRE_MS        30000
-#define SD_SHM_NAME                 "/agentos_service_registry"
+#define SD_MAX_SERVICES 128
+#define SD_MAX_NAME_LEN 64
+#define SD_MAX_ENDPOINT_LEN 256
+#define SD_MAX_TYPE_LEN 32
+#define SD_MAX_TAGS_LEN 256
+#define SD_MAX_DEPS_LEN 512
+#define SD_MAX_INSTANCES 8
+#define SD_DEFAULT_HEARTBEAT_MS 10000
+#define SD_DEFAULT_EXPIRE_MS 30000
+#define SD_SHM_NAME "/agentos_service_registry"
 
 /* ==================== 服务实例信息 ==================== */
 
@@ -78,11 +79,11 @@ typedef struct {
 /* ==================== 负载均衡策略 ==================== */
 
 typedef enum {
-    SD_LB_ROUND_ROBIN      = 0,
-    SD_LB_WEIGHTED         = 1,
+    SD_LB_ROUND_ROBIN = 0,
+    SD_LB_WEIGHTED = 1,
     SD_LB_LEAST_CONNECTION = 2,
-    SD_LB_RANDOM           = 3,
-    SD_LB_LEAST_LOAD       = 4
+    SD_LB_RANDOM = 3,
+    SD_LB_LEAST_LOAD = 4
 } sd_lb_strategy_t;
 
 /* ==================== 服务发现配置 ==================== */
@@ -112,25 +113,21 @@ typedef struct {
 
 /* ==================== 服务发现句柄 ==================== */
 
-typedef struct service_discovery_s* service_discovery_t;
+typedef struct service_discovery_s *service_discovery_t;
 
 /* ==================== 服务变更回调 ==================== */
 
 typedef enum {
-    SD_EVENT_REGISTERED     = 1,
-    SD_EVENT_DEREGISTERED   = 2,
-    SD_EVENT_HEALTH_CHANGE  = 3,
-    SD_EVENT_EXPIRED        = 4,
-    SD_EVENT_INSTANCE_UP    = 5,
-    SD_EVENT_INSTANCE_DOWN  = 6
+    SD_EVENT_REGISTERED = 1,
+    SD_EVENT_DEREGISTERED = 2,
+    SD_EVENT_HEALTH_CHANGE = 3,
+    SD_EVENT_EXPIRED = 4,
+    SD_EVENT_INSTANCE_UP = 5,
+    SD_EVENT_INSTANCE_DOWN = 6
 } sd_event_type_t;
 
-typedef void (*sd_event_callback_t)(
-    sd_event_type_t event,
-    const char* service_name,
-    const sd_instance_t* instance,
-    void* user_data
-);
+typedef void (*sd_event_callback_t)(sd_event_type_t event, const char *service_name,
+                                    const sd_instance_t *instance, void *user_data);
 
 /* ==================== 生命周期管理 ==================== */
 
@@ -139,7 +136,7 @@ typedef void (*sd_event_callback_t)(
  * @param config 配置参数（NULL使用默认）
  * @return 服务发现句柄，失败返回NULL
  */
-AGENTOS_API service_discovery_t sd_create(const sd_config_t* config);
+AGENTOS_API service_discovery_t sd_create(const sd_config_t *config);
 
 /**
  * @brief 销毁服务发现实例
@@ -173,14 +170,9 @@ AGENTOS_API agentos_error_t sd_stop(service_discovery_t sd);
  * @param dependencies 依赖服务（逗号分隔）
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_register(
-    service_discovery_t sd,
-    const char* service_name,
-    const char* service_type,
-    const sd_instance_t* instance,
-    const char* tags,
-    const char* dependencies
-);
+AGENTOS_API agentos_error_t sd_register(service_discovery_t sd, const char *service_name,
+                                        const char *service_type, const sd_instance_t *instance,
+                                        const char *tags, const char *dependencies);
 
 /**
  * @brief 注销服务实例
@@ -189,11 +181,8 @@ AGENTOS_API agentos_error_t sd_register(
  * @param instance_id 实例ID
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_deregister(
-    service_discovery_t sd,
-    const char* service_name,
-    const char* instance_id
-);
+AGENTOS_API agentos_error_t sd_deregister(service_discovery_t sd, const char *service_name,
+                                          const char *instance_id);
 
 /**
  * @brief 注销服务的所有实例
@@ -201,10 +190,7 @@ AGENTOS_API agentos_error_t sd_deregister(
  * @param service_name 服务名称
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_deregister_all(
-    service_discovery_t sd,
-    const char* service_name
-);
+AGENTOS_API agentos_error_t sd_deregister_all(service_discovery_t sd, const char *service_name);
 
 /* ==================== 服务发现 ==================== */
 
@@ -217,13 +203,9 @@ AGENTOS_API agentos_error_t sd_deregister_all(
  * @param found_count [out] 实际找到数量
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_discover(
-    service_discovery_t sd,
-    const char* service_name,
-    sd_instance_t* instances,
-    uint32_t max_count,
-    uint32_t* found_count
-);
+AGENTOS_API agentos_error_t sd_discover(service_discovery_t sd, const char *service_name,
+                                        sd_instance_t *instances, uint32_t max_count,
+                                        uint32_t *found_count);
 
 /**
  * @brief 按类型发现服务
@@ -234,13 +216,9 @@ AGENTOS_API agentos_error_t sd_discover(
  * @param found_count [out] 实际找到数量
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_discover_by_type(
-    service_discovery_t sd,
-    const char* service_type,
-    sd_service_entry_t* entries,
-    uint32_t max_count,
-    uint32_t* found_count
-);
+AGENTOS_API agentos_error_t sd_discover_by_type(service_discovery_t sd, const char *service_type,
+                                                sd_service_entry_t *entries, uint32_t max_count,
+                                                uint32_t *found_count);
 
 /**
  * @brief 按标签发现服务
@@ -251,13 +229,9 @@ AGENTOS_API agentos_error_t sd_discover_by_type(
  * @param found_count [out] 实际找到数量
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_discover_by_tags(
-    service_discovery_t sd,
-    const char* tags,
-    sd_service_entry_t* entries,
-    uint32_t max_count,
-    uint32_t* found_count
-);
+AGENTOS_API agentos_error_t sd_discover_by_tags(service_discovery_t sd, const char *tags,
+                                                sd_service_entry_t *entries, uint32_t max_count,
+                                                uint32_t *found_count);
 
 /**
  * @brief 选择最优实例（负载均衡）
@@ -267,12 +241,8 @@ AGENTOS_API agentos_error_t sd_discover_by_tags(
  * @param instance [out] 选中的实例
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_select_instance(
-    service_discovery_t sd,
-    const char* service_name,
-    sd_lb_strategy_t strategy,
-    sd_instance_t* instance
-);
+AGENTOS_API agentos_error_t sd_select_instance(service_discovery_t sd, const char *service_name,
+                                               sd_lb_strategy_t strategy, sd_instance_t *instance);
 
 /* ==================== 心跳与健康 ==================== */
 
@@ -283,11 +253,8 @@ AGENTOS_API agentos_error_t sd_select_instance(
  * @param instance_id 实例ID
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_heartbeat(
-    service_discovery_t sd,
-    const char* service_name,
-    const char* instance_id
-);
+AGENTOS_API agentos_error_t sd_heartbeat(service_discovery_t sd, const char *service_name,
+                                         const char *instance_id);
 
 /**
  * @brief 更新实例健康状态
@@ -297,12 +264,8 @@ AGENTOS_API agentos_error_t sd_heartbeat(
  * @param healthy 是否健康
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_update_health(
-    service_discovery_t sd,
-    const char* service_name,
-    const char* instance_id,
-    bool healthy
-);
+AGENTOS_API agentos_error_t sd_update_health(service_discovery_t sd, const char *service_name,
+                                             const char *instance_id, bool healthy);
 
 /**
  * @brief 更新实例连接数
@@ -312,12 +275,9 @@ AGENTOS_API agentos_error_t sd_update_health(
  * @param active_connections 当前活跃连接数
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_update_connections(
-    service_discovery_t sd,
-    const char* service_name,
-    const char* instance_id,
-    uint32_t active_connections
-);
+AGENTOS_API agentos_error_t sd_update_connections(service_discovery_t sd, const char *service_name,
+                                                  const char *instance_id,
+                                                  uint32_t active_connections);
 
 /* ==================== 依赖管理 ==================== */
 
@@ -329,12 +289,8 @@ AGENTOS_API agentos_error_t sd_update_connections(
  * @param max_len 缓冲区最大长度
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_get_dependencies(
-    service_discovery_t sd,
-    const char* service_name,
-    char* dependencies,
-    size_t max_len
-);
+AGENTOS_API agentos_error_t sd_get_dependencies(service_discovery_t sd, const char *service_name,
+                                                char *dependencies, size_t max_len);
 
 /**
  * @brief 检查服务依赖是否满足
@@ -344,12 +300,8 @@ AGENTOS_API agentos_error_t sd_get_dependencies(
  * @param max_len 缓冲区最大长度
  * @return 0所有依赖满足，非0有缺失依赖
  */
-AGENTOS_API agentos_error_t sd_check_dependencies(
-    service_discovery_t sd,
-    const char* service_name,
-    char* missing_deps,
-    size_t max_len
-);
+AGENTOS_API agentos_error_t sd_check_dependencies(service_discovery_t sd, const char *service_name,
+                                                  char *missing_deps, size_t max_len);
 
 /* ==================== 事件与统计 ==================== */
 
@@ -360,11 +312,9 @@ AGENTOS_API agentos_error_t sd_check_dependencies(
  * @param user_data 用户数据
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_register_event_callback(
-    service_discovery_t sd,
-    sd_event_callback_t callback,
-    void* user_data
-);
+AGENTOS_API agentos_error_t sd_register_event_callback(service_discovery_t sd,
+                                                       sd_event_callback_t callback,
+                                                       void *user_data);
 
 /**
  * @brief 获取服务发现统计
@@ -372,10 +322,7 @@ AGENTOS_API agentos_error_t sd_register_event_callback(
  * @param stats [out] 统计信息
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t sd_get_stats(
-    service_discovery_t sd,
-    sd_stats_t* stats
-);
+AGENTOS_API agentos_error_t sd_get_stats(service_discovery_t sd, sd_stats_t *stats);
 
 /**
  * @brief 获取所有已注册服务数量
@@ -398,7 +345,7 @@ AGENTOS_API bool sd_is_running(service_discovery_t sd);
  * @param strategy 策略类型
  * @return 策略名称
  */
-AGENTOS_API const char* sd_lb_strategy_to_string(sd_lb_strategy_t strategy);
+AGENTOS_API const char *sd_lb_strategy_to_string(sd_lb_strategy_t strategy);
 
 /**
  * @brief 创建默认配置

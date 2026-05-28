@@ -176,7 +176,7 @@ class SyscallProxy:
             os.path.dirname(os.path.abspath(__file__)),
             os.getcwd(),
             os.environ.get('AGENTOS_LIB_PATH', ''),
-            '/usr/local/lib',
+            os.environ.get('AGENTOS_HOME', os.path.expanduser('~/.agentos')) + '/lib',
             '/usr/lib',
             'C:\\Windows\\System32',
         ]

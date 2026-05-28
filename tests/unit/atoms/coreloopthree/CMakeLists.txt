@@ -1,34 +1,28 @@
 
+# AgentOS CoreLoopThree 单元测试
 
-# 包含核心模块的头文件
-# R-09-124: converted to target_include_directories
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../build/lib)
 
-# 链接核心模块的库
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../build/lib)
-
-# 测试可执行文件
 add_executable(test_cognition test_cognition.c)
-    target_include_directories(test_cognition PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    target_include_directories(test_cognition PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 target_link_libraries(test_cognition agentos_coreloopthree)
 
 add_executable(test_execution test_execution.c)
-    target_include_directories(test_execution PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    target_include_directories(test_execution PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 target_link_libraries(test_execution agentos_coreloopthree)
 
 add_executable(test_memory test_memory.c)
-    target_include_directories(test_memory PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    target_include_directories(test_memory PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 target_link_libraries(test_memory agentos_coreloopthree)
 
 add_executable(test_loop test_loop.c)
-    target_include_directories(test_loop PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    target_include_directories(test_loop PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 target_link_libraries(test_loop agentos_coreloopthree)
 
-# 基准测试
 add_executable(benchmark benchmark.c)
-    target_include_directories(benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    target_include_directories(benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 target_link_libraries(benchmark agentos_coreloopthree)
 
-# 添加测试
 enable_testing()
 add_test(NAME cognition_test COMMAND test_cognition)
 add_test(NAME execution_test COMMAND test_execution)

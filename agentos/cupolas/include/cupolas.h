@@ -26,8 +26,9 @@
 #ifndef CUPOLAS_H
 #define CUPOLAS_H
 
-#include <stddef.h>
 #include "../../commons/include/agentos_types.h"
+
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,100 +36,100 @@ extern "C" {
 
 #ifndef CUPOLAS_API
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
-    #ifdef CUPOLAS_BUILDING_DLL
-        #define CUPOLAS_API __declspec(dllexport)
-    #else
-        #define CUPOLAS_API __declspec(dllimport)
-    #endif
-#elif defined(__GNUC__) || defined(__clang__)
-    #define CUPOLAS_API __attribute__((visibility("default")))
+#ifdef CUPOLAS_BUILDING_DLL
+#define CUPOLAS_API __declspec(dllexport)
 #else
-    #define CUPOLAS_API
+#define CUPOLAS_API __declspec(dllimport)
+#endif
+#elif defined(__GNUC__) || defined(__clang__)
+#define CUPOLAS_API __attribute__((visibility("default")))
+#else
+#define CUPOLAS_API
 #endif
 #endif
 
 #ifndef AGENTOS_OK
-#define AGENTOS_OK                     0
+#define AGENTOS_OK 0
 #endif
 #ifndef AGENTOS_ERR_UNKNOWN
-#define AGENTOS_ERR_UNKNOWN           -1
+#define AGENTOS_ERR_UNKNOWN -1
 #endif
 #ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM     -2
+#define AGENTOS_ERR_INVALID_PARAM -2
 #endif
 #ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER      -3
+#define AGENTOS_ERR_NULL_POINTER -3
 #endif
 #ifndef AGENTOS_ERR_OUT_OF_MEMORY
-#define AGENTOS_ERR_OUT_OF_MEMORY     -4
+#define AGENTOS_ERR_OUT_OF_MEMORY -4
 #endif
 #ifndef AGENTOS_ERR_BUFFER_TOO_SMALL
-#define AGENTOS_ERR_BUFFER_TOO_SMALL  -5
+#define AGENTOS_ERR_BUFFER_TOO_SMALL -5
 #endif
 #ifndef AGENTOS_ERR_NOT_FOUND
-#define AGENTOS_ERR_NOT_FOUND         -6
+#define AGENTOS_ERR_NOT_FOUND -6
 #endif
 #ifndef AGENTOS_ERR_ALREADY_EXISTS
-#define AGENTOS_ERR_ALREADY_EXISTS    -7
+#define AGENTOS_ERR_ALREADY_EXISTS -7
 #endif
 #ifndef AGENTOS_ERR_TIMEOUT
-#define AGENTOS_ERR_TIMEOUT           -8
+#define AGENTOS_ERR_TIMEOUT -8
 #endif
 #ifndef AGENTOS_ERR_NOT_SUPPORTED
-#define AGENTOS_ERR_NOT_SUPPORTED     -9
+#define AGENTOS_ERR_NOT_SUPPORTED -9
 #endif
 #ifndef AGENTOS_ERR_PERMISSION_DENIED
 #define AGENTOS_ERR_PERMISSION_DENIED -10
 #endif
 #ifndef AGENTOS_ERR_IO
-#define AGENTOS_ERR_IO               -11
+#define AGENTOS_ERR_IO -11
 #endif
 #ifndef AGENTOS_ERR_STATE_ERROR
-#define AGENTOS_ERR_STATE_ERROR      -13
+#define AGENTOS_ERR_STATE_ERROR -13
 #endif
 #ifndef AGENTOS_ERR_OVERFLOW
-#define AGENTOS_ERR_OVERFLOW         -14
+#define AGENTOS_ERR_OVERFLOW -14
 #endif
 
 #ifndef cupolas_OK
-#define cupolas_OK                    AGENTOS_OK
+#define cupolas_OK AGENTOS_OK
 #endif
 #ifndef cupolas_ERROR_UNKNOWN
-#define cupolas_ERROR_UNKNOWN         AGENTOS_ERR_UNKNOWN
+#define cupolas_ERROR_UNKNOWN AGENTOS_ERR_UNKNOWN
 #endif
 #ifndef cupolas_ERROR_INVALID_ARG
-#define cupolas_ERROR_INVALID_ARG     AGENTOS_ERR_INVALID_PARAM
+#define cupolas_ERROR_INVALID_ARG AGENTOS_ERR_INVALID_PARAM
 #endif
 #ifndef cupolas_ERROR_NO_MEMORY
-#define cupolas_ERROR_NO_MEMORY       AGENTOS_ERR_OUT_OF_MEMORY
+#define cupolas_ERROR_NO_MEMORY AGENTOS_ERR_OUT_OF_MEMORY
 #endif
 #ifndef cupolas_ERROR_NOT_FOUND
-#define cupolas_ERROR_NOT_FOUND       AGENTOS_ERR_NOT_FOUND
+#define cupolas_ERROR_NOT_FOUND AGENTOS_ERR_NOT_FOUND
 #endif
 #ifndef cupolas_ERROR_PERMISSION
-#define cupolas_ERROR_PERMISSION      AGENTOS_ERR_PERMISSION_DENIED
+#define cupolas_ERROR_PERMISSION AGENTOS_ERR_PERMISSION_DENIED
 #endif
 #ifndef cupolas_ERROR_BUSY
-#define cupolas_ERROR_BUSY            AGENTOS_ERR_STATE_ERROR
+#define cupolas_ERROR_BUSY AGENTOS_ERR_STATE_ERROR
 #endif
 #ifndef cupolas_ERROR_TIMEOUT
-#define cupolas_ERROR_TIMEOUT         AGENTOS_ERR_TIMEOUT
+#define cupolas_ERROR_TIMEOUT AGENTOS_ERR_TIMEOUT
 #endif
 #ifndef cupolas_ERROR_WOULD_BLOCK
-#define cupolas_ERROR_WOULD_BLOCK     AGENTOS_ERR_STATE_ERROR
+#define cupolas_ERROR_WOULD_BLOCK AGENTOS_ERR_STATE_ERROR
 #endif
 #ifndef cupolas_ERROR_OVERFLOW
-#define cupolas_ERROR_OVERFLOW        AGENTOS_ERR_OVERFLOW
+#define cupolas_ERROR_OVERFLOW AGENTOS_ERR_OVERFLOW
 #endif
 #ifndef cupolas_ERROR_NOT_SUPPORTED
-#define cupolas_ERROR_NOT_SUPPORTED   AGENTOS_ERR_NOT_SUPPORTED
+#define cupolas_ERROR_NOT_SUPPORTED AGENTOS_ERR_NOT_SUPPORTED
 #endif
 #ifndef cupolas_ERROR_IO
-#define cupolas_ERROR_IO             AGENTOS_ERR_IO
+#define cupolas_ERROR_IO AGENTOS_ERR_IO
 #endif
 
 #ifndef CUPOLAS_OK
-#define CUPOLAS_OK                    cupolas_OK
+#define CUPOLAS_OK cupolas_OK
 #endif
 
 /* ============================================================================
@@ -144,7 +145,7 @@ extern "C" {
  * @note Thread-safe: Multiple threads may call init, only first succeeds
  * @ownership config_path string: caller retains ownership, may be NULL
  */
-int cupolas_init(const char* config_path, agentos_error_t* error);
+int cupolas_init(const char *config_path, agentos_error_t *error);
 
 /**
  * @brief Cleanup cupolas module
@@ -161,7 +162,7 @@ void cupolas_cleanup(void);
  * @note Thread-safe: Always safe to call
  * @reentrant Yes
  */
-const char* cupolas_version(void);
+const char *cupolas_version(void);
 
 /* ============================================================================
  * Permission Management
@@ -178,8 +179,8 @@ const char* cupolas_version(void);
  * @reentrant Yes, but same agent_id/action/resource from different threads may race
  * @ownership All input strings: caller retains ownership
  */
-int cupolas_check_permission(const char* agent_id, const char* action,
-                           const char* resource, const char* context);
+int cupolas_check_permission(const char *agent_id, const char *action, const char *resource,
+                             const char *context);
 
 /**
  * @brief Add a permission rule
@@ -193,8 +194,8 @@ int cupolas_check_permission(const char* agent_id, const char* action,
  * @reentrant Yes
  * @ownership All input strings: caller retains ownership
  */
-int cupolas_add_permission_rule(const char* agent_id, const char* action,
-                               const char* resource, int allow, int priority);
+int cupolas_add_permission_rule(const char *agent_id, const char *action, const char *resource,
+                                int allow, int priority);
 
 /**
  * @brief Clear permission cache
@@ -218,7 +219,7 @@ void cupolas_clear_permission_cache(void);
  * @reentrant Yes
  * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
-int cupolas_sanitize_input(const char* input, char* output, size_t output_size);
+int cupolas_sanitize_input(const char *input, char *output, size_t output_size);
 
 /* ============================================================================
  * Command Execution
@@ -238,9 +239,9 @@ int cupolas_sanitize_input(const char* input, char* output, size_t output_size);
  * @reentrant No
  * @ownership All input strings: caller retains; output buffers: caller owns
  */
-int cupolas_execute_command(const char* command, char* const argv[],
-                          int* exit_code, char* stdout_buf, size_t stdout_size,
-                          char* stderr_buf, size_t stderr_size);
+int cupolas_execute_command(const char *command, char *const argv[], int *exit_code,
+                            char *stdout_buf, size_t stdout_size, char *stderr_buf,
+                            size_t stderr_size);
 
 /* ============================================================================
  * Audit Logging

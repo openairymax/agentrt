@@ -5,40 +5,43 @@
  */
 
 #include "agentos.h"
-#include "execution.h"
-#include "memory_compat.h"
 #include "atomic_compat.h"
+#include "execution.h"
+#include "error.h"
+#include "memory_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
-#include <strings.h>
-#include <unistd.h>
-#include <sys/wait.h>
 #include <signal.h>
+#include <strings.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #else
 #include <io.h>
 #endif
 #include <errno.h>
 #include <fcntl.h>
-#include <time.h>
 #include <stdio.h>
+#include <time.h>
 
-static int secure_random_bytes(unsigned char* buf, size_t len) {
+static int secure_random_bytes(unsigned char *buf, size_t len)
+{
 #ifdef _WIN32
     HCRYPTPROV prov;
     if (!CryptAcquireContext(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
-        return -1;
+        return AGENTOS_EINVAL;
     if (!CryptGenRandom(prov, (DWORD)len, buf)) {
         CryptReleaseContext(prov, 0);
-        return -1;
+        return AGENTOS_EINVAL;
     }
     CryptReleaseContext(prov, 0);
     return 0;
 #else
-    FILE* f = fopen("/dev/urandom", "rb");
-    if (!f) return -1;
+    FILE *f = fopen("/dev/urandom", "rb");
+    if (!f)
+        return AGENTOS_EINVAL;
     size_t n = fread(buf, 1, len, f);
     fclose(f);
     return (n == len) ? 0 : -1;
@@ -117,14 +120,15 @@ static uint32_t browser_get_time_ms(void)
 
 static void base64_encode(const unsigned char *src, size_t src_len, char *dst, size_t dst_size)
 {
-    static const char b64[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     size_t out_pos = 0;
 
     for (size_t i = 0; i < src_len; i += 3) {
         unsigned int triple = ((unsigned int)src[i]) << 16;
-        if (i + 1 < src_len) triple |= ((unsigned int)src[i + 1]) << 8;
-        if (i + 2 < src_len) triple |= (unsigned int)src[i + 2];
+        if (i + 1 < src_len)
+            triple |= ((unsigned int)src[i + 1]) << 8;
+        if (i + 2 < src_len)
+            triple |= (unsigned int)src[i + 2];
 
         for (int j = 0; j < 4 && out_pos < dst_size - 1; j++) {
             if (i / 3 * 4 + j < (src_len * 4 + 2) / 3) {
@@ -140,11 +144,11 @@ static void base64_encode(const unsigned char *src, size_t src_len, char *dst, s
 static int cdp_ws_connect(const char *ws_url, int *out_fd)
 {
     if (!ws_url || !out_fd)
-        return -1;
+        return AGENTOS_EINVAL;
 
     const char *host_start = strstr(ws_url, "://");
     if (!host_start)
-        return -1;
+        return AGENTOS_EINVAL;
     host_start += 3;
 
     int port = BROWSER_CDP_PORT_FIRST;
@@ -154,13 +158,15 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
     char host[128] = "127.0.0.1";
     if (port_start && (!path_start || port_start < path_start)) {
         size_t host_len = (size_t)(port_start - host_start);
-        if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
+        if (host_len >= sizeof(host))
+            host_len = sizeof(host) - 1;
         memcpy(host, host_start, host_len);
         host[host_len] = '\0';
         port = (int)strtol(port_start + 1, NULL, 10);
     } else if (path_start) {
         size_t host_len = (size_t)(path_start - host_start);
-        if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
+        if (host_len >= sizeof(host))
+            host_len = sizeof(host) - 1;
         memcpy(host, host_start, host_len);
         host[host_len] = '\0';
     }
@@ -171,7 +177,7 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0)
-        return -1;
+        return AGENTOS_EINVAL;
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -187,7 +193,7 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
 
     if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(fd);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     unsigned char nonce[16];
@@ -208,25 +214,25 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
                            path, host, port, key_b64);
     if (req_len <= 0 || (size_t)req_len >= sizeof(req)) {
         close(fd);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (send(fd, req, (size_t)req_len, 0) != (ssize_t)req_len) {
         close(fd);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     char resp[4096];
     ssize_t n = recv(fd, resp, sizeof(resp) - 1, 0);
     if (n <= 0) {
         close(fd);
-        return -1;
+        return AGENTOS_EINVAL;
     }
     resp[n] = '\0';
 
     if (strstr(resp, "101") == NULL || strstr(resp, "Upgrade") == NULL) {
         close(fd);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     struct timeval tv_default;
@@ -242,7 +248,7 @@ static int browser_mgr_init(void)
 {
     int expected = 0;
     if (!atomic_compare_exchange_strong_explicit(&g_browser_mgr_initialized, &expected, 1,
-                                                  memory_order_seq_cst, memory_order_seq_cst))
+                                                 memory_order_seq_cst, memory_order_seq_cst))
         return 0;
 
     memset(&g_browser_mgr, 0, sizeof(g_browser_mgr));
@@ -288,7 +294,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
                            const char *user_data_dir)
 {
     if (!browser_path || !browser_path[0])
-        return -1;
+        return AGENTOS_EINVAL;
 
     browser_mgr_init();
 
@@ -296,11 +302,10 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
     if (g_browser_mgr.state == BROWSER_STATE_RUNNING ||
         g_browser_mgr.state == BROWSER_STATE_LAUNCHING) {
         agentos_mutex_unlock(&g_browser_mgr.browser_lock);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
-    snprintf(g_browser_mgr.browser_path, sizeof(g_browser_mgr.browser_path), "%s",
-             browser_path);
+    snprintf(g_browser_mgr.browser_path, sizeof(g_browser_mgr.browser_path), "%s", browser_path);
     if (port > 0)
         g_browser_mgr.remote_debugging_port = port;
     g_browser_mgr.headless = (uint32_t)(headless ? 1 : 0);
@@ -315,7 +320,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
     if (pipe(pipe_fd) != 0) {
         g_browser_mgr.state = BROWSER_STATE_ERROR;
         agentos_mutex_unlock(&g_browser_mgr.browser_lock);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     pid_t pid = fork();
@@ -324,7 +329,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
         close(pipe_fd[1]);
         g_browser_mgr.state = BROWSER_STATE_ERROR;
         agentos_mutex_unlock(&g_browser_mgr.browser_lock);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (pid == 0) {
@@ -353,8 +358,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
         argv[argc++] = "--no-default-browser-check";
 
         char udd_arg[1024];
-        snprintf(udd_arg, sizeof(udd_arg), "--user-data-dir=%s",
-                 g_browser_mgr.user_data_dir);
+        snprintf(udd_arg, sizeof(udd_arg), "--user-data-dir=%s", g_browser_mgr.user_data_dir);
         argv[argc++] = udd_arg;
 
         argv[argc] = NULL;
@@ -377,8 +381,8 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
 
     while ((browser_get_time_ms() - start_ms) < BROWSER_LAUNCH_TIMEOUT_MS) {
         if (total < (ssize_t)(sizeof(stderr_buf) - 1)) {
-            ssize_t n = read(pipe_fd[0], stderr_buf + total,
-                             sizeof(stderr_buf) - (size_t)total - 1);
+            ssize_t n =
+                read(pipe_fd[0], stderr_buf + total, sizeof(stderr_buf) - (size_t)total - 1);
             if (n > 0) {
                 total += n;
                 stderr_buf[total] = '\0';
@@ -387,8 +391,8 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
                 if (listen_tag) {
                     listen_tag += strlen("DevTools listening on ");
                     size_t i = 0;
-                    while (listen_tag[i] && listen_tag[i] != '\n' &&
-                           listen_tag[i] != '\r' && i < sizeof(ws_url) - 1) {
+                    while (listen_tag[i] && listen_tag[i] != '\n' && listen_tag[i] != '\r' &&
+                           i < sizeof(ws_url) - 1) {
                         ws_url[i] = listen_tag[i];
                         i++;
                     }
@@ -413,8 +417,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
                 setsockopt(test_fd, SOL_SOCKET, SO_SNDTIMEO, &ct, sizeof(ct));
 
                 if (connect(test_fd, (struct sockaddr *)&test_addr, sizeof(test_addr)) == 0) {
-                    snprintf(ws_url, sizeof(ws_url),
-                             "ws://127.0.0.1:%d/devtools/browser",
+                    snprintf(ws_url, sizeof(ws_url), "ws://127.0.0.1:%d/devtools/browser",
                              g_browser_mgr.remote_debugging_port);
                     close(test_fd);
                     break;
@@ -429,14 +432,12 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
     close(pipe_fd[0]);
 
     if (ws_url[0] != '\0') {
-        snprintf(g_browser_mgr.remote_debugging_url,
-                 sizeof(g_browser_mgr.remote_debugging_url), "%s", ws_url);
+        snprintf(g_browser_mgr.remote_debugging_url, sizeof(g_browser_mgr.remote_debugging_url),
+                 "%s", ws_url);
         g_browser_mgr.state = BROWSER_STATE_RUNNING;
     } else {
-        snprintf(g_browser_mgr.remote_debugging_url,
-                 sizeof(g_browser_mgr.remote_debugging_url),
-                 "ws://127.0.0.1:%d/devtools/browser",
-                 g_browser_mgr.remote_debugging_port);
+        snprintf(g_browser_mgr.remote_debugging_url, sizeof(g_browser_mgr.remote_debugging_url),
+                 "ws://127.0.0.1:%d/devtools/browser", g_browser_mgr.remote_debugging_port);
         g_browser_mgr.state = BROWSER_STATE_RUNNING;
     }
 
@@ -449,12 +450,12 @@ int agentos_browser_attach(const char *debugging_url)
     browser_mgr_init();
 
     if (!debugging_url || !debugging_url[0])
-        return -1;
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);
     if (g_browser_mgr.state == BROWSER_STATE_RUNNING) {
         agentos_mutex_unlock(&g_browser_mgr.browser_lock);
-        return -2;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
     snprintf(g_browser_mgr.remote_debugging_url, sizeof(g_browser_mgr.remote_debugging_url), "%s",
@@ -467,12 +468,12 @@ int agentos_browser_attach(const char *debugging_url)
 int agentos_browser_close(void)
 {
     if (!atomic_load_explicit(&g_browser_mgr_initialized, memory_order_acquire))
-        return -1;
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);
     if (g_browser_mgr.state != BROWSER_STATE_RUNNING) {
         agentos_mutex_unlock(&g_browser_mgr.browser_lock);
-        return -2;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
     g_browser_mgr.state = BROWSER_STATE_STOPPING;
@@ -542,7 +543,7 @@ int agentos_browser_get_state(void)
 static int cdp_pool_acquire(const char *agent_id, const char *endpoint, cdp_connection_t **out_conn)
 {
     if (!g_browser_mgr_initialized || !agent_id || !out_conn)
-        return -1;
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&g_browser_mgr.pool_lock);
 
@@ -559,7 +560,7 @@ static int cdp_pool_acquire(const char *agent_id, const char *endpoint, cdp_conn
 
     if (g_browser_mgr.connection_count >= BROWSER_MAX_CDP_CONNS) {
         agentos_mutex_unlock(&g_browser_mgr.pool_lock);
-        return -2;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
     size_t idx = g_browser_mgr.connection_count;
@@ -608,17 +609,17 @@ static void cdp_pool_release(cdp_connection_t *conn)
 int agentos_browser_create_context(const char *agent_id, char *out_context_id, size_t ctx_size)
 {
     if (!g_browser_mgr_initialized || !agent_id || !out_context_id || ctx_size == 0)
-        return -1;
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);
     if (g_browser_mgr.state != BROWSER_STATE_RUNNING) {
         agentos_mutex_unlock(&g_browser_mgr.browser_lock);
-        return -2;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
     if (g_browser_mgr.context_count >= BROWSER_MAX_CONTEXTS) {
         agentos_mutex_unlock(&g_browser_mgr.browser_lock);
-        return -3;
+        return AGENTOS_ERR_NULL_POINTER;
     }
 
     size_t idx = g_browser_mgr.context_count;
@@ -639,7 +640,7 @@ int agentos_browser_create_context(const char *agent_id, char *out_context_id, s
 int agentos_browser_destroy_context(const char *context_id)
 {
     if (!g_browser_mgr_initialized || !context_id)
-        return -1;
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&g_browser_mgr.browser_lock);
     for (size_t i = 0; i < g_browser_mgr.context_count; i++) {
@@ -669,7 +670,7 @@ int agentos_browser_destroy_context(const char *context_id)
         }
     }
     agentos_mutex_unlock(&g_browser_mgr.browser_lock);
-    return -2;
+    return AGENTOS_ERR_INVALID_PARAM;
 }
 
 int agentos_browser_get_context_count(void)
@@ -741,7 +742,7 @@ static int extract_hostname(const char *url, char *hostname, size_t hostname_siz
 {
     const char *start = strstr(url, "://");
     if (!start)
-        return -1;
+        return AGENTOS_EINVAL;
     start += 3;
     const char *at_sign = strchr(start, '@');
     if (at_sign)
@@ -750,7 +751,7 @@ static int extract_hostname(const char *url, char *hostname, size_t hostname_siz
         start++;
         const char *end = strchr(start, ']');
         if (!end)
-            return -1;
+            return AGENTOS_EINVAL;
         size_t len = (size_t)(end - start);
         if (len >= hostname_size)
             len = hostname_size - 1;
@@ -874,7 +875,7 @@ static int ws_send_frame(int fd, const char *payload, size_t payload_len)
     header_size += 4;
 
     if (send(fd, header, header_size, 0) != (ssize_t)header_size) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (payload_len == 0)
@@ -882,7 +883,7 @@ static int ws_send_frame(int fd, const char *payload, size_t payload_len)
 
     uint8_t *masked = (uint8_t *)AGENTOS_MALLOC(payload_len);
     if (!masked)
-        return -1;
+        return AGENTOS_EINVAL;
 
     for (size_t i = 0; i < payload_len; i++) {
         masked[i] = ((const uint8_t *)payload)[i] ^ mask_key[i % 4];
@@ -892,7 +893,7 @@ static int ws_send_frame(int fd, const char *payload, size_t payload_len)
     AGENTOS_FREE(masked);
 
     if (sent != (ssize_t)payload_len)
-        return -1;
+        return AGENTOS_EINVAL;
     return 0;
 }
 
@@ -902,12 +903,12 @@ static int ws_recv_frame(int fd, char **out_payload, size_t *out_len, uint32_t t
     tv.tv_sec = (time_t)(timeout_ms / 1000);
     tv.tv_usec = (suseconds_t)((timeout_ms % 1000) * 1000);
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-        return -1;
+        return AGENTOS_EINVAL;
 
     uint8_t header[2];
     ssize_t n = recv(fd, header, 2, 0);
     if (n != 2)
-        return -1;
+        return AGENTOS_EINVAL;
 
     uint8_t opcode = header[0] & 0x0F;
     uint8_t has_mask = header[1] & 0x80;
@@ -916,12 +917,12 @@ static int ws_recv_frame(int fd, char **out_payload, size_t *out_len, uint32_t t
     if (payload_len == 126) {
         uint8_t ext[2];
         if (recv(fd, ext, 2, 0) != 2)
-            return -1;
+            return AGENTOS_EINVAL;
         payload_len = ((uint64_t)ext[0] << 8) | ext[1];
     } else if (payload_len == 127) {
         uint8_t ext[8];
         if (recv(fd, ext, 8, 0) != 8)
-            return -1;
+            return AGENTOS_EINVAL;
         payload_len = 0;
         for (int i = 0; i < 8; i++) {
             payload_len = (payload_len << 8) | ext[i];
@@ -929,24 +930,24 @@ static int ws_recv_frame(int fd, char **out_payload, size_t *out_len, uint32_t t
     }
 
     if (payload_len > 10 * 1024 * 1024)
-        return -1;
+        return AGENTOS_EINVAL;
 
     uint8_t mask_key[4] = {0, 0, 0, 0};
     if (has_mask) {
         if (recv(fd, mask_key, 4, 0) != 4)
-            return -1;
+            return AGENTOS_EINVAL;
     }
 
     char *payload = (char *)AGENTOS_MALLOC((size_t)payload_len + 1);
     if (!payload)
-        return -1;
+        return AGENTOS_EINVAL;
 
     size_t total_read = 0;
     while (total_read < (size_t)payload_len) {
         n = recv(fd, payload + total_read, (size_t)payload_len - total_read, 0);
         if (n <= 0) {
             AGENTOS_FREE(payload);
-            return -1;
+            return AGENTOS_EINVAL;
         }
         total_read += (size_t)n;
     }
@@ -960,7 +961,7 @@ static int ws_recv_frame(int fd, char **out_payload, size_t *out_len, uint32_t t
 
     if (opcode == 0x08) {
         AGENTOS_FREE(payload);
-        return -2;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
     *out_payload = payload;
@@ -1504,8 +1505,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                       "\"returnByValue\":true}}",
                                       clear_id, clear_js);
                     if (cw > 0 && (size_t)cw < sizeof(clear_json)) {
-                        if (ws_send_frame(conn->socket_fd, clear_json,
-                                          strlen(clear_json)) == 0) {
+                        if (ws_send_frame(conn->socket_fd, clear_json, strlen(clear_json)) == 0) {
                             char *cr = NULL;
                             if (ws_recv_frame(conn->socket_fd, &cr, NULL, 3000) == 0 && cr)
                                 AGENTOS_FREE(cr);
@@ -1560,14 +1560,14 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                            qs_id, es_sel2);
                         AGENTOS_FREE(es_sel2);
                         if (qsw > 0 && (size_t)qsw < sizeof(qs_json)) {
-                            if (ws_send_frame(conn->socket_fd, qs_json,
-                                              strlen(qs_json)) == 0) {
+                            if (ws_send_frame(conn->socket_fd, qs_json, strlen(qs_json)) == 0) {
                                 char *qsr = NULL;
                                 if (ws_recv_frame(conn->socket_fd, &qsr, NULL, 3000) == 0 && qsr) {
                                     const char *nid = strstr(qsr, "\"nodeId\"");
                                     if (nid) {
                                         nid += strlen("\"nodeId\"");
-                                        while (*nid && (*nid == ':' || *nid == ' ')) nid++;
+                                        while (*nid && (*nid == ':' || *nid == ' '))
+                                            nid++;
                                         int node_id = atoi(nid);
                                         if (node_id > 0) {
                                             int sva_id = cdp_get_id();
@@ -1589,20 +1589,23 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                                                       strlen(sva_json)) == 0) {
                                                         char *svar = NULL;
                                                         if (ws_recv_frame(conn->socket_fd, &svar,
-                                                                          NULL, 3000) == 0 && svar) {
+                                                                          NULL, 3000) == 0 &&
+                                                            svar) {
                                                             cdp_ok = 1;
                                                             size_t bsz = 256 + strlen(sel_buf) +
-                                                                strlen(val_buf) + 1;
-                                                            result_json = (char *)AGENTOS_MALLOC(bsz);
+                                                                         strlen(val_buf) + 1;
+                                                            result_json =
+                                                                (char *)AGENTOS_MALLOC(bsz);
                                                             if (result_json) {
-                                                                snprintf(result_json, bsz,
-                                                                         "{\"status\":\"filled\","
-                                                                         "\"selector\":\"%s\","
-                                                                         "\"value\":\"%s\","
-                                                                         "\"cdp_method\":"
-                                                                         "\"DOM.setAttributeValue\","
-                                                                         "\"cdp\":true}",
-                                                                         sel_buf, val_buf);
+                                                                snprintf(
+                                                                    result_json, bsz,
+                                                                    "{\"status\":\"filled\","
+                                                                    "\"selector\":\"%s\","
+                                                                    "\"value\":\"%s\","
+                                                                    "\"cdp_method\":"
+                                                                    "\"DOM.setAttributeValue\","
+                                                                    "\"cdp\":true}",
+                                                                    sel_buf, val_buf);
                                                             }
                                                             AGENTOS_FREE(svar);
                                                         }
@@ -1729,8 +1732,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
         if (has_cdp) {
             int pe_id = cdp_get_id();
             char pe_json[256];
-            snprintf(pe_json, sizeof(pe_json),
-                     "{\"id\":%d,\"method\":\"Page.enable\"}", pe_id);
+            snprintf(pe_json, sizeof(pe_json), "{\"id\":%d,\"method\":\"Page.enable\"}", pe_id);
             if (ws_send_frame(conn->socket_fd, pe_json, strlen(pe_json)) == 0) {
                 char *pe_resp = NULL;
                 if (ws_recv_frame(conn->socket_fd, &pe_resp, NULL, 5000) == 0 && pe_resp) {
@@ -1738,17 +1740,16 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 }
             }
 
-            int check_page_load =
-                (strstr(cmd, "load") != NULL || strstr(cmd, "page") != NULL ||
-                 strstr(cmd, "ready") != NULL);
+            int check_page_load = (strstr(cmd, "load") != NULL || strstr(cmd, "page") != NULL ||
+                                   strstr(cmd, "ready") != NULL);
 
             load_event_fired = 0;
             uint32_t poll_start = browser_get_time_ms();
-            while (!load_event_fired &&
-                   (browser_get_time_ms() - poll_start) < timeout_ms) {
+            while (!load_event_fired && (browser_get_time_ms() - poll_start) < timeout_ms) {
                 char *ev_resp = NULL;
                 uint32_t poll_to = timeout_ms - (browser_get_time_ms() - poll_start);
-                if (poll_to > 500) poll_to = 500;
+                if (poll_to > 500)
+                    poll_to = 500;
                 if (ws_recv_frame(conn->socket_fd, &ev_resp, NULL, poll_to) == 0 && ev_resp) {
                     if (strstr(ev_resp, "Page.loadEventFired"))
                         load_event_fired = 1;
@@ -1758,12 +1759,13 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
 
             if (!load_event_fired && check_page_load) {
                 uint32_t nav_start = browser_get_time_ms();
-                while (!load_event_fired &&
-                       (browser_get_time_ms() - nav_start) < timeout_ms) {
+                while (!load_event_fired && (browser_get_time_ms() - nav_start) < timeout_ms) {
                     char *ev_resp2 = NULL;
                     uint32_t poll_to2 = timeout_ms - (browser_get_time_ms() - nav_start);
-                    if (poll_to2 > 500) poll_to2 = 500;
-                    if (ws_recv_frame(conn->socket_fd, &ev_resp2, NULL, poll_to2) == 0 && ev_resp2) {
+                    if (poll_to2 > 500)
+                        poll_to2 = 500;
+                    if (ws_recv_frame(conn->socket_fd, &ev_resp2, NULL, poll_to2) == 0 &&
+                        ev_resp2) {
                         if (strstr(ev_resp2, "Page.loadEventFired"))
                             load_event_fired = 1;
                         AGENTOS_FREE(ev_resp2);
@@ -1808,8 +1810,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                     goto cdpskip;
                 }
             } else {
-                int check_network =
-                    (strstr(cmd, "network") != NULL || strstr(cmd, "idle") != NULL);
+                int check_network = (strstr(cmd, "network") != NULL || strstr(cmd, "idle") != NULL);
 
                 if (check_page_load || check_network) {
                     written = snprintf(cdp_js, sizeof(cdp_js),
@@ -1901,8 +1902,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 snprintf(result_json, buf_size,
                          "{\"status\":\"waited\",\"timeout_ms\":%u,"
                          "\"cdp_event\":\"%s\",\"cdp\":true}",
-                         timeout_ms,
-                         load_event_fired ? "Page.loadEventFired" : "awaitPromise");
+                         timeout_ms, load_event_fired ? "Page.loadEventFired" : "awaitPromise");
             }
             *out_output = result_json;
             goto cleanup;
@@ -1964,32 +1964,31 @@ cleanup:
 
 /* ==================== IMP-A2: 独立表单填充接口 ==================== */
 
-agentos_error_t agentos_browser_fill_form(
-    void* conn_ptr,
-    const char* selector, size_t selector_len,
-    const char* value, size_t value_len,
-    char** out_output, size_t* out_output_len)
+agentos_error_t agentos_browser_fill_form(void *conn_ptr, const char *selector, size_t selector_len,
+                                          const char *value, size_t value_len, char **out_output,
+                                          size_t *out_output_len)
 {
     if (!out_output || !out_output_len) {
-        if (out_output) *out_output = NULL;
-        if (out_output_len) *out_output_len = 0;
+        if (out_output)
+            *out_output = NULL;
+        if (out_output_len)
+            *out_output_len = 0;
         return AGENTOS_EINVAL;
     }
     *out_output = NULL;
     *out_output_len = 0;
 
-    cdp_connection_t* conn = (cdp_connection_t*)conn_ptr;
+    cdp_connection_t *conn = (cdp_connection_t *)conn_ptr;
     if (!conn || conn->socket_fd < 0) {
         size_t buf_size = 256 + selector_len + value_len + 1;
-        char* result = (char*)AGENTOS_MALLOC(buf_size);
-        if (!result) return AGENTOS_ENOMEM;
+        char *result = (char *)AGENTOS_MALLOC(buf_size);
+        if (!result)
+            return AGENTOS_ENOMEM;
         snprintf(result, buf_size,
                  "{\"status\":\"filled\",\"selector\":\"%.*s\","
                  "\"value\":\"%.*s\",\"simulated\":true}",
-                 (int)(selector_len < 64 ? selector_len : 63),
-                 selector ? selector : "",
-                 (int)(value_len < 128 ? value_len : 127),
-                 value ? value : "");
+                 (int)(selector_len < 64 ? selector_len : 63), selector ? selector : "",
+                 (int)(value_len < 128 ? value_len : 127), value ? value : "");
         *out_output = result;
         *out_output_len = strlen(result);
         return AGENTOS_SUCCESS;
@@ -2002,8 +2001,9 @@ agentos_error_t agentos_browser_fill_form(
     memcpy(sel_buf, selector ? selector : "", copy_sel);
     sel_buf[copy_sel] = '\0';
 
-    char* escaped_sel = js_escape(sel_buf, strlen(sel_buf));
-    if (!escaped_sel) return AGENTOS_ENOMEM;
+    char *escaped_sel = js_escape(sel_buf, strlen(sel_buf));
+    if (!escaped_sel)
+        return AGENTOS_ENOMEM;
 
     char qs_json[4096];
     int qsw = snprintf(qs_json, sizeof(qs_json),
@@ -2018,33 +2018,33 @@ agentos_error_t agentos_browser_fill_form(
     if (ws_send_frame(conn->socket_fd, qs_json, strlen(qs_json)) != 0)
         return AGENTOS_EIO;
 
-    char* qsr = NULL;
+    char *qsr = NULL;
     if (ws_recv_frame(conn->socket_fd, &qsr, NULL, 3000) != 0 || !qsr) {
         size_t buf_size = 256 + selector_len + value_len + 1;
-        char* result = (char*)AGENTOS_MALLOC(buf_size);
-        if (!result) return AGENTOS_ENOMEM;
+        char *result = (char *)AGENTOS_MALLOC(buf_size);
+        if (!result)
+            return AGENTOS_ENOMEM;
         snprintf(result, buf_size,
                  "{\"status\":\"filled\",\"selector\":\"%.*s\","
                  "\"value\":\"%.*s\",\"simulated\":true}",
-                 (int)(selector_len < 64 ? selector_len : 63),
-                 selector ? selector : "",
-                 (int)(value_len < 128 ? value_len : 127),
-                 value ? value : "");
+                 (int)(selector_len < 64 ? selector_len : 63), selector ? selector : "",
+                 (int)(value_len < 128 ? value_len : 127), value ? value : "");
         *out_output = result;
         *out_output_len = strlen(result);
         return AGENTOS_SUCCESS;
     }
 
     int node_id = 0;
-    const char* nid = strstr(qsr, "\"nodeId\"");
+    const char *nid = strstr(qsr, "\"nodeId\"");
     if (nid) {
         nid += strlen("\"nodeId\"");
-        while (*nid && (*nid == ':' || *nid == ' ')) nid++;
-        node_id = atoi(nid);
+        while (*nid && (*nid == ':' || *nid == ' '))
+            nid++;
+        node_id = (int)strtol(nid, NULL, 10);
     }
 
     int used_cdp = 0;
-    char* final_result = NULL;
+    char *final_result = NULL;
 
     if (node_id > 0) {
         int sva_id = cdp_get_id();
@@ -2053,7 +2053,7 @@ agentos_error_t agentos_browser_fill_form(
         memcpy(val_buf, value ? value : "", copy_val);
         val_buf[copy_val] = '\0';
 
-        char* es_val = js_escape(val_buf, strlen(val_buf));
+        char *es_val = js_escape(val_buf, strlen(val_buf));
         if (es_val) {
             char sva_json[8192];
             int svaw = snprintf(sva_json, sizeof(sva_json),
@@ -2065,9 +2065,10 @@ agentos_error_t agentos_browser_fill_form(
 
             if (svaw > 0 && (size_t)svaw < sizeof(sva_json)) {
                 if (ws_send_frame(conn->socket_fd, sva_json, strlen(sva_json)) == 0) {
-                    char* svar = NULL;
+                    char *svar = NULL;
                     ws_recv_frame(conn->socket_fd, &svar, NULL, 3000);
-                    if (svar) AGENTOS_FREE(svar);
+                    if (svar)
+                        AGENTOS_FREE(svar);
                     used_cdp = 1;
                 }
             }
@@ -2075,34 +2076,31 @@ agentos_error_t agentos_browser_fill_form(
     }
 
     if (used_cdp) {
-        char* desc_buf = (char*)AGENTOS_MALLOC(384);
+        char *desc_buf = (char *)AGENTOS_MALLOC(384);
         if (desc_buf) {
             snprintf(desc_buf, 383,
                      "{\"status\":\"filled\",\"selector\":\"%.*s\","
                      "\"value\":\"%.*s\","
                      "\"cdp_method\":\"DOM.setAttributeValue\",\"cdp\":true}",
-                     (int)(selector_len < 64 ? selector_len : 63),
-                     selector ? selector : "",
-                     (int)(value_len < 128 ? value_len : 127),
-                     value ? value : "");
+                     (int)(selector_len < 64 ? selector_len : 63), selector ? selector : "",
+                     (int)(value_len < 128 ? value_len : 127), value ? value : "");
             final_result = desc_buf;
         }
     } else {
-        final_result = (char*)AGENTOS_MALLOC(384);
+        final_result = (char *)AGENTOS_MALLOC(384);
         if (final_result) {
             snprintf(final_result, 383,
                      "{\"status\":\"filled\",\"selector\":\"%.*s\","
                      "\"value\":\"%.*s\",\"simulated\":true}",
-                     (int)(selector_len < 64 ? selector_len : 63),
-                     selector ? selector : "",
-                     (int)(value_len < 128 ? value_len : 127),
-                     value ? value : "");
+                     (int)(selector_len < 64 ? selector_len : 63), selector ? selector : "",
+                     (int)(value_len < 128 ? value_len : 127), value ? value : "");
         }
     }
 
     AGENTOS_FREE(qsr);
 
-    if (!final_result) return AGENTOS_ENOMEM;
+    if (!final_result)
+        return AGENTOS_ENOMEM;
     *out_output = final_result;
     *out_output_len = strlen(final_result);
     return AGENTOS_SUCCESS;
@@ -2110,29 +2108,29 @@ agentos_error_t agentos_browser_fill_form(
 
 /* ==================== IMP-A2: 独立元素等待接口 ==================== */
 
-agentos_error_t agentos_browser_wait_for_element(
-    void* conn_ptr,
-    const char* selector, size_t selector_len,
-    const char* wait_type,
-    uint32_t timeout_ms,
-    char** out_output, size_t* out_output_len)
+agentos_error_t agentos_browser_wait_for_element(void *conn_ptr, const char *selector,
+                                                 size_t selector_len, const char *wait_type,
+                                                 uint32_t timeout_ms, char **out_output,
+                                                 size_t *out_output_len)
 {
     if (!out_output || !out_output_len) {
-        if (out_output) *out_output = NULL;
-        if (out_output_len) *out_output_len = 0;
+        if (out_output)
+            *out_output = NULL;
+        if (out_output_len)
+            *out_output_len = 0;
         return AGENTOS_EINVAL;
     }
     *out_output = NULL;
     *out_output_len = 0;
 
     uint32_t effective_timeout = timeout_ms > 0 ? timeout_ms : 5000;
-    cdp_connection_t* conn = (cdp_connection_t*)conn_ptr;
+    cdp_connection_t *conn = (cdp_connection_t *)conn_ptr;
 
     if (!conn || conn->socket_fd < 0) {
-        char* result = (char*)AGENTOS_MALLOC(256);
-        if (!result) return AGENTOS_ENOMEM;
-        snprintf(result, 255,
-                 "{\"status\":\"waited\",\"timeout_ms\":%u,\"simulated\":true}",
+        char *result = (char *)AGENTOS_MALLOC(256);
+        if (!result)
+            return AGENTOS_ENOMEM;
+        snprintf(result, 255, "{\"status\":\"waited\",\"timeout_ms\":%u,\"simulated\":true}",
                  effective_timeout);
         *out_output = result;
         *out_output_len = strlen(result);
@@ -2141,10 +2139,9 @@ agentos_error_t agentos_browser_wait_for_element(
 
     int pe_id = cdp_get_id();
     char pe_json[256];
-    snprintf(pe_json, sizeof(pe_json),
-             "{\"id\":%d,\"method\":\"Page.enable\"}", pe_id);
+    snprintf(pe_json, sizeof(pe_json), "{\"id\":%d,\"method\":\"Page.enable\"}", pe_id);
     if (ws_send_frame(conn->socket_fd, pe_json, strlen(pe_json)) == 0) {
-        char* pe_resp = NULL;
+        char *pe_resp = NULL;
         if (ws_recv_frame(conn->socket_fd, &pe_resp, NULL, 5000) == 0 && pe_resp)
             AGENTOS_FREE(pe_resp);
     }
@@ -2161,44 +2158,44 @@ agentos_error_t agentos_browser_wait_for_element(
         memcpy(sel_buf, selector, copy_sel);
         sel_buf[copy_sel] = '\0';
 
-        char* escaped_sel = js_escape(sel_buf, strlen(sel_buf));
+        char *escaped_sel = js_escape(sel_buf, strlen(sel_buf));
         if (escaped_sel) {
             char cdp_js[4096];
             snprintf(cdp_js, sizeof(cdp_js),
-                "(function(){var s='%s';var t=%u;"
-                "return new Promise(function(r){"
-                "var st=Date.now();"
-                "var chk=function(){"
-                "if(document.querySelector(s)){r('found');}"
-                "else if(Date.now()-st>t){r('timeout');}"
-                "else{setTimeout(chk,100);}};"
-                "chk();})})()",
-                escaped_sel, effective_timeout);
+                     "(function(){var s='%s';var t=%u;"
+                     "return new Promise(function(r){"
+                     "var st=Date.now();"
+                     "var chk=function(){"
+                     "if(document.querySelector(s)){r('found');}"
+                     "else if(Date.now()-st>t){r('timeout');}"
+                     "else{setTimeout(chk,100);}};"
+                     "chk();})})()",
+                     escaped_sel, effective_timeout);
             AGENTOS_FREE(escaped_sel);
 
             char cdp_json[8192];
             int w2 = snprintf(cdp_json, sizeof(cdp_json),
-                "{\"id\":%d,\"method\":\"Runtime.evaluate\","
-                "\"params\":{\"expression\":\"%s\","
-                "\"returnByValue\":true,\"awaitPromise\":true}}",
-                cdp_id, cdp_js);
+                              "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                              "\"params\":{\"expression\":\"%s\","
+                              "\"returnByValue\":true,\"awaitPromise\":true}}",
+                              cdp_id, cdp_js);
 
             if (w2 > 0 && (size_t)w2 < sizeof(cdp_json)) {
                 if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
-                    char* resp = NULL;
+                    char *resp = NULL;
                     uint32_t recv_to = effective_timeout + 10000;
                     ws_recv_frame(conn->socket_fd, &resp, NULL, recv_to);
-                    if (resp) AGENTOS_FREE(resp);
+                    if (resp)
+                        AGENTOS_FREE(resp);
                 }
             }
 
-            char* result = (char*)AGENTOS_MALLOC(384);
+            char *result = (char *)AGENTOS_MALLOC(384);
             if (result) {
                 snprintf(result, 383,
-                    "{\"status\":\"waited\",\"selector\":\"%.*s\","
-                    "\"timeout_ms\":%u,\"cdp\":true}",
-                    (int)(selector_len < 64 ? selector_len : 63), selector,
-                    effective_timeout);
+                         "{\"status\":\"waited\",\"selector\":\"%.*s\","
+                         "\"timeout_ms\":%u,\"cdp\":true}",
+                         (int)(selector_len < 64 ? selector_len : 63), selector, effective_timeout);
                 *out_output = result;
                 *out_output_len = strlen(result);
             }
@@ -2206,11 +2203,11 @@ agentos_error_t agentos_browser_wait_for_element(
         }
     } else if (is_load || is_network) {
         uint32_t poll_start = browser_get_time_ms();
-        while (!load_event_fired &&
-               (browser_get_time_ms() - poll_start) < effective_timeout) {
-            char* ev_resp = NULL;
+        while (!load_event_fired && (browser_get_time_ms() - poll_start) < effective_timeout) {
+            char *ev_resp = NULL;
             uint32_t poll_to = effective_timeout - (browser_get_time_ms() - poll_start);
-            if (poll_to > 500) poll_to = 500;
+            if (poll_to > 500)
+                poll_to = 500;
             if (ws_recv_frame(conn->socket_fd, &ev_resp, NULL, poll_to) == 0 && ev_resp) {
                 if (strstr(ev_resp, "Page.loadEventFired"))
                     load_event_fired = 1;
@@ -2221,32 +2218,33 @@ agentos_error_t agentos_browser_wait_for_element(
         int cdp_id = cdp_get_id();
         char delay_js[512];
         snprintf(delay_js, sizeof(delay_js),
-            "new Promise(function(r){setTimeout(function(){r('waited');},%u);})",
-            effective_timeout);
+                 "new Promise(function(r){setTimeout(function(){r('waited');},%u);})",
+                 effective_timeout);
 
         char cdp_json[2048];
         snprintf(cdp_json, sizeof(cdp_json),
-            "{\"id\":%d,\"method\":\"Runtime.evaluate\","
-            "\"params\":{\"expression\":\"%s\","
-            "\"returnByValue\":true,\"awaitPromise\":true}}",
-            cdp_id, delay_js);
+                 "{\"id\":%d,\"method\":\"Runtime.evaluate\","
+                 "\"params\":{\"expression\":\"%s\","
+                 "\"returnByValue\":true,\"awaitPromise\":true}}",
+                 cdp_id, delay_js);
 
         if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
-            char* resp = NULL;
+            char *resp = NULL;
             uint32_t recv_to = effective_timeout + 10000;
             ws_recv_frame(conn->socket_fd, &resp, NULL, recv_to);
-            if (resp) AGENTOS_FREE(resp);
+            if (resp)
+                AGENTOS_FREE(resp);
         }
         load_event_fired = 1;
     }
 
-    char* result = (char*)AGENTOS_MALLOC(384);
-    if (!result) return AGENTOS_ENOMEM;
+    char *result = (char *)AGENTOS_MALLOC(384);
+    if (!result)
+        return AGENTOS_ENOMEM;
     snprintf(result, 383,
              "{\"status\":\"waited\",\"timeout_ms\":%u,"
              "\"cdp_event\":\"%s\",\"cdp\":%s}",
-             effective_timeout,
-             load_event_fired ? "Page.loadEventFired" : "awaitPromise",
+             effective_timeout, load_event_fired ? "Page.loadEventFired" : "awaitPromise",
              conn->socket_fd >= 0 ? "true" : "false");
     *out_output = result;
     *out_output_len = strlen(result);
@@ -2301,7 +2299,7 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
 int agentos_browser_unit_set_agent(agentos_execution_unit_t *unit, const char *agent_id)
 {
     if (!unit || !unit->execution_unit_data || !agent_id)
-        return -1;
+        return AGENTOS_EINVAL;
     browser_unit_data_t *data = (browser_unit_data_t *)unit->execution_unit_data;
     strncpy(data->agent_id, agent_id, sizeof(data->agent_id) - 1);
     data->agent_id[sizeof(data->agent_id) - 1] = '\0';

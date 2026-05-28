@@ -20,13 +20,13 @@ typedef struct agentos_metrics agentos_metrics_t;
  * @brief 创建指标收集器
  * @return 收集器句柄，失败返回 NULL
  */
-agentos_metrics_t* agentos_metrics_create(void);
+agentos_metrics_t *agentos_metrics_create(void);
 
 /**
 // From data intelligence emerges. by spharx
  * @brief 销毁收集器
  */
-void agentos_metrics_destroy(agentos_metrics_t* metrics);
+void agentos_metrics_destroy(agentos_metrics_t *metrics);
 
 /**
  * @brief 增加计数器
@@ -34,7 +34,7 @@ void agentos_metrics_destroy(agentos_metrics_t* metrics);
  * @param name 指标名
  * @param value 增加值
  */
-void agentos_metrics_increment(agentos_metrics_t* metrics, const char* name, uint64_t value);
+void agentos_metrics_increment(agentos_metrics_t *metrics, const char *name, uint64_t value);
 
 /**
  * @brief 设置仪表值
@@ -42,7 +42,7 @@ void agentos_metrics_increment(agentos_metrics_t* metrics, const char* name, uin
  * @param name 指标名
  * @param value 值
  */
-void agentos_metrics_gauge(agentos_metrics_t* metrics, const char* name, double value);
+void agentos_metrics_gauge(agentos_metrics_t *metrics, const char *name, double value);
 
 /**
  * @brief 记录耗时
@@ -50,14 +50,14 @@ void agentos_metrics_gauge(agentos_metrics_t* metrics, const char* name, double 
  * @param name 指标名
  * @param duration_ms 耗时（毫秒）
  */
-void agentos_metrics_timing(agentos_metrics_t* metrics, const char* name, double duration_ms);
+void agentos_metrics_timing(agentos_metrics_t *metrics, const char *name, double duration_ms);
 
 /**
  * @brief 导出指标为JSON字符串
  * @param metrics 收集器
  * @return JSON字符串（需调用者释放），失败返回 NULL
  */
-char* agentos_metrics_export(agentos_metrics_t* metrics);
+char *agentos_metrics_export(agentos_metrics_t *metrics);
 
 /**
  * @brief 导出指标为Prometheus格式字符串
@@ -69,7 +69,7 @@ char* agentos_metrics_export(agentos_metrics_t* metrics);
  * - Gauge: # TYPE name gauge \n name value
  * - Timing: # TYPE name summary \n name_sum value \n name_count count
  */
-char* agentos_metrics_export_prometheus(agentos_metrics_t* metrics);
+char *agentos_metrics_export_prometheus(agentos_metrics_t *metrics);
 
 /**
  * @brief 导出指定前缀的指标为Prometheus格式
@@ -77,10 +77,7 @@ char* agentos_metrics_export_prometheus(agentos_metrics_t* metrics);
  * @param prefix 指标名称前缀过滤（NULL导出全部）
  * @return Prometheus格式字符串（需调用者释放），失败返回 NULL
  */
-char* agentos_metrics_export_prometheus_filtered(
-    agentos_metrics_t* metrics,
-    const char* prefix
-);
+char *agentos_metrics_export_prometheus_filtered(agentos_metrics_t *metrics, const char *prefix);
 
 #ifdef __cplusplus
 }

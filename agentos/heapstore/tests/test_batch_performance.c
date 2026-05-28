@@ -9,23 +9,26 @@
  * "From data intelligence emerges."
  */
 
+#include "../include/heapstore.h"
+#include "../include/heapstore_registry.h"
+#include "platform.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "platform.h"
-#include "../include/heapstore.h"
-#include "../include/heapstore_registry.h"
 
 #define NUM_RECORDS 1000
 
-static double get_time_ms(void) {
+static double get_time_ms(void)
+{
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000.0 + ts.tv_nsec / 1000000.0;
 }
 
-static void init_agent_record(heapstore_agent_record_t* record, int index) {
+static void init_agent_record(heapstore_agent_record_t *record, int index)
+{
     memset(record, 0, sizeof(*record));
     snprintf(record->id, sizeof(record->id), "agent_%06d", index);
     snprintf(record->name, sizeof(record->name), "Test Agent %d", index);
@@ -37,7 +40,8 @@ static void init_agent_record(heapstore_agent_record_t* record, int index) {
     record->updated_at = time(NULL);
 }
 
-static int test_single_insert_performance(void) {
+static int test_single_insert_performance(void)
+{
     printf("\n=== 测试：单条插入性能（基准） ===\n\n");
 
     heapstore_config_t config = {0};
@@ -58,7 +62,8 @@ static int test_single_insert_performance(void) {
 
         err = heapstore_registry_add_agent(&record);
         if (err != heapstore_SUCCESS) {
-            printf("❌ heapstore_registry_add_agent failed at %d: %s\n", i, heapstore_strerror(err));
+            printf("❌ heapstore_registry_add_agent failed at %d: %s\n", i,
+                   heapstore_strerror(err));
             heapstore_shutdown();
             return -1;
         }
@@ -78,7 +83,8 @@ static int test_single_insert_performance(void) {
     return 0;
 }
 
-static int test_batch_insert_performance(void) {
+static int test_batch_insert_performance(void)
+{
     printf("\n=== 测试：批量插入性能（事务优化） ===\n\n");
 
     heapstore_config_t config = {0};
@@ -91,7 +97,7 @@ static int test_batch_insert_performance(void) {
         return -1;
     }
 
-    heapstore_agent_record_t* records = malloc(NUM_RECORDS * sizeof(heapstore_agent_record_t));
+    heapstore_agent_record_t *records = malloc(NUM_RECORDS * sizeof(heapstore_agent_record_t));
     if (!records) {
         printf("❌ malloc failed\n");
         heapstore_shutdown();
@@ -127,7 +133,8 @@ static int test_batch_insert_performance(void) {
     return 0;
 }
 
-static int test_comparison(void) {
+static int test_comparison(void)
+{
     printf("\n");
     printf("╔════════════════════════════════════════════════════════╗\n");
     printf("║           heapstore 批量插入性能对比测试                 ║\n");
@@ -153,7 +160,8 @@ static int test_comparison(void) {
     return (single_result == 0 && batch_result == 0) ? 0 : 1;
 }
 
-int main(void) {
+int main(void)
+{
     printf("\n");
     printf("========================================\n");
     printf(" heapstore Batch Insert Performance Test\n");

@@ -12,17 +12,42 @@
 tests/
 ├── unit/                 # 单元测试
 │   ├── atoms/            # Atoms 层单元测试
+│   │   ├── corekern/     #   内核核心测试
+│   │   ├── coreloopthree/#   双思考系统测试
+│   │   ├── memory/       #   内置记忆测试
+│   │   └── syscall/      #   系统调用层测试
 │   ├── commons/          # Commons 层单元测试
-│   ├── cupolas/          # Cupolas 层单元测试
-│   └── daemon/           # Daemon 层单元测试
+│   │   ├── unit/         #   公共工具单元测试
+│   │   └── integration/  #   公共模块集成测试
+│   ├── cupolas/          # Cupolas 安全模块测试
+│   ├── daemon/           # Daemon 守护进程测试
+│   │   ├── common/       #   公共守护进程测试
+│   │   ├── gateway_d/    #   网关守护进程测试
+│   │   ├── llm_d/        #   LLM 守护进程测试
+│   │   ├── market_d/     #   市场守护进程测试
+│   │   ├── monit_d/      #   监控守护进程测试
+│   │   ├── sched_d/      #   调度守护进程测试
+│   │   └── tool_d/       #   工具守护进程测试
+│   ├── gateway/          # 网关层测试
+│   ├── heapstore/        # 堆存储测试
+│   ├── sdk/              # SDK 测试
+│   ├── toolkit/          # 工具包测试
+│   ├── openlab/          # OpenLab 测试
+│   ├── config/           # 配置验证测试
+│   └── manager/          # 管理器测试
 ├── integration/          # 集成测试
-│   ├── protocols/        # 协议交互测试
-│   └── workflows/        # 工作流测试
+│   ├── coreloopthree/    #   双思考系统集成
+│   ├── memoryrovol/      #   记忆系统集成
+│   └── syscall/          #   系统调用集成
 ├── contract/             # 契约测试
-├── benchmark/            # 性能基准测试
+├── benchmarks/           # 性能基准测试
 ├── security/             # 安全测试
+├── platform/             # 跨平台兼容性测试
+├── e2e/                  # 端到端测试
 ├── fuzz/                 # 模糊测试
 ├── fixtures/             # 测试夹具和数据
+├── templates/            # 测试模板
+├── utils/                # 测试工具函数
 ├── conftest.py           # pytest 全局配置
 └── run_tests.py          # 测试运行入口
 ```

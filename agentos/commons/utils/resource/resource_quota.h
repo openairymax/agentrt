@@ -11,8 +11,9 @@
 #ifndef RESOURCE_QUOTA_H
 #define RESOURCE_QUOTA_H
 
-#include "memory_compat.h"
 #include "error.h"
+#include "memory_compat.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -42,42 +43,34 @@ typedef struct agentos_resource_usage {
 typedef struct agentos_resource_manager {
     agentos_resource_quota_t quota;
     agentos_resource_usage_t usage;
-    char* resource_id;
-    void* lock;
+    char *resource_id;
+    void *lock;
     int enabled;
     uint8_t exceeded_flags;
 } agentos_resource_manager_t;
 
-agentos_error_t agentos_resource_manager_create(
-    const agentos_resource_quota_t* quota,
-    const char* resource_id,
-    agentos_resource_manager_t** out_manager);
+agentos_error_t agentos_resource_manager_create(const agentos_resource_quota_t *quota,
+                                                const char *resource_id,
+                                                agentos_resource_manager_t **out_manager);
 
-void agentos_resource_manager_destroy(agentos_resource_manager_t* manager);
+void agentos_resource_manager_destroy(agentos_resource_manager_t *manager);
 
-agentos_error_t agentos_resource_check_memory(
-    agentos_resource_manager_t* manager,
-    size_t requested_bytes);
+agentos_error_t agentos_resource_check_memory(agentos_resource_manager_t *manager,
+                                              size_t requested_bytes);
 
-agentos_error_t agentos_resource_record_allocation(
-    agentos_resource_manager_t* manager,
-    size_t bytes);
+agentos_error_t agentos_resource_record_allocation(agentos_resource_manager_t *manager,
+                                                   size_t bytes);
 
-agentos_error_t agentos_resource_record_free(
-    agentos_resource_manager_t* manager,
-    size_t bytes);
+agentos_error_t agentos_resource_record_free(agentos_resource_manager_t *manager, size_t bytes);
 
-agentos_error_t agentos_resource_record_io(
-    agentos_resource_manager_t* manager);
+agentos_error_t agentos_resource_record_io(agentos_resource_manager_t *manager);
 
-int agentos_resource_is_exceeded(agentos_resource_manager_t* manager);
+int agentos_resource_is_exceeded(agentos_resource_manager_t *manager);
 
-void agentos_resource_get_usage(
-    agentos_resource_manager_t* manager,
-    agentos_resource_usage_t* out_usage);
+void agentos_resource_get_usage(agentos_resource_manager_t *manager,
+                                agentos_resource_usage_t *out_usage);
 
-const char* agentos_resource_get_exceeded_info(
-    agentos_resource_manager_t* manager);
+const char *agentos_resource_get_exceeded_info(agentos_resource_manager_t *manager);
 
 #ifdef __cplusplus
 }

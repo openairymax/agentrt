@@ -15,13 +15,14 @@
  * 5. 线程安全
  */
 
+#include "error.h"
 #include "monitor_service.h"
 #include "platform.h"
-#include "error.h"
 #include "svc_logger.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #define MAX_SPANS_PER_TRACE 128
 #define MAX_TRACES 1024
@@ -39,19 +40,15 @@ typedef enum {
     SPAN_KIND_CONSUMER
 } span_kind_t;
 
-typedef enum {
-    SAMPLE_ALWAYS,
-    SAMPLE_PROBABILISTIC,
-    SAMPLE_RATE_LIMITED
-} sampling_strategy_t;
+typedef enum { SAMPLE_ALWAYS, SAMPLE_PROBABILISTIC, SAMPLE_RATE_LIMITED } sampling_strategy_t;
 
 typedef struct {
-    char* key;
-    char* value;
+    char *key;
+    char *value;
 } span_attribute_t;
 
 typedef struct {
-    char* name;
+    char *name;
     uint64_t timestamp;
     span_attribute_t attributes[MAX_SPAN_ATTRIBUTES];
     size_t attribute_count;
@@ -60,12 +57,12 @@ typedef struct {
 typedef struct {
     char span_id[SPAN_ID_LEN];
     char parent_span_id[SPAN_ID_LEN];
-    char* operation_name;
+    char *operation_name;
     span_kind_t kind;
     uint64_t start_time;
     uint64_t end_time;
     int status_code;
-    char* status_message;
+    char *status_message;
     span_attribute_t attributes[MAX_SPAN_ATTRIBUTES];
     size_t attribute_count;
     span_event_t events[MAX_SPAN_EVENTS];
@@ -96,7 +93,8 @@ static struct {
     int initialized;
 } g_tracing = {0};
 
-static void generate_hex_id(char* buf, size_t buf_len) {
+static void generate_hex_id(char *buf, size_t buf_len)
+{
     static const char hex[] = "0123456789abcdef";
     uint64_t t = (uint64_t)time(NULL);
     uint64_t r = (uint64_t)agentos_random_uint32(0, UINT32_MAX);
@@ -107,26 +105,28 @@ static void generate_hex_id(char* buf, size_t buf_len) {
     buf[buf_len - 1] = '\0';
 }
 
-static bool should_sample(void) {
+static bool should_sample(void)
+{
     switch (g_tracing.default_sampling) {
-        case SAMPLE_ALWAYS:
-            return true;
-        case SAMPLE_PROBABILISTIC:
-            return ((double)agentos_random_float()) < g_tracing.default_sampling_rate;
-        case SAMPLE_RATE_LIMITED: {
-            uint64_t now = (uint64_t)time(NULL);
-            if (now != g_tracing.last_rate_check) {
-                g_tracing.last_rate_check = now;
-                g_tracing.rate_counter = 0;
-            }
-            g_tracing.rate_counter++;
-            return g_tracing.rate_counter <= g_tracing.rate_limit_per_second;
+    case SAMPLE_ALWAYS:
+        return true;
+    case SAMPLE_PROBABILISTIC:
+        return ((double)agentos_random_float()) < g_tracing.default_sampling_rate;
+    case SAMPLE_RATE_LIMITED: {
+        uint64_t now = (uint64_t)time(NULL);
+        if (now != g_tracing.last_rate_check) {
+            g_tracing.last_rate_check = now;
+            g_tracing.rate_counter = 0;
         }
+        g_tracing.rate_counter++;
+        return g_tracing.rate_counter <= g_tracing.rate_limit_per_second;
+    }
     }
     return true;
 }
 
-int tracing_init(sampling_strategy_t strategy, double rate) {
+int tracing_init(sampling_strategy_t strategy, double rate)
+{
     if (g_tracing.initialized) {
         return AGENTOS_SUCCESS;
     }
@@ -149,16 +149,18 @@ int tracing_init(sampling_strategy_t strategy, double rate) {
     return AGENTOS_SUCCESS;
 }
 
-void tracing_shutdown(void) {
-    if (!g_tracing.initialized) return;
+void tracing_shutdown(void)
+{
+    if (!g_tracing.initialized)
+        return;
 
     agentos_mutex_lock(&g_tracing.global_lock);
 
     for (size_t i = 0; i < g_tracing.trace_count; i++) {
-        trace_t* trace = &g_tracing.traces[i];
+        trace_t *trace = &g_tracing.traces[i];
         agentos_mutex_lock(&trace->lock);
         for (size_t j = 0; j < trace->span_count; j++) {
-            span_t* span = &trace->spans[j];
+            span_t *span = &trace->spans[j];
             AGENTOS_FREE(span->operation_name);
             AGENTOS_FREE(span->status_message);
             for (size_t k = 0; k < span->attribute_count; k++) {
@@ -185,8 +187,9 @@ void tracing_shutdown(void) {
     agentos_mutex_destroy(&g_tracing.global_lock);
 }
 
-int tracing_start_trace(const char* operation_name, const char* parent_trace_id,
-                        char* out_trace_id, size_t trace_id_buf_len) {
+int tracing_start_trace(const char *operation_name, const char *parent_trace_id, char *out_trace_id,
+                        size_t trace_id_buf_len)
+{
     if (!operation_name || !out_trace_id) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -203,12 +206,12 @@ int tracing_start_trace(const char* operation_name, const char* parent_trace_id,
             if (g_tracing.traces[i].finished &&
                 (!g_tracing.traces[oldest].finished ||
                  g_tracing.traces[i].spans[0].start_time <
-                 g_tracing.traces[oldest].spans[0].start_time)) {
+                     g_tracing.traces[oldest].spans[0].start_time)) {
                 oldest = i;
             }
         }
 
-        trace_t* old = &g_tracing.traces[oldest];
+        trace_t *old = &g_tracing.traces[oldest];
         agentos_mutex_lock(&old->lock);
         for (size_t j = 0; j < old->span_count; j++) {
             AGENTOS_FREE(old->spans[j].operation_name);
@@ -226,7 +229,7 @@ int tracing_start_trace(const char* operation_name, const char* parent_trace_id,
         g_tracing.trace_count--;
     }
 
-    trace_t* trace = &g_tracing.traces[g_tracing.trace_count];
+    trace_t *trace = &g_tracing.traces[g_tracing.trace_count];
     memset(trace, 0, sizeof(trace_t));
     agentos_mutex_init(&trace->lock);
 
@@ -242,13 +245,13 @@ int tracing_start_trace(const char* operation_name, const char* parent_trace_id,
     trace->sampled = should_sample() ? 1 : 0;
     trace->finished = 0;
 
-    span_t* root_span = &trace->spans[0];
+    span_t *root_span = &trace->spans[0];
     generate_hex_id(root_span->span_id, SPAN_ID_LEN);
     root_span->parent_span_id[0] = '\0';
     root_span->operation_name = AGENTOS_STRDUP(operation_name);
     if (!root_span->operation_name) {
         g_tracing.traces[g_tracing.trace_count].trace_id[0] = '\0';
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     root_span->kind = SPAN_KIND_SERVER;
     root_span->start_time = (uint64_t)time(NULL) * 1000000;
@@ -266,20 +269,21 @@ int tracing_start_trace(const char* operation_name, const char* parent_trace_id,
 
     agentos_mutex_unlock(&g_tracing.global_lock);
 
-    SVC_LOG_DEBUG("Trace started: %s (operation=%s, sampled=%d)",
-                  trace->trace_id, operation_name, trace->sampled);
+    SVC_LOG_DEBUG("Trace started: %s (operation=%s, sampled=%d)", trace->trace_id, operation_name,
+                  trace->sampled);
     return AGENTOS_SUCCESS;
 }
 
-int tracing_start_span(const char* trace_id, const char* operation_name,
-                       span_kind_t kind, char* out_span_id, size_t span_id_buf_len) {
+int tracing_start_span(const char *trace_id, const char *operation_name, span_kind_t kind,
+                       char *out_span_id, size_t span_id_buf_len)
+{
     if (!trace_id || !operation_name || !out_span_id) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     agentos_mutex_lock(&g_tracing.global_lock);
 
-    trace_t* trace = NULL;
+    trace_t *trace = NULL;
     for (size_t i = 0; i < g_tracing.trace_count; i++) {
         if (strcmp(g_tracing.traces[i].trace_id, trace_id) == 0) {
             trace = &g_tracing.traces[i];
@@ -300,13 +304,11 @@ int tracing_start_span(const char* trace_id, const char* operation_name,
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    span_t* span = &trace->spans[trace->span_count];
+    span_t *span = &trace->spans[trace->span_count];
     generate_hex_id(span->span_id, SPAN_ID_LEN);
 
     if (trace->span_count > 0) {
-        strncpy(span->parent_span_id,
-                trace->spans[trace->span_count - 1].span_id,
-                SPAN_ID_LEN - 1);
+        strncpy(span->parent_span_id, trace->spans[trace->span_count - 1].span_id, SPAN_ID_LEN - 1);
     } else {
         span->parent_span_id[0] = '\0';
     }
@@ -328,15 +330,16 @@ int tracing_start_span(const char* trace_id, const char* operation_name,
     return AGENTOS_SUCCESS;
 }
 
-int tracing_end_span(const char* trace_id, const char* span_id,
-                     int status_code, const char* status_message) {
+int tracing_end_span(const char *trace_id, const char *span_id, int status_code,
+                     const char *status_message)
+{
     if (!trace_id || !span_id) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     agentos_mutex_lock(&g_tracing.global_lock);
 
-    trace_t* trace = NULL;
+    trace_t *trace = NULL;
     for (size_t i = 0; i < g_tracing.trace_count; i++) {
         if (strcmp(g_tracing.traces[i].trace_id, trace_id) == 0) {
             trace = &g_tracing.traces[i];
@@ -378,15 +381,16 @@ int tracing_end_span(const char* trace_id, const char* span_id,
     return AGENTOS_SUCCESS;
 }
 
-int tracing_add_span_attribute(const char* trace_id, const char* span_id,
-                               const char* key, const char* value) {
+int tracing_add_span_attribute(const char *trace_id, const char *span_id, const char *key,
+                               const char *value)
+{
     if (!trace_id || !span_id || !key || !value) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     agentos_mutex_lock(&g_tracing.global_lock);
 
-    trace_t* trace = NULL;
+    trace_t *trace = NULL;
     for (size_t i = 0; i < g_tracing.trace_count; i++) {
         if (strcmp(g_tracing.traces[i].trace_id, trace_id) == 0) {
             trace = &g_tracing.traces[i];
@@ -404,10 +408,10 @@ int tracing_add_span_attribute(const char* trace_id, const char* span_id,
 
     for (size_t i = 0; i < trace->span_count; i++) {
         if (strcmp(trace->spans[i].span_id, span_id) == 0) {
-            span_t* span = &trace->spans[i];
+            span_t *span = &trace->spans[i];
             if (span->attribute_count < MAX_SPAN_ATTRIBUTES) {
-                char* dup_key = AGENTOS_STRDUP(key);
-                char* dup_value = AGENTOS_STRDUP(value);
+                char *dup_key = AGENTOS_STRDUP(key);
+                char *dup_value = AGENTOS_STRDUP(value);
                 if (dup_key && dup_value) {
                     span->attributes[span->attribute_count].key = dup_key;
                     span->attributes[span->attribute_count].value = dup_value;
@@ -425,15 +429,15 @@ int tracing_add_span_attribute(const char* trace_id, const char* span_id,
     return AGENTOS_SUCCESS;
 }
 
-int tracing_add_span_event(const char* trace_id, const char* span_id,
-                           const char* event_name) {
+int tracing_add_span_event(const char *trace_id, const char *span_id, const char *event_name)
+{
     if (!trace_id || !span_id || !event_name) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     agentos_mutex_lock(&g_tracing.global_lock);
 
-    trace_t* trace = NULL;
+    trace_t *trace = NULL;
     for (size_t i = 0; i < g_tracing.trace_count; i++) {
         if (strcmp(g_tracing.traces[i].trace_id, trace_id) == 0) {
             trace = &g_tracing.traces[i];
@@ -451,9 +455,9 @@ int tracing_add_span_event(const char* trace_id, const char* span_id,
 
     for (size_t i = 0; i < trace->span_count; i++) {
         if (strcmp(trace->spans[i].span_id, span_id) == 0) {
-            span_t* span = &trace->spans[i];
+            span_t *span = &trace->spans[i];
             if (span->event_count < MAX_SPAN_EVENTS) {
-                char* dup_name = AGENTOS_STRDUP(event_name);
+                char *dup_name = AGENTOS_STRDUP(event_name);
                 if (dup_name) {
                     span->events[span->event_count].name = dup_name;
                     span->events[span->event_count].timestamp = (uint64_t)time(NULL) * 1000000;
@@ -469,12 +473,14 @@ int tracing_add_span_event(const char* trace_id, const char* span_id,
     return AGENTOS_SUCCESS;
 }
 
-char* tracing_export_json(const char* trace_id) {
-    if (!trace_id) return NULL;
+char *tracing_export_json(const char *trace_id)
+{
+    if (!trace_id)
+        return NULL;
 
     agentos_mutex_lock(&g_tracing.global_lock);
 
-    trace_t* trace = NULL;
+    trace_t *trace = NULL;
     for (size_t i = 0; i < g_tracing.trace_count; i++) {
         if (strcmp(g_tracing.traces[i].trace_id, trace_id) == 0) {
             trace = &g_tracing.traces[i];
@@ -490,7 +496,7 @@ char* tracing_export_json(const char* trace_id) {
     agentos_mutex_lock(&trace->lock);
     agentos_mutex_unlock(&g_tracing.global_lock);
 
-    char* buf = (char*)AGENTOS_MALLOC(MAX_TRACE_EXPORT_SIZE);
+    char *buf = (char *)AGENTOS_MALLOC(MAX_TRACE_EXPORT_SIZE);
     if (!buf) {
         agentos_mutex_unlock(&trace->lock);
         return NULL;
@@ -498,26 +504,23 @@ char* tracing_export_json(const char* trace_id) {
 
     size_t pos = 0;
     pos += snprintf(buf + pos, MAX_TRACE_EXPORT_SIZE - pos,
-                    "{\"traceId\":\"%s\",\"sampled\":%s,\"spans\":[",
-                    trace->trace_id, trace->sampled ? "true" : "false");
+                    "{\"traceId\":\"%s\",\"sampled\":%s,\"spans\":[", trace->trace_id,
+                    trace->sampled ? "true" : "false");
 
     for (size_t i = 0; i < trace->span_count; i++) {
-        span_t* span = &trace->spans[i];
-        if (i > 0) buf[pos++] = ',';
+        span_t *span = &trace->spans[i];
+        if (i > 0)
+            buf[pos++] = ',';
 
         pos += snprintf(buf + pos, MAX_TRACE_EXPORT_SIZE - pos,
-                       "{\"spanId\":\"%s\",\"operationName\":\"%s\","
-                       "\"parentId\":\"%s\",\"kind\":%d,"
-                       "\"startTime\":%llu,\"endTime\":%llu,"
-                       "\"statusCode\":%d,\"statusMessage\":\"%s\"}",
-                       span->span_id,
-                       span->operation_name ? span->operation_name : "",
-                       span->parent_span_id,
-                       span->kind,
-                       (unsigned long long)span->start_time,
-                       (unsigned long long)span->end_time,
-                       span->status_code,
-                       span->status_message ? span->status_message : "");
+                        "{\"spanId\":\"%s\",\"operationName\":\"%s\","
+                        "\"parentId\":\"%s\",\"kind\":%d,"
+                        "\"startTime\":%llu,\"endTime\":%llu,"
+                        "\"statusCode\":%d,\"statusMessage\":\"%s\"}",
+                        span->span_id, span->operation_name ? span->operation_name : "",
+                        span->parent_span_id, span->kind, (unsigned long long)span->start_time,
+                        (unsigned long long)span->end_time, span->status_code,
+                        span->status_message ? span->status_message : "");
     }
 
     pos += snprintf(buf + pos, MAX_TRACE_EXPORT_SIZE - pos, "]}");
@@ -526,18 +529,23 @@ char* tracing_export_json(const char* trace_id) {
     return buf;
 }
 
-size_t tracing_get_active_trace_count(void) {
-    if (!g_tracing.initialized) return 0;
+size_t tracing_get_active_trace_count(void)
+{
+    if (!g_tracing.initialized)
+        return 0;
     size_t count = 0;
     agentos_mutex_lock(&g_tracing.global_lock);
     for (size_t i = 0; i < g_tracing.trace_count; i++) {
-        if (!g_tracing.traces[i].finished) count++;
+        if (!g_tracing.traces[i].finished)
+            count++;
     }
     agentos_mutex_unlock(&g_tracing.global_lock);
     return count;
 }
 
-size_t tracing_get_finished_trace_count(void) {
-    if (!g_tracing.initialized) return 0;
+size_t tracing_get_finished_trace_count(void)
+{
+    if (!g_tracing.initialized)
+        return 0;
     return g_tracing.finished_count;
 }

@@ -50,7 +50,7 @@ typedef struct method_dispatcher method_dispatcher_t;
  * @param user_data 用户上下文数据（注册时传入）
  * @note 所有方法处理器必须符合此签名
  */
-typedef void (*method_fn)(cJSON* params, int id, void* user_data);
+typedef void (*method_fn)(cJSON *params, int id, void *user_data);
 
 /**
  * @创建方法分发器实例
@@ -59,7 +59,7 @@ typedef void (*method_fn)(cJSON* params, int id, void* user_data);
  *
  * 内部实现：分配哈希表和数组存储，O(1) 空间复杂度
  */
-method_dispatcher_t* method_dispatcher_create(size_t max_methods);
+method_dispatcher_t *method_dispatcher_create(size_t max_methods);
 
 /**
  * @brief 销毁分发器并释放所有资源
@@ -67,7 +67,7 @@ method_dispatcher_t* method_dispatcher_create(size_t max_methods);
  *
  * 注意：不会销毁注册时传入的 user_data
  */
-void method_dispatcher_destroy(method_dispatcher_t* disp);
+void method_dispatcher_destroy(method_dispatcher_t *disp);
 
 /**
  * @brief 注册方法处理器
@@ -79,7 +79,8 @@ void method_dispatcher_destroy(method_dispatcher_t* disp);
  *
  * 如果方法已存在，将覆盖旧处理器并返回警告日志
  */
-int method_dispatcher_register(method_dispatcher_t* disp, const char* method, method_fn handler, void* user_data);
+int method_dispatcher_register(method_dispatcher_t *disp, const char *method, method_fn handler,
+                               void *user_data);
 
 /**
  * @brief 分发 JSON-RPC 请求到对应的处理器
@@ -95,7 +96,8 @@ int method_dispatcher_register(method_dispatcher_t* disp, const char* method, me
  * 3. 调用处理器，传入 params, id, user_data
  * 4. 如果方法未找到，调用 error_response_fn 构建错误响应
  */
-int method_dispatcher_dispatch(method_dispatcher_t* disp, cJSON* request, char* (*error_response_fn)(int, const char*, int), void* user_data);
+int method_dispatcher_dispatch(method_dispatcher_t *disp, cJSON *request,
+                               char *(*error_response_fn)(int, const char *, int), void *user_data);
 
 #ifdef __cplusplus
 }

@@ -3,9 +3,10 @@
 
 #include "agentos.h"
 #include "delegate.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,39 +20,34 @@ typedef enum agentos_tool_safety_class {
 } agentos_tool_safety_class_t;
 
 typedef struct agentos_tool_call {
-    const char* tool_name;
-    const char* arguments;
+    const char *tool_name;
+    const char *arguments;
     size_t arguments_len;
     agentos_tool_safety_class_t safety_class;
-    const char* resource_path;
+    const char *resource_path;
 } agentos_tool_call_t;
 
 typedef struct agentos_tool_result {
-    char* tool_name;
+    char *tool_name;
     agentos_error_t error;
-    char* output;
+    char *output;
     size_t output_len;
     uint64_t elapsed_ns;
 } agentos_tool_result_t;
 
 typedef struct agentos_parallel_dispatcher agentos_parallel_dispatcher_t;
 
-AGENTOS_API agentos_parallel_dispatcher_t* agentos_parallel_dispatcher_create(int max_parallel);
-AGENTOS_API void agentos_parallel_dispatcher_destroy(agentos_parallel_dispatcher_t* dispatcher);
+AGENTOS_API agentos_parallel_dispatcher_t *agentos_parallel_dispatcher_create(int max_parallel);
+AGENTOS_API void agentos_parallel_dispatcher_destroy(agentos_parallel_dispatcher_t *dispatcher);
 AGENTOS_API agentos_error_t agentos_parallel_dispatcher_set_executor(
-    agentos_parallel_dispatcher_t* dispatcher,
-    agentos_tool_execute_fn executor,
-    void* user_data);
+    agentos_parallel_dispatcher_t *dispatcher, agentos_tool_execute_fn executor, void *user_data);
 AGENTOS_API agentos_error_t agentos_parallel_dispatcher_dispatch(
-    agentos_parallel_dispatcher_t* dispatcher,
-    const agentos_tool_call_t* calls,
-    size_t call_count,
-    agentos_tool_result_t** out_results,
-    size_t* out_result_count);
-AGENTOS_API agentos_error_t agentos_parallel_dispatcher_cancel(
-    agentos_parallel_dispatcher_t* dispatcher);
-AGENTOS_API bool agentos_parallel_dispatcher_is_cancelled(
-    const agentos_parallel_dispatcher_t* dispatcher);
+    agentos_parallel_dispatcher_t *dispatcher, const agentos_tool_call_t *calls, size_t call_count,
+    agentos_tool_result_t **out_results, size_t *out_result_count);
+AGENTOS_API agentos_error_t
+agentos_parallel_dispatcher_cancel(agentos_parallel_dispatcher_t *dispatcher);
+AGENTOS_API bool
+agentos_parallel_dispatcher_is_cancelled(const agentos_parallel_dispatcher_t *dispatcher);
 
 #ifdef __cplusplus
 }

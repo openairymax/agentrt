@@ -6,9 +6,10 @@
 
 #include "intent_classifier.h"
 
-#include "intent_utils.h"
 #include "atomic_compat.h"
+#include "intent_utils.h"
 #include "memory_compat.h"
+#include "error.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -49,7 +50,7 @@ int agentos_intent_classifier_init(void)
 {
     int expected = 0;
     atomic_compare_exchange_strong_explicit(&g_classifier_initialized, &expected, 1,
-                                 memory_order_seq_cst, memory_order_seq_cst);
+                                            memory_order_seq_cst, memory_order_seq_cst);
     return 0;
 }
 
@@ -173,7 +174,7 @@ int agentos_intent_classify(const char *input, size_t input_len,
                             agentos_intent_classification_t *result)
 {
     if (!input || !result || input_len == 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (!atomic_load_explicit(&g_classifier_initialized, memory_order_acquire)) {
@@ -182,7 +183,7 @@ int agentos_intent_classify(const char *input, size_t input_len,
 
     char *lower_input = (char *)AGENTOS_MALLOC(input_len + 1);
     if (!lower_input) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     memcpy(lower_input, input, input_len);

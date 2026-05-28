@@ -10,17 +10,19 @@
  * @date 2026-04-05
  */
 
-#include "sync_platform.h"
-#include <time.h>
 #include "sync_internal.h"
-#include <string.h>
+#include "sync_platform.h"
 
-sync_result_t sync_rwlock_create(sync_rwlock_t* rwlock, const sync_attr_t* attr) {
+#include <string.h>
+#include <time.h>
+
+sync_result_t sync_rwlock_create(sync_rwlock_t *rwlock, const sync_attr_t *attr)
+{
     if (rwlock == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_rwlock* r = (struct sync_rwlock*)AGENTOS_CALLOC(1, sizeof(struct sync_rwlock));
+    struct sync_rwlock *r = (struct sync_rwlock *)AGENTOS_CALLOC(1, sizeof(struct sync_rwlock));
     if (r == NULL) {
         return SYNC_ERROR_MEMORY;
     }
@@ -55,7 +57,8 @@ sync_result_t sync_rwlock_create(sync_rwlock_t* rwlock, const sync_attr_t* attr)
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_rwlock_free(sync_rwlock_t rwlock) {
+sync_result_t sync_rwlock_free(sync_rwlock_t rwlock)
+{
     if (rwlock == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -77,8 +80,8 @@ sync_result_t sync_rwlock_free(sync_rwlock_t rwlock) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_rwlock_read_lock_ex(sync_rwlock_t rwlock,
-                                   const sync_timeout_t* timeout) {
+sync_result_t sync_rwlock_read_lock_ex(sync_rwlock_t rwlock, const sync_timeout_t *timeout)
+{
     if (rwlock == NULL || !rwlock->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -131,7 +134,8 @@ sync_result_t sync_rwlock_read_lock_ex(sync_rwlock_t rwlock,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_rwlock_try_read_lock(sync_rwlock_t rwlock) {
+sync_result_t sync_rwlock_try_read_lock(sync_rwlock_t rwlock)
+{
     if (rwlock == NULL || !rwlock->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -156,8 +160,8 @@ sync_result_t sync_rwlock_try_read_lock(sync_rwlock_t rwlock) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_rwlock_write_lock_ex(sync_rwlock_t rwlock,
-                                    const sync_timeout_t* timeout) {
+sync_result_t sync_rwlock_write_lock_ex(sync_rwlock_t rwlock, const sync_timeout_t *timeout)
+{
     if (rwlock == NULL || !rwlock->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -209,7 +213,8 @@ sync_result_t sync_rwlock_write_lock_ex(sync_rwlock_t rwlock,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_rwlock_try_write_lock(sync_rwlock_t rwlock) {
+sync_result_t sync_rwlock_try_write_lock(sync_rwlock_t rwlock)
+{
     if (rwlock == NULL || !rwlock->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -233,7 +238,8 @@ sync_result_t sync_rwlock_try_write_lock(sync_rwlock_t rwlock) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_rwlock_unlock_ex(sync_rwlock_t rwlock) {
+sync_result_t sync_rwlock_unlock_ex(sync_rwlock_t rwlock)
+{
     if (rwlock == NULL || !rwlock->initialized) {
         return SYNC_ERROR_INVALID;
     }

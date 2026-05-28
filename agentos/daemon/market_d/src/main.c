@@ -15,28 +15,30 @@
  */
 
 #include "atomic_compat.h"
-#include "market_service.h"
-#include "platform.h"
 #include "error.h"
-#include "svc_logger.h"
 #include "jsonrpc_helpers.h"
+#include "logging.h"
+#include "market_service.h"
 #include "method_dispatcher.h"
 #include "param_validator.h"
+#include "platform.h"
+#include "svc_logger.h"
 #include "thread_pool.h"
+
+#include <cjson/cJSON.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <signal.h>
-#include <cjson/cJSON.h>
 
 /* ==================== 前向声明 ==================== */
 
-static void handle_register_agent(cJSON* params, int id, agentos_socket_t client_fd);
-static void handle_search_agents(cJSON* params, int id, agentos_socket_t client_fd);
-static void handle_install_agent(cJSON* params, int id, agentos_socket_t client_fd);
-static void handle_register_skill(cJSON* params, int id, agentos_socket_t client_fd);
-static void handle_search_skills(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_register_agent(cJSON *params, int id, agentos_socket_t client_fd);
+static void handle_search_agents(cJSON *params, int id, agentos_socket_t client_fd);
+static void handle_install_agent(cJSON *params, int id, agentos_socket_t client_fd);
+static void handle_register_skill(cJSON *params, int id, agentos_socket_t client_fd);
+static void handle_search_skills(cJSON *params, int id, agentos_socket_t client_fd);
 static void handle_health_check(int id, agentos_socket_t client_fd);
 static void signal_handler(int signum);
 
@@ -49,69 +51,70 @@ static void signal_handler(int signum);
 
 /* ==================== 全局状态 ==================== */
 
-static market_service_t* g_service = NULL;
+static market_service_t *g_service = NULL;
 static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
-static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
+static method_dispatcher_t *g_dispatcher = NULL; /* 方法分发器 */
 
 /* ==================== 错误码定义 ==================== */
 #define MARKET_ERR_INVALID_PARAM AGENTOS_ERR_INVALID_PARAM
 #define MARKET_ERR_OUT_OF_MEMORY AGENTOS_ERR_OUT_OF_MEMORY
-#define MARKET_ERR_NOT_FOUND     AGENTOS_ERR_NOT_FOUND
+#define MARKET_ERR_NOT_FOUND AGENTOS_ERR_NOT_FOUND
 #define MARKET_ERR_ALREADY_EXISTS (AGENTOS_ERR_DAEMON_BASE + 0x20)
-#define MARKET_ERR_INSTALL_FAIL   (AGENTOS_ERR_DAEMON_BASE + 0x21)
+#define MARKET_ERR_INSTALL_FAIL (AGENTOS_ERR_DAEMON_BASE + 0x21)
 
 /* ==================== JSON-RPC 错误码 ==================== */
-
-#define PARSE_ERROR     -32700
-#define INVALID_REQUEST -32600
-#define METHOD_NOT_FOUND -32601
-#define INVALID_PARAMS  -32602
-#define INTERNAL_ERROR  -32000
 
 
 /**
  * @brief 方法处理器包装函数
  */
 
-static void on_register_agent_method(cJSON* params, int id, void* user_data) {
-    handle_register_agent(params, id, *(agentos_socket_t*)user_data);
+static void on_register_agent_method(cJSON *params, int id, void *user_data)
+{
+    handle_register_agent(params, id, *(agentos_socket_t *)user_data);
 }
 
-static void on_search_agents_method(cJSON* params, int id, void* user_data) {
-    handle_search_agents(params, id, *(agentos_socket_t*)user_data);
+static void on_search_agents_method(cJSON *params, int id, void *user_data)
+{
+    handle_search_agents(params, id, *(agentos_socket_t *)user_data);
 }
 
-static void on_install_agent_method(cJSON* params, int id, void* user_data) {
-    handle_install_agent(params, id, *(agentos_socket_t*)user_data);
+static void on_install_agent_method(cJSON *params, int id, void *user_data)
+{
+    handle_install_agent(params, id, *(agentos_socket_t *)user_data);
 }
 
-static void on_register_skill_method(cJSON* params, int id, void* user_data) {
-    handle_register_skill(params, id, *(agentos_socket_t*)user_data);
+static void on_register_skill_method(cJSON *params, int id, void *user_data)
+{
+    handle_register_skill(params, id, *(agentos_socket_t *)user_data);
 }
 
-static void on_search_skills_method(cJSON* params, int id, void* user_data) {
-    handle_search_skills(params, id, *(agentos_socket_t*)user_data);
+static void on_search_skills_method(cJSON *params, int id, void *user_data)
+{
+    handle_search_skills(params, id, *(agentos_socket_t *)user_data);
 }
 
-static void on_health_check_method(cJSON* params, int id, void* user_data) {
-    handle_health_check(id, *(agentos_socket_t*)user_data);
+static void on_health_check_method(cJSON *params, int id, void *user_data)
+{
+    handle_health_check(id, *(agentos_socket_t *)user_data);
 }
 
-static int register_rpc_methods(void) {
+static int register_rpc_methods(void)
+{
     g_dispatcher = method_dispatcher_create(16);
     if (!g_dispatcher) {
         SVC_LOG_ERROR("Failed to create method dispatcher");
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    
+
     method_dispatcher_register(g_dispatcher, "register_agent", on_register_agent_method, NULL);
     method_dispatcher_register(g_dispatcher, "search_agents", on_search_agents_method, NULL);
     method_dispatcher_register(g_dispatcher, "install_agent", on_install_agent_method, NULL);
     method_dispatcher_register(g_dispatcher, "register_skill", on_register_skill_method, NULL);
     method_dispatcher_register(g_dispatcher, "search_skills", on_search_skills_method, NULL);
     method_dispatcher_register(g_dispatcher, "health_check", on_health_check_method, NULL);
-    
+
     SVC_LOG_INFO("Registered %d RPC methods", 6);
     return 0;
 }
@@ -119,73 +122,79 @@ static int register_rpc_methods(void) {
 /**
  * @brief 处理 register_agent 方法
  */
-static void handle_register_agent(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* agent_json = jsonrpc_get_object_param(params, "agent");
+static void handle_register_agent(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    cJSON *agent_json = jsonrpc_get_object_param(params, "agent");
     if (!agent_json) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing agent object", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS, "Missing agent object", id);
         return;
     }
 
     agent_info_t info = {0};
-    const char* aid = get_string_field(agent_json, "agent_id", NULL);
+    const char *aid = get_string_field(agent_json, "agent_id", NULL);
     if (!aid) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing agent_id", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS, "Missing agent_id", id);
         return;
     }
-    info.agent_id = (char*)aid;
+    info.agent_id = (char *)aid;
 
-    info.name = (char*)get_string_field(agent_json, "name", NULL);
-    info.version = (char*)get_string_field(agent_json, "version", NULL);
-    info.description = (char*)get_string_field(agent_json, "description", NULL);
-    info.author = (char*)get_string_field(agent_json, "author", NULL);
+    info.name = (char *)get_string_field(agent_json, "name", NULL);
+    info.version = (char *)get_string_field(agent_json, "version", NULL);
+    info.description = (char *)get_string_field(agent_json, "description", NULL);
+    info.author = (char *)get_string_field(agent_json, "author", NULL);
 
     int ret = market_service_register_agent(g_service, &info);
 
     if (ret != AGENTOS_SUCCESS) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Register failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Register failed", id);
         SVC_LOG_ERROR("Failed to register agent: %s (error=%d)", aid, ret);
     } else {
-        cJSON* result = cJSON_CreateObject();
+        cJSON *result = cJSON_CreateObject();
         cJSON_AddStringToObject(result, "status", "registered");
         cJSON_AddStringToObject(result, "agent_id", aid);
         JSONRPC_SEND_SUCCESS(client_fd, result, id);
-        SVC_LOG_INFO("Agent registered: %s v%s", aid,
-                    info.version ? info.version : "unknown");
+        SVC_LOG_INFO("Agent registered: %s v%s", aid, info.version ? info.version : "unknown");
     }
 }
 
 /**
  * @brief 处理 search_agents 方法
  */
-static void handle_search_agents(cJSON* params, int id, agentos_socket_t client_fd) {
-    const char* keyword = get_string_field(params, "keyword", "");
+static void handle_search_agents(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    const char *keyword = get_string_field(params, "keyword", "");
     size_t offset = (size_t)get_double_field(params, "offset", 0.0);
     size_t limit = (size_t)get_double_field(params, "limit", 20.0);
 
-    agent_info_t** agents = NULL;
+    agent_info_t **agents = NULL;
     size_t count = 0;
 
     search_params_t sp;
     memset(&sp, 0, sizeof(sp));
-    sp.query = (char*)keyword;
+    sp.query = (char *)keyword;
     sp.limit = limit;
     sp.offset = offset;
 
     int ret = market_service_search_agents(g_service, &sp, &agents, &count);
 
     if (ret != AGENTOS_SUCCESS) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Search failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Search failed", id);
         return;
     }
 
-    cJSON* arr = cJSON_CreateArray();
+    cJSON *arr = cJSON_CreateArray();
     for (size_t i = 0; i < count && agents && agents[i]; i++) {
-        cJSON* a = cJSON_CreateObject();
-        if (agents[i]->agent_id) cJSON_AddStringToObject(a, "agent_id", agents[i]->agent_id);
-        if (agents[i]->name) cJSON_AddStringToObject(a, "name", agents[i]->name);
-        if (agents[i]->version) cJSON_AddStringToObject(a, "version", agents[i]->version);
-        if (agents[i]->description) cJSON_AddStringToObject(a, "description", agents[i]->description);
-        if (agents[i]->author) cJSON_AddStringToObject(a, "author", agents[i]->author);
+        cJSON *a = cJSON_CreateObject();
+        if (agents[i]->agent_id)
+            cJSON_AddStringToObject(a, "agent_id", agents[i]->agent_id);
+        if (agents[i]->name)
+            cJSON_AddStringToObject(a, "name", agents[i]->name);
+        if (agents[i]->version)
+            cJSON_AddStringToObject(a, "version", agents[i]->version);
+        if (agents[i]->description)
+            cJSON_AddStringToObject(a, "description", agents[i]->description);
+        if (agents[i]->author)
+            cJSON_AddStringToObject(a, "author", agents[i]->author);
         cJSON_AddBoolToObject(a, "installed", agents[i]->status == AGENT_STATUS_AVAILABLE);
         cJSON_AddItemToArray(arr, a);
     }
@@ -197,22 +206,24 @@ static void handle_search_agents(cJSON* params, int id, agentos_socket_t client_
 /**
  * @brief 处理 install_agent 方法
  */
-static void handle_install_agent(cJSON* params, int id, agentos_socket_t client_fd) {
-    const char* aid = get_string_field(params, "agent_id", NULL);
+static void handle_install_agent(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    const char *aid = get_string_field(params, "agent_id", NULL);
     if (!aid) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing agent_id", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS, "Missing agent_id", id);
         return;
     }
 
-    const char* version = get_string_field(params, "version", "latest");
+    const char *version = get_string_field(params, "version", "latest");
 
-    int ret = market_service_install_agent(g_service, (const install_request_t*)aid, (install_result_t**)version);
+    int ret = market_service_install_agent(g_service, (const install_request_t *)aid,
+                                           (install_result_t **)version);
 
     if (ret != AGENTOS_SUCCESS) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Install failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Install failed", id);
         SVC_LOG_ERROR("Failed to install agent: %s@%s (error=%d)", aid, version, ret);
     } else {
-        cJSON* result = cJSON_CreateObject();
+        cJSON *result = cJSON_CreateObject();
         cJSON_AddStringToObject(result, "status", "installed");
         cJSON_AddStringToObject(result, "agent_id", aid);
         cJSON_AddStringToObject(result, "installed_version", version);
@@ -224,31 +235,32 @@ static void handle_install_agent(cJSON* params, int id, agentos_socket_t client_
 /**
  * @brief 处理 register_skill 方法
  */
-static void handle_register_skill(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* skill_json = jsonrpc_get_object_param(params, "skill");
+static void handle_register_skill(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    cJSON *skill_json = jsonrpc_get_object_param(params, "skill");
     if (!skill_json) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing skill object", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS, "Missing skill object", id);
         return;
     }
 
     skill_info_t info = {0};
-    const char* sid = get_string_field(skill_json, "skill_id", NULL);
+    const char *sid = get_string_field(skill_json, "skill_id", NULL);
     if (!sid) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing skill_id", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS, "Missing skill_id", id);
         return;
     }
-    info.skill_id = (char*)sid;
+    info.skill_id = (char *)sid;
 
-    info.name = (char*)get_string_field(skill_json, "name", NULL);
-    info.version = (char*)get_string_field(skill_json, "version", NULL);
+    info.name = (char *)get_string_field(skill_json, "name", NULL);
+    info.version = (char *)get_string_field(skill_json, "version", NULL);
 
     int ret = market_service_register_skill(g_service, &info);
 
     if (ret != AGENTOS_SUCCESS) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Register failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Register failed", id);
         SVC_LOG_ERROR("Failed to register skill: %s (error=%d)", sid, ret);
     } else {
-        cJSON* result = cJSON_CreateObject();
+        cJSON *result = cJSON_CreateObject();
         cJSON_AddStringToObject(result, "status", "registered");
         cJSON_AddStringToObject(result, "skill_id", sid);
         JSONRPC_SEND_SUCCESS(client_fd, result, id);
@@ -259,32 +271,37 @@ static void handle_register_skill(cJSON* params, int id, agentos_socket_t client
 /**
  * @brief 处理 search_skills 方法
  */
-static void handle_search_skills(cJSON* params, int id, agentos_socket_t client_fd) {
-    const char* keyword = get_string_field(params, "keyword", "");
+static void handle_search_skills(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    const char *keyword = get_string_field(params, "keyword", "");
 
-    skill_info_t** skills = NULL;
+    skill_info_t **skills = NULL;
     size_t count = 0;
 
     search_params_t sp;
     memset(&sp, 0, sizeof(sp));
-    sp.query = (char*)keyword;
+    sp.query = (char *)keyword;
     sp.limit = 20;
     sp.offset = 0;
 
     int ret = market_service_search_skills(g_service, &sp, &skills, &count);
 
     if (ret != AGENTOS_SUCCESS) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Search failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Search failed", id);
         return;
     }
 
-    cJSON* arr = cJSON_CreateArray();
+    cJSON *arr = cJSON_CreateArray();
     for (size_t i = 0; i < count && skills && skills[i]; i++) {
-        cJSON* s = cJSON_CreateObject();
-        if (skills[i]->skill_id) cJSON_AddStringToObject(s, "skill_id", skills[i]->skill_id);
-        if (skills[i]->name) cJSON_AddStringToObject(s, "name", skills[i]->name);
-        if (skills[i]->version) cJSON_AddStringToObject(s, "version", skills[i]->version);
-        if (skills[i]->description) cJSON_AddStringToObject(s, "description", skills[i]->description);
+        cJSON *s = cJSON_CreateObject();
+        if (skills[i]->skill_id)
+            cJSON_AddStringToObject(s, "skill_id", skills[i]->skill_id);
+        if (skills[i]->name)
+            cJSON_AddStringToObject(s, "name", skills[i]->name);
+        if (skills[i]->version)
+            cJSON_AddStringToObject(s, "version", skills[i]->version);
+        if (skills[i]->description)
+            cJSON_AddStringToObject(s, "description", skills[i]->description);
         cJSON_AddItemToArray(arr, s);
     }
     AGENTOS_FREE(skills);
@@ -295,8 +312,9 @@ static void handle_search_skills(cJSON* params, int id, agentos_socket_t client_
 /**
  * @brief 处理 health_check 方法
  */
-static void handle_health_check(int id, agentos_socket_t client_fd) {
-    cJSON* result = cJSON_CreateObject();
+static void handle_health_check(int id, agentos_socket_t client_fd)
+{
+    cJSON *result = cJSON_CreateObject();
     cJSON_AddStringToObject(result, "service", "market_d");
     cJSON_AddBoolToObject(result, "healthy", true);
     cJSON_AddNumberToObject(result, "timestamp", (double)(uint64_t)time(NULL) * 1000);
@@ -308,38 +326,43 @@ static void handle_health_check(int id, agentos_socket_t client_fd) {
 
 static void handle_client(agentos_socket_t client_fd);
 
-static void handle_client_wrapper(void* arg) {
+static void handle_client_wrapper(void *arg)
+{
     handle_client((agentos_socket_t)(uintptr_t)arg);
 }
 
-static void handle_client(agentos_socket_t client_fd) {
+static void handle_client(agentos_socket_t client_fd)
+{
     char buffer[MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
 
-    if (n <= 0) { agentos_socket_close(client_fd); return; }
+    if (n <= 0) {
+        agentos_socket_close(client_fd);
+        return;
+    }
     buffer[n] = '\0';
 
     if ((size_t)n >= sizeof(buffer) - 1) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_REQUEST, "Request too large", -1);
         agentos_socket_close(client_fd);
         return;
     }
 
-    cJSON* req = cJSON_Parse(buffer);
+    cJSON *req = cJSON_Parse(buffer);
     if (!req) {
-        JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error: invalid JSON", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_PARSE_ERROR, "Parse error: invalid JSON", -1);
         agentos_socket_close(client_fd);
         return;
     }
 
-    cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
-    cJSON* method = cJSON_GetObjectItem(req, "method");
+    cJSON *jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
+    cJSON *method = cJSON_GetObjectItem(req, "method");
     (void)cJSON_GetObjectItem(req, "params");
-    cJSON* id = cJSON_GetObjectItem(req, "id");
+    cJSON *id = cJSON_GetObjectItem(req, "id");
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
         !cJSON_IsString(method) || !id) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_REQUEST, "Invalid Request", -1);
         cJSON_Delete(req);
         agentos_socket_close(client_fd);
         return;
@@ -357,28 +380,43 @@ static void handle_client(agentos_socket_t client_fd) {
 
 /* ==================== 帮助信息 ==================== */
 
-static void signal_handler(int signum __attribute__((unused))) {
+static void signal_handler(int signum __attribute__((unused)))
+{
     atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     SVC_LOG_INFO("Received shutdown signal");
 }
 
-static void print_usage(const char* prog) {
-    printf("AgentOS Market Daemon\n");
-    printf("Usage: %s [options]\n\n", prog);
-    printf("Options:\n");
-    printf("  --manager <path>   Configuration file path\n");
-    printf("  --tcp             Use TCP instead of Unix socket\n");
-    printf("  --help             Show this help\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s --manager AGENTOS_CONFIG_DIR \"/market.yaml\"\n", prog);
-    printf("  %s --tcp           # Use TCP mode on port 8082\n", prog);
+static void svc_log_toggle_handler(int sig)
+{
+    (void)sig;
+    static int debug_mode = 0;
+    debug_mode = !debug_mode;
+    log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_INFO);
+}
+
+static void print_usage(const char *prog)
+{
+    char buf[256];
+    fputs("AgentOS Market Daemon\n", stdout);
+    snprintf(buf, sizeof(buf), "Usage: %s [options]\n\n", prog);
+    fputs(buf, stdout);
+    fputs("Options:\n", stdout);
+    fputs("  --manager <path>   Configuration file path\n", stdout);
+    fputs("  --tcp             Use TCP instead of Unix socket\n", stdout);
+    fputs("  --help             Show this help\n", stdout);
+    fputs("\n", stdout);
+    fputs("Examples:\n", stdout);
+    snprintf(buf, sizeof(buf), "  %s --manager AGENTOS_CONFIG_DIR \"/market.yaml\"\n", prog);
+    fputs(buf, stdout);
+    snprintf(buf, sizeof(buf), "  %s --tcp           # Use TCP mode on port 8082\n", prog);
+    fputs(buf, stdout);
 }
 
 /* ==================== 主函数 ==================== */
 
-int main(int argc, char** argv) {
-    const char* config_path = "agentos/manager/service/market_d/market.yaml";
+int main(int argc, char **argv)
+{
+    const char *config_path = "agentos/manager/service/market_d/market.yaml";
     int use_tcp = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -390,7 +428,7 @@ int main(int argc, char** argv) {
         } else if (strcmp(argv[i], "--tcp") == 0) {
             use_tcp = 1;
         } else {
-            fprintf(stderr, "Unknown option: %s\n", argv[i]);
+            SVC_LOG_ERROR("Unknown option: %s", argv[i]);
             print_usage(argv[0]);
             return 1;
         }
@@ -406,19 +444,21 @@ int main(int argc, char** argv) {
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGUSR1, svc_log_toggle_handler);
 #endif
+
+    agentos_log_init(NULL);
+    atexit(log_cleanup);
 
     SVC_LOG_INFO("Market service starting, manager=%s", config_path);
 
     /* 创建配置 */
-    market_config_t config = {
-        .registry_url = NULL,
-        .storage_path = "market.log",
-        .sync_interval_ms = 30000,
-        .cache_ttl_ms = 3600000,
-        .enable_remote_registry = false,
-        .enable_auto_update = false
-    };
+    market_config_t config = {.registry_url = NULL,
+                              .storage_path = "market.log",
+                              .sync_interval_ms = 30000,
+                              .cache_ttl_ms = 3600000,
+                              .enable_remote_registry = false,
+                              .enable_auto_update = false};
 
     /* 创建市场服务 */
     int ret = market_service_create(&config, &g_service);
@@ -428,7 +468,7 @@ int main(int argc, char** argv) {
         agentos_socket_cleanup();
         return 1;
     }
-    
+
     /* 注册 RPC 方法 */
     if (register_rpc_methods() != 0) {
         SVC_LOG_ERROR("Failed to register RPC methods");
@@ -437,7 +477,7 @@ int main(int argc, char** argv) {
         agentos_socket_cleanup();
         return 1;
     }
-    
+
     SVC_LOG_INFO("Market service created successfully");
 
     /* 创建服务器 Socket */
@@ -476,7 +516,7 @@ int main(int argc, char** argv) {
     tp_config.max_threads = 8;
     tp_config.queue_size = 256;
     tp_config.idle_timeout_ms = 30000;
-    thread_pool_t* pool = thread_pool_create(&tp_config);
+    thread_pool_t *pool = thread_pool_create(&tp_config);
     if (!pool) {
         SVC_LOG_ERROR("Failed to create thread pool");
         agentos_socket_close(server_fd);
@@ -489,10 +529,11 @@ int main(int argc, char** argv) {
     /* 主事件循环 */
     while (atomic_load_explicit(&g_running, memory_order_acquire)) {
         agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
-        if (client_fd == AGENTOS_INVALID_SOCKET) continue;
+        if (client_fd == AGENTOS_INVALID_SOCKET)
+            continue;
 
         /* 并发处理客户端请求 */
-        thread_pool_submit(pool, handle_client_wrapper, (void*)(uintptr_t)client_fd);
+        thread_pool_submit(pool, handle_client_wrapper, (void *)(uintptr_t)client_fd);
     }
 
     /* 清理资源 */
@@ -500,10 +541,12 @@ int main(int argc, char** argv) {
     thread_pool_destroy(pool);
     agentos_socket_close(server_fd);
     market_service_destroy(g_service);
-    if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
+    if (g_dispatcher)
+        method_dispatcher_destroy(g_dispatcher);
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();
 
     SVC_LOG_INFO("Market service stopped");
+    log_cleanup();
     return 0;
 }

@@ -2,9 +2,10 @@
 #define AGENTOS_GATEWAY_PROTOCOL_ROUTER_H
 
 #include "unified_protocol.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,46 +43,33 @@ typedef struct {
     uint64_t route_errors;
 } gw_proto_router_stats_t;
 
-typedef int (*gw_proto_request_handler_t)(
-    const char* method,
-    const char* path,
-    const char* body_json,
-    char** response_json,
-    void* user_data);
+typedef int (*gw_proto_request_handler_t)(const char *method, const char *path,
+                                          const char *body_json, char **response_json,
+                                          void *user_data);
 
-gw_proto_router_t* gw_proto_router_create(void);
-void gw_proto_router_destroy(gw_proto_router_t* router);
+gw_proto_router_t *gw_proto_router_create(void);
+void gw_proto_router_destroy(gw_proto_router_t *router);
 
-int gw_proto_router_init(gw_proto_router_t* router);
-int gw_proto_router_shutdown(gw_proto_router_t* router);
+int gw_proto_router_init(gw_proto_router_t *router);
+int gw_proto_router_shutdown(gw_proto_router_t *router);
 
-gw_proto_detect_result_t gw_proto_detect(const char* content_type,
-                                          const char* path,
-                                          const char* body);
+gw_proto_detect_result_t gw_proto_detect(const char *content_type, const char *path,
+                                         const char *body);
 
-int gw_proto_router_register(gw_proto_router_t* router,
-                              gw_proto_detect_result_t proto_type,
-                              gw_proto_request_handler_t handler,
-                              void* user_data);
+int gw_proto_router_register(gw_proto_router_t *router, gw_proto_detect_result_t proto_type,
+                             gw_proto_request_handler_t handler, void *user_data);
 
-int gw_proto_router_route(gw_proto_router_t* router,
-                           gw_proto_detect_result_t proto_type,
-                           const char* method,
-                           const char* path,
-                           const char* body_json,
-                           char** response_json);
+int gw_proto_router_route(gw_proto_router_t *router, gw_proto_detect_result_t proto_type,
+                          const char *method, const char *path, const char *body_json,
+                          char **response_json);
 
-int gw_proto_router_route_auto(gw_proto_router_t* router,
-                                const char* content_type,
-                                const char* method,
-                                const char* path,
-                                const char* body_json,
-                                char** response_json);
+int gw_proto_router_route_auto(gw_proto_router_t *router, const char *content_type,
+                               const char *method, const char *path, const char *body_json,
+                               char **response_json);
 
-int gw_proto_router_get_stats(gw_proto_router_t* router,
-                               gw_proto_router_stats_t* stats);
+int gw_proto_router_get_stats(gw_proto_router_t *router, gw_proto_router_stats_t *stats);
 
-bool gw_proto_router_is_healthy(gw_proto_router_t* router);
+bool gw_proto_router_is_healthy(gw_proto_router_t *router);
 
 #ifdef __cplusplus
 }

@@ -10,8 +10,8 @@
 #ifndef AGENTOS_OBSERVABILITY_H
 #define AGENTOS_OBSERVABILITY_H
 
-#include "export.h"
 #include "error.h"
+#include "export.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,10 +23,10 @@ extern "C" {
 #ifndef AGENTOS_METRIC_TYPE_T_DEFINED
 #define AGENTOS_METRIC_TYPE_T_DEFINED
 typedef enum {
-    AGENTOS_METRIC_COUNTER_E   = 0,    /**< 计数器，单调递增 */
-    AGENTOS_METRIC_GAUGE_E     = 1,    /**< 仪表，可增可减 */
-    AGENTOS_METRIC_HISTOGRAM_E = 2,    /**< 直方图，统计分布 */
-    AGENTOS_METRIC_SUMMARY_E   = 3     /**< 摘要，分位数统计 */
+    AGENTOS_METRIC_COUNTER_E = 0,   /**< 计数器，单调递增 */
+    AGENTOS_METRIC_GAUGE_E = 1,     /**< 仪表，可增可减 */
+    AGENTOS_METRIC_HISTOGRAM_E = 2, /**< 直方图，统计分布 */
+    AGENTOS_METRIC_SUMMARY_E = 3    /**< 摘要，分位数统计 */
 } agentos_metric_type_t;
 #endif
 
@@ -34,9 +34,9 @@ typedef enum {
  * @brief 健康检查状态
  */
 typedef enum {
-    AGENTOS_HEALTH_PASS,         /**< 健康检查通过 */
-    AGENTOS_HEALTH_WARN,         /**< 健康检查警告，可继续运行 */
-    AGENTOS_HEALTH_FAIL,         /**< 健康检查失败，需要干预 */
+    AGENTOS_HEALTH_PASS, /**< 健康检查通过 */
+    AGENTOS_HEALTH_WARN, /**< 健康检查警告，可继续运行 */
+    AGENTOS_HEALTH_FAIL, /**< 健康检查失败，需要干预 */
 } agentos_health_status_t;
 
 /**
@@ -44,14 +44,14 @@ typedef enum {
  * @note 用于分布式追踪，支持OpenTelemetry标准
  */
 typedef struct agentos_trace_context {
-    char trace_id[32];           /**< 追踪ID，16字节十六进制 */
-    char span_id[16];            /**< 跨度ID，8字节十六进制 */
-    char parent_span_id[16];     /**< 父跨度ID，8字节十六进制 */
-    uint64_t start_ns;           /**< 开始时间（纳秒） */
-    uint64_t end_ns;             /**< 结束时间（纳秒） */
-    char service_name[64];       /**< 服务名称 */
-    char operation_name[128];    /**< 操作名称 */
-    int error_code;              /**< 错误码 */
+    char trace_id[32];        /**< 追踪ID，16字节十六进制 */
+    char span_id[16];         /**< 跨度ID，8字节十六进制 */
+    char parent_span_id[16];  /**< 父跨度ID，8字节十六进制 */
+    uint64_t start_ns;        /**< 开始时间（纳秒） */
+    uint64_t end_ns;          /**< 结束时间（纳秒） */
+    char service_name[64];    /**< 服务名称 */
+    char operation_name[128]; /**< 操作名称 */
+    int error_code;           /**< 错误码 */
 } agentos_trace_context_t;
 
 /**
@@ -59,30 +59,30 @@ typedef struct agentos_trace_context {
  * @param user_data 用户数据
  * @return 健康检查状态
  */
-typedef agentos_health_status_t (*agentos_health_check_cb)(void* user_data);
+typedef agentos_health_status_t (*agentos_health_check_cb)(void *user_data);
 
 /**
  * @brief 指标样本结构
  */
 typedef struct {
-    char name[128];              /**< 指标名称 */
-    double value;                /**< 指标值 */
-    agentos_metric_type_t type;  /**< 指标类型 */
-    uint64_t timestamp_ns;       /**< 时间戳（纳秒） */
-    char labels[256];            /**< 标签，JSON格式 */
+    char name[128];             /**< 指标名称 */
+    double value;               /**< 指标值 */
+    agentos_metric_type_t type; /**< 指标类型 */
+    uint64_t timestamp_ns;      /**< 时间戳（纳秒） */
+    char labels[256];           /**< 标签，JSON格式 */
 } agentos_metric_sample_t;
 
 /**
  * @brief 可观测性配置结构
  */
 typedef struct {
-    int enable_metrics;          /**< 是否启用指标收集 */
-    int enable_tracing;          /**< 是否启用分布式追踪 */
-    int enable_health_check;     /**< 是否启用健康检查 */
-    int metrics_interval_ms;     /**< 指标收集间隔（毫秒） */
-    int health_check_interval_ms;/**< 健康检查间隔（毫秒） */
-    char metrics_endpoint[256];  /**< 指标上报端点 */
-    char tracing_endpoint[256];  /**< 追踪上报端点 */
+    int enable_metrics;           /**< 是否启用指标收集 */
+    int enable_tracing;           /**< 是否启用分布式追踪 */
+    int enable_health_check;      /**< 是否启用健康检查 */
+    int metrics_interval_ms;      /**< 指标收集间隔（毫秒） */
+    int health_check_interval_ms; /**< 健康检查间隔（毫秒） */
+    char metrics_endpoint[256];   /**< 指标上报端点 */
+    char tracing_endpoint[256];   /**< 追踪上报端点 */
 } agentos_observability_config_t;
 
 /**
@@ -91,7 +91,7 @@ typedef struct {
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  * @note 线程安全，可重复调用
  */
-AGENTOS_API int agentos_observability_init(const agentos_observability_config_t* manager);
+AGENTOS_API int agentos_observability_init(const agentos_observability_config_t *manager);
 
 /**
  * @brief 关闭可观测性子系统
@@ -106,9 +106,8 @@ AGENTOS_API void agentos_observability_shutdown(void);
  * @param user_data 用户数据
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_health_check_register(const char* name,
-                                             agentos_health_check_cb callback,
-                                             void* user_data);
+AGENTOS_API int agentos_health_check_register(const char *name, agentos_health_check_cb callback,
+                                              void *user_data);
 
 /**
  * @brief 执行健康检查
@@ -122,7 +121,7 @@ AGENTOS_API agentos_health_status_t agentos_health_check_run(int timeout_ms);
  * @param sample 指标样本
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_metric_record(const agentos_metric_sample_t* sample);
+AGENTOS_API int agentos_metric_record(const agentos_metric_sample_t *sample);
 
 /**
  * @brief 创建计数器指标
@@ -130,7 +129,7 @@ AGENTOS_API int agentos_metric_record(const agentos_metric_sample_t* sample);
  * @param labels 标签（JSON格式）
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_metric_counter_create(const char* name, const char* labels);
+AGENTOS_API int agentos_metric_counter_create(const char *name, const char *labels);
 
 /**
  * @brief 计数器指标递增
@@ -139,7 +138,7 @@ AGENTOS_API int agentos_metric_counter_create(const char* name, const char* labe
  * @param value 递增值
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_metric_counter_inc(const char* name, const char* labels, double value);
+AGENTOS_API int agentos_metric_counter_inc(const char *name, const char *labels, double value);
 
 /**
  * @brief 创建仪表指标
@@ -148,7 +147,8 @@ AGENTOS_API int agentos_metric_counter_inc(const char* name, const char* labels,
  * @param initial_value 初始值
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_metric_gauge_create(const char* name, const char* labels, double initial_value);
+AGENTOS_API int agentos_metric_gauge_create(const char *name, const char *labels,
+                                            double initial_value);
 
 /**
  * @brief 仪表指标设置值
@@ -157,7 +157,7 @@ AGENTOS_API int agentos_metric_gauge_create(const char* name, const char* labels
  * @param value 新值
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_metric_gauge_set(const char* name, const char* labels, double value);
+AGENTOS_API int agentos_metric_gauge_set(const char *name, const char *labels, double value);
 
 /**
  * @brief 开始追踪跨度
@@ -166,9 +166,8 @@ AGENTOS_API int agentos_metric_gauge_set(const char* name, const char* labels, d
  * @param operation_name 操作名称
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_trace_span_start(agentos_trace_context_t* context,
-                                        const char* service_name,
-                                        const char* operation_name);
+AGENTOS_API int agentos_trace_span_start(agentos_trace_context_t *context, const char *service_name,
+                                         const char *operation_name);
 
 /**
  * @brief 结束追踪跨度
@@ -176,7 +175,7 @@ AGENTOS_API int agentos_trace_span_start(agentos_trace_context_t* context,
  * @param error_code 错误码（0表示成功）
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_trace_span_end(agentos_trace_context_t* context, int error_code);
+AGENTOS_API int agentos_trace_span_end(agentos_trace_context_t *context, int error_code);
 
 /**
  * @brief 设置追踪标签
@@ -185,8 +184,8 @@ AGENTOS_API int agentos_trace_span_end(agentos_trace_context_t* context, int err
  * @param value 标签值
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_trace_set_tag(agentos_trace_context_t* context,
-                                     const char* key, const char* value);
+AGENTOS_API int agentos_trace_set_tag(agentos_trace_context_t *context, const char *key,
+                                      const char *value);
 
 /**
  * @brief 记录追踪日志
@@ -194,8 +193,7 @@ AGENTOS_API int agentos_trace_set_tag(agentos_trace_context_t* context,
  * @param message 日志消息
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_trace_log(agentos_trace_context_t* context,
-                                 const char* message);
+AGENTOS_API int agentos_trace_log(agentos_trace_context_t *context, const char *message);
 
 /**
  * @brief 获取系统性能指标
@@ -204,9 +202,8 @@ AGENTOS_API int agentos_trace_log(agentos_trace_context_t* context,
  * @param out_thread_count 输出线程数量
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_performance_get_metrics(double* out_cpu_usage,
-                                               double* out_memory_usage,
-                                               int* out_thread_count);
+AGENTOS_API int agentos_performance_get_metrics(double *out_cpu_usage, double *out_memory_usage,
+                                                int *out_thread_count);
 
 /**
  * @brief 导出所有指标为Prometheus格式
@@ -214,7 +211,7 @@ AGENTOS_API int agentos_performance_get_metrics(double* out_cpu_usage,
  * @param buffer_size 缓冲区大小
  * @return 成功返回写入的字节数，失败返回负数
  */
-AGENTOS_API int agentos_observability_export_prometheus(char* buffer, size_t buffer_size);
+AGENTOS_API int agentos_observability_export_prometheus(char *buffer, size_t buffer_size);
 
 /**
  * @brief 导出健康检查状态
@@ -222,7 +219,7 @@ AGENTOS_API int agentos_observability_export_prometheus(char* buffer, size_t buf
  * @param buffer_size 缓冲区大小
  * @return 成功返回写入的字节数，失败返回负数
  */
-AGENTOS_API int agentos_health_export_status(char* buffer, size_t buffer_size);
+AGENTOS_API int agentos_health_export_status(char *buffer, size_t buffer_size);
 
 #ifdef __cplusplus
 }

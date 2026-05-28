@@ -26,9 +26,9 @@ extern "C" {
  * 此结构为内部使用，不应直接暴露给API用户。
  */
 typedef struct agentos_coordination_context {
-    uint32_t context_flags;           /**< 上下文标志位 */
-    void* context_user_data;          /**< 用户自定义数据 */
-    size_t context_timeout_ms;        /**< 超时时间（毫秒） */
+    uint32_t context_flags;    /**< 上下文标志位 */
+    void *context_user_data;   /**< 用户自定义数据 */
+    size_t context_timeout_ms; /**< 超时时间（毫秒） */
 } agentos_coordination_context_t;
 
 /**
@@ -39,9 +39,9 @@ typedef struct agentos_coordination_context {
  * 此结构为内部使用，对外隐藏实现细节。
  */
 typedef struct agentos_coordinator_base {
-    void* data;                       /**< 私有数据指针（指向具体实现的私有数据） */
-    struct agentos_llm_service* llm;  /**< LLM服务客户端 */
-    
+    void *data; /**< 私有数据指针（指向具体实现的私有数据） */
+    struct agentos_llm_service *llm; /**< LLM服务客户端 */
+
     /**
      * @brief 协调执行函数
      * @param base 基础结构指针
@@ -51,19 +51,15 @@ typedef struct agentos_coordinator_base {
      * @param out_result 输出协调结果（调用者负责释放）
      * @return 错误码
      */
-    agentos_error_t (*coordinate)(
-        struct agentos_coordinator_base* base,
-        const agentos_coordination_context_t* context,
-        const char** inputs,
-        size_t input_count,
-        char** out_result
-    );
-    
+    agentos_error_t (*coordinate)(struct agentos_coordinator_base *base,
+                                  const agentos_coordination_context_t *context,
+                                  const char **inputs, size_t input_count, char **out_result);
+
     /**
      * @brief 销毁函数
      * @param base 基础结构指针
      */
-    void (*destroy)(struct agentos_coordinator_base* base);
+    void (*destroy)(struct agentos_coordinator_base *base);
 } agentos_coordinator_base_t;
 
 /* ==================== 公共API：协同策略工厂函数 ==================== */
@@ -76,11 +72,10 @@ typedef struct agentos_coordinator_base {
  * @param llm LLM服务客户端句柄
  * @return 策略对象，失败返回NULL
  */
-agentos_coordinator_strategy_t* agentos_dual_model_coordinator_create(
-    const char* primary_model,
-    const char* secondary1,
-    const char* secondary2,
-    agentos_llm_service_t* llm);
+agentos_coordinator_strategy_t *agentos_dual_model_coordinator_create(const char *primary_model,
+                                                                      const char *secondary1,
+                                                                      const char *secondary2,
+                                                                      agentos_llm_service_t *llm);
 
 /**
  * @brief 创建多数投票协同策略
@@ -89,10 +84,9 @@ agentos_coordinator_strategy_t* agentos_dual_model_coordinator_create(
  * @param llm LLM服务客户端
  * @return 策略对象
  */
-agentos_coordinator_strategy_t* agentos_majority_coordinator_create(
-    const char** model_names,
-    size_t model_count,
-    agentos_llm_service_t* llm);
+agentos_coordinator_strategy_t *agentos_majority_coordinator_create(const char **model_names,
+                                                                    size_t model_count,
+                                                                    agentos_llm_service_t *llm);
 
 /**
  * @brief 创建加权融合策略
@@ -102,11 +96,10 @@ agentos_coordinator_strategy_t* agentos_majority_coordinator_create(
  * @param llm LLM服务客户端
  * @return 策略对象
  */
-agentos_coordinator_strategy_t* agentos_weighted_coordinator_create(
-    const char** model_names,
-    const float* weights,
-    size_t model_count,
-    agentos_llm_service_t* llm);
+agentos_coordinator_strategy_t *agentos_weighted_coordinator_create(const char **model_names,
+                                                                    const float *weights,
+                                                                    size_t model_count,
+                                                                    agentos_llm_service_t *llm);
 
 /**
  * @brief 创建外部仲裁策略（模型仲裁）
@@ -114,17 +107,16 @@ agentos_coordinator_strategy_t* agentos_weighted_coordinator_create(
  * @param llm LLM服务客户端
  * @return 策略对象
  */
-agentos_coordinator_strategy_t* agentos_arbiter_model_create(
-    const char* arbiter_model,
-    agentos_llm_service_t* llm);
+agentos_coordinator_strategy_t *agentos_arbiter_model_create(const char *arbiter_model,
+                                                             agentos_llm_service_t *llm);
 
 /**
  * @brief 创建外部仲裁策略（人工仲裁）
  * @param callback 人工回调函数，接收问题并填充答案
  * @return 策略对象
  */
-agentos_coordinator_strategy_t* agentos_arbiter_human_create(
-    void (*callback)(const char* question, char* answer, size_t max_len));
+agentos_coordinator_strategy_t *
+agentos_arbiter_human_create(void (*callback)(const char *question, char *answer, size_t max_len));
 
 /* ==================== 内部API：协调器创建函数 ==================== */
 
@@ -135,10 +127,11 @@ agentos_coordinator_strategy_t* agentos_arbiter_human_create(
  * @param out_base 输出基础协调器
  * @return 错误码
  */
-agentos_error_t agentos_coordinator_arbiter_create(
-    const char* arbiter_model,
-    void (*human_callback)(const char* question, char* answer, size_t max_len),
-    agentos_coordinator_base_t** out_base);
+agentos_error_t agentos_coordinator_arbiter_create(const char *arbiter_model,
+                                                   void (*human_callback)(const char *question,
+                                                                          char *answer,
+                                                                          size_t max_len),
+                                                   agentos_coordinator_base_t **out_base);
 
 #ifdef __cplusplus
 }

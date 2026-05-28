@@ -8,13 +8,14 @@
  */
 
 #include "alert_manager.h"
-#include "svc_logger.h"
+
 #include "platform.h"
 #include "safe_string_utils.h"
+#include "svc_logger.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 /* ==================== 内部常量 ==================== */
 
@@ -24,7 +25,7 @@
 
 typedef struct {
     am_alert_callback_t callback;
-    void* user_data;
+    void *user_data;
     am_level_t min_level;
 } am_callback_entry_t;
 
@@ -40,16 +41,25 @@ static struct {
     uint32_t callback_count;
     bool initialized;
     agentos_mutex_t mutex;
-    struct { char name[128]; double value; } latest_metrics[AM_MAX_RULES];
-    struct { char name[128]; double values[8]; uint32_t count; uint32_t head; } metric_history[AM_MAX_RULES];
+    struct {
+        char name[128];
+        double value;
+    } latest_metrics[AM_MAX_RULES];
+    struct {
+        char name[128];
+        double values[8];
+        uint32_t count;
+        uint32_t head;
+    } metric_history[AM_MAX_RULES];
     uint32_t metric_count;
 } g_am = {0};
 
 /* ==================== 辅助函数 ==================== */
 
-static bool evaluate_trend(const char* metric_name, am_comparison_t op, double threshold);
+static bool evaluate_trend(const char *metric_name, am_comparison_t op, double threshold);
 
-static am_alert_t* find_active_alert(const char* name) {
+static am_alert_t *find_active_alert(const char *name)
+{
     for (uint32_t i = 0; i < g_am.active_alert_count; i++) {
         if (strcmp(g_am.active_alerts[i].name, name) == 0)
             return &g_am.active_alerts[i];
@@ -57,7 +67,8 @@ static am_alert_t* find_active_alert(const char* name) {
     return NULL;
 }
 
-static am_rule_t* find_rule(const char* name) {
+static am_rule_t *find_rule(const char *name)
+{
     for (uint32_t i = 0; i < g_am.rule_count; i++) {
         if (strcmp(g_am.rules[i].name, name) == 0)
             return &g_am.rules[i];
@@ -65,19 +76,28 @@ static am_rule_t* find_rule(const char* name) {
     return NULL;
 }
 
-static bool evaluate_condition(double value, am_comparison_t op, double threshold) {
+static bool evaluate_condition(double value, am_comparison_t op, double threshold)
+{
     switch (op) {
-        case AM_OP_GT:  return value > threshold;
-        case AM_OP_GTE: return value >= threshold;
-        case AM_OP_LT:  return value < threshold;
-        case AM_OP_LTE: return value <= threshold;
-        case AM_OP_EQ:  return value == threshold;
-        case AM_OP_NEQ: return value != threshold;
-        default:        return false;
+    case AM_OP_GT:
+        return value > threshold;
+    case AM_OP_GTE:
+        return value >= threshold;
+    case AM_OP_LT:
+        return value < threshold;
+    case AM_OP_LTE:
+        return value <= threshold;
+    case AM_OP_EQ:
+        return value == threshold;
+    case AM_OP_NEQ:
+        return value != threshold;
+    default:
+        return false;
     }
 }
 
-static void dispatch_notifications(const am_alert_t* alert) {
+static void dispatch_notifications(const am_alert_t *alert)
+{
     for (uint32_t i = 0; i < g_am.callback_count; i++) {
         if (alert->level >= g_am.callbacks[i].min_level) {
             g_am.callbacks[i].callback(alert, g_am.callbacks[i].user_data);
@@ -85,35 +105,39 @@ static void dispatch_notifications(const am_alert_t* alert) {
     }
 
     for (uint32_t i = 0; i < g_am.channel_count; i++) {
-        am_channel_t* ch = &g_am.channels[i];
-        if (!ch->enabled || alert->level < ch->min_level) continue;
+        am_channel_t *ch = &g_am.channels[i];
+        if (!ch->enabled || alert->level < ch->min_level)
+            continue;
 
         switch (ch->type) {
-            case AM_CHANNEL_LOG:
-                LOG_WARN("[ALERT][%s] %s: %s (source=%s)",
-                         am_level_to_string(alert->level),
-                         alert->name, alert->message, alert->source);
-                break;
-            case AM_CHANNEL_FILE: {
-                FILE* fp = fopen(ch->config, "a");
-                if (fp) {
-                    fprintf(fp, "[%llu][%s] %s: %s (source=%s)\n",
-                            (unsigned long long)alert->fired_at,
-                            am_level_to_string(alert->level),
-                            alert->name, alert->message, alert->source);
-                    fclose(fp);
+        case AM_CHANNEL_LOG:
+            LOG_WARN("[ALERT][%s] %s: %s (source=%s)", am_level_to_string(alert->level),
+                     alert->name, alert->message, alert->source);
+            break;
+        case AM_CHANNEL_FILE: {
+            FILE *fp = fopen(ch->config, "a");
+            if (fp) {
+                {
+                    char _am_buf[1024];
+                    snprintf(_am_buf, sizeof(_am_buf), "[%llu][%s] %s: %s (source=%s)\n",
+                             (unsigned long long)alert->fired_at, am_level_to_string(alert->level),
+                             alert->name, alert->message, alert->source);
+                    fputs(_am_buf, fp);
                 }
-                break;
+                fclose(fp);
             }
-            default:
-                break;
+            break;
+        }
+        default:
+            break;
         }
     }
 }
 
 /* ==================== 公共API实现 ==================== */
 
-AGENTOS_API am_config_t am_create_default_config(void) {
+AGENTOS_API am_config_t am_create_default_config(void)
+{
     am_config_t config;
     memset(&config, 0, sizeof(am_config_t));
     config.evaluation_interval_ms = 10000;
@@ -125,8 +149,10 @@ AGENTOS_API am_config_t am_create_default_config(void) {
     return config;
 }
 
-AGENTOS_API int am_init(const am_config_t* config) {
-    if (g_am.initialized) return 0;
+AGENTOS_API int am_init(const am_config_t *config)
+{
+    if (g_am.initialized)
+        return 0;
 
     if (config) {
         memcpy(&g_am.config, config, sizeof(am_config_t));
@@ -135,7 +161,8 @@ AGENTOS_API int am_init(const am_config_t* config) {
     }
 
     agentos_error_t err = agentos_mutex_init(&g_am.mutex);
-    if (err != AGENTOS_SUCCESS) return -1;
+    if (err != AGENTOS_SUCCESS)
+        return AGENTOS_ERR_UNKNOWN;
 
     memset(g_am.rules, 0, sizeof(g_am.rules));
     g_am.rule_count = 0;
@@ -154,13 +181,14 @@ AGENTOS_API int am_init(const am_config_t* config) {
     am_register_channel(&log_channel);
 
     LOG_INFO("Alert manager initialized (eval_interval=%ums, dedup=%s)",
-             g_am.config.evaluation_interval_ms,
-             g_am.config.enable_deduplication ? "on" : "off");
+             g_am.config.evaluation_interval_ms, g_am.config.enable_deduplication ? "on" : "off");
     return 0;
 }
 
-AGENTOS_API void am_shutdown(void) {
-    if (!g_am.initialized) return;
+AGENTOS_API void am_shutdown(void)
+{
+    if (!g_am.initialized)
+        return;
 
     agentos_mutex_lock(&g_am.mutex);
     g_am.initialized = false;
@@ -173,14 +201,17 @@ AGENTOS_API void am_shutdown(void) {
 
 /* ==================== 规则管理 ==================== */
 
-AGENTOS_API int am_add_rule(const am_rule_t* rule) {
-    if (!rule) return -1;
-    if (!g_am.initialized) am_init(NULL);
+AGENTOS_API int am_add_rule(const am_rule_t *rule)
+{
+    if (!rule)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_am.initialized)
+        am_init(NULL);
 
     agentos_mutex_lock(&g_am.mutex);
 
     if (find_rule(rule->name)) {
-        am_rule_t* existing = find_rule(rule->name);
+        am_rule_t *existing = find_rule(rule->name);
         memcpy(existing, rule, sizeof(am_rule_t));
         agentos_mutex_unlock(&g_am.mutex);
         return 0;
@@ -188,7 +219,7 @@ AGENTOS_API int am_add_rule(const am_rule_t* rule) {
 
     if (g_am.rule_count >= AM_MAX_RULES) {
         agentos_mutex_unlock(&g_am.mutex);
-        return -1;
+        return AGENTOS_ERR_OVERFLOW;
     }
 
     memcpy(&g_am.rules[g_am.rule_count], rule, sizeof(am_rule_t));
@@ -196,13 +227,15 @@ AGENTOS_API int am_add_rule(const am_rule_t* rule) {
 
     agentos_mutex_unlock(&g_am.mutex);
 
-    LOG_INFO("Alert rule added: %s (type=%d, level=%s)",
-             rule->name, rule->type, am_level_to_string(rule->level));
+    LOG_INFO("Alert rule added: %s (type=%d, level=%s)", rule->name, rule->type,
+             am_level_to_string(rule->level));
     return 0;
 }
 
-AGENTOS_API int am_remove_rule(const char* name) {
-    if (!name) return -1;
+AGENTOS_API int am_remove_rule(const char *name)
+{
+    if (!name)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
@@ -219,18 +252,20 @@ AGENTOS_API int am_remove_rule(const char* name) {
     }
 
     agentos_mutex_unlock(&g_am.mutex);
-    return -1;
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
-AGENTOS_API int am_set_rule_enabled(const char* name, bool enabled) {
-    if (!name) return -1;
+AGENTOS_API int am_set_rule_enabled(const char *name, bool enabled)
+{
+    if (!name)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
-    am_rule_t* rule = find_rule(name);
+    am_rule_t *rule = find_rule(name);
     if (!rule) {
         agentos_mutex_unlock(&g_am.mutex);
-        return -1;
+        return AGENTOS_ERR_NOT_FOUND;
     }
 
     rule->enabled = enabled;
@@ -241,15 +276,17 @@ AGENTOS_API int am_set_rule_enabled(const char* name, bool enabled) {
 
 /* ==================== 告警触发 ==================== */
 
-AGENTOS_API int am_fire(const char* name, am_level_t level,
-                        const char* message, const char* source,
-                        const char* labels) {
-    if (!name) return -1;
-    if (!g_am.initialized) am_init(NULL);
+AGENTOS_API int am_fire(const char *name, am_level_t level, const char *message, const char *source,
+                        const char *labels)
+{
+    if (!name)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_am.initialized)
+        am_init(NULL);
 
     agentos_mutex_lock(&g_am.mutex);
 
-    am_alert_t* existing = find_active_alert(name);
+    am_alert_t *existing = find_active_alert(name);
     if (existing) {
         if (g_am.config.enable_deduplication) {
             existing->trigger_count++;
@@ -265,7 +302,8 @@ AGENTOS_API int am_fire(const char* name, am_level_t level,
         }
 
         existing->level = level;
-        if (message) safe_strcpy(existing->message, message, AM_MAX_MESSAGE_LEN);
+        if (message)
+            safe_strcpy(existing->message, message, AM_MAX_MESSAGE_LEN);
         existing->trigger_count++;
         existing->last_notified = agentos_platform_get_time_ms();
         dispatch_notifications(existing);
@@ -278,17 +316,20 @@ AGENTOS_API int am_fire(const char* name, am_level_t level,
     if (g_am.active_alert_count >= AM_MAX_ACTIVE_ALERTS) {
         agentos_mutex_unlock(&g_am.mutex);
         LOG_ERROR("Max active alerts reached");
-        return -1;
+        return AGENTOS_ERR_OVERFLOW;
     }
 
-    am_alert_t* alert = &g_am.active_alerts[g_am.active_alert_count];
+    am_alert_t *alert = &g_am.active_alerts[g_am.active_alert_count];
     memset(alert, 0, sizeof(am_alert_t));
     safe_strcpy(alert->name, name, AM_MAX_NAME_LEN);
     alert->level = level;
     alert->state = AM_STATE_FIRING;
-    if (message) safe_strcpy(alert->message, message, AM_MAX_MESSAGE_LEN);
-    if (source) safe_strcpy(alert->source, source, sizeof(alert->source));
-    if (labels) safe_strcpy(alert->labels, labels, sizeof(alert->labels));
+    if (message)
+        safe_strcpy(alert->message, message, AM_MAX_MESSAGE_LEN);
+    if (source)
+        safe_strcpy(alert->source, source, sizeof(alert->source));
+    if (labels)
+        safe_strcpy(alert->labels, labels, sizeof(alert->labels));
     alert->fired_at = agentos_platform_get_time_ms();
     alert->trigger_count = 1;
     alert->notification_count = 1;
@@ -303,15 +344,17 @@ AGENTOS_API int am_fire(const char* name, am_level_t level,
     return 0;
 }
 
-AGENTOS_API int am_resolve(const char* name) {
-    if (!name) return -1;
+AGENTOS_API int am_resolve(const char *name)
+{
+    if (!name)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
-    am_alert_t* alert = find_active_alert(name);
+    am_alert_t *alert = find_active_alert(name);
     if (!alert) {
         agentos_mutex_unlock(&g_am.mutex);
-        return -1;
+        return AGENTOS_ERR_NOT_FOUND;
     }
 
     alert->state = AM_STATE_RESOLVED;
@@ -330,15 +373,17 @@ AGENTOS_API int am_resolve(const char* name) {
     return 0;
 }
 
-AGENTOS_API int am_acknowledge(const char* name) {
-    if (!name) return -1;
+AGENTOS_API int am_acknowledge(const char *name)
+{
+    if (!name)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
-    am_alert_t* alert = find_active_alert(name);
+    am_alert_t *alert = find_active_alert(name);
     if (!alert) {
         agentos_mutex_unlock(&g_am.mutex);
-        return -1;
+        return AGENTOS_ERR_NOT_FOUND;
     }
 
     alert->acknowledged = true;
@@ -352,8 +397,10 @@ AGENTOS_API int am_acknowledge(const char* name) {
 
 /* ==================== 指标评估 ==================== */
 
-AGENTOS_API int am_evaluate(const char* metric_name, double value) {
-    if (!metric_name) return 0;
+AGENTOS_API int am_evaluate(const char *metric_name, double value)
+{
+    if (!metric_name)
+        return 0;
 
     agentos_mutex_lock(&g_am.mutex);
 
@@ -361,10 +408,12 @@ AGENTOS_API int am_evaluate(const char* metric_name, double value) {
     uint64_t now = agentos_platform_get_time_ms();
 
     for (uint32_t i = 0; i < g_am.rule_count; i++) {
-        am_rule_t* rule = &g_am.rules[i];
-        if (!rule->enabled) continue;
+        am_rule_t *rule = &g_am.rules[i];
+        if (!rule->enabled)
+            continue;
 
-        if (strcmp(rule->metric_name, metric_name) != 0) continue;
+        if (strcmp(rule->metric_name, metric_name) != 0)
+            continue;
 
         if (rule->last_triggered > 0 &&
             (now - rule->last_triggered) < (uint64_t)rule->cooldown_seconds * 1000)
@@ -372,15 +421,15 @@ AGENTOS_API int am_evaluate(const char* metric_name, double value) {
 
         bool condition_met = false;
         switch (rule->type) {
-            case AM_RULE_THRESHOLD:
-                condition_met = evaluate_condition(value, rule->comparison, rule->threshold);
-                break;
-            case AM_RULE_TREND:
-                condition_met = evaluate_trend(metric_name, rule->comparison, rule->threshold);
-                break;
-            default:
-                condition_met = evaluate_condition(value, rule->comparison, rule->threshold);
-                break;
+        case AM_RULE_THRESHOLD:
+            condition_met = evaluate_condition(value, rule->comparison, rule->threshold);
+            break;
+        case AM_RULE_TREND:
+            condition_met = evaluate_trend(metric_name, rule->comparison, rule->threshold);
+            break;
+        default:
+            condition_met = evaluate_condition(value, rule->comparison, rule->threshold);
+            break;
         }
 
         if (condition_met) {
@@ -388,17 +437,17 @@ AGENTOS_API int am_evaluate(const char* metric_name, double value) {
             triggered++;
 
             char message[AM_MAX_MESSAGE_LEN];
-            snprintf(message, sizeof(message),
-                     "Metric %s value %.2f %s threshold %.2f",
+            snprintf(message, sizeof(message), "Metric %s value %.2f %s threshold %.2f",
                      metric_name, value,
-                     rule->comparison == AM_OP_GT ? ">" :
-                     rule->comparison == AM_OP_GTE ? ">=" :
-                     rule->comparison == AM_OP_LT ? "<" :
-                     rule->comparison == AM_OP_LTE ? "<=" :
-                     rule->comparison == AM_OP_EQ ? "==" : "!=",
+                     rule->comparison == AM_OP_GT    ? ">"
+                     : rule->comparison == AM_OP_GTE ? ">="
+                     : rule->comparison == AM_OP_LT  ? "<"
+                     : rule->comparison == AM_OP_LTE ? "<="
+                     : rule->comparison == AM_OP_EQ  ? "=="
+                                                     : "!=",
                      rule->threshold);
 
-            am_alert_t* existing = find_active_alert(rule->name);
+            am_alert_t *existing = find_active_alert(rule->name);
             if (existing) {
                 existing->trigger_count++;
                 existing->last_notified = now;
@@ -414,8 +463,10 @@ AGENTOS_API int am_evaluate(const char* metric_name, double value) {
     return triggered;
 }
 
-AGENTOS_API int am_record_metric(const char* metric_name, double value) {
-    if (!metric_name) return -1;
+AGENTOS_API int am_record_metric(const char *metric_name, double value)
+{
+    if (!metric_name)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
@@ -450,7 +501,8 @@ AGENTOS_API int am_record_metric(const char* metric_name, double value) {
     return 0;
 }
 
-static double am_get_latest_metric_value(const char* metric_name) {
+static double am_get_latest_metric_value(const char *metric_name)
+{
     for (uint32_t i = 0; i < g_am.metric_count; i++) {
         if (strcmp(g_am.latest_metrics[i].name, metric_name) == 0) {
             return g_am.latest_metrics[i].value;
@@ -459,10 +511,13 @@ static double am_get_latest_metric_value(const char* metric_name) {
     return 0.0;
 }
 
-static bool evaluate_trend(const char* metric_name, am_comparison_t op, double threshold) {
+static bool evaluate_trend(const char *metric_name, am_comparison_t op, double threshold)
+{
     for (uint32_t i = 0; i < g_am.metric_count; i++) {
-        if (strcmp(g_am.metric_history[i].name, metric_name) != 0) continue;
-        if (g_am.metric_history[i].count < 2) return false;
+        if (strcmp(g_am.metric_history[i].name, metric_name) != 0)
+            continue;
+        if (g_am.metric_history[i].count < 2)
+            return false;
 
         double sum = 0.0;
         uint32_t n = g_am.metric_history[i].count;
@@ -491,15 +546,17 @@ static bool evaluate_trend(const char* metric_name, am_comparison_t op, double t
     return false;
 }
 
-AGENTOS_API int am_evaluate_all(void) {
+AGENTOS_API int am_evaluate_all(void)
+{
     agentos_mutex_lock(&g_am.mutex);
 
     int total_triggered = 0;
     uint64_t now = agentos_platform_get_time_ms();
 
     for (uint32_t i = 0; i < g_am.rule_count; i++) {
-        am_rule_t* rule = &g_am.rules[i];
-        if (!rule->enabled) continue;
+        am_rule_t *rule = &g_am.rules[i];
+        if (!rule->enabled)
+            continue;
 
         if (rule->last_triggered > 0 &&
             (now - rule->last_triggered) < (uint64_t)rule->cooldown_seconds * 1000)
@@ -510,7 +567,8 @@ AGENTOS_API int am_evaluate_all(void) {
             agentos_mutex_unlock(&g_am.mutex);
             int result = am_evaluate(rule->metric_name, value);
             agentos_mutex_lock(&g_am.mutex);
-            if (result > 0) total_triggered += result;
+            if (result > 0)
+                total_triggered += result;
         }
     }
 
@@ -520,14 +578,16 @@ AGENTOS_API int am_evaluate_all(void) {
 
 /* ==================== 通知通道 ==================== */
 
-AGENTOS_API int am_register_channel(const am_channel_t* channel) {
-    if (!channel) return -1;
+AGENTOS_API int am_register_channel(const am_channel_t *channel)
+{
+    if (!channel)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
     if (g_am.channel_count >= AM_MAX_CHANNELS) {
         agentos_mutex_unlock(&g_am.mutex);
-        return -1;
+        return AGENTOS_ERR_OVERFLOW;
     }
 
     memcpy(&g_am.channels[g_am.channel_count], channel, sizeof(am_channel_t));
@@ -539,15 +599,17 @@ AGENTOS_API int am_register_channel(const am_channel_t* channel) {
     return 0;
 }
 
-AGENTOS_API int am_register_callback(am_alert_callback_t callback, void* user_data,
-                                     am_level_t min_level) {
-    if (!callback) return -1;
+AGENTOS_API int am_register_callback(am_alert_callback_t callback, void *user_data,
+                                     am_level_t min_level)
+{
+    if (!callback)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
     if (g_am.callback_count >= AM_MAX_CALLBACKS) {
         agentos_mutex_unlock(&g_am.mutex);
-        return -1;
+        return AGENTOS_ERR_OVERFLOW;
     }
 
     g_am.callbacks[g_am.callback_count].callback = callback;
@@ -562,14 +624,14 @@ AGENTOS_API int am_register_callback(am_alert_callback_t callback, void* user_da
 
 /* ==================== 查询 ==================== */
 
-AGENTOS_API int am_get_active_alerts(am_alert_t* alerts, uint32_t max_count,
-                                     uint32_t* found_count) {
-    if (!alerts || !found_count) return -1;
+AGENTOS_API int am_get_active_alerts(am_alert_t *alerts, uint32_t max_count, uint32_t *found_count)
+{
+    if (!alerts || !found_count)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
-    uint32_t count = g_am.active_alert_count < max_count
-        ? g_am.active_alert_count : max_count;
+    uint32_t count = g_am.active_alert_count < max_count ? g_am.active_alert_count : max_count;
     memcpy(alerts, g_am.active_alerts, count * sizeof(am_alert_t));
     *found_count = count;
 
@@ -577,9 +639,11 @@ AGENTOS_API int am_get_active_alerts(am_alert_t* alerts, uint32_t max_count,
     return 0;
 }
 
-AGENTOS_API int am_get_alerts_by_level(am_level_t level, am_alert_t* alerts,
-                                       uint32_t max_count, uint32_t* found_count) {
-    if (!alerts || !found_count) return -1;
+AGENTOS_API int am_get_alerts_by_level(am_level_t level, am_alert_t *alerts, uint32_t max_count,
+                                       uint32_t *found_count)
+{
+    if (!alerts || !found_count)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_am.mutex);
 
@@ -596,24 +660,26 @@ AGENTOS_API int am_get_alerts_by_level(am_level_t level, am_alert_t* alerts,
     return 0;
 }
 
-AGENTOS_API uint32_t am_active_alert_count(void) {
+AGENTOS_API uint32_t am_active_alert_count(void)
+{
     return g_am.active_alert_count;
 }
 
 /* ==================== 工具函数 ==================== */
 
-AGENTOS_API const char* am_level_to_string(am_level_t level) {
-    static const char* level_strings[] = {
-        "INFO", "WARNING", "CRITICAL", "EMERGENCY"
-    };
-    if (level < 0 || level > AM_LEVEL_EMERGENCY) return "UNKNOWN";
+AGENTOS_API const char *am_level_to_string(am_level_t level)
+{
+    static const char *level_strings[] = {"INFO", "WARNING", "CRITICAL", "EMERGENCY"};
+    if (level < 0 || level > AM_LEVEL_EMERGENCY)
+        return "UNKNOWN";
     return level_strings[level];
 }
 
-AGENTOS_API const char* am_state_to_string(am_state_t state) {
-    static const char* state_strings[] = {
-        "PENDING", "FIRING", "RESOLVED", "SUPPRESSED", "ACKNOWLEDGED"
-    };
-    if (state < 0 || state > AM_STATE_ACKNOWLEDGED) return "UNKNOWN";
+AGENTOS_API const char *am_state_to_string(am_state_t state)
+{
+    static const char *state_strings[] = {"PENDING", "FIRING", "RESOLVED", "SUPPRESSED",
+                                          "ACKNOWLEDGED"};
+    if (state < 0 || state > AM_STATE_ACKNOWLEDGED)
+        return "UNKNOWN";
     return state_strings[state];
 }

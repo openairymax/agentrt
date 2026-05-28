@@ -13,9 +13,10 @@
  * syscall/telemetry.c ──▶ heapstore（追踪数据持久化）
  */
 
-#include "syscalls.h"
-#include "observability_compat.h"
 #include "agentos.h"
+#include "observability_compat.h"
+#include "syscalls.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,10 +32,11 @@
 /* heapstore 持久化开关（可通过配置关闭） */
 static bool g_use_heapstore_persistence __attribute__((unused)) = true;
 
-static agentos_metrics_t* g_metrics = NULL;
-static agentos_mutex_t* g_metrics_mutex = NULL;
+static agentos_metrics_t *g_metrics = NULL;
+static agentos_mutex_t *g_metrics_mutex = NULL;
 
-void agentos_sys_set_metrics(agentos_metrics_t* metrics) {
+void agentos_sys_set_metrics(agentos_metrics_t *metrics)
+{
     if (!g_metrics_mutex) {
         g_metrics_mutex = agentos_mutex_create();
     }
@@ -47,14 +49,16 @@ void agentos_sys_set_metrics(agentos_metrics_t* metrics) {
     }
 }
 
-agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
-    if (!out_metrics) return AGENTOS_EINVAL;
+agentos_error_t agentos_sys_telemetry_metrics(char **out_metrics)
+{
+    if (!out_metrics)
+        return AGENTOS_EINVAL;
 
     if (!g_metrics_mutex) {
         g_metrics_mutex = agentos_mutex_create();
     }
 
-    agentos_metrics_t* local_metrics = NULL;
+    agentos_metrics_t *local_metrics = NULL;
 
     if (g_metrics_mutex) {
         agentos_mutex_lock(g_metrics_mutex);
@@ -65,8 +69,9 @@ agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
     }
 
     if (!local_metrics) {
-        agentos_metrics_t* temp = agentos_metrics_create();
-        if (!temp) return AGENTOS_ENOMEM;
+        agentos_metrics_t *temp = agentos_metrics_create();
+        if (!temp)
+            return AGENTOS_ENOMEM;
         *out_metrics = agentos_metrics_export(temp);
         agentos_metrics_destroy(temp);
     } else {
@@ -75,10 +80,13 @@ agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
     return *out_metrics ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }
 
-agentos_error_t agentos_sys_telemetry_traces(const char* trace_id, char** out_spans) {
-    if (!out_spans) return AGENTOS_EINVAL;
+agentos_error_t agentos_sys_telemetry_traces(const char *trace_id, char **out_spans)
+{
+    if (!out_spans)
+        return AGENTOS_EINVAL;
     /* trace_id用于过滤特定追踪（非桩） */
-    if (trace_id && !trace_id[0]) return AGENTOS_EINVAL;
+    if (trace_id && !trace_id[0])
+        return AGENTOS_EINVAL;
 
 #ifdef BUILD_HEAPSTORE
     if (g_use_heapstore_persistence) {
@@ -96,8 +104,10 @@ agentos_error_t agentos_sys_telemetry_traces(const char* trace_id, char** out_sp
 /**
  * @brief 保存追踪 Span 到 heapstore
  */
-agentos_error_t agentos_sys_telemetry_trace_save(agentos_trace_span_t* span) {
-    if (!span) return AGENTOS_EINVAL;
+agentos_error_t agentos_sys_telemetry_trace_save(agentos_trace_span_t *span)
+{
+    if (!span)
+        return AGENTOS_EINVAL;
 
 #ifndef BUILD_HEAPSTORE
     /* 无heapstore时：span指针用于非空验证（非桩） */

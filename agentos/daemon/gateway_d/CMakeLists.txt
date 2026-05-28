@@ -170,6 +170,13 @@ set(GATEWAY_LIB_SOURCES
 
 # 创建 gateway 库对象（不安装，仅供 gateway_d 使用）
 add_library(gateway_lib_obj OBJECT ${GATEWAY_LIB_SOURCES})
+
+if(AGENTOS_HAS_LIBWEBSOCKETS)
+    set_source_files_properties(
+        ${GATEWAY_SRC_DIR}/gateway/ws_gateway.c
+        PROPERTIES COMPILE_DEFINITIONS "AGENTOS_COMPLIANCE_IMPL"
+    )
+endif()
 target_include_directories(gateway_lib_obj PUBLIC
     ${GATEWAY_INCLUDE_DIR}
     ${GATEWAY_SRC_DIR}
@@ -183,6 +190,8 @@ target_include_directories(gateway_lib_obj PUBLIC
     ${COMMONS_DIR}/utils/error/include
     ${COMMONS_DIR}/utils/sync/include
     ${COMMONS_DIR}/utils/compat/include
+    ${COMMONS_DIR}/utils/memory/include
+    ${COMMONS_DIR}/utils/string/include
      ${COMMONS_DIR}/utils/include
      ${DAEMON_COMMON_INCLUDE_DIR}
      ${DAEMON_COMMON_DIR}/src
