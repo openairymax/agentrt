@@ -18,21 +18,23 @@
  */
 
 #include "workbench_limits.h"
-#include "utils/cupolas_utils.h"
+
 #include "../platform/platform.h"
+#include "utils/cupolas_utils.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #if cupolas_PLATFORM_WINDOWS
-#include <windows.h>
-#include <psapi.h>
 #include <jobapi.h>
+#include <psapi.h>
+#include <windows.h>
 #else
-#include <unistd.h>
-#include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/time.h>
 #include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 struct limit_context {
@@ -62,13 +64,13 @@ struct limit_context {
 
     resource_stats_t stats;
     limits_exceeded_callback_t callback;
-    void* callback_user_data;
+    void *callback_user_data;
 };
 
-limit_context_t* limits_create(size_t memory_limit_bytes,
-                               uint32_t cpu_time_limit_ms,
-                               uint32_t processes_limit) {
-    limit_context_t* ctx = (limit_context_t*)cupolas_mem_alloc(sizeof(limit_context_t));
+limit_context_t *limits_create(size_t memory_limit_bytes, uint32_t cpu_time_limit_ms,
+                               uint32_t processes_limit)
+{
+    limit_context_t *ctx = (limit_context_t *)cupolas_mem_alloc(sizeof(limit_context_t));
     if (!ctx) {
         return NULL;
     }
@@ -94,8 +96,10 @@ limit_context_t* limits_create(size_t memory_limit_bytes,
     return ctx;
 }
 
-void limits_destroy(limit_context_t* ctx) {
-    if (!ctx) return;
+void limits_destroy(limit_context_t *ctx)
+{
+    if (!ctx)
+        return;
 
 #if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
@@ -107,7 +111,8 @@ void limits_destroy(limit_context_t* ctx) {
 }
 
 #if cupolas_PLATFORM_WINDOWS
-static int setup_windows_job(limit_context_t* ctx) {
+static int setup_windows_job(limit_context_t *ctx)
+{
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
         return 0;
     }
@@ -127,7 +132,8 @@ static int setup_windows_job(limit_context_t* ctx) {
 
     if (ctx->cpu_time_limit_ms > 0) {
         limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_JOB_TIME;
-        limits.BasicLimitInformation.PerJobUserTimeLimit.QuadPart = (ULONGLONG)ctx->cpu_time_limit_ms * 10000;
+        limits.BasicLimitInformation.PerJobUserTimeLimit.QuadPart =
+            (ULONGLONG)ctx->cpu_time_limit_ms * 10000;
     }
 
     if (ctx->processes_limit > 0) {
@@ -135,10 +141,8 @@ static int setup_windows_job(limit_context_t* ctx) {
         limits.BasicLimitInformation.ActiveProcessLimit = ctx->processes_limit;
     }
 
-    if (!SetInformationJobObject(ctx->job_handle,
-                                JobObjectExtendedLimitInformation,
-                                &limits,
-                                sizeof(limits))) {
+    if (!SetInformationJobObject(ctx->job_handle, JobObjectExtendedLimitInformation, &limits,
+                                 sizeof(limits))) {
         CloseHandle(ctx->job_handle);
         ctx->job_handle = INVALID_HANDLE_VALUE;
         return cupolas_ERROR_UNKNOWN;
@@ -149,17 +153,17 @@ static int setup_windows_job(limit_context_t* ctx) {
 #ifdef JOB_OBJECT_SECURITY_RESTRICT_TOKEN
     secInfo.SecurityLimitFlags |= JOB_OBJECT_SECURITY_RESTRICT_TOKEN;
 #endif
-    SetInformationJobObject(ctx->job_handle,
-                           JobObjectSecurityLimitInformation,
-                           &secInfo,
-                           sizeof(secInfo));
+    SetInformationJobObject(ctx->job_handle, JobObjectSecurityLimitInformation, &secInfo,
+                            sizeof(secInfo));
 
     return 0;
 }
 #endif
 
-int limits_attach(limit_context_t* ctx) {
-    if (!ctx) return cupolas_ERROR_INVALID_ARG;
+int limits_attach(limit_context_t *ctx)
+{
+    if (!ctx)
+        return cupolas_ERROR_INVALID_ARG;
 
 #if cupolas_PLATFORM_WINDOWS
     if (setup_windows_job(ctx) != 0) {
@@ -178,8 +182,10 @@ int limits_attach(limit_context_t* ctx) {
 #endif
 }
 
-void limits_detach(limit_context_t* ctx) {
-    if (!ctx) return;
+void limits_detach(limit_context_t *ctx)
+{
+    if (!ctx)
+        return;
 
 #if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
@@ -192,8 +198,10 @@ void limits_detach(limit_context_t* ctx) {
 #endif
 }
 
-int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mode) {
-    if (!ctx) return cupolas_ERROR_INVALID_ARG;
+int limits_set_memory(limit_context_t *ctx, size_t limit_bytes, limit_mode_t mode)
+{
+    if (!ctx)
+        return cupolas_ERROR_INVALID_ARG;
 
     ctx->memory_limit = limit_bytes;
     ctx->memory_mode = mode;
@@ -203,21 +211,16 @@ int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mod
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {0};
         DWORD size = sizeof(limits);
 
-        if (!QueryInformationJobObject(ctx->job_handle,
-                                      JobObjectExtendedLimitInformation,
-                                      &limits,
-                                      size,
-                                      NULL)) {
+        if (!QueryInformationJobObject(ctx->job_handle, JobObjectExtendedLimitInformation, &limits,
+                                       size, NULL)) {
             return cupolas_ERROR_IO;
         }
 
         limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_PROCESS_MEMORY;
         limits.ProcessMemoryLimit = limit_bytes;
 
-        if (!SetInformationJobObject(ctx->job_handle,
-                                    JobObjectExtendedLimitInformation,
-                                    &limits,
-                                    sizeof(limits))) {
+        if (!SetInformationJobObject(ctx->job_handle, JobObjectExtendedLimitInformation, &limits,
+                                     sizeof(limits))) {
             return cupolas_ERROR_IO;
         }
     }
@@ -234,8 +237,10 @@ int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mod
     return 0;
 }
 
-int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mode) {
-    if (!ctx) return cupolas_ERROR_INVALID_ARG;
+int limits_set_cpu_time(limit_context_t *ctx, uint32_t limit_ms, limit_mode_t mode)
+{
+    if (!ctx)
+        return cupolas_ERROR_INVALID_ARG;
 
     ctx->cpu_time_limit_ms = limit_ms;
     ctx->cpu_time_mode = mode;
@@ -245,21 +250,16 @@ int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mo
         JOBOBJECT_BASIC_LIMIT_INFORMATION limits = {0};
         DWORD size = sizeof(limits);
 
-        if (!QueryInformationJobObject(ctx->job_handle,
-                                      JobObjectBasicLimitInformation,
-                                      &limits,
-                                      size,
-                                      NULL)) {
+        if (!QueryInformationJobObject(ctx->job_handle, JobObjectBasicLimitInformation, &limits,
+                                       size, NULL)) {
             return cupolas_ERROR_IO;
         }
 
         limits.LimitFlags |= JOB_OBJECT_LIMIT_JOB_TIME;
         limits.PerJobUserTimeLimit.QuadPart = (ULONGLONG)limit_ms * 10000;
 
-        if (!SetInformationJobObject(ctx->job_handle,
-                                    JobObjectBasicLimitInformation,
-                                    &limits,
-                                    sizeof(limits))) {
+        if (!SetInformationJobObject(ctx->job_handle, JobObjectBasicLimitInformation, &limits,
+                                     sizeof(limits))) {
             return cupolas_ERROR_IO;
         }
     }
@@ -276,8 +276,10 @@ int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mo
     return 0;
 }
 
-int limits_set_cpu_weight(limit_context_t* ctx, uint32_t weight, limit_mode_t mode) {
-    if (!ctx) return cupolas_ERROR_INVALID_ARG;
+int limits_set_cpu_weight(limit_context_t *ctx, uint32_t weight, limit_mode_t mode)
+{
+    if (!ctx)
+        return cupolas_ERROR_INVALID_ARG;
 
     if (weight < 1 || weight > 10000) {
         return cupolas_ERROR_INVALID_ARG;
@@ -293,8 +295,10 @@ int limits_set_cpu_weight(limit_context_t* ctx, uint32_t weight, limit_mode_t mo
 #endif
 }
 
-int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) {
-    if (!ctx) return cupolas_ERROR_INVALID_ARG;
+int limits_set_processes(limit_context_t *ctx, uint32_t limit, limit_mode_t mode)
+{
+    if (!ctx)
+        return cupolas_ERROR_INVALID_ARG;
 
     ctx->processes_limit = limit;
     ctx->processes_mode = mode;
@@ -304,21 +308,16 @@ int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode
         JOBOBJECT_BASIC_LIMIT_INFORMATION limits = {0};
         DWORD size = sizeof(limits);
 
-        if (!QueryInformationJobObject(ctx->job_handle,
-                                      JobObjectBasicLimitInformation,
-                                      &limits,
-                                      size,
-                                      NULL)) {
+        if (!QueryInformationJobObject(ctx->job_handle, JobObjectBasicLimitInformation, &limits,
+                                       size, NULL)) {
             return cupolas_ERROR_IO;
         }
 
         limits.LimitFlags |= JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
         limits.ActiveProcessLimit = limit;
 
-        if (!SetInformationJobObject(ctx->job_handle,
-                                    JobObjectBasicLimitInformation,
-                                    &limits,
-                                    sizeof(limits))) {
+        if (!SetInformationJobObject(ctx->job_handle, JobObjectBasicLimitInformation, &limits,
+                                     sizeof(limits))) {
             return cupolas_ERROR_IO;
         }
     }
@@ -335,8 +334,10 @@ int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode
     return 0;
 }
 
-int limits_set_threads(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) {
-    if (!ctx) return cupolas_ERROR_INVALID_ARG;
+int limits_set_threads(limit_context_t *ctx, uint32_t limit, limit_mode_t mode)
+{
+    if (!ctx)
+        return cupolas_ERROR_INVALID_ARG;
 
     ctx->threads_limit = limit;
     ctx->threads_mode = mode;
@@ -356,8 +357,10 @@ int limits_set_threads(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) 
     return 0;
 }
 
-int limits_set_file_size(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mode) {
-    if (!ctx) return cupolas_ERROR_INVALID_ARG;
+int limits_set_file_size(limit_context_t *ctx, size_t limit_bytes, limit_mode_t mode)
+{
+    if (!ctx)
+        return cupolas_ERROR_INVALID_ARG;
 
     ctx->file_size_limit = limit_bytes;
     ctx->file_size_mode = mode;
@@ -377,8 +380,10 @@ int limits_set_file_size(limit_context_t* ctx, size_t limit_bytes, limit_mode_t 
     return 0;
 }
 
-int limits_set_file_descriptors(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) {
-    if (!ctx) return cupolas_ERROR_INVALID_ARG;
+int limits_set_file_descriptors(limit_context_t *ctx, uint32_t limit, limit_mode_t mode)
+{
+    if (!ctx)
+        return cupolas_ERROR_INVALID_ARG;
 
     ctx->file_descriptors_limit = limit;
     ctx->file_descriptors_mode = mode;
@@ -398,8 +403,10 @@ int limits_set_file_descriptors(limit_context_t* ctx, uint32_t limit, limit_mode
     return 0;
 }
 
-int limits_get_stats(limit_context_t* ctx, resource_stats_t* stats) {
-    if (!ctx || !stats) return cupolas_ERROR_INVALID_ARG;
+int limits_get_stats(limit_context_t *ctx, resource_stats_t *stats)
+{
+    if (!ctx || !stats)
+        return cupolas_ERROR_INVALID_ARG;
 
     memset(stats, 0, sizeof(resource_stats_t));
 
@@ -412,12 +419,9 @@ int limits_get_stats(limit_context_t* ctx, resource_stats_t* stats) {
     stats->memory_limit = ctx->memory_limit;
 
     FILETIME creationTime, exitTime, kernelTime, userTime;
-    if (GetProcessTimes(ctx->process_handle, &creationTime, &exitTime,
-                       &kernelTime, &userTime)) {
-        ULONGLONG total = ((ULONGLONG)kernelTime.dwHighDateTime << 32) +
-                         kernelTime.dwLowDateTime +
-                         ((ULONGLONG)userTime.dwHighDateTime << 32) +
-                         userTime.dwLowDateTime;
+    if (GetProcessTimes(ctx->process_handle, &creationTime, &exitTime, &kernelTime, &userTime)) {
+        ULONGLONG total = ((ULONGLONG)kernelTime.dwHighDateTime << 32) + kernelTime.dwLowDateTime +
+                          ((ULONGLONG)userTime.dwHighDateTime << 32) + userTime.dwLowDateTime;
         stats->cpu_time_ns = total * 100;
     }
 #else
@@ -442,8 +446,10 @@ int limits_get_stats(limit_context_t* ctx, resource_stats_t* stats) {
     return 0;
 }
 
-bool limits_check(limit_context_t* ctx, limit_type_t type, limit_status_t* status) {
-    if (!ctx || !status) return false;
+bool limits_check(limit_context_t *ctx, limit_type_t type, limit_status_t *status)
+{
+    if (!ctx || !status)
+        return false;
 
     *status = LIMIT_STATUS_OK;
 
@@ -451,39 +457,41 @@ bool limits_check(limit_context_t* ctx, limit_type_t type, limit_status_t* statu
     limits_get_stats(ctx, &stats);
 
     switch (type) {
-        case LIMIT_TYPE_MEMORY:
-            if (ctx->memory_limit > 0 && stats.memory_current > ctx->memory_limit) {
+    case LIMIT_TYPE_MEMORY:
+        if (ctx->memory_limit > 0 && stats.memory_current > ctx->memory_limit) {
+            *status = LIMIT_STATUS_HARD_EXCEEDED;
+            return true;
+        }
+        break;
+
+    case LIMIT_TYPE_CPU_TIME:
+        if (ctx->cpu_time_limit_ms > 0) {
+            uint64_t current_ms = stats.cpu_time_ns / 1000000;
+            if (current_ms > ctx->cpu_time_limit_ms) {
                 *status = LIMIT_STATUS_HARD_EXCEEDED;
                 return true;
             }
-            break;
+        }
+        break;
 
-        case LIMIT_TYPE_CPU_TIME:
-            if (ctx->cpu_time_limit_ms > 0) {
-                uint64_t current_ms = stats.cpu_time_ns / 1000000;
-                if (current_ms > ctx->cpu_time_limit_ms) {
-                    *status = LIMIT_STATUS_HARD_EXCEEDED;
-                    return true;
-                }
-            }
-            break;
+    case LIMIT_TYPE_PROCESSES:
+        if (ctx->processes_limit > 0 && stats.processes_current > ctx->processes_limit) {
+            *status = LIMIT_STATUS_SOFT_EXCEEDED;
+            return true;
+        }
+        break;
 
-        case LIMIT_TYPE_PROCESSES:
-            if (ctx->processes_limit > 0 && stats.processes_current > ctx->processes_limit) {
-                *status = LIMIT_STATUS_SOFT_EXCEEDED;
-                return true;
-            }
-            break;
-
-        default:
-            break;
+    default:
+        break;
     }
 
     return false;
 }
 
-int limits_enforce(limit_context_t* ctx) {
-    if (!ctx) return 0;
+int limits_enforce(limit_context_t *ctx)
+{
+    if (!ctx)
+        return 0;
 
     int killed = 0;
 
@@ -492,11 +500,8 @@ int limits_enforce(limit_context_t* ctx) {
         BOOL has_cpu_time = FALSE;
         JOBOBJECT_BASIC_UI_RESTRICTIONS ui_restrictions;
 
-        if (QueryInformationJobObject(ctx->job_handle,
-                                      JobObjectBasicUIRestrictions,
-                                      &ui_restrictions,
-                                      sizeof(ui_restrictions),
-                                      NULL)) {
+        if (QueryInformationJobObject(ctx->job_handle, JobObjectBasicUIRestrictions,
+                                      &ui_restrictions, sizeof(ui_restrictions), NULL)) {
 #ifdef JOB_OBJECT_UILIMIT_JOB_TIME
             if (ui_restrictions.UIRestrictionsClass & JOB_OBJECT_UILIMIT_JOB_TIME) {
                 TerminateJobObject(ctx->job_handle, 0);
@@ -510,7 +515,7 @@ int limits_enforce(limit_context_t* ctx) {
     if (getrusage(RUSAGE_SELF, &usage) == 0) {
         if (ctx->cpu_time_limit_ms > 0) {
             uint64_t total_ms = (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) * 1000 +
-                               (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1000;
+                                (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1000;
             if (total_ms > ctx->cpu_time_limit_ms) {
                 killed++;
             }
@@ -521,26 +526,34 @@ int limits_enforce(limit_context_t* ctx) {
     return killed;
 }
 
-const char* limits_status_string(limit_status_t status) {
+const char *limits_status_string(limit_status_t status)
+{
     switch (status) {
-        case LIMIT_STATUS_OK:            return "OK";
-        case LIMIT_STATUS_SOFT_EXCEEDED: return "Soft limit exceeded";
-        case LIMIT_STATUS_HARD_EXCEEDED: return "Hard limit exceeded";
-        case LIMIT_STATUS_KILLED:        return "Killed by limit";
-        default:                         return "Unknown";
+    case LIMIT_STATUS_OK:
+        return "OK";
+    case LIMIT_STATUS_SOFT_EXCEEDED:
+        return "Soft limit exceeded";
+    case LIMIT_STATUS_HARD_EXCEEDED:
+        return "Hard limit exceeded";
+    case LIMIT_STATUS_KILLED:
+        return "Killed by limit";
+    default:
+        return "Unknown";
     }
 }
 
-void limits_set_exceeded_callback(limit_context_t* ctx,
-                                  limits_exceeded_callback_t callback,
-                                  void* user_data) {
-    if (!ctx) return;
+void limits_set_exceeded_callback(limit_context_t *ctx, limits_exceeded_callback_t callback,
+                                  void *user_data)
+{
+    if (!ctx)
+        return;
 
     ctx->callback = callback;
     ctx->callback_user_data = user_data;
 }
 
-bool limits_is_available(void) {
+bool limits_is_available(void)
+{
 #if cupolas_PLATFORM_WINDOWS
     return true;
 #else

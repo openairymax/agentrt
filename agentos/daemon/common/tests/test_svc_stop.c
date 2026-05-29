@@ -13,29 +13,28 @@
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "svc_common.h"
+#include "test_macros.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "test_macros.h"
-#include "svc_common.h"
-
 static int g_test_stop_called = 0;
 static int g_test_init_called = 0;
 static int g_test_start_called = 0;
 
-static agentos_svc_config_t g_test_config = {
-    .name = "test_svc",
-    .version = "1.0.0",
-    .capabilities = 0,
-    .max_concurrent = 4,
-    .timeout_ms = 5000,
-    .priority = 0,
-    .auto_start = false
-};
+static agentos_svc_config_t g_test_config = {.name = "test_svc",
+                                             .version = "1.0.0",
+                                             .capabilities = 0,
+                                             .max_concurrent = 4,
+                                             .timeout_ms = 5000,
+                                             .priority = 0,
+                                             .auto_start = false};
 
-static agentos_error_t test_interface_init(agentos_service_t svc, const agentos_svc_config_t* config)
+static agentos_error_t test_interface_init(agentos_service_t svc,
+                                           const agentos_svc_config_t *config)
 {
     (void)svc;
     (void)config;
@@ -81,10 +80,7 @@ static void test_stop_from_wrong_state(void)
     TEST_CASE_START(stop_from_wrong_state);
 
     agentos_svc_interface_t iface = {
-        .init = test_interface_init,
-        .start = test_interface_start,
-        .stop = test_interface_stop
-    };
+        .init = test_interface_init, .start = test_interface_start, .stop = test_interface_stop};
 
     agentos_service_t svc = NULL;
     agentos_error_t err = agentos_service_create(&svc, "test_stop_wrong", &iface, &g_test_config);
@@ -105,10 +101,7 @@ static void test_stop_normal_flow(void)
     reset_test_state();
 
     agentos_svc_interface_t iface = {
-        .init = test_interface_init,
-        .start = test_interface_start,
-        .stop = test_interface_stop
-    };
+        .init = test_interface_init, .start = test_interface_start, .stop = test_interface_stop};
 
     agentos_service_t svc = NULL;
     agentos_error_t err = agentos_service_create(&svc, "test_stop_normal", &iface, &g_test_config);
@@ -125,7 +118,7 @@ static void test_stop_normal_flow(void)
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "正常停止成功");
     TEST_ASSERT_EQUAL_INT(1, g_test_stop_called, "stop回调被调用");
 
-    const char* state_str = agentos_svc_state_to_string(agentos_service_get_state(svc));
+    const char *state_str = agentos_svc_state_to_string(agentos_service_get_state(svc));
     TEST_ASSERT_NOT_NULL(state_str, "状态字符串非空");
     TEST_ASSERT_STRING_CONTAINS(state_str, "STOPPED", "状态为STOPPED");
 
@@ -139,10 +132,7 @@ static void test_stop_then_start_again(void)
     reset_test_state();
 
     agentos_svc_interface_t iface = {
-        .init = test_interface_init,
-        .start = test_interface_start,
-        .stop = test_interface_stop
-    };
+        .init = test_interface_init, .start = test_interface_start, .stop = test_interface_stop};
 
     agentos_service_t svc = NULL;
     agentos_error_t err = agentos_service_create(&svc, "test_restart", &iface, &g_test_config);
@@ -168,10 +158,7 @@ static void test_start_from_zombie_state(void)
     TEST_CASE_START(start_from_zombie_state);
 
     agentos_svc_interface_t iface = {
-        .init = test_interface_init,
-        .start = test_interface_start,
-        .stop = test_interface_stop
-    };
+        .init = test_interface_init, .start = test_interface_start, .stop = test_interface_stop};
 
     agentos_service_t svc = NULL;
     agentos_error_t err = agentos_service_create(&svc, "test_zombie_start", &iface, &g_test_config);
@@ -179,7 +166,7 @@ static void test_start_from_zombie_state(void)
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
     /* 验证zombie状态字符串 */
-    const char* zombie_str = agentos_svc_state_to_string(AGENTOS_SVC_STATE_ZOMBIE);
+    const char *zombie_str = agentos_svc_state_to_string(AGENTOS_SVC_STATE_ZOMBIE);
     TEST_ASSERT_NOT_NULL(zombie_str, "ZOMBIE状态字符串非空");
     TEST_ASSERT_STRING_CONTAINS(zombie_str, "ZOMBIE", "状态字符串包含ZOMBIE");
 
@@ -191,20 +178,20 @@ static void test_state_to_string_boundary(void)
     TEST_CASE_START(state_to_string_boundary);
 
     /* 有效状态 */
-    const char* s_none = agentos_svc_state_to_string(AGENTOS_SVC_STATE_NONE);
+    const char *s_none = agentos_svc_state_to_string(AGENTOS_SVC_STATE_NONE);
     TEST_ASSERT_NOT_NULL(s_none, "NONE状态字符串非空");
     TEST_ASSERT_STRING_CONTAINS(s_none, "NONE", "NONE匹配");
 
-    const char* s_error = agentos_svc_state_to_string(AGENTOS_SVC_STATE_ERROR);
+    const char *s_error = agentos_svc_state_to_string(AGENTOS_SVC_STATE_ERROR);
     TEST_ASSERT_NOT_NULL(s_error, "ERROR状态字符串非空");
     TEST_ASSERT_STRING_CONTAINS(s_error, "ERROR", "ERROR匹配");
 
-    const char* s_zombie = agentos_svc_state_to_string(AGENTOS_SVC_STATE_ZOMBIE);
+    const char *s_zombie = agentos_svc_state_to_string(AGENTOS_SVC_STATE_ZOMBIE);
     TEST_ASSERT_NOT_NULL(s_zombie, "ZOMBIE状态字符串非空");
     TEST_ASSERT_STRING_CONTAINS(s_zombie, "ZOMBIE", "ZOMBIE匹配");
 
     /* 越界状态返回UNKNOWN */
-    const char* s_invalid = agentos_svc_state_to_string((agentos_svc_state_t)999);
+    const char *s_invalid = agentos_svc_state_to_string((agentos_svc_state_t)999);
     TEST_ASSERT_NOT_NULL(s_invalid, "越界状态返回非空");
     TEST_ASSERT_STRING_CONTAINS(s_invalid, "UNKNOWN", "越界返回UNKNOWN");
 }
@@ -213,17 +200,14 @@ static void test_service_create_and_destroy(void)
 {
     TEST_CASE_START(service_create_and_destroy);
 
-    agentos_svc_interface_t iface = {
-        .init = test_interface_init,
-        .stop = test_interface_stop
-    };
+    agentos_svc_interface_t iface = {.init = test_interface_init, .stop = test_interface_stop};
 
     agentos_service_t svc = NULL;
     agentos_error_t err = agentos_service_create(&svc, "test_lifecycle", &iface, &g_test_config);
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
-    const char* name = agentos_service_get_name(svc);
+    const char *name = agentos_service_get_name(svc);
     TEST_ASSERT_NOT_NULL(name, "服务名称非空");
     TEST_ASSERT_EQUAL_STRING("test_lifecycle", name, "服务名称匹配");
 

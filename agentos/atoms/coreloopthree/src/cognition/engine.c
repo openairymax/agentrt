@@ -8,56 +8,55 @@
  * Phase 2: 执行-验证循环 -> Phase 3: 审计 -> Phase 4: 目标对齐
  */
 
-#include "cognition.h"
 #include "agentos.h"
-#include "logger.h"
-#include "id_utils.h"
+#include "cognition.h"
 #include "error_utils.h"
-#include <stdlib.h>
-
+#include "id_utils.h"
+#include "logger.h"
 #include "memory_compat.h"
 #include "string_compat.h"
-#include <string.h>
-#include <stdio.h>
+
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
 
 #include "atomic_compat.h"
-
-#include "thinking_chain.h"
 #include "metacognition.h"
 #include "semantic_unit.h"
-#include "triple_coordinator.h"
 #include "stream_critic.h"
+#include "thinking_chain.h"
+#include "triple_coordinator.h"
 
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #endif
 
 struct agentos_cognition_engine {
-    agentos_plan_strategy_t* plan_strat;
-    agentos_plan_strategy_t* fallback_plan_strat;
-    agentos_coordinator_strategy_t* coord_strat;
-    agentos_dispatching_strategy_t* disp_strat;
-    void* context;
-    void (*context_destroy)(void*);
-    agentos_mutex_t* lock;
+    agentos_plan_strategy_t *plan_strat;
+    agentos_plan_strategy_t *fallback_plan_strat;
+    agentos_coordinator_strategy_t *coord_strat;
+    agentos_dispatching_strategy_t *disp_strat;
+    void *context;
+    void (*context_destroy)(void *);
+    agentos_mutex_t *lock;
     uint32_t stats_processed;
     uint64_t stats_total_time_ns;
     agentos_cognition_config_t manager;
     agentos_feedback_callback_t feedback_cb;
-    void* feedback_user_data;
+    void *feedback_user_data;
     uint64_t stats_success_count;
     uint64_t stats_failure_count;
     uint64_t stats_total_retries;
 
-    agentos_thinking_chain_t* chain;
-    agentos_metacognition_t* meta;
-    agentos_memory_engine_t* memory;
+    agentos_thinking_chain_t *chain;
+    agentos_metacognition_t *meta;
+    agentos_memory_engine_t *memory;
     int enable_dual_thinking;
     uint32_t chain_max_tokens;
     size_t chain_wm_capacity;
@@ -69,40 +68,39 @@ struct agentos_cognition_engine {
     int align_drift_detected;
     uint32_t align_replan_count;
 
-    sc_stream_critic_t* stream_critic;
+    sc_stream_critic_t *stream_critic;
 };
 
-static void trigger_feedback(
-    agentos_cognition_engine_t* engine,
-    int level,
-    const char* event,
-    const char* data) {
+static void trigger_feedback(agentos_cognition_engine_t *engine, int level, const char *event,
+                             const char *data)
+{
     if (engine && engine->feedback_cb) {
-        engine->feedback_cb(
-            level, "cognition", event,
-            data, data ? strlen(data) : 0,
-            engine->feedback_user_data);
+        engine->feedback_cb(level, "cognition", event, data, data ? strlen(data) : 0,
+                            engine->feedback_user_data);
     }
 }
 
-agentos_error_t agentos_cognition_create(
-    agentos_plan_strategy_t* plan_strategy,
-    agentos_coordinator_strategy_t* coord_strategy,
-    agentos_dispatching_strategy_t* disp_strategy,
-    agentos_cognition_engine_t** out_engine) {
-    return agentos_cognition_create_ex(NULL, plan_strategy, coord_strategy, disp_strategy, out_engine);
+agentos_error_t agentos_cognition_create(agentos_plan_strategy_t *plan_strategy,
+                                         agentos_coordinator_strategy_t *coord_strategy,
+                                         agentos_dispatching_strategy_t *disp_strategy,
+                                         agentos_cognition_engine_t **out_engine)
+{
+    return agentos_cognition_create_ex(NULL, plan_strategy, coord_strategy, disp_strategy,
+                                       out_engine);
 }
 
-agentos_error_t agentos_cognition_create_ex(
-    const agentos_cognition_config_t* manager,
-    agentos_plan_strategy_t* plan_strategy,
-    agentos_coordinator_strategy_t* coord_strategy,
-    agentos_dispatching_strategy_t* disp_strategy,
-    agentos_cognition_engine_t** out_engine) {
+agentos_error_t agentos_cognition_create_ex(const agentos_cognition_config_t *manager,
+                                            agentos_plan_strategy_t *plan_strategy,
+                                            agentos_coordinator_strategy_t *coord_strategy,
+                                            agentos_dispatching_strategy_t *disp_strategy,
+                                            agentos_cognition_engine_t **out_engine)
+{
 
-    if (!out_engine) return AGENTOS_EINVAL;
+    if (!out_engine)
+        return AGENTOS_EINVAL;
 
-    agentos_cognition_engine_t* engine = (agentos_cognition_engine_t*)AGENTOS_CALLOC(1, sizeof(agentos_cognition_engine_t));
+    agentos_cognition_engine_t *engine =
+        (agentos_cognition_engine_t *)AGENTOS_CALLOC(1, sizeof(agentos_cognition_engine_t));
     if (!engine) {
         AGENTOS_LOG_ERROR("Failed to allocate cognition engine");
         return AGENTOS_ENOMEM;
@@ -161,7 +159,8 @@ agentos_error_t agentos_cognition_create_ex(
     sc_cfg.enable_memory_confirm = 1;
     agentos_error_t sc_err = sc_stream_critic_create(&sc_cfg, &engine->stream_critic);
     if (sc_err != AGENTOS_SUCCESS) {
-        AGENTOS_LOG_WARN("Stream critic init failed: err=%d, proceeding without critic", (int)sc_err);
+        AGENTOS_LOG_WARN("Stream critic init failed: err=%d, proceeding without critic",
+                         (int)sc_err);
         engine->stream_critic = NULL;
     }
 
@@ -170,8 +169,10 @@ agentos_error_t agentos_cognition_create_ex(
     return AGENTOS_SUCCESS;
 }
 
-void agentos_cognition_destroy(agentos_cognition_engine_t* engine) {
-    if (!engine) return;
+void agentos_cognition_destroy(agentos_cognition_engine_t *engine)
+{
+    if (!engine)
+        return;
     if (engine->chain) {
         agentos_tc_chain_stop(engine->chain);
         agentos_tc_chain_destroy(engine->chain);
@@ -191,20 +192,21 @@ void agentos_cognition_destroy(agentos_cognition_engine_t* engine) {
     AGENTOS_FREE(engine);
 }
 
-void agentos_cognition_set_fallback_plan(
-    agentos_cognition_engine_t* engine,
-    agentos_plan_strategy_t* fallback) {
-    if (!engine) return;
+void agentos_cognition_set_fallback_plan(agentos_cognition_engine_t *engine,
+                                         agentos_plan_strategy_t *fallback)
+{
+    if (!engine)
+        return;
     agentos_mutex_lock(engine->lock);
     engine->fallback_plan_strat = fallback;
     agentos_mutex_unlock(engine->lock);
 }
 
-void agentos_cognition_set_context(
-    agentos_cognition_engine_t* engine,
-    void* context,
-    void (*destroy)(void*)) {
-    if (!engine) return;
+void agentos_cognition_set_context(agentos_cognition_engine_t *engine, void *context,
+                                   void (*destroy)(void *))
+{
+    if (!engine)
+        return;
     agentos_mutex_lock(engine->lock);
     if (engine->context && engine->context_destroy) {
         engine->context_destroy(engine->context);
@@ -214,10 +216,11 @@ void agentos_cognition_set_context(
     agentos_mutex_unlock(engine->lock);
 }
 
-void agentos_cognition_set_memory(
-    agentos_cognition_engine_t* engine,
-    agentos_memory_engine_t* memory) {
-    if (!engine) return;
+void agentos_cognition_set_memory(agentos_cognition_engine_t *engine,
+                                  agentos_memory_engine_t *memory)
+{
+    if (!engine)
+        return;
     agentos_mutex_lock(engine->lock);
     engine->memory = memory;
     if (engine->chain) {
@@ -226,24 +229,23 @@ void agentos_cognition_set_memory(
     agentos_mutex_unlock(engine->lock);
 }
 
-agentos_error_t agentos_cognition_process(
-    agentos_cognition_engine_t* engine,
-    const char* input,
-    size_t input_len,
-    agentos_task_plan_t** out_plan) {
+agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, const char *input,
+                                          size_t input_len, agentos_task_plan_t **out_plan)
+{
 
     if (!engine || !input || !out_plan) {
         AGENTOS_LOG_ERROR("Invalid parameters to cognition_process: engine=%p input=%p out_plan=%p",
-                         (void*)engine, (void*)input, (void*)out_plan);
+                          (void *)engine, (void *)input, (void *)out_plan);
         return AGENTOS_EINVAL;
     }
-    if (input_len == 0) return AGENTOS_EINVAL;
+    if (input_len == 0)
+        return AGENTOS_EINVAL;
 
     agentos_intent_t intent;
     memset(&intent, 0, sizeof(intent));
-    intent.intent_raw_text = (char*)input;
+    intent.intent_raw_text = (char *)input;
     intent.intent_raw_len = input_len;
-    intent.intent_goal = (char*)input;
+    intent.intent_goal = (char *)input;
     intent.intent_goal_len = input_len;
     intent.intent_flags = 0;
     intent.intent_context = engine->context;
@@ -254,8 +256,8 @@ agentos_error_t agentos_cognition_process(
     sc_intent_result_t sc_intent;
     memset(&sc_intent, 0, sizeof(sc_intent));
     if (engine->stream_critic) {
-        agentos_error_t ic_err = sc_intent_classifier(
-            engine->stream_critic, input, input_len, &sc_intent);
+        agentos_error_t ic_err =
+            sc_intent_classifier(engine->stream_critic, input, input_len, &sc_intent);
         if (ic_err == AGENTOS_SUCCESS) {
             if (sc_intent.is_urgent)
                 intent.intent_flags |= 0x04;
@@ -263,9 +265,9 @@ agentos_error_t agentos_cognition_process(
                 intent.intent_flags |= 0x08;
             char ic_fb[256];
             snprintf(ic_fb, sizeof(ic_fb),
-                "{\"category\":\"%s\",\"confidence\":%.2f,\"urgent\":%d,\"multi_step\":%d}",
-                sc_intent.category_name, sc_intent.confidence,
-                sc_intent.is_urgent, sc_intent.requires_multi_step);
+                     "{\"category\":\"%s\",\"confidence\":%.2f,\"urgent\":%d,\"multi_step\":%d}",
+                     sc_intent.category_name, sc_intent.confidence, sc_intent.is_urgent,
+                     sc_intent.requires_multi_step);
             trigger_feedback(engine, 0, "intent_classified", ic_fb);
         }
     }
@@ -276,36 +278,32 @@ agentos_error_t agentos_cognition_process(
             agentos_tc_chain_stop(engine->chain);
             agentos_tc_chain_destroy(engine->chain);
         }
-        agentos_error_t tc_err = agentos_tc_chain_create(
-            input, engine->chain_max_tokens, engine->chain_wm_capacity, &engine->chain);
+        agentos_error_t tc_err = agentos_tc_chain_create(input, engine->chain_max_tokens,
+                                                         engine->chain_wm_capacity, &engine->chain);
         if (tc_err == AGENTOS_SUCCESS) {
             agentos_tc_chain_start(engine->chain);
             agentos_mc_set_chain(engine->meta, engine->chain);
 
             if (engine->memory) {
                 agentos_tc_chain_set_memory(engine->chain, engine->memory);
-                agentos_tc_context_window_prepopulate(
-                    engine->chain, input, input_len,
-                    5);
+                agentos_tc_context_window_prepopulate(engine->chain, input, input_len, 5);
             }
 
-            agentos_thinking_step_t* decomp_step = NULL;
-            agentos_tc_step_create(engine->chain, TC_STEP_DECOMPOSITION,
-                                   input, input_len, NULL, 0, &decomp_step);
+            agentos_thinking_step_t *decomp_step = NULL;
+            agentos_tc_step_create(engine->chain, TC_STEP_DECOMPOSITION, input, input_len, NULL, 0,
+                                   &decomp_step);
             if (decomp_step) {
                 agentos_tc_step_complete(decomp_step, input, input_len, 0.8f, "S1-decomposer");
             }
 
-            char* preemptive_hint = NULL;
+            char *preemptive_hint = NULL;
             size_t hint_len = 0;
-            int preempt = agentos_mc_preemptive_check(
-                engine->meta, TC_STEP_PLANNING, input, input_len,
-                &preemptive_hint, &hint_len);
+            int preempt = agentos_mc_preemptive_check(engine->meta, TC_STEP_PLANNING, input,
+                                                      input_len, &preemptive_hint, &hint_len);
             if (preempt == 1 && preemptive_hint) {
                 if (engine->chain->working_mem) {
-                    agentos_tc_working_memory_store(
-                        engine->chain->working_mem, "preemptive_hint",
-                        preemptive_hint, hint_len + 1, "text/plain", 1);
+                    agentos_tc_working_memory_store(engine->chain->working_mem, "preemptive_hint",
+                                                    preemptive_hint, hint_len + 1, "text/plain", 1);
                 }
                 AGENTOS_FREE(preemptive_hint);
             }
@@ -316,11 +314,11 @@ agentos_error_t agentos_cognition_process(
     }
 
     /* ========== Phase 1: Planning (S2 + S1 pre-validation) ========== */
-    agentos_task_plan_t* plan = NULL;
+    agentos_task_plan_t *plan = NULL;
     agentos_error_t err = AGENTOS_EUNKNOWN;
 
-    agentos_plan_strategy_t* plan_strat = NULL;
-    agentos_plan_strategy_t* fallback_strat = NULL;
+    agentos_plan_strategy_t *plan_strat = NULL;
+    agentos_plan_strategy_t *fallback_strat = NULL;
     agentos_mutex_lock(engine->lock);
     plan_strat = engine->plan_strat;
     fallback_strat = engine->fallback_plan_strat;
@@ -330,35 +328,35 @@ agentos_error_t agentos_cognition_process(
         err = plan_strat->plan(&intent, plan_strat->data, &plan);
     }
 
-    if (err == AGENTOS_SUCCESS && plan && engine->enable_dual_thinking &&
-        engine->meta && engine->chain) {
-        agentos_thinking_step_t* plan_step = NULL;
-        agentos_tc_step_create(engine->chain, TC_STEP_PLANNING,
-                               input, input_len, NULL, 0, &plan_step);
+    if (err == AGENTOS_SUCCESS && plan && engine->enable_dual_thinking && engine->meta &&
+        engine->chain) {
+        agentos_thinking_step_t *plan_step = NULL;
+        agentos_tc_step_create(engine->chain, TC_STEP_PLANNING, input, input_len, NULL, 0,
+                               &plan_step);
         if (plan_step) {
             char plan_desc[256];
-            int pd_len = snprintf(plan_desc, sizeof(plan_desc),
-                "plan_id=%s nodes=%zu",
-                plan->task_plan_id ? plan->task_plan_id : "?",
-                plan->task_plan_node_count);
+            int pd_len =
+                snprintf(plan_desc, sizeof(plan_desc), "plan_id=%s nodes=%zu",
+                         plan->task_plan_id ? plan->task_plan_id : "?", plan->task_plan_node_count);
             agentos_tc_step_complete(plan_step, plan_desc, (size_t)pd_len, 0.75f, "S2-planner");
 
             mc_evaluation_result_t eval;
             agentos_mc_evaluate_step(engine->meta, plan_step, NULL, 0, &eval);
             if (!eval.is_acceptable && eval.strategy != MC_CORRECT_NONE) {
                 AGENTOS_LOG_WARN("Plan S1 pre-validation failed: score=%.2f strategy=%d",
-                                eval.overall_score, eval.strategy);
+                                 eval.overall_score, eval.strategy);
                 engine->dual_think_corrections++;
             }
-            if (eval.critique_text) AGENTOS_FREE(eval.critique_text);
+            if (eval.critique_text)
+                AGENTOS_FREE(eval.critique_text);
         }
     }
 
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_WARN("Primary planning failed: err=%d, trying fallback", (int)err);
         char err_buf[256];
-        snprintf(err_buf, sizeof(err_buf),
-            "{\"error_code\":%d,\"stage\":\"primary_planning\"}", (int)err);
+        snprintf(err_buf, sizeof(err_buf), "{\"error_code\":%d,\"stage\":\"primary_planning\"}",
+                 (int)err);
         trigger_feedback(engine, 1, "planning_retry", err_buf);
 
         if (fallback_strat && fallback_strat->plan) {
@@ -369,8 +367,8 @@ agentos_error_t agentos_cognition_process(
                 agentos_mutex_unlock(engine->lock);
             }
         } else {
-            snprintf(err_buf, sizeof(err_buf),
-                "{\"error_code\":%d,\"stage\":\"no_fallback\"}", (int)err);
+            snprintf(err_buf, sizeof(err_buf), "{\"error_code\":%d,\"stage\":\"no_fallback\"}",
+                     (int)err);
             trigger_feedback(engine, 0, "process_failed", err_buf);
             agentos_mutex_lock(engine->lock);
             engine->stats_failure_count++;
@@ -381,8 +379,8 @@ agentos_error_t agentos_cognition_process(
 
     if (err != AGENTOS_SUCCESS) {
         char err_buf[256];
-        snprintf(err_buf, sizeof(err_buf),
-            "{\"error_code\":%d,\"stage\":\"fallback_failed\"}", (int)err);
+        snprintf(err_buf, sizeof(err_buf), "{\"error_code\":%d,\"stage\":\"fallback_failed\"}",
+                 (int)err);
         trigger_feedback(engine, 0, "process_failed", err_buf);
         agentos_mutex_lock(engine->lock);
         engine->stats_failure_count++;
@@ -407,37 +405,36 @@ agentos_error_t agentos_cognition_process(
         agentos_tc_chain_health_check(engine->chain, &anomaly_count, &has_critical);
         if (has_critical) {
             AGENTOS_LOG_WARN("Chain health check: %zu anomalies, critical detected", anomaly_count);
-            trigger_feedback(engine, 1, "anomaly_detected",
-                           "{\"anomalies\":1,\"critical\":true}");
+            trigger_feedback(engine, 1, "anomaly_detected", "{\"anomalies\":1,\"critical\":true}");
         }
 
-        agentos_thinking_step_t* gen_step = NULL;
-        agentos_tc_step_create(engine->chain, TC_STEP_GENERATION,
-                               input, input_len, NULL, 0, &gen_step);
+        agentos_thinking_step_t *gen_step = NULL;
+        agentos_tc_step_create(engine->chain, TC_STEP_GENERATION, input, input_len, NULL, 0,
+                               &gen_step);
 
         tc3_config_t tc3_cfg = TC3_CONFIG_DEFAULTS;
         tc3_cfg.s2_generate = NULL;
         tc3_cfg.s1_verify = NULL;
         tc3_cfg.s1_expert = NULL;
 
-        tc3_coordinator_t* tc3 = NULL;
-        agentos_error_t tc3_err = tc3_coordinator_create(
-            &tc3_cfg, engine->chain, engine->meta, &tc3);
+        tc3_coordinator_t *tc3 = NULL;
+        agentos_error_t tc3_err =
+            tc3_coordinator_create(&tc3_cfg, engine->chain, engine->meta, &tc3);
 
         if (tc3_err == AGENTOS_SUCCESS && tc3) {
-            char* phase2_output = NULL;
+            char *phase2_output = NULL;
             size_t phase2_output_len = 0;
-            tc3_err = tc3_coordinator_execute_streaming(
-                tc3, input, input_len, &phase2_output, &phase2_output_len);
+            tc3_err = tc3_coordinator_execute_streaming(tc3, input, input_len, &phase2_output,
+                                                        &phase2_output_len);
 
             if (tc3_err == AGENTOS_SUCCESS && phase2_output) {
                 if (gen_step) {
-                    agentos_tc_step_complete(gen_step, phase2_output, phase2_output_len,
-                                             0.8f, "t2-streaming");
+                    agentos_tc_step_complete(gen_step, phase2_output, phase2_output_len, 0.8f,
+                                             "t2-streaming");
                 }
                 if (engine->chain->ctx_window) {
-                    agentos_tc_context_window_append(
-                        engine->chain->ctx_window, phase2_output, phase2_output_len);
+                    agentos_tc_context_window_append(engine->chain->ctx_window, phase2_output,
+                                                     phase2_output_len);
                 }
 
                 tc3_stats_t tc3_stats;
@@ -446,17 +443,16 @@ agentos_error_t agentos_cognition_process(
 
                 char fb[512];
                 snprintf(fb, sizeof(fb),
-                    "{\"units\":%u,\"accepted\":%u,\"corrections\":%u,"
-                    "\"avg_score\":%.2f,\"time_ns\":%llu}",
-                    tc3_stats.total_units, tc3_stats.accepted_units,
-                    tc3_stats.total_corrections, tc3_stats.avg_score,
-                    (unsigned long long)tc3_stats.total_time_ns);
+                         "{\"units\":%u,\"accepted\":%u,\"corrections\":%u,"
+                         "\"avg_score\":%.2f,\"time_ns\":%llu}",
+                         tc3_stats.total_units, tc3_stats.accepted_units,
+                         tc3_stats.total_corrections, tc3_stats.avg_score,
+                         (unsigned long long)tc3_stats.total_time_ns);
                 trigger_feedback(engine, 2, "phase2_critical_loop", fb);
 
                 AGENTOS_FREE(phase2_output);
             } else if (gen_step) {
-                agentos_tc_step_complete(gen_step, "streaming_loop_failed", 21,
-                                         0.3f, "t2-failed");
+                agentos_tc_step_complete(gen_step, "streaming_loop_failed", 21, 0.3f, "t2-failed");
             }
 
             if (engine->memory && engine->chain && gen_step) {
@@ -475,45 +471,44 @@ agentos_error_t agentos_cognition_process(
             tc_monitor_result_t mon_result;
             agentos_tc_step_monitor(gen_step, NULL, &mon_result);
             if (mon_result.anomaly != TC_ANOMALY_NONE && mon_result.is_critical) {
-                trigger_feedback(engine, 1, "step_anomaly",
-                               "{\"anomaly\":1,\"critical\":true}");
+                trigger_feedback(engine, 1, "step_anomaly", "{\"anomaly\":1,\"critical\":true}");
             }
-            if (mon_result.description) AGENTOS_FREE(mon_result.description);
+            if (mon_result.description)
+                AGENTOS_FREE(mon_result.description);
         }
     }
 
     /* ========== Phase 3: Subtask Audit (S1 + expert S1) ========== */
     if (engine->enable_dual_thinking && engine->meta && engine->chain && plan) {
-        agentos_thinking_step_t* audit_step = NULL;
-        agentos_tc_step_create(engine->chain, TC_STEP_AUDIT,
-                               input, input_len, NULL, 0, &audit_step);
+        agentos_thinking_step_t *audit_step = NULL;
+        agentos_tc_step_create(engine->chain, TC_STEP_AUDIT, input, input_len, NULL, 0,
+                               &audit_step);
         if (audit_step) {
             char audit_desc[256];
-            int ad_len = snprintf(audit_desc, sizeof(audit_desc),
-                "audited_plan=%s nodes=%zu corrections=%llu",
-                plan->task_plan_id ? plan->task_plan_id : "?",
-                plan->task_plan_node_count,
+            int ad_len = snprintf(
+                audit_desc, sizeof(audit_desc), "audited_plan=%s nodes=%zu corrections=%llu",
+                plan->task_plan_id ? plan->task_plan_id : "?", plan->task_plan_node_count,
                 (unsigned long long)engine->dual_think_corrections);
             mc_evaluation_result_t eval_audit;
             agentos_mc_evaluate_step(engine->meta, audit_step, input, input_len, &eval_audit);
 
             agentos_tc_step_complete(audit_step, audit_desc, (size_t)ad_len,
-                                eval_audit.overall_score, "S1-auditor");
+                                     eval_audit.overall_score, "S1-auditor");
 
             if (engine->memory && engine->chain && audit_step) {
-                agentos_tc_metacognition_inform_memory(
-                    engine->chain, &eval_audit, audit_step);
+                agentos_tc_metacognition_inform_memory(engine->chain, &eval_audit, audit_step);
                 agentos_tc_step_write_to_memory(engine->chain, audit_step);
             }
-            if (eval_audit.critique_text) AGENTOS_FREE(eval_audit.critique_text);
+            if (eval_audit.critique_text)
+                AGENTOS_FREE(eval_audit.critique_text);
         }
     }
 
     /* ========== Phase 4: Enhanced Goal Alignment Check (P2-B05) ========== */
     if (engine->enable_dual_thinking && engine->meta && engine->chain) {
-        agentos_thinking_step_t* align_step = NULL;
-        agentos_tc_step_create(engine->chain, TC_STEP_ALIGNMENT,
-                               input, input_len, NULL, 0, &align_step);
+        agentos_thinking_step_t *align_step = NULL;
+        agentos_tc_step_create(engine->chain, TC_STEP_ALIGNMENT, input, input_len, NULL, 0,
+                               &align_step);
         if (align_step) {
             mc_evaluation_result_t align_eval;
             agentos_mc_evaluate_step(engine->meta, align_step, input, input_len, &align_eval);
@@ -523,18 +518,21 @@ agentos_error_t agentos_cognition_process(
             float goal_score = align_eval.is_acceptable ? align_eval.overall_score : 0.3f;
 
             if (engine->chain->ctx_window) {
-                char* recent_ctx = NULL;
+                char *recent_ctx = NULL;
                 size_t recent_len = 0;
-                agentos_tc_context_window_get_recent(
-                    engine->chain->ctx_window, 300, &recent_ctx, &recent_len);
+                agentos_tc_context_window_get_recent(engine->chain->ctx_window, 300, &recent_ctx,
+                                                     &recent_len);
                 if (recent_ctx && recent_len > 0) {
                     int goal_match = (strstr(recent_ctx, "goal") != NULL) ||
                                      (strstr(recent_ctx, "objective") != NULL);
                     goal_score = goal_match ? (goal_score + 0.1f) : (goal_score - 0.15f);
-                    if (goal_score > 1.0f) goal_score = 1.0f;
-                    if (goal_score < 0.0f) goal_score = 0.0f;
+                    if (goal_score > 1.0f)
+                        goal_score = 1.0f;
+                    if (goal_score < 0.0f)
+                        goal_score = 0.0f;
                 }
-                if (recent_ctx) AGENTOS_FREE(recent_ctx);
+                if (recent_ctx)
+                    AGENTOS_FREE(recent_ctx);
             }
 
             float composite = (logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f);
@@ -546,8 +544,7 @@ agentos_error_t agentos_cognition_process(
             int aligned = (composite >= 0.65f);
             float drift_trend = 0.0f;
             if (engine->align_history_count >= 3) {
-                size_t n = (engine->align_history_count < 8) ?
-                            engine->align_history_count : 8;
+                size_t n = (engine->align_history_count < 8) ? engine->align_history_count : 8;
                 float recent_avg = 0.0f, older_avg = 0.0f;
                 size_t half = n / 2;
                 for (size_t i = 0; i < half; i++) {
@@ -563,7 +560,7 @@ agentos_error_t agentos_cognition_process(
                 drift_trend = older_avg - recent_avg;
             }
 
-            const char* severity = "ok";
+            const char *severity = "ok";
             int trigger_replan = 0;
             if (!aligned || drift_trend > 0.2f) {
                 if (drift_trend > 0.35f || composite < 0.3f) {
@@ -577,39 +574,34 @@ agentos_error_t agentos_cognition_process(
                 }
             }
 
-            agentos_tc_step_complete(align_step,
-                                    aligned ? "goal_aligned" : "goal_drift_detected",
-                                    aligned ? 12 : 18,
-                                    composite, "S1-alignment");
+            agentos_tc_step_complete(align_step, aligned ? "goal_aligned" : "goal_drift_detected",
+                                     aligned ? 12 : 18, composite, "S1-alignment");
 
             if (!aligned || strcmp(severity, "ok") != 0) {
                 AGENTOS_LOG_WARN("Goal alignment: %s (score=%.2f trend=%.3f severity=%s)",
-                                aligned ? "marginal" : "DRIFT",
-                                composite, drift_trend, severity);
+                                 aligned ? "marginal" : "DRIFT", composite, drift_trend, severity);
 
                 char fb[384];
                 snprintf(fb, sizeof(fb),
-                    "{\"composite\":%.2f,\"logic\":%.2f,\"fact\":%.2f,"
-                    "\"goal\":%.2f,\"trend\":%.3f,\"severity\":\"%s\","
-                    "\"replan\":%s,\"history_count\":%zu}",
-                    composite, logic_score, fact_score, goal_score,
-                    drift_trend, severity,
-                    trigger_replan ? "true" : "false",
-                    engine->align_history_count);
+                         "{\"composite\":%.2f,\"logic\":%.2f,\"fact\":%.2f,"
+                         "\"goal\":%.2f,\"trend\":%.3f,\"severity\":\"%s\","
+                         "\"replan\":%s,\"history_count\":%zu}",
+                         composite, logic_score, fact_score, goal_score, drift_trend, severity,
+                         trigger_replan ? "true" : "false", engine->align_history_count);
                 trigger_feedback(engine,
-                               trigger_replan ? 3 : (strcmp(severity, "warning") == 0 ? 1 : 2),
-                               trigger_replan ? "goal_drift_critical" : "goal_drift", fb);
+                                 trigger_replan ? 3 : (strcmp(severity, "warning") == 0 ? 1 : 2),
+                                 trigger_replan ? "goal_drift_critical" : "goal_drift", fb);
 
                 if (trigger_replan) {
                     engine->align_replan_count++;
                 }
             }
 
-            if (align_eval.critique_text) AGENTOS_FREE(align_eval.critique_text);
+            if (align_eval.critique_text)
+                AGENTOS_FREE(align_eval.critique_text);
 
             if (engine->memory && engine->chain && align_step) {
-                agentos_tc_metacognition_inform_memory(
-                    engine->chain, &align_eval, align_step);
+                agentos_tc_metacognition_inform_memory(engine->chain, &align_eval, align_step);
             }
 
             agentos_mc_detect_patterns(engine->meta, NULL, NULL);
@@ -619,15 +611,14 @@ agentos_error_t agentos_cognition_process(
 
     /* ========== Stream Critic Phase 3+4: Output Correction + Memory Confirmation ========== */
     if (engine->stream_critic && plan) {
-        char* pipeline_input = (char*)input;
+        char *pipeline_input = (char *)input;
         size_t pipeline_input_len = input_len;
-        char* pipeline_output = NULL;
+        char *pipeline_output = NULL;
         size_t pipeline_output_len = 0;
 
         if (engine->chain && engine->chain->ctx_window) {
-            agentos_tc_context_window_get_recent(
-                engine->chain->ctx_window, 2000,
-                &pipeline_output, &pipeline_output_len);
+            agentos_tc_context_window_get_recent(engine->chain->ctx_window, 2000, &pipeline_output,
+                                                 &pipeline_output_len);
         }
 
         if (!pipeline_output || pipeline_output_len == 0) {
@@ -635,22 +626,18 @@ agentos_error_t agentos_cognition_process(
             pipeline_output_len = input_len;
         }
 
-        char* final_output = NULL;
+        char *final_output = NULL;
         size_t final_output_len = 0;
         float final_quality = 0.0f;
 
         agentos_error_t scp_err = sc_stream_critic_pipeline(
-            engine->stream_critic,
-            pipeline_input, pipeline_input_len,
-            pipeline_output, pipeline_output_len,
-            engine->memory,
-            &final_output, &final_output_len, &final_quality);
+            engine->stream_critic, pipeline_input, pipeline_input_len, pipeline_output,
+            pipeline_output_len, engine->memory, &final_output, &final_output_len, &final_quality);
 
         if (scp_err == AGENTOS_SUCCESS && final_output) {
             char scp_fb[384];
-            snprintf(scp_fb, sizeof(scp_fb),
-                "{\"quality\":%.2f,\"output_len\":%zu}",
-                final_quality, final_output_len);
+            snprintf(scp_fb, sizeof(scp_fb), "{\"quality\":%.2f,\"output_len\":%zu}", final_quality,
+                     final_output_len);
             trigger_feedback(engine, 2, "stream_critic_complete", scp_fb);
             AGENTOS_FREE(final_output);
         } else if (scp_err != AGENTOS_SUCCESS) {
@@ -674,13 +661,11 @@ agentos_error_t agentos_cognition_process(
 
     char feedback_buf[512];
     snprintf(feedback_buf, sizeof(feedback_buf),
-        "{\"plan_id\":\"%s\",\"node_count\":%zu,\"elapsed_ns\":%llu,"
-        "\"dual_think\":%d,\"corrections\":%llu,\"status\":\"success\"}",
-        plan->task_plan_id ? plan->task_plan_id : "unknown",
-        plan->task_plan_node_count,
-        (unsigned long long)elapsed,
-        engine->enable_dual_thinking,
-        (unsigned long long)engine->dual_think_corrections);
+             "{\"plan_id\":\"%s\",\"node_count\":%zu,\"elapsed_ns\":%llu,"
+             "\"dual_think\":%d,\"corrections\":%llu,\"status\":\"success\"}",
+             plan->task_plan_id ? plan->task_plan_id : "unknown", plan->task_plan_node_count,
+             (unsigned long long)elapsed, engine->enable_dual_thinking,
+             (unsigned long long)engine->dual_think_corrections);
     trigger_feedback(engine, 0, "process_complete", feedback_buf);
 
     *out_plan = plan;
@@ -695,13 +680,17 @@ process_fail:
     return err;
 }
 
-void agentos_task_plan_free(agentos_task_plan_t* plan) {
-    if (!plan) return;
+void agentos_task_plan_free(agentos_task_plan_t *plan)
+{
+    if (!plan)
+        return;
     for (size_t i = 0; i < plan->task_plan_node_count; i++) {
-        agentos_task_node_t* node = plan->task_plan_nodes[i];
+        agentos_task_node_t *node = plan->task_plan_nodes[i];
         if (node) {
-            if (node->task_node_id) AGENTOS_FREE(node->task_node_id);
-            if (node->task_node_agent_role) AGENTOS_FREE(node->task_node_agent_role);
+            if (node->task_node_id)
+                AGENTOS_FREE(node->task_node_id);
+            if (node->task_node_agent_role)
+                AGENTOS_FREE(node->task_node_agent_role);
             if (node->task_node_depends_on) {
                 for (size_t j = 0; j < node->task_node_depends_count; j++) {
                     AGENTOS_FREE(node->task_node_depends_on[j]);
@@ -712,17 +701,19 @@ void agentos_task_plan_free(agentos_task_plan_t* plan) {
         }
     }
     AGENTOS_FREE(plan->task_plan_nodes);
-    if (plan->task_plan_entry_points) AGENTOS_FREE(plan->task_plan_entry_points);
-    if (plan->task_plan_id) AGENTOS_FREE(plan->task_plan_id);
+    if (plan->task_plan_entry_points)
+        AGENTOS_FREE(plan->task_plan_entry_points);
+    if (plan->task_plan_id)
+        AGENTOS_FREE(plan->task_plan_id);
     AGENTOS_FREE(plan);
 }
 
-agentos_error_t agentos_cognition_stats(
-    agentos_cognition_engine_t* engine,
-    char** out_stats,
-    size_t* out_len) {
+agentos_error_t agentos_cognition_stats(agentos_cognition_engine_t *engine, char **out_stats,
+                                        size_t *out_len)
+{
 
-    if (!engine || !out_stats) return AGENTOS_EINVAL;
+    if (!engine || !out_stats)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(engine->lock);
     uint32_t processed = engine->stats_processed;
@@ -733,36 +724,41 @@ agentos_error_t agentos_cognition_stats(
 
     char buffer[512];
     int len = snprintf(buffer, sizeof(buffer),
-        "{\"processed\":%u,\"avg_time_ns\":%llu,"
-        "\"dual_think_invocations\":%llu,\"dual_think_corrections\":%llu}",
-        processed, (unsigned long long)avg_ns,
-        (unsigned long long)dt_inv, (unsigned long long)dt_corr);
+                       "{\"processed\":%u,\"avg_time_ns\":%llu,"
+                       "\"dual_think_invocations\":%llu,\"dual_think_corrections\":%llu}",
+                       processed, (unsigned long long)avg_ns, (unsigned long long)dt_inv,
+                       (unsigned long long)dt_corr);
 
-    char* result = (char*)AGENTOS_MALLOC(len + 1);
-    if (!result) return AGENTOS_ENOMEM;
+    char *result = (char *)AGENTOS_MALLOC(len + 1);
+    if (!result)
+        return AGENTOS_ENOMEM;
     memcpy(result, buffer, len + 1);
 
     *out_stats = result;
-    if (out_len) *out_len = (size_t)len;
+    if (out_len)
+        *out_len = (size_t)len;
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_cognition_health_check(
-    agentos_cognition_engine_t* engine,
-    char** out_json) {
+agentos_error_t agentos_cognition_health_check(agentos_cognition_engine_t *engine, char **out_json)
+{
 
-    if (!engine || !out_json) return AGENTOS_EINVAL;
+    if (!engine || !out_json)
+        return AGENTOS_EINVAL;
 
 #ifdef AGENTOS_HAS_CJSON
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return AGENTOS_ENOMEM;
+    cJSON *root = cJSON_CreateObject();
+    if (!root)
+        return AGENTOS_ENOMEM;
 
     cJSON_AddStringToObject(root, "status", "healthy");
 
     agentos_mutex_lock(engine->lock);
     cJSON_AddNumberToObject(root, "processed", engine->stats_processed);
     cJSON_AddNumberToObject(root, "avg_time_ns",
-        (engine->stats_processed > 0) ? (engine->stats_total_time_ns / engine->stats_processed) : 0);
+                            (engine->stats_processed > 0)
+                                ? (engine->stats_total_time_ns / engine->stats_processed)
+                                : 0);
     cJSON_AddBoolToObject(root, "dual_thinking_enabled", engine->enable_dual_thinking);
     if (engine->chain) {
         size_t anomaly_count = 0;
@@ -773,9 +769,10 @@ agentos_error_t agentos_cognition_health_check(
     }
     agentos_mutex_unlock(engine->lock);
 
-    char* json = cJSON_PrintUnformatted(root);
+    char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    if (!json) return AGENTOS_ENOMEM;
+    if (!json)
+        return AGENTOS_ENOMEM;
 
     *out_json = json;
     return AGENTOS_SUCCESS;

@@ -12,61 +12,50 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "error.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Fallback definitions when config_unified is unavailable */
-#ifndef CONFIG_SUCCESS
-#define CONFIG_SUCCESS              0
-#endif
-#ifndef CONFIG_ERROR_INVALID_PARAM
-#define CONFIG_ERROR_INVALID_PARAM  (-1)
-#endif
-#ifndef CONFIG_ERROR_IO
-#define CONFIG_ERROR_IO            (-2)
-#endif
-#ifndef CONFIG_ERROR_OUT_OF_MEMORY
-#define CONFIG_ERROR_OUT_OF_MEMORY (-3)
-#endif
-#ifndef CONFIG_ERROR_PARSE
-#define CONFIG_ERROR_PARSE         (-4)
-#endif
-
 /* ==================== 错误码兼容 ==================== */
 
-#define SVC_OK                  CONFIG_SUCCESS
-#define SVC_ERR_INVALID_PARAM   CONFIG_ERROR_INVALID_PARAM
-#define SVC_ERR_IO              CONFIG_ERROR_IO
-#define SVC_ERR_OUT_OF_MEMORY   CONFIG_ERROR_OUT_OF_MEMORY
-#define SVC_ERR_PARSE_ERROR     CONFIG_ERROR_PARSE
-#define SVC_ERR_RPC             (-5001)
+#define SVC_OK AGENTOS_OK
+#define SVC_ERR_INVALID_PARAM AGENTOS_ERR_INVALID_PARAM
+#define SVC_ERR_IO AGENTOS_ERR_IO
+#define SVC_ERR_OUT_OF_MEMORY AGENTOS_ERR_OUT_OF_MEMORY
+#define SVC_ERR_PARSE_ERROR AGENTOS_ERR_PARSE_ERROR
+#define SVC_ERR_RPC (-5001)
 
 /* ==================== 类型兼容 ==================== */
 
 typedef struct {
-    char* service_name;
-    char* listen_addr;
+    char *service_name;
+    char *listen_addr;
     int log_level;
 } svc_config_t;
 
 /* ==================== 兼容性函数包装 ==================== */
 
-static inline int svc_config_load(const char* path __attribute__((unused)), svc_config_t** out_config) {
-    if (!out_config) return SVC_ERR_INVALID_PARAM;
+static inline int svc_config_load(const char *path __attribute__((unused)),
+                                  svc_config_t **out_config)
+{
+    if (!out_config)
+        return SVC_ERR_INVALID_PARAM;
 
     *out_config = NULL;
-    svc_config_t* cfg = (svc_config_t*)calloc(1, sizeof(svc_config_t));
-    if (!cfg) return SVC_ERR_OUT_OF_MEMORY;
+    svc_config_t *cfg = (svc_config_t *)AGENTOS_CALLOC(1, sizeof(svc_config_t));
+    if (!cfg)
+        return SVC_ERR_OUT_OF_MEMORY;
 
-    cfg->service_name = strdup("agentos-service");
-    cfg->listen_addr = strdup(":8080");
+    cfg->service_name = AGENTOS_STRDUP("agentos-service");
+    cfg->listen_addr = AGENTOS_STRDUP(":8080");
     cfg->log_level = 3;
 
     if (!cfg->service_name || !cfg->listen_addr) {
-        free(cfg->service_name);
-        free(cfg->listen_addr);
-        free(cfg);
+        AGENTOS_FREE(cfg->service_name);
+        AGENTOS_FREE(cfg->listen_addr);
+        AGENTOS_FREE(cfg);
         return SVC_ERR_OUT_OF_MEMORY;
     }
 
@@ -74,46 +63,63 @@ static inline int svc_config_load(const char* path __attribute__((unused)), svc_
     return SVC_OK;
 }
 
-static inline void svc_config_free(svc_config_t* config) {
-    if (!config) return;
-    free(config->service_name);
-    free(config->listen_addr);
-    free(config);
+static inline void svc_config_free(svc_config_t *config)
+{
+    if (!config)
+        return;
+    AGENTOS_FREE(config->service_name);
+    AGENTOS_FREE(config->listen_addr);
+    AGENTOS_FREE(config);
 }
 
-static inline const char* svc_config_get_name(const svc_config_t* config) {
+static inline const char *svc_config_get_name(const svc_config_t *config)
+{
     return config ? config->service_name : NULL;
 }
 
-static inline const char* svc_config_get_listen(const svc_config_t* config) {
+static inline const char *svc_config_get_listen(const svc_config_t *config)
+{
     return config ? config->listen_addr : NULL;
 }
 
-static inline int svc_config_get_log_level(const svc_config_t* config) {
+static inline int svc_config_get_log_level(const svc_config_t *config)
+{
     return config ? config->log_level : 3;
 }
 
-static inline const char* svc_config_get_string(const svc_config_t* config, const char* key) {
-    if (!config) return NULL;
-    if (!key) return NULL;
-    if (strcmp(key, "service_name") == 0) return config->service_name;
-    if (strcmp(key, "listen_addr") == 0) return config->listen_addr;
+static inline const char *svc_config_get_string(const svc_config_t *config, const char *key)
+{
+    if (!config)
+        return NULL;
+    if (!key)
+        return NULL;
+    if (strcmp(key, "service_name") == 0)
+        return config->service_name;
+    if (strcmp(key, "listen_addr") == 0)
+        return config->listen_addr;
     return NULL;
 }
 
-static inline int svc_config_get_int(const svc_config_t* config, const char* key) {
-    if (!config || !key) return 0;
-    if (strcmp(key, "log_level") == 0) return config->log_level;
+static inline int svc_config_get_int(const svc_config_t *config, const char *key)
+{
+    if (!config || !key)
+        return 0;
+    if (strcmp(key, "log_level") == 0)
+        return config->log_level;
     return 0;
 }
 
-static inline int svc_config_get_bool(const svc_config_t* config, const char* key) {
-    if (!config || !key) return 0;
-    if (strcmp(key, "log_level") == 0) return config->log_level > 0;
+static inline int svc_config_get_bool(const svc_config_t *config, const char *key)
+{
+    if (!config || !key)
+        return 0;
+    if (strcmp(key, "log_level") == 0)
+        return config->log_level > 0;
     return 0;
 }
 
-static inline void svc_config_destroy(svc_config_t* config) {
+static inline void svc_config_destroy(svc_config_t *config)
+{
     svc_config_free(config);
 }
 

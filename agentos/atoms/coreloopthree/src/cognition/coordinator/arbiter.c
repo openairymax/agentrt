@@ -4,31 +4,37 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "strategy.h"
 #include "agentos.h"
+#include "strategy.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
-#include <string.h>
+
 #include <stdio.h>
+#include <string.h>
 
 /**
  * @brief 外部仲裁私有数据
  */
 typedef struct arbiter_data {
-    char* arbiter_model;           /**< 仲裁模型名称（可为 NULL，表示人工） */
-    agentos_mutex_t* lock;
-    void (*human_callback)(const char* question, char* answer, size_t max_len); /**< 人工回调 */
+    char *arbiter_model; /**< 仲裁模型名称（可为 NULL，表示人工） */
+    agentos_mutex_t *lock;
+    void (*human_callback)(const char *question, char *answer, size_t max_len); /**< 人工回调 */
 } arbiter_data_t;
 
-static void arbiter_destroy(agentos_coordinator_base_t* base) {
-    if (!base) return;
-    arbiter_data_t* data = (arbiter_data_t*)base->data;
+static void arbiter_destroy(agentos_coordinator_base_t *base)
+{
+    if (!base)
+        return;
+    arbiter_data_t *data = (arbiter_data_t *)base->data;
     if (data) {
-        if (data->arbiter_model) AGENTOS_FREE(data->arbiter_model);
-        if (data->lock) agentos_mutex_free(data->lock);
+        if (data->arbiter_model)
+            AGENTOS_FREE(data->arbiter_model);
+        if (data->lock)
+            agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
     AGENTOS_FREE(base);
@@ -37,16 +43,17 @@ static void arbiter_destroy(agentos_coordinator_base_t* base) {
 /**
  * @brief 外部仲裁函数
  */
-static agentos_error_t arbiter_coordinate(
-    agentos_coordinator_base_t* base,
-    const agentos_coordination_context_t __attribute__((unused)) *context,
-    const char** inputs,
-    size_t input_count,
-    char** out_result) {
-    if (!base || !out_result) return AGENTOS_EINVAL;
+static agentos_error_t
+arbiter_coordinate(agentos_coordinator_base_t *base,
+                   const agentos_coordination_context_t __attribute__((unused)) * context,
+                   const char **inputs, size_t input_count, char **out_result)
+{
+    if (!base || !out_result)
+        return AGENTOS_EINVAL;
 
-    arbiter_data_t* data = (arbiter_data_t*)base->data;
-    if (!data) return AGENTOS_EINVAL;
+    arbiter_data_t *data = (arbiter_data_t *)base->data;
+    if (!data)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(data->lock);
 
@@ -54,7 +61,7 @@ static agentos_error_t arbiter_coordinate(
     if (data->human_callback && input_count > 0) {
         char question[1024];
         snprintf(question, sizeof(question), "多个模型输出不一致，请选择最佳结果：\n");
-        
+
         for (size_t i = 0; i < input_count && i < 5; i++) {
             char option[256];
             snprintf(option, sizeof(option), "%zu. %s\n", i + 1, inputs[i]);
@@ -98,16 +105,21 @@ static agentos_error_t arbiter_coordinate(
 /**
  * @brief 创建外部仲裁协调器
  */
-agentos_error_t agentos_coordinator_arbiter_create(
-    const char* arbiter_model,
-    void (*human_callback)(const char* question, char* answer, size_t max_len),
-    agentos_coordinator_base_t** out_base) {
-    if (!out_base) return AGENTOS_EINVAL;
+agentos_error_t agentos_coordinator_arbiter_create(const char *arbiter_model,
+                                                   void (*human_callback)(const char *question,
+                                                                          char *answer,
+                                                                          size_t max_len),
+                                                   agentos_coordinator_base_t **out_base)
+{
+    if (!out_base)
+        return AGENTOS_EINVAL;
 
-    agentos_coordinator_base_t* base = (agentos_coordinator_base_t*)AGENTOS_CALLOC(1, sizeof(agentos_coordinator_base_t));
-    if (!base) return AGENTOS_ENOMEM;
+    agentos_coordinator_base_t *base =
+        (agentos_coordinator_base_t *)AGENTOS_CALLOC(1, sizeof(agentos_coordinator_base_t));
+    if (!base)
+        return AGENTOS_ENOMEM;
 
-    arbiter_data_t* data = (arbiter_data_t*)AGENTOS_CALLOC(1, sizeof(arbiter_data_t));
+    arbiter_data_t *data = (arbiter_data_t *)AGENTOS_CALLOC(1, sizeof(arbiter_data_t));
     if (!data) {
         AGENTOS_FREE(base);
         return AGENTOS_ENOMEM;

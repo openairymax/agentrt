@@ -9,8 +9,9 @@
 #define CUPOLAS_MONITORING_H
 
 #include "cupolas_metrics.h"
-#include <stddef.h>
+
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct gateway gateway_t;
@@ -21,7 +22,7 @@ extern "C" {
 
 /**
  * @brief Monitoring backend types
- * 
+ *
  * Design Principles:
  * - Standard protocols: Prometheus / OpenTelemetry / StatsD support
  * - Low overhead: Minimal impact on core logic
@@ -29,66 +30,66 @@ extern "C" {
  * - Async reporting: Non-blocking main business logic
  */
 typedef enum monitoring_backend {
-    MONITORING_BACKEND_NONE = 0,         /**< No monitoring backend */
-    MONITORING_BACKEND_PROMETHEUS,      /**< Prometheus pull mode (/metrics endpoint) */
-    MONITORING_BACKEND_OPENTELEMETRY,    /**< OpenTelemetry push mode (OTLP protocol) */
-    MONITORING_BACKEND_STATSD,           /**< StatsD traditional metrics collection */
-    MONITORING_BACKEND_ALL               /**< Enable all backends */
+    MONITORING_BACKEND_NONE = 0,      /**< No monitoring backend */
+    MONITORING_BACKEND_PROMETHEUS,    /**< Prometheus pull mode (/metrics endpoint) */
+    MONITORING_BACKEND_OPENTELEMETRY, /**< OpenTelemetry push mode (OTLP protocol) */
+    MONITORING_BACKEND_STATSD,        /**< StatsD traditional metrics collection */
+    MONITORING_BACKEND_ALL            /**< Enable all backends */
 } monitoring_backend_t;
 
 /**
  * @brief Monitoring configuration structure
  */
 typedef struct monitoring_config {
-    monitoring_backend_t backend;        /**< Active monitoring backend(s) */
+    monitoring_backend_t backend; /**< Active monitoring backend(s) */
 
     struct {
-        const char* listen_addr;          /**< Listen address for HTTP server */
-        uint16_t port;                    /**< Port number for metrics endpoint */
-        const char* endpoint;             /**< Metrics endpoint path */
-        bool enable_tls;                  /**< Enable TLS for metrics server */
-        const char* tls_cert_file;         /**< TLS certificate file path */
-        const char* tls_key_file;          /**< TLS private key file path */
+        const char *listen_addr;   /**< Listen address for HTTP server */
+        uint16_t port;             /**< Port number for metrics endpoint */
+        const char *endpoint;      /**< Metrics endpoint path */
+        bool enable_tls;           /**< Enable TLS for metrics server */
+        const char *tls_cert_file; /**< TLS certificate file path */
+        const char *tls_key_file;  /**< TLS private key file path */
     } prometheus;
 
     struct {
-        const char* endpoint;             /**< OTLP collector endpoint URL */
-        const char* service_name;          /**< Service name for identification */
-        const char* service_namespace;    /**< Service namespace */
-        const char* auth_token;            /**< Authentication token */
-        bool enable_tls;                  /**< Enable TLS for OTLP connection */
+        const char *endpoint;          /**< OTLP collector endpoint URL */
+        const char *service_name;      /**< Service name for identification */
+        const char *service_namespace; /**< Service namespace */
+        const char *auth_token;        /**< Authentication token */
+        bool enable_tls;               /**< Enable TLS for OTLP connection */
     } opentelemetry;
 
     struct {
-        const char* host;                 /**< StatsD server host */
-        uint16_t port;                     /**< StatsD server port */
-        const char* prefix;               /**< Metric name prefix */
+        const char *host;   /**< StatsD server host */
+        uint16_t port;      /**< StatsD server port */
+        const char *prefix; /**< Metric name prefix */
     } statsd;
 
-    uint32_t reporting_interval_ms;       /**< Push reporting interval (milliseconds) */
-    uint32_t buffer_size;                /**< Buffer size for metric data */
-    bool enable_caching;                /**< Enable local metric caching */
+    uint32_t reporting_interval_ms; /**< Push reporting interval (milliseconds) */
+    uint32_t buffer_size;           /**< Buffer size for metric data */
+    bool enable_caching;            /**< Enable local metric caching */
 } monitoring_config_t;
 
 /**
  * @brief Monitoring status enumeration
  */
 typedef enum monitoring_status {
-    MONITORING_STATUS_STOPPED = 0,        /**< Monitoring stopped */
-    MONITORING_STATUS_STARTING,         /**< Monitoring starting up */
-    MONITORING_STATUS_RUNNING,          /**< Monitoring active and running */
-    MONITORING_STATUS_ERROR,            /**< Monitoring in error state */
-    MONITORING_STATUS_STOPPING          /**< Monitoring shutting down */
+    MONITORING_STATUS_STOPPED = 0, /**< Monitoring stopped */
+    MONITORING_STATUS_STARTING,    /**< Monitoring starting up */
+    MONITORING_STATUS_RUNNING,     /**< Monitoring active and running */
+    MONITORING_STATUS_ERROR,       /**< Monitoring in error state */
+    MONITORING_STATUS_STOPPING     /**< Monitoring shutting down */
 } monitoring_status_t;
 
 /**
  * @brief Health check result structure
  */
 typedef struct health_check_result {
-    bool healthy;                       /**< Health status (true=healthy) */
-    const char* component;              /**< Component name being checked */
-    const char* message;                /**< Status message or error description */
-    uint64_t timestamp_ns;              /**< Check timestamp in nanoseconds */
+    bool healthy;          /**< Health status (true=healthy) */
+    const char *component; /**< Component name being checked */
+    const char *message;   /**< Status message or error description */
+    uint64_t timestamp_ns; /**< Check timestamp in nanoseconds */
 } health_check_result_t;
 
 /**
@@ -115,7 +116,7 @@ typedef bool (*health_check_fn_t)(void);
  * @ownership Returns owned pointer: caller must call cupolas_monitoring_destroy()
  * @ownership config: caller retains ownership
  */
-cupolas_monitoring_t* cupolas_monitoring_create(const monitoring_config_t* config);
+cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *config);
 
 /**
  * @brief Destroy monitoring manager
@@ -124,7 +125,7 @@ cupolas_monitoring_t* cupolas_monitoring_create(const monitoring_config_t* confi
  * @reentrant No
  * @ownership mgr: transferred to this function, will be freed
  */
-void cupolas_monitoring_destroy(cupolas_monitoring_t* mgr);
+void cupolas_monitoring_destroy(cupolas_monitoring_t *mgr);
 
 /**
  * @brief Start monitoring services
@@ -133,7 +134,7 @@ void cupolas_monitoring_destroy(cupolas_monitoring_t* mgr);
  * @note Thread-safe: Safe to call from main thread only
  * @reentrant No
  */
-int cupolas_monitoring_start(cupolas_monitoring_t* mgr);
+int cupolas_monitoring_start(cupolas_monitoring_t *mgr);
 
 /**
  * @brief Stop monitoring services
@@ -141,7 +142,7 @@ int cupolas_monitoring_start(cupolas_monitoring_t* mgr);
  * @note Thread-safe: Safe to call from main thread only
  * @reentrant No
  */
-void cupolas_monitoring_stop(cupolas_monitoring_t* mgr);
+void cupolas_monitoring_stop(cupolas_monitoring_t *mgr);
 
 /**
  * @brief Get current monitoring status
@@ -150,7 +151,7 @@ void cupolas_monitoring_stop(cupolas_monitoring_t* mgr);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t* mgr);
+monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t *mgr);
 
 /**
  * @brief Report metrics to configured backend (push mode)
@@ -159,7 +160,7 @@ monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t* mgr);
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No (should be called periodically by single thread)
  */
-int cupolas_monitoring_report(cupolas_monitoring_t* mgr);
+int cupolas_monitoring_report(cupolas_monitoring_t *mgr);
 
 /**
  * @brief Export metrics in Prometheus exposition format (pull mode)
@@ -170,23 +171,23 @@ int cupolas_monitoring_report(cupolas_monitoring_t* mgr);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  * @ownership buffer: caller provides buffer, function writes to it
- * 
+ *
  * @details
  * Exports metrics in standard Prometheus text exposition format:
- * 
+ *
  * # HELP cupolas_permission_checks_total Total permission checks
  * # TYPE cupolas_permission_checks_total counter
  * cupolas_permission_checks_total{result="allowed"} 1234
- * 
+ *
  * # HELP cupolas_sanitize_operations_total Total sanitize operations
  * # TYPE cupolas_sanitize_operations_total counter
  * cupolas_sanitize_operations_total{level="strict"} 5678
- * 
+ *
  * # HELP cupolas_audit_events_total Total audit events logged
  * # TYPE cupolas_audit_events_total counter
  * cupolas_audit_events_total{service="tool_d"} 9012
  */
-size_t cupolas_monitoring_export(cupolas_monitoring_t* mgr, char* buffer, size_t size);
+size_t cupolas_monitoring_export(cupolas_monitoring_t *mgr, char *buffer, size_t size);
 
 /**
  * @brief Export metrics in OpenTelemetry OTLP JSON format
@@ -198,7 +199,7 @@ size_t cupolas_monitoring_export(cupolas_monitoring_t* mgr, char* buffer, size_t
  * @reentrant Yes
  * @ownership buffer: caller provides buffer, function writes to it
  */
-size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, size_t size);
+size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, size_t size);
 
 /**
  * @brief Register custom health check callback
@@ -210,9 +211,8 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
  * @reentrant No
  * @ownership name and callback: caller retains ownership
  */
-int cupolas_monitoring_register_health_check(cupolas_monitoring_t* mgr,
-                                          const char* name,
-                                          health_check_fn_t callback);
+int cupolas_monitoring_register_health_check(cupolas_monitoring_t *mgr, const char *name,
+                                             health_check_fn_t callback);
 
 /**
  * @brief Execute all registered health checks
@@ -224,9 +224,8 @@ int cupolas_monitoring_register_health_check(cupolas_monitoring_t* mgr,
  * @reentrant Yes
  * @ownership results: caller provides buffer, function writes to it
  */
-int cupolas_monitoring_check_health(cupolas_monitoring_t* mgr,
-                                 health_check_result_t* results,
-                                 size_t max_results);
+int cupolas_monitoring_check_health(cupolas_monitoring_t *mgr, health_check_result_t *results,
+                                    size_t max_results);
 
 /* ============================================================================
  * Query Functions
@@ -239,7 +238,7 @@ int cupolas_monitoring_check_health(cupolas_monitoring_t* mgr,
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* cupolas_monitoring_get_listen_addr(cupolas_monitoring_t* mgr);
+const char *cupolas_monitoring_get_listen_addr(cupolas_monitoring_t *mgr);
 
 /**
  * @brief Set metric filter patterns
@@ -250,9 +249,8 @@ const char* cupolas_monitoring_get_listen_addr(cupolas_monitoring_t* mgr);
  * @note Thread-safe: Safe to call from main thread only
  * @reentrant No
  */
-int cupolas_monitoring_set_filter(cupolas_monitoring_t* mgr,
-                               const char** include_patterns,
-                               const char** exclude_patterns);
+int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **include_patterns,
+                                  const char **exclude_patterns);
 
 /**
  * @brief Get total number of registered metrics
@@ -261,7 +259,7 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t* mgr,
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-size_t cupolas_monitoring_get_metric_count(cupolas_monitoring_t* mgr);
+size_t cupolas_monitoring_get_metric_count(cupolas_monitoring_t *mgr);
 
 /**
  * @brief Get timestamp of last successful report
@@ -270,7 +268,7 @@ size_t cupolas_monitoring_get_metric_count(cupolas_monitoring_t* mgr);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-uint64_t cupolas_monitoring_get_last_report_time(cupolas_monitoring_t* mgr);
+uint64_t cupolas_monitoring_get_last_report_time(cupolas_monitoring_t *mgr);
 
 /**
  * @brief Get last error message
@@ -279,7 +277,7 @@ uint64_t cupolas_monitoring_get_last_report_time(cupolas_monitoring_t* mgr);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* cupolas_monitoring_get_last_error(cupolas_monitoring_t* mgr);
+const char *cupolas_monitoring_get_last_error(cupolas_monitoring_t *mgr);
 
 /* ============================================================================
  * Convenience Functions - Configuration Builders
@@ -293,7 +291,7 @@ const char* cupolas_monitoring_get_last_error(cupolas_monitoring_t* mgr);
  * @reentrant Yes
  * @ownership Returns owned pointer: caller must call monitoring_config_destroy()
  */
-monitoring_config_t* monitoring_config_create_prometheus(uint16_t port);
+monitoring_config_t *monitoring_config_create_prometheus(uint16_t port);
 
 /**
  * @brief Create default OpenTelemetry configuration
@@ -305,8 +303,8 @@ monitoring_config_t* monitoring_config_create_prometheus(uint16_t port);
  * @ownership Returns owned pointer: caller must call monitoring_config_destroy()
  * @ownership endpoint and service_name: caller retains ownership
  */
-monitoring_config_t* monitoring_config_create_opentelemetry(const char* endpoint,
-                                                            const char* service_name);
+monitoring_config_t *monitoring_config_create_opentelemetry(const char *endpoint,
+                                                            const char *service_name);
 
 /**
  * @brief Destroy configuration structure
@@ -315,7 +313,7 @@ monitoring_config_t* monitoring_config_create_opentelemetry(const char* endpoint
  * @reentrant No
  * @ownership config: transferred to this function, will be freed
  */
-void monitoring_config_destroy(monitoring_config_t* config);
+void monitoring_config_destroy(monitoring_config_t *config);
 
 /* ============================================================================
  * String Conversion Functions
@@ -328,7 +326,7 @@ void monitoring_config_destroy(monitoring_config_t* config);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* monitoring_backend_string(monitoring_backend_t backend);
+const char *monitoring_backend_string(monitoring_backend_t backend);
 
 /**
  * @brief Get status name string
@@ -337,7 +335,7 @@ const char* monitoring_backend_string(monitoring_backend_t backend);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* monitoring_status_string(monitoring_status_t status);
+const char *monitoring_status_string(monitoring_status_t status);
 
 /* ============================================================================
  * Singleton Pattern Functions
@@ -349,7 +347,7 @@ const char* monitoring_status_string(monitoring_status_t status);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-cupolas_monitoring_t* cupolas_monitoring_get_instance(void);
+cupolas_monitoring_t *cupolas_monitoring_get_instance(void);
 
 /**
  * @brief Initialize singleton monitoring instance
@@ -359,7 +357,7 @@ cupolas_monitoring_t* cupolas_monitoring_get_instance(void);
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_monitoring_init_instance(const monitoring_config_t* config);
+int cupolas_monitoring_init_instance(const monitoring_config_t *config);
 
 /**
  * @brief Shutdown singleton monitoring instance
@@ -387,7 +385,7 @@ void cupolas_monitoring_shutdown_instance(void);
  *
  * @since 0.0.5
  */
-int cupolas_monitoring_register_endpoints(cupolas_monitoring_t* mgr, gateway_t* gw);
+int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr, gateway_t *gw);
 
 #ifdef __cplusplus
 }

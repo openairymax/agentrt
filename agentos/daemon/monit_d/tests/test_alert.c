@@ -4,17 +4,19 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "monitor_service.h"
+
+#include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include <stdint.h>
-#include "monitor_service.h"
 
-static void test_monitor_service_create_destroy(void) {
+static void test_monitor_service_create_destroy(void)
+{
     printf("  test_monitor_service_create_destroy...\n");
 
-    monitor_service_t* svc = NULL;
+    monitor_service_t *svc = NULL;
     int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
     assert(svc != NULL);
@@ -25,10 +27,11 @@ static void test_monitor_service_create_destroy(void) {
     printf("    PASSED\n");
 }
 
-static void test_alert_trigger(void) {
+static void test_alert_trigger(void)
+{
     printf("  test_alert_trigger...\n");
 
-    monitor_service_t* svc = NULL;
+    monitor_service_t *svc = NULL;
     int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
@@ -49,7 +52,8 @@ static void test_alert_trigger(void) {
     printf("    PASSED\n");
 }
 
-static void test_alert_severity(void) {
+static void test_alert_severity(void)
+{
     printf("  test_alert_severity...\n");
 
     assert(ALERT_LEVEL_INFO == 0);
@@ -60,10 +64,11 @@ static void test_alert_severity(void) {
     printf("    PASSED\n");
 }
 
-static void test_alert_resolve(void) {
+static void test_alert_resolve(void)
+{
     printf("  test_alert_resolve...\n");
 
-    monitor_service_t* svc = NULL;
+    monitor_service_t *svc = NULL;
     int ret __attribute__((unused)) = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
@@ -86,10 +91,11 @@ static void test_alert_resolve(void) {
     printf("    PASSED\n");
 }
 
-static void test_alert_get_alerts(void) {
+static void test_alert_get_alerts(void)
+{
     printf("  test_alert_get_alerts...\n");
 
-    monitor_service_t* svc = NULL;
+    monitor_service_t *svc = NULL;
     int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
@@ -103,7 +109,7 @@ static void test_alert_get_alerts(void) {
 
     monitor_service_trigger_alert(svc, &alert);
 
-    alert_info_t** alerts = NULL;
+    alert_info_t **alerts = NULL;
     size_t count = 0;
     ret = monitor_service_get_alerts(svc, &alerts, &count);
     if (ret == 0) {
@@ -115,7 +121,8 @@ static void test_alert_get_alerts(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Alert Manager Unit Tests\n");
     printf("=========================================\n");

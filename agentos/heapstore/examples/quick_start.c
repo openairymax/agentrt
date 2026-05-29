@@ -12,17 +12,18 @@
  *       适合首次使用 heapstore 的开发者快速上手。
  */
 
+#include "heapstore.h"
+#include "heapstore_token.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "heapstore.h"
-#include "heapstore_token.h"
-
 /**
  * @brief 错误处理辅助函数
  */
-static void check_error(heapstore_error_t err, const char* context) {
+static void check_error(heapstore_error_t err, const char *context)
+{
     if (err != heapstore_SUCCESS) {
         printf("ERROR: %s failed with error code %d\n", context, err);
         exit(1);
@@ -33,7 +34,8 @@ static void check_error(heapstore_error_t err, const char* context) {
 /**
  * @brief 打印内存池统计信息
  */
-static void print_memory_stats(void) {
+static void print_memory_stats(void)
+{
     heapstore_memory_stats_t stats;
     heapstore_error_t err = heapstore_memory_get_stats(&stats);
     if (err == heapstore_SUCCESS) {
@@ -46,7 +48,8 @@ static void print_memory_stats(void) {
 /**
  * @brief 主函数：快速入门示例
  */
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     (void)argc;
     (void)argv;
 
@@ -56,18 +59,16 @@ int main(int argc, char** argv) {
 
     /* 1. 初始化 heapstore */
     printf("Step 1: Initialize heapstore\n");
-    heapstore_config_t config = {
-        .root_path = "./heapstore_data",
-        .max_log_size_mb = 100,
-        .log_retention_days = 7,
-        .trace_retention_days = 3,
-        .enable_auto_cleanup = true,
-        .enable_log_rotation = true,
-        .enable_trace_export = true,
-        .db_vacuum_interval_days = 7,
-        .circuit_breaker_threshold = 5,
-        .circuit_breaker_timeout_sec = 30
-    };
+    heapstore_config_t config = {.root_path = "./heapstore_data",
+                                 .max_log_size_mb = 100,
+                                 .log_retention_days = 7,
+                                 .trace_retention_days = 3,
+                                 .enable_auto_cleanup = true,
+                                 .enable_log_rotation = true,
+                                 .enable_trace_export = true,
+                                 .db_vacuum_interval_days = 7,
+                                 .circuit_breaker_threshold = 5,
+                                 .circuit_breaker_timeout_sec = 30};
 
     heapstore_error_t err = heapstore_init(&config);
     check_error(err, "heapstore_init");
@@ -93,7 +94,8 @@ int main(int argc, char** argv) {
     err = heapstore_token_get_stats(&token_stats);
     if (err == heapstore_SUCCESS) {
         printf("  - Total Prompt Tokens: %lu\n", (unsigned long)token_stats.total_prompt_tokens);
-        printf("  - Total Completion Tokens: %lu\n", (unsigned long)token_stats.total_completion_tokens);
+        printf("  - Total Completion Tokens: %lu\n",
+               (unsigned long)token_stats.total_completion_tokens);
         printf("  - Write Operations: %lu\n", (unsigned long)token_stats.total_write_operations);
         printf("  - Cache Saved Tokens: %lu\n", (unsigned long)token_stats.tokens_saved_by_cache);
     }
@@ -101,13 +103,8 @@ int main(int argc, char** argv) {
 
     /* 5. 写入日志 */
     printf("Step 5: Write Log\n");
-    err = heapstore_log_write(
-        HEAPSTORE_LOG_INFO,
-        "quick_start_example",
-        NULL,
-        NULL, 0,
-        "Hello from heapstore quick start!"
-    );
+    err = heapstore_log_write(HEAPSTORE_LOG_INFO, "quick_start_example", NULL, NULL, 0,
+                              "Hello from heapstore quick start!");
     check_error(err, "heapstore_log_write");
     printf("\n");
 
@@ -148,7 +145,8 @@ int main(int argc, char** argv) {
     err = heapstore_health_check(&health);
     if (err == heapstore_SUCCESS) {
         printf("  - Overall Status: %s\n", health.is_healthy ? "HEALTHY" : "UNHEALTHY");
-        printf("  - Subsystems: %d/%d healthy\n", health.healthy_subsystems, health.total_subsystems);
+        printf("  - Subsystems: %d/%d healthy\n", health.healthy_subsystems,
+               health.total_subsystems);
     }
     printf("\n");
 

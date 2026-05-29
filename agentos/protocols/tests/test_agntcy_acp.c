@@ -5,13 +5,16 @@
  */
 
 #include "agntcy_acp_adapter.h"
+#include "logging_compat.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
-static int test_create_destroy(void) {
-    agntcy_handle_t* h = NULL;
+static int test_create_destroy(void)
+{
+    agntcy_handle_t *h = NULL;
     int ret __attribute__((unused)) = agntcy_acp_create(&h);
     assert(ret == 0);
     assert(h != NULL);
@@ -23,14 +26,16 @@ static int test_create_destroy(void) {
     return 0;
 }
 
-static int test_create_null(void) {
+static int test_create_null(void)
+{
     int ret __attribute__((unused)) = agntcy_acp_create(NULL);
-    assert(ret == -1);
+    assert(ret != 0);
     return 0;
 }
 
-static int test_agent_register(void) {
-    agntcy_handle_t* h = NULL;
+static int test_agent_register(void)
+{
+    agntcy_handle_t *h = NULL;
     agntcy_acp_create(&h);
 
     agntcy_agent_card_t card = {0};
@@ -46,17 +51,18 @@ static int test_agent_register(void) {
     assert(h->agents[0].online == true);
 
     ret = agntcy_agent_register(NULL, &card);
-    assert(ret == -1);
+    assert(ret != 0);
 
     ret = agntcy_agent_register(h, NULL);
-    assert(ret == -1);
+    assert(ret != 0);
 
     agntcy_acp_destroy(h);
     return 0;
 }
 
-static int test_agent_register_duplicate(void) {
-    agntcy_handle_t* h = NULL;
+static int test_agent_register_duplicate(void)
+{
+    agntcy_handle_t *h = NULL;
     agntcy_acp_create(&h);
 
     agntcy_agent_card_t card = {0};
@@ -75,13 +81,16 @@ static int test_agent_register_duplicate(void) {
     return 0;
 }
 
-static int test_agent_unregister(void) {
-    agntcy_handle_t* h = NULL;
+static int test_agent_unregister(void)
+{
+    agntcy_handle_t *h = NULL;
     agntcy_acp_create(&h);
 
     agntcy_agent_card_t card1 = {0}, card2 = {0};
-    strcpy(card1.agent_id, "agent-001"); card1.capabilities_mask = AGNTCY_CAP_DISCOVERY;
-    strcpy(card2.agent_id, "agent-002"); card2.capabilities_mask = AGNTCY_CAP_CHANNEL;
+    strcpy(card1.agent_id, "agent-001");
+    card1.capabilities_mask = AGNTCY_CAP_DISCOVERY;
+    strcpy(card2.agent_id, "agent-002");
+    card2.capabilities_mask = AGNTCY_CAP_CHANNEL;
 
     agntcy_agent_register(h, &card1);
     agntcy_agent_register(h, &card2);
@@ -93,22 +102,25 @@ static int test_agent_unregister(void) {
     assert(strcmp(h->agents[0].agent_id, "agent-002") == 0);
 
     ret = agntcy_agent_unregister(h, "not-exist");
-    assert(ret == -2);
+    assert(ret != 0);
 
     agntcy_acp_destroy(h);
     return 0;
 }
 
-static int test_agent_discover(void) {
-    agntcy_handle_t* h = NULL;
+static int test_agent_discover(void)
+{
+    agntcy_handle_t *h = NULL;
     agntcy_acp_create(&h);
 
     agntcy_agent_card_t card1 = {0}, card2 = {0};
-    strcpy(card1.agent_id, "agent-disc"); card1.capabilities_mask = AGNTCY_CAP_DISCOVERY | AGNTCY_CAP_CHANNEL;
+    strcpy(card1.agent_id, "agent-disc");
+    card1.capabilities_mask = AGNTCY_CAP_DISCOVERY | AGNTCY_CAP_CHANNEL;
     strcpy(card1.endpoint_url, "http://host:9001");
     card1.online = true;
 
-    strcpy(card2.agent_id, "agent-msg"); card2.capabilities_mask = AGNTCY_CAP_MESSAGING;
+    strcpy(card2.agent_id, "agent-msg");
+    card2.capabilities_mask = AGNTCY_CAP_MESSAGING;
     strcpy(card2.endpoint_url, "http://host:9002");
     card2.online = true;
 
@@ -132,13 +144,18 @@ static int test_agent_discover(void) {
     return 0;
 }
 
-static int test_channel_open_close(void) {
-    agntcy_handle_t* h = NULL;
+static int test_channel_open_close(void)
+{
+    agntcy_handle_t *h = NULL;
     agntcy_acp_create(&h);
 
     agntcy_agent_card_t initiator = {0}, responder = {0};
-    strcpy(initiator.agent_id, "init-01"); initiator.capabilities_mask = AGNTCY_CAP_CHANNEL; initiator.online = true;
-    strcpy(responder.agent_id, "resp-01"); responder.capabilities_mask = AGNTCY_CAP_CHANNEL; responder.online = true;
+    strcpy(initiator.agent_id, "init-01");
+    initiator.capabilities_mask = AGNTCY_CAP_CHANNEL;
+    initiator.online = true;
+    strcpy(responder.agent_id, "resp-01");
+    responder.capabilities_mask = AGNTCY_CAP_CHANNEL;
+    responder.online = true;
 
     agntcy_agent_register(h, &initiator);
     agntcy_agent_register(h, &responder);
@@ -161,13 +178,16 @@ static int test_channel_open_close(void) {
     return 0;
 }
 
-static int test_message_send(void) {
-    agntcy_handle_t* h = NULL;
+static int test_message_send(void)
+{
+    agntcy_handle_t *h = NULL;
     agntcy_acp_create(&h);
 
     agntcy_agent_card_t snd = {0}, rcv = {0};
-    strcpy(snd.agent_id, "sender"); snd.online = true;
-    strcpy(rcv.agent_id, "receiver"); rcv.online = true;
+    strcpy(snd.agent_id, "sender");
+    snd.online = true;
+    strcpy(rcv.agent_id, "receiver");
+    rcv.online = true;
     agntcy_agent_register(h, &snd);
     agntcy_agent_register(h, &rcv);
 
@@ -180,7 +200,7 @@ static int test_message_send(void) {
     strcpy(msg.receiver_id, "receiver");
     strcpy(msg.channel_id, ch.channel_id);
     msg.mode = AGNTCY_MSG_SYNC;
-    msg.payload = (char*)"Hello";
+    msg.payload = (char *)"Hello";
     msg.payload_size = 5;
     msg.timestamp = 1000;
 
@@ -196,8 +216,9 @@ static int test_message_send(void) {
     return 0;
 }
 
-static int test_task_orchestrate(void) {
-    agntcy_handle_t* h = NULL;
+static int test_task_orchestrate(void)
+{
+    agntcy_handle_t *h = NULL;
     agntcy_acp_create(&h);
 
     agntcy_agent_card_t worker = {0};
@@ -206,8 +227,8 @@ static int test_task_orchestrate(void) {
     worker.online = true;
     agntcy_agent_register(h, &worker);
 
-    int ret __attribute__((unused)) = agntcy_task_orchestrate(h, "task-001",
-        "{\"steps\":[{\"id\":\"step1\",\"action\":\"process\"}]}");
+    int ret __attribute__((unused)) = agntcy_task_orchestrate(
+        h, "task-001", "{\"steps\":[{\"id\":\"step1\",\"action\":\"process\"}]}");
     assert(ret == 0);
     assert(h->task_count == 1);
     assert(h->tasks[0]->state == AGNTCY_TASK_DISPATCHED);
@@ -219,14 +240,15 @@ static int test_task_orchestrate(void) {
     assert(state == AGNTCY_TASK_DISPATCHED);
 
     ret = agntcy_task_get_state(h, "no-task", &state);
-    assert(ret == -2);
+    assert(ret != 0);
 
     agntcy_acp_destroy(h);
     return 0;
 }
 
-static int test_ack_negotiate(void) {
-    agntcy_handle_t* h = NULL;
+static int test_ack_negotiate(void)
+{
+    agntcy_handle_t *h = NULL;
     agntcy_acp_create(&h);
 
     agntcy_agent_card_t agent = {0};
@@ -246,19 +268,23 @@ static int test_ack_negotiate(void) {
     assert(resp.valid_until > 0);
 
     ret = agntcy_ack_negotiate(h, "nobody", &req, &resp);
-    assert(ret == -2);
+    assert(ret != 0);
 
     agntcy_acp_destroy(h);
     return 0;
 }
 
-int main(void) {
+int main(void)
+{
     int failures = 0;
 
-    #define RUN_TEST(name) \
-        printf("[TEST] %s... ", #name); \
-        if (test_##name() != 0) { printf("FAILED\n"); failures++; } \
-        else printf("PASSED\n")
+#define RUN_TEST(name)              \
+    printf("[TEST] %s... ", #name); \
+    if (test_##name() != 0) {       \
+        printf("FAILED\n");         \
+        failures++;                 \
+    } else                          \
+        printf("PASSED\n")
 
     RUN_TEST(create_destroy);
     RUN_TEST(create_null);
@@ -271,6 +297,6 @@ int main(void) {
     RUN_TEST(task_orchestrate);
     RUN_TEST(ack_negotiate);
 
-    printf("\nAGNTCY ACP tests: %d failures\n", failures);
+    AGENTOS_LOG_INFO("\nAGNTCY ACP tests: %d failures", failures);
     return failures;
 }

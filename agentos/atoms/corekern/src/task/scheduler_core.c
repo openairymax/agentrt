@@ -1,33 +1,39 @@
+#include "agentos.h"
 /**
  * @file scheduler_core.c
  * @brief 调度器核心层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "scheduler_core.h"
 #include "mem.h"
+#include "scheduler_core.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "atomic_compat.h"
 #include "memory_compat.h"
 #include "string_compat.h"
+
 #include <string.h>
 
 /* ==================== 静态全局状态 ==================== */
 
-static scheduler_core_ctx_t* g_core_ctx = NULL;
+static scheduler_core_ctx_t *g_core_ctx = NULL;
 
-static void* g_ctx_init_lock = NULL;
+static void *g_ctx_init_lock = NULL;
 
 /* ==================== 内部辅助函数 ==================== */
 
 /**
  * @brief 创建并初始化核心上下? * @return 新创建的上下文，失败返回NULL
  */
-static scheduler_core_ctx_t* create_core_ctx(void) {
-    scheduler_core_ctx_t* ctx = (scheduler_core_ctx_t*)AGENTOS_CALLOC(1, sizeof(scheduler_core_ctx_t));
-    if (!ctx) return NULL;
+static scheduler_core_ctx_t *create_core_ctx(void)
+{
+    scheduler_core_ctx_t *ctx =
+        (scheduler_core_ctx_t *)AGENTOS_CALLOC(1, sizeof(scheduler_core_ctx_t));
+    if (!ctx)
+        return NULL;
 
     /* 创建任务表互斥锁 */
     ctx->task_table_lock = agentos_mutex_create();
@@ -50,14 +56,16 @@ static scheduler_core_ctx_t* create_core_ctx(void) {
 /**
  * @brief 销毁核心上下文
  * @param ctx 要销毁的上下? */
-static void destroy_core_ctx(scheduler_core_ctx_t* ctx) {
-    if (!ctx) return;
+static void destroy_core_ctx(scheduler_core_ctx_t *ctx)
+{
+    if (!ctx)
+        return;
 
     /* 销毁所有哈希表节点 */
     for (size_t i = 0; i < HASH_TABLE_BUCKETS; i++) {
-        task_hash_node_t* node = ctx->id_hash_table[i];
+        task_hash_node_t *node = ctx->id_hash_table[i];
         while (node) {
-            task_hash_node_t* next = node->next;
+            task_hash_node_t *next = node->next;
             AGENTOS_FREE(node);
             node = next;
         }
@@ -79,30 +87,33 @@ static void destroy_core_ctx(scheduler_core_ctx_t* ctx) {
 
 /* ==================== 公共API实现 ==================== */
 
-scheduler_core_ctx_t* scheduler_core_get_ctx(void) {
+scheduler_core_ctx_t *scheduler_core_get_ctx(void)
+{
     return g_core_ctx;
 }
 
-int scheduler_core_init(void) {
-    if (atomic_load_ptr((_Atomic void**)&g_core_ctx, memory_order_acquire)) {
+int scheduler_core_init(void)
+{
+    if (atomic_load_ptr((_Atomic void **)&g_core_ctx, memory_order_acquire)) {
         return 0;
     }
 
     if (!g_ctx_init_lock) {
-        void* new_lock = agentos_mutex_create();
-        if (!new_lock) return -1;
+        void *new_lock = agentos_mutex_create();
+        if (!new_lock)
+            return AGENTOS_EINVAL;
 
-        void* expected = NULL;
-        if (!atomic_compare_exchange_strong_ptr(
-                (_Atomic void**)&g_ctx_init_lock, &expected, new_lock,
-                memory_order_seq_cst, memory_order_seq_cst)) {
+        void *expected = NULL;
+        if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&g_ctx_init_lock, &expected,
+                                                new_lock, memory_order_seq_cst,
+                                                memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
     }
 
     agentos_mutex_lock(g_ctx_init_lock);
 
-    if (atomic_load_ptr((_Atomic void**)&g_core_ctx, memory_order_acquire)) {
+    if (atomic_load_ptr((_Atomic void **)&g_core_ctx, memory_order_acquire)) {
         agentos_mutex_unlock(g_ctx_init_lock);
         return 0;
     }
@@ -110,7 +121,7 @@ int scheduler_core_init(void) {
     g_core_ctx = create_core_ctx();
     if (!g_core_ctx) {
         agentos_mutex_unlock(g_ctx_init_lock);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     atomic_store_explicit(&g_core_ctx->initialized, 1, memory_order_release);
@@ -120,8 +131,10 @@ int scheduler_core_init(void) {
     return 0;
 }
 
-void scheduler_core_destroy(void) {
-    if (!g_core_ctx) return;
+void scheduler_core_destroy(void)
+{
+    if (!g_core_ctx)
+        return;
 
     agentos_mutex_lock(g_ctx_init_lock);
 
@@ -134,21 +147,28 @@ void scheduler_core_destroy(void) {
     g_ctx_init_lock = NULL;
 }
 
-int scheduler_core_is_initialized(void) {
-    return g_core_ctx && (atomic_load_explicit(&g_core_ctx->initialized, memory_order_acquire) == 1);
+int scheduler_core_is_initialized(void)
+{
+    return g_core_ctx &&
+           (atomic_load_explicit(&g_core_ctx->initialized, memory_order_acquire) == 1);
 }
 
-uint64_t scheduler_core_fetch_add_task_id(void) {
-    if (!g_core_ctx) return 0;
+uint64_t scheduler_core_fetch_add_task_id(void)
+{
+    if (!g_core_ctx)
+        return 0;
     return atomic_fetch_add_explicit(&g_core_ctx->next_task_id, 1, memory_order_seq_cst);
 }
 
-void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t* info) {
-    if (!g_core_ctx || !info) return;
+void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t *info)
+{
+    if (!g_core_ctx || !info)
+        return;
 
     size_t bucket = task_hash_core(id);
-    task_hash_node_t* node = (task_hash_node_t*)AGENTOS_MALLOC(sizeof(task_hash_node_t));
-    if (!node) return;
+    task_hash_node_t *node = (task_hash_node_t *)AGENTOS_MALLOC(sizeof(task_hash_node_t));
+    if (!node)
+        return;
 
     node->id = id;
     node->task_info = info;
@@ -156,11 +176,13 @@ void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t* info) {
     g_core_ctx->id_hash_table[bucket] = node;
 }
 
-task_info_core_t* scheduler_core_hash_find(agentos_task_id_t id) {
-    if (!g_core_ctx) return NULL;
+task_info_core_t *scheduler_core_hash_find(agentos_task_id_t id)
+{
+    if (!g_core_ctx)
+        return NULL;
 
     size_t bucket = task_hash_core(id);
-    task_hash_node_t* node = g_core_ctx->id_hash_table[bucket];
+    task_hash_node_t *node = g_core_ctx->id_hash_table[bucket];
 
     while (node) {
         if (node->id == id) {
@@ -172,12 +194,14 @@ task_info_core_t* scheduler_core_hash_find(agentos_task_id_t id) {
     return NULL;
 }
 
-void scheduler_core_hash_remove(agentos_task_id_t id) {
-    if (!g_core_ctx) return;
+void scheduler_core_hash_remove(agentos_task_id_t id)
+{
+    if (!g_core_ctx)
+        return;
 
     size_t bucket = task_hash_core(id);
-    task_hash_node_t* node = g_core_ctx->id_hash_table[bucket];
-    task_hash_node_t* prev = NULL;
+    task_hash_node_t *node = g_core_ctx->id_hash_table[bucket];
+    task_hash_node_t *prev = NULL;
 
     while (node) {
         if (node->id == id) {
@@ -194,15 +218,13 @@ void scheduler_core_hash_remove(agentos_task_id_t id) {
     }
 }
 
-task_info_core_t* scheduler_core_task_info_create(
-    agentos_task_id_t id,
-    void* (*entry)(void*),
-    void* arg,
-    const char* name,
-    int priority) {
+task_info_core_t *scheduler_core_task_info_create(agentos_task_id_t id, void *(*entry)(void *),
+                                                  void *arg, const char *name, int priority)
+{
 
-    task_info_core_t* info = (task_info_core_t*)AGENTOS_CALLOC(1, sizeof(task_info_core_t));
-    if (!info) return NULL;
+    task_info_core_t *info = (task_info_core_t *)AGENTOS_CALLOC(1, sizeof(task_info_core_t));
+    if (!info)
+        return NULL;
 
     info->id = id;
     info->entry = entry;
@@ -225,30 +247,36 @@ task_info_core_t* scheduler_core_task_info_create(
     return info;
 }
 
-void scheduler_core_task_info_destroy(task_info_core_t* info) {
-    if (!info) return;
+void scheduler_core_task_info_destroy(task_info_core_t *info)
+{
+    if (!info)
+        return;
 
     /* 注意：platform_handle和platform_data由平台适配器清?*/
     AGENTOS_FREE(info);
 }
 
-int scheduler_core_task_table_add(task_info_core_t* info) {
-    if (!g_core_ctx || !info) return -1;
+int scheduler_core_task_table_add(task_info_core_t *info)
+{
+    if (!g_core_ctx || !info)
+        return AGENTOS_EINVAL;
 
     if (g_core_ctx->task_count >= TASK_TABLE_CAPACITY) {
-        return -1;  /* 表已?*/
+        return AGENTOS_EINVAL; /* 表已?*/
     }
 
     g_core_ctx->task_table[g_core_ctx->task_count++] = info;
     return 0;
 }
 
-task_info_core_t* scheduler_core_task_table_remove(agentos_task_id_t id) {
-    if (!g_core_ctx) return NULL;
+task_info_core_t *scheduler_core_task_table_remove(agentos_task_id_t id)
+{
+    if (!g_core_ctx)
+        return NULL;
 
     for (uint32_t i = 0; i < g_core_ctx->task_count; i++) {
         if (g_core_ctx->task_table[i] && g_core_ctx->task_table[i]->id == id) {
-            task_info_core_t* removed = g_core_ctx->task_table[i];
+            task_info_core_t *removed = g_core_ctx->task_table[i];
 
             /* 移动最后一个元素到当前位置 */
             g_core_ctx->task_table[i] = g_core_ctx->task_table[g_core_ctx->task_count - 1];
@@ -262,11 +290,14 @@ task_info_core_t* scheduler_core_task_table_remove(agentos_task_id_t id) {
     return NULL;
 }
 
-task_info_core_t* scheduler_core_find_by_platform_handle(void* platform_handle) {
-    if (!g_core_ctx || !platform_handle) return NULL;
+task_info_core_t *scheduler_core_find_by_platform_handle(void *platform_handle)
+{
+    if (!g_core_ctx || !platform_handle)
+        return NULL;
 
     for (uint32_t i = 0; i < g_core_ctx->task_count; i++) {
-        if (g_core_ctx->task_table[i] && g_core_ctx->task_table[i]->platform_handle == platform_handle) {
+        if (g_core_ctx->task_table[i] &&
+            g_core_ctx->task_table[i]->platform_handle == platform_handle) {
             return g_core_ctx->task_table[i];
         }
     }

@@ -3,9 +3,9 @@
 /**
  * @file compat.h
  * @brief 跨平台兼容性定义
- * 
+ *
  * 提供编译器兼容性、平台抽象宏、位操作工具等。
- * 
+ *
  * @see docs/Capital_Specifications/coding_standard/C_coding_style_standard.md
  */
 
@@ -15,16 +15,17 @@
 /* ==================== Windows 平台专用定义 ==================== */
 
 #ifdef _WIN32
-    #ifndef _SSIZE_T_DEFINED
-    #define _SSIZE_T_DEFINED
-    #include <BaseTsd.h>
-    typedef SSIZE_T ssize_t;
-    #endif
+#ifndef _SSIZE_T_DEFINED
+#define _SSIZE_T_DEFINED
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
 #endif
+#endif
+
+#include "atomic_compat.h"
 
 #include <stddef.h>
 #include <stdint.h>
-#include "atomic_compat.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,193 +35,199 @@ extern "C" {
 
 #ifndef AGENTOS_API
 #ifdef _WIN32
-    #ifdef AGENTOS_BUILD_SHARED
-        #define AGENTOS_API __declspec(dllexport)
-    #elif defined(AGENTOS_USE_SHARED)
-        #define AGENTOS_API __declspec(dllimport)
-    #else
-        #define AGENTOS_API
-    #endif
+#ifdef AGENTOS_BUILD_SHARED
+#define AGENTOS_API __declspec(dllexport)
+#elif defined(AGENTOS_USE_SHARED)
+#define AGENTOS_API __declspec(dllimport)
 #else
-    #define AGENTOS_API __attribute__((visibility("default")))
+#define AGENTOS_API
+#endif
+#else
+#define AGENTOS_API __attribute__((visibility("default")))
 #endif
 #endif /* AGENTOS_API */
 
 /* ==================== 编译器检测 ==================== */
 
 #if defined(__GNUC__)
-    #define AGENTOS_COMPILER_GCC     1
-    #define AGENTOS_COMPILER_NAME    "GCC"
-    #define AGENTOS_COMPILER_VERSION __GNUC__
+#define AGENTOS_COMPILER_GCC 1
+#define AGENTOS_COMPILER_NAME "GCC"
+#define AGENTOS_COMPILER_VERSION __GNUC__
 #elif defined(__clang__)
-    #define AGENTOS_COMPILER_CLANG   1
-    #define AGENTOS_COMPILER_NAME    "Clang"
-    #define AGENTOS_COMPILER_VERSION __clang_major__
+#define AGENTOS_COMPILER_CLANG 1
+#define AGENTOS_COMPILER_NAME "Clang"
+#define AGENTOS_COMPILER_VERSION __clang_major__
 #elif defined(_MSC_VER)
-    #define AGENTOS_COMPILER_MSVC    1
-    #define AGENTOS_COMPILER_NAME    "MSVC"
-    #define AGENTOS_COMPILER_VERSION _MSC_VER
+#define AGENTOS_COMPILER_MSVC 1
+#define AGENTOS_COMPILER_NAME "MSVC"
+#define AGENTOS_COMPILER_VERSION _MSC_VER
 #else
-    #define AGENTOS_COMPILER_UNKNOWN 1
-    #define AGENTOS_COMPILER_NAME    "Unknown"
-    #define AGENTOS_COMPILER_VERSION 0
+#define AGENTOS_COMPILER_UNKNOWN 1
+#define AGENTOS_COMPILER_NAME "Unknown"
+#define AGENTOS_COMPILER_VERSION 0
 #endif
 
 /* ==================== 平台检测 ==================== */
 
 #if defined(_WIN32) || defined(_WIN64)
-    #define AGENTOS_PLATFORM_WINDOWS 1
-    #define AGENTOS_PLATFORM_NAME    "Windows"
+#define AGENTOS_PLATFORM_WINDOWS 1
+#define AGENTOS_PLATFORM_NAME "Windows"
 #elif defined(__linux__)
-    #define AGENTOS_PLATFORM_LINUX   1
-    #define AGENTOS_PLATFORM_NAME    "Linux"
+#define AGENTOS_PLATFORM_LINUX 1
+#define AGENTOS_PLATFORM_NAME "Linux"
 #elif defined(__APPLE__)
-    #define AGENTOS_PLATFORM_MACOS   1
-    #define AGENTOS_PLATFORM_NAME    "macOS"
+#define AGENTOS_PLATFORM_MACOS 1
+#define AGENTOS_PLATFORM_NAME "macOS"
 #else
-    #define AGENTOS_PLATFORM_UNKNOWN 1
-    #define AGENTOS_PLATFORM_NAME    "Unknown"
+#define AGENTOS_PLATFORM_UNKNOWN 1
+#define AGENTOS_PLATFORM_NAME "Unknown"
 #endif
 
 /* ==================== 编译器属性宏 ==================== */
 
 #if defined(AGENTOS_COMPILER_GCC) || defined(AGENTOS_COMPILER_CLANG)
-    #ifndef AGENTOS_INLINE
-    #define AGENTOS_INLINE          static inline __attribute__((always_inline))
-    #endif
-    #define AGENTOS_NOINLINE        __attribute__((noinline))
-    #ifndef AGENTOS_UNUSED
-    #define AGENTOS_UNUSED          __attribute__((unused))
-    #endif
-    #define AGENTOS_USED            __attribute__((used))
-    #define AGENTOS_WEAK            __attribute__((weak))
-    #define AGENTOS_PACKED          __attribute__((packed))
-    #define AGENTOS_ALIGNED(x)      __attribute__((aligned(x)))
-    #define AGENTOS_DEPRECATED      __attribute__((deprecated))
-    #define AGENTOS_FALLTHROUGH     __attribute__((fallthrough))
-    #define AGENTOS_PRINTF_FORMAT(fmt, args) __attribute__((format(printf, fmt, args))) /* flawfinder: ignore - compile-time format attribute */
-    #define AGENTOS_SCANF_FORMAT(fmt, args)  __attribute__((format(scanf, fmt, args)))  /* flawfinder: ignore - compile-time format attribute */
-    #define AGENTOS_LIKELY(x)       __builtin_expect(!!(x), 1)
-    #define AGENTOS_UNLIKELY(x)     __builtin_expect(!!(x), 0)
-    #define AGENTOS_PREFETCH(x)     __builtin_prefetch(x)
-    #define AGENTOS_UNREACHABLE()   __builtin_unreachable()
-    #define AGENTOS_ASSUME(x)       do { if (!(x)) __builtin_unreachable(); } while (0)
+#ifndef AGENTOS_INLINE
+#define AGENTOS_INLINE static inline __attribute__((always_inline))
+#endif
+#define AGENTOS_NOINLINE __attribute__((noinline))
+#ifndef AGENTOS_UNUSED
+#define AGENTOS_UNUSED __attribute__((unused))
+#endif
+#define AGENTOS_USED __attribute__((used))
+#define AGENTOS_WEAK __attribute__((weak))
+#define AGENTOS_PACKED __attribute__((packed))
+#define AGENTOS_ALIGNED(x) __attribute__((aligned(x)))
+#define AGENTOS_DEPRECATED __attribute__((deprecated))
+#define AGENTOS_FALLTHROUGH __attribute__((fallthrough))
+#define AGENTOS_PRINTF_FORMAT(fmt, args) \
+    __attribute__((                      \
+        format(__printf__, fmt, args)))
+#define AGENTOS_SCANF_FORMAT(fmt, args) \
+    __attribute__((                     \
+        format(__scanf__, fmt, args)))
+#define AGENTOS_LIKELY(x) __builtin_expect(!!(x), 1)
+#define AGENTOS_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#define AGENTOS_PREFETCH(x) __builtin_prefetch(x)
+#define AGENTOS_UNREACHABLE() __builtin_unreachable()
+#define AGENTOS_ASSUME(x)            \
+    do {                             \
+        if (!(x))                    \
+            __builtin_unreachable(); \
+    } while (0)
 #elif defined(AGENTOS_COMPILER_MSVC)
-    #ifndef AGENTOS_INLINE
-    #define AGENTOS_INLINE          static __forceinline
-    #endif
-    #define AGENTOS_NOINLINE        __declspec(noinline)
-    #ifndef AGENTOS_UNUSED
-    #define AGENTOS_UNUSED
-    #endif
-    #define AGENTOS_USED
-    #define AGENTOS_WEAK
-    #define AGENTOS_PACKED
-    #define AGENTOS_ALIGNED(x)      __declspec(align(x))
-    #define AGENTOS_DEPRECATED      __declspec(deprecated)
-    #define AGENTOS_FALLTHROUGH
-    #define AGENTOS_PRINTF_FORMAT(fmt, args)
-    #define AGENTOS_SCANF_FORMAT(fmt, args)
-    #define AGENTOS_LIKELY(x)       (x)
-    #define AGENTOS_UNLIKELY(x)     (x)
-    #define AGENTOS_PREFETCH(x)
-    #define AGENTOS_UNREACHABLE()   __assume(0)
-    #define AGENTOS_ASSUME(x)       __assume(x)
+#ifndef AGENTOS_INLINE
+#define AGENTOS_INLINE static __forceinline
+#endif
+#define AGENTOS_NOINLINE __declspec(noinline)
+#ifndef AGENTOS_UNUSED
+#define AGENTOS_UNUSED
+#endif
+#define AGENTOS_USED
+#define AGENTOS_WEAK
+#define AGENTOS_PACKED
+#define AGENTOS_ALIGNED(x) __declspec(align(x))
+#define AGENTOS_DEPRECATED __declspec(deprecated)
+#define AGENTOS_FALLTHROUGH
+#define AGENTOS_PRINTF_FORMAT(fmt, args)
+#define AGENTOS_SCANF_FORMAT(fmt, args)
+#define AGENTOS_LIKELY(x) (x)
+#define AGENTOS_UNLIKELY(x) (x)
+#define AGENTOS_PREFETCH(x)
+#define AGENTOS_UNREACHABLE() __assume(0)
+#define AGENTOS_ASSUME(x) __assume(x)
 #else
-    #ifndef AGENTOS_INLINE
-    #define AGENTOS_INLINE          static inline
-    #endif
-    #define AGENTOS_NOINLINE
-    #ifndef AGENTOS_UNUSED
-    #define AGENTOS_UNUSED
-    #endif
-    #define AGENTOS_USED
-    #define AGENTOS_WEAK
-    #define AGENTOS_PACKED
-    #define AGENTOS_ALIGNED(x)
-    #define AGENTOS_DEPRECATED
-    #define AGENTOS_FALLTHROUGH
-    #define AGENTOS_PRINTF_FORMAT(fmt, args)
-    #define AGENTOS_SCANF_FORMAT(fmt, args)
-    #define AGENTOS_LIKELY(x)       (x)
-    #define AGENTOS_UNLIKELY(x)     (x)
-    #define AGENTOS_PREFETCH(x)
-    #define AGENTOS_UNREACHABLE()
-    #define AGENTOS_ASSUME(x)       ((void)0)
+#ifndef AGENTOS_INLINE
+#define AGENTOS_INLINE static inline
+#endif
+#define AGENTOS_NOINLINE
+#ifndef AGENTOS_UNUSED
+#define AGENTOS_UNUSED
+#endif
+#define AGENTOS_USED
+#define AGENTOS_WEAK
+#define AGENTOS_PACKED
+#define AGENTOS_ALIGNED(x)
+#define AGENTOS_DEPRECATED
+#define AGENTOS_FALLTHROUGH
+#define AGENTOS_PRINTF_FORMAT(fmt, args)
+#define AGENTOS_SCANF_FORMAT(fmt, args)
+#define AGENTOS_LIKELY(x) (x)
+#define AGENTOS_UNLIKELY(x) (x)
+#define AGENTOS_PREFETCH(x)
+#define AGENTOS_UNREACHABLE()
+#define AGENTOS_ASSUME(x) ((void)0)
 #endif
 
 /* ==================== 线程本地存储 ==================== */
 
 #if defined(AGENTOS_PLATFORM_WINDOWS)
-    #define AGENTOS_THREAD_LOCAL __declspec(thread)
+#define AGENTOS_THREAD_LOCAL __declspec(thread)
 #else
-    #define AGENTOS_THREAD_LOCAL __thread
+#define AGENTOS_THREAD_LOCAL __thread
 #endif
 
 /* ==================== POSIX函数Windows兼容映射 ==================== */
 
 #if defined(AGENTOS_PLATFORM_WINDOWS)
-    #ifndef WIN32_LEAN_AND_MEAN
-    #define WIN32_LEAN_AND_MEAN
-    #endif
-    #ifndef NOMINMAX
-    #define NOMINMAX
-    #endif
-    #ifndef _WINSOCKAPI_
-    #define _WINSOCKAPI_
-    #endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef _WINSOCKAPI_
+#define _WINSOCKAPI_
+#endif
 
-    #define strcasecmp      _stricmp
-    #define strncasecmp     _strnicmp
-    #define strdup          _strdup
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#define strdup _strdup
 
-    #include <time.h>
-    #include <windows.h>
+#include <time.h>
+#include <windows.h>
 
-    AGENTOS_API int nanosleep(const struct timespec* ts, struct timespec* rem);
-    AGENTOS_API char* strndup(const char* s, size_t n);
-    AGENTOS_API struct tm* localtime_r(const time_t* timer, struct tm* buf);
+AGENTOS_API int nanosleep(const struct timespec *ts, struct timespec *rem);
+AGENTOS_API char *strndup(const char *s, size_t n);
+AGENTOS_API struct tm *localtime_r(const time_t *timer, struct tm *buf);
 
-    #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
-        atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
-    #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
-        atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
+#define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
+#define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
+    atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
 
 #ifndef _SC_PAGESIZE
-    #define _SC_PAGESIZE            1
-    #endif
-    #ifndef _SC_NPROCESSORS_ONLN
-    #define _SC_NPROCESSORS_ONLN    2
-    #endif
-    #ifndef _SC_OPEN_MAX
-    #define _SC_OPEN_MAX            3
-    #endif
-    #ifndef _SC_CLK_TCK
-    #define _SC_CLK_TCK             4
-    #endif
+#define _SC_PAGESIZE 1
+#endif
+#ifndef _SC_NPROCESSORS_ONLN
+#define _SC_NPROCESSORS_ONLN 2
+#endif
+#ifndef _SC_OPEN_MAX
+#define _SC_OPEN_MAX 3
+#endif
+#ifndef _SC_CLK_TCK
+#define _SC_CLK_TCK 4
+#endif
 #else
-    #define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) \
-        atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
-    #define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
-        atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
+#define AGENTOS_ATOMIC_FETCH_ADD(ptr, val) atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
+#define AGENTOS_ATOMIC_FETCH_ADD64(ptr, val) \
+    atomic_fetch_add_explicit(ptr, val, memory_order_seq_cst)
 #endif
 
 /* ==================== 路径分隔符 ==================== */
 
 #if defined(AGENTOS_PLATFORM_WINDOWS)
-    #define AGENTOS_PATH_SEP     '\\'
-    #define AGENTOS_PATH_SEP_STR "\\"
+#define AGENTOS_PATH_SEP '\\'
+#define AGENTOS_PATH_SEP_STR "\\"
 #else
-    #define AGENTOS_PATH_SEP     '/'
-    #define AGENTOS_PATH_SEP_STR "/"
+#define AGENTOS_PATH_SEP '/'
+#define AGENTOS_PATH_SEP_STR "/"
 #endif
 
 #ifndef AGENTOS_PATH_MAX
-    #if defined(AGENTOS_PLATFORM_WINDOWS)
-        #define AGENTOS_PATH_MAX 260
-    #else
-        #define AGENTOS_PATH_MAX 4096
-    #endif
+#if defined(AGENTOS_PLATFORM_WINDOWS)
+#define AGENTOS_PATH_MAX 260
+#else
+#define AGENTOS_PATH_MAX 4096
+#endif
 #endif
 
 /* ==================== 对齐工具 ==================== */
@@ -231,7 +238,8 @@ extern "C" {
  * @param align 对齐值（必须是2的幂）
  * @return 1对齐，0未对齐
  */
-AGENTOS_INLINE int agentos_is_aligned(const void* ptr, size_t align) {
+AGENTOS_INLINE int agentos_is_aligned(const void *ptr, size_t align)
+{
     return ((uintptr_t)ptr & (align - 1)) == 0;
 }
 
@@ -241,7 +249,8 @@ AGENTOS_INLINE int agentos_is_aligned(const void* ptr, size_t align) {
  * @param align 对齐值（必须是2的幂）
  * @return 对齐后的值
  */
-AGENTOS_INLINE size_t agentos_align_up(size_t value, size_t align) {
+AGENTOS_INLINE size_t agentos_align_up(size_t value, size_t align)
+{
     return (value + align - 1) & ~(align - 1);
 }
 
@@ -251,7 +260,8 @@ AGENTOS_INLINE size_t agentos_align_up(size_t value, size_t align) {
  * @param align 对齐值（必须是2的幂）
  * @return 对齐后的值
  */
-AGENTOS_INLINE size_t agentos_align_down(size_t value, size_t align) {
+AGENTOS_INLINE size_t agentos_align_down(size_t value, size_t align)
+{
     return value & ~(align - 1);
 }
 
@@ -271,9 +281,9 @@ AGENTOS_INLINE size_t agentos_align_down(size_t value, size_t align) {
  * @return 偏移量
  */
 #if defined(AGENTOS_COMPILER_GCC) || defined(AGENTOS_COMPILER_CLANG)
-    #define AGENTOS_OFFSETOF(type, member) __builtin_offsetof(type, member)
+#define AGENTOS_OFFSETOF(type, member) __builtin_offsetof(type, member)
 #else
-    #define AGENTOS_OFFSETOF(type, member) ((size_t)&((type*)0)->member)
+#define AGENTOS_OFFSETOF(type, member) ((size_t) & ((type *)0)->member)
 #endif
 
 /**
@@ -284,7 +294,7 @@ AGENTOS_INLINE size_t agentos_align_down(size_t value, size_t align) {
  * @return 结构体指针
  */
 #define AGENTOS_CONTAINER_OF(ptr, type, member) \
-    ((type*)((char*)(ptr) - AGENTOS_OFFSETOF(type, member)))
+    ((type *)((char *)(ptr) - AGENTOS_OFFSETOF(type, member)))
 
 /* ==================== 位操作工具 ==================== */
 
@@ -294,7 +304,8 @@ AGENTOS_INLINE size_t agentos_align_down(size_t value, size_t align) {
  * @param bit 位索引（从0开始）
  * @return 1设置，0未设置
  */
-AGENTOS_INLINE int agentos_bit_test(unsigned int x, unsigned int bit) {
+AGENTOS_INLINE int agentos_bit_test(unsigned int x, unsigned int bit)
+{
     return (int)((x >> bit) & 1U);
 }
 
@@ -303,8 +314,10 @@ AGENTOS_INLINE int agentos_bit_test(unsigned int x, unsigned int bit) {
  * @param x 值指针
  * @param bit 位索引（从0开始）
  */
-AGENTOS_INLINE void agentos_bit_set(unsigned int* x, unsigned int bit) {
-    if (x) *x |= (1U << bit);
+AGENTOS_INLINE void agentos_bit_set(unsigned int *x, unsigned int bit)
+{
+    if (x)
+        *x |= (1U << bit);
 }
 
 /**
@@ -312,8 +325,10 @@ AGENTOS_INLINE void agentos_bit_set(unsigned int* x, unsigned int bit) {
  * @param x 值指针
  * @param bit 位索引（从0开始）
  */
-AGENTOS_INLINE void agentos_bit_clear(unsigned int* x, unsigned int bit) {
-    if (x) *x &= ~(1U << bit);
+AGENTOS_INLINE void agentos_bit_clear(unsigned int *x, unsigned int bit)
+{
+    if (x)
+        *x &= ~(1U << bit);
 }
 
 /**
@@ -321,8 +336,10 @@ AGENTOS_INLINE void agentos_bit_clear(unsigned int* x, unsigned int bit) {
  * @param x 值指针
  * @param bit 位索引（从0开始）
  */
-AGENTOS_INLINE void agentos_bit_flip(unsigned int* x, unsigned int bit) {
-    if (x) *x ^= (1U << bit);
+AGENTOS_INLINE void agentos_bit_flip(unsigned int *x, unsigned int bit)
+{
+    if (x)
+        *x ^= (1U << bit);
 }
 
 /**
@@ -330,7 +347,8 @@ AGENTOS_INLINE void agentos_bit_flip(unsigned int* x, unsigned int bit) {
  * @param x 值
  * @return 置位数量
  */
-AGENTOS_INLINE unsigned int agentos_popcount(unsigned int x) {
+AGENTOS_INLINE unsigned int agentos_popcount(unsigned int x)
+{
 #if defined(AGENTOS_COMPILER_GCC) || defined(AGENTOS_COMPILER_CLANG)
     return (unsigned int)__builtin_popcount(x);
 #elif defined(AGENTOS_COMPILER_MSVC)
@@ -350,7 +368,8 @@ AGENTOS_INLINE unsigned int agentos_popcount(unsigned int x) {
  * @param x 值
  * @return 前导零数量
  */
-AGENTOS_INLINE unsigned int agentos_clz(unsigned int x) {
+AGENTOS_INLINE unsigned int agentos_clz(unsigned int x)
+{
 #if defined(AGENTOS_COMPILER_GCC) || defined(AGENTOS_COMPILER_CLANG)
     return (unsigned int)__builtin_clz(x);
 #elif defined(AGENTOS_COMPILER_MSVC)
@@ -361,7 +380,8 @@ AGENTOS_INLINE unsigned int agentos_clz(unsigned int x) {
     return 32U;
 #else
     unsigned int n = 0;
-    if (x == 0) return 32U;
+    if (x == 0)
+        return 32U;
     while ((x & 0x80000000U) == 0) {
         n++;
         x <<= 1;
@@ -375,7 +395,8 @@ AGENTOS_INLINE unsigned int agentos_clz(unsigned int x) {
  * @param x 值
  * @return 尾随零数量
  */
-AGENTOS_INLINE unsigned int agentos_ctz(unsigned int x) {
+AGENTOS_INLINE unsigned int agentos_ctz(unsigned int x)
+{
 #if defined(AGENTOS_COMPILER_GCC) || defined(AGENTOS_COMPILER_CLANG)
     return (unsigned int)__builtin_ctz(x);
 #elif defined(AGENTOS_COMPILER_MSVC)
@@ -386,7 +407,8 @@ AGENTOS_INLINE unsigned int agentos_ctz(unsigned int x) {
     return 32U;
 #else
     unsigned int n = 0;
-    if (x == 0) return 32U;
+    if (x == 0)
+        return 32U;
     while ((x & 1U) == 0) {
         n++;
         x >>= 1;
@@ -404,7 +426,7 @@ AGENTOS_INLINE unsigned int agentos_ctz(unsigned int x) {
  * @param dest_size 目标缓冲区大小
  * @return 0成功，非0失败
  */
-AGENTOS_API int agentos_strlcpy(char* dest, const char* src, size_t dest_size);
+AGENTOS_API int agentos_strlcpy(char *dest, const char *src, size_t dest_size);
 
 /**
  * @brief 安全字符串连接
@@ -413,7 +435,7 @@ AGENTOS_API int agentos_strlcpy(char* dest, const char* src, size_t dest_size);
  * @param dest_size 目标缓冲区大小
  * @return 0成功，非0失败
  */
-AGENTOS_API int agentos_strlcat(char* dest, const char* src, size_t dest_size);
+AGENTOS_API int agentos_strlcat(char *dest, const char *src, size_t dest_size);
 
 /**
  * @brief 安全字符串复制（带返回值）
@@ -422,7 +444,7 @@ AGENTOS_API int agentos_strlcat(char* dest, const char* src, size_t dest_size);
  * @param dest_size 目标缓冲区大小
  * @return 目标缓冲区指针
  */
-AGENTOS_API char* agentos_strncpy_safe(char* dest, const char* src, size_t dest_size);
+AGENTOS_API char *agentos_strncpy_safe(char *dest, const char *src, size_t dest_size);
 
 /* ==================== 安全内存函数 ==================== */
 
@@ -434,7 +456,7 @@ AGENTOS_API char* agentos_strncpy_safe(char* dest, const char* src, size_t dest_
  * @param count 要设置的字节数
  * @return 0成功，非0失败
  */
-AGENTOS_API int agentos_memset_s(void* dest, int c, size_t dest_size, size_t count);
+AGENTOS_API int agentos_memset_s(void *dest, int c, size_t dest_size, size_t count);
 
 /**
  * @brief 安全内存复制
@@ -444,7 +466,7 @@ AGENTOS_API int agentos_memset_s(void* dest, int c, size_t dest_size, size_t cou
  * @param count 要复制的字节数
  * @return 0成功，非0失败
  */
-AGENTOS_API int agentos_memcpy_s(void* dest, size_t dest_size, const void* src, size_t count);
+AGENTOS_API int agentos_memcpy_s(void *dest, size_t dest_size, const void *src, size_t count);
 
 /**
  * @brief 安全内存移动
@@ -454,38 +476,40 @@ AGENTOS_API int agentos_memcpy_s(void* dest, size_t dest_size, const void* src, 
  * @param count 要移动的字节数
  * @return 0成功，非0失败
  */
-AGENTOS_API int agentos_memmove_s(void* dest, size_t dest_size, const void* src, size_t count);
+AGENTOS_API int agentos_memmove_s(void *dest, size_t dest_size, const void *src, size_t count);
 
 /* ==================== 断言宏 ==================== */
 
 #ifdef NDEBUG
-    #define AGENTOS_ASSERT(cond)            ((void)0)
-    #define AGENTOS_ASSERT_MSG(cond, msg)   ((void)0)
+#define AGENTOS_ASSERT(cond) ((void)0)
+#define AGENTOS_ASSERT_MSG(cond, msg) ((void)0)
 #else
-    #define AGENTOS_ASSERT(cond) \
-        do { \
-            if (!(cond)) { \
-                agentos_assert_fail(#cond, __FILE__, __LINE__, __func__); \
-            } \
-        } while (0)
-    
-    #define AGENTOS_ASSERT_MSG(cond, msg) \
-        do { \
-            if (!(cond)) { \
-                agentos_assert_fail_msg(#cond, __FILE__, __LINE__, __func__, msg); \
-            } \
-        } while (0)
+#define AGENTOS_ASSERT(cond)                                          \
+    do {                                                              \
+        if (!(cond)) {                                                \
+            agentos_assert_fail(#cond, __FILE__, __LINE__, __func__); \
+        }                                                             \
+    } while (0)
+
+#define AGENTOS_ASSERT_MSG(cond, msg)                                          \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            agentos_assert_fail_msg(#cond, __FILE__, __LINE__, __func__, msg); \
+        }                                                                      \
+    } while (0)
 #endif
 
 /**
  * @brief 断言失败处理函数
  */
-AGENTOS_API void agentos_assert_fail(const char* cond, const char* file, int line, const char* func);
+AGENTOS_API void agentos_assert_fail(const char *cond, const char *file, int line,
+                                     const char *func);
 
 /**
  * @brief 断言失败处理函数（带消息）
  */
-AGENTOS_API void agentos_assert_fail_msg(const char* cond, const char* file, int line, const char* func, const char* msg);
+AGENTOS_API void agentos_assert_fail_msg(const char *cond, const char *file, int line,
+                                         const char *func, const char *msg);
 
 /**
  * @brief 自定义断言处理器回调类型
@@ -493,9 +517,8 @@ AGENTOS_API void agentos_assert_fail_msg(const char* cond, const char* file, int
  * 设置后，断言失败时调用此回调而非abort()。
  * 生产环境可设置为日志记录+优雅降级。
  */
-typedef void (*agentos_assert_handler_t)(const char* cond, const char* file,
-                                          int line, const char* func,
-                                          const char* msg);
+typedef void (*agentos_assert_handler_t)(const char *cond, const char *file, int line,
+                                         const char *func, const char *msg);
 
 /**
  * @brief 设置自定义断言处理器
@@ -510,31 +533,33 @@ AGENTOS_API agentos_assert_handler_t agentos_get_assert_handler(void);
 /* ==================== 静态断言 ==================== */
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
-    #define AGENTOS_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
+#define AGENTOS_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
 #elif defined(AGENTOS_COMPILER_GCC) || defined(AGENTOS_COMPILER_CLANG)
-    #define AGENTOS_STATIC_ASSERT(cond, msg) \
-        typedef char agentos_static_assert_##__LINE__[(cond) ? 1 : -1] __attribute__((unused))
+#define AGENTOS_STATIC_ASSERT(cond, msg) \
+    typedef char agentos_static_assert_##__LINE__[(cond) ? 1 : -1] __attribute__((unused))
 #else
-    #define AGENTOS_STATIC_ASSERT(cond, msg) \
-        typedef char agentos_static_assert_##__LINE__[(cond) ? 1 : -1]
+#define AGENTOS_STATIC_ASSERT(cond, msg) \
+    typedef char agentos_static_assert_##__LINE__[(cond) ? 1 : -1]
 #endif
 
 /**
  * @brief 编译时检查
  */
-#define AGENTOS_COMPILE_TIME_ASSERT(cond) AGENTOS_STATIC_ASSERT(cond, "Compile-time assertion failed")
+#define AGENTOS_COMPILE_TIME_ASSERT(cond) \
+    AGENTOS_STATIC_ASSERT(cond, "Compile-time assertion failed")
 
 /**
  * @brief 检查类型大小
  */
-#define AGENTOS_CHECK_SIZE(type, size) AGENTOS_STATIC_ASSERT(sizeof(type) == size, "Size mismatch for " #type)
+#define AGENTOS_CHECK_SIZE(type, size) \
+    AGENTOS_STATIC_ASSERT(sizeof(type) == size, "Size mismatch for " #type)
 
 /* ==================== 调试辅助 ==================== */
 
 #ifdef DEBUG
-    #define AGENTOS_DEBUG_BREAK() agentos_debug_break()
+#define AGENTOS_DEBUG_BREAK() agentos_debug_break()
 #else
-    #define AGENTOS_DEBUG_BREAK() ((void)0)
+#define AGENTOS_DEBUG_BREAK() ((void)0)
 #endif
 
 /**
@@ -544,20 +569,20 @@ AGENTOS_API void agentos_debug_break(void);
 
 /* ==================== 版本信息 ==================== */
 
-#define AGENTOS_VERSION_MAJOR  0
-#define AGENTOS_VERSION_MINOR  0
-#define AGENTOS_VERSION_PATCH  5
-#define AGENTOS_VERSION_STRING "0.0.5"
+#define AGENTOS_VERSION_MAJOR 0
+#define AGENTOS_VERSION_MINOR 0
+#define AGENTOS_VERSION_PATCH 5
+#define AGENTOS_VERSION_STRING "0.1.0"
 
 /**
  * @brief 获取版本字符串
  */
-AGENTOS_API const char* agentos_version_string(void);
+AGENTOS_API const char *agentos_version_string(void);
 
 /**
  * @brief 获取构建信息
  */
-AGENTOS_API const char* agentos_build_info(void);
+AGENTOS_API const char *agentos_build_info(void);
 
 #ifdef __cplusplus
 }

@@ -14,19 +14,19 @@
 #ifndef API_RECOVERY_H
 #define API_RECOVERY_H
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define API_REC_MAX_CREDENTIALS     8
-#define API_REC_MAX_CRED_LEN        256
+#define API_REC_MAX_CREDENTIALS 8
+#define API_REC_MAX_CRED_LEN 256
 #define API_REC_MAX_FALLBACK_MODELS 4
-#define API_REC_MAX_MODEL_LEN       64
-#define API_REC_MAX_RETRY           5
+#define API_REC_MAX_MODEL_LEN 64
+#define API_REC_MAX_RETRY 5
 #define API_REC_DEFAULT_BASE_DELAY_MS 200
 
 typedef enum {
@@ -86,8 +86,8 @@ typedef struct {
     uint64_t failed_calls;
     double recovery_rate;
 
-    void* cb_breaker;
-    void* user_context;
+    void *cb_breaker;
+    void *user_context;
 } api_rec_pool_t;
 
 typedef struct {
@@ -96,53 +96,43 @@ typedef struct {
     bool is_retriable;
     bool should_rotate_cred;
     bool should_degrade;
-    const char* message;
+    const char *message;
 } api_rec_result_t;
 
-typedef int (*api_rec_request_fn)(void* ctx, const char* url,
-                                    const char* body, const char* cred,
-                                    char** resp_body, long* http_code);
+typedef int (*api_rec_request_fn)(void *ctx, const char *url, const char *body, const char *cred,
+                                  char **resp_body, long *http_code);
 
-api_rec_pool_t* api_rec_pool_create(const char* name);
-void api_rec_pool_destroy(api_rec_pool_t* pool);
+api_rec_pool_t *api_rec_pool_create(const char *name);
+void api_rec_pool_destroy(api_rec_pool_t *pool);
 
-int api_rec_add_credential(api_rec_pool_t* pool, const char* api_key);
-int api_rec_remove_credential(api_rec_pool_t* pool, size_t index);
-const char* api_rec_next_credential(api_rec_pool_t* pool);
-int api_rec_mark_cred_success(api_rec_pool_t* pool);
-int api_rec_mark_cred_failure(api_rec_pool_t* pool, api_rec_error_code_t err);
-double api_rec_cred_health(const api_rec_pool_t* pool, size_t index);
+int api_rec_add_credential(api_rec_pool_t *pool, const char *api_key);
+int api_rec_remove_credential(api_rec_pool_t *pool, size_t index);
+const char *api_rec_next_credential(api_rec_pool_t *pool);
+int api_rec_mark_cred_success(api_rec_pool_t *pool);
+int api_rec_mark_cred_failure(api_rec_pool_t *pool, api_rec_error_code_t err);
+double api_rec_cred_health(const api_rec_pool_t *pool, size_t index);
 
-int api_rec_add_fallback_model(api_rec_pool_t* pool, const char* model,
-                                 float cost_weight, int priority);
-const char* api_rec_current_model(api_rec_pool_t* pool);
-int api_rec_degrade(api_rec_pool_t* pool);
-int api_rec_upgrade(api_rec_pool_t* pool);
-api_rec_degradation_level_t api_rec_current_level(const api_rec_pool_t* pool);
+int api_rec_add_fallback_model(api_rec_pool_t *pool, const char *model, float cost_weight,
+                               int priority);
+const char *api_rec_current_model(api_rec_pool_t *pool);
+int api_rec_degrade(api_rec_pool_t *pool);
+int api_rec_upgrade(api_rec_pool_t *pool);
+api_rec_degradation_level_t api_rec_current_level(const api_rec_pool_t *pool);
 
-int api_rec_execute_with_recovery(api_rec_pool_t* pool,
-                                  api_rec_request_fn request_fn,
-                                  void* ctx,
-                                  const char* url,
-                                  const char* body,
-                                  char** out_response,
-                                  long* out_http_code,
-                                  api_rec_result_t* out_result);
+int api_rec_execute_with_recovery(api_rec_pool_t *pool, api_rec_request_fn request_fn, void *ctx,
+                                  const char *url, const char *body, char **out_response,
+                                  long *out_http_code, api_rec_result_t *out_result);
 
-int api_rec_set_retry_config(api_rec_pool_t* pool,
-                              uint32_t max_retries,
-                              uint32_t base_delay_ms,
-                              float backoff_factor,
-                              float jitter_ratio);
+int api_rec_set_retry_config(api_rec_pool_t *pool, uint32_t max_retries, uint32_t base_delay_ms,
+                             float backoff_factor, float jitter_ratio);
 
-int api_rec_bind_circuit_breaker(api_rec_pool_t* pool, void* breaker);
+int api_rec_bind_circuit_breaker(api_rec_pool_t *pool, void *breaker);
 
-void api_rec_get_stats(const api_rec_pool_t* pool,
-                       uint64_t* total, uint64_t* recovered,
-                       uint64_t* failed, double* rate);
+void api_rec_get_stats(const api_rec_pool_t *pool, uint64_t *total, uint64_t *recovered,
+                       uint64_t *failed, double *rate);
 
-const char* api_rec_error_string(api_rec_error_code_t code);
-const char* api_rec_degradation_string(api_rec_degradation_level_t level);
+const char *api_rec_error_string(api_rec_error_code_t code);
+const char *api_rec_degradation_string(api_rec_degradation_level_t level);
 
 #ifdef __cplusplus
 }

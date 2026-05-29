@@ -10,15 +10,17 @@
  * 此示例演示了服务的完整生命周期管理。
  *
  * 编译命令（Linux/macOS）:
- *   gcc -o example_svc_usage example_svc_usage.c -I./common/include -L./build/daemon/common -lsvc_common -lagentos_common -lpthread
+ *   gcc -o example_svc_usage example_svc_usage.c -I./common/include -L./build/daemon/common
+ * -lsvc_common -lagentos_common -lpthread
  *
  * 编译命令（Windows）:
  *   cl example_svc_usage.c /I./common/include /link svc_common.lib agentos_common.lib
  */
 
+#include "svc_common.h"
+
 #include <stdio.h>
 #include <string.h>
-#include "svc_common.h"
 
 /* ==================== 示例服务实现 ==================== */
 
@@ -33,15 +35,15 @@ typedef struct {
 /**
  * @brief 示例服务初始化函数
  */
-static agentos_error_t example_service_init(
-    agentos_service_t svc,
-    const agentos_svc_config_t* config) {
+static agentos_error_t example_service_init(agentos_service_t svc,
+                                            const agentos_svc_config_t *config)
+{
 
     printf("示例服务初始化: %s\n", agentos_service_get_name(svc));
 
     /* 分配服务上下文 */
-    example_service_context_t* ctx =
-        (example_service_context_t*)AGENTOS_MALLOC(sizeof(example_service_context_t));
+    example_service_context_t *ctx =
+        (example_service_context_t *)AGENTOS_MALLOC(sizeof(example_service_context_t));
     if (!ctx) {
         return AGENTOS_ENOMEM;
     }
@@ -59,7 +61,8 @@ static agentos_error_t example_service_init(
 /**
  * @brief 示例服务启动函数
  */
-static agentos_error_t example_service_start(agentos_service_t svc) {
+static agentos_error_t example_service_start(agentos_service_t svc)
+{
     printf("示例服务启动: %s\n", agentos_service_get_name(svc));
     return AGENTOS_SUCCESS;
 }
@@ -67,27 +70,26 @@ static agentos_error_t example_service_start(agentos_service_t svc) {
 /**
  * @brief 示例服务停止函数
  */
-static agentos_error_t example_service_stop(
-    agentos_service_t svc,
-    bool force) {
+static agentos_error_t example_service_stop(agentos_service_t svc, bool force)
+{
 
-    printf("示例服务停止: %s (强制: %s)\n",
-           agentos_service_get_name(svc),
-           force ? "是" : "否");
+    printf("示例服务停止: %s (强制: %s)\n", agentos_service_get_name(svc), force ? "是" : "否");
     return AGENTOS_SUCCESS;
 }
 
 /**
  * @brief 示例服务销毁函数
  */
-static void example_service_destroy(agentos_service_t svc) {
+static void example_service_destroy(agentos_service_t svc)
+{
     printf("示例服务销毁: %s\n", agentos_service_get_name(svc));
 }
 
 /**
  * @brief 示例服务健康检查函数
  */
-static agentos_error_t example_service_healthcheck(agentos_service_t svc) {
+static agentos_error_t example_service_healthcheck(agentos_service_t svc)
+{
     printf("示例服务健康检查: %s\n", agentos_service_get_name(svc));
     return AGENTOS_SUCCESS;
 }
@@ -95,37 +97,36 @@ static agentos_error_t example_service_healthcheck(agentos_service_t svc) {
 /**
  * @brief 创建示例服务接口
  */
-static agentos_svc_interface_t create_example_service_interface(void) {
-    agentos_svc_interface_t iface = {
-        .init = example_service_init,
-        .start = example_service_start,
-        .stop = example_service_stop,
-        .destroy = example_service_destroy,
-        .healthcheck = example_service_healthcheck
-    };
+static agentos_svc_interface_t create_example_service_interface(void)
+{
+    agentos_svc_interface_t iface = {.init = example_service_init,
+                                     .start = example_service_start,
+                                     .stop = example_service_stop,
+                                     .destroy = example_service_destroy,
+                                     .healthcheck = example_service_healthcheck};
     return iface;
 }
 
 /* ==================== 主程序 ==================== */
 
-int main(void) {
+int main(void)
+{
     printf("=== AgentOS 服务管理框架使用示例 ===\n\n");
 
     agentos_error_t err = AGENTOS_SUCCESS;
     agentos_service_t service = NULL;
 
     /* 1. 创建服务配置 */
-    agentos_svc_config_t config = {
-        .name = "example-service",
-        .version = "0.0.5",
-        .capabilities = AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_PAUSEABLE,
-        .max_concurrent = 10,
-        .timeout_ms = 5000,
-        .priority = 5,
-        .auto_start = true,
-        .enable_metrics = true,
-        .enable_tracing = false
-    };
+    agentos_svc_config_t config = {.name = "example-service",
+                                   .version = "0.1.0",
+                                   .capabilities =
+                                       AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_PAUSEABLE,
+                                   .max_concurrent = 10,
+                                   .timeout_ms = 5000,
+                                   .priority = 5,
+                                   .auto_start = true,
+                                   .enable_metrics = true,
+                                   .enable_tracing = false};
 
     /* 2. 创建服务接口 */
     agentos_svc_interface_t iface = create_example_service_interface();
@@ -165,8 +166,7 @@ int main(void) {
     printf("\n4. 检查服务状态...\n");
     printf("  服务名称: %s\n", agentos_service_get_name(service));
     printf("  服务版本: %s\n", agentos_service_get_version(service));
-    printf("  服务状态: %s\n",
-           agentos_svc_state_to_string(agentos_service_get_state(service)));
+    printf("  服务状态: %s\n", agentos_svc_state_to_string(agentos_service_get_state(service)));
     printf("  是否就绪: %s\n", agentos_service_is_ready(service) ? "是" : "否");
     printf("  是否运行: %s\n", agentos_service_is_running(service) ? "是" : "否");
 
@@ -217,10 +217,10 @@ int main(void) {
 
     /* 10. 停止服务 */
     printf("\n8. 停止服务...\n");
-    err = agentos_service_stop(service, false);  /* 正常停止 */
+    err = agentos_service_stop(service, false); /* 正常停止 */
     if (err != AGENTOS_SUCCESS) {
         printf("  服务停止失败: %d，尝试强制停止...\n", err);
-        err = agentos_service_stop(service, true);  /* 强制停止 */
+        err = agentos_service_stop(service, true); /* 强制停止 */
         if (err != AGENTOS_SUCCESS) {
             printf("  强制停止也失败: %d\n", err);
         }

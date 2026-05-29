@@ -10,25 +10,27 @@
  * 3. 线程安全
  */
 
-#include "service.h"
 #include "daemon_defaults.h"
-#include "svc_logger.h"
 #include "error.h"
-#include "platform.h"
 #include "executor.h"
+#include "platform.h"
+#include "service.h"
+#include "svc_logger.h"
+
 #include <stdlib.h>
 #include <string.h>
 
 /* ---------- 工具服务创建 ---------- */
 
-tool_service_t* tool_service_create(const char* config_path __attribute__((unused))) {
-    
-    tool_service_t* svc = (tool_service_t*)AGENTOS_CALLOC(1, sizeof(tool_service_t));
+tool_service_t *tool_service_create(const char *config_path __attribute__((unused)))
+{
+
+    tool_service_t *svc = (tool_service_t *)AGENTOS_CALLOC(1, sizeof(tool_service_t));
     if (!svc) {
         SVC_LOG_ERROR("Failed to allocate tool service");
         return NULL;
     }
-    
+
     if (agentos_mutex_init(&svc->lock) != 0) {
         SVC_LOG_ERROR("Failed to initialize service lock");
         AGENTOS_FREE(svc);
@@ -81,87 +83,95 @@ tool_service_t* tool_service_create(const char* config_path __attribute__((unuse
 
 /* ---------- 工具服务销毁 ---------- */
 
-void tool_service_destroy(tool_service_t* svc) {
-    if (!svc) return;
-    
+void tool_service_destroy(tool_service_t *svc)
+{
+    if (!svc)
+        return;
+
     if (svc->registry) {
         tool_registry_destroy(svc->registry);
         svc->registry = NULL;
     }
-    
+
     if (svc->executor) {
         tool_executor_destroy(svc->executor);
         svc->executor = NULL;
     }
-    
+
     if (svc->validator) {
         tool_validator_destroy(svc->validator);
         svc->validator = NULL;
     }
-    
+
     if (svc->cache) {
         tool_cache_destroy(svc->cache);
         svc->cache = NULL;
     }
-    
+
     agentos_mutex_destroy(&svc->lock);
     AGENTOS_FREE(svc);
 }
 
 /* ---------- 工具注册 ---------- */
 
-int tool_service_register(tool_service_t* svc, const tool_metadata_t* meta) {
+int tool_service_register(tool_service_t *svc, const tool_metadata_t *meta)
+{
     if (!svc || !meta || !meta->id) {
         SVC_LOG_ERROR("Invalid parameters to tool_service_register");
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    
+
     agentos_mutex_lock(&svc->lock);
     int ret = tool_registry_add(svc->registry, meta);
     agentos_mutex_unlock(&svc->lock);
-    
+
     if (ret == 0) {
         SVC_LOG_INFO("Registered tool: %s", meta->id);
     } else {
         SVC_LOG_ERROR("Failed to register tool: %s", meta->id);
     }
-    
+
     return ret;
 }
 
-int tool_service_unregister(tool_service_t* svc, const char* tool_id) {
+int tool_service_unregister(tool_service_t *svc, const char *tool_id)
+{
     if (!svc || !tool_id) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    
+
     agentos_mutex_lock(&svc->lock);
     int ret = tool_registry_remove(svc->registry, tool_id);
     agentos_mutex_unlock(&svc->lock);
-    
+
     if (ret == 0) {
         SVC_LOG_INFO("Unregistered tool: %s", tool_id);
     }
-    
+
     return ret;
 }
 
-tool_metadata_t* tool_service_get(tool_service_t* svc, const char* tool_id) {
-    if (!svc || !tool_id) return NULL;
-    
+tool_metadata_t *tool_service_get(tool_service_t *svc, const char *tool_id)
+{
+    if (!svc || !tool_id)
+        return NULL;
+
     agentos_mutex_lock(&svc->lock);
-    tool_metadata_t* meta = tool_registry_get(svc->registry, tool_id);
+    tool_metadata_t *meta = tool_registry_get(svc->registry, tool_id);
     agentos_mutex_unlock(&svc->lock);
-    
+
     return meta;
 }
 
-char* tool_service_list(tool_service_t* svc) {
-    if (!svc) return NULL;
-    
+char *tool_service_list(tool_service_t *svc)
+{
+    if (!svc)
+        return NULL;
+
     agentos_mutex_lock(&svc->lock);
-    char* json = tool_registry_list_json(svc->registry);
+    char *json = tool_registry_list_json(svc->registry);
     agentos_mutex_unlock(&svc->lock);
-    
+
     return json;
 }
 
@@ -170,13 +180,14 @@ char* tool_service_list(tool_service_t* svc) {
 /**
  * @brief 获取工具元数据
  */
-static tool_metadata_t* get_tool_metadata(tool_service_t* svc, const char* tool_id) {
+static tool_metadata_t *get_tool_metadata(tool_service_t *svc, const char *tool_id)
+{
     if (!svc || !tool_id) {
         return NULL;
     }
 
     agentos_mutex_lock(&svc->lock);
-    tool_metadata_t* meta = tool_registry_get(svc->registry, tool_id);
+    tool_metadata_t *meta = tool_registry_get(svc->registry, tool_id);
     agentos_mutex_unlock(&svc->lock);
 
     return meta;
@@ -185,10 +196,11 @@ static tool_metadata_t* get_tool_metadata(tool_service_t* svc, const char* tool_
 /**
  * @brief 验证工具参数
  */
-static int validate_tool_params(tool_service_t* svc, tool_metadata_t* meta,
-                               const char* tool_id, const char* params_json) {
+static int validate_tool_params(tool_service_t *svc, tool_metadata_t *meta, const char *tool_id,
+                                const char *params_json)
+{
     if (!svc || !meta || !tool_id) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (svc->validator) {
@@ -204,10 +216,9 @@ static int validate_tool_params(tool_service_t* svc, tool_metadata_t* meta,
 /**
  * @brief 获取缓存的工具结果
  */
-static tool_result_t* get_cached_result(tool_service_t* svc,
-                                        tool_metadata_t* meta,
-                                        const char* tool_id,
-                                        const char* params_json) {
+static tool_result_t *get_cached_result(tool_service_t *svc, tool_metadata_t *meta,
+                                        const char *tool_id, const char *params_json)
+{
     if (!svc || !meta || !tool_id || !params_json) {
         return NULL;
     }
@@ -216,14 +227,14 @@ static tool_result_t* get_cached_result(tool_service_t* svc,
         return NULL;
     }
 
-    char* cache_key = tool_cache_key(tool_id, params_json);
+    char *cache_key = tool_cache_key(tool_id, params_json);
     if (!cache_key) {
         return NULL;
     }
 
-    char* cached = NULL;
+    char *cached = NULL;
     if (tool_cache_get(svc->cache, cache_key, &cached) == 1 && cached) {
-        tool_result_t* res = tool_result_from_json(cached);
+        tool_result_t *res = tool_result_from_json(cached);
         AGENTOS_FREE(cached);
         cached = NULL;
         if (res) {
@@ -242,11 +253,9 @@ static tool_result_t* get_cached_result(tool_service_t* svc,
 /**
  * @brief 缓存工具结果
  */
-static void cache_tool_result(tool_service_t* svc,
-                             tool_metadata_t* meta,
-                             const char* tool_id,
-                             const char* params_json,
-                             tool_result_t* res) {
+static void cache_tool_result(tool_service_t *svc, tool_metadata_t *meta, const char *tool_id,
+                              const char *params_json, tool_result_t *res)
+{
     if (!svc || !meta || !tool_id || !params_json || !res || !res->success) {
         return;
     }
@@ -255,12 +264,12 @@ static void cache_tool_result(tool_service_t* svc,
         return;
     }
 
-    char* cache_key = tool_cache_key(tool_id, params_json);
+    char *cache_key = tool_cache_key(tool_id, params_json);
     if (!cache_key) {
         return;
     }
 
-    char* res_json = tool_result_to_json(res);
+    char *res_json = tool_result_to_json(res);
     if (res_json) {
         tool_cache_put(svc->cache, cache_key, res_json);
         AGENTOS_FREE(res_json);
@@ -274,15 +283,14 @@ static void cache_tool_result(tool_service_t* svc,
 /**
  * @brief 执行工具
  */
-static int do_execute_tool(tool_service_t* svc,
-                          tool_metadata_t* meta,
-                          const char* params_json,
-                          tool_result_t** out_result) {
+static int do_execute_tool(tool_service_t *svc, tool_metadata_t *meta, const char *params_json,
+                           tool_result_t **out_result)
+{
     if (!svc || !meta || !out_result) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    tool_result_t* res = NULL;
+    tool_result_t *res = NULL;
     int ret = tool_executor_run(svc->executor, meta, params_json, &res);
 
     if (ret != 0) {
@@ -300,9 +308,9 @@ static int do_execute_tool(tool_service_t* svc,
 
 /* ---------- 工具执行（重构后：圈复杂度从 18 降至 8） ---------- */
 
-int tool_service_execute(tool_service_t* svc,
-                         const tool_execute_request_t* req,
-                         tool_result_t** out_result) {
+int tool_service_execute(tool_service_t *svc, const tool_execute_request_t *req,
+                         tool_result_t **out_result)
+{
     if (!svc || !req || !out_result) {
         SVC_LOG_ERROR("Invalid parameters to tool_service_execute");
         return AGENTOS_ERR_INVALID_PARAM;
@@ -313,7 +321,7 @@ int tool_service_execute(tool_service_t* svc,
     }
 
     /* 1. 获取工具元数据 */
-    tool_metadata_t* meta = get_tool_metadata(svc, req->tool_id);
+    tool_metadata_t *meta = get_tool_metadata(svc, req->tool_id);
     if (!meta) {
         SVC_LOG_ERROR("Tool not found: %s", req->tool_id);
         return AGENTOS_ERROR_TOOL_NOT_FOUND;
@@ -327,7 +335,7 @@ int tool_service_execute(tool_service_t* svc,
     }
 
     /* 3. 检查缓存 */
-    tool_result_t* cached_result = get_cached_result(svc, meta, req->tool_id, req->params_json);
+    tool_result_t *cached_result = get_cached_result(svc, meta, req->tool_id, req->params_json);
     if (cached_result) {
         tool_metadata_free(meta);
         *out_result = cached_result;
@@ -335,7 +343,7 @@ int tool_service_execute(tool_service_t* svc,
     }
 
     /* 4. 执行工具 */
-    tool_result_t* res = NULL;
+    tool_result_t *res = NULL;
     int ret = do_execute_tool(svc, meta, req->params_json, &res);
     if (ret != 0) {
         tool_metadata_free(meta);
@@ -356,25 +364,24 @@ int tool_service_execute(tool_service_t* svc,
 
 /* ---------- 流式执行 ---------- */
 
-int tool_service_execute_stream(tool_service_t* svc,
-                                const tool_execute_request_t* req,
-                                tool_stream_callback_t callback,
-                                void* callback_data,
-                                tool_result_t** out_result) {
+int tool_service_execute_stream(tool_service_t *svc, const tool_execute_request_t *req,
+                                tool_stream_callback_t callback, void *callback_data,
+                                tool_result_t **out_result)
+{
     if (!svc || !req || !callback) {
         SVC_LOG_ERROR("Invalid parameters to tool_service_execute_stream");
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    
+
     if (!req->tool_id) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     /* 1. 获取工具元数据 */
     agentos_mutex_lock(&svc->lock);
-    tool_metadata_t* meta = tool_registry_get(svc->registry, req->tool_id);
+    tool_metadata_t *meta = tool_registry_get(svc->registry, req->tool_id);
     agentos_mutex_unlock(&svc->lock);
-    
+
     if (!meta) {
         SVC_LOG_ERROR("Tool not found: %s", req->tool_id);
         return AGENTOS_ERROR_TOOL_NOT_FOUND;
@@ -397,7 +404,7 @@ int tool_service_execute_stream(tool_service_t* svc,
     }
 
     /* 4. 执行工具（带流式回调） */
-    tool_result_t* res = NULL;
+    tool_result_t *res = NULL;
     int ret = tool_executor_run(svc->executor, meta, req->params_json, &res);
 
     if (ret == 0 && res) {
@@ -417,19 +424,21 @@ int tool_service_execute_stream(tool_service_t* svc,
             *out_result = res;
         }
     }
-    
+
     if (ret != 0) {
         SVC_LOG_ERROR("Tool stream execution failed: %s, error: %d", req->tool_id, ret);
     }
-    
+
     tool_metadata_free(meta);
     return ret;
 }
 
 /* ---------- 工具结果释放 ---------- */
 
-void tool_result_free(tool_result_t* res) {
-    if (!res) return;
+void tool_result_free(tool_result_t *res)
+{
+    if (!res)
+        return;
     AGENTOS_FREE(res->output);
     AGENTOS_FREE(res->error);
     AGENTOS_FREE(res);
@@ -437,19 +446,21 @@ void tool_result_free(tool_result_t* res) {
 
 /* ---------- 工具元数据释放 ---------- */
 
-void tool_metadata_free(tool_metadata_t* meta) {
-    if (!meta) return;
+void tool_metadata_free(tool_metadata_t *meta)
+{
+    if (!meta)
+        return;
     AGENTOS_FREE(meta->id);
     AGENTOS_FREE(meta->name);
     AGENTOS_FREE(meta->description);
     AGENTOS_FREE(meta->executable);
-    
+
     for (size_t i = 0; i < meta->param_count; ++i) {
-        AGENTOS_FREE((void*)meta->params[i].name);
-        AGENTOS_FREE((void*)meta->params[i].schema);
+        AGENTOS_FREE((void *)meta->params[i].name);
+        AGENTOS_FREE((void *)meta->params[i].schema);
     }
     AGENTOS_FREE(meta->params);
-    
+
     AGENTOS_FREE(meta->permission_rule);
     AGENTOS_FREE(meta);
 }

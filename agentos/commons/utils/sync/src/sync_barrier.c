@@ -10,20 +10,20 @@
  * @date 2026-04-05
  */
 
-#include "sync_platform.h"
-#include <time.h>
 #include "sync_internal.h"
-#include <string.h>
+#include "sync_platform.h"
 
-sync_result_t sync_barrier_create(sync_barrier_t* barrier,
-                                unsigned int count,
-                                const sync_attr_t* attr) {
+#include <string.h>
+#include <time.h>
+
+sync_result_t sync_barrier_create(sync_barrier_t *barrier, unsigned int count,
+                                  const sync_attr_t *attr)
+{
     if (barrier == NULL || count == 0) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_barrier* b = (struct sync_barrier*)AGENTOS_CALLOC(
-        1, sizeof(struct sync_barrier));
+    struct sync_barrier *b = (struct sync_barrier *)AGENTOS_CALLOC(1, sizeof(struct sync_barrier));
     if (b == NULL) {
         return SYNC_ERROR_MEMORY;
     }
@@ -54,7 +54,8 @@ sync_result_t sync_barrier_create(sync_barrier_t* barrier,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_barrier_free(sync_barrier_t barrier) {
+sync_result_t sync_barrier_free(sync_barrier_t barrier)
+{
     if (barrier == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -76,7 +77,8 @@ sync_result_t sync_barrier_free(sync_barrier_t barrier) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_barrier_wait_ex(sync_barrier_t barrier, const sync_timeout_t* timeout) {
+sync_result_t sync_barrier_wait_ex(sync_barrier_t barrier, const sync_timeout_t *timeout)
+{
     if (barrier == NULL || !barrier->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -117,7 +119,8 @@ sync_result_t sync_barrier_wait_ex(sync_barrier_t barrier, const sync_timeout_t*
 #endif
 }
 
-sync_result_t sync_barrier_reset(sync_barrier_t barrier, unsigned int new_count) {
+sync_result_t sync_barrier_reset(sync_barrier_t barrier, unsigned int new_count)
+{
     if (barrier == NULL || !barrier->initialized) {
         return SYNC_ERROR_INVALID;
     }

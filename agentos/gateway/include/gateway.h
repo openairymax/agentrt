@@ -25,10 +25,11 @@
 #ifndef AGENTOS_GATEWAY_H
 #define AGENTOS_GATEWAY_H
 
+#include "agentos.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include "agentos.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,13 +44,13 @@ extern "C" {
  *       gateway_error_t 用于网关特有的错误场景。
  */
 typedef enum {
-    GATEWAY_SUCCESS = 0,          /**< 成功 */
-    GATEWAY_ERROR_INVALID = -1,   /**< 无效参数 */
-    GATEWAY_ERROR_MEMORY = -2,    /**< 内存不足 */
-    GATEWAY_ERROR_IO = -3,        /**< I/O 错误 */
-    GATEWAY_ERROR_TIMEOUT = -4,   /**< 超时 */
-    GATEWAY_ERROR_CLOSED = -5,    /**< 连接已关闭 */
-    GATEWAY_ERROR_PROTOCOL = -6   /**< 协议错误 */
+    GATEWAY_SUCCESS = 0,        /**< 成功 */
+    GATEWAY_ERROR_INVALID = -1, /**< 无效参数 */
+    GATEWAY_ERROR_MEMORY = -2,  /**< 内存不足 */
+    GATEWAY_ERROR_IO = -3,      /**< I/O 错误 */
+    GATEWAY_ERROR_TIMEOUT = -4, /**< 超时 */
+    GATEWAY_ERROR_CLOSED = -5,  /**< 连接已关闭 */
+    GATEWAY_ERROR_PROTOCOL = -6 /**< 协议错误 */
 } gateway_error_t;
 
 /* ========== 网关类型 ========== */
@@ -58,9 +59,9 @@ typedef enum {
  * @brief 网关类型枚举
  */
 typedef enum {
-    GATEWAY_TYPE_HTTP = 0,   /**< HTTP 网关 (libmicrohttpd) */
-    GATEWAY_TYPE_WS,         /**< WebSocket 网关 (libwebsockets) */
-    GATEWAY_TYPE_STDIO       /**< Stdio 网关 (标准输入输出) */
+    GATEWAY_TYPE_HTTP = 0, /**< HTTP 网关 (libmicrohttpd) */
+    GATEWAY_TYPE_WS,       /**< WebSocket 网关 (libwebsockets) */
+    GATEWAY_TYPE_STDIO     /**< Stdio 网关 (标准输入输出) */
 } gateway_type_t;
 
 /* ========== 网关句柄 ========== */
@@ -91,11 +92,8 @@ typedef struct gateway gateway_t;
  *
  * @see gateway_set_handler()
  */
-typedef int (*gateway_request_handler_t)(
-    const char* request_json,
-    char** response_json,
-    void* user_data
-);
+typedef int (*gateway_request_handler_t)(const char *request_json, char **response_json,
+                                         void *user_data);
 
 /* ========== 通用接口 - 生命周期 ========== */
 
@@ -109,7 +107,7 @@ typedef int (*gateway_request_handler_t)(
  * @param[in] port 监听端口（如 8080）
  * @return 网关句柄，失败返回 NULL（内存不足或参数无效）
  */
-gateway_t* gateway_http_create(const char* host, uint16_t port);
+gateway_t *gateway_http_create(const char *host, uint16_t port);
 
 /**
  * @brief 创建 WebSocket 网关实例
@@ -124,7 +122,7 @@ gateway_t* gateway_http_create(const char* host, uint16_t port);
  * @threadsafe 安全
  * @since 1.0.0
  */
-gateway_t* gateway_ws_create(const char* host, uint16_t port);
+gateway_t *gateway_ws_create(const char *host, uint16_t port);
 
 /**
  * @brief 创建 Stdio 网关实例
@@ -140,7 +138,7 @@ gateway_t* gateway_ws_create(const char* host, uint16_t port);
  *
  * @note Stdio 网关的 start() 是阻塞调用，会在当前线程运行 REPL 循环
  */
-gateway_t* gateway_stdio_create(void);
+gateway_t *gateway_stdio_create(void);
 
 /**
  * @brief 销毁网关实例并释放所有资源
@@ -154,7 +152,7 @@ gateway_t* gateway_stdio_create(void);
  * @threadsafe 不安全，需调用者保证串行
  * @since 1.0.0
  */
-void gateway_destroy(gateway_t* gw);
+void gateway_destroy(gateway_t *gw);
 
 /* ========== 通用接口 - 控制操作 ========== */
 
@@ -175,7 +173,7 @@ void gateway_destroy(gateway_t* gw);
  * @threadsafe 安全
  * @since 1.0.0
  */
-int gateway_start(gateway_t* gw);
+int gateway_start(gateway_t *gw);
 
 /**
  * @brief 停止网关
@@ -190,7 +188,7 @@ int gateway_start(gateway_t* gw);
  * @threadsafe 安全
  * @since 1.0.0
  */
-int gateway_stop(gateway_t* gw);
+int gateway_stop(gateway_t *gw);
 
 /**
  * @brief 设置自定义请求处理回调
@@ -208,11 +206,7 @@ int gateway_stop(gateway_t* gw);
  * @threadsafe 安全（原子设置）
  * @since 1.0.0
  */
-int gateway_set_handler(
-    gateway_t* gw,
-    gateway_request_handler_t handler,
-    void* user_data
-);
+int gateway_set_handler(gateway_t *gw, gateway_request_handler_t handler, void *user_data);
 
 /* ========== 端点注册类型 ========== */
 
@@ -220,11 +214,11 @@ int gateway_set_handler(
  * @brief 端点请求结构（动态注册端点使用）
  */
 typedef struct gateway_endpoint_request {
-    const char* method;              /**< HTTP 方法 */
-    const char* path;                /**< URL 路径 */
-    const char* body;                /**< 请求体（可为 NULL） */
-    size_t body_len;                 /**< 请求体长度 */
-    void* user_data;                 /**< 注册时传入的用户数据 */
+    const char *method; /**< HTTP 方法 */
+    const char *path;   /**< URL 路径 */
+    const char *body;   /**< 请求体（可为 NULL） */
+    size_t body_len;    /**< 请求体长度 */
+    void *user_data;    /**< 注册时传入的用户数据 */
 } gateway_endpoint_request_t;
 
 /**
@@ -234,10 +228,10 @@ typedef struct gateway_endpoint_request {
  * content_type 指向静态字符串字面量，桥接层不释放。
  */
 typedef struct gateway_endpoint_response {
-    int status_code;                 /**< HTTP 状态码 */
-    const char* content_type;        /**< Content-Type（静态字符串） */
-    char* body;                      /**< 响应体（handler 分配，桥接层释放） */
-    size_t body_len;                 /**< 响应体长度 */
+    int status_code;          /**< HTTP 状态码 */
+    const char *content_type; /**< Content-Type（静态字符串） */
+    char *body;               /**< 响应体（handler 分配，桥接层释放） */
+    size_t body_len;          /**< 响应体长度 */
 } gateway_endpoint_response_t;
 
 /**
@@ -249,10 +243,8 @@ typedef struct gateway_endpoint_response {
  *
  * @ownership resp->body 由 handler 分配（malloc/strdup），桥接层负责 free
  */
-typedef int (*gateway_endpoint_handler_t)(
-    const gateway_endpoint_request_t* req,
-    gateway_endpoint_response_t* resp
-);
+typedef int (*gateway_endpoint_handler_t)(const gateway_endpoint_request_t *req,
+                                          gateway_endpoint_response_t *resp);
 
 /* ========== 通用接口 - 查询操作 ========== */
 
@@ -265,7 +257,7 @@ typedef int (*gateway_endpoint_handler_t)(
  * @threadsafe 安全
  * @since 1.0.0
  */
-gateway_type_t gateway_get_type(gateway_t* gw);
+gateway_type_t gateway_get_type(gateway_t *gw);
 
 /**
  * @brief 检查网关是否正在运行
@@ -277,7 +269,7 @@ gateway_type_t gateway_get_type(gateway_t* gw);
  * @threadsafe 安全（原子读取）
  * @since 1.0.0
  */
-bool gateway_is_running(gateway_t* gw);
+bool gateway_is_running(gateway_t *gw);
 
 /**
  * @brief 获取网关统计信息
@@ -301,7 +293,7 @@ bool gateway_is_running(gateway_t* gw);
  * }
  * @endcode
  */
-int gateway_get_stats(gateway_t* gw, char** out_json);
+int gateway_get_stats(gateway_t *gw, char **out_json);
 
 /**
  * @brief 获取网关名称
@@ -312,7 +304,7 @@ int gateway_get_stats(gateway_t* gw, char** out_json);
  * @threadsafe 安全
  * @since 1.0.0
  */
-const char* gateway_get_name(gateway_t* gw);
+const char *gateway_get_name(gateway_t *gw);
 
 /**
  * @brief 注册动态 HTTP 端点
@@ -334,13 +326,8 @@ const char* gateway_get_name(gateway_t* gw);
  * @threadsafe 注册操作本身安全，但与请求处理并发时需注意
  * @since 0.0.5
  */
-int gateway_register_endpoint(
-    gateway_t* gw,
-    const char* method,
-    const char* path,
-    gateway_endpoint_handler_t handler,
-    void* user_data
-);
+int gateway_register_endpoint(gateway_t *gw, const char *method, const char *path,
+                              gateway_endpoint_handler_t handler, void *user_data);
 
 #ifdef __cplusplus
 }

@@ -5,6 +5,7 @@
  */
 
 #include "syscalls.h"
+
 #include <stddef.h>
 
 /* 系统调用号枚举 */
@@ -34,31 +35,31 @@ enum {
     SYS_MAX
 };
 
-typedef void* (*syscall_func_t)(void** args, int argc);
+typedef void *(*syscall_func_t)(void **args, int argc);
 
 /* 函数声明（实现位?syscall_entry.c?*/
-extern void* sys_task_submit(void** args, int argc);
-extern void* sys_task_query(void** args, int argc);
-extern void* sys_task_wait(void** args, int argc);
-extern void* sys_task_cancel(void** args, int argc);
-extern void* sys_memory_write(void** args, int argc);
-extern void* sys_memory_search(void** args, int argc);
-extern void* sys_memory_get(void** args, int argc);
-extern void* sys_memory_delete(void** args, int argc);
-extern void* sys_session_create(void** args, int argc);
-extern void* sys_session_get(void** args, int argc);
-extern void* sys_session_close(void** args, int argc);
-extern void* sys_session_list(void** args, int argc);
-extern void* sys_telemetry_metrics(void** args, int argc);
-extern void* sys_telemetry_traces(void** args, int argc);
-extern void* sys_agent_spawn(void** args, int argc);
-extern void* sys_agent_terminate(void** args, int argc);
-extern void* sys_agent_invoke(void** args, int argc);
-extern void* sys_agent_list(void** args, int argc);
-extern void* sys_skill_install(void** args, int argc);
-extern void* sys_skill_execute(void** args, int argc);
-extern void* sys_skill_list(void** args, int argc);
-extern void* sys_skill_uninstall(void** args, int argc);
+extern void *sys_task_submit(void **args, int argc);
+extern void *sys_task_query(void **args, int argc);
+extern void *sys_task_wait(void **args, int argc);
+extern void *sys_task_cancel(void **args, int argc);
+extern void *sys_memory_write(void **args, int argc);
+extern void *sys_memory_search(void **args, int argc);
+extern void *sys_memory_get(void **args, int argc);
+extern void *sys_memory_delete(void **args, int argc);
+extern void *sys_session_create(void **args, int argc);
+extern void *sys_session_get(void **args, int argc);
+extern void *sys_session_close(void **args, int argc);
+extern void *sys_session_list(void **args, int argc);
+extern void *sys_telemetry_metrics(void **args, int argc);
+extern void *sys_telemetry_traces(void **args, int argc);
+extern void *sys_agent_spawn(void **args, int argc);
+extern void *sys_agent_terminate(void **args, int argc);
+extern void *sys_agent_invoke(void **args, int argc);
+extern void *sys_agent_list(void **args, int argc);
+extern void *sys_skill_install(void **args, int argc);
+extern void *sys_skill_execute(void **args, int argc);
+extern void *sys_skill_list(void **args, int argc);
+extern void *sys_skill_uninstall(void **args, int argc);
 
 static syscall_func_t syscall_table[SYS_MAX] = {
     [SYS_TASK_SUBMIT] = sys_task_submit,
@@ -85,9 +86,12 @@ static syscall_func_t syscall_table[SYS_MAX] = {
     [SYS_SKILL_UNINSTALL] = sys_skill_uninstall,
 };
 
-void* agentos_syscall_invoke(int syscall_num, void** args, int argc) {
-    if (syscall_num < 1 || syscall_num >= SYS_MAX) return (void*)(intptr_t)AGENTOS_EINVAL;
+void *agentos_syscall_invoke(int syscall_num, void **args, int argc)
+{
+    if (syscall_num < 1 || syscall_num >= SYS_MAX)
+        return (void *)(intptr_t)AGENTOS_EINVAL;
     syscall_func_t func = syscall_table[syscall_num];
-    if (!func) return (void*)(intptr_t)AGENTOS_EPROTONOSUPPORT;
+    if (!func)
+        return (void *)(intptr_t)AGENTOS_EPROTONOSUPPORT;
     return func(args, argc);
 }

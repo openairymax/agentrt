@@ -14,9 +14,10 @@
 #define CUPOLAS_SANITIZER_H
 
 #include "../platform/platform.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,8 +36,8 @@ typedef enum sanitize_result {
 
 /* Sanitize Context */
 typedef struct sanitize_context {
-    const char* agent_id;
-    const char* input_type;
+    const char *agent_id;
+    const char *input_type;
     sanitize_level_t level;
     size_t max_length;
     bool allow_html;
@@ -57,7 +58,7 @@ typedef struct sanitizer sanitizer_t;
  * @reentrant No (create/destroy must be paired)
  * @ownership Returned handle: caller owns, must call sanitizer_destroy
  */
-sanitizer_t* sanitizer_create(const char* rules_path);
+sanitizer_t *sanitizer_create(const char *rules_path);
 
 /**
  * @brief Destroy sanitizer
@@ -68,7 +69,7 @@ sanitizer_t* sanitizer_create(const char* rules_path);
  * @reentrant No
  * @ownership sanitizer: caller transfers ownership
  */
-void sanitizer_destroy(sanitizer_t* sanitizer);
+void sanitizer_destroy(sanitizer_t *sanitizer);
 
 /**
  * @brief Sanitize input
@@ -82,11 +83,8 @@ void sanitizer_destroy(sanitizer_t* sanitizer);
  * @reentrant Yes
  * @ownership input: caller retains; output: callee writes, caller owns buffer; ctx: caller retains
  */
-sanitize_result_t sanitizer_sanitize(sanitizer_t* sanitizer,
-                                      const char* input,
-                                      char* output,
-                                      size_t output_size,
-                                      const sanitize_context_t* ctx);
+sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, char *output,
+                                     size_t output_size, const sanitize_context_t *ctx);
 
 /**
  * @brief Check if input is safe
@@ -98,9 +96,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t* sanitizer,
  * @reentrant Yes
  * @ownership input, ctx: caller retains ownership
  */
-bool sanitizer_is_safe(sanitizer_t* sanitizer,
-                       const char* input,
-                       const sanitize_context_t* ctx);
+bool sanitizer_is_safe(sanitizer_t *sanitizer, const char *input, const sanitize_context_t *ctx);
 
 /**
  * @brief Escape HTML special characters
@@ -112,7 +108,7 @@ bool sanitizer_is_safe(sanitizer_t* sanitizer,
  * @reentrant Yes
  * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
-int sanitizer_escape_html(const char* input, char* output, size_t output_size);
+int sanitizer_escape_html(const char *input, char *output, size_t output_size);
 
 /**
  * @brief Escape SQL special characters
@@ -124,7 +120,7 @@ int sanitizer_escape_html(const char* input, char* output, size_t output_size);
  * @reentrant Yes
  * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
-int sanitizer_escape_sql(const char* input, char* output, size_t output_size);
+int sanitizer_escape_sql(const char *input, char *output, size_t output_size);
 
 /**
  * @brief Escape Shell special characters
@@ -136,7 +132,7 @@ int sanitizer_escape_sql(const char* input, char* output, size_t output_size);
  * @reentrant Yes
  * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
-int sanitizer_escape_shell(const char* input, char* output, size_t output_size);
+int sanitizer_escape_shell(const char *input, char *output, size_t output_size);
 
 /**
  * @brief Escape path special characters
@@ -148,7 +144,7 @@ int sanitizer_escape_shell(const char* input, char* output, size_t output_size);
  * @reentrant Yes
  * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
-int sanitizer_escape_path(const char* input, char* output, size_t output_size);
+int sanitizer_escape_path(const char *input, char *output, size_t output_size);
 
 /**
  * @brief Get default sanitize context
@@ -157,7 +153,7 @@ int sanitizer_escape_path(const char* input, char* output, size_t output_size);
  * @reentrant Yes
  * @ownership ctx: callee writes, caller owns
  */
-void sanitizer_default_context(sanitize_context_t* ctx);
+void sanitizer_default_context(sanitize_context_t *ctx);
 
 /**
  * @brief Add sanitization rule
@@ -169,9 +165,7 @@ void sanitizer_default_context(sanitize_context_t* ctx);
  * @reentrant Yes
  * @ownership pattern, replacement: caller retains ownership
  */
-int sanitizer_add_rule(sanitizer_t* sanitizer,
-                       const char* pattern,
-                       const char* replacement);
+int sanitizer_add_rule(sanitizer_t *sanitizer, const char *pattern, const char *replacement);
 
 /**
  * @brief Clear all rules
@@ -180,7 +174,7 @@ int sanitizer_add_rule(sanitizer_t* sanitizer,
  * @reentrant Yes
  * @post All custom rules are removed, default rules remain
  */
-void sanitizer_clear_rules(sanitizer_t* sanitizer);
+void sanitizer_clear_rules(sanitizer_t *sanitizer);
 
 #ifdef __cplusplus
 }

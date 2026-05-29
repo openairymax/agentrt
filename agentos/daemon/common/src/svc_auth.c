@@ -12,30 +12,32 @@
  * - 统一认证入口
  */
 
-#include "svc_auth.h"
 #include "daemon_defaults.h"
+#include "error.h"
+#include "svc_auth.h"
 #include "svc_logger.h"
+
+#include <cjson/cJSON.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <cjson/cJSON.h>
 
 /* ==================== 内部常量 ==================== */
 
-#define MAX_TOKEN_SIZE        4096
-#define MAX_SUBJECT_SIZE      256
-#define MAX_ROLE_SIZE         64
-#define MAX_APIKEY_SIZE       128
-#define MAX_CLIENTS           1024
+#define MAX_TOKEN_SIZE 4096
+#define MAX_SUBJECT_SIZE 256
+#define MAX_ROLE_SIZE 64
+#define MAX_APIKEY_SIZE 128
+#define MAX_CLIENTS 1024
 
-#define DEFAULT_TOKEN_TTL     AGENTOS_DEFAULT_TOKEN_TTL_SEC
+#define DEFAULT_TOKEN_TTL AGENTOS_DEFAULT_TOKEN_TTL_SEC
 #define DEFAULT_REFRESH_THRESHOLD AGENTOS_DEFAULT_REFRESH_THRESHOLD
-#define DEFAULT_RPS           AGENTOS_DEFAULT_RPS_LIMIT
-#define DEFAULT_BURST_SIZE    AGENTOS_DEFAULT_BURST_SIZE
-#define TOKEN_PREFIX          "agentos."
-#define BEARER_PREFIX         "Bearer "
-#define APIKEY_PREFIX         "ApiKey "
+#define DEFAULT_RPS AGENTOS_DEFAULT_RPS_LIMIT
+#define DEFAULT_BURST_SIZE AGENTOS_DEFAULT_BURST_SIZE
+#define TOKEN_PREFIX "agentos."
+#define BEARER_PREFIX "Bearer "
+#define APIKEY_PREFIX "ApiKey "
 
 /* ==================== JWT 内部状态 ==================== */
 
@@ -43,20 +45,20 @@ static struct {
     jwt_config_t config;
     agentos_mutex_t lock;
     int initialized;
-    char subject_buf[MAX_SUBJECT_SIZE];  /**< JWT 验证结果字符串缓冲 */
-    char role_buf[MAX_ROLE_SIZE];        /**< JWT 验证角色缓冲 */
-} g_jwt = { .initialized = 0 };
+    char subject_buf[MAX_SUBJECT_SIZE]; /**< JWT 验证结果字符串缓冲 */
+    char role_buf[MAX_ROLE_SIZE];       /**< JWT 验证角色缓冲 */
+} g_jwt = {.initialized = 0};
 
 /* ==================== API Key 内部状态 ==================== */
 
 static struct {
     apikey_config_t config;
-    char** keys;
+    char **keys;
     size_t capacity;
     agentos_mutex_t lock;
     int initialized;
     char subject_buf[512];
-} g_apikey = { .initialized = 0 };
+} g_apikey = {.initialized = 0};
 
 /* ==================== 速率限制内部状态 ==================== */
 
@@ -64,12 +66,12 @@ static struct {
  * @brief 客户端速率限制条目
  */
 typedef struct rate_limit_entry {
-    char client_id[128];         /**< 客户端标识 */
-    double tokens;               /**< 当前令牌数 */
-    double max_tokens;           /**< 最大令牌数 */
-    double refill_rate;          /**< 每秒补充速率 */
-    time_t last_update;          /**< 最后更新时间 */
-    bool active;                 /**< 是否活跃 */
+    char client_id[128]; /**< 客户端标识 */
+    double tokens;       /**< 当前令牌数 */
+    double max_tokens;   /**< 最大令牌数 */
+    double refill_rate;  /**< 每秒补充速率 */
+    time_t last_update;  /**< 最后更新时间 */
+    bool active;         /**< 是否活跃 */
 } rate_limit_entry_t;
 
 static struct {
@@ -77,7 +79,7 @@ static struct {
     rate_limit_entry_t entries[MAX_CLIENTS];
     agentos_mutex_t lock;
     int initialized;
-} g_ratelimit = { .initialized = 0 };
+} g_ratelimit = {.initialized = 0};
 
 /* ==================== Base64 工具函数 ==================== */
 
@@ -89,15 +91,18 @@ static struct {
  * @param out_len 输出长度
  * @return 0 成功
  */
-static int base64_encode(const uint8_t* data, size_t len,
-                          char* output, size_t* out_len) {
-    static const char table[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static int base64_encode(const uint8_t *data, size_t len, char *output, size_t *out_len)
+{
+    static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-    if (!data || !output || !out_len || len == 0) return AGENTOS_ERR_INVALID_PARAM;
+    if (!data || !output || !out_len || len == 0)
+        return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "base64_encode: null parameter");
 
     size_t needed = ((len + 2) / 3) * 4;
-    if (*out_len < needed + 1) return AGENTOS_ERR_INVALID_PARAM;
+    if (*out_len < needed + 1)
+        return AGENTOS_ERR_INVALID_PARAM;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "base64_encode: output buffer too small");
 
     size_t i = 0, j = 0;
     uint8_t arr3[3] = {0}, arr4[4] = {0};
@@ -131,8 +136,7 @@ static int base64_encode(const uint8_t* data, size_t len,
 /**
  * @brief HMAC-SHA256 计算函数指针类型
  */
-typedef void (*hmac_fn_t)(const char* key, const char* message,
-                         uint8_t* output, size_t* out_len);
+typedef void (*hmac_fn_t)(const char *key, const char *message, uint8_t *output, size_t *out_len);
 
 /**
  * @brief 当前使用的 HMAC 实现指针（运行时选择）
@@ -144,16 +148,16 @@ static hmac_fn_t g_hmac_impl = NULL;
  * 模式 1: OpenSSL HMAC-SHA256 (生产环境推荐，默认使用)
  * ═══════════════════════════════════════════════════════════════
  */
-#include <openssl/hmac.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 
-static void hmac_openssl(const char* key, const char* message,
-                        uint8_t* output, size_t* out_len) {
+__attribute__((unused)) static void hmac_openssl(const char *key, const char *message,
+                                                 uint8_t *output, size_t *out_len)
+{
     unsigned int len = 0;
     unsigned int max_len = (unsigned int)(*out_len);
-    if (HMAC(EVP_sha256(), (const unsigned char*)key, (int)strlen(key),
-             (const unsigned char*)message, strlen(message),
-             output, &len) == NULL) {
+    if (HMAC(EVP_sha256(), (const unsigned char *)key, (int)strlen(key),
+             (const unsigned char *)message, strlen(message), output, &len) == NULL) {
         *out_len = 0;
         return;
     }
@@ -162,7 +166,7 @@ static void hmac_openssl(const char* key, const char* message,
 #define HMAC_IMPL_NAME "OpenSSL"
 
 #if defined(AUTH_USE_OPENSSL)
-/* 
+/*
  * ═══════════════════════════════════════════════════════════════
  * 模式 2: mbedTLS HMAC-SHA256 (嵌入式环境)
  * ═══════════════════════════════════════════════════════════════
@@ -170,18 +174,17 @@ static void hmac_openssl(const char* key, const char* message,
 #elif defined(AUTH_USE_MBEDTLS)
 #include <mbedtls/md.h>
 
-static void hmac_mbedtls(const char* key, const char* message,
-                        uint8_t* output, size_t* out_len) {
+static void hmac_mbedtls(const char *key, const char *message, uint8_t *output, size_t *out_len)
+{
     mbedtls_md_context_t ctx;
     mbedtls_md_init(&ctx);
     mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
-    mbedtls_md_hmac_starts(&ctx,
-        (const unsigned char*)key, strlen(key));
-    mbedtls_md_hmac_update(&ctx,
-        (const unsigned char*)message, strlen(message));
+    mbedtls_md_hmac_starts(&ctx, (const unsigned char *)key, strlen(key));
+    mbedtls_md_hmac_update(&ctx, (const unsigned char *)message, strlen(message));
     mbedtls_md_hmac_finish(&ctx, output);
     mbedtls_md_free(&ctx);
-    if (*out_len > 32) *out_len = 32;
+    if (*out_len > 32)
+        *out_len = 32;
 }
 #define HMAC_IMPL_NAME "mbedTLS"
 
@@ -200,69 +203,95 @@ static void hmac_mbedtls(const char* key, const char* message,
  * - DEBUG 模式下允许编译（开发/测试）
  * - RELEASE/NDEBUG 模式下如果未定义 AUTH_ALLOW_INSECURE_HMAC 则编译失败
  */
-#if defined(NDEBUG) && !defined(AUTH_ALLOW_INSECURE_HMAC) && !defined(AUTH_USE_OPENSSL) && !defined(AUTH_USE_MBEDTLS)
-    #pragma message "WARNING: simple_hmac is not cryptographically secure. Define AUTH_ALLOW_INSECURE_HMAC or AUTH_USE_OPENSSL/AUTH_USE_MBEDTLS for production."
-    #define AUTH_ALLOW_INSECURE_HMAC
+#if defined(NDEBUG) && !defined(AUTH_ALLOW_INSECURE_HMAC) && !defined(AUTH_USE_OPENSSL) && \
+    !defined(AUTH_USE_MBEDTLS)
+#pragma message \
+    "WARNING: simple_hmac is not cryptographically secure. Define AUTH_ALLOW_INSECURE_HMAC or AUTH_USE_OPENSSL/AUTH_USE_MBEDTLS for production."
+#define AUTH_ALLOW_INSECURE_HMAC
 #endif
 
-static void __attribute__((unused)) hmac_builtin(const char* key, const char* message,
-                       uint8_t* output, size_t* out_len) {
-    /* 生产级纯C SHA-256 + HMAC 实现 */
-    #define ROTRIGHT(a,b) (((a) >> (b)) | ((a) << (32-(b))))
-    #define CH(x,y,z) (((x) & (y)) ^ (~(x) & (z)))
-    #define MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
-    #define EP0(x) (ROTRIGHT(x,2) ^ ROTRIGHT(x,13) ^ ROTRIGHT(x,22))
-    #define EP1(x) (ROTRIGHT(x,6) ^ ROTRIGHT(x,11) ^ ROTRIGHT(x,25))
-    #define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
-    #define SIG1(x) (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
+static void __attribute__((unused)) hmac_builtin(const char *key, const char *message,
+                                                 uint8_t *output, size_t *out_len)
+{
+/* 生产级纯C SHA-256 + HMAC 实现 */
+#define ROTRIGHT(a, b) (((a) >> (b)) | ((a) << (32 - (b))))
+#define CH(x, y, z) (((x) & (y)) ^ (~(x) & (z)))
+#define MAJ(x, y, z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
+#define EP0(x) (ROTRIGHT(x, 2) ^ ROTRIGHT(x, 13) ^ ROTRIGHT(x, 22))
+#define EP1(x) (ROTRIGHT(x, 6) ^ ROTRIGHT(x, 11) ^ ROTRIGHT(x, 25))
+#define SIG0(x) (ROTRIGHT(x, 7) ^ ROTRIGHT(x, 18) ^ ((x) >> 3))
+#define SIG1(x) (ROTRIGHT(x, 17) ^ ROTRIGHT(x, 19) ^ ((x) >> 10))
 
     static const uint32_t K[64] = {
-        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
-    };
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+        0xc67178f2};
 
-    uint32_t h[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
-                     0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+    uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
 
     size_t msg_len = strlen(message);
-    if (msg_len > SIZE_MAX - 72) { *out_len = 0; return; }
+    if (msg_len > SIZE_MAX - 72) {
+        *out_len = 0;
+        return;
+    }
     size_t new_len = ((msg_len + 8) / 64 + 1) * 64;
-    unsigned char* msg = (unsigned char*)AGENTOS_CALLOC(new_len + 64, 1);
-    if (!msg) { *out_len = 0; return; }
+    unsigned char *msg = (unsigned char *)AGENTOS_CALLOC(new_len + 64, 1);
+    if (!msg) {
+        *out_len = 0;
+        return;
+    }
     memcpy(msg, message, msg_len);
     msg[msg_len] = 0x80;
 
     {
         uint64_t bits = (uint64_t)(msg_len * 8);
-        for (int i = 63; i >= 0; i--) { msg[new_len + i] = (bits >> ((7-i)*8)) & 0xFF; }
+        for (int i = 63; i >= 0; i--) {
+            msg[new_len + i] = (bits >> ((7 - i) * 8)) & 0xFF;
+        }
     }
 
     for (size_t chunk = 0; chunk < new_len / 64; chunk++) {
-        uint32_t w[64]; memset(w, 0, sizeof(w));
+        uint32_t w[64];
+        memset(w, 0, sizeof(w));
         for (int i = 0; i < 16; i++) {
-            w[i] = ((uint32_t)msg[chunk*64+i*4]<<24) |
-                   ((uint32_t)msg[chunk*64+i*4+1]<<16) |
-                   ((uint32_t)msg[chunk*64+i*4+2]<<8) |
-                   (uint32_t)msg[chunk*64+i*4+3];
+            w[i] = ((uint32_t)msg[chunk * 64 + i * 4] << 24) |
+                   ((uint32_t)msg[chunk * 64 + i * 4 + 1] << 16) |
+                   ((uint32_t)msg[chunk * 64 + i * 4 + 2] << 8) |
+                   (uint32_t)msg[chunk * 64 + i * 4 + 3];
         }
         for (int i = 16; i < 64; i++) {
-            w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
+            w[i] = SIG1(w[i - 2]) + w[i - 7] + SIG0(w[i - 15]) + w[i - 16];
         }
 
-        uint32_t a=h[0], b=h[1], c=h[2], d=h[3], e=h[4], f=h[5], g=h[6], hh=h[7];
+        uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
         for (int i = 0; i < 64; i++) {
-            uint32_t t1 = hh + EP1(e) + CH(e,f,g) + K[i] + w[i];
-            uint32_t t2 = EP0(a) + MAJ(a,b,c);
-            hh=g; g=f; f=e; e=d+t1; d=c; c=b; b=a; a=t1+t2;
+            uint32_t t1 = hh + EP1(e) + CH(e, f, g) + K[i] + w[i];
+            uint32_t t2 = EP0(a) + MAJ(a, b, c);
+            hh = g;
+            g = f;
+            f = e;
+            e = d + t1;
+            d = c;
+            c = b;
+            b = a;
+            a = t1 + t2;
         }
-        h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d;
-        h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=hh;
+        h[0] += a;
+        h[1] += b;
+        h[2] += c;
+        h[3] += d;
+        h[4] += e;
+        h[5] += f;
+        h[6] += g;
+        h[7] += hh;
     }
 
     AGENTOS_FREE(msg);
@@ -274,128 +303,203 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
     memset(k_opad, 0x5c, sizeof(k_opad));
 
     if (key_len > 64) {
-        uint32_t kh[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
-                         0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+        uint32_t kh[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                          0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
         size_t padded_len = 64 * 2;
-        if (key_len + 1 + 8 > padded_len) padded_len = ((key_len + 1 + 8 + 63) / 64) * 64;
-        unsigned char* km = AGENTOS_CALLOC(padded_len, 1);
-        if (!km) { AGENTOS_FREE(msg); return; }
+        if (key_len + 1 + 8 > padded_len)
+            padded_len = ((key_len + 1 + 8 + 63) / 64) * 64;
+        unsigned char *km = AGENTOS_CALLOC(padded_len, 1);
+        if (!km) {
+            AGENTOS_FREE(msg);
+            return;
+        }
         memcpy(km, key, key_len);
         km[key_len] = 0x80;
         size_t bit_len = key_len * 8;
         km[padded_len - 1] = (uint8_t)(bit_len & 0xFF);
         km[padded_len - 2] = (uint8_t)((bit_len >> 8) & 0xFF);
         for (size_t chunk = 0; chunk < padded_len / 64; chunk++) {
-            uint32_t w[64]; memset(w, 0, sizeof(w));
+            uint32_t w[64];
+            memset(w, 0, sizeof(w));
             for (int i = 0; i < 16; i++) {
                 int off = (int)(chunk * 64 + (size_t)i * 4);
                 if (off + 3 < (int)padded_len)
-                    w[i] = ((uint32_t)km[off]<<24)|((uint32_t)km[off+1]<<16)|((uint32_t)km[off+2]<<8)|(uint32_t)km[off+3];
+                    w[i] = ((uint32_t)km[off] << 24) | ((uint32_t)km[off + 1] << 16) |
+                           ((uint32_t)km[off + 2] << 8) | (uint32_t)km[off + 3];
             }
-            for (int i = 16; i < 64; i++) w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
-            uint32_t wa=kh[0],wb=kh[1],wc=kh[2],wd=kh[3],we=kh[4],wf=kh[5],wg=kh[6],whh=kh[7];
+            for (int i = 16; i < 64; i++)
+                w[i] = SIG1(w[i - 2]) + w[i - 7] + SIG0(w[i - 15]) + w[i - 16];
+            uint32_t wa = kh[0], wb = kh[1], wc = kh[2], wd = kh[3], we = kh[4], wf = kh[5],
+                     wg = kh[6], whh = kh[7];
             for (int i = 0; i < 64; i++) {
-                uint32_t t1=whh+EP1(we)+CH(we,wf,wg)+K[i]+w[i],t2=EP0(wa)+MAJ(wa,wb,wc);
-                whh=wg; wg=wf; wf=we; we=wd+t1; wd=wc; wc=wb; wb=wa; wa=t1+t2;
+                uint32_t t1 = whh + EP1(we) + CH(we, wf, wg) + K[i] + w[i],
+                         t2 = EP0(wa) + MAJ(wa, wb, wc);
+                whh = wg;
+                wg = wf;
+                wf = we;
+                we = wd + t1;
+                wd = wc;
+                wc = wb;
+                wb = wa;
+                wa = t1 + t2;
             }
-            kh[0]+=wa; kh[1]+=wb; kh[2]+=wc; kh[3]+=wd;
-            kh[4]+=we; kh[5]+=wf; kh[6]+=wg; kh[7]+=whh;
+            kh[0] += wa;
+            kh[1] += wb;
+            kh[2] += wc;
+            kh[3] += wd;
+            kh[4] += we;
+            kh[5] += wf;
+            kh[6] += wg;
+            kh[7] += whh;
         }
         AGENTOS_FREE(km);
         for (int i = 0; i < 8; i++) {
-            k_ipad[i*4]=(kh[i]>>24)&0xFF; k_ipad[i*4+1]=(kh[i]>>16)&0xFF;
-            k_ipad[i*4+2]=(kh[i]>>8)&0xFF; k_ipad[i*4+3]=kh[i]&0xFF;
-            k_opad[i*4]=k_ipad[i*4]^0x36^0x5c; k_opad[i*4+1]=k_ipad[i*4+1]^0x36^0x5c;
-            k_opad[i*4+2]=k_ipad[i*4+2]^0x36^0x5c; k_opad[i*4+3]=k_ipad[i*4+3]^0x36^0x5c;
-            k_ipad[i*4]^=0x36; k_opad[i*4]^=0x5c;
+            k_ipad[i * 4] = (kh[i] >> 24) & 0xFF;
+            k_ipad[i * 4 + 1] = (kh[i] >> 16) & 0xFF;
+            k_ipad[i * 4 + 2] = (kh[i] >> 8) & 0xFF;
+            k_ipad[i * 4 + 3] = kh[i] & 0xFF;
+            k_opad[i * 4] = k_ipad[i * 4] ^ 0x36 ^ 0x5c;
+            k_opad[i * 4 + 1] = k_ipad[i * 4 + 1] ^ 0x36 ^ 0x5c;
+            k_opad[i * 4 + 2] = k_ipad[i * 4 + 2] ^ 0x36 ^ 0x5c;
+            k_opad[i * 4 + 3] = k_ipad[i * 4 + 3] ^ 0x36 ^ 0x5c;
+            k_ipad[i * 4] ^= 0x36;
+            k_opad[i * 4] ^= 0x5c;
         }
     } else {
         for (size_t i = 0; i < key_len; i++) {
-            k_ipad[i] ^= (unsigned char)key[i]; k_opad[i] ^= (unsigned char)key[i];
+            k_ipad[i] ^= (unsigned char)key[i];
+            k_opad[i] ^= (unsigned char)key[i];
         }
     }
 
     /* Inner hash - 正确处理多块 */
     size_t ilen = 64 + msg_len;
     size_t inner_padded = ((ilen + 8) / 64 + 1) * 64;
-    unsigned char* inner = AGENTOS_CALLOC(inner_padded + 64, 1);
-    if (!inner) { AGENTOS_FREE(msg); return; }
+    unsigned char *inner = AGENTOS_CALLOC(inner_padded + 64, 1);
+    if (!inner) {
+        AGENTOS_FREE(msg);
+        return;
+    }
     memcpy(inner, k_ipad, 64);
     memcpy(inner + 64, message, msg_len);
     inner[ilen] = 0x80;
 
     {
         uint64_t ibits = (uint64_t)(ilen * 8);
-        for (int i = 63; i >= 0; i--) { inner[inner_padded + i] = (ibits >> ((7-i)*8)) & 0xFF; }
+        for (int i = 63; i >= 0; i--) {
+            inner[inner_padded + i] = (ibits >> ((7 - i) * 8)) & 0xFF;
+        }
     }
 
-    uint32_t ih[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
-                      0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+    uint32_t ih[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
 
     for (size_t chunk = 0; chunk < inner_padded / 64; chunk++) {
-        uint32_t w[64]; memset(w, 0, sizeof(w));
-        for (int i = 0; i < 16 && (chunk*64+i*4+3) < inner_padded; i++) {
-            int off = (int)(chunk*64+i*4);
-            if (off+3 < (int)inner_padded)
-                w[i] = ((uint32_t)inner[off]<<24)|((uint32_t)inner[off+1]<<16)|((uint32_t)inner[off+2]<<8)|(uint32_t)inner[off+3];
+        uint32_t w[64];
+        memset(w, 0, sizeof(w));
+        for (int i = 0; i < 16 && (chunk * 64 + i * 4 + 3) < inner_padded; i++) {
+            int off = (int)(chunk * 64 + i * 4);
+            if (off + 3 < (int)inner_padded)
+                w[i] = ((uint32_t)inner[off] << 24) | ((uint32_t)inner[off + 1] << 16) |
+                       ((uint32_t)inner[off + 2] << 8) | (uint32_t)inner[off + 3];
         }
-        for (int i = 16; i < 64; i++) w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
-        uint32_t a=ih[0],b=ih[1],c=ih[2],d=ih[3],e=ih[4],f=ih[5],g=ih[6],hh=ih[7];
+        for (int i = 16; i < 64; i++)
+            w[i] = SIG1(w[i - 2]) + w[i - 7] + SIG0(w[i - 15]) + w[i - 16];
+        uint32_t a = ih[0], b = ih[1], c = ih[2], d = ih[3], e = ih[4], f = ih[5], g = ih[6],
+                 hh = ih[7];
         for (int i = 0; i < 64; i++) {
-            uint32_t t1=hh+EP1(e)+CH(e,f,g)+K[i]+w[i],t2=EP0(a)+MAJ(a,b,c);
-            hh=g;g=f;f=e;e=d+t1;d=c;c=b;b=a;a=t1+t2;
+            uint32_t t1 = hh + EP1(e) + CH(e, f, g) + K[i] + w[i], t2 = EP0(a) + MAJ(a, b, c);
+            hh = g;
+            g = f;
+            f = e;
+            e = d + t1;
+            d = c;
+            c = b;
+            b = a;
+            a = t1 + t2;
         }
-        ih[0]+=a;ih[1]+=b;ih[2]+=c;ih[3]+=d;ih[4]+=e;ih[5]+=f;ih[6]+=g;ih[7]+=hh;
+        ih[0] += a;
+        ih[1] += b;
+        ih[2] += c;
+        ih[3] += d;
+        ih[4] += e;
+        ih[5] += f;
+        ih[6] += g;
+        ih[7] += hh;
     }
     AGENTOS_FREE(inner);
 
     /* Outer hash - 正确处理多块 */
     size_t olen = 64 + 32;
     size_t outer_padded = ((olen + 8) / 64 + 1) * 64;
-    unsigned char* outer = AGENTOS_CALLOC(outer_padded + 64, 1);
+    unsigned char *outer = AGENTOS_CALLOC(outer_padded + 64, 1);
     if (!outer) {
         return;
     }
     memcpy(outer, k_opad, 64);
     for (int i = 0; i < 8; i++) {
-        outer[64+i*4]=(ih[i]>>24)&0xFF; outer[64+i*4+1]=(ih[i]>>16)&0xFF;
-        outer[64+i*4+2]=(ih[i]>>8)&0xFF; outer[64+i*4+3]=ih[i]&0xFF;
+        outer[64 + i * 4] = (ih[i] >> 24) & 0xFF;
+        outer[64 + i * 4 + 1] = (ih[i] >> 16) & 0xFF;
+        outer[64 + i * 4 + 2] = (ih[i] >> 8) & 0xFF;
+        outer[64 + i * 4 + 3] = ih[i] & 0xFF;
     }
 
-    uint32_t oh[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
-                      0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+    uint32_t oh[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
 
     {
         uint64_t obits = (uint64_t)(olen * 8);
-        for (int i = 63; i >= 0; i--) { outer[outer_padded + i] = (obits >> ((7-i)*8)) & 0xFF; }
+        for (int i = 63; i >= 0; i--) {
+            outer[outer_padded + i] = (obits >> ((7 - i) * 8)) & 0xFF;
+        }
     }
 
     for (size_t chunk = 0; chunk < outer_padded / 64; chunk++) {
-        uint32_t w[64]; memset(w, 0, sizeof(w));
-        for (int i = 0; i < 16 && (chunk*64+i*4+3) < outer_padded; i++) {
-            int off = (int)(chunk*64+i*4);
-            if (off+3 < (int)outer_padded)
-                w[i] = ((uint32_t)outer[off]<<24)|((uint32_t)outer[off+1]<<16)|((uint32_t)outer[off+2]<<8)|(uint32_t)outer[off+3];
+        uint32_t w[64];
+        memset(w, 0, sizeof(w));
+        for (int i = 0; i < 16 && (chunk * 64 + i * 4 + 3) < outer_padded; i++) {
+            int off = (int)(chunk * 64 + i * 4);
+            if (off + 3 < (int)outer_padded)
+                w[i] = ((uint32_t)outer[off] << 24) | ((uint32_t)outer[off + 1] << 16) |
+                       ((uint32_t)outer[off + 2] << 8) | (uint32_t)outer[off + 3];
         }
-        for (int i = 16; i < 64; i++) w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
-        uint32_t a=oh[0],b=oh[1],c=oh[2],d=oh[3],e=oh[4],f=oh[5],g=oh[6],hh=oh[7];
+        for (int i = 16; i < 64; i++)
+            w[i] = SIG1(w[i - 2]) + w[i - 7] + SIG0(w[i - 15]) + w[i - 16];
+        uint32_t a = oh[0], b = oh[1], c = oh[2], d = oh[3], e = oh[4], f = oh[5], g = oh[6],
+                 hh = oh[7];
         for (int i = 0; i < 64; i++) {
-            uint32_t t1=hh+EP1(e)+CH(e,f,g)+K[i]+w[i],t2=EP0(a)+MAJ(a,b,c);
-            hh=g;g=f;f=e;e=d+t1;d=c;c=b;b=a;a=t1+t2;
+            uint32_t t1 = hh + EP1(e) + CH(e, f, g) + K[i] + w[i], t2 = EP0(a) + MAJ(a, b, c);
+            hh = g;
+            g = f;
+            f = e;
+            e = d + t1;
+            d = c;
+            c = b;
+            b = a;
+            a = t1 + t2;
         }
-        oh[0]+=a;oh[1]+=b;oh[2]+=c;oh[3]+=d;oh[4]+=e;oh[5]+=f;oh[6]+=g;oh[7]+=hh;
+        oh[0] += a;
+        oh[1] += b;
+        oh[2] += c;
+        oh[3] += d;
+        oh[4] += e;
+        oh[5] += f;
+        oh[6] += g;
+        oh[7] += hh;
     }
 
-    if (*out_len > 32) *out_len = 32;
-    for (size_t i = 0; i < *out_len; i++) output[i] = (oh[i/4] >> ((3-(i%4))*8)) & 0xFF;
+    if (*out_len > 32)
+        *out_len = 32;
+    for (size_t i = 0; i < *out_len; i++)
+        output[i] = (oh[i / 4] >> ((3 - (i % 4)) * 8)) & 0xFF;
 
-    #undef ROTRIGHT
-    #undef CH
-    #undef MAJ
-    #undef EP0
-    #undef EP1
-    #undef SIG0
-    #undef SIG1
+#undef ROTRIGHT
+#undef CH
+#undef MAJ
+#undef EP0
+#undef EP1
+#undef SIG0
+#undef SIG1
 }
 #ifndef HMAC_IMPL_NAME
 #define HMAC_IMPL_NAME "builtin-SHA256"
@@ -405,8 +509,8 @@ static void __attribute__((unused)) hmac_builtin(const char* key, const char* me
 
 /* ==================== JWT 实现 ==================== */
 
-
-int auth_jwt_init(const jwt_config_t* config) {
+int auth_jwt_init(const jwt_config_t *config)
+{
     agentos_mutex_lock(&g_jwt.lock);
 
     if (g_jwt.initialized) {
@@ -418,6 +522,7 @@ int auth_jwt_init(const jwt_config_t* config) {
         SVC_LOG_ERROR("JWT init: invalid config");
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT init: invalid config or secret");
     }
 
     memcpy(&g_jwt.config, config, sizeof(jwt_config_t));
@@ -427,7 +532,7 @@ int auth_jwt_init(const jwt_config_t* config) {
     if (g_jwt.config.refresh_threshold_sec == 0)
         g_jwt.config.refresh_threshold_sec = DEFAULT_REFRESH_THRESHOLD;
 
-    /* 选择 HMAC 实现模式（运行时绑定）*/
+        /* 选择 HMAC 实现模式（运行时绑定）*/
 #if defined(AUTH_USE_OPENSSL)
     g_hmac_impl = hmac_openssl;
 #elif defined(AUTH_USE_MBEDTLS)
@@ -438,13 +543,13 @@ int auth_jwt_init(const jwt_config_t* config) {
 
     g_jwt.initialized = 1;
     SVC_LOG_INFO("JWT authentication module initialized (TTL=%llu sec, HMAC=%s)",
-                (unsigned long long)g_jwt.config.token_ttl_sec,
-                HMAC_IMPL_NAME);
+                 (unsigned long long)g_jwt.config.token_ttl_sec, HMAC_IMPL_NAME);
     agentos_mutex_unlock(&g_jwt.lock);
     return AUTH_SUCCESS;
 }
 
-int auth_jwt_generate_token(const char* subject, const char* role, char** out_token) {
+int auth_jwt_generate_token(const char *subject, const char *role, char **out_token)
+{
     if (!g_jwt.initialized || !subject || !out_token) {
         return AUTH_TOKEN_INVALID;
     }
@@ -453,64 +558,97 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
 
     if (strlen(subject) > MAX_SUBJECT_SIZE) {
         SVC_LOG_ERROR("JWT generate: subject too long");
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: subject too long");
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
 
     /* 构建 Header: {"alg":"HS256","typ":"JWT"} */
-    const char* header_b64 = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
+    const char *header_b64 = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 
     /* 构建 Payload */
     time_t now = time(NULL);
-    cJSON* payload = cJSON_CreateObject();
-    cJSON_AddStringToObject(payload, "iss", g_jwt.config.issuer ? g_jwt.config.issuer : "agentos-daemon");
+    cJSON *payload = cJSON_CreateObject();
+    cJSON_AddStringToObject(payload, "iss",
+                            g_jwt.config.issuer ? g_jwt.config.issuer : "agentos-daemon");
     cJSON_AddStringToObject(payload, "sub", subject);
     cJSON_AddStringToObject(payload, "role", role ? role : "user");
     cJSON_AddNumberToObject(payload, "iat", (double)now);
     cJSON_AddNumberToObject(payload, "exp", (double)(now + g_jwt.config.token_ttl_sec));
 
-    char* payload_json = cJSON_PrintUnformatted(payload);
+    char *payload_json = cJSON_PrintUnformatted(payload);
     cJSON_Delete(payload);
 
-    if (!payload_json) { agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    if (!payload_json) {
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: cJSON_PrintUnformatted failed");
+    }
 
     /* Base64 编码 Payload */
     size_t payload_b64_size = strlen(payload_json) * 2 + 100;
-    char* payload_b64 = (char*)AGENTOS_MALLOC(payload_b64_size);
-    if (!payload_b64) { AGENTOS_FREE(payload_json); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    char *payload_b64 = (char *)AGENTOS_MALLOC(payload_b64_size);
+    if (!payload_b64) {
+        AGENTOS_FREE(payload_json);
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: malloc payload_b64 failed");
+    }
 
-    base64_encode((const uint8_t*)payload_json, strlen(payload_json),
-                  payload_b64, &payload_b64_size);
+    base64_encode((const uint8_t *)payload_json, strlen(payload_json), payload_b64,
+                  &payload_b64_size);
     AGENTOS_FREE(payload_json);
 
     /* 构建签名部分 */
     size_t sign_input_size = strlen(header_b64) + 1 + payload_b64_size + 100;
-    char* sign_input = (char*)AGENTOS_MALLOC(sign_input_size);
-    if (!sign_input) { AGENTOS_FREE(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    char *sign_input = (char *)AGENTOS_MALLOC(sign_input_size);
+    if (!sign_input) {
+        AGENTOS_FREE(payload_b64);
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: malloc sign_input failed");
+    }
     snprintf(sign_input, sign_input_size, "%s.%s", header_b64, payload_b64);
 
     uint8_t hmac_output[32] = {0};
     size_t hmac_len = sizeof(hmac_output);
     g_hmac_impl(g_jwt.config.secret, sign_input, hmac_output, &hmac_len);
     if (hmac_len == 0) {
-        AGENTOS_FREE(sign_input); AGENTOS_FREE(payload_b64);
+        AGENTOS_FREE(sign_input);
+        AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: HMAC computation failed");
     }
 
     size_t sig_b64_size = 128;
-    char* sig_b64 = (char*)AGENTOS_MALLOC(sig_b64_size);
-    if (!sig_b64) { AGENTOS_FREE(sign_input); AGENTOS_FREE(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    char *sig_b64 = (char *)AGENTOS_MALLOC(sig_b64_size);
+    if (!sig_b64) {
+        AGENTOS_FREE(sign_input);
+        AGENTOS_FREE(payload_b64);
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: malloc sig_b64 failed");
+    }
     if (base64_encode(hmac_output, hmac_len, sig_b64, &sig_b64_size) != AGENTOS_SUCCESS) {
-        AGENTOS_FREE(sign_input); AGENTOS_FREE(sig_b64); AGENTOS_FREE(payload_b64);
+        AGENTOS_FREE(sign_input);
+        AGENTOS_FREE(sig_b64);
+        AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
 
     /* 组合 Token */
     size_t token_size = sign_input_size + sig_b64_size + 10;
-    *out_token = (char*)AGENTOS_MALLOC(token_size);
-    if (!*out_token) { AGENTOS_FREE(sign_input); AGENTOS_FREE(sig_b64); AGENTOS_FREE(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    *out_token = (char *)AGENTOS_MALLOC(token_size);
+    if (!*out_token) {
+        AGENTOS_FREE(sign_input);
+        AGENTOS_FREE(sig_b64);
+        AGENTOS_FREE(payload_b64);
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: malloc token failed");
+    }
     snprintf(*out_token, token_size, "%s.%s", sign_input, sig_b64);
 
     AGENTOS_FREE(sign_input);
@@ -522,7 +660,8 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
     return AUTH_SUCCESS;
 }
 
-int auth_jwt_verify_token(const char* token, auth_result_t* result) {
+int auth_jwt_verify_token(const char *token, auth_result_t *result)
+{
     if (!g_jwt.initialized || !token || !result) {
         return AUTH_TOKEN_INVALID;
     }
@@ -534,41 +673,46 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     result->error_message = "Token verification failed";
 
     /* 简单格式检查 */
-    const char* dot1 = strchr(token, '.');
-    const char* dot2 = dot1 ? strchr(dot1 + 1, '.') : NULL;
+    const char *dot1 = strchr(token, '.');
+    const char *dot2 = dot1 ? strchr(dot1 + 1, '.') : NULL;
     if (!dot1 || !dot2) {
         result->error_message = "Invalid token format";
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: invalid token format");
     }
 
     /* 解析 Payload */
     size_t payload_len = (size_t)(dot2 - dot1 - 1);
-    char* payload_b64 = (char*)AGENTOS_MALLOC(payload_len + 1);
+    char *payload_b64 = (char *)AGENTOS_MALLOC(payload_len + 1);
     if (!payload_b64) {
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc payload buffer failed");
     }
     strncpy(payload_b64, dot1 + 1, payload_len);
     payload_b64[payload_len] = '\0';
 
     /* Base64 URL-safe 解码 */
     size_t decoded_len = (payload_len * 3) / 4 + 4;
-    unsigned char* payload_decoded = (unsigned char*)AGENTOS_MALLOC(decoded_len);
+    unsigned char *payload_decoded = (unsigned char *)AGENTOS_MALLOC(decoded_len);
     if (!payload_decoded) {
         AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc decoded buffer failed");
     }
 
     /* Base64 URL -> Standard Base64 转换 */
     for (size_t i = 0; i < payload_len; i++) {
-        if (payload_b64[i] == '-') payload_b64[i] = '+';
-        else if (payload_b64[i] == '_') payload_b64[i] = '/';
+        if (payload_b64[i] == '-')
+            payload_b64[i] = '+';
+        else if (payload_b64[i] == '_')
+            payload_b64[i] = '/';
     }
     /* 补齐 padding */
     size_t pad = (4 - (payload_len % 4)) % 4;
-    char* payload_padded = (char*)AGENTOS_MALLOC(payload_len + pad + 1);
+    char *payload_padded = (char *)AGENTOS_MALLOC(payload_len + pad + 1);
     if (!payload_padded) {
         AGENTOS_FREE(payload_decoded);
         AGENTOS_FREE(payload_b64);
@@ -576,55 +720,62 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         return AUTH_TOKEN_INVALID;
     }
     memcpy(payload_padded, payload_b64, payload_len);
-    for (size_t i = 0; i < pad; i++) payload_padded[payload_len + i] = '=';
+    for (size_t i = 0; i < pad; i++)
+        payload_padded[payload_len + i] = '=';
     payload_padded[payload_len + pad] = '\0';
 
     /* 手动 Base64 解码 */
     static const unsigned char b64_table[256] = {
-        ['A']=0,['B']=1,['C']=2,['D']=3,['E']=4,['F']=5,['G']=6,['H']=7,
-        ['I']=8,['J']=9,['K']=10,['L']=11,['M']=12,['N']=13,['O']=14,['P']=15,
-        ['Q']=16,['R']=17,['S']=18,['T']=19,['U']=20,['V']=21,['W']=22,['X']=23,
-        ['Y']=24,['Z']=25,['a']=26,['b']=27,['c']=28,['d']=29,['e']=30,['f']=31,
-        ['g']=32,['h']=33,['i']=34,['j']=35,['k']=36,['l']=37,['m']=38,['n']=39,
-        ['o']=40,['p']=41,['q']=42,['r']=43,['s']=44,['t']=45,['u']=46,['v']=47,
-        ['w']=48,['x']=49,['y']=50,['z']=51,['0']=52,['1']=53,['2']=54,['3']=55,
-        ['4']=56,['5']=57,['6']=58,['7']=59,['8']=60,['9']=61,['+']=62,['/']=63
-    };
+        ['A'] = 0,  ['B'] = 1,  ['C'] = 2,  ['D'] = 3,  ['E'] = 4,  ['F'] = 5,  ['G'] = 6,
+        ['H'] = 7,  ['I'] = 8,  ['J'] = 9,  ['K'] = 10, ['L'] = 11, ['M'] = 12, ['N'] = 13,
+        ['O'] = 14, ['P'] = 15, ['Q'] = 16, ['R'] = 17, ['S'] = 18, ['T'] = 19, ['U'] = 20,
+        ['V'] = 21, ['W'] = 22, ['X'] = 23, ['Y'] = 24, ['Z'] = 25, ['a'] = 26, ['b'] = 27,
+        ['c'] = 28, ['d'] = 29, ['e'] = 30, ['f'] = 31, ['g'] = 32, ['h'] = 33, ['i'] = 34,
+        ['j'] = 35, ['k'] = 36, ['l'] = 37, ['m'] = 38, ['n'] = 39, ['o'] = 40, ['p'] = 41,
+        ['q'] = 42, ['r'] = 43, ['s'] = 44, ['t'] = 45, ['u'] = 46, ['v'] = 47, ['w'] = 48,
+        ['x'] = 49, ['y'] = 50, ['z'] = 51, ['0'] = 52, ['1'] = 53, ['2'] = 54, ['3'] = 55,
+        ['4'] = 56, ['5'] = 57, ['6'] = 58, ['7'] = 59, ['8'] = 60, ['9'] = 61, ['+'] = 62,
+        ['/'] = 63};
     size_t b64_len = payload_len + pad;
     size_t out_idx = 0;
     for (size_t i = 0; i + 3 < b64_len; i += 4) {
         unsigned char a = b64_table[(unsigned char)payload_padded[i]];
-        unsigned char b = b64_table[(unsigned char)payload_padded[i+1]];
-        unsigned char c = (payload_padded[i+2] == '=') ? 0 : b64_table[(unsigned char)payload_padded[i+2]];
-        unsigned char d = (payload_padded[i+3] == '=') ? 0 : b64_table[(unsigned char)payload_padded[i+3]];
+        unsigned char b = b64_table[(unsigned char)payload_padded[i + 1]];
+        unsigned char c =
+            (payload_padded[i + 2] == '=') ? 0 : b64_table[(unsigned char)payload_padded[i + 2]];
+        unsigned char d =
+            (payload_padded[i + 3] == '=') ? 0 : b64_table[(unsigned char)payload_padded[i + 3]];
         payload_decoded[out_idx++] = (a << 2) | (b >> 4);
-        if (payload_padded[i+2] != '=') payload_decoded[out_idx++] = ((b & 0xF) << 4) | (c >> 2);
-        if (payload_padded[i+3] != '=') payload_decoded[out_idx++] = ((c & 0x3) << 6) | d;
+        if (payload_padded[i + 2] != '=')
+            payload_decoded[out_idx++] = ((b & 0xF) << 4) | (c >> 2);
+        if (payload_padded[i + 3] != '=')
+            payload_decoded[out_idx++] = ((c & 0x3) << 6) | d;
     }
     payload_decoded[out_idx] = '\0';
     AGENTOS_FREE(payload_padded);
     AGENTOS_FREE(payload_b64);
 
-    cJSON* payload = cJSON_Parse((const char*)payload_decoded);
+    cJSON *payload = cJSON_Parse((const char *)payload_decoded);
     AGENTOS_FREE(payload_decoded);
 
     if (!payload) {
         result->error_message = "Invalid token payload";
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: invalid token payload JSON");
     }
 
     /* 提取字段 - 必须在 cJSON_Delete 前复制字符串 */
-    cJSON* sub = cJSON_GetObjectItem(payload, "sub");
-    cJSON* role = cJSON_GetObjectItem(payload, "role");
-    cJSON* exp = cJSON_GetObjectItem(payload, "exp");
+    cJSON *sub = cJSON_GetObjectItem(payload, "sub");
+    cJSON *role = cJSON_GetObjectItem(payload, "role");
+    cJSON *exp = cJSON_GetObjectItem(payload, "exp");
 
     if (cJSON_IsString(sub)) {
         strncpy(g_jwt.subject_buf, sub->valuestring, MAX_SUBJECT_SIZE - 1);
         g_jwt.subject_buf[MAX_SUBJECT_SIZE - 1] = '\0';
         if (strlen(sub->valuestring) >= MAX_SUBJECT_SIZE) {
-            SVC_LOG_WARN("JWT subject truncated to %d chars: original length=%zu",
-                         MAX_SUBJECT_SIZE, strlen(sub->valuestring));
+            SVC_LOG_WARN("JWT subject truncated to %d chars: original length=%zu", MAX_SUBJECT_SIZE,
+                         strlen(sub->valuestring));
         }
         result->subject = g_jwt.subject_buf;
     }
@@ -646,6 +797,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_EXPIRED;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_EXPIRED, "JWT verify: token has expired");
         }
     }
 
@@ -653,12 +805,13 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     {
         size_t header_len = (size_t)(dot1 - token);
         size_t sig_input_len = header_len + 1 + payload_len;
-        char* sig_input = (char*)AGENTOS_MALLOC(sig_input_len + 1);
+        char *sig_input = (char *)AGENTOS_MALLOC(sig_input_len + 1);
         if (!sig_input) {
             result->error_message = "Memory allocation failed for signature verification";
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_input failed");
         }
         memcpy(sig_input, token, header_len);
         sig_input[header_len] = '.';
@@ -666,7 +819,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         sig_input[sig_input_len] = '\0';
 
         size_t sig_b64_len = strlen(dot2 + 1);
-        char* sig_b64 = (char*)AGENTOS_MALLOC(sig_b64_len + 1);
+        char *sig_b64 = (char *)AGENTOS_MALLOC(sig_b64_len + 1);
         if (!sig_b64) {
             AGENTOS_FREE(sig_input);
             result->error_message = "Memory allocation failed";
@@ -674,66 +827,81 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
         }
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_b64 failed");
         memcpy(sig_b64, dot2 + 1, sig_b64_len);
         sig_b64[sig_b64_len] = '\0';
 
         for (size_t i = 0; i < sig_b64_len; i++) {
-            if (sig_b64[i] == '-') sig_b64[i] = '+';
-            else if (sig_b64[i] == '_') sig_b64[i] = '/';
+            if (sig_b64[i] == '-')
+                sig_b64[i] = '+';
+            else if (sig_b64[i] == '_')
+                sig_b64[i] = '/';
         }
 
         size_t expected_sig_len = 32;
         uint8_t computed_hmac[32] = {0};
         g_hmac_impl(g_jwt.config.secret, sig_input, computed_hmac, &expected_sig_len);
         if (expected_sig_len == 0) {
-            AGENTOS_FREE(sig_input); AGENTOS_FREE(sig_b64);
+            AGENTOS_FREE(sig_input);
+            AGENTOS_FREE(sig_b64);
             result->error_message = "HMAC computation failed";
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: HMAC computation failed");
         }
 
         size_t sig_padded_len = sig_b64_len + ((4 - (sig_b64_len % 4)) % 4);
-        char* sig_padded = (char*)AGENTOS_MALLOC(sig_padded_len + 1);
+        char *sig_padded = (char *)AGENTOS_MALLOC(sig_padded_len + 1);
         if (!sig_padded) {
-            AGENTOS_FREE(sig_input); AGENTOS_FREE(sig_b64);
+            AGENTOS_FREE(sig_input);
+            AGENTOS_FREE(sig_b64);
             result->error_message = "Memory allocation failed";
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_padded failed");
         }
         memcpy(sig_padded, sig_b64, sig_b64_len);
         size_t sig_pad = (4 - (sig_b64_len % 4)) % 4;
-        for (size_t i = 0; i < sig_pad; i++) sig_padded[sig_b64_len + i] = '=';
+        for (size_t i = 0; i < sig_pad; i++)
+            sig_padded[sig_b64_len + i] = '=';
         sig_padded[sig_padded_len] = '\0';
 
-        unsigned char* provided_sig = (unsigned char*)AGENTOS_MALLOC(32);
+        unsigned char *provided_sig = (unsigned char *)AGENTOS_MALLOC(32);
         if (!provided_sig) {
-            AGENTOS_FREE(sig_input); AGENTOS_FREE(sig_b64); AGENTOS_FREE(sig_padded);
+            AGENTOS_FREE(sig_input);
+            AGENTOS_FREE(sig_b64);
+            AGENTOS_FREE(sig_padded);
             result->error_message = "Memory allocation failed";
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc provided_sig failed");
         }
         memset(provided_sig, 0, 32);
 
         size_t prov_idx = 0;
         for (size_t i = 0; i + 3 < sig_padded_len; i += 4) {
             unsigned char a = b64_table[(unsigned char)sig_padded[i]];
-            unsigned char b = b64_table[(unsigned char)sig_padded[i+1]];
-            unsigned char c = (sig_padded[i+2] == '=') ? 0 : b64_table[(unsigned char)sig_padded[i+2]];
-            unsigned char d = (sig_padded[i+3] == '=') ? 0 : b64_table[(unsigned char)sig_padded[i+3]];
+            unsigned char b = b64_table[(unsigned char)sig_padded[i + 1]];
+            unsigned char c =
+                (sig_padded[i + 2] == '=') ? 0 : b64_table[(unsigned char)sig_padded[i + 2]];
+            unsigned char d =
+                (sig_padded[i + 3] == '=') ? 0 : b64_table[(unsigned char)sig_padded[i + 3]];
             provided_sig[prov_idx++] = (a << 2) | (b >> 4);
-            if (sig_padded[i+2] != '=') provided_sig[prov_idx++] = ((b & 0xF) << 4) | (c >> 2);
-            if (sig_padded[i+3] != '=') provided_sig[prov_idx++] = ((c & 0x3) << 6) | d;
+            if (sig_padded[i + 2] != '=')
+                provided_sig[prov_idx++] = ((b & 0xF) << 4) | (c >> 2);
+            if (sig_padded[i + 3] != '=')
+                provided_sig[prov_idx++] = ((c & 0x3) << 6) | d;
         }
 
         int sig_match = 1;
         if (prov_idx < expected_sig_len) {
             sig_match = 0;
         } else {
-            volatile const uint8_t* left = (volatile const uint8_t*)computed_hmac;
-            volatile const uint8_t* right = (volatile const uint8_t*)provided_sig;
+            volatile const uint8_t *left = (volatile const uint8_t *)computed_hmac;
+            volatile const uint8_t *right = (volatile const uint8_t *)provided_sig;
             uint8_t acc = 0;
             for (size_t i = 0; i < expected_sig_len; i++) {
                 acc |= left[i] ^ right[i];
@@ -741,7 +909,10 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
             sig_match = (acc == 0);
         }
 
-        AGENTOS_FREE(sig_input); AGENTOS_FREE(sig_b64); AGENTOS_FREE(sig_padded); AGENTOS_FREE(provided_sig);
+        AGENTOS_FREE(sig_input);
+        AGENTOS_FREE(sig_b64);
+        AGENTOS_FREE(sig_padded);
+        AGENTOS_FREE(provided_sig);
 
         if (!sig_match) {
             result->status = AUTH_FAILED;
@@ -750,6 +921,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
             SVC_LOG_WARN("JWT signature verification FAILED for token");
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
+    AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: signature mismatch");
         }
     }
     /* ========== 签名验证结束 ========== */
@@ -764,8 +936,10 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     return AUTH_SUCCESS;
 }
 
-int auth_jwt_refresh_token(const char* old_token, char** out_new_token) {
-    if (!old_token || !out_new_token) return AUTH_TOKEN_INVALID;
+int auth_jwt_refresh_token(const char *old_token, char **out_new_token)
+{
+    if (!old_token || !out_new_token)
+        return AUTH_TOKEN_INVALID;
 
     auth_result_t result;
     int ret = auth_jwt_verify_token(old_token, &result);
@@ -777,7 +951,8 @@ int auth_jwt_refresh_token(const char* old_token, char** out_new_token) {
     return auth_jwt_generate_token(result.subject, result.role, out_new_token);
 }
 
-void auth_jwt_cleanup(void) {
+void auth_jwt_cleanup(void)
+{
     agentos_mutex_lock(&g_jwt.lock);
     if (g_jwt.initialized) {
         g_hmac_impl = NULL;
@@ -793,8 +968,10 @@ void auth_jwt_cleanup(void) {
 
 /* ==================== API Key 实现 ==================== */
 
-int auth_apikey_init(const apikey_config_t* config) {
-    if (g_apikey.initialized) return AGENTOS_ERR_ALREADY_INIT;
+int auth_apikey_init(const apikey_config_t *config)
+{
+    if (g_apikey.initialized)
+        return AGENTOS_ERR_ALREADY_INIT;
 
     agentos_mutex_init(&g_apikey.lock);
 
@@ -804,7 +981,7 @@ int auth_apikey_init(const apikey_config_t* config) {
         /* 复制允许的 Key 列表 */
         if (config->allowed_keys && config->key_count > 0) {
             g_apikey.capacity = config->key_count + 10;
-            g_apikey.keys = (char**)AGENTOS_CALLOC(g_apikey.capacity, sizeof(*g_apikey.keys));
+            g_apikey.keys = (char **)AGENTOS_CALLOC(g_apikey.capacity, sizeof(*g_apikey.keys));
             if (g_apikey.keys) {
                 for (size_t i = 0; i < config->key_count; i++) {
                     if (config->allowed_keys[i]) {
@@ -818,20 +995,21 @@ int auth_apikey_init(const apikey_config_t* config) {
         /* 默认空配置 */
         memset(&g_apikey.config, 0, sizeof(apikey_config_t));
         g_apikey.capacity = 10;
-        g_apikey.keys = (char**)AGENTOS_CALLOC(g_apikey.capacity, sizeof(*g_apikey.keys));
+        g_apikey.keys = (char **)AGENTOS_CALLOC(g_apikey.capacity, sizeof(*g_apikey.keys));
         if (!g_apikey.keys) {
             g_apikey.capacity = 0;
             return AUTH_FAILED;
+    AGENTOS_ERROR_HANDLE(AUTH_FAILED, "APIKey init: calloc keys array failed");
         }
     }
 
     g_apikey.initialized = 1;
-    SVC_LOG_INFO("API Key verification module initialized (%zu keys)",
-                g_apikey.config.key_count);
+    SVC_LOG_INFO("API Key verification module initialized (%zu keys)", g_apikey.config.key_count);
     return AUTH_SUCCESS;
 }
 
-int auth_apikey_verify(const char* api_key, auth_result_t* result) {
+int auth_apikey_verify(const char *api_key, auth_result_t *result)
+{
     if (!g_apikey.initialized || !api_key || !result) {
         return AUTH_APIKEY_INVALID;
     }
@@ -843,8 +1021,7 @@ int auth_apikey_verify(const char* api_key, auth_result_t* result) {
     agentos_mutex_lock(&g_apikey.lock);
 
     for (size_t i = 0; i < g_apikey.config.key_count; i++) {
-        if (g_apikey.keys[i] &&
-            strcmp(api_key, g_apikey.keys[i]) == 0) {
+        if (g_apikey.keys[i] && strcmp(api_key, g_apikey.keys[i]) == 0) {
 
             result->status = AUTH_SUCCESS;
             result->error_message = NULL;
@@ -864,7 +1041,8 @@ int auth_apikey_verify(const char* api_key, auth_result_t* result) {
     return AUTH_APIKEY_INVALID;
 }
 
-int auth_apikey_add(const char* new_key) {
+int auth_apikey_add(const char *new_key)
+{
     if (!g_apikey.initialized || !new_key) {
         return AUTH_APIKEY_INVALID;
     }
@@ -882,10 +1060,11 @@ int auth_apikey_add(const char* new_key) {
     /* 扩容检查 */
     if (g_apikey.config.key_count >= g_apikey.capacity) {
         size_t new_cap = g_apikey.capacity * 2;
-        char** new_keys = (char**)AGENTOS_REALLOC(g_apikey.keys, new_cap * sizeof(*g_apikey.keys));
+        char **new_keys = (char **)AGENTOS_REALLOC(g_apikey.keys, new_cap * sizeof(*g_apikey.keys));
         if (!new_keys) {
             agentos_mutex_unlock(&g_apikey.lock);
             return AGENTOS_ERR_OUT_OF_MEMORY;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "APIKey add: realloc keys failed");
         }
         g_apikey.keys = new_keys;
         g_apikey.capacity = new_cap;
@@ -898,7 +1077,8 @@ int auth_apikey_add(const char* new_key) {
     return AUTH_SUCCESS;
 }
 
-int auth_apikey_remove(const char* key) {
+int auth_apikey_remove(const char *key)
+{
     if (!g_apikey.initialized || !key) {
         return AUTH_APIKEY_INVALID;
     }
@@ -927,7 +1107,8 @@ int auth_apikey_remove(const char* key) {
     return AUTH_APIKEY_INVALID;
 }
 
-void auth_apikey_cleanup(void) {
+void auth_apikey_cleanup(void)
+{
     if (g_apikey.initialized) {
         agentos_mutex_lock(&g_apikey.lock);
         if (g_apikey.keys) {
@@ -947,8 +1128,10 @@ void auth_apikey_cleanup(void) {
 
 /* ==================== 速率限制实现（令牌桶算法）==================== */
 
-int auth_ratelimit_init(const rate_limit_config_t* config) {
-    if (g_ratelimit.initialized) return AGENTOS_ERR_ALREADY_INIT;
+int auth_ratelimit_init(const rate_limit_config_t *config)
+{
+    if (g_ratelimit.initialized)
+        return AGENTOS_ERR_ALREADY_INIT;
 
     agentos_mutex_init(&g_ratelimit.lock);
 
@@ -967,13 +1150,13 @@ int auth_ratelimit_init(const rate_limit_config_t* config) {
     }
 
     g_ratelimit.initialized = 1;
-    SVC_LOG_INFO("Rate limiter initialized (rps=%u, burst=%u)",
-                g_ratelimit.config.requests_per_sec,
-                g_ratelimit.config.burst_size);
+    SVC_LOG_INFO("Rate limiter initialized (rps=%u, burst=%u)", g_ratelimit.config.requests_per_sec,
+                 g_ratelimit.config.burst_size);
     return AUTH_SUCCESS;
 }
 
-int auth_ratelimit_check(const char* client_id) {
+int auth_ratelimit_check(const char *client_id)
+{
     if (!g_ratelimit.initialized || !client_id) {
         return AUTH_RATE_LIMIT_EXCEEDED;
     }
@@ -981,14 +1164,14 @@ int auth_ratelimit_check(const char* client_id) {
     agentos_mutex_lock(&g_ratelimit.lock);
 
     time_t now = time(NULL);
-    rate_limit_entry_t* entry = NULL;
+    rate_limit_entry_t *entry = NULL;
     size_t free_slot = SIZE_MAX;
 
     /* 查找或创建客户端条目 */
     for (size_t i = 0; i < g_ratelimit.config.max_clients; i++) {
         if (g_ratelimit.entries[i].active) {
             if (strncmp(g_ratelimit.entries[i].client_id, client_id,
-                         sizeof(g_ratelimit.entries[i].client_id) - 1) == 0) {
+                        sizeof(g_ratelimit.entries[i].client_id) - 1) == 0) {
                 entry = &g_ratelimit.entries[i];
                 break;
             }
@@ -1015,8 +1198,7 @@ int auth_ratelimit_check(const char* client_id) {
         size_t oldest_idx = 0;
 
         for (size_t i = 0; i < g_ratelimit.config.max_clients; i++) {
-            if (g_ratelimit.entries[i].active &&
-                g_ratelimit.entries[i].last_update < oldest_time) {
+            if (g_ratelimit.entries[i].active && g_ratelimit.entries[i].last_update < oldest_time) {
                 oldest_time = g_ratelimit.entries[i].last_update;
                 oldest_idx = i;
             }
@@ -1028,7 +1210,7 @@ int auth_ratelimit_check(const char* client_id) {
         strncpy(entry->client_id, client_id, sizeof(entry->client_id) - 1);
         entry->client_id[sizeof(entry->client_id) - 1] = '\0';
         entry->max_tokens = (double)g_ratelimit.config.burst_size;
-        entry->tokens = entry->max_tokens;  /* 重置令牌，不继承旧值 */
+        entry->tokens = entry->max_tokens; /* 重置令牌，不继承旧值 */
         entry->refill_rate = (double)g_ratelimit.config.requests_per_sec;
         entry->last_update = now;
     }
@@ -1053,7 +1235,8 @@ int auth_ratelimit_check(const char* client_id) {
     return AUTH_RATE_LIMIT_EXCEEDED;
 }
 
-int auth_ratelimit_reset(const char* client_id) {
+int auth_ratelimit_reset(const char *client_id)
+{
     if (!g_ratelimit.initialized || !client_id) {
         return AUTH_RATE_LIMIT_EXCEEDED;
     }
@@ -1063,7 +1246,7 @@ int auth_ratelimit_reset(const char* client_id) {
     for (size_t i = 0; i < g_ratelimit.config.max_clients; i++) {
         if (g_ratelimit.entries[i].active &&
             strncmp(g_ratelimit.entries[i].client_id, client_id,
-                     sizeof(g_ratelimit.entries[i].client_id) - 1) == 0) {
+                    sizeof(g_ratelimit.entries[i].client_id) - 1) == 0) {
             g_ratelimit.entries[i].tokens = g_ratelimit.entries[i].max_tokens;
             g_ratelimit.entries[i].last_update = time(NULL);
             agentos_mutex_unlock(&g_ratelimit.lock);
@@ -1075,9 +1258,8 @@ int auth_ratelimit_reset(const char* client_id) {
     return AUTH_SUCCESS;
 }
 
-int auth_ratelimit_get_stats(const char* client_id,
-                              uint32_t* remaining,
-                              int64_t* reset_time) {
+int auth_ratelimit_get_stats(const char *client_id, uint32_t *remaining, int64_t *reset_time)
+{
     if (!g_ratelimit.initialized || !client_id || !remaining) {
         return AUTH_RATE_LIMIT_EXCEEDED;
     }
@@ -1087,7 +1269,7 @@ int auth_ratelimit_get_stats(const char* client_id,
     for (size_t i = 0; i < g_ratelimit.config.max_clients; i++) {
         if (g_ratelimit.entries[i].active &&
             strncmp(g_ratelimit.entries[i].client_id, client_id,
-                     sizeof(g_ratelimit.entries[i].client_id) - 1) == 0) {
+                    sizeof(g_ratelimit.entries[i].client_id) - 1) == 0) {
             *remaining = (uint32_t)g_ratelimit.entries[i].tokens;
             if (reset_time) {
                 *reset_time = (int64_t)g_ratelimit.entries[i].last_update * 1000;
@@ -1101,7 +1283,8 @@ int auth_ratelimit_get_stats(const char* client_id,
     return AUTH_RATE_LIMIT_EXCEEDED;
 }
 
-void auth_ratelimit_cleanup(void) {
+void auth_ratelimit_cleanup(void)
+{
     if (g_ratelimit.initialized) {
         agentos_mutex_lock(&g_ratelimit.lock);
         memset(g_ratelimit.entries, 0, sizeof(g_ratelimit.entries));
@@ -1114,15 +1297,18 @@ void auth_ratelimit_cleanup(void) {
 
 /* ==================== 统一认证入口 ==================== */
 
-int auth_init(const auth_config_t* config) {
+int auth_init(const auth_config_t *config)
+{
     int ret = 0;
 
-    if (!config) return AUTH_FAILED;
+    if (!config)
+        return AUTH_FAILED;
 
     if (config->enable_jwt) {
-        const jwt_config_t* jwt_cfg = &config->jwt;
+        const jwt_config_t *jwt_cfg = &config->jwt;
         ret = auth_jwt_init(jwt_cfg);
-        if (ret != AUTH_SUCCESS) return ret;
+        if (ret != AUTH_SUCCESS)
+            return ret;
     }
 
     if (config->enable_apikey) {
@@ -1146,9 +1332,8 @@ int auth_init(const auth_config_t* config) {
     return AUTH_SUCCESS;
 }
 
-int auth_authenticate(const char* auth_header,
-                      const char* client_id,
-                      auth_result_t* result) {
+int auth_authenticate(const char *auth_header, const char *client_id, auth_result_t *result)
+{
     if (!auth_header || !result) {
         return AUTH_MISSING_CREDENTIALS;
     }
@@ -1174,7 +1359,7 @@ int auth_authenticate(const char* auth_header,
             return AUTH_FAILED;
         }
 
-        const char* token = auth_header + strlen(BEARER_PREFIX);
+        const char *token = auth_header + strlen(BEARER_PREFIX);
         return auth_jwt_verify_token(token, result);
 
     } else if (strncmp(auth_header, APIKEY_PREFIX, strlen(APIKEY_PREFIX)) == 0) {
@@ -1185,7 +1370,7 @@ int auth_authenticate(const char* auth_header,
             return AUTH_FAILED;
         }
 
-        const char* key = auth_header + strlen(APIKEY_PREFIX);
+        const char *key = auth_header + strlen(APIKEY_PREFIX);
         return auth_apikey_verify(key, result);
     }
 
@@ -1194,11 +1379,12 @@ int auth_authenticate(const char* auth_header,
     return AUTH_MISSING_CREDENTIALS;
 }
 
-void auth_cleanup(void) {
+void auth_cleanup(void)
+{
     auth_jwt_cleanup();
     auth_apikey_cleanup();
     auth_ratelimit_cleanup();
     SVC_LOG_INFO("All authentication modules cleaned up");
 }
- // force rebuild
- // v2
+// force rebuild
+// v2

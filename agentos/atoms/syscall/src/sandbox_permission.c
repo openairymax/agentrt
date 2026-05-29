@@ -5,9 +5,10 @@
  */
 
 #include "sandbox_permission.h"
-#include "sandbox_internal.h"
+
 #include "agentos.h"
 #include "logger.h"
+#include "sandbox_internal.h"
 
 /* 基础库兼容性层 */
 #include "memory_compat.h"
@@ -15,11 +16,12 @@
 
 /* ==================== 权限规则管理 ==================== */
 
-permission_rule_t* sandbox_permission_create(int syscall_num,
-                                            permission_type_t perm_type,
-                                            const char* condition) {
-    permission_rule_t* rule = (permission_rule_t*)AGENTOS_CALLOC(1, sizeof(permission_rule_t));
-    if (!rule) return NULL;
+permission_rule_t *sandbox_permission_create(int syscall_num, permission_type_t perm_type,
+                                             const char *condition)
+{
+    permission_rule_t *rule = (permission_rule_t *)AGENTOS_CALLOC(1, sizeof(permission_rule_t));
+    if (!rule)
+        return NULL;
 
     rule->syscall_num = syscall_num;
     rule->perm_type = perm_type;
@@ -30,25 +32,31 @@ permission_rule_t* sandbox_permission_create(int syscall_num,
     return rule;
 }
 
-void sandbox_permission_destroy(permission_rule_t* rule) {
-    if (!rule) return;
-    if (rule->condition) AGENTOS_FREE(rule->condition);
+void sandbox_permission_destroy(permission_rule_t *rule)
+{
+    if (!rule)
+        return;
+    if (rule->condition)
+        AGENTOS_FREE(rule->condition);
     AGENTOS_FREE(rule);
 }
 
-void sandbox_permission_destroy_all(permission_rule_t* head) {
+void sandbox_permission_destroy_all(permission_rule_t *head)
+{
     while (head) {
-        permission_rule_t* next = head->next;
+        permission_rule_t *next = head->next;
         sandbox_permission_destroy(head);
         head = next;
     }
 }
 
-agentos_error_t sandbox_permission_add(agentos_sandbox_t* sandbox, int syscall_num,
-                                      permission_type_t perm_type, const char* condition) {
-    if (!sandbox) return AGENTOS_EINVAL;
+agentos_error_t sandbox_permission_add(agentos_sandbox_t *sandbox, int syscall_num,
+                                       permission_type_t perm_type, const char *condition)
+{
+    if (!sandbox)
+        return AGENTOS_EINVAL;
 
-    permission_rule_t* new_rule = sandbox_permission_create(syscall_num, perm_type, condition);
+    permission_rule_t *new_rule = sandbox_permission_create(syscall_num, perm_type, condition);
     if (!new_rule) {
         AGENTOS_LOG_ERROR("Failed to create permission rule");
         return AGENTOS_ENOMEM;
@@ -67,16 +75,17 @@ agentos_error_t sandbox_permission_add(agentos_sandbox_t* sandbox, int syscall_n
     return AGENTOS_SUCCESS;
 }
 
-permission_type_t sandbox_permission_check(agentos_sandbox_t* sandbox,
-                                          int syscall_num,
-                                          void** args __attribute__((unused)),
-                                          int argc __attribute__((unused))) {
-    if (!sandbox) return PERM_DENY;
+permission_type_t sandbox_permission_check(agentos_sandbox_t *sandbox, int syscall_num,
+                                           void **args __attribute__((unused)),
+                                           int argc __attribute__((unused)))
+{
+    if (!sandbox)
+        return PERM_DENY;
 
     agentos_mutex_lock(sandbox->lock);
 
-    permission_rule_t* rule = sandbox->rules;
-    permission_type_t result = PERM_ALLOW;  /* 默认允许 */
+    permission_rule_t *rule = sandbox->rules;
+    permission_type_t result = PERM_ALLOW; /* 默认允许 */
 
     while (rule) {
         if (rule->syscall_num == syscall_num || rule->syscall_num == -1) {

@@ -19,22 +19,24 @@
  */
 
 #include "sync.h"
+
 #include "sync_types.h"
-#include <stdlib.h>
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #ifdef _WIN32
-#include <windows.h>
-#include <synchapi.h>
 #include <process.h>
+#include <synchapi.h>
+#include <windows.h>
 #else
-#include <semaphore.h>
-#include <sched.h>
-#include <unistd.h>
-#include <sys/time.h>
 #include <errno.h>
+#include <sched.h>
+#include <semaphore.h>
+#include <sys/time.h>
+#include <unistd.h>
 #endif
 
 #include "sync_platform.h"
@@ -44,7 +46,7 @@
  */
 typedef struct {
     sync_error_callback_t error_callback;
-    void* user_context;
+    void *user_context;
     bool initialized;
 } sync_global_state_t;
 
@@ -58,7 +60,8 @@ static bool g_initialized = false;
 /**
  * @brief 初始化同步模块
  */
-sync_result_t sync_init(sync_error_callback_t error_callback, void* context) {
+sync_result_t sync_init(sync_error_callback_t error_callback, void *context)
+{
     if (g_initialized) {
         return SYNC_SUCCESS;
     }
@@ -74,7 +77,8 @@ sync_result_t sync_init(sync_error_callback_t error_callback, void* context) {
 /**
  * @brief 清理同步模块
  */
-void sync_cleanup(void) {
+void sync_cleanup(void)
+{
     if (!g_initialized) {
         return;
     }
@@ -88,65 +92,77 @@ void sync_cleanup(void) {
 /**
  * @brief 获取同步原语类型
  */
-sync_type_t sync_get_type(void* lock, sync_lock_type_t lock_type) {
+sync_type_t sync_get_type(void *lock, sync_lock_type_t lock_type)
+{
     (void)lock;
     switch (lock_type) {
-        case SYNC_LOCK_MUTEX: return SYNC_TYPE_MUTEX;
-        case SYNC_LOCK_RECURSIVE_MUTEX: return SYNC_TYPE_RECURSIVE_MUTEX;
-        case SYNC_LOCK_RWLOCK: return SYNC_TYPE_RWLOCK;
-        case SYNC_LOCK_SPINLOCK: return SYNC_TYPE_SPINLOCK;
-        case SYNC_LOCK_SEMAPHORE: return SYNC_TYPE_SEMAPHORE;
-        case SYNC_LOCK_CONDITION: return SYNC_TYPE_CONDITION;
-        case SYNC_LOCK_BARRIER: return SYNC_TYPE_BARRIER;
-        case SYNC_LOCK_EVENT: return SYNC_TYPE_EVENT;
-        default: return SYNC_TYPE_UNKNOWN;
+    case SYNC_LOCK_MUTEX:
+        return SYNC_TYPE_MUTEX;
+    case SYNC_LOCK_RECURSIVE_MUTEX:
+        return SYNC_TYPE_RECURSIVE_MUTEX;
+    case SYNC_LOCK_RWLOCK:
+        return SYNC_TYPE_RWLOCK;
+    case SYNC_LOCK_SPINLOCK:
+        return SYNC_TYPE_SPINLOCK;
+    case SYNC_LOCK_SEMAPHORE:
+        return SYNC_TYPE_SEMAPHORE;
+    case SYNC_LOCK_CONDITION:
+        return SYNC_TYPE_CONDITION;
+    case SYNC_LOCK_BARRIER:
+        return SYNC_TYPE_BARRIER;
+    case SYNC_LOCK_EVENT:
+        return SYNC_TYPE_EVENT;
+    default:
+        return SYNC_TYPE_UNKNOWN;
     }
 }
 
 /**
  * @brief 获取锁的名称
  */
-const char* sync_get_name(void* lock) {
+const char *sync_get_name(void *lock)
+{
     if (lock == NULL) {
         return NULL;
     }
 
-    struct sync_mutex* base = (struct sync_mutex*)lock;
+    struct sync_mutex *base = (struct sync_mutex *)lock;
 
     if (!base->initialized) {
         return NULL;
     }
 
     switch (base->type) {
-        case SYNC_TYPE_MUTEX:
-        case SYNC_TYPE_RECURSIVE_MUTEX:
-            return ((struct sync_mutex*)lock)->name;
-        case SYNC_TYPE_RWLOCK:
-            return ((struct sync_rwlock*)lock)->name;
-        case SYNC_TYPE_SPINLOCK:
-            return ((struct sync_spinlock*)lock)->name;
-        case SYNC_TYPE_SEMAPHORE:
-            return ((struct sync_semaphore*)lock)->name;
-        case SYNC_TYPE_CONDITION:
-            return ((struct sync_condition*)lock)->name;
-        case SYNC_TYPE_BARRIER:
-            return ((struct sync_barrier*)lock)->name;
-        case SYNC_TYPE_EVENT:
-            return ((struct sync_event*)lock)->name;
-        default:
-            return NULL;
+    case SYNC_TYPE_MUTEX:
+    case SYNC_TYPE_RECURSIVE_MUTEX:
+        return ((struct sync_mutex *)lock)->name;
+    case SYNC_TYPE_RWLOCK:
+        return ((struct sync_rwlock *)lock)->name;
+    case SYNC_TYPE_SPINLOCK:
+        return ((struct sync_spinlock *)lock)->name;
+    case SYNC_TYPE_SEMAPHORE:
+        return ((struct sync_semaphore *)lock)->name;
+    case SYNC_TYPE_CONDITION:
+        return ((struct sync_condition *)lock)->name;
+    case SYNC_TYPE_BARRIER:
+        return ((struct sync_barrier *)lock)->name;
+    case SYNC_TYPE_EVENT:
+        return ((struct sync_event *)lock)->name;
+    default:
+        return NULL;
     }
 }
 
 /**
  * @brief 获取锁的统计信息
  */
-sync_result_t sync_get_stats(void* lock, sync_stats_t* stats) {
+sync_result_t sync_get_stats(void *lock, sync_stats_t *stats)
+{
     if (lock == NULL || stats == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_mutex* base = (struct sync_mutex*)lock;
+    struct sync_mutex *base = (struct sync_mutex *)lock;
     if (!base->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -160,12 +176,13 @@ sync_result_t sync_get_stats(void* lock, sync_stats_t* stats) {
 /**
  * @brief 重置锁的统计信息
  */
-sync_result_t sync_reset_stats(void* lock) {
+sync_result_t sync_reset_stats(void *lock)
+{
     if (lock == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_mutex* base = (struct sync_mutex*)lock;
+    struct sync_mutex *base = (struct sync_mutex *)lock;
     if (!base->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -179,7 +196,7 @@ sync_result_t sync_reset_stats(void* lock) {
 #define SYNC_MAX_OPTION_SLOTS 64
 
 typedef struct {
-    void* lock;
+    void *lock;
     uint64_t timeout_ms;
     bool priority_inherit;
     bool robust;
@@ -189,7 +206,8 @@ typedef struct {
 static sync_option_slot_t s_option_slots[SYNC_MAX_OPTION_SLOTS] = {{0}};
 static size_t s_option_count = 0;
 
-static sync_option_slot_t* find_option_slot(void* lock) {
+static sync_option_slot_t *find_option_slot(void *lock)
+{
     for (size_t i = 0; i < s_option_count; i++) {
         if (s_option_slots[i].in_use && s_option_slots[i].lock == lock)
             return &s_option_slots[i];
@@ -197,10 +215,13 @@ static sync_option_slot_t* find_option_slot(void* lock) {
     return NULL;
 }
 
-static sync_option_slot_t* alloc_option_slot(void* lock) {
-    sync_option_slot_t* slot = find_option_slot(lock);
-    if (slot) return slot;
-    if (s_option_count >= SYNC_MAX_OPTION_SLOTS) return NULL;
+static sync_option_slot_t *alloc_option_slot(void *lock)
+{
+    sync_option_slot_t *slot = find_option_slot(lock);
+    if (slot)
+        return slot;
+    if (s_option_count >= SYNC_MAX_OPTION_SLOTS)
+        return NULL;
     slot = &s_option_slots[s_option_count++];
     slot->lock = lock;
     slot->timeout_ms = 0;
@@ -210,111 +231,117 @@ static sync_option_slot_t* alloc_option_slot(void* lock) {
     return slot;
 }
 
-sync_result_t sync_set_option(void* lock, int option, void* value) {
+sync_result_t sync_set_option(void *lock, int option, void *value)
+{
     if (lock == NULL || value == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_mutex* base = (struct sync_mutex*)lock;
+    struct sync_mutex *base = (struct sync_mutex *)lock;
     if (!base->initialized) {
         return SYNC_ERROR_INVALID;
     }
 
     switch (option) {
-        case SYNC_OPTION_NAME: {
-            const char* name = (const char*)value;
-            base->name = name;
-            return SYNC_SUCCESS;
-        }
-        case SYNC_OPTION_TIMEOUT: {
-            uint64_t timeout = *(uint64_t*)value;
-            sync_option_slot_t* slot = alloc_option_slot(lock);
-            if (!slot) return SYNC_ERROR_MEMORY;
-            slot->timeout_ms = timeout;
-            return SYNC_SUCCESS;
-        }
-        case SYNC_OPTION_PRIORITY_INHERIT: {
-            bool pi = *(bool*)value;
-            sync_option_slot_t* slot = alloc_option_slot(lock);
-            if (!slot) return SYNC_ERROR_MEMORY;
-            slot->priority_inherit = pi;
-            return SYNC_SUCCESS;
-        }
-        case SYNC_OPTION_ROBUST: {
-            bool rb = *(bool*)value;
-            sync_option_slot_t* slot = alloc_option_slot(lock);
-            if (!slot) return SYNC_ERROR_MEMORY;
-            slot->robust = rb;
-            return SYNC_SUCCESS;
-        }
-        default:
-            return SYNC_ERROR_UNSUPPORTED;
+    case SYNC_OPTION_NAME: {
+        const char *name = (const char *)value;
+        base->name = name;
+        return SYNC_SUCCESS;
+    }
+    case SYNC_OPTION_TIMEOUT: {
+        uint64_t timeout = *(uint64_t *)value;
+        sync_option_slot_t *slot = alloc_option_slot(lock);
+        if (!slot)
+            return SYNC_ERROR_MEMORY;
+        slot->timeout_ms = timeout;
+        return SYNC_SUCCESS;
+    }
+    case SYNC_OPTION_PRIORITY_INHERIT: {
+        bool pi = *(bool *)value;
+        sync_option_slot_t *slot = alloc_option_slot(lock);
+        if (!slot)
+            return SYNC_ERROR_MEMORY;
+        slot->priority_inherit = pi;
+        return SYNC_SUCCESS;
+    }
+    case SYNC_OPTION_ROBUST: {
+        bool rb = *(bool *)value;
+        sync_option_slot_t *slot = alloc_option_slot(lock);
+        if (!slot)
+            return SYNC_ERROR_MEMORY;
+        slot->robust = rb;
+        return SYNC_SUCCESS;
+    }
+    default:
+        return SYNC_ERROR_UNSUPPORTED;
     }
 }
 
-sync_result_t sync_get_option(void* lock, int option, void* value) {
+sync_result_t sync_get_option(void *lock, int option, void *value)
+{
     if (lock == NULL || value == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_mutex* base = (struct sync_mutex*)lock;
+    struct sync_mutex *base = (struct sync_mutex *)lock;
     if (!base->initialized) {
         return SYNC_ERROR_INVALID;
     }
 
     switch (option) {
-        case SYNC_OPTION_NAME: {
-            const char** out = (const char**)value;
-            *out = base->name;
-            return SYNC_SUCCESS;
-        }
-        case SYNC_OPTION_TIMEOUT: {
-            uint64_t* out = (uint64_t*)value;
-            sync_option_slot_t* slot = find_option_slot(lock);
-            *out = slot ? slot->timeout_ms : 0;
-            return SYNC_SUCCESS;
-        }
-        case SYNC_OPTION_PRIORITY_INHERIT: {
-            bool* out = (bool*)value;
-            sync_option_slot_t* slot = find_option_slot(lock);
-            *out = slot ? slot->priority_inherit : false;
-            return SYNC_SUCCESS;
-        }
-        case SYNC_OPTION_ROBUST: {
-            bool* out = (bool*)value;
-            sync_option_slot_t* slot = find_option_slot(lock);
-            *out = slot ? slot->robust : false;
-            return SYNC_SUCCESS;
-        }
-        default:
-            return SYNC_ERROR_UNSUPPORTED;
+    case SYNC_OPTION_NAME: {
+        const char **out = (const char **)value;
+        *out = base->name;
+        return SYNC_SUCCESS;
+    }
+    case SYNC_OPTION_TIMEOUT: {
+        uint64_t *out = (uint64_t *)value;
+        sync_option_slot_t *slot = find_option_slot(lock);
+        *out = slot ? slot->timeout_ms : 0;
+        return SYNC_SUCCESS;
+    }
+    case SYNC_OPTION_PRIORITY_INHERIT: {
+        bool *out = (bool *)value;
+        sync_option_slot_t *slot = find_option_slot(lock);
+        *out = slot ? slot->priority_inherit : false;
+        return SYNC_SUCCESS;
+    }
+    case SYNC_OPTION_ROBUST: {
+        bool *out = (bool *)value;
+        sync_option_slot_t *slot = find_option_slot(lock);
+        *out = slot ? slot->robust : false;
+        return SYNC_SUCCESS;
+    }
+    default:
+        return SYNC_ERROR_UNSUPPORTED;
     }
 }
 
 /**
  * @brief 检查锁是否有效
  */
-bool sync_is_valid(void* lock) {
+bool sync_is_valid(void *lock)
+{
     return lock != NULL;
 }
 
 /**
  * @brief 打印锁的调试信息
  */
-sync_result_t sync_debug(void* lock) {
+sync_result_t sync_debug(void *lock)
+{
     if (lock == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_mutex* base = (struct sync_mutex*)lock;
+    struct sync_mutex *base = (struct sync_mutex *)lock;
 
     fprintf(stderr, "\n[SYNC DEBUG] ====================\n");
-    fprintf(stderr, "[SYNC DEBUG] Lock at: %p\n", (void*)lock);
+    fprintf(stderr, "[SYNC DEBUG] Lock at: %p\n", (void *)lock);
     fprintf(stderr, "[SYNC DEBUG] Type: %d\n", base->type);
-    fprintf(stderr, "[SYNC DEBUG] Initialized: %s\n",
-            base->initialized ? "true" : "false");
+    fprintf(stderr, "[SYNC DEBUG] Initialized: %s\n", base->initialized ? "true" : "false");
 
-    const char* name = sync_get_name(lock);
+    const char *name = sync_get_name(lock);
     if (name != NULL) {
         fprintf(stderr, "[SYNC DEBUG] Name: %s\n", name);
     } else {
@@ -343,7 +370,8 @@ sync_result_t sync_debug(void* lock) {
 /**
  * @brief 获取当前时间戳（毫秒）
  */
-uint64_t sync_get_timestamp_ms(void) {
+uint64_t sync_get_timestamp_ms(void)
+{
 #ifdef _WIN32
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
@@ -359,7 +387,8 @@ uint64_t sync_get_timestamp_ms(void) {
 /**
  * @brief 线程睡眠（毫秒）
  */
-void sync_sleep_ms(uint64_t ms) {
+void sync_sleep_ms(uint64_t ms)
+{
 #ifdef _WIN32
     Sleep((DWORD)ms);
 #else
@@ -370,7 +399,8 @@ void sync_sleep_ms(uint64_t ms) {
 /**
  * @brief 线程 yield
  */
-void sync_yield(void) {
+void sync_yield(void)
+{
 #ifdef _WIN32
     SwitchToThread();
 #else
