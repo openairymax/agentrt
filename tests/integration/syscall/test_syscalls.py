@@ -15,8 +15,8 @@ import pytest
 import time
 from unittest.mock import MagicMock, patch
 
-from tests.base.base_test import IntegrationTestCase
-from tests.utils.test_helpers import TestDataBuilder, ContractTestHelper
+from tests.utils.python.base_test import IntegrationTestCase
+from tests.utils.python.test_helpers import TestDataBuilder, ContractTestHelper
 
 
 AGENTOS_SUCCESS = 0

@@ -50,7 +50,7 @@ from .src.telemetry import MetricsCollector, Metric
 from .src.cli import AgentOSCLI
 from .src.logger import Color, Style, Logger, OutputFormatter, ProgressBar, Spinner, Table
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 __author__ = "SPHARX Ltd."
 
 __all__ = [

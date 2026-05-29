@@ -2,7 +2,7 @@
 
 `cupolas/src/security/` 提供核心安全防护能力，包括文件扫描、API 防护、行为分析、网络防护和 iOS 级安全模块。
 
-> Part of AgentOS v0.0.5
+> Part of AgentOS v0.1.0
 
 ## 核心能力
 
