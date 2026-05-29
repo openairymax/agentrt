@@ -10,23 +10,23 @@
  *
  * @section 架构定位
  * 本模块提供**内核级进程间通信（IPC）**功能，是AgentOS微内核架构的核心组件。
- * 
+ *
  * **设计原则：**
  * - 轻量级：消息结构仅40字节，避免不必要的开销
  * - 高性能：微秒级延迟，适合内核态高频调用
  * - 零依赖：不依赖commons或其他外部模块
  * - 简洁性：API设计遵循Unix哲学（做一件事并做好）
- * 
+ *
  * **与 应用层IPC 的区别：**
  * - 本模块：agentos_kernel_ipc_message_t（轻量、快速、内核专用）
  * - 应用层：agentos_ipc_message_t（完整、标准化、跨模块通信）
  * - 详细说明见：commons/include/agentos_types.h
- * 
+ *
  * **使用场景：**
  * - 微内核内部服务间通信
  * - 系统调用层的IPC实现
  * - 需要极致性能的关键路径
- * 
+ *
  * @note 不应在应用层代码中直接使用本模块，应通过commons的IPC抽象层
  */
 
@@ -43,10 +43,11 @@
 #define AGENTOS_IPC_API_VERSION_MINOR 0
 #define AGENTOS_IPC_API_VERSION_PATCH 0
 
-#include <stdint.h>
-#include <stddef.h>
 #include "error.h"
 #include "export.h"
+
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,31 +70,31 @@ typedef uint16_t agentos_ipc_port_t;
 
 /**
  * @brief 内核级 IPC 消息结构（轻量级，微内核专用）
- * 
+ *
  * @details 这是AgentOS **Level 1 内核级IPC**的消息类型定义。
- * 
+ *
  * **设计理由（为什么不用完整的应用层IPC）：**
  * 1. 微内核需要极致性能：40字节 vs 200+字节
  * 2. 零依赖原则：不引入commons的复杂类型系统
  * 3. 简单性：内核态编程应避免复杂的抽象
  * 4. Liedtke微内核原则：内核最小化，机制与策略分离
- * 
+ *
  * **字段说明：**
  * - code: 消息类型码（如：0x01=数据, 0x02=控制, 0x03=响应）
  * - data: 消息负载指针（零拷贝设计）
  * - size: 负载大小（字节）
  * - fd: 文件描述符（用于传递文件句柄）
  * - msg_id: 消息唯一标识（用于请求-响应匹配）
- * 
+ *
  * @note 与应用层的 agentos_ipc_message_t 区分：
  *       应用层使用完整的header+payload结构（见commons/include/agentos_types.h）
  */
 typedef struct {
-    uint32_t    code;      /**< 消息码 */
-    const void* data;      /**< 消息数据 */
-    size_t      size;      /**< 数据大小 */
-    int32_t     fd;        /**< 文件描述符 */
-    uint64_t    msg_id;    /**< 消息 ID */
+    uint32_t code;    /**< 消息码 */
+    const void *data; /**< 消息数据 */
+    size_t size;      /**< 数据大小 */
+    int32_t fd;       /**< 文件描述符 */
+    uint64_t msg_id;  /**< 消息 ID */
 } agentos_kernel_ipc_message_t;
 
 /**
@@ -104,10 +105,9 @@ typedef struct {
  * @param userdata [in] 用户数据
  * @return agentos_error_t 错误码
  */
-typedef agentos_error_t (*agentos_ipc_callback_t)(
-    agentos_ipc_channel_t* channel,
-    const agentos_kernel_ipc_message_t* msg,
-    void* userdata);
+typedef agentos_error_t (*agentos_ipc_callback_t)(agentos_ipc_channel_t *channel,
+                                                  const agentos_kernel_ipc_message_t *msg,
+                                                  void *userdata);
 
 /**
  * @brief 初始化 IPC 子系统
@@ -147,11 +147,10 @@ AGENTOS_API void agentos_ipc_cleanup(void);
  *
  * @see agentos_ipc_close()
  */
-AGENTOS_API agentos_error_t agentos_ipc_create_channel(
-    const char* name,
-    agentos_ipc_callback_t callback,
-    void* userdata,
-    agentos_ipc_channel_t** out_channel);
+AGENTOS_API agentos_error_t agentos_ipc_create_channel(const char *name,
+                                                       agentos_ipc_callback_t callback,
+                                                       void *userdata,
+                                                       agentos_ipc_channel_t **out_channel);
 
 /**
  * @brief 连接到已存在的 IPC 通道
@@ -166,9 +165,8 @@ AGENTOS_API agentos_error_t agentos_ipc_create_channel(
  *
  * @see agentos_ipc_close()
  */
-AGENTOS_API agentos_error_t agentos_ipc_connect(
-    const char* name,
-    agentos_ipc_channel_t** out_channel);
+AGENTOS_API agentos_error_t agentos_ipc_connect(const char *name,
+                                                agentos_ipc_channel_t **out_channel);
 
 /**
  * @brief 关闭 IPC 通道
@@ -179,7 +177,7 @@ AGENTOS_API agentos_error_t agentos_ipc_connect(
  * @threadsafe 否
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel);
+AGENTOS_API agentos_error_t agentos_ipc_close(agentos_ipc_channel_t *channel);
 
 /**
  * @brief 发送 IPC 消息
@@ -192,9 +190,8 @@ AGENTOS_API agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel);
  * @threadsafe 否
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_ipc_send(
-    agentos_ipc_channel_t* channel,
-    const agentos_kernel_ipc_message_t* msg);
+AGENTOS_API agentos_error_t agentos_ipc_send(agentos_ipc_channel_t *channel,
+                                             const agentos_kernel_ipc_message_t *msg);
 
 /**
  * @brief 接收 IPC 消息
@@ -208,10 +205,8 @@ AGENTOS_API agentos_error_t agentos_ipc_send(
  * @threadsafe 否
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_ipc_recv(
-    agentos_ipc_channel_t* channel,
-    uint32_t timeout_ms,
-    agentos_kernel_ipc_message_t* out_msg);
+AGENTOS_API agentos_error_t agentos_ipc_recv(agentos_ipc_channel_t *channel, uint32_t timeout_ms,
+                                             agentos_kernel_ipc_message_t *out_msg);
 
 /**
  * @brief 获取通道文件描述符
@@ -222,7 +217,7 @@ AGENTOS_API agentos_error_t agentos_ipc_recv(
  * @threadsafe 否
  * @reentrant 否
  */
-AGENTOS_API int32_t agentos_ipc_get_fd(agentos_ipc_channel_t* channel);
+AGENTOS_API int32_t agentos_ipc_get_fd(agentos_ipc_channel_t *channel);
 
 /**
  * @brief 同步调用（带超时等待响应）
@@ -237,12 +232,10 @@ AGENTOS_API int32_t agentos_ipc_get_fd(agentos_ipc_channel_t* channel);
  * @threadsafe 是
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_ipc_call(
-    agentos_ipc_channel_t* channel,
-    const agentos_kernel_ipc_message_t* msg,
-    void* response,
-    size_t* response_size,
-    uint32_t timeout_ms);
+AGENTOS_API agentos_error_t agentos_ipc_call(agentos_ipc_channel_t *channel,
+                                             const agentos_kernel_ipc_message_t *msg,
+                                             void *response, size_t *response_size,
+                                             uint32_t timeout_ms);
 
 /**
  * @brief 回复消息（唤醒等待的调用者）
@@ -254,9 +247,8 @@ AGENTOS_API agentos_error_t agentos_ipc_call(
  * @threadsafe 是
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_ipc_reply(
-    agentos_ipc_channel_t* channel,
-    const agentos_kernel_ipc_message_t* msg);
+AGENTOS_API agentos_error_t agentos_ipc_reply(agentos_ipc_channel_t *channel,
+                                              const agentos_kernel_ipc_message_t *msg);
 
 #ifdef __cplusplus
 }

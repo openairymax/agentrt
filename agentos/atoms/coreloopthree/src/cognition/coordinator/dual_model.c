@@ -4,18 +4,17 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "../intent_utils.h"
+#include "../metacognition.h"
 #include "agentos.h"
 #include "memory_compat.h"
+#include "observability_compat.h"
 #include "strategy.h"
 #include "string_compat.h"
 
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "../intent_utils.h"
-#include "../metacognition.h"
-#include "observability_compat.h"
 
 // ============================================================================
 // 安全加固宏和辅助函数

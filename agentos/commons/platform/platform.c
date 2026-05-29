@@ -17,45 +17,54 @@
 #include <unistd.h>
 
 /* 2. C标准库头文件 */
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
 
 #if defined(_WIN32) || defined(_WIN64)
-    #include <io.h>
-    #include <direct.h>
-    #include <process.h>
-    #include <sys/stat.h>
-    #include <bcrypt.h>
-    #define strdup _strdup
-    #define access _access /* flawfinder: ignore */
-    #ifndef EEXIST
-        #define EEXIST 17
-    #endif
-    #pragma comment(lib, "bcrypt.lib")
+#include <bcrypt.h>
+#include <direct.h>
+#include <io.h>
+#include <process.h>
+#include <sys/stat.h>
+#define strdup _strdup
+#define access _access /* flawfinder: ignore */
+#ifndef EEXIST
+#define EEXIST 17
+#endif
+#pragma comment(lib, "bcrypt.lib")
 #else
-    #include <sys/stat.h>
-    #include <sys/types.h>
-    #include <sys/wait.h>
-    #include <sys/time.h>
-    #include <fcntl.h>
-    #include <signal.h>
-    #include <errno.h>
-    #include <pthread.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #endif
 
 /* 2. 项目头文件（最后包含，避免覆盖系统定义） */
+#include "error.h"
 #include "platform.h"
 
-/* 3. 确保系统头文件声明在项目头文件之后仍然可用 */
 #include <string.h>
+#include "memory_compat.h"
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
 
 /* ==================== 网络初始化 ==================== */
 
-int agentos_network_init(void) {
+int agentos_network_init(void)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     WSADATA wsaData;
     return WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -64,13 +73,15 @@ int agentos_network_init(void) {
 #endif
 }
 
-void agentos_network_cleanup(void) {
+void agentos_network_cleanup(void)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     WSACleanup();
 #endif
 }
 
-void agentos_ignore_sigpipe(void) {
+void agentos_ignore_sigpipe(void)
+{
 #ifndef AGENTOS_PLATFORM_WINDOWS
     signal(SIGPIPE, SIG_IGN);
 #endif
@@ -78,7 +89,8 @@ void agentos_ignore_sigpipe(void) {
 
 /* ==================== 线程实现 ==================== */
 
-uint64_t agentos_thread_id(void) {
+uint64_t agentos_thread_id(void)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     return (uint64_t)GetCurrentThreadId();
 #else
@@ -88,7 +100,8 @@ uint64_t agentos_thread_id(void) {
 
 #if AGENTOS_PLATFORM_WINDOWS
 
-int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg) {
+int agentos_platform_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, void *arg)
+{
     HANDLE h = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)func, arg, 0, NULL);
     if (h == NULL) {
         return (int)GetLastError();
@@ -97,11 +110,12 @@ int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func
     return 0;
 }
 
-int agentos_platform_thread_join(agentos_thread_t thread, void** retval) {
+int agentos_platform_thread_join(agentos_thread_t thread, void **retval)
+{
     (void)retval;
     DWORD result = WaitForSingleObject(thread, INFINITE);
     if (result != WAIT_OBJECT_0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
     CloseHandle(thread);
     return 0;
@@ -109,15 +123,18 @@ int agentos_platform_thread_join(agentos_thread_t thread, void** retval) {
 
 #else
 
-int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg) {
+int agentos_platform_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, void *arg)
+{
     return pthread_create(thread, NULL, func, arg);
 }
 
-int agentos_platform_thread_join(agentos_thread_t thread, void** retval) {
+int agentos_platform_thread_join(agentos_thread_t thread, void **retval)
+{
     return pthread_join(thread, retval);
 }
 
-int agentos_platform_thread_detach(agentos_thread_t thread) {
+int agentos_platform_thread_detach(agentos_thread_t thread)
+{
     return pthread_detach(thread);
 }
 
@@ -127,47 +144,55 @@ int agentos_platform_thread_detach(agentos_thread_t thread) {
 
 #if AGENTOS_PLATFORM_WINDOWS
 
-int agentos_mutex_init(agentos_mutex_t* mutex) {
+int agentos_mutex_init(agentos_mutex_t *mutex)
+{
     InitializeCriticalSection(mutex);
     return 0;
 }
 
-int agentos_mutex_lock(agentos_mutex_t* mutex) {
+int agentos_mutex_lock(agentos_mutex_t *mutex)
+{
     EnterCriticalSection(mutex);
     return 0;
 }
 
-int agentos_mutex_trylock(agentos_mutex_t* mutex) {
+int agentos_mutex_trylock(agentos_mutex_t *mutex)
+{
     return TryEnterCriticalSection(mutex) ? 0 : -1;
 }
 
-int agentos_mutex_unlock(agentos_mutex_t* mutex) {
+int agentos_mutex_unlock(agentos_mutex_t *mutex)
+{
     LeaveCriticalSection(mutex);
     return 0;
 }
 
-void agentos_mutex_destroy(agentos_mutex_t* mutex) {
+void agentos_mutex_destroy(agentos_mutex_t *mutex)
+{
     DeleteCriticalSection(mutex);
 }
 
-agentos_mutex_t* agentos_mutex_create(void) {
-    agentos_mutex_t* mutex = (agentos_mutex_t*)malloc(sizeof(agentos_mutex_t));
+agentos_mutex_t *agentos_mutex_create(void)
+{
+    agentos_mutex_t *mutex = (agentos_mutex_t *)AGENTOS_MALLOC(sizeof(agentos_mutex_t));
     if (mutex) {
         InitializeCriticalSection(mutex);
     }
     return mutex;
 }
 
-void agentos_mutex_free(agentos_mutex_t* mutex) {
+void agentos_mutex_free(agentos_mutex_t *mutex)
+{
     if (mutex) {
         DeleteCriticalSection(mutex);
-        free(mutex);
+        AGENTOS_FREE(mutex);
     }
 }
 
 #else
 
-int agentos_mutex_init(agentos_mutex_t* mutex) {
+int agentos_mutex_init(agentos_mutex_t *mutex)
+{
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
@@ -176,34 +201,40 @@ int agentos_mutex_init(agentos_mutex_t* mutex) {
     return ret;
 }
 
-int agentos_mutex_lock(agentos_mutex_t* mutex) {
+int agentos_mutex_lock(agentos_mutex_t *mutex)
+{
     return pthread_mutex_lock(mutex);
 }
 
-int agentos_mutex_trylock(agentos_mutex_t* mutex) {
+int agentos_mutex_trylock(agentos_mutex_t *mutex)
+{
     return pthread_mutex_trylock(mutex);
 }
 
-int agentos_mutex_unlock(agentos_mutex_t* mutex) {
+int agentos_mutex_unlock(agentos_mutex_t *mutex)
+{
     return pthread_mutex_unlock(mutex);
 }
 
-void agentos_mutex_destroy(agentos_mutex_t* mutex) {
+void agentos_mutex_destroy(agentos_mutex_t *mutex)
+{
     pthread_mutex_destroy(mutex);
 }
 
-agentos_mutex_t* agentos_mutex_create(void) {
-    agentos_mutex_t* mutex = (agentos_mutex_t*)malloc(sizeof(agentos_mutex_t));
+agentos_mutex_t *agentos_mutex_create(void)
+{
+    agentos_mutex_t *mutex = (agentos_mutex_t *)AGENTOS_MALLOC(sizeof(agentos_mutex_t));
     if (mutex) {
         pthread_mutex_init(mutex, NULL);
     }
     return mutex;
 }
 
-void agentos_mutex_free(agentos_mutex_t* mutex) {
+void agentos_mutex_free(agentos_mutex_t *mutex)
+{
     if (mutex) {
         pthread_mutex_destroy(mutex);
-        free(mutex);
+        AGENTOS_FREE(mutex);
     }
 }
 
@@ -213,66 +244,77 @@ void agentos_mutex_free(agentos_mutex_t* mutex) {
 
 #if AGENTOS_PLATFORM_WINDOWS
 
-int agentos_cond_init(agentos_cond_t* cond) {
+int agentos_cond_init(agentos_cond_t *cond)
+{
     InitializeConditionVariable(cond);
     return 0;
 }
 
-int agentos_cond_wait(agentos_cond_t* cond, agentos_mutex_t* mutex) {
+int agentos_cond_wait(agentos_cond_t *cond, agentos_mutex_t *mutex)
+{
     return SleepConditionVariableCS(cond, mutex, INFINITE) ? 0 : -1;
 }
 
-int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_t timeout_ms) {
+int agentos_cond_timedwait(agentos_cond_t *cond, agentos_mutex_t *mutex, uint32_t timeout_ms)
+{
     BOOL result = SleepConditionVariableCS(cond, mutex, timeout_ms);
     if (!result) {
         DWORD err = GetLastError();
         if (err == ERROR_TIMEOUT) {
             return -2;
         }
-        return -1;
+        return AGENTOS_EINVAL;
     }
     return 0;
 }
 
-int agentos_cond_signal(agentos_cond_t* cond) {
+int agentos_cond_signal(agentos_cond_t *cond)
+{
     WakeConditionVariable(cond);
     return 0;
 }
 
-int agentos_cond_broadcast(agentos_cond_t* cond) {
+int agentos_cond_broadcast(agentos_cond_t *cond)
+{
     WakeAllConditionVariable(cond);
     return 0;
 }
 
-void agentos_cond_destroy(agentos_cond_t* cond) {
+void agentos_cond_destroy(agentos_cond_t *cond)
+{
     (void)cond;
 }
 
-agentos_cond_t* agentos_cond_create(void) {
-    agentos_cond_t* cond = (agentos_cond_t*)malloc(sizeof(agentos_cond_t));
+agentos_cond_t *agentos_cond_create(void)
+{
+    agentos_cond_t *cond = (agentos_cond_t *)AGENTOS_MALLOC(sizeof(agentos_cond_t));
     if (cond) {
         InitializeConditionVariable(cond);
     }
     return cond;
 }
 
-void agentos_cond_free(agentos_cond_t* cond) {
+void agentos_cond_free(agentos_cond_t *cond)
+{
     if (cond) {
-        free(cond);
+        AGENTOS_FREE(cond);
     }
 }
 
 #else
 
-int agentos_cond_init(agentos_cond_t* cond) {
+int agentos_cond_init(agentos_cond_t *cond)
+{
     return pthread_cond_init(cond, NULL);
 }
 
-int agentos_cond_wait(agentos_cond_t* cond, agentos_mutex_t* mutex) {
+int agentos_cond_wait(agentos_cond_t *cond, agentos_mutex_t *mutex)
+{
     return pthread_cond_wait(cond, mutex);
 }
 
-int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_t timeout_ms) {
+int agentos_cond_timedwait(agentos_cond_t *cond, agentos_mutex_t *mutex, uint32_t timeout_ms)
+{
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += timeout_ms / 1000;
@@ -288,30 +330,35 @@ int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_
     return ret;
 }
 
-int agentos_cond_signal(agentos_cond_t* cond) {
+int agentos_cond_signal(agentos_cond_t *cond)
+{
     return pthread_cond_signal(cond);
 }
 
-int agentos_cond_broadcast(agentos_cond_t* cond) {
+int agentos_cond_broadcast(agentos_cond_t *cond)
+{
     return pthread_cond_broadcast(cond);
 }
 
-void agentos_cond_destroy(agentos_cond_t* cond) {
+void agentos_cond_destroy(agentos_cond_t *cond)
+{
     pthread_cond_destroy(cond);
 }
 
-agentos_cond_t* agentos_cond_create(void) {
-    agentos_cond_t* cond = (agentos_cond_t*)malloc(sizeof(agentos_cond_t));
+agentos_cond_t *agentos_cond_create(void)
+{
+    agentos_cond_t *cond = (agentos_cond_t *)AGENTOS_MALLOC(sizeof(agentos_cond_t));
     if (cond) {
         pthread_cond_init(cond, NULL);
     }
     return cond;
 }
 
-void agentos_cond_free(agentos_cond_t* cond) {
+void agentos_cond_free(agentos_cond_t *cond)
+{
     if (cond) {
         pthread_cond_destroy(cond);
-        free(cond);
+        AGENTOS_FREE(cond);
     }
 }
 
@@ -319,7 +366,8 @@ void agentos_cond_free(agentos_cond_t* cond) {
 
 /* ==================== Socket 实现 ==================== */
 
-agentos_socket_t agentos_socket_tcp(void) {
+agentos_socket_t agentos_socket_tcp(void)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     return socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 #else
@@ -327,7 +375,8 @@ agentos_socket_t agentos_socket_tcp(void) {
 #endif
 }
 
-agentos_socket_t agentos_socket_unix(void) {
+agentos_socket_t agentos_socket_unix(void)
+{
 #ifndef AGENTOS_PLATFORM_WINDOWS
     return socket(AF_UNIX, SOCK_STREAM, 0);
 #else
@@ -335,13 +384,15 @@ agentos_socket_t agentos_socket_unix(void) {
 #endif
 }
 
-int agentos_socket_set_nonblock(agentos_socket_t sock, int nonblock) {
+int agentos_socket_set_nonblock(agentos_socket_t sock, int nonblock)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     u_long mode = nonblock ? 1 : 0;
     return ioctlsocket(sock, FIONBIO, &mode);
 #else
     int flags = fcntl(sock, F_GETFL, 0);
-    if (flags < 0) return -1;
+    if (flags < 0)
+        return AGENTOS_EINVAL;
     if (nonblock) {
         return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
     } else {
@@ -350,12 +401,14 @@ int agentos_socket_set_nonblock(agentos_socket_t sock, int nonblock) {
 #endif
 }
 
-int agentos_socket_set_reuseaddr(agentos_socket_t sock, int reuse) {
+int agentos_socket_set_reuseaddr(agentos_socket_t sock, int reuse)
+{
     int opt = reuse ? 1 : 0;
-    return setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+    return setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
 }
 
-void agentos_socket_close(agentos_socket_t sock) {
+void agentos_socket_close(agentos_socket_t sock)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     closesocket(sock);
 #else
@@ -370,11 +423,13 @@ void agentos_socket_close(agentos_socket_t sock) {
 static HANDLE g_process_handle = NULL;
 static HANDLE g_thread_handle = NULL;
 
-int agentos_process_start(const char* executable, char* const argv[],
-                         char* const envp[], agentos_process_info_t* proc) {
+int agentos_process_start(const char *executable, char *const argv[], char *const envp[],
+                          agentos_process_info_t *proc)
+{
     (void)envp;
 
-    if (!proc) return -1;
+    if (!proc)
+        return AGENTOS_EINVAL;
     memset(proc, 0, sizeof(agentos_process_info_t));
 
     STARTUPINFOA si;
@@ -397,14 +452,12 @@ int agentos_process_start(const char* executable, char* const argv[],
         }
     }
 
-    BOOL success = CreateProcessA(
-        NULL, cmdline, NULL, NULL, TRUE,
-        CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP,
-        NULL, NULL, &si, &pi
-    );
+    BOOL success =
+        CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP,
+                       NULL, NULL, &si, &pi);
 
     if (!success) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     g_process_handle = pi.hProcess;
@@ -414,22 +467,24 @@ int agentos_process_start(const char* executable, char* const argv[],
     return 0;
 }
 
-int agentos_process_wait(agentos_process_info_t* proc, uint32_t timeout_ms, int* exit_code) {
+int agentos_process_wait(agentos_process_info_t *proc, uint32_t timeout_ms, int *exit_code)
+{
     (void)proc;
 
-    if (!g_process_handle) return -1;
+    if (!g_process_handle)
+        return AGENTOS_EINVAL;
 
     DWORD result = WaitForSingleObject(g_process_handle, timeout_ms == 0 ? INFINITE : timeout_ms);
     if (result == WAIT_TIMEOUT) {
         return -2;
     }
     if (result != WAIT_OBJECT_0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     DWORD code;
     if (!GetExitCodeProcess(g_process_handle, &code)) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (exit_code) {
@@ -444,15 +499,17 @@ int agentos_process_wait(agentos_process_info_t* proc, uint32_t timeout_ms, int*
     return 0;
 }
 
-int agentos_process_kill(agentos_process_info_t* proc) {
+int agentos_process_kill(agentos_process_info_t *proc)
+{
     (void)proc;
     if (g_process_handle) {
         return TerminateProcess(g_process_handle, 1) ? 0 : -1;
     }
-    return -1;
+    return AGENTOS_EINVAL;
 }
 
-void agentos_process_close_pipes(agentos_process_info_t* proc) {
+void agentos_process_close_pipes(agentos_process_info_t *proc)
+{
     (void)proc;
     if (g_thread_handle) {
         CloseHandle(g_thread_handle);
@@ -466,14 +523,16 @@ void agentos_process_close_pipes(agentos_process_info_t* proc) {
 
 #else
 
-int agentos_process_start(const char* executable, char* const argv[],
-                         char* const envp[], agentos_process_info_t* proc) {
-    if (!proc) return -1;
+int agentos_process_start(const char *executable, char *const argv[], char *const envp[],
+                          agentos_process_info_t *proc)
+{
+    if (!proc)
+        return AGENTOS_EINVAL;
     memset(proc, 0, sizeof(agentos_process_info_t));
 
     pid_t pid = fork();
     if (pid < 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (pid == 0) {
@@ -482,7 +541,8 @@ int agentos_process_start(const char* executable, char* const argv[],
                 putenv(envp[i]);
             }
         }
-        /* flawfinder: ignore - executable and argv are caller-controlled, not arbitrary user input */
+        /* flawfinder: ignore - executable and argv are caller-controlled, not arbitrary user input
+         */
         execvp(executable, argv);
         _exit(127);
     }
@@ -491,7 +551,8 @@ int agentos_process_start(const char* executable, char* const argv[],
     return 0;
 }
 
-int agentos_process_wait(agentos_process_info_t* proc, uint32_t timeout_ms, int* exit_code) {
+int agentos_process_wait(agentos_process_info_t *proc, uint32_t timeout_ms, int *exit_code)
+{
     int status;
     pid_t result;
 
@@ -522,7 +583,7 @@ int agentos_process_wait(agentos_process_info_t* proc, uint32_t timeout_ms, int*
     }
 
     if (result < 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (WIFEXITED(status)) {
@@ -538,11 +599,13 @@ int agentos_process_wait(agentos_process_info_t* proc, uint32_t timeout_ms, int*
     return 0;
 }
 
-int agentos_process_kill(agentos_process_info_t* proc) {
+int agentos_process_kill(agentos_process_info_t *proc)
+{
     return kill(proc->pid, SIGKILL);
 }
 
-void agentos_process_close_pipes(agentos_process_info_t* proc) {
+void agentos_process_close_pipes(agentos_process_info_t *proc)
+{
     (void)proc;
 }
 
@@ -550,7 +613,8 @@ void agentos_process_close_pipes(agentos_process_info_t* proc) {
 
 /* ==================== 时间接口 ==================== */
 
-uint64_t agentos_time_ns(void) {
+uint64_t agentos_time_ns(void)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     LARGE_INTEGER frequency, counter;
     QueryPerformanceFrequency(&frequency);
@@ -563,7 +627,8 @@ uint64_t agentos_time_ns(void) {
 #endif
 }
 
-uint64_t agentos_time_ms(void) {
+uint64_t agentos_time_ms(void)
+{
     return agentos_time_ns() / 1000000ULL;
 }
 
@@ -572,58 +637,62 @@ uint64_t agentos_time_ms(void) {
 static AGENTOS_THREAD_LOCAL unsigned int g_random_seed = 0;
 static AGENTOS_THREAD_LOCAL int g_random_initialized = 0;
 
-void agentos_random_init(void) {
+void agentos_random_init(void)
+{
     if (!g_random_initialized) {
         g_random_seed = (unsigned int)agentos_time_ns();
         g_random_initialized = 1;
     }
 }
 
-uint32_t agentos_random_uint32(uint32_t min, uint32_t max) {
+uint32_t agentos_random_uint32(uint32_t min, uint32_t max)
+{
     if (!g_random_initialized) {
         agentos_random_init();
     }
 
 #if AGENTOS_PLATFORM_WINDOWS
-    return min + (uint32_t)((double)rand() / (RAND_MAX + 1.0) * (max - min + 1));
+    uint32_t rnd;
+    BCryptGenRandom(NULL, (PUCHAR)&rnd, sizeof(rnd), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+    return min + (uint32_t)((rnd / 4294967296.0) * (max - min + 1));
 #else
     return min + (uint32_t)((double)rand_r(&g_random_seed) / (RAND_MAX + 1.0) * (max - min + 1));
 #endif
 }
 
-float agentos_random_float(void) {
+float agentos_random_float(void)
+{
     if (!g_random_initialized) {
         agentos_random_init();
     }
 
 #if AGENTOS_PLATFORM_WINDOWS
-    return (float)rand() / (float)RAND_MAX;
+    uint32_t rnd;
+    BCryptGenRandom(NULL, (PUCHAR)&rnd, sizeof(rnd), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+    return rnd / 4294967296.0f;
 #else
     return (float)rand_r(&g_random_seed) / (float)RAND_MAX;
 #endif
 }
 
-int agentos_random_bytes(void* buf, size_t len) {
+int agentos_random_bytes(void *buf, size_t len)
+{
 #if AGENTOS_PLATFORM_WINDOWS
-    NTSTATUS status = BCryptGenRandom(
-        NULL,
-        (PUCHAR)buf,
-        (ULONG)len,
-        BCRYPT_USE_SYSTEM_PREFERRED_RNG
-    );
+    NTSTATUS status =
+        BCryptGenRandom(NULL, (PUCHAR)buf, (ULONG)len, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
     return status == 0 ? 0 : -1;
 #else
     int fd = open("/dev/urandom", O_RDONLY);
     if (fd < 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t total = 0;
     while (total < len) {
-        ssize_t n = read(fd, (char*)buf + total, len - total);
+        ssize_t n = read(fd, (char *)buf + total, len - total);
         if (n <= 0) {
             close(fd);
-            return -1;
+            return AGENTOS_EINVAL;
         }
         total += (size_t)n;
     }
@@ -635,8 +704,10 @@ int agentos_random_bytes(void* buf, size_t len) {
 
 /* ==================== 文件系统接口 ==================== */
 
-int agentos_file_exists(const char* path) {
-    if (!path) return 0;
+int agentos_file_exists(const char *path)
+{
+    if (!path)
+        return 0;
 #if AGENTOS_PLATFORM_WINDOWS
     struct _stat st;
     return _stat(path, &st) == 0 ? 1 : 0;
@@ -646,18 +717,21 @@ int agentos_file_exists(const char* path) {
 #endif
 }
 
-int agentos_mkdir_p(const char* path) {
-    if (!path) return -1;
+int agentos_mkdir_p(const char *path)
+{
+    if (!path)
+        return AGENTOS_EINVAL;
 
-    char* tmp = strdup(path);
-    if (!tmp) return -1;
+    char *tmp = AGENTOS_STRDUP(path);
+    if (!tmp)
+        return AGENTOS_EINVAL;
 
     size_t len = strlen(tmp);
     if (len > 0 && (tmp[len - 1] == '/' || tmp[len - 1] == '\\')) {
         tmp[len - 1] = '\0';
     }
 
-    for (char* p = tmp + 1; *p; p++) {
+    for (char *p = tmp + 1; *p; p++) {
         if (*p == '/' || *p == '\\') {
             char saved = *p;
             *p = '\0';
@@ -678,22 +752,24 @@ int agentos_mkdir_p(const char* path) {
     int ret = mkdir(tmp, 0755);
 #endif
 
-    free(tmp);
+    AGENTOS_FREE(tmp);
     return (ret == 0 || errno == EEXIST) ? 0 : -1;
 }
 
-int64_t agentos_file_size(const char* path) {
-    if (!path) return -1;
+int64_t agentos_file_size(const char *path)
+{
+    if (!path)
+        return AGENTOS_EINVAL;
 #if AGENTOS_PLATFORM_WINDOWS
     struct _stat st;
     if (_stat(path, &st) != 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
     return st.st_size;
 #else
     struct stat st;
     if (stat(path, &st) != 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
     return st.st_size;
 #endif
@@ -701,9 +777,10 @@ int64_t agentos_file_size(const char* path) {
 
 /* ==================== 字符串工具 ==================== */
 
-int agentos_strlcpy(char* dest, const char* src, size_t dest_size) {
+int agentos_strlcpy(char *dest, const char *src, size_t dest_size)
+{
     if (!dest || dest_size == 0 || !src) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t src_len = strlen(src);
@@ -715,14 +792,15 @@ int agentos_strlcpy(char* dest, const char* src, size_t dest_size) {
     return (int)copy_len;
 }
 
-int agentos_strlcat(char* dest, const char* src, size_t dest_size) {
+int agentos_strlcat(char *dest, const char *src, size_t dest_size)
+{
     if (!dest || dest_size == 0 || !src) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t dest_len = strlen(dest);
     if (dest_len >= dest_size - 1) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t src_len = strlen(src);
@@ -737,7 +815,8 @@ int agentos_strlcat(char* dest, const char* src, size_t dest_size) {
 
 /* ==================== 错误处理 ==================== */
 
-int agentos_get_last_error(void) {
+int agentos_get_last_error(void)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     return (int)GetLastError();
 #else
@@ -745,14 +824,13 @@ int agentos_get_last_error(void) {
 #endif
 }
 
-const char* agentos_strerror(int error) {
+const char *agentos_strerror(int error)
+{
 #if AGENTOS_PLATFORM_WINDOWS
     static char msg[256];
     memset(msg, 0, sizeof(msg));
-    FormatMessageA(
-        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL, (DWORD)error, 0, msg, sizeof(msg), NULL
-    );
+    FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, (DWORD)error,
+                   0, msg, sizeof(msg), NULL);
     return msg;
 #else
     return strerror(error);

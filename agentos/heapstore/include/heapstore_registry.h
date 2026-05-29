@@ -26,9 +26,9 @@ extern "C" {
  * @brief 注册表类型
  */
 typedef enum {
-    heapstore_REG_AGENTS,    /* Agent 注册表 */
-    heapstore_REG_SKILLS,    /* 技能注册表 */
-    heapstore_REG_SESSIONS,  /* 会话注册表 */
+    heapstore_REG_AGENTS,   /* Agent 注册表 */
+    heapstore_REG_SKILLS,   /* 技能注册表 */
+    heapstore_REG_SESSIONS, /* 会话注册表 */
     heapstore_REG_MAX
 } heapstore_registry_type_t;
 
@@ -73,7 +73,7 @@ void heapstore_registry_shutdown(void);
  * @threadsafe 是
  * @reentrant 否
  */
-heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t* record);
+heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t *record);
 
 /**
  * @brief 获取 Agent 记录
@@ -87,7 +87,7 @@ heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t* r
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_record_t* record);
+heapstore_error_t heapstore_registry_get_agent(const char *id, heapstore_agent_record_t *record);
 
 /**
  * @brief 更新 Agent 记录
@@ -100,7 +100,7 @@ heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_r
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t* record);
+heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t *record);
 
 /**
  * @brief 删除 Agent 记录
@@ -112,7 +112,7 @@ heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_delete_agent(const char* id);
+heapstore_error_t heapstore_registry_delete_agent(const char *id);
 
 /**
  * @brief 查询 Agent 记录
@@ -127,7 +127,9 @@ heapstore_error_t heapstore_registry_delete_agent(const char* id);
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const char* filter_status, heapstore_registry_iter_t** iter);
+heapstore_error_t heapstore_registry_query_agents(const char *filter_type,
+                                                  const char *filter_status,
+                                                  heapstore_registry_iter_t **iter);
 
 /**
  * @brief 添加技能记录
@@ -140,7 +142,7 @@ heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* record);
+heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t *record);
 
 /**
  * @brief 获取技能记录
@@ -154,7 +156,7 @@ heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* r
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_get_skill(const char* id, heapstore_skill_record_t* record);
+heapstore_error_t heapstore_registry_get_skill(const char *id, heapstore_skill_record_t *record);
 
 /**
  * @brief 删除技能记录
@@ -166,7 +168,7 @@ heapstore_error_t heapstore_registry_get_skill(const char* id, heapstore_skill_r
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_delete_skill(const char* id);
+heapstore_error_t heapstore_registry_delete_skill(const char *id);
 
 /**
  * @brief 查询技能记录
@@ -179,7 +181,7 @@ heapstore_error_t heapstore_registry_delete_skill(const char* id);
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** iter);
+heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t **iter);
 
 /**
  * @brief 添加会话记录
@@ -192,7 +194,7 @@ heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** it
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_t* record);
+heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_t *record);
 
 /**
  * @brief 获取会话记录
@@ -206,7 +208,8 @@ heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_get_session(const char* id, heapstore_session_record_t* record);
+heapstore_error_t heapstore_registry_get_session(const char *id,
+                                                 heapstore_session_record_t *record);
 
 /**
  * @brief 更新会话记录
@@ -219,7 +222,7 @@ heapstore_error_t heapstore_registry_get_session(const char* id, heapstore_sessi
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_update_session(const heapstore_session_record_t* record);
+heapstore_error_t heapstore_registry_update_session(const heapstore_session_record_t *record);
 
 /**
  * @brief 删除会话记录
@@ -231,7 +234,7 @@ heapstore_error_t heapstore_registry_update_session(const heapstore_session_reco
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_delete_session(const char* id);
+heapstore_error_t heapstore_registry_delete_session(const char *id);
 
 /**
  * @brief 查询会话记录
@@ -245,7 +248,8 @@ heapstore_error_t heapstore_registry_delete_session(const char* id);
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, heapstore_registry_iter_t** iter);
+heapstore_error_t heapstore_registry_query_sessions(const char *filter_status,
+                                                    heapstore_registry_iter_t **iter);
 
 /**
  * @brief 遍历下一条记录
@@ -259,7 +263,7 @@ heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, h
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t* iter, void* record);
+heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t *iter, void *record);
 
 /**
  * @brief 销毁迭代器
@@ -271,7 +275,7 @@ heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t* iter, 
  * @reentrant 否
 
  * @since v1.0.0*/
-void heapstore_registry_iter_destroy(heapstore_registry_iter_t* iter);
+void heapstore_registry_iter_destroy(heapstore_registry_iter_t *iter);
 
 /**
  * @brief 执行数据库 VACUUM 操作
@@ -316,7 +320,8 @@ heapstore_error_t heapstore_registry_vacuum(void);
  * }
  * @endcode
  */
-heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_record_t* records, size_t count);
+heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_record_t *records,
+                                                         size_t count);
 
 /**
  * @brief 批量插入 Session 记录（事务优化版本）
@@ -333,7 +338,8 @@ heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_r
  * @see heapstore_registry_add_session()
  * @since v1.0.0.7
  */
-heapstore_error_t heapstore_registry_batch_insert_sessions(const heapstore_session_record_t* records, size_t count);
+heapstore_error_t
+heapstore_registry_batch_insert_sessions(const heapstore_session_record_t *records, size_t count);
 
 /**
  * @brief 批量插入 Skill 记录（事务优化版本）
@@ -350,7 +356,8 @@ heapstore_error_t heapstore_registry_batch_insert_sessions(const heapstore_sessi
  * @see heapstore_registry_add_skill()
  * @since v1.0.0.7
  */
-heapstore_error_t heapstore_registry_batch_insert_skills(const heapstore_skill_record_t* records, size_t count);
+heapstore_error_t heapstore_registry_batch_insert_skills(const heapstore_skill_record_t *records,
+                                                         size_t count);
 
 /**
  * @brief 检查注册表系统是否健康

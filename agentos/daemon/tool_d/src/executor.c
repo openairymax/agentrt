@@ -6,15 +6,17 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "executor.h"
 #include "daemon_errors.h"
+#include "error.h"
+#include "executor.h"
 #include "platform.h"
 #include "svc_logger.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <time.h>
 #include <sys/wait.h>
+#include <time.h>
 
 struct tool_executor {
     tool_executor_config_t manager;
@@ -23,7 +25,8 @@ struct tool_executor {
     uint64_t success_count;
 };
 
-tool_executor_t* tool_executor_create(const tool_executor_config_t* cfg) {
+tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
+{
     tool_executor_config_t local_cfg;
     if (!cfg) {
         memset(&local_cfg, 0, sizeof(local_cfg));
@@ -32,8 +35,9 @@ tool_executor_t* tool_executor_create(const tool_executor_config_t* cfg) {
         cfg = &local_cfg;
     }
 
-    tool_executor_t* exec = (tool_executor_t*)AGENTOS_CALLOC(1, sizeof(tool_executor_t));
-    if (!exec) return NULL;
+    tool_executor_t *exec = (tool_executor_t *)AGENTOS_CALLOC(1, sizeof(tool_executor_t));
+    if (!exec)
+        return NULL;
 
     exec->manager = *cfg;
     if (exec->manager.timeout_sec == 0) {
@@ -48,31 +52,34 @@ tool_executor_t* tool_executor_create(const tool_executor_config_t* cfg) {
     return exec;
 }
 
-tool_executor_t* tool_executor_create_ex(const tool_executor_config_t* ecfg) {
+tool_executor_t *tool_executor_create_ex(const tool_executor_config_t *ecfg)
+{
     return tool_executor_create(ecfg);
 }
 
-void tool_executor_destroy(tool_executor_t* exec) {
-    if (!exec) return;
+void tool_executor_destroy(tool_executor_t *exec)
+{
+    if (!exec)
+        return;
     SVC_LOG_INFO("Executor destroyed: total=%llu, success=%llu",
-                (unsigned long long)exec->total_executions,
-                (unsigned long long)exec->success_count);
+                 (unsigned long long)exec->total_executions,
+                 (unsigned long long)exec->success_count);
     agentos_mutex_destroy(&exec->lock);
     AGENTOS_FREE(exec);
 }
 
-int tool_executor_run(tool_executor_t* exec,
-                      const tool_metadata_t* meta,
-                      const char* params_json,
-                      tool_result_t** out_result) {
+int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const char *params_json,
+                      tool_result_t **out_result)
+{
     if (!exec || !meta || !out_result) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     *out_result = NULL;
 
-    tool_result_t* result = (tool_result_t*)AGENTOS_CALLOC(1, sizeof(tool_result_t));
-    if (!result) return AGENTOS_ERR_OUT_OF_MEMORY;
+    tool_result_t *result = (tool_result_t *)AGENTOS_CALLOC(1, sizeof(tool_result_t));
+    if (!result)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
     agentos_mutex_lock(&exec->lock);
     exec->total_executions++;
@@ -90,15 +97,17 @@ int tool_executor_run(tool_executor_t* exec,
     }
 
     /* SEC-011: 命令注入防护 - 检测shell元字符 */
-    const char* dangerous_chars = ";|&`$()<>{}[]\\!*?\n\r";
-    const char* check_inputs[] = {meta->executable, params_json, NULL};
+    const char *dangerous_chars = ";|&`$()<>{}[]\\!*?\n\r";
+    const char *check_inputs[] = {meta->executable, params_json, NULL};
     for (int ci = 0; check_inputs[ci]; ci++) {
-        if (!check_inputs[ci]) continue;
-        for (const char* dc = dangerous_chars; *dc; dc++) {
+        if (!check_inputs[ci])
+            continue;
+        for (const char *dc = dangerous_chars; *dc; dc++) {
             if (strchr(check_inputs[ci], *dc)) {
                 result->success = 0;
                 result->output = AGENTOS_STRDUP("");
-                result->error = AGENTOS_STRDUP("Command rejected: contains prohibited shell metacharacters");
+                result->error =
+                    AGENTOS_STRDUP("Command rejected: contains prohibited shell metacharacters");
                 result->exit_code = -1;
                 result->duration_ms = 0;
                 *out_result = result;
@@ -116,7 +125,7 @@ int tool_executor_run(tool_executor_t* exec,
     }
 
     /* flawfinder: ignore - input validated by SEC-011 metachar check above */
-    FILE* pipe = popen(full_command, "r");
+    FILE *pipe = popen(full_command, "r");
     if (!pipe) {
         result->success = 0;
         result->output = AGENTOS_STRDUP("");
@@ -130,7 +139,7 @@ int tool_executor_run(tool_executor_t* exec,
 
     size_t output_size = 4096;
     size_t output_len = 0;
-    char* output_buffer = (char*)AGENTOS_MALLOC(output_size);
+    char *output_buffer = (char *)AGENTOS_MALLOC(output_size);
     if (!output_buffer) {
         pclose(pipe);
         result->success = 0;
@@ -145,12 +154,14 @@ int tool_executor_run(tool_executor_t* exec,
     output_buffer[0] = '\0';
 
     size_t bytes_read;
-    while ((bytes_read = fread(output_buffer + output_len, 1, output_size - output_len - 1, pipe)) > 0) {
+    while ((bytes_read = fread(output_buffer + output_len, 1, output_size - output_len - 1, pipe)) >
+           0) {
         output_len += bytes_read;
         if (output_len >= output_size - 256) {
             output_size *= 2;
-            char* new_buf = (char*)AGENTOS_REALLOC(output_buffer, output_size);
-            if (!new_buf) break;
+            char *new_buf = (char *)AGENTOS_REALLOC(output_buffer, output_size);
+            if (!new_buf)
+                break;
             output_buffer = new_buf;
         }
     }
@@ -165,12 +176,14 @@ int tool_executor_run(tool_executor_t* exec,
     if (!result->success) {
         if (WIFEXITED(exit_status)) {
             char err_msg[256];
-            snprintf(err_msg, sizeof(err_msg), "Command exited with code %d", WEXITSTATUS(exit_status));
+            snprintf(err_msg, sizeof(err_msg), "Command exited with code %d",
+                     WEXITSTATUS(exit_status));
             result->error = AGENTOS_STRDUP(err_msg);
             result->exit_code = WEXITSTATUS(exit_status);
         } else if (WIFSIGNALED(exit_status)) {
             char err_msg[256];
-            snprintf(err_msg, sizeof(err_msg), "Command killed by signal %d", WTERMSIG(exit_status));
+            snprintf(err_msg, sizeof(err_msg), "Command killed by signal %d",
+                     WTERMSIG(exit_status));
             result->error = AGENTOS_STRDUP(err_msg);
             result->exit_code = -WTERMSIG(exit_status);
         } else {
@@ -189,12 +202,10 @@ int tool_executor_run(tool_executor_t* exec,
     return AGENTOS_OK;
 }
 
-int tool_executor_run_async(tool_executor_t* exec,
-                           const tool_metadata_t* meta,
-                           const char* params_json,
-                           tool_execute_callback_t callback,
-                           void* user_data,
-                           tool_result_t** out_result) {
+int tool_executor_run_async(tool_executor_t *exec, const tool_metadata_t *meta,
+                            const char *params_json, tool_execute_callback_t callback,
+                            void *user_data, tool_result_t **out_result)
+{
     if (!exec || !meta) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -203,7 +214,7 @@ int tool_executor_run_async(tool_executor_t* exec,
         *out_result = NULL;
     }
 
-    tool_result_t* result = NULL;
+    tool_result_t *result = NULL;
     int ret = tool_executor_run(exec, meta, params_json, &result);
 
     if (callback && result) {

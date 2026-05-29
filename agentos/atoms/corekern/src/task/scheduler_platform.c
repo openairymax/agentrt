@@ -9,28 +9,30 @@
  */
 
 #include "scheduler_platform.h"
+
 #include "atomic_compat.h"
+
 #include <stddef.h>
 
 /* ==================== 平台适配器操作集声明 ==================== */
 
 #if AGENTOS_PLATFORM_WINDOWS
-extern const scheduler_platform_ops_t* scheduler_platform_get_windows_ops(void);
+extern const scheduler_platform_ops_t *scheduler_platform_get_windows_ops(void);
 #endif
 
 #if AGENTOS_PLATFORM_POSIX
-extern const scheduler_platform_ops_t* scheduler_platform_get_posix_ops(void);
+extern const scheduler_platform_ops_t *scheduler_platform_get_posix_ops(void);
 #endif
 
 /* ==================== 静态全局状态 ==================== */
 
-static const scheduler_platform_ops_t* g_current_platform_ops = NULL;
+static const scheduler_platform_ops_t *g_current_platform_ops = NULL;
 
 static atomic_int g_platform_initialized = 0;
 
 /* ==================== 内部辅助函数 ==================== */
 
-static const scheduler_platform_ops_t* detect_platform_ops(void)
+static const scheduler_platform_ops_t *detect_platform_ops(void)
 {
 #if AGENTOS_PLATFORM_WINDOWS
     return scheduler_platform_get_windows_ops();
@@ -43,29 +45,28 @@ static const scheduler_platform_ops_t* detect_platform_ops(void)
 
 /* ==================== 公共API实现 ==================== */
 
-void scheduler_platform_register_ops(const scheduler_platform_ops_t* ops)
+void scheduler_platform_register_ops(const scheduler_platform_ops_t *ops)
 {
     if (atomic_load_explicit(&g_platform_initialized, memory_order_acquire)) {
         return;
     }
 
-    const scheduler_platform_ops_t* expected = NULL;
-    atomic_compare_exchange_strong_ptr(
-        (_Atomic void**)&g_current_platform_ops, (void**)&expected, (void*)ops,
-        memory_order_seq_cst, memory_order_seq_cst);
+    const scheduler_platform_ops_t *expected = NULL;
+    atomic_compare_exchange_strong_ptr((_Atomic void **)&g_current_platform_ops, (void **)&expected,
+                                       (void *)ops, memory_order_seq_cst, memory_order_seq_cst);
 }
 
-const scheduler_platform_ops_t* scheduler_platform_get_ops(void)
+const scheduler_platform_ops_t *scheduler_platform_get_ops(void)
 {
-    const scheduler_platform_ops_t* ops = atomic_load_ptr(
-        (_Atomic void**)&g_current_platform_ops, memory_order_acquire);
+    const scheduler_platform_ops_t *ops =
+        atomic_load_ptr((_Atomic void **)&g_current_platform_ops, memory_order_acquire);
     if (!ops) {
-        const scheduler_platform_ops_t* new_ops = detect_platform_ops();
+        const scheduler_platform_ops_t *new_ops = detect_platform_ops();
         if (new_ops) {
-            const scheduler_platform_ops_t* expected = NULL;
-            if (atomic_compare_exchange_strong_ptr(
-                    (_Atomic void**)&g_current_platform_ops, (void**)&expected, (void*)new_ops,
-                    memory_order_seq_cst, memory_order_seq_cst)) {
+            const scheduler_platform_ops_t *expected = NULL;
+            if (atomic_compare_exchange_strong_ptr((_Atomic void **)&g_current_platform_ops,
+                                                   (void **)&expected, (void *)new_ops,
+                                                   memory_order_seq_cst, memory_order_seq_cst)) {
                 ops = new_ops;
             } else {
                 ops = expected;
@@ -80,28 +81,27 @@ int scheduler_platform_auto_init(void)
 {
     int expected = 0;
     if (!atomic_compare_exchange_strong_explicit(&g_platform_initialized, &expected, 1,
-                                                  memory_order_seq_cst, memory_order_seq_cst)) {
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         return 0;
     }
 
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
         atomic_store_explicit(&g_platform_initialized, 0, memory_order_seq_cst);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
-    if (!ops->init || !ops->cleanup || !ops->thread_create ||
-        !ops->thread_join || !ops->thread_set_priority ||
-        !ops->get_current_thread_id || !ops->get_thread_system_id ||
-        !ops->thread_sleep || !ops->thread_yield ||
-        !ops->cleanup_platform_resources || !ops->get_name) {
+    if (!ops->init || !ops->cleanup || !ops->thread_create || !ops->thread_join ||
+        !ops->thread_set_priority || !ops->get_current_thread_id || !ops->get_thread_system_id ||
+        !ops->thread_sleep || !ops->thread_yield || !ops->cleanup_platform_resources ||
+        !ops->get_name) {
         atomic_store_explicit(&g_platform_initialized, 0, memory_order_seq_cst);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (ops->init() != 0) {
         atomic_store_explicit(&g_platform_initialized, 0, memory_order_seq_cst);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     return 0;
@@ -116,22 +116,22 @@ void scheduler_platform_cleanup(void)
 {
     int expected = 1;
     if (!atomic_compare_exchange_strong_explicit(&g_platform_initialized, &expected, 0,
-                                                  memory_order_seq_cst, memory_order_seq_cst)) {
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         return;
     }
 
-    const scheduler_platform_ops_t* ops =
-        atomic_load_ptr((_Atomic void**)&g_current_platform_ops, memory_order_acquire);
+    const scheduler_platform_ops_t *ops =
+        atomic_load_ptr((_Atomic void **)&g_current_platform_ops, memory_order_acquire);
     if (ops && ops->cleanup) {
         ops->cleanup();
     }
 
-    atomic_store_ptr((_Atomic void**)&g_current_platform_ops, NULL, memory_order_seq_cst);
+    atomic_store_ptr((_Atomic void **)&g_current_platform_ops, NULL, memory_order_seq_cst);
 }
 
-const char* scheduler_platform_get_name(void)
+const char *scheduler_platform_get_name(void)
 {
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (ops && ops->get_name) {
         return ops->get_name();
     }

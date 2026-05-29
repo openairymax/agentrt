@@ -10,17 +10,18 @@
  * @date 2026-04-05
  */
 
-#include "sync_platform.h"
 #include "check.h"
 #include "sync_internal.h"
+#include "sync_platform.h"
+
 #include <string.h>
 
-sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock,
-                                  const sync_attr_t* attr) {
+sync_result_t sync_spinlock_create(sync_spinlock_t *spinlock, const sync_attr_t *attr)
+{
     CHECK_NULL_RET(spinlock, SYNC_ERROR_INVALID);
 
-    struct sync_spinlock* s = (struct sync_spinlock*)AGENTOS_CALLOC(
-        1, sizeof(struct sync_spinlock));
+    struct sync_spinlock *s =
+        (struct sync_spinlock *)AGENTOS_CALLOC(1, sizeof(struct sync_spinlock));
     CHECK_NULL_RET(s, SYNC_ERROR_MEMORY);
 
     s->type = SYNC_TYPE_SPINLOCK;
@@ -45,7 +46,8 @@ sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock,
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_spinlock_free(sync_spinlock_t spinlock) {
+sync_result_t sync_spinlock_free(sync_spinlock_t spinlock)
+{
     CHECK_NULL_RET(spinlock, SYNC_ERROR_INVALID);
 
     if (!spinlock->initialized) {
@@ -63,7 +65,8 @@ sync_result_t sync_spinlock_free(sync_spinlock_t spinlock) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_spinlock_lock_ex(sync_spinlock_t spinlock) {
+sync_result_t sync_spinlock_lock_ex(sync_spinlock_t spinlock)
+{
     if (spinlock == NULL || !spinlock->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -71,7 +74,7 @@ sync_result_t sync_spinlock_lock_ex(sync_spinlock_t spinlock) {
 #ifdef _WIN32
     int expected = 0;
     while (!atomic_compare_exchange_strong_explicit(&spinlock->lock, &expected, 1,
-                                                     memory_order_acquire, memory_order_relaxed)) {
+                                                    memory_order_acquire, memory_order_relaxed)) {
         expected = 0;
     }
 #else
@@ -85,7 +88,8 @@ sync_result_t sync_spinlock_lock_ex(sync_spinlock_t spinlock) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_spinlock_try_lock(sync_spinlock_t spinlock) {
+sync_result_t sync_spinlock_try_lock(sync_spinlock_t spinlock)
+{
     if (spinlock == NULL || !spinlock->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -93,7 +97,7 @@ sync_result_t sync_spinlock_try_lock(sync_spinlock_t spinlock) {
 #ifdef _WIN32
     int expected = 0;
     if (!atomic_compare_exchange_strong_explicit(&spinlock->lock, &expected, 1,
-                                                  memory_order_acquire, memory_order_relaxed)) {
+                                                 memory_order_acquire, memory_order_relaxed)) {
         return SYNC_ERROR_BUSY;
     }
 #else
@@ -110,7 +114,8 @@ sync_result_t sync_spinlock_try_lock(sync_spinlock_t spinlock) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_spinlock_unlock_ex(sync_spinlock_t spinlock) {
+sync_result_t sync_spinlock_unlock_ex(sync_spinlock_t spinlock)
+{
     if (spinlock == NULL || !spinlock->initialized) {
         return SYNC_ERROR_INVALID;
     }

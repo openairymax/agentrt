@@ -6,7 +6,7 @@ on:
     paths:
       - 'agentos/gateway/**'
       - 'agentos/daemon/**'
-      - 'scripts/deployment/docker/**'
+      - 'scripts/ops/deploy/**'
       - '.github/workflows/e2e.yml'
   pull_request:
     branches: [main]
@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 20
 
     env:
-      COMPOSE_DIR: scripts/deployment/docker
+      COMPOSE_DIR: scripts/ops/deploy
 
     steps:
       - uses: actions/checkout@v4
@@ -128,4 +128,8 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose -f $COMPOSE_DIR/docker-compose.yml down -v --remove-orphans 2>/dev/null || true
+        run: |
+          if [ -f "$COMPOSE_DIR/docker-compose.yml" ]; then
+            docker compose -f "$COMPOSE_DIR/docker-compose.yml" down -v --remove-orphans 2>/dev/null
+            echo "Cleanup completed"
+          fi

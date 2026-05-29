@@ -10,22 +10,36 @@
  * - 线程安全的预算操?
  */
 
-#include "token.h"
-#include <stdlib.h>
-
-/* Unified base library compatibility layer */
+#include "error.h"
 #include "memory_compat.h"
+#include "platform.h"
 #include "string_compat.h"
+#include "token.h"
+
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "platform.h"
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
 #ifdef _WIN32
-        #else
-        #include <unistd.h>
+#else
+#include <unistd.h>
+#endif
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
 #endif
 
 /**
@@ -40,7 +54,8 @@ typedef agentos_mutex_t budget_mutex_t;
 /**
  * @brief 初始化互斥锁
  */
-static int budget_mutex_init(budget_mutex_t* mutex) {
+static int budget_mutex_init(budget_mutex_t *mutex)
+{
 #ifdef _WIN32
     agentos_mutex_init(mutex);
     return 0;
@@ -52,7 +67,8 @@ static int budget_mutex_init(budget_mutex_t* mutex) {
 /**
  * @brief 销毁互斥锁
  */
-static void budget_mutex_destroy(budget_mutex_t* mutex) {
+static void budget_mutex_destroy(budget_mutex_t *mutex)
+{
 #ifdef _WIN32
     agentos_mutex_destroy(mutex);
 #else
@@ -63,7 +79,8 @@ static void budget_mutex_destroy(budget_mutex_t* mutex) {
 /**
  * @brief 加锁
  */
-static void budget_mutex_lock(budget_mutex_t* mutex) {
+static void budget_mutex_lock(budget_mutex_t *mutex)
+{
 #ifdef _WIN32
     agentos_mutex_lock(mutex);
 #else
@@ -74,7 +91,8 @@ static void budget_mutex_lock(budget_mutex_t* mutex) {
 /**
  * @brief 解锁
  */
-static void budget_mutex_unlock(budget_mutex_t* mutex) {
+static void budget_mutex_unlock(budget_mutex_t *mutex)
+{
 #ifdef _WIN32
     agentos_mutex_unlock(mutex);
 #else
@@ -86,23 +104,24 @@ static void budget_mutex_unlock(budget_mutex_t* mutex) {
  * @brief Token预算内部结构
  */
 struct agentos_token_budget {
-    size_t max_tokens;                    /**< 最大Token配额 */
-    atomic_size_t used_tokens;          /**< 已使用Token?*/
-    atomic_size_t input_tokens;          /**< 输入Token?*/
-    atomic_size_t output_tokens;        /**< 输出Token?*/
-    atomic_uint request_count;          /**< 请求计数 */
-    atomic_uint denied_count;            /**< 拒绝计数 */
-    budget_mutex_t mutex;               /**< 互斥?*/
-    time_t reset_time;                  /**< 重置时间 */
-    size_t window_seconds;              /**< 时间窗口（秒?*/
+    size_t max_tokens;           /**< 最大Token配额 */
+    atomic_size_t used_tokens;   /**< 已使用Token?*/
+    atomic_size_t input_tokens;  /**< 输入Token?*/
+    atomic_size_t output_tokens; /**< 输出Token?*/
+    atomic_uint request_count;   /**< 请求计数 */
+    atomic_uint denied_count;    /**< 拒绝计数 */
+    budget_mutex_t mutex;        /**< 互斥?*/
+    time_t reset_time;           /**< 重置时间 */
+    size_t window_seconds;       /**< 时间窗口（秒?*/
 };
 
 /**
  * @brief 检查预算是否充?
  */
-static int check_budget_available(agentos_token_budget_t* budget, size_t input, size_t output) {
+static int check_budget_available(agentos_token_budget_t *budget, size_t input, size_t output)
+{
     if (!budget) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     size_t total = atomic_load(&budget->used_tokens);
@@ -110,19 +129,20 @@ static int check_budget_available(agentos_token_budget_t* budget, size_t input, 
 
     if (total + requested > budget->max_tokens) {
         atomic_fetch_add(&budget->denied_count, 1);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     return 0;
 }
 
-agentos_token_budget_t* agentos_token_budget_create(size_t max_tokens) {
+agentos_token_budget_t *agentos_token_budget_create(size_t max_tokens)
+{
     if (max_tokens == 0) {
         return NULL;
     }
 
-    agentos_token_budget_t* budget = (agentos_token_budget_t*)AGENTOS_MALLOC(
-        sizeof(agentos_token_budget_t));
+    agentos_token_budget_t *budget =
+        (agentos_token_budget_t *)AGENTOS_MALLOC(sizeof(agentos_token_budget_t));
     if (!budget) {
         return NULL;
     }
@@ -147,7 +167,8 @@ agentos_token_budget_t* agentos_token_budget_create(size_t max_tokens) {
     return budget;
 }
 
-void agentos_token_budget_destroy(agentos_token_budget_t* budget) {
+void agentos_token_budget_destroy(agentos_token_budget_t *budget)
+{
     if (!budget) {
         return;
     }
@@ -156,16 +177,18 @@ void agentos_token_budget_destroy(agentos_token_budget_t* budget) {
     AGENTOS_FREE(budget);
 }
 
-int agentos_token_budget_add(agentos_token_budget_t* budget, size_t input_tokens, size_t output_tokens) {
+int agentos_token_budget_add(agentos_token_budget_t *budget, size_t input_tokens,
+                             size_t output_tokens)
+{
     if (!budget) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     budget_mutex_lock(&budget->mutex);
 
     if (check_budget_available(budget, input_tokens, output_tokens) != 0) {
         budget_mutex_unlock(&budget->mutex);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     atomic_fetch_add(&budget->used_tokens, input_tokens + output_tokens);
@@ -178,7 +201,8 @@ int agentos_token_budget_add(agentos_token_budget_t* budget, size_t input_tokens
     return 0;
 }
 
-size_t agentos_token_budget_remaining(agentos_token_budget_t* budget) {
+size_t agentos_token_budget_remaining(agentos_token_budget_t *budget)
+{
     if (!budget) {
         return 0;
     }
@@ -192,7 +216,8 @@ size_t agentos_token_budget_remaining(agentos_token_budget_t* budget) {
     return budget->max_tokens - used;
 }
 
-void agentos_token_budget_reset(agentos_token_budget_t* budget) {
+void agentos_token_budget_reset(agentos_token_budget_t *budget)
+{
     if (!budget) {
         return;
     }
@@ -206,7 +231,8 @@ void agentos_token_budget_reset(agentos_token_budget_t* budget) {
     budget_mutex_unlock(&budget->mutex);
 }
 
-size_t agentos_token_budget_used(agentos_token_budget_t* budget) {
+size_t agentos_token_budget_used(agentos_token_budget_t *budget)
+{
     if (!budget) {
         return 0;
     }
@@ -214,7 +240,8 @@ size_t agentos_token_budget_used(agentos_token_budget_t* budget) {
     return atomic_load(&budget->used_tokens);
 }
 
-size_t agentos_token_budget_input(agentos_token_budget_t* budget) {
+size_t agentos_token_budget_input(agentos_token_budget_t *budget)
+{
     if (!budget) {
         return 0;
     }
@@ -222,7 +249,8 @@ size_t agentos_token_budget_input(agentos_token_budget_t* budget) {
     return atomic_load(&budget->input_tokens);
 }
 
-size_t agentos_token_budget_output(agentos_token_budget_t* budget) {
+size_t agentos_token_budget_output(agentos_token_budget_t *budget)
+{
     if (!budget) {
         return 0;
     }
@@ -230,7 +258,8 @@ size_t agentos_token_budget_output(agentos_token_budget_t* budget) {
     return atomic_load(&budget->output_tokens);
 }
 
-uint32_t agentos_token_budget_requests(agentos_token_budget_t* budget) {
+uint32_t agentos_token_budget_requests(agentos_token_budget_t *budget)
+{
     if (!budget) {
         return 0;
     }
@@ -238,7 +267,8 @@ uint32_t agentos_token_budget_requests(agentos_token_budget_t* budget) {
     return atomic_load(&budget->request_count);
 }
 
-uint32_t agentos_token_budget_denied(agentos_token_budget_t* budget) {
+uint32_t agentos_token_budget_denied(agentos_token_budget_t *budget)
+{
     if (!budget) {
         return 0;
     }
@@ -246,9 +276,10 @@ uint32_t agentos_token_budget_denied(agentos_token_budget_t* budget) {
     return atomic_load(&budget->denied_count);
 }
 
-int agentos_token_budget_set_window(agentos_token_budget_t* budget, size_t window_seconds) {
+int agentos_token_budget_set_window(agentos_token_budget_t *budget, size_t window_seconds)
+{
     if (!budget) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     budget_mutex_lock(&budget->mutex);
@@ -261,9 +292,10 @@ int agentos_token_budget_set_window(agentos_token_budget_t* budget, size_t windo
     return 0;
 }
 
-int agentos_token_budget_check_window(agentos_token_budget_t* budget) {
+int agentos_token_budget_check_window(agentos_token_budget_t *budget)
+{
     if (!budget) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     budget_mutex_lock(&budget->mutex);

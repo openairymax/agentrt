@@ -9,10 +9,15 @@
 #ifndef AGENTOS_COREKERN_STDATOMIC_SHIM
 #define AGENTOS_COREKERN_STDATOMIC_SHIM
 
+#pragma GCC system_header
+
 #if defined(_MSC_VER)
 #include "atomic_compat.h"
 #else
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 #include_next <stdatomic.h>
+#pragma GCC diagnostic pop
 #include "atomic_compat.h"
 #endif
 

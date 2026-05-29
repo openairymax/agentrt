@@ -15,13 +15,14 @@
  * 5. 线程安全
  */
 
+#include "error.h"
 #include "monitor_service.h"
 #include "platform.h"
-#include "error.h"
 #include "svc_logger.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
 
 #define MAX_RING_BUFFER_ENTRIES 8192
@@ -36,25 +37,21 @@ typedef struct {
     char value[MAX_FIELD_VALUE_LEN];
 } context_field_t;
 
-typedef enum {
-    TARGET_FILE,
-    TARGET_CALLBACK,
-    TARGET_RING_BUFFER
-} target_type_t;
+typedef enum { TARGET_FILE, TARGET_CALLBACK, TARGET_RING_BUFFER } target_type_t;
 
 typedef struct {
     target_type_t type;
     union {
         struct {
-            FILE* fp;
+            FILE *fp;
             char path[512];
             uint64_t max_size_bytes;
             uint64_t current_size;
             uint32_t max_rotations;
         } file;
         struct {
-            void (*callback)(const char* json_line, void* user_data);
-            void* user_data;
+            void (*callback)(const char *json_line, void *user_data);
+            void *user_data;
         } callback;
     } config;
     log_level_t min_level;
@@ -93,11 +90,10 @@ static struct {
     int initialized;
 } g_structured_log = {0};
 
-static const char* level_names[] = {
-    "DEBUG", "INFO", "WARNING", "ERROR", "FATAL"
-};
+static const char *level_names[] = {"DEBUG", "INFO", "WARNING", "ERROR", "FATAL"};
 
-int structured_log_init(log_level_t min_level) {
+int structured_log_init(log_level_t min_level)
+{
     if (g_structured_log.initialized) {
         return AGENTOS_SUCCESS;
     }
@@ -116,8 +112,10 @@ int structured_log_init(log_level_t min_level) {
     return AGENTOS_SUCCESS;
 }
 
-void structured_log_shutdown(void) {
-    if (!g_structured_log.initialized) return;
+void structured_log_shutdown(void)
+{
+    if (!g_structured_log.initialized)
+        return;
 
     agentos_mutex_lock(&g_structured_log.target_lock);
     for (size_t i = 0; i < g_structured_log.target_count; i++) {
@@ -137,10 +135,13 @@ void structured_log_shutdown(void) {
     g_structured_log.initialized = 0;
 }
 
-int structured_log_add_file_target(const char* path, log_level_t min_level,
-                                   uint64_t max_size_bytes, uint32_t max_rotations) {
-    if (!path) return AGENTOS_ERR_INVALID_PARAM;
-    if (!g_structured_log.initialized) structured_log_init(LOG_LEVEL_INFO);
+int structured_log_add_file_target(const char *path, log_level_t min_level, uint64_t max_size_bytes,
+                                   uint32_t max_rotations)
+{
+    if (!path)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_structured_log.initialized)
+        structured_log_init(LOG_LEVEL_INFO);
 
     agentos_mutex_lock(&g_structured_log.target_lock);
 
@@ -149,7 +150,7 @@ int structured_log_add_file_target(const char* path, log_level_t min_level,
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    output_target_t* target = &g_structured_log.targets[g_structured_log.target_count];
+    output_target_t *target = &g_structured_log.targets[g_structured_log.target_count];
     target->type = TARGET_FILE;
     target->min_level = min_level;
     target->enabled = true;
@@ -172,11 +173,13 @@ int structured_log_add_file_target(const char* path, log_level_t min_level,
     return AGENTOS_SUCCESS;
 }
 
-int structured_log_add_callback_target(
-    void (*callback)(const char* json_line, void* user_data),
-    void* user_data, log_level_t min_level) {
-    if (!callback) return AGENTOS_ERR_INVALID_PARAM;
-    if (!g_structured_log.initialized) structured_log_init(LOG_LEVEL_INFO);
+int structured_log_add_callback_target(void (*callback)(const char *json_line, void *user_data),
+                                       void *user_data, log_level_t min_level)
+{
+    if (!callback)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_structured_log.initialized)
+        structured_log_init(LOG_LEVEL_INFO);
 
     agentos_mutex_lock(&g_structured_log.target_lock);
 
@@ -185,7 +188,7 @@ int structured_log_add_callback_target(
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    output_target_t* target = &g_structured_log.targets[g_structured_log.target_count];
+    output_target_t *target = &g_structured_log.targets[g_structured_log.target_count];
     target->type = TARGET_CALLBACK;
     target->min_level = min_level;
     target->enabled = true;
@@ -198,16 +201,18 @@ int structured_log_add_callback_target(
     return AGENTOS_SUCCESS;
 }
 
-int structured_log_set_context(const char* key, const char* value) {
-    if (!key || !value) return AGENTOS_ERR_INVALID_PARAM;
-    if (!g_structured_log.initialized) structured_log_init(LOG_LEVEL_INFO);
+int structured_log_set_context(const char *key, const char *value)
+{
+    if (!key || !value)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_structured_log.initialized)
+        structured_log_init(LOG_LEVEL_INFO);
 
     agentos_mutex_lock(&g_structured_log.context_lock);
 
     for (size_t i = 0; i < g_structured_log.global_context_count; i++) {
         if (strcmp(g_structured_log.global_context[i].key, key) == 0) {
-            strncpy(g_structured_log.global_context[i].value, value,
-                    MAX_FIELD_VALUE_LEN - 1);
+            strncpy(g_structured_log.global_context[i].value, value, MAX_FIELD_VALUE_LEN - 1);
             agentos_mutex_unlock(&g_structured_log.context_lock);
             return AGENTOS_SUCCESS;
         }
@@ -218,7 +223,8 @@ int structured_log_set_context(const char* key, const char* value) {
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    context_field_t* field = &g_structured_log.global_context[g_structured_log.global_context_count];
+    context_field_t *field =
+        &g_structured_log.global_context[g_structured_log.global_context_count];
     strncpy(field->key, key, MAX_FIELD_KEY_LEN - 1);
     strncpy(field->value, value, MAX_FIELD_VALUE_LEN - 1);
     g_structured_log.global_context_count++;
@@ -227,7 +233,8 @@ int structured_log_set_context(const char* key, const char* value) {
     return AGENTOS_SUCCESS;
 }
 
-static void format_json_log(const ring_entry_t* entry, char* buf, size_t buf_size) {
+static void format_json_log(const ring_entry_t *entry, char *buf, size_t buf_size)
+{
     size_t pos = 0;
 
     pos += snprintf(buf + pos, buf_size - pos,
@@ -240,74 +247,72 @@ static void format_json_log(const ring_entry_t* entry, char* buf, size_t buf_siz
                     "\"function\":\"%s\"",
                     (unsigned long long)entry->timestamp,
                     entry->level < LOG_LEVEL_COUNT ? level_names[entry->level] : "UNKNOWN",
-                    entry->message,
-                    entry->service_name,
-                    entry->file,
-                    entry->line,
-                    entry->function);
+                    entry->message, entry->service_name, entry->file, entry->line, entry->function);
 
     if (entry->trace_id[0]) {
-        pos += snprintf(buf + pos, buf_size - pos,
-                       ",\"traceId\":\"%s\"", entry->trace_id);
+        pos += snprintf(buf + pos, buf_size - pos, ",\"traceId\":\"%s\"", entry->trace_id);
     }
     if (entry->span_id[0]) {
-        pos += snprintf(buf + pos, buf_size - pos,
-                       ",\"spanId\":\"%s\"", entry->span_id);
+        pos += snprintf(buf + pos, buf_size - pos, ",\"spanId\":\"%s\"", entry->span_id);
     }
 
     for (size_t i = 0; i < entry->context_count && pos < buf_size - 128; i++) {
-        pos += snprintf(buf + pos, buf_size - pos,
-                       ",\"%s\":\"%s\"",
-                       entry->context[i].key, entry->context[i].value);
+        pos += snprintf(buf + pos, buf_size - pos, ",\"%s\":\"%s\"", entry->context[i].key,
+                        entry->context[i].value);
     }
 
     pos += snprintf(buf + pos, buf_size - pos, "}");
 }
 
-static void dispatch_to_targets(const ring_entry_t* entry) {
+static void dispatch_to_targets(const ring_entry_t *entry)
+{
     char json_buf[MAX_LOG_MESSAGE_LEN + 1024];
     format_json_log(entry, json_buf, sizeof(json_buf));
 
     agentos_mutex_lock(&g_structured_log.target_lock);
 
     for (size_t i = 0; i < g_structured_log.target_count; i++) {
-        output_target_t* target = &g_structured_log.targets[i];
-        if (!target->enabled || entry->level < target->min_level) continue;
+        output_target_t *target = &g_structured_log.targets[i];
+        if (!target->enabled || entry->level < target->min_level)
+            continue;
 
         switch (target->type) {
-            case TARGET_FILE:
-                if (target->config.file.fp) {
-                    fprintf(target->config.file.fp, "%s\n", json_buf);
-                    fflush(target->config.file.fp);
-                    target->config.file.current_size += strlen(json_buf) + 1;
+        case TARGET_FILE:
+            if (target->config.file.fp) {
+                fputs(json_buf, target->config.file.fp);
+                fputc('\n', target->config.file.fp);
+                fflush(target->config.file.fp);
+                target->config.file.current_size += strlen(json_buf) + 1;
 
-                    if (target->config.file.current_size >= target->config.file.max_size_bytes) {
-                        fclose(target->config.file.fp);
-                        target->config.file.fp = fopen(target->config.file.path, "w");
-                        if (target->config.file.fp) {
-                            target->config.file.current_size = 0;
-                        }
+                if (target->config.file.current_size >= target->config.file.max_size_bytes) {
+                    fclose(target->config.file.fp);
+                    target->config.file.fp = fopen(target->config.file.path, "w");
+                    if (target->config.file.fp) {
+                        target->config.file.current_size = 0;
                     }
                 }
-                break;
-            case TARGET_CALLBACK:
-                if (target->config.callback.callback) {
-                    target->config.callback.callback(json_buf, target->config.callback.user_data);
-                }
-                break;
-            case TARGET_RING_BUFFER:
-                break;
+            }
+            break;
+        case TARGET_CALLBACK:
+            if (target->config.callback.callback) {
+                target->config.callback.callback(json_buf, target->config.callback.user_data);
+            }
+            break;
+        case TARGET_RING_BUFFER:
+            break;
         }
     }
 
     agentos_mutex_unlock(&g_structured_log.target_lock);
 }
 
-int structured_log_write(log_level_t level, const char* service_name,
-                         const char* file, int line, const char* function,
-                         const char* message) {
-    if (!message) return AGENTOS_ERR_INVALID_PARAM;
-    if (!g_structured_log.initialized) structured_log_init(LOG_LEVEL_INFO);
+int structured_log_write(log_level_t level, const char *service_name, const char *file, int line,
+                         const char *function, const char *message)
+{
+    if (!message)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_structured_log.initialized)
+        structured_log_init(LOG_LEVEL_INFO);
 
     if (level < g_structured_log.min_level) {
         return AGENTOS_SUCCESS;
@@ -317,15 +322,18 @@ int structured_log_write(log_level_t level, const char* service_name,
     entry.level = level;
     entry.timestamp = (uint64_t)time(NULL) * 1000;
     strncpy(entry.message, message, MAX_LOG_MESSAGE_LEN - 1);
-    if (service_name) strncpy(entry.service_name, service_name, sizeof(entry.service_name) - 1);
-    if (file) strncpy(entry.file, file, sizeof(entry.file) - 1);
+    if (service_name)
+        strncpy(entry.service_name, service_name, sizeof(entry.service_name) - 1);
+    if (file)
+        strncpy(entry.file, file, sizeof(entry.file) - 1);
     entry.line = line;
-    if (function) strncpy(entry.function, function, sizeof(entry.function) - 1);
+    if (function)
+        strncpy(entry.function, function, sizeof(entry.function) - 1);
 
     agentos_mutex_lock(&g_structured_log.context_lock);
     entry.context_count = g_structured_log.global_context_count < MAX_CONTEXT_FIELDS
-                          ? g_structured_log.global_context_count
-                          : MAX_CONTEXT_FIELDS;
+                              ? g_structured_log.global_context_count
+                              : MAX_CONTEXT_FIELDS;
     memcpy(entry.context, g_structured_log.global_context,
            entry.context_count * sizeof(context_field_t));
     agentos_mutex_unlock(&g_structured_log.context_lock);
@@ -344,10 +352,11 @@ int structured_log_write(log_level_t level, const char* service_name,
     return AGENTOS_SUCCESS;
 }
 
-int structured_log_query(log_level_t level_filter, const char* service_filter,
-                         uint64_t start_time, uint64_t end_time,
-                         char*** results, size_t* count) {
-    if (!results || !count) return AGENTOS_ERR_INVALID_PARAM;
+int structured_log_query(log_level_t level_filter, const char *service_filter, uint64_t start_time,
+                         uint64_t end_time, char ***results, size_t *count)
+{
+    if (!results || !count)
+        return AGENTOS_ERR_INVALID_PARAM;
     if (!g_structured_log.initialized) {
         *results = NULL;
         *count = 0;
@@ -358,15 +367,19 @@ int structured_log_query(log_level_t level_filter, const char* service_filter,
 
     size_t match_count = 0;
     for (size_t i = 0; i < g_structured_log.entry_count; i++) {
-        size_t idx = (g_structured_log.write_idx - g_structured_log.entry_count + i)
-                     % MAX_RING_BUFFER_ENTRIES;
-        ring_entry_t* entry = &g_structured_log.ring[idx];
+        size_t idx = (g_structured_log.write_idx - g_structured_log.entry_count + i) %
+                     MAX_RING_BUFFER_ENTRIES;
+        ring_entry_t *entry = &g_structured_log.ring[idx];
 
-        if (level_filter != LOG_LEVEL_DEBUG && entry->level < level_filter) continue;
+        if (level_filter != LOG_LEVEL_DEBUG && entry->level < level_filter)
+            continue;
         if (service_filter && entry->service_name[0] &&
-            strstr(entry->service_name, service_filter) == NULL) continue;
-        if (start_time > 0 && entry->timestamp < start_time) continue;
-        if (end_time > 0 && entry->timestamp > end_time) continue;
+            strstr(entry->service_name, service_filter) == NULL)
+            continue;
+        if (start_time > 0 && entry->timestamp < start_time)
+            continue;
+        if (end_time > 0 && entry->timestamp > end_time)
+            continue;
 
         match_count++;
     }
@@ -378,21 +391,25 @@ int structured_log_query(log_level_t level_filter, const char* service_filter,
         return AGENTOS_SUCCESS;
     }
 
-    char** res = (char**)AGENTOS_CALLOC(match_count, sizeof(char*));
+    char **res = (char **)AGENTOS_CALLOC(match_count, sizeof(char *));
     size_t idx_out = 0;
 
     for (size_t i = 0; i < g_structured_log.entry_count && idx_out < match_count; i++) {
-        size_t idx = (g_structured_log.write_idx - g_structured_log.entry_count + i)
-                     % MAX_RING_BUFFER_ENTRIES;
-        ring_entry_t* entry = &g_structured_log.ring[idx];
+        size_t idx = (g_structured_log.write_idx - g_structured_log.entry_count + i) %
+                     MAX_RING_BUFFER_ENTRIES;
+        ring_entry_t *entry = &g_structured_log.ring[idx];
 
-        if (level_filter != LOG_LEVEL_DEBUG && entry->level < level_filter) continue;
+        if (level_filter != LOG_LEVEL_DEBUG && entry->level < level_filter)
+            continue;
         if (service_filter && entry->service_name[0] &&
-            strstr(entry->service_name, service_filter) == NULL) continue;
-        if (start_time > 0 && entry->timestamp < start_time) continue;
-        if (end_time > 0 && entry->timestamp > end_time) continue;
+            strstr(entry->service_name, service_filter) == NULL)
+            continue;
+        if (start_time > 0 && entry->timestamp < start_time)
+            continue;
+        if (end_time > 0 && entry->timestamp > end_time)
+            continue;
 
-        char* json = (char*)AGENTOS_MALLOC(MAX_LOG_MESSAGE_LEN + 1024);
+        char *json = (char *)AGENTOS_MALLOC(MAX_LOG_MESSAGE_LEN + 1024);
         if (json) {
             format_json_log(entry, json, MAX_LOG_MESSAGE_LEN + 1024);
             res[idx_out++] = json;
@@ -406,13 +423,17 @@ int structured_log_query(log_level_t level_filter, const char* service_filter,
     return AGENTOS_SUCCESS;
 }
 
-size_t structured_log_get_entry_count(void) {
-    if (!g_structured_log.initialized) return 0;
+size_t structured_log_get_entry_count(void)
+{
+    if (!g_structured_log.initialized)
+        return 0;
     return g_structured_log.entry_count;
 }
 
-void structured_log_free_results(char** results, size_t count) {
-    if (!results) return;
+void structured_log_free_results(char **results, size_t count)
+{
+    if (!results)
+        return;
     for (size_t i = 0; i < count; i++) {
         AGENTOS_FREE(results[i]);
     }

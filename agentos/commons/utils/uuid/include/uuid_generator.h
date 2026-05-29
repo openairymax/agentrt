@@ -7,8 +7,8 @@
 #ifndef AGENTOS_UUID_GENERATOR_H
 #define AGENTOS_UUID_GENERATOR_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,7 +47,7 @@ void agentos_uuid_cleanup(void);
  * @param buf_len 缓冲区长度
  * @return 成功返回 AGENTOS_UUID_SUCCESS
  */
-agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len);
+agentos_uuid_error_t agentos_uuid_v4(char *out_buf, size_t buf_len);
 
 /**
  * @brief 生成带前缀的 UUID
@@ -56,14 +56,14 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len);
  * @param buf_len 缓冲区长度
  * @return 成功返回 AGENTOS_UUID_SUCCESS
  */
-agentos_uuid_error_t agentos_uuid_with_prefix(const char* prefix, char* out_buf, size_t buf_len);
+agentos_uuid_error_t agentos_uuid_with_prefix(const char *prefix, char *out_buf, size_t buf_len);
 
 /**
  * @brief 验证 UUID 格式是否有效
  * @param uuid UUID 字符串
  * @return 有效返回 1，无效返回 0
  */
-int agentos_uuid_is_valid(const char* uuid);
+int agentos_uuid_is_valid(const char *uuid);
 
 /**
  * @brief 将原始 UUID 二进制转换为字符串
@@ -72,7 +72,8 @@ int agentos_uuid_is_valid(const char* uuid);
  * @param buf_len 缓冲区长度
  * @return 成功返回 AGENTOS_UUID_SUCCESS
  */
-agentos_uuid_error_t agentos_uuid_bin_to_str(const uint8_t* uuid_bin, char* out_buf, size_t buf_len);
+agentos_uuid_error_t agentos_uuid_bin_to_str(const uint8_t *uuid_bin, char *out_buf,
+                                             size_t buf_len);
 
 /**
  * @brief 将 UUID 字符串转换为原始二进制
@@ -80,7 +81,7 @@ agentos_uuid_error_t agentos_uuid_bin_to_str(const uint8_t* uuid_bin, char* out_
  * @param out_bin 输出缓冲区（至少 16 字节）
  * @return 成功返回 AGENTOS_UUID_SUCCESS
  */
-agentos_uuid_error_t agentos_uuid_str_to_bin(const char* uuid_str, uint8_t* out_bin);
+agentos_uuid_error_t agentos_uuid_str_to_bin(const char *uuid_str, uint8_t *out_bin);
 
 #ifdef __cplusplus
 }

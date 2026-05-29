@@ -21,14 +21,13 @@ typedef struct agentos_token_counter agentos_token_counter_t;
  * @param model_name 模型名称（如 "gpt-4"）
  * @return 计数器句柄，失败返回 NULL
  */
-agentos_token_counter_t* agentos_token_counter_create(const char* model_name);
-
+agentos_token_counter_t *agentos_token_counter_create(const char *model_name);
 
 // From data intelligence emerges. by spharx
 /**
  * @brief 销毁计数器
  */
-void agentos_token_counter_destroy(agentos_token_counter_t* counter);
+void agentos_token_counter_destroy(agentos_token_counter_t *counter);
 
 /**
  * @brief 计算文本的Token数量
@@ -36,7 +35,7 @@ void agentos_token_counter_destroy(agentos_token_counter_t* counter);
  * @param text 文本
  * @return Token数量，失败返回 (size_t)-1
  */
-size_t agentos_token_counter_count(agentos_token_counter_t* counter, const char* text);
+size_t agentos_token_counter_count(agentos_token_counter_t *counter, const char *text);
 
 /**
  * @brief 批量计算多个文本的Token数量
@@ -46,7 +45,8 @@ size_t agentos_token_counter_count(agentos_token_counter_t* counter, const char*
  * @param out_counts 输出Token数量数组
  * @return 0 成功，-1 失败
  */
-size_t agentos_token_counter_count_batch(agentos_token_counter_t* counter, const char** texts, size_t count, size_t* out_counts);
+size_t agentos_token_counter_count_batch(agentos_token_counter_t *counter, const char **texts,
+                                         size_t count, size_t *out_counts);
 
 /**
  * @brief 截断文本到指定Token数
@@ -56,7 +56,8 @@ size_t agentos_token_counter_count_batch(agentos_token_counter_t* counter, const
  * @param side 截断侧："left","right","middle"
  * @return 新分配的截断文本，失败返回 NULL
  */
-char* agentos_token_counter_truncate(agentos_token_counter_t* counter, const char* text, size_t max_tokens, const char* side);
+char *agentos_token_counter_truncate(agentos_token_counter_t *counter, const char *text,
+                                     size_t max_tokens, const char *side);
 
 /**
  * @brief Token预算句柄
@@ -68,12 +69,12 @@ typedef struct agentos_token_budget agentos_token_budget_t;
  * @param max_tokens 最大Token数
  * @return 预算句柄，失败返回 NULL
  */
-agentos_token_budget_t* agentos_token_budget_create(size_t max_tokens);
+agentos_token_budget_t *agentos_token_budget_create(size_t max_tokens);
 
 /**
  * @brief 销毁预算
  */
-void agentos_token_budget_destroy(agentos_token_budget_t* budget);
+void agentos_token_budget_destroy(agentos_token_budget_t *budget);
 
 /**
  * @brief 添加Token消耗
@@ -82,53 +83,54 @@ void agentos_token_budget_destroy(agentos_token_budget_t* budget);
  * @param output_tokens 输出Token数
  * @return 0 成功，-1 超出预算
  */
-int agentos_token_budget_add(agentos_token_budget_t* budget, size_t input_tokens, size_t output_tokens);
+int agentos_token_budget_add(agentos_token_budget_t *budget, size_t input_tokens,
+                             size_t output_tokens);
 
 /**
  * @brief 获取剩余Token数
  * @return 剩余Token数
  */
-size_t agentos_token_budget_remaining(agentos_token_budget_t* budget);
+size_t agentos_token_budget_remaining(agentos_token_budget_t *budget);
 
 /**
  * @brief 重置预算
  */
-void agentos_token_budget_reset(agentos_token_budget_t* budget);
+void agentos_token_budget_reset(agentos_token_budget_t *budget);
 
 /**
  * @brief 获取已使用Token数
  * @param budget 预算
  * @return 已使用Token数
  */
-size_t agentos_token_budget_used(agentos_token_budget_t* budget);
+size_t agentos_token_budget_used(agentos_token_budget_t *budget);
 
 /**
  * @brief 获取输入Token数
  * @param budget 预算
  * @return 输入Token数
  */
-size_t agentos_token_budget_input(agentos_token_budget_t* budget);
+size_t agentos_token_budget_input(agentos_token_budget_t *budget);
 
 /**
  * @brief 获取输出Token数
  * @param budget 预算
  * @return 输出Token数
  */
-size_t agentos_token_budget_output(agentos_token_budget_t* budget);
+size_t agentos_token_budget_output(agentos_token_budget_t *budget);
 
 /**
  * @brief 获取请求计数
  * @param budget 预算
  * @return 请求计数
  */
-uint32_t agentos_token_budget_requests(agentos_token_budget_t* budget);
+uint32_t agentos_token_budget_requests(agentos_token_budget_t *budget);
 
 /**
  * @brief 获取拒绝计数
  * @param budget 预算
  * @return 拒绝计数
  */
-uint32_t agentos_token_budget_denied(agentos_token_budget_t* budget);
+uint32_t agentos_token_budget_denied(agentos_token_budget_t *budget);
 
 /**
  * @brief 设置时间窗口
@@ -136,14 +138,14 @@ uint32_t agentos_token_budget_denied(agentos_token_budget_t* budget);
  * @param window_seconds 时间窗口（秒）
  * @return 0 成功，-1 失败
  */
-int agentos_token_budget_set_window(agentos_token_budget_t* budget, size_t window_seconds);
+int agentos_token_budget_set_window(agentos_token_budget_t *budget, size_t window_seconds);
 
 /**
  * @brief 检查并重置时间窗口
  * @param budget 预算
  * @return 0 成功，-1 失败
  */
-int agentos_token_budget_check_window(agentos_token_budget_t* budget);
+int agentos_token_budget_check_window(agentos_token_budget_t *budget);
 
 #ifdef __cplusplus
 }

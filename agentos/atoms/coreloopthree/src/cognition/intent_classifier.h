@@ -38,7 +38,7 @@ typedef enum agentos_intent_type {
 typedef struct agentos_intent_classification {
     agentos_intent_type_t type;
     float confidence;
-    const char* type_name;
+    const char *type_name;
 } agentos_intent_classification_t;
 
 /**
@@ -59,15 +59,15 @@ void agentos_intent_classifier_cleanup(void);
  * @param result 输出分类结果
  * @return 成功返回 0，失败返回错误码
  */
-int agentos_intent_classify(const char* input, size_t input_len, 
-                            agentos_intent_classification_t* result);
+int agentos_intent_classify(const char *input, size_t input_len,
+                            agentos_intent_classification_t *result);
 
 /**
  * @brief 获取意图类型名称
  * @param type 意图类型
  * @return 类型名称字符串
  */
-const char* agentos_intent_type_name(agentos_intent_type_t type);
+const char *agentos_intent_type_name(agentos_intent_type_t type);
 
 #ifdef __cplusplus
 }

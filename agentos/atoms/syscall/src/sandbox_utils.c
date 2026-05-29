@@ -5,10 +5,12 @@
  */
 
 #include "sandbox_utils.h"
-#include "sandbox_internal.h"
-#include "sandbox_quota.h"
+
 #include "agentos.h"
 #include "logger.h"
+#include "sandbox_internal.h"
+#include "sandbox_quota.h"
+
 #include <string.h>
 #include <time.h>
 
@@ -18,8 +20,10 @@
 
 /* ==================== 审计日志管理 ==================== */
 
-uint64_t sandbox_simple_hash(const char* str) {
-    if (!str) return 0;
+uint64_t sandbox_simple_hash(const char *str)
+{
+    if (!str)
+        return 0;
     uint64_t hash = 5381;
     int c;
     while ((c = *str++)) {
@@ -28,26 +32,30 @@ uint64_t sandbox_simple_hash(const char* str) {
     return hash;
 }
 
-static uint64_t get_timestamp_ns(void) {
+static uint64_t get_timestamp_ns(void)
+{
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);
     return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 }
 
-agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t* sandbox, int syscall_num,
-                                       const char* caller_id, int result_code,
-                                       uint64_t duration_ns, const char* details) {
-    if (!sandbox) return AGENTOS_EINVAL;
+agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t *sandbox, int syscall_num,
+                                        const char *caller_id, int result_code,
+                                        uint64_t duration_ns, const char *details)
+{
+    if (!sandbox)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(sandbox->lock);
 
     /* 检查容量，必要时扩容 */
     if (sandbox->audit_count >= sandbox->audit_capacity) {
         size_t new_capacity = sandbox->audit_capacity == 0 ? 100 : sandbox->audit_capacity * 2;
-        if (new_capacity > 10000) new_capacity = 10000;  /* MAX_AUDIT_ENTRIES */
+        if (new_capacity > 10000)
+            new_capacity = 10000; /* MAX_AUDIT_ENTRIES */
 
-        audit_entry_t* new_log = (audit_entry_t*)AGENTOS_REALLOC(sandbox->audit_log,
-                                                          new_capacity * sizeof(audit_entry_t));
+        audit_entry_t *new_log = (audit_entry_t *)AGENTOS_REALLOC(
+            sandbox->audit_log, new_capacity * sizeof(audit_entry_t));
         if (new_log) {
             sandbox->audit_log = new_log;
             sandbox->audit_capacity = new_capacity;
@@ -56,7 +64,7 @@ agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t* sandbox, int syscall_
 
     /* 添加条目 */
     if (sandbox->audit_count < sandbox->audit_capacity) {
-        audit_entry_t* entry = (audit_entry_t*)sandbox->audit_log + sandbox->audit_count;
+        audit_entry_t *entry = (audit_entry_t *)sandbox->audit_log + sandbox->audit_count;
         entry->timestamp = get_timestamp_ns();
         entry->event_type = 0;
         entry->syscall_num = syscall_num;
@@ -65,10 +73,8 @@ agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t* sandbox, int syscall_
         entry->resource_usage_after = duration_ns;
         entry->severity = (result_code != 0) ? 2 : 0;
         entry->syscall_name[0] = '\0';
-        snprintf(entry->message, sizeof(entry->message),
-                 "caller=%s dur=%llu %s",
-                 caller_id ? caller_id : "?",
-                 (unsigned long long)duration_ns,
+        snprintf(entry->message, sizeof(entry->message), "caller=%s dur=%llu %s",
+                 caller_id ? caller_id : "?", (unsigned long long)duration_ns,
                  details ? details : "");
 
         sandbox->audit_count++;
@@ -79,9 +85,10 @@ agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t* sandbox, int syscall_
     return AGENTOS_SUCCESS;
 }
 
-void sandbox_release_resource(agentos_sandbox_t* sandbox, int syscall_num,
-                             void* args, int result) {
-    if (!sandbox) return;
+void sandbox_release_resource(agentos_sandbox_t *sandbox, int syscall_num, void *args, int result)
+{
+    if (!sandbox)
+        return;
 
     agentos_mutex_lock(sandbox->lock);
 
@@ -102,13 +109,15 @@ void sandbox_release_resource(agentos_sandbox_t* sandbox, int syscall_num,
     agentos_mutex_unlock(sandbox->lock);
 }
 
-char* sandbox_generate_args_hash(void* args) {
-    if (!args) return NULL;
+char *sandbox_generate_args_hash(void *args)
+{
+    if (!args)
+        return NULL;
 
-    unsigned char* bytes = (unsigned char*)args;
+    unsigned char *bytes = (unsigned char *)args;
     uint32_t hash = 5381;
-    for (size_t i = 0; i < sizeof(void*) * 2; i++) {
-        hash = ((hash << 5) + hash) + bytes[i % sizeof(void*)];
+    for (size_t i = 0; i < sizeof(void *) * 2; i++) {
+        hash = ((hash << 5) + hash) + bytes[i % sizeof(void *)];
     }
     char hash_str[32];
     snprintf(hash_str, sizeof(hash_str), "%08x", hash);
