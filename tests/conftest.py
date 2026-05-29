@@ -617,7 +617,7 @@ def test_data_factory():
     Returns:
         TestDataFactory: 测试数据工厂实例
     """
-    from tests.utils.data_generator import TestDataFactory
+    from tests.utils.python.data_generator import TestDataFactory
     factory = TestDataFactory(str(PROJECT_ROOT / "tests" / "fixtures" / "data"))
     return factory
 
@@ -630,7 +630,7 @@ def data_generator():
     Returns:
         DataGenerator: 数据生成器实例
     """
-    from tests.utils.data_generator import DataGenerator
+    from tests.utils.python.data_generator import DataGenerator
     return DataGenerator()
 
 
@@ -642,7 +642,7 @@ def mock_factory():
     Returns:
         MockFactory: Mock 工厂实例
     """
-    from tests.utils.test_helpers import MockFactory
+    from tests.utils.python.test_helpers import MockFactory
     return MockFactory()
 
 
@@ -654,7 +654,7 @@ def assert_helpers():
     Returns:
         AssertHelpers: 断言辅助类
     """
-    from tests.utils.test_helpers import AssertHelpers
+    from tests.utils.python.test_helpers import AssertHelpers
     return AssertHelpers()
 
 
@@ -666,7 +666,7 @@ def performance_tester():
     Returns:
         PerformanceTester: 性能测试器实例
     """
-    from tests.utils.test_helpers import PerformanceTester
+    from tests.utils.python.test_helpers import PerformanceTester
     return PerformanceTester()
 
 
@@ -678,7 +678,7 @@ def memory_profiler():
     Yields:
         MemoryProfiler: 内存分析器实例
     """
-    from tests.utils.test_helpers import MemoryProfiler
+    from tests.utils.python.test_helpers import MemoryProfiler
     profiler = MemoryProfiler()
     with profiler:
         yield profiler
@@ -692,7 +692,7 @@ def test_reporter():
     Returns:
         TestReporter: 测试报告器实例
     """
-    from tests.utils.test_helpers import TestReporter
+    from tests.utils.python.test_helpers import TestReporter
     return TestReporter()
 
 
@@ -704,7 +704,7 @@ def test_cleanup():
     Yields:
         TestCleanup: 测试清理工具实例
     """
-    from tests.utils.test_helpers import TestCleanup
+    from tests.utils.python.test_helpers import TestCleanup
     with TestCleanup() as cleanup:
         yield cleanup
 
@@ -720,7 +720,7 @@ def isolated_filesystem(temp_dir):
     Yields:
         Path: 隔离的文件系统根目录
     """
-    from tests.utils.test_isolation import TestIsolationManager
+    from tests.utils.python.test_isolation import TestIsolationManager
     manager = TestIsolationManager()
     with manager.isolated_test_environment("isolated_fs") as env_id:
         yield Path(manager.temp_dirs[env_id])
@@ -735,7 +735,7 @@ def isolated_database():
     Yields:
         Path: 数据库文件路径
     """
-    from tests.utils.test_isolation import DatabaseIsolator
+    from tests.utils.python.test_isolation import DatabaseIsolator
     isolator = DatabaseIsolator()
     db_path = isolator.create_isolated_db("test")
     yield db_path
@@ -750,7 +750,7 @@ def resource_limiter():
     Yields:
         ResourceLimiter: 资源限制器实例
     """
-    from tests.utils.test_isolation import ResourceLimiter
+    from tests.utils.python.test_isolation import ResourceLimiter
     limiter = ResourceLimiter(max_memory_mb=512, max_time_seconds=60)
     with limiter.limit_resources():
         yield limiter
@@ -764,7 +764,7 @@ def state_snapshot():
     Returns:
         StateSnapshot: 状态快照实例
     """
-    from tests.utils.test_isolation import StateSnapshot
+    from tests.utils.python.test_isolation import StateSnapshot
     return StateSnapshot()
 
 
@@ -776,7 +776,7 @@ def comprehensive_isolation():
     Yields:
         Dict: 隔离环境信息
     """
-    from tests.utils.test_isolation import ComprehensiveIsolation
+    from tests.utils.python.test_isolation import ComprehensiveIsolation
     isolator = ComprehensiveIsolation()
     with isolator.full_isolation("test") as env:
         yield env
@@ -791,7 +791,7 @@ def environment_validator():
     Returns:
         EnvironmentValidator: 环境验证器实例
     """
-    from tests.utils.test_helpers import EnvironmentValidator
+    from tests.utils.python.test_helpers import EnvironmentValidator
     return EnvironmentValidator()
 
 
@@ -803,7 +803,7 @@ def data_comparator():
     Returns:
         DataComparator: 数据比较器实例
     """
-    from tests.utils.test_helpers import DataComparator
+    from tests.utils.python.test_helpers import DataComparator
     return DataComparator()
 
 

@@ -2,7 +2,7 @@
 
 `agentos/cupolas/` 是 AgentOS 的安全组件集合，提供全方位的安全防护能力。Cupolas（穹顶）寓意全方位、无死角的系统保护。
 
-> Part of AgentOS v0.0.5
+> Part of AgentOS v0.1.0
 
 ## 设计目标
 
@@ -21,7 +21,10 @@
 | **审计系统** | `src/audit/` | 安全审计日志与事件追踪 |
 | **安全防护引擎** | `src/security/` | 文件扫描、API 保护、行为分析、网络防护 |
 | **安全守卫框架** | `src/guards/` | 可扩展的安全检测框架（规则/模型/行为分析守卫） |
+| **安全平台抽象** | `src/platform/` | 平台级安全适配 |
 | **安全工具库** | `src/utils/` | 安全相关的通用工具函数 |
+| **安全文档** | `docs/` | 安全策略与配置文档 |
+| **测试套件** | `tests/` | 单元/集成/压力/模糊测试（benchmark/fuzz/integration/stress/unit） |
 
 ### 独立组件
 
