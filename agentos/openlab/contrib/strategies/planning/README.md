@@ -1,15 +1,31 @@
-# Planning — 规划策略
+# Planning — 任务规划策略
 
-> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.1.0 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+**模块路径**: `agentos/openlab/contrib/strategies/planning/`
+**版本**: v0.0.5
 
-`openlab/contrib/strategies/planning/` 提供智能体的任务规划策略，负责将复杂目标分解为可执行的步骤序列。
+> **Preview Status**: 本模块当前处于预览/开发阶段，API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
-## 核心能力
+## 概述
 
-- **目标分解**：将高层次目标拆解为可执行的子任务
-- **依赖分析**：识别任务间的依赖关系，确定执行顺序
-- **资源评估**：评估执行每个子任务所需的资源
-- **计划优化**：基于约束条件优化执行计划
+Planning 策略模块提供智能体的任务规划能力，负责将复杂目标分解为可执行的步骤序列。当前实现为贡献骨架（Contrib Skeleton），提供基础规划接口，支持目标分解、依赖分析和计划生成。
+
+## 目录结构
+
+```
+planning/
+├── __init__.py                 # 模块导出
+├── planning.py                 # PlanningStrategy/PlanStep 核心实现
+└── README.md                   # 本文件
+```
+
+## 核心组件
+
+### PlanningStrategy (`planning.py`)
+
+| 类 | 说明 |
+|----|------|
+| `PlanningStrategy` | 规划策略类，接受 config 配置，提供 `plan()` 方法 |
+| `PlanStep` | 计划步骤数据类，包含 step_id/description/dependencies/assigned_agent |
 
 ## 规划流程
 
@@ -19,28 +35,57 @@
  用户需求   子任务列表   DAG 图    资源分配   时间线    执行引擎
 ```
 
-## 使用方式
+## 接口说明
 
 ```python
-from contrib.strategies.planning import PlanningStrategy
+@dataclass
+class PlanStep:
+    step_id: str = ""
+    description: str = ""
+    dependencies: List[str] = field(default_factory=list)
+    assigned_agent: Optional[str] = None
+
+class PlanningStrategy:
+    def __init__(self, config: Optional[Dict[str, Any]] = None)
+
+    async def plan(self, task: Any) -> Dict[str, Any]:
+        """将任务分解为执行计划
+
+        Args:
+            task: 任务对象（dict 或其他类型）
+
+        Returns:
+            Dict: 包含 status/strategy/task/steps 信息
+        """
+```
+
+## 依赖关系
+
+- **核心依赖**: AgentOS OpenLab Core
+- **Python**: >= 3.10, typing, dataclasses
+
+## 使用示例
+
+```python
+from contrib.strategies.planning import PlanningStrategy, PlanStep
 
 planner = PlanningStrategy()
 
-# 生成执行计划
-plan = planner.create_plan(
-    goal="开发一个 REST API 服务",
-    constraints={
-        "deadline": "2024-02-01",
-        "team_size": 3,
-        "tech_stack": ["Python", "FastAPI"]
+plan = await planner.plan(
+    task={
+        "description": "开发一个 REST API 服务",
+        "constraints": {
+            "deadline": "2024-02-01",
+            "team_size": 3,
+            "tech_stack": ["Python", "FastAPI"]
+        }
     }
 )
 
-# 查看计划步骤
-for step in plan.steps:
-    print(f"{step.id}: {step.description} ({step.estimated_hours}h)")
+for step in plan["steps"]:
+    print(f"{step.step_id}: {step.description}")
 ```
 
 ---
 
-*AgentOS OpenLab — Planning Strategy*
+© 2026 SPHARX Ltd. All Rights Reserved.

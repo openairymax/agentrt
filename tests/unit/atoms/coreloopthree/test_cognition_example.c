@@ -1,7 +1,7 @@
 /**
  * @file test_cognition_example.c
  * @brief Cognition 引擎测试示例（使用新的断言宏）
- * @version 0.0.5
+ * @version 0.1.0
  * @date 2026-04-04
  *
  * 本文件演示如何使用 test_macros.h 中的断言宏来编写 C 单元测试。

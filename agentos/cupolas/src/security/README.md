@@ -1,167 +1,178 @@
 # Security — 安全防护引擎
 
-`cupolas/src/security/` 提供核心安全防护能力，包括文件扫描、API 防护、行为分析、网络防护和 iOS 级安全模块。
+**模块路径**: `agentos/cupolas/src/security/`
+**版本**: v0.0.5
 
-> Part of AgentOS v0.1.0
+## 概述
 
-## 核心能力
+Security 模块是 Cupolas 安全穹顶的核心引擎，提供文件安全扫描、API 防护、行为分析、网络安全等纵深防御能力。包含统一错误处理、数字签名验证、密钥保险库、权利管理、运行时保护和网络安全等子模块。其中签名、保险库、权利和运行时保护模块需要 OpenSSL 支持（通过 `AGENTOS_HAS_OPENSSL` 条件编译启用）。
 
-| 能力 | 说明 |
+## 设计目标
+
+- **纵深防御**：多层安全防护，从文件扫描到运行时保护
+- **条件编译**：OpenSSL 相关模块可按需启用，基础功能不依赖 OpenSSL
+- **统一错误处理**：所有安全模块共享错误码体系和报告机制
+- **iOS 级安全**：Entitlements、Vault、Runtime Protection 参照 iOS 安全架构设计
+
+## 目录结构
+
+```
+security/
+├── cupolas_error.h              # 统一错误处理接口
+├── cupolas_error.c              # 错误处理实现
+├── cupolas_signature.h          # 数字签名接口（需 OpenSSL）
+├── cupolas_signature.c          # 签名实现
+├── cupolas_vault.h              # 密钥保险库接口（需 OpenSSL）
+├── cupolas_vault.c              # 保险库实现
+├── cupolas_entitlements.h       # 权利管理接口（需 OpenSSL）
+├── cupolas_entitlements.c       # 权利管理实现
+├── cupolas_runtime_protection.h # 运行时保护接口（需 OpenSSL）
+├── cupolas_runtime_protection.c # 运行时保护实现
+├── cupolas_network_security.h   # 网络安全接口（需 OpenSSL）
+├── cupolas_network_security.c   # 网络安全实现
+├── network/                     # 网络安全子模块
+│   ├── http_security.h          # HTTP 安全接口
+│   ├── http_security.c          # HTTP 安全实现
+│   ├── dns_security.h           # DNS 安全接口
+│   ├── dns_security.c           # DNS 安全实现
+│   ├── network_filter.h         # 网络过滤接口
+│   ├── network_filter.c         # 过滤实现
+│   ├── network_utils.h          # 网络工具接口
+│   ├── network_utils.c          # 工具实现
+│   ├── tls_security.h           # TLS 安全接口（需 OpenSSL）
+│   └── tls_security.c           # TLS 实现
+└── README.md                    # 本文档
+```
+
+## 子模块说明
+
+### 统一错误处理（cupolas_error）
+
+| 错误码 | 说明 |
+|--------|------|
+| `CUPOLAS_OK` | 成功 |
+| `CUPOLAS_ERR_INVALID_PARAM` | 无效参数 |
+| `CUPOLAS_ERR_PERMISSION_DENIED` | 权限不足 |
+| `CUPOLAS_ERR_NOT_FOUND` | 资源未找到 |
+| `CUPOLAS_ERR_ALREADY_EXISTS` | 资源已存在 |
+| `CUPOLAS_ERR_BUFFER_TOO_SMALL` | 缓冲区不足 |
+| `CUPOLAS_ERR_CRYPTO_FAILED` | 加密操作失败 |
+| `CUPOLAS_ERR_SIGNATURE_INVALID` | 签名无效 |
+| `CUPOLAS_ERR_CERT_INVALID` | 证书无效 |
+| `CUPOLAS_ERR_VAULT_LOCKED` | 保险库已锁定 |
+| `CUPOLAS_ERR_RATE_LIMITED` | 请求频率超限 |
+| `CUPOLAS_ERR_INTERNAL` | 内部错误 |
+
+| 函数 | 说明 |
 |------|------|
-| **文件扫描** | 对上传文件和系统文件进行安全扫描 |
-| **API 防护** | 检测和阻止 API 层面的攻击行为 |
-| **行为分析** | 基于规则的运行时行为异常检测 |
-| **环境检测** | 检测运行环境的安全状态 |
-| **报告生成** | 生成安全事件报告 |
+| `cupolas_error_create(code, message)` | 创建错误对象 |
+| `cupolas_error_destroy(error)` | 销毁错误对象 |
+| `cupolas_error_get_code(error)` | 获取错误码 |
+| `cupolas_error_get_message(error)` | 获取错误消息 |
 
-## 引擎架构
+### 数字签名（cupolas_signature）— 需 OpenSSL
 
-```
-输入 → 预处理 → 规则匹配 → 风险评估 → 处置决策 → 输出
-       ↓          ↓          ↓           ↓
-   规范化    规则引擎    评分模型     放行/阻断/告警
-```
+| 函数 | 说明 |
+|------|------|
+| `cupolas_sign_data(data, len, key, sig, sig_len)` | 数据签名 |
+| `cupolas_verify_signature(data, len, sig, sig_len, key)` | 签名验证 |
+| `cupolas_verify_certificate_chain(cert, chain)` | 证书链校验 |
 
-## 模块组成
+支持算法：RSA-2048/4096、ECDSA-P256/P384、Ed25519。
 
-### 基础模块（始终编译）
+### 密钥保险库（cupolas_vault）— 需 OpenSSL
 
-| 模块 | 源文件 | 职责 |
-|------|--------|------|
-| **错误处理** | `cupolas_error.c` | 统一错误码与错误信息管理 |
+类似 iOS Keychain 的安全凭证存储：
 
-### 网络安全子模块（`network/`）
+| 函数 | 说明 |
+|------|------|
+| `cupolas_vault_create(path, master_key)` | 创建保险库 |
+| `cupolas_vault_destroy(vault)` | 销毁保险库 |
+| `cupolas_vault_store(vault, key, data, len)` | 存储凭证（AES-256-GCM 加密） |
+| `cupolas_vault_retrieve(vault, key, data, len)` | 检索凭证 |
+| `cupolas_vault_delete(vault, key)` | 删除凭证 |
+| `cupolas_vault_list(vault, keys, max)` | 列出所有键 |
+| `cupolas_vault_lock(vault)` | 锁定保险库 |
+| `cupolas_vault_unlock(vault, master_key)` | 解锁保险库 |
 
-| 模块 | 源文件 | 职责 |
-|------|--------|------|
-| **HTTP 安全** | `network/http_security.c` | HTTPS 强制、HSTS、URL 校验、请求方法限制 |
-| **DNS 安全** | `network/dns_security.c` | DNSSEC 验证、域名黑白名单、DoH 支持 |
-| **网络过滤** | `network/network_filter.c` | 网络访问控制规则、连接管理、流量统计 |
-| **网络工具** | `network/network_utils.c` | 网络相关辅助函数 |
+### 权利管理（cupolas_entitlements）— 需 OpenSSL
 
-### OpenSSL 条件模块（`AGENTOS_HAS_OPENSSL`）
+声明式权限管理，类似 iOS Entitlements：
 
-当定义 `AGENTOS_HAS_OPENSSL` 时，以下 iOS 级安全模块会被启用：
+| 权利类型 | 说明 |
+|----------|------|
+| 文件系统 | 读/写/执行权限 |
+| 网络 | 入站/出站连接权限 |
+| IPC | 进程间通信权限 |
+| 资源限制 | CPU/内存/时间限制 |
+| 设备访问 | 硬件设备访问权限 |
 
-| 模块 | 源文件 | 职责 |
-|------|--------|------|
-| **数字签名** | `cupolas_signature.c` | 代码签名验证（RSA/ECDSA/Ed25519）、证书链校验、完整性检查 |
-| **密钥保险库** | `cupolas_vault.c` | 安全凭证存储（AES-256-GCM）、ACL 访问控制、类似 iOS Keychain |
-| **权利管理** | `cupolas_entitlements.c` | 声明式权限管理（文件系统/网络/IPC/资源限制/系统调用） |
-| **运行时保护** | `cupolas_runtime_protection.c` | seccomp 系统调用过滤、CFI 控制流完整性、内存保护、完整性校验 |
-| **网络安全** | `cupolas_network_security.c` | TLS 连接管理、防火墙规则、证书验证 |
-| **TLS 安全** | `network/tls_security.c` | TLS/SSL 连接管理、证书链验证、密码套件检查 |
+### 运行时保护（cupolas_runtime_protection）— 需 OpenSSL
 
-## 扫描规则配置
+| 保护类型 | 说明 |
+|----------|------|
+| seccomp | 系统调用过滤 |
+| CFI | 控制流完整性 |
+| 内存保护 | W^X、ASLR、栈保护 |
+| 完整性校验 | 代码段哈希校验 |
+| 反调试 | 检测调试器附加 |
 
-```json
-{
-    "file_scan": {
-        "max_size": "100MB",
-        "allowed_types": ["pdf", "docx", "txt"],
-        "scan_engines": ["clamav", "yara"],
-        "action_on_threat": "quarantine"
-    },
-    "api_protection": {
-        "rate_limit": 1000,
-        "detect_sql_injection": true,
-        "detect_xss": true,
-        "detect_path_traversal": true
-    }
-}
-```
+### 网络安全（network/）
+
+| 子模块 | 说明 |
+|--------|------|
+| **HTTP Security** | 请求头注入防护、CORS 策略、CSRF Token |
+| **DNS Security** | DNS 缓存投毒防护、域名黑名单 |
+| **Network Filter** | IP/端口黑白名单、协议过滤 |
+| **Network Utils** | IP 地址解析、CIDR 匹配、端口扫描检测 |
+| **TLS Security** | TLS 1.2/1.3 连接管理、证书验证（需 OpenSSL） |
 
 ## 使用示例
 
-### 基础安全检查
-
 ```c
-#include "cupolas/cupolas_error.h"
+#include "cupolas_error.h"
 
-// 初始化安全引擎
-security_engine_t* engine = security_engine_create();
-
-// 文件扫描
-security_scan_result_t result = security_scan_file(engine, "/path/to/file.pdf");
-if (result.threat_detected) {
-    printf("威胁检测: %s (严重度: %d)", result.threat_name, result.severity);
-    security_quarantine_file(engine, "/path/to/file.pdf");
-}
-
-// API 请求检查
-bool is_safe = security_check_request(engine, request);
-if (!is_safe) {
-    security_block_request(engine, request);
-}
+cupolas_error_t *error = cupolas_error_create(CUPOLAS_ERR_PERMISSION_DENIED,
+                                              "Agent not authorized for resource");
+printf("Error %d: %s\n", cupolas_error_get_code(error),
+       cupolas_error_get_message(error));
+cupolas_error_destroy(error);
 ```
 
-### 数字签名验证（需 OpenSSL）
-
 ```c
-#include "cupolas/cupolas_signature.h"
+#ifdef AGENTOS_HAS_OPENSSL
+#include "cupolas_vault.h"
 
-// 初始化签名验证模块
-cupolas_sig_config_t sig_config = {
-    .check_cert_chain = true,
-    .check_revocation = true,
-    .allow_self_signed = false
-};
-cupolas_signature_init(&sig_config);
+cupolas_vault_t *vault = cupolas_vault_create("/secure/vault.dat", "master-key-256");
+cupolas_vault_store(vault, "api-key", secret_data, secret_len);
 
-// 验证文件签名
-cupolas_sig_result_t result;
-int ret = cupolas_signature_verify_file("/path/to/agent.wasm", "SPHARX CA", &result);
-if (ret == 0 && result == CUPOLAS_SIG_OK) {
-    printf("签名验证通过");
-}
+char retrieved[256];
+size_t retrieved_len = sizeof(retrieved);
+cupolas_vault_retrieve(vault, "api-key", retrieved, &retrieved_len);
+
+cupolas_vault_lock(vault);
+cupolas_vault_destroy(vault);
+#endif
 ```
 
-### 密钥保险库（需 OpenSSL）
+## 条件编译
 
-```c
-#include "cupolas/cupolas_vault.h"
+| 宏 | 说明 |
+|------|------|
+| `AGENTOS_HAS_OPENSSL` | 启用签名、保险库、权利、运行时保护、TLS 模块 |
+| `AGENTOS_HAS_LIBYAML` | 启用完整 YAML 支持（否则使用内置 `yaml_minimal`） |
 
-// 初始化 Vault
-cupolas_vault_config_t vault_config = {
-    .storage_path = "/var/lib/agentos/vault",
-    .enable_audit = true,
-    .enable_auto_lock = true,
-    .auto_lock_seconds = 300
-};
-cupolas_vault_init(&vault_config);
-
-// 存储凭证
-cupolas_vault_t* vault;
-cupolas_vault_open("default", NULL, &vault);
-cupolas_vault_store(vault, "api-key-001", CUPOLAS_VAULT_CRED_API_KEY,
-                    (const uint8_t*)"secret-key-data", 15, NULL);
-```
-
-### 运行时保护（需 OpenSSL）
-
-```c
-#include "cupolas/cupolas_runtime_protection.h"
-
-// 启用运行时保护
-cupolas_runtime_protect_config_t config = {
-    .level = CUPOLAS_PROTECT_ENHANCED,
-    .seccomp = { .enable_seccomp = true, .default_action = 0 },
-    .cfi = { .enable_cfi = true, .cfi_level = 2 },
-    .integrity = { .enable_code_integrity = true, .check_interval_ms = 5000 }
-};
-cupolas_runtime_protect_enable(&config);
-```
+未定义 `AGENTOS_HAS_OPENSSL` 时，相关函数返回 `CUPOLAS_ERR_NOT_SUPPORTED`。
 
 ## 相关子系统
 
 | 子系统 | 关系 |
 |--------|------|
-| [Sanitizer](../sanitizer/README.md) | 安全引擎调用清洗器进行输入预处理 |
-| [Permission](../permission/README.md) | Entitlements 提供声明式权限，与 RBAC/ABAC 互补 |
-| [Audit](../audit/README.md) | 安全事件（签名验证失败、运行时违规等）写入审计日志 |
-| [Guards](#) | 安全守卫框架提供可扩展的检测能力 |
-| [Utils](../utils/README.md) | 加密工具为 OpenSSL 模块提供底层支持 |
+| [Sanitizer](../sanitizer/README.md) | 安全引擎调用清洗器进行输入校验 |
+| [Permission](../permission/README.md) | Entitlements 提供声明式权限 |
+| [Audit](../audit/README.md) | 安全事件记录审计日志 |
+| [Workbench](../workbench/README.md) | 运行时保护限制工作台进程行为 |
 
 ---
 
-*AgentOS Cupolas — 安全防护*
+© 2026 SPHARX Ltd. All Rights Reserved.

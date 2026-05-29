@@ -1,7 +1,7 @@
 /**
  * @file test_macros.h
  * @brief AgentOS C 单元测试断言宏定义
- * @version 0.0.5
+ * @version 0.1.0
  * @date 2026-04-04
  *
  * 提供简洁易用的 C 测试断言宏，替代手动 printf 检查。

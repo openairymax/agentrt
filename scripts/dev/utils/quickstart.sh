@@ -1,7 +1,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # AgentOS 一键快速启动脚本
 # 用于快速体验 AgentOS 核心功能 
-# 版本：v1.0.0.5
+# 版本：v0.1.0
 # 最后更新：2026-03-20
 
 set -e

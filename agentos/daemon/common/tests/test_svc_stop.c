@@ -16,6 +16,20 @@
 #include "svc_common.h"
 #include "test_macros.h"
 
+#undef TEST_CASE_START
+#undef TEST_ASSERT_EQUAL_INT
+#undef TEST_ASSERT_NOT_NULL
+#undef TEST_ASSERT_TRUE
+#undef TEST_ASSERT_STRING_CONTAINS
+#undef TEST_ASSERT_EQUAL_STRING
+
+#define TEST_CASE_START(name) printf("  [CASE] %s...\n", #name)
+#define TEST_ASSERT_EQUAL_INT(expected, actual, msg) assert((expected) == (actual))
+#define TEST_ASSERT_NOT_NULL(ptr, msg) assert((ptr) != NULL)
+#define TEST_ASSERT_TRUE(expr, msg) assert(expr)
+#define TEST_ASSERT_STRING_CONTAINS(str, sub, msg) assert(strstr((str), (sub)) != NULL)
+#define TEST_ASSERT_EQUAL_STRING(a, b, msg) assert(strcmp((a), (b)) == 0)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
