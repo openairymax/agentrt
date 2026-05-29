@@ -92,12 +92,15 @@ static observe_metric_t *observe_d_find_or_create_metric(observe_d_service_t *sv
 static int observe_d_record_metric(observe_d_service_t *svc, const char *name, double value,
                                    const char *unit, observe_metric_type_t type)
 {
-    if (!svc || !name)
+    if (!svc || !name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null svc or name");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     agentos_mutex_lock(&svc->lock);
     observe_metric_t *m = observe_d_find_or_create_metric(svc, name);
     if (!m) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "metric slot exhausted");
         agentos_mutex_unlock(&svc->lock);
         return AGENTOS_ERR_UNKNOWN;
     }
@@ -119,8 +122,10 @@ static int observe_d_record_metric(observe_d_service_t *svc, const char *name, d
 
 static int observe_d_format_prometheus(observe_d_service_t *svc, char *buffer, size_t buffer_size)
 {
-    if (!svc || !buffer || buffer_size < 128)
+    if (!svc || !buffer || buffer_size < 128) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null param or buffer too small");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     int off = 0;
     agentos_mutex_lock(&svc->lock);
@@ -151,6 +156,7 @@ static int observe_d_handle_http_request(observe_d_service_t *svc, agentos_socke
     char buffer[OBSERVE_D_MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
     if (n <= 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "recv failed or connection closed");
         agentos_socket_close(client_fd);
         return AGENTOS_ERR_UNKNOWN;
     }
@@ -293,6 +299,7 @@ static int observe_d_start_http_server(observe_d_service_t *svc)
     svc->http_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (svc->http_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("observe_d: failed to create HTTP socket");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create HTTP socket");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -307,6 +314,7 @@ static int observe_d_start_http_server(observe_d_service_t *svc)
 
     if (bind(svc->http_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         SVC_LOG_ERROR("observe_d: failed to bind HTTP port %d", svc->metrics_port);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to bind HTTP port");
         agentos_socket_close(svc->http_fd);
         svc->http_fd = AGENTOS_INVALID_SOCKET;
         return AGENTOS_ERR_UNKNOWN;
@@ -314,6 +322,7 @@ static int observe_d_start_http_server(observe_d_service_t *svc)
 
     if (listen(svc->http_fd, OBSERVE_D_HTTP_BACKLOG) < 0) {
         SVC_LOG_ERROR("observe_d: failed to listen on HTTP port %d", svc->metrics_port);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to listen on HTTP port");
         agentos_socket_close(svc->http_fd);
         svc->http_fd = AGENTOS_INVALID_SOCKET;
         return AGENTOS_ERR_UNKNOWN;
@@ -350,19 +359,23 @@ static int observe_d_stop_http_server(observe_d_service_t *svc, int force)
 
 static int observe_d_start(observe_d_service_t *svc)
 {
-    if (!svc)
+    if (!svc) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "null svc");
         return AGENTOS_EINVAL;
+    }
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
     if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("observe_d: failed to create socket at %s", svc->socket_path);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
         return AGENTOS_ERR_UNKNOWN;
     }
 #else
     svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1", (uint16_t)svc->tcp_port);
     if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("observe_d: failed to create TCP server");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create TCP server");
         return AGENTOS_ERR_UNKNOWN;
     }
 #endif
@@ -502,6 +515,9 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     signal(SIGTERM, observe_d_signal_handler);
     signal(SIGPIPE, SIG_IGN);
 #endif
+
+    agentos_log_init(NULL);
+    atexit(agentos_log_shutdown);
 
     if (observe_d_init(&g_service, OBSERVE_D_DEFAULT_PORT, OBSERVE_D_DEFAULT_SOCKET) !=
         AGENTOS_SUCCESS)

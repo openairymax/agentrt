@@ -234,7 +234,7 @@ docs/xxx       (文档分支)
 | 性能优化 | `perf/` | `perf/faiss-indexing-202` | 合并后删除 |
 | 重构 | `refactor/` | `refactor/error-handling-303` | 合并后删除 |
 | 测试 | `test/` | `test/syscall-coverage-404` | 合并后删除 |
-| 发布 | `release/` | `release/v0.0.5` | 版本发布后保留 |
+| 发布 | `release/` | `release/v0.1.0` | 版本发布后保留 |
 
 > **S-07 规范**：分支命名格式为 `<类型>/<名称>-<issue编号>`，三团队统一执行。
 

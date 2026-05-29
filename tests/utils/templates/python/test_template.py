@@ -23,8 +23,8 @@ from tests.utils import (
 )
 
 
-class Test<Module>:
-    """测试 <Module> 模块"""
+class TestModulePlaceholder:
+    """测试 Module 模块（模板，需替换 <Module> 为实际模块名）"""
 
     @pytest.fixture(autouse=True)
     def setup(self, temp_dir):
@@ -64,8 +64,8 @@ class Test<Module>:
         pass
 
 
-class Test<Module>Advanced:
-    """测试 <Module> 高级功能"""
+class TestModuleAdvancedPlaceholder:
+    """测试 Module 高级功能（模板，需替换 <Module> 为实际模块名）"""
 
     @pytest.fixture(scope="class")
     def class_fixture(self):
