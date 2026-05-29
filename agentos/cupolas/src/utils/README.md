@@ -2,7 +2,7 @@
 
 `cupolas/src/utils/` 为 Cupolas 各安全子系统提供共享的工具函数集。
 
-> Part of AgentOS v0.0.5
+> Part of AgentOS v0.1.0
 
 ## 提供的能力
 

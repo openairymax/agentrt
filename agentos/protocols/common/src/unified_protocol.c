@@ -3,27 +3,31 @@
 /**
  * @file unified_protocol.c
  * @brief Unified Protocol Implementation
- * 
+ *
  * 统一协议接口实现，提供协议无关的消息处理和路由功能。
  */
 
 #include "unified_protocol.h"
+
+#include "memory_compat.h"
+#include "platform.h"
 #include "safe_string_utils.h"
+#include "types.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "platform.h"
 
 typedef struct {
     agentos_protocol_type_t type;
-    const char* name;
-    int (*init)(void* context);
-    int (*encode)(void* context, const void* msg, void** out_data, size_t* out_size);
-    int (*decode)(void* context, const void* data, size_t size, void* out_msg);
-    void (*destroy)(void* context);
-    int (*connect)(void* context, const char* endpoint);
-    int (*send)(void* context, const void* data, size_t size);
-    int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
+    const char *name;
+    int (*init)(void *context);
+    int (*encode)(void *context, const void *msg, void **out_data, size_t *out_size);
+    int (*decode)(void *context, const void *data, size_t size, void *out_msg);
+    void (*destroy)(void *context);
+    int (*connect)(void *context, const char *endpoint);
+    int (*send)(void *context, const void *data, size_t size);
+    int (*receive)(void *context, void **data, size_t *size, uint32_t timeout_ms);
 } adapter_impl_t;
 
 // ============================================================================
@@ -31,21 +35,21 @@ typedef struct {
 // ============================================================================
 
 typedef struct protocol_adapter_node_s {
-    protocol_adapter_t* adapter;
-    void* context;
-    struct protocol_adapter_node_s* next;
+    protocol_adapter_t *adapter;
+    void *context;
+    struct protocol_adapter_node_s *next;
 } protocol_adapter_node_t;
 
 struct protocol_stack_s {
     protocol_stack_config_t config;
-    protocol_adapter_node_t* adapters;
+    protocol_adapter_node_t *adapters;
     size_t adapter_count;
     bool initialized;
-    
+
     // 回调函数
-    void (*message_callback)(const unified_message_t* message, void* user_data);
-    void* callback_user_data;
-    
+    void (*message_callback)(const unified_message_t *message, void *user_data);
+    void *callback_user_data;
+
     // 统计信息
     uint64_t messages_sent;
     uint64_t messages_received;
@@ -57,85 +61,88 @@ struct protocol_stack_s {
 // 静态函数声明
 // ============================================================================
 
-static protocol_adapter_node_t* find_adapter_node(protocol_stack_handle_t handle, protocol_type_t type);
-static int validate_message(const unified_message_t* message);
+static protocol_adapter_node_t *find_adapter_node(protocol_stack_handle_t handle,
+                                                  protocol_type_t type);
+static int validate_message(const unified_message_t *message);
 static uint64_t get_current_timestamp(void);
 
 // ============================================================================
 // 核心API实现
 // ============================================================================
 
-protocol_stack_handle_t protocol_stack_create(const protocol_stack_config_t* config)
+protocol_stack_handle_t protocol_stack_create(const protocol_stack_config_t *config)
 {
     if (!config) {
         return NULL;
     }
-    
-    struct protocol_stack_s* stack = (struct protocol_stack_s*)calloc(1, sizeof(struct protocol_stack_s));
+
+    struct protocol_stack_s *stack =
+        (struct protocol_stack_s *)AGENTOS_CALLOC(1, sizeof(struct protocol_stack_s));
     if (!stack) {
         return NULL;
     }
-    
+
     // 复制配置
     stack->config = *config;
     {
         size_t name_len = strlen(config->name) + 1;
-        char* name_copy = (char*)malloc(name_len);
+        char *name_copy = (char *)AGENTOS_MALLOC(name_len);
         if (name_copy) {
             safe_strcpy(name_copy, config->name, name_len);
             strncpy(stack->config.name, name_copy, sizeof(stack->config.name) - 1);
             stack->config.name[sizeof(stack->config.name) - 1] = '\0';
-            free(name_copy);
+            AGENTOS_FREE(name_copy);
         }
     }
-    
+
     stack->adapters = NULL;
     stack->adapter_count = 0;
     stack->initialized = true;
-    
+
     stack->messages_sent = 0;
     stack->messages_received = 0;
     stack->bytes_sent = 0;
     stack->bytes_received = 0;
-    
+
     return stack;
 }
 
 void protocol_stack_destroy(protocol_stack_handle_t handle)
 {
-    if (!handle) return;
-    
-    struct protocol_stack_s* stack = (struct protocol_stack_s*)handle;
-    
+    if (!handle)
+        return;
+
+    struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
+
     // 销毁所有适配器
-    protocol_adapter_node_t* node = stack->adapters;
+    protocol_adapter_node_t *node = stack->adapters;
     while (node) {
-        protocol_adapter_node_t* next = node->next;
+        protocol_adapter_node_t *next = node->next;
         if (node->adapter && node->adapter->destroy) {
             node->adapter->destroy(node->context);
-            free(node->adapter);
+            AGENTOS_FREE(node->adapter);
         }
-        free(node);
+        AGENTOS_FREE(node);
         node = next;
     }
-    
+
     if (stack->config.custom_config) {
-        free(stack->config.custom_config);
+        AGENTOS_FREE(stack->config.custom_config);
     }
-    
-    free(stack);
+
+    AGENTOS_FREE(stack);
 }
 
 int protocol_stack_register_adapter(protocol_stack_handle_t handle, protocol_adapter_t adapter)
 {
     if (!handle) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
 
-    struct protocol_stack_s* stack = (struct protocol_stack_s*)handle;
+    struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
 
     // 检查是否已存在相同类型的适配器
-    protocol_adapter_node_t* existing = find_adapter_node(handle, adapter.type);
+    protocol_adapter_node_t *existing = find_adapter_node(handle, adapter.type);
     if (existing) {
         // 已存在，替换
         if (existing->adapter && existing->adapter->destroy) {
@@ -149,15 +156,16 @@ int protocol_stack_register_adapter(protocol_stack_handle_t handle, protocol_ada
     }
 
     // 创建新节点
-    protocol_adapter_node_t* node = (protocol_adapter_node_t*)malloc(sizeof(protocol_adapter_node_t));
+    protocol_adapter_node_t *node =
+        (protocol_adapter_node_t *)AGENTOS_MALLOC(sizeof(protocol_adapter_node_t));
     if (!node) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
 
-    node->adapter = (protocol_adapter_t*)malloc(sizeof(protocol_adapter_t));
+    node->adapter = (protocol_adapter_t *)AGENTOS_MALLOC(sizeof(protocol_adapter_t));
     if (!node->adapter) {
-        free(node);
-        return -1;
+        AGENTOS_FREE(node);
+        return AGENTOS_EFAIL;
     }
     *node->adapter = adapter;
     node->context = NULL;
@@ -166,44 +174,44 @@ int protocol_stack_register_adapter(protocol_stack_handle_t handle, protocol_ada
     if (adapter.init) {
         int result = adapter.init(node->context);
         if (result != 0) {
-            free(node->adapter);
-            free(node);
+            AGENTOS_FREE(node->adapter);
+            AGENTOS_FREE(node);
             return result;
         }
     }
-    
+
     // 添加到链表
     node->next = stack->adapters;
     stack->adapters = node;
     stack->adapter_count++;
-    
+
     return 0;
 }
 
-int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t* message)
+int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t *message)
 {
     if (!handle || !message) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
-    struct protocol_stack_s* stack = (struct protocol_stack_s*)handle;
-    
+
+    struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
+
     // 验证消息
     int valid = validate_message(message);
     if (valid != 0) {
         return valid;
     }
-    
+
     // 查找对应的适配器
-    protocol_adapter_node_t* adapter_node = find_adapter_node(handle, message->protocol);
+    protocol_adapter_node_t *adapter_node = find_adapter_node(handle, message->protocol);
     if (!adapter_node || !adapter_node->adapter) {
-        return -1; // 未找到适配器
+        return AGENTOS_EFAIL;  // 未找到适配器
     }
-    
-    protocol_adapter_t* adapter = adapter_node->adapter;
+
+    protocol_adapter_t *adapter = adapter_node->adapter;
 
     // 编码消息
-    void* encoded_data = NULL;
+    void *encoded_data = NULL;
     size_t encoded_size = 0;
     if (adapter->encode) {
         int result = adapter->encode(adapter_node->context, message, &encoded_data, &encoded_size);
@@ -212,15 +220,15 @@ int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t*
         }
     } else {
         // 如果没有编码器，直接使用原始数据
-        encoded_data = (void*)message->payload;
+        encoded_data = (void *)message->payload;
         encoded_size = message->payload_size;
     }
-    
+
     if (adapter->connect) {
         int conn_result = adapter->connect(adapter_node->context, message->endpoint);
         if (conn_result != 0 && conn_result != -2) {
             if (encoded_data != message->payload && encoded_data) {
-                free(encoded_data);
+                AGENTOS_FREE(encoded_data);
             }
             return conn_result;
         }
@@ -230,7 +238,7 @@ int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t*
         int send_result = adapter->send(adapter_node->context, encoded_data, encoded_size);
         if (send_result != 0) {
             if (encoded_data != message->payload && encoded_data) {
-                free(encoded_data);
+                AGENTOS_FREE(encoded_data);
             }
             return send_result;
         }
@@ -242,37 +250,38 @@ int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t*
     stack->bytes_sent += encoded_size;
 
     if (encoded_data != message->payload && encoded_data) {
-        free(encoded_data);
+        AGENTOS_FREE(encoded_data);
     }
 
     return 0;
 }
 
-int protocol_stack_receive(protocol_stack_handle_t handle, unified_message_t* message, uint32_t timeout_ms)
+int protocol_stack_receive(protocol_stack_handle_t handle, unified_message_t *message,
+                           uint32_t timeout_ms)
 {
     if (!handle || !message) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
 
-    struct protocol_stack_s* stack = (struct protocol_stack_s*)handle;
+    struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
 
     memset(message, 0, sizeof(unified_message_t));
 
-    protocol_adapter_node_t* adapter_node = stack->adapters;
+    protocol_adapter_node_t *adapter_node = stack->adapters;
     while (adapter_node) {
         if (adapter_node->adapter && adapter_node->adapter->receive) {
-            void* decoded_data = NULL;
+            void *decoded_data = NULL;
             size_t decoded_size = 0;
 
-            int result = adapter_node->adapter->receive(
-                adapter_node->context, &decoded_data, &decoded_size, timeout_ms);
+            int result = adapter_node->adapter->receive(adapter_node->context, &decoded_data,
+                                                        &decoded_size, timeout_ms);
 
             if (result == 0 && decoded_data && decoded_size > 0) {
                 if (adapter_node->adapter->decode) {
                     int dec_result = adapter_node->adapter->decode(
                         adapter_node->context, decoded_data, decoded_size, message);
                     if (dec_result != 0) {
-                        free(decoded_data);
+                        AGENTOS_FREE(decoded_data);
                         adapter_node = adapter_node->next;
                         continue;
                     }
@@ -296,44 +305,43 @@ int protocol_stack_receive(protocol_stack_handle_t handle, unified_message_t* me
                 return 0;
             }
 
-            if (decoded_data) free(decoded_data);
+            if (decoded_data)
+                AGENTOS_FREE(decoded_data);
         }
         adapter_node = adapter_node->next;
     }
 
     if (timeout_ms > 0) {
-        struct timespec ts = {
-            .tv_sec = timeout_ms / 1000,
-            .tv_nsec = (timeout_ms % 1000) * 1000000LL
-        };
+        struct timespec ts = {.tv_sec = timeout_ms / 1000,
+                              .tv_nsec = (timeout_ms % 1000) * 1000000LL};
         nanosleep(&ts, NULL);
     }
 
-    return -1;
+    return AGENTOS_EFAIL;
 }
 
-int protocol_stack_set_callback(protocol_stack_handle_t handle, 
-                               void (*callback)(const unified_message_t* message, void* user_data),
-                               void* user_data)
+int protocol_stack_set_callback(protocol_stack_handle_t handle,
+                                void (*callback)(const unified_message_t *message, void *user_data),
+                                void *user_data)
 {
     if (!handle) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
-    struct protocol_stack_s* stack = (struct protocol_stack_s*)handle;
+
+    struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
     stack->message_callback = callback;
     stack->callback_user_data = user_data;
-    
+
     return 0;
 }
 
-int protocol_stack_get_stats(protocol_stack_handle_t handle, void* stats)
+int protocol_stack_get_stats(protocol_stack_handle_t handle, void *stats)
 {
     if (!handle || !stats) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
 
-    struct protocol_stack_s* stack = (struct protocol_stack_s*)handle;
+    struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
 
     typedef struct {
         uint64_t messages_sent;
@@ -344,7 +352,7 @@ int protocol_stack_get_stats(protocol_stack_handle_t handle, void* stats)
         bool initialized;
     } protocol_stats_t;
 
-    protocol_stats_t* out = (protocol_stats_t*)stats;
+    protocol_stats_t *out = (protocol_stats_t *)stats;
     memset(out, 0, sizeof(*out));
 
     out->messages_sent = stack->messages_sent;
@@ -361,79 +369,64 @@ int protocol_stack_get_stats(protocol_stack_handle_t handle, void* stats)
 // 工具函数实现
 // ============================================================================
 
-unified_message_t unified_message_create(protocol_type_t protocol,
-                                        message_direction_t direction,
-                                        const char* endpoint,
-                                        const void* payload,
-                                        size_t payload_size)
+unified_message_t unified_message_create(protocol_type_t protocol, message_direction_t direction,
+                                         const char *endpoint, const void *payload,
+                                         size_t payload_size)
 {
     unified_message_t message;
     memset(&message, 0, sizeof(message));
-    
+
     static uint64_t next_message_id = 1;
-    
+
     message.message_id = next_message_id++;
     message.protocol = protocol;
     message.direction = direction;
     if (endpoint) {
         strncpy(message.endpoint, endpoint, sizeof(message.endpoint) - 1);
     }
-    message.payload = (void*)payload;
+    message.payload = (void *)payload;
     message.payload_size = payload_size;
     message.timestamp = get_current_timestamp();
-    
+
     return message;
 }
 
-void unified_message_destroy(unified_message_t* message)
+void unified_message_destroy(unified_message_t *message)
 {
-    if (!message) return;
-    
+    if (!message)
+        return;
+
     // 注意：这里不释放payload，由调用者管理
     memset(message, 0, sizeof(unified_message_t));
 }
 
-const char* protocol_type_to_string(protocol_type_t type)
+const char *protocol_type_to_string(protocol_type_t type)
 {
-    static const char* names[] = {
-        "HTTP",
-        "WebSocket",
-        "gRPC",
-        "MQTT",
-        "AMQP",
-        "Raw TCP",
-        "Raw UDP",
-        "Custom"
-    };
-    
+    static const char *names[] = {"HTTP", "WebSocket", "gRPC",    "MQTT",
+                                  "AMQP", "Raw TCP",   "Raw UDP", "Custom"};
+
     if (type < 0 || type > PROTOCOL_CUSTOM) {
         return "Unknown";
     }
-    
+
     return names[type];
 }
 
-protocol_type_t protocol_type_from_string(const char* str)
+protocol_type_t protocol_type_from_string(const char *str)
 {
-    if (!str) return PROTOCOL_CUSTOM;
-    
-    const char* names[] = {"http", "websocket", "grpc", "mqtt", "amqp", "tcp", "udp"};
-    protocol_type_t types[] = {
-        PROTOCOL_HTTP,
-        PROTOCOL_WEBSOCKET,
-        PROTOCOL_GRPC,
-        PROTOCOL_MQTT,
-        PROTOCOL_AMQP,
-        PROTOCOL_RAW_TCP,
-        PROTOCOL_RAW_UDP
-    };
-    
+    if (!str)
+        return PROTOCOL_CUSTOM;
+
+    const char *names[] = {"http", "websocket", "grpc", "mqtt", "amqp", "tcp", "udp"};
+    protocol_type_t types[] = {PROTOCOL_HTTP, PROTOCOL_WEBSOCKET, PROTOCOL_GRPC,   PROTOCOL_MQTT,
+                               PROTOCOL_AMQP, PROTOCOL_RAW_TCP,   PROTOCOL_RAW_UDP};
+
     for (int i = 0; i < 7; i++) {
         if (strcasecmp(str, names[i]) == 0) {
             return types[i];
         }
     }
-    
+
     return PROTOCOL_CUSTOM;
 }
 
@@ -441,37 +434,39 @@ protocol_type_t protocol_type_from_string(const char* str)
 // 静态函数实现
 // ============================================================================
 
-static protocol_adapter_node_t* find_adapter_node(protocol_stack_handle_t handle, protocol_type_t type)
+static protocol_adapter_node_t *find_adapter_node(protocol_stack_handle_t handle,
+                                                  protocol_type_t type)
 {
-    struct protocol_stack_s* stack = (struct protocol_stack_s*)handle;
-    protocol_adapter_node_t* node = stack->adapters;
-    
+    struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
+    protocol_adapter_node_t *node = stack->adapters;
+
     while (node) {
-        if (node->adapter && ((adapter_impl_t*)node->adapter)->type == type) {
+        if (node->adapter && ((adapter_impl_t *)node->adapter)->type == type) {
             return node;
         }
         node = node->next;
     }
-    
+
     return NULL;
 }
 
-static int validate_message(const unified_message_t* message)
+static int validate_message(const unified_message_t *message)
 {
-    if (!message) return -1;
-    
+    if (!message)
+        return AGENTOS_EFAIL;
+
     if (message->protocol < PROTOCOL_HTTP || message->protocol > PROTOCOL_CUSTOM) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
+
     if (message->direction < DIRECTION_REQUEST || message->direction > DIRECTION_NOTIFICATION) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
+
     if (message->endpoint[0] && strlen(message->endpoint) > 1024) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
+
     return 0;
 }
 

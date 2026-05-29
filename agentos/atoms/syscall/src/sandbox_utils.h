@@ -8,8 +8,9 @@
 #define AGENTOS_SANDBOX_UTILS_H
 
 #include "agentos.h"
-#include <stdint.h>
+
 #include <stddef.h>
+#include <stdint.h>
 
 /* 前向声明 */
 typedef struct agentos_sandbox agentos_sandbox_t;
@@ -20,7 +21,7 @@ typedef struct audit_entry audit_entry_t;
  * @param str 输入字符串
  * @return 哈希值
  */
-uint64_t sandbox_simple_hash(const char* str);
+uint64_t sandbox_simple_hash(const char *str);
 
 /**
  * @brief 添加审计日志条目
@@ -32,9 +33,9 @@ uint64_t sandbox_simple_hash(const char* str);
  * @param details 详细信息
  * @return AGENTOS_SUCCESS 成功，其他为错误码
  */
-agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t* sandbox, int syscall_num,
-                                       const char* caller_id, int result_code,
-                                       uint64_t duration_ns, const char* details);
+agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t *sandbox, int syscall_num,
+                                        const char *caller_id, int result_code,
+                                        uint64_t duration_ns, const char *details);
 
 /**
  * @brief 释放沙箱资源
@@ -43,14 +44,13 @@ agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t* sandbox, int syscall_
  * @param args 参数
  * @param result 结果
  */
-void sandbox_release_resource(agentos_sandbox_t* sandbox, int syscall_num,
-                             void* args, int result);
+void sandbox_release_resource(agentos_sandbox_t *sandbox, int syscall_num, void *args, int result);
 
 /**
  * @brief 生成参数哈希
  * @param args 参数
  * @return 参数字符串哈希
  */
-char* sandbox_generate_args_hash(void* args);
+char *sandbox_generate_args_hash(void *args);
 
 #endif /* AGENTOS_SANDBOX_UTILS_H */

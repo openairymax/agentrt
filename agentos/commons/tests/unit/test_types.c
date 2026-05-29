@@ -22,12 +22,13 @@
  * @date 2026-04-02
  */
 
+#include "../tests/utils/test_framework.h"
+#include "types.h"
+
+#include <cmocka.h>
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include "types.h"
-#include "../tests/utils/test_framework.h"
 
 /* ============================================================================
  * 基础类型测试
@@ -36,7 +37,8 @@
 /**
  * @brief 测试错误码常量值正确性
  */
-static void test_error_codes_valid(void **state) {
+static void test_error_codes_valid(void **state)
+{
     (void)state;
 
     assert_int_equal(AGENTOS_SUCCESS, 0);
@@ -52,7 +54,8 @@ static void test_error_codes_valid(void **state) {
 /**
  * @brief 测试 agentos_result_t 结构体大小和字段
  */
-static void test_agentos_result_t_structure(void **state) {
+static void test_agentos_result_t_structure(void **state)
+{
     (void)state;
 
     agentos_result_t result = {0};
@@ -68,7 +71,8 @@ static void test_agentos_result_t_structure(void **state) {
 /**
  * @brief 测试优先级枚举值连续性
  */
-static void test_priority_enums(void **state) {
+static void test_priority_enums(void **state)
+{
     (void)state;
 
     assert_int_equal(AGENTOS_PRIORITY_LOW, 0);
@@ -84,7 +88,8 @@ static void test_priority_enums(void **state) {
 /**
  * @brief 测试任务状态枚举
  */
-static void test_task_status_enums(void **state) {
+static void test_task_status_enums(void **state)
+{
     (void)state;
 
     assert_int_equal(AGENTOS_TASK_PENDING, 0);
@@ -98,7 +103,8 @@ static void test_task_status_enums(void **state) {
 /**
  * @brief 测试任务配置结构体初始化
  */
-static void test_task_config_init(void **state) {
+static void test_task_config_init(void **state)
+{
     (void)state;
 
     agentos_task_config_t config = {0};
@@ -117,7 +123,8 @@ static void test_task_config_init(void **state) {
 /**
  * @brief 测试任务结果结构体
  */
-static void test_task_result_structure(void **state) {
+static void test_task_result_structure(void **state)
+{
     (void)state;
 
     agentos_task_result_t result = {0};
@@ -138,7 +145,8 @@ static void test_task_result_structure(void **state) {
 /**
  * @brief 测试记忆层级枚举
  */
-static void test_memory_layer_enums(void **state) {
+static void test_memory_layer_enums(void **state)
+{
     (void)state;
 
     assert_int_equal(AGENTOS_MEMORY_L1_WORKING, 0);
@@ -150,7 +158,8 @@ static void test_memory_layer_enums(void **state) {
 /**
  * @brief 测试记忆条目结构体
  */
-static void test_memory_entry_structure(void **state) {
+static void test_memory_entry_structure(void **state)
+{
     (void)state;
 
     agentos_memory_entry_t entry = {0};
@@ -173,7 +182,8 @@ static void test_memory_entry_structure(void **state) {
 /**
  * @brief 测试会话配置结构体
  */
-static void test_session_config_structure(void **state) {
+static void test_session_config_structure(void **state)
+{
     (void)state;
 
     agentos_session_config_t config = {0};
@@ -190,7 +200,8 @@ static void test_session_config_structure(void **state) {
 /**
  * @brief 测试上下文结构体
  */
-static void test_context_structure(void **state) {
+static void test_context_structure(void **state)
+{
     (void)state;
 
     agentos_context_t ctx = {0};
@@ -211,7 +222,8 @@ static void test_context_structure(void **state) {
 /**
  * @brief 测试 Agent 契约结构体
  */
-static void test_agent_contract_structure(void **state) {
+static void test_agent_contract_structure(void **state)
+{
     (void)state;
 
     agentos_agent_contract_t contract = {0};
@@ -228,7 +240,8 @@ static void test_agent_contract_structure(void **state) {
 /**
  * @brief 测试 Agent 能力结构体
  */
-static void test_capability_structure(void **state) {
+static void test_capability_structure(void **state)
+{
     (void)state;
 
     agentos_capability_t caps = {0};
@@ -251,7 +264,8 @@ static void test_capability_structure(void **state) {
 /**
  * @brief 测试指标结构体
  */
-static void test_metric_structure(void **state) {
+static void test_metric_structure(void **state)
+{
     (void)state;
 
     agentos_metric_t metric = {0};
@@ -274,7 +288,8 @@ static void test_metric_structure(void **state) {
 /**
  * @brief 测试 IPC 消息头结构体
  */
-static void test_ipc_header_structure(void **state) {
+static void test_ipc_header_structure(void **state)
+{
     (void)state;
 
     agentos_ipc_header_t header = {0};
@@ -295,7 +310,8 @@ static void test_ipc_header_structure(void **state) {
 /**
  * @brief 测试 IPC 配置结构体
  */
-static void test_ipc_config_structure(void **state) {
+static void test_ipc_config_structure(void **state)
+{
     (void)state;
 
     agentos_ipc_config_t config = {0};
@@ -318,7 +334,8 @@ static void test_ipc_config_structure(void **state) {
 /**
  * @brief 测试连接配置结构体
  */
-static void test_conn_config_structure(void **state) {
+static void test_conn_config_structure(void **state)
+{
     (void)state;
 
     agentos_conn_config_t config = {0};
@@ -339,7 +356,8 @@ static void test_conn_config_structure(void **state) {
 /**
  * @brief 测试 HTTP 请求结构体
  */
-static void test_http_request_structure(void **state) {
+static void test_http_request_structure(void **state)
+{
     (void)state;
 
     agentos_http_request_t request = {0};
@@ -356,7 +374,8 @@ static void test_http_request_structure(void **state) {
 /**
  * @brief 测试 HTTP 响应结构体
  */
-static void test_http_response_structure(void **state) {
+static void test_http_response_structure(void **state)
+{
     (void)state;
 
     agentos_http_response_t response = {0};
@@ -377,7 +396,8 @@ static void test_http_response_structure(void **state) {
 /**
  * @brief 测试 AGENTOS_ARRAY_SIZE 宏
  */
-static void test_macro_array_size(void **state) {
+static void test_macro_array_size(void **state)
+{
     (void)state;
 
     int array[] = {1, 2, 3, 4, 5};
@@ -387,7 +407,8 @@ static void test_macro_array_size(void **state) {
 /**
  * @brief 测试 AGENTOS_MIN 宏
  */
-static void test_macro_min(void **state) {
+static void test_macro_min(void **state)
+{
     (void)state;
 
     assert_int_equal(AGENTOS_MIN(3, 7), 3);
@@ -398,7 +419,8 @@ static void test_macro_min(void **state) {
 /**
  * @brief 测试 AGENTOS_MAX 宏
  */
-static void test_macro_max(void **state) {
+static void test_macro_max(void **state)
+{
     (void)state;
 
     assert_int_equal(AGENTOS_MAX(3, 7), 7);
@@ -409,7 +431,8 @@ static void test_macro_max(void **state) {
 /**
  * @brief 测试 AGENTOS_ALIGN_UP 宏
  */
-static void test_macro_align_up(void **state) {
+static void test_macro_align_up(void **state)
+{
     (void)state;
 
     assert_int_equal(AGENTOS_ALIGN_UP(0, 16), 0);
@@ -422,7 +445,8 @@ static void test_macro_align_up(void **state) {
 /**
  * @brief 测试 AGENTOS_VERSION_MAJOR/MINOR/PATCH 宏
  */
-static void test_macro_version(void **state) {
+static void test_macro_version(void **state)
+{
     (void)state;
 
     assert_int_equal(AGENTOS_VERSION_MAJOR(0x01020303), 1);
@@ -433,7 +457,8 @@ static void test_macro_version(void **state) {
 /**
  * @brief 测试时间转换宏
  */
-static void test_macro_time_conversion(void **state) {
+static void test_macro_time_conversion(void **state)
+{
     (void)state;
 
     uint64_t ns = 1500000000ULL; /* 1.5 秒 */
@@ -448,7 +473,8 @@ static void test_macro_time_conversion(void **state) {
  * 主测试入口
  * ============================================================================ */
 
-int main(void) {
+int main(void)
+{
     const struct CMUnitTest tests[] = {
         /* 基础类型测试 */
         cmocka_unit_test(test_error_codes_valid),

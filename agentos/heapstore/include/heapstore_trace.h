@@ -14,9 +14,9 @@
 
 #include "heapstore.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,7 +71,7 @@ void heapstore_trace_shutdown(void);
  * @threadsafe 是
  * @reentrant 否
  */
-heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span);
+heapstore_error_t heapstore_trace_write_span(const heapstore_span_t *span);
 
 /**
  * @brief 批量写入 Span 记录
@@ -85,7 +85,7 @@ heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span);
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t* spans, size_t count);
+heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t *spans, size_t count);
 
 /**
  * @brief 根据 trace_id 查询所有 span
@@ -100,7 +100,8 @@ heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t* span
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore_span_t** spans, size_t* count);
+heapstore_error_t heapstore_trace_query_by_trace(const char *trace_id, heapstore_span_t **spans,
+                                                 size_t *count);
 
 /**
  * @brief 根据时间范围查询 span
@@ -116,7 +117,8 @@ heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint64_t end_time, heapstore_span_t** spans, size_t* count);
+heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint64_t end_time,
+                                                      heapstore_span_t **spans, size_t *count);
 
 /**
  * @brief 释放 span 数组内存
@@ -128,7 +130,7 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
  * @reentrant 是
 
  * @since v1.0.0*/
-void heapstore_trace_free_spans(heapstore_span_t* spans);
+void heapstore_trace_free_spans(heapstore_span_t *spans);
 
 /**
  * @brief 配置追踪导出器
@@ -141,7 +143,7 @@ void heapstore_trace_free_spans(heapstore_span_t* spans);
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter_config_t* manager);
+heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter_config_t *manager);
 
 /**
  * @brief 强制导出待发送的追踪数据
@@ -167,7 +169,8 @@ heapstore_error_t heapstore_trace_flush(void);
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pending_spans, uint64_t* total_size_bytes);
+heapstore_error_t heapstore_trace_get_stats(uint64_t *total_spans, uint64_t *pending_spans,
+                                            uint64_t *total_size_bytes);
 
 /**
  * @brief 清理过期追踪数据
@@ -181,7 +184,7 @@ heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pen
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_bytes);
+heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t *freed_bytes);
 
 /**
  * @brief 检查追踪系统是否健康
@@ -206,7 +209,7 @@ bool heapstore_trace_is_healthy(void);
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_events);
+heapstore_error_t heapstore_trace_export_to_json(char **out_json, bool include_events);
 
 #ifdef __cplusplus
 }

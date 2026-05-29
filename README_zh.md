@@ -38,7 +38,7 @@ Powered by OpenAirymax
 个人用户客户端预告
 
 <div align="center">
-<img src="scripts/assets/AgentOS-desktop-preview.gif" alt="AgentOS 预览" width="800">
+<img src="scripts/resources/images/AgentOS-desktop-preview.gif" alt="AgentOS 预览" width="800">
 </div>
 
 ## 2️⃣ 创新要点
@@ -142,7 +142,7 @@ ctest --output-on-failure
 
 ```text
 # 构建镜像
-docker build -f scripts/deployment/docker/Dockerfile.kernel -t agentos:latest .
+docker build -f scripts/ops/deploy/Dockerfile.kernel -t agentos:latest .
 
 # 运行容器
 docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
@@ -297,7 +297,7 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 "From data intelligence emerges."\
 始于数据，终于智能。
 
-<img src="scripts/assets/feishu-community-qr.png" width="200" />
+<img src="scripts/resources/images/feishu-community-qr.png" width="200" />
 
 <a href="https://atomgit.com/spharx/agentos">AtomGit</a> · <a href="https://gitee.com/spharx/agentos">Gitee</a> · <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> · <a href="https://spharx.cn">官方网站</a>
 

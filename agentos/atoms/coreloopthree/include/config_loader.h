@@ -8,6 +8,7 @@
 #define AGENTOS_CONFIG_LOADER_H
 
 #include "agentos.h"
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -24,7 +25,7 @@ extern "C" {
  * @param out_json 输出文件内容字符串（需调用者释放）
  * @return agentos_error_t
  */
-agentos_error_t agentos_config_load(const char* path, char** out_json);
+agentos_error_t agentos_config_load(const char *path, char **out_json);
 
 /**
  * @brief 解析调度权重配置
@@ -34,11 +35,8 @@ agentos_error_t agentos_config_load(const char* path, char** out_json);
  * @param out_trust_weight 输出信任权重
  * @return agentos_error_t
  */
-agentos_error_t agentos_config_parse_weights(
-    const char* config_json,
-    float* out_cost_weight,
-    float* out_perf_weight,
-    float* out_trust_weight);
+agentos_error_t agentos_config_parse_weights(const char *config_json, float *out_cost_weight,
+                                             float *out_perf_weight, float *out_trust_weight);
 
 #ifdef __cplusplus
 }

@@ -7,6 +7,7 @@
 #include "loop.h"
 
 #include "agentos.h"
+#include "agentos_dirent.h"
 #include "atomic_compat.h"
 #include "check.h"
 #include "checkpoint.h"
@@ -21,9 +22,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include "agentos_dirent.h"
 #include <sys/stat.h>
+#include <time.h>
+#include "error.h"
 
 /**
  * @brief 核心循环结构体
@@ -69,7 +70,7 @@ static void loop_checkpoint_auto_hook(const char *task_id, const char *state_jso
 static void add_completed_node(agentos_core_loop_t *loop, const char *node_id);
 static void clear_completed_nodes(agentos_core_loop_t *loop);
 static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, const char *task_id,
-                                                    const char *session_id, const char *node_id);
+                                                   const char *session_id, const char *node_id);
 
 /* 默认配置 */
 static void init_default_config(agentos_loop_config_t *manager)
@@ -106,16 +107,16 @@ static agentos_error_t validate_loop_parameters(const agentos_loop_config_t *man
         if (manager->loop_config_cognition_threads > 1024 ||
             manager->loop_config_execution_threads > 1024 ||
             manager->loop_config_memory_threads > 1024) {
-            return AGENTOS_EINVAL;
+            AGENTOS_ERROR(AGENTOS_EINVAL, "failed to validate loop config: thread count exceeds max 1024");
         }
 
         if (manager->loop_config_max_queued_tasks == 0 ||
             manager->loop_config_max_queued_tasks > 100000) {
-            return AGENTOS_EINVAL;
+            AGENTOS_ERROR(AGENTOS_EINVAL, "failed to validate loop config: max_queued_tasks out of range");
         }
 
         if (manager->loop_config_stats_interval_ms > 3600000) {
-            return AGENTOS_EINVAL;
+            AGENTOS_ERROR(AGENTOS_EINVAL, "failed to validate loop config: stats_interval_ms exceeds 1 hour");
         }
     }
 
@@ -469,7 +470,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(agentos_core_loop_t *loop, const
                                                 size_t input_len, char **out_task_id)
 {
     if (!loop || !input || !out_task_id)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to submit loop task: null loop, input, or out_task_id");
     if (!loop->cognition || !loop->execution || !loop->memory)
         return AGENTOS_ENOTINIT;
 
@@ -525,7 +526,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(agentos_core_loop_t *loop, const
         agentos_task_plan_free(plan);
         if (enhanced_input)
             AGENTOS_FREE(enhanced_input);
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to submit loop task: empty or null task plan");
     }
 
     /* 步骤 4: 执行层按计划节点提交任务 */
@@ -673,9 +674,7 @@ static void loop_checkpoint_auto_hook(const char *task_id, const char *state_jso
                                "\"session_id\":\"%s\","
                                "\"completed_nodes\":%zu,"
                                "\"checkpoint_seq\":%lu}",
-                               task_id,
-                               loop->current_session_id,
-                               loop->completed_node_count,
+                               task_id, loop->current_session_id, loop->completed_node_count,
                                (unsigned long)loop->checkpoint_seq);
         if (written <= 0 || (size_t)written >= sizeof(state)) {
             snprintf(state, sizeof(state),
@@ -686,10 +685,9 @@ static void loop_checkpoint_auto_hook(const char *task_id, const char *state_jso
 
     loop->checkpoint_seq++;
     agentos_task_checkpoint_t *checkpoint = NULL;
-    agentos_error_t err =
-        agentos_checkpoint_create(task_id, loop->current_session_id, loop->checkpoint_seq, state,
-                                  loop->completed_node_ids, loop->completed_node_count,
-                                  NULL, 0, &checkpoint);
+    agentos_error_t err = agentos_checkpoint_create(
+        task_id, loop->current_session_id, loop->checkpoint_seq, state, loop->completed_node_ids,
+        loop->completed_node_count, NULL, 0, &checkpoint);
     if (err == AGENTOS_SUCCESS && checkpoint) {
         err = agentos_checkpoint_save(checkpoint);
         if (err == AGENTOS_SUCCESS) {
@@ -708,7 +706,7 @@ static agentos_error_t save_plan_checkpoint(agentos_core_loop_t *loop,
     if (!loop->checkpoint_initialized)
         return AGENTOS_ENOTINIT;
     if (!plan || !task_id)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to save plan checkpoint: null plan or task_id");
 
     size_t completed_count = 0;
     size_t pending_count = plan->task_plan_node_count;
@@ -879,8 +877,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
         if (node_task_id)
             AGENTOS_FREE(node_task_id);
 
-        if (err == AGENTOS_SUCCESS && loop->checkpoint_initialized &&
-            node->task_node_id) {
+        if (err == AGENTOS_SUCCESS && loop->checkpoint_initialized && node->task_node_id) {
             add_completed_node(loop, node->task_node_id);
             save_incremental_checkpoint(loop, task_id_buf, loop->current_session_id,
                                         node->task_node_id);
@@ -1124,8 +1121,10 @@ static void add_completed_node(agentos_core_loop_t *loop, const char *node_id)
         return;
 
     if (loop->completed_node_count >= loop->completed_node_capacity) {
-        size_t new_cap = loop->completed_node_capacity == 0 ? 16 : loop->completed_node_capacity * 2;
-        char **new_arr = (char **)AGENTOS_REALLOC(loop->completed_node_ids, new_cap * sizeof(char *));
+        size_t new_cap =
+            loop->completed_node_capacity == 0 ? 16 : loop->completed_node_capacity * 2;
+        char **new_arr =
+            (char **)AGENTOS_REALLOC(loop->completed_node_ids, new_cap * sizeof(char *));
         if (!new_arr)
             return;
         loop->completed_node_ids = new_arr;
@@ -1156,7 +1155,7 @@ static void clear_completed_nodes(agentos_core_loop_t *loop)
 }
 
 static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, const char *task_id,
-                                                    const char *session_id, const char *node_id)
+                                                   const char *session_id, const char *node_id)
 {
     if (!loop || !loop->checkpoint_initialized || !task_id)
         return AGENTOS_EINVAL;
@@ -1166,8 +1165,7 @@ static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, co
                             "{\"type\":\"incremental\",\"task_id\":\"%s\","
                             "\"session_id\":\"%s\",\"completed_node\":\"%s\","
                             "\"total_completed\":%zu}",
-                            task_id, session_id ? session_id : "",
-                            node_id ? node_id : "",
+                            task_id, session_id ? session_id : "", node_id ? node_id : "",
                             loop->completed_node_count);
 
     if (json_len <= 0 || (size_t)json_len >= sizeof(state_json))
@@ -1177,16 +1175,15 @@ static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, co
     agentos_task_checkpoint_t *checkpoint = NULL;
     agentos_error_t err = agentos_checkpoint_create(
         task_id, session_id ? session_id : "default", loop->checkpoint_seq, state_json,
-        loop->completed_node_ids, loop->completed_node_count,
-        NULL, 0, &checkpoint);
+        loop->completed_node_ids, loop->completed_node_count, NULL, 0, &checkpoint);
 
     if (err == AGENTOS_SUCCESS && checkpoint) {
         err = agentos_checkpoint_save(checkpoint);
         if (err == AGENTOS_SUCCESS) {
-            AGENTOS_LOG_INFO("Incremental checkpoint saved for task %s node %s (seq=%lu, completed=%zu)",
-                             task_id, node_id ? node_id : "",
-                             (unsigned long)loop->checkpoint_seq,
-                             loop->completed_node_count);
+            AGENTOS_LOG_INFO(
+                "Incremental checkpoint saved for task %s node %s (seq=%lu, completed=%zu)",
+                task_id, node_id ? node_id : "", (unsigned long)loop->checkpoint_seq,
+                loop->completed_node_count);
         }
         agentos_checkpoint_destroy(checkpoint);
     }

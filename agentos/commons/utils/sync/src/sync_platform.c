@@ -9,22 +9,31 @@
  */
 
 #include "sync_platform.h"
+
 #include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #include <synchapi.h>
+#include <windows.h>
 #else
+#include <errno.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <unistd.h>
 #include <sys/time.h>
-#include <errno.h>
 #include <time.h>
+#include <unistd.h>
 #endif
 
-int platform_mutex_init(platform_mutex_t* mutex) {
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
+
+int platform_mutex_init(platform_mutex_t *mutex)
+{
 #ifdef _WIN32
     InitializeCriticalSection(mutex);
     return 0;
@@ -33,7 +42,8 @@ int platform_mutex_init(platform_mutex_t* mutex) {
 #endif
 }
 
-int platform_mutex_destroy(platform_mutex_t* mutex) {
+int platform_mutex_destroy(platform_mutex_t *mutex)
+{
 #ifdef _WIN32
     DeleteCriticalSection(mutex);
     return 0;
@@ -42,7 +52,8 @@ int platform_mutex_destroy(platform_mutex_t* mutex) {
 #endif
 }
 
-int platform_mutex_lock(platform_mutex_t* mutex) {
+int platform_mutex_lock(platform_mutex_t *mutex)
+{
 #ifdef _WIN32
     EnterCriticalSection(mutex);
     return 0;
@@ -51,7 +62,8 @@ int platform_mutex_lock(platform_mutex_t* mutex) {
 #endif
 }
 
-int platform_mutex_unlock(platform_mutex_t* mutex) {
+int platform_mutex_unlock(platform_mutex_t *mutex)
+{
 #ifdef _WIN32
     LeaveCriticalSection(mutex);
     return 0;
@@ -60,7 +72,8 @@ int platform_mutex_unlock(platform_mutex_t* mutex) {
 #endif
 }
 
-int platform_recursive_mutex_init(platform_recursive_mutex_t* mutex) {
+int platform_recursive_mutex_init(platform_recursive_mutex_t *mutex)
+{
 #ifdef _WIN32
     InitializeCriticalSection(mutex);
     return 0;
@@ -74,7 +87,8 @@ int platform_recursive_mutex_init(platform_recursive_mutex_t* mutex) {
 #endif
 }
 
-int platform_recursive_mutex_destroy(platform_recursive_mutex_t* mutex) {
+int platform_recursive_mutex_destroy(platform_recursive_mutex_t *mutex)
+{
 #ifdef _WIN32
     DeleteCriticalSection(mutex);
     return 0;
@@ -83,7 +97,8 @@ int platform_recursive_mutex_destroy(platform_recursive_mutex_t* mutex) {
 #endif
 }
 
-int platform_recursive_mutex_lock(platform_recursive_mutex_t* mutex) {
+int platform_recursive_mutex_lock(platform_recursive_mutex_t *mutex)
+{
 #ifdef _WIN32
     EnterCriticalSection(mutex);
     return 0;
@@ -92,7 +107,8 @@ int platform_recursive_mutex_lock(platform_recursive_mutex_t* mutex) {
 #endif
 }
 
-int platform_recursive_mutex_unlock(platform_recursive_mutex_t* mutex) {
+int platform_recursive_mutex_unlock(platform_recursive_mutex_t *mutex)
+{
 #ifdef _WIN32
     LeaveCriticalSection(mutex);
     return 0;
@@ -101,7 +117,8 @@ int platform_recursive_mutex_unlock(platform_recursive_mutex_t* mutex) {
 #endif
 }
 
-int platform_rwlock_init(platform_rwlock_t* rwlock) {
+int platform_rwlock_init(platform_rwlock_t *rwlock)
+{
 #ifdef _WIN32
     InitializeSRWLock(rwlock);
     return 0;
@@ -110,7 +127,8 @@ int platform_rwlock_init(platform_rwlock_t* rwlock) {
 #endif
 }
 
-int platform_rwlock_destroy(platform_rwlock_t* rwlock) {
+int platform_rwlock_destroy(platform_rwlock_t *rwlock)
+{
 #ifdef _WIN32
     (void)rwlock;
     return 0;
@@ -119,7 +137,8 @@ int platform_rwlock_destroy(platform_rwlock_t* rwlock) {
 #endif
 }
 
-int platform_rwlock_rdlock(platform_rwlock_t* rwlock) {
+int platform_rwlock_rdlock(platform_rwlock_t *rwlock)
+{
 #ifdef _WIN32
     AcquireSRWLockShared(rwlock);
     return 0;
@@ -128,7 +147,8 @@ int platform_rwlock_rdlock(platform_rwlock_t* rwlock) {
 #endif
 }
 
-int platform_rwlock_wrlock(platform_rwlock_t* rwlock) {
+int platform_rwlock_wrlock(platform_rwlock_t *rwlock)
+{
 #ifdef _WIN32
     AcquireSRWLockExclusive(rwlock);
     return 0;
@@ -137,9 +157,10 @@ int platform_rwlock_wrlock(platform_rwlock_t* rwlock) {
 #endif
 }
 
-int platform_rwlock_unlock(platform_rwlock_t* rwlock) {
+int platform_rwlock_unlock(platform_rwlock_t *rwlock)
+{
 #ifdef _WIN32
-    void* state = *(void**)rwlock;
+    void *state = *(void **)rwlock;
     if (state && ((uintptr_t)state & 0x1) == 0) {
         ReleaseSRWLockShared(rwlock);
     } else {
@@ -151,7 +172,8 @@ int platform_rwlock_unlock(platform_rwlock_t* rwlock) {
 #endif
 }
 
-int platform_spinlock_init(platform_spinlock_t* spinlock) {
+int platform_spinlock_init(platform_spinlock_t *spinlock)
+{
 #ifdef _WIN32
     *spinlock = 0;
     return 0;
@@ -160,7 +182,8 @@ int platform_spinlock_init(platform_spinlock_t* spinlock) {
 #endif
 }
 
-int platform_spinlock_destroy(platform_spinlock_t* spinlock) {
+int platform_spinlock_destroy(platform_spinlock_t *spinlock)
+{
 #ifdef _WIN32
     *spinlock = 0;
     return 0;
@@ -169,11 +192,12 @@ int platform_spinlock_destroy(platform_spinlock_t* spinlock) {
 #endif
 }
 
-int platform_spinlock_lock(platform_spinlock_t* spinlock) {
+int platform_spinlock_lock(platform_spinlock_t *spinlock)
+{
 #ifdef _WIN32
     int expected = 0;
-    while (!atomic_compare_exchange_strong_explicit(spinlock, &expected, 1,
-                                                     memory_order_acquire, memory_order_relaxed)) {
+    while (!atomic_compare_exchange_strong_explicit(spinlock, &expected, 1, memory_order_acquire,
+                                                    memory_order_relaxed)) {
         expected = 0;
         SwitchToThread();
     }
@@ -183,7 +207,8 @@ int platform_spinlock_lock(platform_spinlock_t* spinlock) {
 #endif
 }
 
-int platform_spinlock_unlock(platform_spinlock_t* spinlock) {
+int platform_spinlock_unlock(platform_spinlock_t *spinlock)
+{
 #ifdef _WIN32
     atomic_store_explicit(spinlock, 0, memory_order_release);
     return 0;
@@ -192,7 +217,8 @@ int platform_spinlock_unlock(platform_spinlock_t* spinlock) {
 #endif
 }
 
-int platform_semaphore_init(platform_semaphore_t* semaphore, unsigned int value) {
+int platform_semaphore_init(platform_semaphore_t *semaphore, unsigned int value)
+{
 #ifdef _WIN32
     *semaphore = CreateSemaphore(NULL, (LONG)value, (LONG)0x7FFFFFFF, NULL);
     return (*semaphore != NULL) ? 0 : -1;
@@ -201,7 +227,8 @@ int platform_semaphore_init(platform_semaphore_t* semaphore, unsigned int value)
 #endif
 }
 
-int platform_semaphore_destroy(platform_semaphore_t* semaphore) {
+int platform_semaphore_destroy(platform_semaphore_t *semaphore)
+{
 #ifdef _WIN32
     CloseHandle(*semaphore);
     return 0;
@@ -210,7 +237,8 @@ int platform_semaphore_destroy(platform_semaphore_t* semaphore) {
 #endif
 }
 
-int platform_semaphore_wait(platform_semaphore_t* semaphore) {
+int platform_semaphore_wait(platform_semaphore_t *semaphore)
+{
 #ifdef _WIN32
     return (WaitForSingleObject(*semaphore, INFINITE) == WAIT_OBJECT_0) ? 0 : -1;
 #else
@@ -218,7 +246,8 @@ int platform_semaphore_wait(platform_semaphore_t* semaphore) {
 #endif
 }
 
-int platform_semaphore_post(platform_semaphore_t* semaphore) {
+int platform_semaphore_post(platform_semaphore_t *semaphore)
+{
 #ifdef _WIN32
     return ReleaseSemaphore(*semaphore, 1, NULL) ? 0 : -1;
 #else
@@ -226,7 +255,8 @@ int platform_semaphore_post(platform_semaphore_t* semaphore) {
 #endif
 }
 
-int platform_condition_init(platform_condition_t* cond) {
+int platform_condition_init(platform_condition_t *cond)
+{
 #ifdef _WIN32
     InitializeConditionVariable(cond);
     return 0;
@@ -235,7 +265,8 @@ int platform_condition_init(platform_condition_t* cond) {
 #endif
 }
 
-int platform_condition_destroy(platform_condition_t* cond) {
+int platform_condition_destroy(platform_condition_t *cond)
+{
 #ifdef _WIN32
     (void)cond;
     return 0;
@@ -244,7 +275,8 @@ int platform_condition_destroy(platform_condition_t* cond) {
 #endif
 }
 
-int platform_condition_wait(platform_condition_t* cond, platform_mutex_t* mutex) {
+int platform_condition_wait(platform_condition_t *cond, platform_mutex_t *mutex)
+{
 #ifdef _WIN32
     return SleepConditionVariableCS(cond, mutex, INFINITE) ? 0 : -1;
 #else
@@ -252,7 +284,8 @@ int platform_condition_wait(platform_condition_t* cond, platform_mutex_t* mutex)
 #endif
 }
 
-int platform_condition_signal(platform_condition_t* cond) {
+int platform_condition_signal(platform_condition_t *cond)
+{
 #ifdef _WIN32
     WakeConditionVariable(cond);
     return 0;
@@ -261,7 +294,8 @@ int platform_condition_signal(platform_condition_t* cond) {
 #endif
 }
 
-int platform_condition_broadcast(platform_condition_t* cond) {
+int platform_condition_broadcast(platform_condition_t *cond)
+{
 #ifdef _WIN32
     WakeAllConditionVariable(cond);
     return 0;
@@ -270,7 +304,8 @@ int platform_condition_broadcast(platform_condition_t* cond) {
 #endif
 }
 
-int platform_barrier_init(platform_barrier_t* barrier, unsigned int count) {
+int platform_barrier_init(platform_barrier_t *barrier, unsigned int count)
+{
 #ifdef _WIN32
     InitializeCriticalSection(&barrier->cs);
     InitializeConditionVariable(&barrier->cond);
@@ -283,7 +318,8 @@ int platform_barrier_init(platform_barrier_t* barrier, unsigned int count) {
 #endif
 }
 
-int platform_barrier_destroy(platform_barrier_t* barrier) {
+int platform_barrier_destroy(platform_barrier_t *barrier)
+{
 #ifdef _WIN32
     DeleteCriticalSection(&barrier->cs);
     return 0;
@@ -292,7 +328,8 @@ int platform_barrier_destroy(platform_barrier_t* barrier) {
 #endif
 }
 
-int platform_barrier_wait(platform_barrier_t* barrier) {
+int platform_barrier_wait(platform_barrier_t *barrier)
+{
 #ifdef _WIN32
     EnterCriticalSection(&barrier->cs);
     unsigned int gen = barrier->generation;
@@ -315,7 +352,8 @@ int platform_barrier_wait(platform_barrier_t* barrier) {
 #endif
 }
 
-int platform_event_init(platform_event_t* event, bool manual_reset) {
+int platform_event_init(platform_event_t *event, bool manual_reset)
+{
 #ifdef _WIN32
     *event = CreateEvent(NULL, manual_reset ? TRUE : FALSE, FALSE, NULL);
     return (*event != NULL) ? 0 : -1;
@@ -328,7 +366,8 @@ int platform_event_init(platform_event_t* event, bool manual_reset) {
 #endif
 }
 
-int platform_event_destroy(platform_event_t* event) {
+int platform_event_destroy(platform_event_t *event)
+{
 #ifdef _WIN32
     CloseHandle(*event);
     return 0;
@@ -339,7 +378,8 @@ int platform_event_destroy(platform_event_t* event) {
 #endif
 }
 
-int platform_event_set(platform_event_t* event) {
+int platform_event_set(platform_event_t *event)
+{
 #ifdef _WIN32
     return SetEvent(*event) ? 0 : -1;
 #else
@@ -355,7 +395,8 @@ int platform_event_set(platform_event_t* event) {
 #endif
 }
 
-int platform_event_reset(platform_event_t* event) {
+int platform_event_reset(platform_event_t *event)
+{
 #ifdef _WIN32
     return ResetEvent(*event) ? 0 : -1;
 #else
@@ -366,7 +407,8 @@ int platform_event_reset(platform_event_t* event) {
 #endif
 }
 
-int platform_event_wait(platform_event_t* event, uint64_t timeout_ms) {
+int platform_event_wait(platform_event_t *event, uint64_t timeout_ms)
+{
 #ifdef _WIN32
     DWORD result = WaitForSingleObject(*event, (DWORD)timeout_ms);
     return (result == WAIT_OBJECT_0) ? 0 : -1;
@@ -375,7 +417,7 @@ int platform_event_wait(platform_event_t* event, uint64_t timeout_ms) {
     while (!event->signaled) {
         if (timeout_ms == 0) {
             pthread_mutex_unlock(&event->mutex);
-            return -1;
+            return AGENTOS_EINVAL;
         }
         if (timeout_ms == (uint64_t)-1) {
             pthread_cond_wait(&event->cond, &event->mutex);
@@ -391,7 +433,7 @@ int platform_event_wait(platform_event_t* event, uint64_t timeout_ms) {
             int ret = pthread_cond_timedwait(&event->cond, &event->mutex, &ts);
             if (ret == ETIMEDOUT) {
                 pthread_mutex_unlock(&event->mutex);
-                return -1;
+                return AGENTOS_EINVAL;
             }
         }
     }
@@ -403,7 +445,8 @@ int platform_event_wait(platform_event_t* event, uint64_t timeout_ms) {
 #endif
 }
 
-uint64_t platform_get_timestamp_ms(void) {
+uint64_t platform_get_timestamp_ms(void)
+{
 #ifdef _WIN32
     return (uint64_t)GetTickCount64();
 #else
@@ -413,7 +456,8 @@ uint64_t platform_get_timestamp_ms(void) {
 #endif
 }
 
-uint64_t platform_get_thread_id(void) {
+uint64_t platform_get_thread_id(void)
+{
 #ifdef _WIN32
     return (uint64_t)GetCurrentThreadId();
 #else

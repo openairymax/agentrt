@@ -27,8 +27,8 @@
 #define AGENTOS_FRAMEWORKS_H
 
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,42 +37,42 @@ extern "C" {
 /* ==================== 框架类型枚举 ==================== */
 
 typedef enum {
-    AGENTOS_FW_AGENT   = 0,
-    AGENTOS_FW_MEMORY  = 1,
-    AGENTOS_FW_TASK    = 2,
-    AGENTOS_FW_SAFETY  = 3,
-    AGENTOS_FW_TOOL    = 4,
-    AGENTOS_FW_COUNT   = 5
+    AGENTOS_FW_AGENT = 0,
+    AGENTOS_FW_MEMORY = 1,
+    AGENTOS_FW_TASK = 2,
+    AGENTOS_FW_SAFETY = 3,
+    AGENTOS_FW_TOOL = 4,
+    AGENTOS_FW_COUNT = 5
 } agentos_framework_t;
 
 /* ==================== 框架状态 ==================== */
 
 typedef enum {
     AGENTOS_FW_STATE_UNINITIALIZED = 0,
-    AGENTOS_FW_STATE_INITIALIZED   = 1,
-    AGENTOS_FW_STATE_RUNNING       = 2,
-    AGENTOS_FW_STATE_PAUSED        = 3,
-    AGENTOS_FW_STATE_ERROR         = 4,
-    AGENTOS_FW_STATE_SHUTDOWN      = 5
+    AGENTOS_FW_STATE_INITIALIZED = 1,
+    AGENTOS_FW_STATE_RUNNING = 2,
+    AGENTOS_FW_STATE_PAUSED = 3,
+    AGENTOS_FW_STATE_ERROR = 4,
+    AGENTOS_FW_STATE_SHUTDOWN = 5
 } agentos_fw_state_t;
 
 /* ==================== 框架能力标志 ==================== */
 
 typedef enum {
-    AGENTOS_CAP_COGNITION       = (1 << 0),
-    AGENTOS_CAP_EXECUTION       = (1 << 1),
-    AGENTOS_CAP_MEMORY_STORE    = (1 << 2),
+    AGENTOS_CAP_COGNITION = (1 << 0),
+    AGENTOS_CAP_EXECUTION = (1 << 1),
+    AGENTOS_CAP_MEMORY_STORE = (1 << 2),
     AGENTOS_CAP_MEMORY_RETRIEVE = (1 << 3),
-    AGENTOS_CAP_TASK_SCHEDULE   = (1 << 4),
-    AGENTOS_CAP_TASK_EXECUTE    = (1 << 5),
-    AGENTOS_CAP_SAFETY_CHECK    = (1 << 6),
-    AGENTOS_CAP_SANDBOX         = (1 << 7),
-    AGENTOS_CAP_TOOL_REGISTER   = (1 << 8),
-    AGENTOS_CAP_TOOL_INVOKE     = (1 << 9),
-    AGENTOS_CAP_PROTOCOL_MCP    = (1 << 10),
-    AGENTOS_CAP_PROTOCOL_A2A    = (1 << 11),
+    AGENTOS_CAP_TASK_SCHEDULE = (1 << 4),
+    AGENTOS_CAP_TASK_EXECUTE = (1 << 5),
+    AGENTOS_CAP_SAFETY_CHECK = (1 << 6),
+    AGENTOS_CAP_SANDBOX = (1 << 7),
+    AGENTOS_CAP_TOOL_REGISTER = (1 << 8),
+    AGENTOS_CAP_TOOL_INVOKE = (1 << 9),
+    AGENTOS_CAP_PROTOCOL_MCP = (1 << 10),
+    AGENTOS_CAP_PROTOCOL_A2A = (1 << 11),
     AGENTOS_CAP_PROTOCOL_OPENAI = (1 << 12),
-    AGENTOS_CAP_ALL             = 0x1FFF
+    AGENTOS_CAP_ALL = 0x1FFF
 } agentos_capability_t;
 
 /* ==================== 框架信息 ==================== */
@@ -94,19 +94,19 @@ typedef struct {
 typedef struct {
     int32_t code;
     char message[256];
-    void* data;
+    void *data;
     size_t data_size;
     uint64_t latency_us;
 } agentos_fw_result_t;
 
-#define AGENTOS_FW_OK           0
-#define AGENTOS_FW_ERROR       -1
-#define AGENTOS_FW_NOT_INIT    -2
+#define AGENTOS_FW_OK 0
+#define AGENTOS_FW_ERROR -1
+#define AGENTOS_FW_NOT_INIT -2
 #define AGENTOS_FW_INVALID_ARG -3
-#define AGENTOS_FW_TIMEOUT     -4
-#define AGENTOS_FW_BUSY        -5
-#define AGENTOS_FW_NOT_FOUND   -6
-#define AGENTOS_FW_DENIED      -7
+#define AGENTOS_FW_TIMEOUT -4
+#define AGENTOS_FW_BUSY -5
+#define AGENTOS_FW_NOT_FOUND -6
+#define AGENTOS_FW_DENIED -7
 
 /* ==================== 框架配置 ==================== */
 
@@ -123,30 +123,27 @@ typedef struct {
 /* ==================== 框架事件回调 ==================== */
 
 typedef enum {
-    AGENTOS_FW_EVENT_INIT       = 1,
-    AGENTOS_FW_EVENT_START      = 2,
-    AGENTOS_FW_EVENT_STOP       = 3,
-    AGENTOS_FW_EVENT_ERROR      = 4,
+    AGENTOS_FW_EVENT_INIT = 1,
+    AGENTOS_FW_EVENT_START = 2,
+    AGENTOS_FW_EVENT_STOP = 3,
+    AGENTOS_FW_EVENT_ERROR = 4,
     AGENTOS_FW_EVENT_STATE_CHANGE = 5,
-    AGENTOS_FW_EVENT_OPERATION  = 6
+    AGENTOS_FW_EVENT_OPERATION = 6
 } agentos_fw_event_type_t;
 
 typedef struct {
     agentos_fw_event_type_t type;
     agentos_framework_t framework;
-    const char* detail;
+    const char *detail;
     uint64_t timestamp;
     int32_t error_code;
 } agentos_fw_event_t;
 
-typedef void (*agentos_fw_event_callback_t)(
-    const agentos_fw_event_t* event,
-    void* user_data
-);
+typedef void (*agentos_fw_event_callback_t)(const agentos_fw_event_t *event, void *user_data);
 
 /* ==================== 框架管理器句柄 ==================== */
 
-typedef struct agentos_fw_manager_s* agentos_fw_manager_t;
+typedef struct agentos_fw_manager_s *agentos_fw_manager_t;
 
 /* ==================== 框架管理器生命周期 ==================== */
 
@@ -169,9 +166,8 @@ void agentos_fw_manager_destroy(agentos_fw_manager_t manager);
  * @param config 框架配置（NULL使用默认）
  * @return AGENTOS_FW_OK成功，其他失败
  */
-int32_t agentos_fw_init(agentos_fw_manager_t manager,
-                        agentos_framework_t framework,
-                        const agentos_fw_config_t* config);
+int32_t agentos_fw_init(agentos_fw_manager_t manager, agentos_framework_t framework,
+                        const agentos_fw_config_t *config);
 
 /**
  * @brief 初始化所有框架
@@ -186,8 +182,7 @@ int32_t agentos_fw_init_all(agentos_fw_manager_t manager);
  * @param framework 框架类型
  * @return AGENTOS_FW_OK成功，其他失败
  */
-int32_t agentos_fw_start(agentos_fw_manager_t manager,
-                         agentos_framework_t framework);
+int32_t agentos_fw_start(agentos_fw_manager_t manager, agentos_framework_t framework);
 
 /**
  * @brief 启动所有已初始化框架
@@ -202,8 +197,7 @@ int32_t agentos_fw_start_all(agentos_fw_manager_t manager);
  * @param framework 框架类型
  * @return AGENTOS_FW_OK成功，其他失败
  */
-int32_t agentos_fw_stop(agentos_fw_manager_t manager,
-                        agentos_framework_t framework);
+int32_t agentos_fw_stop(agentos_fw_manager_t manager, agentos_framework_t framework);
 
 /**
  * @brief 停止所有框架
@@ -220,9 +214,8 @@ void agentos_fw_stop_all(agentos_fw_manager_t manager);
  * @param info [out] 框架信息
  * @return AGENTOS_FW_OK成功，其他失败
  */
-int32_t agentos_fw_get_info(agentos_fw_manager_t manager,
-                            agentos_framework_t framework,
-                            agentos_fw_info_t* info);
+int32_t agentos_fw_get_info(agentos_fw_manager_t manager, agentos_framework_t framework,
+                            agentos_fw_info_t *info);
 
 /**
  * @brief 获取所有框架信息
@@ -232,10 +225,8 @@ int32_t agentos_fw_get_info(agentos_fw_manager_t manager,
  * @param found_count [out] 实际数量
  * @return AGENTOS_FW_OK成功，其他失败
  */
-int32_t agentos_fw_get_all_info(agentos_fw_manager_t manager,
-                                agentos_fw_info_t* infos,
-                                uint32_t max_count,
-                                uint32_t* found_count);
+int32_t agentos_fw_get_all_info(agentos_fw_manager_t manager, agentos_fw_info_t *infos,
+                                uint32_t max_count, uint32_t *found_count);
 
 /**
  * @brief 检查框架是否支持指定能力
@@ -244,8 +235,7 @@ int32_t agentos_fw_get_all_info(agentos_fw_manager_t manager,
  * @param capability 能力标志
  * @return true支持，false不支持
  */
-bool agentos_fw_has_capability(agentos_fw_manager_t manager,
-                               agentos_framework_t framework,
+bool agentos_fw_has_capability(agentos_fw_manager_t manager, agentos_framework_t framework,
                                agentos_capability_t capability);
 
 /**
@@ -269,8 +259,7 @@ agentos_fw_state_t agentos_fw_get_state(agentos_fw_manager_t manager,
  */
 int32_t agentos_fw_register_event_callback(agentos_fw_manager_t manager,
                                            agentos_framework_t framework,
-                                           agentos_fw_event_callback_t callback,
-                                           void* user_data);
+                                           agentos_fw_event_callback_t callback, void *user_data);
 
 /* ==================== 框架健康检查 ==================== */
 
@@ -280,8 +269,7 @@ int32_t agentos_fw_register_event_callback(agentos_fw_manager_t manager,
  * @param framework 框架类型
  * @return AGENTOS_FW_OK健康，其他不健康
  */
-int32_t agentos_fw_health_check(agentos_fw_manager_t manager,
-                                agentos_framework_t framework);
+int32_t agentos_fw_health_check(agentos_fw_manager_t manager, agentos_framework_t framework);
 
 /**
  * @brief 执行所有框架健康检查
@@ -297,21 +285,21 @@ int32_t agentos_fw_health_check_all(agentos_fw_manager_t manager);
  * @param framework 框架类型
  * @return 框架名称
  */
-const char* agentos_fw_type_to_string(agentos_framework_t framework);
+const char *agentos_fw_type_to_string(agentos_framework_t framework);
 
 /**
  * @brief 框架状态转字符串
  * @param state 框架状态
  * @return 状态名称
  */
-const char* agentos_fw_state_to_string(agentos_fw_state_t state);
+const char *agentos_fw_state_to_string(agentos_fw_state_t state);
 
 /**
  * @brief 错误码转字符串
  * @param code 错误码
  * @return 错误描述
  */
-const char* agentos_fw_error_to_string(int32_t code);
+const char *agentos_fw_error_to_string(int32_t code);
 
 /**
  * @brief 创建默认框架配置

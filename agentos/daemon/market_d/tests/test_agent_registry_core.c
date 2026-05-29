@@ -6,19 +6,22 @@
  */
 
 #include "agent_registry_core.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #define TEST_PASS(name) printf("✓ %s\n", name)
-#define TEST_FAIL(name, reason) do { \
-    printf("✗ %s: %s\n", name, reason); \
-    return -1; \
-} while(0)
+#define TEST_FAIL(name, reason)             \
+    do {                                    \
+        printf("✗ %s: %s\n", name, reason); \
+        return -1;                          \
+    } while (0)
 
-static int test_create_destroy(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_create_destroy(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     if (!reg) {
         TEST_FAIL("create_destroy", "Failed to create registry");
     }
@@ -28,8 +31,9 @@ static int test_create_destroy(void) {
     return 0;
 }
 
-static int test_init_shutdown(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_init_shutdown(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     if (!reg) {
         TEST_FAIL("init_shutdown", "Failed to create registry");
     }
@@ -45,8 +49,9 @@ static int test_init_shutdown(void) {
     return 0;
 }
 
-static int test_add_get_agent(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_add_get_agent(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     if (!reg) {
         TEST_FAIL("add_get_agent", "Failed to create registry");
     }
@@ -72,7 +77,7 @@ static int test_add_get_agent(void) {
     free(entry.description);
     free(entry.author);
 
-    const agent_entry_t* found = agent_registry_get(reg, "test-agent-001");
+    const agent_entry_t *found = agent_registry_get(reg, "test-agent-001");
     if (!found) {
         agent_registry_shutdown(reg);
         agent_registry_destroy(reg);
@@ -91,8 +96,9 @@ static int test_add_get_agent(void) {
     return 0;
 }
 
-static int test_remove_agent(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_remove_agent(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     agent_registry_init(reg, NULL);
 
     agent_entry_t entry = {0};
@@ -111,7 +117,7 @@ static int test_remove_agent(void) {
         TEST_FAIL("remove_agent", "Failed to remove agent");
     }
 
-    const agent_entry_t* found = agent_registry_get(reg, "test-agent-002");
+    const agent_entry_t *found = agent_registry_get(reg, "test-agent-002");
     if (found) {
         agent_registry_shutdown(reg);
         agent_registry_destroy(reg);
@@ -124,8 +130,9 @@ static int test_remove_agent(void) {
     return 0;
 }
 
-static int test_list_agents(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_list_agents(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     agent_registry_init(reg, NULL);
 
     for (int i = 0; i < 5; i++) {
@@ -140,7 +147,7 @@ static int test_list_agents(void) {
         free(entry.author);
     }
 
-    const agent_entry_t* entries[10];
+    const agent_entry_t *entries[10];
     size_t count = agent_registry_list(reg, entries, 10);
 
     if (count != 5) {
@@ -155,8 +162,9 @@ static int test_list_agents(void) {
     return 0;
 }
 
-static int test_search_by_tag(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_search_by_tag(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     agent_registry_init(reg, NULL);
 
     agent_entry_t entry = {0};
@@ -167,7 +175,7 @@ static int test_search_by_tag(void) {
     agent_registry_add(reg, &entry);
     free(entry.author);
 
-    const agent_entry_t* results[10];
+    const agent_entry_t *results[10];
     size_t count = agent_registry_search_by_tag(reg, "python", results, 10);
 
     agent_registry_shutdown(reg);
@@ -176,8 +184,9 @@ static int test_search_by_tag(void) {
     return 0;
 }
 
-static int test_search(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_search(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     agent_registry_init(reg, NULL);
 
     agent_entry_t entry = {0};
@@ -190,7 +199,7 @@ static int test_search(void) {
     free(entry.description);
     free(entry.author);
 
-    const agent_entry_t* results[10];
+    const agent_entry_t *results[10];
     size_t count = agent_registry_search(reg, "searchable", results, 10);
 
     if (count != 1) {
@@ -205,8 +214,9 @@ static int test_search(void) {
     return 0;
 }
 
-static int test_count(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_count(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     agent_registry_init(reg, NULL);
 
     if (agent_registry_count(reg) != 0) {
@@ -238,8 +248,9 @@ static int test_count(void) {
     return 0;
 }
 
-static int test_add_version(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_add_version(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     agent_registry_init(reg, NULL);
 
     agent_entry_t entry = {0};
@@ -260,7 +271,7 @@ static int test_add_version(void) {
         TEST_FAIL("add_version", "Failed to add version");
     }
 
-    const char* latest = agent_registry_get_latest_version(reg, "version-test-agent");
+    const char *latest = agent_registry_get_latest_version(reg, "version-test-agent");
     if (!latest || strcmp(latest, "1.0.0") != 0) {
         agent_registry_shutdown(reg);
         agent_registry_destroy(reg);
@@ -273,8 +284,9 @@ static int test_add_version(void) {
     return 0;
 }
 
-static int test_invalid_params(void) {
-    agent_registry_t* reg = agent_registry_create();
+static int test_invalid_params(void)
+{
+    agent_registry_t *reg = agent_registry_create();
     agent_registry_init(reg, NULL);
 
     agent_entry_t entry = {0};
@@ -298,21 +310,32 @@ static int test_invalid_params(void) {
     return 0;
 }
 
-int main(void) {
+int main(void)
+{
     int failed = 0;
 
     printf("\n=== Agent Registry Core Unit Tests ===\n\n");
 
-    if (test_create_destroy() != 0) failed++;
-    if (test_init_shutdown() != 0) failed++;
-    if (test_add_get_agent() != 0) failed++;
-    if (test_remove_agent() != 0) failed++;
-    if (test_list_agents() != 0) failed++;
-    if (test_search_by_tag() != 0) failed++;
-    if (test_search() != 0) failed++;
-    if (test_count() != 0) failed++;
-    if (test_add_version() != 0) failed++;
-    if (test_invalid_params() != 0) failed++;
+    if (test_create_destroy() != 0)
+        failed++;
+    if (test_init_shutdown() != 0)
+        failed++;
+    if (test_add_get_agent() != 0)
+        failed++;
+    if (test_remove_agent() != 0)
+        failed++;
+    if (test_list_agents() != 0)
+        failed++;
+    if (test_search_by_tag() != 0)
+        failed++;
+    if (test_search() != 0)
+        failed++;
+    if (test_count() != 0)
+        failed++;
+    if (test_add_version() != 0)
+        failed++;
+    if (test_invalid_params() != 0)
+        failed++;
 
     printf("\n=== Test Summary ===\n");
     printf("Total: 10 tests\n");

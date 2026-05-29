@@ -4,36 +4,42 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "strategy.h"
 #include "agentos.h"
+#include "strategy.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
-#include <string.h>
+
 #include <stdio.h>
+#include <string.h>
 
 /**
  * @brief 加权融合私有数据
  */
 typedef struct weighted_data {
-    char** model_names;           /**< 模型名称数组 */
-    float* weights;                /**< 对应权重 */
-    size_t model_count;            /**< 模型数量 */
-    agentos_mutex_t* lock;
+    char **model_names; /**< 模型名称数组 */
+    float *weights;     /**< 对应权重 */
+    size_t model_count; /**< 模型数量 */
+    agentos_mutex_t *lock;
 } weighted_data_t;
 
-static void weighted_destroy(agentos_coordinator_base_t* base) {
-    if (!base) return;
-    weighted_data_t* data = (weighted_data_t*)base->data;
+static void weighted_destroy(agentos_coordinator_base_t *base)
+{
+    if (!base)
+        return;
+    weighted_data_t *data = (weighted_data_t *)base->data;
     if (data) {
         for (size_t i = 0; i < data->model_count; i++) {
-            if (data->model_names[i]) AGENTOS_FREE(data->model_names[i]);
+            if (data->model_names[i])
+                AGENTOS_FREE(data->model_names[i]);
         }
         AGENTOS_FREE(data->model_names);
         AGENTOS_FREE(data->weights);
-        if (data->lock) agentos_mutex_free(data->lock);
+        if (data->lock)
+            agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
     AGENTOS_FREE(base);
@@ -42,15 +48,15 @@ static void weighted_destroy(agentos_coordinator_base_t* base) {
 /**
  * @brief 加权融合执行
  */
-static agentos_error_t weighted_coordinate(
-    agentos_coordinator_base_t* base,
-    const agentos_coordination_context_t __attribute__((unused)) *context,
-    const char** inputs,
-    size_t input_count,
-    char** out_result) {
-    if (!base || !out_result) return AGENTOS_EINVAL;
+static agentos_error_t
+weighted_coordinate(agentos_coordinator_base_t *base,
+                    const agentos_coordination_context_t __attribute__((unused)) * context,
+                    const char **inputs, size_t input_count, char **out_result)
+{
+    if (!base || !out_result)
+        return AGENTOS_EINVAL;
 
-    weighted_data_t* data = (weighted_data_t*)base->data;
+    weighted_data_t *data = (weighted_data_t *)base->data;
     if (!data || !inputs || input_count == 0) {
         *out_result = AGENTOS_STRDUP("invalid_input");
         return AGENTOS_EINVAL;
@@ -69,7 +75,8 @@ static agentos_error_t weighted_coordinate(
     }
 
     *out_result = AGENTOS_STRDUP(inputs[best_index]);
-    if (!*out_result) return AGENTOS_ENOMEM;
+    if (!*out_result)
+        return AGENTOS_ENOMEM;
 
     return AGENTOS_SUCCESS;
 }
@@ -77,19 +84,20 @@ static agentos_error_t weighted_coordinate(
 /**
  * @brief 创建加权融合协调器
  */
-agentos_error_t agentos_coordinator_weighted_create(
-    const char** model_names,
-    const float* weights,
-    size_t model_count,
-    agentos_coordinator_base_t** out_base) {
+agentos_error_t agentos_coordinator_weighted_create(const char **model_names, const float *weights,
+                                                    size_t model_count,
+                                                    agentos_coordinator_base_t **out_base)
+{
     if (!out_base || !model_names || !weights || model_count == 0) {
         return AGENTOS_EINVAL;
     }
 
-    agentos_coordinator_base_t* base = (agentos_coordinator_base_t*)AGENTOS_CALLOC(1, sizeof(agentos_coordinator_base_t));
-    if (!base) return AGENTOS_ENOMEM;
+    agentos_coordinator_base_t *base =
+        (agentos_coordinator_base_t *)AGENTOS_CALLOC(1, sizeof(agentos_coordinator_base_t));
+    if (!base)
+        return AGENTOS_ENOMEM;
 
-    weighted_data_t* data = (weighted_data_t*)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
+    weighted_data_t *data = (weighted_data_t *)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
     if (!data) {
         AGENTOS_FREE(base);
         return AGENTOS_ENOMEM;
@@ -104,7 +112,7 @@ agentos_error_t agentos_coordinator_weighted_create(
     }
 
     // 复制模型名称
-    data->model_names = (char**)AGENTOS_CALLOC(model_count, sizeof(char*));
+    data->model_names = (char **)AGENTOS_CALLOC(model_count, sizeof(char *));
     if (!data->model_names) {
         agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
@@ -127,7 +135,7 @@ agentos_error_t agentos_coordinator_weighted_create(
     }
 
     // 复制权重
-    data->weights = (float*)AGENTOS_CALLOC(model_count, sizeof(float));
+    data->weights = (float *)AGENTOS_CALLOC(model_count, sizeof(float));
     if (!data->weights) {
         for (size_t i = 0; i < model_count; i++) {
             AGENTOS_FREE(data->model_names[i]);

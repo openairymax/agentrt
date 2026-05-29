@@ -11,33 +11,36 @@
  * 避免类型强转导致的类型安全问题。
  */
 
-#include "tool_service.h"
 #include "svc_common.h"
 #include "svc_logger.h"
+#include "tool_service.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 typedef struct {
-    tool_service_t* tool_svc;
-    char* config_path;
+    tool_service_t *tool_svc;
+    char *config_path;
     agentos_svc_config_t common_cfg;
     bool owns_service;
     bool running;
 } tool_adapter_ctx_t;
 
-static tool_adapter_ctx_t* tool_get_ctx(agentos_service_t service) {
-    if (!service) return NULL;
-    return (tool_adapter_ctx_t*)agentos_service_get_user_data(service);
+static tool_adapter_ctx_t *tool_get_ctx(agentos_service_t service)
+{
+    if (!service)
+        return NULL;
+    return (tool_adapter_ctx_t *)agentos_service_get_user_data(service);
 }
 
-static agentos_error_t tool_adapter_init(
-    agentos_service_t service,
-    const agentos_svc_config_t* config
-) {
-    if (!service) return AGENTOS_EINVAL;
-    tool_adapter_ctx_t* ctx = tool_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
+static agentos_error_t tool_adapter_init(agentos_service_t service,
+                                         const agentos_svc_config_t *config)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    tool_adapter_ctx_t *ctx = tool_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
 
     if (config) {
         memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
@@ -53,7 +56,7 @@ static agentos_error_t tool_adapter_init(
     }
 
     if (!ctx->tool_svc) {
-        const char* path = ctx->config_path ? ctx->config_path : "tool_config.json";
+        const char *path = ctx->config_path ? ctx->config_path : "tool_config.json";
         ctx->tool_svc = tool_service_create(path);
         if (!ctx->tool_svc) {
             SVC_LOG_ERROR("工具服务创建失败");
@@ -65,21 +68,29 @@ static agentos_error_t tool_adapter_init(
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t tool_adapter_start(agentos_service_t service) {
-    if (!service) return AGENTOS_EINVAL;
-    tool_adapter_ctx_t* ctx = tool_get_ctx(service);
-    if (!ctx || !ctx->tool_svc) return AGENTOS_ENOTINIT;
-    if (ctx->running) return AGENTOS_SUCCESS;
+static agentos_error_t tool_adapter_start(agentos_service_t service)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    tool_adapter_ctx_t *ctx = tool_get_ctx(service);
+    if (!ctx || !ctx->tool_svc)
+        return AGENTOS_ENOTINIT;
+    if (ctx->running)
+        return AGENTOS_SUCCESS;
     ctx->running = true;
     SVC_LOG_INFO("工具服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t tool_adapter_stop(agentos_service_t service, bool force) {
-    if (!service) return AGENTOS_EINVAL;
-    tool_adapter_ctx_t* ctx = tool_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
-    if (!ctx->running) return AGENTOS_SUCCESS;
+static agentos_error_t tool_adapter_stop(agentos_service_t service, bool force)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    tool_adapter_ctx_t *ctx = tool_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
+    if (!ctx->running)
+        return AGENTOS_SUCCESS;
     ctx->running = false;
     if (force) {
         if (ctx->tool_svc && ctx->owns_service) {
@@ -87,7 +98,10 @@ static agentos_error_t tool_adapter_stop(agentos_service_t service, bool force) 
             ctx->tool_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->config_path) { AGENTOS_FREE(ctx->config_path); ctx->config_path = NULL; }
+        if (ctx->config_path) {
+            AGENTOS_FREE(ctx->config_path);
+            ctx->config_path = NULL;
+        }
         SVC_LOG_INFO("工具服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("工具服务适配器已停止");
@@ -95,10 +109,13 @@ static agentos_error_t tool_adapter_stop(agentos_service_t service, bool force) 
     return AGENTOS_SUCCESS;
 }
 
-static void tool_adapter_destroy(agentos_service_t service) {
-    if (!service) return;
-    tool_adapter_ctx_t* ctx = tool_get_ctx(service);
-    if (!ctx) return;
+static void tool_adapter_destroy(agentos_service_t service)
+{
+    if (!service)
+        return;
+    tool_adapter_ctx_t *ctx = tool_get_ctx(service);
+    if (!ctx)
+        return;
 
     if (ctx->tool_svc && ctx->owns_service) {
         tool_service_destroy(ctx->tool_svc);
@@ -111,11 +128,11 @@ static void tool_adapter_destroy(agentos_service_t service) {
     }
 
     if (ctx->common_cfg.name && ctx->common_cfg.name[0] != '\0') {
-        AGENTOS_FREE((void*)ctx->common_cfg.name);
+        AGENTOS_FREE((void *)ctx->common_cfg.name);
         ctx->common_cfg.name = NULL;
     }
     if (ctx->common_cfg.version && ctx->common_cfg.version[0] != '\0') {
-        AGENTOS_FREE((void*)ctx->common_cfg.version);
+        AGENTOS_FREE((void *)ctx->common_cfg.version);
         ctx->common_cfg.version = NULL;
     }
 
@@ -123,13 +140,18 @@ static void tool_adapter_destroy(agentos_service_t service) {
     AGENTOS_FREE(ctx);
 }
 
-static agentos_error_t tool_adapter_healthcheck(agentos_service_t service) {
-    if (!service) return AGENTOS_EINVAL;
-    tool_adapter_ctx_t* ctx = tool_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
-    if (!ctx->tool_svc) return AGENTOS_ENOTINIT;
-    if (!ctx->running) return AGENTOS_ENOTINIT;
-    char* list_json = tool_service_list(ctx->tool_svc);
+static agentos_error_t tool_adapter_healthcheck(agentos_service_t service)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    tool_adapter_ctx_t *ctx = tool_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
+    if (!ctx->tool_svc)
+        return AGENTOS_ENOTINIT;
+    if (!ctx->running)
+        return AGENTOS_ENOTINIT;
+    char *list_json = tool_service_list(ctx->tool_svc);
     if (!list_json) {
         SVC_LOG_WARN("工具服务健康检查失败: 无法获取工具列表");
         return AGENTOS_ERR_UNKNOWN;
@@ -146,14 +168,15 @@ static const agentos_svc_interface_t tool_adapter_iface = {
     .healthcheck = tool_adapter_healthcheck,
 };
 
-agentos_error_t tool_service_adapter_create(
-    agentos_service_t* out_service,
-    const agentos_svc_config_t* config
-) {
-    if (!out_service) return AGENTOS_EINVAL;
+agentos_error_t tool_service_adapter_create(agentos_service_t *out_service,
+                                            const agentos_svc_config_t *config)
+{
+    if (!out_service)
+        return AGENTOS_EINVAL;
 
-    tool_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(tool_adapter_ctx_t));
-    if (!ctx) return AGENTOS_ENOMEM;
+    tool_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(tool_adapter_ctx_t));
+    if (!ctx)
+        return AGENTOS_ENOMEM;
 
     if (config) {
         memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
@@ -175,7 +198,7 @@ agentos_error_t tool_service_adapter_create(
         }
     } else {
         ctx->common_cfg.name = "tool_d";
-        ctx->common_cfg.version = "0.0.5";
+        ctx->common_cfg.version = "0.1.0";
         ctx->common_cfg.capabilities = AGENTOS_SVC_CAP_ASYNC;
         ctx->common_cfg.enable_metrics = true;
     }
@@ -183,9 +206,8 @@ agentos_error_t tool_service_adapter_create(
     ctx->owns_service = true;
 
     agentos_service_t svc_handle = NULL;
-    agentos_error_t err = agentos_service_create(
-        &svc_handle, ctx->common_cfg.name, &tool_adapter_iface, &ctx->common_cfg
-    );
+    agentos_error_t err = agentos_service_create(&svc_handle, ctx->common_cfg.name,
+                                                 &tool_adapter_iface, &ctx->common_cfg);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(ctx->config_path);
         AGENTOS_FREE(ctx);
@@ -204,15 +226,15 @@ agentos_error_t tool_service_adapter_create(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t tool_service_adapter_wrap(
-    agentos_service_t* out_service,
-    tool_service_t* tool_svc,
-    const agentos_svc_config_t* config
-) {
-    if (!out_service || !tool_svc) return AGENTOS_EINVAL;
+agentos_error_t tool_service_adapter_wrap(agentos_service_t *out_service, tool_service_t *tool_svc,
+                                          const agentos_svc_config_t *config)
+{
+    if (!out_service || !tool_svc)
+        return AGENTOS_EINVAL;
 
-    tool_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(tool_adapter_ctx_t));
-    if (!ctx) return AGENTOS_ENOMEM;
+    tool_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(tool_adapter_ctx_t));
+    if (!ctx)
+        return AGENTOS_ENOMEM;
 
     ctx->tool_svc = tool_svc;
     ctx->owns_service = false;
@@ -230,13 +252,12 @@ agentos_error_t tool_service_adapter_wrap(
         ctx->common_cfg.enable_tracing = config->enable_tracing;
     } else {
         ctx->common_cfg.name = "tool_d";
-        ctx->common_cfg.version = "0.0.5";
+        ctx->common_cfg.version = "0.1.0";
     }
 
     agentos_service_t svc_handle = NULL;
-    agentos_error_t err = agentos_service_create(
-        &svc_handle, ctx->common_cfg.name, &tool_adapter_iface, &ctx->common_cfg
-    );
+    agentos_error_t err = agentos_service_create(&svc_handle, ctx->common_cfg.name,
+                                                 &tool_adapter_iface, &ctx->common_cfg);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(ctx);
         return err;
@@ -253,32 +274,40 @@ agentos_error_t tool_service_adapter_wrap(
     return AGENTOS_SUCCESS;
 }
 
-tool_service_t* tool_service_adapter_get_original(agentos_service_t service) {
-    if (!service) return NULL;
-    tool_adapter_ctx_t* ctx = tool_get_ctx(service);
+tool_service_t *tool_service_adapter_get_original(agentos_service_t service)
+{
+    if (!service)
+        return NULL;
+    tool_adapter_ctx_t *ctx = tool_get_ctx(service);
     return ctx ? ctx->tool_svc : NULL;
 }
 
-agentos_error_t tool_service_adapter_init(agentos_service_t service) {
+agentos_error_t tool_service_adapter_init(agentos_service_t service)
+{
     return tool_adapter_init(service, NULL);
 }
 
-agentos_error_t tool_service_adapter_start(agentos_service_t service) {
+agentos_error_t tool_service_adapter_start(agentos_service_t service)
+{
     return tool_adapter_start(service);
 }
 
-agentos_error_t tool_service_adapter_stop(agentos_service_t service, bool force) {
+agentos_error_t tool_service_adapter_stop(agentos_service_t service, bool force)
+{
     return tool_adapter_stop(service, force);
 }
 
-void tool_service_adapter_destroy(agentos_service_t service) {
+void tool_service_adapter_destroy(agentos_service_t service)
+{
     tool_adapter_destroy(service);
 }
 
-agentos_error_t tool_service_adapter_healthcheck(agentos_service_t service) {
+agentos_error_t tool_service_adapter_healthcheck(agentos_service_t service)
+{
     return tool_adapter_healthcheck(service);
 }
 
-const agentos_svc_interface_t* tool_service_adapter_get_interface(void) {
+const agentos_svc_interface_t *tool_service_adapter_get_interface(void)
+{
     return &tool_adapter_iface;
 }

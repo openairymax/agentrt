@@ -6,16 +6,17 @@
  * "From data intelligence emerges."
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <time.h>
-
 #include "heapstore.h"
 #include "heapstore_ipc.h"
 
-static void test_ipc_init_shutdown(void) {
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+static void test_ipc_init_shutdown(void)
+{
     printf("Test: ipc_init_shutdown...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_ipc_init();
@@ -25,7 +26,8 @@ static void test_ipc_init_shutdown(void) {
     printf("PASS\n");
 }
 
-static void test_ipc_channel_crud(void) {
+static void test_ipc_channel_crud(void)
+{
     printf("Test: ipc_channel_crud...");
 
     heapstore_ipc_channel_t channel;
@@ -58,7 +60,8 @@ static void test_ipc_channel_crud(void) {
     printf("PASS\n");
 }
 
-static void test_ipc_buffer_crud(void) {
+static void test_ipc_buffer_crud(void)
+{
     printf("Test: ipc_buffer_crud...");
 
     heapstore_ipc_channel_t channel;
@@ -99,7 +102,8 @@ static void test_ipc_buffer_crud(void) {
     printf("PASS\n");
 }
 
-static void test_ipc_stats(void) {
+static void test_ipc_stats(void)
+{
     printf("Test: ipc_stats...");
 
     heapstore_error_t init_err __attribute__((unused)) = heapstore_ipc_init();
@@ -109,15 +113,18 @@ static void test_ipc_stats(void) {
     uint32_t buffer_count = 0;
     uint64_t total_size = 0;
 
-    heapstore_error_t err __attribute__((unused)) = heapstore_ipc_get_stats(&channel_count, &buffer_count, &total_size);
+    heapstore_error_t err __attribute__((unused)) =
+        heapstore_ipc_get_stats(&channel_count, &buffer_count, &total_size);
     assert(err == heapstore_SUCCESS);
 
-    printf("  Channels: %u, Buffers: %u, Total Size: %lu\n", channel_count, buffer_count, (unsigned long)total_size);
+    printf("  Channels: %u, Buffers: %u, Total Size: %lu\n", channel_count, buffer_count,
+           (unsigned long)total_size);
 
     printf("PASS\n");
 }
 
-static void test_ipc_invalid_params(void) {
+static void test_ipc_invalid_params(void)
+{
     printf("Test: ipc_invalid_params...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_ipc_record_channel(NULL);
@@ -148,13 +155,15 @@ static void test_ipc_invalid_params(void) {
     printf("PASS\n");
 }
 
-static void test_ipc_not_found(void) {
+static void test_ipc_not_found(void)
+{
     printf("Test: ipc_not_found...");
 
     heapstore_ipc_channel_t channel;
     memset(&channel, 0, sizeof(channel));
 
-    heapstore_error_t err __attribute__((unused)) = heapstore_ipc_get_channel("nonexistent_id", &channel);
+    heapstore_error_t err __attribute__((unused)) =
+        heapstore_ipc_get_channel("nonexistent_id", &channel);
     assert(err == heapstore_ERR_NOT_FOUND);
 
     heapstore_ipc_buffer_t buffer;
@@ -169,14 +178,16 @@ static void test_ipc_not_found(void) {
     printf("PASS\n");
 }
 
-static void test_ipc_multiple_channels(void) {
+static void test_ipc_multiple_channels(void)
+{
     printf("Test: ipc_multiple_channels...");
 
     for (int i = 0; i < 5; i++) {
         heapstore_ipc_channel_t channel;
         memset(&channel, 0, sizeof(channel));
 
-        snprintf(channel.channel_id, sizeof(channel.channel_id), "ch_multi_%d_%ld", i, (long)time(NULL));
+        snprintf(channel.channel_id, sizeof(channel.channel_id), "ch_multi_%d_%ld", i,
+                 (long)time(NULL));
         snprintf(channel.name, sizeof(channel.name), "Channel %d", i);
         snprintf(channel.type, sizeof(channel.type), "type_%d", i);
         channel.created_at = (uint64_t)time(NULL);
@@ -193,7 +204,8 @@ static void test_ipc_multiple_channels(void) {
     printf("PASS\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=== AgentOS heapstore IPC Unit Tests ===\n\n");
 
     test_ipc_init_shutdown();
@@ -207,4 +219,3 @@ int main(void) {
     printf("\n=== All IPC Tests Passed ===\n");
     return 0;
 }
-

@@ -17,9 +17,9 @@
 #ifndef AGENTOS_ORCHESTRATOR_H
 #define AGENTOS_ORCHESTRATOR_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,44 +35,42 @@ typedef struct orch_pipeline_s orch_pipeline_t;
 
 typedef enum {
     ORCH_PHASE_DECOMPOSITION = 0,
-    ORCH_PHASE_PLANNING      = 1,
-    ORCH_PHASE_GENERATION    = 2,
-    ORCH_PHASE_CRITIQUE      = 3,
-    ORCH_PHASE_VERIFICATION  = 4,
-    ORCH_PHASE_AUDIT         = 5,
-    ORCH_PHASE_ALIGNMENT     = 6,
+    ORCH_PHASE_PLANNING = 1,
+    ORCH_PHASE_GENERATION = 2,
+    ORCH_PHASE_CRITIQUE = 3,
+    ORCH_PHASE_VERIFICATION = 4,
+    ORCH_PHASE_AUDIT = 5,
+    ORCH_PHASE_ALIGNMENT = 6,
     ORCH_PHASE_MAX
 } orch_phase_t;
 
 /* ========== 任务状态 ========== */
 
 typedef enum {
-    ORCH_TASK_PENDING    = 0,
-    ORCH_TASK_RUNNING    = 1,
-    ORCH_TASK_COMPLETED  = 2,
-    ORCH_TASK_FAILED     = 3,
-    ORCH_TASK_CANCELLED  = 4,
-    ORCH_TASK_TIMEOUT    = 5
+    ORCH_TASK_PENDING = 0,
+    ORCH_TASK_RUNNING = 1,
+    ORCH_TASK_COMPLETED = 2,
+    ORCH_TASK_FAILED = 3,
+    ORCH_TASK_CANCELLED = 4,
+    ORCH_TASK_TIMEOUT = 5
 } orch_task_status_t;
 
 /* ========== 编排策略 ========== */
 
 typedef enum {
-    ORCH_STRATEGY_SEQUENTIAL  = 0,
-    ORCH_STRATEGY_PARALLEL    = 1,
+    ORCH_STRATEGY_SEQUENTIAL = 0,
+    ORCH_STRATEGY_PARALLEL = 1,
     ORCH_STRATEGY_CONDITIONAL = 2,
-    ORCH_STRATEGY_LOOP        = 3,
-    ORCH_STRATEGY_ADAPTIVE    = 4
+    ORCH_STRATEGY_LOOP = 3,
+    ORCH_STRATEGY_ADAPTIVE = 4
 } orch_strategy_t;
 
 /* ========== 回调类型 ========== */
 
-typedef void (*orch_progress_cb_t)(orch_phase_t phase,
-                                   orch_task_status_t status,
-                                   const char* task_id,
-                                   void* user_data);
+typedef void (*orch_progress_cb_t)(orch_phase_t phase, orch_task_status_t status,
+                                   const char *task_id, void *user_data);
 
-typedef bool (*orch_condition_fn_t)(const char* context, void* user_data);
+typedef bool (*orch_condition_fn_t)(const char *context, void *user_data);
 
 /* ========== 配置 ========== */
 
@@ -94,89 +92,79 @@ typedef struct {
 /* ========== 任务结果 ========== */
 
 typedef struct {
-    char* task_id;
-    char* output;
+    char *task_id;
+    char *output;
     size_t output_len;
     orch_task_status_t status;
     int error_code;
     uint32_t duration_ms;
-    char* thinking_chain_id;
+    char *thinking_chain_id;
 } orch_result_t;
 
 /* ========== 管线定义 ========== */
 
 typedef struct {
     orch_phase_t phase;
-    const char* agent_id;
-    const char* skill_id;
-    const char* input;
+    const char *agent_id;
+    const char *skill_id;
+    const char *input;
     orch_strategy_t strategy;
     uint32_t timeout_ms;
     orch_condition_fn_t condition_fn;
-    void* condition_data;
+    void *condition_data;
 } orch_pipeline_step_t;
 
 /* ========== 生命周期 ========== */
 
-orchestrator_t* orchestrator_create(const orch_config_t* config);
+orchestrator_t *orchestrator_create(const orch_config_t *config);
 
-void orchestrator_destroy(orchestrator_t* orch);
+void orchestrator_destroy(orchestrator_t *orch);
 
 /* ========== 管线操作 ========== */
 
-orch_pipeline_t* orchestrator_pipeline_create(orchestrator_t* orch,
-                                              const char* name);
+orch_pipeline_t *orchestrator_pipeline_create(orchestrator_t *orch, const char *name);
 
-void orchestrator_pipeline_destroy(orch_pipeline_t* pipeline);
+void orchestrator_pipeline_destroy(orch_pipeline_t *pipeline);
 
-int orchestrator_pipeline_add_step(orch_pipeline_t* pipeline,
-                                   const orch_pipeline_step_t* step);
+int orchestrator_pipeline_add_step(orch_pipeline_t *pipeline, const orch_pipeline_step_t *step);
 
 /* ========== 执行 ========== */
 
-int orchestrator_execute(orchestrator_t* orch,
-                         const char* input,
-                         orch_result_t** out_results,
-                         size_t* out_count);
+int orchestrator_execute(orchestrator_t *orch, const char *input, orch_result_t **out_results,
+                         size_t *out_count);
 
-int orchestrator_execute_pipeline(orchestrator_t* orch,
-                                  orch_pipeline_t* pipeline,
-                                  const char* input,
-                                  orch_result_t** out_results,
-                                  size_t* out_count);
+int orchestrator_execute_pipeline(orchestrator_t *orch, orch_pipeline_t *pipeline,
+                                  const char *input, orch_result_t **out_results,
+                                  size_t *out_count);
 
-int orchestrator_execute_phase(orchestrator_t* orch,
-                               orch_phase_t phase,
-                               const char* input,
-                               orch_result_t** out_result);
+int orchestrator_execute_phase(orchestrator_t *orch, orch_phase_t phase, const char *input,
+                               orch_result_t **out_result);
 
 /* ========== 进度回调 ========== */
 
-void orchestrator_set_progress_callback(orchestrator_t* orch,
-                                        orch_progress_cb_t callback,
-                                        void* user_data);
+void orchestrator_set_progress_callback(orchestrator_t *orch, orch_progress_cb_t callback,
+                                        void *user_data);
 
 /* ========== 查询 ========== */
 
-orch_task_status_t orchestrator_get_task_status(orchestrator_t* orch,
-                                                const char* task_id);
+orch_task_status_t orchestrator_get_task_status(orchestrator_t *orch, const char *task_id);
 
-orch_result_t* orchestrator_get_result(orchestrator_t* orch,
-                                       const char* task_id);
+orch_result_t *orchestrator_get_result(orchestrator_t *orch, const char *task_id);
 
-void orchestrator_result_free(orch_result_t* result);
+void orchestrator_result_free(orch_result_t *result);
 
-uint32_t orchestrator_active_count(orchestrator_t* orch);
+uint32_t orchestrator_active_count(orchestrator_t *orch);
 
 /* ========== 控制 ========== */
 
-int orchestrator_cancel(orchestrator_t* orch, const char* task_id);
+int orchestrator_cancel(orchestrator_t *orch, const char *task_id);
 
-int orchestrator_cancel_all(orchestrator_t* orch);
+int orchestrator_cancel_all(orchestrator_t *orch);
 
 /* ========== 默认配置 ========== */
 
-static inline void orch_config_get_defaults(orch_config_t* cfg) {
+static inline void orch_config_get_defaults(orch_config_t *cfg)
+{
     cfg->max_subtasks = 16;
     cfg->timeout_ms = 60000;
     cfg->max_retries = 3;

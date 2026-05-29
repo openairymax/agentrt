@@ -1,6 +1,6 @@
 {
   "name": "@agentos/sdk",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "description": "AgentOS TypeScript SDK",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
