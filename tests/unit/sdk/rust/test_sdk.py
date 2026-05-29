@@ -15,7 +15,7 @@ import json
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 
-from tests.base.base_test import SDKTestCase
+from tests.utils.python.base_test import SDKTestCase
 
 
 class TestRustSDKClientInit(SDKTestCase):

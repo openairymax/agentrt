@@ -39,15 +39,10 @@ agentos/
 │   ├── taskflow/       #     任务流引擎 — DAG 编排、优先级队列
 │   └── frameworks/     #     框架适配器 — LangChain/MCP/A2A/OpenAI
 ├── commons/            # 统一基础库 — 平台抽象、日志、配置、内存、同步等
-│   ├── platform/       #     跨平台兼容层
-│   ├── utils/          #     工具集
-│   │   ├── logging/    #       日志系统（三层架构）
-│   │   ├── config_unified/ #   统一配置管理
-│   │   ├── strategy/   #       加权评分引擎
-│   │   ├── cognition/  #       认知管理
-│   │   └── execution/  #       安全命令执行
 │   ├── include/        #     公共头文件
-│   └── tests/          #     Commons 单元测试
+│   ├── platform/       #     跨平台兼容层（含 compat）
+│   ├── utils/          #     工具集（logging/config_unified/strategy/cognition 等 20+ 子模块）
+│   └── tests/          #     Commons 单元与集成测试
 ├── cupolas/            # 安全穹顶层 — 全方位安全防护体系
 │   ├── src/
 │   │   ├── security/   #     安全防护引擎
@@ -55,8 +50,12 @@ agentos/
 │   │   ├── permission/ #     权限管理（RBAC+ABAC）
 │   │   ├── audit/      #     审计系统（HMAC 签名链）
 │   │   ├── workbench/  #     安全工作台
+│   │   ├── platform/   #     安全平台抽象
+│   │   ├── guards/     #     安全守卫框架
 │   │   └── utils/      #     安全工具库
-│   └── include/        #     公共头文件
+│   ├── include/        #     公共头文件
+│   ├── docs/           #     安全文档
+│   └── tests/          #     单元/集成/压力/模糊测试
 ├── daemon/             # 用户态守护进程层 — 10+ 核心服务
 │   ├── gateway_d/      #     API 网关守护进程
 │   ├── llm_d/          #     LLM 服务守护进程（多 Provider 支持）
@@ -68,35 +67,62 @@ agentos/
 │   ├── info_d/         #     信息服务守护进程
 │   ├── notify_d/       #     通知服务守护进程
 │   ├── observe_d/      #     观测服务守护进程
-│   └── common/         #     公共服务库（18 个组件）
+│   ├── common/         #     公共服务库（19 个组件）
+│   ├── examples/       #     守护进程使用示例
+│   └── scripts/        #     守护进程管理脚本
 ├── gateway/            # 协议网关层 — HTTP/WS/Stdio → JSON-RPC 2.0
-│   ├── src/            #     网关实现
+│   ├── src/            #     网关实现（gateway + utils）
 │   ├── include/        #     公共头文件
+│   ├── config/         #     网关配置
 │   ├── deploy/         #     部署配置（K8s）
 │   ├── docker/         #     Docker 容器化配置
 │   └── tests/          #     网关测试
-├── heapstore/          # 运行时数据存储 — LMDB+SQLite+Redis 混合存储
+├── heapstore/          # 运行时数据存储 — SQLite + 内存后端混合存储
 │   ├── src/            #     存储引擎实现
 │   ├── include/        #     公共头文件
+│   ├── kernel/         #     内核集成（IPC/内存管理/服务）
+│   ├── registry/       #     服务注册表
+│   ├── services/       #     服务存储（llm_d/market_d/tool_d）
+│   ├── scripts/        #     管理脚本
 │   ├── tests/          #     存储引擎测试
 │   └── examples/       #     使用示例
-├── manager/            # 统一配置管理中心 — JSON Schema + 热重载
-│   ├── schemas/        #     9 个 JSON Schema 文件
-│   ├── scripts/        #     配置管理脚本
+├── manager/            # 统一配置管理中心 — 多模块 Schema + 热重载
+│   ├── schema/         #     各模块 Schema 定义(agent/kernel/model/security 等)
+│   ├── agent/          #     Agent 配置
+│   ├── deployment/     #     部署配置
+│   ├── environment/    #     环境配置
+│   ├── kernel/         #     内核配置
+│   ├── logging/        #     日志配置
+│   ├── model/          #     模型配置
+│   ├── monitoring/     #     监控配置（告警/仪表盘）
+│   ├── sanitizer/      #     清洗器配置
+│   ├── security/       #     安全配置
+│   ├── service/        #     服务配置（tool_d）
+│   ├── skill/          #     技能配置
+│   ├── audit/          #     审计配置
 │   ├── tests/          #     配置测试
 │   ├── tools/          #     配置工具
 │   └── benchmark/      #     性能基准测试
 ├── toolkit/            # 多语言 SDK — Python/Go/Rust/TypeScript
-│   ├── python/         #     Python SDK
+│   ├── python/         #     Python SDK（v0.1.0）
 │   ├── go/             #     Go SDK
 │   ├── rust/           #     Rust SDK
 │   └── typescript/     #     TypeScript SDK
 ├── openlab/            # 开放生态系统 — Apps/Contrib/Markets
-│   ├── openlab/        #     核心管理模块
+│   ├── openlab/        #     核心管理模块（agents/core/protocols/utils）
 │   ├── app/            #     应用（DocGen/E-Commerce/Research/VideoEdit）
 │   ├── contrib/        #     社区贡献（Skills/Strategies/Agents）
-│   └── markets/        #     应用市场模板
-├── protocols/          # 统一协议栈 — 五层架构（Common/Core/Standards/Integrations/Frameworks）
+│   ├── markets/        #     应用市场（agents/skills/templates）
+│   └── tests/          #     单元测试
+├── protocols/          # 统一协议栈 — 五层架构
+│   ├── common/         #     公共层（统一协议接口与实现）
+│   ├── core/           #     核心层（路由/扩展框架/转换器/注册中心/适配器）
+│   ├── standards/      #     标准协议层（A2A/MCP/AGNTCY ACP）
+│   ├── integrations/   #     集成适配层（OpenAI/Claude/OpenClaw/OpenJiuwen/ChinaEco）
+│   ├── frameworks/     #     框架适配层（LangChain/AutoGen）
+│   ├── include/        #     公共头文件
+│   ├── src/            #     协议源文件
+│   └── tests/          #     协议测试
 └── CMakeLists.txt      # 顶层构建配置
 ```
 
@@ -176,28 +202,41 @@ Gateway 负责外部协议到 JSON-RPC 2.0 的转换：
 
 ### Heapstore 存储层
 
-Heapstore 提供运行时数据持久化，采用 LMDB+SQLite+Redis 混合存储方案：
+Heapstore 提供运行时数据持久化，采用 SQLite + 内存后端混合存储方案，支持条件编译自动回退：
 
 | 组件 | 说明 | 存储引擎 |
 |------|------|----------|
-| `heapstore_core` | 核心存储引擎 | LMDB/SQLite/Redis |
+| `heapstore_core` | 核心存储引擎 | SQLite / 内存后端 |
 | `heapstore_log` | 日志存储 | SQLite |
 | `heapstore_registry` | 注册表存储 | SQLite |
 | `heapstore_trace` | 追踪数据存储 | SQLite |
-| `heapstore_memory` | 内存数据存储 | LMDB |
+| `heapstore_memory` | 内存数据存储 | 内存后端 |
 | `heapstore_token` | Token 记录存储 | SQLite |
-| `heapstore_batch` | 批量写操作 | LMDB |
+| `heapstore_batch` | 批量写操作 | SQLite |
+| `kernel/` | 内核集成层 | IPC、内存管理、服务注册 |
+| `services/` | 服务级存储 | llm_d / market_d / tool_d |
 
 ### Manager 配置中心
 
-Manager 是统一配置管理中心：
+Manager 是统一配置管理中心，按领域模块组织配置文件和 Schema：
 
 | 组件 | 说明 |
 |------|------|
-| `schemas/` | 9 个 JSON Schema 文件，272 个验证项 |
-| `scripts/` | 配置生成、验证、应用脚本 |
-| `tests/` | 配置语法/Schema/集成测试 |
+| `schema/` | 各模块 JSON Schema 定义（agent/kernel/model/security 等） |
+| `agent/` | Agent 配置定义与管理 |
+| `kernel/` | 内核级配置（内存/调度/并发限制） |
+| `model/` | 模型配置（Provider/参数/上下文窗口） |
+| `security/` | 安全配置（认证/授权/加密） |
+| `logging/` | 日志配置（级别/格式/输出目标） |
+| `deployment/` | 部署配置（环境/集群/端口） |
+| `environment/` | 环境变量与运行时配置 |
+| `monitoring/` | 监控配置（告警规则/仪表盘） |
+| `sanitizer/` | 输入清洗配置（XSS/SQL注入规则） |
+| `service/` | 服务配置（tool_d 等守护进程） |
+| `skill/` | 技能配置与管理 |
+| `audit/` | 审计配置（事件分类/保留策略） |
 | `tools/` | 配置差异比较、版本清理工具 |
+| `tests/` | 配置语法/Schema/集成测试 |
 | `benchmark/` | TaskManager/SessionManager/MemoryManager/SkillManager 性能测试 |
 
 ### Toolkit SDK
@@ -206,10 +245,10 @@ Manager 是统一配置管理中心：
 
 | 语言 | 版本 | 目录 |
 |------|------|------|
-| Python | v0.0.5 | `toolkit/python/` |
-| Go | v0.0.5 | `toolkit/go/` |
-| Rust | v0.0.5 | `toolkit/rust/` |
-| TypeScript | v0.0.5 | `toolkit/typescript/` |
+| Python | v0.1.0 | `toolkit/python/` |
+| Go | v0.1.0 | `toolkit/go/` |
+| Rust | v0.1.0 | `toolkit/rust/` |
+| TypeScript | v0.1.0 | `toolkit/typescript/` |
 
 所有 SDK 提供统一的 API 接口，涵盖 Agent/Task/Session/Memory/Skill/Syscall/Telemetry 七大核心功能。
 

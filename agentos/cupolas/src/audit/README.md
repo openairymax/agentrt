@@ -2,7 +2,7 @@
 
 `cupolas/src/audit/` 提供安全审计日志记录与事件追踪能力，确保所有安全相关操作的完整可追溯性。
 
-> Part of AgentOS v0.0.5
+> Part of AgentOS v0.1.0
 
 ## 设计目标
 
