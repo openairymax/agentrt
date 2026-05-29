@@ -14,10 +14,14 @@
 #ifndef AGENTOS_ATOMS_COREKERN_ERROR_H
 #define AGENTOS_ATOMS_COREKERN_ERROR_H
 
-#include <stdint.h>
 #include "export.h"
+
+#include <stdint.h>
 /* 统一错误码定义：使用commons权威基础库 */
 #include "../../../commons/include/agentos_types.h"
+
+/* 包含commons统一错误码定义 */
+#include "../../../commons/utils/error/include/error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,25 +51,25 @@ extern "C" {
  * 操作被信号中断
  */
 #ifndef AGENTOS_EINTR
-#define AGENTOS_EINTR                  -31
+#define AGENTOS_EINTR -31
 #endif
 
 #ifndef AGENTOS_EBADF
-#define AGENTOS_EBADF                  -32
+#define AGENTOS_EBADF -32
 #endif
 
 #ifndef AGENTOS_ERESOURCE
-#define AGENTOS_ERESOURCE              -33
+#define AGENTOS_ERESOURCE -33
 #endif
 
 #ifndef AGENTOS_ENOSYS
-#define AGENTOS_ENOSYS                 -34
+#define AGENTOS_ENOSYS -34
 #endif
 
-#define AGENTOS_ECYCLE                 -35
+#define AGENTOS_ECYCLE -35
 
 #ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL                  -36
+#define AGENTOS_EFAIL -36
 #endif
 
 /* AGENTOS_ERROR 已统一为 AGENTOS_EUNKNOWN（见agentos_types.h） */
@@ -87,31 +91,31 @@ extern "C" {
  * @param ... 可变参数
  */
 #ifndef AGENTOS_LOG_DEBUG
-#define AGENTOS_LOG_DEBUG(fmt, ...) \
-    do { \
+#define AGENTOS_LOG_DEBUG(fmt, ...)              \
+    do {                                         \
         OutputDebugStringA("[DEBUG] " fmt "\n"); \
-    } while(0)
+    } while (0)
 #endif
 
 #ifndef AGENTOS_LOG_INFO
-#define AGENTOS_LOG_INFO(fmt, ...) \
-    do { \
+#define AGENTOS_LOG_INFO(fmt, ...)              \
+    do {                                        \
         OutputDebugStringA("[INFO] " fmt "\n"); \
-    } while(0)
+    } while (0)
 #endif
 
 #ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...) \
-    do { \
+#define AGENTOS_LOG_WARN(fmt, ...)              \
+    do {                                        \
         OutputDebugStringA("[WARN] " fmt "\n"); \
-    } while(0)
+    } while (0)
 #endif
 
 #ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...) \
-    do { \
+#define AGENTOS_LOG_ERROR(fmt, ...)              \
+    do {                                         \
         OutputDebugStringA("[ERROR] " fmt "\n"); \
-    } while(0)
+    } while (0)
 #endif
 
 #else /* POSIX */
@@ -119,23 +123,25 @@ extern "C" {
 #include <stdio.h>
 
 #ifndef AGENTOS_LOG_DEBUG
-#define AGENTOS_LOG_DEBUG(fmt, ...) \
-    fprintf(stderr, "[DEBUG] " fmt "\n", ##__VA_ARGS__)
+#define AGENTOS_LOG_DEBUG(fmt, ...) __builtin_fprintf(stderr, "[DEBUG] " fmt "\n", ##__VA_ARGS__)
 #endif
 
 #ifndef AGENTOS_LOG_INFO
-#define AGENTOS_LOG_INFO(fmt, ...) \
-    do { fprintf(stderr, "[INFO] " fmt "\n", ##__VA_ARGS__); } while(0)
+#define AGENTOS_LOG_INFO(fmt, ...)                          \
+    do {                                                    \
+        __builtin_fprintf(stderr, "[INFO] " fmt "\n", ##__VA_ARGS__); \
+    } while (0)
 #endif
 
 #ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...) \
-    do { fprintf(stderr, "[WARN] " fmt "\n", ##__VA_ARGS__); } while(0)
+#define AGENTOS_LOG_WARN(fmt, ...)                          \
+    do {                                                    \
+        __builtin_fprintf(stderr, "[WARN] " fmt "\n", ##__VA_ARGS__); \
+    } while (0)
 #endif
 
 #ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...) \
-    fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
+#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
 #endif
 
 #endif /* _WIN32 */

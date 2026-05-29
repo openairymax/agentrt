@@ -12,31 +12,33 @@
  *       将圈复杂度控制在7以下，提升可维护性。
  */
 
-#include "heapstore.h"
 #include "heapstore_batch.h"
+
+#include "heapstore.h"
 #include "heapstore_log.h"
 #include "private.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+
+#include "memory_compat.h"
 
 /* ==================== 内部辅助函数 ==================== */
 
 /**
  * @brief 处理日志类型的批量写入
  */
-static heapstore_error_t batch_commit_log(const void* data) {
-    const heapstore_log_entry_t* log_entry = (const heapstore_log_entry_t*)data;
+static heapstore_error_t batch_commit_log(const void *data)
+{
+    const heapstore_log_entry_t *log_entry = (const heapstore_log_entry_t *)data;
     if (!log_entry || log_entry->message[0] == '\0') {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    heapstore_log_write(
-        log_entry->level,
-        log_entry->service,
-        log_entry->trace_id[0] ? log_entry->trace_id : NULL,
-        NULL, 0,
-        log_entry->message);
+    heapstore_log_write(log_entry->level, log_entry->service,
+                        log_entry->trace_id[0] ? log_entry->trace_id : NULL, NULL, 0,
+                        log_entry->message);
 
     return heapstore_SUCCESS;
 }
@@ -44,8 +46,9 @@ static heapstore_error_t batch_commit_log(const void* data) {
 /**
  * @brief 处理 Span 类型的批量写入（含单位转换）
  */
-static heapstore_error_t batch_commit_span(const void* data) {
-    const heapstore_trace_entry_t* trace_entry = (const heapstore_trace_entry_t*)data;
+static heapstore_error_t batch_commit_span(const void *data)
+{
+    const heapstore_trace_entry_t *trace_entry = (const heapstore_trace_entry_t *)data;
     if (!trace_entry) {
         return heapstore_ERR_INVALID_PARAM;
     }
@@ -57,7 +60,8 @@ static heapstore_error_t batch_commit_span(const void* data) {
     strncpy(span_rec.span_id, trace_entry->span_id, sizeof(span_rec.span_id) - 1);
 
     if (trace_entry->parent_span_id[0]) {
-        strncpy(span_rec.parent_span_id, trace_entry->parent_span_id, sizeof(span_rec.parent_span_id) - 1);
+        strncpy(span_rec.parent_span_id, trace_entry->parent_span_id,
+                sizeof(span_rec.parent_span_id) - 1);
     }
 
     strncpy(span_rec.name, trace_entry->name, sizeof(span_rec.name) - 1);
@@ -68,7 +72,7 @@ static heapstore_error_t batch_commit_span(const void* data) {
     snprintf(span_rec.status, sizeof(span_rec.status), "%d", trace_entry->status);
 
     if (trace_entry->attributes[0]) {
-        span_rec.attributes = strdup(trace_entry->attributes);
+        span_rec.attributes = AGENTOS_STRDUP(trace_entry->attributes);
         if (!span_rec.attributes) {
             return heapstore_ERR_OUT_OF_MEMORY;
         }
@@ -78,7 +82,7 @@ static heapstore_error_t batch_commit_span(const void* data) {
     heapstore_error_t err = heapstore_trace_write_span(&span_rec);
 
     if (span_rec.attributes) {
-        free(span_rec.attributes);
+        AGENTOS_FREE(span_rec.attributes);
     }
 
     return err;
@@ -87,7 +91,7 @@ static heapstore_error_t batch_commit_span(const void* data) {
 /**
  * @brief 批量操作处理器函数指针类型
  */
-typedef heapstore_error_t (*batch_handler_fn)(const void* data);
+typedef heapstore_error_t (*batch_handler_fn)(const void *data);
 
 /**
  * @brief 批量操作处理器注册表
@@ -98,48 +102,45 @@ static const struct {
     heapstore_batch_item_type_t type;
     batch_handler_fn handler;
 } batch_handlers[] = {
-    { HEAPSTORE_BATCH_ITEM_LOG,           batch_commit_log },
-    { HEAPSTORE_BATCH_ITEM_SPAN,          batch_commit_span },
-    { HEAPSTORE_BATCH_ITEM_SESSION,       NULL }, /* 使用默认处理 */
-    { HEAPSTORE_BATCH_ITEM_AGENT,         NULL },
-    { HEAPSTORE_BATCH_ITEM_SKILL,         NULL },
-    { HEAPSTORE_BATCH_ITEM_MEMORY_POOL,   NULL },
-    { HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC,  NULL },
-    { HEAPSTORE_BATCH_ITEM_IPC_CHANNEL,   NULL },
-    { HEAPSTORE_BATCH_ITEM_IPC_BUFFER,    NULL }
-};
+    {HEAPSTORE_BATCH_ITEM_LOG, batch_commit_log}, {HEAPSTORE_BATCH_ITEM_SPAN, batch_commit_span},
+    {HEAPSTORE_BATCH_ITEM_SESSION, NULL}, /* 使用默认处理 */
+    {HEAPSTORE_BATCH_ITEM_AGENT, NULL},           {HEAPSTORE_BATCH_ITEM_SKILL, NULL},
+    {HEAPSTORE_BATCH_ITEM_MEMORY_POOL, NULL},     {HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC, NULL},
+    {HEAPSTORE_BATCH_ITEM_IPC_CHANNEL, NULL},     {HEAPSTORE_BATCH_ITEM_IPC_BUFFER, NULL}};
 
 #define BATCH_HANDLER_COUNT (sizeof(batch_handlers) / sizeof(batch_handlers[0]))
 
 /**
  * @brief 默认批量处理函数（用于 registry/memory/ipc 操作）
  */
-static heapstore_error_t batch_default_handler(const heapstore_batch_item_t* item) {
+static heapstore_error_t batch_default_handler(const heapstore_batch_item_t *item)
+{
     switch (item->type) {
-        case HEAPSTORE_BATCH_ITEM_SESSION:
-            return heapstore_registry_add_session(&item->data.session);
-        case HEAPSTORE_BATCH_ITEM_AGENT:
-            return heapstore_registry_add_agent(&item->data.agent);
-        case HEAPSTORE_BATCH_ITEM_SKILL:
-            return heapstore_registry_add_skill(&item->data.skill);
-        case HEAPSTORE_BATCH_ITEM_MEMORY_POOL:
-            return heapstore_memory_record_pool(&item->data.memory_pool);
-        case HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC:
-            return heapstore_memory_record_allocation(&item->data.memory_alloc);
-        case HEAPSTORE_BATCH_ITEM_IPC_CHANNEL:
-            return heapstore_ipc_record_channel(&item->data.ipc_channel);
-        case HEAPSTORE_BATCH_ITEM_IPC_BUFFER:
-            return heapstore_ipc_record_buffer(&item->data.ipc_buffer);
-        default:
-            return heapstore_ERR_INVALID_PARAM;
+    case HEAPSTORE_BATCH_ITEM_SESSION:
+        return heapstore_registry_add_session(&item->data.session);
+    case HEAPSTORE_BATCH_ITEM_AGENT:
+        return heapstore_registry_add_agent(&item->data.agent);
+    case HEAPSTORE_BATCH_ITEM_SKILL:
+        return heapstore_registry_add_skill(&item->data.skill);
+    case HEAPSTORE_BATCH_ITEM_MEMORY_POOL:
+        return heapstore_memory_record_pool(&item->data.memory_pool);
+    case HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC:
+        return heapstore_memory_record_allocation(&item->data.memory_alloc);
+    case HEAPSTORE_BATCH_ITEM_IPC_CHANNEL:
+        return heapstore_ipc_record_channel(&item->data.ipc_channel);
+    case HEAPSTORE_BATCH_ITEM_IPC_BUFFER:
+        return heapstore_ipc_record_buffer(&item->data.ipc_buffer);
+    default:
+        return heapstore_ERR_INVALID_PARAM;
     }
 }
 
 /**
  * @brief 为批量写入项目分配内存并初始化
  */
-static heapstore_batch_item_t* batch_alloc_item(heapstore_batch_item_type_t type) {
-    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+static heapstore_batch_item_t *batch_alloc_item(heapstore_batch_item_type_t type)
+{
+    heapstore_batch_item_t *item = (heapstore_batch_item_t *)AGENTOS_MALLOC(sizeof(heapstore_batch_item_t));
     if (!item) {
         return NULL;
     }
@@ -158,9 +159,11 @@ static heapstore_batch_item_t* batch_alloc_item(heapstore_batch_item_type_t type
  * @param item [in] 已分配的项目
  * @return heapstore_error_t 错误码
  */
-static heapstore_error_t batch_append_item(heapstore_batch_context_t* ctx, heapstore_batch_item_t* item) {
+static heapstore_error_t batch_append_item(heapstore_batch_context_t *ctx,
+                                           heapstore_batch_item_t *item)
+{
     if (!ctx || !item) {
-        free(item);
+        AGENTOS_FREE(item);
         return heapstore_ERR_INVALID_PARAM;
     }
 
@@ -178,7 +181,8 @@ static heapstore_error_t batch_append_item(heapstore_batch_context_t* ctx, heaps
 /**
  * @brief 验证批量上下文状态
  */
-static bool batch_validate_context(const heapstore_batch_context_t* ctx) {
+static bool batch_validate_context(const heapstore_batch_context_t *ctx)
+{
     return (ctx != NULL && ctx->count <= ctx->capacity && ctx->capacity > 0);
 }
 
@@ -189,11 +193,10 @@ static bool batch_validate_context(const heapstore_batch_context_t* ctx) {
  *
  * 符合 DRY 原则，所有 add_* 函数都调用此通用实现
  */
-static heapstore_error_t batch_add_generic(
-    heapstore_batch_context_t* ctx,
-    heapstore_batch_item_type_t type,
-    const void* data,
-    size_t data_size) {
+static heapstore_error_t batch_add_generic(heapstore_batch_context_t *ctx,
+                                           heapstore_batch_item_type_t type, const void *data,
+                                           size_t data_size)
+{
 
     if (!batch_validate_context(ctx)) {
         return heapstore_ERR_INVALID_PARAM;
@@ -207,7 +210,7 @@ static heapstore_error_t batch_add_generic(
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    heapstore_batch_item_t* item = batch_alloc_item(type);
+    heapstore_batch_item_t *item = batch_alloc_item(type);
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
@@ -219,11 +222,9 @@ static heapstore_error_t batch_add_generic(
     return batch_append_item(ctx, item);
 }
 
-heapstore_error_t heapstore_batch_add_log(
-    heapstore_batch_context_t* ctx,
-    const char* service,
-    int level,
-    const char* message) {
+heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const char *service,
+                                          int level, const char *message)
+{
 
     if (!batch_validate_context(ctx)) {
         return heapstore_ERR_INVALID_PARAM;
@@ -237,7 +238,7 @@ heapstore_error_t heapstore_batch_add_log(
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    heapstore_batch_item_t* item = batch_alloc_item(HEAPSTORE_BATCH_ITEM_LOG);
+    heapstore_batch_item_t *item = batch_alloc_item(HEAPSTORE_BATCH_ITEM_LOG);
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
@@ -263,11 +264,12 @@ heapstore_error_t heapstore_batch_add_log(
     return batch_append_item(ctx, item);
 }
 
-heapstore_error_t heapstore_batch_add_span(
-    heapstore_batch_context_t* ctx,
-    const heapstore_span_t* span) {
+heapstore_error_t heapstore_batch_add_span(heapstore_batch_context_t *ctx,
+                                           const heapstore_span_t *span)
+{
 
-    if (!span) return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SPAN, span, sizeof(*span));
+    if (!span)
+        return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SPAN, span, sizeof(*span));
 
     heapstore_trace_entry_t converted;
     memset(&converted, 0, sizeof(converted));
@@ -283,51 +285,53 @@ heapstore_error_t heapstore_batch_add_span(
     return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SPAN, &converted, sizeof(converted));
 }
 
-heapstore_error_t heapstore_batch_add_session(
-    heapstore_batch_context_t* ctx,
-    const heapstore_session_record_t* session) {
+heapstore_error_t heapstore_batch_add_session(heapstore_batch_context_t *ctx,
+                                              const heapstore_session_record_t *session)
+{
 
     return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SESSION, session, sizeof(*session));
 }
 
-heapstore_error_t heapstore_batch_add_agent(
-    heapstore_batch_context_t* ctx,
-    const heapstore_agent_record_t* agent) {
+heapstore_error_t heapstore_batch_add_agent(heapstore_batch_context_t *ctx,
+                                            const heapstore_agent_record_t *agent)
+{
 
     return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_AGENT, agent, sizeof(*agent));
 }
 
-heapstore_error_t heapstore_batch_add_skill(
-    heapstore_batch_context_t* ctx,
-    const heapstore_skill_record_t* skill) {
+heapstore_error_t heapstore_batch_add_skill(heapstore_batch_context_t *ctx,
+                                            const heapstore_skill_record_t *skill)
+{
 
     return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SKILL, skill, sizeof(*skill));
 }
 
-heapstore_error_t heapstore_batch_add_memory_pool(
-    heapstore_batch_context_t* ctx,
-    const heapstore_memory_pool_t* pool) {
+heapstore_error_t heapstore_batch_add_memory_pool(heapstore_batch_context_t *ctx,
+                                                  const heapstore_memory_pool_t *pool)
+{
 
     return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_MEMORY_POOL, pool, sizeof(*pool));
 }
 
-heapstore_error_t heapstore_batch_add_memory_allocation(
-    heapstore_batch_context_t* ctx,
-    const heapstore_memory_allocation_t* allocation) {
+heapstore_error_t
+heapstore_batch_add_memory_allocation(heapstore_batch_context_t *ctx,
+                                      const heapstore_memory_allocation_t *allocation)
+{
 
-    return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC, allocation, sizeof(*allocation));
+    return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC, allocation,
+                             sizeof(*allocation));
 }
 
-heapstore_error_t heapstore_batch_add_ipc_channel(
-    heapstore_batch_context_t* ctx,
-    const heapstore_ipc_channel_t* channel) {
+heapstore_error_t heapstore_batch_add_ipc_channel(heapstore_batch_context_t *ctx,
+                                                  const heapstore_ipc_channel_t *channel)
+{
 
     return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_IPC_CHANNEL, channel, sizeof(*channel));
 }
 
-heapstore_error_t heapstore_batch_add_ipc_buffer(
-    heapstore_batch_context_t* ctx,
-    const heapstore_ipc_buffer_t* buffer) {
+heapstore_error_t heapstore_batch_add_ipc_buffer(heapstore_batch_context_t *ctx,
+                                                 const heapstore_ipc_buffer_t *buffer)
+{
 
     return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_IPC_BUFFER, buffer, sizeof(*buffer));
 }
@@ -337,7 +341,8 @@ heapstore_error_t heapstore_batch_add_ipc_buffer(
  *
  * 圈复杂度从 ~10 降低至 ~5
  */
-static heapstore_error_t batch_process_single_item(const heapstore_batch_item_t* item) {
+static heapstore_error_t batch_process_single_item(const heapstore_batch_item_t *item)
+{
     if (!item) {
         return heapstore_ERR_INVALID_PARAM;
     }
@@ -345,7 +350,7 @@ static heapstore_error_t batch_process_single_item(const heapstore_batch_item_t*
     for (size_t i = 0; i < BATCH_HANDLER_COUNT; i++) {
         if (batch_handlers[i].type == item->type) {
             if (batch_handlers[i].handler) {
-                return batch_handlers[i].handler((const void*)&item->data);
+                return batch_handlers[i].handler((const void *)&item->data);
             } else {
                 return batch_default_handler(item);
             }
@@ -355,16 +360,17 @@ static heapstore_error_t batch_process_single_item(const heapstore_batch_item_t*
     return heapstore_ERR_INVALID_PARAM;
 }
 
-heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
+heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t *ctx)
+{
     if (!ctx) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
     heapstore_error_t result = heapstore_SUCCESS;
-    heapstore_batch_item_t* item = ctx->head;
+    heapstore_batch_item_t *item = ctx->head;
 
     while (item) {
-        heapstore_batch_item_t* next = item->next;
+        heapstore_batch_item_t *next = item->next;
 
         heapstore_error_t err = batch_process_single_item(item);
 
@@ -372,7 +378,7 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
             result = err;
         }
 
-        free(item);
+        AGENTOS_FREE(item);
         item = next;
     }
 
@@ -382,13 +388,15 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
     return result;
 }
 
-void heapstore_batch_rollback(heapstore_batch_context_t* ctx) {
-    if (!ctx) return;
+void heapstore_batch_rollback(heapstore_batch_context_t *ctx)
+{
+    if (!ctx)
+        return;
 
-    heapstore_batch_item_t* item = ctx->head;
+    heapstore_batch_item_t *item = ctx->head;
     while (item) {
-        heapstore_batch_item_t* next = item->next;
-        free(item);
+        heapstore_batch_item_t *next = item->next;
+        AGENTOS_FREE(item);
         item = next;
     }
 

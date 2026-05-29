@@ -5,30 +5,30 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "market_service.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "market_service.h"
 
 /**
  * @brief 测试服务创建和销毁
  */
-int test_service_create_destroy() {
+int test_service_create_destroy()
+{
     printf("测试服务创建和销毁...");
 
     // 配置市场服务
-    market_config_t manager = {
-        .registry_url = "http://registry.agentos.org",
-        .storage_path = "./test_market",
-        .sync_interval_ms = 60000,
-        .cache_ttl_ms = 300000,
-        .enable_remote_registry = true,
-        .enable_auto_update = true
-    };
+    market_config_t manager = {.registry_url = "http://registry.agentos.org",
+                               .storage_path = "./test_market",
+                               .sync_interval_ms = 60000,
+                               .cache_ttl_ms = 300000,
+                               .enable_remote_registry = true,
+                               .enable_auto_update = true};
 
     // 创建市场服务
-    market_service_t* service = NULL;
+    market_service_t *service = NULL;
     int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败：创建服务返回 %d\n", ret);
@@ -49,21 +49,20 @@ int test_service_create_destroy() {
 /**
  * @brief 测试 Agent 注册
  */
-int test_register_agent() {
+int test_register_agent()
+{
     printf("测试 Agent 注册...");
 
     // 配置市场服务
-    market_config_t manager = {
-        .registry_url = "http://registry.agentos.org",
-        .storage_path = "./test_market",
-        .sync_interval_ms = 60000,
-        .cache_ttl_ms = 300000,
-        .enable_remote_registry = true,
-        .enable_auto_update = true
-    };
+    market_config_t manager = {.registry_url = "http://registry.agentos.org",
+                               .storage_path = "./test_market",
+                               .sync_interval_ms = 60000,
+                               .cache_ttl_ms = 300000,
+                               .enable_remote_registry = true,
+                               .enable_auto_update = true};
 
     // 创建市场服务
-    market_service_t* service = NULL;
+    market_service_t *service = NULL;
     int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败：创建服务返回 %d\n", ret);
@@ -71,20 +70,18 @@ int test_register_agent() {
     }
 
     // 注册 Agent
-    agent_info_t agent = {
-        .agent_id = "agent-001",
-        .name = "助手 Agent",
-        .version = "1.0.0",
-        .description = "通用助手 Agent",
-        .type = AGENT_TYPE_ASSISTANT,
-        .status = AGENT_STATUS_AVAILABLE,
-        .author = "SPHARX",
-        .repository = "https://github.com/spharx/agent-001",
-        .dependencies = "none",
-        .rating = 4.5,
-        .download_count = 1000,
-        .last_updated = (uint64_t)time(NULL) * 1000
-    };
+    agent_info_t agent = {.agent_id = "agent-001",
+                          .name = "助手 Agent",
+                          .version = "1.0.0",
+                          .description = "通用助手 Agent",
+                          .type = AGENT_TYPE_ASSISTANT,
+                          .status = AGENT_STATUS_AVAILABLE,
+                          .author = "SPHARX",
+                          .repository = "https://github.com/spharx/agent-001",
+                          .dependencies = "none",
+                          .rating = 4.5,
+                          .download_count = 1000,
+                          .last_updated = (uint64_t)time(NULL) * 1000};
 
     ret = market_service_register_agent(service, &agent);
     if (ret != 0) {
@@ -94,18 +91,16 @@ int test_register_agent() {
     }
 
     // 搜索 Agent
-    search_params_t search_params = {
-        .query = "助手",
-        .agent_type = AGENT_TYPE_ASSISTANT,
-        .skill_type = SKILL_TYPE_COUNT,
-        .only_installed = false,
-        .sort_by_rating = true,
-        .sort_by_download = false,
-        .limit = 10,
-        .offset = 0
-    };
+    search_params_t search_params = {.query = "助手",
+                                     .agent_type = AGENT_TYPE_ASSISTANT,
+                                     .skill_type = SKILL_TYPE_COUNT,
+                                     .only_installed = false,
+                                     .sort_by_rating = true,
+                                     .sort_by_download = false,
+                                     .limit = 10,
+                                     .offset = 0};
 
-    agent_info_t** agents = NULL;
+    agent_info_t **agents = NULL;
     size_t count = 0;
     ret = market_service_search_agents(service, &search_params, &agents, &count);
     if (ret != 0) {
@@ -135,14 +130,12 @@ int test_register_agent() {
 /**
  * @brief 主测试函数
  */
-int main() {
+int main()
+{
     printf("开始市场服务单元测试\n");
     printf("========================\n");
 
-    int tests[] = {
-        test_service_create_destroy,
-        test_register_agent
-    };
+    int tests[] = {test_service_create_destroy, test_register_agent};
 
     size_t test_count = sizeof(tests) / sizeof(tests[0]);
     int passed = 0;
@@ -157,7 +150,8 @@ int main() {
     }
 
     printf("========================\n");
-    printf("测试完成：%zu 个测试，%d 个通过，%zu 个失败\n", test_count, passed, test_count - passed);
+    printf("测试完成：%zu 个测试，%d 个通过，%zu 个失败\n", test_count, passed,
+           test_count - passed);
 
     if (passed == test_count) {
         printf("所有测试通过！\n");

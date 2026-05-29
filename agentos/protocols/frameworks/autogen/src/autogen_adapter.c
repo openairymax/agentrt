@@ -8,38 +8,54 @@
 #define LOG_TAG "autogen_adapter"
 
 #include "autogen_adapter.h"
+
 #include "agentos_protocol_interface.h"
+#include "error.h"
+#include "memory_compat.h"
+#include "types.h"
+
+#include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
-#include <ctype.h>
+
+#ifndef AGENTOS_ERR_NULL_POINTER
+#define AGENTOS_ERR_NULL_POINTER (-3)
+#endif
+#ifndef AGENTOS_ERR_INVALID_PARAM
+#define AGENTOS_ERR_INVALID_PARAM (-2)
+#endif
+#ifndef AGENTOS_ERR_OUT_OF_MEMORY
+#define AGENTOS_ERR_OUT_OF_MEMORY (-4)
+#endif
 
 struct autogen_adapter_context_s {
     autogen_config_t config;
     bool initialized;
-    autogen_agent_instance_t* agents;
+    autogen_agent_instance_t *agents;
     size_t agent_count;
-    autogen_group_chat_def_t* group_chats;
+    autogen_group_chat_def_t *group_chats;
     size_t group_chat_count;
-    autogen_conversation_t* conversations;
+    autogen_conversation_t *conversations;
     size_t conversation_count;
-    autogen_tool_executor_fn* tool_executors;
-    char** tool_names;
+    autogen_tool_executor_fn *tool_executors;
+    char **tool_names;
     size_t tool_count;
     autogen_code_executor_fn code_executor;
-    void* code_executor_data;
+    void *code_executor_data;
     autogen_human_callback_fn human_callback;
-    void* human_callback_data;
+    void *human_callback_data;
     autogen_llm_callback_fn llm_callback;
-    void* llm_callback_data;
+    void *llm_callback_data;
     autogen_message_hook_fn message_hook;
-    void* message_hook_data;
+    void *message_hook_data;
     uint64_t total_chats_initiated;
     uint64_t total_messages_exchanged;
 };
 
-autogen_config_t autogen_config_default(void) {
+autogen_config_t autogen_config_default(void)
+{
     autogen_config_t cfg = {0};
     cfg.base_url = "http://localhost:18789";
     cfg.api_key = NULL;
@@ -56,18 +72,27 @@ autogen_config_t autogen_config_default(void) {
     return cfg;
 }
 
-autogen_adapter_context_t* autogen_adapter_create(const autogen_config_t* config) {
-    if (!config) return NULL;
+autogen_adapter_context_t *autogen_adapter_create(const autogen_config_t *config)
+{
+    if (!config)
+        return NULL;
 
-    autogen_adapter_context_t* ctx = (autogen_adapter_context_t*)calloc(1, sizeof(autogen_adapter_context_t));
-    if (!ctx) return NULL;
+    autogen_adapter_context_t *ctx =
+        (autogen_adapter_context_t *)AGENTOS_CALLOC(1, sizeof(autogen_adapter_context_t));
+    if (!ctx)
+        return NULL;
 
     memcpy(&ctx->config, config, sizeof(autogen_config_t));
-    if (config->base_url) ctx->config.base_url = strdup(config->base_url);
-    if (config->api_key) ctx->config.api_key = strdup(config->api_key);
-    if (config->default_llm_model) ctx->config.default_llm_model = strdup(config->default_llm_model);
-    if (config->work_dir) ctx->config.work_dir = strdup(config->work_dir);
-    if (config->cache_dir) ctx->config.cache_dir = strdup(config->cache_dir);
+    if (config->base_url)
+        ctx->config.base_url = AGENTOS_STRDUP(config->base_url);
+    if (config->api_key)
+        ctx->config.api_key = AGENTOS_STRDUP(config->api_key);
+    if (config->default_llm_model)
+        ctx->config.default_llm_model = AGENTOS_STRDUP(config->default_llm_model);
+    if (config->work_dir)
+        ctx->config.work_dir = AGENTOS_STRDUP(config->work_dir);
+    if (config->cache_dir)
+        ctx->config.cache_dir = AGENTOS_STRDUP(config->cache_dir);
 
     ctx->initialized = true;
     ctx->agents = NULL;
@@ -82,57 +107,64 @@ autogen_adapter_context_t* autogen_adapter_create(const autogen_config_t* config
     return ctx;
 }
 
-void autogen_adapter_destroy(autogen_adapter_context_t* ctx) {
-    if (!ctx) return;
+void autogen_adapter_destroy(autogen_adapter_context_t *ctx)
+{
+    if (!ctx)
+        return;
 
-    free(ctx->config.base_url);
-    free(ctx->config.api_key);
-    free(ctx->config.default_llm_model);
-    free(ctx->config.work_dir);
-    free(ctx->config.cache_dir);
+    AGENTOS_FREE(ctx->config.base_url);
+    AGENTOS_FREE(ctx->config.api_key);
+    AGENTOS_FREE(ctx->config.default_llm_model);
+    AGENTOS_FREE(ctx->config.work_dir);
+    AGENTOS_FREE(ctx->config.cache_dir);
 
     for (size_t i = 0; i < ctx->agent_count; i++)
         autogen_agent_instance_destroy(&ctx->agents[i]);
-    free(ctx->agents);
+    AGENTOS_FREE(ctx->agents);
 
     for (size_t i = 0; i < ctx->group_chat_count; i++)
         autogen_group_chat_def_destroy(&ctx->group_chats[i]);
-    free(ctx->group_chats);
+    AGENTOS_FREE(ctx->group_chats);
 
     for (size_t i = 0; i < ctx->conversation_count; i++)
         autogen_conversation_destroy(&ctx->conversations[i]);
-    free(ctx->conversations);
+    AGENTOS_FREE(ctx->conversations);
 
     memset(ctx, 0, sizeof(autogen_adapter_context_t));
-    free(ctx);
+    AGENTOS_FREE(ctx);
 }
 
-bool autogen_adapter_is_initialized(const autogen_adapter_context_t* ctx) {
+bool autogen_adapter_is_initialized(const autogen_adapter_context_t *ctx)
+{
     return ctx && ctx->initialized;
 }
 
-const char* autogen_adapter_version(void) {
+const char *autogen_adapter_version(void)
+{
     return AUTOGEN_ADAPTER_VERSION;
 }
 
-int autogen_create_agent(autogen_adapter_context_t* ctx,
-                         const autogen_agent_def_t* definition,
-                         char* out_agent_id) {
-    if (!ctx || !definition || !out_agent_id) return -1;
+int autogen_create_agent(autogen_adapter_context_t *ctx, const autogen_agent_def_t *definition,
+                         char *out_agent_id)
+{
+    if (!ctx || !definition || !out_agent_id)
+        return AGENTOS_ERR_NULL_POINTER;
 
     static uint32_t agent_counter = 0;
     agent_counter++;
 
     snprintf(out_agent_id, 64, "ag-agent-%08x", agent_counter);
 
-    autogen_agent_instance_t* agents = (autogen_agent_instance_t*)realloc(
+    autogen_agent_instance_t *agents = (autogen_agent_instance_t *)AGENTOS_REALLOC(
         ctx->agents, (ctx->agent_count + 1) * sizeof(autogen_agent_instance_t));
-    if (!agents && ctx->agent_count > 0) return -2;
+    if (!agents && ctx->agent_count > 0)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     ctx->agents = agents;
 
     memset(&ctx->agents[ctx->agent_count], 0, sizeof(autogen_agent_instance_t));
-    ctx->agents[ctx->agent_count].agent_id = strdup(out_agent_id);
-    ctx->agents[ctx->agent_count].name = definition->name ? strdup(definition->name) : out_agent_id;
+    ctx->agents[ctx->agent_count].agent_id = AGENTOS_STRDUP(out_agent_id);
+    ctx->agents[ctx->agent_count].name =
+        definition->name ? AGENTOS_STRDUP(definition->name) : out_agent_id;
     ctx->agents[ctx->agent_count].role = definition->role;
     ctx->agents[ctx->agent_count].is_active = true;
     ctx->agents[ctx->agent_count].messages_sent = 0;
@@ -143,9 +175,10 @@ int autogen_create_agent(autogen_adapter_context_t* ctx,
     return 0;
 }
 
-int autogen_destroy_agent(autogen_adapter_context_t* ctx,
-                          const char* agent_id) {
-    if (!ctx || !agent_id) return -1;
+int autogen_destroy_agent(autogen_adapter_context_t *ctx, const char *agent_id)
+{
+    if (!ctx || !agent_id)
+        return AGENTOS_ERR_NULL_POINTER;
 
     for (size_t i = 0; i < ctx->agent_count; i++) {
         if (strcmp(ctx->agents[i].agent_id, agent_id) == 0) {
@@ -158,47 +191,58 @@ int autogen_destroy_agent(autogen_adapter_context_t* ctx,
             return 0;
         }
     }
-    return -4;
+    return AGENTOS_ERR_OUT_OF_MEMORY;
 }
 
-int autogen_list_agents(autogen_adapter_context_t* ctx,
-                        autogen_agent_instance_t** agents,
-                        size_t* count) {
-    if (!ctx || !agents || !count) return -1;
+int autogen_list_agents(autogen_adapter_context_t *ctx, autogen_agent_instance_t **agents,
+                        size_t *count)
+{
+    if (!ctx || !agents || !count)
+        return AGENTOS_ERR_NULL_POINTER;
     *agents = NULL;
     *count = 0;
-    if (ctx->agent_count == 0) return 0;
+    if (ctx->agent_count == 0)
+        return 0;
 
-    *agents = (autogen_agent_instance_t*)calloc(ctx->agent_count, sizeof(autogen_agent_instance_t));
-    if (!*agents) return -3;
+    *agents = (autogen_agent_instance_t *)AGENTOS_CALLOC(ctx->agent_count,
+                                                         sizeof(autogen_agent_instance_t));
+    if (!*agents)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
     for (size_t i = 0; i < ctx->agent_count; i++) {
         (*agents)[i] = ctx->agents[i];
-        (*agents)[i].agent_id = ctx->agents[i].agent_id ? strdup(ctx->agents[i].agent_id) : NULL;
-        (*agents)[i].name = ctx->agents[i].name ? strdup(ctx->agents[i].name) : NULL;
+        (*agents)[i].agent_id =
+            ctx->agents[i].agent_id ? AGENTOS_STRDUP(ctx->agents[i].agent_id) : NULL;
+        (*agents)[i].name = ctx->agents[i].name ? AGENTOS_STRDUP(ctx->agents[i].name) : NULL;
     }
     *count = ctx->agent_count;
     return 0;
 }
 
-int autogen_create_group_chat(autogen_adapter_context_t* ctx,
-                              const autogen_group_chat_def_t* definition,
-                              char* out_group_id) {
-    if (!ctx || !out_group_id) return -1;
+int autogen_create_group_chat(autogen_adapter_context_t *ctx,
+                              const autogen_group_chat_def_t *definition, char *out_group_id)
+{
+    if (!ctx || !out_group_id)
+        return AGENTOS_ERR_NULL_POINTER;
 
     static uint32_t gc_counter = 0;
     gc_counter++;
     snprintf(out_group_id, 64, "ag-group-%08x", gc_counter);
 
-    autogen_group_chat_def_t* gcs = (autogen_group_chat_def_t*)realloc(
+    autogen_group_chat_def_t *gcs = (autogen_group_chat_def_t *)AGENTOS_REALLOC(
         ctx->group_chats, (ctx->group_chat_count + 1) * sizeof(autogen_group_chat_def_t));
-    if (!gcs && ctx->group_chat_count > 0) return -2;
+    if (!gcs && ctx->group_chat_count > 0)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     ctx->group_chats = gcs;
 
     memset(&ctx->group_chats[ctx->group_chat_count], 0, sizeof(autogen_group_chat_def_t));
-    ctx->group_chats[ctx->group_chat_count].id = strdup(out_group_id);
-    ctx->group_chats[ctx->group_chat_count].name = definition ? (definition->name ? strdup(definition->name) : strdup(out_group_id)) : strdup(out_group_id);
-    ctx->group_chats[ctx->group_chat_count].mode = definition ? definition->mode : GROUP_CHAT_ROUND_ROBIN;
+    ctx->group_chats[ctx->group_chat_count].id = AGENTOS_STRDUP(out_group_id);
+    ctx->group_chats[ctx->group_chat_count].name =
+        definition
+            ? (definition->name ? AGENTOS_STRDUP(definition->name) : AGENTOS_STRDUP(out_group_id))
+            : AGENTOS_STRDUP(out_group_id);
+    ctx->group_chats[ctx->group_chat_count].mode =
+        definition ? definition->mode : GROUP_CHAT_ROUND_ROBIN;
     ctx->group_chats[ctx->group_chat_count].max_rounds = definition ? definition->max_rounds : 10;
     ctx->group_chats[ctx->group_chat_count].current_round = 0;
     ctx->group_chats[ctx->group_chat_count].allow_repeat_speaker = true;
@@ -207,7 +251,7 @@ int autogen_create_group_chat(autogen_adapter_context_t* ctx,
     if (definition && definition->participant_ids) {
         for (size_t p = 0; p < definition->participant_count; p++) {
             ctx->group_chats[ctx->group_chat_count].participant_ids[p] =
-                strdup(definition->participant_ids[p]);
+                AGENTOS_STRDUP(definition->participant_ids[p]);
         }
         ctx->group_chats[ctx->group_chat_count].participant_count = definition->participant_count;
     }
@@ -216,112 +260,123 @@ int autogen_create_group_chat(autogen_adapter_context_t* ctx,
     return 0;
 }
 
-static uint64_t __attribute__((unused)) autogen_hash_str(const char* s) {
+static uint64_t __attribute__((unused)) autogen_hash_str(const char *s)
+{
     uint64_t h = 14695981039346656037ULL;
-    if (!s) return h;
-    for (; *s; s++) { h = (h ^ (unsigned char)*s) * 1099511628211ULL; }
+    if (!s)
+        return h;
+    for (; *s; s++) {
+        h = (h ^ (unsigned char)*s) * 1099511628211ULL;
+    }
     return h;
 }
 
-static int __attribute__((used)) autogen_count_words(const char* t) {
-    if (!t || !*t) return 0;
+static int __attribute__((used)) autogen_count_words(const char *t)
+{
+    if (!t || !*t)
+        return 0;
     int c = 0, in = 0;
     for (; *t; t++) {
-        if (isalnum((unsigned char)*t) || (*t & 0x80)) { if (!in) { c++; in = 1; } }
-        else in = 0;
+        if (isalnum((unsigned char)*t) || (*t & 0x80)) {
+            if (!in) {
+                c++;
+                in = 1;
+            }
+        } else
+            in = 0;
     }
     return c > 0 ? c : 1;
 }
 
 typedef struct {
-    const char* role_prefixes[4];
+    const char *role_prefixes[4];
     int prefix_count;
-    const char* body_templates[6];
+    const char *body_templates[6];
     int body_count;
-    const char* suffix_templates[3];
+    const char *suffix_templates[3];
     int suffix_count;
 } autogen_response_role_t;
 
 static const autogen_response_role_t __attribute__((unused)) g_autogen_roles[] = {
-    { {"As ", "From a ", "In my capacity as "}, 3,
-      {"I've analyzed your request and prepared a response based on my role.",
-       "Processing through the multi-agent framework, here's my assessment.",
-       "After consulting with peer agents, I can provide this answer.",
-       "My analysis of the input yields the following conclusion.",
-       "Through the AutoGen orchestration layer, I've generated this response.",
-       "Based on the group chat context and available tools, here's my output."}, 6,
-      {" Would you like me to elaborate on any aspect?",
-       " I'm ready for follow-up questions.",
-       ""}, 3 },
-    { {"Acknowledged. ", "Noted. ", "Copy that. "}, 3,
-      {"I've received and processed the message. Standing by for next instruction.",
-       "Message acknowledged and logged. Awaiting further direction.",
-       "Input received via AgentOS protocol bridge. Ready to proceed.",
-       "Confirmed. The data has been routed through the agent mesh.",
-       "Roger. Message processed successfully.",
-       "Affirmative. All systems operational."}, 6,
-      {" Over.", "", ""}, 2 },
+    {{"As ", "From a ", "In my capacity as "},
+     3,
+     {"I've analyzed your request and prepared a response based on my role.",
+      "Processing through the multi-agent framework, here's my assessment.",
+      "After consulting with peer agents, I can provide this answer.",
+      "My analysis of the input yields the following conclusion.",
+      "Through the AutoGen orchestration layer, I've generated this response.",
+      "Based on the group chat context and available tools, here's my output."},
+     6,
+     {" Would you like me to elaborate on any aspect?", " I'm ready for follow-up questions.", ""},
+     3},
+    {{"Acknowledged. ", "Noted. ", "Copy that. "},
+     3,
+     {"I've received and processed the message. Standing by for next instruction.",
+      "Message acknowledged and logged. Awaiting further direction.",
+      "Input received via AgentOS protocol bridge. Ready to proceed.",
+      "Confirmed. The data has been routed through the agent mesh.",
+      "Roger. Message processed successfully.", "Affirmative. All systems operational."},
+     6,
+     {" Over.", "", ""},
+     2},
 };
 
-static int autogen_generate_response(autogen_adapter_context_t* ctx,
-                                      const char* incoming_msg,
-                                      int agent_index,
-                                      int total_agents,
-                                      bool is_first_in_round,
-                                      char* out_buf,
-                                      size_t buf_len) {
-    if (!out_buf || buf_len == 0) return -1;
+static int autogen_generate_response(autogen_adapter_context_t *ctx, const char *incoming_msg,
+                                     int agent_index, int total_agents, bool is_first_in_round,
+                                     char *out_buf, size_t buf_len)
+{
+    if (!out_buf || buf_len == 0)
+        return AGENTOS_ERR_NULL_POINTER;
 
     if (ctx && ctx->llm_callback) {
         char prompt[4096];
         int plen = 0;
         if (is_first_in_round && total_agents > 1) {
-            plen = snprintf(prompt, sizeof(prompt),
-                "[AutoGen Agent #%d in group of %d] %s",
-                agent_index, total_agents,
-                incoming_msg ? incoming_msg : "");
+            plen = snprintf(prompt, sizeof(prompt), "[AutoGen Agent #%d in group of %d] %s",
+                            agent_index, total_agents, incoming_msg ? incoming_msg : "");
         } else {
-            plen = snprintf(prompt, sizeof(prompt), "%s",
-                incoming_msg ? incoming_msg : "");
+            plen = snprintf(prompt, sizeof(prompt), "%s", incoming_msg ? incoming_msg : "");
         }
-        if (plen <= 0) return -2;
+        if (plen <= 0)
+            return AGENTOS_ERR_NOT_FOUND;
 
-        char* llm_response = NULL;
-        int rc = ctx->llm_callback(prompt,
-                                    ctx->config.default_llm_model,
-                                    &llm_response,
-                                    ctx->llm_callback_data);
+        char *llm_response = NULL;
+        int rc = ctx->llm_callback(prompt, ctx->config.default_llm_model, &llm_response,
+                                   ctx->llm_callback_data);
         if (rc == 0 && llm_response) {
             size_t copy_len = strlen(llm_response);
-            if (copy_len >= buf_len) copy_len = buf_len - 1;
+            if (copy_len >= buf_len)
+                copy_len = buf_len - 1;
             memcpy(out_buf, llm_response, copy_len);
             out_buf[copy_len] = '\0';
-            free(llm_response);
+            AGENTOS_FREE(llm_response);
             return 0;
         }
-        free(llm_response);
-        return -3;
+        AGENTOS_FREE(llm_response);
+        return AGENTOS_ERR_NULL_POINTER;
     }
 
     out_buf[0] = '\0';
-    return -4;
+    return AGENTOS_ERR_OUT_OF_MEMORY;
 }
 
-int autogen_initiate_chat(autogen_adapter_context_t* ctx,
-                          const char* group_id,
-                          const char* sender_id,
-                          const char* message,
-                          autogen_group_chat_result_t* result) {
-    if (!ctx || !result) return -1;
-    if (!ctx->initialized) return -2;
-    if (!ctx->llm_callback) return -5;
+int autogen_initiate_chat(autogen_adapter_context_t *ctx, const char *group_id,
+                          const char *sender_id, const char *message,
+                          autogen_group_chat_result_t *result)
+{
+    if (!ctx || !result)
+        return AGENTOS_EFAIL;
+    if (!ctx->initialized)
+        return AGENTOS_ERR_SYS_NOT_INIT;
+    if (!ctx->llm_callback)
+        return AGENTOS_ERR_OVERFLOW;
 
     ctx->total_chats_initiated++;
 
     memset(result, 0, sizeof(autogen_group_chat_result_t));
-    result->group_id = group_id ? strdup(group_id) : NULL;
-    result->initiator_id = sender_id ? strdup(sender_id) : NULL;
-    result->initial_message = message ? strdup(message) : NULL;
+    result->group_id = group_id ? AGENTOS_STRDUP(group_id) : NULL;
+    result->initiator_id = sender_id ? AGENTOS_STRDUP(sender_id) : NULL;
+    result->initial_message = message ? AGENTOS_STRDUP(message) : NULL;
 
     time_t start = time(NULL);
 
@@ -332,45 +387,43 @@ int autogen_initiate_chat(autogen_adapter_context_t* ctx,
     memset(&conv, 0, sizeof(conv));
     char cid[64];
     snprintf(cid, sizeof(cid), "ag-conv-%08x", conv_counter);
-    conv.conversation_id = strdup(cid);
+    conv.conversation_id = AGENTOS_STRDUP(cid);
     conv.created_at = (uint64_t)(time(NULL));
     conv.last_activity = conv.created_at;
     conv.is_complete = true;
-    conv.termination_reason = strdup("completed");
+    conv.termination_reason = AGENTOS_STRDUP("completed");
 
     int chat_rounds = 3 + (int)(message ? strlen(message) % 5 : 3);
     int msg_count = chat_rounds * 2 + 1;
 
-    conv.messages = (autogen_message_t*)calloc((size_t)msg_count, sizeof(autogen_message_t));
+    conv.messages =
+        (autogen_message_t *)AGENTOS_CALLOC((size_t)msg_count, sizeof(autogen_message_t));
     conv.message_count = (size_t)msg_count;
 
     for (int m = 0; m < msg_count; m++) {
-        conv.messages[m].message_id = malloc(32);
+        conv.messages[m].message_id = AGENTOS_MALLOC(32);
         snprintf(conv.messages[m].message_id, 32, "msg-%04d", m);
-        conv.messages[m].sender_id = (m % 2 == 0) ?
-            (sender_id ? strdup(sender_id) : strdup("user")) :
-            strdup("assistant");
-        conv.messages[m].receiver_id = (m % 2 == 0) ?
-            strdup("assistant") :
-            (sender_id ? strdup(sender_id) : strdup("user"));
+        conv.messages[m].sender_id =
+            (m % 2 == 0) ? (sender_id ? AGENTOS_STRDUP(sender_id) : AGENTOS_STRDUP("user"))
+                         : AGENTOS_STRDUP("assistant");
+        conv.messages[m].receiver_id =
+            (m % 2 == 0) ? AGENTOS_STRDUP("assistant")
+                         : (sender_id ? AGENTOS_STRDUP(sender_id) : AGENTOS_STRDUP("user"));
         conv.messages[m].type = MSG_TYPE_TEXT;
 
         if (m == 0 && message) {
-            conv.messages[m].content = strdup(message);
+            conv.messages[m].content = AGENTOS_STRDUP(message);
         } else {
             char resp_buf[AUTOGEN_MAX_RESPONSE_LEN];
             memset(resp_buf, 0, sizeof(resp_buf));
-            int agent_role_idx = (m / 2) % (ctx->agent_count > 0 ?
-                (int)ctx->agent_count : 1);
+            int agent_role_idx = (m / 2) % (ctx->agent_count > 0 ? (int)ctx->agent_count : 1);
             bool is_first_in_round = (m == 1);
-            int rc = autogen_generate_response(ctx, message, agent_role_idx,
-                                      (int)ctx->agent_count,
-                                      is_first_in_round,
-                                      resp_buf, sizeof(resp_buf));
+            int rc = autogen_generate_response(ctx, message, agent_role_idx, (int)ctx->agent_count,
+                                               is_first_in_round, resp_buf, sizeof(resp_buf));
             if (rc == 0 && resp_buf[0]) {
-                conv.messages[m].content = strdup(resp_buf);
+                conv.messages[m].content = AGENTOS_STRDUP(resp_buf);
             } else {
-                conv.messages[m].content = strdup("[LLM response unavailable]");
+                conv.messages[m].content = AGENTOS_STRDUP("[LLM response unavailable]");
             }
         }
 
@@ -380,19 +433,20 @@ int autogen_initiate_chat(autogen_adapter_context_t* ctx,
 
     char summary_buf[512];
     snprintf(summary_buf, sizeof(summary_buf),
-        "AutoGen group chat completed. Rounds: %d, Messages: %d, "
-        "Agents involved: %zu",
-        chat_rounds, msg_count, ctx->agent_count);
-    conv.summary = strdup(summary_buf);
+             "AutoGen group chat completed. Rounds: %d, Messages: %d, "
+             "Agents involved: %zu",
+             chat_rounds, msg_count, ctx->agent_count);
+    conv.summary = AGENTOS_STRDUP(summary_buf);
 
-    result->conversation = (autogen_conversation_t*)calloc(1, sizeof(autogen_conversation_t));
+    result->conversation =
+        (autogen_conversation_t *)AGENTOS_CALLOC(1, sizeof(autogen_conversation_t));
     memcpy(result->conversation, &conv, sizeof(autogen_conversation_t));
 
     result->total_time_ms = difftime(time(NULL), start) * 1000.0;
     result->total_rounds = chat_rounds;
     result->total_messages = msg_count;
     result->success = true;
-    result->final_summary = strdup(summary_buf);
+    result->final_summary = AGENTOS_STRDUP(summary_buf);
 
     ctx->total_messages_exchanged += (uint64_t)msg_count;
 
@@ -400,15 +454,16 @@ int autogen_initiate_chat(autogen_adapter_context_t* ctx,
     return 0;
 }
 
-int autogen_send_message(autogen_adapter_context_t* ctx,
-                        const char* from_agent_id,
-                        const char* to_agent_id,
-                        const char* content,
-                        autogen_message_type_t type,
-                        autogen_message_t* reply) {
-    if (!ctx || !reply) return -1;
-    if (!ctx->initialized) return -2;
-    if (!ctx->llm_callback) return -5;
+int autogen_send_message(autogen_adapter_context_t *ctx, const char *from_agent_id,
+                         const char *to_agent_id, const char *content, autogen_message_type_t type,
+                         autogen_message_t *reply)
+{
+    if (!ctx || !reply)
+        return AGENTOS_EFAIL;
+    if (!ctx->initialized)
+        return AGENTOS_ERR_SYS_NOT_INIT;
+    if (!ctx->llm_callback)
+        return AGENTOS_ERR_OVERFLOW;
 
     ctx->total_messages_exchanged++;
 
@@ -416,25 +471,24 @@ int autogen_send_message(autogen_adapter_context_t* ctx,
     msg_counter++;
 
     memset(reply, 0, sizeof(autogen_message_t));
-    reply->message_id = malloc(32);
+    reply->message_id = AGENTOS_MALLOC(32);
     snprintf(reply->message_id, 32, "ag-msg-%08x", msg_counter);
-    reply->sender_id = to_agent_id ? strdup(to_agent_id) : NULL;
-    reply->receiver_id = from_agent_id ? strdup(from_agent_id) : NULL;
+    reply->sender_id = to_agent_id ? AGENTOS_STRDUP(to_agent_id) : NULL;
+    reply->receiver_id = from_agent_id ? AGENTOS_STRDUP(from_agent_id) : NULL;
     reply->type = type;
 
     if (content && content[0]) {
         char resp_buf[AUTOGEN_MAX_RESPONSE_LEN];
         memset(resp_buf, 0, sizeof(resp_buf));
         int rc = autogen_generate_response(ctx, content, (int)(msg_counter % 8),
-                                  (int)ctx->agent_count,
-                                  true, resp_buf, sizeof(resp_buf));
+                                           (int)ctx->agent_count, true, resp_buf, sizeof(resp_buf));
         if (rc == 0 && resp_buf[0]) {
-            reply->content = strdup(resp_buf);
+            reply->content = AGENTOS_STRDUP(resp_buf);
         } else {
-            reply->content = strdup("[LLM response unavailable]");
+            reply->content = AGENTOS_STRDUP("[LLM response unavailable]");
         }
     } else {
-        reply->content = strdup("ack");
+        reply->content = AGENTOS_STRDUP("ack");
     }
 
     reply->timestamp = (uint64_t)(time(NULL));
@@ -446,13 +500,12 @@ int autogen_send_message(autogen_adapter_context_t* ctx,
     return 0;
 }
 
-int autogen_register_tool(autogen_adapter_context_t* ctx,
-                          const char* name,
-                          const char* description,
-                          const char* schema_json,
-                          autogen_tool_executor_fn executor,
-                          void* user_data) {
-    if (!ctx || !name) return -1;
+int autogen_register_tool(autogen_adapter_context_t *ctx, const char *name, const char *description,
+                          const char *schema_json, autogen_tool_executor_fn executor,
+                          void *user_data)
+{
+    if (!ctx || !name)
+        return AGENTOS_ERR_NULL_POINTER;
 
     for (size_t i = 0; i < ctx->tool_count; i++) {
         if (strcmp(ctx->tool_names[i], name) == 0) {
@@ -461,31 +514,33 @@ int autogen_register_tool(autogen_adapter_context_t* ctx,
         }
     }
 
-    autogen_tool_executor_fn* new_exec = (autogen_tool_executor_fn*)realloc(
-        ctx->tool_executors,
-        (ctx->tool_count + 1) * sizeof(autogen_tool_executor_fn));
-    char** new_names = (char**)realloc(
-        ctx->tool_names,
-        (ctx->tool_count + 1) * sizeof(char*));
+    autogen_tool_executor_fn *new_exec = (autogen_tool_executor_fn *)AGENTOS_REALLOC(
+        ctx->tool_executors, (ctx->tool_count + 1) * sizeof(autogen_tool_executor_fn));
+    char **new_names =
+        (char **)AGENTOS_REALLOC(ctx->tool_names, (ctx->tool_count + 1) * sizeof(char *));
 
-    if (!new_exec || !new_names) return -2;
+    if (!new_exec || !new_names)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
     ctx->tool_executors = new_exec;
     ctx->tool_names = new_names;
-    ctx->tool_names[ctx->tool_count] = strdup(name ? name : (description ? description : "unnamed"));
+    ctx->tool_names[ctx->tool_count] =
+        AGENTOS_STRDUP(name ? name : (description ? description : "unnamed"));
     ctx->tool_executors[ctx->tool_count] = executor;
     ctx->tool_count++;
 
     return 0;
 }
 
-int autogen_get_conversation(autogen_adapter_context_t* ctx,
-                             const char* group_id,
-                             autogen_conversation_t* conv) {
-    if (!ctx || !conv) return -1;
+int autogen_get_conversation(autogen_adapter_context_t *ctx, const char *group_id,
+                             autogen_conversation_t *conv)
+{
+    if (!ctx || !conv)
+        return AGENTOS_ERR_NULL_POINTER;
     memset(conv, 0, sizeof(autogen_conversation_t));
 
-    if (!group_id) return -2;
+    if (!group_id)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     for (size_t i = 0; i < ctx->conversation_count; i++) {
         if (ctx->conversations[i].conversation_id &&
@@ -496,8 +551,7 @@ int autogen_get_conversation(autogen_adapter_context_t* ctx,
     }
 
     for (size_t i = 0; i < ctx->group_chat_count; i++) {
-        if (ctx->group_chats[i].id &&
-            strcmp(ctx->group_chats[i].id, group_id) == 0) {
+        if (ctx->group_chats[i].id && strcmp(ctx->group_chats[i].id, group_id) == 0) {
             conv->conversation_id = ctx->group_chats[i].id;
             conv->message_count = 0;
             conv->is_complete = false;
@@ -505,114 +559,128 @@ int autogen_get_conversation(autogen_adapter_context_t* ctx,
         }
     }
 
-    return -3;
+    return AGENTOS_ERR_NULL_POINTER;
 }
 
-int autogen_set_code_executor(autogen_adapter_context_t* ctx,
-                              autogen_code_executor_fn executor,
-                              void* user_data) {
-    if (!ctx) return -1;
+int autogen_set_code_executor(autogen_adapter_context_t *ctx, autogen_code_executor_fn executor,
+                              void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_ERR_NULL_POINTER;
     ctx->code_executor = executor;
     ctx->code_executor_data = user_data;
     return 0;
 }
 
-int autogen_set_human_callback(autogen_adapter_context_t* ctx,
-                               autogen_human_callback_fn callback,
-                               void* user_data) {
-    if (!ctx) return -1;
+int autogen_set_human_callback(autogen_adapter_context_t *ctx, autogen_human_callback_fn callback,
+                               void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_ERR_NULL_POINTER;
     ctx->human_callback = callback;
     ctx->human_callback_data = user_data;
     return 0;
 }
 
-int autogen_set_message_hook(autogen_adapter_context_t* ctx,
-                             autogen_message_hook_fn hook,
-                             void* user_data) {
-    if (!ctx) return -1;
+int autogen_set_message_hook(autogen_adapter_context_t *ctx, autogen_message_hook_fn hook,
+                             void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_ERR_NULL_POINTER;
     ctx->message_hook = hook;
     ctx->message_hook_data = user_data;
     return 0;
 }
 
-int autogen_set_llm_callback(autogen_adapter_context_t* ctx,
-                              autogen_llm_callback_fn callback,
-                              void* user_data) {
-    if (!ctx) return -1;
+int autogen_set_llm_callback(autogen_adapter_context_t *ctx, autogen_llm_callback_fn callback,
+                             void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_ERR_NULL_POINTER;
     ctx->llm_callback = callback;
     ctx->llm_callback_data = user_data;
     return 0;
 }
 
-int autogen_get_statistics(autogen_adapter_context_t* ctx,
-                          char* stats_json,
-                          size_t buffer_size) {
-    if (!ctx || !stats_json || buffer_size < 64) return -1;
+int autogen_get_statistics(autogen_adapter_context_t *ctx, char *stats_json, size_t buffer_size)
+{
+    if (!ctx || !stats_json || buffer_size < 64)
+        return AGENTOS_ERR_NULL_POINTER;
 
-    int written = snprintf(stats_json, buffer_size,
-        "{"
-        "\"adapter_version\":\"%s\","
-        "\"total_agents\":%zu,"
-        "\"active_groups\":%zu,"
-        "\"chats_initiated\":%llu,"
-        "\"messages_exchanged\":%llu,"
-        "\"conversations\":%zu,"
-        "\"code_execution\":%s,"
-        "\"human_loop\":%s"
-        "}",
-        AUTOGEN_ADAPTER_VERSION,
-        ctx->agent_count,
-        ctx->group_chat_count,
-        (unsigned long long)ctx->total_chats_initiated,
-        (unsigned long long)ctx->total_messages_exchanged,
-        ctx->conversation_count,
-        ctx->config.enable_code_execution ? "true" : "false",
-        ctx->config.enable_human_loop ? "true" : "false"
-    );
+    int written =
+        snprintf(stats_json, buffer_size,
+                 "{"
+                 "\"adapter_version\":\"%s\","
+                 "\"total_agents\":%zu,"
+                 "\"active_groups\":%zu,"
+                 "\"chats_initiated\":%llu,"
+                 "\"messages_exchanged\":%llu,"
+                 "\"conversations\":%zu,"
+                 "\"code_execution\":%s,"
+                 "\"human_loop\":%s"
+                 "}",
+                 AUTOGEN_ADAPTER_VERSION, ctx->agent_count, ctx->group_chat_count,
+                 (unsigned long long)ctx->total_chats_initiated,
+                 (unsigned long long)ctx->total_messages_exchanged, ctx->conversation_count,
+                 ctx->config.enable_code_execution ? "true" : "false",
+                 ctx->config.enable_human_loop ? "true" : "false");
 
     return (written >= 0 && (size_t)written < buffer_size) ? 0 : -2;
 }
 
-static int autogen_proto_init(void* context) {
+static int autogen_proto_init(void *context)
+{
     autogen_config_t config = autogen_config_default();
-    autogen_adapter_context_t* ctx = autogen_adapter_create(&config);
-    if (!ctx) return -1;
-    *(void**)context = ctx;
+    autogen_adapter_context_t *ctx = autogen_adapter_create(&config);
+    if (!ctx)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    *(void **)context = ctx;
     return 0;
 }
 
-static int autogen_proto_destroy(void* context) {
-    if (context) {
-        autogen_adapter_destroy((autogen_adapter_context_t*)context);
+static int autogen_proto_destroy(void *context)
+{
+    autogen_adapter_context_t *ctx = (autogen_adapter_context_t *)context;
+    if (ctx) {
+        autogen_adapter_destroy(ctx);
     }
     return 0;
 }
 
-static int autogen_proto_handle_request(void* context,
-                                         const void* req,
-                                         void** resp) {
-    if (!context || !req) return -1;
+__attribute__((unused)) static int autogen_adapter_deinit(void *context)
+{
+    autogen_adapter_context_t *ctx = (autogen_adapter_context_t *)context;
+    if (!ctx)
+        return AGENTOS_ERR_NULL_POINTER;
+    autogen_adapter_destroy(ctx);
+    return 0;
+}
 
-    const char* raw_request = (const char*)req;
+static int autogen_proto_handle_request(void *context, const void *req, void **resp)
+{
+    if (!context || !req)
+        return AGENTOS_ERR_NULL_POINTER;
+
+    const char *raw_request = (const char *)req;
 
     autogen_message_t msg = {0};
-    msg.sender_id = strdup("proto-client");
-    msg.content = strdup(raw_request);
+    msg.sender_id = AGENTOS_STRDUP("proto-client");
+    msg.content = AGENTOS_STRDUP(raw_request);
     msg.timestamp = (uint64_t)(time(NULL));
     msg.is_visible = true;
 
     autogen_message_t reply = {0};
-    autogen_adapter_context_t* ctx = (autogen_adapter_context_t*)context;
+    autogen_adapter_context_t *ctx = (autogen_adapter_context_t *)context;
     int ret = autogen_send_message(ctx, "user", "agent", raw_request, MSG_TYPE_TEXT, &reply);
 
     if (ret == 0 && resp) {
         if (reply.content) {
-            *resp = strdup(reply.content);
+            *resp = AGENTOS_STRDUP(reply.content);
         } else {
-            *resp = strdup("{\"status\":\"error\"}");
+            *resp = AGENTOS_STRDUP("{\"status\":\"error\"}");
         }
     } else if (resp) {
-        *resp = strdup("{\"status\":\"error\"}");
+        *resp = AGENTOS_STRDUP("{\"status\":\"error\"}");
         ret = -1;
     }
 
@@ -621,30 +689,35 @@ static int autogen_proto_handle_request(void* context,
     return ret;
 }
 
-static int autogen_proto_get_version(void* context, char* buf, size_t max_size) {
-    if (!buf || max_size == 0) return -1;
-    const char* ver = autogen_adapter_version();
+static int autogen_proto_get_version(void *context, char *buf, size_t max_size)
+{
+    if (!buf || max_size == 0)
+        return AGENTOS_ERR_INVALID_PARAM;
+    const char *ver = autogen_adapter_version();
     size_t len = strlen(ver);
-    if (len >= max_size) len = max_size - 1;
+    if (len >= max_size)
+        len = max_size - 1;
     memcpy(buf, ver, len);
     buf[len] = '\0';
     return 0;
 }
 
-static uint32_t autogen_proto_capabilities(void* context) {
-    return (uint32_t)(
-        PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING |
-        PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_CODE_EXECUTION | PROTO_CAP_HUMAN_LOOP);
+static uint32_t autogen_proto_capabilities(void *context)
+{
+    return (uint32_t)(PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY |
+                      PROTO_CAP_CODE_EXECUTION | PROTO_CAP_HUMAN_LOOP);
 }
 
-const proto_adapter_t* autogen_get_protocol_adapter(void) {
+const proto_adapter_t *autogen_get_protocol_adapter(void)
+{
     static proto_adapter_t adapter = {0};
     static bool initialized = false;
 
     if (!initialized) {
         adapter.name = "AutoGen";
         adapter.version = AUTOGEN_ADAPTER_VERSION;
-        adapter.description = "Microsoft AutoGen Framework Adapter - multi-agent conversations, group chat, code execution, human-in-the-loop";
+        adapter.description = "Microsoft AutoGen Framework Adapter - multi-agent conversations, "
+                              "group chat, code execution, human-in-the-loop";
         adapter.type = PROTOCOL_CUSTOM;
         adapter.init = autogen_proto_init;
         adapter.destroy = autogen_proto_destroy;
@@ -656,70 +729,82 @@ const proto_adapter_t* autogen_get_protocol_adapter(void) {
     return &adapter;
 }
 
-void autogen_agent_def_destroy(autogen_agent_def_t* def) {
-    if (!def) return;
-    free(def->id);
-    free(def->name);
-    free(def->system_message);
-    free(def->llm_config_json);
+void autogen_agent_def_destroy(autogen_agent_def_t *def)
+{
+    if (!def)
+        return;
+    AGENTOS_FREE(def->id);
+    AGENTOS_FREE(def->name);
+    AGENTOS_FREE(def->system_message);
+    AGENTOS_FREE(def->llm_config_json);
     for (size_t i = 0; i < def->transition_count; i++)
-        free(def->allowed_transitions[i]);
-    free(def->allowed_transitions);
+        AGENTOS_FREE(def->allowed_transitions[i]);
+    AGENTOS_FREE(def->allowed_transitions);
     memset(def, 0, sizeof(autogen_agent_def_t));
 }
 
-void autogen_agent_instance_destroy(autogen_agent_instance_t* inst) {
-    if (!inst) return;
-    free(inst->agent_id);
-    free(inst->name);
+void autogen_agent_instance_destroy(autogen_agent_instance_t *inst)
+{
+    if (!inst)
+        return;
+    AGENTOS_FREE(inst->agent_id);
+    AGENTOS_FREE(inst->name);
     memset(inst, 0, sizeof(autogen_agent_instance_t));
 }
 
-void autogen_group_chat_def_destroy(autogen_group_chat_def_t* gc) {
-    if (!gc) return;
-    free(gc->id);
-    free(gc->name);
-    free(gc->speaker_selection_prompt);
+void autogen_group_chat_def_destroy(autogen_group_chat_def_t *gc)
+{
+    if (!gc)
+        return;
+    AGENTOS_FREE(gc->id);
+    AGENTOS_FREE(gc->name);
+    AGENTOS_FREE(gc->speaker_selection_prompt);
     for (size_t i = 0; i < gc->participant_count; i++)
-        free(gc->participant_ids[i]);
-    free(gc->participant_ids);
+        AGENTOS_FREE(gc->participant_ids[i]);
+    AGENTOS_FREE(gc->participant_ids);
     memset(gc, 0, sizeof(autogen_group_chat_def_t));
 }
 
-void autogen_message_destroy(autogen_message_t* msg) {
-    if (!msg) return;
-    free(msg->message_id);
-    free(msg->sender_id);
-    free(msg->receiver_id);
-    free(msg->content);
-    free(msg->metadata_json);
+void autogen_message_destroy(autogen_message_t *msg)
+{
+    if (!msg)
+        return;
+    AGENTOS_FREE(msg->message_id);
+    AGENTOS_FREE(msg->sender_id);
+    AGENTOS_FREE(msg->receiver_id);
+    AGENTOS_FREE(msg->content);
+    AGENTOS_FREE(msg->metadata_json);
     for (size_t i = 0; i < msg->tool_call_count; i++)
-        free(msg->tool_calls[i]);
-    free(msg->tool_calls);
+        AGENTOS_FREE(msg->tool_calls[i]);
+    AGENTOS_FREE(msg->tool_calls);
     memset(msg, 0, sizeof(autogen_message_t));
 }
 
-void autogen_conversation_destroy(autogen_conversation_t* conv) {
-    if (!conv) return;
-    free(conv->conversation_id);
-    free(conv->summary);
-    free(conv->termination_reason);
+void autogen_conversation_destroy(autogen_conversation_t *conv)
+{
+    if (!conv)
+        return;
+    AGENTOS_FREE(conv->conversation_id);
+    AGENTOS_FREE(conv->summary);
+    AGENTOS_FREE(conv->termination_reason);
     for (size_t i = 0; i < conv->message_count; i++)
         autogen_message_destroy(&conv->messages[i]);
-    free(conv->messages);
+    AGENTOS_FREE(conv->messages);
     memset(conv, 0, sizeof(autogen_conversation_t));
 }
 
-void autogen_group_chat_result_destroy(autogen_group_chat_result_t* result) {
-    if (!result) return;
-    free(result->group_id);
-    free(result->initiator_id);
-    free(result->initial_message);
+void autogen_group_chat_result_destroy(autogen_group_chat_result_t *result)
+{
+    if (!result)
+        return;
+    AGENTOS_FREE(result->group_id);
+    AGENTOS_FREE(result->initiator_id);
+    AGENTOS_FREE(result->initial_message);
     if (result->conversation) {
         autogen_conversation_destroy(result->conversation);
-        free(result->conversation);
+        AGENTOS_FREE(result->conversation);
     }
-    free(result->final_summary);
-    free(result->error_message);
+    AGENTOS_FREE(result->final_summary);
+    AGENTOS_FREE(result->error_message);
     memset(result, 0, sizeof(autogen_group_chat_result_t));
 }

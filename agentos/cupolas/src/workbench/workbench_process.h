@@ -12,6 +12,7 @@
 #define CUPOLAS_WORKBENCH_PROCESS_H
 
 #include "../platform/platform.h"
+
 #include <stdbool.h>
 
 #ifdef __cplusplus

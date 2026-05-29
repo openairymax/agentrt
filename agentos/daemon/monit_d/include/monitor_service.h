@@ -8,33 +8,33 @@
 #ifndef AGENTOS_MONITOR_SERVICE_H
 #define AGENTOS_MONITOR_SERVICE_H
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /**
  * @brief 监控服务配置
  */
 typedef struct {
     uint32_t metrics_collection_interval_ms; /**< 指标收集间隔（毫秒） */
-    uint32_t health_check_interval_ms;      /**< 健康检查间隔（毫秒） */
-    uint32_t log_flush_interval_ms;         /**< 日志刷新间隔（毫秒） */
+    uint32_t health_check_interval_ms;       /**< 健康检查间隔（毫秒） */
+    uint32_t log_flush_interval_ms;          /**< 日志刷新间隔（毫秒） */
     uint32_t alert_check_interval_ms;        /**< 告警检查间隔（毫秒） */
-    char* log_file_path;                    /**< 日志文件路径 */
-    char* metrics_storage_path;             /**< 指标存储路径 */
-    bool enable_tracing;                    /**< 是否启用追踪 */
-    bool enable_alerting;                   /**< 是否启用告警 */
-    double loop_threshold;                  /**< 死循环检测阈值（0.0-1.0） */
+    char *log_file_path;                     /**< 日志文件路径 */
+    char *metrics_storage_path;              /**< 指标存储路径 */
+    bool enable_tracing;                     /**< 是否启用追踪 */
+    bool enable_alerting;                    /**< 是否启用告警 */
+    double loop_threshold;                   /**< 死循环检测阈值（0.0-1.0） */
 } monitor_config_t;
 
 /**
  * @brief 指标类型
  */
 typedef enum {
-    METRIC_TYPE_COUNTER,    /**< 计数器 */
-    METRIC_TYPE_GAUGE,      /**<  gauge */
-    METRIC_TYPE_HISTOGRAM,  /**< 直方图 */
-    METRIC_TYPE_SUMMARY,    /**< 摘要 */
+    METRIC_TYPE_COUNTER,   /**< 计数器 */
+    METRIC_TYPE_GAUGE,     /**<  gauge */
+    METRIC_TYPE_HISTOGRAM, /**< 直方图 */
+    METRIC_TYPE_SUMMARY,   /**< 摘要 */
     METRIC_TYPE_COUNT
 } metric_type_t;
 
@@ -42,10 +42,10 @@ typedef enum {
  * @brief 告警级别
  */
 typedef enum {
-    ALERT_LEVEL_INFO,       /**< 信息 */
-    ALERT_LEVEL_WARNING,    /**< 警告 */
-    ALERT_LEVEL_ERROR,      /**< 错误 */
-    ALERT_LEVEL_CRITICAL,   /**< 严重 */
+    ALERT_LEVEL_INFO,     /**< 信息 */
+    ALERT_LEVEL_WARNING,  /**< 警告 */
+    ALERT_LEVEL_ERROR,    /**< 错误 */
+    ALERT_LEVEL_CRITICAL, /**< 严重 */
     ALERT_LEVEL_COUNT
 } alert_level_t;
 
@@ -53,28 +53,28 @@ typedef enum {
  * @brief 指标信息
  */
 typedef struct {
-    char* name;             /**< 指标名称 */
-    char* description;      /**< 指标描述 */
-    metric_type_t type;     /**< 指标类型 */
-    char** labels;          /**< 标签数组 */
-    size_t label_count;     /**< 标签数量 */
-    double value;           /**< 指标值 */
-    uint64_t timestamp;     /**< 时间戳 */
+    char *name;         /**< 指标名称 */
+    char *description;  /**< 指标描述 */
+    metric_type_t type; /**< 指标类型 */
+    char **labels;      /**< 标签数组 */
+    size_t label_count; /**< 标签数量 */
+    double value;       /**< 指标值 */
+    uint64_t timestamp; /**< 时间戳 */
 } metric_info_t;
 
 /**
  * @brief 告警信息
  */
 typedef struct {
-    char* alert_id;         /**< 告警 ID */
-    char* message;          /**< 告警消息 */
-    alert_level_t level;     /**< 告警级别 */
-    char* service_name;      /**< 服务名称 */
-    char* resource_id;      /**< 资源 ID */
-    char** labels;          /**< 标签数组 */
-    size_t label_count;     /**< 标签数量 */
-    uint64_t timestamp;     /**< 时间戳 */
-    bool is_resolved;       /**< 是否已解决 */
+    char *alert_id;      /**< 告警 ID */
+    char *message;       /**< 告警消息 */
+    alert_level_t level; /**< 告警级别 */
+    char *service_name;  /**< 服务名称 */
+    char *resource_id;   /**< 资源 ID */
+    char **labels;       /**< 标签数组 */
+    size_t label_count;  /**< 标签数量 */
+    uint64_t timestamp;  /**< 时间戳 */
+    bool is_resolved;    /**< 是否已解决 */
 } alert_info_t;
 
 /**
@@ -89,26 +89,26 @@ typedef struct {
  * @brief 日志信息
  */
 typedef struct {
-    log_level_t level;      /**< 日志级别 */
-    char* message;          /**< 日志消息 */
-    char* service_name;      /**< 服务名称 */
-    char* file;             /**< 文件名 */
-    int line;               /**< 行号 */
-    char* function;         /**< 函数名 */
-    uint64_t timestamp;     /**< 时间戳 */
-    char** context;         /**< 上下文信息 */
-    size_t context_count;   /**< 上下文数量 */
+    log_level_t level;    /**< 日志级别 */
+    char *message;        /**< 日志消息 */
+    char *service_name;   /**< 服务名称 */
+    char *file;           /**< 文件名 */
+    int line;             /**< 行号 */
+    char *function;       /**< 函数名 */
+    uint64_t timestamp;   /**< 时间戳 */
+    char **context;       /**< 上下文信息 */
+    size_t context_count; /**< 上下文数量 */
 } log_info_t;
 
 /**
  * @brief 健康检查结果
  */
 typedef struct {
-    char* service_name;      /**< 服务名称 */
-    bool is_healthy;        /**< 是否健康 */
-    char* status_message;    /**< 状态消息 */
-    uint64_t timestamp;     /**< 时间戳 */
-    int error_code;          /**< 错误码 */
+    char *service_name;   /**< 服务名称 */
+    bool is_healthy;      /**< 是否健康 */
+    char *status_message; /**< 状态消息 */
+    uint64_t timestamp;   /**< 时间戳 */
+    int error_code;       /**< 错误码 */
 } health_check_result_t;
 
 /**
@@ -122,14 +122,14 @@ typedef struct monitor_service monitor_service_t;
  * @param service 输出参数，返回创建的服务句柄
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_create(const monitor_config_t* manager, monitor_service_t** service);
+int monitor_service_create(const monitor_config_t *manager, monitor_service_t **service);
 
 /**
  * @brief 销毁监控服务
  * @param service 服务句柄
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_destroy(monitor_service_t* service);
+int monitor_service_destroy(monitor_service_t *service);
 
 /**
  * @brief 记录指标
@@ -137,7 +137,7 @@ int monitor_service_destroy(monitor_service_t* service);
  * @param metric 指标信息
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_record_metric(monitor_service_t* service, const metric_info_t* metric);
+int monitor_service_record_metric(monitor_service_t *service, const metric_info_t *metric);
 
 /**
  * @brief 记录日志
@@ -145,7 +145,7 @@ int monitor_service_record_metric(monitor_service_t* service, const metric_info_
  * @param log 日志信息
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_log(monitor_service_t* service, const log_info_t* log);
+int monitor_service_log(monitor_service_t *service, const log_info_t *log);
 
 /**
  * @brief 触发告警
@@ -153,7 +153,7 @@ int monitor_service_log(monitor_service_t* service, const log_info_t* log);
  * @param alert 告警信息
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_trigger_alert(monitor_service_t* service, const alert_info_t* alert);
+int monitor_service_trigger_alert(monitor_service_t *service, const alert_info_t *alert);
 
 /**
  * @brief 解决告警
@@ -161,7 +161,7 @@ int monitor_service_trigger_alert(monitor_service_t* service, const alert_info_t
  * @param alert_id 告警 ID
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_resolve_alert(monitor_service_t* service, const char* alert_id);
+int monitor_service_resolve_alert(monitor_service_t *service, const char *alert_id);
 
 /**
  * @brief 执行健康检查
@@ -170,7 +170,8 @@ int monitor_service_resolve_alert(monitor_service_t* service, const char* alert_
  * @param result 输出参数，返回健康检查结果
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_health_check(monitor_service_t* service, const char* service_name, health_check_result_t** result);
+int monitor_service_health_check(monitor_service_t *service, const char *service_name,
+                                 health_check_result_t **result);
 
 /**
  * @brief 获取指标数据
@@ -180,7 +181,8 @@ int monitor_service_health_check(monitor_service_t* service, const char* service
  * @param count 输出参数，返回指标数量
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_get_metrics(monitor_service_t* service, const char* metric_name, metric_info_t*** metrics, size_t* count);
+int monitor_service_get_metrics(monitor_service_t *service, const char *metric_name,
+                                metric_info_t ***metrics, size_t *count);
 
 /**
  * @brief 获取告警列表
@@ -189,7 +191,7 @@ int monitor_service_get_metrics(monitor_service_t* service, const char* metric_n
  * @param count 输出参数，返回告警数量
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_get_alerts(monitor_service_t* service, alert_info_t*** alerts, size_t* count);
+int monitor_service_get_alerts(monitor_service_t *service, alert_info_t ***alerts, size_t *count);
 
 /**
  * @brief 重载配置
@@ -197,7 +199,7 @@ int monitor_service_get_alerts(monitor_service_t* service, alert_info_t*** alert
  * @param manager 新的配置信息
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_reload_config(monitor_service_t* service, const monitor_config_t* manager);
+int monitor_service_reload_config(monitor_service_t *service, const monitor_config_t *manager);
 
 /**
  * @brief 生成监控报告
@@ -205,7 +207,7 @@ int monitor_service_reload_config(monitor_service_t* service, const monitor_conf
  * @param report 输出参数，返回报告内容
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_generate_report(monitor_service_t* service, char** report);
+int monitor_service_generate_report(monitor_service_t *service, char **report);
 
 /* ===================== Agent 状态监控增强 ===================== */
 
@@ -213,19 +215,19 @@ int monitor_service_generate_report(monitor_service_t* service, char** report);
  * @brief Agent 执行状态
  */
 typedef enum {
-    AGENT_STATE_CREATED = 0,     /**< 已创建 */
-    AGENT_STATE_INITIALIZING,    /**< 初始化中 */
-    AGENT_STATE_READY,           /**< 就绪 */
-    AGENT_STATE_RUNNING,         /**< 运行中 */
-    AGENT_STATE_WAITING,         /**< 等待中 */
-    AGENT_STATE_THINKING,        /**< 思考中 */
-    AGENT_STATE_EXECUTING,       /**< 执行中 */
-    AGENT_STATE_EXECUTING_TOOL,  /**< 执行工具中 */
-    AGENT_STATE_PAUSED,          /**< 暂停 */
-    AGENT_STATE_COMPLETED,       /**< 完成 */
-    AGENT_STATE_FAILED,          /**< 失败 */
-    AGENT_STATE_CANCELLED,       /**< 已取消 */
-    AGENT_STATE_STUCK,           /**< 卡住（可能死循环） */
+    AGENT_STATE_CREATED = 0,    /**< 已创建 */
+    AGENT_STATE_INITIALIZING,   /**< 初始化中 */
+    AGENT_STATE_READY,          /**< 就绪 */
+    AGENT_STATE_RUNNING,        /**< 运行中 */
+    AGENT_STATE_WAITING,        /**< 等待中 */
+    AGENT_STATE_THINKING,       /**< 思考中 */
+    AGENT_STATE_EXECUTING,      /**< 执行中 */
+    AGENT_STATE_EXECUTING_TOOL, /**< 执行工具中 */
+    AGENT_STATE_PAUSED,         /**< 暂停 */
+    AGENT_STATE_COMPLETED,      /**< 完成 */
+    AGENT_STATE_FAILED,         /**< 失败 */
+    AGENT_STATE_CANCELLED,      /**< 已取消 */
+    AGENT_STATE_STUCK,          /**< 卡住（可能死循环） */
     AGENT_STATE_COUNT
 } agent_execution_state_t;
 
@@ -233,78 +235,75 @@ typedef enum {
  * @brief 死循环检测模式
  */
 typedef enum {
-    LOOP_DETECTION_TIME_BASED = 0,   /**< 基于时间检测 */
-    LOOP_DETECTION_PATTERN_BASED,    /**< 基于模式检测 */
-    LOOP_DETECTION_RESOURCE_BASED,   /**< 基于资源检测 */
-    LOOP_DETECTION_HYBRID            /**< 混合检测 */
+    LOOP_DETECTION_TIME_BASED = 0, /**< 基于时间检测 */
+    LOOP_DETECTION_PATTERN_BASED,  /**< 基于模式检测 */
+    LOOP_DETECTION_RESOURCE_BASED, /**< 基于资源检测 */
+    LOOP_DETECTION_HYBRID          /**< 混合检测 */
 } loop_detection_mode_t;
 
 /**
  * @brief Agent 执行轨迹点
  */
 typedef struct {
-    uint64_t timestamp;          /**< 时间戳（微秒） */
+    uint64_t timestamp;            /**< 时间戳（微秒） */
     agent_execution_state_t state; /**< 状态 */
-    char* location;              /**< 位置（函数/模块） */
-    size_t loop_count;           /**< 循环计数 */
-    size_t memory_usage;         /**< 内存使用（字节） */
-    double cpu_usage;            /**< CPU 使用率 */
+    char *location;                /**< 位置（函数/模块） */
+    size_t loop_count;             /**< 循环计数 */
+    size_t memory_usage;           /**< 内存使用（字节） */
+    double cpu_usage;              /**< CPU 使用率 */
 } agent_trace_point_t;
 
 /**
  * @brief Agent 执行轨迹
  */
 typedef struct {
-    char* agent_id;              /**< Agent ID */
-    char* task_id;               /**< 任务 ID */
-    char* trace_id;              /**< Trace ID */
+    char *agent_id;                        /**< Agent ID */
+    char *task_id;                         /**< 任务 ID */
+    char *trace_id;                        /**< Trace ID */
     agent_execution_state_t current_state; /**< 当前状态 */
-    uint64_t start_time;         /**< 开始时间 */
-    uint64_t end_time;           /**< 结束时间 */
-    uint64_t last_update_time;   /**< 最后更新时间 */
-    int status;                  /**< 状态码 */
-    char* service_name;          /**< 服务名称 */
-    agent_trace_point_t* trace_points; /**< 轨迹点数组 */
-    size_t trace_point_count;    /**< 轨迹点数量 */
-    size_t trace_point_capacity; /**< 轨迹点容量 */
-    size_t loop_detection_count; /**< 循环检测计数 */
-    bool is_suspected_loop;      /**< 是否疑似死循环 */
-    bool loop_detected;          /**< 是否检测到死循环 */
-    double loop_confidence;      /**< 死循环置信度 */
-    char** locations;            /**< 位置历史数组 */
-    uint64_t* location_times;    /**< 位置时间戳数组 */
-    size_t location_count;       /**< 位置数量 */
+    uint64_t start_time;                   /**< 开始时间 */
+    uint64_t end_time;                     /**< 结束时间 */
+    uint64_t last_update_time;             /**< 最后更新时间 */
+    int status;                            /**< 状态码 */
+    char *service_name;                    /**< 服务名称 */
+    agent_trace_point_t *trace_points;     /**< 轨迹点数组 */
+    size_t trace_point_count;              /**< 轨迹点数量 */
+    size_t trace_point_capacity;           /**< 轨迹点容量 */
+    size_t loop_detection_count;           /**< 循环检测计数 */
+    bool is_suspected_loop;                /**< 是否疑似死循环 */
+    bool loop_detected;                    /**< 是否检测到死循环 */
+    double loop_confidence;                /**< 死循环置信度 */
+    char **locations;                      /**< 位置历史数组 */
+    uint64_t *location_times;              /**< 位置时间戳数组 */
+    size_t location_count;                 /**< 位置数量 */
 } agent_execution_trace_t;
 
 /**
  * @brief 死循环检测配置
  */
 typedef struct {
-    loop_detection_mode_t mode;  /**< 检测模式 */
+    loop_detection_mode_t mode;     /**< 检测模式 */
     uint64_t max_execution_time_ms; /**< 最大执行时间（毫秒） */
-    size_t max_loop_iterations;  /**< 最大循环迭代次数 */
-    size_t pattern_window_size;  /**< 模式窗口大小 */
-    double resource_threshold;   /**< 资源阈值 */
-    bool enable_auto_recovery;   /**< 是否启用自动恢复 */
-    bool enable_alerting;        /**< 是否启用告警 */
+    size_t max_loop_iterations;     /**< 最大循环迭代次数 */
+    size_t pattern_window_size;     /**< 模式窗口大小 */
+    double resource_threshold;      /**< 资源阈值 */
+    bool enable_auto_recovery;      /**< 是否启用自动恢复 */
+    bool enable_alerting;           /**< 是否启用告警 */
 } loop_detection_config_t;
 
 /**
  * @brief 默认死循环检测配置
  */
-#define LOOP_DETECTION_CONFIG_DEFAULT { \
-    .mode = LOOP_DETECTION_HYBRID, \
-    .max_execution_time_ms = 30000, \
-    .max_loop_iterations = 1000, \
-    .pattern_window_size = 10, \
-    .resource_threshold = 0.9, \
-    .enable_auto_recovery = true, \
-    .enable_alerting = true \
-}
+#define LOOP_DETECTION_CONFIG_DEFAULT                                                      \
+    {                                                                                      \
+        .mode = LOOP_DETECTION_HYBRID, .max_execution_time_ms = 30000,                     \
+        .max_loop_iterations = 1000, .pattern_window_size = 10, .resource_threshold = 0.9, \
+        .enable_auto_recovery = true, .enable_alerting = true                              \
+    }
 
 /**
  * @brief 开始监控 Agent 执行
- * 
+ *
  * @param service 监控服务句柄
  * @param agent_id Agent ID
  * @param task_id 任务 ID
@@ -312,63 +311,49 @@ typedef struct {
  * @param trace 输出参数，返回执行轨迹句柄
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_start_agent_trace(
-    monitor_service_t* service,
-    const char* agent_id,
-    const char* task_id,
-    const loop_detection_config_t* loop_config,
-    agent_execution_trace_t** trace
-);
+int monitor_service_start_agent_trace(monitor_service_t *service, const char *agent_id,
+                                      const char *task_id,
+                                      const loop_detection_config_t *loop_config,
+                                      agent_execution_trace_t **trace);
 
 /**
  * @brief 更新 Agent 执行状态
- * 
+ *
  * @param service 监控服务句柄
  * @param trace 执行轨迹句柄
  * @param new_state 新状态
  * @param location 位置信息
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_update_agent_state(
-    monitor_service_t* service,
-    agent_execution_trace_t* trace,
-    agent_execution_state_t new_state,
-    const char* location
-);
+int monitor_service_update_agent_state(monitor_service_t *service, agent_execution_trace_t *trace,
+                                       agent_execution_state_t new_state, const char *location);
 
 /**
  * @brief 检查死循环
- * 
+ *
  * @param service 监控服务句柄
  * @param trace 执行轨迹句柄
  * @param is_loop 输出参数，是否为死循环
  * @param confidence 输出参数，检测置信度（0.0-1.0）
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_check_loop(
-    monitor_service_t* service,
-    agent_execution_trace_t* trace,
-    bool* is_loop,
-    double* confidence
-);
+int monitor_service_check_loop(monitor_service_t *service, agent_execution_trace_t *trace,
+                               bool *is_loop, double *confidence);
 
 /**
  * @brief 结束 Agent 执行监控
- * 
+ *
  * @param service 监控服务句柄
  * @param trace 执行轨迹句柄
  * @param final_state 最终状态
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_end_agent_trace(
-    monitor_service_t* service,
-    agent_execution_trace_t* trace,
-    agent_execution_state_t final_state
-);
+int monitor_service_end_agent_trace(monitor_service_t *service, agent_execution_trace_t *trace,
+                                    agent_execution_state_t final_state);
 
 /**
  * @brief 获取 Agent 执行摘要
- * 
+ *
  * @param service 监控服务句柄
  * @param agent_id Agent ID（可为 NULL 获取所有）
  * @param start_time 开始时间（可为 0）
@@ -376,17 +361,12 @@ int monitor_service_end_agent_trace(
  * @param summary 输出参数，返回摘要信息
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_get_agent_summary(
-    monitor_service_t* service,
-    const char* agent_id,
-    uint64_t start_time,
-    uint64_t end_time,
-    char** summary
-);
+int monitor_service_get_agent_summary(monitor_service_t *service, const char *agent_id,
+                                      uint64_t start_time, uint64_t end_time, char **summary);
 
 /**
  * @brief 导出 Agent 执行轨迹
- * 
+ *
  * @param service 监控服务句柄
  * @param trace 执行轨迹句柄
  * @param format 导出格式（"json", "csv", "text"）
@@ -394,38 +374,27 @@ int monitor_service_get_agent_summary(
  * @param size 输出参数，返回数据大小
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_export_agent_trace(
-    monitor_service_t* service,
-    agent_execution_trace_t* trace,
-    const char* format,
-    char** data,
-    size_t* size
-);
+int monitor_service_export_agent_trace(monitor_service_t *service, agent_execution_trace_t *trace,
+                                       const char *format, char **data, size_t *size);
 
 /**
  * @brief 获取活跃 Agent 列表
- * 
+ *
  * @param service 监控服务句柄
  * @param agent_ids 输出参数，返回 Agent ID 数组
  * @param count 输出参数，返回 Agent 数量
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_get_active_agents(
-    monitor_service_t* service,
-    char*** agent_ids,
-    size_t* count
-);
+int monitor_service_get_active_agents(monitor_service_t *service, char ***agent_ids, size_t *count);
 
 /**
  * @brief 重置死循环检测
- * 
+ *
  * @param service 监控服务句柄
  * @param trace 执行轨迹句柄
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_service_reset_loop_detection(
-    monitor_service_t* service,
-    agent_execution_trace_t* trace
-);
+int monitor_service_reset_loop_detection(monitor_service_t *service,
+                                         agent_execution_trace_t *trace);
 
 #endif /* AGENTOS_MONITOR_SERVICE_H */

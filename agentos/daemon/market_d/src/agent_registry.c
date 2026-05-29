@@ -1,17 +1,20 @@
 #include "memory_compat.h"
+
+
 /**
  * @file agent_registry.c
  * @brief Agent 注册表实现（基于实际market_service.h API）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "daemon_errors.h"
+#include "error.h"
 #include "market_service.h"
 #include "platform.h"
-#include "error.h"
-#include "daemon_errors.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #define MAX_AGENTS 1024
 
@@ -28,17 +31,20 @@ typedef struct {
 
 static agent_registry_t g_registry = {0};
 
-static int find_agent_index(const char* agent_id) {
+static int find_agent_index(const char *agent_id)
+{
     for (size_t i = 0; i < g_registry.entry_count; i++) {
         if (g_registry.entries[i].info.agent_id &&
             strcmp(g_registry.entries[i].info.agent_id, agent_id) == 0)
             return (int)i;
     }
-    return -1;
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
-static void free_agent_info(agent_info_t* info) {
-    if (!info) return;
+static void free_agent_info(agent_info_t *info)
+{
+    if (!info)
+        return;
     AGENTOS_FREE(info->agent_id);
     AGENTOS_FREE(info->name);
     AGENTOS_FREE(info->version);
@@ -49,29 +55,38 @@ static void free_agent_info(agent_info_t* info) {
     memset(info, 0, sizeof(agent_info_t));
 }
 
-static void free_agent_entry(agent_entry_t* entry) {
-    if (!entry) return;
+static void free_agent_entry(agent_entry_t *entry)
+{
+    if (!entry)
+        return;
     free_agent_info(&entry->info);
 }
 
-static char* safe_strdup(const char* str) {
-    if (!str) return NULL;
+static char *safe_strdup(const char *str)
+{
+    if (!str)
+        return NULL;
     size_t len = strlen(str);
-    char* copy = (char*)AGENTOS_MALLOC(len + 1);
-    if (copy) memcpy(copy, str, len + 1);
+    char *copy = (char *)AGENTOS_MALLOC(len + 1);
+    if (copy)
+        memcpy(copy, str, len + 1);
     return copy;
 }
 
-int agent_registry_init(const char* db_path __attribute__((unused))) {
-    if (g_registry.initialized) return AGENTOS_OK;
+int agent_registry_init(const char *db_path __attribute__((unused)))
+{
+    if (g_registry.initialized)
+        return AGENTOS_OK;
     agentos_mutex_init(&g_registry.lock);
     g_registry.entry_count = 0;
     g_registry.initialized = 1;
     return AGENTOS_OK;
 }
 
-void agent_registry_shutdown(void) {
-    if (!g_registry.initialized) return;
+void agent_registry_shutdown(void)
+{
+    if (!g_registry.initialized)
+        return;
     agentos_mutex_lock(&g_registry.lock);
     for (size_t i = 0; i < g_registry.entry_count; i++)
         free_agent_entry(&g_registry.entries[i]);
@@ -81,9 +96,12 @@ void agent_registry_shutdown(void) {
     agentos_mutex_destroy(&g_registry.lock);
 }
 
-int agent_registry_register(const agent_info_t* reg) {
-    if (!reg || !reg->agent_id || !reg->name) return AGENTOS_ERR_INVALID_PARAM;
-    if (!g_registry.initialized) return AGENTOS_ERR_STATE_ERROR;
+int agent_registry_register(const agent_info_t *reg)
+{
+    if (!reg || !reg->agent_id || !reg->name)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_registry.initialized)
+        return AGENTOS_ERR_STATE_ERROR;
 
     agentos_mutex_lock(&g_registry.lock);
     if (find_agent_index(reg->agent_id) >= 0) {
@@ -95,7 +113,7 @@ int agent_registry_register(const agent_info_t* reg) {
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    agent_entry_t* entry = &g_registry.entries[g_registry.entry_count++];
+    agent_entry_t *entry = &g_registry.entries[g_registry.entry_count++];
     entry->info.agent_id = safe_strdup(reg->agent_id);
     entry->info.name = safe_strdup(reg->name);
     entry->info.version = safe_strdup(reg->version);
@@ -113,13 +131,19 @@ int agent_registry_register(const agent_info_t* reg) {
     return AGENTOS_OK;
 }
 
-int agent_registry_unregister(const char* agent_id) {
-    if (!agent_id) return AGENTOS_ERR_INVALID_PARAM;
-    if (!g_registry.initialized) return AGENTOS_ERR_STATE_ERROR;
+int agent_registry_unregister(const char *agent_id)
+{
+    if (!agent_id)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_registry.initialized)
+        return AGENTOS_ERR_STATE_ERROR;
 
     agentos_mutex_lock(&g_registry.lock);
     int idx = find_agent_index(agent_id);
-    if (idx < 0) { agentos_mutex_unlock(&g_registry.lock); return AGENTOS_ERR_NOT_FOUND; }
+    if (idx < 0) {
+        agentos_mutex_unlock(&g_registry.lock);
+        return AGENTOS_ERR_NOT_FOUND;
+    }
 
     free_agent_entry(&g_registry.entries[idx]);
     for (size_t i = (size_t)idx; i < g_registry.entry_count - 1; i++)
@@ -130,15 +154,21 @@ int agent_registry_unregister(const char* agent_id) {
     return AGENTOS_OK;
 }
 
-int agent_registry_get(const char* agent_id, agent_info_t* out_info) {
-    if (!agent_id || !out_info) return AGENTOS_ERR_INVALID_PARAM;
-    if (!g_registry.initialized) return AGENTOS_ERR_STATE_ERROR;
+int agent_registry_get(const char *agent_id, agent_info_t *out_info)
+{
+    if (!agent_id || !out_info)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_registry.initialized)
+        return AGENTOS_ERR_STATE_ERROR;
 
     agentos_mutex_lock(&g_registry.lock);
     int idx = find_agent_index(agent_id);
-    if (idx < 0) { agentos_mutex_unlock(&g_registry.lock); return AGENTOS_ERR_NOT_FOUND; }
+    if (idx < 0) {
+        agentos_mutex_unlock(&g_registry.lock);
+        return AGENTOS_ERR_NOT_FOUND;
+    }
 
-    agent_entry_t* entry = &g_registry.entries[idx];
+    agent_entry_t *entry = &g_registry.entries[idx];
     memset(out_info, 0, sizeof(agent_info_t));
     out_info->agent_id = safe_strdup(entry->info.agent_id);
     out_info->name = safe_strdup(entry->info.name);
@@ -157,40 +187,47 @@ int agent_registry_get(const char* agent_id, agent_info_t* out_info) {
     return AGENTOS_OK;
 }
 
-int agent_registry_search(const search_params_t* params, agent_info_t*** results, size_t* count) {
-    if (!params || !results || !count) return AGENTOS_ERR_INVALID_PARAM;
+int agent_registry_search(const search_params_t *params, agent_info_t ***results, size_t *count)
+{
+    if (!params || !results || !count)
+        return AGENTOS_ERR_INVALID_PARAM;
     *results = NULL;
     *count = 0;
-    if (!g_registry.initialized) return AGENTOS_ERR_STATE_ERROR;
+    if (!g_registry.initialized)
+        return AGENTOS_ERR_STATE_ERROR;
 
-    const char* query = params->query ? params->query : "";
+    const char *query = params->query ? params->query : "";
 
     agentos_mutex_lock(&g_registry.lock);
     size_t match_count = 0;
     for (size_t i = 0; i < g_registry.entry_count; i++) {
-        agent_entry_t* entry = &g_registry.entries[i];
-        if (!query[0] ||
-            (entry->info.agent_id && strstr(entry->info.agent_id, query)) ||
+        agent_entry_t *entry = &g_registry.entries[i];
+        if (!query[0] || (entry->info.agent_id && strstr(entry->info.agent_id, query)) ||
             (entry->info.name && strstr(entry->info.name, query)) ||
             (entry->info.description && strstr(entry->info.description, query))) {
             match_count++;
         }
     }
 
-    if (match_count == 0) { agentos_mutex_unlock(&g_registry.lock); return AGENTOS_OK; }
+    if (match_count == 0) {
+        agentos_mutex_unlock(&g_registry.lock);
+        return AGENTOS_OK;
+    }
 
-    *results = (agent_info_t**)AGENTOS_CALLOC(match_count, sizeof(agent_info_t*));
-    if (!*results) { agentos_mutex_unlock(&g_registry.lock); return AGENTOS_ERR_OUT_OF_MEMORY; }
+    *results = (agent_info_t **)AGENTOS_CALLOC(match_count, sizeof(agent_info_t *));
+    if (!*results) {
+        agentos_mutex_unlock(&g_registry.lock);
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     size_t result_idx = 0;
     for (size_t i = 0; i < g_registry.entry_count && result_idx < match_count; i++) {
-        agent_entry_t* entry = &g_registry.entries[i];
-        if (!query[0] ||
-            (entry->info.agent_id && strstr(entry->info.agent_id, query)) ||
+        agent_entry_t *entry = &g_registry.entries[i];
+        if (!query[0] || (entry->info.agent_id && strstr(entry->info.agent_id, query)) ||
             (entry->info.name && strstr(entry->info.name, query)) ||
             (entry->info.description && strstr(entry->info.description, query))) {
 
-            (*results)[result_idx] = (agent_info_t*)AGENTOS_CALLOC(1, sizeof(agent_info_t));
+            (*results)[result_idx] = (agent_info_t *)AGENTOS_CALLOC(1, sizeof(agent_info_t));
             if ((*results)[result_idx]) {
                 agent_registry_get(entry->info.agent_id, (*results)[result_idx]);
                 result_idx++;
@@ -203,15 +240,21 @@ int agent_registry_search(const search_params_t* params, agent_info_t*** results
     return AGENTOS_OK;
 }
 
-int agent_registry_add_version(const char* agent_id, const char* version_str) {
-    if (!agent_id || !version_str) return AGENTOS_ERR_INVALID_PARAM;
-    if (!g_registry.initialized) return AGENTOS_ERR_STATE_ERROR;
+int agent_registry_add_version(const char *agent_id, const char *version_str)
+{
+    if (!agent_id || !version_str)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!g_registry.initialized)
+        return AGENTOS_ERR_STATE_ERROR;
 
     agentos_mutex_lock(&g_registry.lock);
     int idx = find_agent_index(agent_id);
-    if (idx < 0) { agentos_mutex_unlock(&g_registry.lock); return AGENTOS_ERR_NOT_FOUND; }
+    if (idx < 0) {
+        agentos_mutex_unlock(&g_registry.lock);
+        return AGENTOS_ERR_NOT_FOUND;
+    }
 
-    agent_entry_t* entry = &g_registry.entries[idx];
+    agent_entry_t *entry = &g_registry.entries[idx];
     AGENTOS_FREE(entry->info.version);
     entry->info.version = safe_strdup(version_str);
     entry->info.last_updated = (uint64_t)time(NULL);
@@ -220,15 +263,22 @@ int agent_registry_add_version(const char* agent_id, const char* version_str) {
     return AGENTOS_OK;
 }
 
-void agent_info_free(agent_info_t* info) {
-    if (!info) return;
+void agent_info_free(agent_info_t *info)
+{
+    if (!info)
+        return;
     free_agent_info(info);
 }
 
-void agent_search_results_free(agent_info_t** results, size_t count) {
-    if (!results) return;
+void agent_search_results_free(agent_info_t **results, size_t count)
+{
+    if (!results)
+        return;
     for (size_t i = 0; i < count; i++) {
-        if (results[i]) { agent_info_free(results[i]); AGENTOS_FREE(results[i]); }
+        if (results[i]) {
+            agent_info_free(results[i]);
+            AGENTOS_FREE(results[i]);
+        }
     }
     AGENTOS_FREE(results);
 }

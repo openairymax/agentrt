@@ -12,17 +12,18 @@
  *       包括批量日志、追踪、注册表等操作。
  */
 
+#include "heapstore.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-#include "heapstore.h"
-
 /**
  * @brief 主函数：批量写入示例
  */
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     (void)argc;
     (void)argv;
 
@@ -32,18 +33,16 @@ int main(int argc, char** argv) {
 
     /* 1. 初始化 */
     printf("Step 1: Initialize heapstore\n");
-    heapstore_config_t config = {
-        .root_path = "./heapstore_data",
-        .max_log_size_mb = 100,
-        .log_retention_days = 7,
-        .trace_retention_days = 3,
-        .enable_auto_cleanup = true,
-        .enable_log_rotation = true,
-        .enable_trace_export = true,
-        .db_vacuum_interval_days = 7,
-        .circuit_breaker_threshold = 5,
-        .circuit_breaker_timeout_sec = 30
-    };
+    heapstore_config_t config = {.root_path = "./heapstore_data",
+                                 .max_log_size_mb = 100,
+                                 .log_retention_days = 7,
+                                 .trace_retention_days = 3,
+                                 .enable_auto_cleanup = true,
+                                 .enable_log_rotation = true,
+                                 .enable_trace_export = true,
+                                 .db_vacuum_interval_days = 7,
+                                 .circuit_breaker_threshold = 5,
+                                 .circuit_breaker_timeout_sec = 30};
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
@@ -54,7 +53,7 @@ int main(int argc, char** argv) {
 
     /* 2. 创建批量上下文 */
     printf("Step 2: Create Batch Context\n");
-    heapstore_batch_context_t* ctx = heapstore_batch_begin(1024);
+    heapstore_batch_context_t *ctx = heapstore_batch_begin(1024);
     if (!ctx) {
         printf("ERROR: batch_begin failed\n");
         heapstore_shutdown();
@@ -68,13 +67,7 @@ int main(int argc, char** argv) {
         char message[128];
         snprintf(message, sizeof(message), "Batch log message #%d at %ld", i, (long)time(NULL));
 
-        err = heapstore_batch_add_log(
-            ctx,
-            HEAPSTORE_LOG_INFO,
-            "batch_example",
-            NULL,
-            message
-        );
+        err = heapstore_batch_add_log(ctx, HEAPSTORE_LOG_INFO, "batch_example", NULL, message);
 
         if (err != heapstore_SUCCESS) {
             printf("  WARNING: failed to add log #%d: error %d\n", i, err);

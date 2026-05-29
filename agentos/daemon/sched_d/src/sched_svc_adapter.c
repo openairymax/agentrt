@@ -19,40 +19,42 @@
 #include <string.h>
 
 typedef struct {
-    sched_service_t* sched_svc;
+    sched_service_t *sched_svc;
     sched_config_t sched_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
     bool running;
 } sched_adapter_ctx_t;
 
-static sched_adapter_ctx_t* sched_get_ctx(agentos_service_t service) {
-    if (!service) return NULL;
-    return (sched_adapter_ctx_t*)agentos_service_get_user_data(service);
+static sched_adapter_ctx_t *sched_get_ctx(agentos_service_t service)
+{
+    if (!service)
+        return NULL;
+    return (sched_adapter_ctx_t *)agentos_service_get_user_data(service);
 }
 
-static void sched_config_from_common(
-    sched_config_t* sched_cfg,
-    const agentos_svc_config_t* common_cfg
-) {
+static void sched_config_from_common(sched_config_t *sched_cfg,
+                                     const agentos_svc_config_t *common_cfg)
+{
     memset(sched_cfg, 0, sizeof(sched_config_t));
     sched_cfg->strategy = SCHED_STRATEGY_WEIGHTED;
-    sched_cfg->health_check_interval_ms = (common_cfg && common_cfg->timeout_ms > 0)
-                                           ? common_cfg->timeout_ms : 10000;
+    sched_cfg->health_check_interval_ms =
+        (common_cfg && common_cfg->timeout_ms > 0) ? common_cfg->timeout_ms : 10000;
     sched_cfg->stats_report_interval_ms = 60000;
     sched_cfg->enable_ml_strategy = (common_cfg && common_cfg->enable_metrics);
     sched_cfg->ml_model_path = NULL;
-    sched_cfg->max_agents = (common_cfg && common_cfg->max_concurrent > 0)
-                            ? common_cfg->max_concurrent : 100;
+    sched_cfg->max_agents =
+        (common_cfg && common_cfg->max_concurrent > 0) ? common_cfg->max_concurrent : 100;
 }
 
-static agentos_error_t sched_adapter_init(
-    agentos_service_t service,
-    const agentos_svc_config_t* config
-) {
-    if (!service) return AGENTOS_EINVAL;
-    sched_adapter_ctx_t* ctx = sched_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
+static agentos_error_t sched_adapter_init(agentos_service_t service,
+                                          const agentos_svc_config_t *config)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    sched_adapter_ctx_t *ctx = sched_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
 
     if (config) {
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
@@ -71,21 +73,29 @@ static agentos_error_t sched_adapter_init(
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t sched_adapter_start(agentos_service_t service) {
-    if (!service) return AGENTOS_EINVAL;
-    sched_adapter_ctx_t* ctx = sched_get_ctx(service);
-    if (!ctx || !ctx->sched_svc) return AGENTOS_ENOTINIT;
-    if (ctx->running) return AGENTOS_SUCCESS;
+static agentos_error_t sched_adapter_start(agentos_service_t service)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    sched_adapter_ctx_t *ctx = sched_get_ctx(service);
+    if (!ctx || !ctx->sched_svc)
+        return AGENTOS_ENOTINIT;
+    if (ctx->running)
+        return AGENTOS_SUCCESS;
     ctx->running = true;
     SVC_LOG_INFO("调度器服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force) {
-    if (!service) return AGENTOS_EINVAL;
-    sched_adapter_ctx_t* ctx = sched_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
-    if (!ctx->running) return AGENTOS_SUCCESS;
+static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    sched_adapter_ctx_t *ctx = sched_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
+    if (!ctx->running)
+        return AGENTOS_SUCCESS;
     ctx->running = false;
     if (force) {
         if (ctx->sched_svc && ctx->owns_service) {
@@ -93,7 +103,10 @@ static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force)
             ctx->sched_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->sched_cfg.ml_model_path) { AGENTOS_FREE((void*)ctx->sched_cfg.ml_model_path); ctx->sched_cfg.ml_model_path = NULL; }
+        if (ctx->sched_cfg.ml_model_path) {
+            AGENTOS_FREE((void *)ctx->sched_cfg.ml_model_path);
+            ctx->sched_cfg.ml_model_path = NULL;
+        }
         SVC_LOG_INFO("调度器服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("调度器服务适配器已停止");
@@ -101,32 +114,41 @@ static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force)
     return AGENTOS_SUCCESS;
 }
 
-static void sched_adapter_destroy(agentos_service_t service) {
-    if (!service) return;
-    sched_adapter_ctx_t* ctx = sched_get_ctx(service);
-    if (!ctx) return;
+static void sched_adapter_destroy(agentos_service_t service)
+{
+    if (!service)
+        return;
+    sched_adapter_ctx_t *ctx = sched_get_ctx(service);
+    if (!ctx)
+        return;
 
     if (ctx->sched_svc && ctx->owns_service) {
         sched_service_destroy(ctx->sched_svc);
         ctx->sched_svc = NULL;
     }
 
-    if (ctx->sched_cfg.ml_model_path) AGENTOS_FREE((void*)ctx->sched_cfg.ml_model_path);
+    if (ctx->sched_cfg.ml_model_path)
+        AGENTOS_FREE((void *)ctx->sched_cfg.ml_model_path);
 
     agentos_service_set_user_data(service, NULL);
     AGENTOS_FREE(ctx);
 }
 
-static agentos_error_t sched_adapter_healthcheck(agentos_service_t service) {
-    if (!service) return AGENTOS_EINVAL;
-    sched_adapter_ctx_t* ctx = sched_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
+static agentos_error_t sched_adapter_healthcheck(agentos_service_t service)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    sched_adapter_ctx_t *ctx = sched_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
 
-    if (!ctx->sched_svc) return AGENTOS_ENOTINIT;
+    if (!ctx->sched_svc)
+        return AGENTOS_ENOTINIT;
 
     bool health_status = false;
     int ret = sched_service_health_check(ctx->sched_svc, &health_status);
-    if (ret != 0 || !health_status) return AGENTOS_ERR_UNKNOWN;
+    if (ret != 0 || !health_status)
+        return AGENTOS_ERR_UNKNOWN;
 
     return AGENTOS_SUCCESS;
 }
@@ -139,29 +161,29 @@ static const agentos_svc_interface_t sched_adapter_iface = {
     .healthcheck = sched_adapter_healthcheck,
 };
 
-agentos_error_t sched_service_adapter_create(
-    agentos_service_t* out_service,
-    const agentos_svc_config_t* config
-) {
-    if (!out_service) return AGENTOS_EINVAL;
+agentos_error_t sched_service_adapter_create(agentos_service_t *out_service,
+                                             const agentos_svc_config_t *config)
+{
+    if (!out_service)
+        return AGENTOS_EINVAL;
 
-    sched_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(sched_adapter_ctx_t));
-    if (!ctx) return AGENTOS_ENOMEM;
+    sched_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(sched_adapter_ctx_t));
+    if (!ctx)
+        return AGENTOS_ENOMEM;
 
     if (config) {
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "sched_d";
-        ctx->common_cfg.version = "0.0.5";
+        ctx->common_cfg.version = "0.1.0";
         ctx->common_cfg.enable_metrics = true;
     }
 
     ctx->owns_service = true;
 
     agentos_service_t svc_handle = NULL;
-    agentos_error_t err = agentos_service_create(
-        &svc_handle, ctx->common_cfg.name, &sched_adapter_iface, &ctx->common_cfg
-    );
+    agentos_error_t err = agentos_service_create(&svc_handle, ctx->common_cfg.name,
+                                                 &sched_adapter_iface, &ctx->common_cfg);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(ctx);
         return err;
@@ -178,15 +200,16 @@ agentos_error_t sched_service_adapter_create(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t sched_service_adapter_wrap(
-    agentos_service_t* out_service,
-    sched_service_t* sched_svc,
-    const agentos_svc_config_t* config
-) {
-    if (!out_service || !sched_svc) return AGENTOS_EINVAL;
+agentos_error_t sched_service_adapter_wrap(agentos_service_t *out_service,
+                                           sched_service_t *sched_svc,
+                                           const agentos_svc_config_t *config)
+{
+    if (!out_service || !sched_svc)
+        return AGENTOS_EINVAL;
 
-    sched_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(sched_adapter_ctx_t));
-    if (!ctx) return AGENTOS_ENOMEM;
+    sched_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(sched_adapter_ctx_t));
+    if (!ctx)
+        return AGENTOS_ENOMEM;
 
     ctx->sched_svc = sched_svc;
     ctx->owns_service = false;
@@ -195,13 +218,12 @@ agentos_error_t sched_service_adapter_wrap(
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "sched_d";
-        ctx->common_cfg.version = "0.0.5";
+        ctx->common_cfg.version = "0.1.0";
     }
 
     agentos_service_t svc_handle = NULL;
-    agentos_error_t err = agentos_service_create(
-        &svc_handle, ctx->common_cfg.name, &sched_adapter_iface, &ctx->common_cfg
-    );
+    agentos_error_t err = agentos_service_create(&svc_handle, ctx->common_cfg.name,
+                                                 &sched_adapter_iface, &ctx->common_cfg);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(ctx);
         return err;
@@ -218,32 +240,40 @@ agentos_error_t sched_service_adapter_wrap(
     return AGENTOS_SUCCESS;
 }
 
-sched_service_t* sched_service_adapter_get_original(agentos_service_t service) {
-    if (!service) return NULL;
-    sched_adapter_ctx_t* ctx = sched_get_ctx(service);
+sched_service_t *sched_service_adapter_get_original(agentos_service_t service)
+{
+    if (!service)
+        return NULL;
+    sched_adapter_ctx_t *ctx = sched_get_ctx(service);
     return ctx ? ctx->sched_svc : NULL;
 }
 
-agentos_error_t sched_service_adapter_init(agentos_service_t service) {
+agentos_error_t sched_service_adapter_init(agentos_service_t service)
+{
     return sched_adapter_init(service, NULL);
 }
 
-agentos_error_t sched_service_adapter_start(agentos_service_t service) {
+agentos_error_t sched_service_adapter_start(agentos_service_t service)
+{
     return sched_adapter_start(service);
 }
 
-agentos_error_t sched_service_adapter_stop(agentos_service_t service, bool force) {
+agentos_error_t sched_service_adapter_stop(agentos_service_t service, bool force)
+{
     return sched_adapter_stop(service, force);
 }
 
-void sched_service_adapter_destroy(agentos_service_t service) {
+void sched_service_adapter_destroy(agentos_service_t service)
+{
     sched_adapter_destroy(service);
 }
 
-agentos_error_t sched_service_adapter_healthcheck(agentos_service_t service) {
+agentos_error_t sched_service_adapter_healthcheck(agentos_service_t service)
+{
     return sched_adapter_healthcheck(service);
 }
 
-const agentos_svc_interface_t* sched_service_adapter_get_interface(void) {
+const agentos_svc_interface_t *sched_service_adapter_get_interface(void)
+{
     return &sched_adapter_iface;
 }

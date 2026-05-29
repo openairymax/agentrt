@@ -15,26 +15,100 @@
  */
 
 #include "a2a_v03_adapter.h"
+
+#include "memory_compat.h"
+
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <inttypes.h>
+
+#ifndef AGENTOS_SUCCESS
+#define AGENTOS_SUCCESS 0
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_ENOMEM
+#define AGENTOS_ENOMEM (-2)
+#endif
+#ifndef AGENTOS_ENOTSUP
+#define AGENTOS_ENOTSUP (-3)
+#endif
 
 /* Forward declarations for types defined in header */
 typedef struct a2a_v03_adapter_s a2a_v03_adapter_t;
 
 /* Internal types needed only in this translation unit */
-typedef struct { int type; float proposed_cost; int proposed_timeout_ms; int proposed_priority; } a2a_proposal_internal_t;
-typedef struct { char task_id[64]; int outcome; float final_cost; int final_timeout_ms; int counter_priority; int round_number; } a2a_negotiation_result_internal_t;
-typedef struct { const char* task_id; const char* description; int num_participants; float consensus_threshold; } a2a_consensus_request_internal_t;
-typedef struct { char task_id[64]; int agreed; int rounds_completed; int agreements[16]; int total_participants; int agree_count; bool consensus_reached; int consensus_type; } a2a_consensus_result_internal_t;
-typedef void (*a2a_stream_callback_internal_t)(const char*, size_t, bool, void*);
-typedef struct { const char* task_id; const char* target_agent_id; const char* description; int timeout_ms; a2a_stream_callback_internal_t callback; void* user_data; } a2a_task_request_internal_t;
-typedef struct { char task_id[64]; int status; char* result_json; char accepted_by[64]; int negotiation_rounds; int estimated_duration_ms; } a2a_task_response_internal_t;
-typedef struct { uint32_t total_tasks; uint32_t active; uint32_t active_tasks; uint32_t completed_tasks; uint32_t failed_tasks; double avg_delegation_latency_ms; double avg_consensus_latency_ms; uint32_t registered_agents; } a2a_stats_internal_t;
-typedef struct { int event_type; char task_id[64]; uint8_t progress_percentage; char phase[64]; char* detail_json; } a2a_progress_event_internal_t;
+typedef struct {
+    int type;
+    float proposed_cost;
+    int proposed_timeout_ms;
+    int proposed_priority;
+} a2a_proposal_internal_t;
+typedef struct {
+    char task_id[64];
+    int outcome;
+    float final_cost;
+    int final_timeout_ms;
+    int counter_priority;
+    int round_number;
+} a2a_negotiation_result_internal_t;
+typedef struct {
+    const char *task_id;
+    const char *description;
+    int num_participants;
+    float consensus_threshold;
+} a2a_consensus_request_internal_t;
+typedef struct {
+    char task_id[64];
+    int agreed;
+    int rounds_completed;
+    int agreements[16];
+    int total_participants;
+    int agree_count;
+    bool consensus_reached;
+    int consensus_type;
+} a2a_consensus_result_internal_t;
+typedef void (*a2a_stream_callback_internal_t)(const char *, size_t, bool, void *);
+typedef struct {
+    const char *task_id;
+    const char *target_agent_id;
+    const char *description;
+    int timeout_ms;
+    a2a_stream_callback_internal_t callback;
+    void *user_data;
+} a2a_task_request_internal_t;
+typedef struct {
+    char task_id[64];
+    int status;
+    char *result_json;
+    char accepted_by[64];
+    int negotiation_rounds;
+    int estimated_duration_ms;
+} a2a_task_response_internal_t;
+typedef struct {
+    uint32_t total_tasks;
+    uint32_t active;
+    uint32_t active_tasks;
+    uint32_t completed_tasks;
+    uint32_t failed_tasks;
+    double avg_delegation_latency_ms;
+    double avg_consensus_latency_ms;
+    uint32_t registered_agents;
+} a2a_stats_internal_t;
+typedef struct {
+    int event_type;
+    char task_id[64];
+    uint8_t progress_percentage;
+    char phase[64];
+    char *detail_json;
+} a2a_progress_event_internal_t;
 
 /* Compatibility defines */
 #define A2A_PROGRESS_UPDATE 1
@@ -60,7 +134,7 @@ typedef struct {
     int version;
     int protocol_version;
     bool available;
-    char* capabilities_json;
+    char *capabilities_json;
 } a2a_internal_card_t;
 
 /* Use header-declared types; define local adapter state */
@@ -75,31 +149,34 @@ struct a2a_v03_adapter_s {
     uint64_t total_consensus_ms;
     bool initialized;
     a2a_v03_config_t config;
-    a2a_task_t* tasks[A2A_V03_MAX_TASKS];
+    a2a_task_t *tasks[A2A_V03_MAX_TASKS];
     size_t task_count;
     a2a_notification_handler_t notification_handler;
-    void* notification_handler_user_data;
+    void *notification_handler_user_data;
     a2a_task_handler_t task_handler;
-    void* task_handler_user_data;
+    void *task_handler_user_data;
     a2a_message_handler_t message_handler;
-    void* message_handler_user_data;
+    void *message_handler_user_data;
     a2a_negotiation_handler_t negotiation_handler;
-    void* negotiation_handler_user_data;
+    void *negotiation_handler_user_data;
     a2a_streaming_handler_t streaming_handler;
-    void* streaming_handler_user_data;
+    void *streaming_handler_user_data;
 };
 
-static struct a2a_v03_adapter_s* g_a2a_instance = NULL;
+static struct a2a_v03_adapter_s *g_a2a_instance = NULL;
 
 /* ============================================================================
  * Lifecycle
  * ============================================================================ */
 
-int a2a_v03_create(a2a_config_t config, a2a_handle_t* out_handle) {
-    if (!out_handle) return -1;
+int a2a_v03_create(a2a_config_t config, a2a_handle_t *out_handle)
+{
+    if (!out_handle)
+        return AGENTOS_EFAIL;
 
-    struct a2a_v03_adapter_s* adapter = calloc(1, sizeof(struct a2a_v03_adapter_s));
-    if (!adapter) return -2;
+    struct a2a_v03_adapter_s *adapter = AGENTOS_CALLOC(1, sizeof(struct a2a_v03_adapter_s));
+    if (!adapter)
+        return -2;
     if (config.default_timeout_ms > 0) {
         adapter->config.default_timeout_ms = config.default_timeout_ms;
     }
@@ -113,20 +190,26 @@ int a2a_v03_create(a2a_config_t config, a2a_handle_t* out_handle) {
     return 0;
 }
 
-void a2a_v03_destroy(a2a_handle_t handle) {
-    if (!handle) return;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
+void a2a_v03_destroy(a2a_handle_t handle)
+{
+    if (!handle)
+        return;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
     adapter->initialized = false;
-    if (g_a2a_instance == adapter) g_a2a_instance = NULL;
-    free(adapter);
+    if (g_a2a_instance == adapter)
+        g_a2a_instance = NULL;
+    AGENTOS_FREE(adapter);
 }
 
-bool a2a_v03_is_initialized(a2a_handle_t handle) {
-    if (!handle) return false;
-    return ((struct a2a_v03_adapter_s*)handle)->initialized;
+bool a2a_v03_is_initialized(a2a_handle_t handle)
+{
+    if (!handle)
+        return false;
+    return ((struct a2a_v03_adapter_s *)handle)->initialized;
 }
 
-const char* a2a_v03_version(void) {
+const char *a2a_v03_version(void)
+{
     return "AgentOS-A2A/" A2A_VERSION;
 }
 
@@ -134,17 +217,21 @@ const char* a2a_v03_version(void) {
  * Agent Discovery
  * ============================================================================ */
 
-int a2a_v03_register_agent(a2a_v03_context_t* ctx,
-                            const a2a_agent_card_t* card) {
-    if (!ctx || !card) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
-    if (adapter->agent_count >= A2A_MAX_AGENTS) return -3;
+int a2a_v03_register_agent(a2a_v03_context_t *ctx, const a2a_agent_card_t *card)
+{
+    if (!ctx || !card)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
+    if (adapter->agent_count >= A2A_MAX_AGENTS)
+        return -3;
 
-    a2a_internal_card_t* internal_card = &adapter->agents[adapter->agent_count];
+    a2a_internal_card_t *internal_card = &adapter->agents[adapter->agent_count];
     snprintf(internal_card->id, sizeof(internal_card->id), "agent_%zu_%" PRIu64 ",",
              adapter->agent_count + 1, adapter->task_counter++);
-    strncpy(internal_card->name, card->name ? card->name : "Unknown", sizeof(internal_card->name) - 1);
+    strncpy(internal_card->name, card->name ? card->name : "Unknown",
+            sizeof(internal_card->name) - 1);
     strncpy(internal_card->url, card->url ? card->url : "", sizeof(internal_card->url) - 1);
 
     if (card->capabilities_json) {
@@ -158,50 +245,55 @@ int a2a_v03_register_agent(a2a_v03_context_t* ctx,
     return 0;
 }
 
-int a2a_v03_discover_agents(a2a_v03_context_t* ctx,
-                              const char* capability,
-                              const char* skill_name,
-                              a2a_agent_card_t*** results,
-                              size_t* result_count) {
-    if (!ctx || !results || !result_count) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_discover_agents(a2a_v03_context_t *ctx, const char *capability, const char *skill_name,
+                            a2a_agent_card_t ***results, size_t *result_count)
+{
+    if (!ctx || !results || !result_count)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
 
     *result_count = 0;
     *results = NULL;
 
     size_t matched = 0;
-    a2a_agent_card_t** agent_array = NULL;
+    a2a_agent_card_t **agent_array = NULL;
 
     for (size_t i = 0; i < adapter->agent_count && matched < A2A_MAX_AGENTS; i++) {
-        const a2a_internal_card_t* card = &adapter->agents[i];
+        const a2a_internal_card_t *card = &adapter->agents[i];
 
-        if (!card->available) continue;
+        if (!card->available)
+            continue;
         if (capability && capability[0] != '\0') {
-            if (!strstr(card->capabilities, capability)) continue;
+            if (!strstr(card->capabilities, capability))
+                continue;
         }
 
         matched++;
     }
 
     if (matched > 0) {
-        agent_array = (a2a_agent_card_t**)calloc(matched, sizeof(a2a_agent_card_t*));
-        if (!agent_array) return -3;
+        agent_array = (a2a_agent_card_t **)AGENTOS_CALLOC(matched, sizeof(a2a_agent_card_t *));
+        if (!agent_array)
+            return -3;
 
         size_t idx = 0;
         for (size_t i = 0; i < adapter->agent_count && idx < matched; i++) {
-            const a2a_internal_card_t* card = &adapter->agents[i];
-            if (!card->available) continue;
+            const a2a_internal_card_t *card = &adapter->agents[i];
+            if (!card->available)
+                continue;
             if (capability && capability[0] != '\0') {
-                if (!strstr(card->capabilities, capability)) continue;
+                if (!strstr(card->capabilities, capability))
+                    continue;
             }
 
-            agent_array[idx] = (a2a_agent_card_t*)calloc(1, sizeof(a2a_agent_card_t));
+            agent_array[idx] = (a2a_agent_card_t *)AGENTOS_CALLOC(1, sizeof(a2a_agent_card_t));
             if (agent_array[idx]) {
-                agent_array[idx]->id = strdup(card->id);
-                agent_array[idx]->name = strdup(card->name);
-                agent_array[idx]->url = strdup(card->url);
-                agent_array[idx]->capabilities_json = strdup(card->capabilities);
+                agent_array[idx]->id = AGENTOS_STRDUP(card->id);
+                agent_array[idx]->name = AGENTOS_STRDUP(card->name);
+                agent_array[idx]->url = AGENTOS_STRDUP(card->url);
+                agent_array[idx]->capabilities_json = AGENTOS_STRDUP(card->capabilities);
                 agent_array[idx]->protocol_version = card->version;
                 idx++;
             }
@@ -213,21 +305,23 @@ int a2a_v03_discover_agents(a2a_v03_context_t* ctx,
     return 0;
 }
 
-const a2a_agent_card_t* a2a_v03_get_agent_card(a2a_v03_context_t* ctx,
-                                                 const char* agent_id) {
-    if (!ctx || !agent_id) return NULL;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return NULL;
+const a2a_agent_card_t *a2a_v03_get_agent_card(a2a_v03_context_t *ctx, const char *agent_id)
+{
+    if (!ctx || !agent_id)
+        return NULL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return NULL;
 
     for (size_t i = 0; i < adapter->agent_count; i++) {
         if (strcmp(adapter->agents[i].id, agent_id) == 0) {
             static a2a_agent_card_t card;
             memset(&card, 0, sizeof(card));
-            const a2a_internal_card_t* internal = &adapter->agents[i];
-            card.id = strdup(internal->id);
-            card.name = strdup(internal->name);
-            card.url = strdup(internal->url);
-            card.capabilities_json = strdup(internal->capabilities);
+            const a2a_internal_card_t *internal = &adapter->agents[i];
+            card.id = AGENTOS_STRDUP(internal->id);
+            card.name = AGENTOS_STRDUP(internal->name);
+            card.url = AGENTOS_STRDUP(internal->url);
+            card.capabilities_json = AGENTOS_STRDUP(internal->capabilities);
             card.protocol_version = internal->version;
             return &card;
         }
@@ -240,78 +334,82 @@ const a2a_agent_card_t* a2a_v03_get_agent_card(a2a_v03_context_t* ctx,
  * Task Delegation
  * ============================================================================ */
 
-int a2a_v03_delegate_task(a2a_handle_t handle,
-                           const a2a_task_request_internal_t* request,
-                           a2a_task_response_internal_t* out_response) {
-    if (!handle || !request || !out_response) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
-    if (!adapter->initialized) return -2;
+int a2a_v03_delegate_task(a2a_handle_t handle, const a2a_task_request_internal_t *request,
+                          a2a_task_response_internal_t *out_response)
+{
+    if (!handle || !request || !out_response)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
+    if (!adapter->initialized)
+        return -2;
 
     memset(out_response, 0, sizeof(*out_response));
 
-    snprintf(out_response->task_id, sizeof(out_response->task_id),
-             "task_%" PRIu64, adapter->task_counter++);
+    snprintf(out_response->task_id, sizeof(out_response->task_id), "task_%" PRIu64,
+             adapter->task_counter++);
 
     out_response->status = A2A_TASK_STATUS_ACCEPTED;
     strncpy(out_response->accepted_by,
             request->target_agent_id ? request->target_agent_id : "coordinator",
             sizeof(out_response->accepted_by) - 1);
     out_response->negotiation_rounds = 0;
-    out_response->estimated_duration_ms = request->timeout_ms > 0 ?
-                                           request->timeout_ms / 2 :
-                                           A2A_DEFAULT_TIMEOUT_MS / 2;
+    out_response->estimated_duration_ms =
+        request->timeout_ms > 0 ? request->timeout_ms / 2 : A2A_DEFAULT_TIMEOUT_MS / 2;
 
     if (request->description) {
-        out_response->result_json = malloc(512);
-        snprintf((char*)out_response->result_json, 512,
+        out_response->result_json = AGENTOS_MALLOC(512);
+        snprintf((char *)out_response->result_json, 512,
                  "{\"task_id\":\"%s\",\"status\":\"delegated\","
                  "\"description\":\"%s\"}",
-                 out_response->task_id,
-                 request->description);
+                 out_response->task_id, request->description);
     }
 
     return 0;
 }
 
-int a2a_v03_negotiate_task(a2a_handle_t handle,
-                             const char* task_id,
-                             const a2a_proposal_internal_t* proposal,
-                             a2a_negotiation_result_internal_t* out_result) {
-    if (!handle || !task_id || !proposal || !out_result) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
-    if (!adapter->initialized) return -2;
+int a2a_v03_negotiate_task(a2a_handle_t handle, const char *task_id,
+                           const a2a_proposal_internal_t *proposal,
+                           a2a_negotiation_result_internal_t *out_result)
+{
+    if (!handle || !task_id || !proposal || !out_result)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
+    if (!adapter->initialized)
+        return -2;
 
     memset(out_result, 0, sizeof(*out_result));
     strncpy(out_result->task_id, task_id, sizeof(out_result->task_id) - 1);
 
     switch (proposal->type) {
-        case A2A_NEGOTIATE_COST:
-            out_result->outcome = A2A_OUTCOME_ACCEPTED;
-            out_result->final_cost = proposal->proposed_cost * 1.1f;
-            break;
-        case A2A_NEGOTIATE_TIMEOUT:
-            out_result->outcome = A2A_OUTCOME_ACCEPTED;
-            out_result->final_timeout_ms = proposal->proposed_timeout_ms * 1.2f;
-            break;
-        case A2A_NEGOTIATE_PRIORITY:
-            out_result->outcome = A2A_OUTCOME_COUNTER_OFFER;
-            out_result->counter_priority = proposal->proposed_priority + 10;
-            break;
-        default:
-            out_result->outcome = A2A_OUTCOME_REJECTED;
-            break;
+    case A2A_NEGOTIATE_COST:
+        out_result->outcome = A2A_OUTCOME_ACCEPTED;
+        out_result->final_cost = proposal->proposed_cost * 1.1f;
+        break;
+    case A2A_NEGOTIATE_TIMEOUT:
+        out_result->outcome = A2A_OUTCOME_ACCEPTED;
+        out_result->final_timeout_ms = proposal->proposed_timeout_ms * 1.2f;
+        break;
+    case A2A_NEGOTIATE_PRIORITY:
+        out_result->outcome = A2A_OUTCOME_COUNTER_OFFER;
+        out_result->counter_priority = proposal->proposed_priority + 10;
+        break;
+    default:
+        out_result->outcome = A2A_OUTCOME_REJECTED;
+        break;
     }
 
     out_result->round_number = 1;
     return 0;
 }
 
-int a2a_v03_achieve_consensus(a2a_handle_t handle,
-                               const a2a_consensus_request_internal_t* request,
-                               a2a_consensus_result_internal_t* out_result) {
-    if (!handle || !request || !out_result) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
-    if (!adapter->initialized) return -2;
+int a2a_v03_achieve_consensus(a2a_handle_t handle, const a2a_consensus_request_internal_t *request,
+                              a2a_consensus_result_internal_t *out_result)
+{
+    if (!handle || !request || !out_result)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
+    if (!adapter->initialized)
+        return -2;
 
     memset(out_result, 0, sizeof(*out_result));
 
@@ -328,8 +426,7 @@ int a2a_v03_achieve_consensus(a2a_handle_t handle,
     out_result->total_participants = request->num_participants;
     out_result->agree_count = agree_count;
 
-    float threshold = request->consensus_threshold > 0 ?
-                      request->consensus_threshold : 0.67f;
+    float threshold = request->consensus_threshold > 0 ? request->consensus_threshold : 0.67f;
     float ratio = (float)agree_count / (float)request->num_participants;
 
     if (ratio >= threshold) {
@@ -348,49 +445,50 @@ int a2a_v03_achieve_consensus(a2a_handle_t handle,
  * Streaming
  * ============================================================================ */
 
-int a2a_v03_stream_task(a2a_handle_t handle,
-                         const a2a_task_request_internal_t* request,
-                         a2a_stream_callback_internal_t on_chunk,
-                         void* user_data,
-                         a2a_task_response_internal_t* final_response) {
-    if (!handle || !request || !on_chunk || !final_response) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
-    if (!adapter->initialized) return -2;
+int a2a_v03_stream_task(a2a_handle_t handle, const a2a_task_request_internal_t *request,
+                        a2a_stream_callback_internal_t on_chunk, void *user_data,
+                        a2a_task_response_internal_t *final_response)
+{
+    if (!handle || !request || !on_chunk || !final_response)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
+    if (!adapter->initialized)
+        return -2;
 
-    snprintf(final_response->task_id, sizeof(final_response->task_id),
-             "stream_task_%" PRIu64, adapter->task_counter++);
+    snprintf(final_response->task_id, sizeof(final_response->task_id), "stream_task_%" PRIu64,
+             adapter->task_counter++);
 
     a2a_progress_event_internal_t event;
     memset(&event, 0, sizeof(event));
     strncpy(event.task_id, final_response->task_id, sizeof(event.task_id) - 1);
 
-    const char* phases[] = {"initiated", "planning", "executing",
-                            "verifying", "completed"};
+    const char *phases[] = {"initiated", "planning", "executing", "verifying", "completed"};
     for (int i = 0; i < 5; i++) {
         event.event_type = A2A_PROGRESS_UPDATE;
         event.progress_percentage = (uint8_t)(20 * i + 20);
         strncpy(event.phase, phases[i], sizeof(event.phase) - 1);
 
         char detail[256];
-        snprintf(detail, sizeof(detail),
-                 "{\"phase\":\"%s\",\"progress\":%d}",
-                 phases[i], event.progress_percentage);
-        event.detail_json = strdup(detail);
+        snprintf(detail, sizeof(detail), "{\"phase\":\"%s\",\"progress\":%d}", phases[i],
+                 event.progress_percentage);
+        event.detail_json = AGENTOS_STRDUP(detail);
 
         on_chunk(event.detail_json, strlen(event.detail_json), (i == 4), user_data);
-        free((void*)event.detail_json);
+        AGENTOS_FREE((void *)event.detail_json);
     }
 
     final_response->status = A2A_TASK_STATUS_COMPLETED;
     {
         size_t result_sz = 256 + (final_response->task_id[0] ? strlen(final_response->task_id) : 0);
-        char* result_buf = (char*)malloc(result_sz);
+        char *result_buf = (char *)AGENTOS_MALLOC(result_sz);
         if (result_buf) {
             snprintf(result_buf, result_sz,
-                "{\"task_id\":\"%s\",\"status\":\"completed\",\"phases_completed\":5}",
-                final_response->task_id);
+                     "{\"task_id\":\"%s\",\"status\":\"completed\",\"phases_completed\":5}",
+                     final_response->task_id);
         }
-        final_response->result_json = result_buf ? result_buf : strdup("{\"status\":\"error\",\"reason\":\"allocation_failed\"}");
+        final_response->result_json =
+            result_buf ? result_buf
+                       : AGENTOS_STRDUP("{\"status\":\"error\",\"reason\":\"allocation_failed\"}");
     }
 
     return 0;
@@ -400,32 +498,39 @@ int a2a_v03_stream_task(a2a_handle_t handle,
  * Statistics & Cleanup
  * ============================================================================ */
 
-int a2a_v03_get_stats(a2a_handle_t handle, a2a_stats_internal_t* out_stats) {
-    if (!handle || !out_stats) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
-    if (!adapter->initialized) return -2;
+int a2a_v03_get_stats(a2a_handle_t handle, a2a_stats_internal_t *out_stats)
+{
+    if (!handle || !out_stats)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
+    if (!adapter->initialized)
+        return -2;
 
     memset(out_stats, 0, sizeof(*out_stats));
     out_stats->registered_agents = (uint32_t)adapter->agent_count;
     out_stats->active_tasks = (uint32_t)adapter->active_task_count;
     out_stats->completed_tasks = (uint32_t)adapter->completed_task_count;
     out_stats->failed_tasks = (uint32_t)adapter->failed_task_count;
-    out_stats->avg_delegation_latency_ms = adapter->total_delegation_ms > 0 && adapter->completed_task_count > 0
-        ? (float)(adapter->total_delegation_ms / adapter->completed_task_count)
-        : 0.0f;
-    out_stats->avg_consensus_latency_ms = adapter->total_consensus_ms > 0 && adapter->completed_task_count > 0
-        ? (float)(adapter->total_consensus_ms / adapter->completed_task_count)
-        : 0.0f;
+    out_stats->avg_delegation_latency_ms =
+        adapter->total_delegation_ms > 0 && adapter->completed_task_count > 0
+            ? (float)(adapter->total_delegation_ms / adapter->completed_task_count)
+            : 0.0f;
+    out_stats->avg_consensus_latency_ms =
+        adapter->total_consensus_ms > 0 && adapter->completed_task_count > 0
+            ? (float)(adapter->total_consensus_ms / adapter->completed_task_count)
+            : 0.0f;
     return 0;
 }
 
-void a2a_free_agent_list(a2a_agent_list_t* list) {
-    if (!list) return;
+void a2a_free_agent_list(a2a_agent_list_t *list)
+{
+    if (!list)
+        return;
     for (size_t i = 0; i < list->count && i < A2A_MAX_AGENTS; i++) {
-        free((void*)list->agents[i].id);
-        free((void*)list->agents[i].name);
-        free((void*)list->agents[i].url);
-        free((void*)list->agents[i].capabilities_json);
+        AGENTOS_FREE((void *)list->agents[i].id);
+        AGENTOS_FREE((void *)list->agents[i].name);
+        AGENTOS_FREE((void *)list->agents[i].url);
+        AGENTOS_FREE((void *)list->agents[i].capabilities_json);
     }
     memset(list, 0, sizeof(*list));
 }
@@ -442,18 +547,22 @@ void a2a_free_agent_list(a2a_agent_list_t* list) {
  * 5. Request signature verification (tamper-proof)
  * ============================================================================ */
 
-#include <time.h>
-#include <ctype.h>
+#include "memory_compat.h"
 #include "platform.h"
 
-#define A2A_MAX_SESSIONS 128
-#define A2A_MAX_TOKENS   256
+#include <ctype.h>
+#include <time.h>
 
-static uint64_t a2a_timestamp_ms(void) {
+#define A2A_MAX_SESSIONS 128
+#define A2A_MAX_TOKENS 256
+
+static uint64_t a2a_timestamp_ms(void)
+{
     return agentos_time_ms();
 }
 
-static void a2a_hex_encode(const uint8_t* data, size_t len, char* out, size_t out_size) {
+static void a2a_hex_encode(const uint8_t *data, size_t len, char *out, size_t out_size)
+{
     static const char hex[] = "0123456789abcdef";
     for (size_t i = 0; i < len && (i * 2 + 2) < out_size; i++) {
         out[i * 2] = hex[(data[i] >> 4) & 0x0F];
@@ -462,7 +571,8 @@ static void a2a_hex_encode(const uint8_t* data, size_t len, char* out, size_t ou
     out[len * 2] = '\0';
 }
 
-static uint32_t a2a_simple_hash(const char* data, size_t len) {
+static uint32_t a2a_simple_hash(const char *data, size_t len)
+{
     uint32_t hash = 5381;
     for (size_t i = 0; i < len; i++) {
         hash = ((hash << 5) + hash) + (uint8_t)data[i];
@@ -470,20 +580,21 @@ static uint32_t a2a_simple_hash(const char* data, size_t len) {
     return hash;
 }
 
-static void a2a_generate_token_string(char* token_buf, size_t buf_size,
-                                       const char* agent_id, uint64_t timestamp) {
+static void a2a_generate_token_string(char *token_buf, size_t buf_size, const char *agent_id,
+                                      uint64_t timestamp)
+{
     uint8_t raw[32];
-    const char* src = agent_id ? agent_id : "anonymous";
+    const char *src = agent_id ? agent_id : "anonymous";
     size_t src_len = strlen(src);
 
     for (size_t i = 0; i < sizeof(raw); i++) {
-        raw[i] = (uint8_t)(a2a_simple_hash(src, src_len) ^ (timestamp >> (i % 8))
-                    ^ (uint8_t)(i * 37 + 0xAB)
-                    ^ (uint8_t)((timestamp * (i + 1)) & 0xFF));
+        raw[i] = (uint8_t)(a2a_simple_hash(src, src_len) ^ (timestamp >> (i % 8)) ^
+                           (uint8_t)(i * 37 + 0xAB) ^ (uint8_t)((timestamp * (i + 1)) & 0xFF));
     }
 
     a2a_hex_encode(raw, sizeof(raw), token_buf, buf_size);
-    if (buf_size > 0) token_buf[buf_size - 1] = '\0';
+    if (buf_size > 0)
+        token_buf[buf_size - 1] = '\0';
 }
 
 typedef struct {
@@ -499,8 +610,10 @@ typedef struct {
 
 static a2a_auth_state_t g_a2a_auth = {0};
 
-int a2a_v03_auth_init(a2a_v03_context_t* ctx, const a2a_auth_config_t* auth_config) {
-    if (!ctx || !auth_config) return -1;
+int a2a_v03_auth_init(a2a_v03_context_t *ctx, const a2a_auth_config_t *auth_config)
+{
+    if (!ctx || !auth_config)
+        return AGENTOS_EFAIL;
 
     memset(&g_a2a_auth, 0, sizeof(g_a2a_auth));
     g_a2a_auth.initialized = true;
@@ -516,8 +629,10 @@ int a2a_v03_auth_init(a2a_v03_context_t* ctx, const a2a_auth_config_t* auth_conf
     return 0;
 }
 
-void a2a_v03_auth_shutdown(a2a_v03_context_t* ctx) {
-    if (!ctx) return;
+void a2a_v03_auth_shutdown(a2a_v03_context_t *ctx)
+{
+    if (!ctx)
+        return;
 
     for (size_t i = 0; i < g_a2a_auth.token_count; i++) {
         memset(&g_a2a_auth.tokens[i], 0, sizeof(g_a2a_auth.tokens[i]));
@@ -530,12 +645,13 @@ void a2a_v03_auth_shutdown(a2a_v03_context_t* ctx) {
     memset(&g_a2a_auth, 0, sizeof(g_a2a_auth));
 }
 
-int a2a_v03_authenticate(a2a_v03_context_t* ctx,
-                          const char* agent_id,
-                          const char* credential,
-                          a2a_auth_token_t** out_token) {
-    if (!ctx || !agent_id || !credential || !out_token) return -1;
-    if (!g_a2a_auth.initialized) return -2;
+int a2a_v03_authenticate(a2a_v03_context_t *ctx, const char *agent_id, const char *credential,
+                         a2a_auth_token_t **out_token)
+{
+    if (!ctx || !agent_id || !credential || !out_token)
+        return AGENTOS_EFAIL;
+    if (!g_a2a_auth.initialized)
+        return -2;
 
     uint64_t now = a2a_timestamp_ms() / 1000;
 
@@ -545,20 +661,20 @@ int a2a_v03_authenticate(a2a_v03_context_t* ctx,
 
     int cred_valid = 0;
     switch (g_a2a_auth.config.method) {
-        case A2A_AUTH_API_KEY:
-            cred_valid = (strcmp(credential, g_a2a_auth.config.shared_secret) == 0);
-            break;
-        case A2A_AUTH_HMAC_SHA256: {
-            uint32_t cred_hash = a2a_simple_hash(credential, strlen(credential));
-            uint32_t secret_hash = a2a_simple_hash(g_a2a_auth.config.shared_secret,
-                                                     g_a2a_auth.config.secret_len);
-            cred_valid = (cred_hash == secret_hash);
-            break;
-        }
-        case A2A_AUTH_NONE:
-        default:
-            cred_valid = 1;
-            break;
+    case A2A_AUTH_API_KEY:
+        cred_valid = (strcmp(credential, g_a2a_auth.config.shared_secret) == 0);
+        break;
+    case A2A_AUTH_HMAC_SHA256: {
+        uint32_t cred_hash = a2a_simple_hash(credential, strlen(credential));
+        uint32_t secret_hash =
+            a2a_simple_hash(g_a2a_auth.config.shared_secret, g_a2a_auth.config.secret_len);
+        cred_valid = (cred_hash == secret_hash);
+        break;
+    }
+    case A2A_AUTH_NONE:
+    default:
+        cred_valid = 1;
+        break;
     }
 
     if (!cred_valid) {
@@ -578,7 +694,7 @@ int a2a_v03_authenticate(a2a_v03_context_t* ctx,
         g_a2a_auth.token_count--;
     }
 
-    a2a_auth_token_t* tok = &g_a2a_auth.tokens[g_a2a_auth.token_count++];
+    a2a_auth_token_t *tok = &g_a2a_auth.tokens[g_a2a_auth.token_count++];
     memset(tok, 0, sizeof(*tok));
 
     strncpy(tok->agent_id, agent_id, sizeof(tok->agent_id) - 1);
@@ -587,44 +703,49 @@ int a2a_v03_authenticate(a2a_v03_context_t* ctx,
     tok->permissions = 0xFFFFFFFF;
     tok->valid = true;
 
-    a2a_generate_token_string(tok->token, sizeof(tok->token),
-                               agent_id, now);
+    a2a_generate_token_string(tok->token, sizeof(tok->token), agent_id, now);
 
     *out_token = tok;
     return 0;
 }
 
-int a2a_v03_verify_token(a2a_v03_context_t* ctx,
-                           const char* token_str,
-                           a2a_auth_token_t** out_token) {
-    if (!ctx || !token_str || !out_token) return -1;
-    if (!g_a2a_auth.initialized) return -2;
+int a2a_v03_verify_token(a2a_v03_context_t *ctx, const char *token_str,
+                         a2a_auth_token_t **out_token)
+{
+    if (!ctx || !token_str || !out_token)
+        return AGENTOS_EFAIL;
+    if (!g_a2a_auth.initialized)
+        return -2;
 
     uint64_t now = a2a_timestamp_ms() / 1000;
 
     for (size_t i = 0; i < g_a2a_auth.token_count; i++) {
-        a2a_auth_token_t* tok = &g_a2a_auth.tokens[i];
-        if (!tok->valid) continue;
-        if (strcmp(tok->token, token_str) != 0) continue;
+        a2a_auth_token_t *tok = &g_a2a_auth.tokens[i];
+        if (!tok->valid)
+            continue;
+        if (strcmp(tok->token, token_str) != 0)
+            continue;
 
         if (now >= tok->expires_at) {
             tok->valid = false;
             return -6;
         }
 
-        if (out_token) *out_token = tok;
+        if (out_token)
+            *out_token = tok;
         return 0;
     }
 
     return -7;
 }
 
-int a2a_v03_invalidate_token(a2a_v03_context_t* ctx, const char* token_str) {
-    if (!ctx || !token_str) return -1;
+int a2a_v03_invalidate_token(a2a_v03_context_t *ctx, const char *token_str)
+{
+    if (!ctx || !token_str)
+        return AGENTOS_EFAIL;
 
     for (size_t i = 0; i < g_a2a_auth.token_count; i++) {
-        if (g_a2a_auth.tokens[i].valid &&
-            strcmp(g_a2a_auth.tokens[i].token, token_str) == 0) {
+        if (g_a2a_auth.tokens[i].valid && strcmp(g_a2a_auth.tokens[i].token, token_str) == 0) {
             memset(&g_a2a_auth.tokens[i], 0, sizeof(g_a2a_auth.tokens[i]));
             return 0;
         }
@@ -633,68 +754,61 @@ int a2a_v03_invalidate_token(a2a_v03_context_t* ctx, const char* token_str) {
     return -8;
 }
 
-const char* a2a_v03_sign_request(a2a_v03_context_t* ctx,
-                                   const char* method,
-                                   const char* params_json,
-                                   const char* token_str,
-                                   char* out_signature,
-                                   size_t sig_buf_size) {
+const char *a2a_v03_sign_request(a2a_v03_context_t *ctx, const char *method,
+                                 const char *params_json, const char *token_str,
+                                 char *out_signature, size_t sig_buf_size)
+{
     if (!ctx || !method || !params_json || !out_signature || sig_buf_size < 65)
         return NULL;
-    if (!g_a2a_auth.initialized) return NULL;
+    if (!g_a2a_auth.initialized)
+        return NULL;
 
     char sign_data[4096];
-    int len = snprintf(sign_data, sizeof(sign_data),
-                       "%s|%s|%s|%" PRIu64 "",
-                       method, params_json,
-                       token_str ? token_str : "",
-                       (uint64_t)a2a_timestamp_ms());
+    int len = snprintf(sign_data, sizeof(sign_data), "%s|%s|%s|%" PRIu64 "", method, params_json,
+                       token_str ? token_str : "", (uint64_t)a2a_timestamp_ms());
 
-    if (len <= 0 || len >= (int)sizeof(sign_data)) return NULL;
+    if (len <= 0 || len >= (int)sizeof(sign_data))
+        return NULL;
 
     uint32_t hash = a2a_simple_hash(sign_data, (size_t)len);
 
-    if (g_a2a_auth.config.method == A2A_AUTH_HMAC_SHA256 &&
-        g_a2a_auth.config.secret_len > 0) {
-        uint32_t key_hash = a2a_simple_hash(g_a2a_auth.config.shared_secret,
-                                              g_a2a_auth.config.secret_len);
+    if (g_a2a_auth.config.method == A2A_AUTH_HMAC_SHA256 && g_a2a_auth.config.secret_len > 0) {
+        uint32_t key_hash =
+            a2a_simple_hash(g_a2a_auth.config.shared_secret, g_a2a_auth.config.secret_len);
         hash ^= key_hash;
         hash = (hash << 16) | (hash >> 16);
     }
 
-    snprintf(out_signature, sig_buf_size,
-             "%08x%08x%08x%08x",
-             hash, hash ^ 0xA5A5A5A5,
-             hash ^ 0x5A5A5A5A,
-             (uint32_t)a2a_timestamp_ms());
+    snprintf(out_signature, sig_buf_size, "%08x%08x%08x%08x", hash, hash ^ 0xA5A5A5A5,
+             hash ^ 0x5A5A5A5A, (uint32_t)a2a_timestamp_ms());
 
     return out_signature;
 }
 
-int a2a_v03_verify_signature(a2a_v03_context_t* ctx,
-                              const char* method,
-                              const char* params_json,
-                              const char* signature,
-                              const char* token_str) {
-    if (!ctx || !method || !params_json || !signature) return -1;
+int a2a_v03_verify_signature(a2a_v03_context_t *ctx, const char *method, const char *params_json,
+                             const char *signature, const char *token_str)
+{
+    if (!ctx || !method || !params_json || !signature)
+        return AGENTOS_EFAIL;
 
     char expected[65];
-    if (!a2a_v03_sign_request(ctx, method, params_json, token_str,
-                                expected, sizeof(expected))) {
+    if (!a2a_v03_sign_request(ctx, method, params_json, token_str, expected, sizeof(expected))) {
         return -2;
     }
 
-    if (memcmp(expected, signature, 64) == 0) return 0;
+    if (memcmp(expected, signature, 64) == 0)
+        return 0;
     return -9;
 }
 
-int a2a_v03_create_session(a2a_v03_context_t* ctx,
-                            const char* remote_agent_id,
-                            a2a_auth_method_t auth_method,
-                            a2a_crypto_method_t crypto_method,
-                            a2a_session_t** out_session) {
-    if (!ctx || !remote_agent_id || !out_session) return -1;
-    if (!g_a2a_auth.initialized) return -2;
+int a2a_v03_create_session(a2a_v03_context_t *ctx, const char *remote_agent_id,
+                           a2a_auth_method_t auth_method, a2a_crypto_method_t crypto_method,
+                           a2a_session_t **out_session)
+{
+    if (!ctx || !remote_agent_id || !out_session)
+        return AGENTOS_EFAIL;
+    if (!g_a2a_auth.initialized)
+        return -2;
 
     if (g_a2a_auth.session_count >= g_a2a_auth.config.max_sessions) {
         size_t oldest_idx = 0;
@@ -712,13 +826,11 @@ int a2a_v03_create_session(a2a_v03_context_t* ctx,
 
     uint64_t now = a2a_timestamp_ms();
 
-    a2a_session_t* sess = &g_a2a_auth.sessions[g_a2a_auth.session_count++];
+    a2a_session_t *sess = &g_a2a_auth.sessions[g_a2a_auth.session_count++];
     memset(sess, 0, sizeof(*sess));
 
-    snprintf(sess->session_id, sizeof(sess->session_id),
-             "sess_%s_%" PRIu64 "_%08x",
-             remote_agent_id,
-             (uint64_t)(now / 1000),
+    snprintf(sess->session_id, sizeof(sess->session_id), "sess_%s_%" PRIu64 "_%08x",
+             remote_agent_id, (uint64_t)(now / 1000),
              a2a_simple_hash(remote_agent_id, strlen(remote_agent_id)));
 
     strncpy(sess->remote_agent_id, remote_agent_id, sizeof(sess->remote_agent_id) - 1);
@@ -733,16 +845,17 @@ int a2a_v03_create_session(a2a_v03_context_t* ctx,
     return 0;
 }
 
-int a2a_v03_validate_session(a2a_v03_context_t* ctx,
-                               const char* session_id,
-                               a2a_session_t** out_session) {
-    if (!ctx || !session_id || !out_session) return -1;
+int a2a_v03_validate_session(a2a_v03_context_t *ctx, const char *session_id,
+                             a2a_session_t **out_session)
+{
+    if (!ctx || !session_id || !out_session)
+        return AGENTOS_EFAIL;
 
     for (size_t i = 0; i < g_a2a_auth.session_count; i++) {
-        a2a_session_t* sess = &g_a2a_auth.sessions[i];
+        a2a_session_t *sess = &g_a2a_auth.sessions[i];
 
-        if (strncmp(sess->session_id, session_id,
-                     sizeof(sess->session_id)) != 0) continue;
+        if (strncmp(sess->session_id, session_id, sizeof(sess->session_id)) != 0)
+            continue;
 
         uint64_t now = a2a_timestamp_ms();
         uint64_t age_sec = (now - sess->created_at) / 1000;
@@ -755,46 +868,61 @@ int a2a_v03_validate_session(a2a_v03_context_t* ctx,
         sess->last_activity = now;
         sess->request_count++;
 
-        if (out_session) *out_session = sess;
+        if (out_session)
+            *out_session = sess;
         return 0;
     }
 
     return -7;
 }
 
-void a2a_v03_destroy_session(a2a_v03_context_t* ctx, const char* session_id) {
-    if (!ctx || !session_id) return;
+void a2a_v03_destroy_session(a2a_v03_context_t *ctx, const char *session_id)
+{
+    if (!ctx || !session_id)
+        return;
 
     for (size_t i = 0; i < g_a2a_auth.session_count; i++) {
         if (strncmp(g_a2a_auth.sessions[i].session_id, session_id,
-                     sizeof(g_a2a_auth.sessions[i].session_id)) == 0) {
+                    sizeof(g_a2a_auth.sessions[i].session_id)) == 0) {
             memset(&g_a2a_auth.sessions[i], 0, sizeof(a2a_session_t));
             return;
         }
     }
 }
 
-size_t a2a_v03_get_active_session_count(a2a_v03_context_t* ctx) {
+size_t a2a_v03_get_active_session_count(a2a_v03_context_t *ctx)
+{
     (void)ctx;
     return g_a2a_auth.session_count;
 }
 
-const char* a2a_auth_method_string(a2a_auth_method_t method) {
+const char *a2a_auth_method_string(a2a_auth_method_t method)
+{
     switch (method) {
-        case A2A_AUTH_NONE:      return "none";
-        case A2A_AUTH_API_KEY:   return "api_key";
-        case A2A_AUTH_HMAC_SHA256: return "hmac-sha256";
-        case A2A_AUTH_JWT_BEARER: return "jwt-bearer";
-        default:                 return "unknown";
+    case A2A_AUTH_NONE:
+        return "none";
+    case A2A_AUTH_API_KEY:
+        return "api_key";
+    case A2A_AUTH_HMAC_SHA256:
+        return "hmac-sha256";
+    case A2A_AUTH_JWT_BEARER:
+        return "jwt-bearer";
+    default:
+        return "unknown";
     }
 }
 
-const char* a2a_crypto_method_string(a2a_crypto_method_t method) {
+const char *a2a_crypto_method_string(a2a_crypto_method_t method)
+{
     switch (method) {
-        case A2A_CRYPTO_NONE:       return "none";
-        case A2A_CRYPTO_AES_128_GCM: return "aes-128-gcm";
-        case A2A_CRYPTO_AES_256_GCM: return "aes-256-gcm";
-        default:                     return "unknown";
+    case A2A_CRYPTO_NONE:
+        return "none";
+    case A2A_CRYPTO_AES_128_GCM:
+        return "aes-128-gcm";
+    case A2A_CRYPTO_AES_256_GCM:
+        return "aes-256-gcm";
+    default:
+        return "unknown";
     }
 }
 
@@ -802,7 +930,8 @@ const char* a2a_crypto_method_string(a2a_crypto_method_t method) {
  * New-Style API implementations (a2a_v03_adapter.h declared functions)
  * ============================================================================ */
 
-a2a_v03_config_t a2a_v03_config_default(void) {
+a2a_v03_config_t a2a_v03_config_default(void)
+{
     a2a_v03_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.capabilities = A2A_CAP_TASK_EXECUTION | A2A_CAP_STREAMING | A2A_CAP_NEGOTIATION |
@@ -819,7 +948,8 @@ a2a_v03_config_t a2a_v03_config_default(void) {
     return cfg;
 }
 
-a2a_v03_context_t* a2a_v03_context_create(const a2a_v03_config_t* config) {
+a2a_v03_context_t *a2a_v03_context_create(const a2a_v03_config_t *config)
+{
     a2a_v03_config_t cfg = config ? *config : a2a_v03_config_default();
     a2a_handle_t handle = NULL;
     a2a_config_t legacy_cfg;
@@ -827,22 +957,28 @@ a2a_v03_context_t* a2a_v03_context_create(const a2a_v03_config_t* config) {
     legacy_cfg.max_agents = (uint32_t)cfg.max_agents;
     legacy_cfg.max_tasks = (uint32_t)cfg.max_tasks;
     legacy_cfg.default_timeout_ms = cfg.default_timeout_ms;
-    if (a2a_v03_create(legacy_cfg, &handle) != 0) return NULL;
-    return (a2a_v03_context_t*)handle;
+    if (a2a_v03_create(legacy_cfg, &handle) != 0)
+        return NULL;
+    return (a2a_v03_context_t *)handle;
 }
 
-void a2a_v03_context_destroy(a2a_v03_context_t* ctx) {
-    if (ctx) a2a_v03_destroy((a2a_handle_t)ctx);
+void a2a_v03_context_destroy(a2a_v03_context_t *ctx)
+{
+    if (ctx)
+        a2a_v03_destroy((a2a_handle_t)ctx);
 }
 
-int a2a_v03_unregister_agent(a2a_v03_context_t* ctx, const char* agent_id) {
-    if (!ctx || !agent_id) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_unregister_agent(a2a_v03_context_t *ctx, const char *agent_id)
+{
+    if (!ctx || !agent_id)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
     for (size_t i = 0; i < adapter->agent_count; i++) {
         if (strcmp(adapter->agents[i].id, agent_id) == 0) {
-            free(adapter->agents[i].name);
-            free(adapter->agents[i].url);
+            AGENTOS_FREE(adapter->agents[i].name);
+            AGENTOS_FREE(adapter->agents[i].url);
             if (i < adapter->agent_count - 1) {
                 adapter->agents[i] = adapter->agents[adapter->agent_count - 1];
             }
@@ -853,24 +989,31 @@ int a2a_v03_unregister_agent(a2a_v03_context_t* ctx, const char* agent_id) {
     return -3;
 }
 
-int a2a_v03_create_task(a2a_v03_context_t* ctx, const char* agent_id,
-                         const char* description, const char* input_json,
-                         a2a_task_t** task) {
-    if (!ctx || !task) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
-    if (adapter->task_count >= A2A_V03_MAX_TASKS) return -3;
+int a2a_v03_create_task(a2a_v03_context_t *ctx, const char *agent_id, const char *description,
+                        const char *input_json, a2a_task_t **task)
+{
+    if (!ctx || !task)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
+    if (adapter->task_count >= A2A_V03_MAX_TASKS)
+        return -3;
 
-    a2a_task_t* t = (a2a_task_t*)calloc(1, sizeof(a2a_task_t));
-    if (!t) return -4;
+    a2a_task_t *t = (a2a_task_t *)AGENTOS_CALLOC(1, sizeof(a2a_task_t));
+    if (!t)
+        return -4;
 
-    t->id = (char*)malloc(A2A_TASK_ID_SIZE);
-    if (!t->id) { free(t); return -5; }
+    t->id = (char *)AGENTOS_MALLOC(A2A_TASK_ID_SIZE);
+    if (!t->id) {
+        AGENTOS_FREE(t);
+        return -5;
+    }
     snprintf(t->id, A2A_TASK_ID_SIZE, "task_%zu_%u", adapter->task_count,
              (unsigned int)(a2a_timestamp_ms() % 100000));
-    t->agent_id = agent_id ? strdup(agent_id) : NULL;
-    t->description = description ? strdup(description) : NULL;
-    t->input_json = input_json ? strdup(input_json) : NULL;
+    t->agent_id = agent_id ? AGENTOS_STRDUP(agent_id) : NULL;
+    t->description = description ? AGENTOS_STRDUP(description) : NULL;
+    t->input_json = input_json ? AGENTOS_STRDUP(input_json) : NULL;
     t->output_json = NULL;
     t->state = A2A_TASK_SUBMITTED;
     t->created_at = a2a_timestamp_ms();
@@ -882,30 +1025,35 @@ int a2a_v03_create_task(a2a_v03_context_t* ctx, const char* agent_id,
 
     if (adapter->task_handler) {
         a2a_task_state_t new_state = t->state;
-        char* output = NULL;
+        char *output = NULL;
         adapter->task_handler(ctx, t, &new_state, &output, adapter->task_handler_user_data);
         t->state = new_state;
-        if (output) { free(t->output_json); t->output_json = output; }
+        if (output) {
+            AGENTOS_FREE(t->output_json);
+            t->output_json = output;
+        }
     }
 
     *task = t;
     return 0;
 }
 
-int a2a_v03_update_task(a2a_v03_context_t* ctx, const char* task_id,
-                         a2a_task_state_t new_state, const char* output_json,
-                         double progress) {
-    if (!ctx || !task_id) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_update_task(a2a_v03_context_t *ctx, const char *task_id, a2a_task_state_t new_state,
+                        const char *output_json, double progress)
+{
+    if (!ctx || !task_id)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
 
     for (size_t i = 0; i < adapter->task_count; i++) {
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
-            a2a_task_t* t = adapter->tasks[i];
+            a2a_task_t *t = adapter->tasks[i];
             t->state = new_state;
             if (output_json) {
-                free(t->output_json);
-                t->output_json = strdup(output_json);
+                AGENTOS_FREE(t->output_json);
+                t->output_json = AGENTOS_STRDUP(output_json);
             }
             t->progress = progress;
             t->updated_at = a2a_timestamp_ms();
@@ -915,19 +1063,21 @@ int a2a_v03_update_task(a2a_v03_context_t* ctx, const char* task_id,
     return -3;
 }
 
-int a2a_v03_cancel_task(a2a_v03_context_t* ctx, const char* task_id,
-                         const char* reason) {
-    if (!ctx || !task_id) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_cancel_task(a2a_v03_context_t *ctx, const char *task_id, const char *reason)
+{
+    if (!ctx || !task_id)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
 
     for (size_t i = 0; i < adapter->task_count; i++) {
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
             adapter->tasks[i]->state = A2A_TASK_CANCELED;
             adapter->tasks[i]->updated_at = a2a_timestamp_ms();
             if (reason) {
-                free(adapter->tasks[i]->error_message);
-                adapter->tasks[i]->error_message = strdup(reason);
+                AGENTOS_FREE(adapter->tasks[i]->error_message);
+                adapter->tasks[i]->error_message = AGENTOS_STRDUP(reason);
             }
             return 0;
         }
@@ -935,11 +1085,13 @@ int a2a_v03_cancel_task(a2a_v03_context_t* ctx, const char* task_id,
     return -3;
 }
 
-int a2a_v03_get_task(a2a_v03_context_t* ctx, const char* task_id,
-                      a2a_task_t** task) {
-    if (!ctx || !task_id || !task) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_get_task(a2a_v03_context_t *ctx, const char *task_id, a2a_task_t **task)
+{
+    if (!ctx || !task_id || !task)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
 
     for (size_t i = 0; i < adapter->task_count; i++) {
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
@@ -950,26 +1102,28 @@ int a2a_v03_get_task(a2a_v03_context_t* ctx, const char* task_id,
     return -3;
 }
 
-int a2a_v03_send_message(a2a_v03_context_t* ctx, const char* target_agent_id,
-                          const a2a_message_t* message,
-                          a2a_message_t** response, size_t* response_count) {
-    if (!ctx || !target_agent_id || !message) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_send_message(a2a_v03_context_t *ctx, const char *target_agent_id,
+                         const a2a_message_t *message, a2a_message_t **response,
+                         size_t *response_count)
+{
+    if (!ctx || !target_agent_id || !message)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
 
     if (adapter->message_handler) {
-        return adapter->message_handler(ctx, target_agent_id, message,
-                                         response, response_count,
-                                         adapter->message_handler_user_data);
+        return adapter->message_handler(ctx, target_agent_id, message, response, response_count,
+                                        adapter->message_handler_user_data);
     }
 
     if (response && response_count) {
-        a2a_message_t* resp = (a2a_message_t*)calloc(1, sizeof(a2a_message_t));
+        a2a_message_t *resp = (a2a_message_t *)AGENTOS_CALLOC(1, sizeof(a2a_message_t));
         if (resp) {
-            resp->role = strdup("assistant");
+            resp->role = AGENTOS_STRDUP("assistant");
             resp->type = A2A_MSG_STRUCTURED;
-            resp->content_json = strdup("{\"status\":\"received\",\"ack\":true}");
-            resp->mime_type = strdup("application/json");
+            resp->content_json = AGENTOS_STRDUP("{\"status\":\"received\",\"ack\":true}");
+            resp->mime_type = AGENTOS_STRDUP("application/json");
             *response = resp;
             *response_count = 1;
         }
@@ -977,58 +1131,67 @@ int a2a_v03_send_message(a2a_v03_context_t* ctx, const char* target_agent_id,
     return 0;
 }
 
-int a2a_v03_negotiate(a2a_v03_context_t* ctx, const a2a_negotiation_t* proposal,
-                       a2a_negotiation_action_t* response_action,
-                       char** response_terms) {
-    if (!ctx || !proposal) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_negotiate(a2a_v03_context_t *ctx, const a2a_negotiation_t *proposal,
+                      a2a_negotiation_action_t *response_action, char **response_terms)
+{
+    if (!ctx || !proposal)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
 
     if (adapter->negotiation_handler) {
-        return adapter->negotiation_handler(ctx, proposal, response_action,
-                                             response_terms,
-                                             adapter->negotiation_handler_user_data);
+        return adapter->negotiation_handler(ctx, proposal, response_action, response_terms,
+                                            adapter->negotiation_handler_user_data);
     }
 
-    if (response_action) *response_action = A2A_NEGOTIATE_REJECT;
-    if (response_terms) *response_terms = NULL;
+    if (response_action)
+        *response_action = A2A_NEGOTIATE_REJECT;
+    if (response_terms)
+        *response_terms = NULL;
     return 0;
 }
 
-int a2a_v03_subscribe_notifications(a2a_v03_context_t* ctx,
-                                     a2a_notification_handler_t handler,
-                                     void* user_data) {
-    if (!ctx || !handler) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+int a2a_v03_subscribe_notifications(a2a_v03_context_t *ctx, a2a_notification_handler_t handler,
+                                    void *user_data)
+{
+    if (!ctx || !handler)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->notification_handler = handler;
     adapter->notification_handler_user_data = user_data;
     return 0;
 }
 
-int a2a_v03_unsubscribe_notifications(a2a_v03_context_t* ctx) {
-    if (!ctx) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+int a2a_v03_unsubscribe_notifications(a2a_v03_context_t *ctx)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->notification_handler = NULL;
     adapter->notification_handler_user_data = NULL;
     return 0;
 }
 
-int a2a_v03_send_notification(a2a_v03_context_t* ctx,
-                               const a2a_notification_t* notification) {
-    if (!ctx || !notification) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->notification_handler) return -3;
-    adapter->notification_handler(ctx, notification,
-                                   adapter->notification_handler_user_data);
+int a2a_v03_send_notification(a2a_v03_context_t *ctx, const a2a_notification_t *notification)
+{
+    if (!ctx || !notification)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->notification_handler)
+        return -3;
+    adapter->notification_handler(ctx, notification, adapter->notification_handler_user_data);
     return 0;
 }
 
-int a2a_v03_stream_task_update(a2a_v03_context_t* ctx, const char* task_id,
-                                double progress, const char* chunk_json,
-                                bool is_final) {
-    if (!ctx || !task_id) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_stream_task_update(a2a_v03_context_t *ctx, const char *task_id, double progress,
+                               const char *chunk_json, bool is_final)
+{
+    if (!ctx || !task_id)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
 
     for (size_t i = 0; i < adapter->task_count; i++) {
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
@@ -1037,8 +1200,8 @@ int a2a_v03_stream_task_update(a2a_v03_context_t* ctx, const char* task_id,
             if (is_final) {
                 adapter->tasks[i]->state = A2A_TASK_COMPLETED;
                 if (chunk_json) {
-                    free(adapter->tasks[i]->output_json);
-                    adapter->tasks[i]->output_json = strdup(chunk_json);
+                    AGENTOS_FREE(adapter->tasks[i]->output_json);
+                    adapter->tasks[i]->output_json = AGENTOS_STRDUP(chunk_json);
                 }
             }
             break;
@@ -1046,69 +1209,75 @@ int a2a_v03_stream_task_update(a2a_v03_context_t* ctx, const char* task_id,
     }
 
     if (adapter->streaming_handler) {
-        adapter->streaming_handler(ctx, task_id, progress, chunk_json,
-                                    is_final, adapter->streaming_handler_user_data);
+        adapter->streaming_handler(ctx, task_id, progress, chunk_json, is_final,
+                                   adapter->streaming_handler_user_data);
     }
     return 0;
 }
 
-int a2a_v03_set_task_handler(a2a_v03_context_t* ctx, a2a_task_handler_t handler,
-                              void* user_data) {
-    if (!ctx) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+int a2a_v03_set_task_handler(a2a_v03_context_t *ctx, a2a_task_handler_t handler, void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->task_handler = handler;
     adapter->task_handler_user_data = user_data;
     return 0;
 }
 
-int a2a_v03_set_message_handler(a2a_v03_context_t* ctx,
-                                 a2a_message_handler_t handler,
-                                 void* user_data) {
-    if (!ctx) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+int a2a_v03_set_message_handler(a2a_v03_context_t *ctx, a2a_message_handler_t handler,
+                                void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->message_handler = handler;
     adapter->message_handler_user_data = user_data;
     return 0;
 }
 
-int a2a_v03_set_negotiation_handler(a2a_v03_context_t* ctx,
-                                      a2a_negotiation_handler_t handler,
-                                      void* user_data) {
-    if (!ctx) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+int a2a_v03_set_negotiation_handler(a2a_v03_context_t *ctx, a2a_negotiation_handler_t handler,
+                                    void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->negotiation_handler = handler;
     adapter->negotiation_handler_user_data = user_data;
     return 0;
 }
 
-int a2a_v03_set_streaming_handler(a2a_v03_context_t* ctx,
-                                    a2a_streaming_handler_t handler,
-                                    void* user_data) {
-    if (!ctx) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+int a2a_v03_set_streaming_handler(a2a_v03_context_t *ctx, a2a_streaming_handler_t handler,
+                                  void *user_data)
+{
+    if (!ctx)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->streaming_handler = handler;
     adapter->streaming_handler_user_data = user_data;
     return 0;
 }
 
-int a2a_v03_route_request(a2a_v03_context_t* ctx, const char* method,
-                           const char* params_json, char** response_json) {
-    if (!ctx || !method || !response_json) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
-    if (!adapter->initialized) return -2;
+int a2a_v03_route_request(a2a_v03_context_t *ctx, const char *method, const char *params_json,
+                          char **response_json)
+{
+    if (!ctx || !method || !response_json)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    if (!adapter->initialized)
+        return -2;
     *response_json = NULL;
 
     if (strcmp(method, "agent/discover") == 0) {
         size_t buf_size = 256 + adapter->agent_count * 128;
-        char* buf = (char*)malloc(buf_size);
-        if (!buf) return -3;
+        char *buf = (char *)AGENTOS_MALLOC(buf_size);
+        if (!buf)
+            return -3;
         int pos = snprintf(buf, buf_size, "{\"agents\":[");
         for (size_t i = 0; i < adapter->agent_count; i++) {
-            pos += snprintf(buf + pos, buf_size - (size_t)pos,
-                           "%s{\"id\":\"%s\",\"name\":\"%s\"}",
-                           i > 0 ? "," : "",
-                           adapter->agents[i].id,
-                           adapter->agents[i].name[0] ? adapter->agents[i].name : "");
+            pos += snprintf(buf + pos, buf_size - (size_t)pos, "%s{\"id\":\"%s\",\"name\":\"%s\"}",
+                            i > 0 ? "," : "", adapter->agents[i].id,
+                            adapter->agents[i].name[0] ? adapter->agents[i].name : "");
         }
         snprintf(buf + pos, buf_size - (size_t)pos, "]}");
         *response_json = buf;
@@ -1116,11 +1285,11 @@ int a2a_v03_route_request(a2a_v03_context_t* ctx, const char* method,
     }
 
     if (strcmp(method, "task/create") == 0) {
-        a2a_task_t* task = NULL;
+        a2a_task_t *task = NULL;
         int rc = a2a_v03_create_task(ctx, NULL, params_json, NULL, &task);
         if (rc == 0 && task) {
             size_t buf_size = 256;
-            char* buf = (char*)malloc(buf_size);
+            char *buf = (char *)AGENTOS_MALLOC(buf_size);
             if (buf) {
                 snprintf(buf, buf_size, "{\"task_id\":\"%s\",\"state\":\"submitted\"}", task->id);
                 *response_json = buf;
@@ -1131,15 +1300,13 @@ int a2a_v03_route_request(a2a_v03_context_t* ctx, const char* method,
 
     if (strcmp(method, "task/list") == 0) {
         size_t buf_size = 256 + adapter->task_count * 128;
-        char* buf = (char*)malloc(buf_size);
-        if (!buf) return -3;
+        char *buf = (char *)AGENTOS_MALLOC(buf_size);
+        if (!buf)
+            return -3;
         int pos = snprintf(buf, buf_size, "{\"tasks\":[");
         for (size_t i = 0; i < adapter->task_count; i++) {
-            pos += snprintf(buf + pos, buf_size - (size_t)pos,
-                           "%s{\"id\":\"%s\",\"state\":%d}",
-                           i > 0 ? "," : "",
-                           adapter->tasks[i]->id,
-                           (int)adapter->tasks[i]->state);
+            pos += snprintf(buf + pos, buf_size - (size_t)pos, "%s{\"id\":\"%s\",\"state\":%d}",
+                            i > 0 ? "," : "", adapter->tasks[i]->id, (int)adapter->tasks[i]->state);
         }
         snprintf(buf + pos, buf_size - (size_t)pos, "]}");
         *response_json = buf;
@@ -1148,76 +1315,113 @@ int a2a_v03_route_request(a2a_v03_context_t* ctx, const char* method,
 
     if (strcmp(method, "stats") == 0) {
         size_t buf_size = 256;
-        char* buf = (char*)malloc(buf_size);
-        if (!buf) return -3;
-        snprintf(buf, buf_size,
-                 "{\"agent_count\":%zu,\"task_count\":%zu,\"capabilities\":%u}",
+        char *buf = (char *)AGENTOS_MALLOC(buf_size);
+        if (!buf)
+            return -3;
+        snprintf(buf, buf_size, "{\"agent_count\":%zu,\"task_count\":%zu,\"capabilities\":%u}",
                  adapter->agent_count, adapter->task_count, adapter->config.capabilities);
         *response_json = buf;
         return 0;
     }
 
-    *response_json = strdup("{\"error\":\"unknown method\"}");
+    *response_json = AGENTOS_STRDUP("{\"error\":\"unknown method\"}");
     return -10;
 }
 
-static int a2a_adapter_init_cb(void* context) {
-    if (!context) return -1;
+static int a2a_adapter_init_cb(void *context)
+{
+    if (!context)
+        return AGENTOS_ENOMEM;
     return 0;
 }
-static int a2a_adapter_destroy_cb(void* context) { a2a_v03_context_destroy((a2a_v03_context_t*)context); return 0; }
-static int a2a_adapter_encode_cb(void* c, const void* m, void** o, size_t* s) {
-    if (!c || !m || !o || !s) return -1;
-    const char* msg = (const char*)m;
+static int a2a_adapter_destroy_cb(void *context)
+{
+    a2a_v03_context_destroy((a2a_v03_context_t *)context);
+    return 0;
+}
+static int a2a_adapter_encode_cb(void *c, const void *m, void **o, size_t *s)
+{
+    if (!c || !m || !o || !s)
+        return AGENTOS_EFAIL;
+    const char *msg = (const char *)m;
     size_t len = strlen(msg) + 1;
-    char* buf = (char*)malloc(len);
-    if (!buf) return -1;
+    char *buf = (char *)AGENTOS_MALLOC(len);
+    if (!buf)
+        return AGENTOS_EFAIL;
     memcpy(buf, msg, len);
     *o = buf;
     *s = len;
     return 0;
 }
-static int a2a_adapter_decode_cb(void* c, const void* d, size_t s, void* o) {
-    if (!c || !d || !o || s == 0) return -1;
+static int a2a_adapter_decode_cb(void *c, const void *d, size_t s, void *o)
+{
+    if (!c || !d || !o || s == 0)
+        return AGENTOS_EFAIL;
     memcpy(o, d, s);
     return 0;
 }
-static int a2a_adapter_connect_cb(void* c, const char* e) {
-    if (!c) return -1;
+static int a2a_adapter_connect_cb(void *c, const char *e)
+{
+    if (!c)
+        return AGENTOS_EFAIL;
     (void)e;
     return 0;
 }
-static int a2a_adapter_disconnect_cb(void* c) {
-    if (!c) return -1;
+static int a2a_adapter_disconnect_cb(void *c)
+{
+    if (!c)
+        return AGENTOS_EFAIL;
     return 0;
 }
-static int a2a_adapter_is_connected_cb(void* c) { return c ? 1 : 0; }
-static int a2a_adapter_send_cb(void* c, const void* d, size_t s) {
-    if (!c || !d || s == 0) return -1;
-    return -1;
+static int a2a_adapter_is_connected_cb(void *c)
+{
+    return c ? 1 : 0;
 }
-static int a2a_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) {
-    if (!c || !d || !s) return -1;
+static int a2a_adapter_send_cb(void *c, const void *d, size_t s)
+{
+    if (!c || !d || s == 0)
+        return AGENTOS_EFAIL;
+    return AGENTOS_ENOTSUP;
+}
+static int a2a_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t)
+{
+    if (!c || !d || !s)
+        return AGENTOS_EFAIL;
     (void)t;
     *d = NULL;
     *s = 0;
-    return -1;
+    return AGENTOS_EINVAL;
 }
-static int a2a_adapter_handle_request_cb(void* c, const void* r, void** rp) {
-    if (!c || !r) return -1;
-    if (rp) *rp = NULL;
-    return a2a_v03_route_request((a2a_v03_context_t*)c, (const char*)r, NULL, (char**)rp);
+static int a2a_adapter_handle_request_cb(void *c, const void *r, void **rp)
+{
+    if (!c || !r)
+        return AGENTOS_EFAIL;
+    if (rp)
+        *rp = NULL;
+    return a2a_v03_route_request((a2a_v03_context_t *)c, (const char *)r, NULL, (char **)rp);
 }
-static int a2a_adapter_get_version_cb(void* c, char* b, size_t s) { (void)c; snprintf(b, s, "0.3.0"); return 0; }
-static uint32_t a2a_adapter_capabilities_cb(void* c) { (void)c; return A2A_CAP_TASK_EXECUTION|A2A_CAP_STREAMING|A2A_CAP_NEGOTIATION; }
-static int a2a_adapter_get_stats_cb(void* c, char* b, size_t s) {
-    if (!c || !b || s == 0) return -1;
-    struct a2a_v03_adapter_s* a = (struct a2a_v03_adapter_s*)c;
+static int a2a_adapter_get_version_cb(void *c, char *b, size_t s)
+{
+    (void)c;
+    snprintf(b, s, "0.3.0");
+    return 0;
+}
+static uint32_t a2a_adapter_capabilities_cb(void *c)
+{
+    (void)c;
+    return A2A_CAP_TASK_EXECUTION | A2A_CAP_STREAMING | A2A_CAP_NEGOTIATION;
+}
+static int a2a_adapter_get_stats_cb(void *c, char *b, size_t s)
+{
+    if (!c || !b || s == 0)
+        return AGENTOS_EFAIL;
+    struct a2a_v03_adapter_s *a = (struct a2a_v03_adapter_s *)c;
     snprintf(b, s, "{\"agents\":%zu,\"tasks\":%zu}", a->agent_count, a->task_count);
     return 0;
 }
 
-const protocol_adapter_t* a2a_v03_get_adapter(void) {
+const protocol_adapter_t *a2a_v03_get_adapter(void)
+{
     static protocol_adapter_t s_adapter;
     static bool s_init = false;
     if (!s_init) {
@@ -1244,75 +1448,89 @@ const protocol_adapter_t* a2a_v03_get_adapter(void) {
     return &s_adapter;
 }
 
-size_t a2a_v03_get_agent_count(a2a_v03_context_t* ctx) {
-    if (!ctx) return 0;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+size_t a2a_v03_get_agent_count(a2a_v03_context_t *ctx)
+{
+    if (!ctx)
+        return 0;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     return adapter->agent_count;
 }
 
-size_t a2a_v03_get_task_count(a2a_v03_context_t* ctx) {
-    if (!ctx) return 0;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+size_t a2a_v03_get_task_count(a2a_v03_context_t *ctx)
+{
+    if (!ctx)
+        return 0;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     return adapter->task_count;
 }
 
-uint32_t a2a_v03_get_capabilities(a2a_v03_context_t* ctx) {
-    if (!ctx) return 0;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+uint32_t a2a_v03_get_capabilities(a2a_v03_context_t *ctx)
+{
+    if (!ctx)
+        return 0;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     return adapter->config.capabilities;
 }
 
-void a2a_agent_card_destroy(a2a_agent_card_t* card) {
-    if (!card) return;
-    free(card->id);
-    free(card->name);
-    free(card->description);
-    free(card->url);
-    free(card->version);
-    free(card->provider_name);
-    free(card->provider_url);
-    free(card->documentation_url);
-    free(card->authentication_schemes_json);
-    free(card->capabilities_json);
+void a2a_agent_card_destroy(a2a_agent_card_t *card)
+{
+    if (!card)
+        return;
+    AGENTOS_FREE(card->id);
+    AGENTOS_FREE(card->name);
+    AGENTOS_FREE(card->description);
+    AGENTOS_FREE(card->url);
+    AGENTOS_FREE(card->version);
+    AGENTOS_FREE(card->provider_name);
+    AGENTOS_FREE(card->provider_url);
+    AGENTOS_FREE(card->documentation_url);
+    AGENTOS_FREE(card->authentication_schemes_json);
+    AGENTOS_FREE(card->capabilities_json);
     if (card->skills) {
         for (size_t i = 0; i < card->skill_count; i++) {
-            free(card->skills[i].name);
-            free(card->skills[i].description);
-            free(card->skills[i].schema_json);
+            AGENTOS_FREE(card->skills[i].name);
+            AGENTOS_FREE(card->skills[i].description);
+            AGENTOS_FREE(card->skills[i].schema_json);
         }
-        free(card->skills);
+        AGENTOS_FREE(card->skills);
     }
-    free(card);
+    AGENTOS_FREE(card);
 }
 
-void a2a_task_destroy(a2a_task_t* task) {
-    if (!task) return;
-    free(task->id);
-    free(task->session_id);
-    free(task->agent_id);
-    free(task->description);
-    free(task->input_json);
-    free(task->output_json);
-    free(task->error_message);
-    free(task);
+void a2a_task_destroy(a2a_task_t *task)
+{
+    if (!task)
+        return;
+    AGENTOS_FREE(task->id);
+    AGENTOS_FREE(task->session_id);
+    AGENTOS_FREE(task->agent_id);
+    AGENTOS_FREE(task->description);
+    AGENTOS_FREE(task->input_json);
+    AGENTOS_FREE(task->output_json);
+    AGENTOS_FREE(task->error_message);
+    AGENTOS_FREE(task);
 }
 
-void a2a_message_destroy(a2a_message_t* msg) {
-    if (!msg) return;
-    free(msg->role);
-    free(msg->content_json);
-    free(msg->mime_type);
-    free(msg->file_name);
-    free(msg->file_data);
-    free(msg);
+void a2a_message_destroy(a2a_message_t *msg)
+{
+    if (!msg)
+        return;
+    AGENTOS_FREE(msg->role);
+    AGENTOS_FREE(msg->content_json);
+    AGENTOS_FREE(msg->mime_type);
+    AGENTOS_FREE(msg->file_name);
+    AGENTOS_FREE(msg->file_data);
+    AGENTOS_FREE(msg);
 }
 
-void a2a_negotiation_destroy(a2a_negotiation_t* neg) {
-    if (!neg) return;
-    free(neg->task_id);
-    free(neg->agent_id);
-    free(neg->terms_json);
-    free(neg->counter_proposal_json);
-    free(neg->reason);
-    free(neg);
+void a2a_negotiation_destroy(a2a_negotiation_t *neg)
+{
+    if (!neg)
+        return;
+    AGENTOS_FREE(neg->task_id);
+    AGENTOS_FREE(neg->agent_id);
+    AGENTOS_FREE(neg->terms_json);
+    AGENTOS_FREE(neg->counter_proposal_json);
+    AGENTOS_FREE(neg->reason);
+    AGENTOS_FREE(neg);
 }

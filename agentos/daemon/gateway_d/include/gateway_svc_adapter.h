@@ -24,6 +24,7 @@
 
 #include "gateway_service.h"
 #include "svc_common.h"
+
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -66,10 +67,8 @@ extern "C" {
  * }
  * @endcode
  */
-AGENTOS_API agentos_error_t gateway_service_adapter_create(
-    agentos_service_t* out_service,
-    const agentos_svc_config_t* config
-);
+AGENTOS_API agentos_error_t gateway_service_adapter_create(agentos_service_t *out_service,
+                                                           const agentos_svc_config_t *config);
 
 /**
  * @brief 将现有网关服务包装为适配器
@@ -88,11 +87,9 @@ AGENTOS_API agentos_error_t gateway_service_adapter_create(
  * @threadsafe 否
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t gateway_service_adapter_wrap(
-    agentos_service_t* out_service,
-    gateway_service_t gateway_svc,
-    const agentos_svc_config_t* config
-);
+AGENTOS_API agentos_error_t gateway_service_adapter_wrap(agentos_service_t *out_service,
+                                                         gateway_service_t gateway_svc,
+                                                         const agentos_svc_config_t *config);
 
 /**
  * @brief 获取原始网关服务句柄
@@ -106,9 +103,7 @@ AGENTOS_API agentos_error_t gateway_service_adapter_wrap(
  * @threadsafe 是（前提是服务状态不变）
  * @reentrant 是
  */
-AGENTOS_API gateway_service_t gateway_service_adapter_get_original(
-    agentos_service_t service
-);
+AGENTOS_API gateway_service_t gateway_service_adapter_get_original(agentos_service_t service);
 
 /* ==================== 适配器生命周期管理 ==================== */
 
@@ -151,10 +146,7 @@ AGENTOS_API agentos_error_t gateway_service_adapter_start(agentos_service_t serv
  * @threadsafe 是（底层网关服务需支持并发停止）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t gateway_service_adapter_stop(
-    agentos_service_t service,
-    bool force
-);
+AGENTOS_API agentos_error_t gateway_service_adapter_stop(agentos_service_t service, bool force);
 
 /**
  * @brief 适配器服务销毁
@@ -221,10 +213,8 @@ AGENTOS_API bool gateway_service_adapter_is_running(agentos_service_t service);
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t gateway_service_adapter_get_stats(
-    agentos_service_t service,
-    agentos_svc_stats_t* stats
-);
+AGENTOS_API agentos_error_t gateway_service_adapter_get_stats(agentos_service_t service,
+                                                              agentos_svc_stats_t *stats);
 
 /* ==================== 工具函数 ==================== */
 
@@ -239,7 +229,7 @@ AGENTOS_API agentos_error_t gateway_service_adapter_get_stats(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API const agentos_svc_interface_t* gateway_service_adapter_get_interface(void);
+AGENTOS_API const agentos_svc_interface_t *gateway_service_adapter_get_interface(void);
 
 /**
  * @brief 检查是否支持特定网关类型
@@ -253,10 +243,8 @@ AGENTOS_API const agentos_svc_interface_t* gateway_service_adapter_get_interface
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API bool gateway_service_adapter_supports_type(
-    agentos_service_t service,
-    gateway_daemon_type_t type
-);
+AGENTOS_API bool gateway_service_adapter_supports_type(agentos_service_t service,
+                                                       gateway_daemon_type_t type);
 
 /**
  * @brief 启用/禁用特定网关类型
@@ -272,11 +260,9 @@ AGENTOS_API bool gateway_service_adapter_supports_type(
  * @threadsafe 否
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t gateway_service_adapter_set_type_enabled(
-    agentos_service_t service,
-    gateway_daemon_type_t type,
-    bool enabled
-);
+AGENTOS_API agentos_error_t gateway_service_adapter_set_type_enabled(agentos_service_t service,
+                                                                     gateway_daemon_type_t type,
+                                                                     bool enabled);
 
 /* ==================== 配置管理 ==================== */
 
@@ -292,10 +278,8 @@ AGENTOS_API agentos_error_t gateway_service_adapter_set_type_enabled(
  * @threadsafe 否
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t gateway_service_adapter_create_from_config(
-    agentos_service_t* out_service,
-    const char* config_path
-);
+AGENTOS_API agentos_error_t
+gateway_service_adapter_create_from_config(agentos_service_t *out_service, const char *config_path);
 
 /**
  * @brief 重新加载适配器配置
@@ -310,10 +294,8 @@ AGENTOS_API agentos_error_t gateway_service_adapter_create_from_config(
  * @threadsafe 否
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t gateway_service_adapter_reload_config(
-    agentos_service_t service,
-    const char* config_path
-);
+AGENTOS_API agentos_error_t gateway_service_adapter_reload_config(agentos_service_t service,
+                                                                  const char *config_path);
 
 /* ==================== 适配器注册 ==================== */
 

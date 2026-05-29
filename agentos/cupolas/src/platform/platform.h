@@ -13,9 +13,9 @@
 #ifndef cupolas_PLATFORM_H
 #define cupolas_PLATFORM_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,23 +26,23 @@ extern "C" {
  * ============================================================================ */
 
 #if defined(_WIN32) || defined(_WIN64)
-    #define cupolas_PLATFORM_WINDOWS  1
-    #define cupolas_PLATFORM_POSIX    0
-    #ifdef _WIN64
-        #define cupolas_PLATFORM_64BIT 1
-    #else
-        #define cupolas_PLATFORM_64BIT 0
-    #endif
-#elif defined(__linux__) || defined(__APPLE__) || defined(__unix__)
-    #define cupolas_PLATFORM_WINDOWS  0
-    #define cupolas_PLATFORM_POSIX    1
-    #if defined(__x86_64__) || defined(__aarch64__)
-        #define cupolas_PLATFORM_64BIT 1
-    #else
-        #define cupolas_PLATFORM_64BIT 0
-    #endif
+#define cupolas_PLATFORM_WINDOWS 1
+#define cupolas_PLATFORM_POSIX 0
+#ifdef _WIN64
+#define cupolas_PLATFORM_64BIT 1
 #else
-    #error "Unsupported platform"
+#define cupolas_PLATFORM_64BIT 0
+#endif
+#elif defined(__linux__) || defined(__APPLE__) || defined(__unix__)
+#define cupolas_PLATFORM_WINDOWS 0
+#define cupolas_PLATFORM_POSIX 1
+#if defined(__x86_64__) || defined(__aarch64__)
+#define cupolas_PLATFORM_64BIT 1
+#else
+#define cupolas_PLATFORM_64BIT 0
+#endif
+#else
+#error "Unsupported platform"
 #endif
 
 /* ============================================================================
@@ -50,13 +50,13 @@ extern "C" {
  * ============================================================================ */
 
 #if cupolas_PLATFORM_WINDOWS
-    #ifdef cupolas_BUILD_DLL
-        #define cupolas_API __declspec(dllexport)
-    #else
-        #define cupolas_API __declspec(dllimport)
-    #endif
+#ifdef cupolas_BUILD_DLL
+#define cupolas_API __declspec(dllexport)
 #else
-    #define cupolas_API __attribute__((visibility("default")))
+#define cupolas_API __declspec(dllimport)
+#endif
+#else
+#define cupolas_API __attribute__((visibility("default")))
 #endif
 
 /* ============================================================================
@@ -65,24 +65,25 @@ extern "C" {
 
 /* Thread Handle Types */
 #if cupolas_PLATFORM_WINDOWS
-    #include <windows.h>
-    #include "atomic_compat.h"
-    typedef HANDLE cupolas_thread_t;
-    typedef DWORD cupolas_thread_id_t;
-    typedef CRITICAL_SECTION cupolas_mutex_t;
-    typedef struct {
-        SRWLOCK lock;
-        atomic_long state;
-    } cupolas_rwlock_t;
-    typedef CONDITION_VARIABLE cupolas_cond_t;
+#include "atomic_compat.h"
+
+#include <windows.h>
+typedef HANDLE cupolas_thread_t;
+typedef DWORD cupolas_thread_id_t;
+typedef CRITICAL_SECTION cupolas_mutex_t;
+typedef struct {
+    SRWLOCK lock;
+    atomic_long state;
+} cupolas_rwlock_t;
+typedef CONDITION_VARIABLE cupolas_cond_t;
 #else
-    #include <pthread.h>
-    #include <sys/types.h>
-    typedef pthread_t cupolas_thread_t;
-    typedef pthread_t cupolas_thread_id_t;
-    typedef pthread_mutex_t cupolas_mutex_t;
-    typedef pthread_rwlock_t cupolas_rwlock_t;
-    typedef pthread_cond_t cupolas_cond_t;
+#include <pthread.h>
+#include <sys/types.h>
+typedef pthread_t cupolas_thread_t;
+typedef pthread_t cupolas_thread_id_t;
+typedef pthread_mutex_t cupolas_mutex_t;
+typedef pthread_rwlock_t cupolas_rwlock_t;
+typedef pthread_cond_t cupolas_cond_t;
 #endif
 
 /* Mutex Interface */
@@ -94,7 +95,7 @@ extern "C" {
  * @reentrant N/A
  * @ownership mutex: callee initializes
  */
-int cupolas_mutex_init(cupolas_mutex_t* mutex);
+int cupolas_mutex_init(cupolas_mutex_t *mutex);
 
 /**
  * @brief Destroy mutex
@@ -104,7 +105,7 @@ int cupolas_mutex_init(cupolas_mutex_t* mutex);
  * @reentrant N/A
  * @ownership mutex: caller transfers ownership
  */
-int cupolas_mutex_destroy(cupolas_mutex_t* mutex);
+int cupolas_mutex_destroy(cupolas_mutex_t *mutex);
 
 /**
  * @brief Lock mutex
@@ -113,7 +114,7 @@ int cupolas_mutex_destroy(cupolas_mutex_t* mutex);
  * @note Thread-safe: Yes
  * @reentrant No (deadlock if same thread locks twice)
  */
-int cupolas_mutex_lock(cupolas_mutex_t* mutex);
+int cupolas_mutex_lock(cupolas_mutex_t *mutex);
 
 /**
  * @brief Try lock mutex
@@ -122,7 +123,7 @@ int cupolas_mutex_lock(cupolas_mutex_t* mutex);
  * @note Thread-safe: Yes
  * @reentrant No
  */
-int cupolas_mutex_trylock(cupolas_mutex_t* mutex);
+int cupolas_mutex_trylock(cupolas_mutex_t *mutex);
 
 /**
  * @brief Unlock mutex
@@ -131,7 +132,7 @@ int cupolas_mutex_trylock(cupolas_mutex_t* mutex);
  * @note Thread-safe: Yes
  * @reentrant No (only owner should unlock)
  */
-int cupolas_mutex_unlock(cupolas_mutex_t* mutex);
+int cupolas_mutex_unlock(cupolas_mutex_t *mutex);
 
 /* Read-Write Lock Interface */
 /**
@@ -142,7 +143,7 @@ int cupolas_mutex_unlock(cupolas_mutex_t* mutex);
  * @reentrant N/A
  * @ownership rwlock: callee initializes
  */
-int cupolas_rwlock_init(cupolas_rwlock_t* rwlock);
+int cupolas_rwlock_init(cupolas_rwlock_t *rwlock);
 
 /**
  * @brief Destroy read-write lock
@@ -152,7 +153,7 @@ int cupolas_rwlock_init(cupolas_rwlock_t* rwlock);
  * @reentrant N/A
  * @ownership rwlock: caller transfers ownership
  */
-int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock);
+int cupolas_rwlock_destroy(cupolas_rwlock_t *rwlock);
 
 /**
  * @brief Acquire read lock
@@ -161,7 +162,7 @@ int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock);
  * @note Thread-safe: Yes
  * @reentrant Yes (same thread can acquire multiple read locks)
  */
-int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock);
+int cupolas_rwlock_rdlock(cupolas_rwlock_t *rwlock);
 
 /**
  * @brief Acquire write lock
@@ -170,7 +171,7 @@ int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock);
  * @note Thread-safe: Yes
  * @reentrant No
  */
-int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock);
+int cupolas_rwlock_wrlock(cupolas_rwlock_t *rwlock);
 
 /**
  * @brief Try acquire read lock
@@ -179,7 +180,7 @@ int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock);
+int cupolas_rwlock_tryrdlock(cupolas_rwlock_t *rwlock);
 
 /**
  * @brief Try acquire write lock
@@ -188,7 +189,7 @@ int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock);
  * @note Thread-safe: Yes
  * @reentrant No
  */
-int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock);
+int cupolas_rwlock_trywrlock(cupolas_rwlock_t *rwlock);
 
 /**
  * @brief Unlock read-write lock
@@ -197,7 +198,7 @@ int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_rwlock_unlock(cupolas_rwlock_t* rwlock);
+int cupolas_rwlock_unlock(cupolas_rwlock_t *rwlock);
 
 /* Condition Variable Interface */
 /**
@@ -208,7 +209,7 @@ int cupolas_rwlock_unlock(cupolas_rwlock_t* rwlock);
  * @reentrant N/A
  * @ownership cond: callee initializes
  */
-int cupolas_cond_init(cupolas_cond_t* cond);
+int cupolas_cond_init(cupolas_cond_t *cond);
 
 /**
  * @brief Destroy condition variable
@@ -218,7 +219,7 @@ int cupolas_cond_init(cupolas_cond_t* cond);
  * @reentrant N/A
  * @ownership cond: caller transfers ownership
  */
-int cupolas_cond_destroy(cupolas_cond_t* cond);
+int cupolas_cond_destroy(cupolas_cond_t *cond);
 
 /**
  * @brief Wait for condition
@@ -229,7 +230,7 @@ int cupolas_cond_destroy(cupolas_cond_t* cond);
  * @reentrant No
  * @post Atomically releases mutex and waits, then reacquires mutex on wake
  */
-int cupolas_cond_wait(cupolas_cond_t* cond, cupolas_mutex_t* mutex);
+int cupolas_cond_wait(cupolas_cond_t *cond, cupolas_mutex_t *mutex);
 
 /**
  * @brief Wait for condition with timeout
@@ -240,7 +241,7 @@ int cupolas_cond_wait(cupolas_cond_t* cond, cupolas_mutex_t* mutex);
  * @note Thread-safe: Yes
  * @reentrant No
  */
-int cupolas_cond_timedwait(cupolas_cond_t* cond, cupolas_mutex_t* mutex, uint32_t timeout_ms);
+int cupolas_cond_timedwait(cupolas_cond_t *cond, cupolas_mutex_t *mutex, uint32_t timeout_ms);
 
 /**
  * @brief Signal condition variable (wake one)
@@ -249,7 +250,7 @@ int cupolas_cond_timedwait(cupolas_cond_t* cond, cupolas_mutex_t* mutex, uint32_
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_cond_signal(cupolas_cond_t* cond);
+int cupolas_cond_signal(cupolas_cond_t *cond);
 
 /**
  * @brief Broadcast condition variable (wake all)
@@ -258,10 +259,10 @@ int cupolas_cond_signal(cupolas_cond_t* cond);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_cond_broadcast(cupolas_cond_t* cond);
+int cupolas_cond_broadcast(cupolas_cond_t *cond);
 
 /* Thread Interface */
-typedef void* (*cupolas_thread_func_t)(void* arg);
+typedef void *(*cupolas_thread_func_t)(void *arg);
 
 /**
  * @brief Create thread
@@ -273,7 +274,7 @@ typedef void* (*cupolas_thread_func_t)(void* arg);
  * @reentrant N/A
  * @ownership thread: callee initializes, caller owns
  */
-int cupolas_thread_create(cupolas_thread_t* thread, cupolas_thread_func_t func, void* arg);
+int cupolas_thread_create(cupolas_thread_t *thread, cupolas_thread_func_t func, void *arg);
 
 /**
  * @brief Join thread
@@ -284,7 +285,7 @@ int cupolas_thread_create(cupolas_thread_t* thread, cupolas_thread_func_t func, 
  * @reentrant N/A
  * @ownership retval: callee writes if not NULL, caller owns
  */
-int cupolas_thread_join(cupolas_thread_t thread, void** retval);
+int cupolas_thread_join(cupolas_thread_t thread, void **retval);
 
 /**
  * @brief Detach thread
@@ -319,13 +320,13 @@ bool cupolas_thread_equal(cupolas_thread_id_t t1, cupolas_thread_id_t t2);
 
 /* Process Handle Types */
 #if cupolas_PLATFORM_WINDOWS
-    typedef HANDLE cupolas_process_t;
-    typedef DWORD cupolas_pid_t;
-    typedef HANDLE cupolas_pipe_t;
+typedef HANDLE cupolas_process_t;
+typedef DWORD cupolas_pid_t;
+typedef HANDLE cupolas_pipe_t;
 #else
-    typedef pid_t cupolas_pid_t;
-    typedef int cupolas_process_t;
-    typedef int cupolas_pipe_t[2];
+typedef pid_t cupolas_pid_t;
+typedef int cupolas_process_t;
+typedef int cupolas_pipe_t[2];
 #endif
 
 /* Process Exit Status */
@@ -337,8 +338,8 @@ typedef struct cupolas_exit_status {
 
 /* Process Attributes */
 typedef struct cupolas_process_attr {
-    const char* working_dir;
-    const char** env;
+    const char *working_dir;
+    const char **env;
     bool redirect_stdin;
     bool redirect_stdout;
     bool redirect_stderr;
@@ -359,10 +360,8 @@ typedef struct cupolas_process_attr {
  * @reentrant N/A
  * @ownership proc: callee initializes, caller owns
  */
-int cupolas_process_spawn(cupolas_process_t* proc,
-                        const char* path,
-                        char* const argv[],
-                        const cupolas_process_attr_t* attr);
+int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const argv[],
+                          const cupolas_process_attr_t *attr);
 
 /**
  * @brief Wait for process
@@ -374,7 +373,8 @@ int cupolas_process_spawn(cupolas_process_t* proc,
  * @reentrant Yes
  * @ownership status: callee writes, caller owns
  */
-int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status, uint32_t timeout_ms);
+int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t *status,
+                         uint32_t timeout_ms);
 
 /**
  * @brief Terminate process
@@ -413,7 +413,7 @@ cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc);
  * @reentrant N/A
  * @ownership pipe: callee initializes, caller owns
  */
-int cupolas_pipe_create(cupolas_pipe_t* pipe);
+int cupolas_pipe_create(cupolas_pipe_t *pipe);
 
 /**
  * @brief Close pipe
@@ -422,7 +422,7 @@ int cupolas_pipe_create(cupolas_pipe_t* pipe);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_pipe_close(cupolas_pipe_t* pipe);
+int cupolas_pipe_close(cupolas_pipe_t *pipe);
 
 /**
  * @brief Read from pipe
@@ -435,7 +435,7 @@ int cupolas_pipe_close(cupolas_pipe_t* pipe);
  * @reentrant Yes
  * @ownership buf: caller owns; bytes_read: callee writes if not NULL
  */
-int cupolas_pipe_read(cupolas_pipe_t* pipe, void* buf, size_t count, size_t* bytes_read);
+int cupolas_pipe_read(cupolas_pipe_t *pipe, void *buf, size_t count, size_t *bytes_read);
 
 /**
  * @brief Write to pipe
@@ -448,7 +448,7 @@ int cupolas_pipe_read(cupolas_pipe_t* pipe, void* buf, size_t count, size_t* byt
  * @reentrant Yes
  * @ownership buf: caller retains; bytes_written: callee writes if not NULL
  */
-int cupolas_pipe_write(cupolas_pipe_t* pipe, const void* buf, size_t count, size_t* bytes_written);
+int cupolas_pipe_write(cupolas_pipe_t *pipe, const void *buf, size_t count, size_t *bytes_written);
 
 /* ============================================================================
  * Time Primitives
@@ -469,7 +469,7 @@ typedef struct cupolas_timestamp {
  * @reentrant Yes
  * @ownership ts: callee writes, caller owns
  */
-int cupolas_time_now(cupolas_timestamp_t* ts);
+int cupolas_time_now(cupolas_timestamp_t *ts);
 
 /**
  * @brief Get monotonic timestamp
@@ -479,7 +479,7 @@ int cupolas_time_now(cupolas_timestamp_t* ts);
  * @reentrant Yes
  * @ownership ts: callee writes, caller owns
  */
-int cupolas_time_mono(cupolas_timestamp_t* ts);
+int cupolas_time_mono(cupolas_timestamp_t *ts);
 
 /**
  * @brief Get current time in milliseconds
@@ -511,13 +511,13 @@ void cupolas_sleep_us(uint32_t us);
 
 /* File Path Maximum Length */
 #if cupolas_PLATFORM_WINDOWS
-    #define cupolas_PATH_MAX  260
-    #define cupolas_PATH_SEP  '\\'
-    #define cupolas_PATH_SEP_STR "\\"
+#define cupolas_PATH_MAX 260
+#define cupolas_PATH_SEP '\\'
+#define cupolas_PATH_SEP_STR "\\"
 #else
-    #define cupolas_PATH_MAX  4096
-    #define cupolas_PATH_SEP  '/'
-    #define cupolas_PATH_SEP_STR "/"
+#define cupolas_PATH_MAX 4096
+#define cupolas_PATH_SEP '/'
+#define cupolas_PATH_SEP_STR "/"
 #endif
 
 /* File Attributes */
@@ -539,7 +539,7 @@ typedef struct cupolas_file_stat {
  * @reentrant Yes
  * @ownership stat: callee writes, caller owns
  */
-int cupolas_file_stat(const char* path, cupolas_file_stat_t* stat);
+int cupolas_file_stat(const char *path, cupolas_file_stat_t *stat);
 
 /**
  * @brief Check if file exists
@@ -548,7 +548,7 @@ int cupolas_file_stat(const char* path, cupolas_file_stat_t* stat);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_file_exists(const char* path);
+int cupolas_file_exists(const char *path);
 
 /**
  * @brief Create directory
@@ -558,7 +558,7 @@ int cupolas_file_exists(const char* path);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_file_mkdir(const char* path, bool recursive);
+int cupolas_file_mkdir(const char *path, bool recursive);
 
 /**
  * @brief Remove file or empty directory
@@ -567,7 +567,7 @@ int cupolas_file_mkdir(const char* path, bool recursive);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_file_remove(const char* path);
+int cupolas_file_remove(const char *path);
 
 /**
  * @brief Rename file
@@ -577,7 +577,7 @@ int cupolas_file_remove(const char* path);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_file_rename(const char* old_path, const char* new_path);
+int cupolas_file_rename(const char *old_path, const char *new_path);
 
 /**
  * @brief Get absolute path
@@ -589,7 +589,7 @@ int cupolas_file_rename(const char* old_path, const char* new_path);
  * @reentrant Yes
  * @ownership buf: caller owns
  */
-char* cupolas_file_abspath(const char* path, char* buf, size_t size);
+char *cupolas_file_abspath(const char *path, char *buf, size_t size);
 
 /**
  * @brief Get directory name
@@ -601,7 +601,7 @@ char* cupolas_file_abspath(const char* path, char* buf, size_t size);
  * @reentrant Yes
  * @ownership buf: caller owns
  */
-char* cupolas_file_dirname(const char* path, char* buf, size_t size);
+char *cupolas_file_dirname(const char *path, char *buf, size_t size);
 
 /* ============================================================================
  * Memory Primitives
@@ -615,7 +615,7 @@ char* cupolas_file_dirname(const char* path, char* buf, size_t size);
  * @note Thread-safe: Yes (heap operations are atomic)
  * @reentrant Yes
  */
-void* cupolas_mem_alloc(size_t size);
+void *cupolas_mem_alloc(size_t size);
 
 /**
  * @brief Allocate aligned memory
@@ -625,7 +625,7 @@ void* cupolas_mem_alloc(size_t size);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void* cupolas_mem_alloc_aligned(size_t size, size_t alignment);
+void *cupolas_mem_alloc_aligned(size_t size, size_t alignment);
 
 /**
  * @brief Free memory
@@ -633,7 +633,7 @@ void* cupolas_mem_alloc_aligned(size_t size, size_t alignment);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void cupolas_mem_free(void* ptr);
+void cupolas_mem_free(void *ptr);
 
 /**
  * @brief Reallocate memory
@@ -644,7 +644,7 @@ void cupolas_mem_free(void* ptr);
  * @reentrant Yes
  * @post On failure, original pointer remains valid
  */
-void* cupolas_mem_realloc(void* ptr, size_t size);
+void *cupolas_mem_realloc(void *ptr, size_t size);
 
 /* Secure Memory Operations */
 /**
@@ -654,7 +654,7 @@ void* cupolas_mem_realloc(void* ptr, size_t size);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void cupolas_mem_zero(void* ptr, size_t size);
+void cupolas_mem_zero(void *ptr, size_t size);
 
 /**
  * @brief Lock memory (prevent swapping)
@@ -664,7 +664,7 @@ void cupolas_mem_zero(void* ptr, size_t size);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void cupolas_mem_lock(void* ptr, size_t size);
+void cupolas_mem_lock(void *ptr, size_t size);
 
 /**
  * @brief Unlock memory
@@ -674,7 +674,7 @@ void cupolas_mem_lock(void* ptr, size_t size);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void cupolas_mem_unlock(void* ptr, size_t size);
+void cupolas_mem_unlock(void *ptr, size_t size);
 
 /* ============================================================================
  * Utility Macros
@@ -691,7 +691,7 @@ void cupolas_mem_unlock(void* ptr, size_t size);
 
 typedef volatile int32_t cupolas_atomic32_t;
 typedef volatile int64_t cupolas_atomic64_t;
-typedef volatile void* cupolas_atomic_ptr_t;
+typedef volatile void *cupolas_atomic_ptr_t;
 
 /**
  * @brief Load 32-bit atomic value
@@ -700,7 +700,7 @@ typedef volatile void* cupolas_atomic_ptr_t;
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int32_t cupolas_atomic_load32(cupolas_atomic32_t* ptr);
+int32_t cupolas_atomic_load32(cupolas_atomic32_t *ptr);
 
 /**
  * @brief Store 32-bit atomic value
@@ -709,7 +709,7 @@ int32_t cupolas_atomic_load32(cupolas_atomic32_t* ptr);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void cupolas_atomic_store32(cupolas_atomic32_t* ptr, int32_t val);
+void cupolas_atomic_store32(cupolas_atomic32_t *ptr, int32_t val);
 
 /**
  * @brief Add to 32-bit atomic value
@@ -719,7 +719,7 @@ void cupolas_atomic_store32(cupolas_atomic32_t* ptr, int32_t val);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int32_t cupolas_atomic_add32(cupolas_atomic32_t* ptr, int32_t delta);
+int32_t cupolas_atomic_add32(cupolas_atomic32_t *ptr, int32_t delta);
 
 /**
  * @brief Subtract from 32-bit atomic value
@@ -729,7 +729,7 @@ int32_t cupolas_atomic_add32(cupolas_atomic32_t* ptr, int32_t delta);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int32_t cupolas_atomic_sub32(cupolas_atomic32_t* ptr, int32_t delta);
+int32_t cupolas_atomic_sub32(cupolas_atomic32_t *ptr, int32_t delta);
 
 /**
  * @brief Increment 32-bit atomic value
@@ -738,7 +738,7 @@ int32_t cupolas_atomic_sub32(cupolas_atomic32_t* ptr, int32_t delta);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int32_t cupolas_atomic_inc32(cupolas_atomic32_t* ptr);
+int32_t cupolas_atomic_inc32(cupolas_atomic32_t *ptr);
 
 /**
  * @brief Decrement 32-bit atomic value
@@ -747,7 +747,7 @@ int32_t cupolas_atomic_inc32(cupolas_atomic32_t* ptr);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int32_t cupolas_atomic_dec32(cupolas_atomic32_t* ptr);
+int32_t cupolas_atomic_dec32(cupolas_atomic32_t *ptr);
 
 /**
  * @brief Compare and swap 32-bit atomic value
@@ -758,7 +758,7 @@ int32_t cupolas_atomic_dec32(cupolas_atomic32_t* ptr);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-bool cupolas_atomic_cas32(cupolas_atomic32_t* ptr, int32_t expected, int32_t desired);
+bool cupolas_atomic_cas32(cupolas_atomic32_t *ptr, int32_t expected, int32_t desired);
 
 /**
  * @brief Load 64-bit atomic value
@@ -767,7 +767,7 @@ bool cupolas_atomic_cas32(cupolas_atomic32_t* ptr, int32_t expected, int32_t des
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int64_t cupolas_atomic_load64(cupolas_atomic64_t* ptr);
+int64_t cupolas_atomic_load64(cupolas_atomic64_t *ptr);
 
 /**
  * @brief Store 64-bit atomic value
@@ -776,7 +776,7 @@ int64_t cupolas_atomic_load64(cupolas_atomic64_t* ptr);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void cupolas_atomic_store64(cupolas_atomic64_t* ptr, int64_t val);
+void cupolas_atomic_store64(cupolas_atomic64_t *ptr, int64_t val);
 
 /**
  * @brief Add to 64-bit atomic value
@@ -786,7 +786,7 @@ void cupolas_atomic_store64(cupolas_atomic64_t* ptr, int64_t val);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int64_t cupolas_atomic_add64(cupolas_atomic64_t* ptr, int64_t delta);
+int64_t cupolas_atomic_add64(cupolas_atomic64_t *ptr, int64_t delta);
 
 /**
  * @brief Subtract from 64-bit atomic value
@@ -796,7 +796,7 @@ int64_t cupolas_atomic_add64(cupolas_atomic64_t* ptr, int64_t delta);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int64_t cupolas_atomic_sub64(cupolas_atomic64_t* ptr, int64_t delta);
+int64_t cupolas_atomic_sub64(cupolas_atomic64_t *ptr, int64_t delta);
 
 /**
  * @brief Compare and swap 64-bit atomic value
@@ -807,7 +807,7 @@ int64_t cupolas_atomic_sub64(cupolas_atomic64_t* ptr, int64_t delta);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-bool cupolas_atomic_cas64(cupolas_atomic64_t* ptr, int64_t expected, int64_t desired);
+bool cupolas_atomic_cas64(cupolas_atomic64_t *ptr, int64_t expected, int64_t desired);
 
 /**
  * @brief Load pointer atomic value
@@ -816,7 +816,7 @@ bool cupolas_atomic_cas64(cupolas_atomic64_t* ptr, int64_t expected, int64_t des
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void* cupolas_atomic_load_ptr(cupolas_atomic_ptr_t* ptr);
+void *cupolas_atomic_load_ptr(cupolas_atomic_ptr_t *ptr);
 
 /**
  * @brief Store pointer atomic value
@@ -825,7 +825,7 @@ void* cupolas_atomic_load_ptr(cupolas_atomic_ptr_t* ptr);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-void cupolas_atomic_store_ptr(cupolas_atomic_ptr_t* ptr, void* val);
+void cupolas_atomic_store_ptr(cupolas_atomic_ptr_t *ptr, void *val);
 
 /**
  * @brief Compare and swap pointer atomic value
@@ -836,47 +836,47 @@ void cupolas_atomic_store_ptr(cupolas_atomic_ptr_t* ptr, void* val);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-bool cupolas_atomic_cas_ptr(cupolas_atomic_ptr_t* ptr, void* expected, void* desired);
+bool cupolas_atomic_cas_ptr(cupolas_atomic_ptr_t *ptr, void *expected, void *desired);
 
 /* ============================================================================
  * Error Handling
  * ============================================================================ */
 
 #ifndef cupolas_OK
-#define cupolas_OK                    0
+#define cupolas_OK 0
 #endif
 #ifndef cupolas_ERROR_UNKNOWN
-#define cupolas_ERROR_UNKNOWN         -1
+#define cupolas_ERROR_UNKNOWN -1
 #endif
 #ifndef cupolas_ERROR_INVALID_ARG
-#define cupolas_ERROR_INVALID_ARG     -2
+#define cupolas_ERROR_INVALID_ARG -2
 #endif
 #ifndef cupolas_ERROR_NO_MEMORY
-#define cupolas_ERROR_NO_MEMORY       -3
+#define cupolas_ERROR_NO_MEMORY -3
 #endif
 #ifndef cupolas_ERROR_NOT_FOUND
-#define cupolas_ERROR_NOT_FOUND       -4
+#define cupolas_ERROR_NOT_FOUND -4
 #endif
 #ifndef cupolas_ERROR_PERMISSION
-#define cupolas_ERROR_PERMISSION      -5
+#define cupolas_ERROR_PERMISSION -5
 #endif
 #ifndef cupolas_ERROR_BUSY
-#define cupolas_ERROR_BUSY            -6
+#define cupolas_ERROR_BUSY -6
 #endif
 #ifndef cupolas_ERROR_TIMEOUT
-#define cupolas_ERROR_TIMEOUT         -7
+#define cupolas_ERROR_TIMEOUT -7
 #endif
 #ifndef cupolas_ERROR_WOULD_BLOCK
-#define cupolas_ERROR_WOULD_BLOCK     -8
+#define cupolas_ERROR_WOULD_BLOCK -8
 #endif
 #ifndef cupolas_ERROR_OVERFLOW
-#define cupolas_ERROR_OVERFLOW        -9
+#define cupolas_ERROR_OVERFLOW -9
 #endif
 #ifndef cupolas_ERROR_NOT_SUPPORTED
-#define cupolas_ERROR_NOT_SUPPORTED   -10
+#define cupolas_ERROR_NOT_SUPPORTED -10
 #endif
 #ifndef cupolas_ERROR_IO
-#define cupolas_ERROR_IO              -11
+#define cupolas_ERROR_IO -11
 #endif
 
 /**
@@ -894,7 +894,7 @@ int cupolas_get_last_error(void);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-const char* cupolas_strerror(int error);
+const char *cupolas_strerror(int error);
 
 /* ============================================================================
  * String Utilities
@@ -908,7 +908,7 @@ const char* cupolas_strerror(int error);
  * @reentrant Yes
  * @ownership Returned string: caller owns, must call cupolas_mem_free
  */
-char* cupolas_strdup(const char* str);
+char *cupolas_strdup(const char *str);
 
 /**
  * @brief Duplicate string with length limit
@@ -919,7 +919,7 @@ char* cupolas_strdup(const char* str);
  * @reentrant Yes
  * @ownership Returned string: caller owns, must call cupolas_mem_free
  */
-char* cupolas_strndup(const char* str, size_t n);
+char *cupolas_strndup(const char *str, size_t n);
 
 /**
  * @brief Case-insensitive string comparison
@@ -929,7 +929,7 @@ char* cupolas_strndup(const char* str, size_t n);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_strcasecmp(const char* s1, const char* s2);
+int cupolas_strcasecmp(const char *s1, const char *s2);
 
 /**
  * @brief Case-insensitive string comparison with length limit
@@ -940,7 +940,7 @@ int cupolas_strcasecmp(const char* s1, const char* s2);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int cupolas_strncasecmp(const char* s1, const char* s2, size_t n);
+int cupolas_strncasecmp(const char *s1, const char *s2, size_t n);
 
 /* ============================================================================
  * One-Time Initialization
@@ -954,9 +954,10 @@ typedef pthread_once_t cupolas_once_t;
 #define CUPOLAS_ONCE_INIT PTHREAD_ONCE_INIT
 #endif
 
-static inline void cupolas_call_once(cupolas_once_t* once, void (*func)(void)) {
+static inline void cupolas_call_once(cupolas_once_t *once, void (*func)(void))
+{
 #if cupolas_PLATFORM_WINDOWS
-    InitOnceExecuteOnce(once, (PINIT_ONCE_FN)(void*)func, NULL, NULL);
+    InitOnceExecuteOnce(once, (PINIT_ONCE_FN)(void *)func, NULL, NULL);
 #else
     pthread_once(once, func);
 #endif

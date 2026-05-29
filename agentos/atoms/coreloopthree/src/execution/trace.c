@@ -6,11 +6,13 @@
 
 #include "agentos.h"
 #include "execution.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
+
 #include <string.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
@@ -29,10 +31,10 @@ typedef struct trace_span {
     struct trace_span *next;
 } trace_span_t;
 
-static trace_span_t *g_trace_spans      = NULL;
-static agentos_mutex_t *g_trace_lock    = NULL;
-static agentos_mutex_t *g_current_lock  = NULL;
-static trace_span_t *g_current_span     = NULL;
+static trace_span_t *g_trace_spans = NULL;
+static agentos_mutex_t *g_trace_lock = NULL;
+static agentos_mutex_t *g_current_lock = NULL;
+static trace_span_t *g_current_span = NULL;
 static atomic_int g_trace_initialized = 0;
 
 static agentos_error_t ensure_trace_init(void)
@@ -61,7 +63,7 @@ static atomic_uint64_t span_counter = 0;
 static void generate_span_id(char *buf, size_t len)
 {
     uint64_t id = atomic_fetch_add_explicit(&span_counter, 1, memory_order_seq_cst);
-    snprintf(buf, len, "span_%llu", (unsigned long long) id);
+    snprintf(buf, len, "span_%llu", (unsigned long long)id);
 }
 
 agentos_error_t agentos_trace_init(void)
@@ -111,8 +113,8 @@ void agentos_trace_shutdown(void)
     g_current_span = NULL;
 }
 
-agentos_error_t agentos_trace_start_span(const char *name, const char *trace_id, const char *parent_id,
-                                         char **out_span_id)
+agentos_error_t agentos_trace_start_span(const char *name, const char *trace_id,
+                                         const char *parent_id, char **out_span_id)
 {
     if (!name || !out_span_id)
         return AGENTOS_EINVAL;
@@ -121,18 +123,18 @@ agentos_error_t agentos_trace_start_span(const char *name, const char *trace_id,
     if (err != AGENTOS_SUCCESS)
         return err;
 
-    trace_span_t *span = (trace_span_t *) AGENTOS_CALLOC(1, sizeof(trace_span_t));
+    trace_span_t *span = (trace_span_t *)AGENTOS_CALLOC(1, sizeof(trace_span_t));
     if (!span)
         return AGENTOS_ENOMEM;
 
     char id_buf[64];
     generate_span_id(id_buf, sizeof(id_buf));
-    span->span_id    = AGENTOS_STRDUP(id_buf);
-    span->trace_id   = trace_id ? AGENTOS_STRDUP(trace_id) : AGENTOS_STRDUP(id_buf);
-    span->parent_id  = parent_id ? AGENTOS_STRDUP(parent_id) : NULL;
-    span->name       = AGENTOS_STRDUP(name);
+    span->span_id = AGENTOS_STRDUP(id_buf);
+    span->trace_id = trace_id ? AGENTOS_STRDUP(trace_id) : AGENTOS_STRDUP(id_buf);
+    span->parent_id = parent_id ? AGENTOS_STRDUP(parent_id) : NULL;
+    span->name = AGENTOS_STRDUP(name);
     span->start_time = agentos_time_monotonic_ns();
-    span->end_time   = 0;
+    span->end_time = 0;
 
     if (!span->span_id || !span->trace_id || !span->name) {
         if (span->span_id)
@@ -148,7 +150,7 @@ agentos_error_t agentos_trace_start_span(const char *name, const char *trace_id,
     }
 
     agentos_mutex_lock(g_trace_lock);
-    span->next    = g_trace_spans;
+    span->next = g_trace_spans;
     g_trace_spans = span;
 
     g_current_span = span;

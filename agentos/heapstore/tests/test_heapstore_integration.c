@@ -6,33 +6,32 @@
  * "From data intelligence emerges."
  */
 
+#include "heapstore.h"
+#include "heapstore_ipc.h"
+#include "heapstore_log.h"
+#include "heapstore_memory.h"
+#include "heapstore_registry.h"
+#include "heapstore_trace.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <time.h>
 #include <unistd.h>
 
-#include "heapstore.h"
-#include "heapstore_log.h"
-#include "heapstore_registry.h"
-#include "heapstore_trace.h"
-#include "heapstore_ipc.h"
-#include "heapstore_memory.h"
-
-static void test_full_lifecycle(void) {
+static void test_full_lifecycle(void)
+{
     printf("Test: full_lifecycle...");
 
-    heapstore_config_t manager = {
-        .root_path = "hs_integ_lifecycle",
-        .max_log_size_mb = 50,
-        .log_retention_days = 7,
-        .trace_retention_days = 3,
-        .enable_auto_cleanup = true,
-        .enable_log_rotation = true,
-        .enable_trace_export = true,
-        .db_vacuum_interval_days = 7
-    };
+    heapstore_config_t manager = {.root_path = "hs_integ_lifecycle",
+                                  .max_log_size_mb = 50,
+                                  .log_retention_days = 7,
+                                  .trace_retention_days = 3,
+                                  .enable_auto_cleanup = true,
+                                  .enable_log_rotation = true,
+                                  .enable_trace_export = true,
+                                  .db_vacuum_interval_days = 7};
 
     heapstore_error_t err __attribute__((unused)) = heapstore_init(&manager);
     assert(err == heapstore_SUCCESS);
@@ -55,38 +54,42 @@ static void test_full_lifecycle(void) {
     printf("PASS\n");
 }
 
-static void test_all_subsystems_init(void) {
+static void test_all_subsystems_init(void)
+{
     printf("Test: all_subsystems_init...");
 
-    heapstore_config_t manager = {
-        .root_path = "hs_integ_subsystems"
-    };
+    heapstore_config_t manager = {.root_path = "hs_integ_subsystems"};
 
     heapstore_error_t err __attribute__((unused)) = heapstore_init(&manager);
     assert(err == heapstore_SUCCESS);
 
     err = heapstore_registry_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED ||
+        err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  Registry initialized\n");
     }
 
     err = heapstore_trace_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED ||
+        err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  Trace initialized\n");
     }
 
     err = heapstore_ipc_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED ||
+        err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  IPC initialized\n");
     }
 
     err = heapstore_memory_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED ||
+        err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  Memory initialized\n");
     }
 
     err = heapstore_log_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED ||
+        err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  Log initialized\n");
     }
 
@@ -94,12 +97,11 @@ static void test_all_subsystems_init(void) {
     printf("PASS\n");
 }
 
-static void test_logging_across_services(void) {
+static void test_logging_across_services(void)
+{
     printf("Test: logging_across_services...");
 
-    heapstore_config_t manager = {
-        .root_path = "hs_integ_logging"
-    };
+    heapstore_config_t manager = {.root_path = "hs_integ_logging"};
 
     heapstore_error_t err __attribute__((unused)) = heapstore_init(&manager);
     assert(err == heapstore_SUCCESS);
@@ -121,10 +123,12 @@ static void test_logging_across_services(void) {
     printf("PASS\n");
 }
 
-static void test_registry_workflow(void) {
+static void test_registry_workflow(void)
+{
     printf("Test: registry_workflow...");
 
-    heapstore_error_t err __attribute__((unused)) = heapstore_init(&(heapstore_config_t){.root_path = "hs_integ_reg"});
+    heapstore_error_t err __attribute__((unused)) =
+        heapstore_init(&(heapstore_config_t){.root_path = "hs_integ_reg"});
     assert(err == heapstore_SUCCESS);
 
     heapstore_agent_record_t agent;
@@ -157,10 +161,12 @@ static void test_registry_workflow(void) {
     printf("PASS\n");
 }
 
-static void test_trace_workflow(void) {
+static void test_trace_workflow(void)
+{
     printf("Test: trace_workflow...");
 
-    heapstore_error_t err __attribute__((unused)) = heapstore_init(&(heapstore_config_t){.root_path = "hs_integ_trace"});
+    heapstore_error_t err __attribute__((unused)) =
+        heapstore_init(&(heapstore_config_t){.root_path = "hs_integ_trace"});
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t span;
@@ -188,10 +194,12 @@ static void test_trace_workflow(void) {
     printf("PASS\n");
 }
 
-static void test_concurrent_access_simulation(void) {
+static void test_concurrent_access_simulation(void)
+{
     printf("Test: concurrent_access_simulation...");
 
-    heapstore_error_t err __attribute__((unused)) = heapstore_init(&(heapstore_config_t){.root_path = "hs_integ_concurrent"});
+    heapstore_error_t err __attribute__((unused)) =
+        heapstore_init(&(heapstore_config_t){.root_path = "hs_integ_concurrent"});
     assert(err == heapstore_SUCCESS);
 
     for (int i = 0; i < 10; i++) {
@@ -215,13 +223,11 @@ static void test_concurrent_access_simulation(void) {
     printf("PASS\n");
 }
 
-static void test_cleanup_dry_run(void) {
+static void test_cleanup_dry_run(void)
+{
     printf("Test: cleanup_dry_run...");
 
-    heapstore_config_t manager = {
-        .root_path = "hs_integ_cleanup",
-        .enable_auto_cleanup = true
-    };
+    heapstore_config_t manager = {.root_path = "hs_integ_cleanup", .enable_auto_cleanup = true};
 
     heapstore_error_t err __attribute__((unused)) = heapstore_init(&manager);
     assert(err == heapstore_SUCCESS);
@@ -240,24 +246,20 @@ static void test_cleanup_dry_run(void) {
     printf("PASS\n");
 }
 
-static void test_config_reload(void) {
+static void test_config_reload(void)
+{
     printf("Test: config_reload...");
 
     heapstore_config_t manager = {
-        .root_path = "hs_integ_reload",
-        .max_log_size_mb = 100,
-        .log_retention_days = 7
-    };
+        .root_path = "hs_integ_reload", .max_log_size_mb = 100, .log_retention_days = 7};
 
     heapstore_error_t err __attribute__((unused)) = heapstore_init(&manager);
     assert(err == heapstore_SUCCESS);
 
-    heapstore_config_t new_config = {
-        .max_log_size_mb = 200,
-        .log_retention_days = 14,
-        .trace_retention_days = 5,
-        .enable_auto_cleanup = false
-    };
+    heapstore_config_t new_config = {.max_log_size_mb = 200,
+                                     .log_retention_days = 14,
+                                     .trace_retention_days = 5,
+                                     .enable_auto_cleanup = false};
 
     err = heapstore_reload_config(&new_config);
     assert(err == heapstore_SUCCESS);
@@ -269,7 +271,8 @@ static void test_config_reload(void) {
     printf("PASS\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=== AgentOS heapstore Integration Tests ===\n\n");
 
     test_full_lifecycle();

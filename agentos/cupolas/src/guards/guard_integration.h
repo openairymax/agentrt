@@ -3,7 +3,7 @@
 /**
  * @file guard_integration.h
  * @brief SafetyGuard与Cupolas组件集成接口
- * 
+ *
  * 提供SafetyGuard框架与Cupolas现有组件的集成API。
  */
 
@@ -25,7 +25,7 @@ extern "C" {
  * @param config 守卫管理器配置
  * @return 错误码
  */
-CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t* config);
+CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t *config);
 
 /**
  * @brief 清理Cupolas守卫集成
@@ -52,14 +52,14 @@ CUPOLAS_API int cupolas_guards_is_enabled(void);
  * @brief 获取守卫管理器实例
  * @return 守卫管理器句柄
  */
-CUPOLAS_API guard_manager_t* cupolas_guards_get_manager(void);
+CUPOLAS_API guard_manager_t *cupolas_guards_get_manager(void);
 
 /**
  * @brief 注册守卫到Cupolas
  * @param guard 守卫实例
  * @return 错误码
  */
-CUPOLAS_API int cupolas_guards_register_guard(guard_t* guard);
+CUPOLAS_API int cupolas_guards_register_guard(guard_t *guard);
 
 /**
  * @brief 执行安全检测（针对Cupolas操作）
@@ -73,19 +73,14 @@ CUPOLAS_API int cupolas_guards_register_guard(guard_t* guard);
  * @param actual_results 实际结果数（输出）
  * @return 错误码
  */
-CUPOLAS_API int cupolas_guards_check(
-    const char* operation,
-    const char* resource,
-    const char* agent_id,
-    const void* input_data,
-    size_t input_size,
-    guard_result_t* results,
-    size_t max_results,
-    size_t* actual_results);
+CUPOLAS_API int cupolas_guards_check(const char *operation, const char *resource,
+                                     const char *agent_id, const void *input_data,
+                                     size_t input_size, guard_result_t *results, size_t max_results,
+                                     size_t *actual_results);
 
 /**
  * @brief 注册Cupolas钩子
- * 
+ *
  * 将守卫钩子注册到Cupolas各个组件。
  * 注意：此函数需要在Cupolas初始化后调用。
  * @return 错误码
@@ -101,4 +96,4 @@ CUPOLAS_API void cupolas_guards_unregister_hooks(void);
 }
 #endif
 
-#endif // CUPOLAS_GUARD_INTEGRATION_H
+#endif  // CUPOLAS_GUARD_INTEGRATION_H

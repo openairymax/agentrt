@@ -20,9 +20,10 @@
 #define CUPOLAS_WORKBENCH_H
 
 #include "../platform/platform.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,26 +39,26 @@ typedef enum workbench_state {
 
 /* Resource Limits Configuration */
 typedef struct workbench_limits {
-    size_t max_memory_bytes;       /* Max memory limit in bytes, 0 = unlimited */
-    uint32_t max_cpu_time_ms;      /* Max CPU time in milliseconds, 0 = unlimited */
-    size_t max_output_bytes;       /* Max output size in bytes, 0 = use default */
-    uint32_t max_processes;        /* Max child processes, 0 = unlimited */
-    uint32_t max_threads;          /* Max threads, 0 = unlimited */
-    size_t max_file_size_bytes;    /* Max file size in bytes, 0 = unlimited */
+    size_t max_memory_bytes;    /* Max memory limit in bytes, 0 = unlimited */
+    uint32_t max_cpu_time_ms;   /* Max CPU time in milliseconds, 0 = unlimited */
+    size_t max_output_bytes;    /* Max output size in bytes, 0 = use default */
+    uint32_t max_processes;     /* Max child processes, 0 = unlimited */
+    uint32_t max_threads;       /* Max threads, 0 = unlimited */
+    size_t max_file_size_bytes; /* Max file size in bytes, 0 = unlimited */
 } workbench_limits_t;
 
 /* Workbench Configuration */
 typedef struct workbench_config {
-    const char* working_dir;
-    const char** env_vars;
+    const char *working_dir;
+    const char **env_vars;
     size_t env_count;
     uint32_t timeout_ms;
     size_t max_output_size;
     bool redirect_stdin;
     bool redirect_stdout;
     bool redirect_stderr;
-    workbench_limits_t limits;     /* Resource limits */
-    bool enable_limits;           /* Enable resource control */
+    workbench_limits_t limits; /* Resource limits */
+    bool enable_limits;        /* Enable resource control */
 } workbench_config_t;
 
 /* Workbench Execution Result */
@@ -66,9 +67,9 @@ typedef struct workbench_result {
     bool timed_out;
     bool signaled;
     int signal;
-    char* stdout_data;
+    char *stdout_data;
     size_t stdout_size;
-    char* stderr_data;
+    char *stderr_data;
     size_t stderr_size;
     uint64_t start_time_ms;
     uint64_t end_time_ms;
@@ -86,7 +87,7 @@ typedef struct workbench workbench_t;
  * @reentrant No (create/destroy must be paired)
  * @ownership Returned handle: caller owns, must call workbench_destroy
  */
-workbench_t* workbench_create(const workbench_config_t* config);
+workbench_t *workbench_create(const workbench_config_t *config);
 
 /**
  * @brief Destroy workbench
@@ -97,7 +98,7 @@ workbench_t* workbench_create(const workbench_config_t* config);
  * @reentrant No
  * @ownership wb: caller transfers ownership
  */
-void workbench_destroy(workbench_t* wb);
+void workbench_destroy(workbench_t *wb);
 
 /**
  * @brief Execute command synchronously
@@ -108,10 +109,11 @@ void workbench_destroy(workbench_t* wb);
  * @return 0 on success, negative on failure
  * @note Thread-safe: No, each workbench instance is single-threaded
  * @reentrant No
- * @ownership command, argv: caller retains; result: callee allocates, caller must call workbench_result_free
+ * @ownership command, argv: caller retains; result: callee allocates, caller must call
+ * workbench_result_free
  */
-int workbench_execute(workbench_t* wb, const char* command, char* const argv[],
-                      workbench_result_t* result);
+int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
+                      workbench_result_t *result);
 
 /**
  * @brief Execute command asynchronously
@@ -123,7 +125,7 @@ int workbench_execute(workbench_t* wb, const char* command, char* const argv[],
  * @reentrant No
  * @ownership command, argv: caller retains ownership
  */
-int workbench_execute_async(workbench_t* wb, const char* command, char* const argv[]);
+int workbench_execute_async(workbench_t *wb, const char *command, char *const argv[]);
 
 /**
  * @brief Wait for async execution to complete
@@ -135,7 +137,7 @@ int workbench_execute_async(workbench_t* wb, const char* command, char* const ar
  * @reentrant No
  * @ownership result: callee allocates, caller must call workbench_result_free
  */
-int workbench_wait(workbench_t* wb, workbench_result_t* result, uint32_t timeout_ms);
+int workbench_wait(workbench_t *wb, workbench_result_t *result, uint32_t timeout_ms);
 
 /**
  * @brief Terminate execution
@@ -144,7 +146,7 @@ int workbench_wait(workbench_t* wb, workbench_result_t* result, uint32_t timeout
  * @note Thread-safe: No
  * @reentrant No
  */
-int workbench_terminate(workbench_t* wb);
+int workbench_terminate(workbench_t *wb);
 
 /**
  * @brief Get workbench state
@@ -153,7 +155,7 @@ int workbench_terminate(workbench_t* wb);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-workbench_state_t workbench_get_state(workbench_t* wb);
+workbench_state_t workbench_get_state(workbench_t *wb);
 
 /**
  * @brief Get process ID
@@ -162,7 +164,7 @@ workbench_state_t workbench_get_state(workbench_t* wb);
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-int64_t workbench_get_pid(workbench_t* wb);
+int64_t workbench_get_pid(workbench_t *wb);
 
 /**
  * @brief Write to stdin
@@ -175,7 +177,7 @@ int64_t workbench_get_pid(workbench_t* wb);
  * @reentrant No
  * @ownership data: caller retains ownership; written: callee writes, caller owns
  */
-int workbench_write_stdin(workbench_t* wb, const void* data, size_t size, size_t* written);
+int workbench_write_stdin(workbench_t *wb, const void *data, size_t size, size_t *written);
 
 /**
  * @brief Read from stdout
@@ -188,7 +190,7 @@ int workbench_write_stdin(workbench_t* wb, const void* data, size_t size, size_t
  * @reentrant No
  * @ownership buf: caller owns; read_size: callee writes, caller owns
  */
-int workbench_read_stdout(workbench_t* wb, void* buf, size_t size, size_t* read_size);
+int workbench_read_stdout(workbench_t *wb, void *buf, size_t size, size_t *read_size);
 
 /**
  * @brief Read from stderr
@@ -201,7 +203,7 @@ int workbench_read_stdout(workbench_t* wb, void* buf, size_t size, size_t* read_
  * @reentrant No
  * @ownership buf: caller owns; read_size: callee writes, caller owns
  */
-int workbench_read_stderr(workbench_t* wb, void* buf, size_t size, size_t* read_size);
+int workbench_read_stderr(workbench_t *wb, void *buf, size_t size, size_t *read_size);
 
 /**
  * @brief Free execution result
@@ -211,7 +213,7 @@ int workbench_read_stderr(workbench_t* wb, void* buf, size_t size, size_t* read_
  * @reentrant No
  * @ownership result: caller transfers ownership
  */
-void workbench_result_free(workbench_result_t* result);
+void workbench_result_free(workbench_result_t *result);
 
 /**
  * @brief Get default workbench configuration
@@ -220,7 +222,7 @@ void workbench_result_free(workbench_result_t* result);
  * @reentrant Yes
  * @ownership config: callee writes, caller owns
  */
-void workbench_default_config(workbench_config_t* config);
+void workbench_default_config(workbench_config_t *config);
 
 /**
  * @brief Set resource limits
@@ -231,7 +233,7 @@ void workbench_default_config(workbench_config_t* config);
  * @reentrant Yes
  * @ownership limits: caller retains ownership
  */
-int workbench_set_limits(workbench_t* wb, const workbench_limits_t* limits);
+int workbench_set_limits(workbench_t *wb, const workbench_limits_t *limits);
 
 /**
  * @brief Get resource limits
@@ -242,7 +244,7 @@ int workbench_set_limits(workbench_t* wb, const workbench_limits_t* limits);
  * @reentrant Yes
  * @ownership limits: callee writes, caller owns
  */
-int workbench_get_limits(workbench_t* wb, workbench_limits_t* limits);
+int workbench_get_limits(workbench_t *wb, workbench_limits_t *limits);
 
 /**
  * @brief Get current resource usage
@@ -254,7 +256,7 @@ int workbench_get_limits(workbench_t* wb, workbench_limits_t* limits);
  * @reentrant Yes
  * @ownership memory_usage, cpu_usage: callee writes, caller owns
  */
-int workbench_get_usage(workbench_t* wb, size_t* memory_usage, uint64_t* cpu_usage);
+int workbench_get_usage(workbench_t *wb, size_t *memory_usage, uint64_t *cpu_usage);
 
 #ifdef __cplusplus
 }

@@ -1,15 +1,18 @@
 #include "parallel_dispatcher.h"
-#include "ipc_service_bus.h"
-#include "platform.h"
+
 #include "atomic_compat.h"
+#include "error.h"
+#include "ipc_service_bus.h"
 #include "memory_compat.h"
+#include "platform.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
 
 struct parallel_dispatcher_s {
-    thread_pool_t* pool;
+    thread_pool_t *pool;
     parallel_dispatch_config_t config;
     ipc_service_bus_t bus;
 };
@@ -19,51 +22,62 @@ typedef struct dispatch_context_s dispatch_context_t;
 typedef struct {
     agentos_mutex_t lock;
     agentos_cond_t cond;
-    parallel_result_t* results;
-    dispatch_context_t* contexts;
+    parallel_result_t *results;
+    dispatch_context_t *contexts;
     size_t task_count;
     atomic_int completed_count;
     atomic_int error_count;
     atomic_int cancel_flag;
     parallel_complete_cb_t on_complete;
-    void* cb_user_data;
-    parallel_dispatcher_t* dispatcher;
+    void *cb_user_data;
+    parallel_dispatcher_t *dispatcher;
 } dispatch_session_t;
 
 struct dispatch_context_s {
-    parallel_dispatcher_t* dispatcher;
+    parallel_dispatcher_t *dispatcher;
     size_t task_index;
     parallel_task_t task;
-    parallel_result_t* result_slot;
-    dispatch_session_t* session;
+    parallel_result_t *result_slot;
+    dispatch_session_t *session;
 };
 
-static uint64_t time_ms(void) {
+static uint64_t time_ms(void)
+{
     return agentos_time_ms();
 }
 
-static char* json_extract_field(const char* json, const char* key) {
-    if (!json || !key) return NULL;
+static char *json_extract_field(const char *json, const char *key)
+{
+    if (!json || !key)
+        return NULL;
     char search[256];
     snprintf(search, sizeof(search), "\"%s\"", key);
-    const char* pos = strstr(json, search);
-    if (!pos) return NULL;
+    const char *pos = strstr(json, search);
+    if (!pos)
+        return NULL;
     pos += strlen(search);
-    while (*pos && (*pos == ' ' || *pos == ':' || *pos == '\t')) pos++;
+    while (*pos && (*pos == ' ' || *pos == ':' || *pos == '\t'))
+        pos++;
     if (*pos == '"') {
         pos++;
-        const char* end = strchr(pos, '"');
-        if (!end) return NULL;
+        const char *end = strchr(pos, '"');
+        if (!end)
+            return NULL;
         size_t len = (size_t)(end - pos);
-        char* val = (char*)AGENTOS_MALLOC(len + 1);
-        if (val) { memcpy(val, pos, len); val[len] = '\0'; }
+        char *val = (char *)AGENTOS_MALLOC(len + 1);
+        if (val) {
+            memcpy(val, pos, len);
+            val[len] = '\0';
+        }
         return val;
     }
     return NULL;
 }
 
-static void session_release(dispatch_session_t* session) {
-    if (!session) return;
+static void session_release(dispatch_session_t *session)
+{
+    if (!session)
+        return;
     bool should_free = false;
     agentos_mutex_lock(&session->lock);
     if ((size_t)session->completed_count >= session->task_count) {
@@ -74,11 +88,14 @@ static void session_release(dispatch_session_t* session) {
     if (should_free) {
         agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
-        if (session->contexts) AGENTOS_FREE(session->contexts);
+        if (session->contexts)
+            AGENTOS_FREE(session->contexts);
         if (session->results) {
             for (size_t i = 0; i < session->task_count; i++) {
-                if (session->results[i].output) AGENTOS_FREE(session->results[i].output);
-                if (session->results[i].error) AGENTOS_FREE(session->results[i].error);
+                if (session->results[i].output)
+                    AGENTOS_FREE(session->results[i].output);
+                if (session->results[i].error)
+                    AGENTOS_FREE(session->results[i].error);
             }
             AGENTOS_FREE(session->results);
         }
@@ -86,11 +103,13 @@ static void session_release(dispatch_session_t* session) {
     }
 }
 
-static void dispatch_worker(void* arg) {
-    dispatch_context_t* ctx = (dispatch_context_t*)arg;
-    if (!ctx || !ctx->dispatcher || !ctx->session) return;
+static void dispatch_worker(void *arg)
+{
+    dispatch_context_t *ctx = (dispatch_context_t *)arg;
+    if (!ctx || !ctx->dispatcher || !ctx->session)
+        return;
 
-    dispatch_session_t* session = ctx->session;
+    dispatch_session_t *session = ctx->session;
 
     agentos_mutex_lock(&session->lock);
     if (session->cancel_flag) {
@@ -121,10 +140,10 @@ static void dispatch_worker(void* arg) {
     if (bus) {
         char request_payload[2048];
         snprintf(request_payload, sizeof(request_payload),
-            "{\"jsonrpc\":\"2.0\",\"method\":\"execute\",\"params\":{\"tool_id\":\"%s\",\"params\":%s},\"id\":%zu}",
-            ctx->task.tool_id ? ctx->task.tool_id : "",
-            ctx->task.params_json ? ctx->task.params_json : "{}",
-            ctx->task_index + 1);
+                 "{\"jsonrpc\":\"2.0\",\"method\":\"execute\",\"params\":{\"tool_id\":\"%s\","
+                 "\"params\":%s},\"id\":%zu}",
+                 ctx->task.tool_id ? ctx->task.tool_id : "",
+                 ctx->task.params_json ? ctx->task.params_json : "{}", ctx->task_index + 1);
 
         ipc_bus_message_t request;
         memset(&request, 0, sizeof(request));
@@ -143,9 +162,9 @@ static void dispatch_worker(void* arg) {
             ctx->dispatcher->config.timeout_ms > 0 ? ctx->dispatcher->config.timeout_ms : 30000);
 
         if (err == AGENTOS_SUCCESS && response.payload && response.payload_size > 0) {
-            const char* resp_str = (const char*)response.payload;
-            char* result_str = json_extract_field(resp_str, "result");
-            char* error_str = json_extract_field(resp_str, "error");
+            const char *resp_str = (const char *)response.payload;
+            char *result_str = json_extract_field(resp_str, "result");
+            char *error_str = json_extract_field(resp_str, "error");
             if (result_str) {
                 ctx->result_slot->success = 1;
                 ctx->result_slot->output = result_str;
@@ -169,7 +188,8 @@ static void dispatch_worker(void* arg) {
 
     agentos_mutex_lock(&session->lock);
     session->completed_count++;
-    if (!ctx->result_slot->success) session->error_count++;
+    if (!ctx->result_slot->success)
+        session->error_count++;
 
     if (ctx->dispatcher->config.cancel_on_error && session->error_count > 0) {
         session->cancel_flag = 1;
@@ -185,12 +205,16 @@ static void dispatch_worker(void* arg) {
     session_release(session);
 }
 
-parallel_dispatcher_t* parallel_dispatcher_create(
-    thread_pool_t* pool, const parallel_dispatch_config_t* config) {
-    if (!pool) return NULL;
+parallel_dispatcher_t *parallel_dispatcher_create(thread_pool_t *pool,
+                                                  const parallel_dispatch_config_t *config)
+{
+    if (!pool)
+        return NULL;
 
-    parallel_dispatcher_t* disp = (parallel_dispatcher_t*)AGENTOS_CALLOC(1, sizeof(parallel_dispatcher_t));
-    if (!disp) return NULL;
+    parallel_dispatcher_t *disp =
+        (parallel_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(parallel_dispatcher_t));
+    if (!disp)
+        return NULL;
 
     disp->pool = pool;
     disp->bus = NULL;
@@ -204,39 +228,44 @@ parallel_dispatcher_t* parallel_dispatcher_create(
         disp->config.cancel_on_error = false;
     }
 
-    if (disp->config.max_concurrency == 0) disp->config.max_concurrency = 4;
-    if (disp->config.timeout_ms == 0) disp->config.timeout_ms = 30000;
+    if (disp->config.max_concurrency == 0)
+        disp->config.max_concurrency = 4;
+    if (disp->config.timeout_ms == 0)
+        disp->config.timeout_ms = 30000;
 
     return disp;
 }
 
-void parallel_dispatcher_destroy(parallel_dispatcher_t* dispatcher) {
-    if (!dispatcher) return;
+void parallel_dispatcher_destroy(parallel_dispatcher_t *dispatcher)
+{
+    if (!dispatcher)
+        return;
     AGENTOS_FREE(dispatcher);
 }
 
-static bool should_return(parallel_wait_mode_t mode, int completed, size_t total) {
+static bool should_return(parallel_wait_mode_t mode, int completed, size_t total)
+{
     switch (mode) {
-        case PARALLEL_WAIT_ALL:
-            return (size_t)completed >= total;
-        case PARALLEL_WAIT_ANY:
-            return completed >= 1;
-        case PARALLEL_WAIT_MAJORITY:
-            return (size_t)completed >= (total / 2 + 1);
-        default:
-            return (size_t)completed >= total;
+    case PARALLEL_WAIT_ALL:
+        return (size_t)completed >= total;
+    case PARALLEL_WAIT_ANY:
+        return completed >= 1;
+    case PARALLEL_WAIT_MAJORITY:
+        return (size_t)completed >= (total / 2 + 1);
+    default:
+        return (size_t)completed >= total;
     }
 }
 
-static dispatch_session_t* session_create(
-    parallel_dispatcher_t* dispatcher,
-    const parallel_task_t* tasks,
-    size_t task_count,
-    parallel_result_t* results,
-    parallel_complete_cb_t on_complete,
-    void* user_data) {
-    dispatch_session_t* session = (dispatch_session_t*)AGENTOS_CALLOC(1, sizeof(dispatch_session_t));
-    if (!session) return NULL;
+static dispatch_session_t *session_create(parallel_dispatcher_t *dispatcher,
+                                          const parallel_task_t *tasks, size_t task_count,
+                                          parallel_result_t *results,
+                                          parallel_complete_cb_t on_complete, void *user_data)
+{
+    dispatch_session_t *session =
+        (dispatch_session_t *)AGENTOS_CALLOC(1, sizeof(dispatch_session_t));
+    if (!session)
+        return NULL;
 
     agentos_mutex_init(&session->lock);
     agentos_cond_init(&session->cond);
@@ -249,7 +278,8 @@ static dispatch_session_t* session_create(
     session->cb_user_data = user_data;
     session->dispatcher = dispatcher;
 
-    session->contexts = (dispatch_context_t*)AGENTOS_CALLOC(task_count, sizeof(dispatch_context_t));
+    session->contexts =
+        (dispatch_context_t *)AGENTOS_CALLOC(task_count, sizeof(dispatch_context_t));
     if (!session->contexts) {
         agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
@@ -268,23 +298,25 @@ static dispatch_session_t* session_create(
     return session;
 }
 
-int parallel_dispatcher_execute(
-    parallel_dispatcher_t* dispatcher,
-    const parallel_task_t* tasks,
-    size_t task_count,
-    parallel_result_t** results,
-    size_t* result_count) {
-    if (!dispatcher || !tasks || task_count == 0 || !results) return -1;
+int parallel_dispatcher_execute(parallel_dispatcher_t *dispatcher, const parallel_task_t *tasks,
+                                size_t task_count, parallel_result_t **results,
+                                size_t *result_count)
+{
+    if (!dispatcher || !tasks || task_count == 0 || !results)
+        return AGENTOS_ERR_INVALID_PARAM;
 
-    *results = (parallel_result_t*)AGENTOS_CALLOC(task_count, sizeof(parallel_result_t));
-    if (!*results) return -3;
-    if (result_count) *result_count = task_count;
+    *results = (parallel_result_t *)AGENTOS_CALLOC(task_count, sizeof(parallel_result_t));
+    if (!*results)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    if (result_count)
+        *result_count = task_count;
 
-    dispatch_session_t* session = session_create(dispatcher, tasks, task_count, *results, NULL, NULL);
+    dispatch_session_t *session =
+        session_create(dispatcher, tasks, task_count, *results, NULL, NULL);
     if (!session) {
         AGENTOS_FREE(*results);
         *results = NULL;
-        return -3;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     for (size_t i = 0; i < task_count; i++) {
@@ -316,27 +348,27 @@ int parallel_dispatcher_execute(
         }
     }
 
-wait_done:
-    {
-        uint64_t deadline = time_ms() + dispatcher->config.timeout_ms;
-        while (1) {
-            agentos_mutex_lock(&session->lock);
-            bool done = should_return(dispatcher->config.wait_mode,
-                session->completed_count, task_count);
-            agentos_mutex_unlock(&session->lock);
+wait_done: {
+    uint64_t deadline = time_ms() + dispatcher->config.timeout_ms;
+    while (1) {
+        agentos_mutex_lock(&session->lock);
+        bool done =
+            should_return(dispatcher->config.wait_mode, session->completed_count, task_count);
+        agentos_mutex_unlock(&session->lock);
 
-            if (done) break;
+        if (done)
+            break;
 
-            if (time_ms() >= deadline) {
-                session->cancel_flag = 1;
-                break;
-            }
-
-            agentos_mutex_lock(&session->lock);
-            agentos_cond_timedwait(&session->cond, &session->lock, 50);
-            agentos_mutex_unlock(&session->lock);
+        if (time_ms() >= deadline) {
+            session->cancel_flag = 1;
+            break;
         }
+
+        agentos_mutex_lock(&session->lock);
+        agentos_cond_timedwait(&session->cond, &session->lock, 50);
+        agentos_mutex_unlock(&session->lock);
     }
+}
 
     int errors = session->error_count;
     bool session_freed_by_worker = false;
@@ -349,28 +381,31 @@ wait_done:
     if (!session_freed_by_worker) {
         agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
-        if (session->contexts) AGENTOS_FREE(session->contexts);
+        if (session->contexts)
+            AGENTOS_FREE(session->contexts);
         AGENTOS_FREE(session);
     }
 
     return (errors > 0) ? 1 : 0;
 }
 
-int parallel_dispatcher_execute_async(
-    parallel_dispatcher_t* dispatcher,
-    const parallel_task_t* tasks,
-    size_t task_count,
-    parallel_complete_cb_t on_complete,
-    void* user_data) {
-    if (!dispatcher || !tasks || task_count == 0) return -1;
+int parallel_dispatcher_execute_async(parallel_dispatcher_t *dispatcher,
+                                      const parallel_task_t *tasks, size_t task_count,
+                                      parallel_complete_cb_t on_complete, void *user_data)
+{
+    if (!dispatcher || !tasks || task_count == 0)
+        return AGENTOS_ERR_INVALID_PARAM;
 
-    parallel_result_t* results = (parallel_result_t*)AGENTOS_CALLOC(task_count, sizeof(parallel_result_t));
-    if (!results) return -3;
+    parallel_result_t *results =
+        (parallel_result_t *)AGENTOS_CALLOC(task_count, sizeof(parallel_result_t));
+    if (!results)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
-    dispatch_session_t* session = session_create(dispatcher, tasks, task_count, results, on_complete, user_data);
+    dispatch_session_t *session =
+        session_create(dispatcher, tasks, task_count, results, on_complete, user_data);
     if (!session) {
         AGENTOS_FREE(results);
-        return -3;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     int submitted = 0;
@@ -382,7 +417,8 @@ int parallel_dispatcher_execute_async(
             results[i].success = 0;
             results[i].error = AGENTOS_STRDUP("submit failed");
             results[i].task_index = i;
-            if (on_complete) on_complete(i, &results[i], user_data);
+            if (on_complete)
+                on_complete(i, &results[i], user_data);
             agentos_mutex_lock(&session->lock);
             session->completed_count++;
             session->error_count++;
@@ -393,25 +429,31 @@ int parallel_dispatcher_execute_async(
     if (submitted == 0) {
         agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
-        if (session->contexts) AGENTOS_FREE(session->contexts);
+        if (session->contexts)
+            AGENTOS_FREE(session->contexts);
         AGENTOS_FREE(session);
         AGENTOS_FREE(results);
-        return -4;
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     return 0;
 }
 
-void parallel_result_free(parallel_result_t* results, size_t count) {
-    if (!results) return;
+void parallel_result_free(parallel_result_t *results, size_t count)
+{
+    if (!results)
+        return;
     for (size_t i = 0; i < count; i++) {
-        if (results[i].output) AGENTOS_FREE(results[i].output);
-        if (results[i].error) AGENTOS_FREE(results[i].error);
+        if (results[i].output)
+            AGENTOS_FREE(results[i].output);
+        if (results[i].error)
+            AGENTOS_FREE(results[i].error);
     }
     AGENTOS_FREE(results);
 }
 
-parallel_task_t parallel_task_create(const char* tool_id, const char* params_json) {
+parallel_task_t parallel_task_create(const char *tool_id, const char *params_json)
+{
     parallel_task_t task;
     memset(&task, 0, sizeof(task));
     task.tool_id = tool_id ? AGENTOS_STRDUP(tool_id) : NULL;
@@ -420,8 +462,16 @@ parallel_task_t parallel_task_create(const char* tool_id, const char* params_jso
     return task;
 }
 
-void parallel_task_free(parallel_task_t* task) {
-    if (!task) return;
-    if (task->tool_id) { AGENTOS_FREE(task->tool_id); task->tool_id = NULL; }
-    if (task->params_json) { AGENTOS_FREE(task->params_json); task->params_json = NULL; }
+void parallel_task_free(parallel_task_t *task)
+{
+    if (!task)
+        return;
+    if (task->tool_id) {
+        AGENTOS_FREE(task->tool_id);
+        task->tool_id = NULL;
+    }
+    if (task->params_json) {
+        AGENTOS_FREE(task->params_json);
+        task->params_json = NULL;
+    }
 }

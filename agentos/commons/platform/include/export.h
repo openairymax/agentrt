@@ -17,31 +17,31 @@ extern "C" {
 #endif
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
-    #ifdef AGENTOS_BUILDING_DLL
-        #ifndef AGENTOS_API
-        #define AGENTOS_API __declspec(dllexport)
-        #endif
-    #else
-        #ifndef AGENTOS_API
-        #define AGENTOS_API __declspec(dllimport)
-        #endif
-    #endif
-#elif defined(__GNUC__) || defined(__clang__)
-    #ifndef AGENTOS_API
-    #define AGENTOS_API __attribute__((visibility("default")))
-    #endif
+#ifdef AGENTOS_BUILDING_DLL
+#ifndef AGENTOS_API
+#define AGENTOS_API __declspec(dllexport)
+#endif
 #else
-    #ifndef AGENTOS_API
-    #define AGENTOS_API
-    #endif
+#ifndef AGENTOS_API
+#define AGENTOS_API __declspec(dllimport)
+#endif
+#endif
+#elif defined(__GNUC__) || defined(__clang__)
+#ifndef AGENTOS_API
+#define AGENTOS_API __attribute__((visibility("default")))
+#endif
+#else
+#ifndef AGENTOS_API
+#define AGENTOS_API
+#endif
 #endif
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
-    #define AGENTOS_INTERNAL
+#define AGENTOS_INTERNAL
 #elif defined(__GNUC__) || defined(__clang__)
-    #define AGENTOS_INTERNAL __attribute__((visibility("hidden")))
+#define AGENTOS_INTERNAL __attribute__((visibility("hidden")))
 #else
-    #define AGENTOS_INTERNAL
+#define AGENTOS_INTERNAL
 #endif
 
 #ifdef __cplusplus

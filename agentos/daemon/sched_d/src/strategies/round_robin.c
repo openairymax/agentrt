@@ -6,31 +6,23 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "scheduler_service.h"
 #include "strategy_interface.h"
 
-/**
- * @brief 错误码定义
- */
-#define ROUND_ROBIN_SUCCESS 0
-#define ROUND_ROBIN_ERROR_INVALID_PARAM -1
-#define ROUND_ROBIN_ERROR_NO_AGENT -2
-#define ROUND_ROBIN_ERROR_AGENT_NOT_FOUND -3
-#define ROUND_ROBIN_ERROR_NO_AVAILABLE_AGENT -4
-#define ROUND_ROBIN_ERROR_MEMORY -5
-#define ROUND_ROBIN_ERROR_MAX_AGENTS -6
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "../../../commons/utils/error/include/error.h"
 
 /**
  * @brief 轮询调度策略数据
  */
 typedef struct {
-    agent_info_t** agents;      /**< Agent 列表 */
-    size_t agent_count;         /**< Agent 数量 */
-    size_t current_index;       /**< 当前索引 */
-    size_t max_agents;          /**< 最大 Agent 数量 */
+    agent_info_t **agents; /**< Agent 列表 */
+    size_t agent_count;    /**< Agent 数量 */
+    size_t current_index;  /**< 当前索引 */
+    size_t max_agents;     /**< 最大 Agent 数量 */
 } round_robin_data_t;
 
 /**
@@ -38,11 +30,12 @@ typedef struct {
  * @param src 源字符串
  * @return 复制后的字符串，失败返回NULL
  */
-static char* safe_strdup(const char* src) {
+static char *safe_strdup(const char *src)
+{
     if (!src) {
         return NULL;
     }
-    char* dest = AGENTOS_STRDUP(src);
+    char *dest = AGENTOS_STRDUP(src);
     return dest;
 }
 
@@ -50,8 +43,10 @@ static char* safe_strdup(const char* src) {
  * @brief 释放Agent信息
  * @param agent Agent指针
  */
-static void free_agent_info(agent_info_t* agent) {
-    if (!agent) return;
+static void free_agent_info(agent_info_t *agent)
+{
+    if (!agent)
+        return;
     if (agent->agent_id) {
         AGENTOS_FREE(agent->agent_id);
         agent->agent_id = NULL;
@@ -68,12 +63,13 @@ static void free_agent_info(agent_info_t* agent) {
  * @param src 源Agent信息
  * @return 复制后的Agent信息，失败返回NULL
  */
-static agent_info_t* clone_agent_info(const agent_info_t* src) {
+static agent_info_t *clone_agent_info(const agent_info_t *src)
+{
     if (!src) {
         return NULL;
     }
 
-    agent_info_t* dest = (agent_info_t*)AGENTOS_MALLOC(sizeof(agent_info_t));
+    agent_info_t *dest = (agent_info_t *)AGENTOS_MALLOC(sizeof(agent_info_t));
     if (!dest) {
         return NULL;
     }
@@ -111,32 +107,33 @@ static agent_info_t* clone_agent_info(const agent_info_t* src) {
  * @param data 输出参数，返回策略数据
  * @return 0 表示成功，非 0 表示错误码
  */
-static int round_robin_create(const sched_config_t* config, void** data) {
+static int round_robin_create(const sched_config_t *config, void **data)
+{
     if (!config || !data) {
-        return ROUND_ROBIN_ERROR_INVALID_PARAM;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
     *data = NULL;
 
-    round_robin_data_t* rrd = (round_robin_data_t*)AGENTOS_MALLOC(sizeof(round_robin_data_t));
+    round_robin_data_t *rrd = (round_robin_data_t *)AGENTOS_MALLOC(sizeof(round_robin_data_t));
     if (!rrd) {
-        return ROUND_ROBIN_ERROR_MEMORY;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     memset(rrd, 0, sizeof(round_robin_data_t));
 
     rrd->max_agents = config->max_agents > 0 ? config->max_agents : 100;
-    rrd->agents = (agent_info_t**)AGENTOS_MALLOC(sizeof(agent_info_t*) * rrd->max_agents);
+    rrd->agents = (agent_info_t **)AGENTOS_MALLOC(sizeof(agent_info_t *) * rrd->max_agents);
     if (!rrd->agents) {
         AGENTOS_FREE(rrd);
-        return ROUND_ROBIN_ERROR_MEMORY;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    memset(rrd->agents, 0, sizeof(agent_info_t*) * rrd->max_agents);
+    memset(rrd->agents, 0, sizeof(agent_info_t *) * rrd->max_agents);
 
     rrd->agent_count = 0;
     rrd->current_index = 0;
 
     *data = rrd;
-    return ROUND_ROBIN_SUCCESS;
+    return AGENTOS_OK;
 }
 
 /**
@@ -144,13 +141,14 @@ static int round_robin_create(const sched_config_t* config, void** data) {
  * @param data 策略数据
  * @return 0 表示成功，非 0 表示错误码
  */
-static int round_robin_destroy(void* data) {
+static int round_robin_destroy(void *data)
+{
     if (!data) {
-        return ROUND_ROBIN_SUCCESS;
+        return AGENTOS_OK;
     }
 
-    round_robin_data_t* rrd = (round_robin_data_t*)data;
-    
+    round_robin_data_t *rrd = (round_robin_data_t *)data;
+
     if (rrd->agents) {
         for (size_t i = 0; i < rrd->agent_count; i++) {
             free_agent_info(rrd->agents[i]);
@@ -161,7 +159,7 @@ static int round_robin_destroy(void* data) {
     }
 
     AGENTOS_FREE(rrd);
-    return ROUND_ROBIN_SUCCESS;
+    return AGENTOS_OK;
 }
 
 /**
@@ -170,19 +168,20 @@ static int round_robin_destroy(void* data) {
  * @param agent_info Agent 信息
  * @return 0 表示成功，非 0 表示错误码
  */
-static int round_robin_register_agent(void* data, const agent_info_t* agent_info) {
+static int round_robin_register_agent(void *data, const agent_info_t *agent_info)
+{
     if (!data || !agent_info) {
-        return ROUND_ROBIN_ERROR_INVALID_PARAM;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    round_robin_data_t* rrd = (round_robin_data_t*)data;
+    round_robin_data_t *rrd = (round_robin_data_t *)data;
 
     if (!agent_info->agent_id) {
-        return ROUND_ROBIN_ERROR_INVALID_PARAM;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
     if (rrd->agent_count >= rrd->max_agents) {
-        return ROUND_ROBIN_ERROR_MAX_AGENTS;
+        return AGENTOS_ERR_OVERFLOW;
     }
 
     for (size_t i = 0; i < rrd->agent_count; i++) {
@@ -195,7 +194,7 @@ static int round_robin_register_agent(void* data, const agent_info_t* agent_info
             if (agent_info->agent_name) {
                 rrd->agents[i]->agent_name = safe_strdup(agent_info->agent_name);
                 if (!rrd->agents[i]->agent_name) {
-                    return ROUND_ROBIN_ERROR_MEMORY;
+                    return AGENTOS_ERR_OUT_OF_MEMORY;
                 }
             }
             rrd->agents[i]->load_factor = agent_info->load_factor;
@@ -203,17 +202,17 @@ static int round_robin_register_agent(void* data, const agent_info_t* agent_info
             rrd->agents[i]->avg_response_time_ms = agent_info->avg_response_time_ms;
             rrd->agents[i]->is_available = agent_info->is_available;
             rrd->agents[i]->weight = agent_info->weight;
-            return ROUND_ROBIN_SUCCESS;
+            return AGENTOS_OK;
         }
     }
 
-    agent_info_t* new_agent = clone_agent_info(agent_info);
+    agent_info_t *new_agent = clone_agent_info(agent_info);
     if (!new_agent) {
-        return ROUND_ROBIN_ERROR_MEMORY;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     rrd->agents[rrd->agent_count++] = new_agent;
-    return ROUND_ROBIN_SUCCESS;
+    return AGENTOS_OK;
 }
 
 /**
@@ -222,12 +221,13 @@ static int round_robin_register_agent(void* data, const agent_info_t* agent_info
  * @param agent_id Agent ID
  * @return 0 表示成功，非 0 表示错误码
  */
-static int round_robin_unregister_agent(void* data, const char* agent_id) {
+static int round_robin_unregister_agent(void *data, const char *agent_id)
+{
     if (!data || !agent_id) {
-        return ROUND_ROBIN_ERROR_INVALID_PARAM;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    round_robin_data_t* rrd = (round_robin_data_t*)data;
+    round_robin_data_t *rrd = (round_robin_data_t *)data;
 
     for (size_t i = 0; i < rrd->agent_count; i++) {
         if (rrd->agents[i] && rrd->agents[i]->agent_id &&
@@ -244,11 +244,11 @@ static int round_robin_unregister_agent(void* data, const char* agent_id) {
                 rrd->current_index = 0;
             }
 
-            return ROUND_ROBIN_SUCCESS;
+            return AGENTOS_OK;
         }
     }
 
-    return ROUND_ROBIN_ERROR_AGENT_NOT_FOUND;
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
 /**
@@ -257,7 +257,8 @@ static int round_robin_unregister_agent(void* data, const char* agent_id) {
  * @param agent_info Agent 信息
  * @return 0 表示成功，非 0 表示错误码
  */
-static int round_robin_update_agent_status(void* data, const agent_info_t* agent_info) {
+static int round_robin_update_agent_status(void *data, const agent_info_t *agent_info)
+{
     return round_robin_register_agent(data, agent_info);
 }
 
@@ -268,29 +269,30 @@ static int round_robin_update_agent_status(void* data, const agent_info_t* agent
  * @param result 输出参数，返回调度结果
  * @return 0 表示成功，非 0 表示错误码
  */
-static int round_robin_schedule(void* data, const task_info_t* task_info, sched_result_t** result) {
+static int round_robin_schedule(void *data, const task_info_t *task_info, sched_result_t **result)
+{
     if (!data || !task_info || !result) {
-        return ROUND_ROBIN_ERROR_INVALID_PARAM;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
     *result = NULL;
 
-    round_robin_data_t* rrd = (round_robin_data_t*)data;
+    round_robin_data_t *rrd = (round_robin_data_t *)data;
 
     if (rrd->agent_count == 0) {
-        return ROUND_ROBIN_ERROR_NO_AGENT;
+        return AGENTOS_ERR_NOT_FOUND;
     }
 
     size_t __attribute__((unused)) start_index = rrd->current_index;
     size_t attempts = 0;
 
     while (attempts < rrd->agent_count) {
-        agent_info_t* agent = rrd->agents[rrd->current_index];
+        agent_info_t *agent = rrd->agents[rrd->current_index];
 
         if (agent && agent->is_available && agent->load_factor < 0.9) {
-            sched_result_t* res = (sched_result_t*)AGENTOS_MALLOC(sizeof(sched_result_t));
+            sched_result_t *res = (sched_result_t *)AGENTOS_MALLOC(sizeof(sched_result_t));
             if (!res) {
-                return ROUND_ROBIN_ERROR_MEMORY;
+                return AGENTOS_ERR_OUT_OF_MEMORY;
             }
             memset(res, 0, sizeof(sched_result_t));
 
@@ -298,7 +300,7 @@ static int round_robin_schedule(void* data, const task_info_t* task_info, sched_
                 res->selected_agent_id = safe_strdup(agent->agent_id);
                 if (!res->selected_agent_id) {
                     AGENTOS_FREE(res);
-                    return ROUND_ROBIN_ERROR_MEMORY;
+                    return AGENTOS_ERR_OUT_OF_MEMORY;
                 }
             } else {
                 res->selected_agent_id = NULL;
@@ -310,21 +312,22 @@ static int round_robin_schedule(void* data, const task_info_t* task_info, sched_
             rrd->current_index = (rrd->current_index + 1) % rrd->agent_count;
 
             *result = res;
-            return ROUND_ROBIN_SUCCESS;
+            return AGENTOS_OK;
         }
 
         rrd->current_index = (rrd->current_index + 1) % rrd->agent_count;
         attempts++;
     }
 
-    return ROUND_ROBIN_ERROR_NO_AVAILABLE_AGENT;
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
 /**
  * @brief 获取轮询调度策略名称
  * @return 策略名称
  */
-static const char* round_robin_get_name(void) {
+static const char *round_robin_get_name(void)
+{
     return "round_robin";
 }
 
@@ -333,12 +336,13 @@ static const char* round_robin_get_name(void) {
  * @param data 策略数据
  * @return 可用 Agent 数量
  */
-static size_t round_robin_get_available_agent_count(void* data) {
+static size_t round_robin_get_available_agent_count(void *data)
+{
     if (!data) {
         return 0;
     }
 
-    round_robin_data_t* rrd = (round_robin_data_t*)data;
+    round_robin_data_t *rrd = (round_robin_data_t *)data;
     size_t count = 0;
 
     for (size_t i = 0; i < rrd->agent_count; i++) {
@@ -355,12 +359,13 @@ static size_t round_robin_get_available_agent_count(void* data) {
  * @param data 策略数据
  * @return 总 Agent 数量
  */
-static size_t round_robin_get_total_agent_count(void* data) {
+static size_t round_robin_get_total_agent_count(void *data)
+{
     if (!data) {
         return 0;
     }
 
-    round_robin_data_t* rrd = (round_robin_data_t*)data;
+    round_robin_data_t *rrd = (round_robin_data_t *)data;
     return rrd->agent_count;
 }
 
@@ -376,13 +381,13 @@ static const strategy_interface_t round_robin_strategy = {
     .schedule = round_robin_schedule,
     .get_name = round_robin_get_name,
     .get_available_agent_count = round_robin_get_available_agent_count,
-    .get_total_agent_count = round_robin_get_total_agent_count
-};
+    .get_total_agent_count = round_robin_get_total_agent_count};
 
 /**
  * @brief 获取轮询调度策略接口
  * @return 轮询调度策略接口
  */
-const strategy_interface_t* get_round_robin_strategy(void) {
+const strategy_interface_t *get_round_robin_strategy(void)
+{
     return &round_robin_strategy;
 }

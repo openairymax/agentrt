@@ -15,29 +15,32 @@
  */
 
 #include "atomic_compat.h"
-#include "llm_service.h"
-#include "platform.h"
-#include "thread_pool.h"
-#include "error.h"
-#include "response.h"
-#include "jsonrpc_helpers.h"
-#include "method_dispatcher.h"
-#include "param_validator.h"
-#include "svc_logger.h"
 #include "daemon_errors.h"
 #include "daemon_event_driver.h"
-#include <signal.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include "error.h"
+#include "jsonrpc_helpers.h"
+#include "llm_service.h"
+#include "logging.h"
+#include "method_dispatcher.h"
+#include "param_validator.h"
+#include "platform.h"
+#include "response.h"
+#include "svc_logger.h"
+#include "thread_pool.h"
+
 #include <cjson/cJSON.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 /* ==================== 事件驱动适配器 ==================== */
 
 static void handle_client(agentos_socket_t client_fd);
 
-static int llm_on_client(void* service_ctx, agentos_socket_t client_fd) {
+static int llm_on_client(void *service_ctx, agentos_socket_t client_fd)
+{
     (void)service_ctx;
     handle_client(client_fd);
     return 0;
@@ -55,16 +58,16 @@ static int llm_on_client(void* service_ctx, agentos_socket_t client_fd) {
 
 /* ==================== 全局状态 ==================== */
 
-static llm_service_t* g_service = NULL;
+static llm_service_t *g_service = NULL;
 static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
-static method_dispatcher_t* g_dispatcher = NULL;
-static daemon_event_driver_t* g_event_driver = NULL;
+static method_dispatcher_t *g_dispatcher = NULL;
+static daemon_event_driver_t *g_event_driver = NULL;
 
 /* 服务配置 */
 typedef struct {
-    char* socket_path;
-    char* tcp_host;
+    char *socket_path;
+    char *tcp_host;
     uint16_t tcp_port;
     int use_tcp;
     int max_threads;
@@ -75,27 +78,32 @@ static llm_daemon_config_t g_config = {0};
 
 /* ==================== 信号处理 ==================== */
 
-static void signal_handler(int sig __attribute__((unused))) {
+static void signal_handler(int sig __attribute__((unused)))
+{
     agentos_mutex_lock(&g_running_lock);
     atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     agentos_mutex_unlock(&g_running_lock);
-    if (g_event_driver) daemon_event_driver_stop(g_event_driver);
+    if (g_event_driver)
+        daemon_event_driver_stop(g_event_driver);
+}
+
+static void svc_log_toggle_handler(int sig)
+{
+    (void)sig;
+    static int debug_mode = 0;
+    debug_mode = !debug_mode;
+    log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_WARN);
 }
 
 /* ==================== JSON-RPC 错误码 ==================== */
 
-#define PARSE_ERROR     -32700
-#define INVALID_REQUEST -32600
-#define METHOD_NOT_FOUND -32601
-#define INVALID_PARAMS  -32602
-#define INTERNAL_ERROR  -32000
 
 /* ==================== 请求上下文（线程安全） ==================== */
 
 typedef struct {
     llm_message_t messages[MAX_MESSAGES_PER_REQUEST];
     size_t message_count;
-    char* response_buffer;
+    char *response_buffer;
     size_t response_size;
     size_t response_capacity;
 } request_context_t;
@@ -103,33 +111,37 @@ typedef struct {
 /**
  * @brief 创建请求上下文
  */
-static request_context_t* request_context_create(void) {
-    request_context_t* ctx = (request_context_t*)AGENTOS_CALLOC(1, sizeof(request_context_t));
-    if (!ctx) return NULL;
-    
+static request_context_t *request_context_create(void)
+{
+    request_context_t *ctx = (request_context_t *)AGENTOS_CALLOC(1, sizeof(request_context_t));
+    if (!ctx)
+        return NULL;
+
     ctx->response_capacity = MAX_BUFFER;
-    ctx->response_buffer = (char*)AGENTOS_MALLOC(ctx->response_capacity);
+    ctx->response_buffer = (char *)AGENTOS_MALLOC(ctx->response_capacity);
     if (!ctx->response_buffer) {
         AGENTOS_FREE(ctx);
         return NULL;
     }
     ctx->response_buffer[0] = '\0';
     ctx->response_size = 0;
-    
+
     return ctx;
 }
 
 /**
  * @brief 销毁请求上下文
  */
-static void request_context_destroy(request_context_t* ctx) {
-    if (!ctx) return;
-    
+static void request_context_destroy(request_context_t *ctx)
+{
+    if (!ctx)
+        return;
+
     for (size_t i = 0; i < ctx->message_count; i++) {
-        AGENTOS_FREE((void*)ctx->messages[i].role);
-        AGENTOS_FREE((void*)ctx->messages[i].content);
+        AGENTOS_FREE((void *)ctx->messages[i].role);
+        AGENTOS_FREE((void *)ctx->messages[i].content);
     }
-    
+
     AGENTOS_FREE(ctx->response_buffer);
     AGENTOS_FREE(ctx);
 }
@@ -143,105 +155,118 @@ static void request_context_destroy(request_context_t* ctx) {
  * @param cfg 输出配置
  * @return 0 成功，非0 失败
  */
-static void parse_params_cleanup(request_context_t* ctx, llm_request_config_t* cfg) {
-    if (cfg->model) { AGENTOS_FREE((void*)cfg->model); cfg->model = NULL; }
+static void parse_params_cleanup(request_context_t *ctx, llm_request_config_t *cfg)
+{
+    if (cfg->model) {
+        AGENTOS_FREE((void *)cfg->model);
+        cfg->model = NULL;
+    }
     for (size_t i = 0; i < ctx->message_count; i++) {
-        AGENTOS_FREE((void*)ctx->messages[i].role);
-        AGENTOS_FREE((void*)ctx->messages[i].content);
+        AGENTOS_FREE((void *)ctx->messages[i].role);
+        AGENTOS_FREE((void *)ctx->messages[i].content);
     }
     ctx->message_count = 0;
 }
 
-static int parse_params(cJSON* params, request_context_t* ctx, llm_request_config_t* cfg) {
+static int parse_params(cJSON *params, request_context_t *ctx, llm_request_config_t *cfg)
+{
     memset(cfg, 0, sizeof(llm_request_config_t));
-    
-    cJSON* model = cJSON_GetObjectItem(params, "model");
+
+    cJSON *model = cJSON_GetObjectItem(params, "model");
     if (!cJSON_IsString(model)) {
-        return -1;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "model parameter is not a string");
+        return AGENTOS_ERR_INVALID_PARAM;
     }
     cfg->model = AGENTOS_STRDUP(model->valuestring);
-    if (!cfg->model) return -1;
-    
-    cJSON* messages = cJSON_GetObjectItem(params, "messages");
+    if (!cfg->model) {
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate model string");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
+
+    cJSON *messages = cJSON_GetObjectItem(params, "messages");
     if (cJSON_IsArray(messages)) {
         size_t count = cJSON_GetArraySize(messages);
         if (count > MAX_MESSAGES_PER_REQUEST) {
             parse_params_cleanup(ctx, cfg);
-            return -1;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "too many messages");
+            return AGENTOS_ERR_OVERFLOW;
         }
-        
+
         ctx->message_count = count;
         cfg->message_count = count;
         cfg->messages = ctx->messages;
-        
+
         for (size_t i = 0; i < count; ++i) {
-            cJSON* item = cJSON_GetArrayItem(messages, i);
-            cJSON* role = cJSON_GetObjectItem(item, "role");
-            cJSON* content = cJSON_GetObjectItem(item, "content");
-            
+            cJSON *item = cJSON_GetArrayItem(messages, i);
+            cJSON *role = cJSON_GetObjectItem(item, "role");
+            cJSON *content = cJSON_GetObjectItem(item, "content");
+
             if (!cJSON_IsString(role) || !cJSON_IsString(content)) {
                 parse_params_cleanup(ctx, cfg);
-                return -1;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "message role or content is not a string");
+                return AGENTOS_ERR_INVALID_PARAM;
             }
-            
+
             ctx->messages[i].role = AGENTOS_STRDUP(role->valuestring);
             ctx->messages[i].content = AGENTOS_STRDUP(content->valuestring);
-            
+
             if (!ctx->messages[i].role || !ctx->messages[i].content) {
                 ctx->message_count = i;
                 parse_params_cleanup(ctx, cfg);
-                return -1;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate message role or content");
+                return AGENTOS_ERR_OUT_OF_MEMORY;
             }
         }
     }
-    
+
     /* 解析可选参数 */
-    cJSON* temp = cJSON_GetObjectItem(params, "temperature");
+    cJSON *temp = cJSON_GetObjectItem(params, "temperature");
     if (cJSON_IsNumber(temp)) {
         cfg->temperature = (float)temp->valuedouble;
     }
-    
-    cJSON* top_p = cJSON_GetObjectItem(params, "top_p");
+
+    cJSON *top_p = cJSON_GetObjectItem(params, "top_p");
     if (cJSON_IsNumber(top_p)) {
         cfg->top_p = (float)top_p->valuedouble;
     }
-    
-    cJSON* max_tokens = cJSON_GetObjectItem(params, "max_tokens");
+
+    cJSON *max_tokens = cJSON_GetObjectItem(params, "max_tokens");
     if (cJSON_IsNumber(max_tokens)) {
         cfg->max_tokens = max_tokens->valueint;
     }
-    
-    cJSON* stream = cJSON_GetObjectItem(params, "stream");
+
+    cJSON *stream = cJSON_GetObjectItem(params, "stream");
     if (cJSON_IsBool(stream)) {
         cfg->stream = cJSON_IsTrue(stream) ? 1 : 0;
     }
-    
-    cJSON* presence_penalty = cJSON_GetObjectItem(params, "presence_penalty");
+
+    cJSON *presence_penalty = cJSON_GetObjectItem(params, "presence_penalty");
     if (cJSON_IsNumber(presence_penalty)) {
         cfg->presence_penalty = presence_penalty->valuedouble;
     }
-    
-    cJSON* frequency_penalty = cJSON_GetObjectItem(params, "frequency_penalty");
+
+    cJSON *frequency_penalty = cJSON_GetObjectItem(params, "frequency_penalty");
     if (cJSON_IsNumber(frequency_penalty)) {
         cfg->frequency_penalty = frequency_penalty->valuedouble;
     }
-    
+
     return 0;
 }
 
 /* ==================== 方法处理器包装函数 ==================== */
 
 /* 前向声明 */
-static char* handle_complete(cJSON* params, int id);
-static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t client_fd);
+static char *handle_complete(cJSON *params, int id);
+static char *handle_complete_stream(cJSON *params, int id, agentos_socket_t client_fd);
 
 /**
  * @brief complete 方法的包装器（适配 method_dispatcher 接口）
  */
-static void on_complete_method(cJSON* params, int id, void* user_data __attribute__((unused))) {
-    char* response = handle_complete(params, id);
+static void on_complete_method(cJSON *params, int id, void *user_data __attribute__((unused)))
+{
+    char *response = handle_complete(params, id);
     if (response) {
-        agentos_socket_t client_fd = *(agentos_socket_t*)user_data;
+        agentos_socket_t client_fd = *(agentos_socket_t *)user_data;
         agentos_socket_send(client_fd, response, strlen(response));
         AGENTOS_FREE(response);
     }
@@ -250,9 +275,11 @@ static void on_complete_method(cJSON* params, int id, void* user_data __attribut
 /**
  * @brief complete_stream 方法的包装器
  */
-static void on_complete_stream_method(cJSON* params, int id, void* user_data __attribute__((unused))) {
-    agentos_socket_t client_fd = *(agentos_socket_t*)user_data;
-    char* response = handle_complete_stream(params, id, client_fd);
+static void on_complete_stream_method(cJSON *params, int id,
+                                      void *user_data __attribute__((unused)))
+{
+    agentos_socket_t client_fd = *(agentos_socket_t *)user_data;
+    char *response = handle_complete_stream(params, id, client_fd);
     if (response) {
         agentos_socket_send(client_fd, response, strlen(response));
         AGENTOS_FREE(response);
@@ -264,16 +291,17 @@ static void on_complete_stream_method(cJSON* params, int id, void* user_data __a
 /**
  * @brief 处理 complete 方法
  */
-static char* handle_complete(cJSON* params, int id) {
-    request_context_t* ctx = request_context_create();
+static char *handle_complete(cJSON *params, int id)
+{
+    request_context_t *ctx = request_context_create();
     if (!ctx) {
-        return jsonrpc_build_error(INTERNAL_ERROR, "Out of memory", id);
+        return jsonrpc_build_error(JSONRPC_INTERNAL_ERROR, "Out of memory", id);
     }
 
     llm_request_config_t cfg;
     if (parse_params(params, ctx, &cfg) != 0) {
         request_context_destroy(ctx);
-        return jsonrpc_build_error(INVALID_PARAMS, "Invalid params", id);
+        return jsonrpc_build_error(JSONRPC_INVALID_PARAMS, "Invalid params", id);
     }
 
     uint64_t start_time = agentos_time_ms();
@@ -281,13 +309,14 @@ static char* handle_complete(cJSON* params, int id) {
 #define LLM_MAX_RETRIES 3
 #define LLM_BASE_DELAY_MS 100
 
-    llm_response_t* resp = NULL;
+    llm_response_t *resp = NULL;
     int ret = -1;
 
     for (int attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
         ret = llm_service_complete(g_service, &cfg, &resp);
 
-        if (ret == 0) break;
+        if (ret == 0)
+            break;
 
         if (attempt < LLM_MAX_RETRIES) {
             unsigned delay_ms = LLM_BASE_DELAY_MS * (1U << (attempt > 15 ? 15 : attempt));
@@ -300,34 +329,33 @@ static char* handle_complete(cJSON* params, int id) {
     uint64_t end_time = agentos_time_ms();
 
     if (ret != 0) {
-        SVC_LOG_ERROR("LLM complete failed after %d attempts (total %llums)",
-                      LLM_MAX_RETRIES + 1,
+        SVC_LOG_ERROR("LLM complete failed after %d attempts (total %llums)", LLM_MAX_RETRIES + 1,
                       (unsigned long long)(end_time - start_time));
-        AGENTOS_FREE((void*)cfg.model);
+        AGENTOS_FREE((void *)cfg.model);
         request_context_destroy(ctx);
-        return jsonrpc_build_error(INTERNAL_ERROR, "LLM service unavailable after retries", id);
+        return jsonrpc_build_error(JSONRPC_INTERNAL_ERROR, "LLM service unavailable after retries", id);
     }
-    
-    char* resp_json = response_to_json(resp);
+
+    char *resp_json = response_to_json(resp);
     llm_response_free(resp);
-    AGENTOS_FREE((void*)cfg.model);
-    
+    AGENTOS_FREE((void *)cfg.model);
+
     if (!resp_json) {
         request_context_destroy(ctx);
-        return jsonrpc_build_error(INTERNAL_ERROR, "Failed to serialize response", id);
+        return jsonrpc_build_error(JSONRPC_INTERNAL_ERROR, "Failed to serialize response", id);
     }
-    
-    cJSON* result = cJSON_Parse(resp_json);
+
+    cJSON *result = cJSON_Parse(resp_json);
     AGENTOS_FREE(resp_json);
-    
+
     if (!result) {
         request_context_destroy(ctx);
-        return jsonrpc_build_error(INTERNAL_ERROR, "Invalid response format", id);
+        return jsonrpc_build_error(JSONRPC_INTERNAL_ERROR, "Invalid response format", id);
     }
-    
-    char* success = jsonrpc_build_success(result, id);
+
+    char *success = jsonrpc_build_success(result, id);
     cJSON_Delete(result);
-    
+
     request_context_destroy(ctx);
     return success;
 }
@@ -339,41 +367,43 @@ typedef struct {
     agentos_socket_t fd;
 } llm_stream_ctx_t;
 
-static void llm_stream_callback(const char* chunk, void* user_data) {
-    llm_stream_ctx_t* sctx = (llm_stream_ctx_t*)user_data;
+static void llm_stream_callback(const char *chunk, void *user_data)
+{
+    llm_stream_ctx_t *sctx = (llm_stream_ctx_t *)user_data;
     agentos_socket_send(sctx->fd, chunk, strlen(chunk));
 }
 
-static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t client_fd) {
-    request_context_t* ctx = request_context_create();
+static char *handle_complete_stream(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    request_context_t *ctx = request_context_create();
     if (!ctx) {
-        return jsonrpc_build_error(INTERNAL_ERROR, "Out of memory", id);
+        return jsonrpc_build_error(JSONRPC_INTERNAL_ERROR, "Out of memory", id);
     }
-    
+
     llm_request_config_t cfg;
     if (parse_params(params, ctx, &cfg) != 0) {
         request_context_destroy(ctx);
-        return jsonrpc_build_error(INVALID_PARAMS, "Invalid params", id);
+        return jsonrpc_build_error(JSONRPC_INVALID_PARAMS, "Invalid params", id);
     }
-    
+
     cfg.stream = 1;
-    
-    llm_stream_ctx_t stream_ctx = { .fd = client_fd };
-    
-    llm_response_t* resp = NULL;
+
+    llm_stream_ctx_t stream_ctx = {.fd = client_fd};
+
+    llm_response_t *resp = NULL;
     int ret = llm_service_complete_stream(g_service, &cfg, llm_stream_callback, &stream_ctx, &resp);
-    
+
     if (ret != 0) {
-        AGENTOS_FREE((void*)cfg.model);
+        AGENTOS_FREE((void *)cfg.model);
         request_context_destroy(ctx);
-        return jsonrpc_build_error(INTERNAL_ERROR, "Service error", id);
+        return jsonrpc_build_error(JSONRPC_INTERNAL_ERROR, "Service error", id);
     }
-    
+
     if (resp) {
         llm_response_free(resp);
     }
-    
-    AGENTOS_FREE((void*)cfg.model);
+
+    AGENTOS_FREE((void *)cfg.model);
     request_context_destroy(ctx);
     return NULL;
 }
@@ -383,7 +413,8 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
 /**
  * @brief 处理单个客户端连接
  */
-static void handle_client(agentos_socket_t client_fd) {
+static void handle_client(agentos_socket_t client_fd)
+{
     char buffer[MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
 
@@ -394,26 +425,26 @@ static void handle_client(agentos_socket_t client_fd) {
     buffer[n] = '\0';
 
     if ((size_t)n >= sizeof(buffer) - 1) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_REQUEST, "Request too large", -1);
         agentos_socket_close(client_fd);
         return;
     }
 
-    cJSON* req = cJSON_Parse(buffer);
+    cJSON *req = cJSON_Parse(buffer);
     if (!req) {
-        JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_PARSE_ERROR, "Parse error", -1);
         agentos_socket_close(client_fd);
         return;
     }
 
-    cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
-    cJSON* method = cJSON_GetObjectItem(req, "method");
-    cJSON* params = cJSON_GetObjectItem(req, "params");
-    cJSON* id = cJSON_GetObjectItem(req, "id");
+    cJSON *jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
+    cJSON *method = cJSON_GetObjectItem(req, "method");
+    cJSON *params = cJSON_GetObjectItem(req, "params");
+    cJSON *id = cJSON_GetObjectItem(req, "id");
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
         !cJSON_IsString(method) || !params || !id) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_REQUEST, "Invalid Request", -1);
         cJSON_Delete(req);
         agentos_socket_close(client_fd);
         return;
@@ -430,12 +461,13 @@ static void handle_client(agentos_socket_t client_fd) {
 /**
  * @brief 加载守护进程配置
  */
-static int load_daemon_config(const char* config_path) {
+static int load_daemon_config(const char *config_path)
+{
     /* 默认配置 */
     g_config.use_tcp = 0;
     g_config.max_threads = MAX_THREADS;
     g_config.max_clients = MAX_CLIENTS;
-    
+
 #if defined(AGENTOS_PLATFORM_WINDOWS)
     g_config.socket_path = AGENTOS_STRDUP(DEFAULT_SOCKET_PATH_WIN);
     g_config.tcp_host = AGENTOS_STRDUP("127.0.0.1");
@@ -444,58 +476,59 @@ static int load_daemon_config(const char* config_path) {
     g_config.tcp_host = AGENTOS_STRDUP("127.0.0.1");
 #endif
     g_config.tcp_port = DEFAULT_TCP_PORT;
-    
+
     /* 如果提供了配置文件，尝试加载 */
     if (config_path) {
-        FILE* f = fopen(config_path, "rb");
+        FILE *f = fopen(config_path, "rb");
         if (f) {
             fseek(f, 0, SEEK_END);
             long len = ftell(f);
             fseek(f, 0, SEEK_SET);
-            
-            char* content = (char*)AGENTOS_MALLOC(len + 1);
+
+            char *content = (char *)AGENTOS_MALLOC(len + 1);
             if (content) {
                 size_t nread = fread(content, 1, len, f);
                 if (nread == (size_t)len) {
-                content[len] = '\0';
-                
-                cJSON* root = cJSON_Parse(content);
-                if (root) {
-                    cJSON* daemon = cJSON_GetObjectItem(root, "daemon");
-                    if (daemon) {
-                        cJSON* socket_path = cJSON_GetObjectItem(daemon, "socket_path");
-                        if (cJSON_IsString(socket_path)) {
-                            AGENTOS_FREE(g_config.socket_path);
-                            g_config.socket_path = AGENTOS_STRDUP(socket_path->valuestring);
+                    content[len] = '\0';
+
+                    cJSON *root = cJSON_Parse(content);
+                    if (root) {
+                        cJSON *daemon = cJSON_GetObjectItem(root, "daemon");
+                        if (daemon) {
+                            cJSON *socket_path = cJSON_GetObjectItem(daemon, "socket_path");
+                            if (cJSON_IsString(socket_path)) {
+                                AGENTOS_FREE(g_config.socket_path);
+                                g_config.socket_path = AGENTOS_STRDUP(socket_path->valuestring);
+                            }
+
+                            cJSON *tcp_port = cJSON_GetObjectItem(daemon, "tcp_port");
+                            if (cJSON_IsNumber(tcp_port)) {
+                                g_config.tcp_port = (uint16_t)tcp_port->valueint;
+                                g_config.use_tcp = 1;
+                            }
+
+                            cJSON *max_threads = cJSON_GetObjectItem(daemon, "max_threads");
+                            if (cJSON_IsNumber(max_threads)) {
+                                g_config.max_threads = max_threads->valueint;
+                            }
                         }
-                        
-                        cJSON* tcp_port = cJSON_GetObjectItem(daemon, "tcp_port");
-                        if (cJSON_IsNumber(tcp_port)) {
-                            g_config.tcp_port = (uint16_t)tcp_port->valueint;
-                            g_config.use_tcp = 1;
-                        }
-                        
-                        cJSON* max_threads = cJSON_GetObjectItem(daemon, "max_threads");
-                        if (cJSON_IsNumber(max_threads)) {
-                            g_config.max_threads = max_threads->valueint;
-                        }
+                        cJSON_Delete(root);
                     }
-                    cJSON_Delete(root);
-                }
                 }
                 AGENTOS_FREE(content);
             }
             fclose(f);
         }
     }
-    
+
     return 0;
 }
 
 /**
  * @brief 释放配置资源
  */
-static void free_daemon_config(void) {
+static void free_daemon_config(void)
+{
     AGENTOS_FREE(g_config.socket_path);
     AGENTOS_FREE(g_config.tcp_host);
     memset(&g_config, 0, sizeof(g_config));
@@ -503,42 +536,50 @@ static void free_daemon_config(void) {
 
 /* ==================== 主函数 ==================== */
 
-int main(int argc, char** argv) {
-    const char* config_path = NULL;
-    
+int main(int argc, char **argv)
+{
+    const char *config_path = NULL;
+
     /* 解析命令行参数 */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--manager") == 0 && i + 1 < argc) {
             config_path = argv[++i];
         } else if (strcmp(argv[i], "--help") == 0) {
-            printf("Usage: %s [--manager <path>] [--tcp]\n", argv[0]);
-            printf("  --manager  Configuration file path\n");
-            printf("  --tcp     Use TCP instead of Unix socket\n");
+            char buf[256];
+            snprintf(buf, sizeof(buf), "Usage: %s [--manager <path>] [--tcp]\n", argv[0]);
+            fputs(buf, stdout);
+            fputs("  --manager  Configuration file path\n", stdout);
+            fputs("  --tcp     Use TCP instead of Unix socket\n", stdout);
             return 0;
         } else if (strcmp(argv[i], "--tcp") == 0) {
             g_config.use_tcp = 1;
         }
     }
-    
+
     /* 初始化平台层 */
     agentos_socket_init();
     agentos_mutex_init(&g_running_lock);
-    
+
     /* 设置信号处理 */
 #if !defined(AGENTOS_PLATFORM_WINDOWS)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGUSR1, svc_log_toggle_handler);
 #else
-    /* Windows 使用控制台控制处理 */
     SetConsoleCtrlHandler((PHANDLER_ROUTINE)signal_handler, TRUE);
 #endif
-    
+
+    agentos_logger_config_t log_cfg = {0};
+    log_cfg.level = (agentos_log_level_t)LOG_LEVEL_WARN;
+    agentos_log_init(&log_cfg);
+    atexit(log_cleanup);
+
     /* 加载配置 */
     load_daemon_config(config_path);
-    
+
     SVC_LOG_INFO("LLM service starting, manager=%s", config_path ? config_path : "default");
-    
+
     /* 创建 LLM 服务 */
     g_service = llm_service_create(config_path);
     if (!g_service) {
@@ -547,15 +588,15 @@ int main(int argc, char** argv) {
         agentos_socket_cleanup();
         return 1;
     }
-    
+
     /* 创建服务器 Socket */
     agentos_socket_t server_fd;
-    
+
     if (g_config.use_tcp) {
         server_fd = agentos_socket_create_tcp_server(g_config.tcp_host, g_config.tcp_port);
         if (server_fd == AGENTOS_INVALID_SOCKET) {
-            SVC_LOG_ERROR("Failed to create TCP server on %s:%d", 
-                    g_config.tcp_host, g_config.tcp_port);
+            SVC_LOG_ERROR("Failed to create TCP server on %s:%d", g_config.tcp_host,
+                          g_config.tcp_port);
             llm_service_destroy(g_service);
             free_daemon_config();
             agentos_socket_cleanup();
@@ -577,7 +618,7 @@ int main(int argc, char** argv) {
         }
         SVC_LOG_INFO("Listening on %s", g_config.socket_path);
     }
-    
+
     /* 创建事件驱动框架 */
     daemon_event_config_t ev_config;
     memset(&ev_config, 0, sizeof(ev_config));
@@ -618,7 +659,7 @@ int main(int argc, char** argv) {
 
     SVC_LOG_INFO("LLM service running (event-driven mode)");
     daemon_event_driver_run(g_event_driver);
-    
+
     /* 清理 */
     SVC_LOG_INFO("LLM service stopping...");
     daemon_event_driver_destroy(g_event_driver);
@@ -627,7 +668,8 @@ int main(int argc, char** argv) {
     free_daemon_config();
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();
-    
+
     SVC_LOG_INFO("LLM service stopped");
+    log_cleanup();
     return 0;
 }

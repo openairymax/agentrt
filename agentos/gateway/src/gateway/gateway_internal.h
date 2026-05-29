@@ -1,9 +1,9 @@
 #ifndef AGENTOS_GATEWAY_INTERNAL_H
 #define AGENTOS_GATEWAY_INTERNAL_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <stdlib.h>
 
 #ifdef __cplusplus
@@ -20,72 +20,63 @@ typedef enum {
     GATEWAY_ERROR_PROTOCOL = -6
 } gateway_error_t;
 
-typedef enum {
-    GATEWAY_TYPE_HTTP = 0,
-    GATEWAY_TYPE_WS,
-    GATEWAY_TYPE_STDIO
-} gateway_type_t;
+typedef enum { GATEWAY_TYPE_HTTP = 0, GATEWAY_TYPE_WS, GATEWAY_TYPE_STDIO } gateway_type_t;
 
-typedef int (*gateway_request_handler_t)(
-    const char* request_json,
-    char** response_json,
-    void* user_data
-);
+typedef int (*gateway_request_handler_t)(const char *request_json, char **response_json,
+                                         void *user_data);
 
 typedef struct gateway_endpoint_request {
-    const char* method;
-    const char* path;
-    const char* body;
+    const char *method;
+    const char *path;
+    const char *body;
     size_t body_len;
-    void* user_data;
+    void *user_data;
 } gateway_endpoint_request_t;
 
 typedef struct gateway_endpoint_response {
     int status_code;
-    const char* content_type;
-    char* body;
+    const char *content_type;
+    char *body;
     size_t body_len;
 } gateway_endpoint_response_t;
 
-typedef int (*gateway_endpoint_handler_t)(
-    const gateway_endpoint_request_t* req,
-    gateway_endpoint_response_t* resp
-);
+typedef int (*gateway_endpoint_handler_t)(const gateway_endpoint_request_t *req,
+                                          gateway_endpoint_response_t *resp);
 
-typedef char* (*gateway_internal_handler_t)(void* request, void* user_data);
+typedef char *(*gateway_internal_handler_t)(void *request, void *user_data);
 
 typedef struct gateway_ops {
-    int (*start)(void* impl);
-    void (*stop)(void* impl);
-    void (*destroy)(void* impl);
-    const char* (*get_name)(void* impl);
-    int (*get_stats)(void* impl, char** out_json);
-    bool (*is_running)(void* impl);
-    int (*set_handler)(void* impl, gateway_internal_handler_t handler, void* user_data);
+    int (*start)(void *impl);
+    void (*stop)(void *impl);
+    void (*destroy)(void *impl);
+    const char *(*get_name)(void *impl);
+    int (*get_stats)(void *impl, char **out_json);
+    bool (*is_running)(void *impl);
+    int (*set_handler)(void *impl, gateway_internal_handler_t handler, void *user_data);
 } gateway_ops_t;
 
 typedef struct gateway {
-    const gateway_ops_t* ops;
-    void* impl;
+    const gateway_ops_t *ops;
+    void *impl;
     gateway_type_t type;
     gateway_request_handler_t public_handler;
-    void* public_handler_data;
+    void *public_handler_data;
 } gateway_t;
 
-gateway_t* gateway_http_create(const char* host, uint16_t port);
-gateway_t* gateway_ws_create(const char* host, uint16_t port);
-gateway_t* gateway_stdio_create(void);
+gateway_t *gateway_http_create(const char *host, uint16_t port);
+gateway_t *gateway_ws_create(const char *host, uint16_t port);
+gateway_t *gateway_stdio_create(void);
 
-void gateway_destroy(gateway_t* gw);
-int gateway_start(gateway_t* gw);
-int gateway_stop(gateway_t* gw);
-int gateway_get_stats(gateway_t* gw, char** out_json);
-int gateway_set_handler(gateway_t* gw, gateway_request_handler_t handler, void* user_data);
-bool gateway_is_running(gateway_t* gw);
-gateway_type_t gateway_get_type(gateway_t* gw);
-const char* gateway_get_name(gateway_t* gw);
-int gateway_register_endpoint(gateway_t* gw, const char* method, const char* path,
-                              gateway_endpoint_handler_t handler, void* user_data);
+void gateway_destroy(gateway_t *gw);
+int gateway_start(gateway_t *gw);
+int gateway_stop(gateway_t *gw);
+int gateway_get_stats(gateway_t *gw, char **out_json);
+int gateway_set_handler(gateway_t *gw, gateway_request_handler_t handler, void *user_data);
+bool gateway_is_running(gateway_t *gw);
+gateway_type_t gateway_get_type(gateway_t *gw);
+const char *gateway_get_name(gateway_t *gw);
+int gateway_register_endpoint(gateway_t *gw, const char *method, const char *path,
+                              gateway_endpoint_handler_t handler, void *user_data);
 
 #ifdef __cplusplus
 }

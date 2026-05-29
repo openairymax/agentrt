@@ -15,17 +15,18 @@
 #define AGENTOS_DYNAMIC_POLICY_ENGINE_H
 
 #include "safety_guard.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define DPOLICY_MAX_RULES       512
-#define DPOLICY_MAX_VERSIONS    32
-#define DPOLICY_MAX_CONFLICTS   64
+#define DPOLICY_MAX_RULES 512
+#define DPOLICY_MAX_VERSIONS 32
+#define DPOLICY_MAX_CONFLICTS 64
 
 typedef enum {
     DPOLICY_EFFECT_ALLOW = 0,
@@ -63,11 +64,11 @@ typedef struct {
 
 typedef struct {
     char version[32];
-    dpolicy_rule_t* rules;
+    dpolicy_rule_t *rules;
     size_t rule_count;
     uint64_t created_at;
-    char* created_by;
-    char* description;
+    char *created_by;
+    char *description;
 } dpolicy_version_t;
 
 typedef struct {
@@ -80,55 +81,49 @@ typedef struct {
 typedef struct {
     dpolicy_change_type_t type;
     char rule_id[64];
-    char* old_value_json;
-    char* new_value_json;
+    char *old_value_json;
+    char *new_value_json;
     uint64_t timestamp;
-    char* changed_by;
+    char *changed_by;
 } dpolicy_change_record_t;
 
 typedef struct dpolicy_engine_s dpolicy_engine_t;
 
-typedef void (*dpolicy_change_callback_t)(const dpolicy_change_record_t* record,
-                                            void* user_data);
+typedef void (*dpolicy_change_callback_t)(const dpolicy_change_record_t *record, void *user_data);
 
 #ifdef AGENTOS_ENABLE_V2_API
 
-dpolicy_engine_t* dpolicy_engine_create(dpolicy_conflict_strategy_t default_strategy);
-void dpolicy_engine_destroy(dpolicy_engine_t* engine);
+dpolicy_engine_t *dpolicy_engine_create(dpolicy_conflict_strategy_t default_strategy);
+void dpolicy_engine_destroy(dpolicy_engine_t *engine);
 
-int dpolicy_engine_add_rule(dpolicy_engine_t* engine, const dpolicy_rule_t* rule);
-int dpolicy_engine_remove_rule(dpolicy_engine_t* engine, const char* rule_id);
-int dpolicy_engine_update_rule(dpolicy_engine_t* engine, const char* rule_id, const dpolicy_rule_t* new_rule);
+int dpolicy_engine_add_rule(dpolicy_engine_t *engine, const dpolicy_rule_t *rule);
+int dpolicy_engine_remove_rule(dpolicy_engine_t *engine, const char *rule_id);
+int dpolicy_engine_update_rule(dpolicy_engine_t *engine, const char *rule_id,
+                               const dpolicy_rule_t *new_rule);
 
-dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t* engine,
-                                           const char* subject,
-                                           const char* action,
-                                           const char* resource,
-                                           const char* context_json);
+dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *subject,
+                                         const char *action, const char *resource,
+                                         const char *context_json);
 
-int dpolicy_engine_detect_conflicts(dpolicy_engine_t* engine,
-                                      dpolicy_conflict_t** conflicts,
-                                      size_t* conflict_count);
+int dpolicy_engine_detect_conflicts(dpolicy_engine_t *engine, dpolicy_conflict_t **conflicts,
+                                    size_t *conflict_count);
 
-int dpolicy_engine_resolve_conflict(dpolicy_engine_t* engine,
-                                      const dpolicy_conflict_t* conflict);
+int dpolicy_engine_resolve_conflict(dpolicy_engine_t *engine, const dpolicy_conflict_t *conflict);
 
-int dpolicy_engine_commit_version(dpolicy_engine_t* engine, const char* description);
-int dpolicy_engine_rollback(dpolicy_engine_t* engine, const char* version);
+int dpolicy_engine_commit_version(dpolicy_engine_t *engine, const char *description);
+int dpolicy_engine_rollback(dpolicy_engine_t *engine, const char *version);
 
-int dpolicy_engine_load_policies_json(dpolicy_engine_t* engine, const char* json);
-int dpolicy_engine_export_policies_json(dpolicy_engine_t* engine, char** json);
+int dpolicy_engine_load_policies_json(dpolicy_engine_t *engine, const char *json);
+int dpolicy_engine_export_policies_json(dpolicy_engine_t *engine, char **json);
 
-int dpolicy_engine_set_change_callback(dpolicy_engine_t* engine,
-                                         dpolicy_change_callback_t callback,
-                                         void* user_data);
+int dpolicy_engine_set_change_callback(dpolicy_engine_t *engine, dpolicy_change_callback_t callback,
+                                       void *user_data);
 
-int dpolicy_engine_validate_compliance(dpolicy_engine_t* engine,
-                                         const char* standard,
-                                         char** report_json);
+int dpolicy_engine_validate_compliance(dpolicy_engine_t *engine, const char *standard,
+                                       char **report_json);
 
-size_t dpolicy_engine_get_rule_count(dpolicy_engine_t* engine);
-size_t dpolicy_engine_get_version_count(dpolicy_engine_t* engine);
+size_t dpolicy_engine_get_rule_count(dpolicy_engine_t *engine);
+size_t dpolicy_engine_get_version_count(dpolicy_engine_t *engine);
 
 #endif /* AGENTOS_ENABLE_V2_API */
 

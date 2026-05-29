@@ -27,10 +27,10 @@
 #ifndef AGENTOS_PLATFORM_H
 #define AGENTOS_PLATFORM_H
 
+#include <compat.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include <compat.h>
 /* 注意：不在此处包含 <time.h>，因为项目的 corekern/include/time.h 会覆盖系统 time.h */
 /* 需要使用 time.h 定义的代码（如 clockid_t, CLOCK_MONOTONIC）应在 .c 文件中 */
 /* 在包含 platform.h 之前先包含系统的 <time.h> */
@@ -41,30 +41,30 @@ extern "C" {
 
 /* ==================== 平台检测 ==================== */
 #if defined(_WIN32) || defined(_WIN64)
-    #define AGENTOS_PLATFORM_WINDOWS 1
-    #define AGENTOS_PLATFORM_NAME "Windows"
-    #if defined(_WIN64)
-        #define AGENTOS_PLATFORM_BITS 64
-    #else
-        #define AGENTOS_PLATFORM_BITS 32
-    #endif
-    #define AGENTOS_PLATFORM_POSIX 0
-#elif defined(__APPLE__) && defined(__MACH__)
-    #define AGENTOS_PLATFORM_MACOS 1
-    #define AGENTOS_PLATFORM_NAME "macOS"
-    #define AGENTOS_PLATFORM_BITS 64
-    #define AGENTOS_PLATFORM_POSIX 1
-#elif defined(__linux__)
-    #define AGENTOS_PLATFORM_LINUX 1
-    #define AGENTOS_PLATFORM_NAME "Linux"
-    #if defined(__x86_64__) || defined(__aarch64__)
-        #define AGENTOS_PLATFORM_BITS 64
-    #else
-        #define AGENTOS_PLATFORM_BITS 32
-    #endif
-    #define AGENTOS_PLATFORM_POSIX 1
+#define AGENTOS_PLATFORM_WINDOWS 1
+#define AGENTOS_PLATFORM_NAME "Windows"
+#if defined(_WIN64)
+#define AGENTOS_PLATFORM_BITS 64
 #else
-    #error "Unsupported platform"
+#define AGENTOS_PLATFORM_BITS 32
+#endif
+#define AGENTOS_PLATFORM_POSIX 0
+#elif defined(__APPLE__) && defined(__MACH__)
+#define AGENTOS_PLATFORM_MACOS 1
+#define AGENTOS_PLATFORM_NAME "macOS"
+#define AGENTOS_PLATFORM_BITS 64
+#define AGENTOS_PLATFORM_POSIX 1
+#elif defined(__linux__)
+#define AGENTOS_PLATFORM_LINUX 1
+#define AGENTOS_PLATFORM_NAME "Linux"
+#if defined(__x86_64__) || defined(__aarch64__)
+#define AGENTOS_PLATFORM_BITS 64
+#else
+#define AGENTOS_PLATFORM_BITS 32
+#endif
+#define AGENTOS_PLATFORM_POSIX 1
+#else
+#error "Unsupported platform"
 #endif
 
 /* ==================== 导出宏定义 ==================== */
@@ -72,18 +72,18 @@ extern "C" {
 
 /* ==================== 线程局部存储 ==================== */
 #if defined(_WIN32) || defined(_WIN64)
-    #define AGENTOS_THREAD_LOCAL __declspec(thread)
+#define AGENTOS_THREAD_LOCAL __declspec(thread)
 #else
-    #define AGENTOS_THREAD_LOCAL __thread
+#define AGENTOS_THREAD_LOCAL __thread
 #endif
 
 /* ==================== 内联函数 ==================== */
 #if defined(_WIN32) || defined(_WIN64)
-    #ifndef AGENTOS_INLINE
-    #define AGENTOS_INLINE __forceinline
-    #endif
+#ifndef AGENTOS_INLINE
+#define AGENTOS_INLINE __forceinline
+#endif
 #else
-    #define AGENTOS_INLINE static inline __attribute__((always_inline))
+#define AGENTOS_INLINE static inline __attribute__((always_inline))
 #endif
 
 /* ==================== 未使用参数标记 ==================== */
@@ -93,74 +93,74 @@ extern "C" {
 
 /* ==================== 路径分隔符 ==================== */
 #if AGENTOS_PLATFORM_WINDOWS
-    #define AGENTOS_PATH_SEP '\\'
-    #define AGENTOS_PATH_SEP_STR "\\"
-    #define AGENTOS_PATH_MAX 260
+#define AGENTOS_PATH_SEP '\\'
+#define AGENTOS_PATH_SEP_STR "\\"
+#define AGENTOS_PATH_MAX 260
 #else
-    #define AGENTOS_PATH_SEP '/'
-    #define AGENTOS_PATH_SEP_STR "/"
-    #define AGENTOS_PATH_MAX 4096
+#define AGENTOS_PATH_SEP '/'
+#define AGENTOS_PATH_SEP_STR "/"
+#define AGENTOS_PATH_MAX 4096
 #endif
 
 /* ==================== 标准路径常量 (BAN-32合规) ==================== */
 #if AGENTOS_PLATFORM_WINDOWS
-    #define AGENTOS_RUNTIME_DIR "C:\\ProgramData\\agentos\\run"
-    #define AGENTOS_LOG_DIR "C:\\ProgramData\\agentos\\logs"
-    #define AGENTOS_CONFIG_DIR "C:\\ProgramData\\agentos\\config"
-    #define AGENTOS_TMP_DIR "C:\\ProgramData\\agentos\\tmp"
-    #define AGENTOS_CACHE_DIR "C:\\ProgramData\\agentos\\cache"
+#define AGENTOS_RUNTIME_DIR "C:\\ProgramData\\agentos\\run"
+#define AGENTOS_LOG_DIR "C:\\ProgramData\\agentos\\logs"
+#define AGENTOS_CONFIG_DIR "C:\\ProgramData\\agentos\\config"
+#define AGENTOS_TMP_DIR "C:\\ProgramData\\agentos\\tmp"
+#define AGENTOS_CACHE_DIR "C:\\ProgramData\\agentos\\cache"
 #else
-    #define AGENTOS_RUNTIME_DIR "/run/agentos"
-    #define AGENTOS_LOG_DIR "/var/log/agentos"
-    #define AGENTOS_CONFIG_DIR "/etc/agentos"
-    #define AGENTOS_TMP_DIR "/var/tmp/agentos"
-    #define AGENTOS_CACHE_DIR "/var/cache/agentos"
+#define AGENTOS_RUNTIME_DIR "/run/agentos"
+#define AGENTOS_LOG_DIR "/var/log/agentos"
+#define AGENTOS_CONFIG_DIR "/etc/agentos"
+#define AGENTOS_TMP_DIR "/var/tmp/agentos"
+#define AGENTOS_CACHE_DIR "/var/cache/agentos"
 #endif
 
 /* ==================== 平台头文件包含 ==================== */
 #if AGENTOS_PLATFORM_WINDOWS
-    #ifndef WIN32_LEAN_AND_MEAN
-    #define WIN32_LEAN_AND_MEAN
-    #endif
-    #ifndef NOMINMAX
-    #define NOMINMAX
-    #endif
-    #include <windows.h>
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
 #else
-    #include <time.h>
-    #include <pthread.h>
-    #include <unistd.h>
-    #include <sys/types.h>
-    #include <sys/socket.h>
-    #include <sys/un.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <fcntl.h>
-    #include <errno.h>
-    #include <signal.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <signal.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <time.h>
+#include <unistd.h>
 #endif
 
 /* ==================== 基础类型定义 ==================== */
 
 #if AGENTOS_PLATFORM_WINDOWS
-    typedef HANDLE agentos_thread_t;
-    typedef DWORD agentos_thread_id_t;
-    typedef CRITICAL_SECTION agentos_mutex_t;
-    typedef CONDITION_VARIABLE agentos_cond_t;
-    typedef DWORD agentos_pid_t;
-    typedef SOCKET agentos_socket_t;
-    typedef HANDLE agentos_process_t;
+typedef HANDLE agentos_thread_t;
+typedef DWORD agentos_thread_id_t;
+typedef CRITICAL_SECTION agentos_mutex_t;
+typedef CONDITION_VARIABLE agentos_cond_t;
+typedef DWORD agentos_pid_t;
+typedef SOCKET agentos_socket_t;
+typedef HANDLE agentos_process_t;
 #else
-    typedef pthread_t agentos_thread_t;
-    typedef pthread_t agentos_thread_id_t;
-    typedef pthread_mutex_t agentos_mutex_t;
-    typedef pthread_cond_t agentos_cond_t;
-    typedef pid_t agentos_pid_t;
-    typedef int agentos_socket_t;
-    typedef pid_t agentos_process_t;
+typedef pthread_t agentos_thread_t;
+typedef pthread_t agentos_thread_id_t;
+typedef pthread_mutex_t agentos_mutex_t;
+typedef pthread_cond_t agentos_cond_t;
+typedef pid_t agentos_pid_t;
+typedef int agentos_socket_t;
+typedef pid_t agentos_process_t;
 #endif
 
 #define AGENTOS_INVALID_THREAD ((agentos_thread_t)0)
@@ -175,46 +175,46 @@ extern "C" {
  * @param mutex 互斥锁指针
  * @return 0 成功，非0 失败
  */
-int agentos_mutex_init(agentos_mutex_t* mutex);
+int agentos_mutex_init(agentos_mutex_t *mutex);
 
 /**
  * @brief 销毁互斥锁
  * @param mutex 互斥锁指针
  */
-void agentos_mutex_destroy(agentos_mutex_t* mutex);
+void agentos_mutex_destroy(agentos_mutex_t *mutex);
 
 /**
  * @brief 加锁
  * @param mutex 互斥锁指针
  * @return 0 成功，非0 失败
  */
-int agentos_mutex_lock(agentos_mutex_t* mutex);
+int agentos_mutex_lock(agentos_mutex_t *mutex);
 
 /**
  * @brief 尝试加锁
  * @param mutex 互斥锁指针
  * @return 0 成功，非0 失败或已锁定
  */
-int agentos_mutex_trylock(agentos_mutex_t* mutex);
+int agentos_mutex_trylock(agentos_mutex_t *mutex);
 
 /**
  * @brief 解锁
  * @param mutex 互斥锁指针
  * @return 0 成功，非0 失败
  */
-int agentos_mutex_unlock(agentos_mutex_t* mutex);
+int agentos_mutex_unlock(agentos_mutex_t *mutex);
 
 /**
  * @brief 动态创建互斥锁（分配内存并初始化）
  * @return 互斥锁指针，失败返回NULL
  */
-agentos_mutex_t* agentos_mutex_create(void);
+agentos_mutex_t *agentos_mutex_create(void);
 
 /**
  * @brief 动态销毁互斥锁（销毁并释放内存）
  * @param mutex 互斥锁指针
  */
-void agentos_mutex_free(agentos_mutex_t* mutex);
+void agentos_mutex_free(agentos_mutex_t *mutex);
 
 /* ==================== 条件变量接口 ==================== */
 
@@ -223,13 +223,13 @@ void agentos_mutex_free(agentos_mutex_t* mutex);
  * @param cond 条件变量指针
  * @return 0 成功，非0 失败
  */
-int agentos_cond_init(agentos_cond_t* cond);
+int agentos_cond_init(agentos_cond_t *cond);
 
 /**
  * @brief 销毁条件变量
  * @param cond 条件变量指针
  */
-void agentos_cond_destroy(agentos_cond_t* cond);
+void agentos_cond_destroy(agentos_cond_t *cond);
 
 /**
  * @brief 等待条件变量
@@ -237,7 +237,7 @@ void agentos_cond_destroy(agentos_cond_t* cond);
  * @param mutex 互斥锁指针
  * @return 0 成功，非0 失败
  */
-int agentos_cond_wait(agentos_cond_t* cond, agentos_mutex_t* mutex);
+int agentos_cond_wait(agentos_cond_t *cond, agentos_mutex_t *mutex);
 
 /**
  * @brief 超时等待条件变量
@@ -246,40 +246,40 @@ int agentos_cond_wait(agentos_cond_t* cond, agentos_mutex_t* mutex);
  * @param timeout_ms 超时时间（毫秒）
  * @return 0 成功，非0 失败或超时
  */
-int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_t timeout_ms);
+int agentos_cond_timedwait(agentos_cond_t *cond, agentos_mutex_t *mutex, uint32_t timeout_ms);
 
 /**
  * @brief 唤醒一个等待线程
  * @param cond 条件变量指针
  * @return 0 成功，非0 失败
  */
-int agentos_cond_signal(agentos_cond_t* cond);
+int agentos_cond_signal(agentos_cond_t *cond);
 
 /**
  * @brief 唤醒所有等待线程
  * @param cond 条件变量指针
  * @return 0 成功，非0 失败
  */
-int agentos_cond_broadcast(agentos_cond_t* cond);
+int agentos_cond_broadcast(agentos_cond_t *cond);
 
 /**
  * @brief 动态创建条件变量（分配内存并初始化）
  * @return 条件变量指针，失败返回NULL
  */
-agentos_cond_t* agentos_cond_create(void);
+agentos_cond_t *agentos_cond_create(void);
 
 /**
  * @brief 动态销毁条件变量（销毁并释放内存）
  * @param cond 条件变量指针
  */
-void agentos_cond_free(agentos_cond_t* cond);
+void agentos_cond_free(agentos_cond_t *cond);
 
 /* ==================== 线程接口 ==================== */
 
 /**
  * @brief 线程函数类型
  */
-typedef void* (*agentos_thread_func_t)(void* arg);
+typedef void *(*agentos_thread_func_t)(void *arg);
 
 /**
  * @brief 创建线程
@@ -288,7 +288,7 @@ typedef void* (*agentos_thread_func_t)(void* arg);
  * @param arg 线程参数
  * @return 0 成功，非0 失败
  */
-int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg);
+int agentos_platform_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, void *arg);
 
 /**
  * @brief 等待线程结束
@@ -296,7 +296,7 @@ int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func
  * @param retval 返回值指针（可为NULL）
  * @return 0 成功，非0 失败
  */
-int agentos_platform_thread_join(agentos_thread_t thread, void** retval);
+int agentos_platform_thread_join(agentos_thread_t thread, void **retval);
 
 /**
  * @brief 分离线程（线程结束后自动回收资源）
@@ -373,7 +373,8 @@ typedef struct {
  * @param proc 输出进程信息
  * @return 0 成功，非0 失败
  */
-int agentos_process_start(const char* executable, char* const argv[], char* const envp[], agentos_process_info_t* proc);
+int agentos_process_start(const char *executable, char *const argv[], char *const envp[],
+                          agentos_process_info_t *proc);
 
 /**
  * @brief 等待进程结束
@@ -382,20 +383,20 @@ int agentos_process_start(const char* executable, char* const argv[], char* cons
  * @param exit_code 输出退出码（可为NULL）
  * @return 0 成功，非0 失败或超时
  */
-int agentos_process_wait(agentos_process_info_t* proc, uint32_t timeout_ms, int* exit_code);
+int agentos_process_wait(agentos_process_info_t *proc, uint32_t timeout_ms, int *exit_code);
 
 /**
  * @brief 终止进程
  * @param proc 进程信息
  * @return 0 成功，非0 失败
  */
-int agentos_process_kill(agentos_process_info_t* proc);
+int agentos_process_kill(agentos_process_info_t *proc);
 
 /**
  * @brief 关闭进程管道
  * @param proc 进程信息
  */
-void agentos_process_close_pipes(agentos_process_info_t* proc);
+void agentos_process_close_pipes(agentos_process_info_t *proc);
 
 /* ==================== 时间接口 ==================== */
 
@@ -438,7 +439,7 @@ float agentos_random_float(void);
  * @param len 长度
  * @return 0 成功，非0 失败
  */
-int agentos_random_bytes(void* buf, size_t len);
+int agentos_random_bytes(void *buf, size_t len);
 
 /* ==================== 文件系统接口 ==================== */
 
@@ -447,21 +448,21 @@ int agentos_random_bytes(void* buf, size_t len);
  * @param path 文件路径
  * @return 1 存在，0 不存在
  */
-int agentos_file_exists(const char* path);
+int agentos_file_exists(const char *path);
 
 /**
  * @brief 创建目录（递归）
  * @param path 目录路径
  * @return 0 成功，非0 失败
  */
-int agentos_mkdir_p(const char* path);
+int agentos_mkdir_p(const char *path);
 
 /**
  * @brief 获取文件大小
  * @param path 文件路径
  * @return 文件大小，失败返回 -1
  */
-int64_t agentos_file_size(const char* path);
+int64_t agentos_file_size(const char *path);
 
 /* ==================== 网络初始化接口 ==================== */
 
@@ -492,7 +493,7 @@ void agentos_ignore_sigpipe(void);
  * @param dest_size 目标缓冲区大小
  * @return 0成功，非0失败
  */
-int agentos_strlcpy(char* dest, const char* src, size_t dest_size);
+int agentos_strlcpy(char *dest, const char *src, size_t dest_size);
 
 /**
  * @brief 安全的字符串连接
@@ -501,7 +502,7 @@ int agentos_strlcpy(char* dest, const char* src, size_t dest_size);
  * @param dest_size 目标缓冲区大小
  * @return 0成功，非0失败
  */
-int agentos_strlcat(char* dest, const char* src, size_t dest_size);
+int agentos_strlcat(char *dest, const char *src, size_t dest_size);
 
 /* ==================== 错误处理接口 ==================== */
 
@@ -516,7 +517,7 @@ int agentos_get_last_error(void);
  * @param error 错误码
  * @return 错误描述字符串
  */
-const char* agentos_strerror(int error);
+const char *agentos_strerror(int error);
 
 /* ==================== 系统信息类型 (UNI-01: 唯一定义) ==================== */
 
@@ -532,7 +533,7 @@ typedef struct {
 } agentos_sysinfo_t;
 #endif
 
-int agentos_get_sysinfo(agentos_sysinfo_t* info);
+int agentos_get_sysinfo(agentos_sysinfo_t *info);
 
 /* ==================== 原子操作类型 (UNI-01: 唯一定义) ==================== */
 
@@ -542,10 +543,10 @@ int agentos_get_sysinfo(agentos_sysinfo_t* info);
 typedef atomic_int agentos_atomic_int_t;
 #endif
 
-int agentos_atomic_load(agentos_atomic_int_t* atomic);
-void agentos_atomic_store(agentos_atomic_int_t* atomic, int value);
-int agentos_atomic_fetch_add(agentos_atomic_int_t* atomic, int value);
-int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value);
+int agentos_atomic_load(agentos_atomic_int_t *atomic);
+void agentos_atomic_store(agentos_atomic_int_t *atomic, int value);
+int agentos_atomic_fetch_add(agentos_atomic_int_t *atomic, int value);
+int agentos_atomic_fetch_sub(agentos_atomic_int_t *atomic, int value);
 
 #ifdef __cplusplus
 }

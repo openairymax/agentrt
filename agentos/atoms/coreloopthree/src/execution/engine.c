@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 
+
 /* JSON解析库 */
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
@@ -30,6 +31,7 @@
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 #include "platform.h"
+#include "error.h"
 
 typedef struct task_control_block {
     char *task_id;
@@ -242,7 +244,7 @@ static void tcb_release(task_tcb_t *tcb)
     agentos_mutex_lock(tcb->tcb_lock);
     if (tcb->ref_count <= 0) {
         agentos_mutex_unlock(tcb->tcb_lock);
-        AGENTOS_LOG_ERROR("tcb_release: ref_count already zero for task %s", 
+        AGENTOS_LOG_ERROR("tcb_release: ref_count already zero for task %s",
                           tcb->task_id ? tcb->task_id : "(null)");
         return;
     }
@@ -445,7 +447,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
 {
 
     if (!out_engine)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to create execution engine: null out_engine");
     if (max_concurrency == 0)
         max_concurrency = 1;
 
@@ -592,7 +594,7 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
         AGENTOS_LOG_ERROR(
             "Invalid parameters to execution_submit: engine=%p, task=%p, out_task_id=%p",
             (void *)engine, (void *)task, (void *)out_task_id);
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to submit execution: null engine, task, or out_task_id");
     }
 
     agentos_task_t *task_copy = task_desc_deep_copy(task);
@@ -656,7 +658,7 @@ agentos_error_t agentos_execution_query(agentos_execution_engine_t *engine, cons
 {
 
     if (!engine || !task_id || !out_status)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to query execution: null engine, task_id, or out_status");
 
     // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
@@ -755,7 +757,7 @@ agentos_error_t agentos_execution_get_result(agentos_execution_engine_t *engine,
 {
 
     if (!engine || !task_id || !out_result)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get execution result: null engine, task_id, or out_result");
 
     // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
@@ -800,7 +802,7 @@ agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engin
 {
 
     if (!engine || !out_json)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to check execution health: null engine or out_json");
 
     cJSON *root = cJSON_CreateObject();
     if (!root)

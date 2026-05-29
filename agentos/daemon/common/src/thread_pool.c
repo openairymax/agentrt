@@ -1,22 +1,25 @@
-#include "memory_compat.h"
 #include "thread_pool.h"
+
+#include "error.h"
+#include "memory_compat.h"
+
 #include <platform.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 typedef struct task_node {
     thread_task_fn_t fn;
-    void* arg;
-    struct task_node* next;
+    void *arg;
+    struct task_node *next;
 } task_node_t;
 
 struct thread_pool_s {
     thread_pool_config_t config;
-    agentos_thread_t* threads;
+    agentos_thread_t *threads;
     uint32_t thread_count;
-    task_node_t* queue_head;
-    task_node_t* queue_tail;
+    task_node_t *queue_head;
+    task_node_t *queue_tail;
     uint32_t queue_count;
     uint32_t active_count;
     agentos_mutex_t lock;
@@ -25,9 +28,9 @@ struct thread_pool_s {
     bool shutdown;
 };
 
-static void* worker_thread_func(void* arg)
+static void *worker_thread_func(void *arg)
 {
-    thread_pool_t* pool = (thread_pool_t*)arg;
+    thread_pool_t *pool = (thread_pool_t *)arg;
 
     while (true) {
         agentos_mutex_lock(&pool->lock);
@@ -41,10 +44,11 @@ static void* worker_thread_func(void* arg)
             break;
         }
 
-        task_node_t* task = pool->queue_head;
+        task_node_t *task = pool->queue_head;
         if (task) {
             pool->queue_head = task->next;
-            if (!pool->queue_head) pool->queue_tail = NULL;
+            if (!pool->queue_head)
+                pool->queue_tail = NULL;
             pool->queue_count--;
             pool->active_count++;
         }
@@ -64,10 +68,11 @@ static void* worker_thread_func(void* arg)
     return NULL;
 }
 
-thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
+thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
 {
-    thread_pool_t* pool = (thread_pool_t*)AGENTOS_CALLOC(1, sizeof(thread_pool_t));
-    if (!pool) return NULL;
+    thread_pool_t *pool = (thread_pool_t *)AGENTOS_CALLOC(1, sizeof(thread_pool_t));
+    if (!pool)
+        return NULL;
 
     if (config) {
         pool->config = *config;
@@ -80,8 +85,8 @@ thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
         pool->config = defaults;
     }
 
-    pool->threads = (agentos_thread_t*)AGENTOS_CALLOC(
-        pool->config.max_threads, sizeof(agentos_thread_t));
+    pool->threads =
+        (agentos_thread_t *)AGENTOS_CALLOC(pool->config.max_threads, sizeof(agentos_thread_t));
     if (!pool->threads) {
         AGENTOS_FREE(pool);
         return NULL;
@@ -98,12 +103,13 @@ thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
     pool->shutdown = false;
 
     uint32_t num_threads = pool->config.min_threads;
-    if (num_threads < 1) num_threads = 1;
-    if (num_threads > pool->config.max_threads) num_threads = pool->config.max_threads;
+    if (num_threads < 1)
+        num_threads = 1;
+    if (num_threads > pool->config.max_threads)
+        num_threads = pool->config.max_threads;
 
     for (uint32_t i = 0; i < num_threads; i++) {
-        int rc = agentos_thread_create(&pool->threads[i],
-                                                  worker_thread_func, pool);
+        int rc = agentos_thread_create(&pool->threads[i], worker_thread_func, pool);
         if (rc == 0) {
             pool->thread_count++;
         }
@@ -120,9 +126,10 @@ thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
     return pool;
 }
 
-void thread_pool_destroy(thread_pool_t* pool)
+void thread_pool_destroy(thread_pool_t *pool)
 {
-    if (!pool) return;
+    if (!pool)
+        return;
 
     agentos_mutex_lock(&pool->lock);
     pool->shutdown = true;
@@ -133,9 +140,9 @@ void thread_pool_destroy(thread_pool_t* pool)
         agentos_thread_join(pool->threads[i], NULL);
     }
 
-    task_node_t* node = pool->queue_head;
+    task_node_t *node = pool->queue_head;
     while (node) {
-        task_node_t* next = node->next;
+        task_node_t *next = node->next;
         AGENTOS_FREE(node);
         node = next;
     }
@@ -146,15 +153,16 @@ void thread_pool_destroy(thread_pool_t* pool)
     AGENTOS_FREE(pool);
 }
 
-int thread_pool_submit(thread_pool_t* pool,
-                       thread_task_fn_t task,
-                       void* arg)
+int thread_pool_submit(thread_pool_t *pool, thread_task_fn_t task, void *arg)
 {
-    if (!pool || !task) return -1;
-    if (!pool->running) return -2;
+    if (!pool || !task)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (!pool->running)
+        return AGENTOS_ERR_UNKNOWN;
 
-    task_node_t* node = (task_node_t*)AGENTOS_CALLOC(1, sizeof(task_node_t));
-    if (!node) return -3;
+    task_node_t *node = (task_node_t *)AGENTOS_CALLOC(1, sizeof(task_node_t));
+    if (!node)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
     node->fn = task;
     node->arg = arg;
@@ -165,13 +173,13 @@ int thread_pool_submit(thread_pool_t* pool,
     if (pool->shutdown) {
         agentos_mutex_unlock(&pool->lock);
         AGENTOS_FREE(node);
-        return -4;
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     if (pool->queue_count >= pool->config.queue_size) {
         agentos_mutex_unlock(&pool->lock);
         AGENTOS_FREE(node);
-        return -5;
+        return AGENTOS_ERR_OVERFLOW;
     }
 
     if (pool->queue_tail) {
@@ -188,26 +196,29 @@ int thread_pool_submit(thread_pool_t* pool,
     return 0;
 }
 
-uint32_t thread_pool_active_count(thread_pool_t* pool)
+uint32_t thread_pool_active_count(thread_pool_t *pool)
 {
-    if (!pool) return 0;
+    if (!pool)
+        return 0;
     agentos_mutex_lock(&pool->lock);
     uint32_t count = pool->active_count;
     agentos_mutex_unlock(&pool->lock);
     return count;
 }
 
-uint32_t thread_pool_pending_count(thread_pool_t* pool)
+uint32_t thread_pool_pending_count(thread_pool_t *pool)
 {
-    if (!pool) return 0;
+    if (!pool)
+        return 0;
     agentos_mutex_lock(&pool->lock);
     uint32_t count = pool->queue_count;
     agentos_mutex_unlock(&pool->lock);
     return count;
 }
 
-bool thread_pool_is_running(thread_pool_t* pool)
+bool thread_pool_is_running(thread_pool_t *pool)
 {
-    if (!pool) return false;
+    if (!pool)
+        return false;
     return pool->running;
 }

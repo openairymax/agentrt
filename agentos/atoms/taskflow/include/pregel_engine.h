@@ -3,7 +3,7 @@
 /**
  * @file pregel_engine.h
  * @brief Pregel Engine for Distributed Graph Computation
- * 
+ *
  * Pregel 超步引擎，实现 Google Pregel 模型的分布式图计算。
  * 支持迭代计算、消息传递和容错恢复。
  */
@@ -11,8 +11,8 @@
 #ifndef AGENTOS_PREGEL_ENGINE_H
 #define AGENTOS_PREGEL_ENGINE_H
 
-#include "taskflow_types.h"
 #include "graph_engine.h"
+#include "taskflow_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +25,7 @@ extern "C" {
 /**
  * @brief Pregel 引擎句柄（不透明类型）
  */
-typedef struct pregel_engine_s* pregel_engine_handle_t;
+typedef struct pregel_engine_s *pregel_engine_handle_t;
 
 // ============================================================================
 // 超步回调函数类型
@@ -40,14 +40,9 @@ typedef struct pregel_engine_s* pregel_engine_handle_t;
  * @param message_count 消息数量
  * @param user_context 用户上下文
  */
-typedef void (*pregel_compute_func_t)(
-    vertex_id_t vertex_id,
-    void* vertex_value,
-    size_t vertex_value_size,
-    graph_message_t* incoming_messages,
-    size_t message_count,
-    void* user_context
-);
+typedef void (*pregel_compute_func_t)(vertex_id_t vertex_id, void *vertex_value,
+                                      size_t vertex_value_size, graph_message_t *incoming_messages,
+                                      size_t message_count, void *user_context);
 
 /**
  * @brief 消息发送回调函数
@@ -57,33 +52,22 @@ typedef void (*pregel_compute_func_t)(
  * @param payload_size 负载大小
  * @param user_context 用户上下文
  */
-typedef void (*pregel_send_func_t)(
-    vertex_id_t source,
-    vertex_id_t target,
-    const void* payload,
-    size_t payload_size,
-    void* user_context
-);
+typedef void (*pregel_send_func_t)(vertex_id_t source, vertex_id_t target, const void *payload,
+                                   size_t payload_size, void *user_context);
 
 /**
  * @brief 超步开始回调函数
  * @param superstep 超步ID
  * @param user_context 用户上下文
  */
-typedef void (*pregel_superstep_start_func_t)(
-    superstep_t superstep,
-    void* user_context
-);
+typedef void (*pregel_superstep_start_func_t)(superstep_t superstep, void *user_context);
 
 /**
  * @brief 超步结束回调函数
  * @param superstep 超步ID
  * @param user_context 用户上下文
  */
-typedef void (*pregel_superstep_end_func_t)(
-    superstep_t superstep,
-    void* user_context
-);
+typedef void (*pregel_superstep_end_func_t)(superstep_t superstep, void *user_context);
 
 // ============================================================================
 // Pregel 配置
@@ -93,25 +77,25 @@ typedef void (*pregel_superstep_end_func_t)(
  * @brief Pregel 引擎配置
  */
 typedef struct {
-    size_t max_workers;                     /**< 最大工作线程数 */
-    size_t message_buffer_size;             /**< 消息缓冲区大小 */
-    uint32_t superstep_timeout_ms;          /**< 超步超时时间（毫秒） */
-    
+    size_t max_workers;            /**< 最大工作线程数 */
+    size_t message_buffer_size;    /**< 消息缓冲区大小 */
+    uint32_t superstep_timeout_ms; /**< 超步超时时间（毫秒） */
+
     // 回调函数
-    pregel_compute_func_t compute_func;     /**< 顶点计算函数 */
-    pregel_send_func_t send_func;           /**< 消息发送函数 */
+    pregel_compute_func_t compute_func;       /**< 顶点计算函数 */
+    pregel_send_func_t send_func;             /**< 消息发送函数 */
     pregel_superstep_start_func_t start_func; /**< 超步开始函数 */
-    pregel_superstep_end_func_t end_func;   /**< 超步结束函数 */
-    void* user_context;                     /**< 用户上下文 */
-    
+    pregel_superstep_end_func_t end_func;     /**< 超步结束函数 */
+    void *user_context;                       /**< 用户上下文 */
+
     // 容错配置
-    bool enable_fault_tolerance;            /**< 是否启用容错 */
-    size_t checkpoint_interval;             /**< 检查点间隔（超步数） */
-    
+    bool enable_fault_tolerance; /**< 是否启用容错 */
+    size_t checkpoint_interval;  /**< 检查点间隔（超步数） */
+
     // 性能优化
-    bool enable_message_combining;          /**< 是否启用消息合并 */
-    bool enable_edge_caching;               /**< 是否启用边缓存 */
-    size_t batch_size;                      /**< 批处理大小 */
+    bool enable_message_combining; /**< 是否启用消息合并 */
+    bool enable_edge_caching;      /**< 是否启用边缓存 */
+    size_t batch_size;             /**< 批处理大小 */
 } pregel_config_t;
 
 // ============================================================================
@@ -123,7 +107,7 @@ typedef struct {
  * @param config 引擎配置
  * @return 引擎句柄，失败返回 NULL
  */
-pregel_engine_handle_t pregel_engine_create(const pregel_config_t* config);
+pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config);
 
 /**
  * @brief 销毁 Pregel 引擎实例
@@ -138,7 +122,7 @@ void pregel_engine_destroy(pregel_engine_handle_t engine);
  * @return 错误码
  */
 taskflow_error_t pregel_engine_init(pregel_engine_handle_t engine,
-                                   graph_engine_handle_t graph_engine);
+                                    graph_engine_handle_t graph_engine);
 
 /**
  * @brief 启动 Pregel 计算
@@ -146,8 +130,7 @@ taskflow_error_t pregel_engine_init(pregel_engine_handle_t engine,
  * @param max_supersteps 最大超步数
  * @return 错误码
  */
-taskflow_error_t pregel_engine_start(pregel_engine_handle_t engine,
-                                    size_t max_supersteps);
+taskflow_error_t pregel_engine_start(pregel_engine_handle_t engine, size_t max_supersteps);
 
 /**
  * @brief 执行单个超步
@@ -207,11 +190,9 @@ size_t pregel_engine_get_queued_messages(pregel_engine_handle_t engine);
  * @param payload_size 负载大小
  * @return 错误码
  */
-taskflow_error_t pregel_engine_send_message(pregel_engine_handle_t engine,
-                                           vertex_id_t source,
-                                           vertex_id_t target,
-                                           const void* payload,
-                                           size_t payload_size);
+taskflow_error_t pregel_engine_send_message(pregel_engine_handle_t engine, vertex_id_t source,
+                                            vertex_id_t target, const void *payload,
+                                            size_t payload_size);
 
 /**
  * @brief 广播消息
@@ -221,10 +202,8 @@ taskflow_error_t pregel_engine_send_message(pregel_engine_handle_t engine,
  * @param payload_size 负载大小
  * @return 错误码
  */
-taskflow_error_t pregel_engine_broadcast_message(pregel_engine_handle_t engine,
-                                                vertex_id_t source,
-                                                const void* payload,
-                                                size_t payload_size);
+taskflow_error_t pregel_engine_broadcast_message(pregel_engine_handle_t engine, vertex_id_t source,
+                                                 const void *payload, size_t payload_size);
 
 /**
  * @brief 获取顶点投票结果
@@ -232,8 +211,7 @@ taskflow_error_t pregel_engine_broadcast_message(pregel_engine_handle_t engine,
  * @param vertex_id 顶点ID
  * @return 是否投票停止（true: 停止, false: 继续）
  */
-bool pregel_engine_get_vote_to_halt(pregel_engine_handle_t engine,
-                                   vertex_id_t vertex_id);
+bool pregel_engine_get_vote_to_halt(pregel_engine_handle_t engine, vertex_id_t vertex_id);
 
 /**
  * @brief 设置顶点投票结果
@@ -243,8 +221,7 @@ bool pregel_engine_get_vote_to_halt(pregel_engine_handle_t engine,
  * @return 错误码
  */
 taskflow_error_t pregel_engine_set_vote_to_halt(pregel_engine_handle_t engine,
-                                              vertex_id_t vertex_id,
-                                              bool vote_to_halt);
+                                                vertex_id_t vertex_id, bool vote_to_halt);
 
 /**
  * @brief 创建检查点
@@ -260,7 +237,7 @@ uint64_t pregel_engine_create_checkpoint(pregel_engine_handle_t engine);
  * @return 错误码
  */
 taskflow_error_t pregel_engine_restore_checkpoint(pregel_engine_handle_t engine,
-                                                 uint64_t checkpoint_id);
+                                                  uint64_t checkpoint_id);
 
 /**
  * @brief 删除检查点
@@ -277,8 +254,7 @@ taskflow_error_t pregel_engine_delete_checkpoint(pregel_engine_handle_t engine,
  * @param stats 统计信息结构（输出）
  * @return 错误码
  */
-taskflow_error_t pregel_engine_get_stats(pregel_engine_handle_t engine,
-                                        execution_stats_t* stats);
+taskflow_error_t pregel_engine_get_stats(pregel_engine_handle_t engine, execution_stats_t *stats);
 
 /**
  * @brief 重置统计信息
@@ -294,10 +270,10 @@ taskflow_error_t pregel_engine_reset_stats(pregel_engine_handle_t engine);
  * @return 错误码
  */
 taskflow_error_t pregel_engine_wait_for_completion(pregel_engine_handle_t engine,
-                                                  uint32_t timeout_ms);
+                                                   uint32_t timeout_ms);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // AGENTOS_PREGEL_ENGINE_H
+#endif  // AGENTOS_PREGEL_ENGINE_H

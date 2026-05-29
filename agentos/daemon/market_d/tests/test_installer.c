@@ -4,16 +4,18 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "market_service.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "market_service.h"
 
-static void test_installer_agent_install_uninstall(void) {
+static void test_installer_agent_install_uninstall(void)
+{
     printf("  test_installer_agent_install_uninstall...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -31,11 +33,10 @@ static void test_installer_agent_install_uninstall(void) {
     request.id = "install_test_agent";
     request.version = "1.0.0";
 
-    install_result_t* result = NULL;
+    install_result_t *result = NULL;
     ret = market_service_install_agent(svc, &request, &result);
     if (ret == 0 && result != NULL) {
-        printf("    Agent install: success=%d, msg=%s\n",
-               result->success,
+        printf("    Agent install: success=%d, msg=%s\n", result->success,
                result->message ? result->message : "(null)");
         free(result->message);
         free(result->installed_version);
@@ -50,10 +51,11 @@ static void test_installer_agent_install_uninstall(void) {
     printf("    PASSED\n");
 }
 
-static void test_installer_skill_install_uninstall(void) {
+static void test_installer_skill_install_uninstall(void)
+{
     printf("  test_installer_skill_install_uninstall...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -71,11 +73,10 @@ static void test_installer_skill_install_uninstall(void) {
     request.id = "install_test_skill";
     request.force_update = true;
 
-    install_result_t* result = NULL;
+    install_result_t *result = NULL;
     ret = market_service_install_skill(svc, &request, &result);
     if (ret == 0 && result != NULL) {
-        printf("    Skill install: success=%d, version=%s\n",
-               result->success,
+        printf("    Skill install: success=%d, version=%s\n", result->success,
                result->installed_version ? result->installed_version : "(null)");
         free(result->message);
         free(result->installed_version);
@@ -90,19 +91,19 @@ static void test_installer_skill_install_uninstall(void) {
     printf("    PASSED\n");
 }
 
-static void test_installer_check_update(void) {
+static void test_installer_check_update(void)
+{
     printf("  test_installer_check_update...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
     bool has_update = false;
-    char* latest_version = NULL;
+    char *latest_version = NULL;
     ret = market_service_check_update(svc, "some_agent_or_skill_id", &has_update, &latest_version);
     if (ret == 0) {
-        printf("    Update check: has_update=%s, latest=%s\n",
-               has_update ? "yes" : "no",
+        printf("    Update check: has_update=%s, latest=%s\n", has_update ? "yes" : "no",
                latest_version ? latest_version : "(null)");
         free(latest_version);
     } else {
@@ -114,10 +115,11 @@ static void test_installer_check_update(void) {
     printf("    PASSED\n");
 }
 
-static void test_installer_sync_registry(void) {
+static void test_installer_sync_registry(void)
+{
     printf("  test_installer_sync_registry...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -133,10 +135,11 @@ static void test_installer_sync_registry(void) {
     printf("    PASSED\n");
 }
 
-static void test_installer_reload_config(void) {
+static void test_installer_reload_config(void)
+{
     printf("  test_installer_reload_config...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -153,7 +156,8 @@ static void test_installer_reload_config(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Installer Unit Tests\n");
     printf("=========================================\n");

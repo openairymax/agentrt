@@ -11,37 +11,37 @@
  * @note 测试覆盖目标: 90%+
  */
 
+#include "heapstore.h"
+#include "private.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "heapstore.h"
-#include "private.h"
-
 /* ==================== 测试框架宏定义 ==================== */
 
-#define TEST_ASSERT(condition, msg) \
-    do { \
-        if (!(condition)) { \
+#define TEST_ASSERT(condition, msg)                        \
+    do {                                                   \
+        if (!(condition)) {                                \
             printf("FAIL: %s (line %d)\n", msg, __LINE__); \
-            test_failures++; \
-        } else { \
-            printf("PASS: %s\n", msg); \
-            test_passes++; \
-        } \
-    } while(0)
+            test_failures++;                               \
+        } else {                                           \
+            printf("PASS: %s\n", msg);                     \
+            test_passes++;                                 \
+        }                                                  \
+    } while (0)
 
-#define TEST_ASSERT_EQ(expected, actual, msg) \
-    do { \
-        if ((expected) != (actual)) { \
-            printf("FAIL: %s (expected=%d, actual=%d, line %d)\n", \
-                   msg, (int)(expected), (int)(actual), __LINE__); \
-            test_failures++; \
-        } else { \
-            printf("PASS: %s\n", msg); \
-            test_passes++; \
-        } \
-    } while(0)
+#define TEST_ASSERT_EQ(expected, actual, msg)                                            \
+    do {                                                                                 \
+        if ((expected) != (actual)) {                                                    \
+            printf("FAIL: %s (expected=%d, actual=%d, line %d)\n", msg, (int)(expected), \
+                   (int)(actual), __LINE__);                                             \
+            test_failures++;                                                             \
+        } else {                                                                         \
+            printf("PASS: %s\n", msg);                                                   \
+            test_passes++;                                                               \
+        }                                                                                \
+    } while (0)
 
 static int test_passes = 0;
 static int test_failures = 0;
@@ -51,10 +51,11 @@ static int test_failures = 0;
 /**
  * @brief 测试批量上下文初始化和销毁
  */
-static void test_batch_init_destroy(void) {
+static void test_batch_init_destroy(void)
+{
     printf("\n=== Test: Batch Init/Destroy ===\n");
 
-    heapstore_batch_context_t* ctx = NULL;
+    heapstore_batch_context_t *ctx = NULL;
     size_t capacity = 100;
 
     heapstore_error_t err = heapstore_batch_begin(capacity, &ctx);
@@ -69,17 +70,19 @@ static void test_batch_init_destroy(void) {
 /**
  * @brief 测试批量添加日志
  */
-static void test_batch_add_log(void) {
+static void test_batch_add_log(void)
+{
     printf("\n=== Test: Batch Add Log ===\n");
 
-    heapstore_batch_context_t* ctx = NULL;
+    heapstore_batch_context_t *ctx = NULL;
     heapstore_error_t err = heapstore_batch_begin(100, &ctx);
     if (err != heapstore_SUCCESS || !ctx) {
         TEST_ASSERT(false, "Failed to init batch context");
         return;
     }
 
-    err = heapstore_batch_add_log(ctx, HEAPSTORE_LOG_INFO, "test_service", "trace_001", "Test message");
+    err = heapstore_batch_add_log(ctx, HEAPSTORE_LOG_INFO, "test_service", "trace_001",
+                                  "Test message");
     TEST_ASSERT_EQ(heapstore_SUCCESS, err, "add_log should succeed");
     TEST_ASSERT_EQ(1, ctx->count, "count should be 1 after add");
 
@@ -94,7 +97,8 @@ static void test_batch_add_log(void) {
 /**
  * @brief 测试参数验证（边界条件）
  */
-static void test_batch_parameter_validation(void) {
+static void test_batch_parameter_validation(void)
+{
     printf("\n=== Test: Parameter Validation ===\n");
 
     heapstore_error_t err;
@@ -118,16 +122,18 @@ static void test_batch_parameter_validation(void) {
 
     ctx.count = ctx.capacity;
     err = heapstore_batch_add_log(&ctx, HEAPSTORE_LOG_INFO, "svc", NULL, "msg");
-    TEST_ASSERT(err == heapstore_ERR_OUT_OF_MEMORY, "add_log when full should return OUT_OF_MEMORY");
+    TEST_ASSERT(err == heapstore_ERR_OUT_OF_MEMORY,
+                "add_log when full should return OUT_OF_MEMORY");
 }
 
 /**
  * @brief 测试批量提交和回滚
  */
-static void test_batch_commit_rollback(void) {
+static void test_batch_commit_rollback(void)
+{
     printf("\n=== Test: Batch Commit/Rollback ===\n");
 
-    heapstore_batch_context_t* ctx = NULL;
+    heapstore_batch_context_t *ctx = NULL;
     heapstore_error_t err = heapstore_batch_begin(100, &ctx);
     if (err != heapstore_SUCCESS || !ctx) {
         TEST_ASSERT(false, "Failed to init batch context");
@@ -147,7 +153,7 @@ static void test_batch_commit_rollback(void) {
 
     err = heapstore_batch_commit(ctx);
     TEST_ASSERT(err == heapstore_SUCCESS || err == heapstore_ERR_NOT_INITIALIZED,
-                 "commit should succeed or indicate not initialized");
+                "commit should succeed or indicate not initialized");
     TEST_ASSERT_EQ(0, ctx->count, "count should be 0 after commit");
 
     heapstore_batch_destroy(ctx);
@@ -171,11 +177,12 @@ static void test_batch_commit_rollback(void) {
 /**
  * @brief 测试容量限制
  */
-static void test_batch_capacity_limit(void) {
+static void test_batch_capacity_limit(void)
+{
     printf("\n=== Test: Capacity Limit ===\n");
 
     const size_t small_capacity = 3;
-    heapstore_batch_context_t* ctx = NULL;
+    heapstore_batch_context_t *ctx = NULL;
     heapstore_error_t err = heapstore_batch_begin(small_capacity, &ctx);
     if (err != heapstore_SUCCESS || !ctx) {
         TEST_ASSERT(false, "Failed to init batch context");
@@ -202,10 +209,11 @@ static void test_batch_capacity_limit(void) {
 /**
  * @brief 测试重复销毁安全性
  */
-static void test_batch_double_destroy(void) {
+static void test_batch_double_destroy(void)
+{
     printf("\n=== Test: Double Destroy Safety ===\n");
 
-    heapstore_batch_context_t* ctx = NULL;
+    heapstore_batch_context_t *ctx = NULL;
     heapstore_error_t err = heapstore_batch_begin(10, &ctx);
     if (err != heapstore_SUCCESS || !ctx) {
         return;
@@ -220,7 +228,8 @@ static void test_batch_double_destroy(void) {
 
 /* ==================== 主测试入口 ==================== */
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     (void)argc;
     (void)argv;
 

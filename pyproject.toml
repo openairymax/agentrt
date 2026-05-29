@@ -26,7 +26,7 @@ classifiers = [
 ]
 include = [
     "agentos/manager/*.yaml",
-    "scripts/*.py",
+    "scripts/**/*.py",
     "agentos/manuals/**/*.md",
 ]
 

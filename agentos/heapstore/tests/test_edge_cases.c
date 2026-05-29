@@ -9,19 +9,20 @@
  * "From data intelligence emerges."
  */
 
+#include "../include/heapstore.h"
+#include "../include/utils.h"
+#include "platform.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "../include/heapstore.h"
-#include "../include/utils.h"
-
-#include "platform.h"
 #define TEST_PASS(name) printf("✅ PASS: %s\n", name)
 #define TEST_FAIL(name, reason) printf("❌ FAIL: %s - %s\n", name, reason)
 
-static int test_error_message_format(void) {
-    const char* msg = heapstore_strerror(heapstore_ERR_INVALID_PARAM);
+static int test_error_message_format(void)
+{
+    const char *msg = heapstore_strerror(heapstore_ERR_INVALID_PARAM);
 
     if (msg == NULL) {
         TEST_FAIL("error_msg_not_null", "Error message should not be NULL");
@@ -43,7 +44,7 @@ static int test_error_message_format(void) {
         return -1;
     }
 
-    const char* success_msg = heapstore_strerror(heapstore_SUCCESS);
+    const char *success_msg = heapstore_strerror(heapstore_SUCCESS);
     if (strncmp(success_msg, "[OK]", 4) != 0) {
         TEST_FAIL("success_msg_format", "Success message should start with [OK]");
         return -1;
@@ -53,7 +54,8 @@ static int test_error_message_format(void) {
     return 0;
 }
 
-static int test_null_pointer_handling(void) {
+static int test_null_pointer_handling(void)
+{
     heapstore_config_t config = {0};
     config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test";
 
@@ -82,7 +84,8 @@ static int test_null_pointer_handling(void) {
     return 0;
 }
 
-static int test_empty_string_handling(void) {
+static int test_empty_string_handling(void)
+{
     heapstore_config_t config = {0};
     config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test2";
 
@@ -111,7 +114,8 @@ static int test_empty_string_handling(void) {
     return 0;
 }
 
-static int test_very_long_input(void) {
+static int test_very_long_input(void)
+{
     heapstore_config_t config = {0};
     config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test3";
 
@@ -148,7 +152,8 @@ static int test_very_long_input(void) {
     return 0;
 }
 
-static int test_special_characters_in_service_name(void) {
+static int test_special_characters_in_service_name(void)
+{
     heapstore_config_t config = {0};
     config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test4";
 
@@ -158,16 +163,9 @@ static int test_special_characters_in_service_name(void) {
         return -1;
     }
 
-    const char* dangerous_names[] = {
-        "service; rm -rf /",
-        "service$(whoami)",
-        "service`id`",
-        "service|cat /etc/passwd",
-        "service& echo pwned",
-        "service\ninjection",
-        "service\ttab",
-        NULL
-    };
+    const char *dangerous_names[] = {
+        "service; rm -rf /",   "service$(whoami)",   "service`id`",  "service|cat /etc/passwd",
+        "service& echo pwned", "service\ninjection", "service\ttab", NULL};
 
     for (int i = 0; dangerous_names[i] != NULL; i++) {
         err = heapstore_log_write_fast(dangerous_names[i], 0, "test");
@@ -183,7 +181,8 @@ static int test_special_characters_in_service_name(void) {
     return 0;
 }
 
-static int test_sanitize_function_edge_cases(void) {
+static int test_sanitize_function_edge_cases(void)
+{
     char output[256];
 
     if (heapstore_sanitize_path_component(output, "valid_service", sizeof(output)) != 0) {
@@ -229,7 +228,8 @@ static int test_sanitize_function_edge_cases(void) {
     return 0;
 }
 
-static int test_initialization_edge_cases(void) {
+static int test_initialization_edge_cases(void)
+{
     heapstore_config_t config = {0};
     config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test5";
 
@@ -258,7 +258,8 @@ static int test_initialization_edge_cases(void) {
     return 0;
 }
 
-static int test_stats_and_metrics(void) {
+static int test_stats_and_metrics(void)
+{
     heapstore_config_t config = {0};
     config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test6";
 
@@ -295,7 +296,8 @@ static int test_stats_and_metrics(void) {
     return 0;
 }
 
-static int test_health_check(void) {
+static int test_health_check(void)
+{
     heapstore_config_t config = {0};
     config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test7";
 
@@ -324,7 +326,8 @@ static int test_health_check(void) {
     return 0;
 }
 
-int main(void) {
+int main(void)
+{
     int failed = 0;
 
     printf("\n");
@@ -332,15 +335,24 @@ int main(void) {
     printf(" heapstore Edge Cases Test Suite\n");
     printf("========================================\n\n");
 
-    if (test_error_message_format() != 0) failed++;
-    if (test_null_pointer_handling() != 0) failed++;
-    if (test_empty_string_handling() != 0) failed++;
-    if (test_very_long_input() != 0) failed++;
-    if (test_special_characters_in_service_name() != 0) failed++;
-    if (test_sanitize_function_edge_cases() != 0) failed++;
-    if (test_initialization_edge_cases() != 0) failed++;
-    if (test_stats_and_metrics() != 0) failed++;
-    if (test_health_check() != 0) failed++;
+    if (test_error_message_format() != 0)
+        failed++;
+    if (test_null_pointer_handling() != 0)
+        failed++;
+    if (test_empty_string_handling() != 0)
+        failed++;
+    if (test_very_long_input() != 0)
+        failed++;
+    if (test_special_characters_in_service_name() != 0)
+        failed++;
+    if (test_sanitize_function_edge_cases() != 0)
+        failed++;
+    if (test_initialization_edge_cases() != 0)
+        failed++;
+    if (test_stats_and_metrics() != 0)
+        failed++;
+    if (test_health_check() != 0)
+        failed++;
 
     printf("\n========================================\n");
     printf(" Test Results: %d passed, %d failed\n", 9 - failed, failed);

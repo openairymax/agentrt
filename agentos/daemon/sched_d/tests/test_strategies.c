@@ -4,23 +4,25 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "scheduler_service.h"
+#include "strategy_interface.h"
+#include "error.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "scheduler_service.h"
-#include "strategy_interface.h"
 
-static void test_round_robin_strategy(void) {
+static void test_round_robin_strategy(void)
+{
     printf("  test_round_robin_strategy...\n");
 
-    const strategy_interface_t* strategy = get_round_robin_strategy();
+    const strategy_interface_t *strategy = get_round_robin_strategy();
     assert(strategy != NULL);
     assert(strategy->get_name != NULL);
-    assert(strcmp(strategy->get_name(), "round_robin") == 0 ||
-           strategy->get_name() != NULL);
+    assert(strcmp(strategy->get_name(), "round_robin") == 0 || strategy->get_name() != NULL);
 
-    void* data = NULL;
+    void *data = NULL;
     sched_config_t config;
     memset(&config, 0, sizeof(config));
     config.strategy = SCHED_STRATEGY_ROUND_ROBIN;
@@ -49,7 +51,7 @@ static void test_round_robin_strategy(void) {
     task.priority = TASK_PRIORITY_NORMAL;
     task.timeout_ms = 5000;
 
-    sched_result_t* result = NULL;
+    sched_result_t *result = NULL;
     ret = strategy->schedule(data, &task, &result);
     if (ret == 0 && result != NULL) {
         printf("    Selected agent: %s\n", result->selected_agent_id);
@@ -63,13 +65,14 @@ static void test_round_robin_strategy(void) {
     printf("    PASSED\n");
 }
 
-static void test_weighted_strategy(void) {
+static void test_weighted_strategy(void)
+{
     printf("  test_weighted_strategy...\n");
 
-    const strategy_interface_t* strategy = get_weighted_strategy();
+    const strategy_interface_t *strategy = get_weighted_strategy();
     assert(strategy != NULL);
 
-    void* data = NULL;
+    void *data = NULL;
     sched_config_t config;
     memset(&config, 0, sizeof(config));
     config.strategy = SCHED_STRATEGY_WEIGHTED;
@@ -101,11 +104,11 @@ static void test_weighted_strategy(void) {
     task.task_id = "weighted_task_1";
     task.priority = TASK_PRIORITY_NORMAL;
 
-    sched_result_t* result = NULL;
+    sched_result_t *result = NULL;
     ret = strategy->schedule(data, &task, &result);
     if (ret == 0 && result != NULL) {
-        printf("    Selected agent: %s (confidence: %.2f)\n",
-               result->selected_agent_id, result->confidence);
+        printf("    Selected agent: %s (confidence: %.2f)\n", result->selected_agent_id,
+               result->confidence);
     }
 
     strategy->destroy(data);
@@ -113,13 +116,14 @@ static void test_weighted_strategy(void) {
     printf("    PASSED\n");
 }
 
-static void test_ml_based_strategy(void) {
+static void test_ml_based_strategy(void)
+{
     printf("  test_ml_based_strategy...\n");
 
-    const strategy_interface_t* strategy = get_ml_based_strategy();
+    const strategy_interface_t *strategy = get_ml_based_strategy();
     assert(strategy != NULL);
 
-    void* data = NULL;
+    void *data = NULL;
     sched_config_t config;
     memset(&config, 0, sizeof(config));
     config.strategy = SCHED_STRATEGY_ML_BASED;
@@ -141,7 +145,7 @@ static void test_ml_based_strategy(void) {
         task.task_id = "ml_task_1";
         task.priority = TASK_PRIORITY_NORMAL;
 
-        sched_result_t* result = NULL;
+        sched_result_t *result = NULL;
         strategy->schedule(data, &task, &result);
 
         strategy->destroy(data);
@@ -152,13 +156,14 @@ static void test_ml_based_strategy(void) {
     printf("    PASSED\n");
 }
 
-static void test_priority_based_strategy(void) {
+static void test_priority_based_strategy(void)
+{
     printf("  test_priority_based_strategy...\n");
 
-    const strategy_interface_t* strategy = get_priority_based_strategy();
+    const strategy_interface_t *strategy = get_priority_based_strategy();
     assert(strategy != NULL);
 
-    void* data = NULL;
+    void *data = NULL;
     sched_config_t config;
     memset(&config, 0, sizeof(config));
     config.strategy = SCHED_STRATEGY_ROUND_ROBIN;
@@ -186,7 +191,7 @@ static void test_priority_based_strategy(void) {
     high_task.task_id = "high_priority_task";
     high_task.priority = TASK_PRIORITY_HIGH;
 
-    sched_result_t* result = NULL;
+    sched_result_t *result = NULL;
     strategy->schedule(data, &high_task, &result);
 
     strategy->destroy(data);
@@ -194,7 +199,109 @@ static void test_priority_based_strategy(void) {
     printf("    PASSED\n");
 }
 
-static void test_strategy_enum_values(void) {
+static void test_round_robin_error_paths(void)
+{
+    printf("  test_round_robin_error_paths...\n");
+
+    const strategy_interface_t *strategy = get_round_robin_strategy();
+    assert(strategy != NULL);
+
+    void *data = NULL;
+    sched_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.strategy = SCHED_STRATEGY_ROUND_ROBIN;
+    config.max_agents = 2;
+
+    /* create error paths */
+    int ret = strategy->create(NULL, &data);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    ret = strategy->create(&config, NULL);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    /* valid create for subsequent tests */
+    ret = strategy->create(&config, &data);
+    assert(ret == AGENTOS_OK);
+    assert(data != NULL);
+
+    /* register error paths */
+    ret = strategy->register_agent(NULL, NULL);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    ret = strategy->register_agent(data, NULL);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    agent_info_t no_id_agent;
+    memset(&no_id_agent, 0, sizeof(no_id_agent));
+    no_id_agent.agent_id = NULL;
+    ret = strategy->register_agent(data, &no_id_agent);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    /* overflow test: fill to max_agents=2 then try to add one more */
+    agent_info_t agent;
+    memset(&agent, 0, sizeof(agent));
+    agent.agent_id = "err_agent_1";
+    agent.agent_name = "Error Agent 1";
+    agent.is_available = true;
+    ret = strategy->register_agent(data, &agent);
+    assert(ret == AGENTOS_OK);
+
+    agent_info_t agent2;
+    memset(&agent2, 0, sizeof(agent2));
+    agent2.agent_id = "err_agent_2";
+    agent2.agent_name = "Error Agent 2";
+    agent2.is_available = true;
+    ret = strategy->register_agent(data, &agent2);
+    assert(ret == AGENTOS_OK);
+
+    agent_info_t agent3;
+    memset(&agent3, 0, sizeof(agent3));
+    agent3.agent_id = "err_agent_3";
+    agent3.agent_name = "Error Agent 3";
+    agent3.is_available = true;
+    ret = strategy->register_agent(data, &agent3);
+    assert(ret == AGENTOS_ERR_OVERFLOW);
+
+    /* unregister error paths */
+    ret = strategy->unregister_agent(NULL, "err_agent_1");
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    ret = strategy->unregister_agent(data, NULL);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    ret = strategy->unregister_agent(data, "nonexistent_agent");
+    assert(ret == AGENTOS_ERR_NOT_FOUND);
+
+    /* schedule error paths */
+    ret = strategy->schedule(NULL, NULL, NULL);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    sched_result_t *result = NULL;
+    task_info_t task;
+    memset(&task, 0, sizeof(task));
+    task.task_id = "err_task";
+    task.priority = TASK_PRIORITY_NORMAL;
+
+    ret = strategy->schedule(data, NULL, &result);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    ret = strategy->schedule(data, &task, NULL);
+    assert(ret == AGENTOS_ERR_INVALID_PARAM);
+
+    /* schedule with no agents: unregister all, then try schedule */
+    strategy->unregister_agent(data, "err_agent_1");
+    strategy->unregister_agent(data, "err_agent_2");
+
+    ret = strategy->schedule(data, &task, &result);
+    assert(ret == AGENTOS_ERR_NOT_FOUND);
+
+    strategy->destroy(data);
+
+    printf("    PASSED\n");
+}
+
+static void test_strategy_enum_values(void)
+{
     printf("  test_strategy_enum_values...\n");
 
     assert(SCHED_STRATEGY_ROUND_ROBIN == 0);
@@ -210,13 +317,15 @@ static void test_strategy_enum_values(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Scheduler Strategies Unit Tests\n");
     printf("=========================================\n");
 
     test_strategy_enum_values();
     test_round_robin_strategy();
+    test_round_robin_error_paths();
     test_weighted_strategy();
     test_ml_based_strategy();
     test_priority_based_strategy();

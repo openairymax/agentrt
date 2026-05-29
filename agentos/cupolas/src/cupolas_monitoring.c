@@ -19,20 +19,29 @@
  */
 
 #include "cupolas_monitoring.h"
+
 #include "cupolas_metrics.h"
-#include "utils/cupolas_utils.h"
-#include "platform/platform.h"
 #include "gateway.h"
+#include "platform/platform.h"
+#include "utils/cupolas_utils.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
 
 #if cupolas_PLATFORM_WINDOWS
-#include <windows.h>
 #include <psapi.h>
+#include <windows.h>
 #else
 #include <unistd.h>
+#endif
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
 #endif
 
 #define MAX_METRICS_BUFFER (64 * 1024)
@@ -75,29 +84,41 @@ struct cupolas_monitoring {
     uint64_t last_report_time;
     char last_error[512];
 
-    cupolas_monitoring_t* instance;
+    cupolas_monitoring_t *instance;
 };
 
-static cupolas_monitoring_t* g_monitoring = NULL;
+static cupolas_monitoring_t *g_monitoring = NULL;
 static cupolas_rwlock_t g_monitoring_lock = {0};
 
-const char* monitoring_backend_string(monitoring_backend_t backend) {
+const char *monitoring_backend_string(monitoring_backend_t backend)
+{
     switch (backend) {
-        case MONITORING_BACKEND_PROMETHEUS:  return "prometheus";
-        case MONITORING_BACKEND_OPENTELEMETRY: return "opentelemetry";
-        case MONITORING_BACKEND_STATSD:     return "statsd";
-        default:                            return "none";
+    case MONITORING_BACKEND_PROMETHEUS:
+        return "prometheus";
+    case MONITORING_BACKEND_OPENTELEMETRY:
+        return "opentelemetry";
+    case MONITORING_BACKEND_STATSD:
+        return "statsd";
+    default:
+        return "none";
     }
 }
 
-const char* monitoring_status_string(monitoring_status_t status) {
+const char *monitoring_status_string(monitoring_status_t status)
+{
     switch (status) {
-        case MONITORING_STATUS_STOPPED:   return "stopped";
-        case MONITORING_STATUS_STARTING:  return "starting";
-        case MONITORING_STATUS_RUNNING:   return "running";
-        case MONITORING_STATUS_ERROR:     return "error";
-        case MONITORING_STATUS_STOPPING:  return "stopping";
-        default:                          return "unknown";
+    case MONITORING_STATUS_STOPPED:
+        return "stopped";
+    case MONITORING_STATUS_STARTING:
+        return "starting";
+    case MONITORING_STATUS_RUNNING:
+        return "running";
+    case MONITORING_STATUS_ERROR:
+        return "error";
+    case MONITORING_STATUS_STOPPING:
+        return "stopping";
+    default:
+        return "unknown";
     }
 }
 
@@ -105,10 +126,13 @@ const char* monitoring_status_string(monitoring_status_t status) {
 
 #if cupolas_PLATFORM_POSIX
 #include <sys/resource.h>
+#include "memory_compat.h"
 
-static uint64_t get_process_rss_bytes(void) {
-    FILE* f = fopen("/proc/self/status", "r");
-    if (!f) return 0;
+static uint64_t get_process_rss_bytes(void)
+{
+    FILE *f = fopen("/proc/self/status", "r");
+    if (!f)
+        return 0;
     char line[256];
     uint64_t rss = 0;
     while (fgets(line, sizeof(line), f)) {
@@ -123,31 +147,43 @@ static uint64_t get_process_rss_bytes(void) {
     return rss;
 }
 
-static double get_process_cpu_seconds(void) {
-    FILE* f = fopen("/proc/self/stat", "r");
-    if (!f) return 0.0;
+static double get_process_cpu_seconds(void)
+{
+    FILE *f = fopen("/proc/self/stat", "r");
+    if (!f)
+        return 0.0;
     char line[1024];
-    if (!fgets(line, sizeof(line), f)) { fclose(f); return 0.0; }
+    if (!fgets(line, sizeof(line), f)) {
+        fclose(f);
+        return 0.0;
+    }
     fclose(f);
 
     long utime = 0, stime = 0;
     int field = 0;
-    const char* p = line;
+    const char *p = line;
     while (*p && field < 15) {
-        if (*p == ' ') field++;
-        else if (field == 13) utime = strtol(p, NULL, 10);
-        else if (field == 14) stime = strtol(p, NULL, 10);
+        if (*p == ' ')
+            field++;
+        else if (field == 13)
+            utime = strtol(p, NULL, 10);
+        else if (field == 14)
+            stime = strtol(p, NULL, 10);
         p++;
     }
     static long clk_tck = 0;
-    if (clk_tck == 0) clk_tck = sysconf(_SC_CLK_TCK);
-    if (clk_tck <= 0) clk_tck = 100;
+    if (clk_tck == 0)
+        clk_tck = sysconf(_SC_CLK_TCK);
+    if (clk_tck <= 0)
+        clk_tck = 100;
     return (double)(utime + stime) / (double)clk_tck;
 }
 
-static int get_thread_count(void) {
-    FILE* f = fopen("/proc/self/status", "r");
-    if (!f) return 1;
+static int get_thread_count(void)
+{
+    FILE *f = fopen("/proc/self/status", "r");
+    if (!f)
+        return 1;
     char line[256];
     int threads = 1;
     while (fgets(line, sizeof(line), f)) {
@@ -163,54 +199,60 @@ static int get_thread_count(void) {
 #else
 
 #if cupolas_PLATFORM_WINDOWS
-static uint64_t get_process_rss_bytes(void) {
+static uint64_t get_process_rss_bytes(void)
+{
     PROCESS_MEMORY_COUNTERS_EX pmc;
-    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&pmc, sizeof(pmc))) {
         return pmc.WorkingSetSize;
     }
     return 0;
 }
 
-static double get_process_cpu_seconds(void) {
+static double get_process_cpu_seconds(void)
+{
     FILETIME creation, exit, kernel, user;
     if (GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user)) {
         ULARGE_INTEGER kt, ut;
-        kt.LowPart = kernel.dwLowDateTime; kt.HighPart = kernel.dwHighDateTime;
-        ut.LowPart = user.dwLowDateTime; ut.HighPart = user.dwHighDateTime;
+        kt.LowPart = kernel.dwLowDateTime;
+        kt.HighPart = kernel.dwHighDateTime;
+        ut.LowPart = user.dwLowDateTime;
+        ut.HighPart = user.dwHighDateTime;
         return (double)(kt.QuadPart + ut.QuadPart) / 10000000.0;
     }
     return 0.0;
 }
 
-static int get_thread_count(void) {
+static int get_thread_count(void)
+{
     return 1;
 }
 #else
-static uint64_t get_process_rss_bytes(void) {
+static uint64_t get_process_rss_bytes(void)
+{
     return 0;
 }
 
-static double get_process_cpu_seconds(void) {
+static double get_process_cpu_seconds(void)
+{
     return 0.0;
 }
 
-static int get_thread_count(void) {
+static int get_thread_count(void)
+{
     return 1;
 }
 #endif
 
 #endif
 
-static void* collector_thread_func(void* arg) {
-    cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)arg;
+static void *collector_thread_func(void *arg)
+{
+    cupolas_monitoring_t *mgr = (cupolas_monitoring_t *)arg;
 
     while (mgr->collector_running) {
-        metrics_gauge_set(METRIC_PROCESS_MEMORY_BYTES, NULL,
-                          (double)get_process_rss_bytes());
-        metrics_gauge_set(METRIC_PROCESS_CPU_SECONDS, NULL,
-                          get_process_cpu_seconds());
-        metrics_gauge_set(METRIC_THREAD_COUNT, NULL,
-                          (double)get_thread_count());
+        metrics_gauge_set(METRIC_PROCESS_MEMORY_BYTES, NULL, (double)get_process_rss_bytes());
+        metrics_gauge_set(METRIC_PROCESS_CPU_SECONDS, NULL, get_process_cpu_seconds());
+        metrics_gauge_set(METRIC_THREAD_COUNT, NULL, (double)get_thread_count());
 
         for (uint32_t i = 0; i < mgr->collect_interval_ms / 100 && mgr->collector_running; i++) {
             cupolas_sleep_ms(100);
@@ -220,8 +262,9 @@ static void* collector_thread_func(void* arg) {
     return NULL;
 }
 
-static void* reporter_thread_func(void* arg) {
-    cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)arg;
+static void *reporter_thread_func(void *arg)
+{
+    cupolas_monitoring_t *mgr = (cupolas_monitoring_t *)arg;
 
     while (mgr->reporter_running) {
         cupolas_sleep_ms(mgr->collect_interval_ms * 2);
@@ -240,9 +283,10 @@ static void* reporter_thread_func(void* arg) {
 
 /* ========== Dynamic Endpoint Handlers (via gateway registration) ========== */
 
-static int handle_metrics_endpoint(const gateway_endpoint_request_t* req,
-                                   gateway_endpoint_response_t* resp) {
-    cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)req->user_data;
+static int handle_metrics_endpoint(const gateway_endpoint_request_t *req,
+                                   gateway_endpoint_response_t *resp)
+{
+    cupolas_monitoring_t *mgr = (cupolas_monitoring_t *)req->user_data;
 
     cupolas_rwlock_rdlock(&mgr->lock);
 
@@ -254,22 +298,23 @@ static int handle_metrics_endpoint(const gateway_endpoint_request_t* req,
     if (len > 0) {
         resp->status_code = 200;
         resp->content_type = "text/plain; version=0.0.4; charset=utf-8";
-        resp->body = strndup(buf, len);
+        resp->body = AGENTOS_STRNDUP(buf, len);
         resp->body_len = len;
     } else {
-        const char* no_metrics = "# No metrics available\n";
+        const char *no_metrics = "# No metrics available\n";
         resp->status_code = 200;
         resp->content_type = "text/plain; version=0.0.4; charset=utf-8";
-        resp->body = strdup(no_metrics);
+        resp->body = AGENTOS_STRDUP(no_metrics);
         resp->body_len = strlen(no_metrics);
     }
 
     return 0;
 }
 
-static int handle_health_endpoint(const gateway_endpoint_request_t* req,
-                                  gateway_endpoint_response_t* resp) {
-    cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)req->user_data;
+static int handle_health_endpoint(const gateway_endpoint_request_t *req,
+                                  gateway_endpoint_response_t *resp)
+{
+    cupolas_monitoring_t *mgr = (cupolas_monitoring_t *)req->user_data;
 
     health_check_result_t results[MAX_HEALTH_CHECKS];
     int count = cupolas_monitoring_check_health(mgr, results, MAX_HEALTH_CHECKS);
@@ -279,44 +324,45 @@ static int handle_health_endpoint(const gateway_endpoint_request_t* req,
     bool all_healthy = true;
 
     for (int i = 0; i < count && off < sizeof(buf) - 256; i++) {
-        off += snprintf(buf + off, sizeof(buf) - off,
-            "  \"%s\": %s,\n",
-            results[i].component ? results[i].component : "unknown",
-            results[i].healthy ? "true" : "false");
-        if (!results[i].healthy) all_healthy = false;
+        off += snprintf(buf + off, sizeof(buf) - off, "  \"%s\": %s,\n",
+                        results[i].component ? results[i].component : "unknown",
+                        results[i].healthy ? "true" : "false");
+        if (!results[i].healthy)
+            all_healthy = false;
     }
 
-    off += snprintf(buf + off, sizeof(buf) - off,
-                    "  \"status\": \"%s\"\n}\n",
+    off += snprintf(buf + off, sizeof(buf) - off, "  \"status\": \"%s\"\n}\n",
                     all_healthy ? "healthy" : "unhealthy");
 
     resp->status_code = all_healthy ? 200 : 503;
     resp->content_type = "application/json";
-    resp->body = strndup(buf, off);
+    resp->body = AGENTOS_STRNDUP(buf, off);
     resp->body_len = off;
 
     return 0;
 }
 
-static int handle_index_endpoint(const gateway_endpoint_request_t* req __attribute__((unused)),
-                                 gateway_endpoint_response_t* resp) {
-    const char* body =
-        "<html><head><title>Cupolas Monitoring</title></head><body>"
-        "<h2>AgentOS Cupolas Monitoring</h2>"
-        "<ul>"
-        "<li><a href=\"/metrics\">/metrics</a> - Prometheus exposition format</li>"
-        "<li><a href=\"/health\">/health</a> - Health check endpoint</li>"
-        "</ul></body></html>";
+static int handle_index_endpoint(const gateway_endpoint_request_t *req __attribute__((unused)),
+                                 gateway_endpoint_response_t *resp)
+{
+    const char *body = "<html><head><title>Cupolas Monitoring</title></head><body>"
+                       "<h2>AgentOS Cupolas Monitoring</h2>"
+                       "<ul>"
+                       "<li><a href=\"/metrics\">/metrics</a> - Prometheus exposition format</li>"
+                       "<li><a href=\"/health\">/health</a> - Health check endpoint</li>"
+                       "</ul></body></html>";
     resp->status_code = 200;
     resp->content_type = "text/html";
-    resp->body = strdup(body);
+    resp->body = AGENTOS_STRDUP(body);
     resp->body_len = strlen(body);
 
     return 0;
 }
 
-cupolas_monitoring_t* cupolas_monitoring_create(const monitoring_config_t* manager) {
-    cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)cupolas_mem_alloc(sizeof(cupolas_monitoring_t));
+cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *manager)
+{
+    cupolas_monitoring_t *mgr =
+        (cupolas_monitoring_t *)cupolas_mem_alloc(sizeof(cupolas_monitoring_t));
     if (!mgr) {
         return NULL;
     }
@@ -339,13 +385,16 @@ cupolas_monitoring_t* cupolas_monitoring_create(const monitoring_config_t* manag
 
     mgr->collector_running = false;
     mgr->collect_interval_ms = manager ? manager->reporting_interval_ms : 10000;
-    if (mgr->collect_interval_ms < 1000) mgr->collect_interval_ms = 1000;
+    if (mgr->collect_interval_ms < 1000)
+        mgr->collect_interval_ms = 1000;
 
     return mgr;
 }
 
-void cupolas_monitoring_destroy(cupolas_monitoring_t* mgr) {
-    if (!mgr) return;
+void cupolas_monitoring_destroy(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return;
 
     cupolas_monitoring_stop(mgr);
 
@@ -354,8 +403,10 @@ void cupolas_monitoring_destroy(cupolas_monitoring_t* mgr) {
     cupolas_mem_free(mgr);
 }
 
-int cupolas_monitoring_start(cupolas_monitoring_t* mgr) {
-    if (!mgr) return -1;
+int cupolas_monitoring_start(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return AGENTOS_EINVAL;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
@@ -369,36 +420,29 @@ int cupolas_monitoring_start(cupolas_monitoring_t* mgr) {
 
     metrics_init(mgr->collect_interval_ms);
 
-    metric_desc_t mem_desc = {
-        .name = METRIC_PROCESS_MEMORY_BYTES,
-        .help = "Current process resident memory in bytes",
-        .type = METRIC_TYPE_GAUGE,
-        .label_names = NULL,
-        .label_count = 0
-    };
+    metric_desc_t mem_desc = {.name = METRIC_PROCESS_MEMORY_BYTES,
+                              .help = "Current process resident memory in bytes",
+                              .type = METRIC_TYPE_GAUGE,
+                              .label_names = NULL,
+                              .label_count = 0};
     metrics_register(&mem_desc);
 
-    metric_desc_t cpu_desc = {
-        .name = METRIC_PROCESS_CPU_SECONDS,
-        .help = "Total CPU time consumed by process",
-        .type = METRIC_TYPE_GAUGE,
-        .label_names = NULL,
-        .label_count = 0
-    };
+    metric_desc_t cpu_desc = {.name = METRIC_PROCESS_CPU_SECONDS,
+                              .help = "Total CPU time consumed by process",
+                              .type = METRIC_TYPE_GAUGE,
+                              .label_names = NULL,
+                              .label_count = 0};
     metrics_register(&cpu_desc);
 
-    metric_desc_t thread_desc = {
-        .name = METRIC_THREAD_COUNT,
-        .help = "Number of threads in process",
-        .type = METRIC_TYPE_GAUGE,
-        .label_names = NULL,
-        .label_count = 0
-    };
+    metric_desc_t thread_desc = {.name = METRIC_THREAD_COUNT,
+                                 .help = "Number of threads in process",
+                                 .type = METRIC_TYPE_GAUGE,
+                                 .label_names = NULL,
+                                 .label_count = 0};
     metrics_register(&thread_desc);
 
     mgr->collector_running = true;
-    int ret = cupolas_thread_create(&mgr->collector_thread,
-                                    collector_thread_func, mgr);
+    int ret = cupolas_thread_create(&mgr->collector_thread, collector_thread_func, mgr);
     if (ret != 0) {
         CUPOLAS_LOG_ERROR("monitoring: failed to create collector thread");
         mgr->collector_running = false;
@@ -406,8 +450,7 @@ int cupolas_monitoring_start(cupolas_monitoring_t* mgr) {
 
     if (mgr->manager.backend == MONITORING_BACKEND_PROMETHEUS ||
         mgr->manager.backend == MONITORING_BACKEND_ALL) {
-        ret = cupolas_thread_create(&mgr->reporter_thread,
-                                    reporter_thread_func, mgr);
+        ret = cupolas_thread_create(&mgr->reporter_thread, reporter_thread_func, mgr);
         if (ret != 0) {
             CUPOLAS_LOG_ERROR("monitoring: failed to create reporter thread");
         }
@@ -417,19 +460,19 @@ int cupolas_monitoring_start(cupolas_monitoring_t* mgr) {
 
     cupolas_rwlock_unlock(&mgr->lock);
 
-    CUPOLAS_LOG("monitoring: started (collect_ms=%u)",
-                mgr->collect_interval_ms);
+    CUPOLAS_LOG("monitoring: started (collect_ms=%u)", mgr->collect_interval_ms);
 
     return 0;
 }
 
-void cupolas_monitoring_stop(cupolas_monitoring_t* mgr) {
-    if (!mgr) return;
+void cupolas_monitoring_stop(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
-    if (mgr->status != MONITORING_STATUS_RUNNING &&
-        mgr->status != MONITORING_STATUS_STARTING) {
+    if (mgr->status != MONITORING_STATUS_RUNNING && mgr->status != MONITORING_STATUS_STARTING) {
         cupolas_rwlock_unlock(&mgr->lock);
         return;
     }
@@ -441,7 +484,7 @@ void cupolas_monitoring_stop(cupolas_monitoring_t* mgr) {
 
     cupolas_rwlock_unlock(&mgr->lock);
 
-    void* retval = NULL;
+    void *retval = NULL;
     cupolas_thread_join(mgr->reporter_thread, &retval);
 
     cupolas_thread_join(mgr->collector_thread, &retval);
@@ -456,8 +499,10 @@ void cupolas_monitoring_stop(cupolas_monitoring_t* mgr) {
     CUPOLAS_LOG("monitoring: stopped");
 }
 
-monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t* mgr) {
-    if (!mgr) return MONITORING_STATUS_ERROR;
+monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return MONITORING_STATUS_ERROR;
 
     cupolas_rwlock_rdlock(&mgr->lock);
     monitoring_status_t status = mgr->status;
@@ -466,8 +511,10 @@ monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t* mgr) {
     return status;
 }
 
-int cupolas_monitoring_report(cupolas_monitoring_t* mgr) {
-    if (!mgr) return -1;
+int cupolas_monitoring_report(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return AGENTOS_EINVAL;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
@@ -481,8 +528,10 @@ int cupolas_monitoring_report(cupolas_monitoring_t* mgr) {
     return 0;
 }
 
-size_t cupolas_monitoring_export(cupolas_monitoring_t* mgr, char* buffer, size_t size) {
-    if (!mgr || !buffer || size == 0) return 0;
+size_t cupolas_monitoring_export(cupolas_monitoring_t *mgr, char *buffer, size_t size)
+{
+    if (!mgr || !buffer || size == 0)
+        return 0;
 
     cupolas_rwlock_rdlock(&mgr->lock);
 
@@ -524,7 +573,8 @@ size_t cupolas_monitoring_export(cupolas_monitoring_t* mgr, char* buffer, size_t
  *   "timestamp_ns": 1704067200000000000
  * }
  */
-size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, size_t size) {
+size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, size_t size)
+{
     if (!mgr || !buffer || size == 0) {
         return 0;
     }
@@ -537,19 +587,20 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
     }
 
     size_t written = 0;
-    written += snprintf(buffer + written, size - written,
-        "{\n"
-        "  \"resourceMetrics\": [{\n"
-        "    \"resource\": {\n"
-        "      \"attributes\": [\n"
-        "        {\"key\": \"service.name\", \"value\": {\"stringValue\": \"%s\"}}\n"
-        "      ]\n"
-        "    },\n"
-        "    \"scopeMetrics\": [{\n"
-        "      \"scope\": {\"name\": \"cupolas.monitoring\"},\n"
-        "      \"metrics\": [\n",
-        mgr->manager.opentelemetry.service_name ?
-            mgr->manager.opentelemetry.service_name : "cupolas");
+    written +=
+        snprintf(buffer + written, size - written,
+                 "{\n"
+                 "  \"resourceMetrics\": [{\n"
+                 "    \"resource\": {\n"
+                 "      \"attributes\": [\n"
+                 "        {\"key\": \"service.name\", \"value\": {\"stringValue\": \"%s\"}}\n"
+                 "      ]\n"
+                 "    },\n"
+                 "    \"scopeMetrics\": [{\n"
+                 "      \"scope\": {\"name\": \"cupolas.monitoring\"},\n"
+                 "      \"metrics\": [\n",
+                 mgr->manager.opentelemetry.service_name ? mgr->manager.opentelemetry.service_name
+                                                         : "cupolas");
 
     if (written >= size) {
         cupolas_rwlock_unlock(&mgr->lock);
@@ -557,8 +608,8 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
     }
 
     bool first_metric = true;
-    const char* metric_data = mgr->metrics_buffer;
-    const char* line_start = metric_data;
+    const char *metric_data = mgr->metrics_buffer;
+    const char *line_start = metric_data;
     int line_num = 0;
 
     while (*metric_data && written < size) {
@@ -569,8 +620,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
                 strncpy(line, line_start, line_len);
                 line[line_len] = '\0';
 
-                if (strncmp(line, "# HELP ", 7) == 0 ||
-                    strncmp(line, "# TYPE ", 7) == 0) {
+                if (strncmp(line, "# HELP ", 7) == 0 || strncmp(line, "# TYPE ", 7) == 0) {
                     line_start = metric_data + 1;
                     metric_data++;
                     line_num++;
@@ -581,7 +631,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
                     char metric_name[128] = {0};
                     char metric_value[64] = {0};
 
-                    char* space_pos = strrchr(line, ' ');
+                    char *space_pos = strrchr(line, ' ');
                     if (space_pos) {
                         size_t name_len = (size_t)(space_pos - line);
                         if (name_len < sizeof(metric_name)) {
@@ -591,12 +641,12 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
                             metric_value[sizeof(metric_value) - 1] = '\0';
 
                             if (!first_metric) {
-                                written += snprintf(buffer + written, size - written,
-                                    ",\n");
+                                written += snprintf(buffer + written, size - written, ",\n");
                             }
                             first_metric = false;
 
-                            written += snprintf(buffer + written, size - written,
+                            written += snprintf(
+                                buffer + written, size - written,
                                 "        {\n"
                                 "          \"name\": \"%s\",\n"
                                 "          \"description\": \"%s metric exported from cupolas\",\n"
@@ -610,8 +660,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
                                 "            }]\n"
                                 "          }\n"
                                 "        }",
-                                metric_name, metric_name,
-                                (unsigned long long)mgr->last_report_time,
+                                metric_name, metric_name, (unsigned long long)mgr->last_report_time,
                                 metric_value);
 
                             if (written >= size) {
@@ -628,31 +677,32 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
     }
 
     written += snprintf(buffer + written, size - written,
-        "\n      ]\n"
-        "    }]\n"
-        "  }],\n"
-        "  \"timestamp_ns\": %llu\n"
-        "}\n",
-        (unsigned long long)mgr->last_report_time);
+                        "\n      ]\n"
+                        "    }]\n"
+                        "  }],\n"
+                        "  \"timestamp_ns\": %llu\n"
+                        "}\n",
+                        (unsigned long long)mgr->last_report_time);
 
     cupolas_rwlock_unlock(&mgr->lock);
 
     return (written < size) ? written : 0;
 }
 
-int cupolas_monitoring_register_health_check(cupolas_monitoring_t* mgr,
-                                         const char* name,
-                                         health_check_fn_t callback) {
-    if (!mgr || !name || !callback) return -1;
+int cupolas_monitoring_register_health_check(cupolas_monitoring_t *mgr, const char *name,
+                                             health_check_fn_t callback)
+{
+    if (!mgr || !name || !callback)
+        return AGENTOS_EINVAL;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
     if (mgr->health_check_count >= MAX_HEALTH_CHECKS) {
         cupolas_rwlock_unlock(&mgr->lock);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
-    health_check_entry_t* entry = &mgr->health_checks[mgr->health_check_count++];
+    health_check_entry_t *entry = &mgr->health_checks[mgr->health_check_count++];
     snprintf(entry->name, sizeof(entry->name), "%s", name);
     entry->callback = callback;
     entry->registered = true;
@@ -662,16 +712,17 @@ int cupolas_monitoring_register_health_check(cupolas_monitoring_t* mgr,
     return 0;
 }
 
-int cupolas_monitoring_check_health(cupolas_monitoring_t* mgr,
-                                health_check_result_t* results,
-                                size_t max_results) {
-    if (!mgr || !results || max_results == 0) return 0;
+int cupolas_monitoring_check_health(cupolas_monitoring_t *mgr, health_check_result_t *results,
+                                    size_t max_results)
+{
+    if (!mgr || !results || max_results == 0)
+        return 0;
 
     cupolas_rwlock_rdlock(&mgr->lock);
 
     size_t count = 0;
     for (size_t i = 0; i < mgr->health_check_count && count < max_results; i++) {
-        health_check_entry_t* entry = &mgr->health_checks[i];
+        health_check_entry_t *entry = &mgr->health_checks[i];
         if (entry->registered && entry->callback) {
             results[count].timestamp_ns = metrics_get_timestamp_ns();
             results[count].healthy = entry->callback();
@@ -686,30 +737,33 @@ int cupolas_monitoring_check_health(cupolas_monitoring_t* mgr,
     return (int)count;
 }
 
-const char* cupolas_monitoring_get_listen_addr(cupolas_monitoring_t* mgr) {
-    if (!mgr) return NULL;
+const char *cupolas_monitoring_get_listen_addr(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return NULL;
 
     cupolas_rwlock_rdlock(&mgr->lock);
     static char addr[128];
-    snprintf(addr, sizeof(addr), "%s:%u",
-            mgr->manager.prometheus.listen_addr,
-            mgr->manager.prometheus.port);
+    snprintf(addr, sizeof(addr), "%s:%u", mgr->manager.prometheus.listen_addr,
+             mgr->manager.prometheus.port);
     cupolas_rwlock_unlock(&mgr->lock);
 
     return addr;
 }
 
-int cupolas_monitoring_set_filter(cupolas_monitoring_t* mgr,
-                               const char** include_patterns,
-                               const char** exclude_patterns) {
-    if (!mgr) return -1;
+int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **include_patterns,
+                                  const char **exclude_patterns)
+{
+    if (!mgr)
+        return AGENTOS_EINVAL;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
     mgr->include_count = 0;
     if (include_patterns) {
         for (size_t i = 0; include_patterns[i] && mgr->include_count < MAX_FILTER_PATTERNS; i++) {
-            strncpy(mgr->include_patterns[mgr->include_count], include_patterns[i], MAX_PATTERN_LEN - 1);
+            strncpy(mgr->include_patterns[mgr->include_count], include_patterns[i],
+                    MAX_PATTERN_LEN - 1);
             mgr->include_patterns[mgr->include_count][MAX_PATTERN_LEN - 1] = '\0';
             mgr->include_count++;
         }
@@ -718,7 +772,8 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t* mgr,
     mgr->exclude_count = 0;
     if (exclude_patterns) {
         for (size_t i = 0; exclude_patterns[i] && mgr->exclude_count < MAX_FILTER_PATTERNS; i++) {
-            strncpy(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i], MAX_PATTERN_LEN - 1);
+            strncpy(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i],
+                    MAX_PATTERN_LEN - 1);
             mgr->exclude_patterns[mgr->exclude_count][MAX_PATTERN_LEN - 1] = '\0';
             mgr->exclude_count++;
         }
@@ -729,8 +784,10 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t* mgr,
     return 0;
 }
 
-size_t cupolas_monitoring_get_metric_count(cupolas_monitoring_t* mgr) {
-    if (!mgr) return 0;
+size_t cupolas_monitoring_get_metric_count(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return 0;
 
     cupolas_rwlock_rdlock(&mgr->lock);
     size_t count = metrics_get_count();
@@ -739,8 +796,10 @@ size_t cupolas_monitoring_get_metric_count(cupolas_monitoring_t* mgr) {
     return count;
 }
 
-uint64_t cupolas_monitoring_get_last_report_time(cupolas_monitoring_t* mgr) {
-    if (!mgr) return 0;
+uint64_t cupolas_monitoring_get_last_report_time(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return 0;
 
     cupolas_rwlock_rdlock(&mgr->lock);
     uint64_t time = mgr->last_report_time;
@@ -749,19 +808,24 @@ uint64_t cupolas_monitoring_get_last_report_time(cupolas_monitoring_t* mgr) {
     return time;
 }
 
-const char* cupolas_monitoring_get_last_error(cupolas_monitoring_t* mgr) {
-    if (!mgr) return NULL;
+const char *cupolas_monitoring_get_last_error(cupolas_monitoring_t *mgr)
+{
+    if (!mgr)
+        return NULL;
 
     cupolas_rwlock_rdlock(&mgr->lock);
-    const char* error = mgr->last_error[0] ? mgr->last_error : NULL;
+    const char *error = mgr->last_error[0] ? mgr->last_error : NULL;
     cupolas_rwlock_unlock(&mgr->lock);
 
     return error;
 }
 
-monitoring_config_t* monitoring_config_create_prometheus(uint16_t port) {
-    monitoring_config_t* manager = (monitoring_config_t*)cupolas_mem_alloc(sizeof(monitoring_config_t));
-    if (!manager) return NULL;
+monitoring_config_t *monitoring_config_create_prometheus(uint16_t port)
+{
+    monitoring_config_t *manager =
+        (monitoring_config_t *)cupolas_mem_alloc(sizeof(monitoring_config_t));
+    if (!manager)
+        return NULL;
 
     memset(manager, 0, sizeof(monitoring_config_t));
 
@@ -776,10 +840,13 @@ monitoring_config_t* monitoring_config_create_prometheus(uint16_t port) {
     return manager;
 }
 
-monitoring_config_t* monitoring_config_create_opentelemetry(const char* endpoint,
-                                                           const char* service_name) {
-    monitoring_config_t* manager = (monitoring_config_t*)cupolas_mem_alloc(sizeof(monitoring_config_t));
-    if (!manager) return NULL;
+monitoring_config_t *monitoring_config_create_opentelemetry(const char *endpoint,
+                                                            const char *service_name)
+{
+    monitoring_config_t *manager =
+        (monitoring_config_t *)cupolas_mem_alloc(sizeof(monitoring_config_t));
+    if (!manager)
+        return NULL;
 
     memset(manager, 0, sizeof(monitoring_config_t));
 
@@ -793,18 +860,21 @@ monitoring_config_t* monitoring_config_create_opentelemetry(const char* endpoint
     return manager;
 }
 
-void monitoring_config_destroy(monitoring_config_t* manager) {
+void monitoring_config_destroy(monitoring_config_t *manager)
+{
     cupolas_mem_free(manager);
 }
 
-cupolas_monitoring_t* cupolas_monitoring_get_instance(void) {
+cupolas_monitoring_t *cupolas_monitoring_get_instance(void)
+{
     cupolas_rwlock_rdlock(&g_monitoring_lock);
-    cupolas_monitoring_t* instance = g_monitoring;
+    cupolas_monitoring_t *instance = g_monitoring;
     cupolas_rwlock_unlock(&g_monitoring_lock);
     return instance;
 }
 
-int cupolas_monitoring_init_instance(const monitoring_config_t* manager) {
+int cupolas_monitoring_init_instance(const monitoring_config_t *manager)
+{
     cupolas_rwlock_wrlock(&g_monitoring_lock);
 
     if (g_monitoring) {
@@ -815,7 +885,7 @@ int cupolas_monitoring_init_instance(const monitoring_config_t* manager) {
     g_monitoring = cupolas_monitoring_create(manager);
     if (!g_monitoring) {
         cupolas_rwlock_unlock(&g_monitoring_lock);
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     cupolas_rwlock_unlock(&g_monitoring_lock);
@@ -823,7 +893,8 @@ int cupolas_monitoring_init_instance(const monitoring_config_t* manager) {
     return cupolas_monitoring_start(g_monitoring);
 }
 
-void cupolas_monitoring_shutdown_instance(void) {
+void cupolas_monitoring_shutdown_instance(void)
+{
     cupolas_rwlock_wrlock(&g_monitoring_lock);
 
     if (g_monitoring) {
@@ -835,30 +906,29 @@ void cupolas_monitoring_shutdown_instance(void) {
     cupolas_rwlock_unlock(&g_monitoring_lock);
 }
 
-int cupolas_monitoring_register_endpoints(cupolas_monitoring_t* mgr, gateway_t* gw) {
-    if (!mgr || !gw) return -1;
+int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr, gateway_t *gw)
+{
+    if (!mgr || !gw)
+        return AGENTOS_EINVAL;
 
     agentos_error_t err;
 
-    err = gateway_register_endpoint(gw, "GET", "/metrics",
-                                    handle_metrics_endpoint, mgr);
+    err = gateway_register_endpoint(gw, "GET", "/metrics", handle_metrics_endpoint, mgr);
     if (err != AGENTOS_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /metrics endpoint");
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
-    err = gateway_register_endpoint(gw, "GET", "/health",
-                                    handle_health_endpoint, mgr);
+    err = gateway_register_endpoint(gw, "GET", "/health", handle_health_endpoint, mgr);
     if (err != AGENTOS_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /health endpoint");
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
-    err = gateway_register_endpoint(gw, "GET", "/monitoring",
-                                    handle_index_endpoint, mgr);
+    err = gateway_register_endpoint(gw, "GET", "/monitoring", handle_index_endpoint, mgr);
     if (err != AGENTOS_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /monitoring endpoint");
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     CUPOLAS_LOG("monitoring: endpoints registered with gateway");

@@ -16,6 +16,7 @@
 #define GATEWAY_SYSCALL_ROUTER_H
 
 #include "agentos.h"
+
 #include <cjson/cJSON.h>
 
 #ifdef __cplusplus
@@ -32,7 +33,7 @@ extern "C" {
  * @param[in] request_id 请求 ID（可为 NULL）
  * @return JSON 响应字符串，需调用者 free()
  */
-char* gateway_syscall_route(const char* method, cJSON* params, cJSON* request_id);
+char *gateway_syscall_route(const char *method, cJSON *params, cJSON *request_id);
 
 #ifdef __cplusplus
 }
