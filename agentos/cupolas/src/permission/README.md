@@ -2,7 +2,7 @@
 
 `cupolas/src/permission/` 提供基于 RBAC（基于角色的访问控制）和 ABAC（基于属性的访问控制）的权限管理引擎。
 
-> Part of AgentOS v0.0.5
+> Part of AgentOS v0.1.0
 
 ## 设计目标
 

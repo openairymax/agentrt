@@ -63,7 +63,7 @@ from .plugin import (
     ResolutionResult, ReloadResult, get_plugin_registry,
 )
 
-__version__ = "2.0.0"
+__version__ = "0.1.0"
 __author__ = "SPHARX Ltd."
 
 __all__ = [
