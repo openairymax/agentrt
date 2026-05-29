@@ -58,7 +58,7 @@ void heapstore_memory_shutdown(void);
  * @threadsafe 是
  * @reentrant 否
  */
-heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* pool);
+heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t *pool);
 
 /**
  * @brief 获取内存池信息
@@ -72,7 +72,7 @@ heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* po
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_memory_get_pool(const char* pool_id, heapstore_memory_pool_t* pool);
+heapstore_error_t heapstore_memory_get_pool(const char *pool_id, heapstore_memory_pool_t *pool);
 
 /**
  * @brief 更新内存池使用情况
@@ -86,7 +86,8 @@ heapstore_error_t heapstore_memory_get_pool(const char* pool_id, heapstore_memor
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_memory_update_pool_usage(const char* pool_id, size_t used_size, uint32_t free_block_count);
+heapstore_error_t heapstore_memory_update_pool_usage(const char *pool_id, size_t used_size,
+                                                     uint32_t free_block_count);
 
 /**
  * @brief 记录内存分配
@@ -99,7 +100,8 @@ heapstore_error_t heapstore_memory_update_pool_usage(const char* pool_id, size_t
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allocation_t* allocation);
+heapstore_error_t
+heapstore_memory_record_allocation(const heapstore_memory_allocation_t *allocation);
 
 /**
  * @brief 获取内存分配记录
@@ -113,7 +115,8 @@ heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allo
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_memory_get_allocation(const char* allocation_id, heapstore_memory_allocation_t* allocation);
+heapstore_error_t heapstore_memory_get_allocation(const char *allocation_id,
+                                                  heapstore_memory_allocation_t *allocation);
 
 /**
  * @brief 更新分配状态（释放）
@@ -125,7 +128,7 @@ heapstore_error_t heapstore_memory_get_allocation(const char* allocation_id, hea
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_memory_free_allocation(const char* allocation_id);
+heapstore_error_t heapstore_memory_free_allocation(const char *allocation_id);
 
 /**
  * @brief 获取内存存储统计信息
@@ -140,7 +143,8 @@ heapstore_error_t heapstore_memory_free_allocation(const char* allocation_id);
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_memory_get_stats(uint32_t* pool_count, uint32_t* total_allocations, uint64_t* total_size);
+heapstore_error_t heapstore_memory_get_stats(uint32_t *pool_count, uint32_t *total_allocations,
+                                             uint64_t *total_size);
 
 /**
  * @brief 检查内存系统是否健康

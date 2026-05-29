@@ -13,8 +13,8 @@
 #define heapstore_UTILS_H
 
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,7 +32,7 @@ extern "C" {
  *
  * @note 支持创建多级嵌套目录
  */
-bool heapstore_ensure_directory(const char* path);
+bool heapstore_ensure_directory(const char *path);
 
 /**
  * @brief 计算目录的总大小和文件数量
@@ -49,7 +49,7 @@ bool heapstore_ensure_directory(const char* path);
  * @note 递归计算子目录大小
  * @since v1.0.0
  */
-bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, uint32_t* out_count);
+bool heapstore_calculate_directory_size(const char *path, uint64_t *out_size, uint32_t *out_count);
 
 /**
  * @brief 净化路径组件，防止路径遍历和注入攻击
@@ -83,14 +83,15 @@ bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, ui
  * @example
  * @code
  * char safe_name[256];
- * if (heapstore_sanitize_path_component(safe_name, "../../../etc/passwd", sizeof(safe_name)) != 0) {
+ * if (heapstore_sanitize_path_component(safe_name, "../../../etc/passwd", sizeof(safe_name)) != 0)
+ * {
  *     // 输入被拒绝，包含路径遍历攻击
  *     return ERROR_INVALID_PARAM;
  * }
  * // safe_name 现在是安全的，可用于路径构造
  * @endcode
  */
-int heapstore_sanitize_path_component(char* output, const char* input, size_t size);
+int heapstore_sanitize_path_component(char *output, const char *input, size_t size);
 
 /**
  * @brief 验证标识符是否安全（不包含路径遍历等危险模式）
@@ -115,7 +116,7 @@ int heapstore_sanitize_path_component(char* output, const char* input, size_t si
  *
  * @since v1.0.0.7
  */
-bool heapstore_is_safe_identifier(const char* input);
+bool heapstore_is_safe_identifier(const char *input);
 
 #ifdef __cplusplus
 }

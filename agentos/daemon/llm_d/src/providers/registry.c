@@ -5,13 +5,14 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "platform.h"
 #include "registry.h"
 #include "svc_logger.h"
-#include "platform.h"
+
+#include <cjson/cJSON.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <cjson/cJSON.h>
 
 /* 外部声明各提供商操作表 */
 extern const provider_ops_t openai_ops;
@@ -21,27 +22,37 @@ extern const provider_ops_t google_ops;
 extern const provider_ops_t local_ops;
 
 struct provider_registry {
-    provider_t* providers;
+    provider_t *providers;
     agentos_mutex_t lock;
 };
 
-static const provider_ops_t* get_ops_by_name(const char* name) {
-    if (strcmp(name, "openai") == 0) return &openai_ops;
-    if (strcmp(name, "anthropic") == 0) return &anthropic_ops;
-    if (strcmp(name, "deepseek") == 0) return &deepseek_ops;
-    if (strcmp(name, "google") == 0) return &google_ops;
-    if (strcmp(name, "local") == 0) return &local_ops;
+static const provider_ops_t *get_ops_by_name(const char *name)
+{
+    if (strcmp(name, "openai") == 0)
+        return &openai_ops;
+    if (strcmp(name, "anthropic") == 0)
+        return &anthropic_ops;
+    if (strcmp(name, "deepseek") == 0)
+        return &deepseek_ops;
+    if (strcmp(name, "google") == 0)
+        return &google_ops;
+    if (strcmp(name, "local") == 0)
+        return &local_ops;
     return NULL;
 }
 
-provider_registry_t* provider_registry_create(const service_config_t* cfg) {
-    provider_registry_t* reg = AGENTOS_CALLOC(1, sizeof(provider_registry_t));
-    if (!reg) return NULL;
+provider_registry_t *provider_registry_create(const service_config_t *cfg)
+{
+    provider_registry_t *reg = AGENTOS_CALLOC(1, sizeof(provider_registry_t));
+    if (!reg)
+        return NULL;
     agentos_mutex_init(&reg->lock);
 
     size_t count = 0;
-    while (cfg->providers && cfg->providers[count].name) count++;
-    if (count == 0) return reg;
+    while (cfg->providers && cfg->providers[count].name)
+        count++;
+    if (count == 0)
+        return reg;
 
     reg->providers = AGENTOS_CALLOC(count + 1, sizeof(provider_t));
     if (!reg->providers) {
@@ -50,25 +61,25 @@ provider_registry_t* provider_registry_create(const service_config_t* cfg) {
     }
 
     for (size_t i = 0; i < count; ++i) {
-        const provider_config_t* pcfg = (const provider_config_t*)&cfg->providers[i];
-        const provider_ops_t* ops = get_ops_by_name(pcfg->name);
+        const provider_config_t *pcfg = (const provider_config_t *)&cfg->providers[i];
+        const provider_ops_t *ops = get_ops_by_name(pcfg->name);
         if (!ops) {
             SVC_LOG_WARN("Unknown provider: %s, skipping", pcfg->name);
             continue;
         }
 
-        provider_ctx_t* ctx = ops->init(pcfg->name, pcfg->api_key,
-                                         pcfg->api_base, pcfg->organization,
-                                         pcfg->timeout_sec, pcfg->max_retries);
+        provider_ctx_t *ctx = ops->init(pcfg->name, pcfg->api_key, pcfg->api_base,
+                                        pcfg->organization, pcfg->timeout_sec, pcfg->max_retries);
         if (!ctx) {
             SVC_LOG_ERROR("Failed to init provider: %s", pcfg->name);
             continue;
         }
 
-        char** models = NULL;
+        char **models = NULL;
         size_t model_cnt = 0;
         if (pcfg->models) {
-            while (pcfg->models[model_cnt]) model_cnt++;
+            while (pcfg->models[model_cnt])
+                model_cnt++;
             models = AGENTOS_CALLOC(model_cnt + 1, sizeof(*models));
             if (models) {
                 for (size_t j = 0; j < model_cnt; ++j)
@@ -85,14 +96,17 @@ provider_registry_t* provider_registry_create(const service_config_t* cfg) {
     return reg;
 }
 
-provider_registry_t* provider_registry_create_from_config(const service_config_t* cfg,
-                                                           const char* config_path) {
-    provider_registry_t* reg = provider_registry_create(cfg);
-    if (!reg) return NULL;
+provider_registry_t *provider_registry_create_from_config(const service_config_t *cfg,
+                                                          const char *config_path)
+{
+    provider_registry_t *reg = provider_registry_create(cfg);
+    if (!reg)
+        return NULL;
 
-    if (!config_path) return reg;
+    if (!config_path)
+        return reg;
 
-    FILE* f = fopen(config_path, "rb");
+    FILE *f = fopen(config_path, "rb");
     if (!f) {
         SVC_LOG_WARN("Cannot open provider config '%s'", config_path);
         return reg;
@@ -102,23 +116,29 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    if (len <= 0) { fclose(f); return reg; }
+    if (len <= 0) {
+        fclose(f);
+        return reg;
+    }
 
-    char* content = (char*)AGENTOS_MALLOC((size_t)len + 1);
-    if (!content) { fclose(f); return reg; }
+    char *content = (char *)AGENTOS_MALLOC((size_t)len + 1);
+    if (!content) {
+        fclose(f);
+        return reg;
+    }
 
     size_t read_len = fread(content, 1, (size_t)len, f);
     content[read_len] = '\0';
     fclose(f);
 
-    cJSON* root = cJSON_Parse(content);
+    cJSON *root = cJSON_Parse(content);
     AGENTOS_FREE(content);
     if (!root) {
         SVC_LOG_WARN("Failed to parse provider config '%s'", config_path);
         return reg;
     }
 
-    cJSON* providers_arr = cJSON_GetObjectItem(root, "providers");
+    cJSON *providers_arr = cJSON_GetObjectItem(root, "providers");
     if (!providers_arr || !cJSON_IsArray(providers_arr)) {
         cJSON_Delete(root);
         SVC_LOG_WARN("No 'providers' array in '%s'", config_path);
@@ -126,18 +146,27 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
     }
 
     int n = cJSON_GetArraySize(providers_arr);
-    if (n <= 0) { cJSON_Delete(root); return reg; }
+    if (n <= 0) {
+        cJSON_Delete(root);
+        return reg;
+    }
 
     agentos_mutex_lock(&reg->lock);
 
     size_t old_count = 0;
     if (reg->providers) {
-        while (reg->providers[old_count].name) old_count++;
+        while (reg->providers[old_count].name)
+            old_count++;
     }
 
     size_t new_count = (size_t)n;
-    provider_t* new_provs = (provider_t*)AGENTOS_CALLOC(old_count + new_count + 1, sizeof(provider_t));
-    if (!new_provs) { agentos_mutex_unlock(&reg->lock); cJSON_Delete(root); return reg; }
+    provider_t *new_provs =
+        (provider_t *)AGENTOS_CALLOC(old_count + new_count + 1, sizeof(provider_t));
+    if (!new_provs) {
+        agentos_mutex_unlock(&reg->lock);
+        cJSON_Delete(root);
+        return reg;
+    }
 
     if (reg->providers) {
         memcpy(new_provs, reg->providers, old_count * sizeof(provider_t));
@@ -147,19 +176,20 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
 
     size_t valid_idx = old_count;
     for (int i = 0; i < n; ++i) {
-        cJSON* pitem = cJSON_GetArrayItem(providers_arr, i);
-        cJSON* pname = cJSON_GetObjectItem(pitem, "name");
-        cJSON* pkey_env = cJSON_GetObjectItem(pitem, "api_key_env");
-        cJSON* pkey = cJSON_GetObjectItem(pitem, "api_key");
-        cJSON* pbase = cJSON_GetObjectItem(pitem, "base_url");
-        cJSON* ptimeout = cJSON_GetObjectItem(pitem, "timeout_sec");
-        cJSON* pretries = cJSON_GetObjectItem(pitem, "max_retries");
-        cJSON* pmodels = cJSON_GetObjectItem(pitem, "models");
+        cJSON *pitem = cJSON_GetArrayItem(providers_arr, i);
+        cJSON *pname = cJSON_GetObjectItem(pitem, "name");
+        cJSON *pkey_env = cJSON_GetObjectItem(pitem, "api_key_env");
+        cJSON *pkey = cJSON_GetObjectItem(pitem, "api_key");
+        cJSON *pbase = cJSON_GetObjectItem(pitem, "base_url");
+        cJSON *ptimeout = cJSON_GetObjectItem(pitem, "timeout_sec");
+        cJSON *pretries = cJSON_GetObjectItem(pitem, "max_retries");
+        cJSON *pmodels = cJSON_GetObjectItem(pitem, "models");
 
-        if (!cJSON_IsString(pname)) continue;
+        if (!cJSON_IsString(pname))
+            continue;
 
-        const char* name_str = pname->valuestring;
-        const provider_ops_t* ops = get_ops_by_name(name_str);
+        const char *name_str = pname->valuestring;
+        const provider_ops_t *ops = get_ops_by_name(name_str);
         if (!ops) {
             SVC_LOG_WARN("Unknown provider in config: %s, skipping", name_str);
             continue;
@@ -167,38 +197,37 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
 
         char api_key_buf[512] = {0};
         if (cJSON_IsString(pkey_env) && pkey_env->valuestring[0]) {
-            const char* env_val = getenv(pkey_env->valuestring);
+            const char *env_val = getenv(pkey_env->valuestring);
             if (env_val && env_val[0]) {
                 strncpy(api_key_buf, env_val, sizeof(api_key_buf) - 1);
             } else {
-                SVC_LOG_WARN("Env var '%s' not set for provider '%s'",
-                             pkey_env->valuestring, name_str);
+                SVC_LOG_WARN("Env var '%s' not set for provider '%s'", pkey_env->valuestring,
+                             name_str);
             }
         } else if (cJSON_IsString(pkey) && pkey->valuestring[0]) {
             strncpy(api_key_buf, pkey->valuestring, sizeof(api_key_buf) - 1);
         }
 
-        const char* base_str = cJSON_IsString(pbase) ? pbase->valuestring : NULL;
+        const char *base_str = cJSON_IsString(pbase) ? pbase->valuestring : NULL;
         double timeout = cJSON_IsNumber(ptimeout) ? ptimeout->valuedouble : 30.0;
         int retries = cJSON_IsNumber(pretries) ? pretries->valueint : 3;
 
-        provider_ctx_t* ctx = ops->init(name_str,
-                                         api_key_buf[0] ? api_key_buf : NULL,
-                                         base_str, NULL,
-                                         timeout, retries);
+        provider_ctx_t *ctx = ops->init(name_str, api_key_buf[0] ? api_key_buf : NULL, base_str,
+                                        NULL, timeout, retries);
         if (!ctx) {
             SVC_LOG_ERROR("Failed to init provider '%s' from config", name_str);
             continue;
         }
 
-        char** models = NULL;
+        char **models = NULL;
         if (cJSON_IsArray(pmodels)) {
             int mcount = cJSON_GetArraySize(pmodels);
-            models = (char**)AGENTOS_CALLOC((size_t)mcount + 1, sizeof(char*));
+            models = (char **)AGENTOS_CALLOC((size_t)mcount + 1, sizeof(char *));
             if (models) {
                 for (int j = 0; j < mcount; ++j) {
-                    cJSON* mitem = cJSON_GetArrayItem(pmodels, j);
-                    if (cJSON_IsString(mitem)) models[j] = AGENTOS_STRDUP(mitem->valuestring);
+                    cJSON *mitem = cJSON_GetArrayItem(pmodels, j);
+                    if (cJSON_IsString(mitem))
+                        models[j] = AGENTOS_STRDUP(mitem->valuestring);
                 }
                 models[mcount] = NULL;
             }
@@ -218,15 +247,18 @@ provider_registry_t* provider_registry_create_from_config(const service_config_t
     return reg;
 }
 
-void provider_registry_destroy(provider_registry_t* reg) {
-    if (!reg) return;
+void provider_registry_destroy(provider_registry_t *reg)
+{
+    if (!reg)
+        return;
     agentos_mutex_lock(&reg->lock);
     if (reg->providers) {
-        for (provider_t* p = reg->providers; p->name; ++p) {
+        for (provider_t *p = reg->providers; p->name; ++p) {
             p->ops->destroy(p->ctx);
-            AGENTOS_FREE((void*)p->name);
+            AGENTOS_FREE((void *)p->name);
             if (p->models) {
-                for (char** m = p->models; *m; ++m) AGENTOS_FREE(*m);
+                for (char **m = p->models; *m; ++m)
+                    AGENTOS_FREE(*m);
                 AGENTOS_FREE(p->models);
             }
         }
@@ -238,16 +270,19 @@ void provider_registry_destroy(provider_registry_t* reg) {
     AGENTOS_FREE(reg);
 }
 
-const provider_t* provider_registry_find(provider_registry_t* reg, const char* model) {
-    if (!reg) return NULL;
+const provider_t *provider_registry_find(provider_registry_t *reg, const char *model)
+{
+    if (!reg)
+        return NULL;
     agentos_mutex_lock(&reg->lock);
     if (!reg->providers) {
         agentos_mutex_unlock(&reg->lock);
         return NULL;
     }
-    for (provider_t* p = reg->providers; p->name; ++p) {
-        if (!p->models) continue;
-        for (char** m = p->models; *m; ++m) {
+    for (provider_t *p = reg->providers; p->name; ++p) {
+        if (!p->models)
+            continue;
+        for (char **m = p->models; *m; ++m) {
             if (strcmp(*m, model) == 0) {
                 agentos_mutex_unlock(&reg->lock);
                 return p;

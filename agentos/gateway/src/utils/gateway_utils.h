@@ -15,17 +15,17 @@
 #ifndef GATEWAY_UTILS_H
 #define GATEWAY_UTILS_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <windows.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
-    #include <time.h>
-    #include <unistd.h>
+#include <time.h>
+#include <unistd.h>
 #endif
 
 #ifdef __cplusplus
@@ -43,7 +43,8 @@ extern "C" {
  * @threadsafe 安全（只读操作）
  * @note 精度：Windows ~100ns，POSIX ~1ns（取决于硬件）
  */
-static inline uint64_t gateway_time_ns(void) {
+static inline uint64_t gateway_time_ns(void)
+{
 #ifdef _WIN32
     FILETIME ft;
     ULARGE_INTEGER uli;
@@ -65,7 +66,8 @@ static inline uint64_t gateway_time_ns(void) {
  *
  * @param seconds 睡眠秒数
  */
-static inline void gateway_sleep(unsigned int seconds) {
+static inline void gateway_sleep(unsigned int seconds)
+{
 #ifdef _WIN32
     Sleep(seconds * 1000);
 #else
@@ -79,7 +81,8 @@ static inline void gateway_sleep(unsigned int seconds) {
  * @param start_ns 起始时间戳
  * @return 从 start_ns 到现在经过的纳秒数
  */
-static inline uint64_t gateway_elapsed_ns(uint64_t start_ns) {
+static inline uint64_t gateway_elapsed_ns(uint64_t start_ns)
+{
     return gateway_time_ns() - start_ns;
 }
 
@@ -89,7 +92,8 @@ static inline uint64_t gateway_elapsed_ns(uint64_t start_ns) {
  * @param ns 纳秒值
  * @return 毫秒值
  */
-static inline uint64_t gateway_ns_to_ms(uint64_t ns) {
+static inline uint64_t gateway_ns_to_ms(uint64_t ns)
+{
     return ns / 1000000ULL;
 }
 

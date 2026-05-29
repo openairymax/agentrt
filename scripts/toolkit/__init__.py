@@ -35,22 +35,22 @@ Usage:
     )
 """
 
-from .initializer import ConfigInitializer
-from .doctor import AgentOSDoctor
-from .memory_manager import MemoryManager
-from .checkpoint_manager import CheckpointManager
-from .token_utils import TokenCounter, TokenBudget, get_token_counter, get_token_budget
-from .benchmark import AgentOSBenchmark, BenchmarkReporter
-from .validate_contracts import ContractValidator
-from .config_engine import ConfigEngine, Environment, create_default_engine
-from .plugin import PluginRegistry, Plugin, PluginMetadata
-from .events import EventBus, Event, EventHandler
-from .security import SecurityManager, InputValidator
-from .telemetry import MetricsCollector, Metric
-from .cli import AgentOSCLI
-from .logger import Color, Style, Logger, OutputFormatter, ProgressBar, Spinner, Table
+from .src.initializer import ConfigInitializer
+from .src.doctor import AgentOSDoctor
+from .src.memory_manager import MemoryManager
+from .src.checkpoint_manager import CheckpointManager
+from .src.token_utils import TokenCounter, TokenBudget, get_token_counter, get_token_budget
+from .src.benchmark import AgentOSBenchmark, BenchmarkReporter
+from .src.validate_contracts import ContractValidator
+from .src.config_engine import ConfigEngine, Environment, create_default_engine
+from .src.plugin import PluginRegistry, Plugin, PluginMetadata
+from .src.events import EventBus, Event, EventHandler
+from .src.security import SecurityManager, InputValidator
+from .src.telemetry import MetricsCollector, Metric
+from .src.cli import AgentOSCLI
+from .src.logger import Color, Style, Logger, OutputFormatter, ProgressBar, Spinner, Table
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 __author__ = "SPHARX Ltd."
 
 __all__ = [

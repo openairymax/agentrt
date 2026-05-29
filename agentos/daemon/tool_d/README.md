@@ -1,6 +1,6 @@
 # Tool Daemon — 工具执行守护进程
 
-> **Version**: AgentOS v0.0.5 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
+> **Version**: AgentOS v0.1.0 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
 
 `daemon/tool_d/` 是 AgentOS 的工具执行守护进程，负责外部工具的注册、发现、安全执行和结果管理。
 

@@ -9,6 +9,7 @@
 
 #include "cognition/delegate.h"
 #include "cognition/parallel_dispatcher.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
@@ -19,43 +20,44 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        printf("  Running: %s\n", #func);                                                                              \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)                    \
+    do {                                  \
+        tests_run++;                      \
+        printf("  Running: %s\n", #func); \
+        func();                           \
+        tests_passed++;                   \
     } while (0)
 
-#define RUN_TEST_MAY_FAIL(func)                                                                                        \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        printf("  Running: %s\n", #func);                                                                              \
-        func();                                                                                                        \
+#define RUN_TEST_MAY_FAIL(func)           \
+    do {                                  \
+        tests_run++;                      \
+        printf("  Running: %s\n", #func); \
+        func();                           \
     } while (0)
 
 static int g_exec_count = 0;
 
-static agentos_error_t mock_executor(const char *tool_name, const char *arguments, size_t arguments_len,
-                                     char **out_output, size_t *out_output_len, void *user_data)
+static agentos_error_t mock_executor(const char *tool_name, const char *arguments,
+                                     size_t arguments_len, char **out_output,
+                                     size_t *out_output_len, void *user_data)
 {
-    (void) user_data;
+    (void)user_data;
     g_exec_count++;
     if (out_output && out_output_len) {
         char buf[256];
-        int n           = snprintf(buf, sizeof(buf),
-                                   "{\"tool\":\"%s\",\"result\":\"ok\","
-                                             "\"args_len\":%zu}",
+        int n = snprintf(buf, sizeof(buf),
+                         "{\"tool\":\"%s\",\"result\":\"ok\","
+                         "\"args_len\":%zu}",
                          tool_name ? tool_name : "", arguments_len);
-        *out_output     = strdup(buf);
-        *out_output_len = (size_t) n;
+        *out_output = strdup(buf);
+        *out_output_len = (size_t)n;
     }
     return AGENTOS_SUCCESS;
 }
@@ -122,14 +124,15 @@ static void test_dispatch_single_call(void)
     g_exec_count = 0;
     agentos_tool_call_t call;
     memset(&call, 0, sizeof(call));
-    call.tool_name     = "test_tool";
-    call.arguments     = "{\"param\":\"value\"}";
+    call.tool_name = "test_tool";
+    call.arguments = "{\"param\":\"value\"}";
     call.arguments_len = strlen(call.arguments);
-    call.safety_class  = AGENTOS_TOOL_READ_ONLY;
+    call.safety_class = AGENTOS_TOOL_READ_ONLY;
 
     agentos_tool_result_t *results = NULL;
-    size_t result_count            = 0;
-    agentos_error_t err            = agentos_parallel_dispatcher_dispatch(d, &call, 1, &results, &result_count);
+    size_t result_count = 0;
+    agentos_error_t err =
+        agentos_parallel_dispatcher_dispatch(d, &call, 1, &results, &result_count);
 
     printf("    Single dispatch: err=%d, results=%zu, exec=%d\n", err, result_count, g_exec_count);
     TEST_PASS("dispatch single call");
@@ -151,14 +154,14 @@ static void test_dispatch_multiple_calls(void)
     const char *tools[] = {"search", "read", "write", "list", "calc"};
     for (int i = 0; i < 5; i++) {
         memset(&calls[i], 0, sizeof(calls[i]));
-        calls[i].tool_name     = tools[i];
-        calls[i].arguments     = "{}";
+        calls[i].tool_name = tools[i];
+        calls[i].arguments = "{}";
         calls[i].arguments_len = 2;
-        calls[i].safety_class  = (agentos_tool_safety_class_t) (i % 4);
+        calls[i].safety_class = (agentos_tool_safety_class_t)(i % 4);
     }
 
     agentos_tool_result_t *results = NULL;
-    size_t result_count            = 0;
+    size_t result_count = 0;
     agentos_parallel_dispatcher_dispatch(d, calls, 5, &results, &result_count);
 
     printf("    Multi dispatch: results=%zu, exec=%d\n", result_count, g_exec_count);
@@ -174,10 +177,10 @@ static void test_dispatch_safety_classification(void)
     const char *names[] = {"read_only", "write_shared", "interactive", "side_effect"};
     for (int i = 0; i < 4; i++) {
         memset(&calls[i], 0, sizeof(calls[i]));
-        calls[i].tool_name     = names[i];
-        calls[i].arguments     = "{}";
+        calls[i].tool_name = names[i];
+        calls[i].arguments = "{}";
         calls[i].arguments_len = 2;
-        calls[i].safety_class  = (agentos_tool_safety_class_t) i;
+        calls[i].safety_class = (agentos_tool_safety_class_t)i;
     }
     assert(calls[0].safety_class == AGENTOS_TOOL_READ_ONLY);
     assert(calls[1].safety_class == AGENTOS_TOOL_WRITE_SHARED);
@@ -190,8 +193,8 @@ static void test_delegate_create_destroy(void)
 {
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
-    config.focus_prompt   = "Focus on data analysis";
-    config.max_depth      = 1;
+    config.focus_prompt = "Focus on data analysis";
+    config.max_depth = 1;
     config.max_iterations = 5;
 
     agentos_delegate_task_t *task = agentos_delegate_create("Analyze the dataset", &config);
@@ -212,7 +215,7 @@ static void test_delegate_assign_collect(void)
 {
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
-    config.max_depth      = 1;
+    config.max_depth = 1;
     config.max_iterations = 3;
 
     agentos_delegate_task_t *task = agentos_delegate_create("Process user request", &config);
@@ -222,14 +225,14 @@ static void test_delegate_assign_collect(void)
         return;
     }
 
-    g_exec_count        = 0;
+    g_exec_count = 0;
     agentos_error_t err = agentos_delegate_assign(task, mock_executor, NULL);
     printf("    Assign result: %d, state=%d\n", err, agentos_delegate_get_state(task));
     assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_COMPLETED);
 
-    char *result      = NULL;
+    char *result = NULL;
     size_t result_len = 0;
-    err               = agentos_delegate_collect(task, &result, &result_len);
+    err = agentos_delegate_collect(task, &result, &result_len);
 
     printf("    Collect: err=%d, len=%zu, exec=%d\n", err, result_len, g_exec_count);
     TEST_PASS("delegate assign and collect cycle");
@@ -327,14 +330,14 @@ static void test_dispatcher_cancel(void)
 
     agentos_tool_call_t call;
     memset(&call, 0, sizeof(call));
-    call.tool_name     = "test_tool";
-    call.arguments     = "{}";
+    call.tool_name = "test_tool";
+    call.arguments = "{}";
     call.arguments_len = 2;
-    call.safety_class  = AGENTOS_TOOL_READ_ONLY;
+    call.safety_class = AGENTOS_TOOL_READ_ONLY;
 
     agentos_tool_result_t *results = NULL;
-    size_t result_count            = 0;
-    err                            = agentos_parallel_dispatcher_dispatch(d, &call, 1, &results, &result_count);
+    size_t result_count = 0;
+    err = agentos_parallel_dispatcher_dispatch(d, &call, 1, &results, &result_count);
     assert(err == AGENTOS_ENOTINIT);
 
     TEST_PASS("dispatcher cancel sets cancelled flag and blocks dispatch");
@@ -375,8 +378,8 @@ static void test_delegate_collect_not_completed(void)
         return;
     }
 
-    char *result        = NULL;
-    size_t result_len   = 0;
+    char *result = NULL;
+    size_t result_len = 0;
     agentos_error_t err = agentos_delegate_collect(task, &result, &result_len);
     assert(err == AGENTOS_EBUSY);
 
@@ -398,9 +401,11 @@ static void test_struct_sizes(void)
     assert(sizeof(agentos_tool_call_t) >= sizeof(char *) * 3 + sizeof(size_t) + sizeof(int));
     assert(sizeof(agentos_tool_result_t) >=
            sizeof(char *) * 2 + sizeof(agentos_error_t) + sizeof(size_t) + sizeof(uint64_t));
-    assert(sizeof(agentos_delegate_config_t) >= sizeof(char *) * 2 + sizeof(size_t) + sizeof(int) * 2 + sizeof(float));
-    assert(sizeof(agentos_delegate_task_t) >= sizeof(char *) * 2 + sizeof(agentos_delegate_config_t) +
-                                                  sizeof(agentos_error_t) + sizeof(agentos_delegate_state_t));
+    assert(sizeof(agentos_delegate_config_t) >=
+           sizeof(char *) * 2 + sizeof(size_t) + sizeof(int) * 2 + sizeof(float));
+    assert(sizeof(agentos_delegate_task_t) >=
+           sizeof(char *) * 2 + sizeof(agentos_delegate_config_t) + sizeof(agentos_error_t) +
+               sizeof(agentos_delegate_state_t));
     TEST_PASS("struct sizes adequate");
 }
 

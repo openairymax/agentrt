@@ -15,21 +15,22 @@
  */
 
 #include "atomic_compat.h"
-#include "tool_service.h"
-#include "platform.h"
-#include "thread_pool.h"
+#include "daemon_event_driver.h"
 #include "error.h"
-#include "svc_logger.h"
 #include "jsonrpc_helpers.h"
+#include "logging.h"
 #include "method_dispatcher.h"
 #include "param_validator.h"
+#include "platform.h"
+#include "svc_logger.h"
 #include "thread_pool.h"
-#include "daemon_event_driver.h"
+#include "tool_service.h"
+
+#include <cjson/cJSON.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-#include <cjson/cJSON.h>
 
 /* ==================== 配置常量 ==================== */
 
@@ -43,16 +44,16 @@ static void handle_client(agentos_socket_t client_fd);
 
 /* ==================== 全局状态 ==================== */
 
-static tool_service_t* g_service = NULL;
+static tool_service_t *g_service = NULL;
 static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
-static method_dispatcher_t* g_dispatcher = NULL;
-static daemon_event_driver_t* g_event_driver = NULL;
+static method_dispatcher_t *g_dispatcher = NULL;
+static daemon_event_driver_t *g_event_driver = NULL;
 
 /* 服务配置 */
 typedef struct {
-    char* socket_path;
-    char* tcp_host;
+    char *socket_path;
+    char *tcp_host;
     uint16_t tcp_port;
     int use_tcp;
     int max_clients;
@@ -66,11 +67,13 @@ static tool_daemon_config_t g_config = {0};
  * @brief 信号处理函数
  * @param sig 信号值
  */
-static void signal_handler(int sig __attribute__((unused))) {
+static void signal_handler(int sig __attribute__((unused)))
+{
     agentos_mutex_lock(&g_running_lock);
     atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     agentos_mutex_unlock(&g_running_lock);
-    if (g_event_driver) daemon_event_driver_stop(g_event_driver);
+    if (g_event_driver)
+        daemon_event_driver_stop(g_event_driver);
 }
 
 #ifdef _WIN32
@@ -79,33 +82,37 @@ static void signal_handler(int sig __attribute__((unused))) {
  * @param fdwCtrlType 控制信号类型
  * @return TRUE 已处理
  */
-static BOOL WINAPI console_handler(DWORD fdwCtrlType) {
+static BOOL WINAPI console_handler(DWORD fdwCtrlType)
+{
     switch (fdwCtrlType) {
-        case CTRL_C_EVENT:
-        case CTRL_CLOSE_EVENT:
-        case CTRL_SHUTDOWN_EVENT:
-            signal_handler((int)fdwCtrlType);
-            return TRUE;
-        default:
-            return FALSE;
+    case CTRL_C_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        signal_handler((int)fdwCtrlType);
+        return TRUE;
+    default:
+        return FALSE;
     }
 }
 #endif
 
+static void svc_log_toggle_handler(int sig)
+{
+    (void)sig;
+    static int debug_mode = 0;
+    debug_mode = !debug_mode;
+    log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_INFO);
+}
+
 /* ==================== JSON-RPC 错误码 ==================== */
 
-#define PARSE_ERROR     -32700
-#define INVALID_REQUEST -32600
-#define METHOD_NOT_FOUND -32601
-#define INVALID_PARAMS  -32602
-#define INTERNAL_ERROR  -32000
 
 /* ==================== 请求处理方法 ==================== */
 
 /**
  * @brief 处理 register 方法
  */
-static void handle_register(cJSON* params, int id, agentos_socket_t fd);
+static void handle_register(cJSON *params, int id, agentos_socket_t fd);
 
 /**
  * @brief 处理 list_tools 方法
@@ -115,12 +122,12 @@ static void handle_list(int id, agentos_socket_t fd);
 /**
  * @brief 处理 get_tool 方法
  */
-static void handle_get(cJSON* params, int id, agentos_socket_t fd);
+static void handle_get(cJSON *params, int id, agentos_socket_t fd);
 
 /**
  * @brief 处理 execute_tool 方法
  */
-static void handle_execute(cJSON* params, int id, agentos_socket_t fd);
+static void handle_execute(cJSON *params, int id, agentos_socket_t fd);
 
 /**
  * @brief 方法处理器包装函数
@@ -129,32 +136,37 @@ static void handle_execute(cJSON* params, int id, agentos_socket_t fd);
 /**
  * @brief register 方法的包装器
  */
-static void on_register_method(cJSON* params, int id, void* user_data) {
-    handle_register(params, id, *(agentos_socket_t*)user_data);
+static void on_register_method(cJSON *params, int id, void *user_data)
+{
+    handle_register(params, id, *(agentos_socket_t *)user_data);
 }
 
 /**
  * @brief list 方法的包装器
  */
-static void on_list_method(cJSON* params, int id, void* user_data) {
-    handle_list(id, *(agentos_socket_t*)user_data);
+static void on_list_method(cJSON *params, int id, void *user_data)
+{
+    handle_list(id, *(agentos_socket_t *)user_data);
 }
 
 /**
  * @brief get 方法的包装器
  */
-static void on_get_method(cJSON* params, int id, void* user_data) {
-    handle_get(params, id, *(agentos_socket_t*)user_data);
+static void on_get_method(cJSON *params, int id, void *user_data)
+{
+    handle_get(params, id, *(agentos_socket_t *)user_data);
 }
 
 /**
  * @brief execute 方法的包装器
  */
-static void on_execute_method(cJSON* params, int id, void* user_data) {
-    handle_execute(params, id, *(agentos_socket_t*)user_data);
+static void on_execute_method(cJSON *params, int id, void *user_data)
+{
+    handle_execute(params, id, *(agentos_socket_t *)user_data);
 }
 
-static int tool_on_client(void* service_ctx, agentos_socket_t client_fd) {
+static int tool_on_client(void *service_ctx, agentos_socket_t client_fd)
+{
     (void)service_ctx;
     handle_client(client_fd);
     return 0;
@@ -166,44 +178,48 @@ static int tool_on_client(void* service_ctx, agentos_socket_t client_fd) {
  * @param id 请求 ID
  * @param client_fd 客户端描述符
  */
-static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* tool = jsonrpc_get_object_param(params, "tool");
+static void handle_register(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    cJSON *tool = jsonrpc_get_object_param(params, "tool");
     if (!tool) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing tool object", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS, "Missing tool object", id);
         return;
     }
 
     tool_metadata_t meta = {0};
-    const char* tid = get_string_field(tool, "id", NULL);
-    const char* tname = get_string_field(tool, "name", NULL);
-    const char* texec = get_string_field(tool, "executable", NULL);
+    const char *tid = get_string_field(tool, "id", NULL);
+    const char *tname = get_string_field(tool, "name", NULL);
+    const char *texec = get_string_field(tool, "executable", NULL);
 
     if (!tid || !tname || !texec) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Invalid tool fields: id, name, executable required", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS,
+                           "Invalid tool fields: id, name, executable required", id);
         return;
     }
 
-    meta.id = (char*)tid;
-    meta.name = (char*)tname;
-    meta.executable = (char*)texec;
+    meta.id = (char *)tid;
+    meta.name = (char *)tname;
+    meta.executable = (char *)texec;
 
-    meta.description = (char*)get_string_field(tool, "description", NULL);
+    meta.description = (char *)get_string_field(tool, "description", NULL);
     meta.timeout_sec = get_int_field(tool, "timeout_sec", 0);
     meta.cacheable = get_bool_field(tool, "cacheable", false);
-    meta.permission_rule = (char*)get_string_field(tool, "permission_rule", NULL);
+    meta.permission_rule = (char *)get_string_field(tool, "permission_rule", NULL);
 
     /* 参数列表 */
-    cJSON* params_arr = cJSON_GetObjectItem(tool, "params");
+    cJSON *params_arr = cJSON_GetObjectItem(tool, "params");
     if (cJSON_IsArray(params_arr)) {
         size_t cnt = cJSON_GetArraySize(params_arr);
-        tool_param_t* p = (tool_param_t*)AGENTOS_CALLOC(cnt, sizeof(tool_param_t));
+        tool_param_t *p = (tool_param_t *)AGENTOS_CALLOC(cnt, sizeof(tool_param_t));
         if (p) {
             for (size_t i = 0; i < cnt; ++i) {
-                cJSON* item = cJSON_GetArrayItem(params_arr, i);
-                cJSON* pname = cJSON_GetObjectItem(item, "name");
-                cJSON* pschema = cJSON_GetObjectItem(item, "schema");
-                if (cJSON_IsString(pname)) p[i].name = pname->valuestring;
-                if (cJSON_IsString(pschema)) p[i].schema = pschema->valuestring;
+                cJSON *item = cJSON_GetArrayItem(params_arr, i);
+                cJSON *pname = cJSON_GetObjectItem(item, "name");
+                cJSON *pschema = cJSON_GetObjectItem(item, "schema");
+                if (cJSON_IsString(pname))
+                    p[i].name = pname->valuestring;
+                if (cJSON_IsString(pschema))
+                    p[i].schema = pschema->valuestring;
             }
             meta.params = p;
             meta.param_count = cnt;
@@ -211,10 +227,10 @@ static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
     }
 
     int ret = tool_service_register(g_service, &meta);
-    AGENTOS_FREE((void*)meta.params);
+    AGENTOS_FREE((void *)meta.params);
 
     if (ret != AGENTOS_SUCCESS) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Register failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Register failed", id);
         SVC_LOG_ERROR("Failed to register tool: %s (error=%d)", meta.id, ret);
     } else {
         JSONRPC_SEND_SUCCESS(client_fd, NULL, id);
@@ -227,18 +243,19 @@ static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
  * @param id 请求ID
  * @param client_fd 客户端描述符
  */
-static void handle_list(int id, agentos_socket_t client_fd) {
-    char* list_json = tool_service_list(g_service);
+static void handle_list(int id, agentos_socket_t client_fd)
+{
+    char *list_json = tool_service_list(g_service);
     if (!list_json) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "List failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "List failed", id);
         return;
     }
 
-    cJSON* result = cJSON_Parse(list_json);
+    cJSON *result = cJSON_Parse(list_json);
     AGENTOS_FREE(list_json);
 
     if (!result) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Invalid JSON from list", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Invalid JSON from list", id);
         return;
     }
 
@@ -251,32 +268,35 @@ static void handle_list(int id, agentos_socket_t client_fd) {
  * @param id 请求ID
  * @param client_fd 客户端描述符
  */
-static void handle_get(cJSON* params, int id, agentos_socket_t client_fd) {
-    const char* tid = get_string_field(params, "tool_id", NULL);
+static void handle_get(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    const char *tid = get_string_field(params, "tool_id", NULL);
     if (!tid) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing tool_id", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS, "Missing tool_id", id);
         return;
     }
 
-    tool_metadata_t* meta = tool_service_get(g_service, tid);
+    tool_metadata_t *meta = tool_service_get(g_service, tid);
     if (!meta) {
-        JSONRPC_SEND_ERROR(client_fd, METHOD_NOT_FOUND, "Tool not found", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_METHOD_NOT_FOUND, "Tool not found", id);
         return;
     }
 
-    cJSON* obj = cJSON_CreateObject();
+    cJSON *obj = cJSON_CreateObject();
     cJSON_AddStringToObject(obj, "id", meta->id);
     cJSON_AddStringToObject(obj, "name", meta->name);
     cJSON_AddStringToObject(obj, "executable", meta->executable);
-    if (meta->description) cJSON_AddStringToObject(obj, "description", meta->description);
+    if (meta->description)
+        cJSON_AddStringToObject(obj, "description", meta->description);
     cJSON_AddNumberToObject(obj, "timeout_sec", meta->timeout_sec);
     cJSON_AddBoolToObject(obj, "cacheable", meta->cacheable);
-    if (meta->permission_rule) cJSON_AddStringToObject(obj, "permission_rule", meta->permission_rule);
+    if (meta->permission_rule)
+        cJSON_AddStringToObject(obj, "permission_rule", meta->permission_rule);
 
     if (meta->param_count > 0) {
-        cJSON* params_arr = cJSON_CreateArray();
+        cJSON *params_arr = cJSON_CreateArray();
         for (size_t i = 0; i < meta->param_count; ++i) {
-            cJSON* pobj = cJSON_CreateObject();
+            cJSON *pobj = cJSON_CreateObject();
             cJSON_AddStringToObject(pobj, "name", meta->params[i].name);
             cJSON_AddStringToObject(pobj, "schema", meta->params[i].schema);
             cJSON_AddItemToArray(params_arr, pobj);
@@ -294,42 +314,42 @@ static void handle_get(cJSON* params, int id, agentos_socket_t client_fd) {
  * @param id 请求ID
  * @param client_fd 客户端描述符
  */
-static void handle_execute(cJSON* params, int id, agentos_socket_t client_fd) {
-    const char* tid = get_string_field(params, "tool_id", NULL);
-    cJSON* jparams = jsonrpc_get_object_param(params, "params");
+static void handle_execute(cJSON *params, int id, agentos_socket_t client_fd)
+{
+    const char *tid = get_string_field(params, "tool_id", NULL);
+    cJSON *jparams = jsonrpc_get_object_param(params, "params");
 
     if (!tid || !jparams) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Invalid execute params: tool_id and params required", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_PARAMS,
+                           "Invalid execute params: tool_id and params required", id);
         return;
     }
 
-    char* params_json = cJSON_PrintUnformatted(jparams);
+    char *params_json = cJSON_PrintUnformatted(jparams);
     if (!params_json) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "JSON serialization failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "JSON serialization failed", id);
         return;
     }
 
-    tool_execute_request_t req = {
-        .tool_id = tid,
-        .params_json = params_json,
-        .stream = 0
-    };
+    tool_execute_request_t req = {.tool_id = tid, .params_json = params_json, .stream = 0};
 
-    tool_result_t* res = NULL;
+    tool_result_t *res = NULL;
     int ret = tool_service_execute(g_service, &req, &res);
-    AGENTOS_FREE((void*)params_json);
+    AGENTOS_FREE((void *)params_json);
 
     if (ret != AGENTOS_SUCCESS || !res) {
-        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Execution failed", id);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Execution failed", id);
         SVC_LOG_ERROR("Tool execution failed: %s (error=%d)", tid, ret);
         return;
     }
 
     /* 结果转 JSON */
-    cJSON* result = cJSON_CreateObject();
+    cJSON *result = cJSON_CreateObject();
     cJSON_AddNumberToObject(result, "success", res->success);
-    if (res->output) cJSON_AddStringToObject(result, "output", res->output);
-    if (res->error) cJSON_AddStringToObject(result, "error", res->error);
+    if (res->output)
+        cJSON_AddStringToObject(result, "output", res->output);
+    if (res->error)
+        cJSON_AddStringToObject(result, "error", res->error);
     cJSON_AddNumberToObject(result, "exit_code", res->exit_code);
 
     JSONRPC_SEND_SUCCESS(client_fd, result, id);
@@ -342,8 +362,9 @@ static void handle_execute(cJSON* params, int id, agentos_socket_t client_fd) {
  * @brief 处理单个客户端连接
  * @param client_fd 客户端描述符
  */
-static void handle_client(agentos_socket_t client_fd) {
-    char* buffer = (char*)AGENTOS_MALLOC(MAX_BUFFER);
+static void handle_client(agentos_socket_t client_fd)
+{
+    char *buffer = (char *)AGENTOS_MALLOC(MAX_BUFFER);
     if (!buffer) {
         agentos_socket_close(client_fd);
         return;
@@ -358,28 +379,29 @@ static void handle_client(agentos_socket_t client_fd) {
     buffer[n] = '\0';
 
     if ((size_t)n >= (size_t)(MAX_BUFFER - 1)) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_REQUEST, "Request too large", -1);
         AGENTOS_FREE(buffer);
         agentos_socket_close(client_fd);
         return;
     }
 
-    cJSON* req = cJSON_Parse(buffer);
+    cJSON *req = cJSON_Parse(buffer);
     if (!req) {
-        JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error: invalid JSON", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_PARSE_ERROR, "Parse error: invalid JSON", -1);
         AGENTOS_FREE(buffer);
         agentos_socket_close(client_fd);
         return;
     }
 
-    cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
-    cJSON* method = cJSON_GetObjectItem(req, "method");
+    cJSON *jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
+    cJSON *method = cJSON_GetObjectItem(req, "method");
     (void)cJSON_GetObjectItem(req, "params");
-    cJSON* id = cJSON_GetObjectItem(req, "id");
+    cJSON *id = cJSON_GetObjectItem(req, "id");
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
         !cJSON_IsString(method) || !id) {
-        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request: missing jsonrpc/method/id", -1);
+        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INVALID_REQUEST, "Invalid Request: missing jsonrpc/method/id",
+                           -1);
         cJSON_Delete(req);
         AGENTOS_FREE(buffer);
         agentos_socket_close(client_fd);
@@ -404,7 +426,8 @@ static void handle_client(agentos_socket_t client_fd) {
  * @param config_path 配置文件路径
  * @return 0 成功，非0 失败
  */
-static int load_daemon_config(const char* config_path) {
+static int load_daemon_config(const char *config_path)
+{
     /* 默认配置 */
     g_config.use_tcp = 0;
     g_config.max_clients = MAX_CLIENTS;
@@ -420,42 +443,42 @@ static int load_daemon_config(const char* config_path) {
 
     /* 如果提供了配置文件，尝试加载 */
     if (config_path) {
-        FILE* f = fopen(config_path, "rb");
+        FILE *f = fopen(config_path, "rb");
         if (f) {
             fseek(f, 0, SEEK_END);
             long len = ftell(f);
             fseek(f, 0, SEEK_SET);
 
             if (len > 0 && len < 1024 * 1024) { /* 限制配置文件大小为 1MB */
-                char* content = (char*)AGENTOS_MALLOC((size_t)len + 1);
+                char *content = (char *)AGENTOS_MALLOC((size_t)len + 1);
                 if (content) {
                     size_t read_len = fread(content, 1, (size_t)len, f);
                     if (read_len == (size_t)len) {
-                    content[read_len] = '\0';
+                        content[read_len] = '\0';
 
-                    cJSON* root = cJSON_Parse(content);
-                    if (root) {
-                        cJSON* daemon_cfg = cJSON_GetObjectItem(root, "daemon");
-                        if (daemon_cfg) {
-                            cJSON* socket_path = cJSON_GetObjectItem(daemon_cfg, "socket_path");
-                            if (cJSON_IsString(socket_path)) {
-                                AGENTOS_FREE(g_config.socket_path);
-                                g_config.socket_path = AGENTOS_STRDUP(socket_path->valuestring);
-                            }
+                        cJSON *root = cJSON_Parse(content);
+                        if (root) {
+                            cJSON *daemon_cfg = cJSON_GetObjectItem(root, "daemon");
+                            if (daemon_cfg) {
+                                cJSON *socket_path = cJSON_GetObjectItem(daemon_cfg, "socket_path");
+                                if (cJSON_IsString(socket_path)) {
+                                    AGENTOS_FREE(g_config.socket_path);
+                                    g_config.socket_path = AGENTOS_STRDUP(socket_path->valuestring);
+                                }
 
-                            cJSON* tcp_port = cJSON_GetObjectItem(daemon_cfg, "tcp_port");
-                            if (cJSON_IsNumber(tcp_port)) {
-                                g_config.tcp_port = (uint16_t)tcp_port->valueint;
-                                g_config.use_tcp = 1;
-                            }
+                                cJSON *tcp_port = cJSON_GetObjectItem(daemon_cfg, "tcp_port");
+                                if (cJSON_IsNumber(tcp_port)) {
+                                    g_config.tcp_port = (uint16_t)tcp_port->valueint;
+                                    g_config.use_tcp = 1;
+                                }
 
-                            cJSON* max_clients = cJSON_GetObjectItem(daemon_cfg, "max_clients");
-                            if (cJSON_IsNumber(max_clients)) {
-                                g_config.max_clients = max_clients->valueint;
+                                cJSON *max_clients = cJSON_GetObjectItem(daemon_cfg, "max_clients");
+                                if (cJSON_IsNumber(max_clients)) {
+                                    g_config.max_clients = max_clients->valueint;
+                                }
                             }
+                            cJSON_Delete(root);
                         }
-                        cJSON_Delete(root);
-                    }
                     }
                     AGENTOS_FREE(content);
                 }
@@ -470,7 +493,8 @@ static int load_daemon_config(const char* config_path) {
 /**
  * @brief 释放配置资源
  */
-static void free_daemon_config(void) {
+static void free_daemon_config(void)
+{
     AGENTOS_FREE(g_config.socket_path);
     AGENTOS_FREE(g_config.tcp_host);
     memset(&g_config, 0, sizeof(g_config));
@@ -482,23 +506,29 @@ static void free_daemon_config(void) {
  * @brief 打印使用说明
  * @param prog 程序名
  */
-static void print_usage(const char* prog) {
-    printf("AgentOS Tool Daemon\n");
-    printf("Usage: %s [options]\n\n", prog);
-    printf("Options:\n");
-    printf("  --manager <path>   Configuration file path\n");
-    printf("  --tcp             Use TCP instead of Unix socket\n");
-    printf("  --help             Show this help\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s --manager AGENTOS_CONFIG_DIR \"/tool.yaml\"\n", prog);
-    printf("  %s --tcp           # Use TCP mode on port 8081\n", prog);
+static void print_usage(const char *prog)
+{
+    char buf[256];
+    fputs("AgentOS Tool Daemon\n", stdout);
+    snprintf(buf, sizeof(buf), "Usage: %s [options]\n\n", prog);
+    fputs(buf, stdout);
+    fputs("Options:\n", stdout);
+    fputs("  --manager <path>   Configuration file path\n", stdout);
+    fputs("  --tcp             Use TCP instead of Unix socket\n", stdout);
+    fputs("  --help             Show this help\n", stdout);
+    fputs("\n", stdout);
+    fputs("Examples:\n", stdout);
+    snprintf(buf, sizeof(buf), "  %s --manager AGENTOS_CONFIG_DIR \"/tool.yaml\"\n", prog);
+    fputs(buf, stdout);
+    snprintf(buf, sizeof(buf), "  %s --tcp           # Use TCP mode on port 8081\n", prog);
+    fputs(buf, stdout);
 }
 
 /* ==================== 主函数 ==================== */
 
-int main(int argc, char** argv) {
-    const char* config_path = NULL;
+int main(int argc, char **argv)
+{
+    const char *config_path = NULL;
 
     /* 解析命令行参数 */
     for (int i = 1; i < argc; i++) {
@@ -510,7 +540,7 @@ int main(int argc, char** argv) {
         } else if (strcmp(argv[i], "--tcp") == 0) {
             g_config.use_tcp = 1;
         } else {
-            fprintf(stderr, "Unknown option: %s\n", argv[i]);
+            SVC_LOG_ERROR("Unknown option: %s", argv[i]);
             print_usage(argv[0]);
             return 1;
         }
@@ -527,7 +557,11 @@ int main(int argc, char** argv) {
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGUSR1, svc_log_toggle_handler);
 #endif
+
+    agentos_log_init(NULL);
+    atexit(log_cleanup);
 
     /* 加载配置 */
     load_daemon_config(config_path);
@@ -535,7 +569,8 @@ int main(int argc, char** argv) {
     SVC_LOG_INFO("Tool service starting, manager=%s", config_path ? config_path : "default");
 
     /* 创建工具服务 */
-    g_service = tool_service_create(config_path ? config_path : "agentos/manager/service/tool_d/tool.yaml");
+    g_service =
+        tool_service_create(config_path ? config_path : "agentos/manager/service/tool_d/tool.yaml");
     if (!g_service) {
         SVC_LOG_ERROR("Failed to create tool service");
         free_daemon_config();
@@ -550,8 +585,8 @@ int main(int argc, char** argv) {
     if (g_config.use_tcp) {
         server_fd = agentos_socket_create_tcp_server(g_config.tcp_host, g_config.tcp_port);
         if (server_fd == AGENTOS_INVALID_SOCKET) {
-            SVC_LOG_ERROR("Failed to create TCP server on %s:%d",
-                        g_config.tcp_host, g_config.tcp_port);
+            SVC_LOG_ERROR("Failed to create TCP server on %s:%d", g_config.tcp_host,
+                          g_config.tcp_port);
             tool_service_destroy(g_service);
             free_daemon_config();
             agentos_mutex_destroy(&g_running_lock);
@@ -629,5 +664,6 @@ int main(int argc, char** argv) {
     agentos_socket_cleanup();
 
     SVC_LOG_INFO("Tool service stopped");
+    log_cleanup();
     return 0;
 }

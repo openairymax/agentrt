@@ -15,9 +15,10 @@
 #define CUPOLAS_CIRCUIT_BREAKER_H
 
 #include "platform/platform.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,35 +46,31 @@ typedef struct circuit_breaker_config {
 } circuit_breaker_config_t;
 
 typedef void (*circuit_state_change_callback_t)(circuit_state_t old_state,
-                                               circuit_state_t new_state,
-                                               void* user_data);
+                                                circuit_state_t new_state, void *user_data);
 
 typedef struct circuit_breaker circuit_breaker_t;
 
-circuit_breaker_t* circuit_breaker_create(const circuit_breaker_config_t* config);
+circuit_breaker_t *circuit_breaker_create(const circuit_breaker_config_t *config);
 
-void circuit_breaker_destroy(circuit_breaker_t* breaker);
+void circuit_breaker_destroy(circuit_breaker_t *breaker);
 
-int circuit_breaker_call(circuit_breaker_t* breaker,
-                        int (*func)(void* arg),
-                        void* arg,
-                        uint32_t timeout_ms);
+int circuit_breaker_call(circuit_breaker_t *breaker, int (*func)(void *arg), void *arg,
+                         uint32_t timeout_ms);
 
-bool circuit_breaker_is_available(circuit_breaker_t* breaker);
+bool circuit_breaker_is_available(circuit_breaker_t *breaker);
 
-circuit_state_t circuit_breaker_get_state(circuit_breaker_t* breaker);
+circuit_state_t circuit_breaker_get_state(circuit_breaker_t *breaker);
 
-void circuit_breaker_record_success(circuit_breaker_t* breaker);
+void circuit_breaker_record_success(circuit_breaker_t *breaker);
 
-void circuit_breaker_record_failure(circuit_breaker_t* breaker);
+void circuit_breaker_record_failure(circuit_breaker_t *breaker);
 
-void circuit_breaker_record_timeout(circuit_breaker_t* breaker);
+void circuit_breaker_record_timeout(circuit_breaker_t *breaker);
 
-void circuit_breaker_reset(circuit_breaker_t* breaker);
+void circuit_breaker_reset(circuit_breaker_t *breaker);
 
-void circuit_breaker_set_callback(circuit_breaker_t* breaker,
-                                 circuit_state_change_callback_t callback,
-                                 void* user_data);
+void circuit_breaker_set_callback(circuit_breaker_t *breaker,
+                                  circuit_state_change_callback_t callback, void *user_data);
 
 typedef struct circuit_breaker_stats {
     uint64_t total_calls;
@@ -87,31 +84,29 @@ typedef struct circuit_breaker_stats {
     double current_failure_rate;
 } circuit_breaker_stats_t;
 
-void circuit_breaker_get_stats(circuit_breaker_t* breaker, circuit_breaker_stats_t* stats);
+void circuit_breaker_get_stats(circuit_breaker_t *breaker, circuit_breaker_stats_t *stats);
 
-void circuit_breaker_reset_stats(circuit_breaker_t* breaker);
+void circuit_breaker_reset_stats(circuit_breaker_t *breaker);
 
-const char* circuit_state_to_string(circuit_state_t state);
+const char *circuit_state_to_string(circuit_state_t state);
 
-const char* circuit_event_to_string(circuit_event_t event);
+const char *circuit_event_to_string(circuit_event_t event);
 
 typedef struct circuit_breaker_registry circuit_breaker_registry_t;
 
-circuit_breaker_registry_t* circuit_breaker_registry_create(void);
+circuit_breaker_registry_t *circuit_breaker_registry_create(void);
 
-void circuit_breaker_registry_destroy(circuit_breaker_registry_t* registry);
+void circuit_breaker_registry_destroy(circuit_breaker_registry_t *registry);
 
-int circuit_breaker_registry_register(circuit_breaker_registry_t* registry,
-                                      const char* name,
-                                      circuit_breaker_t* breaker);
+int circuit_breaker_registry_register(circuit_breaker_registry_t *registry, const char *name,
+                                      circuit_breaker_t *breaker);
 
-circuit_breaker_t* circuit_breaker_registry_get(circuit_breaker_registry_t* registry,
-                                                const char* name);
+circuit_breaker_t *circuit_breaker_registry_get(circuit_breaker_registry_t *registry,
+                                                const char *name);
 
-void circuit_breaker_registry_remove(circuit_breaker_registry_t* registry,
-                                     const char* name);
+void circuit_breaker_registry_remove(circuit_breaker_registry_t *registry, const char *name);
 
-void circuit_breaker_registry_reset_all(circuit_breaker_registry_t* registry);
+void circuit_breaker_registry_reset_all(circuit_breaker_registry_t *registry);
 
 #ifdef __cplusplus
 }

@@ -6,6 +6,7 @@
  */
 
 #include "execution.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
@@ -16,35 +17,35 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)  \
+    do {                \
+        tests_run++;    \
+        func();         \
+        tests_passed++; \
     } while (0)
 
 static int g_mock_unit_data __attribute__((unused)) = 123;
 static agentos_error_t mock_execute(agentos_execution_unit_t *u, const void *in, void **out)
 {
-    (void) u;
-    (void) in;
-    (void) *out;
+    (void)u;
+    (void)in;
+    (void)*out;
     return AGENTOS_SUCCESS;
 }
 static void mock_destroy(agentos_execution_unit_t *u)
 {
-    (void) u;
+    (void)u;
 }
 static const char *mock_meta(agentos_execution_unit_t *u)
 {
-    (void) u;
+    (void)u;
     return "test_unit";
 }
 
@@ -53,7 +54,7 @@ static const char *mock_meta(agentos_execution_unit_t *u)
 static void test_execution_create_default(void)
 {
     agentos_execution_engine_t *engine = NULL;
-    agentos_error_t err                = agentos_execution_create(8, &engine);
+    agentos_error_t err = agentos_execution_create(8, &engine);
 
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         TEST_PASS("execution_create with concurrency=8");
@@ -66,7 +67,7 @@ static void test_execution_create_default(void)
 static void test_execution_create_single_thread(void)
 {
     agentos_execution_engine_t *engine = NULL;
-    agentos_error_t err                = agentos_execution_create(1, &engine);
+    agentos_error_t err = agentos_execution_create(1, &engine);
 
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         TEST_PASS("execution_create single thread");
@@ -79,7 +80,7 @@ static void test_execution_create_single_thread(void)
 static void test_execution_create_high_concurrency(void)
 {
     agentos_execution_engine_t *engine = NULL;
-    agentos_error_t err                = agentos_execution_create(64, &engine);
+    agentos_error_t err = agentos_execution_create(64, &engine);
 
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         TEST_PASS("execution_create high concurrency=64");
@@ -118,9 +119,9 @@ static void test_execution_register_unit(void)
 
     static int unit_data = 123;
 
-    agentos_execution_unit_t unit = {.execution_unit_data         = &unit_data,
-                                     .execution_unit_execute      = mock_execute,
-                                     .execution_unit_destroy      = mock_destroy,
+    agentos_execution_unit_t unit = {.execution_unit_data = &unit_data,
+                                     .execution_unit_execute = mock_execute,
+                                     .execution_unit_destroy = mock_destroy,
                                      .execution_unit_get_metadata = mock_meta};
 
     agentos_error_t err = agentos_execution_register_unit(engine, "test_unit", unit);
@@ -144,7 +145,7 @@ static void test_execution_register_null_name(void)
     }
 
     agentos_execution_unit_t unit = {0};
-    agentos_error_t err           = agentos_execution_register_unit(engine, NULL, unit);
+    agentos_error_t err = agentos_execution_register_unit(engine, NULL, unit);
 
     if (err != AGENTOS_SUCCESS) {
         TEST_PASS("execution_register rejects NULL name");
@@ -183,12 +184,12 @@ static void test_execution_submit_task(void)
 
     agentos_task_t task;
     memset(&task, 0, sizeof(task));
-    task.task_id         = "test-task-001";
-    task.task_id_len     = strlen("test-task-001");
+    task.task_id = "test-task-001";
+    task.task_id_len = strlen("test-task-001");
     task.task_timeout_ms = 5000;
-    task.task_status     = TASK_STATUS_PENDING;
+    task.task_status = TASK_STATUS_PENDING;
 
-    char *submitted_id  = NULL;
+    char *submitted_id = NULL;
     agentos_error_t err = agentos_execution_submit(engine, &task, &submitted_id);
 
     if (err == AGENTOS_SUCCESS && submitted_id != NULL) {
@@ -231,8 +232,8 @@ static void test_execution_query_task(void)
 
     agentos_task_t task;
     memset(&task, 0, sizeof(task));
-    task.task_id         = "query-test-001";
-    task.task_id_len     = strlen("query-test-001");
+    task.task_id = "query-test-001";
+    task.task_id_len = strlen("query-test-001");
     task.task_timeout_ms = 30000;
 
     char *submitted_id = NULL;
@@ -268,8 +269,8 @@ static void test_execution_wait_task(void)
 
     agentos_task_t task;
     memset(&task, 0, sizeof(task));
-    task.task_id         = "wait-test-001";
-    task.task_id_len     = strlen("wait-test-001");
+    task.task_id = "wait-test-001";
+    task.task_id_len = strlen("wait-test-001");
     task.task_timeout_ms = 1000;
 
     char *submitted_id = NULL;
@@ -277,7 +278,7 @@ static void test_execution_wait_task(void)
 
     if (submitted_id) {
         agentos_task_t *result = NULL;
-        agentos_error_t werr   = agentos_execution_wait(engine, submitted_id, 2000, &result);
+        agentos_error_t werr = agentos_execution_wait(engine, submitted_id, 2000, &result);
 
         if (werr == AGENTOS_SUCCESS && result != NULL) {
             printf("    Result status: %d\n", result->task_status);
@@ -306,8 +307,8 @@ static void test_execution_get_result(void)
 
     agentos_task_t task;
     memset(&task, 0, sizeof(task));
-    task.task_id         = "result-test-001";
-    task.task_id_len     = strlen("result-test-001");
+    task.task_id = "result-test-001";
+    task.task_id_len = strlen("result-test-001");
     task.task_timeout_ms = 1000;
 
     char *submitted_id = NULL;
@@ -315,7 +316,7 @@ static void test_execution_get_result(void)
 
     if (submitted_id) {
         agentos_task_t *result = NULL;
-        agentos_error_t gerr   = agentos_execution_get_result(engine, submitted_id, &result);
+        agentos_error_t gerr = agentos_execution_get_result(engine, submitted_id, &result);
 
         if (gerr == AGENTOS_SUCCESS && result != NULL) {
             agentos_task_free(result);
@@ -344,8 +345,8 @@ static void test_execution_cancel_task(void)
 
     agentos_task_t task;
     memset(&task, 0, sizeof(task));
-    task.task_id         = "cancel-test-001";
-    task.task_id_len     = strlen("cancel-test-001");
+    task.task_id = "cancel-test-001";
+    task.task_id_len = strlen("cancel-test-001");
     task.task_timeout_ms = 60000;
 
     char *submitted_id = NULL;
@@ -380,7 +381,7 @@ static void test_task_free_null(void)
 static void test_compensation_create_destroy(void)
 {
     agentos_compensation_t *mgr = NULL;
-    agentos_error_t err         = agentos_compensation_create(&mgr);
+    agentos_error_t err = agentos_compensation_create(&mgr);
 
     if (err == AGENTOS_SUCCESS && mgr != NULL) {
         TEST_PASS("compensation_create succeeds");
@@ -415,8 +416,9 @@ static void test_compensation_register_action(void)
         return;
     }
 
-    int dummy_input     = 999;
-    agentos_error_t err = agentos_compensation_register(mgr, "action_001", "undo_handler_001", &dummy_input);
+    int dummy_input = 999;
+    agentos_error_t err =
+        agentos_compensation_register(mgr, "action_001", "undo_handler_001", &dummy_input);
 
     if (err == AGENTOS_SUCCESS) {
         TEST_PASS("compensation_register action");
@@ -436,8 +438,8 @@ static void test_compensation_human_queue(void)
         return;
     }
 
-    char **actions      = NULL;
-    size_t count        = 0;
+    char **actions = NULL;
+    size_t count = 0;
     agentos_error_t err = agentos_compensation_get_human_queue(mgr, &actions, &count);
 
     if (err == AGENTOS_SUCCESS) {
@@ -458,15 +460,15 @@ static void test_compensation_human_queue(void)
 /* ==================== 反馈回调 ==================== */
 
 static int g_feedback_called = 0;
-static void test_feedback_callback(int level, const char *module, const char *event, const char *data, size_t data_len,
-                                   void *user_data)
+static void test_feedback_callback(int level, const char *module, const char *event,
+                                   const char *data, size_t data_len, void *user_data)
 {
-    (void) level;
-    (void) module;
-    (void) event;
-    (void) data;
-    (void) data_len;
-    (void) user_data;
+    (void)level;
+    (void)module;
+    (void)event;
+    (void)data;
+    (void)data_len;
+    (void)user_data;
     g_feedback_called++;
 }
 
@@ -500,7 +502,7 @@ static void test_execution_health_check(void)
         return;
     }
 
-    char *json          = NULL;
+    char *json = NULL;
     agentos_error_t err = agentos_execution_health_check(engine, &json);
 
     if (err == AGENTOS_SUCCESS && json != NULL) {

@@ -1,6 +1,7 @@
 /**
  * @file sandbox_internal.h
- * @brief 沙箱内部数据结构定义（sandbox.c / sandbox_utils.c / sandbox_permission.c / sandbox_quota.c 共享）
+ * @brief 沙箱内部数据结构定义（sandbox.c / sandbox_utils.c / sandbox_permission.c / sandbox_quota.c
+ * 共享）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
@@ -12,11 +13,12 @@
 #ifndef SANDBOX_INTERNAL_H
 #define SANDBOX_INTERNAL_H
 
-#include "sandbox_quota.h"
-#include "sandbox_permission.h"
 #include "agentos.h"
-#include <stdint.h>
+#include "sandbox_permission.h"
+#include "sandbox_quota.h"
+
 #include <stddef.h>
+#include <stdint.h>
 #include <time.h>
 
 #ifdef __cplusplus
@@ -70,8 +72,8 @@ typedef struct sandbox_performance_stats {
 } sandbox_perf_stats_t;
 
 typedef struct sandbox_config {
-    char* sandbox_name;
-    char* owner_id;
+    char *sandbox_name;
+    char *owner_id;
     uint32_t priority;
     uint32_t timeout_ms;
     uint32_t flags;
@@ -80,18 +82,18 @@ typedef struct sandbox_config {
 
 struct agentos_sandbox {
     uint64_t sandbox_id;
-    char* sandbox_name;
-    char* owner_id;
+    char *sandbox_name;
+    char *owner_id;
     sandbox_state_t state;
     sandbox_config_t manager;
-    permission_rule_t* rules;
+    permission_rule_t *rules;
     uint32_t rule_count;
-    agentos_mutex_t* lock;
+    agentos_mutex_t *lock;
     uint64_t create_time_ns;
     uint64_t last_active_ns;
     uint64_t call_count;
     uint64_t violation_count;
-    audit_entry_t* audit_log;
+    audit_entry_t *audit_log;
     size_t audit_count;
     size_t audit_capacity;
     size_t audit_write_index;

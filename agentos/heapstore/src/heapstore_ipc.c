@@ -10,6 +10,8 @@
  */
 
 #include "heapstore_ipc.h"
+
+#include "atomic_compat.h"
 #include "private.h"
 #include "utils.h"
 
@@ -17,23 +19,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "atomic_compat.h"
+
+#include "memory_compat.h"
 
 #ifdef _WIN32
-#include <windows.h>
 #include <direct.h>
 #include <io.h>
 #include <platform.h>
+#include <windows.h>
 #define mkdir(path, mode) _mkdir(path)
 #define F_OK 0
 #define access _access
 #else
-#include <unistd.h>
-#include <sys/stat.h>
 #include "agentos_mman.h"
-#include <fcntl.h>
+
 #include <errno.h>
+#include <fcntl.h>
 #include <platform.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #define heapstore_IPC_MAX_CHANNELS 256
@@ -48,100 +52,170 @@ static heapstore_ipc_buffer_t s_buffers[heapstore_IPC_MAX_BUFFERS];
 static size_t s_buffer_count = 0;
 static char s_ipc_path[heapstore_IPC_MAX_PATH] = {0};
 
-static heapstore_error_t persist_channel_to_file(const heapstore_ipc_channel_t* channel) {
-    if (!channel || !s_ipc_path[0]) return heapstore_ERR_INVALID_PARAM;
+static heapstore_error_t persist_channel_to_file(const heapstore_ipc_channel_t *channel)
+{
+    if (!channel || !s_ipc_path[0])
+        return heapstore_ERR_INVALID_PARAM;
     char path[heapstore_IPC_MAX_PATH + 256];
     snprintf(path, sizeof(path), "%s/channels/%s.json", s_ipc_path, channel->channel_id);
-    FILE* fp = fopen(path, "w");
-    if (!fp) return heapstore_ERR_FILE_OPEN_FAILED;
-    fprintf(fp, "{\"channel_id\":\"%s\",\"name\":\"%s\",\"type\":\"%s\","
-                "\"status\":\"%s\",\"created_at\":%llu,"
-                "\"last_activity_at\":%llu,\"buffer_size\":%zu,"
-                "\"current_usage\":%zu}\n",
-            channel->channel_id, channel->name, channel->type,
-            channel->status, (unsigned long long)channel->created_at,
-            (unsigned long long)channel->last_activity_at,
+    FILE *fp = fopen(path, "w");
+    if (!fp)
+        return heapstore_ERR_FILE_OPEN_FAILED;
+    fprintf(fp,
+            "{\"channel_id\":\"%s\",\"name\":\"%s\",\"type\":\"%s\","
+            "\"status\":\"%s\",\"created_at\":%llu,"
+            "\"last_activity_at\":%llu,\"buffer_size\":%zu,"
+            "\"current_usage\":%zu}\n",
+            channel->channel_id, channel->name, channel->type, channel->status,
+            (unsigned long long)channel->created_at, (unsigned long long)channel->last_activity_at,
             channel->buffer_size, channel->current_usage);
     fclose(fp);
     return heapstore_SUCCESS;
 }
 
-static heapstore_error_t persist_buffer_to_file(const heapstore_ipc_buffer_t* buffer) {
-    if (!buffer || !s_ipc_path[0]) return heapstore_ERR_INVALID_PARAM;
+static heapstore_error_t persist_buffer_to_file(const heapstore_ipc_buffer_t *buffer)
+{
+    if (!buffer || !s_ipc_path[0])
+        return heapstore_ERR_INVALID_PARAM;
     char path[heapstore_IPC_MAX_PATH + 256];
     snprintf(path, sizeof(path), "%s/buffers/%s.json", s_ipc_path, buffer->buffer_id);
-    FILE* fp = fopen(path, "w");
-    if (!fp) return heapstore_ERR_FILE_OPEN_FAILED;
-    fprintf(fp, "{\"buffer_id\":\"%s\",\"channel_id\":\"%s\","
-                "\"size\":%zu,\"used\":%zu,"
-                "\"created_at\":%llu,\"status\":\"%s\"}\n",
-            buffer->buffer_id, buffer->channel_id,
-            buffer->size, buffer->used,
+    FILE *fp = fopen(path, "w");
+    if (!fp)
+        return heapstore_ERR_FILE_OPEN_FAILED;
+    fprintf(fp,
+            "{\"buffer_id\":\"%s\",\"channel_id\":\"%s\","
+            "\"size\":%zu,\"used\":%zu,"
+            "\"created_at\":%llu,\"status\":\"%s\"}\n",
+            buffer->buffer_id, buffer->channel_id, buffer->size, buffer->used,
             (unsigned long long)buffer->created_at, buffer->status);
     fclose(fp);
     return heapstore_SUCCESS;
 }
 
-static heapstore_error_t load_channel_from_file(const char* channel_id, heapstore_ipc_channel_t* channel) {
-    if (!channel_id || !channel || !s_ipc_path[0]) return heapstore_ERR_INVALID_PARAM;
+static heapstore_error_t load_channel_from_file(const char *channel_id,
+                                                heapstore_ipc_channel_t *channel)
+{
+    if (!channel_id || !channel || !s_ipc_path[0])
+        return heapstore_ERR_INVALID_PARAM;
     char path[heapstore_IPC_MAX_PATH + 256];
     snprintf(path, sizeof(path), "%s/channels/%s.json", s_ipc_path, channel_id);
-    FILE* fp = fopen(path, "r");
-    if (!fp) return heapstore_ERR_NOT_FOUND;
+    FILE *fp = fopen(path, "r");
+    if (!fp)
+        return heapstore_ERR_NOT_FOUND;
     memset(channel, 0, sizeof(*channel));
     char buf[2048];
     if (fgets(buf, sizeof(buf), fp)) {
-        char* v;
+        char *v;
         if ((v = strstr(buf, "\"channel_id\":\""))) {
-            v += 14; char* e = strchr(v, '"');
-            if (e) { size_t l = (size_t)(e-v); if (l>=sizeof(channel->channel_id)) l=sizeof(channel->channel_id)-1; memcpy(channel->channel_id, v, l); }
+            v += 14;
+            char *e = strchr(v, '"');
+            if (e) {
+                size_t l = (size_t)(e - v);
+                if (l >= sizeof(channel->channel_id))
+                    l = sizeof(channel->channel_id) - 1;
+                memcpy(channel->channel_id, v, l);
+            }
         }
         if ((v = strstr(buf, "\"name\":\""))) {
-            v += 8; char* e = strchr(v, '"');
-            if (e) { size_t l = (size_t)(e-v); if (l>=sizeof(channel->name)) l=sizeof(channel->name)-1; memcpy(channel->name, v, l); }
+            v += 8;
+            char *e = strchr(v, '"');
+            if (e) {
+                size_t l = (size_t)(e - v);
+                if (l >= sizeof(channel->name))
+                    l = sizeof(channel->name) - 1;
+                memcpy(channel->name, v, l);
+            }
         }
         if ((v = strstr(buf, "\"type\":\""))) {
-            v += 8; char* e = strchr(v, '"');
-            if (e) { size_t l = (size_t)(e-v); if (l>=sizeof(channel->type)) l=sizeof(channel->type)-1; memcpy(channel->type, v, l); }
+            v += 8;
+            char *e = strchr(v, '"');
+            if (e) {
+                size_t l = (size_t)(e - v);
+                if (l >= sizeof(channel->type))
+                    l = sizeof(channel->type) - 1;
+                memcpy(channel->type, v, l);
+            }
         }
         if ((v = strstr(buf, "\"status\":\""))) {
-            v += 10; char* e = strchr(v, '"');
-            if (e) { size_t l = (size_t)(e-v); if (l>=sizeof(channel->status)) l=sizeof(channel->status)-1; memcpy(channel->status, v, l); }
+            v += 10;
+            char *e = strchr(v, '"');
+            if (e) {
+                size_t l = (size_t)(e - v);
+                if (l >= sizeof(channel->status))
+                    l = sizeof(channel->status) - 1;
+                memcpy(channel->status, v, l);
+            }
         }
-        if ((v = strstr(buf, "\"buffer_size\":"))) { channel->buffer_size = (size_t)atoll(v+14); }
-        if ((v = strstr(buf, "\"current_usage\":"))) { channel->current_usage = (size_t)atoll(v+16); }
-        if ((v = strstr(buf, "\"created_at\":"))) { channel->created_at = (uint64_t)strtoull(v+13, NULL, 10); }
-        if ((v = strstr(buf, "\"last_activity_at\":"))) { channel->last_activity_at = (uint64_t)strtoull(v+20, NULL, 10); }
+        if ((v = strstr(buf, "\"buffer_size\":"))) {
+            channel->buffer_size = (size_t)atoll(v + 14);
+        }
+        if ((v = strstr(buf, "\"current_usage\":"))) {
+            channel->current_usage = (size_t)atoll(v + 16);
+        }
+        if ((v = strstr(buf, "\"created_at\":"))) {
+            channel->created_at = (uint64_t)strtoull(v + 13, NULL, 10);
+        }
+        if ((v = strstr(buf, "\"last_activity_at\":"))) {
+            channel->last_activity_at = (uint64_t)strtoull(v + 20, NULL, 10);
+        }
     }
     fclose(fp);
     return heapstore_SUCCESS;
 }
 
-static heapstore_error_t load_buffer_from_file(const char* buffer_id, heapstore_ipc_buffer_t* buffer) {
-    if (!buffer_id || !buffer || !s_ipc_path[0]) return heapstore_ERR_INVALID_PARAM;
+static heapstore_error_t load_buffer_from_file(const char *buffer_id,
+                                               heapstore_ipc_buffer_t *buffer)
+{
+    if (!buffer_id || !buffer || !s_ipc_path[0])
+        return heapstore_ERR_INVALID_PARAM;
     char path[heapstore_IPC_MAX_PATH + 256];
     snprintf(path, sizeof(path), "%s/buffers/%s.json", s_ipc_path, buffer_id);
-    FILE* fp = fopen(path, "r");
-    if (!fp) return heapstore_ERR_NOT_FOUND;
+    FILE *fp = fopen(path, "r");
+    if (!fp)
+        return heapstore_ERR_NOT_FOUND;
     memset(buffer, 0, sizeof(*buffer));
     char buf[2048];
     if (fgets(buf, sizeof(buf), fp)) {
-        char* v;
+        char *v;
         if ((v = strstr(buf, "\"buffer_id\":\""))) {
-            v += 13; char* e = strchr(v, '"');
-            if (e) { size_t l = (size_t)(e-v); if (l>=sizeof(buffer->buffer_id)) l=sizeof(buffer->buffer_id)-1; memcpy(buffer->buffer_id, v, l); }
+            v += 13;
+            char *e = strchr(v, '"');
+            if (e) {
+                size_t l = (size_t)(e - v);
+                if (l >= sizeof(buffer->buffer_id))
+                    l = sizeof(buffer->buffer_id) - 1;
+                memcpy(buffer->buffer_id, v, l);
+            }
         }
         if ((v = strstr(buf, "\"channel_id\":\""))) {
-            v += 14; char* e = strchr(v, '"');
-            if (e) { size_t l = (size_t)(e-v); if (l>=sizeof(buffer->channel_id)) l=sizeof(buffer->channel_id)-1; memcpy(buffer->channel_id, v, l); }
+            v += 14;
+            char *e = strchr(v, '"');
+            if (e) {
+                size_t l = (size_t)(e - v);
+                if (l >= sizeof(buffer->channel_id))
+                    l = sizeof(buffer->channel_id) - 1;
+                memcpy(buffer->channel_id, v, l);
+            }
         }
-        if ((v = strstr(buf, "\"size\":"))) { buffer->size = (size_t)atoll(v+7); }
-        if ((v = strstr(buf, "\"used\":"))) { buffer->used = (size_t)atoll(v+7); }
+        if ((v = strstr(buf, "\"size\":"))) {
+            buffer->size = (size_t)atoll(v + 7);
+        }
+        if ((v = strstr(buf, "\"used\":"))) {
+            buffer->used = (size_t)atoll(v + 7);
+        }
         if ((v = strstr(buf, "\"status\":\""))) {
-            v += 10; char* e = strchr(v, '"');
-            if (e) { size_t l = (size_t)(e-v); if (l>=sizeof(buffer->status)) l=sizeof(buffer->status)-1; memcpy(buffer->status, v, l); }
+            v += 10;
+            char *e = strchr(v, '"');
+            if (e) {
+                size_t l = (size_t)(e - v);
+                if (l >= sizeof(buffer->status))
+                    l = sizeof(buffer->status) - 1;
+                memcpy(buffer->status, v, l);
+            }
         }
-        if ((v = strstr(buf, "\"created_at\":"))) { buffer->created_at = (uint64_t)strtoull(v+13, NULL, 10); }
+        if ((v = strstr(buf, "\"created_at\":"))) {
+            buffer->created_at = (uint64_t)strtoull(v + 13, NULL, 10);
+        }
     }
     fclose(fp);
     return heapstore_SUCCESS;
@@ -151,7 +225,7 @@ static heapstore_error_t load_buffer_from_file(const char* buffer_id, heapstore_
 typedef struct {
     char shm_name[256];
     int shm_fd;
-    void* mapped;
+    void *mapped;
     size_t mapped_size;
 } ipc_shm_region_t;
 
@@ -159,19 +233,22 @@ typedef struct {
 static ipc_shm_region_t s_shm_regions[IPC_SHM_MAX_REGIONS];
 static size_t s_shm_region_count = 0;
 
-static ipc_shm_region_t* find_or_create_shm(const char* name, size_t size) {
+static ipc_shm_region_t *find_or_create_shm(const char *name, size_t size)
+{
     for (size_t i = 0; i < s_shm_region_count; i++) {
         if (strcmp(s_shm_regions[i].shm_name, name) == 0) {
             return &s_shm_regions[i];
         }
     }
-    if (s_shm_region_count >= IPC_SHM_MAX_REGIONS) return NULL;
+    if (s_shm_region_count >= IPC_SHM_MAX_REGIONS)
+        return NULL;
 
-    ipc_shm_region_t* r = &s_shm_regions[s_shm_region_count];
+    ipc_shm_region_t *r = &s_shm_regions[s_shm_region_count];
     snprintf(r->shm_name, sizeof(r->shm_name), "/agentos_ipc_%s", name);
 
     r->shm_fd = shm_open(r->shm_name, O_CREAT | O_RDWR, 0666);
-    if (r->shm_fd < 0) return NULL;
+    if (r->shm_fd < 0)
+        return NULL;
 
     if (ftruncate(r->shm_fd, (off_t)size) != 0) {
         close(r->shm_fd);
@@ -192,12 +269,13 @@ static ipc_shm_region_t* find_or_create_shm(const char* name, size_t size) {
 }
 #endif
 
-heapstore_error_t heapstore_ipc_init(void) {
+heapstore_error_t heapstore_ipc_init(void)
+{
     if (s_initialized) {
         return heapstore_SUCCESS;
     }
 
-    const char* base_path = "agentos/heapstore/kernel/ipc";
+    const char *base_path = "agentos/heapstore/kernel/ipc";
     strncpy(s_ipc_path, base_path, sizeof(s_ipc_path) - 1);
     s_ipc_path[sizeof(s_ipc_path) - 1] = '\0';
 
@@ -221,7 +299,8 @@ heapstore_error_t heapstore_ipc_init(void) {
     return heapstore_SUCCESS;
 }
 
-void heapstore_ipc_shutdown(void) {
+void heapstore_ipc_shutdown(void)
+{
     if (!s_initialized) {
         return;
     }
@@ -252,7 +331,8 @@ void heapstore_ipc_shutdown(void) {
     agentos_mutex_unlock(&s_ipc_lock);
 }
 
-heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* channel) {
+heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t *channel)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -292,7 +372,9 @@ heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* ch
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_ipc_get_channel(const char* channel_id, heapstore_ipc_channel_t* channel) {
+heapstore_error_t heapstore_ipc_get_channel(const char *channel_id,
+                                            heapstore_ipc_channel_t *channel)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -327,7 +409,8 @@ heapstore_error_t heapstore_ipc_get_channel(const char* channel_id, heapstore_ip
     return heapstore_ERR_NOT_FOUND;
 }
 
-heapstore_error_t heapstore_ipc_update_channel_activity(const char* channel_id) {
+heapstore_error_t heapstore_ipc_update_channel_activity(const char *channel_id)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -350,7 +433,8 @@ heapstore_error_t heapstore_ipc_update_channel_activity(const char* channel_id) 
     return heapstore_ERR_NOT_FOUND;
 }
 
-heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buffer) {
+heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t *buffer)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -384,7 +468,8 @@ heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buff
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_ipc_get_buffer(const char* buffer_id, heapstore_ipc_buffer_t* buffer) {
+heapstore_error_t heapstore_ipc_get_buffer(const char *buffer_id, heapstore_ipc_buffer_t *buffer)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -419,7 +504,9 @@ heapstore_error_t heapstore_ipc_get_buffer(const char* buffer_id, heapstore_ipc_
     return heapstore_ERR_NOT_FOUND;
 }
 
-heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buffer_count, uint64_t* total_size) {
+heapstore_error_t heapstore_ipc_get_stats(uint32_t *channel_count, uint32_t *buffer_count,
+                                          uint64_t *total_size)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -448,7 +535,8 @@ heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buf
     return heapstore_SUCCESS;
 }
 
-bool heapstore_ipc_is_healthy(void) {
+bool heapstore_ipc_is_healthy(void)
+{
     return s_initialized;
 }
 
@@ -456,7 +544,7 @@ bool heapstore_ipc_is_healthy(void) {
 
 typedef struct {
     char channel_id[128];
-    ipc_shm_region_t* shm;
+    ipc_shm_region_t *shm;
     size_t data_len;
     atomic_uint_fast32_t ready_flag;
 } ipc_active_channel_t;
@@ -465,7 +553,8 @@ typedef struct {
 static ipc_active_channel_t s_active_channels[IPC_ACTIVE_MAX];
 static size_t s_active_count = 0;
 
-static ipc_active_channel_t* find_active_channel(const char* channel_id) {
+static ipc_active_channel_t *find_active_channel(const char *channel_id)
+{
     for (size_t i = 0; i < s_active_count; i++) {
         if (strcmp(s_active_channels[i].channel_id, channel_id) == 0) {
             return &s_active_channels[i];
@@ -474,16 +563,20 @@ static ipc_active_channel_t* find_active_channel(const char* channel_id) {
     return NULL;
 }
 
-static ipc_active_channel_t* create_active_channel(const char* channel_id, size_t buffer_size) {
-    if (find_active_channel(channel_id)) return NULL;
-    if (s_active_count >= IPC_ACTIVE_MAX) return NULL;
+static ipc_active_channel_t *create_active_channel(const char *channel_id, size_t buffer_size)
+{
+    if (find_active_channel(channel_id))
+        return NULL;
+    if (s_active_count >= IPC_ACTIVE_MAX)
+        return NULL;
 
-    ipc_active_channel_t* ac = &s_active_channels[s_active_count];
+    ipc_active_channel_t *ac = &s_active_channels[s_active_count];
     memset(ac, 0, sizeof(*ac));
     strncpy(ac->channel_id, channel_id, sizeof(ac->channel_id) - 1);
 
     ac->shm = find_or_create_shm(channel_id, buffer_size);
-    if (!ac->shm) return NULL;
+    if (!ac->shm)
+        return NULL;
 
     ac->data_len = 0;
     atomic_store_explicit(&ac->ready_flag, 0, memory_order_release);
@@ -491,23 +584,25 @@ static ipc_active_channel_t* create_active_channel(const char* channel_id, size_
     return ac;
 }
 
-heapstore_error_t heapstore_ipc_create_channel(const char* channel_id,
-                                                  const char* name,
-                                                  const char* type,
-                                                  size_t buffer_size) {
-    if (!s_initialized) return heapstore_ERR_NOT_INITIALIZED;
-    if (!channel_id || !name || !type) return heapstore_ERR_INVALID_PARAM;
-    if (buffer_size < 256) buffer_size = 65536;
+heapstore_error_t heapstore_ipc_create_channel(const char *channel_id, const char *name,
+                                               const char *type, size_t buffer_size)
+{
+    if (!s_initialized)
+        return heapstore_ERR_NOT_INITIALIZED;
+    if (!channel_id || !name || !type)
+        return heapstore_ERR_INVALID_PARAM;
+    if (buffer_size < 256)
+        buffer_size = 65536;
 
     agentos_mutex_lock(&s_ipc_lock);
 
-    ipc_active_channel_t* existing = find_active_channel(channel_id);
+    ipc_active_channel_t *existing = find_active_channel(channel_id);
     if (existing) {
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_SUCCESS;
     }
 
-    ipc_active_channel_t* ac = create_active_channel(channel_id, buffer_size);
+    ipc_active_channel_t *ac = create_active_channel(channel_id, buffer_size);
     if (!ac) {
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_INTERNAL;
@@ -530,9 +625,12 @@ heapstore_error_t heapstore_ipc_create_channel(const char* channel_id,
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id) {
-    if (!s_initialized) return heapstore_ERR_NOT_INITIALIZED;
-    if (!channel_id) return heapstore_ERR_INVALID_PARAM;
+heapstore_error_t heapstore_ipc_destroy_channel(const char *channel_id)
+{
+    if (!s_initialized)
+        return heapstore_ERR_NOT_INITIALIZED;
+    if (!channel_id)
+        return heapstore_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&s_ipc_lock);
 
@@ -544,8 +642,10 @@ heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id) {
                 if (strcmp(s_shm_regions[j].shm_name + 12, channel_id) == 0) {
                     if (s_shm_regions[j].mapped && s_shm_regions[j].mapped != MAP_FAILED)
                         munmap(s_shm_regions[j].mapped, s_shm_regions[j].mapped_size);
-                    if (s_shm_regions[j].shm_fd >= 0) close(s_shm_regions[j].shm_fd);
-                    if (s_shm_regions[j].shm_name[0]) shm_unlink(s_shm_regions[j].shm_name);
+                    if (s_shm_regions[j].shm_fd >= 0)
+                        close(s_shm_regions[j].shm_fd);
+                    if (s_shm_regions[j].shm_name[0])
+                        shm_unlink(s_shm_regions[j].shm_name);
                     memmove(&s_shm_regions[j], &s_shm_regions[s_shm_region_count - 1],
                             sizeof(ipc_shm_region_t));
                     s_shm_region_count--;
@@ -577,15 +677,16 @@ heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id) {
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_ipc_send(const char* channel_id,
-                                          const void* data,
-                                          size_t len) {
-    if (!s_initialized) return heapstore_ERR_NOT_INITIALIZED;
-    if (!channel_id || !data || len == 0) return heapstore_ERR_INVALID_PARAM;
+heapstore_error_t heapstore_ipc_send(const char *channel_id, const void *data, size_t len)
+{
+    if (!s_initialized)
+        return heapstore_ERR_NOT_INITIALIZED;
+    if (!channel_id || !data || len == 0)
+        return heapstore_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&s_ipc_lock);
 
-    ipc_active_channel_t* ac = find_active_channel(channel_id);
+    ipc_active_channel_t *ac = find_active_channel(channel_id);
     if (!ac || !ac->shm) {
         heapstore_ipc_create_channel(channel_id, channel_id, "auto", len + 256);
         ac = find_active_channel(channel_id);
@@ -601,11 +702,12 @@ heapstore_error_t heapstore_ipc_send(const char* channel_id,
         return heapstore_ERR_INTERNAL;
     }
 
-    volatile uint32_t* msg_len = (volatile uint32_t*)ac->shm->mapped;
-    volatile uint32_t* msg_ready = (volatile uint32_t*)((char*)ac->shm->mapped + sizeof(uint32_t));
+    volatile uint32_t *msg_len = (volatile uint32_t *)ac->shm->mapped;
+    volatile uint32_t *msg_ready =
+        (volatile uint32_t *)((char *)ac->shm->mapped + sizeof(uint32_t));
 
     *msg_len = (uint32_t)len;
-    memcpy((char*)ac->shm->mapped + header_size, data, len);
+    memcpy((char *)ac->shm->mapped + header_size, data, len);
     atomic_thread_fence(memory_order_seq_cst);
     *msg_ready = 1;
     ac->data_len = len;
@@ -622,24 +724,26 @@ heapstore_error_t heapstore_ipc_send(const char* channel_id,
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_ipc_receive(const char* channel_id,
-                                           void** out_data,
-                                           size_t* out_len) {
-    if (!s_initialized) return heapstore_ERR_NOT_INITIALIZED;
-    if (!channel_id || !out_data || !out_len) return heapstore_ERR_INVALID_PARAM;
+heapstore_error_t heapstore_ipc_receive(const char *channel_id, void **out_data, size_t *out_len)
+{
+    if (!s_initialized)
+        return heapstore_ERR_NOT_INITIALIZED;
+    if (!channel_id || !out_data || !out_len)
+        return heapstore_ERR_INVALID_PARAM;
 
     *out_data = NULL;
     *out_len = 0;
 
     agentos_mutex_lock(&s_ipc_lock);
 
-    ipc_active_channel_t* ac = find_active_channel(channel_id);
+    ipc_active_channel_t *ac = find_active_channel(channel_id);
     if (!ac || !ac->shm) {
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_NOT_FOUND;
     }
 
-    volatile uint32_t* msg_ready = (volatile uint32_t*)((char*)ac->shm->mapped + sizeof(uint32_t));
+    volatile uint32_t *msg_ready =
+        (volatile uint32_t *)((char *)ac->shm->mapped + sizeof(uint32_t));
     atomic_thread_fence(memory_order_seq_cst);
 
     if (*msg_ready != 1) {
@@ -647,20 +751,20 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
         return heapstore_ERR_NOT_FOUND;
     }
 
-    volatile uint32_t* msg_len = (volatile uint32_t*)ac->shm->mapped;
+    volatile uint32_t *msg_len = (volatile uint32_t *)ac->shm->mapped;
     uint32_t len = *msg_len;
     if (len == 0 || len > ac->shm->mapped_size - sizeof(uint32_t) * 2) {
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    void* buf = malloc(len);
+    void *buf = AGENTOS_MALLOC(len);
     if (!buf) {
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(buf, (char*)ac->shm->mapped + sizeof(uint32_t) * 2, len);
+    memcpy(buf, (char *)ac->shm->mapped + sizeof(uint32_t) * 2, len);
     atomic_thread_fence(memory_order_seq_cst);
     *msg_ready = 0;
     *msg_len = 0;
@@ -675,17 +779,17 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
 
 #else
 
-heapstore_error_t heapstore_ipc_create_channel(const char* channel_id,
-                                                  const char* name,
-                                                  const char* type,
-                                                  size_t buffer_size) {
-    if (!channel_id || !name || !type) return heapstore_ERR_INVALID_PARAM;
+heapstore_error_t heapstore_ipc_create_channel(const char *channel_id, const char *name,
+                                               const char *type, size_t buffer_size)
+{
+    if (!channel_id || !name || !type)
+        return heapstore_ERR_INVALID_PARAM;
     agentos_mutex_lock(&s_ipc_lock);
     if (s_channel_count >= heapstore_IPC_MAX_CHANNELS) {
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_NO_SPACE;
     }
-    heapstore_ipc_channel_t* ch = &s_channels[s_channel_count];
+    heapstore_ipc_channel_t *ch = &s_channels[s_channel_count];
     snprintf(ch->channel_id, sizeof(ch->channel_id), "%s", channel_id);
     snprintf(ch->name, sizeof(ch->name), "%s", name);
     snprintf(ch->type, sizeof(ch->type), "%s", type);
@@ -700,8 +804,10 @@ heapstore_error_t heapstore_ipc_create_channel(const char* channel_id,
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id) {
-    if (!channel_id) return heapstore_ERR_INVALID_PARAM;
+heapstore_error_t heapstore_ipc_destroy_channel(const char *channel_id)
+{
+    if (!channel_id)
+        return heapstore_ERR_INVALID_PARAM;
     agentos_mutex_lock(&s_ipc_lock);
     for (size_t i = 0; i < s_channel_count; i++) {
         if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
@@ -716,26 +822,33 @@ heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id) {
     return heapstore_ERR_NOT_FOUND;
 }
 
-heapstore_error_t heapstore_ipc_send(const char* channel_id,
-                                          const void* data,
-                                          size_t len) {
-    if (!channel_id || !data || len == 0) return heapstore_ERR_INVALID_PARAM;
+heapstore_error_t heapstore_ipc_send(const char *channel_id, const void *data, size_t len)
+{
+    if (!channel_id || !data || len == 0)
+        return heapstore_ERR_INVALID_PARAM;
     agentos_mutex_lock(&s_ipc_lock);
-    heapstore_ipc_channel_t* ch = NULL;
+    heapstore_ipc_channel_t *ch = NULL;
     for (size_t i = 0; i < s_channel_count; i++) {
         if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
-            ch = &s_channels[i]; break;
+            ch = &s_channels[i];
+            break;
         }
     }
-    if (!ch) { agentos_mutex_unlock(&s_ipc_lock); return heapstore_ERR_NOT_FOUND; }
-    if (len > ch->buffer_size) { agentos_mutex_unlock(&s_ipc_lock); return heapstore_ERR_NO_SPACE; }
+    if (!ch) {
+        agentos_mutex_unlock(&s_ipc_lock);
+        return heapstore_ERR_NOT_FOUND;
+    }
+    if (len > ch->buffer_size) {
+        agentos_mutex_unlock(&s_ipc_lock);
+        return heapstore_ERR_NO_SPACE;
+    }
     if (s_buffer_count >= heapstore_IPC_MAX_BUFFERS) {
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_NO_SPACE;
     }
-    heapstore_ipc_buffer_t* buf = &s_buffers[s_buffer_count];
-    snprintf(buf->buffer_id, sizeof(buf->buffer_id), "buf_%zu_%llu",
-             s_buffer_count, (unsigned long long)time(NULL));
+    heapstore_ipc_buffer_t *buf = &s_buffers[s_buffer_count];
+    snprintf(buf->buffer_id, sizeof(buf->buffer_id), "buf_%zu_%llu", s_buffer_count,
+             (unsigned long long)time(NULL));
     snprintf(buf->channel_id, sizeof(buf->channel_id), "%s", channel_id);
     buf->size = ch->buffer_size;
     buf->used = len;
@@ -750,16 +863,17 @@ heapstore_error_t heapstore_ipc_send(const char* channel_id,
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_ipc_receive(const char* channel_id,
-                                           void** out_data,
-                                           size_t* out_len) {
-    if (!channel_id || !out_data || !out_len) return heapstore_ERR_INVALID_PARAM;
+heapstore_error_t heapstore_ipc_receive(const char *channel_id, void **out_data, size_t *out_len)
+{
+    if (!channel_id || !out_data || !out_len)
+        return heapstore_ERR_INVALID_PARAM;
     agentos_mutex_lock(&s_ipc_lock);
-    heapstore_ipc_buffer_t* found = NULL;
+    heapstore_ipc_buffer_t *found = NULL;
     for (size_t i = 0; i < s_buffer_count; i++) {
         if (strcmp(s_buffers[i].channel_id, channel_id) == 0 &&
             strcmp(s_buffers[i].status, "ready") == 0) {
-            found = &s_buffers[i]; break;
+            found = &s_buffers[i];
+            break;
         }
     }
     if (!found) {
@@ -768,8 +882,11 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_NOT_FOUND;
     }
-    void* data = malloc(found->used > 0 ? found->used : 1);
-    if (!data) { agentos_mutex_unlock(&s_ipc_lock); return heapstore_ERR_OUT_OF_MEMORY; }
+    void *data = AGENTOS_MALLOC(found->used > 0 ? found->used : 1);
+    if (!data) {
+        agentos_mutex_unlock(&s_ipc_lock);
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
     memset(data, 0, found->used > 0 ? found->used : 1);
     *out_data = data;
     *out_len = found->used;

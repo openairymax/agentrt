@@ -25,7 +25,7 @@ extern "C" {
  *
  * @ownership 调用者需通过gateway_destroy()释放
  */
-gateway_t* stdio_gateway_create(void);
+gateway_t *stdio_gateway_create(void);
 
 #ifdef __cplusplus
 }

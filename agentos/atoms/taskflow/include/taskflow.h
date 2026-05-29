@@ -3,10 +3,10 @@
 /**
  * @file taskflow.h
  * @brief AgentOS TaskFlow Graph Execution System Main Header
- * 
+ *
  * TaskFlow 图执行系统主头文件，提供基于 Pregel 超步模型的分布式计算框架。
  * 支持大规模图计算的容错、分布式执行和状态管理。
- * 
+ *
  * 主要特性：
  * 1. 有向无环图（DAG）执行引擎
  * 2. Pregel 超步迭代计算模型
@@ -23,10 +23,10 @@
 /**
  * @defgroup taskflow TaskFlow Graph Execution System
  * @brief 图执行系统模块
- * 
+ *
  * 基于 Pregel 模型的分布式图计算框架，提供大规模图分析的执行引擎。
  * 支持容错、检查点和分布式执行。
- * 
+ *
  * @{
  */
 
@@ -42,19 +42,19 @@ extern "C" {
  * @brief TaskFlow 错误码枚举
  */
 typedef enum {
-    TASKFLOW_SUCCESS = 0,           /**< 成功 */
-    TASKFLOW_ERROR_INVALID_ARG,     /**< 无效参数 */
-    TASKFLOW_ERROR_MEMORY,          /**< 内存不足 */
-    TASKFLOW_ERROR_NOT_INITIALIZED, /**< 未初始化 */
+    TASKFLOW_SUCCESS = 0,               /**< 成功 */
+    TASKFLOW_ERROR_INVALID_ARG,         /**< 无效参数 */
+    TASKFLOW_ERROR_MEMORY,              /**< 内存不足 */
+    TASKFLOW_ERROR_NOT_INITIALIZED,     /**< 未初始化 */
     TASKFLOW_ERROR_ALREADY_INITIALIZED, /**< 已初始化 */
-    TASKFLOW_ERROR_GRAPH_TOO_LARGE, /**< 图过大 */
-    TASKFLOW_ERROR_PARTITION,       /**< 分区错误 */
-    TASKFLOW_ERROR_CHECKPOINT,      /**< 检查点错误 */
-    TASKFLOW_ERROR_TIMEOUT,         /**< 超时错误 */
-    TASKFLOW_ERROR_FAULT_DETECTED,  /**< 检测到故障 */
-    TASKFLOW_ERROR_COMMUNICATION,   /**< 通信错误 */
-    TASKFLOW_ERROR_INTERNAL,        /**< 内部错误 */
-    TASKFLOW_ERROR_NO_ACTIVE_VERTICES, /**< 无活跃顶点(计算完成) */
+    TASKFLOW_ERROR_GRAPH_TOO_LARGE,     /**< 图过大 */
+    TASKFLOW_ERROR_PARTITION,           /**< 分区错误 */
+    TASKFLOW_ERROR_CHECKPOINT,          /**< 检查点错误 */
+    TASKFLOW_ERROR_TIMEOUT,             /**< 超时错误 */
+    TASKFLOW_ERROR_FAULT_DETECTED,      /**< 检测到故障 */
+    TASKFLOW_ERROR_COMMUNICATION,       /**< 通信错误 */
+    TASKFLOW_ERROR_INTERNAL,            /**< 内部错误 */
+    TASKFLOW_ERROR_NO_ACTIVE_VERTICES,  /**< 无活跃顶点(计算完成) */
     TASKFLOW_ERROR_ALREADY_RUNNING,     /**< 引擎已在运行 */
     TASKFLOW_ERROR_INIT_FAILED          /**< 引擎初始化/线程创建失败 */
 } taskflow_error_code_t;
@@ -66,17 +66,17 @@ typedef enum {
 /**
  * @brief TaskFlow 引擎句柄（不透明类型）
  */
-typedef struct taskflow_engine_s* taskflow_handle_t;
+typedef struct taskflow_engine_s *taskflow_handle_t;
 
 /**
  * @brief 图句柄（不透明类型）
  */
-typedef struct taskflow_graph_s* taskflow_graph_handle_t;
+typedef struct taskflow_graph_s *taskflow_graph_handle_t;
 
 /**
  * @brief 分区句柄（不透明类型）
  */
-typedef struct taskflow_partition_s* taskflow_partition_handle_t;
+typedef struct taskflow_partition_s *taskflow_partition_handle_t;
 
 // ============================================================================
 // 核心API：引擎管理
@@ -87,7 +87,7 @@ typedef struct taskflow_partition_s* taskflow_partition_handle_t;
  * @param config 引擎配置参数
  * @return 引擎句柄，失败返回 NULL
  */
-taskflow_handle_t taskflow_engine_create(const taskflow_config_t* config);
+taskflow_handle_t taskflow_engine_create(const taskflow_config_t *config);
 
 /**
  * @brief 销毁 TaskFlow 引擎实例
@@ -153,7 +153,8 @@ void taskflow_graph_destroy(taskflow_graph_handle_t graph);
  * @param vertex 顶点结构
  * @return 错误码
  */
-taskflow_error_t taskflow_graph_add_vertex(taskflow_graph_handle_t graph, const graph_vertex_t* vertex);
+taskflow_error_t taskflow_graph_add_vertex(taskflow_graph_handle_t graph,
+                                           const graph_vertex_t *vertex);
 
 /**
  * @brief 从图移除顶点
@@ -169,7 +170,7 @@ taskflow_error_t taskflow_graph_remove_vertex(taskflow_graph_handle_t graph, ver
  * @param edge 边结构
  * @return 错误码
  */
-taskflow_error_t taskflow_graph_add_edge(taskflow_graph_handle_t graph, const graph_edge_t* edge);
+taskflow_error_t taskflow_graph_add_edge(taskflow_graph_handle_t graph, const graph_edge_t *edge);
 
 /**
  * @brief 从图移除边
@@ -205,8 +206,7 @@ size_t taskflow_graph_get_edge_count(taskflow_graph_handle_t graph);
  * @return 错误码
  */
 taskflow_error_t taskflow_graph_partition(taskflow_graph_handle_t graph,
-                                         partition_strategy_t strategy,
-                                         size_t partition_count);
+                                          partition_strategy_t strategy, size_t partition_count);
 
 /**
  * @brief 获取图的分区列表
@@ -216,8 +216,7 @@ taskflow_error_t taskflow_graph_partition(taskflow_graph_handle_t graph,
  * @return 实际分区数量
  */
 size_t taskflow_graph_get_partitions(taskflow_graph_handle_t graph,
-                                    taskflow_partition_handle_t* partitions,
-                                    size_t max_count);
+                                     taskflow_partition_handle_t *partitions, size_t max_count);
 
 // ============================================================================
 // 核心API：执行控制
@@ -230,9 +229,8 @@ size_t taskflow_graph_get_partitions(taskflow_graph_handle_t graph,
  * @param max_supersteps 最大超步数
  * @return 错误码
  */
-taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine,
-                                      taskflow_graph_handle_t graph,
-                                      size_t max_supersteps);
+taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine, taskflow_graph_handle_t graph,
+                                       size_t max_supersteps);
 
 /**
  * @brief 执行图计算（异步）
@@ -243,11 +241,10 @@ taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine,
  * @param user_data 用户数据
  * @return 错误码
  */
-taskflow_error_t taskflow_execute_async(taskflow_handle_t engine,
-                                       taskflow_graph_handle_t graph,
-                                       size_t max_supersteps,
-                                       void (*callback)(taskflow_error_t result, void* user_data),
-                                       void* user_data);
+taskflow_error_t taskflow_execute_async(taskflow_handle_t engine, taskflow_graph_handle_t graph,
+                                        size_t max_supersteps,
+                                        void (*callback)(taskflow_error_t result, void *user_data),
+                                        void *user_data);
 
 /**
  * @brief 取消正在执行的计算
@@ -277,11 +274,9 @@ taskflow_error_t taskflow_execute_wait(taskflow_handle_t engine, uint32_t timeou
  * @param payload_size 负载大小
  * @return 错误码
  */
-taskflow_error_t taskflow_send_message(taskflow_handle_t engine,
-                                      vertex_id_t source,
-                                      vertex_id_t target,
-                                      const void* payload,
-                                      size_t payload_size);
+taskflow_error_t taskflow_send_message(taskflow_handle_t engine, vertex_id_t source,
+                                       vertex_id_t target, const void *payload,
+                                       size_t payload_size);
 
 /**
  * @brief 广播消息到所有顶点
@@ -291,10 +286,8 @@ taskflow_error_t taskflow_send_message(taskflow_handle_t engine,
  * @param payload_size 负载大小
  * @return 错误码
  */
-taskflow_error_t taskflow_broadcast_message(taskflow_handle_t engine,
-                                           vertex_id_t source,
-                                           const void* payload,
-                                           size_t payload_size);
+taskflow_error_t taskflow_broadcast_message(taskflow_handle_t engine, vertex_id_t source,
+                                            const void *payload, size_t payload_size);
 
 /**
  * @brief 获取顶点的入站消息
@@ -304,10 +297,8 @@ taskflow_error_t taskflow_broadcast_message(taskflow_handle_t engine,
  * @param max_count 数组最大容量
  * @return 实际消息数量
  */
-size_t taskflow_get_incoming_messages(taskflow_handle_t engine,
-                                     vertex_id_t vertex_id,
-                                     graph_message_t* messages,
-                                     size_t max_count);
+size_t taskflow_get_incoming_messages(taskflow_handle_t engine, vertex_id_t vertex_id,
+                                      graph_message_t *messages, size_t max_count);
 
 /**
  * @brief 清空顶点的消息队列
@@ -351,9 +342,7 @@ taskflow_error_t taskflow_delete_checkpoint(taskflow_handle_t engine, uint64_t c
  * @param max_count 数组最大容量
  * @return 实际检查点数量
  */
-size_t taskflow_list_checkpoints(taskflow_handle_t engine,
-                                uint64_t* checkpoints,
-                                size_t max_count);
+size_t taskflow_list_checkpoints(taskflow_handle_t engine, uint64_t *checkpoints, size_t max_count);
 
 // ============================================================================
 // 核心API：统计与监控
@@ -365,7 +354,7 @@ size_t taskflow_list_checkpoints(taskflow_handle_t engine,
  * @param stats 统计信息结构（输出）
  * @return 错误码
  */
-taskflow_error_t taskflow_get_stats(taskflow_handle_t engine, execution_stats_t* stats);
+taskflow_error_t taskflow_get_stats(taskflow_handle_t engine, execution_stats_t *stats);
 
 /**
  * @brief 重置统计信息
@@ -404,26 +393,26 @@ size_t taskflow_get_queued_message_count(taskflow_handle_t engine);
  * @param error 错误码
  * @return 错误描述字符串
  */
-const char* taskflow_error_to_string(taskflow_error_t error);
+const char *taskflow_error_to_string(taskflow_error_t error);
 
 /**
  * @brief 获取 TaskFlow 版本信息
  * @return 版本字符串
  */
-const char* taskflow_get_version(void);
+const char *taskflow_get_version(void);
 
 /**
  * @brief 设置日志回调函数
  * @param callback 日志回调函数
  * @param user_data 用户数据
  */
-void taskflow_set_log_callback(void (*callback)(const char* message, void* user_data),
-                              void* user_data);
+void taskflow_set_log_callback(void (*callback)(const char *message, void *user_data),
+                               void *user_data);
 
 #ifdef __cplusplus
 }
 #endif
 
-/** @} */ // end of taskflow group
+/** @} */  // end of taskflow group
 
-#endif // AGENTOS_TASKFLOW_H
+#endif  // AGENTOS_TASKFLOW_H

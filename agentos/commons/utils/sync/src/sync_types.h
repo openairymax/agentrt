@@ -16,8 +16,8 @@
 #ifndef AGENTOS_SYNC_TYPES_H
 #define AGENTOS_SYNC_TYPES_H
 
-#include "sync.h"
 #include "memory_compat.h"
+#include "sync.h"
 #include "sync_platform.h"
 
 #ifdef __cplusplus
@@ -27,7 +27,7 @@ extern "C" {
 struct sync_mutex {
     sync_type_t type;
     bool initialized;
-    const char* name;
+    const char *name;
     sync_stats_t stats;
     platform_mutex_t mutex;
 };
@@ -35,7 +35,7 @@ struct sync_mutex {
 struct sync_recursive_mutex {
     sync_type_t type;
     bool initialized;
-    const char* name;
+    const char *name;
     sync_stats_t stats;
     size_t recursive_count;
     uint64_t owner_thread;
@@ -45,7 +45,7 @@ struct sync_recursive_mutex {
 struct sync_rwlock {
     sync_type_t type;
     bool initialized;
-    const char* name;
+    const char *name;
     sync_stats_t stats;
     size_t read_count;
     bool is_writer;
@@ -55,7 +55,7 @@ struct sync_rwlock {
 struct sync_spinlock {
     sync_type_t type;
     bool initialized;
-    const char* name;
+    const char *name;
     sync_stats_t stats;
     platform_spinlock_t lock;
 };
@@ -63,7 +63,7 @@ struct sync_spinlock {
 struct sync_semaphore {
     sync_type_t type;
     bool initialized;
-    const char* name;
+    const char *name;
     sync_stats_t stats;
     unsigned int max_value;
     platform_semaphore_t semaphore;
@@ -72,7 +72,7 @@ struct sync_semaphore {
 struct sync_condition {
     sync_type_t type;
     bool initialized;
-    const char* name;
+    const char *name;
     sync_stats_t stats;
     platform_condition_t cond;
 };
@@ -80,7 +80,7 @@ struct sync_condition {
 struct sync_barrier {
     sync_type_t type;
     bool initialized;
-    const char* name;
+    const char *name;
     sync_stats_t stats;
     unsigned int count;
     unsigned int current;
@@ -91,7 +91,7 @@ struct sync_barrier {
 struct sync_event {
     sync_type_t type;
     bool initialized;
-    const char* name;
+    const char *name;
     sync_stats_t stats;
     bool manual_reset;
     bool signaled;

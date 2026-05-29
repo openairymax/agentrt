@@ -7,26 +7,29 @@
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "../../utils/memory/include/memory.h"
+#include "../utils/test_framework.h"
+
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include "../utils/test_framework.h"
-#include "../../utils/memory/include/memory.h"
 
 typedef struct {
     int fd;
     bool is_open;
-    char* name;
+    char *name;
 } mock_resource_t;
 
 static int resource_create_count = 0;
 static int resource_destroy_count = 0;
 
-static mock_resource_t* mock_resource_create(const char* name) {
-    mock_resource_t* res = (mock_resource_t*)malloc(sizeof(mock_resource_t));
-    if (!res) return NULL;
+static mock_resource_t *mock_resource_create(const char *name)
+{
+    mock_resource_t *res = (mock_resource_t *)malloc(sizeof(mock_resource_t));
+    if (!res)
+        return NULL;
 
     res->fd = ++resource_create_count;
     res->is_open = true;
@@ -35,8 +38,10 @@ static mock_resource_t* mock_resource_create(const char* name) {
     return res;
 }
 
-static void mock_resource_destroy(mock_resource_t* res) {
-    if (!res) return;
+static void mock_resource_destroy(mock_resource_t *res)
+{
+    if (!res)
+        return;
 
     if (res->is_open) {
         res->is_open = false;
@@ -50,9 +55,10 @@ static void mock_resource_destroy(mock_resource_t* res) {
     free(res);
 }
 
-static void test_resource_lifecycle(void** state) {
+static void test_resource_lifecycle(void **state)
+{
     (void)state;
-    mock_resource_t* res = mock_resource_create("test_resource");
+    mock_resource_t *res = mock_resource_create("test_resource");
 
     assert_non_null(res);
     assert_true(res->is_open);
@@ -63,10 +69,11 @@ static void test_resource_lifecycle(void** state) {
     assert_int_equal(1, resource_destroy_count);
 }
 
-static void test_multiple_resources(void** state) {
+static void test_multiple_resources(void **state)
+{
     (void)state;
     const int num_resources = 10;
-    mock_resource_t* resources[10];
+    mock_resource_t *resources[10];
 
     for (int i = 0; i < num_resources; i++) {
         char name[32];
@@ -85,25 +92,27 @@ static void test_multiple_resources(void** state) {
     assert_int_equal(num_resources, resource_destroy_count);
 }
 
-static void test_null_resource_handling(void** state) {
+static void test_null_resource_handling(void **state)
+{
     (void)state;
     mock_resource_destroy(NULL);
     assert_int_equal(0, resource_destroy_count);
 
-    mock_resource_t* res = mock_resource_create(NULL);
+    mock_resource_t *res = mock_resource_create(NULL);
     assert_non_null(res);
     assert_null(res->name);
 
     mock_resource_destroy(res);
 }
 
-static void test_resource_leak_detection(void** state) {
+static void test_resource_leak_detection(void **state)
+{
     (void)state;
     int initial_count = resource_destroy_count;
 
     {
-        mock_resource_t* res1 = mock_resource_create("leak_test_1");
-        mock_resource_t* res2 = mock_resource_create("leak_test_2");
+        mock_resource_t *res1 = mock_resource_create("leak_test_1");
+        mock_resource_t *res2 = mock_resource_create("leak_test_2");
 
         assert_non_null(res1);
         assert_non_null(res2);
@@ -114,15 +123,16 @@ static void test_resource_leak_detection(void** state) {
     assert_int_equal(initial_count + 1, resource_destroy_count);
 }
 
-static void test_memory_allocation_paired(void** state) {
+static void test_memory_allocation_paired(void **state)
+{
     (void)state;
-    void* ptr1 = malloc(1024);
+    void *ptr1 = malloc(1024);
     assert_non_null(ptr1);
 
-    void* ptr2 = calloc(100, sizeof(int));
+    void *ptr2 = calloc(100, sizeof(int));
     assert_non_null(ptr2);
 
-    char* str = strdup("Test string");
+    char *str = strdup("Test string");
     assert_non_null(str);
     assert_string_equal("Test string", str);
 
@@ -131,14 +141,15 @@ static void test_memory_allocation_paired(void** state) {
     free(ptr1);
 }
 
-static void test_large_memory_allocation(void** state) {
+static void test_large_memory_allocation(void **state)
+{
     (void)state;
     size_t large_size = 1024 * 1024;
-    void* ptr = malloc(large_size);
+    void *ptr = malloc(large_size);
 
     if (ptr) {
         memset(ptr, 0xAB, large_size);
-        unsigned char* bytes = (unsigned char*)ptr;
+        unsigned char *bytes = (unsigned char *)ptr;
         assert_int_equal(0xAB, bytes[0]);
         assert_int_equal(0xAB, bytes[large_size - 1]);
 
@@ -146,19 +157,21 @@ static void test_large_memory_allocation(void** state) {
     }
 }
 
-static void test_zero_size_allocation(void** state) {
+static void test_zero_size_allocation(void **state)
+{
     (void)state;
-    void* ptr = malloc(0);
+    void *ptr = malloc(0);
 
     if (ptr) {
         free(ptr);
     }
 }
 
-static void test_memory_alignment(void** state) {
+static void test_memory_alignment(void **state)
+{
     (void)state;
     size_t alignment = 64;
-    void* ptr = NULL;
+    void *ptr = NULL;
 
 #ifdef _WIN32
     ptr = _aligned_malloc(256, alignment);
@@ -178,9 +191,10 @@ static void test_memory_alignment(void** state) {
     }
 }
 
-static void test_memory_statistics(void** state) {
+static void test_memory_statistics(void **state)
+{
     (void)state;
-    void* ptrs[5];
+    void *ptrs[5];
     for (int i = 0; i < 5; i++) {
         ptrs[i] = malloc(1024 * (i + 1));
         assert_non_null(ptrs[i]);
@@ -191,7 +205,8 @@ static void test_memory_statistics(void** state) {
     }
 }
 
-int main(void) {
+int main(void)
+{
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_resource_lifecycle),
         cmocka_unit_test(test_multiple_resources),

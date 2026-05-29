@@ -9,33 +9,24 @@
 #ifndef AGENTOS_CHANNEL_SERVICE_H
 #define AGENTOS_CHANNEL_SERVICE_H
 
+#include "platform.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include "platform.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define CHANNEL_MAX_ID       128
-#define CHANNEL_MAX_NAME     256
-#define CHANNEL_MAX_TYPE     32
-#define CHANNEL_MAX_STATUS   32
+#define CHANNEL_MAX_ID 128
+#define CHANNEL_MAX_NAME 256
+#define CHANNEL_MAX_TYPE 32
+#define CHANNEL_MAX_STATUS 32
 #define CHANNEL_MAX_ENDPOINT 512
 #define CHANNEL_MAX_CHANNELS 256
 
-#define CHANNEL_OK             0
-#define CHANNEL_ERR_PARAM     -1
-#define CHANNEL_ERR_FULL      -2
-#define CHANNEL_ERR_EXISTS    -3
-#define CHANNEL_ERR_CREATE    -4
-#define CHANNEL_ERR_MEMORY    -5
-#define CHANNEL_ERR_TIMEOUT   -6
-#define CHANNEL_ERR_IO        -7
-#define CHANNEL_ERR_REJECTED  -8
-#define CHANNEL_ERR_NOT_FOUND -9
-#define CHANNEL_ERR_NOT_OPEN  -10
+#define CHANNEL_OK 0
 
 typedef enum {
     CHANNEL_TYPE_SOCKET = 0,
@@ -75,63 +66,45 @@ typedef struct {
     uint32_t idle_timeout_ms;
 } channel_config_t;
 
-#define CHANNEL_CONFIG_DEFAULTS { \
-    .max_channels = CHANNEL_MAX_CHANNELS, \
-    .default_buffer_size = 65536, \
-    .socket_backlog = 128, \
-    .socket_dir = AGENTOS_TMP_DIR "/channels", \
-    .shm_prefix = "/agentos_ch_", \
-    .idle_timeout_ms = 30000 }
+#define CHANNEL_CONFIG_DEFAULTS                                                                    \
+    {                                                                                              \
+        .max_channels = CHANNEL_MAX_CHANNELS, .default_buffer_size = 65536, .socket_backlog = 128, \
+        .socket_dir = AGENTOS_TMP_DIR "/channels", .shm_prefix = "/agentos_ch_",                   \
+        .idle_timeout_ms = 30000                                                                   \
+    }
 
-typedef void (*channel_message_cb_t)(
-    const char* channel_id,
-    const void* data,
-    size_t data_len,
-    void* user_data);
+typedef void (*channel_message_cb_t)(const char *channel_id, const void *data, size_t data_len,
+                                     void *user_data);
 
-channel_service_t* channel_service_create(const channel_config_t* config);
-void channel_service_destroy(channel_service_t* svc);
+channel_service_t *channel_service_create(const channel_config_t *config);
+void channel_service_destroy(channel_service_t *svc);
 
-int channel_service_start(channel_service_t* svc);
-int channel_service_stop(channel_service_t* svc);
+int channel_service_start(channel_service_t *svc);
+int channel_service_stop(channel_service_t *svc);
 
-int channel_service_open(channel_service_t* svc,
-                          const char* channel_id,
-                          const char* name,
-                          channel_type_t type,
-                          const char* endpoint);
+int channel_service_open(channel_service_t *svc, const char *channel_id, const char *name,
+                         channel_type_t type, const char *endpoint);
 
-int channel_service_close(channel_service_t* svc, const char* channel_id);
+int channel_service_close(channel_service_t *svc, const char *channel_id);
 
-int channel_service_send(channel_service_t* svc,
-                           const char* channel_id,
-                           const void* data,
-                           size_t data_len);
+int channel_service_send(channel_service_t *svc, const char *channel_id, const void *data,
+                         size_t data_len);
 
-int channel_service_receive(channel_service_t* svc,
-                              const char* channel_id,
-                              void** out_data,
-                              size_t* out_len);
+int channel_service_receive(channel_service_t *svc, const char *channel_id, void **out_data,
+                            size_t *out_len);
 
-int channel_service_list(channel_service_t* svc,
-                           channel_info_t* out_list,
-                           size_t list_capacity,
-                           size_t* out_count);
+int channel_service_list(channel_service_t *svc, channel_info_t *out_list, size_t list_capacity,
+                         size_t *out_count);
 
-int channel_service_get_info(channel_service_t* svc,
-                               const char* channel_id,
-                               channel_info_t* out_info);
+int channel_service_get_info(channel_service_t *svc, const char *channel_id,
+                             channel_info_t *out_info);
 
-int channel_service_set_callback(channel_service_t* svc,
-                                   const char* channel_id,
-                                   channel_message_cb_t callback,
-                                   void* user_data);
+int channel_service_set_callback(channel_service_t *svc, const char *channel_id,
+                                 channel_message_cb_t callback, void *user_data);
 
-int channel_service_ping(channel_service_t* svc,
-                           const char* channel_id,
-                           int64_t* out_latency_ms);
+int channel_service_ping(channel_service_t *svc, const char *channel_id, int64_t *out_latency_ms);
 
-bool channel_service_is_healthy(channel_service_t* svc);
+bool channel_service_is_healthy(channel_service_t *svc);
 
 #ifdef __cplusplus
 }

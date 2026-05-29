@@ -5,16 +5,18 @@
  * test_cupolas_integration.c - cupolas Module Integration Tests
  */
 
+#include "../include/cupolas.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "../include/cupolas.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static void test_cupolas_init_cleanup(void) {
+static void test_cupolas_init_cleanup(void)
+{
     agentos_error_t error = AGENTOS_OK;
     int ret = cupolas_init(NULL, &error);
     if (ret == AGENTOS_OK) {
@@ -26,8 +28,9 @@ static void test_cupolas_init_cleanup(void) {
     }
 }
 
-static void test_cupolas_version(void) {
-    const char* ver = cupolas_version();
+static void test_cupolas_version(void)
+{
+    const char *ver = cupolas_version();
     if (ver != NULL && strlen(ver) > 0) {
         TEST_PASS("cupolas_version");
     } else {
@@ -35,7 +38,8 @@ static void test_cupolas_version(void) {
     }
 }
 
-static void test_cupolas_sanitize_integration(void) {
+static void test_cupolas_sanitize_integration(void)
+{
     agentos_error_t error = AGENTOS_OK;
     int ret = cupolas_init(NULL, &error);
     if (ret != AGENTOS_OK) {
@@ -43,7 +47,7 @@ static void test_cupolas_sanitize_integration(void) {
         return;
     }
 
-    const char* input = "<script>alert('xss')</script>";
+    const char *input = "<script>alert('xss')</script>";
     char output[256] = {0};
 
     ret = cupolas_sanitize_input(input, output, sizeof(output));
@@ -56,7 +60,8 @@ static void test_cupolas_sanitize_integration(void) {
     cupolas_cleanup();
 }
 
-int main(void) {
+int main(void)
+{
     printf("=== cupolas Integration Tests ===\n\n");
 
     test_cupolas_init_cleanup();

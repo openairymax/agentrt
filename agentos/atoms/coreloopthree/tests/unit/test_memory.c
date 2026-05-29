@@ -6,6 +6,7 @@
  */
 
 #include "memory.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
@@ -16,18 +17,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)  \
+    do {                \
+        tests_run++;    \
+        func();         \
+        tests_passed++; \
     } while (0)
 
 /* ==================== 记忆引擎生命周期 ==================== */
@@ -35,7 +36,7 @@ static int tests_failed = 0;
 static void test_memory_create_default(void)
 {
     agentos_memory_engine_t *engine = NULL;
-    agentos_error_t err             = agentos_memory_create(NULL, &engine);
+    agentos_error_t err = agentos_memory_create(NULL, &engine);
 
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         TEST_PASS("memory_create with default config");
@@ -74,14 +75,14 @@ static void test_memory_write_record(void)
 
     agentos_memory_record_t record;
     memset(&record, 0, sizeof(record));
-    record.memory_record_type       = AGENTOS_MEMTYPE_TEXT;
+    record.memory_record_type = AGENTOS_MEMTYPE_TEXT;
     record.memory_record_importance = 0.85f;
 
-    const char *data              = "This is a test memory entry about a conversation";
-    record.memory_record_data     = (void *) data;
+    const char *data = "This is a test memory entry about a conversation";
+    record.memory_record_data = (void *)data;
     record.memory_record_data_len = strlen(data);
 
-    char *record_id     = NULL;
+    char *record_id = NULL;
     agentos_error_t err = agentos_memory_write(engine, &record, &record_id);
 
     if (err == AGENTOS_SUCCESS && record_id != NULL) {
@@ -126,17 +127,17 @@ static void test_memory_query_records(void)
 
     agentos_memory_query_t query;
     memset(&query, 0, sizeof(query));
-    query.memory_query_text        = "test query for memory search";
-    query.memory_query_text_len    = strlen(query.memory_query_text);
-    query.memory_query_limit       = 10;
+    query.memory_query_text = "test query for memory search";
+    query.memory_query_text_len = strlen(query.memory_query_text);
+    query.memory_query_limit = 10;
     query.memory_query_include_raw = 0;
 
     agentos_memory_result_ext_t *result = NULL;
-    agentos_error_t err                 = agentos_memory_query(engine, &query, &result);
+    agentos_error_t err = agentos_memory_query(engine, &query, &result);
 
     if (err == AGENTOS_SUCCESS && result != NULL) {
         printf("    Query results: %zu items, time=%lu ns\n", result->memory_result_count,
-               (unsigned long) result->memory_result_query_time_ns);
+               (unsigned long)result->memory_result_query_time_ns);
         agentos_memory_result_free(result);
         TEST_PASS("memory_query returns results");
     } else {
@@ -170,18 +171,18 @@ static void test_memory_get_by_id(void)
 
     agentos_memory_record_t record;
     memset(&record, 0, sizeof(record));
-    record.memory_record_type       = AGENTOS_MEMTYPE_EMBEDDING;
+    record.memory_record_type = AGENTOS_MEMTYPE_EMBEDDING;
     record.memory_record_importance = 0.9f;
-    const char *data                = "feature vector data";
-    record.memory_record_data       = (void *) data;
-    record.memory_record_data_len   = strlen(data);
+    const char *data = "feature vector data";
+    record.memory_record_data = (void *)data;
+    record.memory_record_data_len = strlen(data);
 
     char *record_id = NULL;
     agentos_memory_write(engine, &record, &record_id);
 
     if (record_id) {
         agentos_memory_record_t *fetched = NULL;
-        agentos_error_t gerr             = agentos_memory_get(engine, record_id, 1, &fetched);
+        agentos_error_t gerr = agentos_memory_get(engine, record_id, 1, &fetched);
 
         if (gerr == AGENTOS_SUCCESS && fetched != NULL) {
             printf("    Fetched type: %d, importance: %.2f\n", fetched->memory_record_type,
@@ -212,9 +213,9 @@ static void test_memory_mount(void)
 
     agentos_memory_record_t record;
     memset(&record, 0, sizeof(record));
-    record.memory_record_type     = AGENTOS_MEMTYPE_STRUCTURED;
-    const char *data              = "structured memory content";
-    record.memory_record_data     = (void *) data;
+    record.memory_record_type = AGENTOS_MEMTYPE_STRUCTURED;
+    const char *data = "structured memory content";
+    record.memory_record_data = (void *)data;
     record.memory_record_data_len = strlen(data);
 
     char *record_id = NULL;
@@ -303,7 +304,7 @@ static void test_memory_health_check(void)
         return;
     }
 
-    char *json          = NULL;
+    char *json = NULL;
     agentos_error_t err = agentos_memory_health_check(engine, &json);
 
     if (err == AGENTOS_SUCCESS && json != NULL) {
@@ -329,20 +330,20 @@ static void test_memory_write_all_types(void)
     }
 
     const char *types[] __attribute__((unused)) = {"RAW", "FEATURE", "STRUCTURE", "PATTERN"};
-    agentos_memory_type_t type_values[] = {AGENTOS_MEMTYPE_TEXT, AGENTOS_MEMTYPE_EMBEDDING, AGENTOS_MEMTYPE_STRUCTURED,
-                                           AGENTOS_MEMTYPE_BINARY};
+    agentos_memory_type_t type_values[] = {AGENTOS_MEMTYPE_TEXT, AGENTOS_MEMTYPE_EMBEDDING,
+                                           AGENTOS_MEMTYPE_STRUCTURED, AGENTOS_MEMTYPE_BINARY};
 
     int all_ok = 1;
     for (int i = 0; i < 4; i++) {
         agentos_memory_record_t rec;
         memset(&rec, 0, sizeof(rec));
-        rec.memory_record_type       = type_values[i];
-        rec.memory_record_importance = 0.5f + (float) i * 0.1f;
-        const char *d                = "test data";
-        rec.memory_record_data       = (void *) d;
-        rec.memory_record_data_len   = strlen(d);
+        rec.memory_record_type = type_values[i];
+        rec.memory_record_importance = 0.5f + (float)i * 0.1f;
+        const char *d = "test data";
+        rec.memory_record_data = (void *)d;
+        rec.memory_record_data_len = strlen(d);
 
-        char *id            = NULL;
+        char *id = NULL;
         agentos_error_t err = agentos_memory_write(engine, &rec, &id);
         if (err != AGENTOS_SUCCESS)
             all_ok = 0;
@@ -372,10 +373,10 @@ static void test_memory_query_with_limits(void)
 
     agentos_memory_query_t query;
     memset(&query, 0, sizeof(query));
-    query.memory_query_text        = "search term";
-    query.memory_query_text_len    = strlen(query.memory_query_text);
-    query.memory_query_limit       = 3;
-    query.memory_query_offset      = 0;
+    query.memory_query_text = "search term";
+    query.memory_query_text_len = strlen(query.memory_query_text);
+    query.memory_query_limit = 3;
+    query.memory_query_offset = 0;
     query.memory_query_include_raw = 0;
 
     agentos_memory_result_ext_t *result = NULL;

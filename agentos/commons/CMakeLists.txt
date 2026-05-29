@@ -59,6 +59,19 @@ endif()
 
 add_library(agentos_common STATIC ${SOURCES})
 
+set_source_files_properties(
+    utils/memory/src/memory.c
+    utils/memory/src/memory_pool.c
+    utils/memory/src/memory_debug.c
+    utils/memory/memory_common.c
+    utils/logging/src/logging.c
+    utils/logging/src/logging_compat.c
+    utils/logging/src/atomic_logging.c
+    utils/logging/src/service_logging.c
+    utils/logging/logging_common.c
+    PROPERTIES COMPILE_DEFINITIONS "AGENTOS_COMPLIANCE_IMPL"
+)
+
 if(MSVC)
     target_compile_options(agentos_common PRIVATE /std:c11 /utf-8 /W3 /wd4819 /wd4005 /D_ENABLE_ATOMIC_ALIGNMENT_FIX)
 endif()

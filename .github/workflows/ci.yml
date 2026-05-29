@@ -33,7 +33,7 @@ jobs:
           cmake -B ${{ github.workspace }}/../AgentOS-ci-build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTS=ON \
-            -DWARNINGS_AS_ERRORS=OFF
+            -DWARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: |
@@ -109,9 +109,194 @@ jobs:
             echo "[OK] BAN-58: No hardcoded paths in source"
           fi
 
+      - name: BAN-70 — BUILD_TESTS=ON verification
+        run: |
+          if grep -rn 'option(BUILD_TESTS.*ON' CMakeLists.txt 2>/dev/null; then
+            echo "[OK] BAN-70: BUILD_TESTS defaults to ON in CMakeLists.txt"
+          else
+            echo "::warning::BAN-70: BUILD_TESTS should default to ON"
+          fi
+
+      - name: BAN-71 — banned_functions.h injection
+        run: |
+          if grep -rn 'banned_functions\.h' CMakeLists.txt 2>/dev/null; then
+            echo "[OK] BAN-71: banned_functions.h injection configured in CMakeLists.txt"
+          else
+            echo "::warning::BAN-71: banned_functions.h injection not found in CMakeLists.txt"
+          fi
+
+      - name: BAN-72 — WARNINGS_AS_ERRORS verification
+        run: |
+          if grep -rn 'option(WARNINGS_AS_ERRORS.*ON' CMakeLists.txt 2>/dev/null; then
+            echo "[OK] BAN-72: WARNINGS_AS_ERRORS defaults to ON"
+          else
+            echo "::warning::BAN-72: WARNINGS_AS_ERRORS should default to ON"
+          fi
+
+      - name: BAN-73 — No return -1 magic numbers
+        run: |
+          VIOLATIONS=$(grep -rn 'return -1' agentos/ \
+            --include='*.c' --include='*.h' 2>/dev/null | grep -v test_ | grep -v Docs | wc -l)
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "::warning::BAN-73: $VIOLATIONS instances of 'return -1' (should use error codes)"
+          else
+            echo "[OK] BAN-73: No return -1 magic numbers found"
+          fi
+
+      - name: BAN-74 — agentos_error_push_ex coverage
+        run: |
+          USES=$(grep -rn 'agentos_error_push_ex\|error_push_ex' agentos/ \
+            --include='*.c' --include='*.h' 2>/dev/null | wc -l)
+          if [ "$USES" -gt 0 ]; then
+            echo "[OK] BAN-74: $USES uses of agentos_error_push_ex found"
+          else
+            echo "::warning::BAN-74: agentos_error_push_ex not used in source"
+          fi
+
+      - name: BAN-75 — No extern in function body
+        run: |
+          echo "BAN-75: extern-in-body check delegated to clang-tidy (misc-use-internal-linkage)"
+          echo "[INFO] BAN-75: Run clang-tidy for detailed analysis"
+
+      - name: BAN-77 — No GBK-encoded source files
+        run: |
+          if find agentos/ -name '*.c' -o -name '*.h' | xargs file -i 2>/dev/null | grep -i 'charset=iso-8859\|charset=gb\|charset=unknown-8bit' | head -10; then
+            echo "::error::BAN-77: Non-UTF-8 encoded source files found"
+            exit 1
+          else
+            echo "[OK] BAN-77: All source files are UTF-8 encoded"
+          fi
+
+  clang-tidy:
+    name: Clang-Tidy Analysis
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang-tidy cmake build-essential \
+            libssl-dev libcurl4-openssl-dev libcjson-dev libyaml-dev
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA=${{ github.event.pull_request.base.sha }}
+          else
+            BASE_SHA=$(git rev-parse HEAD~1)
+          fi
+          CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD -- '*.c' '*.h' 2>/dev/null | head -50 || echo "")
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "files<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGED" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure CMake
+        if: steps.changed-files.outputs.has_changes == 'true'
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=OFF \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy
+        if: steps.changed-files.outputs.has_changes == 'true'
+        run: |
+          ISSUES=0
+          echo "${{ steps.changed-files.outputs.files }}" | while read -r file; do
+            if [ -n "$file" ] && [ -f "$file" ]; then
+              echo "::group::clang-tidy: $file"
+              clang-tidy "$file" -p build --header-filter='.*' 2>&1 || echo "::warning::clang-tidy reported issues in $file"
+              echo "::endgroup::"
+            fi
+          done
+
+  cppcheck:
+    name: Cppcheck Static Analysis
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cppcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all --inconclusive --std=c11 --error-exitcode=0 \
+            --suppress=missingIncludeSystem \
+            --suppress=unmatchedSuppression \
+            -i build -i third_party -i vendor \
+            agentos/ 2>&1 | tee cppcheck-report.txt; echo "::notice::cppcheck completed"
+          ISSUES=$(grep -c '^\[' cppcheck-report.txt 2>/dev/null || echo "0")
+          echo "::notice::cppcheck: $ISSUES issues found"
+          if [ "$ISSUES" -gt 0 ]; then
+            cat cppcheck-report.txt
+          fi
+
+  python-checks:
+    name: Python BAN-80~82 Checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python lint tools
+        run: |
+          pip install flake8 bandit mypy 2>/dev/null || echo "::warning::some Python lint tools not available"
+
+      - name: BAN-80 — flake8 (no shadow builtins)
+        run: |
+          if find . -name '*.py' -not -path '*/venv/*' -not -path '*/.venv/*' \
+            -not -path '*/node_modules/*' -not -path '*/build/*' | head -5 | grep -q .; then
+            flake8 --select=A001,A002,A003 --max-line-length=120 \
+              --exclude=venv,.venv,build,node_modules,__pycache__ . 2>&1 || \
+              echo "::warning::BAN-80: flake8 shadow builtins check found issues"
+          else
+            echo "[OK] BAN-80: No Python files to check"
+          fi
+
+      - name: BAN-81 — flake8 f-string syntax
+        run: |
+          if find . -name '*.py' -not -path '*/venv/*' -not -path '*/.venv/*' \
+            -not -path '*/node_modules/*' -not -path '*/build/*' | head -5 | grep -q .; then
+            flake8 --select=F541 --max-line-length=120 \
+              --exclude=venv,.venv,build,node_modules,__pycache__ . 2>&1 || \
+              echo "::warning::BAN-81: flake8 f-string check found issues"
+          else
+            echo "[OK] BAN-81: No Python files to check"
+          fi
+
+      - name: BAN-82 — bandit security scan
+        run: |
+          if find . -name '*.py' -not -path '*/venv/*' -not -path '*/.venv/*' \
+            -not -path '*/node_modules/*' -not -path '*/build/*' | head -5 | grep -q .; then
+            bandit -r . -x venv,.venv,build,node_modules,__pycache__ -ll 2>&1 || \
+              echo "::warning::BAN-82: bandit security scan found issues"
+          else
+            echo "[OK] BAN-82: No Python files to check"
+          fi
+
   result:
     name: CI Result
-    needs: [build-and-test, ban-scan]
+    needs: [build-and-test, ban-scan, clang-tidy, cppcheck, python-checks]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -120,6 +305,15 @@ jobs:
         run: exit 1
       - name: Check ban-scan status
         if: ${{ needs.ban-scan.result == 'failure' }}
+        run: exit 1
+      - name: Check clang-tidy status
+        if: ${{ needs.clang-tidy.result == 'failure' }}
+        run: exit 1
+      - name: Check cppcheck status
+        if: ${{ needs.cppcheck.result == 'failure' }}
+        run: exit 1
+      - name: Check python-checks status
+        if: ${{ needs.python-checks.result == 'failure' }}
         run: exit 1
       - name: All checks passed
         run: echo "::notice::All AgentOS CI checks passed!"

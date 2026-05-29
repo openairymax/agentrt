@@ -10,4 +10,4 @@ AgentOS Manager Tools - Base Utilities Package
 from tools.base.utils import ConfigLoader, ReportExporter, FileHelper
 
 __all__ = ['ConfigLoader', 'ReportExporter', 'FileHelper']
-__version__ = '1.0.0'
+__version__ = '0.1.0'

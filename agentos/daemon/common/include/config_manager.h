@@ -19,8 +19,8 @@
 #define AGENTOS_CONFIG_MANAGER_H
 
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,22 +28,22 @@ extern "C" {
 
 /* ==================== 常量定义 ==================== */
 
-#define CM_MAX_KEY_LEN          128
-#define CM_MAX_VALUE_LEN        2048
-#define CM_MAX_ENTRIES          512
-#define CM_MAX_WATCHERS         32
-#define CM_MAX_HISTORY          64
-#define CM_MAX_NAMESPACE_LEN    32
-#define CM_MAX_PATH_LEN         512
+#define CM_MAX_KEY_LEN 128
+#define CM_MAX_VALUE_LEN 2048
+#define CM_MAX_ENTRIES 512
+#define CM_MAX_WATCHERS 32
+#define CM_MAX_HISTORY 64
+#define CM_MAX_NAMESPACE_LEN 32
+#define CM_MAX_PATH_LEN 512
 
 /* ==================== 配置值类型 ==================== */
 
 typedef enum {
-    CM_TYPE_STRING  = 0,
-    CM_TYPE_INT     = 1,
-    CM_TYPE_DOUBLE  = 2,
-    CM_TYPE_BOOL    = 3,
-    CM_TYPE_NULL    = 4
+    CM_TYPE_STRING = 0,
+    CM_TYPE_INT = 1,
+    CM_TYPE_DOUBLE = 2,
+    CM_TYPE_BOOL = 3,
+    CM_TYPE_NULL = 4
 } cm_value_type_t;
 
 /* ==================== 配置条目 ==================== */
@@ -85,21 +85,13 @@ typedef struct {
 
 /* ==================== 配置变更回调 ==================== */
 
-typedef void (*cm_change_callback_t)(
-    const char* key,
-    const char* old_value,
-    const char* new_value,
-    void* user_data
-);
+typedef void (*cm_change_callback_t)(const char *key, const char *old_value, const char *new_value,
+                                     void *user_data);
 
 /* ==================== 配置校验回调 ==================== */
 
-typedef bool (*cm_validator_t)(
-    const char* key,
-    const char* value,
-    char* error_msg,
-    size_t error_msg_size
-);
+typedef bool (*cm_validator_t)(const char *key, const char *value, char *error_msg,
+                               size_t error_msg_size);
 
 /* ==================== 生命周期管理 ==================== */
 
@@ -108,7 +100,7 @@ typedef bool (*cm_validator_t)(
  * @param config 配置参数（NULL使用默认）
  * @return 0成功，非0失败
  */
-int cm_init(const cm_config_t* config);
+int cm_init(const cm_config_t *config);
 
 /**
  * @brief 关闭配置管理器
@@ -123,7 +115,7 @@ void cm_shutdown(void);
  * @param default_value 默认值（配置不存在时返回）
  * @return 配置值字符串
  */
-const char* cm_get(const char* key, const char* default_value);
+const char *cm_get(const char *key, const char *default_value);
 
 /**
  * @brief 获取整数配置值
@@ -131,7 +123,7 @@ const char* cm_get(const char* key, const char* default_value);
  * @param default_value 默认值
  * @return 配置值
  */
-int64_t cm_get_int(const char* key, int64_t default_value);
+int64_t cm_get_int(const char *key, int64_t default_value);
 
 /**
  * @brief 获取浮点配置值
@@ -139,7 +131,7 @@ int64_t cm_get_int(const char* key, int64_t default_value);
  * @param default_value 默认值
  * @return 配置值
  */
-double cm_get_double(const char* key, double default_value);
+double cm_get_double(const char *key, double default_value);
 
 /**
  * @brief 获取布尔配置值
@@ -147,7 +139,7 @@ double cm_get_double(const char* key, double default_value);
  * @param default_value 默认值
  * @return 配置值
  */
-bool cm_get_bool(const char* key, bool default_value);
+bool cm_get_bool(const char *key, bool default_value);
 
 /**
  * @brief 设置配置值
@@ -156,7 +148,7 @@ bool cm_get_bool(const char* key, bool default_value);
  * @param source 来源标识
  * @return 0成功，非0失败
  */
-int cm_set(const char* key, const char* value, const char* source);
+int cm_set(const char *key, const char *value, const char *source);
 
 /**
  * @brief 设置带命名空间的配置值
@@ -166,8 +158,8 @@ int cm_set(const char* key, const char* value, const char* source);
  * @param source 来源标识
  * @return 0成功，非0失败
  */
-int cm_set_namespaced(const char* namespace_, const char* key,
-                      const char* value, const char* source);
+int cm_set_namespaced(const char *namespace_, const char *key, const char *value,
+                      const char *source);
 
 /* ==================== 配置加载 ==================== */
 
@@ -182,7 +174,7 @@ int cm_set_namespaced(const char* namespace_, const char* key,
  * @param namespace_ 命名空间（NULL使用默认）
  * @return 加载的配置项数量，-1表示失败
  */
-int cm_load_json(const char* path, const char* namespace_);
+int cm_load_json(const char *path, const char *namespace_);
 
 /**
  * @brief 从环境变量加载配置
@@ -190,7 +182,7 @@ int cm_load_json(const char* path, const char* namespace_);
  * @param namespace_ 命名空间
  * @return 加载的配置项数量
  */
-int cm_load_env(const char* prefix, const char* namespace_);
+int cm_load_env(const char *prefix, const char *namespace_);
 
 /**
  * @brief 从命令行参数加载配置
@@ -198,7 +190,7 @@ int cm_load_env(const char* prefix, const char* namespace_);
  * @param argv 参数数组
  * @return 加载的配置项数量
  */
-int cm_load_args(int argc, char** argv);
+int cm_load_args(int argc, char **argv);
 
 /* ==================== 配置监视与热更新 ==================== */
 
@@ -209,8 +201,7 @@ int cm_load_args(int argc, char** argv);
  * @param user_data 用户数据
  * @return 0成功，非0失败
  */
-int cm_watch(const char* key_pattern, cm_change_callback_t callback,
-             void* user_data);
+int cm_watch(const char *key_pattern, cm_change_callback_t callback, void *user_data);
 
 /**
  * @brief 取消配置监视
@@ -218,7 +209,7 @@ int cm_watch(const char* key_pattern, cm_change_callback_t callback,
  * @param callback 回调函数
  * @return 0成功，非0失败
  */
-int cm_unwatch(const char* key_pattern, cm_change_callback_t callback);
+int cm_unwatch(const char *key_pattern, cm_change_callback_t callback);
 
 /**
  * @brief 手动触发配置重新加载
@@ -234,7 +225,7 @@ int cm_reload(void);
  * @param validator 校验函数
  * @return 0成功，非0失败
  */
-int cm_register_validator(const char* key_pattern, cm_validator_t validator);
+int cm_register_validator(const char *key_pattern, cm_validator_t validator);
 
 /**
  * @brief 校验所有配置
@@ -252,8 +243,8 @@ int cm_validate_all(void);
  * @param found_count [out] 实际数量
  * @return 0成功，非0失败
  */
-int cm_get_history(const char* key, cm_change_record_t* records,
-                   uint32_t max_count, uint32_t* found_count);
+int cm_get_history(const char *key, cm_change_record_t *records, uint32_t max_count,
+                   uint32_t *found_count);
 
 /**
  * @brief 回滚配置到指定版本
@@ -261,7 +252,7 @@ int cm_get_history(const char* key, cm_change_record_t* records,
  * @param version 目标版本（0表示上一版本）
  * @return 0成功，非0失败
  */
-int cm_rollback(const char* key, uint64_t version);
+int cm_rollback(const char *key, uint64_t version);
 
 /* ==================== 环境差异化 ==================== */
 
@@ -269,21 +260,21 @@ int cm_rollback(const char* key, uint64_t version);
  * @brief 获取当前环境
  * @return 环境名称
  */
-const char* cm_get_environment(void);
+const char *cm_get_environment(void);
 
 /**
  * @brief 设置环境
  * @param env 环境名称（dev/staging/prod）
  * @return 0成功，非0失败
  */
-int cm_set_environment(const char* env);
+int cm_set_environment(const char *env);
 
 /**
  * @brief 加载环境特定配置
  * @param env 环境名称
  * @return 加载的配置项数量
  */
-int cm_load_environment_config(const char* env);
+int cm_load_environment_config(const char *env);
 
 /* ==================== 导出 ==================== */
 
@@ -292,7 +283,7 @@ int cm_load_environment_config(const char* env);
  * @param namespace_ 命名空间（NULL导出全部）
  * @return JSON字符串（需调用者释放），失败返回NULL
  */
-char* cm_export_json(const char* namespace_);
+char *cm_export_json(const char *namespace_);
 
 /**
  * @brief 获取配置条目数量

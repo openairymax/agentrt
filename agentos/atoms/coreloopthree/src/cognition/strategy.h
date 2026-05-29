@@ -7,8 +7,8 @@
 #ifndef AGENTOS_COGNITION_STRATEGIES_H
 #define AGENTOS_COGNITION_STRATEGIES_H
 
-#include "planner/strategy.h"
 #include "coordinator/strategy.h"
 #include "dispatcher/strategy.h"
+#include "planner/strategy.h"
 
 #endif /* AGENTOS_COGNITION_STRATEGIES_H */

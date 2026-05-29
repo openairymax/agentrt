@@ -4,9 +4,9 @@
 /* 字符串兼容性头文件 */
 
 #ifdef _WIN32
-#include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 /* 定义 ssize_t 类型 */
 typedef intptr_t ssize_t;
@@ -18,9 +18,9 @@ typedef intptr_t ssize_t;
 #endif
 
 #else
-#include <string.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #endif
 
 #endif /* STRING_COMPAT_H */

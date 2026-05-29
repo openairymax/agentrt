@@ -3,22 +3,24 @@
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "atomic_compat.h"
-#include "platform.h"
-#include "error.h"
-#include "svc_logger.h"
 #include "agentos_event_loop.h"
+#include "atomic_compat.h"
+#include "error.h"
+#include "logging.h"
+#include "platform.h"
+#include "svc_logger.h"
+
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <time.h>
 
 #ifndef _WIN32
-#include <unistd.h>
-#include <sys/utsname.h>
-#include <sys/sysinfo.h>
 #include <sys/statvfs.h>
+#include <sys/sysinfo.h>
+#include <sys/utsname.h>
+#include <unistd.h>
 #endif
 
 #define INFO_D_DEFAULT_PORT 8083
@@ -58,25 +60,39 @@ typedef struct {
     size_t history_count;
     size_t history_head;
     int tcp_port;
-    char* socket_path;
+    char *socket_path;
 } info_d_service_t;
 
 static info_d_service_t g_service = {0};
 static atomic_int g_shutdown = 0;
-static agentos_event_loop_t* g_event_loop = NULL;
+static agentos_event_loop_t *g_event_loop = NULL;
 
-static void info_d_signal_handler(int sig) {
+static void info_d_signal_handler(int sig)
+{
     (void)sig;
     atomic_store_explicit(&g_shutdown, 1, memory_order_seq_cst);
-    if (g_event_loop) agentos_event_loop_stop(g_event_loop);
+    if (g_event_loop)
+        agentos_event_loop_stop(g_event_loop);
 }
 
-static void info_d_handle_request(info_d_service_t* svc, agentos_socket_t client_fd);
+static void svc_log_toggle_handler(int sig)
+{
+    (void)sig;
+    static int debug_mode = 0;
+    debug_mode = !debug_mode;
+    log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_INFO);
+}
 
-static int info_d_on_client(int fd, uint32_t events, void* user_data) {
+static void info_d_handle_request(info_d_service_t *svc, agentos_socket_t client_fd);
+
+static int info_d_on_client(int fd, uint32_t events, void *user_data)
+{
     (void)events;
-    info_d_service_t* svc = (info_d_service_t*)user_data;
-    if (!svc || !svc->running) return -1;
+    info_d_service_t *svc = (info_d_service_t *)user_data;
+    if (!svc || !svc->running) {
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "svc is NULL or not running");
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     agentos_socket_t client = agentos_socket_accept(fd, 0);
     if (client != AGENTOS_INVALID_SOCKET) {
@@ -85,8 +101,12 @@ static int info_d_on_client(int fd, uint32_t events, void* user_data) {
     return 0;
 }
 
-static int info_d_collect_system_info(system_info_snapshot_t* snap) {
-    if (!snap) return -1;
+static int info_d_collect_system_info(system_info_snapshot_t *snap)
+{
+    if (!snap) {
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "snap is NULL");
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
     memset(snap, 0, sizeof(*snap));
     snap->timestamp = (uint64_t)time(NULL);
 
@@ -102,7 +122,8 @@ static int info_d_collect_system_info(system_info_snapshot_t* snap) {
         snap->free_memory_kb = (uint64_t)(mem_status.ullAvailPhys / 1024);
         snap->used_memory_kb = snap->total_memory_kb - snap->free_memory_kb;
         if (snap->total_memory_kb > 0)
-            snap->memory_usage_pct = (double)snap->used_memory_kb / (double)snap->total_memory_kb * 100.0;
+            snap->memory_usage_pct =
+                (double)snap->used_memory_kb / (double)snap->total_memory_kb * 100.0;
     }
 
     ULARGE_INTEGER total_bytes, free_bytes, avail_bytes;
@@ -123,7 +144,8 @@ static int info_d_collect_system_info(system_info_snapshot_t* snap) {
         snap->free_memory_kb = (uint64_t)(si.freeram / 1024);
         snap->used_memory_kb = snap->total_memory_kb - snap->free_memory_kb;
         if (snap->total_memory_kb > 0)
-            snap->memory_usage_pct = (double)snap->used_memory_kb / (double)snap->total_memory_kb * 100.0;
+            snap->memory_usage_pct =
+                (double)snap->used_memory_kb / (double)snap->total_memory_kb * 100.0;
         snap->uptime_sec = (uint64_t)si.uptime;
     }
 
@@ -137,7 +159,8 @@ static int info_d_collect_system_info(system_info_snapshot_t* snap) {
     }
 
     long clk_tck = sysconf(_SC_CLK_TCK);
-    if (clk_tck <= 0) clk_tck = 100;
+    if (clk_tck <= 0)
+        clk_tck = 100;
     snap->cpu_usage_pct = 0.0;
 #endif
 
@@ -145,11 +168,13 @@ static int info_d_collect_system_info(system_info_snapshot_t* snap) {
 }
 
 #ifdef _WIN32
-static DWORD WINAPI info_d_collect_loop(LPVOID arg) {
+static DWORD WINAPI info_d_collect_loop(LPVOID arg)
+{
 #else
-static void* info_d_collect_loop(void* arg) {
+static void *info_d_collect_loop(void *arg)
+{
 #endif
-    info_d_service_t* svc = (info_d_service_t*)arg;
+    info_d_service_t *svc = (info_d_service_t *)arg;
     if (!svc) {
 #ifdef _WIN32
         return 1;
@@ -188,8 +213,11 @@ static void* info_d_collect_loop(void* arg) {
 #endif
 }
 
-static int info_d_init(info_d_service_t* svc, int port, const char* sock) {
-    if (!svc) return AGENTOS_EINVAL;
+static int info_d_init(info_d_service_t *svc, int port, const char *sock)
+{
+    if (!svc)
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
+        return AGENTOS_EINVAL;
 
     memset(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : INFO_D_DEFAULT_PORT;
@@ -206,21 +234,25 @@ static int info_d_init(info_d_service_t* svc, int port, const char* sock) {
     return AGENTOS_SUCCESS;
 }
 
-static int info_d_start(info_d_service_t* svc) {
-    if (!svc) return AGENTOS_EINVAL;
+static int info_d_start(info_d_service_t *svc)
+{
+    if (!svc)
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
+        return AGENTOS_EINVAL;
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
     if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("info_d: failed to create socket at %s", svc->socket_path);
-        return -1;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
+        return AGENTOS_ERR_UNKNOWN;
     }
 #else
-    svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1",
-                                                       (uint16_t)svc->tcp_port);
+    svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1", (uint16_t)svc->tcp_port);
     if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("info_d: failed to create TCP server");
-        return -1;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create TCP server");
+        return AGENTOS_ERR_UNKNOWN;
     }
 #endif
 
@@ -234,13 +266,17 @@ static int info_d_start(info_d_service_t* svc) {
     return AGENTOS_SUCCESS;
 }
 
-static int info_d_stop(info_d_service_t* svc, int force) {
-    if (!svc) return AGENTOS_EINVAL;
+static int info_d_stop(info_d_service_t *svc, int force)
+{
+    if (!svc)
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&svc->lock);
     svc->running = 0;
     svc->collect_running = 0;
-    if (force) svc->force_stop = 1;
+    if (force)
+        svc->force_stop = 1;
     agentos_mutex_unlock(&svc->lock);
 
     if (force) {
@@ -260,13 +296,15 @@ static int info_d_stop(info_d_service_t* svc, int force) {
 #endif
     }
 
-    SVC_LOG_INFO("info_d: service stopped (force=%d, collections=%zu)",
-                 force, svc->history_count);
+    SVC_LOG_INFO("info_d: service stopped (force=%d, collections=%zu)", force, svc->history_count);
     return AGENTOS_SUCCESS;
 }
 
-static int info_d_destroy(info_d_service_t* svc) {
-    if (!svc) return AGENTOS_EINVAL;
+static int info_d_destroy(info_d_service_t *svc)
+{
+    if (!svc)
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
+        return AGENTOS_EINVAL;
 
     if (svc->server_fd != AGENTOS_INVALID_SOCKET) {
         agentos_socket_close(svc->server_fd);
@@ -279,15 +317,18 @@ static int info_d_destroy(info_d_service_t* svc) {
     return AGENTOS_SUCCESS;
 }
 
-static uint64_t info_d_healthcheck(info_d_service_t* svc) {
-    if (!svc) return 0;
+static uint64_t info_d_healthcheck(info_d_service_t *svc)
+{
+    if (!svc)
+        return 0;
 
     uint64_t last_time = 0;
     agentos_mutex_lock(&svc->lock);
     last_time = svc->last_collect_time;
     agentos_mutex_unlock(&svc->lock);
 
-    if (!svc->running) return 0;
+    if (!svc->running)
+        return 0;
 
     uint64_t now = (uint64_t)time(NULL);
     uint64_t staleness = now > last_time ? now - last_time : 0;
@@ -297,7 +338,8 @@ static uint64_t info_d_healthcheck(info_d_service_t* svc) {
     return last_time;
 }
 
-static void info_d_handle_request(info_d_service_t* svc, agentos_socket_t client_fd) {
+static void info_d_handle_request(info_d_service_t *svc, agentos_socket_t client_fd)
+{
     char buffer[INFO_D_MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
     if (n <= 0) {
@@ -313,10 +355,10 @@ static void info_d_handle_request(info_d_service_t* svc, agentos_socket_t client
 
     char response[8192];
 #ifdef _WIN32
-    const char* platform_name = "Windows";
+    const char *platform_name = "Windows";
 #else
     struct utsname uts;
-    const char* platform_name = "Linux";
+    const char *platform_name = "Linux";
     if (uname(&uts) == 0) {
         platform_name = uts.sysname;
     }
@@ -326,58 +368,49 @@ static void info_d_handle_request(info_d_service_t* svc, agentos_socket_t client
     uint64_t last_collect = info_d_healthcheck(svc);
 
     snprintf(response, sizeof(response),
-        "{"
-        "\"service\":\"info_d\","
-        "\"status\":\"ok\","
-        "\"platform\":\"%s\","
-        "\"service_uptime_sec\":%llu,"
-        "\"requests\":%llu,"
-        "\"errors\":%llu,"
-        "\"healthy\":%s,"
-        "\"system\":{"
-            "\"cpu_cores\":%d,"
-            "\"cpu_usage_pct\":%.2f,"
-            "\"total_memory_kb\":%llu,"
-            "\"free_memory_kb\":%llu,"
-            "\"used_memory_kb\":%llu,"
-            "\"memory_usage_pct\":%.2f,"
-            "\"disk_total_kb\":%llu,"
-            "\"disk_free_kb\":%llu,"
-            "\"disk_used_kb\":%llu,"
-            "\"disk_usage_pct\":%.2f,"
-            "\"system_uptime_sec\":%llu"
-        "},"
-        "\"collection\":{"
-            "\"interval_sec\":%d,"
-            "\"last_collect_time\":%llu,"
-            "\"history_count\":%zu"
-        "}"
-        "}",
-        platform_name,
-        (unsigned long long)service_uptime,
-        (unsigned long long)svc->request_count,
-        (unsigned long long)svc->error_count,
-        last_collect > 0 ? "true" : "false",
-        snap.cpu_cores,
-        snap.cpu_usage_pct,
-        (unsigned long long)snap.total_memory_kb,
-        (unsigned long long)snap.free_memory_kb,
-        (unsigned long long)snap.used_memory_kb,
-        snap.memory_usage_pct,
-        (unsigned long long)snap.disk_total_kb,
-        (unsigned long long)snap.disk_free_kb,
-        (unsigned long long)snap.disk_used_kb,
-        snap.disk_usage_pct,
-        (unsigned long long)snap.uptime_sec,
-        INFO_D_COLLECT_INTERVAL_SEC,
-        (unsigned long long)last_collect,
-        svc->history_count);
+             "{"
+             "\"service\":\"info_d\","
+             "\"status\":\"ok\","
+             "\"platform\":\"%s\","
+             "\"service_uptime_sec\":%llu,"
+             "\"requests\":%llu,"
+             "\"errors\":%llu,"
+             "\"healthy\":%s,"
+             "\"system\":{"
+             "\"cpu_cores\":%d,"
+             "\"cpu_usage_pct\":%.2f,"
+             "\"total_memory_kb\":%llu,"
+             "\"free_memory_kb\":%llu,"
+             "\"used_memory_kb\":%llu,"
+             "\"memory_usage_pct\":%.2f,"
+             "\"disk_total_kb\":%llu,"
+             "\"disk_free_kb\":%llu,"
+             "\"disk_used_kb\":%llu,"
+             "\"disk_usage_pct\":%.2f,"
+             "\"system_uptime_sec\":%llu"
+             "},"
+             "\"collection\":{"
+             "\"interval_sec\":%d,"
+             "\"last_collect_time\":%llu,"
+             "\"history_count\":%zu"
+             "}"
+             "}",
+             platform_name, (unsigned long long)service_uptime,
+             (unsigned long long)svc->request_count, (unsigned long long)svc->error_count,
+             last_collect > 0 ? "true" : "false", snap.cpu_cores, snap.cpu_usage_pct,
+             (unsigned long long)snap.total_memory_kb, (unsigned long long)snap.free_memory_kb,
+             (unsigned long long)snap.used_memory_kb, snap.memory_usage_pct,
+             (unsigned long long)snap.disk_total_kb, (unsigned long long)snap.disk_free_kb,
+             (unsigned long long)snap.disk_used_kb, snap.disk_usage_pct,
+             (unsigned long long)snap.uptime_sec, INFO_D_COLLECT_INTERVAL_SEC,
+             (unsigned long long)last_collect, svc->history_count);
 
     agentos_socket_send(client_fd, response, strlen(response));
     agentos_socket_close(client_fd);
 }
 
-int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) {
+int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
+{
 
 #ifdef _WIN32
     SetConsoleCtrlHandler(NULL, TRUE);
@@ -385,7 +418,11 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
     signal(SIGINT, info_d_signal_handler);
     signal(SIGTERM, info_d_signal_handler);
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGUSR1, svc_log_toggle_handler);
 #endif
+
+    agentos_log_init(NULL);
+    atexit(log_cleanup);
 
     if (info_d_init(&g_service, INFO_D_DEFAULT_PORT, INFO_D_DEFAULT_SOCKET) != AGENTOS_SUCCESS)
         return 1;
@@ -402,9 +439,8 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
         return 1;
     }
 
-    agentos_event_loop_add_fd(g_event_loop, (int)g_service.server_fd,
-                               AGENTOS_EVENT_TYPE_READ,
-                               info_d_on_client, &g_service);
+    agentos_event_loop_add_fd(g_event_loop, (int)g_service.server_fd, AGENTOS_EVENT_TYPE_READ,
+                              info_d_on_client, &g_service);
 
     LOG_INFO("info_d running with epoll event loop on fd=%d", (int)g_service.server_fd);
     agentos_event_loop_run(g_event_loop);
@@ -414,5 +450,6 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
 
     info_d_stop(&g_service, g_shutdown ? 1 : 0);
     info_d_destroy(&g_service);
+    log_cleanup();
     return 0;
 }

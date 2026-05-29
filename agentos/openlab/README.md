@@ -1,6 +1,6 @@
 # OpenLab — 开放生态系统
 
-> **Preview Status**: OpenLab 当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。
+> **Preview Status**: OpenLab 当前处于预览/开发阶段，作为 AgentOS v0.1.0 的一部分发布。API 和功能可能在未来版本中发生变化。
 
 `agentos/openlab/` 是 AgentOS 的开放生态系统层，提供应用、贡献、市场和模板四大能力体系，构建开放、协作的 Agent 开发生态。各模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成，并通过 protocols 层进行通信。
 
@@ -15,10 +15,11 @@
 
 | 模块 | 路径 | 说明 |
 |------|------|------|
-| **OpenLab 核心** | `openlab/` | 生态系统的核心管理与调度能力 |
+| **OpenLab 核心** | `openlab/` | 生态系统的核心管理与调度能力（agents/core/protocols/utils） |
 | **应用市场** | `app/` | 官方和社区驱动的 Agent 应用 |
 | **社区贡献** | `contrib/` | 社区贡献的技能和策略 |
-| **市场模板** | `markets/templates/` | 可复用的项目模板 |
+| **市场模板** | `markets/` | 可复用的项目模板（agents/skills/templates） |
+| **测试套件** | `tests/` | 单元测试 |
 
 ## 架构
 
@@ -31,8 +32,8 @@
 |  |  (app/)          |  |  (contrib/)      |  |  (markets/)      | |
 |  |                  |  |                  |  |                  | |
 |  | • DocGen         |  | • Skills         |  | • Templates      | |
-|  | • E-Commerce     |  | • Strategies     |  | • Agent/Skill     | |
-|  | • Research       |  | • Agents         |  |   Distributions  | |
+|  | • E-Commerce     |  | • Strategies     |  | • Agents         | |
+|  | • Research       |  | • Agents         |  | • Skills         | |
 |  | • VideoEdit      |  |                  |  |                  | |
 |  +------------------+  +------------------+  +------------------+ |
 +-------------------------------------------------------------------+

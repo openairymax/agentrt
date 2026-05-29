@@ -4,16 +4,18 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "market_service.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "market_service.h"
 
-static void test_market_create_destroy(void) {
+static void test_market_create_destroy(void)
+{
     printf("  test_market_create_destroy...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 || svc != NULL);
 
@@ -25,10 +27,11 @@ static void test_market_create_destroy(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_register_agent(void) {
+static void test_market_register_agent(void)
+{
     printf("  test_market_register_agent...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -49,10 +52,11 @@ static void test_market_register_agent(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_search_agents(void) {
+static void test_market_search_agents(void)
+{
     printf("  test_market_search_agents...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -69,7 +73,7 @@ static void test_market_search_agents(void) {
     memset(&params, 0, sizeof(params));
     params.query = "Search Test";
 
-    agent_info_t** agents = NULL;
+    agent_info_t **agents = NULL;
     size_t count = 0;
     ret = market_service_search_agents(svc, &params, &agents, &count);
     if (ret == 0) {
@@ -84,10 +88,11 @@ static void test_market_search_agents(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_get_installed_agents(void) {
+static void test_market_get_installed_agents(void)
+{
     printf("  test_market_get_installed_agents...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -108,7 +113,7 @@ static void test_market_get_installed_agents(void) {
     market_service_register_agent(svc, &info1);
     market_service_register_agent(svc, &info2);
 
-    agent_info_t** agents = NULL;
+    agent_info_t **agents = NULL;
     size_t count = 0;
     ret = market_service_get_installed_agents(svc, &agents, &count);
     if (ret == 0) {
@@ -121,10 +126,11 @@ static void test_market_get_installed_agents(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_uninstall_agent(void) {
+static void test_market_uninstall_agent(void)
+{
     printf("  test_market_uninstall_agent...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret __attribute__((unused)) = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
@@ -145,19 +151,19 @@ static void test_market_uninstall_agent(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_check_update(void) {
+static void test_market_check_update(void)
+{
     printf("  test_market_check_update...\n");
 
-    market_service_t* svc = NULL;
+    market_service_t *svc = NULL;
     int ret = market_service_create(NULL, &svc);
     assert(ret == 0 && svc != NULL);
 
     bool has_update = false;
-    char* latest_version = NULL;
+    char *latest_version = NULL;
     ret = market_service_check_update(svc, "test_agent", &has_update, &latest_version);
     if (ret == 0) {
-        printf("    Update available: %s, latest: %s\n",
-               has_update ? "yes" : "no",
+        printf("    Update available: %s, latest: %s\n", has_update ? "yes" : "no",
                latest_version ? latest_version : "(null)");
         free(latest_version);
     } else {
@@ -169,7 +175,8 @@ static void test_market_check_update(void) {
     printf("    PASSED\n");
 }
 
-static void test_market_enum_values(void) {
+static void test_market_enum_values(void)
+{
     printf("  test_market_enum_values...\n");
 
     assert(AGENT_TYPE_ASSISTANT == 0);
@@ -190,7 +197,8 @@ static void test_market_enum_values(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Market Service Unit Tests\n");
     printf("=========================================\n");

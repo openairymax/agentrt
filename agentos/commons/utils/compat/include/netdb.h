@@ -11,6 +11,8 @@
 #ifndef AGENTOS_COMPAT_NETDB_H
 #define AGENTOS_COMPAT_NETDB_H
 
+#pragma GCC system_header
+
 #ifdef __cplusplus
 extern "C" {
 #endif

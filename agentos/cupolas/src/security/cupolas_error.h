@@ -13,8 +13,8 @@
 #ifndef cupolas_ERROR_H
 #define cupolas_ERROR_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,26 +35,26 @@ extern "C" {
  * - Module-specific errors: -200 to -299
  */
 typedef enum {
-    cupolas_ERR_OK                 =   0,
-    cupolas_ERR_UNKNOWN            =  -1,
-    cupolas_ERR_INVALID_PARAM      =  -2,
-    cupolas_ERR_NULL_POINTER       =  -3,
-    cupolas_ERR_OUT_OF_MEMORY      =  -4,
-    cupolas_ERR_BUFFER_TOO_SMALL   =  -5,
-    cupolas_ERR_NOT_FOUND          =  -6,
-    cupolas_ERR_ALREADY_EXISTS     =  -7,
-    cupolas_ERR_TIMEOUT            =  -8,
-    cupolas_ERR_NOT_SUPPORTED      =  -9,
-    cupolas_ERR_PERMISSION_DENIED  = -10,
-    cupolas_ERR_IO                = -11,
-    cupolas_ERR_STATE_ERROR        = -13,
-    cupolas_ERR_OVERFLOW          = -14,
-    cupolas_ERR_TRY_AGAIN         = -15,
-    cupolas_ERR_AUTH_FAILED       = -16,
-    cupolas_ERR_CERT_INVALID       = -17,
-    cupolas_ERR_CERT_EXPIRED       = -18,
-    cupolas_ERR_SIGNATURE_INVALID  = -19,
-    cupolas_ERR_TAMPERED          = -20
+    cupolas_ERR_OK = 0,
+    cupolas_ERR_UNKNOWN = -1,
+    cupolas_ERR_INVALID_PARAM = -2,
+    cupolas_ERR_NULL_POINTER = -3,
+    cupolas_ERR_OUT_OF_MEMORY = -4,
+    cupolas_ERR_BUFFER_TOO_SMALL = -5,
+    cupolas_ERR_NOT_FOUND = -6,
+    cupolas_ERR_ALREADY_EXISTS = -7,
+    cupolas_ERR_TIMEOUT = -8,
+    cupolas_ERR_NOT_SUPPORTED = -9,
+    cupolas_ERR_PERMISSION_DENIED = -10,
+    cupolas_ERR_IO = -11,
+    cupolas_ERR_STATE_ERROR = -13,
+    cupolas_ERR_OVERFLOW = -14,
+    cupolas_ERR_TRY_AGAIN = -15,
+    cupolas_ERR_AUTH_FAILED = -16,
+    cupolas_ERR_CERT_INVALID = -17,
+    cupolas_ERR_CERT_EXPIRED = -18,
+    cupolas_ERR_SIGNATURE_INVALID = -19,
+    cupolas_ERR_TAMPERED = -20
 } cupolas_error_t;
 
 /* ============================================================================
@@ -67,15 +67,15 @@ typedef enum {
  * Error codes for code signature verification module.
  */
 typedef enum {
-    cupolas_SIG_ERR_OK             =   0,
-    cupolas_SIG_ERR_INVALID        =  -1,
-    cupolas_SIG_ERR_EXPIRED        =  -2,
-    cupolas_SIG_ERR_REVOKED        =  -3,
-    cupolas_SIG_ERR_UNTRUSTED      =  -4,
-    cupolas_SIG_ERR_TAMPERED       =  -5,
-    cupolas_SIG_ERR_NO_SIGNATURE   =  -6,
-    cupolas_SIG_ERR_CERT_INVALID   =  -7,
-    cupolas_SIG_ERR_CERT_EXPIRED   =  -8,
+    cupolas_SIG_ERR_OK = 0,
+    cupolas_SIG_ERR_INVALID = -1,
+    cupolas_SIG_ERR_EXPIRED = -2,
+    cupolas_SIG_ERR_REVOKED = -3,
+    cupolas_SIG_ERR_UNTRUSTED = -4,
+    cupolas_SIG_ERR_TAMPERED = -5,
+    cupolas_SIG_ERR_NO_SIGNATURE = -6,
+    cupolas_SIG_ERR_CERT_INVALID = -7,
+    cupolas_SIG_ERR_CERT_EXPIRED = -8,
     cupolas_SIG_ERR_ALGO_UNSUPPORTED = -9
 } cupolas_sig_error_t;
 
@@ -85,13 +85,13 @@ typedef enum {
  * Error codes for entitlements permission declaration module.
  */
 typedef enum {
-    cupolas_ENT_ERR_OK             =   0,
-    cupolas_ENT_ERR_INVALID        =  -1,
+    cupolas_ENT_ERR_OK = 0,
+    cupolas_ENT_ERR_INVALID = -1,
     cupolas_ENT_ERR_SIGNATURE_INVALID = -2,
-    cupolas_ENT_ERR_EXPIRED        =  -3,
-    cupolas_ENT_ERR_DENIED         =  -4,
-    cupolas_ENT_ERR_NOT_FOUND      =  -5,
-    cupolas_ENT_ERR_PARSE_ERROR    =  -6
+    cupolas_ENT_ERR_EXPIRED = -3,
+    cupolas_ENT_ERR_DENIED = -4,
+    cupolas_ENT_ERR_NOT_FOUND = -5,
+    cupolas_ENT_ERR_PARSE_ERROR = -6
 } cupolas_ent_error_t;
 
 /**
@@ -100,13 +100,13 @@ typedef enum {
  * Error codes for secure credential storage module.
  */
 typedef enum {
-    cupolas_VAULT_ERR_OK           =   0,
-    cupolas_VAULT_ERR_INVALID       =  -1,
-    cupolas_VAULT_ERR_LOCKED       =  -2,
+    cupolas_VAULT_ERR_OK = 0,
+    cupolas_VAULT_ERR_INVALID = -1,
+    cupolas_VAULT_ERR_LOCKED = -2,
     cupolas_VAULT_ERR_ACCESS_DENIED = -3,
-    cupolas_VAULT_ERR_NOT_FOUND    =  -4,
+    cupolas_VAULT_ERR_NOT_FOUND = -4,
     cupolas_VAULT_ERR_ALREADY_EXISTS = -5,
-    cupolas_VAULT_ERR_CORRUPT      =  -6,
+    cupolas_VAULT_ERR_CORRUPT = -6,
     cupolas_VAULT_ERR_DECRYPT_FAILED = -7,
     cupolas_VAULT_ERR_ENCRYPT_FAILED = -8,
     cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE = -9
@@ -118,15 +118,15 @@ typedef enum {
  * Error codes for network security module (TLS, firewall).
  */
 typedef enum {
-    cupolas_NET_ERR_OK              =   0,
-    cupolas_NET_ERR_INVALID         =  -1,
-    cupolas_NET_ERR_CERT_INVALID   =  -2,
-    cupolas_NET_ERR_CERT_EXPIRED   =  -3,
-    cupolas_NET_ERR_CERT_REVOKED   =  -4,
-    cupolas_NET_ERR_UNTRUSTED      =  -5,
-    cupolas_NET_ERR_HOST_MISMATCH  =  -6,
-    cupolas_NET_ERR_DENIED         =  -7,
-    cupolas_NET_ERR_TIMEOUT         =  -8
+    cupolas_NET_ERR_OK = 0,
+    cupolas_NET_ERR_INVALID = -1,
+    cupolas_NET_ERR_CERT_INVALID = -2,
+    cupolas_NET_ERR_CERT_EXPIRED = -3,
+    cupolas_NET_ERR_CERT_REVOKED = -4,
+    cupolas_NET_ERR_UNTRUSTED = -5,
+    cupolas_NET_ERR_HOST_MISMATCH = -6,
+    cupolas_NET_ERR_DENIED = -7,
+    cupolas_NET_ERR_TIMEOUT = -8
 } cupolas_net_error_t;
 
 /**
@@ -135,9 +135,9 @@ typedef enum {
  * Error codes for runtime protection module (seccomp, CFI).
  */
 typedef enum {
-    cupolas_RUNTIME_ERR_OK         =   0,
-    cupolas_RUNTIME_ERR_INVALID    =  -1,
-    cupolas_RUNTIME_ERR_VIOLATION  =  -2,
+    cupolas_RUNTIME_ERR_OK = 0,
+    cupolas_RUNTIME_ERR_INVALID = -1,
+    cupolas_RUNTIME_ERR_VIOLATION = -2,
     cupolas_RUNTIME_ERR_COMPROMISED = -3,
     cupolas_RUNTIME_ERR_NOT_SUPPORTED = -4
 } cupolas_runtime_error_t;
@@ -153,7 +153,7 @@ typedef enum {
  * @note Thread-safe: Yes
  * @reentrant Yes
  */
-const char* cupolas_error_string(cupolas_error_t error);
+const char *cupolas_error_string(cupolas_error_t error);
 
 /**
  * @brief Convert signature error to unified error
@@ -254,105 +254,105 @@ cupolas_runtime_error_t cupolas_error_to_runtime(cupolas_error_t error);
  * @param[in] e Error code
  * @return true if success, false otherwise
  */
-#define cupolas_ERROR_IS_SUCCESS(e)   ((e) == cupolas_ERR_OK)
+#define cupolas_ERROR_IS_SUCCESS(e) ((e) == cupolas_ERR_OK)
 
 /**
  * @brief Check if error is fatal (cannot recover)
  * @param[in] e Error code
  * @return true if fatal, false otherwise
  */
-#define cupolas_ERROR_IS_FATAL(e)     ((e) <  cupolas_ERR_OUT_OF_MEMORY)
+#define cupolas_ERROR_IS_FATAL(e) ((e) < cupolas_ERR_OUT_OF_MEMORY)
 
 /**
  * @brief Check if error is a parameter validation error
  * @param[in] e Error code
  * @return true if parameter error, false otherwise
  */
-#define cupolas_ERROR_IS_PARAM(e)     ((e) == cupolas_ERR_INVALID_PARAM || \
-                                    (e) == cupolas_ERR_NULL_POINTER)
+#define cupolas_ERROR_IS_PARAM(e) \
+    ((e) == cupolas_ERR_INVALID_PARAM || (e) == cupolas_ERR_NULL_POINTER)
 
 /* ============================================================================
  * Backward Compatibility Aliases
  * ============================================================================ */
 
 #ifndef AGENTOS_OK
-#define AGENTOS_OK                    cupolas_ERR_OK
+#define AGENTOS_OK cupolas_ERR_OK
 #endif
 #ifndef AGENTOS_ERR_UNKNOWN
-#define AGENTOS_ERR_UNKNOWN          cupolas_ERR_UNKNOWN
+#define AGENTOS_ERR_UNKNOWN cupolas_ERR_UNKNOWN
 #endif
 #ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM   cupolas_ERR_INVALID_PARAM
+#define AGENTOS_ERR_INVALID_PARAM cupolas_ERR_INVALID_PARAM
 #endif
 #ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER    cupolas_ERR_NULL_POINTER
+#define AGENTOS_ERR_NULL_POINTER cupolas_ERR_NULL_POINTER
 #endif
 #ifndef AGENTOS_ERR_OUT_OF_MEMORY
-#define AGENTOS_ERR_OUT_OF_MEMORY   cupolas_ERR_OUT_OF_MEMORY
+#define AGENTOS_ERR_OUT_OF_MEMORY cupolas_ERR_OUT_OF_MEMORY
 #endif
 #ifndef AGENTOS_ERR_BUFFER_TOO_SMALL
 #define AGENTOS_ERR_BUFFER_TOO_SMALL cupolas_ERR_BUFFER_TOO_SMALL
 #endif
 #ifndef AGENTOS_ERR_NOT_FOUND
-#define AGENTOS_ERR_NOT_FOUND        cupolas_ERR_NOT_FOUND
+#define AGENTOS_ERR_NOT_FOUND cupolas_ERR_NOT_FOUND
 #endif
 #ifndef AGENTOS_ERR_ALREADY_EXISTS
-#define AGENTOS_ERR_ALREADY_EXISTS   cupolas_ERR_ALREADY_EXISTS
+#define AGENTOS_ERR_ALREADY_EXISTS cupolas_ERR_ALREADY_EXISTS
 #endif
 #ifndef AGENTOS_ERR_TIMEOUT
-#define AGENTOS_ERR_TIMEOUT          cupolas_ERR_TIMEOUT
+#define AGENTOS_ERR_TIMEOUT cupolas_ERR_TIMEOUT
 #endif
 #ifndef AGENTOS_ERR_NOT_SUPPORTED
-#define AGENTOS_ERR_NOT_SUPPORTED    cupolas_ERR_NOT_SUPPORTED
+#define AGENTOS_ERR_NOT_SUPPORTED cupolas_ERR_NOT_SUPPORTED
 #endif
 #ifndef AGENTOS_ERR_PERMISSION_DENIED
 #define AGENTOS_ERR_PERMISSION_DENIED cupolas_ERR_PERMISSION_DENIED
 #endif
 #ifndef AGENTOS_ERR_IO
-#define AGENTOS_ERR_IO              cupolas_ERR_IO
+#define AGENTOS_ERR_IO cupolas_ERR_IO
 #endif
 #ifndef AGENTOS_ERR_STATE_ERROR
-#define AGENTOS_ERR_STATE_ERROR     cupolas_ERR_STATE_ERROR
+#define AGENTOS_ERR_STATE_ERROR cupolas_ERR_STATE_ERROR
 #endif
 #ifndef AGENTOS_ERR_OVERFLOW
-#define AGENTOS_ERR_OVERFLOW        cupolas_ERR_OVERFLOW
+#define AGENTOS_ERR_OVERFLOW cupolas_ERR_OVERFLOW
 #endif
 
 #ifndef cupolas_OK
-#define cupolas_OK                    cupolas_ERR_OK
+#define cupolas_OK cupolas_ERR_OK
 #endif
 #ifndef cupolas_ERROR_UNKNOWN
-#define cupolas_ERROR_UNKNOWN         cupolas_ERR_UNKNOWN
+#define cupolas_ERROR_UNKNOWN cupolas_ERR_UNKNOWN
 #endif
 #ifndef cupolas_ERROR_INVALID_ARG
-#define cupolas_ERROR_INVALID_ARG     cupolas_ERR_INVALID_PARAM
+#define cupolas_ERROR_INVALID_ARG cupolas_ERR_INVALID_PARAM
 #endif
 #ifndef cupolas_ERROR_NO_MEMORY
-#define cupolas_ERROR_NO_MEMORY       cupolas_ERR_OUT_OF_MEMORY
+#define cupolas_ERROR_NO_MEMORY cupolas_ERR_OUT_OF_MEMORY
 #endif
 #ifndef cupolas_ERROR_NOT_FOUND
-#define cupolas_ERROR_NOT_FOUND       cupolas_ERR_NOT_FOUND
+#define cupolas_ERROR_NOT_FOUND cupolas_ERR_NOT_FOUND
 #endif
 #ifndef cupolas_ERROR_PERMISSION
-#define cupolas_ERROR_PERMISSION      cupolas_ERR_PERMISSION_DENIED
+#define cupolas_ERROR_PERMISSION cupolas_ERR_PERMISSION_DENIED
 #endif
 #ifndef cupolas_ERROR_BUSY
-#define cupolas_ERROR_BUSY            cupolas_ERR_STATE_ERROR
+#define cupolas_ERROR_BUSY cupolas_ERR_STATE_ERROR
 #endif
 #ifndef cupolas_ERROR_TIMEOUT
-#define cupolas_ERROR_TIMEOUT         cupolas_ERR_TIMEOUT
+#define cupolas_ERROR_TIMEOUT cupolas_ERR_TIMEOUT
 #endif
 #ifndef cupolas_ERROR_WOULD_BLOCK
-#define cupolas_ERROR_WOULD_BLOCK     cupolas_ERR_TRY_AGAIN
+#define cupolas_ERROR_WOULD_BLOCK cupolas_ERR_TRY_AGAIN
 #endif
 #ifndef cupolas_ERROR_OVERFLOW
-#define cupolas_ERROR_OVERFLOW         cupolas_ERR_OVERFLOW
+#define cupolas_ERROR_OVERFLOW cupolas_ERR_OVERFLOW
 #endif
 #ifndef cupolas_ERROR_NOT_SUPPORTED
-#define cupolas_ERROR_NOT_SUPPORTED   cupolas_ERR_NOT_SUPPORTED
+#define cupolas_ERROR_NOT_SUPPORTED cupolas_ERR_NOT_SUPPORTED
 #endif
 #ifndef cupolas_ERROR_IO
-#define cupolas_ERROR_IO             cupolas_ERR_IO
+#define cupolas_ERROR_IO cupolas_ERR_IO
 #endif
 
 #ifdef __cplusplus

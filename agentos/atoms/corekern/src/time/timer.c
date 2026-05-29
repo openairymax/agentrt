@@ -5,57 +5,58 @@
  */
 
 #include "agentos_time.h"
-#include "task.h"
-#include <stdlib.h>
-
 #include "atomic_compat.h"
 #include "memory_compat.h"
 #include "string_compat.h"
+#include "task.h"
+
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct agentos_timer {
     agentos_timer_callback_t callback;
-    void* userdata;
+    void *userdata;
     uint32_t interval_ms;
     int one_shot;
     int active;
     uint64_t next_fire_ns;
-    struct agentos_timer* next;
+    struct agentos_timer *next;
 } agentos_timer_t;
 
-static agentos_timer_t* timer_list = NULL;
-static agentos_mutex_t* timer_lock = NULL;
+static agentos_timer_t *timer_list = NULL;
+static agentos_mutex_t *timer_lock = NULL;
 static atomic_int timer_processing = 0;
 
-agentos_timer_t* agentos_timer_create(
-    agentos_timer_callback_t callback,
-    void* userdata) {
+agentos_timer_t *agentos_timer_create(agentos_timer_callback_t callback, void *userdata)
+{
 
-    if (!callback) return NULL;
+    if (!callback)
+        return NULL;
 
-    agentos_timer_t* timer = (agentos_timer_t*)AGENTOS_CALLOC(1, sizeof(agentos_timer_t));
-    if (!timer) return NULL;
+    agentos_timer_t *timer = (agentos_timer_t *)AGENTOS_CALLOC(1, sizeof(agentos_timer_t));
+    if (!timer)
+        return NULL;
 
     timer->callback = callback;
     timer->userdata = userdata;
     return timer;
 }
 
-agentos_error_t agentos_timer_start(
-    agentos_timer_t* timer,
-    uint32_t interval_ms,
-    int one_shot) {
+agentos_error_t agentos_timer_start(agentos_timer_t *timer, uint32_t interval_ms, int one_shot)
+{
 
-    if (!timer || interval_ms == 0) return AGENTOS_EINVAL;
+    if (!timer || interval_ms == 0)
+        return AGENTOS_EINVAL;
 
     if (!timer_lock) {
-        agentos_mutex_t* new_lock = agentos_mutex_create();
-        if (!new_lock) return AGENTOS_ENOMEM;
+        agentos_mutex_t *new_lock = agentos_mutex_create();
+        if (!new_lock)
+            return AGENTOS_ENOMEM;
 
-        agentos_mutex_t* expected = NULL;
-        if (!atomic_compare_exchange_strong_ptr(
-                (_Atomic void**)&timer_lock, (void**)&expected, (void*)new_lock,
-                memory_order_seq_cst, memory_order_seq_cst)) {
+        agentos_mutex_t *expected = NULL;
+        if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&timer_lock, (void **)&expected,
+                                                (void *)new_lock, memory_order_seq_cst,
+                                                memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
     }
@@ -63,7 +64,7 @@ agentos_error_t agentos_timer_start(
     agentos_mutex_lock(timer_lock);
 
     if (timer->active) {
-        agentos_timer_t** pp = &timer_list;
+        agentos_timer_t **pp = &timer_list;
         while (*pp) {
             if (*pp == timer) {
                 *pp = timer->next;
@@ -85,14 +86,17 @@ agentos_error_t agentos_timer_start(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_timer_stop(agentos_timer_t* timer) {
-    if (!timer) return AGENTOS_EINVAL;
+agentos_error_t agentos_timer_stop(agentos_timer_t *timer)
+{
+    if (!timer)
+        return AGENTOS_EINVAL;
 
-    if (!timer_lock) return AGENTOS_SUCCESS;
+    if (!timer_lock)
+        return AGENTOS_SUCCESS;
 
     agentos_mutex_lock(timer_lock);
 
-    agentos_timer_t** pp = &timer_list;
+    agentos_timer_t **pp = &timer_list;
     while (*pp) {
         if (*pp == timer) {
             *pp = timer->next;
@@ -107,8 +111,10 @@ agentos_error_t agentos_timer_stop(agentos_timer_t* timer) {
     return AGENTOS_SUCCESS;
 }
 
-void agentos_timer_destroy(agentos_timer_t* timer) {
-    if (!timer) return;
+void agentos_timer_destroy(agentos_timer_t *timer)
+{
+    if (!timer)
+        return;
 
     if (!timer_lock) {
         AGENTOS_FREE(timer);
@@ -117,7 +123,7 @@ void agentos_timer_destroy(agentos_timer_t* timer) {
 
     agentos_mutex_lock(timer_lock);
 
-    agentos_timer_t** pp = &timer_list;
+    agentos_timer_t **pp = &timer_list;
     while (*pp) {
         if (*pp == timer) {
             *pp = timer->next;
@@ -133,24 +139,26 @@ void agentos_timer_destroy(agentos_timer_t* timer) {
     AGENTOS_FREE(timer);
 }
 
-void agentos_time_timer_process(void) {
-    if (!timer_lock) return;
+void agentos_time_timer_process(void)
+{
+    if (!timer_lock)
+        return;
 
     int expected = 0;
     if (!atomic_compare_exchange_strong_explicit(&timer_processing, &expected, 1,
-                                                  memory_order_seq_cst, memory_order_seq_cst)) {
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         return;
     }
 
     typedef struct {
         agentos_timer_callback_t callback;
-        void* userdata;
-        agentos_timer_t* source;
+        void *userdata;
+        agentos_timer_t *source;
         int is_one_shot;
     } fire_entry_t;
 
     int capacity = 64;
-    fire_entry_t* to_fire = (fire_entry_t*)AGENTOS_CALLOC(capacity, sizeof(fire_entry_t));
+    fire_entry_t *to_fire = (fire_entry_t *)AGENTOS_CALLOC(capacity, sizeof(fire_entry_t));
     if (!to_fire) {
         atomic_store_explicit(&timer_processing, 0, memory_order_seq_cst);
         return;
@@ -160,16 +168,18 @@ void agentos_time_timer_process(void) {
     agentos_mutex_lock(timer_lock);
 
     uint64_t now = agentos_time_monotonic_ns();
-    agentos_timer_t* timer = timer_list;
+    agentos_timer_t *timer = timer_list;
 
     while (timer) {
-        agentos_timer_t* next = timer->next;
+        agentos_timer_t *next = timer->next;
 
         if (timer->active && now >= timer->next_fire_ns) {
             if (fire_count >= capacity) {
                 int new_capacity = capacity * 2;
-                fire_entry_t* new_buf = (fire_entry_t*)AGENTOS_REALLOC(to_fire, new_capacity * sizeof(fire_entry_t));
-                if (!new_buf) break;
+                fire_entry_t *new_buf =
+                    (fire_entry_t *)AGENTOS_REALLOC(to_fire, new_capacity * sizeof(fire_entry_t));
+                if (!new_buf)
+                    break;
                 to_fire = new_buf;
                 capacity = new_capacity;
                 memset(to_fire + fire_count, 0, (capacity - fire_count) * sizeof(fire_entry_t));
@@ -201,13 +211,15 @@ void agentos_time_timer_process(void) {
     atomic_store_explicit(&timer_processing, 0, memory_order_seq_cst);
 }
 
-void agentos_time_timer_cleanup(void) {
-    if (!timer_lock) return;
+void agentos_time_timer_cleanup(void)
+{
+    if (!timer_lock)
+        return;
 
     agentos_mutex_lock(timer_lock);
 
     while (timer_list) {
-        agentos_timer_t* timer = timer_list;
+        agentos_timer_t *timer = timer_list;
         timer_list = timer->next;
         AGENTOS_FREE(timer);
     }

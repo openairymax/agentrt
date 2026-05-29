@@ -6,9 +6,10 @@
 
 #include "entity_extractor.h"
 
-#include "intent_utils.h"
 #include "atomic_compat.h"
+#include "intent_utils.h"
 #include "memory_compat.h"
+#include "types.h"
 
 #include <ctype.h>
 #ifndef _WIN32
@@ -56,7 +57,7 @@ int agentos_entity_extractor_init(void)
 {
     int expected = 0;
     atomic_compare_exchange_strong_explicit(&g_extractor_initialized, &expected, 1,
-                                 memory_order_seq_cst, memory_order_seq_cst);
+                                            memory_order_seq_cst, memory_order_seq_cst);
     return 0;
 }
 
@@ -112,7 +113,7 @@ int agentos_extraction_result_add(agentos_extraction_result_t *result,
                                   const agentos_entity_t *entity)
 {
     if (!result || !entity) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     /* 扩容检查 */
@@ -121,7 +122,7 @@ int agentos_extraction_result_add(agentos_extraction_result_t *result,
         agentos_entity_t *new_entities = (agentos_entity_t *)AGENTOS_REALLOC(
             result->entities, new_capacity * sizeof(agentos_entity_t));
         if (!new_entities) {
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
         /* 初始化新空间 */
@@ -333,15 +334,31 @@ static void extract_filepaths(const char *input, size_t input_len,
     regfree(&regex);
 }
 #else
-static void extract_urls(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
-static void extract_emails(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
-static void extract_filepaths(const char *input, size_t input_len, agentos_extraction_result_t *result) { (void)input; (void)input_len; (void)result; }
+static void extract_urls(const char *input, size_t input_len, agentos_extraction_result_t *result)
+{
+    (void)input;
+    (void)input_len;
+    (void)result;
+}
+static void extract_emails(const char *input, size_t input_len, agentos_extraction_result_t *result)
+{
+    (void)input;
+    (void)input_len;
+    (void)result;
+}
+static void extract_filepaths(const char *input, size_t input_len,
+                              agentos_extraction_result_t *result)
+{
+    (void)input;
+    (void)input_len;
+    (void)result;
+}
 #endif
 
 int agentos_entity_extract(const char *input, size_t input_len, agentos_extraction_result_t *result)
 {
     if (!input || !result || input_len == 0) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (!atomic_load_explicit(&g_extractor_initialized, memory_order_acquire)) {
@@ -352,7 +369,7 @@ int agentos_entity_extract(const char *input, size_t input_len, agentos_extracti
     if (!result->entities) {
         agentos_extraction_result_t *new_result = agentos_extraction_result_create(10);
         if (!new_result) {
-            return -1;
+            return AGENTOS_EINVAL;
         }
         memcpy(result, new_result, sizeof(*result));
         AGENTOS_FREE(new_result);

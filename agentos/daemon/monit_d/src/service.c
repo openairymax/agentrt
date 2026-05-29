@@ -11,13 +11,15 @@
  * 整合指标采集、告警管理、分布式追踪和结构化日志四大子系统。
  */
 
+#include "daemon_errors.h"
+#include "error.h"
 #include "monitor_service.h"
 #include "platform.h"
-#include "error.h"
 #include "svc_logger.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
 
 #define MAX_ALERTS 1024
@@ -28,32 +30,32 @@
 #define MAX_METRICS 256
 
 typedef struct {
-    char* alert_id;
-    char* message;
+    char *alert_id;
+    char *message;
     alert_level_t level;
-    char* service_name;
-    char* resource_id;
+    char *service_name;
+    char *resource_id;
     uint64_t timestamp;
     bool is_resolved;
 } alert_entry_t;
 
 typedef struct {
     log_level_t level;
-    char* message;
-    char* service_name;
-    char* file;
+    char *message;
+    char *service_name;
+    char *file;
     int line;
-    char* function;
+    char *function;
     uint64_t timestamp;
 } log_entry_t;
 
 typedef struct {
-    char* trace_id;
-    char* operation_name;
+    char *trace_id;
+    char *operation_name;
     uint64_t start_time;
     uint64_t end_time;
     int status;
-    char* service_name;
+    char *service_name;
     size_t span_count;
 } trace_entry_t;
 
@@ -73,7 +75,7 @@ struct monitor_service {
     size_t trace_count;
     agentos_mutex_t trace_lock;
 
-    metric_info_t* metric_cache[MAX_METRICS];
+    metric_info_t *metric_cache[MAX_METRICS];
     size_t metric_cache_count;
     agentos_mutex_t metric_lock;
 
@@ -81,18 +83,20 @@ struct monitor_service {
     int running;
 };
 
-static uint64_t get_timestamp_ms(void) {
+static uint64_t get_timestamp_ms(void)
+{
     return agentos_time_ms();
 }
 
-int monitor_service_create(const monitor_config_t* config, monitor_service_t** service) {
+int monitor_service_create(const monitor_config_t *config, monitor_service_t **service)
+{
     if (!service) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    monitor_service_t* svc = (monitor_service_t*)AGENTOS_CALLOC(1, sizeof(monitor_service_t));
+    monitor_service_t *svc = (monitor_service_t *)AGENTOS_CALLOC(1, sizeof(monitor_service_t));
     if (!svc) {
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate monitor service");
     }
 
     if (config) {
@@ -136,7 +140,8 @@ int monitor_service_create(const monitor_config_t* config, monitor_service_t** s
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_destroy(monitor_service_t* service) {
+int monitor_service_destroy(monitor_service_t *service)
+{
     if (!service) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -192,7 +197,8 @@ int monitor_service_destroy(monitor_service_t* service) {
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_record_metric(monitor_service_t* service, const metric_info_t* metric) {
+int monitor_service_record_metric(monitor_service_t *service, const metric_info_t *metric)
+{
     if (!service || !metric) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -200,7 +206,7 @@ int monitor_service_record_metric(monitor_service_t* service, const metric_info_
     agentos_mutex_lock(&service->metric_lock);
 
     if (service->metric_cache_count < MAX_METRICS) {
-        metric_info_t* entry = (metric_info_t*)AGENTOS_CALLOC(1, sizeof(metric_info_t));
+        metric_info_t *entry = (metric_info_t *)AGENTOS_CALLOC(1, sizeof(metric_info_t));
         if (!entry) {
             agentos_mutex_unlock(&service->metric_lock);
             return AGENTOS_ENOMEM;
@@ -217,7 +223,8 @@ int monitor_service_record_metric(monitor_service_t* service, const metric_info_
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_log(monitor_service_t* service, const log_info_t* log) {
+int monitor_service_log(monitor_service_t *service, const log_info_t *log)
+{
     if (!service || !log) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -248,7 +255,8 @@ int monitor_service_log(monitor_service_t* service, const log_info_t* log) {
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_trigger_alert(monitor_service_t* service, const alert_info_t* alert) {
+int monitor_service_trigger_alert(monitor_service_t *service, const alert_info_t *alert)
+{
     if (!service || !alert) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -265,7 +273,7 @@ int monitor_service_trigger_alert(monitor_service_t* service, const alert_info_t
         service->alert_count--;
     }
 
-    alert_entry_t* entry = &service->alerts[service->alert_count];
+    alert_entry_t *entry = &service->alerts[service->alert_count];
     entry->alert_id = alert->alert_id ? AGENTOS_STRDUP(alert->alert_id) : NULL;
     entry->message = alert->message ? AGENTOS_STRDUP(alert->message) : NULL;
     entry->level = alert->level;
@@ -277,7 +285,7 @@ int monitor_service_trigger_alert(monitor_service_t* service, const alert_info_t
 
     agentos_mutex_unlock(&service->alert_lock);
 
-    const char* level_str[] = {"INFO", "WARNING", "ERROR", "CRITICAL"};
+    const char *level_str[] = {"INFO", "WARNING", "ERROR", "CRITICAL"};
     SVC_LOG_WARN("Alert triggered: [%s] %s (service=%s)",
                  level_str[alert->level < ALERT_LEVEL_COUNT ? alert->level : 0],
                  alert->message ? alert->message : "N/A",
@@ -285,7 +293,8 @@ int monitor_service_trigger_alert(monitor_service_t* service, const alert_info_t
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_resolve_alert(monitor_service_t* service, const char* alert_id) {
+int monitor_service_resolve_alert(monitor_service_t *service, const char *alert_id)
+{
     if (!service || !alert_id) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -302,21 +311,24 @@ int monitor_service_resolve_alert(monitor_service_t* service, const char* alert_
     }
 
     agentos_mutex_unlock(&service->alert_lock);
-    return AGENTOS_ERR_NOT_FOUND;
+    AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "alert not found");
 }
 
-int monitor_service_health_check(monitor_service_t* service, const char* service_name,
-                                 health_check_result_t** result) {
+int monitor_service_health_check(monitor_service_t *service, const char *service_name,
+                                 health_check_result_t **result)
+{
     if (!service || !result) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    health_check_result_t* hr = (health_check_result_t*)AGENTOS_CALLOC(1, sizeof(health_check_result_t));
+    health_check_result_t *hr =
+        (health_check_result_t *)AGENTOS_CALLOC(1, sizeof(health_check_result_t));
     if (!hr) {
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate health check result");
     }
 
-    hr->service_name = service_name ? AGENTOS_STRDUP(service_name) : AGENTOS_STRDUP("monitor_service");
+    hr->service_name =
+        service_name ? AGENTOS_STRDUP(service_name) : AGENTOS_STRDUP("monitor_service");
     hr->is_healthy = service->initialized ? true : false;
     hr->timestamp = get_timestamp_ms();
     hr->error_code = 0;
@@ -344,8 +356,9 @@ int monitor_service_health_check(monitor_service_t* service, const char* service
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_get_metrics(monitor_service_t* service, const char* metric_name,
-                                metric_info_t*** metrics, size_t* count) {
+int monitor_service_get_metrics(monitor_service_t *service, const char *metric_name,
+                                metric_info_t ***metrics, size_t *count)
+{
     if (!service || !metrics || !count) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -367,10 +380,11 @@ int monitor_service_get_metrics(monitor_service_t* service, const char* metric_n
         return AGENTOS_SUCCESS;
     }
 
-    metric_info_t** result = (metric_info_t**)AGENTOS_CALLOC(result_count, sizeof(metric_info_t*));
+    metric_info_t **result =
+        (metric_info_t **)AGENTOS_CALLOC(result_count, sizeof(metric_info_t *));
     if (!result) {
         agentos_mutex_unlock(&service->metric_lock);
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate metrics result array");
     }
 
     size_t idx = 0;
@@ -388,7 +402,8 @@ int monitor_service_get_metrics(monitor_service_t* service, const char* metric_n
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_get_alerts(monitor_service_t* service, alert_info_t*** alerts, size_t* count) {
+int monitor_service_get_alerts(monitor_service_t *service, alert_info_t ***alerts, size_t *count)
+{
     if (!service || !alerts || !count) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -402,14 +417,15 @@ int monitor_service_get_alerts(monitor_service_t* service, alert_info_t*** alert
         return AGENTOS_SUCCESS;
     }
 
-    alert_info_t** result = (alert_info_t**)AGENTOS_CALLOC(service->alert_count, sizeof(alert_info_t*));
+    alert_info_t **result =
+        (alert_info_t **)AGENTOS_CALLOC(service->alert_count, sizeof(alert_info_t *));
     if (!result) {
         agentos_mutex_unlock(&service->alert_lock);
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate alerts result array");
     }
 
     for (size_t i = 0; i < service->alert_count; i++) {
-        alert_info_t* info = (alert_info_t*)AGENTOS_CALLOC(1, sizeof(alert_info_t));
+        alert_info_t *info = (alert_info_t *)AGENTOS_CALLOC(1, sizeof(alert_info_t));
         if (info) {
             info->alert_id = service->alerts[i].alert_id;
             info->message = service->alerts[i].message;
@@ -429,7 +445,8 @@ int monitor_service_get_alerts(monitor_service_t* service, alert_info_t*** alert
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_reload_config(monitor_service_t* service, const monitor_config_t* config) {
+int monitor_service_reload_config(monitor_service_t *service, const monitor_config_t *config)
+{
     if (!service || !config) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -438,21 +455,24 @@ int monitor_service_reload_config(monitor_service_t* service, const monitor_conf
     AGENTOS_FREE(service->config.metrics_storage_path);
 
     memcpy(&service->config, config, sizeof(monitor_config_t));
-    service->config.log_file_path = config->log_file_path ? AGENTOS_STRDUP(config->log_file_path) : NULL;
-    service->config.metrics_storage_path = config->metrics_storage_path ? AGENTOS_STRDUP(config->metrics_storage_path) : NULL;
+    service->config.log_file_path =
+        config->log_file_path ? AGENTOS_STRDUP(config->log_file_path) : NULL;
+    service->config.metrics_storage_path =
+        config->metrics_storage_path ? AGENTOS_STRDUP(config->metrics_storage_path) : NULL;
 
     SVC_LOG_INFO("Monitor service config reloaded");
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_generate_report(monitor_service_t* service, char** report) {
+int monitor_service_generate_report(monitor_service_t *service, char **report)
+{
     if (!service || !report) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    char* buf = (char*)AGENTOS_MALLOC(MAX_REPORT_SIZE);
+    char *buf = (char *)AGENTOS_MALLOC(MAX_REPORT_SIZE);
     if (!buf) {
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate report buffer");
     }
 
     size_t pos = 0;
@@ -462,15 +482,13 @@ int monitor_service_generate_report(monitor_service_t* service, char** report) {
                     (unsigned long long)get_timestamp_ms());
 
     agentos_mutex_lock(&service->metric_lock);
-    pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos,
-                    "--- Metrics (%zu recorded) ---\n", service->metric_cache_count);
+    pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos, "--- Metrics (%zu recorded) ---\n",
+                    service->metric_cache_count);
     for (size_t i = 0; i < service->metric_cache_count && pos < MAX_REPORT_SIZE - 256; i++) {
-        metric_info_t* m = service->metric_cache[i];
+        metric_info_t *m = service->metric_cache[i];
         if (m && m->name) {
-            pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos,
-                           "  %s: %.4f (type=%d, ts=%llu)\n",
-                           m->name, m->value, m->type,
-                           (unsigned long long)m->timestamp);
+            pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos, "  %s: %.4f (type=%d, ts=%llu)\n",
+                            m->name, m->value, m->type, (unsigned long long)m->timestamp);
         }
     }
     agentos_mutex_unlock(&service->metric_lock);
@@ -478,53 +496,54 @@ int monitor_service_generate_report(monitor_service_t* service, char** report) {
     agentos_mutex_lock(&service->alert_lock);
     size_t unresolved = 0;
     for (size_t i = 0; i < service->alert_count; i++) {
-        if (!service->alerts[i].is_resolved) unresolved++;
+        if (!service->alerts[i].is_resolved)
+            unresolved++;
     }
-    pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos,
-                    "\n--- Alerts (%zu total, %zu unresolved) ---\n",
-                    service->alert_count, unresolved);
-    const char* level_str[] = {"INFO", "WARNING", "ERROR", "CRITICAL"};
+    pos +=
+        snprintf(buf + pos, MAX_REPORT_SIZE - pos, "\n--- Alerts (%zu total, %zu unresolved) ---\n",
+                 service->alert_count, unresolved);
+    const char *level_str[] = {"INFO", "WARNING", "ERROR", "CRITICAL"};
     for (size_t i = 0; i < service->alert_count && pos < MAX_REPORT_SIZE - 256; i++) {
-        alert_entry_t* a = &service->alerts[i];
-        pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos,
-                       "  [%s] %s: %s%s\n",
-                       level_str[a->level < ALERT_LEVEL_COUNT ? a->level : 0],
-                       a->alert_id ? a->alert_id : "N/A",
-                       a->message ? a->message : "N/A",
-                       a->is_resolved ? " (resolved)" : "");
+        alert_entry_t *a = &service->alerts[i];
+        pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos, "  [%s] %s: %s%s\n",
+                        level_str[a->level < ALERT_LEVEL_COUNT ? a->level : 0],
+                        a->alert_id ? a->alert_id : "N/A", a->message ? a->message : "N/A",
+                        a->is_resolved ? " (resolved)" : "");
     }
     agentos_mutex_unlock(&service->alert_lock);
 
     agentos_mutex_lock(&service->trace_lock);
-    pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos,
-                    "\n--- Traces (%zu recorded) ---\n", service->trace_count);
+    pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos, "\n--- Traces (%zu recorded) ---\n",
+                    service->trace_count);
     for (size_t i = 0; i < service->trace_count && pos < MAX_REPORT_SIZE - 256; i++) {
-        trace_entry_t* t = &service->traces[i];
-        pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos,
-                       "  %s: %s (status=%d, duration=%llums)\n",
-                       t->trace_id ? t->trace_id : "N/A",
-                       t->operation_name ? t->operation_name : "N/A",
-                       t->status,
-                       (unsigned long long)(t->end_time - t->start_time));
+        trace_entry_t *t = &service->traces[i];
+        pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos, "  %s: %s (status=%d, duration=%llums)\n",
+                        t->trace_id ? t->trace_id : "N/A",
+                        t->operation_name ? t->operation_name : "N/A", t->status,
+                        (unsigned long long)(t->end_time - t->start_time));
     }
     agentos_mutex_unlock(&service->trace_lock);
 
-    pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos,
-                    "\n--- Logs (%zu entries) ---\n", service->log_count);
+    pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos, "\n--- Logs (%zu entries) ---\n",
+                    service->log_count);
 
     *report = buf;
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_start_agent_trace(monitor_service_t* service, const char* agent_id __attribute__((unused)),
-                                      const char* task_id __attribute__((unused)), const loop_detection_config_t* loop_config __attribute__((unused)),
-                                      agent_execution_trace_t** trace) {
+int monitor_service_start_agent_trace(monitor_service_t *service,
+                                      const char *agent_id __attribute__((unused)),
+                                      const char *task_id __attribute__((unused)),
+                                      const loop_detection_config_t *loop_config
+                                      __attribute__((unused)),
+                                      agent_execution_trace_t **trace)
+{
     if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     if (!service->config.enable_tracing) {
-        return AGENTOS_ERR_STATE_ERROR;
+        AGENTOS_ERROR(AGENTOS_ERR_STATE_ERROR, "tracing is disabled");
     }
 
     agentos_mutex_lock(&service->trace_lock);
@@ -538,9 +557,10 @@ int monitor_service_start_agent_trace(monitor_service_t* service, const char* ag
         service->trace_count--;
     }
 
-    trace_entry_t* entry = &service->traces[service->trace_count];
+    trace_entry_t *entry = &service->traces[service->trace_count];
     char tid[64];
-    snprintf(tid, sizeof(tid), "trace-%zu-%lu", service->trace_count, (unsigned long)get_timestamp_ms());
+    snprintf(tid, sizeof(tid), "trace-%zu-%lu", service->trace_count,
+             (unsigned long)get_timestamp_ms());
     entry->trace_id = AGENTOS_STRDUP(tid);
     entry->operation_name = task_id ? AGENTOS_STRDUP(task_id) : AGENTOS_STRDUP("unknown");
     entry->service_name = agent_id ? AGENTOS_STRDUP(agent_id) : NULL;
@@ -550,7 +570,8 @@ int monitor_service_start_agent_trace(monitor_service_t* service, const char* ag
     entry->span_count = 0;
     service->trace_count++;
 
-    agent_execution_trace_t* t = (agent_execution_trace_t*)AGENTOS_CALLOC(1, sizeof(agent_execution_trace_t));
+    agent_execution_trace_t *t =
+        (agent_execution_trace_t *)AGENTOS_CALLOC(1, sizeof(agent_execution_trace_t));
     if (t) {
         t->agent_id = agent_id ? AGENTOS_STRDUP(agent_id) : NULL;
         t->task_id = task_id ? AGENTOS_STRDUP(task_id) : NULL;
@@ -562,16 +583,15 @@ int monitor_service_start_agent_trace(monitor_service_t* service, const char* ag
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_update_agent_state(monitor_service_t* service,
-                                       agent_execution_trace_t* trace,
-                                       agent_execution_state_t new_state,
-                                       const char* location) {
+int monitor_service_update_agent_state(monitor_service_t *service, agent_execution_trace_t *trace,
+                                       agent_execution_state_t new_state, const char *location)
+{
     if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     if (!service->config.enable_tracing) {
-        return AGENTOS_ERR_STATE_ERROR;
+        AGENTOS_ERROR(AGENTOS_ERR_STATE_ERROR, "tracing is disabled");
     }
 
     trace->current_state = new_state;
@@ -590,7 +610,7 @@ int monitor_service_update_agent_state(monitor_service_t* service,
     case AGENT_STATE_EXECUTING_TOOL:
         if (location && trace->trace_point_count < trace->trace_point_capacity) {
             size_t idx = trace->trace_point_count++;
-            agent_trace_point_t* tp = &trace->trace_points[idx];
+            agent_trace_point_t *tp = &trace->trace_points[idx];
             tp->timestamp = now;
             tp->state = new_state;
             AGENTOS_FREE(tp->location);
@@ -613,10 +633,9 @@ int monitor_service_update_agent_state(monitor_service_t* service,
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_check_loop(monitor_service_t* service,
-                                agent_execution_trace_t* trace,
-                                bool* is_loop,
-                                double* confidence) {
+int monitor_service_check_loop(monitor_service_t *service, agent_execution_trace_t *trace,
+                               bool *is_loop, double *confidence)
+{
     if (!service || !trace || !is_loop || !confidence) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -633,10 +652,9 @@ int monitor_service_check_loop(monitor_service_t* service,
 
     for (size_t i = 0; i < total_pairs; i++) {
         for (size_t j = i + 2; j < trace->trace_point_count && j < i + 5; j++) {
-            agent_trace_point_t* pi = &trace->trace_points[i];
-            agent_trace_point_t* pj = &trace->trace_points[j];
-            if (pi->location && pj->location &&
-                strcmp(pi->location, pj->location) == 0) {
+            agent_trace_point_t *pi = &trace->trace_points[i];
+            agent_trace_point_t *pj = &trace->trace_points[j];
+            if (pi->location && pj->location && strcmp(pi->location, pj->location) == 0) {
                 loop_count++;
             }
         }
@@ -655,9 +673,9 @@ int monitor_service_check_loop(monitor_service_t* service,
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_end_agent_trace(monitor_service_t* service,
-                                    agent_execution_trace_t* trace,
-                                    agent_execution_state_t final_state __attribute__((unused))) {
+int monitor_service_end_agent_trace(monitor_service_t *service, agent_execution_trace_t *trace,
+                                    agent_execution_state_t final_state __attribute__((unused)))
+{
     if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -677,8 +695,9 @@ int monitor_service_end_agent_trace(monitor_service_t* service,
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_get_agent_summary(monitor_service_t* service, const char* agent_id,
-                                      uint64_t start_time, uint64_t end_time, char** summary) {
+int monitor_service_get_agent_summary(monitor_service_t *service, const char *agent_id,
+                                      uint64_t start_time, uint64_t end_time, char **summary)
+{
     if (!service || !summary) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -687,9 +706,9 @@ int monitor_service_get_agent_summary(monitor_service_t* service, const char* ag
     snprintf(buf, sizeof(buf),
              "Agent summary for %s (time range: %llu - %llu)\n"
              "Traces: %zu, Alerts: %zu, Metrics: %zu\n",
-             agent_id ? agent_id : "all",
-             (unsigned long long)start_time, (unsigned long long)end_time,
-             service->trace_count, service->alert_count, service->metric_cache_count);
+             agent_id ? agent_id : "all", (unsigned long long)start_time,
+             (unsigned long long)end_time, service->trace_count, service->alert_count,
+             service->metric_cache_count);
 
     *summary = AGENTOS_STRDUP(buf);
     if (!*summary) {
@@ -698,23 +717,21 @@ int monitor_service_get_agent_summary(monitor_service_t* service, const char* ag
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_export_agent_trace(monitor_service_t* service,
-                                       agent_execution_trace_t* trace,
-                                       const char* format, char** data, size_t* size) {
+int monitor_service_export_agent_trace(monitor_service_t *service, agent_execution_trace_t *trace,
+                                       const char *format, char **data, size_t *size)
+{
     if (!service || !data || !size) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    const char* fmt = format ? format : "json";
+    const char *fmt = format ? format : "json";
     char buf[2048];
 
     if (strcmp(fmt, "json") == 0) {
-        snprintf(buf, sizeof(buf),
-                 "{\"trace_id\":\"%s\",\"format\":\"json\"}",
+        snprintf(buf, sizeof(buf), "{\"trace_id\":\"%s\",\"format\":\"json\"}",
                  trace && trace->agent_id ? trace->agent_id : "unknown");
     } else {
-        snprintf(buf, sizeof(buf),
-                 "trace_id=%s\nformat=%s\n",
+        snprintf(buf, sizeof(buf), "trace_id=%s\nformat=%s\n",
                  trace && trace->agent_id ? trace->agent_id : "unknown", fmt);
     }
 
@@ -723,8 +740,8 @@ int monitor_service_export_agent_trace(monitor_service_t* service,
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_get_active_agents(monitor_service_t* service,
-                                      char*** agent_ids, size_t* count) {
+int monitor_service_get_active_agents(monitor_service_t *service, char ***agent_ids, size_t *count)
+{
     if (!service || !agent_ids || !count) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -745,7 +762,7 @@ int monitor_service_get_active_agents(monitor_service_t* service,
         return AGENTOS_SUCCESS;
     }
 
-    char** ids = (char**)AGENTOS_CALLOC(active, sizeof(char*));
+    char **ids = (char **)AGENTOS_CALLOC(active, sizeof(char *));
     if (!ids) {
         agentos_mutex_unlock(&service->trace_lock);
         return AGENTOS_ENOMEM;
@@ -764,8 +781,8 @@ int monitor_service_get_active_agents(monitor_service_t* service,
     return AGENTOS_SUCCESS;
 }
 
-int monitor_service_reset_loop_detection(monitor_service_t* service,
-                                          agent_execution_trace_t* trace) {
+int monitor_service_reset_loop_detection(monitor_service_t *service, agent_execution_trace_t *trace)
+{
     if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -774,7 +791,7 @@ int monitor_service_reset_loop_detection(monitor_service_t* service,
     trace->loop_detection_count = 0;
 
     for (size_t i = 0; i < trace->trace_point_count; i++) {
-        agent_trace_point_t* tp = &trace->trace_points[i];
+        agent_trace_point_t *tp = &trace->trace_points[i];
         AGENTOS_FREE(tp->location);
         tp->location = NULL;
         tp->loop_count = 0;

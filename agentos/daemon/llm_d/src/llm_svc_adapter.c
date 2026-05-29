@@ -21,33 +21,36 @@
 #include <string.h>
 
 typedef struct {
-    llm_service_t* llm_svc;
-    char* config_path;
+    llm_service_t *llm_svc;
+    char *config_path;
     agentos_svc_config_t common_cfg;
     bool owns_service;
     bool running;
 } llm_adapter_ctx_t;
 
-static llm_adapter_ctx_t* llm_get_ctx(agentos_service_t service) {
-    if (!service) return NULL;
-    return (llm_adapter_ctx_t*)agentos_service_get_user_data(service);
+static llm_adapter_ctx_t *llm_get_ctx(agentos_service_t service)
+{
+    if (!service)
+        return NULL;
+    return (llm_adapter_ctx_t *)agentos_service_get_user_data(service);
 }
 
-static agentos_error_t llm_adapter_init(
-    agentos_service_t service,
-    const agentos_svc_config_t* config
-) {
-    if (!service) return AGENTOS_EINVAL;
+static agentos_error_t llm_adapter_init(agentos_service_t service,
+                                        const agentos_svc_config_t *config)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
 
-    llm_adapter_ctx_t* ctx = llm_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
+    llm_adapter_ctx_t *ctx = llm_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
 
     if (config) {
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     }
 
     if (!ctx->llm_svc) {
-        const char* path = ctx->config_path ? ctx->config_path : "llm_config.json";
+        const char *path = ctx->config_path ? ctx->config_path : "llm_config.json";
         ctx->llm_svc = llm_service_create(path);
         if (!ctx->llm_svc) {
             SVC_LOG_ERROR("LLM服务创建失败");
@@ -59,21 +62,29 @@ static agentos_error_t llm_adapter_init(
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t llm_adapter_start(agentos_service_t service) {
-    if (!service) return AGENTOS_EINVAL;
-    llm_adapter_ctx_t* ctx = llm_get_ctx(service);
-    if (!ctx || !ctx->llm_svc) return AGENTOS_ENOTINIT;
-    if (ctx->running) return AGENTOS_SUCCESS;
+static agentos_error_t llm_adapter_start(agentos_service_t service)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    llm_adapter_ctx_t *ctx = llm_get_ctx(service);
+    if (!ctx || !ctx->llm_svc)
+        return AGENTOS_ENOTINIT;
+    if (ctx->running)
+        return AGENTOS_SUCCESS;
     ctx->running = true;
     SVC_LOG_INFO("LLM服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t llm_adapter_stop(agentos_service_t service, bool force) {
-    if (!service) return AGENTOS_EINVAL;
-    llm_adapter_ctx_t* ctx = llm_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
-    if (!ctx->running) return AGENTOS_SUCCESS;
+static agentos_error_t llm_adapter_stop(agentos_service_t service, bool force)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    llm_adapter_ctx_t *ctx = llm_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
+    if (!ctx->running)
+        return AGENTOS_SUCCESS;
     ctx->running = false;
     if (force) {
         if (ctx->llm_svc && ctx->owns_service) {
@@ -81,7 +92,10 @@ static agentos_error_t llm_adapter_stop(agentos_service_t service, bool force) {
             ctx->llm_svc = NULL;
             ctx->owns_service = false;
         }
-        if (ctx->config_path) { AGENTOS_FREE(ctx->config_path); ctx->config_path = NULL; }
+        if (ctx->config_path) {
+            AGENTOS_FREE(ctx->config_path);
+            ctx->config_path = NULL;
+        }
         SVC_LOG_INFO("LLM服务适配器已强制停止");
     } else {
         SVC_LOG_INFO("LLM服务适配器已停止");
@@ -89,10 +103,13 @@ static agentos_error_t llm_adapter_stop(agentos_service_t service, bool force) {
     return AGENTOS_SUCCESS;
 }
 
-static void llm_adapter_destroy(agentos_service_t service) {
-    if (!service) return;
-    llm_adapter_ctx_t* ctx = llm_get_ctx(service);
-    if (!ctx) return;
+static void llm_adapter_destroy(agentos_service_t service)
+{
+    if (!service)
+        return;
+    llm_adapter_ctx_t *ctx = llm_get_ctx(service);
+    if (!ctx)
+        return;
 
     if (ctx->llm_svc && ctx->owns_service) {
         llm_service_destroy(ctx->llm_svc);
@@ -108,19 +125,25 @@ static void llm_adapter_destroy(agentos_service_t service) {
     AGENTOS_FREE(ctx);
 }
 
-static agentos_error_t llm_adapter_healthcheck(agentos_service_t service) {
-    if (!service) return AGENTOS_EINVAL;
-    llm_adapter_ctx_t* ctx = llm_get_ctx(service);
-    if (!ctx) return AGENTOS_EINVAL;
-    if (!ctx->llm_svc) return AGENTOS_ENOTINIT;
-    if (!ctx->running) return AGENTOS_ENOTINIT;
-    char* stats_json = NULL;
+static agentos_error_t llm_adapter_healthcheck(agentos_service_t service)
+{
+    if (!service)
+        return AGENTOS_EINVAL;
+    llm_adapter_ctx_t *ctx = llm_get_ctx(service);
+    if (!ctx)
+        return AGENTOS_EINVAL;
+    if (!ctx->llm_svc)
+        return AGENTOS_ENOTINIT;
+    if (!ctx->running)
+        return AGENTOS_ENOTINIT;
+    char *stats_json = NULL;
     int ret = llm_service_stats(ctx->llm_svc, &stats_json);
     if (ret != 0) {
         SVC_LOG_WARN("LLM服务健康检查失败: %d", ret);
         return AGENTOS_ERR_UNKNOWN;
     }
-    if (stats_json) AGENTOS_FREE(stats_json);
+    if (stats_json)
+        AGENTOS_FREE(stats_json);
     return AGENTOS_SUCCESS;
 }
 
@@ -132,14 +155,15 @@ static const agentos_svc_interface_t llm_adapter_iface = {
     .healthcheck = llm_adapter_healthcheck,
 };
 
-agentos_error_t llm_service_adapter_create(
-    agentos_service_t* out_service,
-    const agentos_svc_config_t* config
-) {
-    if (!out_service) return AGENTOS_EINVAL;
+agentos_error_t llm_service_adapter_create(agentos_service_t *out_service,
+                                           const agentos_svc_config_t *config)
+{
+    if (!out_service)
+        return AGENTOS_EINVAL;
 
-    llm_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(llm_adapter_ctx_t));
-    if (!ctx) return AGENTOS_ENOMEM;
+    llm_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(llm_adapter_ctx_t));
+    if (!ctx)
+        return AGENTOS_ENOMEM;
 
     if (config) {
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
@@ -152,7 +176,7 @@ agentos_error_t llm_service_adapter_create(
         }
     } else {
         ctx->common_cfg.name = "llm_d";
-        ctx->common_cfg.version = "0.0.5";
+        ctx->common_cfg.version = "0.1.0";
         ctx->common_cfg.capabilities = AGENTOS_SVC_CAP_ASYNC;
         ctx->common_cfg.enable_metrics = true;
     }
@@ -160,12 +184,8 @@ agentos_error_t llm_service_adapter_create(
     ctx->owns_service = true;
 
     agentos_service_t svc_handle = NULL;
-    agentos_error_t err = agentos_service_create(
-        &svc_handle,
-        ctx->common_cfg.name,
-        &llm_adapter_iface,
-        &ctx->common_cfg
-    );
+    agentos_error_t err = agentos_service_create(&svc_handle, ctx->common_cfg.name,
+                                                 &llm_adapter_iface, &ctx->common_cfg);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(ctx->config_path);
         AGENTOS_FREE(ctx);
@@ -184,15 +204,15 @@ agentos_error_t llm_service_adapter_create(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t llm_service_adapter_wrap(
-    agentos_service_t* out_service,
-    llm_service_t* llm_svc,
-    const agentos_svc_config_t* config
-) {
-    if (!out_service || !llm_svc) return AGENTOS_EINVAL;
+agentos_error_t llm_service_adapter_wrap(agentos_service_t *out_service, llm_service_t *llm_svc,
+                                         const agentos_svc_config_t *config)
+{
+    if (!out_service || !llm_svc)
+        return AGENTOS_EINVAL;
 
-    llm_adapter_ctx_t* ctx = AGENTOS_CALLOC(1, sizeof(llm_adapter_ctx_t));
-    if (!ctx) return AGENTOS_ENOMEM;
+    llm_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(llm_adapter_ctx_t));
+    if (!ctx)
+        return AGENTOS_ENOMEM;
 
     ctx->llm_svc = llm_svc;
     ctx->owns_service = false;
@@ -201,16 +221,12 @@ agentos_error_t llm_service_adapter_wrap(
         memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "llm_d";
-        ctx->common_cfg.version = "0.0.5";
+        ctx->common_cfg.version = "0.1.0";
     }
 
     agentos_service_t svc_handle = NULL;
-    agentos_error_t err = agentos_service_create(
-        &svc_handle,
-        ctx->common_cfg.name,
-        &llm_adapter_iface,
-        &ctx->common_cfg
-    );
+    agentos_error_t err = agentos_service_create(&svc_handle, ctx->common_cfg.name,
+                                                 &llm_adapter_iface, &ctx->common_cfg);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(ctx);
         return err;
@@ -227,32 +243,40 @@ agentos_error_t llm_service_adapter_wrap(
     return AGENTOS_SUCCESS;
 }
 
-llm_service_t* llm_service_adapter_get_original(agentos_service_t service) {
-    if (!service) return NULL;
-    llm_adapter_ctx_t* ctx = llm_get_ctx(service);
+llm_service_t *llm_service_adapter_get_original(agentos_service_t service)
+{
+    if (!service)
+        return NULL;
+    llm_adapter_ctx_t *ctx = llm_get_ctx(service);
     return ctx ? ctx->llm_svc : NULL;
 }
 
-agentos_error_t llm_service_adapter_init(agentos_service_t service) {
+agentos_error_t llm_service_adapter_init(agentos_service_t service)
+{
     return llm_adapter_init(service, NULL);
 }
 
-agentos_error_t llm_service_adapter_start(agentos_service_t service) {
+agentos_error_t llm_service_adapter_start(agentos_service_t service)
+{
     return llm_adapter_start(service);
 }
 
-agentos_error_t llm_service_adapter_stop(agentos_service_t service, bool force) {
+agentos_error_t llm_service_adapter_stop(agentos_service_t service, bool force)
+{
     return llm_adapter_stop(service, force);
 }
 
-void llm_service_adapter_destroy(agentos_service_t service) {
+void llm_service_adapter_destroy(agentos_service_t service)
+{
     llm_adapter_destroy(service);
 }
 
-agentos_error_t llm_service_adapter_healthcheck(agentos_service_t service) {
+agentos_error_t llm_service_adapter_healthcheck(agentos_service_t service)
+{
     return llm_adapter_healthcheck(service);
 }
 
-const agentos_svc_interface_t* llm_service_adapter_get_interface(void) {
+const agentos_svc_interface_t *llm_service_adapter_get_interface(void)
+{
     return &llm_adapter_iface;
 }

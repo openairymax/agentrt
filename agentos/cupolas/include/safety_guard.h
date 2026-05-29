@@ -24,22 +24,22 @@
 #ifndef AGENTOS_SAFETY_GUARD_H
 #define AGENTOS_SAFETY_GUARD_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define SAFETY_GUARD_VERSION        "1.0.0"
-#define SAFETY_MAX_GUARDS           64
-#define SAFETY_MAX_POLICIES         128
-#define SAFETY_MAX_RESOURCES        256
-#define SAFETY_MAX_AUDIT_ENTRIES    10000
-#define SAFETY_MAX_SUBJECT_LEN      128
-#define SAFETY_MAX_ACTION_LEN       64
-#define SAFETY_MAX_RESOURCE_LEN     256
+#define SAFETY_GUARD_VERSION "1.0.0"
+#define SAFETY_MAX_GUARDS 64
+#define SAFETY_MAX_POLICIES 128
+#define SAFETY_MAX_RESOURCES 256
+#define SAFETY_MAX_AUDIT_ENTRIES 10000
+#define SAFETY_MAX_SUBJECT_LEN 128
+#define SAFETY_MAX_ACTION_LEN 64
+#define SAFETY_MAX_RESOURCE_LEN 256
 
 typedef enum {
     SAFETY_EVENT_ACCESS_REQUEST = 0,
@@ -93,7 +93,7 @@ typedef struct {
     char subject[SAFETY_MAX_SUBJECT_LEN];
     char action[SAFETY_MAX_ACTION_LEN];
     char resource[SAFETY_MAX_RESOURCE_LEN];
-    const void* context;
+    const void *context;
     size_t context_size;
     uint64_t timestamp;
     uint32_t flags;
@@ -104,7 +104,7 @@ typedef struct {
     char reason[256];
     safety_severity_t severity;
     uint32_t conditions;
-    void* modified_context;
+    void *modified_context;
     size_t modified_context_size;
 } safety_result_t;
 
@@ -118,11 +118,9 @@ typedef struct {
     bool audit_enabled;
 } safety_guard_descriptor_t;
 
-typedef safety_decision_t (*safety_guard_check_fn)(
-    const safety_guard_descriptor_t* guard,
-    const safety_event_t* event,
-    safety_result_t* result,
-    void* user_data);
+typedef safety_decision_t (*safety_guard_check_fn)(const safety_guard_descriptor_t *guard,
+                                                   const safety_event_t *event,
+                                                   safety_result_t *result, void *user_data);
 
 typedef struct {
     char id[64];
@@ -134,7 +132,7 @@ typedef struct {
     bool overridable;
     uint64_t valid_from;
     uint64_t valid_until;
-    char* rules_json;
+    char *rules_json;
 } safety_policy_t;
 
 typedef struct {
@@ -160,101 +158,76 @@ typedef struct {
 
 typedef struct safety_guard_context_s safety_guard_context_t;
 
-typedef void (*safety_violation_callback_t)(
-    const safety_event_t* event,
-    const safety_result_t* result,
-    void* user_data);
+typedef void (*safety_violation_callback_t)(const safety_event_t *event,
+                                            const safety_result_t *result, void *user_data);
 
-typedef void (*safety_policy_change_callback_t)(
-    const char* policy_id,
-    const char* change_type,
-    void* user_data);
+typedef void (*safety_policy_change_callback_t)(const char *policy_id, const char *change_type,
+                                                void *user_data);
 
 #ifdef AGENTOS_ENABLE_V2_API
 
-safety_guard_context_t* safety_guard_create(void);
-void safety_guard_destroy(safety_guard_context_t* ctx);
+safety_guard_context_t *safety_guard_create(void);
+void safety_guard_destroy(safety_guard_context_t *ctx);
 
-int safety_guard_register_guard(safety_guard_context_t* ctx,
-                                  const safety_guard_descriptor_t* descriptor,
-                                  safety_guard_check_fn check_fn,
-                                  void* user_data);
+int safety_guard_register_guard(safety_guard_context_t *ctx,
+                                const safety_guard_descriptor_t *descriptor,
+                                safety_guard_check_fn check_fn, void *user_data);
 
-int safety_guard_unregister_guard(safety_guard_context_t* ctx, const char* name);
+int safety_guard_unregister_guard(safety_guard_context_t *ctx, const char *name);
 
-int safety_guard_enable_guard(safety_guard_context_t* ctx, const char* name);
-int safety_guard_disable_guard(safety_guard_context_t* ctx, const char* name);
+int safety_guard_enable_guard(safety_guard_context_t *ctx, const char *name);
+int safety_guard_disable_guard(safety_guard_context_t *ctx, const char *name);
 
-safety_decision_t safety_guard_check(safety_guard_context_t* ctx,
-                                       const safety_event_t* event,
-                                       safety_result_t* result);
+safety_decision_t safety_guard_check(safety_guard_context_t *ctx, const safety_event_t *event,
+                                     safety_result_t *result);
 
-safety_decision_t safety_guard_check_chain(safety_guard_context_t* ctx,
-                                              const safety_event_t* event,
-                                              safety_result_t** results,
-                                              size_t* result_count);
+safety_decision_t safety_guard_check_chain(safety_guard_context_t *ctx, const safety_event_t *event,
+                                           safety_result_t **results, size_t *result_count);
 
-int safety_guard_add_policy(safety_guard_context_t* ctx,
-                              const safety_policy_t* policy);
+int safety_guard_add_policy(safety_guard_context_t *ctx, const safety_policy_t *policy);
 
-int safety_guard_remove_policy(safety_guard_context_t* ctx, const char* policy_id);
+int safety_guard_remove_policy(safety_guard_context_t *ctx, const char *policy_id);
 
-int safety_guard_update_policy(safety_guard_context_t* ctx,
-                                 const char* policy_id,
-                                 const char* new_rules_json);
+int safety_guard_update_policy(safety_guard_context_t *ctx, const char *policy_id,
+                               const char *new_rules_json);
 
-int safety_guard_load_policies(safety_guard_context_t* ctx,
-                                 const char* policies_json);
+int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies_json);
 
-int safety_guard_resolve_conflict(safety_guard_context_t* ctx,
-                                    const char* policy_a_id,
-                                    const char* policy_b_id,
-                                    safety_decision_t* resolved_decision);
+int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *policy_a_id,
+                                  const char *policy_b_id, safety_decision_t *resolved_decision);
 
-int safety_guard_set_quota(safety_guard_context_t* ctx,
-                             const char* resource_id,
-                             int64_t limit,
-                             uint64_t reset_interval_ms);
+int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id, int64_t limit,
+                           uint64_t reset_interval_ms);
 
-int safety_guard_check_quota(safety_guard_context_t* ctx,
-                               const char* resource_id,
-                               int64_t requested,
-                               bool* allowed);
+int safety_guard_check_quota(safety_guard_context_t *ctx, const char *resource_id,
+                             int64_t requested, bool *allowed);
 
-int safety_guard_consume_quota(safety_guard_context_t* ctx,
-                                 const char* resource_id,
-                                 int64_t amount);
+int safety_guard_consume_quota(safety_guard_context_t *ctx, const char *resource_id,
+                               int64_t amount);
 
-int safety_guard_release_quota(safety_guard_context_t* ctx,
-                                 const char* resource_id,
-                                 int64_t amount);
+int safety_guard_release_quota(safety_guard_context_t *ctx, const char *resource_id,
+                               int64_t amount);
 
-int safety_guard_record_audit(safety_guard_context_t* ctx,
-                                const safety_event_t* event,
-                                const safety_result_t* result,
-                                const char* guard_name);
+int safety_guard_record_audit(safety_guard_context_t *ctx, const safety_event_t *event,
+                              const safety_result_t *result, const char *guard_name);
 
-int safety_guard_query_audit(safety_guard_context_t* ctx,
-                               const char* subject,
-                               uint64_t from_timestamp,
-                               uint64_t to_timestamp,
-                               safety_audit_entry_t** entries,
-                               size_t* entry_count);
+int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
+                             uint64_t from_timestamp, uint64_t to_timestamp,
+                             safety_audit_entry_t **entries, size_t *entry_count);
 
-int safety_guard_set_violation_callback(safety_guard_context_t* ctx,
-                                          safety_violation_callback_t callback,
-                                          void* user_data);
+int safety_guard_set_violation_callback(safety_guard_context_t *ctx,
+                                        safety_violation_callback_t callback, void *user_data);
 
-int safety_guard_set_policy_change_callback(safety_guard_context_t* ctx,
-                                               safety_policy_change_callback_t callback,
-                                               void* user_data);
+int safety_guard_set_policy_change_callback(safety_guard_context_t *ctx,
+                                            safety_policy_change_callback_t callback,
+                                            void *user_data);
 
-int safety_guard_emergency_stop(safety_guard_context_t* ctx, const char* reason);
-int safety_guard_emergency_release(safety_guard_context_t* ctx);
+int safety_guard_emergency_stop(safety_guard_context_t *ctx, const char *reason);
+int safety_guard_emergency_release(safety_guard_context_t *ctx);
 
-size_t safety_guard_get_guard_count(safety_guard_context_t* ctx);
-size_t safety_guard_get_policy_count(safety_guard_context_t* ctx);
-size_t safety_guard_get_audit_count(safety_guard_context_t* ctx);
+size_t safety_guard_get_guard_count(safety_guard_context_t *ctx);
+size_t safety_guard_get_policy_count(safety_guard_context_t *ctx);
+size_t safety_guard_get_audit_count(safety_guard_context_t *ctx);
 
 #endif /* AGENTOS_ENABLE_V2_API */
 

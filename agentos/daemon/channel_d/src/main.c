@@ -1,32 +1,44 @@
-#include "memory_compat.h"
 #include "atomic_compat.h"
 #include "channel_service.h"
+#include "error.h"
+#include "logging.h"
+#include "memory_compat.h"
+#include "svc_logger.h"
+
+#include <inttypes.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <inttypes.h>
-#include <signal.h>
 #include <unistd.h>
 
 static atomic_int g_running = 1;
-static channel_service_t* g_svc __attribute__((unused)) = NULL;
+static channel_service_t *g_svc __attribute__((unused)) = NULL;
 
 static void signal_handler(int sig __attribute__((unused)))
 {
     atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
 }
 
-__attribute__((used))
-static int handle_service_request(const char* method,
-                                   const char* params_json,
-                                   char** response_json,
-                                   void* user_data)
+static void svc_log_toggle_handler(int sig)
 {
-    channel_service_t* svc = (channel_service_t*)user_data;
-    if (!svc || !method || !response_json) return -1;
+    (void)sig;
+    static int debug_mode = 0;
+    debug_mode = !debug_mode;
+    log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_INFO);
+}
+
+__attribute__((used)) static int handle_service_request(const char *method, const char *params_json,
+                                                        char **response_json, void *user_data)
+{
+    channel_service_t *svc = (channel_service_t *)user_data;
+    if (!svc || !method || !response_json) {
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     if (strcmp(method, "ping") == 0) {
-        const char* id_start = strstr(params_json, "\"id\"");
+        const char *id_start = strstr(params_json, "\"id\"");
         if (!id_start) {
             bool healthy = channel_service_is_healthy(svc);
             char buf[128];
@@ -35,22 +47,38 @@ static int handle_service_request(const char* method,
             return 0;
         }
         char id[128] = {0};
-        const char* p = strchr(id_start + 4, '"');
-        if (p) { p++; const char* e = strchr(p, '"'); if (e) { size_t l = (size_t)(e-p); if (l>127) l=127; memcpy(id,p,l); }}
+        const char *p = strchr(id_start + 4, '"');
+        if (p) {
+            p++;
+            const char *e = strchr(p, '"');
+            if (e) {
+                size_t l = (size_t)(e - p);
+                if (l > 127)
+                    l = 127;
+                memcpy(id, p, l);
+            }
+        }
         int64_t latency_ms = 0;
         int rc = channel_service_ping(svc, id, &latency_ms);
         if (rc != CHANNEL_OK) {
             char err[256];
-            snprintf(err, sizeof(err), "{\"error\":\"ping failed: %d\",\"latency_ms\":%lld}", rc, (long long)latency_ms);
+            snprintf(err, sizeof(err), "{\"error\":\"ping failed: %d\",\"latency_ms\":%lld}", rc,
+                     (long long)latency_ms);
             *response_json = AGENTOS_STRDUP(err);
-            return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_ping failed");
+            return AGENTOS_ERR_UNKNOWN;
         }
-        size_t sz = snprintf(NULL, 0, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}",
-                             id, (long long)latency_ms) + 1;
-        char* buf = (char*)AGENTOS_MALLOC(sz);
-        if (!buf) return -1;
-        snprintf(buf, sz, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}",
-                 id, (long long)latency_ms);
+        size_t sz =
+            snprintf(NULL, 0, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}", id,
+                     (long long)latency_ms) +
+            1;
+        char *buf = (char *)AGENTOS_MALLOC(sz);
+        if (!buf) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "malloc failed for ping response buffer");
+            return AGENTOS_ERR_UNKNOWN;
+        }
+        snprintf(buf, sz, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}", id,
+                 (long long)latency_ms);
         *response_json = buf;
         return 0;
     }
@@ -61,22 +89,28 @@ static int handle_service_request(const char* method,
         int rc = channel_service_list(svc, info_list, CHANNEL_MAX_CHANNELS, &count);
         if (rc != 0) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"list failed\"}");
-            return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_list failed");
+            return AGENTOS_ERR_UNKNOWN;
         }
 
         size_t buf_size = 4096 + count * 1024;
-        char* buf = (char*)AGENTOS_MALLOC(buf_size);
-        if (!buf) return -1;
+        char *buf = (char *)AGENTOS_MALLOC(buf_size);
+        if (!buf) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "malloc failed for list response buffer");
+            return AGENTOS_ERR_UNKNOWN;
+        }
 
         size_t pos = 0;
         pos += snprintf(buf + pos, buf_size - pos, "{\"channels\":[");
         for (size_t i = 0; i < count; i++) {
-            if (i > 0) pos += snprintf(buf + pos, buf_size - pos, ",");
+            if (i > 0)
+                pos += snprintf(buf + pos, buf_size - pos, ",");
             pos += snprintf(buf + pos, buf_size - pos,
-                "{\"id\":\"%s\",\"name\":\"%s\",\"type\":%d,\"status\":%d,\"sent\":%zu,\"recv\":%zu}",
-                info_list[i].channel_id, info_list[i].name,
-                info_list[i].type, info_list[i].status,
-                info_list[i].messages_sent, info_list[i].messages_received);
+                            "{\"id\":\"%s\",\"name\":\"%s\",\"type\":%d,\"status\":%d,\"sent\":%zu,"
+                            "\"recv\":%zu}",
+                            info_list[i].channel_id, info_list[i].name, info_list[i].type,
+                            info_list[i].status, info_list[i].messages_sent,
+                            info_list[i].messages_received);
         }
         pos += snprintf(buf + pos, buf_size - pos, "]}");
         *response_json = buf;
@@ -84,28 +118,48 @@ static int handle_service_request(const char* method,
     }
 
     if (strcmp(method, "open") == 0) {
-        const char* id_start = strstr(params_json, "\"id\"");
-        const char* name_start = strstr(params_json, "\"name\"");
-        const char* type_start = strstr(params_json, "\"type\"");
+        const char *id_start = strstr(params_json, "\"id\"");
+        const char *name_start = strstr(params_json, "\"name\"");
+        const char *type_start = strstr(params_json, "\"type\"");
 
         if (!id_start || !name_start) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"missing id or name\"}");
-            return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "missing id or name in open request");
+            return AGENTOS_ERR_UNKNOWN;
         }
 
         char id[128] = {0}, name[256] = {0};
-        const char* p = strchr(id_start + 4, '"');
-        if (p) { p++; const char* e = strchr(p, '"'); if (e) { size_t l = (size_t)(e-p); if (l>127) l=127; memcpy(id,p,l); }}
+        const char *p = strchr(id_start + 4, '"');
+        if (p) {
+            p++;
+            const char *e = strchr(p, '"');
+            if (e) {
+                size_t l = (size_t)(e - p);
+                if (l > 127)
+                    l = 127;
+                memcpy(id, p, l);
+            }
+        }
 
         p = strchr(name_start + 6, '"');
-        if (p) { p++; const char* e = strchr(p, '"'); if (e) { size_t l = (size_t)(e-p); if (l>255) l=255; memcpy(name,p,l); }}
+        if (p) {
+            p++;
+            const char *e = strchr(p, '"');
+            if (e) {
+                size_t l = (size_t)(e - p);
+                if (l > 255)
+                    l = 255;
+                memcpy(name, p, l);
+            }
+        }
 
         channel_type_t type = CHANNEL_TYPE_SOCKET;
         if (type_start) {
             p = strchr(type_start + 6, ':');
             if (p) {
-                int t = atoi(p + 1);
-                if (t >= 0 && t <= 2) type = (channel_type_t)t;
+                int t = (int)strtol(p + 1, NULL, 10);
+                if (t >= 0 && t <= 2)
+                    type = (channel_type_t)t;
             }
         }
 
@@ -114,7 +168,8 @@ static int handle_service_request(const char* method,
             char err[256];
             snprintf(err, sizeof(err), "{\"error\":\"open failed: %d\"}", rc);
             *response_json = AGENTOS_STRDUP(err);
-            return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_open failed");
+            return AGENTOS_ERR_UNKNOWN;
         }
 
         *response_json = AGENTOS_STRDUP("{\"status\":\"opened\"}");
@@ -122,46 +177,68 @@ static int handle_service_request(const char* method,
     }
 
     if (strcmp(method, "close") == 0) {
-        const char* id_start = strstr(params_json, "\"id\"");
+        const char *id_start = strstr(params_json, "\"id\"");
         if (!id_start) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"missing id\"}");
-            return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "missing id in close request");
+            return AGENTOS_ERR_UNKNOWN;
         }
         char id[128] = {0};
-        const char* p = strchr(id_start + 4, '"');
-        if (p) { p++; const char* e = strchr(p, '"'); if (e) { size_t l = (size_t)(e-p); if (l>127) l=127; memcpy(id,p,l); }}
+        const char *p = strchr(id_start + 4, '"');
+        if (p) {
+            p++;
+            const char *e = strchr(p, '"');
+            if (e) {
+                size_t l = (size_t)(e - p);
+                if (l > 127)
+                    l = 127;
+                memcpy(id, p, l);
+            }
+        }
 
         int rc = channel_service_close(svc, id);
         if (rc != 0) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"close failed\"}");
-            return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_close failed");
+            return AGENTOS_ERR_UNKNOWN;
         }
         *response_json = AGENTOS_STRDUP("{\"status\":\"closed\"}");
         return 0;
     }
 
     if (strcmp(method, "send") == 0) {
-        const char* id_start = strstr(params_json, "\"id\"");
-        const char* data_start = strstr(params_json, "\"data\"");
+        const char *id_start = strstr(params_json, "\"id\"");
+        const char *data_start = strstr(params_json, "\"data\"");
         if (!id_start || !data_start) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"missing id or data\"}");
-            return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "missing id or data in send request");
+            return AGENTOS_ERR_UNKNOWN;
         }
         char id[128] = {0};
-        const char* p = strchr(id_start + 4, '"');
-        if (p) { p++; const char* e = strchr(p, '"'); if (e) { size_t l = (size_t)(e-p); if (l>127) l=127; memcpy(id,p,l); }}
+        const char *p = strchr(id_start + 4, '"');
+        if (p) {
+            p++;
+            const char *e = strchr(p, '"');
+            if (e) {
+                size_t l = (size_t)(e - p);
+                if (l > 127)
+                    l = 127;
+                memcpy(id, p, l);
+            }
+        }
 
         p = strchr(data_start + 6, '"');
         if (p) {
             p++;
-            const char* e = strchr(p, '"');
+            const char *e = strchr(p, '"');
             size_t dlen = e ? (size_t)(e - p) : strlen(p);
             int rc = channel_service_send(svc, id, p, dlen);
             if (rc != 0) {
                 char err[256];
                 snprintf(err, sizeof(err), "{\"error\":\"send failed: %d\"}", rc);
                 *response_json = AGENTOS_STRDUP(err);
-                return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_send failed");
+                return AGENTOS_ERR_UNKNOWN;
             }
         }
         *response_json = AGENTOS_STRDUP("{\"status\":\"sent\"}");
@@ -175,12 +252,13 @@ static int handle_service_request(const char* method,
     }
 
     *response_json = AGENTOS_STRDUP("{\"error\":\"unknown method\"}");
-    return -1;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "unknown method");
+    return AGENTOS_ERR_UNKNOWN;
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-    const char* socket_dir = NULL;
+    const char *socket_dir = NULL;
     uint32_t max_channels = CHANNEL_MAX_CHANNELS;
 
     for (int i = 1; i < argc; i++) {
@@ -189,15 +267,19 @@ int main(int argc, char* argv[])
         } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
             socket_dir = argv[++i];
         } else if (strcmp(argv[i], "-n") == 0 && i + 1 < argc) {
-            max_channels = (uint32_t)atoi(argv[++i]);
+            max_channels = (uint32_t)strtol(argv[++i], NULL, 10);
         } else if (strcmp(argv[i], "-h") == 0) {
-            printf("Usage: channel_d [-c config] [-s socket_dir] [-n max_channels] [-h]\n");
+            fputs("Usage: channel_d [-c config] [-s socket_dir] [-n max_channels] [-h]\n", stdout);
             return 0;
         }
     }
 
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
+    signal(SIGUSR1, svc_log_toggle_handler);
+
+    agentos_log_init(NULL);
+    atexit(log_cleanup);
 
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
     config.max_channels = max_channels;
@@ -205,27 +287,28 @@ int main(int argc, char* argv[])
         strncpy(config.socket_dir, socket_dir, sizeof(config.socket_dir) - 1);
     }
 
-    channel_service_t* svc = channel_service_create(&config);
+    channel_service_t *svc = channel_service_create(&config);
     if (!svc) {
-        fprintf(stderr, "Failed to create channel service\n");
+        SVC_LOG_ERROR("Failed to create channel service");
         return 1;
     }
 
     if (channel_service_start(svc) != 0) {
-        fprintf(stderr, "Failed to start channel service\n");
+        SVC_LOG_ERROR("Failed to start channel service");
         channel_service_destroy(svc);
         return 1;
     }
 
-    fprintf(stdout, "channel_d started (max_channels=%u, socket_dir=%s)\n",
-            config.max_channels, config.socket_dir);
+    SVC_LOG_INFO("channel_d started (max_channels=%u, socket_dir=%s)", config.max_channels,
+                 config.socket_dir);
 
     while (atomic_load_explicit(&g_running, memory_order_acquire)) {
         sleep(1);
     }
 
-    fprintf(stdout, "channel_d shutting down\n");
+    SVC_LOG_INFO("channel_d shutting down");
     channel_service_stop(svc);
     channel_service_destroy(svc);
+    log_cleanup();
     return 0;
 }

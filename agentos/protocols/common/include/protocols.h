@@ -3,7 +3,7 @@
 /**
  * @file protocols.h
  * @brief Main header for AgentOS Unified Protocols Framework
- * 
+ *
  * 统一协议栈框架主头文件，包含所有公共API和类型定义。
  * 使用此框架可实现协议无关的通信层。
  */
@@ -16,16 +16,16 @@
 /**
  * @defgroup protocols Unified Protocols Framework
  * @brief 统一协议栈框架
- * 
+ *
  * 提供跨协议的统一抽象层，支持HTTP、WebSocket、gRPC、MQTT等协议的统一处理。
- * 
+ *
  * 主要特性：
  * 1. 协议无关的API设计
  * 2. 统一的消息模型
  * 3. 高性能的消息路由
  * 4. 可扩展的适配器架构
  * 5. 内置的连接池和负载均衡
- * 
+ *
  * @{
  */
 
@@ -54,7 +54,7 @@ void protocols_framework_cleanup(void);
  * @brief 获取框架版本信息
  * @return 版本字符串
  */
-const char* protocols_framework_version(void);
+const char *protocols_framework_version(void);
 
 // ============================================================================
 // 协议栈管理器
@@ -63,7 +63,7 @@ const char* protocols_framework_version(void);
 /**
  * @brief 协议栈管理器句柄
  */
-typedef struct protocol_manager_s* protocol_manager_handle_t;
+typedef struct protocol_manager_s *protocol_manager_handle_t;
 
 /**
  * @brief 创建协议栈管理器
@@ -84,7 +84,7 @@ void protocol_manager_destroy(protocol_manager_handle_t manager);
  * @return 协议栈句柄，失败返回NULL
  */
 protocol_stack_handle_t protocol_manager_create_stack(protocol_manager_handle_t manager,
-                                                     const protocol_stack_config_t* config);
+                                                      const protocol_stack_config_t *config);
 
 /**
  * @brief 通过管理器销毁协议栈
@@ -92,7 +92,7 @@ protocol_stack_handle_t protocol_manager_create_stack(protocol_manager_handle_t 
  * @param stack 协议栈句柄
  */
 void protocol_manager_destroy_stack(protocol_manager_handle_t manager,
-                                   protocol_stack_handle_t stack);
+                                    protocol_stack_handle_t stack);
 
 /**
  * @brief 获取所有协议栈列表
@@ -102,8 +102,7 @@ void protocol_manager_destroy_stack(protocol_manager_handle_t manager,
  * @return 实际协议栈数量
  */
 size_t protocol_manager_get_stacks(protocol_manager_handle_t manager,
-                                  protocol_stack_handle_t* stacks,
-                                  size_t max_count);
+                                   protocol_stack_handle_t *stacks, size_t max_count);
 
 // ============================================================================
 // 默认适配器
@@ -113,25 +112,25 @@ size_t protocol_manager_get_stacks(protocol_manager_handle_t manager,
  * @brief 获取HTTP协议适配器
  * @return HTTP协议适配器
  */
-const protocol_adapter_t* protocol_adapter_http(void);
+const protocol_adapter_t *protocol_adapter_http(void);
 
 /**
  * @brief 获取WebSocket协议适配器
  * @return WebSocket协议适配器
  */
-const protocol_adapter_t* protocol_adapter_websocket(void);
+const protocol_adapter_t *protocol_adapter_websocket(void);
 
 /**
  * @brief 获取gRPC协议适配器
  * @return gRPC协议适配器
  */
-const protocol_adapter_t* protocol_adapter_grpc(void);
+const protocol_adapter_t *protocol_adapter_grpc(void);
 
 /**
  * @brief 获取MQTT协议适配器
  * @return MQTT协议适配器
  */
-const protocol_adapter_t* protocol_adapter_mqtt(void);
+const protocol_adapter_t *protocol_adapter_mqtt(void);
 
 // ============================================================================
 // 错误处理
@@ -159,13 +158,13 @@ typedef enum {
  * @param error 错误码
  * @return 错误描述字符串
  */
-const char* protocol_error_to_string(protocol_error_t error);
+const char *protocol_error_to_string(protocol_error_t error);
 
 /**
  * @brief 获取最近一次错误信息
  * @return 错误信息字符串
  */
-const char* protocol_get_last_error(void);
+const char *protocol_get_last_error(void);
 
 // ============================================================================
 // 配置辅助函数
@@ -176,18 +175,18 @@ const char* protocol_get_last_error(void);
  * @param name 协议栈名称
  * @return 默认配置
  */
-protocol_stack_config_t protocol_stack_config_default(const char* name);
+protocol_stack_config_t protocol_stack_config_default(const char *name);
 
 /**
  * @brief 释放协议栈配置资源
  * @param config 配置结构
  */
-void protocol_stack_config_destroy(protocol_stack_config_t* config);
+void protocol_stack_config_destroy(protocol_stack_config_t *config);
 
 #ifdef __cplusplus
 }
 #endif
 
-/** @} */ // end of protocols group
+/** @} */  // end of protocols group
 
-#endif // AGENTOS_PROTOCOLS_H
+#endif  // AGENTOS_PROTOCOLS_H

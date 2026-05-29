@@ -22,25 +22,25 @@ extern "C" {
 /* ==================== 符号导出宏 ==================== */
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
-    #ifdef AGENTOS_BUILDING_DLL
-        #define AGENTOS_API __declspec(dllexport)
-    #else
-        #define AGENTOS_API __declspec(dllimport)
-    #endif
-#elif defined(__GNUC__) || defined(__clang__)
-    #define AGENTOS_API __attribute__((visibility("default")))
+#ifdef AGENTOS_BUILDING_DLL
+#define AGENTOS_API __declspec(dllexport)
 #else
-    #define AGENTOS_API
+#define AGENTOS_API __declspec(dllimport)
+#endif
+#elif defined(__GNUC__) || defined(__clang__)
+#define AGENTOS_API __attribute__((visibility("default")))
+#else
+#define AGENTOS_API
 #endif
 
 /* ==================== 内部符号标记 ==================== */
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
-    #define AGENTOS_INTERNAL
+#define AGENTOS_INTERNAL
 #elif defined(__GNUC__) || defined(__clang__)
-    #define AGENTOS_INTERNAL __attribute__((visibility("hidden")))
+#define AGENTOS_INTERNAL __attribute__((visibility("hidden")))
 #else
-    #define AGENTOS_INTERNAL
+#define AGENTOS_INTERNAL
 #endif
 
 #ifdef __cplusplus

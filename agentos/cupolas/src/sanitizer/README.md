@@ -2,7 +2,7 @@
 
 `cupolas/src/sanitizer/` 是输入校验与注入防护引擎，对所有进入系统的外部数据进行安全清洗。
 
-> Part of AgentOS v0.0.5
+> Part of AgentOS v0.1.0
 
 ## 设计目标
 

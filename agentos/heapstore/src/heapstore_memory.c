@@ -10,22 +10,24 @@
  */
 
 #include "heapstore_memory.h"
+
+#include "platform.h"
 #include "private.h"
 #include "utils.h"
-#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #include <direct.h>
+#include <windows.h>
 #define mkdir(path, mode) _mkdir(path)
 #else
-#include <unistd.h>
-#include <sys/stat.h>
 #include "platform.h"
+
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #define heapstore_MEMORY_MAX_POOLS 64
@@ -42,12 +44,13 @@ static char s_memory_path[heapstore_MEMORY_MAX_PATH] = {0};
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-heapstore_error_t heapstore_memory_init(void) {
+heapstore_error_t heapstore_memory_init(void)
+{
     if (s_initialized) {
         return heapstore_SUCCESS;
     }
 
-    const char* root = heapstore_get_root();
+    const char *root = heapstore_get_root();
     char base_path[512];
     if (root && root[0]) {
         snprintf(base_path, sizeof(base_path), "%s/kernel/memory", root);
@@ -91,7 +94,8 @@ heapstore_error_t heapstore_memory_init(void) {
 }
 #pragma GCC diagnostic pop
 
-void heapstore_memory_shutdown(void) {
+void heapstore_memory_shutdown(void)
+{
     if (!s_initialized) {
         return;
     }
@@ -107,7 +111,8 @@ void heapstore_memory_shutdown(void) {
     agentos_mutex_unlock(&s_memory_lock);
 }
 
-heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* pool) {
+heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t *pool)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -139,7 +144,8 @@ heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* po
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_memory_get_pool(const char* pool_id, heapstore_memory_pool_t* pool) {
+heapstore_error_t heapstore_memory_get_pool(const char *pool_id, heapstore_memory_pool_t *pool)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -162,7 +168,9 @@ heapstore_error_t heapstore_memory_get_pool(const char* pool_id, heapstore_memor
     return heapstore_ERR_NOT_FOUND;
 }
 
-heapstore_error_t heapstore_memory_update_pool_usage(const char* pool_id, size_t used_size, uint32_t free_block_count) {
+heapstore_error_t heapstore_memory_update_pool_usage(const char *pool_id, size_t used_size,
+                                                     uint32_t free_block_count)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -186,7 +194,9 @@ heapstore_error_t heapstore_memory_update_pool_usage(const char* pool_id, size_t
     return heapstore_ERR_NOT_FOUND;
 }
 
-heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allocation_t* allocation) {
+heapstore_error_t
+heapstore_memory_record_allocation(const heapstore_memory_allocation_t *allocation)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -218,7 +228,9 @@ heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allo
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_memory_get_allocation(const char* allocation_id, heapstore_memory_allocation_t* allocation) {
+heapstore_error_t heapstore_memory_get_allocation(const char *allocation_id,
+                                                  heapstore_memory_allocation_t *allocation)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -241,7 +253,8 @@ heapstore_error_t heapstore_memory_get_allocation(const char* allocation_id, hea
     return heapstore_ERR_NOT_FOUND;
 }
 
-heapstore_error_t heapstore_memory_free_allocation(const char* allocation_id) {
+heapstore_error_t heapstore_memory_free_allocation(const char *allocation_id)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -265,7 +278,9 @@ heapstore_error_t heapstore_memory_free_allocation(const char* allocation_id) {
     return heapstore_ERR_NOT_FOUND;
 }
 
-heapstore_error_t heapstore_memory_get_stats(uint32_t* pool_count, uint32_t* total_allocations, uint64_t* total_size) {
+heapstore_error_t heapstore_memory_get_stats(uint32_t *pool_count, uint32_t *total_allocations,
+                                             uint64_t *total_size)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -291,6 +306,7 @@ heapstore_error_t heapstore_memory_get_stats(uint32_t* pool_count, uint32_t* tot
     return heapstore_SUCCESS;
 }
 
-bool heapstore_memory_is_healthy(void) {
+bool heapstore_memory_is_healthy(void)
+{
     return s_initialized;
 }

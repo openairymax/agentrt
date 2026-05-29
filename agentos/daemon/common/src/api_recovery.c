@@ -1,3 +1,4 @@
+#include "error.h"
 #include "memory_compat.h"
 /**
  * @file api_recovery.c
@@ -7,26 +8,39 @@
 
 #include "api_recovery.h"
 #include "daemon_defaults.h"
-#include "svc_logger.h"
 #include "platform.h"
+#include "svc_logger.h"
+
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
-#include <math.h>
 
-static uint64_t rec_timestamp_ms(void) {
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
+
+static uint64_t rec_timestamp_ms(void)
+{
     return agentos_time_ms();
 }
 
-static double rec_jitter(float ratio) {
-    if (ratio <= 0.0f) return 0.0;
+static double rec_jitter(float ratio)
+{
+    if (ratio <= 0.0f)
+        return 0.0;
     double r = (double)agentos_random_uint32(0, RAND_MAX) / (double)RAND_MAX * 2.0 - 1.0;
     return r * ratio;
 }
 
-static void rec_update_cred_health(api_rec_credential_t* cred, bool success) {
-    if (!cred) return;
+static void rec_update_cred_health(api_rec_credential_t *cred, bool success)
+{
+    if (!cred)
+        return;
     cred->total_uses++;
     uint64_t now = rec_timestamp_ms();
 
@@ -36,7 +50,8 @@ static void rec_update_cred_health(api_rec_credential_t* cred, bool success) {
 
         double decay = AGENTOS_API_REC_HEALTH_DECAY;
         cred->health_score = cred->health_score * decay + (1.0 - decay) * 1.0;
-        if (cred->health_score > 1.0) cred->health_score = 1.0;
+        if (cred->health_score > 1.0)
+            cred->health_score = 1.0;
     } else {
         cred->last_failure_time = now;
         cred->consecutive_failures++;
@@ -44,7 +59,8 @@ static void rec_update_cred_health(api_rec_credential_t* cred, bool success) {
 
         double penalty = AGENTOS_API_REC_HEALTH_PENALTY;
         cred->health_score = cred->health_score * (1.0 - penalty);
-        if (cred->health_score < 0.0) cred->health_score = 0.0;
+        if (cred->health_score < 0.0)
+            cred->health_score = 0.0;
 
         if (cred->consecutive_failures >= AGENTOS_API_REC_CONSECUTIVE_DISABLE) {
             cred->is_valid = false;
@@ -52,19 +68,26 @@ static void rec_update_cred_health(api_rec_credential_t* cred, bool success) {
     }
 }
 
-static api_rec_error_code_t classify_http_error(long http_code) {
-    if (http_code == 429) return API_REC_ERR_RATE_LIMIT;
-    if (http_code == 401 || http_code == 403) return API_REC_ERR_AUTH;
-    if (http_code >= 500 && http_code < 600) return API_REC_ERR_SERVER;
-    if (http_code == 0 || http_code >= 600) return API_REC_ERR_NETWORK;
+static api_rec_error_code_t classify_http_error(long http_code)
+{
+    if (http_code == 429)
+        return API_REC_ERR_RATE_LIMIT;
+    if (http_code == 401 || http_code == 403)
+        return API_REC_ERR_AUTH;
+    if (http_code >= 500 && http_code < 600)
+        return API_REC_ERR_SERVER;
+    if (http_code == 0 || http_code >= 600)
+        return API_REC_ERR_NETWORK;
     return API_REC_ERR_UNKNOWN;
 }
 
 /* ==================== Lifecycle ==================== */
 
-api_rec_pool_t* api_rec_pool_create(const char* name) {
-    api_rec_pool_t* pool = AGENTOS_CALLOC(1, sizeof(api_rec_pool_t));
-    if (!pool) return NULL;
+api_rec_pool_t *api_rec_pool_create(const char *name)
+{
+    api_rec_pool_t *pool = AGENTOS_CALLOC(1, sizeof(api_rec_pool_t));
+    if (!pool)
+        return NULL;
 
     if (name) {
         strncpy(pool->name, name, sizeof(pool->name) - 1);
@@ -93,28 +116,32 @@ api_rec_pool_t* api_rec_pool_create(const char* name) {
     return pool;
 }
 
-void api_rec_pool_destroy(api_rec_pool_t* pool) {
-    if (!pool) return;
+void api_rec_pool_destroy(api_rec_pool_t *pool)
+{
+    if (!pool)
+        return;
     SVC_LOG_INFO("API recovery pool destroyed: %s (calls=%llu recovered=%llu rate=%.1f%%)",
-                 pool->name,
-                 (unsigned long long)pool->total_calls,
-                 (unsigned long long)pool->recovered_calls,
-                 pool->recovery_rate * 100.0);
+                 pool->name, (unsigned long long)pool->total_calls,
+                 (unsigned long long)pool->recovered_calls, pool->recovery_rate * 100.0);
     AGENTOS_FREE(pool);
 }
 
 /* ==================== Credential Pool ==================== */
 
-int api_rec_add_credential(api_rec_pool_t* pool, const char* api_key) {
-    if (!pool || !api_key) return -1;
-    if (pool->cred_count >= API_REC_MAX_CREDENTIALS) return -2;
+int api_rec_add_credential(api_rec_pool_t *pool, const char *api_key)
+{
+    if (!pool || !api_key)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (pool->cred_count >= API_REC_MAX_CREDENTIALS)
+        return AGENTOS_ERR_OVERFLOW;
 
     size_t idx = pool->cred_count++;
-    api_rec_credential_t* cred = &pool->credentials[idx];
+    api_rec_credential_t *cred = &pool->credentials[idx];
     memset(cred, 0, sizeof(*cred));
 
     size_t klen = strlen(api_key);
-    if (klen >= API_REC_MAX_CRED_LEN) klen = API_REC_MAX_CRED_LEN - 1;
+    if (klen >= API_REC_MAX_CRED_LEN)
+        klen = API_REC_MAX_CRED_LEN - 1;
     memcpy(cred->key, api_key, klen);
     cred->key[klen] = '\0';
     cred->is_valid = true;
@@ -124,8 +151,10 @@ int api_rec_add_credential(api_rec_pool_t* pool, const char* api_key) {
     return 0;
 }
 
-int api_rec_remove_credential(api_rec_pool_t* pool, size_t index) {
-    if (!pool || index >= pool->cred_count) return -1;
+int api_rec_remove_credential(api_rec_pool_t *pool, size_t index)
+{
+    if (!pool || index >= pool->cred_count)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     for (size_t i = index; i < pool->cred_count - 1; i++) {
         pool->credentials[i] = pool->credentials[i + 1];
@@ -140,17 +169,19 @@ int api_rec_remove_credential(api_rec_pool_t* pool, size_t index) {
     return 0;
 }
 
-const char* api_rec_next_credential(api_rec_pool_t* pool) {
-    if (!pool || pool->cred_count == 0) return NULL;
+const char *api_rec_next_credential(api_rec_pool_t *pool)
+{
+    if (!pool || pool->cred_count == 0)
+        return NULL;
 
     size_t attempts = 0;
     size_t start_idx = pool->cred_index;
 
     do {
-        api_rec_credential_t* cred = &pool->credentials[pool->cred_index];
+        api_rec_credential_t *cred = &pool->credentials[pool->cred_index];
 
         if (cred->is_valid && cred->health_score > AGENTOS_API_REC_HEALTH_MIN) {
-            const char* key = cred->key;
+            const char *key = cred->key;
             pool->cred_index = (pool->cred_index + 1) % pool->cred_count;
             return key;
         }
@@ -158,10 +189,11 @@ const char* api_rec_next_credential(api_rec_pool_t* pool) {
         pool->cred_index = (pool->cred_index + 1) % pool->cred_count;
         attempts++;
 
-        if (attempts > pool->cred_count) break;
+        if (attempts > pool->cred_count)
+            break;
     } while (pool->cred_index != start_idx);
 
-    api_rec_credential_t* best = &pool->credentials[0];
+    api_rec_credential_t *best = &pool->credentials[0];
     for (size_t i = 1; i < pool->cred_count; i++) {
         if (pool->credentials[i].health_score > best->health_score)
             best = &pool->credentials[i];
@@ -173,15 +205,19 @@ const char* api_rec_next_credential(api_rec_pool_t* pool) {
     return best->key;
 }
 
-int api_rec_mark_cred_success(api_rec_pool_t* pool) {
-    if (!pool || pool->cred_count == 0) return -1;
+int api_rec_mark_cred_success(api_rec_pool_t *pool)
+{
+    if (!pool || pool->cred_count == 0)
+        return AGENTOS_ERR_INVALID_PARAM;
     size_t last_idx = (pool->cred_index == 0) ? pool->cred_count - 1 : pool->cred_index - 1;
     rec_update_cred_health(&pool->credentials[last_idx], true);
     return 0;
 }
 
-int api_rec_mark_cred_failure(api_rec_pool_t* pool, api_rec_error_code_t err) {
-    if (!pool || pool->cred_count == 0) return -1;
+int api_rec_mark_cred_failure(api_rec_pool_t *pool, api_rec_error_code_t err)
+{
+    if (!pool || pool->cred_count == 0)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     size_t last_idx = (pool->cred_index == 0) ? pool->cred_count - 1 : pool->cred_index - 1;
 
@@ -200,37 +236,45 @@ int api_rec_mark_cred_failure(api_rec_pool_t* pool, api_rec_error_code_t err) {
     return 0;
 }
 
-double api_rec_cred_health(const api_rec_pool_t* pool, size_t index) {
-    if (!pool || index >= pool->cred_count) return -1.0;
+double api_rec_cred_health(const api_rec_pool_t *pool, size_t index)
+{
+    if (!pool || index >= pool->cred_count)
+        return AGENTOS_EINVAL;
     return pool->credentials[index].health_score;
 }
 
 /* ==================== Fallback Models ==================== */
 
-int api_rec_add_fallback_model(api_rec_pool_t* pool, const char* model,
-                                 float cost_weight, int priority) {
-    if (!pool || !model) return -1;
-    if (pool->fallback_count >= API_REC_MAX_FALLBACK_MODELS) return -2;
+int api_rec_add_fallback_model(api_rec_pool_t *pool, const char *model, float cost_weight,
+                               int priority)
+{
+    if (!pool || !model)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (pool->fallback_count >= API_REC_MAX_FALLBACK_MODELS)
+        return AGENTOS_ERR_OVERFLOW;
 
     size_t idx = pool->fallback_count++;
-    api_rec_model_t* m = &pool->fallback_models[idx];
+    api_rec_model_t *m = &pool->fallback_models[idx];
     memset(m, 0, sizeof(*m));
 
     size_t mlen = strlen(model);
-    if (mlen >= API_REC_MAX_MODEL_LEN) mlen = API_REC_MAX_MODEL_LEN - 1;
+    if (mlen >= API_REC_MAX_MODEL_LEN)
+        mlen = API_REC_MAX_MODEL_LEN - 1;
     memcpy(m->model, model, mlen);
     m->model[mlen] = '\0';
     m->cost_weight = cost_weight;
     m->priority = priority;
     m->available = true;
 
-    SVC_LOG_INFO("API rec[%s]: fallback model '%s' added (priority=%d weight=%.2f)",
-                 pool->name, model, priority, cost_weight);
+    SVC_LOG_INFO("API rec[%s]: fallback model '%s' added (priority=%d weight=%.2f)", pool->name,
+                 model, priority, cost_weight);
     return 0;
 }
 
-const char* api_rec_current_model(api_rec_pool_t* pool) {
-    if (!pool) return NULL;
+const char *api_rec_current_model(api_rec_pool_t *pool)
+{
+    if (!pool)
+        return NULL;
 
     if (pool->current_level == API_REC_DEGRADE_NONE ||
         pool->current_fallback_idx >= pool->fallback_count) {
@@ -240,53 +284,55 @@ const char* api_rec_current_model(api_rec_pool_t* pool) {
     return pool->fallback_models[pool->current_fallback_idx].model;
 }
 
-int api_rec_degrade(api_rec_pool_t* pool) {
-    if (!pool) return -1;
+int api_rec_degrade(api_rec_pool_t *pool)
+{
+    if (!pool)
+        return AGENTOS_ERR_INVALID_PARAM;
     if (pool->current_fallback_idx < pool->fallback_count) {
         pool->current_fallback_idx++;
         if (pool->current_fallback_idx >= pool->fallback_count) {
             pool->current_level = API_REC_DEGRADE_CACHE;
             SVC_LOG_ERROR("API rec[%s]: all fallback models exhausted, using cache only",
-                         pool->name);
+                          pool->name);
         } else {
             pool->current_level = API_REC_DEGRADE_LOWER_TIER;
         }
     } else {
         pool->current_level = API_REC_DEGRADE_CACHE;
-        SVC_LOG_ERROR("API rec[%s]: already at cache level, cannot degrade further",
-                     pool->name);
+        SVC_LOG_ERROR("API rec[%s]: already at cache level, cannot degrade further", pool->name);
     }
 
-    SVC_LOG_WARN("API rec[%s]: degraded to level=%d model='%s'",
-                 pool->name, pool->current_level,
+    SVC_LOG_WARN("API rec[%s]: degraded to level=%d model='%s'", pool->name, pool->current_level,
                  api_rec_current_model(pool));
     return 0;
 }
 
-int api_rec_upgrade(api_rec_pool_t* pool) {
-    if (!pool) return -1;
+int api_rec_upgrade(api_rec_pool_t *pool)
+{
+    if (!pool)
+        return AGENTOS_ERR_INVALID_PARAM;
     if (pool->current_fallback_idx > 0) {
         pool->current_fallback_idx--;
-        pool->current_level = (pool->current_fallback_idx == 0)
-            ? API_REC_DEGRADE_NONE : API_REC_DEGRADE_LOWER_TIER;
-        SVC_LOG_INFO("API rec[%s]: upgraded to level=%d model='%s'",
-                     pool->name, pool->current_level, api_rec_current_model(pool));
+        pool->current_level =
+            (pool->current_fallback_idx == 0) ? API_REC_DEGRADE_NONE : API_REC_DEGRADE_LOWER_TIER;
+        SVC_LOG_INFO("API rec[%s]: upgraded to level=%d model='%s'", pool->name,
+                     pool->current_level, api_rec_current_model(pool));
     }
     return 0;
 }
 
-api_rec_degradation_level_t api_rec_current_level(const api_rec_pool_t* pool) {
+api_rec_degradation_level_t api_rec_current_level(const api_rec_pool_t *pool)
+{
     return pool ? pool->current_level : API_REC_DEGRADE_NONE;
 }
 
 /* ==================== Retry Config ==================== */
 
-int api_rec_set_retry_config(api_rec_pool_t* pool,
-                              uint32_t max_retries,
-                              uint32_t base_delay_ms,
-                              float backoff_factor,
-                              float jitter_ratio) {
-    if (!pool) return -1;
+int api_rec_set_retry_config(api_rec_pool_t *pool, uint32_t max_retries, uint32_t base_delay_ms,
+                             float backoff_factor, float jitter_ratio)
+{
+    if (!pool)
+        return AGENTOS_ERR_INVALID_PARAM;
     pool->max_retries = max_retries > 0 ? max_retries : API_REC_MAX_RETRY;
     pool->base_delay_ms = base_delay_ms > 0 ? base_delay_ms : API_REC_DEFAULT_BASE_DELAY_MS;
     pool->backoff_factor = backoff_factor > 1.0f ? backoff_factor : 2.0f;
@@ -296,36 +342,37 @@ int api_rec_set_retry_config(api_rec_pool_t* pool,
 
 /* ==================== Circuit Breaker Bind ==================== */
 
-int api_rec_bind_circuit_breaker(api_rec_pool_t* pool, void* breaker) {
-    if (!pool) return -1;
+int api_rec_bind_circuit_breaker(api_rec_pool_t *pool, void *breaker)
+{
+    if (!pool)
+        return AGENTOS_ERR_INVALID_PARAM;
     pool->cb_breaker = breaker;
     return 0;
 }
 
 /* ==================== Core: Execute with Recovery ==================== */
 
-int api_rec_execute_with_recovery(api_rec_pool_t* pool,
-                                  api_rec_request_fn request_fn,
-                                  void* ctx,
-                                  const char* url,
-                                  const char* body,
-                                  char** out_response,
-                                  long* out_http_code,
-                                  api_rec_result_t* out_result) {
-    if (!pool || !request_fn || !url || !body || !out_response) return -1;
-    if (out_result) memset(out_result, 0, sizeof(*out_result));
+int api_rec_execute_with_recovery(api_rec_pool_t *pool, api_rec_request_fn request_fn, void *ctx,
+                                  const char *url, const char *body, char **out_response,
+                                  long *out_http_code, api_rec_result_t *out_result)
+{
+    if (!pool || !request_fn || !url || !body || !out_response)
+        return AGENTOS_ERR_INVALID_PARAM;
+    if (out_result)
+        memset(out_result, 0, sizeof(*out_result));
 
     *out_response = NULL;
-    if (out_http_code) *out_http_code = 0;
+    if (out_http_code)
+        *out_http_code = 0;
 
     pool->total_calls++;
 
     int ret = -1;
     long http_code = 0;
-    char* resp_body = NULL;
+    char *resp_body = NULL;
     bool recovered = false;
 
-    const char* cred = api_rec_next_credential(pool);
+    const char *cred = api_rec_next_credential(pool);
     if (!cred) {
         if (out_result) {
             out_result->rec_code = API_REC_ERR_AUTH;
@@ -338,12 +385,11 @@ int api_rec_execute_with_recovery(api_rec_pool_t* pool,
     for (uint32_t attempt = 0; attempt <= pool->max_retries; attempt++) {
 
         if (attempt > 0) {
-            unsigned delay_ms = (unsigned)(pool->base_delay_ms *
-                pow((double)pool->backoff_factor, (double)(attempt - 1)));
+            unsigned delay_ms = (unsigned)(pool->base_delay_ms * pow((double)pool->backoff_factor,
+                                                                     (double)(attempt - 1)));
             delay_ms += (unsigned)(delay_ms * rec_jitter(pool->jitter_ratio));
 
-            SVC_LOG_DEBUG("API rec[%s]: retry #%u in %ums",
-                          pool->name, attempt, delay_ms);
+            SVC_LOG_DEBUG("API rec[%s]: retry #%u in %ums", pool->name, attempt, delay_ms);
 
             struct timespec ts;
             ts.tv_sec = delay_ms / 1000;
@@ -353,14 +399,14 @@ int api_rec_execute_with_recovery(api_rec_pool_t* pool,
             if (classify_http_error(http_code) == API_REC_ERR_RATE_LIMIT) {
                 cred = api_rec_next_credential(pool);
                 if (!cred) {
-                    if (out_result) out_result->rec_code = API_REC_ERR_AUTH;
+                    if (out_result)
+                        out_result->rec_code = API_REC_ERR_AUTH;
                     goto done;
                 }
             }
 
-            if (classify_http_error(http_code) == API_REC_ERR_SERVER &&
-                attempt >= 2 && pool->fallback_count > 0 &&
-                pool->current_fallback_idx < pool->fallback_count) {
+            if (classify_http_error(http_code) == API_REC_ERR_SERVER && attempt >= 2 &&
+                pool->fallback_count > 0 && pool->current_fallback_idx < pool->fallback_count) {
                 api_rec_degrade(pool);
             }
         }
@@ -400,8 +446,7 @@ int api_rec_execute_with_recovery(api_rec_pool_t* pool,
             continue;
         }
 
-        if (err == API_REC_ERR_SERVER && attempt >= 2 &&
-            pool->fallback_count > 0 &&
+        if (err == API_REC_ERR_SERVER && attempt >= 2 && pool->fallback_count > 0 &&
             pool->current_fallback_idx < pool->fallback_count) {
             api_rec_degrade(pool);
             continue;
@@ -412,7 +457,8 @@ done:
     if (recovered) {
         *out_response = resp_body;
         resp_body = NULL;
-        if (out_http_code) *out_http_code = http_code;
+        if (out_http_code)
+            *out_http_code = http_code;
         pool->recovered_calls++;
         if (out_result) {
             out_result->rec_code = API_REC_ERR_NONE;
@@ -442,33 +488,51 @@ done:
 
 /* ==================== Stats ==================== */
 
-void api_rec_get_stats(const api_rec_pool_t* pool,
-                       uint64_t* total, uint64_t* recovered,
-                       uint64_t* failed, double* rate) {
-    if (!pool) return;
-    if (total) *total = pool->total_calls;
-    if (recovered) *recovered = pool->recovered_calls;
-    if (failed) *failed = pool->failed_calls;
-    if (rate) *rate = pool->recovery_rate;
+void api_rec_get_stats(const api_rec_pool_t *pool, uint64_t *total, uint64_t *recovered,
+                       uint64_t *failed, double *rate)
+{
+    if (!pool)
+        return;
+    if (total)
+        *total = pool->total_calls;
+    if (recovered)
+        *recovered = pool->recovered_calls;
+    if (failed)
+        *failed = pool->failed_calls;
+    if (rate)
+        *rate = pool->recovery_rate;
 }
 
-const char* api_rec_error_string(api_rec_error_code_t code) {
+const char *api_rec_error_string(api_rec_error_code_t code)
+{
     switch (code) {
-        case API_REC_ERR_NONE:     return "none";
-        case API_REC_ERR_NETWORK:   return "network";
-        case API_REC_ERR_TIMEOUT:   return "timeout";
-        case API_REC_ERR_RATE_LIMIT:return "rate_limit";
-        case API_REC_ERR_AUTH:      return "auth";
-        case API_REC_ERR_SERVER:    return "server";
-        default:                   return "unknown";
+    case API_REC_ERR_NONE:
+        return "none";
+    case API_REC_ERR_NETWORK:
+        return "network";
+    case API_REC_ERR_TIMEOUT:
+        return "timeout";
+    case API_REC_ERR_RATE_LIMIT:
+        return "rate_limit";
+    case API_REC_ERR_AUTH:
+        return "auth";
+    case API_REC_ERR_SERVER:
+        return "server";
+    default:
+        return "unknown";
     }
 }
 
-const char* api_rec_degradation_string(api_rec_degradation_level_t level) {
+const char *api_rec_degradation_string(api_rec_degradation_level_t level)
+{
     switch (level) {
-        case API_REC_DEGRADE_NONE:       return "none";
-        case API_REC_DEGRADE_LOWER_TIER: return "lower_tier";
-        case API_REC_DEGRADE_CACHE:      return "cache";
-        default:                         return "unknown";
+    case API_REC_DEGRADE_NONE:
+        return "none";
+    case API_REC_DEGRADE_LOWER_TIER:
+        return "lower_tier";
+    case API_REC_DEGRADE_CACHE:
+        return "cache";
+    default:
+        return "unknown";
     }
 }

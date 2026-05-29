@@ -5,16 +5,18 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "strategy_interface.h"
-#include "scheduler_service.h"
-#include "platform.h"
 #include "daemon_errors.h"
+#include "error.h"
+#include "platform.h"
+#include "scheduler_service.h"
+#include "strategy_interface.h"
+
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #ifndef AGENTOS_ERR_SCHED_NO_AGENT
-#define AGENTOS_ERR_SCHED_NO_AGENT  (-2001)
+#define AGENTOS_ERR_SCHED_NO_AGENT (-2001)
 #endif
 
 #define MAX_AGENTS 256
@@ -25,7 +27,7 @@
 #define MAX_WEIGHT 100.0
 
 typedef struct {
-    char* agent_id;
+    char *agent_id;
     double weight;
     double success_rate;
     uint64_t total_tasks;
@@ -40,57 +42,72 @@ typedef struct {
     double total_weight;
 } weighted_data_t;
 
-static int find_agent_index(weighted_data_t* data, const char* agent_id) {
+static int find_agent_index(weighted_data_t *data, const char *agent_id)
+{
     for (size_t i = 0; i < data->agent_count; i++) {
         if (data->agents[i].agent_id && strcmp(data->agents[i].agent_id, agent_id) == 0)
             return (int)i;
     }
-    return -1;
+    return AGENTOS_ERR_NOT_FOUND;
 }
 
-static void normalize_weights(weighted_data_t* data) {
+static void normalize_weights(weighted_data_t *data)
+{
     double sum = 0.0;
     for (size_t i = 0; i < data->agent_count; i++)
         sum += data->agents[i].weight;
     data->total_weight = sum > 0 ? sum : 1.0;
 }
 
-static int select_by_weight(weighted_data_t* data) {
-    if (data->agent_count == 0) return -1;
+static int select_by_weight(weighted_data_t *data)
+{
+    if (data->agent_count == 0)
+        return AGENTOS_ERR_NOT_FOUND;
     double r = ((double)agentos_random_float()) * data->total_weight;
     double cumulative = 0.0;
     for (size_t i = 0; i < data->agent_count; i++) {
         cumulative += data->agents[i].weight;
-        if (r <= cumulative) return (int)i;
+        if (r <= cumulative)
+            return (int)i;
     }
     return (int)(data->agent_count - 1);
 }
 
 /* ==================== strategy_interface_t 实现 ==================== */
 
-static int weighted_create(const sched_config_t* manager __attribute__((unused)), void** out_data) {
-    weighted_data_t* data = (weighted_data_t*)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
-    if (!data) return AGENTOS_ERR_OUT_OF_MEMORY;
-    if (agentos_mutex_init(&data->lock) != 0) { AGENTOS_FREE(data); return AGENTOS_ERR_UNKNOWN; }
+static int weighted_create(const sched_config_t *manager __attribute__((unused)), void **out_data)
+{
+    weighted_data_t *data = (weighted_data_t *)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
+    if (!data)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    if (agentos_mutex_init(&data->lock) != 0) {
+        AGENTOS_FREE(data);
+        return AGENTOS_ERR_UNKNOWN;
+    }
     data->total_weight = 0.0;
     *out_data = data;
     return AGENTOS_OK;
 }
 
-static int weighted_destroy(void* raw_data) {
-    if (!raw_data) return AGENTOS_ERR_INVALID_PARAM;
-    weighted_data_t* data = (weighted_data_t*)raw_data;
+static int weighted_destroy(void *raw_data)
+{
+    if (!raw_data)
+        return AGENTOS_ERR_INVALID_PARAM;
+    weighted_data_t *data = (weighted_data_t *)raw_data;
     agentos_mutex_lock(&data->lock);
-    for (size_t i = 0; i < data->agent_count; i++) AGENTOS_FREE(data->agents[i].agent_id);
+    for (size_t i = 0; i < data->agent_count; i++)
+        AGENTOS_FREE(data->agents[i].agent_id);
     agentos_mutex_unlock(&data->lock);
     agentos_mutex_destroy(&data->lock);
     AGENTOS_FREE(data);
     return AGENTOS_OK;
 }
 
-static int weighted_register_agent(void* raw_data, const agent_info_t* agent) {
-    if (!raw_data || !agent || !agent->agent_id) return AGENTOS_ERR_INVALID_PARAM;
-    weighted_data_t* data = (weighted_data_t*)raw_data;
+static int weighted_register_agent(void *raw_data, const agent_info_t *agent)
+{
+    if (!raw_data || !agent || !agent->agent_id)
+        return AGENTOS_ERR_INVALID_PARAM;
+    weighted_data_t *data = (weighted_data_t *)raw_data;
     agentos_mutex_lock(&data->lock);
     if (find_agent_index(data, agent->agent_id) >= 0) {
         agentos_mutex_unlock(&data->lock);
@@ -117,12 +134,17 @@ static int weighted_register_agent(void* raw_data, const agent_info_t* agent) {
     return AGENTOS_OK;
 }
 
-static int weighted_unregister_agent(void* raw_data, const char* agent_id) {
-    if (!raw_data || !agent_id) return AGENTOS_ERR_INVALID_PARAM;
-    weighted_data_t* data = (weighted_data_t*)raw_data;
+static int weighted_unregister_agent(void *raw_data, const char *agent_id)
+{
+    if (!raw_data || !agent_id)
+        return AGENTOS_ERR_INVALID_PARAM;
+    weighted_data_t *data = (weighted_data_t *)raw_data;
     agentos_mutex_lock(&data->lock);
     int idx = find_agent_index(data, agent_id);
-    if (idx < 0) { agentos_mutex_unlock(&data->lock); return AGENTOS_ERR_NOT_FOUND; }
+    if (idx < 0) {
+        agentos_mutex_unlock(&data->lock);
+        return AGENTOS_ERR_NOT_FOUND;
+    }
     AGENTOS_FREE(data->agents[idx].agent_id);
     for (size_t i = (size_t)idx; i < data->agent_count - 1; i++)
         data->agents[i] = data->agents[i + 1];
@@ -132,9 +154,11 @@ static int weighted_unregister_agent(void* raw_data, const char* agent_id) {
     return AGENTOS_OK;
 }
 
-static int weighted_update_agent_status(void* raw_data, const agent_info_t* agent_info) {
-    if (!raw_data || !agent_info) return AGENTOS_ERR_INVALID_PARAM;
-    weighted_data_t* data = (weighted_data_t*)raw_data;
+static int weighted_update_agent_status(void *raw_data, const agent_info_t *agent_info)
+{
+    if (!raw_data || !agent_info)
+        return AGENTOS_ERR_INVALID_PARAM;
+    weighted_data_t *data = (weighted_data_t *)raw_data;
     agentos_mutex_lock(&data->lock);
     int idx = find_agent_index(data, agent_info->agent_id);
     if (idx >= 0) {
@@ -145,15 +169,27 @@ static int weighted_update_agent_status(void* raw_data, const agent_info_t* agen
     return AGENTOS_OK;
 }
 
-static int weighted_schedule(void* raw_data, const task_info_t* task_info __attribute__((unused)), sched_result_t** out_result) {
-    if (!raw_data || !out_result) return AGENTOS_ERR_INVALID_PARAM;
-    weighted_data_t* data = (weighted_data_t*)raw_data;
+static int weighted_schedule(void *raw_data, const task_info_t *task_info __attribute__((unused)),
+                             sched_result_t **out_result)
+{
+    if (!raw_data || !out_result)
+        return AGENTOS_ERR_INVALID_PARAM;
+    weighted_data_t *data = (weighted_data_t *)raw_data;
     agentos_mutex_lock(&data->lock);
-    if (data->agent_count == 0) { agentos_mutex_unlock(&data->lock); return AGENTOS_ERR_SCHED_NO_AGENT; }
+    if (data->agent_count == 0) {
+        agentos_mutex_unlock(&data->lock);
+        return AGENTOS_ERR_SCHED_NO_AGENT;
+    }
     int idx = select_by_weight(data);
-    if (idx < 0) { agentos_mutex_unlock(&data->lock); return AGENTOS_ERR_SCHED_NO_AGENT; }
-    sched_result_t* result = (sched_result_t*)AGENTOS_CALLOC(1, sizeof(sched_result_t));
-    if (!result) { agentos_mutex_unlock(&data->lock); return AGENTOS_ERR_OUT_OF_MEMORY; }
+    if (idx < 0) {
+        agentos_mutex_unlock(&data->lock);
+        return AGENTOS_ERR_SCHED_NO_AGENT;
+    }
+    sched_result_t *result = (sched_result_t *)AGENTOS_CALLOC(1, sizeof(sched_result_t));
+    if (!result) {
+        agentos_mutex_unlock(&data->lock);
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
     result->selected_agent_id = AGENTOS_STRDUP(data->agents[idx].agent_id);
     result->confidence = (float)(data->agents[idx].weight / data->total_weight);
     result->estimated_time_ms = (uint32_t)data->agents[idx].avg_latency_ms;
@@ -162,18 +198,24 @@ static int weighted_schedule(void* raw_data, const task_info_t* task_info __attr
     return AGENTOS_OK;
 }
 
-static const char* weighted_get_name(void) { return "weighted"; }
+static const char *weighted_get_name(void)
+{
+    return "weighted";
+}
 
-static size_t weighted_get_available_agent_count(void* raw_data) {
-    if (!raw_data) return 0;
-    weighted_data_t* data = (weighted_data_t*)raw_data;
+static size_t weighted_get_available_agent_count(void *raw_data)
+{
+    if (!raw_data)
+        return 0;
+    weighted_data_t *data = (weighted_data_t *)raw_data;
     agentos_mutex_lock(&data->lock);
     size_t c = data->agent_count;
     agentos_mutex_unlock(&data->lock);
     return c;
 }
 
-static size_t weighted_get_total_agent_count(void* raw_data) {
+static size_t weighted_get_total_agent_count(void *raw_data)
+{
     return weighted_get_available_agent_count(raw_data);
 }
 
@@ -189,6 +231,7 @@ static const strategy_interface_t g_weighted_strategy = {
     .get_total_agent_count = weighted_get_total_agent_count,
 };
 
-const strategy_interface_t* get_weighted_strategy(void) {
+const strategy_interface_t *get_weighted_strategy(void)
+{
     return &g_weighted_strategy;
 }

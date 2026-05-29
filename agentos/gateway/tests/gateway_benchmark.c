@@ -32,21 +32,23 @@
  * @copyright (c) 2026 SPHARX / TeamC Integration Group
  */
 
+#include <math.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdatomic.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <math.h>
-#include <stdint.h>
 #include <sys/time.h>
-#include <pthread.h>
-#include <signal.h>
+#include <time.h>
 #include <unistd.h>
-#include <stdatomic.h>
 
 #ifdef USE_CURL
 #include <curl/curl.h>
 #endif
+#include "memory_compat.h"
+#include "gateway_compat.h"
 
 /* ========== 常量定义 ========== */
 
@@ -75,7 +77,7 @@ typedef struct {
 } request_result_t;
 
 typedef struct {
-    request_result_t* results;
+    request_result_t *results;
     size_t capacity;
     size_t count;
     pthread_mutex_t mutex;
@@ -87,7 +89,7 @@ typedef struct {
     int total_requests;
     int duration_sec;
     char method[16];
-    char* payload;
+    char *payload;
     size_t payload_size;
     char output_file[256];
     int warmup_count;
@@ -97,13 +99,13 @@ typedef struct {
     atomic_int completed_requests;
     atomic_int success_count;
     atomic_int error_count;
-    
+
     struct timeval start_time;
     struct timeval end_time;
-    
+
     result_set_t warmup_results;
     result_set_t bench_results;
-    
+
     pthread_barrier_t start_barrier;
 } benchmark_config_t;
 
@@ -132,41 +134,49 @@ static volatile sig_atomic_t g_interrupted = 0;
 
 /* ========== 工具函数 ========== */
 
-static uint64_t get_timestamp_ns(void) {
+static uint64_t get_timestamp_ns(void)
+{
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-static double elapsed_ms(struct timeval* start, struct timeval* end) {
+static double elapsed_ms(struct timeval *start, struct timeval *end)
+{
     return (double)(end->tv_sec - start->tv_sec) * 1000.0 +
            (double)(end->tv_usec - start->tv_usec) / 1000.0;
 }
 
-static int compare_double(const void* a, const void* b) {
-    double da = *(const double*)a;
-    double db = *(const double*)b;
-    if (da < db) return -1;
-    if (da > db) return 1;
+static int compare_double(const void *a, const void *b)
+{
+    double da = *(const double *)a;
+    double db = *(const double *)b;
+    if (da < db)
+        return -1;
+    if (da > db)
+        return 1;
     return 0;
 }
 
-static void result_set_init(result_set_t* set, size_t capacity) {
-    set->results = (request_result_t*)calloc(capacity, sizeof(request_result_t));
+static void result_set_init(result_set_t *set, size_t capacity)
+{
+    set->results = (request_result_t *)AGENTOS_CALLOC(capacity, sizeof(request_result_t));
     set->capacity = capacity;
     set->count = 0;
     pthread_mutex_init(&set->mutex, NULL);
 }
 
-static void result_set_destroy(result_set_t* set) {
-    free(set->results);
+static void result_set_destroy(result_set_t *set)
+{
+    AGENTOS_FREE(set->results);
     set->results = NULL;
     set->capacity = 0;
     set->count = 0;
     pthread_mutex_destroy(&set->mutex);
 }
 
-static void result_set_add(result_set_t* set, const request_result_t* result) {
+static void result_set_add(result_set_t *set, const request_result_t *result)
+{
     pthread_mutex_lock(&set->mutex);
     if (set->count < set->capacity) {
         set->results[set->count++] = *result;
@@ -176,15 +186,17 @@ static void result_set_add(result_set_t* set, const request_result_t* result) {
 
 /* ========== 统计计算 ========== */
 
-static void compute_statistics(const result_set_t* set, benchmark_stats_t* stats) {
+static void compute_statistics(const result_set_t *set, benchmark_stats_t *stats)
+{
     if (set->count == 0) {
         memset(stats, 0, sizeof(benchmark_stats_t));
         return;
     }
 
     size_t n = set->count;
-    double* latencies = (double*)malloc(n * sizeof(double));
-    if (!latencies) return;
+    double *latencies = (double *)AGENTOS_MALLOC(n * sizeof(double));
+    if (!latencies)
+        return;
 
     for (size_t i = 0; i < n; i++) {
         latencies[i] = set->results[i].latency_us;
@@ -194,7 +206,7 @@ static void compute_statistics(const result_set_t* set, benchmark_stats_t* stats
 
     stats->min_us = latencies[0];
     stats->max_us = latencies[n - 1];
-    
+
     double sum = 0.0;
     for (size_t i = 0; i < n; i++) {
         sum += latencies[i];
@@ -202,11 +214,14 @@ static void compute_statistics(const result_set_t* set, benchmark_stats_t* stats
     stats->mean_us = sum / n;
     stats->median_us = latencies[n / 2];
     stats->p95_us = latencies[(size_t)(n * 0.95)];
-    if (stats->p95_us >= n) stats->p95_us = latencies[n - 1];
+    if (stats->p95_us >= n)
+        stats->p95_us = latencies[n - 1];
     stats->p99_us = latencies[(size_t)(n * 0.99)];
-    if (stats->p99_us >= n) stats->p99_us = latencies[n - 1];
+    if (stats->p99_us >= n)
+        stats->p99_us = latencies[n - 1];
     stats->p999_us = latencies[(size_t)(n * 0.999)];
-    if (stats->p999_us >= n) stats->p999_us = latencies[n - 1];
+    if (stats->p999_us >= n)
+        stats->p999_us = latencies[n - 1];
 
     double variance = 0.0;
     for (size_t i = 0; i < n; i++) {
@@ -215,13 +230,13 @@ static void compute_statistics(const result_set_t* set, benchmark_stats_t* stats
     }
     stats->stddev_us = sqrt(variance / n);
 
-    free(latencies);
+    AGENTOS_FREE(latencies);
 
     stats->total_requests = (int)n;
     stats->success_count = 0;
     stats->error_count = 0;
     stats->total_bytes = 0;
-    
+
     for (size_t i = 0; i < n; i++) {
         if (set->results[i].error_code == 0 && set->results[i].status_code > 0) {
             stats->success_count++;
@@ -230,29 +245,31 @@ static void compute_statistics(const result_set_t* set, benchmark_stats_t* stats
             stats->error_count++;
         }
     }
-    
+
     stats->error_rate_pct = (n > 0) ? (double)stats->error_count / n * 100.0 : 0.0;
     stats->duration_sec = elapsed_ms(&g_config.start_time, &g_config.end_time) / 1000.0;
-    stats->throughput_rps = (stats->duration_sec > 0) ? 
-                           (double)stats->success_count / stats->duration_sec : 0.0;
+    stats->throughput_rps =
+        (stats->duration_sec > 0) ? (double)stats->success_count / stats->duration_sec : 0.0;
 }
 
 #ifdef USE_CURL
 
 /* ========== libcurl 回调 ========== */
 
-static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
+static size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp)
+{
     size_t realsize = size * nmemb;
-    size_t* total_size = (size_t*)userp;
+    size_t *total_size = (size_t *)userp;
     *total_size += realsize;
     return realsize;
 }
 
 /* ========== 工作线程 ========== */
 
-static void* worker_thread(void* arg) {
-    int thread_id = *(int*)arg;
-    CURL* curl = curl_easy_init();
+static void *worker_thread(void *arg)
+{
+    int thread_id = *(int *)arg;
+    CURL *curl = curl_easy_init();
     if (!curl) {
         fprintf(stderr, "[Thread %d] Failed to init curl\n", thread_id);
         return NULL;
@@ -261,8 +278,7 @@ static void* worker_thread(void* arg) {
     pthread_barrier_wait(&g_config.start_barrier);
 
     while (g_config.running && !g_interrupted) {
-        if (g_config.completed_requests >= g_config.total_requests &&
-            g_config.total_requests > 0) {
+        if (g_config.completed_requests >= g_config.total_requests && g_config.total_requests > 0) {
             break;
         }
 
@@ -273,7 +289,7 @@ static void* worker_thread(void* arg) {
         curl_easy_setopt(curl, CURLOPT_URL, g_config.url);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-        
+
         size_t response_size = 0;
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_size);
 
@@ -288,7 +304,7 @@ static void* worker_thread(void* arg) {
 
         long http_code = 0;
         CURLcode res = curl_easy_perform(curl);
-        
+
         gettimeofday(&req_end, NULL);
 
         if (res == CURLE_OK) {
@@ -316,14 +332,12 @@ static void* worker_thread(void* arg) {
             __sync_fetch_and_add(&g_config.error_count, 1);
         }
 
-        if (g_config.verbose && thread_id == 0 && 
-            g_config.completed_requests % 100 == 0) {
-            printf("\r  Progress: %d/%d requests (%.1f%%)",
-                   g_config.completed_requests,
+        if (g_config.verbose && thread_id == 0 && g_config.completed_requests % 100 == 0) {
+            printf("\r  Progress: %d/%d requests (%.1f%%)", g_config.completed_requests,
                    g_config.total_requests > 0 ? g_config.total_requests : 999999,
-                   g_config.total_requests > 0 ?
-                   (double)g_config.completed_requests / g_config.total_requests * 100.0 :
-                   0.0);
+                   g_config.total_requests > 0
+                       ? (double)g_config.completed_requests / g_config.total_requests * 100.0
+                       : 0.0);
             fflush(stdout);
         }
     }
@@ -336,8 +350,9 @@ static void* worker_thread(void* arg) {
 
 /* ========== 报告生成 ========== */
 
-static void print_report(const benchmark_stats_t* warmup_stats,
-                         const benchmark_stats_t* bench_stats) {
+static void print_report(const benchmark_stats_t *warmup_stats,
+                         const benchmark_stats_t *bench_stats)
+{
     printf("\n\n");
     printf("╔══════════════════════════════════════════════════════════════╗\n");
     printf("║         AgentOS Gateway Performance Benchmark Report        ║\n");
@@ -363,7 +378,7 @@ static void print_report(const benchmark_stats_t* warmup_stats,
     printf("║   P95:            %-43.2f║\n", bench_stats->p95_us);
     printf("║   P99:            %-43.2f", bench_stats->p99_us);
     if (bench_stats->p99_us / 1000.0 <= TARGET_P99_MS) {
-        printf(" ✅ PASS"); 
+        printf(" ✅ PASS");
     } else {
         printf(" ❌ FAIL (>%.0fms)", TARGET_P99_MS);
     }
@@ -373,19 +388,16 @@ static void print_report(const benchmark_stats_t* warmup_stats,
     printf("║   StdDev:         %-43.2f║\n", bench_stats->stddev_us);
     printf("╠══════════════════════════════════════════════════════════════╣\n");
     printf("║ Throughput & Errors:                                         ║\n");
-    printf("║   Throughput:     %-43.2f req/s",
-           bench_stats->throughput_rps);
+    printf("║   Throughput:     %-43.2f req/s", bench_stats->throughput_rps);
     if (bench_stats->throughput_rps >= TARGET_THROUGHPUT_RPS) {
         printf(" ✅ PASS");
     } else {
         printf(" ⚠️  LOW (<%.0f)", TARGET_THROUGHPUT_RPS);
     }
     printf("║\n");
-    printf("║   Success Rate:   %-42.2f%%║\n",
-           100.0 - bench_stats->error_rate_pct);
+    printf("║   Success Rate:   %-42.2f%%║\n", 100.0 - bench_stats->error_rate_pct);
     printf("║   Error Rate:     %-43.2f%%║\n", bench_stats->error_rate_pct);
-    printf("║   Total Bytes:    %-43zu MB║\n",
-           bench_stats->total_bytes / (1024 * 1024));
+    printf("║   Total Bytes:    %-43zu MB║\n", bench_stats->total_bytes / (1024 * 1024));
     printf("╠══════════════════════════════════════════════════════════════╣\n");
     printf("║ Concurrency Test:                                            ║\n");
     printf("║   Max Concurrency:%-43d", g_config.concurrent);
@@ -400,24 +412,39 @@ static void print_report(const benchmark_stats_t* warmup_stats,
     printf("\nPerformance Verdict:\n");
     int passed = 0;
     int total = 3;
-    
-    if (bench_stats->p99_us / 1000.0 <= TARGET_P99_MS) { passed++; printf("  ✅ PERF-001: P99 latency ≤%.0fms\n", TARGET_P99_MS); }
-    else { printf("  ❌ PERF-001: P99 latency %.2fms > %.0fms\n", bench_stats->p99_us/1000.0, TARGET_P99_MS); }
-    
-    if (bench_stats->throughput_rps >= TARGET_THROUGHPUT_RPS) { passed++; printf("  ✅ PERF-002: Throughput ≥%.0f req/s\n", TARGET_THROUGHPUT_RPS); }
-    else { printf("  ⚠️  PERF-002: Throughput %.2f < %.0f req/s\n", bench_stats->throughput_rps, TARGET_THROUGHPUT_RPS); }
-    
-    if (g_config.concurrent <= MAX_CONCURRENT_CONNECTIONS && bench_stats->error_rate_pct < 1.0) { passed++; printf("  ✅ PERF-003: Concurrency %d stable\n", g_config.concurrent); }
-    else { printf("  ❌ PERF-003: Concurrency unstable (errors %.2f%%)\n", bench_stats->error_rate_pct); }
-    
-    printf("\nOverall: %d/%d benchmarks passed (%.0f%%)\n", 
-           passed, total, (float)passed / total * 100.0);
+
+    if (bench_stats->p99_us / 1000.0 <= TARGET_P99_MS) {
+        passed++;
+        printf("  ✅ PERF-001: P99 latency ≤%.0fms\n", TARGET_P99_MS);
+    } else {
+        printf("  ❌ PERF-001: P99 latency %.2fms > %.0fms\n", bench_stats->p99_us / 1000.0,
+               TARGET_P99_MS);
+    }
+
+    if (bench_stats->throughput_rps >= TARGET_THROUGHPUT_RPS) {
+        passed++;
+        printf("  ✅ PERF-002: Throughput ≥%.0f req/s\n", TARGET_THROUGHPUT_RPS);
+    } else {
+        printf("  ⚠️  PERF-002: Throughput %.2f < %.0f req/s\n", bench_stats->throughput_rps,
+               TARGET_THROUGHPUT_RPS);
+    }
+
+    if (g_config.concurrent <= MAX_CONCURRENT_CONNECTIONS && bench_stats->error_rate_pct < 1.0) {
+        passed++;
+        printf("  ✅ PERF-003: Concurrency %d stable\n", g_config.concurrent);
+    } else {
+        printf("  ❌ PERF-003: Concurrency unstable (errors %.2f%%)\n",
+               bench_stats->error_rate_pct);
+    }
+
+    printf("\nOverall: %d/%d benchmarks passed (%.0f%%)\n", passed, total,
+           (float)passed / total * 100.0);
 }
 
-static void write_json_report(const benchmark_stats_t* warmup_stats,
-                              const benchmark_stats_t* bench_stats,
-                              const char* filename) {
-    FILE* f = fopen(filename, "w");
+static void write_json_report(const benchmark_stats_t *warmup_stats,
+                              const benchmark_stats_t *bench_stats, const char *filename)
+{
+    FILE *f = fopen(filename, "w");
     if (!f) {
         fprintf(stderr, "Warning: Cannot open report file: %s\n", filename);
         return;
@@ -454,7 +481,7 @@ static void write_json_report(const benchmark_stats_t* warmup_stats,
     fprintf(f, "      \"success_count\": %d,\n", bench_stats->success_count);
     fprintf(f, "      \"error_count\": %d,\n", bench_stats->error_count);
     fprintf(f, "      \"error_rate_pct\": %.2f,\n", bench_stats->error_rate_pct);
-    fprintf(f, "      \"total_mb\": %.2f\n", (double)bench_stats->total_bytes / (1024*1024));
+    fprintf(f, "      \"total_mb\": %.2f\n", (double)bench_stats->total_bytes / (1024 * 1024));
     fprintf(f, "    },\n");
     fprintf(f, "    \"verdict\": {\n");
     fprintf(f, "      \"perf_001_p99_pass\": %s,\n",
@@ -462,8 +489,9 @@ static void write_json_report(const benchmark_stats_t* warmup_stats,
     fprintf(f, "      \"perf_002_throughput_pass\": %s,\n",
             bench_stats->throughput_rps >= TARGET_THROUGHPUT_RPS ? "true" : "false");
     fprintf(f, "      \"perf_003_concurrency_pass\": %s\n",
-            g_config.concurrent <= MAX_CONCURRENT_CONNECTIONS && 
-            bench_stats->error_rate_pct < 1.0 ? "true" : "false");
+            g_config.concurrent <= MAX_CONCURRENT_CONNECTIONS && bench_stats->error_rate_pct < 1.0
+                ? "true"
+                : "false");
     fprintf(f, "    }\n");
     fprintf(f, "  }\n");
     fprintf(f, "}\n");
@@ -474,7 +502,8 @@ static void write_json_report(const benchmark_stats_t* warmup_stats,
 
 /* ========== 信号处理 ========== */
 
-static void signal_handler(int signum) {
+static void signal_handler(int signum)
+{
     (void)signum;
     g_interrupted = 1;
     g_config.running = 0;
@@ -483,12 +512,14 @@ static void signal_handler(int signum) {
 
 /* ========== 参数解析 ========== */
 
-static void print_usage(const char* prog) {
+static void print_usage(const char *prog)
+{
     printf("AgentOS Gateway Benchmark Tool v%s\n\n", BENCHMARK_VERSION);
     printf("Usage: %s [options]\n\n", prog);
     printf("Options:\n");
     printf("  --url <URL>          Target URL (default: %s)\n", DEFAULT_URL);
-    printf("  --concurrent <N>     Concurrent connections (default: 10, max: %d)\n", MAX_CONCURRENT);
+    printf("  --concurrent <N>     Concurrent connections (default: 10, max: %d)\n",
+           MAX_CONCURRENT);
     printf("  --requests <N>       Total requests (default: 1000)\n");
     printf("  --duration <S>       Duration in seconds (default: 30)\n");
     printf("  --method <GET|POST>  HTTP method (default: GET)\n");
@@ -503,16 +534,16 @@ static void print_usage(const char* prog) {
     printf("  PERF-003: Concurrency > %d connections\n", MAX_CONCURRENT_CONNECTIONS);
 }
 
-static int parse_args(int argc, char* argv[]) {
+static int parse_args(int argc, char *argv[])
+{
     memset(&g_config, 0, sizeof(g_config));
-    
+
     strncpy(g_config.url, DEFAULT_URL, MAX_URL_LENGTH - 1);
     g_config.concurrent = 10;
     g_config.total_requests = 1000;
     g_config.duration_sec = 30;
     strncpy(g_config.method, "GET", sizeof(g_config.method) - 1);
-    strncpy(g_config.output_file, "benchmark_report.json", 
-            sizeof(g_config.output_file) - 1);
+    strncpy(g_config.output_file, "benchmark_report.json", sizeof(g_config.output_file) - 1);
     g_config.warmup_count = WARMUP_COUNT;
     g_config.verbose = 0;
     g_config.running = 1;
@@ -525,8 +556,10 @@ static int parse_args(int argc, char* argv[]) {
             strncpy(g_config.url, argv[++i], MAX_URL_LENGTH - 1);
         } else if (strcmp(argv[i], "--concurrent") == 0 && i + 1 < argc) {
             g_config.concurrent = atoi(argv[++i]);
-            if (g_config.concurrent < 1) g_config.concurrent = 1;
-            if (g_config.concurrent > MAX_CONCURRENT) g_config.concurrent = MAX_CONCURRENT;
+            if (g_config.concurrent < 1)
+                g_config.concurrent = 1;
+            if (g_config.concurrent > MAX_CONCURRENT)
+                g_config.concurrent = MAX_CONCURRENT;
         } else if (strcmp(argv[i], "--requests") == 0 && i + 1 < argc) {
             g_config.total_requests = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--duration") == 0 && i + 1 < argc) {
@@ -534,13 +567,16 @@ static int parse_args(int argc, char* argv[]) {
         } else if (strcmp(argv[i], "--method") == 0 && i + 1 < argc) {
             strncpy(g_config.method, argv[++i], sizeof(g_config.method) - 1);
         } else if (strcmp(argv[i], "--payload") == 0 && i + 1 < argc) {
-            FILE* pf = fopen(argv[++i], "rb");
+            FILE *pf = fopen(argv[++i], "rb");
             if (pf) {
                 fseek(pf, 0, SEEK_END);
                 g_config.payload_size = ftell(pf);
                 fseek(pf, 0, SEEK_SET);
-                g_config.payload = (char*)malloc(g_config.payload_size + 1);
-                { size_t __attribute__((unused)) _fr; _fr = fread(g_config.payload, 1, g_config.payload_size, pf); }
+                g_config.payload = (char *)AGENTOS_MALLOC(g_config.payload_size + 1);
+                {
+                    size_t __attribute__((unused)) _fr;
+                    _fr = fread(g_config.payload, 1, g_config.payload_size, pf);
+                }
                 g_config.payload[g_config.payload_size] = '\0';
                 fclose(pf);
             }
@@ -553,7 +589,7 @@ static int parse_args(int argc, char* argv[]) {
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[i]);
             print_usage(argv[0]);
-            return -1;
+            return AGENTOS_EFAIL;
         }
     }
     return 1;
@@ -561,12 +597,14 @@ static int parse_args(int argc, char* argv[]) {
 
 /* ========== 主函数 ========== */
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
     printf("AgentOS Gateway Performance Benchmark v%s\n", BENCHMARK_VERSION);
     printf("TeamC Integration Group | C-W1-004 Task\n\n");
 
     int ret = parse_args(argc, argv);
-    if (ret <= 0) return ret == 0 ? 0 : 1;
+    if (ret <= 0)
+        return ret == 0 ? 0 : 1;
 
 #ifndef USE_CURL
     printf("⚠️  Warning: Built without libcurl support\n");
@@ -587,18 +625,16 @@ int main(int argc, char* argv[]) {
     printf("  Output:        %s\n", g_config.output_file);
     printf("\n");
 
-    result_set_init(&g_config.warmup_results, 
-                    g_config.warmup_count + g_config.concurrent);
-    result_set_init(&g_config.bench_results,
-                    g_config.total_requests + g_config.concurrent);
+    result_set_init(&g_config.warmup_results, g_config.warmup_count + g_config.concurrent);
+    result_set_init(&g_config.bench_results, g_config.total_requests + g_config.concurrent);
 
 #ifdef USE_CURL
     curl_global_init(CURL_GLOBAL_ALL);
 
     pthread_barrier_init(&g_config.start_barrier, NULL, g_config.concurrent + 1);
 
-    pthread_t* threads = (pthread_t*)malloc(g_config.concurrent * sizeof(pthread_t));
-    int* thread_ids = (int*)malloc(g_config.concurrent * sizeof(int));
+    pthread_t *threads = (pthread_t *)AGENTOS_MALLOC(g_config.concurrent * sizeof(pthread_t));
+    int *thread_ids = (int *)AGENTOS_MALLOC(g_config.concurrent * sizeof(int));
 
     printf("Creating %d worker threads...\n", g_config.concurrent);
     for (int i = 0; i < g_config.concurrent; i++) {
@@ -611,15 +647,13 @@ int main(int argc, char* argv[]) {
     pthread_barrier_wait(&g_config.start_barrier);
 
     while (g_config.running && !g_interrupted) {
-        if (g_config.total_requests > 0 && 
-            g_config.completed_requests >= g_config.total_requests) {
+        if (g_config.total_requests > 0 && g_config.completed_requests >= g_config.total_requests) {
             break;
         }
         if (g_config.duration_sec > 0) {
             struct timeval now;
             gettimeofday(&now, NULL);
-            if (elapsed_ms(&g_config.start_time, &now) / 1000.0 >= 
-                g_config.duration_sec) {
+            if (elapsed_ms(&g_config.start_time, &now) / 1000.0 >= g_config.duration_sec) {
                 break;
             }
         }
@@ -634,8 +668,8 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], NULL);
     }
 
-    free(threads);
-    free(thread_ids);
+    AGENTOS_FREE(threads);
+    AGENTOS_FREE(thread_ids);
     pthread_barrier_destroy(&g_config.start_barrier);
 
     curl_global_cleanup();
@@ -643,10 +677,10 @@ int main(int argc, char* argv[]) {
 #else
     printf("[SIMULATION] Generating synthetic benchmark data...\n");
     gettimeofday(&g_config.start_time, NULL);
-    
+
     srand((unsigned int)time(NULL));
     int total = g_config.total_requests > 0 ? g_config.total_requests : 1000;
-    
+
     for (int i = 0; i < total && !g_interrupted; i++) {
         request_result_t r;
         r.latency_us = 500.0 + (double)(rand() % 95000);
@@ -654,7 +688,7 @@ int main(int argc, char* argv[]) {
         r.response_size = 256 + (rand() % 4096);
         r.timestamp_ns = get_timestamp_ns();
         r.error_code = 0;
-        
+
         if (g_config.warmup_count > 0) {
             result_set_add(&g_config.warmup_results, &r);
             g_config.warmup_count--;
@@ -663,14 +697,14 @@ int main(int argc, char* argv[]) {
         }
         g_config.completed_requests++;
         g_config.success_count++;
-        
+
         if (g_config.verbose && i % 100 == 0) {
             printf("\r  Progress: %d/%d", i, total);
             fflush(stdout);
         }
         usleep(100);
     }
-    
+
     gettimeofday(&g_config.end_time, NULL);
     printf("\n");
 #endif
@@ -684,7 +718,7 @@ int main(int argc, char* argv[]) {
 
     result_set_destroy(&g_config.warmup_results);
     result_set_destroy(&g_config.bench_results);
-    free(g_config.payload);
+    AGENTOS_FREE(g_config.payload);
 
     printf("\nBenchmark complete.\n");
     return 0;

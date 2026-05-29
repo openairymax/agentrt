@@ -2,10 +2,10 @@
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
  * SPDX-License-Identifier: Apache-2.0
- * 
+ *
  * @file test_framework.h
  * @brief AgentOS 测试框架 - CMocka 集成层
- * 
+ *
  * @details
  * 本文件提供 CMocka 测试框架的集成封装，包括：
  * - 统一的测试宏定义
@@ -13,16 +13,16 @@
  * - 内存泄漏检测
  * - 测试覆盖率报告
  * - 参数化测试支持
- * 
+ *
  * 使用方法：
  * @code
  * #include "test_framework.h"
- * 
+ *
  * static void test_example(void **state) {
  *     AGENTOS_TEST_ASSERT(1 == 1);
  *     AGENTOS_TEST_ASSERT_PTR_NOT_NULL(malloc(10));
  * }
- * 
+ *
  * int main(void) {
  *     const struct CMUnitTest tests[] = {
  *         cmocka_unit_test(test_example),
@@ -30,11 +30,11 @@
  *     return cmocka_run_group_tests(tests, NULL, NULL);
  * }
  * @endcode
- * 
+ *
  * @author Spharx AgentOS Team
  * @date 2026-04-01
  * @version 1.0
- * 
+ *
  * @see ARCHITECTURAL_PRINCIPLES.md E-8 可测试性原则
  */
 
@@ -42,9 +42,9 @@
 #define AGENTOS_TEST_FRAMEWORK_H
 
 /* CMocka 标准头文件 */
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <setjmp.h>
 
 #ifdef AGENTOS_HAS_CMOCKA
 #include <cmocka.h>
@@ -70,17 +70,17 @@ extern "C" {
  */
 
 /* 基础断言宏（继承自 CMocka） */
-#define AGENTOS_TEST_ASSERT(condition)             assert_true(condition)
-#define AGENTOS_TEST_ASSERT_NOT(condition)         assert_false(condition)
-#define AGENTOS_TEST_ASSERT_EQUAL(a, b)            assert_int_equal(a, b)
-#define AGENTOS_TEST_ASSERT_NOT_EQUAL(a, b)        assert_int_not_equal(a, b)
-#define AGENTOS_TEST_ASSERT_PTR_EQUAL(a, b)        assert_ptr_equal(a, b)
-#define AGENTOS_TEST_ASSERT_PTR_NOT_EQUAL(a, b)    assert_ptr_not_equal(a, b)
-#define AGENTOS_TEST_ASSERT_PTR_NULL(ptr)          assert_null(ptr)
-#define AGENTOS_TEST_ASSERT_PTR_NOT_NULL(ptr)      assert_non_null(ptr)
-#define AGENTOS_TEST_ASSERT_STRING_EQUAL(a, b)     assert_string_equal(a, b)
+#define AGENTOS_TEST_ASSERT(condition) assert_true(condition)
+#define AGENTOS_TEST_ASSERT_NOT(condition) assert_false(condition)
+#define AGENTOS_TEST_ASSERT_EQUAL(a, b) assert_int_equal(a, b)
+#define AGENTOS_TEST_ASSERT_NOT_EQUAL(a, b) assert_int_not_equal(a, b)
+#define AGENTOS_TEST_ASSERT_PTR_EQUAL(a, b) assert_ptr_equal(a, b)
+#define AGENTOS_TEST_ASSERT_PTR_NOT_EQUAL(a, b) assert_ptr_not_equal(a, b)
+#define AGENTOS_TEST_ASSERT_PTR_NULL(ptr) assert_null(ptr)
+#define AGENTOS_TEST_ASSERT_PTR_NOT_NULL(ptr) assert_non_null(ptr)
+#define AGENTOS_TEST_ASSERT_STRING_EQUAL(a, b) assert_string_equal(a, b)
 #define AGENTOS_TEST_ASSERT_STRING_NOT_EQUAL(a, b) assert_string_not_equal(a, b)
-#define AGENTOS_TEST_ASSERT_MEMORY_EQUAL(a, b, n)  assert_memory_equal(a, b, n)
+#define AGENTOS_TEST_ASSERT_MEMORY_EQUAL(a, b, n) assert_memory_equal(a, b, n)
 #define AGENTOS_TEST_ASSERT_MEMORY_NOT_EQUAL(a, b, n) assert_memory_not_equal(a, b, n)
 #define AGENTOS_TEST_ASSERT_FLOAT_EQUAL(a, b, eps) assert_float_equal(a, b, eps)
 #define AGENTOS_TEST_ASSERT_DOUBLE_EQUAL(a, b, eps) assert_double_equal(a, b, eps)
@@ -92,22 +92,19 @@ extern "C" {
  * @param result 实际结果
  * @param expected 期望的错误码
  */
-#define AGENTOS_TEST_ASSERT_ERROR(result, expected) \
-    assert_int_equal((int)(result), (int)(expected))
+#define AGENTOS_TEST_ASSERT_ERROR(result, expected) assert_int_equal((int)(result), (int)(expected))
 
 /**
  * @brief 成功断言
  * @param result 实际结果
  */
-#define AGENTOS_TEST_ASSERT_SUCCESS(result) \
-    assert_int_equal((int)(result), AGENTOS_SUCCESS)
+#define AGENTOS_TEST_ASSERT_SUCCESS(result) assert_int_equal((int)(result), AGENTOS_SUCCESS)
 
 /**
  * @brief 失败断言
  * @param result 实际结果
  */
-#define AGENTOS_TEST_ASSERT_FAILURE(result) \
-    assert_true((int)(result) < 0)
+#define AGENTOS_TEST_ASSERT_FAILURE(result) assert_true((int)(result) < 0)
 
 /**
  * @brief 范围断言
@@ -115,24 +112,21 @@ extern "C" {
  * @param min 最小值
  * @param max 最大值
  */
-#define AGENTOS_TEST_ASSERT_RANGE(value, min, max) \
-    assert_true((value) >= (min) && (value) <= (max))
+#define AGENTOS_TEST_ASSERT_RANGE(value, min, max) assert_true((value) >= (min) && (value) <= (max))
 
 /**
  * @brief 位掩码断言
  * @param value 待检查值
  * @param mask 期望的掩码位
  */
-#define AGENTOS_TEST_ASSERT_BITS_SET(value, mask) \
-    assert_true(((value) & (mask)) == (mask))
+#define AGENTOS_TEST_ASSERT_BITS_SET(value, mask) assert_true(((value) & (mask)) == (mask))
 
 /**
  * @brief 位掩码清除断言
  * @param value 待检查值
  * @param mask 不期望的掩码位
  */
-#define AGENTOS_TEST_ASSERT_BITS_CLEAR(value, mask) \
-    assert_true(((value) & (mask)) == 0)
+#define AGENTOS_TEST_ASSERT_BITS_CLEAR(value, mask) assert_true(((value) & (mask)) == 0)
 
 /** @} */ /* end of TestMacros */
 
@@ -150,7 +144,7 @@ extern "C" {
  * @brief 定义测试组
  * @param name 测试组名称
  */
-#define AGENTOS_TEST_GROUP(name) \
+#define AGENTOS_TEST_GROUP(name)           \
     static int setup_##name(void **state); \
     static int teardown_##name(void **state)
 
@@ -166,8 +160,7 @@ extern "C" {
  * @brief 定义简单单元测试（无夹具）
  * @param test 测试函数名称
  */
-#define AGENTOS_SIMPLE_TEST(test) \
-    cmocka_unit_test(test)
+#define AGENTOS_SIMPLE_TEST(test) cmocka_unit_test(test)
 
 /**
  * @brief 定义参数化测试
@@ -195,15 +188,15 @@ extern "C" {
  * @param reason 跳过原因
  */
 #define AGENTOS_TEST_SKIP(reason) \
-    skip(); print_message("Skipped: %s\n", reason)
+    skip();                       \
+    print_message("Skipped: %s\n", reason)
 
 /**
  * @brief 测试消息输出
  * @param fmt 格式字符串
  * @param ... 可变参数
  */
-#define AGENTOS_TEST_MESSAGE(fmt, ...) \
-    print_message("[TEST] " fmt "\n", ##__VA_ARGS__)
+#define AGENTOS_TEST_MESSAGE(fmt, ...) print_message("[TEST] " fmt "\n", ##__VA_ARGS__)
 
 /**
  * @brief 测试调试输出
@@ -218,41 +211,37 @@ extern "C" {
  * @param fmt 格式字符串
  * @param ... 可变参数
  */
-#define AGENTOS_TEST_WARN(fmt, ...) \
-    print_message("[WARN] " fmt "\n", ##__VA_ARGS__)
+#define AGENTOS_TEST_WARN(fmt, ...) print_message("[WARN] " fmt "\n", ##__VA_ARGS__)
 
 /**
  * @brief 测试开始标记
  * @param name 测试名称
  */
-#define AGENTOS_TEST_BEGIN(name) \
-    print_message("\n========== TEST: %s ==========\n", name)
+#define AGENTOS_TEST_BEGIN(name) print_message("\n========== TEST: %s ==========\n", name)
 
 /**
  * @brief 测试结束标记
  * @param name 测试名称
  */
-#define AGENTOS_TEST_END(name) \
-    print_message("========== END: %s ==========\n\n", name)
+#define AGENTOS_TEST_END(name) print_message("========== END: %s ==========\n\n", name)
 
 /**
  * @brief 性能测试计时开始
  */
-#define AGENTOS_PERF_BEGIN() \
-    uint64_t _perf_start = agentos_get_timestamp_ns()
+#define AGENTOS_PERF_BEGIN() uint64_t _perf_start = agentos_get_timestamp_ns()
 
 /**
  * @brief 性能测试计时结束
  * @param threshold_us 阈值（微秒）
  */
-#define AGENTOS_PERF_END(threshold_us) \
-    do { \
-        uint64_t _perf_end = agentos_get_timestamp_ns(); \
-        uint64_t _perf_us = (_perf_end - _perf_start) / 1000; \
-        print_message("[PERF] Elapsed: %lu us (threshold: %lu us)\n", \
-                      (unsigned long)_perf_us, (unsigned long)(threshold_us)); \
-        assert_true(_perf_us <= (threshold_us)); \
-    } while(0)
+#define AGENTOS_PERF_END(threshold_us)                                                         \
+    do {                                                                                       \
+        uint64_t _perf_end = agentos_get_timestamp_ns();                                       \
+        uint64_t _perf_us = (_perf_end - _perf_start) / 1000;                                  \
+        print_message("[PERF] Elapsed: %lu us (threshold: %lu us)\n", (unsigned long)_perf_us, \
+                      (unsigned long)(threshold_us));                                          \
+        assert_true(_perf_us <= (threshold_us));                                               \
+    } while (0)
 
 /** @} */ /* end of TestHelpers */
 
@@ -271,14 +260,14 @@ extern "C" {
  * @param ptr 指针
  * @param size 期望大小
  */
-#define AGENTOS_TEST_ASSERT_ALLOCATED(ptr, size) \
-    do { \
-        assert_non_null(ptr); \
-        if (ptr) { \
+#define AGENTOS_TEST_ASSERT_ALLOCATED(ptr, size)                    \
+    do {                                                            \
+        assert_non_null(ptr);                                       \
+        if (ptr) {                                                  \
             size_t _actual_size = agentos_test_get_alloc_size(ptr); \
-            assert_true(_actual_size >= (size)); \
-        } \
-    } while(0)
+            assert_true(_actual_size >= (size));                    \
+        }                                                           \
+    } while (0)
 
 /**
  * @brief 测试内存对齐
@@ -308,11 +297,11 @@ extern "C" {
  * @brief 测试运行器结构
  */
 typedef struct {
-    const char* name;                   /**< 测试组名称 */
-    const struct CMUnitTest* tests;     /**< 测试数组 */
-    size_t test_count;                  /**< 测试数量 */
-    CMFixtureFunction setup;            /**< 全局设置函数 */
-    CMFixtureFunction teardown;         /**< 全局清理函数 */
+    const char *name;               /**< 测试组名称 */
+    const struct CMUnitTest *tests; /**< 测试数组 */
+    size_t test_count;              /**< 测试数量 */
+    CMFixtureFunction setup;        /**< 全局设置函数 */
+    CMFixtureFunction teardown;     /**< 全局清理函数 */
 } agentos_test_runner_t;
 
 /**
@@ -320,7 +309,7 @@ typedef struct {
  * @param runner 测试运行器
  * @return 测试结果（0 成功，非 0 失败）
  */
-int agentos_run_tests(const agentos_test_runner_t* runner);
+int agentos_run_tests(const agentos_test_runner_t *runner);
 
 /**
  * @brief 运行单个测试
@@ -338,7 +327,7 @@ int agentos_run_single_test(CMUnitTestFunction test);
  * @param ptr 内存指针
  * @return 分配大小，失败返回 0
  */
-size_t agentos_test_get_alloc_size(void* ptr);
+size_t agentos_test_get_alloc_size(void *ptr);
 
 /**
  * @brief 检查内存泄漏
@@ -351,14 +340,14 @@ size_t agentos_test_check_leaks(void);
  * @param buffer 输出缓冲区
  * @param len 缓冲区长度
  */
-void agentos_test_random_string(char* buffer, size_t len);
+void agentos_test_random_string(char *buffer, size_t len);
 
 /**
  * @brief 生成随机字节
  * @param buffer 输出缓冲区
  * @param len 缓冲区长度
  */
-void agentos_test_random_bytes(void* buffer, size_t len);
+void agentos_test_random_bytes(void *buffer, size_t len);
 
 /**
  * @brief 获取当前时间戳（纳秒）
@@ -379,13 +368,13 @@ uint64_t agentos_get_timestamp_ms(void);
  * @param len 缓冲区长度
  * @return 文件句柄，失败返回 NULL
  */
-FILE* agentos_test_create_temp_file(const char* prefix, char* buffer, size_t len);
+FILE *agentos_test_create_temp_file(const char *prefix, char *buffer, size_t len);
 
 /**
  * @brief 删除临时文件
  * @param path 文件路径
  */
-void agentos_test_delete_temp_file(const char* path);
+void agentos_test_delete_temp_file(const char *path);
 
 /**
  * @brief 比较两个文件内容
@@ -393,7 +382,7 @@ void agentos_test_delete_temp_file(const char* path);
  * @param path2 文件2路径
  * @return true 相同，false 不同
  */
-bool agentos_test_compare_files(const char* path1, const char* path2);
+bool agentos_test_compare_files(const char *path1, const char *path2);
 
 /* ============================================================================
  * 参数化测试支持
@@ -403,17 +392,17 @@ bool agentos_test_compare_files(const char* path1, const char* path2);
  * @brief 参数化测试数据结构
  */
 typedef struct {
-    const char* name;               /**< 参数名称 */
-    void* value;                    /**< 参数值 */
-    size_t value_size;              /**< 值大小 */
+    const char *name;  /**< 参数名称 */
+    void *value;       /**< 参数值 */
+    size_t value_size; /**< 值大小 */
 } agentos_test_param_t;
 
 /**
  * @brief 参数化测试数据数组
  */
 typedef struct {
-    agentos_test_param_t* params;   /**< 参数数组 */
-    size_t count;                   /**< 参数数量 */
+    agentos_test_param_t *params; /**< 参数数组 */
+    size_t count;                 /**< 参数数量 */
 } agentos_test_params_t;
 
 /**
@@ -421,13 +410,13 @@ typedef struct {
  * @param count 参数数量
  * @return 参数数组
  */
-agentos_test_params_t* agentos_test_params_create(size_t count);
+agentos_test_params_t *agentos_test_params_create(size_t count);
 
 /**
  * @brief 释放参数化测试数据
  * @param params 参数数组
  */
-void agentos_test_params_free(agentos_test_params_t* params);
+void agentos_test_params_free(agentos_test_params_t *params);
 
 /**
  * @brief 设置参数值
@@ -437,13 +426,8 @@ void agentos_test_params_free(agentos_test_params_t* params);
  * @param value 参数值
  * @param value_size 值大小
  */
-void agentos_test_params_set(
-    agentos_test_params_t* params,
-    size_t index,
-    const char* name,
-    const void* value,
-    size_t value_size
-);
+void agentos_test_params_set(agentos_test_params_t *params, size_t index, const char *name,
+                             const void *value, size_t value_size);
 
 /**
  * @brief 获取参数值
@@ -453,12 +437,8 @@ void agentos_test_params_set(
  * @param value_size 值大小
  * @return 错误码
  */
-agentos_error_t agentos_test_params_get(
-    const agentos_test_params_t* params,
-    const char* name,
-    void* value,
-    size_t value_size
-);
+agentos_error_t agentos_test_params_get(const agentos_test_params_t *params, const char *name,
+                                        void *value, size_t value_size);
 
 /* ============================================================================
  * 测试报告
@@ -468,18 +448,18 @@ agentos_error_t agentos_test_params_get(
  * @brief 测试结果结构
  */
 typedef struct {
-    const char* test_name;          /**< 测试名称 */
-    bool passed;                    /**< 是否通过 */
-    const char* message;            /**< 结果消息 */
-    uint64_t duration_us;           /**< 执行时间（微秒） */
+    const char *test_name; /**< 测试名称 */
+    bool passed;           /**< 是否通过 */
+    const char *message;   /**< 结果消息 */
+    uint64_t duration_us;  /**< 执行时间（微秒） */
 } agentos_test_result_t;
 
 /**
  * @brief 测试报告结构
  */
 typedef struct {
-    const char* group_name;         /**< 测试组名称 */
-    agentos_test_result_t* results; /**< 测试结果数组 */
+    const char *group_name;         /**< 测试组名称 */
+    agentos_test_result_t *results; /**< 测试结果数组 */
     size_t result_count;            /**< 结果数量 */
     size_t passed_count;            /**< 通过数量 */
     size_t failed_count;            /**< 失败数量 */
@@ -495,18 +475,14 @@ typedef struct {
  * @param len 缓冲区长度
  * @return 错误码
  */
-agentos_error_t agentos_test_generate_report(
-    const agentos_test_report_t* report,
-    const char* format,
-    char* buffer,
-    size_t len
-);
+agentos_error_t agentos_test_generate_report(const agentos_test_report_t *report,
+                                             const char *format, char *buffer, size_t len);
 
 /**
  * @brief 打印测试报告
  * @param report 测试报告
  */
-void agentos_test_print_report(const agentos_test_report_t* report);
+void agentos_test_print_report(const agentos_test_report_t *report);
 
 #ifdef __cplusplus
 }
