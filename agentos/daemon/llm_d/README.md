@@ -1,6 +1,6 @@
 # LLM Daemon — LLM 服务守护进程
 
-> **Version**: AgentOS v0.0.5 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
+> **Version**: AgentOS v0.1.0 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
 
 `daemon/llm_d/` 是 AgentOS 的大语言模型服务守护进程，提供统一的模型调用接口，支持多种 LLM 提供商。
 

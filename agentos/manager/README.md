@@ -46,19 +46,23 @@
 
 ## Schema 定义
 
-Manager 使用 JSON Schema 定义所有配置项的结构和约束。Schema 文件位于 `manager/schemas/` 目录：
+Manager 使用 JSON Schema 定义所有配置项的结构和约束。Schema 按领域模块组织在 `manager/` 目录下：
 
-| Schema | 说明 | 校验项数 |
-|--------|------|----------|
-| `kernel.schema.json` | 内核配置 | 32 |
-| `model.schema.json` | 模型配置 | 28 |
-| `security.schema.json` | 安全配置 | 35 |
-| `sanitizer.schema.json` | 清洗器配置 | 24 |
-| `logging.schema.json` | 日志配置 | 30 |
-| `management.schema.json` | 管理配置 | 26 |
-| `deployment.schema.json` | 部署配置 | 30 |
-| `tls.schema.json` | TLS 配置 | 22 |
-| `auth.schema.json` | 认证配置 | 25 |
+| 配置领域 | 目录 | 说明 |
+|----------|------|------|
+| **内核配置** | `kernel/` | 内核级配置（内存/调度/并发限制） |
+| **模型配置** | `model/` | 模型配置（Provider/参数/上下文窗口） |
+| **安全配置** | `security/` | 安全配置（认证/授权/加密） |
+| **清洗器配置** | `sanitizer/` | 输入清洗配置（XSS/SQL 注入规则） |
+| **日志配置** | `logging/` | 日志配置（级别/格式/输出目标） |
+| **Agent 配置** | `agent/` | Agent 配置定义与管理 |
+| **部署配置** | `deployment/` | 部署配置（cupolas/环境/集群/端口） |
+| **环境配置** | `environment/` | 环境变量与运行时配置 |
+| **监控配置** | `monitoring/` | 监控配置（告警规则/仪表盘） |
+| **服务配置** | `service/` | 服务配置（tool_d 等守护进程） |
+| **技能配置** | `skill/` | 技能配置与管理 |
+| **审计配置** | `audit/` | 审计配置（事件分类/保留策略） |
+| **Schema 定义** | `schema/` | 各模块 JSON Schema 统一定义 |
 
 ## 配置示例
 
@@ -104,10 +108,12 @@ python manager/scripts/apply_config.py --env production
 
 | 子模块 | 路径 | 说明 |
 |--------|------|------|
+| 配置定义 | `agent/`, `kernel/`, `model/`, `security/`, `sanitizer/`, `logging/` | 各领域的配置 Schema 与默认值定义 |
+| 配置管理 | `deployment/`, `environment/`, `monitoring/`, `service/`, `skill/`, `audit/` | 部署、环境、监控、服务与审计配置管理 |
+| Schema 统一定义 | `schema/` | 跨模块共享的 JSON Schema 定义 |
 | 测试套件 | `tests/` | Manager 模块的单元测试和集成测试 |
 | 工具集 | `tools/` | 配置对比、版本清理等运维工具 |
 | 性能基准 | `benchmark/` | Manager 模块性能基准测试 |
-| Schema 定义 | `schemas/` | 各模块的 JSON Schema 定义 |
 
 ## 热重载机制
 

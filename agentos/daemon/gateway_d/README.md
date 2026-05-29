@@ -1,6 +1,6 @@
 # Gateway Daemon — API 网关守护进程
 
-> **Version**: AgentOS v0.0.5 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
+> **Version**: AgentOS v0.1.0 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
 
 `daemon/gateway_d/` 是 AgentOS 的 API 网关守护进程，负责将外部客户端的 HTTP/WebSocket/MCP 请求转换为内部 JSON-RPC 2.0 调用，并路由到对应的服务守护进程。
 
@@ -24,7 +24,7 @@
   IPC Service Bus     ← 通过 JSON-RPC 2.0 转发到后端服务
 ```
 
-> **MCP 协议支持**: gateway_d 从 v0.0.5 起支持 Model Context Protocol (MCP)，允许 MCP 客户端通过网关与 AgentOS 后端服务交互。MCP 请求在适配器层被转换为标准 JSON-RPC 2.0 调用。
+> **MCP 协议支持**: gateway_d 从 v0.1.0 起支持 Model Context Protocol (MCP)，允许 MCP 客户端通过网关与 AgentOS 后端服务交互。MCP 请求在适配器层被转换为标准 JSON-RPC 2.0 调用。
 
 ## 使用方式
 
