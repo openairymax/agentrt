@@ -11,14 +11,23 @@
  */
 
 #include "service_logging.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "memory_compat.h"
+#include "platform.h"
 #include "string_compat.h"
+
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "platform.h"
+#include "../../error/include/error.h"
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
 
 #define MAX_OUTPUTTERS 16
 #define MAX_FILTERS 32
@@ -30,25 +39,25 @@ typedef log_monitoring_stats_t service_logging_stats_t;
 typedef struct outputter {
     int type;
     char name[64];
-    int (*output)(struct outputter* self, const log_record_t* record);
-    void (*destroy)(struct outputter* self);
-    void* user_data;
+    int (*output)(struct outputter *self, const log_record_t *record);
+    void (*destroy)(struct outputter *self);
+    void *user_data;
 } outputter_t;
 
 typedef struct filter {
     int type;
     char name[64];
-    bool (*filter)(struct filter* self, const log_record_t* record);
-    void (*destroy)(struct filter* self);
-    void* user_data;
+    bool (*filter)(struct filter *self, const log_record_t *record);
+    void (*destroy)(struct filter *self);
+    void *user_data;
 } filter_t;
 
 typedef struct {
     service_logging_config_t manager;
     bool initialized;
-    outputter_t* outputters[MAX_OUTPUTTERS];
+    outputter_t *outputters[MAX_OUTPUTTERS];
     int outputter_count;
-    filter_t* filters[MAX_FILTERS];
+    filter_t *filters[MAX_FILTERS];
     int filter_count;
     agentos_mutex_t mutex;
     service_logging_stats_t stats;
@@ -57,86 +66,108 @@ typedef struct {
 } service_logging_state_t;
 
 static service_logging_state_t g_service_state = {
-    .initialized = false,
-    .outputter_count = 0,
-    .filter_count = 0
-};
+    .initialized = false, .outputter_count = 0, .filter_count = 0};
 
-static int console_outputter_output(outputter_t* self, const log_record_t* record) {
+static int console_outputter_output(outputter_t *self, const log_record_t *record)
+{
     (void)self;
-    if (!record) return -1;
-    FILE* stream = (record->level >= LOG_LEVEL_ERROR) ? stderr : stdout;
+    if (!record)
+        return AGENTOS_EINVAL;
+    FILE *stream = (record->level >= LOG_LEVEL_ERROR) ? stderr : stdout;
     fprintf(stream, "[SERVICE] %s:%d %s\n", record->module, record->line, record->message);
     return 0;
 }
 
-static void console_outputter_destroy(outputter_t* self) {
+static void console_outputter_destroy(outputter_t *self)
+{
     AGENTOS_FREE(self);
 }
 
-static int file_outputter_output(outputter_t* self, const log_record_t* record) {
-    if (!self || !record) return -1;
+static int file_outputter_output(outputter_t *self, const log_record_t *record)
+{
+    if (!self || !record)
+        return AGENTOS_EINVAL;
 
-    FILE* fp = (FILE*)self->user_data;
+    FILE *fp = (FILE *)self->user_data;
     if (!fp) {
         fp = fopen(self->name, "a");
-        if (!fp) return -1;
+        if (!fp)
+            return AGENTOS_EINVAL;
         self->user_data = fp;
     }
 
     char time_buf[64];
     time_t now = (time_t)(record->timestamp / 1000);
     struct tm tm_info_buf;
-    struct tm* tm_info = localtime_r(&now, &tm_info_buf);
+    struct tm *tm_info = localtime_r(&now, &tm_info_buf);
     if (tm_info) {
         strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", tm_info);
     } else {
         snprintf(time_buf, sizeof(time_buf), "UNKNOWN");
     }
 
-    const char* level_str = "UNKNOWN";
+    const char *level_str = "UNKNOWN";
     switch (record->level) {
-        case LOG_LEVEL_DEBUG: level_str = "DEBUG"; break;
-        case LOG_LEVEL_INFO:  level_str = "INFO";  break;
-        case LOG_LEVEL_WARN:  level_str = "WARN";  break;
-        case LOG_LEVEL_ERROR: level_str = "ERROR"; break;
-        case LOG_LEVEL_FATAL: level_str = "FATAL"; break;
-        case LOG_LEVEL_COUNT: level_str = "UNKNOWN"; break;
+    case LOG_LEVEL_DEBUG:
+        level_str = "DEBUG";
+        break;
+    case LOG_LEVEL_INFO:
+        level_str = "INFO";
+        break;
+    case LOG_LEVEL_WARN:
+        level_str = "WARN";
+        break;
+    case LOG_LEVEL_ERROR:
+        level_str = "ERROR";
+        break;
+    case LOG_LEVEL_FATAL:
+        level_str = "FATAL";
+        break;
+    case LOG_LEVEL_COUNT:
+        level_str = "UNKNOWN";
+        break;
     }
 
-    fprintf(fp, "[%s] [%s] %s:%d - %s\n",
-            time_buf, level_str, record->module, record->line, record->message);
+    fprintf(fp, "[%s] [%s] %s:%d - %s\n", time_buf, level_str, record->module, record->line,
+            record->message);
     fflush(fp);
     return 0;
 }
 
-static void file_outputter_destroy(outputter_t* self) {
+static void file_outputter_destroy(outputter_t *self)
+{
     if (self && self->user_data) {
-        fclose((FILE*)self->user_data);
+        fclose((FILE *)self->user_data);
         self->user_data = NULL;
     }
     AGENTOS_FREE(self);
 }
 
-static bool level_filter_filter(filter_t* self, const log_record_t* record) {
-    if (!self || !record) return false;
+static bool level_filter_filter(filter_t *self, const log_record_t *record)
+{
+    if (!self || !record)
+        return false;
     int min_level = (int)(intptr_t)self->user_data;
-    if (min_level <= 0) min_level = LOG_LEVEL_INFO;
+    if (min_level <= 0)
+        min_level = LOG_LEVEL_INFO;
     return (int)record->level >= min_level;
 }
 
-static void level_filter_destroy(filter_t* self) {
+static void level_filter_destroy(filter_t *self)
+{
     AGENTOS_FREE(self);
 }
 
-void service_log_output_record(const log_record_t* record) {
-    if (!record || !g_service_state.initialized) return;
+void service_log_output_record(const log_record_t *record)
+{
+    if (!record || !g_service_state.initialized)
+        return;
 
     agentos_mutex_lock(&g_service_state.mutex);
 
     bool passed = true;
     for (int i = 0; i < g_service_state.filter_count; i++) {
-        filter_t* f = g_service_state.filters[i];
+        filter_t *f = g_service_state.filters[i];
         if (f && f->filter && !f->filter(f, record)) {
             passed = false;
             break;
@@ -145,7 +176,7 @@ void service_log_output_record(const log_record_t* record) {
 
     if (passed) {
         for (int i = 0; i < g_service_state.outputter_count; i++) {
-            outputter_t* o = g_service_state.outputters[i];
+            outputter_t *o = g_service_state.outputters[i];
             if (o && o->output) {
                 o->output(o, record);
             }
@@ -157,13 +188,14 @@ void service_log_output_record(const log_record_t* record) {
     agentos_mutex_unlock(&g_service_state.mutex);
 }
 
-int service_logging_init(const service_logging_config_t* manager) {
+int service_logging_init(const service_logging_config_t *manager)
+{
     if (g_service_state.initialized) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     if (agentos_mutex_init(&g_service_state.mutex) != 0) {
-        return -2;
+        return AGENTOS_ERR_SYS_NOT_INIT;
     }
 
     if (manager) {
@@ -182,7 +214,7 @@ int service_logging_init(const service_logging_config_t* manager) {
 
     memset(&g_service_state.stats, 0, sizeof(service_logging_stats_t));
 
-    outputter_t* console_outputter = (outputter_t*)AGENTOS_CALLOC(1, sizeof(outputter_t));
+    outputter_t *console_outputter = (outputter_t *)AGENTOS_CALLOC(1, sizeof(outputter_t));
     if (console_outputter) {
         console_outputter->type = 1;
         snprintf(console_outputter->name, sizeof(console_outputter->name), "%s", "console");
@@ -195,34 +227,39 @@ int service_logging_init(const service_logging_config_t* manager) {
     return 0;
 }
 
-int service_logging_configure_rotation(const log_rotation_config_t* manager) {
-    if (!g_service_state.initialized || !manager) return -1;
+int service_logging_configure_rotation(const log_rotation_config_t *manager)
+{
+    if (!g_service_state.initialized || !manager)
+        return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
     memcpy(&g_service_state.rotation_config, manager, sizeof(log_rotation_config_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }
 
-int service_logging_configure_transport(const log_transport_config_t* manager) {
-    if (!g_service_state.initialized || !manager) return -1;
+int service_logging_configure_transport(const log_transport_config_t *manager)
+{
+    if (!g_service_state.initialized || !manager)
+        return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
     memcpy(&g_service_state.transport_config, manager, sizeof(log_transport_config_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }
 
-int service_logging_add_outputter(const char* name, int type, void* user_data) {
+int service_logging_add_outputter(const char *name, int type, void *user_data)
+{
     if (!g_service_state.initialized || !name ||
         g_service_state.outputter_count >= MAX_OUTPUTTERS) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     agentos_mutex_lock(&g_service_state.mutex);
 
-    outputter_t* outputter = (outputter_t*)AGENTOS_CALLOC(1, sizeof(outputter_t));
+    outputter_t *outputter = (outputter_t *)AGENTOS_CALLOC(1, sizeof(outputter_t));
     if (!outputter) {
         agentos_mutex_unlock(&g_service_state.mutex);
-        return -2;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     outputter->type = type;
@@ -231,18 +268,18 @@ int service_logging_add_outputter(const char* name, int type, void* user_data) {
     outputter->user_data = user_data;
 
     switch (type) {
-        case 1:
-            outputter->output = console_outputter_output;
-            outputter->destroy = console_outputter_destroy;
-            break;
-        case 2:
-            outputter->output = file_outputter_output;
-            outputter->destroy = file_outputter_destroy;
-            break;
-        default:
-            AGENTOS_FREE(outputter);
-            agentos_mutex_unlock(&g_service_state.mutex);
-            return -3;
+    case 1:
+        outputter->output = console_outputter_output;
+        outputter->destroy = console_outputter_destroy;
+        break;
+    case 2:
+        outputter->output = file_outputter_output;
+        outputter->destroy = file_outputter_destroy;
+        break;
+    default:
+        AGENTOS_FREE(outputter);
+        agentos_mutex_unlock(&g_service_state.mutex);
+        return AGENTOS_ERR_NULL_POINTER;
     }
 
     g_service_state.outputters[g_service_state.outputter_count++] = outputter;
@@ -250,18 +287,18 @@ int service_logging_add_outputter(const char* name, int type, void* user_data) {
     return 0;
 }
 
-int service_logging_add_filter(const char* name, int type, void* user_data) {
-    if (!g_service_state.initialized || !name ||
-        g_service_state.filter_count >= MAX_FILTERS) {
-        return -1;
+int service_logging_add_filter(const char *name, int type, void *user_data)
+{
+    if (!g_service_state.initialized || !name || g_service_state.filter_count >= MAX_FILTERS) {
+        return AGENTOS_EINVAL;
     }
 
     agentos_mutex_lock(&g_service_state.mutex);
 
-    filter_t* filter = (filter_t*)AGENTOS_CALLOC(1, sizeof(filter_t));
+    filter_t *filter = (filter_t *)AGENTOS_CALLOC(1, sizeof(filter_t));
     if (!filter) {
         agentos_mutex_unlock(&g_service_state.mutex);
-        return -2;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     filter->type = type;
@@ -270,14 +307,14 @@ int service_logging_add_filter(const char* name, int type, void* user_data) {
     filter->user_data = user_data;
 
     switch (type) {
-        case 1:
-            filter->filter = level_filter_filter;
-            filter->destroy = level_filter_destroy;
-            break;
-        default:
-            AGENTOS_FREE(filter);
-            agentos_mutex_unlock(&g_service_state.mutex);
-            return -3;
+    case 1:
+        filter->filter = level_filter_filter;
+        filter->destroy = level_filter_destroy;
+        break;
+    default:
+        AGENTOS_FREE(filter);
+        agentos_mutex_unlock(&g_service_state.mutex);
+        return AGENTOS_ERR_NULL_POINTER;
     }
 
     g_service_state.filters[g_service_state.filter_count++] = filter;
@@ -285,14 +322,16 @@ int service_logging_add_filter(const char* name, int type, void* user_data) {
     return 0;
 }
 
-int service_logging_process_record(const log_record_t* record) {
-    if (!g_service_state.initialized || !record) return -1;
+int service_logging_process_record(const log_record_t *record)
+{
+    if (!g_service_state.initialized || !record)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&g_service_state.mutex);
 
     bool passed = true;
     for (int i = 0; i < g_service_state.filter_count; i++) {
-        filter_t* f = g_service_state.filters[i];
+        filter_t *f = g_service_state.filters[i];
         if (f && f->filter && !f->filter(f, record)) {
             passed = false;
             break;
@@ -302,7 +341,7 @@ int service_logging_process_record(const log_record_t* record) {
     int success_count = 0;
     if (passed) {
         for (int i = 0; i < g_service_state.outputter_count; i++) {
-            outputter_t* o = g_service_state.outputters[i];
+            outputter_t *o = g_service_state.outputters[i];
             if (o && o->output && o->output(o, record) == 0) {
                 success_count++;
             }
@@ -315,32 +354,40 @@ int service_logging_process_record(const log_record_t* record) {
     return success_count > 0 ? 0 : -2;
 }
 
-int service_logging_get_stats(service_logging_stats_t* stats) {
-    if (!g_service_state.initialized || !stats) return -1;
+int service_logging_get_stats(service_logging_stats_t *stats)
+{
+    if (!g_service_state.initialized || !stats)
+        return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
     memcpy(stats, &g_service_state.stats, sizeof(service_logging_stats_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }
 
-int service_logging_reload_config(const char* config_path) {
-    if (!g_service_state.initialized || !config_path) return -1;
+int service_logging_reload_config(const char *config_path)
+{
+    if (!g_service_state.initialized || !config_path)
+        return AGENTOS_EINVAL;
 
-    FILE* f = fopen(config_path, "r");
-    if (!f) return -1;
+    FILE *f = fopen(config_path, "r");
+    if (!f)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&g_service_state.mutex);
 
     char line[512];
     while (fgets(line, sizeof(line), f)) {
-        char* nl = strchr(line, '\n');
-        if (nl) *nl = '\0';
-        if (line[0] == '#' || line[0] == '\0') continue;
-        char* eq = strchr(line, '=');
-        if (!eq) continue;
+        char *nl = strchr(line, '\n');
+        if (nl)
+            *nl = '\0';
+        if (line[0] == '#' || line[0] == '\0')
+            continue;
+        char *eq = strchr(line, '=');
+        if (!eq)
+            continue;
         *eq = '\0';
-        const char* key = line;
-        const char* val = eq + 1;
+        const char *key = line;
+        const char *val = eq + 1;
         if (strcmp(key, "worker_threads") == 0) {
             g_service_state.manager.worker_threads = atoi(val);
         } else if (strcmp(key, "enable_rotation") == 0) {
@@ -359,13 +406,15 @@ int service_logging_reload_config(const char* config_path) {
     return 0;
 }
 
-void service_logging_cleanup(void) {
-    if (!g_service_state.initialized) return;
+void service_logging_cleanup(void)
+{
+    if (!g_service_state.initialized)
+        return;
 
     agentos_mutex_lock(&g_service_state.mutex);
 
     for (int i = 0; i < g_service_state.outputter_count; i++) {
-        outputter_t* outputter = g_service_state.outputters[i];
+        outputter_t *outputter = g_service_state.outputters[i];
         if (outputter && outputter->destroy) {
             outputter->destroy(outputter);
         }
@@ -373,7 +422,7 @@ void service_logging_cleanup(void) {
     g_service_state.outputter_count = 0;
 
     for (int i = 0; i < g_service_state.filter_count; i++) {
-        filter_t* filter = g_service_state.filters[i];
+        filter_t *filter = g_service_state.filters[i];
         if (filter && filter->destroy) {
             filter->destroy(filter);
         }

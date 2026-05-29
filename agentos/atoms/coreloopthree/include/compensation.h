@@ -17,22 +17,22 @@ extern "C" {
  * @brief 补偿事务条目
  */
 typedef struct agentos_compensation_entry {
-    char* action_id;
-    char* compensator_id;
-    void* input;
+    char *action_id;
+    char *compensator_id;
+    void *input;
     size_t input_size;
-    void (*input_free_fn)(void*);
-    struct agentos_compensation_entry* next;
+    void (*input_free_fn)(void *);
+    struct agentos_compensation_entry *next;
 } agentos_compensation_entry_t;
 
 /**
  * @brief 补偿事务管理器
  */
 typedef struct agentos_compensation {
-    agentos_compensation_entry_t* entries;
+    agentos_compensation_entry_t *entries;
     size_t entry_count;
-    agentos_mutex_t* lock;
-    char** human_queue;
+    agentos_mutex_t *lock;
+    char **human_queue;
     size_t human_queue_size;
     size_t human_queue_capacity;
 } agentos_compensation_t;
@@ -42,7 +42,7 @@ typedef struct agentos_compensation {
  */
 typedef struct agentos_compensation_result {
     agentos_error_t status;
-    char* error_message;
+    char *error_message;
     int requires_human;
 } agentos_compensation_result_t;
 
@@ -51,15 +51,13 @@ typedef struct agentos_compensation_result {
  * @param out_manager [out] 输出管理器句柄
  * @return agentos_error_t AGENTOS_SUCCESS 成功
  */
-AGENTOS_API agentos_error_t agentos_compensation_create(
-    agentos_compensation_t** out_manager);
+AGENTOS_API agentos_error_t agentos_compensation_create(agentos_compensation_t **out_manager);
 
 /**
  * @brief 销毁补偿事务管理器
  * @param manager [in] 管理器句柄
  */
-AGENTOS_API void agentos_compensation_destroy(
-    agentos_compensation_t* manager);
+AGENTOS_API void agentos_compensation_destroy(agentos_compensation_t *manager);
 
 /**
  * @brief 注册可补偿操作
@@ -69,11 +67,10 @@ AGENTOS_API void agentos_compensation_destroy(
  * @param input [in] 原始输入
  * @return agentos_error_t AGENTOS_SUCCESS 成功
  */
-AGENTOS_API agentos_error_t agentos_compensation_register(
-    agentos_compensation_t* manager,
-    const char* action_id,
-    const char* compensator_id,
-    const void* input);
+AGENTOS_API agentos_error_t agentos_compensation_register(agentos_compensation_t *manager,
+                                                          const char *action_id,
+                                                          const char *compensator_id,
+                                                          const void *input);
 
 /**
  * @brief 执行补偿（回滚）
@@ -81,9 +78,8 @@ AGENTOS_API agentos_error_t agentos_compensation_register(
  * @param action_id [in] 操作ID
  * @return agentos_error_t AGENTOS_SUCCESS 成功
  */
-AGENTOS_API agentos_error_t agentos_compensation_compensate(
-    agentos_compensation_t* manager,
-    const char* action_id);
+AGENTOS_API agentos_error_t agentos_compensation_compensate(agentos_compensation_t *manager,
+                                                            const char *action_id);
 
 /**
  * @brief 获取待人工介入的队列
@@ -92,17 +88,15 @@ AGENTOS_API agentos_error_t agentos_compensation_compensate(
  * @param out_count [out] 输出数量
  * @return agentos_error_t AGENTOS_SUCCESS 成功
  */
-AGENTOS_API agentos_error_t agentos_compensation_get_human_queue(
-    agentos_compensation_t* manager,
-    char*** out_actions,
-    size_t* out_count);
+AGENTOS_API agentos_error_t agentos_compensation_get_human_queue(agentos_compensation_t *manager,
+                                                                 char ***out_actions,
+                                                                 size_t *out_count);
 
 /**
  * @brief 释放补偿结果
  * @param result [in] 补偿结果
  */
-AGENTOS_API void agentos_compensation_result_free(
-    agentos_compensation_result_t* result);
+AGENTOS_API void agentos_compensation_result_free(agentos_compensation_result_t *result);
 
 #ifdef __cplusplus
 }

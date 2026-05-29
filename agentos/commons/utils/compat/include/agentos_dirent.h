@@ -3,9 +3,9 @@
 
 #ifdef _WIN32
 
-#include <windows.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <windows.h>
 
 #define AGENTOS_MAX_PATH 260
 
@@ -20,9 +20,11 @@ typedef struct {
     int first;
 } DIR;
 
-static inline DIR* opendir(const char* name) {
-    DIR* dir = (DIR*)malloc(sizeof(DIR));
-    if (!dir) return NULL;
+static inline DIR *opendir(const char *name)
+{
+    DIR *dir = (DIR *)malloc(sizeof(DIR));
+    if (!dir)
+        return NULL;
 
     char pattern[AGENTOS_MAX_PATH];
     snprintf(pattern, sizeof(pattern), "%s\\*", name);
@@ -36,10 +38,13 @@ static inline DIR* opendir(const char* name) {
     return dir;
 }
 
-static inline struct dirent* readdir(DIR* dir) {
-    if (!dir) return NULL;
+static inline struct dirent *readdir(DIR *dir)
+{
+    if (!dir)
+        return NULL;
     if (!dir->first) {
-        if (!FindNextFileA(dir->hFind, &dir->ffd)) return NULL;
+        if (!FindNextFileA(dir->hFind, &dir->ffd))
+            return NULL;
     }
     dir->first = 0;
     strncpy(dir->ent.d_name, dir->ffd.cFileName, AGENTOS_MAX_PATH - 1);
@@ -47,8 +52,10 @@ static inline struct dirent* readdir(DIR* dir) {
     return &dir->ent;
 }
 
-static inline int closedir(DIR* dir) {
-    if (!dir) return -1;
+static inline int closedir(DIR *dir)
+{
+    if (!dir)
+        return -1;
     FindClose(dir->hFind);
     free(dir);
     return 0;

@@ -26,6 +26,7 @@
 #define AGENTOS_CIRCUIT_BREAKER_H
 
 #include "svc_common.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -35,21 +36,17 @@ extern "C" {
 
 /* ==================== 常量定义 ==================== */
 
-#define CB_MAX_BREAKERS         64
-#define CB_MAX_NAME_LEN         64
-#define CB_MAX_FALLBACKS        4
-#define CB_DEFAULT_FAILURE_THRESHOLD   5
-#define CB_DEFAULT_SUCCESS_THRESHOLD   3
-#define CB_DEFAULT_TIMEOUT_MS          30000
-#define CB_DEFAULT_HALF_OPEN_MAX       1
+#define CB_MAX_BREAKERS 64
+#define CB_MAX_NAME_LEN 64
+#define CB_MAX_FALLBACKS 4
+#define CB_DEFAULT_FAILURE_THRESHOLD 5
+#define CB_DEFAULT_SUCCESS_THRESHOLD 3
+#define CB_DEFAULT_TIMEOUT_MS 30000
+#define CB_DEFAULT_HALF_OPEN_MAX 1
 
 /* ==================== 熔断器状态 ==================== */
 
-typedef enum {
-    CB_STATE_CLOSED       = 0,
-    CB_STATE_OPEN         = 1,
-    CB_STATE_HALF_OPEN    = 2
-} cb_state_t;
+typedef enum { CB_STATE_CLOSED = 0, CB_STATE_OPEN = 1, CB_STATE_HALF_OPEN = 2 } cb_state_t;
 
 /* ==================== 熔断器配置 ==================== */
 
@@ -88,13 +85,13 @@ typedef struct {
 /* ==================== 熔断器事件 ==================== */
 
 typedef enum {
-    CB_EVENT_STATE_CHANGE    = 1,
-    CB_EVENT_FAILURE         = 2,
-    CB_EVENT_SUCCESS         = 3,
-    CB_EVENT_REJECTED        = 4,
-    CB_EVENT_SLOW_CALL       = 5,
-    CB_EVENT_TIMEOUT         = 6,
-    CB_EVENT_FAILOVER        = 7
+    CB_EVENT_STATE_CHANGE = 1,
+    CB_EVENT_FAILURE = 2,
+    CB_EVENT_SUCCESS = 3,
+    CB_EVENT_REJECTED = 4,
+    CB_EVENT_SLOW_CALL = 5,
+    CB_EVENT_TIMEOUT = 6,
+    CB_EVENT_FAILOVER = 7
 } cb_event_type_t;
 
 typedef struct {
@@ -102,22 +99,19 @@ typedef struct {
     char breaker_name[CB_MAX_NAME_LEN];
     cb_state_t old_state;
     cb_state_t new_state;
-    const char* message;
+    const char *message;
     uint64_t timestamp;
 } cb_event_t;
 
-typedef void (*cb_event_callback_t)(
-    const cb_event_t* event,
-    void* user_data
-);
+typedef void (*cb_event_callback_t)(const cb_event_t *event, void *user_data);
 
 /* ==================== 故障转移策略 ==================== */
 
 typedef enum {
-    CB_FAILOVER_RETRY        = 0,
-    CB_FAILOVER_FALLBACK     = 1,
-    CB_FAILOVER_REDIRECT     = 2,
-    CB_FAILOVER_CACHE        = 3
+    CB_FAILOVER_RETRY = 0,
+    CB_FAILOVER_FALLBACK = 1,
+    CB_FAILOVER_REDIRECT = 2,
+    CB_FAILOVER_CACHE = 3
 } cb_failover_strategy_t;
 
 typedef struct {
@@ -130,11 +124,11 @@ typedef struct {
 
 /* ==================== 熔断器句柄 ==================== */
 
-typedef struct circuit_breaker_s* circuit_breaker_t;
+typedef struct circuit_breaker_s *circuit_breaker_t;
 
 /* ==================== 熔断器管理器 ==================== */
 
-typedef struct cb_manager_s* cb_manager_t;
+typedef struct cb_manager_s *cb_manager_t;
 
 /* ==================== 熔断器生命周期 ==================== */
 
@@ -159,11 +153,8 @@ AGENTOS_API void cb_manager_destroy(cb_manager_t manager);
  * @param config 配置参数（NULL使用默认）
  * @return 熔断器句柄，失败返回NULL
  */
-AGENTOS_API circuit_breaker_t cb_create(
-    cb_manager_t manager,
-    const char* name,
-    const cb_config_t* config
-);
+AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
+                                        const cb_config_t *config);
 
 /**
  * @brief 销毁熔断器
@@ -212,7 +203,7 @@ AGENTOS_API cb_state_t cb_get_state(circuit_breaker_t breaker);
  * @param breaker 熔断器句柄
  * @return 名称
  */
-AGENTOS_API const char* cb_get_name(circuit_breaker_t breaker);
+AGENTOS_API const char *cb_get_name(circuit_breaker_t breaker);
 
 /**
  * @brief 获取熔断器统计
@@ -220,7 +211,7 @@ AGENTOS_API const char* cb_get_name(circuit_breaker_t breaker);
  * @param stats [out] 统计信息
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t cb_get_stats(circuit_breaker_t breaker, cb_stats_t* stats);
+AGENTOS_API agentos_error_t cb_get_stats(circuit_breaker_t breaker, cb_stats_t *stats);
 
 /**
  * @brief 重置熔断器到关闭状态
@@ -248,10 +239,8 @@ AGENTOS_API void cb_force_close(circuit_breaker_t breaker);
  * @param config 故障转移配置
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t cb_set_failover_config(
-    circuit_breaker_t breaker,
-    const cb_failover_config_t* config
-);
+AGENTOS_API agentos_error_t cb_set_failover_config(circuit_breaker_t breaker,
+                                                   const cb_failover_config_t *config);
 
 /**
  * @brief 执行故障转移
@@ -261,12 +250,8 @@ AGENTOS_API agentos_error_t cb_set_failover_config(
  * @param result_size 结果缓冲区大小
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t cb_execute_failover(
-    circuit_breaker_t breaker,
-    int32_t original_error,
-    char* fallback_result,
-    size_t result_size
-);
+AGENTOS_API agentos_error_t cb_execute_failover(circuit_breaker_t breaker, int32_t original_error,
+                                                char *fallback_result, size_t result_size);
 
 /* ==================== 事件与回调 ==================== */
 
@@ -277,11 +262,9 @@ AGENTOS_API agentos_error_t cb_execute_failover(
  * @param user_data 用户数据
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t cb_register_event_callback(
-    cb_manager_t manager,
-    cb_event_callback_t callback,
-    void* user_data
-);
+AGENTOS_API agentos_error_t cb_register_event_callback(cb_manager_t manager,
+                                                       cb_event_callback_t callback,
+                                                       void *user_data);
 
 /**
  * @brief 查找熔断器
@@ -289,7 +272,7 @@ AGENTOS_API agentos_error_t cb_register_event_callback(
  * @param name 熔断器名称
  * @return 熔断器句柄，未找到返回NULL
  */
-AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char* name);
+AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char *name);
 
 /**
  * @brief 获取所有熔断器数量
@@ -305,7 +288,7 @@ AGENTOS_API uint32_t cb_count(cb_manager_t manager);
  * @param state 状态
  * @return 状态名称
  */
-AGENTOS_API const char* cb_state_to_string(cb_state_t state);
+AGENTOS_API const char *cb_state_to_string(cb_state_t state);
 
 /**
  * @brief 创建默认配置

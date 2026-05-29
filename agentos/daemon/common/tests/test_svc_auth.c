@@ -5,48 +5,51 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "error.h"
+#include "svc_auth.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "svc_auth.h"
-#include "error.h"
 
 /* ==================== 测试辅助宏 ==================== */
 
-#define TEST_ASSERT(condition, msg) \
-    do { \
-        if (!(condition)) { \
+#define TEST_ASSERT(condition, msg)                            \
+    do {                                                       \
+        if (!(condition)) {                                    \
             printf("  ✗ FAIL: %s (line %d)\n", msg, __LINE__); \
-            return -1; \
-        } \
-    } while(0)
+            return -1;                                         \
+        }                                                      \
+    } while (0)
 
 #define TEST_PASS(msg) printf("  ✓ PASS: %s\n", msg)
 
 static int g_tests_passed = 0;
 static int g_tests_failed = 0;
 
-#define RUN_TEST(test_func) \
-    do { \
+#define RUN_TEST(test_func)                  \
+    do {                                     \
         printf("\n[TEST] %s\n", #test_func); \
-        int ret = test_func(); \
-        if (ret == 0) { g_tests_passed++; } \
-        else { g_tests_failed++; } \
-    } while(0)
+        int ret = test_func();               \
+        if (ret == 0) {                      \
+            g_tests_passed++;                \
+        } else {                             \
+            g_tests_failed++;                \
+        }                                    \
+    } while (0)
 
 /* ==================== JWT 测试 ==================== */
 
 /**
  * @brief 测试 JWT 初始化
  */
-int test_jwt_init(void) {
-    jwt_config_t config = {
-        .secret = "test-secret-key-for-unit-testing",
-        .secret_len = 35,
-        .token_ttl_sec = 3600,
-        .refresh_threshold_sec = 300,
-        .issuer = "agentos-test"
-    };
+int test_jwt_init(void)
+{
+    jwt_config_t config = {.secret = "test-secret-key-for-unit-testing",
+                           .secret_len = 35,
+                           .token_ttl_sec = 3600,
+                           .refresh_threshold_sec = 300,
+                           .issuer = "agentos-test"};
 
     int ret = auth_jwt_init(&config);
     TEST_ASSERT(ret == AUTH_SUCCESS, "JWT init should succeed");
@@ -60,18 +63,17 @@ int test_jwt_init(void) {
 /**
  * @brief 测试 JWT Token 生成
  */
-int test_jwt_generate_token(void) {
+int test_jwt_generate_token(void)
+{
     /* 先初始化 */
-    jwt_config_t config = {
-        .secret = "test-secret-key",
-        .secret_len = 16,
-        .token_ttl_sec = 3600,
-        .refresh_threshold_sec = 300,
-        .issuer = "agentos-test"
-    };
+    jwt_config_t config = {.secret = "test-secret-key",
+                           .secret_len = 16,
+                           .token_ttl_sec = 3600,
+                           .refresh_threshold_sec = 300,
+                           .issuer = "agentos-test"};
     auth_jwt_init(&config);
 
-    char* token = NULL;
+    char *token = NULL;
     int ret = auth_jwt_generate_token("user-001", "admin", &token);
 
     TEST_ASSERT(ret == AUTH_SUCCESS, "Token generation should succeed");
@@ -95,19 +97,18 @@ int test_jwt_generate_token(void) {
 /**
  * @brief 测试 JWT Token 验证
  */
-int test_jwt_verify_token(void) {
+int test_jwt_verify_token(void)
+{
     /* 初始化 */
-    jwt_config_t config = {
-        .secret = "test-verify-secret",
-        .secret_len = 19,
-        .token_ttl_sec = 3600,
-        .refresh_threshold_sec = 300,
-        .issuer = "agentos-test"
-    };
+    jwt_config_t config = {.secret = "test-verify-secret",
+                           .secret_len = 19,
+                           .token_ttl_sec = 3600,
+                           .refresh_threshold_sec = 300,
+                           .issuer = "agentos-test"};
     auth_jwt_init(&config);
 
     /* 生成 Token */
-    char* token = NULL;
+    char *token = NULL;
     auth_jwt_generate_token("user-002", "user", &token);
     TEST_ASSERT(token != NULL, "Token should be generated");
 
@@ -129,7 +130,8 @@ int test_jwt_verify_token(void) {
     TEST_ASSERT(ret != AUTH_SUCCESS, "NULL token should fail");
     TEST_PASS("Token verification rejects NULL token");
 
-    if (token) free(token);
+    if (token)
+        free(token);
     auth_jwt_cleanup();
     return 0;
 }
@@ -137,19 +139,18 @@ int test_jwt_verify_token(void) {
 /**
  * @brief 测试 JWT Token 刷新
  */
-int test_jwt_refresh_token(void) {
+int test_jwt_refresh_token(void)
+{
     /* 初始化 */
-    jwt_config_t config = {
-        .secret = "test-refresh-secret",
-        .secret_len = 20,
-        .token_ttl_sec = 3600,
-        .refresh_threshold_sec = 300,
-        .issuer = "agentos-test"
-    };
+    jwt_config_t config = {.secret = "test-refresh-secret",
+                           .secret_len = 20,
+                           .token_ttl_sec = 3600,
+                           .refresh_threshold_sec = 300,
+                           .issuer = "agentos-test"};
     auth_jwt_init(&config);
 
     /* 生成旧 Token */
-    char* old_token = NULL;
+    char *old_token = NULL;
     auth_jwt_generate_token("user-003", "agent", &old_token);
     TEST_ASSERT(old_token != NULL, "Old token should be generated");
 
@@ -157,7 +158,7 @@ int test_jwt_refresh_token(void) {
     sleep(1);
 
     /* 刷新 Token */
-    char* new_token = NULL;
+    char *new_token = NULL;
     int ret = auth_jwt_refresh_token(old_token, &new_token);
     TEST_ASSERT(ret == AUTH_SUCCESS, "Token refresh should succeed");
     TEST_ASSERT(new_token != NULL, "New token should not be NULL");
@@ -170,8 +171,10 @@ int test_jwt_refresh_token(void) {
     TEST_ASSERT(ret == AUTH_SUCCESS, "Refreshed token should be valid");
     TEST_PASS("Refreshed token is valid");
 
-    if (old_token) free(old_token);
-    if (new_token) free(new_token);
+    if (old_token)
+        free(old_token);
+    if (new_token)
+        free(new_token);
     auth_jwt_cleanup();
     return 0;
 }
@@ -181,18 +184,12 @@ int test_jwt_refresh_token(void) {
 /**
  * @brief 测试 API Key 初始化和验证
  */
-int test_apikey_init_and_verify(void) {
-    const char* allowed_keys[] = {
-        "apikey-1234567890",
-        "apikey-abcdef1234",
-        "apikey-testkey999"
-    };
+int test_apikey_init_and_verify(void)
+{
+    const char *allowed_keys[] = {"apikey-1234567890", "apikey-abcdef1234", "apikey-testkey999"};
 
     apikey_config_t config = {
-        .allowed_keys = allowed_keys,
-        .key_count = 3,
-        .enable_key_rotation = false
-    };
+        .allowed_keys = allowed_keys, .key_count = 3, .enable_key_rotation = false};
 
     int ret = auth_apikey_init(&config);
     TEST_ASSERT(ret == AUTH_SUCCESS, "API Key init should succeed");
@@ -222,14 +219,12 @@ int test_apikey_init_and_verify(void) {
 /**
  * @brief 测试 API Key 动态添加和移除
  */
-int test_apikey_add_remove(void) {
-    const char* initial_keys[] = {"initial-key-1"};
-    
+int test_apikey_add_remove(void)
+{
+    const char *initial_keys[] = {"initial-key-1"};
+
     apikey_config_t config = {
-        .allowed_keys = initial_keys,
-        .key_count = 1,
-        .enable_key_rotation = true
-    };
+        .allowed_keys = initial_keys, .key_count = 1, .enable_key_rotation = true};
     auth_apikey_init(&config);
 
     /* 添加新 Key */
@@ -267,12 +262,9 @@ int test_apikey_add_remove(void) {
 /**
  * @brief 测试速率限制器初始化和检查
  */
-int test_ratelimit_init_and_check(void) {
-    rate_limit_config_t config = {
-        .requests_per_sec = 10,
-        .burst_size = 5,
-        .max_clients = 100
-    };
+int test_ratelimit_init_and_check(void)
+{
+    rate_limit_config_t config = {.requests_per_sec = 10, .burst_size = 5, .max_clients = 100};
 
     int ret = auth_ratelimit_init(&config);
     TEST_ASSERT(ret == AUTH_SUCCESS, "Rate limiter init should succeed");
@@ -304,12 +296,9 @@ int test_ratelimit_init_and_check(void) {
 /**
  * @brief 测试速率限制统计信息
  */
-int test_ratelimit_stats(void) {
-    rate_limit_config_t config = {
-        .requests_per_sec = 100,
-        .burst_size = 50,
-        .max_clients = 100
-    };
+int test_ratelimit_stats(void)
+{
+    rate_limit_config_t config = {.requests_per_sec = 100, .burst_size = 50, .max_clients = 100};
     auth_ratelimit_init(&config);
 
     /* 消耗一些令牌 */
@@ -339,28 +328,27 @@ int test_ratelimit_stats(void) {
 /**
  * @brief 测试统一认证流程
  */
-int test_unified_authenticate(void) {
-    auth_config_t config = {
-        .jwt.secret = "unified-auth-secret",
-        .jwt.secret_len = 21,
-        .jwt.token_ttl_sec = 3600,
-        .jwt.refresh_threshold_sec = 300,
-        .jwt.issuer = "agentos-unified",
-        .apikey.allowed_keys = (const char*[]){"unified-api-key"},
-        .apikey.key_count = 1,
-        .ratelimit.requests_per_sec = 100,
-        .ratelimit.burst_size = 20,
-        .enable_jwt = true,
-        .enable_apikey = true,
-        .enable_ratelimit = true
-    };
+int test_unified_authenticate(void)
+{
+    auth_config_t config = {.jwt.secret = "unified-auth-secret",
+                            .jwt.secret_len = 21,
+                            .jwt.token_ttl_sec = 3600,
+                            .jwt.refresh_threshold_sec = 300,
+                            .jwt.issuer = "agentos-unified",
+                            .apikey.allowed_keys = (const char *[]){"unified-api-key"},
+                            .apikey.key_count = 1,
+                            .ratelimit.requests_per_sec = 100,
+                            .ratelimit.burst_size = 20,
+                            .enable_jwt = true,
+                            .enable_apikey = true,
+                            .enable_ratelimit = true};
 
     int ret = auth_init(&config);
     TEST_ASSERT(ret == AUTH_SUCCESS, "Unified auth init should succeed");
     TEST_PASS("Unified authentication initialization");
 
     /* 测试 Bearer Token 认证 */
-    char* token = NULL;
+    char *token = NULL;
     auth_jwt_generate_token("unified-user", "admin", &token);
     TEST_ASSERT(token != NULL, "Token should be generated");
 
@@ -375,7 +363,7 @@ int test_unified_authenticate(void) {
     free(token);
 
     /* 测试 API Key 认证 */
-    const char* apikey_header = "ApiKey unified-api-key";
+    const char *apikey_header = "ApiKey unified-api-key";
     ret = auth_authenticate(apikey_header, "test-client-2", &result);
     TEST_ASSERT(ret == AUTH_SUCCESS, "API Key authentication should succeed");
     TEST_PASS("API Key authentication via unified entry");
@@ -399,19 +387,18 @@ int test_unified_authenticate(void) {
 /**
  * @brief 测试边界条件和错误处理
  */
-int test_edge_cases(void) {
+int test_edge_cases(void)
+{
     /* 双重初始化检测 */
-    jwt_config_t config = {
-        .secret = "edge-case-secret",
-        .secret_len = 17,
-        .token_ttl_sec = 3600,
-        .refresh_threshold_sec = 300,
-        .issuer = "edge-test"
-    };
+    jwt_config_t config = {.secret = "edge-case-secret",
+                           .secret_len = 17,
+                           .token_ttl_sec = 3600,
+                           .refresh_threshold_sec = 300,
+                           .issuer = "edge-test"};
     auth_jwt_init(&config);
-    int ret = auth_jwt_init(&config);  /* 再次初始化 */
-    TEST_ASSERT(ret == AGENTOS_ERR_ALREADY_INIT || ret == 0, 
-              "Double init should handle gracefully");
+    int ret = auth_jwt_init(&config); /* 再次初始化 */
+    TEST_ASSERT(ret == AGENTOS_ERR_ALREADY_INIT || ret == 0,
+                "Double init should handle gracefully");
     TEST_PASS("Double initialization handling");
     auth_jwt_cleanup();
 
@@ -431,7 +418,8 @@ int test_edge_cases(void) {
 
 /* ==================== 主函数 ==================== */
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     (void)argc;
     (void)argv;
 
@@ -463,8 +451,7 @@ int main(int argc, char** argv) {
     /* 结果汇总 */
     printf("\n");
     printf("======================================================\n");
-    printf("  Test Results: %d passed, %d failed\n", 
-           g_tests_passed, g_tests_failed);
+    printf("  Test Results: %d passed, %d failed\n", g_tests_passed, g_tests_failed);
     printf("======================================================\n\n");
 
     return g_tests_failed > 0 ? 1 : 0;

@@ -26,13 +26,13 @@ typedef struct agentos_config agentos_config_t;
  * @brief 创建配置对象
  * @return 配置对象，失败返回值NULL
  */
-agentos_config_t* agentos_config_create(void);
+agentos_config_t *agentos_config_create(void);
 
 /**
  * @brief 销毁配置对?
  * @param manager 配置对象
  */
-void agentos_config_destroy(agentos_config_t* manager);
+void agentos_config_destroy(agentos_config_t *manager);
 
 /**
  * @brief 从字符串解析配置（格? key=value?
@@ -40,7 +40,7 @@ void agentos_config_destroy(agentos_config_t* manager);
  * @param text 配置文本
  * @return 0 成功，非0 失败
  */
-int agentos_config_parse(agentos_config_t* manager, const char* text);
+int agentos_config_parse(agentos_config_t *manager, const char *text);
 
 /**
  * @brief 从文件加载配?
@@ -48,7 +48,7 @@ int agentos_config_parse(agentos_config_t* manager, const char* text);
  * @param path 文件路径
  * @return 0 成功，非0 失败
  */
-int agentos_config_load_file(agentos_config_t* manager, const char* path);
+int agentos_config_load_file(agentos_config_t *manager, const char *path);
 
 /**
  * @brief 保存配置到文?
@@ -56,7 +56,7 @@ int agentos_config_load_file(agentos_config_t* manager, const char* path);
  * @param path 文件路径
  * @return 0 成功，非0 失败
  */
-int agentos_config_save_file(agentos_config_t* manager, const char* path);
+int agentos_config_save_file(agentos_config_t *manager, const char *path);
 
 /**
  * @brief 获取字符串?
@@ -65,7 +65,8 @@ int agentos_config_save_file(agentos_config_t* manager, const char* path);
  * @param default_value 默认?
  * @return 值字符串，找不到返回默认?
  */
-const char* agentos_config_get_string(agentos_config_t* manager, const char* key, const char* default_value);
+const char *agentos_config_get_string(agentos_config_t *manager, const char *key,
+                                      const char *default_value);
 
 /**
  * @brief 获取整数?
@@ -74,7 +75,7 @@ const char* agentos_config_get_string(agentos_config_t* manager, const char* key
  * @param default_value 默认?
  * @return ?
  */
-int agentos_config_get_int(agentos_config_t* manager, const char* key, int default_value);
+int agentos_config_get_int(agentos_config_t *manager, const char *key, int default_value);
 
 /**
  * @brief 获取浮点数?
@@ -83,7 +84,7 @@ int agentos_config_get_int(agentos_config_t* manager, const char* key, int defau
  * @param default_value 默认?
  * @return ?
  */
-double agentos_config_get_double(agentos_config_t* manager, const char* key, double default_value);
+double agentos_config_get_double(agentos_config_t *manager, const char *key, double default_value);
 
 /**
  * @brief 获取布尔?
@@ -92,7 +93,7 @@ double agentos_config_get_double(agentos_config_t* manager, const char* key, dou
  * @param default_value 默认?
  * @return ?
  */
-int agentos_config_get_bool(agentos_config_t* manager, const char* key, int default_value);
+int agentos_config_get_bool(agentos_config_t *manager, const char *key, int default_value);
 
 /**
  * @brief 设置字符串?
@@ -101,7 +102,7 @@ int agentos_config_get_bool(agentos_config_t* manager, const char* key, int defa
  * @param value ?
  * @return 0 成功，非0 失败
  */
-int agentos_config_set_string(agentos_config_t* manager, const char* key, const char* value);
+int agentos_config_set_string(agentos_config_t *manager, const char *key, const char *value);
 
 /**
  * @brief 设置整数?
@@ -110,7 +111,7 @@ int agentos_config_set_string(agentos_config_t* manager, const char* key, const 
  * @param value ?
  * @return 0 成功，非0 失败
  */
-int agentos_config_set_int(agentos_config_t* manager, const char* key, int value);
+int agentos_config_set_int(agentos_config_t *manager, const char *key, int value);
 
 /**
  * @brief 设置浮点数?
@@ -119,7 +120,7 @@ int agentos_config_set_int(agentos_config_t* manager, const char* key, int value
  * @param value ?
  * @return 0 成功，非0 失败
  */
-int agentos_config_set_double(agentos_config_t* manager, const char* key, double value);
+int agentos_config_set_double(agentos_config_t *manager, const char *key, double value);
 
 /**
  * @brief 设置布尔?
@@ -128,7 +129,7 @@ int agentos_config_set_double(agentos_config_t* manager, const char* key, double
  * @param value ?
  * @return 0 成功，非0 失败
  */
-int agentos_config_set_bool(agentos_config_t* manager, const char* key, int value);
+int agentos_config_set_bool(agentos_config_t *manager, const char *key, int value);
 
 /**
  * @brief 删除配置?
@@ -136,7 +137,7 @@ int agentos_config_set_bool(agentos_config_t* manager, const char* key, int valu
  * @param key ?
  * @return 0 成功，非0 失败
  */
-int agentos_config_remove(agentos_config_t* manager, const char* key);
+int agentos_config_remove(agentos_config_t *manager, const char *key);
 
 /**
  * @brief 检查配置项是否存在
@@ -144,7 +145,7 @@ int agentos_config_remove(agentos_config_t* manager, const char* key);
  * @param key ?
  * @return 1 存在? 不存?
  */
-int agentos_config_has(agentos_config_t* manager, const char* key);
+int agentos_config_has(agentos_config_t *manager, const char *key);
 
 #ifdef __cplusplus
 }

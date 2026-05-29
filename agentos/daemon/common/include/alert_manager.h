@@ -28,17 +28,17 @@ extern "C" {
 
 /* ==================== 常量定义 ==================== */
 
-#define AM_MAX_RULES            64
-#define AM_MAX_NAME_LEN         64
-#define AM_MAX_MESSAGE_LEN      512
-#define AM_MAX_CHANNELS         8
-#define AM_MAX_ACTIVE_ALERTS    256
+#define AM_MAX_RULES 64
+#define AM_MAX_NAME_LEN 64
+#define AM_MAX_MESSAGE_LEN 512
+#define AM_MAX_CHANNELS 8
+#define AM_MAX_ACTIVE_ALERTS 256
 
 /* ==================== 告警级别 ==================== */
 
 typedef enum {
-    AM_LEVEL_INFO     = 0,
-    AM_LEVEL_WARNING  = 1,
+    AM_LEVEL_INFO = 0,
+    AM_LEVEL_WARNING = 1,
     AM_LEVEL_CRITICAL = 2,
     AM_LEVEL_EMERGENCY = 3
 } am_level_t;
@@ -46,9 +46,9 @@ typedef enum {
 /* ==================== 告警状态 ==================== */
 
 typedef enum {
-    AM_STATE_PENDING    = 0,
-    AM_STATE_FIRING     = 1,
-    AM_STATE_RESOLVED   = 2,
+    AM_STATE_PENDING = 0,
+    AM_STATE_FIRING = 1,
+    AM_STATE_RESOLVED = 2,
     AM_STATE_SUPPRESSED = 3,
     AM_STATE_ACKNOWLEDGED = 4
 } am_state_t;
@@ -56,30 +56,30 @@ typedef enum {
 /* ==================== 告警规则类型 ==================== */
 
 typedef enum {
-    AM_RULE_THRESHOLD   = 0,
-    AM_RULE_TREND       = 1,
-    AM_RULE_COMPOSITE   = 2,
-    AM_RULE_ANOMALY     = 3
+    AM_RULE_THRESHOLD = 0,
+    AM_RULE_TREND = 1,
+    AM_RULE_COMPOSITE = 2,
+    AM_RULE_ANOMALY = 3
 } am_rule_type_t;
 
 /* ==================== 比较运算符 ==================== */
 
 typedef enum {
-    AM_OP_GT   = 0,
-    AM_OP_GTE  = 1,
-    AM_OP_LT   = 2,
-    AM_OP_LTE  = 3,
-    AM_OP_EQ   = 4,
-    AM_OP_NEQ  = 5
+    AM_OP_GT = 0,
+    AM_OP_GTE = 1,
+    AM_OP_LT = 2,
+    AM_OP_LTE = 3,
+    AM_OP_EQ = 4,
+    AM_OP_NEQ = 5
 } am_comparison_t;
 
 /* ==================== 通知通道类型 ==================== */
 
 typedef enum {
-    AM_CHANNEL_LOG      = 0,
+    AM_CHANNEL_LOG = 0,
     AM_CHANNEL_CALLBACK = 1,
-    AM_CHANNEL_WEBHOOK  = 2,
-    AM_CHANNEL_FILE     = 3
+    AM_CHANNEL_WEBHOOK = 2,
+    AM_CHANNEL_FILE = 3
 } am_channel_type_t;
 
 /* ==================== 告警条目 ==================== */
@@ -138,10 +138,7 @@ typedef struct {
 
 /* ==================== 告警回调 ==================== */
 
-typedef void (*am_alert_callback_t)(
-    const am_alert_t* alert,
-    void* user_data
-);
+typedef void (*am_alert_callback_t)(const am_alert_t *alert, void *user_data);
 
 /* ==================== 生命周期管理 ==================== */
 
@@ -150,7 +147,7 @@ typedef void (*am_alert_callback_t)(
  * @param config 配置参数（NULL使用默认）
  * @return 0成功，非0失败
  */
-int am_init(const am_config_t* config);
+int am_init(const am_config_t *config);
 
 /**
  * @brief 关闭告警管理器
@@ -164,14 +161,14 @@ void am_shutdown(void);
  * @param rule 规则定义
  * @return 0成功，非0失败
  */
-int am_add_rule(const am_rule_t* rule);
+int am_add_rule(const am_rule_t *rule);
 
 /**
  * @brief 移除告警规则
  * @param name 规则名称
  * @return 0成功，非0失败
  */
-int am_remove_rule(const char* name);
+int am_remove_rule(const char *name);
 
 /**
  * @brief 启用/禁用规则
@@ -179,7 +176,7 @@ int am_remove_rule(const char* name);
  * @param enabled 是否启用
  * @return 0成功，非0失败
  */
-int am_set_rule_enabled(const char* name, bool enabled);
+int am_set_rule_enabled(const char *name, bool enabled);
 
 /* ==================== 告警触发 ==================== */
 
@@ -192,23 +189,22 @@ int am_set_rule_enabled(const char* name, bool enabled);
  * @param labels 标签
  * @return 0成功，非0失败
  */
-int am_fire(const char* name, am_level_t level,
-            const char* message, const char* source,
-            const char* labels);
+int am_fire(const char *name, am_level_t level, const char *message, const char *source,
+            const char *labels);
 
 /**
  * @brief 解决告警
  * @param name 告警名称
  * @return 0成功，非0失败
  */
-int am_resolve(const char* name);
+int am_resolve(const char *name);
 
 /**
  * @brief 确认告警
  * @param name 告警名称
  * @return 0成功，非0失败
  */
-int am_acknowledge(const char* name);
+int am_acknowledge(const char *name);
 
 /* ==================== 指标评估 ==================== */
 
@@ -218,7 +214,7 @@ int am_acknowledge(const char* name);
  * @param value 指标当前值
  * @return 0成功，非0失败
  */
-int am_record_metric(const char* metric_name, double value);
+int am_record_metric(const char *metric_name, double value);
 
 /**
  * @brief 评估指标值（检查是否触发规则）
@@ -226,7 +222,7 @@ int am_record_metric(const char* metric_name, double value);
  * @param value 指标值
  * @return 触发的告警数量（0表示未触发）
  */
-int am_evaluate(const char* metric_name, double value);
+int am_evaluate(const char *metric_name, double value);
 
 /**
  * @brief 评估所有规则
@@ -241,7 +237,7 @@ int am_evaluate_all(void);
  * @param channel 通道配置
  * @return 0成功，非0失败
  */
-int am_register_channel(const am_channel_t* channel);
+int am_register_channel(const am_channel_t *channel);
 
 /**
  * @brief 注册告警回调
@@ -250,8 +246,7 @@ int am_register_channel(const am_channel_t* channel);
  * @param min_level 最低告警级别
  * @return 0成功，非0失败
  */
-int am_register_callback(am_alert_callback_t callback, void* user_data,
-                         am_level_t min_level);
+int am_register_callback(am_alert_callback_t callback, void *user_data, am_level_t min_level);
 
 /* ==================== 查询 ==================== */
 
@@ -262,8 +257,7 @@ int am_register_callback(am_alert_callback_t callback, void* user_data,
  * @param found_count [out] 实际数量
  * @return 0成功，非0失败
  */
-int am_get_active_alerts(am_alert_t* alerts, uint32_t max_count,
-                         uint32_t* found_count);
+int am_get_active_alerts(am_alert_t *alerts, uint32_t max_count, uint32_t *found_count);
 
 /**
  * @brief 获取指定级别的活跃告警
@@ -273,8 +267,8 @@ int am_get_active_alerts(am_alert_t* alerts, uint32_t max_count,
  * @param found_count [out] 实际数量
  * @return 0成功，非0失败
  */
-int am_get_alerts_by_level(am_level_t level, am_alert_t* alerts,
-                           uint32_t max_count, uint32_t* found_count);
+int am_get_alerts_by_level(am_level_t level, am_alert_t *alerts, uint32_t max_count,
+                           uint32_t *found_count);
 
 /**
  * @brief 获取活跃告警数量
@@ -289,14 +283,14 @@ uint32_t am_active_alert_count(void);
  * @param level 级别
  * @return 级别名称
  */
-const char* am_level_to_string(am_level_t level);
+const char *am_level_to_string(am_level_t level);
 
 /**
  * @brief 告警状态转字符串
  * @param state 状态
  * @return 状态名称
  */
-const char* am_state_to_string(am_state_t state);
+const char *am_state_to_string(am_state_t state);
 
 /**
  * @brief 创建默认配置

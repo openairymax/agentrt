@@ -13,12 +13,16 @@
  */
 
 #include "http_gateway.h"
-#include "../utils/jsonrpc.h"
-#include "../utils/syscall_router.h"
-#include "../utils/gateway_utils.h"
+
+#include "../../../commons/utils/error/include/error.h"
+#include "../utils/gateway_protocol_handler.h"
 #include "../utils/gateway_rate_limiter.h"
 #include "../utils/gateway_rpc_handler.h"
-#include "../utils/gateway_protocol_handler.h"
+#include "../utils/gateway_utils.h"
+#include "../utils/jsonrpc.h"
+#include "../utils/syscall_router.h"
+#include "error.h"
+#include "memory_compat.h"
 
 #ifdef GATEWAY_HAS_HTTP
 
@@ -26,23 +30,23 @@
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
-#include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
 /* 平台特定头文件 */
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <windows.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
-    #include <arpa/inet.h>
-    #include <sys/socket.h>
-    #include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #endif
 
 /* ========== HTTP网关内部结构 ========== */
@@ -58,13 +62,16 @@
 
 /* ========== 安全HTTP头 ========== */
 
-void gateway_apply_security_headers(struct MHD_Response* response) {
-    if (!response) return;
-    
+void gateway_apply_security_headers(struct MHD_Response *response)
+{
+    if (!response)
+        return;
+
     MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
     MHD_add_response_header(response, "X-Frame-Options", "DENY");
     MHD_add_response_header(response, "X-XSS-Protection", "1; mode=block");
-    MHD_add_response_header(response, "Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    MHD_add_response_header(response, "Strict-Transport-Security",
+                            "max-age=31536000; includeSubDomains");
     MHD_add_response_header(response, "Cache-Control", "no-store, no-cache, must-revalidate");
     MHD_add_response_header(response, "Pragma", "no-cache");
 }
@@ -77,14 +84,16 @@ void gateway_apply_security_headers(struct MHD_Response* response) {
  * @param origin 请求头中的Origin值
  * @return true 允许访问，false 拒绝访问
  */
-static bool is_cors_origin_allowed(const http_gateway_t* gateway, const char* origin) {
-    if (!origin || !gateway) return false;
-    
+static bool is_cors_origin_allowed(const http_gateway_t *gateway, const char *origin)
+{
+    if (!origin || !gateway)
+        return false;
+
     /* 开发模式：允许所有来源 */
     if (gateway->cors.allow_all_origins) {
         return true;
     }
-    
+
     /* 生产模式：白名单匹配 */
     for (size_t i = 0; i < gateway->cors.allowed_origins_count; i++) {
         if (gateway->cors.allowed_origins[i] &&
@@ -92,7 +101,7 @@ static bool is_cors_origin_allowed(const http_gateway_t* gateway, const char* or
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -105,48 +114,46 @@ static bool is_cors_origin_allowed(const http_gateway_t* gateway, const char* or
  * @param content_len 内容长度
  * @return MHD 响应对象
  */
-static struct MHD_Response* __attribute__((used)) create_http_response_ex(
-    http_gateway_t* gateway,
-    struct MHD_Connection* connection,
-    int status_code __attribute__((unused)), 
-    const char* content, 
-    size_t content_len
-) {
-    
-    struct MHD_Response* response = MHD_create_response_from_buffer(
-        content_len, (void*)content, MHD_RESPMEM_MUST_COPY);
-    
+static struct MHD_Response *__attribute__((used))
+create_http_response_ex(http_gateway_t *gateway, struct MHD_Connection *connection,
+                        int status_code __attribute__((unused)), const char *content,
+                        size_t content_len)
+{
+
+    struct MHD_Response *response =
+        MHD_create_response_from_buffer(content_len, (void *)content, MHD_RESPMEM_MUST_COPY);
+
     if (!response) {
         return NULL;
     }
-    
+
     MHD_add_response_header(response, "Content-Type", "application/json");
     MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
 
     gateway_apply_security_headers(response);
 
     /* 安全的 CORS 头设置 */
-    const char* origin = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Origin");
+    const char *origin = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Origin");
     if (is_cors_origin_allowed(gateway, origin)) {
         MHD_add_response_header(response, "Access-Control-Allow-Origin", origin);
-        
+
         if (gateway->cors.allowed_methods) {
-            MHD_add_response_header(response, "Access-Control-Allow-Methods", 
+            MHD_add_response_header(response, "Access-Control-Allow-Methods",
                                     gateway->cors.allowed_methods);
         }
-        
+
         if (gateway->cors.allowed_headers) {
-            MHD_add_response_header(response, "Access-Control-Allow-Headers", 
+            MHD_add_response_header(response, "Access-Control-Allow-Headers",
                                     gateway->cors.allowed_headers);
         }
-        
+
         if (gateway->cors.max_age > 0) {
             char max_age_str[16];
             snprintf(max_age_str, sizeof(max_age_str), "%d", gateway->cors.max_age);
             MHD_add_response_header(response, "Access-Control-Max-Age", max_age_str);
         }
     }
-    
+
     return response;
 }
 
@@ -158,21 +165,22 @@ static struct MHD_Response* __attribute__((used)) create_http_response_ex(
  * @return MHD 响应对象
  * @deprecated 请使用 create_http_response_ex() 以获得安全的CORS处理
  */
-struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
-    struct MHD_Response* response = MHD_create_response_from_buffer(
-        content_len, (void*)content, MHD_RESPMEM_MUST_COPY);
-    
+struct MHD_Response *create_http_response(int status_code, const char *content, size_t content_len)
+{
+    struct MHD_Response *response =
+        MHD_create_response_from_buffer(content_len, (void *)content, MHD_RESPMEM_MUST_COPY);
+
     if (!response) {
         return NULL;
     }
-    
+
     MHD_add_response_header(response, "Content-Type", "application/json");
     MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
 
     gateway_apply_security_headers(response);
 
     /* 注意：此函数不设置CORS头，请使用create_http_response_ex() */
-    
+
     return response;
 }
 
@@ -181,10 +189,11 @@ struct MHD_Response* create_http_response(int status_code, const char* content, 
 /**
  * @brief 解析HTTP请求头
  */
-static int __attribute__((unused)) parse_headers(void* cls __attribute__((unused)),
-                         enum MHD_ValueKind kind __attribute__((unused)),
-                         const char* key __attribute__((unused)),
-                         const char* value __attribute__((unused))) {
+static int __attribute__((unused)) parse_headers(void *cls __attribute__((unused)),
+                                                 enum MHD_ValueKind kind __attribute__((unused)),
+                                                 const char *key __attribute__((unused)),
+                                                 const char *value __attribute__((unused)))
+{
     return MHD_YES;
 }
 
@@ -196,29 +205,31 @@ static int __attribute__((unused)) parse_headers(void* cls __attribute__((unused
  * @param size 数据大小
  * @return 0 成功，非0 失败
  */
-int parse_json_request(http_gateway_t* gateway, http_request_context_t* context, const char* data, size_t size) {
+int parse_json_request(http_gateway_t *gateway, http_request_context_t *context, const char *data,
+                       size_t size)
+{
     if (!data || size == 0) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
+
     /* 强化大小限制检查 */
     if (size > gateway->max_request_size) {
         /* 记录安全事件（如果有日志系统） */
         atomic_fetch_add(&gateway->requests_failed, 1);
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
+
     context->json_request = cJSON_Parse(data);
     if (!context->json_request) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
+
     if (jsonrpc_validate_request(context->json_request) != 0) {
         cJSON_Delete(context->json_request);
         context->json_request = NULL;
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    
+
     return 0;
 }
 /**
@@ -230,8 +241,8 @@ int parse_json_request(http_gateway_t* gateway, http_request_context_t* context,
  * 此函数在内部存储公共类型的回调，并在调用时进行适配。
  */
 typedef struct {
-    int (*public_handler)(const char*, char**, void*);
-    void* user_data;
+    int (*public_handler)(const char *, char **, void *);
+    void *user_data;
 } http_handler_adapter_t;
 
 /**
@@ -240,16 +251,19 @@ typedef struct {
  * @param user_data 指向 http_handler_adapter_t 的指针
  * @return JSON 响应字符串（需调用者 free），或 NULL
  */
-static char* __attribute__((used)) http_handler_adapter(void* request, void* user_data) {
-    http_handler_adapter_t* adapter = (http_handler_adapter_t*)user_data;
-    if (!adapter || !adapter->public_handler) return NULL;
+static char *__attribute__((used)) http_handler_adapter(void *request, void *user_data)
+{
+    http_handler_adapter_t *adapter = (http_handler_adapter_t *)user_data;
+    if (!adapter || !adapter->public_handler)
+        return NULL;
 
-    char* request_json = cJSON_Print((cJSON*)request);
-    if (!request_json) return NULL;
+    char *request_json = cJSON_Print((cJSON *)request);
+    if (!request_json)
+        return NULL;
 
-    char* response_json = NULL;
+    char *response_json = NULL;
     int ret = adapter->public_handler(request_json, &response_json, adapter->user_data);
-    free(request_json);
+    AGENTOS_FREE(request_json);
 
     if (ret != 0 || !response_json) {
         return NULL;
@@ -261,22 +275,24 @@ static char* __attribute__((used)) http_handler_adapter(void* request, void* use
 
 typedef struct {
     gateway_internal_handler_t internal_handler;
-    void* internal_data;
+    void *internal_data;
 } internal_to_public_adapter_t;
 
-static int internal_handler_public_wrapper(const char* request_json, char** response_json, void* user_data) {
-    internal_to_public_adapter_t* adapter = (internal_to_public_adapter_t*)user_data;
+static int internal_handler_public_wrapper(const char *request_json, char **response_json,
+                                           void *user_data)
+{
+    internal_to_public_adapter_t *adapter = (internal_to_public_adapter_t *)user_data;
     if (!adapter || !adapter->internal_handler) {
         *response_json = NULL;
-        return -1;
+        return AGENTOS_EFAIL;
     }
-    char* resp = adapter->internal_handler((void*)request_json, adapter->internal_data);
+    char *resp = adapter->internal_handler((void *)request_json, adapter->internal_data);
     if (resp) {
         *response_json = resp;
         return 0;
     }
     *response_json = NULL;
-    return -1;
+    return AGENTOS_EFAIL;
 }
 
 /**
@@ -285,33 +301,22 @@ static int internal_handler_public_wrapper(const char* request_json, char** resp
  * @param context 请求上下文
  * @return JSON响应字符串
  */
-char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* context) {
+char *handle_jsonrpc_request(http_gateway_t *gateway, http_request_context_t *context)
+{
     rpc_result_t result;
-    
+
     /* 检查是否有多协议处理器和原始数据 */
     if (gateway->protocol_handler && context->upload_data && context->upload_data_size > 0) {
-        internal_to_public_adapter_t adapter = {
-            .internal_handler = gateway->handler,
-            .internal_data = gateway->handler_data
-        };
-        result = gateway_protocol_handle_request(
-            gateway->protocol_handler,
-            context->upload_data,
-            context->upload_data_size,
-            AGENTOS_PROTOCOL_COUNT,
-            internal_handler_public_wrapper,
-            &adapter
-        );
+        internal_to_public_adapter_t adapter = {.internal_handler = gateway->handler,
+                                                .internal_data = gateway->handler_data};
+        result = gateway_protocol_handle_request(gateway->protocol_handler, context->upload_data,
+                                                 context->upload_data_size, AGENTOS_PROTOCOL_COUNT,
+                                                 internal_handler_public_wrapper, &adapter);
     } else if (context->json_request) {
-        internal_to_public_adapter_t adapter = {
-            .internal_handler = gateway->handler,
-            .internal_data = gateway->handler_data
-        };
-        result = gateway_rpc_handle_request(
-            context->json_request,
-            internal_handler_public_wrapper,
-            &adapter
-        );
+        internal_to_public_adapter_t adapter = {.internal_handler = gateway->handler,
+                                                .internal_data = gateway->handler_data};
+        result = gateway_rpc_handle_request(context->json_request, internal_handler_public_wrapper,
+                                            &adapter);
     } else {
         /* 无效请求 */
         return jsonrpc_create_error_response(NULL, -32600, "Invalid request", NULL);
@@ -319,115 +324,123 @@ char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* co
 
     if (result.error_code != 0 || !result.response_json) {
         /* 错误情况：返回错误响应 */
-        char* error_resp = result.response_json ? result.response_json : 
-                          jsonrpc_create_error_response(NULL, -32603, "Internal error", NULL);
+        char *error_resp =
+            result.response_json
+                ? result.response_json
+                : jsonrpc_create_error_response(NULL, -32603, "Internal error", NULL);
         if (result.response_json) {
-            result.response_json = NULL;  /* 防止 gateway_rpc_free 释放 */
+            result.response_json = NULL; /* 防止 gateway_rpc_free 释放 */
         }
         gateway_rpc_free(&result);
         return error_resp;
     }
 
     /* 成功情况：提取响应并清理 */
-    char* success_resp = result.response_json;
-    result.response_json = NULL;  /* 防止 gateway_rpc_free 释放 */
+    char *success_resp = result.response_json;
+    result.response_json = NULL; /* 防止 gateway_rpc_free 释放 */
     gateway_rpc_free(&result);
-    
+
     return success_resp;
 }
 /* handle_http_request() 函数已迁移至 http_gateway_routes.c */
 /* ========== 网关操作表 ========== */
 
-static void http_request_completed_callback(void* cls __attribute__((unused)),
-                                              struct MHD_Connection* connection __attribute__((unused)),
-                                              void** con_cls, enum MHD_RequestTerminationCode toe __attribute__((unused))) {
+static void http_request_completed_callback(
+    void *cls __attribute__((unused)), struct MHD_Connection *connection __attribute__((unused)),
+    void **con_cls, enum MHD_RequestTerminationCode toe __attribute__((unused)))
+{
     if (con_cls && *con_cls) {
-        http_request_context_t* ctx = (http_request_context_t*)*con_cls;
+        http_request_context_t *ctx = (http_request_context_t *)*con_cls;
         if (ctx->json_request) {
             cJSON_Delete(ctx->json_request);
             ctx->json_request = NULL;
         }
-        free(ctx);
+        AGENTOS_FREE(ctx);
         *con_cls = NULL;
     }
 }
 
-static agentos_error_t http_gateway_start(void* gateway_impl) {
-    http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
-    
+static agentos_error_t http_gateway_start(void *gateway_impl)
+{
+    http_gateway_t *gateway = (http_gateway_t *)gateway_impl;
+
     unsigned int conn_limit = gateway->connection_limit > 0 ? gateway->connection_limit : 1000;
     unsigned int conn_timeout = gateway->connection_timeout > 0 ? gateway->connection_timeout : 30;
-    
-    const char* env_conn = getenv("GATEWAY_HTTP_CONN_LIMIT");
-    const char* env_timeout = getenv("GATEWAY_HTTP_TIMEOUT");
-    if (env_conn) { unsigned long v = strtoul(env_conn, NULL, 10); if (v > 0) conn_limit = (unsigned int)v; }
-    if (env_timeout) { unsigned long v = strtoul(env_timeout, NULL, 10); if (v > 0) conn_timeout = (unsigned int)v; }
-    
+
+    const char *env_conn = getenv("GATEWAY_HTTP_CONN_LIMIT");
+    const char *env_timeout = getenv("GATEWAY_HTTP_TIMEOUT");
+    if (env_conn) {
+        unsigned long v = strtoul(env_conn, NULL, 10);
+        if (v > 0)
+            conn_limit = (unsigned int)v;
+    }
+    if (env_timeout) {
+        unsigned long v = strtoul(env_timeout, NULL, 10);
+        if (v > 0)
+            conn_timeout = (unsigned int)v;
+    }
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wincompatible-pointer-types"
     gateway->daemon = MHD_start_daemon(
-        MHD_USE_EPOLL_INTERNAL_THREAD | MHD_USE_TURBO,
-        gateway->port,
-        NULL, NULL,
-        handle_http_request,
-        gateway,
-        MHD_OPTION_CONNECTION_LIMIT, conn_limit,
-        MHD_OPTION_CONNECTION_TIMEOUT, conn_timeout,
-        MHD_OPTION_THREAD_POOL_SIZE, 4,
-        MHD_OPTION_NOTIFY_COMPLETED, http_request_completed_callback, NULL,
-        MHD_OPTION_END);
+        MHD_USE_EPOLL_INTERNAL_THREAD | MHD_USE_TURBO, gateway->port, NULL, NULL,
+        handle_http_request, gateway, MHD_OPTION_CONNECTION_LIMIT, conn_limit,
+        MHD_OPTION_CONNECTION_TIMEOUT, conn_timeout, MHD_OPTION_THREAD_POOL_SIZE, 4,
+        MHD_OPTION_NOTIFY_COMPLETED, http_request_completed_callback, NULL, MHD_OPTION_END);
 #pragma GCC diagnostic pop
-    
+
     if (!gateway->daemon) {
         return AGENTOS_EBUSY;
     }
-    
+
     atomic_store(&gateway->running, true);
-    
+
     return AGENTOS_SUCCESS;
 }
-static void http_gateway_stop(void* gateway_impl) {
-    http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
-    
+static void http_gateway_stop(void *gateway_impl)
+{
+    http_gateway_t *gateway = (http_gateway_t *)gateway_impl;
+
     atomic_store(&gateway->running, false);
-    
+
     if (gateway->daemon) {
         MHD_stop_daemon(gateway->daemon);
         gateway->daemon = NULL;
     }
 }
-static void http_gateway_destroy(void* gateway_impl) {
-    http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
+static void http_gateway_destroy(void *gateway_impl)
+{
+    http_gateway_t *gateway = (http_gateway_t *)gateway_impl;
 
     http_gateway_stop(gateway);
 
     if (gateway->handler_adapter) {
-        free(gateway->handler_adapter);
+        AGENTOS_FREE(gateway->handler_adapter);
         gateway->handler_adapter = NULL;
     }
     gateway->handler = NULL;
     gateway->handler_data = NULL;
 
     if (gateway->host) {
-        free(gateway->host);
+        AGENTOS_FREE(gateway->host);
     }
-    
+
     /* 清理 CORS 配置资源 */
     if (gateway->cors.allowed_methods) {
-        free(gateway->cors.allowed_methods);
+        AGENTOS_FREE(gateway->cors.allowed_methods);
     }
     if (gateway->cors.allowed_headers) {
-        free(gateway->cors.allowed_headers);
+        AGENTOS_FREE(gateway->cors.allowed_headers);
     }
     if (gateway->cors.allowed_origins) {
         for (size_t i = 0; i < gateway->cors.allowed_origins_count; i++) {
             if (gateway->cors.allowed_origins[i]) {
-                free(gateway->cors.allowed_origins[i]);
+                AGENTOS_FREE(gateway->cors.allowed_origins[i]);
             }
         }
-        free(gateway->cors.allowed_origins);
+        AGENTOS_FREE(gateway->cors.allowed_origins);
     }
-    
+
     /* 清理速率限制器 */
     if (gateway->rate_limiter) {
         gateway_rate_limiter_destroy(gateway->rate_limiter);
@@ -442,35 +455,41 @@ static void http_gateway_destroy(void* gateway_impl) {
     /* 清理动态端点 */
     if (gateway->dynamic_endpoints) {
         for (size_t i = 0; i < gateway->dynamic_endpoint_count; i++) {
-            free(gateway->dynamic_endpoints[i].method);
-            free(gateway->dynamic_endpoints[i].path);
+            AGENTOS_FREE(gateway->dynamic_endpoints[i].method);
+            AGENTOS_FREE(gateway->dynamic_endpoints[i].path);
         }
-        free(gateway->dynamic_endpoints);
+        AGENTOS_FREE(gateway->dynamic_endpoints);
         gateway->dynamic_endpoints = NULL;
     }
     gateway->dynamic_endpoint_count = 0;
     gateway->dynamic_endpoint_capacity = 0;
 
-    free(gateway);
+    AGENTOS_FREE(gateway);
 }
-static const char* http_gateway_get_name(void* gateway_impl __attribute__((unused))) {
+static const char *http_gateway_get_name(void *gateway_impl __attribute__((unused)))
+{
     return "HTTP Gateway";
 }
-static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_json) {
-    http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
-    if (!gateway || !out_json) return AGENTOS_EINVAL;
+static agentos_error_t http_gateway_get_stats(void *gateway_impl, char **out_json)
+{
+    http_gateway_t *gateway = (http_gateway_t *)gateway_impl;
+    if (!gateway || !out_json)
+        return AGENTOS_EINVAL;
 
-    cJSON* stats = cJSON_CreateObject();
-    if (!stats) return AGENTOS_ENOMEM;
+    cJSON *stats = cJSON_CreateObject();
+    if (!stats)
+        return AGENTOS_ENOMEM;
     cJSON_AddNumberToObject(stats, "requests_total", (double)atomic_load(&gateway->requests_total));
-    cJSON_AddNumberToObject(stats, "requests_failed", (double)atomic_load(&gateway->requests_failed));
+    cJSON_AddNumberToObject(stats, "requests_failed",
+                            (double)atomic_load(&gateway->requests_failed));
     cJSON_AddNumberToObject(stats, "bytes_received", (double)atomic_load(&gateway->bytes_received));
     cJSON_AddNumberToObject(stats, "bytes_sent", (double)atomic_load(&gateway->bytes_sent));
-    
-    char* json_str = cJSON_Print(stats);
+
+    char *json_str = cJSON_Print(stats);
     cJSON_Delete(stats);
 
-    if (!json_str) return AGENTOS_ENOMEM;
+    if (!json_str)
+        return AGENTOS_ENOMEM;
     *out_json = json_str;
     return AGENTOS_SUCCESS;
 }
@@ -480,9 +499,11 @@ static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_jso
  * @param gateway_impl 网关实现指针
  * @return true 运行中，false 已停止或无效
  */
-static bool http_gateway_is_running(void* gateway_impl) {
-    http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
-    if (!gateway) return false;
+static bool http_gateway_is_running(void *gateway_impl)
+{
+    http_gateway_t *gateway = (http_gateway_t *)gateway_impl;
+    if (!gateway)
+        return false;
     return atomic_load(&gateway->running);
 }
 
@@ -494,13 +515,16 @@ static bool http_gateway_is_running(void* gateway_impl) {
  * 2. 公共模式（推荐）：通过 gateway_set_handler() API 传入，
  *    自动创建适配器将公共签名 (const char*, char**, void*) -> int 转换为内部签名
  */
-static agentos_error_t http_gateway_set_handler(void* gateway_impl, gateway_internal_handler_t handler, void* user_data) {
-    http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
-    if (!gateway) return AGENTOS_EINVAL;
+static agentos_error_t http_gateway_set_handler(void *gateway_impl,
+                                                gateway_internal_handler_t handler, void *user_data)
+{
+    http_gateway_t *gateway = (http_gateway_t *)gateway_impl;
+    if (!gateway)
+        return AGENTOS_EINVAL;
 
     /* 清理旧适配器 */
     if (gateway->handler_adapter) {
-        free(gateway->handler_adapter);
+        AGENTOS_FREE(gateway->handler_adapter);
         gateway->handler_adapter = NULL;
     }
 
@@ -510,114 +534,114 @@ static agentos_error_t http_gateway_set_handler(void* gateway_impl, gateway_inte
     return AGENTOS_SUCCESS;
 }
 
-static const gateway_ops_t http_gateway_ops = {
-    .start = http_gateway_start,
-    .stop = http_gateway_stop,
-    .destroy = http_gateway_destroy,
-    .get_name = http_gateway_get_name,
-    .get_stats = http_gateway_get_stats,
-    .is_running = http_gateway_is_running,
-    .set_handler = http_gateway_set_handler
-};
+static const gateway_ops_t http_gateway_ops = {.start = http_gateway_start,
+                                               .stop = http_gateway_stop,
+                                               .destroy = http_gateway_destroy,
+                                               .get_name = http_gateway_get_name,
+                                               .get_stats = http_gateway_get_stats,
+                                               .is_running = http_gateway_is_running,
+                                               .set_handler = http_gateway_set_handler};
 /* ========== 公共接口 ========== */
-gateway_t* http_gateway_create(const char* host, uint16_t port) {
+gateway_t *http_gateway_create(const char *host, uint16_t port)
+{
     if (!host) {
         return NULL;
     }
-    
-    http_gateway_t* gateway = calloc(1, sizeof(http_gateway_t));
+
+    http_gateway_t *gateway = AGENTOS_CALLOC(1, sizeof(http_gateway_t));
     if (!gateway) {
         return NULL;
     }
-    
+
     gateway->port = port;
-    gateway->host = strdup(host);
+    gateway->host = AGENTOS_STRDUP(host);
     gateway->handler_adapter = NULL;
     gateway->handler = NULL;
     gateway->handler_data = NULL;
-    
+
     if (!gateway->host) {
-        free(gateway);
+        AGENTOS_FREE(gateway);
         return NULL;
     }
-    
+
     atomic_init(&gateway->running, false);
     atomic_init(&gateway->requests_total, 0);
     atomic_init(&gateway->requests_failed, 0);
     atomic_init(&gateway->bytes_received, 0);
     atomic_init(&gateway->bytes_sent, 0);
-    
+
     /* 设置最大请求体大小（默认1MB，更安全） */
     gateway->max_request_size = 1 * 1024 * 1024; /* 1MB */
-    
+
     /* 从环境变量读取最大请求体大小 */
-    const char* env_max_size = getenv("GATEWAY_MAX_REQUEST_SIZE");
+    const char *env_max_size = getenv("GATEWAY_MAX_REQUEST_SIZE");
     if (env_max_size) {
         long size = strtol(env_max_size, NULL, 10);
-        if (size > 0 && size <= 100 * 1024 * 1024) {  /* 最大100MB */
+        if (size > 0 && size <= 100 * 1024 * 1024) { /* 最大100MB */
             gateway->max_request_size = (size_t)size;
         }
     }
-    
+
     /* 初始化 CORS 配置（默认生产模式） */
     gateway->cors.allow_all_origins = false;
     gateway->cors.allowed_origins = NULL;
     gateway->cors.allowed_origins_count = 0;
-    gateway->cors.allowed_methods = strdup("POST, GET, OPTIONS");
-    gateway->cors.allowed_headers = strdup("Content-Type, Authorization");
-    gateway->cors.max_age = 3600;  /* 1小时缓存 */
-    
+    gateway->cors.allowed_methods = AGENTOS_STRDUP("POST, GET, OPTIONS");
+    gateway->cors.allowed_headers = AGENTOS_STRDUP("Content-Type, Authorization");
+    gateway->cors.max_age = 3600; /* 1小时缓存 */
+
     /* 从环境变量读取 CORS 模式 */
-    const char* cors_mode = getenv("GATEWAY_CORS_MODE");
+    const char *cors_mode = getenv("GATEWAY_CORS_MODE");
     if (cors_mode && strcmp(cors_mode, "dev") == 0) {
         gateway->cors.allow_all_origins = true;
         /* 开发模式日志（如果有日志系统） */
     }
-    
+
     /* 从环境变量读取允许的来源列表 */
-    const char* cors_origins = getenv("GATEWAY_CORS_ORIGINS");
+    const char *cors_origins = getenv("GATEWAY_CORS_ORIGINS");
     if (cors_origins && !gateway->cors.allow_all_origins) {
         /* 简单解析逗号分隔的来源列表 */
-        char* origins_copy = strdup(cors_origins);
+        char *origins_copy = AGENTOS_STRDUP(cors_origins);
         if (origins_copy) {
             size_t count = 1;
-            for (char* p = origins_copy; *p; p++) {
-                if (*p == ',') count++;
+            for (char *p = origins_copy; *p; p++) {
+                if (*p == ',')
+                    count++;
             }
-            
-            gateway->cors.allowed_origins = malloc(count * sizeof(char*));
+
+            gateway->cors.allowed_origins = AGENTOS_MALLOC(count * sizeof(char *));
             if (gateway->cors.allowed_origins) {
-                char* token = strtok(origins_copy, ",");
+                char *token = strtok(origins_copy, ",");
                 size_t i = 0;
                 while (token && i < count) {
-                    gateway->cors.allowed_origins[i++] = strdup(token);
+                    gateway->cors.allowed_origins[i++] = AGENTOS_STRDUP(token);
                     token = strtok(NULL, ",");
                 }
                 gateway->cors.allowed_origins_count = i;
             }
-            free(origins_copy);
+            AGENTOS_FREE(origins_copy);
         }
     }
-    
+
     /* 初始化速率限制器（默认禁用） */
     gateway->rate_limiter = NULL;
-    const char* rate_limit_enabled = getenv("GATEWAY_RATE_LIMIT_ENABLED");
+    const char *rate_limit_enabled = getenv("GATEWAY_RATE_LIMIT_ENABLED");
     if (rate_limit_enabled && strcmp(rate_limit_enabled, "true") == 0) {
         gateway_rate_limit_config_t rl_config;
         gateway_rate_limiter_get_default_config(&rl_config);
         rl_config.enabled = true;
-        
+
         /* 从环境变量读取配置 */
-        const char* rps = getenv("GATEWAY_RATE_LIMIT_RPS");
+        const char *rps = getenv("GATEWAY_RATE_LIMIT_RPS");
         if (rps) {
             rl_config.requests_per_second = (uint32_t)strtol(rps, NULL, 10);
         }
-        
-        const char* rpm = getenv("GATEWAY_RATE_LIMIT_RPM");
+
+        const char *rpm = getenv("GATEWAY_RATE_LIMIT_RPM");
         if (rpm) {
             rl_config.requests_per_minute = (uint32_t)strtol(rpm, NULL, 10);
         }
-        
+
         gateway->rate_limiter = gateway_rate_limiter_create(&rl_config);
     }
 
@@ -627,16 +651,16 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
         /* 协议处理器创建失败，但不影响基本功能 */
         /* 可以降级为纯JSON-RPC模式 */
     }
-    
-    gateway_t* gw = malloc(sizeof(gateway_t));
+
+    gateway_t *gw = AGENTOS_MALLOC(sizeof(gateway_t));
     if (!gw) {
-        free(gateway->cors.allowed_methods);
-        free(gateway->cors.allowed_headers);
+        AGENTOS_FREE(gateway->cors.allowed_methods);
+        AGENTOS_FREE(gateway->cors.allowed_headers);
         if (gateway->cors.allowed_origins) {
             for (size_t i = 0; i < gateway->cors.allowed_origins_count; i++) {
-                free(gateway->cors.allowed_origins[i]);
+                AGENTOS_FREE(gateway->cors.allowed_origins[i]);
             }
-            free(gateway->cors.allowed_origins);
+            AGENTOS_FREE(gateway->cors.allowed_origins);
         }
         if (gateway->protocol_handler) {
             gateway_protocol_handler_destroy(gateway->protocol_handler);
@@ -644,47 +668,44 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
         if (gateway->rate_limiter) {
             gateway_rate_limiter_destroy(gateway->rate_limiter);
         }
-        free(gateway->host);
-        free(gateway);
+        AGENTOS_FREE(gateway->host);
+        AGENTOS_FREE(gateway);
         return NULL;
     }
-    
+
     gw->ops = &http_gateway_ops;
     gw->impl = gateway;
     gw->type = GATEWAY_TYPE_HTTP;
-    
+
     return gw;
 }
 
-int http_gateway_register_endpoint(http_gateway_t* gateway,
-                                    const char* method,
-                                    const char* path,
-                                    gateway_endpoint_handler_t handler,
-                                    void* user_data) {
+int http_gateway_register_endpoint(http_gateway_t *gateway, const char *method, const char *path,
+                                   gateway_endpoint_handler_t handler, void *user_data)
+{
     if (!gateway || !method || !path || !handler) {
-        return -1;
+        return AGENTOS_EFAIL;
     }
 
     if (gateway->dynamic_endpoint_count >= gateway->dynamic_endpoint_capacity) {
-        size_t new_cap = gateway->dynamic_endpoint_capacity == 0
-                             ? 8
-                             : gateway->dynamic_endpoint_capacity * 2;
-        http_dynamic_endpoint_t* new_arr = realloc(
-            gateway->dynamic_endpoints, new_cap * sizeof(http_dynamic_endpoint_t));
+        size_t new_cap =
+            gateway->dynamic_endpoint_capacity == 0 ? 8 : gateway->dynamic_endpoint_capacity * 2;
+        http_dynamic_endpoint_t *new_arr =
+            AGENTOS_REALLOC(gateway->dynamic_endpoints, new_cap * sizeof(http_dynamic_endpoint_t));
         if (!new_arr) {
-            return -2;
+            return AGENTOS_ERR_INVALID_PARAM;
         }
         gateway->dynamic_endpoints = new_arr;
         gateway->dynamic_endpoint_capacity = new_cap;
     }
 
-    http_dynamic_endpoint_t* slot = &gateway->dynamic_endpoints[gateway->dynamic_endpoint_count];
-    slot->method = strdup(method);
-    slot->path = strdup(path);
+    http_dynamic_endpoint_t *slot = &gateway->dynamic_endpoints[gateway->dynamic_endpoint_count];
+    slot->method = AGENTOS_STRDUP(method);
+    slot->path = AGENTOS_STRDUP(path);
     if (!slot->method || !slot->path) {
-        free(slot->method);
-        free(slot->path);
-        return -2;
+        AGENTOS_FREE(slot->method);
+        AGENTOS_FREE(slot->path);
+        return AGENTOS_ERR_INVALID_PARAM;
     }
     slot->handler = handler;
     slot->user_data = user_data;
@@ -698,7 +719,9 @@ int http_gateway_register_endpoint(http_gateway_t* gateway,
 
 #ifndef GATEWAY_HAS_HTTP
 
-gateway_t* http_gateway_create(const char* host __attribute__((unused)), uint16_t port __attribute__((unused))) {
+gateway_t *http_gateway_create(const char *host __attribute__((unused)),
+                               uint16_t port __attribute__((unused)))
+{
     return NULL;
 }
 

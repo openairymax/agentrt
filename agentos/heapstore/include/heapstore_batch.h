@@ -12,13 +12,12 @@
 #ifndef AGENTOS_HEAPSTORE_BATCH_H
 #define AGENTOS_HEAPSTORE_BATCH_H
 
+#include "../../commons/platform/include/platform.h"
+#include "heapstore.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-
-#include "../../commons/platform/include/platform.h"
-
-#include "heapstore.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,15 +60,15 @@ typedef struct {
 typedef struct heapstore_batch_item {
     heapstore_batch_item_type_t type;
     heapstore_batch_item_data_t data;
-    struct heapstore_batch_item* next;
+    struct heapstore_batch_item *next;
 } heapstore_batch_item_t;
 
 /**
  * @brief 批量写入上下文
  */
 typedef struct heapstore_batch_context {
-    heapstore_batch_item_t* head;
-    heapstore_batch_item_t* tail;
+    heapstore_batch_item_t *head;
+    heapstore_batch_item_t *tail;
     size_t count;
     size_t capacity;
     agentos_mutex_t lock;
@@ -85,7 +84,7 @@ typedef struct heapstore_batch_context {
  * @threadsafe 是
  * @reentrant 是
  */
-heapstore_batch_context_t* heapstore_batch_begin(size_t batch_size);
+heapstore_batch_context_t *heapstore_batch_begin(size_t batch_size);
 
 /**
  * @brief 添加日志到批量写入缓冲区
@@ -101,91 +100,72 @@ heapstore_batch_context_t* heapstore_batch_begin(size_t batch_size);
  * @reentrant 是
 
  * @since v1.0.0.5*/
-heapstore_error_t heapstore_batch_add_log(
-    heapstore_batch_context_t* ctx,
-    const char* service,
-    int level,
-    const char* message);
+heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const char *service,
+                                          int level, const char *message);
 
 /**
  * @brief 添加带追踪ID的日志到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_log_with_trace(
-    heapstore_batch_context_t* ctx,
-    const char* service,
-    int level,
-    const char* trace_id,
-    const char* message);
+heapstore_error_t heapstore_batch_add_log_with_trace(heapstore_batch_context_t *ctx,
+                                                     const char *service, int level,
+                                                     const char *trace_id, const char *message);
 
 /**
  * @brief 添加追踪Span到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_trace(
-    heapstore_batch_context_t* ctx,
-    const char* trace_id,
-    const char* span_id,
-    const char* parent_id,
-    const char* name,
-    int64_t start_time_us,
-    int64_t end_time_us,
-    int status,
-    const char* attributes);
+heapstore_error_t heapstore_batch_add_trace(heapstore_batch_context_t *ctx, const char *trace_id,
+                                            const char *span_id, const char *parent_id,
+                                            const char *name, int64_t start_time_us,
+                                            int64_t end_time_us, int status,
+                                            const char *attributes);
 
 /**
  * @brief 添加会话记录到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_session(
-    heapstore_batch_context_t* ctx,
-    const heapstore_session_record_t* record);
+heapstore_error_t heapstore_batch_add_session(heapstore_batch_context_t *ctx,
+                                              const heapstore_session_record_t *record);
 
 /**
  * @brief 添加Agent记录到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_agent(
-    heapstore_batch_context_t* ctx,
-    const heapstore_agent_record_t* record);
+heapstore_error_t heapstore_batch_add_agent(heapstore_batch_context_t *ctx,
+                                            const heapstore_agent_record_t *record);
 
 /**
  * @brief 添加Skill记录到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_skill(
-    heapstore_batch_context_t* ctx,
-    const heapstore_skill_record_t* record);
+heapstore_error_t heapstore_batch_add_skill(heapstore_batch_context_t *ctx,
+                                            const heapstore_skill_record_t *record);
 
 /**
  * @brief 添加内存池记录到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_memory_pool(
-    heapstore_batch_context_t* ctx,
-    const heapstore_memory_pool_t* pool);
+heapstore_error_t heapstore_batch_add_memory_pool(heapstore_batch_context_t *ctx,
+                                                  const heapstore_memory_pool_t *pool);
 
 /**
  * @brief 添加内存分配记录到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_allocation(
-    heapstore_batch_context_t* ctx,
-    const heapstore_memory_allocation_t* allocation);
+heapstore_error_t heapstore_batch_add_allocation(heapstore_batch_context_t *ctx,
+                                                 const heapstore_memory_allocation_t *allocation);
 
 /**
  * @brief 添加IPC通道记录到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_ipc_channel(
-    heapstore_batch_context_t* ctx,
-    const heapstore_ipc_channel_t* channel);
+heapstore_error_t heapstore_batch_add_ipc_channel(heapstore_batch_context_t *ctx,
+                                                  const heapstore_ipc_channel_t *channel);
 
 /**
  * @brief 添加IPC缓冲区记录到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_ipc_buffer(
-    heapstore_batch_context_t* ctx,
-    const heapstore_ipc_buffer_t* buffer);
+heapstore_error_t heapstore_batch_add_ipc_buffer(heapstore_batch_context_t *ctx,
+                                                 const heapstore_ipc_buffer_t *buffer);
 
 /**
  * @brief 添加Span记录到批量写入缓冲区
  */
-heapstore_error_t heapstore_batch_add_span(
-    heapstore_batch_context_t* ctx,
-    const heapstore_span_t* span);
+heapstore_error_t heapstore_batch_add_span(heapstore_batch_context_t *ctx,
+                                           const heapstore_span_t *span);
 
 /**
  * @brief 提交批量写入
@@ -197,7 +177,7 @@ heapstore_error_t heapstore_batch_add_span(
  * @reentrant 否
 
  * @since v1.0.0.5*/
-heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx);
+heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t *ctx);
 
 /**
  * @brief 回滚批量写入
@@ -208,7 +188,7 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx);
  * @reentrant 是
 
  * @since v1.0.0.5*/
-void heapstore_batch_rollback(heapstore_batch_context_t* ctx);
+void heapstore_batch_rollback(heapstore_batch_context_t *ctx);
 
 /**
  * @brief 销毁批量写入上下文
@@ -219,7 +199,7 @@ void heapstore_batch_rollback(heapstore_batch_context_t* ctx);
  * @reentrant 是
 
  * @since v1.0.0.5*/
-void heapstore_batch_context_destroy(heapstore_batch_context_t* ctx);
+void heapstore_batch_context_destroy(heapstore_batch_context_t *ctx);
 
 /**
  * @brief 获取当前批量项目数量
@@ -227,7 +207,7 @@ void heapstore_batch_context_destroy(heapstore_batch_context_t* ctx);
  * @param ctx [in] 批量写入上下文
  * @return size_t 项目数量
  */
-size_t heapstore_batch_get_count(const heapstore_batch_context_t* ctx);
+size_t heapstore_batch_get_count(const heapstore_batch_context_t *ctx);
 
 /**
  * @brief 获取批量上下文容量
@@ -235,7 +215,7 @@ size_t heapstore_batch_get_count(const heapstore_batch_context_t* ctx);
  * @param ctx [in] 批量写入上下文
  * @return size_t 容量大小
  */
-size_t heapstore_batch_get_capacity(const heapstore_batch_context_t* ctx);
+size_t heapstore_batch_get_capacity(const heapstore_batch_context_t *ctx);
 
 #ifdef __cplusplus
 }

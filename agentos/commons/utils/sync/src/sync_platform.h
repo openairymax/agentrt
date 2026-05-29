@@ -1,19 +1,19 @@
 /**
  * @file sync_platform.h
  * @brief 同步模块平台抽象层 - 内部使用
- * 
+ *
  * 提供跨平台的同步原语底层实现抽象
  * 支持Windows和POSIX系统
- * 
+ *
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef SYNC_PLATFORM_H
 #define SYNC_PLATFORM_H
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,9 +26,10 @@ extern "C" {
 
 /* Windows平台特定实现 */
 #ifdef _WIN32
-#include <windows.h>
-#include <synchapi.h>
 #include "atomic_compat.h"
+
+#include <synchapi.h>
+#include <windows.h>
 
 /** Windows平台互斥锁类型 */
 typedef CRITICAL_SECTION platform_mutex_t;
@@ -62,11 +63,11 @@ typedef HANDLE platform_event_t;
 
 /* POSIX平台特定实现 */
 #else
+#include <errno.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <unistd.h>
 #include <sys/time.h>
-#include <errno.h>
+#include <unistd.h>
 
 /** POSIX平台互斥锁类型 */
 typedef pthread_mutex_t platform_mutex_t;
@@ -103,116 +104,116 @@ typedef struct {
  * @brief 平台互斥锁初始化
  * @return 0 成功，非0 失败
  */
-int platform_mutex_init(platform_mutex_t* mutex);
+int platform_mutex_init(platform_mutex_t *mutex);
 
 /**
  * @brief 平台互斥锁销毁
  * @param[in] mutex 互斥锁指针
  * @return 0 成功，非0 失败
  */
-int platform_mutex_destroy(platform_mutex_t* mutex);
+int platform_mutex_destroy(platform_mutex_t *mutex);
 
 /**
  * @brief 平台互斥锁加锁
  * @param[in] mutex 互斥锁指针
  * @return 0 成功，非0 失败
  */
-int platform_mutex_lock(platform_mutex_t* mutex);
+int platform_mutex_lock(platform_mutex_t *mutex);
 
 /**
  * @brief 平台互斥锁解锁
  * @param[in] mutex 互斥锁指针
  * @return 0 成功，非0 失败
  */
-int platform_mutex_unlock(platform_mutex_t* mutex);
+int platform_mutex_unlock(platform_mutex_t *mutex);
 
 /**
  * @brief 平台递归互斥锁初始化
  * @return 0 成功，非0 失败
  */
-int platform_recursive_mutex_init(platform_recursive_mutex_t* mutex);
+int platform_recursive_mutex_init(platform_recursive_mutex_t *mutex);
 
 /**
  * @brief 平台递归互斥锁销毁
  * @param[in] mutex 递归互斥锁指针
  * @return 0 成功，非0 失败
  */
-int platform_recursive_mutex_destroy(platform_recursive_mutex_t* mutex);
+int platform_recursive_mutex_destroy(platform_recursive_mutex_t *mutex);
 
 /**
  * @brief 平台递归互斥锁加锁
  * @param[in] mutex 递归互斥锁指针
  * @return 0 成功，非0 失败
  */
-int platform_recursive_mutex_lock(platform_recursive_mutex_t* mutex);
+int platform_recursive_mutex_lock(platform_recursive_mutex_t *mutex);
 
 /**
  * @brief 平台递归互斥锁解锁
  * @param[in] mutex 递归互斥锁指针
  * @return 0 成功，非0 失败
  */
-int platform_recursive_mutex_unlock(platform_recursive_mutex_t* mutex);
+int platform_recursive_mutex_unlock(platform_recursive_mutex_t *mutex);
 
 /**
  * @brief 平台读写锁初始化
  * @return 0 成功，非0 失败
  */
-int platform_rwlock_init(platform_rwlock_t* rwlock);
+int platform_rwlock_init(platform_rwlock_t *rwlock);
 
 /**
  * @brief 平台读写锁销毁
  * @param[in] rwlock 读写锁指针
  * @return 0 成功，非0 失败
  */
-int platform_rwlock_destroy(platform_rwlock_t* rwlock);
+int platform_rwlock_destroy(platform_rwlock_t *rwlock);
 
 /**
  * @brief 平台读锁加锁
  * @param[in] rwlock 读写锁指针
  * @return 0 成功，非0 失败
  */
-int platform_rwlock_rdlock(platform_rwlock_t* rwlock);
+int platform_rwlock_rdlock(platform_rwlock_t *rwlock);
 
 /**
  * @brief 平台写锁加锁
  * @param[in] rwlock 读写锁指针
  * @return 0 成功，非0 失败
  */
-int platform_rwlock_wrlock(platform_rwlock_t* rwlock);
+int platform_rwlock_wrlock(platform_rwlock_t *rwlock);
 
 /**
  * @brief 平台读写锁解锁
  * @param[in] rwlock 读写锁指针
  * @return 0 成功，非0 失败
  */
-int platform_rwlock_unlock(platform_rwlock_t* rwlock);
+int platform_rwlock_unlock(platform_rwlock_t *rwlock);
 
 /**
  * @brief 平台自旋锁初始化
  * @return 0 成功，非0 失败
  */
-int platform_spinlock_init(platform_spinlock_t* spinlock);
+int platform_spinlock_init(platform_spinlock_t *spinlock);
 
 /**
  * @brief 平台自旋锁销毁
  * @param[in] spinlock 自旋锁指针
  * @return 0 成功，非0 失败
  */
-int platform_spinlock_destroy(platform_spinlock_t* spinlock);
+int platform_spinlock_destroy(platform_spinlock_t *spinlock);
 
 /**
  * @brief 平台自旋锁加锁
  * @param[in] spinlock 自旋锁指针
  * @return 0 成功，非0 失败
  */
-int platform_spinlock_lock(platform_spinlock_t* spinlock);
+int platform_spinlock_lock(platform_spinlock_t *spinlock);
 
 /**
  * @brief 平台自旋锁解锁
  * @param[in] spinlock 自旋锁指针
  * @return 0 成功，非0 失败
  */
-int platform_spinlock_unlock(platform_spinlock_t* spinlock);
+int platform_spinlock_unlock(platform_spinlock_t *spinlock);
 
 /**
  * @brief 平台信号量初始化
@@ -220,41 +221,41 @@ int platform_spinlock_unlock(platform_spinlock_t* spinlock);
  * @param[in] value 初始值
  * @return 0 成功，非0 失败
  */
-int platform_semaphore_init(platform_semaphore_t* semaphore, unsigned int value);
+int platform_semaphore_init(platform_semaphore_t *semaphore, unsigned int value);
 
 /**
  * @brief 平台信号量销毁
  * @param[in] semaphore 信号量指针
  * @return 0 成功，非0 失败
  */
-int platform_semaphore_destroy(platform_semaphore_t* semaphore);
+int platform_semaphore_destroy(platform_semaphore_t *semaphore);
 
 /**
  * @brief 平台信号量等待（P操作）
  * @param[in] semaphore 信号量指针
  * @return 0 成功，非0 失败
  */
-int platform_semaphore_wait(platform_semaphore_t* semaphore);
+int platform_semaphore_wait(platform_semaphore_t *semaphore);
 
 /**
  * @brief 平台信号量发信号（V操作）
  * @param[in] semaphore 信号量指针
  * @return 0 成功，非0 失败
  */
-int platform_semaphore_post(platform_semaphore_t* semaphore);
+int platform_semaphore_post(platform_semaphore_t *semaphore);
 
 /**
  * @brief 平台条件变量初始化
  * @return 0 成功，非0 失败
  */
-int platform_condition_init(platform_condition_t* cond);
+int platform_condition_init(platform_condition_t *cond);
 
 /**
  * @brief 平台条件变量销毁
  * @param[in] cond 条件变量指针
  * @return 0 成功，非0 失败
  */
-int platform_condition_destroy(platform_condition_t* cond);
+int platform_condition_destroy(platform_condition_t *cond);
 
 /**
  * @brief 平台条件变量等待
@@ -262,21 +263,21 @@ int platform_condition_destroy(platform_condition_t* cond);
  * @param[in] mutex 互斥锁指针
  * @return 0 成功，非0 失败
  */
-int platform_condition_wait(platform_condition_t* cond, platform_mutex_t* mutex);
+int platform_condition_wait(platform_condition_t *cond, platform_mutex_t *mutex);
 
 /**
  * @brief 平台条件变量唤醒一个线程
  * @param[in] cond 条件变量指针
  * @return 0 成功，非0 失败
  */
-int platform_condition_signal(platform_condition_t* cond);
+int platform_condition_signal(platform_condition_t *cond);
 
 /**
  * @brief 平台条件变量唤醒所有线程
  * @param[in] cond 条件变量指针
  * @return 0 成功，非0 失败
  */
-int platform_condition_broadcast(platform_condition_t* cond);
+int platform_condition_broadcast(platform_condition_t *cond);
 
 /**
  * @brief 平台屏障初始化
@@ -284,21 +285,21 @@ int platform_condition_broadcast(platform_condition_t* cond);
  * @param[in] count 等待线程数
  * @return 0 成功，非0 失败
  */
-int platform_barrier_init(platform_barrier_t* barrier, unsigned int count);
+int platform_barrier_init(platform_barrier_t *barrier, unsigned int count);
 
 /**
  * @brief 平台屏障销毁
  * @param[in] barrier 屏障指针
  * @return 0 成功，非0 失败
  */
-int platform_barrier_destroy(platform_barrier_t* barrier);
+int platform_barrier_destroy(platform_barrier_t *barrier);
 
 /**
  * @brief 平台屏障等待
  * @param[in] barrier 屏障指针
  * @return 0 成功，非0 失败
  */
-int platform_barrier_wait(platform_barrier_t* barrier);
+int platform_barrier_wait(platform_barrier_t *barrier);
 
 /**
  * @brief 平台事件初始化
@@ -306,28 +307,28 @@ int platform_barrier_wait(platform_barrier_t* barrier);
  * @param[in] manual_reset 是否手动重置
  * @return 0 成功，非0 失败
  */
-int platform_event_init(platform_event_t* event, bool manual_reset);
+int platform_event_init(platform_event_t *event, bool manual_reset);
 
 /**
  * @brief 平台事件销毁
  * @param[in] event 事件指针
  * @return 0 成功，非0 失败
  */
-int platform_event_destroy(platform_event_t* event);
+int platform_event_destroy(platform_event_t *event);
 
 /**
  * @brief 平台事件设置信号
  * @param[in] event 事件指针
  * @return 0 成功，非0 失败
  */
-int platform_event_set(platform_event_t* event);
+int platform_event_set(platform_event_t *event);
 
 /**
  * @brief 平台事件重置信号
  * @param[in] event 事件指针
  * @return 0 成功，非0 失败
  */
-int platform_event_reset(platform_event_t* event);
+int platform_event_reset(platform_event_t *event);
 
 /**
  * @brief 平台事件等待
@@ -335,7 +336,7 @@ int platform_event_reset(platform_event_t* event);
  * @param[in] timeout_ms 超时时间（毫秒），0表示无限等待
  * @return 0 成功，非0 失败
  */
-int platform_event_wait(platform_event_t* event, uint64_t timeout_ms);
+int platform_event_wait(platform_event_t *event, uint64_t timeout_ms);
 
 /**
  * @brief 获取当前时间戳（毫秒）

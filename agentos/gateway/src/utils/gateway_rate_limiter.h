@@ -15,8 +15,8 @@
 #ifndef AGENTOS_GATEWAY_RATE_LIMITER_H
 #define AGENTOS_GATEWAY_RATE_LIMITER_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,12 +26,12 @@ extern "C" {
  * @brief 速率限制器配置
  */
 typedef struct {
-    bool enabled;                          /**< 是否启用速率限制 */
-    uint32_t requests_per_second;          /**< 每秒请求数限制 */
-    uint32_t requests_per_minute;          /**< 每分钟请求数限制 */
-    uint32_t requests_per_hour;            /**< 每小时请求数限制 */
-    uint32_t burst_size;                   /**< 突发容量（令牌桶大小） */
-    uint32_t cleanup_interval_sec;         /**< 清理过期客户端的间隔（秒） */
+    bool enabled;                  /**< 是否启用速率限制 */
+    uint32_t requests_per_second;  /**< 每秒请求数限制 */
+    uint32_t requests_per_minute;  /**< 每分钟请求数限制 */
+    uint32_t requests_per_hour;    /**< 每小时请求数限制 */
+    uint32_t burst_size;           /**< 突发容量（令牌桶大小） */
+    uint32_t cleanup_interval_sec; /**< 清理过期客户端的间隔（秒） */
 } gateway_rate_limit_config_t;
 
 /**
@@ -49,7 +49,7 @@ typedef struct gateway_rate_limiter gateway_rate_limiter_t;
  * @threadsafe 安全
  * @since 1.0.0
  */
-gateway_rate_limiter_t* gateway_rate_limiter_create(const gateway_rate_limit_config_t* config);
+gateway_rate_limiter_t *gateway_rate_limiter_create(const gateway_rate_limit_config_t *config);
 
 /**
  * @brief 销毁速率限制器
@@ -59,7 +59,7 @@ gateway_rate_limiter_t* gateway_rate_limiter_create(const gateway_rate_limit_con
  * @threadsafe 安全
  * @since 1.0.0
  */
-void gateway_rate_limiter_destroy(gateway_rate_limiter_t* limiter);
+void gateway_rate_limiter_destroy(gateway_rate_limiter_t *limiter);
 
 /**
  * @brief 检查请求是否允许
@@ -71,7 +71,7 @@ void gateway_rate_limiter_destroy(gateway_rate_limiter_t* limiter);
  * @threadsafe 安全
  * @since 1.0.0
  */
-bool gateway_rate_limiter_allow(gateway_rate_limiter_t* limiter, const char* client_key);
+bool gateway_rate_limiter_allow(gateway_rate_limiter_t *limiter, const char *client_key);
 
 /**
  * @brief 获取当前限制状态（用于监控）
@@ -84,12 +84,8 @@ bool gateway_rate_limiter_allow(gateway_rate_limiter_t* limiter, const char* cli
  * @threadsafe 安全
  * @since 1.0.0
  */
-void gateway_rate_limiter_get_stats(
-    const gateway_rate_limiter_t* limiter,
-    uint64_t* total_allowed,
-    uint64_t* total_rejected,
-    uint32_t* active_clients
-);
+void gateway_rate_limiter_get_stats(const gateway_rate_limiter_t *limiter, uint64_t *total_allowed,
+                                    uint64_t *total_rejected, uint32_t *active_clients);
 
 /**
  * @brief 重置指定客户端的计数器
@@ -100,7 +96,7 @@ void gateway_rate_limiter_get_stats(
  * @threadsafe 安全
  * @since 1.0.0
  */
-void gateway_rate_limiter_reset_client(gateway_rate_limiter_t* limiter, const char* client_key);
+void gateway_rate_limiter_reset_client(gateway_rate_limiter_t *limiter, const char *client_key);
 
 /**
  * @brief 获取默认配置
@@ -109,7 +105,7 @@ void gateway_rate_limiter_reset_client(gateway_rate_limiter_t* limiter, const ch
  *
  * @since 1.0.0
  */
-void gateway_rate_limiter_get_default_config(gateway_rate_limit_config_t* config);
+void gateway_rate_limiter_get_default_config(gateway_rate_limit_config_t *config);
 
 #ifdef __cplusplus
 }

@@ -6,9 +6,12 @@
  */
 
 #include "cupolas_signature.h"
-#include "cupolas_error.h"
-#include "utils/cupolas_utils.h"
+
 #include "../platform/platform.h"
+#include "cupolas_error.h"
+#include "memory_compat.h"
+#include "utils/cupolas_utils.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,13 +19,13 @@
 
 /* OpenSSL 头文件 */
 #ifdef CUPOLAS_USE_OPENSSL
-#include <openssl/evp.h>
-#include <openssl/rsa.h>
 #include <openssl/ec.h>
-#include <openssl/pem.h>
-#include <openssl/x509.h>
-#include <openssl/sha.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
+#include <openssl/sha.h>
+#include <openssl/x509.h>
 #endif
 
 /* ============================================================================
@@ -31,22 +34,22 @@
 
 struct cupolas_signature {
     cupolas_sig_algo_t algo;
-    uint8_t* data;
+    uint8_t *data;
     size_t len;
     uint64_t timestamp;
-    char* signer_id;
+    char *signer_id;
 };
 
 typedef struct {
-    char* signer_cn;
-    char* public_key_pem;
+    char *signer_cn;
+    char *public_key_pem;
     bool is_trusted;
 } trusted_signer_t;
 
 static struct {
     bool initialized;
     cupolas_sig_config_t config;
-    trusted_signer_t* trusted_signers;
+    trusted_signer_t *trusted_signers;
     size_t trusted_count;
     size_t trusted_capacity;
     cupolas_rwlock_t lock;
@@ -56,7 +59,8 @@ static struct {
  * 初始化/清理
  * ============================================================================ */
 
-int cupolas_signature_init(const cupolas_sig_config_t* config) {
+int cupolas_signature_init(const cupolas_sig_config_t *config)
+{
     if (g_sig_ctx.initialized) {
         return CUPOLAS_SIG_OK;
     }
@@ -86,7 +90,8 @@ int cupolas_signature_init(const cupolas_sig_config_t* config) {
     return CUPOLAS_SIG_OK;
 }
 
-void cupolas_signature_cleanup(void) {
+void cupolas_signature_cleanup(void)
+{
     if (!g_sig_ctx.initialized) {
         return;
     }
@@ -95,10 +100,10 @@ void cupolas_signature_cleanup(void) {
 
     if (g_sig_ctx.trusted_signers) {
         for (size_t i = 0; i < g_sig_ctx.trusted_count; i++) {
-            free(g_sig_ctx.trusted_signers[i].signer_cn);
-            free(g_sig_ctx.trusted_signers[i].public_key_pem);
+            AGENTOS_FREE(g_sig_ctx.trusted_signers[i].signer_cn);
+            AGENTOS_FREE(g_sig_ctx.trusted_signers[i].public_key_pem);
         }
-        free(g_sig_ctx.trusted_signers);
+        AGENTOS_FREE(g_sig_ctx.trusted_signers);
     }
 
     cupolas_rwlock_unlock(&g_sig_ctx.lock);
@@ -116,12 +121,13 @@ void cupolas_signature_cleanup(void) {
  * 哈希计算
  * ============================================================================ */
 
-int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
+int cupolas_signature_compute_hash(const char *file_path, uint8_t *hash_out)
+{
     if (!file_path || !hash_out) {
         return CUPOLAS_SIG_INVALID;
     }
 
-    FILE* f = fopen(file_path, "rb");
+    FILE *f = fopen(file_path, "rb");
     if (!f) {
         return CUPOLAS_SIG_INVALID;
     }
@@ -154,9 +160,9 @@ int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
  * 签名验证
  * ============================================================================ */
 
-int cupolas_signature_verify_file(const char* file_path,
-                                 const char* expected_signer,
-                                 cupolas_sig_result_t* result) {
+int cupolas_signature_verify_file(const char *file_path, const char *expected_signer,
+                                  cupolas_sig_result_t *result)
+{
     if (!g_sig_ctx.initialized) {
         return CUPOLAS_SIG_INVALID;
     }
@@ -194,17 +200,16 @@ int cupolas_signature_verify_file(const char* file_path,
     return CUPOLAS_SIG_OK;
 }
 
-int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
-                                 const uint8_t* signature, size_t sig_len,
-                                 cupolas_sig_algo_t algo,
-                                 const char* public_key) {
+int cupolas_signature_verify_data(const uint8_t *data, size_t data_len, const uint8_t *signature,
+                                  size_t sig_len, cupolas_sig_algo_t algo, const char *public_key)
+{
     if (!data || !signature || !public_key) {
         return CUPOLAS_SIG_INVALID;
     }
 
 #ifdef CUPOLAS_USE_OPENSSL
-    EVP_PKEY* pkey = NULL;
-    BIO* bio = BIO_new_mem_buf(public_key, -1);
+    EVP_PKEY *pkey = NULL;
+    BIO *bio = BIO_new_mem_buf(public_key, -1);
     if (!bio) {
         return CUPOLAS_SIG_INVALID;
     }
@@ -216,25 +221,25 @@ int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
         return CUPOLAS_SIG_CERT_INVALID;
     }
 
-    const EVP_MD* md = NULL;
+    const EVP_MD *md = NULL;
     switch (algo) {
-        case CUPOLAS_SIG_ALGO_RSA_SHA256:
-        case CUPOLAS_SIG_ALGO_ECDSA_P256:
-            md = EVP_sha256();
-            break;
-        case CUPOLAS_SIG_ALGO_RSA_SHA384:
-        case CUPOLAS_SIG_ALGO_ECDSA_P384:
-            md = EVP_sha384();
-            break;
-        case CUPOLAS_SIG_ALGO_RSA_SHA512:
-            md = EVP_sha512();
-            break;
-        default:
-            EVP_PKEY_free(pkey);
-            return CUPOLAS_SIG_ALGO_UNSUPPORTED;
+    case CUPOLAS_SIG_ALGO_RSA_SHA256:
+    case CUPOLAS_SIG_ALGO_ECDSA_P256:
+        md = EVP_sha256();
+        break;
+    case CUPOLAS_SIG_ALGO_RSA_SHA384:
+    case CUPOLAS_SIG_ALGO_ECDSA_P384:
+        md = EVP_sha384();
+        break;
+    case CUPOLAS_SIG_ALGO_RSA_SHA512:
+        md = EVP_sha512();
+        break;
+    default:
+        EVP_PKEY_free(pkey);
+        return CUPOLAS_SIG_ALGO_UNSUPPORTED;
     }
 
-    EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
+    EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
     if (!md_ctx) {
         EVP_PKEY_free(pkey);
         return CUPOLAS_SIG_INVALID;
@@ -258,8 +263,8 @@ int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
 #endif
 }
 
-int cupolas_signature_verify_integrity(const char* file_path,
-                                      const uint8_t* expected_hash) {
+int cupolas_signature_verify_integrity(const char *file_path, const uint8_t *expected_hash)
+{
     if (!file_path || !expected_hash) {
         return CUPOLAS_SIG_INVALID;
     }
@@ -281,16 +286,16 @@ int cupolas_signature_verify_integrity(const char* file_path,
  * 签名者管理
  * ============================================================================ */
 
-int cupolas_signature_get_signer_info(const char* file_path,
-                                     cupolas_signer_info_t* info) {
+int cupolas_signature_get_signer_info(const char *file_path, cupolas_signer_info_t *info)
+{
     if (!file_path || !info) {
         return CUPOLAS_SIG_INVALID;
     }
 
     memset(info, 0, sizeof(cupolas_signer_info_t));
 
-    info->subject_cn = strdup("unavailable");
-    info->subject_org = strdup("unavailable");
+    info->subject_cn = AGENTOS_STRDUP("unavailable");
+    info->subject_org = AGENTOS_STRDUP("unavailable");
     info->not_before = 0;
     info->not_after = 0;
     info->is_ca = false;
@@ -299,22 +304,24 @@ int cupolas_signature_get_signer_info(const char* file_path,
     return CUPOLAS_SIG_UNTRUSTED;
 }
 
-void cupolas_signature_free_signer_info(cupolas_signer_info_t* info) {
+void cupolas_signature_free_signer_info(cupolas_signer_info_t *info)
+{
     if (!info) {
         return;
     }
 
-    free(info->subject_cn);
-    free(info->subject_org);
-    free(info->subject_ou);
-    free(info->issuer_cn);
-    free(info->serial_number);
-    free(info->key_id);
-    free(info->algorithm);
+    AGENTOS_FREE(info->subject_cn);
+    AGENTOS_FREE(info->subject_org);
+    AGENTOS_FREE(info->subject_ou);
+    AGENTOS_FREE(info->issuer_cn);
+    AGENTOS_FREE(info->serial_number);
+    AGENTOS_FREE(info->key_id);
+    AGENTOS_FREE(info->algorithm);
     memset(info, 0, sizeof(cupolas_signer_info_t));
 }
 
-bool cupolas_signature_is_trusted_signer(const char* signer_cn) {
+bool cupolas_signature_is_trusted_signer(const char *signer_cn)
+{
     if (!signer_cn || !g_sig_ctx.initialized) {
         return false;
     }
@@ -332,8 +339,8 @@ bool cupolas_signature_is_trusted_signer(const char* signer_cn) {
     return found;
 }
 
-int cupolas_signature_add_trusted_signer(const char* signer_cn,
-                                        const char* public_key) {
+int cupolas_signature_add_trusted_signer(const char *signer_cn, const char *public_key)
+{
     if (!signer_cn || !public_key || !g_sig_ctx.initialized) {
         return CUPOLAS_SIG_INVALID;
     }
@@ -342,8 +349,8 @@ int cupolas_signature_add_trusted_signer(const char* signer_cn,
 
     if (g_sig_ctx.trusted_count >= g_sig_ctx.trusted_capacity) {
         size_t new_capacity = g_sig_ctx.trusted_capacity == 0 ? 16 : g_sig_ctx.trusted_capacity * 2;
-        trusted_signer_t* new_signers = realloc(g_sig_ctx.trusted_signers,
-                                                 new_capacity * sizeof(trusted_signer_t));
+        trusted_signer_t *new_signers =
+            AGENTOS_REALLOC(g_sig_ctx.trusted_signers, new_capacity * sizeof(trusted_signer_t));
         if (!new_signers) {
             cupolas_rwlock_unlock(&g_sig_ctx.lock);
             return CUPOLAS_SIG_INVALID;
@@ -352,9 +359,9 @@ int cupolas_signature_add_trusted_signer(const char* signer_cn,
         g_sig_ctx.trusted_capacity = new_capacity;
     }
 
-    trusted_signer_t* ts = &g_sig_ctx.trusted_signers[g_sig_ctx.trusted_count];
-    ts->signer_cn = strdup(signer_cn);
-    ts->public_key_pem = strdup(public_key);
+    trusted_signer_t *ts = &g_sig_ctx.trusted_signers[g_sig_ctx.trusted_count];
+    ts->signer_cn = AGENTOS_STRDUP(signer_cn);
+    ts->public_key_pem = AGENTOS_STRDUP(public_key);
     ts->is_trusted = true;
 
     g_sig_ctx.trusted_count++;
@@ -367,11 +374,9 @@ int cupolas_signature_add_trusted_signer(const char* signer_cn,
  * 签名生成
  * ============================================================================ */
 
-int cupolas_signature_sign_file(const char* file_path,
-                               const char* private_key,
-                               cupolas_sig_algo_t algo,
-                               uint8_t* signature_out,
-                               size_t* sig_len) {
+int cupolas_signature_sign_file(const char *file_path, const char *private_key,
+                                cupolas_sig_algo_t algo, uint8_t *signature_out, size_t *sig_len)
+{
     if (!file_path || !private_key || !signature_out || !sig_len) {
         return CUPOLAS_SIG_INVALID;
     }
@@ -382,22 +387,19 @@ int cupolas_signature_sign_file(const char* file_path,
         return ret;
     }
 
-    return cupolas_signature_sign_data(hash, 32, private_key, algo,
-                                      signature_out, sig_len);
+    return cupolas_signature_sign_data(hash, 32, private_key, algo, signature_out, sig_len);
 }
 
-int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
-                               const char* private_key,
-                               cupolas_sig_algo_t algo,
-                               uint8_t* signature_out,
-                               size_t* sig_len) {
+int cupolas_signature_sign_data(const uint8_t *data, size_t data_len, const char *private_key,
+                                cupolas_sig_algo_t algo, uint8_t *signature_out, size_t *sig_len)
+{
     if (!data || !private_key || !signature_out || !sig_len) {
         return CUPOLAS_SIG_INVALID;
     }
 
 #ifdef CUPOLAS_USE_OPENSSL
-    EVP_PKEY* pkey = NULL;
-    BIO* bio = BIO_new_mem_buf(private_key, -1);
+    EVP_PKEY *pkey = NULL;
+    BIO *bio = BIO_new_mem_buf(private_key, -1);
     if (!bio) {
         return CUPOLAS_SIG_INVALID;
     }
@@ -409,25 +411,25 @@ int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
         return CUPOLAS_SIG_CERT_INVALID;
     }
 
-    const EVP_MD* md = NULL;
+    const EVP_MD *md = NULL;
     switch (algo) {
-        case CUPOLAS_SIG_ALGO_RSA_SHA256:
-        case CUPOLAS_SIG_ALGO_ECDSA_P256:
-            md = EVP_sha256();
-            break;
-        case CUPOLAS_SIG_ALGO_RSA_SHA384:
-        case CUPOLAS_SIG_ALGO_ECDSA_P384:
-            md = EVP_sha384();
-            break;
-        case CUPOLAS_SIG_ALGO_RSA_SHA512:
-            md = EVP_sha512();
-            break;
-        default:
-            EVP_PKEY_free(pkey);
-            return CUPOLAS_SIG_ALGO_UNSUPPORTED;
+    case CUPOLAS_SIG_ALGO_RSA_SHA256:
+    case CUPOLAS_SIG_ALGO_ECDSA_P256:
+        md = EVP_sha256();
+        break;
+    case CUPOLAS_SIG_ALGO_RSA_SHA384:
+    case CUPOLAS_SIG_ALGO_ECDSA_P384:
+        md = EVP_sha384();
+        break;
+    case CUPOLAS_SIG_ALGO_RSA_SHA512:
+        md = EVP_sha512();
+        break;
+    default:
+        EVP_PKEY_free(pkey);
+        return CUPOLAS_SIG_ALGO_UNSUPPORTED;
     }
 
-    EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
+    EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
     if (!md_ctx) {
         EVP_PKEY_free(pkey);
         return CUPOLAS_SIG_INVALID;
@@ -448,7 +450,8 @@ int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
 #else
     (void)data_len;
     (void)algo;
-    if (sig_len) *sig_len = 0;
+    if (sig_len)
+        *sig_len = 0;
     return CUPOLAS_SIG_UNTRUSTED;
 #endif
 }
@@ -457,39 +460,61 @@ int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
  * 辅助函数
  * ============================================================================ */
 
-const char* cupolas_signature_result_string(cupolas_sig_result_t result) {
+const char *cupolas_signature_result_string(cupolas_sig_result_t result)
+{
     switch (result) {
-        case CUPOLAS_SIG_OK:           return "Signature valid";
-        case CUPOLAS_SIG_INVALID:      return "Signature invalid";
-        case CUPOLAS_SIG_EXPIRED:      return "Signature expired";
-        case CUPOLAS_SIG_REVOKED:      return "Signature revoked";
-        case CUPOLAS_SIG_UNTRUSTED:    return "Untrusted signer";
-        case CUPOLAS_SIG_TAMPERED:     return "Code tampered";
-        case CUPOLAS_SIG_NO_SIGNATURE: return "No signature found";
-        case CUPOLAS_SIG_CERT_INVALID: return "Invalid certificate";
-        case CUPOLAS_SIG_CERT_EXPIRED: return "Certificate expired";
-        case CUPOLAS_SIG_ALGO_UNSUPPORTED: return "Unsupported algorithm";
-        default:                     return "Unknown error";
+    case CUPOLAS_SIG_OK:
+        return "Signature valid";
+    case CUPOLAS_SIG_INVALID:
+        return "Signature invalid";
+    case CUPOLAS_SIG_EXPIRED:
+        return "Signature expired";
+    case CUPOLAS_SIG_REVOKED:
+        return "Signature revoked";
+    case CUPOLAS_SIG_UNTRUSTED:
+        return "Untrusted signer";
+    case CUPOLAS_SIG_TAMPERED:
+        return "Code tampered";
+    case CUPOLAS_SIG_NO_SIGNATURE:
+        return "No signature found";
+    case CUPOLAS_SIG_CERT_INVALID:
+        return "Invalid certificate";
+    case CUPOLAS_SIG_CERT_EXPIRED:
+        return "Certificate expired";
+    case CUPOLAS_SIG_ALGO_UNSUPPORTED:
+        return "Unsupported algorithm";
+    default:
+        return "Unknown error";
     }
 }
 
-const char* cupolas_signature_algo_string(cupolas_sig_algo_t algo) {
+const char *cupolas_signature_algo_string(cupolas_sig_algo_t algo)
+{
     switch (algo) {
-        case CUPOLAS_SIG_ALGO_RSA_SHA256: return "RSA-SHA256";
-        case CUPOLAS_SIG_ALGO_RSA_SHA384: return "RSA-SHA384";
-        case CUPOLAS_SIG_ALGO_RSA_SHA512: return "RSA-SHA512";
-        case CUPOLAS_SIG_ALGO_ECDSA_P256: return "ECDSA-P256";
-        case CUPOLAS_SIG_ALGO_ECDSA_P384: return "ECDSA-P384";
-        case CUPOLAS_SIG_ALGO_ED25519:    return "Ed25519";
-        default:                        return "Unknown";
+    case CUPOLAS_SIG_ALGO_RSA_SHA256:
+        return "RSA-SHA256";
+    case CUPOLAS_SIG_ALGO_RSA_SHA384:
+        return "RSA-SHA384";
+    case CUPOLAS_SIG_ALGO_RSA_SHA512:
+        return "RSA-SHA512";
+    case CUPOLAS_SIG_ALGO_ECDSA_P256:
+        return "ECDSA-P256";
+    case CUPOLAS_SIG_ALGO_ECDSA_P384:
+        return "ECDSA-P384";
+    case CUPOLAS_SIG_ALGO_ED25519:
+        return "Ed25519";
+    default:
+        return "Unknown";
     }
 }
 
-uint64_t cupolas_signature_get_timestamp(void) {
+uint64_t cupolas_signature_get_timestamp(void)
+{
     return (uint64_t)time(NULL);
 }
 
-int cupolas_signature_check_validity(uint64_t not_before, uint64_t not_after) {
+int cupolas_signature_check_validity(uint64_t not_before, uint64_t not_after)
+{
     uint64_t now = cupolas_signature_get_timestamp();
 
     if (now < not_before) {

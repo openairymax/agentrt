@@ -35,8 +35,7 @@ static int g_exec_count = 0;
 static agentos_error_t mock_executor(const char *tool_name __attribute__((unused)),
                                      const char *arguments __attribute__((unused)),
                                      size_t arguments_len __attribute__((unused)),
-                                     char **out_output,
-                                     size_t *out_output_len,
+                                     char **out_output, size_t *out_output_len,
                                      void *user_data __attribute__((unused)))
 {
     g_exec_count++;

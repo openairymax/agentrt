@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：10.0.0
-# 最后更新：2026-05-16
+# 版本：11.0.0
+# 最后更新：2026-05-29
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -12,54 +12,42 @@
 # 5. 项目必需文件使用否定规则明确保留
 # 6. 通配符规则限定作用范围，避免意外排除项目必需文件
 #
-# V10.0.0更新（v0.0.5发行准备 — scripts/重构 + 根目录规范化）：
-# - scripts/ 目录全面重构：deploy/→deployment/, tools/→code_quality/,
-#   source_other/→assets/, core/→toolkit/, cmake/移入scripts/cmake/
-# - 根目录配置文件：.clang-format/.clang-tidy/.clangd/.editorconfig/
-#   .jscpd.json/.lizardrc/.pre-commit-config.yaml/vcpkg.json/Doxyfile
-#   全部从scripts/development/config/提升至项目根目录
-# - 移除所有指向已不存在路径的规则（deploy/docker/, docker/, scripts/deploy/）
-# - 源码和产物严格分离：agentos/仅含源码，构建产物输出至AgentOS-build/
-# - 新增scripts/cmake/、scripts/code_quality/、scripts/assets/否定规则
+# V11.0.0更新（v0.1.0发行准备 — 全面对齐实际项目结构）：
+# - scripts/ 目录结构已从扁平重组为 ci/dev/ops/resources/toolkit 五大模块
+# - 移除所有指向已不存在路径的规则（atomslite/interfaces/desktop-client/docs/manuals）
+# - 移除所有旧 scripts/ 子目录规则（cmake/code_quality/demo/deployment/
+#   development/library/pipeline/release/tests）并替换为新路径
+# - 新增 scripts/ci/ scripts/dev/ scripts/ops/ scripts/resources/ 肯定规则
+# - agentos/ 模块列表与 v0.1.0 实际源码完全一致
+# - 清理重复规则和非存在的配置文件引用
 #
-# V9.1.0更新（脚本整理与文档优化版）：
-# - 添加 scripts/release/ 目录否定规则（保留发布脚本）
-# - 优化 Visual Studio 规则避免误匹配 scripts/release/
-#
-# 项目模块结构（2026-05-16 V10.0 当前）：
+# 项目模块结构（2026-05-29 V11.0 当前）：
 # 核心源码 (agentos/) — 仅含源码，构建产物严禁在此外
-#   - atoms/       : 原子内核
-#   - atomslite/   : 轻量级原子模块
-#   - commons/     : 统一基础库
-#   - cupolas/     : 安全穹顶
-#   - daemon/      : 用户态服务
-#   - gateway/     : 统一网关
-#   - heapstore/   : 运行时数据存储
-#   - manager/     : 统一配置管理
-#   - openlab/     : 开放生态
-#   - protocols/   : 行业协议适配
-#   - toolkit/     : 多语言 SDK 工具
-#   - interfaces/  : 统一接口定义
+#   - atoms/       : 微内核原子组件层（corekern/coreloopthree/memory/syscall/taskflow/frameworks）
+#   - commons/     : 统一基础库（平台抽象/日志/配置/内存/同步等 20+ 子模块）
+#   - cupolas/     : 安全穹顶层（防护/清洗/权限/审计/守卫框架）
+#   - daemon/      : 用户态守护进程层（gateway_d/llm_d/tool_d/sched_d 等 10+ 服务）
+#   - gateway/     : 协议网关层（HTTP/WS/Stdio → JSON-RPC 2.0）
+#   - heapstore/   : 运行时数据存储（SQLite + 内存后端混合存储）
+#   - manager/     : 统一配置管理中心（多模块 Schema + 热重载）
+#   - openlab/     : 开放生态系统（Apps/Contrib/Markets）
+#   - protocols/   : 统一协议栈（五层架构）
+#   - toolkit/     : 多语言 SDK 工具（Python/Go/Rust/TypeScript）
 #
-# 脚本与构建 (scripts/) — 构建、CI/CD、部署、代码质量全部集中
-#   - cmake/           : CMake 预包含头文件
-#   - code_quality/    : 代码质量工具 (Lizard, JSCPD, 编码风格)
-#   - demo/            : 技术演示脚本
-#   - deployment/      : Docker 部署配置 & 编排
-#   - development/     : 开发辅助 (quickstart, validate)
-#   - library/         : 第三方依赖引用
-#   - pipeline/        : CI/CD 流水线脚本
-#   - release/         : 发布脚本
-#   - tests/           : 集成测试脚本
-#   - toolkit/         : 构建工具链
-#   - verify/          : 构建验证脚本
+# 脚本工具集 (scripts/) — CI/CD、开发环境、运维部署、资源管理
+#   - ci/           : 持续集成（pipeline/quality/release/verify）
+#   - dev/          : 开发环境（build/setup/cli/cmake/config/utils）
+#   - ops/          : 运维部署（deploy/benchmark/demo/lib/tests）
+#   - resources/    : 项目资源（images/tutorial）
+#   - toolkit/      : Python 运维工具包
+#
+# 测试套件 (tests/) — 单元/集成/契约/基准/安全测试
 #
 # 项目根目录配置文件
 #   - .clang-format / .clang-tidy / .clangd : C/C++ 格式化与诊断
 #   - .editorconfig                        : 跨IDE基础规范
 #   - .env.example                         : 环境变量模板
 #   - .gitattributes                       : Git 换行符处理
-#   - .jscpd.json / .lizardrc              : 代码质量分析
 #   - .pre-commit-config.yaml             : Pre-commit 钩子
 #   - vcpkg.json                           : C++ 依赖清单
 #   - Doxyfile                             : API 文档生成
@@ -72,20 +60,7 @@
 CHANGELOG.md
 
 # =============================================================================
-# 修复记录目录（本地工作记录，不追踪）
-# 注意：.bendiwenjian/ 目录整体排除，但总线检查报告需保留
-# Git 机制要求：父目录排除后，必须逐级否定才能重新包含子文件
-# =============================================================================
-
-.bendiwenjian/
-.bendiwenjian/总线检查/
-.bendiwenjian/总线检查/*.md
-.cargo/
-.atomcode/
-datalog/
-build_no_daemon/
-# =============================================================================
-# 1. CMake 构建系统（构建产物，不追踪）
+# CMake 构建系统（构建产物，不追踪）
 # =============================================================================
 
 # IDE 配置
@@ -93,7 +68,6 @@ build_no_daemon/
 .compile_flags.txt
 
 # .clangd 使用相对路径，可以追踪（方便新开发者开箱即用）
-# 如果本地修改了 .clangd 添加了绝对路径，请勿提交
 !.clangd
 
 # CMake缓存和临时文件（所有层级）
@@ -104,10 +78,6 @@ build_no_daemon/
 **/CTestTestfile.cmake
 
 # CMake用户配置
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-cmake_install.*
 CMakeUserPresets.json
 CMakePresets.json
 
@@ -118,7 +88,7 @@ CMakePresets.json
 **/AgentOSConfigVersion.cmake
 
 # =============================================================================
-# 1.1 构建输出目录（所有层级，关键规则！）
+# 构建输出目录（所有层级，关键规则！）
 # =============================================================================
 
 # 根目录构建目录
@@ -129,7 +99,6 @@ build-test/
 build_clean/
 build_warn/
 build_test_protocol/
-build_no_daemon/
 
 # 子目录中的构建产物（防止源内构建）
 **/build/
@@ -146,7 +115,6 @@ cmake-build-release/
 cmake-build-coverage/
 
 # 外部构建目录（Out-of-Source Build）
-# 所有构建产物统一输出到此目录，保持源码仓库纯净
 AgentOS-build/
 AgentOS-build-*/
 ci-artifacts/
@@ -161,7 +129,7 @@ compile_flags.txt
 compile_commands/*.json
 
 # =============================================================================
-# 2. 编译产物（构建时生成，不追踪）
+# 编译产物（构建时生成，不追踪）
 # =============================================================================
 
 # 目标文件
@@ -190,7 +158,7 @@ compile_commands/*.json
 *.pch.gch
 
 # =============================================================================
-# 3. Python 相关（运行时生成，不追踪）
+# Python 相关（运行时生成，不追踪）
 # =============================================================================
 
 # Python 缓存
@@ -250,7 +218,7 @@ dmypy.json
 .ruff_cache/
 
 # =============================================================================
-# 4. Go 语言 SDK（构建产物，不追踪）
+# Go 语言 SDK（构建产物，不追踪）
 # =============================================================================
 
 agentos/toolkit/go/vendor/
@@ -263,7 +231,7 @@ cover.out
 cover.html
 
 # =============================================================================
-# 5. Rust 语言 SDK（构建产物，不追踪）
+# Rust 语言 SDK（构建产物，不追踪）
 # =============================================================================
 
 agentos/toolkit/rust/target/
@@ -274,7 +242,7 @@ agentos/toolkit/rust/doc/
 agentos/toolkit/rust/target/doc/
 
 # =============================================================================
-# 6. TypeScript/JavaScript SDK（构建产物，不追踪）
+# TypeScript/JavaScript SDK（构建产物，不追踪）
 # =============================================================================
 
 agentos/toolkit/typescript/node_modules/
@@ -288,7 +256,7 @@ agentos/toolkit/typescript/tsbuildinfo/
 .nuxt/
 
 # =============================================================================
-# 7. 环境变量和敏感配置（本地配置，不追踪）
+# 环境变量和敏感配置（本地配置，不追踪）
 # =============================================================================
 
 # 环境文件
@@ -327,7 +295,7 @@ local_settings.py
 override.yaml
 
 # =============================================================================
-# 8. IDE 和编辑器配置（本地开发配置，不追踪）
+# IDE 和编辑器配置（本地开发配置，不追踪）
 # =============================================================================
 
 # Visual Studio Code
@@ -374,7 +342,7 @@ out/
 .sln.docstates
 [Dd]ebug/
 [Rr]elease/
-!scripts/release/
+!scripts/ci/release/
 x64/
 x86/
 bld/
@@ -387,7 +355,7 @@ bld/
 .settings/
 
 # =============================================================================
-# 9. 日志、数据库和运行时文件（运行时生成，不追踪）
+# 日志、数据库和运行时文件（运行时生成，不追踪）
 # =============================================================================
 
 # 日志文件
@@ -429,7 +397,7 @@ temp/
 *.orig
 
 # =============================================================================
-# 10. agentos/heapstore/ 运行时目录（运行时生成，仅保留空路径）
+# agentos/heapstore/ 运行时目录（运行时生成，仅保留空路径）
 # =============================================================================
 
 # kernel/ 子目录（排除内容，保留 .gitkeep）
@@ -469,7 +437,7 @@ agentos/heapstore/db/*
 !agentos/heapstore/db/.gitkeep
 
 # =============================================================================
-# 11. 测试相关（测试结果不追踪，测试代码保留）
+# 测试相关（测试结果不追踪，测试代码保留）
 # =============================================================================
 
 # 测试结果和报告
@@ -502,25 +470,19 @@ tests/benchmarks/concurrency/report/*
 !tests/benchmarks/concurrency/report/.gitkeep
 
 # =============================================================================
-# 12. 文档生成（构建产物，不追踪）
+# 文档生成（构建产物，不追踪）
 # =============================================================================
 
-manuals/_build/
-manuals/.doctrees/
-manuals/doctrees/
 doxygen/
 xml/
 html/
 latex/
 man/
 site/
-manuals/architecture/diagrams/*.svg
-manuals/architecture/diagrams/*.png
-manuals/architecture/diagrams/*.pdf
 toolkit/go/doc/
 
 # =============================================================================
-# 13. 操作系统文件（系统生成，不追踪）
+# 操作系统文件（系统生成，不追踪）
 # =============================================================================
 
 # macOS
@@ -550,7 +512,7 @@ $RECYCLE.BIN/
 .nfs*
 
 # =============================================================================
-# 14. 依赖管理（本地安装，不追踪）
+# 依赖管理（本地安装，不追踪）
 # =============================================================================
 
 vendor/
@@ -561,7 +523,7 @@ Carthage/Build/
 .swiftpm/
 
 # =============================================================================
-# 15. 大型文件和二进制文件（运行时生成，不追踪）
+# 大型文件和二进制文件（运行时生成，不追踪）
 # =============================================================================
 
 # FAISS 索引
@@ -591,12 +553,12 @@ agentos/heapstore/models/*.onnx
 /datasets/
 
 # 压缩包（部署目录下的）
-scripts/deployment/**/*.tar.gz
-scripts/deployment/**/*.tar.bz2
-scripts/deployment/**/*.tar.xz
-scripts/deployment/**/*.zip
-scripts/deployment/**/*.rar
-scripts/deployment/**/*.7z
+scripts/ops/deploy/**/*.tar.gz
+scripts/ops/deploy/**/*.tar.bz2
+scripts/ops/deploy/**/*.tar.xz
+scripts/ops/deploy/**/*.zip
+scripts/ops/deploy/**/*.rar
+scripts/ops/deploy/**/*.7z
 
 # Docker 覆盖和集群配置
 docker-compose.override.yml
@@ -605,11 +567,11 @@ docker-compose.override.yml
 .kube/
 
 # =============================================================================
-# 16. 部署和安装（构建产物，不追踪）
+# 部署和安装（构建产物，不追踪）
 # =============================================================================
 
-scripts/deployment/artifacts/
-scripts/deployment/packages/
+scripts/ops/deploy/artifacts/
+scripts/ops/deploy/packages/
 install/
 installed/
 VERSION
@@ -617,7 +579,7 @@ version.txt
 build_version.txt
 
 # =============================================================================
-# 17. 代码质量工具缓存（运行时生成，不追踪）
+# 代码质量工具缓存（运行时生成，不追踪）
 # =============================================================================
 
 .pre-commit-manager.local.yaml
@@ -635,11 +597,10 @@ cppcheck.local.xml
 .jscpd-store/
 .scannerwork/
 sonar-report.json
-.clangd/
 .cache/clangd/
 
 # =============================================================================
-# 18. 本地开发文档（临时文件，不追踪）
+# 本地开发文档（临时文件，不追踪）
 # =============================================================================
 
 *.draft
@@ -680,75 +641,17 @@ coverage_reports/
 *评估报告*.md
 *穷尽检查*.md
 
-# 本地工作记录目录（历史档案除外）
-.bendiwenjian/
-.bendiwenjian/总线检查/
-.bendiwenjian/总线检查/*.md
-
 # =============================================================================
-# 19. 桌面客户端（Tauri 构建产物，不追踪）
-# =============================================================================
-
-# Tauri 构建产物
-scripts/desktop-client/src-tauri/target/
-scripts/desktop-client/dist/
-scripts/desktop-client/node_modules/
-
-# 前端构建缓存
-scripts/desktop-client/.vite/
-scripts/desktop-client/.turbo/
-scripts/desktop-client/.cache/
-scripts/desktop-client/.temp/
-scripts/desktop-client/coverage/
-
-# Tauri 配置和生成文件
-scripts/desktop-client/src-tauri/WixTools/
-scripts/desktop-client/src-tauri/gen/
-scripts/desktop-client/src-tauri/Cargo.lock
-
-# 包管理器日志
-scripts/desktop-client/npm-debug.log*
-scripts/desktop-client/yarn-debug.log*
-scripts/desktop-client/yarn-error.log*
-scripts/desktop-client/pnpm-debug.log*
-
-# 环境文件
-scripts/desktop-client/.env
-scripts/desktop-client/.env.local
-scripts/desktop-client/.env.production.local
-
-# =============================================================================
-# 20. docs/ 目录（保留源文件，排除构建产物）
-# =============================================================================
-
-# docs/ 目录（保留源文件，排除构建产物）
-docs/_build/
-docs/.doctrees/
-docs/doctrees/
-docs/html/
-docs/latex/
-docs/man/
-docs/site/
-docs/*.svg
-docs/*.png
-docs/*.pdf
-
-# Doxygen API 文档输出（保留源文件 mainpage.dox）
-docs/api/html/
-docs/api/xml/
-docs/api/latex/
-docs/api/man/
-
-# =============================================================================
-# 21. 必须保留的例外（项目必需文件）
+# 必须保留的例外（项目必需文件）
 # =============================================================================
 
 # 环境模板
 !.env.example
 
 # =============================================================================
-# 21a. 根目录配置文件（V10.0: 提升至项目根目录）
+# 根目录配置文件
 # =============================================================================
+
 !.clang-format
 !.clang-tidy
 !.clangd
@@ -759,14 +662,13 @@ docs/api/man/
 !Doxyfile
 
 # agentos/manager/ 配置文件
-!agentos/manager/*.yaml
-!agentos/manager/*.yml
-!agentos/manager/*.template
-!agentos/manager/*.schema.json
+!agentos/manager/**/*.yaml
+!agentos/manager/**/*.yml
+!agentos/manager/**/*.template
+!agentos/manager/**/*.schema.json
 !agentos/manager/.env.template
 
 # 关键文档
-!docs/**/*.md
 !BUILD.md
 !README.md
 !README_zh.md
@@ -779,10 +681,10 @@ docs/api/man/
 !ACKNOWLEDGMENTS.md
 
 # =============================================================================
-# 21b. scripts/ 脚本文件 — 按子目录管理
+# scripts/ 脚本文件 — 对齐 V11.0 实际目录结构（ci/dev/ops/resources/toolkit）
 # =============================================================================
 
-# scripts/ 通用脚本
+# scripts/ 通用脚本（所有子目录）
 !scripts/**/*.sh
 !scripts/**/*.py
 !scripts/**/*.bat
@@ -790,67 +692,56 @@ docs/api/man/
 !scripts/**/*.yml
 !scripts/**/*.yaml
 
-# scripts/cmake/ — CMake 预包含头文件
-!scripts/cmake/*.h
+# scripts/ci/ — 持续集成
+!scripts/ci/**/*.sh
+!scripts/ci/**/*.py
+!scripts/ci/**/*.yaml
+!scripts/ci/**/*.yml
+!scripts/ci/**/CMakeLists.txt
 
-# scripts/code_quality/ — 代码质量工具
-!scripts/code_quality/**/*.py
-!scripts/code_quality/**/*.sh
-!scripts/code_quality/.jscpd.json
-!scripts/code_quality/.lizardrc
+# scripts/dev/ — 开发环境
+!scripts/dev/**/*.sh
+!scripts/dev/**/*.py
+!scripts/dev/**/*.bat
+!scripts/dev/**/*.ps1
+!scripts/dev/**/*.yaml
+!scripts/dev/**/*.yml
+!scripts/dev/cmake/*.h
 
-# scripts/deployment/ — Docker 部署
-!scripts/deployment/docker/.gitignore
-!scripts/deployment/docker/Dockerfile*
-!scripts/deployment/docker/*.sh
-!scripts/deployment/docker/Makefile
+# scripts/ops/ — 运维部署
+!scripts/ops/**/*.sh
+!scripts/ops/**/*.py
+!scripts/ops/**/*.yaml
+!scripts/ops/**/*.yml
+!scripts/ops/deploy/docker/Dockerfile*
+!scripts/ops/deploy/docker/Makefile
+!scripts/ops/deploy/docker-compose*.yml
+!scripts/ops/deploy/docker-compose*.yaml
+!scripts/ops/deploy/docker/.gitignore
+!scripts/ops/deploy/k8s/**/*.yml
+!scripts/ops/deploy/k8s/**/*.yaml
 
-# scripts/development/ — 开发辅助脚本
-!scripts/development/quickstart.sh
-!scripts/development/validate.sh
+# scripts/resources/ — 项目资源
+!scripts/resources/**/*.sh
+!scripts/resources/**/*.py
+!scripts/resources/**/*.json
+!scripts/resources/**/*.yaml
+!scripts/resources/**/*.yml
+!scripts/resources/images/*.{svg,png,jpg,gif}
+!scripts/resources/tutorial/**/*
 
-# scripts/release/ — 发布脚本（排除发布产物）
-!scripts/release/release.sh
-!scripts/release/cleanup_builds.sh
-scripts/release/artifacts/
-scripts/release/packages/
-scripts/release/*.tar.gz
-scripts/release/*.zip
-
-# scripts/pipeline/ — CI/CD 流水线脚本
-!scripts/pipeline/*.sh
-!scripts/pipeline/*.py
-
-# scripts/toolkit/ — 构建工具链
+# scripts/toolkit/ — 运维工具包
 !scripts/toolkit/**/*.sh
 !scripts/toolkit/**/*.py
+!scripts/toolkit/**/*.yaml
+!scripts/toolkit/**/*.yml
 
-# scripts/library/ — 第三方依赖引用
-!scripts/library/**/*.cmake
-!scripts/library/**/*.txt
-
-# scripts/assets/ — 其他资源
-!scripts/assets/**/*.sh
-!scripts/assets/**/*.py
-!scripts/assets/**/*.json
-!scripts/assets/**/*.yaml
-!scripts/assets/**/*.yml
-
-# scripts/demo/ — 演示脚本
-!scripts/demo/**/*.py
-!scripts/demo/**/*.sh
-
-# scripts/tests/ — 集成测试
-!scripts/tests/**/*.sh
-!scripts/tests/**/*.py
-!scripts/tests/**/*.yaml
-
-# scripts/verify/ — 验证脚本
-!scripts/verify/**/*.sh
-!scripts/verify/**/*.py
+# 手写 Makefile（非 CMake 生成，需保留）
+!tests/Makefile
+!scripts/ops/deploy/docker/Makefile
 
 # =============================================================================
-# 21c. tests/ 测试目录
+# tests/ 测试目录
 # =============================================================================
 
 !tests/**/*.py
@@ -870,27 +761,23 @@ scripts/release/*.zip
 !tests/unit/services/llm_d/.gitkeep
 !tests/unit/services/tool_d/.gitkeep
 
-# 手写Makefile（非CMake生成，需保留）
-!tests/Makefile
-!scripts/deployment/docker/Makefile
-
 # =============================================================================
-# 21d. Docker 和部署配置
+# Docker 和部署配置
 # =============================================================================
 
 !Dockerfile*
 !docker-compose*.yml
-!scripts/deployment/docker/Dockerfile*
+!docker-compose*.yaml
+!scripts/ops/deploy/docker/Dockerfile*
 !agentos/openlab/Dockerfile
 !agentos/gateway/docker/Dockerfile*
 !agentos/daemon/Dockerfile.ci
 
 # =============================================================================
-# 21e. CMake 构建配置
+# CMake 构建配置
 # =============================================================================
 
 !agentos/atoms/**/CMakeLists.txt
-!agentos/atomslite/**/CMakeLists.txt
 !agentos/commons/**/CMakeLists.txt
 !agentos/commons/tests/CMakeLists.txt
 !agentos/cupolas/CMakeLists.txt
@@ -903,7 +790,7 @@ scripts/release/*.zip
 !pyproject.toml
 
 # =============================================================================
-# 21f. toolkit/ 语言 SDK 配置
+# toolkit/ 语言 SDK 配置
 # =============================================================================
 
 !agentos/toolkit/python/pyproject.toml
@@ -915,33 +802,35 @@ scripts/release/*.zip
 !agentos/toolkit/typescript/jest.config.js
 
 # =============================================================================
-# 21g. 其他
+# 其他必须保留的文件
 # =============================================================================
 
 !agentos/openlab/pyproject.toml
 !agentos/openlab/requirements.txt
 !agentos/commons/utils/types/.gitkeep
+!LICENSE
+!NOTICE
+!.github/CODEOWNERS
 
 # =============================================================================
-# 22. GitHub 平台模板目录（项目必需，保留）
+# GitHub 平台模板目录（项目必需，保留）
 # =============================================================================
-
 # .github/ 是 GitHub 平台配置目录，随仓库同步
 # 包含 CI/CD 工作流、Issue 模板、PR 模板等
 
 # =============================================================================
-# 23. 强化防护规则（V10.0更新）
+# 强化防护规则（V11.0 更新）
 # =============================================================================
 
-# 23.1 防止意外追踪非源码文件（白名单模式）
-# 只有以下类型的文件应该被git追踪：
+# 防止意外追踪非源码文件（白名单模式）
+# 只有以下类型的文件应该被 git 追踪：
 # - 源码: *.c, *.h, *.py, *.ts, *.tsx, *.rs, *.go, *.js
 # - 配置: CMakeLists.txt, *.yml, *.yaml, *.json, *.toml
 # - 文档: *.md (仅项目必需文档)
 # - 脚本: *.sh, *.bat, *.ps1
 # - 其他: Dockerfile*, .gitignore, .gitkeep, LICENSE, NOTICE
 
-# 23.2 本地生成的临时脚本（不追踪）
+# 本地生成的临时脚本（不追踪）
 *.local.sh
 *.local.py
 *.local.bat
@@ -949,7 +838,7 @@ scripts/release/*.zip
 *test-local*.sh
 *quick-test*.sh
 
-# 23.3 IDE/编辑器工作区文件（强化排除）
+# IDE/编辑器工作区文件（强化排除）
 *.workspace
 *.code-workspace
 .vscode/*.json
@@ -957,28 +846,23 @@ scripts/release/*.zip
 !.vscode/tasks.json
 !.vscode/launch.json
 
-# 23.4 操作系统元数据（强化排除)
+# 操作系统元数据（强化排除）
 .fuse_hidden*
 .nfs*
 .Trashes*
 .apdisk
 ._*
 
-# 23.5 项目根目录特殊文件（明确保留）
-!LICENSE
-!NOTICE
-!.gitattributes
-!.github/CODEOWNERS
-
 # =============================================================================
 # 结束
 # =============================================================================
 #
-# V10.0.0 维护说明：
-# 1. scripts/ 子目录变更时需同步更新第21b节的否定规则
-# 2. 根目录新增配置文件时需在第21a节添加否定规则
-# 3. 添加新规则时，必须验证不会误排除项目必需文件
-# 4. 使用 git check-ignore -v <file> 验证规则生效
-# 5. 定期运行 git status --porcelain 检查是否有意外追踪的文件
-# 6. 项目必需文件必须在第21节有明确的否定规则(!前缀)
-# 7. agentos/ 路径仅含源码，构建产物输出至项目根目录外的 AgentOS-build/
+# V11.0.0 维护说明：
+# 1. scripts/ 子目录变更时需同步更新 scripts/ 肯定规则节
+# 2. agentos/ 新增模块时需在 CMake 配置节添加否定规则
+# 3. 根目录新增配置文件时需在根目录配置节添加否定规则
+# 4. 添加新规则时，必须验证不会误排除项目必需文件
+# 5. 使用 git check-ignore -v <file> 验证规则生效
+# 6. 定期运行 git status --porcelain 检查是否有意外追踪的文件
+# 7. 项目必需文件必须在肯定规则节有明确的 ! 前缀规则
+# 8. agentos/ 路径仅含源码，构建产物输出至 AgentOS-build/

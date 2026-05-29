@@ -21,6 +21,7 @@
 #define AGENTOS_IPC_SERVICE_BUS_H
 
 #include "svc_common.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -30,34 +31,34 @@ extern "C" {
 
 /* ==================== 常量定义 ==================== */
 
-#define IPC_BUS_MAX_SERVICES        64
-#define IPC_BUS_MAX_CHANNELS        32
-#define IPC_BUS_MAX_MESSAGE_SIZE    (512 * 1024)
-#define IPC_BUS_DEFAULT_TIMEOUT_MS  5000
-#define IPC_BUS_MAX_RETRIES         3
-#define IPC_BUS_CHANNEL_NAME_LEN    128
-#define IPC_BUS_SERVICE_ID_LEN      64
+#define IPC_BUS_MAX_SERVICES 64
+#define IPC_BUS_MAX_CHANNELS 32
+#define IPC_BUS_MAX_MESSAGE_SIZE (512 * 1024)
+#define IPC_BUS_DEFAULT_TIMEOUT_MS 5000
+#define IPC_BUS_MAX_RETRIES 3
+#define IPC_BUS_CHANNEL_NAME_LEN 128
+#define IPC_BUS_SERVICE_ID_LEN 64
 
 /* ==================== 服务总线消息类型 ==================== */
 
 typedef enum {
-    IPC_BUS_MSG_REQUEST       = 0,
-    IPC_BUS_MSG_RESPONSE      = 1,
-    IPC_BUS_MSG_NOTIFICATION  = 2,
-    IPC_BUS_MSG_BROADCAST     = 3,
-    IPC_BUS_MSG_HEARTBEAT     = 4,
-    IPC_BUS_MSG_DISCOVERY     = 5,
-    IPC_BUS_MSG_CONTROL       = 6
+    IPC_BUS_MSG_REQUEST = 0,
+    IPC_BUS_MSG_RESPONSE = 1,
+    IPC_BUS_MSG_NOTIFICATION = 2,
+    IPC_BUS_MSG_BROADCAST = 3,
+    IPC_BUS_MSG_HEARTBEAT = 4,
+    IPC_BUS_MSG_DISCOVERY = 5,
+    IPC_BUS_MSG_CONTROL = 6
 } ipc_bus_msg_type_t;
 
 /* ==================== 服务总线协议类型 ==================== */
 
 typedef enum {
-    IPC_BUS_PROTO_JSON_RPC    = 0,
-    IPC_BUS_PROTO_MCP         = 1,
-    IPC_BUS_PROTO_A2A         = 2,
-    IPC_BUS_PROTO_OPENAI      = 3,
-    IPC_BUS_PROTO_AUTO        = 4
+    IPC_BUS_PROTO_JSON_RPC = 0,
+    IPC_BUS_PROTO_MCP = 1,
+    IPC_BUS_PROTO_A2A = 2,
+    IPC_BUS_PROTO_OPENAI = 3,
+    IPC_BUS_PROTO_AUTO = 4
 } ipc_bus_proto_t;
 
 /* ==================== 服务总线消息头 ==================== */
@@ -78,14 +79,14 @@ typedef struct {
     uint8_t reserved[16];
 } ipc_bus_message_header_t;
 
-#define IPC_BUS_MESSAGE_MAGIC    0x49534200
-#define IPC_BUS_MESSAGE_VERSION  1
+#define IPC_BUS_MESSAGE_MAGIC 0x49534200
+#define IPC_BUS_MESSAGE_VERSION 1
 
 /* ==================== 服务总线消息 ==================== */
 
 typedef struct {
     ipc_bus_message_header_t header;
-    void* payload;
+    void *payload;
     size_t payload_size;
 } ipc_bus_message_t;
 
@@ -132,24 +133,16 @@ typedef struct {
 
 /* ==================== 服务总线句柄 ==================== */
 
-typedef struct ipc_service_bus_s* ipc_service_bus_t;
-typedef struct ipc_bus_channel_s* ipc_bus_channel_t;
+typedef struct ipc_service_bus_s *ipc_service_bus_t;
+typedef struct ipc_bus_channel_s *ipc_bus_channel_t;
 
 /* ==================== 回调函数类型 ==================== */
 
-typedef int (*ipc_bus_message_handler_t)(
-    ipc_bus_channel_t channel,
-    const ipc_bus_message_t* message,
-    void* user_data
-);
+typedef int (*ipc_bus_message_handler_t)(ipc_bus_channel_t channel,
+                                         const ipc_bus_message_t *message, void *user_data);
 
-typedef void (*ipc_bus_event_handler_t)(
-    ipc_service_bus_t bus,
-    const char* event_name,
-    const void* event_data,
-    size_t data_len,
-    void* user_data
-);
+typedef void (*ipc_bus_event_handler_t)(ipc_service_bus_t bus, const char *event_name,
+                                        const void *event_data, size_t data_len, void *user_data);
 
 /* ==================== 服务总线生命周期 ==================== */
 
@@ -159,10 +152,8 @@ typedef void (*ipc_bus_event_handler_t)(
  * @param config 总线配置（NULL使用默认）
  * @return 总线句柄，失败返回NULL
  */
-AGENTOS_API ipc_service_bus_t ipc_service_bus_create(
-    const char* bus_name,
-    const ipc_bus_channel_config_t* config
-);
+AGENTOS_API ipc_service_bus_t ipc_service_bus_create(const char *bus_name,
+                                                     const ipc_bus_channel_config_t *config);
 
 /**
  * @brief 销毁服务总线实例
@@ -192,10 +183,8 @@ AGENTOS_API agentos_error_t ipc_service_bus_stop(ipc_service_bus_t bus);
  * @param config 通道配置
  * @return 通道句柄，失败返回NULL
  */
-AGENTOS_API ipc_bus_channel_t ipc_bus_channel_create(
-    ipc_service_bus_t bus,
-    const ipc_bus_channel_config_t* config
-);
+AGENTOS_API ipc_bus_channel_t ipc_bus_channel_create(ipc_service_bus_t bus,
+                                                     const ipc_bus_channel_config_t *config);
 
 /**
  * @brief 销毁通信通道
@@ -208,7 +197,7 @@ AGENTOS_API void ipc_bus_channel_destroy(ipc_bus_channel_t channel);
  * @param channel 通道句柄
  * @return 通道名称
  */
-AGENTOS_API const char* ipc_bus_channel_get_name(ipc_bus_channel_t channel);
+AGENTOS_API const char *ipc_bus_channel_get_name(ipc_bus_channel_t channel);
 
 /* ==================== 消息发送 ==================== */
 
@@ -219,11 +208,8 @@ AGENTOS_API const char* ipc_bus_channel_get_name(ipc_bus_channel_t channel);
  * @param message 消息结构
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_send(
-    ipc_service_bus_t bus,
-    const char* target_service,
-    const ipc_bus_message_t* message
-);
+AGENTOS_API agentos_error_t ipc_service_bus_send(ipc_service_bus_t bus, const char *target_service,
+                                                 const ipc_bus_message_t *message);
 
 /**
  * @brief 发送请求并等待响应
@@ -234,13 +220,11 @@ AGENTOS_API agentos_error_t ipc_service_bus_send(
  * @param timeout_ms 超时时间
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_request(
-    ipc_service_bus_t bus,
-    const char* target_service,
-    const ipc_bus_message_t* request,
-    ipc_bus_message_t* response,
-    uint32_t timeout_ms
-);
+AGENTOS_API agentos_error_t ipc_service_bus_request(ipc_service_bus_t bus,
+                                                    const char *target_service,
+                                                    const ipc_bus_message_t *request,
+                                                    ipc_bus_message_t *response,
+                                                    uint32_t timeout_ms);
 
 /**
  * @brief 广播消息到所有服务
@@ -248,10 +232,8 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
  * @param message 消息结构
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_broadcast(
-    ipc_service_bus_t bus,
-    const ipc_bus_message_t* message
-);
+AGENTOS_API agentos_error_t ipc_service_bus_broadcast(ipc_service_bus_t bus,
+                                                      const ipc_bus_message_t *message);
 
 /**
  * @brief 发送通知消息
@@ -262,13 +244,9 @@ AGENTOS_API agentos_error_t ipc_service_bus_broadcast(
  * @param protocol 协议类型
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_notify(
-    ipc_service_bus_t bus,
-    const char* target_service,
-    const void* payload,
-    size_t payload_size,
-    ipc_bus_proto_t protocol
-);
+AGENTOS_API agentos_error_t ipc_service_bus_notify(ipc_service_bus_t bus,
+                                                   const char *target_service, const void *payload,
+                                                   size_t payload_size, ipc_bus_proto_t protocol);
 
 /* ==================== 消息接收 ==================== */
 
@@ -279,11 +257,9 @@ AGENTOS_API agentos_error_t ipc_service_bus_notify(
  * @param user_data 用户数据
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_register_handler(
-    ipc_service_bus_t bus,
-    ipc_bus_message_handler_t handler,
-    void* user_data
-);
+AGENTOS_API agentos_error_t ipc_service_bus_register_handler(ipc_service_bus_t bus,
+                                                             ipc_bus_message_handler_t handler,
+                                                             void *user_data);
 
 /**
  * @brief 注销消息处理器
@@ -291,10 +267,8 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_handler(
  * @param handler 消息处理函数
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_unregister_handler(
-    ipc_service_bus_t bus,
-    ipc_bus_message_handler_t handler
-);
+AGENTOS_API agentos_error_t ipc_service_bus_unregister_handler(ipc_service_bus_t bus,
+                                                               ipc_bus_message_handler_t handler);
 
 /**
  * @brief 注册事件处理器
@@ -304,12 +278,10 @@ AGENTOS_API agentos_error_t ipc_service_bus_unregister_handler(
  * @param user_data 用户数据
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_register_event_handler(
-    ipc_service_bus_t bus,
-    const char* event_name,
-    ipc_bus_event_handler_t handler,
-    void* user_data
-);
+AGENTOS_API agentos_error_t ipc_service_bus_register_event_handler(ipc_service_bus_t bus,
+                                                                   const char *event_name,
+                                                                   ipc_bus_event_handler_t handler,
+                                                                   void *user_data);
 
 /* ==================== 服务端点管理 ==================== */
 
@@ -319,10 +291,8 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_event_handler(
  * @param endpoint 端点信息
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_register_endpoint(
-    ipc_service_bus_t bus,
-    const ipc_bus_endpoint_t* endpoint
-);
+AGENTOS_API agentos_error_t ipc_service_bus_register_endpoint(ipc_service_bus_t bus,
+                                                              const ipc_bus_endpoint_t *endpoint);
 
 /**
  * @brief 注销服务端点
@@ -330,10 +300,8 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_endpoint(
  * @param service_name 服务名称
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_unregister_endpoint(
-    ipc_service_bus_t bus,
-    const char* service_name
-);
+AGENTOS_API agentos_error_t ipc_service_bus_unregister_endpoint(ipc_service_bus_t bus,
+                                                                const char *service_name);
 
 /**
  * @brief 发现服务端点
@@ -345,14 +313,11 @@ AGENTOS_API agentos_error_t ipc_service_bus_unregister_endpoint(
  * @param found_count [out] 实际找到数量
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_discover(
-    ipc_service_bus_t bus,
-    const char* service_name,
-    ipc_bus_proto_t protocol,
-    ipc_bus_endpoint_t* endpoints,
-    uint32_t max_count,
-    uint32_t* found_count
-);
+AGENTOS_API agentos_error_t ipc_service_bus_discover(ipc_service_bus_t bus,
+                                                     const char *service_name,
+                                                     ipc_bus_proto_t protocol,
+                                                     ipc_bus_endpoint_t *endpoints,
+                                                     uint32_t max_count, uint32_t *found_count);
 
 /**
  * @brief 选择最优端点（负载均衡）
@@ -362,12 +327,10 @@ AGENTOS_API agentos_error_t ipc_service_bus_discover(
  * @param endpoint [out] 选中的端点
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_select_endpoint(
-    ipc_service_bus_t bus,
-    const char* service_name,
-    ipc_bus_proto_t protocol,
-    ipc_bus_endpoint_t* endpoint
-);
+AGENTOS_API agentos_error_t ipc_service_bus_select_endpoint(ipc_service_bus_t bus,
+                                                            const char *service_name,
+                                                            ipc_bus_proto_t protocol,
+                                                            ipc_bus_endpoint_t *endpoint);
 
 /**
  * @brief 更新端点健康状态
@@ -376,11 +339,9 @@ AGENTOS_API agentos_error_t ipc_service_bus_select_endpoint(
  * @param healthy 是否健康
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_update_endpoint_health(
-    ipc_service_bus_t bus,
-    const char* service_name,
-    bool healthy
-);
+AGENTOS_API agentos_error_t ipc_service_bus_update_endpoint_health(ipc_service_bus_t bus,
+                                                                   const char *service_name,
+                                                                   bool healthy);
 
 /* ==================== 消息辅助函数 ==================== */
 
@@ -392,41 +353,36 @@ AGENTOS_API agentos_error_t ipc_service_bus_update_endpoint_health(
  * @param payload_size 负载大小
  * @return 消息结构，失败返回NULL
  */
-AGENTOS_API ipc_bus_message_t* ipc_bus_message_create(
-    ipc_bus_msg_type_t msg_type,
-    ipc_bus_proto_t protocol,
-    const void* payload,
-    size_t payload_size
-);
+AGENTOS_API ipc_bus_message_t *ipc_bus_message_create(ipc_bus_msg_type_t msg_type,
+                                                      ipc_bus_proto_t protocol, const void *payload,
+                                                      size_t payload_size);
 
 /**
  * @brief 释放服务总线消息
  * @param message 消息结构
  */
-AGENTOS_API void ipc_bus_message_free(ipc_bus_message_t* message);
+AGENTOS_API void ipc_bus_message_free(ipc_bus_message_t *message);
 
 /**
  * @brief 复制消息
  * @param message 源消息
  * @return 新消息，失败返回NULL
  */
-AGENTOS_API ipc_bus_message_t* ipc_bus_message_clone(
-    const ipc_bus_message_t* message
-);
+AGENTOS_API ipc_bus_message_t *ipc_bus_message_clone(const ipc_bus_message_t *message);
 
 /**
  * @brief 协议类型转字符串
  * @param proto 协议类型
  * @return 协议名称字符串
  */
-AGENTOS_API const char* ipc_bus_proto_to_string(ipc_bus_proto_t proto);
+AGENTOS_API const char *ipc_bus_proto_to_string(ipc_bus_proto_t proto);
 
 /**
  * @brief 字符串转协议类型
  * @param str 协议名称
  * @return 协议类型
  */
-AGENTOS_API ipc_bus_proto_t ipc_bus_proto_from_string(const char* str);
+AGENTOS_API ipc_bus_proto_t ipc_bus_proto_from_string(const char *str);
 
 /* ==================== 统计与诊断 ==================== */
 
@@ -436,10 +392,8 @@ AGENTOS_API ipc_bus_proto_t ipc_bus_proto_from_string(const char* str);
  * @param stats [out] 统计信息
  * @return 0成功，非0失败
  */
-AGENTOS_API agentos_error_t ipc_service_bus_get_stats(
-    ipc_service_bus_t bus,
-    ipc_bus_stats_t* stats
-);
+AGENTOS_API agentos_error_t ipc_service_bus_get_stats(ipc_service_bus_t bus,
+                                                      ipc_bus_stats_t *stats);
 
 /**
  * @brief 重置统计信息
@@ -453,7 +407,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_reset_stats(ipc_service_bus_t bus);
  * @param bus 总线句柄
  * @return 总线名称
  */
-AGENTOS_API const char* ipc_service_bus_get_name(ipc_service_bus_t bus);
+AGENTOS_API const char *ipc_service_bus_get_name(ipc_service_bus_t bus);
 
 /**
  * @brief 检查总线是否运行中
