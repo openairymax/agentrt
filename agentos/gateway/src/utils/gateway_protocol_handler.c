@@ -637,8 +637,10 @@ int gateway_protocol_handler_load_config_from_json(gateway_protocol_config_t *co
     gateway_protocol_handler_get_default_config(config);
 
     cJSON *root = cJSON_Parse(json_config);
-    if (!root)
-        return -2;
+    if (!root) {
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "gateway_protocol_handler: invalid parameter", __FILE__, __LINE__, __func__);
+        return AGENTOS_ERR_INVALID_PARAM;
+        }
 
     cJSON *item;
 
@@ -725,13 +727,15 @@ int gateway_protocol_convert_to_jsonrpc(gateway_protocol_handler_t handler,
         AGENTOS_FREE(id_str);
         return *jsonrpc_out ? 0 : -2;
     default:
-        return -3;
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "gateway_protocol_handler: null pointer", __FILE__, __LINE__, __func__);
+        return AGENTOS_ERR_NULL_POINTER;
     }
 
     if (!params) {
         AGENTOS_FREE(method);
         AGENTOS_FREE(id_str);
-        return -4;
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, "gateway_protocol_handler: out of memory", __FILE__, __LINE__, __func__);
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     cJSON *jsonrpc_req = cJSON_CreateObject();
@@ -768,13 +772,16 @@ int gateway_protocol_convert_from_jsonrpc(gateway_protocol_handler_t handler,
     AGENTOS_CHECK(target_response != NULL, AGENTOS_EFAIL, "target_response is NULL");
 
     cJSON *jsonrpc = cJSON_Parse(jsonrpc_response);
-    if (!jsonrpc)
-        return -2;
+    if (!jsonrpc) {
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "gateway_protocol_handler: invalid parameter", __FILE__, __LINE__, __func__);
+        return AGENTOS_ERR_INVALID_PARAM;
+        }
 
     cJSON *result = cJSON_GetObjectItem(jsonrpc, "result");
     if (!result) {
         cJSON_Delete(jsonrpc);
-        return -3;
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "gateway_protocol_handler: null pointer", __FILE__, __LINE__, __func__);
+        return AGENTOS_ERR_NULL_POINTER;
     }
 
     switch (target_protocol) {

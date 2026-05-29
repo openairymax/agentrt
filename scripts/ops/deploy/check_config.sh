@@ -153,8 +153,8 @@ else
 fi
 
 # 检查镜像版�?
-if grep -q "1.0.0.5" docker-compose.yml; then
-    print_check "OK" "镜像版本正确 (1.0.0.5)"
+if grep -q "0.1.0" docker-compose.yml; then
+    print_check "OK" "镜像版本正确 (0.1.0)"
 else
     print_check "WARNING" "镜像版本可能不是最新的"
 fi

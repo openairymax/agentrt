@@ -297,13 +297,13 @@ static int handle_metrics_endpoint(const gateway_endpoint_request_t *req,
 
     if (len > 0) {
         resp->status_code = 200;
-        resp->content_type = "text/plain; version=0.0.4; charset=utf-8";
+        resp->content_type = "text/plain; version=0.1.0; charset=utf-8";
         resp->body = AGENTOS_STRNDUP(buf, len);
         resp->body_len = len;
     } else {
         const char *no_metrics = "# No metrics available\n";
         resp->status_code = 200;
-        resp->content_type = "text/plain; version=0.0.4; charset=utf-8";
+        resp->content_type = "text/plain; version=0.1.0; charset=utf-8";
         resp->body = AGENTOS_STRDUP(no_metrics);
         resp->body_len = strlen(no_metrics);
     }

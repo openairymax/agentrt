@@ -1,36 +1,149 @@
 # VideoEdit — 智能视频编辑应用
 
-> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.1.0 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+**模块路径**: `agentos/openlab/app/videoedit/`
+**版本**: v0.0.5
 
-`openlab/app/videoedit/` 是一款基于 AgentOS 平台的智能视频编辑应用，通过 AI 辅助实现视频剪辑、字幕生成和特效添加。
+> **Preview Status**: 本模块当前处于预览/开发阶段，API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
-## 核心能力
+## 概述
 
-- **智能剪辑**：基于内容分析的自动剪辑和场景分割
-- **字幕生成**：语音识别自动生成字幕，支持多语言
-- **特效增强**：AI 驱动的滤镜、转场和特效
-- **内容分析**：视频内容识别、标签化和摘要生成
+VideoEdit 是基于 AgentOS 平台的智能视频编辑应用，采用 FastAPI + FFmpeg 架构，通过 `EditPipeline` 管线编排器和 `FFmpegWrapper` FFmpeg 封装层实现视频剪辑、合并、特效、格式转换、字幕添加、缩略图提取、GIF 创建和音频提取等全功能视频处理。支持异步任务处理和进度追踪。
 
-## 使用方式
+## 目录结构
+
+```
+videoedit/
+├── src/
+│   ├── main.py                 # FastAPI 应用入口（VideoEditApp）
+│   └── edit_pipeline.py        # 编辑管线核心
+│       ├── FFmpegWrapper        # FFmpeg 操作封装
+│       ├── EditPipeline         # 管线编排器
+│       ├── VideoValidator       # 视频验证器
+│       └── PipelineConfig       # 配置管理器（单例）
+├── config.yaml                 # 应用配置（含 FFmpeg/编解码器参数）
+├── manifest.json               # 应用清单
+├── run.sh                      # 启动脚本
+└── README.md                   # 本文件
+```
+
+## 核心组件
+
+### EditPipeline (`src/edit_pipeline.py`)
+
+视频编辑管线编排器，管理任务队列和进度追踪：
+
+| 类 | 说明 |
+|----|------|
+| `EditPipeline` | 主编排器，提供 trim/merge/filter/convert/thumbnail/gif/audio/subtitle 处理方法 |
+| `FFmpegWrapper` | FFmpeg 操作封装，支持 trim/merge/filter/thumbnail/convert/audio/subtitle/gif |
+| `VideoValidator` | 视频验证器，验证文件格式/时间范围/分辨率 |
+| `PipelineConfig` | 配置管理器（单例模式），支持 YAML 配置加载 |
+
+### 支持的枚举类型
+
+| 枚举 | 说明 |
+|------|------|
+| `VideoFormat` | 视频格式：MP4/AVI/MOV/MKV/WEBM/GIF/FLV/WMV/MPEG |
+| `VideoCodec` | 视频编解码器：H264/H265/VP8/VP9/MPEG4/GIF |
+| `AudioCodec` | 音频编解码器：AAC/MP3/OPUS/VORBIS/WAV |
+| `FilterType` | 滤镜类型：BRIGHTNESS/CONTRAST/SATURATION/BLUR/SHARPEN/GRAYSCALE/SEPIA/INVERT/POSTERIZE |
+| `TransitionType` | 转场类型：FADE/DISSOLVE/WIPE/SLIDE |
+
+### VideoEditApp (`src/main.py`)
+
+FastAPI 应用类，提供 RESTful API 端点：
+
+| 请求模型 | 说明 |
+|----------|------|
+| `TrimRequest` | 剪辑请求：start_time/end_time/output_format |
+| `MergeRequest` | 合并请求：output_format |
+| `FilterRequest` | 滤镜请求：filter_type/filter_value/output_format |
+| `ConvertRequest` | 转换请求：output_format/video_codec/bitrate |
+| `GifRequest` | GIF 请求：start_time/duration/fps/width |
+| `AudioExtractRequest` | 音频提取请求：output_format |
+| `SubtitleRequest` | 字幕请求：subtitle_path/output_format |
+
+## 接口说明
+
+### RESTful API
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/` | GET | 服务信息 |
+| `/health` | GET | 健康检查 |
+| `/api/upload` | POST | 上传视频文件 |
+| `/api/trim/{file_id}` | POST | 视频剪辑 |
+| `/api/merge` | POST | 视频合并 |
+| `/api/filter/{file_id}` | POST | 应用滤镜 |
+| `/api/convert/{file_id}` | POST | 格式转换 |
+| `/api/thumbnails/{file_id}` | POST | 提取缩略图 |
+| `/api/gif/{file_id}` | POST | 创建 GIF |
+| `/api/audio/{file_id}` | POST | 提取音频 |
+| `/api/subtitles/{file_id}` | POST | 添加字幕 |
+| `/api/task/{task_id}` | GET | 查询任务状态 |
+| `/api/task/{task_id}/cancel` | POST | 取消任务 |
+| `/api/download/{filename}` | GET | 下载文件 |
+| `/api/formats` | GET | 获取支持格式 |
+| `/api/cleanup` | POST | 清理临时文件 |
+
+## 配置说明
+
+`config.yaml` 主要配置项：
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `host` | 服务地址 | `0.0.0.0` |
+| `port` | 服务端口 | 8001 |
+| `max_file_size` | 最大文件大小 | 5GB |
+| `ffmpeg.path` | FFmpeg 路径 | `ffmpeg` |
+| `ffmpeg.timeout` | 操作超时（秒） | 3600 |
+| `ffmpeg.preset` | 编码预设 | medium |
+| `ffmpeg.crf` | 质量因子 | 23 |
+| `video.default_codec` | 默认视频编解码器 | libx264 |
+| `audio.default_codec` | 默认音频编解码器 | aac |
+| `tasks.max_concurrent` | 最大并发任务 | 2 |
+| `tasks.auto_cleanup_hours` | 自动清理时间 | 24 |
+
+## 依赖关系
+
+- **核心依赖**: FastAPI, Uvicorn, PyYAML, aiofiles
+- **视频处理**: FFmpeg（系统级依赖）
+- **可选依赖**: OpenCV, MoviePy, Pillow, NumPy
+
+## 构建说明
+
+```bash
+# 安装 FFmpeg（Ubuntu/Debian）
+sudo apt install ffmpeg
+
+# 安装 Python 依赖
+pip install -e ".[videoedit]"
+
+# 启动服务
+python src/main.py --config config.yaml --host 0.0.0.0 --port 8001
+```
+
+## 使用示例
 
 ```python
-from videoedit import VideoEditApp
+from videoedit.src.main import VideoEditApp
 
-editor = VideoEditApp()
+app = VideoEditApp(config_path="config.yaml")
 
-# 导入视频
-video = editor.import_video("input/demo.mp4")
+# 启动服务
+app.run(host="0.0.0.0", port=8001)
 
-# 智能剪辑
-clips = editor.smart_cut(video, max_duration=120)
+# 或通过管线直接使用
+from videoedit.src.edit_pipeline import EditPipeline, PipelineConfig
 
-# 生成字幕
-subtitles = editor.generate_subtitles(clips, language="zh")
+config = PipelineConfig()
+config.load("config.yaml")
+pipeline = EditPipeline(config._config)
 
-# 导出成品
-editor.export(clips, "output/demo_edited.mp4", format="mp4")
+result = await pipeline.process_trim("input.mp4", 10.0, 60.0)
+print(f"Status: {result.status}, Output: {result.output_path}")
 ```
 
 ---
 
-*AgentOS OpenLab — VideoEdit*
+© 2026 SPHARX Ltd. All Rights Reserved.
