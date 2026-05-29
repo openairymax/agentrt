@@ -23,19 +23,29 @@
  */
 
 #include "workbench_container.h"
-#include "utils/cupolas_utils.h"
+
 #include "../platform/platform.h"
+#include "utils/cupolas_utils.h"
+
+#include <platform.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
 
 #if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
 #else
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
+#endif
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
 #endif
 
 #define CONTAINER_ID_LENGTH 64
@@ -50,16 +60,19 @@
  * @note Rejects characters that could enable command injection:
  *       ; | & ` $ ( ) < > { } [ ] ! # ~ \ ' " and non-printable chars
  */
-static bool is_safe_image_name(const char* image) {
+static bool is_safe_image_name(const char *image)
+{
     if (!image || !*image || strlen(image) > MAX_IMAGE_NAME_LEN) {
         return false;
     }
 
-    const char* unsafe_chars = ";|&`$()<>{}[]!#~\\'\"\n\r\t";
-    for (const char* p = image; *p; p++) {
+    const char *unsafe_chars = ";|&`$()<>{}[]!#~\\'\"\n\r\t";
+    for (const char *p = image; *p; p++) {
         unsigned char c = (unsigned char)*p;
-        if (c < 0x20 || c > 0x7E) return false;
-        if (strchr(unsafe_chars, c)) return false;
+        if (c < 0x20 || c > 0x7E)
+            return false;
+        if (strchr(unsafe_chars, c))
+            return false;
     }
 
     if (strchr(image, ' ') && (strstr(image, "$(") || strstr(image, "`"))) {
@@ -78,7 +91,8 @@ typedef struct container_handle {
     container_state_t state;
 } container_handle_t;
 
-static container_runtime_t detect_available_runtime(void) {
+static container_runtime_t detect_available_runtime(void)
+{
     if (container_runtime_is_available(CONTAINER_RUNTIME_DOCKER)) {
         return CONTAINER_RUNTIME_DOCKER;
     }
@@ -88,27 +102,30 @@ static container_runtime_t detect_available_runtime(void) {
     return CONTAINER_RUNTIME_AUTO;
 }
 
-bool container_runtime_is_available(container_runtime_t runtime) {
-    const char* cmd = NULL;
+bool container_runtime_is_available(container_runtime_t runtime)
+{
+    const char *cmd = NULL;
     switch (runtime) {
-        case CONTAINER_RUNTIME_DOCKER:
-            cmd = "docker --version";
-            break;
-        case CONTAINER_RUNTIME_RUNC:
-            cmd = "runc --version";
-            break;
-        case CONTAINER_RUNTIME_CRUN:
-            cmd = "crun --version";
-            break;
-        default:
-            return false;
+    case CONTAINER_RUNTIME_DOCKER:
+        cmd = "docker --version";
+        break;
+    case CONTAINER_RUNTIME_RUNC:
+        cmd = "runc --version";
+        break;
+    case CONTAINER_RUNTIME_CRUN:
+        cmd = "crun --version";
+        break;
+    default:
+        return false;
     }
     /* flawfinder: ignore - cmd is hardcoded, not from user input */
     return system(cmd) == 0;
 }
 
-void container_config_init(container_config_t* manager) {
-    if (!manager) return;
+void container_config_init(container_config_t *manager)
+{
+    if (!manager)
+        return;
 
     memset(manager, 0, sizeof(container_config_t));
 
@@ -130,8 +147,10 @@ void container_config_init(container_config_t* manager) {
     manager->image_policy.pull_latest = false;
 }
 
-void* container_manager_create(const container_config_t* manager) {
-    container_handle_t* handle = (container_handle_t*)cupolas_mem_alloc(sizeof(container_handle_t));
+void *container_manager_create(const container_config_t *manager)
+{
+    container_handle_t *handle =
+        (container_handle_t *)cupolas_mem_alloc(sizeof(container_handle_t));
     if (!handle) {
         return NULL;
     }
@@ -153,17 +172,18 @@ void* container_manager_create(const container_config_t* manager) {
     handle->state = CONTAINER_STATE_CREATED;
     handle->is_running = false;
 
-    srand((unsigned int)time(NULL));
-    snprintf(handle->container_id, CONTAINER_ID_LENGTH, "%s%08x%08x",
-             CONTAINER_NAME_PREFIX, rand(), rand());
+    snprintf(handle->container_id, CONTAINER_ID_LENGTH, "%s%08x%08x", CONTAINER_NAME_PREFIX,
+             agentos_random_uint32(0, 0xFFFFFFFF), agentos_random_uint32(0, 0xFFFFFFFF));
 
     return handle;
 }
 
-void container_manager_destroy(void* mgr) {
-    if (!mgr) return;
+void container_manager_destroy(void *mgr)
+{
+    if (!mgr)
+        return;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     if (handle->is_running) {
         container_stop(mgr, 5000);
@@ -174,25 +194,28 @@ void container_manager_destroy(void* mgr) {
     cupolas_mem_free(handle);
 }
 
-static int execute_command(const char* cmd, int timeout_ms, char* output, size_t output_size) {
-    if (!cmd) return -1;
+static int execute_command(const char *cmd, int timeout_ms, char *output, size_t output_size)
+{
+    if (!cmd)
+        return AGENTOS_EINVAL;
 
     /* SEC-011: 命令注入防护 - 检测shell元字符（与executor.c对齐） */
-    const char* dangerous_chars = ";|&`$()<>{}[]\\!*?\n\r";
-    for (const char* dc = dangerous_chars; *dc; dc++) {
+    const char *dangerous_chars = ";|&`$()<>{}[]\\!*?\n\r";
+    for (const char *dc = dangerous_chars; *dc; dc++) {
         if (strchr(cmd, *dc)) {
-            return -1;
+            return AGENTOS_EINVAL;
         }
     }
 
 #if cupolas_PLATFORM_WINDOWS
-    FILE* pipe = _popen(cmd, "r");
+    FILE *pipe = _popen(cmd, "r");
 #else
     /* flawfinder: ignore - cmd validated above for injection patterns */
-    FILE* pipe = popen(cmd, "r");
+    FILE *pipe = popen(cmd, "r");
 #endif
 
-    if (!pipe) return -1;
+    if (!pipe)
+        return AGENTOS_EINVAL;
 
     if (output && output_size > 0) {
         size_t offset = 0;
@@ -217,8 +240,10 @@ static int execute_command(const char* cmd, int timeout_ms, char* output, size_t
     return result;
 }
 
-int container_pull_image(void* mgr, const char* image) {
-    if (!mgr || !image) return cupolas_ERROR_INVALID_ARG;
+int container_pull_image(void *mgr, const char *image)
+{
+    if (!mgr || !image)
+        return cupolas_ERROR_INVALID_ARG;
 
     if (!is_safe_image_name(image)) {
         return cupolas_ERROR_PERMISSION;
@@ -233,10 +258,12 @@ int container_pull_image(void* mgr, const char* image) {
     return result == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
-int container_start(void* mgr, const char* name, container_result_t* result) {
-    if (!mgr) return cupolas_ERROR_INVALID_ARG;
+int container_start(void *mgr, const char *name, container_result_t *result)
+{
+    if (!mgr)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     if (!handle->manager.image || !handle->manager.command) {
         return cupolas_ERROR_INVALID_ARG;
@@ -267,11 +294,8 @@ int container_start(void* mgr, const char* name, container_result_t* result) {
     }
 
     char cmd[MAX_COMMAND_LENGTH * 2];
-    snprintf(cmd, MAX_COMMAND_LENGTH * 2, "docker run --name %s %s %s %s",
-             handle->container_name,
-             handle->manager.resources.memory_limit > 0 ?
-                 "" : "--rm -i",
-             handle->manager.image,
+    snprintf(cmd, MAX_COMMAND_LENGTH * 2, "docker run --name %s %s %s %s", handle->container_name,
+             handle->manager.resources.memory_limit > 0 ? "" : "--rm -i", handle->manager.image,
              handle->manager.command);
 
     for (size_t i = 0; i < handle->manager.args_count && handle->manager.args; i++) {
@@ -290,18 +314,20 @@ int container_start(void* mgr, const char* name, container_result_t* result) {
     return 0;
 }
 
-int container_stop(void* mgr, uint32_t timeout_ms) {
-    if (!mgr) return cupolas_ERROR_INVALID_ARG;
+int container_stop(void *mgr, uint32_t timeout_ms)
+{
+    if (!mgr)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     if (!handle->is_running) {
         return 0;
     }
 
     char cmd[MAX_COMMAND_LENGTH];
-    snprintf(cmd, MAX_COMMAND_LENGTH, "docker stop -t %u %s",
-             (timeout_ms + 999) / 1000, handle->container_name);
+    snprintf(cmd, MAX_COMMAND_LENGTH, "docker stop -t %u %s", (timeout_ms + 999) / 1000,
+             handle->container_name);
 
     int ret = execute_command(cmd, timeout_ms, NULL, 0);
 
@@ -311,10 +337,12 @@ int container_stop(void* mgr, uint32_t timeout_ms) {
     return ret == 0 ? 0 : -1;
 }
 
-int container_remove(void* mgr) {
-    if (!mgr) return cupolas_ERROR_INVALID_ARG;
+int container_remove(void *mgr)
+{
+    if (!mgr)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     char cmd[MAX_COMMAND_LENGTH];
     snprintf(cmd, MAX_COMMAND_LENGTH, "docker rm -f %s", handle->container_name);
@@ -327,10 +355,12 @@ int container_remove(void* mgr) {
     return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
-int container_get_info(void* mgr, container_info_t* info) {
-    if (!mgr || !info) return cupolas_ERROR_INVALID_ARG;
+int container_get_info(void *mgr, container_info_t *info)
+{
+    if (!mgr || !info)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     memset(info, 0, sizeof(container_info_t));
 
@@ -341,10 +371,12 @@ int container_get_info(void* mgr, container_info_t* info) {
     return cupolas_OK;
 }
 
-int container_get_stats(void* mgr, container_info_t* info) {
-    if (!mgr || !info) return cupolas_ERROR_INVALID_ARG;
+int container_get_stats(void *mgr, container_info_t *info)
+{
+    if (!mgr || !info)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     if (!handle->is_running) {
         memset(&info->stats, 0, sizeof(info->stats));
@@ -376,10 +408,12 @@ int container_get_stats(void* mgr, container_info_t* info) {
     return cupolas_OK;
 }
 
-int container_pause(void* mgr) {
-    if (!mgr) return cupolas_ERROR_INVALID_ARG;
+int container_pause(void *mgr)
+{
+    if (!mgr)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     if (!handle->is_running) {
         return cupolas_ERROR_INVALID_ARG;
@@ -397,10 +431,12 @@ int container_pause(void* mgr) {
     return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
-int container_unpause(void* mgr) {
-    if (!mgr) return cupolas_ERROR_INVALID_ARG;
+int container_unpause(void *mgr)
+{
+    if (!mgr)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     if (handle->state != CONTAINER_STATE_PAUSED) {
         return cupolas_ERROR_INVALID_ARG;
@@ -419,13 +455,16 @@ int container_unpause(void* mgr) {
     return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
-int container_wait(void* mgr, uint32_t timeout_ms, int* exit_code) {
-    if (!mgr) return cupolas_ERROR_INVALID_ARG;
+int container_wait(void *mgr, uint32_t timeout_ms, int *exit_code)
+{
+    if (!mgr)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     if (!handle->is_running) {
-        if (exit_code) *exit_code = 0;
+        if (exit_code)
+            *exit_code = 0;
         return cupolas_OK;
     }
 
@@ -436,7 +475,7 @@ int container_wait(void* mgr, uint32_t timeout_ms, int* exit_code) {
     int ret = execute_command(cmd, timeout_ms, output, sizeof(output));
 
     if (exit_code) {
-        *exit_code = atoi(output);
+        *exit_code = (int)strtol(output, NULL, 10);
     }
 
     handle->is_running = false;
@@ -445,11 +484,13 @@ int container_wait(void* mgr, uint32_t timeout_ms, int* exit_code) {
     return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
-int container_exec(void* mgr, const char* command, const char** args,
-                  size_t arg_count, container_result_t* result) {
-    if (!mgr || !command) return cupolas_ERROR_INVALID_ARG;
+int container_exec(void *mgr, const char *command, const char **args, size_t arg_count,
+                   container_result_t *result)
+{
+    if (!mgr || !command)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     if (!handle->is_running) {
         return cupolas_ERROR_INVALID_ARG;
@@ -484,14 +525,17 @@ int container_exec(void* mgr, const char* command, const char** args,
     return cupolas_OK;
 }
 
-int container_get_logs(void* mgr, size_t tail, char* output, size_t size) {
-    if (!mgr || !output || size == 0) return cupolas_ERROR_INVALID_ARG;
+int container_get_logs(void *mgr, size_t tail, char *output, size_t size)
+{
+    if (!mgr || !output || size == 0)
+        return cupolas_ERROR_INVALID_ARG;
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t *handle = (container_handle_t *)mgr;
 
     char cmd[MAX_COMMAND_LENGTH];
     if (tail > 0) {
-        snprintf(cmd, MAX_COMMAND_LENGTH, "docker logs --tail %zu %s", tail, handle->container_name);
+        snprintf(cmd, MAX_COMMAND_LENGTH, "docker logs --tail %zu %s", tail,
+                 handle->container_name);
     } else {
         snprintf(cmd, MAX_COMMAND_LENGTH, "docker logs %s", handle->container_name);
     }
@@ -501,8 +545,10 @@ int container_get_logs(void* mgr, size_t tail, char* output, size_t size) {
     return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
-void container_result_free(container_result_t* result) {
-    if (!result) return;
+void container_result_free(container_result_t *result)
+{
+    if (!result)
+        return;
 
     if (result->stdout_data) {
         cupolas_mem_free(result->stdout_data);

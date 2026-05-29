@@ -7,14 +7,17 @@
 #include "agentos.h"
 #include "execution.h"
 #include "memory_compat.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>
+#include "error.h"
 #endif
 
 #define AGENTOS_MAX_CODE_SIZE (4 * 1024 * 1024)
@@ -25,8 +28,8 @@ typedef struct code_unit_data {
 } code_unit_data_t;
 
 #ifdef _WIN32
-static agentos_error_t create_temp_file_windows(const char *suffix, const char *content, size_t content_len,
-                                                char **out_path)
+static agentos_error_t create_temp_file_windows(const char *suffix, const char *content,
+                                                size_t content_len, char **out_path)
 {
     char temp_dir[MAX_PATH];
     DWORD dir_len = GetTempPathA(MAX_PATH, temp_dir);
@@ -53,7 +56,7 @@ static agentos_error_t create_temp_file_windows(const char *suffix, const char *
         return AGENTOS_EIO;
     }
 
-    size_t written   = fwrite(content, 1, content_len, f);
+    size_t written = fwrite(content, 1, content_len, f);
     int close_result = fclose(f);
 
     if (written != content_len) {
@@ -75,8 +78,8 @@ static agentos_error_t create_temp_file_windows(const char *suffix, const char *
     return AGENTOS_SUCCESS;
 }
 #else
-static agentos_error_t create_temp_file_unix(const char *suffix, const char *content, size_t content_len,
-                                             char **out_path)
+static agentos_error_t create_temp_file_unix(const char *suffix, const char *content,
+                                             size_t content_len, char **out_path)
 {
     char temp_dir[256];
     const char *td = getenv("TMPDIR");
@@ -92,9 +95,9 @@ static agentos_error_t create_temp_file_unix(const char *suffix, const char *con
     }
 
     char temp_filename[512];
-    int needed =
-        snprintf(temp_filename, sizeof(temp_filename), "%sagentos_code_XXXXXX%s", temp_dir, suffix ? suffix : "");
-    if (needed < 0 || (size_t) needed >= sizeof(temp_filename)) {
+    int needed = snprintf(temp_filename, sizeof(temp_filename), "%sagentos_code_XXXXXX%s", temp_dir,
+                          suffix ? suffix : "");
+    if (needed < 0 || (size_t)needed >= sizeof(temp_filename)) {
         return AGENTOS_EIO;
     }
 
@@ -102,10 +105,10 @@ static agentos_error_t create_temp_file_unix(const char *suffix, const char *con
     if (fd == -1)
         return AGENTOS_EIO;
 
-    ssize_t written  = write(fd, content, content_len);
+    ssize_t written = write(fd, content, content_len);
     int close_result = close(fd);
 
-    if (written < 0 || (size_t) written != content_len) {
+    if (written < 0 || (size_t)written != content_len) {
         unlink(temp_filename);
         return AGENTOS_EIO;
     }
@@ -125,10 +128,11 @@ static agentos_error_t create_temp_file_unix(const char *suffix, const char *con
 }
 #endif
 
-static agentos_error_t create_temp_file(const char *suffix, const char *content, size_t content_len, char **out_path)
+static agentos_error_t create_temp_file(const char *suffix, const char *content, size_t content_len,
+                                        char **out_path)
 {
     if (!content || !out_path)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to create temp file: null content or out_path");
 #ifdef _WIN32
     return create_temp_file_windows(suffix, content, content_len, out_path);
 #else
@@ -156,24 +160,24 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
         return AGENTOS_EIO;
 
     STARTUPINFOA si = {0};
-    si.cb           = sizeof(si);
-    si.dwFlags      = STARTF_USESTDHANDLES;
-    si.hStdError    = hWritePipe;
-    si.hStdOutput   = hWritePipe;
-    si.hStdInput    = GetStdHandle(STD_INPUT_HANDLE);
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdError = hWritePipe;
+    si.hStdOutput = hWritePipe;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
     PROCESS_INFORMATION pi = {0};
-    if (!CreateProcessA(NULL, (LPSTR) cmd, NULL, NULL, TRUE, CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS, NULL, NULL, &si,
-                        &pi)) {
+    if (!CreateProcessA(NULL, (LPSTR)cmd, NULL, NULL, TRUE,
+                        CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi)) {
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
         return AGENTOS_EIO;
     }
     CloseHandle(hWritePipe);
 
-    size_t cap   = 4096;
+    size_t cap = 4096;
     size_t total = 0;
-    char *output = (char *) AGENTOS_MALLOC(cap);
+    char *output = (char *)AGENTOS_MALLOC(cap);
     if (!output) {
         CloseHandle(hReadPipe);
         TerminateProcess(pi.hProcess, 1);
@@ -187,10 +191,10 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
     DWORD bytesRead;
     while (ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0) {
         buffer[bytesRead] = '\0';
-        size_t len        = bytesRead;
+        size_t len = bytesRead;
         if (total + len + 1 > cap) {
             cap *= 2;
-            char *new_out = (char *) AGENTOS_REALLOC(output, cap);
+            char *new_out = (char *)AGENTOS_REALLOC(output, cap);
             if (!new_out) {
                 AGENTOS_FREE(output);
                 CloseHandle(hReadPipe);
@@ -220,9 +224,9 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
     if (!pipe)
         return AGENTOS_EIO;
 
-    size_t cap   = 4096;
+    size_t cap = 4096;
     size_t total = 0;
-    char *output = (char *) AGENTOS_MALLOC(cap);
+    char *output = (char *)AGENTOS_MALLOC(cap);
     if (!output) {
         pclose(pipe);
         return AGENTOS_ENOMEM;
@@ -234,7 +238,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
         size_t len = strlen(buffer);
         if (total + len + 1 > cap) {
             cap *= 2;
-            char *new_out = (char *) AGENTOS_REALLOC(output, cap);
+            char *new_out = (char *)AGENTOS_REALLOC(output, cap);
             if (!new_out) {
                 AGENTOS_FREE(output);
                 pclose(pipe);
@@ -246,7 +250,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
         total += len;
     }
 
-    int status  = pclose(pipe);
+    int status = pclose(pipe);
     *out_output = output;
     return (status == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 #endif
@@ -255,7 +259,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
 static agentos_error_t escape_shell_arg(const char *arg, char *out, size_t out_size)
 {
     if (!arg || !out || out_size < 4)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to escape shell arg: null arg, null out, or insufficient size");
     size_t j = 0;
     out[j++] = '\'';
     for (size_t i = 0; arg[i] && j < out_size - 4; i++) {
@@ -269,18 +273,19 @@ static agentos_error_t escape_shell_arg(const char *arg, char *out, size_t out_s
         }
     }
     out[j++] = '\'';
-    out[j]   = '\0';
+    out[j] = '\0';
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *input, void **out_output)
+static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *input,
+                                    void **out_output)
 {
-    code_unit_data_t *data = (code_unit_data_t *) unit->execution_unit_data;
+    code_unit_data_t *data = (code_unit_data_t *)unit->execution_unit_data;
     if (!data || !input || !out_output)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to execute code: null data, input, or out_output");
 
-    const char *code = (const char *) input;
-    size_t code_len  = strlen(code);
+    const char *code = (const char *)input;
+    size_t code_len = strlen(code);
 
     if (code_len > AGENTOS_MAX_CODE_SIZE) {
         return AGENTOS_EINVAL;
@@ -291,22 +296,22 @@ static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *
         return AGENTOS_EPROTONOSUPPORT;
     }
 
-    const char *suffix      = NULL;
+    const char *suffix = NULL;
     const char *interpreter = NULL;
     if (strcmp(data->language, "python") == 0) {
-        suffix      = ".py";
+        suffix = ".py";
         interpreter = "python";
     } else if (strcmp(data->language, "javascript") == 0 || strcmp(data->language, "node") == 0) {
-        suffix      = ".js";
+        suffix = ".js";
         interpreter = "node";
     }
 
-    char *temp_path     = NULL;
+    char *temp_path = NULL;
     agentos_error_t err = create_temp_file(suffix, code, code_len, &temp_path);
     if (err != AGENTOS_SUCCESS)
         return err;
 
-    char *cmd = (char *) AGENTOS_MALLOC(8192);
+    char *cmd = (char *)AGENTOS_MALLOC(8192);
     if (!cmd) {
         remove_temp_file(temp_path);
         AGENTOS_FREE(temp_path);
@@ -326,7 +331,7 @@ static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *
 #endif
 
     char *output = NULL;
-    err          = execute_command_capture(cmd, &output);
+    err = execute_command_capture(cmd, &output);
     remove_temp_file(temp_path);
     AGENTOS_FREE(temp_path);
 
@@ -347,7 +352,7 @@ static void code_destroy(agentos_execution_unit_t *unit)
 {
     if (!unit)
         return;
-    code_unit_data_t *data = (code_unit_data_t *) unit->execution_unit_data;
+    code_unit_data_t *data = (code_unit_data_t *)unit->execution_unit_data;
     if (data) {
         if (data->language)
             AGENTOS_FREE(data->language);
@@ -365,12 +370,13 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
     if (strlen(language) > 32)
         return NULL;
 
-    agentos_execution_unit_t *unit = (agentos_execution_unit_t *) AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
+    agentos_execution_unit_t *unit =
+        (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit)
         return NULL;
     memset(unit, 0, sizeof(*unit));
 
-    code_unit_data_t *data = (code_unit_data_t *) AGENTOS_MALLOC(sizeof(code_unit_data_t));
+    code_unit_data_t *data = (code_unit_data_t *)AGENTOS_MALLOC(sizeof(code_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
         return NULL;
@@ -385,7 +391,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
             if (lj + 1 < sizeof(safe_lang) - 1)
                 safe_lang[lj++] = '\\';
         }
-        if (lj < sizeof(safe_lang) - 1 && (unsigned char) c >= 0x20) {
+        if (lj < sizeof(safe_lang) - 1 && (unsigned char)c >= 0x20) {
             safe_lang[lj++] = c;
         }
     }
@@ -404,7 +410,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
         return NULL;
     }
 
-    unit->execution_unit_data    = data;
+    unit->execution_unit_data = data;
     unit->execution_unit_execute = code_execute;
     unit->execution_unit_destroy = code_destroy;
 

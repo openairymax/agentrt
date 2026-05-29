@@ -29,19 +29,20 @@
 
 #include "agentos_protocol_interface.h"
 #include "unified_protocol.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define PROTO_REGISTRY_VERSION       "2.1.0"
-#define PROTO_REGISTRY_MAX_ADAPTERS   32
-#define PROTO_REGISTRY_MAX_DEPS       16
-#define PROTO_REGISTRY_NAME_MAX_LEN   64
-#define PROTO_REGISTRY_DESC_MAX_LEN   256
+#define PROTO_REGISTRY_VERSION "2.1.0"
+#define PROTO_REGISTRY_MAX_ADAPTERS 32
+#define PROTO_REGISTRY_MAX_DEPS 16
+#define PROTO_REGISTRY_NAME_MAX_LEN 64
+#define PROTO_REGISTRY_DESC_MAX_LEN 256
 
 typedef enum {
     PROTO_CAT_CORE = 0,
@@ -76,8 +77,8 @@ typedef struct {
     proto_type_t type;
     uint32_t capabilities;
     proto_state_t state;
-    const protocol_adapter_t* adapter;
-    void* context;
+    const protocol_adapter_t *adapter;
+    void *context;
     proto_dependency_t dependencies[PROTO_REGISTRY_MAX_DEPS];
     size_t dependency_count;
     uint64_t registered_at;
@@ -102,88 +103,65 @@ typedef struct {
 
 typedef struct protocol_registry_s protocol_registry_t;
 
-typedef int (*proto_registry_event_fn)(const char* event_name,
-                                        const char* entry_name,
-                                        proto_state_t old_state,
-                                        proto_state_t new_state,
-                                        void* user_data);
+typedef int (*proto_registry_event_fn)(const char *event_name, const char *entry_name,
+                                       proto_state_t old_state, proto_state_t new_state,
+                                       void *user_data);
 
-protocol_registry_t* proto_registry_create(void);
-void proto_registry_destroy(protocol_registry_t* registry);
+protocol_registry_t *proto_registry_create(void);
+void proto_registry_destroy(protocol_registry_t *registry);
 
-const char* proto_registry_version(void);
+const char *proto_registry_version(void);
 
-int proto_registry_register(protocol_registry_t* registry,
-                            const char* name,
-                            const char* version,
-                            const char* description,
-                            proto_category_t category,
-                            proto_type_t type,
-                            uint32_t capabilities,
-                            const protocol_adapter_t* adapter,
-                            void* context);
+int proto_registry_register(protocol_registry_t *registry, const char *name, const char *version,
+                            const char *description, proto_category_t category, proto_type_t type,
+                            uint32_t capabilities, const protocol_adapter_t *adapter,
+                            void *context);
 
-int proto_registry_unregister(protocol_registry_t* registry,
-                              const char* name);
+int proto_registry_unregister(protocol_registry_t *registry, const char *name);
 
-proto_registry_entry_t* proto_registry_find(protocol_registry_t* registry,
-                                            const char* name);
+proto_registry_entry_t *proto_registry_find(protocol_registry_t *registry, const char *name);
 
-proto_registry_entry_t* proto_registry_find_by_type(protocol_registry_t* registry,
+proto_registry_entry_t *proto_registry_find_by_type(protocol_registry_t *registry,
                                                     proto_type_t type);
 
-proto_registry_entry_t* proto_registry_find_by_capability(protocol_registry_t* registry,
+proto_registry_entry_t *proto_registry_find_by_capability(protocol_registry_t *registry,
                                                           uint32_t required_caps);
 
-size_t proto_registry_list_all(protocol_registry_t* registry,
-                               proto_registry_entry_t** entries);
+size_t proto_registry_list_all(protocol_registry_t *registry, proto_registry_entry_t **entries);
 
-size_t proto_registry_list_by_category(protocol_registry_t* registry,
-                                       proto_category_t category,
-                                       proto_registry_entry_t** entries);
+size_t proto_registry_list_by_category(protocol_registry_t *registry, proto_category_t category,
+                                       proto_registry_entry_t **entries);
 
-size_t proto_registry_list_active(protocol_registry_t* registry,
-                                  proto_registry_entry_t** entries);
+size_t proto_registry_list_active(protocol_registry_t *registry, proto_registry_entry_t **entries);
 
-int proto_registry_set_state(protocol_registry_t* registry,
-                             const char* name,
-                             proto_state_t state);
+int proto_registry_set_state(protocol_registry_t *registry, const char *name, proto_state_t state);
 
-int proto_registry_add_dependency(protocol_registry_t* registry,
-                                  const char* name,
-                                  const char* dep_name);
+int proto_registry_add_dependency(protocol_registry_t *registry, const char *name,
+                                  const char *dep_name);
 
-bool proto_registry_check_dependencies(const proto_registry_entry_t* entry);
+bool proto_registry_check_dependencies(const proto_registry_entry_t *entry);
 
-int proto_registry_activate(protocol_registry_t* registry,
-                            const char* name);
+int proto_registry_activate(protocol_registry_t *registry, const char *name);
 
-int proto_registry_deactivate(protocol_registry_t* registry,
-                              const char* name);
+int proto_registry_deactivate(protocol_registry_t *registry, const char *name);
 
-int proto_registry_heartbeat(protocol_registry_t* registry,
-                             const char* name);
+int proto_registry_heartbeat(protocol_registry_t *registry, const char *name);
 
-int proto_registry_record_request(protocol_registry_t* registry,
-                                  const char* name,
-                                  bool success,
+int proto_registry_record_request(protocol_registry_t *registry, const char *name, bool success,
                                   double latency_ms);
 
-int proto_registry_get_statistics(protocol_registry_t* registry,
-                                  proto_registry_stats_t* stats);
+int proto_registry_get_statistics(protocol_registry_t *registry, proto_registry_stats_t *stats);
 
-int proto_registry_export_json(protocol_registry_t* registry,
-                                char* json_buffer,
-                                size_t buffer_size);
+int proto_registry_export_json(protocol_registry_t *registry, char *json_buffer,
+                               size_t buffer_size);
 
-int proto_registry_set_event_callback(protocol_registry_t* registry,
-                                      proto_registry_event_fn callback,
-                                      void* user_data);
+int proto_registry_set_event_callback(protocol_registry_t *registry,
+                                      proto_registry_event_fn callback, void *user_data);
 
-int proto_registry_initialize_builtins(protocol_registry_t* registry);
+int proto_registry_initialize_builtins(protocol_registry_t *registry);
 
-const char* proto_category_to_string(proto_category_t cat);
-const char* proto_state_to_string(proto_state_t state);
+const char *proto_category_to_string(proto_category_t cat);
+const char *proto_state_to_string(proto_state_t state);
 
 #ifdef __cplusplus
 }

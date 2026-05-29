@@ -4,19 +4,21 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "registry.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "registry.h"
 
 /**
  * @brief 测试注册表创建和销毁
  */
-static void test_registry_create_destroy(void) {
+static void test_registry_create_destroy(void)
+{
     printf("  test_registry_create_destroy...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
     tool_registry_destroy(reg);
@@ -27,10 +29,11 @@ static void test_registry_create_destroy(void) {
 /**
  * @brief 测试工具注册
  */
-static void test_registry_add(void) {
+static void test_registry_add(void)
+{
     printf("  test_registry_add...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
     tool_metadata_t meta;
@@ -53,10 +56,11 @@ static void test_registry_add(void) {
 /**
  * @brief 测试工具重复注册
  */
-static void test_registry_add_duplicate(void) {
+static void test_registry_add_duplicate(void)
+{
     printf("  test_registry_add_duplicate...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
     tool_metadata_t meta;
@@ -79,10 +83,11 @@ static void test_registry_add_duplicate(void) {
 /**
  * @brief 测试工具获取
  */
-static void test_registry_get(void) {
+static void test_registry_get(void)
+{
     printf("  test_registry_get...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
     tool_metadata_t meta;
@@ -94,7 +99,7 @@ static void test_registry_get(void) {
 
     tool_registry_add(reg, &meta);
 
-    tool_metadata_t* retrieved = tool_registry_get(reg, "get_test_tool");
+    tool_metadata_t *retrieved = tool_registry_get(reg, "get_test_tool");
     assert(retrieved != NULL);
     assert(strcmp(retrieved->id, "get_test_tool") == 0);
     assert(strcmp(retrieved->name, "Get Test Tool") == 0);
@@ -108,13 +113,14 @@ static void test_registry_get(void) {
 /**
  * @brief 测试工具获取不存在
  */
-static void test_registry_get_nonexistent(void) {
+static void test_registry_get_nonexistent(void)
+{
     printf("  test_registry_get_nonexistent...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
-    tool_metadata_t* retrieved __attribute__((unused)) = tool_registry_get(reg, "nonexistent_tool");
+    tool_metadata_t *retrieved __attribute__((unused)) = tool_registry_get(reg, "nonexistent_tool");
     assert(retrieved == NULL);
 
     tool_registry_destroy(reg);
@@ -125,10 +131,11 @@ static void test_registry_get_nonexistent(void) {
 /**
  * @brief 测试工具移除
  */
-static void test_registry_remove(void) {
+static void test_registry_remove(void)
+{
     printf("  test_registry_remove...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
     tool_metadata_t meta;
@@ -142,7 +149,7 @@ static void test_registry_remove(void) {
     int ret __attribute__((unused)) = tool_registry_remove(reg, "remove_test_tool");
     assert(ret == 0);
 
-    tool_metadata_t* retrieved __attribute__((unused)) = tool_registry_get(reg, "remove_test_tool");
+    tool_metadata_t *retrieved __attribute__((unused)) = tool_registry_get(reg, "remove_test_tool");
     assert(retrieved == NULL);
 
     tool_registry_destroy(reg);
@@ -153,10 +160,11 @@ static void test_registry_remove(void) {
 /**
  * @brief 测试工具移除不存在
  */
-static void test_registry_remove_nonexistent(void) {
+static void test_registry_remove_nonexistent(void)
+{
     printf("  test_registry_remove_nonexistent...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
     int ret __attribute__((unused)) = tool_registry_remove(reg, "nonexistent_tool");
@@ -170,10 +178,11 @@ static void test_registry_remove_nonexistent(void) {
 /**
  * @brief 测试工具列表JSON
  */
-static void test_registry_list_json(void) {
+static void test_registry_list_json(void)
+{
     printf("  test_registry_list_json...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
     tool_metadata_t meta1;
@@ -191,7 +200,7 @@ static void test_registry_list_json(void) {
     tool_registry_add(reg, &meta1);
     tool_registry_add(reg, &meta2);
 
-    char* json = tool_registry_list_json(reg);
+    char *json = tool_registry_list_json(reg);
     assert(json != NULL);
     assert(strstr(json, "json_tool_1") != NULL);
     assert(strstr(json, "json_tool_2") != NULL);
@@ -205,13 +214,14 @@ static void test_registry_list_json(void) {
 /**
  * @brief 测试空注册表列表JSON
  */
-static void test_registry_list_json_empty(void) {
+static void test_registry_list_json_empty(void)
+{
     printf("  test_registry_list_json_empty...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
-    char* json = tool_registry_list_json(reg);
+    char *json = tool_registry_list_json(reg);
     assert(json != NULL);
     assert(strcmp(json, "[]") == 0);
 
@@ -224,7 +234,8 @@ static void test_registry_list_json_empty(void) {
 /**
  * @brief 测试注册表空参数
  */
-static void test_registry_null_param(void) {
+static void test_registry_null_param(void)
+{
     printf("  test_registry_null_param...\n");
 
     int ret __attribute__((unused)) = tool_registry_add(NULL, NULL);
@@ -234,11 +245,11 @@ static void test_registry_null_param(void) {
     memset(&meta, 0, sizeof(meta));
     meta.id = NULL;
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     ret = tool_registry_add(reg, &meta);
     assert(ret != 0);
 
-    tool_metadata_t* retrieved __attribute__((unused)) = tool_registry_get(NULL, "test");
+    tool_metadata_t *retrieved __attribute__((unused)) = tool_registry_get(NULL, "test");
     assert(retrieved == NULL);
 
     retrieved = tool_registry_get(reg, NULL);
@@ -252,10 +263,11 @@ static void test_registry_null_param(void) {
 /**
  * @brief 测试带参数的工具
  */
-static void test_registry_tool_with_params(void) {
+static void test_registry_tool_with_params(void)
+{
     printf("  test_registry_tool_with_params...\n");
 
-    tool_registry_t* reg = tool_registry_create(NULL);
+    tool_registry_t *reg = tool_registry_create(NULL);
     assert(reg != NULL);
 
     tool_param_t params[2];
@@ -276,7 +288,7 @@ static void test_registry_tool_with_params(void) {
     int ret __attribute__((unused)) = tool_registry_add(reg, &meta);
     assert(ret == 0);
 
-    tool_metadata_t* retrieved __attribute__((unused)) = tool_registry_get(reg, "param_tool");
+    tool_metadata_t *retrieved __attribute__((unused)) = tool_registry_get(reg, "param_tool");
     assert(retrieved != NULL);
     assert(retrieved->param_count == 2);
     assert(strcmp(retrieved->params[0].name, "input_file") == 0);
@@ -288,7 +300,8 @@ static void test_registry_tool_with_params(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Tool Registry Unit Tests\n");
     printf("=========================================\n");

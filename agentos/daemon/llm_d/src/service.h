@@ -7,20 +7,20 @@
 #ifndef AGENTOS_LLM_SERVICE_INTERNAL_H
 #define AGENTOS_LLM_SERVICE_INTERNAL_H
 
-#include "llm_service.h"
-#include "providers/registry.h"
 #include "cache.h"
 #include "cost_tracker.h"
-#include "token_counter.h"
+#include "llm_service.h"
 #include "platform.h"
+#include "providers/registry.h"
+#include "token_counter.h"
 
 struct llm_service {
-    provider_registry_t* registry;
-    cache_t* cache;
-    cost_tracker_t* cost;
-    token_counter_t* token_counter;
-    agentos_mutex_t lock;   /* 保护 registry 和 cost 等 */
-    void** rules;
+    provider_registry_t *registry;
+    cache_t *cache;
+    cost_tracker_t *cost;
+    token_counter_t *token_counter;
+    agentos_mutex_t lock; /* 保护 registry 和 cost 等 */
+    void **rules;
     size_t rule_count;
 };
 

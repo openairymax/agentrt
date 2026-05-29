@@ -4,17 +4,19 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "token_counter.h"
+
+#include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include <stdint.h>
-#include "token_counter.h"
 
-static void test_token_counter_create_destroy(void) {
+static void test_token_counter_create_destroy(void)
+{
     printf("  test_token_counter_create_destroy...\n");
 
-    token_counter_t* counter = token_counter_create("gpt-4");
+    token_counter_t *counter = token_counter_create("gpt-4");
     assert(counter != NULL);
 
     token_counter_destroy(counter);
@@ -22,13 +24,14 @@ static void test_token_counter_create_destroy(void) {
     printf("    PASSED\n");
 }
 
-static void test_token_counter_count(void) {
+static void test_token_counter_count(void)
+{
     printf("  test_token_counter_count...\n");
 
-    token_counter_t* counter = token_counter_create("gpt-4");
+    token_counter_t *counter = token_counter_create("gpt-4");
     assert(counter != NULL);
 
-    const char* text = "Hello, world! This is a test.";
+    const char *text = "Hello, world! This is a test.";
     size_t count __attribute__((unused)) = token_counter_count(counter, text);
     assert(count > 0);
 
@@ -37,10 +40,11 @@ static void test_token_counter_count(void) {
     printf("    PASSED\n");
 }
 
-static void test_token_counter_empty_string(void) {
+static void test_token_counter_empty_string(void)
+{
     printf("  test_token_counter_empty_string...\n");
 
-    token_counter_t* counter = token_counter_create("gpt-4");
+    token_counter_t *counter = token_counter_create("gpt-4");
     assert(counter != NULL);
 
     size_t count __attribute__((unused)) = token_counter_count(counter, "");
@@ -51,10 +55,11 @@ static void test_token_counter_empty_string(void) {
     printf("    PASSED\n");
 }
 
-static void test_token_counter_null_input(void) {
+static void test_token_counter_null_input(void)
+{
     printf("  test_token_counter_null_input...\n");
 
-    token_counter_t* counter = token_counter_create("gpt-4");
+    token_counter_t *counter = token_counter_create("gpt-4");
     assert(counter != NULL);
 
     size_t count __attribute__((unused)) = token_counter_count(counter, NULL);
@@ -65,13 +70,14 @@ static void test_token_counter_null_input(void) {
     printf("    PASSED\n");
 }
 
-static void test_token_counter_estimate(void) {
+static void test_token_counter_estimate(void)
+{
     printf("  test_token_counter_estimate...\n");
 
-    token_counter_t* counter = token_counter_create("gpt-4");
+    token_counter_t *counter = token_counter_create("gpt-4");
     assert(counter != NULL);
 
-    const char* text = "The quick brown fox jumps over the lazy dog.";
+    const char *text = "The quick brown fox jumps over the lazy dog.";
     size_t estimated __attribute__((unused)) = token_counter_count(counter, text);
     assert(estimated > 0);
 
@@ -80,7 +86,8 @@ static void test_token_counter_estimate(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Token Counter Unit Tests\n");
     printf("=========================================\n");

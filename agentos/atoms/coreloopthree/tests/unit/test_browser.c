@@ -7,6 +7,7 @@
 
 #include "execution.h"
 #include "memory_compat.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
@@ -17,50 +18,50 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)  \
+    do {                \
+        tests_run++;    \
+        func();         \
+        tests_passed++; \
     } while (0)
 
-#define ASSERT_NOT_NULL(ptr, name)                                                                                     \
-    do {                                                                                                               \
-        if ((ptr) == NULL) {                                                                                           \
-            TEST_FAIL(name, "unexpected NULL");                                                                        \
-            return;                                                                                                    \
-        }                                                                                                              \
+#define ASSERT_NOT_NULL(ptr, name)              \
+    do {                                        \
+        if ((ptr) == NULL) {                    \
+            TEST_FAIL(name, "unexpected NULL"); \
+            return;                             \
+        }                                       \
     } while (0)
 
-#define ASSERT_STR_EQ(a, b, name)                                                                                      \
-    do {                                                                                                               \
-        if (strcmp((a), (b)) != 0) {                                                                                   \
-            TEST_FAIL(name, "string mismatch");                                                                        \
-            return;                                                                                                    \
-        }                                                                                                              \
+#define ASSERT_STR_EQ(a, b, name)               \
+    do {                                        \
+        if (strcmp((a), (b)) != 0) {            \
+            TEST_FAIL(name, "string mismatch"); \
+            return;                             \
+        }                                       \
     } while (0)
 
-#define ASSERT_STR_CONTAINS(haystack, needle, name)                                                                    \
-    do {                                                                                                               \
-        if (strstr((haystack), (needle)) == NULL) {                                                                    \
-            TEST_FAIL(name, "expected substring not found");                                                           \
-            return;                                                                                                    \
-        }                                                                                                              \
+#define ASSERT_STR_CONTAINS(haystack, needle, name)          \
+    do {                                                     \
+        if (strstr((haystack), (needle)) == NULL) {          \
+            TEST_FAIL(name, "expected substring not found"); \
+            return;                                          \
+        }                                                    \
     } while (0)
 
-#define ASSERT_STR_NOT_CONTAINS(haystack, needle, name)                                                                \
-    do {                                                                                                               \
-        if (strstr((haystack), (needle)) != NULL) {                                                                    \
-            TEST_FAIL(name, "unexpected substring found");                                                             \
-            return;                                                                                                    \
-        }                                                                                                              \
+#define ASSERT_STR_NOT_CONTAINS(haystack, needle, name)    \
+    do {                                                   \
+        if (strstr((haystack), (needle)) != NULL) {        \
+            TEST_FAIL(name, "unexpected substring found"); \
+            return;                                        \
+        }                                                  \
     } while (0)
 
 extern agentos_execution_unit_t *agentos_browser_unit_create(void);
@@ -122,7 +123,8 @@ static void test_browser_execute_navigate(void)
     ASSERT_NOT_NULL(unit, "browser_execute_navigate create");
 
     void *output = NULL;
-    agentos_error_t err = unit->execution_unit_execute(unit, "navigate https://example.com", &output);
+    agentos_error_t err =
+        unit->execution_unit_execute(unit, "navigate https://example.com", &output);
 
     if (err != AGENTOS_SUCCESS || output == NULL) {
         TEST_FAIL("browser_execute_navigate", "execute failed");
@@ -150,7 +152,8 @@ static void test_browser_execute_navigate_no_url(void)
 
     if (err != AGENTOS_EINVAL) {
         TEST_FAIL("browser_execute_navigate_no_url", "expected AGENTOS_EINVAL");
-        if (output) AGENTOS_FREE(output);
+        if (output)
+            AGENTOS_FREE(output);
         unit->execution_unit_destroy(unit);
         return;
     }
@@ -170,11 +173,13 @@ static void test_browser_execute_navigate_unsafe_url(void)
     ASSERT_NOT_NULL(unit, "browser_execute_navigate_unsafe create");
 
     void *output = NULL;
-    agentos_error_t err = unit->execution_unit_execute(unit, "navigate http://127.0.0.1/admin", &output);
+    agentos_error_t err =
+        unit->execution_unit_execute(unit, "navigate http://127.0.0.1/admin", &output);
 
     if (err != AGENTOS_EPERM) {
         TEST_FAIL("browser_execute_navigate_unsafe", "expected AGENTOS_EPERM");
-        if (output) AGENTOS_FREE(output);
+        if (output)
+            AGENTOS_FREE(output);
         unit->execution_unit_destroy(unit);
         return;
     }
@@ -217,7 +222,8 @@ static void test_browser_execute_evaluate_blocked(void)
     ASSERT_NOT_NULL(unit, "browser_execute_evaluate_blocked create");
 
     void *output = NULL;
-    agentos_error_t err = unit->execution_unit_execute(unit, "evaluate script=document.cookie", &output);
+    agentos_error_t err =
+        unit->execution_unit_execute(unit, "evaluate script=document.cookie", &output);
 
     if (err != AGENTOS_SUCCESS || output == NULL) {
         TEST_FAIL("browser_execute_evaluate_blocked", "execute failed");
@@ -334,8 +340,7 @@ static void test_browser_execute_wait(void)
     ASSERT_NOT_NULL(unit, "browser_execute_wait create");
 
     void *output = NULL;
-    agentos_error_t err =
-        unit->execution_unit_execute(unit, "wait timeout=1000", &output);
+    agentos_error_t err = unit->execution_unit_execute(unit, "wait timeout=1000", &output);
 
     if (err != AGENTOS_SUCCESS || output == NULL) {
         TEST_FAIL("browser_execute_wait", "execute failed");
@@ -387,7 +392,8 @@ static void test_browser_execute_unsupported(void)
 
     if (err == AGENTOS_SUCCESS) {
         TEST_FAIL("browser_execute_unsupported", "should not return SUCCESS for unsupported");
-        if (output) AGENTOS_FREE(output);
+        if (output)
+            AGENTOS_FREE(output);
         unit->execution_unit_destroy(unit);
         return;
     }
@@ -499,11 +505,13 @@ static void test_browser_no_enotsup(void)
             char msg[128];
             snprintf(msg, sizeof(msg), "command '%s' returned ENOTSUP/ENOSYS", commands[i]);
             TEST_FAIL("browser_no_enotsup", msg);
-            if (output) AGENTOS_FREE(output);
+            if (output)
+                AGENTOS_FREE(output);
             unit->execution_unit_destroy(unit);
             return;
         }
-        if (output) AGENTOS_FREE(output);
+        if (output)
+            AGENTOS_FREE(output);
     }
 
     unit->execution_unit_destroy(unit);
@@ -532,15 +540,16 @@ static void test_browser_simulated_markers(void)
             const char *result = (const char *)output;
             if (strstr(result, "simulated") == NULL && strstr(result, "cdp") == NULL) {
                 char msg[128];
-                snprintf(msg, sizeof(msg),
-                         "command '%s' has neither simulated nor cdp marker", commands[i]);
+                snprintf(msg, sizeof(msg), "command '%s' has neither simulated nor cdp marker",
+                         commands[i]);
                 TEST_FAIL("browser_simulated_markers", msg);
                 AGENTOS_FREE(output);
                 unit->execution_unit_destroy(unit);
                 return;
             }
         }
-        if (output) AGENTOS_FREE(output);
+        if (output)
+            AGENTOS_FREE(output);
     }
 
     unit->execution_unit_destroy(unit);

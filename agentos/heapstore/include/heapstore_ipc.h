@@ -14,9 +14,9 @@
 
 #include "heapstore.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,7 +60,7 @@ void heapstore_ipc_shutdown(void);
  * @threadsafe 是
  * @reentrant 否
  */
-heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* channel);
+heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t *channel);
 
 /**
  * @brief 获取通道信息
@@ -74,7 +74,8 @@ heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* ch
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_ipc_get_channel(const char* channel_id, heapstore_ipc_channel_t* channel);
+heapstore_error_t heapstore_ipc_get_channel(const char *channel_id,
+                                            heapstore_ipc_channel_t *channel);
 
 /**
  * @brief 更新通道活动
@@ -86,7 +87,7 @@ heapstore_error_t heapstore_ipc_get_channel(const char* channel_id, heapstore_ip
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_ipc_update_channel_activity(const char* channel_id);
+heapstore_error_t heapstore_ipc_update_channel_activity(const char *channel_id);
 
 /**
  * @brief 记录缓冲区信息
@@ -99,7 +100,7 @@ heapstore_error_t heapstore_ipc_update_channel_activity(const char* channel_id);
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buffer);
+heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t *buffer);
 
 /**
  * @brief 获取缓冲区信息
@@ -113,7 +114,7 @@ heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buff
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_ipc_get_buffer(const char* buffer_id, heapstore_ipc_buffer_t* buffer);
+heapstore_error_t heapstore_ipc_get_buffer(const char *buffer_id, heapstore_ipc_buffer_t *buffer);
 
 /**
  * @brief 获取 IPC 存储统计信息
@@ -128,7 +129,8 @@ heapstore_error_t heapstore_ipc_get_buffer(const char* buffer_id, heapstore_ipc_
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buffer_count, uint64_t* total_size);
+heapstore_error_t heapstore_ipc_get_stats(uint32_t *channel_count, uint32_t *buffer_count,
+                                          uint64_t *total_size);
 
 /**
  * @brief 检查 IPC 系统是否健康
@@ -141,11 +143,11 @@ heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buf
  * @since v1.0.0*/
 bool heapstore_ipc_is_healthy(void);
 
-heapstore_error_t heapstore_ipc_send(const char* channel_id, const void* data, size_t len);
-heapstore_error_t heapstore_ipc_receive(const char* channel_id, void** data, size_t* len);
-heapstore_error_t heapstore_ipc_create_channel(const char* channel_id, const char* name,
-                                              const char* type, size_t buffer_size);
-heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id);
+heapstore_error_t heapstore_ipc_send(const char *channel_id, const void *data, size_t len);
+heapstore_error_t heapstore_ipc_receive(const char *channel_id, void **data, size_t *len);
+heapstore_error_t heapstore_ipc_create_channel(const char *channel_id, const char *name,
+                                               const char *type, size_t buffer_size);
+heapstore_error_t heapstore_ipc_destroy_channel(const char *channel_id);
 
 #ifdef __cplusplus
 }

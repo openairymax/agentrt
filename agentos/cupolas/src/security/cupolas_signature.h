@@ -8,9 +8,9 @@
 #ifndef CUPOLAS_SIGNATURE_H
 #define CUPOLAS_SIGNATURE_H
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,7 +18,7 @@ extern "C" {
 
 /**
  * @brief Signature verification result codes
- * 
+ *
  * Design principles:
  * - Multi-layer: Verify code signatures from multiple sources
  * - Algorithm support: RSA, ECDSA, Ed25519
@@ -42,12 +42,12 @@ typedef enum {
  * @brief Signature algorithm types
  */
 typedef enum {
-    CUPOLAS_SIG_ALGO_RSA_SHA256 = 1,  /**< RSA with SHA-256 */
-    CUPOLAS_SIG_ALGO_RSA_SHA384 = 2,  /**< RSA with SHA-384 */
-    CUPOLAS_SIG_ALGO_RSA_SHA512 = 3,  /**< RSA with SHA-512 */
-    CUPOLAS_SIG_ALGO_ECDSA_P256 = 4,  /**< ECDSA P-256 */
-    CUPOLAS_SIG_ALGO_ECDSA_P384 = 5,  /**< ECDSA P-384 */
-    CUPOLAS_SIG_ALGO_ED25519 = 6      /**< Ed25519 */
+    CUPOLAS_SIG_ALGO_RSA_SHA256 = 1, /**< RSA with SHA-256 */
+    CUPOLAS_SIG_ALGO_RSA_SHA384 = 2, /**< RSA with SHA-384 */
+    CUPOLAS_SIG_ALGO_RSA_SHA512 = 3, /**< RSA with SHA-512 */
+    CUPOLAS_SIG_ALGO_ECDSA_P256 = 4, /**< ECDSA P-256 */
+    CUPOLAS_SIG_ALGO_ECDSA_P384 = 5, /**< ECDSA P-384 */
+    CUPOLAS_SIG_ALGO_ED25519 = 6     /**< Ed25519 */
 } cupolas_sig_algo_t;
 
 /**
@@ -64,14 +64,14 @@ typedef struct cupolas_signature cupolas_signature_t;
  * @brief Signature verification configuration
  */
 typedef struct {
-    bool check_cert_chain;          /**< Verify certificate chain */
-    bool check_revocation;          /**< Check revocation status */
-    bool check_timestamp;           /**< Verify timestamp */
-    bool allow_self_signed;         /**< Allow self-signed */
-    bool allow_expired_test;        /**< Allow expired for testing */
-    const char* trusted_ca_path;    /**< Trusted CA bundle path */
-    const char* crl_path;           /**< CRL distribution path */
-    uint32_t max_chain_depth;       /**< Maximum chain depth */
+    bool check_cert_chain;       /**< Verify certificate chain */
+    bool check_revocation;       /**< Check revocation status */
+    bool check_timestamp;        /**< Verify timestamp */
+    bool allow_self_signed;      /**< Allow self-signed */
+    bool allow_expired_test;     /**< Allow expired for testing */
+    const char *trusted_ca_path; /**< Trusted CA bundle path */
+    const char *crl_path;        /**< CRL distribution path */
+    uint32_t max_chain_depth;    /**< Maximum chain depth */
 } cupolas_sig_config_t;
 
 /**
@@ -82,11 +82,12 @@ typedef struct {
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_signature_init(const cupolas_sig_config_t* config);
+int cupolas_signature_init(const cupolas_sig_config_t *config);
 
 /**
  * @brief Shutdown signature verification module
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  */
 void cupolas_signature_cleanup(void);
@@ -102,9 +103,8 @@ void cupolas_signature_cleanup(void);
  * @ownership file_path and expected_signer: caller retains ownership
  * @ownership result: caller provides buffer, function writes to it
  */
-int cupolas_signature_verify_file(const char* file_path,
-                                 const char* expected_signer,
-                                 cupolas_sig_result_t* result);
+int cupolas_signature_verify_file(const char *file_path, const char *expected_signer,
+                                  cupolas_sig_result_t *result);
 
 /**
  * @brief Verify data signature in memory
@@ -119,10 +119,8 @@ int cupolas_signature_verify_file(const char* file_path,
  * @reentrant Yes
  * @ownership All parameters: caller retains ownership
  */
-int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
-                                 const uint8_t* signature, size_t sig_len,
-                                 cupolas_sig_algo_t algo,
-                                 const char* public_key);
+int cupolas_signature_verify_data(const uint8_t *data, size_t data_len, const uint8_t *signature,
+                                  size_t sig_len, cupolas_sig_algo_t algo, const char *public_key);
 
 /**
  * @brief Verify file integrity (hash check)
@@ -133,8 +131,7 @@ int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
  * @reentrant Yes
  * @ownership file_path and expected_hash: caller retains ownership
  */
-int cupolas_signature_verify_integrity(const char* file_path,
-                                      const uint8_t* expected_hash);
+int cupolas_signature_verify_integrity(const char *file_path, const uint8_t *expected_hash);
 
 /**
  * @brief Compute file hash
@@ -146,7 +143,7 @@ int cupolas_signature_verify_integrity(const char* file_path,
  * @ownership file_path: caller retains ownership
  * @ownership hash_out: caller provides buffer, function writes to it
  */
-int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out);
+int cupolas_signature_compute_hash(const char *file_path, uint8_t *hash_out);
 
 /**
  * @brief Get signer information from file
@@ -158,8 +155,7 @@ int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out);
  * @ownership file_path: caller retains ownership
  * @ownership info: caller provides buffer, function writes to it
  */
-int cupolas_signature_get_signer_info(const char* file_path,
-                                     cupolas_signer_info_t* info);
+int cupolas_signature_get_signer_info(const char *file_path, cupolas_signer_info_t *info);
 
 /**
  * @brief Free signer info structure
@@ -168,7 +164,7 @@ int cupolas_signature_get_signer_info(const char* file_path,
  * @reentrant No
  * @ownership info: transferred to this function, will be freed
  */
-void cupolas_signature_free_signer_info(cupolas_signer_info_t* info);
+void cupolas_signature_free_signer_info(cupolas_signer_info_t *info);
 
 /**
  * @brief Check if signer is in trusted list
@@ -178,19 +174,19 @@ void cupolas_signature_free_signer_info(cupolas_signer_info_t* info);
  * @reentrant Yes
  * @ownership signer_cn: caller retains ownership
  */
-bool cupolas_signature_is_trusted_signer(const char* signer_cn);
+bool cupolas_signature_is_trusted_signer(const char *signer_cn);
 
 /**
  * @brief Add signer to trusted list
  * @param[in] signer_cn Signer CN
  * @param[in] public_key Public key (PEM format)
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership signer_cn and public_key: caller retains ownership
  */
-int cupolas_signature_add_trusted_signer(const char* signer_cn,
-                                        const char* public_key);
+int cupolas_signature_add_trusted_signer(const char *signer_cn, const char *public_key);
 
 /**
  * @brief Sign a file
@@ -200,16 +196,14 @@ int cupolas_signature_add_trusted_signer(const char* signer_cn,
  * @param[out] signature_out Output buffer
  * @param[in,out] sig_len Buffer size / actual length
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership file_path and private_key: caller retains ownership
  * @ownership signature_out: caller provides buffer, function writes to it
  */
-int cupolas_signature_sign_file(const char* file_path,
-                               const char* private_key,
-                               cupolas_sig_algo_t algo,
-                               uint8_t* signature_out,
-                               size_t* sig_len);
+int cupolas_signature_sign_file(const char *file_path, const char *private_key,
+                                cupolas_sig_algo_t algo, uint8_t *signature_out, size_t *sig_len);
 
 /**
  * @brief Sign data in memory
@@ -220,16 +214,14 @@ int cupolas_signature_sign_file(const char* file_path,
  * @param[out] signature_out Output buffer
  * @param[in,out] sig_len Buffer size / actual length
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership data and private_key: caller retains ownership
  * @ownership signature_out: caller provides buffer, function writes to it
  */
-int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
-                               const char* private_key,
-                               cupolas_sig_algo_t algo,
-                               uint8_t* signature_out,
-                               size_t* sig_len);
+int cupolas_signature_sign_data(const uint8_t *data, size_t data_len, const char *private_key,
+                                cupolas_sig_algo_t algo, uint8_t *signature_out, size_t *sig_len);
 
 /**
  * @brief Get result code string
@@ -238,7 +230,7 @@ int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* cupolas_signature_result_string(cupolas_sig_result_t result);
+const char *cupolas_signature_result_string(cupolas_sig_result_t result);
 
 /**
  * @brief Get algorithm name string
@@ -247,7 +239,7 @@ const char* cupolas_signature_result_string(cupolas_sig_result_t result);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-const char* cupolas_signature_algo_string(cupolas_sig_algo_t algo);
+const char *cupolas_signature_algo_string(cupolas_sig_algo_t algo);
 
 /**
  * @brief Get current timestamp

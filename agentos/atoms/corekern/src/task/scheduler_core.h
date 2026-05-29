@@ -17,6 +17,7 @@
 #define AGENTOS_SCHEDULER_CORE_H
 
 #include "../../include/task.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -56,28 +57,28 @@ typedef struct task_info_core {
     volatile agentos_task_state_t state;
 
     /** @brief 线程入口函数 */
-    void* (*entry)(void*);
+    void *(*entry)(void *);
 
     /** @brief 线程参数 */
-    void* arg;
+    void *arg;
 
     /** @brief 线程返回值 */
-    void* retval;
+    void *retval;
 
     /** @brief 平台特定句柄（由适配器管理） */
-    void* platform_handle;
+    void *platform_handle;
 
     /** @brief 平台特定数据（由适配器管理） */
-    void* platform_data;
+    void *platform_data;
 } task_info_core_t;
 
 /**
  * @brief 哈希表节点
  */
 typedef struct task_hash_node {
-    struct task_hash_node* next;
+    struct task_hash_node *next;
     agentos_task_id_t id;
-    task_info_core_t* task_info;
+    task_info_core_t *task_info;
 } task_hash_node_t;
 
 /* ==================== 核心管理结构 ==================== */
@@ -87,13 +88,13 @@ typedef struct task_hash_node {
  */
 typedef struct scheduler_core_ctx {
     /** @brief 任务信息数组 */
-    task_info_core_t* task_table[TASK_TABLE_CAPACITY];
+    task_info_core_t *task_table[TASK_TABLE_CAPACITY];
 
     /** @brief 当前任务数量 */
     uint32_t task_count;
 
     /** @brief 任务表互斥锁 */
-    void* task_table_lock;  /* 平台无关锁句柄 */
+    void *task_table_lock; /* 平台无关锁句柄 */
 
     /** @brief 初始化状态标志 */
     atomic_int initialized;
@@ -102,7 +103,7 @@ typedef struct scheduler_core_ctx {
     atomic_uint64_t next_task_id;
 
     /** @brief ID到任务信息的哈希索引 */
-    task_hash_node_t* id_hash_table[HASH_TABLE_BUCKETS];
+    task_hash_node_t *id_hash_table[HASH_TABLE_BUCKETS];
 } scheduler_core_ctx_t;
 
 /* ==================== 核心API声明 ==================== */
@@ -111,7 +112,7 @@ typedef struct scheduler_core_ctx {
  * @brief 获取调度器核心上下文（单例模式）
  * @return 核心上下文指针，失败返回NULL
  */
-scheduler_core_ctx_t* scheduler_core_get_ctx(void);
+scheduler_core_ctx_t *scheduler_core_get_ctx(void);
 
 /**
  * @brief 初始化调度器核心
@@ -145,7 +146,8 @@ uint64_t scheduler_core_fetch_add_task_id(void);
  * @param id 任务ID
  * @return 哈希桶索引
  */
-static inline size_t task_hash_core(agentos_task_id_t id) {
+static inline size_t task_hash_core(agentos_task_id_t id)
+{
     return (size_t)(id % HASH_TABLE_BUCKETS);
 }
 
@@ -156,7 +158,7 @@ static inline size_t task_hash_core(agentos_task_id_t id) {
  *
  * @note 调用者必须确保已持有适当的锁
  */
-void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t* info);
+void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t *info);
 
 /**
  * @brief 从哈希表查找任务
@@ -165,7 +167,7 @@ void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t* info);
  *
  * @note 调用者必须确保已持有适当的锁
  */
-task_info_core_t* scheduler_core_hash_find(agentos_task_id_t id);
+task_info_core_t *scheduler_core_hash_find(agentos_task_id_t id);
 
 /**
  * @brief 从哈希表移除任务
@@ -184,12 +186,8 @@ void scheduler_core_hash_remove(agentos_task_id_t id);
  * @param priority 任务优先级
  * @return 任务信息指针，失败返回NULL
  */
-task_info_core_t* scheduler_core_task_info_create(
-    agentos_task_id_t id,
-    void* (*entry)(void*),
-    void* arg,
-    const char* name,
-    int priority);
+task_info_core_t *scheduler_core_task_info_create(agentos_task_id_t id, void *(*entry)(void *),
+                                                  void *arg, const char *name, int priority);
 
 /**
  * @brief 销毁核心任务信息结构
@@ -197,7 +195,7 @@ task_info_core_t* scheduler_core_task_info_create(
  *
  * @note 只销毁核心部分，平台特定部分由适配器清理
  */
-void scheduler_core_task_info_destroy(task_info_core_t* info);
+void scheduler_core_task_info_destroy(task_info_core_t *info);
 
 /**
  * @brief 将任务添加到任务表
@@ -206,7 +204,7 @@ void scheduler_core_task_info_destroy(task_info_core_t* info);
  *
  * @note 调用者必须确保已持有适当的锁
  */
-int scheduler_core_task_table_add(task_info_core_t* info);
+int scheduler_core_task_table_add(task_info_core_t *info);
 
 /**
  * @brief 从任务表移除任务
@@ -215,7 +213,7 @@ int scheduler_core_task_table_add(task_info_core_t* info);
  *
  * @note 调用者必须确保已持有适当的锁
  */
-task_info_core_t* scheduler_core_task_table_remove(agentos_task_id_t id);
+task_info_core_t *scheduler_core_task_table_remove(agentos_task_id_t id);
 
 /**
  * @brief 通过平台句柄查找任务
@@ -224,7 +222,7 @@ task_info_core_t* scheduler_core_task_table_remove(agentos_task_id_t id);
  *
  * @note 调用者必须确保已持有适当的锁
  */
-task_info_core_t* scheduler_core_find_by_platform_handle(void* platform_handle);
+task_info_core_t *scheduler_core_find_by_platform_handle(void *platform_handle);
 
 #ifdef __cplusplus
 }

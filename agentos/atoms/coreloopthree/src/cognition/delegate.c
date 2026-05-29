@@ -1,7 +1,10 @@
 #include "delegate.h"
+
 #include "agentos.h"
-#include "platform.h"
 #include "atomic_compat.h"
+#include "memory_compat.h"
+#include "platform.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,30 +13,34 @@ static atomic_int g_delegate_mutex_initialized = 0;
 static int g_delegate_depth = 0;
 static uint64_t g_task_counter = 0;
 
-static void ensure_mutex_init(void) {
+static void ensure_mutex_init(void)
+{
     int expected = 0;
     if (atomic_compare_exchange_strong_explicit(&g_delegate_mutex_initialized, &expected, 1,
-                                                 memory_order_seq_cst, memory_order_seq_cst)) {
+                                                memory_order_seq_cst, memory_order_seq_cst)) {
         agentos_mutex_init(&g_delegate_mutex);
     }
 }
 
-static char* delegate_strdup(const char* s) {
-    if (!s) return NULL;
+static char *delegate_strdup(const char *s)
+{
+    if (!s)
+        return NULL;
     size_t len = strlen(s);
-    char* dup = (char*)malloc(len + 1);
+    char *dup = (char *)AGENTOS_MALLOC(len + 1);
     if (dup) {
         memcpy(dup, s, len + 1);
     }
     return dup;
 }
 
-static char** delegate_deep_copy_tools(const char** src, size_t count, size_t* out_count) {
+static char **delegate_deep_copy_tools(const char **src, size_t count, size_t *out_count)
+{
     if (!src || count == 0) {
         *out_count = 0;
         return NULL;
     }
-    char** dst = (char**)calloc(count, sizeof(char*));
+    char **dst = (char **)AGENTOS_CALLOC(count, sizeof(char *));
     if (!dst) {
         *out_count = 0;
         return NULL;
@@ -44,9 +51,9 @@ static char** delegate_deep_copy_tools(const char** src, size_t count, size_t* o
             dst[copied] = delegate_strdup(src[i]);
             if (!dst[copied]) {
                 for (size_t j = 0; j < copied; j++) {
-                    free(dst[j]);
+                    AGENTOS_FREE(dst[j]);
                 }
-                free(dst);
+                AGENTOS_FREE(dst);
                 *out_count = 0;
                 return NULL;
             }
@@ -57,18 +64,21 @@ static char** delegate_deep_copy_tools(const char** src, size_t count, size_t* o
     return dst;
 }
 
-static void delegate_free_tools(char** tools, size_t count) {
-    if (!tools) return;
+static void delegate_free_tools(char **tools, size_t count)
+{
+    if (!tools)
+        return;
     for (size_t i = 0; i < count; i++) {
-        free(tools[i]);
+        AGENTOS_FREE(tools[i]);
     }
-    free(tools);
+    AGENTOS_FREE(tools);
 }
 
-agentos_delegate_task_t* agentos_delegate_create(
-    const char* task_description,
-    const agentos_delegate_config_t* config) {
-    if (!task_description) return NULL;
+agentos_delegate_task_t *agentos_delegate_create(const char *task_description,
+                                                 const agentos_delegate_config_t *config)
+{
+    if (!task_description)
+        return NULL;
 
     ensure_mutex_init();
     agentos_mutex_lock(&g_delegate_mutex);
@@ -78,25 +88,26 @@ agentos_delegate_task_t* agentos_delegate_create(
     }
     agentos_mutex_unlock(&g_delegate_mutex);
 
-    agentos_delegate_task_t* task = (agentos_delegate_task_t*)calloc(
-        1, sizeof(agentos_delegate_task_t));
-    if (!task) return NULL;
+    agentos_delegate_task_t *task =
+        (agentos_delegate_task_t *)AGENTOS_CALLOC(1, sizeof(agentos_delegate_task_t));
+    if (!task)
+        return NULL;
 
     agentos_mutex_lock(&g_delegate_mutex);
     uint64_t my_id = g_task_counter++;
     agentos_mutex_unlock(&g_delegate_mutex);
 
-    task->task_id = (char*)malloc(64);
+    task->task_id = (char *)AGENTOS_MALLOC(64);
     if (!task->task_id) {
-        free(task);
+        AGENTOS_FREE(task);
         return NULL;
     }
     snprintf(task->task_id, 64, "delegate_%lu", (unsigned long)my_id);
 
     task->description = delegate_strdup(task_description);
     if (!task->description) {
-        free(task->task_id);
-        free(task);
+        AGENTOS_FREE(task->task_id);
+        AGENTOS_FREE(task);
         return NULL;
     }
 
@@ -110,20 +121,19 @@ agentos_delegate_task_t* agentos_delegate_create(
     if (config) {
         task->config.focus_prompt = delegate_strdup(config->focus_prompt);
         if (config->focus_prompt && !task->config.focus_prompt) {
-            free(task->task_id);
-            free(task->description);
-            free(task);
+            AGENTOS_FREE(task->task_id);
+            AGENTOS_FREE(task->description);
+            AGENTOS_FREE(task);
             return NULL;
         }
         task->config.allowed_tool_count = config->allowed_tool_count;
         task->config.allowed_tools = config->allowed_tools;
         task->owned_tools = delegate_deep_copy_tools(
-            config->allowed_tools, config->allowed_tool_count,
-            &task->owned_tool_count);
+            config->allowed_tools, config->allowed_tool_count, &task->owned_tool_count);
         task->config.max_depth = config->max_depth > 0 ? config->max_depth : 2;
         task->config.max_iterations = config->max_iterations > 0 ? config->max_iterations : 10;
-        task->config.token_budget_ratio = config->token_budget_ratio > 0.0f
-            ? config->token_budget_ratio : 0.3f;
+        task->config.token_budget_ratio =
+            config->token_budget_ratio > 0.0f ? config->token_budget_ratio : 0.3f;
     } else {
         memset(&task->config, 0, sizeof(agentos_delegate_config_t));
         task->config.max_depth = 2;
@@ -134,21 +144,27 @@ agentos_delegate_task_t* agentos_delegate_create(
     return task;
 }
 
-void agentos_delegate_destroy(agentos_delegate_task_t* task) {
-    if (!task) return;
-    if (task->task_id) free(task->task_id);
-    if (task->description) free(task->description);
-    if (task->result) free(task->result);
-    if (task->config.focus_prompt) free((void*)task->config.focus_prompt);
+void agentos_delegate_destroy(agentos_delegate_task_t *task)
+{
+    if (!task)
+        return;
+    if (task->task_id)
+        AGENTOS_FREE(task->task_id);
+    if (task->description)
+        AGENTOS_FREE(task->description);
+    if (task->result)
+        AGENTOS_FREE(task->result);
+    if (task->config.focus_prompt)
+        AGENTOS_FREE((void *)task->config.focus_prompt);
     delegate_free_tools(task->owned_tools, task->owned_tool_count);
-    free(task);
+    AGENTOS_FREE(task);
 }
 
-agentos_error_t agentos_delegate_assign(
-    agentos_delegate_task_t* task,
-    agentos_tool_execute_fn executor,
-    void* user_data) {
-    if (!task || !executor) return AGENTOS_EINVAL;
+agentos_error_t agentos_delegate_assign(agentos_delegate_task_t *task,
+                                        agentos_tool_execute_fn executor, void *user_data)
+{
+    if (!task || !executor)
+        return AGENTOS_EINVAL;
 
     ensure_mutex_init();
     agentos_mutex_lock(&g_delegate_mutex);
@@ -165,15 +181,11 @@ agentos_error_t agentos_delegate_assign(
     g_delegate_depth++;
     agentos_mutex_unlock(&g_delegate_mutex);
 
-    char* output = NULL;
+    char *output = NULL;
     size_t output_len = 0;
-    agentos_error_t err = executor(
-        "delegate_task",
-        task->description,
-        task->description ? strlen(task->description) : 0,
-        &output,
-        &output_len,
-        user_data);
+    agentos_error_t err = executor("delegate_task", task->description,
+                                   task->description ? strlen(task->description) : 0, &output,
+                                   &output_len, user_data);
 
     agentos_mutex_lock(&g_delegate_mutex);
     g_delegate_depth--;
@@ -185,7 +197,7 @@ agentos_error_t agentos_delegate_assign(
 
     if (task->state == AGENTOS_DELEGATE_CANCELLED) {
         if (output) {
-            free(output);
+            AGENTOS_FREE(output);
             task->result = NULL;
             task->result_len = 0;
         }
@@ -198,11 +210,11 @@ agentos_error_t agentos_delegate_assign(
     return err;
 }
 
-agentos_error_t agentos_delegate_collect(
-    agentos_delegate_task_t* task,
-    char** out_result,
-    size_t* out_result_len) {
-    if (!task || !out_result) return AGENTOS_EINVAL;
+agentos_error_t agentos_delegate_collect(agentos_delegate_task_t *task, char **out_result,
+                                         size_t *out_result_len)
+{
+    if (!task || !out_result)
+        return AGENTOS_EINVAL;
 
     ensure_mutex_init();
     agentos_mutex_lock(&g_delegate_mutex);
@@ -215,24 +227,27 @@ agentos_error_t agentos_delegate_collect(
 
     if (task->result && task->result_len > 0) {
         *out_result = task->result;
-        if (out_result_len) *out_result_len = task->result_len;
+        if (out_result_len)
+            *out_result_len = task->result_len;
         task->result = NULL;
         task->result_len = 0;
     } else {
         *out_result = NULL;
-        if (out_result_len) *out_result_len = 0;
+        if (out_result_len)
+            *out_result_len = 0;
     }
 
     return task->status;
 }
 
-agentos_error_t agentos_delegate_cancel(agentos_delegate_task_t* task) {
-    if (!task) return AGENTOS_EINVAL;
+agentos_error_t agentos_delegate_cancel(agentos_delegate_task_t *task)
+{
+    if (!task)
+        return AGENTOS_EINVAL;
 
     ensure_mutex_init();
     agentos_mutex_lock(&g_delegate_mutex);
-    if (task->state == AGENTOS_DELEGATE_COMPLETED ||
-        task->state == AGENTOS_DELEGATE_FAILED ||
+    if (task->state == AGENTOS_DELEGATE_COMPLETED || task->state == AGENTOS_DELEGATE_FAILED ||
         task->state == AGENTOS_DELEGATE_CANCELLED) {
         agentos_mutex_unlock(&g_delegate_mutex);
         return AGENTOS_EINVAL;
@@ -245,8 +260,9 @@ agentos_error_t agentos_delegate_cancel(agentos_delegate_task_t* task) {
     return AGENTOS_SUCCESS;
 }
 
-agentos_delegate_state_t agentos_delegate_get_state(
-    const agentos_delegate_task_t* task) {
-    if (!task) return AGENTOS_DELEGATE_IDLE;
+agentos_delegate_state_t agentos_delegate_get_state(const agentos_delegate_task_t *task)
+{
+    if (!task)
+        return AGENTOS_DELEGATE_IDLE;
     return task->state;
 }

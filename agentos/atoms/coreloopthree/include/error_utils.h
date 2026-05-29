@@ -8,6 +8,7 @@
 #define AGENTOS_ERROR_UTILS_H
 
 #include "agentos.h"
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -19,7 +20,7 @@ extern "C" {
  * @param err 错误码
  * @return 错误消息字符串（静态字符串，无需释放）
  */
-const char* agentos_error_string(agentos_error_t err);
+const char *agentos_error_string(agentos_error_t err);
 
 /**
  * @brief 将错误码转换为JSON格式的错误响应
@@ -28,10 +29,7 @@ const char* agentos_error_string(agentos_error_t err);
  * @param out_json 输出JSON字符串（需调用者释放）
  * @return agentos_error_t
  */
-agentos_error_t agentos_error_to_json(
-    agentos_error_t err,
-    const char* message,
-    char** out_json);
+agentos_error_t agentos_error_to_json(agentos_error_t err, const char *message, char **out_json);
 
 #ifndef AGENTOS_ERROR_CONTEXT_T_DEFINED
 #define AGENTOS_ERROR_CONTEXT_T_DEFINED
@@ -40,12 +38,12 @@ agentos_error_t agentos_error_to_json(
  * @note 这是agentos_error_context_t的完整版定义（含动态分配和时间戳）
  */
 typedef struct agentos_error_context {
-    agentos_error_t code;           /**< 错误码 */
-    char* message;                   /**< 错误消息 */
-    char* file;                      /**< 发生错误的文件名 */
-    int line;                        /**< 发生错误的行号 */
-    char* function;                  /**< 发生错误的函数名 */
-    uint64_t timestamp_ns;           /**< 错误发生时间戳 */
+    agentos_error_t code;  /**< 错误码 */
+    char *message;         /**< 错误消息 */
+    char *file;            /**< 发生错误的文件名 */
+    int line;              /**< 发生错误的行号 */
+    char *function;        /**< 发生错误的函数名 */
+    uint64_t timestamp_ns; /**< 错误发生时间戳 */
 } agentos_error_context_t;
 #endif /* AGENTOS_ERROR_CONTEXT_T_DEFINED */
 
@@ -59,19 +57,15 @@ typedef struct agentos_error_context {
  * @param out_context 输出错误上下文（需调用 agentos_error_context_free 释放）
  * @return agentos_error_t
  */
-agentos_error_t agentos_error_context_create(
-    agentos_error_t code,
-    const char* message,
-    const char* file,
-    int line,
-    const char* function,
-    agentos_error_context_t** out_context);
+agentos_error_t agentos_error_context_create(agentos_error_t code, const char *message,
+                                             const char *file, int line, const char *function,
+                                             agentos_error_context_t **out_context);
 
 /**
  * @brief 释放错误上下文
  * @param context 错误上下文
  */
-void agentos_error_context_free(agentos_error_context_t* context);
+void agentos_error_context_free(agentos_error_context_t *context);
 
 /**
  * @brief 将错误上下文转换为JSON格式
@@ -79,9 +73,8 @@ void agentos_error_context_free(agentos_error_context_t* context);
  * @param out_json 输出JSON字符串（需调用者释放）
  * @return agentos_error_t
  */
-agentos_error_t agentos_error_context_to_json(
-    const agentos_error_context_t* context,
-    char** out_json);
+agentos_error_t agentos_error_context_to_json(const agentos_error_context_t *context,
+                                              char **out_json);
 
 /**
  * @brief 便捷宏：创建错误上下文，自动填充文件名、行号和函数名

@@ -1,6 +1,6 @@
 # DocGen — 智能文档生成应用
 
-> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.1.0 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
 `openlab/app/docgen/` 是一款基于 AgentOS 平台的智能文档生成应用，能够根据用户需求自动生成结构化文档。
 

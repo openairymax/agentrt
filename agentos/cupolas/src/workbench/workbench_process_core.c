@@ -12,74 +12,81 @@
  * @date 2024
  */
 
-#include "workbench_process.h"
 #include "utils/cupolas_utils.h"
+#include "workbench_process.h"
+
 #include <stdlib.h>
 #include <string.h>
 
 #if cupolas_PLATFORM_WINDOWS
-#include <io.h>
 #include <fcntl.h>
+#include <io.h>
 #include <process.h>
 
-int cupolas_process_spawn(cupolas_process_t* proc, 
-                        const char* path, 
-                        char* const argv[],
-                        const cupolas_process_attr_t* attr) {
-    if (!proc || !path) return cupolas_ERROR_INVALID_ARG;
-    
+int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const argv[],
+                          const cupolas_process_attr_t *attr)
+{
+    if (!proc || !path)
+        return cupolas_ERROR_INVALID_ARG;
+
     HANDLE hStdinRead = NULL, hStdinWrite = NULL;
     HANDLE hStdoutRead = NULL, hStdoutWrite = NULL;
     HANDLE hStderrRead = NULL, hStderrWrite = NULL;
-    
+
     SECURITY_ATTRIBUTES sa;
     sa.nLength = sizeof(SECURITY_ATTRIBUTES);
     sa.lpSecurityDescriptor = NULL;
     sa.bInheritHandle = TRUE;
-    
+
     if (attr && attr->redirect_stdin) {
         if (!CreatePipe(&hStdinRead, &hStdinWrite, &sa, 0)) {
             return cupolas_ERROR_IO;
         }
         SetHandleInformation(hStdinWrite, HANDLE_FLAG_INHERIT, 0);
     }
-    
+
     if (attr && attr->redirect_stdout) {
         if (!CreatePipe(&hStdoutRead, &hStdoutWrite, &sa, 0)) {
-            if (hStdinRead) CloseHandle(hStdinRead);
-            if (hStdinWrite) CloseHandle(hStdinWrite);
+            if (hStdinRead)
+                CloseHandle(hStdinRead);
+            if (hStdinWrite)
+                CloseHandle(hStdinWrite);
             return cupolas_ERROR_IO;
         }
         SetHandleInformation(hStdoutRead, HANDLE_FLAG_INHERIT, 0);
     }
-    
+
     if (attr && attr->redirect_stderr) {
         if (!CreatePipe(&hStderrRead, &hStderrWrite, &sa, 0)) {
-            if (hStdinRead) CloseHandle(hStdinRead);
-            if (hStdinWrite) CloseHandle(hStdinWrite);
-            if (hStdoutRead) CloseHandle(hStdoutRead);
-            if (hStdoutWrite) CloseHandle(hStdoutWrite);
+            if (hStdinRead)
+                CloseHandle(hStdinRead);
+            if (hStdinWrite)
+                CloseHandle(hStdinWrite);
+            if (hStdoutRead)
+                CloseHandle(hStdoutRead);
+            if (hStdoutWrite)
+                CloseHandle(hStdoutWrite);
             return cupolas_ERROR_IO;
         }
         SetHandleInformation(hStderrRead, HANDLE_FLAG_INHERIT, 0);
     }
-    
+
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     memset(&si, 0, sizeof(si));
     memset(&pi, 0, sizeof(pi));
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
-    
+
     si.hStdInput = hStdinRead ? hStdinRead : GetStdHandle(STD_INPUT_HANDLE);
     si.hStdOutput = hStdoutWrite ? hStdoutWrite : GetStdHandle(STD_OUTPUT_HANDLE);
     si.hStdError = hStderrWrite ? hStderrWrite : GetStdHandle(STD_ERROR_HANDLE);
-    
+
     char cmdline[32768];
     size_t len = 0;
     cmdline[0] = '\0';
-    
-    const char* p = path;
+
+    const char *p = path;
     while (*p && len < sizeof(cmdline) - 2) {
         if (*p == ' ' || *p == '\t') {
             cmdline[len++] = '"';
@@ -91,48 +98,46 @@ int cupolas_process_spawn(cupolas_process_t* proc,
             cmdline[len++] = *p++;
         }
     }
-    
+
     if (argv) {
         for (int i = 0; argv[i] && len < sizeof(cmdline) - 2; i++) {
             cmdline[len++] = ' ';
-            const char* arg = argv[i];
+            const char *arg = argv[i];
             int need_quote = (strchr(arg, ' ') || strchr(arg, '\t'));
-            if (need_quote) cmdline[len++] = '"';
+            if (need_quote)
+                cmdline[len++] = '"';
             while (*arg && len < sizeof(cmdline) - 1) {
                 cmdline[len++] = *arg++;
             }
-            if (need_quote) cmdline[len++] = '"';
+            if (need_quote)
+                cmdline[len++] = '"';
         }
     }
     cmdline[len] = '\0';
-    
+
     DWORD creationFlags = CREATE_NO_WINDOW;
-    BOOL success = CreateProcessA(
-        NULL,
-        cmdline,
-        NULL,
-        NULL,
-        TRUE,
-        creationFlags,
-        NULL,
-        attr && attr->working_dir ? attr->working_dir : NULL,
-        &si,
-        &pi
-    );
-    
-    if (hStdinRead) CloseHandle(hStdinRead);
-    if (hStdoutWrite) CloseHandle(hStdoutWrite);
-    if (hStderrWrite) CloseHandle(hStderrWrite);
-    
+    BOOL success = CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, creationFlags, NULL,
+                                  attr && attr->working_dir ? attr->working_dir : NULL, &si, &pi);
+
+    if (hStdinRead)
+        CloseHandle(hStdinRead);
+    if (hStdoutWrite)
+        CloseHandle(hStdoutWrite);
+    if (hStderrWrite)
+        CloseHandle(hStderrWrite);
+
     if (!success) {
-        if (hStdinWrite) CloseHandle(hStdinWrite);
-        if (hStdoutRead) CloseHandle(hStdoutRead);
-        if (hStderrRead) CloseHandle(hStderrRead);
+        if (hStdinWrite)
+            CloseHandle(hStdinWrite);
+        if (hStdoutRead)
+            CloseHandle(hStdoutRead);
+        if (hStderrRead)
+            CloseHandle(hStderrRead);
         return cupolas_ERROR_IO;
     }
-    
+
     CloseHandle(pi.hThread);
-    
+
     if (attr && attr->redirect_stdin) {
         attr->stdin_pipe = hStdinWrite;
     }
@@ -142,119 +147,142 @@ int cupolas_process_spawn(cupolas_process_t* proc,
     if (attr && attr->redirect_stderr) {
         attr->stderr_pipe = hStderrRead;
     }
-    
+
     *proc = pi.hProcess;
     return cupolas_OK;
 }
 
-int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status, uint32_t timeout_ms) {
-    if (!proc || !status) return cupolas_ERROR_INVALID_ARG;
-    
+int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t *status, uint32_t timeout_ms)
+{
+    if (!proc || !status)
+        return cupolas_ERROR_INVALID_ARG;
+
     DWORD wait_time = timeout_ms > 0 ? timeout_ms : INFINITE;
     DWORD result = WaitForSingleObject(proc, wait_time);
-    
+
     if (result == WAIT_TIMEOUT) {
         return cupolas_ERROR_TIMEOUT;
     }
-    
+
     if (result != WAIT_OBJECT_0) {
         return cupolas_ERROR_UNKNOWN;
     }
-    
+
     DWORD exit_code;
     if (!GetExitCodeProcess(proc, &exit_code)) {
         return cupolas_ERROR_UNKNOWN;
     }
-    
+
     status->code = (int)exit_code;
     status->signaled = false;
     status->signal = 0;
-    
+
     return cupolas_OK;
 }
 
-int cupolas_process_terminate(cupolas_process_t proc, int signal) {
+int cupolas_process_terminate(cupolas_process_t proc, int signal)
+{
     (void)signal;
-    if (!proc) return cupolas_ERROR_INVALID_ARG;
-    
+    if (!proc)
+        return cupolas_ERROR_INVALID_ARG;
+
     return TerminateProcess(proc, 1) ? cupolas_OK : cupolas_ERROR_UNKNOWN;
 }
 
-int cupolas_process_close(cupolas_process_t proc) {
-    if (!proc) return cupolas_ERROR_INVALID_ARG;
-    
+int cupolas_process_close(cupolas_process_t proc)
+{
+    if (!proc)
+        return cupolas_ERROR_INVALID_ARG;
+
     CloseHandle(proc);
     return cupolas_OK;
 }
 
-cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc) {
-    if (!proc) return 0;
+cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc)
+{
+    if (!proc)
+        return 0;
     return GetProcessId(proc);
 }
 
 #else
 
-#include <unistd.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <fcntl.h>
 #include <errno.h>
-#include <sys/time.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <sys/select.h>
+#include <sys/time.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 /**
  * @brief 创建标准输入输出重定向管道 (POSIX)
  */
-static int create_redirect_pipes_posix(
-    int* stdin_pipe, int* stdout_pipe, int* stderr_pipe,
-    const cupolas_process_attr_t* attr) {
-    
+static int create_redirect_pipes_posix(int *stdin_pipe, int *stdout_pipe, int *stderr_pipe,
+                                       const cupolas_process_attr_t *attr)
+{
+
     if (attr && attr->redirect_stdin) {
         if (pipe(stdin_pipe) != 0) {
             return cupolas_ERROR_IO;
         }
     }
-    
+
     if (attr && attr->redirect_stdout) {
         if (pipe(stdout_pipe) != 0) {
-            if (stdin_pipe[0] >= 0) close(stdin_pipe[0]);
-            if (stdin_pipe[1] >= 0) close(stdin_pipe[1]);
+            if (stdin_pipe[0] >= 0)
+                close(stdin_pipe[0]);
+            if (stdin_pipe[1] >= 0)
+                close(stdin_pipe[1]);
             return cupolas_ERROR_IO;
         }
     }
-    
+
     if (attr && attr->redirect_stderr) {
         if (pipe(stderr_pipe) != 0) {
-            if (stdin_pipe[0] >= 0) close(stdin_pipe[0]);
-            if (stdin_pipe[1] >= 0) close(stdin_pipe[1]);
-            if (stdout_pipe[0] >= 0) close(stdout_pipe[0]);
-            if (stdout_pipe[1] >= 0) close(stdout_pipe[1]);
+            if (stdin_pipe[0] >= 0)
+                close(stdin_pipe[0]);
+            if (stdin_pipe[1] >= 0)
+                close(stdin_pipe[1]);
+            if (stdout_pipe[0] >= 0)
+                close(stdout_pipe[0]);
+            if (stdout_pipe[1] >= 0)
+                close(stdout_pipe[1]);
             return cupolas_ERROR_IO;
         }
     }
-    
+
     return cupolas_OK;
 }
 
 /**
  * @brief 清理管道文件描述符
  */
-static void cleanup_pipes_posix(int* stdin_pipe, int* stdout_pipe, int* stderr_pipe,
-                               int close_stdin_read, int close_stdout_write, int close_stderr_write) {
-    if (close_stdin_read && stdin_pipe[0] >= 0) close(stdin_pipe[0]);
-    if (stdin_pipe[1] >= 0) close(stdin_pipe[1]);
-    if (close_stdout_write && stdout_pipe[1] >= 0) close(stdout_pipe[1]);
-    if (stdout_pipe[0] >= 0) close(stdout_pipe[0]);
-    if (close_stderr_write && stderr_pipe[1] >= 0) close(stderr_pipe[1]);
-    if (stderr_pipe[0] >= 0) close(stderr_pipe[0]);
+static void cleanup_pipes_posix(int *stdin_pipe, int *stdout_pipe, int *stderr_pipe,
+                                int close_stdin_read, int close_stdout_write,
+                                int close_stderr_write)
+{
+    if (close_stdin_read && stdin_pipe[0] >= 0)
+        close(stdin_pipe[0]);
+    if (stdin_pipe[1] >= 0)
+        close(stdin_pipe[1]);
+    if (close_stdout_write && stdout_pipe[1] >= 0)
+        close(stdout_pipe[1]);
+    if (stdout_pipe[0] >= 0)
+        close(stdout_pipe[0]);
+    if (close_stderr_write && stderr_pipe[1] >= 0)
+        close(stderr_pipe[1]);
+    if (stderr_pipe[0] >= 0)
+        close(stderr_pipe[0]);
 }
 
 /**
  * @brief 子进程设置函数
  */
-static void setup_child_process(int* stdin_pipe, int* stdout_pipe, int* stderr_pipe,
-                               const cupolas_process_attr_t* attr,
-                               const char* path, char* const argv[]) {
+static void setup_child_process(int *stdin_pipe, int *stdout_pipe, int *stderr_pipe,
+                                const cupolas_process_attr_t *attr, const char *path,
+                                char *const argv[])
+{
     if (attr && attr->working_dir) {
         if (chdir(attr->working_dir) != 0) {
             _exit(127);
@@ -283,40 +311,41 @@ static void setup_child_process(int* stdin_pipe, int* stdout_pipe, int* stderr_p
         fcntl(fd, F_SETFD, FD_CLOEXEC);
     }
 
-    execvp(path ? path : NULL, argv ? argv : NULL); /* flawfinder: ignore - path/argv validated by caller */
+    execvp(path ? path : NULL,
+           argv ? argv : NULL); /* flawfinder: ignore - path/argv validated by caller */
     _exit(127);
 }
 
-int cupolas_process_spawn(cupolas_process_t* proc, 
-                        const char* path, 
-                        char* const argv[],
-                        const cupolas_process_attr_t* attr) {
-    if (!proc || !path) return cupolas_ERROR_INVALID_ARG;
-    
+int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const argv[],
+                          const cupolas_process_attr_t *attr)
+{
+    if (!proc || !path)
+        return cupolas_ERROR_INVALID_ARG;
+
     int stdin_pipe[2] = {-1, -1};
     int stdout_pipe[2] = {-1, -1};
     int stderr_pipe[2] = {-1, -1};
-    
+
     int err = create_redirect_pipes_posix(stdin_pipe, stdout_pipe, stderr_pipe, attr);
     if (err != cupolas_OK) {
         return err;
     }
-    
+
     pid_t pid = fork();
-    
+
     if (pid < 0) {
         cleanup_pipes_posix(stdin_pipe, stdout_pipe, stderr_pipe, 1, 1, 1);
         return cupolas_ERROR_UNKNOWN;
     }
-    
+
     if (pid == 0) {
         setup_child_process(stdin_pipe, stdout_pipe, stderr_pipe, attr, path, argv);
     }
-    
+
     close(stdin_pipe[0]);
     close(stdout_pipe[1]);
     close(stderr_pipe[1]);
-    
+
     if (attr) {
         if (attr->redirect_stdin && stdin_pipe[1] >= 0) {
             close(stdin_pipe[1]);
@@ -328,14 +357,16 @@ int cupolas_process_spawn(cupolas_process_t* proc,
             close(stderr_pipe[0]);
         }
     }
-    
+
     *proc = pid;
     return cupolas_OK;
 }
 
-int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status, uint32_t timeout_ms) {
-    if (!status) return cupolas_ERROR_INVALID_ARG;
-    
+int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t *status, uint32_t timeout_ms)
+{
+    if (!status)
+        return cupolas_ERROR_INVALID_ARG;
+
     if (timeout_ms > 0) {
         struct timeval tv;
         tv.tv_sec = timeout_ms / 1000;
@@ -368,18 +399,19 @@ int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status, 
             gettimeofday(&end, NULL);
             long elapsed_us = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
             long remaining_us = tv.tv_sec * 1000000 + tv.tv_usec - elapsed_us;
-            if (remaining_us <= 0) break;
+            if (remaining_us <= 0)
+                break;
             tv.tv_sec = remaining_us / 1000000;
             tv.tv_usec = remaining_us % 1000000;
         }
         return cupolas_ERROR_TIMEOUT;
     }
-    
+
     int result = waitpid(proc, &status->code, 0);
     if (result < 0) {
         return cupolas_ERROR_UNKNOWN;
     }
-    
+
     if (WIFEXITED(status->code)) {
         status->code = WEXITSTATUS(status->code);
         status->signaled = false;
@@ -389,18 +421,22 @@ int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status, 
         status->signaled = true;
         status->code = -1;
     }
-    
+
     return cupolas_OK;
 }
 
-int cupolas_process_terminate(cupolas_process_t proc, int signal) {
-    if (proc <= 0) return cupolas_ERROR_INVALID_ARG;
-    
+int cupolas_process_terminate(cupolas_process_t proc, int signal)
+{
+    if (proc <= 0)
+        return cupolas_ERROR_INVALID_ARG;
+
     return kill(proc, signal > 0 ? signal : SIGTERM) == 0 ? cupolas_OK : cupolas_ERROR_UNKNOWN;
 }
 
-int cupolas_process_close(cupolas_process_t proc) {
-    if (proc <= 0) return cupolas_ERROR_INVALID_ARG;
+int cupolas_process_close(cupolas_process_t proc)
+{
+    if (proc <= 0)
+        return cupolas_ERROR_INVALID_ARG;
 
 #ifndef cupolas_PLATFORM_WINDOWS
     int status = 0;
@@ -414,7 +450,8 @@ int cupolas_process_close(cupolas_process_t proc) {
     return cupolas_OK;
 }
 
-cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc) {
+cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc)
+{
     return proc;
 }
 

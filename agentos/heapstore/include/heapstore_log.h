@@ -97,7 +97,8 @@ void heapstore_log_shutdown(void);
  *
  * @note 通常使用宏 heapstore_LOG_* 代替直接调用
  */
-void heapstore_log_write(heapstore_log_level_t level, const char* service, const char* trace_id, const char* file, int line, const char* format, ...);
+void heapstore_log_write(heapstore_log_level_t level, const char *service, const char *trace_id,
+                         const char *file, int line, const char *format, ...);
 
 /**
  * @brief 写入日志（va_list 版本）
@@ -114,7 +115,8 @@ void heapstore_log_write(heapstore_log_level_t level, const char* service, const
  * @threadsafe 是
  * @reentrant 否
  */
-void heapstore_log_writev(heapstore_log_level_t level, const char* service, const char* trace_id, const char* file, int line, const char* format, va_list args);
+void heapstore_log_writev(heapstore_log_level_t level, const char *service, const char *trace_id,
+                          const char *file, int line, const char *format, va_list args);
 
 /**
  * @brief 获取当前日志级别
@@ -151,7 +153,8 @@ void heapstore_log_set_level(heapstore_log_level_t level);
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_log_get_service_path(const char* service, char* buffer, size_t buffer_size);
+heapstore_error_t heapstore_log_get_service_path(const char *service, char *buffer,
+                                                 size_t buffer_size);
 
 /**
  * @brief 执行日志轮转
@@ -176,7 +179,7 @@ heapstore_error_t heapstore_log_rotate(void);
  * @reentrant 否
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes);
+heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t *freed_bytes);
 
 /**
  * @brief 获取日志文件信息
@@ -190,7 +193,7 @@ heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes)
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_log_get_file_info(const char* service, heapstore_log_file_info_t* info);
+heapstore_error_t heapstore_log_get_file_info(const char *service, heapstore_log_file_info_t *info);
 
 /**
  * @brief 获取日志统计信息
@@ -205,7 +208,8 @@ heapstore_error_t heapstore_log_get_file_info(const char* service, heapstore_log
  * @reentrant 是
 
  * @since v1.0.0*/
-heapstore_error_t heapstore_log_get_stats(uint32_t* total_files, uint64_t* total_size_bytes, time_t* oldest_timestamp);
+heapstore_error_t heapstore_log_get_stats(uint32_t *total_files, uint64_t *total_size_bytes,
+                                          time_t *oldest_timestamp);
 
 /**
  * @brief 检查日志系统是否健康
@@ -218,17 +222,21 @@ heapstore_error_t heapstore_log_get_stats(uint32_t* total_files, uint64_t* total
  * @since v1.0.0*/
 bool heapstore_log_is_healthy(void);
 
-#define HEAPSTORE_LOG_ERROR(service, trace_id, fmt, ...) \
-    heapstore_log_write(HEAPSTORE_LOG_ERROR, service, trace_id, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define HEAPSTORE_LOG_ERROR(service, trace_id, fmt, ...)                                 \
+    heapstore_log_write(HEAPSTORE_LOG_ERROR, service, trace_id, __FILE__, __LINE__, fmt, \
+                        ##__VA_ARGS__)
 
-#define HEAPSTORE_LOG_WARN(service, trace_id, fmt, ...) \
-    heapstore_log_write(HEAPSTORE_LOG_WARN, service, trace_id, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define HEAPSTORE_LOG_WARN(service, trace_id, fmt, ...)                                 \
+    heapstore_log_write(HEAPSTORE_LOG_WARN, service, trace_id, __FILE__, __LINE__, fmt, \
+                        ##__VA_ARGS__)
 
-#define HEAPSTORE_LOG_INFO(service, trace_id, fmt, ...) \
-    heapstore_log_write(HEAPSTORE_LOG_INFO, service, trace_id, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define HEAPSTORE_LOG_INFO(service, trace_id, fmt, ...)                                 \
+    heapstore_log_write(HEAPSTORE_LOG_INFO, service, trace_id, __FILE__, __LINE__, fmt, \
+                        ##__VA_ARGS__)
 
-#define HEAPSTORE_LOG_DEBUG(service, trace_id, fmt, ...) \
-    heapstore_log_write(HEAPSTORE_LOG_DEBUG, service, trace_id, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define HEAPSTORE_LOG_DEBUG(service, trace_id, fmt, ...)                                 \
+    heapstore_log_write(HEAPSTORE_LOG_DEBUG, service, trace_id, __FILE__, __LINE__, fmt, \
+                        ##__VA_ARGS__)
 
 #ifdef __cplusplus
 }

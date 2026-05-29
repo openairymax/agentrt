@@ -18,16 +18,17 @@
 #endif
 
 #include "heapstore.h"
+#include "heapstore_ipc.h"
 #include "heapstore_log.h"
+#include "heapstore_memory.h"
 #include "heapstore_registry.h"
 #include "heapstore_trace.h"
-#include "heapstore_ipc.h"
-#include "heapstore_memory.h"
 
 #define BENCHMARK_ITERATIONS 10000
 #define BENCHMARK_BATCH_SIZE 100
 
-static double get_time_ms(void) {
+static double get_time_ms(void)
+{
 #ifdef _WIN32
     LARGE_INTEGER frequency;
     LARGE_INTEGER counter;
@@ -41,7 +42,8 @@ static double get_time_ms(void) {
 #endif
 }
 
-static void benchmark_init_shutdown(void) {
+static void benchmark_init_shutdown(void)
+{
     printf("\n=== Init/Shutdown Benchmark ===\n");
 
     double start = get_time_ms();
@@ -52,11 +54,11 @@ static void benchmark_init_shutdown(void) {
     }
 
     double elapsed = get_time_ms() - start;
-    printf("100 init/shutdown cycles: %.2f ms (%.2f ms/op)\n",
-           elapsed, elapsed / 100.0);
+    printf("100 init/shutdown cycles: %.2f ms (%.2f ms/op)\n", elapsed, elapsed / 100.0);
 }
 
-static void benchmark_logging(void) {
+static void benchmark_logging(void)
+{
     printf("\n=== Logging Benchmark ===\n");
 
     heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
@@ -69,13 +71,14 @@ static void benchmark_logging(void) {
     }
 
     double elapsed = get_time_ms() - start;
-    printf("%d log writes: %.2f ms (%.2f ops/sec)\n",
-           BENCHMARK_ITERATIONS, elapsed, BENCHMARK_ITERATIONS * 1000.0 / elapsed);
+    printf("%d log writes: %.2f ms (%.2f ops/sec)\n", BENCHMARK_ITERATIONS, elapsed,
+           BENCHMARK_ITERATIONS * 1000.0 / elapsed);
 
     heapstore_shutdown();
 }
 
-static void benchmark_registry_insert(void) {
+static void benchmark_registry_insert(void)
+{
     printf("\n=== Registry Insert Benchmark ===\n");
 
     heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
@@ -97,13 +100,13 @@ static void benchmark_registry_insert(void) {
     }
 
     double elapsed = get_time_ms() - start;
-    printf("1000 agent inserts: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 1000 * 1000.0 / elapsed);
+    printf("1000 agent inserts: %.2f ms (%.2f ops/sec)\n", elapsed, 1000 * 1000.0 / elapsed);
 
     heapstore_shutdown();
 }
 
-static void benchmark_trace_write(void) {
+static void benchmark_trace_write(void)
+{
     printf("\n=== Trace Write Benchmark ===\n");
 
     heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
@@ -125,14 +128,15 @@ static void benchmark_trace_write(void) {
     }
 
     double elapsed = get_time_ms() - start;
-    printf("%d span writes: %.2f ms (%.2f ops/sec)\n",
-           BENCHMARK_ITERATIONS, elapsed, BENCHMARK_ITERATIONS * 1000.0 / elapsed);
+    printf("%d span writes: %.2f ms (%.2f ops/sec)\n", BENCHMARK_ITERATIONS, elapsed,
+           BENCHMARK_ITERATIONS * 1000.0 / elapsed);
 
     heapstore_trace_flush();
     heapstore_shutdown();
 }
 
-static void benchmark_trace_batch_write(void) {
+static void benchmark_trace_batch_write(void)
+{
     printf("\n=== Trace Batch Write Benchmark ===\n");
 
     heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
@@ -157,15 +161,15 @@ static void benchmark_trace_batch_write(void) {
     }
 
     double elapsed = get_time_ms() - start;
-    printf("%d span batch writes (%d per batch): %.2f ms (%.2f ops/sec)\n",
-           BENCHMARK_ITERATIONS, BENCHMARK_BATCH_SIZE,
-           elapsed, BENCHMARK_ITERATIONS * 1000.0 / elapsed);
+    printf("%d span batch writes (%d per batch): %.2f ms (%.2f ops/sec)\n", BENCHMARK_ITERATIONS,
+           BENCHMARK_BATCH_SIZE, elapsed, BENCHMARK_ITERATIONS * 1000.0 / elapsed);
 
     heapstore_trace_flush();
     heapstore_shutdown();
 }
 
-static void benchmark_ipc_operations(void) {
+static void benchmark_ipc_operations(void)
+{
     printf("\n=== IPC Operations Benchmark ===\n");
 
     heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
@@ -185,8 +189,7 @@ static void benchmark_ipc_operations(void) {
     }
 
     double elapsed = get_time_ms() - start;
-    printf("5000 IPC channel inserts: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 5000 * 1000.0 / elapsed);
+    printf("5000 IPC channel inserts: %.2f ms (%.2f ops/sec)\n", elapsed, 5000 * 1000.0 / elapsed);
 
     start = get_time_ms();
 
@@ -198,13 +201,13 @@ static void benchmark_ipc_operations(void) {
     }
 
     elapsed = get_time_ms() - start;
-    printf("5000 IPC channel lookups: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 5000 * 1000.0 / elapsed);
+    printf("5000 IPC channel lookups: %.2f ms (%.2f ops/sec)\n", elapsed, 5000 * 1000.0 / elapsed);
 
     heapstore_shutdown();
 }
 
-static void benchmark_memory_operations(void) {
+static void benchmark_memory_operations(void)
+{
     printf("\n=== Memory Operations Benchmark ===\n");
 
     heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
@@ -227,8 +230,7 @@ static void benchmark_memory_operations(void) {
     }
 
     double elapsed = get_time_ms() - start;
-    printf("5000 memory pool inserts: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 5000 * 1000.0 / elapsed);
+    printf("5000 memory pool inserts: %.2f ms (%.2f ops/sec)\n", elapsed, 5000 * 1000.0 / elapsed);
 
     start = get_time_ms();
 
@@ -240,13 +242,13 @@ static void benchmark_memory_operations(void) {
     }
 
     elapsed = get_time_ms() - start;
-    printf("5000 memory pool lookups: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 5000 * 1000.0 / elapsed);
+    printf("5000 memory pool lookups: %.2f ms (%.2f ops/sec)\n", elapsed, 5000 * 1000.0 / elapsed);
 
     heapstore_shutdown();
 }
 
-static void benchmark_stats_operations(void) {
+static void benchmark_stats_operations(void)
+{
     printf("\n=== Stats Operations Benchmark ===\n");
 
     heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
@@ -271,13 +273,13 @@ static void benchmark_stats_operations(void) {
     }
 
     double elapsed = get_time_ms() - start;
-    printf("10000 stats queries: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 10000 * 1000.0 / elapsed);
+    printf("10000 stats queries: %.2f ms (%.2f ops/sec)\n", elapsed, 10000 * 1000.0 / elapsed);
 
     heapstore_shutdown();
 }
 
-int main(void) {
+int main(void)
+{
     printf("===========================================\n");
     printf("   AgentOS heapstore Performance Benchmark\n");
     printf("===========================================\n");
@@ -301,4 +303,3 @@ int main(void) {
 
     return 0;
 }
-

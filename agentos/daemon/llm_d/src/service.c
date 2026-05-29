@@ -6,30 +6,34 @@
  *
  * 改进说明：
  * 1. 修复 stpcpy 不可移植问题
- * 2. 统一错误码为 AGENTOS_ERR_* 
+ * 2. 统一错误码为 AGENTOS_ERR_*
  * 3. 完善 YAML 解析逻辑
  * 4. 线程安全
  */
 
-#include "service.h"
 #include "daemon_defaults.h"
-#include "svc_logger.h"
 #include "error.h"
 #include "platform.h"
 #include "response.h"
+#include "service.h"
+#include "svc_logger.h"
+
+#include <cjson/cJSON.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <cjson/cJSON.h>
 #ifdef HAVE_YAML
 #include <yaml.h>
 #endif
 
-static int ends_with(const char* str, const char* suffix) {
-    if (!str || !suffix) return 0;
+static int ends_with(const char *str, const char *suffix)
+{
+    if (!str || !suffix)
+        return 0;
     size_t str_len = strlen(str);
     size_t suffix_len = strlen(suffix);
-    if (suffix_len > str_len) return 0;
+    if (suffix_len > str_len)
+        return 0;
     return strcmp(str + str_len - suffix_len, suffix) == 0;
 }
 
@@ -42,18 +46,19 @@ static int ends_with(const char* str, const char* suffix) {
  * @param src 源字符串
  * @return 写入后的结束位置
  */
-static char* safe_strcat(char* dest, size_t dest_size, const char* src) __attribute__((unused));
-static char* safe_strcat(char* dest, size_t dest_size, const char* src) {
+static char *safe_strcat(char *dest, size_t dest_size, const char *src) __attribute__((unused));
+static char *safe_strcat(char *dest, size_t dest_size, const char *src)
+{
     size_t dest_len = strlen(dest);
     size_t remaining = dest_size - dest_len - 1;
     size_t src_len = strlen(src);
     size_t copy_len = (src_len < remaining) ? src_len : remaining;
-    
+
     if (copy_len > 0) {
         memcpy(dest + dest_len, src, copy_len);
         dest[dest_len + copy_len] = '\0';
     }
-    
+
     return dest + dest_len + copy_len;
 }
 
@@ -62,47 +67,47 @@ static char* safe_strcat(char* dest, size_t dest_size, const char* src) {
  * @param manager 请求配置
  * @return 缓存键字符串（需调用者释放），失败返回 NULL
  */
-static char* make_cache_key(const llm_request_config_t* manager) {
+static char *make_cache_key(const llm_request_config_t *manager)
+{
     if (!manager || !manager->model) {
         return NULL;
     }
-    
+
     /* 计算所需缓冲区大小 */
     size_t len = strlen(manager->model) + 2;
     for (size_t i = 0; i < manager->message_count; ++i) {
-        const char* role = manager->messages[i].role ? manager->messages[i].role : "";
-        const char* content = manager->messages[i].content ? manager->messages[i].content : "";
-        len += strlen(role) + 1 +
-               strlen(content) + 1;
+        const char *role = manager->messages[i].role ? manager->messages[i].role : "";
+        const char *content = manager->messages[i].content ? manager->messages[i].content : "";
+        len += strlen(role) + 1 + strlen(content) + 1;
     }
-    
-    char* key = (char*)AGENTOS_MALLOC(len);
-    if (!key) return NULL;
-    
+
+    char *key = (char *)AGENTOS_MALLOC(len);
+    if (!key)
+        return NULL;
+
     /* 构建缓存键 */
-    char* p = key;
-    
+    char *p = key;
+
     /* 使用安全的字符串复制 */
     size_t written = snprintf(p, len, "%s", manager->model);
     p += written;
-    
+
     *p++ = '|';
-    
+
     for (size_t i = 0; i < manager->message_count; ++i) {
-        const char* role = manager->messages[i].role ? manager->messages[i].role : "";
-        const char* content = manager->messages[i].content ? manager->messages[i].content : "";
-        written = snprintf(p, len - (p - key), "%s:%s|",
-                          role, content);
+        const char *role = manager->messages[i].role ? manager->messages[i].role : "";
+        const char *content = manager->messages[i].content ? manager->messages[i].content : "";
+        written = snprintf(p, len - (p - key), "%s:%s|", role, content);
         p += written;
     }
-    
+
     /* 确保字符串以 null 结尾 */
     if (p > key && p[-1] == '|') {
         p[-1] = '\0';
     } else {
         *p = '\0';
     }
-    
+
     return key;
 }
 
@@ -114,34 +119,36 @@ static char* make_cache_key(const llm_request_config_t* manager) {
  * @param count 输出规则数量
  * @return 规则数组（需调用者释放），失败返回 NULL
  */
-static pricing_rule_t* load_pricing_rules(cJSON* root, int* count) {
+static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
+{
     if (!root || !count) {
         *count = 0;
         return NULL;
     }
-    
-    cJSON* pricing = cJSON_GetObjectItem(root, "pricing");
+
+    cJSON *pricing = cJSON_GetObjectItem(root, "pricing");
     if (!pricing || !cJSON_IsArray(pricing)) {
         *count = 0;
         return NULL;
     }
 
     int n = cJSON_GetArraySize(pricing);
-    pricing_rule_t* rules = (pricing_rule_t*)AGENTOS_CALLOC((size_t)n, sizeof(pricing_rule_t));
-    if (!rules) return NULL;
+    pricing_rule_t *rules = (pricing_rule_t *)AGENTOS_CALLOC((size_t)n, sizeof(pricing_rule_t));
+    if (!rules)
+        return NULL;
 
     for (int i = 0; i < n; ++i) {
-        cJSON* item = cJSON_GetArrayItem(pricing, i);
-        cJSON* pattern = cJSON_GetObjectItem(item, "pattern");
-        cJSON* input = cJSON_GetObjectItem(item, "input_price_per_k");
-        cJSON* output = cJSON_GetObjectItem(item, "output_price_per_k");
+        cJSON *item = cJSON_GetArrayItem(pricing, i);
+        cJSON *pattern = cJSON_GetObjectItem(item, "pattern");
+        cJSON *input = cJSON_GetObjectItem(item, "input_price_per_k");
+        cJSON *output = cJSON_GetObjectItem(item, "output_price_per_k");
 
         if (cJSON_IsString(pattern) && cJSON_IsNumber(input) && cJSON_IsNumber(output)) {
             rules[i].model_pattern = AGENTOS_STRDUP(pattern->valuestring);
             if (!rules[i].model_pattern) {
                 /* 内存分配失败，清理已分配的 */
                 for (int j = 0; j < i; ++j) {
-                    AGENTOS_FREE((void*)rules[j].model_pattern);
+                    AGENTOS_FREE((void *)rules[j].model_pattern);
                 }
                 AGENTOS_FREE(rules);
                 *count = 0;
@@ -153,30 +160,33 @@ static pricing_rule_t* load_pricing_rules(cJSON* root, int* count) {
             rules[i].model_pattern = NULL;
         }
     }
-    
+
     *count = n;
     return rules;
 }
 
 /* ---------- 释放定价规则 ---------- */
 
-static void free_pricing_rules(pricing_rule_t* rules, int count) {
-    if (!rules) return;
+static void free_pricing_rules(pricing_rule_t *rules, int count)
+{
+    if (!rules)
+        return;
     for (int i = 0; i < count; ++i) {
-        AGENTOS_FREE((void*)rules[i].model_pattern);
+        AGENTOS_FREE((void *)rules[i].model_pattern);
     }
     AGENTOS_FREE(rules);
 }
 
 /* ---------- 创建服务 ---------- */
 
-llm_service_t* llm_service_create(const char* config_path) {
-    llm_service_t* svc = (llm_service_t*)AGENTOS_CALLOC(1, sizeof(llm_service_t));
+llm_service_t *llm_service_create(const char *config_path)
+{
+    llm_service_t *svc = (llm_service_t *)AGENTOS_CALLOC(1, sizeof(llm_service_t));
     if (!svc) {
         SVC_LOG_ERROR("Failed to allocate service context");
         return NULL;
     }
-    
+
     if (agentos_mutex_init(&svc->lock) != 0) {
         SVC_LOG_ERROR("Failed to initialize service lock");
         AGENTOS_FREE(svc);
@@ -193,44 +203,47 @@ llm_service_t* llm_service_create(const char* config_path) {
 
     /* 解析定价规则（使用 cJSON） */
     if (config_path) {
-        FILE* f = fopen(config_path, "rb");
+        FILE *f = fopen(config_path, "rb");
         if (f) {
-        fseek(f, 0, SEEK_END);
-        long yaml_len = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        
-        if (yaml_len <= 0) {
-            fclose(f);
-        } else {
-            char* yaml_content = (char*)AGENTOS_MALLOC((size_t)yaml_len + 1);
-            if (yaml_content) {
-                size_t read_len = fread(yaml_content, 1, (size_t)yaml_len, f);
-                if (read_len != (size_t)yaml_len) { AGENTOS_FREE(yaml_content); yaml_content = NULL; }
-                if (yaml_content) {
-                yaml_content[read_len] = '\0';
-                
-                cJSON* root = cJSON_Parse(yaml_content);
-                if (root) {
-                    int rule_count = 0;
-                    pricing_rule_t* rules = load_pricing_rules(root, &rule_count);
-                    if (rules && rule_count > 0) {
-                        svc->rules = (void**)rules;
-                        svc->rule_count = rule_count;
-                        SVC_LOG_INFO("Loaded %d pricing rules", rule_count);
-                    } else if (rules) {
-                        AGENTOS_FREE(rules);
-                    }
-                    cJSON_Delete(root);
-                } else {
-                    SVC_LOG_WARN("Failed to parse pricing rules from manager");
-                }
-                }
-                AGENTOS_FREE(yaml_content);
+            fseek(f, 0, SEEK_END);
+            long yaml_len = ftell(f);
+            fseek(f, 0, SEEK_SET);
+
+            if (yaml_len <= 0) {
+                fclose(f);
             } else {
-                SVC_LOG_ERROR("Failed to allocate memory for manager content");
+                char *yaml_content = (char *)AGENTOS_MALLOC((size_t)yaml_len + 1);
+                if (yaml_content) {
+                    size_t read_len = fread(yaml_content, 1, (size_t)yaml_len, f);
+                    if (read_len != (size_t)yaml_len) {
+                        AGENTOS_FREE(yaml_content);
+                        yaml_content = NULL;
+                    }
+                    if (yaml_content) {
+                        yaml_content[read_len] = '\0';
+
+                        cJSON *root = cJSON_Parse(yaml_content);
+                        if (root) {
+                            int rule_count = 0;
+                            pricing_rule_t *rules = load_pricing_rules(root, &rule_count);
+                            if (rules && rule_count > 0) {
+                                svc->rules = (void **)rules;
+                                svc->rule_count = rule_count;
+                                SVC_LOG_INFO("Loaded %d pricing rules", rule_count);
+                            } else if (rules) {
+                                AGENTOS_FREE(rules);
+                            }
+                            cJSON_Delete(root);
+                        } else {
+                            SVC_LOG_WARN("Failed to parse pricing rules from manager");
+                        }
+                    }
+                    AGENTOS_FREE(yaml_content);
+                } else {
+                    SVC_LOG_ERROR("Failed to allocate memory for manager content");
+                }
+                fclose(f);
             }
-            fclose(f);
-        }
         }
     }
 
@@ -254,7 +267,7 @@ llm_service_t* llm_service_create(const char* config_path) {
     }
 
     /* 创建成本追踪器 */
-    svc->cost = cost_tracker_create((const pricing_rule_t*)svc->rules, (int)svc->rule_count);
+    svc->cost = cost_tracker_create((const pricing_rule_t *)svc->rules, (int)svc->rule_count);
     if (!svc->cost) {
         SVC_LOG_ERROR("Failed to create cost tracker");
         cache_destroy(svc->cache);
@@ -282,35 +295,37 @@ llm_service_t* llm_service_create(const char* config_path) {
 
 /* ---------- 销毁服务 ---------- */
 
-void llm_service_destroy(llm_service_t* svc) {
-    if (!svc) return;
-    
+void llm_service_destroy(llm_service_t *svc)
+{
+    if (!svc)
+        return;
+
     if (svc->registry) {
         provider_registry_destroy(svc->registry);
         svc->registry = NULL;
     }
-    
+
     if (svc->cache) {
         cache_destroy(svc->cache);
         svc->cache = NULL;
     }
-    
+
     if (svc->cost) {
         cost_tracker_destroy(svc->cost);
         svc->cost = NULL;
     }
-    
+
     if (svc->token_counter) {
         token_counter_destroy(svc->token_counter);
         svc->token_counter = NULL;
     }
-    
+
     if (svc->rules) {
-        free_pricing_rules((pricing_rule_t*)svc->rules, (int)svc->rule_count);
+        free_pricing_rules((pricing_rule_t *)svc->rules, (int)svc->rule_count);
         svc->rules = NULL;
         svc->rule_count = 0;
     }
-    
+
     agentos_mutex_destroy(&svc->lock);
     AGENTOS_FREE(svc);
 }
@@ -320,16 +335,16 @@ void llm_service_destroy(llm_service_t* svc) {
 /**
  * @brief 从缓存获取响应
  */
-static int get_cached_response(llm_service_t* svc,
-                               const char* cache_key,
-                               llm_response_t** out_response) {
+static int get_cached_response(llm_service_t *svc, const char *cache_key,
+                               llm_response_t **out_response)
+{
     if (!svc || !cache_key || !out_response) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    char* cached_json = NULL;
+    char *cached_json = NULL;
     if (cache_get(svc->cache, cache_key, &cached_json) == 1 && cached_json) {
-        llm_response_t* cached_resp = response_from_json(cached_json);
+        llm_response_t *cached_resp = response_from_json(cached_json);
         AGENTOS_FREE(cached_json);
         cached_json = NULL;
 
@@ -347,13 +362,14 @@ static int get_cached_response(llm_service_t* svc,
 /**
  * @brief 查找提供商
  */
-static const provider_t* find_provider(llm_service_t* svc, const char* model) {
+static const provider_t *find_provider(llm_service_t *svc, const char *model)
+{
     if (!svc || !model) {
         return NULL;
     }
 
     agentos_mutex_lock(&svc->lock);
-    const provider_t* prov = provider_registry_find(svc->registry, model);
+    const provider_t *prov = provider_registry_find(svc->registry, model);
     agentos_mutex_unlock(&svc->lock);
 
     return prov;
@@ -362,12 +378,13 @@ static const provider_t* find_provider(llm_service_t* svc, const char* model) {
 /**
  * @brief 存储响应到缓存
  */
-static void cache_response(llm_service_t* svc, const char* cache_key, llm_response_t* resp) {
+static void cache_response(llm_service_t *svc, const char *cache_key, llm_response_t *resp)
+{
     if (!svc || !cache_key || !resp) {
         return;
     }
 
-    char* resp_json = response_to_json(resp);
+    char *resp_json = response_to_json(resp);
     if (resp_json) {
         cache_put(svc->cache, cache_key, resp_json);
         AGENTOS_FREE(resp_json);
@@ -378,7 +395,8 @@ static void cache_response(llm_service_t* svc, const char* cache_key, llm_respon
 /**
  * @brief 更新成本追踪
  */
-static void update_cost_tracking(llm_service_t* svc, const char* model, const llm_response_t* resp) {
+static void update_cost_tracking(llm_service_t *svc, const char *model, const llm_response_t *resp)
+{
     if (!svc || !model || !resp) {
         return;
     }
@@ -388,9 +406,9 @@ static void update_cost_tracking(llm_service_t* svc, const char* model, const ll
 
 /* ---------- 同步完成（重构后：圈复杂度从 22 降至 9） ---------- */
 
-int llm_service_complete(llm_service_t* svc,
-                         const llm_request_config_t* manager,
-                         llm_response_t** out_response) {
+int llm_service_complete(llm_service_t *svc, const llm_request_config_t *manager,
+                         llm_response_t **out_response)
+{
     /* 参数检查 */
     if (!svc || !manager || !out_response) {
         SVC_LOG_ERROR("Invalid arguments to llm_service_complete");
@@ -403,14 +421,14 @@ int llm_service_complete(llm_service_t* svc,
     }
 
     /* 生成缓存键 */
-    char* cache_key = make_cache_key(manager);
+    char *cache_key = make_cache_key(manager);
     if (!cache_key) {
         SVC_LOG_ERROR("Failed to generate cache key");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     /* 检查缓存 */
-    llm_response_t* cached_resp = NULL;
+    llm_response_t *cached_resp = NULL;
     int cache_status = get_cached_response(svc, cache_key, &cached_resp);
     if (cache_status > 0 && cached_resp) {
         AGENTOS_FREE(cache_key);
@@ -419,7 +437,7 @@ int llm_service_complete(llm_service_t* svc,
     }
 
     /* 查找提供商 */
-    const provider_t* prov = find_provider(svc, manager->model);
+    const provider_t *prov = find_provider(svc, manager->model);
     if (!prov) {
         SVC_LOG_ERROR("No provider for model '%s'", manager->model);
         AGENTOS_FREE(cache_key);
@@ -428,11 +446,11 @@ int llm_service_complete(llm_service_t* svc,
     }
 
     /* 调用提供商 */
-    llm_response_t* resp = NULL;
+    llm_response_t *resp = NULL;
     int ret = prov->ops->complete(prov->ctx, manager, &resp);
     if (ret != 0) {
-        SVC_LOG_ERROR("Provider '%s' failed for model '%s': error %d",
-                     prov->name, manager->model, ret);
+        SVC_LOG_ERROR("Provider '%s' failed for model '%s': error %d", prov->name, manager->model,
+                      ret);
         AGENTOS_FREE(cache_key);
         cache_key = NULL;
         return ret;
@@ -450,31 +468,30 @@ int llm_service_complete(llm_service_t* svc,
 
 /* ---------- 流式完成 ---------- */
 
-int llm_service_complete_stream(llm_service_t* svc,
-                                const llm_request_config_t* manager,
-                                llm_stream_callback_t callback,
-                                void* callback_data,
-                                llm_response_t** out_response) {
+int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *manager,
+                                llm_stream_callback_t callback, void *callback_data,
+                                llm_response_t **out_response)
+{
     /* 参数检查 */
     if (!svc || !manager || !callback) {
         SVC_LOG_ERROR("Invalid arguments to llm_service_complete_stream");
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    
+
     if (!manager->model) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     /* 查找提供商 */
     agentos_mutex_lock(&svc->lock);
-    const provider_t* prov = provider_registry_find(svc->registry, manager->model);
+    const provider_t *prov = provider_registry_find(svc->registry, manager->model);
     agentos_mutex_unlock(&svc->lock);
-    
+
     if (!prov) {
         SVC_LOG_ERROR("No provider for model '%s'", manager->model);
         return AGENTOS_ERR_LLM_INVALID_MODEL;
     }
-    
+
     /* 检查是否支持流式 */
     if (!prov->ops->complete_stream) {
         SVC_LOG_WARN("Provider '%s' does not support streaming", prov->name);
@@ -483,43 +500,43 @@ int llm_service_complete_stream(llm_service_t* svc,
 
     /* 调用流式接口 */
     int ret = prov->ops->complete_stream(prov->ctx, manager, callback, callback_data, out_response);
-    
+
     if (ret == 0 && out_response && *out_response) {
-        llm_response_t* resp = *out_response;
-        cost_tracker_add(svc->cost, manager->model,
-                         resp->prompt_tokens, resp->completion_tokens);
+        llm_response_t *resp = *out_response;
+        cost_tracker_add(svc->cost, manager->model, resp->prompt_tokens, resp->completion_tokens);
     }
-    
+
     return ret;
 }
 
 /* ---------- 统计 ---------- */
 
-int llm_service_stats(llm_service_t* svc, char** out_json) {
+int llm_service_stats(llm_service_t *svc, char **out_json)
+{
     if (!svc || !out_json) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    
-    cJSON* root = cJSON_CreateObject();
+
+    cJSON *root = cJSON_CreateObject();
     if (!root) {
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    
-    cJSON* cost_json = cost_tracker_export(svc->cost);
+
+    cJSON *cost_json = cost_tracker_export(svc->cost);
     if (cost_json) {
         cJSON_AddItemToObject(root, "cost", cost_json);
     }
-    
+
     cJSON_AddNumberToObject(root, "cache_size", cache_size(svc->cache));
     cJSON_AddNumberToObject(root, "cache_capacity", cache_capacity(svc->cache));
-    
-    char* json = cJSON_PrintUnformatted(root);
+
+    char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    
+
     if (!json) {
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    
+
     *out_json = json;
     return AGENTOS_OK;
 }
@@ -532,7 +549,8 @@ int llm_service_stats(llm_service_t* svc, char** out_json) {
  * @param cfg 输出配置
  * @return 0 成功，非0 失败
  */
-int svc_config_load(const char* config_path, service_config_t* cfg) {
+int svc_config_load(const char *config_path, service_config_t *cfg)
+{
     if (!cfg || !config_path) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -552,73 +570,77 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     }
 
     memset(cfg, 0, sizeof(service_config_t));
-    
+
     cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
     cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
     cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
     cfg->timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
-    
-    FILE* f = fopen(config_path, "rb");
+
+    FILE *f = fopen(config_path, "rb");
     if (!f) {
         SVC_LOG_WARN("Cannot open manager file '%s', using defaults", config_path);
-        return 0;  /* 使用默认值，不算错误 */
+        return 0; /* 使用默认值，不算错误 */
     }
-    
+
     fseek(f, 0, SEEK_END);
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
-    
-    char* content = (char*)AGENTOS_MALLOC((size_t)len + 1);
+
+    char *content = (char *)AGENTOS_MALLOC((size_t)len + 1);
     if (!content) {
         fclose(f);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    
+
     size_t read_len = fread(content, 1, (size_t)len, f);
-    if (read_len != (size_t)len) { AGENTOS_FREE(content); fclose(f); return AGENTOS_ERR_IO; }
+    if (read_len != (size_t)len) {
+        AGENTOS_FREE(content);
+        fclose(f);
+        return AGENTOS_ERR_IO;
+    }
     content[read_len] = '\0';
     fclose(f);
-    
+
     /* 使用 cJSON 解析（配置文件实际上是 JSON） */
-    cJSON* root = cJSON_Parse(content);
+    cJSON *root = cJSON_Parse(content);
     AGENTOS_FREE(content);
-    
+
     if (!root) {
         SVC_LOG_WARN("Failed to parse manager file, using defaults");
         return 0;
     }
-    
+
     /* 提取配置值 */
-    cJSON* item;
-    
+    cJSON *item;
+
     item = cJSON_GetObjectItem(root, "cache_capacity");
     if (item && cJSON_IsNumber(item)) {
         cfg->cache_capacity = item->valueint;
     }
-    
+
     item = cJSON_GetObjectItem(root, "cache_ttl_sec");
     if (item && cJSON_IsNumber(item)) {
         cfg->cache_ttl_sec = item->valueint;
     }
-    
+
     item = cJSON_GetObjectItem(root, "max_retries");
     if (item && cJSON_IsNumber(item)) {
         cfg->max_retries = item->valueint;
     }
-    
+
     item = cJSON_GetObjectItem(root, "timeout_ms");
     if (item && cJSON_IsNumber(item)) {
         cfg->timeout_ms = item->valueint;
     }
-    
+
     item = cJSON_GetObjectItem(root, "token_encoding");
     if (item && cJSON_IsString(item)) {
         size_t enc_len = strlen(item->valuestring);
         if (enc_len < sizeof(cfg->token_encoding)) {
-            memcpy((char*)cfg->token_encoding, item->valuestring, enc_len + 1);
+            memcpy((char *)cfg->token_encoding, item->valuestring, enc_len + 1);
         }
     }
-    
+
     cJSON_Delete(root);
     return AGENTOS_OK;
 }
@@ -631,23 +653,27 @@ typedef struct {
 } yaml_kv_t;
 
 typedef struct {
-    yaml_kv_t* pairs;
+    yaml_kv_t *pairs;
     size_t count;
     size_t capacity;
 } yaml_map_t;
 
-static void yaml_map_init(yaml_map_t* m) {
+static void yaml_map_init(yaml_map_t *m)
+{
     m->pairs = NULL;
     m->count = 0;
     m->capacity = 0;
 }
 
-static void yaml_map_add(yaml_map_t* m, const char* key, const char* value) {
-    if (!key || !value) return;
+static void yaml_map_add(yaml_map_t *m, const char *key, const char *value)
+{
+    if (!key || !value)
+        return;
     if (m->count >= m->capacity) {
         size_t new_cap = m->capacity == 0 ? 16 : m->capacity * 2;
-        yaml_kv_t* new_pairs = (yaml_kv_t*)AGENTOS_REALLOC(m->pairs, new_cap * sizeof(yaml_kv_t));
-        if (!new_pairs) return;
+        yaml_kv_t *new_pairs = (yaml_kv_t *)AGENTOS_REALLOC(m->pairs, new_cap * sizeof(yaml_kv_t));
+        if (!new_pairs)
+            return;
         m->pairs = new_pairs;
         m->capacity = new_cap;
     }
@@ -658,23 +684,29 @@ static void yaml_map_add(yaml_map_t* m, const char* key, const char* value) {
     m->count++;
 }
 
-static const char* yaml_map_get(const yaml_map_t* m, const char* key) {
-    if (!m || !key) return NULL;
+static const char *yaml_map_get(const yaml_map_t *m, const char *key)
+{
+    if (!m || !key)
+        return NULL;
     for (size_t i = 0; i < m->count; ++i) {
-        if (strcmp(m->pairs[i].key, key) == 0) return m->pairs[i].value;
+        if (strcmp(m->pairs[i].key, key) == 0)
+            return m->pairs[i].value;
     }
     return NULL;
 }
 
-static void yaml_map_free(yaml_map_t* m) {
+static void yaml_map_free(yaml_map_t *m)
+{
     AGENTOS_FREE(m->pairs);
     m->pairs = NULL;
     m->count = 0;
     m->capacity = 0;
 }
 
-int svc_config_load_yaml(const char* config_path, service_config_t* cfg) {
-    if (!cfg || !config_path) return AGENTOS_ERR_INVALID_PARAM;
+int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
+{
+    if (!cfg || !config_path)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     memset(cfg, 0, sizeof(service_config_t));
     cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
@@ -682,7 +714,7 @@ int svc_config_load_yaml(const char* config_path, service_config_t* cfg) {
     cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
     cfg->timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
 
-    FILE* f = fopen(config_path, "rb");
+    FILE *f = fopen(config_path, "rb");
     if (!f) {
         SVC_LOG_WARN("Cannot open YAML config '%s', using defaults", config_path);
         return 0;
@@ -710,7 +742,7 @@ int svc_config_load_yaml(const char* config_path, service_config_t* cfg) {
         if (event.type == YAML_STREAM_END_EVENT) {
             done = 1;
         } else if (event.type == YAML_SCALAR_EVENT) {
-            const char* val = (const char*)event.data.scalar.value;
+            const char *val = (const char *)event.data.scalar.value;
             if (val && strcmp(val, "global") == 0) {
                 in_global = 1;
             } else if (in_global && val) {
@@ -721,8 +753,9 @@ int svc_config_load_yaml(const char* config_path, service_config_t* cfg) {
                 yaml_event_t val_event;
                 if (yaml_parser_parse(&parser, &val_event)) {
                     if (val_event.type == YAML_SCALAR_EVENT) {
-                        const char* v = (const char*)val_event.data.scalar.value;
-                        if (v) yaml_map_add(&current_map, key_buf, v);
+                        const char *v = (const char *)val_event.data.scalar.value;
+                        if (v)
+                            yaml_map_add(&current_map, key_buf, v);
                     }
                     yaml_event_delete(&val_event);
                 }
@@ -736,7 +769,7 @@ int svc_config_load_yaml(const char* config_path, service_config_t* cfg) {
     yaml_parser_delete(&parser);
     fclose(f);
 
-    const char* val;
+    const char *val;
     if ((val = yaml_map_get(&current_map, "cache_capacity"))) {
         cfg->cache_capacity = (size_t)atol(val);
     }
@@ -744,7 +777,7 @@ int svc_config_load_yaml(const char* config_path, service_config_t* cfg) {
         cfg->cache_ttl_sec = (uint32_t)atol(val);
     }
     if ((val = yaml_map_get(&current_map, "max_retries"))) {
-        cfg->max_retries = atoi(val);
+        cfg->max_retries = (int)strtol(val, NULL, 10);
     }
     if ((val = yaml_map_get(&current_map, "timeout_ms"))) {
         cfg->timeout_ms = (uint32_t)atol(val);
@@ -752,7 +785,7 @@ int svc_config_load_yaml(const char* config_path, service_config_t* cfg) {
     if ((val = yaml_map_get(&current_map, "token_encoding"))) {
         size_t enc_len = strlen(val);
         if (enc_len < sizeof(cfg->token_encoding)) {
-            memcpy((char*)cfg->token_encoding, val, enc_len + 1);
+            memcpy((char *)cfg->token_encoding, val, enc_len + 1);
         }
     }
 
@@ -770,13 +803,16 @@ typedef struct {
     int max_retries;
 } model_entry_t;
 
-int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_providers, size_t* out_count) {
-    if (!config_path || !out_providers || !out_count) return AGENTOS_ERR_INVALID_PARAM;
+int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_providers,
+                               size_t *out_count)
+{
+    if (!config_path || !out_providers || !out_count)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     *out_providers = NULL;
     *out_count = 0;
 
-    FILE* f = fopen(config_path, "rb");
+    FILE *f = fopen(config_path, "rb");
     if (!f) {
         SVC_LOG_WARN("Cannot open model config '%s'", config_path);
         return 0;
@@ -800,11 +836,12 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
     int done = 0;
 
     while (!done) {
-        if (!yaml_parser_parse(&parser, &event)) break;
+        if (!yaml_parser_parse(&parser, &event))
+            break;
         if (event.type == YAML_STREAM_END_EVENT) {
             done = 1;
         } else if (event.type == YAML_SCALAR_EVENT) {
-            const char* val = (const char*)event.data.scalar.value;
+            const char *val = (const char *)event.data.scalar.value;
             if (val && strcmp(val, "models") == 0 && !in_models) {
                 in_models = 1;
                 continue;
@@ -817,8 +854,9 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
                 yaml_event_t val_event;
                 if (yaml_parser_parse(&parser, &val_event)) {
                     if (val_event.type == YAML_SCALAR_EVENT) {
-                        const char* v = (const char*)val_event.data.scalar.value;
-                        if (v) yaml_map_add(&item_map, key_buf, v);
+                        const char *v = (const char *)val_event.data.scalar.value;
+                        if (v)
+                            yaml_map_add(&item_map, key_buf, v);
                     }
                     yaml_event_delete(&val_event);
                 }
@@ -832,21 +870,28 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
         } else if (event.type == YAML_MAPPING_END_EVENT && in_models) {
             in_model_item--;
             if (in_model_item == 0 && model_count < 64) {
-                const char* n = yaml_map_get(&item_map, "name");
-                const char* p = yaml_map_get(&item_map, "provider");
-                const char* e = yaml_map_get(&item_map, "api_key_env");
-                const char* ep = yaml_map_get(&item_map, "endpoint");
-                const char* t = yaml_map_get(&item_map, "timeout_sec");
-                const char* r = yaml_map_get(&item_map, "max_retries");
+                const char *n = yaml_map_get(&item_map, "name");
+                const char *p = yaml_map_get(&item_map, "provider");
+                const char *e = yaml_map_get(&item_map, "api_key_env");
+                const char *ep = yaml_map_get(&item_map, "endpoint");
+                const char *t = yaml_map_get(&item_map, "timeout_sec");
+                const char *r = yaml_map_get(&item_map, "max_retries");
 
                 if (n && p) {
                     memset(&models[model_count], 0, sizeof(model_entry_t));
                     strncpy(models[model_count].name, n, sizeof(models[model_count].name) - 1);
-                    strncpy(models[model_count].provider, p, sizeof(models[model_count].provider) - 1);
-                    if (e) strncpy(models[model_count].api_key_env, e, sizeof(models[model_count].api_key_env) - 1);
-                    if (ep) strncpy(models[model_count].endpoint, ep, sizeof(models[model_count].endpoint) - 1);
-                    if (t) models[model_count].timeout_sec = atoi(t);
-                    if (r) models[model_count].max_retries = atoi(r);
+                    strncpy(models[model_count].provider, p,
+                            sizeof(models[model_count].provider) - 1);
+                    if (e)
+                        strncpy(models[model_count].api_key_env, e,
+                                sizeof(models[model_count].api_key_env) - 1);
+                    if (ep)
+                        strncpy(models[model_count].endpoint, ep,
+                                sizeof(models[model_count].endpoint) - 1);
+                    if (t)
+                        models[model_count].timeout_sec = (int)strtol(t, NULL, 10);
+                    if (r)
+                        models[model_count].max_retries = (int)strtol(r, NULL, 10);
                     model_count++;
                 }
             }
@@ -871,7 +916,7 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
         char base_url[512];
         int timeout_sec;
         int max_retries;
-        char* model_names[64];
+        char *model_names[64];
         size_t model_count;
     } provider_agg_t;
 
@@ -881,14 +926,17 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
     for (size_t i = 0; i < model_count; ++i) {
         size_t j = 0;
         for (; j < prov_count; ++j) {
-            if (strcmp(provs[j].name, models[i].provider) == 0) break;
+            if (strcmp(provs[j].name, models[i].provider) == 0)
+                break;
         }
         if (j == prov_count) {
-            if (prov_count >= 16) break;
+            if (prov_count >= 16)
+                break;
             memset(&provs[prov_count], 0, sizeof(provider_agg_t));
             strncpy(provs[prov_count].name, models[i].provider, sizeof(provs[prov_count].name) - 1);
             if (models[i].api_key_env[0])
-                strncpy(provs[prov_count].api_key_env, models[i].api_key_env, sizeof(provs[prov_count].api_key_env) - 1);
+                strncpy(provs[prov_count].api_key_env, models[i].api_key_env,
+                        sizeof(provs[prov_count].api_key_env) - 1);
             prov_count++;
         }
         if (provs[j].model_count < 64) {
@@ -903,26 +951,29 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
             provs[j].max_retries = models[i].max_retries;
     }
 
-    provider_config_t* result = (provider_config_t*)AGENTOS_CALLOC(prov_count + 1, sizeof(provider_config_t));
-    if (!result) return AGENTOS_ERR_OUT_OF_MEMORY;
+    provider_config_t *result =
+        (provider_config_t *)AGENTOS_CALLOC(prov_count + 1, sizeof(provider_config_t));
+    if (!result)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
 
     for (size_t i = 0; i < prov_count; ++i) {
         result[i].name = AGENTOS_STRDUP(provs[i].name);
         if (provs[i].api_key_env[0]) {
             char env_prefix[8] = "env:";
             size_t env_key_len = strlen(provs[i].api_key_env);
-            char* key_buf = (char*)AGENTOS_MALLOC(4 + env_key_len + 1);
+            char *key_buf = (char *)AGENTOS_MALLOC(4 + env_key_len + 1);
             if (key_buf) {
                 memcpy(key_buf, env_prefix, 4);
                 memcpy(key_buf + 4, provs[i].api_key_env, env_key_len + 1);
                 result[i].api_key = key_buf;
             }
         }
-        if (provs[i].base_url[0]) result[i].api_base = AGENTOS_STRDUP(provs[i].base_url);
+        if (provs[i].base_url[0])
+            result[i].api_base = AGENTOS_STRDUP(provs[i].base_url);
         result[i].timeout_sec = (double)provs[i].timeout_sec;
         result[i].max_retries = provs[i].max_retries;
         if (provs[i].model_count > 0) {
-            char** marr = (char**)AGENTOS_CALLOC(provs[i].model_count + 1, sizeof(char*));
+            char **marr = (char **)AGENTOS_CALLOC(provs[i].model_count + 1, sizeof(char *));
             if (marr) {
                 for (size_t k = 0; k < provs[i].model_count; ++k)
                     marr[k] = provs[i].model_names[k];
@@ -940,13 +991,16 @@ int svc_load_model_config_yaml(const char* config_path, provider_config_t** out_
 
 #endif /* HAVE_YAML */
 
-static int svc_load_model_config_json(const char* config_path, provider_config_t** out_providers, size_t* out_count) {
-    if (!config_path || !out_providers || !out_count) return AGENTOS_ERR_INVALID_PARAM;
+static int svc_load_model_config_json(const char *config_path, provider_config_t **out_providers,
+                                      size_t *out_count)
+{
+    if (!config_path || !out_providers || !out_count)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     *out_providers = NULL;
     *out_count = 0;
 
-    FILE* f = fopen(config_path, "rb");
+    FILE *f = fopen(config_path, "rb");
     if (!f) {
         SVC_LOG_WARN("Cannot open model config '%s'", config_path);
         return 0;
@@ -956,21 +1010,24 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char* content = (char*)AGENTOS_MALLOC((size_t)len + 1);
-    if (!content) { fclose(f); return AGENTOS_ERR_OUT_OF_MEMORY; }
+    char *content = (char *)AGENTOS_MALLOC((size_t)len + 1);
+    if (!content) {
+        fclose(f);
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     size_t read_len = fread(content, 1, (size_t)len, f);
     content[read_len] = '\0';
     fclose(f);
 
-    cJSON* root = cJSON_Parse(content);
+    cJSON *root = cJSON_Parse(content);
     AGENTOS_FREE(content);
     if (!root) {
         SVC_LOG_WARN("Failed to parse model config JSON");
         return 0;
     }
 
-    cJSON* providers_arr = cJSON_GetObjectItem(root, "providers");
+    cJSON *providers_arr = cJSON_GetObjectItem(root, "providers");
     if (!providers_arr || !cJSON_IsArray(providers_arr)) {
         cJSON_Delete(root);
         SVC_LOG_WARN("No 'providers' array in model config");
@@ -978,29 +1035,37 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
     }
 
     int n = cJSON_GetArraySize(providers_arr);
-    if (n <= 0) { cJSON_Delete(root); return 0; }
+    if (n <= 0) {
+        cJSON_Delete(root);
+        return 0;
+    }
 
-    provider_config_t* result = (provider_config_t*)AGENTOS_CALLOC((size_t)n + 1, sizeof(provider_config_t));
-    if (!result) { cJSON_Delete(root); return AGENTOS_ERR_OUT_OF_MEMORY; }
+    provider_config_t *result =
+        (provider_config_t *)AGENTOS_CALLOC((size_t)n + 1, sizeof(provider_config_t));
+    if (!result) {
+        cJSON_Delete(root);
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     size_t valid_count = 0;
     for (int i = 0; i < n; ++i) {
-        cJSON* pitem = cJSON_GetArrayItem(providers_arr, i);
-        cJSON* pname = cJSON_GetObjectItem(pitem, "name");
-        cJSON* pkey_env = cJSON_GetObjectItem(pitem, "api_key_env");
-        cJSON* pbase = cJSON_GetObjectItem(pitem, "base_url");
-        cJSON* ptimeout = cJSON_GetObjectItem(pitem, "timeout_sec");
-        cJSON* pretries = cJSON_GetObjectItem(pitem, "max_retries");
-        cJSON* pmodels = cJSON_GetObjectItem(pitem, "models");
+        cJSON *pitem = cJSON_GetArrayItem(providers_arr, i);
+        cJSON *pname = cJSON_GetObjectItem(pitem, "name");
+        cJSON *pkey_env = cJSON_GetObjectItem(pitem, "api_key_env");
+        cJSON *pbase = cJSON_GetObjectItem(pitem, "base_url");
+        cJSON *ptimeout = cJSON_GetObjectItem(pitem, "timeout_sec");
+        cJSON *pretries = cJSON_GetObjectItem(pitem, "max_retries");
+        cJSON *pmodels = cJSON_GetObjectItem(pitem, "models");
 
-        if (!cJSON_IsString(pname)) continue;
+        if (!cJSON_IsString(pname))
+            continue;
 
-        provider_config_t* pcfg = &result[valid_count];
+        provider_config_t *pcfg = &result[valid_count];
         pcfg->name = AGENTOS_STRDUP(pname->valuestring);
 
         if (cJSON_IsString(pkey_env) && pkey_env->valuestring[0]) {
             size_t env_len = strlen(pkey_env->valuestring);
-            char* key_buf = (char*)AGENTOS_MALLOC(4 + env_len + 1);
+            char *key_buf = (char *)AGENTOS_MALLOC(4 + env_len + 1);
             if (key_buf) {
                 memcpy(key_buf, "env:", 4);
                 memcpy(key_buf + 4, pkey_env->valuestring, env_len + 1);
@@ -1008,17 +1073,21 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
             }
         }
 
-        if (cJSON_IsString(pbase)) pcfg->api_base = AGENTOS_STRDUP(pbase->valuestring);
-        if (cJSON_IsNumber(ptimeout)) pcfg->timeout_sec = ptimeout->valuedouble;
-        if (cJSON_IsNumber(pretries)) pcfg->max_retries = pretries->valueint;
+        if (cJSON_IsString(pbase))
+            pcfg->api_base = AGENTOS_STRDUP(pbase->valuestring);
+        if (cJSON_IsNumber(ptimeout))
+            pcfg->timeout_sec = ptimeout->valuedouble;
+        if (cJSON_IsNumber(pretries))
+            pcfg->max_retries = pretries->valueint;
 
         if (cJSON_IsArray(pmodels)) {
             int mcount = cJSON_GetArraySize(pmodels);
-            char** marr = (char**)AGENTOS_CALLOC((size_t)mcount + 1, sizeof(char*));
+            char **marr = (char **)AGENTOS_CALLOC((size_t)mcount + 1, sizeof(char *));
             if (marr) {
                 for (int j = 0; j < mcount; ++j) {
-                    cJSON* mitem = cJSON_GetArrayItem(pmodels, j);
-                    if (cJSON_IsString(mitem)) marr[j] = AGENTOS_STRDUP(mitem->valuestring);
+                    cJSON *mitem = cJSON_GetArrayItem(pmodels, j);
+                    if (cJSON_IsString(mitem))
+                        marr[j] = AGENTOS_STRDUP(mitem->valuestring);
                 }
                 marr[mcount] = NULL;
                 pcfg->models = marr;
@@ -1034,8 +1103,11 @@ static int svc_load_model_config_json(const char* config_path, provider_config_t
     return AGENTOS_OK;
 }
 
-int svc_load_model_config(const char* config_path, provider_config_t** out_providers, size_t* out_count) {
-    if (!config_path || !out_providers || !out_count) return AGENTOS_ERR_INVALID_PARAM;
+int svc_load_model_config(const char *config_path, provider_config_t **out_providers,
+                          size_t *out_count)
+{
+    if (!config_path || !out_providers || !out_count)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     if (ends_with(config_path, ".yaml") || ends_with(config_path, ".yml")) {
 #ifdef HAVE_YAML
@@ -1048,15 +1120,17 @@ int svc_load_model_config(const char* config_path, provider_config_t** out_provi
     return svc_load_model_config_json(config_path, out_providers, out_count);
 }
 
-void llm_response_free(llm_response_t* resp) {
-    if (!resp) return;
+void llm_response_free(llm_response_t *resp)
+{
+    if (!resp)
+        return;
     AGENTOS_FREE(resp->id);
     AGENTOS_FREE(resp->model);
     AGENTOS_FREE(resp->finish_reason);
     if (resp->choices) {
         for (size_t i = 0; i < resp->choice_count; i++) {
-            AGENTOS_FREE((void*)resp->choices[i].role);
-            AGENTOS_FREE((void*)resp->choices[i].content);
+            AGENTOS_FREE((void *)resp->choices[i].role);
+            AGENTOS_FREE((void *)resp->choices[i].content);
         }
         AGENTOS_FREE(resp->choices);
     }

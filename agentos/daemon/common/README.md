@@ -31,7 +31,7 @@
 | `safe_string_utils` | 安全字符串操作 |
 | `method_dispatcher` | 方法分发器 |
 | `jsonrpc_helpers` | JSON-RPC 辅助函数 |
-| `unified_metrics` | 统一指标采集（v0.0.5 新增） |
+| `unified_metrics` | 统一指标采集（v0.1.0 新增） |
 | `platform` | 平台兼容层 |
 
 ## 使用方式

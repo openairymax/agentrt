@@ -4,14 +4,16 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "platform.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <time.h>
-#include "platform.h"
 
-static void test_platform_detection(void) {
+static void test_platform_detection(void)
+{
     printf("  test_platform_detection...\n");
 
 #if defined(AGENTOS_PLATFORM_WINDOWS)
@@ -28,7 +30,8 @@ static void test_platform_detection(void) {
     printf("    PASSED\n");
 }
 
-static void test_mutex_operations(void) {
+static void test_mutex_operations(void)
+{
     printf("  test_mutex_operations...\n");
 
     agentos_mutex_t mutex;
@@ -39,7 +42,13 @@ static void test_mutex_operations(void) {
     assert(ret == 0);
 
     ret = agentos_mutex_trylock(&mutex);
-    assert(ret != 0);
+    assert(ret == 0);  /* recursive mutex: same thread can relock */
+
+    ret = agentos_mutex_unlock(&mutex);
+    assert(ret == 0);  /* unlock the extra recursive lock */
+
+    ret = agentos_mutex_lock(&mutex);  /* relock for later unlock test */
+    assert(ret == 0);
 
     ret = agentos_mutex_unlock(&mutex);
     assert(ret == 0);
@@ -50,7 +59,8 @@ static void test_mutex_operations(void) {
     printf("    PASSED\n");
 }
 
-static void test_time_operations(void) {
+static void test_time_operations(void)
+{
     printf("  test_time_operations...\n");
 
     uint64_t ns = agentos_time_ns();
@@ -62,7 +72,8 @@ static void test_time_operations(void) {
     printf("    PASSED\n");
 }
 
-static void test_random_operations(void) {
+static void test_random_operations(void)
+{
     printf("  test_random_operations...\n");
 
     agentos_random_init();
@@ -78,7 +89,8 @@ static void test_random_operations(void) {
     printf("    PASSED\n");
 }
 
-static void test_file_operations(void) {
+static void test_file_operations(void)
+{
     printf("  test_file_operations...\n");
 
     assert(agentos_file_exists(".") == 1);
@@ -87,11 +99,12 @@ static void test_file_operations(void) {
     printf("    PASSED\n");
 }
 
-static void test_strlcpy(void) {
+static void test_strlcpy(void)
+{
     printf("  test_strlcpy...\n");
 
     char dest[32];
-    const char* src = "Hello, AgentOS!";
+    const char *src = "Hello, AgentOS!";
 
     agentos_strlcpy(dest, src, sizeof(dest));
     assert(strcmp(dest, src) == 0);
@@ -103,7 +116,8 @@ static void test_strlcpy(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Platform Module Unit Tests\n");
     printf("=========================================\n");

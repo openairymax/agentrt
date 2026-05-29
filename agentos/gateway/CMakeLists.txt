@@ -47,6 +47,13 @@ set(GATEWAY_HEADERS
 # ========== 库目标 ==========
 add_library(gateway STATIC ${GATEWAY_SOURCES})
 
+if(AGENTOS_HAS_LIBWEBSOCKETS)
+    set_source_files_properties(
+        src/gateway/ws_gateway.c
+        PROPERTIES COMPILE_DEFINITIONS "AGENTOS_COMPLIANCE_IMPL"
+    )
+endif()
+
 target_include_directories(gateway
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -58,6 +65,7 @@ target_include_directories(gateway
         ${SYSCALL_DIR}/include
         ${COMMONS_DIR}
         ${COMMONS_DIR}/utils/include
+        ${COMMONS_DIR}/utils/types/include
         ${COMMONS_DIR}/utils/compat/include
         ${COMMONS_DIR}/platform/include
         ${COMMONS_DIR}/utils/error/include
@@ -83,6 +91,7 @@ target_include_directories(gateway
 target_link_libraries(gateway PRIVATE
     agentos_protocols
     agentos_common
+    agentos_memory
 )
 
 if(AGENTOS_HAS_CJSON)
@@ -162,6 +171,10 @@ if(BUILD_TESTS)
         add_executable(gateway_benchmark tests/gateway_benchmark.c)
         target_include_directories(gateway_benchmark PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/types/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/include
         )

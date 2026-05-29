@@ -6,26 +6,29 @@
  * "From data intelligence emerges."
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <time.h>
-
 #include "heapstore.h"
 #include "heapstore_memory.h"
 
-static void test_memory_init_shutdown(void) {
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+static void test_memory_init_shutdown(void)
+{
     printf("Test: memory_init_shutdown...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_memory_init();
-    assert(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED);
+    assert(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED ||
+           err == heapstore_ERR_DIR_CREATE_FAILED);
 
     heapstore_memory_shutdown();
     printf("PASS\n");
 }
 
-static void test_memory_pool_crud(void) {
+static void test_memory_pool_crud(void)
+{
     printf("Test: memory_pool_crud...");
 
     heapstore_memory_pool_t pool;
@@ -59,7 +62,8 @@ static void test_memory_pool_crud(void) {
     printf("PASS\n");
 }
 
-static void test_memory_allocation_crud(void) {
+static void test_memory_allocation_crud(void)
+{
     printf("Test: memory_allocation_crud...");
 
     heapstore_memory_pool_t pool;
@@ -76,7 +80,8 @@ static void test_memory_allocation_crud(void) {
     heapstore_memory_allocation_t allocation;
     memset(&allocation, 0, sizeof(allocation));
 
-    snprintf(allocation.allocation_id, sizeof(allocation.allocation_id), "alloc_%ld", (long)time(NULL));
+    snprintf(allocation.allocation_id, sizeof(allocation.allocation_id), "alloc_%ld",
+             (long)time(NULL));
     snprintf(allocation.pool_id, sizeof(allocation.pool_id), "%s", pool.pool_id);
     allocation.size = 8192;
     allocation.address = 0x10000000;
@@ -103,7 +108,8 @@ static void test_memory_allocation_crud(void) {
     printf("PASS\n");
 }
 
-static void test_memory_stats(void) {
+static void test_memory_stats(void)
+{
     printf("Test: memory_stats...");
 
     heapstore_error_t init_err __attribute__((unused)) = heapstore_memory_init();
@@ -113,16 +119,18 @@ static void test_memory_stats(void) {
     uint32_t total_allocations = 0;
     uint64_t total_size = 0;
 
-    heapstore_error_t err __attribute__((unused)) = heapstore_memory_get_stats(&pool_count, &total_allocations, &total_size);
+    heapstore_error_t err __attribute__((unused)) =
+        heapstore_memory_get_stats(&pool_count, &total_allocations, &total_size);
     assert(err == heapstore_SUCCESS);
 
-    printf("  Pools: %u, Allocations: %u, Total Size: %lu\n",
-           pool_count, total_allocations, (unsigned long)total_size);
+    printf("  Pools: %u, Allocations: %u, Total Size: %lu\n", pool_count, total_allocations,
+           (unsigned long)total_size);
 
     printf("PASS\n");
 }
 
-static void test_memory_invalid_params(void) {
+static void test_memory_invalid_params(void)
+{
     printf("Test: memory_invalid_params...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_memory_record_pool(NULL);
@@ -156,13 +164,15 @@ static void test_memory_invalid_params(void) {
     printf("PASS\n");
 }
 
-static void test_memory_not_found(void) {
+static void test_memory_not_found(void)
+{
     printf("Test: memory_not_found...");
 
     heapstore_memory_pool_t pool;
     memset(&pool, 0, sizeof(pool));
 
-    heapstore_error_t err __attribute__((unused)) = heapstore_memory_get_pool("nonexistent_id", &pool);
+    heapstore_error_t err __attribute__((unused)) =
+        heapstore_memory_get_pool("nonexistent_id", &pool);
     assert(err == heapstore_ERR_NOT_FOUND);
 
     heapstore_memory_allocation_t allocation;
@@ -180,7 +190,8 @@ static void test_memory_not_found(void) {
     printf("PASS\n");
 }
 
-static void test_memory_update_usage(void) {
+static void test_memory_update_usage(void)
+{
     printf("Test: memory_update_usage...");
 
     heapstore_memory_pool_t pool;
@@ -212,7 +223,8 @@ static void test_memory_update_usage(void) {
     printf("PASS\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=== AgentOS heapstore Memory Unit Tests ===\n\n");
 
     test_memory_init_shutdown();
@@ -226,4 +238,3 @@ int main(void) {
     printf("\n=== All Memory Tests Passed ===\n");
     return 0;
 }
-

@@ -66,6 +66,7 @@ install(FILES
     DESTINATION include/agentos/daemon/channel_d
 )
 
+if(BUILD_TESTS)
 if(AGENTOS_HAS_CMOCKA)
     enable_testing()
     add_executable(test_channel_e2e tests/test_channel_e2e.c src/channel_service.c)
@@ -99,3 +100,4 @@ else()
     )
     add_test(NAME channel_e2e COMMAND test_channel_e2e)
 endif()
+endif() # BUILD_TESTS

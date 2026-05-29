@@ -13,9 +13,9 @@
 #ifndef AGENTOS_HEAPSTORE_TYPES_H
 #define AGENTOS_HEAPSTORE_TYPES_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <time.h>
 
 #ifdef __cplusplus
@@ -111,7 +111,7 @@ typedef struct heapstore_span {
     uint64_t end_time_ns;
     char service_name[64];
     char status[32];
-    void* attributes;
+    void *attributes;
     size_t attribute_count;
 } heapstore_span_t;
 

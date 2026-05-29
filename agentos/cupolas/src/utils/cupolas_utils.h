@@ -48,9 +48,11 @@
 #ifndef CUPOLAS_UTILS_H
 #define CUPOLAS_UTILS_H
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
+
+#include "../../../commons/utils/memory/include/memory_compat.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,8 +105,7 @@ extern "C" {
  * int* numbers = CUPOLAS_ALLOC(int, 100); // 100 ints, all zeroed
  * @endcode
  */
-#define CUPOLAS_ALLOC(type, count) \
-    ((type*)calloc(count, sizeof(type)))
+#define CUPOLAS_ALLOC(type, count) ((type *)AGENTOS_CALLOC(count, sizeof(type)))
 
 /**
  * @brief Allocate single zero-initialized structure
@@ -115,8 +116,7 @@ extern "C" {
  * my_config_t* cfg = CUPOLAS_ALLOC_STRUCT(my_config_t);
  * @endcode
  */
-#define CUPOLAS_ALLOC_STRUCT(type) \
-    ((type*)calloc(1, sizeof(type)))
+#define CUPOLAS_ALLOC_STRUCT(type) ((type *)AGENTOS_CALLOC(1, sizeof(type)))
 
 /**
  * @brief Allocate uninitialized array (faster than CUPOLAS_ALLOC)
@@ -130,8 +130,7 @@ extern "C" {
  * memset(buffer, 0, 4096); // Manual init if needed
  * @endcode
  */
-#define CUPOLAS_ALLOC_ARRAY(type, count) \
-    ((type*)malloc((count) * sizeof(type)))
+#define CUPOLAS_ALLOC_ARRAY(type, count) ((type *)AGENTOS_MALLOC((count) * sizeof(type)))
 
 /**
  * @brief Reallocate memory block with type safety
@@ -145,8 +144,7 @@ extern "C" {
  * arr = CUPOLAS_REALLOC(arr, int, 200); // Expand to 200 ints
  * @endcode
  */
-#define CUPOLAS_REALLOC(ptr, type, count) \
-    ((type*)realloc(ptr, (count) * sizeof(type)))
+#define CUPOLAS_REALLOC(ptr, type, count) ((type *)AGENTOS_REALLOC(ptr, (count) * sizeof(type)))
 
 /**
  * @brief Free memory and set pointer to NULL (dangling pointer prevention)
@@ -160,7 +158,10 @@ extern "C" {
  * @endcode
  */
 #define CUPOLAS_FREE(ptr) \
-    do { free(ptr); ptr = NULL; } while(0)
+    do {                  \
+        AGENTOS_FREE(ptr);        \
+        ptr = NULL;       \
+    } while (0)
 
 /**
  * @brief Free memory with explicit NULL check
@@ -169,7 +170,12 @@ extern "C" {
  * @sa CUPOLAS_FREE
  */
 #define CUPOLAS_FREE_ARRAY(ptr) \
-    do { if(ptr) { free(ptr); ptr = NULL; } } while(0)
+    do {                        \
+        if (ptr) {              \
+            AGENTOS_FREE(ptr);          \
+            ptr = NULL;         \
+        }                       \
+    } while (0)
 
 /* ============================================================================
  * Error Handling Macros - Unified Error Checking and Early Return
@@ -196,7 +202,10 @@ extern "C" {
  * @endcode
  */
 #define CUPOLAS_CHECK_NULL(ptr) \
-    do { if ((ptr) == NULL) return -1; } while(0)
+    do {                        \
+        if ((ptr) == NULL)      \
+            return -1;          \
+    } while (0)
 
 /**
  * @brief Check for NULL pointer with custom return value
@@ -205,7 +214,10 @@ extern "C" {
  * @return ret if ptr is NULL
  */
 #define CUPOLAS_CHECK_NULL_RET(ptr, ret) \
-    do { if ((ptr) == NULL) return (ret); } while(0)
+    do {                                 \
+        if ((ptr) == NULL)               \
+            return (ret);                \
+    } while (0)
 
 /**
  * @brief Check expression result, return -1 if nonzero (error)
@@ -217,7 +229,10 @@ extern "C" {
  * @endcode
  */
 #define CUPOLAS_CHECK_RESULT(expr) \
-    do { if ((expr) != 0) return -1; } while(0)
+    do {                           \
+        if ((expr) != 0)           \
+            return -1;             \
+    } while (0)
 
 /**
  * @brief Check result with custom error return value
@@ -225,7 +240,10 @@ extern "C" {
  * @param ret Value to return on error
  */
 #define CUPOLAS_CHECK_RESULT_RET(expr, ret) \
-    do { if ((expr) != 0) return (ret); } while(0)
+    do {                                    \
+        if ((expr) != 0)                    \
+            return (ret);                   \
+    } while (0)
 
 /**
  * @brief Check condition is true, return -1 if false
@@ -233,7 +251,10 @@ extern "C" {
  * @return -1 if condition is false
  */
 #define CUPOLAS_CHECK_TRUE(cond) \
-    do { if (!(cond)) return -1; } while(0)
+    do {                         \
+        if (!(cond))             \
+            return -1;           \
+    } while (0)
 
 /**
  * @brief Check condition with custom return value
@@ -241,7 +262,10 @@ extern "C" {
  * @ret Value to return if false
  */
 #define CUPOLAS_CHECK_TRUE_RET(cond, ret) \
-    do { if (!(cond)) return (ret); } while(0)
+    do {                                  \
+        if (!(cond))                      \
+            return (ret);                 \
+    } while (0)
 
 /* ============================================================================
  * String and Utility Macros
@@ -306,16 +330,14 @@ extern "C" {
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG(fmt, ...) \
-    fprintf(stderr, "[CUPOLAS] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG(fmt, ...) fprintf(stderr, "[CUPOLAS] " fmt "\n", ##__VA_ARGS__)
 
 /**
  * @brief Log error message
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG_ERROR(fmt, ...) \
-    fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_ERROR(fmt, ...) fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
 
 /**
  * @brief Log debug message (stripped in release builds)
@@ -323,8 +345,7 @@ extern "C" {
  * @param ... Format arguments
  * @note Only emitted when debugging is enabled
  */
-#define CUPOLAS_LOG_DEBUG(fmt, ...) \
-    fprintf(stderr, "[CUPOLAS DEBUG] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_DEBUG(fmt, ...) fprintf(stderr, "[CUPOLAS DEBUG] " fmt "\n", ##__VA_ARGS__)
 
 #else
 
@@ -332,8 +353,7 @@ extern "C" {
 #define CUPOLAS_LOG(fmt, ...) ((void)0)
 
 /** @brief Error logging always enabled even in release builds */
-#define CUPOLAS_LOG_ERROR(fmt, ...) \
-    fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_ERROR(fmt, ...) fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
 
 /** @brief Disabled debug logging noop */
 #define CUPOLAS_LOG_DEBUG(fmt, ...) ((void)0)
@@ -539,7 +559,7 @@ extern "C" {
  * }
  * @endcode
  */
-char* cupolas_strdup(const char* str);
+char *cupolas_strdup(const char *str);
 
 /**
  * @brief Safe string copy with size limit (strlcpy implementation)
@@ -550,7 +570,7 @@ char* cupolas_strdup(const char* str);
  * @note Always null-terminates dest, even if truncated
  * @sa strlcpy BSD function
  */
-size_t cupolas_strlcpy(char* dest, const char* src, size_t len);
+size_t cupolas_strlcpy(char *dest, const char *src, size_t len);
 
 /**
  * @brief Secure memset that won't be optimized away
@@ -559,7 +579,7 @@ size_t cupolas_strlcpy(char* dest, const char* src, size_t len);
  * @note Uses volatile or compiler-specific barriers to prevent dead-store elimination
  * @security Use for erasing sensitive data (passwords, keys)
  */
-void cupolas_memset_s(void* ptr, size_t len);
+void cupolas_memset_s(void *ptr, size_t len);
 
 /**
  * @brief Get current timestamp in milliseconds
@@ -581,7 +601,7 @@ uint64_t cupolas_get_timestamp_ns(void);
  * @return 32-bit hash value
  * @note Good distribution for hashtable keys; not cryptographically secure
  */
-uint32_t cupolas_hash_string(const char* str);
+uint32_t cupolas_hash_string(const char *str);
 
 /**
  * @brief Unified logging function with level control
@@ -590,7 +610,7 @@ uint32_t cupolas_hash_string(const char* str);
  * @param ... Variable arguments
  * @note Thread-safe when used with CUPOLAS_ENABLE_LOGGING
  */
-void cupolas_log_message(const char* level, const char* fmt, ...);
+void cupolas_log_message(const char *level, const char *fmt, ...);
 
 #ifdef __cplusplus
 }

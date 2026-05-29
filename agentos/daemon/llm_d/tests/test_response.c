@@ -4,17 +4,19 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 #include "llm_service.h"
 #include "response.h"
 
-static void test_response_alloc_free(void) {
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static void test_response_alloc_free(void)
+{
     printf("  test_response_alloc_free...\n");
 
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t *resp = (llm_response_t *)calloc(1, sizeof(llm_response_t));
     assert(resp != NULL);
     assert(resp->id == NULL);
     assert(resp->model == NULL);
@@ -24,8 +26,8 @@ static void test_response_alloc_free(void) {
     free(resp->finish_reason);
     if (resp->choices) {
         for (size_t i = 0; i < resp->choice_count; i++) {
-            free((void*)resp->choices[i].role);
-            free((void*)resp->choices[i].content);
+            free((void *)resp->choices[i].role);
+            free((void *)resp->choices[i].content);
         }
         free(resp->choices);
     }
@@ -34,10 +36,11 @@ static void test_response_alloc_free(void) {
     printf("    PASSED\n");
 }
 
-static void test_response_manual_build(void) {
+static void test_response_manual_build(void)
+{
     printf("  test_response_manual_build...\n");
 
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t *resp = (llm_response_t *)calloc(1, sizeof(llm_response_t));
     assert(resp != NULL);
 
     resp->id = strdup("chatcmpl-abc123");
@@ -51,7 +54,7 @@ static void test_response_manual_build(void) {
     assert(strcmp(resp->model, "gpt-4") == 0);
     assert(resp->total_tokens == 150);
 
-    char* json = response_to_json(resp);
+    char *json = response_to_json(resp);
     if (json != NULL) {
         printf("    JSON output: %.80s\n", json);
         free(json);
@@ -65,17 +68,18 @@ static void test_response_manual_build(void) {
     printf("    PASSED\n");
 }
 
-static void test_response_with_choices(void) {
+static void test_response_with_choices(void)
+{
     printf("  test_response_with_choices...\n");
 
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t *resp = (llm_response_t *)calloc(1, sizeof(llm_response_t));
     assert(resp != NULL);
 
     resp->id = strdup("chatcmpl-choice-test");
     resp->model = strdup("gpt-4");
 
     resp->choice_count = 2;
-    resp->choices = (llm_message_t*)calloc(2, sizeof(llm_message_t));
+    resp->choices = (llm_message_t *)calloc(2, sizeof(llm_message_t));
     assert(resp->choices != NULL);
 
     resp->choices[0].role = strdup("assistant");
@@ -87,14 +91,14 @@ static void test_response_with_choices(void) {
     assert(strcmp(resp->choices[0].role, "assistant") == 0);
     assert(strcmp(resp->choices[0].content, "Hello! How can I help you?") == 0);
 
-    char* json = response_to_json(resp);
+    char *json = response_to_json(resp);
     if (json != NULL) {
         free(json);
     }
 
     for (size_t i = 0; i < resp->choice_count; i++) {
-        free((void*)resp->choices[i].role);
-        free((void*)resp->choices[i].content);
+        free((void *)resp->choices[i].role);
+        free((void *)resp->choices[i].content);
     }
     free(resp->choices);
     free(resp->id);
@@ -105,19 +109,20 @@ static void test_response_with_choices(void) {
     printf("    PASSED\n");
 }
 
-static void test_response_from_json(void) {
+static void test_response_from_json(void)
+{
     printf("  test_response_from_json...\n");
 
-    const char* json_str = "{"
-        "\"id\": \"chatcmpl-123\","
-        "\"model\": \"gpt-4\","
-        "\"finish_reason\": \"stop\","
-        "\"prompt_tokens\": 10,"
-        "\"completion_tokens\": 5,"
-        "\"total_tokens\": 15"
-    "}";
+    const char *json_str = "{"
+                           "\"id\": \"chatcmpl-123\","
+                           "\"model\": \"gpt-4\","
+                           "\"finish_reason\": \"stop\","
+                           "\"prompt_tokens\": 10,"
+                           "\"completion_tokens\": 5,"
+                           "\"total_tokens\": 15"
+                           "}";
 
-    llm_response_t* resp = response_from_json(json_str);
+    llm_response_t *resp = response_from_json(json_str);
     if (resp != NULL) {
         assert(resp->id != NULL || resp->model != NULL);
         printf("    Parsed response: model=%s\n", resp->model ? resp->model : "(null)");
@@ -127,8 +132,8 @@ static void test_response_from_json(void) {
         free(resp->finish_reason);
         if (resp->choices) {
             for (size_t i = 0; i < resp->choice_count; i++) {
-                free((void*)resp->choices[i].role);
-                free((void*)resp->choices[i].content);
+                free((void *)resp->choices[i].role);
+                free((void *)resp->choices[i].content);
             }
             free(resp->choices);
         }
@@ -140,19 +145,21 @@ static void test_response_from_json(void) {
     printf("    PASSED\n");
 }
 
-static void test_response_null_handling(void) {
+static void test_response_null_handling(void)
+{
     printf("  test_response_null_handling...\n");
 
-    char* json __attribute__((unused)) = response_to_json(NULL);
+    char *json __attribute__((unused)) = response_to_json(NULL);
     assert(json == NULL);
 
-    llm_response_t* resp __attribute__((unused)) = response_from_json(NULL);
+    llm_response_t *resp __attribute__((unused)) = response_from_json(NULL);
     assert(resp == NULL);
 
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  LLM Response Unit Tests\n");
     printf("=========================================\n");

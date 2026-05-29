@@ -8,9 +8,9 @@
 #ifndef CUPOLAS_NETWORK_FILTER_H
 #define CUPOLAS_NETWORK_FILTER_H
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,17 +34,17 @@ typedef enum {
 } cupolas_protocol_t;
 
 typedef struct {
-    char* rule_id;
-    char* description;
-    char* src_ip_pattern;
-    char* dst_ip_pattern;
+    char *rule_id;
+    char *description;
+    char *src_ip_pattern;
+    char *dst_ip_pattern;
     uint16_t src_port_start;
     uint16_t src_port_end;
     uint16_t dst_port_start;
     uint16_t dst_port_end;
     cupolas_protocol_t protocol;
-    char* host_pattern;
-    char* url_pattern;
+    char *host_pattern;
+    char *url_pattern;
     cupolas_net_action_t action;
     uint32_t priority;
     bool enabled;
@@ -53,12 +53,12 @@ typedef struct {
 } cupolas_net_filter_rule_t;
 
 typedef struct {
-    char* local_ip;
+    char *local_ip;
     uint16_t local_port;
-    char* remote_ip;
+    char *remote_ip;
     uint16_t remote_port;
-    char* hostname;
-    char* cipher_suite;
+    char *hostname;
+    char *cipher_suite;
     bool is_encrypted;
     uint64_t bytes_sent;
     uint64_t bytes_received;
@@ -79,21 +79,21 @@ typedef struct {
 int network_filter_init(void);
 void network_filter_cleanup(void);
 
-int network_filter_add_rule(const cupolas_net_filter_rule_t* rule);
-int network_filter_remove_rule(const char* rule_id);
-int network_filter_update_rule(const char* rule_id, const cupolas_net_filter_rule_t* rule);
-int network_filter_get_rule(const char* rule_id, cupolas_net_filter_rule_t* rule);
-int network_filter_list_rules(cupolas_net_filter_rule_t** rules, size_t* count);
+int network_filter_add_rule(const cupolas_net_filter_rule_t *rule);
+int network_filter_remove_rule(const char *rule_id);
+int network_filter_update_rule(const char *rule_id, const cupolas_net_filter_rule_t *rule);
+int network_filter_get_rule(const char *rule_id, cupolas_net_filter_rule_t *rule);
+int network_filter_list_rules(cupolas_net_filter_rule_t **rules, size_t *count);
 
-int network_filter_check_access(const char* host, uint16_t port, 
-                                cupolas_protocol_t protocol, const char* direction);
-int network_filter_check_url(const char* url, const char* method);
+int network_filter_check_access(const char *host, uint16_t port, cupolas_protocol_t protocol,
+                                const char *direction);
+int network_filter_check_url(const char *url, const char *method);
 
-int network_filter_get_connections(cupolas_connection_info_t** connections, size_t* count);
-int network_filter_close_connection(const char* local_ip, uint16_t local_port,
-                                   const char* remote_ip, uint16_t remote_port);
+int network_filter_get_connections(cupolas_connection_info_t **connections, size_t *count);
+int network_filter_close_connection(const char *local_ip, uint16_t local_port,
+                                    const char *remote_ip, uint16_t remote_port);
 
-int network_filter_get_stats(cupolas_net_stats_t* stats);
+int network_filter_get_stats(cupolas_net_stats_t *stats);
 void network_filter_reset_stats(void);
 
 #ifdef __cplusplus

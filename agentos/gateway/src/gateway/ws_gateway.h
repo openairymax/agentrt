@@ -13,6 +13,7 @@
 #define AGENTOS_GATEWAY_WS_H
 
 #include "gateway_internal.h"
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -28,7 +29,7 @@ extern "C" {
  *
  * @ownership 调用者需通过gateway_destroy()释放
  */
-gateway_t* ws_gateway_create(const char* host, uint16_t port);
+gateway_t *ws_gateway_create(const char *host, uint16_t port);
 
 #ifdef __cplusplus
 }

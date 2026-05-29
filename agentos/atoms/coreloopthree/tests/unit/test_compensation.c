@@ -6,6 +6,7 @@
  */
 
 #include "compensation.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
@@ -16,18 +17,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)  \
+    do {                \
+        tests_run++;    \
+        func();         \
+        tests_passed++; \
     } while (0)
 
 /* ==================== 补偿管理器生命周期 ==================== */
@@ -35,7 +36,7 @@ static int tests_failed = 0;
 static void test_compensation_lifecycle(void)
 {
     agentos_compensation_t *mgr = NULL;
-    agentos_error_t err         = agentos_compensation_create(&mgr);
+    agentos_error_t err = agentos_compensation_create(&mgr);
 
     if (err == AGENTOS_SUCCESS && mgr != NULL) {
         assert(mgr->entries == NULL || mgr->entry_count <= 1000);
@@ -74,8 +75,9 @@ static void test_compensation_register_single(void)
         return;
     }
 
-    int test_value      = 42;
-    agentos_error_t err = agentos_compensation_register(mgr, "action_write_db", "compensator_delete_row", &test_value);
+    int test_value = 42;
+    agentos_error_t err = agentos_compensation_register(mgr, "action_write_db",
+                                                        "compensator_delete_row", &test_value);
 
     if (err == AGENTOS_SUCCESS) {
         assert(mgr->entry_count >= 1);
@@ -96,13 +98,14 @@ static void test_compensation_register_multiple(void)
         return;
     }
 
-    const char *actions[]      = {"action_step_1", "action_step_2", "action_step_3"};
+    const char *actions[] = {"action_step_1", "action_step_2", "action_step_3"};
     const char *compensators[] = {"undo_step_1", "undo_step_2", "undo_step_3"};
-    int values[]               = {100, 200, 300};
+    int values[] = {100, 200, 300};
 
     int all_ok = 1;
     for (int i = 0; i < 3; i++) {
-        agentos_error_t err = agentos_compensation_register(mgr, actions[i], compensators[i], &values[i]);
+        agentos_error_t err =
+            agentos_compensation_register(mgr, actions[i], compensators[i], &values[i]);
         if (err != AGENTOS_SUCCESS)
             all_ok = 0;
     }
@@ -126,7 +129,7 @@ static void test_compensation_register_null_action_id(void)
         return;
     }
 
-    int val             = 0;
+    int val = 0;
     agentos_error_t err = agentos_compensation_register(mgr, NULL, "some_compensator", &val);
 
     if (err != AGENTOS_SUCCESS) {
@@ -203,8 +206,8 @@ static void test_compensation_human_queue_empty(void)
         return;
     }
 
-    char **actions      = NULL;
-    size_t count        = 0;
+    char **actions = NULL;
+    size_t count = 0;
     agentos_error_t err = agentos_compensation_get_human_queue(mgr, &actions, &count);
 
     if (err == AGENTOS_SUCCESS && count == 0) {
@@ -226,8 +229,8 @@ static void test_compensation_human_queue_empty(void)
 
 static void test_compensation_human_queue_null_mgr(void)
 {
-    char **actions      = NULL;
-    size_t count        = 0;
+    char **actions = NULL;
+    size_t count = 0;
     agentos_error_t err = agentos_compensation_get_human_queue(NULL, &actions, &count);
     if (err != AGENTOS_SUCCESS) {
         TEST_PASS("human queue handles NULL manager");
@@ -304,7 +307,7 @@ static void test_compensation_register_bulk(void)
         snprintf(action_id, sizeof(action_id), "bulk_action_%03d", i);
         snprintf(comp_id, sizeof(comp_id), "bulk_undo_%03d", i);
 
-        int val             = i;
+        int val = i;
         agentos_error_t err = agentos_compensation_register(mgr, action_id, comp_id, &val);
         if (err == AGENTOS_SUCCESS)
             ok_count++;

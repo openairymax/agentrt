@@ -10,6 +10,7 @@
 
 #include "../platform/platform.h"
 #include "sanitizer.h"
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -18,7 +19,7 @@ extern "C" {
 
 /**
  * @brief Sanitizer cache structure
- * 
+ *
  * Design principles:
  * - LRU caching for sanitized strings
  * - Thread-safe with fine-grained locking
@@ -34,16 +35,17 @@ typedef struct sanitizer_cache sanitizer_cache_t;
  * @reentrant No
  * @ownership Returns owned pointer: caller must call sanitizer_cache_destroy()
  */
-sanitizer_cache_t* sanitizer_cache_create(size_t capacity);
+sanitizer_cache_t *sanitizer_cache_create(size_t capacity);
 
 /**
  * @brief Destroy sanitizer cache and free all resources
  * @param[in] cache Cache handle (may be NULL)
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership cache: transferred to this function, will be freed
  */
-void sanitizer_cache_destroy(sanitizer_cache_t* cache);
+void sanitizer_cache_destroy(sanitizer_cache_t *cache);
 
 /**
  * @brief Get cached sanitized result
@@ -56,7 +58,7 @@ void sanitizer_cache_destroy(sanitizer_cache_t* cache);
  * @ownership Returns owned pointer: caller must free with free()
  * @ownership input: caller retains ownership
  */
-char* sanitizer_cache_get(sanitizer_cache_t* cache, const char* input, sanitize_level_t level);
+char *sanitizer_cache_get(sanitizer_cache_t *cache, const char *input, sanitize_level_t level);
 
 /**
  * @brief Store sanitized result in cache
@@ -68,15 +70,17 @@ char* sanitizer_cache_get(sanitizer_cache_t* cache, const char* input, sanitize_
  * @reentrant Yes
  * @ownership input and output: caller retains ownership
  */
-void sanitizer_cache_put(sanitizer_cache_t* cache, const char* input, const char* output, sanitize_level_t level);
+void sanitizer_cache_put(sanitizer_cache_t *cache, const char *input, const char *output,
+                         sanitize_level_t level);
 
 /**
  * @brief Clear all cache entries
  * @param[in] cache Cache handle
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  */
-void sanitizer_cache_clear(sanitizer_cache_t* cache);
+void sanitizer_cache_clear(sanitizer_cache_t *cache);
 
 #ifdef __cplusplus
 }

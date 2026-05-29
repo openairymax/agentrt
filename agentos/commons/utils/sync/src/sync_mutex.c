@@ -10,17 +10,19 @@
  * @date 2026-04-05
  */
 
-#include "sync_platform.h"
-#include <time.h>
 #include "sync_internal.h"
-#include <string.h>
+#include "sync_platform.h"
 
-sync_result_t sync_mutex_create(sync_mutex_t* mutex, const sync_attr_t* attr) {
+#include <string.h>
+#include <time.h>
+
+sync_result_t sync_mutex_create(sync_mutex_t *mutex, const sync_attr_t *attr)
+{
     if (mutex == NULL) {
         return SYNC_ERROR_INVALID;
     }
 
-    struct sync_mutex* m = (struct sync_mutex*)AGENTOS_CALLOC(1, sizeof(struct sync_mutex));
+    struct sync_mutex *m = (struct sync_mutex *)AGENTOS_CALLOC(1, sizeof(struct sync_mutex));
     if (m == NULL) {
         return SYNC_ERROR_MEMORY;
     }
@@ -53,7 +55,8 @@ sync_result_t sync_mutex_create(sync_mutex_t* mutex, const sync_attr_t* attr) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_mutex_free(sync_mutex_t mutex) {
+sync_result_t sync_mutex_free(sync_mutex_t mutex)
+{
     if (mutex == NULL) {
         return SYNC_ERROR_INVALID;
     }
@@ -75,7 +78,8 @@ sync_result_t sync_mutex_free(sync_mutex_t mutex) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_mutex_lock_ex(sync_mutex_t mutex, const sync_timeout_t* timeout) {
+sync_result_t sync_mutex_lock_ex(sync_mutex_t mutex, const sync_timeout_t *timeout)
+{
     if (mutex == NULL || !mutex->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -131,7 +135,8 @@ sync_result_t sync_mutex_lock_ex(sync_mutex_t mutex, const sync_timeout_t* timeo
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_mutex_try_lock(sync_mutex_t mutex) {
+sync_result_t sync_mutex_try_lock(sync_mutex_t mutex)
+{
     if (mutex == NULL || !mutex->initialized) {
         return SYNC_ERROR_INVALID;
     }
@@ -155,7 +160,8 @@ sync_result_t sync_mutex_try_lock(sync_mutex_t mutex) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_mutex_unlock_ex(sync_mutex_t mutex) {
+sync_result_t sync_mutex_unlock_ex(sync_mutex_t mutex)
+{
     if (mutex == NULL || !mutex->initialized) {
         return SYNC_ERROR_INVALID;
     }
