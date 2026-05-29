@@ -1,145 +1,77 @@
-# Python 工具集
+# Python 统一工具包
 
 `scripts/toolkit/`
 
 ## 概述
 
-`toolkit/` 模块提供 AgentOS 运维和开发的 Python 工具集合，包括系统诊断、性能测试、内存管理、Token 统计、配置管理、契约验证、日志、事件、安全、遥测等功能。该模块整合了原 `core/` 目录的模块，提供统一的 Python 工具入口。
+`toolkit/` 模块提供 AgentOS 运维和开发的 Python 工具集合，共 **17 个文件**（含 15 个源模块），包括系统诊断、性能测试、多层记忆管理、Token 统计与预算、配置模板引擎、检查点管理、契约验证、CLI 增强、事件总线、日志、插件系统、安全模块和遥测系统。
 
-## 模块结构
+> **版本**：v0.1.0 预览版，API 可能随版本迭代发生变化。
+> **状态**：🔶 预览版
+
+## 目录结构
 
 ```
-toolkit/
-├── __init__.py              # 模块入口
-├── doctor.py                # 系统健康检查
-├── benchmark.py             # 性能基准测试
-├── memory_manager.py        # 内存管理工具
-├── token_utils.py           # Token 统计工具
-├── config_engine.py         # 配置管理引擎
-├── initializer.py           # 初始化工具
-├── checkpoint_manager.py    # 状态检查点管理
-├── validate_contracts.py    # 契约验证
-├── cli.py                   # 命令行接口
-├── events.py                # 事件系统
-├── logger.py                # 日志模块
-├── plugin.py                # 插件管理
-├── security.py              # 安全模块
-└── telemetry.py             # 遥测模块
+toolkit/                           # 共 17 个文件
+├── README.md                      # 本文档
+├── __init__.py                    # 包入口（统一导出所有工具类）
+└── src/                           # 工具模块源码（15 个文件）
+    ├── __init__.py                # 内部模块入口
+    ├── initializer.py             # 配置初始化器（默认配置/完整性验证/环境特定配置/备份恢复）
+    ├── doctor.py                  # 系统健康诊断（8 大类别：系统/Python/构建/项目/配置/网络/安全/性能）
+    ├── benchmark.py               # 性能基准测试（IPC 延迟/内存分配/上下文切换/调度吞吐/JSON 解析）
+    ├── memory_manager.py          # 多层记忆管理器（L1 原始/L2 特征/L3 结构化/L4 模式）
+    ├── token_utils.py             # Token 工具集（多策略计数 + 预算分配/追踪/告警）
+    ├── config_engine.py           # 配置模板引擎（Jinja2，dev/staging/production/testing）
+    ├── checkpoint_manager.py      # 状态检查点管理器（创建/恢复/轮转/JSON 序列化）
+    ├── validate_contracts.py      # 接口契约验证（syscall 头文件/配置格式/API 响应合规）
+    ├── cli.py                     # 交互式 CLI 增强（彩色输出/进度条/spinner/选择菜单/表格）
+    ├── events.py                  # 事件总线系统（同步/异步/优先级/过滤/历史回放/分布式追踪）
+    ├── logger.py                  # 日志模块（终端颜色/格式化输出/进度条/spinner/表格渲染）
+    ├── plugin.py                  # 插件系统（动态发现/元数据管理/依赖解析/执行隔离）
+    ├── security.py                # 安全模块（输入净化/路径检查/注入防护/权限最小化/审计）
+    └── telemetry.py               # 遥测系统（实时指标/基准追踪/趋势分析，兼容 Prometheus）
 ```
 
-## 工具说明
+## 使用方式
 
-### doctor.py - 系统健康检查
+```python
+from scripts.toolkit import (
+    ConfigInitializer,
+    AgentOSDoctor,
+    MemoryManager,
+    TokenCounter,
+    TokenBudget,
+    CheckpointManager,
+    AgentOSBenchmark,
+    ContractValidator,
+    ConfigEngine,
+    PluginRegistry,
+    EventBus,
+    SecurityManager,
+    MetricsCollector,
+)
+```
 
-检查项：
-- Python 环境版本
-- 依赖包完整性
-- 磁盘空间
-- 网络连接
-- Docker 状态（如可用）
+### 常用操作
 
-### benchmark.py - 性能测试
+```python
+doctor = AgentOSDoctor()
+doctor.run_all()
 
-测试项：
-- CPU 计算性能
-- 内存分配速度
-- I/O 读写性能
-- JSON 序列化性能
+mm = MemoryManager()
+mm.stats()
 
-### memory_manager.py - 内存管理
+counter = TokenCounter()
+budget = TokenBudget(total=100000)
+count = counter.estimate("Hello, world!")
+budget.use(count)
 
-功能：
-- 实时内存监控
-- 内存泄漏检测
-- 垃圾回收触发
-- 内存快照
+initializer = ConfigInitializer()
+initializer.init()
 
-### token_utils.py - Token 工具
-
-功能：
-- Token 计数
-- Token 预算估算
-- 文本编码策略
-
-### config_engine.py - 配置管理
-
-功能：
-- 配置文件加载和解析
-- 配置项验证
-- 多环境配置切换
-
-### checkpoint_manager.py - 检查点管理
-
-功能：
-- 运行状态检查点保存
-- 检查点恢复
-- 增量状态追踪
-
-### validate_contracts.py - 契约验证
-
-功能：
-- API 契约一致性验证
-- 接口规范检查
-
-### cli.py - 命令行接口
-
-功能：
-- toolkit 统一命令行入口
-- 子命令分发
-
-### events.py - 事件系统
-
-功能：
-- 事件发布和订阅
-- 异步事件处理
-
-### logger.py - 日志模块
-
-功能：
-- 结构化日志输出
-- 多级别日志控制
-
-### plugin.py - 插件管理
-
-功能：
-- 插件注册和加载
-- 插件生命周期管理
-
-### security.py - 安全模块
-
-功能：
-- 权限验证
-- 安全策略执行
-
-### telemetry.py - 遥测模块
-
-功能：
-- 运行指标采集
-- 性能数据上报
-
-## 快速开始
-
-```bash
-cd scripts/toolkit
-
-# 运行全面诊断
-python doctor.py
-
-# 详细模式
-python doctor.py --verbose
-
-# JSON 输出
-python doctor.py --json
-
-# 性能测试
-python benchmark.py
-
-# 指定测试时长（秒）
-python benchmark.py --duration 60
-
-# 内存管理
-python memory_manager.py --stats
-python memory_manager.py --gc
+validator = ContractValidator()
+validator.validate_syscall_headers()
 ```
 
 ---

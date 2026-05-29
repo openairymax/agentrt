@@ -9,17 +9,19 @@
  * "From data intelligence emerges."
  */
 
+#include "../include/heapstore_log.h"
+#include "../include/utils.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "../include/heapstore_log.h"
-#include "../include/utils.h"
 
 #define TEST_PASS(name) printf("✅ PASS: %s\n", name)
 #define TEST_FAIL(name, reason) printf("❌ FAIL: %s - %s\n", name, reason)
 
-static int test_sanitize_path_component_valid(void) {
+static int test_sanitize_path_component_valid(void)
+{
     char output[256];
 
     if (heapstore_sanitize_path_component(output, "valid_service", sizeof(output)) != 0) {
@@ -45,7 +47,8 @@ static int test_sanitize_path_component_valid(void) {
     return 0;
 }
 
-static int test_sanitize_path_component_traversal(void) {
+static int test_sanitize_path_component_traversal(void)
+{
     char output[256];
 
     if (heapstore_sanitize_path_component(output, "../etc/passwd", sizeof(output)) != -1) {
@@ -67,7 +70,8 @@ static int test_sanitize_path_component_traversal(void) {
     return 0;
 }
 
-static int test_sanitize_path_component_slashes(void) {
+static int test_sanitize_path_component_slashes(void)
+{
     char output[256];
 
     if (heapstore_sanitize_path_component(output, "service/name", sizeof(output)) != -1) {
@@ -89,7 +93,8 @@ static int test_sanitize_path_component_slashes(void) {
     return 0;
 }
 
-static int test_sanitize_path_component_special_chars(void) {
+static int test_sanitize_path_component_special_chars(void)
+{
     char output[256];
 
     if (heapstore_sanitize_path_component(output, "service; rm -rf /", sizeof(output)) != 0) {
@@ -123,7 +128,8 @@ static int test_sanitize_path_component_special_chars(void) {
     return 0;
 }
 
-static int test_sanitize_path_component_null_checks(void) {
+static int test_sanitize_path_component_null_checks(void)
+{
     char output[256];
 
     if (heapstore_sanitize_path_component(NULL, "test", sizeof(output)) != -1) {
@@ -145,7 +151,8 @@ static int test_sanitize_path_component_null_checks(void) {
     return 0;
 }
 
-static int test_is_safe_identifier(void) {
+static int test_is_safe_identifier(void)
+{
     if (!heapstore_is_safe_identifier("valid_service")) {
         TEST_FAIL("safe_valid", "Should accept valid identifier");
         return -1;
@@ -180,7 +187,8 @@ static int test_is_safe_identifier(void) {
     return 0;
 }
 
-static int test_log_path_traversal_blocked(void) {
+static int test_log_path_traversal_blocked(void)
+{
     heapstore_error_t err = heapstore_log_init();
     if (err != heapstore_SUCCESS) {
         TEST_FAIL("log_init", "Failed to initialize log system");
@@ -194,7 +202,8 @@ static int test_log_path_traversal_blocked(void) {
         return -1;
     }
 
-    err = heapstore_log_write(HEAPSTORE_LOG_INFO, "service/../../etc/passwd", NULL, NULL, 0, "test message");
+    err = heapstore_log_write(HEAPSTORE_LOG_INFO, "service/../../etc/passwd", NULL, NULL, 0,
+                              "test message");
     if (err == heapstore_SUCCESS) {
         TEST_FAIL("log_nested_traversal_blocked", "Should reject nested path traversal");
         heapstore_log_shutdown();
@@ -206,7 +215,8 @@ static int test_log_path_traversal_blocked(void) {
     return 0;
 }
 
-static int test_log_valid_service_allowed(void) {
+static int test_log_valid_service_allowed(void)
+{
     heapstore_error_t err = heapstore_log_init();
     if (err != heapstore_SUCCESS) {
         TEST_FAIL("log_init", "Failed to initialize log system");
@@ -220,7 +230,8 @@ static int test_log_valid_service_allowed(void) {
         return -1;
     }
 
-    err = heapstore_log_write(HEAPSTORE_LOG_INFO, "service-123_test", NULL, NULL, 0, "test message");
+    err =
+        heapstore_log_write(HEAPSTORE_LOG_INFO, "service-123_test", NULL, NULL, 0, "test message");
     if (err != heapstore_SUCCESS) {
         TEST_FAIL("log_valid_service_complex", "Should accept complex valid name");
         heapstore_log_shutdown();
@@ -232,7 +243,8 @@ static int test_log_valid_service_allowed(void) {
     return 0;
 }
 
-int main(void) {
+int main(void)
+{
     int failed = 0;
 
     printf("\n");
@@ -241,14 +253,22 @@ int main(void) {
     printf(" Path Traversal Prevention\n");
     printf("========================================\n\n");
 
-    if (test_sanitize_path_component_valid() != 0) failed++;
-    if (test_sanitize_path_component_traversal() != 0) failed++;
-    if (test_sanitize_path_component_slashes() != 0) failed++;
-    if (test_sanitize_path_component_special_chars() != 0) failed++;
-    if (test_sanitize_path_component_null_checks() != 0) failed++;
-    if (test_is_safe_identifier() != 0) failed++;
-    if (test_log_path_traversal_blocked() != 0) failed++;
-    if (test_log_valid_service_allowed() != 0) failed++;
+    if (test_sanitize_path_component_valid() != 0)
+        failed++;
+    if (test_sanitize_path_component_traversal() != 0)
+        failed++;
+    if (test_sanitize_path_component_slashes() != 0)
+        failed++;
+    if (test_sanitize_path_component_special_chars() != 0)
+        failed++;
+    if (test_sanitize_path_component_null_checks() != 0)
+        failed++;
+    if (test_is_safe_identifier() != 0)
+        failed++;
+    if (test_log_path_traversal_blocked() != 0)
+        failed++;
+    if (test_log_valid_service_allowed() != 0)
+        failed++;
 
     printf("\n========================================\n");
     printf(" Test Results: %d passed, %d failed\n", 8 - failed, failed);

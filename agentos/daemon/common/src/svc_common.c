@@ -20,21 +20,22 @@
  */
 
 #include "svc_common.h"
-#include "svc_logger.h"
-#include "platform.h"
+
 #include "atomic_compat.h"
 #include "error.h"
 #include "ipc_client.h"
+#include "memory_compat.h"
+#include "platform.h"
 #include "safe_string_utils.h"
+#include "svc_logger.h"
 #include "thread_pool.h"
 
-#include "memory_compat.h"
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 
 #ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
@@ -42,10 +43,10 @@
 
 /* ==================== 内部常量 ==================== */
 
-#define MAX_SERVICE_NAME_LEN    64
+#define MAX_SERVICE_NAME_LEN 64
 #define MAX_SERVICE_VERSION_LEN 32
-#define MAX_SERVICES            256
-#define DEFAULT_HEALTHCHECK_INTERVAL_MS 5000  /* 5秒健康检查间隔 */
+#define MAX_SERVICES 256
+#define DEFAULT_HEALTHCHECK_INTERVAL_MS 5000 /* 5秒健康检查间隔 */
 
 /* ==================== 内部数据结构 ==================== */
 
@@ -56,207 +57,210 @@ typedef struct agentos_service_internal {
     /* 基本信息 */
     char name[MAX_SERVICE_NAME_LEN];
     char version[MAX_SERVICE_VERSION_LEN];
-    
+
     /* 状态管理 */
     agentos_svc_state_t state;
     agentos_mutex_t state_mutex;
-    
+
     /* 配置 */
     agentos_svc_config_t config;
     uint32_t capabilities;
-    
+
     /* 统计信息 */
     agentos_svc_stats_t stats;
     agentos_mutex_t stats_mutex;
-    
+
     /* 接口 */
     agentos_svc_interface_t iface;
-    
+
     /* 健康检查状态 */
     uint64_t last_healthcheck_time;
     int healthcheck_failures;
-    
+
     /* 用户上下文数据 */
-    void* user_data;
+    void *user_data;
 
     /* 并发支持 */
-    void* thread_pool;
-    pthread_t* threads;
+    void *thread_pool;
+    pthread_t *threads;
     size_t thread_count;
 
     /* 链表支持 */
-    struct agentos_service_internal* next;
+    struct agentos_service_internal *next;
 } agentos_service_internal_t;
 
 /**
  * @brief 服务注册表内部状态
  */
 static struct {
-    agentos_service_internal_t* services;           /* 服务链表头 */
-    agentos_mutex_t registry_mutex;        /* 注册表互斥锁 */
-    uint32_t service_count;                         /* 当前服务数 */
-    int initialized;                                /* 模块初始化标志 */
-} g_registry = { 
-    .services = NULL,
-    .service_count = 0,
-    .initialized = 0 
-};
+    agentos_service_internal_t *services; /* 服务链表头 */
+    agentos_mutex_t registry_mutex;       /* 注册表互斥锁 */
+    uint32_t service_count;               /* 当前服务数 */
+    int initialized;                      /* 模块初始化标志 */
+} g_registry = {.services = NULL, .service_count = 0, .initialized = 0};
 
 /* ==================== 辅助函数 ==================== */
 
 /**
  * @brief 初始化服务管理模块
  */
-static agentos_error_t svc_common_module_init(void) {
+static agentos_error_t svc_common_module_init(void)
+{
     if (g_registry.initialized) {
         return AGENTOS_SUCCESS;
     }
-    
+
     agentos_error_t err = AGENTOS_SUCCESS;
-    
+
     /* 初始化注册表互斥锁 */
     err = agentos_mutex_init(&g_registry.registry_mutex);
     if (err != AGENTOS_SUCCESS) {
         LOG_ERROR("Failed to initialize registry mutex: %d", err);
         return DAEMON_EINIT;
+    AGENTOS_ERROR_HANDLE(DAEMON_EINIT, "svc_common: registry mutex init failed");
     }
-    
+
     g_registry.initialized = 1;
     LOG_DEBUG("Service common module initialized");
-    
+
     return AGENTOS_SUCCESS;
 }
 
 /**
  * @brief 清理服务管理模块
  */
-static void svc_common_module_cleanup(void) {
+static void svc_common_module_cleanup(void)
+{
     if (!g_registry.initialized) {
         return;
     }
-    
+
     /* 注意：不在这里销毁服务，应由调用者负责 */
     agentos_mutex_destroy(&g_registry.registry_mutex);
     g_registry.initialized = 0;
-    
+
     LOG_DEBUG("Service common module cleaned up");
 }
 
 /**
  * @brief 查找服务内部结构
  */
-static agentos_service_internal_t* find_service_internal(const char* name) {
+static agentos_service_internal_t *find_service_internal(const char *name)
+{
     if (!name || !g_registry.initialized) {
         return NULL;
     }
-    
-    agentos_service_internal_t* current = g_registry.services;
+
+    agentos_service_internal_t *current = g_registry.services;
     while (current) {
         if (strcmp(current->name, name) == 0) {
             return current;
         }
         current = current->next;
     }
-    
+
     return NULL;
 }
 
 /**
  * @brief 注册服务到内部注册表
  */
-static agentos_error_t register_service_internal(agentos_service_internal_t* service) {
+static agentos_error_t register_service_internal(agentos_service_internal_t *service)
+{
     if (!service || !g_registry.initialized) {
         return AGENTOS_EINVAL;
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "register_service_internal: null service");
     }
-    
+
     agentos_mutex_lock(&g_registry.registry_mutex);
-    
+
     /* 检查服务是否已存在 */
     if (find_service_internal(service->name)) {
         agentos_mutex_unlock(&g_registry.registry_mutex);
         return AGENTOS_EEXIST;
     }
-    
+
     /* 添加到链表头部 */
     service->next = g_registry.services;
     g_registry.services = service;
     g_registry.service_count++;
-    
+
     agentos_mutex_unlock(&g_registry.registry_mutex);
-    
+
     LOG_INFO("Service '%s' registered internally", service->name);
-    
+
     return AGENTOS_SUCCESS;
 }
 
 /**
  * @brief 从内部注册表注销服务
  */
-static agentos_error_t unregister_service_internal(agentos_service_internal_t* service) {
+static agentos_error_t unregister_service_internal(agentos_service_internal_t *service)
+{
     if (!service || !g_registry.initialized) {
         return AGENTOS_EINVAL;
     }
-    
+
     agentos_mutex_lock(&g_registry.registry_mutex);
-    
+
     /* 查找服务并移除 */
-    agentos_service_internal_t** prev = &g_registry.services;
-    agentos_service_internal_t* current = g_registry.services;
-    
+    agentos_service_internal_t **prev = &g_registry.services;
+    agentos_service_internal_t *current = g_registry.services;
+
     while (current) {
         if (current == service) {
             *prev = current->next;
             g_registry.service_count--;
-            
+
             agentos_mutex_unlock(&g_registry.registry_mutex);
             LOG_INFO("Service '%s' unregistered internally", service->name);
             return AGENTOS_SUCCESS;
         }
-        
+
         prev = &current->next;
         current = current->next;
     }
-    
+
     agentos_mutex_unlock(&g_registry.registry_mutex);
-    
-    return AGENTOS_ENOENT;  /* 服务未找到 */
+
+    return AGENTOS_ENOENT; /* 服务未找到 */
 }
 
 /**
  * @brief 更新服务统计信息
  */
-static void __attribute__((unused)) update_service_stats(agentos_service_internal_t* service, 
-                                 bool success, 
-                                 uint64_t process_time_ms) {
+static void __attribute__((unused)) update_service_stats(agentos_service_internal_t *service,
+                                                         bool success, uint64_t process_time_ms)
+{
     if (!service) {
         return;
     }
-    
+
     agentos_mutex_lock(&service->stats_mutex);
-    
+
     service->stats.request_count++;
-    
+
     if (success) {
         service->stats.success_count++;
     } else {
         service->stats.error_count++;
     }
-    
+
     service->stats.total_time_ms += process_time_ms;
-    
+
     if (process_time_ms > service->stats.max_time_ms) {
         service->stats.max_time_ms = process_time_ms;
     }
-    
+
     if (service->stats.min_time_ms == 0 || process_time_ms < service->stats.min_time_ms) {
         service->stats.min_time_ms = process_time_ms;
     }
-    
+
     if (service->stats.request_count > 0) {
-        service->stats.avg_time_ms = (double)service->stats.total_time_ms / 
-                                      service->stats.request_count;
+        service->stats.avg_time_ms =
+            (double)service->stats.total_time_ms / service->stats.request_count;
     }
-    
+
     agentos_mutex_unlock(&service->stats_mutex);
 }
 
@@ -264,56 +268,60 @@ static void __attribute__((unused)) update_service_stats(agentos_service_interna
 
 /* 服务生命周期管理 */
 
-agentos_error_t agentos_service_create(
-    agentos_service_t* out_service,
-    const char* name,
-    const agentos_svc_interface_t* iface,
-    const agentos_svc_config_t* config) {
-    
+agentos_error_t agentos_service_create(agentos_service_t *out_service, const char *name,
+                                       const agentos_svc_interface_t *iface,
+                                       const agentos_svc_config_t *config)
+{
+
     if (!out_service || !name || !iface || !config) {
         return AGENTOS_EINVAL;
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: null parameter");
     }
-    
+
     /* 初始化模块（如果未初始化） */
     agentos_error_t err = svc_common_module_init();
     if (err != AGENTOS_SUCCESS) {
         return err;
     }
-    
+
     /* 检查名称长度 */
     size_t name_len = strlen(name);
     if (name_len == 0 || name_len >= MAX_SERVICE_NAME_LEN) {
         return AGENTOS_EINVAL;
     }
-    
+
     /* 分配服务结构 */
-    agentos_service_internal_t* service = 
-        (agentos_service_internal_t*)AGENTOS_CALLOC(1, sizeof(agentos_service_internal_t));
+    agentos_service_internal_t *service =
+        (agentos_service_internal_t *)AGENTOS_CALLOC(1, sizeof(agentos_service_internal_t));
     if (!service) {
+    AGENTOS_ERROR_HANDLE(AGENTOS_ENOMEM, "agentos_service_create: calloc service failed");
         return AGENTOS_ENOMEM;
     }
-    
+
     /* 初始化基本信息 */
     if (safe_strcpy(service->name, name, MAX_SERVICE_NAME_LEN) != 0) {
         AGENTOS_FREE(service);
         return AGENTOS_EINVAL;
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: name copy failed");
     }
-    
+
     if (config->version) {
         if (safe_strcpy(service->version, config->version, MAX_SERVICE_VERSION_LEN) != 0) {
             AGENTOS_FREE(service);
             return AGENTOS_EINVAL;
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: version copy failed");
         }
     }
-    
+
     /* 初始化状态 */
     service->state = AGENTOS_SVC_STATE_CREATED;
     err = agentos_mutex_init(&service->state_mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(service);
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: state mutex init failed");
         return err;
     }
-    
+
     /* 初始化统计互斥锁 */
     err = agentos_mutex_init(&service->stats_mutex);
     if (err != AGENTOS_SUCCESS) {
@@ -321,21 +329,21 @@ agentos_error_t agentos_service_create(
         AGENTOS_FREE(service);
         return err;
     }
-    
+
     /* 复制配置 */
     memcpy(&service->config, config, sizeof(agentos_svc_config_t));
     service->capabilities = config->capabilities;
-    
+
     /* 复制接口 */
     memcpy(&service->iface, iface, sizeof(agentos_svc_interface_t));
-    
+
     /* 初始化线程追踪 */
     service->threads = NULL;
     service->thread_count = 0;
-    
+
     /* 初始化统计信息 */
     memset(&service->stats, 0, sizeof(agentos_svc_stats_t));
-    
+
     /* 注册到内部注册表 */
     err = register_service_internal(service);
     if (err != AGENTOS_SUCCESS) {
@@ -344,27 +352,27 @@ agentos_error_t agentos_service_create(
         AGENTOS_FREE(service);
         return err;
     }
-    
+
     *out_service = (agentos_service_t)service;
-    
+
     LOG_INFO("Service '%s' created successfully", name);
-    
+
     return AGENTOS_SUCCESS;
 }
 
-void agentos_service_destroy(agentos_service_t svc) {
+void agentos_service_destroy(agentos_service_t svc)
+{
     if (!svc) {
         return;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     /* 如果服务还在运行，先强制停止（带5秒超时保护） */
-    if (service->state == AGENTOS_SVC_STATE_RUNNING || 
-        service->state == AGENTOS_SVC_STATE_PAUSED) {
+    if (service->state == AGENTOS_SVC_STATE_RUNNING || service->state == AGENTOS_SVC_STATE_PAUSED) {
         agentos_service_stop((agentos_service_t)service, true);
     }
-    
+
     /* 从注册表注销（即使部分资源已损坏，继续清理） */
     {
         agentos_error_t unreg_err = unregister_service_internal(service);
@@ -373,16 +381,16 @@ void agentos_service_destroy(agentos_service_t svc) {
                      service->name, unreg_err);
         }
     }
-    
+
     /* 调用服务的销毁函数（容错：失败不阻塞后续清理） */
     if (service->iface.destroy) {
         service->iface.destroy(svc);
     }
-    
+
     /* 清理资源：跳过已损坏/已释放的资源 */
     agentos_mutex_destroy(&service->state_mutex);
     agentos_mutex_destroy(&service->stats_mutex);
-    
+
     /* 释放内存：无论前面是否出错，内存必须释放 */
     if (service->threads) {
         AGENTOS_FREE(service->threads);
@@ -390,37 +398,38 @@ void agentos_service_destroy(agentos_service_t svc) {
         service->thread_count = 0;
     }
     AGENTOS_FREE(service);
-    
+
     LOG_INFO("Service destroyed");
 }
 
-agentos_error_t agentos_service_init(agentos_service_t svc) {
+agentos_error_t agentos_service_init(agentos_service_t svc)
+{
     if (!svc) {
         return AGENTOS_EINVAL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     agentos_mutex_lock(&service->state_mutex);
-    
+
     /* 状态检查 */
     if (service->state != AGENTOS_SVC_STATE_CREATED) {
         agentos_mutex_unlock(&service->state_mutex);
-        LOG_ERROR("Service '%s' cannot initialize from state %d", 
-                 service->name, service->state);
+        LOG_ERROR("Service '%s' cannot initialize from state %d", service->name, service->state);
         return DAEMON_ESTATE;
+    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_init: invalid state transition");
     }
-    
+
     /* 更新状态 */
     service->state = AGENTOS_SVC_STATE_INITIALIZING;
     agentos_mutex_unlock(&service->state_mutex);
-    
+
     /* 调用服务的初始化函数 */
     agentos_error_t err = AGENTOS_SUCCESS;
     if (service->iface.init) {
         err = service->iface.init(svc, &service->config);
     }
-    
+
     agentos_mutex_lock(&service->state_mutex);
     if (err == AGENTOS_SUCCESS) {
         service->state = AGENTOS_SVC_STATE_READY;
@@ -429,54 +438,53 @@ agentos_error_t agentos_service_init(agentos_service_t svc) {
         service->state = AGENTOS_SVC_STATE_ERROR;
         LOG_ERROR("Service '%s' initialization failed: %d", service->name, err);
     }
-    
+
     agentos_mutex_unlock(&service->state_mutex);
-    
+
     return err;
 }
 
-agentos_error_t agentos_service_start(agentos_service_t svc) {
+agentos_error_t agentos_service_start(agentos_service_t svc)
+{
     if (!svc) {
         return AGENTOS_EINVAL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     agentos_mutex_lock(&service->state_mutex);
-    
+
     /* 状态检查 */
-    if (service->state != AGENTOS_SVC_STATE_READY && 
-        service->state != AGENTOS_SVC_STATE_STOPPED &&
-        service->state != AGENTOS_SVC_STATE_PAUSED &&
-        service->state != AGENTOS_SVC_STATE_ZOMBIE) {
+    if (service->state != AGENTOS_SVC_STATE_READY && service->state != AGENTOS_SVC_STATE_STOPPED &&
+        service->state != AGENTOS_SVC_STATE_PAUSED && service->state != AGENTOS_SVC_STATE_ZOMBIE) {
         agentos_mutex_unlock(&service->state_mutex);
-        LOG_ERROR("Service '%s' cannot start from state %d", 
-                 service->name, service->state);
+        LOG_ERROR("Service '%s' cannot start from state %d", service->name, service->state);
         return DAEMON_ESTATE;
+    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_start: invalid state transition");
     }
-    
+
     /* 更新状态 */
     agentos_svc_state_t old_state = service->state;
     service->state = AGENTOS_SVC_STATE_RUNNING;
     agentos_mutex_unlock(&service->state_mutex);
-    
+
     /* 调用服务的启动函数 */
     agentos_error_t err = AGENTOS_SUCCESS;
     if (service->iface.start) {
         err = service->iface.start(svc);
     }
-    
+
     if (err != AGENTOS_SUCCESS) {
         agentos_mutex_lock(&service->state_mutex);
-        service->state = old_state;  /* 恢复原状态 */
+        service->state = old_state; /* 恢复原状态 */
         agentos_mutex_unlock(&service->state_mutex);
-        
+
         LOG_ERROR("Service '%s' start failed: %d", service->name, err);
         return err;
     }
-    
+
     LOG_INFO("Service '%s' started successfully", service->name);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -489,32 +497,32 @@ static void svc_stop_timeout_handler(int signum __attribute__((unused)))
     g_svc_stop_timeout_flag = 1;
 }
 
-agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
+agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
+{
     if (!svc) {
         return AGENTOS_EINVAL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     agentos_mutex_lock(&service->state_mutex);
-    
+
     /* 状态检查 */
-    if (service->state != AGENTOS_SVC_STATE_RUNNING && 
-        service->state != AGENTOS_SVC_STATE_PAUSED) {
+    if (service->state != AGENTOS_SVC_STATE_RUNNING && service->state != AGENTOS_SVC_STATE_PAUSED) {
         agentos_mutex_unlock(&service->state_mutex);
-        LOG_WARN("Service '%s' cannot stop from state %d", 
-                service->name, service->state);
+        LOG_WARN("Service '%s' cannot stop from state %d", service->name, service->state);
         return DAEMON_ESTATE;
+    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_stop: invalid state transition");
     }
-    
+
     /* 更新状态 */
     service->state = AGENTOS_SVC_STATE_STOPPING;
     agentos_mutex_unlock(&service->state_mutex);
-    
+
     /* 调用服务的停止函数 */
     agentos_error_t err = AGENTOS_SUCCESS;
     bool zombie = false;
-    
+
     if (service->iface.stop) {
         struct sigaction old_act, new_act;
         if (force) {
@@ -526,16 +534,16 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
             sigaction(SIGALRM, &new_act, &old_act);
             alarm(FORCE_STOP_TIMEOUT_SEC);
         }
-        
+
         err = service->iface.stop(svc, force);
-        
+
         if (force) {
             alarm(0);
             sigaction(SIGALRM, &old_act, NULL);
             if (g_svc_stop_timeout_flag) {
                 zombie = true;
                 LOG_ERROR("Service '%s' force stop timed out after %d seconds - marking ZOMBIE",
-                         service->name, FORCE_STOP_TIMEOUT_SEC);
+                          service->name, FORCE_STOP_TIMEOUT_SEC);
 
 #ifdef AGENTOS_OS_UNIX
                 if (service->threads && service->thread_count > 0) {
@@ -544,16 +552,16 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
                     for (size_t i = 0; i < service->thread_count; i++) {
                         pthread_t tid = service->threads[i];
                         if (tid) {
-                            void* retval = NULL;
+                            void *retval = NULL;
                             int join_rc = pthread_tryjoin_np(tid, &retval);
                             if (join_rc == EBUSY) {
                                 LOG_ERROR("Service '%s' thread[%zu] deadlocked - cancelling",
-                                         service->name, i);
+                                          service->name, i);
                                 pthread_cancel(tid);
                                 pthread_join(tid, NULL);
                             } else if (join_rc == 0) {
                                 LOG_INFO("Service '%s' thread[%zu] joined with retval=%p",
-                                        service->name, i, retval);
+                                         service->name, i, retval);
                             }
                         }
                     }
@@ -562,48 +570,50 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
             }
         }
     }
-    
+
     agentos_mutex_lock(&service->state_mutex);
     if (err == AGENTOS_SUCCESS || force) {
         service->state = zombie ? AGENTOS_SVC_STATE_ZOMBIE : AGENTOS_SVC_STATE_STOPPED;
-        LOG_INFO("Service '%s' stopped %s", 
-                service->name, force ? (zombie ? "(ZOMBIE)" : "(forced)") : "gracefully");
+        LOG_INFO("Service '%s' stopped %s", service->name,
+                 force ? (zombie ? "(ZOMBIE)" : "(forced)") : "gracefully");
     } else {
         service->state = AGENTOS_SVC_STATE_ERROR;
         LOG_ERROR("Service '%s' stop failed: %d", service->name, err);
     }
-    
+
     agentos_mutex_unlock(&service->state_mutex);
-    
+
     return err;
 }
 
 typedef struct {
     agentos_service_t service;
-    char* method;
-    char* params_json;
+    char *method;
+    char *params_json;
     agentos_svc_async_complete_fn on_complete;
-    void* user_data;
+    void *user_data;
 } async_request_context_t;
 
-static void async_request_worker(void* arg) {
-    async_request_context_t* ctx = (async_request_context_t*)arg;
-    if (!ctx) return;
+static void async_request_worker(void *arg)
+{
+    async_request_context_t *ctx = (async_request_context_t *)arg;
+    if (!ctx)
+        return;
 
-    char* response_json = NULL;
+    char *response_json = NULL;
     agentos_error_t err = AGENTOS_EINVAL;
 
-    agentos_service_internal_t* svc = (agentos_service_internal_t*)ctx->service;
+    agentos_service_internal_t *svc = (agentos_service_internal_t *)ctx->service;
     if (svc && svc->iface.handle_request) {
-        err = svc->iface.handle_request(ctx->service, ctx->method,
-                                         ctx->params_json, &response_json,
-                                         svc->user_data);
+        err = svc->iface.handle_request(ctx->service, ctx->method, ctx->params_json, &response_json,
+                                        svc->user_data);
     }
 
     if (ctx->on_complete) {
         ctx->on_complete(ctx->service, ctx->method, err, response_json, ctx->user_data);
     } else {
-        if (response_json) AGENTOS_FREE(response_json);
+        if (response_json)
+            AGENTOS_FREE(response_json);
     }
 
     AGENTOS_FREE(ctx->method);
@@ -611,26 +621,29 @@ static void async_request_worker(void* arg) {
     AGENTOS_FREE(ctx);
 }
 
-agentos_error_t agentos_service_set_thread_pool(agentos_service_t svc, void* pool) {
-    if (!svc) return AGENTOS_EINVAL;
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
+agentos_error_t agentos_service_set_thread_pool(agentos_service_t svc, void *pool)
+{
+    if (!svc)
+        return AGENTOS_EINVAL;
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
     service->thread_pool = pool;
     return AGENTOS_SUCCESS;
 }
 
-int agentos_service_handle_request_async(
-    agentos_service_t service,
-    const char* method,
-    const char* params_json,
-    agentos_svc_async_complete_fn on_complete,
-    void* user_data
-) {
-    if (!service || !method) return -1;
+int agentos_service_handle_request_async(agentos_service_t service, const char *method,
+                                         const char *params_json,
+                                         agentos_svc_async_complete_fn on_complete, void *user_data)
+{
+    if (!service || !method)
+        return AGENTOS_ERR_INVALID_PARAM;
 
-    agentos_service_internal_t* svc = (agentos_service_internal_t*)service;
+    agentos_service_internal_t *svc = (agentos_service_internal_t *)service;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "handle_request_async: null service or method");
 
-    async_request_context_t* ctx = (async_request_context_t*)AGENTOS_CALLOC(1, sizeof(*ctx));
-    if (!ctx) return -2;
+    async_request_context_t *ctx = (async_request_context_t *)AGENTOS_CALLOC(1, sizeof(*ctx));
+    if (!ctx)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "handle_request_async: calloc ctx failed");
 
     ctx->service = service;
     ctx->method = AGENTOS_STRDUP(method);
@@ -641,7 +654,9 @@ int agentos_service_handle_request_async(
     if (svc->thread_pool) {
         int rc = thread_pool_submit(svc->thread_pool, async_request_worker, ctx);
         if (rc != 0) {
-            AGENTOS_FREE(ctx->method); AGENTOS_FREE(ctx->params_json); AGENTOS_FREE(ctx);
+            AGENTOS_FREE(ctx->method);
+            AGENTOS_FREE(ctx->params_json);
+            AGENTOS_FREE(ctx);
             return rc;
         }
         return 0;
@@ -651,258 +666,256 @@ int agentos_service_handle_request_async(
     return 0;
 }
 
-agentos_error_t agentos_service_pause(agentos_service_t svc) {
+agentos_error_t agentos_service_pause(agentos_service_t svc)
+{
     if (!svc) {
         return AGENTOS_EINVAL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     agentos_mutex_lock(&service->state_mutex);
-    
+
     /* 状态检查 */
     if (service->state != AGENTOS_SVC_STATE_RUNNING) {
         agentos_mutex_unlock(&service->state_mutex);
-        LOG_ERROR("Service '%s' cannot pause from state %d", 
-                 service->name, service->state);
+        LOG_ERROR("Service '%s' cannot pause from state %d", service->name, service->state);
         return DAEMON_ESTATE;
+    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_pause: invalid state");
     }
-    
+
     /* 检查是否支持暂停 */
     if (!(service->capabilities & AGENTOS_SVC_CAP_PAUSEABLE)) {
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' does not support pause", service->name);
         return AGENTOS_EPROTONOSUPPORT;
     }
-    
+
     /* 更新状态 */
     service->state = AGENTOS_SVC_STATE_PAUSED;
     agentos_mutex_unlock(&service->state_mutex);
-    
+
     LOG_INFO("Service '%s' paused", service->name);
-    
+
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_service_resume(agentos_service_t svc) {
+agentos_error_t agentos_service_resume(agentos_service_t svc)
+{
     if (!svc) {
         return AGENTOS_EINVAL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     agentos_mutex_lock(&service->state_mutex);
-    
+
     /* 状态检查 */
     if (service->state != AGENTOS_SVC_STATE_PAUSED) {
         agentos_mutex_unlock(&service->state_mutex);
-        LOG_ERROR("Service '%s' cannot resume from state %d", 
-                 service->name, service->state);
+        LOG_ERROR("Service '%s' cannot resume from state %d", service->name, service->state);
         return DAEMON_ESTATE;
+    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_resume: invalid state");
     }
-    
+
     /* 更新状态 */
     service->state = AGENTOS_SVC_STATE_RUNNING;
     agentos_mutex_unlock(&service->state_mutex);
-    
+
     LOG_INFO("Service '%s' resumed", service->name);
-    
+
     return AGENTOS_SUCCESS;
 }
 
 /* 服务状态查询 */
 
-agentos_svc_state_t agentos_service_get_state(agentos_service_t svc) {
+agentos_svc_state_t agentos_service_get_state(agentos_service_t svc)
+{
     if (!svc) {
         return AGENTOS_SVC_STATE_NONE;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     agentos_mutex_lock(&service->state_mutex);
     agentos_svc_state_t state = service->state;
     agentos_mutex_unlock(&service->state_mutex);
-    
+
     return state;
 }
 
-bool agentos_service_is_ready(agentos_service_t svc) {
+bool agentos_service_is_ready(agentos_service_t svc)
+{
     agentos_svc_state_t state = agentos_service_get_state(svc);
     return state == AGENTOS_SVC_STATE_READY;
 }
 
-bool agentos_service_is_running(agentos_service_t svc) {
+bool agentos_service_is_running(agentos_service_t svc)
+{
     agentos_svc_state_t state = agentos_service_get_state(svc);
     return state == AGENTOS_SVC_STATE_RUNNING;
 }
 
-const char* agentos_service_get_name(agentos_service_t svc) {
+const char *agentos_service_get_name(agentos_service_t svc)
+{
     if (!svc) {
         return NULL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
     return service->name;
 }
 
-const char* agentos_service_get_version(agentos_service_t svc) {
+const char *agentos_service_get_version(agentos_service_t svc)
+{
     if (!svc) {
         return NULL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
     return service->version[0] ? service->version : "1.0.0";
 }
 
 /* 服务统计 */
 
-agentos_error_t agentos_service_get_stats(
-    agentos_service_t svc,
-    agentos_svc_stats_t* out_stats) {
-    
+agentos_error_t agentos_service_get_stats(agentos_service_t svc, agentos_svc_stats_t *out_stats)
+{
+
     if (!svc || !out_stats) {
         return AGENTOS_EINVAL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     agentos_mutex_lock(&service->stats_mutex);
     memcpy(out_stats, &service->stats, sizeof(agentos_svc_stats_t));
     agentos_mutex_unlock(&service->stats_mutex);
-    
+
     return AGENTOS_SUCCESS;
 }
 
-void agentos_service_reset_stats(agentos_service_t svc) {
+void agentos_service_reset_stats(agentos_service_t svc)
+{
     if (!svc) {
         return;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     agentos_mutex_lock(&service->stats_mutex);
     memset(&service->stats, 0, sizeof(agentos_svc_stats_t));
     agentos_mutex_unlock(&service->stats_mutex);
-    
+
     LOG_DEBUG("Service '%s' stats reset", service->name);
 }
 
 /* 服务健康检查 */
 
-agentos_error_t agentos_service_healthcheck(agentos_service_t svc) {
+agentos_error_t agentos_service_healthcheck(agentos_service_t svc)
+{
     if (!svc) {
         return AGENTOS_EINVAL;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
-    
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
+
     /* 如果服务提供了健康检查函数，则使用它 */
     if (service->iface.healthcheck) {
         agentos_error_t err = service->iface.healthcheck(svc);
-        
+
         /* 更新健康检查状态 */
         uint64_t current_time = agentos_platform_get_time_ms();
         service->last_healthcheck_time = current_time;
-        
+
         if (err != AGENTOS_SUCCESS) {
             service->healthcheck_failures++;
-            LOG_WARN("Service '%s' health check failed: %d (failures: %d)",
-                    service->name, err, service->healthcheck_failures);
+            LOG_WARN("Service '%s' health check failed: %d (failures: %d)", service->name, err,
+                     service->healthcheck_failures);
         } else {
             service->healthcheck_failures = 0;
         }
-        
+
         return err;
     }
-    
+
     /* 默认健康检查：检查服务状态 */
     agentos_svc_state_t state = agentos_service_get_state(svc);
-    
+
     switch (state) {
-        case AGENTOS_SVC_STATE_READY:
-        case AGENTOS_SVC_STATE_RUNNING:
-        case AGENTOS_SVC_STATE_PAUSED:
-            return AGENTOS_SUCCESS;
-            
-        case AGENTOS_SVC_STATE_ERROR:
-            return DAEMON_EHEALTH;
-            
-        default:
-            return DAEMON_ESTATE;
+    case AGENTOS_SVC_STATE_READY:
+    case AGENTOS_SVC_STATE_RUNNING:
+    case AGENTOS_SVC_STATE_PAUSED:
+        return AGENTOS_SUCCESS;
+
+    case AGENTOS_SVC_STATE_ERROR:
+        return DAEMON_EHEALTH;
+
+    default:
+        return DAEMON_ESTATE;
     }
 }
 
 /* 服务能力查询 */
 
-bool agentos_service_has_capability(
-    agentos_service_t svc,
-    agentos_svc_capability_t capability) {
-    
+bool agentos_service_has_capability(agentos_service_t svc, agentos_svc_capability_t capability)
+{
+
     if (!svc) {
         return false;
     }
-    
-    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
+
+    agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
     return (service->capabilities & capability) != 0;
 }
 
 /* 服务状态字符串转换 */
 
-const char* agentos_svc_state_to_string(agentos_svc_state_t state) {
-    static const char* state_strings[] = {
-        "NONE",
-        "CREATED",
-        "INITIALIZING",
-        "READY",
-        "RUNNING",
-        "PAUSED",
-        "STOPPING",
-        "STOPPED",
-        "ZOMBIE",
-        "ERROR"
-    };
-    
+const char *agentos_svc_state_to_string(agentos_svc_state_t state)
+{
+    static const char *state_strings[] = {"NONE",   "CREATED",  "INITIALIZING", "READY",  "RUNNING",
+                                          "PAUSED", "STOPPING", "STOPPED",      "ZOMBIE", "ERROR"};
+
     if (state < AGENTOS_SVC_STATE_NONE || state > AGENTOS_SVC_STATE_ERROR) {
         return "UNKNOWN";
     }
-    
+
     return state_strings[state];
 }
 
-agentos_svc_state_t agentos_svc_state_from_string(const char* str) {
+agentos_svc_state_t agentos_svc_state_from_string(const char *str)
+{
     if (!str) {
         return AGENTOS_SVC_STATE_NONE;
     }
-    
+
     static const struct {
-        const char* name;
+        const char *name;
         agentos_svc_state_t state;
-    } state_map[] = {
-        {"NONE", AGENTOS_SVC_STATE_NONE},
-        {"CREATED", AGENTOS_SVC_STATE_CREATED},
-        {"INITIALIZING", AGENTOS_SVC_STATE_INITIALIZING},
-        {"READY", AGENTOS_SVC_STATE_READY},
-        {"RUNNING", AGENTOS_SVC_STATE_RUNNING},
-        {"PAUSED", AGENTOS_SVC_STATE_PAUSED},
-        {"STOPPING", AGENTOS_SVC_STATE_STOPPING},
-        {"STOPPED", AGENTOS_SVC_STATE_STOPPED},
-        {"ZOMBIE", AGENTOS_SVC_STATE_ZOMBIE},
-        {"ERROR", AGENTOS_SVC_STATE_ERROR},
-        {NULL, AGENTOS_SVC_STATE_NONE}
-    };
-    
+    } state_map[] = {{"NONE", AGENTOS_SVC_STATE_NONE},
+                     {"CREATED", AGENTOS_SVC_STATE_CREATED},
+                     {"INITIALIZING", AGENTOS_SVC_STATE_INITIALIZING},
+                     {"READY", AGENTOS_SVC_STATE_READY},
+                     {"RUNNING", AGENTOS_SVC_STATE_RUNNING},
+                     {"PAUSED", AGENTOS_SVC_STATE_PAUSED},
+                     {"STOPPING", AGENTOS_SVC_STATE_STOPPING},
+                     {"STOPPED", AGENTOS_SVC_STATE_STOPPED},
+                     {"ZOMBIE", AGENTOS_SVC_STATE_ZOMBIE},
+                     {"ERROR", AGENTOS_SVC_STATE_ERROR},
+                     {NULL, AGENTOS_SVC_STATE_NONE}};
+
     for (int i = 0; state_map[i].name; i++) {
         if (strcasecmp(str, state_map[i].name) == 0) {
             return state_map[i].state;
         }
     }
-    
+
     return AGENTOS_SVC_STATE_NONE;
 }
 
 /* 服务注册表 */
 
-agentos_error_t agentos_service_register(agentos_service_t svc) {
+agentos_error_t agentos_service_register(agentos_service_t svc)
+{
     if (!svc) {
         return AGENTOS_EINVAL;
     }
@@ -914,10 +927,11 @@ agentos_error_t agentos_service_register(agentos_service_t svc) {
         }
     }
 
-    agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+    agentos_service_internal_t *internal = (agentos_service_internal_t *)svc;
     agentos_mutex_lock(&g_registry.registry_mutex);
 
-    for (agentos_service_internal_t* current = g_registry.services; current; current = current->next) {
+    for (agentos_service_internal_t *current = g_registry.services; current;
+         current = current->next) {
         if (current == internal) {
             agentos_mutex_unlock(&g_registry.registry_mutex);
             LOG_DEBUG("Service '%s' already registered", internal->name);
@@ -931,11 +945,13 @@ agentos_error_t agentos_service_register(agentos_service_t svc) {
 
     agentos_mutex_unlock(&g_registry.registry_mutex);
 
-    LOG_INFO("Service '%s' explicitly registered (total: %u)", internal->name, g_registry.service_count);
+    LOG_INFO("Service '%s' explicitly registered (total: %u)", internal->name,
+             g_registry.service_count);
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_service_unregister(agentos_service_t svc) {
+agentos_error_t agentos_service_unregister(agentos_service_t svc)
+{
     if (!svc) {
         return AGENTOS_EINVAL;
     }
@@ -944,11 +960,11 @@ agentos_error_t agentos_service_unregister(agentos_service_t svc) {
         return AGENTOS_ENOTINIT;
     }
 
-    agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+    agentos_service_internal_t *internal = (agentos_service_internal_t *)svc;
     agentos_mutex_lock(&g_registry.registry_mutex);
 
-    agentos_service_internal_t** prev = &g_registry.services;
-    agentos_service_internal_t* current = g_registry.services;
+    agentos_service_internal_t **prev = &g_registry.services;
+    agentos_service_internal_t *current = g_registry.services;
 
     while (current) {
         if (current == internal) {
@@ -956,7 +972,8 @@ agentos_error_t agentos_service_unregister(agentos_service_t svc) {
             g_registry.service_count--;
 
             agentos_mutex_unlock(&g_registry.registry_mutex);
-            LOG_INFO("Service '%s' unregistered (remaining: %u)", internal->name, g_registry.service_count);
+            LOG_INFO("Service '%s' unregistered (remaining: %u)", internal->name,
+                     g_registry.service_count);
             return AGENTOS_SUCCESS;
         }
 
@@ -969,54 +986,58 @@ agentos_error_t agentos_service_unregister(agentos_service_t svc) {
     return AGENTOS_ENOENT;
 }
 
-agentos_service_t agentos_service_find(const char* name) {
+agentos_service_t agentos_service_find(const char *name)
+{
     if (!name || !g_registry.initialized) {
         return NULL;
     }
-    
+
     agentos_mutex_lock(&g_registry.registry_mutex);
-    
-    agentos_service_internal_t* service = find_service_internal(name);
-    
+
+    agentos_service_internal_t *service = find_service_internal(name);
+
     agentos_mutex_unlock(&g_registry.registry_mutex);
-    
+
     return (agentos_service_t)service;
 }
 
-uint32_t agentos_service_count(void) {
+uint32_t agentos_service_count(void)
+{
     if (!g_registry.initialized) {
         return 0;
     }
-    
+
     agentos_mutex_lock(&g_registry.registry_mutex);
     uint32_t count = g_registry.service_count;
     agentos_mutex_unlock(&g_registry.registry_mutex);
-    
+
     return count;
 }
 
-void agentos_service_foreach(agentos_service_enum_fn callback, void* user_data) {
+void agentos_service_foreach(agentos_service_enum_fn callback, void *user_data)
+{
     if (!callback || !g_registry.initialized) {
         return;
     }
-    
+
     agentos_mutex_lock(&g_registry.registry_mutex);
-    
-    agentos_service_internal_t* current = g_registry.services;
+
+    agentos_service_internal_t *current = g_registry.services;
     while (current) {
         callback((agentos_service_t)current, user_data);
         current = current->next;
     }
-    
+
     agentos_mutex_unlock(&g_registry.registry_mutex);
 }
 
-agentos_error_t agentos_service_set_user_data(agentos_service_t service, void* user_data) {
+agentos_error_t agentos_service_set_user_data(agentos_service_t service, void *user_data)
+{
     if (!service) {
         return AGENTOS_EINVAL;
     }
 
-    agentos_service_internal_t* internal = (agentos_service_internal_t*)service;
+    agentos_service_internal_t *internal = (agentos_service_internal_t *)service;
     agentos_mutex_lock(&internal->state_mutex);
     internal->user_data = user_data;
     agentos_mutex_unlock(&internal->state_mutex);
@@ -1024,14 +1045,15 @@ agentos_error_t agentos_service_set_user_data(agentos_service_t service, void* u
     return AGENTOS_SUCCESS;
 }
 
-void* agentos_service_get_user_data(agentos_service_t service) {
+void *agentos_service_get_user_data(agentos_service_t service)
+{
     if (!service) {
         return NULL;
     }
 
-    agentos_service_internal_t* internal = (agentos_service_internal_t*)service;
+    agentos_service_internal_t *internal = (agentos_service_internal_t *)service;
     agentos_mutex_lock(&internal->state_mutex);
-    void* data = internal->user_data;
+    void *data = internal->user_data;
     agentos_mutex_unlock(&internal->state_mutex);
 
     return data;
@@ -1039,7 +1061,8 @@ void* agentos_service_get_user_data(agentos_service_t service) {
 
 /* ==================== 模块清理 ==================== */
 
-void agentos_svc_common_cleanup(void) {
+void agentos_svc_common_cleanup(void)
+{
     svc_common_module_cleanup();
 }
 
@@ -1063,7 +1086,8 @@ static struct {
     agentos_mutex_t mutex;
 } g_cross_registry = {0};
 
-agentos_error_t agentos_registry_init(const char* registry_url) {
+agentos_error_t agentos_registry_init(const char *registry_url)
+{
     if (!registry_url) {
         return AGENTOS_EINVAL;
     }
@@ -1073,6 +1097,7 @@ agentos_error_t agentos_registry_init(const char* registry_url) {
     err = agentos_mutex_init(&g_cross_registry.mutex);
     if (err != AGENTOS_SUCCESS) {
         return err;
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_registry_init: mutex init failed");
     }
 
     agentos_mutex_lock(&g_cross_registry.mutex);
@@ -1082,7 +1107,8 @@ agentos_error_t agentos_registry_init(const char* registry_url) {
         return AGENTOS_SUCCESS;
     }
 
-    if (safe_strcpy(g_cross_registry.registry_url, registry_url, sizeof(g_cross_registry.registry_url)) != 0) {
+    if (safe_strcpy(g_cross_registry.registry_url, registry_url,
+                    sizeof(g_cross_registry.registry_url)) != 0) {
         agentos_mutex_unlock(&g_cross_registry.mutex);
         return AGENTOS_EINVAL;
     }
@@ -1096,10 +1122,9 @@ agentos_error_t agentos_registry_init(const char* registry_url) {
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_registry_register(
-    agentos_service_t service,
-    const agentos_service_metadata_t* metadata
-) {
+agentos_error_t agentos_registry_register(agentos_service_t service,
+                                          const agentos_service_metadata_t *metadata)
+{
     if (!service || !metadata) {
         return AGENTOS_EINVAL;
     }
@@ -1118,7 +1143,8 @@ agentos_error_t agentos_registry_register(
 
     for (uint32_t i = 0; i < g_cross_registry.entry_count; i++) {
         if (g_cross_registry.entries[i].service == service) {
-            memcpy(&g_cross_registry.entries[i].metadata, metadata, sizeof(agentos_service_metadata_t));
+            memcpy(&g_cross_registry.entries[i].metadata, metadata,
+                   sizeof(agentos_service_metadata_t));
             g_cross_registry.entries[i].metadata.last_heartbeat = agentos_platform_get_time_ms();
             agentos_mutex_unlock(&g_cross_registry.mutex);
             LOG_INFO("Service '%s' re-registered in cross-process registry", metadata->name);
@@ -1126,7 +1152,7 @@ agentos_error_t agentos_registry_register(
         }
     }
 
-    registry_entry_t* entry = &g_cross_registry.entries[g_cross_registry.entry_count];
+    registry_entry_t *entry = &g_cross_registry.entries[g_cross_registry.entry_count];
     memcpy(&entry->metadata, metadata, sizeof(agentos_service_metadata_t));
     entry->service = service;
     entry->registered = true;
@@ -1141,7 +1167,8 @@ agentos_error_t agentos_registry_register(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_registry_deregister(agentos_service_t service) {
+agentos_error_t agentos_registry_deregister(agentos_service_t service)
+{
     if (!service) {
         return AGENTOS_EINVAL;
     }
@@ -1154,9 +1181,11 @@ agentos_error_t agentos_registry_deregister(agentos_service_t service) {
                      g_cross_registry.entries[i].metadata.name);
 
             if (i < g_cross_registry.entry_count - 1) {
-                g_cross_registry.entries[i] = g_cross_registry.entries[g_cross_registry.entry_count - 1];
+                g_cross_registry.entries[i] =
+                    g_cross_registry.entries[g_cross_registry.entry_count - 1];
             }
-            memset(&g_cross_registry.entries[g_cross_registry.entry_count - 1], 0, sizeof(registry_entry_t));
+            memset(&g_cross_registry.entries[g_cross_registry.entry_count - 1], 0,
+                   sizeof(registry_entry_t));
             g_cross_registry.entry_count--;
 
             agentos_mutex_unlock(&g_cross_registry.mutex);
@@ -1168,19 +1197,23 @@ agentos_error_t agentos_registry_deregister(agentos_service_t service) {
     return AGENTOS_ENOENT;
 }
 
-static bool tag_matches(const char* filter_tags, const char* service_tags) {
-    if (!filter_tags || !filter_tags[0]) return true;
-    if (!service_tags || !service_tags[0]) return false;
+static bool tag_matches(const char *filter_tags, const char *service_tags)
+{
+    if (!filter_tags || !filter_tags[0])
+        return true;
+    if (!service_tags || !service_tags[0])
+        return false;
 
     char filter_copy[AGENTOS_MAX_TAGS_LEN];
     if (safe_strcpy(filter_copy, filter_tags, sizeof(filter_copy)) != 0) {
         return false;
     }
 
-    char* saveptr = NULL;
-    char* token = strtok_r(filter_copy, ",", &saveptr);
+    char *saveptr = NULL;
+    char *token = strtok_r(filter_copy, ",", &saveptr);
     while (token) {
-        while (*token == ' ') token++;
+        while (*token == ' ')
+            token++;
         if (strstr(service_tags, token)) {
             return true;
         }
@@ -1189,11 +1222,9 @@ static bool tag_matches(const char* filter_tags, const char* service_tags) {
     return false;
 }
 
-agentos_service_metadata_t* agentos_registry_discover(
-    const char* service_type,
-    const char* filter_tags,
-    size_t* result_count
-) {
+agentos_service_metadata_t *agentos_registry_discover(const char *service_type,
+                                                      const char *filter_tags, size_t *result_count)
+{
     if (!result_count) {
         return NULL;
     }
@@ -1208,8 +1239,9 @@ agentos_service_metadata_t* agentos_registry_discover(
 
     size_t match_count = 0;
     for (uint32_t i = 0; i < g_cross_registry.entry_count; i++) {
-        registry_entry_t* entry = &g_cross_registry.entries[i];
-        if (!entry->registered) continue;
+        registry_entry_t *entry = &g_cross_registry.entries[i];
+        if (!entry->registered)
+            continue;
 
         bool type_match = !service_type || !service_type[0] ||
                           strcmp(entry->metadata.service_type, service_type) == 0;
@@ -1225,7 +1257,7 @@ agentos_service_metadata_t* agentos_registry_discover(
         return NULL;
     }
 
-    agentos_service_metadata_t* results = (agentos_service_metadata_t*)AGENTOS_CALLOC(
+    agentos_service_metadata_t *results = (agentos_service_metadata_t *)AGENTOS_CALLOC(
         match_count, sizeof(agentos_service_metadata_t));
     if (!results) {
         agentos_mutex_unlock(&g_cross_registry.mutex);
@@ -1234,8 +1266,9 @@ agentos_service_metadata_t* agentos_registry_discover(
 
     size_t idx = 0;
     for (uint32_t i = 0; i < g_cross_registry.entry_count && idx < match_count; i++) {
-        registry_entry_t* entry = &g_cross_registry.entries[i];
-        if (!entry->registered) continue;
+        registry_entry_t *entry = &g_cross_registry.entries[i];
+        if (!entry->registered)
+            continue;
 
         bool type_match = !service_type || !service_type[0] ||
                           strcmp(entry->metadata.service_type, service_type) == 0;
@@ -1250,18 +1283,20 @@ agentos_service_metadata_t* agentos_registry_discover(
     *result_count = match_count;
     agentos_mutex_unlock(&g_cross_registry.mutex);
 
-    LOG_DEBUG("Service discovery: found %zu services (type=%s, tags=%s)",
-              match_count, service_type ? service_type : "*", filter_tags ? filter_tags : "*");
+    LOG_DEBUG("Service discovery: found %zu services (type=%s, tags=%s)", match_count,
+              service_type ? service_type : "*", filter_tags ? filter_tags : "*");
     return results;
 }
 
-void agentos_registry_discover_free(agentos_service_metadata_t* results) {
+void agentos_registry_discover_free(agentos_service_metadata_t *results)
+{
     if (results) {
         AGENTOS_FREE(results);
     }
 }
 
-agentos_error_t agentos_registry_heartbeat(agentos_service_t service) {
+agentos_error_t agentos_registry_heartbeat(agentos_service_t service)
+{
     if (!service) {
         return AGENTOS_EINVAL;
     }
@@ -1278,9 +1313,10 @@ agentos_error_t agentos_registry_heartbeat(agentos_service_t service) {
             agentos_svc_stats_t stats;
             if (agentos_service_get_stats(service, &stats) == AGENTOS_SUCCESS) {
                 g_cross_registry.entries[i].metadata.current_load =
-                    stats.current_concurrent > 0 ?
-                    (uint32_t)(stats.current_concurrent * 100 / (stats.peak_concurrent > 0 ? stats.peak_concurrent : 1)) :
-                    0;
+                    stats.current_concurrent > 0
+                        ? (uint32_t)(stats.current_concurrent * 100 /
+                                     (stats.peak_concurrent > 0 ? stats.peak_concurrent : 1))
+                        : 0;
             }
 
             agentos_mutex_unlock(&g_cross_registry.mutex);
@@ -1292,7 +1328,8 @@ agentos_error_t agentos_registry_heartbeat(agentos_service_t service) {
     return AGENTOS_ENOENT;
 }
 
-void agentos_registry_cleanup(void) {
+void agentos_registry_cleanup(void)
+{
     agentos_mutex_lock(&g_cross_registry.mutex);
 
     memset(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
@@ -1314,7 +1351,7 @@ void agentos_registry_cleanup(void) {
 typedef struct {
     char service_name[64];
     agentos_config_change_callback_t callback;
-    void* user_data;
+    void *user_data;
     bool active;
 } config_watcher_t;
 
@@ -1326,7 +1363,8 @@ static struct {
     agentos_mutex_t mutex;
 } g_config_mgr = {0};
 
-static agentos_error_t config_mgr_init(void) {
+static agentos_error_t config_mgr_init(void)
+{
     if (g_config_mgr.initialized) {
         return AGENTOS_SUCCESS;
     }
@@ -1338,7 +1376,8 @@ static agentos_error_t config_mgr_init(void) {
 
     memset(g_config_mgr.watchers, 0, sizeof(g_config_mgr.watchers));
     g_config_mgr.watcher_count = 0;
-    if (safe_strcpy(g_config_mgr.config_base_path, "./config", sizeof(g_config_mgr.config_base_path)) != 0) {
+    if (safe_strcpy(g_config_mgr.config_base_path, "./config",
+                    sizeof(g_config_mgr.config_base_path)) != 0) {
         agentos_mutex_destroy(&g_config_mgr.mutex);
         return AGENTOS_EINVAL;
     }
@@ -1347,7 +1386,8 @@ static agentos_error_t config_mgr_init(void) {
     return AGENTOS_SUCCESS;
 }
 
-static void compute_simple_checksum(const char* data, size_t len, char* out, size_t out_size) {
+static void compute_simple_checksum(const char *data, size_t len, char *out, size_t out_size)
+{
     uint64_t hash = 5381;
     for (size_t i = 0; i < len; i++) {
         hash = ((hash << 5) + hash) + (unsigned char)data[i];
@@ -1355,39 +1395,39 @@ static void compute_simple_checksum(const char* data, size_t len, char* out, siz
     snprintf(out, out_size, "%016llx", (unsigned long long)hash);
 }
 
-agentos_error_t agentos_config_load(
-    const char* service_name,
-    agentos_config_t** config
-) {
+agentos_error_t agentos_config_load(const char *service_name, agentos_config_t **config)
+{
     if (!service_name || !config) {
         return AGENTOS_EINVAL;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_config_load: null parameter");
 
     config_mgr_init();
 
     char config_path[MAX_CONFIG_PATH_LEN];
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-    snprintf(config_path, sizeof(config_path), "%s/%s.json",
-             g_config_mgr.config_base_path, service_name);
+    snprintf(config_path, sizeof(config_path), "%s/%s.json", g_config_mgr.config_base_path,
+             service_name);
 
-    FILE* fp = fopen(config_path, "rb");
+    FILE *fp = fopen(config_path, "rb");
     if (!fp) {
-        snprintf(config_path, sizeof(config_path), "%s/%s.yaml",
-                 g_config_mgr.config_base_path, service_name);
+        snprintf(config_path, sizeof(config_path), "%s/%s.yaml", g_config_mgr.config_base_path,
+                 service_name);
         fp = fopen(config_path, "rb");
     }
     if (!fp) {
-        snprintf(config_path, sizeof(config_path), "%s/%s.toml",
-                 g_config_mgr.config_base_path, service_name);
+        snprintf(config_path, sizeof(config_path), "%s/%s.toml", g_config_mgr.config_base_path,
+                 service_name);
         fp = fopen(config_path, "rb");
     }
 #pragma GCC diagnostic pop
 
-    agentos_config_t* cfg = (agentos_config_t*)AGENTOS_CALLOC(1, sizeof(agentos_config_t));
+    agentos_config_t *cfg = (agentos_config_t *)AGENTOS_CALLOC(1, sizeof(agentos_config_t));
     if (!cfg) {
         return AGENTOS_ENOMEM;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ENOMEM, "agentos_config_load: calloc config failed");
 
     if (!fp) {
         cfg->raw_config = AGENTOS_CALLOC(1, 1);
@@ -1414,7 +1454,7 @@ agentos_error_t agentos_config_load(
         return AGENTOS_SUCCESS;
     }
 
-    cfg->raw_config = (char*)AGENTOS_CALLOC(1, file_size + 1);
+    cfg->raw_config = (char *)AGENTOS_CALLOC(1, file_size + 1);
     if (!cfg->raw_config) {
         fclose(fp);
         AGENTOS_FREE(cfg);
@@ -1423,7 +1463,12 @@ agentos_error_t agentos_config_load(
 
     size_t bytes_read = fread(cfg->raw_config, 1, file_size, fp);
     fclose(fp);
-    if (bytes_read != (size_t)file_size) { AGENTOS_FREE(cfg->raw_config); AGENTOS_FREE(cfg); return AGENTOS_EIO; }
+    if (bytes_read != (size_t)file_size) {
+        AGENTOS_FREE(cfg->raw_config);
+        AGENTOS_FREE(cfg);
+        return AGENTOS_EIO;
+    }
+    AGENTOS_ERROR_HANDLE(AGENTOS_EIO, "agentos_config_load: fread size mismatch");
 
     cfg->config_size = bytes_read;
     cfg->raw_config[bytes_read] = '\0';
@@ -1433,16 +1478,14 @@ agentos_error_t agentos_config_load(
 
     *config = cfg;
 
-    LOG_INFO("Config loaded for service '%s': %zu bytes from %s",
-             service_name, bytes_read, config_path);
+    LOG_INFO("Config loaded for service '%s': %zu bytes from %s", service_name, bytes_read,
+             config_path);
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_config_watch(
-    const char* service_name,
-    agentos_config_change_callback_t callback,
-    void* user_data
-) {
+agentos_error_t agentos_config_watch(const char *service_name,
+                                     agentos_config_change_callback_t callback, void *user_data)
+{
     if (!service_name || !callback) {
         return AGENTOS_EINVAL;
     }
@@ -1466,7 +1509,7 @@ agentos_error_t agentos_config_watch(
         }
     }
 
-    config_watcher_t* watcher = &g_config_mgr.watchers[g_config_mgr.watcher_count];
+    config_watcher_t *watcher = &g_config_mgr.watchers[g_config_mgr.watcher_count];
     if (safe_strcpy(watcher->service_name, service_name, sizeof(watcher->service_name)) != 0) {
         agentos_mutex_unlock(&g_config_mgr.mutex);
         return AGENTOS_EINVAL;
@@ -1482,10 +1525,9 @@ agentos_error_t agentos_config_watch(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_config_unwatch(
-    const char* service_name,
-    agentos_config_change_callback_t callback
-) {
+agentos_error_t agentos_config_unwatch(const char *service_name,
+                                       agentos_config_change_callback_t callback)
+{
     if (!service_name) {
         return AGENTOS_EINVAL;
     }
@@ -1503,7 +1545,8 @@ agentos_error_t agentos_config_unwatch(
                 g_config_mgr.watchers[i].active = false;
 
                 if (i < g_config_mgr.watcher_count - 1) {
-                    g_config_mgr.watchers[i] = g_config_mgr.watchers[g_config_mgr.watcher_count - 1];
+                    g_config_mgr.watchers[i] =
+                        g_config_mgr.watchers[g_config_mgr.watcher_count - 1];
                 }
                 g_config_mgr.watcher_count--;
                 if (callback == NULL) {
@@ -1517,7 +1560,8 @@ agentos_error_t agentos_config_unwatch(
     return AGENTOS_SUCCESS;
 }
 
-void agentos_config_free(agentos_config_t* config) {
+void agentos_config_free(agentos_config_t *config)
+{
     if (!config) {
         return;
     }
@@ -1538,7 +1582,7 @@ typedef struct {
     agentos_service_t service;
     agentos_monitor_config_t config;
     agentos_degradation_handler_t degradation_handler;
-    void* degradation_user_data;
+    void *degradation_user_data;
     bool active;
     uint32_t consecutive_failures;
     uint32_t restart_attempts;
@@ -1556,7 +1600,8 @@ static struct {
     agentos_mutex_t mutex;
 } g_monitor = {0};
 
-static agentos_error_t monitor_init(void) {
+static agentos_error_t monitor_init(void)
+{
     if (g_monitor.initialized) {
         return AGENTOS_SUCCESS;
     }
@@ -1573,38 +1618,40 @@ static agentos_error_t monitor_init(void) {
     return AGENTOS_SUCCESS;
 }
 
-static void* monitor_thread_func(void* arg) {
-    monitored_service_t* mon = (monitored_service_t*)arg;
-    if (!mon || !mon->service) return NULL;
+static void *monitor_thread_func(void *arg)
+{
+    monitored_service_t *mon = (monitored_service_t *)arg;
+    if (!mon || !mon->service)
+        return NULL;
 
-    const char* svc_name = agentos_service_get_name(mon->service);
+    const char *svc_name = agentos_service_get_name(mon->service);
     uint32_t interval_ms = mon->config.healthcheck_interval_ms;
-    if (interval_ms == 0) interval_ms = 30000;
+    if (interval_ms == 0)
+        interval_ms = 30000;
 
     LOG_INFO("Monitor thread started for service '%s' (interval=%ums)", svc_name, interval_ms);
 
     while (!mon->stop_requested && mon->active) {
         agentos_sleep_ms(interval_ms);
 
-        if (mon->stop_requested || !mon->active) break;
+        if (mon->stop_requested || !mon->active)
+            break;
 
         agentos_error_t err = agentos_service_healthcheck(mon->service);
         mon->last_check_time = agentos_platform_get_time_ms();
 
         if (err != AGENTOS_SUCCESS) {
             mon->consecutive_failures++;
-            LOG_WARN("Service '%s' health check failed (consecutive: %u)",
-                     svc_name, mon->consecutive_failures);
+            LOG_WARN("Service '%s' health check failed (consecutive: %u)", svc_name,
+                     mon->consecutive_failures);
 
             if (mon->config.enable_degradation &&
-                mon->consecutive_failures >= mon->config.degradation_threshold &&
-                !mon->degraded && mon->degradation_handler) {
+                mon->consecutive_failures >= mon->config.degradation_threshold && !mon->degraded &&
+                mon->degradation_handler) {
                 mon->degraded = true;
                 char reason[128];
-                snprintf(reason, sizeof(reason),
-                         "consecutive_failures=%u >= threshold=%u",
-                         mon->consecutive_failures,
-                         mon->config.degradation_threshold);
+                snprintf(reason, sizeof(reason), "consecutive_failures=%u >= threshold=%u",
+                         mon->consecutive_failures, mon->config.degradation_threshold);
                 mon->degradation_handler(mon->service, reason, mon->degradation_user_data);
                 LOG_WARN("Service '%s' degraded: %s", svc_name, reason);
             }
@@ -1614,9 +1661,8 @@ static void* monitor_thread_func(void* arg) {
                 uint64_t now = agentos_platform_get_time_ms();
                 if (now >= mon->next_restart_time) {
                     mon->restart_attempts++;
-                    LOG_INFO("Auto-restarting service '%s' (attempt %u/%u)",
-                             svc_name, mon->restart_attempts,
-                             mon->config.max_restart_attempts);
+                    LOG_INFO("Auto-restarting service '%s' (attempt %u/%u)", svc_name,
+                             mon->restart_attempts, mon->config.max_restart_attempts);
                     agentos_service_stop(mon->service, true);
                     agentos_error_t start_err = agentos_service_start(mon->service);
                     if (start_err == AGENTOS_SUCCESS) {
@@ -1629,14 +1675,15 @@ static void* monitor_thread_func(void* arg) {
                         if (backoff > mon->config.restart_backoff_max_ms)
                             backoff = mon->config.restart_backoff_max_ms;
                         mon->next_restart_time = now + backoff;
-                        LOG_ERROR("Service '%s' restart failed, next retry in %ums",
-                                  svc_name, backoff);
+                        LOG_ERROR("Service '%s' restart failed, next retry in %ums", svc_name,
+                                  backoff);
                     }
                 }
             }
         } else {
             if (mon->consecutive_failures > 0)
-                LOG_INFO("Service '%s' recovered after %u failures", svc_name, mon->consecutive_failures);
+                LOG_INFO("Service '%s' recovered after %u failures", svc_name,
+                         mon->consecutive_failures);
             mon->consecutive_failures = 0;
             mon->restart_attempts = 0;
             mon->degraded = false;
@@ -1647,10 +1694,9 @@ static void* monitor_thread_func(void* arg) {
     return NULL;
 }
 
-agentos_error_t agentos_service_monitor_start(
-    agentos_service_t service,
-    const agentos_monitor_config_t* config
-) {
+agentos_error_t agentos_service_monitor_start(agentos_service_t service,
+                                              const agentos_monitor_config_t *config)
+{
     if (!service || !config) {
         return AGENTOS_EINVAL;
     }
@@ -1676,22 +1722,18 @@ agentos_error_t agentos_service_monitor_start(
             g_monitor.services[i].last_check_time = agentos_platform_get_time_ms();
             g_monitor.services[i].next_restart_time = 0;
 
-            int thread_err = agentos_thread_create(
-                &g_monitor.services[i].monitor_thread,
-                monitor_thread_func,
-                &g_monitor.services[i]
-            );
+            int thread_err = agentos_thread_create(&g_monitor.services[i].monitor_thread,
+                                                   monitor_thread_func, &g_monitor.services[i]);
             if (thread_err != 0) {
                 g_monitor.services[i].active = false;
                 agentos_mutex_unlock(&g_monitor.mutex);
                 LOG_ERROR("Failed to create monitor thread for service '%s'",
-                         agentos_service_get_name(service));
+                          agentos_service_get_name(service));
                 return DAEMON_EINIT;
             }
 
             agentos_mutex_unlock(&g_monitor.mutex);
-            LOG_INFO("Service monitoring updated for '%s'",
-                     agentos_service_get_name(service));
+            LOG_INFO("Service monitoring updated for '%s'", agentos_service_get_name(service));
             return AGENTOS_SUCCESS;
         }
     }
@@ -1701,7 +1743,7 @@ agentos_error_t agentos_service_monitor_start(
         return AGENTOS_ENOMEM;
     }
 
-    monitored_service_t* mon = &g_monitor.services[g_monitor.count];
+    monitored_service_t *mon = &g_monitor.services[g_monitor.count];
     mon->service = service;
     memcpy(&mon->config, config, sizeof(agentos_monitor_config_t));
     mon->degradation_handler = NULL;
@@ -1715,16 +1757,12 @@ agentos_error_t agentos_service_monitor_start(
     mon->stop_requested = 0;
     mon->monitor_thread = (agentos_thread_t)0;
 
-    int thread_err = agentos_thread_create(
-        &mon->monitor_thread,
-        monitor_thread_func,
-        mon
-    );
+    int thread_err = agentos_thread_create(&mon->monitor_thread, monitor_thread_func, mon);
     if (thread_err != 0) {
         mon->active = false;
         agentos_mutex_unlock(&g_monitor.mutex);
         LOG_ERROR("Failed to create monitor thread for service '%s'",
-                 agentos_service_get_name(service));
+                  agentos_service_get_name(service));
         return DAEMON_EINIT;
     }
 
@@ -1733,13 +1771,13 @@ agentos_error_t agentos_service_monitor_start(
     agentos_mutex_unlock(&g_monitor.mutex);
 
     LOG_INFO("Service monitoring started for '%s' (interval=%ums, auto_restart=%s)",
-             agentos_service_get_name(service),
-             config->healthcheck_interval_ms,
+             agentos_service_get_name(service), config->healthcheck_interval_ms,
              config->auto_restart ? "true" : "false");
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_service_monitor_stop(agentos_service_t service) {
+agentos_error_t agentos_service_monitor_stop(agentos_service_t service)
+{
     if (!service) {
         return AGENTOS_EINVAL;
     }
@@ -1772,7 +1810,8 @@ agentos_error_t agentos_service_monitor_stop(agentos_service_t service) {
                     if (j < g_monitor.count - 1) {
                         g_monitor.services[j] = g_monitor.services[g_monitor.count - 1];
                     }
-                    memset(&g_monitor.services[g_monitor.count - 1], 0, sizeof(monitored_service_t));
+                    memset(&g_monitor.services[g_monitor.count - 1], 0,
+                           sizeof(monitored_service_t));
                     g_monitor.count--;
                     break;
                 }
@@ -1787,11 +1826,10 @@ agentos_error_t agentos_service_monitor_stop(agentos_service_t service) {
     return AGENTOS_ENOENT;
 }
 
-agentos_error_t agentos_service_set_degradation_handler(
-    agentos_service_t service,
-    agentos_degradation_handler_t handler,
-    void* user_data
-) {
+agentos_error_t agentos_service_set_degradation_handler(agentos_service_t service,
+                                                        agentos_degradation_handler_t handler,
+                                                        void *user_data)
+{
     if (!service || !handler) {
         return AGENTOS_EINVAL;
     }
@@ -1805,14 +1843,13 @@ agentos_error_t agentos_service_set_degradation_handler(
             g_monitor.services[i].degradation_handler = handler;
             g_monitor.services[i].degradation_user_data = user_data;
             agentos_mutex_unlock(&g_monitor.mutex);
-            LOG_INFO("Degradation handler set for service '%s'",
-                     agentos_service_get_name(service));
+            LOG_INFO("Degradation handler set for service '%s'", agentos_service_get_name(service));
             return AGENTOS_SUCCESS;
         }
     }
 
     if (g_monitor.count < MAX_MONITORED_SERVICES) {
-        monitored_service_t* mon = &g_monitor.services[g_monitor.count];
+        monitored_service_t *mon = &g_monitor.services[g_monitor.count];
         mon->service = service;
         mon->degradation_handler = handler;
         mon->degradation_user_data = user_data;
@@ -1842,19 +1879,22 @@ typedef struct {
 
 #ifdef AGENTOS_HAS_CURL
 typedef struct {
-    char* data;
+    char *data;
     size_t size;
     size_t capacity;
 } curl_response_buf_t;
 
-static size_t curl_write_cb(void* ptr, size_t size, size_t nmemb, void* userdata) {
-    curl_response_buf_t* buf = (curl_response_buf_t*)userdata;
+static size_t curl_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
+{
+    curl_response_buf_t *buf = (curl_response_buf_t *)userdata;
     size_t total = size * nmemb;
     if (buf->size + total + 1 > buf->capacity) {
         size_t new_cap = buf->capacity == 0 ? 4096 : buf->capacity;
-        while (new_cap < buf->size + total + 1) new_cap *= 2;
-        char* new_data = (char*)AGENTOS_REALLOC(buf->data, new_cap);
-        if (!new_data) return 0;
+        while (new_cap < buf->size + total + 1)
+            new_cap *= 2;
+        char *new_data = (char *)AGENTOS_REALLOC(buf->data, new_cap);
+        if (!new_data)
+            return 0;
         buf->data = new_data;
         buf->capacity = new_cap;
     }
@@ -1865,13 +1905,10 @@ static size_t curl_write_cb(void* ptr, size_t size, size_t nmemb, void* userdata
 }
 #endif
 
-static agentos_error_t http_client_call(
-    const char* service_name,
-    const char* method,
-    const char* params_json,
-    char** response_json,
-    uint32_t timeout_ms
-) {
+static agentos_error_t http_client_call(const char *service_name, const char *method,
+                                        const char *params_json, char **response_json,
+                                        uint32_t timeout_ms)
+{
     if (!service_name || !method || !response_json) {
         return AGENTOS_EINVAL;
     }
@@ -1882,14 +1919,13 @@ static agentos_error_t http_client_call(
 
     agentos_service_t svc = agentos_service_find(service_name);
     if (svc) {
-        agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+        agentos_service_internal_t *internal = (agentos_service_internal_t *)svc;
 
         if (internal->iface.handle_request) {
             agentos_error_t err = internal->iface.handle_request(
                 svc, method, params_json, response_json, internal->user_data);
             if (err != AGENTOS_SUCCESS) {
-                LOG_WARN("Service '%s' handle_request('%s') failed: %d",
-                         service_name, method, err);
+                LOG_WARN("Service '%s' handle_request('%s') failed: %d", service_name, method, err);
                 return err;
             }
             if (!*response_json) {
@@ -1904,8 +1940,8 @@ static agentos_error_t http_client_call(
 
         agentos_svc_state_t state = agentos_service_get_state(svc);
         if (state != AGENTOS_SVC_STATE_RUNNING) {
-            LOG_WARN("Service '%s' not running (state=%s), cannot handle request",
-                     service_name, agentos_svc_state_to_string(state));
+            LOG_WARN("Service '%s' not running (state=%s), cannot handle request", service_name,
+                     agentos_svc_state_to_string(state));
             return DAEMON_ESTATE;
         }
 
@@ -1917,13 +1953,13 @@ static agentos_error_t http_client_call(
     snprintf(url, sizeof(url), "http://%s/api/%s", service_name, method);
 
 #ifdef AGENTOS_HAS_CURL
-    CURL* curl = curl_easy_init();
+    CURL *curl = curl_easy_init();
     if (!curl) {
         LOG_ERROR("Failed to initialize CURL for remote call to '%s'", service_name);
         return DAEMON_EINIT;
     }
 
-    struct curl_slist* headers = NULL;
+    struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -1934,7 +1970,7 @@ static agentos_error_t http_client_call(
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, params_json);
     }
 
-    curl_response_buf_t resp_buf = { NULL, 0, 0 };
+    curl_response_buf_t resp_buf = {NULL, 0, 0};
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp_buf);
 
@@ -1972,13 +2008,10 @@ static agentos_error_t http_client_call(
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t http_client_stream(
-    const char* service_name,
-    const char* method,
-    const char* params_json,
-    agentos_stream_callback_t callback,
-    void* user_data
-) {
+static agentos_error_t http_client_stream(const char *service_name, const char *method,
+                                          const char *params_json,
+                                          agentos_stream_callback_t callback, void *user_data)
+{
     if (!service_name || !method || !callback) {
         return AGENTOS_EINVAL;
     }
@@ -1987,23 +2020,23 @@ static agentos_error_t http_client_stream(
 
     agentos_service_t svc = agentos_service_find(service_name);
     if (svc) {
-        agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+        agentos_service_internal_t *internal = (agentos_service_internal_t *)svc;
 
         if (internal->iface.handle_request) {
-            char* response = NULL;
-            agentos_error_t err = internal->iface.handle_request(
-                svc, method, params_json, &response, internal->user_data);
+            char *response = NULL;
+            agentos_error_t err = internal->iface.handle_request(svc, method, params_json,
+                                                                 &response, internal->user_data);
             if (err == AGENTOS_SUCCESS && response) {
                 callback(response, strlen(response), user_data);
                 AGENTOS_FREE(response);
             } else {
-                const char* err_json = "{\"error\":\"stream_failed\"}";
+                const char *err_json = "{\"error\":\"stream_failed\"}";
                 callback(err_json, strlen(err_json), user_data);
             }
             return err;
         }
 
-        const char* err_json = "{\"error\":\"no_stream_handler\"}";
+        const char *err_json = "{\"error\":\"no_stream_handler\"}";
         callback(err_json, strlen(err_json), user_data);
         return AGENTOS_ESERVICE;
     }
@@ -2011,31 +2044,27 @@ static agentos_error_t http_client_stream(
     return AGENTOS_ENOENT;
 }
 
-static agentos_error_t memory_client_call(
-    const char* service_name,
-    const char* method,
-    const char* params_json,
-    char** response_json,
-    uint32_t timeout_ms
-) {
+static agentos_error_t memory_client_call(const char *service_name, const char *method,
+                                          const char *params_json, char **response_json,
+                                          uint32_t timeout_ms)
+{
     if (!service_name || !method || !response_json) {
         return AGENTOS_EINVAL;
     }
 
     agentos_service_t svc = agentos_service_find(service_name);
     if (svc) {
-        agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+        agentos_service_internal_t *internal = (agentos_service_internal_t *)svc;
 
         if (internal->iface.handle_request) {
             agentos_error_t err = internal->iface.handle_request(
                 svc, method, params_json, response_json, internal->user_data);
             if (err != AGENTOS_SUCCESS) {
-                LOG_WARN("Service '%s' handle_request('%s') failed: %d",
-                         service_name, method, err);
+                LOG_WARN("Service '%s' handle_request('%s') failed: %d", service_name, method, err);
                 return err;
             }
             if (!*response_json) {
-                *response_json = (char*)AGENTOS_CALLOC(1, 2);
+                *response_json = (char *)AGENTOS_CALLOC(1, 2);
                 if (*response_json) {
                     (*response_json)[0] = '{';
                     (*response_json)[1] = '}';
@@ -2053,8 +2082,8 @@ static agentos_error_t memory_client_call(
     char rpc_method[256];
     snprintf(rpc_method, sizeof(rpc_method), "%s.%s", service_name, method);
 
-    int rpc_err = svc_rpc_call(rpc_method, params_json, response_json,
-                               timeout_ms ? timeout_ms : 30000);
+    int rpc_err =
+        svc_rpc_call(rpc_method, params_json, response_json, timeout_ms ? timeout_ms : 30000);
     if (rpc_err != 0 || !(*response_json)) {
         LOG_WARN("IPC RPC call to '%s' failed: %d", rpc_method, rpc_err);
         return AGENTOS_EIO;
@@ -2064,13 +2093,10 @@ static agentos_error_t memory_client_call(
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t memory_client_stream(
-    const char* service_name,
-    const char* method,
-    const char* params_json,
-    agentos_stream_callback_t callback,
-    void* user_data
-) {
+static agentos_error_t memory_client_stream(const char *service_name, const char *method,
+                                            const char *params_json,
+                                            agentos_stream_callback_t callback, void *user_data)
+{
     if (!service_name || !method || !callback) {
         return AGENTOS_EINVAL;
     }
@@ -2080,37 +2106,35 @@ static agentos_error_t memory_client_stream(
         return AGENTOS_ENOENT;
     }
 
-    agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+    agentos_service_internal_t *internal = (agentos_service_internal_t *)svc;
 
     if (internal->iface.handle_request) {
-        char* response = NULL;
-        agentos_error_t err = internal->iface.handle_request(
-            svc, method, params_json, &response, internal->user_data);
+        char *response = NULL;
+        agentos_error_t err = internal->iface.handle_request(svc, method, params_json, &response,
+                                                             internal->user_data);
         if (err == AGENTOS_SUCCESS && response) {
             callback(response, strlen(response), user_data);
             AGENTOS_FREE(response);
         } else {
-            const char* err_json = "{\"error\":\"stream_failed\"}";
+            const char *err_json = "{\"error\":\"stream_failed\"}";
             callback(err_json, strlen(err_json), user_data);
         }
         return err;
     }
 
-    const char* err_json = "{\"error\":\"no_stream_handler\"}";
+    const char *err_json = "{\"error\":\"no_stream_handler\"}";
     callback(err_json, strlen(err_json), user_data);
     return AGENTOS_ESERVICE;
 }
 
-agentos_error_t agentos_service_client_create(
-    agentos_svc_protocol_type_t protocol,
-    const char* config,
-    agentos_service_client_t** client
-) {
+agentos_error_t agentos_service_client_create(agentos_svc_protocol_type_t protocol,
+                                              const char *config, agentos_service_client_t **client)
+{
     if (!client) {
         return AGENTOS_EINVAL;
     }
 
-    client_internal_t* internal = (client_internal_t*)AGENTOS_CALLOC(1, sizeof(client_internal_t));
+    client_internal_t *internal = (client_internal_t *)AGENTOS_CALLOC(1, sizeof(client_internal_t));
     if (!internal) {
         return AGENTOS_ENOMEM;
     }
@@ -2124,32 +2148,34 @@ agentos_error_t agentos_service_client_create(
             return AGENTOS_EINVAL;
         }
     } else {
-        if (safe_strcpy(internal->base_url, "http://localhost:8080", sizeof(internal->base_url)) != 0) {
+        if (safe_strcpy(internal->base_url, "http://localhost:8080", sizeof(internal->base_url)) !=
+            0) {
             AGENTOS_FREE(internal);
             return AGENTOS_EINVAL;
         }
     }
 
-    agentos_service_client_t* cli = (agentos_service_client_t*)AGENTOS_CALLOC(1, sizeof(agentos_service_client_t));
+    agentos_service_client_t *cli =
+        (agentos_service_client_t *)AGENTOS_CALLOC(1, sizeof(agentos_service_client_t));
     if (!cli) {
         AGENTOS_FREE(internal);
         return AGENTOS_ENOMEM;
     }
 
     switch (protocol) {
-        case SVC_PROTO_HTTP:
-            cli->call = http_client_call;
-            cli->stream = http_client_stream;
-            break;
-        case SVC_PROTO_MEMORY:
-            cli->call = memory_client_call;
-            cli->stream = memory_client_stream;
-            break;
-        default:
-            cli->call = http_client_call;
-            cli->stream = http_client_stream;
-            LOG_WARN("Protocol %d not fully implemented, using HTTP fallback", protocol);
-            break;
+    case SVC_PROTO_HTTP:
+        cli->call = http_client_call;
+        cli->stream = http_client_stream;
+        break;
+    case SVC_PROTO_MEMORY:
+        cli->call = memory_client_call;
+        cli->stream = memory_client_stream;
+        break;
+    default:
+        cli->call = http_client_call;
+        cli->stream = http_client_stream;
+        LOG_WARN("Protocol %d not fully implemented, using HTTP fallback", protocol);
+        break;
     }
 
     *client = cli;
@@ -2159,7 +2185,8 @@ agentos_error_t agentos_service_client_create(
     return AGENTOS_SUCCESS;
 }
 
-void agentos_service_client_destroy(agentos_service_client_t* client) {
+void agentos_service_client_destroy(agentos_service_client_t *client)
+{
     if (!client) {
         return;
     }

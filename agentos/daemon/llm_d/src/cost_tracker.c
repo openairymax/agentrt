@@ -7,26 +7,29 @@
 
 #include "cost_tracker.h"
 #include "platform.h"
+
 #include <stdlib.h>
 #include <string.h>
 
 typedef struct model_cost {
-    char* model;
+    char *model;
     uint64_t prompt_tokens;
     uint64_t completion_tokens;
     double cost_usd;
-    struct model_cost* next;
+    struct model_cost *next;
 } model_cost_t;
 
 struct cost_tracker {
-    pricing_rule_t* rules;
+    pricing_rule_t *rules;
     int rule_count;
-    model_cost_t* models;
+    model_cost_t *models;
     agentos_mutex_t lock;
 };
 
-static int match_rule(const char* model, const pricing_rule_t* rule) {
-    if (!rule || !rule->model_pattern || !model) return 0;
+static int match_rule(const char *model, const pricing_rule_t *rule)
+{
+    if (!rule || !rule->model_pattern || !model)
+        return 0;
     size_t len = strlen(rule->model_pattern);
     if (rule->model_pattern[len - 1] == '*') {
         return strncmp(model, rule->model_pattern, len - 1) == 0;
@@ -34,8 +37,9 @@ static int match_rule(const char* model, const pricing_rule_t* rule) {
     return strcmp(model, rule->model_pattern) == 0;
 }
 
-static void get_price(const cost_tracker_t* ct, const char* model,
-                      double* input_price, double* output_price) {
+static void get_price(const cost_tracker_t *ct, const char *model, double *input_price,
+                      double *output_price)
+{
     *input_price = 0.001;
     *output_price = 0.002;
     for (int i = 0; i < ct->rule_count; ++i) {
@@ -47,9 +51,11 @@ static void get_price(const cost_tracker_t* ct, const char* model,
     }
 }
 
-cost_tracker_t* cost_tracker_create(const pricing_rule_t* rules, int rule_count) {
-    cost_tracker_t* ct = AGENTOS_CALLOC(1, sizeof(cost_tracker_t));
-    if (!ct) return NULL;
+cost_tracker_t *cost_tracker_create(const pricing_rule_t *rules, int rule_count)
+{
+    cost_tracker_t *ct = AGENTOS_CALLOC(1, sizeof(cost_tracker_t));
+    if (!ct)
+        return NULL;
     if (rule_count > 0) {
         ct->rules = AGENTOS_MALLOC(rule_count * sizeof(pricing_rule_t));
         if (!ct->rules) {
@@ -63,12 +69,14 @@ cost_tracker_t* cost_tracker_create(const pricing_rule_t* rules, int rule_count)
     return ct;
 }
 
-void cost_tracker_destroy(cost_tracker_t* ct) {
-    if (!ct) return;
+void cost_tracker_destroy(cost_tracker_t *ct)
+{
+    if (!ct)
+        return;
     agentos_mutex_lock(&ct->lock);
-    model_cost_t* m = ct->models;
+    model_cost_t *m = ct->models;
     while (m) {
-        model_cost_t* next = m->next;
+        model_cost_t *next = m->next;
         AGENTOS_FREE(m->model);
         AGENTOS_FREE(m);
         m = next;
@@ -79,13 +87,16 @@ void cost_tracker_destroy(cost_tracker_t* ct) {
     AGENTOS_FREE(ct);
 }
 
-void cost_tracker_add(cost_tracker_t* ct, const char* model,
-                      uint32_t prompt_tokens, uint32_t completion_tokens) {
-    if (!ct || !model) return;
+void cost_tracker_add(cost_tracker_t *ct, const char *model, uint32_t prompt_tokens,
+                      uint32_t completion_tokens)
+{
+    if (!ct || !model)
+        return;
     agentos_mutex_lock(&ct->lock);
-    model_cost_t* m = ct->models;
+    model_cost_t *m = ct->models;
     while (m) {
-        if (strcmp(m->model, model) == 0) break;
+        if (strcmp(m->model, model) == 0)
+            break;
         m = m->next;
     }
     if (!m) {
@@ -103,19 +114,20 @@ void cost_tracker_add(cost_tracker_t* ct, const char* model,
 
     double in_price, out_price;
     get_price(ct, model, &in_price, &out_price);
-    m->cost_usd += (prompt_tokens / 1000.0) * in_price +
-                   (completion_tokens / 1000.0) * out_price;
+    m->cost_usd += (prompt_tokens / 1000.0) * in_price + (completion_tokens / 1000.0) * out_price;
     agentos_mutex_unlock(&ct->lock);
 }
 
-cJSON* cost_tracker_export(cost_tracker_t* ct) {
-    if (!ct) return cJSON_CreateObject();
+cJSON *cost_tracker_export(cost_tracker_t *ct)
+{
+    if (!ct)
+        return cJSON_CreateObject();
     agentos_mutex_lock(&ct->lock);
-    cJSON* root = cJSON_CreateObject();
-    cJSON* arr = cJSON_CreateArray();
-    model_cost_t* m = ct->models;
+    cJSON *root = cJSON_CreateObject();
+    cJSON *arr = cJSON_CreateArray();
+    model_cost_t *m = ct->models;
     while (m) {
-        cJSON* obj = cJSON_CreateObject();
+        cJSON *obj = cJSON_CreateObject();
         cJSON_AddStringToObject(obj, "model", m->model);
         cJSON_AddNumberToObject(obj, "prompt_tokens", m->prompt_tokens);
         cJSON_AddNumberToObject(obj, "completion_tokens", m->completion_tokens);

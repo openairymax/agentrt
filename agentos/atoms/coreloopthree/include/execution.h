@@ -21,6 +21,7 @@
 #include "agentos.h"
 #include "cognition.h"
 #include "compensation.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -55,20 +56,20 @@ typedef enum {
  * @brief 执行任务结构
  */
 typedef struct agentos_task {
-    char* task_id;                    /**< 任务ID */
-    size_t task_id_len;               /**< ID长度 */
-    char* task_agent_id;              /**< 分配的Agent ID */
-    size_t task_agent_id_len;         /**< Agent ID长度 */
+    char *task_id;                     /**< 任务ID */
+    size_t task_id_len;                /**< ID长度 */
+    char *task_agent_id;               /**< 分配的Agent ID */
+    size_t task_agent_id_len;          /**< Agent ID长度 */
     agentos_task_status_t task_status; /**< 任务状态 */
-    void* task_input;                 /**< 输入数据 */
-    void* task_output;                /**< 输出数据 */
-    uint64_t task_created_ns;         /**< 创建时间（纳秒） */
-    uint64_t task_started_ns;         /**< 开始时间 */
-    uint64_t task_completed_ns;       /**< 完成时间 */
-    uint32_t task_timeout_ms;         /**< 超时时间 */
-    uint32_t task_retry_count;        /**< 已重试次数 */
-    uint32_t task_max_retries;        /**< 最大重试次数 */
-    char* task_error_msg;             /**< 错误信息 */
+    void *task_input;                  /**< 输入数据 */
+    void *task_output;                 /**< 输出数据 */
+    uint64_t task_created_ns;          /**< 创建时间（纳秒） */
+    uint64_t task_started_ns;          /**< 开始时间 */
+    uint64_t task_completed_ns;        /**< 完成时间 */
+    uint32_t task_timeout_ms;          /**< 超时时间 */
+    uint32_t task_retry_count;         /**< 已重试次数 */
+    uint32_t task_max_retries;         /**< 最大重试次数 */
+    char *task_error_msg;              /**< 错误信息 */
 } agentos_task_t;
 #define AGENTOS_TASK_T_DEFINED
 
@@ -76,7 +77,7 @@ typedef struct agentos_task {
  * @brief 执行单元基类（类似抽象接口）
  */
 struct agentos_execution_unit {
-    void* execution_unit_data;                        /**< 私有数据 */
+    void *execution_unit_data; /**< 私有数据 */
     /**
      * @brief 执行方法
      * @param unit 单元对象
@@ -84,17 +85,16 @@ struct agentos_execution_unit {
      * @param out_output 输出数据（需分配）
      * @return agentos_error_t
      */
-    agentos_error_t (*execution_unit_execute)(agentos_execution_unit_t* unit,
-                               const void* input,
-                               void** out_output);
+    agentos_error_t (*execution_unit_execute)(agentos_execution_unit_t *unit, const void *input,
+                                              void **out_output);
     /**
      * @brief 释放单元资源
      */
-    void (*execution_unit_destroy)(agentos_execution_unit_t* unit);
+    void (*execution_unit_destroy)(agentos_execution_unit_t *unit);
     /**
      * @brief 获取单元元数据
      */
-    const char* (*execution_unit_get_metadata)(agentos_execution_unit_t* unit);
+    const char *(*execution_unit_get_metadata)(agentos_execution_unit_t *unit);
 };
 
 /* ==================== 执行引擎接口 ==================== */
@@ -111,9 +111,8 @@ struct agentos_execution_unit {
  * @reentrant 否
  * @see agentos_execution_destroy()
  */
-AGENTOS_API agentos_error_t agentos_execution_create(
-    uint32_t max_concurrency,
-    agentos_execution_engine_t** out_engine);
+AGENTOS_API agentos_error_t agentos_execution_create(uint32_t max_concurrency,
+                                                     agentos_execution_engine_t **out_engine);
 
 /**
  * @brief 销毁执行引擎
@@ -125,7 +124,7 @@ AGENTOS_API agentos_error_t agentos_execution_create(
  * @reentrant 否
  * @see agentos_execution_create()
  */
-AGENTOS_API void agentos_execution_destroy(agentos_execution_engine_t* engine);
+AGENTOS_API void agentos_execution_destroy(agentos_execution_engine_t *engine);
 
 /**
  * @brief 注册执行单元
@@ -140,10 +139,9 @@ AGENTOS_API void agentos_execution_destroy(agentos_execution_engine_t* engine);
  * @reentrant 否
  * @see agentos_execution_unregister_unit()
  */
-AGENTOS_API agentos_error_t agentos_execution_register_unit(
-    agentos_execution_engine_t* engine,
-    const char* name,
-    agentos_execution_unit_t unit);
+AGENTOS_API agentos_error_t agentos_execution_register_unit(agentos_execution_engine_t *engine,
+                                                            const char *name,
+                                                            agentos_execution_unit_t unit);
 
 /**
  * @brief 注销执行单元
@@ -156,9 +154,8 @@ AGENTOS_API agentos_error_t agentos_execution_register_unit(
  * @reentrant 否
  * @see agentos_execution_register_unit()
  */
-AGENTOS_API void agentos_execution_unregister_unit(
-    agentos_execution_engine_t* engine,
-    const char* name);
+AGENTOS_API void agentos_execution_unregister_unit(agentos_execution_engine_t *engine,
+                                                   const char *name);
 
 /**
  * @brief 提交任务执行
@@ -179,10 +176,9 @@ AGENTOS_API void agentos_execution_unregister_unit(
  *
  * @see agentos_execution_query(), agentos_execution_wait()
  */
-AGENTOS_API agentos_error_t agentos_execution_submit(
-    agentos_execution_engine_t* engine,
-    const agentos_task_t* task,
-    char** out_task_id);
+AGENTOS_API agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
+                                                     const agentos_task_t *task,
+                                                     char **out_task_id);
 
 /**
  * @brief 查询任务状态
@@ -196,10 +192,9 @@ AGENTOS_API agentos_error_t agentos_execution_submit(
  * @reentrant 否
  * @see agentos_execution_submit()
  */
-AGENTOS_API agentos_error_t agentos_execution_query(
-    agentos_execution_engine_t* engine,
-    const char* task_id,
-    agentos_task_status_t* out_status);
+AGENTOS_API agentos_error_t agentos_execution_query(agentos_execution_engine_t *engine,
+                                                    const char *task_id,
+                                                    agentos_task_status_t *out_status);
 
 /**
  * @brief 等待任务完成
@@ -215,11 +210,9 @@ AGENTOS_API agentos_error_t agentos_execution_query(
  * @reentrant 否
  * @see agentos_task_free()
  */
-AGENTOS_API agentos_error_t agentos_execution_wait(
-    agentos_execution_engine_t* engine,
-    const char* task_id,
-    uint32_t timeout_ms,
-    agentos_task_t** out_result);
+AGENTOS_API agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine,
+                                                   const char *task_id, uint32_t timeout_ms,
+                                                   agentos_task_t **out_result);
 
 /**
  * @brief 取消任务
@@ -232,9 +225,8 @@ AGENTOS_API agentos_error_t agentos_execution_wait(
  * @reentrant 否
  * @see agentos_execution_submit()
  */
-AGENTOS_API agentos_error_t agentos_execution_cancel(
-    agentos_execution_engine_t* engine,
-    const char* task_id);
+AGENTOS_API agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine,
+                                                     const char *task_id);
 
 /**
  * @brief 获取任务结果
@@ -249,10 +241,9 @@ AGENTOS_API agentos_error_t agentos_execution_cancel(
  * @reentrant 否
  * @see agentos_task_free()
  */
-AGENTOS_API agentos_error_t agentos_execution_get_result(
-    agentos_execution_engine_t* engine,
-    const char* task_id,
-    agentos_task_t** out_result);
+AGENTOS_API agentos_error_t agentos_execution_get_result(agentos_execution_engine_t *engine,
+                                                         const char *task_id,
+                                                         agentos_task_t **out_result);
 
 /**
  * @brief 释放任务结果（递减引用计数，当计数为0时释放内部结构）
@@ -264,7 +255,7 @@ AGENTOS_API agentos_error_t agentos_execution_get_result(
  * @reentrant 否
  * @see agentos_execution_wait(), agentos_execution_get_result()
  */
-AGENTOS_API void agentos_task_free(agentos_task_t* task);
+AGENTOS_API void agentos_task_free(agentos_task_t *task);
 
 /* ==================== 补偿事务接口 ==================== */
 
@@ -279,8 +270,7 @@ AGENTOS_API void agentos_task_free(agentos_task_t* task);
  * @reentrant 否
  * @see agentos_compensation_destroy()
  */
-AGENTOS_API agentos_error_t agentos_compensation_create(
-    agentos_compensation_t** out_manager);
+AGENTOS_API agentos_error_t agentos_compensation_create(agentos_compensation_t **out_manager);
 
 /**
  * @brief 销毁补偿管理器
@@ -292,7 +282,7 @@ AGENTOS_API agentos_error_t agentos_compensation_create(
  * @reentrant 否
  * @see agentos_compensation_create()
  */
-AGENTOS_API void agentos_compensation_destroy(agentos_compensation_t* manager);
+AGENTOS_API void agentos_compensation_destroy(agentos_compensation_t *manager);
 
 /**
  * @brief 注册可补偿操作
@@ -308,11 +298,10 @@ AGENTOS_API void agentos_compensation_destroy(agentos_compensation_t* manager);
  * @reentrant 否
  * @see agentos_compensation_compensate()
  */
-AGENTOS_API agentos_error_t agentos_compensation_register(
-    agentos_compensation_t* manager,
-    const char* action_id,
-    const char* compensator_id,
-    const void* input);
+AGENTOS_API agentos_error_t agentos_compensation_register(agentos_compensation_t *manager,
+                                                          const char *action_id,
+                                                          const char *compensator_id,
+                                                          const void *input);
 
 /**
  * @brief 执行补偿（回滚）
@@ -325,9 +314,8 @@ AGENTOS_API agentos_error_t agentos_compensation_register(
  * @reentrant 否
  * @see agentos_compensation_register()
  */
-AGENTOS_API agentos_error_t agentos_compensation_compensate(
-    agentos_compensation_t* manager,
-    const char* action_id);
+AGENTOS_API agentos_error_t agentos_compensation_compensate(agentos_compensation_t *manager,
+                                                            const char *action_id);
 
 /**
  * @brief 获取待人工介入的队列
@@ -341,10 +329,9 @@ AGENTOS_API agentos_error_t agentos_compensation_compensate(
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_compensation_get_human_queue(
-    agentos_compensation_t* manager,
-    char*** out_actions,
-    size_t* out_count);
+AGENTOS_API agentos_error_t agentos_compensation_get_human_queue(agentos_compensation_t *manager,
+                                                                 char ***out_actions,
+                                                                 size_t *out_count);
 
 /**
  * @brief 获取执行引擎健康状态
@@ -357,9 +344,8 @@ AGENTOS_API agentos_error_t agentos_compensation_get_human_queue(
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否
  */
-AGENTOS_API agentos_error_t agentos_execution_health_check(
-    agentos_execution_engine_t* engine,
-    char** out_json);
+AGENTOS_API agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engine,
+                                                           char **out_json);
 
 /**
  * @brief 设置执行引擎的反馈回调
@@ -377,10 +363,9 @@ AGENTOS_API agentos_error_t agentos_execution_health_check(
  *   - 1 (轮次内): 任务重试/补偿触发
  *   - 2 (跨轮次): 统计信息更新
  */
-AGENTOS_API void agentos_execution_set_feedback_callback(
-    agentos_execution_engine_t* engine,
-    agentos_feedback_callback_t callback,
-    void* user_data);
+AGENTOS_API void agentos_execution_set_feedback_callback(agentos_execution_engine_t *engine,
+                                                         agentos_feedback_callback_t callback,
+                                                         void *user_data);
 
 #ifdef __cplusplus
 }

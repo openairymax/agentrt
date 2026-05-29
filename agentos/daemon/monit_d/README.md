@@ -1,6 +1,6 @@
 # Monitor Daemon — 监控告警守护进程
 
-> **Version**: AgentOS v0.0.5 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
+> **Version**: AgentOS v0.1.0 | **BAN-12**: 依赖由根 CMakeLists.txt 集中检测 | **BAN-33**: 遵循源外构建规则
 
 `daemon/monit_d/` 是 AgentOS 的监控告警守护进程，负责系统指标采集、健康检查和告警管理。
 

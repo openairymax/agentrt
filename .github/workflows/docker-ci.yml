@@ -4,13 +4,13 @@ on:
   push:
     branches: [main, develop, "release/*"]
     paths:
-      - "scripts/deployment/docker/**"
+      - "scripts/ops/deploy/**"
       - "agentos/**"
       - ".github/workflows/docker-ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
-      - "scripts/deployment/docker/**"
+      - "scripts/ops/deploy/**"
       - "agentos/**"
   workflow_dispatch:
     inputs:
@@ -30,7 +30,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: ${{ github.repository_owner }}/agentos
-  DOCKER_DIR: scripts/deployment/docker
+  DOCKER_DIR: scripts/ops/deploy
 
 jobs:
   lint:
@@ -112,10 +112,10 @@ jobs:
       matrix:
         include:
           - service: "kernel"
-            dockerfile: "scripts/deployment/docker/Dockerfile.kernel"
+            dockerfile: "scripts/ops/deploy/Dockerfile.kernel"
             target: "runtime"
           - service: "service"
-            dockerfile: "scripts/deployment/docker/Dockerfile.service"
+            dockerfile: "scripts/ops/deploy/Dockerfile.service"
             target: "gateway"
     steps:
       - name: Checkout
@@ -177,11 +177,11 @@ jobs:
       matrix:
         include:
           - service: "kernel"
-            dockerfile: "scripts/deployment/docker/Dockerfile.kernel"
+            dockerfile: "scripts/ops/deploy/Dockerfile.kernel"
             target: "runtime"
             platforms: "linux/amd64,linux/arm64"
           - service: "service"
-            dockerfile: "scripts/deployment/docker/Dockerfile.service"
+            dockerfile: "scripts/ops/deploy/Dockerfile.service"
             target: "gateway"
             platforms: "linux/amd64,linux/arm64"
     permissions:

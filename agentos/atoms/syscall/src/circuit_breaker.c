@@ -15,24 +15,26 @@
  * 5. 监控指标：熔断器状态和统计
  */
 
-#include "syscalls.h"
 #include "agentos.h"
 #include "logger.h"
+#include "syscalls.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
-#include <time.h>
+
 #include <string.h>
+#include <time.h>
 
 /**
  * @brief 熔断器状态
  */
 typedef enum circuit_state {
-    CIRCUIT_CLOSED = 0,    /**< 关闭状态（正常） */
-    CIRCUIT_OPEN = 1,      /**< 打开状态（熔断） */
-    CIRCUIT_HALF_OPEN = 2  /**< 半开状态（探测恢复） */
+    CIRCUIT_CLOSED = 0,   /**< 关闭状态（正常） */
+    CIRCUIT_OPEN = 1,     /**< 打开状态（熔断） */
+    CIRCUIT_HALF_OPEN = 2 /**< 半开状态（探测恢复） */
 } circuit_state_t;
 
 /**
@@ -47,19 +49,22 @@ typedef struct circuit_breaker {
     int timeout_ms;
     time_t last_failure_time;
     time_t last_state_change;
-    agentos_mutex_t* lock;
+    agentos_mutex_t *lock;
 } circuit_breaker_t;
 
-static circuit_breaker_t* g_circuit_breaker = NULL;
+static circuit_breaker_t *g_circuit_breaker = NULL;
 
 /**
  * @brief 创建熔断器
  */
-agentos_error_t agentos_sys_circuit_breaker_create(int failure_threshold, int timeout_ms) {
-    if (g_circuit_breaker) return AGENTOS_EALREADY;
+agentos_error_t agentos_sys_circuit_breaker_create(int failure_threshold, int timeout_ms)
+{
+    if (g_circuit_breaker)
+        return AGENTOS_EALREADY;
 
-    circuit_breaker_t* cb = (circuit_breaker_t*)AGENTOS_CALLOC(1, sizeof(circuit_breaker_t));
-    if (!cb) return AGENTOS_ENOMEM;
+    circuit_breaker_t *cb = (circuit_breaker_t *)AGENTOS_CALLOC(1, sizeof(circuit_breaker_t));
+    if (!cb)
+        return AGENTOS_ENOMEM;
 
     cb->state = CIRCUIT_CLOSED;
     cb->failure_threshold = failure_threshold > 0 ? failure_threshold : 5;
@@ -72,16 +77,18 @@ agentos_error_t agentos_sys_circuit_breaker_create(int failure_threshold, int ti
     }
 
     g_circuit_breaker = cb;
-    AGENTOS_LOG_INFO("Circuit breaker created (threshold=%d, timeout=%dms)",
-                    cb->failure_threshold, cb->timeout_ms);
+    AGENTOS_LOG_INFO("Circuit breaker created (threshold=%d, timeout=%dms)", cb->failure_threshold,
+                     cb->timeout_ms);
     return AGENTOS_SUCCESS;
 }
 
 /**
  * @brief 检查是否允许执行
  */
-agentos_error_t agentos_sys_circuit_breaker_check(void) {
-    if (!g_circuit_breaker) return AGENTOS_ENOTINIT;
+agentos_error_t agentos_sys_circuit_breaker_check(void)
+{
+    if (!g_circuit_breaker)
+        return AGENTOS_ENOTINIT;
 
     agentos_mutex_lock(g_circuit_breaker->lock);
 
@@ -106,8 +113,10 @@ agentos_error_t agentos_sys_circuit_breaker_check(void) {
 /**
  * @brief 记录成功
  */
-void agentos_sys_circuit_breaker_success(void) {
-    if (!g_circuit_breaker) return;
+void agentos_sys_circuit_breaker_success(void)
+{
+    if (!g_circuit_breaker)
+        return;
 
     agentos_mutex_lock(g_circuit_breaker->lock);
 
@@ -127,8 +136,10 @@ void agentos_sys_circuit_breaker_success(void) {
 /**
  * @brief 记录失败
  */
-void agentos_sys_circuit_breaker_failure(void) {
-    if (!g_circuit_breaker) return;
+void agentos_sys_circuit_breaker_failure(void)
+{
+    if (!g_circuit_breaker)
+        return;
 
     agentos_mutex_lock(g_circuit_breaker->lock);
 
@@ -151,8 +162,10 @@ void agentos_sys_circuit_breaker_failure(void) {
 /**
  * @brief 获取熔断器状态
  */
-agentos_error_t agentos_sys_circuit_breaker_get_state(int* out_state) {
-    if (!g_circuit_breaker || !out_state) return AGENTOS_EINVAL;
+agentos_error_t agentos_sys_circuit_breaker_get_state(int *out_state)
+{
+    if (!g_circuit_breaker || !out_state)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(g_circuit_breaker->lock);
     *out_state = g_circuit_breaker->state;
@@ -164,8 +177,10 @@ agentos_error_t agentos_sys_circuit_breaker_get_state(int* out_state) {
 /**
  * @brief 重置熔断器
  */
-void agentos_sys_circuit_breaker_reset(void) {
-    if (!g_circuit_breaker) return;
+void agentos_sys_circuit_breaker_reset(void)
+{
+    if (!g_circuit_breaker)
+        return;
 
     agentos_mutex_lock(g_circuit_breaker->lock);
 
@@ -181,8 +196,10 @@ void agentos_sys_circuit_breaker_reset(void) {
 /**
  * @brief 销毁熔断器
  */
-void agentos_sys_circuit_breaker_destroy(void) {
-    if (!g_circuit_breaker) return;
+void agentos_sys_circuit_breaker_destroy(void)
+{
+    if (!g_circuit_breaker)
+        return;
 
     AGENTOS_LOG_INFO("Circuit breaker destroyed");
 

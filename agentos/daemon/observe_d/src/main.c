@@ -4,20 +4,21 @@
  */
 
 #include "atomic_compat.h"
-#include "platform.h"
 #include "error.h"
+#include "platform.h"
 #include "svc_logger.h"
+
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <time.h>
 
 #ifndef _WIN32
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #endif
 
 #define OBSERVE_D_DEFAULT_PORT 8085
@@ -27,17 +28,14 @@
 #define OBSERVE_D_MAX_METRICS 256
 #define OBSERVE_D_HTTP_BACKLOG 16
 
-typedef enum {
-    OBSERVE_METRIC_GAUGE,
-    OBSERVE_METRIC_COUNTER
-} observe_metric_type_t;
+typedef enum { OBSERVE_METRIC_GAUGE, OBSERVE_METRIC_COUNTER } observe_metric_type_t;
 
 typedef struct {
-    char* name;
-    char* help;
+    char *name;
+    char *help;
     observe_metric_type_t type;
     double value;
-    char* unit;
+    char *unit;
     uint64_t updated_at;
 } observe_metric_t;
 
@@ -57,28 +55,30 @@ typedef struct {
     size_t metric_count;
     int tcp_port;
     int metrics_port;
-    char* socket_path;
+    char *socket_path;
 } observe_d_service_t;
 
 static observe_d_service_t g_service = {0};
 static atomic_int g_shutdown = 0;
 
-static void observe_d_signal_handler(int sig) {
-    
+static void observe_d_signal_handler(int sig)
+{
+
     atomic_store_explicit(&g_shutdown, 1, memory_order_seq_cst);
 }
 
-static observe_metric_t* observe_d_find_or_create_metric(observe_d_service_t* svc,
-                                                          const char* name) {
+static observe_metric_t *observe_d_find_or_create_metric(observe_d_service_t *svc, const char *name)
+{
     for (size_t i = 0; i < svc->metric_count; i++) {
         if (svc->metrics[i].name && strcmp(svc->metrics[i].name, name) == 0) {
             return &svc->metrics[i];
         }
     }
 
-    if (svc->metric_count >= OBSERVE_D_MAX_METRICS) return NULL;
+    if (svc->metric_count >= OBSERVE_D_MAX_METRICS)
+        return NULL;
 
-    observe_metric_t* m = &svc->metrics[svc->metric_count];
+    observe_metric_t *m = &svc->metrics[svc->metric_count];
     m->name = AGENTOS_STRDUP(name);
     m->help = AGENTOS_STRDUP(name);
     m->type = OBSERVE_METRIC_GAUGE;
@@ -89,16 +89,17 @@ static observe_metric_t* observe_d_find_or_create_metric(observe_d_service_t* sv
     return m;
 }
 
-static int observe_d_record_metric(observe_d_service_t* svc, const char* name,
-                                    double value, const char* unit,
-                                    observe_metric_type_t type) {
-    if (!svc || !name) return -1;
+static int observe_d_record_metric(observe_d_service_t *svc, const char *name, double value,
+                                   const char *unit, observe_metric_type_t type)
+{
+    if (!svc || !name)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&svc->lock);
-    observe_metric_t* m = observe_d_find_or_create_metric(svc, name);
+    observe_metric_t *m = observe_d_find_or_create_metric(svc, name);
     if (!m) {
         agentos_mutex_unlock(&svc->lock);
-        return -1;
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     if (type == OBSERVE_METRIC_COUNTER)
@@ -116,50 +117,51 @@ static int observe_d_record_metric(observe_d_service_t* svc, const char* name,
     return 0;
 }
 
-static int observe_d_format_prometheus(observe_d_service_t* svc,
-                                        char* buffer, size_t buffer_size) {
-    if (!svc || !buffer || buffer_size < 128) return -1;
+static int observe_d_format_prometheus(observe_d_service_t *svc, char *buffer, size_t buffer_size)
+{
+    if (!svc || !buffer || buffer_size < 128)
+        return AGENTOS_ERR_INVALID_PARAM;
 
     int off = 0;
     agentos_mutex_lock(&svc->lock);
 
     for (size_t i = 0; i < svc->metric_count && off < (int)(buffer_size - 256); i++) {
-        observe_metric_t* m = &svc->metrics[i];
-        if (!m->name) continue;
+        observe_metric_t *m = &svc->metrics[i];
+        if (!m->name)
+            continue;
 
-        const char* type_str = m->type == OBSERVE_METRIC_COUNTER ? "counter" : "gauge";
+        const char *type_str = m->type == OBSERVE_METRIC_COUNTER ? "counter" : "gauge";
 
         int added = snprintf(buffer + off, buffer_size - (size_t)off,
-            "# HELP %s %s\n"
-            "# TYPE %s %s\n"
-            "%s %.6f %llu\n",
-            m->name, m->help ? m->help : m->name,
-            m->name, type_str,
-            m->name, m->value,
-            (unsigned long long)(m->updated_at * 1000));
-        if (added > 0) off += added;
+                             "# HELP %s %s\n"
+                             "# TYPE %s %s\n"
+                             "%s %.6f %llu\n",
+                             m->name, m->help ? m->help : m->name, m->name, type_str, m->name,
+                             m->value, (unsigned long long)(m->updated_at * 1000));
+        if (added > 0)
+            off += added;
     }
 
     agentos_mutex_unlock(&svc->lock);
     return off;
 }
 
-static int observe_d_handle_http_request(observe_d_service_t* svc,
-                                          agentos_socket_t client_fd) {
+static int observe_d_handle_http_request(observe_d_service_t *svc, agentos_socket_t client_fd)
+{
     char buffer[OBSERVE_D_MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
     if (n <= 0) {
         agentos_socket_close(client_fd);
-        return -1;
+        return AGENTOS_ERR_UNKNOWN;
     }
     buffer[n] = '\0';
 
     svc->http_request_count++;
 
-    int is_metrics = (strstr(buffer, "GET /metrics") != NULL ||
-                      strstr(buffer, "GET /metrics HTTP") != NULL);
-    int is_health = (strstr(buffer, "GET /health") != NULL ||
-                     strstr(buffer, "GET /healthz") != NULL);
+    int is_metrics =
+        (strstr(buffer, "GET /metrics") != NULL || strstr(buffer, "GET /metrics HTTP") != NULL);
+    int is_health =
+        (strstr(buffer, "GET /health") != NULL || strstr(buffer, "GET /healthz") != NULL);
 
     if (is_metrics) {
         char metrics_buf[65536];
@@ -167,12 +169,12 @@ static int observe_d_handle_http_request(observe_d_service_t* svc,
 
         char header[512];
         int header_len = snprintf(header, sizeof(header),
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/plain; version=0.0.4\r\n"
-            "Content-Length: %d\r\n"
-            "Connection: close\r\n"
-            "\r\n",
-            metrics_len > 0 ? metrics_len : 0);
+                                  "HTTP/1.1 200 OK\r\n"
+                                  "Content-Type: text/plain; version=0.0.4\r\n"
+                                  "Content-Length: %d\r\n"
+                                  "Connection: close\r\n"
+                                  "\r\n",
+                                  metrics_len > 0 ? metrics_len : 0);
 
         agentos_socket_send(client_fd, header, (size_t)header_len);
         if (metrics_len > 0)
@@ -181,13 +183,13 @@ static int observe_d_handle_http_request(observe_d_service_t* svc,
         uint64_t uptime = (uint64_t)time(NULL) - svc->start_time;
         char health_buf[512];
         int health_len = snprintf(health_buf, sizeof(health_buf),
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: application/json\r\n"
-            "Content-Length: %d\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "{\"status\":\"ok\",\"uptime_sec\":%llu,\"metrics\":%zu}\r\n",
-            0, (unsigned long long)uptime, svc->metric_count);
+                                  "HTTP/1.1 200 OK\r\n"
+                                  "Content-Type: application/json\r\n"
+                                  "Content-Length: %d\r\n"
+                                  "Connection: close\r\n"
+                                  "\r\n"
+                                  "{\"status\":\"ok\",\"uptime_sec\":%llu,\"metrics\":%zu}\r\n",
+                                  0, (unsigned long long)uptime, svc->metric_count);
 
         int content_start = 0;
         for (int i = 0; i < health_len; i++) {
@@ -199,7 +201,8 @@ static int observe_d_handle_http_request(observe_d_service_t* svc,
         (void)(health_len - content_start);
 
         char final_buf[1024];
-        int final_len = snprintf(final_buf, sizeof(final_buf),
+        int final_len = snprintf(
+            final_buf, sizeof(final_buf),
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: application/json\r\n"
             "Content-Length: %d\r\n"
@@ -212,13 +215,12 @@ static int observe_d_handle_http_request(observe_d_service_t* svc,
 
         agentos_socket_send(client_fd, final_buf, (size_t)final_len);
     } else {
-        const char* not_found =
-            "HTTP/1.1 404 Not Found\r\n"
-            "Content-Type: text/plain\r\n"
-            "Content-Length: 9\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "Not Found";
+        const char *not_found = "HTTP/1.1 404 Not Found\r\n"
+                                "Content-Type: text/plain\r\n"
+                                "Content-Length: 9\r\n"
+                                "Connection: close\r\n"
+                                "\r\n"
+                                "Not Found";
         agentos_socket_send(client_fd, not_found, strlen(not_found));
     }
 
@@ -227,11 +229,13 @@ static int observe_d_handle_http_request(observe_d_service_t* svc,
 }
 
 #ifdef _WIN32
-static DWORD WINAPI observe_d_http_loop(LPVOID arg) {
+static DWORD WINAPI observe_d_http_loop(LPVOID arg)
+{
 #else
-static void* observe_d_http_loop(void* arg) {
+static void *observe_d_http_loop(void *arg)
+{
 #endif
-    observe_d_service_t* svc = (observe_d_service_t*)arg;
+    observe_d_service_t *svc = (observe_d_service_t *)arg;
     if (!svc) {
 #ifdef _WIN32
         return 1;
@@ -254,8 +258,10 @@ static void* observe_d_http_loop(void* arg) {
 #endif
 }
 
-static int observe_d_init(observe_d_service_t* svc, int port, const char* sock) {
-    if (!svc) return AGENTOS_EINVAL;
+static int observe_d_init(observe_d_service_t *svc, int port, const char *sock)
+{
+    if (!svc)
+        return AGENTOS_EINVAL;
 
     memset(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : OBSERVE_D_DEFAULT_PORT;
@@ -281,16 +287,17 @@ static int observe_d_init(observe_d_service_t* svc, int port, const char* sock) 
     return AGENTOS_SUCCESS;
 }
 
-static int observe_d_start_http_server(observe_d_service_t* svc) {
+static int observe_d_start_http_server(observe_d_service_t *svc)
+{
 #ifndef _WIN32
     svc->http_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (svc->http_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("observe_d: failed to create HTTP socket");
-        return -1;
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     int reuse = 1;
-    setsockopt(svc->http_fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
+    setsockopt(svc->http_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse, sizeof(reuse));
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -298,18 +305,18 @@ static int observe_d_start_http_server(observe_d_service_t* svc) {
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons((uint16_t)svc->metrics_port);
 
-    if (bind(svc->http_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    if (bind(svc->http_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         SVC_LOG_ERROR("observe_d: failed to bind HTTP port %d", svc->metrics_port);
         agentos_socket_close(svc->http_fd);
         svc->http_fd = AGENTOS_INVALID_SOCKET;
-        return -1;
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     if (listen(svc->http_fd, OBSERVE_D_HTTP_BACKLOG) < 0) {
         SVC_LOG_ERROR("observe_d: failed to listen on HTTP port %d", svc->metrics_port);
         agentos_socket_close(svc->http_fd);
         svc->http_fd = AGENTOS_INVALID_SOCKET;
-        return -1;
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     svc->http_running = 1;
@@ -324,7 +331,8 @@ static int observe_d_start_http_server(observe_d_service_t* svc) {
 #endif
 }
 
-static int observe_d_stop_http_server(observe_d_service_t* svc, int force) {
+static int observe_d_stop_http_server(observe_d_service_t *svc, int force)
+{
     svc->http_running = 0;
 
     if (svc->http_fd != AGENTOS_INVALID_SOCKET) {
@@ -340,21 +348,22 @@ static int observe_d_stop_http_server(observe_d_service_t* svc, int force) {
     return 0;
 }
 
-static int observe_d_start(observe_d_service_t* svc) {
-    if (!svc) return AGENTOS_EINVAL;
+static int observe_d_start(observe_d_service_t *svc)
+{
+    if (!svc)
+        return AGENTOS_EINVAL;
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
     if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("observe_d: failed to create socket at %s", svc->socket_path);
-        return -1;
+        return AGENTOS_ERR_UNKNOWN;
     }
 #else
-    svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1",
-                                                       (uint16_t)svc->tcp_port);
+    svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1", (uint16_t)svc->tcp_port);
     if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("observe_d: failed to create TCP server");
-        return -1;
+        return AGENTOS_ERR_UNKNOWN;
     }
 #endif
 
@@ -367,12 +376,15 @@ static int observe_d_start(observe_d_service_t* svc) {
     return AGENTOS_SUCCESS;
 }
 
-static int observe_d_stop(observe_d_service_t* svc, int force) {
-    if (!svc) return AGENTOS_EINVAL;
+static int observe_d_stop(observe_d_service_t *svc, int force)
+{
+    if (!svc)
+        return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&svc->lock);
     svc->running = 0;
-    if (force) svc->force_stop = 1;
+    if (force)
+        svc->force_stop = 1;
     agentos_mutex_unlock(&svc->lock);
 
     observe_d_stop_http_server(svc, force);
@@ -392,8 +404,10 @@ static int observe_d_stop(observe_d_service_t* svc, int force) {
     return AGENTOS_SUCCESS;
 }
 
-static int observe_d_destroy(observe_d_service_t* svc) {
-    if (!svc) return AGENTOS_EINVAL;
+static int observe_d_destroy(observe_d_service_t *svc)
+{
+    if (!svc)
+        return AGENTOS_EINVAL;
 
     if (svc->http_fd != AGENTOS_INVALID_SOCKET) {
         agentos_socket_close(svc->http_fd);
@@ -416,9 +430,12 @@ static int observe_d_destroy(observe_d_service_t* svc) {
     return AGENTOS_SUCCESS;
 }
 
-static int observe_d_healthcheck(observe_d_service_t* svc) {
-    if (!svc) return 0;
-    if (!svc->running) return 0;
+static int observe_d_healthcheck(observe_d_service_t *svc)
+{
+    if (!svc)
+        return 0;
+    if (!svc->running)
+        return 0;
 
 #ifndef _WIN32
     return (svc->http_fd != AGENTOS_INVALID_SOCKET && svc->http_running) ? 1 : 0;
@@ -427,8 +444,8 @@ static int observe_d_healthcheck(observe_d_service_t* svc) {
 #endif
 }
 
-static void observe_d_handle_request(observe_d_service_t* svc,
-                                      agentos_socket_t client_fd) {
+static void observe_d_handle_request(observe_d_service_t *svc, agentos_socket_t client_fd)
+{
     char buffer[OBSERVE_D_MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
     if (n <= 0) {
@@ -456,31 +473,29 @@ static void observe_d_handle_request(observe_d_service_t* svc,
 
     char response[4096];
     snprintf(response, sizeof(response),
-        "{"
-        "\"service\":\"observe_d\","
-        "\"status\":\"ok\","
-        "\"observed\":%llu,"
-        "\"metric_count\":%zu,"
-        "\"http_requests\":%llu,"
-        "\"uptime_sec\":%llu,"
-        "\"healthy\":%s,"
-        "\"prometheus\":{"
-            "\"port\":%d,"
-            "\"endpoint\":\"/metrics\""
-        "}"
-        "}",
-        (unsigned long long)svc->observe_count,
-        mcount,
-        (unsigned long long)svc->http_request_count,
-        (unsigned long long)uptime,
-        healthy ? "true" : "false",
-        svc->metrics_port);
+             "{"
+             "\"service\":\"observe_d\","
+             "\"status\":\"ok\","
+             "\"observed\":%llu,"
+             "\"metric_count\":%zu,"
+             "\"http_requests\":%llu,"
+             "\"uptime_sec\":%llu,"
+             "\"healthy\":%s,"
+             "\"prometheus\":{"
+             "\"port\":%d,"
+             "\"endpoint\":\"/metrics\""
+             "}"
+             "}",
+             (unsigned long long)svc->observe_count, mcount,
+             (unsigned long long)svc->http_request_count, (unsigned long long)uptime,
+             healthy ? "true" : "false", svc->metrics_port);
 
     agentos_socket_send(client_fd, response, strlen(response));
     agentos_socket_close(client_fd);
 }
 
-int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) {
+int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
+{
 
 #ifndef _WIN32
     signal(SIGINT, observe_d_signal_handler);
@@ -488,8 +503,8 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-    if (observe_d_init(&g_service, OBSERVE_D_DEFAULT_PORT,
-                       OBSERVE_D_DEFAULT_SOCKET) != AGENTOS_SUCCESS)
+    if (observe_d_init(&g_service, OBSERVE_D_DEFAULT_PORT, OBSERVE_D_DEFAULT_SOCKET) !=
+        AGENTOS_SUCCESS)
         return 1;
     if (observe_d_start(&g_service) != AGENTOS_SUCCESS) {
         observe_d_destroy(&g_service);

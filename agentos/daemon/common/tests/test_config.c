@@ -5,26 +5,31 @@
  * 对齐: cm_* 全局配置API (config_manager.h)
  */
 
+#include "config_manager.h"
+#include "platform.h"
+#include "safe_string_utils.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <unistd.h>
-#include "config_manager.h"
-#include "safe_string_utils.h"
-#include "platform.h"
 
 static int test_count = 0;
 static int pass_count = 0;
 
-#define TEST_ASSERT(cond, msg) do { \
-    test_count++; \
-    if (cond) { pass_count++; } else { \
-        printf("  FAIL: %s (line %d)\n", msg, __LINE__); \
-    } \
-} while(0)
+#define TEST_ASSERT(cond, msg)                               \
+    do {                                                     \
+        test_count++;                                        \
+        if (cond) {                                          \
+            pass_count++;                                    \
+        } else {                                             \
+            printf("  FAIL: %s (line %d)\n", msg, __LINE__); \
+        }                                                    \
+    } while (0)
 
-static void test_config_init_shutdown(void) {
+static void test_config_init_shutdown(void)
+{
     printf("  test_config_init_shutdown...\n");
 
     cm_config_t cfg = cm_create_default_config();
@@ -38,7 +43,8 @@ static void test_config_init_shutdown(void) {
     printf("    PASSED\n");
 }
 
-static void test_config_set_get(void) {
+static void test_config_set_get(void)
+{
     printf("  test_config_set_get...\n");
 
     cm_init(NULL);
@@ -52,7 +58,7 @@ static void test_config_set_get(void) {
     ret = cm_set("test.host", "localhost", "unit_test");
     TEST_ASSERT(ret == 0, "cm_set host");
 
-    const char* host = cm_get("test.host", NULL);
+    const char *host = cm_get("test.host", NULL);
     TEST_ASSERT(host != NULL, "cm_get non-null");
     TEST_ASSERT(strcmp(host, "localhost") == 0, "cm_get value match");
 
@@ -70,7 +76,8 @@ static void test_config_set_get(void) {
     printf("    PASSED\n");
 }
 
-static void test_config_namespaced(void) {
+static void test_config_namespaced(void)
+{
     printf("  test_config_namespaced...\n");
 
     cm_init(NULL);
@@ -81,7 +88,7 @@ static void test_config_namespaced(void) {
     int64_t port = cm_get_int("daemon.port", -1);
     TEST_ASSERT(port == 9000, "namespaced get_int");
 
-    const char* val = cm_get("daemon.port", NULL);
+    const char *val = cm_get("daemon.port", NULL);
     TEST_ASSERT(val != NULL && strcmp(val, "9000") == 0, "namespaced get");
 
     uint32_t count = cm_entry_count();
@@ -92,12 +99,13 @@ static void test_config_namespaced(void) {
     printf("    PASSED\n");
 }
 
-static void test_config_environment(void) {
+static void test_config_environment(void)
+{
     printf("  test_config_environment...\n");
 
     cm_init(NULL);
 
-    const char* env = cm_get_environment();
+    const char *env = cm_get_environment();
     TEST_ASSERT(env != NULL, "environment not null");
 
     int ret = cm_set_environment("test");
@@ -118,16 +126,21 @@ static char g_last_watch_key[128] = {0};
 static char g_last_watch_old[256] = {0};
 static char g_last_watch_new[256] = {0};
 
-static void test_watch_callback(const char* key, const char* old_val,
-                                const char* new_val, void* user_data) {
+static void test_watch_callback(const char *key, const char *old_val, const char *new_val,
+                                void *user_data)
+{
     (void)user_data;
     g_watch_callback_fired++;
-    if (key) safe_strcpy(g_last_watch_key, key, sizeof(g_last_watch_key));
-    if (old_val) safe_strcpy(g_last_watch_old, old_val, sizeof(g_last_watch_old));
-    if (new_val) safe_strcpy(g_last_watch_new, new_val, sizeof(g_last_watch_new));
+    if (key)
+        safe_strcpy(g_last_watch_key, key, sizeof(g_last_watch_key));
+    if (old_val)
+        safe_strcpy(g_last_watch_old, old_val, sizeof(g_last_watch_old));
+    if (new_val)
+        safe_strcpy(g_last_watch_new, new_val, sizeof(g_last_watch_new));
 }
 
-static void test_config_watch_callback(void) {
+static void test_config_watch_callback(void)
+{
     printf("  test_config_watch_callback...\n");
 
     cm_init(NULL);
@@ -152,14 +165,18 @@ static void test_config_watch_callback(void) {
     printf("    PASSED\n");
 }
 
-static void test_config_load_json(void) {
+static void test_config_load_json(void)
+{
     printf("  test_config_load_json...\n");
 
     cm_init(NULL);
 
-    FILE* fp = fopen(AGENTOS_TMP_DIR "/test_agentos_config.json", "w");
+    FILE *fp = fopen(AGENTOS_TMP_DIR "/test_agentos_config.json", "w");
     TEST_ASSERT(fp != NULL, "create temp config file");
-    if (!fp) { cm_shutdown(); return; }
+    if (!fp) {
+        cm_shutdown();
+        return;
+    }
 
     fprintf(fp, "# Test config\n");
     fprintf(fp, "app.name=AgentOS-Test\n");
@@ -171,7 +188,7 @@ static void test_config_load_json(void) {
     int count = cm_load_json(AGENTOS_TMP_DIR "/test_agentos_config.json", "jsonns");
     TEST_ASSERT(count >= 3, "loaded entries from JSON");
 
-    const char* name = cm_get("jsonns.app.name", NULL);
+    const char *name = cm_get("jsonns.app.name", NULL);
     TEST_ASSERT(name != NULL && strcmp(name, "AgentOS-Test") == 0, "JSON loaded name");
 
     int64_t port = cm_get_int("jsonns.server.port", 0);
@@ -182,7 +199,8 @@ static void test_config_load_json(void) {
     printf("    PASSED\n");
 }
 
-static void test_config_history(void) {
+static void test_config_history(void)
+{
     printf("  test_config_history...\n");
 
     cm_init(NULL);
@@ -200,14 +218,15 @@ static void test_config_history(void) {
     int rb = cm_rollback("hist.key", 0);
     TEST_ASSERT(rb == 0, "cm_rollback success");
 
-    const char* val = cm_get("hist.key", NULL);
+    const char *val = cm_get("hist.key", NULL);
     TEST_ASSERT(val != NULL, "rollback value exists");
 
     cm_shutdown();
     printf("    PASSED\n");
 }
 
-static void test_config_export(void) {
+static void test_config_export(void)
+{
     printf("  test_config_export...\n");
 
     cm_init(NULL);
@@ -215,7 +234,7 @@ static void test_config_export(void) {
     cm_set("export.str", "hello", "exp");
     cm_set("export.num", "42", "exp");
 
-    char* json = cm_export_json(NULL);
+    char *json = cm_export_json(NULL);
     TEST_ASSERT(json != NULL, "cm_export_json non-NULL");
     TEST_ASSERT(strstr(json, "export.str") != NULL, "JSON contains export.str");
     TEST_ASSERT(strstr(json, "hello") != NULL, "JSON contains value");
@@ -232,14 +251,18 @@ static void test_config_export(void) {
 
 static bool g_validator_called = false;
 
-static bool my_validator(const char* key, const char* value,
-                         char* error_msg, size_t error_size) {
-    (void)key; (void)value; (void)error_msg; (void)error_size;
+static bool my_validator(const char *key, const char *value, char *error_msg, size_t error_size)
+{
+    (void)key;
+    (void)value;
+    (void)error_msg;
+    (void)error_size;
     g_validator_called = true;
     return true;
 }
 
-static void test_config_validator(void) {
+static void test_config_validator(void)
+{
     printf("  test_config_validator...\n");
 
     cm_init(NULL);
@@ -258,14 +281,14 @@ static void test_config_validator(void) {
     printf("    PASSED\n");
 }
 
-static void test_config_edge_cases(void) {
+static void test_config_edge_cases(void)
+{
     printf("  test_config_edge_cases...\n");
 
     cm_init(NULL);
 
-    const char* null_key = cm_get(NULL, "default");
-    TEST_ASSERT(null_key != NULL && strcmp(null_key, "default") == 0,
-                "NULL key returns default");
+    const char *null_key = cm_get(NULL, "default");
+    TEST_ASSERT(null_key != NULL && strcmp(null_key, "default") == 0, "NULL key returns default");
 
     int64_t missing_int = cm_get_int("nonexistent.key.that.does.not.exist", -999);
     TEST_ASSERT(missing_int == -999, "missing key returns default int");
@@ -302,7 +325,8 @@ static void test_config_edge_cases(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  Config Manager Unit Tests (TeamC)\n");
     printf("=========================================\n\n");

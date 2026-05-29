@@ -1,4 +1,3 @@
-#include "memory_compat.h"
 /**
  * @file monitor.c
  * @brief 监控模块实现
@@ -6,24 +5,28 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "error.h"
+#include "memory_compat.h"
+#include "scheduler_service.h"
+#include "svc_logger.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "scheduler_service.h"
 
 /**
  * @brief 监控数据
  */
 typedef struct {
-    uint64_t total_tasks;       /**< 总任务数 */
-    uint64_t successful_tasks;  /**< 成功任务数 */
-    uint64_t failed_tasks;      /**< 失败任务数 */
+    uint64_t total_tasks;             /**< 总任务数 */
+    uint64_t successful_tasks;        /**< 成功任务数 */
+    uint64_t failed_tasks;            /**< 失败任务数 */
     uint64_t total_execution_time_ms; /**< 总执行时间（毫秒） */
-    time_t last_health_check;   /**< 上次健康检查时间 */
-    time_t last_stats_report;   /**< 上次统计报告时间 */
-    size_t available_agents;    /**< 可用 Agent 数量 */
-    size_t total_agents;        /**< 总 Agent 数量 */
+    time_t last_health_check;         /**< 上次健康检查时间 */
+    time_t last_stats_report;         /**< 上次统计报告时间 */
+    size_t available_agents;          /**< 可用 Agent 数量 */
+    size_t total_agents;              /**< 总 Agent 数量 */
 } monitor_data_t;
 
 /**
@@ -31,10 +34,11 @@ typedef struct {
  * @param data 输出参数，返回监控数据
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_create(void** data) {
-    monitor_data_t* md = (monitor_data_t*)AGENTOS_MALLOC(sizeof(monitor_data_t));
+int monitor_create(void **data)
+{
+    monitor_data_t *md = (monitor_data_t *)AGENTOS_MALLOC(sizeof(monitor_data_t));
     if (!md) {
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     md->total_tasks = 0;
@@ -55,7 +59,8 @@ int monitor_create(void** data) {
  * @param data 监控数据
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_destroy(void* data) {
+int monitor_destroy(void *data)
+{
     if (!data) {
         return 0;
     }
@@ -71,12 +76,13 @@ int monitor_destroy(void* data) {
  * @param execution_time_ms 执行时间（毫秒）
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_record_task(void* data, bool success, uint32_t execution_time_ms) {
+int monitor_record_task(void *data, bool success, uint32_t execution_time_ms)
+{
     if (!data) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    monitor_data_t* md = (monitor_data_t*)data;
+    monitor_data_t *md = (monitor_data_t *)data;
 
     md->total_tasks++;
     if (success) {
@@ -96,12 +102,13 @@ int monitor_record_task(void* data, bool success, uint32_t execution_time_ms) {
  * @param total_count 总 Agent 数量
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_update_agent_status(void* data, size_t available_count, size_t total_count) {
+int monitor_update_agent_status(void *data, size_t available_count, size_t total_count)
+{
     if (!data) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    monitor_data_t* md = (monitor_data_t*)data;
+    monitor_data_t *md = (monitor_data_t *)data;
     md->available_agents = available_count;
     md->total_agents = total_count;
 
@@ -114,12 +121,13 @@ int monitor_update_agent_status(void* data, size_t available_count, size_t total
  * @param health_status 输出参数，返回健康状态
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_health_check(void* data, bool* health_status) {
+int monitor_health_check(void *data, bool *health_status)
+{
     if (!data || !health_status) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    monitor_data_t* md = (monitor_data_t*)data;
+    monitor_data_t *md = (monitor_data_t *)data;
 
     // 简单的健康检查逻辑
     // 1. 检查是否有可用的 Agent
@@ -131,7 +139,7 @@ int monitor_health_check(void* data, bool* health_status) {
     // 检查可用 Agent
     if (md->total_agents > 0 && md->available_agents == 0) {
         healthy = false;
-        printf("Health check failed: No available agents\n");
+        SVC_LOG_WARN("Health check failed: No available agents");
     }
 
     // 检查任务失败率
@@ -139,7 +147,7 @@ int monitor_health_check(void* data, bool* health_status) {
         float failure_rate = (float)md->failed_tasks / md->total_tasks;
         if (failure_rate > 0.5) {  // 失败率超过 50%
             healthy = false;
-            printf("Health check failed: High failure rate (%.2f)\n", failure_rate);
+            SVC_LOG_WARN("Health check failed: High failure rate (%.2f)", failure_rate);
         }
     }
 
@@ -156,17 +164,18 @@ int monitor_health_check(void* data, bool* health_status) {
  * @param stats 输出参数，返回统计信息
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_get_stats(void* data, void** stats) {
+int monitor_get_stats(void *data, void **stats)
+{
     if (!data || !stats) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    monitor_data_t* md = (monitor_data_t*)data;
+    monitor_data_t *md = (monitor_data_t *)data;
 
     // 创建统计信息字符串
-    char* stats_str = (char*)AGENTOS_MALLOC(512);
+    char *stats_str = (char *)AGENTOS_MALLOC(512);
     if (!stats_str) {
-        return -1;
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     float avg_execution_time = 0.0f;
@@ -179,23 +188,18 @@ int monitor_get_stats(void* data, void** stats) {
         success_rate = (float)md->successful_tasks / md->total_tasks;
     }
 
-    snprintf(stats_str, 512, 
-             "Total Tasks: %lu\n" 
-             "Successful Tasks: %lu\n" 
-             "Failed Tasks: %lu\n" 
-             "Success Rate: %.2f%%\n" 
-             "Average Execution Time: %.2f ms\n" 
-             "Available Agents: %zu/%zu\n" 
-             "Last Health Check: %s" 
+    snprintf(stats_str, 512,
+             "Total Tasks: %lu\n"
+             "Successful Tasks: %lu\n"
+             "Failed Tasks: %lu\n"
+             "Success Rate: %.2f%%\n"
+             "Average Execution Time: %.2f ms\n"
+             "Available Agents: %zu/%zu\n"
+             "Last Health Check: %s"
              "Last Stats Report: %s",
-             (unsigned long)md->total_tasks,
-             (unsigned long)md->successful_tasks,
-             (unsigned long)md->failed_tasks,
-             success_rate * 100.0f,
-             avg_execution_time,
-             md->available_agents,
-             md->total_agents,
-             ctime(&md->last_health_check),
+             (unsigned long)md->total_tasks, (unsigned long)md->successful_tasks,
+             (unsigned long)md->failed_tasks, success_rate * 100.0f, avg_execution_time,
+             md->available_agents, md->total_agents, ctime(&md->last_health_check),
              ctime(&md->last_stats_report));
 
     *stats = stats_str;
@@ -207,19 +211,20 @@ int monitor_get_stats(void* data, void** stats) {
  * @param data 监控数据
  * @return 0 表示成功，非 0 表示错误码
  */
-int monitor_generate_report(void* data) {
+int monitor_generate_report(void *data)
+{
     if (!data) {
-        return -1;
+        return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    monitor_data_t* md = (monitor_data_t*)data;
+    monitor_data_t *md = (monitor_data_t *)data;
 
     // 生成统计报告
-    void* stats = NULL;
+    void *stats = NULL;
     if (monitor_get_stats(data, &stats) == 0) {
-        printf("\n=== Scheduler Stats Report ===\n");
-        printf("%s\n", (char*)stats);
-        printf("=============================\n");
+        SVC_LOG_INFO("=== Scheduler Stats Report ===");
+        SVC_LOG_INFO("%s", (char *)stats);
+        SVC_LOG_INFO("=============================");
         AGENTOS_FREE(stats);
     }
 

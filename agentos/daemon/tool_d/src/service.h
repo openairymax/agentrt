@@ -7,20 +7,20 @@
 #ifndef TOOL_SERVICE_INTERNAL_H
 #define TOOL_SERVICE_INTERNAL_H
 
-#include "tool_service.h"
-#include "registry.h"
-#include "executor.h"
-#include "validator.h"
 #include "cache.h"
 #include "config.h"
+#include "executor.h"
 #include "platform.h"
+#include "registry.h"
+#include "tool_service.h"
+#include "validator.h"
 
 struct tool_service {
-    tool_registry_t* registry;
-    tool_executor_t* executor;
-    tool_validator_t* validator;
-    tool_cache_t* cache;
-    tool_config_t* manager;
+    tool_registry_t *registry;
+    tool_executor_t *executor;
+    tool_validator_t *validator;
+    tool_cache_t *cache;
+    tool_config_t *manager;
     agentos_mutex_t lock;
 };
 

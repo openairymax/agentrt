@@ -4,14 +4,15 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "cognition.h"
 #include "agent_registry.h"
-#include "strategy.h"
 #include "agentos.h"
+#include "cognition.h"
+#include "strategy.h"
+
+#include <float.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <float.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
@@ -21,10 +22,10 @@
  * @brief 加权调度策略内部数据结构
  */
 typedef struct weighted_data {
-    weighted_config_t config;                    /**< 权重配置 */
-    void* registry_ctx;                          /**< 注册中心上下文 */
-    agent_registry_get_agents_func get_agents;   /**< 获取候选Agent列表的函数 */
-    agentos_mutex_t* lock;                       /**< 线程安全锁 */
+    weighted_config_t config;                  /**< 权重配置 */
+    void *registry_ctx;                        /**< 注册中心上下文 */
+    agent_registry_get_agents_func get_agents; /**< 获取候选Agent列表的函数 */
+    agentos_mutex_t *lock;                     /**< 线程安全锁 */
 } weighted_data_t;
 
 /**
@@ -36,11 +37,10 @@ typedef struct weighted_data {
  * @param data [in] 加权调度上下文
  * @return 综合得分（越高越好）
  */
-static float compute_weighted_score(
-    const agent_info_t* agent,
-    const weighted_data_t* data)
+static float compute_weighted_score(const agent_info_t *agent, const weighted_data_t *data)
 {
-    if (!agent || !data) return 0.0f;
+    if (!agent || !data)
+        return 0.0f;
 
     float cost_score = 1.0f;
     float perf_score = 1.0f;
@@ -58,8 +58,7 @@ static float compute_weighted_score(
     trust_score = agent->trust_score;
 
     /* 加权综合得分 */
-    float total = data->config.cost_weight * cost_score +
-                  data->config.perf_weight * perf_score +
+    float total = data->config.cost_weight * cost_score + data->config.perf_weight * perf_score +
                   data->config.trust_weight * trust_score;
 
     return total;
@@ -69,12 +68,14 @@ static float compute_weighted_score(
  * @brief 销毁加权调度策略实例
  * @param strategy [in] 要销毁的策略实例
  */
-static void weighted_destroy(agentos_dispatching_strategy_t* strategy)
+static void weighted_destroy(agentos_dispatching_strategy_t *strategy)
 {
-    if (!strategy) return;
-    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    if (!strategy)
+        return;
+    weighted_data_t *data = (weighted_data_t *)strategy->data;
     if (data) {
-        if (data->lock) agentos_mutex_free(data->lock);
+        if (data->lock)
+            agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
     }
     AGENTOS_FREE(strategy);
@@ -90,35 +91,36 @@ static void weighted_destroy(agentos_dispatching_strategy_t* strategy)
  * @param out_agent_id [out] 选中的Agent ID
  * @return AGENTOS_SUCCESS 成功
  */
-static agentos_error_t weighted_select(
-    const agentos_task_node_t* task,
-    const void** candidates,
-    size_t count,
-    void* context,
-    char** out_agent_id)
+static agentos_error_t weighted_select(const agentos_task_node_t *task, const void **candidates,
+                                       size_t count, void *context, char **out_agent_id)
 {
-    weighted_data_t* data = (weighted_data_t*)context;
-    if (!data || !task || !out_agent_id) return AGENTOS_EINVAL;
+    weighted_data_t *data = (weighted_data_t *)context;
+    if (!data || !task || !out_agent_id)
+        return AGENTOS_EINVAL;
 
-    agent_info_t** agents = NULL;
+    agent_info_t **agents = NULL;
     size_t agent_count = 0;
     agentos_error_t err;
 
     if (candidates && count > 0) {
-        agents = (agent_info_t**)candidates;
+        agents = (agent_info_t **)candidates;
         agent_count = count;
     } else {
-        err = data->get_agents(data->registry_ctx, task->task_node_agent_role, &agents, &agent_count);
-        if (err != AGENTOS_SUCCESS) return err;
-        if (agent_count == 0) return AGENTOS_ENOENT;
+        err =
+            data->get_agents(data->registry_ctx, task->task_node_agent_role, &agents, &agent_count);
+        if (err != AGENTOS_SUCCESS)
+            return err;
+        if (agent_count == 0)
+            return AGENTOS_ENOENT;
     }
 
     float best_score = -FLT_MAX;
     int best_index = -1;
 
     for (size_t i = 0; i < agent_count; i++) {
-        agent_info_t* agent = agents[i];
-        if (!agent) continue;
+        agent_info_t *agent = agents[i];
+        if (!agent)
+            continue;
         float score = compute_weighted_score(agent, data);
         if (score > best_score) {
             best_score = score;
@@ -145,17 +147,17 @@ static agentos_error_t weighted_select(
  * @return AGENTOS_EINVAL 参数无效
  * @return AGENTOS_ENOMEM 内存分配失败
  */
-agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
-    const weighted_config_t* config,
-    void* registry_ctx,
-    agent_registry_get_agents_func get_agents_func)
+agentos_dispatching_strategy_t *
+agentos_dispatching_weighted_create(const weighted_config_t *config, void *registry_ctx,
+                                    agent_registry_get_agents_func get_agents_func)
 {
     if (!registry_ctx || !get_agents_func) {
         return NULL;
     }
 
-    weighted_data_t* data = (weighted_data_t*)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
-    if (!data) return NULL;
+    weighted_data_t *data = (weighted_data_t *)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
+    if (!data)
+        return NULL;
 
     if (config) {
         data->config = *config;
@@ -173,10 +175,11 @@ agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
         return NULL;
     }
 
-    agentos_dispatching_strategy_t* strategy =
-        (agentos_dispatching_strategy_t*)AGENTOS_CALLOC(1, sizeof(*strategy));
+    agentos_dispatching_strategy_t *strategy =
+        (agentos_dispatching_strategy_t *)AGENTOS_CALLOC(1, sizeof(*strategy));
     if (!strategy) {
-        if (data->lock) agentos_mutex_free(data->lock);
+        if (data->lock)
+            agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
         return NULL;
     }

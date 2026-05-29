@@ -9,6 +9,7 @@
 #define CUPOLAS_PERMISSION_RULE_H
 
 #include "../platform/platform.h"
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -17,36 +18,36 @@ extern "C" {
 
 /**
  * @brief Permission rule structure
- * 
+ *
  * Design principles:
  * - Pattern matching with glob support
  * - Priority-based rule evaluation
  * - Wildcard support via NULL fields
  */
 typedef struct permission_rule {
-    char*                   agent_id;       /**< Agent ID (NULL = wildcard) */
-    char*                   action;         /**< Action name (NULL = wildcard) */
-    char*                   resource;       /**< Resource pattern (supports glob) */
-    char*                   resource_pattern; /**< Pre-compiled pattern (optional) */
-    int                     allow;          /**< Permission result (1=allow, 0=deny) */
-    int                     priority;       /**< Priority (higher number = higher priority) */
-    struct permission_rule* next;           /**< Next rule in linked list */
+    char *agent_id;               /**< Agent ID (NULL = wildcard) */
+    char *action;                 /**< Action name (NULL = wildcard) */
+    char *resource;               /**< Resource pattern (supports glob) */
+    char *resource_pattern;       /**< Pre-compiled pattern (optional) */
+    int allow;                    /**< Permission result (1=allow, 0=deny) */
+    int priority;                 /**< Priority (higher number = higher priority) */
+    struct permission_rule *next; /**< Next rule in linked list */
 } permission_rule_t;
 
 /**
  * @brief Rule manager structure
- * 
+ *
  * Provides rule storage and matching with:
  * - Thread-safe read-write lock
  * - Hot-reload support with mtime tracking
  * - Version control for change detection
  */
 typedef struct rule_manager {
-    permission_rule_t*  rules;          /**< Linked list of rules */
-    cupolas_rwlock_t    rwlock;         /**< Read-write lock for thread safety */
-    char*               path;           /**< Path to rules configuration file */
-    uint64_t            last_mtime;     /**< Last modification time of config file */
-    cupolas_atomic32_t  version;        /**< Rule version counter */
+    permission_rule_t *rules;   /**< Linked list of rules */
+    cupolas_rwlock_t rwlock;    /**< Read-write lock for thread safety */
+    char *path;                 /**< Path to rules configuration file */
+    uint64_t last_mtime;        /**< Last modification time of config file */
+    cupolas_atomic32_t version; /**< Rule version counter */
 } rule_manager_t;
 
 /**
@@ -58,16 +59,17 @@ typedef struct rule_manager {
  * @ownership Returns owned pointer: caller must call rule_manager_destroy()
  * @ownership path: caller retains ownership
  */
-rule_manager_t* rule_manager_create(const char* path);
+rule_manager_t *rule_manager_create(const char *path);
 
 /**
  * @brief Destroy rule manager and free all resources
  * @param[in] mgr Rule manager handle (may be NULL)
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership mgr: transferred to this function, will be freed
  */
-void rule_manager_destroy(rule_manager_t* mgr);
+void rule_manager_destroy(rule_manager_t *mgr);
 
 /**
  * @brief Match rules against given parameters
@@ -81,20 +83,18 @@ void rule_manager_destroy(rule_manager_t* mgr);
  * @reentrant Yes
  * @ownership All parameters: caller retains ownership
  */
-int rule_manager_match(rule_manager_t* mgr,
-                       const char* agent_id,
-                       const char* action,
-                       const char* resource,
-                       const char* context);
+int rule_manager_match(rule_manager_t *mgr, const char *agent_id, const char *action,
+                       const char *resource, const char *context);
 
 /**
  * @brief Reload rules from configuration file
  * @param[in] mgr Rule manager handle
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  */
-int rule_manager_reload(rule_manager_t* mgr);
+int rule_manager_reload(rule_manager_t *mgr);
 
 /**
  * @brief Add a new rule to the manager
@@ -105,24 +105,22 @@ int rule_manager_reload(rule_manager_t* mgr);
  * @param[in] allow Permission result (1=allow, 0=deny)
  * @param[in] priority Priority level (higher number = higher priority)
  * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  * @ownership All string parameters: caller retains ownership
  */
-int rule_manager_add(rule_manager_t* mgr,
-                     const char* agent_id,
-                     const char* action,
-                     const char* resource,
-                     int allow,
-                     int priority);
+int rule_manager_add(rule_manager_t *mgr, const char *agent_id, const char *action,
+                     const char *resource, int allow, int priority);
 
 /**
  * @brief Clear all rules from the manager
  * @param[in] mgr Rule manager handle
- * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
+ * operations)
  * @reentrant No
  */
-void rule_manager_clear(rule_manager_t* mgr);
+void rule_manager_clear(rule_manager_t *mgr);
 
 /**
  * @brief Get number of rules
@@ -131,7 +129,7 @@ void rule_manager_clear(rule_manager_t* mgr);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-size_t rule_manager_count(rule_manager_t* mgr);
+size_t rule_manager_count(rule_manager_t *mgr);
 
 #ifdef __cplusplus
 }

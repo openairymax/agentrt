@@ -14,9 +14,9 @@
 #ifndef STRING_COMMON_H
 #define STRING_COMMON_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +29,7 @@ extern "C" {
  * @param src 源字符串
  * @return 目标字符串指针
  */
-char* string_common_strlcpy(char* dest, size_t dest_size, const char* src);
+char *string_common_strlcpy(char *dest, size_t dest_size, const char *src);
 
 /**
  * @brief 安全的字符串连接函数
@@ -38,14 +38,14 @@ char* string_common_strlcpy(char* dest, size_t dest_size, const char* src);
  * @param src 源字符串
  * @return 目标字符串指针
  */
-char* string_common_strlcat(char* dest, size_t dest_size, const char* src);
+char *string_common_strlcat(char *dest, size_t dest_size, const char *src);
 
 /**
  * @brief 字符串复制（动态内存分配）
  * @param str 源字符串
  * @return 复制的字符串指针，需要调用 free() 释放
  */
-char* string_common_strdup(const char* str);
+char *string_common_strdup(const char *str);
 
 /**
  * @brief 字符串复制（指定长度，动态内存分配）
@@ -53,7 +53,7 @@ char* string_common_strdup(const char* str);
  * @param n 最大复制长度
  * @return 复制的字符串指针，需要调用 free() 释放
  */
-char* string_common_strndup(const char* str, size_t n);
+char *string_common_strndup(const char *str, size_t n);
 
 /**
  * @brief 大小写不敏感的字符串比较
@@ -61,7 +61,7 @@ char* string_common_strndup(const char* str, size_t n);
  * @param s2 字符串2
  * @return 比较结果
  */
-int string_common_strcasecmp(const char* s1, const char* s2);
+int string_common_strcasecmp(const char *s1, const char *s2);
 
 /**
  * @brief 大小写不敏感的字符串比较（指定长度）
@@ -70,7 +70,7 @@ int string_common_strcasecmp(const char* s1, const char* s2);
  * @param n 最大比较长度
  * @return 比较结果
  */
-int string_common_strncasecmp(const char* s1, const char* s2, size_t n);
+int string_common_strncasecmp(const char *s1, const char *s2, size_t n);
 
 /**
  * @brief 字符串查找
@@ -78,7 +78,7 @@ int string_common_strncasecmp(const char* s1, const char* s2, size_t n);
  * @param needle 要查找的子串
  * @return 子串在字符串中的位置指针，未找到返回 NULL
  */
-char* string_common_strstr(const char* haystack, const char* needle);
+char *string_common_strstr(const char *haystack, const char *needle);
 
 /**
  * @brief 字符串分割
@@ -86,13 +86,13 @@ char* string_common_strstr(const char* haystack, const char* needle);
  * @param delim 分隔符
  * @return 分割后的字符串数组，最后一个元素为 NULL
  */
-char** string_common_strsplit(const char* str, const char* delim);
+char **string_common_strsplit(const char *str, const char *delim);
 
 /**
  * @brief 释放字符串数组
  * @param arr 字符串数组
  */
-void string_common_strsplit_free(char** arr);
+void string_common_strsplit_free(char **arr);
 
 /**
  * @brief 字符串转换为整数
@@ -101,7 +101,7 @@ void string_common_strsplit_free(char** arr);
  * @param result 转换结果
  * @return 成功返回 true，失败返回 false
  */
-bool string_common_strtoint(const char* str, int base, int* result);
+bool string_common_strtoint(const char *str, int base, int *result);
 
 /**
  * @brief 字符串转换为无符号整数
@@ -110,7 +110,7 @@ bool string_common_strtoint(const char* str, int base, int* result);
  * @param result 转换结果
  * @return 成功返回 true，失败返回 false
  */
-bool string_common_strtouint(const char* str, int base, uint32_t* result);
+bool string_common_strtouint(const char *str, int base, uint32_t *result);
 
 /**
  * @brief 字符串转换为双精度浮点数
@@ -118,7 +118,7 @@ bool string_common_strtouint(const char* str, int base, uint32_t* result);
  * @param result 转换结果
  * @return 成功返回 true，失败返回 false
  */
-bool string_common_strtod(const char* str, double* result);
+bool string_common_strtod(const char *str, double *result);
 
 /**
  * @brief 整数转换为字符串
@@ -128,7 +128,7 @@ bool string_common_strtod(const char* str, double* result);
  * @param buf_size 缓冲区大小
  * @return 转换后的字符串长度
  */
-size_t string_common_itoa(int value, int base, char* buf, size_t buf_size);
+size_t string_common_itoa(int value, int base, char *buf, size_t buf_size);
 
 /**
  * @brief 无符号整数转换为字符串
@@ -138,7 +138,7 @@ size_t string_common_itoa(int value, int base, char* buf, size_t buf_size);
  * @param buf_size 缓冲区大小
  * @return 转换后的字符串长度
  */
-size_t string_common_utoa(uint32_t value, int base, char* buf, size_t buf_size);
+size_t string_common_utoa(uint32_t value, int base, char *buf, size_t buf_size);
 
 /**
  * @brief 双精度浮点数转换为字符串
@@ -148,28 +148,28 @@ size_t string_common_utoa(uint32_t value, int base, char* buf, size_t buf_size);
  * @param buf_size 缓冲区大小
  * @return 转换后的字符串长度
  */
-size_t string_common_ftoa(double value, int precision, char* buf, size_t buf_size);
+size_t string_common_ftoa(double value, int precision, char *buf, size_t buf_size);
 
 /**
  * @brief 字符串修剪（去除首尾空白字符）
  * @param str 字符串
  * @return 修剪后的字符串指针
  */
-char* string_common_strtrim(char* str);
+char *string_common_strtrim(char *str);
 
 /**
  * @brief 字符串转小写
  * @param str 字符串
  * @return 转换后的字符串指针
  */
-char* string_common_strtolower(char* str);
+char *string_common_strtolower(char *str);
 
 /**
  * @brief 字符串转大写
  * @param str 字符串
  * @return 转换后的字符串指针
  */
-char* string_common_strtoupper(char* str);
+char *string_common_strtoupper(char *str);
 
 /**
  * @brief JSON字符串转义
@@ -177,7 +177,7 @@ char* string_common_strtoupper(char* str);
  * @param out 输出转义后的字符串（动态分配，调用者负责free）
  * @return 成功返回0，失败返回-1
  */
-int string_common_json_escape(const char* src, char** out);
+int string_common_json_escape(const char *src, char **out);
 
 /**
  * @brief JSON字符串转义（固定缓冲区版本）
@@ -186,7 +186,7 @@ int string_common_json_escape(const char* src, char** out);
  * @param dst_size 目标缓冲区大小
  * @return 写入的字符数
  */
-size_t string_common_json_escape_buf(const char* src, char* dst, size_t dst_size);
+size_t string_common_json_escape_buf(const char *src, char *dst, size_t dst_size);
 
 #ifdef __cplusplus
 }

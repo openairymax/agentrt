@@ -14,24 +14,25 @@
  */
 
 #include "atomic_compat.h"
-#include "gateway_service.h"
-#include "svc_common.h"
-#include "svc_logger.h"
-#include "svc_config.h"
-#include "platform.h"
 #include "error.h"
+#include "gateway_service.h"
+#include "logging.h"
+#include "platform.h"
+#include "svc_common.h"
+#include "svc_config.h"
+#include "svc_logger.h"
 
 #ifdef AGENTOS_HAS_PROTOCOLS
-#include "unified_protocol.h"
-#include "mcp_v1_adapter.h"
 #include "a2a_v03_adapter.h"
+#include "mcp_v1_adapter.h"
 #include "openai_enterprise_adapter.h"
+#include "unified_protocol.h"
 #endif
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 
 /* ==================== 全局状态 ==================== */
 
@@ -44,7 +45,8 @@ static agentos_mutex_t g_running_lock;
 /**
  * @brief 信号处理函数（线程安全，使用互斥锁保护运行标志）
  */
-static void signal_handler(int sig __attribute__((unused))) {
+static void signal_handler(int sig __attribute__((unused)))
+{
     agentos_mutex_lock(&g_running_lock);
     atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
     agentos_mutex_unlock(&g_running_lock);
@@ -58,87 +60,107 @@ static void signal_handler(int sig __attribute__((unused))) {
 /**
  * @brief Windows控制台事件处理函数
  */
-static BOOL WINAPI console_handler(DWORD fdwCtrlType) {
+static BOOL WINAPI console_handler(DWORD fdwCtrlType)
+{
     switch (fdwCtrlType) {
-        case CTRL_C_EVENT:
-        case CTRL_CLOSE_EVENT:
-        case CTRL_SHUTDOWN_EVENT:
-            signal_handler((int)fdwCtrlType);
-            return TRUE;
-        default:
-            return FALSE;
+    case CTRL_C_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        signal_handler((int)fdwCtrlType);
+        return TRUE;
+    default:
+        return FALSE;
     }
 }
 #endif
 
+static void svc_log_toggle_handler(int sig)
+{
+    (void)sig;
+    static int debug_mode = 0;
+    debug_mode = !debug_mode;
+    log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_INFO);
+}
+
 /* ==================== 帮助信息 ==================== */
 
-static void print_usage(const char* prog) {
-    printf("AgentOS Gateway Daemon\n");
-    printf("Usage: %s [options]\n\n", prog);
-    printf("Options:\n");
-    printf("  -c <config>   Configuration file path\n");
-    printf("  -h <host>     HTTP gateway host (default: 0.0.0.0)\n");
-    printf("  -p <port>     HTTP gateway port (default: 8080)\n");
-    printf("  -w <port>     WebSocket gateway port (default: 8081)\n");
-    printf("  -s            Enable stdio gateway\n");
-    printf("  -d            Run as daemon (Unix only)\n");
-    printf("  -v            Verbose output\n");
-    printf("  --help        Show this help\n");
-    printf("\nExamples:\n");
-    printf("  %s -h 127.0.0.1 -p 8080\n", prog);
-    printf("  %s -c AGENTOS_CONFIG_DIR \"/gateway.conf\"\n", prog);
+static void print_usage(const char *prog)
+{
+    char buf[256];
+    fputs("AgentOS Gateway Daemon\n", stdout);
+    snprintf(buf, sizeof(buf), "Usage: %s [options]\n\n", prog);
+    fputs(buf, stdout);
+    fputs("Options:\n", stdout);
+    fputs("  -c <config>   Configuration file path\n", stdout);
+    fputs("  -h <host>     HTTP gateway host (default: 0.0.0.0)\n", stdout);
+    fputs("  -p <port>     HTTP gateway port (default: 8080)\n", stdout);
+    fputs("  -w <port>     WebSocket gateway port (default: 8081)\n", stdout);
+    fputs("  -s            Enable stdio gateway\n", stdout);
+    fputs("  -d            Run as daemon (Unix only)\n", stdout);
+    fputs("  -v            Verbose output\n", stdout);
+    fputs("  --help        Show this help\n", stdout);
+    fputs("\nExamples:\n", stdout);
+    snprintf(buf, sizeof(buf), "  %s -h 127.0.0.1 -p 8080\n", prog);
+    fputs(buf, stdout);
+    snprintf(buf, sizeof(buf), "  %s -c AGENTOS_CONFIG_DIR \"/gateway.conf\"\n", prog);
+    fputs(buf, stdout);
 }
 
 /* ==================== 参数解析 ==================== */
 
-static int parse_args(int argc, char* argv[], gateway_service_config_t* config) {
+static int parse_args(int argc, char *argv[], gateway_service_config_t *config)
+{
     gateway_service_get_default_config(config);
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             exit(0);
-        }
-        else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
+        } else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
             agentos_error_t err = gateway_service_load_config(config, argv[++i]);
             if (err != AGENTOS_SUCCESS) {
                 SVC_LOG_ERROR("Failed to load config: %s", argv[i]);
-                return -1;
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_IO, "failed to load config file");
+                return AGENTOS_ERR_IO;
             }
-        }
-        else if (strcmp(argv[i], "-h") == 0 && i + 1 < argc) {
+        } else if (strcmp(argv[i], "-h") == 0 && i + 1 < argc) {
             config->http.host = argv[++i];
-        }
-        else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
-            config->http.port = (uint16_t)atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
+            config->http.port = (uint16_t)strtol(argv[++i], NULL, 10);
             config->http.enabled = true;
-        }
-        else if (strcmp(argv[i], "-w") == 0 && i + 1 < argc) {
-            config->ws.port = (uint16_t)atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-w") == 0 && i + 1 < argc) {
+            config->ws.port = (uint16_t)strtol(argv[++i], NULL, 10);
             config->ws.enabled = true;
-        }
-        else if (strcmp(argv[i], "-s") == 0) {
+        } else if (strcmp(argv[i], "-s") == 0) {
             config->stdio.enabled = true;
-        }
-        else if (strcmp(argv[i], "-v") == 0) {
+        } else if (strcmp(argv[i], "-v") == 0) {
             config->enable_metrics = true;
-        }
-        else if (strcmp(argv[i], "-d") == 0) {
+        } else if (strcmp(argv[i], "-d") == 0) {
 #ifndef _WIN32
             pid_t pid = fork();
-            if (pid < 0) { SVC_LOG_ERROR("Failed to fork"); return -1; }
-            if (pid > 0) exit(0);
-            setsid(); umask(022); { int __rc __attribute__((unused)) = chdir("/"); }
-            fclose(stdin); fclose(stdout); fclose(stderr);
+            if (pid < 0) {
+                SVC_LOG_ERROR("Failed to fork");
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "fork failed when daemonizing");
+                return AGENTOS_ERR_UNKNOWN;
+            }
+            if (pid > 0)
+                exit(0);
+            setsid();
+            umask(022);
+            {
+                int __rc __attribute__((unused)) = chdir("/");
+            }
+            fclose(stdin);
+            fclose(stdout);
+            fclose(stderr);
             SVC_LOG_INFO("Gateway daemonized");
 #else
             SVC_LOG_WARN("-d not supported on Windows");
 #endif
-        }
-        else {
+        } else {
             SVC_LOG_ERROR("Unknown option: %s", argv[i]);
-            return -1;
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "unknown option");
+            return AGENTOS_ERR_INVALID_PARAM;
         }
     }
     return 0;
@@ -146,7 +168,8 @@ static int parse_args(int argc, char* argv[], gateway_service_config_t* config) 
 
 /* ==================== 主函数 ==================== */
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
     gateway_service_config_t config;
 
     /* E-3 资源确定性: 初始化与清理成对 */
@@ -161,7 +184,11 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, signal_handler);
     signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGUSR1, svc_log_toggle_handler);
 #endif
+
+    agentos_log_init(NULL);
+    atexit(log_cleanup);
 
     if (parse_args(argc, argv, &config) != 0) {
         agentos_mutex_destroy(&g_running_lock);
@@ -185,12 +212,13 @@ int main(int argc, char* argv[]) {
 
     /* Initialize UnifiedProtocol stack for multi-protocol support */
 #ifdef AGENTOS_HAS_PROTOCOLS
-    const protocol_adapter_t* mcp_adapter = mcp_v1_get_adapter();
+    const protocol_adapter_t *mcp_adapter = mcp_v1_get_adapter();
     if (mcp_adapter) {
         if (mcp_adapter->init(mcp_adapter->context) == 0) {
             SVC_LOG_INFO("MCP v1.0 adapter initialized (version=%s, caps=0x%x)",
-                        mcp_adapter->version ? mcp_adapter->version : "unknown",
-                        mcp_adapter->capabilities ? mcp_adapter->capabilities(mcp_adapter->context) : 0);
+                         mcp_adapter->version ? mcp_adapter->version : "unknown",
+                         mcp_adapter->capabilities ? mcp_adapter->capabilities(mcp_adapter->context)
+                                                   : 0);
         } else {
             SVC_LOG_WARN("Failed to initialize MCP v1.0 adapter");
         }
@@ -206,14 +234,11 @@ int main(int argc, char* argv[]) {
     }
 
     SVC_LOG_INFO("AgentOS Gateway Daemon started");
-    SVC_LOG_INFO("  HTTP:     %s:%d %s",
-                config.http.host, config.http.port,
-                config.http.enabled ? "[enabled]" : "[disabled]");
-    SVC_LOG_INFO("  WebSocket: %s:%d %s",
-                config.ws.host, config.ws.port,
-                config.ws.enabled ? "[enabled]" : "[disabled]");
-    SVC_LOG_INFO("  Stdio:    %s",
-                config.stdio.enabled ? "[enabled]" : "[disabled]");
+    SVC_LOG_INFO("  HTTP:     %s:%d %s", config.http.host, config.http.port,
+                 config.http.enabled ? "[enabled]" : "[disabled]");
+    SVC_LOG_INFO("  WebSocket: %s:%d %s", config.ws.host, config.ws.port,
+                 config.ws.enabled ? "[enabled]" : "[disabled]");
+    SVC_LOG_INFO("  Stdio:    %s", config.stdio.enabled ? "[enabled]" : "[disabled]");
 
     /* 主事件循环：信号驱动 + 周期性健康检查 */
     int loop_count = 0;
@@ -232,13 +257,11 @@ int main(int argc, char* argv[]) {
             agentos_svc_stats_t stats;
             if (gateway_service_get_stats(g_service, &stats) == AGENTOS_SUCCESS) {
                 SVC_LOG_INFO("Health Check [interval=%ds] "
-                            "| concurrent=%u | total_req=%llu "
-                            "| errors=%llu | avg_time=%.1fms",
-                            HEALTH_CHECK_INTERVAL,
-                            stats.current_concurrent,
-                            (unsigned long long)stats.request_count,
-                            (unsigned long long)stats.error_count,
-                            stats.avg_time_ms);
+                             "| concurrent=%u | total_req=%llu "
+                             "| errors=%llu | avg_time=%.1fms",
+                             HEALTH_CHECK_INTERVAL, stats.current_concurrent,
+                             (unsigned long long)stats.request_count,
+                             (unsigned long long)stats.error_count, stats.avg_time_ms);
             }
         }
     }
@@ -249,7 +272,7 @@ int main(int argc, char* argv[]) {
     /* Cleanup protocol stack */
 #ifdef AGENTOS_HAS_PROTOCOLS
     {
-        const protocol_adapter_t* mcp_adapter = mcp_v1_get_adapter();
+        const protocol_adapter_t *mcp_adapter = mcp_v1_get_adapter();
         if (mcp_adapter && mcp_adapter->destroy) {
             mcp_adapter->destroy(mcp_adapter->context);
             SVC_LOG_INFO("MCP adapter destroyed");
@@ -264,5 +287,6 @@ cleanup:
     agentos_socket_cleanup();
 
     SVC_LOG_INFO("Gateway daemon stopped");
+    log_cleanup();
     return 0;
 }

@@ -6,6 +6,7 @@
  */
 
 #include "cognition.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else
@@ -16,18 +17,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name)      printf("[PASS] %s\n", name)
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run    = 0;
+static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func)                                                                                                 \
-    do {                                                                                                               \
-        tests_run++;                                                                                                   \
-        func();                                                                                                        \
-        tests_passed++;                                                                                                \
+#define RUN_TEST(func)  \
+    do {                \
+        tests_run++;    \
+        func();         \
+        tests_passed++; \
     } while (0)
 
 /* ==================== 解析器创建/销毁 ==================== */
@@ -35,7 +36,7 @@ static int tests_failed = 0;
 static void test_parser_basic_lifecycle(void)
 {
     agentos_intent_parser_t *p = NULL;
-    agentos_error_t err        = agentos_intent_parser_create(&p);
+    agentos_error_t err = agentos_intent_parser_create(&p);
     if (err == AGENTOS_SUCCESS && p != NULL) {
         TEST_PASS("parser basic lifecycle: create OK");
         agentos_intent_parser_destroy(p);
@@ -72,9 +73,9 @@ static void test_parser_simple_greeting(void)
         return;
     }
 
-    const char *input        = "Hello there!";
+    const char *input = "Hello there!";
     agentos_intent_t *intent = NULL;
-    agentos_error_t err      = agentos_intent_parser_parse(p, input, strlen(input), &intent);
+    agentos_error_t err = agentos_intent_parser_parse(p, input, strlen(input), &intent);
 
     if (err == AGENTOS_SUCCESS && intent != NULL) {
         printf("    Goal: %s, Flags: 0x%x\n", intent->intent_goal ? intent->intent_goal : "(null)",
@@ -97,9 +98,9 @@ static void test_parser_question_input(void)
         return;
     }
 
-    const char *input        = "What is the weather like today?";
+    const char *input = "What is the weather like today?";
     agentos_intent_t *intent = NULL;
-    agentos_error_t err      = agentos_intent_parser_parse(p, input, strlen(input), &intent);
+    agentos_error_t err = agentos_intent_parser_parse(p, input, strlen(input), &intent);
 
     if (err == AGENTOS_SUCCESS && intent != NULL) {
         agentos_intent_free(intent);
@@ -120,9 +121,9 @@ static void test_parser_command_input(void)
         return;
     }
 
-    const char *input        = "Search for latest AI research papers";
+    const char *input = "Search for latest AI research papers";
     agentos_intent_t *intent = NULL;
-    agentos_error_t err      = agentos_intent_parser_parse(p, input, strlen(input), &intent);
+    agentos_error_t err = agentos_intent_parser_parse(p, input, strlen(input), &intent);
 
     if (err == AGENTOS_SUCCESS && intent != NULL) {
         agentos_intent_free(intent);
@@ -144,7 +145,7 @@ static void test_parser_empty_input(void)
     }
 
     agentos_intent_t *intent = NULL;
-    agentos_error_t err      = agentos_intent_parser_parse(p, "", 0, &intent);
+    agentos_error_t err = agentos_intent_parser_parse(p, "", 0, &intent);
     if (err != AGENTOS_SUCCESS || intent == NULL) {
         TEST_PASS("parser rejects empty input");
     } else {
@@ -207,7 +208,7 @@ static void test_parser_rule_matching(void)
 
     agentos_intent_parser_add_rule(p, "*search*", "SEARCH_INTENT", 0.88f, 0);
 
-    const char *input        = "Please search for Python tutorials";
+    const char *input = "Please search for Python tutorials";
     agentos_intent_t *intent = NULL;
     agentos_intent_parser_parse(p, input, strlen(input), &intent);
 
@@ -234,7 +235,7 @@ static void test_parser_stats_tracking(void)
     }
 
     const char *inputs[] = {"hello", "what is this", "search something", "help me please"};
-    int n                = sizeof(inputs) / sizeof(inputs[0]);
+    int n = sizeof(inputs) / sizeof(inputs[0]);
 
     for (int i = 0; i < n; i++) {
         agentos_intent_t *intent = NULL;
@@ -243,7 +244,7 @@ static void test_parser_stats_tracking(void)
             agentos_intent_free(intent);
     }
 
-    char *stats         = NULL;
+    char *stats = NULL;
     agentos_error_t err = agentos_intent_parser_stats(p, &stats);
     if (err == AGENTOS_SUCCESS && stats != NULL) {
         printf("    Stats: %.120s\n", stats);
@@ -323,7 +324,7 @@ static void test_parser_health_check_json(void)
         return;
     }
 
-    char *json          = NULL;
+    char *json = NULL;
     agentos_error_t err = agentos_intent_parser_health_check(p, &json);
 
     if (err == AGENTOS_SUCCESS && json != NULL) {

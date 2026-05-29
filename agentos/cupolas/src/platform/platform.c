@@ -10,43 +10,56 @@
  */
 
 #include "platform.h"
+
 #include "atomic_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
+
+#include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <errno.h>
 #ifndef _WIN32
 #include "agentos_mman.h"
 #endif
 
 #if cupolas_PLATFORM_WINDOWS
-    #include <io.h>
-    #include <direct.h>
-    #include <process.h>
-    #include <windows.h>
-    #define getcwd _getcwd
-    #define rmdir _rmdir
-    #define unlink _unlink
-    #define access _access /* flawfinder: ignore */
-    #define F_OK 0
-    #define W_OK 2
-    #define R_OK 4
+#include <direct.h>
+#include <io.h>
+#include <process.h>
+#include <windows.h>
+#define getcwd _getcwd
+#define rmdir _rmdir
+#define unlink _unlink
+#define access _access /* flawfinder: ignore */
+#define F_OK 0
+#define W_OK 2
+#define R_OK 4
 #else
-    #include <unistd.h>
-    #include <sys/stat.h>
-    #include <sys/wait.h>
-    #include <signal.h>
-    #include <time.h>
-    #include <fcntl.h>
-    #include <pthread.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 #endif
+
+#ifndef AGENTOS_EINVAL
+#define AGENTOS_EINVAL (-1)
+#endif
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL (-1)
+#endif
+
+extern char **environ;
 
 /* ============================================================================
  * Mutex Implementation
  * ============================================================================ */
 
-int cupolas_mutex_init(cupolas_mutex_t* mutex) {
+int cupolas_mutex_init(cupolas_mutex_t *mutex)
+{
 #if cupolas_PLATFORM_WINDOWS
     InitializeCriticalSection(mutex);
     return 0;
@@ -55,7 +68,8 @@ int cupolas_mutex_init(cupolas_mutex_t* mutex) {
 #endif
 }
 
-int cupolas_mutex_destroy(cupolas_mutex_t* mutex) {
+int cupolas_mutex_destroy(cupolas_mutex_t *mutex)
+{
 #if cupolas_PLATFORM_WINDOWS
     DeleteCriticalSection(mutex);
     return 0;
@@ -64,7 +78,8 @@ int cupolas_mutex_destroy(cupolas_mutex_t* mutex) {
 #endif
 }
 
-int cupolas_mutex_lock(cupolas_mutex_t* mutex) {
+int cupolas_mutex_lock(cupolas_mutex_t *mutex)
+{
 #if cupolas_PLATFORM_WINDOWS
     EnterCriticalSection(mutex);
     return 0;
@@ -73,18 +88,22 @@ int cupolas_mutex_lock(cupolas_mutex_t* mutex) {
 #endif
 }
 
-int cupolas_mutex_trylock(cupolas_mutex_t* mutex) {
+int cupolas_mutex_trylock(cupolas_mutex_t *mutex)
+{
 #if cupolas_PLATFORM_WINDOWS
     return TryEnterCriticalSection(mutex) ? 0 : cupolas_ERROR_BUSY;
 #else
     int ret = pthread_mutex_trylock(mutex);
-    if (ret == 0) return 0;
-    if (ret == EBUSY) return cupolas_ERROR_BUSY;
-    return -1;
+    if (ret == 0)
+        return 0;
+    if (ret == EBUSY)
+        return cupolas_ERROR_BUSY;
+    return AGENTOS_EINVAL;
 #endif
 }
 
-int cupolas_mutex_unlock(cupolas_mutex_t* mutex) {
+int cupolas_mutex_unlock(cupolas_mutex_t *mutex)
+{
 #if cupolas_PLATFORM_WINDOWS
     LeaveCriticalSection(mutex);
     return 0;
@@ -97,7 +116,8 @@ int cupolas_mutex_unlock(cupolas_mutex_t* mutex) {
  * Read-Write Lock Implementation
  * ============================================================================ */
 
-int cupolas_rwlock_init(cupolas_rwlock_t* rwlock) {
+int cupolas_rwlock_init(cupolas_rwlock_t *rwlock)
+{
 #if cupolas_PLATFORM_WINDOWS
     InitializeSRWLock(&rwlock->lock);
     rwlock->state = 0;
@@ -107,7 +127,8 @@ int cupolas_rwlock_init(cupolas_rwlock_t* rwlock) {
 #endif
 }
 
-int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock) {
+int cupolas_rwlock_destroy(cupolas_rwlock_t *rwlock)
+{
 #if cupolas_PLATFORM_WINDOWS
     rwlock->state = 0;
     (void)rwlock;
@@ -117,7 +138,8 @@ int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock) {
 #endif
 }
 
-int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock) {
+int cupolas_rwlock_rdlock(cupolas_rwlock_t *rwlock)
+{
 #if cupolas_PLATFORM_WINDOWS
     AcquireSRWLockShared(&rwlock->lock);
     atomic_fetch_add_32(&rwlock->state, 1, memory_order_seq_cst);
@@ -127,7 +149,8 @@ int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock) {
 #endif
 }
 
-int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock) {
+int cupolas_rwlock_wrlock(cupolas_rwlock_t *rwlock)
+{
 #if cupolas_PLATFORM_WINDOWS
     AcquireSRWLockExclusive(&rwlock->lock);
     atomic_exchange_32(&rwlock->state, -1, memory_order_seq_cst);
@@ -137,33 +160,42 @@ int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock) {
 #endif
 }
 
-int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock) {
+int cupolas_rwlock_tryrdlock(cupolas_rwlock_t *rwlock)
+{
 #if cupolas_PLATFORM_WINDOWS
-    if (!TryAcquireSRWLockShared(&rwlock->lock)) return cupolas_ERROR_BUSY;
+    if (!TryAcquireSRWLockShared(&rwlock->lock))
+        return cupolas_ERROR_BUSY;
     atomic_fetch_add_32(&rwlock->state, 1, memory_order_seq_cst);
     return 0;
 #else
     int ret = pthread_rwlock_tryrdlock(rwlock);
-    if (ret == 0) return 0;
-    if (ret == EBUSY) return cupolas_ERROR_BUSY;
-    return -1;
+    if (ret == 0)
+        return 0;
+    if (ret == EBUSY)
+        return cupolas_ERROR_BUSY;
+    return AGENTOS_EINVAL;
 #endif
 }
 
-int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock) {
+int cupolas_rwlock_trywrlock(cupolas_rwlock_t *rwlock)
+{
 #if cupolas_PLATFORM_WINDOWS
-    if (!TryAcquireSRWLockExclusive(&rwlock->lock)) return cupolas_ERROR_BUSY;
+    if (!TryAcquireSRWLockExclusive(&rwlock->lock))
+        return cupolas_ERROR_BUSY;
     atomic_exchange_32(&rwlock->state, -1, memory_order_seq_cst);
     return 0;
 #else
     int ret = pthread_rwlock_trywrlock(rwlock);
-    if (ret == 0) return 0;
-    if (ret == EBUSY) return cupolas_ERROR_BUSY;
-    return -1;
+    if (ret == 0)
+        return 0;
+    if (ret == EBUSY)
+        return cupolas_ERROR_BUSY;
+    return AGENTOS_EINVAL;
 #endif
 }
 
-int cupolas_rwlock_unlock(cupolas_rwlock_t* rwlock) {
+int cupolas_rwlock_unlock(cupolas_rwlock_t *rwlock)
+{
 #if cupolas_PLATFORM_WINDOWS
     long s = atomic_fetch_add_32(&rwlock->state, 0, memory_order_seq_cst);
     if (s < 0) {
@@ -183,7 +215,8 @@ int cupolas_rwlock_unlock(cupolas_rwlock_t* rwlock) {
  * Condition Variable Implementation
  * ============================================================================ */
 
-int cupolas_cond_init(cupolas_cond_t* cond) {
+int cupolas_cond_init(cupolas_cond_t *cond)
+{
 #if cupolas_PLATFORM_WINDOWS
     InitializeConditionVariable(cond);
     return 0;
@@ -192,7 +225,8 @@ int cupolas_cond_init(cupolas_cond_t* cond) {
 #endif
 }
 
-int cupolas_cond_destroy(cupolas_cond_t* cond) {
+int cupolas_cond_destroy(cupolas_cond_t *cond)
+{
 #if cupolas_PLATFORM_WINDOWS
     /* CONDITION_VARIABLE does not need destruction */
     (void)cond;
@@ -202,7 +236,8 @@ int cupolas_cond_destroy(cupolas_cond_t* cond) {
 #endif
 }
 
-int cupolas_cond_wait(cupolas_cond_t* cond, cupolas_mutex_t* mutex) {
+int cupolas_cond_wait(cupolas_cond_t *cond, cupolas_mutex_t *mutex)
+{
 #if cupolas_PLATFORM_WINDOWS
     SleepConditionVariableCS(cond, mutex, INFINITE) ? 0 : -1;
 #else
@@ -210,8 +245,8 @@ int cupolas_cond_wait(cupolas_cond_t* cond, cupolas_mutex_t* mutex) {
 #endif
 }
 
-int cupolas_cond_timedwait(cupolas_cond_t* cond, cupolas_mutex_t* mutex,
-                           uint32_t timeout_ms) {
+int cupolas_cond_timedwait(cupolas_cond_t *cond, cupolas_mutex_t *mutex, uint32_t timeout_ms)
+{
 #if cupolas_PLATFORM_WINDOWS
     if (!SleepConditionVariableCS(cond, mutex, timeout_ms))
         return cupolas_ERROR_TIMEOUT;
@@ -226,13 +261,16 @@ int cupolas_cond_timedwait(cupolas_cond_t* cond, cupolas_mutex_t* mutex,
         ts.tv_sec++;
     }
     int ret = pthread_cond_timedwait(cond, mutex, &ts);
-    if (ret == 0) return 0;
-    if (ret == ETIMEDOUT) return cupolas_ERROR_TIMEOUT;
-    return -1;
+    if (ret == 0)
+        return 0;
+    if (ret == ETIMEDOUT)
+        return cupolas_ERROR_TIMEOUT;
+    return AGENTOS_EINVAL;
 #endif
 }
 
-int cupolas_cond_signal(cupolas_cond_t* cond) {
+int cupolas_cond_signal(cupolas_cond_t *cond)
+{
 #if cupolas_PLATFORM_WINDOWS
     WakeConditionVariable(cond);
     return 0;
@@ -241,7 +279,8 @@ int cupolas_cond_signal(cupolas_cond_t* cond) {
 #endif
 }
 
-int cupolas_cond_broadcast(cupolas_cond_t* cond) {
+int cupolas_cond_broadcast(cupolas_cond_t *cond)
+{
 #if cupolas_PLATFORM_WINDOWS
     WakeAllConditionVariable(cond);
     return 0;
@@ -256,58 +295,71 @@ int cupolas_cond_broadcast(cupolas_cond_t* cond) {
 
 typedef struct thread_wrapper_arg {
     cupolas_thread_func_t func;
-    void* arg;
+    void *arg;
 } thread_wrapper_arg_t;
 
 #if !cupolas_PLATFORM_WINDOWS
-static void* thread_wrapper(void* arg) {
-    thread_wrapper_arg_t* wrapper = (thread_wrapper_arg_t*)arg;
+static void *thread_wrapper(void *arg)
+{
+    thread_wrapper_arg_t *wrapper = (thread_wrapper_arg_t *)arg;
     cupolas_thread_func_t func = wrapper->func;
-    void* user_arg = wrapper->arg;
-    free(wrapper);
+    void *user_arg = wrapper->arg;
+    AGENTOS_FREE(wrapper);
     return func(user_arg);
 }
 #endif
 
-int cupolas_thread_create(cupolas_thread_t* thread, cupolas_thread_func_t func, void* arg) {
+int cupolas_thread_create(cupolas_thread_t *thread, cupolas_thread_func_t func, void *arg)
+{
 #if cupolas_PLATFORM_WINDOWS
-    thread_wrapper_arg_t* wrapper = (thread_wrapper_arg_t*)malloc(sizeof(thread_wrapper_arg_t));
-    if (!wrapper) return cupolas_ERROR_NO_MEMORY;
+    thread_wrapper_arg_t *wrapper =
+        (thread_wrapper_arg_t *)AGENTOS_MALLOC(sizeof(thread_wrapper_arg_t));
+    if (!wrapper)
+        return cupolas_ERROR_NO_MEMORY;
     wrapper->func = func;
     wrapper->arg = arg;
 
-    *thread = CreateThread(NULL, 0,
-                          (LPTHREAD_START_ROUTINE)(void(*)(void*))func,
-                          arg, 0, NULL);
-    if (*thread == NULL) { free(wrapper); return cupolas_ERROR_UNKNOWN; }
-    free(wrapper);
+    *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(void (*)(void *))func, arg, 0, NULL);
+    if (*thread == NULL) {
+        AGENTOS_FREE(wrapper);
+        return cupolas_ERROR_UNKNOWN;
+    }
+    AGENTOS_FREE(wrapper);
     return 0;
 #else
-    thread_wrapper_arg_t* wrapper = (thread_wrapper_arg_t*)malloc(sizeof(thread_wrapper_arg_t));
-    if (!wrapper) return cupolas_ERROR_NO_MEMORY;
+    thread_wrapper_arg_t *wrapper =
+        (thread_wrapper_arg_t *)AGENTOS_MALLOC(sizeof(thread_wrapper_arg_t));
+    if (!wrapper)
+        return cupolas_ERROR_NO_MEMORY;
     wrapper->func = func;
     wrapper->arg = arg;
 
     int ret = pthread_create(thread, NULL, thread_wrapper, wrapper);
-    if (ret != 0) { free(wrapper); return -1; }
+    if (ret != 0) {
+        AGENTOS_FREE(wrapper);
+        return AGENTOS_EINVAL;
+    }
     return 0;
 #endif
 }
 
-int cupolas_thread_join(cupolas_thread_t thread, void** retval) {
+int cupolas_thread_join(cupolas_thread_t thread, void **retval)
+{
 #if cupolas_PLATFORM_WINDOWS
     WaitForSingleObject(thread, INFINITE);
     DWORD exit_code;
     GetExitCodeThread(thread, &exit_code);
     CloseHandle(thread);
-    if (retval) *retval = (void*)(uintptr_t)exit_code;
+    if (retval)
+        *retval = (void *)(uintptr_t)exit_code;
     return 0;
 #else
     return pthread_join(thread, retval) == 0 ? 0 : -1;
 #endif
 }
 
-int cupolas_thread_detach(cupolas_thread_t thread) {
+int cupolas_thread_detach(cupolas_thread_t thread)
+{
 #if cupolas_PLATFORM_WINDOWS
     CloseHandle(thread);
     return 0;
@@ -316,7 +368,8 @@ int cupolas_thread_detach(cupolas_thread_t thread) {
 #endif
 }
 
-cupolas_thread_id_t cupolas_thread_self(void) {
+cupolas_thread_id_t cupolas_thread_self(void)
+{
 #if cupolas_PLATFORM_WINDOWS
     return GetCurrentThreadId();
 #else
@@ -324,7 +377,8 @@ cupolas_thread_id_t cupolas_thread_self(void) {
 #endif
 }
 
-bool cupolas_thread_equal(cupolas_thread_id_t t1, cupolas_thread_id_t t2) {
+bool cupolas_thread_equal(cupolas_thread_id_t t1, cupolas_thread_id_t t2)
+{
 #if cupolas_PLATFORM_WINDOWS
     return t1 == t2;
 #else
@@ -336,14 +390,14 @@ bool cupolas_thread_equal(cupolas_thread_id_t t1, cupolas_thread_id_t t2) {
  * Process Implementation
  * ============================================================================ */
 
-int cupolas_process_spawn(cupolas_process_t* proc,
-                        const char* path,
-                        char* const argv[],
-                        const cupolas_process_attr_t* attr) {
-    if (!proc || !path || !argv) return cupolas_ERROR_INVALID_ARG;
+int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const argv[],
+                          const cupolas_process_attr_t *attr)
+{
+    if (!proc || !path || !argv)
+        return cupolas_ERROR_INVALID_ARG;
 
 #if cupolas_PLATFORM_WINDOWS
-    STARTUPINFOA si = { 0 };
+    STARTUPINFOA si = {0};
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
     si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
@@ -359,35 +413,39 @@ int cupolas_process_spawn(cupolas_process_t* proc,
             si.hStdError = attr->stderr_pipe;
     }
 
-    PROCESS_INFORMATION pi = { 0 };
-    char cmdLine[4096] = { 0 };
+    PROCESS_INFORMATION pi = {0};
+    char cmdLine[4096] = {0};
     size_t offset = 0;
 
     for (int i = 0; argv[i] != NULL; i++) {
         size_t len = strlen(argv[i]);
-        if (offset + len + 2 > sizeof(cmdLine)) return cupolas_ERROR_OVERFLOW;
-        if (i > 0) cmdLine[offset++] = ' ';
+        if (offset + len + 2 > sizeof(cmdLine))
+            return cupolas_ERROR_OVERFLOW;
+        if (i > 0)
+            cmdLine[offset++] = ' ';
         memcpy(cmdLine + offset, argv[i], len);
         offset += len;
     }
     cmdLine[offset] = '\0';
 
-    const char* working_dir = (attr && attr->working_dir) ? attr->working_dir : NULL;
+    const char *working_dir = (attr && attr->working_dir) ? attr->working_dir : NULL;
     LPVOID env_block = NULL;
     if (attr && attr->env) {
         env_block = (LPVOID)attr->env;
     }
 
-    BOOL ok = CreateProcessA(NULL, cmdLine, NULL, NULL, TRUE,
-                              CREATE_NO_WINDOW, env_block, working_dir, &si, &pi);
-    if (!ok) return cupolas_ERROR_IO;
+    BOOL ok = CreateProcessA(NULL, cmdLine, NULL, NULL, TRUE, CREATE_NO_WINDOW, env_block,
+                             working_dir, &si, &pi);
+    if (!ok)
+        return cupolas_ERROR_IO;
 
     *proc = pi.hProcess;
     CloseHandle(pi.hThread);
     return 0;
 #else
     pid_t pid = fork();
-    if (pid < 0) return cupolas_ERROR_IO;
+    if (pid < 0)
+        return cupolas_ERROR_IO;
     if (pid == 0) {
         if (attr) {
             if (attr->working_dir) {
@@ -410,12 +468,11 @@ int cupolas_process_spawn(cupolas_process_t* proc,
                 close(attr->stderr_pipe[1]);
             }
             if (attr->env) {
-                extern char** environ;
-                environ = (char**)attr->env;
+                environ = (char **)attr->env;
             }
         }
         if (attr && attr->env) {
-            execve(path, argv, (char* const*)attr->env);
+            execve(path, argv, (char *const *)attr->env);
         } else {
             execvp(path, argv);
         }
@@ -426,15 +483,18 @@ int cupolas_process_spawn(cupolas_process_t* proc,
 #endif
 }
 
-int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status,
-                        uint32_t timeout_ms) {
-    if (!status) return cupolas_ERROR_INVALID_ARG;
+int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t *status, uint32_t timeout_ms)
+{
+    if (!status)
+        return cupolas_ERROR_INVALID_ARG;
 
 #if cupolas_PLATFORM_WINDOWS
     DWORD ms = (timeout_ms == 0) ? INFINITE : (DWORD)timeout_ms;
     DWORD result = WaitForSingleObject(proc, ms);
-    if (result == WAIT_TIMEOUT) return cupolas_ERROR_TIMEOUT;
-    if (result != WAIT_OBJECT_0) return cupolas_ERROR_IO;
+    if (result == WAIT_TIMEOUT)
+        return cupolas_ERROR_TIMEOUT;
+    if (result != WAIT_OBJECT_0)
+        return cupolas_ERROR_IO;
 
     DWORD exit_code;
     GetExitCodeProcess(proc, &exit_code);
@@ -446,7 +506,8 @@ int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status,
     if (timeout_ms == 0) {
         int s;
         pid_t ret = waitpid(proc, &s, 0);
-        if (ret < 0) return cupolas_ERROR_IO;
+        if (ret < 0)
+            return cupolas_ERROR_IO;
         status->signaled = WIFSIGNALED(s);
         status->signal = WTERMSIG(s);
         status->code = WEXITSTATUS(s);
@@ -461,7 +522,8 @@ int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status,
                 status->code = WEXITSTATUS(s);
                 return 0;
             }
-            if (ret < 0 && errno != ECHILD) return cupolas_ERROR_IO;
+            if (ret < 0 && errno != ECHILD)
+                return cupolas_ERROR_IO;
             usleep(10000);
         }
         return cupolas_ERROR_TIMEOUT;
@@ -469,7 +531,8 @@ int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status,
 #endif
 }
 
-int cupolas_process_terminate(cupolas_process_t proc, int signal) {
+int cupolas_process_terminate(cupolas_process_t proc, int signal)
+{
 #if cupolas_PLATFORM_WINDOWS
     (void)signal;
     return TerminateProcess(proc, 1) ? 0 : -1;
@@ -478,7 +541,8 @@ int cupolas_process_terminate(cupolas_process_t proc, int signal) {
 #endif
 }
 
-int cupolas_process_close(cupolas_process_t proc) {
+int cupolas_process_close(cupolas_process_t proc)
+{
 #if cupolas_PLATFORM_WINDOWS
     return CloseHandle(proc) ? 0 : -1;
 #else
@@ -487,7 +551,8 @@ int cupolas_process_close(cupolas_process_t proc) {
 #endif
 }
 
-cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc) {
+cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc)
+{
 #if cupolas_PLATFORM_WINDOWS
     return GetProcessId(proc);
 #else
@@ -499,12 +564,14 @@ cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc) {
  * Pipe Implementation
  * ============================================================================ */
 
-int cupolas_pipe_create(cupolas_pipe_t* pfd) {
+int cupolas_pipe_create(cupolas_pipe_t *pfd)
+{
 #if cupolas_PLATFORM_WINDOWS
     HANDLE readHandle, writeHandle;
-    SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+    SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), NULL, TRUE};
 
-    if (!CreatePipe(&readHandle, &writeHandle, &sa, 0)) return cupolas_ERROR_IO;
+    if (!CreatePipe(&readHandle, &writeHandle, &sa, 0))
+        return cupolas_ERROR_IO;
     pfd[0] = readHandle;
     pfd[1] = writeHandle;
     return 0;
@@ -513,7 +580,8 @@ int cupolas_pipe_create(cupolas_pipe_t* pfd) {
 #endif
 }
 
-int cupolas_pipe_close(cupolas_pipe_t* pipe) {
+int cupolas_pipe_close(cupolas_pipe_t *pipe)
+{
 #if cupolas_PLATFORM_WINDOWS
     CloseHandle(pipe[0]);
     CloseHandle(pipe[1]);
@@ -525,32 +593,38 @@ int cupolas_pipe_close(cupolas_pipe_t* pipe) {
 #endif
 }
 
-int cupolas_pipe_read(cupolas_pipe_t* pipe, void* buf, size_t count,
-                     size_t* bytes_read) {
+int cupolas_pipe_read(cupolas_pipe_t *pipe, void *buf, size_t count, size_t *bytes_read)
+{
 #if cupolas_PLATFORM_WINDOWS
     DWORD bytesRead = 0;
     BOOL ok = ReadFile(pipe[0], buf, (DWORD)count, &bytesRead, NULL);
-    if (bytes_read) *bytes_read = bytesRead;
+    if (bytes_read)
+        *bytes_read = bytesRead;
     return ok ? 0 : cupolas_ERROR_IO;
 #else
     ssize_t n = read((*pipe)[0], buf, count);
-    if (n < 0) return cupolas_ERROR_IO;
-    if (bytes_read) *bytes_read = (size_t)n;
+    if (n < 0)
+        return cupolas_ERROR_IO;
+    if (bytes_read)
+        *bytes_read = (size_t)n;
     return 0;
 #endif
 }
 
-int cupolas_pipe_write(cupolas_pipe_t* pipe, const void* buf, size_t count,
-                      size_t* bytes_written) {
+int cupolas_pipe_write(cupolas_pipe_t *pipe, const void *buf, size_t count, size_t *bytes_written)
+{
 #if cupolas_PLATFORM_WINDOWS
     DWORD written = 0;
     BOOL ok = WriteFile(pipe[1], buf, (DWORD)count, &written, NULL);
-    if (bytes_written) *bytes_written = written;
+    if (bytes_written)
+        *bytes_written = written;
     return ok ? 0 : cupolas_ERROR_IO;
 #else
     ssize_t n = write((*pipe)[1], buf, count);
-    if (n < 0) return cupolas_ERROR_IO;
-    if (bytes_written) *bytes_written = (size_t)n;
+    if (n < 0)
+        return cupolas_ERROR_IO;
+    if (bytes_written)
+        *bytes_written = (size_t)n;
     return 0;
 #endif
 }
@@ -559,8 +633,10 @@ int cupolas_pipe_write(cupolas_pipe_t* pipe, const void* buf, size_t count,
  * Time Implementation
  * ============================================================================ */
 
-int cupolas_time_now(cupolas_timestamp_t* ts) {
-    if (!ts) return cupolas_ERROR_INVALID_ARG;
+int cupolas_time_now(cupolas_timestamp_t *ts)
+{
+    if (!ts)
+        return cupolas_ERROR_INVALID_ARG;
 #if cupolas_PLATFORM_WINDOWS
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
@@ -573,15 +649,18 @@ int cupolas_time_now(cupolas_timestamp_t* ts) {
     return 0;
 #else
     struct timespec tp;
-    if (clock_gettime(CLOCK_REALTIME, &tp) != 0) return cupolas_ERROR_IO;
+    if (clock_gettime(CLOCK_REALTIME, &tp) != 0)
+        return cupolas_ERROR_IO;
     ts->sec = tp.tv_sec;
     ts->nsec = tp.tv_nsec;
     return 0;
 #endif
 }
 
-int cupolas_time_mono(cupolas_timestamp_t* ts) {
-    if (!ts) return cupolas_ERROR_INVALID_ARG;
+int cupolas_time_mono(cupolas_timestamp_t *ts)
+{
+    if (!ts)
+        return cupolas_ERROR_INVALID_ARG;
 #if cupolas_PLATFORM_WINDOWS
     LARGE_INTEGER freq, counter;
     QueryPerformanceFrequency(&freq);
@@ -592,14 +671,16 @@ int cupolas_time_mono(cupolas_timestamp_t* ts) {
     return 0;
 #else
     struct timespec tp;
-    if (clock_gettime(CLOCK_MONOTONIC, &tp) != 0) return cupolas_ERROR_IO;
+    if (clock_gettime(CLOCK_MONOTONIC, &tp) != 0)
+        return cupolas_ERROR_IO;
     ts->sec = tp.tv_sec;
     ts->nsec = tp.tv_nsec;
     return 0;
 #endif
 }
 
-uint64_t cupolas_time_ms(void) {
+uint64_t cupolas_time_ms(void)
+{
 #if cupolas_PLATFORM_WINDOWS
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
@@ -614,7 +695,8 @@ uint64_t cupolas_time_ms(void) {
 #endif
 }
 
-void cupolas_sleep_ms(uint32_t ms) {
+void cupolas_sleep_ms(uint32_t ms)
+{
 #if cupolas_PLATFORM_WINDOWS
     Sleep(ms);
 #else
@@ -622,7 +704,8 @@ void cupolas_sleep_ms(uint32_t ms) {
 #endif
 }
 
-void cupolas_sleep_us(uint32_t us) {
+void cupolas_sleep_us(uint32_t us)
+{
 #if cupolas_PLATFORM_WINDOWS
     if (us < 1000) {
         Sleep(1);
@@ -638,15 +721,16 @@ void cupolas_sleep_us(uint32_t us) {
  * File System Implementation
  * ============================================================================ */
 
-int cupolas_file_stat(const char* path, cupolas_file_stat_t* file_stat) {
-    if (!path || !file_stat) return cupolas_ERROR_INVALID_ARG;
+int cupolas_file_stat(const char *path, cupolas_file_stat_t *file_stat)
+{
+    if (!path || !file_stat)
+        return cupolas_ERROR_INVALID_ARG;
     memset(file_stat, 0, sizeof(*file_stat));
 
 #if cupolas_PLATFORM_WINDOWS
     WIN32_FILE_ATTRIBUTE_DATA fad;
     if (!GetFileAttributesExA(path, GetFileExInfoStandard, &fad)) {
-        if (GetLastError() == ERROR_FILE_NOT_FOUND ||
-            GetLastError() == ERROR_PATH_NOT_FOUND) {
+        if (GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND) {
             file_stat->exists = false;
             return 0;
         }
@@ -668,7 +752,10 @@ int cupolas_file_stat(const char* path, cupolas_file_stat_t* file_stat) {
 #else
     struct stat st;
     if (stat(path, &st) != 0) {
-        if (errno == ENOENT) { file_stat->exists = false; return 0; }
+        if (errno == ENOENT) {
+            file_stat->exists = false;
+            return 0;
+        }
         return cupolas_ERROR_IO;
     }
 
@@ -682,8 +769,10 @@ int cupolas_file_stat(const char* path, cupolas_file_stat_t* file_stat) {
 #endif
 }
 
-int cupolas_file_exists(const char* path) {
-    if (!path) return 0;
+int cupolas_file_exists(const char *path)
+{
+    if (!path)
+        return 0;
 #if cupolas_PLATFORM_WINDOWS
     DWORD attrs = GetFileAttributesA(path);
     return (attrs != INVALID_FILE_ATTRIBUTES) ? 1 : 0;
@@ -693,14 +782,16 @@ int cupolas_file_exists(const char* path) {
 #endif
 }
 
-int cupolas_file_mkdir(const char* path, bool recursive) {
-    if (!path) return cupolas_ERROR_INVALID_ARG;
+int cupolas_file_mkdir(const char *path, bool recursive)
+{
+    if (!path)
+        return cupolas_ERROR_INVALID_ARG;
 #if cupolas_PLATFORM_WINDOWS
     if (recursive) {
         char tmp[cupolas_PATH_MAX];
         strncpy(tmp, path, sizeof(tmp) - 1);
         tmp[sizeof(tmp) - 1] = '\0';
-        for (char* p = tmp + 1; *p; p++) {
+        for (char *p = tmp + 1; *p; p++) {
             if (*p == '\\' || *p == '/') {
                 *p = '\0';
                 CreateDirectoryA(tmp, NULL);
@@ -714,7 +805,7 @@ int cupolas_file_mkdir(const char* path, bool recursive) {
         char tmp[cupolas_PATH_MAX];
         strncpy(tmp, path, sizeof(tmp) - 1);
         tmp[sizeof(tmp) - 1] = '\0';
-        for (char* p = tmp + 1; *p; p++) {
+        for (char *p = tmp + 1; *p; p++) {
             if (*p == '/') {
                 *p = '\0';
                 mkdir(tmp, 0755);
@@ -726,11 +817,14 @@ int cupolas_file_mkdir(const char* path, bool recursive) {
 #endif
 }
 
-int cupolas_file_remove(const char* path) {
-    if (!path) return cupolas_ERROR_INVALID_ARG;
+int cupolas_file_remove(const char *path)
+{
+    if (!path)
+        return cupolas_ERROR_INVALID_ARG;
 #if cupolas_PLATFORM_WINDOWS
     DWORD attrs = GetFileAttributesA(path);
-    if (attrs == INVALID_FILE_ATTRIBUTES) return cupolas_ERROR_NOT_FOUND;
+    if (attrs == INVALID_FILE_ATTRIBUTES)
+        return cupolas_ERROR_NOT_FOUND;
     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
         return RemoveDirectoryA(path) ? 0 : cupolas_ERROR_IO;
     return DeleteFileA(path) ? 0 : cupolas_ERROR_IO;
@@ -739,8 +833,10 @@ int cupolas_file_remove(const char* path) {
 #endif
 }
 
-int cupolas_file_rename(const char* old_path, const char* new_path) {
-    if (!old_path || !new_path) return cupolas_ERROR_INVALID_ARG;
+int cupolas_file_rename(const char *old_path, const char *new_path)
+{
+    if (!old_path || !new_path)
+        return cupolas_ERROR_INVALID_ARG;
 #if cupolas_PLATFORM_WINDOWS
     return MoveFileExA(old_path, new_path, MOVEFILE_REPLACE_EXISTING) ? 0 : cupolas_ERROR_IO;
 #else
@@ -748,13 +844,16 @@ int cupolas_file_rename(const char* old_path, const char* new_path) {
 #endif
 }
 
-char* cupolas_file_abspath(const char* path, char* buf, size_t size) {
-    if (!path || !buf || size == 0) return NULL;
+char *cupolas_file_abspath(const char *path, char *buf, size_t size)
+{
+    if (!path || !buf || size == 0)
+        return NULL;
 #if cupolas_PLATFORM_WINDOWS
     DWORD ret = GetFullPathNameA(path, (DWORD)size, buf, NULL);
     return (ret > 0 && ret < size) ? buf : NULL;
 #else
-    if (realpath(path, buf)) return buf;
+    if (realpath(path, buf))
+        return buf;
     if (strlen(path) < size) {
         strncpy(buf, path, size - 1);
         buf[size - 1] = '\0';
@@ -764,19 +863,23 @@ char* cupolas_file_abspath(const char* path, char* buf, size_t size) {
 #endif
 }
 
-char* cupolas_file_dirname(const char* path, char* buf, size_t size) {
-    if (!path || !buf || size == 0) return NULL;
+char *cupolas_file_dirname(const char *path, char *buf, size_t size)
+{
+    if (!path || !buf || size == 0)
+        return NULL;
 
     size_t len = strlen(path);
-    if (len >= size) return NULL;
+    if (len >= size)
+        return NULL;
 
     strncpy(buf, path, size);
     buf[size - 1] = '\0';
 
-    char* last_slash = strrchr(buf, '/');
+    char *last_slash = strrchr(buf, '/');
 #if cupolas_PLATFORM_WINDOWS
-    char* last_bs = strrchr(buf, '\\');
-    if (last_bs > last_slash) last_slash = last_bs;
+    char *last_bs = strrchr(buf, '\\');
+    if (last_bs > last_slash)
+        last_slash = last_bs;
 #endif
 
     if (last_slash) {
@@ -792,69 +895,85 @@ char* cupolas_file_dirname(const char* path, char* buf, size_t size) {
  * Memory Implementation
  * ============================================================================ */
 
-void* cupolas_mem_alloc(size_t size) {
-    if (size == 0) return NULL;
+void *cupolas_mem_alloc(size_t size)
+{
+    if (size == 0)
+        return NULL;
 #if cupolas_PLATFORM_WINDOWS
     return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
 #else
-    void* ptr = malloc(size);
-    if (ptr) memset(ptr, 0, size);
+    void *ptr = AGENTOS_MALLOC(size);
+    if (ptr)
+        memset(ptr, 0, size);
     return ptr;
 #endif
 }
 
-void* cupolas_mem_alloc_aligned(size_t size, size_t alignment) {
-    if (size == 0 || alignment == 0) return NULL;
+void *cupolas_mem_alloc_aligned(size_t size, size_t alignment)
+{
+    if (size == 0 || alignment == 0)
+        return NULL;
 #if cupolas_PLATFORM_WINDOWS
     return _aligned_malloc(size, alignment);
 #else
-    void* ptr = NULL;
+    void *ptr = NULL;
     int ret = posix_memalign(&ptr, alignment, size);
-    if (ret != 0) return NULL;
+    if (ret != 0)
+        return NULL;
     return ptr;
 #endif
 }
 
-void cupolas_mem_free(void* ptr) {
-    if (!ptr) return;
+void cupolas_mem_free(void *ptr)
+{
+    if (!ptr)
+        return;
 #if cupolas_PLATFORM_WINDOWS
     HeapFree(GetProcessHeap(), 0, ptr);
 #else
-    free(ptr);
+    AGENTOS_FREE(ptr);
 #endif
 }
 
-void* cupolas_mem_realloc(void* ptr, size_t size) {
+void *cupolas_mem_realloc(void *ptr, size_t size)
+{
 #if cupolas_PLATFORM_WINDOWS
     return HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ptr, size);
 #else
-    return realloc(ptr, size);
+    return AGENTOS_REALLOC(ptr, size);
 #endif
 }
 
-void cupolas_mem_zero(void* ptr, size_t size) {
-    if (!ptr || size == 0) return;
+void cupolas_mem_zero(void *ptr, size_t size)
+{
+    if (!ptr || size == 0)
+        return;
 #if cupolas_PLATFORM_WINDOWS
     SecureZeroMemory(ptr, size);
 #else
-    volatile unsigned char* p = (volatile unsigned char*)ptr;
-    while (size--) *p++ = 0;
+    volatile unsigned char *p = (volatile unsigned char *)ptr;
+    while (size--)
+        *p++ = 0;
 #endif
 }
 
-void cupolas_mem_lock(void* ptr, size_t size) {
+void cupolas_mem_lock(void *ptr, size_t size)
+{
 #if cupolas_PLATFORM_WINDOWS
     VirtualLock(ptr, size);
 #else
-    if (ptr && size > 0) mlock(ptr, size);
+    if (ptr && size > 0)
+        mlock(ptr, size);
 #endif
 }
 
-void cupolas_mem_unlock(void* ptr, size_t size) {
+void cupolas_mem_unlock(void *ptr, size_t size)
+{
 #if cupolas_PLATFORM_WINDOWS
     VirtualUnlock(ptr, size);
 #else
-    if (ptr && size > 0) munlock(ptr, size);
+    if (ptr && size > 0)
+        munlock(ptr, size);
 #endif
 }
 
@@ -862,76 +981,95 @@ void cupolas_mem_unlock(void* ptr, size_t size) {
  * Atomic Operations Implementation
  * ============================================================================ */
 
-int32_t cupolas_atomic_load32(volatile int32_t* ptr) {
-    return (int32_t)atomic_load_32((volatile _Atomic long*)ptr, memory_order_seq_cst);
+int32_t cupolas_atomic_load32(volatile int32_t *ptr)
+{
+    return (int32_t)atomic_load_32((volatile _Atomic long *)ptr, memory_order_seq_cst);
 }
 
-void cupolas_atomic_store32(volatile int32_t* ptr, int32_t val) {
-    atomic_store_32((volatile _Atomic long*)ptr, (long)val, memory_order_seq_cst);
+void cupolas_atomic_store32(volatile int32_t *ptr, int32_t val)
+{
+    atomic_store_32((volatile _Atomic long *)ptr, (long)val, memory_order_seq_cst);
 }
 
-int32_t cupolas_atomic_add32(volatile int32_t* ptr, int32_t delta) {
-    return (int32_t)(atomic_fetch_add_32((volatile _Atomic long*)ptr, (long)delta, memory_order_seq_cst) + delta);
+int32_t cupolas_atomic_add32(volatile int32_t *ptr, int32_t delta)
+{
+    return (int32_t)(atomic_fetch_add_32((volatile _Atomic long *)ptr, (long)delta,
+                                         memory_order_seq_cst) +
+                     delta);
 }
 
-int32_t cupolas_atomic_sub32(volatile int32_t* ptr, int32_t delta) {
+int32_t cupolas_atomic_sub32(volatile int32_t *ptr, int32_t delta)
+{
     return cupolas_atomic_add32(ptr, -delta);
 }
 
-int32_t cupolas_atomic_inc32(volatile int32_t* ptr) {
+int32_t cupolas_atomic_inc32(volatile int32_t *ptr)
+{
     return cupolas_atomic_add32(ptr, 1);
 }
 
-int32_t cupolas_atomic_dec32(volatile int32_t* ptr) {
+int32_t cupolas_atomic_dec32(volatile int32_t *ptr)
+{
     return cupolas_atomic_sub32(ptr, 1);
 }
 
-bool cupolas_atomic_cas32(volatile int32_t* ptr, int32_t expected, int32_t desired) {
+bool cupolas_atomic_cas32(volatile int32_t *ptr, int32_t expected, int32_t desired)
+{
     long exp = (long)expected;
-    return atomic_compare_exchange_strong_32((volatile _Atomic long*)ptr, &exp, (long)desired,
-                                              memory_order_seq_cst, memory_order_seq_cst);
+    return atomic_compare_exchange_strong_32((volatile _Atomic long *)ptr, &exp, (long)desired,
+                                             memory_order_seq_cst, memory_order_seq_cst);
 }
 
-int64_t cupolas_atomic_load64(volatile int64_t* ptr) {
-    return atomic_load_64((volatile _Atomic int64_t*)ptr, memory_order_seq_cst);
+int64_t cupolas_atomic_load64(volatile int64_t *ptr)
+{
+    return atomic_load_64((volatile _Atomic int64_t *)ptr, memory_order_seq_cst);
 }
 
-void cupolas_atomic_store64(volatile int64_t* ptr, int64_t val) {
-    atomic_store_64((volatile _Atomic int64_t*)ptr, val, memory_order_seq_cst);
+void cupolas_atomic_store64(volatile int64_t *ptr, int64_t val)
+{
+    atomic_store_64((volatile _Atomic int64_t *)ptr, val, memory_order_seq_cst);
 }
 
-int64_t cupolas_atomic_add64(volatile int64_t* ptr, int64_t delta) {
-    return atomic_fetch_add_64((volatile _Atomic int64_t*)ptr, delta, memory_order_seq_cst) + delta;
+int64_t cupolas_atomic_add64(volatile int64_t *ptr, int64_t delta)
+{
+    return atomic_fetch_add_64((volatile _Atomic int64_t *)ptr, delta, memory_order_seq_cst) +
+           delta;
 }
 
-int64_t cupolas_atomic_sub64(volatile int64_t* ptr, int64_t delta) {
+int64_t cupolas_atomic_sub64(volatile int64_t *ptr, int64_t delta)
+{
     return cupolas_atomic_add64(ptr, -delta);
 }
 
-bool cupolas_atomic_cas64(volatile int64_t* ptr, int64_t expected, int64_t desired) {
+bool cupolas_atomic_cas64(volatile int64_t *ptr, int64_t expected, int64_t desired)
+{
     int64_t exp = expected;
-    return atomic_compare_exchange_strong_64((volatile _Atomic int64_t*)ptr, &exp, desired,
+    return atomic_compare_exchange_strong_64((volatile _Atomic int64_t *)ptr, &exp, desired,
+                                             memory_order_seq_cst, memory_order_seq_cst);
+}
+
+void *cupolas_atomic_load_ptr(volatile void **ptr)
+{
+    return atomic_load_ptr((_Atomic void **)ptr, memory_order_seq_cst);
+}
+
+void cupolas_atomic_store_ptr(volatile void **ptr, void *val)
+{
+    atomic_store_ptr((_Atomic void **)ptr, val, memory_order_seq_cst);
+}
+
+bool cupolas_atomic_cas_ptr(volatile void **ptr, void *expected, void *desired)
+{
+    return atomic_compare_exchange_strong_ptr((_Atomic void **)ptr, &expected, desired,
                                               memory_order_seq_cst, memory_order_seq_cst);
-}
-
-void* cupolas_atomic_load_ptr(volatile void** ptr) {
-    return atomic_load_ptr((_Atomic void**)ptr, memory_order_seq_cst);
-}
-
-void cupolas_atomic_store_ptr(volatile void** ptr, void* val) {
-    atomic_store_ptr((_Atomic void**)ptr, val, memory_order_seq_cst);
-}
-
-bool cupolas_atomic_cas_ptr(volatile void** ptr, void* expected, void* desired) {
-    return atomic_compare_exchange_strong_ptr((_Atomic void**)ptr, &expected, desired,
-                                               memory_order_seq_cst, memory_order_seq_cst);
 }
 
 /* ============================================================================
  * Error Handling Implementation
  * ============================================================================ */
 
-int cupolas_get_last_error(void) {
+int cupolas_get_last_error(void)
+{
 #if cupolas_PLATFORM_WINDOWS
     return (int)GetLastError();
 #else
@@ -939,28 +1077,40 @@ int cupolas_get_last_error(void) {
 #endif
 }
 
-const char* cupolas_strerror(int error) {
+const char *cupolas_strerror(int error)
+{
     switch (error) {
-        case 0:              return "Success";
-        case cupolas_ERROR_UNKNOWN:      return "Unknown error";
-        case cupolas_ERROR_INVALID_ARG:  return "Invalid argument";
-        case cupolas_ERROR_NO_MEMORY:    return "Out of memory";
-        case cupolas_ERROR_NOT_FOUND:    return "Not found";
-        case cupolas_ERROR_PERMISSION:   return "Permission denied";
-        case cupolas_ERROR_BUSY:         return "Resource busy";
-        case cupolas_ERROR_TIMEOUT:      return "Operation timed out";
-        case cupolas_ERROR_WOULD_BLOCK:   return "Operation would block";
-        case cupolas_ERROR_OVERFLOW:     return "Overflow";
-        case cupolas_ERROR_NOT_SUPPORTED: return "Not supported";
-        case cupolas_ERROR_IO:           return "I/O error";
-        default:
+    case 0:
+        return "Success";
+    case cupolas_ERROR_UNKNOWN:
+        return "Unknown error";
+    case cupolas_ERROR_INVALID_ARG:
+        return "Invalid argument";
+    case cupolas_ERROR_NO_MEMORY:
+        return "Out of memory";
+    case cupolas_ERROR_NOT_FOUND:
+        return "Not found";
+    case cupolas_ERROR_PERMISSION:
+        return "Permission denied";
+    case cupolas_ERROR_BUSY:
+        return "Resource busy";
+    case cupolas_ERROR_TIMEOUT:
+        return "Operation timed out";
+    case cupolas_ERROR_WOULD_BLOCK:
+        return "Operation would block";
+    case cupolas_ERROR_OVERFLOW:
+        return "Overflow";
+    case cupolas_ERROR_NOT_SUPPORTED:
+        return "Not supported";
+    case cupolas_ERROR_IO:
+        return "I/O error";
+    default:
 #if cupolas_PLATFORM_WINDOWS
-            static char msg[256];
-            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, (DWORD)error,
-                         0, msg, sizeof(msg), NULL);
-            return msg;
+        static char msg[256];
+        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, (DWORD)error, 0, msg, sizeof(msg), NULL);
+        return msg;
 #else
-            return strerror(error);
+        return strerror(error);
 #endif
     }
 }
@@ -969,19 +1119,25 @@ const char* cupolas_strerror(int error) {
  * String Utilities Implementation
  * ============================================================================ */
 
-char* cupolas_strdup(const char* str) {
-    if (!str) return NULL;
+char *cupolas_strdup(const char *str)
+{
+    if (!str)
+        return NULL;
     size_t len = strlen(str) + 1;
-    char* dup = (char*)cupolas_mem_alloc(len);
-    if (dup) memcpy(dup, str, len);
+    char *dup = (char *)cupolas_mem_alloc(len);
+    if (dup)
+        memcpy(dup, str, len);
     return dup;
 }
 
-char* cupolas_strndup(const char* str, size_t n) {
-    if (!str) return NULL;
+char *cupolas_strndup(const char *str, size_t n)
+{
+    if (!str)
+        return NULL;
     size_t len = strlen(str);
-    if (len > n) len = n;
-    char* dup = (char*)cupolas_mem_alloc(len + 1);
+    if (len > n)
+        len = n;
+    char *dup = (char *)cupolas_mem_alloc(len + 1);
     if (dup) {
         memcpy(dup, str, len);
         dup[len] = '\0';
@@ -989,8 +1145,10 @@ char* cupolas_strndup(const char* str, size_t n) {
     return dup;
 }
 
-int cupolas_strcasecmp(const char* s1, const char* s2) {
-    if (!s1 || !s2) return (s1 ? 1 : (s2 ? -1 : 0));
+int cupolas_strcasecmp(const char *s1, const char *s2)
+{
+    if (!s1 || !s2)
+        return (s1 ? 1 : (s2 ? -1 : 0));
 #if cupolas_PLATFORM_WINDOWS
     return _stricmp(s1, s2);
 #else
@@ -998,8 +1156,10 @@ int cupolas_strcasecmp(const char* s1, const char* s2) {
 #endif
 }
 
-int cupolas_strncasecmp(const char* s1, const char* s2, size_t n) {
-    if (!s1 || !s2) return (s1 ? 1 : (s2 ? -1 : 0));
+int cupolas_strncasecmp(const char *s1, const char *s2, size_t n)
+{
+    if (!s1 || !s2)
+        return (s1 ? 1 : (s2 ? -1 : 0));
 #if cupolas_PLATFORM_WINDOWS
     return _strnicmp(s1, s2, n);
 #else

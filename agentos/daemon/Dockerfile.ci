@@ -5,7 +5,7 @@
 FROM ubuntu:22.04 AS builder
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
-LABEL version="0.0.5"
+LABEL version="0.1.0"
 LABEL description="AgentOS daemon Build Environment"
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -105,7 +105,7 @@ RUN cd /build/daemon/market_d/build && ctest --output-on-failure
 FROM ubuntu:22.04 AS runtime
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
-LABEL version="0.0.5"
+LABEL version="0.1.0"
 LABEL description="AgentOS daemon Runtime"
 
 ENV DEBIAN_FRONTEND=noninteractive \
