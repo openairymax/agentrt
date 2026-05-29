@@ -4,17 +4,19 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "cache.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <unistd.h>
-#include "cache.h"
 
-static void test_cache_create_destroy(void) {
+static void test_cache_create_destroy(void)
+{
     printf("  test_cache_create_destroy...\n");
 
-    cache_t* cache = cache_create(100, 3600);
+    cache_t *cache = cache_create(100, 3600);
     assert(cache != NULL);
 
     cache_destroy(cache);
@@ -22,18 +24,19 @@ static void test_cache_create_destroy(void) {
     printf("    PASSED\n");
 }
 
-static void test_cache_put_get(void) {
+static void test_cache_put_get(void)
+{
     printf("  test_cache_put_get...\n");
 
-    cache_t* cache = cache_create(100, 3600);
+    cache_t *cache = cache_create(100, 3600);
     assert(cache != NULL);
 
-    const char* key = "test_key_123";
-    const char* value = "test_response_content";
+    const char *key = "test_key_123";
+    const char *value = "test_response_content";
 
     cache_put(cache, key, value);
 
-    char* retrieved = NULL;
+    char *retrieved = NULL;
     int ret __attribute__((unused)) = cache_get(cache, key, &retrieved);
     assert(ret == 1);
     assert(retrieved != NULL);
@@ -45,13 +48,14 @@ static void test_cache_put_get(void) {
     printf("    PASSED\n");
 }
 
-static void test_cache_miss(void) {
+static void test_cache_miss(void)
+{
     printf("  test_cache_miss...\n");
 
-    cache_t* cache = cache_create(100, 3600);
+    cache_t *cache = cache_create(100, 3600);
     assert(cache != NULL);
 
-    char* retrieved = NULL;
+    char *retrieved = NULL;
     int ret __attribute__((unused)) = cache_get(cache, "nonexistent_key", &retrieved);
     assert(ret != 0 || retrieved == NULL);
 
@@ -60,10 +64,11 @@ static void test_cache_miss(void) {
     printf("    PASSED\n");
 }
 
-static void test_cache_clear(void) {
+static void test_cache_clear(void)
+{
     printf("  test_cache_clear...\n");
 
-    cache_t* cache = cache_create(100, 3600);
+    cache_t *cache = cache_create(100, 3600);
     assert(cache != NULL);
 
     cache_put(cache, "key1", "value1");
@@ -72,7 +77,7 @@ static void test_cache_clear(void) {
 
     cache_clear(cache);
 
-    char* retrieved __attribute__((unused)) = NULL;
+    char *retrieved __attribute__((unused)) = NULL;
     assert(cache_get(cache, "key1", &retrieved) != 0 || retrieved == NULL);
     assert(cache_get(cache, "key2", &retrieved) != 0 || retrieved == NULL);
     assert(cache_get(cache, "key3", &retrieved) != 0 || retrieved == NULL);
@@ -82,10 +87,11 @@ static void test_cache_clear(void) {
     printf("    PASSED\n");
 }
 
-static void test_cache_size(void) {
+static void test_cache_size(void)
+{
     printf("  test_cache_size...\n");
 
-    cache_t* cache = cache_create(100, 3600);
+    cache_t *cache = cache_create(100, 3600);
     assert(cache != NULL);
     assert(cache_capacity(cache) == 100);
 
@@ -99,18 +105,19 @@ static void test_cache_size(void) {
     printf("    PASSED\n");
 }
 
-static void test_cache_ttl(void) {
+static void test_cache_ttl(void)
+{
     printf("  test_cache_ttl...\n");
 
-    cache_t* cache = cache_create(100, 1);
+    cache_t *cache = cache_create(100, 1);
     assert(cache != NULL);
 
-    const char* key = "ttl_test_key";
-    const char* value = "ttl_test_value";
+    const char *key = "ttl_test_key";
+    const char *value = "ttl_test_value";
 
     cache_put(cache, key, value);
 
-    char* retrieved = NULL;
+    char *retrieved = NULL;
     int ret = cache_get(cache, key, &retrieved);
     if (ret == 0 && retrieved != NULL) {
         free(retrieved);
@@ -131,7 +138,8 @@ static void test_cache_ttl(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  LLM Cache Unit Tests\n");
     printf("=========================================\n");

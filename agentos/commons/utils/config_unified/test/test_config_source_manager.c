@@ -12,20 +12,19 @@
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "../include/config_source.h"
+#include "test_macros.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 
-#include "test_macros.h"
-
-#include "../include/config_source.h"
-
 static int g_callback_count = 0;
-static config_source_t* g_last_callback_source = NULL;
+static config_source_t *g_last_callback_source = NULL;
 
-static void test_change_callback(config_source_t* source, void* user_data)
+static void test_change_callback(config_source_t *source, void *user_data)
 {
     (void)user_data;
     g_callback_count++;
@@ -49,7 +48,7 @@ static void test_poll_not_watching(void)
 {
     TEST_CASE_START(poll_not_watching);
 
-    config_source_manager_t* mgr = config_source_manager_create();
+    config_source_manager_t *mgr = config_source_manager_create();
     TEST_ASSERT_NOT_NULL(mgr, "管理器创建成功");
 
     int result = config_source_manager_poll_changes(mgr);
@@ -63,7 +62,7 @@ static void test_poll_watch_register(void)
 {
     TEST_CASE_START(poll_watch_register);
 
-    config_source_manager_t* mgr = config_source_manager_create();
+    config_source_manager_t *mgr = config_source_manager_create();
     TEST_ASSERT_NOT_NULL(mgr, "管理器创建成功");
 
     config_error_t err = config_source_manager_watch(mgr, test_change_callback, NULL);
@@ -82,7 +81,7 @@ static void test_poll_debounce(void)
     TEST_CASE_START(poll_debounce);
 
     reset_callback_state();
-    config_source_manager_t* mgr = config_source_manager_create();
+    config_source_manager_t *mgr = config_source_manager_create();
     TEST_ASSERT_NOT_NULL(mgr, "管理器创建成功");
 
     config_source_manager_watch(mgr, test_change_callback, NULL);
@@ -102,10 +101,10 @@ static void test_poll_with_memory_source(void)
     TEST_CASE_START(poll_with_memory_source);
 
     reset_callback_state();
-    config_source_manager_t* mgr = config_source_manager_create();
+    config_source_manager_t *mgr = config_source_manager_create();
     TEST_ASSERT_NOT_NULL(mgr, "管理器创建成功");
 
-    config_source_t* mem_src = config_source_create_memory("test_mem");
+    config_source_t *mem_src = config_source_create_memory("test_mem");
     TEST_ASSERT_NOT_NULL(mem_src, "内存配置源创建成功");
 
     config_source_manager_add(mgr, mem_src);
@@ -122,7 +121,7 @@ static void test_poll_no_changes(void)
     TEST_CASE_START(poll_no_changes);
 
     reset_callback_state();
-    config_source_manager_t* mgr = config_source_manager_create();
+    config_source_manager_t *mgr = config_source_manager_create();
     TEST_ASSERT_NOT_NULL(mgr, "管理器创建成功");
 
     config_source_manager_watch(mgr, test_change_callback, NULL);

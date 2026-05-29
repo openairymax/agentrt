@@ -5,32 +5,32 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "monitor_service.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "monitor_service.h"
 
 /**
  * @brief 测试服务创建和销毁
  */
-int test_service_create_destroy() {
+int test_service_create_destroy()
+{
     printf("测试服务创建和销毁...");
 
     // 配置监控服务
-    monitor_config_t manager = {
-        .metrics_collection_interval_ms = 5000,
-        .health_check_interval_ms = 10000,
-        .log_flush_interval_ms = 30000,
-        .alert_check_interval_ms = 5000,
-        .log_file_path = "test_monitor.log",
-        .metrics_storage_path = "test_metrics",
-        .enable_tracing = true,
-        .enable_alerting = true
-    };
+    monitor_config_t manager = {.metrics_collection_interval_ms = 5000,
+                                .health_check_interval_ms = 10000,
+                                .log_flush_interval_ms = 30000,
+                                .alert_check_interval_ms = 5000,
+                                .log_file_path = "test_monitor.log",
+                                .metrics_storage_path = "test_metrics",
+                                .enable_tracing = true,
+                                .enable_alerting = true};
 
     // 创建监控服务
-    monitor_service_t* service = NULL;
+    monitor_service_t *service = NULL;
     int ret = monitor_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败：创建服务返回 %d\n", ret);
@@ -51,13 +51,12 @@ int test_service_create_destroy() {
 /**
  * @brief 主测试函数
  */
-int main() {
+int main()
+{
     printf("开始监控服务单元测试\n");
     printf("========================\n");
 
-    int tests[] = {
-        test_service_create_destroy
-    };
+    int tests[] = {test_service_create_destroy};
 
     size_t test_count = sizeof(tests) / sizeof(tests[0]);
     int passed = 0;
@@ -72,7 +71,8 @@ int main() {
     }
 
     printf("========================\n");
-    printf("测试完成：%zu 个测试，%d 个通过，%zu 个失败\n", test_count, passed, test_count - passed);
+    printf("测试完成：%zu 个测试，%d 个通过，%zu 个失败\n", test_count, passed,
+           test_count - passed);
 
     if (passed == test_count) {
         printf("所有测试通过！\n");

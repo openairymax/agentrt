@@ -9,28 +9,30 @@
  */
 
 #include "resource_quota.h"
+
 #include "../../atoms/corekern/include/agentos.h"
 #include "../../utils/observability/include/logger.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #define RESOURCE_FLAG_MEMORY_EXCEEDED 0x01
-#define RESOURCE_FLAG_CPU_EXCEEDED     0x02
-#define RESOURCE_FLAG_IO_EXCEEDED      0x04
+#define RESOURCE_FLAG_CPU_EXCEEDED 0x02
+#define RESOURCE_FLAG_IO_EXCEEDED 0x04
 #define RESOURCE_FLAG_NETWORK_EXCEEDED 0x08
 
-agentos_error_t agentos_resource_manager_create(
-    const agentos_resource_quota_t* quota,
-    const char* resource_id,
-    agentos_resource_manager_t** out_manager) {
+agentos_error_t agentos_resource_manager_create(const agentos_resource_quota_t *quota,
+                                                const char *resource_id,
+                                                agentos_resource_manager_t **out_manager)
+{
 
     if (!quota || !resource_id || !out_manager) {
         return AGENTOS_EINVAL;
     }
 
-    agentos_resource_manager_t* manager = (agentos_resource_manager_t*)
-        AGENTOS_CALLOC(1, sizeof(agentos_resource_manager_t));
+    agentos_resource_manager_t *manager =
+        (agentos_resource_manager_t *)AGENTOS_CALLOC(1, sizeof(agentos_resource_manager_t));
     if (!manager) {
         return AGENTOS_ENOMEM;
     }
@@ -54,8 +56,10 @@ agentos_error_t agentos_resource_manager_create(
     return AGENTOS_SUCCESS;
 }
 
-void agentos_resource_manager_destroy(agentos_resource_manager_t* manager) {
-    if (!manager) return;
+void agentos_resource_manager_destroy(agentos_resource_manager_t *manager)
+{
+    if (!manager)
+        return;
 
     if (manager->resource_id) {
         AGENTOS_FREE(manager->resource_id);
@@ -64,9 +68,9 @@ void agentos_resource_manager_destroy(agentos_resource_manager_t* manager) {
     AGENTOS_FREE(manager);
 }
 
-agentos_error_t agentos_resource_check_memory(
-    agentos_resource_manager_t* manager,
-    size_t requested_bytes) {
+agentos_error_t agentos_resource_check_memory(agentos_resource_manager_t *manager,
+                                              size_t requested_bytes)
+{
 
     if (!manager || !manager->enabled) {
         return AGENTOS_SUCCESS;
@@ -81,11 +85,9 @@ agentos_error_t agentos_resource_check_memory(
         if (projected > manager->quota.max_memory_bytes) {
             manager->exceeded_flags |= RESOURCE_FLAG_MEMORY_EXCEEDED;
             AGENTOS_LOG_WARN("Resource %s: Memory quota exceeded (current: %zu, "
-                           "requested: %zu, limit: %zu)",
-                           manager->resource_id,
-                           manager->usage.current_memory_bytes,
-                           requested_bytes,
-                           manager->quota.max_memory_bytes);
+                             "requested: %zu, limit: %zu)",
+                             manager->resource_id, manager->usage.current_memory_bytes,
+                             requested_bytes, manager->quota.max_memory_bytes);
             return AGENTOS_ENOMEM;
         }
     }
@@ -93,9 +95,9 @@ agentos_error_t agentos_resource_check_memory(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_resource_record_allocation(
-    agentos_resource_manager_t* manager,
-    size_t bytes) {
+agentos_error_t agentos_resource_record_allocation(agentos_resource_manager_t *manager,
+                                                   size_t bytes)
+{
 
     if (!manager || !manager->enabled) {
         return AGENTOS_SUCCESS;
@@ -116,9 +118,8 @@ agentos_error_t agentos_resource_record_allocation(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_resource_record_free(
-    agentos_resource_manager_t* manager,
-    size_t bytes) {
+agentos_error_t agentos_resource_record_free(agentos_resource_manager_t *manager, size_t bytes)
+{
 
     if (!manager || !manager->enabled) {
         return AGENTOS_SUCCESS;
@@ -132,7 +133,7 @@ agentos_error_t agentos_resource_record_free(
         manager->usage.current_memory_bytes -= bytes;
     } else {
         AGENTOS_LOG_WARN("Resource %s: Free amount (%zu) exceeds allocated (%zu)",
-                        manager->resource_id, bytes, manager->usage.current_memory_bytes);
+                         manager->resource_id, bytes, manager->usage.current_memory_bytes);
         manager->usage.current_memory_bytes = 0;
     }
 
@@ -140,8 +141,8 @@ agentos_error_t agentos_resource_record_free(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_resource_record_io(
-    agentos_resource_manager_t* manager) {
+agentos_error_t agentos_resource_record_io(agentos_resource_manager_t *manager)
+{
 
     if (!manager || !manager->enabled) {
         return AGENTOS_SUCCESS;
@@ -151,29 +152,28 @@ agentos_error_t agentos_resource_record_io(
     manager->usage.operation_count++;
     manager->usage.last_update = time(NULL);
 
-    if (manager->quota.max_io_ops > 0 &&
-        manager->usage.total_io_ops >= manager->quota.max_io_ops) {
+    if (manager->quota.max_io_ops > 0 && manager->usage.total_io_ops >= manager->quota.max_io_ops) {
         manager->exceeded_flags |= RESOURCE_FLAG_IO_EXCEEDED;
         AGENTOS_LOG_WARN("Resource %s: I/O quota exceeded (total: %zu, limit: %zu)",
-                        manager->resource_id,
-                        manager->usage.total_io_ops,
-                        manager->quota.max_io_ops);
+                         manager->resource_id, manager->usage.total_io_ops,
+                         manager->quota.max_io_ops);
         return AGENTOS_EBUSY;
     }
 
     return AGENTOS_SUCCESS;
 }
 
-int agentos_resource_is_exceeded(agentos_resource_manager_t* manager) {
+int agentos_resource_is_exceeded(agentos_resource_manager_t *manager)
+{
     if (!manager || !manager->enabled) {
         return 0;
     }
     return (manager->exceeded_flags != 0) ? 1 : 0;
 }
 
-void agentos_resource_get_usage(
-    agentos_resource_manager_t* manager,
-    agentos_resource_usage_t* out_usage) {
+void agentos_resource_get_usage(agentos_resource_manager_t *manager,
+                                agentos_resource_usage_t *out_usage)
+{
 
     if (!manager || !out_usage) {
         return;
@@ -182,8 +182,8 @@ void agentos_resource_get_usage(
     memcpy(out_usage, &manager->usage, sizeof(agentos_resource_usage_t));
 }
 
-const char* agentos_resource_get_exceeded_info(
-    agentos_resource_manager_t* manager) {
+const char *agentos_resource_get_exceeded_info(agentos_resource_manager_t *manager)
+{
 
     static char info_buffer[512];
 
@@ -196,20 +196,16 @@ const char* agentos_resource_get_exceeded_info(
                        "Resource '%s' exceeded: ", manager->resource_id);
 
     if (manager->exceeded_flags & RESOURCE_FLAG_MEMORY_EXCEEDED) {
-        offset += snprintf(info_buffer + offset, sizeof(info_buffer) - offset,
-                          "[Memory] ");
+        offset += snprintf(info_buffer + offset, sizeof(info_buffer) - offset, "[Memory] ");
     }
     if (manager->exceeded_flags & RESOURCE_FLAG_CPU_EXCEEDED) {
-        offset += snprintf(info_buffer + offset, sizeof(info_buffer) - offset,
-                          "[CPU] ");
+        offset += snprintf(info_buffer + offset, sizeof(info_buffer) - offset, "[CPU] ");
     }
     if (manager->exceeded_flags & RESOURCE_FLAG_IO_EXCEEDED) {
-        offset += snprintf(info_buffer + offset, sizeof(info_buffer) - offset,
-                          "[I/O] ");
+        offset += snprintf(info_buffer + offset, sizeof(info_buffer) - offset, "[I/O] ");
     }
     if (manager->exceeded_flags & RESOURCE_FLAG_NETWORK_EXCEEDED) {
-        offset += snprintf(info_buffer + offset, sizeof(info_buffer) - offset,
-                          "[Network] ");
+        offset += snprintf(info_buffer + offset, sizeof(info_buffer) - offset, "[Network] ");
     }
 
     return info_buffer;

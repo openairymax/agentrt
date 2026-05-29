@@ -1,3 +1,5 @@
+#include "agentos.h"
+#include "error.h"
 /**
  * @file scheduler.c
  * @brief 任务调度器（基于新架构：核心层 + 平台适配器）
@@ -16,10 +18,11 @@
  * - 支持未来平台扩展
  */
 
-#include "task.h"
+#include "mem.h"
 #include "scheduler_core.h"
 #include "scheduler_platform.h"
-#include "mem.h"
+#include "task.h"
+
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -28,12 +31,13 @@
 
 /* Check macros for unified error handling */
 #include "check.h"
+
 #include <string.h>
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 #ifdef _MSC_VER
-#include <winsock2.h>
 #include <windows.h>
+#include <winsock2.h>
 #include <ws2tcpip.h>
 #else
 #include <unistd.h>
@@ -52,7 +56,7 @@
  */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
-static void* __attribute__((used)) user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
+static void *__attribute__((used)) user_thread_entry_adapter(void *(*user_func)(void *), void *arg)
 {
     /* 用户函数是 void (*func)(void*)，我们调用它并返回NULL */
     user_func(arg);
@@ -68,10 +72,10 @@ static void* __attribute__((used)) user_thread_entry_adapter(void* (*user_func)(
  * @param user_func 用户线程入口函数
  * @return 适配后的函数指针
  */
-static void* (*wrap_user_thread_entry(agentos_thread_func_t user_func))(void*)
+static void *(*wrap_user_thread_entry(agentos_thread_func_t user_func))(void *)
 {
     /* 返回一个适配器函数，该适配器调用user_func */
-    return (void* (*)(void*))user_func;
+    return (void *(*)(void *))user_func;
 }
 
 /* ==================== 内部辅助函数 ==================== */
@@ -86,11 +90,11 @@ static void* (*wrap_user_thread_entry(agentos_thread_func_t user_func))(void*)
 static int ensure_scheduler_fully_initialized(void)
 {
     if (scheduler_core_init() != 0) {
-        return -1;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to init scheduler: core layer init failed");
     }
 
     if (scheduler_platform_auto_init() != 0) {
-        return -1;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to init scheduler: platform adapter init failed");
     }
 
     return 0;
@@ -104,10 +108,10 @@ static int ensure_scheduler_fully_initialized(void)
  * @param platform_handle 平台特定句柄
  * @return 任务信息指针，未找到返回NULL
  */
-static task_info_core_t* __attribute__((used)) find_task_by_platform_handle(void* platform_handle)
+static task_info_core_t *__attribute__((used)) find_task_by_platform_handle(void *platform_handle)
 {
     (void)platform_handle;
-    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
         return NULL;
     }
@@ -124,16 +128,16 @@ static task_info_core_t* __attribute__((used)) find_task_by_platform_handle(void
  * @param tid 任务ID
  * @return 任务信息指针，未找到返回NULL
  */
-static task_info_core_t* find_task_by_id(agentos_task_id_t tid)
+static task_info_core_t *find_task_by_id(agentos_task_id_t tid)
 {
-    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
         return NULL;
     }
 
     agentos_mutex_lock(ctx->task_table_lock);
 
-    task_info_core_t* info = scheduler_core_hash_find(tid);
+    task_info_core_t *info = scheduler_core_hash_find(tid);
 
     if (!info) {
         agentos_mutex_unlock(ctx->task_table_lock);
@@ -144,7 +148,7 @@ static task_info_core_t* find_task_by_id(agentos_task_id_t tid)
 
 static void release_task_lock(void)
 {
-    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (ctx && ctx->task_table_lock) {
         agentos_mutex_unlock(ctx->task_table_lock);
     }
@@ -178,14 +182,11 @@ agentos_error_t agentos_task_init(void)
  * @param arg 线程参数
  * @return 0 成功，错误码 失败
  */
-int agentos_thread_create(
-    agentos_thread_t* thread,
-    agentos_thread_func_t func,
-    void* arg)
+int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, void *arg)
 {
     /* 参数检查 */
     if (!thread || !func) {
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to create thread: null thread or func pointer");
     }
 
     /* 确保调度器已初始化 */
@@ -194,7 +195,7 @@ int agentos_thread_create(
     }
 
     /* 获取平台适配器操作集 */
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
         return AGENTOS_EPLATFORM;
     }
@@ -206,24 +207,21 @@ int agentos_thread_create(
     }
 
     /* 解析线程属性（使用默认值） */
-    const char* task_name = "unnamed";
+    const char *task_name = "unnamed";
     int priority = AGENTOS_TASK_PRIORITY_NORMAL;
     size_t stack_size = 0;
 
     /* 创建核心任务信息结构 */
-    task_info_core_t* task_info = scheduler_core_task_info_create(
-        task_id,
-        wrap_user_thread_entry(func),  /* 适配用户函数 */
-        arg,
-        task_name,
-        priority);
+    task_info_core_t *task_info =
+        scheduler_core_task_info_create(task_id, wrap_user_thread_entry(func), /* 适配用户函数 */
+                                        arg, task_name, priority);
 
     if (!task_info) {
         return AGENTOS_ENOMEM;
     }
 
     /* 使用平台适配器创建线程 */
-    void* platform_handle = ops->thread_create(task_info, stack_size);
+    void *platform_handle = ops->thread_create(task_info, stack_size);
     if (!platform_handle) {
         scheduler_core_task_info_destroy(task_info);
         return AGENTOS_ENOMEM;
@@ -233,7 +231,7 @@ int agentos_thread_create(
     task_info->platform_handle = platform_handle;
 
     /* 获取核心上下文 */
-    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
         ops->cleanup_platform_resources(platform_handle, NULL);
         scheduler_core_task_info_destroy(task_info);
@@ -261,14 +259,21 @@ int agentos_thread_create(
     /* 设置输出线程句柄 */
 #if defined(_WIN32) || defined(_WIN64)
     {
-        typedef struct windows_task_data { HANDLE thread_handle; DWORD thread_id; } wtd_t;
-        wtd_t* wdata = (wtd_t*)platform_handle;
+        typedef struct windows_task_data {
+            HANDLE thread_handle;
+            DWORD thread_id;
+        } wtd_t;
+        wtd_t *wdata = (wtd_t *)platform_handle;
         *thread = wdata->thread_handle;
     }
 #else
     {
-        typedef struct posix_task_data { pthread_t thread_handle; pthread_attr_t thread_attr; int has_custom_stack_size; } ptd_t;
-        ptd_t* pdata = (ptd_t*)platform_handle;
+        typedef struct posix_task_data {
+            pthread_t thread_handle;
+            pthread_attr_t thread_attr;
+            int has_custom_stack_size;
+        } ptd_t;
+        ptd_t *pdata = (ptd_t *)platform_handle;
         *thread = pdata->thread_handle;
     }
 #endif
@@ -285,39 +290,47 @@ int agentos_thread_create(
  * @param retval 返回值输出
  * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
-agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval)
+agentos_error_t agentos_thread_join(agentos_thread_t thread, void **retval)
 {
     if (!thread) {
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to join thread: null thread handle");
     }
 
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
         return AGENTOS_EPLATFORM;
     }
 
-    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
         return AGENTOS_EINVAL;
     }
 
-    task_info_core_t* task_info = NULL;
+    task_info_core_t *task_info = NULL;
 
     agentos_mutex_lock(ctx->task_table_lock);
     for (uint32_t i = 0; i < ctx->task_count; i++) {
-        task_info_core_t* info = ctx->task_table[i];
-        if (!info || !info->platform_handle) continue;
+        task_info_core_t *info = ctx->task_table[i];
+        if (!info || !info->platform_handle)
+            continue;
 
 #if defined(_WIN32) || defined(_WIN64)
-        typedef struct windows_task_data { HANDLE thread_handle; DWORD thread_id; } wtd_t;
-        wtd_t* wdata = (wtd_t*)info->platform_handle;
+        typedef struct windows_task_data {
+            HANDLE thread_handle;
+            DWORD thread_id;
+        } wtd_t;
+        wtd_t *wdata = (wtd_t *)info->platform_handle;
         if (wdata->thread_handle == thread) {
             task_info = info;
             break;
         }
 #else
-        typedef struct posix_task_data { pthread_t thread_handle; pthread_attr_t thread_attr; int has_custom_stack_size; } ptd_t;
-        ptd_t* pdata = (ptd_t*)info->platform_handle;
+        typedef struct posix_task_data {
+            pthread_t thread_handle;
+            pthread_attr_t thread_attr;
+            int has_custom_stack_size;
+        } ptd_t;
+        ptd_t *pdata = (ptd_t *)info->platform_handle;
         if (pthread_equal(pdata->thread_handle, thread)) {
             task_info = info;
             break;
@@ -352,7 +365,7 @@ agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval)
 agentos_task_id_t agentos_task_self(void)
 {
     /* 获取平台适配器操作集 */
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
         return 0;
     }
@@ -364,7 +377,7 @@ agentos_task_id_t agentos_task_self(void)
     }
 
     /* 获取核心上下文 */
-    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
         return 0;
     }
@@ -373,7 +386,7 @@ agentos_task_id_t agentos_task_self(void)
     agentos_mutex_lock(ctx->task_table_lock);
 
     for (uint32_t i = 0; i < ctx->task_count; i++) {
-        task_info_core_t* info = ctx->task_table[i];
+        task_info_core_t *info = ctx->task_table[i];
         if (!info || !info->platform_handle) {
             continue;
         }
@@ -402,11 +415,12 @@ agentos_task_id_t agentos_task_self(void)
 void agentos_task_sleep(uint32_t ms)
 {
     /* 获取平台适配器操作集 */
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops || !ops->thread_sleep) {
         /* 如果没有平台适配器，使用简单循环等待（仅用于紧急情况） */
         volatile uint32_t i;
-        for (i = 0; i < (uint32_t)(1000 * ms); i++);
+        for (i = 0; i < (uint32_t)(1000 * ms); i++)
+            ;
         return;
     }
 
@@ -421,9 +435,9 @@ void agentos_task_sleep(uint32_t ms)
 void agentos_task_yield(void)
 {
     /* 获取平台适配器操作集 */
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops || !ops->thread_yield) {
-        return;  /* 无法让出 */
+        return; /* 无法让出 */
     }
 
     ops->thread_yield();
@@ -441,18 +455,17 @@ void agentos_task_yield(void)
 agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
 {
     /* 验证优先级范围 */
-    if (priority < AGENTOS_TASK_PRIORITY_MIN ||
-        priority > AGENTOS_TASK_PRIORITY_MAX) {
-        return AGENTOS_EINVAL;
+    if (priority < AGENTOS_TASK_PRIORITY_MIN || priority > AGENTOS_TASK_PRIORITY_MAX) {
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to set task priority: priority out of valid range");
     }
 
     /* 查找任务信息 */
-    task_info_core_t* task_info = find_task_by_id(tid);
+    task_info_core_t *task_info = find_task_by_id(tid);
     if (!task_info) {
         return AGENTOS_EINVAL;
     }
 
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
         release_task_lock();
         return AGENTOS_EPLATFORM;
@@ -479,16 +492,15 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
  * @param out_priority 优先级输出
  * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
-agentos_error_t agentos_task_get_priority(agentos_task_id_t tid, int* out_priority)
+agentos_error_t agentos_task_get_priority(agentos_task_id_t tid, int *out_priority)
 {
     if (!out_priority) {
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get task priority: null output pointer");
     }
 
-    /* 查找任务信息 */
-    task_info_core_t* task_info = find_task_by_id(tid);
+    task_info_core_t *task_info = find_task_by_id(tid);
     if (!task_info) {
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get task priority: task not found");
     }
 
     *out_priority = task_info->priority;
@@ -506,15 +518,15 @@ agentos_error_t agentos_task_get_priority(agentos_task_id_t tid, int* out_priori
  * @param out_state 状态输出
  * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
-agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state_t* out_state)
+agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state_t *out_state)
 {
     if (!out_state) {
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get task state: null output pointer");
     }
 
-    task_info_core_t* task_info = find_task_by_id(tid);
+    task_info_core_t *task_info = find_task_by_id(tid);
     if (!task_info) {
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get task state: task not found");
     }
 
     *out_state = task_info->state;
@@ -525,12 +537,13 @@ agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state
 
 /* ==================== 调度器高级功能 ==================== */
 
-agentos_error_t agentos_scheduler_resolve_dependencies(
-    const uint64_t* dep_from, const uint64_t* dep_to, size_t edge_count,
-    agentos_dep_result_t* out_result) {
+agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
+                                                       const uint64_t *dep_to, size_t edge_count,
+                                                       agentos_dep_result_t *out_result)
+{
 
     if (!dep_from || !dep_to || !out_result)
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to resolve dependencies: null dep_from, dep_to, or out_result");
 
     memset(out_result, 0, sizeof(agentos_dep_result_t));
 
@@ -538,8 +551,9 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
         return AGENTOS_SUCCESS;
 
     /* 收集所有唯一节点 */
-    uint64_t* nodes = (uint64_t*)AGENTOS_MALLOC(edge_count * 2 * sizeof(uint64_t));
-    if (!nodes) return AGENTOS_ENOMEM;
+    uint64_t *nodes = (uint64_t *)AGENTOS_MALLOC(edge_count * 2 * sizeof(uint64_t));
+    if (!nodes)
+        return AGENTOS_ENOMEM;
     size_t node_count = 0;
 
     for (size_t i = 0; i < edge_count; i++) {
@@ -566,27 +580,34 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
     }
 
     /* 建图: in_degree, adjacency list, 反向邻接表 (用于循环检测路径追踪) */
-    size_t* in_degree = (size_t*)AGENTOS_CALLOC(unique_count, sizeof(size_t));
-    size_t** adj = (size_t**)AGENTOS_CALLOC(unique_count, sizeof(size_t*));
-    size_t* adj_cap = (size_t*)AGENTOS_CALLOC(unique_count, sizeof(size_t));
-    size_t* adj_cnt = (size_t*)AGENTOS_CALLOC(unique_count, sizeof(size_t));
+    size_t *in_degree = (size_t *)AGENTOS_CALLOC(unique_count, sizeof(size_t));
+    size_t **adj = (size_t **)AGENTOS_CALLOC(unique_count, sizeof(size_t *));
+    size_t *adj_cap = (size_t *)AGENTOS_CALLOC(unique_count, sizeof(size_t));
+    size_t *adj_cnt = (size_t *)AGENTOS_CALLOC(unique_count, sizeof(size_t));
 
-    size_t** rev_adj = (size_t**)AGENTOS_CALLOC(unique_count, sizeof(size_t*));
-    size_t* rev_cap = (size_t*)AGENTOS_CALLOC(unique_count, sizeof(size_t));
-    size_t* rev_cnt = (size_t*)AGENTOS_CALLOC(unique_count, sizeof(size_t));
+    size_t **rev_adj = (size_t **)AGENTOS_CALLOC(unique_count, sizeof(size_t *));
+    size_t *rev_cap = (size_t *)AGENTOS_CALLOC(unique_count, sizeof(size_t));
+    size_t *rev_cnt = (size_t *)AGENTOS_CALLOC(unique_count, sizeof(size_t));
 
-    if (!in_degree || !adj || !adj_cap || !adj_cnt ||
-        !rev_adj || !rev_cap || !rev_cnt) {
-        AGENTOS_FREE(nodes); AGENTOS_FREE(in_degree); AGENTOS_FREE(adj); AGENTOS_FREE(adj_cap); AGENTOS_FREE(adj_cnt);
-        AGENTOS_FREE(rev_adj); AGENTOS_FREE(rev_cap); AGENTOS_FREE(rev_cnt);
+    if (!in_degree || !adj || !adj_cap || !adj_cnt || !rev_adj || !rev_cap || !rev_cnt) {
+        AGENTOS_FREE(nodes);
+        AGENTOS_FREE(in_degree);
+        AGENTOS_FREE(adj);
+        AGENTOS_FREE(adj_cap);
+        AGENTOS_FREE(adj_cnt);
+        AGENTOS_FREE(rev_adj);
+        AGENTOS_FREE(rev_cap);
+        AGENTOS_FREE(rev_cnt);
         return AGENTOS_ENOMEM;
     }
 
     for (size_t i = 0; i < edge_count; i++) {
         size_t from_idx = unique_count, to_idx = unique_count;
         for (size_t j = 0; j < unique_count; j++) {
-            if (nodes[j] == dep_from[i]) from_idx = j;
-            if (nodes[j] == dep_to[i]) to_idx = j;
+            if (nodes[j] == dep_from[i])
+                from_idx = j;
+            if (nodes[j] == dep_to[i])
+                to_idx = j;
         }
         if (from_idx >= unique_count || to_idx >= unique_count) {
             goto cleanup_fail;
@@ -595,8 +616,9 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
         /* forward: from -> to */
         if (adj_cnt[from_idx] >= adj_cap[from_idx]) {
             size_t new_cap = adj_cap[from_idx] ? adj_cap[from_idx] * 2 : 4;
-            size_t* new_adj = (size_t*)AGENTOS_REALLOC(adj[from_idx], new_cap * sizeof(size_t));
-            if (!new_adj) goto cleanup_oom;
+            size_t *new_adj = (size_t *)AGENTOS_REALLOC(adj[from_idx], new_cap * sizeof(size_t));
+            if (!new_adj)
+                goto cleanup_oom;
             adj[from_idx] = new_adj;
             adj_cap[from_idx] = new_cap;
         }
@@ -606,8 +628,9 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
         /* reverse: to -> from (for cycle backtracking) */
         if (rev_cnt[to_idx] >= rev_cap[to_idx]) {
             size_t new_cap = rev_cap[to_idx] ? rev_cap[to_idx] * 2 : 4;
-            size_t* new_rev = (size_t*)AGENTOS_REALLOC(rev_adj[to_idx], new_cap * sizeof(size_t));
-            if (!new_rev) goto cleanup_oom;
+            size_t *new_rev = (size_t *)AGENTOS_REALLOC(rev_adj[to_idx], new_cap * sizeof(size_t));
+            if (!new_rev)
+                goto cleanup_oom;
             rev_adj[to_idx] = new_rev;
             rev_cap[to_idx] = new_cap;
         }
@@ -615,10 +638,11 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
     }
 
     /* Kahn 拓扑排序 + 循环参与者追踪 */
-    size_t* queue = (size_t*)AGENTOS_MALLOC(unique_count * sizeof(size_t));
-    if (!queue) goto cleanup_oom;
+    size_t *queue = (size_t *)AGENTOS_MALLOC(unique_count * sizeof(size_t));
+    if (!queue)
+        goto cleanup_oom;
 
-    size_t* in_degree_copy = (size_t*)AGENTOS_MALLOC(unique_count * sizeof(size_t));
+    size_t *in_degree_copy = (size_t *)AGENTOS_MALLOC(unique_count * sizeof(size_t));
     if (!in_degree_copy) {
         AGENTOS_FREE(queue);
         goto cleanup_oom;
@@ -627,12 +651,14 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
 
     size_t q_head = 0, q_tail = 0;
     for (size_t i = 0; i < unique_count; i++) {
-        if (in_degree_copy[i] == 0) queue[q_tail++] = i;
+        if (in_degree_copy[i] == 0)
+            queue[q_tail++] = i;
     }
 
-    out_result->sorted_tasks = (uint64_t*)AGENTOS_MALLOC(unique_count * sizeof(uint64_t));
+    out_result->sorted_tasks = (uint64_t *)AGENTOS_MALLOC(unique_count * sizeof(uint64_t));
     if (!out_result->sorted_tasks) {
-        AGENTOS_FREE(queue); AGENTOS_FREE(in_degree_copy);
+        AGENTOS_FREE(queue);
+        AGENTOS_FREE(in_degree_copy);
         goto cleanup_oom;
     }
 
@@ -644,7 +670,8 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
         for (size_t j = 0; j < adj_cnt[u]; j++) {
             size_t v = adj[u][j];
             in_degree_copy[v]--;
-            if (in_degree_copy[v] == 0) queue[q_tail++] = v;
+            if (in_degree_copy[v] == 0)
+                queue[q_tail++] = v;
         }
     }
 
@@ -656,15 +683,16 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
         /* in_degree_copy 仍在手: 入度 > 0 的节点即循环参与者 */
         size_t cycle_count = 0;
         for (size_t i = 0; i < unique_count; i++) {
-            if (in_degree_copy[i] > 0) cycle_count++;
+            if (in_degree_copy[i] > 0)
+                cycle_count++;
         }
 
         if (cycle_count > 0) {
-            out_result->cycle = (agentos_cycle_report_t*)AGENTOS_CALLOC(
-                1, sizeof(agentos_cycle_report_t));
+            out_result->cycle =
+                (agentos_cycle_report_t *)AGENTOS_CALLOC(1, sizeof(agentos_cycle_report_t));
             if (out_result->cycle) {
                 out_result->cycle->cycle_nodes =
-                    (uint64_t*)AGENTOS_MALLOC(cycle_count * sizeof(uint64_t));
+                    (uint64_t *)AGENTOS_MALLOC(cycle_count * sizeof(uint64_t));
                 if (out_result->cycle->cycle_nodes) {
                     out_result->cycle->cycle_node_count = cycle_count;
                     size_t ci = 0;
@@ -675,10 +703,8 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
 
                     char desc_buf[256];
                     int dl = snprintf(desc_buf, sizeof(desc_buf),
-                        "Cycle detected: %zu nodes in dependency loop",
-                        cycle_count);
-                    out_result->cycle->description =
-                        (char*)AGENTOS_MALLOC((size_t)dl + 1);
+                                      "Cycle detected: %zu nodes in dependency loop", cycle_count);
+                    out_result->cycle->description = (char *)AGENTOS_MALLOC((size_t)dl + 1);
                     if (out_result->cycle->description) {
                         memcpy(out_result->cycle->description, desc_buf, (size_t)dl);
                         out_result->cycle->description[dl] = '\0';
@@ -695,31 +721,39 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
         out_result->sorted_count = 0;
 
         /* 清理并返回循环错误 */
-        for (size_t k = 0; k < unique_count; k++) AGENTOS_FREE(adj[k]);
-        AGENTOS_FREE(adj); AGENTOS_FREE(adj_cap); AGENTOS_FREE(adj_cnt);
-        for (size_t k = 0; k < unique_count; k++) AGENTOS_FREE(rev_adj[k]);
-        AGENTOS_FREE(rev_adj); AGENTOS_FREE(rev_cap); AGENTOS_FREE(rev_cnt);
-        AGENTOS_FREE(nodes); AGENTOS_FREE(in_degree);
+        for (size_t k = 0; k < unique_count; k++)
+            AGENTOS_FREE(adj[k]);
+        AGENTOS_FREE(adj);
+        AGENTOS_FREE(adj_cap);
+        AGENTOS_FREE(adj_cnt);
+        for (size_t k = 0; k < unique_count; k++)
+            AGENTOS_FREE(rev_adj[k]);
+        AGENTOS_FREE(rev_adj);
+        AGENTOS_FREE(rev_cap);
+        AGENTOS_FREE(rev_cnt);
+        AGENTOS_FREE(nodes);
+        AGENTOS_FREE(in_degree);
         return AGENTOS_ECYCLE;
     }
 
     /* 优先级组继承: 对于每条边 from->to，将 from 在排序中的位置优先级传递 */
-    out_result->inherited_priorities =
-        (int*)AGENTOS_MALLOC(sorted_cnt * sizeof(int));
+    out_result->inherited_priorities = (int *)AGENTOS_MALLOC(sorted_cnt * sizeof(int));
     if (out_result->inherited_priorities) {
         for (size_t i = 0; i < sorted_cnt; i++)
             out_result->inherited_priorities[i] = AGENTOS_TASK_PRIORITY_NORMAL;
 
         /* 从后向前遍历排序列表，传递优先级（依赖者继承被依赖者的优先级） */
-        int* base_prio = (int*)AGENTOS_MALLOC(sorted_cnt * sizeof(int));
+        int *base_prio = (int *)AGENTOS_MALLOC(sorted_cnt * sizeof(int));
         if (base_prio) {
             for (size_t i = 0; i < sorted_cnt; i++)
                 base_prio[i] = AGENTOS_TASK_PRIORITY_NORMAL;
             for (size_t i = 0; i < edge_count; i++) {
                 size_t from_pos = sorted_cnt, to_pos = sorted_cnt;
                 for (size_t j = 0; j < sorted_cnt; j++) {
-                    if (out_result->sorted_tasks[j] == dep_from[i]) from_pos = j;
-                    if (out_result->sorted_tasks[j] == dep_to[i]) to_pos = j;
+                    if (out_result->sorted_tasks[j] == dep_from[i])
+                        from_pos = j;
+                    if (out_result->sorted_tasks[j] == dep_to[i])
+                        to_pos = j;
                 }
                 /* from depends on to, so from should inherit to's priority if higher */
                 if (from_pos < sorted_cnt && to_pos < sorted_cnt) {
@@ -727,42 +761,63 @@ agentos_error_t agentos_scheduler_resolve_dependencies(
                         base_prio[from_pos] = base_prio[to_pos];
                 }
             }
-            memcpy(out_result->inherited_priorities, base_prio,
-                   sorted_cnt * sizeof(int));
+            memcpy(out_result->inherited_priorities, base_prio, sorted_cnt * sizeof(int));
             AGENTOS_FREE(base_prio);
         }
         out_result->priority_count = sorted_cnt;
     }
 
     /* 清理内存 */
-    for (size_t k = 0; k < unique_count; k++) AGENTOS_FREE(adj[k]);
-    AGENTOS_FREE(adj); AGENTOS_FREE(adj_cap); AGENTOS_FREE(adj_cnt);
-    for (size_t k = 0; k < unique_count; k++) AGENTOS_FREE(rev_adj[k]);
-    AGENTOS_FREE(rev_adj); AGENTOS_FREE(rev_cap); AGENTOS_FREE(rev_cnt);
-    AGENTOS_FREE(nodes); AGENTOS_FREE(in_degree);
+    for (size_t k = 0; k < unique_count; k++)
+        AGENTOS_FREE(adj[k]);
+    AGENTOS_FREE(adj);
+    AGENTOS_FREE(adj_cap);
+    AGENTOS_FREE(adj_cnt);
+    for (size_t k = 0; k < unique_count; k++)
+        AGENTOS_FREE(rev_adj[k]);
+    AGENTOS_FREE(rev_adj);
+    AGENTOS_FREE(rev_cap);
+    AGENTOS_FREE(rev_cnt);
+    AGENTOS_FREE(nodes);
+    AGENTOS_FREE(in_degree);
 
     return AGENTOS_SUCCESS;
 
 cleanup_oom:
-    for (size_t k = 0; k < unique_count; k++) AGENTOS_FREE(adj[k]);
-    AGENTOS_FREE(adj); AGENTOS_FREE(adj_cap); AGENTOS_FREE(adj_cnt);
-    for (size_t k = 0; k < unique_count; k++) AGENTOS_FREE(rev_adj[k]);
-    AGENTOS_FREE(rev_adj); AGENTOS_FREE(rev_cap); AGENTOS_FREE(rev_cnt);
-    AGENTOS_FREE(nodes); AGENTOS_FREE(in_degree);
+    for (size_t k = 0; k < unique_count; k++)
+        AGENTOS_FREE(adj[k]);
+    AGENTOS_FREE(adj);
+    AGENTOS_FREE(adj_cap);
+    AGENTOS_FREE(adj_cnt);
+    for (size_t k = 0; k < unique_count; k++)
+        AGENTOS_FREE(rev_adj[k]);
+    AGENTOS_FREE(rev_adj);
+    AGENTOS_FREE(rev_cap);
+    AGENTOS_FREE(rev_cnt);
+    AGENTOS_FREE(nodes);
+    AGENTOS_FREE(in_degree);
     return AGENTOS_ENOMEM;
 
 cleanup_fail:
-    for (size_t k = 0; k < unique_count; k++) AGENTOS_FREE(adj[k]);
-    AGENTOS_FREE(adj); AGENTOS_FREE(adj_cap); AGENTOS_FREE(adj_cnt);
-    for (size_t k = 0; k < unique_count; k++) AGENTOS_FREE(rev_adj[k]);
-    AGENTOS_FREE(rev_adj); AGENTOS_FREE(rev_cap); AGENTOS_FREE(rev_cnt);
-    AGENTOS_FREE(nodes); AGENTOS_FREE(in_degree);
+    for (size_t k = 0; k < unique_count; k++)
+        AGENTOS_FREE(adj[k]);
+    AGENTOS_FREE(adj);
+    AGENTOS_FREE(adj_cap);
+    AGENTOS_FREE(adj_cnt);
+    for (size_t k = 0; k < unique_count; k++)
+        AGENTOS_FREE(rev_adj[k]);
+    AGENTOS_FREE(rev_adj);
+    AGENTOS_FREE(rev_cap);
+    AGENTOS_FREE(rev_cnt);
+    AGENTOS_FREE(nodes);
+    AGENTOS_FREE(in_degree);
     return AGENTOS_EINVAL;
 }
 
-void agentos_scheduler_dep_result_free(agentos_dep_result_t* result)
+void agentos_scheduler_dep_result_free(agentos_dep_result_t *result)
 {
-    if (!result) return;
+    if (!result)
+        return;
     if (result->sorted_tasks)
         AGENTOS_FREE(result->sorted_tasks);
     if (result->inherited_priorities)
@@ -777,18 +832,19 @@ void agentos_scheduler_dep_result_free(agentos_dep_result_t* result)
     memset(result, 0, sizeof(agentos_dep_result_t));
 }
 
-agentos_error_t agentos_scheduler_priority_inherit(
-    agentos_task_id_t blocking_task_id, agentos_task_id_t blocked_task_id) {
+agentos_error_t agentos_scheduler_priority_inherit(agentos_task_id_t blocking_task_id,
+                                                   agentos_task_id_t blocked_task_id)
+{
 
     if (blocking_task_id == 0 || blocked_task_id == 0)
         return AGENTOS_EINVAL;
 
-    task_info_core_t* blocking_task = find_task_by_id(blocking_task_id);
+    task_info_core_t *blocking_task = find_task_by_id(blocking_task_id);
     if (!blocking_task) {
         return AGENTOS_EINVAL;
     }
 
-    task_info_core_t* blocked_task = find_task_by_id(blocked_task_id);
+    task_info_core_t *blocked_task = find_task_by_id(blocked_task_id);
     if (!blocked_task) {
         release_task_lock();
         return AGENTOS_EINVAL;
@@ -803,7 +859,7 @@ agentos_error_t agentos_scheduler_priority_inherit(
         new_priority = AGENTOS_TASK_PRIORITY_MAX;
 
     if (new_priority != blocking_task->priority) {
-        const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+        const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
         if (ops && ops->thread_set_priority) {
             ops->thread_set_priority(blocking_task->platform_handle, new_priority);
         }
@@ -815,10 +871,11 @@ agentos_error_t agentos_scheduler_priority_inherit(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_scheduler_resource_reserve(
-    size_t est_memory_kb, int est_cpu_cores) {
+agentos_error_t agentos_scheduler_resource_reserve(size_t est_memory_kb, int est_cpu_cores)
+{
 
-    if (est_cpu_cores < 1) est_cpu_cores = 1;
+    if (est_cpu_cores < 1)
+        est_cpu_cores = 1;
 
     size_t avail_mem_kb = 0;
     int avail_cpu_cores = 1;
@@ -870,18 +927,19 @@ agentos_error_t agentos_scheduler_resource_reserve(
 
 void agentos_task_cleanup(void)
 {
-    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx || !scheduler_core_is_initialized()) {
         return;
     }
 
-    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+    const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
 
     agentos_mutex_lock(ctx->task_table_lock);
 
     for (uint32_t i = 0; i < ctx->task_count; i++) {
-        task_info_core_t* info = ctx->task_table[i];
-        if (!info) continue;
+        task_info_core_t *info = ctx->task_table[i];
+        if (!info)
+            continue;
 
         if (ops && ops->cleanup_platform_resources && info->platform_handle) {
             ops->cleanup_platform_resources(info->platform_handle, info->platform_data);
@@ -892,9 +950,9 @@ void agentos_task_cleanup(void)
     }
 
     for (size_t b = 0; b < HASH_TABLE_BUCKETS; b++) {
-        task_hash_node_t* node = ctx->id_hash_table[b];
+        task_hash_node_t *node = ctx->id_hash_table[b];
         while (node) {
-            task_hash_node_t* next = node->next;
+            task_hash_node_t *next = node->next;
             AGENTOS_FREE(node);
             node = next;
         }

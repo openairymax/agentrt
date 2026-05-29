@@ -2,7 +2,7 @@
 
 `cupolas/src/workbench/` 提供安全策略的交互式测试与验证环境，允许安全管理员在正式部署前验证安全规则的有效性。
 
-> Part of AgentOS v0.0.5
+> Part of AgentOS v0.1.0
 
 ## 设计目标
 

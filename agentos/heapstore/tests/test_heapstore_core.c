@@ -6,14 +6,15 @@
  * "From data intelligence emerges."
  */
 
+#include "heapstore.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
-#include "heapstore.h"
-
-static void test_init_shutdown(void) {
+static void test_init_shutdown(void)
+{
     printf("Test: init_shutdown...");
 
     assert(!heapstore_is_initialized());
@@ -23,8 +24,10 @@ static void test_init_shutdown(void) {
     manager.enable_auto_cleanup = true;
 
     heapstore_error_t err = heapstore_init(&manager);
-    printf(" (err=%d) ", (int)err); fflush(stdout);
-    assert(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED);
+    printf(" (err=%d) ", (int)err);
+    fflush(stdout);
+    assert(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED ||
+           err == heapstore_ERR_DIR_CREATE_FAILED);
 
     if (err == heapstore_SUCCESS) {
         assert(heapstore_is_initialized());
@@ -36,7 +39,8 @@ static void test_init_shutdown(void) {
     printf("PASS\n");
 }
 
-static void test_init_twice(void) {
+static void test_init_twice(void)
+{
     printf("Test: init_twice...");
 
     heapstore_config_t manager = {0};
@@ -53,7 +57,8 @@ static void test_init_twice(void) {
     printf("PASS\n");
 }
 
-static void test_get_path(void) {
+static void test_get_path(void)
+{
     printf("Test: get_path...");
 
     heapstore_config_t manager = {0};
@@ -81,7 +86,8 @@ static void test_get_path(void) {
     printf("PASS\n");
 }
 
-static void test_get_full_path_invalid(void) {
+static void test_get_full_path_invalid(void)
+{
     printf("Test: get_full_path_invalid...");
 
     heapstore_config_t manager = {0};
@@ -105,7 +111,8 @@ static void test_get_full_path_invalid(void) {
     printf("PASS\n");
 }
 
-static void test_get_stats(void) {
+static void test_get_stats(void)
+{
     printf("Test: get_stats...");
 
     heapstore_config_t manager = {0};
@@ -125,7 +132,8 @@ static void test_get_stats(void) {
     printf("PASS\n");
 }
 
-static void test_get_stats_not_initialized(void) {
+static void test_get_stats_not_initialized(void)
+{
     printf("Test: get_stats_not_initialized...");
 
     heapstore_stats_t stats;
@@ -137,7 +145,8 @@ static void test_get_stats_not_initialized(void) {
     printf("PASS\n");
 }
 
-static void test_cleanup(void) {
+static void test_cleanup(void)
+{
     printf("Test: cleanup...");
 
     heapstore_config_t manager = {0};
@@ -159,21 +168,26 @@ static void test_cleanup(void) {
     printf("PASS\n");
 }
 
-static void test_strerror(void) {
+static void test_strerror(void)
+{
     printf("Test: strerror...");
 
     assert(strstr(heapstore_strerror(heapstore_SUCCESS), "heapstore_SUCCESS") != NULL);
     assert(strstr(heapstore_strerror(heapstore_ERR_INVALID_PARAM), "INVALID_PARAM") != NULL);
     assert(strstr(heapstore_strerror(heapstore_ERR_NOT_INITIALIZED), "NOT_INITIALIZED") != NULL);
-    assert(strstr(heapstore_strerror(heapstore_ERR_ALREADY_INITIALIZED), "ALREADY_INITIALIZED") != NULL);
-    assert(strstr(heapstore_strerror(heapstore_ERR_DIR_CREATE_FAILED), "DIR_CREATE_FAILED") != NULL);
+    assert(strstr(heapstore_strerror(heapstore_ERR_ALREADY_INITIALIZED), "ALREADY_INITIALIZED") !=
+           NULL);
+    assert(strstr(heapstore_strerror(heapstore_ERR_DIR_CREATE_FAILED), "DIR_CREATE_FAILED") !=
+           NULL);
     assert(strstr(heapstore_strerror(heapstore_ERR_OUT_OF_MEMORY), "OUT_OF_MEMORY") != NULL);
-    assert(strstr(heapstore_strerror((heapstore_error_t)-999), "Unknown") != NULL || strstr(heapstore_strerror((heapstore_error_t)-999), "unknown") != NULL);
+    assert(strstr(heapstore_strerror((heapstore_error_t)-999), "Unknown") != NULL ||
+           strstr(heapstore_strerror((heapstore_error_t)-999), "unknown") != NULL);
 
     printf("PASS\n");
 }
 
-static void test_reload_config(void) {
+static void test_reload_config(void)
+{
     printf("Test: reload_config...");
 
     heapstore_config_t manager = {0};
@@ -200,7 +214,8 @@ static void test_reload_config(void) {
     printf("PASS\n");
 }
 
-static void test_reload_config_not_initialized(void) {
+static void test_reload_config_not_initialized(void)
+{
     printf("Test: reload_config_not_initialized...");
 
     heapstore_config_t manager = {0};
@@ -212,7 +227,8 @@ static void test_reload_config_not_initialized(void) {
     printf("PASS\n");
 }
 
-static void test_flush(void) {
+static void test_flush(void)
+{
     printf("Test: flush...");
 
     heapstore_config_t manager = {0};
@@ -229,7 +245,8 @@ static void test_flush(void) {
     printf("PASS\n");
 }
 
-static void test_flush_not_initialized(void) {
+static void test_flush_not_initialized(void)
+{
     printf("Test: flush_not_initialized...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_flush();
@@ -238,7 +255,8 @@ static void test_flush_not_initialized(void) {
     printf("PASS\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=== AgentOS heapstore Core Unit Tests ===\n\n");
 
     test_init_shutdown();
@@ -257,4 +275,3 @@ int main(void) {
     printf("\n=== All Tests Passed ===\n");
     return 0;
 }
-

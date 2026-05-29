@@ -15,13 +15,14 @@
  * 5. 线程安全
  */
 
+#include "error.h"
 #include "monitor_service.h"
 #include "platform.h"
-#include "error.h"
 #include "svc_logger.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #define MAX_RULES 128
 #define MAX_ALERT_HISTORY 2048
@@ -36,22 +37,15 @@ typedef enum {
     ALERT_RULE_CUSTOM
 } alert_rule_type_t;
 
-typedef enum {
-    OP_GT,
-    OP_GTE,
-    OP_LT,
-    OP_LTE,
-    OP_EQ,
-    OP_NEQ
-} comparison_op_t;
+typedef enum { OP_GT, OP_GTE, OP_LT, OP_LTE, OP_EQ, OP_NEQ } comparison_op_t;
 
 typedef struct {
-    char* rule_id;
-    char* metric_name;
+    char *rule_id;
+    char *metric_name;
     comparison_op_t op;
     double threshold;
     alert_level_t level;
-    char* message_template;
+    char *message_template;
     uint32_t evaluation_interval_ms;
     uint32_t consecutive_count;
     uint32_t current_count;
@@ -59,22 +53,22 @@ typedef struct {
 } threshold_rule_t;
 
 typedef struct {
-    char* rule_id;
-    char* metric_name;
+    char *rule_id;
+    char *metric_name;
     double rate_of_change;
     uint32_t window_ms;
     alert_level_t level;
-    char* message_template;
+    char *message_template;
     bool enabled;
 } trend_rule_t;
 
 typedef struct {
-    char* rule_id;
-    char** sub_rule_ids;
+    char *rule_id;
+    char **sub_rule_ids;
     size_t sub_rule_count;
-    char* logic_operator;
+    char *logic_operator;
     alert_level_t level;
-    char* message_template;
+    char *message_template;
     bool enabled;
 } composite_rule_t;
 
@@ -87,22 +81,18 @@ typedef struct {
     } rule;
 } alert_rule_t;
 
-typedef enum {
-    CHANNEL_LOG,
-    CHANNEL_CALLBACK,
-    CHANNEL_ESCALATION
-} channel_type_t;
+typedef enum { CHANNEL_LOG, CHANNEL_CALLBACK, CHANNEL_ESCALATION } channel_type_t;
 
 typedef struct {
     channel_type_t type;
-    void (*callback)(const alert_info_t* alert, void* user_data);
-    void* user_data;
+    void (*callback)(const alert_info_t *alert, void *user_data);
+    void *user_data;
     alert_level_t min_level;
     bool enabled;
 } notification_channel_t;
 
 typedef struct {
-    char* group_key_pattern;
+    char *group_key_pattern;
     uint32_t suppress_duration_ms;
     uint64_t last_alert_time;
     bool active;
@@ -129,7 +119,8 @@ static struct {
     int initialized;
 } g_alert_mgr = {0};
 
-int alert_system_init(void) {
+int alert_system_init(void)
+{
     if (g_alert_mgr.initialized) {
         return AGENTOS_SUCCESS;
     }
@@ -145,7 +136,8 @@ int alert_system_init(void) {
     return AGENTOS_SUCCESS;
 }
 
-void alert_system_shutdown(void) {
+void alert_system_shutdown(void)
+{
     if (!g_alert_mgr.initialized) {
         return;
     }
@@ -179,10 +171,10 @@ void alert_system_shutdown(void) {
     agentos_mutex_destroy(&g_alert_mgr.lock);
 }
 
-int alert_add_threshold_rule(const char* rule_id, const char* metric_name,
-                             comparison_op_t op, double threshold,
-                             alert_level_t level, const char* message_template,
-                             uint32_t consecutive_count) {
+int alert_add_threshold_rule(const char *rule_id, const char *metric_name, comparison_op_t op,
+                             double threshold, alert_level_t level, const char *message_template,
+                             uint32_t consecutive_count)
+{
     if (!rule_id || !metric_name) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -198,14 +190,15 @@ int alert_add_threshold_rule(const char* rule_id, const char* metric_name,
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    alert_rule_t* rule = &g_alert_mgr.rules[g_alert_mgr.rule_count];
+    alert_rule_t *rule = &g_alert_mgr.rules[g_alert_mgr.rule_count];
     rule->type = ALERT_RULE_THRESHOLD;
     rule->rule.threshold.rule_id = AGENTOS_STRDUP(rule_id);
     rule->rule.threshold.metric_name = AGENTOS_STRDUP(metric_name);
     rule->rule.threshold.op = op;
     rule->rule.threshold.threshold = threshold;
     rule->rule.threshold.level = level;
-    rule->rule.threshold.message_template = message_template ? AGENTOS_STRDUP(message_template) : NULL;
+    rule->rule.threshold.message_template =
+        message_template ? AGENTOS_STRDUP(message_template) : NULL;
     rule->rule.threshold.evaluation_interval_ms = 10000;
     rule->rule.threshold.consecutive_count = consecutive_count > 0 ? consecutive_count : 1;
     rule->rule.threshold.current_count = 0;
@@ -214,13 +207,14 @@ int alert_add_threshold_rule(const char* rule_id, const char* metric_name,
 
     agentos_mutex_unlock(&g_alert_mgr.lock);
 
-    SVC_LOG_INFO("Alert threshold rule added: %s (metric=%s, threshold=%.2f)",
-                 rule_id, metric_name, threshold);
+    SVC_LOG_INFO("Alert threshold rule added: %s (metric=%s, threshold=%.2f)", rule_id, metric_name,
+                 threshold);
     return AGENTOS_SUCCESS;
 }
 
-int alert_add_notification_channel(void (*callback)(const alert_info_t*, void*),
-                                   void* user_data, alert_level_t min_level) {
+int alert_add_notification_channel(void (*callback)(const alert_info_t *, void *), void *user_data,
+                                   alert_level_t min_level)
+{
     if (!callback) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -236,7 +230,7 @@ int alert_add_notification_channel(void (*callback)(const alert_info_t*, void*),
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    notification_channel_t* ch = &g_alert_mgr.channels[g_alert_mgr.channel_count];
+    notification_channel_t *ch = &g_alert_mgr.channels[g_alert_mgr.channel_count];
     ch->type = CHANNEL_CALLBACK;
     ch->callback = callback;
     ch->user_data = user_data;
@@ -248,16 +242,17 @@ int alert_add_notification_channel(void (*callback)(const alert_info_t*, void*),
     return AGENTOS_SUCCESS;
 }
 
-static bool check_suppression(const alert_info_t* alert) {
+static bool check_suppression(const alert_info_t *alert)
+{
     for (size_t i = 0; i < g_alert_mgr.suppression_count; i++) {
-        suppression_rule_t* sup = &g_alert_mgr.suppressions[i];
-        if (!sup->active) continue;
+        suppression_rule_t *sup = &g_alert_mgr.suppressions[i];
+        if (!sup->active)
+            continue;
 
         char group_key[MAX_GROUP_KEY_LEN];
         snprintf(group_key, sizeof(group_key), "%s:%s:%d",
                  alert->service_name ? alert->service_name : "",
-                 alert->resource_id ? alert->resource_id : "",
-                 alert->level);
+                 alert->resource_id ? alert->resource_id : "", alert->level);
 
         if (strstr(group_key, sup->group_key_pattern) != NULL) {
             uint64_t now = (uint64_t)time(NULL) * 1000;
@@ -270,33 +265,35 @@ static bool check_suppression(const alert_info_t* alert) {
     return false;
 }
 
-static void notify_channels(const alert_info_t* alert) {
+static void notify_channels(const alert_info_t *alert)
+{
     for (size_t i = 0; i < g_alert_mgr.channel_count; i++) {
-        notification_channel_t* ch = &g_alert_mgr.channels[i];
-        if (!ch->enabled || alert->level < ch->min_level) continue;
+        notification_channel_t *ch = &g_alert_mgr.channels[i];
+        if (!ch->enabled || alert->level < ch->min_level)
+            continue;
 
         switch (ch->type) {
-            case CHANNEL_CALLBACK:
-                if (ch->callback) {
-                    ch->callback(alert, ch->user_data);
-                }
-                break;
-            case CHANNEL_LOG: {
-                const char* level_str[] = {"INFO", "WARNING", "ERROR", "CRITICAL"};
-                SVC_LOG_WARN("ALERT [%s] %s: %s",
-                             level_str[alert->level < ALERT_LEVEL_COUNT ? alert->level : 0],
-                             alert->alert_id ? alert->alert_id : "N/A",
-                             alert->message ? alert->message : "N/A");
-                break;
+        case CHANNEL_CALLBACK:
+            if (ch->callback) {
+                ch->callback(alert, ch->user_data);
             }
-            case CHANNEL_ESCALATION:
-                SVC_LOG_ERROR("ALERT ESCALATION: %s", alert->message ? alert->message : "N/A");
-                break;
+            break;
+        case CHANNEL_LOG: {
+            const char *level_str[] = {"INFO", "WARNING", "ERROR", "CRITICAL"};
+            SVC_LOG_WARN(
+                "ALERT [%s] %s: %s", level_str[alert->level < ALERT_LEVEL_COUNT ? alert->level : 0],
+                alert->alert_id ? alert->alert_id : "N/A", alert->message ? alert->message : "N/A");
+            break;
+        }
+        case CHANNEL_ESCALATION:
+            SVC_LOG_ERROR("ALERT ESCALATION: %s", alert->message ? alert->message : "N/A");
+            break;
         }
     }
 }
 
-static void add_to_history(const alert_info_t* alert) {
+static void add_to_history(const alert_info_t *alert)
+{
     if (g_alert_mgr.history_count >= MAX_ALERT_HISTORY) {
         AGENTOS_FREE(g_alert_mgr.history[0].alert.alert_id);
         AGENTOS_FREE(g_alert_mgr.history[0].alert.message);
@@ -307,7 +304,7 @@ static void add_to_history(const alert_info_t* alert) {
         g_alert_mgr.history_count--;
     }
 
-    grouped_alert_t* entry = &g_alert_mgr.history[g_alert_mgr.history_count];
+    grouped_alert_t *entry = &g_alert_mgr.history[g_alert_mgr.history_count];
     memset(entry, 0, sizeof(grouped_alert_t));
 
     entry->alert.alert_id = alert->alert_id ? AGENTOS_STRDUP(alert->alert_id) : NULL;
@@ -323,13 +320,13 @@ static void add_to_history(const alert_info_t* alert) {
 
     snprintf(entry->group_key, sizeof(entry->group_key), "%s:%s:%d",
              alert->service_name ? alert->service_name : "",
-             alert->resource_id ? alert->resource_id : "",
-             alert->level);
+             alert->resource_id ? alert->resource_id : "", alert->level);
 
     g_alert_mgr.history_count++;
 }
 
-int alert_evaluate_metric(const char* metric_name, double value) {
+int alert_evaluate_metric(const char *metric_name, double value)
+{
     if (!metric_name || !g_alert_mgr.initialized) {
         return AGENTOS_SUCCESS;
     }
@@ -337,20 +334,34 @@ int alert_evaluate_metric(const char* metric_name, double value) {
     agentos_mutex_lock(&g_alert_mgr.lock);
 
     for (size_t i = 0; i < g_alert_mgr.rule_count; i++) {
-        alert_rule_t* rule = &g_alert_mgr.rules[i];
-        if (rule->type != ALERT_RULE_THRESHOLD || !rule->rule.threshold.enabled) continue;
-        if (strcmp(rule->rule.threshold.metric_name, metric_name) != 0) continue;
+        alert_rule_t *rule = &g_alert_mgr.rules[i];
+        if (rule->type != ALERT_RULE_THRESHOLD || !rule->rule.threshold.enabled)
+            continue;
+        if (strcmp(rule->rule.threshold.metric_name, metric_name) != 0)
+            continue;
 
         bool triggered = false;
-        threshold_rule_t* tr = &rule->rule.threshold;
+        threshold_rule_t *tr = &rule->rule.threshold;
 
         switch (tr->op) {
-            case OP_GT:  triggered = value > tr->threshold; break;
-            case OP_GTE: triggered = value >= tr->threshold; break;
-            case OP_LT:  triggered = value < tr->threshold; break;
-            case OP_LTE: triggered = value <= tr->threshold; break;
-            case OP_EQ:  triggered = value == tr->threshold; break;
-            case OP_NEQ: triggered = value != tr->threshold; break;
+        case OP_GT:
+            triggered = value > tr->threshold;
+            break;
+        case OP_GTE:
+            triggered = value >= tr->threshold;
+            break;
+        case OP_LT:
+            triggered = value < tr->threshold;
+            break;
+        case OP_LTE:
+            triggered = value <= tr->threshold;
+            break;
+        case OP_EQ:
+            triggered = value == tr->threshold;
+            break;
+        case OP_NEQ:
+            triggered = value != tr->threshold;
+            break;
         }
 
         if (triggered) {
@@ -358,8 +369,8 @@ int alert_evaluate_metric(const char* metric_name, double value) {
             if (tr->current_count >= tr->consecutive_count) {
                 alert_info_t alert = {0};
                 char alert_id[64];
-                snprintf(alert_id, sizeof(alert_id), "auto-%s-%llu",
-                         tr->rule_id, (unsigned long long)(uint64_t)time(NULL) * 1000);
+                snprintf(alert_id, sizeof(alert_id), "auto-%s-%llu", tr->rule_id,
+                         (unsigned long long)(uint64_t)time(NULL) * 1000);
                 alert.alert_id = alert_id;
                 alert.level = tr->level;
                 alert.service_name = "monitor";
@@ -368,11 +379,13 @@ int alert_evaluate_metric(const char* metric_name, double value) {
 
                 char msg_buf[512];
                 if (tr->message_template) {
-                    snprintf(msg_buf, sizeof(msg_buf), tr->message_template, value, tr->threshold); /* flawfinder: ignore - template is internal constant string */
+                    snprintf(msg_buf, sizeof(msg_buf), tr->message_template, value,
+                             tr->threshold); /* flawfinder: ignore - template is internal constant
+                                                string */
                 } else {
                     snprintf(msg_buf, sizeof(msg_buf),
-                             "Metric %s value %.2f exceeded threshold %.2f",
-                             metric_name, value, tr->threshold);
+                             "Metric %s value %.2f exceeded threshold %.2f", metric_name, value,
+                             tr->threshold);
                 }
                 alert.message = msg_buf;
 
@@ -392,7 +405,8 @@ int alert_evaluate_metric(const char* metric_name, double value) {
     return AGENTOS_SUCCESS;
 }
 
-int alert_resolve(const char* alert_id) {
+int alert_resolve(const char *alert_id)
+{
     if (!alert_id || !g_alert_mgr.initialized) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -413,25 +427,31 @@ int alert_resolve(const char* alert_id) {
     return AGENTOS_ERR_NOT_FOUND;
 }
 
-size_t alert_get_unresolved_count(void) {
-    if (!g_alert_mgr.initialized) return 0;
+size_t alert_get_unresolved_count(void)
+{
+    if (!g_alert_mgr.initialized)
+        return 0;
 
     size_t count = 0;
     agentos_mutex_lock(&g_alert_mgr.lock);
     for (size_t i = 0; i < g_alert_mgr.history_count; i++) {
-        if (!g_alert_mgr.history[i].alert.is_resolved) count++;
+        if (!g_alert_mgr.history[i].alert.is_resolved)
+            count++;
     }
     agentos_mutex_unlock(&g_alert_mgr.lock);
     return count;
 }
 
-size_t alert_get_count_by_level(alert_level_t level) {
-    if (!g_alert_mgr.initialized) return 0;
+size_t alert_get_count_by_level(alert_level_t level)
+{
+    if (!g_alert_mgr.initialized)
+        return 0;
 
     size_t count = 0;
     agentos_mutex_lock(&g_alert_mgr.lock);
     for (size_t i = 0; i < g_alert_mgr.history_count; i++) {
-        if (g_alert_mgr.history[i].alert.level == level) count++;
+        if (g_alert_mgr.history[i].alert.level == level)
+            count++;
     }
     agentos_mutex_unlock(&g_alert_mgr.lock);
     return count;

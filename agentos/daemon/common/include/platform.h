@@ -16,46 +16,47 @@
 #include "compat.h"
 
 /* ==================== 基本类型 ==================== */
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* ==================== 包含 commons 的统一平台抽象层 ==================== */
 /* 使用相对路径避免递归包含自身 */
 #include "../../../commons/platform/include/platform.h"
-#include <compat.h>
+
 #include <atomic_compat.h>
+#include <compat.h>
 
 /* ==================== daemon 额外需要的系统头文件 ==================== */
 #if AGENTOS_PLATFORM_POSIX
-#include <sys/stat.h>
 #include <dlfcn.h>
-#include <sys/utsname.h>
+#include <sys/stat.h>
 #include <sys/sysinfo.h>
+#include <sys/utsname.h>
 #endif
 
 /* ==================== 兼容性别名 ==================== */
 
 typedef agentos_mutex_t agentos_platform_mutex_t;
-#define agentos_platform_mutex_init    agentos_mutex_init
-#define agentos_platform_mutex_lock    agentos_mutex_lock
-#define agentos_platform_mutex_unlock  agentos_mutex_unlock
+#define agentos_platform_mutex_init agentos_mutex_init
+#define agentos_platform_mutex_lock agentos_mutex_lock
+#define agentos_platform_mutex_unlock agentos_mutex_unlock
 #define agentos_platform_mutex_destroy agentos_mutex_destroy
-#define agentos_platform_get_time_ms   agentos_time_ms
+#define agentos_platform_get_time_ms agentos_time_ms
 
 typedef agentos_cond_t agentos_platform_cond_val_t;
-#define agentos_platform_cond_init     agentos_cond_init
-#define agentos_platform_cond_destroy  agentos_cond_destroy
-#define agentos_platform_cond_wait     agentos_cond_wait
+#define agentos_platform_cond_init agentos_cond_init
+#define agentos_platform_cond_destroy agentos_cond_destroy
+#define agentos_platform_cond_wait agentos_cond_wait
 #define agentos_platform_cond_timedwait agentos_cond_timedwait
-#define agentos_platform_cond_signal   agentos_cond_signal
+#define agentos_platform_cond_signal agentos_cond_signal
 #define agentos_platform_cond_broadcast agentos_cond_broadcast
 
 typedef agentos_thread_t agentos_platform_thread_t;
 #define agentos_platform_thread_create agentos_platform_thread_create
-#define agentos_platform_thread_join   agentos_platform_thread_join
+#define agentos_platform_thread_join agentos_platform_thread_join
 
 #ifndef AGENTOS_THREAD_LOCAL
 #define AGENTOS_THREAD_LOCAL _Thread_local
@@ -71,11 +72,11 @@ typedef agentos_thread_t agentos_platform_thread_t;
 
 /* ==================== 类型兼容 ==================== */
 
-typedef agentos_mutex_t* agentos_mutex_handle_t;
-typedef agentos_cond_t* agentos_cond_handle_t;
-typedef agentos_cond_t* agentos_platform_cond_t;
-typedef agentos_thread_t* agentos_thread_handle_t;
-typedef agentos_socket_t* agentos_socket_handle_t;
+typedef agentos_mutex_t *agentos_mutex_handle_t;
+typedef agentos_cond_t *agentos_cond_handle_t;
+typedef agentos_cond_t *agentos_platform_cond_t;
+typedef agentos_thread_t *agentos_thread_handle_t;
+typedef agentos_socket_t *agentos_socket_handle_t;
 
 /* ==================== 额外类型定义 ==================== */
 
@@ -94,11 +95,7 @@ typedef struct {
     int signal;
 } agentos_process_status_t;
 
-typedef enum {
-    AGENTOS_AF_INET,
-    AGENTOS_AF_INET6,
-    AGENTOS_AF_UNIX
-} agentos_address_family_t;
+typedef enum { AGENTOS_AF_INET, AGENTOS_AF_INET6, AGENTOS_AF_UNIX } agentos_address_family_t;
 
 typedef enum {
     AGENTOS_SOCK_STREAM,
@@ -118,22 +115,22 @@ typedef struct {
 
 /* ==================== 兼容性函数声明（实现在 platform_compat.c） ==================== */
 
-int agentos_time_now(agentos_timestamp_t* ts);
-int agentos_time_monotonic(agentos_timestamp_t* ts);
-uint64_t agentos_time_to_ms(const agentos_timestamp_t* ts);
-void agentos_time_from_ms(uint64_t ms, agentos_timestamp_t* ts);
+int agentos_time_now(agentos_timestamp_t *ts);
+int agentos_time_monotonic(agentos_timestamp_t *ts);
+uint64_t agentos_time_to_ms(const agentos_timestamp_t *ts);
+void agentos_time_from_ms(uint64_t ms, agentos_timestamp_t *ts);
 void agentos_sleep_ms(uint32_t ms);
 uint32_t agentos_process_self(void);
 uint64_t agentos_thread_self(void);
-int agentos_thread_setname(const char* name);
-int agentos_thread_getname(char* name, size_t size);
-int agentos_mkdir(const char* path, int recursive);
+int agentos_thread_setname(const char *name);
+int agentos_thread_getname(char *name, size_t size);
+int agentos_mkdir(const char *path, int recursive);
 
-typedef void* agentos_dl_t;
-agentos_dl_t agentos_dl_open(const char* path);
+typedef void *agentos_dl_t;
+agentos_dl_t agentos_dl_open(const char *path);
 int agentos_dl_close(agentos_dl_t dl);
-void* agentos_dl_sym(agentos_dl_t dl, const char* name);
-const char* agentos_dl_error(void);
+void *agentos_dl_sym(agentos_dl_t dl, const char *name);
+const char *agentos_dl_error(void);
 
 #ifndef AGENTOS_SYSINFO_T_DEFINED
 #define AGENTOS_SYSINFO_T_DEFINED
@@ -147,7 +144,7 @@ typedef struct {
 } agentos_sysinfo_t;
 #endif
 
-int agentos_get_sysinfo(agentos_sysinfo_t* info);
+int agentos_get_sysinfo(agentos_sysinfo_t *info);
 
 /* ==================== 原子操作兼容 ==================== */
 /* atomic_load_32/atomic_store_32/atomic_fetch_add_32/atomic_fetch_sub_32
@@ -161,14 +158,14 @@ int agentos_get_sysinfo(agentos_sysinfo_t* info);
 
 int agentos_socket_init(void);
 void agentos_socket_cleanup(void);
-agentos_socket_t agentos_socket_create_tcp_server(const char* host, uint16_t port);
+agentos_socket_t agentos_socket_create_tcp_server(const char *host, uint16_t port);
 
 #if AGENTOS_PLATFORM_POSIX
-agentos_socket_t agentos_socket_create_unix_server(const char* path);
+agentos_socket_t agentos_socket_create_unix_server(const char *path);
 #endif
 
 agentos_socket_t agentos_socket_accept(agentos_socket_t server_fd, uint32_t timeout_ms);
-ssize_t agentos_socket_recv(agentos_socket_t sock, void* buf, size_t len);
-ssize_t agentos_socket_send(agentos_socket_t sock, const void* buf, size_t len);
+ssize_t agentos_socket_recv(agentos_socket_t sock, void *buf, size_t len);
+ssize_t agentos_socket_send(agentos_socket_t sock, const void *buf, size_t len);
 
 #endif /* AGENTOS_DAEMON_COMMON_PLATFORM_H */

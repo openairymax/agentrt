@@ -27,13 +27,13 @@
 #ifndef AGENTOS_heapstore_INTEGRATION_H
 #define AGENTOS_heapstore_INTEGRATION_H
 
+#include "agentos.h"
 #include "heapstore.h"
+#include "heapstore_ipc.h"
 #include "heapstore_log.h"
+#include "heapstore_memory.h"
 #include "heapstore_registry.h"
 #include "heapstore_trace.h"
-#include "heapstore_ipc.h"
-#include "heapstore_memory.h"
-#include "agentos.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +56,7 @@ extern "C" {
  *
  * @see heapstore_integration_shutdown()
  */
-AGENTOS_API agentos_error_t heapstore_integration_init(const char* root_path);
+AGENTOS_API agentos_error_t heapstore_integration_init(const char *root_path);
 
 /**
  * @brief 关闭 heapstore 集成并清理资源
@@ -86,11 +86,10 @@ AGENTOS_API void heapstore_integration_shutdown(void);
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_syscall_session_save(
-    const char* session_id,
-    const char* metadata,
-    uint64_t created_ns,
-    uint64_t last_active_ns);
+AGENTOS_API agentos_error_t heapstore_syscall_session_save(const char *session_id,
+                                                           const char *metadata,
+                                                           uint64_t created_ns,
+                                                           uint64_t last_active_ns);
 
 /**
  * @brief 为 syscall 层提供会话加载接口
@@ -105,11 +104,10 @@ AGENTOS_API agentos_error_t heapstore_syscall_session_save(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_syscall_session_load(
-    const char* session_id,
-    char** out_metadata,
-    uint64_t* out_created_ns,
-    uint64_t* out_last_active_ns);
+AGENTOS_API agentos_error_t heapstore_syscall_session_load(const char *session_id,
+                                                           char **out_metadata,
+                                                           uint64_t *out_created_ns,
+                                                           uint64_t *out_last_active_ns);
 
 /**
  * @brief 为 syscall 层提供会话删除接口
@@ -120,7 +118,7 @@ AGENTOS_API agentos_error_t heapstore_syscall_session_load(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_syscall_session_delete(const char* session_id);
+AGENTOS_API agentos_error_t heapstore_syscall_session_delete(const char *session_id);
 
 /**
  * @brief 为 syscall 层提供会话列表接口
@@ -133,9 +131,7 @@ AGENTOS_API agentos_error_t heapstore_syscall_session_delete(const char* session
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_syscall_session_list(
-    char*** out_sessions,
-    size_t* out_count);
+AGENTOS_API agentos_error_t heapstore_syscall_session_list(char ***out_sessions, size_t *out_count);
 
 /* ==================== telemetry 层集成 ==================== */
 
@@ -156,15 +152,10 @@ AGENTOS_API agentos_error_t heapstore_syscall_session_list(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_syscall_trace_save(
-    const char* trace_id,
-    const char* span_id,
-    const char* parent_id,
-    const char* name,
-    int64_t start_time_us,
-    int64_t end_time_us,
-    int status,
-    const char* events_json);
+AGENTOS_API agentos_error_t heapstore_syscall_trace_save(const char *trace_id, const char *span_id,
+                                                         const char *parent_id, const char *name,
+                                                         int64_t start_time_us, int64_t end_time_us,
+                                                         int status, const char *events_json);
 
 /**
  * @brief 为 telemetry 层提供追踪数据导出接口
@@ -176,7 +167,7 @@ AGENTOS_API agentos_error_t heapstore_syscall_trace_save(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_syscall_trace_export(char** out_traces);
+AGENTOS_API agentos_error_t heapstore_syscall_trace_export(char **out_traces);
 
 /* ====================== memory (built-in) 层集成 ====================== */
 
@@ -193,11 +184,8 @@ AGENTOS_API agentos_error_t heapstore_syscall_trace_export(char** out_traces);
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_memory_raw_save(
-    const void* data,
-    size_t len,
-    const char* metadata,
-    char** out_record_id);
+AGENTOS_API agentos_error_t heapstore_memory_raw_save(const void *data, size_t len,
+                                                      const char *metadata, char **out_record_id);
 
 /**
  * @brief 为 memory (built-in) 层提供原始记忆数据加载接口
@@ -212,11 +200,8 @@ AGENTOS_API agentos_error_t heapstore_memory_raw_save(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_memory_raw_load(
-    const char* record_id,
-    void** out_data,
-    size_t* out_len,
-    char** out_metadata);
+AGENTOS_API agentos_error_t heapstore_memory_raw_load(const char *record_id, void **out_data,
+                                                      size_t *out_len, char **out_metadata);
 
 /**
  * @brief 为 memory (built-in) 层提供原始记忆数据删除接口
@@ -227,7 +212,7 @@ AGENTOS_API agentos_error_t heapstore_memory_raw_load(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_memory_raw_delete(const char* record_id);
+AGENTOS_API agentos_error_t heapstore_memory_raw_delete(const char *record_id);
 
 /* ==================== corekern IPC 层集成 ==================== */
 
@@ -242,9 +227,8 @@ AGENTOS_API agentos_error_t heapstore_memory_raw_delete(const char* record_id);
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_ipc_channel_save(
-    const char* channel_id,
-    const char* state_json);
+AGENTOS_API agentos_error_t heapstore_ipc_channel_save(const char *channel_id,
+                                                       const char *state_json);
 
 /**
  * @brief 为 corekern IPC 层提供通道状态加载接口
@@ -257,9 +241,7 @@ AGENTOS_API agentos_error_t heapstore_ipc_channel_save(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_ipc_channel_load(
-    const char* channel_id,
-    char** out_state);
+AGENTOS_API agentos_error_t heapstore_ipc_channel_load(const char *channel_id, char **out_state);
 
 /* ==================== commons logging 层集成 ==================== */
 
@@ -279,12 +261,9 @@ AGENTOS_API agentos_error_t heapstore_ipc_channel_load(
  *
  * @note 此接口同时支持快速路径和慢速路径
  */
-AGENTOS_API agentos_error_t heapstore_logging_write(
-    const char* module,
-    int level,
-    const char* trace_id,
-    const char* message,
-    uint64_t timestamp_ns);
+AGENTOS_API agentos_error_t heapstore_logging_write(const char *module, int level,
+                                                    const char *trace_id, const char *message,
+                                                    uint64_t timestamp_ns);
 
 /* ==================== 健康检查与可观测性 ==================== */
 
@@ -298,7 +277,7 @@ AGENTOS_API agentos_error_t heapstore_logging_write(
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_integration_health_check(char** out_health_json);
+AGENTOS_API agentos_error_t heapstore_integration_health_check(char **out_health_json);
 
 /**
  * @brief 获取 heapstore 集成统计信息
@@ -310,7 +289,7 @@ AGENTOS_API agentos_error_t heapstore_integration_health_check(char** out_health
  * @threadsafe 是
  * @reentrant 是
  */
-AGENTOS_API agentos_error_t heapstore_integration_get_stats(char** out_stats_json);
+AGENTOS_API agentos_error_t heapstore_integration_get_stats(char **out_stats_json);
 
 #ifdef __cplusplus
 }

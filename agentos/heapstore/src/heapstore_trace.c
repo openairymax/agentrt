@@ -10,24 +10,28 @@
  */
 
 #include "heapstore_trace.h"
+
+#include "platform.h"
 #include "private.h"
 #include "utils.h"
-#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+#include "memory_compat.h"
+
 #ifdef _WIN32
-#include <windows.h>
 #include <direct.h>
+#include <windows.h>
 #define mkdir(path, mode) _mkdir(path)
 #else
-#include <unistd.h>
-#include <sys/stat.h>
 #include "agentos_dirent.h"
 #include "platform.h"
+
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #define heapstore_TRACE_MAX_PATH 512
@@ -37,18 +41,19 @@
 static bool s_initialized = false;
 static char s_trace_path[heapstore_TRACE_MAX_PATH] = {0};
 static agentos_mutex_t s_trace_lock = {0};
-static heapstore_span_t* s_span_buffer = NULL;
+static heapstore_span_t *s_span_buffer = NULL;
 static size_t s_span_count = 0;
 static heapstore_trace_exporter_config_t s_exporter_config = {0};
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-heapstore_error_t heapstore_trace_init(void) {
+heapstore_error_t heapstore_trace_init(void)
+{
     if (s_initialized) {
         return heapstore_SUCCESS;
     }
 
-    const char* base_path = "agentos/heapstore/traces";
+    const char *base_path = "agentos/heapstore/traces";
     strncpy(s_trace_path, base_path, sizeof(s_trace_path) - 1);
     s_trace_path[sizeof(s_trace_path) - 1] = '\0';
 
@@ -58,7 +63,7 @@ heapstore_error_t heapstore_trace_init(void) {
     snprintf(spans_path, sizeof(spans_path), "%s/spans", s_trace_path);
     heapstore_ensure_directory(spans_path);
 
-    s_span_buffer = (heapstore_span_t*)calloc(heapstore_TRACE_MAX_SPANS, sizeof(heapstore_span_t));
+    s_span_buffer = (heapstore_span_t *)AGENTOS_CALLOC(heapstore_TRACE_MAX_SPANS, sizeof(heapstore_span_t));
     if (!s_span_buffer) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
@@ -76,7 +81,8 @@ heapstore_error_t heapstore_trace_init(void) {
 }
 #pragma GCC diagnostic pop
 
-void heapstore_trace_shutdown(void) {
+void heapstore_trace_shutdown(void)
+{
     if (!s_initialized) {
         return;
     }
@@ -84,7 +90,7 @@ void heapstore_trace_shutdown(void) {
     agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_buffer) {
-        free(s_span_buffer);
+        AGENTOS_FREE(s_span_buffer);
         s_span_buffer = NULL;
     }
     s_span_count = 0;
@@ -93,7 +99,8 @@ void heapstore_trace_shutdown(void) {
     agentos_mutex_unlock(&s_trace_lock);
 }
 
-heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span) {
+heapstore_error_t heapstore_trace_write_span(const heapstore_span_t *span)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -121,7 +128,8 @@ heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span) {
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t* spans, size_t count) {
+heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t *spans, size_t count)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -145,7 +153,9 @@ heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t* span
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore_span_t** spans, size_t* count) {
+heapstore_error_t heapstore_trace_query_by_trace(const char *trace_id, heapstore_span_t **spans,
+                                                 size_t *count)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -170,7 +180,7 @@ heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore
         return heapstore_ERR_NOT_FOUND;
     }
 
-    heapstore_span_t* result = (heapstore_span_t*)malloc(match_count * sizeof(heapstore_span_t));
+    heapstore_span_t *result = (heapstore_span_t *)AGENTOS_MALLOC(match_count * sizeof(heapstore_span_t));
     if (!result) {
         agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
@@ -192,7 +202,9 @@ heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint64_t end_time, heapstore_span_t** spans, size_t* count) {
+heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint64_t end_time,
+                                                      heapstore_span_t **spans, size_t *count)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -205,7 +217,8 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
 
     size_t match_count = 0;
     for (size_t i = 0; i < s_span_count; i++) {
-        if (s_span_buffer[i].start_time_ns >= start_time && s_span_buffer[i].end_time_ns <= end_time) {
+        if (s_span_buffer[i].start_time_ns >= start_time &&
+            s_span_buffer[i].end_time_ns <= end_time) {
             match_count++;
         }
     }
@@ -217,7 +230,7 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
         return heapstore_ERR_NOT_FOUND;
     }
 
-    heapstore_span_t* result = (heapstore_span_t*)malloc(match_count * sizeof(heapstore_span_t));
+    heapstore_span_t *result = (heapstore_span_t *)AGENTOS_MALLOC(match_count * sizeof(heapstore_span_t));
     if (!result) {
         agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
@@ -225,7 +238,8 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
 
     size_t idx = 0;
     for (size_t i = 0; i < s_span_count; i++) {
-        if (s_span_buffer[i].start_time_ns >= start_time && s_span_buffer[i].end_time_ns <= end_time) {
+        if (s_span_buffer[i].start_time_ns >= start_time &&
+            s_span_buffer[i].end_time_ns <= end_time) {
             memcpy(&result[idx], &s_span_buffer[i], sizeof(heapstore_span_t));
             idx++;
         }
@@ -239,13 +253,15 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
     return heapstore_SUCCESS;
 }
 
-void heapstore_trace_free_spans(heapstore_span_t* spans) {
+void heapstore_trace_free_spans(heapstore_span_t *spans)
+{
     if (spans) {
-        free(spans);
+        AGENTOS_FREE(spans);
     }
 }
 
-heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter_config_t* manager) {
+heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter_config_t *manager)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -263,7 +279,8 @@ heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-heapstore_error_t heapstore_trace_flush(void) {
+heapstore_error_t heapstore_trace_flush(void)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -277,13 +294,13 @@ heapstore_error_t heapstore_trace_flush(void) {
 
     char filename[256];
     time_t now = time(NULL);
-    struct tm* tm_info = localtime(&now);
+    struct tm *tm_info = localtime(&now);
     strftime(filename, sizeof(filename), "spans_%Y%m%d_%H%M%S.json", tm_info);
 
     char filepath[heapstore_TRACE_MAX_PATH];
     snprintf(filepath, sizeof(filepath), "%s/spans/%s", s_trace_path, filename);
 
-    FILE* fp = fopen(filepath, "w");
+    FILE *fp = fopen(filepath, "w");
     if (!fp) {
         agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_FILE_OPEN_FAILED;
@@ -295,7 +312,8 @@ heapstore_error_t heapstore_trace_flush(void) {
         fprintf(fp, "      \"trace_id\": \"%s\",\n", s_span_buffer[i].trace_id);
         fprintf(fp, "      \"span_id\": \"%s\",\n", s_span_buffer[i].span_id);
         fprintf(fp, "      \"name\": \"%s\",\n", s_span_buffer[i].name);
-        fprintf(fp, "      \"start_time_ns\": %lu,\n", (unsigned long)s_span_buffer[i].start_time_ns);
+        fprintf(fp, "      \"start_time_ns\": %lu,\n",
+                (unsigned long)s_span_buffer[i].start_time_ns);
         fprintf(fp, "      \"end_time_ns\": %lu\n", (unsigned long)s_span_buffer[i].end_time_ns);
         fprintf(fp, "    }%s\n", (i < s_span_count - 1) ? "," : "");
     }
@@ -310,7 +328,9 @@ heapstore_error_t heapstore_trace_flush(void) {
 }
 #pragma GCC diagnostic pop
 
-heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pending_spans, uint64_t* total_size_bytes) {
+heapstore_error_t heapstore_trace_get_stats(uint64_t *total_spans, uint64_t *pending_spans,
+                                            uint64_t *total_size_bytes)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -334,7 +354,8 @@ heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pen
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_bytes) {
+heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t *freed_bytes)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -373,9 +394,11 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
                 time_t file_time = (time_t)((uli.QuadPart - 116444736000000000ULL) / 10000000);
 
                 if (file_time < cutoff_time) {
-                    uint64_t file_size = ((uint64_t)find_data.nFileSizeHigh << 32) | find_data.nFileSizeLow;
+                    uint64_t file_size =
+                        ((uint64_t)find_data.nFileSizeHigh << 32) | find_data.nFileSizeLow;
                     if (DeleteFileA(filepath)) {
-                        if (freed_bytes) *freed_bytes += file_size;
+                        if (freed_bytes)
+                            *freed_bytes += file_size;
                     }
                 }
             }
@@ -383,9 +406,9 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
         FindClose(h_find);
     }
 #else
-    DIR* dir = opendir(spans_path);
+    DIR *dir = opendir(spans_path);
     if (dir) {
-        struct dirent* entry;
+        struct dirent *entry;
         while ((entry = readdir(dir)) != NULL) {
             if (entry->d_type != DT_REG) {
                 continue;
@@ -399,7 +422,8 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
                 if (st.st_mtime < cutoff_time) {
                     uint64_t file_size = (uint64_t)st.st_size;
                     if (unlink(filepath) == 0) {
-                        if (freed_bytes) *freed_bytes += file_size;
+                        if (freed_bytes)
+                            *freed_bytes += file_size;
                     }
                 }
             }
@@ -414,7 +438,8 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
 }
 #pragma GCC diagnostic pop
 
-bool heapstore_trace_is_healthy(void) {
+bool heapstore_trace_is_healthy(void)
+{
     return s_initialized && s_span_buffer != NULL;
 }
 
@@ -425,7 +450,8 @@ bool heapstore_trace_is_healthy(void) {
  */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_events) {
+heapstore_error_t heapstore_trace_export_to_json(char **out_json, bool include_events)
+{
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -437,14 +463,15 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
     agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_count == 0) {
-        *out_json = strdup(include_events ? "[]" : "[]");
+        *out_json = AGENTOS_STRDUP(include_events ? "[]" : "[]");
         agentos_mutex_unlock(&s_trace_lock);
         return (*out_json != NULL) ? heapstore_SUCCESS : heapstore_ERR_OUT_OF_MEMORY;
     }
 
     size_t estimated_size = s_span_count * 512 + 64;
-    if (include_events) estimated_size += s_span_count * 256;
-    char* json_buffer = (char*)malloc(estimated_size);
+    if (include_events)
+        estimated_size += s_span_count * 256;
+    char *json_buffer = (char *)AGENTOS_MALLOC(estimated_size);
     if (!json_buffer) {
         agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
@@ -455,12 +482,14 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
     pos += snprintf(json_buffer + pos, estimated_size - pos, "[\n");
 
     for (size_t i = 0; i < s_span_count; i++) {
-        const heapstore_span_t* span = &s_span_buffer[i];
+        const heapstore_span_t *span = &s_span_buffer[i];
 
         /* 转义字符串中的特殊字符 */
         char escaped_name[256];
         size_t name_idx = 0;
-        for (size_t j = 0; span->name[j] && j < sizeof(span->name) - 1 && name_idx < sizeof(escaped_name) - 1; j++) {
+        for (size_t j = 0;
+             span->name[j] && j < sizeof(span->name) - 1 && name_idx < sizeof(escaped_name) - 1;
+             j++) {
             if (span->name[j] == '"' || span->name[j] == '\\') {
                 escaped_name[name_idx++] = '\\';
             }
@@ -469,7 +498,8 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
         escaped_name[name_idx] = '\0';
 
         /* 写入单个 span 的 JSON 对象 */
-        pos += snprintf(json_buffer + pos, estimated_size - pos,
+        pos += snprintf(
+            json_buffer + pos, estimated_size - pos,
             "  {\n"
             "    \"traceId\": \"%s\",\n"
             "    \"spanId\": \"%s\",\n"
@@ -480,23 +510,17 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
             "    \"status\": \"%s\",\n"
             "    \"attributeCount\": %zu%s\n"
             "  }%s\n",
-            span->trace_id,
-            span->span_id,
-            span->parent_span_id[0] ? span->parent_span_id : "",
-            escaped_name,
-            (unsigned long long)span->start_time_ns,
-            (unsigned long long)span->end_time_ns,
-            span->status,
-            span->attribute_count,
-            include_events ? ",\n    \"events\": []" : "",
-            (i < s_span_count - 1) ? "," : "");
+            span->trace_id, span->span_id, span->parent_span_id[0] ? span->parent_span_id : "",
+            escaped_name, (unsigned long long)span->start_time_ns,
+            (unsigned long long)span->end_time_ns, span->status, span->attribute_count,
+            include_events ? ",\n    \"events\": []" : "", (i < s_span_count - 1) ? "," : "");
 
         /* 检查缓冲区是否足够 */
         if (pos >= estimated_size - 512) {
             estimated_size *= 2;
-            char* new_buffer = (char*)realloc(json_buffer, estimated_size);
+            char *new_buffer = (char *)AGENTOS_REALLOC(json_buffer, estimated_size);
             if (!new_buffer) {
-                free(json_buffer);
+                AGENTOS_FREE(json_buffer);
                 agentos_mutex_unlock(&s_trace_lock);
                 return heapstore_ERR_OUT_OF_MEMORY;
             }

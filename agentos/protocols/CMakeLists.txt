@@ -48,7 +48,6 @@ set(PROTOCOLS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/standards/mcp/include
     ${CMAKE_CURRENT_SOURCE_DIR}/integrations/openai/include
     ${CMAKE_CURRENT_SOURCE_DIR}/integrations/openjiuwen/include
-    ${AGENTOS_COMMONS_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/include

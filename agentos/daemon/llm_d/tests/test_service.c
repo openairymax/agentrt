@@ -4,16 +4,18 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "llm_service.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "llm_service.h"
 
-static void test_service_create_destroy(void) {
+static void test_service_create_destroy(void)
+{
     printf("  test_service_create_destroy...\n");
 
-    llm_service_t* svc = llm_service_create(NULL);
+    llm_service_t *svc = llm_service_create(NULL);
     assert(svc != NULL);
 
     llm_service_destroy(svc);
@@ -21,10 +23,11 @@ static void test_service_create_destroy(void) {
     printf("    PASSED\n");
 }
 
-static void test_service_create_with_config(void) {
+static void test_service_create_with_config(void)
+{
     printf("  test_service_create_with_config...\n");
 
-    llm_service_t* svc = llm_service_create("/nonexistent/config.yaml");
+    llm_service_t *svc = llm_service_create("/nonexistent/config.yaml");
     if (svc != NULL) {
         llm_service_destroy(svc);
         printf("    PASSED (created with default config)\n");
@@ -33,7 +36,8 @@ static void test_service_create_with_config(void) {
     }
 }
 
-static void test_message_build(void) {
+static void test_message_build(void)
+{
     printf("  test_message_build...\n");
 
     llm_message_t messages[2];
@@ -51,7 +55,8 @@ static void test_message_build(void) {
     printf("    PASSED\n");
 }
 
-static void test_request_config(void) {
+static void test_request_config(void)
+{
     printf("  test_request_config...\n");
 
     llm_request_config_t config;
@@ -70,10 +75,11 @@ static void test_request_config(void) {
     printf("    PASSED\n");
 }
 
-static void test_response_free(void) {
+static void test_response_free(void)
+{
     printf("  test_response_free...\n");
 
-    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    llm_response_t *resp = (llm_response_t *)calloc(1, sizeof(llm_response_t));
     assert(resp != NULL);
 
     resp->id = strdup("chatcmpl-123");
@@ -85,13 +91,14 @@ static void test_response_free(void) {
     printf("    PASSED\n");
 }
 
-static void test_service_stats(void) {
+static void test_service_stats(void)
+{
     printf("  test_service_stats...\n");
 
-    llm_service_t* svc = llm_service_create(NULL);
+    llm_service_t *svc = llm_service_create(NULL);
     assert(svc != NULL);
 
-    char* stats_json = NULL;
+    char *stats_json = NULL;
     int ret = llm_service_stats(svc, &stats_json);
     if (ret == 0 && stats_json != NULL) {
         printf("    Stats: %s\n", stats_json);
@@ -103,7 +110,8 @@ static void test_service_stats(void) {
     printf("    PASSED\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=========================================\n");
     printf("  LLM Service Unit Tests\n");
     printf("=========================================\n");

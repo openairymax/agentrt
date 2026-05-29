@@ -1,6 +1,6 @@
 # OpenLab Core — 开放生态核心
 
-> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.1.0 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
 `openlab/openlab/` 是 OpenLab 生态系统的核心管理模块，提供生态系统的注册、发现和管理能力。
 

@@ -2,17 +2,17 @@
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
  * SPDX-License-Identifier: Apache-2.0
- * 
+ *
  * @file network_common.c
  * @brief 网络通信模块实现 - 跨平台网络抽象层
- * 
+ *
  * @details
  * 本文件实现了 network_common.h 中声明的所有网络功能。
  * 遵循 ARCHITECTURAL_PRINCIPLES.md 的设计原则：
  * - E-4 跨平台一致性：支持 Windows/Linux/macOS
  * - E-5 命名语义化：所有函数名精确表达用途
  * - E-6 错误可追溯：统一的错误码体系
- * 
+ *
  * @author Spharx AgentOS Team
  * @date 2026-04-03
  * @version 1.0.0.7
@@ -20,14 +20,15 @@
 
 /* Windows网络编程：必须在所有Windows头文件前定义 */
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
 #endif
 
-#include "network_common.h"
 #include "../../memory/include/memory_compat.h"
+#include "network_common.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,17 +36,18 @@
 #ifdef _WIN32
 #define strdup _strdup
 #endif
-#include <stdarg.h>
 #include "atomic_compat.h"
 
+#include <stdarg.h>
+
 #ifndef _WIN32
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <netdb.h>
-    #include <unistd.h>
-    #include <fcntl.h>
-    #include <errno.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #endif
 
 /* ============================================================================
@@ -60,24 +62,24 @@ struct network_connection {
     network_status_t status;           /**< 连接状态 */
     char error_msg[256];               /**< 错误消息 */
     network_event_callback_t event_cb; /**< 事件回调 */
-    void* event_user_data;             /**< 回调用户数据 */
+    void *event_user_data;             /**< 回调用户数据 */
     network_stats_t stats;             /**< 统计信息 */
 #ifdef _WIN32
-    SOCKET sock;                       /**< Windows Socket 句柄 */
+    SOCKET sock; /**< Windows Socket 句柄 */
 #else
-    int fd;                            /**< Unix 文件描述符 */
+    int fd; /**< Unix 文件描述符 */
 #endif
-    struct sockaddr_in addr;           /**< 目标地址 */
+    struct sockaddr_in addr; /**< 目标地址 */
 };
 
 /**
  * @brief 连接池内部结构
  */
 struct network_pool {
-    network_config_t base_config;      /**< 基础配置 */
-    size_t max_size;                   /**< 最大连接数 */
-    size_t current_size;               /**< 当前连接数 */
-    struct network_connection** connections; /**< 连接数组 */
+    network_config_t base_config;            /**< 基础配置 */
+    size_t max_size;                         /**< 最大连接数 */
+    size_t current_size;                     /**< 当前连接数 */
+    struct network_connection **connections; /**< 连接数组 */
 };
 
 /* ============================================================================
@@ -88,16 +90,17 @@ struct network_pool {
  * @brief 初始化 Winsock（仅 Windows）
  * @return 成功返回 0
  */
-static int network_init_winsock(void) {
+static int network_init_winsock(void)
+{
 #ifdef _WIN32
     static atomic_int initialized = 0;
     int expected = 0;
-    if (atomic_compare_exchange_strong_explicit(&initialized, &expected, 1,
-                                                 memory_order_seq_cst, memory_order_seq_cst)) {
+    if (atomic_compare_exchange_strong_explicit(&initialized, &expected, 1, memory_order_seq_cst,
+                                                memory_order_seq_cst)) {
         WSADATA wsaData;
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
             atomic_store_explicit(&initialized, 0, memory_order_seq_cst);
-            return -1;
+            return AGENTOS_EINVAL;
         }
     }
 #endif
@@ -109,7 +112,8 @@ static int network_init_winsock(void) {
  * @param handle 平台特定句柄
  * @return 成功返回 0
  */
-static int set_nonblocking_mode(void* handle) {
+static int set_nonblocking_mode(void *handle)
+{
 #ifdef _WIN32
     u_long mode = 1;
     ioctlsocket((SOCKET)(uintptr_t)handle, FIONBIO, &mode);
@@ -126,13 +130,16 @@ static int set_nonblocking_mode(void* handle) {
  * @param timeout_ms 超时时间（毫秒）
  * @param is_recv 是否为接收超时
  */
-static void set_socket_timeout(void* handle, int timeout_ms, int is_recv) {
+static void set_socket_timeout(void *handle, int timeout_ms, int is_recv)
+{
 #ifdef _WIN32
     DWORD ms = (DWORD)timeout_ms;
     if (is_recv) {
-        setsockopt((SOCKET)(uintptr_t)handle, SOL_SOCKET, SO_RCVTIMEO, (const char*)&ms, sizeof(ms));
+        setsockopt((SOCKET)(uintptr_t)handle, SOL_SOCKET, SO_RCVTIMEO, (const char *)&ms,
+                   sizeof(ms));
     } else {
-        setsockopt((SOCKET)(uintptr_t)handle, SOL_SOCKET, SO_SNDTIMEO, (const char*)&ms, sizeof(ms));
+        setsockopt((SOCKET)(uintptr_t)handle, SOL_SOCKET, SO_SNDTIMEO, (const char *)&ms,
+                   sizeof(ms));
     }
 #else
     struct timeval tv;
@@ -151,11 +158,15 @@ static void set_socket_timeout(void* handle, int timeout_ms, int is_recv) {
  * @param af AgentOS 地址族枚举
  * @return 系统地址族值
  */
-static int af_to_native(network_af_t af) {
+static int af_to_native(network_af_t af)
+{
     switch (af) {
-        case NETWORK_AF_INET:  return AF_INET;
-        case NETWORK_AF_INET6: return AF_INET6;
-        default:              return AF_INET;
+    case NETWORK_AF_INET:
+        return AF_INET;
+    case NETWORK_AF_INET6:
+        return AF_INET6;
+    default:
+        return AF_INET;
     }
 }
 
@@ -164,12 +175,17 @@ static int af_to_native(network_af_t af) {
  * @param st AgentOS Socket 类型枚举
  * @return 系统 Socket 类型值
  */
-static int socktype_to_native(network_sock_type_t st) {
+static int socktype_to_native(network_sock_type_t st)
+{
     switch (st) {
-        case NETWORK_SOCK_STREAM: return SOCK_STREAM;
-        case NETWORK_SOCK_DGRAM:  return SOCK_DGRAM;
-        case NETWORK_SOCK_RAW:    return SOCK_RAW;
-        default:                  return SOCK_STREAM;
+    case NETWORK_SOCK_STREAM:
+        return SOCK_STREAM;
+    case NETWORK_SOCK_DGRAM:
+        return SOCK_DGRAM;
+    case NETWORK_SOCK_RAW:
+        return SOCK_RAW;
+    default:
+        return SOCK_STREAM;
     }
 }
 
@@ -181,7 +197,8 @@ static int socktype_to_native(network_sock_type_t st) {
  * @brief 创建默认网络配置
  * @return 默认配置结构体
  */
-network_config_t network_create_default_config(void) {
+network_config_t network_create_default_config(void)
+{
     network_config_t config = {0};
 
     config.host = "127.0.0.1";
@@ -209,12 +226,14 @@ network_config_t network_create_default_config(void) {
  * @param config 网络配置
  * @return 连接句柄，失败返回 NULL
  */
-network_connection_t* network_connection_create(const network_config_t* config) {
+network_connection_t *network_connection_create(const network_config_t *config)
+{
     if (!config) {
         return NULL;
     }
 
-    network_connection_t* conn = (network_connection_t*)AGENTOS_CALLOC(1, sizeof(network_connection_t));
+    network_connection_t *conn =
+        (network_connection_t *)AGENTOS_CALLOC(1, sizeof(network_connection_t));
     if (!conn) {
         return NULL;
     }
@@ -241,7 +260,8 @@ network_connection_t* network_connection_create(const network_config_t* config) 
  * @brief 销毁网络连接
  * @param connection 连接句柄
  */
-void network_connection_destroy(network_connection_t* connection) {
+void network_connection_destroy(network_connection_t *connection)
+{
     if (!connection) {
         return;
     }
@@ -259,7 +279,8 @@ void network_connection_destroy(network_connection_t* connection) {
  * @param connection 连接句柄
  * @return 错误码
  */
-agentos_error_t network_connect(network_connection_t* connection) {
+agentos_error_t network_connect(network_connection_t *connection)
+{
     if (!connection) {
         return AGENTOS_EINVAL;
     }
@@ -282,8 +303,8 @@ agentos_error_t network_connect(network_connection_t* connection) {
 #ifdef _WIN32
     SOCKET s = socket(native_af, native_type, 0);
     if (s == INVALID_SOCKET) {
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "socket() failed: %d", WSAGetLastError());
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "socket() failed: %d",
+                 WSAGetLastError());
         connection->status = NETWORK_STATUS_ERROR;
         return AGENTOS_EIO;
     }
@@ -291,8 +312,8 @@ agentos_error_t network_connect(network_connection_t* connection) {
 #else
     int fd = socket(native_af, native_type, 0);
     if (fd < 0) {
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "socket() failed: %s", strerror(errno));
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "socket() failed: %s",
+                 strerror(errno));
         connection->status = NETWORK_STATUS_ERROR;
         return AGENTOS_EIO;
     }
@@ -314,26 +335,26 @@ agentos_error_t network_connect(network_connection_t* connection) {
         int gai_ret = getaddrinfo(connection->config.host, NULL, &hints, &result);
         if (gai_ret != 0) {
             snprintf(connection->error_msg, sizeof(connection->error_msg),
-                     "DNS resolution failed for %s: %s",
-                     connection->config.host, gai_strerror(gai_ret));
+                     "DNS resolution failed for %s: %s", connection->config.host,
+                     gai_strerror(gai_ret));
             network_disconnect(connection);
             connection->status = NETWORK_STATUS_ERROR;
             return AGENTOS_EIO;
         }
 
-        struct sockaddr_in* addr_in = (struct sockaddr_in*)result->ai_addr;
+        struct sockaddr_in *addr_in = (struct sockaddr_in *)result->ai_addr;
         connection->addr.sin_addr = addr_in->sin_addr;
         freeaddrinfo(result);
     }
 
     /* 设置超时 */
 #ifdef _WIN32
-    void* handle = (void*)(uintptr_t)connection->sock;
+    void *handle = (void *)(uintptr_t)connection->sock;
 #else
-    void* handle = (void*)(intptr_t)connection->fd;
+    void *handle = (void *)(intptr_t)connection->fd;
 #endif
-    set_socket_timeout(handle, connection->config.timeout_ms, 1);  /* 接收超时 */
-    set_socket_timeout(handle, connection->config.timeout_ms, 0);  /* 发送超时 */
+    set_socket_timeout(handle, connection->config.timeout_ms, 1); /* 接收超时 */
+    set_socket_timeout(handle, connection->config.timeout_ms, 0); /* 发送超时 */
 
     /* 设置非阻塞模式（如果需要） */
     if (connection->config.nonblocking) {
@@ -342,20 +363,19 @@ agentos_error_t network_connect(network_connection_t* connection) {
 
     /* 建立连接 */
 #ifdef _WIN32
-    if (connect(connection->sock, (struct sockaddr*)&connection->addr,
-                sizeof(connection->addr)) == SOCKET_ERROR) {
+    if (connect(connection->sock, (struct sockaddr *)&connection->addr, sizeof(connection->addr)) ==
+        SOCKET_ERROR) {
         int err = WSAGetLastError();
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "connect() failed: %d", err);
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "connect() failed: %d", err);
         network_disconnect(connection);
         connection->status = NETWORK_STATUS_ERROR;
         return AGENTOS_EIO;
     }
 #else
-    if (connect(connection->fd, (struct sockaddr*)&connection->addr,
-                sizeof(connection->addr)) < 0) {
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "connect() failed: %s", strerror(errno));
+    if (connect(connection->fd, (struct sockaddr *)&connection->addr, sizeof(connection->addr)) <
+        0) {
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "connect() failed: %s",
+                 strerror(errno));
         network_disconnect(connection);
         connection->status = NETWORK_STATUS_ERROR;
         return AGENTOS_EIO;
@@ -379,7 +399,8 @@ agentos_error_t network_connect(network_connection_t* connection) {
  * @param connection 连接句柄
  * @return 错误码
  */
-agentos_error_t network_disconnect(network_connection_t* connection) {
+agentos_error_t network_disconnect(network_connection_t *connection)
+{
     if (!connection) {
         return AGENTOS_EINVAL;
     }
@@ -423,36 +444,31 @@ agentos_error_t network_disconnect(network_connection_t* connection) {
  * @param sent [out] 实际发送的字节数
  * @return 错误码
  */
-agentos_error_t network_send(
-    network_connection_t* connection,
-    const void* data,
-    size_t length,
-    size_t* sent
-) {
+agentos_error_t network_send(network_connection_t *connection, const void *data, size_t length,
+                             size_t *sent)
+{
     if (!connection || !data || length == 0) {
         return AGENTOS_EINVAL;
     }
 
     if (connection->status != NETWORK_STATUS_CONNECTED) {
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "Not connected");
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "Not connected");
         return AGENTOS_ENOTCONN;
     }
 
 #ifdef _WIN32
-    int result = send(connection->sock, (const char*)data, (int)length, 0);
+    int result = send(connection->sock, (const char *)data, (int)length, 0);
     if (result == SOCKET_ERROR) {
         int err = WSAGetLastError();
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "send() failed: %d", err);
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "send() failed: %d", err);
         connection->stats.error_count++;
         return AGENTOS_EIO;
     }
 #else
     ssize_t result = write(connection->fd, data, length);
     if (result < 0) {
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "write() failed: %s", strerror(errno));
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "write() failed: %s",
+                 strerror(errno));
         connection->stats.error_count++;
         return AGENTOS_EIO;
     }
@@ -482,12 +498,9 @@ agentos_error_t network_send(
  * @param received [out] 实际接收的字节数
  * @return 错误码
  */
-agentos_error_t network_receive(
-    network_connection_t* connection,
-    void* buffer,
-    size_t length,
-    size_t* received
-) {
+agentos_error_t network_receive(network_connection_t *connection, void *buffer, size_t length,
+                                size_t *received)
+{
     if (!connection || !buffer || length == 0) {
         return AGENTOS_EINVAL;
     }
@@ -497,11 +510,10 @@ agentos_error_t network_receive(
     }
 
 #ifdef _WIN32
-    int result = recv(connection->sock, (char*)buffer, (int)length, 0);
+    int result = recv(connection->sock, (char *)buffer, (int)length, 0);
     if (result == SOCKET_ERROR) {
         int err = WSAGetLastError();
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "recv() failed: %d", err);
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "recv() failed: %d", err);
         connection->stats.error_count++;
         return AGENTOS_EIO;
     }
@@ -513,8 +525,8 @@ agentos_error_t network_receive(
 #else
     ssize_t result = read(connection->fd, buffer, length);
     if (result < 0) {
-        snprintf(connection->error_msg, sizeof(connection->error_msg),
-                 "read() failed: %s", strerror(errno));
+        snprintf(connection->error_msg, sizeof(connection->error_msg), "read() failed: %s",
+                 strerror(errno));
         connection->stats.error_count++;
         return AGENTOS_EIO;
     }
@@ -548,20 +560,17 @@ agentos_error_t network_receive(
  * @param length 数据长度
  * @return 错误码
  */
-agentos_error_t network_send_all(
-    network_connection_t* connection,
-    const void* data,
-    size_t length
-) {
+agentos_error_t network_send_all(network_connection_t *connection, const void *data, size_t length)
+{
     if (!connection || !data || length == 0) {
         return AGENTOS_EINVAL;
     }
 
-    const uint8_t* ptr = (const uint8_t*)data;
+    const uint8_t *ptr = (const uint8_t *)data;
     size_t remaining = length;
     int retries = 0;
-    int max_retries = connection->config.max_retries > 0 ?
-                      connection->config.max_retries : NETWORK_DEFAULT_MAX_RETRIES;
+    int max_retries = connection->config.max_retries > 0 ? connection->config.max_retries
+                                                         : NETWORK_DEFAULT_MAX_RETRIES;
 
     while (remaining > 0) {
         size_t sent = 0;
@@ -590,20 +599,17 @@ agentos_error_t network_send_all(
  * @param length 期望接收的长度
  * @return 错误码
  */
-agentos_error_t network_receive_exact(
-    network_connection_t* connection,
-    void* buffer,
-    size_t length
-) {
+agentos_error_t network_receive_exact(network_connection_t *connection, void *buffer, size_t length)
+{
     if (!connection || !buffer || length == 0) {
         return AGENTOS_EINVAL;
     }
 
-    uint8_t* ptr = (uint8_t*)buffer;
+    uint8_t *ptr = (uint8_t *)buffer;
     size_t remaining = length;
     int retries = 0;
-    int max_retries = connection->config.max_retries > 0 ?
-                      connection->config.max_retries : NETWORK_DEFAULT_MAX_RETRIES;
+    int max_retries = connection->config.max_retries > 0 ? connection->config.max_retries
+                                                         : NETWORK_DEFAULT_MAX_RETRIES;
 
     while (remaining > 0) {
         size_t received = 0;
@@ -638,7 +644,8 @@ agentos_error_t network_receive_exact(
  * @param connection 连接句柄
  * @return 连接状态
  */
-network_status_t network_get_status(const network_connection_t* connection) {
+network_status_t network_get_status(const network_connection_t *connection)
+{
     if (!connection) {
         return NETWORK_STATUS_ERROR;
     }
@@ -651,10 +658,8 @@ network_status_t network_get_status(const network_connection_t* connection) {
  * @param timeout_ms 超时时间（毫秒）
  * @return 错误码
  */
-agentos_error_t network_set_timeout(
-    network_connection_t* connection,
-    int timeout_ms
-) {
+agentos_error_t network_set_timeout(network_connection_t *connection, int timeout_ms)
+{
     if (!connection) {
         return AGENTOS_EINVAL;
     }
@@ -663,12 +668,12 @@ agentos_error_t network_set_timeout(
 
     if (connection->status == NETWORK_STATUS_CONNECTED) {
 #ifdef _WIN32
-        void* handle = (void*)(uintptr_t)connection->sock;
+        void *handle = (void *)(uintptr_t)connection->sock;
 #else
-        void* handle = (void*)(intptr_t)connection->fd;
+        void *handle = (void *)(intptr_t)connection->fd;
 #endif
-        set_socket_timeout(handle, timeout_ms, 0);  /* 发送超时 */
-        set_socket_timeout(handle, timeout_ms, 1);  /* 接收超时 */
+        set_socket_timeout(handle, timeout_ms, 0); /* 发送超时 */
+        set_socket_timeout(handle, timeout_ms, 1); /* 接收超时 */
     }
 
     return AGENTOS_SUCCESS;
@@ -681,11 +686,9 @@ agentos_error_t network_set_timeout(
  * @param write_timeout_ms 写入超时
  * @return 错误码
  */
-agentos_error_t network_set_rw_timeout(
-    network_connection_t* connection,
-    int read_timeout_ms,
-    int write_timeout_ms
-) {
+agentos_error_t network_set_rw_timeout(network_connection_t *connection, int read_timeout_ms,
+                                       int write_timeout_ms)
+{
     if (!connection) {
         return AGENTOS_EINVAL;
     }
@@ -695,9 +698,9 @@ agentos_error_t network_set_rw_timeout(
 
     if (connection->status == NETWORK_STATUS_CONNECTED) {
 #ifdef _WIN32
-        void* handle = (void*)(uintptr_t)connection->sock;
+        void *handle = (void *)(uintptr_t)connection->sock;
 #else
-        void* handle = (void*)(intptr_t)connection->fd;
+        void *handle = (void *)(intptr_t)connection->fd;
 #endif
         set_socket_timeout(handle, read_timeout_ms, 1);
         set_socket_timeout(handle, write_timeout_ms, 0);
@@ -712,10 +715,8 @@ agentos_error_t network_set_rw_timeout(
  * @param stats [out] 统计信息
  * @return 错误码
  */
-agentos_error_t network_get_stats(
-    const network_connection_t* connection,
-    network_stats_t* stats
-) {
+agentos_error_t network_get_stats(const network_connection_t *connection, network_stats_t *stats)
+{
     if (!connection || !stats) {
         return AGENTOS_EINVAL;
     }
@@ -729,7 +730,8 @@ agentos_error_t network_get_stats(
  * @param connection 连接句柄
  * @return 错误码
  */
-agentos_error_t network_reset_stats(network_connection_t* connection) {
+agentos_error_t network_reset_stats(network_connection_t *connection)
+{
     if (!connection) {
         return AGENTOS_EINVAL;
     }
@@ -745,11 +747,9 @@ agentos_error_t network_reset_stats(network_connection_t* connection) {
  * @param user_data 用户数据
  * @return 错误码
  */
-agentos_error_t network_set_event_callback(
-    network_connection_t* connection,
-    network_event_callback_t callback,
-    void* user_data
-) {
+agentos_error_t network_set_event_callback(network_connection_t *connection,
+                                           network_event_callback_t callback, void *user_data)
+{
     if (!connection) {
         return AGENTOS_EINVAL;
     }
@@ -765,7 +765,8 @@ agentos_error_t network_set_event_callback(
  * @param connection 连接句柄
  * @return 错误消息字符串
  */
-const char* network_get_error_message(const network_connection_t* connection) {
+const char *network_get_error_message(const network_connection_t *connection)
+{
     if (!connection) {
         return "Invalid connection handle";
     }
@@ -783,11 +784,10 @@ const char* network_get_error_message(const network_connection_t* connection) {
  * @param response [out] HTTP 响应
  * @return 错误码
  */
-agentos_error_t network_http_request(
-    network_connection_t* connection,
-    const network_http_request_t* request,
-    network_http_response_t* response
-) {
+agentos_error_t network_http_request(network_connection_t *connection,
+                                     const network_http_request_t *request,
+                                     network_http_response_t *response)
+{
     if (!connection || !request || !response) {
         return AGENTOS_EINVAL;
     }
@@ -803,15 +803,14 @@ agentos_error_t network_http_request(
     int offset = 0;
 
     /* 请求行 */
-    offset += snprintf(request_buf + offset, sizeof(request_buf) - offset,
-                       "%s %s HTTP/1.1\r\n",
-                       request->method ? request->method : "GET",
-                       request->path ? request->path : "/");
+    offset +=
+        snprintf(request_buf + offset, sizeof(request_buf) - offset, "%s %s HTTP/1.1\r\n",
+                 request->method ? request->method : "GET", request->path ? request->path : "/");
 
     /* Host 头 */
     if (connection->config.host) {
-        offset += snprintf(request_buf + offset, sizeof(request_buf) - offset,
-                           "Host: %s\r\n", connection->config.host);
+        offset += snprintf(request_buf + offset, sizeof(request_buf) - offset, "Host: %s\r\n",
+                           connection->config.host);
     }
 
     /* Content-Type */
@@ -830,8 +829,8 @@ agentos_error_t network_http_request(
     if (request->headers && request->header_count > 0) {
         for (size_t i = 0; i < request->header_count; i++) {
             if (request->headers[i]) {
-                offset += snprintf(request_buf + offset, sizeof(request_buf) - offset,
-                                  "%s\r\n", request->headers[i]);
+                offset += snprintf(request_buf + offset, sizeof(request_buf) - offset, "%s\r\n",
+                                   request->headers[i]);
             }
         }
     }
@@ -888,14 +887,14 @@ agentos_error_t network_http_request(
     }
 
     /* 分离响应头和响应体 */
-    char* body_start = strstr(recv_buffer, "\r\n\r\n");
+    char *body_start = strstr(recv_buffer, "\r\n\r\n");
     if (body_start) {
         size_t header_len = body_start - recv_buffer + 4;
 
         /* 提取响应头 */
-        response->headers = (char**)AGENTOS_CALLOC(1, sizeof(char*));
+        response->headers = (char **)AGENTOS_CALLOC(1, sizeof(char *));
         if (response->headers) {
-            response->headers[0] = (char*)AGENTOS_MALLOC(header_len + 1);
+            response->headers[0] = (char *)AGENTOS_MALLOC(header_len + 1);
             if (response->headers[0]) {
                 memcpy(response->headers[0], recv_buffer, header_len);
                 response->headers[0][header_len] = '\0';
@@ -909,7 +908,7 @@ agentos_error_t network_http_request(
         response->body = AGENTOS_MALLOC(body_len + 1);
         if (response->body) {
             memcpy(response->body, body_start, body_len);
-            ((char*)response->body)[body_len] = '\0';
+            ((char *)response->body)[body_len] = '\0';
             response->body_len = body_len;
         }
     } else {
@@ -917,7 +916,7 @@ agentos_error_t network_http_request(
         response->body = AGENTOS_MALLOC(total_received + 1);
         if (response->body) {
             memcpy(response->body, recv_buffer, total_received);
-            ((char*)response->body)[total_received] = '\0';
+            ((char *)response->body)[total_received] = '\0';
             response->body_len = total_received;
         }
     }
@@ -933,11 +932,9 @@ agentos_error_t network_http_request(
  * @param response [out] HTTP 响应
  * @return 错误码
  */
-agentos_error_t network_http_get(
-    network_connection_t* connection,
-    const char* path,
-    network_http_response_t* response
-) {
+agentos_error_t network_http_get(network_connection_t *connection, const char *path,
+                                 network_http_response_t *response)
+{
     network_http_request_t request = {0};
     request.method = "GET";
     request.path = path;
@@ -955,14 +952,10 @@ agentos_error_t network_http_get(
  * @param response [out] HTTP 响应
  * @return 错误码
  */
-agentos_error_t network_http_post(
-    network_connection_t* connection,
-    const char* path,
-    const char* content_type,
-    const void* body,
-    size_t body_len,
-    network_http_response_t* response
-) {
+agentos_error_t network_http_post(network_connection_t *connection, const char *path,
+                                  const char *content_type, const void *body, size_t body_len,
+                                  network_http_response_t *response)
+{
     network_http_request_t request = {0};
     request.method = "POST";
     request.path = path;
@@ -977,7 +970,8 @@ agentos_error_t network_http_post(
  * @brief 释放 HTTP 响应资源
  * @param response HTTP 响应结构体
  */
-void network_http_response_free(network_http_response_t* response) {
+void network_http_response_free(network_http_response_t *response)
+{
     if (!response) {
         return;
     }
@@ -1020,15 +1014,13 @@ void network_http_response_free(network_http_response_t* response) {
  * @param pool_size 池大小
  * @return 连接池句柄
  */
-network_pool_t* network_pool_create(
-    const network_config_t* config,
-    size_t pool_size
-) {
+network_pool_t *network_pool_create(const network_config_t *config, size_t pool_size)
+{
     if (!config || pool_size == 0 || pool_size > NETWORK_MAX_POOL_SIZE) {
         return NULL;
     }
 
-    network_pool_t* pool = (network_pool_t*)AGENTOS_CALLOC(1, sizeof(network_pool_t));
+    network_pool_t *pool = (network_pool_t *)AGENTOS_CALLOC(1, sizeof(network_pool_t));
     if (!pool) {
         return NULL;
     }
@@ -1036,7 +1028,8 @@ network_pool_t* network_pool_create(
     pool->base_config = *config;
     pool->max_size = pool_size;
     pool->current_size = 0;
-    pool->connections = (network_connection_t**)AGENTOS_CALLOC(pool_size, sizeof(network_connection_t*));
+    pool->connections =
+        (network_connection_t **)AGENTOS_CALLOC(pool_size, sizeof(network_connection_t *));
 
     if (!pool->connections) {
         AGENTOS_FREE(pool);
@@ -1050,7 +1043,8 @@ network_pool_t* network_pool_create(
  * @brief 销毁连接池
  * @param pool 连接池句柄
  */
-void network_pool_destroy(network_pool_t* pool) {
+void network_pool_destroy(network_pool_t *pool)
+{
     if (!pool) {
         return;
     }
@@ -1071,10 +1065,8 @@ void network_pool_destroy(network_pool_t* pool) {
  * @param timeout_ms 超时时间
  * @return 连接句柄
  */
-network_connection_t* network_pool_acquire(
-    network_pool_t* pool,
-    int timeout_ms
-) {
+network_connection_t *network_pool_acquire(network_pool_t *pool, int timeout_ms)
+{
     if (!pool) {
         return NULL;
     }
@@ -1091,7 +1083,7 @@ network_connection_t* network_pool_acquire(
 
     /* 如果未达到最大连接数，创建新连接 */
     if (pool->current_size < pool->max_size) {
-        network_connection_t* conn = network_connection_create(&pool->base_config);
+        network_connection_t *conn = network_connection_create(&pool->base_config);
         if (!conn) {
             return NULL;
         }
@@ -1116,10 +1108,8 @@ network_connection_t* network_pool_acquire(
  * @param pool 连接池句柄
  * @param connection 连接句柄
  */
-void network_pool_release(
-    network_pool_t* pool,
-    network_connection_t* connection
-) {
+void network_pool_release(network_pool_t *pool, network_connection_t *connection)
+{
     if (!pool || !connection) {
         return;
     }
@@ -1131,7 +1121,8 @@ void network_pool_release(
  * @param pool 连接池句柄
  * @return 可用连接数
  */
-size_t network_pool_available(const network_pool_t* pool) {
+size_t network_pool_available(const network_pool_t *pool)
+{
     if (!pool) {
         return 0;
     }
@@ -1157,7 +1148,8 @@ size_t network_pool_available(const network_pool_t* pool) {
  * @param pool 连接池句柄
  * @return 总大小
  */
-size_t network_pool_size(const network_pool_t* pool) {
+size_t network_pool_size(const network_pool_t *pool)
+{
     if (!pool) {
         return 0;
     }
@@ -1169,22 +1161,22 @@ size_t network_pool_size(const network_pool_t* pool) {
  * @param pool 连接池句柄
  * @return 健康连接数
  */
-size_t network_pool_health_check(network_pool_t* pool) {
+size_t network_pool_health_check(network_pool_t *pool)
+{
     if (!pool) {
         return 0;
     }
 
     size_t healthy = 0;
 
-    for (size_t i = 0; i < pool->current_size; ) {
+    for (size_t i = 0; i < pool->current_size;) {
         if (pool->connections[i]) {
             network_status_t status = network_get_status(pool->connections[i]);
 
             if (status == NETWORK_STATUS_CONNECTED) {
                 healthy++;
                 i++;
-            } else if (status == NETWORK_STATUS_ERROR ||
-                       status == NETWORK_STATUS_DISCONNECTED) {
+            } else if (status == NETWORK_STATUS_ERROR || status == NETWORK_STATUS_DISCONNECTED) {
                 /* 移除不健康的连接 */
                 network_connection_destroy(pool->connections[i]);
 
@@ -1218,11 +1210,9 @@ size_t network_pool_health_check(network_pool_t* pool) {
  * @param result [out] 解析结果
  * @return 错误码
  */
-agentos_error_t network_dns_resolve(
-    const char* hostname,
-    network_af_t af,
-    network_dns_result_t* result
-) {
+agentos_error_t network_dns_resolve(const char *hostname, network_af_t af,
+                                    network_dns_result_t *result)
+{
     if (!hostname || !result) {
         return AGENTOS_EINVAL;
     }
@@ -1241,7 +1231,7 @@ agentos_error_t network_dns_resolve(
 
     /* 统计结果数量 */
     int count = 0;
-    struct addrinfo* p = res;
+    struct addrinfo *p = res;
     while (p) {
         count++;
         p = p->ai_next;
@@ -1253,8 +1243,8 @@ agentos_error_t network_dns_resolve(
     }
 
     /* 分配结果内存 */
-    result->addresses = (char**)AGENTOS_CALLOC((size_t)count, sizeof(char*));
-    result->ports = (int*)AGENTOS_CALLOC((size_t)count, sizeof(int));
+    result->addresses = (char **)AGENTOS_CALLOC((size_t)count, sizeof(char *));
+    result->ports = (int *)AGENTOS_CALLOC((size_t)count, sizeof(int));
     result->count = (size_t)count;
 
     if (!result->addresses || !result->ports) {
@@ -1270,11 +1260,11 @@ agentos_error_t network_dns_resolve(
         char ip_str[INET6_ADDRSTRLEN];
 
         if (p->ai_family == AF_INET) {
-            struct sockaddr_in* addr_in = (struct sockaddr_in*)p->ai_addr;
+            struct sockaddr_in *addr_in = (struct sockaddr_in *)p->ai_addr;
             inet_ntop(AF_INET, &addr_in->sin_addr, ip_str, sizeof(ip_str));
             result->ports[i] = ntohs(addr_in->sin_port);
         } else if (p->ai_family == AF_INET6) {
-            struct sockaddr_in6* addr_in6 = (struct sockaddr_in6*)p->ai_addr;
+            struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)p->ai_addr;
             inet_ntop(AF_INET6, &addr_in6->sin6_addr, ip_str, sizeof(ip_str));
             result->ports[i] = ntohs(addr_in6->sin6_port);
         } else {
@@ -1295,7 +1285,8 @@ agentos_error_t network_dns_resolve(
  * @brief 释放 DNS 解析结果
  * @param result 解析结果
  */
-void network_dns_result_free(network_dns_result_t* result) {
+void network_dns_result_free(network_dns_result_t *result)
+{
     if (!result) {
         return;
     }
@@ -1328,7 +1319,8 @@ void network_dns_result_free(network_dns_result_t* result) {
  * @param timeout_ms 超时时间
  * @return true 可达，false 不可达
  */
-bool network_is_reachable(const char* host, int timeout_ms) {
+bool network_is_reachable(const char *host, int timeout_ms)
+{
     if (!host) {
         return false;
     }
@@ -1340,7 +1332,7 @@ bool network_is_reachable(const char* host, int timeout_ms) {
     config.host = host;
     config.timeout_ms = timeout_ms > 0 ? timeout_ms : 5000;
 
-    network_connection_t* conn = network_connection_create(&config);
+    network_connection_t *conn = network_connection_create(&config);
     if (!conn) {
         return false;
     }
@@ -1364,11 +1356,8 @@ bool network_is_reachable(const char* host, int timeout_ms) {
  * @param buffer_len 缓冲区长度
  * @return 错误码
  */
-agentos_error_t network_get_local_ip(
-    network_af_t af,
-    char* buffer,
-    size_t buffer_len
-) {
+agentos_error_t network_get_local_ip(network_af_t af, char *buffer, size_t buffer_len)
+{
     if (!buffer || buffer_len == 0) {
         return AGENTOS_EINVAL;
     }
@@ -1390,10 +1379,10 @@ agentos_error_t network_get_local_ip(
     }
 
     if (res->ai_family == AF_INET) {
-        struct sockaddr_in* addr_in = (struct sockaddr_in*)res->ai_addr;
+        struct sockaddr_in *addr_in = (struct sockaddr_in *)res->ai_addr;
         inet_ntop(AF_INET, &addr_in->sin_addr, buffer, (socklen_t)buffer_len);
     } else if (res->ai_family == AF_INET6) {
-        struct sockaddr_in6* addr_in6 = (struct sockaddr_in6*)res->ai_addr;
+        struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)res->ai_addr;
         inet_ntop(AF_INET6, &addr_in6->sin6_addr, buffer, (socklen_t)buffer_len);
     } else {
         strncpy(buffer, "127.0.0.1", buffer_len - 1);
@@ -1403,7 +1392,7 @@ agentos_error_t network_get_local_ip(
     freeaddrinfo(res);
 #else
     /* 使用 UDP socket 连接到外部地址来获取本地 IP */
-    const char* test_host = "8.8.8.8";
+    const char *test_host = "8.8.8.8";
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         strncpy(buffer, "127.0.0.1", buffer_len - 1);
@@ -1417,11 +1406,11 @@ agentos_error_t network_get_local_ip(
     server.sin_port = htons(80);
     inet_pton(AF_INET, test_host, &server.sin_addr);
 
-    connect(sockfd, (struct sockaddr*)&server, sizeof(server));
+    connect(sockfd, (struct sockaddr *)&server, sizeof(server));
 
     struct sockaddr_in local_addr;
     socklen_t addr_len = sizeof(local_addr);
-    getsockname(sockfd, (struct sockaddr*)&local_addr, &addr_len);
+    getsockname(sockfd, (struct sockaddr *)&local_addr, &addr_len);
     inet_ntop(AF_INET, &local_addr.sin_addr, buffer, (socklen_t)buffer_len);
 
     close(sockfd);
@@ -1438,21 +1427,18 @@ agentos_error_t network_get_local_ip(
  * @param buffer_len 缓冲区长度
  * @return 错误码
  */
-agentos_error_t network_addr_to_string(
-    network_af_t af,
-    const void* addr,
-    char* buffer,
-    size_t buffer_len
-) {
+agentos_error_t network_addr_to_string(network_af_t af, const void *addr, char *buffer,
+                                       size_t buffer_len)
+{
     if (!addr || !buffer || buffer_len == 0) {
         return AGENTOS_EINVAL;
     }
 
     if (af == NETWORK_AF_INET) {
-        const struct sockaddr_in* addr_in = (const struct sockaddr_in*)addr;
+        const struct sockaddr_in *addr_in = (const struct sockaddr_in *)addr;
         inet_ntop(AF_INET, &addr_in->sin_addr, buffer, (socklen_t)buffer_len);
     } else if (af == NETWORK_AF_INET6) {
-        const struct sockaddr_in6* addr_in6 = (const struct sockaddr_in6*)addr;
+        const struct sockaddr_in6 *addr_in6 = (const struct sockaddr_in6 *)addr;
         inet_ntop(AF_INET6, &addr_in6->sin6_addr, buffer, (socklen_t)buffer_len);
     } else {
         strncpy(buffer, "unknown", buffer_len - 1);
@@ -1466,7 +1452,8 @@ agentos_error_t network_addr_to_string(
  * @brief 初始化网络子系统
  * @return 错误码
  */
-agentos_error_t network_init(void) {
+agentos_error_t network_init(void)
+{
     if (network_init_winsock() != 0) {
         return AGENTOS_EIO;
     }
@@ -1476,7 +1463,8 @@ agentos_error_t network_init(void) {
 /**
  * @brief 清理网络子系统
  */
-void network_cleanup(void) {
+void network_cleanup(void)
+{
 #ifdef _WIN32
     WSACleanup();
 #endif

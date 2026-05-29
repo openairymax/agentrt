@@ -1,6 +1,6 @@
 # Applications — 智能应用
 
-> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。各应用通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.1.0 的一部分发布。API 和功能可能在未来版本中发生变化。各应用通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
 `openlab/app/` 包含 AgentOS 生态系统中的官方智能应用，涵盖文档生成、电商、研究和视频编辑等领域。
 

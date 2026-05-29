@@ -6,16 +6,17 @@
  * "From data intelligence emerges."
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <time.h>
-
 #include "heapstore.h"
 #include "heapstore_trace.h"
 
-static void test_trace_init_shutdown(void) {
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+static void test_trace_init_shutdown(void)
+{
     printf("Test: trace_init_shutdown...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
@@ -26,7 +27,8 @@ static void test_trace_init_shutdown(void) {
     printf("PASS\n");
 }
 
-static void test_trace_write_span(void) {
+static void test_trace_write_span(void)
+{
     printf("Test: trace_write_span...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
@@ -52,7 +54,8 @@ static void test_trace_write_span(void) {
     printf("PASS\n");
 }
 
-static void test_trace_write_batch(void) {
+static void test_trace_write_batch(void)
+{
     printf("Test: trace_write_batch...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
@@ -79,7 +82,8 @@ static void test_trace_write_batch(void) {
     printf("PASS\n");
 }
 
-static void test_trace_flush(void) {
+static void test_trace_flush(void)
+{
     printf("Test: trace_flush...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
@@ -107,7 +111,8 @@ static void test_trace_flush(void) {
     printf("PASS\n");
 }
 
-static void test_trace_invalid_params(void) {
+static void test_trace_invalid_params(void)
+{
     printf("Test: trace_invalid_params...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
@@ -132,7 +137,8 @@ static void test_trace_invalid_params(void) {
     printf("PASS\n");
 }
 
-static void test_trace_stats(void) {
+static void test_trace_stats(void)
+{
     printf("Test: trace_stats...");
 
     heapstore_error_t err __attribute__((unused)) = heapstore_trace_init();
@@ -165,7 +171,8 @@ static void test_trace_stats(void) {
     printf("PASS\n");
 }
 
-int main(void) {
+int main(void)
+{
     printf("=== AgentOS heapstore Trace Unit Tests ===\n\n");
 
     test_trace_init_shutdown();
@@ -178,4 +185,3 @@ int main(void) {
     printf("\n=== All Trace Tests Passed ===\n");
     return 0;
 }
-

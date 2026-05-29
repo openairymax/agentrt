@@ -824,7 +824,7 @@ int agentos_mc_preemptive_check(agentos_metacognition_t *mc, tc_step_type_t step
                                 size_t *out_hint_len)
 {
     if (!mc || !input || !out_preemptive_hint || !out_hint_len)
-        return -1;
+        return AGENTOS_EINVAL;
     *out_preemptive_hint = NULL;
     *out_hint_len = 0;
 
@@ -848,7 +848,7 @@ int agentos_mc_preemptive_check(agentos_metacognition_t *mc, tc_step_type_t step
         size_t hlen = 384 + strlen(pat->pattern_key) + 64;
         char *hint = (char *)AGENTOS_MALLOC(hlen);
         if (!hint)
-            return -1;
+            return AGENTOS_EINVAL;
 
         int written =
             snprintf(hint, hlen,
@@ -864,7 +864,7 @@ int agentos_mc_preemptive_check(agentos_metacognition_t *mc, tc_step_type_t step
 
         if (written <= 0 || (size_t)written >= hlen) {
             AGENTOS_FREE(hint);
-            return -1;
+            return AGENTOS_EINVAL;
         }
 
         *out_preemptive_hint = hint;

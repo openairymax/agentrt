@@ -13,7 +13,6 @@
 #define AGENTOS_heapstore_PRIVATE_H
 
 #include "../include/heapstore.h"
-
 #include "atomic_compat.h"
 
 #define heapstore_MAX_PATH_LEN 512
@@ -25,7 +24,7 @@ typedef heapstore_error_t (*submodule_init_fn)(void);
 typedef void (*submodule_shutdown_fn)(void);
 
 struct heapstore_submodule {
-    const char* name;
+    const char *name;
     submodule_init_fn init;
     submodule_shutdown_fn shutdown;
     atomic_bool initialized;

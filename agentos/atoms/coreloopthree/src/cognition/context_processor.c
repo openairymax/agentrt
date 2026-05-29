@@ -1,6 +1,7 @@
 #include "context_processor.h"
 
 #include "agentos.h"
+#include "memory_compat.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -14,14 +15,14 @@ extern void agentos_sys_free(void *);
 agentos_model_context_t *agentos_model_context_create(size_t capacity)
 {
     agentos_model_context_t *ctx =
-        (agentos_model_context_t *)calloc(1, sizeof(agentos_model_context_t));
+        (agentos_model_context_t *)AGENTOS_CALLOC(1, sizeof(agentos_model_context_t));
     if (!ctx)
         return NULL;
     ctx->capacity = capacity > 0 ? capacity : 64;
     ctx->entries =
-        (agentos_context_entry_t *)calloc(ctx->capacity, sizeof(agentos_context_entry_t));
+        (agentos_context_entry_t *)AGENTOS_CALLOC(ctx->capacity, sizeof(agentos_context_entry_t));
     if (!ctx->entries) {
-        free(ctx);
+        AGENTOS_FREE(ctx);
         return NULL;
     }
     ctx->entry_count = 0;
@@ -37,13 +38,13 @@ void agentos_model_context_destroy(agentos_model_context_t *ctx)
     if (ctx->entries) {
         for (size_t i = 0; i < ctx->entry_count; i++) {
             if (ctx->entries[i].content)
-                free(ctx->entries[i].content);
+                AGENTOS_FREE(ctx->entries[i].content);
             if (ctx->entries[i].metadata)
-                free(ctx->entries[i].metadata);
+                AGENTOS_FREE(ctx->entries[i].metadata);
         }
-        free(ctx->entries);
+        AGENTOS_FREE(ctx->entries);
     }
-    free(ctx);
+    AGENTOS_FREE(ctx);
 }
 
 agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, const char *content,
@@ -54,7 +55,7 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
         return AGENTOS_EINVAL;
     if (ctx->entry_count >= ctx->capacity) {
         size_t new_cap = ctx->capacity * 2;
-        agentos_context_entry_t *new_entries = (agentos_context_entry_t *)realloc(
+        agentos_context_entry_t *new_entries = (agentos_context_entry_t *)AGENTOS_REALLOC(
             ctx->entries, new_cap * sizeof(agentos_context_entry_t));
         if (!new_entries)
             return AGENTOS_ENOMEM;
@@ -64,7 +65,7 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
         ctx->capacity = new_cap;
     }
     agentos_context_entry_t *entry = &ctx->entries[ctx->entry_count];
-    entry->content = (char *)malloc(content_len + 1);
+    entry->content = (char *)AGENTOS_MALLOC(content_len + 1);
     if (!entry->content)
         return AGENTOS_ENOMEM;
     memcpy(entry->content, content, content_len);
@@ -72,7 +73,7 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
     entry->content_len = content_len;
     if (metadata) {
         size_t meta_len = strlen(metadata);
-        entry->metadata = (char *)malloc(meta_len + 1);
+        entry->metadata = (char *)AGENTOS_MALLOC(meta_len + 1);
         if (entry->metadata) {
             memcpy(entry->metadata, metadata, meta_len + 1);
             entry->metadata_len = meta_len;
@@ -85,7 +86,8 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t window_trimmer_process(agentos_context_processor_t __attribute__((unused)) *self,
+static agentos_error_t window_trimmer_process(agentos_context_processor_t __attribute__((unused)) *
+                                                  self,
                                               agentos_model_context_t *context,
                                               const agentos_context_processor_config_t *config)
 {
@@ -121,9 +123,9 @@ static agentos_error_t window_trimmer_process(agentos_context_processor_t __attr
     if (kept_count < recent_start) {
         for (size_t i = kept_count; i < recent_start; i++) {
             if (context->entries[i].content)
-                free(context->entries[i].content);
+                AGENTOS_FREE(context->entries[i].content);
             if (context->entries[i].metadata)
-                free(context->entries[i].metadata);
+                AGENTOS_FREE(context->entries[i].metadata);
             memset(&context->entries[i], 0, sizeof(agentos_context_entry_t));
         }
         memmove(context->entries + kept_count, context->entries + recent_start,
@@ -135,7 +137,8 @@ static agentos_error_t window_trimmer_process(agentos_context_processor_t __attr
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t compressor_process(agentos_context_processor_t __attribute__((unused)) *self,
+static agentos_error_t compressor_process(agentos_context_processor_t __attribute__((unused)) *
+                                              self,
                                           agentos_model_context_t *context,
                                           const agentos_context_processor_config_t *config)
 {
@@ -162,7 +165,7 @@ static agentos_error_t compressor_process(agentos_context_processor_t __attribut
         if (tail_len > entry->content_len - head_len)
             tail_len = entry->content_len - head_len;
 
-        char *compressed = (char *)malloc(target_len + 1);
+        char *compressed = (char *)AGENTOS_MALLOC(target_len + 1);
         if (!compressed)
             continue;
         memcpy(compressed, entry->content, head_len);
@@ -173,7 +176,7 @@ static agentos_error_t compressor_process(agentos_context_processor_t __attribut
         compressed[target_len] = '\0';
 
         size_t old_len = entry->content_len;
-        free(entry->content);
+        AGENTOS_FREE(entry->content);
         entry->content = compressed;
         entry->content_len = target_len;
         context->total_content_len -= (old_len - target_len);
@@ -182,7 +185,8 @@ static agentos_error_t compressor_process(agentos_context_processor_t __attribut
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t summarizer_process(agentos_context_processor_t __attribute__((unused)) *self,
+static agentos_error_t summarizer_process(agentos_context_processor_t __attribute__((unused)) *
+                                              self,
                                           agentos_model_context_t *context,
                                           const agentos_context_processor_config_t *config)
 {
@@ -196,7 +200,7 @@ static agentos_error_t summarizer_process(agentos_context_processor_t __attribut
         return AGENTOS_SUCCESS;
 
     size_t summary_max = 512;
-    char *summary = (char *)malloc(summary_max);
+    char *summary = (char *)AGENTOS_MALLOC(summary_max);
     if (!summary)
         return AGENTOS_ENOMEM;
 
@@ -213,9 +217,9 @@ static agentos_error_t summarizer_process(agentos_context_processor_t __attribut
 
     for (size_t i = 0; i < context->entry_count - 1; i++) {
         if (context->entries[i].content)
-            free(context->entries[i].content);
+            AGENTOS_FREE(context->entries[i].content);
         if (context->entries[i].metadata)
-            free(context->entries[i].metadata);
+            AGENTOS_FREE(context->entries[i].metadata);
     }
 
     context->entries[0].content = summary;
@@ -232,9 +236,10 @@ static agentos_error_t summarizer_process(agentos_context_processor_t __attribut
     return AGENTOS_SUCCESS;
 }
 
-static agentos_error_t memory_augmenter_process(agentos_context_processor_t __attribute__((unused)) *self,
-                                                agentos_model_context_t *context,
-                                                const agentos_context_processor_config_t *config)
+static agentos_error_t
+memory_augmenter_process(agentos_context_processor_t __attribute__((unused)) * self,
+                         agentos_model_context_t *context,
+                         const agentos_context_processor_config_t *config)
 {
     if (!context || !config)
         return AGENTOS_EINVAL;
@@ -261,7 +266,7 @@ static agentos_error_t memory_augmenter_process(agentos_context_processor_t __at
     }
 
     size_t aug_max = 256 + count * 128;
-    char *aug_content = (char *)malloc(aug_max);
+    char *aug_content = (char *)AGENTOS_MALLOC(aug_max);
     if (!aug_content) {
         agentos_sys_free(record_ids);
         agentos_sys_free(scores);
@@ -277,7 +282,7 @@ static agentos_error_t memory_augmenter_process(agentos_context_processor_t __at
     pos += snprintf(aug_content + pos, aug_max - pos, "]");
 
     agentos_model_context_add_entry(context, aug_content, pos, "memory_augmenter", 10);
-    free(aug_content);
+    AGENTOS_FREE(aug_content);
 
     agentos_sys_free(record_ids);
     agentos_sys_free(scores);
@@ -289,21 +294,21 @@ static void default_processor_destroy(agentos_context_processor_t *self)
     if (!self)
         return;
     if (self->name)
-        free(self->name);
+        AGENTOS_FREE(self->name);
     if (self->type)
-        free(self->type);
-    free(self);
+        AGENTOS_FREE(self->type);
+    AGENTOS_FREE(self);
 }
 
 static agentos_context_processor_t *create_processor(const char *name, const char *type,
                                                      agentos_context_process_func_t process_func)
 {
     agentos_context_processor_t *p =
-        (agentos_context_processor_t *)calloc(1, sizeof(agentos_context_processor_t));
+        (agentos_context_processor_t *)AGENTOS_CALLOC(1, sizeof(agentos_context_processor_t));
     if (!p)
         return NULL;
-    p->name = strdup(name);
-    p->type = strdup(type);
+    p->name = AGENTOS_STRDUP(name);
+    p->type = AGENTOS_STRDUP(type);
     p->process = process_func;
     p->destroy = default_processor_destroy;
     p->user_data = NULL;
@@ -333,14 +338,14 @@ agentos_context_processor_t *agentos_context_processor_memory_augmenter(void)
 agentos_context_engine_t *agentos_context_engine_create(void)
 {
     agentos_context_engine_t *engine =
-        (agentos_context_engine_t *)calloc(1, sizeof(agentos_context_engine_t));
+        (agentos_context_engine_t *)AGENTOS_CALLOC(1, sizeof(agentos_context_engine_t));
     if (!engine)
         return NULL;
     engine->processor_capacity = 8;
-    engine->processors = (agentos_context_processor_t **)calloc(
+    engine->processors = (agentos_context_processor_t **)AGENTOS_CALLOC(
         engine->processor_capacity, sizeof(agentos_context_processor_t *));
     if (!engine->processors) {
-        free(engine);
+        AGENTOS_FREE(engine);
         return NULL;
     }
     engine->processor_count = 0;
@@ -357,9 +362,9 @@ void agentos_context_engine_destroy(agentos_context_engine_t *engine)
                 engine->processors[i]->destroy(engine->processors[i]);
             }
         }
-        free(engine->processors);
+        AGENTOS_FREE(engine->processors);
     }
-    free(engine);
+    AGENTOS_FREE(engine);
 }
 
 agentos_error_t agentos_context_engine_register_processor(agentos_context_engine_t *engine,
@@ -369,7 +374,7 @@ agentos_error_t agentos_context_engine_register_processor(agentos_context_engine
         return AGENTOS_EINVAL;
     if (engine->processor_count >= engine->processor_capacity) {
         size_t new_cap = engine->processor_capacity * 2;
-        agentos_context_processor_t **new_procs = (agentos_context_processor_t **)realloc(
+        agentos_context_processor_t **new_procs = (agentos_context_processor_t **)AGENTOS_REALLOC(
             engine->processors, new_cap * sizeof(agentos_context_processor_t *));
         if (!new_procs)
             return AGENTOS_ENOMEM;

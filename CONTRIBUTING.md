@@ -302,7 +302,7 @@ cd ../AgentOS && python -m pytest tests/ -v
 bandit -r agentos/openlab/
 
 # 6. BAN 检查（S-08 合规：运行质量门禁脚本）
-scripts/pipeline/quality-gate.sh --strict
+scripts/ci/pipeline/quality-gate.sh --strict
 ```
 
 ### 第四步：提交和推送
@@ -539,7 +539,7 @@ cd ../AgentOS-build && ctest --output-on-failure
 cd ../AgentOS-build && ctest -R <module> --output-on-failure
 
 # 运行 Python 测试
-cd ../AgentOS && python -m pytest tests/unit/coreloopthree/ -v
+cd ../AgentOS && python -m pytest tests/unit/atoms/coreloopthree/ -v
 python -m pytest tests/integration/syscall/ -v
 
 # 生成覆盖率报告
