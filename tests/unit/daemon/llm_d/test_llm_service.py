@@ -14,7 +14,7 @@ import json
 import pytest
 from unittest.mock import MagicMock, patch
 
-from tests.base.base_test import BaseTestCase
+from tests.utils.python.base_test import BaseTestCase
 
 
 class TestLLMProviderRouting(BaseTestCase):

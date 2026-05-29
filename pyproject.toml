@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "agentos"
-version = "1.0.0.9"
+version = "0.1.0"
 description = "AgentOS - 智能体操作系统核心引擎 (A+ 94/100 行业标杆评级)"
 authors = ["Spharx AgentOS Team"]
 license = "Apache-2.0"

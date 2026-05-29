@@ -1,6 +1,6 @@
 # E-Commerce — 智能电商助手应用
 
-> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.0.5 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.1.0 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
 `openlab/app/ecommerce/` 是一款基于 AgentOS 平台的智能电商助手应用，帮助商家管理商品、处理订单和优化运营。
 

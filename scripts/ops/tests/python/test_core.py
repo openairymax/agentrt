@@ -277,25 +277,31 @@ class TestEventBus:
 # Security Tests
 ###############################################################################
 
+import tempfile
+import os
+
 class TestSecurityManager:
     """安全管理器测试"""
+
+    def _tmpdir(self):
+        return tempfile.gettempdir()
 
     def test_validate_path_safe(self):
         """测试安全路径"""
         manager = SecurityManager()
-        result = manager.validate_path("/tmp/agentos_test")
+        result = manager.validate_path(os.path.join(self._tmpdir(), "agentos_test"))
         assert result.valid is True
 
     def test_validate_path_traversal(self):
         """测试路径遍历攻击"""
         manager = SecurityManager()
-        result = manager.validate_path("/tmp/../../../etc/passwd")
+        result = manager.validate_path(os.path.join(self._tmpdir(), "..", "..", "..", "etc", "passwd"))
         assert result.valid is False
 
     def test_validate_path_too_long(self):
         """测试过长路径"""
         manager = SecurityManager(SecurityConfig(max_path_length=100))
-        long_path = "/tmp/" + "a" * 200
+        long_path = os.path.join(self._tmpdir(), "a" * 200)
         result = manager.validate_path(long_path)
         assert result.valid is False
 
