@@ -98,7 +98,7 @@ class SDKRestructurer:
 
         # core/__init__.py
         core_init = '''# AgentOS Python SDK - Core Layer
-# Version: 2.0.0.0
+# Version: 0.1.0
 
 """
 Core layer providing low-level FFI bindings and syscall proxies.
@@ -122,7 +122,7 @@ except ImportError:
 
         # modules/__init__.py
         modules_init = '''# AgentOS Python SDK - Business Modules Layer
-# Version: 2.0.0.0
+# Version: 0.1.0
 
 """
 Business logic modules for task, memory, session, and skill management.
@@ -136,7 +136,7 @@ __all__ = ["task", "memory", "session", "skill"]
         # 为每个子模块生成 __init__.py
         for module_name in ['task', 'memory', 'session', 'skill']:
             module_init = f'''# AgentOS Python SDK - {module_name.title()} Module
-# Version: 2.0.0.0
+# Version: 0.1.0
 
 """
 {module_name.title()} management module.
@@ -162,7 +162,7 @@ except ImportError:
 
         # client/__init__.py
         client_init = '''# AgentOS Python SDK - Client Layer
-# Version: 2.0.0.0
+# Version: 0.1.0
 
 """
 Client classes for interacting with AgentOS system.
@@ -182,7 +182,7 @@ except ImportError:
 
         # utils/__init__.py
         utils_init = '''# AgentOS Python SDK - Utilities Layer
-# Version: 2.0.0.0
+# Version: 0.1.0
 
 """
 commons utility functions and helpers.
@@ -213,7 +213,7 @@ except ImportError:
 
         # telemetry/__init__.py
         telemetry_init = '''# AgentOS Python SDK - Telemetry Layer
-# Version: 2.0.0.0
+# Version: 0.1.0
 
 """
 Telemetry and observability utilities.
@@ -240,7 +240,7 @@ except ImportError:
 
         # types/__init__.py
         types_init = '''# AgentOS Python SDK - Type Definitions
-# Version: 2.0.0.0
+# Version: 0.1.0
 
 """
 commons type definitions and enums.
@@ -274,7 +274,7 @@ except ImportError:
         print("\n🔄 更新顶层 __init__.py...")
 
         top_init = '''# AgentOS Python SDK
-# Version: 2.0.0.0
+# Version: 0.1.0
 # Last updated: 2026-03-21
 
 """

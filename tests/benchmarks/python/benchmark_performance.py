@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: Apache-2.0
 """
@@ -93,14 +93,15 @@ def run_benchmark(name: str, func, iterations: int = 100) -> Dict:
 
 
 def main():
+    global GATEWAY_URL
     parser = argparse.ArgumentParser(description="AgentOS Performance Benchmarks")
-    parser.add_argument("--gateway", default=GATEWAY_URL)
+    parser.add_argument("--gateway", default=None)
     parser.add_argument("--iterations", "-n", type=int, default=100)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    global GATEWAY_URL
-    GATEWAY_URL = args.gateway
+    if args.gateway:
+        GATEWAY_URL = args.gateway
 
     print(f"\n{'=' * 60}")
     print(f"  AgentOS Performance Benchmark Suite")
