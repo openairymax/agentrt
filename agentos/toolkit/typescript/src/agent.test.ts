@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK Tests
-// Version: 1.0.0.5
+// Version: 0.1.0
 // Last updated: 2026-03-21
 
 import axios from 'axios';
