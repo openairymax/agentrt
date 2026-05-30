@@ -4,7 +4,7 @@
 Powered by OpenAirymax
 > The seminal fourth "Operating System Philosophy" in human computing history.
 
-English | [简体中文](README_zh.md)
+**Language:** English | [简体中文](README_zh.md)
 
 [![AtomGit](https://atomgit.com/openairymax/agentos/star/badge.svg)](https://atomgit.com/openairymax/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
@@ -26,15 +26,14 @@ English | [简体中文](README_zh.md)
 
 | User Type | Product | Version | Download |
 |:---------:|:-------:|:-------:|:--------:|
-|  **Pro Users** | Docker | `v0.1.0` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.1.0) |
-|  **Personal Users** | Desktop | `v0.1.0` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.1.0) |
+| **Pro Users** | Docker | `v0.1.0` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.1.0) |
+| **Personal Users** | Desktop | `v0.1.0` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.1.0) |
 
-
-## 🌟 Introduction
+## 1️⃣ Introduction
 
 **AgentOS** is an intelligent agent operating system that provides comprehensive OS-level support for orchestrating agent teams.
 
-### 🎥 Project Preview
+**1.1 Project Preview**
 
 Personal Client Preview
 
@@ -42,44 +41,45 @@ Personal Client Preview
 <img src="scripts/resources/images/AgentOS-desktop-preview.gif" alt="AgentOS Preview" width="800">
 </div>
 
-## 💡 Innovation Highlights
+## 2️⃣ Innovation Highlights
 
 <div align="center">
 
 ⚡️
 
-**Foundational [Multibody Cybernetic Intelligent System](#)**
+**Foundational Theory** **[Multibody Cybernetic Intelligent System](#)**
 
 </div>
 
-- **Pure Kernel**: Only atomic mechanisms, ensuring purity and efficiency.
-- **Cognitive Loop**: Perception, Planning, Action.
-- **Memory Stratification**: L1 Raw → L2 Features → L3 Structures → L4 Patterns (OSS: L1+L2 built-in, PRO: L1-L4 via MemoryRovol).
-- **Inherent Security**: Sandbox Isolation, Permission Arbitration, Input Sanitization, Audit Trail.
-- **Token Efficiency**: Saves approximately **500%** tokens compared to traditional frameworks.
-- **Comprehensive SDKs**: Native support for Go / Python / Rust / TypeScript.
+- **Pure Kernel**: Kernel only provides atomic mechanisms, pure and efficient
+- **Cognitive Loop**: Cognition, Planning, Action
+- **Memory Stratification**: L1 Raw Layer → L2 Feature Layer → L3 Structure Layer → L4 Pattern Layer (OSS: L1+L2 built-in, PRO: L1-L4 via MemoryRovol)
+- **Inherent Security**: Sandbox isolation, permission arbitration, input sanitization, audit trail
+- **Token Efficiency**: Saves approximately 500% tokens compared to traditional frameworks
+- **Comprehensive SDKs**: Native support for Go, Python, Rust, TypeScript
 
-## 🎯 Core Philosophy
+## 3️⃣ Core Philosophy
 
-**Drive Teams**
+**3.1 Team Drive**
 - Precisely coordinates multi-Agent collaboration
 - Efficiently completes complex task orchestration and resource scheduling
 
-**Autonomous Evolution**:
+**3.2 Autonomous Evolution**
 - Possesses self-evolution capability
 - Dynamically adjusts strategies
 - Continuously optimizes execution effectiveness
+
+## 4️⃣ System Architecture
+
 
 <p align="center">
   <strong> ✨ </strong><br>
   <strong> Brand New Architecture · Inherent Security · Intelligence Emergence </strong>
 </p>
 
-## 🏗️ System Architecture
 
-**Architecture Design**
-  Complete architecture from kernel to application:
-
+**4.1 Architecture Design**
+Complete architecture from kernel to application:
 ```
 ⬇️ Application Layer (openlab)
 ⇅ Service Layer (daemon) — 10+ daemon services
@@ -92,24 +92,35 @@ Personal Client Preview
 ⬆️ SDK Layer (toolkit)
 ```
 
-**Design Principles**
-  Built upon [ARCHITECTURAL_PRINCIPLES](#):
-- **System Perspective**: Feedback loops · Layered decomposition · Holistic design · Emergence management → Real-time response <10ms
-- **Kernel Perspective**: Minimalist kernel · Contractual interfaces · Service isolation · Pluggable strategies → Kernel ~6K LOC (~478K LOC total)
-- **Cognitive Perspective**: Dual-system synergy · Incremental evolution · Memory stratification · Forgetting mechanism → Token savings 500%
-- **Engineering Perspective**: Security built-in · Observability · Resource determinism · Cross-platform consistency → Test coverage >90%
-- **Design Aesthetics**: Simplicity first · Extreme attention to detail · Human-centric · Perfectionism → API <50/module
+**4.2 Design Principles**
+Built upon [ARCHITECTURAL_PRINCIPLES](#):
 
-## 🚀 Quick Start
+- **System Perspective**: Real-time response <10ms
+      Feedback loops, layered decomposition
+      Holistic design, emergence management
+- **Kernel Perspective**: Kernel ~6K LOC (full repo ~478K LOC)
+      Minimalist kernel, contractual interfaces
+      Service isolation, pluggable strategies
+- **Cognitive Perspective**: Token savings 80%
+      Dual-system synergy, incremental evolution
+      Memory stratification, forgetting mechanism
+- **Engineering Perspective**: Test coverage >95%
+    Security built-in, observability
+    Resource determinism, cross-platform consistency
+- **Design Aesthetics**: API <50 per module
+    Simplicity first, extreme attention to detail
+    Human-centric, perfectionism
 
-### Environment Requirements
+## 5️⃣ Quick Start
+
+**5.1 Environment Requirements**
 
 - **Operating System**: Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
 - **Compiler**: GCC 11+ / Clang 14+ (C11/C++17)
 - **Build Tools**: CMake 3.20+, Ninja
 - **Python**: 3.10+ (Required for OpenLab)
 
-### Installation & Build
+**5.2 Installation & Build**
 
 ```bash
 # 1. Clone repository
@@ -127,7 +138,7 @@ cmake --build . --parallel $(nproc)
 ctest --output-on-failure
 ```
 
-### Docker Quick Start
+**5.3 Docker Quick Start**
 
 ```text
 # Build image
@@ -137,7 +148,7 @@ docker build -f scripts/ops/deploy/Dockerfile.kernel -t agentos:latest .
 docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 ```
 
-### Usage Methods
+**5.4 Usage Methods**
 
 | Language | Usage Method |
 |:-----|:---------|
@@ -147,46 +158,46 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 | Rust | Use `use agentos_toolkit::prelude::*;` |
 | TypeScript | Install via `npm install @spharx/agentos-toolkit` then directly import |
 
-### Reading Navigation
+**5.5 Reading Navigation**
 
 | Document | Core Content |
-|:-----|:---------|
+| :------------------------------------------ | :------------------- |
 | [📘 Architectural Principles](#) | Five-dimensional orthogonal system, 24 core principles |
 | [🚀 Quick Start](#) | 5-minute getting-started guide |
 | [⚙️ Build Guide](#) | Detailed build steps and options |
 | [🧪 Testing Guide](#) | Unit/Integration/Contract testing |
 | [🐳 Deployment Guide](#) | Docker/Kubernetes deployment |
 
-> 📝 **Note**: Documentation is coming soon. Links will be updated when available.
-
-### Common Questions
+**5.6 Common Questions**
 
 <details>
 <summary>👉 Q1: What is the difference between AgentOS and traditional AI Agent frameworks?</summary>
 
-AgentOS is an **operating system-level** product, not a single framework:
+AgentOS is an operating system-level product, not a single framework:
 
 | Dimension | AgentOS | Traditional Frameworks |
-|------|---------|----------|
+| ------------ | ---------- | ----- |
 | **Positioning** | Multi-agent collaboration OS | Single agent |
 | **Architecture** | Microkernel + strict layering | Loosely coupled modules |
 | **Security** | Four-layer inherent security | Application-level protection |
 | **Memory** | Four-layer stratification system | Vector database |
-| **Token Efficiency** | Saves ~500% | No optimization |
+| **Token Efficiency** | Saves approximately 500% | No optimization |
 
 </details>
 
 <details>
 <summary>👉 Q2: Which application scenarios is it suitable for?</summary>
 
-**✅ Especially suitable**
+✅ Especially suitable
+
 - 🎯 Complex multi-step task orchestration
 - 🧠 Long-term memory and knowledge accumulation needs
 - 🔒 High-security enterprise applications
 - 💾 Resource-constrained embedded scenarios (atomslite)
 - 🌐 Multi-language development teams
 
-**❌ Not suitable**
+❌ Not suitable
+
 - 🚫 Simple single-call tasks (using a sledgehammer to crack a nut)
 
 </details>
@@ -194,14 +205,14 @@ AgentOS is an **operating system-level** product, not a single framework:
 <details>
 <summary>👉 Q3: How is security guaranteed?</summary>
 
-**Security built-in design, four-layer protection**
+Security built-in design, four-layer protection
 
 | Protection Layer | Implementation Method |
-|---------|---------|
-| **Virtual Workspace** | Process/Container/WASM sandbox isolation |
-| **Permission Arbitration** | RBAC + YAML rule engine |
-| **Input Sanitization** | Regex filtering + Type checking |
-| **Audit Trail** | Full-chain tamper-proof logging |
+| -------- | ---------------- |
+| Virtual Workspace | Process/Container/WASM sandbox isolation |
+| Permission Arbitration | RBAC + YAML rule engine |
+| Input Sanitization | Regex filtering + Type checking |
+| Audit Trail | Full-chain tamper-proof logging |
 
 See [cupolas security documentation](agentos/cupolas/README.md)
 
@@ -211,50 +222,50 @@ See [cupolas security documentation](agentos/cupolas/README.md)
 <summary>👉 Q4: What prerequisite knowledge is needed for learning?</summary>
 
 | Role | Prerequisite Knowledge | Time to Get Started |
-|------|---------|----------|
-| **Application Developer** | Python/Go basics | 1-2 days |
-| **System Developer** | C/C++, OS fundamentals | 1-2 weeks |
-| **Architect** | Microkernel, distributed systems | 1 month |
+| --------- | ------------- | ------- |
+| Application Developer | Python/Go basics | 1-2 days |
+| System Developer | C/C++, OS fundamentals | 1-2 weeks |
+| Architect | Microkernel, distributed systems | 1 month |
 
-**Recommended Path**: [Quick Start](#) → [Architectural Principles](#) → [CoreLoopThree](#)
+Recommended path: [Quick Start](#) → [Architectural Principles](#) → [CoreLoopThree](#)
 
 </details>
 
-## 🎏 Participating in Contribution
+## 6️⃣ Participating in Contribution
 
 We are walking into the future: "Intelligence emergence, and nothing less, is the ultimate sublimation of AI".
 
-### The Power of Belief
+The power of belief
 
-<p align="center">
-  <strong> ☀️ </strong><br>
-  <strong> This is not humanity's sunset, but the dawn of a new world </strong>
-</p>
+<div align="center">
 
-**Believe**
+☀️
 
-  The spirit of open source can maximize the wisdom of the group;
-  Collaboration will propel humanity to new heights.
+This is not humanity's sunset, but the dawn of a new world
 
-**Witness**
+</div>
 
-  Every day of our work is part of history;
-  It will surely be engraved on the monument of human civilization's development.
+**Believe:**
+The spirit of open source can maximize the wisdom of the group;
+Collaboration will propel humanity to new heights.
 
-### Ways to Contribute
+**Witness:**
+Every day of our work is part of history;
+It will surely be engraved on the monument of human civilization's development.
 
+**Contribution:**
 Whether you are an experienced developer or just starting out:
 
-**Find Issues**
+**Discover:**
 Report bugs, help us improve quality
 
-**Share Ideas**
-Suggest new features, make the project stronger
+**Ideas:**
+New feature suggestions, make the project stronger
 
-**Share Knowledge**
+**Share:**
 Improve documentation, help more people understand AgentOS
 
-**Write Code**
+**Coding:**
 Submit PRs, jointly create history
 
 <p align="center">
@@ -262,21 +273,19 @@ Submit PRs, jointly create history
   <strong> A faint light cannot illuminate the entire path, yet it guides our direction forward </strong>
 </p>
 
-### Contribution Process
-
+**6.1 Contribution Process:**
 See [Contributing Guide](CONTRIBUTING.md)
 
-```bash
+```text
 Fork Project → Create Branch → Develop & Test → Submit PR → Code Review → Merge to Main
 ```
 
-**Main Platforms**: [AtomGit](https://atomgit.com/spharx/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+**Main Platforms:** [AtomGit](https://atomgit.com/spharx/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
 
-### Contributors
-
+**6.2 Contributors:**
 See [AUTHORS.md](AUTHORS.md) for the list of contributors.
 
-## 📜 License
+## 7️⃣ License
 
 This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) file for details.
 
@@ -284,7 +293,8 @@ This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE
 
 <div align="center">
 
-**"From data intelligence emerges."**
+"From data intelligence emerges."\
+From data, to intelligence.
 
 <img src="scripts/resources/images/feishu-community-qr.png" width="200" />
 
@@ -296,7 +306,7 @@ This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE
 
 ***
 
-## ⭐️ Github Star History
+## Star History
 
 [![Star History Chart](https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left)](https://star-history.com/#SpharxTeam/AgentOS)
 
