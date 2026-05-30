@@ -8,7 +8,7 @@
  * 动态安全策略引擎，支持运行时策略加载、版本管理、
  * 冲突检测与解决、策略热更新和合规性验证。
  *
- * @since 2.0.0
+ * @since 0.1.0
  */
 
 #ifndef AGENTOS_DYNAMIC_POLICY_ENGINE_H

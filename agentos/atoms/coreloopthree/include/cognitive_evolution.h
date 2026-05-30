@@ -15,7 +15,7 @@
  * 4. 认知层级 — 从感知到推理的认知跃迁
  * 5. 自适应学习 — 根据环境变化调整认知参数
  *
- * @since 2.0.0
+ * @since 0.1.0
  */
 
 #ifndef AGENTOS_COGNITIVE_EVOLUTION_H

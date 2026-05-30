@@ -1,79 +1,117 @@
 # Cupolas Utils — 安全工具库
 
-`cupolas/src/utils/` 为 Cupolas 各安全子系统提供共享的工具函数集。
+**模块路径**: `agentos/cupolas/src/utils/`
+**版本**: v0.0.5
 
-> Part of AgentOS v0.1.0
+## 概述
 
-## 提供的能力
+Cupolas Utils 是 Cupolas 安全穹顶的内部工具库，提供所有 Cupolas 子模块共享的基础设施，包括安全内存管理、统一错误处理、日志桥接和编译器提示宏。该模块不对外暴露公共 API，仅供 Cupolas 内部子模块使用。
 
-| 工具 | 说明 |
+## 设计目标
+
+- **安全内存管理**：零化释放、安全拷贝、分配跟踪
+- **统一错误处理**：Cupolas 全模块共享的错误码体系
+- **日志桥接**：将 Cupolas 内部日志桥接到 Commons 日志系统
+- **编译器提示**：跨编译器的属性注解和分支预测宏
+
+## 目录结构
+
+```
+utils/
+├── cupolas_utils.h              # 工具库公共头文件
+├── cupolas_utils.c              # 工具库实现
+└── README.md                    # 本文档
+```
+
+## 核心功能
+
+### 安全内存管理
+
+| 宏 | 说明 |
 |------|------|
-| **加密工具** | 哈希计算、对称/非对称加密、密钥派生 |
-| **编码工具** | Base64、Hex、URL 编解码 |
-| **校验工具** | 校验和计算、数据完整性验证 |
-| **模式匹配** | 正则表达式匹配、通配符匹配、ACL 模式匹配 |
-| **序列化工具** | 安全的数据序列化与反序列化 |
+| `CUPOLAS_MALLOC(size)` | 分配内存（失败时返回 NULL） |
+| `CUPOLAS_CALLOC(num, size)` | 零初始化分配 |
+| `CUPOLAS_FREE(ptr)` | 释放内存并将指针置 NULL |
+| `CUPOLAS_SAFE_FREE(ptr)` | 安全释放（零化内存后释放） |
+| `CUPOLAS_SAFE_STRDUP(str)` | 安全字符串复制 |
+| `CUPOLAS_SAFE_COPY(dst, src, size)` | 安全内存拷贝（边界检查） |
 
-> **OpenSSL 条件说明**：加密工具中的对称/非对称加密功能在 `AGENTOS_HAS_OPENSSL` 定义时使用 OpenSSL 实现，否则使用内置的轻量实现（功能受限）。
+### 编译器提示
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_LIKELY(x)` | 分支预测：x 大概率为真 |
+| `CUPOLAS_UNLIKELY(x)` | 分支预测：x 大概率为假 |
+| `CUPOLAS_UNUSED(x)` | 抑制未使用变量警告 |
+| `CUPOLAS_ALIGNED(n)` | 内存对齐属性 |
+| `CUPOLAS_PACKED` | 紧凑结构体属性 |
+| `CUPOLAS_NOINLINE` | 禁止内联 |
+| `CUPOLAS_HOT` | 热路径函数优化提示 |
+| `CUPOLAS_COLD` | 冷路径函数优化提示 |
+
+### 错误处理
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_CHECK_NULL(ptr, retval)` | NULL 检查，为空则返回 retval |
+| `CUPOLAS_CHECK_PARAM(cond, retval)` | 参数校验，条件不满足则返回 retval |
+| `CUPOLAS_GOTO_CLEANUP_IF(cond)` | 条件满足则跳转到 cleanup 标签 |
+| `CUPOLAS_RETURN_IF_ERROR(err)` | 错误则提前返回 |
+
+### 日志桥接
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_LOG_DEBUG(fmt, ...)` | DEBUG 级别日志 |
+| `CUPOLAS_LOG_INFO(fmt, ...)` | INFO 级别日志 |
+| `CUPOLAS_LOG_WARN(fmt, ...)` | WARN 级别日志 |
+| `CUPOLAS_LOG_ERROR(fmt, ...)` | ERROR 级别日志 |
+
+> 日志桥接宏内部调用 Commons 的 `log_write` 函数，模块名自动设为 `cupolas`。
+
+### 安全常量
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `CUPOLAS_MAX_PATH_LEN` | 4096 | 最大路径长度 |
+| `CUPOLAS_MAX_INPUT_LEN` | 65536 | 最大输入长度 |
+| `CUPOLAS_MAX_RULE_COUNT` | 1024 | 最大规则数量 |
+| `CUPOLAS_MAX_CACHE_SIZE` | 4096 | 最大缓存条目数 |
+| `CUPOLAS_HASH_SIZE` | 32 | SHA-256 哈希大小 |
+| `CUPOLAS_HMAC_SIZE` | 32 | HMAC-SHA256 大小 |
+| `CUPOLAS_AES_KEY_SIZE` | 32 | AES-256 密钥大小 |
+| `CUPOLAS_AES_NONCE_SIZE` | 12 | AES-GCM Nonce 大小 |
+| `CUPOLAS_AES_TAG_SIZE` | 16 | AES-GCM Tag 大小 |
 
 ## 使用示例
 
 ```c
-#include "cupolas/cupolas_utils.h"
+#include "cupolas_utils.h"
 
-// 哈希计算
-char hash[65];
-crypto_sha256(hash, "data_to_hash", 12);
-printf("SHA256: %s", hash);
+char *data = CUPOLAS_MALLOC(1024);
+if (CUPOLAS_UNLIKELY(data == NULL)) {
+    CUPOLAS_LOG_ERROR("内存分配失败");
+    return CUPOLAS_ERR_INTERNAL;
+}
 
-// 安全随机数生成
-uint8_t random_bytes[32];
-crypto_random_bytes(random_bytes, 32);
+CUPOLAS_SAFE_COPY(data, source, 1024);
 
-// URL 编码
-char encoded[256];
-url_encode(encoded, "user input with special chars & = ?");
+CUPOLAS_SAFE_FREE(data);
 
-// 模式匹配
-bool matched = pattern_match("/api/v1/*", "/api/v1/users");
-printf("Pattern match: %s", matched ? "true" : "false");
+CUPOLAS_CHECK_NULL(engine, CUPOLAS_ERR_INVALID_PARAM);
+CUPOLAS_CHECK_PARAM(size > 0 && size <= CUPOLAS_MAX_INPUT_LEN, CUPOLAS_ERR_INVALID_PARAM);
 ```
 
-## 工具列表
+## 依赖关系
 
-```c
-// cupolas_utils.h — 统一头文件
-
-// 哈希与加密
-void   crypto_sha256(char* out, const uint8_t* data, size_t len);
-void   crypto_random_bytes(uint8_t* out, size_t len);
-int    crypto_aes_encrypt(const uint8_t* key, const uint8_t* iv,
-                          const uint8_t* plaintext, uint8_t* ciphertext);
-int    crypto_aes_decrypt(const uint8_t* key, const uint8_t* iv,
-                          const uint8_t* ciphertext, uint8_t* plaintext);
-
-// 编码
-void   base64_encode(const uint8_t* in, size_t len, char* out);
-int    base64_decode(const char* in, uint8_t* out, size_t* out_len);
-void   hex_encode(const uint8_t* in, size_t len, char* out);
-int    hex_decode(const char* in, uint8_t* out, size_t* out_len);
-void   url_encode(char* out, const char* in);
-int    url_decode(char* out, const char* in);
-
-// 模式匹配
-bool   pattern_match(const char* pattern, const char* str);
-bool   pattern_match_acl(const char* acl_pattern, const char* resource);
-```
-
-## 相关子系统
-
-| 子系统 | 关系 |
-|--------|------|
-| [Security](../security/README.md) | 加密工具为签名验证、密钥保险库等提供底层支持 |
-| [Audit](../audit/README.md) | HMAC 签名链使用哈希工具 |
-| [Sanitizer](../sanitizer/README.md) | 模式匹配用于注入检测规则 |
-| [Permission](../permission/README.md) | ACL 模式匹配用于资源权限判断 |
+| 依赖 | 说明 |
+|------|------|
+| `agentos_types.h` | 统一类型定义 |
+| `memory_compat.h` | Commons 内存管理宏 |
+| `logging.h` | Commons 日志系统（桥接目标） |
+| `<string.h>` | 字符串操作 |
+| `<stdlib.h>` | 标准库 |
 
 ---
 
-*AgentOS Cupolas — Utils*
+© 2026 SPHARX Ltd. All Rights Reserved.

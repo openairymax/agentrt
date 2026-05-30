@@ -10,7 +10,7 @@
  * 架构:
  *   Gateway HTTP/WS/Stdio → bridge → protocol_router → transformer → handler
  *
- * @since 2.0.0
+ * @since 0.1.0
  */
 
 #ifndef AGENTOS_GATEWAY_PROTOCOL_BRIDGE_H

@@ -1,6 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Kubernetes Service for AgentOS gateway Module
-# Version: 0.0.5
+# Version: 0.1.0
 
 apiVersion: v1
 kind: Service
