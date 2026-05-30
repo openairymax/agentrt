@@ -15,7 +15,7 @@
  * 4. 显式验证 — 每次访问都进行身份验证和授权
  * 5. 微分段 — 细粒度的网络和资源隔离
  *
- * @since 2.0.0
+ * @since 0.1.0
  */
 
 #ifndef AGENTOS_ZERO_TRUST_INTEGRATION_H

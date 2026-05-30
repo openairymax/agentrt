@@ -1,5 +1,5 @@
 # AgentOS 测试夹具和共享配置
-# Version: 1.0.0.9
+# Version: 0.1.0
 # Last updated: 2026-04-04
 
 """
@@ -598,7 +598,7 @@ def project_info():
     """
     return {
         "name": "AgentOS",
-        "version": "1.0.0.9",
+        "version": "0.1.0",
         "root": PROJECT_ROOT,
         "tests_dir": PROJECT_ROOT / "tests",
         "toolkit_dir": PROJECT_ROOT / "toolkit" / "python",
