@@ -38,7 +38,7 @@ void gateway_service_get_default_config(gateway_service_config_t *config)
     memset(config, 0, sizeof(*config));
 
     config->name = "agentos-gateway";
-    config->version = "0.0.4";
+    config->version = "0.1.0";
 
     config->http.type = GATEWAY_DAEMON_TYPE_HTTP;
     config->http.host = "0.0.0.0";

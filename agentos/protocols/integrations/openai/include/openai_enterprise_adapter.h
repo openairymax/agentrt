@@ -17,7 +17,7 @@
  * 7. 请求重试与超时管理
  * 8. 审计日志与合规
  *
- * @since 2.0.0
+ * @since 0.1.0
  * @see unified_protocol.h
  */
 

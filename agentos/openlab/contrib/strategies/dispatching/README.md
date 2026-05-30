@@ -1,33 +1,71 @@
-# Dispatching — 调度策略
+# Dispatching — 任务调度策略
 
-> **Preview Status**: 本模块当前处于预览/开发阶段，作为 AgentOS v0.1.0 的一部分发布。API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+**模块路径**: `agentos/openlab/contrib/strategies/dispatching/`
+**版本**: v0.0.5
 
-`openlab/contrib/strategies/dispatching/` 提供智能体的任务调度策略，负责将任务高效地分发给最合适的执行者。
+> **Preview Status**: 本模块当前处于预览/开发阶段，API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
-## 核心能力
+## 概述
 
-- **任务分发**：根据任务类型和 Agent 能力进行智能分发
-- **负载均衡**：基于 Agent 当前负载动态分配任务
-- **优先级调度**：支持基于优先级的任务队列管理
-- **故障转移**：Agent 异常时的自动任务重分配
+Dispatching 策略模块提供智能体的任务调度能力，负责将任务高效地分发给最合适的执行者。当前实现为贡献骨架（Contrib Skeleton），提供基础调度接口，支持根据不同策略进行任务分配。
+
+## 目录结构
+
+```
+dispatching/
+├── __init__.py                 # 模块导出
+├── dispatching.py              # DispatchingStrategy 核心实现
+└── README.md                   # 本文件
+```
+
+## 核心组件
+
+### DispatchingStrategy (`dispatching.py`)
+
+| 类 | 说明 |
+|----|------|
+| `DispatchingStrategy` | 调度策略基类，接受 config 配置，提供 `dispatch()` 方法 |
 
 ## 调度策略
 
 | 策略 | 说明 | 适用场景 |
 |------|------|----------|
-| 轮询调度 | 依次分配给可用 Agent | 各 Agent 能力相同 |
-| 能力匹配 | 按能力匹配度分配 | 专业化 Agent 集群 |
-| 最短队列 | 分配给等待队列最短的 Agent | 高负载场景 |
-| 加权分配 | 按权重比例分配 | 异构 Agent 集群 |
+| 轮询调度 (Round Robin) | 依次分配给可用 Agent | 各 Agent 能力相同 |
+| 能力匹配 (Capability Match) | 按能力匹配度分配 | 专业化 Agent 集群 |
+| 最短队列 (Shortest Queue) | 分配给等待队列最短的 Agent | 高负载场景 |
+| 加权分配 (Weighted) | 按权重比例分配 | 异构 Agent 集群 |
+| 随机分配 (Random) | 随机选择 Agent | 负载测试 |
 
-## 使用方式
+## 接口说明
+
+```python
+class DispatchingStrategy:
+    def __init__(self, config: Optional[Dict[str, Any]] = None)
+
+    async def dispatch(self, task: Any, agents: list = None) -> Dict[str, Any]:
+        """分发任务到合适的 Agent
+
+        Args:
+            task: 任务对象
+            agents: 可用 Agent 列表
+
+        Returns:
+            Dict: 包含 status/strategy/assigned_agents/task 信息
+        """
+```
+
+## 依赖关系
+
+- **核心依赖**: AgentOS OpenLab Core
+- **Python**: >= 3.10, typing
+
+## 使用示例
 
 ```python
 from contrib.strategies.dispatching import DispatchingStrategy
 
 dispatcher = DispatchingStrategy(strategy="capability_match")
 
-# 分发任务
 task = {
     "id": "task-001",
     "type": "code_review",
@@ -35,10 +73,10 @@ task = {
     "payload": {"repo": "agentos", "branch": "main"}
 }
 
-agent = dispatcher.dispatch(task)
-print(f"Task dispatched to: {agent.id}")
+result = await dispatcher.dispatch(task, agents=available_agents)
+print(f"Task dispatched to: {result['assigned_agents']}")
 ```
 
 ---
 
-*AgentOS OpenLab — Dispatching Strategy*
+© 2026 SPHARX Ltd. All Rights Reserved.

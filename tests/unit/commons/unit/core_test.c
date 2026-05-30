@@ -20,8 +20,8 @@ void test_version() {
     int result = agentos_core_check_version(">=1.0.0.0");
     printf("版本兼容性检�?(>=1.0.0.0): %d\n", result);
     
-    result = agentos_core_check_version("<2.0.0.0");
-    printf("版本兼容性检�?(<2.0.0.0): %d\n", result);
+    result = agentos_core_check_version("<0.2.0");
+    printf("版本兼容性检�?(<0.2.0): %d\n", result);
 }
 
 void test_platform() {
