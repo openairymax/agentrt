@@ -10,7 +10,7 @@ English | [简体中文](README_zh.md)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
 [![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS/stargazers)
 
-[![Version](https://img.shields.io/badge/version-0.0.5-5a6b7e)](https://atomgit.com/openairymax/agentos)
+[![Version](https://img.shields.io/badge/version-0.1.0-5a6b7e)](https://atomgit.com/openairymax/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/openairymax/agentos)
 
@@ -26,8 +26,8 @@ English | [简体中文](README_zh.md)
 
 | User Type | Product | Version | Download |
 |:---------:|:-------:|:-------:|:--------:|
-|  **Pro Users** | Docker | `v0.0.5` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.0.5) |
-|  **Personal Users** | Desktop | `v0.0.5` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.5) |
+|  **Pro Users** | Docker | `v0.1.0` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.1.0) |
+|  **Personal Users** | Desktop | `v0.1.0` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.1.0) |
 
 
 ## 🌟 Introduction

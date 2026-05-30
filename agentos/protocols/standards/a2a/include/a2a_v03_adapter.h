@@ -15,7 +15,7 @@
  * 5. Streaming — 流式任务执行与进度推送
  * 6. Push Notifications — 事件驱动的通知机制
  *
- * @since 2.0.0
+ * @since 0.1.0
  * @see unified_protocol.h
  */
 

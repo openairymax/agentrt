@@ -1,42 +1,196 @@
-# Go SDK
+# Toolkit Go — AgentOS Go SDK
 
-`toolkit/go/` 是 AgentOS 的 Go 语言 SDK，提供完整的 AgentOS 客户端功能。
+**模块路径**: `agentos/toolkit/go/`
+**版本**: v0.0.5 (SDK v3.0.0)
 
-## 版本
+## 概述
 
-当前版本: **v0.1.0**
+AgentOS Go SDK 提供基于 Go 语言的 AgentOS 系统编程接口，采用惯用的 Go 风格设计，支持 goroutine 并发模型。SDK 包含客户端层、业务模块层（Task/Memory/Session/Skill）、系统调用绑定、遥测、插件系统和类型定义，与 Python/Rust/TypeScript SDK 保持 API 一致性。
 
-> **注意**：本 SDK 模块当前处于预览状态（Preview），默认不参与构建，需要额外配置才能启用。
-
-## 安装
-
-```bash
-cd toolkit/go
-go build ./...
-```
-
-## 结构
+## 目录结构
 
 ```
 go/
-├── agentos/                  # SDK 主包
-│   ├── client/              # HTTP 客户端
-│   ├── modules/             # 模块管理器
-│   │   ├── task/           # 任务管理
-│   │   ├── session/        # 会话管理
-│   │   ├── memory/         # 内存管理
-│   │   └── skill/          # 技能管理
-│   ├── syscall/            # 系统调用接口
-│   ├── telemetry/          # 遥测
-│   ├── types/              # 类型定义
-│   ├── utils/              # 工具函数
-│   ├── agentos.go          # AgentOS 核心
-│   ├── config.go           # 配置管理
-│   ├── errors.go           # 错误定义
-│   └── protocol.go         # 协议实现
-├── README.md                # 本文件
-├── go.mod                   # Go 模块定义
-└── coverage                 # 测试覆盖率报告
+├── agentos/
+│   ├── agentos.go              # 版本信息（Version/Author/License）
+│   ├── config.go               # 配置管理（Config/ConfigOption/环境变量）
+│   ├── protocol.go             # 协议处理
+│   ├── errors.go               # 错误定义与错误码
+│   ├── client/
+│   │   ├── client.go           # APIClient/Client/ClientConfig
+│   │   └── mock.go             # MockClient 测试客户端
+│   ├── modules/
+│   │   ├── modules.go          # 模块导出
+│   │   ├── base_manager.go     # BaseManager 基类
+│   │   ├── task/
+│   │   │   └── manager.go      # TaskManager
+│   │   ├── memory/
+│   │   │   └── manager.go      # MemoryManager
+│   │   ├── session/
+│   │   │   └── manager.go      # SessionManager
+│   │   └── skill/
+│   │       └── manager.go      # SkillManager
+│   ├── plugin/
+│   │   └── plugin.go           # Plugin 系统
+│   ├── syscall/
+│   │   └── syscall.go          # 系统调用绑定
+│   ├── telemetry/
+│   │   └── telemetry.go        # OpenTelemetry 遥测
+│   ├── types/
+│   │   └── types.go            # 类型定义
+│   └── utils/
+│       └── helpers.go          # 工具函数
+├── go.mod                      # Go 模块配置
+└── README.md                   # 本文件
+```
+
+## 核心组件
+
+### 客户端层
+
+| 类型 | 说明 |
+|------|------|
+| `Client` | 同步 HTTP 客户端，支持 API Key 认证 |
+| `APIClient` | 高级 API 客户端，封装所有业务模块 |
+| `ClientConfig` | 客户端配置（endpoint/timeout/maxRetries/apiKey） |
+| `MockClient` | 测试用 Mock 客户端 |
+
+### 业务模块层
+
+| 管理器 | 说明 | 核心方法 |
+|--------|------|----------|
+| `TaskManager` | 任务管理 | Submit/Get/Cancel/List/Wait |
+| `MemoryManager` | 记忆管理 | Write/Read/Search/Delete/List |
+| `SessionManager` | 会话管理 | Create/Get/Close/List |
+| `SkillManager` | 技能管理 | Load/Execute/Unload/List |
+
+### 类型定义
+
+| 类型 | 说明 |
+|------|------|
+| `Task` / `TaskResult` | 任务与结果 |
+| `Memory` / `MemorySearchResult` | 记忆与搜索结果 |
+| `Session` | 会话 |
+| `Skill` / `SkillResult` / `SkillInfo` | 技能与执行结果 |
+| `TaskStatus` | 任务状态枚举 |
+| `MemoryLayer` | 记忆层级（L1/L2/L3/L4） |
+| `SessionStatus` | 会话状态枚举 |
+| `SkillStatus` | 技能状态枚举 |
+
+### 错误码体系
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `CODE_SUCCESS` | `0x0000` | 成功 |
+| `CODE_TIMEOUT` | `0x0004` | 超时 |
+| `CODE_NOT_FOUND` | `0x0005` | 未找到 |
+| `CODE_NETWORK_ERROR` | `0x000A` | 网络错误 |
+| `CODE_TASK_FAILED` | `0x3001` | 任务失败 |
+| `CODE_MEMORY_NOT_FOUND` | `0x4001` | 记忆未找到 |
+| `CODE_SESSION_EXPIRED` | `0x4005` | 会话过期 |
+| `CODE_SKILL_NOT_FOUND` | `0x4006` | 技能未找到 |
+
+## 接口说明
+
+### Client 初始化
+
+```go
+import "agentos"
+
+client, err := agentos.NewClient("http://localhost:18789")
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Close()
+
+clientWithKey, err := agentos.NewClientWithAPIKey("http://localhost:18789", "your-api-key")
+```
+
+### TaskManager
+
+```go
+taskManager := client.TaskManager()
+
+task, err := taskManager.Submit(ctx, "analyze this data")
+result, err := taskManager.Wait(ctx, task.ID, 30*time.Second)
+tasks, err := taskManager.List(ctx, &agentos.ListOptions{Limit: 10})
+err := taskManager.Cancel(ctx, taskID)
+```
+
+### MemoryManager
+
+```go
+memoryManager := client.MemoryManager()
+
+memoryID, err := memoryManager.Write(ctx, "important data", nil)
+memories, err := memoryManager.Search(ctx, "query", 5)
+memory, err := memoryManager.Read(ctx, memoryID)
+err := memoryManager.Delete(ctx, memoryID)
+```
+
+### SessionManager
+
+```go
+sessionManager := client.SessionManager()
+
+session, err := sessionManager.Create(ctx)
+session, err := sessionManager.Get(ctx, sessionID)
+err := sessionManager.Close(ctx, sessionID)
+```
+
+### SkillManager
+
+```go
+skillManager := client.SkillManager()
+
+skill, err := skillManager.Load(ctx, "browser-skill")
+result, err := skillManager.Execute(ctx, skill.ID, params)
+err := skillManager.Unload(ctx, skill.ID)
+```
+
+## 配置说明
+
+```go
+config := agentos.NewConfig(
+    agentos.WithEndpoint("http://localhost:18789"),
+    agentos.WithTimeout(30 * time.Second),
+    agentos.WithMaxRetries(3),
+    agentos.WithAPIKey("your-api-key"),
+    agentos.WithUserAgent("my-app/1.0"),
+    agentos.WithDebug(true),
+)
+
+client, err := agentos.NewClientWithConfig(config)
+```
+
+也支持从环境变量加载配置：
+
+```go
+config := agentos.NewConfigFromEnv()
+// AGENTOS_ENDPOINT, AGENTOS_TIMEOUT, AGENTOS_API_KEY
+```
+
+## 依赖关系
+
+- **Go 版本**: >= 1.21
+- **核心依赖**: Go 标准库（net/http, encoding/json, context, sync）
+- **测试依赖**: testify
+- **无外部运行时依赖**
+
+## 构建说明
+
+```bash
+# 安装
+go get agentos
+
+# 运行测试
+go test ./...
+
+# 运行基准测试
+go test -bench=. ./...
+
+# 运行特定模块测试
+go test ./agentos/modules/task/...
 ```
 
 ## 使用示例
@@ -45,39 +199,42 @@ go/
 package main
 
 import (
+    "context"
     "fmt"
-    "agentos/client"
+    "log"
+    "time"
+
+    "agentos"
 )
 
 func main() {
-    // 创建客户端
-    c := client.NewClient("http://localhost:8080")
-
-    // 创建 Agent
-    agent, err := c.CreateAgent("agent-001", "example-agent")
+    client, err := agentos.NewClient("http://localhost:18789")
     if err != nil {
-        fmt.Printf("Error: %v\n", err)
-        return
+        log.Fatal(err)
     }
-    fmt.Printf("Agent created: %s\n", agent.ID)
+    defer client.Close()
 
-    // 提交任务
-    task, err := c.CreateTask(agent.ID, "example_task", nil)
+    ctx := context.Background()
+
+    task, err := client.TaskManager().Submit(ctx, "analyze sales data")
     if err != nil {
-        fmt.Printf("Error: %v\n", err)
-        return
+        log.Fatal(err)
     }
-    fmt.Printf("Task created: %s\n", task.ID)
+
+    result, err := client.TaskManager().Wait(ctx, task.ID, 60*time.Second)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Task result: %s\n", result.Output)
+
+    memoryID, err := client.MemoryManager().Write(ctx, "analysis result", nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Memory saved: %s\n", memoryID)
 }
-```
-
-## 运行测试
-
-```bash
-cd toolkit/go
-go test ./... -v
 ```
 
 ---
 
-*AgentOS Toolkit — Go SDK*
+© 2026 SPHARX Ltd. All Rights Reserved.
