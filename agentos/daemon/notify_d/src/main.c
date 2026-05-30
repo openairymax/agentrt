@@ -386,9 +386,10 @@ static DWORD WINAPI notify_d_event_loop(LPVOID arg)
 static int notify_d_enqueue(notify_d_service_t *svc, const char *msg, const char *channel,
                             const char *event_type)
 {
-    if (!svc || !msg)
+    if (!svc || !msg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return AGENTOS_ERR_INVALID_PARAM;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+    }
     if (svc->pending_count >= NOTIFY_D_MAX_PENDING) {
     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "pending queue full");
         return AGENTOS_ERR_UNKNOWN;
@@ -697,6 +698,9 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     signal(SIGTERM, notify_d_signal_handler);
     signal(SIGPIPE, SIG_IGN);
 #endif
+
+    agentos_log_init(NULL);
+    atexit(agentos_log_shutdown);
 
     if (notify_d_init(&g_service, NOTIFY_D_DEFAULT_PORT, NOTIFY_D_DEFAULT_SOCKET) !=
         AGENTOS_SUCCESS)

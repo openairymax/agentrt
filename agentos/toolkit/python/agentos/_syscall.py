@@ -1,5 +1,5 @@
 # AgentOS Python SDK FFI Binding Layer (Refactored)
-# Version: 2.0.0.0
+# Version: 0.1.0
 # Last updated: 2026-03-21
 
 """

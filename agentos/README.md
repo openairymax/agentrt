@@ -300,4 +300,4 @@ ctest --output-on-failure
 
 ---
 
-*AgentOS 核心引擎*
+© 2026 SPHARX Ltd. All Rights Reserved.

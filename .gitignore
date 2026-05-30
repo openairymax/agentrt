@@ -99,6 +99,7 @@ build-test/
 build_clean/
 build_warn/
 build_test_protocol/
+build_ci*/
 
 # 子目录中的构建产物（防止源内构建）
 **/build/

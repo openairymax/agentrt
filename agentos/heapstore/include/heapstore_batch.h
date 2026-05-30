@@ -99,7 +99,7 @@ heapstore_batch_context_t *heapstore_batch_begin(size_t batch_size);
  * @threadsafe 是
  * @reentrant 是
 
- * @since v1.0.0.5*/
+ * @since v0.1.0*/
 heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const char *service,
                                           int level, const char *message);
 
@@ -176,7 +176,7 @@ heapstore_error_t heapstore_batch_add_span(heapstore_batch_context_t *ctx,
  * @threadsafe 是
  * @reentrant 否
 
- * @since v1.0.0.5*/
+ * @since v0.1.0*/
 heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t *ctx);
 
 /**
@@ -187,7 +187,7 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t *ctx);
  * @threadsafe 是
  * @reentrant 是
 
- * @since v1.0.0.5*/
+ * @since v0.1.0*/
 void heapstore_batch_rollback(heapstore_batch_context_t *ctx);
 
 /**
@@ -198,7 +198,7 @@ void heapstore_batch_rollback(heapstore_batch_context_t *ctx);
  * @threadsafe 是
  * @reentrant 是
 
- * @since v1.0.0.5*/
+ * @since v0.1.0*/
 void heapstore_batch_context_destroy(heapstore_batch_context_t *ctx);
 
 /**
