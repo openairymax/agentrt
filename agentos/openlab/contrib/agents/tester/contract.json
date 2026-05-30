@@ -4,7 +4,7 @@
   "agent_id": "tester",
   "agent_name": "Tester Agent",
   "description": "质量测试智能体，负责测试策略制定、自动化测试和质量保?,
-  "version": "1.0.0.9",
+  "version": "0.1.0",
   "author": "Spharx AgentOS Team",
   "license": "Apache-2.0",
   

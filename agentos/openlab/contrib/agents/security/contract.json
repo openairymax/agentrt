@@ -4,7 +4,7 @@
   "agent_id": "security",
   "agent_name": "Security Agent",
   "description": "安全审计智能体，负责安全评估、漏洞扫描和安全策略制定",
-  "version": "1.0.0.9",
+  "version": "0.1.0",
   "author": "Spharx AgentOS Team",
   "license": "Apache-2.0",
   

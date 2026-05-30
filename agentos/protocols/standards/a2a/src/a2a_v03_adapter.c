@@ -11,7 +11,7 @@
  * - task/consensus — 多智能体共识
  * - task/stream — 流式任务执行
  *
- * @since 2.0.0
+ * @since 0.1.0
  */
 
 #include "a2a_v03_adapter.h"

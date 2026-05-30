@@ -16,7 +16,7 @@
  * 6. logging/setLogLevel — 日志级别控制
  * 7. notifications — 进度/取消/消息通知
  *
- * @since 2.0.0
+ * @since 0.1.0
  * @see unified_protocol.h
  */
 

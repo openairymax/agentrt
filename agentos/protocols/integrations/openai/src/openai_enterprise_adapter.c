@@ -10,7 +10,7 @@
  * - /v1/models — 模型列表
  * - 流式 SSE 响应处理
  *
- * @since 2.0.0
+ * @since 0.1.0
  */
 
 #include "openai_enterprise_adapter.h"
@@ -148,8 +148,10 @@ int openai_create(openai_enterprise_config_t config, openai_handle_t *out_handle
 
     struct openai_enterprise_adapter_s *adapter =
         AGENTOS_CALLOC(1, sizeof(struct openai_enterprise_adapter_s));
-    if (!adapter)
+    if (!adapter) {
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, "openai: out of memory", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
 
     adapter->config = config;
     adapter->model_count = 0;
@@ -253,8 +255,10 @@ int openai_list_models(openai_handle_t handle, const char *search_query, void *o
     if (!handle)
         return AGENTOS_EFAIL;
     struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)handle;
-    if (!adapter->initialized)
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_SYS_NOT_INIT, "openai: not initialized", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_SYS_NOT_INIT;
+        }
 
     int count = 0;
     for (size_t i = 0; i < adapter->model_count; i++) {
@@ -459,8 +463,10 @@ static int openai_parse_chat_response(const char *json_str, char *content_out, s
     if (!json_str || !content_out)
         return AGENTOS_EFAIL;
     cJSON *root = cJSON_Parse(json_str);
-    if (!root)
+    if (!root) {
+        agentos_error_push_ex(AGENTOS_ERR_NOT_FOUND, "openai: not found", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_NOT_FOUND;
+        }
 
     int result = -3;
     cJSON *choices = cJSON_GetObjectItem(root, "choices");
@@ -583,8 +589,10 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
     if (!handle || !request || !out_response)
         return AGENTOS_EFAIL;
     struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)handle;
-    if (!adapter->initialized)
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_SYS_NOT_INIT, "openai: not initialized", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_SYS_NOT_INIT;
+        }
 
     uint32_t est_tokens = 100;
     if (request->num_messages > 0 && request->messages) {
@@ -604,6 +612,7 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
         if (out_response->finish_reasons)
             out_response->finish_reasons[0] = OPENAI_FINISH_RATE_LIMITED;
         openai_on_429(adapter);
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, "openai: out of memory", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -617,8 +626,10 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
 #ifndef AGENTOS_HAS_CURL
     return -ENOSYS;
 #else
-    if (!adapter->config.api_key || !adapter->config.api_key[0])
+    if (!adapter->config.api_key || !adapter->config.api_key[0]) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, "openai: unknown error", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_UNKNOWN;
+        }
 
     cJSON *req_json = cJSON_CreateObject();
     cJSON_AddStringToObject(req_json, "model", request->model ? request->model : "gpt-4o");
@@ -717,9 +728,11 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
                 out_response->finish_reasons[0] = OPENAI_FINISH_STOP;
             out_response->usage = api_usage;
         } else {
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, "openai: unknown error", __FILE__, __LINE__, __func__);
             return AGENTOS_ERR_UNKNOWN;
         }
     } else {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, "openai: unknown error", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -741,8 +754,10 @@ int openai_chat_completion_streaming(openai_handle_t handle, const openai_chat_r
     if (!handle || !request || !on_chunk || !final_summary)
         return AGENTOS_EFAIL;
     struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)handle;
-    if (!adapter->initialized)
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_SYS_NOT_INIT, "openai: not initialized", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_SYS_NOT_INIT;
+        }
 
 #ifndef AGENTOS_HAS_CURL
     (void)request;
@@ -750,8 +765,10 @@ int openai_chat_completion_streaming(openai_handle_t handle, const openai_chat_r
     (void)user_data;
     return -ENOSYS;
 #else
-    if (!adapter->config.api_key || !adapter->config.api_key[0])
+    if (!adapter->config.api_key || !adapter->config.api_key[0]) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, "openai: unknown error", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_UNKNOWN;
+        }
 
     uint64_t ts_start_ms = agentos_time_ms();
 
@@ -803,16 +820,20 @@ int openai_chat_completion_streaming(openai_handle_t handle, const openai_chat_r
                         req_str, api_response, sizeof(api_response));
     AGENTOS_FREE(req_str);
 
-    if (api_result <= 0)
+    if (api_result <= 0) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, "openai: unknown error", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_UNKNOWN;
+        }
 
     char full_response[OPENAI_MAX_RESPONSE_LEN];
     memset(full_response, 0, sizeof(full_response));
     openai_usage_t api_usage = {0};
     int parse_result =
         openai_parse_chat_response(api_response, full_response, sizeof(full_response), &api_usage);
-    if (parse_result != 0)
+    if (parse_result != 0) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, "openai: unknown error", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_UNKNOWN;
+        }
 
     size_t response_len = strlen(full_response);
     size_t pos = 0;
@@ -875,8 +896,10 @@ int openai_create_embedding(openai_handle_t handle, const openai_embedding_reque
     if (!handle || !request || !out_response)
         return AGENTOS_EFAIL;
     struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)handle;
-    if (!adapter->initialized)
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_SYS_NOT_INIT, "openai: not initialized", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_SYS_NOT_INIT;
+        }
 
     uint64_t ts_start_ms = agentos_time_ms();
 
@@ -894,8 +917,10 @@ int openai_create_embedding(openai_handle_t handle, const openai_embedding_reque
     }
 
     out_response->embeddings = AGENTOS_CALLOC(dims, sizeof(double));
-    if (!out_response->embeddings)
+    if (!out_response->embeddings) {
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, "openai: out of memory", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
     out_response->embedding_dim = (size_t)dims;
 
     float *accum = AGENTOS_CALLOC(dims, sizeof(float));
@@ -973,8 +998,10 @@ int openai_get_stats(void *handle, openai_rate_limit_t *out_stats)
     if (!handle || !out_stats)
         return AGENTOS_EFAIL;
     struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)handle;
-    if (!adapter->initialized)
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_SYS_NOT_INIT, "openai: not initialized", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_SYS_NOT_INIT;
+        }
 
     memset(out_stats, 0, sizeof(*out_stats));
     out_stats->current_rpm = (double)adapter->rate_window_requests;
@@ -1133,10 +1160,14 @@ int openai_enterprise_register_model(openai_enterprise_context_t *ctx, const ope
     if (!ctx || !ctx->handle || !model)
         return AGENTOS_EFAIL;
     struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)ctx->handle;
-    if (!adapter->initialized)
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_SYS_NOT_INIT, "openai: not initialized", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_SYS_NOT_INIT;
-    if (adapter->model_count >= OPENAI_MAX_MODELS)
+        }
+    if (adapter->model_count >= OPENAI_MAX_MODELS) {
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "openai: null pointer", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_NULL_POINTER;
+        }
     openai_model_t *slot = &adapter->models[adapter->model_count];
     slot->id = model->id ? AGENTOS_STRDUP(model->id) : NULL;
     slot->name = model->name ? AGENTOS_STRDUP(model->name) : NULL;
@@ -1219,16 +1250,20 @@ int openai_enterprise_list_models(openai_enterprise_context_t *ctx, openai_model
     if (!ctx || !ctx->handle || !models || !model_count)
         return AGENTOS_EFAIL;
     struct openai_enterprise_adapter_s *adapter = (struct openai_enterprise_adapter_s *)ctx->handle;
-    if (!adapter->initialized)
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_SYS_NOT_INIT, "openai: not initialized", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_SYS_NOT_INIT;
+        }
     *model_count = adapter->model_count;
     if (adapter->model_count == 0) {
         *models = NULL;
         return 0;
     }
     *models = AGENTOS_CALLOC(adapter->model_count, sizeof(openai_model_t));
-    if (!*models)
+    if (!*models) {
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, "openai: out of memory", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
     for (size_t i = 0; i < adapter->model_count; i++) {
         (*models)[i].id = adapter->models[i].id ? AGENTOS_STRDUP(adapter->models[i].id) : NULL;
         (*models)[i].name =
@@ -1421,6 +1456,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t *ctx, const char
         return 0;
     }
     *response_json = NULL;
+    agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, "openai: unknown error", __FILE__, __LINE__, __func__);
     return AGENTOS_ERR_UNKNOWN;
 }
 
@@ -1536,6 +1572,7 @@ static int openai_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t)
     if (!adapter || !adapter->initialized) {
         *d = NULL;
         *s = 0;
+        agentos_error_push_ex(AGENTOS_ERR_SYS_NOT_INIT, "openai: not initialized", __FILE__, __LINE__, __func__);
         return AGENTOS_ERR_SYS_NOT_INIT;
     }
 
@@ -1545,6 +1582,7 @@ static int openai_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t)
         if (!buf) {
             *d = NULL;
             *s = 0;
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, "openai: out of memory", __FILE__, __LINE__, __func__);
             return AGENTOS_ERR_OUT_OF_MEMORY;
         }
         memcpy(buf, adapter->last_response_body, len);

@@ -17,6 +17,86 @@
 
 ---
 
+## [v0.1.0] - 2026-05-29
+
+### 🎯 首个正式发行版
+
+AgentOS 首个正式发行版。经过多轮深度代码审计、版本统一、目录结构重组和文档全面更新，项目已达到可对外发布的成熟度。
+
+### 🏗️ 版本统一与规范化
+
+#### 全局版本号统一至 v0.1.0
+- **统一**: 项目全部版本号从 v0.0.5 统一为 v0.1.0
+  - 55 个 README.md 文档版本号统一
+  - pyproject.toml、setup.cfg 等配置文件版本号统一
+  - CHANGELOG 新增 v0.1.0 条目
+- **修复**: 不正确的版本号：1.0.0.9 → 0.1.0、2.0.0.0 → 0.1.0
+- **移除**: 所有残留的 v0.0.5 引用
+
+#### Scripts 目录全面重组
+- **重构**: scripts/ 从扁平结构重组为五大模块
+  - `scripts/ci/` — 持续集成（pipeline/quality/release/verify）
+  - `scripts/dev/` — 开发环境（build/setup/cli/cmake/config/utils）
+  - `scripts/ops/` — 运维部署（deploy/benchmark/demo/lib/tests）
+  - `scripts/resources/` — 项目资源（images/tutorial）
+  - `scripts/toolkit/` — Python 运维工具包
+
+#### Tests 目录系统性整理
+- **整理**: tests/ 目录与 agentos/ 模块完全对齐
+  - 新增完整的 agentos/ 模块对应关系表（24 行）
+  - 目录结构树与源码一一对应
+  - 版本号和存储描述统一
+
+#### .gitignore 全面更新 (V11.0.0)
+- **移除**: 17 个已不存在的路径引用
+- **重写**: scripts/ 肯定规则对齐实际目录结构
+- **精简**: 从 984 行精简至 868 行（减少 11.8%）
+
+### 📖 文档全面更新
+
+#### README 文档更新
+- **更新**: agentos/ 下全部 55 个 README.md 文档
+- **对齐**: 目录树与实际源码结构完全一致
+- **修正**: heapstore 存储描述（LMDB+Redis → SQLite+内存后端）
+- **补充**: 遗漏的子目录描述（commons/compliance/quality、cupolas/platform/docs、daemon/examples/scripts 等）
+
+### 🔧 代码质量改进
+
+#### 桩函数清除
+- **清除**: 移除所有不允许的桩函数（stub/simplified/placeholder 实现）
+- **扫描**: 全项目桩函数扫描与清理
+- **验证**: 确认无残留桩函数
+
+#### 路径可移植性
+- **修复**: 测试代码中的硬编码 `/tmp/` 路径改为可移植写法
+- **清理**: 无本地开发路径暴露风险
+
+### 📊 项目状态
+
+| 模块 | 状态 | 版本 |
+|------|------|------|
+| atoms | ✅ 就绪 | v0.1.0 |
+| commons | ✅ 就绪 | v0.1.0 |
+| cupolas | ✅ 就绪 | v0.1.0 |
+| daemon | ✅ 就绪 | v0.1.0 |
+| gateway | ✅ 就绪 | v0.1.0 |
+| heapstore | ✅ 就绪 | v0.1.0 |
+| manager | ✅ 就绪 | v0.1.0 |
+| openlab | ✅ 就绪 | v0.1.0 |
+| protocols | ✅ 就绪 | v0.1.0 |
+| toolkit | ✅ 就绪 | v0.1.0 |
+
+### 🎯 关键里程碑
+- ✅ 全局版本号统一为 v0.1.0
+- ✅ scripts/ 目录结构重组为五大模块
+- ✅ tests/ 与 agentos/ 模块完全对齐
+- ✅ .gitignore 精简对齐实际结构
+- ✅ 55 个 README 文档全面更新
+- ✅ 桩函数全面清除
+- ✅ 首个正式发行版就绪
+
+---
+
 ## [v0.0.5] - 2026-05-24
 
 ### 🔬 C 运行时深度审计与质量加固
