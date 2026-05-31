@@ -25,6 +25,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 兼容层：create/destroy 包装 ==================== */
 
@@ -137,7 +142,7 @@ static int ensure_binder_lock(void)
         return AGENTOS_SUCCESS;
     agentos_mutex_t *lock = agentos_mutex_create();
     if (!lock)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     agentos_mutex_t *expected = NULL;
     if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&binder_global_lock,
                                             (void **)&expected, (void *)lock, memory_order_acq_rel,
@@ -236,7 +241,7 @@ agentos_error_t agentos_ipc_init(void)
     if (!binder_global_lock) {
         agentos_mutex_t *new_lock = agentos_mutex_create();
         if (!new_lock)
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
 
         agentos_mutex_t *expected = NULL;
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&binder_global_lock,
@@ -287,9 +292,9 @@ agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callbac
 {
 
     if (!name || !out_channel)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     if (strlen(name) >= MAX_CHANNEL_NAME)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     int err = ensure_binder_lock();
     if (err != AGENTOS_SUCCESS)
         return err;
@@ -301,7 +306,7 @@ agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callbac
 
     if (callback && find_node_locked(name)) {
         agentos_mutex_unlock(binder_global_lock);
-        return AGENTOS_EEXIST;
+        ATM_RET_ERR(AGENTOS_EEXIST);
     }
 
     ch = (agentos_ipc_channel_t *)AGENTOS_CALLOC(1, sizeof(agentos_ipc_channel_t));
@@ -353,14 +358,14 @@ cleanup:
         AGENTOS_FREE(ch);
     }
     AGENTOS_FREE(node);
-    return AGENTOS_ENOMEM;
+    ATM_RET_ERR(AGENTOS_ENOMEM);
 }
 
 agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **out_channel)
 {
 
     if (!name || !out_channel)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     int err = ensure_binder_lock();
     if (err != AGENTOS_SUCCESS)
         return err;
@@ -370,14 +375,14 @@ agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **ou
     binder_node_t *target = find_node_locked(name);
     if (!target) {
         agentos_mutex_unlock(binder_global_lock);
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
     agentos_ipc_channel_t *ch =
         (agentos_ipc_channel_t *)AGENTOS_CALLOC(1, sizeof(agentos_ipc_channel_t));
     if (!ch) {
         agentos_mutex_unlock(binder_global_lock);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     strncpy(ch->name, name, MAX_CHANNEL_NAME - 1);
@@ -391,7 +396,7 @@ agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **ou
         atomic_fetch_sub_explicit(&target->ref_count, 1, memory_order_seq_cst);
         AGENTOS_FREE(ch);
         agentos_mutex_unlock(binder_global_lock);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     ch->cond = agentos_cond_create();
@@ -400,7 +405,7 @@ agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **ou
         atomic_fetch_sub_explicit(&target->ref_count, 1, memory_order_seq_cst);
         AGENTOS_FREE(ch);
         agentos_mutex_unlock(binder_global_lock);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     agentos_mutex_unlock(binder_global_lock);
@@ -414,16 +419,16 @@ agentos_error_t agentos_ipc_call(agentos_ipc_channel_t *channel,
 {
 
     if (!channel || !msg)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     if (!channel->remote_target)
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
 
     agentos_kernel_ipc_message_t call_msg = *msg;
     call_msg.msg_id = generate_msg_id();
 
     pending_call_t *pc = pending_call_create();
     if (!pc)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     pc->msg_id = call_msg.msg_id;
     pc->response_buf = response;
@@ -468,7 +473,7 @@ agentos_error_t agentos_ipc_call(agentos_ipc_channel_t *channel,
             remove_pending_call_locked(channel, pc);
             agentos_mutex_unlock(channel->lock);
             pending_call_destroy(pc);
-            return AGENTOS_ETIMEDOUT;
+            ATM_RET_ERR(AGENTOS_ETIMEDOUT);
         }
 
         uint32_t remaining = (uint32_t)(timeout_ms - elapsed);
@@ -494,7 +499,7 @@ agentos_error_t agentos_ipc_send(agentos_ipc_channel_t *channel,
 {
 
     if (!channel || !msg)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (channel->remote_target) {
         agentos_kernel_ipc_message_t send_msg = *msg;
@@ -511,7 +516,7 @@ agentos_error_t agentos_ipc_send(agentos_ipc_channel_t *channel,
     ipc_message_node_t *node = (ipc_message_node_t *)AGENTOS_CALLOC(1, sizeof(ipc_message_node_t));
     if (!node) {
         agentos_mutex_unlock(channel->lock);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     memcpy(&node->msg, msg, sizeof(agentos_kernel_ipc_message_t));
@@ -542,14 +547,14 @@ agentos_error_t agentos_ipc_reply(agentos_ipc_channel_t *channel,
 {
 
     if (!channel || !msg)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_mutex_lock(channel->lock);
 
     pending_call_t *pc = find_pending_call_locked(channel, msg->msg_id);
     if (!pc) {
         agentos_mutex_unlock(channel->lock);
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
     if (msg->data && pc->response_buf) {
@@ -577,7 +582,7 @@ agentos_error_t agentos_ipc_recv(agentos_ipc_channel_t *channel, uint32_t timeou
 {
 
     if (!channel || !out_msg)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_mutex_lock(channel->lock);
 
@@ -587,7 +592,7 @@ agentos_error_t agentos_ipc_recv(agentos_ipc_channel_t *channel, uint32_t timeou
 
     if (!channel->queue) {
         agentos_mutex_unlock(channel->lock);
-        return AGENTOS_ETIMEDOUT;
+        ATM_RET_ERR(AGENTOS_ETIMEDOUT);
     }
 
     ipc_message_node_t *node = channel->queue;
@@ -605,14 +610,14 @@ agentos_error_t agentos_ipc_recv(agentos_ipc_channel_t *channel, uint32_t timeou
 int32_t agentos_ipc_get_fd(agentos_ipc_channel_t *channel)
 {
     if (!channel)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     return channel->fd;
 }
 
 agentos_error_t agentos_ipc_close(agentos_ipc_channel_t *channel)
 {
     if (!channel)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     int err = ensure_binder_lock();
     if (err != AGENTOS_SUCCESS)
         return err;

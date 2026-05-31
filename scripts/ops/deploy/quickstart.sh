@@ -92,11 +92,11 @@ check_ports() {
     for port in "${ports[@]}"; do
         if command -v lsof &> /dev/null; then
             if lsof -i :$port &> /dev/null; then
-                occupied+=($port)
+                occupied+=("$port")
             fi
         elif command -v netstat &> /dev/null; then
             if netstat -tuln | grep -q ":$port "; then
-                occupied+=($port)
+                occupied+=("$port")
             fi
         fi
     done

@@ -1348,7 +1348,7 @@ static config_error_t file_source_save(config_source_t *source, const config_con
     bool is_json = (ext && (strcmp(ext, ".json") == 0 || strcmp(ext, ".JSON") == 0));
 
     if (is_json) {
-        fprintf(f, "{\n");
+        fputs("{\n", f);
         size_t count = config_context_count(ctx);
         for (size_t i = 0; i < count; i++) {
             const char *key = NULL;
@@ -1356,11 +1356,13 @@ static config_error_t file_source_save(config_source_t *source, const config_con
             if (!key || !val)
                 continue;
             if (i > 0)
-                fprintf(f, ",\n");
+                fputs(",\n", f);
             const char *str_val = config_value_get_string(val, "");
-            fprintf(f, "  \"%s\": \"%s\"", key, str_val ? str_val : "");
+            char line_buf[4096];
+            snprintf(line_buf, sizeof(line_buf), "  \"%s\": \"%s\"", key, str_val ? str_val : "");
+            fputs(line_buf, f);
         }
-        fprintf(f, "\n}\n");
+        fputs("\n}\n", f);
     } else {
         size_t count = config_context_count(ctx);
         for (size_t i = 0; i < count; i++) {
@@ -1369,7 +1371,9 @@ static config_error_t file_source_save(config_source_t *source, const config_con
             if (!key || !val)
                 continue;
             const char *str_val = config_value_get_string(val, "");
-            fprintf(f, "%s=%s\n", key, str_val ? str_val : "");
+            char line_buf[4096];
+            snprintf(line_buf, sizeof(line_buf), "%s=%s\n", key, str_val ? str_val : "");
+            fputs(line_buf, f);
         }
     }
 

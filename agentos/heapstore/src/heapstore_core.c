@@ -307,7 +307,9 @@ init_subsystem_with_rollback(subsystem_init_func init, subsystem_shutdown_func s
 
     heapstore_error_t err = init();
     if (err != heapstore_SUCCESS) {
-        fprintf(stderr, "[heapstore] Failed to initialize %s: %s\n", name, heapstore_strerror(err));
+        char line_buf[4096];
+        snprintf(line_buf, sizeof(line_buf), "[heapstore] Failed to initialize %s: %s\n", name, heapstore_strerror(err));
+        fputs(line_buf, stderr);
         return err;
     }
     return heapstore_SUCCESS;

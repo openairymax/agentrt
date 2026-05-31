@@ -32,6 +32,11 @@
 #include "atomic_compat.h"
 #include "platform.h"
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct task_control_block {
     char *task_id;
@@ -469,7 +474,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
         (agentos_execution_engine_t *)AGENTOS_CALLOC(1, sizeof(agentos_execution_engine_t));
     if (!engine) {
         AGENTOS_LOG_ERROR("Failed to allocate execution engine");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     engine->max_concurrency = max_concurrency;
@@ -485,7 +490,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
             agentos_cond_free(engine->task_available_cond);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to create synchronization primitives");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     engine->running = 1;
@@ -498,7 +503,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
         agentos_cond_free(engine->task_available_cond);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to allocate worker threads array");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     // 创建任务哈希表，大小为最大并发数?倍，减少冲突
@@ -510,7 +515,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
         agentos_cond_free(engine->task_available_cond);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to create task hash table");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     for (size_t i = 0; i < engine->worker_count; i++) {
@@ -526,7 +531,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
             agentos_cond_free(engine->task_available_cond);
             AGENTOS_FREE(engine);
             AGENTOS_LOG_ERROR("Failed to create worker thread %zu", i);
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         }
     }
 
@@ -614,7 +619,7 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
     agentos_task_t *task_copy = task_desc_deep_copy(task);
     if (!task_copy) {
         AGENTOS_LOG_ERROR("Failed to deep copy task description");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     task_tcb_t *tcb = (task_tcb_t *)AGENTOS_CALLOC(1, sizeof(task_tcb_t));
@@ -622,7 +627,7 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
         AGENTOS_FREE(task_copy);
         AGENTOS_LOG_ERROR("Failed to allocate task control block: %s (code %d)",
                           agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     char id_buf[64];
@@ -646,7 +651,7 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
             agentos_mutex_free(tcb->tcb_lock);
         AGENTOS_FREE(tcb);
         AGENTOS_FREE(task_copy);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     char *dup_id = AGENTOS_STRDUP(tcb->task_id);
@@ -661,7 +666,7 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
 
     if (!*out_task_id) {
         AGENTOS_LOG_ERROR("Failed to duplicate task_id");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     return AGENTOS_SUCCESS;
@@ -684,7 +689,7 @@ agentos_error_t agentos_execution_query(agentos_execution_engine_t *engine, cons
         return AGENTOS_SUCCESS;
     }
 
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const char *task_id,
@@ -692,12 +697,12 @@ agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const
 {
 
     if (!engine || !task_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (!tcb)
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
 
     agentos_cond_t *cond = tcb->completed_cond;
     agentos_mutex_lock(tcb->tcb_lock);
@@ -709,7 +714,7 @@ agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const
             if (err != 0) {
                 agentos_mutex_unlock(tcb->tcb_lock);
                 tcb_release(tcb);
-                return AGENTOS_ETIMEDOUT;
+                ATM_RET_ERR(AGENTOS_ETIMEDOUT);
             }
         }
     }
@@ -719,7 +724,7 @@ agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const
         agentos_task_t *result_copy = task_result_deep_copy(tcb);
         if (!result_copy) {
             tcb_release(tcb);
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         }
         *out_result = result_copy;
     }
@@ -732,12 +737,12 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
 {
 
     if (!engine || !task_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (!tcb)
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
 
     // 检查任务是否在队列?
     agentos_mutex_lock(engine->queue_lock);
@@ -763,7 +768,7 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
     }
     agentos_mutex_unlock(engine->queue_lock);
     tcb_release(tcb);
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 agentos_error_t agentos_execution_get_result(agentos_execution_engine_t *engine,
@@ -776,20 +781,20 @@ agentos_error_t agentos_execution_get_result(agentos_execution_engine_t *engine,
     // 使用哈希表快速查找任?
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (!tcb)
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
 
     agentos_mutex_lock(tcb->tcb_lock);
     if (tcb->status != TASK_STATUS_SUCCEEDED && tcb->status != TASK_STATUS_FAILED) {
         agentos_mutex_unlock(tcb->tcb_lock);
         tcb_release(tcb);
-        return AGENTOS_EBUSY;
+        ATM_RET_ERR(AGENTOS_EBUSY);
     }
     agentos_mutex_unlock(tcb->tcb_lock);
 
     agentos_task_t *result_copy = task_result_deep_copy(tcb);
     if (!result_copy) {
         tcb_release(tcb);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     *out_result = result_copy;
 
@@ -820,7 +825,7 @@ agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engin
 
     cJSON *root = cJSON_CreateObject();
     if (!root)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     agentos_mutex_lock(engine->queue_lock);
     size_t queue_len = 0;
@@ -851,7 +856,7 @@ agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engin
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (!json)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     *out_json = json;
     return AGENTOS_SUCCESS;

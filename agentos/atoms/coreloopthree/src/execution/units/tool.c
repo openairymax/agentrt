@@ -12,6 +12,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct tool_unit_data {
     char *tool_name;
@@ -23,7 +28,7 @@ static agentos_error_t tool_execute(agentos_execution_unit_t *unit, const void *
 {
     tool_unit_data_t *data = (tool_unit_data_t *)unit->execution_unit_data;
     if (!data || !input)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     const char *cmd = (const char *)input;
 
@@ -32,7 +37,7 @@ static agentos_error_t tool_execute(agentos_execution_unit_t *unit, const void *
         size_t args_len = strlen(tool_args);
         char *result = (char *)AGENTOS_MALLOC(args_len + 128);
         if (!result)
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         snprintf(result, args_len + 128, "{\"tool\":\"%s\",\"status\":\"invoked\",\"args\":\"%s\"}",
                  data->tool_name, tool_args);
         *out_output = result;
@@ -41,7 +46,7 @@ static agentos_error_t tool_execute(agentos_execution_unit_t *unit, const void *
         size_t name_len = strlen(data->tool_name);
         char *result = (char *)AGENTOS_MALLOC(name_len + 64);
         if (!result)
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         snprintf(result, name_len + 64, "{\"tool\":\"%s\",\"status\":\"valid\"}", data->tool_name);
         *out_output = result;
         return AGENTOS_SUCCESS;
@@ -50,7 +55,7 @@ static agentos_error_t tool_execute(agentos_execution_unit_t *unit, const void *
         size_t meta_len = strlen(meta);
         char *result = (char *)AGENTOS_MALLOC(meta_len + 64);
         if (!result)
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         snprintf(result, meta_len + 64,
                  "{\"tool\":\"%s\",\"status\":\"described\",\"metadata\":%s}", data->tool_name,
                  meta);

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # AgentOS 环境验证脚本
 # 用于检查开发和运行环境的完整性

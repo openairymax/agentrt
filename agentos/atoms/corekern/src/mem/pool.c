@@ -11,6 +11,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 #define POOL_MAGIC 0x504F4F4C
 #define BLOCK_ALLOCATED 0xA110CA7E
@@ -37,13 +42,13 @@ static inline int32_t pool_block_index(agentos_mem_pool_t *pool, void *ptr)
     uint8_t *base = (uint8_t *)pool->raw_memory;
     uint8_t *block = (uint8_t *)ptr;
     if (block < base)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     size_t offset = (size_t)(block - base);
     if (offset % pool->actual_block_size != 0)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     uint32_t index = (uint32_t)(offset / pool->actual_block_size);
     if (index >= pool->block_count)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     return (int32_t)index;
 }
 
@@ -154,10 +159,10 @@ void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
 agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t *pool_handle, void *ptr)
 {
     if (!pool_handle || !ptr)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     agentos_mem_pool_t *pool = pool_handle;
     if (pool->magic != POOL_MAGIC)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (pool->lock) {
         agentos_mutex_lock(pool->lock);
@@ -168,21 +173,21 @@ agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t *pool_handle, void *ptr
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     if (pool->block_tags[idx] == BLOCK_FREED) {
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
-        return AGENTOS_EALREADY;
+        ATM_RET_ERR(AGENTOS_EALREADY);
     }
 
     if (pool->block_tags[idx] != BLOCK_ALLOCATED) {
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     pool->block_tags[idx] = BLOCK_FREED;

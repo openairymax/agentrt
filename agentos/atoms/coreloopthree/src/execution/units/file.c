@@ -23,6 +23,11 @@
 
 #include <limits.h>
 #include <unistd.h>
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 #define PATH_SEPARATOR "/"
 #endif
 
@@ -50,14 +55,14 @@ static agentos_error_t file_build_path(file_unit_data_t *data, const char *path,
                                        size_t max_len)
 {
     if (!data || !path || !out_full)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (is_path_traversal_attempt(path)) {
-        return AGENTOS_EPERM;
+        ATM_RET_ERR(AGENTOS_EPERM);
     }
 
     if (!data->root_dir) {
-        return AGENTOS_EPERM;
+        ATM_RET_ERR(AGENTOS_EPERM);
     }
 
     snprintf(out_full, max_len, "%s/%s", data->root_dir, path);
@@ -70,7 +75,7 @@ static agentos_error_t file_build_path(file_unit_data_t *data, const char *path,
             if (realpath(out_full, resolved_full)) {
                 size_t root_len = strlen(resolved_root);
                 if (strncmp(resolved_full, resolved_root, root_len) != 0) {
-                    return AGENTOS_EPERM;
+                    ATM_RET_ERR(AGENTOS_EPERM);
                 }
             } else {
                 char resolved_parent[PATH_MAX];
@@ -86,7 +91,7 @@ static agentos_error_t file_build_path(file_unit_data_t *data, const char *path,
                         char resolved_dir[PATH_MAX];
                         if (realpath(full_copy, resolved_dir)) {
                             if (strncmp(resolved_dir, resolved_parent, parent_len) != 0) {
-                                return AGENTOS_EPERM;
+                                ATM_RET_ERR(AGENTOS_EPERM);
                             }
                         }
                     }
@@ -103,33 +108,33 @@ static agentos_error_t file_do_read(const char *full_path, void **out_output)
 {
     FILE *f = fopen(full_path, "rb");
     if (!f)
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
 
     if (fseek(f, 0, SEEK_END) != 0) {
         fclose(f);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
     long size = ftell(f);
     if (size < 0) {
         fclose(f);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
     if (fseek(f, 0, SEEK_SET) != 0) {
         fclose(f);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     char *content = (char *)AGENTOS_MALLOC((size_t)size + 1);
     if (!content) {
         fclose(f);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     size_t bytes_read = fread(content, 1, (size_t)size, f);
     if (bytes_read != (size_t)size) {
         AGENTOS_FREE(content);
         fclose(f);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     content[size] = '\0';
@@ -144,7 +149,7 @@ static agentos_error_t file_do_delete(const char *full_path, void **out_output)
         *out_output = AGENTOS_STRDUP("deleted");
         return AGENTOS_SUCCESS;
     }
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 #ifdef _WIN32
@@ -156,13 +161,13 @@ static agentos_error_t file_do_list_win(const char *full_path, void **out_output
 
     HANDLE hFind = FindFirstFileA(search_path, &find_data);
     if (hFind == INVALID_HANDLE_VALUE)
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
 
     size_t cap = 1024;
     char *listing = (char *)AGENTOS_MALLOC(cap);
     if (!listing) {
         FindClose(hFind);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     size_t pos = 0;
@@ -179,7 +184,7 @@ static agentos_error_t file_do_list_win(const char *full_path, void **out_output
                 if (!new_list) {
                     AGENTOS_FREE(listing);
                     FindClose(hFind);
-                    return AGENTOS_ENOMEM;
+                    ATM_RET_ERR(AGENTOS_ENOMEM);
                 }
                 listing = new_list;
             }
@@ -200,14 +205,14 @@ static agentos_error_t file_do_list_posix(const char *full_path, void **out_outp
 {
     DIR *dir = opendir(full_path);
     if (!dir)
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
 
     struct dirent *entry;
     size_t cap = 1024;
     char *listing = (char *)AGENTOS_MALLOC(cap);
     if (!listing) {
         closedir(dir);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     size_t pos = 0;
@@ -223,7 +228,7 @@ static agentos_error_t file_do_list_posix(const char *full_path, void **out_outp
             if (!new_list) {
                 AGENTOS_FREE(listing);
                 closedir(dir);
-                return AGENTOS_ENOMEM;
+                ATM_RET_ERR(AGENTOS_ENOMEM);
             }
             listing = new_list;
         }
@@ -245,14 +250,14 @@ static agentos_error_t file_execute(agentos_execution_unit_t *unit, const void *
 {
     file_unit_data_t *data = (file_unit_data_t *)unit->execution_unit_data;
     if (!data || !input)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     const char *cmd = (const char *)input;
     char op[32] = {0};
     char path[256] = {0};
 
     if (sscanf(cmd, "op=%31[^&]&path=%255[^\n]", op, path) != 2) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     char full_path[512];
@@ -271,7 +276,7 @@ static agentos_error_t file_execute(agentos_execution_unit_t *unit, const void *
         return file_do_list_posix(full_path, out_output);
 #endif
     }
-    return AGENTOS_EPROTONOSUPPORT;
+    ATM_RET_ERR(AGENTOS_EPROTONOSUPPORT);
 }
 
 static void file_destroy(agentos_execution_unit_t *unit)
