@@ -109,7 +109,7 @@ check_ports() {
             exit 1
         fi
     else
-        print_success "所有端口可�?
+        print_success "All ports available"�?
     fi
 }
 
@@ -123,15 +123,15 @@ create_env_file() {
     fi
     
     cp .env.example .env
-    print_success "已创�?.env 文件"
+    print_success ".env file created"
     
     echo ""
-    echo "请编�?.env 文件配置以下必要参数:"
-    echo "  - OPENAI_API_KEY (或其�?LLM API 密钥)"
-    echo "  - POSTGRES_PASSWORD (数据库密�?"
+    echo "Edit .env file to configure:"
+    echo "  - OPENAI_API_KEY (or other LLM API key)"
+    echo "  - POSTGRES_PASSWORD (database password)"
     echo ""
     
-    read -p "是否现在编辑 .env 文件�?y/N): " edit
+    read -p "Edit .env file now? (y/N): " edit
     if [[ $edit =~ ^[Yy]$ ]]; then
         if command -v nano &> /dev/null; then
             nano .env
@@ -173,7 +173,7 @@ start_services() {
     
     $DOCKER_COMPOSE up -d
     
-    print_success "服务已启�?
+    print_success "Service started"�?
 }
 
 # 等待服务就绪
@@ -186,7 +186,7 @@ wait_for_services() {
     echo "检查内核服�?.."
     while [ $attempt -lt $max_attempts ]; do
         if docker ps --format '{{.Names}}' | grep -q "agentos-kernel"; then
-            print_success "内核服务已启�?
+            print_success "Kernel service started"�?
             break
         fi
         sleep 2
@@ -212,7 +212,7 @@ wait_for_services() {
 # 显示访问信息
 show_access_info() {
     echo ""
-    print_success "AgentOS 部署完成�?
+    print_success "AgentOS deployment complete"�?
     echo ""
     echo "=========================================="
     echo "  服务访问信息"
@@ -246,7 +246,7 @@ show_access_info() {
 main() {
     print_logo
     
-    echo "欢迎使用 AgentOS Docker 快速入门向�?
+    echo "Welcome to AgentOS Docker Quick Start"�?
     echo ""
     
     # 环境检�?
@@ -269,7 +269,7 @@ main() {
 }
 
 # 捕获中断信号
-trap 'echo ""; print_warning "操作被中�?; exit 1' INT TERM
+trap 'echo ""; print_warning "Operation interrupted"�?; exit 1' INT TERM
 
 # 执行主函�?
 main "$@"

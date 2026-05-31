@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 extern agentos_error_t agentos_sys_memory_search(const char *query, uint32_t limit,
                                                  char ***out_record_ids, float **out_scores,
@@ -16,13 +17,13 @@ agentos_model_context_t *agentos_model_context_create(size_t capacity)
 {
     agentos_model_context_t *ctx =
         (agentos_model_context_t *)AGENTOS_CALLOC(1, sizeof(agentos_model_context_t));
-    if (!ctx)
-        return NULL;
+    if (!ctx) return NULL;
     ctx->capacity = capacity > 0 ? capacity : 64;
     ctx->entries =
         (agentos_context_entry_t *)AGENTOS_CALLOC(ctx->capacity, sizeof(agentos_context_entry_t));
     if (!ctx->entries) {
         AGENTOS_FREE(ctx);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     ctx->entry_count = 0;
@@ -305,8 +306,7 @@ static agentos_context_processor_t *create_processor(const char *name, const cha
 {
     agentos_context_processor_t *p =
         (agentos_context_processor_t *)AGENTOS_CALLOC(1, sizeof(agentos_context_processor_t));
-    if (!p)
-        return NULL;
+    if (!p) return NULL;
     p->name = AGENTOS_STRDUP(name);
     p->type = AGENTOS_STRDUP(type);
     p->process = process_func;
@@ -339,13 +339,13 @@ agentos_context_engine_t *agentos_context_engine_create(void)
 {
     agentos_context_engine_t *engine =
         (agentos_context_engine_t *)AGENTOS_CALLOC(1, sizeof(agentos_context_engine_t));
-    if (!engine)
-        return NULL;
+    if (!engine) return NULL;
     engine->processor_capacity = 8;
     engine->processors = (agentos_context_processor_t **)AGENTOS_CALLOC(
         engine->processor_capacity, sizeof(agentos_context_processor_t *));
     if (!engine->processors) {
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     engine->processor_count = 0;

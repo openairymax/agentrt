@@ -8,6 +8,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 typedef struct tool_exec_context {
     agentos_tool_execute_fn executor;
@@ -52,8 +53,10 @@ static int any_interactive(const agentos_tool_call_t *calls, size_t count)
 static void *tool_exec_thread(void *arg)
 {
     tool_exec_context_t *ctx = (tool_exec_context_t *)arg;
-    if (!ctx || !ctx->executor || !ctx->call || !ctx->result)
+    if (!ctx || !ctx->executor || !ctx->call || !ctx->result) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     uint64_t start_ns = agentos_time_ns();
 
@@ -94,8 +97,7 @@ agentos_parallel_dispatcher_t *agentos_parallel_dispatcher_create(int max_parall
 {
     agentos_parallel_dispatcher_t *d =
         (agentos_parallel_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(agentos_parallel_dispatcher_t));
-    if (!d)
-        return NULL;
+    if (!d) return NULL;
     d->max_parallel = max_parallel > 0 ? max_parallel : 4;
     d->executor = NULL;
     d->executor_user_data = NULL;

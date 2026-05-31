@@ -30,12 +30,10 @@ static atomic_int timer_processing = 0;
 agentos_timer_t *agentos_timer_create(agentos_timer_callback_t callback, void *userdata)
 {
 
-    if (!callback)
-        return NULL;
+    if (!callback) return NULL;
 
     agentos_timer_t *timer = (agentos_timer_t *)AGENTOS_CALLOC(1, sizeof(agentos_timer_t));
-    if (!timer)
-        return NULL;
+    if (!timer) return NULL;
 
     timer->callback = callback;
     timer->userdata = userdata;

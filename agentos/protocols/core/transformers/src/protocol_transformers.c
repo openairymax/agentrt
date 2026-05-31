@@ -21,10 +21,6 @@
 #ifndef AGENTOS_ERR_NULL_POINTER
 #define AGENTOS_ERR_NULL_POINTER (-3)
 #endif
-#ifndef AGENTOS_SUCCESS
-#define AGENTOS_SUCCESS 0
-#endif
-
 /* ============================================================================
  * Transform Context
  * ============================================================================ */

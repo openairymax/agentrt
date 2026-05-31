@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -90,8 +91,11 @@ static agentos_checkpoint_state_t string_to_state(const char *s)
 
 static char *safe_strdup(const char *src)
 {
-    if (!src)
+    if (!src) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t len = strlen(src);
     char *d = (char *)AGENTOS_MALLOC(len + 1);
     if (d) {
@@ -103,11 +107,17 @@ static char *safe_strdup(const char *src)
 
 static char **safe_str_array_dup(char **src, size_t count)
 {
-    if (!src || count == 0)
+    if (!src || count == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
+
         return NULL;
+    }
     char **dst = (char **)AGENTOS_CALLOC(count, sizeof(char *));
-    if (!dst)
+    if (!dst) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     memset(dst, 0, sizeof(char *) * count);
     for (size_t i = 0; i < count; i++) {
         dst[i] = safe_strdup(src[i]);
@@ -115,6 +125,7 @@ static char **safe_str_array_dup(char **src, size_t count)
             for (size_t j = 0; j < i; j++)
                 AGENTOS_FREE(dst[j]);
             AGENTOS_FREE(dst);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
     }
@@ -177,29 +188,44 @@ static agentos_error_t copy_nodes(agentos_task_checkpoint_t *cp, char **complete
 
 static char *json_extract_string(const char *json, const char *key)
 {
-    if (!json || !key)
+    if (!json || !key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     char search[256];
     snprintf(search, sizeof(search), "\"%s\"", key);
     const char *p = strstr(json, search);
-    if (!p)
+    if (!p) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p += strlen(search);
     while (*p && isspace((unsigned char)*p))
         p++;
-    if (*p != ':')
+    if (*p != ':') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p++;
     while (*p && isspace((unsigned char)*p))
         p++;
-    if (*p != '"')
+    if (*p != '"') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p++;
 
     size_t cap = 512;
     char *val = (char *)AGENTOS_MALLOC(cap);
-    if (!val)
+    if (!val) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t len = 0;
 
     while (*p && *p != '"' && *p != '\n') {
@@ -225,8 +251,11 @@ static char *json_extract_string(const char *json, const char *key)
             if (len + 2 >= cap) {
                 cap *= 2;
                 val = (char *)AGENTOS_REALLOC(val, cap);
-                if (!val)
+                if (!val) {
+                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
                     return NULL;
+                }
             }
             val[len++] = esc;
             p++;
@@ -234,8 +263,11 @@ static char *json_extract_string(const char *json, const char *key)
             if (len + 2 >= cap) {
                 cap *= 2;
                 val = (char *)AGENTOS_REALLOC(val, cap);
-                if (!val)
+                if (!val) {
+                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
                     return NULL;
+                }
             }
             val[len++] = *p;
             p++;

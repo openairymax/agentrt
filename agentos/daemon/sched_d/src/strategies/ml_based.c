@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file ml_based.c
  * @brief 基于机器学习的调度策略实现（生产级）

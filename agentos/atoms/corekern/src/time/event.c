@@ -11,6 +11,7 @@
 #include "task.h"
 
 #include <stdlib.h>
+#include "error.h"
 
 struct agentos_event {
     atomic_int signaled;
@@ -23,8 +24,7 @@ static atomic_int eventloop_running = 0;
 agentos_event_t *agentos_event_create(void)
 {
     agentos_event_t *ev = (agentos_event_t *)AGENTOS_CALLOC(1, sizeof(agentos_event_t));
-    if (!ev)
-        return NULL;
+    if (!ev) return NULL;
 
     atomic_init(&ev->signaled, 0);
     ev->mutex = agentos_mutex_create();
@@ -36,6 +36,7 @@ agentos_event_t *agentos_event_create(void)
         if (ev->cond)
             agentos_cond_free(ev->cond);
         AGENTOS_FREE(ev);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     return ev;

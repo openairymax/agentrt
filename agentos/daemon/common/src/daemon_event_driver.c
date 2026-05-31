@@ -1,6 +1,5 @@
 #include "daemon_event_driver.h"
 
-#include "error.h"
 #include "jsonrpc_helpers.h"
 #include "memory_compat.h"
 #include "method_dispatcher.h"
@@ -8,6 +7,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 struct daemon_event_driver {
     agentos_event_loop_t *loop;
@@ -64,18 +64,25 @@ static void on_health_timer(agentos_event_loop_t *loop, uint64_t timer_id, void 
 
 daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *config)
 {
-    if (!config)
+    if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     daemon_event_driver_t *driver =
         (daemon_event_driver_t *)AGENTOS_CALLOC(1, sizeof(daemon_event_driver_t));
-    if (!driver)
+    if (!driver) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     int max_events = config->max_events > 0 ? config->max_events : 64;
     driver->loop = agentos_event_loop_create(max_events);
     if (!driver->loop) {
         AGENTOS_FREE(driver);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -101,6 +108,7 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
                 thread_pool_destroy(driver->pool);
             agentos_event_loop_destroy(driver->loop);
             AGENTOS_FREE(driver);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
     }

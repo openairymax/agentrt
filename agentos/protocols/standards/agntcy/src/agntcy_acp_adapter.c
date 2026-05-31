@@ -39,7 +39,7 @@ int agntcy_acp_create(agntcy_handle_t **handle)
 
     agntcy_handle_t *h = (agntcy_handle_t *)AGENTOS_CALLOC(1, sizeof(agntcy_handle_t));
     if (!h)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     h->initialized = true;
     *handle = h;
@@ -64,7 +64,7 @@ int agntcy_agent_register(agntcy_handle_t *h, const agntcy_agent_card_t *card)
     if (!h || !card)
         return AGENTOS_ERR_NULL_POINTER;
     if (h->agent_count >= AGNTCY_ACP_MAX_AGENTS)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     for (size_t i = 0; i < h->agent_count; i++) {
         if (strcmp(h->agents[i].agent_id, card->agent_id) == 0) {
@@ -97,7 +97,7 @@ int agntcy_agent_unregister(agntcy_handle_t *h, const char *agent_id)
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int agntcy_agent_discover(agntcy_handle_t *h, uint32_t cap_mask, agntcy_agent_card_t *results,
@@ -125,7 +125,7 @@ int agntcy_channel_open(agntcy_handle_t *h, const char *initiator_id, const char
     if (!h || !initiator_id || !responder_id || !channel)
         return AGENTOS_ERR_NULL_POINTER;
     if (h->channel_count >= AGNTCY_ACP_MAX_CHANNELS)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     bool initiator_found = false, responder_found = false;
     for (size_t i = 0; i < h->agent_count; i++) {
@@ -136,7 +136,7 @@ int agntcy_channel_open(agntcy_handle_t *h, const char *initiator_id, const char
     }
 
     if (!initiator_found || !responder_found)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     snprintf(channel->channel_id, AGNTCY_ACP_CHANNEL_ID_SIZE, "ch-%s-%s-%llu", initiator_id,
              responder_id, (unsigned long long)(uint64_t)(time(NULL) * 1000));
@@ -173,7 +173,7 @@ int agntcy_channel_close(agntcy_handle_t *h, const char *channel_id)
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int agntcy_message_send(agntcy_handle_t *h, const agntcy_message_t *msg, char *response,
@@ -197,7 +197,7 @@ int agntcy_message_send(agntcy_handle_t *h, const agntcy_message_t *msg, char *r
     }
 
     if (!channel_valid)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     if (msg->payload && msg->payload_size > 0) {
         int written = snprintf(response, *resp_size,
@@ -244,7 +244,7 @@ int agntcy_task_orchestrate(agntcy_handle_t *h, const char *task_id, const char 
     if (!h || !task_id || !workflow_json)
         return AGENTOS_ERR_NULL_POINTER;
     if (h->task_count >= AGNTCY_ACP_MAX_TASKS)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     agntcy_task_t *task = NULL;
     for (size_t i = 0; i < h->task_count; i++) {
@@ -257,7 +257,7 @@ int agntcy_task_orchestrate(agntcy_handle_t *h, const char *task_id, const char 
     if (!task) {
         task = (agntcy_task_t *)AGENTOS_CALLOC(1, sizeof(agntcy_task_t));
         if (!task)
-            return -3;
+            AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
         strncpy(task->task_id, task_id, sizeof(task->task_id) - 1);
         h->tasks[h->task_count++] = task;
     }
@@ -292,14 +292,17 @@ int agntcy_task_get_state(agntcy_handle_t *h, const char *task_id, agntcy_task_s
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int agntcy_ack_negotiate(agntcy_handle_t *h, const char *agent_id, const agntcy_ack_t *ack_request,
                          agntcy_ack_t *ack_response)
 {
     if (!h || !agent_id || !ack_request || !ack_response)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "agntcy_ack_negotiate: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     bool agent_found = false;
     for (size_t i = 0; i < h->agent_count; i++) {
@@ -309,7 +312,7 @@ int agntcy_ack_negotiate(agntcy_handle_t *h, const char *agent_id, const agntcy_
         }
     }
     if (!agent_found)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     memcpy(ack_response, ack_request, sizeof(agntcy_ack_t));
 

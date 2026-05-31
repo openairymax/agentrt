@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 struct gw_protocol_bridge_s {
     gw_protocol_bridge_config_t config;
@@ -38,11 +39,16 @@ int gw_protocol_bridge_create(const gw_protocol_bridge_config_t *config,
                               gw_protocol_bridge_handle_t *out_handle)
 {
     if (!config || !out_handle)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "gw_protocol_bridge_create: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     struct gw_protocol_bridge_s *bridge = AGENTOS_CALLOC(1, sizeof(struct gw_protocol_bridge_s));
-    if (!bridge)
-        return -2;
+    if (!bridge) {
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "allocation failed");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     bridge->config = *config;
     bridge->default_handler = NULL;
@@ -90,10 +96,15 @@ int gw_protocol_bridge_register_handler(gw_protocol_bridge_handle_t bridge,
                                         void *(*handler)(const void *, size_t, size_t *))
 {
     if (!bridge || !handler || proto_type >= GW_PROTO_COUNT)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_BUFFER_TOO_SMALL, __FILE__, __LINE__, __func__, "gw_protocol_bridge_register_handler: capacity exceeded");
+        return AGENTOS_ERR_BUFFER_TOO_SMALL;
+        }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
-    if (!b->initialized)
-        return -2;
+    if (!b->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     b->handlers[proto_type] = (void *)(uintptr_t)handler;
     if (endpoint_pattern) {
@@ -107,7 +118,10 @@ int gw_protocol_bridge_set_default_handler(gw_protocol_bridge_handle_t bridge,
                                            void *(*handler)(const void *, size_t, size_t *))
 {
     if (!bridge)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "gw_protocol_bridge_set_default_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
     b->default_handler = (void *)(uintptr_t)handler;
     return 0;
@@ -122,7 +136,10 @@ int gw_protocol_bridge_detect_protocol(gw_protocol_bridge_handle_t bridge, const
                                        gw_detection_result_t *out_result)
 {
     if (!bridge || !data || !out_result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "gw_protocol_bridge_detect_protocol: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
 
     memset(out_result, 0, sizeof(*out_result));
@@ -229,10 +246,15 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
                                        gw_processed_response_t *out_response)
 {
     if (!bridge || !incoming || !out_response)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "gw_protocol_bridge_process_request: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
-    if (!b->initialized)
-        return -2;
+    if (!b->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     memset(out_response, 0, sizeof(*out_response));
 
@@ -345,7 +367,10 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
 int gw_protocol_bridge_get_stats(gw_protocol_bridge_handle_t bridge, gw_bridge_stats_t *out_stats)
 {
     if (!bridge || !out_stats)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "gw_protocol_bridge_get_stats: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
     memcpy(out_stats, &b->stats, sizeof(*out_stats));
 
@@ -368,7 +393,10 @@ int gw_protocol_bridge_get_stats(gw_protocol_bridge_handle_t bridge, gw_bridge_s
 int gw_protocol_bridge_reset_stats(gw_protocol_bridge_handle_t bridge)
 {
     if (!bridge)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "gw_protocol_bridge_reset_stats: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
     memset(&b->stats, 0, sizeof(b->stats));
     return 0;
@@ -441,7 +469,10 @@ int gw_protocol_bridge_list_registry_protocols(gw_protocol_bridge_handle_t bridg
                                                char **protocols_json)
 {
     if (!bridge || !protocols_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "gw_protocol_bridge_list_registry_protocols: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     *protocols_json = AGENTOS_STRDUP("{\"registered_protocols\":[],\"total\":0}");
     return 0;
 }
@@ -450,13 +481,18 @@ int gw_protocol_bridge_load_extensions_from_config(gw_protocol_bridge_handle_t b
                                                    const char *config_json)
 {
     if (!bridge || !config_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "gw_protocol_bridge_load_extensions_from_config: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
 
     if (!b->ext_framework) {
         b->ext_framework = proto_ext_framework_create();
-        if (!b->ext_framework)
-            return -2;
+        if (!b->ext_framework) {
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "operation failed");
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
     }
 
     return proto_ext_load_from_config((proto_ext_framework_t *)b->ext_framework, config_json);
@@ -466,10 +502,15 @@ int gw_protocol_bridge_register_extension_adapter(gw_protocol_bridge_handle_t br
                                                   gw_proto_type_t proto_type, void *handler)
 {
     if (!bridge || !handler || proto_type >= GW_PROTO_COUNT)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_BUFFER_TOO_SMALL, __FILE__, __LINE__, __func__, "gw_protocol_bridge_register_extension_adapter: capacity exceeded");
+        return AGENTOS_ERR_BUFFER_TOO_SMALL;
+        }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
-    if (!b->initialized)
-        return -2;
+    if (!b->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     b->handlers[proto_type] = handler;
     static const char *patterns[] = {

@@ -85,8 +85,8 @@ int proto_registry_register(protocol_registry_t *registry, const char *name, con
                             const char *description, proto_category_t category, proto_type_t type,
                             uint32_t capabilities, const protocol_adapter_t *adapter, void *context)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
-    AGENTOS_CHECK(name != NULL, AGENTOS_EFAIL, "name is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
+    AGENTOS_CHECK(name != NULL, AGENTOS_ERR_NULL_POINTER, "name is NULL");
     if (registry->entry_count >= PROTO_REGISTRY_MAX_ADAPTERS)
         return AGENTOS_ERR_OVERFLOW;
 
@@ -127,8 +127,8 @@ int proto_registry_register(protocol_registry_t *registry, const char *name, con
 
 int proto_registry_unregister(protocol_registry_t *registry, const char *name)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
-    AGENTOS_CHECK(name != NULL, AGENTOS_EFAIL, "name is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
+    AGENTOS_CHECK(name != NULL, AGENTOS_ERR_NULL_POINTER, "name is NULL");
 
     for (size_t i = 0; i < registry->entry_count; i++) {
         if (strncmp(registry->entries[i].name, name, PROTO_REGISTRY_NAME_MAX_LEN - 1) == 0) {
@@ -270,8 +270,8 @@ size_t proto_registry_list_active(protocol_registry_t *registry, proto_registry_
 
 int proto_registry_set_state(protocol_registry_t *registry, const char *name, proto_state_t state)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
-    AGENTOS_CHECK(name != NULL, AGENTOS_EFAIL, "name is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
+    AGENTOS_CHECK(name != NULL, AGENTOS_ERR_NULL_POINTER, "name is NULL");
 
     proto_registry_entry_t *entry = proto_registry_find(registry, name);
     if (!entry)
@@ -294,9 +294,9 @@ int proto_registry_set_state(protocol_registry_t *registry, const char *name, pr
 int proto_registry_add_dependency(protocol_registry_t *registry, const char *name,
                                   const char *dep_name)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
-    AGENTOS_CHECK(name != NULL, AGENTOS_EFAIL, "name is NULL");
-    AGENTOS_CHECK(dep_name != NULL, AGENTOS_EFAIL, "dep_name is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
+    AGENTOS_CHECK(name != NULL, AGENTOS_ERR_NULL_POINTER, "name is NULL");
+    AGENTOS_CHECK(dep_name != NULL, AGENTOS_ERR_NULL_POINTER, "dep_name is NULL");
 
     proto_registry_entry_t *entry = proto_registry_find(registry, name);
     if (!entry)
@@ -329,7 +329,10 @@ bool proto_registry_check_dependencies(const proto_registry_entry_t *entry)
 int proto_registry_activate(protocol_registry_t *registry, const char *name)
 {
     if (!registry || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_registry_activate: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     proto_registry_entry_t *entry = proto_registry_find(registry, name);
     if (!entry)
@@ -345,8 +348,8 @@ int proto_registry_activate(protocol_registry_t *registry, const char *name)
 
 int proto_registry_deactivate(protocol_registry_t *registry, const char *name)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
-    AGENTOS_CHECK(name != NULL, AGENTOS_EFAIL, "name is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
+    AGENTOS_CHECK(name != NULL, AGENTOS_ERR_NULL_POINTER, "name is NULL");
 
     proto_registry_entry_t *entry = proto_registry_find(registry, name);
     if (!entry)
@@ -357,8 +360,8 @@ int proto_registry_deactivate(protocol_registry_t *registry, const char *name)
 
 int proto_registry_heartbeat(protocol_registry_t *registry, const char *name)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
-    AGENTOS_CHECK(name != NULL, AGENTOS_EFAIL, "name is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
+    AGENTOS_CHECK(name != NULL, AGENTOS_ERR_NULL_POINTER, "name is NULL");
 
     proto_registry_entry_t *entry = proto_registry_find(registry, name);
     if (!entry)
@@ -382,7 +385,10 @@ int proto_registry_record_request(protocol_registry_t *registry, const char *nam
                                   double latency_ms)
 {
     if (!registry || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_registry_record_request: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     proto_registry_entry_t *entry = proto_registry_find(registry, name);
     if (!entry)
@@ -400,8 +406,8 @@ int proto_registry_record_request(protocol_registry_t *registry, const char *nam
 
 int proto_registry_get_statistics(protocol_registry_t *registry, proto_registry_stats_t *stats)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
-    AGENTOS_CHECK(stats != NULL, AGENTOS_EFAIL, "stats is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
+    AGENTOS_CHECK(stats != NULL, AGENTOS_ERR_NULL_POINTER, "stats is NULL");
 
     memset(stats, 0, sizeof(proto_registry_stats_t));
 
@@ -434,9 +440,9 @@ int proto_registry_get_statistics(protocol_registry_t *registry, proto_registry_
 
 int proto_registry_export_json(protocol_registry_t *registry, char *json_buffer, size_t buffer_size)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
-    AGENTOS_CHECK(json_buffer != NULL, AGENTOS_EFAIL, "json_buffer is NULL");
-    AGENTOS_CHECK(buffer_size >= 128, AGENTOS_EFAIL, "buffer_size too small");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
+    AGENTOS_CHECK(json_buffer != NULL, AGENTOS_ERR_NULL_POINTER, "json_buffer is NULL");
+    AGENTOS_CHECK(buffer_size >= 128, AGENTOS_ERR_BUFFER_TOO_SMALL, "buffer_size too small");
 
     int pos = 0;
     pos += snprintf(json_buffer + pos, buffer_size - pos,
@@ -465,7 +471,7 @@ int proto_registry_export_json(protocol_registry_t *registry, char *json_buffer,
 int proto_registry_set_event_callback(protocol_registry_t *registry,
                                       proto_registry_event_fn callback, void *user_data)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
     registry->event_callback = callback;
     registry->event_callback_data = user_data;
     return 0;
@@ -473,7 +479,7 @@ int proto_registry_set_event_callback(protocol_registry_t *registry,
 
 int proto_registry_initialize_builtins(protocol_registry_t *registry)
 {
-    AGENTOS_CHECK(registry != NULL, AGENTOS_EFAIL, "registry is NULL");
+    AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
 
     struct builtin_def {
         const char *name;

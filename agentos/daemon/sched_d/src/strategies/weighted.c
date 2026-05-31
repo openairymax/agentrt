@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file weighted.c
  * @brief 加权调度策略实现（基于实际API定义）
@@ -6,7 +7,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "platform.h"
 #include "scheduler_service.h"
 #include "strategy_interface.h"

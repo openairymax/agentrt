@@ -21,8 +21,7 @@
  */
 char *intent_to_lowercase(char *str)
 {
-    if (!str)
-        return NULL;
+    if (!str) return NULL;
     for (char *p = str; *p; ++p) {
         *p = tolower(*p);
     }

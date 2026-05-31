@@ -130,9 +130,9 @@ void mcp_server_destroy(mcp_server_t server)
 int mcp_server_register_tool(mcp_server_t server, const char *name, const char *description,
                              cJSON *input_schema, mcp_tool_handler_t handler, void *user_data)
 {
-    AGENTOS_CHECK(server != NULL, AGENTOS_EFAIL, "server is NULL");
-    AGENTOS_CHECK(name != NULL, AGENTOS_EFAIL, "name is NULL");
-    AGENTOS_CHECK(handler != NULL, AGENTOS_EFAIL, "handler is NULL");
+    AGENTOS_CHECK(server != NULL, AGENTOS_ERR_NULL_POINTER, "server is NULL");
+    AGENTOS_CHECK(name != NULL, AGENTOS_ERR_NULL_POINTER, "name is NULL");
+    AGENTOS_CHECK(handler != NULL, AGENTOS_ERR_NULL_POINTER, "handler is NULL");
     if (server->tool_count >= MCP_MAX_TOOLS)
         return AGENTOS_ERR_OVERFLOW;
 
@@ -149,9 +149,9 @@ int mcp_server_register_resource(mcp_server_t server, const char *uri, const cha
                                  const char *description, const char *mime_type,
                                  mcp_resource_handler_t handler, void *user_data)
 {
-    AGENTOS_CHECK(server != NULL, AGENTOS_EFAIL, "server is NULL");
-    AGENTOS_CHECK(uri != NULL, AGENTOS_EFAIL, "uri is NULL");
-    AGENTOS_CHECK(handler != NULL, AGENTOS_EFAIL, "handler is NULL");
+    AGENTOS_CHECK(server != NULL, AGENTOS_ERR_NULL_POINTER, "server is NULL");
+    AGENTOS_CHECK(uri != NULL, AGENTOS_ERR_NULL_POINTER, "uri is NULL");
+    AGENTOS_CHECK(handler != NULL, AGENTOS_ERR_NULL_POINTER, "handler is NULL");
     if (server->resource_count >= MCP_MAX_RESOURCES)
         return AGENTOS_ERR_OVERFLOW;
 
@@ -181,9 +181,9 @@ int mcp_server_register_prompt(mcp_server_t server, const char *name, const char
                                cJSON *argument_schema, mcp_prompt_handler_t handler,
                                void *user_data)
 {
-    AGENTOS_CHECK(server != NULL, AGENTOS_EFAIL, "server is NULL");
-    AGENTOS_CHECK(name != NULL, AGENTOS_EFAIL, "name is NULL");
-    AGENTOS_CHECK(handler != NULL, AGENTOS_EFAIL, "handler is NULL");
+    AGENTOS_CHECK(server != NULL, AGENTOS_ERR_NULL_POINTER, "server is NULL");
+    AGENTOS_CHECK(name != NULL, AGENTOS_ERR_NULL_POINTER, "name is NULL");
+    AGENTOS_CHECK(handler != NULL, AGENTOS_ERR_NULL_POINTER, "handler is NULL");
     if (server->prompt_count >= MCP_MAX_PROMPTS)
         return AGENTOS_ERR_OVERFLOW;
 
@@ -481,9 +481,9 @@ static int handle_prompts_get(mcp_server_t server, const cJSON *params, cJSON **
 int mcp_server_handle_request(mcp_server_t server, const char *method, const cJSON *params,
                               cJSON **response)
 {
-    AGENTOS_CHECK(server != NULL, AGENTOS_EFAIL, "server is NULL");
-    AGENTOS_CHECK(method != NULL, AGENTOS_EFAIL, "method is NULL");
-    AGENTOS_CHECK(response != NULL, AGENTOS_EFAIL, "response is NULL");
+    AGENTOS_CHECK(server != NULL, AGENTOS_ERR_NULL_POINTER, "server is NULL");
+    AGENTOS_CHECK(method != NULL, AGENTOS_ERR_NULL_POINTER, "method is NULL");
+    AGENTOS_CHECK(response != NULL, AGENTOS_ERR_NULL_POINTER, "response is NULL");
 
     server->request_count++;
 
@@ -522,7 +522,7 @@ int mcp_server_handle_request(mcp_server_t server, const char *method, const cJS
 
 int mcp_server_get_capabilities(cJSON **caps)
 {
-    AGENTOS_CHECK(caps != NULL, AGENTOS_EFAIL, "caps is NULL");
+    AGENTOS_CHECK(caps != NULL, AGENTOS_ERR_NULL_POINTER, "caps is NULL");
 
     *caps = cJSON_CreateObject();
 

@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -146,8 +147,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
 {
     size_t req_cap = 4096;
     char *request = (char *)AGENTOS_MALLOC(req_cap);
-    if (!request)
-        return NULL;
+    if (!request) return NULL;
 
     int len = snprintf(request, req_cap,
                        "%s %s HTTP/1.1\r\n"
@@ -171,6 +171,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
             char *new_req = (char *)AGENTOS_REALLOC(request, req_cap);
             if (!new_req) {
                 AGENTOS_FREE(request);
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 return NULL;
             }
             request = new_req;
@@ -190,6 +191,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
         int sent = send(sock, request + total_sent, (int)((size_t)len - total_sent), 0);
         if (sent <= 0) {
             AGENTOS_FREE(request);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_IO, "io operation failed");
             return NULL;
         }
         total_sent += (size_t)sent;
@@ -198,8 +200,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
 
     size_t resp_cap = 8192;
     char *response = (char *)AGENTOS_MALLOC(resp_cap);
-    if (!response)
-        return NULL;
+    if (!response) return NULL;
 
     size_t total_recv = 0;
     for (;;) {
@@ -208,6 +209,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
             char *new_resp = (char *)AGENTOS_REALLOC(response, resp_cap);
             if (!new_resp) {
                 AGENTOS_FREE(response);
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 return NULL;
             }
             response = new_resp;
@@ -224,8 +226,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
 
 static char *extract_body(const char *response)
 {
-    if (!response)
-        return NULL;
+    if (!response) return NULL;
 
     const char *header_end = strstr(response, "\r\n\r\n");
     if (!header_end)

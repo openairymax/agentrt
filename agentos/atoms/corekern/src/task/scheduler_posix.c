@@ -21,6 +21,7 @@
 #include "string_compat.h"
 
 #include <string.h>
+#include "error.h"
 
 /* ==================== 内部类型定义 ==================== */
 
@@ -138,6 +139,7 @@ static void *posix_thread_create(task_info_core_t *info, size_t stack_size)
     /* 分配平台特定数据 */
     data = (posix_task_data_t *)AGENTOS_CALLOC(1, sizeof(posix_task_data_t));
     if (!data) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -145,6 +147,7 @@ static void *posix_thread_create(task_info_core_t *info, size_t stack_size)
     ret = pthread_attr_init(&data->thread_attr);
     if (ret != 0) {
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -164,6 +167,7 @@ static void *posix_thread_create(task_info_core_t *info, size_t stack_size)
     if (ret != 0) {
         pthread_attr_destroy(&data->thread_attr);
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 

@@ -1,6 +1,5 @@
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "jsonrpc_helpers.h"
 #include "memory_compat.h"
 #include "method_dispatcher.h"
@@ -8,6 +7,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 struct method_handler {
     char *method;
@@ -33,18 +33,25 @@ static int find_method_index(method_dispatcher_t *disp, const char *method)
 
 method_dispatcher_t *method_dispatcher_create(size_t max_methods)
 {
-    if (max_methods == 0)
+    if (max_methods == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
+
         return NULL;
+    }
 
     method_dispatcher_t *disp =
         (method_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(method_dispatcher_t));
-    if (!disp)
+    if (!disp) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     disp->handlers =
         (struct method_handler *)AGENTOS_CALLOC(max_methods, sizeof(struct method_handler));
     if (!disp->handlers) {
         AGENTOS_FREE(disp);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

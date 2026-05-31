@@ -12,6 +12,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 /**
  * @brief 注册表条?
@@ -143,10 +144,14 @@ void agentos_registry_unregister_unit(const char *unit_id)
 
 agentos_execution_unit_t *agentos_registry_get_unit(const char *unit_id)
 {
-    if (!unit_id)
+    if (!unit_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-    if (ensure_registry_init() != AGENTOS_SUCCESS)
+        }
+    if (ensure_registry_init() != AGENTOS_SUCCESS) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     agentos_mutex_lock(g_registry_lock);
     registry_entry_t *entry = g_registry;
     while (entry) {
@@ -158,5 +163,6 @@ agentos_execution_unit_t *agentos_registry_get_unit(const char *unit_id)
         entry = entry->next;
     }
     agentos_mutex_unlock(g_registry_lock);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }

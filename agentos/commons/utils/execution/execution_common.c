@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include "error.h"
 #ifndef _WIN32
 #include <sys/wait.h>
 #endif
@@ -323,6 +324,7 @@ bool execution_validate_command(const char *command)
 char *execution_format_result_json(const execution_result_t *result)
 {
     if (!result) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -331,6 +333,7 @@ char *execution_format_result_json(const execution_result_t *result)
     size_t buffer_size = 1024;
     char *buffer = memory_safe_alloc(buffer_size);
     if (!buffer) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -346,6 +349,7 @@ char *execution_format_result_json(const execution_result_t *result)
         char *new_buffer = memory_safe_realloc(buffer, buffer_size);
         if (!new_buffer) {
             memory_safe_free(buffer);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
         buffer = new_buffer;

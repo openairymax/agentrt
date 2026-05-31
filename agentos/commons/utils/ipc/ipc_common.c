@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 #ifndef OFF_MAX
 #ifdef LLONG_MAX
@@ -364,11 +365,13 @@ ipc_config_t ipc_create_default_config(ipc_type_t type)
 ipc_channel_t *ipc_channel_create(const ipc_config_t *config)
 {
     if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     ipc_channel_t *channel = (ipc_channel_t *)AGENTOS_CALLOC(1, sizeof(ipc_channel_t));
     if (!channel) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -604,6 +607,7 @@ ipc_state_t ipc_channel_get_state(const ipc_channel_t *channel)
 const char *ipc_channel_get_name(const ipc_channel_t *channel)
 {
     if (!channel) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     return channel->config.name;
@@ -1064,11 +1068,13 @@ agentos_error_t ipc_set_message_callback(ipc_channel_t *channel, ipc_message_cal
 ipc_server_t *ipc_server_create(const ipc_config_t *config)
 {
     if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     ipc_server_t *server = (ipc_server_t *)AGENTOS_CALLOC(1, sizeof(ipc_server_t));
     if (!server) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -1153,14 +1159,17 @@ agentos_error_t ipc_server_stop(ipc_server_t *server)
 ipc_channel_t *ipc_server_accept(ipc_server_t *server, uint32_t timeout_ms)
 {
     if (!server) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     if (server->state != IPC_STATE_OPEN) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     if (server->connection_count >= server->max_connections) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
@@ -1169,6 +1178,7 @@ ipc_channel_t *ipc_server_accept(ipc_server_t *server, uint32_t timeout_ms)
             server->connections && server->connection_count > 0 ? server->connections[0] : NULL;
         int listen_fd = listen_channel ? listen_channel->socket_fd : -1;
         if (listen_fd < 0) {
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
             return NULL;
         }
 
@@ -1180,6 +1190,7 @@ ipc_channel_t *ipc_server_accept(ipc_server_t *server, uint32_t timeout_ms)
         FD_SET(listen_fd, &readfds);
         int sel = select(listen_fd + 1, &readfds, NULL, NULL, &tv);
         if (sel <= 0) {
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
             return NULL;
         }
 
@@ -1187,12 +1198,14 @@ ipc_channel_t *ipc_server_accept(ipc_server_t *server, uint32_t timeout_ms)
         socklen_t addr_len = sizeof(addr);
         int client_fd = accept(listen_fd, (struct sockaddr *)&addr, &addr_len);
         if (client_fd < 0) {
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
             return NULL;
         }
 
         ipc_channel_t *client_channel = ipc_channel_create(&server->config);
         if (!client_channel) {
             close(client_fd);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
         client_channel->socket_fd = client_fd;
@@ -1208,6 +1221,7 @@ ipc_channel_t *ipc_server_accept(ipc_server_t *server, uint32_t timeout_ms)
 
     ipc_channel_t *client_channel = ipc_channel_create(&server->config);
     if (!client_channel) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -1254,11 +1268,13 @@ agentos_error_t ipc_server_broadcast(ipc_server_t *server, const ipc_message_t *
 ipc_client_t *ipc_client_create(const ipc_config_t *config)
 {
     if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     ipc_client_t *client = (ipc_client_t *)AGENTOS_CALLOC(1, sizeof(ipc_client_t));
     if (!client) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -1394,6 +1410,7 @@ agentos_error_t ipc_client_disconnect(ipc_client_t *client)
 ipc_channel_t *ipc_client_get_channel(ipc_client_t *client)
 {
     if (!client) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     return client->channel;
@@ -1406,11 +1423,13 @@ ipc_channel_t *ipc_client_get_channel(ipc_client_t *client)
 ipc_shm_t *ipc_shm_create(const ipc_shm_config_t *config)
 {
     if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     ipc_shm_t *shm = (ipc_shm_t *)AGENTOS_CALLOC(1, sizeof(ipc_shm_t));
     if (!shm) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -1459,6 +1478,7 @@ void ipc_shm_destroy(ipc_shm_t *shm)
 void *ipc_shm_map(ipc_shm_t *shm)
 {
     if (!shm) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -1473,6 +1493,7 @@ void *ipc_shm_map(ipc_shm_t *shm)
 
     if (shm->hMapFile == NULL) {
         snprintf(shm->error_msg, sizeof(shm->error_msg), "CreateFileMapping failed");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1486,6 +1507,7 @@ void *ipc_shm_map(ipc_shm_t *shm)
     shm->shm_fd = shm_open(shm->config.name, flags, mode);
     if (shm->shm_fd < 0) {
         snprintf(shm->error_msg, sizeof(shm->error_msg), "shm_open failed");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1493,6 +1515,7 @@ void *ipc_shm_map(ipc_shm_t *shm)
         if (ftruncate(shm->shm_fd, (off_t)shm->config.size) != 0) {
             snprintf(shm->error_msg, sizeof(shm->error_msg), "ftruncate failed for size %zu",
                      shm->config.size);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
             return NULL;
         }
     }
@@ -1505,6 +1528,7 @@ void *ipc_shm_map(ipc_shm_t *shm)
     if (shm->mapped_addr == MAP_FAILED || shm->mapped_addr == NULL) {
         snprintf(shm->error_msg, sizeof(shm->error_msg), "Memory mapping failed");
         shm->mapped_addr = NULL;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1696,11 +1720,13 @@ static agentos_error_t ipc_mq_dequeue_message(ipc_mq_t *mq, void *buffer, size_t
 ipc_mq_t *ipc_mq_create(const ipc_mq_config_t *config)
 {
     if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     ipc_mq_t *mq = (ipc_mq_t *)AGENTOS_CALLOC(1, sizeof(ipc_mq_t));
     if (!mq) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -1723,18 +1749,21 @@ ipc_mq_t *ipc_mq_create(const ipc_mq_config_t *config)
         if (mq->hNotEmpty)
             CloseHandle(mq->hNotEmpty);
         AGENTOS_FREE(mq);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 #else
     if (agentos_mutex_init(&mq->mutex) != 0) {
         snprintf(mq->error_msg, sizeof(mq->error_msg), "Failed to initialize mutex");
         AGENTOS_FREE(mq);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
     if (agentos_cond_init(&mq->not_empty) != 0) {
         snprintf(mq->error_msg, sizeof(mq->error_msg), "Failed to initialize condition variable");
         agentos_mutex_destroy(&mq->mutex);
         AGENTOS_FREE(mq);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 #endif
@@ -1982,6 +2011,7 @@ ipc_message_t *ipc_message_create(ipc_msg_type_t type, const void *payload, size
 {
     ipc_message_t *msg = (ipc_message_t *)AGENTOS_CALLOC(1, sizeof(ipc_message_t));
     if (!msg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2005,6 +2035,7 @@ ipc_message_t *ipc_message_create(ipc_msg_type_t type, const void *payload, size
             msg->payload_size = payload_len;
         } else {
             AGENTOS_FREE(msg);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
             return NULL;
         }
     } else {
@@ -2034,6 +2065,7 @@ void ipc_message_free(ipc_message_t *message)
 ipc_message_t *ipc_message_clone(const ipc_message_t *message)
 {
     if (!message) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2192,17 +2224,22 @@ static rpc_method_node_t *rpc_find_method_node(ipc_rpc_server_t *server, const c
             return node;
         node = node->next;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
 ipc_rpc_server_t *ipc_rpc_server_create(const ipc_rpc_server_config_t *config)
 {
-    if (!config || !config->transport)
+    if (!config || !config->transport) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     ipc_rpc_server_t *server = (ipc_rpc_server_t *)AGENTOS_CALLOC(1, sizeof(ipc_rpc_server_t));
-    if (!server)
+    if (!server) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     server->transport = config->transport;
     server->max_request_size =
@@ -2293,8 +2330,10 @@ agentos_error_t ipc_rpc_server_register_method(ipc_rpc_server_t *server,
 
 rpc_method_handler_t ipc_rpc_server_find_method(ipc_rpc_server_t *server, const char *method_name)
 {
-    if (!server || !method_name)
+    if (!server || !method_name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     rpc_method_node_t *node = rpc_find_method_node(server, method_name);
     return node ? node->handler : NULL;
 }
@@ -2406,12 +2445,16 @@ agentos_error_t ipc_rpc_server_process(ipc_rpc_server_t *server, uint32_t timeou
 
 ipc_rpc_client_t *ipc_rpc_client_create(const ipc_rpc_client_config_t *config)
 {
-    if (!config || !config->transport)
+    if (!config || !config->transport) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     ipc_rpc_client_t *client = (ipc_rpc_client_t *)AGENTOS_CALLOC(1, sizeof(ipc_rpc_client_t));
-    if (!client)
+    if (!client) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     client->transport = config->transport;
     client->timeout_ms = config->timeout_ms > 0 ? config->timeout_ms : IPC_DEFAULT_TIMEOUT_MS;
