@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 typedef struct tool_unit_data {
     char *tool_name;
@@ -78,18 +79,17 @@ static void tool_destroy(agentos_execution_unit_t *unit)
 
 agentos_execution_unit_t *agentos_tool_unit_create(const char *tool_name)
 {
-    if (!tool_name)
-        return NULL;
+    if (!tool_name) return NULL;
 
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
-    if (!unit)
-        return NULL;
+    if (!unit) return NULL;
     memset(unit, 0, sizeof(*unit));
 
     tool_unit_data_t *data = (tool_unit_data_t *)AGENTOS_MALLOC(sizeof(tool_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -105,6 +105,7 @@ agentos_execution_unit_t *agentos_tool_unit_create(const char *tool_name)
             AGENTOS_FREE(data->metadata_json);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

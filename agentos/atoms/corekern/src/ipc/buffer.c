@@ -13,6 +13,7 @@
 #include "memory_compat.h"
 
 #include <string.h>
+#include "error.h"
 
 struct agentos_ipc_buffer {
     uint8_t *data;
@@ -24,12 +25,12 @@ agentos_ipc_buffer_t *agentos_ipc_buffer_create(size_t capacity)
 {
     agentos_ipc_buffer_t *buf =
         (agentos_ipc_buffer_t *)AGENTOS_CALLOC(1, sizeof(agentos_ipc_buffer_t));
-    if (!buf)
-        return NULL;
+    if (!buf) return NULL;
 
     buf->data = (uint8_t *)agentos_mem_alloc(capacity);
     if (!buf->data) {
         AGENTOS_FREE(buf);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     buf->capacity = capacity;

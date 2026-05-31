@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 /* 外部声明各提供商操作表 */
 extern const provider_ops_t openai_ops;
@@ -38,14 +39,17 @@ static const provider_ops_t *get_ops_by_name(const char *name)
         return &google_ops;
     if (strcmp(name, "local") == 0)
         return &local_ops;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
 provider_registry_t *provider_registry_create(const service_config_t *cfg)
 {
     provider_registry_t *reg = AGENTOS_CALLOC(1, sizeof(provider_registry_t));
-    if (!reg)
+    if (!reg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     agentos_mutex_init(&reg->lock);
 
     size_t count = 0;
@@ -57,6 +61,7 @@ provider_registry_t *provider_registry_create(const service_config_t *cfg)
     reg->providers = AGENTOS_CALLOC(count + 1, sizeof(provider_t));
     if (!reg->providers) {
         AGENTOS_FREE(reg);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -100,8 +105,10 @@ provider_registry_t *provider_registry_create_from_config(const service_config_t
                                                           const char *config_path)
 {
     provider_registry_t *reg = provider_registry_create(cfg);
-    if (!reg)
+    if (!reg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     if (!config_path)
         return reg;
@@ -272,11 +279,14 @@ void provider_registry_destroy(provider_registry_t *reg)
 
 const provider_t *provider_registry_find(provider_registry_t *reg, const char *model)
 {
-    if (!reg)
+    if (!reg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     agentos_mutex_lock(&reg->lock);
     if (!reg->providers) {
         agentos_mutex_unlock(&reg->lock);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     for (provider_t *p = reg->providers; p->name; ++p) {
@@ -290,5 +300,6 @@ const provider_t *provider_registry_find(provider_registry_t *reg, const char *m
         }
     }
     agentos_mutex_unlock(&reg->lock);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }

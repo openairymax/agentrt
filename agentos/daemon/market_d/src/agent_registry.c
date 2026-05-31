@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 
 
 /**
@@ -8,7 +9,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "market_service.h"
 #include "platform.h"
 
@@ -64,8 +64,11 @@ static void free_agent_entry(agent_entry_t *entry)
 
 static char *safe_strdup(const char *str)
 {
-    if (!str)
+    if (!str) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t len = strlen(str);
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
     if (copy)

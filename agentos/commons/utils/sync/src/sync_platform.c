@@ -25,6 +25,12 @@
 #include <unistd.h>
 #endif
 
+#include "error.h"
+
+#define SYNC_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
+         agentos_error_str(c)); return (c); } while(0)
+
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
 #endif
@@ -417,7 +423,7 @@ int platform_event_wait(platform_event_t *event, uint64_t timeout_ms)
     while (!event->signaled) {
         if (timeout_ms == 0) {
             pthread_mutex_unlock(&event->mutex);
-            return AGENTOS_EINVAL;
+            SYNC_RET_ERR(AGENTOS_EINVAL);
         }
         if (timeout_ms == (uint64_t)-1) {
             pthread_cond_wait(&event->cond, &event->mutex);
@@ -433,7 +439,7 @@ int platform_event_wait(platform_event_t *event, uint64_t timeout_ms)
             int ret = pthread_cond_timedwait(&event->cond, &event->mutex, &ts);
             if (ret == ETIMEDOUT) {
                 pthread_mutex_unlock(&event->mutex);
-                return AGENTOS_EINVAL;
+                SYNC_RET_ERR(AGENTOS_EINVAL);
             }
         }
     }

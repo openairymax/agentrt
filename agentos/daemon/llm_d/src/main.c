@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -17,7 +18,6 @@
 #include "atomic_compat.h"
 #include "daemon_errors.h"
 #include "daemon_event_driver.h"
-#include "error.h"
 #include "jsonrpc_helpers.h"
 #include "llm_service.h"
 #include "logging.h"
@@ -114,13 +114,17 @@ typedef struct {
 static request_context_t *request_context_create(void)
 {
     request_context_t *ctx = (request_context_t *)AGENTOS_CALLOC(1, sizeof(request_context_t));
-    if (!ctx)
+    if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     ctx->response_capacity = MAX_BUFFER;
     ctx->response_buffer = (char *)AGENTOS_MALLOC(ctx->response_capacity);
     if (!ctx->response_buffer) {
         AGENTOS_FREE(ctx);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     ctx->response_buffer[0] = '\0';
@@ -405,6 +409,7 @@ static char *handle_complete_stream(cJSON *params, int id, agentos_socket_t clie
 
     AGENTOS_FREE((void *)cfg.model);
     request_context_destroy(ctx);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 

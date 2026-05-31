@@ -26,6 +26,7 @@
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
+#include "error.h"
 
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
@@ -149,8 +150,7 @@ static config_source_t *config_source_create_base(config_source_type_t type, con
                                                   const config_source_adapter_t *adapter)
 {
     config_source_t *source = (config_source_t *)AGENTOS_CALLOC(1, sizeof(config_source_t));
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
 
     // 初始化属
     source->adapter = adapter;
@@ -191,8 +191,7 @@ static void config_source_free_base(config_source_t *source)
  */
 static char *duplicate_string(const char *str)
 {
-    if (!str)
-        return NULL;
+    if (!str) return NULL;
     size_t len = strlen(str);
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
     if (copy) {
@@ -1413,8 +1412,7 @@ static bool file_source_has_changed(config_source_t *source)
  * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t *file_source_get_attributes(config_source_t *source)
 {
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
     return &source->attributes;
 }
 
@@ -1574,8 +1572,7 @@ static bool env_source_has_changed(config_source_t *source)
  * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t *env_source_get_attributes(config_source_t *source)
 {
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
     return &source->attributes;
 }
 
@@ -1684,8 +1681,7 @@ static bool args_source_has_changed(config_source_t *source)
  * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t *args_source_get_attributes(config_source_t *source)
 {
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
     return &source->attributes;
 }
 
@@ -1781,8 +1777,7 @@ static bool memory_source_has_changed(config_source_t *source)
  * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t *memory_source_get_attributes(config_source_t *source)
 {
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
     return &source->attributes;
 }
 
@@ -1869,8 +1864,7 @@ static bool defaults_source_has_changed(config_source_t *source)
  * @param source 配置? * @return 配置源属? */
 static const config_source_attr_t *defaults_source_get_attributes(config_source_t *source)
 {
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
     return &source->attributes;
 }
 
@@ -1978,8 +1972,7 @@ static bool remote_source_has_changed(config_source_t *source)
 
 static const config_source_attr_t *remote_source_get_attributes(config_source_t *source)
 {
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
     return &source->attributes;
 }
 
@@ -2013,19 +2006,18 @@ static const config_source_adapter_t remote_source_adapter = {
 
 config_source_t *config_source_create_file(const config_file_source_options_t *options)
 {
-    if (!options || !options->file_path)
-        return NULL;
+    if (!options || !options->file_path) return NULL;
 
     // 创建配置源基础对象
     config_source_t *source =
         config_source_create_base(CONFIG_SOURCE_FILE, options->file_path, &file_source_adapter);
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
 
     // 创建私有数据
     file_source_priv_t *priv = (file_source_priv_t *)AGENTOS_CALLOC(1, sizeof(file_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2049,6 +2041,7 @@ config_source_t *config_source_create_file(const config_file_source_options_t *o
             AGENTOS_FREE(priv->encoding);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -2076,20 +2069,19 @@ config_source_t *config_source_create_file(const config_file_source_options_t *o
 
 config_source_t *config_source_create_env(const config_env_source_options_t *options)
 {
-    if (!options)
-        return NULL;
+    if (!options) return NULL;
 
     // 创建配置源基础对象
     const char *name = options->prefix ? options->prefix : "env";
     config_source_t *source =
         config_source_create_base(CONFIG_SOURCE_ENV, name, &env_source_adapter);
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
 
     // 创建私有数据
     env_source_priv_t *priv = (env_source_priv_t *)AGENTOS_CALLOC(1, sizeof(env_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2108,6 +2100,7 @@ config_source_t *config_source_create_env(const config_env_source_options_t *opt
             AGENTOS_FREE(priv->prefix);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2121,20 +2114,19 @@ config_source_t *config_source_create_env(const config_env_source_options_t *opt
 
 config_source_t *config_source_create_args(const config_args_source_options_t *options)
 {
-    if (!options || options->argc <= 0 || !options->argv)
-        return NULL;
+    if (!options || options->argc <= 0 || !options->argv) return NULL;
 
     // 创建配置源基础对象
     const char *name = options->prefix ? options->prefix : "args";
     config_source_t *source =
         config_source_create_base(CONFIG_SOURCE_ARGS, name, &args_source_adapter);
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
 
     // 创建私有数据
     args_source_priv_t *priv = (args_source_priv_t *)AGENTOS_CALLOC(1, sizeof(args_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2152,6 +2144,7 @@ config_source_t *config_source_create_args(const config_args_source_options_t *o
             AGENTOS_FREE(priv->prefix);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2164,20 +2157,19 @@ config_source_t *config_source_create_args(const config_args_source_options_t *o
 
 config_source_t *config_source_create_memory(const config_memory_source_options_t *options)
 {
-    if (!options || !options->data)
-        return NULL;
+    if (!options || !options->data) return NULL;
 
     // 创建配置源基础对象
     config_source_t *source =
         config_source_create_base(CONFIG_SOURCE_MEMORY, "memory", &memory_source_adapter);
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
 
     // 创建私有数据
     memory_source_priv_t *priv =
         (memory_source_priv_t *)AGENTOS_CALLOC(1, sizeof(memory_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2195,6 +2187,7 @@ config_source_t *config_source_create_memory(const config_memory_source_options_
             AGENTOS_FREE(priv->format);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2208,20 +2201,19 @@ config_source_t *config_source_create_memory(const config_memory_source_options_
 
 config_source_t *config_source_create_defaults(const char *const *default_values, size_t count)
 {
-    if (!default_values || count == 0)
-        return NULL;
+    if (!default_values || count == 0) return NULL;
 
     // 创建配置源基础对象
     config_source_t *source =
         config_source_create_base(CONFIG_SOURCE_DEFAULT, "defaults", &defaults_source_adapter);
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
 
     // 创建私有数据
     defaults_source_priv_t *priv =
         (defaults_source_priv_t *)AGENTOS_CALLOC(1, sizeof(defaults_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2235,6 +2227,7 @@ config_source_t *config_source_create_defaults(const char *const *default_values
             AGENTOS_FREE(priv->vals);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2257,18 +2250,17 @@ config_source_t *config_source_create_defaults(const char *const *default_values
 config_source_t *config_source_create_remote(const char *url, const char *token, const char *ns,
                                              uint32_t poll_interval_ms)
 {
-    if (!url)
-        return NULL;
+    if (!url) return NULL;
 
     config_source_t *source =
         config_source_create_base(CONFIG_SOURCE_NETWORK, "remote", &remote_source_adapter);
-    if (!source)
-        return NULL;
+    if (!source) return NULL;
 
     remote_source_priv_t *priv =
         (remote_source_priv_t *)AGENTOS_CALLOC(1, sizeof(remote_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2330,6 +2322,7 @@ bool config_source_has_changed(config_source_t *source)
 const config_source_attr_t *config_source_get_attributes(config_source_t *source)
 {
     if (!source || !source->adapter || !source->adapter->get_attributes) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -2354,8 +2347,7 @@ config_source_manager_t *config_source_manager_create(void)
 {
     config_source_manager_t *manager =
         (config_source_manager_t *)AGENTOS_CALLOC(1, sizeof(config_source_manager_t));
-    if (!manager)
-        return NULL;
+    if (!manager) return NULL;
 
     // 初始容量
     manager->capacity = 16;
@@ -2363,6 +2355,7 @@ config_source_manager_t *config_source_manager_create(void)
         (config_source_t **)AGENTOS_CALLOC(manager->capacity, sizeof(config_source_t *));
     if (!manager->sources) {
         AGENTOS_FREE(manager);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -2450,8 +2443,7 @@ config_error_t config_source_manager_remove(config_source_manager_t *manager,
 
 config_source_t *config_source_manager_find(config_source_manager_t *manager, const char *name)
 {
-    if (!manager || !name)
-        return NULL;
+    if (!manager || !name) return NULL;
 
     for (size_t i = 0; i < manager->count; i++) {
         const config_source_attr_t *attr = config_source_get_attributes(manager->sources[i]);
@@ -2460,6 +2452,7 @@ config_source_t *config_source_manager_find(config_source_manager_t *manager, co
         }
     }
 
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -2630,16 +2623,14 @@ const char *config_parse_file_format(const char *file_path)
 
 char *config_source_create_name(config_source_type_t type, const char *identifier)
 {
-    if (!identifier)
-        return NULL;
+    if (!identifier) return NULL;
 
     const char *type_str = config_source_type_to_string(type);
     size_t type_len = strlen(type_str);
     size_t id_len = strlen(identifier);
 
     char *name = (char *)AGENTOS_MALLOC(type_len + id_len + 2);  // +2 for ':' and null terminator
-    if (!name)
-        return NULL;
+    if (!name) return NULL;
 
     snprintf(name, type_len + id_len + 2, "%s:%s", type_str, identifier);
     return name;

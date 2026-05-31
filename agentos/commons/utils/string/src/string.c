@@ -21,6 +21,7 @@
 #include <string.h>
 #include <wchar.h>
 #include <wctype.h>
+#include "error.h"
 
 #ifdef _WIN32
 #include <locale.h>
@@ -307,6 +308,7 @@ size_t string_length(const char *str, size_t max_len)
 const char *string_find(const char *haystack, const char *needle, int options)
 {
     if (haystack == NULL || needle == NULL || needle[0] == '\0') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
@@ -322,6 +324,7 @@ const char *string_find(const char *haystack, const char *needle, int options)
             h++;
         }
 
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     } else {
         // 区分大小写查
@@ -332,6 +335,7 @@ const char *string_find(const char *haystack, const char *needle, int options)
 const char *string_find_last(const char *haystack, const char *needle, int options)
 {
     if (haystack == NULL || needle == NULL || needle[0] == '\0') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -339,6 +343,7 @@ const char *string_find_last(const char *haystack, const char *needle, int optio
     size_t needle_len = strlen(needle);
 
     if (needle_len > haystack_len) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -358,6 +363,7 @@ const char *string_find_last(const char *haystack, const char *needle, int optio
 const char *string_find_char(const char *str, char ch)
 {
     if (str == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -367,6 +373,7 @@ const char *string_find_char(const char *str, char ch)
 const char *string_find_char_last(const char *str, char ch)
 {
     if (str == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -403,6 +410,7 @@ char *string_trim(char *str)
 char *string_trim_start(char *str)
 {
     if (str == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -438,6 +446,7 @@ char *string_trim_end(char *str)
 char *string_to_lower(char *str)
 {
     if (str == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -453,6 +462,7 @@ char *string_to_lower(char *str)
 char *string_to_upper(char *str)
 {
     if (str == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -954,6 +964,7 @@ int string_format_v(char *buffer, size_t buffer_size, const char *format, va_lis
 char *string_alloc_format(const char *format, ...)
 {
     if (format == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -968,6 +979,7 @@ char *string_alloc_format(const char *format, ...)
 char *string_alloc_format_v(const char *format, va_list args)
 {
     if (format == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -979,6 +991,7 @@ char *string_alloc_format_v(const char *format, va_list args)
 
     if (needed < 0) {
         string_set_error(STRING_ERROR_FORMAT, "format failed");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -986,6 +999,7 @@ char *string_alloc_format_v(const char *format, va_list args)
     char *buffer = (char *)AGENTOS_MALLOC((size_t)needed + 1);
     if (buffer == NULL) {
         string_set_error(STRING_ERROR_MEMORY_ALLOCATION, "内存分配失败");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -999,6 +1013,7 @@ char *string_alloc_format_v(const char *format, va_list args)
     if (result < 0) {
         AGENTOS_FREE(buffer);
         string_set_error(STRING_ERROR_FORMAT, "format failed");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1008,6 +1023,7 @@ char *string_alloc_format_v(const char *format, va_list args)
 char *string_alloc_copy(const char *str)
 {
     if (str == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1015,6 +1031,7 @@ char *string_alloc_copy(const char *str)
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
     if (copy == NULL) {
         string_set_error(STRING_ERROR_MEMORY_ALLOCATION, "内存分配失败");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1027,6 +1044,7 @@ char *string_alloc_copy(const char *str)
 char *string_alloc_copy_n(const char *str, size_t len)
 {
     if (str == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1034,6 +1052,7 @@ char *string_alloc_copy_n(const char *str, size_t len)
     char *copy = (char *)AGENTOS_MALLOC(actual_len + 1);
     if (copy == NULL) {
         string_set_error(STRING_ERROR_MEMORY_ALLOCATION, "内存分配失败");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1046,6 +1065,7 @@ char *string_alloc_copy_n(const char *str, size_t len)
 char *string_alloc_concat(const char *str1, const char *str2)
 {
     if (str1 == NULL && str2 == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1055,6 +1075,7 @@ char *string_alloc_concat(const char *str1, const char *str2)
     char *result = (char *)AGENTOS_MALLOC(len1 + len2 + 1);
     if (result == NULL) {
         string_set_error(STRING_ERROR_MEMORY_ALLOCATION, "内存分配失败");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1080,6 +1101,7 @@ string_buffer_t *string_buffer_create(size_t initial_capacity, string_encoding_t
     string_buffer_t *buffer = (string_buffer_t *)AGENTOS_MALLOC(sizeof(string_buffer_t));
     if (buffer == NULL) {
         string_set_error(STRING_ERROR_MEMORY_ALLOCATION, "内存分配失败");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
@@ -1087,6 +1109,7 @@ string_buffer_t *string_buffer_create(size_t initial_capacity, string_encoding_t
     if (buffer->data == NULL) {
         AGENTOS_FREE(buffer);
         string_set_error(STRING_ERROR_MEMORY_ALLOCATION, "内存分配失败");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
@@ -1245,6 +1268,7 @@ void string_buffer_clear(string_buffer_t *buffer)
 const char *string_buffer_cstr(const string_buffer_t *buffer)
 {
     if (buffer == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -1339,11 +1363,13 @@ ssize_t string_view_find(const string_view_t *haystack, const string_view_t *nee
 char *string_view_to_cstr(const string_view_t *view)
 {
     if (view == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
     char *str = (char *)AGENTOS_MALLOC(view->length + 1);
     if (str == NULL) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 

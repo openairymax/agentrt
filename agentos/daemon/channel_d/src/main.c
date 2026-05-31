@@ -1,6 +1,5 @@
 #include "atomic_compat.h"
 #include "channel_service.h"
-#include "error.h"
 #include "logging.h"
 #include "memory_compat.h"
 #include "svc_logger.h"
@@ -11,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "error.h"
 
 static atomic_int g_running = 1;
 static channel_service_t *g_svc __attribute__((unused)) = NULL;

@@ -56,8 +56,7 @@ static uint64_t generate_id(taskflow_engine_t *engine)
 taskflow_engine_t *taskflow_engine_create(void)
 {
     taskflow_engine_t *engine = (taskflow_engine_t *)AGENTOS_CALLOC(1, sizeof(taskflow_engine_t));
-    if (!engine)
-        return NULL;
+    if (!engine) return NULL;
     engine->handler_count = 0;
     engine->workflow_count = 0;
     engine->execution_count = 0;
@@ -218,17 +217,18 @@ static taskflow_workflow_t *find_workflow(taskflow_engine_t *engine, const char 
         if (strcmp(engine->workflows[i].workflow.id, workflow_id) == 0)
             return &engine->workflows[i].workflow;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
 static handler_entry_t *find_handler(taskflow_engine_t *engine, const char *name)
 {
-    if (!name)
-        return NULL;
+    if (!name) return NULL;
     for (size_t i = 0; i < engine->handler_count; i++) {
         if (strcmp(engine->handlers[i].name, name) == 0)
             return &engine->handlers[i];
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 

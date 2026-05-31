@@ -1,11 +1,11 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "agentos_event_loop.h"
 #include "atomic_compat.h"
-#include "error.h"
 #include "logging.h"
 #include "platform.h"
 #include "svc_logger.h"
@@ -179,6 +179,7 @@ static void *info_d_collect_loop(void *arg)
 #ifdef _WIN32
         return 1;
 #else
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
 #endif
     }

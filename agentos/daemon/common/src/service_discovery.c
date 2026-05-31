@@ -13,7 +13,6 @@
 
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "memory_compat.h"
 #include "platform.h"
 #include "safe_string_utils.h"
@@ -22,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 /* ==================== 内部常量 ==================== */
 
@@ -292,8 +292,11 @@ AGENTOS_API sd_config_t sd_create_default_config(void)
 AGENTOS_API service_discovery_t sd_create(const sd_config_t *config)
 {
     sd_internal_t *sd = (sd_internal_t *)AGENTOS_CALLOC(1, sizeof(sd_internal_t));
-    if (!sd)
+    if (!sd) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     if (config) {
         memcpy(&sd->config, config, sizeof(sd_config_t));
@@ -304,6 +307,7 @@ AGENTOS_API service_discovery_t sd_create(const sd_config_t *config)
     agentos_error_t err = agentos_mutex_init(&sd->mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(sd);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 

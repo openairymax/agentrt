@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 typedef struct weighted_data {
     weighted_config_t manager;
@@ -98,18 +99,17 @@ agentos_dispatching_weighted_create(const weighted_config_t *manager, void *regi
                                     agent_registry_get_agents_func get_agents_func)
 {
 
-    if (!get_agents_func)
-        return NULL;
+    if (!get_agents_func) return NULL;
 
     agentos_dispatching_strategy_t *strat =
         (agentos_dispatching_strategy_t *)AGENTOS_MALLOC(sizeof(agentos_dispatching_strategy_t));
-    if (!strat)
-        return NULL;
+    if (!strat) return NULL;
     memset(strat, 0, sizeof(*strat));
 
     weighted_data_t *data = (weighted_data_t *)AGENTOS_MALLOC(sizeof(weighted_data_t));
     if (!data) {
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     memset(data, 0, sizeof(*data));
@@ -128,6 +128,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *manager, void *regi
     if (!data->lock) {
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

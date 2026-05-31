@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #define FW_MAX_CALLBACKS 8
 #define FW_MAX_NAME_LEN 32
@@ -127,8 +128,10 @@ AGENTOS_API agentos_fw_manager_t agentos_fw_manager_create(void)
 {
     fw_manager_internal_t *mgr =
         (fw_manager_internal_t *)AGENTOS_CALLOC(1, sizeof(fw_manager_internal_t));
-    if (!mgr)
+    if (!mgr) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     for (int i = 0; i < AGENTOS_FW_COUNT; i++) {
         init_fw_info(&mgr->frameworks[i], (agentos_framework_t)i);

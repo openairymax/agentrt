@@ -111,8 +111,7 @@ void sandbox_release_resource(agentos_sandbox_t *sandbox, int syscall_num, void 
 
 char *sandbox_generate_args_hash(void *args)
 {
-    if (!args)
-        return NULL;
+    if (!args) return NULL;
 
     unsigned char *bytes = (unsigned char *)args;
     uint32_t hash = 5381;

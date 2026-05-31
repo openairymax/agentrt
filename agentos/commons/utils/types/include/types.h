@@ -411,6 +411,8 @@ typedef enum {
     AGENTOS_AGENT_OFFICIAL = 2   /**< 官方维护 */
 } agentos_agent_level_t;
 
+#ifndef AGENTOS_CAPABILITY_T_DEFINED
+#define AGENTOS_CAPABILITY_T_DEFINED
 /**
  * @brief Agent 能力结构
  */
@@ -423,6 +425,7 @@ typedef struct {
     uint32_t avg_duration_ms;  /**< 平均执行时间 */
     float success_rate;        /**< 成功率 */
 } agentos_capability_t;
+#endif
 
 /**
  * @brief Agent 模型配置

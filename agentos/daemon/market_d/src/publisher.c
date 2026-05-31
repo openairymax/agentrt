@@ -5,12 +5,12 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "error.h"
 #include "market_service.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 int publisher_publish_agent(market_service_t *service, const agent_info_t *agent_info)
 {

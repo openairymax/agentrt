@@ -1,11 +1,11 @@
 #include "gateway_mcp_server.h"
 
-#include "error.h"
 #include "memory_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #define GW_MCP_MAX_TOOLS 256
 #define GW_MCP_MAX_RESOURCES 128
@@ -46,8 +46,11 @@ static int handle_mcp_request(const char *method, const char *path, const char *
 gw_mcp_server_t *gw_mcp_server_create(const gw_mcp_server_config_t *config)
 {
     gw_mcp_server_t *server = (gw_mcp_server_t *)AGENTOS_CALLOC(1, sizeof(gw_mcp_server_t));
-    if (!server)
+    if (!server) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     if (config) {
         server->config = *config;
     } else {
@@ -154,6 +157,7 @@ static gw_mcp_tool_entry_t *find_tool(gw_mcp_server_t *server, const char *name)
             return &server->tools[i];
         }
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -164,6 +168,7 @@ static gw_mcp_resource_entry_t *find_resource(gw_mcp_server_t *server, const cha
             return &server->resources[i];
         }
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -171,8 +176,11 @@ static char *build_tools_list_json(gw_mcp_server_t *server)
 {
     size_t buf_size = 4096 + server->tool_count * 1024;
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
-    if (!buf)
+    if (!buf) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null buffer");
+
         return NULL;
+    }
 
     size_t pos = 0;
     pos += snprintf(buf + pos, buf_size - pos, "{\"tools\":[");
@@ -191,8 +199,11 @@ static char *build_resources_list_json(gw_mcp_server_t *server)
 {
     size_t buf_size = 4096 + server->resource_count * 1024;
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
-    if (!buf)
+    if (!buf) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null buffer");
+
         return NULL;
+    }
 
     size_t pos = 0;
     pos += snprintf(buf + pos, buf_size - pos, "{\"resources\":[");
@@ -211,25 +222,40 @@ static char *build_resources_list_json(gw_mcp_server_t *server)
 
 static char *extract_jsonrpc_method(const char *body)
 {
-    if (!body)
+    if (!body) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     const char *key = "\"method\"";
     const char *p = strstr(body, key);
-    if (!p)
+    if (!p) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
-    if (*p != '"')
+    if (*p != '"') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p++;
     const char *end = strchr(p, '"');
-    if (!end)
+    if (!end) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t len = (size_t)(end - p);
     char *method = (char *)AGENTOS_MALLOC(len + 1);
-    if (!method)
+    if (!method) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     memcpy(method, p, len);
     method[len] = '\0';
     return method;
@@ -237,43 +263,63 @@ static char *extract_jsonrpc_method(const char *body)
 
 static char *__attribute__((used)) extract_jsonrpc_id(const char *body)
 {
-    if (!body)
+    if (!body) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     const char *key = "\"id\"";
     const char *p = strstr(body, key);
-    if (!p)
+    if (!p) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p == '"') {
         p++;
         const char *end = strchr(p, '"');
-        if (!end)
+        if (!end) {
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
             return NULL;
+        }
         size_t len = (size_t)(end - p);
         char *id = (char *)AGENTOS_MALLOC(len + 1);
-        if (!id)
+        if (!id) {
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
             return NULL;
+        }
         memcpy(id, p, len);
         id[len] = '\0';
         return id;
     }
     char *endptr = NULL;
     long val = strtol(p, &endptr, 10);
-    if (endptr == p)
+    if (endptr == p) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
+    }
     char *id = (char *)AGENTOS_MALLOC(32);
-    if (!id)
+    if (!id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(id, 32, "%ld", val);
     return id;
 }
 
 static char *extract_jsonrpc_params(const char *body)
 {
-    if (!body)
+    if (!body) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     const char *key = "\"params\"";
     const char *p = strstr(body, key);
     if (!p)
@@ -310,25 +356,40 @@ static char *extract_jsonrpc_params(const char *body)
 
 static char *extract_tool_name_from_params(const char *params_json)
 {
-    if (!params_json)
+    if (!params_json) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     const char *key = "\"name\"";
     const char *p = strstr(params_json, key);
-    if (!p)
+    if (!p) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
-    if (*p != '"')
+    if (*p != '"') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p++;
     const char *end = strchr(p, '"');
-    if (!end)
+    if (!end) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t len = (size_t)(end - p);
     char *name = (char *)AGENTOS_MALLOC(len + 1);
-    if (!name)
+    if (!name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     memcpy(name, p, len);
     name[len] = '\0';
     return name;
@@ -374,25 +435,40 @@ static char *extract_tool_args_from_params(const char *params_json)
 
 static char *extract_resource_uri_from_params(const char *params_json)
 {
-    if (!params_json)
+    if (!params_json) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     const char *key = "\"uri\"";
     const char *p = strstr(params_json, key);
-    if (!p)
+    if (!p) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
-    if (*p != '"')
+    if (*p != '"') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p++;
     const char *end = strchr(p, '"');
-    if (!end)
+    if (!end) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t len = (size_t)(end - p);
     char *uri = (char *)AGENTOS_MALLOC(len + 1);
-    if (!uri)
+    if (!uri) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     memcpy(uri, p, len);
     uri[len] = '\0';
     return uri;
@@ -559,8 +635,11 @@ static int handle_mcp_request(const char *method, const char *path, const char *
 
 gw_proto_request_handler_t gw_mcp_server_get_handler(gw_mcp_server_t *server)
 {
-    if (!server)
+    if (!server) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     return handle_mcp_request;
 }
 

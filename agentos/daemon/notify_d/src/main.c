@@ -1,10 +1,10 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "atomic_compat.h"
-#include "error.h"
 #include "platform.h"
 #include "svc_logger.h"
 
@@ -344,6 +344,7 @@ static DWORD WINAPI notify_d_event_loop(LPVOID arg)
     notify_d_service_t *svc = (notify_d_service_t *)arg;
     if (!svc) {
 #ifndef _WIN32
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
 #else
         return 1;
@@ -421,6 +422,7 @@ static notify_client_t *notify_d_find_client_slot(notify_d_service_t *svc)
     }
     if (svc->client_count < NOTIFY_D_MAX_CLIENTS)
         return &svc->clients[svc->client_count];
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     return NULL;
 }
 
@@ -700,7 +702,7 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 #endif
 
     agentos_log_init(NULL);
-    atexit(agentos_log_shutdown);
+    atexit(log_cleanup);
 
     if (notify_d_init(&g_service, NOTIFY_D_DEFAULT_PORT, NOTIFY_D_DEFAULT_SOCKET) !=
         AGENTOS_SUCCESS)
@@ -719,5 +721,6 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 
     notify_d_stop(&g_service, g_shutdown ? 1 : 0);
     notify_d_destroy(&g_service);
+    log_cleanup();
     return 0;
 }

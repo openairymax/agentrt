@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Docker 镜像构建脚本
-# 用法�?/build.sh [kernel|service|all] [dev|release]
+AgentOS Docker Image Build Script
+# Usage: ./build.sh [kernel|service|all] [dev|release]
 
 set -e
 
@@ -13,32 +13,33 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 配置变量
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"pwd)")
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "${AGENTOS_SCRIPT_DIR}")"
 AGENTOS_PROJECT_ROOT="$(dirname "${AGENTOS_SCRIPTS_DIR}")"
-VERSION="1.0.0.6"
+VERSION="0.1.0"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-spharx}"
 KERNEL_IMAGE="${DOCKER_REGISTRY}/agentos-kernel"
 SERVICE_IMAGE="${DOCKER_REGISTRY}/agentos-services"
 
-# 打印帮助信息
+# Print usage information
 print_usage() {
+
     cat << EOF
-用法�?0 [选项] [目标]
+Usage: $0 [options] [target]
 
 目标:
     kernel      构建内核镜像 (默认)
     service     构建服务镜像
-    all         构建所有镜�?
+    all         Build all images
 
 构建类型:
-    dev         开发版�?(包含调试工具)
-    release     生产版本 (优化大小)
+    dev         Development (with debug tools)
+    release     Production (optimized size)
 
 示例:
     $0 kernel dev       # 构建开发版内核镜像
-    $0 service release  # 构建生产版服务镜�?
-    $0 all              # 构建所有镜�?(默认 release)
+    $0 service release  # Build production service image
+    $0 all              # Build all images (default release)
 
 EOF
 }
@@ -60,31 +61,31 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检�?Docker 是否安装
+# Check if Docker is installed
 check_docker() {
     if ! command -v docker &> /dev/null; then
-        log_error "Docker 未安装，请先安装 Docker"
+        log_error "Docker not installed, please install Docker first"
         exit 1
     fi
 
     if ! docker info &> /dev/null; then
-        log_error "Docker 未运行，请启�?Docker 服务"
+        log_error "Docker not running, please start Docker service"
         exit 1
     fi
 
-    log_info "Docker 版本�?(docker --version)"
+    log_info "Docker version: $(docker --version)"
 }
 
 # 构建内核镜像
 build_kernel() {
     local build_type="${1:-release}"
 
-    log_info "开始构�?AgentOS 内核镜像 (${build_type})..."
+    log_info "Building AgentOS kernel image (${build_type})..."
 
     cd "${AGENTOS_PROJECT_ROOT}"
 
     if [ "${build_type}" = "dev" ]; then
-        # 开发版本：包含所有调试工�?
+        # Development version: with all debug tools
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.kernel" \
             -t ${KERNEL_IMAGE}:${VERSION}-dev \
@@ -103,7 +104,7 @@ build_kernel() {
             .
     fi
 
-    log_success "内核镜像构建完成"
+Kernel image build complete
     docker images | grep agentos-kernel
 }
 
@@ -115,14 +116,14 @@ build_service() {
 
     cd "${AGENTOS_PROJECT_ROOT}"
 
-    # 确保内核镜像已存�?
+# Ensure kernel image exists
     if ! docker image inspect ${KERNEL_IMAGE}:${VERSION} &> /dev/null; then
-        log_warning "内核镜像不存在，先构建内核镜�?
+Kernel image not found, building first
         build_kernel "release"
     fi
 
     if [ "${build_type}" = "dev" ]; then
-        # 开发版�?
+# Development version
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.service" \
             -t ${SERVICE_IMAGE}:${VERSION}-dev \
@@ -139,11 +140,11 @@ build_service() {
             .
     fi
 
-    log_success "服务镜像构建完成"
+Service image build complete
     docker images | grep agentos-services
 }
 
-# 构建所有镜�?
+# Build all images
 build_all() {
     local build_type="${1:-release}"
 
@@ -152,25 +153,25 @@ build_all() {
     build_kernel "${build_type}"
     build_service "${build_type}"
 
-    log_success "所有镜像构建完�?
+All images build complete
 
     # 显示镜像列表
     echo ""
-    log_info "当前 AgentOS 镜像:"
+Current AgentOS images:
     docker images | grep agentos
 }
 
-# 清理旧镜�?
+# Clean up old images
 cleanup_images() {
-    log_info "清理旧的 AgentOS 镜像..."
+Cleaning up old AgentOS images...
 
     # 删除悬空镜像
     docker image prune -f
 
-    log_success "清理完成"
+Clean up complete
 }
 
-# 主函�?
+# Main function
 main() {
     local target="${1:-kernel}"
     local build_type="${2:-release}"
@@ -208,7 +209,7 @@ main() {
     esac
 
     echo ""
-    log_success "构建完成�?
+    log_success "构建完成�?"
     echo ""
 
     # 提示

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
@@ -259,6 +260,7 @@ struct tm *localtime_r(const time_t *timer, struct tm *buf)
 {
     if (localtime_s(buf, timer) == 0)
         return buf;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 #endif

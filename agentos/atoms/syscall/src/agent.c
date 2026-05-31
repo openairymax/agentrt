@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 static agentos_cognition_engine_t *g_cognition_engine = NULL;
 
@@ -56,6 +57,7 @@ static agentos_cognition_engine_t *ensure_cognition_engine(void)
     agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &g_cognition_engine);
     if (err != AGENTOS_SUCCESS || !g_cognition_engine) {
         g_cognition_engine = NULL;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     return g_cognition_engine;
@@ -63,8 +65,7 @@ static agentos_cognition_engine_t *ensure_cognition_engine(void)
 
 static char *build_memory_context(const char *input)
 {
-    if (!input)
-        return NULL;
+    if (!input) return NULL;
     char **record_ids = NULL;
     float *scores = NULL;
     size_t count = 0;
@@ -74,6 +75,7 @@ static char *build_memory_context(const char *input)
             agentos_sys_free(record_ids);
         if (scores)
             agentos_sys_free(scores);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
     size_t ctx_max = count * 256 + 64;
@@ -81,6 +83,7 @@ static char *build_memory_context(const char *input)
     if (!ctx) {
         agentos_sys_free(record_ids);
         agentos_sys_free(scores);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     size_t pos = 0;
@@ -99,12 +102,10 @@ static char *build_memory_context(const char *input)
 
 static char *serialize_task_plan(agentos_task_plan_t *plan)
 {
-    if (!plan)
-        return NULL;
+    if (!plan) return NULL;
     size_t buf_max = 4096 + plan->task_plan_node_count * 512;
     char *buf = (char *)AGENTOS_MALLOC(buf_max);
-    if (!buf)
-        return NULL;
+    if (!buf) return NULL;
     size_t pos = 0;
     pos += snprintf(buf + pos, buf_max - pos,
                     "{\"plan_id\":\"%s\",\"node_count\":%zu,\"entry_count\":%zu,\"nodes\":[",

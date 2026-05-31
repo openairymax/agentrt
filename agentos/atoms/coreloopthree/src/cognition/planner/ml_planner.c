@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 /**
  * @brief ML model handle (for future ML runtime integration)
@@ -451,12 +452,12 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
 
     agentos_plan_strategy_t *strat =
         (agentos_plan_strategy_t *)AGENTOS_MALLOC(sizeof(agentos_plan_strategy_t));
-    if (!strat)
-        return NULL;
+    if (!strat) return NULL;
 
     ml_planner_data_t *data = (ml_planner_data_t *)AGENTOS_CALLOC(1, sizeof(ml_planner_data_t));
     if (!data) {
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -465,6 +466,7 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
     if (model_path && !data->model_path) {
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     data->llm = llm;
@@ -475,6 +477,7 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
             AGENTOS_FREE(data->model_path);
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

@@ -24,6 +24,7 @@
 
 /* LLM客户端接口 — BAN-35合规：使用本地副本 */
 #include "llm_client.h"
+#include "error.h"
 
 typedef struct {
     agentos_thinking_chain_t *chain;
@@ -686,8 +687,7 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
 
     agentos_task_plan_t *plan =
         (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
-    if (!plan)
-        return NULL;
+    if (!plan) return NULL;
 
     char plan_id[128];
     snprintf(plan_id, sizeof(plan_id), "fallback_%zu", session_count);
@@ -699,6 +699,7 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
     if (!plan->task_plan_nodes) {
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

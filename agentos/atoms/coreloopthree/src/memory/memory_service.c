@@ -39,8 +39,7 @@ static agentos_memory_record_t *deep_copy_record(const agentos_memory_record_t *
 {
     agentos_memory_record_t *copy =
         (agentos_memory_record_t *)AGENTOS_CALLOC(1, sizeof(agentos_memory_record_t));
-    if (!copy)
-        return NULL;
+    if (!copy) return NULL;
 
     if (record->memory_record_id) {
         copy->memory_record_id = AGENTOS_STRDUP(record->memory_record_id);

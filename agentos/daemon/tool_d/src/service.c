@@ -28,12 +28,14 @@ tool_service_t *tool_service_create(const char *config_path __attribute__((unuse
     tool_service_t *svc = (tool_service_t *)AGENTOS_CALLOC(1, sizeof(tool_service_t));
     if (!svc) {
         SVC_LOG_ERROR("Failed to allocate tool service");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     if (agentos_mutex_init(&svc->lock) != 0) {
         SVC_LOG_ERROR("Failed to initialize service lock");
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -43,6 +45,7 @@ tool_service_t *tool_service_create(const char *config_path __attribute__((unuse
         SVC_LOG_ERROR("Failed to create registry");
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -57,6 +60,7 @@ tool_service_t *tool_service_create(const char *config_path __attribute__((unuse
         tool_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -68,6 +72,7 @@ tool_service_t *tool_service_create(const char *config_path __attribute__((unuse
         tool_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -153,8 +158,10 @@ int tool_service_unregister(tool_service_t *svc, const char *tool_id)
 
 tool_metadata_t *tool_service_get(tool_service_t *svc, const char *tool_id)
 {
-    if (!svc || !tool_id)
+    if (!svc || !tool_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     agentos_mutex_lock(&svc->lock);
     tool_metadata_t *meta = tool_registry_get(svc->registry, tool_id);
@@ -165,8 +172,10 @@ tool_metadata_t *tool_service_get(tool_service_t *svc, const char *tool_id)
 
 char *tool_service_list(tool_service_t *svc)
 {
-    if (!svc)
+    if (!svc) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     agentos_mutex_lock(&svc->lock);
     char *json = tool_registry_list_json(svc->registry);
@@ -183,6 +192,7 @@ char *tool_service_list(tool_service_t *svc)
 static tool_metadata_t *get_tool_metadata(tool_service_t *svc, const char *tool_id)
 {
     if (!svc || !tool_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -220,15 +230,18 @@ static tool_result_t *get_cached_result(tool_service_t *svc, tool_metadata_t *me
                                         const char *tool_id, const char *params_json)
 {
     if (!svc || !meta || !tool_id || !params_json) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     if (!meta->cacheable) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     char *cache_key = tool_cache_key(tool_id, params_json);
     if (!cache_key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -247,6 +260,7 @@ static tool_result_t *get_cached_result(tool_service_t *svc, tool_metadata_t *me
 
     AGENTOS_FREE(cache_key);
     cache_key = NULL;
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
