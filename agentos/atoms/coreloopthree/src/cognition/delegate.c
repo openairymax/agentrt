@@ -8,6 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 static agentos_mutex_t g_delegate_mutex;
 static atomic_int g_delegate_mutex_initialized = 0;
@@ -169,17 +174,17 @@ agentos_error_t agentos_delegate_assign(agentos_delegate_task_t *task,
                                         agentos_tool_execute_fn executor, void *user_data)
 {
     if (!task || !executor)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     ensure_mutex_init();
     agentos_mutex_lock(&g_delegate_mutex);
     if (task->state != AGENTOS_DELEGATE_IDLE) {
         agentos_mutex_unlock(&g_delegate_mutex);
-        return AGENTOS_EBUSY;
+        ATM_RET_ERR(AGENTOS_EBUSY);
     }
     if (g_delegate_depth >= task->config.max_depth) {
         agentos_mutex_unlock(&g_delegate_mutex);
-        return AGENTOS_EPERM;
+        ATM_RET_ERR(AGENTOS_EPERM);
     }
 
     task->state = AGENTOS_DELEGATE_RUNNING;
@@ -219,7 +224,7 @@ agentos_error_t agentos_delegate_collect(agentos_delegate_task_t *task, char **o
                                          size_t *out_result_len)
 {
     if (!task || !out_result)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     ensure_mutex_init();
     agentos_mutex_lock(&g_delegate_mutex);
@@ -227,7 +232,7 @@ agentos_error_t agentos_delegate_collect(agentos_delegate_task_t *task, char **o
     agentos_mutex_unlock(&g_delegate_mutex);
 
     if (st == AGENTOS_DELEGATE_IDLE || st == AGENTOS_DELEGATE_RUNNING) {
-        return AGENTOS_EBUSY;
+        ATM_RET_ERR(AGENTOS_EBUSY);
     }
 
     if (task->result && task->result_len > 0) {
@@ -248,14 +253,14 @@ agentos_error_t agentos_delegate_collect(agentos_delegate_task_t *task, char **o
 agentos_error_t agentos_delegate_cancel(agentos_delegate_task_t *task)
 {
     if (!task)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     ensure_mutex_init();
     agentos_mutex_lock(&g_delegate_mutex);
     if (task->state == AGENTOS_DELEGATE_COMPLETED || task->state == AGENTOS_DELEGATE_FAILED ||
         task->state == AGENTOS_DELEGATE_CANCELLED) {
         agentos_mutex_unlock(&g_delegate_mutex);
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     task->state = AGENTOS_DELEGATE_CANCELLED;

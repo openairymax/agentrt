@@ -25,6 +25,11 @@
 /* LLM客户端接口 — BAN-35合规：使用本地副本 */
 #include "llm_client.h"
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct {
     agentos_thinking_chain_t *chain;
@@ -50,7 +55,7 @@ static agentos_error_t real_s2_generate(const char *input, size_t in_len, char *
                                         size_t *out_len, void *user_data)
 {
     if (!input || !output || !out_len)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     reflective_context_t *ctx = (reflective_context_t *)user_data;
 
@@ -69,7 +74,7 @@ static agentos_error_t real_s2_generate(const char *input, size_t in_len, char *
     size_t buf_size = in_len + 256;
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     int written = snprintf(buf, buf_size,
                            "[Reflective Analysis of: %.*s]\n"
@@ -140,12 +145,12 @@ static int real_s1_verify(const char *content, size_t len, float confidence, voi
 static __attribute__((unused)) agentos_error_t reflective_plan_init(void **out_context)
 {
     if (!out_context)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     reflective_context_t *ctx =
         (reflective_context_t *)AGENTOS_CALLOC(1, sizeof(reflective_context_t));
     if (!ctx)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     ctx->chain = NULL;
     ctx->meta = NULL;
@@ -186,7 +191,7 @@ static agentos_error_t reflective_plan(const agentos_intent_t *intent, void *con
 {
 
     if (!intent || !out_plan)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     reflective_context_t *ctx = (reflective_context_t *)context;
 
@@ -416,7 +421,7 @@ static agentos_error_t reflective_plan(const agentos_intent_t *intent, void *con
     }
 
     if (!plan)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     return AGENTOS_SUCCESS;
 }
 
@@ -439,7 +444,7 @@ static agentos_error_t parse_llm_plan_json(const char *json_text, llm_plan_node_
 
     *node_count = 0;
     if (!json_text || !nodes)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     const char *p = json_text;
 
@@ -521,10 +526,10 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
 {
 
     if (!ctx || !intent || !out_plan)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (!ctx->llm || !agentos_llm_service_is_available(ctx->llm)) {
-        return AGENTOS_ESERVICE;
+        ATM_RET_ERR(AGENTOS_ESERVICE);
     }
 
     char prompt[2048];
@@ -548,7 +553,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
         audit_passed ? "passed" : "FAILED", aligned ? "aligned" : "DRIFTED");
 
     if (plen <= 0 || (size_t)plen >= sizeof(prompt))
-        return AGENTOS_EUNKNOWN;
+        ATM_RET_ERR(AGENTOS_EUNKNOWN);
 
     char *response = NULL;
     agentos_error_t err = agentos_llm_service_call(ctx->llm, prompt, &response);
@@ -570,7 +575,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
     agentos_task_plan_t *plan =
         (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
     if (!plan)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     char plan_id[128];
     snprintf(plan_id, sizeof(plan_id), "llm_dynamic_%zu", ctx->session_count);
@@ -587,7 +592,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
     if (!plan->task_plan_nodes && total > 0) {
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     for (size_t i = 0; i < parsed_count; i++) {

@@ -331,14 +331,22 @@ extern "C" {
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG(fmt, ...) fprintf(stderr, "[CUPOLAS] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
 
 /**
  * @brief Log error message
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG_ERROR(fmt, ...) fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_ERROR(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
 
 /**
  * @brief Log debug message (stripped in release builds)
@@ -346,7 +354,11 @@ extern "C" {
  * @param ... Format arguments
  * @note Only emitted when debugging is enabled
  */
-#define CUPOLAS_LOG_DEBUG(fmt, ...) fprintf(stderr, "[CUPOLAS DEBUG] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_DEBUG(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS DEBUG] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
 
 #else
 
@@ -354,7 +366,11 @@ extern "C" {
 #define CUPOLAS_LOG(fmt, ...) ((void)0)
 
 /** @brief Error logging always enabled even in release builds */
-#define CUPOLAS_LOG_ERROR(fmt, ...) fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_ERROR(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
 
 /** @brief Disabled debug logging noop */
 #define CUPOLAS_LOG_DEBUG(fmt, ...) ((void)0)

@@ -15,6 +15,11 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /**
  * @brief 轮询调度策略内部结构
@@ -58,7 +63,7 @@ static agentos_error_t rr_select(const agentos_task_node_t __attribute__((unused
 
     struct agentos_round_robin_dispatch *rr = (struct agentos_round_robin_dispatch *)context;
     if (!rr || !out_agent_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agent_info_t **agents = NULL;
     size_t agent_count = 0;
@@ -72,7 +77,7 @@ static agentos_error_t rr_select(const agentos_task_node_t __attribute__((unused
         if (err != AGENTOS_SUCCESS)
             return err;
         if (agent_count == 0)
-            return AGENTOS_ENOENT;
+            ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
     size_t next_index;
@@ -86,7 +91,7 @@ static agentos_error_t rr_select(const agentos_task_node_t __attribute__((unused
         return *out_agent_id ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
 
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 /**

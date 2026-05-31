@@ -17,6 +17,11 @@
 
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 静态全局状态 ==================== */
 
@@ -102,7 +107,7 @@ int scheduler_core_init(void)
     if (!g_ctx_init_lock) {
         void *new_lock = agentos_mutex_create();
         if (!new_lock)
-            return AGENTOS_EINVAL;
+            ATM_RET_ERR(AGENTOS_EINVAL);
 
         void *expected = NULL;
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&g_ctx_init_lock, &expected,
@@ -122,7 +127,7 @@ int scheduler_core_init(void)
     g_core_ctx = create_core_ctx();
     if (!g_core_ctx) {
         agentos_mutex_unlock(g_ctx_init_lock);
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     atomic_store_explicit(&g_core_ctx->initialized, 1, memory_order_release);
@@ -259,10 +264,10 @@ void scheduler_core_task_info_destroy(task_info_core_t *info)
 int scheduler_core_task_table_add(task_info_core_t *info)
 {
     if (!g_core_ctx || !info)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (g_core_ctx->task_count >= TASK_TABLE_CAPACITY) {
-        return AGENTOS_EINVAL; /* 表已?*/
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     g_core_ctx->task_table[g_core_ctx->task_count++] = info;

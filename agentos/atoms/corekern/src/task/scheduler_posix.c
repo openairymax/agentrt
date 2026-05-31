@@ -22,6 +22,11 @@
 
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 内部类型定义 ==================== */
 
@@ -92,7 +97,7 @@ static int map_priority_to_posix(int agentos_priority, int *sched_policy, struct
 
         if (min_prio == -1 || max_prio == -1) {
             /* 如果所有调度策略都不支持优先级，则无法设置优先?*/
-            return AGENTOS_EINVAL;
+            ATM_RET_ERR(AGENTOS_EINVAL);
         }
     }
 
@@ -198,7 +203,7 @@ static int posix_thread_join(void *platform_handle, void **retval)
     posix_task_data_t *data = (posix_task_data_t *)platform_handle;
 
     if (!data) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 等待线程结束 */
@@ -221,12 +226,12 @@ static int posix_thread_set_priority(void *platform_handle, int priority)
     posix_task_data_t *data = (posix_task_data_t *)platform_handle;
 
     if (!data) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 验证优先级范?*/
     if (priority < AGENTOS_TASK_PRIORITY_MIN || priority > AGENTOS_TASK_PRIORITY_MAX) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 映射优先级到POSIX调度参数 */
@@ -234,7 +239,7 @@ static int posix_thread_set_priority(void *platform_handle, int priority)
     struct sched_param sp = {0};
 
     if (map_priority_to_posix(priority, &sched_policy, &sp) != 0) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 设置调度参数 */

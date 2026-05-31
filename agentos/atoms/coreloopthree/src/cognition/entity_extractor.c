@@ -19,6 +19,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 static atomic_int g_extractor_initialized = 0;
 
@@ -116,7 +121,7 @@ int agentos_extraction_result_add(agentos_extraction_result_t *result,
                                   const agentos_entity_t *entity)
 {
     if (!result || !entity) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 扩容检查 */
@@ -125,7 +130,7 @@ int agentos_extraction_result_add(agentos_extraction_result_t *result,
         agentos_entity_t *new_entities = (agentos_entity_t *)AGENTOS_REALLOC(
             result->entities, new_capacity * sizeof(agentos_entity_t));
         if (!new_entities) {
-            return AGENTOS_EINVAL;
+            ATM_RET_ERR(AGENTOS_EINVAL);
         }
 
         /* 初始化新空间 */
@@ -361,7 +366,7 @@ static void extract_filepaths(const char *input, size_t input_len,
 int agentos_entity_extract(const char *input, size_t input_len, agentos_extraction_result_t *result)
 {
     if (!input || !result || input_len == 0) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     if (!atomic_load_explicit(&g_extractor_initialized, memory_order_acquire)) {
@@ -372,7 +377,7 @@ int agentos_entity_extract(const char *input, size_t input_len, agentos_extracti
     if (!result->entities) {
         agentos_extraction_result_t *new_result = agentos_extraction_result_create(10);
         if (!new_result) {
-            return AGENTOS_EINVAL;
+            ATM_RET_ERR(AGENTOS_EINVAL);
         }
         memcpy(result, new_result, sizeof(*result));
         AGENTOS_FREE(new_result);

@@ -19,6 +19,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /**
  * @brief ML model handle (for future ML runtime integration)
@@ -164,7 +169,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
 {
 
     if (!intent || !out_plan)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     /* 1. 匹配意图规则 */
     int rule_index = -1;
@@ -215,7 +220,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     agentos_task_plan_t *plan =
         (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
     if (!plan)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     char plan_id[64];
     snprintf(plan_id, sizeof(plan_id), "rule_plan_%s_%d%s",
@@ -224,7 +229,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     plan->task_plan_id = AGENTOS_STRDUP(plan_id);
     if (!plan->task_plan_id) {
         AGENTOS_FREE(plan);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     plan->task_plan_nodes =
@@ -232,7 +237,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     if (!plan->task_plan_nodes && subtask_count > 0) {
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* DS-006: 依赖链优化 —— 识别可并行任务组 */
@@ -417,7 +422,7 @@ cleanup_nodes:
     AGENTOS_FREE(plan->task_plan_nodes);
     AGENTOS_FREE(plan->task_plan_id);
     AGENTOS_FREE(plan);
-    return AGENTOS_ENOMEM;
+    ATM_RET_ERR(AGENTOS_ENOMEM);
 }
 
 static void ml_planner_destroy_single_node(agentos_task_node_t *node)
@@ -440,7 +445,7 @@ static agentos_error_t ml_planner_plan(const agentos_intent_t *intent, void *con
 
     ml_planner_data_t *data = (ml_planner_data_t *)context;
     if (!data || !intent || !out_plan)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     // Primary path: rule-based planning (always available)
     // This replaces both the old fallback and the PHASE2-IMPLEMENTED stub

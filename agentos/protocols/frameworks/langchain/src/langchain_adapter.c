@@ -20,12 +20,6 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER (-3)
-#endif
-#ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM (-2)
-#endif
 
 langchain_config_t langchain_config_default(void)
 {

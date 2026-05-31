@@ -18,6 +18,11 @@
 #else
 #include <unistd.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 #endif
 
 #define AGENTOS_MAX_CODE_SIZE (4 * 1024 * 1024)
@@ -34,12 +39,12 @@ static agentos_error_t create_temp_file_windows(const char *suffix, const char *
     char temp_dir[MAX_PATH];
     DWORD dir_len = GetTempPathA(MAX_PATH, temp_dir);
     if (dir_len == 0 || dir_len > MAX_PATH)
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
 
     char temp_path[MAX_PATH];
     UINT ret = GetTempFileNameA(temp_dir, "aos", 0, temp_path);
     if (ret == 0)
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
 
     if (suffix) {
         char final_path[MAX_PATH];
@@ -53,7 +58,7 @@ static agentos_error_t create_temp_file_windows(const char *suffix, const char *
     FILE *f = fopen(temp_path, "wb");
     if (!f) {
         DeleteFileA(temp_path);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     size_t written = fwrite(content, 1, content_len, f);
@@ -61,18 +66,18 @@ static agentos_error_t create_temp_file_windows(const char *suffix, const char *
 
     if (written != content_len) {
         DeleteFileA(temp_path);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     if (close_result != 0) {
         DeleteFileA(temp_path);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     *out_path = AGENTOS_STRDUP(temp_path);
     if (!*out_path) {
         DeleteFileA(temp_path);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     return AGENTOS_SUCCESS;
@@ -98,30 +103,30 @@ static agentos_error_t create_temp_file_unix(const char *suffix, const char *con
     int needed = snprintf(temp_filename, sizeof(temp_filename), "%sagentos_code_XXXXXX%s", temp_dir,
                           suffix ? suffix : "");
     if (needed < 0 || (size_t)needed >= sizeof(temp_filename)) {
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     int fd = mkstemp(temp_filename);
     if (fd == -1)
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
 
     ssize_t written = write(fd, content, content_len);
     int close_result = close(fd);
 
     if (written < 0 || (size_t)written != content_len) {
         unlink(temp_filename);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     if (close_result != 0) {
         unlink(temp_filename);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     *out_path = AGENTOS_STRDUP(temp_filename);
     if (!*out_path) {
         unlink(temp_filename);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     return AGENTOS_SUCCESS;
@@ -157,7 +162,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
     HANDLE hReadPipe, hWritePipe;
     SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), NULL, TRUE};
     if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
 
     STARTUPINFOA si = {0};
     si.cb = sizeof(si);
@@ -171,7 +176,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
                         CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi)) {
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
     CloseHandle(hWritePipe);
 
@@ -183,7 +188,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
         TerminateProcess(pi.hProcess, 1);
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     output[0] = '\0';
 
@@ -201,7 +206,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
                 TerminateProcess(pi.hProcess, 1);
                 CloseHandle(pi.hProcess);
                 CloseHandle(pi.hThread);
-                return AGENTOS_ENOMEM;
+                ATM_RET_ERR(AGENTOS_ENOMEM);
             }
             output = new_out;
         }
@@ -222,14 +227,14 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
     /* flawfinder: ignore - cmd is built by build_command with escape_shell_arg */
     FILE *pipe = popen(cmd, "r");
     if (!pipe)
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
 
     size_t cap = 4096;
     size_t total = 0;
     char *output = (char *)AGENTOS_MALLOC(cap);
     if (!output) {
         pclose(pipe);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     output[0] = '\0';
 
@@ -242,7 +247,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
             if (!new_out) {
                 AGENTOS_FREE(output);
                 pclose(pipe);
-                return AGENTOS_ENOMEM;
+                ATM_RET_ERR(AGENTOS_ENOMEM);
             }
             output = new_out;
         }
@@ -288,12 +293,12 @@ static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *
     size_t code_len = strlen(code);
 
     if (code_len > AGENTOS_MAX_CODE_SIZE) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     if (strcmp(data->language, "python") != 0 && strcmp(data->language, "javascript") != 0 &&
         strcmp(data->language, "node") != 0) {
-        return AGENTOS_EPROTONOSUPPORT;
+        ATM_RET_ERR(AGENTOS_EPROTONOSUPPORT);
     }
 
     const char *suffix = NULL;
@@ -315,7 +320,7 @@ static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *
     if (!cmd) {
         remove_temp_file(temp_path);
         AGENTOS_FREE(temp_path);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 #ifdef _WIN32
     snprintf(cmd, 8192, "\"%s\" \"%s\"", interpreter, temp_path);
@@ -325,7 +330,7 @@ static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *
         remove_temp_file(temp_path);
         AGENTOS_FREE(temp_path);
         AGENTOS_FREE(cmd);
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
     snprintf(cmd, 8192, "%s %s 2>&1", interpreter, escaped_path);
 #endif

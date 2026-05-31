@@ -19,6 +19,11 @@
 
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 内部类型定义 ==================== */
 
@@ -156,12 +161,12 @@ static int windows_thread_join(void *platform_handle, void **retval)
     windows_task_data_t *data = (windows_task_data_t *)platform_handle;
 
     if (!data || !data->thread_handle) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 等待线程结束 */
     if (WaitForSingleObject(data->thread_handle, INFINITE) != WAIT_OBJECT_0) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 如果调用者请求返回值，需要从任务信息结构中获?*/
@@ -185,12 +190,12 @@ static int windows_thread_set_priority(void *platform_handle, int priority)
     windows_task_data_t *data = (windows_task_data_t *)platform_handle;
 
     if (!data || !data->thread_handle) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 验证优先级范?*/
     if (priority < AGENTOS_TASK_PRIORITY_MIN || priority > AGENTOS_TASK_PRIORITY_MAX) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     /* 映射优先级到Windows常量 */
@@ -198,7 +203,7 @@ static int windows_thread_set_priority(void *platform_handle, int priority)
 
     /* 设置线程优先?*/
     if (!SetThreadPriority(data->thread_handle, win_priority)) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     return 0;

@@ -351,7 +351,7 @@ int circuit_breaker_call(circuit_breaker_t *breaker, int (*func)(void *arg), voi
         cupolas_mutex_lock(&breaker->lock);
         breaker->rejected_calls++;
         cupolas_mutex_unlock(&breaker->lock);
-        return -2;
+        return AGENTOS_ERR_BUSY;
     }
 
     if (state == CIRCUIT_STATE_HALF_OPEN) {
@@ -359,7 +359,7 @@ int circuit_breaker_call(circuit_breaker_t *breaker, int (*func)(void *arg), voi
         if (breaker->half_open_calls >= breaker->config.half_open_max_calls) {
             breaker->rejected_calls++;
             cupolas_mutex_unlock(&breaker->lock);
-            return -2;
+            return AGENTOS_ERR_BUSY;
         }
         breaker->half_open_calls++;
         cupolas_mutex_unlock(&breaker->lock);
@@ -525,7 +525,7 @@ int circuit_breaker_registry_register(circuit_breaker_registry_t *registry, cons
     while (entry) {
         if (strcmp(entry->name, name) == 0) {
             cupolas_mutex_unlock(&registry->lock);
-            return -2;
+            return AGENTOS_ERR_ALREADY_EXISTS;
         }
         entry = entry->next;
     }

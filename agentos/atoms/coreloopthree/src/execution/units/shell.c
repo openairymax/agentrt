@@ -19,6 +19,11 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 #endif
 
 typedef struct shell_unit_data {
@@ -60,10 +65,10 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
                                      void **out_output)
 {
     if (!unit || !unit->execution_unit_data)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     const char *cmd = (const char *)input;
     if (!cmd || !out_output)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (!is_shell_command_allowed(cmd)) {
         *out_output = AGENTOS_STRDUP("{\"error\":\"command_not_allowed\"}");
@@ -74,7 +79,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
     HANDLE hReadPipe, hWritePipe;
     SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), NULL, TRUE};
     if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
 
     STARTUPINFOA si = {0};
     si.cb = sizeof(si);
@@ -91,7 +96,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
                         NULL, NULL, &si, &pi)) {
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
     CloseHandle(hWritePipe);
 
@@ -103,7 +108,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
         TerminateProcess(pi.hProcess, 1);
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     output[0] = '\0';
 
@@ -121,7 +126,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
                 TerminateProcess(pi.hProcess, 1);
                 CloseHandle(pi.hProcess);
                 CloseHandle(pi.hThread);
-                return AGENTOS_ENOMEM;
+                ATM_RET_ERR(AGENTOS_ENOMEM);
             }
             output = new_out;
         }
@@ -150,7 +155,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
             close(pipe_err[0]);
             close(pipe_err[1]);
         }
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     pid_t pid = fork();
@@ -159,7 +164,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
         close(pipe_out[1]);
         close(pipe_err[0]);
         close(pipe_err[1]);
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     if (pid == 0) {
@@ -186,7 +191,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
         close(pipe_err[0]);
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     output[0] = '\0';
 
@@ -204,7 +209,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
                 close(pipe_err[0]);
                 kill(pid, SIGKILL);
                 waitpid(pid, NULL, 0);
-                return AGENTOS_ENOMEM;
+                ATM_RET_ERR(AGENTOS_ENOMEM);
             }
             output = new_out;
         }

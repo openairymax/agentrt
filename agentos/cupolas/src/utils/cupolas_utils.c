@@ -116,13 +116,16 @@ void cupolas_log_message(const char *level, const char *format, ...)
     if (!level || !format)
         return;
 
+    char line_buf[4096];
+
     va_list args;
     va_start(args, format);
 
-    fprintf(stderr, "[CUPOLAS %s] ", level);
+    snprintf(line_buf, sizeof(line_buf), "[CUPOLAS %s] ", level);
+    fputs(line_buf, stderr);
     vfprintf(stderr, format,
              args); /* flawfinder: ignore - format string is internal, not user input */
-    fprintf(stderr, "\n");
+    fputs("\n", stderr);
 
     va_end(args);
 }

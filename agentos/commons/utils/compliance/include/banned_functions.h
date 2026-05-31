@@ -14,6 +14,7 @@
 #pragma GCC poison calloc
 #pragma GCC poison realloc
 #pragma GCC poison strdup
+#pragma GCC poison fprintf
 #pragma GCC poison sprintf
 #pragma GCC poison vsprintf
 #pragma GCC poison gets

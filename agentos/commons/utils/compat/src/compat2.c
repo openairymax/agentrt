@@ -7,6 +7,7 @@
 
 #include "compat.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -144,8 +145,11 @@ int agentos_memmove_s(void *dest, size_t dest_size, const void *src, size_t coun
 
 void agentos_assert_fail(const char *cond, const char *file, int line, const char *func)
 {
-    fprintf(stderr, "Assertion failed: %s\n", cond);
-    fprintf(stderr, "  at %s:%d in %s()\n", file, line, func);
+    char buf[256];
+    snprintf(buf, sizeof(buf), "Assertion failed: %s\n", cond);
+    fputs(buf, stderr);
+    snprintf(buf, sizeof(buf), "  at %s:%d in %s()\n", file, line, func);
+    fputs(buf, stderr);
 
     if (g_assert_handler) {
         g_assert_handler(cond, file, line, func, NULL);
@@ -166,9 +170,13 @@ void agentos_assert_fail(const char *cond, const char *file, int line, const cha
 void agentos_assert_fail_msg(const char *cond, const char *file, int line, const char *func,
                              const char *msg)
 {
-    fprintf(stderr, "Assertion failed: %s\n", cond);
-    fprintf(stderr, "  Message: %s\n", msg);
-    fprintf(stderr, "  at %s:%d in %s()\n", file, line, func);
+    char buf[256];
+    snprintf(buf, sizeof(buf), "Assertion failed: %s\n", cond);
+    fputs(buf, stderr);
+    snprintf(buf, sizeof(buf), "  Message: %s\n", msg);
+    fputs(buf, stderr);
+    snprintf(buf, sizeof(buf), "  at %s:%d in %s()\n", file, line, func);
+    fputs(buf, stderr);
 
     if (g_assert_handler) {
         g_assert_handler(cond, file, line, func, msg);

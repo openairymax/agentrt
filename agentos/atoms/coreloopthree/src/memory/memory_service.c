@@ -12,6 +12,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct async_write_req {
     agentos_memory_engine_t *engine;
@@ -102,16 +107,16 @@ int agentos_memory_write_async(agentos_memory_engine_t *engine,
 {
 
     if (!engine || !record)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     async_write_req_t *req = (async_write_req_t *)AGENTOS_CALLOC(1, sizeof(async_write_req_t));
     if (!req)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     agentos_memory_record_t *rec_copy = deep_copy_record(record);
     if (!rec_copy) {
         AGENTOS_FREE(req);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     req->engine = engine;
@@ -127,7 +132,7 @@ int agentos_memory_write_async(agentos_memory_engine_t *engine,
     if (rc != 0) {
         free_record_copy(rec_copy);
         AGENTOS_FREE(req);
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
     return AGENTOS_SUCCESS;
 }

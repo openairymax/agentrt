@@ -12,6 +12,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 extern agentos_error_t agentos_coordinator_dual_model_create(const char *primary_model,
                                                              const char *secondary_model,
@@ -38,12 +43,12 @@ static agentos_error_t adapter_coordinate(const char **prompts, size_t count, vo
                                           char **out_result)
 {
     if (!context || !out_result)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_coordinator_strategy_t *strategy = (agentos_coordinator_strategy_t *)context;
     strategy_adapter_data_t *adapter = (strategy_adapter_data_t *)strategy->data;
     if (!adapter || !adapter->base || !adapter->base->coordinate)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_coordination_context_t ctx;
     memset(&ctx, 0, sizeof(ctx));

@@ -262,9 +262,13 @@ int config_save_file(const char *file_path)
         const config_value_t *val = config_context_get_value_at(ctx, i);
         if (!key || !val)
             continue;
-        fprintf(f, "%s=", key);
+        {
+            char _buf[256];
+            snprintf(_buf, sizeof(_buf), "%s=", key);
+            fputs(_buf, f);
+        }
         config_value_print(val, 0);
-        fprintf(f, "\n");
+        fputs("\n", f);
     }
     fclose(f);
     return 0;
@@ -530,15 +534,23 @@ int config_dump_to_file(const char *file_path, const char *format)
         if (!key || !val)
             continue;
         if (format && strcmp(format, "json") == 0) {
-            fprintf(f, "\"%s\": ", key);
+            {
+                char _buf[256];
+                snprintf(_buf, sizeof(_buf), "\"%s\": ", key);
+                fputs(_buf, f);
+            }
             config_value_print(val, 0);
             if (i < count - 1)
-                fprintf(f, ",");
-            fprintf(f, "\n");
+                fputs(",", f);
+            fputs("\n", f);
         } else {
-            fprintf(f, "%s=", key);
+            {
+                char _buf[256];
+                snprintf(_buf, sizeof(_buf), "%s=", key);
+                fputs(_buf, f);
+            }
             config_value_print(val, 0);
-            fprintf(f, "\n");
+            fputs("\n", f);
         }
     }
     fclose(f);

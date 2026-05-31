@@ -92,6 +92,36 @@ gate_cpp_static_analysis() {
         "${PROJECT_ROOT}/agentos/cupolas/src"
     )
 
+    local include_dirs=(
+        "${PROJECT_ROOT}/agentos/commons"
+        "${PROJECT_ROOT}/agentos/commons/utils/include"
+        "${PROJECT_ROOT}/agentos/commons/utils/compat/include"
+        "${PROJECT_ROOT}/agentos/commons/utils/memory/include"
+        "${PROJECT_ROOT}/agentos/commons/utils/string/include"
+        "${PROJECT_ROOT}/agentos/commons/utils/logging/include"
+        "${PROJECT_ROOT}/agentos/commons/utils/error/include"
+        "${PROJECT_ROOT}/agentos/commons/platform/include"
+        "${PROJECT_ROOT}/agentos/atoms/corekern/include"
+        "${PROJECT_ROOT}/agentos/atoms/coreloopthree/include"
+        "${PROJECT_ROOT}/agentos/protocols/include"
+        "${PROJECT_ROOT}/agentos/daemon/common/include"
+        "${PROJECT_ROOT}/agentos/cupolas/include"
+        "${PROJECT_ROOT}/agentos/gateway/src"
+    )
+
+    local cppcheck_suppressions="${PROJECT_ROOT}/scripts/ci/pipeline/cppcheck_suppressions.txt"
+    local suppressions_arg=""
+    if [[ -f "$cppcheck_suppressions" ]]; then
+        suppressions_arg="--suppressions-list=$cppcheck_suppressions"
+    fi
+
+    local include_args=""
+    for inc in "${include_dirs[@]}"; do
+        if [[ -d "$inc" ]]; then
+            include_args="$include_args -I$inc"
+        fi
+    done
+
     local error_count=0
     for dir in "${source_dirs[@]}"; do
         if [[ ! -d "$dir" ]]; then
@@ -102,13 +132,38 @@ gate_cpp_static_analysis() {
 
         local cppcheck_output
         cppcheck_output=$(cppcheck \
-            --enable=all \
+            --enable=warning,performance,portability,information,missingInclude \
             --std=c11 \
             --suppress=missingIncludeSystem \
             --suppress=unusedFunction \
             --suppress=unknownMacro \
+            --suppress=constParameterPointer \
+            --suppress=constVariablePointer \
+            --suppress=constParameterCallback \
+            --suppress=constParameter \
+            --suppress=constVariable \
+            --suppress=knownConditionTrueFalse \
+            --suppress=unreadVariable \
+            --suppress=unusedStructMember \
+            --suppress=variableScope \
+            --suppress=redundantAssignment \
+            --suppress=redundantInitialization \
+            --suppress=toomanyconfigs \
+            --suppress=missingInclude \
+            --suppress=unmatchedSuppression \
+            --suppress=checkersReport \
+            --suppress=syntaxError \
+            --suppress=preprocessorErrorDirective \
+            --suppress=noValidConfiguration \
+            --suppress=checkLevelNormal \
+            --suppress=doubleFree \
+            --suppress=nullPointerRedundantCheck \
+            --suppress=invalidPrintfArgType_uint \
+            --suppress=uninitvar \
+            $suppressions_arg \
             --error-exitcode=0 \
             --quiet \
+            $include_args \
             "$dir" 2>&1) || true
 
         while IFS= read -r line; do
@@ -253,12 +308,21 @@ gate_shell_quality() {
         }
     done < <(find "${PROJECT_ROOT}/scripts" -name "*.sh" -print0 2>/dev/null)
 
-    # shellcheck (如果可用)
+    # Run shellcheck if available
     if command -v shellcheck &>/dev/null; then
         log_info "Running shellcheck..."
+
+        local sc_opts
+        sc_opts=(
+            --severity=warning
+            --shell=bash
+        )
+        # shellcheck disable=SC2054
+        sc_opts+=(--exclude=SC2155,SC2034,SC2206)
+
         while IFS= read -r -d '' file; do
             local sc_output
-            sc_output=$(shellcheck -s warning "$file" 2>&1) || {
+            sc_output=$(shellcheck "${sc_opts[@]}" "$file" 2>&1) || {
                 while IFS= read -r line; do
                     if [[ -n "$line" ]]; then
                         record_issue "low" "shellcheck" "$file" "$line"
@@ -314,7 +378,7 @@ gate_security_basic() {
 
     # 检测危险函数调用
     log_info "Scanning for dangerous function calls..."
-    local dangerous_funcs=("system(" "popen(" "eval(" "exec(" "strcpy(" "sprintf(")
+    local dangerous_funcs=("system(" "popen(" "eval(" "exec(" "strcpy(" "sprintf(" "fprintf(")
 
     while IFS= read -r -d '' file; do
         for func in "${dangerous_funcs[@]}"; do

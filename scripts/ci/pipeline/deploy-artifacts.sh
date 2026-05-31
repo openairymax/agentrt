@@ -285,8 +285,8 @@ generate_metadata() {
     total_size=$(du -sh "$OUTPUT_DIR" 2>/dev/null | cut -f1 || echo "unknown")
 
     local artifact_list
-    artifact_list=$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name "*.tar.gz" -o -name "*.zip" 2>/dev/null \
-        | xargs -I{} basename "{}" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+    artifact_list=$(find "$OUTPUT_DIR" -maxdepth 1 -type f \( -name "*.tar.gz" -o -name "*.zip" \) -print0 2>/dev/null \
+        | xargs -0 -I{} basename "{}" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
 
     cat > "$meta_file" << EOF
 {

@@ -7,6 +7,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 
 #ifndef AGENTOS_EINVAL
@@ -121,7 +126,7 @@ int taskflow_engine_register_handler(taskflow_engine_t *engine, const char *name
     if (!engine || !name || !handler)
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to register handler: null engine, name, or handler");
     if (engine->handler_count >= TASKFLOW_MAX_PARALLEL)
-        return AGENTOS_ERR_OVERFLOW;
+        ATM_RET_ERR(AGENTOS_ERR_OVERFLOW);
     for (size_t i = 0; i < engine->handler_count; i++) {
         if (strcmp(engine->handlers[i].name, name) == 0) {
             engine->handlers[i].handler = handler;
@@ -140,7 +145,7 @@ int taskflow_engine_register_handler(taskflow_engine_t *engine, const char *name
 int taskflow_engine_unregister_handler(taskflow_engine_t *engine, const char *name)
 {
     if (!engine || !name)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->handler_count; i++) {
         if (strcmp(engine->handlers[i].name, name) == 0) {
             memmove(&engine->handlers[i], &engine->handlers[i + 1],
@@ -158,7 +163,7 @@ int taskflow_engine_register_workflow(taskflow_engine_t *engine,
     if (!engine || !workflow)
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to register workflow: null engine or workflow");
     if (engine->workflow_count >= TASKFLOW_MAX_SUBFLOWS)
-        return AGENTOS_ERR_OVERFLOW;
+        ATM_RET_ERR(AGENTOS_ERR_OVERFLOW);
     for (size_t i = 0; i < engine->workflow_count; i++) {
         if (strcmp(engine->workflows[i].workflow.id, workflow->id) == 0) {
             engine->workflows[i].workflow = *workflow;
@@ -175,7 +180,7 @@ int taskflow_engine_register_workflow(taskflow_engine_t *engine,
 int taskflow_engine_unregister_workflow(taskflow_engine_t *engine, const char *workflow_id)
 {
     if (!engine || !workflow_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->workflow_count; i++) {
         if (strcmp(engine->workflows[i].workflow.id, workflow_id) == 0) {
             memmove(&engine->workflows[i], &engine->workflows[i + 1],
@@ -192,7 +197,7 @@ int taskflow_engine_load_workflow_json(taskflow_engine_t *engine, const char *wo
     if (!engine || !workflow_json)
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to load workflow json: null engine or workflow_json");
     if (engine->workflow_count >= TASKFLOW_MAX_SUBFLOWS)
-        return AGENTOS_ERR_OVERFLOW;
+        ATM_RET_ERR(AGENTOS_ERR_OVERFLOW);
     workflow_entry_t *we = &engine->workflows[engine->workflow_count];
     memset(we, 0, sizeof(workflow_entry_t));
     snprintf(we->workflow.id, sizeof(we->workflow.id), "wf_json_%zu", engine->workflow_count);
@@ -201,7 +206,7 @@ int taskflow_engine_load_workflow_json(taskflow_engine_t *engine, const char *wo
     we->workflow.node_count = 1;
     we->workflow.nodes = (taskflow_node_t *)AGENTOS_CALLOC(1, sizeof(taskflow_node_t));
     if (!we->workflow.nodes)
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        ATM_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
     snprintf(we->workflow.nodes[0].id, sizeof(we->workflow.nodes[0].id), "node_0");
     we->workflow.nodes[0].type = TASKFLOW_NODE_TASK;
     we->workflow.nodes[0].state = TASKFLOW_STATE_PENDING;
@@ -239,9 +244,9 @@ int taskflow_engine_start(taskflow_engine_t *engine, const char *workflow_id,
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to start execution: null engine, workflow_id, or execution_id");
     taskflow_workflow_t *wf = find_workflow(engine, workflow_id);
     if (!wf)
-        return AGENTOS_ERR_INVALID_PARAM;
+        ATM_RET_ERR(AGENTOS_ERR_INVALID_PARAM);
     if (engine->execution_count >= TASKFLOW_MAX_PARALLEL)
-        return AGENTOS_ERR_INVALID_PARAM;
+        ATM_RET_ERR(AGENTOS_ERR_INVALID_PARAM);
 
     execution_entry_t *ee = &engine->executions[engine->execution_count];
     memset(ee, 0, sizeof(execution_entry_t));
@@ -324,7 +329,7 @@ int taskflow_engine_start(taskflow_engine_t *engine, const char *workflow_id,
 int taskflow_engine_cancel(taskflow_engine_t *engine, const char *execution_id)
 {
     if (!engine || !execution_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->execution_count; i++) {
         if (strcmp(engine->executions[i].execution.execution_id, execution_id) == 0) {
             engine->executions[i].execution.state = TASKFLOW_STATE_CANCELED;
@@ -339,11 +344,11 @@ int taskflow_engine_cancel(taskflow_engine_t *engine, const char *execution_id)
 int taskflow_engine_pause(taskflow_engine_t *engine, const char *execution_id)
 {
     if (!engine || !execution_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->execution_count; i++) {
         if (strcmp(engine->executions[i].execution.execution_id, execution_id) == 0) {
             if (engine->executions[i].execution.state != TASKFLOW_STATE_RUNNING)
-                return AGENTOS_ERR_IO;
+                ATM_RET_ERR(AGENTOS_ERR_IO);
             engine->executions[i].execution.state = TASKFLOW_STATE_WAITING;
             return 0;
         }
@@ -354,11 +359,11 @@ int taskflow_engine_pause(taskflow_engine_t *engine, const char *execution_id)
 int taskflow_engine_resume(taskflow_engine_t *engine, const char *execution_id)
 {
     if (!engine || !execution_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->execution_count; i++) {
         if (strcmp(engine->executions[i].execution.execution_id, execution_id) == 0) {
             if (engine->executions[i].execution.state != TASKFLOW_STATE_WAITING)
-                return AGENTOS_ERR_IO;
+                ATM_RET_ERR(AGENTOS_ERR_IO);
             engine->executions[i].execution.state = TASKFLOW_STATE_RUNNING;
             return 0;
         }
@@ -383,17 +388,17 @@ int taskflow_engine_get_execution(taskflow_engine_t *engine, const char *executi
 int taskflow_engine_step(taskflow_engine_t *engine, const char *execution_id)
 {
     if (!engine || !execution_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->execution_count; i++) {
         execution_entry_t *ee = &engine->executions[i];
         if (strcmp(ee->execution.execution_id, execution_id) != 0)
             continue;
         if (ee->execution.state != TASKFLOW_STATE_RUNNING)
-            return AGENTOS_ERR_IO;
+            ATM_RET_ERR(AGENTOS_ERR_IO);
 
         taskflow_workflow_t *wf = find_workflow(engine, ee->execution.workflow_id);
         if (!wf)
-            return AGENTOS_ERR_NULL_POINTER;
+            ATM_RET_ERR(AGENTOS_ERR_NULL_POINTER);
 
         ee->execution.superstep++;
         if (ee->execution.completed_nodes < wf->node_count) {
@@ -413,17 +418,17 @@ int taskflow_engine_step(taskflow_engine_t *engine, const char *execution_id)
 int taskflow_engine_run_to_completion(taskflow_engine_t *engine, const char *execution_id)
 {
     if (!engine || !execution_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->execution_count; i++) {
         execution_entry_t *ee = &engine->executions[i];
         if (strcmp(ee->execution.execution_id, execution_id) != 0)
             continue;
         if (ee->execution.state != TASKFLOW_STATE_RUNNING)
-            return AGENTOS_ERR_IO;
+            ATM_RET_ERR(AGENTOS_ERR_IO);
 
         taskflow_workflow_t *wf = find_workflow(engine, ee->execution.workflow_id);
         if (!wf)
-            return AGENTOS_ERR_NULL_POINTER;
+            ATM_RET_ERR(AGENTOS_ERR_NULL_POINTER);
 
         ee->execution.completed_nodes = wf->node_count;
         ee->execution.progress = 1.0;
@@ -449,7 +454,7 @@ int taskflow_engine_create_checkpoint(taskflow_engine_t *engine, const char *exe
         if (strcmp(ee->execution.execution_id, execution_id) != 0)
             continue;
         if (ee->checkpoint_count >= TASKFLOW_MAX_CHECKPOINTS)
-            return AGENTOS_ERR_OVERFLOW;
+            ATM_RET_ERR(AGENTOS_ERR_OVERFLOW);
 
         taskflow_checkpoint_t *cp = &ee->checkpoints[ee->checkpoint_count];
         uint64_t cid = generate_id(engine);
@@ -482,7 +487,7 @@ int taskflow_engine_create_checkpoint(taskflow_engine_t *engine, const char *exe
 int taskflow_engine_restore_checkpoint(taskflow_engine_t *engine, const char *checkpoint_id)
 {
     if (!engine || !checkpoint_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->execution_count; i++) {
         execution_entry_t *ee = &engine->executions[i];
         for (size_t j = 0; j < ee->checkpoint_count; j++) {
@@ -520,7 +525,7 @@ int taskflow_engine_set_condition_fn(taskflow_engine_t *engine, taskflow_conditi
                                      void *user_data)
 {
     if (!engine)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     engine->condition_fn = fn;
     engine->condition_user_data = user_data;
     return 0;
@@ -530,7 +535,7 @@ int taskflow_engine_set_progress_callback(taskflow_engine_t *engine,
                                           taskflow_progress_callback_t callback, void *user_data)
 {
     if (!engine)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     engine->progress_cb = callback;
     engine->progress_user_data = user_data;
     return 0;
@@ -540,7 +545,7 @@ int taskflow_engine_set_event_callback(taskflow_engine_t *engine,
                                        taskflow_event_callback_t callback, void *user_data)
 {
     if (!engine)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     engine->event_cb = callback;
     engine->event_user_data = user_data;
     return 0;
@@ -550,7 +555,7 @@ int taskflow_engine_notify_event(taskflow_engine_t *engine, const char *executio
                                  const char *event_type, const char *data_json)
 {
     if (!engine || !event_type)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     if (engine->event_cb) {
         engine->event_cb(execution_id, event_type, data_json, engine->event_user_data);
     }
@@ -570,7 +575,7 @@ int taskflow_engine_set_variable(taskflow_engine_t *engine, const char *executio
         size_t new_len = old_len + strlen(key) + strlen(value_json) + 32;
         char *new_vars = (char *)AGENTOS_MALLOC(new_len);
         if (!new_vars)
-            return AGENTOS_ERR_OUT_OF_MEMORY;
+            ATM_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
         if (old_len <= 2) {
             snprintf(new_vars, new_len, "{\"%s\":%s}", key, value_json);
         } else {
@@ -589,7 +594,7 @@ int taskflow_engine_get_variable(taskflow_engine_t *engine, const char *executio
                                  const char *key, char **value_json)
 {
     if (!engine || !execution_id || !key || !value_json)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     *value_json = NULL;
     for (size_t i = 0; i < engine->execution_count; i++) {
         execution_entry_t *ee = &engine->executions[i];

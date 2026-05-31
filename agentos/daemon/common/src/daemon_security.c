@@ -541,7 +541,7 @@ static struct {
 static pthread_mutex_t g_security_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const char *DANGEROUS_PATTERNS[] = {";",  "|", "`",  "$(", "${", "&&", "||", ">",
-                                           ">>", "<", "<<", "\\", "\n", "\r", "\0", NULL};
+                                           ">>", "<", "<<", "\\", "\n", "\r", NULL};
 
 static bool contains_dangerous_pattern(const char *input)
 {

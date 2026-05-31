@@ -18,9 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER (-3)
-#endif
 /* ============================================================================
  * Transform Context
  * ============================================================================ */

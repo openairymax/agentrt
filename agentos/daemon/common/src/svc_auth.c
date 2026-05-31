@@ -253,7 +253,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
 
     {
         uint64_t bits = (uint64_t)(msg_len * 8);
-        for (int i = 63; i >= 0; i--) {
+        for (int i = 7; i >= 0; i--) {
             msg[new_len + i] = (bits >> ((7 - i) * 8)) & 0xFF;
         }
     }
@@ -386,7 +386,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
 
     {
         uint64_t ibits = (uint64_t)(ilen * 8);
-        for (int i = 63; i >= 0; i--) {
+        for (int i = 7; i >= 0; i--) {
             inner[inner_padded + i] = (ibits >> ((7 - i) * 8)) & 0xFF;
         }
     }
@@ -449,7 +449,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
 
     {
         uint64_t obits = (uint64_t)(olen * 8);
-        for (int i = 63; i >= 0; i--) {
+        for (int i = 7; i >= 0; i--) {
             outer[outer_padded + i] = (obits >> ((7 - i) * 8)) & 0xFF;
         }
     }
