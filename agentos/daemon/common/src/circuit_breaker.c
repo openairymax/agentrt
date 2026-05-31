@@ -173,12 +173,15 @@ AGENTOS_API cb_manager_t cb_manager_create(void)
 {
     cb_manager_internal_t *mgr =
         (cb_manager_internal_t *)AGENTOS_CALLOC(1, sizeof(cb_manager_internal_t));
-    if (!mgr)
+    if (!mgr) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     agentos_error_t err = agentos_mutex_init(&mgr->mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(mgr);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -213,8 +216,10 @@ AGENTOS_API void cb_manager_destroy(cb_manager_t manager)
 AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
                                         const cb_config_t *config)
 {
-    if (!manager || !name)
+    if (!manager || !name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     cb_manager_internal_t *mgr = (cb_manager_internal_t *)manager;
 
@@ -223,6 +228,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
     if (mgr->breaker_count >= CB_MAX_BREAKERS) {
         agentos_mutex_unlock(&mgr->mutex);
         LOG_ERROR("Max circuit breakers reached");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
@@ -236,6 +242,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
     cb_internal_t *cb = (cb_internal_t *)AGENTOS_CALLOC(1, sizeof(cb_internal_t));
     if (!cb) {
         agentos_mutex_unlock(&mgr->mutex);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -257,6 +264,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(cb);
         agentos_mutex_unlock(&mgr->mutex);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -484,8 +492,10 @@ AGENTOS_API cb_state_t cb_get_state(circuit_breaker_t breaker)
 
 AGENTOS_API const char *cb_get_name(circuit_breaker_t breaker)
 {
-    if (!breaker)
+    if (!breaker) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     cb_internal_t *cb = (cb_internal_t *)breaker;
     return cb->name;
 }
@@ -683,8 +693,10 @@ AGENTOS_API agentos_error_t cb_register_event_callback(cb_manager_t manager,
 
 AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char *name)
 {
-    if (!manager || !name)
+    if (!manager || !name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     cb_manager_internal_t *mgr = (cb_manager_internal_t *)manager;
 
@@ -698,6 +710,7 @@ AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char *name)
     }
 
     agentos_mutex_unlock(&mgr->mutex);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 

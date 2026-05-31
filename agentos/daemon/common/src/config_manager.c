@@ -9,7 +9,6 @@
 
 #include "config_manager.h"
 
-#include "error.h"
 #include "memory_compat.h"
 #include "platform.h"
 #include "safe_string_utils.h"
@@ -18,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 extern char **environ;
 
@@ -62,6 +62,7 @@ static cm_entry_t *find_entry(const char *key)
         if (strcmp(g_cm.entries[i].key, key) == 0)
             return &g_cm.entries[i];
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -720,8 +721,11 @@ AGENTOS_API int cm_load_environment_config(const char *env)
 
 AGENTOS_API char *cm_export_json(const char *namespace_)
 {
-    if (!g_cm.initialized)
+    if (!g_cm.initialized) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     agentos_mutex_lock(&g_cm.mutex);
 

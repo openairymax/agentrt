@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -95,6 +96,7 @@ static obs_metric_entry_t *find_metric(const char *name, const char *labels)
             }
         }
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 

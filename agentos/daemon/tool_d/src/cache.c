@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file cache.c
  * @brief 工具结果缓存实现（LRU?
@@ -53,14 +54,18 @@ static unsigned int hash_key(const char *key)
 static cache_entry_t *entry_create(const char *key, const char *value)
 {
     cache_entry_t *e = memory_safe_alloc(sizeof(cache_entry_t));
-    if (!e)
+    if (!e) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     e->key = memory_safe_strdup(key);
     e->value = memory_safe_strdup(value);
     if (!e->key || !e->value) {
         memory_safe_free(e->key);
         memory_safe_free(e->value);
         memory_safe_free(e);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     e->timestamp = time(NULL);
@@ -133,8 +138,11 @@ static void evict_lru(tool_cache_t *cache)
 tool_cache_t *tool_cache_create(size_t capacity, int ttl_sec)
 {
     tool_cache_t *cache = AGENTOS_CALLOC(1, sizeof(tool_cache_t));
-    if (!cache)
+    if (!cache) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     cache->capacity = capacity;
     cache->ttl_sec = ttl_sec;
     agentos_mutex_init(&cache->lru_lock);
@@ -279,16 +287,22 @@ void cache_clear(tool_cache_t *cache)
 
 char *tool_cache_key(const char *tool_id, const char *params_json)
 {
-    if (!tool_id || !params_json)
+    if (!tool_id || !params_json) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     size_t tool_id_len = strlen(tool_id);
     size_t params_len = strlen(params_json);
     size_t len = tool_id_len + params_len + 2;
 
     char *key = memory_safe_alloc(len);
-    if (!key)
+    if (!key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     snprintf(key, len, "%s|%s", tool_id, params_json);
     return key;
@@ -297,11 +311,15 @@ char *tool_cache_key(const char *tool_id, const char *params_json)
 tool_result_t *tool_result_from_json(const char *json)
 {
     cJSON *root = cJSON_Parse(json);
-    if (!root)
+    if (!root) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     tool_result_t *res = AGENTOS_CALLOC(1, sizeof(tool_result_t));
     if (!res) {
         cJSON_Delete(root);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     cJSON *success = cJSON_GetObjectItem(root, "success");

@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 
 
 /**
@@ -14,7 +15,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "monitor_service.h"
 #include "platform.h"
 
@@ -501,13 +501,17 @@ int metrics_histogram_observe(const char *name, double value, const metric_label
 char *metrics_export_prometheus(void)
 {
     if (!g_metrics.initialized) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
     size_t buf_size = 64 * 1024; /* 64KB */
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
-    if (!buf)
+    if (!buf) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null buffer");
+
         return NULL;
+    }
 
     size_t pos = 0;
 

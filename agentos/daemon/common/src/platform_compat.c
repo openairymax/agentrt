@@ -2,13 +2,13 @@
 #define _GNU_SOURCE
 #endif
 #include "atomic_compat.h"
-#include "error.h"
 #include "platform.h"
 
 #include <limits.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <time.h>
+#include "error.h"
 #ifndef _WIN32
 #include <dlfcn.h>
 #include <sys/sysinfo.h>

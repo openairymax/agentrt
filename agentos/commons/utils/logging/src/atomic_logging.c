@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../error/include/error.h"
+#include "error.h"
 
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
@@ -99,6 +100,7 @@ static ThreadLocalBuffer *get_thread_local_buffer(void)
             if (!g_tls_log_buffer->buffer) {
                 AGENTOS_FREE(g_tls_log_buffer);
                 g_tls_log_buffer = NULL;
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 return NULL;
             }
         }

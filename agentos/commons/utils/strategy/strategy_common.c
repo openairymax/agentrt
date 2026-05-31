@@ -11,6 +11,7 @@
 
 #include <float.h>
 #include <stdio.h>
+#include "error.h"
 
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
@@ -138,6 +139,7 @@ void strategy_cleanup_data(void *data, void (*free_func)(void *))
 char *strategy_generate_name(const char *base_name, const char *suffix)
 {
     if (!base_name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -147,6 +149,7 @@ char *strategy_generate_name(const char *base_name, const char *suffix)
 
     char *name = (char *)AGENTOS_MALLOC(total_len);
     if (!name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

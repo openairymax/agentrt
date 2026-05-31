@@ -84,7 +84,7 @@ def process_file(filepath):
                 continue
 
             desc = error_descriptions.get(err_code, 'error')
-            error_push_line = f'{indent}agentos_error_push_ex({err_code}, "{ctx}: {desc}", __FILE__, __LINE__, __func__);\n'
+            error_push_line = f'{indent}agentos_error_push_ex({err_code}, __FILE__, __LINE__, __func__, "{ctx}: {desc}");\n'
             lines.insert(i, error_push_line)
             total_added += 1
             i += 2  # Skip past the inserted line + the return line

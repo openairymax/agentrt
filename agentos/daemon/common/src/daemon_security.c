@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /* SPDX-License-Identifier: Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -32,7 +33,6 @@
 #define SVC_LOG_SECURITY(...) LOG_WARN(__VA_ARGS__)
 #endif
 
-#include "error.h"
 #include "platform.h"
 #include "svc_logger.h"
 

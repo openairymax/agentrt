@@ -20,8 +20,7 @@ permission_rule_t *sandbox_permission_create(int syscall_num, permission_type_t 
                                              const char *condition)
 {
     permission_rule_t *rule = (permission_rule_t *)AGENTOS_CALLOC(1, sizeof(permission_rule_t));
-    if (!rule)
-        return NULL;
+    if (!rule) return NULL;
 
     rule->syscall_num = syscall_num;
     rule->perm_type = perm_type;

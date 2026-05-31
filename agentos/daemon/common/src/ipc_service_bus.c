@@ -14,7 +14,6 @@
 
 
 #include "atomic_compat.h"
-#include "error.h"
 #include "ipc_client.h"
 #include "memory_compat.h"
 #include "platform.h"
@@ -25,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 /* ==================== 内部常量 ==================== */
 
@@ -116,6 +116,7 @@ static ipc_bus_channel_internal_t *find_channel(ipc_service_bus_internal_t *bus,
             return ch;
         ch = ch->next;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -148,16 +149,23 @@ static void init_message_header(ipc_bus_message_header_t *header, ipc_bus_msg_ty
 AGENTOS_API ipc_service_bus_t ipc_service_bus_create(const char *bus_name,
                                                      const ipc_bus_channel_config_t *config)
 {
-    if (!bus_name)
+    if (!bus_name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     ipc_service_bus_internal_t *bus =
         (ipc_service_bus_internal_t *)AGENTOS_CALLOC(1, sizeof(ipc_service_bus_internal_t));
-    if (!bus)
+    if (!bus) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     if (safe_strcpy(bus->name, bus_name, IPC_BUS_SERVICE_ID_LEN) != 0) {
         AGENTOS_FREE(bus);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -175,6 +183,7 @@ AGENTOS_API ipc_service_bus_t ipc_service_bus_create(const char *bus_name,
     agentos_error_t err = agentos_mutex_init(&bus->mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(bus);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
@@ -256,8 +265,11 @@ AGENTOS_API agentos_error_t ipc_service_bus_stop(ipc_service_bus_t bus_handle)
 AGENTOS_API ipc_bus_channel_t ipc_bus_channel_create(ipc_service_bus_t bus_handle,
                                                      const ipc_bus_channel_config_t *config)
 {
-    if (!bus_handle || !config)
+    if (!bus_handle || !config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     ipc_service_bus_internal_t *bus = (ipc_service_bus_internal_t *)bus_handle;
 
@@ -266,12 +278,14 @@ AGENTOS_API ipc_bus_channel_t ipc_bus_channel_create(ipc_service_bus_t bus_handl
     if (bus->channel_count >= IPC_BUS_MAX_CHANNELS) {
         agentos_mutex_unlock(&bus->mutex);
         LOG_ERROR("Cannot create channel: max channels reached");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
     if (find_channel(bus, config->name)) {
         agentos_mutex_unlock(&bus->mutex);
         LOG_ERROR("Channel '%s' already exists", config->name);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 
@@ -279,6 +293,7 @@ AGENTOS_API ipc_bus_channel_t ipc_bus_channel_create(ipc_service_bus_t bus_handl
         (ipc_bus_channel_internal_t *)AGENTOS_CALLOC(1, sizeof(ipc_bus_channel_internal_t));
     if (!ch) {
         agentos_mutex_unlock(&bus->mutex);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -308,8 +323,11 @@ AGENTOS_API void ipc_bus_channel_destroy(ipc_bus_channel_t channel)
 
 AGENTOS_API const char *ipc_bus_channel_get_name(ipc_bus_channel_t channel)
 {
-    if (!channel)
+    if (!channel) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     ipc_bus_channel_internal_t *ch = (ipc_bus_channel_internal_t *)channel;
     return ch->name;
 }
@@ -843,8 +861,11 @@ AGENTOS_API ipc_bus_message_t *ipc_bus_message_create(ipc_bus_msg_type_t msg_typ
                                                       size_t payload_size)
 {
     ipc_bus_message_t *msg = (ipc_bus_message_t *)AGENTOS_CALLOC(1, sizeof(ipc_bus_message_t));
-    if (!msg)
+    if (!msg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     init_message_header(&msg->header, msg_type, protocol, NULL, NULL);
     msg->header.msg_id = (uint64_t)agentos_platform_get_time_ms();
@@ -854,6 +875,7 @@ AGENTOS_API ipc_bus_message_t *ipc_bus_message_create(ipc_bus_msg_type_t msg_typ
         msg->payload = AGENTOS_CALLOC(1, payload_size);
         if (!msg->payload) {
             AGENTOS_FREE(msg);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
         memcpy(msg->payload, payload, payload_size);
@@ -877,14 +899,20 @@ AGENTOS_API void ipc_bus_message_free(ipc_bus_message_t *message)
 
 AGENTOS_API ipc_bus_message_t *ipc_bus_message_clone(const ipc_bus_message_t *message)
 {
-    if (!message)
+    if (!message) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     ipc_bus_message_t *clone =
         ipc_bus_message_create(message->header.msg_type, message->header.protocol, message->payload,
                                message->payload_size);
-    if (!clone)
+    if (!clone) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     clone->header = message->header;
     return clone;
@@ -951,8 +979,11 @@ AGENTOS_API agentos_error_t ipc_service_bus_reset_stats(ipc_service_bus_t bus_ha
 
 AGENTOS_API const char *ipc_service_bus_get_name(ipc_service_bus_t bus_handle)
 {
-    if (!bus_handle)
+    if (!bus_handle) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     ipc_service_bus_internal_t *bus = (ipc_service_bus_internal_t *)bus_handle;
     return bus->name;
 }

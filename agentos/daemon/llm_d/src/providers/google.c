@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file google.c
  * @brief Google Gemini 适配器实现
@@ -12,7 +13,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "platform.h"
 #include "provider.h"
 #include "svc_logger.h"
@@ -38,6 +38,7 @@ static provider_ctx_t *google_init(const char *name __attribute__((unused)), con
 
     google_ctx_t *ctx = (google_ctx_t *)AGENTOS_CALLOC(1, sizeof(google_ctx_t));
     if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -56,12 +57,18 @@ static void google_destroy(provider_ctx_t *ctx_ptr)
 
 static char *google_build_request(const llm_request_config_t *manager)
 {
-    if (!manager)
+    if (!manager) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     cJSON *root = cJSON_CreateObject();
-    if (!root)
+    if (!root) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     cJSON *contents = cJSON_CreateArray();
     char *system_instruction_text = NULL;
@@ -447,8 +454,11 @@ static size_t gg_sse_write_cb(void *contents, size_t size, size_t nmemb, void *u
 static llm_response_t *gg_build_stream_response(gg_stream_acc_t *acc)
 {
     llm_response_t *r = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
-    if (!r)
+    if (!r) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     r->id = AGENTOS_STRDUP("");
     r->model = acc->resp_model ? acc->resp_model : AGENTOS_STRDUP("unknown");

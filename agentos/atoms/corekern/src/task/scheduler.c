@@ -113,6 +113,7 @@ static task_info_core_t *__attribute__((used)) find_task_by_platform_handle(void
     (void)platform_handle;
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -132,6 +133,7 @@ static task_info_core_t *find_task_by_id(agentos_task_id_t tid)
 {
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

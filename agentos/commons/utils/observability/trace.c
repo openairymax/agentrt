@@ -28,6 +28,7 @@
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 #include "platform.h"
+#include "error.h"
 
 #ifndef _WIN32
 #include <stdint.h>
@@ -177,6 +178,7 @@ static trace_event_t *create_event(const char *name, const char *attributes)
 {
     trace_event_t *event = (trace_event_t *)AGENTOS_MALLOC(sizeof(trace_event_t));
     if (!event) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -212,16 +214,19 @@ static void free_events(trace_event_t *head)
 agentos_trace_span_t *agentos_trace_begin(const char *name, const char *parent_id)
 {
     if (!name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     if (init_trace_system() != 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     agentos_trace_span_t *span =
         (agentos_trace_span_t *)AGENTOS_MALLOC(sizeof(agentos_trace_span_t));
     if (!span) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -252,6 +257,7 @@ agentos_trace_span_t *agentos_trace_begin(const char *name, const char *parent_i
 
     if (trace_mutex_init(&span->mutex) != 0) {
         AGENTOS_FREE(span);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
@@ -330,6 +336,7 @@ void agentos_trace_add_event(agentos_trace_span_t *span, const char *name, const
 char *agentos_trace_export(void)
 {
     if (init_trace_system() != 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -339,6 +346,7 @@ char *agentos_trace_export(void)
     char *buffer = (char *)AGENTOS_MALLOC(buffer_size);
     if (!buffer) {
         trace_mutex_unlock(&g_trace_state.mutex);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -424,6 +432,7 @@ char *agentos_trace_export(void)
             if (!new_buffer) {
                 trace_mutex_unlock(&g_trace_state.mutex);
                 AGENTOS_FREE(buffer);
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 return NULL;
             }
             buffer = new_buffer;

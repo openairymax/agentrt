@@ -20,6 +20,7 @@
 
 #include "sync.h"
 
+#include "error.h"
 #include "sync_types.h"
 
 #include <stdio.h>

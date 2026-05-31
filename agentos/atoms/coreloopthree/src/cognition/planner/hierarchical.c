@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 typedef struct {
     const char *keyword;
@@ -77,13 +78,13 @@ static int str_contains_i(const char *haystack, const char *needle)
 
 static const domain_rule_t *match_domain(const char *goal)
 {
-    if (!goal)
-        return NULL;
+    if (!goal) return NULL;
     for (size_t i = 0; i < g_domain_rule_count; i++) {
         if (str_contains_i(goal, g_domain_rules[i].keyword)) {
             return &g_domain_rules[i];
         }
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -149,8 +150,7 @@ agentos_plan_hierarchical_create(agentos_llm_service_t __attribute__((unused)) *
 
     hierarchical_data_t *data =
         (hierarchical_data_t *)AGENTOS_CALLOC(1, sizeof(hierarchical_data_t));
-    if (!data)
-        return NULL;
+    if (!data) return NULL;
     data->max_depth = max_depth > 0 ? max_depth : 5;
     data->decomposition_threshold = 0.7f;
 
@@ -158,6 +158,7 @@ agentos_plan_hierarchical_create(agentos_llm_service_t __attribute__((unused)) *
         (agentos_plan_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_plan_strategy_t));
     if (!strategy) {
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

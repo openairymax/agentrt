@@ -58,6 +58,8 @@ typedef enum {
 
 /* ==================== 框架能力标志 ==================== */
 
+#ifndef AGENTOS_CAPABILITY_T_DEFINED
+#define AGENTOS_CAPABILITY_T_DEFINED
 typedef enum {
     AGENTOS_CAP_COGNITION = (1 << 0),
     AGENTOS_CAP_EXECUTION = (1 << 1),
@@ -74,6 +76,7 @@ typedef enum {
     AGENTOS_CAP_PROTOCOL_OPENAI = (1 << 12),
     AGENTOS_CAP_ALL = 0x1FFF
 } agentos_capability_t;
+#endif
 
 /* ==================== 框架信息 ==================== */
 

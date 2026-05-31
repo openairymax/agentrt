@@ -70,6 +70,7 @@ static char *safe_strcat(char *dest, size_t dest_size, const char *src)
 static char *make_cache_key(const llm_request_config_t *manager)
 {
     if (!manager || !manager->model) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -82,8 +83,10 @@ static char *make_cache_key(const llm_request_config_t *manager)
     }
 
     char *key = (char *)AGENTOS_MALLOC(len);
-    if (!key)
+    if (!key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     /* 构建缓存键 */
     char *p = key;
@@ -123,19 +126,23 @@ static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
 {
     if (!root || !count) {
         *count = 0;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     cJSON *pricing = cJSON_GetObjectItem(root, "pricing");
     if (!pricing || !cJSON_IsArray(pricing)) {
         *count = 0;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     int n = cJSON_GetArraySize(pricing);
     pricing_rule_t *rules = (pricing_rule_t *)AGENTOS_CALLOC((size_t)n, sizeof(pricing_rule_t));
-    if (!rules)
+    if (!rules) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     for (int i = 0; i < n; ++i) {
         cJSON *item = cJSON_GetArrayItem(pricing, i);
@@ -152,6 +159,7 @@ static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
                 }
                 AGENTOS_FREE(rules);
                 *count = 0;
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 return NULL;
             }
             rules[i].input_price_per_k = input->valuedouble;
@@ -184,12 +192,14 @@ llm_service_t *llm_service_create(const char *config_path)
     llm_service_t *svc = (llm_service_t *)AGENTOS_CALLOC(1, sizeof(llm_service_t));
     if (!svc) {
         SVC_LOG_ERROR("Failed to allocate service context");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     if (agentos_mutex_init(&svc->lock) != 0) {
         SVC_LOG_ERROR("Failed to initialize service lock");
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -253,6 +263,7 @@ llm_service_t *llm_service_create(const char *config_path)
         SVC_LOG_ERROR("Failed to create provider registry");
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -263,6 +274,7 @@ llm_service_t *llm_service_create(const char *config_path)
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -274,6 +286,7 @@ llm_service_t *llm_service_create(const char *config_path)
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -286,6 +299,7 @@ llm_service_t *llm_service_create(const char *config_path)
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -365,6 +379,7 @@ static int get_cached_response(llm_service_t *svc, const char *cache_key,
 static const provider_t *find_provider(llm_service_t *svc, const char *model)
 {
     if (!svc || !model) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -686,12 +701,15 @@ static void yaml_map_add(yaml_map_t *m, const char *key, const char *value)
 
 static const char *yaml_map_get(const yaml_map_t *m, const char *key)
 {
-    if (!m || !key)
+    if (!m || !key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     for (size_t i = 0; i < m->count; ++i) {
         if (strcmp(m->pairs[i].key, key) == 0)
             return m->pairs[i].value;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     return NULL;
 }
 

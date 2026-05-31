@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -238,12 +239,12 @@ agentos_execution_unit_t *agentos_shell_unit_create(void)
 {
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_CALLOC(1, sizeof(agentos_execution_unit_t));
-    if (!unit)
-        return NULL;
+    if (!unit) return NULL;
 
     shell_unit_data_t *data = (shell_unit_data_t *)AGENTOS_CALLOC(1, sizeof(shell_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -251,6 +252,7 @@ agentos_execution_unit_t *agentos_shell_unit_create(void)
     if (!data->metadata_json) {
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

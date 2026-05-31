@@ -365,7 +365,10 @@ int autogen_initiate_chat(autogen_adapter_context_t *ctx, const char *group_id,
                           autogen_group_chat_result_t *result)
 {
     if (!ctx || !result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "autogen_initiate_chat: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->initialized)
         return AGENTOS_ERR_SYS_NOT_INIT;
     if (!ctx->llm_callback)
@@ -459,7 +462,10 @@ int autogen_send_message(autogen_adapter_context_t *ctx, const char *from_agent_
                          autogen_message_t *reply)
 {
     if (!ctx || !reply)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "autogen_send_message: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->initialized)
         return AGENTOS_ERR_SYS_NOT_INIT;
     if (!ctx->llm_callback)

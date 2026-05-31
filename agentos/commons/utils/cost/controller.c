@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 /* 平台特定头文件 */
 #ifdef _WIN32
@@ -153,12 +154,14 @@ agentos_budget_controller_t *agentos_budget_controller_create(double max_cost_us
                                                               uint32_t period_seconds)
 {
     if (max_cost_usd <= 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
     agentos_budget_controller_t *controller =
         (agentos_budget_controller_t *)AGENTOS_MALLOC(sizeof(agentos_budget_controller_t));
     if (!controller) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -173,6 +176,7 @@ agentos_budget_controller_t *agentos_budget_controller_create(double max_cost_us
 
     if (budget_ctrl_mutex_init(&controller->mutex) != 0) {
         AGENTOS_FREE(controller);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 

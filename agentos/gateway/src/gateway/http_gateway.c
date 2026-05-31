@@ -209,25 +209,29 @@ int parse_json_request(http_gateway_t *gateway, http_request_context_t *context,
                        size_t size)
 {
     if (!data || size == 0) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "parse_json_request: parse error");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     /* 强化大小限制检查 */
     if (size > gateway->max_request_size) {
         /* 记录安全事件（如果有日志系统） */
         atomic_fetch_add(&gateway->requests_failed, 1);
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     context->json_request = cJSON_Parse(data);
     if (!context->json_request) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "cJSON_Parse: parse error");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     if (jsonrpc_validate_request(context->json_request) != 0) {
         cJSON_Delete(context->json_request);
         context->json_request = NULL;
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: parse error");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     return 0;
@@ -284,7 +288,8 @@ static int internal_handler_public_wrapper(const char *request_json, char **resp
     internal_to_public_adapter_t *adapter = (internal_to_public_adapter_t *)user_data;
     if (!adapter || !adapter->internal_handler) {
         *response_json = NULL;
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: null pointer");
+        return AGENTOS_ERR_UNKNOWN;
     }
     char *resp = adapter->internal_handler((void *)request_json, adapter->internal_data);
     if (resp) {
@@ -292,7 +297,8 @@ static int internal_handler_public_wrapper(const char *request_json, char **resp
         return 0;
     }
     *response_json = NULL;
-    return AGENTOS_EFAIL;
+    agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "if: null pointer");
+    return AGENTOS_ERR_NULL_POINTER;
 }
 
 /**
@@ -684,7 +690,8 @@ int http_gateway_register_endpoint(http_gateway_t *gateway, const char *method, 
                                    gateway_endpoint_handler_t handler, void *user_data)
 {
     if (!gateway || !method || !path || !handler) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "http_gateway_register_endpoint: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     if (gateway->dynamic_endpoint_count >= gateway->dynamic_endpoint_capacity) {

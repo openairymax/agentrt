@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 /* ==================== 内部常量定义 ==================== */
 
@@ -119,8 +120,7 @@ struct agentos_intent_parser {
 
 static char *to_lowercase(char *str)
 {
-    if (!str)
-        return NULL;
+    if (!str) return NULL;
     for (char *p = str; *p; ++p) {
         *p = tolower(*p);
     }
@@ -251,12 +251,12 @@ static void free_keywords(char **keywords, size_t count)
 static intent_rule_t *create_intent_rule(const char *pattern, const char *intent_name,
                                          float confidence, uint32_t flags)
 {
-    if (!pattern || !intent_name)
-        return NULL;
+    if (!pattern || !intent_name) return NULL;
 
     intent_rule_t *rule = (intent_rule_t *)AGENTOS_CALLOC(1, sizeof(intent_rule_t));
     if (!rule) {
         AGENTOS_LOG_ERROR("Failed to allocate intent rule");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -274,6 +274,7 @@ static intent_rule_t *create_intent_rule(const char *pattern, const char *intent
             AGENTOS_FREE(rule->intent_name);
         AGENTOS_FREE(rule);
         AGENTOS_LOG_ERROR("Failed to duplicate strings for intent rule");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

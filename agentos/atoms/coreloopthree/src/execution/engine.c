@@ -90,13 +90,16 @@ static size_t task_hash(const char *task_id, size_t table_size)
 static task_hash_table_t *task_hash_table_create(size_t size)
 {
     task_hash_table_t *table = (task_hash_table_t *)AGENTOS_CALLOC(1, sizeof(task_hash_table_t));
-    if (!table)
+    if (!table) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     table->size = size;
     table->buckets = (task_tcb_t **)AGENTOS_CALLOC(size, sizeof(task_tcb_t *));
     if (!table->buckets) {
         AGENTOS_FREE(table);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -104,6 +107,7 @@ static task_hash_table_t *task_hash_table_create(size_t size)
     if (!table->lock) {
         AGENTOS_FREE(table->buckets);
         AGENTOS_FREE(table);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -158,8 +162,10 @@ static void task_hash_table_insert(task_hash_table_t *table, task_tcb_t *tcb)
  */
 static task_tcb_t *task_hash_table_find(task_hash_table_t *table, const char *task_id)
 {
-    if (!table || !task_id)
+    if (!table || !task_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     size_t index = task_hash(task_id, table->size);
     agentos_mutex_lock(table->lock);
@@ -175,6 +181,7 @@ static task_tcb_t *task_hash_table_find(task_hash_table_t *table, const char *ta
     }
 
     agentos_mutex_unlock(table->lock);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -280,8 +287,10 @@ static void tcb_release(task_tcb_t *tcb)
 static agentos_task_t *task_desc_deep_copy(const agentos_task_t *task)
 {
     agentos_task_t *copy = (agentos_task_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_t));
-    if (!copy)
+    if (!copy) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     if (task->task_id) {
         copy->task_id = AGENTOS_STRDUP(task->task_id);
@@ -311,6 +320,7 @@ fail:
     if (copy->task_input)
         AGENTOS_FREE(copy->task_input);
     AGENTOS_FREE(copy);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -320,8 +330,10 @@ fail:
 static agentos_task_t *task_result_deep_copy(const task_tcb_t *tcb)
 {
     agentos_task_t *result = (agentos_task_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_t));
-    if (!result)
+    if (!result) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     if (tcb->task_desc->task_id) {
         result->task_id = AGENTOS_STRDUP(tcb->task_desc->task_id);
@@ -347,6 +359,7 @@ fail:
     if (result->task_agent_id)
         AGENTOS_FREE(result->task_agent_id);
     AGENTOS_FREE(result);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -424,6 +437,7 @@ static void *worker_thread_func(void *arg)
         }
         tcb_release(tcb);
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 

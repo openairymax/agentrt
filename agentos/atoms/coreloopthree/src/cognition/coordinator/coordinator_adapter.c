@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 extern agentos_error_t agentos_coordinator_dual_model_create(const char *primary_model,
                                                              const char *secondary_model,
@@ -66,14 +67,14 @@ static void adapter_destroy(agentos_coordinator_strategy_t *strategy)
 
 static agentos_coordinator_strategy_t *wrap_base_to_strategy(agentos_coordinator_base_t *base)
 {
-    if (!base)
-        return NULL;
+    if (!base) return NULL;
 
     agentos_coordinator_strategy_t *strategy =
         (agentos_coordinator_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_coordinator_strategy_t));
     if (!strategy) {
         if (base->destroy)
             base->destroy(base);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -83,6 +84,7 @@ static agentos_coordinator_strategy_t *wrap_base_to_strategy(agentos_coordinator
         if (base->destroy)
             base->destroy(base);
         AGENTOS_FREE(strategy);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -106,19 +108,16 @@ agentos_coordinator_strategy_t *agentos_dual_model_coordinator_create(const char
         const char *model_names[3] = {primary_model, secondary1, secondary2};
         float weights[3] = {0.5f, 0.3f, 0.2f};
         agentos_error_t err = agentos_coordinator_weighted_create(model_names, weights, 3, &base);
-        if (err != AGENTOS_SUCCESS || !base)
-            return NULL;
+        if (err != AGENTOS_SUCCESS || !base) return NULL;
     } else {
         agentos_error_t err =
             agentos_coordinator_dual_model_create(primary_model, secondary1, 0.7f, 0.3f, &base);
-        if (err != AGENTOS_SUCCESS || !base)
-            return NULL;
+        if (err != AGENTOS_SUCCESS || !base) return NULL;
     }
 
     strategy_adapter_data_t *adapter =
         (strategy_adapter_data_t *)AGENTOS_MALLOC(sizeof(strategy_adapter_data_t));
-    if (!adapter)
-        return NULL;
+    if (!adapter) return NULL;
     adapter->base = base;
     adapter->base->llm = (struct agentos_llm_service *)llm;
 
@@ -132,8 +131,7 @@ agentos_coordinator_strategy_t *agentos_majority_coordinator_create(const char *
 
     agentos_coordinator_base_t *base = NULL;
     agentos_error_t err = agentos_coordinator_majority_create(model_count, 0.5f, &base);
-    if (err != AGENTOS_SUCCESS || !base)
-        return NULL;
+    if (err != AGENTOS_SUCCESS || !base) return NULL;
 
     base->llm = (struct agentos_llm_service *)llm;
 
@@ -145,14 +143,12 @@ agentos_coordinator_strategy_t *agentos_weighted_coordinator_create(const char *
                                                                     size_t model_count,
                                                                     agentos_llm_service_t *llm)
 {
-    if (!llm || !model_names || !weights || model_count == 0)
-        return NULL;
+    if (!llm || !model_names || !weights || model_count == 0) return NULL;
 
     agentos_coordinator_base_t *base = NULL;
     agentos_error_t err =
         agentos_coordinator_weighted_create(model_names, weights, model_count, &base);
-    if (err != AGENTOS_SUCCESS || !base)
-        return NULL;
+    if (err != AGENTOS_SUCCESS || !base) return NULL;
 
     return wrap_base_to_strategy(base);
 }
@@ -160,13 +156,11 @@ agentos_coordinator_strategy_t *agentos_weighted_coordinator_create(const char *
 agentos_coordinator_strategy_t *agentos_arbiter_model_create(const char *arbiter_model,
                                                              agentos_llm_service_t *llm)
 {
-    if (!llm || !arbiter_model)
-        return NULL;
+    if (!llm || !arbiter_model) return NULL;
 
     agentos_coordinator_base_t *base = NULL;
     agentos_error_t err = agentos_coordinator_arbiter_create(arbiter_model, NULL, &base);
-    if (err != AGENTOS_SUCCESS || !base)
-        return NULL;
+    if (err != AGENTOS_SUCCESS || !base) return NULL;
 
     return wrap_base_to_strategy(base);
 }
@@ -176,8 +170,7 @@ agentos_arbiter_human_create(void (*callback)(const char *question, char *answer
 {
     agentos_coordinator_base_t *base = NULL;
     agentos_error_t err = agentos_coordinator_arbiter_create(NULL, callback, &base);
-    if (err != AGENTOS_SUCCESS || !base)
-        return NULL;
+    if (err != AGENTOS_SUCCESS || !base) return NULL;
 
     return wrap_base_to_strategy(base);
 }

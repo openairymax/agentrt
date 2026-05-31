@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 typedef struct reactive_data {
     agentos_llm_service_t *llm;
@@ -239,12 +240,12 @@ agentos_plan_strategy_t *agentos_plan_reactive_create(agentos_llm_service_t *llm
 {
     agentos_plan_strategy_t *strat =
         (agentos_plan_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_plan_strategy_t));
-    if (!strat)
-        return NULL;
+    if (!strat) return NULL;
 
     reactive_data_t *rdata = (reactive_data_t *)AGENTOS_CALLOC(1, sizeof(reactive_data_t));
     if (!rdata) {
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -253,6 +254,7 @@ agentos_plan_strategy_t *agentos_plan_reactive_create(agentos_llm_service_t *llm
     if (!rdata->lock) {
         AGENTOS_FREE(rdata);
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

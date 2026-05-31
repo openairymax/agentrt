@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file svc_auth.c
  * @brief Daemon 服务层认证中间件实现
@@ -13,7 +14,6 @@
  */
 
 #include "daemon_defaults.h"
-#include "error.h"
 #include "svc_auth.h"
 #include "svc_logger.h"
 

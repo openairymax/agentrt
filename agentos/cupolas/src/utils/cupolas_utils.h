@@ -52,6 +52,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../../commons/utils/error/include/error.h"
 #include "../../../commons/utils/memory/include/memory_compat.h"
 
 #ifdef __cplusplus
@@ -185,14 +186,14 @@ extern "C" {
  * All macros perform early return on failure condition.
  *
  * @note Return value conventions:
- *   - Default: returns -1 on error
+ *   - Default: returns AGENTOS_EINVAL on error
  *   - _RET variants: allow custom return value
  */
 
 /**
- * @brief Check for NULL pointer, return -1 if true
+ * @brief Check for NULL pointer, return AGENTOS_EINVAL if true
  * @param ptr Pointer to check
- * @return -1 if ptr is NULL, otherwise continues execution
+ * @return AGENTOS_EINVAL if ptr is NULL, otherwise continues execution
  *
  * @code
  * int process(config_t* cfg) {
@@ -204,7 +205,7 @@ extern "C" {
 #define CUPOLAS_CHECK_NULL(ptr) \
     do {                        \
         if ((ptr) == NULL)      \
-            return -1;          \
+            return AGENTOS_EINVAL;          \
     } while (0)
 
 /**
@@ -220,9 +221,9 @@ extern "C" {
     } while (0)
 
 /**
- * @brief Check expression result, return -1 if nonzero (error)
+ * @brief Check expression result, return AGENTOS_EINVAL if nonzero (error)
  * @param expr Expression to evaluate (should return 0 on success)
- * @return -1 if expr != 0
+ * @return AGENTOS_EINVAL if expr != 0
  *
  * @code
  * CUPOLAS_CHECK_RESULT(initialize());
@@ -231,7 +232,7 @@ extern "C" {
 #define CUPOLAS_CHECK_RESULT(expr) \
     do {                           \
         if ((expr) != 0)           \
-            return -1;             \
+            return AGENTOS_EINVAL;             \
     } while (0)
 
 /**
@@ -246,14 +247,14 @@ extern "C" {
     } while (0)
 
 /**
- * @brief Check condition is true, return -1 if false
+ * @brief Check condition is true, return AGENTOS_EINVAL if false
  * @param cond Boolean condition to test
- * @return -1 if condition is false
+ * @return AGENTOS_EINVAL if condition is false
  */
 #define CUPOLAS_CHECK_TRUE(cond) \
     do {                         \
         if (!(cond))             \
-            return -1;           \
+            return AGENTOS_EINVAL;           \
     } while (0)
 
 /**

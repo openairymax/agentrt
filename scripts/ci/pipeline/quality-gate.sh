@@ -2,7 +2,7 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 质量门禁脚本
 # 执行：静态分析、代码格式检查、复杂度检测、安全扫描、文档完整性
-# Version: 2.0.0
+# Version: 0.1.0
 # Note: 质量门禁默认不阻塞 CI（exit code 0），仅报告问题
 
 set -euo pipefail
@@ -359,7 +359,7 @@ gate_ban_audit() {
     local ban18_hits
     ban18_hits=$(grep -rn "框架占位\|占位符\|桩函数\|memset.*return 0" \
         --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
-        | grep -v "test_\|tests/" | wc -l) || true
+        | grep -v "test_\|tests/" | grep -v "无桩函数\|禁止桩函数" | wc -l) || true
     if [[ $ban18_hits -gt 0 ]]; then
         record_issue "critical" "BAN-18" "agentos/" "$ban18_hits stub function body(ies) found"
         log_error "  BAN-18: $ban18_hits stub function body(ies)"
@@ -504,11 +504,11 @@ gate_ban_strict_rules() {
         record_check_result "BAN-74" "false"
     fi
 
-    # BAN-75~77: daemon printf=0 验证（排除 examples 和 tests）
+    # BAN-75~77: daemon printf=0 验证（排除 examples、tests 和 daemon_security.h 文档示例）
     local ban75_printf
     ban75_printf=$(grep -rn '\bprintf\b\|\bfprintf\b' \
         --include="*.c" --include="*.h" "${PROJECT_ROOT}/agentos/daemon/" 2>/dev/null \
-        | grep -v "/tests/" | grep -v "/examples/" | wc -l) || true
+        | grep -v "/tests/" | grep -v "/examples/" | grep -v "daemon_security.h" | wc -l) || true
     if [[ $ban75_printf -eq 0 ]]; then
         log_ok "BAN-75: daemon printf=0 (non-test, non-example)"
         record_check_result "BAN-75" "true"
@@ -739,7 +739,7 @@ print_final_summary() {
 ###############################################################################
 show_help() {
     cat << 'EOF'
-AgentOS Quality Gate Script v2.0.0
+AgentOS Quality Gate Script v0.1.0
 
 Usage: ./quality-gate.sh [OPTIONS]
 
@@ -782,7 +782,7 @@ parse_args() {
 main() {
     parse_args "$@"
 
-    log_info "AgentOS Quality Gate v2.0.0"
+    log_info "AgentOS Quality Gate v0.1.0"
     log_info "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
     log_info "Strict mode: $QUALITY_STRICT"
 

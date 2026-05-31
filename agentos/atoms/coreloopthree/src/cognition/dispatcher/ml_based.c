@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 #define ML_FEATURE_COUNT 4
 #define ML_MAX_HISTORY 256
@@ -199,8 +200,7 @@ agentos_dispatching_ml_create(const char __attribute__((unused)) * model_path, v
 {
 
     ml_dispatch_data_t *data = (ml_dispatch_data_t *)AGENTOS_CALLOC(1, sizeof(ml_dispatch_data_t));
-    if (!data)
-        return NULL;
+    if (!data) return NULL;
 
     data->feature_weights[ML_FEATURE_COST] = 0.2f;
     data->feature_weights[ML_FEATURE_SUCCESS_RATE] = 0.35f;
@@ -249,6 +249,7 @@ agentos_dispatching_ml_create(const char __attribute__((unused)) * model_path, v
         (agentos_dispatching_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_dispatching_strategy_t));
     if (!strategy) {
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

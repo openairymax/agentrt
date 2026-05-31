@@ -16,8 +16,7 @@ confidence_calibrator_t *confidence_calibrator_create(double decay_factor)
 {
     confidence_calibrator_t *cb =
         (confidence_calibrator_t *)AGENTOS_CALLOC(1, sizeof(confidence_calibrator_t));
-    if (!cb)
-        return NULL;
+    if (!cb) return NULL;
 
     cb->decay_factor =
         (decay_factor > 0.0 && decay_factor < 1.0) ? decay_factor : CC_DEFAULT_DECAY_FACTOR;

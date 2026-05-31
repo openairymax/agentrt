@@ -548,7 +548,10 @@ int langchain_memory_add(langchain_adapter_context_t *ctx, const char *memory_id
                          const char *content)
 {
     if (!ctx || !memory_id || !role || !content)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "langchain_memory_add: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t m = 0; m < ctx->memory_count; m++) {
         if (strcmp(ctx->memories[m].id, memory_id) == 0) {

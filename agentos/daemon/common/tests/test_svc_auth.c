@@ -5,12 +5,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "error.h"
 #include "svc_auth.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 /* ==================== 测试辅助宏 ==================== */
 

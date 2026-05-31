@@ -11,6 +11,7 @@
 #include "types.h"
 
 #include <stdio.h>
+#include "error.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -82,13 +83,16 @@ int proto_ext_register(proto_ext_framework_t *fw, const proto_ext_descriptor_t *
                        const proto_ext_callbacks_t *callbacks)
 {
     if (!fw || !descriptor || !callbacks)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_register: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (fw->adapter_count >= PROTO_EXT_MAX_ADAPTERS)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, descriptor->name) == 0) {
-            return -3;
+            AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
         }
     }
 
@@ -97,7 +101,7 @@ int proto_ext_register(proto_ext_framework_t *fw, const proto_ext_descriptor_t *
         proto_ext_adapter_entry_t *new_adapters =
             AGENTOS_REALLOC(fw->adapters, new_cap * sizeof(proto_ext_adapter_entry_t));
         if (!new_adapters)
-            return -4;
+            AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "out of memory");
         fw->adapters = new_adapters;
         fw->adapter_capacity = new_cap;
     }
@@ -120,7 +124,10 @@ int proto_ext_register(proto_ext_framework_t *fw, const proto_ext_descriptor_t *
 int proto_ext_unregister(proto_ext_framework_t *fw, const char *name)
 {
     if (!fw || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_unregister: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, name) == 0) {
             if (fw->adapters[i].state >= PROTO_EXT_STATE_RUNNING) {
@@ -135,17 +142,20 @@ int proto_ext_unregister(proto_ext_framework_t *fw, const char *name)
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_load(proto_ext_framework_t *fw, const char *name, const char *config_json)
 {
     if (!fw || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_load: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, name) == 0) {
             if (fw->adapters[i].state != PROTO_EXT_STATE_UNLOADED)
-                return -3;
+                AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
             if (fw->adapters[i].callbacks.on_load) {
                 int rc = fw->adapters[i].callbacks.on_load(&fw->adapters[i].adapter_context);
@@ -170,13 +180,16 @@ int proto_ext_load(proto_ext_framework_t *fw, const char *name, const char *conf
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_unload(proto_ext_framework_t *fw, const char *name)
 {
     if (!fw || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_unload: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, name) == 0) {
             if (fw->adapters[i].callbacks.on_unload) {
@@ -187,13 +200,16 @@ int proto_ext_unload(proto_ext_framework_t *fw, const char *name)
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_start(proto_ext_framework_t *fw, const char *name)
 {
     if (!fw || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_start: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, name) == 0) {
             if (fw->adapters[i].state < PROTO_EXT_STATE_LOADED) {
@@ -212,13 +228,16 @@ int proto_ext_start(proto_ext_framework_t *fw, const char *name)
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_stop(proto_ext_framework_t *fw, const char *name)
 {
     if (!fw || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_stop: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, name) == 0) {
             if (fw->adapters[i].callbacks.on_stop) {
@@ -230,18 +249,21 @@ int proto_ext_stop(proto_ext_framework_t *fw, const char *name)
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_send_message(proto_ext_framework_t *fw, const char *adapter_name,
                            const unified_message_t *message)
 {
     if (!fw || !adapter_name || !message)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_send_message: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, adapter_name) == 0) {
             if (fw->adapters[i].state != PROTO_EXT_STATE_RUNNING)
-                return -3;
+                AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
             if (fw->adapters[i].callbacks.encode_message) {
                 void *encoded = NULL;
@@ -275,20 +297,23 @@ int proto_ext_send_message(proto_ext_framework_t *fw, const char *adapter_name,
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_handle_request(proto_ext_framework_t *fw, const char *adapter_name,
                              const char *method, const char *params_json, char **response_json)
 {
     if (!fw || !adapter_name || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_handle_request: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, adapter_name) == 0) {
             if (fw->adapters[i].state != PROTO_EXT_STATE_RUNNING)
-                return -3;
+                AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
             if (!fw->adapters[i].callbacks.handle_request)
-                return -4;
+                AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "out of memory");
 
             int rc = fw->adapters[i].callbacks.handle_request(fw->adapters[i].adapter_context,
                                                               method, params_json, response_json);
@@ -302,14 +327,17 @@ int proto_ext_handle_request(proto_ext_framework_t *fw, const char *adapter_name
             return rc;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_auto_route(proto_ext_framework_t *fw, const unified_message_t *message,
                          char **adapter_name)
 {
     if (!fw || !message || !adapter_name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_auto_route: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (fw->adapters[i].state != PROTO_EXT_STATE_RUNNING)
@@ -329,14 +357,17 @@ int proto_ext_auto_route(proto_ext_framework_t *fw, const unified_message_t *mes
         }
     }
 
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_negotiate(proto_ext_framework_t *fw, const char *adapter_name,
                         const char *client_version, char **agreed_version)
 {
     if (!fw || !adapter_name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_negotiate: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, adapter_name) == 0) {
             if (!fw->adapters[i].callbacks.negotiate_version) {
@@ -347,7 +378,7 @@ int proto_ext_negotiate(proto_ext_framework_t *fw, const char *adapter_name,
                                                                client_version, agreed_version);
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_add_middleware(proto_ext_framework_t *fw, const char *name,
@@ -355,16 +386,19 @@ int proto_ext_add_middleware(proto_ext_framework_t *fw, const char *name,
                              void *user_data)
 {
     if (!fw || !name || !middleware)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_add_middleware: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (fw->middleware_count >= PROTO_EXT_MAX_MIDDLEWARE)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     if (fw->middleware_count >= fw->middleware_capacity) {
         size_t new_cap = fw->middleware_capacity * 2;
         proto_middleware_t *new_mw =
             AGENTOS_REALLOC(fw->middlewares, new_cap * sizeof(proto_middleware_t));
         if (!new_mw)
-            return -3;
+            AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
         fw->middlewares = new_mw;
         fw->middleware_capacity = new_cap;
     }
@@ -392,7 +426,10 @@ int proto_ext_add_middleware(proto_ext_framework_t *fw, const char *name,
 int proto_ext_remove_middleware(proto_ext_framework_t *fw, const char *name)
 {
     if (!fw || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_remove_middleware: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->middleware_count; i++) {
         if (strcmp(fw->middlewares[i].name, name) == 0) {
             memmove(&fw->middlewares[i], &fw->middlewares[i + 1],
@@ -401,40 +438,49 @@ int proto_ext_remove_middleware(proto_ext_framework_t *fw, const char *name)
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_enable_middleware(proto_ext_framework_t *fw, const char *name)
 {
     if (!fw || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_enable_middleware: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->middleware_count; i++) {
         if (strcmp(fw->middlewares[i].name, name) == 0) {
             fw->middlewares[i].enabled = true;
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_disable_middleware(proto_ext_framework_t *fw, const char *name)
 {
     if (!fw || !name)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_disable_middleware: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->middleware_count; i++) {
         if (strcmp(fw->middlewares[i].name, name) == 0) {
             fw->middlewares[i].enabled = false;
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_process_middleware_chain(proto_ext_framework_t *fw, const unified_message_t *request,
                                        unified_message_t *response)
 {
     if (!fw || !request || !response)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_process_middleware_chain: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t i = 0; i < fw->middleware_count; i++) {
         if (!fw->middlewares[i].enabled)
@@ -450,7 +496,10 @@ int proto_ext_get_adapter_stats(proto_ext_framework_t *fw, const char *name,
                                 proto_ext_stats_t *stats)
 {
     if (!fw || !name || !stats)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_get_adapter_stats: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, name) == 0) {
             strncpy(stats->name, fw->adapters[i].descriptor.name, PROTO_EXT_MAX_NAME_LEN - 1);
@@ -461,17 +510,20 @@ int proto_ext_get_adapter_stats(proto_ext_framework_t *fw, const char *name,
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int proto_ext_list_adapters(proto_ext_framework_t *fw, char **names_json)
 {
     if (!fw || !names_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_list_adapters: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     size_t buf_size = 4096 + fw->adapter_count * 128;
     char *buf = AGENTOS_MALLOC(buf_size);
     if (!buf)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     size_t offset = snprintf(buf, buf_size, "{\"adapters\":[");
     for (size_t i = 0; i < fw->adapter_count; i++) {
@@ -511,7 +563,10 @@ int proto_ext_list_adapters(proto_ext_framework_t *fw, char **names_json)
 int proto_ext_list_capabilities(proto_ext_framework_t *fw, char **caps_json)
 {
     if (!fw || !caps_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_list_capabilities: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     uint32_t all_caps = 0;
     for (size_t i = 0; i < fw->adapter_count; i++) {
@@ -523,7 +578,7 @@ int proto_ext_list_capabilities(proto_ext_framework_t *fw, char **caps_json)
     size_t buf_size = 2048;
     char *buf = AGENTOS_MALLOC(buf_size);
     if (!buf)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     size_t offset = snprintf(buf, buf_size, "{\"capabilities\":[");
 
@@ -576,12 +631,15 @@ int proto_ext_find_by_capability(proto_ext_framework_t *fw, uint32_t capability,
                                  char ***adapter_names, size_t *count)
 {
     if (!fw || !adapter_names || !count)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_find_by_capability: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     size_t found = 0;
     char **results = AGENTOS_CALLOC(fw->adapter_count, sizeof(char *));
     if (!results)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (fw->adapters[i].descriptor.capabilities & capability) {
@@ -645,18 +703,21 @@ static int json_extract_int(const char *json, const char *key, int default_val)
 int proto_ext_load_from_config(proto_ext_framework_t *fw, const char *config_json)
 {
     if (!fw || !config_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "proto_ext_load_from_config: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     const char *adapters_start = strstr(config_json, "\"adapters\"");
     if (!adapters_start) {
         adapters_start = strstr(config_json, "\"extensions\"");
         if (!adapters_start)
-            return -2;
+            AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     }
 
     const char *array_start = strchr(adapters_start, '[');
     if (!array_start)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     int loaded_count = 0;
     const char *p = array_start + 1;
@@ -746,19 +807,22 @@ static int fw_adapter_destroy(void *ctx)
 static int fw_adapter_encode(void *ctx, const void *msg, void **out_data, size_t *out_size)
 {
     if (!msg || !out_data || !out_size)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "fw_adapter_encode: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     unified_message_t *umsg = (unified_message_t *)msg;
     size_t in_len =
         umsg->payload_size ? umsg->payload_size : (umsg->payload ? strlen(umsg->payload) : 0);
     if (in_len == 0) {
         *out_data = NULL;
         *out_size = 0;
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     }
 
     *out_data = AGENTOS_MALLOC(in_len);
     if (!*out_data)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
     memcpy(*out_data, umsg->payload ? umsg->payload : "", in_len);
     *out_size = in_len;
     return 0;
@@ -767,13 +831,16 @@ static int fw_adapter_encode(void *ctx, const void *msg, void **out_data, size_t
 static int fw_adapter_decode(void *ctx, const void *data, size_t size, void *out_msg)
 {
     if (!data || !out_msg || size == 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "fw_adapter_decode: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     unified_message_t *msg = (unified_message_t *)out_msg;
     memset(msg, 0, sizeof(*msg));
     msg->payload = AGENTOS_MALLOC(size + 1);
     if (!msg->payload)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
     memcpy((void *)msg->payload, data, size);
     ((char *)msg->payload)[size] = '\0';
     msg->payload_size = size;
@@ -788,7 +855,10 @@ static int fw_adapter_is_connected(void *ctx)
 static int fw_adapter_get_stats(void *ctx, char *stats_json, size_t max_size)
 {
     if (!stats_json || max_size < 64)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "fw_adapter_get_stats: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     int written = snprintf(stats_json, max_size,
                            "{\"adapter\":\"protocol_extension_framework\",\"status\":\"active\"}");
     return (written >= 0 && (size_t)written < max_size) ? 0 : -2;
@@ -797,9 +867,12 @@ static int fw_adapter_get_stats(void *ctx, char *stats_json, size_t max_size)
 static int fw_adapter_connect(void *ctx, const char *endpoint)
 {
     if (!endpoint)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "fw_adapter_connect: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!g_framework_instance)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
         if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_INITIALIZED) {
             g_framework_instance->adapters[i].state = PROTO_EXT_STATE_RUNNING;
@@ -807,13 +880,13 @@ static int fw_adapter_connect(void *ctx, const char *endpoint)
             return 0;
         }
     }
-    return -3;
+    AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 }
 
 static int fw_adapter_disconnect(void *ctx)
 {
     if (!g_framework_instance)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
         if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {
             g_framework_instance->adapters[i].state = PROTO_EXT_STATE_LOADED;
@@ -825,9 +898,12 @@ static int fw_adapter_disconnect(void *ctx)
 static int fw_adapter_send(void *ctx, const void *data, size_t size)
 {
     if (!data || size == 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "fw_adapter_send: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!g_framework_instance)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
         if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {
             g_framework_instance->adapters[i].messages_processed++;
@@ -836,15 +912,18 @@ static int fw_adapter_send(void *ctx, const void *data, size_t size)
             return 0;
         }
     }
-    return -3;
+    AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 }
 
 static int fw_adapter_receive(void *ctx, void **data, size_t *size, uint32_t timeout_ms)
 {
     if (!data || !size)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_TIMEOUT, __FILE__, __LINE__, __func__, "fw_adapter_receive: timeout");
+        return AGENTOS_ERR_TIMEOUT;
+        }
     if (!g_framework_instance)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     *data = NULL;
     *size = 0;
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
@@ -852,15 +931,18 @@ static int fw_adapter_receive(void *ctx, void **data, size_t *size, uint32_t tim
             return 0;
         }
     }
-    return -3;
+    AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 }
 
 static int fw_adapter_handle_request(void *ctx, const void *req, void **resp)
 {
     if (!req || !resp)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "fw_adapter_handle_request: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!g_framework_instance)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     size_t running = 0;
     for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
         if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {

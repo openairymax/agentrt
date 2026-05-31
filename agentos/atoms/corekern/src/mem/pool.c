@@ -10,6 +10,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #define POOL_MAGIC 0x504F4F4C
 #define BLOCK_ALLOCATED 0xA110CA7E
@@ -48,25 +49,34 @@ static inline int32_t pool_block_index(agentos_mem_pool_t *pool, void *ptr)
 
 agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_count)
 {
-    if (block_size < sizeof(void *) || block_count == 0)
+    if (block_size < sizeof(void *) || block_count == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
+    }
 
-    if (block_size > SIZE_MAX - 7)
+    if (block_size > SIZE_MAX - 7) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
+    }
     size_t actual_block_size = (block_size + 7) & ~(size_t)7;
 
-    if (block_count > SIZE_MAX / actual_block_size)
+    if (block_count > SIZE_MAX / actual_block_size) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
+    }
     size_t total_size = actual_block_size * block_count;
 
     void *raw = agentos_mem_aligned_alloc(total_size, 8);
-    if (!raw)
+    if (!raw) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     agentos_mem_pool_t *pool =
         (agentos_mem_pool_t *)AGENTOS_CALLOC(1, sizeof(struct agentos_mem_pool));
     if (!pool) {
         agentos_mem_aligned_free(raw);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -74,6 +84,7 @@ agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_co
     if (!pool->block_tags) {
         AGENTOS_FREE(pool);
         agentos_mem_aligned_free(raw);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -100,11 +111,15 @@ agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_co
 
 void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
 {
-    if (!pool_handle)
+    if (!pool_handle) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
     agentos_mem_pool_t *pool = pool_handle;
-    if (pool->magic != POOL_MAGIC)
+    if (pool->magic != POOL_MAGIC) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     if (pool->lock) {
         agentos_mutex_lock(pool->lock);
@@ -114,6 +129,7 @@ void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

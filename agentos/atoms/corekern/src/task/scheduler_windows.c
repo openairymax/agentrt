@@ -18,6 +18,7 @@
 #include "memory_compat.h"
 
 #include <string.h>
+#include "error.h"
 
 /* ==================== 内部类型定义 ==================== */
 
@@ -113,6 +114,7 @@ static void *windows_thread_create(task_info_core_t *info, size_t stack_size)
     /* 分配平台特定数据 */
     data = (windows_task_data_t *)AGENTOS_CALLOC(1, sizeof(windows_task_data_t));
     if (!data) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -130,6 +132,7 @@ static void *windows_thread_create(task_info_core_t *info, size_t stack_size)
 
     if (!data->thread_handle) {
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

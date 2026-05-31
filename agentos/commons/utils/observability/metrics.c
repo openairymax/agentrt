@@ -18,6 +18,7 @@
 #include <cjson/cJSON.h>
 #endif
 #include <stdint.h>
+#include "error.h"
 
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
@@ -152,12 +153,16 @@ void agentos_metrics_timing(agentos_metrics_t *metrics, const char *name, double
 
 char *agentos_metrics_export(agentos_metrics_t *metrics)
 {
-    if (!metrics)
+    if (!metrics) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 #ifndef AGENTOS_NO_CJSON
     cJSON *root = cJSON_CreateObject();
-    if (!root)
+    if (!root) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     cJSON *counters = cJSON_CreateObject();
     cJSON *gauges = cJSON_CreateObject();
@@ -215,13 +220,17 @@ static int sanitize_metric_name(const char *name, char *out, size_t out_size)
 
 char *agentos_metrics_export_prometheus_filtered(agentos_metrics_t *metrics, const char *prefix)
 {
-    if (!metrics)
+    if (!metrics) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     size_t buf_size = 4096;
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
-    if (!buf)
+    if (!buf) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     size_t pos = 0;
 
 #define APPEND(fmt, ...)                                                                           \

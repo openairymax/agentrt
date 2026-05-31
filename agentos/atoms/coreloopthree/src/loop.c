@@ -268,8 +268,7 @@ static char *build_enhanced_input(const char *input, size_t input_len,
                                   agentos_memory_record_t **records, size_t record_count,
                                   size_t max_memories)
 {
-    if (!input || record_count == 0 || !records)
-        return NULL;
+    if (!input || record_count == 0 || !records) return NULL;
 
     size_t total_len = input_len + 1024;
     for (size_t i = 0; i < record_count; i++) {
@@ -279,8 +278,7 @@ static char *build_enhanced_input(const char *input, size_t input_len,
     }
 
     char *enhanced_input = (char *)AGENTOS_MALLOC(total_len);
-    if (!enhanced_input)
-        return NULL;
+    if (!enhanced_input) return NULL;
 
     size_t pos = 0;
     pos += snprintf(enhanced_input + pos, total_len - pos, "[上下文增强]\n相关记忆数量：%zu\n\n",

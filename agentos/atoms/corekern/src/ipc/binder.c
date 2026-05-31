@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 /* ==================== 兼容层：create/destroy 包装 ==================== */
 
@@ -32,6 +33,7 @@ static inline agentos_mutex_t *agentos_mutex_create_compat(void)
     agentos_mutex_t *m = (agentos_mutex_t *)AGENTOS_CALLOC(1, sizeof(agentos_mutex_t));
     if (m && agentos_mutex_init(m) != 0) {
         AGENTOS_FREE(m);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
     return m;
@@ -50,6 +52,7 @@ static inline agentos_cond_t *agentos_cond_create_compat(void)
     agentos_cond_t *c = (agentos_cond_t *)AGENTOS_CALLOC(1, sizeof(agentos_cond_t));
     if (c && agentos_cond_init(c) != 0) {
         AGENTOS_FREE(c);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
     return c;
@@ -154,6 +157,7 @@ static binder_node_t *find_node_locked(const char *name)
             return node;
         node = node->next;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -165,6 +169,7 @@ static pending_call_t *find_pending_call_locked(agentos_ipc_channel_t *ch, uint6
             return pc;
         pc = pc->next;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -183,17 +188,18 @@ static void remove_pending_call_locked(agentos_ipc_channel_t *ch, pending_call_t
 static pending_call_t *pending_call_create(void)
 {
     pending_call_t *pc = (pending_call_t *)AGENTOS_CALLOC(1, sizeof(pending_call_t));
-    if (!pc)
-        return NULL;
+    if (!pc) return NULL;
 
     if (agentos_mutex_init(&pc->cond_lock) != 0) {
         AGENTOS_FREE(pc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
     if (agentos_cond_init(&pc->cond) != 0) {
         agentos_mutex_destroy(&pc->cond_lock);
         AGENTOS_FREE(pc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 

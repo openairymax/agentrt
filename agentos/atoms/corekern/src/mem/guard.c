@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include "error.h"
 
 #define GUARD_SIZE 16
 #define GUARD_PATTERN 0xDEADBEEFU
@@ -48,8 +49,10 @@ static guard_block_t *create_guarded_block(size_t size)
 {
     size_t total = sizeof(guard_block_t) + size + GUARD_SIZE;
     guard_block_t *block = (guard_block_t *)AGENTOS_MALLOC(total);
-    if (!block)
+    if (!block) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     fill_guard(block->front);
     block->user_size = size;
