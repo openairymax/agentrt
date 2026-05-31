@@ -222,14 +222,21 @@ static void trace_store_service_check_storage_limit(const char *current_file)
     (void)current_file;
     int deleted = trace_store_service_cleanup_old_files(1);
     if (deleted > 0) {
-        fprintf(stderr, "Trace storage limit exceeded, cleaned %d old files\n", deleted);
+        {
+        char _buf[256];
+        snprintf(_buf, sizeof(_buf), "Trace storage limit exceeded, cleaned %d old files\n", deleted);
+        fputs(_buf, stderr);
+    }
     } else {
-        fprintf(stderr,
+        {
+        char _buf[256];
+        snprintf(_buf, sizeof(_buf),
                 "Warning: Trace storage limit exceeded (%llu bytes > %llu bytes), no old files to "
                 "clean\n",
                 (unsigned long long)g_ctx.total_bytes_stored,
                 (unsigned long long)g_ctx.max_storage_bytes);
     }
+}
 }
 
 /**
@@ -378,9 +385,9 @@ int trace_store_service_export_traces(const time_t *start_time, const time_t *en
     time_t t_end = end_time ? *end_time : time(NULL);
 
     if (strcmp(export_format, "json") == 0) {
-        fprintf(f, "{\"traces\": [\n");
+        fputs("{\"traces\": [\n", f);
     } else if (strcmp(export_format, "csv") == 0) {
-        fprintf(f, "timestamp_ns,component,operation,duration_ns,success,trace_id,metadata\n");
+        fputs("timestamp_ns,component,operation,duration_ns,success,trace_id,metadata\n", f);
     }
 
     struct dirent *entry;
@@ -412,11 +419,19 @@ int trace_store_service_export_traces(const time_t *start_time, const time_t *en
 
             if (strcmp(export_format, "json") == 0) {
                 if (!first_json)
-                    fprintf(f, ",\n");
-                fprintf(f, "  %s", line);
+                    fputs(",\n", f);
+                {
+                    char _buf[2048];
+                    snprintf(_buf, sizeof(_buf), "  %s", line);
+                    fputs(_buf, f);
+                }
                 first_json = false;
             } else if (strcmp(export_format, "csv") == 0) {
-                fprintf(f, "%s\n", line);
+                {
+                    char _buf[2048];
+                    snprintf(_buf, sizeof(_buf), "%s\n", line);
+                    fputs(_buf, f);
+                }
             }
             exported++;
         }
@@ -424,7 +439,7 @@ int trace_store_service_export_traces(const time_t *start_time, const time_t *en
     }
 
     if (strcmp(export_format, "json") == 0) {
-        fprintf(f, "\n]}\n");
+        fputs("\n]}\n", f);
     }
 
     closedir(dir);

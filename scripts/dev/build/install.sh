@@ -183,7 +183,7 @@ check_dependencies() {
     for dep in "${deps[@]}"; do
         case "$dep" in
             bash)
-                if [[ "${BASH_VERSION:-0}" < "4.0" ]]; then
+                if (( BASH_VERSINFO[0] < 4 )); then
                     missing+=("bash >= 4.0")
                 fi
                 ;;

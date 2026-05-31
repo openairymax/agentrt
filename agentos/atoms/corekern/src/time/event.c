@@ -12,6 +12,11 @@
 
 #include <stdlib.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 struct agentos_event {
     atomic_int signaled;
@@ -45,7 +50,7 @@ agentos_event_t *agentos_event_create(void)
 agentos_error_t agentos_event_wait(agentos_event_t *event, uint32_t timeout_ms)
 {
     if (!event)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_mutex_lock(event->mutex);
     if (atomic_load_explicit(&event->signaled, memory_order_acquire)) {
@@ -65,7 +70,7 @@ agentos_error_t agentos_event_wait(agentos_event_t *event, uint32_t timeout_ms)
 agentos_error_t agentos_event_signal(agentos_event_t *event)
 {
     if (!event)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     agentos_mutex_lock(event->mutex);
     atomic_store_explicit(&event->signaled, 1, memory_order_seq_cst);
     agentos_mutex_unlock(event->mutex);
@@ -76,7 +81,7 @@ agentos_error_t agentos_event_signal(agentos_event_t *event)
 agentos_error_t agentos_event_reset(agentos_event_t *event)
 {
     if (!event)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     agentos_mutex_lock(event->mutex);
     atomic_store_explicit(&event->signaled, 0, memory_order_seq_cst);
     agentos_mutex_unlock(event->mutex);

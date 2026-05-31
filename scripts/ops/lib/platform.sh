@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck shell=bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 平台检测和环境工具模块
 # 遵循 AgentOS 架构设计原则：跨平台一致性原则 (E-4)

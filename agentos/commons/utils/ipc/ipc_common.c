@@ -322,7 +322,7 @@ agentos_error_t ipc_init(void)
     }
 #endif
 
-    srand((unsigned int)(agentos_time_ns() & 0xFFFFFFFF));
+    agentos_random_init();
     g_ipc_initialized = true;
 
     return AGENTOS_SUCCESS;

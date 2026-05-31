@@ -16,6 +16,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct reactive_data {
     agentos_llm_service_t *llm;
@@ -87,7 +92,7 @@ static agentos_error_t reactive_plan(const agentos_intent_t *intent, void *conte
 
     reactive_data_t *data = (reactive_data_t *)context;
     if (!intent || !out_plan)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     const char *goal = intent->intent_goal ? (const char *)intent->intent_goal : "";
     size_t goal_len = intent->intent_goal_len;
@@ -140,7 +145,7 @@ static agentos_error_t reactive_plan(const agentos_intent_t *intent, void *conte
     if (!plan) {
         if (llm_plan)
             AGENTOS_FREE(llm_plan);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     uint64_t counter = 0;
@@ -162,7 +167,7 @@ static agentos_error_t reactive_plan(const agentos_intent_t *intent, void *conte
         AGENTOS_FREE(plan);
         if (llm_plan)
             AGENTOS_FREE(llm_plan);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     for (size_t i = 0; i < node_count; i++) {
@@ -233,7 +238,7 @@ cleanup:
     AGENTOS_FREE(plan);
     if (llm_plan)
         AGENTOS_FREE(llm_plan);
-    return AGENTOS_ENOMEM;
+    ATM_RET_ERR(AGENTOS_ENOMEM);
 }
 
 agentos_plan_strategy_t *agentos_plan_reactive_create(agentos_llm_service_t *llm)

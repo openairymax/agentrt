@@ -21,6 +21,11 @@
 #include <string.h>
 #include <time.h>
 #include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 #define ML_FEATURE_COUNT 4
 #define ML_MAX_HISTORY 256
@@ -115,7 +120,7 @@ static agentos_error_t ml_dispatch(const agentos_task_node_t *task, const void *
                                    size_t count, void *context, char **out_agent_id)
 {
     if (!context || !out_agent_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     ml_dispatch_data_t *data = (ml_dispatch_data_t *)context;
 
@@ -179,7 +184,7 @@ static agentos_error_t ml_dispatch(const agentos_task_node_t *task, const void *
     }
 
     *out_agent_id = NULL;
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 static void ml_destroy(agentos_dispatching_strategy_t *strategy)
@@ -264,7 +269,7 @@ agentos_error_t agentos_dispatching_ml_report_outcome(agentos_dispatching_strate
                                                       float reward)
 {
     if (!strategy || !strategy->data)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     ml_dispatch_data_t *data = (ml_dispatch_data_t *)strategy->data;
     if (reward < 0.0f)

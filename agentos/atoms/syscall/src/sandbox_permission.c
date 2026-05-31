@@ -13,6 +13,11 @@
 /* 基础库兼容性层 */
 #include "memory_compat.h"
 #include "string_compat.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 权限规则管理 ==================== */
 
@@ -53,12 +58,12 @@ agentos_error_t sandbox_permission_add(agentos_sandbox_t *sandbox, int syscall_n
                                        permission_type_t perm_type, const char *condition)
 {
     if (!sandbox)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     permission_rule_t *new_rule = sandbox_permission_create(syscall_num, perm_type, condition);
     if (!new_rule) {
         AGENTOS_LOG_ERROR("Failed to create permission rule");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     agentos_mutex_lock(sandbox->lock);
