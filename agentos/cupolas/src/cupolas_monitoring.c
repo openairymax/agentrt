@@ -24,6 +24,7 @@
 #include "gateway.h"
 #include "platform/platform.h"
 #include "utils/cupolas_utils.h"
+#include "error.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,13 +36,6 @@
 #include <windows.h>
 #else
 #include <unistd.h>
-#endif
-
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
 #endif
 
 #define MAX_METRICS_BUFFER (64 * 1024)

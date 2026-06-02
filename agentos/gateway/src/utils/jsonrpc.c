@@ -296,7 +296,8 @@ int jsonrpc_validate_batch_request(const cJSON *batch_json, size_t *out_count)
     AGENTOS_CHECK(out_count != NULL, AGENTOS_ERR_NULL_POINTER, "out_count is NULL");
     *out_count = 0;
 
-    AGENTOS_CHECK(cJSON_IsArray(batch_json), AGENTOS_ERR_INVALID_PARAM, "batch_json is not an array");
+    AGENTOS_CHECK(cJSON_IsArray(batch_json), AGENTOS_ERR_INVALID_PARAM,
+                  "batch_json is not an array");
 
     size_t count = cJSON_GetArraySize(batch_json);
     AGENTOS_CHECK(count > 0, AGENTOS_ERR_INVALID_PARAM, "batch is empty");

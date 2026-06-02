@@ -49,7 +49,7 @@ provider_registry_t *provider_registry_create(const service_config_t *cfg)
     if (!reg) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
     agentos_mutex_init(&reg->lock);
 
     size_t count = 0;
@@ -108,7 +108,7 @@ provider_registry_t *provider_registry_create_from_config(const service_config_t
     if (!reg) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
 
     if (!config_path)
         return reg;
@@ -282,7 +282,7 @@ const provider_t *provider_registry_find(provider_registry_t *reg, const char *m
     if (!reg) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
     agentos_mutex_lock(&reg->lock);
     if (!reg->providers) {
         agentos_mutex_unlock(&reg->lock);

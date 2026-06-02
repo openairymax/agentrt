@@ -3,7 +3,7 @@
 # 自包含构建，提供完整的后端服务运行时环境
 
 # === 1. 构建阶段 ===
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 
@@ -32,7 +32,7 @@ RUN mkdir -p /workspace/AgentOS-build \
     && cmake --install /workspace/AgentOS-build
 
 # === 2. 运行时阶段 ===
-FROM ubuntu:22.04 AS gateway
+FROM ubuntu:24.04 AS gateway
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="0.1.0"

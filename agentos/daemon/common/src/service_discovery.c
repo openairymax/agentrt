@@ -11,7 +11,6 @@
 
 #include "service_discovery.h"
 
-
 #include "daemon_errors.h"
 #include "memory_compat.h"
 #include "platform.h"

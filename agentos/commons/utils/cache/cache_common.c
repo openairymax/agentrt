@@ -14,12 +14,7 @@
 #include <time.h>
 #include "error.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 #define HASH_SIZE 1024
 

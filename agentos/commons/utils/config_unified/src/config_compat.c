@@ -10,18 +10,14 @@
 #include "config_compat.h"
 
 #include "core_config.h"
+#include "error.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "memory_compat.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 static config_context_t *g_compat_ctx = NULL;
 static config_compat_stats_t g_compat_stats = {0};

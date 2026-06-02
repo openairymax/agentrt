@@ -12,12 +12,6 @@
 #define ATM_RET_ERR(c) \
     do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
 
-
-
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-
 typedef struct {
     char name[128];
     taskflow_task_handler_t handler;

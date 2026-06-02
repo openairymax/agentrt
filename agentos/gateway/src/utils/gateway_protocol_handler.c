@@ -638,9 +638,10 @@ int gateway_protocol_handler_load_config_from_json(gateway_protocol_config_t *co
 
     cJSON *root = cJSON_Parse(json_config);
     if (!root) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "gateway_protocol_handler: invalid parameter");
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__,
+                              "gateway_protocol_handler: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
-        }
+    }
 
     cJSON *item;
 
@@ -727,14 +728,16 @@ int gateway_protocol_convert_to_jsonrpc(gateway_protocol_handler_t handler,
         AGENTOS_FREE(id_str);
         return *jsonrpc_out ? 0 : -2;
     default:
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "gateway_protocol_handler: null pointer");
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__,
+                              "gateway_protocol_handler: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
     }
 
     if (!params) {
         AGENTOS_FREE(method);
         AGENTOS_FREE(id_str);
-        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "gateway_protocol_handler: out of memory");
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
+                              "gateway_protocol_handler: out of memory");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -773,14 +776,16 @@ int gateway_protocol_convert_from_jsonrpc(gateway_protocol_handler_t handler,
 
     cJSON *jsonrpc = cJSON_Parse(jsonrpc_response);
     if (!jsonrpc) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "gateway_protocol_handler: invalid parameter");
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__,
+                              "gateway_protocol_handler: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
-        }
+    }
 
     cJSON *result = cJSON_GetObjectItem(jsonrpc, "result");
     if (!result) {
         cJSON_Delete(jsonrpc);
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "gateway_protocol_handler: null pointer");
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__,
+                              "gateway_protocol_handler: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
     }
 

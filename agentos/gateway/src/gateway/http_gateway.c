@@ -209,7 +209,8 @@ int parse_json_request(http_gateway_t *gateway, http_request_context_t *context,
                        size_t size)
 {
     if (!data || size == 0) {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "parse_json_request: parse error");
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "parse_json_request: parse error");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -223,7 +224,8 @@ int parse_json_request(http_gateway_t *gateway, http_request_context_t *context,
 
     context->json_request = cJSON_Parse(data);
     if (!context->json_request) {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "cJSON_Parse: parse error");
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "cJSON_Parse: parse error");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -288,7 +290,8 @@ static int internal_handler_public_wrapper(const char *request_json, char **resp
     internal_to_public_adapter_t *adapter = (internal_to_public_adapter_t *)user_data;
     if (!adapter || !adapter->internal_handler) {
         *response_json = NULL;
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: null pointer");
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "if: null pointer");
         return AGENTOS_ERR_UNKNOWN;
     }
     char *resp = adapter->internal_handler((void *)request_json, adapter->internal_data);
@@ -297,7 +300,8 @@ static int internal_handler_public_wrapper(const char *request_json, char **resp
         return 0;
     }
     *response_json = NULL;
-    agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "if: null pointer");
+    agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__,
+                          "if: null pointer");
     return AGENTOS_ERR_NULL_POINTER;
 }
 
@@ -617,11 +621,12 @@ gateway_t *http_gateway_create(const char *host, uint16_t port)
 
             gateway->cors.allowed_origins = AGENTOS_MALLOC(count * sizeof(char *));
             if (gateway->cors.allowed_origins) {
-                char *token = strtok(origins_copy, ",");
+                char *saveptr = NULL;
+                char *token = strtok_r(origins_copy, ",", &saveptr);
                 size_t i = 0;
                 while (token && i < count) {
                     gateway->cors.allowed_origins[i++] = AGENTOS_STRDUP(token);
-                    token = strtok(NULL, ",");
+                    token = strtok_r(NULL, ",", &saveptr);
                 }
                 gateway->cors.allowed_origins_count = i;
             }
@@ -690,7 +695,8 @@ int http_gateway_register_endpoint(http_gateway_t *gateway, const char *method, 
                                    gateway_endpoint_handler_t handler, void *user_data)
 {
     if (!gateway || !method || !path || !handler) {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "http_gateway_register_endpoint: failed");
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "http_gateway_register_endpoint: failed");
         return AGENTOS_ERR_UNKNOWN;
     }
 
