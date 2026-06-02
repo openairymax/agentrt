@@ -7,7 +7,6 @@
 
 #include "param_validator.h"
 
-
 #include <stdarg.h>
 #include <string.h>
 #include "error.h"

@@ -117,7 +117,7 @@ static agentos_error_t svc_common_module_init(void)
     if (err != AGENTOS_SUCCESS) {
         LOG_ERROR("Failed to initialize registry mutex: %d", err);
         return DAEMON_EINIT;
-    AGENTOS_ERROR_HANDLE(DAEMON_EINIT, "svc_common: registry mutex init failed");
+        AGENTOS_ERROR_HANDLE(DAEMON_EINIT, "svc_common: registry mutex init failed");
     }
 
     g_registry.initialized = 1;
@@ -171,7 +171,7 @@ static agentos_error_t register_service_internal(agentos_service_internal_t *ser
 {
     if (!service || !g_registry.initialized) {
         return AGENTOS_EINVAL;
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "register_service_internal: null service");
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "register_service_internal: null service");
     }
 
     agentos_mutex_lock(&g_registry.registry_mutex);
@@ -277,7 +277,7 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
 
     if (!out_service || !name || !iface || !config) {
         return AGENTOS_EINVAL;
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: null parameter");
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: null parameter");
     }
 
     /* 初始化模块（如果未初始化） */
@@ -296,7 +296,7 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
     agentos_service_internal_t *service =
         (agentos_service_internal_t *)AGENTOS_CALLOC(1, sizeof(agentos_service_internal_t));
     if (!service) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ENOMEM, "agentos_service_create: calloc service failed");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ENOMEM, "agentos_service_create: calloc service failed");
         return AGENTOS_ENOMEM;
     }
 
@@ -304,14 +304,14 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
     if (safe_strcpy(service->name, name, MAX_SERVICE_NAME_LEN) != 0) {
         AGENTOS_FREE(service);
         return AGENTOS_EINVAL;
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: name copy failed");
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: name copy failed");
     }
 
     if (config->version) {
         if (safe_strcpy(service->version, config->version, MAX_SERVICE_VERSION_LEN) != 0) {
             AGENTOS_FREE(service);
             return AGENTOS_EINVAL;
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: version copy failed");
+            AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: version copy failed");
         }
     }
 
@@ -320,7 +320,7 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
     err = agentos_mutex_init(&service->state_mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(service);
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: state mutex init failed");
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: state mutex init failed");
         return err;
     }
 
@@ -419,7 +419,7 @@ agentos_error_t agentos_service_init(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot initialize from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_init: invalid state transition");
+        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_init: invalid state transition");
     }
 
     /* 更新状态 */
@@ -462,7 +462,7 @@ agentos_error_t agentos_service_start(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot start from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_start: invalid state transition");
+        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_start: invalid state transition");
     }
 
     /* 更新状态 */
@@ -514,7 +514,7 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_WARN("Service '%s' cannot stop from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_stop: invalid state transition");
+        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_stop: invalid state transition");
     }
 
     /* 更新状态 */
@@ -683,7 +683,7 @@ agentos_error_t agentos_service_pause(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot pause from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_pause: invalid state");
+        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_pause: invalid state");
     }
 
     /* 检查是否支持暂停 */
@@ -717,7 +717,7 @@ agentos_error_t agentos_service_resume(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot resume from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-    AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_resume: invalid state");
+        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_resume: invalid state");
     }
 
     /* 更新状态 */
@@ -1103,7 +1103,7 @@ agentos_error_t agentos_registry_init(const char *registry_url)
     err = agentos_mutex_init(&g_cross_registry.mutex);
     if (err != AGENTOS_SUCCESS) {
         return err;
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_registry_init: mutex init failed");
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_registry_init: mutex init failed");
     }
 
     agentos_mutex_lock(&g_cross_registry.mutex);
@@ -1634,7 +1634,7 @@ static void *monitor_thread_func(void *arg)
     if (!mon || !mon->service) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
 
     const char *svc_name = agentos_service_get_name(mon->service);
     uint32_t interval_ms = mon->config.healthcheck_interval_ms;

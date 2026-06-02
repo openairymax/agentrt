@@ -31,7 +31,8 @@
 static int validate_rpc_request(const cJSON *request)
 {
     AGENTOS_CHECK(request != NULL, AGENTOS_ERR_NULL_POINTER, "request is NULL");
-    AGENTOS_CHECK(cJSON_IsObject(request), AGENTOS_ERR_INVALID_PARAM, "request is not a JSON object");
+    AGENTOS_CHECK(cJSON_IsObject(request), AGENTOS_ERR_INVALID_PARAM,
+                  "request is not a JSON object");
 
     const cJSON *jsonrpc = cJSON_GetObjectItem(request, "jsonrpc");
     AGENTOS_CHECK(jsonrpc != NULL, AGENTOS_ERR_NOT_FOUND, "jsonrpc field missing");

@@ -232,18 +232,17 @@ static char *ws_message_to_json(ws_message_t *msg)
  */
 static int ws_send_message(struct lws *wsi, ws_message_t *msg)
 {
-    if (!wsi || !msg)
-        {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "ws_send_message: IO error");
+    if (!wsi || !msg) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "ws_send_message: IO error");
         return AGENTOS_ERR_UNKNOWN;
-        }
+    }
 
     char *json_str = ws_message_to_json(msg);
-    if (!json_str)
-        {
+    if (!json_str) {
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: failed");
         return AGENTOS_ERR_UNKNOWN;
-        }
+    }
 
     size_t out_len = strlen(json_str);
     int result = lws_write(wsi, (unsigned char *)json_str, out_len, LWS_WRITE_TEXT);
@@ -257,17 +256,16 @@ static int ws_send_message(struct lws *wsi, ws_message_t *msg)
 static int ws_rpc_handler_adapter(const char *request_json, char **response_json, void *ctx)
 {
     ws_gateway_t *gw = (ws_gateway_t *)ctx;
-    if (!gw || !gw->handler)
-        {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "ws_rpc_handler_adapter: failed");
+    if (!gw || !gw->handler) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "ws_rpc_handler_adapter: failed");
         return AGENTOS_ERR_UNKNOWN;
-        }
+    }
     char *result = gw->handler((void *)request_json, gw->handler_data);
-    if (!result)
-        {
+    if (!result) {
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: failed");
         return AGENTOS_ERR_UNKNOWN;
-        }
+    }
     *response_json = result;
     return 0;
 }
@@ -320,11 +318,11 @@ static int handle_ws_established(ws_gateway_t *gateway, ws_connection_context_t 
                                  void **user)
 {
     ws_connection_context_t *context = AGENTOS_CALLOC(1, sizeof(ws_connection_context_t));
-    if (!context)
-        {
-        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "handle_ws_established: allocation failed");
+    if (!context) {
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
+                              "handle_ws_established: allocation failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
-        }
+    }
 
     context->wsi = (struct lws *)*user;
     context->connect_time_ns = gateway_time_ns();
@@ -367,16 +365,17 @@ static int handle_ws_rpc_request(ws_gateway_t *gateway, ws_connection_context_t 
                                  cJSON *rpc_request, struct lws *wsi)
 {
     char *response = handle_rpc_request(gateway, rpc_request);
-    if (!response)
-        {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "handle_ws_rpc_request: IO error");
+    if (!response) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "handle_ws_rpc_request: IO error");
         return AGENTOS_ERR_UNKNOWN;
-        }
+    }
 
     cJSON *response_json = cJSON_Parse(response);
     if (!response_json) {
         AGENTOS_FREE(response);
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "cJSON_Parse: parse error");
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "cJSON_Parse: parse error");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -406,11 +405,11 @@ static int handle_ws_unknown_message(struct lws *wsi, const char *unknown_type)
              unknown_type ? unknown_type : "null");
 
     char *error_json = jsonrpc_create_error_response(NULL, -32600, err_buf, NULL);
-    if (!error_json)
-        {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "snprintf: not supported");
+    if (!error_json) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "snprintf: not supported");
         return AGENTOS_ERR_UNKNOWN;
-        }
+    }
 
     ws_message_t *error_msg = ws_message_create(WS_MSG_TYPE_ERROR, NULL, NULL);
     if (error_msg) {
@@ -478,11 +477,11 @@ static int ws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *
         return handle_ws_established(gateway, &context, &user);
 
     case LWS_CALLBACK_RECEIVE:
-        if (!context)
-            {
-            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "handle_ws_established: failed");
+        if (!context) {
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                                  "handle_ws_established: failed");
             return AGENTOS_ERR_UNKNOWN;
-            }
+        }
 
         if (len > gateway->max_request_size) {
             char *error_json =
@@ -496,7 +495,8 @@ static int ws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *
                 }
                 AGENTOS_FREE(error_json);
             }
-            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "ws_send_message: IO error");
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                                  "ws_send_message: IO error");
             return AGENTOS_ERR_UNKNOWN;
         }
 

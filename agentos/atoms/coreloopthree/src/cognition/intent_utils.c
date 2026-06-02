@@ -107,9 +107,9 @@ size_t intent_extract_keywords(const char *text, char **keywords, size_t max_key
     if (!copy)
         return 0;
 
-    char *token = strtok(copy, " ,.!?;:\t\n\r");
+    char *saveptr = NULL;
+    char *token = strtok_r(copy, " ,.!?;:\t\n\r", &saveptr);
     while (token && count < max_keywords) {
-        // 过滤短词
         if (strlen(token) > 2) {
             keywords[count] = AGENTOS_STRDUP(token);
             if (keywords[count]) {
@@ -117,7 +117,7 @@ size_t intent_extract_keywords(const char *text, char **keywords, size_t max_key
                 count++;
             }
         }
-        token = strtok(NULL, " ,.!?;:\t\n\r");
+        token = strtok_r(NULL, " ,.!?;:\t\n\r", &saveptr);
     }
 
     AGENTOS_FREE(copy);

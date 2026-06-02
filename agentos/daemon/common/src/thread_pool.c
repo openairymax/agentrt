@@ -75,7 +75,7 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
     if (!pool) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
 
     if (config) {
         pool->config = *config;

@@ -11,7 +11,7 @@ services:
       context: ../../
       dockerfile: scripts/deployment/docker/Dockerfile.service
       target: runtime
-    image: ${DOCKER_REGISTRY:-spharx}/agentos-scripts:staging
+    image: ${DOCKER_REGISTRY:-spharx}/agentos-scripts:0.1.0-staging
     container_name: agentos-scripts
     hostname: agentos-scripts-staging
     restart: unless-stopped

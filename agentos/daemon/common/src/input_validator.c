@@ -96,7 +96,8 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
                     snprintf(err, sizeof(err), "SQL injection pattern: %s", sql_patterns[i]);
                     *out_violation = AGENTOS_STRDUP(err);
                 }
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: contains null byte");
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
+                                     "input_validator: contains null byte");
                 return AGENTOS_ERR_INVALID_PARAM;
             }
         }
@@ -107,7 +108,8 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
             strstr(input, "onload=")) {
             if (out_violation)
                 *out_violation = AGENTOS_STRDUP("XSS pattern detected");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: contains control chars");
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
+                                 "input_validator: contains control chars");
             return AGENTOS_ERR_INVALID_PARAM;
         }
     }
@@ -118,7 +120,8 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
             if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') {
                 if (out_violation)
                     *out_violation = AGENTOS_STRDUP("Control character detected");
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: SQL injection pattern");
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
+                                     "input_validator: SQL injection pattern");
                 return AGENTOS_ERR_INVALID_PARAM;
             }
         }

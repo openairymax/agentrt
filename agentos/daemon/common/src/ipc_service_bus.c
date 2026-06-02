@@ -12,7 +12,6 @@
 
 #include "ipc_service_bus.h"
 
-
 #include "atomic_compat.h"
 #include "ipc_client.h"
 #include "memory_compat.h"

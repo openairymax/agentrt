@@ -35,12 +35,7 @@
 #include <unistd.h>
 #endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 #define MAX_SPANS 1024
 #define MAX_EVENTS_PER_SPAN 64

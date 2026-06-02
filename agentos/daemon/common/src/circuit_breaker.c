@@ -176,7 +176,7 @@ AGENTOS_API cb_manager_t cb_manager_create(void)
     if (!mgr) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
 
     agentos_error_t err = agentos_mutex_init(&mgr->mutex);
     if (err != AGENTOS_SUCCESS) {
@@ -219,7 +219,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
     if (!manager || !name) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
 
     cb_manager_internal_t *mgr = (cb_manager_internal_t *)manager;
 
@@ -495,7 +495,7 @@ AGENTOS_API const char *cb_get_name(circuit_breaker_t breaker)
     if (!breaker) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
     cb_internal_t *cb = (cb_internal_t *)breaker;
     return cb->name;
 }
@@ -696,7 +696,7 @@ AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char *name)
     if (!manager || !name) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
 
     cb_manager_internal_t *mgr = (cb_manager_internal_t *)manager;
 

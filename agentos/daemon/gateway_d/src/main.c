@@ -140,7 +140,7 @@ static int parse_args(int argc, char *argv[], gateway_service_config_t *config)
             pid_t pid = fork();
             if (pid < 0) {
                 SVC_LOG_ERROR("Failed to fork");
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "fork failed when daemonizing");
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "fork failed when daemonizing");
                 return AGENTOS_ERR_UNKNOWN;
             }
             if (pid > 0)

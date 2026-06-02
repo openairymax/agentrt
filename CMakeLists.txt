@@ -52,13 +52,14 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 项目范围选项
-option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" ON)
+option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
 option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)
 option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+option(AGENTOS_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 if(BUILD_TESTS)

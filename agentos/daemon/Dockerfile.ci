@@ -2,7 +2,7 @@
 # AgentOS daemon 模块独立构建 CI Docker 镜像
 # 用于 daemon 模块的独立构建和测试
 
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="0.1.0"
@@ -102,7 +102,7 @@ RUN cd /build/daemon/market_d/build && ctest --output-on-failure
 # ============================================================================
 # 运行时镜像
 # ============================================================================
-FROM ubuntu:22.04 AS runtime
+FROM ubuntu:24.04 AS runtime
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="0.1.0"

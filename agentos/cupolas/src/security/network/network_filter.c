@@ -17,9 +17,6 @@
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
 #endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
 
 #define MAX_FILTER_RULES 512
 #define MAX_CONNECTIONS 1024
