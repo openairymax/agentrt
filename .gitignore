@@ -517,6 +517,8 @@ $RECYCLE.BIN/
 # 依赖管理（本地安装，不追踪）
 # =============================================================================
 
+node_modules/
+**/node_modules/
 vendor/
 vendor/bundle/
 Gemfile.lock
