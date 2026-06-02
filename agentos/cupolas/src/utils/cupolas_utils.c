@@ -9,13 +9,9 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <strings.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+#include "logging_compat.h"
 
 size_t cupolas_strlcpy(char *dst, const char *src, size_t size)
 {
@@ -116,16 +112,19 @@ void cupolas_log_message(const char *level, const char *format, ...)
     if (!level || !format)
         return;
 
-    char line_buf[4096];
+    int log_level = LOG_LEVEL_INFO;
+    if (cupolas_strcasecmp(level, "ERROR") == 0 || cupolas_strcasecmp(level, "FATAL") == 0)
+        log_level = LOG_LEVEL_ERROR;
+    else if (cupolas_strcasecmp(level, "WARN") == 0 || cupolas_strcasecmp(level, "WARNING") == 0)
+        log_level = LOG_LEVEL_WARN;
+    else if (cupolas_strcasecmp(level, "DEBUG") == 0)
+        log_level = LOG_LEVEL_DEBUG;
+
+    char prefixed_fmt[4096];
+    snprintf(prefixed_fmt, sizeof(prefixed_fmt), "[CUPOLAS %s] %s", level, format);
 
     va_list args;
     va_start(args, format);
-
-    snprintf(line_buf, sizeof(line_buf), "[CUPOLAS %s] ", level);
-    fputs(line_buf, stderr);
-    vfprintf(stderr, format,
-             args); /* flawfinder: ignore - format string is internal, not user input */
-    fputs("\n", stderr);
-
+    agentos_log_write_va(log_level, __FILE__, __LINE__, prefixed_fmt, args);
     va_end(args);
 }

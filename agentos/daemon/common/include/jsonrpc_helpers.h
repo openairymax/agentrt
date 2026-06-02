@@ -70,7 +70,7 @@ AGENTOS_API int jsonrpc_is_batch_request(const char *raw);
         char *_err = jsonrpc_build_error((error_code), (message), (id)); \
         if (_err) {                                                      \
             agentos_socket_send((socket), _err, strlen(_err));           \
-            AGENTOS_FREE(_err);                                                  \
+            AGENTOS_FREE(_err);                                          \
         }                                                                \
     } while (0)
 
@@ -87,7 +87,7 @@ AGENTOS_API int jsonrpc_is_batch_request(const char *raw);
         cJSON_Delete((result));                                        \
         if (_success) {                                                \
             agentos_socket_send((socket), _success, strlen(_success)); \
-            AGENTOS_FREE(_success);                                            \
+            AGENTOS_FREE(_success);                                    \
         }                                                              \
     } while (0)
 

@@ -501,7 +501,8 @@ static int ht_init(hash_table_t *ht, size_t capacity)
     ht->entries = (hash_entry_t *)AGENTOS_CALLOC(capacity, sizeof(hash_entry_t));
     if (!ht->entries) {
         ht->capacity = 0;
-        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "ht_init: allocation failed");
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
+                              "ht_init: allocation failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     ht->capacity = capacity;
@@ -542,19 +543,19 @@ static bool ht_insert(hash_table_t *ht, const char *key, size_t index)
 
 static ssize_t ht_lookup(hash_table_t *ht, const char *key)
 {
-    if (!ht->entries || ht->count == 0)
-        {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "ht_lookup: failed");
+    if (!ht->entries || ht->count == 0) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "ht_lookup: failed");
         return AGENTOS_ERR_UNKNOWN;
-        }
+    }
     unsigned long h = hash_fn(key) % ht->capacity;
     for (size_t i = 0; i < ht->capacity; i++) {
         size_t pos = (h + i) % ht->capacity;
-        if (!ht->entries[pos].occupied)
-            {
-            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "hash_fn: failed");
+        if (!ht->entries[pos].occupied) {
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                                  "hash_fn: failed");
             return AGENTOS_ERR_UNKNOWN;
-            }
+        }
         if (strcmp(ht->entries[pos].key, key) == 0)
             return (ssize_t)ht->entries[pos].index;
     }

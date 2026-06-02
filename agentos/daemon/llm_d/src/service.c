@@ -86,7 +86,7 @@ static char *make_cache_key(const llm_request_config_t *manager)
     if (!key) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
 
     /* 构建缓存键 */
     char *p = key;
@@ -142,7 +142,7 @@ static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
     if (!rules) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
 
     for (int i = 0; i < n; ++i) {
         cJSON *item = cJSON_GetArrayItem(pricing, i);
@@ -704,7 +704,7 @@ static const char *yaml_map_get(const yaml_map_t *m, const char *key)
     if (!m || !key) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-        }
+    }
     for (size_t i = 0; i < m->count; ++i) {
         if (strcmp(m->pairs[i].key, key) == 0)
             return m->pairs[i].value;

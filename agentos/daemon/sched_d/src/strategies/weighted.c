@@ -15,10 +15,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef AGENTOS_ERR_SCHED_NO_AGENT
-#define AGENTOS_ERR_SCHED_NO_AGENT (-2001)
-#endif
-
 #define MAX_AGENTS 256
 #define DEFAULT_WEIGHT 1.0
 #define WEIGHT_DECAY 0.95
@@ -178,12 +174,12 @@ static int weighted_schedule(void *raw_data, const task_info_t *task_info __attr
     agentos_mutex_lock(&data->lock);
     if (data->agent_count == 0) {
         agentos_mutex_unlock(&data->lock);
-        return AGENTOS_ERR_SCHED_NO_AGENT;
+        return AGENTOS_ERR_NOT_FOUND;
     }
     int idx = select_by_weight(data);
     if (idx < 0) {
         agentos_mutex_unlock(&data->lock);
-        return AGENTOS_ERR_SCHED_NO_AGENT;
+        return AGENTOS_ERR_NOT_FOUND;
     }
     sched_result_t *result = (sched_result_t *)AGENTOS_CALLOC(1, sizeof(sched_result_t));
     if (!result) {

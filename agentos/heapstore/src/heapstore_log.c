@@ -254,7 +254,8 @@ void heapstore_log_write(heapstore_log_level_t level, const char *service, const
     }
 
     time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
+    struct tm tm_buf2;
+    struct tm *tm_info = localtime_r(&now, &tm_buf2);
     char timestamp[32];
     strftime(timestamp, sizeof(timestamp), "%H:%M:%S", tm_info);
 
@@ -296,7 +297,8 @@ void heapstore_log_writev(heapstore_log_level_t level, const char *service, cons
 
     uint64_t now_ms = agentos_time_ms();
     time_t now = (time_t)(now_ms / 1000);
-    struct tm *tm_info = localtime(&now);
+    struct tm tm_buf3;
+    struct tm *tm_info = localtime_r(&now, &tm_buf3);
     char timestamp[32];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
     char msec[8];
@@ -375,7 +377,8 @@ heapstore_error_t heapstore_log_rotate(void)
     }
 
     time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
+    struct tm tm_buf4;
+    struct tm *tm_info = localtime_r(&now, &tm_buf4);
     char timestamp[64];
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
 
