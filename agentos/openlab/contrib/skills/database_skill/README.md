@@ -1,9 +1,9 @@
 # Database Skill — 数据库操作技能
 
 **模块路径**: `agentos/openlab/contrib/skills/database_skill/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
-> **Preview Status**: 本模块当前处于预览/开发阶段，API 和功能可能在未来版本中发生变化。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentOS v0.1.0 的正式组成部分，API 已稳定。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
 ## 概述
 

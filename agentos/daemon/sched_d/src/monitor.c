@@ -5,7 +5,6 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "error.h"
 #include "memory_compat.h"
 #include "scheduler_service.h"
 #include "svc_logger.h"
@@ -14,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 /**
  * @brief 监控数据

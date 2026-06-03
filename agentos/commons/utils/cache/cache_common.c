@@ -12,13 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 #define HASH_SIZE 1024
 
@@ -99,6 +95,7 @@ int cache_string_compare(const void *a, const void *b)
 void *cache_string_copy(const void *data)
 {
     if (!data) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     return memory_safe_strdup((const char *)data);
@@ -122,12 +119,14 @@ static cache_entry_t *cache_entry_create(const cache_config_t *manager, const vo
 {
     cache_entry_t *entry = memory_safe_alloc(sizeof(cache_entry_t));
     if (!entry) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     entry->key = manager->key_copy_func(key);
     if (!entry->key) {
         memory_safe_free(entry);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -135,6 +134,7 @@ static cache_entry_t *cache_entry_create(const cache_config_t *manager, const vo
     if (!entry->value) {
         manager->key_free_func(entry->key);
         memory_safe_free(entry);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -236,6 +236,7 @@ cache_t cache_create(const cache_config_t *manager)
 {
     cache_impl_t *cache = memory_safe_alloc(sizeof(cache_impl_t));
     if (!cache) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

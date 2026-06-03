@@ -26,18 +26,12 @@
 #include "memory_compat.h"
 #include "platform.h"
 #include "string_compat.h"
+#include "error.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
 
 static size_t log_get_registered_module_count(void)
 {

@@ -1,5 +1,5 @@
 # AgentOS Python SDK - Base Manager Implementation
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # 所有 Manager 的基类，提供统一的初始化和配置

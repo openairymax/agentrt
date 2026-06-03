@@ -2,7 +2,7 @@
 # AgentOS 内核基础镜像
 # 包含编译内核所需的所有依赖和工具
 
-FROM ubuntu:22.04 AS base
+FROM ubuntu:24.04 AS base
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="0.1.0"
@@ -112,7 +112,7 @@ RUN mkdir -p /workspace/AgentOS-build \
     && cmake --install /workspace/AgentOS-build
 
 # === 6. 运行时阶段 ===
-FROM ubuntu:22.04 AS runtime
+FROM ubuntu:24.04 AS runtime
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL version="0.1.0"

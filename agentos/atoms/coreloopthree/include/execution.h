@@ -48,7 +48,8 @@ typedef enum {
     TASK_STATUS_SUCCEEDED = 2,
     TASK_STATUS_FAILED = 3,
     TASK_STATUS_CANCELLED = 4,
-    TASK_STATUS_RETRYING = 5
+    TASK_STATUS_TIMEOUT = 5,
+    TASK_STATUS_RETRYING = 6
 } agentos_task_status_t;
 #endif
 

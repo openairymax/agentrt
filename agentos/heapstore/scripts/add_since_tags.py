@@ -9,7 +9,7 @@
 1. 扫描 include/*.h 文件
 2. 查找所有缺少 @since 标记的公共 API
 3. 在 @see 或 */ 之前添加 @since v1.0.0
-4. 保留已有 @since 标记的 API（如 token 模块的 v1.0.0.6）
+4. 保留已有 @since 标记的 API（如 token 模块的 v0.1.0）
 """
 
 import os
@@ -99,9 +99,9 @@ def main():
         
         # 特殊处理 token 模块（已有部分@since 标记）
         if 'token' in filename:
-            count = add_since_to_file(filepath, "v1.0.0.6")
+            count = add_since_to_file(filepath, "v0.1.0")
         elif 'batch' in filename:
-            count = add_since_to_file(filepath, "v1.0.0.5")
+            count = add_since_to_file(filepath, "v0.1.0")
         else:
             count = add_since_to_file(filepath, "v1.0.0")
         

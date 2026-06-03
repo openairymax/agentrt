@@ -24,7 +24,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
 # 带重试的执行函数
 retry_cmd() {
-    local cmd="$@"
+    local cmd="$*"
     local attempt=1
     
     while [ $attempt -le $MAX_RETRIES ]; do

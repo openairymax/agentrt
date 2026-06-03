@@ -525,7 +525,8 @@ static void test_execution_enum_values(void)
     assert(TASK_STATUS_SUCCEEDED == 2);
     assert(TASK_STATUS_FAILED == 3);
     assert(TASK_STATUS_CANCELLED == 4);
-    assert(TASK_STATUS_RETRYING == 5);
+    assert(TASK_STATUS_TIMEOUT == 5);
+    assert(TASK_STATUS_RETRYING == 6);
     TEST_PASS("task status enum values correct");
 }
 

@@ -17,6 +17,11 @@
 /* 基础库兼容性层 */
 #include "memory_compat.h"
 #include "string_compat.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 审计日志管理 ==================== */
 
@@ -44,7 +49,7 @@ agentos_error_t sandbox_add_audit_entry(agentos_sandbox_t *sandbox, int syscall_
                                         uint64_t duration_ns, const char *details)
 {
     if (!sandbox)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_mutex_lock(sandbox->lock);
 
@@ -111,8 +116,7 @@ void sandbox_release_resource(agentos_sandbox_t *sandbox, int syscall_num, void 
 
 char *sandbox_generate_args_hash(void *args)
 {
-    if (!args)
-        return NULL;
+    if (!args) return NULL;
 
     unsigned char *bytes = (unsigned char *)args;
     uint32_t hash = 5381;

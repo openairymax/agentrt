@@ -9,7 +9,7 @@ AgentOS openlab.protocols — Protocol Integration Bindings
 - ProtocolToolBridge — 协议工具桥接(MCP工具→AgentOS Skill)
 - UnifiedProtocolRunner — 统一协议运行器
 
-@since 2.0.0
+@since 0.1.0
 """
 
 from __future__ import annotations
@@ -387,12 +387,14 @@ class ProtocolSessionManager:
 # ============================================================================
 # Built-in Handlers
 # ============================================================================
-
 class JSONRPCHandler(ProtocolHandler):
     """Handler for JSON-RPC 2.0 protocol messages."""
 
-    def __init__(self, endpoint: str = "http://localhost:18789"):
+    def __init__(self, endpoint: str = None):
+        if endpoint is None:
+            endpoint = os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789")
         self._endpoint = endpoint
+        self._request_id = 0
 
     @property
     def protocol_name(self) -> str:
@@ -440,7 +442,9 @@ class JSONRPCHandler(ProtocolHandler):
 class MCPHandler(ProtocolHandler):
     """Handler for Model Context Protocol (MCP) messages."""
 
-    def __init__(self, endpoint: str = "http://localhost:18789"):
+    def __init__(self, endpoint: str = None):
+        if endpoint is None:
+            endpoint = os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789")
         self._endpoint = endpoint
 
     @property

@@ -18,6 +18,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -273,14 +274,14 @@ static inline bool agentos_validate_priority(int priority, int min_val, int max_
 static inline int safe_add_int(int a, int b, int *result)
 {
     if (!result)
-        return -1;
+        return AGENTOS_EINVAL;
 
     if ((b > 0 && a > INT_MAX - b) || (b < 0 && a < INT_MIN - b)) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     *result = a + b;
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -293,22 +294,22 @@ static inline int safe_add_int(int a, int b, int *result)
 static inline int safe_mul_int(int a, int b, int *result)
 {
     if (!result)
-        return -1;
+        return AGENTOS_EINVAL;
 
     if (a > 0) {
         if (b > 0 && a > INT_MAX / b)
-            return -1;
+            return AGENTOS_EINVAL;
         if (b < 0 && b < INT_MIN / a)
-            return -1;
+            return AGENTOS_EINVAL;
     } else if (a < 0) {
         if (b > 0 && a < INT_MIN / b)
-            return -1;
+            return AGENTOS_EINVAL;
         if (b < 0 && a > INT_MAX / b)
-            return -1;
+            return AGENTOS_EINVAL;
     }
 
     *result = a * b;
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -321,14 +322,14 @@ static inline int safe_mul_int(int a, int b, int *result)
 static inline int safe_add_size(size_t a, size_t b, size_t *result)
 {
     if (!result)
-        return -1;
+        return AGENTOS_EINVAL;
 
     if (a > SIZE_MAX - b) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     *result = a + b;
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -341,14 +342,14 @@ static inline int safe_add_size(size_t a, size_t b, size_t *result)
 static inline int safe_mul_size(size_t a, size_t b, size_t *result)
 {
     if (!result)
-        return -1;
+        return AGENTOS_EINVAL;
 
     if (b != 0 && a > SIZE_MAX / b) {
-        return -1;
+        return AGENTOS_EINVAL;
     }
 
     *result = a * b;
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -410,12 +411,12 @@ static inline bool is_safe_str_copy(const char *src, char *dest, size_t dest_siz
 static inline int safe_memcpy(void *dest, size_t dest_size, const void *src, size_t src_size)
 {
     if (!dest || !src)
-        return -1;
+        return AGENTOS_EINVAL;
     if (src_size > dest_size)
-        return -1;
+        return AGENTOS_EINVAL;
 
     memcpy(dest, src, src_size);
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -429,12 +430,12 @@ static inline int safe_memcpy(void *dest, size_t dest_size, const void *src, siz
 static inline int safe_memset(void *dest, size_t dest_size, int value, size_t count)
 {
     if (!dest)
-        return -1;
+        return AGENTOS_EINVAL;
     if (count > dest_size)
-        return -1;
+        return AGENTOS_EINVAL;
 
     memset(dest, value, count);
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -447,14 +448,14 @@ static inline int safe_memset(void *dest, size_t dest_size, int value, size_t co
 static inline int safe_strcpy(char *dest, size_t dest_size, const char *src)
 {
     if (!dest || !src || dest_size == 0)
-        return -1;
+        return AGENTOS_EINVAL;
 
     size_t src_len = strlen(src);
     if (src_len >= dest_size)
-        return -1;
+        return AGENTOS_EINVAL;
 
     memcpy(dest, src, src_len + 1);
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -467,16 +468,16 @@ static inline int safe_strcpy(char *dest, size_t dest_size, const char *src)
 static inline int safe_strcat(char *dest, size_t dest_size, const char *src)
 {
     if (!dest || !src || dest_size == 0)
-        return -1;
+        return AGENTOS_EINVAL;
 
     size_t current_len = strlen(dest);
     size_t src_len = strlen(src);
 
     if (current_len + src_len >= dest_size)
-        return -1;
+        return AGENTOS_EINVAL;
 
     memcpy(dest + current_len, src, src_len + 1);
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -487,7 +488,7 @@ static inline int safe_strcat(char *dest, size_t dest_size, const char *src)
 static inline size_t safe_strlen(const char *str)
 {
     if (!str)
-        return 0;
+        return AGENTOS_SUCCESS;
     return strlen(str);
 }
 
@@ -519,11 +520,11 @@ static inline int safe_strcmp(const char *str1, const char *str2)
 static inline int safe_int_to_size(int value, size_t *result)
 {
     if (!result)
-        return -1;
+        return AGENTOS_EINVAL;
     if (value < 0)
-        return -1;
+        return AGENTOS_EINVAL;
     *result = (size_t)value;
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -535,11 +536,11 @@ static inline int safe_int_to_size(int value, size_t *result)
 static inline int safe_size_to_int(size_t value, int *result)
 {
     if (!result)
-        return -1;
+        return AGENTOS_EINVAL;
     if (value > (size_t)INT_MAX)
-        return -1;
+        return AGENTOS_EINVAL;
     *result = (int)value;
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -551,11 +552,11 @@ static inline int safe_size_to_int(size_t value, int *result)
 static inline int safe_double_to_int(double value, int *result)
 {
     if (!result)
-        return -1;
+        return AGENTOS_EINVAL;
     if (value > (double)INT_MAX || value < (double)INT_MIN)
-        return -1;
+        return AGENTOS_EINVAL;
     *result = (int)value;
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /* ==================== 兼容别名 ==================== */

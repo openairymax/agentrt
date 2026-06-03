@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 // ============================================================================
 // 内部数据结构
@@ -185,14 +186,12 @@ static const char *taskflow_unit_get_metadata_impl(agentos_execution_unit_t *uni
 
 agentos_execution_unit_t *taskflow_unit_create(const taskflow_unit_config_t *config)
 {
-    if (!config)
-        return NULL;
+    if (!config) return NULL;
 
     // 分配私有数据
     taskflow_unit_private_t *private =
         (taskflow_unit_private_t *)AGENTOS_CALLOC(1, sizeof(taskflow_unit_private_t));
-    if (!private)
-        return NULL;
+    if (!private) return NULL;
 
     // 复制配置
     private->config = *config;
@@ -201,6 +200,7 @@ agentos_execution_unit_t *taskflow_unit_create(const taskflow_unit_config_t *con
     private->taskflow_engine = taskflow_engine_create(&config->taskflow_config);
     if (!private->taskflow_engine) {
         AGENTOS_FREE(private);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -209,6 +209,7 @@ agentos_execution_unit_t *taskflow_unit_create(const taskflow_unit_config_t *con
     if (result != TASKFLOW_SUCCESS) {
         taskflow_engine_destroy(private->taskflow_engine);
         AGENTOS_FREE(private);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -225,6 +226,7 @@ agentos_execution_unit_t *taskflow_unit_create(const taskflow_unit_config_t *con
         (agentos_execution_unit_t *)AGENTOS_CALLOC(1, sizeof(agentos_execution_unit_t));
     if (!unit) {
         taskflow_unit_destroy_impl(&private->unit);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -249,8 +251,7 @@ taskflow_task_input_t *taskflow_task_input_create(taskflow_graph_handle_t graph,
 {
     taskflow_task_input_t *input =
         (taskflow_task_input_t *)AGENTOS_CALLOC(1, sizeof(taskflow_task_input_t));
-    if (!input)
-        return NULL;
+    if (!input) return NULL;
 
     input->graph = graph;
     input->max_supersteps = max_supersteps;
@@ -261,6 +262,7 @@ taskflow_task_input_t *taskflow_task_input_create(taskflow_graph_handle_t graph,
         input->vertices = (graph_vertex_t *)AGENTOS_MALLOC(vertex_count * sizeof(graph_vertex_t));
         if (!input->vertices) {
             AGENTOS_FREE(input);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
         memcpy(input->vertices, vertices, vertex_count * sizeof(graph_vertex_t));
@@ -274,6 +276,7 @@ taskflow_task_input_t *taskflow_task_input_create(taskflow_graph_handle_t graph,
             if (input->vertices)
                 AGENTOS_FREE(input->vertices);
             AGENTOS_FREE(input);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
         memcpy(input->edges, edges, edge_count * sizeof(graph_edge_t));
@@ -301,8 +304,7 @@ taskflow_task_output_t *taskflow_task_output_create(void)
 {
     taskflow_task_output_t *output =
         (taskflow_task_output_t *)AGENTOS_CALLOC(1, sizeof(taskflow_task_output_t));
-    if (!output)
-        return NULL;
+    if (!output) return NULL;
 
     output->result = TASKFLOW_SUCCESS;
     output->completed_supersteps = 0;
@@ -326,16 +328,14 @@ void taskflow_task_output_destroy(taskflow_task_output_t *output)
 
 taskflow_task_input_t *taskflow_parse_task_input(const agentos_task_t *agentos_task)
 {
-    if (!agentos_task || !agentos_task->task_input)
-        return NULL;
+    if (!agentos_task || !agentos_task->task_input) return NULL;
 
     const taskflow_task_input_t *src = (const taskflow_task_input_t *)agentos_task->task_input;
 
     taskflow_task_input_t *input =
         taskflow_task_input_create(src->graph, src->vertices, src->vertex_count, src->edges,
                                    src->edge_count, src->max_supersteps);
-    if (!input)
-        return NULL;
+    if (!input) return NULL;
 
     input->graph_config = src->graph_config;
     input->user_context = src->user_context;

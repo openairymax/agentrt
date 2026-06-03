@@ -1,5 +1,5 @@
 // AgentOS Rust SDK - 模块结构测试
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 测试模块化结构是否正确

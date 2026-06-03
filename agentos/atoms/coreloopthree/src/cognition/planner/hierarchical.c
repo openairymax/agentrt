@@ -13,6 +13,12 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct {
     const char *keyword;
@@ -77,13 +83,13 @@ static int str_contains_i(const char *haystack, const char *needle)
 
 static const domain_rule_t *match_domain(const char *goal)
 {
-    if (!goal)
-        return NULL;
+    if (!goal) return NULL;
     for (size_t i = 0; i < g_domain_rule_count; i++) {
         if (str_contains_i(goal, g_domain_rules[i].keyword)) {
             return &g_domain_rules[i];
         }
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -92,14 +98,14 @@ static agentos_error_t hierarchical_plan_func(const agentos_intent_t __attribute
                                               void *context, agentos_task_plan_t **out_plan)
 {
     if (!context || !out_plan)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     hierarchical_data_t *data = (hierarchical_data_t *)context;
 
     agentos_task_plan_t *plan =
         (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
     if (!plan)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     const domain_rule_t *rule = match_domain(intent ? intent->intent_goal : NULL);
     const char *const *task_names = rule ? rule->subtasks : g_default_subtasks;
@@ -110,7 +116,7 @@ static agentos_error_t hierarchical_plan_func(const agentos_intent_t __attribute
             (agentos_task_node_t **)AGENTOS_CALLOC(count, sizeof(agentos_task_node_t *));
         if (!plan->task_plan_nodes) {
             AGENTOS_FREE(plan);
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         }
         size_t actual_count = 0;
         for (size_t i = 0; i < count; i++) {
@@ -149,8 +155,7 @@ agentos_plan_hierarchical_create(agentos_llm_service_t __attribute__((unused)) *
 
     hierarchical_data_t *data =
         (hierarchical_data_t *)AGENTOS_CALLOC(1, sizeof(hierarchical_data_t));
-    if (!data)
-        return NULL;
+    if (!data) return NULL;
     data->max_depth = max_depth > 0 ? max_depth : 5;
     data->decomposition_threshold = 0.7f;
 
@@ -158,6 +163,7 @@ agentos_plan_hierarchical_create(agentos_llm_service_t __attribute__((unused)) *
         (agentos_plan_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_plan_strategy_t));
     if (!strategy) {
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

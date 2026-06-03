@@ -260,9 +260,8 @@ static void memory_pool_free_blocks(memory_pool_t *pool)
 
 memory_pool_t *memory_pool_create(const memory_pool_options_t *options)
 {
-    if (options == NULL || options->block_size == 0) {
+    if (options == NULL || options->block_size == 0)
         return NULL;
-    }
 
     // 分配内存池结
     memory_pool_t *pool = memory_calloc(sizeof(memory_pool_t), "memory_pool_instance");

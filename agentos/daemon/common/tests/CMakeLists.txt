@@ -21,6 +21,12 @@ set(TEST_SOURCES
 #    test_svc_stop.c  # TODO: 框架宏不兼容，待修复后重新启用
     test_ipc_service_bus.c
     test_strategies_recovery.c
+    test_log_sanitizer.c
+    test_thread_pool.c
+    test_daemon_security.c
+    test_agentos_event_loop.c
+    test_api_recovery.c
+    test_service_discovery.c
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})
@@ -101,3 +107,40 @@ add_test(NAME svc_test_daemon_common COMMAND svc_test_daemon_common
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 message(STATUS "  [test] svc_test_daemon_common: P1-C06 deep unit tests configured")
+
+# ===== Checkpoint Unit Tests (test_checkpoint.c) =====
+add_executable(svc_test_checkpoint test_checkpoint.c)
+
+target_include_directories(svc_test_checkpoint PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/types/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../atoms/corekern/include
+)
+
+target_link_libraries(svc_test_checkpoint PRIVATE
+    svc_common
+    Threads::Threads
+)
+
+if(AGENTOS_HAS_CJSON)
+    target_link_libraries(svc_test_checkpoint PRIVATE cjson)
+endif()
+
+if(AGENTOS_HAS_CURL)
+    target_include_directories(svc_test_checkpoint PRIVATE ${CURL_INCLUDE_DIRS})
+    target_link_libraries(svc_test_checkpoint PRIVATE ${CURL_LIBRARIES})
+endif()
+
+target_compile_options(svc_test_checkpoint PRIVATE
+    -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
+)
+
+add_test(NAME svc_test_checkpoint COMMAND svc_test_checkpoint
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+message(STATUS "  [test] svc_test_checkpoint: configured")

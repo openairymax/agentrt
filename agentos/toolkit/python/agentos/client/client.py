@@ -1,5 +1,5 @@
 # AgentOS Python SDK - Client Implementation
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 
 """
@@ -14,6 +14,7 @@ Provides:
 
 import json
 import logging
+import os
 import random
 import time
 from abc import ABC, abstractmethod
@@ -54,14 +55,14 @@ class ClientConfig:
     
     对应 Go SDK: agentos/manager.go
     """
-    endpoint: str = "http://localhost:18789"
+    endpoint: str = field(default_factory=lambda: os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789"))
     timeout: float = 30.0
     max_retries: int = 3
     retry_delay: float = 1.0
     max_connections: int = 100
     idle_conn_timeout: float = 90.0
     api_key: Optional[str] = None
-    user_agent: str = "AgentOS-Python-tools/3.0.0"
+    user_agent: str = "AgentOS-Python-tools/0.1.0"
     headers: Dict[str, str] = field(default_factory=dict)
 
     def validate(self) -> None:

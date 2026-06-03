@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file market_service_impl.c
  * @brief 市场服务核心实现
@@ -7,7 +8,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "market_service.h"
 #include "svc_logger.h"
 

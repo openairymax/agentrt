@@ -1,5 +1,5 @@
-#include "error.h"
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file jsonrpc_helpers.c
  * @brief JSON-RPC 2.0 公共辅助函数实现
@@ -20,8 +20,10 @@ char *jsonrpc_build_error(int code, const char *message, int id)
         message = jsonrpc_get_error_message(code);
 
     cJSON *root = cJSON_CreateObject();
-    if (!root)
+    if (!root) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "cJSON_CreateObject failed");
         return NULL;
+    }
 
     cJSON_AddStringToObject(root, "jsonrpc", "2.0");
     cJSON_AddNumberToObject(root, "id", id);
@@ -174,21 +176,29 @@ int jsonrpc_get_bool_param(cJSON *params, const char *key, int default_value)
 
 cJSON *jsonrpc_get_array_param(cJSON *params, const char *key)
 {
-    if (!params || !key)
+    if (!params || !key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "jsonrpc_get_array_param: null parameter");
         return NULL;
+    }
     cJSON *item = cJSON_GetObjectItem(params, key);
-    if (!item || !cJSON_IsArray(item))
+    if (!item || !cJSON_IsArray(item)) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "jsonrpc_get_array_param: not an array");
         return NULL;
+    }
     return item;
 }
 
 cJSON *jsonrpc_get_object_param(cJSON *params, const char *key)
 {
-    if (!params || !key)
+    if (!params || !key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "jsonrpc_get_object_param: null parameter");
         return NULL;
+    }
     cJSON *item = cJSON_GetObjectItem(params, key);
-    if (!item || !cJSON_IsObject(item))
+    if (!item || !cJSON_IsObject(item)) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "jsonrpc_get_object_param: not an object");
         return NULL;
+    }
     return item;
 }
 
@@ -205,6 +215,7 @@ char *jsonrpc_build_notification(const char *method, cJSON *params)
     if (!method) {
         if (params)
             cJSON_Delete(params);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

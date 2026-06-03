@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -28,8 +29,11 @@ typedef struct {
 
 static sched_adapter_ctx_t *sched_get_ctx(agentos_service_t service)
 {
-    if (!service)
+    if (!service) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
     return (sched_adapter_ctx_t *)agentos_service_get_user_data(service);
 }
 
@@ -242,8 +246,11 @@ agentos_error_t sched_service_adapter_wrap(agentos_service_t *out_service,
 
 sched_service_t *sched_service_adapter_get_original(agentos_service_t service)
 {
-    if (!service)
+    if (!service) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
     sched_adapter_ctx_t *ctx = sched_get_ctx(service);
     return ctx ? ctx->sched_svc : NULL;
 }

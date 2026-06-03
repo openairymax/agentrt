@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file token_counter.c
  * @brief Token 计数实现
@@ -27,12 +28,16 @@ struct token_counter {
 token_counter_t *token_counter_create(const char *encoding_name)
 {
     token_counter_t *tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
-    if (!tc)
+    if (!tc) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     tc->enc = tiktoken_get_encoding(encoding_name);
     if (!tc->enc) {
         SVC_LOG_ERROR("Failed to get encoding %s", encoding_name);
         AGENTOS_FREE(tc);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     tc->encoding_name = AGENTOS_STRDUP(encoding_name);
@@ -82,8 +87,11 @@ static agentos_token_model_t encoding_to_model_type(const char *enc)
 token_counter_t *token_counter_create(const char *encoding_name)
 {
     token_counter_t *tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
-    if (!tc)
+    if (!tc) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     tc->encoding_name = AGENTOS_STRDUP(encoding_name ? encoding_name : "cl100k_base");
 

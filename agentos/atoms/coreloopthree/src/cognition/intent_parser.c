@@ -40,6 +40,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 内部常量定义 ==================== */
 
@@ -113,14 +119,13 @@ struct agentos_intent_parser {
 /* ==================== [LEGACY] 工具函数 ====================
  * 以下函数与 intent_utils.c 中的实现重复。
  * 保留原因：确保向后兼容，避免破坏现有调用方。
- * 计划在 v2.0 统一为 intent_utils 模块的公开API。
+ * 计划在后续版本统一为 intent_utils 模块的公开API。
  * 新代码请使用 intent_utils.h 中声明的函数。
  * ============================================================ */
 
 static char *to_lowercase(char *str)
 {
-    if (!str)
-        return NULL;
+    if (!str) return NULL;
     for (char *p = str; *p; ++p) {
         *p = tolower(*p);
     }
@@ -251,12 +256,12 @@ static void free_keywords(char **keywords, size_t count)
 static intent_rule_t *create_intent_rule(const char *pattern, const char *intent_name,
                                          float confidence, uint32_t flags)
 {
-    if (!pattern || !intent_name)
-        return NULL;
+    if (!pattern || !intent_name) return NULL;
 
     intent_rule_t *rule = (intent_rule_t *)AGENTOS_CALLOC(1, sizeof(intent_rule_t));
     if (!rule) {
         AGENTOS_LOG_ERROR("Failed to allocate intent rule");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -274,6 +279,7 @@ static intent_rule_t *create_intent_rule(const char *pattern, const char *intent
             AGENTOS_FREE(rule->intent_name);
         AGENTOS_FREE(rule);
         AGENTOS_LOG_ERROR("Failed to duplicate strings for intent rule");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -320,7 +326,7 @@ static void free_rule_list(intent_rule_t *head)
 static agentos_error_t add_rule_to_parser(agentos_intent_parser_t *parser, intent_rule_t *rule)
 {
     if (!parser || !rule)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_mutex_lock(parser->lock);
 
@@ -348,12 +354,12 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t *parser, co
                                              char **out_intent_name, float *out_confidence)
 {
     if (!parser || !text || !out_intent_name || !out_confidence) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     char *lower_text = AGENTOS_STRDUP(text);
     if (!lower_text)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     to_lowercase(lower_text);
 
     agentos_mutex_lock(parser->lock);
@@ -373,7 +379,7 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t *parser, co
                 if (!best_intent) {
                     AGENTOS_FREE(lower_text);
                     agentos_mutex_unlock(parser->lock);
-                    return AGENTOS_ENOMEM;
+                    ATM_RET_ERR(AGENTOS_ENOMEM);
                 }
             }
         }
@@ -390,7 +396,7 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t *parser, co
                 if (!best_intent) {
                     AGENTOS_FREE(lower_text);
                     agentos_mutex_unlock(parser->lock);
-                    return AGENTOS_ENOMEM;
+                    ATM_RET_ERR(AGENTOS_ENOMEM);
                 }
             }
         }
@@ -409,7 +415,7 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t *parser, co
 
     if (best_intent)
         AGENTOS_FREE(best_intent);
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 /**
@@ -422,7 +428,7 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t *parser, co
 /* ==================== [LEGACY] 实体提取函数 ====================
  * 以下函数与 entity_extractor.c 中的实现重复。
  * 保留原因：确保向后兼容。
- * 计划在 v2.0 统一为 entity_extractor 模块的公开API。
+ * 计划在后续版本统一为 entity_extractor 模块的公开API。
  * ============================================================ */
 
 static size_t extract_entities_from_text(const char *text, extracted_entity_t *entities,
@@ -510,20 +516,20 @@ static size_t extract_entities_from_text(const char *text, extracted_entity_t *e
 agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t **out_parser)
 {
     if (!out_parser)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_intent_parser_t *parser =
         (agentos_intent_parser_t *)AGENTOS_CALLOC(1, sizeof(agentos_intent_parser_t));
     if (!parser) {
         AGENTOS_LOG_ERROR("Failed to allocate intent parser");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     parser->lock = agentos_mutex_create();
     if (!parser->lock) {
         AGENTOS_LOG_ERROR("Failed to create mutex for intent parser");
         AGENTOS_FREE(parser);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     // 生成唯一 ID
@@ -637,7 +643,7 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser, con
                                             size_t input_len, agentos_intent_t **out_intent)
 {
     if (!parser || !input || !out_intent) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     // 记录开始时间
@@ -650,7 +656,7 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser, con
     if (!intent) {
         AGENTOS_LOG_ERROR("Failed to allocate intent structure");
         parser->failure_count++;
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     intent->intent_raw_text = (char *)AGENTOS_MALLOC(input_len + 1);
@@ -658,7 +664,7 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser, con
         AGENTOS_LOG_ERROR("Failed to allocate raw text buffer");
         AGENTOS_FREE(intent);
         parser->failure_count++;
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     memcpy(intent->intent_raw_text, input, input_len);
     intent->intent_raw_text[input_len] = '\0';
@@ -722,7 +728,7 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser, con
         if (!intent->intent_goal) {
             AGENTOS_FREE(intent);
             parser->failure_count++;
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         }
         intent->intent_goal_len = 7;
         intent->intent_flags = 0x02;
@@ -781,17 +787,17 @@ agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t *parser, 
                                                uint32_t flags)
 {
     if (!parser || !pattern || !intent_name)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (confidence < 0.0f || confidence > 1.0f) {
         AGENTOS_LOG_ERROR("Confidence must be between 0.0 and 1.0");
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     intent_rule_t *rule = create_intent_rule(pattern, intent_name, confidence, flags);
     if (!rule) {
         AGENTOS_LOG_ERROR("Failed to create intent rule");
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     agentos_error_t result = add_rule_to_parser(parser, rule);
@@ -811,11 +817,11 @@ agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t *parser, 
 agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t *parser, char **out_stats)
 {
     if (!parser || !out_stats)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     cJSON *stats_json = cJSON_CreateObject();
     if (!stats_json)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     agentos_mutex_lock(parser->lock);
 
@@ -851,7 +857,7 @@ agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t *parser, cha
     cJSON_Delete(stats_json);
 
     if (!stats_str)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     *out_stats = stats_str;
     return AGENTOS_SUCCESS;
@@ -887,11 +893,11 @@ void agentos_intent_parser_reset_stats(agentos_intent_parser_t *parser)
 agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t *parser, char **out_json)
 {
     if (!parser || !out_json)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     cJSON *health_json = cJSON_CreateObject();
     if (!health_json)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     agentos_mutex_lock(parser->lock);
 
@@ -920,7 +926,7 @@ agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t *pars
     cJSON_Delete(health_json);
 
     if (!health_str)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     *out_json = health_str;
     return AGENTOS_SUCCESS;

@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 typedef struct {
     agentos_protocol_type_t type;
@@ -136,7 +137,8 @@ void protocol_stack_destroy(protocol_stack_handle_t handle)
 int protocol_stack_register_adapter(protocol_stack_handle_t handle, protocol_adapter_t adapter)
 {
     if (!handle) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_stack_register_adapter: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
@@ -159,13 +161,15 @@ int protocol_stack_register_adapter(protocol_stack_handle_t handle, protocol_ada
     protocol_adapter_node_t *node =
         (protocol_adapter_node_t *)AGENTOS_MALLOC(sizeof(protocol_adapter_node_t));
     if (!node) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "AGENTOS_MALLOC: allocation failed");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     node->adapter = (protocol_adapter_t *)AGENTOS_MALLOC(sizeof(protocol_adapter_t));
     if (!node->adapter) {
         AGENTOS_FREE(node);
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "AGENTOS_MALLOC: allocation failed");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     *node->adapter = adapter;
     node->context = NULL;
@@ -191,7 +195,8 @@ int protocol_stack_register_adapter(protocol_stack_handle_t handle, protocol_ada
 int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t *message)
 {
     if (!handle || !message) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_stack_send: IO error");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
@@ -205,7 +210,8 @@ int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t 
     // 查找对应的适配器
     protocol_adapter_node_t *adapter_node = find_adapter_node(handle, message->protocol);
     if (!adapter_node || !adapter_node->adapter) {
-        return AGENTOS_EFAIL;  // 未找到适配器
+        agentos_error_push_ex(AGENTOS_ERR_NOT_FOUND, __FILE__, __LINE__, __func__, "route_message: adapter not found");
+        return AGENTOS_ERR_NOT_FOUND;
     }
 
     protocol_adapter_t *adapter = adapter_node->adapter;
@@ -260,7 +266,8 @@ int protocol_stack_receive(protocol_stack_handle_t handle, unified_message_t *me
                            uint32_t timeout_ms)
 {
     if (!handle || !message) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_TIMEOUT, __FILE__, __LINE__, __func__, "protocol_stack_receive: timeout");
+        return AGENTOS_ERR_TIMEOUT;
     }
 
     struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
@@ -317,7 +324,8 @@ int protocol_stack_receive(protocol_stack_handle_t handle, unified_message_t *me
         nanosleep(&ts, NULL);
     }
 
-    return AGENTOS_EFAIL;
+    agentos_error_push_ex(AGENTOS_ERR_TIMEOUT, __FILE__, __LINE__, __func__, "nanosleep: timeout");
+    return AGENTOS_ERR_TIMEOUT;
 }
 
 int protocol_stack_set_callback(protocol_stack_handle_t handle,
@@ -325,7 +333,8 @@ int protocol_stack_set_callback(protocol_stack_handle_t handle,
                                 void *user_data)
 {
     if (!handle) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_stack_set_callback: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
@@ -338,7 +347,8 @@ int protocol_stack_set_callback(protocol_stack_handle_t handle,
 int protocol_stack_get_stats(protocol_stack_handle_t handle, void *stats)
 {
     if (!handle || !stats) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_stack_get_stats: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
@@ -453,18 +463,24 @@ static protocol_adapter_node_t *find_adapter_node(protocol_stack_handle_t handle
 static int validate_message(const unified_message_t *message)
 {
     if (!message)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "validate_message: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     if (message->protocol < PROTOCOL_HTTP || message->protocol > PROTOCOL_CUSTOM) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     if (message->direction < DIRECTION_REQUEST || message->direction > DIRECTION_NOTIFICATION) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     if (message->endpoint[0] && strlen(message->endpoint) > 1024) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     return 0;

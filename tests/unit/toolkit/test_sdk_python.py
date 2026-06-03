@@ -1,5 +1,5 @@
 # AgentOS Python SDK 单元测试（V2.0 重构版）
-# Version: 2.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-06
 #
 # 优化要点：

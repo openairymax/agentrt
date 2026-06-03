@@ -1,7 +1,7 @@
 # Cupolas Utils — 安全工具库
 
 **模块路径**: `agentos/cupolas/src/utils/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

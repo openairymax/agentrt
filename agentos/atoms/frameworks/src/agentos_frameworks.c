@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #define FW_MAX_CALLBACKS 8
 #define FW_MAX_NAME_LEN 32
@@ -56,13 +57,13 @@ typedef struct {
 } fw_descriptor_t;
 
 static const fw_descriptor_t g_fw_descriptors[AGENTOS_FW_COUNT] = {
-    {"CoreLoopThree", "2.0.0",
+    {"CoreLoopThree", "0.1.0",
      AGENTOS_CAP_COGNITION | AGENTOS_CAP_EXECUTION | AGENTOS_CAP_PROTOCOL_MCP |
          AGENTOS_CAP_PROTOCOL_A2A},
-    {"MemoryRovol", "2.0.0", AGENTOS_CAP_MEMORY_STORE | AGENTOS_CAP_MEMORY_RETRIEVE},
-    {"CoreKern", "2.0.0", AGENTOS_CAP_TASK_SCHEDULE | AGENTOS_CAP_TASK_EXECUTE},
-    {"Cupolas", "2.0.0", AGENTOS_CAP_SAFETY_CHECK | AGENTOS_CAP_SANDBOX},
-    {"ToolD", "2.0.0",
+    {"MemoryRovol", "0.1.0", AGENTOS_CAP_MEMORY_STORE | AGENTOS_CAP_MEMORY_RETRIEVE},
+    {"CoreKern", "0.1.0", AGENTOS_CAP_TASK_SCHEDULE | AGENTOS_CAP_TASK_EXECUTE},
+    {"Cupolas", "0.1.0", AGENTOS_CAP_SAFETY_CHECK | AGENTOS_CAP_SANDBOX},
+    {"ToolD", "0.1.0",
      AGENTOS_CAP_TOOL_REGISTER | AGENTOS_CAP_TOOL_INVOKE | AGENTOS_CAP_PROTOCOL_MCP |
          AGENTOS_CAP_PROTOCOL_OPENAI},
 };
@@ -127,8 +128,10 @@ AGENTOS_API agentos_fw_manager_t agentos_fw_manager_create(void)
 {
     fw_manager_internal_t *mgr =
         (fw_manager_internal_t *)AGENTOS_CALLOC(1, sizeof(fw_manager_internal_t));
-    if (!mgr)
+    if (!mgr) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     for (int i = 0; i < AGENTOS_FW_COUNT; i++) {
         init_fw_info(&mgr->frameworks[i], (agentos_framework_t)i);

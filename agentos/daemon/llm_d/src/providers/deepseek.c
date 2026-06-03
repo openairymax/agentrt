@@ -1,6 +1,7 @@
 #include "memory_compat.h"
 
 #include <cjson/cJSON.h>
+#include "error.h"
 /**
  * @file deepseek.c
  * @brief DeepSeek 适配器（兼容 OpenAI 格式）
@@ -13,7 +14,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "platform.h"
 #include "provider.h"
 #include "svc_logger.h"
@@ -42,6 +42,7 @@ static provider_ctx_t *deepseek_init(const char *name __attribute__((unused)), c
 
     deepseek_ctx_t *ctx = (deepseek_ctx_t *)AGENTOS_CALLOC(1, sizeof(deepseek_ctx_t));
     if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -198,8 +199,11 @@ static int ds_stream_on_chunk(const char *json_line, void *userdata)
 static llm_response_t *ds_build_stream_response(ds_stream_acc_t *acc)
 {
     llm_response_t *resp = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
-    if (!resp)
+    if (!resp) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     resp->id = acc->resp_id ? acc->resp_id : AGENTOS_STRDUP("");
     acc->resp_id = NULL;

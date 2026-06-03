@@ -1,5 +1,5 @@
 # AgentOS Python SDK - Token 优化器
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # Token 使用效率优化模块

@@ -464,34 +464,6 @@ char *gateway_syscall_route(const char *method, cJSON *params, cJSON *request_id
 #define AGENTOS_OK 0
 #endif
 
-#ifndef AGENTOS_SUCCESS
-#define AGENTOS_SUCCESS 0
-#endif
-
-#ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM (-1)
-#endif
-
-#ifndef AGENTOS_ERR_OUT_OF_MEMORY
-#define AGENTOS_ERR_OUT_OF_MEMORY (-2)
-#endif
-
-#ifndef AGENTOS_ERR_NOT_FOUND
-#define AGENTOS_ERR_NOT_FOUND (-3)
-#endif
-
-#ifndef AGENTOS_ERR_NOT_SUPPORTED
-#define AGENTOS_ERR_NOT_SUPPORTED (-4)
-#endif
-
-#ifndef AGENTOS_ERR_INVALID_STATE
-#define AGENTOS_ERR_INVALID_STATE (-5)
-#endif
-
-#ifndef AGENTOS_ERR_EXEC_FAILED
-#define AGENTOS_ERR_EXEC_FAILED (-6)
-#endif
-
 #define MAX_TASKS_DEFAULT 256
 #define MAX_RECORDS_DEFAULT 1024
 #define MAX_SESSIONS_DEFAULT 64
@@ -529,7 +501,9 @@ static int ht_init(hash_table_t *ht, size_t capacity)
     ht->entries = (hash_entry_t *)AGENTOS_CALLOC(capacity, sizeof(hash_entry_t));
     if (!ht->entries) {
         ht->capacity = 0;
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
+                              "ht_init: allocation failed");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     ht->capacity = capacity;
     ht->count = 0;
@@ -569,17 +543,24 @@ static bool ht_insert(hash_table_t *ht, const char *key, size_t index)
 
 static ssize_t ht_lookup(hash_table_t *ht, const char *key)
 {
-    if (!ht->entries || ht->count == 0)
-        return AGENTOS_EFAIL;
+    if (!ht->entries || ht->count == 0) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                              "ht_lookup: failed");
+        return AGENTOS_ERR_UNKNOWN;
+    }
     unsigned long h = hash_fn(key) % ht->capacity;
     for (size_t i = 0; i < ht->capacity; i++) {
         size_t pos = (h + i) % ht->capacity;
-        if (!ht->entries[pos].occupied)
-            return AGENTOS_EFAIL;
+        if (!ht->entries[pos].occupied) {
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
+                                  "hash_fn: failed");
+            return AGENTOS_ERR_UNKNOWN;
+        }
         if (strcmp(ht->entries[pos].key, key) == 0)
             return (ssize_t)ht->entries[pos].index;
     }
-    return AGENTOS_EFAIL;
+    agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: failed");
+    return AGENTOS_ERR_UNKNOWN;
 }
 
 static void ht_remove(hash_table_t *ht, const char *key)
@@ -1158,7 +1139,7 @@ agentos_error_t agentos_sys_agent_invoke(const char *agent_id, const char *input
         if (g_runtime.agents[idx].status != 1) {
             *out_output = AGENTOS_STRDUP("{\"error\":\"Agent not running\"}");
             RUNTIME_UNLOCK();
-            return AGENTOS_ERR_INVALID_STATE;
+            return AGENTOS_ERR_STATE_ERROR;
         }
 
         cJSON *result = cJSON_CreateObject();

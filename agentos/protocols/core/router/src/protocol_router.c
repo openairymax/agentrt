@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 #define INDEX_NOT_FOUND (-1)
 
@@ -118,7 +119,8 @@ int protocol_router_add_rule(protocol_router_handle_t router, const protocol_rul
                              message_transformer_t transformer)
 {
     if (!router || !rule) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_router_add_rule: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     struct protocol_router_s *r = (struct protocol_router_s *)router;
@@ -126,7 +128,8 @@ int protocol_router_add_rule(protocol_router_handle_t router, const protocol_rul
     // 创建规则节点
     rule_node_t *node = create_rule_node(rule, transformer);
     if (!node) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "create_rule_node: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     // 添加到链表（按优先级排序）
@@ -146,7 +149,8 @@ int protocol_router_route(protocol_router_handle_t router, const unified_message
                           unified_message_t *transformed)
 {
     if (!router || !message || !transformed) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_router_route: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     struct protocol_router_s *r = (struct protocol_router_s *)router;
@@ -247,7 +251,8 @@ int protocol_router_route_batch(protocol_router_handle_t router, const unified_m
                                 size_t count, unified_message_t *transformed)
 {
     if (!router || !messages || !transformed || count == 0) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_router_route_batch: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     int success_count = 0;
@@ -265,7 +270,8 @@ int protocol_router_set_decision_func(protocol_router_handle_t router,
                                       route_decision_func_t decision_func)
 {
     if (!router) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_router_set_decision_func: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     struct protocol_router_s *r = (struct protocol_router_s *)router;
@@ -277,7 +283,8 @@ int protocol_router_set_decision_func(protocol_router_handle_t router,
 int protocol_router_get_stats(protocol_router_handle_t router, char **stats_json)
 {
     if (!router || !stats_json) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_router_get_stats: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     struct protocol_router_s *r = (struct protocol_router_s *)router;
@@ -303,7 +310,8 @@ int protocol_router_get_stats(protocol_router_handle_t router, char **stats_json
 
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "AGENTOS_MALLOC: allocation failed");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     snprintf(buf, buf_size, fmt, /* flawfinder: ignore - pre-sized buffer from prior probe */
@@ -346,7 +354,8 @@ int protocol_transformer_default(const unified_message_t *source, unified_messag
                                  void *context)
 {
     if (!source || !target) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_transformer_default: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     *target = *source;
@@ -354,7 +363,10 @@ int protocol_transformer_default(const unified_message_t *source, unified_messag
     if (source->payload && source->payload_size > 0) {
         void *new_payload = AGENTOS_MALLOC(source->payload_size);
         if (!new_payload)
-            return AGENTOS_EFAIL;
+            {
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "if: allocation failed");
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+            }
         memcpy(new_payload, source->payload, source->payload_size);
         target->payload = new_payload;
     }
@@ -706,7 +718,8 @@ static int default_decision_func(const unified_message_t *message, const protoco
                                  size_t rule_count)
 {
     if (!message || !rules || rule_count == 0) {
-        return AGENTOS_EFAIL;
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "default_decision_func: failed");
+        return AGENTOS_ERR_UNKNOWN;
     }
 
     // 简单决策：按顺序匹配第一个符合的规则
