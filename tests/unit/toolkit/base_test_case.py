@@ -1,5 +1,5 @@
 # AgentOS Python SDK - 测试基类
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # 提供统一的测试基类，消除重复初始化代码

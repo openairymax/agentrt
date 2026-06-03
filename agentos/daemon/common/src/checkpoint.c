@@ -1,11 +1,11 @@
 /**
  * @file checkpoint.c
- * @brief AgentOS 任务检查点实现（生产级 v3.0）
+ * @brief AgentOS 任务检查点实现（生产级 v0.1.0）
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
- * v3.0 变更：
+ * v0.1.0 变更：
  * - CROSS-01: agentos_mutex_t → agentos_mutex_t
  * - CROSS-03: time(NULL) → agentos_time_ns()
  * - 新增 auto-checkpoint hook 机制（CoreLoopThree 集成）

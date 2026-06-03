@@ -9,13 +9,14 @@ AgentOS Python SDK — Protocol Client Module
 - A2A (Agent-to-Agent) v0.3
 - OpenAI API 兼容
 
-@since 3.0.0
+@since 0.1.0
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import asyncio
 from dataclasses import dataclass, field
@@ -47,7 +48,7 @@ PROTOCOL_NAMES = {
 class ProtocolConfig:
     """Configuration for a protocol client."""
     protocol_type: ProtocolType = ProtocolType.JSONRPC
-    endpoint: str = "http://localhost:18789"
+    endpoint: str = field(default_factory=lambda: os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789"))
     api_key: Optional[str] = None
     timeout: int = 30
     retry_count: int = 3

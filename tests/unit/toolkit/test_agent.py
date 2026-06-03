@@ -1,5 +1,5 @@
 # AgentOS Python SDK Tests
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-04
 
 import unittest

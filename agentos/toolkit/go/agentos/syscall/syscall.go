@@ -1,5 +1,5 @@
 // AgentOS Go SDK Syscall Module
-// Version: 2.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-23
 //
 // This module provides system call bindings for AgentOS, following the design

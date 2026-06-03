@@ -119,7 +119,7 @@ struct agentos_intent_parser {
 /* ==================== [LEGACY] 工具函数 ====================
  * 以下函数与 intent_utils.c 中的实现重复。
  * 保留原因：确保向后兼容，避免破坏现有调用方。
- * 计划在 v2.0 统一为 intent_utils 模块的公开API。
+ * 计划在后续版本统一为 intent_utils 模块的公开API。
  * 新代码请使用 intent_utils.h 中声明的函数。
  * ============================================================ */
 
@@ -428,7 +428,7 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t *parser, co
 /* ==================== [LEGACY] 实体提取函数 ====================
  * 以下函数与 entity_extractor.c 中的实现重复。
  * 保留原因：确保向后兼容。
- * 计划在 v2.0 统一为 entity_extractor 模块的公开API。
+ * 计划在后续版本统一为 entity_extractor 模块的公开API。
  * ============================================================ */
 
 static size_t extract_entities_from_text(const char *text, extracted_entity_t *entities,

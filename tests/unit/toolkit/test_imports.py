@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def test_imports():
     """测试所有模块导入"""
     print("=" * 60)
-    print("AgentOS Python SDK v3.0.0 模块导入测试")
+    print("AgentOS Python SDK v0.1.0 模块导入测试")
     print("=" * 60)
     
     # 测试 client 模块

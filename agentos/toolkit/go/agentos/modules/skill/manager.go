@@ -1,5 +1,5 @@
 // AgentOS Go SDK - 技能管理模块
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-22
 //
 // 提供技能的注册、加载、执行、卸载及验证功能。
