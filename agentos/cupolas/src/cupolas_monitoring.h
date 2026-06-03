@@ -234,7 +234,7 @@ int cupolas_monitoring_check_health(cupolas_monitoring_t *mgr, health_check_resu
 /**
  * @brief Get Prometheus metrics endpoint address
  * @param[in] mgr Monitoring manager handle
- * @return Address string (e.g., "0.0.0.0:9090"), NULL if not running
+ * @return Address string (e.g., "127.0.0.1:9090"), NULL if not running
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */

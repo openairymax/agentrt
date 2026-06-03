@@ -14,13 +14,13 @@
  */
 
 #include "atomic_compat.h"
-#include "error.h"
 #include "gateway_service.h"
 #include "logging.h"
 #include "platform.h"
 #include "svc_common.h"
 #include "svc_config.h"
 #include "svc_logger.h"
+#include "error.h"
 
 #ifdef AGENTOS_HAS_PROTOCOLS
 #include "a2a_v03_adapter.h"
@@ -140,7 +140,7 @@ static int parse_args(int argc, char *argv[], gateway_service_config_t *config)
             pid_t pid = fork();
             if (pid < 0) {
                 SVC_LOG_ERROR("Failed to fork");
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "fork failed when daemonizing");
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "fork failed when daemonizing");
                 return AGENTOS_ERR_UNKNOWN;
             }
             if (pid > 0)

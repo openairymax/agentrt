@@ -78,7 +78,7 @@ bool heapstore_calculate_directory_size(const char *path, uint64_t *out_size, ui
  *
  * @see heapstore_ensure_directory()
  *
- * @since v1.0.0.7
+ * @since v0.1.0
  *
  * @example
  * @code
@@ -114,7 +114,7 @@ int heapstore_sanitize_path_component(char *output, const char *input, size_t si
  *
  * @see heapstore_sanitize_path_component()
  *
- * @since v1.0.0.7
+ * @since v0.1.0
  */
 bool heapstore_is_safe_identifier(const char *input);
 

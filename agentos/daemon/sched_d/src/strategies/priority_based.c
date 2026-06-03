@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file priority_based.c
  * @brief 基于优先级的调度策略实现
@@ -6,7 +7,6 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "error.h"
 #include "scheduler_service.h"
 #include "strategy_interface.h"
 

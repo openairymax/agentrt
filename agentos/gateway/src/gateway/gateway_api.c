@@ -53,7 +53,7 @@ void gateway_destroy(gateway_t *gw)
 
 int gateway_start(gateway_t *gw)
 {
-    AGENTOS_CHECK(gw != NULL, AGENTOS_EFAIL, "gw is NULL");
+    AGENTOS_CHECK(gw != NULL, AGENTOS_ERR_NULL_POINTER, "gw is NULL");
     int err = 0;
     if (gw->ops && gw->ops->start) {
         err = gw->ops->start(gw->impl);
@@ -67,7 +67,7 @@ int gateway_start(gateway_t *gw)
 
 int gateway_stop(gateway_t *gw)
 {
-    AGENTOS_CHECK(gw != NULL, AGENTOS_EFAIL, "gw is NULL");
+    AGENTOS_CHECK(gw != NULL, AGENTOS_ERR_NULL_POINTER, "gw is NULL");
     if (gw->ops && gw->ops->stop) {
         gw->ops->stop(gw->impl);
     }
@@ -78,8 +78,8 @@ int gateway_stop(gateway_t *gw)
 
 int gateway_get_stats(gateway_t *gw, char **out_json)
 {
-    AGENTOS_CHECK(gw != NULL, AGENTOS_EFAIL, "gw is NULL");
-    AGENTOS_CHECK(out_json != NULL, AGENTOS_EFAIL, "out_json is NULL");
+    AGENTOS_CHECK(gw != NULL, AGENTOS_ERR_NULL_POINTER, "gw is NULL");
+    AGENTOS_CHECK(out_json != NULL, AGENTOS_ERR_NULL_POINTER, "out_json is NULL");
 
     double uptime_seconds = difftime(time(NULL), g_gateway_stats.start_time);
 
@@ -108,7 +108,7 @@ int gateway_get_stats(gateway_t *gw, char **out_json)
 
 int gateway_set_handler(gateway_t *gw, gateway_request_handler_t handler, void *user_data)
 {
-    AGENTOS_CHECK(gw != NULL, AGENTOS_EFAIL, "gw is NULL");
+    AGENTOS_CHECK(gw != NULL, AGENTOS_ERR_NULL_POINTER, "gw is NULL");
     gw->public_handler = handler;
     gw->public_handler_data = user_data;
     return 0;
@@ -138,11 +138,11 @@ const char *gateway_get_name(gateway_t *gw)
 int gateway_register_endpoint(gateway_t *gw, const char *method, const char *path,
                               gateway_endpoint_handler_t handler, void *user_data)
 {
-    AGENTOS_CHECK(gw != NULL, AGENTOS_EFAIL, "gw is NULL");
-    AGENTOS_CHECK(method != NULL, AGENTOS_EFAIL, "method is NULL");
-    AGENTOS_CHECK(path != NULL, AGENTOS_EFAIL, "path is NULL");
-    AGENTOS_CHECK(handler != NULL, AGENTOS_EFAIL, "handler is NULL");
-    AGENTOS_CHECK(gw->type == GATEWAY_TYPE_HTTP, AGENTOS_EFAIL, "gw type is not HTTP");
+    AGENTOS_CHECK(gw != NULL, AGENTOS_ERR_NULL_POINTER, "gw is NULL");
+    AGENTOS_CHECK(method != NULL, AGENTOS_ERR_NULL_POINTER, "method is NULL");
+    AGENTOS_CHECK(path != NULL, AGENTOS_ERR_NULL_POINTER, "path is NULL");
+    AGENTOS_CHECK(handler != NULL, AGENTOS_ERR_NULL_POINTER, "handler is NULL");
+    AGENTOS_CHECK(gw->type == GATEWAY_TYPE_HTTP, AGENTOS_ERR_INVALID_PARAM, "gw type is not HTTP");
     return http_gateway_register_endpoint((http_gateway_t *)gw->impl, method, path, handler,
                                           user_data);
 }

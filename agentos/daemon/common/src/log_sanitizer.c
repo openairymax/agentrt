@@ -80,14 +80,18 @@ static void ensure_initialized(void)
  */
 static const char *log_strcasestr(const char *haystack, const char *needle)
 {
-    if (!haystack || !needle)
+    if (!haystack || !needle) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     size_t haystack_len = strlen(haystack);
     size_t needle_len = strlen(needle);
 
-    if (needle_len > haystack_len)
+    if (needle_len > haystack_len) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     for (size_t i = 0; i <= haystack_len - needle_len; i++) {
         int match = 1;
@@ -100,6 +104,7 @@ static const char *log_strcasestr(const char *haystack, const char *needle)
         if (match)
             return &haystack[i];
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -129,6 +134,7 @@ static const char *find_pattern(const char *message, const sensitive_field_t *pa
 
         return pos;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -137,8 +143,10 @@ static const char *find_pattern(const char *message, const sensitive_field_t *pa
  */
 static const char *find_value_end(const char *value_start)
 {
-    if (!value_start || !*value_start)
+    if (!value_start || !*value_start) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     char quote = 0;
     if (*value_start == '"' || *value_start == '\'') {
@@ -302,8 +310,10 @@ int log_sanitize(const char *message, char *buffer, size_t buffer_size)
 
 char *log_sanitize_dup(const char *message)
 {
-    if (!message)
+    if (!message) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     /* 预分配缓冲区 */
     size_t alloc_size = strlen(message) + 1;
@@ -311,12 +321,15 @@ char *log_sanitize_dup(const char *message)
         alloc_size = MAX_LINE_LENGTH;
 
     char *buffer = AGENTOS_MALLOC(alloc_size);
-    if (!buffer)
+    if (!buffer) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     int result = sanitize_core(message, buffer, alloc_size);
     if (result < 0) {
         AGENTOS_FREE(buffer);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

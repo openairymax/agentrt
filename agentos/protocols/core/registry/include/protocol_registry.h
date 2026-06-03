@@ -12,7 +12,7 @@
  * 5. 运行时统计与监控
  * 6. 热加载/卸载支持
  *
- * 支持的协议（v2.1.0）:
+ * 支持的协议（v0.1.0）:
  * - JSON-RPC 2.0 (原生)
  * - MCP v1.0 (Model Context Protocol)
  * - A2A v0.3 (Agent-to-Agent)

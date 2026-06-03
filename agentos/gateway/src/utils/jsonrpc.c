@@ -36,11 +36,11 @@ static const char *const g_custom_error_messages[] = {
 int jsonrpc_validate_request(const cJSON *json)
 {
 #ifdef AGENTOS_HAS_CJSON
-    AGENTOS_CHECK(json != NULL, AGENTOS_EFAIL, "json is NULL");
+    AGENTOS_CHECK(json != NULL, AGENTOS_ERR_NULL_POINTER, "json is NULL");
 
     if (!cJSON_HasObjectItem(json, "jsonrpc") || !cJSON_HasObjectItem(json, "method") ||
         !cJSON_HasObjectItem(json, "id")) {
-        AGENTOS_ERROR(AGENTOS_EFAIL, "missing required JSON-RPC fields");
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "missing required JSON-RPC fields");
     }
 
     const cJSON *jsonrpc = cJSON_GetObjectItemCaseSensitive(json, "jsonrpc");
@@ -58,7 +58,7 @@ int jsonrpc_validate_request(const cJSON *json)
         AGENTOS_ERROR(-2, "method field is not a string");
     }
     if (strlen(method->valuestring) == 0) {
-        AGENTOS_ERROR(AGENTOS_EFAIL, "method is empty");
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "method is empty");
     }
 
     if (!cJSON_IsNumber(id) && !cJSON_IsString(id) && !cJSON_IsNull(id)) {
@@ -68,7 +68,7 @@ int jsonrpc_validate_request(const cJSON *json)
     return 0;
 #else
     (void)json;
-    AGENTOS_ERROR(AGENTOS_EFAIL, "cJSON not available");
+    AGENTOS_ERROR(AGENTOS_ERR_NOT_SUPPORTED, "cJSON not available");
 #endif
 }
 
@@ -292,14 +292,15 @@ const char *jsonrpc_get_error_message(int code)
 int jsonrpc_validate_batch_request(const cJSON *batch_json, size_t *out_count)
 {
 #ifdef AGENTOS_HAS_CJSON
-    AGENTOS_CHECK(batch_json != NULL, AGENTOS_EFAIL, "batch_json is NULL");
-    AGENTOS_CHECK(out_count != NULL, AGENTOS_EFAIL, "out_count is NULL");
+    AGENTOS_CHECK(batch_json != NULL, AGENTOS_ERR_NULL_POINTER, "batch_json is NULL");
+    AGENTOS_CHECK(out_count != NULL, AGENTOS_ERR_NULL_POINTER, "out_count is NULL");
     *out_count = 0;
 
-    AGENTOS_CHECK(cJSON_IsArray(batch_json), AGENTOS_EFAIL, "batch_json is not an array");
+    AGENTOS_CHECK(cJSON_IsArray(batch_json), AGENTOS_ERR_INVALID_PARAM,
+                  "batch_json is not an array");
 
     size_t count = cJSON_GetArraySize(batch_json);
-    AGENTOS_CHECK(count > 0, AGENTOS_EFAIL, "batch is empty");
+    AGENTOS_CHECK(count > 0, AGENTOS_ERR_INVALID_PARAM, "batch is empty");
     if (count > JSONRPC_MAX_BATCH_SIZE)
         AGENTOS_ERROR(-3, "batch exceeds max size");
 
@@ -317,7 +318,7 @@ int jsonrpc_validate_batch_request(const cJSON *batch_json, size_t *out_count)
 #else
     (void)batch_json;
     (void)out_count;
-    AGENTOS_ERROR(AGENTOS_EFAIL, "cJSON not available");
+    AGENTOS_ERROR(AGENTOS_ERR_NOT_SUPPORTED, "cJSON not available");
 #endif
 }
 
