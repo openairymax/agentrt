@@ -1,5 +1,5 @@
 // AgentOS Go SDK - 插件框架测试
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-04-26
 
 package plugin

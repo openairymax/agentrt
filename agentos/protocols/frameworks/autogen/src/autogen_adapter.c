@@ -48,7 +48,7 @@ struct autogen_adapter_context_s {
 autogen_config_t autogen_config_default(void)
 {
     autogen_config_t cfg = {0};
-    cfg.base_url = "http://localhost:18789";
+    cfg.base_url = "http://127.0.0.1:18789";
     cfg.api_key = NULL;
     cfg.timeout_ms = AUTOGEN_DEFAULT_TIMEOUT_MS;
     cfg.enable_code_execution = true;

@@ -50,7 +50,7 @@ class PluginMetadata:
     dependencies: List[str] = field(default_factory=list)
     entry_point: str = ""
     tags: List[str] = field(default_factory=list)
-    min_agentos_version: str = "1.0.0"
+    min_agentos_version: str = "0.1.0"
     loaded_at: Optional[datetime] = None
 
 
@@ -200,12 +200,15 @@ class PluginRegistry:
 
     def load_plugin_from_module(self, module_path: str, class_name: str = "Plugin") -> Optional[Plugin]:
         try:
-            spec = importlib.util.spec_from_file_location("dynamic_plugin", module_path)
+            # 使用模块路径生成唯一模块名，避免多个插件共享同一 sys.modules 条目
+            # 微内核架构要求每个插件运行在独立的命名空间中
+            module_name = f"agentos_plugin_{Path(module_path).stem}_{id(self)}_{len(self._plugins)}"
+            spec = importlib.util.spec_from_file_location(module_name, module_path)
             if not spec or not spec.loader:
                 return None
 
             module = importlib.util.module_from_spec(spec)
-            sys.modules["dynamic_plugin"] = module
+            sys.modules[module_name] = module
             spec.loader.exec_module(module)
 
             plugin_class: Type[Plugin] = getattr(module, class_name, None)
