@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file cost_tracker.c
  * @brief 成本跟踪实现（根据配置规则匹配）
@@ -54,12 +55,16 @@ static void get_price(const cost_tracker_t *ct, const char *model, double *input
 cost_tracker_t *cost_tracker_create(const pricing_rule_t *rules, int rule_count)
 {
     cost_tracker_t *ct = AGENTOS_CALLOC(1, sizeof(cost_tracker_t));
-    if (!ct)
+    if (!ct) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     if (rule_count > 0) {
         ct->rules = AGENTOS_MALLOC(rule_count * sizeof(pricing_rule_t));
         if (!ct->rules) {
             AGENTOS_FREE(ct);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
         memcpy(ct->rules, rules, rule_count * sizeof(pricing_rule_t));

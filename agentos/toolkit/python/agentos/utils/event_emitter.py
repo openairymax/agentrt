@@ -1,5 +1,5 @@
 # AgentOS Python SDK - Event Emitter
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # 事件订阅机制（EventEmitter 模式）

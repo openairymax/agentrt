@@ -17,6 +17,7 @@
 #include "a2a_v03_adapter.h"
 
 #include "memory_compat.h"
+#include "error.h"
 
 #include <inttypes.h>
 #include <stdbool.h>
@@ -24,22 +25,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifndef AGENTOS_SUCCESS
-#define AGENTOS_SUCCESS 0
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_ENOMEM
-#define AGENTOS_ENOMEM (-2)
-#endif
-#ifndef AGENTOS_ENOTSUP
-#define AGENTOS_ENOTSUP (-3)
-#endif
 
 /* Forward declarations for types defined in header */
 typedef struct a2a_v03_adapter_s a2a_v03_adapter_t;
@@ -172,11 +157,16 @@ static struct a2a_v03_adapter_s *g_a2a_instance = NULL;
 int a2a_v03_create(a2a_config_t config, a2a_handle_t *out_handle)
 {
     if (!out_handle)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_create: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     struct a2a_v03_adapter_s *adapter = AGENTOS_CALLOC(1, sizeof(struct a2a_v03_adapter_s));
-    if (!adapter)
-        return -2;
+    if (!adapter) {
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "allocation failed");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
     if (config.default_timeout_ms > 0) {
         adapter->config.default_timeout_ms = config.default_timeout_ms;
     }
@@ -220,12 +210,19 @@ const char *a2a_v03_version(void)
 int a2a_v03_register_agent(a2a_v03_context_t *ctx, const a2a_agent_card_t *card)
 {
     if (!ctx || !card)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_register_agent: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
-    if (adapter->agent_count >= A2A_MAX_AGENTS)
-        return -3;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
+    if (adapter->agent_count >= A2A_MAX_AGENTS) {
+        agentos_error_push_ex(AGENTOS_ERR_BUFFER_TOO_SMALL, __FILE__, __LINE__, __func__, "capacity exceeded");
+        return AGENTOS_ERR_BUFFER_TOO_SMALL;
+    }
 
     a2a_internal_card_t *internal_card = &adapter->agents[adapter->agent_count];
     snprintf(internal_card->id, sizeof(internal_card->id), "agent_%zu_%" PRIu64 ",",
@@ -249,10 +246,15 @@ int a2a_v03_discover_agents(a2a_v03_context_t *ctx, const char *capability, cons
                             a2a_agent_card_t ***results, size_t *result_count)
 {
     if (!ctx || !results || !result_count)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_discover_agents: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     *result_count = 0;
     *results = NULL;
@@ -275,8 +277,10 @@ int a2a_v03_discover_agents(a2a_v03_context_t *ctx, const char *capability, cons
 
     if (matched > 0) {
         agent_array = (a2a_agent_card_t **)AGENTOS_CALLOC(matched, sizeof(a2a_agent_card_t *));
-        if (!agent_array)
-            return -3;
+        if (!agent_array) {
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "allocation failed");
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
 
         size_t idx = 0;
         for (size_t i = 0; i < adapter->agent_count && idx < matched; i++) {
@@ -338,10 +342,15 @@ int a2a_v03_delegate_task(a2a_handle_t handle, const a2a_task_request_internal_t
                           a2a_task_response_internal_t *out_response)
 {
     if (!handle || !request || !out_response)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_delegate_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     memset(out_response, 0, sizeof(*out_response));
 
@@ -372,10 +381,15 @@ int a2a_v03_negotiate_task(a2a_handle_t handle, const char *task_id,
                            a2a_negotiation_result_internal_t *out_result)
 {
     if (!handle || !task_id || !proposal || !out_result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_negotiate_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     memset(out_result, 0, sizeof(*out_result));
     strncpy(out_result->task_id, task_id, sizeof(out_result->task_id) - 1);
@@ -406,10 +420,15 @@ int a2a_v03_achieve_consensus(a2a_handle_t handle, const a2a_consensus_request_i
                               a2a_consensus_result_internal_t *out_result)
 {
     if (!handle || !request || !out_result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_achieve_consensus: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     memset(out_result, 0, sizeof(*out_result));
 
@@ -450,10 +469,15 @@ int a2a_v03_stream_task(a2a_handle_t handle, const a2a_task_request_internal_t *
                         a2a_task_response_internal_t *final_response)
 {
     if (!handle || !request || !on_chunk || !final_response)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_stream_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     snprintf(final_response->task_id, sizeof(final_response->task_id), "stream_task_%" PRIu64,
              adapter->task_counter++);
@@ -501,10 +525,15 @@ int a2a_v03_stream_task(a2a_handle_t handle, const a2a_task_request_internal_t *
 int a2a_v03_get_stats(a2a_handle_t handle, a2a_stats_internal_t *out_stats)
 {
     if (!handle || !out_stats)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_get_stats: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)handle;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     memset(out_stats, 0, sizeof(*out_stats));
     out_stats->registered_agents = (uint32_t)adapter->agent_count;
@@ -613,7 +642,10 @@ static a2a_auth_state_t g_a2a_auth = {0};
 int a2a_v03_auth_init(a2a_v03_context_t *ctx, const a2a_auth_config_t *auth_config)
 {
     if (!ctx || !auth_config)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_auth_init: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     memset(&g_a2a_auth, 0, sizeof(g_a2a_auth));
     g_a2a_auth.initialized = true;
@@ -649,14 +681,20 @@ int a2a_v03_authenticate(a2a_v03_context_t *ctx, const char *agent_id, const cha
                          a2a_auth_token_t **out_token)
 {
     if (!ctx || !agent_id || !credential || !out_token)
-        return AGENTOS_EFAIL;
-    if (!g_a2a_auth.initialized)
-        return -2;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_authenticate: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
+    if (!g_a2a_auth.initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     uint64_t now = a2a_timestamp_ms() / 1000;
 
     if (g_a2a_auth.lockout_until > 0 && now < g_a2a_auth.lockout_until) {
-        return -10;
+        agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__, "a2a_timestamp_ms: error AGENTOS_ERR_NOT_SUPPORTED");
+        return AGENTOS_ERR_NOT_SUPPORTED;
     }
 
     int cred_valid = 0;
@@ -683,7 +721,8 @@ int a2a_v03_authenticate(a2a_v03_context_t *ctx, const char *agent_id, const cha
             g_a2a_auth.lockout_until = now + 300;
             g_a2a_auth.failed_attempts = 0;
         }
-        return -5;
+        agentos_error_push_ex(AGENTOS_ERR_BUFFER_TOO_SMALL, __FILE__, __LINE__, __func__, "operation failed");
+        return AGENTOS_ERR_BUFFER_TOO_SMALL;
     }
 
     g_a2a_auth.failed_attempts = 0;
@@ -713,9 +752,14 @@ int a2a_v03_verify_token(a2a_v03_context_t *ctx, const char *token_str,
                          a2a_auth_token_t **out_token)
 {
     if (!ctx || !token_str || !out_token)
-        return AGENTOS_EFAIL;
-    if (!g_a2a_auth.initialized)
-        return -2;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_verify_token: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
+    if (!g_a2a_auth.initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     uint64_t now = a2a_timestamp_ms() / 1000;
 
@@ -728,7 +772,8 @@ int a2a_v03_verify_token(a2a_v03_context_t *ctx, const char *token_str,
 
         if (now >= tok->expires_at) {
             tok->valid = false;
-            return -6;
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
+            return AGENTOS_ERR_UNKNOWN;
         }
 
         if (out_token)
@@ -736,13 +781,17 @@ int a2a_v03_verify_token(a2a_v03_context_t *ctx, const char *token_str,
         return 0;
     }
 
-    return -7;
+    agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
+    return AGENTOS_ERR_UNKNOWN;
 }
 
 int a2a_v03_invalidate_token(a2a_v03_context_t *ctx, const char *token_str)
 {
     if (!ctx || !token_str)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_invalidate_token: invalid parameter");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t i = 0; i < g_a2a_auth.token_count; i++) {
         if (g_a2a_auth.tokens[i].valid && strcmp(g_a2a_auth.tokens[i].token, token_str) == 0) {
@@ -751,7 +800,8 @@ int a2a_v03_invalidate_token(a2a_v03_context_t *ctx, const char *token_str)
         }
     }
 
-    return -8;
+    agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "memset: error AGENTOS_ERR_NULL_POINTER");
+    return AGENTOS_ERR_NULL_POINTER;
 }
 
 const char *a2a_v03_sign_request(a2a_v03_context_t *ctx, const char *method,
@@ -789,16 +839,21 @@ int a2a_v03_verify_signature(a2a_v03_context_t *ctx, const char *method, const c
                              const char *signature, const char *token_str)
 {
     if (!ctx || !method || !params_json || !signature)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_verify_signature: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     char expected[65];
     if (!a2a_v03_sign_request(ctx, method, params_json, token_str, expected, sizeof(expected))) {
-        return -2;
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "operation failed");
+        return AGENTOS_ERR_NULL_POINTER;
     }
 
     if (memcmp(expected, signature, 64) == 0)
         return 0;
-    return -9;
+    agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
+    return AGENTOS_ERR_UNKNOWN;
 }
 
 int a2a_v03_create_session(a2a_v03_context_t *ctx, const char *remote_agent_id,
@@ -806,9 +861,14 @@ int a2a_v03_create_session(a2a_v03_context_t *ctx, const char *remote_agent_id,
                            a2a_session_t **out_session)
 {
     if (!ctx || !remote_agent_id || !out_session)
-        return AGENTOS_EFAIL;
-    if (!g_a2a_auth.initialized)
-        return -2;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_create_session: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
+    if (!g_a2a_auth.initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     if (g_a2a_auth.session_count >= g_a2a_auth.config.max_sessions) {
         size_t oldest_idx = 0;
@@ -849,7 +909,10 @@ int a2a_v03_validate_session(a2a_v03_context_t *ctx, const char *session_id,
                              a2a_session_t **out_session)
 {
     if (!ctx || !session_id || !out_session)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_validate_session: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t i = 0; i < g_a2a_auth.session_count; i++) {
         a2a_session_t *sess = &g_a2a_auth.sessions[i];
@@ -862,7 +925,8 @@ int a2a_v03_validate_session(a2a_v03_context_t *ctx, const char *session_id,
 
         if (age_sec > (uint64_t)g_a2a_auth.config.token_ttl_sec * 2) {
             memset(sess, 0, sizeof(*sess));
-            return -6;
+            agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__, "a2a_timestamp_ms: error AGENTOS_ERR_NOT_SUPPORTED");
+            return AGENTOS_ERR_NOT_SUPPORTED;
         }
 
         sess->last_activity = now;
@@ -873,7 +937,8 @@ int a2a_v03_validate_session(a2a_v03_context_t *ctx, const char *session_id,
         return 0;
     }
 
-    return -7;
+    agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
+    return AGENTOS_ERR_UNKNOWN;
 }
 
 void a2a_v03_destroy_session(a2a_v03_context_t *ctx, const char *session_id)
@@ -971,10 +1036,15 @@ void a2a_v03_context_destroy(a2a_v03_context_t *ctx)
 int a2a_v03_unregister_agent(a2a_v03_context_t *ctx, const char *agent_id)
 {
     if (!ctx || !agent_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_unregister_agent: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
     for (size_t i = 0; i < adapter->agent_count; i++) {
         if (strcmp(adapter->agents[i].id, agent_id) == 0) {
             AGENTOS_FREE(adapter->agents[i].name);
@@ -986,28 +1056,39 @@ int a2a_v03_unregister_agent(a2a_v03_context_t *ctx, const char *agent_id)
             return 0;
         }
     }
-    return -3;
+    agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
+    return AGENTOS_ERR_UNKNOWN;
 }
 
 int a2a_v03_create_task(a2a_v03_context_t *ctx, const char *agent_id, const char *description,
                         const char *input_json, a2a_task_t **task)
 {
     if (!ctx || !task)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_create_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
-    if (adapter->task_count >= A2A_V03_MAX_TASKS)
-        return -3;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
+    if (adapter->task_count >= A2A_V03_MAX_TASKS) {
+        agentos_error_push_ex(AGENTOS_ERR_BUFFER_TOO_SMALL, __FILE__, __LINE__, __func__, "capacity exceeded");
+        return AGENTOS_ERR_BUFFER_TOO_SMALL;
+    }
 
     a2a_task_t *t = (a2a_task_t *)AGENTOS_CALLOC(1, sizeof(a2a_task_t));
-    if (!t)
-        return -4;
+    if (!t) {
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "allocation failed");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     t->id = (char *)AGENTOS_MALLOC(A2A_TASK_ID_SIZE);
     if (!t->id) {
         AGENTOS_FREE(t);
-        return -5;
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "AGENTOS_MALLOC: error AGENTOS_ERR_OUT_OF_MEMORY");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     snprintf(t->id, A2A_TASK_ID_SIZE, "task_%zu_%u", adapter->task_count,
              (unsigned int)(a2a_timestamp_ms() % 100000));
@@ -1042,10 +1123,15 @@ int a2a_v03_update_task(a2a_v03_context_t *ctx, const char *task_id, a2a_task_st
                         const char *output_json, double progress)
 {
     if (!ctx || !task_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_update_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     for (size_t i = 0; i < adapter->task_count; i++) {
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
@@ -1060,16 +1146,22 @@ int a2a_v03_update_task(a2a_v03_context_t *ctx, const char *task_id, a2a_task_st
             return 0;
         }
     }
-    return -3;
+    agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__, "a2a_timestamp_ms: error AGENTOS_ERR_NOT_SUPPORTED");
+    return AGENTOS_ERR_NOT_SUPPORTED;
 }
 
 int a2a_v03_cancel_task(a2a_v03_context_t *ctx, const char *task_id, const char *reason)
 {
     if (!ctx || !task_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_cancel_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     for (size_t i = 0; i < adapter->task_count; i++) {
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
@@ -1082,16 +1174,22 @@ int a2a_v03_cancel_task(a2a_v03_context_t *ctx, const char *task_id, const char 
             return 0;
         }
     }
-    return -3;
+    agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "AGENTOS_STRDUP: error AGENTOS_ERR_OUT_OF_MEMORY");
+    return AGENTOS_ERR_OUT_OF_MEMORY;
 }
 
 int a2a_v03_get_task(a2a_v03_context_t *ctx, const char *task_id, a2a_task_t **task)
 {
     if (!ctx || !task_id || !task)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_get_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     for (size_t i = 0; i < adapter->task_count; i++) {
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
@@ -1099,7 +1197,8 @@ int a2a_v03_get_task(a2a_v03_context_t *ctx, const char *task_id, a2a_task_t **t
             return 0;
         }
     }
-    return -3;
+    agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
+    return AGENTOS_ERR_UNKNOWN;
 }
 
 int a2a_v03_send_message(a2a_v03_context_t *ctx, const char *target_agent_id,
@@ -1107,10 +1206,15 @@ int a2a_v03_send_message(a2a_v03_context_t *ctx, const char *target_agent_id,
                          size_t *response_count)
 {
     if (!ctx || !target_agent_id || !message)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_send_message: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     if (adapter->message_handler) {
         return adapter->message_handler(ctx, target_agent_id, message, response, response_count,
@@ -1135,10 +1239,15 @@ int a2a_v03_negotiate(a2a_v03_context_t *ctx, const a2a_negotiation_t *proposal,
                       a2a_negotiation_action_t *response_action, char **response_terms)
 {
     if (!ctx || !proposal)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_negotiate: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     if (adapter->negotiation_handler) {
         return adapter->negotiation_handler(ctx, proposal, response_action, response_terms,
@@ -1156,7 +1265,10 @@ int a2a_v03_subscribe_notifications(a2a_v03_context_t *ctx, a2a_notification_han
                                     void *user_data)
 {
     if (!ctx || !handler)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_subscribe_notifications: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->notification_handler = handler;
     adapter->notification_handler_user_data = user_data;
@@ -1166,7 +1278,10 @@ int a2a_v03_subscribe_notifications(a2a_v03_context_t *ctx, a2a_notification_han
 int a2a_v03_unsubscribe_notifications(a2a_v03_context_t *ctx)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_unsubscribe_notifications: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->notification_handler = NULL;
     adapter->notification_handler_user_data = NULL;
@@ -1176,10 +1291,15 @@ int a2a_v03_unsubscribe_notifications(a2a_v03_context_t *ctx)
 int a2a_v03_send_notification(a2a_v03_context_t *ctx, const a2a_notification_t *notification)
 {
     if (!ctx || !notification)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_send_notification: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->notification_handler)
-        return -3;
+    if (!adapter->notification_handler) {
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "operation failed");
+        return AGENTOS_ERR_NULL_POINTER;
+    }
     adapter->notification_handler(ctx, notification, adapter->notification_handler_user_data);
     return 0;
 }
@@ -1188,10 +1308,15 @@ int a2a_v03_stream_task_update(a2a_v03_context_t *ctx, const char *task_id, doub
                                const char *chunk_json, bool is_final)
 {
     if (!ctx || !task_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_stream_task_update: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
 
     for (size_t i = 0; i < adapter->task_count; i++) {
         if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
@@ -1218,7 +1343,10 @@ int a2a_v03_stream_task_update(a2a_v03_context_t *ctx, const char *task_id, doub
 int a2a_v03_set_task_handler(a2a_v03_context_t *ctx, a2a_task_handler_t handler, void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_set_task_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->task_handler = handler;
     adapter->task_handler_user_data = user_data;
@@ -1229,7 +1357,10 @@ int a2a_v03_set_message_handler(a2a_v03_context_t *ctx, a2a_message_handler_t ha
                                 void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_set_message_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->message_handler = handler;
     adapter->message_handler_user_data = user_data;
@@ -1240,7 +1371,10 @@ int a2a_v03_set_negotiation_handler(a2a_v03_context_t *ctx, a2a_negotiation_hand
                                     void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_set_negotiation_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->negotiation_handler = handler;
     adapter->negotiation_handler_user_data = user_data;
@@ -1251,7 +1385,10 @@ int a2a_v03_set_streaming_handler(a2a_v03_context_t *ctx, a2a_streaming_handler_
                                   void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_set_streaming_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
     adapter->streaming_handler = handler;
     adapter->streaming_handler_user_data = user_data;
@@ -1262,17 +1399,24 @@ int a2a_v03_route_request(a2a_v03_context_t *ctx, const char *method, const char
                           char **response_json)
 {
     if (!ctx || !method || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_v03_route_request: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
-    if (!adapter->initialized)
-        return -2;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__, "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
     *response_json = NULL;
 
     if (strcmp(method, "agent/discover") == 0) {
         size_t buf_size = 256 + adapter->agent_count * 128;
         char *buf = (char *)AGENTOS_MALLOC(buf_size);
-        if (!buf)
-            return -3;
+        if (!buf) {
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "allocation failed");
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
         int pos = snprintf(buf, buf_size, "{\"agents\":[");
         for (size_t i = 0; i < adapter->agent_count; i++) {
             pos += snprintf(buf + pos, buf_size - (size_t)pos, "%s{\"id\":\"%s\",\"name\":\"%s\"}",
@@ -1301,8 +1445,10 @@ int a2a_v03_route_request(a2a_v03_context_t *ctx, const char *method, const char
     if (strcmp(method, "task/list") == 0) {
         size_t buf_size = 256 + adapter->task_count * 128;
         char *buf = (char *)AGENTOS_MALLOC(buf_size);
-        if (!buf)
-            return -3;
+        if (!buf) {
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "allocation failed");
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
         int pos = snprintf(buf, buf_size, "{\"tasks\":[");
         for (size_t i = 0; i < adapter->task_count; i++) {
             pos += snprintf(buf + pos, buf_size - (size_t)pos, "%s{\"id\":\"%s\",\"state\":%d}",
@@ -1316,8 +1462,10 @@ int a2a_v03_route_request(a2a_v03_context_t *ctx, const char *method, const char
     if (strcmp(method, "stats") == 0) {
         size_t buf_size = 256;
         char *buf = (char *)AGENTOS_MALLOC(buf_size);
-        if (!buf)
-            return -3;
+        if (!buf) {
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "allocation failed");
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
         snprintf(buf, buf_size, "{\"agent_count\":%zu,\"task_count\":%zu,\"capabilities\":%u}",
                  adapter->agent_count, adapter->task_count, adapter->config.capabilities);
         *response_json = buf;
@@ -1325,7 +1473,8 @@ int a2a_v03_route_request(a2a_v03_context_t *ctx, const char *method, const char
     }
 
     *response_json = AGENTOS_STRDUP("{\"error\":\"unknown method\"}");
-    return -10;
+    agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "AGENTOS_STRDUP: error AGENTOS_ERR_OUT_OF_MEMORY");
+    return AGENTOS_ERR_OUT_OF_MEMORY;
 }
 
 static int a2a_adapter_init_cb(void *context)
@@ -1342,12 +1491,18 @@ static int a2a_adapter_destroy_cb(void *context)
 static int a2a_adapter_encode_cb(void *c, const void *m, void **o, size_t *s)
 {
     if (!c || !m || !o || !s)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_encode_cb: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     const char *msg = (const char *)m;
     size_t len = strlen(msg) + 1;
     char *buf = (char *)AGENTOS_MALLOC(len);
     if (!buf)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "strlen: allocation failed");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
     memcpy(buf, msg, len);
     *o = buf;
     *s = len;
@@ -1356,21 +1511,30 @@ static int a2a_adapter_encode_cb(void *c, const void *m, void **o, size_t *s)
 static int a2a_adapter_decode_cb(void *c, const void *d, size_t s, void *o)
 {
     if (!c || !d || !o || s == 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_decode_cb: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     memcpy(o, d, s);
     return 0;
 }
 static int a2a_adapter_connect_cb(void *c, const char *e)
 {
     if (!c)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_connect_cb: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     (void)e;
     return 0;
 }
 static int a2a_adapter_disconnect_cb(void *c)
 {
     if (!c)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_disconnect_cb: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     return 0;
 }
 static int a2a_adapter_is_connected_cb(void *c)
@@ -1380,13 +1544,19 @@ static int a2a_adapter_is_connected_cb(void *c)
 static int a2a_adapter_send_cb(void *c, const void *d, size_t s)
 {
     if (!c || !d || s == 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_send_cb: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     return AGENTOS_ENOTSUP;
 }
 static int a2a_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t)
 {
     if (!c || !d || !s)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_receive_cb: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     (void)t;
     *d = NULL;
     *s = 0;
@@ -1395,7 +1565,10 @@ static int a2a_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t)
 static int a2a_adapter_handle_request_cb(void *c, const void *r, void **rp)
 {
     if (!c || !r)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_handle_request_cb: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (rp)
         *rp = NULL;
     return a2a_v03_route_request((a2a_v03_context_t *)c, (const char *)r, NULL, (char **)rp);
@@ -1414,7 +1587,10 @@ static uint32_t a2a_adapter_capabilities_cb(void *c)
 static int a2a_adapter_get_stats_cb(void *c, char *b, size_t s)
 {
     if (!c || !b || s == 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_get_stats_cb: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     struct a2a_v03_adapter_s *a = (struct a2a_v03_adapter_s *)c;
     snprintf(b, s, "{\"agents\":%zu,\"tasks\":%zu}", a->agent_count, a->task_count);
     return 0;

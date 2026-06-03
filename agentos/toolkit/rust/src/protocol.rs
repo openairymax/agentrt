@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
 //! @file protocol.rs
 //! @brief AgentOS Rust SDK — Protocol Client Module
@@ -57,9 +57,11 @@ pub struct ProtocolConfig {
 
 impl Default for ProtocolConfig {
     fn default() -> Self {
+        let endpoint = std::env::var("AGENTOS_ENDPOINT")
+            .unwrap_or_else(|_| "http://127.0.0.1:18789".to_string());
         Self {
             protocol_type: ProtocolType::JsonRpc,
-            endpoint: "http://localhost:18789".to_string(),
+            endpoint,
             api_key: None,
             timeout: Duration::from_secs(30),
             retry_count: 3,

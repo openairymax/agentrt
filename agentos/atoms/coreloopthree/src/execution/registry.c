@@ -12,6 +12,12 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /**
  * @brief 注册表条?
@@ -34,7 +40,7 @@ static agentos_error_t ensure_registry_init(void)
 
     agentos_mutex_t *new_lock = agentos_mutex_create();
     if (!new_lock)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     agentos_mutex_t *expected = NULL;
     if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&g_registry_lock, (void **)&expected,
@@ -81,7 +87,7 @@ void agentos_registry_cleanup(void)
 agentos_error_t agentos_registry_register_unit(const char *unit_id, agentos_execution_unit_t *unit)
 {
     if (!unit_id || !unit)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_error_t err = ensure_registry_init();
     if (err != AGENTOS_SUCCESS)
@@ -94,7 +100,7 @@ agentos_error_t agentos_registry_register_unit(const char *unit_id, agentos_exec
     while (entry) {
         if (strcmp(entry->unit_id, unit_id) == 0) {
             agentos_mutex_unlock(g_registry_lock);
-            return AGENTOS_EEXIST;
+            ATM_RET_ERR(AGENTOS_EEXIST);
         }
         entry = entry->next;
     }
@@ -103,14 +109,14 @@ agentos_error_t agentos_registry_register_unit(const char *unit_id, agentos_exec
     entry = (registry_entry_t *)AGENTOS_MALLOC(sizeof(registry_entry_t));
     if (!entry) {
         agentos_mutex_unlock(g_registry_lock);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     entry->unit_id = AGENTOS_STRDUP(unit_id);
     entry->unit = unit;
     if (!entry->unit_id) {
         AGENTOS_FREE(entry);
         agentos_mutex_unlock(g_registry_lock);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     entry->next = g_registry;
@@ -143,10 +149,14 @@ void agentos_registry_unregister_unit(const char *unit_id)
 
 agentos_execution_unit_t *agentos_registry_get_unit(const char *unit_id)
 {
-    if (!unit_id)
+    if (!unit_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-    if (ensure_registry_init() != AGENTOS_SUCCESS)
+        }
+    if (ensure_registry_init() != AGENTOS_SUCCESS) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     agentos_mutex_lock(g_registry_lock);
     registry_entry_t *entry = g_registry;
     while (entry) {
@@ -158,5 +168,6 @@ agentos_execution_unit_t *agentos_registry_get_unit(const char *unit_id)
         entry = entry->next;
     }
     agentos_mutex_unlock(g_registry_lock);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }

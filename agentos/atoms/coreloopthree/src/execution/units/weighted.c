@@ -13,6 +13,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct weighted_data {
     weighted_config_t manager;
@@ -52,7 +58,7 @@ static agentos_error_t weighted_dispatch(const agentos_task_node_t *task, const 
 
     weighted_data_t *data = (weighted_data_t *)context;
     if (!data || !task || !out_agent_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agent_info_t **agents = NULL;
     size_t agent_count = 0;
@@ -67,7 +73,7 @@ static agentos_error_t weighted_dispatch(const agentos_task_node_t *task, const 
         if (err != AGENTOS_SUCCESS)
             return err;
         if (agent_count == 0)
-            return AGENTOS_ENOENT;
+            ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
     float best_score = -FLT_MAX;
@@ -86,11 +92,11 @@ static agentos_error_t weighted_dispatch(const agentos_task_node_t *task, const 
         agent_info_t *best_agent = agents[best_index];
         *out_agent_id = AGENTOS_STRDUP(best_agent->agent_id);
         if (!*out_agent_id)
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         return AGENTOS_SUCCESS;
     }
 
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 agentos_dispatching_strategy_t *
@@ -98,18 +104,17 @@ agentos_dispatching_weighted_create(const weighted_config_t *manager, void *regi
                                     agent_registry_get_agents_func get_agents_func)
 {
 
-    if (!get_agents_func)
-        return NULL;
+    if (!get_agents_func) return NULL;
 
     agentos_dispatching_strategy_t *strat =
         (agentos_dispatching_strategy_t *)AGENTOS_MALLOC(sizeof(agentos_dispatching_strategy_t));
-    if (!strat)
-        return NULL;
+    if (!strat) return NULL;
     memset(strat, 0, sizeof(*strat));
 
     weighted_data_t *data = (weighted_data_t *)AGENTOS_MALLOC(sizeof(weighted_data_t));
     if (!data) {
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     memset(data, 0, sizeof(*data));
@@ -128,6 +133,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *manager, void *regi
     if (!data->lock) {
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

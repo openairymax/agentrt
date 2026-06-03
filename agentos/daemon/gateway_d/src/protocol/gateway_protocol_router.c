@@ -1,6 +1,5 @@
 #include "gateway_protocol_router.h"
 
-#include "error.h"
 #include "gateway_a2a_handler.h"
 #include "gateway_mcp_server.h"
 #include "gateway_openai_compat.h"
@@ -10,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 typedef struct {
     gw_proto_detect_result_t proto_type;
@@ -87,8 +87,11 @@ static gw_proto_detect_result_t detect_from_body(const char *body)
 gw_proto_router_t *gw_proto_router_create(void)
 {
     gw_proto_router_t *router = (gw_proto_router_t *)AGENTOS_CALLOC(1, sizeof(gw_proto_router_t));
-    if (!router)
+    if (!router) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     router->adapter_count = 0;
     router->initialized = false;
     router->healthy = false;
@@ -229,6 +232,7 @@ find_handler(gw_proto_router_t *router, gw_proto_detect_result_t proto_type, voi
             return router->adapters[i].handler;
         }
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 

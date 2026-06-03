@@ -41,13 +41,6 @@
 #include <unistd.h>
 #endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
-
 #define CONTAINER_ID_LENGTH 64
 #define CONTAINER_NAME_PREFIX "cupolas_"
 #define MAX_COMMAND_LENGTH 4096

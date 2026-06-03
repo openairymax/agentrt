@@ -2,7 +2,7 @@
  * @file test_agent_registry_core.c
  * @brief Agent注册表核心功能单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * @version 2.0.0
+ * @version 0.1.0
  */
 
 #include "agent_registry_core.h"

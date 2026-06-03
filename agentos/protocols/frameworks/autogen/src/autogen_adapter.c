@@ -20,15 +20,6 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER (-3)
-#endif
-#ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM (-2)
-#endif
-#ifndef AGENTOS_ERR_OUT_OF_MEMORY
-#define AGENTOS_ERR_OUT_OF_MEMORY (-4)
-#endif
 
 struct autogen_adapter_context_s {
     autogen_config_t config;
@@ -57,7 +48,7 @@ struct autogen_adapter_context_s {
 autogen_config_t autogen_config_default(void)
 {
     autogen_config_t cfg = {0};
-    cfg.base_url = "http://localhost:18789";
+    cfg.base_url = "http://127.0.0.1:18789";
     cfg.api_key = NULL;
     cfg.timeout_ms = AUTOGEN_DEFAULT_TIMEOUT_MS;
     cfg.enable_code_execution = true;
@@ -365,7 +356,10 @@ int autogen_initiate_chat(autogen_adapter_context_t *ctx, const char *group_id,
                           autogen_group_chat_result_t *result)
 {
     if (!ctx || !result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "autogen_initiate_chat: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->initialized)
         return AGENTOS_ERR_SYS_NOT_INIT;
     if (!ctx->llm_callback)
@@ -459,7 +453,10 @@ int autogen_send_message(autogen_adapter_context_t *ctx, const char *from_agent_
                          autogen_message_t *reply)
 {
     if (!ctx || !reply)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "autogen_send_message: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->initialized)
         return AGENTOS_ERR_SYS_NOT_INIT;
     if (!ctx->llm_callback)

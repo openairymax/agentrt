@@ -35,7 +35,7 @@ Example:
     asyncio.run(main())
 
 Author: Spharx AgentOS Team
-Version: 1.0.0.6
+Version: 0.1.0
 """
 
 from openlab.core import (

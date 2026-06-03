@@ -1,5 +1,5 @@
 // AgentOS Go SDK - 配置管理模块单元测试
-// Version: 3.0.0
+// Version: 0.1.0
 
 package agentos
 
@@ -11,7 +11,7 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.Endpoint != "http://localhost:18789" {
+	if cfg.Endpoint != "http://127.0.0.1:18789" {
 		t.Errorf("默认端点 = %q", cfg.Endpoint)
 	}
 	if cfg.Timeout != 30*time.Second {
@@ -31,8 +31,8 @@ func TestWithEndpoint(t *testing.T) {
 
 func TestWithEndpoint_IgnoresEmpty(t *testing.T) {
 	cfg := NewConfig(WithEndpoint(""))
-	if cfg.Endpoint != "http://localhost:18789" {
-		t.Errorf("空端点不应覆盖默认值, got %q", cfg.Endpoint)
+	if cfg.Endpoint != "http://127.0.0.1:18789" {
+		t.Errorf("空端点应回退到默认值，got %q", cfg.Endpoint)
 	}
 }
 

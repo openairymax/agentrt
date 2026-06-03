@@ -1,5 +1,5 @@
-#include "error.h"
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file sched_service_impl.c
  * @brief 调度服务核心实现

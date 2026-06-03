@@ -17,6 +17,10 @@
 #include <string.h>
 #include <time.h>
 
+#define RQ_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
+         agentos_error_str(c)); return (c); } while(0)
+
 #define RESOURCE_FLAG_MEMORY_EXCEEDED 0x01
 #define RESOURCE_FLAG_CPU_EXCEEDED 0x02
 #define RESOURCE_FLAG_IO_EXCEEDED 0x04
@@ -28,13 +32,13 @@ agentos_error_t agentos_resource_manager_create(const agentos_resource_quota_t *
 {
 
     if (!quota || !resource_id || !out_manager) {
-        return AGENTOS_EINVAL;
+        RQ_RET_ERR(AGENTOS_EINVAL);
     }
 
     agentos_resource_manager_t *manager =
         (agentos_resource_manager_t *)AGENTOS_CALLOC(1, sizeof(agentos_resource_manager_t));
     if (!manager) {
-        return AGENTOS_ENOMEM;
+        RQ_RET_ERR(AGENTOS_ENOMEM);
     }
 
     memcpy(&manager->quota, quota, sizeof(agentos_resource_quota_t));
@@ -43,7 +47,7 @@ agentos_error_t agentos_resource_manager_create(const agentos_resource_quota_t *
     manager->resource_id = AGENTOS_STRDUP(resource_id);
     if (!manager->resource_id) {
         AGENTOS_FREE(manager);
-        return AGENTOS_ENOMEM;
+        RQ_RET_ERR(AGENTOS_ENOMEM);
     }
 
     manager->lock = NULL;
@@ -77,7 +81,7 @@ agentos_error_t agentos_resource_check_memory(agentos_resource_manager_t *manage
     }
 
     if (requested_bytes == 0) {
-        return AGENTOS_EINVAL;
+        RQ_RET_ERR(AGENTOS_EINVAL);
     }
 
     if (manager->quota.max_memory_bytes > 0) {
@@ -88,7 +92,7 @@ agentos_error_t agentos_resource_check_memory(agentos_resource_manager_t *manage
                              "requested: %zu, limit: %zu)",
                              manager->resource_id, manager->usage.current_memory_bytes,
                              requested_bytes, manager->quota.max_memory_bytes);
-            return AGENTOS_ENOMEM;
+            RQ_RET_ERR(AGENTOS_ENOMEM);
         }
     }
 
@@ -104,7 +108,7 @@ agentos_error_t agentos_resource_record_allocation(agentos_resource_manager_t *m
     }
 
     if (bytes == 0) {
-        return AGENTOS_EINVAL;
+        RQ_RET_ERR(AGENTOS_EINVAL);
     }
 
     manager->usage.current_memory_bytes += bytes;
@@ -126,7 +130,7 @@ agentos_error_t agentos_resource_record_free(agentos_resource_manager_t *manager
     }
 
     if (bytes == 0) {
-        return AGENTOS_EINVAL;
+        RQ_RET_ERR(AGENTOS_EINVAL);
     }
 
     if (bytes <= manager->usage.current_memory_bytes) {
@@ -157,7 +161,7 @@ agentos_error_t agentos_resource_record_io(agentos_resource_manager_t *manager)
         AGENTOS_LOG_WARN("Resource %s: I/O quota exceeded (total: %zu, limit: %zu)",
                          manager->resource_id, manager->usage.total_io_ops,
                          manager->quota.max_io_ops);
-        return AGENTOS_EBUSY;
+        RQ_RET_ERR(AGENTOS_EBUSY);
     }
 
     return AGENTOS_SUCCESS;

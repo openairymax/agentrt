@@ -18,6 +18,8 @@
 #include "error.h"
 
 #include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -240,7 +242,15 @@ static inline void agentos_compat_error_handle_with_context(agentos_error_t err,
         va_start(args2, fmt);
         vsnprintf(buffer, sizeof(buffer), fmt, args2);
         va_end(args2);
-        g_compat_error_info_handler(err, function, file, line, user_data, buffer);
+        agentos_compat_error_info_t info;
+        memset(&info, 0, sizeof(info));
+        info.code = err;
+        info.function = function;
+        info.file = file;
+        info.line = line;
+        info.context = user_data;
+        snprintf(info.message, sizeof(info.message), "%s", buffer);
+        g_compat_error_info_handler(&info);
     }
 
     if (err != AGENTOS_OK) {

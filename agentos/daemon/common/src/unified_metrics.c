@@ -9,7 +9,6 @@
 
 #include "unified_metrics.h"
 
-#include "error.h"
 #include "memory_compat.h"
 #include "platform.h"
 #include "safe_string_utils.h"
@@ -18,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 /* ==================== 内部状态 ==================== */
 
@@ -38,6 +38,7 @@ static um_module_metrics_t *find_module(const char *name)
         if (strcmp(g_um.modules[i].module_name, name) == 0)
             return &g_um.modules[i];
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -47,6 +48,7 @@ static um_metric_entry_t *find_metric(um_module_metrics_t *mod, const char *name
         if (strcmp(mod->metrics[i].name, name) == 0)
             return &mod->metrics[i];
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -370,8 +372,11 @@ AGENTOS_API char *um_export_prometheus(void)
 
 AGENTOS_API char *um_export_prometheus_module(const char *module_name)
 {
-    if (!g_um.initialized)
+    if (!g_um.initialized) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     agentos_mutex_lock(&g_um.mutex);
 
@@ -379,6 +384,7 @@ AGENTOS_API char *um_export_prometheus_module(const char *module_name)
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
         agentos_mutex_unlock(&g_um.mutex);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     size_t pos = 0;
@@ -473,8 +479,11 @@ AGENTOS_API char *um_export_prometheus_module(const char *module_name)
 
 AGENTOS_API char *um_export_json(void)
 {
-    if (!g_um.initialized)
+    if (!g_um.initialized) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     agentos_mutex_lock(&g_um.mutex);
 
@@ -482,6 +491,7 @@ AGENTOS_API char *um_export_json(void)
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
         agentos_mutex_unlock(&g_um.mutex);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     size_t pos = 0;

@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file agent_registry_core.c
  * @brief Agent注册表核心功能实现
@@ -6,7 +7,6 @@
  */
 
 #include "agent_registry_core.h"
-#include "error.h"
 #include "platform.h"
 #include "svc_logger.h"
 
@@ -25,8 +25,11 @@ struct agent_registry {
 agent_registry_t *agent_registry_core_create(void)
 {
     agent_registry_t *reg = (agent_registry_t *)AGENTOS_CALLOC(1, sizeof(agent_registry_t));
-    if (!reg)
+    if (!reg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     agentos_mutex_init(&reg->lock);
     reg->initialized = 0;
     return reg;
@@ -119,8 +122,11 @@ int agent_registry_core_remove(agent_registry_t *registry, const char *agent_id)
 
 const agent_entry_t *agent_registry_core_get(agent_registry_t *registry, const char *agent_id)
 {
-    if (!registry || !registry->initialized || !agent_id)
+    if (!registry || !registry->initialized || !agent_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
         if (strcmp(registry->entries[i].id, agent_id) == 0) {
@@ -129,6 +135,7 @@ const agent_entry_t *agent_registry_core_get(agent_registry_t *registry, const c
         }
     }
     agentos_mutex_unlock(&registry->lock);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
@@ -190,8 +197,11 @@ int agent_registry_core_add_version(agent_registry_t *registry, const char *agen
 
 const char *agent_registry_core_get_latest_version(agent_registry_t *registry, const char *agent_id)
 {
-    if (!registry || !registry->initialized || !agent_id)
+    if (!registry || !registry->initialized || !agent_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
         if (strcmp(registry->entries[i].id, agent_id) == 0) {
@@ -200,6 +210,7 @@ const char *agent_registry_core_get_latest_version(agent_registry_t *registry, c
         }
     }
     agentos_mutex_unlock(&registry->lock);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 

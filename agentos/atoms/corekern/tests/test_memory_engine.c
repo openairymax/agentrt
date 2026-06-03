@@ -171,6 +171,7 @@ static void test_memory_provider_alloc_free(void)
     if (p1) {
         memset(p1, 0xAA, 128);
         unsigned char *d = (unsigned char *)p1;
+    (void)d;
         assert(d[0] == 0xAA && d[127] == 0xAA);
         TEST_PASS("分配内存可读写");
         AGENTOS_FREE(p1);
@@ -313,6 +314,7 @@ static void test_error_codes_match(void)
     };
     int n_std = (int)(sizeof(std_errs) / sizeof(std_errs[0]));
     int all_negative = 1;
+    (void)all_negative;
     for (int i = 0; i < n_std; i++) {
         if (std_errs[i] >= 0) all_negative = 0;
     }
@@ -325,6 +327,7 @@ static void test_error_codes_match(void)
     };
     int n_kern = (int)(sizeof(kern_errs) / sizeof(kern_errs[0]));
     int kern_negative = 1;
+    (void)kern_negative;
     for (int i = 0; i < n_kern; i++) {
         if (kern_errs[i] >= 0) kern_negative = 0;
     }
@@ -333,6 +336,7 @@ static void test_error_codes_match(void)
 
     /* 验证 SUCCESS 与所有错误码不同 */
     int success_unique = 1;
+    (void)success_unique;
     for (int i = 0; i < n_std; i++) {
         if (AGENTOS_SUCCESS == std_errs[i]) success_unique = 0;
     }
@@ -384,6 +388,7 @@ static void test_error_strerror_coverage(void)
     };
     int n = (int)(sizeof(check_codes) / sizeof(check_codes[0]));
     int all_covered = 1;
+    (void)all_covered;
 
     for (int i = 0; i < n; i++) {
         const char *desc = agentos_strerror(check_codes[i]);
@@ -394,6 +399,7 @@ static void test_error_strerror_coverage(void)
     TEST_PASS("%d 个错误码均有非空strerror描述", n);
 
     const char *unknown_desc = agentos_strerror(-9999);
+    (void)unknown_desc;
     assert(unknown_desc != NULL);
     TEST_PASS("未知错误码也有描述字符串");
     assert(unknown_desc[0] != '\0');
@@ -468,6 +474,7 @@ static void test_weighted_score_basic(void)
     };
 
     float score = test_compute_weighted_score(&agent_a, &cfg);
+    (void)score;
     assert(score > 0.0f);
     TEST_PASS("正常Agent得分 > 0");
     assert(score <= 1.5f);
@@ -483,6 +490,7 @@ static void test_weighted_score_basic(void)
     };
 
     float score_b = test_compute_weighted_score(&agent_b, &cfg);
+    (void)score_b;
     assert(score > score_b);
     TEST_PASS("高质量Agent得分高于低质量Agent");
 }
@@ -529,6 +537,7 @@ static void test_weighted_score_zero_cost(void)
     };
 
     float score = test_compute_weighted_score(&zero_cost, &cfg);
+    (void)score;
     assert(score > 0.0f);
     TEST_PASS("零成本Agent得分 > 0");
 
@@ -536,6 +545,7 @@ static void test_weighted_score_zero_cost(void)
     float perf_part = cfg.perf_weight * zero_cost.success_rate;
     float trust_part = cfg.trust_weight * zero_cost.trust_score;
     float expected = cost_part + perf_part + trust_part;
+    (void)expected;
     assert(fabsf(score - expected) <= 1e-5f);
     TEST_PASS("零成本时cost_score=1.0，总分精确匹配");
 }
@@ -556,30 +566,35 @@ static void test_weighted_config_weights(void)
     test_weighted_config_t cost_only = {.cost_weight = 1.0f, .perf_weight = 0.0f,
                                         .trust_weight = 0.0f};
     float sc = test_compute_weighted_score(&agent, &cost_only);
+    (void)sc;
     assert(sc > 0.0f);
     TEST_PASS("纯成本权重得分有意义");
 
     test_weighted_config_t perf_only = {.cost_weight = 0.0f, .perf_weight = 1.0f,
                                         .trust_weight = 0.0f};
     float sp = test_compute_weighted_score(&agent, &perf_only);
+    (void)sp;
     assert(fabsf(sp - agent.success_rate) <= 1e-6f);
     TEST_PASS("纯性能权重得分==success_rate");
 
     test_weighted_config_t trust_only = {.cost_weight = 0.0f, .perf_weight = 0.0f,
                                          .trust_weight = 1.0f};
     float st = test_compute_weighted_score(&agent, &trust_only);
+    (void)st;
     assert(fabsf(st - agent.trust_score) <= 1e-6f);
     TEST_PASS("纯信任权重得分==trust_score");
 
     test_weighted_config_t all_zero = {.cost_weight = 0.0f, .perf_weight = 0.0f,
                                        .trust_weight = 0.0f};
     float sz = test_compute_weighted_score(&agent, &all_zero);
+    (void)sz;
     assert(fabsf(sz - 0.0f) <= 1e-6f);
     TEST_PASS("全零权重得分为0");
 
     test_weighted_config_t default_cfg = {.cost_weight = 0.3f, .perf_weight = 0.4f,
                                           .trust_weight = 0.3f};
     float sum_w = default_cfg.cost_weight + default_cfg.perf_weight + default_cfg.trust_weight;
+    (void)sum_w;
     assert(fabsf(sum_w - 1.0f) <= 1e-6f);
     TEST_PASS("默认权重之和为1.0");
 }

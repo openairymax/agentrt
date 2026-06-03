@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck shell=bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 统一日志和错误处理模块
 # 遵循 AgentOS 架构设计原则：反馈闭环、工程美学

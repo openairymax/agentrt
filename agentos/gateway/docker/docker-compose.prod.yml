@@ -9,7 +9,7 @@ version: '3.8'
 services:
   gateway:
     # 生产环境使用预构建镜像
-    image: ghcr.io/spharx/agentos/gateway:${BUILD_VERSION:-latest}
+    image: ghcr.io/spharx/agentos/gateway:${BUILD_VERSION:-0.1.0}
     
     # 生产环境不暴露端口，通过反向代理访问
     ports: []
@@ -97,7 +97,7 @@ services:
 
   # 生产环境添加反向代理
   nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: agentos-nginx
     hostname: nginx
     restart: unless-stopped

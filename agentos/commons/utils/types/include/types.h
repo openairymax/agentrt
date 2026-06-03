@@ -22,7 +22,7 @@
  *
  * @author Spharx AgentOS Team
  * @date 2026-04-03
- * @version 1.0.0.7
+ * @version 0.1.0
  *
  * @note 线程安全：本文件定义的类型均为值类型或不可变类型，线程安全
  * @see ARCHITECTURAL_PRINCIPLES.md K-2 接口契约化原则
@@ -411,6 +411,8 @@ typedef enum {
     AGENTOS_AGENT_OFFICIAL = 2   /**< 官方维护 */
 } agentos_agent_level_t;
 
+#ifndef AGENTOS_CAPABILITY_T_DEFINED
+#define AGENTOS_CAPABILITY_T_DEFINED
 /**
  * @brief Agent 能力结构
  */
@@ -423,6 +425,7 @@ typedef struct {
     uint32_t avg_duration_ms;  /**< 平均执行时间 */
     float success_rate;        /**< 成功率 */
 } agentos_capability_t;
+#endif
 
 /**
  * @brief Agent 模型配置

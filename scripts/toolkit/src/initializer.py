@@ -55,7 +55,7 @@ DEFAULT_CONFIGS = {
 # Version: 1.0.0
 
 # System
-version = "1.0.0.6"
+version = "0.1.0"
 log_level = "info"
 data_dir = "${HOME}/.agentos/data"
 run_dir = "/var/run/agentos"

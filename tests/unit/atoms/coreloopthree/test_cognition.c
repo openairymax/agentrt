@@ -38,7 +38,7 @@ static void test_cognition_process() {
         return;
     }
 
-    const char* input = "帮我分析最近的销售数�?;
+    const char* input = "帮我分析最近的销售数据";
     agentos_task_plan_t* plan = NULL;
     err = agentos_cognition_process(engine, input, strlen(input), &plan);
     printf("test_cognition_process: %d\n", err);

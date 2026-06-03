@@ -2,7 +2,7 @@
  * @file jsonrpc_helpers.h
  * @brief JSON-RPC 2.0 公共辅助函数库
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * @version 2.0.0
+ * @version 0.1.0
  * @date 2026-04-04
  */
 
@@ -70,7 +70,7 @@ AGENTOS_API int jsonrpc_is_batch_request(const char *raw);
         char *_err = jsonrpc_build_error((error_code), (message), (id)); \
         if (_err) {                                                      \
             agentos_socket_send((socket), _err, strlen(_err));           \
-            AGENTOS_FREE(_err);                                                  \
+            AGENTOS_FREE(_err);                                          \
         }                                                                \
     } while (0)
 
@@ -87,7 +87,7 @@ AGENTOS_API int jsonrpc_is_batch_request(const char *raw);
         cJSON_Delete((result));                                        \
         if (_success) {                                                \
             agentos_socket_send((socket), _success, strlen(_success)); \
-            AGENTOS_FREE(_success);                                            \
+            AGENTOS_FREE(_success);                                    \
         }                                                              \
     } while (0)
 

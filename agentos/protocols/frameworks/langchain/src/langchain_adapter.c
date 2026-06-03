@@ -20,17 +20,11 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER (-3)
-#endif
-#ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM (-2)
-#endif
 
 langchain_config_t langchain_config_default(void)
 {
     langchain_config_t cfg = {0};
-    cfg.base_url = "http://localhost:18789";
+    cfg.base_url = "http://127.0.0.1:18789";
     cfg.api_key = NULL;
     cfg.timeout_ms = LANGCHAIN_DEFAULT_TIMEOUT_MS;
     cfg.enable_streaming = true;
@@ -548,7 +542,10 @@ int langchain_memory_add(langchain_adapter_context_t *ctx, const char *memory_id
                          const char *content)
 {
     if (!ctx || !memory_id || !role || !content)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "langchain_memory_add: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t m = 0; m < ctx->memory_count; m++) {
         if (strcmp(ctx->memories[m].id, memory_id) == 0) {

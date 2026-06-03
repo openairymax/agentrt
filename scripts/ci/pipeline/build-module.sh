@@ -125,7 +125,7 @@ validate_module() {
     fi
     if [[ -z "${MODULE_SOURCES[$module]:-}" ]]; then
         log_error "Unknown module: $module"
-        log_info "Available modules: ${!MODULE_SOURCES[@]}"
+        log_info "Available modules: ${!MODULE_SOURCES[*]}"
         return 1
     fi
     return 0

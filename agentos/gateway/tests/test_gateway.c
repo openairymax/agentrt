@@ -237,7 +237,7 @@ int main(int argc, char **argv)
     (void)argv;
 
     printf("\n========================================\n");
-    printf("  Gateway Module Unit Tests v2.0\n");
+    printf("  Gateway Module Unit Tests v0.1.0\n");
     printf("  (Aligned with ARCHITECTURAL_PRINCIPLES)\n");
     printf("========================================\n\n");
 

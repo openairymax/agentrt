@@ -312,6 +312,60 @@ class CppAnalyzer(BaseLanguageAnalyzer):
         }
 
 
+class GoAnalyzer(BaseLanguageAnalyzer):
+    """Go 代码分析器（基础实现）"""
+
+    GO_EXTENSIONS = {'.go'}
+
+    def __init__(self):
+        super().__init__(Language.GO)
+
+    def analyze_directory(self, directory: Path) -> LanguageReport:
+        """分析 Go 代码目录"""
+        self.issues = []
+        self.metrics = {}
+        go_files = list(directory.rglob("*.go"))
+        total_lines = 0
+        for f in go_files:
+            try:
+                with open(f, 'r', encoding='utf-8', errors='ignore') as fh:
+                    lines = fh.readlines()
+                total_lines += len(lines)
+            except Exception:
+                pass
+        self.metrics["total_files"] = len(go_files)
+        self.metrics["total_lines"] = total_lines
+        return LanguageReport(self.language, self.issues, self.metrics)
+
+
+class TypeScriptAnalyzer(BaseLanguageAnalyzer):
+    """TypeScript 代码分析器（基础实现）"""
+
+    TS_EXTENSIONS = {'.ts', '.tsx'}
+
+    def __init__(self):
+        super().__init__(Language.TYPESCRIPT)
+
+    def analyze_directory(self, directory: Path) -> LanguageReport:
+        """分析 TypeScript 代码目录"""
+        self.issues = []
+        self.metrics = {}
+        ts_files = []
+        for ext in self.TS_EXTENSIONS:
+            ts_files.extend(directory.rglob(f"*{ext}"))
+        total_lines = 0
+        for f in ts_files:
+            try:
+                with open(f, 'r', encoding='utf-8', errors='ignore') as fh:
+                    lines = fh.readlines()
+                total_lines += len(lines)
+            except Exception:
+                pass
+        self.metrics["total_files"] = len(ts_files)
+        self.metrics["total_lines"] = total_lines
+        return LanguageReport(self.language, self.issues, self.metrics)
+
+
 class PythonAnalyzer(BaseLanguageAnalyzer):
     """Python 代码分析器"""
     
@@ -490,7 +544,8 @@ class UnifiedQualityAnalyzer:
         self.analyzers = {
             Language.CPP: CppAnalyzer(),
             Language.PYTHON: PythonAnalyzer(),
-            # TODO: 添加 Go 和 TypeScript 分析器
+            Language.GO: GoAnalyzer(),
+            Language.TYPESCRIPT: TypeScriptAnalyzer(),
         }
     
     def analyze_all(self) -> QualityReport:

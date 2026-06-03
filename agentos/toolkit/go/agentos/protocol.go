@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file protocol.go
@@ -10,7 +10,7 @@
  * - A2A (Agent-to-Agent) v0.3
  * - OpenAI API 兼容
  *
- * @since 3.0.0
+ * @since 0.1.0
  */
 
 package agentos
@@ -70,9 +70,13 @@ type ProtocolConfig struct {
 
 // DefaultProtocolConfig returns sensible defaults for protocol clients
 func DefaultProtocolConfig() *ProtocolConfig {
+	endpoint := "http://127.0.0.1:18789"
+	if v := os.Getenv("AGENTOS_ENDPOINT"); v != "" {
+		endpoint = v
+	}
 	return &ProtocolConfig{
 		Type:        ProtocolJSONRPC,
-		Endpoint:    "http://localhost:18789",
+		Endpoint:    endpoint,
 		Timeout:     30 * time.Second,
 		RetryCount:  3,
 		RetryDelay:  1 * time.Second,

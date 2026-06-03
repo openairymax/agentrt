@@ -20,8 +20,10 @@
 
 #include "sync.h"
 
+#include "error.h"
 #include "sync_types.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -336,33 +338,50 @@ sync_result_t sync_debug(void *lock)
 
     struct sync_mutex *base = (struct sync_mutex *)lock;
 
-    fprintf(stderr, "\n[SYNC DEBUG] ====================\n");
-    fprintf(stderr, "[SYNC DEBUG] Lock at: %p\n", (void *)lock);
-    fprintf(stderr, "[SYNC DEBUG] Type: %d\n", base->type);
-    fprintf(stderr, "[SYNC DEBUG] Initialized: %s\n", base->initialized ? "true" : "false");
+    fputs("\n[SYNC DEBUG] ====================\n", stderr);
+    {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Lock at: %p\n", (void *)lock);
+        fputs(buf, stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Type: %d\n", base->type);
+        fputs(buf, stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Initialized: %s\n",
+                 base->initialized ? "true" : "false");
+        fputs(buf, stderr);
+    }
 
     const char *name = sync_get_name(lock);
     if (name != NULL) {
-        fprintf(stderr, "[SYNC DEBUG] Name: %s\n", name);
+        char buf[256];
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Name: %s\n", name);
+        fputs(buf, stderr);
     } else {
-        fprintf(stderr, "[SYNC DEBUG] Name: (unnamed)\n");
+        fputs("[SYNC DEBUG] Name: (unnamed)\n", stderr);
     }
 
     sync_stats_t stats;
     if (sync_get_stats(lock, &stats) == SYNC_SUCCESS) {
-        fprintf(stderr, "[SYNC DEBUG] --- Statistics ---\n");
-        fprintf(stderr, "[SYNC DEBUG] Lock count: %zu\n", stats.lock_count);
-        fprintf(stderr, "[SYNC DEBUG] Unlock count: %zu\n", stats.unlock_count);
-        fprintf(stderr, "[SYNC DEBUG] Wait count: %zu\n", stats.wait_count);
-        fprintf(stderr, "[SYNC DEBUG] Timeout count: %zu\n", stats.timeout_count);
-        fprintf(stderr, "[SYNC DEBUG] Deadlock count: %zu\n", stats.deadlock_count);
-        fprintf(stderr, "[SYNC DEBUG] Total wait time: %lu ms\n",
+        char buf[256];
+        fputs("[SYNC DEBUG] --- Statistics ---\n", stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Lock count: %zu\n", stats.lock_count);
+        fputs(buf, stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Unlock count: %zu\n", stats.unlock_count);
+        fputs(buf, stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Wait count: %zu\n", stats.wait_count);
+        fputs(buf, stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Timeout count: %zu\n", stats.timeout_count);
+        fputs(buf, stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Deadlock count: %zu\n", stats.deadlock_count);
+        fputs(buf, stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Total wait time: %lu ms\n",
                 (unsigned long)stats.total_wait_time_ms);
-        fprintf(stderr, "[SYNC DEBUG] Max wait time: %lu ms\n",
+        fputs(buf, stderr);
+        snprintf(buf, sizeof(buf), "[SYNC DEBUG] Max wait time: %lu ms\n",
                 (unsigned long)stats.max_wait_time_ms);
+        fputs(buf, stderr);
     }
 
-    fprintf(stderr, "[SYNC DEBUG] ====================\n\n");
+    fputs("[SYNC DEBUG] ====================\n\n", stderr);
 
     return SYNC_SUCCESS;
 }

@@ -26,6 +26,7 @@
 #include <time.h>
 #include <unistd.h>
 #include "../../../../commons/utils/error/include/error.h"
+#include "error.h"
 
 struct mcp_transport {
     mcp_transport_type_t type;
@@ -100,7 +101,10 @@ static int read_line(int fd, char *buf, size_t buf_size, uint32_t timeout_ms)
         char c;
         ssize_t n = read(fd, &c, 1);
         if (n <= 0)
-            return AGENTOS_EFAIL;
+            {
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "read: failed");
+            return AGENTOS_ERR_UNKNOWN;
+            }
 
         if (c == '\n') {
             buf[pos] = '\0';
@@ -135,7 +139,10 @@ static int write_all(int fd, const char *buf, size_t len, uint32_t timeout_ms)
 
         ssize_t n = write(fd, buf + written, len - written);
         if (n <= 0)
-            return AGENTOS_EFAIL;
+            {
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "write: failed");
+            return AGENTOS_ERR_UNKNOWN;
+            }
         written += (size_t)n;
     }
     return 0;
@@ -268,7 +275,10 @@ void mcp_transport_destroy(mcp_transport_t *transport)
 int mcp_transport_start(mcp_transport_t *transport)
 {
     if (!transport)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_transport_start: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (transport->state == MCP_TRANSPORT_CONNECTED)
         return 0;
 
@@ -376,7 +386,10 @@ int mcp_transport_start(mcp_transport_t *transport)
 int mcp_transport_stop(mcp_transport_t *transport)
 {
     if (!transport)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_transport_stop: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     atomic_store_explicit(&transport->running, 0, memory_order_seq_cst);
 
@@ -392,7 +405,10 @@ int mcp_transport_stop(mcp_transport_t *transport)
 int mcp_transport_send(mcp_transport_t *transport, const char *message, size_t length)
 {
     if (!transport || !message || length == 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_transport_send: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (transport->state != MCP_TRANSPORT_CONNECTED)
         return AGENTOS_ERR_NOT_FOUND;
 
@@ -456,7 +472,10 @@ int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t
                           uint32_t timeout_ms)
 {
     if (!transport || !out_message || !out_length)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_TIMEOUT, __FILE__, __LINE__, __func__, "mcp_transport_receive: timeout");
+        return AGENTOS_ERR_TIMEOUT;
+        }
     if (transport->state != MCP_TRANSPORT_CONNECTED)
         return AGENTOS_ERR_NOT_FOUND;
 
@@ -490,7 +509,10 @@ int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t
 
         char *body = (char *)AGENTOS_MALLOC(content_length + 1);
         if (!body)
-            return AGENTOS_EFAIL;
+            {
+            agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "AGENTOS_MALLOC: allocation failed");
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+            }
 
         size_t total_read = 0;
         while (total_read < content_length) {
@@ -529,14 +551,20 @@ int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t
         char line_buf[8192];
         int line_result = read_line(transport->http_socket, line_buf, sizeof(line_buf), timeout_ms);
         if (line_result < 0)
-            return AGENTOS_EFAIL;
+            {
+            agentos_error_push_ex(AGENTOS_ERR_TIMEOUT, __FILE__, __LINE__, __func__, "read_line: timeout");
+            return AGENTOS_ERR_TIMEOUT;
+            }
 
         if (strncmp(line_buf, "data: ", 6) == 0) {
             const char *data = line_buf + 6;
             size_t data_len = strlen(data);
             char *msg = (char *)AGENTOS_MALLOC(data_len + 1);
             if (!msg)
-                return AGENTOS_EFAIL;
+                {
+                agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "if: allocation failed");
+                return AGENTOS_ERR_OUT_OF_MEMORY;
+                }
             memcpy(msg, data, data_len);
             msg[data_len] = '\0';
             *out_message = msg;

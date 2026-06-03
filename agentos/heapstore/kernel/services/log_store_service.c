@@ -152,7 +152,11 @@ int log_store_service_store_entry(heapstore_log_level_t level, const char *compo
     char time_buf[64];
     strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", tm_info);
 
-    fprintf(f, "[%s] [%s] [%s] %s\n", time_buf, level_str, component, message);
+    {
+    char _buf[512];
+    snprintf(_buf, sizeof(_buf), "[%s] [%s] [%s] %s\n", time_buf, level_str, component, message);
+    fputs(_buf, f);
+}
     fclose(f);
 
     log_store_service_check_rotation(filename);

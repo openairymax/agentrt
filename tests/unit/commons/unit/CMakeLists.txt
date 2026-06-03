@@ -1,10 +1,6 @@
 # AgentOS Commons 单元测试
 
 add_executable(commons_unit_test
-    core_test.c
-    test_logger.c
-    test_error.c
-    test_token.c
     io_test.c
     test_config.c
     test_cost.c

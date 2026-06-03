@@ -306,18 +306,25 @@ heapstore_error_t heapstore_trace_flush(void)
         return heapstore_ERR_FILE_OPEN_FAILED;
     }
 
-    fprintf(fp, "{\n  \"spans\": [\n");
+    char _buf[512];
+    fputs("{\n  \"spans\": [\n", fp);
     for (size_t i = 0; i < s_span_count; i++) {
-        fprintf(fp, "    {\n");
-        fprintf(fp, "      \"trace_id\": \"%s\",\n", s_span_buffer[i].trace_id);
-        fprintf(fp, "      \"span_id\": \"%s\",\n", s_span_buffer[i].span_id);
-        fprintf(fp, "      \"name\": \"%s\",\n", s_span_buffer[i].name);
-        fprintf(fp, "      \"start_time_ns\": %lu,\n",
+        fputs("    {\n", fp);
+        snprintf(_buf, sizeof(_buf), "      \"trace_id\": \"%s\",\n", s_span_buffer[i].trace_id);
+        fputs(_buf, fp);
+        snprintf(_buf, sizeof(_buf), "      \"span_id\": \"%s\",\n", s_span_buffer[i].span_id);
+        fputs(_buf, fp);
+        snprintf(_buf, sizeof(_buf), "      \"name\": \"%s\",\n", s_span_buffer[i].name);
+        fputs(_buf, fp);
+        snprintf(_buf, sizeof(_buf), "      \"start_time_ns\": %lu,\n",
                 (unsigned long)s_span_buffer[i].start_time_ns);
-        fprintf(fp, "      \"end_time_ns\": %lu\n", (unsigned long)s_span_buffer[i].end_time_ns);
-        fprintf(fp, "    }%s\n", (i < s_span_count - 1) ? "," : "");
+        fputs(_buf, fp);
+        snprintf(_buf, sizeof(_buf), "      \"end_time_ns\": %lu\n", (unsigned long)s_span_buffer[i].end_time_ns);
+        fputs(_buf, fp);
+        snprintf(_buf, sizeof(_buf), "    }%s\n", (i < s_span_count - 1) ? "," : "");
+        fputs(_buf, fp);
     }
-    fprintf(fp, "  ]\n}\n");
+    fputs("  ]\n}\n", fp);
 
     fclose(fp);
     s_span_count = 0;

@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file executor.c
  * @brief 工具执行器实现（生产级进程管理）
@@ -7,7 +8,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "executor.h"
 #include "platform.h"
 #include "svc_logger.h"
@@ -36,8 +36,11 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
     }
 
     tool_executor_t *exec = (tool_executor_t *)AGENTOS_CALLOC(1, sizeof(tool_executor_t));
-    if (!exec)
+    if (!exec) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     exec->manager = *cfg;
     if (exec->manager.timeout_sec == 0) {
@@ -45,6 +48,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
     }
     if (agentos_mutex_init(&exec->lock) != 0) {
         AGENTOS_FREE(exec);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
     exec->total_executions = 0;

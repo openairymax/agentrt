@@ -41,12 +41,12 @@ static void test_execution_register_unregister() {
     // 创建一个简单的执行单元
     agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (unit) {
-        unit->data = NULL;
-        unit->execute = NULL;
-        unit->destroy = NULL;
-        unit->get_metadata = NULL;
+        unit->execution_unit_data = NULL;
+        unit->execution_unit_execute = NULL;
+        unit->execution_unit_destroy = NULL;
+        unit->execution_unit_get_metadata = NULL;
 
-        err = agentos_execution_register_unit(engine, "test_unit", unit);
+        err = agentos_execution_register_unit(engine, "test_unit", *unit);
         printf("test_execution_register: %d\n", err);
 
         agentos_execution_unregister_unit(engine, "test_unit");
@@ -70,19 +70,19 @@ static void test_execution_submit_query() {
     // 创建一个任�?
     agentos_task_t task = {
         .task_id = "test_task",
-        .id_len = strlen("test_task"),
-        .agent_id = "test_agent",
-        .agent_id_len = strlen("test_agent"),
-        .status = TASK_STATUS_PENDING,
-        .input = NULL,
-        .output = NULL,
-        .created_ns = 0,
-        .started_ns = 0,
-        .completed_ns = 0,
-        .timeout_ms = 1000,
-        .retry_count = 0,
-        .max_retries = 3,
-        .error_msg = NULL
+        .task_id_len = strlen("test_task"),
+        .task_agent_id = "test_agent",
+        .task_agent_id_len = strlen("test_agent"),
+        .task_status = TASK_STATUS_PENDING,
+        .task_input = NULL,
+        .task_output = NULL,
+        .task_created_ns = 0,
+        .task_started_ns = 0,
+        .task_completed_ns = 0,
+        .task_timeout_ms = 1000,
+        .task_retry_count = 0,
+        .task_max_retries = 3,
+        .task_error_msg = NULL
     };
 
     char* task_id = NULL;
@@ -116,19 +116,19 @@ static void test_execution_cancel() {
     // 创建一个任�?
     agentos_task_t task = {
         .task_id = "test_task_cancel",
-        .id_len = strlen("test_task_cancel"),
-        .agent_id = "test_agent",
-        .agent_id_len = strlen("test_agent"),
-        .status = TASK_STATUS_PENDING,
-        .input = NULL,
-        .output = NULL,
-        .created_ns = 0,
-        .started_ns = 0,
-        .completed_ns = 0,
-        .timeout_ms = 1000,
-        .retry_count = 0,
-        .max_retries = 3,
-        .error_msg = NULL
+        .task_id_len = strlen("test_task_cancel"),
+        .task_agent_id = "test_agent",
+        .task_agent_id_len = strlen("test_agent"),
+        .task_status = TASK_STATUS_PENDING,
+        .task_input = NULL,
+        .task_output = NULL,
+        .task_created_ns = 0,
+        .task_started_ns = 0,
+        .task_completed_ns = 0,
+        .task_timeout_ms = 1000,
+        .task_retry_count = 0,
+        .task_max_retries = 3,
+        .task_error_msg = NULL
     };
 
     char* task_id = NULL;

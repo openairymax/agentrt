@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include "error.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -37,27 +38,34 @@
  */
 char *agentos_io_read_file(const char *path, size_t *out_len)
 {
-    if (!path)
+    if (!path) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     FILE *f = fopen(path, "rb");
-    if (!f)
+    if (!f) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (size < 0) {
         fclose(f);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     char *buf = (char *)memory_alloc(size + 1, "file_read_buffer");
     if (!buf) {
         fclose(f);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     size_t read = fread(buf, 1, size, f);
     fclose(f);
     if (read != (size_t)size) {
         memory_free(buf);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_IO, "io operation failed");
         return NULL;
     }
     buf[size] = '\0';

@@ -1,5 +1,5 @@
 // AgentOS Rust SDK - HTTP 客户端实现
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 提供 HTTP 通信层、APIClient 接口定义和依赖倒转抽象。
@@ -351,7 +351,8 @@ impl ClientBuilder {
     /// 创建新的构建器
     pub fn new(endpoint: &str) -> Self {
         let endpoint = if endpoint.is_empty() {
-            "http://localhost:18789".to_string()
+            std::env::var("AGENTOS_ENDPOINT")
+                .unwrap_or_else(|_| "http://127.0.0.1:18789".to_string())
         } else {
             let trimmed = endpoint.trim_end_matches('/');
             // 不再使用 panic，而是在 build() 时返回错误
@@ -364,7 +365,7 @@ impl ClientBuilder {
             max_retries: 3,
             retry_delay: Duration::from_secs(1),
             api_key: None,
-            user_agent: "AgentOS-Rust-tools/3.0.0".to_string(),
+            user_agent: "AgentOS-Rust-tools/0.1.0".to_string(),
             max_connections: 10,
             idle_conn_timeout: Duration::from_secs(90),
         }

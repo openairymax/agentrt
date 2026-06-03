@@ -1,5 +1,5 @@
 // AgentOS Go SDK - 任务管理模块
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-22
 //
 // 提供任务的提交、查询、等待、取消、列表等生命周期管理功能。

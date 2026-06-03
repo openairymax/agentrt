@@ -65,14 +65,17 @@ static void *worker_thread_func(void *arg)
         }
     }
 
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
 thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
 {
     thread_pool_t *pool = (thread_pool_t *)AGENTOS_CALLOC(1, sizeof(thread_pool_t));
-    if (!pool)
+    if (!pool) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     if (config) {
         pool->config = *config;
@@ -89,6 +92,7 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
         (agentos_thread_t *)AGENTOS_CALLOC(pool->config.max_threads, sizeof(agentos_thread_t));
     if (!pool->threads) {
         AGENTOS_FREE(pool);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -120,6 +124,7 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
         agentos_cond_destroy(&pool->notify);
         AGENTOS_FREE(pool->threads);
         AGENTOS_FREE(pool);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 

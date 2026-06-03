@@ -241,9 +241,12 @@ int mcp_v1_register_tool(mcp_v1_context_t *ctx, const mcp_tool_t *tool, mcp_tool
                          void *user_data)
 {
     if (!ctx || !tool || !handler)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_register_tool: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (ctx->tool_count >= ctx->config.max_tools) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
 
@@ -252,7 +255,7 @@ int mcp_v1_register_tool(mcp_v1_context_t *ctx, const mcp_tool_t *tool, mcp_tool
         mcp_tool_entry_t *new_tools =
             AGENTOS_REALLOC(ctx->tools, new_cap * sizeof(mcp_tool_entry_t));
         if (!new_tools) {
-            agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+            agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
             return AGENTOS_ERR_NULL_POINTER;
             }
         ctx->tools = new_tools;
@@ -275,9 +278,12 @@ int mcp_v1_register_resource(mcp_v1_context_t *ctx, const mcp_resource_t *resour
                              mcp_resource_handler_t handler, void *user_data)
 {
     if (!ctx || !resource)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_register_resource: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (ctx->resource_count >= ctx->config.max_resources) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
 
@@ -286,7 +292,7 @@ int mcp_v1_register_resource(mcp_v1_context_t *ctx, const mcp_resource_t *resour
         mcp_resource_entry_t *new_res =
             AGENTOS_REALLOC(ctx->resources, new_cap * sizeof(mcp_resource_entry_t));
         if (!new_res) {
-            agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+            agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
             return AGENTOS_ERR_NULL_POINTER;
             }
         ctx->resources = new_res;
@@ -309,14 +315,17 @@ int mcp_v1_register_resource_template(mcp_v1_context_t *ctx,
                                       const mcp_resource_template_t *template)
 {
     if (!ctx || !template)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_register_resource_template: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     if (ctx->template_count >= ctx->template_capacity) {
         size_t new_cap = ctx->template_capacity * 2;
         mcp_resource_template_t *new_tpl =
             AGENTOS_REALLOC(ctx->resource_templates, new_cap * sizeof(mcp_resource_template_t));
         if (!new_tpl) {
-            agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+            agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
             return AGENTOS_ERR_NULL_POINTER;
             }
         ctx->resource_templates = new_tpl;
@@ -337,9 +346,12 @@ int mcp_v1_register_prompt(mcp_v1_context_t *ctx, const mcp_prompt_t *prompt,
                            mcp_prompt_handler_t handler, void *user_data)
 {
     if (!ctx || !prompt)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_register_prompt: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (ctx->prompt_count >= MCP_V1_MAX_PROMPTS) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
 
@@ -348,7 +360,7 @@ int mcp_v1_register_prompt(mcp_v1_context_t *ctx, const mcp_prompt_t *prompt,
         mcp_prompt_entry_t *new_prompts =
             AGENTOS_REALLOC(ctx->prompts, new_cap * sizeof(mcp_prompt_entry_t));
         if (!new_prompts) {
-            agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+            agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
             return AGENTOS_ERR_NULL_POINTER;
             }
         ctx->prompts = new_prompts;
@@ -370,7 +382,10 @@ int mcp_v1_set_sampling_handler(mcp_v1_context_t *ctx, mcp_sampling_handler_t ha
                                 void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_set_sampling_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->sampling_handler = handler;
     ctx->sampling_user_data = user_data;
     if (handler)
@@ -382,7 +397,10 @@ int mcp_v1_set_completion_handler(mcp_v1_context_t *ctx, mcp_completion_handler_
                                   void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_set_completion_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->completion_handler = handler;
     ctx->completion_user_data = user_data;
     if (handler)
@@ -394,7 +412,10 @@ int mcp_v1_set_progress_callback(mcp_v1_context_t *ctx, mcp_progress_callback_t 
                                  void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_set_progress_callback: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->progress_callback = callback;
     ctx->progress_user_data = user_data;
     return 0;
@@ -403,7 +424,10 @@ int mcp_v1_set_progress_callback(mcp_v1_context_t *ctx, mcp_progress_callback_t 
 int mcp_v1_set_log_callback(mcp_v1_context_t *ctx, mcp_log_callback_t callback, void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_set_log_callback: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->log_callback = callback;
     ctx->log_user_data = user_data;
     return 0;
@@ -412,7 +436,10 @@ int mcp_v1_set_log_callback(mcp_v1_context_t *ctx, mcp_log_callback_t callback, 
 int mcp_v1_set_log_level(mcp_v1_context_t *ctx, mcp_log_level_t level)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_set_log_level: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->log_level = level;
     return 0;
 }
@@ -420,12 +447,15 @@ int mcp_v1_set_log_level(mcp_v1_context_t *ctx, mcp_log_level_t level)
 int mcp_v1_handle_tools_list(mcp_v1_context_t *ctx, char **response_json)
 {
     if (!ctx || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_tools_list: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     size_t buf_size = 4096 + ctx->tool_count * 512;
     char *buf = AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
 
@@ -454,7 +484,10 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t *ctx, const char *name, const char
                              char **response_json)
 {
     if (!ctx || !name || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_tools_call: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     mcp_tool_entry_t *found = NULL;
     for (size_t i = 0; i < ctx->tool_count; i++) {
@@ -480,7 +513,7 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t *ctx, const char *name, const char
         }
         AGENTOS_FREE(name_esc);
         *response_json = resp;
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -494,7 +527,7 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t *ctx, const char *name, const char
     char *buf = AGENTOS_MALLOC(buf_size);
     if (!buf) {
         mcp_content_destroy(results, result_count);
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
     }
 
@@ -535,12 +568,15 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t *ctx, const char *name, const char
 int mcp_v1_handle_resources_list(mcp_v1_context_t *ctx, char **response_json)
 {
     if (!ctx || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_resources_list: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     size_t buf_size = 4096 + ctx->resource_count * 512;
     char *buf = AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
 
@@ -571,7 +607,10 @@ int mcp_v1_handle_resources_list(mcp_v1_context_t *ctx, char **response_json)
 int mcp_v1_handle_resources_read(mcp_v1_context_t *ctx, const char *uri, char **response_json)
 {
     if (!ctx || !uri || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_resources_read: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     mcp_resource_entry_t *found = NULL;
     for (size_t i = 0; i < ctx->resource_count; i++) {
@@ -591,7 +630,7 @@ int mcp_v1_handle_resources_read(mcp_v1_context_t *ctx, const char *uri, char **
                      uri_esc);
         AGENTOS_FREE(uri_esc);
         *response_json = resp;
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -622,12 +661,15 @@ int mcp_v1_handle_resources_read(mcp_v1_context_t *ctx, const char *uri, char **
 int mcp_v1_handle_resources_templates(mcp_v1_context_t *ctx, char **response_json)
 {
     if (!ctx || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_resources_templates: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     size_t buf_size = 4096 + ctx->template_count * 512;
     char *buf = AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
 
@@ -655,12 +697,15 @@ int mcp_v1_handle_resources_templates(mcp_v1_context_t *ctx, char **response_jso
 int mcp_v1_handle_prompts_list(mcp_v1_context_t *ctx, char **response_json)
 {
     if (!ctx || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_prompts_list: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     size_t buf_size = 4096 + ctx->prompt_count * 512;
     char *buf = AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
 
@@ -690,7 +735,10 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t *ctx, const char *name, const cha
                               char **response_json)
 {
     if (!ctx || !name || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_prompts_get: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     mcp_prompt_entry_t *found = NULL;
     for (size_t i = 0; i < ctx->prompt_count; i++) {
@@ -702,7 +750,7 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t *ctx, const char *name, const cha
 
     if (!found || !found->handler) {
         *response_json = AGENTOS_STRDUP("{\"description\":\"Prompt not found\",\"messages\":[]}");
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -713,7 +761,7 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t *ctx, const char *name, const cha
     size_t buf_size = 4096 + message_count * 1024;
     char *buf = AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
 
@@ -745,13 +793,16 @@ int mcp_v1_handle_sampling(mcp_v1_context_t *ctx, const mcp_sampling_params_t *p
                            mcp_sampling_result_t *result)
 {
     if (!ctx || !params || !result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_sampling: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->sampling_handler) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
     if (!(ctx->config.capabilities & MCP_CAP_SAMPLING)) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
 
@@ -763,9 +814,12 @@ int mcp_v1_handle_completion(mcp_v1_context_t *ctx, const mcp_completion_request
                              mcp_completion_result_t *result)
 {
     if (!ctx || !request || !result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_completion: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->completion_handler) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
 
@@ -777,7 +831,10 @@ int mcp_v1_send_progress(mcp_v1_context_t *ctx, const char *progress_token, doub
                          double total)
 {
     if (!ctx || !progress_token)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_send_progress: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (ctx->progress_callback) {
         ctx->progress_callback(progress_token, progress, total, ctx->progress_user_data);
     }
@@ -787,7 +844,10 @@ int mcp_v1_send_progress(mcp_v1_context_t *ctx, const char *progress_token, doub
 int mcp_v1_notify_cancelled(mcp_v1_context_t *ctx, const char *request_id, const char *reason)
 {
     if (!ctx || !request_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_notify_cancelled: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (ctx->log_callback) {
         ctx->log_callback(MCP_LOG_INFO, "mcp", reason ? reason : "Request cancelled",
                           ctx->log_user_data);
@@ -805,9 +865,12 @@ typedef struct {
 int mcp_v1_stream_config(mcp_v1_context_t *ctx, const mcp_stream_config_t *config)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_stream_config: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!config) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
 
@@ -879,7 +942,10 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t *ctx, const char *name,
                                        void *user_data)
 {
     if (!ctx || !name || !callback)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_tools_call_streaming: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     mcp_stream_event_t start_event;
     mcp_stream_event_init(&start_event, MCP_STREAM_EVENT_PROGRESS, "{\"status\":\"started\"}");
@@ -912,7 +978,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t *ctx, const char *name,
         done_event.total = 100;
         callback(&done_event, user_data);
         AGENTOS_FREE(done_event.event_data);
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -1026,13 +1092,16 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t *ctx, const mcp_sampling_p
                                      mcp_stream_callback_t callback, void *user_data)
 {
     if (!ctx || !params || !callback)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_handle_sampling_streaming: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->sampling_handler) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
     if (!(ctx->config.capabilities & MCP_CAP_SAMPLING)) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
 
@@ -1113,7 +1182,10 @@ int mcp_v1_route_request(mcp_v1_context_t *ctx, const char *method, const char *
                          char **response_json)
 {
     if (!ctx || !method || !response_json)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_route_request: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     ctx->request_counter++;
 
@@ -1226,7 +1298,7 @@ int mcp_v1_route_request(mcp_v1_context_t *ctx, const char *method, const char *
 
     *response_json =
         AGENTOS_STRDUP("{\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}");
-    agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+    agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
     return AGENTOS_ERR_INVALID_PARAM;
 }
 
@@ -1234,11 +1306,14 @@ static int mcp_adapter_init(void *context)
 {
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_init: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     mcp_v1_config_t config = mcp_v1_config_default();
     mcp_v1_context_t *new_ctx = mcp_v1_context_create(&config);
     if (!new_ctx) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
     memcpy(ctx, new_ctx, sizeof(mcp_v1_context_t));
@@ -1257,7 +1332,10 @@ static int mcp_adapter_destroy(void *context)
 static int mcp_adapter_encode(void *context, const void *msg, void **encoded, size_t *size)
 {
     if (!context || !msg || !encoded || !size)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_encode: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     const unified_message_t *umsg = (const unified_message_t *)msg;
 
@@ -1278,9 +1356,12 @@ static int mcp_adapter_encode(void *context, const void *msg, void **encoded, si
 static int mcp_adapter_decode(void *context, const void *data, size_t data_size, void *out_msg)
 {
     if (!context || !data || !out_msg)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_decode: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (data_size == 0) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
 
@@ -1289,7 +1370,7 @@ static int mcp_adapter_decode(void *context, const void *data, size_t data_size,
 
     char *input_copy = AGENTOS_MALLOC(data_size + 1);
     if (!input_copy) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, "mcp_v1_adapter: null pointer", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
     memcpy(input_copy, data, data_size);
@@ -1336,7 +1417,10 @@ static int mcp_adapter_decode(void *context, const void *data, size_t data_size,
 static int mcp_adapter_connect(void *context, const char *address)
 {
     if (!context)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_connect: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     if (address) {
         char *old_name = (char *)ctx->config.server_name;
@@ -1360,7 +1444,10 @@ static int mcp_adapter_connect(void *context, const char *address)
 static int mcp_adapter_disconnect(void *context)
 {
     if (!context)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_disconnect: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     if (ctx->config.server_name) {
         AGENTOS_FREE((void *)ctx->config.server_name);
@@ -1383,10 +1470,13 @@ static int mcp_adapter_is_connected(void *context)
 static int mcp_adapter_send(void *context, const void *data, size_t size)
 {
     if (!context || !data)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_send: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     if (!ctx->transport) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
     return mcp_transport_send(ctx->transport, (const char *)data, size);
@@ -1395,10 +1485,13 @@ static int mcp_adapter_send(void *context, const void *data, size_t size)
 static int mcp_adapter_receive(void *context, void **data, size_t *size)
 {
     if (!context || !data || !size)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_receive: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     if (!ctx->transport) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "mcp_v1_adapter: invalid parameter", __FILE__, __LINE__, __func__);
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
     char *msg = NULL;
@@ -1422,7 +1515,10 @@ static int mcp_adapter_get_stats(void *context, char *stats_json, size_t max_siz
 {
     (void)context;
     if (!stats_json || max_size < 64)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_get_stats: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     int written = snprintf(stats_json, max_size,
                            "{\"adapter_version\":\"%s\",\"protocol\":\"mcp\"}", MCP_V1_VERSION);
     return (written >= 0 && (size_t)written < max_size) ? 0 : -2;
@@ -1431,7 +1527,10 @@ static int mcp_adapter_get_stats(void *context, char *stats_json, size_t max_siz
 static int mcp_adapter_handle_request(void *context, const void *req, void **resp)
 {
     if (!context || !req || !resp)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_handle_request: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     const unified_message_t *msg = (const unified_message_t *)req;
 
@@ -1455,7 +1554,10 @@ static int mcp_adapter_get_version(void *context, char *buf, size_t max_size)
 {
     (void)context;
     if (!buf || max_size == 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_adapter_get_version: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     size_t len = strlen(MCP_V1_VERSION);
     if (len >= max_size)
         len = max_size - 1;
@@ -1500,7 +1602,10 @@ const protocol_adapter_t *mcp_v1_get_adapter(void)
 int mcp_v1_set_transport(mcp_v1_context_t *ctx, mcp_transport_t *transport)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "mcp_v1_set_transport: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->transport = transport;
     return 0;
 }

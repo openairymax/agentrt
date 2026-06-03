@@ -12,6 +12,7 @@
 #include "protocol_transformers.h"
 
 #include <stdio.h>
+#include "error.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -200,7 +201,10 @@ static int openclaw_parse_endpoint(const char *endpoint_url, char *host, size_t 
                                    int *port)
 {
     if (!endpoint_url || !host || !port)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_parse_endpoint: parse error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     const char *url = endpoint_url;
     const char *host_start = url;
@@ -251,7 +255,10 @@ static int __attribute__((unused)) openclaw_socket_set_nonblocking(socket_fd_t f
 #else
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "ioctlsocket: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 #endif
 }
@@ -272,7 +279,10 @@ static int openclaw_socket_connect(socket_fd_t fd, const char *host, int port, u
 
     int ret = getaddrinfo(host, port_str, &hints, &result);
     if (ret != 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "snprintf: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     int connected = -1;
     for (rp = result; rp != NULL; rp = rp->ai_next) {
@@ -289,7 +299,7 @@ static int openclaw_socket_connect(socket_fd_t fd, const char *host, int port, u
     freeaddrinfo(result);
 
     if (connected == -1)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     if (connected == 1) {
         struct pollfd pfd;
@@ -298,14 +308,14 @@ static int openclaw_socket_connect(socket_fd_t fd, const char *host, int port, u
 
         int poll_ret = poll(&pfd, 1, (int)timeout_ms);
         if (poll_ret <= 0)
-            return -3;
+            AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
         int so_error = 0;
         socklen_t len = sizeof(so_error);
         if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) < 0)
-            return -4;
+            AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "out of memory");
         if (so_error != 0)
-            return -5;
+            AGENTOS_ERROR(AGENTOS_ERR_IO, "I/O error");
     }
 
     return 0;
@@ -322,7 +332,10 @@ static int openclaw_socket_send(socket_fd_t fd, const void *data, size_t len, ui
 
         int poll_ret = poll(&pfd, 1, (int)timeout_ms);
         if (poll_ret <= 0)
-            return AGENTOS_EFAIL;
+            {
+            agentos_error_push_ex(AGENTOS_ERR_TIMEOUT, __FILE__, __LINE__, __func__, "poll: timeout");
+            return AGENTOS_ERR_TIMEOUT;
+            }
 
         ssize_t sent = send(fd, (const char *)data + total_sent, len - total_sent, 0);
         if (sent < 0) {
@@ -345,7 +358,10 @@ static int openclaw_socket_recv(socket_fd_t fd, char *buffer, size_t buffer_size
 
     int poll_ret = poll(&pfd, 1, (int)timeout_ms);
     if (poll_ret <= 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_TIMEOUT, __FILE__, __LINE__, __func__, "poll: timeout");
+        return AGENTOS_ERR_TIMEOUT;
+        }
 
     ssize_t recvd = recv(fd, buffer, buffer_size - 1, 0);
     if (recvd < 0) {
@@ -356,7 +372,7 @@ static int openclaw_socket_recv(socket_fd_t fd, char *buffer, size_t buffer_size
         return AGENTOS_EINVAL;
     }
     if (recvd == 0)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     buffer[recvd] = '\0';
     *out_len = (size_t)recvd;
@@ -367,7 +383,10 @@ static int openclaw_serialize_message(const openclaw_message_t *msg, char *buffe
                                       size_t buffer_size)
 {
     if (!msg || !buffer)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_serialize_message: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     const char *sender = msg->sender_id ? msg->sender_id : "";
     const char *receiver = msg->receiver_id ? msg->receiver_id : "";
@@ -397,7 +416,10 @@ static int openclaw_serialize_message(const openclaw_message_t *msg, char *buffe
 int openclaw_connect(openclaw_adapter_context_t *ctx)
 {
     if (!ctx || !ctx->initialized)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_connect: not initialized");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (ctx->connected)
         return 0;
 
@@ -410,7 +432,7 @@ int openclaw_connect(openclaw_adapter_context_t *ctx)
     if (fd == INVALID_SOCK) {
         snprintf(ctx->last_error, sizeof(ctx->last_error), "Failed to create socket: errno=%d",
                  sock_errno);
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     }
 
     int ret = openclaw_socket_connect(fd, host, port, ctx->config.request_timeout_ms);
@@ -418,7 +440,7 @@ int openclaw_connect(openclaw_adapter_context_t *ctx)
         snprintf(ctx->last_error, sizeof(ctx->last_error), "Connect failed: %.80s:%d (ret=%d)",
                  host, port, ret);
         close_socket(fd);
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
     }
 
     ctx->sock_fd = fd;
@@ -432,7 +454,10 @@ int openclaw_connect(openclaw_adapter_context_t *ctx)
 int openclaw_disconnect(openclaw_adapter_context_t *ctx)
 {
     if (!ctx || !ctx->connected)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_disconnect: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t i = 0; i < ctx->active_session_count; i++) {
         if (ctx->active_sessions[i].is_active)
@@ -456,10 +481,13 @@ bool openclaw_is_connected(const openclaw_adapter_context_t *ctx)
 int openclaw_register_agent(openclaw_adapter_context_t *ctx, const openclaw_agent_card_t *card)
 {
     if (!ctx || !card || !card->agent_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_register_agent: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->connected) {
         snprintf(ctx->last_error, sizeof(ctx->last_error), "Not connected to OpenClaw platform");
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     }
 
     for (size_t i = 0; i < ctx->registered_agent_count; i++) {
@@ -480,7 +508,7 @@ int openclaw_register_agent(openclaw_adapter_context_t *ctx, const openclaw_agen
     openclaw_agent_card_t *new_agents = (openclaw_agent_card_t *)AGENTOS_REALLOC(
         ctx->registered_agents, (ctx->registered_agent_count + 1) * sizeof(openclaw_agent_card_t));
     if (!new_agents)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     ctx->registered_agents = new_agents;
     memset(&ctx->registered_agents[ctx->registered_agent_count], 0, sizeof(openclaw_agent_card_t));
@@ -506,12 +534,15 @@ int openclaw_discover_agents(openclaw_adapter_context_t *ctx, const char *capabi
                              size_t *count)
 {
     if (!ctx || !agents || !count)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_discover_agents: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     *agents = NULL;
     *count = 0;
 
     if (!ctx->connected)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     size_t match_count = 0;
     for (size_t i = 0; i < ctx->registered_agent_count; i++) {
@@ -526,7 +557,7 @@ int openclaw_discover_agents(openclaw_adapter_context_t *ctx, const char *capabi
 
     *agents = (openclaw_agent_card_t *)AGENTOS_CALLOC(match_count, sizeof(openclaw_agent_card_t));
     if (!*agents)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     size_t idx = 0;
     for (size_t i = 0; i < ctx->registered_agent_count && idx < match_count; i++) {
@@ -549,7 +580,10 @@ int openclaw_discover_agents(openclaw_adapter_context_t *ctx, const char *capabi
 int openclaw_unregister_agent(openclaw_adapter_context_t *ctx, const char *agent_id)
 {
     if (!ctx || !agent_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_unregister_agent: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t i = 0; i < ctx->registered_agent_count; i++) {
         if (strcmp(ctx->registered_agents[i].agent_id, agent_id) == 0) {
@@ -562,16 +596,19 @@ int openclaw_unregister_agent(openclaw_adapter_context_t *ctx, const char *agent
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int openclaw_register_tool(openclaw_adapter_context_t *ctx, const openclaw_tool_info_t *tool)
 {
     if (!ctx || !tool || !tool->tool_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_register_tool: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->connected) {
         snprintf(ctx->last_error, sizeof(ctx->last_error), "Not connected");
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
     }
 
     for (size_t i = 0; i < ctx->registered_tool_count; i++) {
@@ -593,7 +630,7 @@ int openclaw_register_tool(openclaw_adapter_context_t *ctx, const openclaw_tool_
     openclaw_tool_info_t *new_tools = (openclaw_tool_info_t *)AGENTOS_REALLOC(
         ctx->registered_tools, (ctx->registered_tool_count + 1) * sizeof(openclaw_tool_info_t));
     if (!new_tools)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     ctx->registered_tools = new_tools;
     memset(&ctx->registered_tools[ctx->registered_tool_count], 0, sizeof(openclaw_tool_info_t));
@@ -615,12 +652,15 @@ int openclaw_list_tools(openclaw_adapter_context_t *ctx, const char *agent_id,
                         openclaw_tool_info_t **tools, size_t *count)
 {
     if (!ctx || !tools || !count)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_list_tools: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     *tools = NULL;
     *count = 0;
 
     if (!ctx->connected)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     size_t match_count = 0;
     for (size_t i = 0; i < ctx->registered_tool_count; i++) {
@@ -635,7 +675,7 @@ int openclaw_list_tools(openclaw_adapter_context_t *ctx, const char *agent_id,
 
     *tools = (openclaw_tool_info_t *)AGENTOS_CALLOC(match_count, sizeof(openclaw_tool_info_t));
     if (!*tools)
-        return -3;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     size_t idx = 0;
     for (size_t i = 0; i < ctx->registered_tool_count && idx < match_count; i++) {
@@ -664,9 +704,12 @@ int openclaw_create_session(openclaw_adapter_context_t *ctx,
                             openclaw_session_t *out_session)
 {
     if (!ctx || !out_session)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_create_session: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->connected)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     static uint32_t session_counter = 0;
     session_counter++;
@@ -710,7 +753,10 @@ int openclaw_create_session(openclaw_adapter_context_t *ctx,
 int openclaw_close_session(openclaw_adapter_context_t *ctx, const char *session_id)
 {
     if (!ctx || !session_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_close_session: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t i = 0; i < ctx->active_session_count; i++) {
         if (strcmp(ctx->active_sessions[i].session_id, session_id) == 0) {
@@ -724,16 +770,19 @@ int openclaw_close_session(openclaw_adapter_context_t *ctx, const char *session_
             return 0;
         }
     }
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int openclaw_send_message(openclaw_adapter_context_t *ctx, const openclaw_message_t *msg,
                           openclaw_message_t *response)
 {
     if (!ctx || !msg || !response)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_send_message: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->connected)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     ctx->messages_sent++;
 
@@ -800,9 +849,12 @@ int openclaw_delegate_task(openclaw_adapter_context_t *ctx, const openclaw_task_
                            const char *target_agent_id, openclaw_task_t *result)
 {
     if (!ctx || !task || !result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_delegate_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!ctx->connected)
-        return -2;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
     ctx->tasks_delegated++;
 
@@ -857,7 +909,10 @@ int openclaw_query_task(openclaw_adapter_context_t *ctx, const char *task_id,
                         openclaw_task_t *result)
 {
     if (!ctx || !task_id || !result)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_query_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     memset(result, 0, sizeof(openclaw_task_t));
 
     for (size_t i = 0; i < ctx->tracked_task_count; i++) {
@@ -889,13 +944,16 @@ int openclaw_query_task(openclaw_adapter_context_t *ctx, const char *task_id,
         }
     }
 
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int openclaw_cancel_task(openclaw_adapter_context_t *ctx, const char *task_id)
 {
     if (!ctx || !task_id)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_cancel_task: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     for (size_t i = 0; i < ctx->tracked_task_count; i++) {
         if (ctx->tracked_tasks[i].task_id && strcmp(ctx->tracked_tasks[i].task_id, task_id) == 0) {
@@ -907,13 +965,16 @@ int openclaw_cancel_task(openclaw_adapter_context_t *ctx, const char *task_id)
         }
     }
 
-    return -2;
+    AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 }
 
 int openclaw_get_cluster_status(openclaw_adapter_context_t *ctx, openclaw_cluster_status_t *status)
 {
     if (!ctx || !status)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_get_cluster_status: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     memset(status, 0, sizeof(openclaw_cluster_status_t));
     status->node_id = "agentos-node-001";
@@ -939,7 +1000,10 @@ int openclaw_set_message_handler(openclaw_adapter_context_t *ctx,
                                  openclaw_message_handler_t handler, void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_set_message_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->message_handler = handler;
     ctx->message_handler_data = user_data;
     return 0;
@@ -949,7 +1013,10 @@ int openclaw_set_task_handler(openclaw_adapter_context_t *ctx, openclaw_task_han
                               void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_set_task_handler: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->task_handler = handler;
     ctx->task_handler_data = user_data;
     return 0;
@@ -959,7 +1026,10 @@ int openclaw_set_event_callback(openclaw_adapter_context_t *ctx, openclaw_event_
                                 void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_set_event_callback: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->event_callback = callback;
     ctx->event_callback_data = user_data;
     return 0;
@@ -969,7 +1039,10 @@ int openclaw_set_status_callback(openclaw_adapter_context_t *ctx,
                                  openclaw_status_callback_t callback, void *user_data)
 {
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_set_status_callback: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     ctx->status_callback = callback;
     ctx->status_callback_data = user_data;
     return 0;
@@ -978,7 +1051,10 @@ int openclaw_set_status_callback(openclaw_adapter_context_t *ctx,
 int openclaw_send_heartbeat(openclaw_adapter_context_t *ctx)
 {
     if (!ctx || !ctx->connected)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_send_heartbeat: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     ctx->connection_uptime_sec += ctx->config.heartbeat_interval_sec;
 
@@ -1000,7 +1076,10 @@ int openclaw_send_heartbeat(openclaw_adapter_context_t *ctx)
 int openclaw_get_statistics(openclaw_adapter_context_t *ctx, char *stats_json, size_t buffer_size)
 {
     if (!ctx || !stats_json || buffer_size < 64)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_get_statistics: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
 
     openclaw_cluster_status_t status;
     openclaw_get_cluster_status(ctx, &status);
@@ -1048,7 +1127,10 @@ static int openclaw_proto_init(void *context)
     openclaw_config_t config = openclaw_config_default();
     openclaw_adapter_context_t *ctx = openclaw_adapter_create(&config);
     if (!ctx)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_proto_init: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     *(void **)context = ctx;
     return 0;
 }
@@ -1064,7 +1146,10 @@ static int openclaw_proto_destroy(void *context)
 static int openclaw_proto_handle_request(void *context, const void *req, void **resp)
 {
     if (!context || !req)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_proto_handle_request: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     openclaw_adapter_context_t *ctx = (openclaw_adapter_context_t *)context;
 
     const char *raw_request = (const char *)req;
@@ -1111,7 +1196,10 @@ static int openclaw_proto_handle_request(void *context, const void *req, void **
 static int openclaw_proto_get_version(void *context, char *buf, size_t max_size)
 {
     if (!buf || max_size == 0)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_proto_get_version: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     const char *ver = openclaw_adapter_version();
     size_t len = strlen(ver);
     if (len >= max_size)

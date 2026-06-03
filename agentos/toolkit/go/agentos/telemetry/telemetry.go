@@ -1,5 +1,5 @@
 // AgentOS Go SDK - 遥测模块
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-22
 //
 // 提供可观测性功能，包括指标收集、分布式追踪和运行时监控。

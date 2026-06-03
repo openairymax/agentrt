@@ -16,6 +16,12 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 static agentos_cognition_engine_t *g_cognition_engine = NULL;
 
@@ -56,6 +62,7 @@ static agentos_cognition_engine_t *ensure_cognition_engine(void)
     agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &g_cognition_engine);
     if (err != AGENTOS_SUCCESS || !g_cognition_engine) {
         g_cognition_engine = NULL;
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     return g_cognition_engine;
@@ -63,8 +70,7 @@ static agentos_cognition_engine_t *ensure_cognition_engine(void)
 
 static char *build_memory_context(const char *input)
 {
-    if (!input)
-        return NULL;
+    if (!input) return NULL;
     char **record_ids = NULL;
     float *scores = NULL;
     size_t count = 0;
@@ -74,6 +80,7 @@ static char *build_memory_context(const char *input)
             agentos_sys_free(record_ids);
         if (scores)
             agentos_sys_free(scores);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
     size_t ctx_max = count * 256 + 64;
@@ -81,6 +88,7 @@ static char *build_memory_context(const char *input)
     if (!ctx) {
         agentos_sys_free(record_ids);
         agentos_sys_free(scores);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     size_t pos = 0;
@@ -99,12 +107,10 @@ static char *build_memory_context(const char *input)
 
 static char *serialize_task_plan(agentos_task_plan_t *plan)
 {
-    if (!plan)
-        return NULL;
+    if (!plan) return NULL;
     size_t buf_max = 4096 + plan->task_plan_node_count * 512;
     char *buf = (char *)AGENTOS_MALLOC(buf_max);
-    if (!buf)
-        return NULL;
+    if (!buf) return NULL;
     size_t pos = 0;
     pos += snprintf(buf + pos, buf_max - pos,
                     "{\"plan_id\":\"%s\",\"node_count\":%zu,\"entry_count\":%zu,\"nodes\":[",
@@ -131,19 +137,19 @@ static agentos_error_t agent_unit_execute(agentos_execution_unit_t *unit, const 
                                           void **out_output)
 {
     if (!unit || !input || !out_output)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     const char *spec = (const char *)unit->execution_unit_data;
     if (!spec) {
         AGENTOS_LOG_ERROR("Agent unit has no spec data");
-        return AGENTOS_ENOTINIT;
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
     }
 
     const char *input_str = (const char *)input;
     size_t input_len = strnlen(input_str, 65536);
     if (input_len == 0) {
         AGENTOS_LOG_WARN("Empty input received for agent execution");
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     uint64_t start_ns = agentos_time_monotonic_ns();
@@ -214,7 +220,7 @@ static agentos_error_t agent_unit_execute(agentos_execution_unit_t *unit, const 
     if (!result) {
         if (mem_ctx)
             AGENTOS_FREE(mem_ctx);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     if (mem_ctx) {
@@ -268,7 +274,7 @@ static const char *agent_unit_get_metadata(agentos_execution_unit_t *unit)
 agentos_error_t agentos_sys_agent_spawn(const char *agent_spec, char **out_agent_id)
 {
     if (!agent_spec || !out_agent_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     ensure_agent_lock();
 
     char id_buf[64];
@@ -278,7 +284,7 @@ agentos_error_t agentos_sys_agent_spawn(const char *agent_spec, char **out_agent
 
     agent_instance_t *inst = (agent_instance_t *)AGENTOS_CALLOC(1, sizeof(agent_instance_t));
     if (!inst)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     inst->agent_id = AGENTOS_STRDUP(id_buf);
     inst->spec = AGENTOS_STRDUP(agent_spec);
@@ -288,7 +294,7 @@ agentos_error_t agentos_sys_agent_spawn(const char *agent_spec, char **out_agent
         if (inst->spec)
             AGENTOS_FREE(inst->spec);
         AGENTOS_FREE(inst);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 创建执行单元并注册到全局 registry */
@@ -298,7 +304,7 @@ agentos_error_t agentos_sys_agent_spawn(const char *agent_spec, char **out_agent
         AGENTOS_FREE(inst->agent_id);
         AGENTOS_FREE(inst->spec);
         AGENTOS_FREE(inst);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     unit->execution_unit_data = AGENTOS_STRDUP(agent_spec);
@@ -307,7 +313,7 @@ agentos_error_t agentos_sys_agent_spawn(const char *agent_spec, char **out_agent
         AGENTOS_FREE(inst->agent_id);
         AGENTOS_FREE(inst->spec);
         AGENTOS_FREE(inst);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     unit->execution_unit_execute = agent_unit_execute;
@@ -325,7 +331,7 @@ agentos_error_t agentos_sys_agent_spawn(const char *agent_spec, char **out_agent
 
     *out_agent_id = AGENTOS_STRDUP(inst->agent_id);
     if (!*out_agent_id) {
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     AGENTOS_LOG_INFO("Agent spawned: %s (registered as execution unit)", *out_agent_id);
@@ -338,7 +344,7 @@ agentos_error_t agentos_sys_agent_spawn(const char *agent_spec, char **out_agent
 agentos_error_t agentos_sys_agent_terminate(const char *agent_id)
 {
     if (!agent_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     ensure_agent_lock();
 
     agentos_mutex_lock(agent_lock);
@@ -371,7 +377,7 @@ agentos_error_t agentos_sys_agent_terminate(const char *agent_id)
 
     agentos_mutex_unlock(agent_lock);
     AGENTOS_LOG_WARN("Agent not found: %s", agent_id);
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 /**
@@ -389,7 +395,7 @@ agentos_error_t agentos_sys_agent_invoke(const char *agent_id, const char *input
                                          char **out_output)
 {
     if (!agent_id || !input || !out_output)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     ensure_agent_lock();
 
     /* 验证 agent 存在性 */
@@ -404,19 +410,19 @@ agentos_error_t agentos_sys_agent_invoke(const char *agent_id, const char *input
 
     if (!inst) {
         AGENTOS_LOG_WARN("Agent not found: %s", agent_id);
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
     if (!inst->unit) {
         AGENTOS_LOG_ERROR("Agent has no execution unit: %s", agent_id);
-        return AGENTOS_ENOTINIT;
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
     }
 
     /* 直接通过 registry 获取执行单元并同步调用 */
     agentos_execution_unit_t *unit = agentos_registry_get_unit(agent_id);
     if (!unit) {
         AGENTOS_LOG_ERROR("Execution unit not found in registry: %s", agent_id);
-        return AGENTOS_ENOENT;
+        ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
     void *output = NULL;
@@ -428,7 +434,7 @@ agentos_error_t agentos_sys_agent_invoke(const char *agent_id, const char *input
 
     if (!output) {
         AGENTOS_LOG_WARN("Agent returned null output: %s", agent_id);
-        return AGENTOS_ENOTINIT;
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
     }
 
     *out_output = (char *)output;
@@ -443,7 +449,7 @@ agentos_error_t agentos_sys_agent_invoke(const char *agent_id, const char *input
 agentos_error_t agentos_sys_agent_list(char ***out_agent_ids, size_t *out_count)
 {
     if (!out_agent_ids || !out_count)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     ensure_agent_lock();
 
     agentos_mutex_lock(agent_lock);
@@ -467,7 +473,7 @@ agentos_error_t agentos_sys_agent_list(char ***out_agent_ids, size_t *out_count)
     char **ids = (char **)AGENTOS_CALLOC(count, sizeof(char *));
     if (!ids) {
         agentos_mutex_unlock(agent_lock);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     // 填充数组
@@ -480,7 +486,7 @@ agentos_error_t agentos_sys_agent_list(char ***out_agent_ids, size_t *out_count)
             }
             AGENTOS_FREE(ids);
             agentos_mutex_unlock(agent_lock);
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         }
         inst = inst->next;
     }

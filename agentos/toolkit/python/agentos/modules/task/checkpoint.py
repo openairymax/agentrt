@@ -1,5 +1,5 @@
 # AgentOS Python SDK - Checkpoint Manager
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # 检查点管理器，支持长时间任务的断点续传和状态恢复

@@ -296,12 +296,14 @@ int audit_rotator_write(audit_rotator_t *rotator, const audit_entry_t *entry)
     json_escape(entry->resource ? entry->resource : "", esc_resource, sizeof(esc_resource));
     json_escape(entry->detail ? entry->detail : "", esc_detail, sizeof(esc_detail));
 
-    int written = fprintf(rotator->fp,
+    char line_buf[4096];
+    int written = snprintf(line_buf, sizeof(line_buf),
                           "{\"ts\":\"%s.%03u\",\"type\":\"%s\",\"agent\":\"%s\",\"action\":\"%s\","
                           "\"resource\":\"%s\",\"detail\":\"%s\",\"result\":%d}\n",
                           timestamp, (unsigned)(entry->timestamp_ms % 1000),
                           cupolas_audit_event_type_str(entry->type), esc_agent, esc_action,
                           esc_resource, esc_detail, entry->result);
+    fputs(line_buf, rotator->fp);
 
     if (written > 0) {
         rotator->current_size += (size_t)written;

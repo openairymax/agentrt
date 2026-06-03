@@ -17,12 +17,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+#include "error_compat.h"
+
+#define CUP_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
 
 #define DEFAULT_BUCKET_COUNT 64
 #define MAX_BUCKET_COUNT 4096
@@ -222,11 +220,11 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
                       const char *resource, const char *context)
 {
     if (!cm)
-        return AGENTOS_EINVAL;
+        CUP_RET_ERR(AGENTOS_EINVAL);
 
     char *key = build_cache_key(agent_id, action, resource, context);
     if (!key)
-        return AGENTOS_EINVAL;
+        CUP_RET_ERR(AGENTOS_EINVAL);
 
     uint32_t hash = hash_string(key);
 
@@ -242,7 +240,7 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
                 cupolas_atomic_add64(&cm->miss_count, 1);
                 cupolas_mutex_unlock(&cm->lock);
                 cupolas_mem_free(key);
-                return AGENTOS_EINVAL;
+                CUP_RET_ERR(AGENTOS_EINVAL);
             }
         }
 
@@ -257,7 +255,7 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
     cupolas_atomic_add64(&cm->miss_count, 1);
     cupolas_mutex_unlock(&cm->lock);
     cupolas_mem_free(key);
-    return AGENTOS_EINVAL;
+    CUP_RET_ERR(AGENTOS_EINVAL);
 }
 
 void cache_manager_put(cache_manager_t *cm, const char *agent_id, const char *action,
