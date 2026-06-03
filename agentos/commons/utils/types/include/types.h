@@ -22,7 +22,7 @@
  *
  * @author Spharx AgentOS Team
  * @date 2026-04-03
- * @version 1.0.0.7
+ * @version 0.1.0
  *
  * @note 线程安全：本文件定义的类型均为值类型或不可变类型，线程安全
  * @see ARCHITECTURAL_PRINCIPLES.md K-2 接口契约化原则

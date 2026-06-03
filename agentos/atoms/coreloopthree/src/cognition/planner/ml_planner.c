@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * [DESIGN] Rule-based planning is the current production implementation.
- * ML runtime integration (ONNX/TFLite) is planned for v2.0 to enhance
+ * ML runtime integration (ONNX/TFLite) is planned for a future release to enhance
  * planning quality with learned task decomposition patterns.
  */
 
@@ -68,7 +68,7 @@ static void ml_planner_destroy(agentos_plan_strategy_t *strategy)
  *
  * This function prepares the planner for rule-based planning, which is
  * the current production-safe primary path. ML runtime integration
- * will be added in v2.0.
+ * will be added in a future release.
  */
 static bool ml_planner_try_load_model(ml_planner_data_t *data)
 {
@@ -76,7 +76,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t *data)
         return false;
 
     /* [DESIGN] Rule-based planning is the current primary path.
-     * ML runtime integration (ONNX/TFLite) is planned for v2.0
+     * ML runtime integration (ONNX/TFLite) is planned for a future release
      * to enhance planning quality with learned task decomposition patterns. */
     data->model = (ml_model_t *)AGENTOS_CALLOC(1, sizeof(ml_model_t));
     if (!data->model) {
@@ -89,7 +89,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t *data)
     data->rule_based_active = true;
 
     AGENTOS_LOG_INFO(
-        "ML planner: rule-based planning initialized, ML integration planned for v2.0");
+        "ML planner: rule-based planning initialized, ML integration planned for a future release");
     return true;
 }
 

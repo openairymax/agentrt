@@ -719,6 +719,7 @@ coverage_reports/
 !scripts/ops/**/*.yml
 !scripts/ops/deploy/docker/Dockerfile*
 !scripts/ops/deploy/docker/Makefile
+!scripts/ops/deploy/Makefile
 !scripts/ops/deploy/docker-compose*.yml
 !scripts/ops/deploy/docker-compose*.yaml
 !scripts/ops/deploy/docker/.gitignore
@@ -743,6 +744,7 @@ coverage_reports/
 # 手写 Makefile（非 CMake 生成，需保留）
 !tests/Makefile
 !scripts/ops/deploy/docker/Makefile
+!scripts/ops/deploy/Makefile
 
 # =============================================================================
 # tests/ 测试目录

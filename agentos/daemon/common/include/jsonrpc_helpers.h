@@ -2,7 +2,7 @@
  * @file jsonrpc_helpers.h
  * @brief JSON-RPC 2.0 公共辅助函数库
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * @version 2.0.0
+ * @version 0.1.0
  * @date 2026-04-04
  */
 

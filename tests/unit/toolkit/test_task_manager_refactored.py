@@ -1,5 +1,5 @@
 # AgentOS Python SDK - Task Manager Tests (Using BaseTestCase)
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # 使用 BaseTestCase 的任务管理器测试
