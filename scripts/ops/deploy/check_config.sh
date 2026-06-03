@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker 配置检查脚�?
 # 验证所有配置文件和环境的正确�?
@@ -38,7 +39,7 @@ print_check() {
 }
 
 echo "=========================================="
-echo "  AgentOS Docker 配置检�?
+echo "  AgentOS Docker Configuration Check"
 echo "=========================================="
 echo ""
 
@@ -48,19 +49,19 @@ print_check "INFO" "检�?Docker 环境..."
 if command -v docker &> /dev/null; then
     print_check "OK" "Docker 已安装：$(docker --version)"
 else
-    print_check "ERROR" "Docker 未安�?
+    print_check "ERROR" "Docker not installed"
 fi
 
 if docker info &> /dev/null 2>&1; then
     print_check "OK" "Docker 服务运行正常"
 else
-    print_check "ERROR" "Docker 服务未运�?
+    print_check "ERROR" "Docker service not running"
 fi
 
 if command -v docker-compose &> /dev/null || command -v docker compose &> /dev/null; then
-    print_check "OK" "Docker Compose 已安�?
+    print_check "OK" "Docker Compose installed"
 else
-    print_check "ERROR" "Docker Compose 未安�?
+    print_check "ERROR" "Docker Compose not installed"
 fi
 
 echo ""
@@ -96,9 +97,9 @@ if [ -f ".env" ]; then
     
     # 检查必要的变量
     if grep -q "OPENAI_API_KEY=" .env && ! grep -q "OPENAI_API_KEY=sk-your-openai-api-key-here" .env; then
-        print_check "OK" "OPENAI_API_KEY 已配�?
+        print_check "OK" "OPENAI_API_KEY 已配�"
     else
-        print_check "WARNING" "OPENAI_API_KEY 未配置或使用默认�?
+        print_check "WARNING" "OPENAI_API_KEY 未配置或使用默认�"
     fi
     
     if grep -q "POSTGRES_PASSWORD=" .env; then
@@ -106,13 +107,13 @@ if [ -f ".env" ]; then
         if [ "$password" == "agentos_secure_password_123" ]; then
             print_check "WARNING" "POSTGRES_PASSWORD 使用默认值，建议修改"
         else
-            print_check "OK" "POSTGRES_PASSWORD 已配�?
+            print_check "OK" "POSTGRES_PASSWORD 已配�"
         fi
     else
-        print_check "ERROR" "POSTGRES_PASSWORD 未配�?
+        print_check "ERROR" "POSTGRES_PASSWORD 未配�"
     fi
 else
-    print_check "WARNING" ".env 文件不存在，将使�?.env.example 默认�?
+    print_check "WARNING" ".env 文件不存在，将使�?.env.example 默认�"
 fi
 
 echo ""
@@ -124,18 +125,18 @@ ports=(8080 8081 8082 8083 8084)
 for port in "${ports[@]}"; do
     if command -v lsof &> /dev/null; then
         if lsof -i :$port &> /dev/null; then
-            print_check "WARNING" "端口 $port 被占�?
+            print_check "WARNING" "端口 $port 被占�"
         else
             print_check "OK" "端口 $port 可用"
         fi
     elif command -v netstat &> /dev/null; then
         if netstat -tuln | grep -q ":$port "; then
-            print_check "WARNING" "端口 $port 被占�?
+            print_check "WARNING" "端口 $port 被占�"
         else
             print_check "OK" "端口 $port 可用"
         fi
     else
-        print_check "INFO" "无法检查端�?$port（缺�?lsof/netstat�?
+        print_check "INFO" "无法检查端�?$port（缺�?lsof/netstat�"
         break
     fi
 done
@@ -176,7 +177,7 @@ fi
 if [ ! -z "$memory_limit" ]; then
     print_check "OK" "内存限制�?memory_limit"
 else
-    print_check "WARNING" "未设置内存限�?
+    print_check "WARNING" "未设置内存限�"
 fi
 
 echo ""
@@ -187,9 +188,9 @@ print_check "INFO" "检查健康检查配�?.."
 services=("agentos-kernel" "agentos-services" "redis" "postgres")
 for service in "${services[@]}"; do
     if grep -A 10 "$service:" docker-compose.yml | grep -q "healthcheck:"; then
-        print_check "OK" "$service 配置了健康检�?
+        print_check "OK" "$service 配置了健康检�"
     else
-        print_check "WARNING" "$service 未配置健康检�?
+        print_check "WARNING" "$service 未配置健康检�"
     fi
 done
 
@@ -203,9 +204,9 @@ if grep -q "volumes:" docker-compose.yml; then
     
     # 检查持久化数据�?
     if grep -q "redis-data:" docker-compose.yml && grep -q "postgres-data:" docker-compose.yml; then
-        print_check "OK" "数据库持久化已配�?
+        print_check "OK" "数据库持久化已配�"
     else
-        print_check "WARNING" "数据库持久化配置可能不完�?
+        print_check "WARNING" "数据库持久化配置可能不完�"
     fi
 else
     print_check "ERROR" "未配置数据卷"
@@ -217,7 +218,7 @@ echo ""
 print_check "INFO" "检查网络安全配�?.."
 
 if grep -q "networks:" docker-compose.yml; then
-    print_check "OK" "网络配置已定�?
+    print_check "OK" "网络配置已定�"
 else
     print_check "WARNING" "未定义自定义网络"
 fi
@@ -226,7 +227,7 @@ fi
 if grep -q "user:" docker-compose.yml; then
     print_check "OK" "配置了非 root 用户"
 else
-    print_check "INFO" "使用默认用户（建议在 Dockerfile 中创建非 root 用户�?
+    print_check "INFO" "使用默认用户（建议在 Dockerfile 中创建非 root 用户�"
 fi
 
 echo ""
@@ -238,7 +239,7 @@ scripts=("build.sh" "quickstart.sh")
 for script in "${scripts[@]}"; do
     if [ -f "$script" ]; then
         if [ -x "$script" ]; then
-            print_check "OK" "$script 可执�?
+            print_check "OK" "$script 可执�"
         else
             print_check "WARNING" "$script 不可执行，需�?chmod +x"
         fi
@@ -247,30 +248,30 @@ done
 
 echo ""
 
-# 总结
 echo "=========================================="
-echo "  检查完�?
+echo "  Check Complete"
 echo "=========================================="
 echo ""
-echo "错误数：$ERRORS"
-echo "警告数：$WARNINGS"
+echo "Errors: $ERRORS"
+echo "Warnings: $WARNINGS"
+echo ""
 echo ""
 
-if [ $ERRORS -gt 0 ]; then
-    print_check "ERROR" "发现 $ERRORS 个错误，请修复后再运�?
+    if [ $ERRORS -gt 0 ]; then
+    print_check "ERROR" "Found $ERRORS errors, fix before running"
     exit 1
 elif [ $WARNINGS -gt 0 ]; then
-    print_check "WARNING" "发现 $WARNINGS 个警告，建议检查配�?
+    print_check "WARNING" "Found $WARNINGS warnings, review config"
     echo ""
-    echo "虽然有警告，但您可以继续�?
-    echo "  构建镜像�?/build.sh all release"
-    echo "  快速启动：./quickstart.sh"
+    echo "Continue with caution"
+    echo "  Build image: ./build.sh all release"
+    echo "  Quick start: ./quickstart.sh"
 else
-    print_check "OK" "所有检查通过�?
+    print_check "OK" "All checks passed"
     echo ""
-    echo "您可以安全地执行以下命令�?
-    echo "  构建镜像�?/build.sh all release"
-    echo "  快速启动：./quickstart.sh"
+    echo "You can safely run:"
+    echo "  Build image: ./build.sh all release"
+    echo "  Quick start: ./quickstart.sh"
 fi
 
 echo ""

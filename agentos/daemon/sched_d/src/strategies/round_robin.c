@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file round_robin.c
  * @brief 轮询调度策略实现
@@ -33,6 +34,7 @@ typedef struct {
 static char *safe_strdup(const char *src)
 {
     if (!src) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
     char *dest = AGENTOS_STRDUP(src);
@@ -66,11 +68,13 @@ static void free_agent_info(agent_info_t *agent)
 static agent_info_t *clone_agent_info(const agent_info_t *src)
 {
     if (!src) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
     agent_info_t *dest = (agent_info_t *)AGENTOS_MALLOC(sizeof(agent_info_t));
     if (!dest) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
     memset(dest, 0, sizeof(agent_info_t));
@@ -79,6 +83,7 @@ static agent_info_t *clone_agent_info(const agent_info_t *src)
         dest->agent_id = safe_strdup(src->agent_id);
         if (!dest->agent_id) {
             AGENTOS_FREE(dest);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
     }
@@ -88,6 +93,7 @@ static agent_info_t *clone_agent_info(const agent_info_t *src)
         if (!dest->agent_name) {
             AGENTOS_FREE(dest->agent_id);
             AGENTOS_FREE(dest);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
     }

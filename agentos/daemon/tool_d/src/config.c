@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <yaml.h>
+#include "error.h"
 
 static void free_tool_def(tool_def_t *def)
 {
@@ -29,6 +30,7 @@ tool_config_t *tool_config_load(const char *path)
     FILE *f = fopen(path, "rb");
     if (!f) {
         SVC_LOG_ERROR("Cannot open manager: %s", path);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -41,6 +43,7 @@ tool_config_t *tool_config_load(const char *path)
     if (!cfg) {
         fclose(f);
         yaml_parser_delete(&parser);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -177,6 +180,7 @@ error:
             AGENTOS_FREE(params[i]);
         AGENTOS_FREE(params);
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 

@@ -13,7 +13,7 @@
 
 static void test_logger_level_conversion(void)
 {
-    printf("  test_logger_level_conversion...\n");
+    SVC_LOG_INFO("  test_logger_level_conversion...");
 
     assert(strcmp(agentos_log_level_to_string((agentos_log_level_t)LOG_LEVEL_DEBUG), "DEBUG") == 0);
     assert(strcmp(agentos_log_level_to_string((agentos_log_level_t)LOG_LEVEL_INFO), "INFO") == 0);
@@ -27,12 +27,12 @@ static void test_logger_level_conversion(void)
     assert(agentos_log_level_from_string("ERROR") == (agentos_log_level_t)LOG_LEVEL_ERROR);
     assert(agentos_log_level_from_string("FATAL") == (agentos_log_level_t)LOG_LEVEL_FATAL);
 
-    printf("    PASSED\n");
+    SVC_LOG_INFO("    PASSED");
 }
 
 static void test_logger_init_shutdown(void)
 {
-    printf("  test_logger_init_shutdown...\n");
+    SVC_LOG_INFO("  test_logger_init_shutdown...");
 
     agentos_logger_config_t config = {.name = "test_agentos",
                                       .level = (int)LOG_LEVEL_DEBUG,
@@ -49,12 +49,12 @@ static void test_logger_init_shutdown(void)
 
     agentos_log_shutdown();
 
-    printf("    PASSED\n");
+    SVC_LOG_INFO("    PASSED");
 }
 
 static void test_logger_trace_context(void)
 {
-    printf("  test_logger_trace_context...\n");
+    SVC_LOG_INFO("  test_logger_trace_context...");
 
     agentos_trace_context_t ctx;
     agentos_trace_new(&ctx);
@@ -71,12 +71,12 @@ static void test_logger_trace_context(void)
     const char *session_id = agentos_trace_get_session_id();
     assert(strcmp(session_id, "test-session-123") == 0);
 
-    printf("    PASSED\n");
+    SVC_LOG_INFO("    PASSED");
 }
 
 static void test_logger_macros(void)
 {
-    printf("  test_logger_macros...\n");
+    SVC_LOG_INFO("  test_logger_macros...");
 
     agentos_logger_config_t config = {.name = "test_agentos",
                                       .level = (int)LOG_LEVEL_DEBUG,
@@ -101,20 +101,20 @@ static void test_logger_macros(void)
 
     agentos_log_shutdown();
 
-    printf("    PASSED\n");
+    SVC_LOG_INFO("    PASSED");
 }
 
 int main(void)
 {
-    printf("=========================================\n");
-    printf("  Logger Module Unit Tests\n");
-    printf("=========================================\n");
+    SVC_LOG_INFO("=========================================");
+    SVC_LOG_INFO("  Logger Module Unit Tests");
+    SVC_LOG_INFO("=========================================");
 
     test_logger_level_conversion();
     test_logger_init_shutdown();
     test_logger_trace_context();
     test_logger_macros();
 
-    printf("\n✅ All logger module tests PASSED\n");
+    SVC_LOG_INFO("All logger module tests PASSED");
     return 0;
 }

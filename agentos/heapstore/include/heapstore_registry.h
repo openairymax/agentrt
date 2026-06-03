@@ -308,7 +308,7 @@ heapstore_error_t heapstore_registry_vacuum(void);
  * - 适用于批量导入场景
  *
  * @see heapstore_registry_add_agent()
- * @since v1.0.0.7
+ * @since v0.1.0
  *
  * @example
  * @code
@@ -336,7 +336,7 @@ heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_r
  *
  * @note 所有记录要么全部插入成功，要么全部回滚
  * @see heapstore_registry_add_session()
- * @since v1.0.0.7
+ * @since v0.1.0
  */
 heapstore_error_t
 heapstore_registry_batch_insert_sessions(const heapstore_session_record_t *records, size_t count);
@@ -354,7 +354,7 @@ heapstore_registry_batch_insert_sessions(const heapstore_session_record_t *recor
  *
  * @note 所有记录要么全部插入成功，要么全部回滚
  * @see heapstore_registry_add_skill()
- * @since v1.0.0.7
+ * @since v0.1.0
  */
 heapstore_error_t heapstore_registry_batch_insert_skills(const heapstore_skill_record_t *records,
                                                          size_t count);

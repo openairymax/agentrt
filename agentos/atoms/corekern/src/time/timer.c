@@ -12,6 +12,11 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct agentos_timer {
     agentos_timer_callback_t callback;
@@ -30,12 +35,10 @@ static atomic_int timer_processing = 0;
 agentos_timer_t *agentos_timer_create(agentos_timer_callback_t callback, void *userdata)
 {
 
-    if (!callback)
-        return NULL;
+    if (!callback) return NULL;
 
     agentos_timer_t *timer = (agentos_timer_t *)AGENTOS_CALLOC(1, sizeof(agentos_timer_t));
-    if (!timer)
-        return NULL;
+    if (!timer) return NULL;
 
     timer->callback = callback;
     timer->userdata = userdata;
@@ -46,12 +49,12 @@ agentos_error_t agentos_timer_start(agentos_timer_t *timer, uint32_t interval_ms
 {
 
     if (!timer || interval_ms == 0)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (!timer_lock) {
         agentos_mutex_t *new_lock = agentos_mutex_create();
         if (!new_lock)
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
 
         agentos_mutex_t *expected = NULL;
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&timer_lock, (void **)&expected,
@@ -89,7 +92,7 @@ agentos_error_t agentos_timer_start(agentos_timer_t *timer, uint32_t interval_ms
 agentos_error_t agentos_timer_stop(agentos_timer_t *timer)
 {
     if (!timer)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (!timer_lock)
         return AGENTOS_SUCCESS;

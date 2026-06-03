@@ -11,6 +11,7 @@
 
 #include "memory_compat.h"
 #include "taskflow.h"
+#include "error.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -617,13 +618,13 @@ typedef struct {
 static vertex_hashset_t *hashset_create(size_t size)
 {
     vertex_hashset_t *set = (vertex_hashset_t *)AGENTOS_CALLOC(1, sizeof(vertex_hashset_t));
-    if (!set)
-        return NULL;
+    if (!set) return NULL;
 
     set->size = size;
     set->buckets = (hashset_node_t **)AGENTOS_CALLOC(size, sizeof(hashset_node_t *));
     if (!set->buckets) {
         AGENTOS_FREE(set);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -701,12 +702,14 @@ static bool hashset_add(vertex_hashset_t *set, vertex_id_t vertex_id)
 graph_engine_handle_t graph_engine_create(const taskflow_config_t *config)
 {
     if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     struct graph_engine_s *engine =
         (struct graph_engine_s *)AGENTOS_CALLOC(1, sizeof(struct graph_engine_s));
     if (!engine) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -720,6 +723,7 @@ graph_engine_handle_t graph_engine_create(const taskflow_config_t *config)
     engine->vertices = (graph_vertex_t *)AGENTOS_CALLOC(engine->vertex_capacity, sizeof(graph_vertex_t));
     if (!engine->vertices) {
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -727,6 +731,7 @@ graph_engine_handle_t graph_engine_create(const taskflow_config_t *config)
     if (!engine->edges) {
         AGENTOS_FREE(engine->vertices);
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -753,6 +758,7 @@ graph_engine_handle_t graph_engine_create(const taskflow_config_t *config)
         AGENTOS_FREE(engine->vertices);
         AGENTOS_FREE(engine->edges);
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
         return NULL;
     }
 

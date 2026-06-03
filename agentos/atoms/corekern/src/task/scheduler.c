@@ -43,6 +43,11 @@
 #include <unistd.h>
 #endif
 #include "compat.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 类型适配辅助 ==================== */
 
@@ -113,6 +118,7 @@ static task_info_core_t *__attribute__((used)) find_task_by_platform_handle(void
     (void)platform_handle;
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -132,6 +138,7 @@ static task_info_core_t *find_task_by_id(agentos_task_id_t tid)
 {
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -166,7 +173,7 @@ static void release_task_lock(void)
 agentos_error_t agentos_task_init(void)
 {
     if (ensure_scheduler_fully_initialized() != 0) {
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     return AGENTOS_SUCCESS;
@@ -191,19 +198,19 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
 
     /* 确保调度器已初始化 */
     if (ensure_scheduler_fully_initialized() != 0) {
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 获取平台适配器操作集 */
     const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
-        return AGENTOS_EPLATFORM;
+        ATM_RET_ERR(AGENTOS_EPLATFORM);
     }
 
     /* 生成任务ID */
     uint64_t task_id = scheduler_core_fetch_add_task_id();
     if (task_id == 0) {
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 解析线程属性（使用默认值） */
@@ -217,14 +224,14 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
                                         arg, task_name, priority);
 
     if (!task_info) {
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 使用平台适配器创建线程 */
     void *platform_handle = ops->thread_create(task_info, stack_size);
     if (!platform_handle) {
         scheduler_core_task_info_destroy(task_info);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 设置平台句柄到任务信息 */
@@ -235,7 +242,7 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
     if (!ctx) {
         ops->cleanup_platform_resources(platform_handle, NULL);
         scheduler_core_task_info_destroy(task_info);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 将任务添加到核心层管理 */
@@ -253,7 +260,7 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
         /* 添加失败，清理资源 */
         ops->cleanup_platform_resources(platform_handle, NULL);
         scheduler_core_task_info_destroy(task_info);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 设置输出线程句柄 */
@@ -298,12 +305,12 @@ agentos_error_t agentos_thread_join(agentos_thread_t thread, void **retval)
 
     const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
-        return AGENTOS_EPLATFORM;
+        ATM_RET_ERR(AGENTOS_EPLATFORM);
     }
 
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     task_info_core_t *task_info = NULL;
@@ -340,12 +347,12 @@ agentos_error_t agentos_thread_join(agentos_thread_t thread, void **retval)
     agentos_mutex_unlock(ctx->task_table_lock);
 
     if (!task_info) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     int result = ops->thread_join(task_info->platform_handle, retval);
     if (result != 0) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     if (retval && task_info->retval) {
@@ -462,19 +469,19 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
     /* 查找任务信息 */
     task_info_core_t *task_info = find_task_by_id(tid);
     if (!task_info) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
         release_task_lock();
-        return AGENTOS_EPLATFORM;
+        ATM_RET_ERR(AGENTOS_EPLATFORM);
     }
 
     int result = ops->thread_set_priority(task_info->platform_handle, priority);
     if (result != 0) {
         release_task_lock();
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     task_info->priority = priority;
@@ -553,7 +560,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
     /* 收集所有唯一节点 */
     uint64_t *nodes = (uint64_t *)AGENTOS_MALLOC(edge_count * 2 * sizeof(uint64_t));
     if (!nodes)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     size_t node_count = 0;
 
     for (size_t i = 0; i < edge_count; i++) {
@@ -598,7 +605,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
         AGENTOS_FREE(rev_adj);
         AGENTOS_FREE(rev_cap);
         AGENTOS_FREE(rev_cnt);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     for (size_t i = 0; i < edge_count; i++) {
@@ -733,7 +740,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
         AGENTOS_FREE(rev_cnt);
         AGENTOS_FREE(nodes);
         AGENTOS_FREE(in_degree);
-        return AGENTOS_ECYCLE;
+        ATM_RET_ERR(AGENTOS_ECYCLE);
     }
 
     /* 优先级组继承: 对于每条边 from->to，将 from 在排序中的位置优先级传递 */
@@ -796,7 +803,7 @@ cleanup_oom:
     AGENTOS_FREE(rev_cnt);
     AGENTOS_FREE(nodes);
     AGENTOS_FREE(in_degree);
-    return AGENTOS_ENOMEM;
+    ATM_RET_ERR(AGENTOS_ENOMEM);
 
 cleanup_fail:
     for (size_t k = 0; k < unique_count; k++)
@@ -811,7 +818,7 @@ cleanup_fail:
     AGENTOS_FREE(rev_cnt);
     AGENTOS_FREE(nodes);
     AGENTOS_FREE(in_degree);
-    return AGENTOS_EINVAL;
+    ATM_RET_ERR(AGENTOS_EINVAL);
 }
 
 void agentos_scheduler_dep_result_free(agentos_dep_result_t *result)
@@ -837,17 +844,17 @@ agentos_error_t agentos_scheduler_priority_inherit(agentos_task_id_t blocking_ta
 {
 
     if (blocking_task_id == 0 || blocked_task_id == 0)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     task_info_core_t *blocking_task = find_task_by_id(blocking_task_id);
     if (!blocking_task) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     task_info_core_t *blocked_task = find_task_by_id(blocked_task_id);
     if (!blocked_task) {
         release_task_lock();
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     int new_priority = blocking_task->priority;
@@ -915,11 +922,11 @@ agentos_error_t agentos_scheduler_resource_reserve(size_t est_memory_kb, int est
     }
 
     if (est_memory_kb > avail_mem_kb) {
-        return AGENTOS_ERESOURCE;
+        ATM_RET_ERR(AGENTOS_ERESOURCE);
     }
 
     if (est_cpu_cores > avail_cpu_cores) {
-        return AGENTOS_ERESOURCE;
+        ATM_RET_ERR(AGENTOS_ERESOURCE);
     }
 
     return AGENTOS_SUCCESS;

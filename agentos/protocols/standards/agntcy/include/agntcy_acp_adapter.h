@@ -11,7 +11,7 @@
  * 4. task/orchestrate — 跨智能体任务编排（工作流定义）
  * 5. ack/agreement — 服务等级确认与资源承诺
  *
- * @since 3.0.0
+ * @since 0.1.0
  * @see unified_protocol.h
  */
 

@@ -53,9 +53,6 @@ extern char __edata[];
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
 #endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
 
 #define CUPOLAS_MAX_SECCOMP_RULES 256
 #define CUPOLAS_MAX_CFI_TARGETS 4096

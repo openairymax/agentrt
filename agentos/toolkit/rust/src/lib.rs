@@ -1,5 +1,5 @@
 // AgentOS Rust SDK - 主入口
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // SDK 顶层统一入口，提供版本信息并导出所有公共 API。
@@ -16,13 +16,13 @@ pub mod utils;
 pub mod modules;
 
 // 保留旧模块以保持向后兼容（标记为 deprecated）
-#[deprecated(since = "3.0.0", note = "请使用 modules::task::TaskManager")]
+#[deprecated(since = "0.1.0", note = "请使用 modules::task::TaskManager")]
 pub mod task;
-#[deprecated(since = "3.0.0", note = "请使用 modules::memory::MemoryManager")]
+#[deprecated(since = "0.1.0", note = "请使用 modules::memory::MemoryManager")]
 pub mod memory;
-#[deprecated(since = "3.0.0", note = "请使用 modules::session::SessionManager")]
+#[deprecated(since = "0.1.0", note = "请使用 modules::session::SessionManager")]
 pub mod session;
-#[deprecated(since = "3.0.0", note = "请使用 modules::skill::SkillManager")]
+#[deprecated(since = "0.1.0", note = "请使用 modules::skill::SkillManager")]
 pub mod skill;
 
 // 其他模块
@@ -36,7 +36,7 @@ pub mod plugin;
 // ============================================================
 
 /// SDK 版本号
-pub const VERSION: &str = "3.0.0";
+pub const VERSION: &str = "0.1.0";
 
 /// SDK 作者
 pub const AUTHOR: &str = "SpharxWorks";
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn test_version() {
-        assert_eq!(VERSION, "3.0.0");
+        assert_eq!(VERSION, "0.1.0");
     }
 
     #[test]

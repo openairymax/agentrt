@@ -1,5 +1,5 @@
 # AgentOS Python SDK - Checkpoint Manager Tests
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # 检查点管理器单元测试

@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -15,7 +16,6 @@
  * 5. 线程安全
  */
 
-#include "error.h"
 #include "monitor_service.h"
 #include "platform.h"
 #include "svc_logger.h"
@@ -475,8 +475,11 @@ int tracing_add_span_event(const char *trace_id, const char *span_id, const char
 
 char *tracing_export_json(const char *trace_id)
 {
-    if (!trace_id)
+    if (!trace_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     agentos_mutex_lock(&g_tracing.global_lock);
 
@@ -490,6 +493,7 @@ char *tracing_export_json(const char *trace_id)
 
     if (!trace) {
         agentos_mutex_unlock(&g_tracing.global_lock);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -499,6 +503,7 @@ char *tracing_export_json(const char *trace_id)
     char *buf = (char *)AGENTOS_MALLOC(MAX_TRACE_EXPORT_SIZE);
     if (!buf) {
         agentos_mutex_unlock(&trace->lock);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
