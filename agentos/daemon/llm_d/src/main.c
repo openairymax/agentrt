@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -17,7 +18,6 @@
 #include "atomic_compat.h"
 #include "daemon_errors.h"
 #include "daemon_event_driver.h"
-#include "error.h"
 #include "jsonrpc_helpers.h"
 #include "llm_service.h"
 #include "logging.h"
@@ -97,7 +97,6 @@ static void svc_log_toggle_handler(int sig)
 
 /* ==================== JSON-RPC 错误码 ==================== */
 
-
 /* ==================== 请求上下文（线程安全） ==================== */
 
 typedef struct {
@@ -114,13 +113,17 @@ typedef struct {
 static request_context_t *request_context_create(void)
 {
     request_context_t *ctx = (request_context_t *)AGENTOS_CALLOC(1, sizeof(request_context_t));
-    if (!ctx)
+    if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     ctx->response_capacity = MAX_BUFFER;
     ctx->response_buffer = (char *)AGENTOS_MALLOC(ctx->response_capacity);
     if (!ctx->response_buffer) {
         AGENTOS_FREE(ctx);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     ctx->response_buffer[0] = '\0';
@@ -174,12 +177,12 @@ static int parse_params(cJSON *params, request_context_t *ctx, llm_request_confi
 
     cJSON *model = cJSON_GetObjectItem(params, "model");
     if (!cJSON_IsString(model)) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "model parameter is not a string");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "model parameter is not a string");
         return AGENTOS_ERR_INVALID_PARAM;
     }
     cfg->model = AGENTOS_STRDUP(model->valuestring);
     if (!cfg->model) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate model string");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate model string");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -188,7 +191,7 @@ static int parse_params(cJSON *params, request_context_t *ctx, llm_request_confi
         size_t count = cJSON_GetArraySize(messages);
         if (count > MAX_MESSAGES_PER_REQUEST) {
             parse_params_cleanup(ctx, cfg);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "too many messages");
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "too many messages");
             return AGENTOS_ERR_OVERFLOW;
         }
 
@@ -203,7 +206,8 @@ static int parse_params(cJSON *params, request_context_t *ctx, llm_request_confi
 
             if (!cJSON_IsString(role) || !cJSON_IsString(content)) {
                 parse_params_cleanup(ctx, cfg);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "message role or content is not a string");
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
+                                     "message role or content is not a string");
                 return AGENTOS_ERR_INVALID_PARAM;
             }
 
@@ -213,7 +217,8 @@ static int parse_params(cJSON *params, request_context_t *ctx, llm_request_confi
             if (!ctx->messages[i].role || !ctx->messages[i].content) {
                 ctx->message_count = i;
                 parse_params_cleanup(ctx, cfg);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate message role or content");
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY,
+                                     "failed to duplicate message role or content");
                 return AGENTOS_ERR_OUT_OF_MEMORY;
             }
         }
@@ -333,7 +338,8 @@ static char *handle_complete(cJSON *params, int id)
                       (unsigned long long)(end_time - start_time));
         AGENTOS_FREE((void *)cfg.model);
         request_context_destroy(ctx);
-        return jsonrpc_build_error(JSONRPC_INTERNAL_ERROR, "LLM service unavailable after retries", id);
+        return jsonrpc_build_error(JSONRPC_INTERNAL_ERROR, "LLM service unavailable after retries",
+                                   id);
     }
 
     char *resp_json = response_to_json(resp);
@@ -405,6 +411,7 @@ static char *handle_complete_stream(cJSON *params, int id, agentos_socket_t clie
 
     AGENTOS_FREE((void *)cfg.model);
     request_context_destroy(ctx);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 

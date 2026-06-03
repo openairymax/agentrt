@@ -10,6 +10,12 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 #define POOL_MAGIC 0x504F4F4C
 #define BLOCK_ALLOCATED 0xA110CA7E
@@ -36,37 +42,46 @@ static inline int32_t pool_block_index(agentos_mem_pool_t *pool, void *ptr)
     uint8_t *base = (uint8_t *)pool->raw_memory;
     uint8_t *block = (uint8_t *)ptr;
     if (block < base)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     size_t offset = (size_t)(block - base);
     if (offset % pool->actual_block_size != 0)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     uint32_t index = (uint32_t)(offset / pool->actual_block_size);
     if (index >= pool->block_count)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     return (int32_t)index;
 }
 
 agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_count)
 {
-    if (block_size < sizeof(void *) || block_count == 0)
+    if (block_size < sizeof(void *) || block_count == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
+    }
 
-    if (block_size > SIZE_MAX - 7)
+    if (block_size > SIZE_MAX - 7) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
+    }
     size_t actual_block_size = (block_size + 7) & ~(size_t)7;
 
-    if (block_count > SIZE_MAX / actual_block_size)
+    if (block_count > SIZE_MAX / actual_block_size) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
+    }
     size_t total_size = actual_block_size * block_count;
 
     void *raw = agentos_mem_aligned_alloc(total_size, 8);
-    if (!raw)
+    if (!raw) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     agentos_mem_pool_t *pool =
         (agentos_mem_pool_t *)AGENTOS_CALLOC(1, sizeof(struct agentos_mem_pool));
     if (!pool) {
         agentos_mem_aligned_free(raw);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -74,6 +89,7 @@ agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_co
     if (!pool->block_tags) {
         AGENTOS_FREE(pool);
         agentos_mem_aligned_free(raw);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -100,11 +116,15 @@ agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_co
 
 void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
 {
-    if (!pool_handle)
+    if (!pool_handle) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
     agentos_mem_pool_t *pool = pool_handle;
-    if (pool->magic != POOL_MAGIC)
+    if (pool->magic != POOL_MAGIC) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     if (pool->lock) {
         agentos_mutex_lock(pool->lock);
@@ -114,6 +134,7 @@ void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -138,10 +159,10 @@ void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
 agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t *pool_handle, void *ptr)
 {
     if (!pool_handle || !ptr)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     agentos_mem_pool_t *pool = pool_handle;
     if (pool->magic != POOL_MAGIC)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (pool->lock) {
         agentos_mutex_lock(pool->lock);
@@ -152,21 +173,21 @@ agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t *pool_handle, void *ptr
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     if (pool->block_tags[idx] == BLOCK_FREED) {
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
-        return AGENTOS_EALREADY;
+        ATM_RET_ERR(AGENTOS_EALREADY);
     }
 
     if (pool->block_tags[idx] != BLOCK_ALLOCATED) {
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     pool->block_tags[idx] = BLOCK_FREED;

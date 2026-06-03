@@ -3,6 +3,7 @@
 
 #ifdef _WIN32
 
+#include "memory_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
@@ -22,7 +23,7 @@ typedef struct {
 
 static inline DIR *opendir(const char *name)
 {
-    DIR *dir = (DIR *)malloc(sizeof(DIR));
+    DIR *dir = (DIR *)AGENTOS_MALLOC(sizeof(DIR));
     if (!dir)
         return NULL;
 
@@ -31,7 +32,7 @@ static inline DIR *opendir(const char *name)
 
     dir->hFind = FindFirstFileA(pattern, &dir->ffd);
     if (dir->hFind == INVALID_HANDLE_VALUE) {
-        free(dir);
+        AGENTOS_FREE(dir);
         return NULL;
     }
     dir->first = 1;
@@ -57,7 +58,7 @@ static inline int closedir(DIR *dir)
     if (!dir)
         return -1;
     FindClose(dir->hFind);
-    free(dir);
+    AGENTOS_FREE(dir);
     return 0;
 }
 

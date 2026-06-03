@@ -1,5 +1,5 @@
 // AgentOS Go SDK - 技能管理模块单元测试
-// Version: 3.0.0
+// Version: 0.1.0
 
 package skill
 

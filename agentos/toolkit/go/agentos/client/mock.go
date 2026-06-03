@@ -1,5 +1,5 @@
 // AgentOS Go SDK - Mock 客户端实现
-// Version: 3.0.0
+// Version: 0.1.0
 //
 // 提供 APIClient 接口的 Mock 实现，仅供单元测试使用。
 // 警告：此文件为测试工具，不应在生产代码中使用。

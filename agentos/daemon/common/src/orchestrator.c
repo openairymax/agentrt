@@ -16,7 +16,6 @@
 #include "cognition.h"
 #include "confidence_calibrator.h"
 #include "daemon_defaults.h"
-#include "error.h"
 #include "ipc_service_bus.h"
 #include "memory_compat.h"
 #include "memory_provider.h"
@@ -33,6 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 #define ORCH_MAX_TASKS 64
 #define ORCH_MAX_STEPS 32
@@ -266,8 +266,11 @@ void orchestrator_destroy(orchestrator_t *orch)
 
 orch_pipeline_t *orchestrator_pipeline_create(orchestrator_t *orch, const char *name)
 {
-    if (!orch)
+    if (!orch) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     orch_pipeline_t *p = (orch_pipeline_t *)AGENTOS_CALLOC(1, sizeof(orch_pipeline_t));
     if (!p) {
@@ -343,10 +346,16 @@ static void ensure_orch_bus_mutex(void)
 
 static char *memory_query_context(agentos_memory_provider_t *mem, const char *query, uint32_t limit)
 {
-    if (!mem || !query)
+    if (!mem || !query) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
-    if (!mem->query || !mem->get_raw)
+    }
+    if (!mem->query || !mem->get_raw) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     char **ids = NULL;
     float *scores = NULL;
     size_t count = 0;
@@ -359,6 +368,7 @@ static char *memory_query_context(agentos_memory_provider_t *mem, const char *qu
         }
         if (scores)
             AGENTOS_FREE(scores);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
     size_t buf_sz = count * 256 + 64;
@@ -438,8 +448,11 @@ static void memory_sync_persistent(agentos_memory_provider_t *mem)
 
 static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, const char *topic)
 {
-    if (!mem || !topic || !mem->retrieve)
+    if (!mem || !topic || !mem->retrieve) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     char **ids = NULL;
     float *scores = NULL;
     size_t count = 0;
@@ -452,6 +465,7 @@ static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, cons
         }
         if (scores)
             AGENTOS_FREE(scores);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
     size_t buf_sz = count * 256 + 64;
@@ -483,8 +497,11 @@ static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, cons
 
 static char *call_llm_service(const char *prompt, const char *system_role)
 {
-    if (!prompt)
+    if (!prompt) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     ensure_orch_bus_mutex();
     agentos_mutex_lock(&g_orch_bus_mutex);
@@ -544,8 +561,11 @@ static char *build_decomposition_prompt(const char *input)
 {
     size_t len = strlen(input) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
-    if (!prompt)
+    if (!prompt) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(prompt, len,
              "Decompose the following task into subtasks. "
              "Return a JSON array of objects with \"id\", \"description\", \"priority\" fields.\n\n"
@@ -558,8 +578,11 @@ static char *build_planning_prompt(const char *decomposed)
 {
     size_t len = strlen(decomposed) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
-    if (!prompt)
+    if (!prompt) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(prompt, len,
              "Create an execution plan for these subtasks. "
              "Return a JSON object with \"steps\" array, each having \"subtask_id\", "
@@ -573,8 +596,11 @@ static char *build_generation_prompt(const char *plan)
 {
     size_t len = strlen(plan) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
-    if (!prompt)
+    if (!prompt) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(prompt, len,
              "Execute the following plan and produce the final output. "
              "Be thorough and complete.\n\n"
@@ -587,8 +613,11 @@ static char *build_verification_prompt(const char *original, const char *generat
 {
     size_t len = strlen(original) + strlen(generated) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
-    if (!prompt)
+    if (!prompt) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(prompt, len,
              "Verify the following output against the original task. "
              "Return JSON: {\"verified\":bool,\"score\":0.0-1.0,"
@@ -602,8 +631,11 @@ static char *build_audit_prompt(const char *output, const char *verification)
 {
     size_t len = strlen(output) + strlen(verification) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
-    if (!prompt)
+    if (!prompt) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(prompt, len,
              "Audit this output for correctness, completeness, and safety. "
              "Return JSON: {\"audit_passed\":bool,\"issues\":[\"...\"],"
@@ -617,8 +649,11 @@ static char *build_correction_prompt(const char *output, const char *critique)
 {
     size_t len = strlen(output) + strlen(critique) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
-    if (!prompt)
+    if (!prompt) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(prompt, len,
              "Improve the following output based on the critique. "
              "Return the corrected output.\n\n"
@@ -680,30 +715,48 @@ static bool extract_bool_from_json(const char *json, const char *field)
 
 static char *extract_field_string(const char *json, const char *field)
 {
-    if (!json || !field)
+    if (!json || !field) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t flen = strlen(field) + 4;
     char *key = (char *)AGENTOS_MALLOC(flen);
-    if (!key)
+    if (!key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(key, flen, "\"%s\"", field);
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
-    if (!p)
+    if (!p) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
-    if (*p != '"')
+    if (*p != '"') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p++;
     const char *end = strchr(p, '"');
-    if (!end)
+    if (!end) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t len = (size_t)(end - p);
     char *val = (char *)AGENTOS_MALLOC(len + 1);
-    if (!val)
+    if (!val) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     memcpy(val, p, len);
     val[len] = '\0';
     return val;
@@ -1693,8 +1746,11 @@ orch_task_status_t orchestrator_get_task_status(orchestrator_t *orch, const char
 
 orch_result_t *orchestrator_get_result(orchestrator_t *orch, const char *task_id)
 {
-    if (!orch || !task_id)
+    if (!orch || !task_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     for (uint32_t i = 0; i < orch->task_count; i++) {
         if (strcmp(orch->tasks[i].id, task_id) == 0) {

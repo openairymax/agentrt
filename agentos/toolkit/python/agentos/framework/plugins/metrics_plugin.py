@@ -41,7 +41,9 @@ class MetricsPlugin(BasePlugin):
         self._timers = {}
 
     async def on_error(self, error: Exception) -> None:
-        pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("MetricsPlugin error: %s", error, exc_info=True)
 
     def get_capabilities(self) -> List[str]:
         return ["metrics", "counters", "gauges", "timers"]

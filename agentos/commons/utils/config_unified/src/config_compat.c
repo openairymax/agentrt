@@ -10,18 +10,14 @@
 #include "config_compat.h"
 
 #include "core_config.h"
+#include "error.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "memory_compat.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 static config_context_t *g_compat_ctx = NULL;
 static config_compat_stats_t g_compat_stats = {0};
@@ -262,9 +258,13 @@ int config_save_file(const char *file_path)
         const config_value_t *val = config_context_get_value_at(ctx, i);
         if (!key || !val)
             continue;
-        fprintf(f, "%s=", key);
+        {
+            char _buf[256];
+            snprintf(_buf, sizeof(_buf), "%s=", key);
+            fputs(_buf, f);
+        }
         config_value_print(val, 0);
-        fprintf(f, "\n");
+        fputs("\n", f);
     }
     fclose(f);
     return 0;
@@ -530,15 +530,23 @@ int config_dump_to_file(const char *file_path, const char *format)
         if (!key || !val)
             continue;
         if (format && strcmp(format, "json") == 0) {
-            fprintf(f, "\"%s\": ", key);
+            {
+                char _buf[256];
+                snprintf(_buf, sizeof(_buf), "\"%s\": ", key);
+                fputs(_buf, f);
+            }
             config_value_print(val, 0);
             if (i < count - 1)
-                fprintf(f, ",");
-            fprintf(f, "\n");
+                fputs(",", f);
+            fputs("\n", f);
         } else {
-            fprintf(f, "%s=", key);
+            {
+                char _buf[256];
+                snprintf(_buf, sizeof(_buf), "%s=", key);
+                fputs(_buf, f);
+            }
             config_value_print(val, 0);
-            fprintf(f, "\n");
+            fputs("\n", f);
         }
     }
     fclose(f);

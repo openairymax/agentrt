@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck shell=bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 错误码定义模块
 # 遵循 AgentOS 架构设计原则：错误可追溯原则 (E-7)

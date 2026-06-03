@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -16,7 +17,6 @@
 
 #include "atomic_compat.h"
 #include "daemon_event_driver.h"
-#include "error.h"
 #include "jsonrpc_helpers.h"
 #include "logging.h"
 #include "method_dispatcher.h"

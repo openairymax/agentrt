@@ -24,6 +24,7 @@
 #include "gateway.h"
 #include "platform/platform.h"
 #include "utils/cupolas_utils.h"
+#include "error.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,13 +36,6 @@
 #include <windows.h>
 #else
 #include <unistd.h>
-#endif
-
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
 #endif
 
 #define MAX_METRICS_BUFFER (64 * 1024)
@@ -374,7 +368,7 @@ cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *manag
     } else {
         memset(&mgr->manager, 0, sizeof(monitoring_config_t));
         mgr->manager.backend = MONITORING_BACKEND_PROMETHEUS;
-        mgr->manager.prometheus.listen_addr = "0.0.0.0";
+        mgr->manager.prometheus.listen_addr = "127.0.0.1";
         mgr->manager.prometheus.port = 9090;
         mgr->manager.prometheus.endpoint = "/metrics";
         mgr->manager.reporting_interval_ms = 10000;
@@ -830,7 +824,7 @@ monitoring_config_t *monitoring_config_create_prometheus(uint16_t port)
     memset(manager, 0, sizeof(monitoring_config_t));
 
     manager->backend = MONITORING_BACKEND_PROMETHEUS;
-    manager->prometheus.listen_addr = "0.0.0.0";
+    manager->prometheus.listen_addr = "127.0.0.1";
     manager->prometheus.port = port;
     manager->prometheus.endpoint = "/metrics";
     manager->reporting_interval_ms = 10000;

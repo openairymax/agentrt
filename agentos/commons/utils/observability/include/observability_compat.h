@@ -39,14 +39,14 @@ static inline int agentos_observability_register_metric(agentos_observability_t 
                                                         const char *desc)
 {
     if (!obs || !name)
-        return -1;
+        return AGENTOS_EINVAL;
     (void)desc;
     if (type == AGENTOS_METRIC_COUNTER) {
         agentos_metrics_increment(obs, name, 0);
     } else if (type == AGENTOS_METRIC_GAUGE) {
         agentos_metrics_gauge(obs, name, 0.0);
     }
-    return 0;
+    return AGENTOS_SUCCESS;
 }
 
 /* 函数映射：计数器增加 */

@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../commons/utils/error/include/error.h"
+#include "error.h"
 
 #define MAX_HANDLERS 64
 #define MAX_HANDLER_NAME 64
@@ -29,7 +30,10 @@ struct protocol_handler_router_s {
 int protocol_adapter_create(agentos_protocol_type_t type, protocol_adapter_t *adapter)
 {
     if (!adapter)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_adapter_create: failed");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     memset(adapter, 0, sizeof(*adapter));
     adapter->type = type;
     adapter->init = NULL;
@@ -46,9 +50,15 @@ void protocol_adapter_destroy(protocol_adapter_t adapter)
 int protocol_adapter_send(protocol_adapter_t adapter, const agentos_message_t *msg)
 {
     if (!adapter.init)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_adapter_send: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!msg)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_adapter_send: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (adapter.send) {
         return adapter.send(adapter.context, msg->data, msg->len);
     }
@@ -58,9 +68,15 @@ int protocol_adapter_send(protocol_adapter_t adapter, const agentos_message_t *m
 int protocol_adapter_recv(protocol_adapter_t adapter, agentos_message_t *msg, size_t max_len)
 {
     if (!adapter.init)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_adapter_recv: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (!msg)
-        return AGENTOS_EFAIL;
+        {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_adapter_recv: IO error");
+        return AGENTOS_ERR_UNKNOWN;
+        }
     if (adapter.receive) {
         void *data = NULL;
         size_t size = 0;

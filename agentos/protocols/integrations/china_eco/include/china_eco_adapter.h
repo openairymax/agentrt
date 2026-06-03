@@ -10,7 +10,7 @@
  * 3. SM Crypto Suite — 国产加密算法SM2/SM3/SM4的OpenSSL delegate支持
  * 4. Message Queue Bridge — RocketMQ / Pulsar 消息队列协议映射
  *
- * @since 3.0.0
+ * @since 0.1.0
  * @see unified_protocol.h
  */
 

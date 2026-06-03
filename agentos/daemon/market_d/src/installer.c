@@ -5,13 +5,13 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "error.h"
 #include "market_service.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include "error.h"
 
 static int __attribute__((unused)) create_directory(const char *path)
 {

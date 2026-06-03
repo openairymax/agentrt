@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 // ============================================================================
 // 内部数据结构
@@ -195,8 +196,10 @@ static bool message_queue_enqueue(message_queue_t *queue, vertex_id_t target, co
 // 从消息队列取出消息
 static message_queue_entry_t *message_queue_dequeue(message_queue_t *queue)
 {
-    if (!queue || !queue->front)
+    if (!queue || !queue->front) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     message_queue_entry_t *entry = queue->front;
     queue->front = entry->next;
@@ -282,8 +285,10 @@ static bool init_vertex_states(struct pregel_engine_s *engine)
 static void *worker_thread_func(void *arg)
 {
     worker_context_t *context = (worker_context_t *)arg;
-    if (!context || !context->engine)
+    if (!context || !context->engine) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
 
     struct pregel_engine_s *engine = context->engine;
 
@@ -340,12 +345,14 @@ static void *worker_thread_func(void *arg)
 pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
 {
     if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     struct pregel_engine_s *engine =
         (struct pregel_engine_s *)AGENTOS_CALLOC(1, sizeof(struct pregel_engine_s));
     if (!engine) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -374,6 +381,7 @@ pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
         (message_queue_t **)AGENTOS_CALLOC(engine->config.max_workers, sizeof(message_queue_t *));
     if (!engine->message_queues) {
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -386,6 +394,7 @@ pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
             }
             AGENTOS_FREE(engine->message_queues);
             AGENTOS_FREE(engine);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
     }
@@ -398,6 +407,7 @@ pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
         }
         AGENTOS_FREE(engine->message_queues);
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -411,6 +421,7 @@ pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
         }
         AGENTOS_FREE(engine->message_queues);
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

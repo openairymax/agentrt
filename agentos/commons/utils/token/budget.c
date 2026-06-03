@@ -28,19 +28,7 @@
 #include <unistd.h>
 #endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
 
 /**
  * @brief 跨平台互斥锁类型
@@ -138,12 +126,14 @@ static int check_budget_available(agentos_token_budget_t *budget, size_t input, 
 agentos_token_budget_t *agentos_token_budget_create(size_t max_tokens)
 {
     if (max_tokens == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 
     agentos_token_budget_t *budget =
         (agentos_token_budget_t *)AGENTOS_MALLOC(sizeof(agentos_token_budget_t));
     if (!budget) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -158,6 +148,7 @@ agentos_token_budget_t *agentos_token_budget_create(size_t max_tokens)
 
     if (budget_mutex_init(&budget->mutex) != 0) {
         AGENTOS_FREE(budget);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
 

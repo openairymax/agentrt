@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: Apache-2.0
 #
