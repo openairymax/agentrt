@@ -1,5 +1,5 @@
 # AgentOS Python SDK - OpenTelemetry 集成
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # OpenTelemetry 可观测性集成
@@ -30,7 +30,7 @@ class TelemetryConfig:
     def __init__(
         self,
         service_name: str = "agentos-toolkit",
-        service_version: str = "3.0.0",
+        service_version: str = "0.1.0",
         enabled: bool = True,
         export_endpoint: Optional[str] = None,
         sample_rate: float = 1.0

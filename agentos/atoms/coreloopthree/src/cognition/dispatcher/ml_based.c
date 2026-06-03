@@ -20,6 +20,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 #define ML_FEATURE_COUNT 4
 #define ML_MAX_HISTORY 256
@@ -114,7 +120,7 @@ static agentos_error_t ml_dispatch(const agentos_task_node_t *task, const void *
                                    size_t count, void *context, char **out_agent_id)
 {
     if (!context || !out_agent_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     ml_dispatch_data_t *data = (ml_dispatch_data_t *)context;
 
@@ -178,7 +184,7 @@ static agentos_error_t ml_dispatch(const agentos_task_node_t *task, const void *
     }
 
     *out_agent_id = NULL;
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 static void ml_destroy(agentos_dispatching_strategy_t *strategy)
@@ -199,8 +205,7 @@ agentos_dispatching_ml_create(const char __attribute__((unused)) * model_path, v
 {
 
     ml_dispatch_data_t *data = (ml_dispatch_data_t *)AGENTOS_CALLOC(1, sizeof(ml_dispatch_data_t));
-    if (!data)
-        return NULL;
+    if (!data) return NULL;
 
     data->feature_weights[ML_FEATURE_COST] = 0.2f;
     data->feature_weights[ML_FEATURE_SUCCESS_RATE] = 0.35f;
@@ -249,6 +254,7 @@ agentos_dispatching_ml_create(const char __attribute__((unused)) * model_path, v
         (agentos_dispatching_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_dispatching_strategy_t));
     if (!strategy) {
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -263,7 +269,7 @@ agentos_error_t agentos_dispatching_ml_report_outcome(agentos_dispatching_strate
                                                       float reward)
 {
     if (!strategy || !strategy->data)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     ml_dispatch_data_t *data = (ml_dispatch_data_t *)strategy->data;
     if (reward < 0.0f)

@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file anthropic.c
  * @brief Anthropic 适配器实现
@@ -11,7 +12,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "platform.h"
 #include "provider.h"
 #include "svc_logger.h"
@@ -41,6 +41,7 @@ static provider_ctx_t *anthropic_init(const char *name __attribute__((unused)), 
 
     anthropic_ctx_t *ctx = (anthropic_ctx_t *)AGENTOS_CALLOC(1, sizeof(anthropic_ctx_t));
     if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -61,12 +62,18 @@ static void anthropic_destroy(provider_ctx_t *ctx_ptr)
 
 static char *anthropic_build_request(const llm_request_config_t *manager)
 {
-    if (!manager)
+    if (!manager) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     cJSON *root = cJSON_CreateObject();
-    if (!root)
+    if (!root) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     cJSON_AddStringToObject(root, "model",
                             manager->model && manager->model[0] ? manager->model
@@ -432,8 +439,11 @@ static size_t ant_sse_write_cb(void *contents, size_t size, size_t nmemb, void *
 static llm_response_t *ant_build_stream_response(ant_stream_acc_t *acc)
 {
     llm_response_t *r = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
-    if (!r)
+    if (!r) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     r->id = acc->resp_id ? acc->resp_id : AGENTOS_STRDUP("");
     acc->resp_id = NULL;

@@ -245,6 +245,31 @@ jobs:
             cat cppcheck-report.txt
           fi
 
+  quality-gate:
+    name: Quality Gate (20 Checks)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang-format shellcheck python3
+
+      - name: Run quality-gate.sh --strict
+        run: |
+          bash scripts/ci/pipeline/quality-gate.sh --strict
+
+      - name: Upload quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-report
+          path: ci-artifacts/quality-report.json
+          retention-days: 7
+
   python-checks:
     name: Python BAN-80~82 Checks
     runs-on: ubuntu-22.04
@@ -296,7 +321,7 @@ jobs:
 
   result:
     name: CI Result
-    needs: [build-and-test, ban-scan, clang-tidy, cppcheck, python-checks]
+    needs: [build-and-test, ban-scan, clang-tidy, cppcheck, quality-gate, python-checks]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -311,6 +336,9 @@ jobs:
         run: exit 1
       - name: Check cppcheck status
         if: ${{ needs.cppcheck.result == 'failure' }}
+        run: exit 1
+      - name: Check quality-gate status
+        if: ${{ needs.quality-gate.result == 'failure' }}
         run: exit 1
       - name: Check python-checks status
         if: ${{ needs.python-checks.result == 'failure' }}

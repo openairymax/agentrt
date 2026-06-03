@@ -9,6 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../../../commons/utils/error/include/error.h"
+#include "error.h"
+
+#define COG_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
+         agentos_error_str(c)); return (c); } while(0)
 
 struct cog_evolution_s {
     cog_level_t current_level;
@@ -34,16 +39,14 @@ struct cog_evolution_s {
 
 static char *json_strdup(const char *src)
 {
-    if (!src)
-        return NULL;
+    if (!src) return NULL;
     return AGENTOS_STRDUP(src);
 }
 
 cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
 {
     cog_evolution_t *evo = (cog_evolution_t *)AGENTOS_CALLOC(1, sizeof(cog_evolution_t));
-    if (!evo)
-        return NULL;
+    if (!evo) return NULL;
 
     evo->current_level = initial_level > COG_LEVEL_CREATION ? COG_LEVEL_CREATION : initial_level;
 
@@ -52,6 +55,7 @@ cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
         (cog_experience_t *)AGENTOS_CALLOC(evo->experience_capacity, sizeof(cog_experience_t));
     if (!evo->experiences) {
         AGENTOS_FREE(evo);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -60,6 +64,7 @@ cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
     if (!evo->strategies) {
         AGENTOS_FREE(evo->experiences);
         AGENTOS_FREE(evo);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -69,6 +74,7 @@ cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
         AGENTOS_FREE(evo->strategies);
         AGENTOS_FREE(evo->experiences);
         AGENTOS_FREE(evo);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -79,6 +85,7 @@ cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
         AGENTOS_FREE(evo->strategies);
         AGENTOS_FREE(evo->experiences);
         AGENTOS_FREE(evo);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -176,7 +183,7 @@ void cog_evolution_destroy(cog_evolution_t *evo)
 int cog_evolution_record_experience(cog_evolution_t *evo, const cog_experience_t *experience)
 {
     if (!evo || !experience)
-        return AGENTOS_EINVAL;
+        COG_RET_ERR(AGENTOS_EINVAL);
 
     if (evo->experience_count >= COG_EVO_MAX_EXPERIENCES) {
         evo->total_fitness -= evo->experiences[0].reward;
@@ -193,7 +200,7 @@ int cog_evolution_record_experience(cog_evolution_t *evo, const cog_experience_t
         cog_experience_t *new_arr =
             (cog_experience_t *)AGENTOS_REALLOC(evo->experiences, new_cap * sizeof(cog_experience_t));
         if (!new_arr)
-            return AGENTOS_ERR_OVERFLOW;
+            COG_RET_ERR(AGENTOS_ERR_OVERFLOW);
         evo->experiences = new_arr;
         evo->experience_capacity = new_cap;
     }
@@ -232,7 +239,7 @@ static double compute_pattern_confidence(const cog_experience_t *experiences, si
 int cog_evolution_extract_patterns(cog_evolution_t *evo, size_t *pattern_count)
 {
     if (!evo)
-        return AGENTOS_EINVAL;
+        COG_RET_ERR(AGENTOS_EINVAL);
 
     for (size_t i = 0; i < evo->experience_count && evo->pattern_count < COG_EVO_MAX_PATTERNS;
          i++) {
@@ -288,7 +295,7 @@ int cog_evolution_extract_patterns(cog_evolution_t *evo, size_t *pattern_count)
 int cog_evolution_evolve_strategies(cog_evolution_t *evo, size_t *strategy_count)
 {
     if (!evo)
-        return AGENTOS_EINVAL;
+        COG_RET_ERR(AGENTOS_EINVAL);
 
     for (size_t i = 0; i < evo->pattern_count && evo->strategy_count < COG_EVO_MAX_STRATEGIES;
          i++) {
@@ -355,7 +362,7 @@ int cog_evolution_select_strategy(cog_evolution_t *evo, const char *domain,
                                   const char *context_json, cog_strategy_t **strategy)
 {
     if (!evo || !strategy)
-        return AGENTOS_EINVAL;
+        COG_RET_ERR(AGENTOS_EINVAL);
 
     double best_fitness = -1.0;
     cog_strategy_t *best = NULL;
@@ -390,7 +397,7 @@ int cog_evolution_transfer_knowledge(cog_evolution_t *evo, const char *source_do
                                      const char *target_domain, cog_knowledge_t **knowledge)
 {
     if (!evo || !source_domain || !target_domain || !knowledge)
-        return AGENTOS_EINVAL;
+        COG_RET_ERR(AGENTOS_EINVAL);
 
     double best_score = 0.0;
     cog_knowledge_t *best = NULL;
@@ -455,7 +462,7 @@ cog_level_t cog_evolution_get_level(cog_evolution_t *evo)
 int cog_evolution_evaluate_level(cog_evolution_t *evo, cog_level_t *new_level)
 {
     if (!evo || !new_level)
-        return AGENTOS_EINVAL;
+        COG_RET_ERR(AGENTOS_EINVAL);
 
     double avg_fitness = 0.0;
     if (evo->experience_count > 0) {
@@ -487,7 +494,7 @@ int cog_evolution_evaluate_level(cog_evolution_t *evo, cog_level_t *new_level)
 int cog_evolution_set_reward_fn(cog_evolution_t *evo, cog_reward_fn fn, void *user_data)
 {
     if (!evo)
-        return AGENTOS_EINVAL;
+        COG_RET_ERR(AGENTOS_EINVAL);
     evo->reward_fn = fn;
     evo->reward_user_data = user_data;
     return 0;
@@ -496,7 +503,7 @@ int cog_evolution_set_reward_fn(cog_evolution_t *evo, cog_reward_fn fn, void *us
 int cog_evolution_set_level_change_fn(cog_evolution_t *evo, cog_level_change_fn fn, void *user_data)
 {
     if (!evo)
-        return AGENTOS_EINVAL;
+        COG_RET_ERR(AGENTOS_EINVAL);
     evo->level_change_fn = fn;
     evo->level_change_user_data = user_data;
     return 0;

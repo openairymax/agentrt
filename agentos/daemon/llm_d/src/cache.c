@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file cache.c
  * @brief LRU 缓存实现（双链表 + 哈希表）
@@ -56,12 +57,16 @@ static unsigned int hash_key(const char *key)
 static cache_entry_t *entry_create(const char *key, const char *value)
 {
     cache_entry_t *e = memory_safe_alloc(sizeof(cache_entry_t));
-    if (!e)
+    if (!e) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     e->key = memory_safe_strdup(key);
     if (!e->key) {
         memory_safe_free(e);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -69,6 +74,7 @@ static cache_entry_t *entry_create(const char *key, const char *value)
     if (!e->value) {
         memory_safe_free(e->key);
         memory_safe_free(e);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -156,8 +162,11 @@ static void evict_lru(cache_t *cache)
 cache_t *cache_create(size_t capacity, int ttl_sec)
 {
     cache_t *cache = AGENTOS_CALLOC(1, sizeof(cache_t));
-    if (!cache)
+    if (!cache) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     cache->capacity = capacity;
     cache->ttl_sec = ttl_sec;
     agentos_mutex_init(&cache->lru_lock);

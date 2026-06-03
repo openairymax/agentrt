@@ -1,5 +1,5 @@
 # AgentOS Python SDK - API 响应处理工具
-# Version: 3.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-05
 #
 # 提供统一的 API 响应处理函数，消除重复代码

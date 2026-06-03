@@ -6,6 +6,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 extern agentos_error_t agentos_sys_memory_search(const char *query, uint32_t limit,
                                                  char ***out_record_ids, float **out_scores,
@@ -16,13 +22,13 @@ agentos_model_context_t *agentos_model_context_create(size_t capacity)
 {
     agentos_model_context_t *ctx =
         (agentos_model_context_t *)AGENTOS_CALLOC(1, sizeof(agentos_model_context_t));
-    if (!ctx)
-        return NULL;
+    if (!ctx) return NULL;
     ctx->capacity = capacity > 0 ? capacity : 64;
     ctx->entries =
         (agentos_context_entry_t *)AGENTOS_CALLOC(ctx->capacity, sizeof(agentos_context_entry_t));
     if (!ctx->entries) {
         AGENTOS_FREE(ctx);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     ctx->entry_count = 0;
@@ -52,13 +58,13 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
                                                 uint32_t priority)
 {
     if (!ctx || !content)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     if (ctx->entry_count >= ctx->capacity) {
         size_t new_cap = ctx->capacity * 2;
         agentos_context_entry_t *new_entries = (agentos_context_entry_t *)AGENTOS_REALLOC(
             ctx->entries, new_cap * sizeof(agentos_context_entry_t));
         if (!new_entries)
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         memset(new_entries + ctx->capacity, 0,
                (new_cap - ctx->capacity) * sizeof(agentos_context_entry_t));
         ctx->entries = new_entries;
@@ -67,7 +73,7 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
     agentos_context_entry_t *entry = &ctx->entries[ctx->entry_count];
     entry->content = (char *)AGENTOS_MALLOC(content_len + 1);
     if (!entry->content)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     memcpy(entry->content, content, content_len);
     entry->content[content_len] = '\0';
     entry->content_len = content_len;
@@ -92,7 +98,7 @@ static agentos_error_t window_trimmer_process(agentos_context_processor_t __attr
                                               const agentos_context_processor_config_t *config)
 {
     if (!context || !config)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     size_t budget = config->target_tokens > 0 ? config->target_tokens : 2048;
     size_t approx_chars = budget * 4;
@@ -143,7 +149,7 @@ static agentos_error_t compressor_process(agentos_context_processor_t __attribut
                                           const agentos_context_processor_config_t *config)
 {
     if (!context || !config)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     float ratio = config->compression_ratio > 0.0f && config->compression_ratio < 1.0f
                       ? config->compression_ratio
@@ -191,7 +197,7 @@ static agentos_error_t summarizer_process(agentos_context_processor_t __attribut
                                           const agentos_context_processor_config_t *config)
 {
     if (!context || !config)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     size_t budget = config->target_tokens > 0 ? config->target_tokens : 2048;
     size_t approx_chars = budget * 4;
@@ -202,7 +208,7 @@ static agentos_error_t summarizer_process(agentos_context_processor_t __attribut
     size_t summary_max = 512;
     char *summary = (char *)AGENTOS_MALLOC(summary_max);
     if (!summary)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     size_t pos = 0;
     pos += snprintf(summary + pos, summary_max - pos,
@@ -242,7 +248,7 @@ memory_augmenter_process(agentos_context_processor_t __attribute__((unused)) * s
                          const agentos_context_processor_config_t *config)
 {
     if (!context || !config)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     if (context->entry_count == 0)
         return AGENTOS_SUCCESS;
 
@@ -270,7 +276,7 @@ memory_augmenter_process(agentos_context_processor_t __attribute__((unused)) * s
     if (!aug_content) {
         agentos_sys_free(record_ids);
         agentos_sys_free(scores);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     size_t pos = 0;
@@ -305,8 +311,7 @@ static agentos_context_processor_t *create_processor(const char *name, const cha
 {
     agentos_context_processor_t *p =
         (agentos_context_processor_t *)AGENTOS_CALLOC(1, sizeof(agentos_context_processor_t));
-    if (!p)
-        return NULL;
+    if (!p) return NULL;
     p->name = AGENTOS_STRDUP(name);
     p->type = AGENTOS_STRDUP(type);
     p->process = process_func;
@@ -339,13 +344,13 @@ agentos_context_engine_t *agentos_context_engine_create(void)
 {
     agentos_context_engine_t *engine =
         (agentos_context_engine_t *)AGENTOS_CALLOC(1, sizeof(agentos_context_engine_t));
-    if (!engine)
-        return NULL;
+    if (!engine) return NULL;
     engine->processor_capacity = 8;
     engine->processors = (agentos_context_processor_t **)AGENTOS_CALLOC(
         engine->processor_capacity, sizeof(agentos_context_processor_t *));
     if (!engine->processors) {
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     engine->processor_count = 0;
@@ -371,13 +376,13 @@ agentos_error_t agentos_context_engine_register_processor(agentos_context_engine
                                                           agentos_context_processor_t *processor)
 {
     if (!engine || !processor)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     if (engine->processor_count >= engine->processor_capacity) {
         size_t new_cap = engine->processor_capacity * 2;
         agentos_context_processor_t **new_procs = (agentos_context_processor_t **)AGENTOS_REALLOC(
             engine->processors, new_cap * sizeof(agentos_context_processor_t *));
         if (!new_procs)
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         engine->processors = new_procs;
         engine->processor_capacity = new_cap;
     }
@@ -390,7 +395,7 @@ agentos_error_t agentos_context_engine_process(agentos_context_engine_t *engine,
                                                const agentos_context_processor_config_t *config)
 {
     if (!engine || !context || !config)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     agentos_error_t err = AGENTOS_SUCCESS;
     for (size_t i = 0; i < engine->processor_count; i++) {
         if (engine->processors[i] && engine->processors[i]->process) {

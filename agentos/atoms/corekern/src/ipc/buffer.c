@@ -13,6 +13,12 @@
 #include "memory_compat.h"
 
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 struct agentos_ipc_buffer {
     uint8_t *data;
@@ -24,12 +30,12 @@ agentos_ipc_buffer_t *agentos_ipc_buffer_create(size_t capacity)
 {
     agentos_ipc_buffer_t *buf =
         (agentos_ipc_buffer_t *)AGENTOS_CALLOC(1, sizeof(agentos_ipc_buffer_t));
-    if (!buf)
-        return NULL;
+    if (!buf) return NULL;
 
     buf->data = (uint8_t *)agentos_mem_alloc(capacity);
     if (!buf->data) {
         AGENTOS_FREE(buf);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     buf->capacity = capacity;
@@ -50,9 +56,9 @@ agentos_error_t agentos_ipc_buffer_write(agentos_ipc_buffer_t *buf, const void *
 {
 
     if (!buf || !data)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     if (buf->used + size > buf->capacity)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     memcpy(buf->data + buf->used, data, size);
     buf->used += size;
@@ -64,7 +70,7 @@ agentos_error_t agentos_ipc_buffer_read(agentos_ipc_buffer_t *buf, void *out_dat
 {
 
     if (!buf || !out_data)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     size_t to_read = (size < buf->used) ? size : buf->used;
     memcpy(out_data, buf->data, to_read);
     if (out_read)

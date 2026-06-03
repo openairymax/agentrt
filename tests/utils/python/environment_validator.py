@@ -4,7 +4,7 @@ AgentOS 测试环境验证器
 
 验证测试环境是否满足运行测试的所有要求。
 
-Version: 2.0.0
+Version: 0.1.0
 Last updated: 2026-04-23
 """
 

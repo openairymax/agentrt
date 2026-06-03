@@ -5,12 +5,12 @@
  */
 
 #include "safe_string_utils.h"
-#include "error.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #define TEST_PASS(name) printf("✓ %s\n", name)
 #define TEST_FAIL(name, reason)             \

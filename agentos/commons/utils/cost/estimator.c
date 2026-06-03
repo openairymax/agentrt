@@ -21,6 +21,7 @@
 /* Unified base library compatibility layer */
 #include <memory_compat.h>
 #include <string_compat.h>
+#include "error.h"
 
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
@@ -85,6 +86,7 @@ static const model_cost_config_t *find_model_config(agentos_cost_estimator_t *es
                                                     const char *model_name)
 {
     if (!estimator || !model_name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -170,6 +172,7 @@ agentos_cost_estimator_t *agentos_cost_estimator_create(const char *config_path)
     agentos_cost_estimator_t *estimator =
         (agentos_cost_estimator_t *)AGENTOS_MALLOC(sizeof(agentos_cost_estimator_t));
     if (!estimator) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -177,6 +180,7 @@ agentos_cost_estimator_t *agentos_cost_estimator_create(const char *config_path)
 
     if (agentos_mutex_init(&estimator->mutex) != 0) {
         AGENTOS_FREE(estimator);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 

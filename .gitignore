@@ -103,6 +103,7 @@ build_ci*/
 
 # 子目录中的构建产物（防止源内构建）
 **/build/
+!scripts/dev/build/
 **/_build/
 **/build-test/
 agentos/build/
@@ -516,6 +517,8 @@ $RECYCLE.BIN/
 # 依赖管理（本地安装，不追踪）
 # =============================================================================
 
+node_modules/
+**/node_modules/
 vendor/
 vendor/bundle/
 Gemfile.lock
@@ -716,6 +719,7 @@ coverage_reports/
 !scripts/ops/**/*.yml
 !scripts/ops/deploy/docker/Dockerfile*
 !scripts/ops/deploy/docker/Makefile
+!scripts/ops/deploy/Makefile
 !scripts/ops/deploy/docker-compose*.yml
 !scripts/ops/deploy/docker-compose*.yaml
 !scripts/ops/deploy/docker/.gitignore
@@ -740,6 +744,7 @@ coverage_reports/
 # 手写 Makefile（非 CMake 生成，需保留）
 !tests/Makefile
 !scripts/ops/deploy/docker/Makefile
+!scripts/ops/deploy/Makefile
 
 # =============================================================================
 # tests/ 测试目录

@@ -1,7 +1,7 @@
 # Security — 安全防护引擎
 
 **模块路径**: `agentos/cupolas/src/security/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

@@ -7,7 +7,7 @@ AgentOS 测试模板 - 安全测试
 2. 重命名为 test_<module>_security.py
 3. 实现安全测试用例
 
-Version: 2.0.0
+Version: 0.1.0
 """
 
 import pytest
