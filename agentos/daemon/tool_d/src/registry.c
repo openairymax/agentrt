@@ -38,8 +38,10 @@ static unsigned int hash(const char *id)
 static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
 {
     tool_metadata_t *dst = AGENTOS_CALLOC(1, sizeof(tool_metadata_t));
-    if (!dst)
+    if (!dst) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     dst->id = AGENTOS_STRDUP(src->id);
     dst->name = AGENTOS_STRDUP(src->name);
     dst->description = src->description ? AGENTOS_STRDUP(src->description) : NULL;
@@ -56,6 +58,7 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
             AGENTOS_FREE(dst->executable);
             AGENTOS_FREE(dst->permission_rule);
             AGENTOS_FREE(dst);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
         for (size_t i = 0; i < src->param_count; ++i) {
@@ -70,8 +73,10 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
 tool_registry_t *tool_registry_create(const tool_config_t *cfg)
 {
     tool_registry_t *reg = AGENTOS_CALLOC(1, sizeof(tool_registry_t));
-    if (!reg)
+    if (!reg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     agentos_mutex_init(&reg->lock);
 
     if (cfg && cfg->tools) {
@@ -210,8 +215,10 @@ int tool_registry_remove(tool_registry_t *reg, const char *tool_id)
 
 tool_metadata_t *tool_registry_get(tool_registry_t *reg, const char *tool_id)
 {
-    if (!reg || !tool_id)
+    if (!reg || !tool_id) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+        }
     unsigned int idx = hash(tool_id);
     agentos_mutex_lock(&reg->lock);
     for (registry_entry_t *e = reg->buckets[idx]; e; e = e->next) {
@@ -222,6 +229,7 @@ tool_metadata_t *tool_registry_get(tool_registry_t *reg, const char *tool_id)
         }
     }
     agentos_mutex_unlock(&reg->lock);
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 

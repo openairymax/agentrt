@@ -26,6 +26,11 @@ extern void agentos_sys_set_memory_provider(void *provider);
 #include <cjson/cJSON.h>
 #else
 #include <cjson/cJSON.h>
+#include "error.h"
+
+#define TASK_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
+         agentos_error_str(c)); return (c); } while(0)
 #endif
 
 static agentos_cognition_engine_t *g_cognition = NULL;
@@ -48,7 +53,10 @@ void agentos_sys_init(void *cognition, void *execution, void *memory)
 static cJSON *build_name_to_index_map(agentos_task_plan_t *plan, size_t n)
 {
     cJSON *name_to_idx = cJSON_CreateObject();
-    if (!name_to_idx)
+    if (!name_to_idx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+        
+    }
         return NULL;
 
     for (size_t i = 0; i < n; i++) {
@@ -65,7 +73,10 @@ static cJSON *build_name_to_index_map(agentos_task_plan_t *plan, size_t n)
 static int *calculate_indegrees(cJSON *name_to_idx, agentos_task_plan_t *plan, size_t n)
 {
     int *indeg = (int *)AGENTOS_CALLOC(n, sizeof(int));
-    if (!indeg)
+    if (!indeg) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+        
+    }
         return NULL;
 
     for (size_t i = 0; i < n; i++) {
@@ -92,7 +103,10 @@ static int *kahn_algorithm(cJSON *name_to_idx, int *indeg, agentos_task_plan_t *
                            int *order, size_t *pos)
 {
     int *queue = (int *)AGENTOS_MALLOC(n * sizeof(int));
-    if (!queue)
+    if (!queue) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+        
+    }
         return NULL;
 
     int qhead = 0, qtail = 0;
@@ -119,6 +133,7 @@ static int *kahn_algorithm(cJSON *name_to_idx, int *indeg, agentos_task_plan_t *
                         if (qtail >= (int)n) {
                             AGENTOS_LOG_ERROR("Topological sort queue overflow during processing");
                             AGENTOS_FREE(queue);
+                            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
                             return NULL;
                         }
                         queue[qtail++] = v;
@@ -140,12 +155,16 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
 {
     size_t n = plan->task_plan_node_count;
     int *order = (int *)AGENTOS_MALLOC(n * sizeof(int));
-    if (!order)
+    if (!order) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+        
+    }
         return NULL;
 
     cJSON *name_to_idx = build_name_to_index_map(plan, n);
     if (!name_to_idx) {
         AGENTOS_FREE(order);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -153,6 +172,7 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
     if (!indeg) {
         cJSON_Delete(name_to_idx);
         AGENTOS_FREE(order);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -162,6 +182,7 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
         cJSON_Delete(name_to_idx);
         AGENTOS_FREE(indeg);
         AGENTOS_FREE(order);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -172,6 +193,7 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
     if (pos != n) {
         // 有环
         AGENTOS_FREE(order);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
     *out_count = n;
@@ -193,6 +215,7 @@ static char *execute_node(agentos_task_node_t *node, uint32_t timeout_ms)
     agentos_error_t err = agentos_execution_submit(g_execution, &task, &task_id);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Failed to submit node %s", node->task_node_id);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -201,6 +224,7 @@ static char *execute_node(agentos_task_node_t *node, uint32_t timeout_ms)
     AGENTOS_FREE(task_id);
     if (err != AGENTOS_SUCCESS || !result_task) {
         AGENTOS_LOG_ERROR("Node %s execution failed", node->task_node_id);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -212,6 +236,7 @@ static char *execute_node(agentos_task_node_t *node, uint32_t timeout_ms)
     }
     if (!output) {
         agentos_task_free(result_task);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     agentos_task_free(result_task);
@@ -224,9 +249,9 @@ agentos_error_t agentos_sys_task_submit(const char *input, size_t input_len, uin
                                         char **out_result)
 {
     if (!input || !out_result)
-        return AGENTOS_EINVAL;
+        TASK_RET_ERR(AGENTOS_EINVAL);
     if (!g_cognition || !g_execution)
-        return AGENTOS_ENOTINIT;
+        TASK_RET_ERR(AGENTOS_ENOTINIT);
 
     agentos_task_plan_t *plan = NULL;
     agentos_error_t err = agentos_cognition_process(g_cognition, input, input_len, &plan);
@@ -234,7 +259,7 @@ agentos_error_t agentos_sys_task_submit(const char *input, size_t input_len, uin
         return err;
     if (!plan || plan->task_plan_node_count == 0) {
         agentos_task_plan_free(plan);
-        return AGENTOS_EINVAL;
+        TASK_RET_ERR(AGENTOS_EINVAL);
     }
 
     // 拓扑排序
@@ -242,7 +267,7 @@ agentos_error_t agentos_sys_task_submit(const char *input, size_t input_len, uin
     int *order = topological_sort(plan, &order_count);
     if (!order) {
         agentos_task_plan_free(plan);
-        return AGENTOS_EINVAL;
+        TASK_RET_ERR(AGENTOS_EINVAL);
     }
 
     // 按顺序执行节?
@@ -264,7 +289,7 @@ agentos_error_t agentos_sys_task_submit(const char *input, size_t input_len, uin
     char *json = cJSON_PrintUnformatted(result_obj);
     cJSON_Delete(result_obj);
     if (!json)
-        return AGENTOS_ENOMEM;
+        TASK_RET_ERR(AGENTOS_ENOMEM);
     *out_result = json;
     return AGENTOS_SUCCESS;
 }
@@ -272,9 +297,9 @@ agentos_error_t agentos_sys_task_submit(const char *input, size_t input_len, uin
 agentos_error_t agentos_sys_task_query(const char *task_id, int *out_status)
 {
     if (!task_id || !out_status)
-        return AGENTOS_EINVAL;
+        TASK_RET_ERR(AGENTOS_EINVAL);
     if (!g_execution)
-        return AGENTOS_ENOTINIT;
+        TASK_RET_ERR(AGENTOS_ENOTINIT);
     agentos_task_status_t status;
     agentos_error_t err = agentos_execution_query(g_execution, task_id, &status);
     if (err == AGENTOS_SUCCESS) {
@@ -286,9 +311,9 @@ agentos_error_t agentos_sys_task_query(const char *task_id, int *out_status)
 agentos_error_t agentos_sys_task_wait(const char *task_id, uint32_t timeout_ms, char **out_result)
 {
     if (!task_id || !out_result)
-        return AGENTOS_EINVAL;
+        TASK_RET_ERR(AGENTOS_EINVAL);
     if (!g_execution)
-        return AGENTOS_ENOTINIT;
+        TASK_RET_ERR(AGENTOS_ENOTINIT);
     agentos_task_t *result_task = NULL;
     agentos_error_t err = agentos_execution_wait(g_execution, task_id, timeout_ms, &result_task);
     if (err == AGENTOS_SUCCESS && result_task) {
@@ -299,7 +324,7 @@ agentos_error_t agentos_sys_task_wait(const char *task_id, uint32_t timeout_ms, 
         }
         if (!*out_result) {
             agentos_task_free(result_task);
-            return AGENTOS_ENOMEM;
+            TASK_RET_ERR(AGENTOS_ENOMEM);
         }
         agentos_task_free(result_task);
     }
@@ -309,8 +334,8 @@ agentos_error_t agentos_sys_task_wait(const char *task_id, uint32_t timeout_ms, 
 agentos_error_t agentos_sys_task_cancel(const char *task_id)
 {
     if (!task_id)
-        return AGENTOS_EINVAL;
+        TASK_RET_ERR(AGENTOS_EINVAL);
     if (!g_execution)
-        return AGENTOS_ENOTINIT;
+        TASK_RET_ERR(AGENTOS_ENOTINIT);
     return agentos_execution_cancel(g_execution, task_id);
 }

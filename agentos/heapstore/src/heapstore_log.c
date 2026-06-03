@@ -127,7 +127,9 @@ static FILE *get_service_log_file(const char *service)
 
     char safe_service[heapstore_LOG_MAX_SERVICE_LEN];
     if (heapstore_sanitize_path_component(safe_service, service, sizeof(safe_service)) != 0) {
-        fprintf(stderr, "[heapstore_LOG SECURITY] Rejected unsafe service name: %s\n", service);
+        char _buf[heapstore_LOG_MAX_SERVICE_LEN + 128];
+        snprintf(_buf, sizeof(_buf), "[heapstore_LOG SECURITY] Rejected unsafe service name: %s\n", service);
+        fputs(_buf, stderr);
         return NULL;
     }
 
@@ -196,7 +198,7 @@ heapstore_error_t heapstore_log_init(void)
 void heapstore_log_shutdown(void)
 {
     if (!s_initialized) {
-        fprintf(stderr, "[heapstore_LOG WARN] Shutdown called but not initialized\n");
+        fputs("[heapstore_LOG WARN] Shutdown called but not initialized\n", stderr);
         return;
     }
 
@@ -205,7 +207,7 @@ void heapstore_log_shutdown(void)
     if (s_main_log_file) {
         fflush(s_main_log_file);
         fclose(s_main_log_file);
-        fprintf(stdout, "[heapstore_LOG INFO] Main log file closed\n");
+        fputs("[heapstore_LOG INFO] Main log file closed\n", stdout);
         s_main_log_file = NULL;
     }
 
@@ -218,12 +220,14 @@ void heapstore_log_shutdown(void)
         }
         agentos_mutex_destroy(&s_service_logs[i].lock);
     }
-    fprintf(stdout, "[heapstore_LOG INFO] Closed %zu service log files\n", s_service_log_count);
+    char _buf2[128];
+    snprintf(_buf2, sizeof(_buf2), "[heapstore_LOG INFO] Closed %zu service log files\n", s_service_log_count);
+    fputs(_buf2, stdout);
     s_service_log_count = 0;
     agentos_mutex_unlock(&s_service_lock);
 
     s_initialized = false;
-    fprintf(stdout, "[heapstore_LOG INFO] Logging system shutdown complete\n");
+    fputs("[heapstore_LOG INFO] Logging system shutdown complete\n", stdout);
 
     agentos_mutex_unlock(&s_log_lock);
 }
@@ -250,7 +254,8 @@ void heapstore_log_write(heapstore_log_level_t level, const char *service, const
     }
 
     time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
+    struct tm tm_buf2;
+    struct tm *tm_info = localtime_r(&now, &tm_buf2);
     char timestamp[32];
     strftime(timestamp, sizeof(timestamp), "%H:%M:%S", tm_info);
 
@@ -259,14 +264,17 @@ void heapstore_log_write(heapstore_log_level_t level, const char *service, const
     va_list args;
     va_start(args, format);
 
-    fprintf(fp, "[%s] [%s] [%s] [%s:%d] ", s_current_date, timestamp, level_str, file, line);
+    char _buf3[512];
+    snprintf(_buf3, sizeof(_buf3), "[%s] [%s] [%s] [%s:%d] ", s_current_date, timestamp, level_str, file, line);
+    fputs(_buf3, fp);
 
     if (trace_id) {
-        fprintf(fp, "[trace:%s] ", trace_id);
+        snprintf(_buf3, sizeof(_buf3), "[trace:%s] ", trace_id);
+        fputs(_buf3, fp);
     }
 
     vfprintf(fp, format, args); /* flawfinder: ignore - logger forwarding va_list to file */
-    fprintf(fp, "\n");
+    fputs("\n", fp);
     fflush(fp);
 
     va_end(args);
@@ -289,7 +297,8 @@ void heapstore_log_writev(heapstore_log_level_t level, const char *service, cons
 
     uint64_t now_ms = agentos_time_ms();
     time_t now = (time_t)(now_ms / 1000);
-    struct tm *tm_info = localtime(&now);
+    struct tm tm_buf3;
+    struct tm *tm_info = localtime_r(&now, &tm_buf3);
     char timestamp[32];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
     char msec[8];
@@ -307,13 +316,16 @@ void heapstore_log_writev(heapstore_log_level_t level, const char *service, cons
 
     FILE *fp = get_service_log_file(service);
 
+    char _buf4[2048];
     if (trace_id && trace_id[0]) {
-        fprintf(fp, "%s.%s [%s] [%s] [trace=%s] [%s:%d] %s\n", timestamp, msec,
+        snprintf(_buf4, sizeof(_buf4), "%s.%s [%s] [%s] [trace=%s] [%s:%d] %s\n", timestamp, msec,
                 level_to_string(level), service ? service : "unknown", trace_id, filename, line,
                 message);
+        fputs(_buf4, fp);
     } else {
-        fprintf(fp, "%s.%s [%s] [%s] [%s:%d] %s\n", timestamp, msec, level_to_string(level),
+        snprintf(_buf4, sizeof(_buf4), "%s.%s [%s] [%s] [%s:%d] %s\n", timestamp, msec, level_to_string(level),
                 service ? service : "unknown", filename, line, message);
+        fputs(_buf4, fp);
     }
 
     fflush(fp);
@@ -335,7 +347,7 @@ heapstore_error_t heapstore_log_get_service_path(const char *service, char *buff
                                                  size_t buffer_size)
 {
     if (!buffer || buffer_size == 0) {
-        fprintf(stderr, "[heapstore_LOG ERROR] Invalid buffer parameter\n");
+        fputs("[heapstore_LOG ERROR] Invalid buffer parameter\n", stderr);
         return heapstore_ERR_INVALID_PARAM;
     }
 
@@ -352,7 +364,7 @@ heapstore_error_t heapstore_log_get_service_path(const char *service, char *buff
 heapstore_error_t heapstore_log_rotate(void)
 {
     if (!s_initialized) {
-        fprintf(stderr, "[heapstore_LOG ERROR] Log rotate called but not initialized\n");
+        fputs("[heapstore_LOG ERROR] Log rotate called but not initialized\n", stderr);
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
@@ -365,7 +377,8 @@ heapstore_error_t heapstore_log_rotate(void)
     }
 
     time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
+    struct tm tm_buf4;
+    struct tm *tm_info = localtime_r(&now, &tm_buf4);
     char timestamp[64];
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
 
@@ -375,22 +388,26 @@ heapstore_error_t heapstore_log_rotate(void)
     char new_path[heapstore_LOG_MAX_PATH];
     snprintf(new_path, sizeof(new_path), "agentos/heapstore/logs/kernel/agentos_%s.log", timestamp);
 
+    char _buf5[1024];
     if (rename(old_path, new_path) != 0) {
-        fprintf(stderr, "[heapstore_LOG ERROR] Failed to rotate log file: %s -> %s\n", old_path,
+        snprintf(_buf5, sizeof(_buf5), "[heapstore_LOG ERROR] Failed to rotate log file: %s -> %s\n", old_path,
                 new_path);
+        fputs(_buf5, stderr);
         agentos_mutex_unlock(&s_log_lock);
         return heapstore_ERR_FILE_OPERATION_FAILED;
     }
 
     s_main_log_file = fopen(old_path, "a");
     if (!s_main_log_file) {
-        fprintf(stderr, "[heapstore_LOG ERROR] Failed to create new log file after rotation: %s\n",
+        snprintf(_buf5, sizeof(_buf5), "[heapstore_LOG ERROR] Failed to create new log file after rotation: %s\n",
                 old_path);
+        fputs(_buf5, stderr);
         agentos_mutex_unlock(&s_log_lock);
         return heapstore_ERR_FILE_OPEN_FAILED;
     }
 
-    fprintf(stdout, "[heapstore_LOG INFO] Log rotated: %s -> %s\n", old_path, new_path);
+    snprintf(_buf5, sizeof(_buf5), "[heapstore_LOG INFO] Log rotated: %s -> %s\n", old_path, new_path);
+    fputs(_buf5, stdout);
     agentos_mutex_unlock(&s_log_lock);
 
     return heapstore_SUCCESS;
@@ -482,7 +499,7 @@ heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t *freed_bytes)
 heapstore_error_t heapstore_log_get_file_info(const char *service, heapstore_log_file_info_t *info)
 {
     if (!info) {
-        fprintf(stderr, "[heapstore_LOG ERROR] Invalid info parameter (NULL)\n");
+        fputs("[heapstore_LOG ERROR] Invalid info parameter (NULL)\n", stderr);
         return heapstore_ERR_INVALID_PARAM;
     }
 
@@ -510,7 +527,9 @@ heapstore_error_t heapstore_log_get_file_info(const char *service, heapstore_log
         info->created_at = st.st_ctime;
         info->modified_at = st.st_mtime;
     } else {
-        fprintf(stderr, "[heapstore_LOG WARN] Failed to get file info: %s\n", filepath);
+        char _buf6[heapstore_LOG_MAX_PATH + 128];
+        snprintf(_buf6, sizeof(_buf6), "[heapstore_LOG WARN] Failed to get file info: %s\n", filepath);
+        fputs(_buf6, stderr);
         return heapstore_ERR_FILE_NOT_FOUND;
     }
 

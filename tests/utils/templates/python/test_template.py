@@ -8,7 +8,7 @@ AgentOS 测试模板 - Python 单元测试
 3. 替换 <Module> 为实际模块名
 4. 实现测试用例
 
-Version: 2.0.0
+Version: 0.1.0
 """
 
 import pytest

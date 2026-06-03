@@ -239,9 +239,8 @@ static memory_debug_block_t *memory_debug_find_block(void *user_ptr)
     memory_debug_block_t *block = (memory_debug_block_t *)block_ptr;
 
     // 验证魔数
-    if (block->magic != MEMORY_DEBUG_MAGIC) {
+    if (block->magic != MEMORY_DEBUG_MAGIC)
         return NULL;
-    }
 
     return block;
 }

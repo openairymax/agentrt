@@ -1,5 +1,5 @@
 // AgentOS Go SDK - 插件框架
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-04-26
 //
 // 插件化框架，提供运行时的动态功能扩展能力。

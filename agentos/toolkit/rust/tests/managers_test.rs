@@ -1,5 +1,5 @@
 // AgentOS Rust SDK - Managers 模块测试
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-04-27
 
 use agentos_rs::*;

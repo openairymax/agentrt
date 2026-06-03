@@ -4,13 +4,17 @@
 #include "multi_agent_collaboration.h"
 
 #include "agentos.h"
+#include "error.h"
 #include "memory_compat.h"
 #include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../../../commons/utils/error/include/error.h"
+
+#define MAC_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
+         agentos_error_str(c)); return (c); } while(0)
 
 #define MAC_MAX_AGENTS 1024
 #define MAC_MAX_TASKS 4096
@@ -139,56 +143,55 @@ static void mac_hash_remove(size_t *table, const char *key, size_t index)
 static ssize_t mac_hash_find_agent(mac_framework_t *fw, const char *agent_id)
 {
     if (!agent_id || !agent_id[0])
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     size_t slot = mac_hash_str(agent_id);
     for (size_t probe = 0; probe < MAC_HASH_SIZE; probe++) {
         size_t pos = (slot + probe) & MAC_HASH_MASK;
         size_t idx = fw->agent_hash[pos];
         if (idx == 0)
-            return AGENTOS_EINVAL;
+            MAC_RET_ERR(AGENTOS_EINVAL);
         if (idx - 1 < fw->agent_count && strcmp(fw->agents[idx - 1].id, agent_id) == 0)
             return (ssize_t)(idx - 1);
     }
-    return AGENTOS_EINVAL;
+    MAC_RET_ERR(AGENTOS_EINVAL);
 }
 
 static ssize_t mac_hash_find_group(mac_framework_t *fw, const char *group_id)
 {
     if (!group_id || !group_id[0])
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     size_t slot = mac_hash_str(group_id);
     for (size_t probe = 0; probe < MAC_HASH_SIZE; probe++) {
         size_t pos = (slot + probe) & MAC_HASH_MASK;
         size_t idx = fw->group_hash[pos];
         if (idx == 0)
-            return AGENTOS_EINVAL;
+            MAC_RET_ERR(AGENTOS_EINVAL);
         if (idx - 1 < fw->group_count && strcmp(fw->groups[idx - 1].id, group_id) == 0)
             return (ssize_t)(idx - 1);
     }
-    return AGENTOS_EINVAL;
+    MAC_RET_ERR(AGENTOS_EINVAL);
 }
 
 static ssize_t mac_hash_find_consensus(mac_framework_t *fw, const char *consensus_id)
 {
     if (!consensus_id || !consensus_id[0])
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     size_t slot = mac_hash_str(consensus_id);
     for (size_t probe = 0; probe < MAC_HASH_SIZE; probe++) {
         size_t pos = (slot + probe) & MAC_HASH_MASK;
         size_t idx = fw->consensus_hash[pos];
         if (idx == 0)
-            return AGENTOS_EINVAL;
+            MAC_RET_ERR(AGENTOS_EINVAL);
         if (idx - 1 < fw->consensus_count && strcmp(fw->consensuses[idx - 1].id, consensus_id) == 0)
             return (ssize_t)(idx - 1);
     }
-    return AGENTOS_EINVAL;
+    MAC_RET_ERR(AGENTOS_EINVAL);
 }
 
 mac_framework_t *mac_framework_create(mac_collab_mode_t default_mode)
 {
     mac_framework_t *fw = (mac_framework_t *)AGENTOS_CALLOC(1, sizeof(mac_framework_t));
-    if (!fw)
-        return NULL;
+    if (!fw) return NULL;
     fw->default_mode = default_mode;
     fw->lock_init = 0;
     memset(fw->agent_hash, 0, sizeof(fw->agent_hash));
@@ -234,17 +237,17 @@ void mac_framework_destroy(mac_framework_t *fw)
 int mac_framework_register_agent(mac_framework_t *fw, const mac_agent_info_t *agent)
 {
     if (!fw || !agent)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
     if (fw->agent_count >= MAC_MAX_AGENTS) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_OVERFLOW;
+        MAC_RET_ERR(AGENTOS_ERR_OVERFLOW);
     }
     if (mac_hash_find_agent(fw, agent->id) >= 0) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_NULL_POINTER;
+        MAC_RET_ERR(AGENTOS_ERR_NULL_POINTER);
     }
     mac_agent_info_t *slot = &fw->agents[fw->agent_count];
     memcpy(slot, agent, sizeof(mac_agent_info_t));
@@ -260,14 +263,14 @@ int mac_framework_register_agent(mac_framework_t *fw, const mac_agent_info_t *ag
 int mac_framework_unregister_agent(mac_framework_t *fw, const char *agent_id)
 {
     if (!fw || !agent_id)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
     ssize_t idx = mac_hash_find_agent(fw, agent_id);
     if (idx < 0) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_NOT_FOUND;
+        MAC_RET_ERR(AGENTOS_ERR_NOT_FOUND);
     }
 
     AGENTOS_FREE(fw->agents[idx].capabilities_json);
@@ -288,13 +291,13 @@ int mac_framework_create_group(mac_framework_t *fw, const char *name, mac_collab
                                const char **agent_ids, size_t agent_count, char **group_id)
 {
     if (!fw || !name)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
     if (fw->group_count >= MAC_MAX_GROUPS) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_OVERFLOW;
+        MAC_RET_ERR(AGENTOS_ERR_OVERFLOW);
     }
 
     mac_group_t *group = &fw->groups[fw->group_count];
@@ -312,7 +315,7 @@ int mac_framework_create_group(mac_framework_t *fw, const char *name, mac_collab
             (mac_agent_info_t *)AGENTOS_CALLOC(agent_count, sizeof(mac_agent_info_t));
         if (!members) {
             agentos_mutex_unlock(&fw->lock);
-            return AGENTOS_ERR_OUT_OF_MEMORY;
+            MAC_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
         }
 
         for (size_t i = 0; i < agent_count; i++) {
@@ -345,14 +348,14 @@ int mac_framework_create_group(mac_framework_t *fw, const char *name, mac_collab
 int mac_framework_disband_group(mac_framework_t *fw, const char *group_id)
 {
     if (!fw || !group_id)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
     ssize_t idx = mac_hash_find_group(fw, group_id);
     if (idx < 0) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_NOT_FOUND;
+        MAC_RET_ERR(AGENTOS_ERR_NOT_FOUND);
     }
 
     for (size_t m = 0; m < fw->groups[idx].member_count; m++) {
@@ -409,7 +412,7 @@ int mac_framework_delegate_task(mac_framework_t *fw, const char *group_id,
                                 const mac_collab_task_t *task, char **assigned_agent_id)
 {
     if (!fw || !task)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
@@ -420,19 +423,19 @@ int mac_framework_delegate_task(mac_framework_t *fw, const char *group_id,
             group = &fw->groups[gidx];
         } else {
             agentos_mutex_unlock(&fw->lock);
-            return AGENTOS_ERR_NOT_FOUND;
+            MAC_RET_ERR(AGENTOS_ERR_NOT_FOUND);
         }
     }
 
     if (fw->task_count >= MAC_MAX_TASKS) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_NULL_POINTER;
+        MAC_RET_ERR(AGENTOS_ERR_NULL_POINTER);
     }
 
     mac_agent_info_t *agent = select_agent_for_task(fw, group, task);
     if (!agent) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        MAC_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
     }
 
     if (fw->delegate_fn) {
@@ -469,7 +472,7 @@ int mac_framework_collect_results(mac_framework_t *fw, const char *group_id, con
                                   char ***results, size_t *result_count)
 {
     if (!fw || !results || !result_count)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
@@ -477,7 +480,7 @@ int mac_framework_collect_results(mac_framework_t *fw, const char *group_id, con
     char **out = (char **)AGENTOS_CALLOC(capacity, sizeof(char *));
     if (!out) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_OVERFLOW;
+        MAC_RET_ERR(AGENTOS_ERR_OVERFLOW);
     }
 
     for (size_t i = 0; i < fw->task_count; i++) {
@@ -499,7 +502,7 @@ int mac_framework_collect_results(mac_framework_t *fw, const char *group_id, con
                     AGENTOS_FREE(out[j]);
                 AGENTOS_FREE(out);
                 agentos_mutex_unlock(&fw->lock);
-                return AGENTOS_ERR_NULL_POINTER;
+                MAC_RET_ERR(AGENTOS_ERR_NULL_POINTER);
             }
             out = new_out;
         }
@@ -509,7 +512,7 @@ int mac_framework_collect_results(mac_framework_t *fw, const char *group_id, con
                 AGENTOS_FREE(out[j]);
             AGENTOS_FREE(out);
             agentos_mutex_unlock(&fw->lock);
-            return AGENTOS_ERR_NULL_POINTER;
+            MAC_RET_ERR(AGENTOS_ERR_NULL_POINTER);
         }
         count++;
     }
@@ -537,13 +540,13 @@ int mac_framework_start_consensus(mac_framework_t *fw, const char *group_id,
                                   char **consensus_id)
 {
     if (!fw || !proposal_json)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
     if (fw->consensus_count >= MAC_MAX_CONSENSUS) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_OVERFLOW;
+        MAC_RET_ERR(AGENTOS_ERR_OVERFLOW);
     }
 
     mac_consensus_t *c = &fw->consensuses[fw->consensus_count];
@@ -575,26 +578,26 @@ int mac_framework_vote(mac_framework_t *fw, const char *consensus_id, const char
                        const char *vote_json)
 {
     if (!fw || !consensus_id || !agent_id || !vote_json)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
     ssize_t cidx = mac_hash_find_consensus(fw, consensus_id);
     if (cidx < 0) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        MAC_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
     }
 
     mac_consensus_t *c = &fw->consensuses[cidx];
     if (c->resolved) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_NOT_FOUND;
+        MAC_RET_ERR(AGENTOS_ERR_NOT_FOUND);
     }
 
     for (size_t v = 0; v < c->vote_count; v++) {
         if (c->voter_ids[v] && strcmp(c->voter_ids[v], agent_id) == 0) {
             agentos_mutex_unlock(&fw->lock);
-            return AGENTOS_ERR_OVERFLOW;
+            MAC_RET_ERR(AGENTOS_ERR_OVERFLOW);
         }
     }
 
@@ -602,13 +605,13 @@ int mac_framework_vote(mac_framework_t *fw, const char *consensus_id, const char
     char **new_votes = (char **)AGENTOS_REALLOC(c->votes, new_count * sizeof(char *));
     if (!new_votes) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        MAC_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
     }
     c->votes = new_votes;
     char **new_voter_ids = (char **)AGENTOS_REALLOC(c->voter_ids, new_count * sizeof(char *));
     if (!new_voter_ids) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        MAC_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
     }
     c->voter_ids = new_voter_ids;
     c->votes[c->vote_count] = AGENTOS_STRDUP(vote_json);
@@ -739,14 +742,14 @@ int mac_framework_resolve_consensus(mac_framework_t *fw, const char *consensus_i
                                     char **result_json)
 {
     if (!fw || !consensus_id || !result_json)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 
     ssize_t cidx = mac_hash_find_consensus(fw, consensus_id);
     if (cidx < 0) {
         agentos_mutex_unlock(&fw->lock);
-        return AGENTOS_ERR_NOT_FOUND;
+        MAC_RET_ERR(AGENTOS_ERR_NOT_FOUND);
     }
 
     mac_consensus_t *c = &fw->consensuses[cidx];
@@ -791,7 +794,7 @@ int mac_framework_resolve_consensus(mac_framework_t *fw, const char *consensus_i
 int mac_framework_set_delegate_fn(mac_framework_t *fw, mac_task_delegate_fn fn, void *user_data)
 {
     if (!fw)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     fw->delegate_fn = fn;
     fw->delegate_user_data = user_data;
     return 0;
@@ -800,7 +803,7 @@ int mac_framework_set_delegate_fn(mac_framework_t *fw, mac_task_delegate_fn fn, 
 int mac_framework_set_aggregate_fn(mac_framework_t *fw, mac_result_aggregate_fn fn, void *user_data)
 {
     if (!fw)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     fw->aggregate_fn = fn;
     fw->aggregate_user_data = user_data;
     return 0;
@@ -832,7 +835,7 @@ int mac_framework_register_agents_batch(mac_framework_t *fw, const mac_agent_inf
                                         size_t count, size_t *registered_count)
 {
     if (!fw || !agents || count == 0)
-        return AGENTOS_EINVAL;
+        MAC_RET_ERR(AGENTOS_EINVAL);
     ensure_lock(fw);
     agentos_mutex_lock(&fw->lock);
 

@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file openai.c
  * @brief OpenAI 适配器实现（含生产级Rate Limiting）
@@ -16,7 +17,6 @@
  */
 
 #include "daemon_errors.h"
-#include "error.h"
 #include "platform.h"
 #include "provider.h"
 #include "svc_logger.h"
@@ -284,6 +284,7 @@ static provider_ctx_t *openai_init(const char *name __attribute__((unused)), con
 
     openai_ctx_t *ctx = (openai_ctx_t *)AGENTOS_CALLOC(1, sizeof(openai_ctx_t));
     if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -452,8 +453,11 @@ static int oai_stream_on_chunk(const char *json_line, void *userdata)
 static llm_response_t *oai_build_stream_response(oai_stream_acc_t *acc)
 {
     llm_response_t *resp = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
-    if (!resp)
+    if (!resp) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     if (acc->resp_id)
         resp->id = acc->resp_id;

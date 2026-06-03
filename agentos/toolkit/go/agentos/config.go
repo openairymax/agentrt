@@ -24,12 +24,16 @@ type Config struct {
 type ConfigOption func(*Config)
 
 func DefaultConfig() *Config {
+	endpoint := "http://127.0.0.1:18789"
+	if v := os.Getenv("AGENTOS_ENDPOINT"); v != "" {
+		endpoint = v
+	}
 	return &Config{
-		Endpoint:        "http://localhost:18789",
+		Endpoint:        endpoint,
 		Timeout:         30 * time.Second,
 		MaxRetries:      3,
 		RetryDelay:      1 * time.Second,
-		UserAgent:       "AgentOS-Go-tools/3.0.0",
+		UserAgent:       "AgentOS-Go-tools/0.1.0",
 		LogLevel:        "info",
 		MaxConnections:  10,
 		IdleConnTimeout: 90 * time.Second,

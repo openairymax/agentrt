@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -28,6 +29,11 @@ typedef int socklen_t;
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 #define SOCKET int
 #define INVALID_SOCKET (-1)
 #define SOCKET_ERROR (-1)
@@ -61,7 +67,7 @@ static int parse_url(const char *url, char *host, size_t host_size, int *port, c
                      size_t path_size)
 {
     if (!url || !host || !port || !path)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     const char *p = url;
     if (strncmp(p, "https://", 8) == 0) {
@@ -71,7 +77,7 @@ static int parse_url(const char *url, char *host, size_t host_size, int *port, c
         p += 7;
         *port = 80;
     } else {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     const char *slash = strchr(p, '/');
@@ -146,8 +152,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
 {
     size_t req_cap = 4096;
     char *request = (char *)AGENTOS_MALLOC(req_cap);
-    if (!request)
-        return NULL;
+    if (!request) return NULL;
 
     int len = snprintf(request, req_cap,
                        "%s %s HTTP/1.1\r\n"
@@ -171,6 +176,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
             char *new_req = (char *)AGENTOS_REALLOC(request, req_cap);
             if (!new_req) {
                 AGENTOS_FREE(request);
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 return NULL;
             }
             request = new_req;
@@ -190,6 +196,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
         int sent = send(sock, request + total_sent, (int)((size_t)len - total_sent), 0);
         if (sent <= 0) {
             AGENTOS_FREE(request);
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_IO, "io operation failed");
             return NULL;
         }
         total_sent += (size_t)sent;
@@ -198,8 +205,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
 
     size_t resp_cap = 8192;
     char *response = (char *)AGENTOS_MALLOC(resp_cap);
-    if (!response)
-        return NULL;
+    if (!response) return NULL;
 
     size_t total_recv = 0;
     for (;;) {
@@ -208,6 +214,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
             char *new_resp = (char *)AGENTOS_REALLOC(response, resp_cap);
             if (!new_resp) {
                 AGENTOS_FREE(response);
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 return NULL;
             }
             response = new_resp;
@@ -224,8 +231,7 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
 
 static char *extract_body(const char *response)
 {
-    if (!response)
-        return NULL;
+    if (!response) return NULL;
 
     const char *header_end = strstr(response, "\r\n\r\n");
     if (!header_end)
@@ -257,7 +263,7 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
                                    void **out_output)
 {
     if (!unit || !unit->execution_unit_data || !input || !out_output) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     api_unit_data_t *data = (api_unit_data_t *)unit->execution_unit_data;
@@ -270,7 +276,7 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
     if (sscanf(request_str, "method=%15[^&]&url=%2047[^&]&body=%4095[^\n]", method, url, body) <
         2) {
         if (sscanf(request_str, "%2047s", url) != 1) {
-            return AGENTOS_EINVAL;
+            ATM_RET_ERR(AGENTOS_EINVAL);
         }
         strncpy(method, "GET", sizeof(method) - 1);
     }
@@ -280,7 +286,7 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
     char path[MAX_URL_LENGTH] = {0};
 
     if (parse_url(url, host, sizeof(host), &port, path, sizeof(path)) != 0) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     agentos_mutex_lock(data->lock);
@@ -297,7 +303,7 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
     SOCKET sock = connect_to_host(
         host, port, data->config.timeout_ms > 0 ? data->config.timeout_ms : DEFAULT_TIMEOUT_MS);
     if (sock == INVALID_SOCKET) {
-        return AGENTOS_ECONNREFUSED;
+        ATM_RET_ERR(AGENTOS_ECONNREFUSED);
     }
 
     char *raw_response =
@@ -306,14 +312,14 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
     closesocket(sock);
 
     if (!raw_response) {
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     char *response_body = extract_body(raw_response);
     AGENTOS_FREE(raw_response);
 
     if (!response_body) {
-        return AGENTOS_EIO;
+        ATM_RET_ERR(AGENTOS_EIO);
     }
 
     agentos_mutex_lock(data->lock);
@@ -372,19 +378,19 @@ agentos_error_t agentos_unit_api_create(const api_config_t *config,
                                         agentos_execution_unit_t **out_unit)
 {
     if (!config || !out_unit) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_CALLOC(1, sizeof(agentos_execution_unit_t));
     if (!unit) {
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     api_unit_data_t *data = (api_unit_data_t *)AGENTOS_CALLOC(1, sizeof(api_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     data->id = AGENTOS_STRDUP("api");
@@ -396,7 +402,7 @@ agentos_error_t agentos_unit_api_create(const api_config_t *config,
             AGENTOS_FREE(data->description);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     memcpy(&data->config, config, sizeof(api_config_t));
@@ -407,7 +413,7 @@ agentos_error_t agentos_unit_api_create(const api_config_t *config,
         AGENTOS_FREE(data->description);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     data->cache_capacity = 10;
     data->cached_count = 0;
@@ -419,7 +425,7 @@ agentos_error_t agentos_unit_api_create(const api_config_t *config,
         AGENTOS_FREE(data->cached_responses);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     unit->execution_unit_data = data;

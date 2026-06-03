@@ -1,7 +1,6 @@
 #include "parallel_dispatcher.h"
 
 #include "atomic_compat.h"
-#include "error.h"
 #include "ipc_service_bus.h"
 #include "memory_compat.h"
 #include "platform.h"
@@ -10,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "error.h"
 
 struct parallel_dispatcher_s {
     thread_pool_t *pool;
@@ -48,21 +48,30 @@ static uint64_t time_ms(void)
 
 static char *json_extract_field(const char *json, const char *key)
 {
-    if (!json || !key)
+    if (!json || !key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     char search[256];
     snprintf(search, sizeof(search), "\"%s\"", key);
     const char *pos = strstr(json, search);
-    if (!pos)
+    if (!pos) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     pos += strlen(search);
     while (*pos && (*pos == ' ' || *pos == ':' || *pos == '\t'))
         pos++;
     if (*pos == '"') {
         pos++;
         const char *end = strchr(pos, '"');
-        if (!end)
+        if (!end) {
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
             return NULL;
+        }
         size_t len = (size_t)(end - pos);
         char *val = (char *)AGENTOS_MALLOC(len + 1);
         if (val) {
@@ -71,6 +80,7 @@ static char *json_extract_field(const char *json, const char *key)
         }
         return val;
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -208,13 +218,19 @@ static void dispatch_worker(void *arg)
 parallel_dispatcher_t *parallel_dispatcher_create(thread_pool_t *pool,
                                                   const parallel_dispatch_config_t *config)
 {
-    if (!pool)
+    if (!pool) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     parallel_dispatcher_t *disp =
         (parallel_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(parallel_dispatcher_t));
-    if (!disp)
+    if (!disp) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     disp->pool = pool;
     disp->bus = NULL;
@@ -264,8 +280,11 @@ static dispatch_session_t *session_create(parallel_dispatcher_t *dispatcher,
 {
     dispatch_session_t *session =
         (dispatch_session_t *)AGENTOS_CALLOC(1, sizeof(dispatch_session_t));
-    if (!session)
+    if (!session) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     agentos_mutex_init(&session->lock);
     agentos_cond_init(&session->cond);
@@ -284,6 +303,7 @@ static dispatch_session_t *session_create(parallel_dispatcher_t *dispatcher,
         agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         AGENTOS_FREE(session);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

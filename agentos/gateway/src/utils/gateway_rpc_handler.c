@@ -30,22 +30,23 @@
  */
 static int validate_rpc_request(const cJSON *request)
 {
-    AGENTOS_CHECK(request != NULL, AGENTOS_EFAIL, "request is NULL");
-    AGENTOS_CHECK(cJSON_IsObject(request), AGENTOS_EFAIL, "request is not a JSON object");
+    AGENTOS_CHECK(request != NULL, AGENTOS_ERR_NULL_POINTER, "request is NULL");
+    AGENTOS_CHECK(cJSON_IsObject(request), AGENTOS_ERR_INVALID_PARAM,
+                  "request is not a JSON object");
 
     const cJSON *jsonrpc = cJSON_GetObjectItem(request, "jsonrpc");
-    AGENTOS_CHECK(jsonrpc != NULL, AGENTOS_EFAIL, "jsonrpc field missing");
-    AGENTOS_CHECK(cJSON_IsString(jsonrpc), AGENTOS_EFAIL, "jsonrpc is not a string");
-    AGENTOS_CHECK(strcmp(jsonrpc->valuestring, "2.0") == 0, AGENTOS_EFAIL,
+    AGENTOS_CHECK(jsonrpc != NULL, AGENTOS_ERR_NOT_FOUND, "jsonrpc field missing");
+    AGENTOS_CHECK(cJSON_IsString(jsonrpc), AGENTOS_ERR_INVALID_PARAM, "jsonrpc is not a string");
+    AGENTOS_CHECK(strcmp(jsonrpc->valuestring, "2.0") == 0, AGENTOS_ERR_NOT_SUPPORTED,
                   "jsonrpc version is not 2.0");
 
     const cJSON *method = cJSON_GetObjectItem(request, "method");
-    AGENTOS_CHECK(method != NULL, AGENTOS_EFAIL, "method field missing");
-    AGENTOS_CHECK(cJSON_IsString(method), AGENTOS_EFAIL, "method is not a string");
+    AGENTOS_CHECK(method != NULL, AGENTOS_ERR_NOT_FOUND, "method field missing");
+    AGENTOS_CHECK(cJSON_IsString(method), AGENTOS_ERR_INVALID_PARAM, "method is not a string");
 
     const cJSON *id = cJSON_GetObjectItem(request, "id");
     if (id && !cJSON_IsNumber(id) && !cJSON_IsString(id) && !cJSON_IsNull(id))
-        AGENTOS_ERROR(AGENTOS_EFAIL, "id type is invalid");
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "id type is invalid");
 
     return 0;
 }
@@ -56,18 +57,18 @@ static int validate_rpc_request(const cJSON *request)
 static int extract_request_fields(const cJSON *request, const char **method_out,
                                   const cJSON **params_out, const cJSON **id_out)
 {
-    AGENTOS_CHECK(request != NULL, AGENTOS_EFAIL, "request is NULL");
-    AGENTOS_CHECK(method_out != NULL, AGENTOS_EFAIL, "method_out is NULL");
-    AGENTOS_CHECK(params_out != NULL, AGENTOS_EFAIL, "params_out is NULL");
-    AGENTOS_CHECK(id_out != NULL, AGENTOS_EFAIL, "id_out is NULL");
+    AGENTOS_CHECK(request != NULL, AGENTOS_ERR_NULL_POINTER, "request is NULL");
+    AGENTOS_CHECK(method_out != NULL, AGENTOS_ERR_NULL_POINTER, "method_out is NULL");
+    AGENTOS_CHECK(params_out != NULL, AGENTOS_ERR_NULL_POINTER, "params_out is NULL");
+    AGENTOS_CHECK(id_out != NULL, AGENTOS_ERR_NULL_POINTER, "id_out is NULL");
 
     *method_out = NULL;
     *params_out = NULL;
     *id_out = NULL;
 
     const cJSON *method = cJSON_GetObjectItem(request, "method");
-    AGENTOS_CHECK(method != NULL, AGENTOS_EFAIL, "method field missing");
-    AGENTOS_CHECK(cJSON_IsString(method), AGENTOS_EFAIL, "method is not a string");
+    AGENTOS_CHECK(method != NULL, AGENTOS_ERR_NOT_FOUND, "method field missing");
+    AGENTOS_CHECK(cJSON_IsString(method), AGENTOS_ERR_INVALID_PARAM, "method is not a string");
     *method_out = method->valuestring;
 
     *params_out = cJSON_GetObjectItem(request, "params");

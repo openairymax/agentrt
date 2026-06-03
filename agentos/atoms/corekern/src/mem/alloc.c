@@ -28,6 +28,11 @@
 #include <string.h>
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
+#include "error.h"
+
+#define ALLOC_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
+         agentos_error_str(c)); return (c); } while(0)
 
 /* ==================== 全局状态 ==================== */
 
@@ -93,7 +98,7 @@ static int ensure_initialized(void)
             init_lock = agentos_mutex_create();
             if (!init_lock) {
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
-                return AGENTOS_EINVAL;
+                ALLOC_RET_ERR(AGENTOS_EINVAL);
             }
 
             mem_stats_mutex = agentos_mutex_create();
@@ -101,7 +106,7 @@ static int ensure_initialized(void)
                 agentos_mutex_free(init_lock);
                 init_lock = NULL;
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
-                return AGENTOS_EINVAL;
+                ALLOC_RET_ERR(AGENTOS_EINVAL);
             }
 
             /* 初始化完成，发布状态（使用 release 语义） */
@@ -136,7 +141,7 @@ agentos_error_t agentos_mem_init(size_t heap_size)
     atomic_store_explicit(&max_heap_size, heap_size, memory_order_release);
 
     if (ensure_initialized() != 0) {
-        return AGENTOS_ENOMEM;
+        ALLOC_RET_ERR(AGENTOS_ENOMEM);
     }
 
     return AGENTOS_SUCCESS;
@@ -239,6 +244,7 @@ void *agentos_mem_alloc_ex(size_t size, const char *file, int line)
 {
     void *ptr = AGENTOS_MALLOC(size);
     if (!ptr) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -291,6 +297,7 @@ void *agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char *fi
         ptr = NULL;
 #endif
     if (!ptr) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -387,6 +394,7 @@ void *agentos_mem_realloc_ex(void *ptr, size_t new_size, const char *file, int l
         return agentos_mem_alloc_ex(new_size, file, line);
     if (new_size == 0) {
         agentos_mem_free(ptr);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

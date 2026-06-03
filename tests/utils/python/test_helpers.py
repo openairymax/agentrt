@@ -10,7 +10,7 @@ AgentOS 测试实用工具函数库
 - 环境验证
 - 报告生成
 
-Version: 2.0.0
+Version: 0.1.0
 Last updated: 2026-04-23
 """
 
