@@ -12,7 +12,7 @@ services:
       context: ../../
       dockerfile: scripts/deployment/docker/Dockerfile.kernel
       target: production
-    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-atoms:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-atoms:${VERSION:-0.1.0}
     container_name: agentos-atoms
     hostname: agentos-atoms-prod
     restart: always
@@ -99,7 +99,7 @@ services:
       # FIXME: Dockerfile.gateway does not exist, using service image fallback
       dockerfile: scripts/deployment/docker/Dockerfile.service
       target: production
-    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-gateway:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-gateway:${VERSION:-0.1.0}
     container_name: agentos-gateway
     hostname: agentos-gateway-prod
     restart: always
@@ -163,7 +163,7 @@ services:
       context: ../../
       dockerfile: scripts/deployment/docker/Dockerfile.service
       target: production
-    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-daemon:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-daemon:${VERSION:-0.1.0}
     container_name: agentos-daemon
     hostname: agentos-daemon-prod
     restart: always
@@ -226,7 +226,7 @@ services:
       # FIXME: Dockerfile.openlab does not exist, using service image fallback
       dockerfile: scripts/deployment/docker/Dockerfile.service
       target: production
-    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-openlab:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-openlab:${VERSION:-0.1.0}
     container_name: agentos-openlab
     hostname: agentos-openlab-prod
     restart: always
@@ -580,7 +580,7 @@ services:
 
   # ==================== Nginx (Reverse Proxy) ====================
   nginx-prod:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: agentos-nginx-prod
     hostname: agentos-nginx-prod
     restart: always

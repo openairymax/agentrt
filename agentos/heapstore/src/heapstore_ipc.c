@@ -61,7 +61,8 @@ static heapstore_error_t persist_channel_to_file(const heapstore_ipc_channel_t *
     FILE *fp = fopen(path, "w");
     if (!fp)
         return heapstore_ERR_FILE_OPEN_FAILED;
-    fprintf(fp,
+    char _buf[1024];
+    snprintf(_buf, sizeof(_buf),
             "{\"channel_id\":\"%s\",\"name\":\"%s\",\"type\":\"%s\","
             "\"status\":\"%s\",\"created_at\":%llu,"
             "\"last_activity_at\":%llu,\"buffer_size\":%zu,"
@@ -69,6 +70,7 @@ static heapstore_error_t persist_channel_to_file(const heapstore_ipc_channel_t *
             channel->channel_id, channel->name, channel->type, channel->status,
             (unsigned long long)channel->created_at, (unsigned long long)channel->last_activity_at,
             channel->buffer_size, channel->current_usage);
+    fputs(_buf, fp);
     fclose(fp);
     return heapstore_SUCCESS;
 }
@@ -82,12 +84,14 @@ static heapstore_error_t persist_buffer_to_file(const heapstore_ipc_buffer_t *bu
     FILE *fp = fopen(path, "w");
     if (!fp)
         return heapstore_ERR_FILE_OPEN_FAILED;
-    fprintf(fp,
+    char _buf[1024];
+    snprintf(_buf, sizeof(_buf),
             "{\"buffer_id\":\"%s\",\"channel_id\":\"%s\","
             "\"size\":%zu,\"used\":%zu,"
             "\"created_at\":%llu,\"status\":\"%s\"}\n",
             buffer->buffer_id, buffer->channel_id, buffer->size, buffer->used,
             (unsigned long long)buffer->created_at, buffer->status);
+    fputs(_buf, fp);
     fclose(fp);
     return heapstore_SUCCESS;
 }

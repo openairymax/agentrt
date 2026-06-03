@@ -1,11 +1,11 @@
 #include "gateway_a2a_handler.h"
 
-#include "error.h"
 #include "memory_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 #define GW_A2A_MAX_TASK_TYPES 64
 
@@ -31,8 +31,11 @@ static int handle_a2a_request(const char *method, const char *path, const char *
 gw_a2a_handler_t *gw_a2a_handler_create(const gw_a2a_handler_config_t *config)
 {
     gw_a2a_handler_t *handler = (gw_a2a_handler_t *)AGENTOS_CALLOC(1, sizeof(gw_a2a_handler_t));
-    if (!handler)
+    if (!handler) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
     if (config) {
         handler->config = *config;
     } else {
@@ -135,35 +138,54 @@ static gw_a2a_task_type_entry_t *find_task_type(gw_a2a_handler_t *handler, const
             return &handler->task_types[i];
         }
     }
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 
 static char *extract_a2a_field(const char *json, const char *field_name)
 {
-    if (!json || !field_name)
+    if (!json || !field_name) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t flen = strlen(field_name) + 4;
     char *key = (char *)AGENTOS_MALLOC(flen);
-    if (!key)
+    if (!key) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     snprintf(key, flen, "\"%s\"", field_name);
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
-    if (!p)
+    if (!p) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p += strlen(field_name) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
-    if (*p != '"')
+    if (*p != '"') {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     p++;
     const char *end = strchr(p, '"');
-    if (!end)
+    if (!end) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     size_t len = (size_t)(end - p);
     char *val = (char *)AGENTOS_MALLOC(len + 1);
-    if (!val)
+    if (!val) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     memcpy(val, p, len);
     val[len] = '\0';
     return val;
@@ -250,8 +272,11 @@ static int handle_a2a_request(const char *method, const char *path, const char *
 
 gw_proto_request_handler_t gw_a2a_handler_get_handler(gw_a2a_handler_t *handler)
 {
-    if (!handler)
+    if (!handler) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
     return handle_a2a_request;
 }
 

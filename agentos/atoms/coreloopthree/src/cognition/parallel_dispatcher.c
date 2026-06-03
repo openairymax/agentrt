@@ -8,6 +8,12 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct tool_exec_context {
     agentos_tool_execute_fn executor;
@@ -52,8 +58,10 @@ static int any_interactive(const agentos_tool_call_t *calls, size_t count)
 static void *tool_exec_thread(void *arg)
 {
     tool_exec_context_t *ctx = (tool_exec_context_t *)arg;
-    if (!ctx || !ctx->executor || !ctx->call || !ctx->result)
+    if (!ctx || !ctx->executor || !ctx->call || !ctx->result) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     uint64_t start_ns = agentos_time_ns();
 
@@ -94,8 +102,7 @@ agentos_parallel_dispatcher_t *agentos_parallel_dispatcher_create(int max_parall
 {
     agentos_parallel_dispatcher_t *d =
         (agentos_parallel_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(agentos_parallel_dispatcher_t));
-    if (!d)
-        return NULL;
+    if (!d) return NULL;
     d->max_parallel = max_parallel > 0 ? max_parallel : 4;
     d->executor = NULL;
     d->executor_user_data = NULL;
@@ -117,7 +124,7 @@ agentos_error_t agentos_parallel_dispatcher_set_executor(agentos_parallel_dispat
                                                          void *user_data)
 {
     if (!dispatcher || !executor)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     agentos_mutex_lock(&dispatcher->mutex);
     dispatcher->executor = executor;
     dispatcher->executor_user_data = user_data;
@@ -132,13 +139,13 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
                                                      size_t *out_result_count)
 {
     if (!dispatcher || !calls || call_count == 0 || !out_results || !out_result_count) {
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     agentos_mutex_lock(&dispatcher->mutex);
     if (!dispatcher->executor) {
         agentos_mutex_unlock(&dispatcher->mutex);
-        return AGENTOS_ENOTINIT;
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
     }
     dispatcher->cancelled = 0;
     agentos_mutex_unlock(&dispatcher->mutex);
@@ -146,7 +153,7 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
     agentos_tool_result_t *results =
         (agentos_tool_result_t *)AGENTOS_CALLOC(call_count, sizeof(agentos_tool_result_t));
     if (!results)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     for (size_t i = 0; i < call_count; i++) {
         results[i].tool_name = calls[i].tool_name ? AGENTOS_STRDUP(calls[i].tool_name) : NULL;
@@ -179,7 +186,7 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
             AGENTOS_FREE(results[i].tool_name);
         }
         AGENTOS_FREE(results);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     for (size_t i = 0; i < call_count; i++) {
@@ -323,7 +330,7 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
 agentos_error_t agentos_parallel_dispatcher_cancel(agentos_parallel_dispatcher_t *dispatcher)
 {
     if (!dispatcher)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     agentos_mutex_lock(&dispatcher->mutex);
     dispatcher->cancelled = 1;
     dispatcher->executor = NULL;

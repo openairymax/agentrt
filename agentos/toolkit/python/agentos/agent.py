@@ -1,5 +1,5 @@
 # AgentOS Python SDK Client
-# Version: 2.0.0
+# Version: 0.1.0
 # Last updated: 2026-03-23
 
 """
@@ -9,6 +9,7 @@ This module provides the main client classes for interacting with the AgentOS sy
 """
 
 import json
+import os
 import time
 import logging
 import asyncio
@@ -33,7 +34,9 @@ class AgentOS:
     This class provides a synchronous interface to interact with the AgentOS system.
     """
     
-    def __init__(self, endpoint: str = "http://localhost:18789", timeout: int = 30, api_key: Optional[str] = None):
+    def __init__(self, endpoint: str = None, timeout: int = 30, api_key: Optional[str] = None):
+        if endpoint is None:
+            endpoint = os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789")
         """
         Initialize the AgentOS client.
         
@@ -219,7 +222,7 @@ class AsyncAgentOS:
     This class provides an asynchronous interface to interact with the AgentOS system.
     """
     
-    def __init__(self, endpoint: str = "http://localhost:18789", timeout: int = 30, api_key: Optional[str] = None):
+    def __init__(self, endpoint: str = None, timeout: int = 30, api_key: Optional[str] = None):
         """
         Initialize the AsyncAgentOS client.
         
@@ -228,6 +231,8 @@ class AsyncAgentOS:
             timeout: The request timeout in seconds.
             api_key: Optional API key for authentication.
         """
+        if endpoint is None:
+            endpoint = os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789")
         self.endpoint = endpoint.rstrip('/')
         self.timeout = timeout
         self.api_key = api_key

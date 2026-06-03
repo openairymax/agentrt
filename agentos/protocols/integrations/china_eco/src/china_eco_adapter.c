@@ -15,15 +15,6 @@
 
 #include "error.h"
 
-#ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER (-3)
-#endif
-#ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM (-2)
-#endif
-#ifndef AGENTOS_ERR_OUT_OF_MEMORY
-#define AGENTOS_ERR_OUT_OF_MEMORY (-4)
-#endif
 #include "memory_compat.h"
 #include "types.h"
 

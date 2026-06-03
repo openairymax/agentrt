@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file validator.c
  * @brief 工具参数验证器实现（基于 cJSON Schema 验证）

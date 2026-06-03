@@ -1,5 +1,5 @@
 // AgentOS Rust SDK - 集成测试
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 测试 SDK 的公共 API 和模块集成
@@ -258,7 +258,7 @@ fn test_http_status_mapping() {
 
 #[test]
 fn test_version_info() {
-    assert_eq!(VERSION, "3.0.0");
+    assert_eq!(VERSION, "0.1.0");
     assert_eq!(AUTHOR, "SpharxWorks");
     assert_eq!(LICENSE, "MIT");
 }

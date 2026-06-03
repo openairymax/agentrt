@@ -18,13 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER (-3)
-#endif
-#ifndef AGENTOS_SUCCESS
-#define AGENTOS_SUCCESS 0
-#endif
-
 /* ============================================================================
  * Transform Context
  * ============================================================================ */
@@ -82,7 +75,7 @@ int transformer_jsonrpc_to_mcp_request(const unified_message_t *source, unified_
                     const char *end = strchr(start, '"');
                     if (end) {
                         size_t len = end - start;
-                        name = strndup(start, len);
+                        name = AGENTOS_STRNDUP(start, len);
                     }
                 }
             }

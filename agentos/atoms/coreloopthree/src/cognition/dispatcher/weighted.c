@@ -17,6 +17,12 @@
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /**
  * @brief 加权调度策略内部数据结构
@@ -96,7 +102,7 @@ static agentos_error_t weighted_select(const agentos_task_node_t *task, const vo
 {
     weighted_data_t *data = (weighted_data_t *)context;
     if (!data || !task || !out_agent_id)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     agent_info_t **agents = NULL;
     size_t agent_count = 0;
@@ -111,7 +117,7 @@ static agentos_error_t weighted_select(const agentos_task_node_t *task, const vo
         if (err != AGENTOS_SUCCESS)
             return err;
         if (agent_count == 0)
-            return AGENTOS_ENOENT;
+            ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
     float best_score = -FLT_MAX;
@@ -133,7 +139,7 @@ static agentos_error_t weighted_select(const agentos_task_node_t *task, const vo
         return *out_agent_id ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
 
-    return AGENTOS_ENOENT;
+    ATM_RET_ERR(AGENTOS_ENOENT);
 }
 
 /**
@@ -152,12 +158,12 @@ agentos_dispatching_weighted_create(const weighted_config_t *config, void *regis
                                     agent_registry_get_agents_func get_agents_func)
 {
     if (!registry_ctx || !get_agents_func) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     weighted_data_t *data = (weighted_data_t *)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
-    if (!data)
-        return NULL;
+    if (!data) return NULL;
 
     if (config) {
         data->config = *config;
@@ -172,6 +178,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *config, void *regis
     data->lock = agentos_mutex_create();
     if (!data->lock) {
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -181,6 +188,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *config, void *regis
         if (data->lock)
             agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

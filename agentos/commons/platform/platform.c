@@ -261,7 +261,7 @@ int agentos_cond_timedwait(agentos_cond_t *cond, agentos_mutex_t *mutex, uint32_
     if (!result) {
         DWORD err = GetLastError();
         if (err == ERROR_TIMEOUT) {
-            return -2;
+            return AGENTOS_ERR_TIMEOUT;
         }
         return AGENTOS_EINVAL;
     }
@@ -325,7 +325,7 @@ int agentos_cond_timedwait(agentos_cond_t *cond, agentos_mutex_t *mutex, uint32_
     }
     int ret = pthread_cond_timedwait(cond, mutex, &ts);
     if (ret == ETIMEDOUT) {
-        return -2;
+        return AGENTOS_ERR_TIMEOUT;
     }
     return ret;
 }
@@ -476,7 +476,7 @@ int agentos_process_wait(agentos_process_info_t *proc, uint32_t timeout_ms, int 
 
     DWORD result = WaitForSingleObject(g_process_handle, timeout_ms == 0 ? INFINITE : timeout_ms);
     if (result == WAIT_TIMEOUT) {
-        return -2;
+        return AGENTOS_ERR_TIMEOUT;
     }
     if (result != WAIT_OBJECT_0) {
         return AGENTOS_EINVAL;
@@ -578,7 +578,7 @@ int agentos_process_wait(agentos_process_info_t *proc, uint32_t timeout_ms, int 
         sigprocmask(SIG_SETMASK, &old_mask, NULL);
 
         if (result == 0) {
-            return -2;
+            return AGENTOS_ERR_TIMEOUT;
         }
     }
 

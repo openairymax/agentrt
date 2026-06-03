@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -300,6 +301,7 @@ agentos_error_t gateway_service_adapter_create(agentos_service_t *out_service,
 gateway_service_t gateway_service_adapter_get_original(agentos_service_t service)
 {
     if (!service) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

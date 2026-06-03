@@ -75,8 +75,10 @@ static observe_metric_t *observe_d_find_or_create_metric(observe_d_service_t *sv
         }
     }
 
-    if (svc->metric_count >= OBSERVE_D_MAX_METRICS)
+    if (svc->metric_count >= OBSERVE_D_MAX_METRICS) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
+        }
 
     observe_metric_t *m = &svc->metrics[svc->metric_count];
     m->name = AGENTOS_STRDUP(name);
@@ -246,6 +248,7 @@ static void *observe_d_http_loop(void *arg)
 #ifdef _WIN32
         return 1;
 #else
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
 #endif
     }
@@ -260,6 +263,7 @@ static void *observe_d_http_loop(void *arg)
 #ifdef _WIN32
     return 0;
 #else
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 #endif
 }

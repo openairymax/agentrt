@@ -5,12 +5,12 @@
  */
 
 #include "agentos_types.h"
-#include "error.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 static void test_error_strerror(void)
 {

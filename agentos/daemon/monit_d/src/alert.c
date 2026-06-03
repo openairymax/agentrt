@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
@@ -15,7 +16,6 @@
  * 5. 线程安全
  */
 
-#include "error.h"
 #include "monitor_service.h"
 #include "platform.h"
 #include "svc_logger.h"

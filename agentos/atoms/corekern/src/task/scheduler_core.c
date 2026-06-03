@@ -16,6 +16,12 @@
 #include "string_compat.h"
 
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /* ==================== 静态全局状态 ==================== */
 
@@ -32,13 +38,13 @@ static scheduler_core_ctx_t *create_core_ctx(void)
 {
     scheduler_core_ctx_t *ctx =
         (scheduler_core_ctx_t *)AGENTOS_CALLOC(1, sizeof(scheduler_core_ctx_t));
-    if (!ctx)
-        return NULL;
+    if (!ctx) return NULL;
 
     /* 创建任务表互斥锁 */
     ctx->task_table_lock = agentos_mutex_create();
     if (!ctx->task_table_lock) {
         AGENTOS_FREE(ctx);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -101,7 +107,7 @@ int scheduler_core_init(void)
     if (!g_ctx_init_lock) {
         void *new_lock = agentos_mutex_create();
         if (!new_lock)
-            return AGENTOS_EINVAL;
+            ATM_RET_ERR(AGENTOS_EINVAL);
 
         void *expected = NULL;
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&g_ctx_init_lock, &expected,
@@ -121,7 +127,7 @@ int scheduler_core_init(void)
     g_core_ctx = create_core_ctx();
     if (!g_core_ctx) {
         agentos_mutex_unlock(g_ctx_init_lock);
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     atomic_store_explicit(&g_core_ctx->initialized, 1, memory_order_release);
@@ -178,8 +184,7 @@ void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t *info)
 
 task_info_core_t *scheduler_core_hash_find(agentos_task_id_t id)
 {
-    if (!g_core_ctx)
-        return NULL;
+    if (!g_core_ctx) return NULL;
 
     size_t bucket = task_hash_core(id);
     task_hash_node_t *node = g_core_ctx->id_hash_table[bucket];
@@ -191,6 +196,7 @@ task_info_core_t *scheduler_core_hash_find(agentos_task_id_t id)
         node = node->next;
     }
 
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
@@ -223,8 +229,7 @@ task_info_core_t *scheduler_core_task_info_create(agentos_task_id_t id, void *(*
 {
 
     task_info_core_t *info = (task_info_core_t *)AGENTOS_CALLOC(1, sizeof(task_info_core_t));
-    if (!info)
-        return NULL;
+    if (!info) return NULL;
 
     info->id = id;
     info->entry = entry;
@@ -259,10 +264,10 @@ void scheduler_core_task_info_destroy(task_info_core_t *info)
 int scheduler_core_task_table_add(task_info_core_t *info)
 {
     if (!g_core_ctx || !info)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     if (g_core_ctx->task_count >= TASK_TABLE_CAPACITY) {
-        return AGENTOS_EINVAL; /* 表已?*/
+        ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     g_core_ctx->task_table[g_core_ctx->task_count++] = info;
@@ -271,8 +276,7 @@ int scheduler_core_task_table_add(task_info_core_t *info)
 
 task_info_core_t *scheduler_core_task_table_remove(agentos_task_id_t id)
 {
-    if (!g_core_ctx)
-        return NULL;
+    if (!g_core_ctx) return NULL;
 
     for (uint32_t i = 0; i < g_core_ctx->task_count; i++) {
         if (g_core_ctx->task_table[i] && g_core_ctx->task_table[i]->id == id) {
@@ -292,8 +296,7 @@ task_info_core_t *scheduler_core_task_table_remove(agentos_task_id_t id)
 
 task_info_core_t *scheduler_core_find_by_platform_handle(void *platform_handle)
 {
-    if (!g_core_ctx || !platform_handle)
-        return NULL;
+    if (!g_core_ctx || !platform_handle) return NULL;
 
     for (uint32_t i = 0; i < g_core_ctx->task_count; i++) {
         if (g_core_ctx->task_table[i] &&
@@ -302,5 +305,6 @@ task_info_core_t *scheduler_core_find_by_platform_handle(void *platform_handle)
         }
     }
 
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }

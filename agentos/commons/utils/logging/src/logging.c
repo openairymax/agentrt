@@ -517,8 +517,7 @@ void log_write_va(log_level_t level, const char *module, int line, const char *f
 
 const char *log_set_trace_id(const char *trace_id)
 {
-    if (!g_logging_state.initialized)
-        return NULL;
+    if (!g_logging_state.initialized) return NULL;
 
     if (trace_id) {
         strncpy(g_tls_trace_id, trace_id, sizeof(g_tls_trace_id) - 1);
@@ -532,15 +531,13 @@ const char *log_set_trace_id(const char *trace_id)
 
 const char *log_get_trace_id(void)
 {
-    if (!g_logging_state.initialized)
-        return NULL;
+    if (!g_logging_state.initialized) return NULL;
     return g_tls_trace_id[0] ? g_tls_trace_id : NULL;
 }
 
 const char *log_set_span_id(const char *span_id)
 {
-    if (!g_logging_state.initialized)
-        return NULL;
+    if (!g_logging_state.initialized) return NULL;
 
     if (span_id) {
         strncpy(g_tls_span_id, span_id, sizeof(g_tls_span_id) - 1);
@@ -554,8 +551,7 @@ const char *log_set_span_id(const char *span_id)
 
 const char *log_get_span_id(void)
 {
-    if (!g_logging_state.initialized)
-        return NULL;
+    if (!g_logging_state.initialized) return NULL;
     return g_tls_span_id[0] ? g_tls_span_id : NULL;
 }
 

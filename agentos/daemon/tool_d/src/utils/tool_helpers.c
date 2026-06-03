@@ -7,12 +7,12 @@
 #include "tool_helpers.h"
 
 #include "daemon_errors.h"
-#include "error.h"
 
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 bool tool_is_valid_id(const char *id)
 {

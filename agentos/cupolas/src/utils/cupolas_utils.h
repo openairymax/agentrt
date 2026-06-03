@@ -52,6 +52,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../../commons/utils/error/include/error.h"
 #include "../../../commons/utils/memory/include/memory_compat.h"
 
 #ifdef __cplusplus
@@ -185,14 +186,14 @@ extern "C" {
  * All macros perform early return on failure condition.
  *
  * @note Return value conventions:
- *   - Default: returns -1 on error
+ *   - Default: returns AGENTOS_EINVAL on error
  *   - _RET variants: allow custom return value
  */
 
 /**
- * @brief Check for NULL pointer, return -1 if true
+ * @brief Check for NULL pointer, return AGENTOS_EINVAL if true
  * @param ptr Pointer to check
- * @return -1 if ptr is NULL, otherwise continues execution
+ * @return AGENTOS_EINVAL if ptr is NULL, otherwise continues execution
  *
  * @code
  * int process(config_t* cfg) {
@@ -204,7 +205,7 @@ extern "C" {
 #define CUPOLAS_CHECK_NULL(ptr) \
     do {                        \
         if ((ptr) == NULL)      \
-            return -1;          \
+            return AGENTOS_EINVAL;          \
     } while (0)
 
 /**
@@ -220,9 +221,9 @@ extern "C" {
     } while (0)
 
 /**
- * @brief Check expression result, return -1 if nonzero (error)
+ * @brief Check expression result, return AGENTOS_EINVAL if nonzero (error)
  * @param expr Expression to evaluate (should return 0 on success)
- * @return -1 if expr != 0
+ * @return AGENTOS_EINVAL if expr != 0
  *
  * @code
  * CUPOLAS_CHECK_RESULT(initialize());
@@ -231,7 +232,7 @@ extern "C" {
 #define CUPOLAS_CHECK_RESULT(expr) \
     do {                           \
         if ((expr) != 0)           \
-            return -1;             \
+            return AGENTOS_EINVAL;             \
     } while (0)
 
 /**
@@ -246,14 +247,14 @@ extern "C" {
     } while (0)
 
 /**
- * @brief Check condition is true, return -1 if false
+ * @brief Check condition is true, return AGENTOS_EINVAL if false
  * @param cond Boolean condition to test
- * @return -1 if condition is false
+ * @return AGENTOS_EINVAL if condition is false
  */
 #define CUPOLAS_CHECK_TRUE(cond) \
     do {                         \
         if (!(cond))             \
-            return -1;           \
+            return AGENTOS_EINVAL;           \
     } while (0)
 
 /**
@@ -330,14 +331,22 @@ extern "C" {
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG(fmt, ...) fprintf(stderr, "[CUPOLAS] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
 
 /**
  * @brief Log error message
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG_ERROR(fmt, ...) fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_ERROR(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
 
 /**
  * @brief Log debug message (stripped in release builds)
@@ -345,7 +354,11 @@ extern "C" {
  * @param ... Format arguments
  * @note Only emitted when debugging is enabled
  */
-#define CUPOLAS_LOG_DEBUG(fmt, ...) fprintf(stderr, "[CUPOLAS DEBUG] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_DEBUG(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS DEBUG] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
 
 #else
 
@@ -353,7 +366,11 @@ extern "C" {
 #define CUPOLAS_LOG(fmt, ...) ((void)0)
 
 /** @brief Error logging always enabled even in release builds */
-#define CUPOLAS_LOG_ERROR(fmt, ...) fprintf(stderr, "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__)
+#define CUPOLAS_LOG_ERROR(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
 
 /** @brief Disabled debug logging noop */
 #define CUPOLAS_LOG_DEBUG(fmt, ...) ((void)0)

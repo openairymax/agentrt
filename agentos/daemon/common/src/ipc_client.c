@@ -1,4 +1,5 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file ipc_client.c
  * @brief IPC 客户端实现（线程安全版本）
@@ -11,7 +12,6 @@
  * 4. 添加超时和重试机制
  */
 
-#include "error.h"
 #include "platform.h"
 #include "svc_common.h"
 #include "svc_config.h"

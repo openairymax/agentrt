@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Shell 脚本测试框架
-# 基于 bats-core 的单元测试库
+# AgentOS Shell Script Testing Framework
+# Based on bats-core unit test library
 
 ###############################################################################
-# 测试框架初始�?
+# Test Framework Initialization
 ###############################################################################
 
 AGENTOS_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_TEST_DIR")"
 
-# 加载依赖
+# Load dependencies
 # shellcheck source=../library/common.sh
 source "$AGENTOS_SCRIPTS_DIR/library/common.sh"
 
 ###############################################################################
-# 测试配置
+# Test Configuration
 ###############################################################################
 
 AGENTOS_TEST_VERBOSE="${AGENTOS_TEST_VERBOSE:-0}"
@@ -23,7 +23,7 @@ AGENTOS_TEST_COVERAGE="${AGENTOS_TEST_COVERAGE:-0}"
 AGENTOS_TEST_TIMEOUT="${AGENTOS_TEST_TIMEOUT:-60}"
 
 ###############################################################################
-# 测试统计
+# Test Statistics
 ###############################################################################
 
 TESTS_RUN=0
@@ -33,10 +33,10 @@ TESTS_SKIPPED=0
 TEST_FAILURES=()
 
 ###############################################################################
-# 测试工具函数
+# Test Utility Functions
 ###############################################################################
 
-# 打印测试开�?
+# Print test start
 test_start() {
     local test_name="$1"
     ((TESTS_RUN++))
@@ -45,7 +45,7 @@ test_start() {
     fi
 }
 
-# 打印测试通过
+# Print test passed
 test_pass() {
     local test_name="$1"
     ((TESTS_PASSED++))
@@ -54,7 +54,7 @@ test_pass() {
     fi
 }
 
-# 打印测试失败
+# Print test failed
 test_fail() {
     local test_name="$1"
     local message="${2:-}"
@@ -66,7 +66,7 @@ test_fail() {
     fi
 }
 
-# 打印测试跳过
+# Print test skipped
 test_skip() {
     local test_name="$1"
     local reason="${2:-}"
@@ -78,13 +78,13 @@ test_skip() {
 }
 
 ###############################################################################
-# 断言函数
+# Assertion Functions
 ###############################################################################
 
-# 断言为真
+# Assert true
 assert_true() {
     local condition="$1"
-    local message="${2:-Assertion failed: expected true"}
+    local message="${2:-Assertion failed: expected true}"
 
     if eval "$condition"; then
         return 0
@@ -94,7 +94,7 @@ assert_true() {
     fi
 }
 
-# 断言为假
+# Assert false
 assert_false() {
     local condition="$1"
     local message="${2:-Assertion failed: expected false}"
@@ -107,7 +107,7 @@ assert_false() {
     fi
 }
 
-# 断言相等
+# Assert equal
 assert_equal() {
     local expected="$1"
     local actual="$2"
@@ -125,7 +125,7 @@ assert_equal() {
     fi
 }
 
-# 断言字符串包�?
+# Assert string contains
 assert_contains() {
     local haystack="$1"
     local needle="$2"
@@ -141,7 +141,7 @@ assert_contains() {
     fi
 }
 
-# 断言文件存在
+# Assert file exists
 assert_file_exists() {
     local file="$1"
     if [[ -f "$file" ]]; then
@@ -152,7 +152,7 @@ assert_file_exists() {
     fi
 }
 
-# 断言目录存在
+# Assert directory exists
 assert_dir_exists() {
     local dir="$1"
     if [[ -d "$dir" ]]; then
@@ -163,7 +163,7 @@ assert_dir_exists() {
     fi
 }
 
-# 断言命令存在
+# Assert command exists
 assert_command_exists() {
     local cmd="$1"
     if command -v "$cmd" &> /dev/null; then
@@ -174,7 +174,7 @@ assert_command_exists() {
     fi
 }
 
-# 断言非空
+# Assert not empty
 assert_not_empty() {
     local value="$1"
     local message="${2:-Value should not be empty}"
@@ -186,7 +186,7 @@ assert_not_empty() {
     fi
 }
 
-# 断言匹配正则
+# Assert pattern match
 assert_match() {
     local pattern="$1"
     local value="$2"
@@ -203,7 +203,7 @@ assert_match() {
 }
 
 ###############################################################################
-# 测试运行�?
+# Test Runner
 ###############################################################################
 
 run_test() {
@@ -222,7 +222,7 @@ run_test() {
 }
 
 ###############################################################################
-# 测试报告
+# Test Report
 ###############################################################################
 
 print_test_report() {
@@ -242,7 +242,7 @@ print_test_report() {
         echo "  Failed Tests"
         echo "=========================================="
         for failure in "${TEST_FAILURES[@]}"; do
-            echo -e "  ${COLOR_RED}�?$failure${COLOR_NC}"
+            echo -e "  ${COLOR_RED}* $failure${COLOR_NC}"
         done
         echo ""
         return 1
@@ -254,7 +254,7 @@ print_test_report() {
 }
 
 ###############################################################################
-# 导出函数
+# Export Functions
 ###############################################################################
 export -f test_start test_pass test_fail test_skip
 export -f assert_true assert_false assert_equal assert_contains

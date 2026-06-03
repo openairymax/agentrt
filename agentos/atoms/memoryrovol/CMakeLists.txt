@@ -72,8 +72,7 @@ target_include_directories(agentos_memoryrovol PRIVATE
 # Force-include AgentOS compat headers for MemoryRovol sources
 # that lack explicit #include of these headers
 target_compile_options(agentos_memoryrovol PRIVATE
-    -include
-    agentos_mr_force_includes.h
+    "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/agentos_mr_force_includes.h"
 )
 
 # Create interface library that links MemoryRovol into AgentOS atoms

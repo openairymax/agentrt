@@ -13,6 +13,7 @@
 #undef AGENTOS_USE_SCHEDULER_THREAD_IMPL
 #include "memory_compat.h"
 #include "platform.h"
+#include "error.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -110,12 +111,14 @@ static taskflow_error_t taskflow_engine_stop_core(taskflow_handle_t engine);
 taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config)
 {
     if (!config) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     // 验证配置
     taskflow_error_t valid = taskflow_engine_validate_config(config);
     if (valid != TASKFLOW_SUCCESS) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -123,6 +126,7 @@ taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config)
     struct taskflow_engine_s *engine =
         (struct taskflow_engine_s *)AGENTOS_CALLOC(1, sizeof(struct taskflow_engine_s));
     if (!engine) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -136,6 +140,7 @@ taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config)
     engine->graph_engine = graph_engine_create(config);
     if (!engine->graph_engine) {
         AGENTOS_FREE(engine);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -271,8 +276,10 @@ taskflow_error_t taskflow_engine_init(taskflow_handle_t engine)
 static void *engine_worker_thread(void *arg)
 {
     struct taskflow_engine_s *e = (struct taskflow_engine_s *)arg;
-    if (!e)
+    if (!e) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     while (e->worker_active) {
         agentos_mutex_lock(&e->engine_mutex);
@@ -425,6 +432,7 @@ taskflow_error_t taskflow_engine_resume_core(taskflow_handle_t engine)
 taskflow_graph_handle_t taskflow_graph_create(taskflow_handle_t engine)
 {
     if (!engine) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -433,6 +441,7 @@ taskflow_graph_handle_t taskflow_graph_create(taskflow_handle_t engine)
     struct taskflow_graph_s *graph =
         (struct taskflow_graph_s *)AGENTOS_CALLOC(1, sizeof(struct taskflow_graph_s));
     if (!graph) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
@@ -603,8 +612,10 @@ taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine, taskflow_graph_
 static void *async_execute_worker(void *arg)
 {
     struct taskflow_engine_s *e = (struct taskflow_engine_s *)arg;
-    if (!e)
+    if (!e) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
 
     // 执行同步计算
     e->async_result = taskflow_execute_sync(e, e->async_graph, e->async_max_supersteps);
@@ -620,6 +631,7 @@ static void *async_execute_worker(void *arg)
         e->async_callback(e->async_result, e->async_user_data);
     }
 
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 

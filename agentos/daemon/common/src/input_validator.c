@@ -1,11 +1,11 @@
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file input_validator.c
  * @brief 输入验证框架实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "error.h"
 #include "input_validator.h"
 #include "svc_logger.h"
 
@@ -17,8 +17,11 @@
 validation_result_t *validator_create(void)
 {
     validation_result_t *v = (validation_result_t *)AGENTOS_CALLOC(1, sizeof(validation_result_t));
-    if (!v)
+    if (!v) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     v->valid = 1;
     v->rule_count = 0;
     return v;
@@ -93,7 +96,8 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
                     snprintf(err, sizeof(err), "SQL injection pattern: %s", sql_patterns[i]);
                     *out_violation = AGENTOS_STRDUP(err);
                 }
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: contains null byte");
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
+                                     "input_validator: contains null byte");
                 return AGENTOS_ERR_INVALID_PARAM;
             }
         }
@@ -104,7 +108,8 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
             strstr(input, "onload=")) {
             if (out_violation)
                 *out_violation = AGENTOS_STRDUP("XSS pattern detected");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: contains control chars");
+            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
+                                 "input_validator: contains control chars");
             return AGENTOS_ERR_INVALID_PARAM;
         }
     }
@@ -115,7 +120,8 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
             if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') {
                 if (out_violation)
                     *out_violation = AGENTOS_STRDUP("Control character detected");
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: SQL injection pattern");
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
+                                     "input_validator: SQL injection pattern");
                 return AGENTOS_ERR_INVALID_PARAM;
             }
         }
@@ -241,8 +247,11 @@ static int apply_single_rule(const validation_rule_t *rule, const cJSON *data, c
 
 validation_result_t *validator_validate(validation_result_t *v, const cJSON *data)
 {
-    if (!v)
+    if (!v) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
     if (!data) {
         v->valid = 0;
         v->error_message = AGENTOS_STRDUP("No data provided for validation");

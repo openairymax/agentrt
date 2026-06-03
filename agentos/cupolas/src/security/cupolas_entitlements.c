@@ -38,9 +38,6 @@
 #ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL (-1)
 #endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
 
 #define cupolas_MAX_PATH_LEN 4096
 #define cupolas_MAX_HOST_LEN 256

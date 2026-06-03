@@ -1,5 +1,5 @@
-#include "error.h"
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file api_recovery.c
  * @brief API错误恢复系统实现 — 多凭证池 + 降级策略 + 熔断集成
@@ -86,8 +86,11 @@ static api_rec_error_code_t classify_http_error(long http_code)
 api_rec_pool_t *api_rec_pool_create(const char *name)
 {
     api_rec_pool_t *pool = AGENTOS_CALLOC(1, sizeof(api_rec_pool_t));
-    if (!pool)
+    if (!pool) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     if (name) {
         strncpy(pool->name, name, sizeof(pool->name) - 1);
@@ -171,8 +174,11 @@ int api_rec_remove_credential(api_rec_pool_t *pool, size_t index)
 
 const char *api_rec_next_credential(api_rec_pool_t *pool)
 {
-    if (!pool || pool->cred_count == 0)
+    if (!pool || pool->cred_count == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     size_t attempts = 0;
     size_t start_idx = pool->cred_index;
@@ -273,8 +279,11 @@ int api_rec_add_fallback_model(api_rec_pool_t *pool, const char *model, float co
 
 const char *api_rec_current_model(api_rec_pool_t *pool)
 {
-    if (!pool)
+    if (!pool) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+
         return NULL;
+    }
 
     if (pool->current_level == API_REC_DEGRADE_NONE ||
         pool->current_fallback_idx >= pool->fallback_count) {

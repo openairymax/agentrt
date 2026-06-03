@@ -1,7 +1,7 @@
 """
 AgentOS 测试数据管理自动化框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 2.0.0
+Version: 0.1.0
 Last updated: 2026-04-23
 
 自动生成和管理测试数据

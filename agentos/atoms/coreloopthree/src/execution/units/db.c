@@ -16,6 +16,12 @@
 #include "memory_compat.h"
 
 #include <sqlite3.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 typedef struct db_unit_data {
     char *connection_string;
@@ -105,12 +111,12 @@ static agentos_error_t db_execute(agentos_execution_unit_t *unit, const void *in
                                   void **out_output)
 {
     if (!unit || !unit->execution_unit_data || !input || !out_output)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     db_unit_data_t *data = (db_unit_data_t *)unit->execution_unit_data;
     const char *query = (const char *)input;
     if (!is_safe_query(query))
-        return AGENTOS_EPERM;
+        ATM_RET_ERR(AGENTOS_EPERM);
 
     if (!data->db) {
         *out_output = AGENTOS_STRDUP("{\"error\":\"no_database_connection\"}");
@@ -134,7 +140,7 @@ static agentos_error_t db_execute(agentos_execution_unit_t *unit, const void *in
     char *result = (char *)AGENTOS_MALLOC(result_cap);
     if (!result) {
         sqlite3_finalize(stmt);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     size_t pos = 0;
@@ -159,7 +165,7 @@ static agentos_error_t db_execute(agentos_execution_unit_t *unit, const void *in
             if (!new_result) {
                 AGENTOS_FREE(result);
                 sqlite3_finalize(stmt);
-                return AGENTOS_ENOMEM;
+                ATM_RET_ERR(AGENTOS_ENOMEM);
             }
             result = new_result;
         }
@@ -189,7 +195,7 @@ static agentos_error_t db_execute(agentos_execution_unit_t *unit, const void *in
         if (!new_result) {
             AGENTOS_FREE(result);
             sqlite3_finalize(stmt);
-            return AGENTOS_ENOMEM;
+            ATM_RET_ERR(AGENTOS_ENOMEM);
         }
         result = new_result;
     }
@@ -221,13 +227,13 @@ agentos_execution_unit_t *agentos_db_unit_create(const char *connection_string)
 {
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
-    if (!unit)
-        return NULL;
+    if (!unit) return NULL;
     memset(unit, 0, sizeof(*unit));
 
     db_unit_data_t *data = (db_unit_data_t *)AGENTOS_MALLOC(sizeof(db_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -265,6 +271,7 @@ agentos_execution_unit_t *agentos_db_unit_create(const char *connection_string)
             AGENTOS_FREE(data->metadata_json);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

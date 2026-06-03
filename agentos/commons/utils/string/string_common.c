@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "memory_compat.h"
+#include "error.h"
 
 /**
  * @brief 安全的字符串复制函数
@@ -60,6 +61,7 @@ char *string_common_strlcat(char *dest, size_t dest_size, const char *src)
 char *string_common_strdup(const char *str)
 {
     if (!str) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -77,6 +79,7 @@ char *string_common_strdup(const char *str)
 char *string_common_strndup(const char *str, size_t n)
 {
     if (!str) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -148,6 +151,7 @@ char *string_common_strstr(const char *haystack, const char *needle)
 char **string_common_strsplit(const char *str, const char *delim)
 {
     if (!str || !delim) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -164,6 +168,7 @@ char **string_common_strsplit(const char *str, const char *delim)
     // 分配字符串数组
     char **arr = (char **)AGENTOS_MALLOC((count + 1) * sizeof(char *));
     if (!arr) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -359,6 +364,7 @@ size_t string_common_ftoa(double value, int precision, char *buf, size_t buf_siz
 char *string_common_strtrim(char *str)
 {
     if (!str) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -384,6 +390,7 @@ char *string_common_strtrim(char *str)
 char *string_common_strtolower(char *str)
 {
     if (!str) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -402,6 +409,7 @@ char *string_common_strtolower(char *str)
 char *string_common_strtoupper(char *str)
 {
     if (!str) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

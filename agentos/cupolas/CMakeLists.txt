@@ -265,6 +265,14 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_stress_concurrent cupolas)
 
+    add_executable(test_yaml_minimal tests/unit/test_yaml_minimal.c)
+    target_include_directories(test_yaml_minimal PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_yaml_minimal cupolas)
+
     if(MSVC)
         add_custom_command(TARGET test_cupolas_core POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -277,6 +285,7 @@ if(BUILD_TESTS)
     add_test(NAME cupolas_signature_tests COMMAND test_cupolas_signature)
     add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)
     add_test(NAME cupolas_stress_tests COMMAND test_stress_concurrent)
+    add_test(NAME cupolas_yaml_tests COMMAND test_yaml_minimal)
 endif()
 
 install(TARGETS cupolas

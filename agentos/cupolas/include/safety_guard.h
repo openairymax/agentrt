@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
-/** @note This API is planned for v2.0.0. Enable with AGENTOS_ENABLE_V2_API to access. */
+/** @note This API is planned for next release. Enable with AGENTOS_ENABLE_V2_API to access. */
 /**
  * @file safety_guard.h
  * @brief SafetyGuard - AgentOS细粒度安全守卫框架
