@@ -79,6 +79,7 @@ static void test_ipc_bus_start_stop(void)
     assert(bus != NULL);
 
     agentos_error_t ret = ipc_service_bus_start(bus);
+    (void)ret;
     assert(ret == AGENTOS_OK);
     assert(ipc_service_bus_is_running(bus) == true);
 
@@ -99,6 +100,7 @@ static void test_ipc_bus_double_start(void)
     assert(bus != NULL);
 
     agentos_error_t ret = ipc_service_bus_start(bus);
+    (void)ret;
     assert(ret == AGENTOS_OK);
 
     ret = ipc_service_bus_start(bus);
@@ -158,6 +160,7 @@ static void test_ipc_bus_register_handler(void)
     assert(bus != NULL);
 
     agentos_error_t ret = ipc_service_bus_register_handler(bus, dummy_handler, (void *)0x1);
+    (void)ret;
     assert(ret == AGENTOS_OK);
 
     ret = ipc_service_bus_unregister_handler(bus, dummy_handler);
@@ -176,6 +179,7 @@ static void test_ipc_bus_unregister_handler(void)
     assert(bus != NULL);
 
     agentos_error_t ret = ipc_service_bus_register_handler(bus, dummy_handler, NULL);
+    (void)ret;
     assert(ret == AGENTOS_OK);
 
     ret = ipc_service_bus_unregister_handler(bus, dummy_handler);
@@ -197,6 +201,7 @@ static void test_ipc_bus_get_name(void)
     assert(bus != NULL);
 
     const char *name = ipc_service_bus_get_name(bus);
+    (void)name;
     assert(name != NULL);
     assert(strcmp(name, "my_named_bus") == 0);
 
@@ -240,6 +245,7 @@ static void test_ipc_bus_stats(void)
     memset(&stats, 0, sizeof(stats));
 
     agentos_error_t ret = ipc_service_bus_get_stats(bus, &stats);
+    (void)ret;
     assert(ret == AGENTOS_OK);
     assert(stats.messages_sent == 0);
     assert(stats.messages_received == 0);
@@ -305,6 +311,7 @@ static void test_ipc_bus_lifecycle_full(void)
     assert(channel != NULL);
 
     agentos_error_t ret = ipc_service_bus_register_handler(bus, dummy_handler, NULL);
+    (void)ret;
     assert(ret == AGENTOS_OK);
 
     ret = ipc_service_bus_register_handler(bus, dummy_handler2, (void *)0xDEAD);

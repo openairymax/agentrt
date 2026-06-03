@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * [DESIGN] Rule-based planning is the current production implementation.
- * ML runtime integration (ONNX/TFLite) is planned for v2.0 to enhance
+ * ML runtime integration (ONNX/TFLite) is planned for a future release to enhance
  * planning quality with learned task decomposition patterns.
  */
 
@@ -18,6 +18,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
+
 
 /**
  * @brief ML model handle (for future ML runtime integration)
@@ -62,7 +68,7 @@ static void ml_planner_destroy(agentos_plan_strategy_t *strategy)
  *
  * This function prepares the planner for rule-based planning, which is
  * the current production-safe primary path. ML runtime integration
- * will be added in v2.0.
+ * will be added in a future release.
  */
 static bool ml_planner_try_load_model(ml_planner_data_t *data)
 {
@@ -70,7 +76,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t *data)
         return false;
 
     /* [DESIGN] Rule-based planning is the current primary path.
-     * ML runtime integration (ONNX/TFLite) is planned for v2.0
+     * ML runtime integration (ONNX/TFLite) is planned for a future release
      * to enhance planning quality with learned task decomposition patterns. */
     data->model = (ml_model_t *)AGENTOS_CALLOC(1, sizeof(ml_model_t));
     if (!data->model) {
@@ -83,7 +89,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t *data)
     data->rule_based_active = true;
 
     AGENTOS_LOG_INFO(
-        "ML planner: rule-based planning initialized, ML integration planned for v2.0");
+        "ML planner: rule-based planning initialized, ML integration planned for a future release");
     return true;
 }
 
@@ -163,7 +169,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
 {
 
     if (!intent || !out_plan)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     /* 1. 匹配意图规则 */
     int rule_index = -1;
@@ -214,7 +220,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     agentos_task_plan_t *plan =
         (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
     if (!plan)
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
 
     char plan_id[64];
     snprintf(plan_id, sizeof(plan_id), "rule_plan_%s_%d%s",
@@ -223,7 +229,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     plan->task_plan_id = AGENTOS_STRDUP(plan_id);
     if (!plan->task_plan_id) {
         AGENTOS_FREE(plan);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     plan->task_plan_nodes =
@@ -231,7 +237,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     if (!plan->task_plan_nodes && subtask_count > 0) {
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
-        return AGENTOS_ENOMEM;
+        ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* DS-006: 依赖链优化 —— 识别可并行任务组 */
@@ -416,7 +422,7 @@ cleanup_nodes:
     AGENTOS_FREE(plan->task_plan_nodes);
     AGENTOS_FREE(plan->task_plan_id);
     AGENTOS_FREE(plan);
-    return AGENTOS_ENOMEM;
+    ATM_RET_ERR(AGENTOS_ENOMEM);
 }
 
 static void ml_planner_destroy_single_node(agentos_task_node_t *node)
@@ -439,7 +445,7 @@ static agentos_error_t ml_planner_plan(const agentos_intent_t *intent, void *con
 
     ml_planner_data_t *data = (ml_planner_data_t *)context;
     if (!data || !intent || !out_plan)
-        return AGENTOS_EINVAL;
+        ATM_RET_ERR(AGENTOS_EINVAL);
 
     // Primary path: rule-based planning (always available)
     // This replaces both the old fallback and the PHASE2-IMPLEMENTED stub
@@ -451,12 +457,12 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
 
     agentos_plan_strategy_t *strat =
         (agentos_plan_strategy_t *)AGENTOS_MALLOC(sizeof(agentos_plan_strategy_t));
-    if (!strat)
-        return NULL;
+    if (!strat) return NULL;
 
     ml_planner_data_t *data = (ml_planner_data_t *)AGENTOS_CALLOC(1, sizeof(ml_planner_data_t));
     if (!data) {
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
@@ -465,6 +471,7 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
     if (model_path && !data->model_path) {
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     data->llm = llm;
@@ -475,6 +482,7 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
             AGENTOS_FREE(data->model_path);
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 

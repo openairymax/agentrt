@@ -1,5 +1,5 @@
-#include "error.h"
 #include "memory_compat.h"
+#include "error.h"
 /**
  * @file safe_string_utils.c
  * @brief 安全字符串处理工具实现
@@ -117,16 +117,22 @@ int safe_strcmp(const char *str1, const char *str2, size_t max_len)
 
 char *safe_strdup_with_limit(const char *str, size_t max_copy_len)
 {
-    if (!str)
+    if (!str) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     size_t len = strlen(str);
     if (max_copy_len > 0 && len > max_copy_len)
         len = max_copy_len;
 
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
-    if (!copy)
+    if (!copy) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
+
         return NULL;
+    }
 
     memcpy(copy, str, len);
     copy[len] = '\0';
@@ -195,8 +201,10 @@ void *safe_malloc(size_t size, const char *purpose)
     /* purpose用于调试追踪（非桩） */
     if (purpose && !purpose[0]) { /* 目的字符串有效性 */
     }
-    if (size == 0)
+    if (size == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
     void *ptr = AGENTOS_MALLOC(size);
     return ptr;
 }
@@ -206,10 +214,14 @@ void *safe_calloc(size_t count, size_t size, const char *purpose)
     /* purpose用于调试追踪（非桩） */
     if (purpose && !purpose[0]) { /* 目的字符串有效性 */
     }
-    if (count == 0 || size == 0)
+    if (count == 0 || size == 0) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
-    if (count > SIZE_MAX / size)
+    }
+    if (count > SIZE_MAX / size) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
+    }
     void *ptr = AGENTOS_CALLOC(count, size);
     return ptr;
 }
@@ -221,6 +233,7 @@ void *safe_realloc(void *ptr, size_t new_size, const char *purpose)
     }
     if (new_size == 0) {
         AGENTOS_FREE(ptr);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     void *new_ptr = AGENTOS_REALLOC(ptr, new_size);

@@ -1,10 +1,10 @@
 #include "memory_compat.h"
+#include "error.h"
 /*
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "atomic_compat.h"
-#include "error.h"
 #include "platform.h"
 #include "svc_logger.h"
 
@@ -84,7 +84,7 @@ static void notify_d_signal_handler(int sig)
 static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key, size_t out_size)
 {
     if (!client_key || !out_key || out_size < 64) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -101,7 +101,7 @@ static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key,
     size_t padded_len = ((msg_len + 8) / 64 + 1) * 64;
     unsigned char *padded = (unsigned char *)AGENTOS_CALLOC(1, padded_len);
     if (!padded) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "calloc failed for SHA1 padded buffer");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "calloc failed for SHA1 padded buffer");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     memcpy(padded, combined, msg_len);
@@ -197,21 +197,21 @@ static int notify_d_handle_ws_upgrade(notify_d_service_t *svc, notify_client_t *
     const char *key_tag = "Sec-WebSocket-Key: ";
     const char *key_start = strstr(request, key_tag);
     if (!key_start) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "missing Sec-WebSocket-Key header");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "missing Sec-WebSocket-Key header");
         return AGENTOS_ERR_UNKNOWN;
     }
     key_start += strlen(key_tag);
 
     const char *key_end = strstr(key_start, "\r\n");
     if (!key_end) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "Sec-WebSocket-Key value not terminated by CRLF");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "Sec-WebSocket-Key value not terminated by CRLF");
         return AGENTOS_ERR_UNKNOWN;
     }
 
     char client_key[256];
     size_t key_len = (size_t)(key_end - key_start);
     if (key_len >= sizeof(client_key)) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "Sec-WebSocket-Key too long");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "Sec-WebSocket-Key too long");
         return AGENTOS_ERR_UNKNOWN;
     }
     memcpy(client_key, key_start, key_len);
@@ -219,7 +219,7 @@ static int notify_d_handle_ws_upgrade(notify_d_service_t *svc, notify_client_t *
 
     char accept_key[64];
     if (notify_d_compute_ws_accept_key(client_key, accept_key, sizeof(accept_key)) != 0) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to compute WebSocket accept key");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to compute WebSocket accept key");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -233,7 +233,7 @@ static int notify_d_handle_ws_upgrade(notify_d_service_t *svc, notify_client_t *
                             accept_key);
 
     if (agentos_socket_send(client->fd, response, (size_t)resp_len) <= 0) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to send WebSocket 101 response");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to send WebSocket 101 response");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -245,7 +245,7 @@ static int notify_d_handle_ws_upgrade(notify_d_service_t *svc, notify_client_t *
 static int notify_d_send_ws_frame(notify_client_t *client, const char *payload, size_t payload_len)
 {
     if (!client || !payload || client->fd == AGENTOS_INVALID_SOCKET) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter or invalid socket");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter or invalid socket");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -268,11 +268,11 @@ static int notify_d_send_ws_frame(notify_client_t *client, const char *payload, 
     }
 
     if (agentos_socket_send(client->fd, (const char *)frame, header_len) <= 0) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to send WS frame header");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to send WS frame header");
         return AGENTOS_ERR_UNKNOWN;
     }
     if (agentos_socket_send(client->fd, payload, payload_len) <= 0) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to send WS frame payload");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to send WS frame payload");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -282,7 +282,7 @@ static int notify_d_send_ws_frame(notify_client_t *client, const char *payload, 
 static int notify_d_broadcast_event(notify_d_service_t *svc, const notify_event_t *event)
 {
     if (!svc || !event) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -344,6 +344,7 @@ static DWORD WINAPI notify_d_event_loop(LPVOID arg)
     notify_d_service_t *svc = (notify_d_service_t *)arg;
     if (!svc) {
 #ifndef _WIN32
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
 #else
         return 1;
@@ -391,13 +392,13 @@ static int notify_d_enqueue(notify_d_service_t *svc, const char *msg, const char
         return AGENTOS_ERR_INVALID_PARAM;
     }
     if (svc->pending_count >= NOTIFY_D_MAX_PENDING) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "pending queue full");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "pending queue full");
         return AGENTOS_ERR_UNKNOWN;
     }
 
     notify_event_t *event = (notify_event_t *)AGENTOS_CALLOC(1, sizeof(notify_event_t));
     if (!event) {
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "calloc failed for notify_event_t");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "calloc failed for notify_event_t");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -421,14 +422,15 @@ static notify_client_t *notify_d_find_client_slot(notify_d_service_t *svc)
     }
     if (svc->client_count < NOTIFY_D_MAX_CLIENTS)
         return &svc->clients[svc->client_count];
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     return NULL;
 }
 
 static int notify_d_init(notify_d_service_t *svc, int port, const char *sock)
 {
     if (!svc)
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
+    return AGENTOS_EINVAL;
 
     memset(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : NOTIFY_D_DEFAULT_PORT;
@@ -445,14 +447,14 @@ static int notify_d_init(notify_d_service_t *svc, int port, const char *sock)
 static int notify_d_start(notify_d_service_t *svc)
 {
     if (!svc)
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
+    return AGENTOS_EINVAL;
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
     if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("notify_d: failed to create socket at %s", svc->socket_path);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
         return AGENTOS_ERR_UNKNOWN;
     }
 #else
@@ -477,8 +479,8 @@ static int notify_d_start(notify_d_service_t *svc)
 static int notify_d_stop(notify_d_service_t *svc, int force)
 {
     if (!svc)
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
+    return AGENTOS_EINVAL;
 
     agentos_mutex_lock(&svc->lock);
     svc->running = 0;
@@ -533,8 +535,8 @@ static int notify_d_stop(notify_d_service_t *svc, int force)
 static int notify_d_destroy(notify_d_service_t *svc)
 {
     if (!svc)
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
+    return AGENTOS_EINVAL;
 
     notify_d_stop(svc, 1);
 
@@ -700,7 +702,7 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 #endif
 
     agentos_log_init(NULL);
-    atexit(agentos_log_shutdown);
+    atexit(log_cleanup);
 
     if (notify_d_init(&g_service, NOTIFY_D_DEFAULT_PORT, NOTIFY_D_DEFAULT_SOCKET) !=
         AGENTOS_SUCCESS)
@@ -719,5 +721,6 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 
     notify_d_stop(&g_service, g_shutdown ? 1 : 0);
     notify_d_destroy(&g_service);
+    log_cleanup();
     return 0;
 }

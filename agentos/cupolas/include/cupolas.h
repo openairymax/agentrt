@@ -27,6 +27,7 @@
 #define CUPOLAS_H
 
 #include "../../commons/include/agentos_types.h"
+#include "../../commons/utils/error/include/error.h"
 
 #include <stddef.h>
 
@@ -46,49 +47,6 @@ extern "C" {
 #else
 #define CUPOLAS_API
 #endif
-#endif
-
-#ifndef AGENTOS_OK
-#define AGENTOS_OK 0
-#endif
-#ifndef AGENTOS_ERR_UNKNOWN
-#define AGENTOS_ERR_UNKNOWN -1
-#endif
-#ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM -2
-#endif
-#ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER -3
-#endif
-#ifndef AGENTOS_ERR_OUT_OF_MEMORY
-#define AGENTOS_ERR_OUT_OF_MEMORY -4
-#endif
-#ifndef AGENTOS_ERR_BUFFER_TOO_SMALL
-#define AGENTOS_ERR_BUFFER_TOO_SMALL -5
-#endif
-#ifndef AGENTOS_ERR_NOT_FOUND
-#define AGENTOS_ERR_NOT_FOUND -6
-#endif
-#ifndef AGENTOS_ERR_ALREADY_EXISTS
-#define AGENTOS_ERR_ALREADY_EXISTS -7
-#endif
-#ifndef AGENTOS_ERR_TIMEOUT
-#define AGENTOS_ERR_TIMEOUT -8
-#endif
-#ifndef AGENTOS_ERR_NOT_SUPPORTED
-#define AGENTOS_ERR_NOT_SUPPORTED -9
-#endif
-#ifndef AGENTOS_ERR_PERMISSION_DENIED
-#define AGENTOS_ERR_PERMISSION_DENIED -10
-#endif
-#ifndef AGENTOS_ERR_IO
-#define AGENTOS_ERR_IO -11
-#endif
-#ifndef AGENTOS_ERR_STATE_ERROR
-#define AGENTOS_ERR_STATE_ERROR -13
-#endif
-#ifndef AGENTOS_ERR_OVERFLOW
-#define AGENTOS_ERR_OVERFLOW -14
 #endif
 
 #ifndef cupolas_OK

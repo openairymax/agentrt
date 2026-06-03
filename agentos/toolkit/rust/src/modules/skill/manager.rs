@@ -1,5 +1,5 @@
 // AgentOS Rust SDK - 技能管理器实现
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 提供技能的加载、执行、查询等功能。

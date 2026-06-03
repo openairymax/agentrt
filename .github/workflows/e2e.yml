@@ -36,7 +36,6 @@ jobs:
       - name: Install
         working-directory: agentos/toolkit/typescript
         run: npm ci
-        continue-on-error: true
 
       - name: TypeScript Check
         working-directory: agentos/toolkit/typescript

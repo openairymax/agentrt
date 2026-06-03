@@ -6,12 +6,12 @@
 
 #include "scheduler_service.h"
 #include "strategy_interface.h"
-#include "error.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "error.h"
 
 static void test_round_robin_strategy(void)
 {
@@ -214,6 +214,7 @@ static void test_round_robin_error_paths(void)
 
     /* create error paths */
     int ret = strategy->create(NULL, &data);
+    (void)ret;
     assert(ret == AGENTOS_ERR_INVALID_PARAM);
 
     ret = strategy->create(&config, NULL);

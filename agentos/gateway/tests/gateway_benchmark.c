@@ -48,6 +48,7 @@
 #include <curl/curl.h>
 #endif
 #include "memory_compat.h"
+#include "error.h"
 #include "gateway_compat.h"
 
 /* ========== 常量定义 ========== */
@@ -151,8 +152,10 @@ static int compare_double(const void *a, const void *b)
 {
     double da = *(const double *)a;
     double db = *(const double *)b;
-    if (da < db)
-        return -1;
+    if (da < db) {
+        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "compare_double: error AGENTOS_ERR_UNKNOWN");
+        return AGENTOS_ERR_UNKNOWN;
+    }
     if (da > db)
         return 1;
     return 0;
@@ -589,7 +592,8 @@ static int parse_args(int argc, char *argv[])
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[i]);
             print_usage(argv[0]);
-            return AGENTOS_EFAIL;
+            agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "if: not supported");
+            return AGENTOS_ERR_UNKNOWN;
         }
     }
     return 1;

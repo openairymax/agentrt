@@ -18,6 +18,7 @@
 #include "gateway_rpc_handler.h"
 #include "jsonrpc.h"
 #include "memory_compat.h"
+#include "error.h"
 #include "gateway_compat.h"
 
 #include <assert.h>
@@ -240,12 +241,12 @@ static int mock_handler(const char *request_str, char **response_str, void *user
     (void)user_data;
 
     if (!request_str || !response_str)
-        return AGENTOS_EFAIL;
+        return AGENTOS_ERR_NULL_POINTER;
 
     /* 简单的echo handler */
     cJSON *request = cJSON_Parse(request_str);
     if (!request)
-        return AGENTOS_EFAIL;
+        return AGENTOS_ERR_PARSE_ERROR;
 
     cJSON *response = cJSON_CreateObject();
     cJSON_AddStringToObject(response, "jsonrpc", "2.0");
@@ -296,7 +297,7 @@ static int error_handler_func(const char *req, char **resp, void *data)
     (void)req;
     (void)resp;
     (void)data;
-    return AGENTOS_EFAIL; /* 返回错误 */
+    return AGENTOS_ERR_UNKNOWN; /* 返回错误 */
 }
 
 /**

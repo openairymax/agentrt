@@ -11,6 +11,8 @@
 
 #include "utils.h"
 
+#include "error.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -25,13 +27,6 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
-#endif
-
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
 #endif
 
 bool heapstore_ensure_directory(const char *path)

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # AgentOS 一键快速启动脚本
 # 用于快速体验 AgentOS 核心功能 
@@ -118,7 +119,7 @@ build_kernel() {
             -DBUILD_TESTS=OFF \
             -DENABLE_TRACING=OFF
 
-        cmake --build . --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+        cmake --build . --parallel "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
         cd "${PROJECT_ROOT}"
         print_success "内核构建完成"

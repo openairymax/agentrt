@@ -37,7 +37,9 @@ class LoggerPlugin(BasePlugin):
         self._logs = []
 
     async def on_error(self, error: Exception) -> None:
-        pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("LoggerPlugin error: %s", error, exc_info=True)
 
     def get_capabilities(self) -> List[str]:
         return ["logging", "structured_logs", "log_query"]
