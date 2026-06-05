@@ -51,7 +51,7 @@ tool_service_t *tool_service_create(const char *config_path __attribute__((unuse
 
     /* 创建执行器 */
     tool_executor_config_t exec_config;
-    memset(&exec_config, 0, sizeof(exec_config));
+    AGENTOS_MEMSET(&exec_config, 0, sizeof(exec_config));
     exec_config.timeout_sec = AGENTOS_DEFAULT_TIMEOUT_SEC;
 
     svc->executor = tool_executor_create_ex(&exec_config);

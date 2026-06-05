@@ -181,10 +181,10 @@ agentos_error_t sc_stream_critic_reset(sc_stream_critic_t *critic)
         critic->last_accepted_len = 0;
     }
     if (critic->accumulated_critique) {
-        memset(critic->accumulated_critique, 0, critic->accumulated_critique_cap);
+        AGENTOS_MEMSET(critic->accumulated_critique, 0, critic->accumulated_critique_cap);
         critic->accumulated_critique_len = 0;
     }
-    memset(&critic->stats, 0, sizeof(sc_critic_stats_t));
+    AGENTOS_MEMSET(&critic->stats, 0, sizeof(sc_critic_stats_t));
     return AGENTOS_SUCCESS;
 }
 
@@ -196,7 +196,7 @@ agentos_error_t sc_intent_classifier(sc_stream_critic_t *critic, const char *inp
     if (!critic || !input || !out_result)
         return AGENTOS_EINVAL;
 
-    memset(out_result, 0, sizeof(sc_intent_result_t));
+    AGENTOS_MEMSET(out_result, 0, sizeof(sc_intent_result_t));
 
     agentos_intent_classification_t cls;
     int rc = agentos_intent_classify(input, input_len, &cls);
@@ -262,7 +262,7 @@ void sc_intent_result_free(sc_intent_result_t *result)
     }
     if (result->reasoning_hint)
         AGENTOS_FREE(result->reasoning_hint);
-    memset(result, 0, sizeof(sc_intent_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(sc_intent_result_t));
 }
 
 /* ==================== Phase 1: stream_validator ==================== */
@@ -381,11 +381,11 @@ agentos_error_t sc_stream_validator(sc_stream_critic_t *critic, const char *cont
     if (!critic || !content || !out_result)
         return AGENTOS_EINVAL;
     if (content_len == 0) {
-        memset(out_result, 0, sizeof(sc_validation_result_t));
+        AGENTOS_MEMSET(out_result, 0, sizeof(sc_validation_result_t));
         return AGENTOS_EINVAL;
     }
 
-    memset(out_result, 0, sizeof(sc_validation_result_t));
+    AGENTOS_MEMSET(out_result, 0, sizeof(sc_validation_result_t));
 
     uint64_t start_ns = agentos_time_monotonic_ns();
     uint32_t aspects =
@@ -469,7 +469,7 @@ void sc_validation_result_free(sc_validation_result_t *result)
 {
     if (!result)
         return;
-    memset(result, 0, sizeof(sc_validation_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(sc_validation_result_t));
 }
 
 /* ==================== Phase 3: output_corrector ==================== */
@@ -543,7 +543,7 @@ sc_output_corrector(sc_stream_critic_t *critic, const char *raw_output, size_t r
     if (!critic || !raw_output || !out_result)
         return AGENTOS_EINVAL;
 
-    memset(out_result, 0, sizeof(sc_correction_result_t));
+    AGENTOS_MEMSET(out_result, 0, sizeof(sc_correction_result_t));
 
     out_result->entries = (sc_correction_entry_t *)AGENTOS_CALLOC(critic->config.max_corrections,
                                                                   sizeof(sc_correction_entry_t));
@@ -555,7 +555,7 @@ sc_output_corrector(sc_stream_critic_t *critic, const char *raw_output, size_t r
 
     /* 检测常见问题 */
     sc_correction_entry_t candidate;
-    memset(&candidate, 0, sizeof(candidate));
+    AGENTOS_MEMSET(&candidate, 0, sizeof(candidate));
 
     if (detect_repetition(raw_output, raw_output_len, &candidate) &&
         out_result->entry_count < out_result->entries_capacity) {
@@ -628,7 +628,7 @@ void sc_correction_result_free(sc_correction_result_t *result)
         AGENTOS_FREE(result->final_output);
     if (result->entries)
         AGENTOS_FREE(result->entries);
-    memset(result, 0, sizeof(sc_correction_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(sc_correction_result_t));
 }
 
 /* ==================== Phase 4: memory_confirmer ==================== */
@@ -641,7 +641,7 @@ agentos_error_t sc_memory_confirmer(sc_stream_critic_t *critic, const char *outp
     if (!critic || !output || !out_result)
         return AGENTOS_EINVAL;
 
-    memset(out_result, 0, sizeof(sc_memory_result_t));
+    AGENTOS_MEMSET(out_result, 0, sizeof(sc_memory_result_t));
 
     uint64_t start_ns = agentos_time_monotonic_ns();
 
@@ -699,7 +699,7 @@ void sc_memory_result_free(sc_memory_result_t *result)
         return;
     if (result->entries)
         AGENTOS_FREE(result->entries);
-    memset(result, 0, sizeof(sc_memory_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(sc_memory_result_t));
 }
 
 /* ==================== 全管线便捷接口 ==================== */

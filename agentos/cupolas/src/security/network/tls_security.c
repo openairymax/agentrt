@@ -385,9 +385,7 @@ int tls_get_cipher_suites(char ***suites, size_t *count)
                                            "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"};
 
     *count = sizeof(default_suites) / sizeof(default_suites[0]);
-    *suites = (char **)AGENTOS_MALLOC(*count * sizeof(char *));
-    if (!*suites)
-        return AGENTOS_EINVAL;
+    SAFE_MALLOC_ARRAY(*suites, *count, sizeof(char *));
 
     for (size_t i = 0; i < *count; i++) {
         (*suites)[i] = cupolas_strdup(default_suites[i]);

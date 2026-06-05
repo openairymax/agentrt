@@ -243,10 +243,10 @@ network_connection_t *network_connection_create(const network_config_t *config)
 
     conn->config = *config;
     conn->status = NETWORK_STATUS_DISCONNECTED;
-    memset(conn->error_msg, 0, sizeof(conn->error_msg));
+    AGENTOS_MEMSET(conn->error_msg, 0, sizeof(conn->error_msg));
     conn->event_cb = NULL;
     conn->event_user_data = NULL;
-    memset(&conn->stats, 0, sizeof(network_stats_t));
+    AGENTOS_MEMSET(&conn->stats, 0, sizeof(network_stats_t));
 
 #ifdef _WIN32
     conn->sock = INVALID_SOCKET;
@@ -254,7 +254,7 @@ network_connection_t *network_connection_create(const network_config_t *config)
     conn->fd = -1;
 #endif
 
-    memset(&conn->addr, 0, sizeof(conn->addr));
+    AGENTOS_MEMSET(&conn->addr, 0, sizeof(conn->addr));
 
     return conn;
 }
@@ -324,14 +324,14 @@ agentos_error_t network_connect(network_connection_t *connection)
 #endif
 
     /* 设置目标地址 */
-    memset(&connection->addr, 0, sizeof(connection->addr));
+    AGENTOS_MEMSET(&connection->addr, 0, sizeof(connection->addr));
     connection->addr.sin_family = AF_INET;
     connection->addr.sin_port = htons((uint16_t)connection->config.port);
 
     /* 尝试直接解析为 IP，否则使用 DNS */
     if (inet_pton(AF_INET, connection->config.host, &connection->addr.sin_addr) <= 0) {
         struct addrinfo hints, *result;
-        memset(&hints, 0, sizeof(hints));
+        AGENTOS_MEMSET(&hints, 0, sizeof(hints));
         hints.ai_family = native_af;
         hints.ai_socktype = native_type;
 
@@ -739,7 +739,7 @@ agentos_error_t network_reset_stats(network_connection_t *connection)
         return AGENTOS_EINVAL;
     }
 
-    memset(&connection->stats, 0, sizeof(network_stats_t));
+    AGENTOS_MEMSET(&connection->stats, 0, sizeof(network_stats_t));
     return AGENTOS_SUCCESS;
 }
 
@@ -799,7 +799,7 @@ agentos_error_t network_http_request(network_connection_t *connection,
         return AGENTOS_ENOTCONN;
     }
 
-    memset(response, 0, sizeof(network_http_response_t));
+    AGENTOS_MEMSET(response, 0, sizeof(network_http_response_t));
 
     /* 构建 HTTP 请求行 */
     char request_buf[NETWORK_DEFAULT_BUFFER_SIZE * 2];
@@ -1004,7 +1004,7 @@ void network_http_response_free(network_http_response_t *response)
         response->status_text = NULL;
     }
 
-    memset(response, 0, sizeof(network_http_response_t));
+    AGENTOS_MEMSET(response, 0, sizeof(network_http_response_t));
 }
 
 /* ============================================================================
@@ -1229,7 +1229,7 @@ agentos_error_t network_dns_resolve(const char *hostname, network_af_t af,
     network_init_winsock();
 
     struct addrinfo hints, *res;
-    memset(&hints, 0, sizeof(hints));
+    AGENTOS_MEMSET(&hints, 0, sizeof(hints));
     hints.ai_family = af_to_native(af);
     hints.ai_socktype = SOCK_STREAM;
 
@@ -1277,7 +1277,7 @@ agentos_error_t network_dns_resolve(const char *hostname, network_af_t af,
             inet_ntop(AF_INET6, &addr_in6->sin6_addr, ip_str, sizeof(ip_str));
             result->ports[i] = ntohs(addr_in6->sin6_port);
         } else {
-            strncpy(ip_str, "unknown", INET6_ADDRSTRLEN - 1);
+            AGENTOS_STRNCPY_TERM(ip_str, "unknown", INET6_ADDRSTRLEN);
             ip_str[INET6_ADDRSTRLEN - 1] = '\0';
             result->ports[i] = 0;
         }
@@ -1378,11 +1378,11 @@ agentos_error_t network_get_local_ip(network_af_t af, char *buffer, size_t buffe
     gethostname(hostname, sizeof(hostname));
 
     struct addrinfo hints, *res;
-    memset(&hints, 0, sizeof(hints));
+    AGENTOS_MEMSET(&hints, 0, sizeof(hints));
     hints.ai_family = af_to_native(af);
 
     if (getaddrinfo(hostname, NULL, &hints, &res) != 0) {
-        strncpy(buffer, "127.0.0.1", buffer_len - 1);
+        AGENTOS_STRNCPY_TERM(buffer, "127.0.0.1", buffer_len);
         buffer[buffer_len - 1] = '\0';
         return AGENTOS_SUCCESS;
     }
@@ -1394,7 +1394,7 @@ agentos_error_t network_get_local_ip(network_af_t af, char *buffer, size_t buffe
         struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)res->ai_addr;
         inet_ntop(AF_INET6, &addr_in6->sin6_addr, buffer, (socklen_t)buffer_len);
     } else {
-        strncpy(buffer, "127.0.0.1", buffer_len - 1);
+        AGENTOS_STRNCPY_TERM(buffer, "127.0.0.1", buffer_len);
         buffer[buffer_len - 1] = '\0';
     }
 
@@ -1404,13 +1404,13 @@ agentos_error_t network_get_local_ip(network_af_t af, char *buffer, size_t buffe
     const char *test_host = "8.8.8.8";
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
-        strncpy(buffer, "127.0.0.1", buffer_len - 1);
+        AGENTOS_STRNCPY_TERM(buffer, "127.0.0.1", buffer_len);
         buffer[buffer_len - 1] = '\0';
         return AGENTOS_SUCCESS;
     }
 
     struct sockaddr_in server;
-    memset(&server, 0, sizeof(server));
+    AGENTOS_MEMSET(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(80);
     inet_pton(AF_INET, test_host, &server.sin_addr);
@@ -1450,7 +1450,7 @@ agentos_error_t network_addr_to_string(network_af_t af, const void *addr, char *
         const struct sockaddr_in6 *addr_in6 = (const struct sockaddr_in6 *)addr;
         inet_ntop(AF_INET6, &addr_in6->sin6_addr, buffer, (socklen_t)buffer_len);
     } else {
-        strncpy(buffer, "unknown", buffer_len - 1);
+        AGENTOS_STRNCPY_TERM(buffer, "unknown", buffer_len);
         buffer[buffer_len - 1] = '\0';
     }
 

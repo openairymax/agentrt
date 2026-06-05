@@ -122,6 +122,7 @@ static void test_ipc_bus_channel_create(void)
     ipc_bus_channel_config_t config;
     memset(&config, 0, sizeof(config));
     strncpy(config.name, "test_channel", IPC_BUS_CHANNEL_NAME_LEN - 1);
+    config.name[IPC_BUS_CHANNEL_NAME_LEN - 1] = '\0';
     config.default_protocol = IPC_BUS_PROTO_JSON_RPC;
     config.timeout_ms = IPC_BUS_DEFAULT_TIMEOUT_MS;
 
@@ -145,6 +146,7 @@ static void test_ipc_bus_channel_null_bus(void)
     ipc_bus_channel_config_t config;
     memset(&config, 0, sizeof(config));
     strncpy(config.name, "null_bus_ch", IPC_BUS_CHANNEL_NAME_LEN - 1);
+    config.name[IPC_BUS_CHANNEL_NAME_LEN - 1] = '\0';
 
     ipc_bus_channel_t channel = ipc_bus_channel_create(NULL, &config);
     assert(channel == NULL);
@@ -305,6 +307,7 @@ static void test_ipc_bus_lifecycle_full(void)
     ipc_bus_channel_config_t ch_cfg;
     memset(&ch_cfg, 0, sizeof(ch_cfg));
     strncpy(ch_cfg.name, "lc_channel", IPC_BUS_CHANNEL_NAME_LEN - 1);
+    ch_cfg.name[IPC_BUS_CHANNEL_NAME_LEN - 1] = '\0';
     ch_cfg.default_protocol = IPC_BUS_PROTO_MCP;
 
     ipc_bus_channel_t channel = ipc_bus_channel_create(bus, &ch_cfg);

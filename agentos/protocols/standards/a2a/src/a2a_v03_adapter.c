@@ -227,13 +227,11 @@ int a2a_v03_register_agent(a2a_v03_context_t *ctx, const a2a_agent_card_t *card)
     a2a_internal_card_t *internal_card = &adapter->agents[adapter->agent_count];
     snprintf(internal_card->id, sizeof(internal_card->id), "agent_%zu_%" PRIu64 ",",
              adapter->agent_count + 1, adapter->task_counter++);
-    strncpy(internal_card->name, card->name ? card->name : "Unknown",
-            sizeof(internal_card->name) - 1);
-    strncpy(internal_card->url, card->url ? card->url : "", sizeof(internal_card->url) - 1);
+    AGENTOS_STRNCPY_TERM(internal_card->name, card->name ? card->name : "Unknown", sizeof(internal_card->name));
+    AGENTOS_STRNCPY_TERM(internal_card->url, card->url ? card->url : "", sizeof(internal_card->url));
 
     if (card->capabilities_json) {
-        strncpy(internal_card->capabilities, card->capabilities_json,
-                sizeof(internal_card->capabilities) - 1);
+        AGENTOS_STRNCPY_TERM(internal_card->capabilities, card->capabilities_json, sizeof(internal_card->capabilities));
     }
     internal_card->version = card->protocol_version > 0 ? card->protocol_version : 3;
     internal_card->available = true;
@@ -320,7 +318,7 @@ const a2a_agent_card_t *a2a_v03_get_agent_card(a2a_v03_context_t *ctx, const cha
     for (size_t i = 0; i < adapter->agent_count; i++) {
         if (strcmp(adapter->agents[i].id, agent_id) == 0) {
             static a2a_agent_card_t card;
-            memset(&card, 0, sizeof(card));
+            AGENTOS_MEMSET(&card, 0, sizeof(card));
             const a2a_internal_card_t *internal = &adapter->agents[i];
             card.id = AGENTOS_STRDUP(internal->id);
             card.name = AGENTOS_STRDUP(internal->name);
@@ -352,15 +350,13 @@ int a2a_v03_delegate_task(a2a_handle_t handle, const a2a_task_request_internal_t
         return AGENTOS_ERR_STATE_ERROR;
     }
 
-    memset(out_response, 0, sizeof(*out_response));
+    AGENTOS_MEMSET(out_response, 0, sizeof(*out_response));
 
     snprintf(out_response->task_id, sizeof(out_response->task_id), "task_%" PRIu64,
              adapter->task_counter++);
 
     out_response->status = A2A_TASK_STATUS_ACCEPTED;
-    strncpy(out_response->accepted_by,
-            request->target_agent_id ? request->target_agent_id : "coordinator",
-            sizeof(out_response->accepted_by) - 1);
+    AGENTOS_STRNCPY_TERM(out_response->accepted_by, request->target_agent_id ? request->target_agent_id : "coordinator", sizeof(out_response->accepted_by));
     out_response->negotiation_rounds = 0;
     out_response->estimated_duration_ms =
         request->timeout_ms > 0 ? request->timeout_ms / 2 : A2A_DEFAULT_TIMEOUT_MS / 2;
@@ -391,8 +387,8 @@ int a2a_v03_negotiate_task(a2a_handle_t handle, const char *task_id,
         return AGENTOS_ERR_STATE_ERROR;
     }
 
-    memset(out_result, 0, sizeof(*out_result));
-    strncpy(out_result->task_id, task_id, sizeof(out_result->task_id) - 1);
+    AGENTOS_MEMSET(out_result, 0, sizeof(*out_result));
+    AGENTOS_STRNCPY_TERM(out_result->task_id, task_id, sizeof(out_result->task_id));
 
     switch (proposal->type) {
     case A2A_NEGOTIATE_COST:
@@ -430,7 +426,7 @@ int a2a_v03_achieve_consensus(a2a_handle_t handle, const a2a_consensus_request_i
         return AGENTOS_ERR_STATE_ERROR;
     }
 
-    memset(out_result, 0, sizeof(*out_result));
+    AGENTOS_MEMSET(out_result, 0, sizeof(*out_result));
 
     size_t agree_count = 0;
     for (int i = 0; i < request->num_participants; i++) {
@@ -483,14 +479,14 @@ int a2a_v03_stream_task(a2a_handle_t handle, const a2a_task_request_internal_t *
              adapter->task_counter++);
 
     a2a_progress_event_internal_t event;
-    memset(&event, 0, sizeof(event));
-    strncpy(event.task_id, final_response->task_id, sizeof(event.task_id) - 1);
+    AGENTOS_MEMSET(&event, 0, sizeof(event));
+    AGENTOS_STRNCPY_TERM(event.task_id, final_response->task_id, sizeof(event.task_id));
 
     const char *phases[] = {"initiated", "planning", "executing", "verifying", "completed"};
     for (int i = 0; i < 5; i++) {
         event.event_type = A2A_PROGRESS_UPDATE;
         event.progress_percentage = (uint8_t)(20 * i + 20);
-        strncpy(event.phase, phases[i], sizeof(event.phase) - 1);
+        AGENTOS_STRNCPY_TERM(event.phase, phases[i], sizeof(event.phase));
 
         char detail[256];
         snprintf(detail, sizeof(detail), "{\"phase\":\"%s\",\"progress\":%d}", phases[i],
@@ -535,7 +531,7 @@ int a2a_v03_get_stats(a2a_handle_t handle, a2a_stats_internal_t *out_stats)
         return AGENTOS_ERR_STATE_ERROR;
     }
 
-    memset(out_stats, 0, sizeof(*out_stats));
+    AGENTOS_MEMSET(out_stats, 0, sizeof(*out_stats));
     out_stats->registered_agents = (uint32_t)adapter->agent_count;
     out_stats->active_tasks = (uint32_t)adapter->active_task_count;
     out_stats->completed_tasks = (uint32_t)adapter->completed_task_count;
@@ -561,7 +557,7 @@ void a2a_free_agent_list(a2a_agent_list_t *list)
         AGENTOS_FREE((void *)list->agents[i].url);
         AGENTOS_FREE((void *)list->agents[i].capabilities_json);
     }
-    memset(list, 0, sizeof(*list));
+    AGENTOS_MEMSET(list, 0, sizeof(*list));
 }
 
 /* ============================================================================
@@ -647,7 +643,7 @@ int a2a_v03_auth_init(a2a_v03_context_t *ctx, const a2a_auth_config_t *auth_conf
         return AGENTOS_ERR_UNKNOWN;
         }
 
-    memset(&g_a2a_auth, 0, sizeof(g_a2a_auth));
+    AGENTOS_MEMSET(&g_a2a_auth, 0, sizeof(g_a2a_auth));
     g_a2a_auth.initialized = true;
     g_a2a_auth.config = *auth_config;
 
@@ -667,14 +663,14 @@ void a2a_v03_auth_shutdown(a2a_v03_context_t *ctx)
         return;
 
     for (size_t i = 0; i < g_a2a_auth.token_count; i++) {
-        memset(&g_a2a_auth.tokens[i], 0, sizeof(g_a2a_auth.tokens[i]));
+        AGENTOS_MEMSET(&g_a2a_auth.tokens[i], 0, sizeof(g_a2a_auth.tokens[i]));
     }
     for (size_t i = 0; i < g_a2a_auth.session_count; i++) {
-        memset(&g_a2a_auth.sessions[i], 0, sizeof(g_a2a_auth.sessions[i]));
+        AGENTOS_MEMSET(&g_a2a_auth.sessions[i], 0, sizeof(g_a2a_auth.sessions[i]));
     }
 
-    memset(&g_a2a_auth.config.shared_secret, 0, sizeof(g_a2a_auth.config.shared_secret));
-    memset(&g_a2a_auth, 0, sizeof(g_a2a_auth));
+    AGENTOS_MEMSET(&g_a2a_auth.config.shared_secret, 0, sizeof(g_a2a_auth.config.shared_secret));
+    AGENTOS_MEMSET(&g_a2a_auth, 0, sizeof(g_a2a_auth));
 }
 
 int a2a_v03_authenticate(a2a_v03_context_t *ctx, const char *agent_id, const char *credential,
@@ -734,9 +730,9 @@ int a2a_v03_authenticate(a2a_v03_context_t *ctx, const char *agent_id, const cha
     }
 
     a2a_auth_token_t *tok = &g_a2a_auth.tokens[g_a2a_auth.token_count++];
-    memset(tok, 0, sizeof(*tok));
+    AGENTOS_MEMSET(tok, 0, sizeof(*tok));
 
-    strncpy(tok->agent_id, agent_id, sizeof(tok->agent_id) - 1);
+    AGENTOS_STRNCPY_TERM(tok->agent_id, agent_id, sizeof(tok->agent_id));
     tok->issued_at = now;
     tok->expires_at = now + g_a2a_auth.config.token_ttl_sec;
     tok->permissions = 0xFFFFFFFF;
@@ -795,7 +791,7 @@ int a2a_v03_invalidate_token(a2a_v03_context_t *ctx, const char *token_str)
 
     for (size_t i = 0; i < g_a2a_auth.token_count; i++) {
         if (g_a2a_auth.tokens[i].valid && strcmp(g_a2a_auth.tokens[i].token, token_str) == 0) {
-            memset(&g_a2a_auth.tokens[i], 0, sizeof(g_a2a_auth.tokens[i]));
+            AGENTOS_MEMSET(&g_a2a_auth.tokens[i], 0, sizeof(g_a2a_auth.tokens[i]));
             return 0;
         }
     }
@@ -879,7 +875,7 @@ int a2a_v03_create_session(a2a_v03_context_t *ctx, const char *remote_agent_id,
                 oldest_idx = i;
             }
         }
-        memset(&g_a2a_auth.sessions[oldest_idx], 0, sizeof(a2a_session_t));
+        AGENTOS_MEMSET(&g_a2a_auth.sessions[oldest_idx], 0, sizeof(a2a_session_t));
         g_a2a_auth.sessions[oldest_idx] = g_a2a_auth.sessions[g_a2a_auth.session_count - 1];
         g_a2a_auth.session_count--;
     }
@@ -887,13 +883,13 @@ int a2a_v03_create_session(a2a_v03_context_t *ctx, const char *remote_agent_id,
     uint64_t now = a2a_timestamp_ms();
 
     a2a_session_t *sess = &g_a2a_auth.sessions[g_a2a_auth.session_count++];
-    memset(sess, 0, sizeof(*sess));
+    AGENTOS_MEMSET(sess, 0, sizeof(*sess));
 
     snprintf(sess->session_id, sizeof(sess->session_id), "sess_%s_%" PRIu64 "_%08x",
              remote_agent_id, (uint64_t)(now / 1000),
              a2a_simple_hash(remote_agent_id, strlen(remote_agent_id)));
 
-    strncpy(sess->remote_agent_id, remote_agent_id, sizeof(sess->remote_agent_id) - 1);
+    AGENTOS_STRNCPY_TERM(sess->remote_agent_id, remote_agent_id, sizeof(sess->remote_agent_id));
     sess->auth_method = auth_method;
     sess->crypto_method = crypto_method;
     sess->created_at = now;
@@ -924,7 +920,7 @@ int a2a_v03_validate_session(a2a_v03_context_t *ctx, const char *session_id,
         uint64_t age_sec = (now - sess->created_at) / 1000;
 
         if (age_sec > (uint64_t)g_a2a_auth.config.token_ttl_sec * 2) {
-            memset(sess, 0, sizeof(*sess));
+            AGENTOS_MEMSET(sess, 0, sizeof(*sess));
             agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__, "a2a_timestamp_ms: error AGENTOS_ERR_NOT_SUPPORTED");
             return AGENTOS_ERR_NOT_SUPPORTED;
         }
@@ -949,7 +945,7 @@ void a2a_v03_destroy_session(a2a_v03_context_t *ctx, const char *session_id)
     for (size_t i = 0; i < g_a2a_auth.session_count; i++) {
         if (strncmp(g_a2a_auth.sessions[i].session_id, session_id,
                     sizeof(g_a2a_auth.sessions[i].session_id)) == 0) {
-            memset(&g_a2a_auth.sessions[i], 0, sizeof(a2a_session_t));
+            AGENTOS_MEMSET(&g_a2a_auth.sessions[i], 0, sizeof(a2a_session_t));
             return;
         }
     }
@@ -998,7 +994,7 @@ const char *a2a_crypto_method_string(a2a_crypto_method_t method)
 a2a_v03_config_t a2a_v03_config_default(void)
 {
     a2a_v03_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
+    AGENTOS_MEMSET(&cfg, 0, sizeof(cfg));
     cfg.capabilities = A2A_CAP_TASK_EXECUTION | A2A_CAP_STREAMING | A2A_CAP_NEGOTIATION |
                        A2A_CAP_PUSH_NOTIFICATIONS | A2A_CAP_MULTI_TURN | A2A_CAP_STATE_TRANSITION;
     cfg.max_agents = 256;
@@ -1018,7 +1014,7 @@ a2a_v03_context_t *a2a_v03_context_create(const a2a_v03_config_t *config)
     a2a_v03_config_t cfg = config ? *config : a2a_v03_config_default();
     a2a_handle_t handle = NULL;
     a2a_config_t legacy_cfg;
-    memset(&legacy_cfg, 0, sizeof(legacy_cfg));
+    AGENTOS_MEMSET(&legacy_cfg, 0, sizeof(legacy_cfg));
     legacy_cfg.max_agents = (uint32_t)cfg.max_agents;
     legacy_cfg.max_tasks = (uint32_t)cfg.max_tasks;
     legacy_cfg.default_timeout_ms = cfg.default_timeout_ms;
@@ -1601,7 +1597,7 @@ const protocol_adapter_t *a2a_v03_get_adapter(void)
     static protocol_adapter_t s_adapter;
     static bool s_init = false;
     if (!s_init) {
-        memset(&s_adapter, 0, sizeof(s_adapter));
+        AGENTOS_MEMSET(&s_adapter, 0, sizeof(s_adapter));
         s_adapter.type = AGENTOS_PROTOCOL_A2A;
         s_adapter.name = "a2a-v0.3";
         s_adapter.version = "0.3.0";

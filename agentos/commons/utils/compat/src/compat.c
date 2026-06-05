@@ -75,7 +75,7 @@ int agentos_memset_s(void *dest, int c, size_t dest_size, size_t count)
         return AGENTOS_EINVAL;
     }
 
-    memset(dest, c, count);
+    memset(dest, (int)c, count);
     return 0;
 }
 

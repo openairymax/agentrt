@@ -430,7 +430,7 @@ pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
     engine->checkpoint_count = 0;
 
     // 初始化统计信息
-    memset(&engine->stats, 0, sizeof(engine->stats));
+    AGENTOS_MEMSET(&engine->stats, 0, sizeof(engine->stats));
 
     // 初始化状态
     engine->current_superstep = 0;
@@ -1040,7 +1040,7 @@ taskflow_error_t pregel_engine_reset_stats(pregel_engine_handle_t engine)
 
     struct pregel_engine_s *e = (struct pregel_engine_s *)engine;
 
-    memset(&e->stats, 0, sizeof(e->stats));
+    AGENTOS_MEMSET(&e->stats, 0, sizeof(e->stats));
 
     return TASKFLOW_SUCCESS;
 }
@@ -1157,7 +1157,7 @@ taskflow_error_t pregel_engine_run_superstep(pregel_engine_handle_t engine)
                     if (new_msgs) {
                         vs->incoming_messages = new_msgs;
                         graph_message_t *msg = &vs->incoming_messages[vs->incoming_message_count];
-                        memset(msg, 0, sizeof(graph_message_t));
+                        AGENTOS_MEMSET(msg, 0, sizeof(graph_message_t));
                         msg->id = (message_id_t)(vs->incoming_message_count + 1);
                         msg->sender = entry->target;
                         msg->receiver = entry->target;

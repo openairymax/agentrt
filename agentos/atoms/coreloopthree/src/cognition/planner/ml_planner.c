@@ -305,16 +305,32 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
             if (in_parallel_group && (int)i > my_group_start) {
                 /* 并行组内: 仅依赖组内第一个任务 + 所有前置串行任务 */
                 size_t dep_count = 1 + (size_t)my_group_start;
-                node->task_node_depends_on = (char **)AGENTOS_MALLOC(dep_count * sizeof(char *));
+                SAFE_MALLOC_ARRAY(node->task_node_depends_on, dep_count, sizeof(char *));
                 if (node->task_node_depends_on) {
                     node->task_node_depends_count = dep_count;
                     /* 依赖组首节点 */
                     node->task_node_depends_on[0] =
                         AGENTOS_STRDUP(plan->task_plan_nodes[my_group_start]->task_node_id);
-                    /* 依赖所有前置串行任务 */
-                    for (size_t d = 1; d < dep_count; d++) {
-                        node->task_node_depends_on[d] =
-                            AGENTOS_STRDUP(plan->task_plan_nodes[d - 1]->task_node_id);
+                    if (!node->task_node_depends_on[0]) {
+                        /* SEC-09: STRDUP 失败时清理已分配资源 */
+                        AGENTOS_FREE(node->task_node_depends_on);
+                        node->task_node_depends_on = NULL;
+                        node->task_node_depends_count = 0;
+                    } else {
+                        /* 依赖所有前置串行任务 */
+                        for (size_t d = 1; d < dep_count; d++) {
+                            node->task_node_depends_on[d] =
+                                AGENTOS_STRDUP(plan->task_plan_nodes[d - 1]->task_node_id);
+                            if (!node->task_node_depends_on[d]) {
+                                /* SEC-09: 清理已分配的所有依赖项 */
+                                for (size_t e = 0; e < d; e++)
+                                    AGENTOS_FREE(node->task_node_depends_on[e]);
+                                AGENTOS_FREE(node->task_node_depends_on);
+                                node->task_node_depends_on = NULL;
+                                node->task_node_depends_count = 0;
+                                break;
+                            }
+                        }
                     }
                 }
             } else {
@@ -324,6 +340,12 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
                     node->task_node_depends_count = 1;
                     node->task_node_depends_on[0] =
                         AGENTOS_STRDUP(plan->task_plan_nodes[i - 1]->task_node_id);
+                    if (!node->task_node_depends_on[0]) {
+                        /* SEC-09: STRDUP 失败时清理已分配资源 */
+                        AGENTOS_FREE(node->task_node_depends_on);
+                        node->task_node_depends_on = NULL;
+                        node->task_node_depends_count = 0;
+                    }
                 }
             }
         }
@@ -355,6 +377,12 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
                 verify_node->task_node_depends_count = 1;
                 verify_node->task_node_depends_on[0] = AGENTOS_STRDUP(
                     plan->task_plan_nodes[plan->task_plan_node_count - 1]->task_node_id);
+                if (!verify_node->task_node_depends_on[0]) {
+                    /* SEC-09: STRDUP 失败时清理已分配资源 */
+                    AGENTOS_FREE(verify_node->task_node_depends_on);
+                    verify_node->task_node_depends_on = NULL;
+                    verify_node->task_node_depends_count = 0;
+                }
             }
 
             agentos_task_node_t **expanded = (agentos_task_node_t **)AGENTOS_REALLOC(
@@ -385,6 +413,12 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
                 qa_node->task_node_depends_count = 1;
                 qa_node->task_node_depends_on[0] = AGENTOS_STRDUP(
                     plan->task_plan_nodes[plan->task_plan_node_count - 1]->task_node_id);
+                if (!qa_node->task_node_depends_on[0]) {
+                    /* SEC-09: STRDUP 失败时清理已分配资源 */
+                    AGENTOS_FREE(qa_node->task_node_depends_on);
+                    qa_node->task_node_depends_on = NULL;
+                    qa_node->task_node_depends_count = 0;
+                }
             }
 
             agentos_task_node_t **expanded = (agentos_task_node_t **)AGENTOS_REALLOC(

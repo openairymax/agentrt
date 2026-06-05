@@ -58,7 +58,7 @@ static void test_agentos_result_t_structure(void **state) {
     agentos_result_t result = {0};
     result.success = true;
     result.error_code = AGENTOS_SUCCESS;
-    strncpy(result.error_message, "Test error", sizeof(result.error_message));
+    AGENTOS_STRNCPY_TERM(result.error_message, "Test error", sizeof(result.error_message));
 
     assert_true(result.success);
     assert_int_equal(result.error_code, AGENTOS_SUCCESS);

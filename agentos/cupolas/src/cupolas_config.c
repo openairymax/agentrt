@@ -110,7 +110,7 @@ cupolas_config_t *cupolas_config_create(const char *config_dir)
         return NULL;
     }
 
-    memset(cfg, 0, sizeof(cupolas_config_t));
+    AGENTOS_MEMSET(cfg, 0, sizeof(cupolas_config_t));
 
     if (config_dir) {
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s", config_dir);
@@ -338,7 +338,7 @@ int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
 
     cupolas_rwlock_rdlock(&cfg->lock);
 
-    memset(result, 0, sizeof(config_validation_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(config_validation_result_t));
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t *entry = &cfg->entries[type];

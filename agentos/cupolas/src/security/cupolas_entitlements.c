@@ -97,6 +97,8 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
         return NULL;
 
     size_t capacity = 16;
+    if (capacity > SIZE_MAX / sizeof(char *))
+        return NULL;
     char **arr = (char **)AGENTOS_MALLOC(capacity * sizeof(char *));
     if (!arr)
         return NULL;

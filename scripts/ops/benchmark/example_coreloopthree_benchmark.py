@@ -11,7 +11,7 @@ AgentOS CoreLoopThree 性能基准测试示例
 2. 可重复性 - 确保每次测试条件一致
 3. 可扩展性 - 可轻松扩展到实际 C 模块测试
 
-@version v1.0.0
+@version 0.1.0
 @date 2026-04-11
 @copyright (c) 2026 SPHARX. All Rights Reserved.
 """

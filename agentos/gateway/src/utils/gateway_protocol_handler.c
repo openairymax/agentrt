@@ -139,7 +139,7 @@ static agentos_protocol_type_t detect_protocol_internal(const char *request_data
 static rpc_result_t create_error_result(int code, const char *message, const char *id_str)
 {
     rpc_result_t result;
-    memset(&result, 0, sizeof(result));
+    AGENTOS_MEMSET(&result, 0, sizeof(result));
     result.error_code = code;
     result.error_message = AGENTOS_STRDUP(message ? message : "Unknown error");
 
@@ -510,7 +510,7 @@ rpc_result_t gateway_protocol_handle_request(gateway_protocol_handler_t handler,
     }
 
     rpc_result_t final_result;
-    memset(&final_result, 0, sizeof(final_result));
+    AGENTOS_MEMSET(&final_result, 0, sizeof(final_result));
     final_result.error_code = 0;
     final_result.response_json = response_str;
 
@@ -618,7 +618,7 @@ void gateway_protocol_handler_get_default_config(gateway_protocol_config_t *conf
 {
     if (!config)
         return;
-    memset(config, 0, sizeof(*config));
+    AGENTOS_MEMSET(config, 0, sizeof(*config));
     config->enable_mcp_protocol = true;
     config->enable_a2a_protocol = true;
     config->enable_openai_protocol = true;

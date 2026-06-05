@@ -131,7 +131,7 @@ static int32_t find_endpoint_index(ipc_service_bus_internal_t *bus, const char *
 static void init_message_header(ipc_bus_message_header_t *header, ipc_bus_msg_type_t msg_type,
                                 ipc_bus_proto_t protocol, const char *source, const char *target)
 {
-    memset(header, 0, sizeof(ipc_bus_message_header_t));
+    AGENTOS_MEMSET(header, 0, sizeof(ipc_bus_message_header_t));
     header->magic = IPC_BUS_MESSAGE_MAGIC;
     header->version = IPC_BUS_MESSAGE_VERSION;
     header->msg_type = msg_type;
@@ -171,7 +171,7 @@ AGENTOS_API ipc_service_bus_t ipc_service_bus_create(const char *bus_name,
     if (config) {
         memcpy(&bus->default_config, config, sizeof(ipc_bus_channel_config_t));
     } else {
-        memset(&bus->default_config, 0, sizeof(ipc_bus_channel_config_t));
+        AGENTOS_MEMSET(&bus->default_config, 0, sizeof(ipc_bus_channel_config_t));
         safe_strcpy(bus->default_config.name, "default", IPC_BUS_CHANNEL_NAME_LEN);
         bus->default_config.default_protocol = IPC_BUS_PROTO_JSON_RPC;
         bus->default_config.timeout_ms = IPC_BUS_DEFAULT_TIMEOUT_MS;
@@ -710,7 +710,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_unregister_endpoint(ipc_service_bus_
     if ((uint32_t)idx < bus->endpoint_count - 1) {
         bus->endpoints[idx] = bus->endpoints[bus->endpoint_count - 1];
     }
-    memset(&bus->endpoints[bus->endpoint_count - 1], 0, sizeof(ipc_bus_endpoint_t));
+    AGENTOS_MEMSET(&bus->endpoints[bus->endpoint_count - 1], 0, sizeof(ipc_bus_endpoint_t));
     bus->endpoint_count--;
     bus->stats.active_endpoints = bus->endpoint_count;
 
@@ -877,6 +877,7 @@ AGENTOS_API ipc_bus_message_t *ipc_bus_message_create(ipc_bus_msg_type_t msg_typ
             AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
+        /* SEC-02: dst容量 = payload_size (来自AGENTOS_CALLOC)，与复制大小一致，边界检查已隐式满足 */
         memcpy(msg->payload, payload, payload_size);
         msg->payload_size = payload_size;
         msg->header.checksum = compute_checksum(payload, payload_size);
@@ -970,7 +971,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_reset_stats(ipc_service_bus_t bus_ha
     ipc_service_bus_internal_t *bus = (ipc_service_bus_internal_t *)bus_handle;
 
     agentos_mutex_lock(&bus->mutex);
-    memset(&bus->stats, 0, sizeof(ipc_bus_stats_t));
+    AGENTOS_MEMSET(&bus->stats, 0, sizeof(ipc_bus_stats_t));
     agentos_mutex_unlock(&bus->mutex);
 
     return AGENTOS_SUCCESS;

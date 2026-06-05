@@ -101,7 +101,7 @@ int trace_store_service_init(const char *storage_path, uint64_t max_storage_byte
     }
 
     // 设置存储路径
-    strncpy(g_ctx.storage_path, storage_path, sizeof(g_ctx.storage_path) - 1);
+    AGENTOS_STRNCPY_TERM(g_ctx.storage_path, storage_path, sizeof(g_ctx.storage_path));
     g_ctx.storage_path[sizeof(g_ctx.storage_path) - 1] = '\0';
 
     g_ctx.max_storage_bytes =
@@ -266,7 +266,7 @@ int trace_store_service_query_traces(const heapstore_trace_query_t *query,
     }
 
     heapstore_trace_point_t *results =
-        (heapstore_trace_point_t *)AGENTOS_MALLOC(max_traces * sizeof(heapstore_trace_point_t));
+        SAFE_MALLOC_ARRAY(results, max_traces, sizeof(heapstore_trace_point_t));
     if (!results) {
         closedir(dir);
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -326,7 +326,7 @@ int trace_store_service_query_traces(const heapstore_trace_query_t *query,
     }
 
     heapstore_trace_point_t *final_results =
-        (heapstore_trace_point_t *)AGENTOS_MALLOC(found_count * sizeof(heapstore_trace_point_t));
+        SAFE_MALLOC_ARRAY(final_results, found_count, sizeof(heapstore_trace_point_t));
     if (!final_results) {
         AGENTOS_FREE(results);
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -537,5 +537,5 @@ void trace_store_service_shutdown(void)
         return;
     }
 
-    memset(&g_ctx, 0, sizeof(g_ctx));
+    AGENTOS_MEMSET(&g_ctx, 0, sizeof(g_ctx));
 }

@@ -642,8 +642,7 @@ agentos_error_t agentos_error_register_i18n(const agentos_error_i18n_entry_t *en
     }
 
     /* 分配新内存 */
-    g_i18n_entries =
-        (agentos_error_i18n_entry_t *)AGENTOS_MALLOC(count * sizeof(agentos_error_i18n_entry_t));
+    SAFE_MALLOC_ARRAY(g_i18n_entries, count, sizeof(agentos_error_i18n_entry_t));
     if (g_i18n_entries == NULL) {
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }

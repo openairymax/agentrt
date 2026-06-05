@@ -215,7 +215,7 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
     if (!handler)
         return NULL;
 
-    memset(handler, 0, sizeof(overflow_handler_t));
+    AGENTOS_MEMSET(handler, 0, sizeof(overflow_handler_t));
 
     snprintf(handler->overflow_dir, sizeof(handler->overflow_dir), "%s",
              overflow_dir ? overflow_dir : DEFAULT_OVERFLOW_DIR);
@@ -405,7 +405,7 @@ audit_queue_ex_t *audit_queue_ex_create(size_t max_size, const char *overflow_di
     if (!queue_ex)
         return NULL;
 
-    memset(queue_ex, 0, sizeof(audit_queue_ex_t));
+    AGENTOS_MEMSET(queue_ex, 0, sizeof(audit_queue_ex_t));
 
     queue_ex->queue = audit_queue_create(max_size);
     if (!queue_ex->queue) {

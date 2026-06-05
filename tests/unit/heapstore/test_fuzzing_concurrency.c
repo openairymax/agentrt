@@ -161,7 +161,7 @@ static void test_fuzz_config_params(void) {
     heapstore_config_t config;
     
     for (int i = 0; i < 1000; i++) {
-        memset(&config, 0, sizeof(config));
+        AGENTOS_MEMSET(&config, 0, sizeof(config));
         
         /* 生成随机但合理的配置 */
         config.root_path = AGENTOS_TMP_DIR "/agentos_heapstore_test";

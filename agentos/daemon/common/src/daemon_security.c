@@ -185,7 +185,7 @@ void daemon_security_shutdown(void)
 
     cupolas_cleanup();
 
-    memset(&g_daemon_security, 0, sizeof(g_daemon_security));
+    AGENTOS_MEMSET(&g_daemon_security, 0, sizeof(g_daemon_security));
 
     SVC_LOG_INFO("Daemon security layer shutdown complete");
 }
@@ -579,7 +579,7 @@ int daemon_security_init(const daemon_security_config_t *config, agentos_error_t
         return 0;
     }
 
-    memset(&g_security_ctx, 0, sizeof(g_security_ctx));
+    AGENTOS_MEMSET(&g_security_ctx, 0, sizeof(g_security_ctx));
     g_security_ctx.current_sanitize_level = SANITIZE_LEVEL_STRICT;
     g_security_ctx.permission_enabled = true;
     g_security_ctx.signature_enabled = true;
@@ -834,7 +834,7 @@ int daemon_verify_package_signature(const char *package_path, bool *is_valid,
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "verify_package_signature: null parameter");
     }
     if (signer_info)
-        memset(signer_info, 0, sizeof(cupolas_signer_info_t));
+        AGENTOS_MEMSET(signer_info, 0, sizeof(cupolas_signer_info_t));
 
     *is_valid = false;
 

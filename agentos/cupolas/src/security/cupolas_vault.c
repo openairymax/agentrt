@@ -102,7 +102,7 @@ int cupolas_vault_init(const cupolas_vault_config_t *config)
 
     int expected = VLT_INIT_UNINIT;
     if (atomic_compare_exchange_strong(&g_vault_ctx.initialized, &expected, VLT_INIT_PROGRESS)) {
-        memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
+        AGENTOS_MEMSET(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 
         if (config) {
             memcpy(&g_vault_ctx.default_config, config, sizeof(cupolas_vault_config_t));
@@ -132,7 +132,7 @@ void cupolas_vault_cleanup(void)
     }
 
     cupolas_rwlock_destroy(&g_vault_ctx.global_lock);
-    memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
+    AGENTOS_MEMSET(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 }
 
 int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault_t **vault)
@@ -226,7 +226,7 @@ void cupolas_vault_close(cupolas_vault_t *vault)
         AGENTOS_FREE(vault->entries);
     }
 
-    memset(vault->master_key, 0, AES_KEY_SIZE);
+    AGENTOS_MEMSET(vault->master_key, 0, AES_KEY_SIZE);
 
     cupolas_rwlock_unlock(&vault->lock);
     cupolas_rwlock_destroy(&vault->lock);
@@ -242,7 +242,7 @@ int cupolas_vault_lock(cupolas_vault_t *vault)
     }
 
     cupolas_rwlock_wrlock(&vault->lock);
-    memset(vault->master_key, 0, AES_KEY_SIZE);
+    AGENTOS_MEMSET(vault->master_key, 0, AES_KEY_SIZE);
     vault->is_locked = true;
     cupolas_rwlock_unlock(&vault->lock);
 
@@ -340,7 +340,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         AGENTOS_FREE(entry->metadata.cred_id);
     } else {
         entry = &vault->entries[vault->entry_count];
-        memset(entry, 0, sizeof(credential_entry_t));
+        AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
         entry->cred_id = AGENTOS_STRDUP(cred_id);
     }
 
@@ -355,7 +355,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            memset(entry, 0, sizeof(credential_entry_t));
+            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
         }
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
@@ -366,7 +366,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            memset(entry, 0, sizeof(credential_entry_t));
+            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -382,7 +382,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            memset(entry, 0, sizeof(credential_entry_t));
+            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -399,7 +399,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            memset(entry, 0, sizeof(credential_entry_t));
+            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -414,7 +414,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            memset(entry, 0, sizeof(credential_entry_t));
+            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -839,7 +839,7 @@ void cupolas_vault_free_metadata(cupolas_vault_metadata_t *metadata)
     AGENTOS_FREE(metadata->description);
     AGENTOS_FREE(metadata->service);
     AGENTOS_FREE(metadata->account);
-    memset(metadata, 0, sizeof(cupolas_vault_metadata_t));
+    AGENTOS_MEMSET(metadata, 0, sizeof(cupolas_vault_metadata_t));
 }
 
 int cupolas_vault_list(cupolas_vault_t *vault, cupolas_vault_cred_type_t type,
@@ -1409,7 +1409,7 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         }
 
         credential_entry_t *entry = &vault->entries[vault->entry_count];
-        memset(entry, 0, sizeof(credential_entry_t));
+        AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
         entry->cred_id = cred_id;
         entry->type = type;
         entry->encrypted_data = (uint8_t *)AGENTOS_MALLOC(total_decrypted);
@@ -1485,7 +1485,7 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         }
 
         {
-            memset(&entry->metadata, 0, sizeof(entry->metadata));
+            AGENTOS_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
             char *meta_ptrs[4] = {NULL, NULL, NULL, NULL};
             for (int m = 0; m < 4; m++) {
                 size_t field_len = 0;
@@ -1568,14 +1568,13 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
                     entry->type = 0;
                     entry->encrypted_data = NULL;
                     entry->encrypted_len = 0;
-                    memset(&entry->acl, 0, sizeof(entry->acl));
-                    memset(&entry->metadata, 0, sizeof(entry->metadata));
+                    AGENTOS_MEMSET(&entry->acl, 0, sizeof(entry->acl));
+                    AGENTOS_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
                     vault->entry_count++;
                     imported++;
                 }
             }
-            strncpy(current_id, line + 1, strlen(line) - 2);
-            current_id[strlen(line) - 2] = '\0';
+            AGENTOS_STRNCPY_TERM(current_id, line + 1, sizeof(current_id));
             in_entry = true;
         }
     }
@@ -1586,8 +1585,8 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         entry->type = 0;
         entry->encrypted_data = NULL;
         entry->encrypted_len = 0;
-        memset(&entry->acl, 0, sizeof(entry->acl));
-        memset(&entry->metadata, 0, sizeof(entry->metadata));
+        AGENTOS_MEMSET(&entry->acl, 0, sizeof(entry->acl));
+        AGENTOS_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
         vault->entry_count++;
         imported++;
     }

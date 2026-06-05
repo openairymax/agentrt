@@ -35,7 +35,7 @@ static void test_registry_agent_crud(void)
     assert(err == heapstore_SUCCESS);
 
     heapstore_agent_record_t record;
-    memset(&record, 0, sizeof(record));
+    AGENTOS_MEMSET(&record, 0, sizeof(record));
 
     snprintf(record.id, sizeof(record.id), "agent_%d", (int)time(NULL));
     snprintf(record.name, sizeof(record.name), "Test Agent");
@@ -48,7 +48,7 @@ static void test_registry_agent_crud(void)
     err = heapstore_registry_add_agent(&record);
     if (err == heapstore_SUCCESS) {
         heapstore_agent_record_t get_record;
-        memset(&get_record, 0, sizeof(get_record));
+        AGENTOS_MEMSET(&get_record, 0, sizeof(get_record));
 
         err = heapstore_registry_get_agent(record.id, &get_record);
         assert(err == heapstore_SUCCESS);
@@ -79,7 +79,7 @@ static void test_registry_skill_crud(void)
     assert(err == heapstore_SUCCESS);
 
     heapstore_skill_record_t record;
-    memset(&record, 0, sizeof(record));
+    AGENTOS_MEMSET(&record, 0, sizeof(record));
 
     snprintf(record.id, sizeof(record.id), "skill_%d", (int)time(NULL));
     snprintf(record.name, sizeof(record.name), "Test Skill");
@@ -90,7 +90,7 @@ static void test_registry_skill_crud(void)
     err = heapstore_registry_add_skill(&record);
     if (err == heapstore_SUCCESS) {
         heapstore_skill_record_t get_record;
-        memset(&get_record, 0, sizeof(get_record));
+        AGENTOS_MEMSET(&get_record, 0, sizeof(get_record));
 
         err = heapstore_registry_get_skill(record.id, &get_record);
         assert(err == heapstore_SUCCESS);
@@ -112,7 +112,7 @@ static void test_registry_session_crud(void)
     assert(err == heapstore_SUCCESS);
 
     heapstore_session_record_t record;
-    memset(&record, 0, sizeof(record));
+    AGENTOS_MEMSET(&record, 0, sizeof(record));
 
     snprintf(record.id, sizeof(record.id), "session_%d", (int)time(NULL));
     snprintf(record.user_id, sizeof(record.user_id), "user_123");
@@ -124,7 +124,7 @@ static void test_registry_session_crud(void)
     err = heapstore_registry_add_session(&record);
     if (err == heapstore_SUCCESS) {
         heapstore_session_record_t get_record;
-        memset(&get_record, 0, sizeof(get_record));
+        AGENTOS_MEMSET(&get_record, 0, sizeof(get_record));
 
         err = heapstore_registry_get_session(record.id, &get_record);
         assert(err == heapstore_SUCCESS);
@@ -150,7 +150,7 @@ static void test_registry_invalid_params(void)
     assert(err == heapstore_SUCCESS);
 
     heapstore_agent_record_t agent_record;
-    memset(&agent_record, 0, sizeof(agent_record));
+    AGENTOS_MEMSET(&agent_record, 0, sizeof(agent_record));
 
     err = heapstore_registry_add_agent(NULL);
     assert(err == heapstore_ERR_INVALID_PARAM);

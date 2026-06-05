@@ -647,7 +647,7 @@ char *platform_path_dirname(const char *path)
     size_t len = last_slash - path;
     char *result = (char *)AGENTOS_MALLOC(len + 1);
     if (result) {
-        strncpy(result, path, len);
+        AGENTOS_STRNCPY_TERM(result, path, len);
         result[len] = '\0';
     }
     return result;

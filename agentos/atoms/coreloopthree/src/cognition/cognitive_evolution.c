@@ -275,7 +275,7 @@ int cog_evolution_extract_patterns(cog_evolution_t *evo, size_t *pattern_count)
             }
 
             cog_pattern_t *p = &evo->patterns[evo->pattern_count];
-            memset(p, 0, sizeof(cog_pattern_t));
+            AGENTOS_MEMSET(p, 0, sizeof(cog_pattern_t));
             snprintf(p->id, sizeof(p->id), "pat_%zu", evo->pattern_count);
             snprintf(p->pattern_type, sizeof(p->pattern_type), "action_outcome");
             p->trigger_json = json_strdup(exp->action_json);
@@ -329,7 +329,7 @@ int cog_evolution_evolve_strategies(cog_evolution_t *evo, size_t *strategy_count
             }
 
             cog_strategy_t *s = &evo->strategies[evo->strategy_count];
-            memset(s, 0, sizeof(cog_strategy_t));
+            AGENTOS_MEMSET(s, 0, sizeof(cog_strategy_t));
             snprintf(s->id, sizeof(s->id), "strat_%zu", evo->strategy_count);
             snprintf(s->name, sizeof(s->name), "evolved_%zu", evo->strategy_count);
             snprintf(s->domain, sizeof(s->domain), "general");
@@ -430,10 +430,10 @@ int cog_evolution_transfer_knowledge(cog_evolution_t *evo, const char *source_do
                 }
 
                 cog_knowledge_t *k = &evo->knowledge[evo->knowledge_count];
-                memset(k, 0, sizeof(cog_knowledge_t));
+                AGENTOS_MEMSET(k, 0, sizeof(cog_knowledge_t));
                 snprintf(k->id, sizeof(k->id), "kn_%zu", evo->knowledge_count);
-                strncpy(k->source_domain, source_domain, sizeof(k->source_domain) - 1);
-                strncpy(k->target_domain, target_domain, sizeof(k->target_domain) - 1);
+                AGENTOS_STRNCPY_TERM(k->source_domain, source_domain, sizeof(k->source_domain));
+                AGENTOS_STRNCPY_TERM(k->target_domain, target_domain, sizeof(k->target_domain));
                 k->knowledge_json = json_strdup(s->action_json);
                 k->adaptation_json = json_strdup(s->condition_json);
                 k->transfer_score = s->fitness * 0.7;

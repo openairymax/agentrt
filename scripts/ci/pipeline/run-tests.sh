@@ -2,7 +2,7 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 测试运行脚本
 # 支持：CTest/pytest 双引擎、覆盖率收集、测试分类执行、超时控制
-# Version: 2.0.0
+# Version: 0.1.0
 
 set -euo pipefail
 

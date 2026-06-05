@@ -34,7 +34,7 @@ int network_utils_parse_url(const char *url, char *scheme, char *host, uint16_t 
     const char *colon = strstr(p, "://");
     if (colon && scheme) {
         size_t scheme_len = colon - p;
-        strncpy(scheme, p, scheme_len);
+        AGENTOS_STRNCPY_TERM(scheme, p, scheme_len);
         scheme[scheme_len] = '\0';
         p = colon + 3;
     }
@@ -51,7 +51,7 @@ int network_utils_parse_url(const char *url, char *scheme, char *host, uint16_t 
         } else {
             host_len = strlen(p);
         }
-        strncpy(host, p, host_len);
+        AGENTOS_STRNCPY_TERM(host, p, host_len);
         host[host_len] = '\0';
     }
 
@@ -91,7 +91,7 @@ int network_utils_ip_in_cidr(const char *ip, const char *cidr)
         return 0;
 
     char cidr_copy[64];
-    strncpy(cidr_copy, cidr, sizeof(cidr_copy) - 1);
+    AGENTOS_STRNCPY_TERM(cidr_copy, cidr, sizeof(cidr_copy));
     cidr_copy[sizeof(cidr_copy) - 1] = '\0';
 
     char *slash = strchr(cidr_copy, '/');

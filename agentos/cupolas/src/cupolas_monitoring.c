@@ -361,12 +361,12 @@ cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *manag
         return NULL;
     }
 
-    memset(mgr, 0, sizeof(cupolas_monitoring_t));
+    AGENTOS_MEMSET(mgr, 0, sizeof(cupolas_monitoring_t));
 
     if (manager) {
         memcpy(&mgr->manager, manager, sizeof(monitoring_config_t));
     } else {
-        memset(&mgr->manager, 0, sizeof(monitoring_config_t));
+        AGENTOS_MEMSET(&mgr->manager, 0, sizeof(monitoring_config_t));
         mgr->manager.backend = MONITORING_BACKEND_PROMETHEUS;
         mgr->manager.prometheus.listen_addr = "127.0.0.1";
         mgr->manager.prometheus.port = 9090;
@@ -611,7 +611,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
             size_t line_len = (size_t)(metric_data - line_start);
             if (line_len > 0 && line_len < 256) {
                 char line[256];
-                strncpy(line, line_start, line_len);
+                AGENTOS_STRNCPY_TERM(line, line_start, line_len);
                 line[line_len] = '\0';
 
                 if (strncmp(line, "# HELP ", 7) == 0 || strncmp(line, "# TYPE ", 7) == 0) {
@@ -629,9 +629,9 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
                     if (space_pos) {
                         size_t name_len = (size_t)(space_pos - line);
                         if (name_len < sizeof(metric_name)) {
-                            strncpy(metric_name, line, name_len);
+                            AGENTOS_STRNCPY_TERM(metric_name, line, name_len);
                             metric_name[name_len] = '\0';
-                            strncpy(metric_value, space_pos + 1, sizeof(metric_value) - 1);
+                            AGENTOS_STRNCPY_TERM(metric_value, space_pos + 1, sizeof(metric_value));
                             metric_value[sizeof(metric_value) - 1] = '\0';
 
                             if (!first_metric) {
@@ -756,8 +756,7 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
     mgr->include_count = 0;
     if (include_patterns) {
         for (size_t i = 0; include_patterns[i] && mgr->include_count < MAX_FILTER_PATTERNS; i++) {
-            strncpy(mgr->include_patterns[mgr->include_count], include_patterns[i],
-                    MAX_PATTERN_LEN - 1);
+            AGENTOS_STRNCPY_TERM(mgr->include_patterns[mgr->include_count], include_patterns[i], MAX_PATTERN_LEN);
             mgr->include_patterns[mgr->include_count][MAX_PATTERN_LEN - 1] = '\0';
             mgr->include_count++;
         }
@@ -766,8 +765,7 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
     mgr->exclude_count = 0;
     if (exclude_patterns) {
         for (size_t i = 0; exclude_patterns[i] && mgr->exclude_count < MAX_FILTER_PATTERNS; i++) {
-            strncpy(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i],
-                    MAX_PATTERN_LEN - 1);
+            AGENTOS_STRNCPY_TERM(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i], MAX_PATTERN_LEN);
             mgr->exclude_patterns[mgr->exclude_count][MAX_PATTERN_LEN - 1] = '\0';
             mgr->exclude_count++;
         }
@@ -821,7 +819,7 @@ monitoring_config_t *monitoring_config_create_prometheus(uint16_t port)
     if (!manager)
         return NULL;
 
-    memset(manager, 0, sizeof(monitoring_config_t));
+    AGENTOS_MEMSET(manager, 0, sizeof(monitoring_config_t));
 
     manager->backend = MONITORING_BACKEND_PROMETHEUS;
     manager->prometheus.listen_addr = "127.0.0.1";
@@ -842,7 +840,7 @@ monitoring_config_t *monitoring_config_create_opentelemetry(const char *endpoint
     if (!manager)
         return NULL;
 
-    memset(manager, 0, sizeof(monitoring_config_t));
+    AGENTOS_MEMSET(manager, 0, sizeof(monitoring_config_t));
 
     manager->backend = MONITORING_BACKEND_OPENTELEMETRY;
     manager->opentelemetry.endpoint = endpoint;

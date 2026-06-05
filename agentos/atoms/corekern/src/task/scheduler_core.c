@@ -54,7 +54,7 @@ static scheduler_core_ctx_t *create_core_ctx(void)
     ctx->task_count = 0;
 
     /* 清零哈希?*/
-    memset(ctx->id_hash_table, 0, sizeof(ctx->id_hash_table));
+    AGENTOS_MEMSET(ctx->id_hash_table, 0, sizeof(ctx->id_hash_table));
 
     return ctx;
 }
@@ -239,7 +239,7 @@ task_info_core_t *scheduler_core_task_info_create(agentos_task_id_t id, void *(*
 
     /* 设置任务名称 */
     if (name) {
-        strncpy(info->name, name, sizeof(info->name) - 1);
+        AGENTOS_STRNCPY_TERM(info->name, name, sizeof(info->name));
         info->name[sizeof(info->name) - 1] = '\0';
     } else {
         snprintf(info->name, sizeof(info->name), "task_%llu", (unsigned long long)id);
