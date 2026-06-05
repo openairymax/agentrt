@@ -285,7 +285,7 @@ static int claude_proto_handle_request(void *context, const void *req, void **re
         user_content = (const char *)request->body;
 
     char resp_text[CLAUDE_MAX_RESPONSE_LEN];
-    memset(resp_text, 0, sizeof(resp_text));
+    AGENTOS_MEMSET(resp_text, 0, sizeof(resp_text));
     claude_generate_response(user_content, system_content, resp_text, sizeof(resp_text));
 
     unified_message_t *response = (unified_message_t *)AGENTOS_CALLOC(1, sizeof(unified_message_t));
@@ -297,8 +297,7 @@ static int claude_proto_handle_request(void *context, const void *req, void **re
     response->payload_size = resp_len;
     response->status = 200;
     if (request) {
-        strncpy(response->correlation_id, request->correlation_id,
-                sizeof(response->correlation_id) - 1);
+        AGENTOS_STRNCPY_TERM(response->correlation_id, request->correlation_id, sizeof(response->correlation_id));
     }
 
     ctx->total_requests++;
@@ -490,14 +489,14 @@ void claude_adapter_destroy(claude_adapter_context_t *ctx)
 
     if (ctx->config.api_key) {
         size_t key_len = strlen(ctx->config.api_key);
-        memset(ctx->config.api_key, 0, key_len);
+        AGENTOS_MEMSET(ctx->config.api_key, 0, key_len);
         AGENTOS_FREE(ctx->config.api_key);
     }
     AGENTOS_FREE(ctx->config.base_url);
     AGENTOS_FREE(ctx->config.system_prompt);
     AGENTOS_FREE(ctx->config.metadata_json);
 
-    memset(ctx, 0, sizeof(claude_adapter_context_t));
+    AGENTOS_MEMSET(ctx, 0, sizeof(claude_adapter_context_t));
     AGENTOS_FREE(ctx);
 }
 
@@ -522,7 +521,7 @@ int claude_messages_create(claude_adapter_context_t *ctx, const claude_message_t
 
     ctx->total_requests++;
 
-    memset(response, 0, sizeof(claude_response_t));
+    AGENTOS_MEMSET(response, 0, sizeof(claude_response_t));
 
     if (ctx->message_handler) {
         const char *model_name = claude_model_id_to_api_name(ctx->config.default_model);
@@ -583,7 +582,7 @@ int claude_messages_create(claude_adapter_context_t *ctx, const claude_message_t
     cJSON_Delete(req);
 
     char api_response[8192];
-    memset(api_response, 0, sizeof(api_response));
+    AGENTOS_MEMSET(api_response, 0, sizeof(api_response));
     int api_result = claude_api_call(ctx->config.api_key, ctx->config.base_url, req_json,
                                      api_response, sizeof(api_response));
     AGENTOS_FREE(req_json);
@@ -677,7 +676,7 @@ int claude_messages_stream(claude_adapter_context_t *ctx, const claude_message_t
     }
 
     char full_response[CLAUDE_MAX_RESPONSE_LEN];
-    memset(full_response, 0, sizeof(full_response));
+    AGENTOS_MEMSET(full_response, 0, sizeof(full_response));
     int gen_result =
         claude_generate_response(user_content, sys_ctx, full_response, sizeof(full_response));
     if (gen_result < 0)
@@ -712,7 +711,7 @@ int claude_messages_stream(claude_adapter_context_t *ctx, const claude_message_t
         pos += cLen;
 
         claude_stream_event_t event;
-        memset(&event, 0, sizeof(event));
+        AGENTOS_MEMSET(&event, 0, sizeof(event));
         event.text = chunk_buf;
         event.stop_reason = (pos >= resp_len) ? CLAUDE_STOP_END_TURN : 0;
         event.is_final = (pos >= resp_len);
@@ -864,7 +863,7 @@ void claude_response_destroy(claude_response_t *resp)
         }
     }
     AGENTOS_FREE(resp->content_blocks);
-    memset(resp, 0, sizeof(claude_response_t));
+    AGENTOS_MEMSET(resp, 0, sizeof(claude_response_t));
 }
 
 void claude_message_destroy(claude_message_t *msg)
@@ -876,7 +875,7 @@ void claude_message_destroy(claude_message_t *msg)
     for (size_t i = 0; i < msg->breakpoint_count; i++)
         AGENTOS_FREE(msg->cache_control_breakpoints[i]);
     AGENTOS_FREE(msg->cache_control_breakpoints);
-    memset(msg, 0, sizeof(claude_message_t));
+    AGENTOS_MEMSET(msg, 0, sizeof(claude_message_t));
 }
 
 void claude_tool_def_destroy(claude_tool_def_t *tool)
@@ -886,7 +885,7 @@ void claude_tool_def_destroy(claude_tool_def_t *tool)
     AGENTOS_FREE(tool->name);
     AGENTOS_FREE(tool->description);
     AGENTOS_FREE(tool->input_schema_json);
-    memset(tool, 0, sizeof(claude_tool_def_t));
+    AGENTOS_MEMSET(tool, 0, sizeof(claude_tool_def_t));
 }
 
 void claude_model_info_destroy(claude_model_info_t *info)
@@ -895,7 +894,7 @@ void claude_model_info_destroy(claude_model_info_t *info)
         return;
     AGENTOS_FREE(info->api_name);
     AGENTOS_FREE(info->display_name);
-    memset(info, 0, sizeof(claude_model_info_t));
+    AGENTOS_MEMSET(info, 0, sizeof(claude_model_info_t));
 }
 
 void claude_stream_event_destroy(claude_stream_event_t *event)
@@ -903,5 +902,5 @@ void claude_stream_event_destroy(claude_stream_event_t *event)
     if (!event)
         return;
     AGENTOS_FREE(event->text);
-    memset(event, 0, sizeof(claude_stream_event_t));
+    AGENTOS_MEMSET(event, 0, sizeof(claude_stream_event_t));
 }

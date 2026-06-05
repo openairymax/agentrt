@@ -162,7 +162,7 @@ static int ml_based_create(const sched_config_t *manager, void **data)
     mld->mae = 0.0f;
     mld->history_count = 0;
     mld->history_head = 0;
-    memset(mld->history, 0, sizeof(mld->history));
+    AGENTOS_MEMSET(mld->history, 0, sizeof(mld->history));
 
     init_default_weights(&mld->weights);
 

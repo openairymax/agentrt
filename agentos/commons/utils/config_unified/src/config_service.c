@@ -408,7 +408,7 @@ bool config_validator_validate(config_validator_t *validator, const char *key,
                 min_len = sizeof(min_buf) - 1;
             memcpy(min_buf, validator->pattern, min_len);
             min_buf[min_len] = '\0';
-            strncpy(max_buf, comma + 1, sizeof(max_buf) - 1);
+            AGENTOS_STRNCPY_TERM(max_buf, comma + 1, sizeof(max_buf));
             max_buf[sizeof(max_buf) - 1] = '\0';
             return validate_range(value, min_buf, max_buf);
         }
@@ -624,7 +624,7 @@ config_error_t config_schema_add_item(config_schema_t *schema, const config_sche
 
     // 复制Schema
     schema_item_internal_t *new_item = &schema->items[schema->count];
-    memset(new_item, 0, sizeof(schema_item_internal_t));
+    AGENTOS_MEMSET(new_item, 0, sizeof(schema_item_internal_t));
 
     new_item->key = duplicate_string(item->key);
     if (!new_item->key)
@@ -1409,7 +1409,7 @@ uint32_t config_version_create_snapshot(config_version_manager_t *manager, const
 
     // 创建版本
     config_version_item_t *version = &manager->versions[manager->count];
-    memset(version, 0, sizeof(config_version_item_t));
+    AGENTOS_MEMSET(version, 0, sizeof(config_version_item_t));
 
     version->version = manager->next_version++;
     version->timestamp = (uint64_t)time(NULL);

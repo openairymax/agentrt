@@ -32,7 +32,7 @@ sync_result_t sync_condition_create(sync_condition_t *condition, const sync_attr
     if (attr != NULL && attr->name != NULL) {
         c->name = sync_internal_strdup(attr->name);
     }
-    memset(&c->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&c->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
     InitializeConditionVariable(&c->cond);

@@ -299,7 +299,7 @@ agentos_execution_unit_t *agentos_file_unit_create(const char *root_dir)
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
-    memset(unit, 0, sizeof(*unit));
+    AGENTOS_MEMSET(unit, 0, sizeof(*unit));
 
     file_unit_data_t *data = (file_unit_data_t *)AGENTOS_MALLOC(sizeof(file_unit_data_t));
     if (!data) {

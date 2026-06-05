@@ -1163,7 +1163,7 @@ int yaml_parse_string(yaml_document_t *doc, const char *input, size_t len)
 {
     if (!doc || !input)
         return AGENTOS_EINVAL;
-    memset(doc, 0, sizeof(*doc));
+    AGENTOS_MEMSET(doc, 0, sizeof(*doc));
 
     size_t start_pos = 0;
     if (len >= 3 && (unsigned char)input[0] == 0xEF && (unsigned char)input[1] == 0xBB &&
@@ -1187,7 +1187,7 @@ int yaml_parse_string(yaml_document_t *doc, const char *input, size_t len)
     doc->source_len = effective_len;
 
     struct parse_ctx ctx;
-    memset(&ctx, 0, sizeof(ctx));
+    AGENTOS_MEMSET(&ctx, 0, sizeof(ctx));
     ctx.src = doc->source;
     ctx.len = effective_len;
     ctx.pos = start_pos;
@@ -1232,7 +1232,7 @@ int yaml_parse_multi(yaml_document_t *doc, const char *input, size_t len)
     source_copy[effective_len] = '\0';
 
     struct parse_ctx ctx;
-    memset(&ctx, 0, sizeof(ctx));
+    AGENTOS_MEMSET(&ctx, 0, sizeof(ctx));
     ctx.src = source_copy;
     ctx.len = effective_len;
     ctx.pos = start_pos;

@@ -150,8 +150,7 @@ static int load_config_from_file(agentos_cost_estimator_t *estimator, const char
         if (sscanf(line, "%63[^,],%lf,%lf,%d,%d", model, &input_cost, &output_cost, &max_in,
                    &max_out) >= 3) {
             if (estimator->config_count < MAX_CONFIG_ENTRIES) {
-                strncpy(estimator->configs[estimator->config_count].model_name, model,
-                        MAX_MODEL_NAME - 1);
+                AGENTOS_STRNCPY_TERM(estimator->configs[estimator->config_count].model_name, model, MAX_MODEL_NAME);
                 estimator->configs[estimator->config_count].input_cost_per_1k = input_cost;
                 estimator->configs[estimator->config_count].output_cost_per_1k = output_cost;
                 estimator->configs[estimator->config_count].max_input_tokens =
@@ -176,7 +175,7 @@ agentos_cost_estimator_t *agentos_cost_estimator_create(const char *config_path)
         return NULL;
     }
 
-    memset(estimator, 0, sizeof(agentos_cost_estimator_t));
+    AGENTOS_MEMSET(estimator, 0, sizeof(agentos_cost_estimator_t));
 
     if (agentos_mutex_init(&estimator->mutex) != 0) {
         AGENTOS_FREE(estimator);
@@ -192,8 +191,8 @@ agentos_cost_estimator_t *agentos_cost_estimator_create(const char *config_path)
 
     for (size_t i = 0; i < sizeof(default_configs) / sizeof(default_configs[0]); i++) {
         if (estimator->config_count < MAX_CONFIG_ENTRIES) {
-            strncpy(estimator->configs[estimator->config_count].model_name,
-                    default_configs[i].model_name, MAX_MODEL_NAME - 1);
+            AGENTOS_STRNCPY_TERM(estimator->configs[estimator->config_count].model_name,
+                    default_configs[i].model_name, MAX_MODEL_NAME);
             estimator->configs[estimator->config_count].input_cost_per_1k =
                 default_configs[i].input_cost_per_1k;
             estimator->configs[estimator->config_count].output_cost_per_1k =
@@ -335,7 +334,7 @@ int agentos_cost_estimator_add_model(agentos_cost_estimator_t *estimator, const 
 
     agentos_mutex_lock(&estimator->mutex);
 
-    strncpy(estimator->configs[estimator->config_count].model_name, model_name, MAX_MODEL_NAME - 1);
+    AGENTOS_STRNCPY_TERM(estimator->configs[estimator->config_count].model_name, model_name, MAX_MODEL_NAME);
     estimator->configs[estimator->config_count].input_cost_per_1k = input_cost_per_1k;
     estimator->configs[estimator->config_count].output_cost_per_1k = output_cost_per_1k;
     estimator->configs[estimator->config_count].max_input_tokens = 4096;

@@ -1,0 +1,33 @@
+# LeakSanitizer Suppressions for AgentOS
+# Suppress known leaks from third-party libraries (OpenSSL, etc.)
+
+# OpenSSL known allocations (initialization routines, not actual leaks)
+leak:CRYPTO_malloc
+leak:OPENSSL_malloc
+leak:CRYPTO_zalloc
+leak:OPENSSL_zalloc
+leak:CRYPTO_realloc
+leak:OPENSSL_realloc
+leak:CRYPTO_free
+leak:OPENSSL_free
+
+# libcurl global initialization
+leak:curl_global_init
+leak:curl_easy_init
+leak:Curl_open
+
+# libmicrohttpd internal buffers
+leak:MHD_start_daemon
+leak:MHD_create_response_from_buffer
+
+# libwebsockets context allocation
+leak:lws_create_context
+leak:lws_context_destroy
+
+# SQLite3 static allocations
+leak:sqlite3_initialize
+leak:sqlite3_malloc
+
+# libevent global base
+leak:event_base_new
+leak:event_base_free

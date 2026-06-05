@@ -42,7 +42,7 @@ static void cupolas_internal_config_init_defaults(cupolas_internal_config_t *cfg
 {
     if (!cfg)
         return;
-    memset(cfg, 0, sizeof(*cfg));
+    AGENTOS_MEMSET(cfg, 0, sizeof(*cfg));
 #ifdef _WIN32
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
              AGENTOS_CONFIG_DIR "\\cupolas\\permission_rules.yaml");
@@ -78,7 +78,7 @@ int cupolas_init(const char *config_path, agentos_error_t *error)
         return CUPOLAS_OK;
     }
 
-    memset(&g_cupolas, 0, sizeof(g_cupolas));
+    AGENTOS_MEMSET(&g_cupolas, 0, sizeof(g_cupolas));
 
     if (cupolas_mutex_init(&g_cupolas.lock) != 0) {
         if (error)
@@ -438,12 +438,12 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
     }
 
     if (stdout_buf && stdout_size > 0 && result.stdout_data) {
-        strncpy(stdout_buf, result.stdout_data, stdout_size - 1);
+        AGENTOS_STRNCPY_TERM(stdout_buf, result.stdout_data, stdout_size);
         stdout_buf[stdout_size - 1] = '\0';
     }
 
     if (stderr_buf && stderr_size > 0 && result.stderr_data) {
-        strncpy(stderr_buf, result.stderr_data, stderr_size - 1);
+        AGENTOS_STRNCPY_TERM(stderr_buf, result.stderr_data, stderr_size);
         stderr_buf[stderr_size - 1] = '\0';
     }
 

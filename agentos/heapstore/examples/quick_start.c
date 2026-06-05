@@ -111,13 +111,13 @@ int main(int argc, char **argv)
     /* 6. 写入追踪数据 */
     printf("Step 6: Write Trace Span\n");
     heapstore_span_t span = {0};
-    strncpy(span.trace_id, "trace-001", sizeof(span.trace_id) - 1);
-    strncpy(span.span_id, "span-001", sizeof(span.span_id) - 1);
-    strncpy(span.name, "quick_start_example", sizeof(span.name) - 1);
-    strncpy(span.kind, "internal", sizeof(span.kind) - 1);
+    AGENTOS_STRNCPY_TERM(span.trace_id, "trace-001", sizeof(span.trace_id));
+    AGENTOS_STRNCPY_TERM(span.span_id, "span-001", sizeof(span.span_id));
+    AGENTOS_STRNCPY_TERM(span.name, "quick_start_example", sizeof(span.name));
+    AGENTOS_STRNCPY_TERM(span.kind, "internal", sizeof(span.kind));
     span.start_time_ns = 1000000000ULL;
     span.end_time_ns = 1001000000ULL;
-    strncpy(span.status, "OK", sizeof(span.status) - 1);
+    AGENTOS_STRNCPY_TERM(span.status, "OK", sizeof(span.status));
 
     err = heapstore_trace_write_span(&span);
     check_error(err, "heapstore_trace_write_span");

@@ -84,7 +84,7 @@ static void string_set_error(string_error_t error, const char *message)
 {
     g_context.last_error = error;
     if (message != NULL) {
-        strncpy(g_context.error_message, message, sizeof(g_context.error_message) - 1);
+        AGENTOS_STRNCPY_TERM(g_context.error_message, message, sizeof(g_context.error_message));
         g_context.error_message[sizeof(g_context.error_message) - 1] = '\0';
     }
 }
@@ -1379,6 +1379,9 @@ string_list_t string_list_create(size_t initial_capacity)
     string_list_t list = {.items = NULL, .count = 0, .capacity = 0};
 
     if (initial_capacity > 0) {
+        if (initial_capacity > SIZE_MAX / sizeof(string_view_t)) {
+            return list;
+        }
         list.items = (string_view_t *)AGENTOS_MALLOC(initial_capacity * sizeof(string_view_t));
         if (list.items != NULL) {
             list.capacity = initial_capacity;

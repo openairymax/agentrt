@@ -74,7 +74,7 @@ void china_eco_destroy(china_eco_handle_t *handle)
 {
     if (!handle)
         return;
-    memset(handle, 0, sizeof(china_eco_handle_t));
+    AGENTOS_MEMSET(handle, 0, sizeof(china_eco_handle_t));
     AGENTOS_FREE(handle);
 }
 
@@ -336,7 +336,7 @@ int china_eco_sm3_hash(const void *data, size_t size, uint8_t digest[CHINA_ECO_S
     if (!data && size > 0)
         return AGENTOS_ERR_INVALID_PARAM;
     if (!data || size == 0) {
-        memset(digest, 0, CHINA_ECO_SM3_DIGEST_SIZE);
+        AGENTOS_MEMSET(digest, 0, CHINA_ECO_SM3_DIGEST_SIZE);
         return 0;
     }
 
@@ -359,7 +359,7 @@ int china_eco_sm3_hash(const void *data, size_t size, uint8_t digest[CHINA_ECO_S
 
     if (remaining >= 56) {
         sm3_compress(V, final_block);
-        memset(final_block, 0, 64);
+        AGENTOS_MEMSET(final_block, 0, 64);
     }
 
     for (int i = 0; i < 8; i++) {
@@ -520,7 +520,7 @@ int china_eco_sm4_encrypt(china_eco_sm4_context_t *ctx, const void *plaintext, s
     memcpy(prev_block, ctx->iv, CHINA_ECO_SM4_BLOCK_SIZE);
 
     for (size_t offset = 0; offset < padded_size; offset += CHINA_ECO_SM4_BLOCK_SIZE) {
-        memset(block, 0, CHINA_ECO_SM4_BLOCK_SIZE);
+        AGENTOS_MEMSET(block, 0, CHINA_ECO_SM4_BLOCK_SIZE);
         if (offset < pt_size) {
             size_t copy_size = CHINA_ECO_SM4_BLOCK_SIZE;
             if (offset + copy_size > pt_size)
@@ -533,7 +533,7 @@ int china_eco_sm4_encrypt(china_eco_sm4_context_t *ctx, const void *plaintext, s
                     block[j] = pad_val;
             }
         } else {
-            memset(block, CHINA_ECO_SM4_BLOCK_SIZE, CHINA_ECO_SM4_BLOCK_SIZE);
+            AGENTOS_MEMSET(block, CHINA_ECO_SM4_BLOCK_SIZE, CHINA_ECO_SM4_BLOCK_SIZE);
         }
 
         for (size_t j = 0; j < CHINA_ECO_SM4_BLOCK_SIZE; j++)

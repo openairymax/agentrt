@@ -20,15 +20,6 @@
 // 安全加固宏和辅助函数
 // ============================================================================
 
-/* 安全字符串复制宏（确保空字符结尾） */
-#define SAFE_STRNCPY(dst, src, size)           \
-    do {                                       \
-        if ((src) && (size) > 0) {             \
-            strncpy((dst), (src), (size) - 1); \
-            (dst)[(size) - 1] = '\0';          \
-        }                                      \
-    } while (0)
-
 /* 浮点数验证宏 */
 #define VALIDATE_FLOAT(value, min, max) \
     ((!isnan((value)) && !isinf((value)) && (value) >= (min) && (value) <= (max)))
@@ -193,7 +184,7 @@ static void init_performance_stats(performance_stats_t *stats)
     if (!stats)
         return;
 
-    memset(stats, 0, sizeof(performance_stats_t));
+    AGENTOS_MEMSET(stats, 0, sizeof(performance_stats_t));
     stats->adaptive_threshold = 0.3f; /* 默认自适应阈值 */
 }
 

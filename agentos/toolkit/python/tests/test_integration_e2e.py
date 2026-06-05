@@ -1,6 +1,6 @@
 # AgentOS SDK 端到端集成测试
 # 验证: Config→Client→Modules→Plugin→ErrorHandling 完整链路
-# Version: 1.0.0
+# Version: 0.1.0
 
 import sys
 import os

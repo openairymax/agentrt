@@ -460,7 +460,7 @@ agentos_error_t agentos_tc_step_create(agentos_thinking_chain_t *chain, tc_step_
     }
 
     agentos_thinking_step_t *step = &chain->steps[chain->step_count];
-    memset(step, 0, sizeof(agentos_thinking_step_t));
+    AGENTOS_MEMSET(step, 0, sizeof(agentos_thinking_step_t));
 
     step->step_id = chain->next_step_id++;
     step->type = type;
@@ -481,7 +481,7 @@ agentos_error_t agentos_tc_step_create(agentos_thinking_chain_t *chain, tc_step_
     }
 
     if (depends_on && depends_count > 0) {
-        step->depends_on = (uint32_t *)AGENTOS_MALLOC(depends_count * sizeof(uint32_t));
+        SAFE_MALLOC_ARRAY(step->depends_on, depends_count, sizeof(uint32_t));
         if (step->depends_on) {
             memcpy(step->depends_on, depends_on, depends_count * sizeof(uint32_t));
             step->depends_count = depends_count;
@@ -845,7 +845,7 @@ agentos_error_t agentos_tc_context_window_prepopulate(agentos_thinking_chain_t *
     }
 
     agentos_memory_query_t query;
-    memset(&query, 0, sizeof(query));
+    AGENTOS_MEMSET(&query, 0, sizeof(query));
     query.memory_query_text = (char *)query_text;
     query.memory_query_text_len = query_len;
     query.memory_query_limit = limit > 0 ? limit : 5;
@@ -896,7 +896,7 @@ agentos_error_t agentos_tc_working_memory_sync_to_persistent(agentos_thinking_ch
         struct wm_entry *e = &chain->working_mem->entries[i];
         if (e->pinned && e->value && e->value_size > 0) {
             agentos_memory_record_t rec;
-            memset(&rec, 0, sizeof(rec));
+            AGENTOS_MEMSET(&rec, 0, sizeof(rec));
             rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
             rec.memory_record_data = e->value;
             rec.memory_record_data_len = e->value_size;
@@ -928,7 +928,7 @@ agentos_error_t agentos_tc_step_write_to_memory(agentos_thinking_chain_t *chain,
         return AGENTOS_EINVAL;
 
     agentos_memory_record_t rec;
-    memset(&rec, 0, sizeof(rec));
+    AGENTOS_MEMSET(&rec, 0, sizeof(rec));
     rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
     rec.memory_record_data = step->content;
     rec.memory_record_data_len = step->content_len;
@@ -972,7 +972,7 @@ agentos_error_t agentos_tc_metacognition_inform_memory(agentos_thinking_chain_t 
 
     if (eval_typed->critique_text && eval_typed->critique_len > 0) {
         agentos_memory_record_t rec;
-        memset(&rec, 0, sizeof(rec));
+        AGENTOS_MEMSET(&rec, 0, sizeof(rec));
         rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
         rec.memory_record_data = (void *)eval_typed->critique_text;
         rec.memory_record_data_len = eval_typed->critique_len;
@@ -1040,7 +1040,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
     if (!config)
         config = &defaults;
 
-    memset(out_result, 0, sizeof(tc_monitor_result_t));
+    AGENTOS_MEMSET(out_result, 0, sizeof(tc_monitor_result_t));
     out_result->anomaly = TC_ANOMALY_NONE;
     out_result->is_critical = 0;
     out_result->severity_score = 0.0f;
@@ -1217,7 +1217,7 @@ agentos_error_t agentos_tc_step_recover(agentos_thinking_chain_t *chain,
     if (!chain || !failed_step || !out_result)
         return AGENTOS_EINVAL;
 
-    memset(out_result, 0, sizeof(tc_recovery_result_t));
+    AGENTOS_MEMSET(out_result, 0, sizeof(tc_recovery_result_t));
     out_result->strategy_used = TC_RECOVER_ABORT;
     out_result->success = 0;
 
@@ -1401,7 +1401,7 @@ size_t agentos_tc_chain_rollback(agentos_thinking_chain_t *chain, uint32_t check
                 AGENTOS_FREE(step->correction_history[h]);
             AGENTOS_FREE(step->correction_history);
         }
-        memset(step, 0, sizeof(agentos_thinking_step_t));
+        AGENTOS_MEMSET(step, 0, sizeof(agentos_thinking_step_t));
     }
 
     chain->step_count = target_steps;

@@ -88,7 +88,7 @@ static agentos_error_t builtin_init(agentos_memory_provider_t *provider, const c
         return AGENTOS_ENOMEM;
     }
 
-    memset(&impl->stats, 0, sizeof(impl->stats));
+    AGENTOS_MEMSET(&impl->stats, 0, sizeof(impl->stats));
     snprintf(impl->stats.provider_name, sizeof(impl->stats.provider_name), "builtin");
     snprintf(impl->stats.provider_version, sizeof(impl->stats.provider_version), "0.1.0");
 
@@ -229,7 +229,8 @@ static agentos_error_t builtin_forget(agentos_memory_provider_t *provider)
         time_t updated_at;
     } record_age_t;
 
-    record_age_t *ages = (record_age_t *)AGENTOS_MALLOC(total * sizeof(record_age_t));
+    record_age_t *ages;
+    SAFE_MALLOC_ARRAY(ages, total, sizeof(record_age_t));
     if (!ages)
         return AGENTOS_ENOMEM;
 

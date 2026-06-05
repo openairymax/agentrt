@@ -67,7 +67,7 @@ int log_store_service_init(const char *storage_path, uint64_t max_storage_bytes)
     }
 
     // 设置存储路径
-    strncpy(g_ctx.storage_path, storage_path, sizeof(g_ctx.storage_path) - 1);
+    AGENTOS_STRNCPY_TERM(g_ctx.storage_path, storage_path, sizeof(g_ctx.storage_path));
     g_ctx.storage_path[sizeof(g_ctx.storage_path) - 1] = '\0';
 
     g_ctx.max_storage_bytes =
@@ -224,7 +224,8 @@ int log_store_service_query_entries(const time_t *start_time, const time_t *end_
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    char **results = (char **)AGENTOS_MALLOC(max_entries * sizeof(char *));
+    char **results;
+    SAFE_MALLOC_ARRAY(results, max_entries, sizeof(char *));
     if (!results) {
         closedir(dir);
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -263,7 +264,7 @@ int log_store_service_query_entries(const time_t *start_time, const time_t *end_
             }
 
             struct tm tm_info;
-            memset(&tm_info, 0, sizeof(tm_info));
+            AGENTOS_MEMSET(&tm_info, 0, sizeof(tm_info));
             char time_buf[32];
             if (sscanf(line + 1, "%31[^]]", time_buf) == 1) {
                 strptime(time_buf, "%Y-%m-%d %H:%M:%S", &tm_info);
@@ -317,7 +318,8 @@ int log_store_service_query_entries(const time_t *start_time, const time_t *end_
         return 0;
     }
 
-    char **final_results = (char **)AGENTOS_MALLOC(found_count * sizeof(char *));
+    char **final_results;
+    SAFE_MALLOC_ARRAY(final_results, found_count, sizeof(char *));
     if (!final_results) {
         for (int i = 0; i < found_count; i++) {
             AGENTOS_FREE(results[i]);
@@ -453,5 +455,5 @@ void log_store_service_shutdown(void)
         return;
     }
 
-    memset(&g_ctx, 0, sizeof(g_ctx));
+    AGENTOS_MEMSET(&g_ctx, 0, sizeof(g_ctx));
 }

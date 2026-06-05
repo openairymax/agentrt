@@ -18,10 +18,11 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
-# 添加父目录到路径
-sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+# 添加项目根目录到路径
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "agentos" / "manager"))
 
-from drift_detector import ConfigDriftDetector, DriftType, DriftSeverity
+from tools.drift_detector import ConfigDriftDetector, DriftType, DriftSeverity
 
 
 class TestConfigDriftDetector:
@@ -126,7 +127,7 @@ class TestConfigDriftDetector:
         )
         
         assert drift_item.drift_type == DriftType.MODIFIED.value
-        assert drift_item.severity == DriftSeverity.INFO.value
+        assert drift_item.severity == DriftSeverity.CRITICAL.value
         assert drift_item.details == "File content has been modified"
     
     def test_detect_deleted_file(self, detector, temp_config_dir):
@@ -320,7 +321,7 @@ class TestDriftDetectorCLI:
         result = subprocess.run(
             [
                 sys.executable,
-                str(Path(__file__).parent.parent / "tools" / "drift_detector.py"),
+                str(Path(__file__).parent.parent.parent.parent / "agentos" / "manager" / "tools" / "drift_detector.py"),
                 "--config-dir", str(temp_config_dir),
                 "--action", "create-baseline",
                 "--verbose"
@@ -341,7 +342,7 @@ class TestDriftDetectorCLI:
         subprocess.run(
             [
                 sys.executable,
-                str(Path(__file__).parent.parent / "tools" / "drift_detector.py"),
+                str(Path(__file__).parent.parent.parent.parent / "agentos" / "manager" / "tools" / "drift_detector.py"),
                 "--config-dir", str(temp_config_dir),
                 "--action", "create-baseline"
             ],
@@ -355,7 +356,7 @@ class TestDriftDetectorCLI:
         result = subprocess.run(
             [
                 sys.executable,
-                str(Path(__file__).parent.parent / "tools" / "drift_detector.py"),
+                str(Path(__file__).parent.parent.parent.parent / "agentos" / "manager" / "tools" / "drift_detector.py"),
                 "--config-dir", str(temp_config_dir),
                 "--action", "detect",
                 "--output", "test_drift_report.json"

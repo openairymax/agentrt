@@ -244,7 +244,7 @@ static int local_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_conf
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     loc_stream_acc_t acc;
-    memset(&acc, 0, sizeof(acc));
+    AGENTOS_MEMSET(&acc, 0, sizeof(acc));
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;

@@ -524,7 +524,7 @@ static int openai_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     explicit_bzero(auth_header, sizeof(auth_header));
 
     oai_stream_acc_t acc;
-    memset(&acc, 0, sizeof(acc));
+    AGENTOS_MEMSET(&acc, 0, sizeof(acc));
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;

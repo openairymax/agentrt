@@ -429,7 +429,7 @@ static void test_very_long_method_name(void) {
     TEST_BEGIN("very_long_method_name");
 
     char long_method[1024];
-    memset(long_method, 'A', sizeof(long_method) - 1);
+    AGENTOS_MEMSET(long_method, 'A', sizeof(long_method) - 1);
     long_method[sizeof(long_method) - 1] = '\0';
 
     cJSON* request = cJSON_CreateObject();

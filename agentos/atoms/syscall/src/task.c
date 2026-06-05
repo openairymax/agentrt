@@ -102,7 +102,8 @@ static int *calculate_indegrees(cJSON *name_to_idx, agentos_task_plan_t *plan, s
 static int *kahn_algorithm(cJSON *name_to_idx, int *indeg, agentos_task_plan_t *plan, size_t n,
                            int *order, size_t *pos)
 {
-    int *queue = (int *)AGENTOS_MALLOC(n * sizeof(int));
+    int *queue;
+    SAFE_MALLOC_ARRAY(queue, n, sizeof(int));
     if (!queue) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         
@@ -154,7 +155,8 @@ static int *kahn_algorithm(cJSON *name_to_idx, int *indeg, agentos_task_plan_t *
 static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
 {
     size_t n = plan->task_plan_node_count;
-    int *order = (int *)AGENTOS_MALLOC(n * sizeof(int));
+    int *order;
+    SAFE_MALLOC_ARRAY(order, n, sizeof(int));
     if (!order) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         
@@ -206,7 +208,7 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
 static char *execute_node(agentos_task_node_t *node, uint32_t timeout_ms)
 {
     agentos_task_t task;
-    memset(&task, 0, sizeof(task));
+    AGENTOS_MEMSET(&task, 0, sizeof(task));
     task.task_agent_id = node->task_node_agent_role;
     task.task_input = node->task_node_input;
     task.task_timeout_ms = node->task_node_timeout_ms ? node->task_node_timeout_ms : timeout_ms;

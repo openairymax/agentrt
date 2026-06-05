@@ -379,7 +379,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
-    memset(unit, 0, sizeof(*unit));
+    AGENTOS_MEMSET(unit, 0, sizeof(*unit));
 
     code_unit_data_t *data = (code_unit_data_t *)AGENTOS_MALLOC(sizeof(code_unit_data_t));
     if (!data) {

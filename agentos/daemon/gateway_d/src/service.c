@@ -35,7 +35,7 @@ void gateway_service_get_default_config(gateway_service_config_t *config)
 {
     if (!config)
         return;
-    memset(config, 0, sizeof(*config));
+    AGENTOS_MEMSET(config, 0, sizeof(*config));
 
     config->name = "agentos-gateway";
     config->version = "0.1.0";
@@ -233,7 +233,7 @@ agentos_error_t gateway_service_get_stats(gateway_service_t service, agentos_svc
 {
     if (!service || !stats)
         return AGENTOS_EINVAL;
-    memset(stats, 0, sizeof(*stats));
+    AGENTOS_MEMSET(stats, 0, sizeof(*stats));
     stats->request_count = service->requests_total;
     stats->error_count = service->requests_failed;
     return AGENTOS_SUCCESS;

@@ -88,7 +88,7 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
 
     if (config->thread_pool_max > 0) {
         thread_pool_config_t tp_config;
-        memset(&tp_config, 0, sizeof(tp_config));
+        AGENTOS_MEMSET(&tp_config, 0, sizeof(tp_config));
         tp_config.min_threads = config->thread_pool_min > 0 ? config->thread_pool_min : 2;
         tp_config.max_threads = config->thread_pool_max;
         tp_config.queue_size =

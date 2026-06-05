@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - Configuration Module
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 提供客户端配置的定义、创建、验证和合并功能。

@@ -17,7 +17,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
 #include "error.h"
+
+/* SEC-02: 最大协议桥响应大小（100 MB）— 防超大响应耗尽内存 */
+#define BRIDGE_MAX_RESPONSE_SIZE (100 * 1024 * 1024)
 
 struct gw_protocol_bridge_s {
     gw_protocol_bridge_config_t config;
@@ -62,7 +66,7 @@ int gw_protocol_bridge_create(const gw_protocol_bridge_config_t *config,
     bridge->ext_framework = NULL;
 
     bridge->initialized = true;
-    memset(&bridge->stats, 0, sizeof(bridge->stats));
+    AGENTOS_MEMSET(&bridge->stats, 0, sizeof(bridge->stats));
 
     *out_handle = bridge;
     return 0;
@@ -110,8 +114,7 @@ int gw_protocol_bridge_register_handler(gw_protocol_bridge_handle_t bridge,
 
     b->handlers[proto_type] = (void *)(uintptr_t)handler;
     if (endpoint_pattern) {
-        strncpy(b->handler_patterns[proto_type], endpoint_pattern,
-                sizeof(b->handler_patterns[proto_type]) - 1);
+        AGENTOS_STRNCPY_TERM(b->handler_patterns[proto_type], endpoint_pattern, sizeof(b->handler_patterns[proto_type]));
     }
     return 0;
 }
@@ -144,7 +147,7 @@ int gw_protocol_bridge_detect_protocol(gw_protocol_bridge_handle_t bridge, const
     }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
 
-    memset(out_result, 0, sizeof(*out_result));
+    AGENTOS_MEMSET(out_result, 0, sizeof(*out_result));
 
     double confidence = 50.0;
     gw_proto_type_t detected = GW_PROTO_JSONRPC;
@@ -227,7 +230,7 @@ done:
 
     static const char *type_names[] = {"jsonrpc",    "mcp",      "a2a",   "openai",
                                        "openjiuwen", "openclaw", "claude"};
-    strncpy(out_result->type_name, type_names[detected], sizeof(out_result->type_name) - 1);
+    AGENTOS_STRNCPY_TERM(out_result->type_name, type_names[detected], sizeof(out_result->type_name));
 
     b->stats.total_requests++;
     if (detected < GW_PROTO_COUNT) {
@@ -259,7 +262,7 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
         return AGENTOS_ERR_STATE_ERROR;
     }
 
-    memset(out_response, 0, sizeof(*out_response));
+    AGENTOS_MEMSET(out_response, 0, sizeof(*out_response));
 
     uint64_t start_ns = agentos_time_ns();
 
@@ -281,14 +284,13 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
     out_response->detected_protocol = AGENTOS_STRDUP(detection.type_name);
 
     unified_message_t source_msg;
-    memset(&source_msg, 0, sizeof(source_msg));
+    AGENTOS_MEMSET(&source_msg, 0, sizeof(source_msg));
     source_msg.protocol = PROTOCOL_HTTP;
-    strncpy(source_msg.protocol_name, detection.type_name, sizeof(source_msg.protocol_name) - 1);
+    AGENTOS_STRNCPY_TERM(source_msg.protocol_name, detection.type_name, sizeof(source_msg.protocol_name));
     source_msg.payload = (void *)incoming->raw_data;
     source_msg.payload_size = incoming->raw_size;
     if (incoming->x_trace_id) {
-        strncpy(source_msg.metadata.trace_id, incoming->x_trace_id,
-                sizeof(source_msg.metadata.trace_id) - 1);
+        AGENTOS_STRNCPY_TERM(source_msg.metadata.trace_id, incoming->x_trace_id, sizeof(source_msg.metadata.trace_id));
     }
 
     if (b->handlers[detection.detected_type]) {
@@ -298,7 +300,15 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
         size_t resp_size = 0;
         void *result = handler_fn(incoming->raw_data, incoming->raw_size, &resp_size);
 
+        /* SEC-02: 前置大小校验防超大响应缓冲区溢出 */
         if (result && resp_size > 0) {
+            if (resp_size > BRIDGE_MAX_RESPONSE_SIZE) {
+                agentos_error_push_ex(AGENTOS_ERR_OVERFLOW, __FILE__, __LINE__, __func__,
+                                      "handler response size %zu exceeds max %zu",
+                                      resp_size, (size_t)BRIDGE_MAX_RESPONSE_SIZE);
+                AGENTOS_FREE(result);
+                return NULL;
+            }
             out_response->response_data = (char *)AGENTOS_MALLOC(resp_size + 1);
             if (out_response->response_data) {
                 memcpy(out_response->response_data, result, resp_size);
@@ -315,7 +325,15 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
         size_t resp_size = 0;
         void *result = def_handler(incoming->raw_data, incoming->raw_size, &resp_size);
 
+        /* SEC-02: 前置大小校验防超大响应缓冲区溢出 */
         if (result && resp_size > 0) {
+            if (resp_size > BRIDGE_MAX_RESPONSE_SIZE) {
+                agentos_error_push_ex(AGENTOS_ERR_OVERFLOW, __FILE__, __LINE__, __func__,
+                                      "default_handler response size %zu exceeds max %zu",
+                                      resp_size, (size_t)BRIDGE_MAX_RESPONSE_SIZE);
+                AGENTOS_FREE(result);
+                return NULL;
+            }
             out_response->response_data = (char *)AGENTOS_MALLOC(resp_size + 1);
             if (out_response->response_data) {
                 memcpy(out_response->response_data, result, resp_size);
@@ -389,7 +407,7 @@ int gw_protocol_bridge_get_stats(gw_protocol_bridge_handle_t bridge, gw_bridge_s
                                (unsigned long long)b->stats.requests_by_proto[i]);
         }
     }
-    strncpy(out_stats->active_protocols, buf, sizeof(out_stats->active_protocols) - 1);
+    AGENTOS_STRNCPY_TERM(out_stats->active_protocols, buf, sizeof(out_stats->active_protocols));
     return 0;
 }
 
@@ -401,7 +419,7 @@ int gw_protocol_bridge_reset_stats(gw_protocol_bridge_handle_t bridge)
         return AGENTOS_ERR_UNKNOWN;
     }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
-    memset(&b->stats, 0, sizeof(b->stats));
+    AGENTOS_MEMSET(&b->stats, 0, sizeof(b->stats));
     return 0;
 }
 
@@ -520,7 +538,6 @@ int gw_protocol_bridge_register_extension_adapter(gw_protocol_bridge_handle_t br
     b->handlers[proto_type] = handler;
     static const char *patterns[] = {
         "/rpc", "/mcp", "/a2a", "/v1/chat/completions", "/openjiuwen", "/openclaw", "/v1/messages"};
-    strncpy(b->handler_patterns[proto_type], patterns[proto_type],
-            sizeof(b->handler_patterns[proto_type]) - 1);
+    AGENTOS_STRNCPY_TERM(b->handler_patterns[proto_type], patterns[proto_type], sizeof(b->handler_patterns[proto_type]));
     return 0;
 }

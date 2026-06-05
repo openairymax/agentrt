@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - Mock Client
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-04-27
 //
 // WARNING: 测试工具，仅供单元测试使用。不应在生产代码中引用。

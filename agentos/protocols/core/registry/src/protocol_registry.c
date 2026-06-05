@@ -66,7 +66,7 @@ void proto_registry_destroy(protocol_registry_t *registry)
         return;
 
     for (size_t i = 0; i < registry->entry_count; i++) {
-        memset(&registry->entries[i], 0, sizeof(proto_registry_entry_t));
+        AGENTOS_MEMSET(&registry->entries[i], 0, sizeof(proto_registry_entry_t));
     }
     registry->entry_count = 0;
 
@@ -96,7 +96,7 @@ int proto_registry_register(protocol_registry_t *registry, const char *name, con
     }
 
     proto_registry_entry_t *entry = &registry->entries[registry->entry_count];
-    memset(entry, 0, sizeof(proto_registry_entry_t));
+    AGENTOS_MEMSET(entry, 0, sizeof(proto_registry_entry_t));
 
     snprintf(entry->name, PROTO_REGISTRY_NAME_MAX_LEN, "%s", name);
     snprintf(entry->version, sizeof(entry->version), "%s", version ? version : "1.0.0");
@@ -409,7 +409,7 @@ int proto_registry_get_statistics(protocol_registry_t *registry, proto_registry_
     AGENTOS_CHECK(registry != NULL, AGENTOS_ERR_NULL_POINTER, "registry is NULL");
     AGENTOS_CHECK(stats != NULL, AGENTOS_ERR_NULL_POINTER, "stats is NULL");
 
-    memset(stats, 0, sizeof(proto_registry_stats_t));
+    AGENTOS_MEMSET(stats, 0, sizeof(proto_registry_stats_t));
 
     stats->total_entries = registry->entry_count;
     stats->total_uptime_sec = 0.0;

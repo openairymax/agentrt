@@ -123,7 +123,7 @@ static void test_dispatch_single_call(void)
 
     g_exec_count = 0;
     agentos_tool_call_t call;
-    memset(&call, 0, sizeof(call));
+    AGENTOS_MEMSET(&call, 0, sizeof(call));
     call.tool_name = "test_tool";
     call.arguments = "{\"param\":\"value\"}";
     call.arguments_len = strlen(call.arguments);
@@ -153,7 +153,7 @@ static void test_dispatch_multiple_calls(void)
     agentos_tool_call_t calls[5];
     const char *tools[] = {"search", "read", "write", "list", "calc"};
     for (int i = 0; i < 5; i++) {
-        memset(&calls[i], 0, sizeof(calls[i]));
+        AGENTOS_MEMSET(&calls[i], 0, sizeof(calls[i]));
         calls[i].tool_name = tools[i];
         calls[i].arguments = "{}";
         calls[i].arguments_len = 2;
@@ -176,7 +176,7 @@ static void test_dispatch_safety_classification(void)
     agentos_tool_call_t calls[4];
     const char *names[] = {"read_only", "write_shared", "interactive", "side_effect"};
     for (int i = 0; i < 4; i++) {
-        memset(&calls[i], 0, sizeof(calls[i]));
+        AGENTOS_MEMSET(&calls[i], 0, sizeof(calls[i]));
         calls[i].tool_name = names[i];
         calls[i].arguments = "{}";
         calls[i].arguments_len = 2;
@@ -192,7 +192,7 @@ static void test_dispatch_safety_classification(void)
 static void test_delegate_create_destroy(void)
 {
     agentos_delegate_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.focus_prompt = "Focus on data analysis";
     config.max_depth = 1;
     config.max_iterations = 5;
@@ -214,7 +214,7 @@ static void test_delegate_create_destroy(void)
 static void test_delegate_assign_collect(void)
 {
     agentos_delegate_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.max_depth = 1;
     config.max_iterations = 3;
 
@@ -245,7 +245,7 @@ static void test_delegate_assign_collect(void)
 static void test_delegate_max_depth_limit(void)
 {
     agentos_delegate_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.max_depth = 10;
 
     agentos_delegate_task_t *task = agentos_delegate_create("Deep delegation test", &config);
@@ -261,7 +261,7 @@ static void test_delegate_max_depth_limit(void)
 static void test_delegate_cancel_idle(void)
 {
     agentos_delegate_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.max_depth = 2;
 
     agentos_delegate_task_t *task = agentos_delegate_create("Cancel test", &config);
@@ -291,7 +291,7 @@ static void test_delegate_cancel_idle(void)
 static void test_delegate_cancel_completed(void)
 {
     agentos_delegate_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.max_depth = 2;
 
     agentos_delegate_task_t *task = agentos_delegate_create("Cancel completed test", &config);
@@ -329,7 +329,7 @@ static void test_dispatcher_cancel(void)
     assert(agentos_parallel_dispatcher_is_cancelled(d));
 
     agentos_tool_call_t call;
-    memset(&call, 0, sizeof(call));
+    AGENTOS_MEMSET(&call, 0, sizeof(call));
     call.tool_name = "test_tool";
     call.arguments = "{}";
     call.arguments_len = 2;
@@ -368,7 +368,7 @@ static void test_delegate_get_state_null(void)
 static void test_delegate_collect_not_completed(void)
 {
     agentos_delegate_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.max_depth = 2;
 
     agentos_delegate_task_t *task = agentos_delegate_create("Collect not completed test", &config);

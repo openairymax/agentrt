@@ -28,7 +28,7 @@ sync_result_t sync_spinlock_create(sync_spinlock_t *spinlock, const sync_attr_t 
     if (attr != NULL && attr->name != NULL) {
         s->name = sync_internal_strdup(attr->name);
     }
-    memset(&s->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&s->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
     s->lock = 0;

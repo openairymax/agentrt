@@ -21,9 +21,64 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef AGENTOS_HAS_OPENSSL
+#include <openssl/sha.h>
+#endif
+
 #define DEFAULT_QUEUE_SIZE 10000
 #define DEFAULT_BATCH_SIZE 100
 #define DEFAULT_FLUSH_INTERVAL_MS 1000
+
+/* SHA-256 审计哈希链追踪 */
+static char g_last_hash[65] = "0000000000000000000000000000000000000000000000000000000000000000";
+static cupolas_mutex_t g_hash_chain_lock;
+
+/**
+ * @brief 计算审计条目的 SHA-256 哈希链值
+ * 
+ * 哈希格式: SHA256(prev_hash + id + timestamp + subject + action + resource + detail + result)
+ * 使用哈希链保证审计日志的不可篡改性。
+ */
+static void audit_compute_chain_hash(const audit_entry_t *entry, const char *prev_hash,
+                                     char *hash_out)
+{
+#ifdef AGENTOS_HAS_OPENSSL
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, prev_hash, strlen(prev_hash));
+    SHA256_Update(&sha256, entry->agent_id ? entry->agent_id : "", 
+                  entry->agent_id ? strlen(entry->agent_id) : 0);
+    SHA256_Update(&sha256, &entry->timestamp_ms, sizeof(entry->timestamp_ms));
+    SHA256_Update(&sha256, entry->action ? entry->action : "",
+                  entry->action ? strlen(entry->action) : 0);
+    SHA256_Update(&sha256, entry->resource ? entry->resource : "",
+                  entry->resource ? strlen(entry->resource) : 0);
+    SHA256_Update(&sha256, entry->detail ? entry->detail : "",
+                  entry->detail ? strlen(entry->detail) : 0);
+    SHA256_Update(&sha256, &entry->result, sizeof(entry->result));
+
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    SHA256_Final(digest, &sha256);
+
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    {
+        sprintf(hash_out + i * 2, "%02x", digest[i]);
+    }
+    hash_out[64] = '\0';
+#else
+    /* OpenSSL 不可用时的回退: 使用简单校验和 */
+    uint32_t checksum = 0;
+    const char *str = prev_hash;
+    while (*str) checksum = checksum * 31 + (unsigned char)*str++;
+    if (entry->agent_id) { str = entry->agent_id; while (*str) checksum = checksum * 31 + (unsigned char)*str++; }
+    checksum ^= (uint32_t)entry->timestamp_ms;
+    if (entry->action) { str = entry->action; while (*str) checksum = checksum * 31 + (unsigned char)*str++; }
+    if (entry->resource) { str = entry->resource; while (*str) checksum = checksum * 31 + (unsigned char)*str++; }
+    checksum ^= (uint32_t)entry->result;
+    snprintf(hash_out, 65, "%016x%016x%016x%016x", checksum, checksum ^ 0xAAAAAAAA,
+             checksum ^ 0x55555555, checksum ^ 0xFFFFFFFF);
+#endif
+}
 
 struct audit_logger {
     audit_queue_t *queue;
@@ -86,11 +141,18 @@ static void *audit_writer_thread(void *arg)
 audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
                                     size_t max_file_size, int max_files)
 {
+    /* 初始化哈希链互斥锁（仅首次调用） */
+    static cupolas_atomic32_t hash_lock_inited = {0};
+    if (cupolas_atomic_load32(&hash_lock_inited) == 0) {
+        cupolas_mutex_init(&g_hash_chain_lock);
+        cupolas_atomic_store32(&hash_lock_inited, 1);
+    }
+
     audit_logger_t *logger = (audit_logger_t *)cupolas_mem_alloc(sizeof(audit_logger_t));
     if (!logger)
         return NULL;
 
-    memset(logger, 0, sizeof(audit_logger_t));
+    AGENTOS_MEMSET(logger, 0, sizeof(audit_logger_t));
 
     if (log_dir) {
         logger->log_dir = cupolas_strdup(log_dir);
@@ -161,6 +223,13 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
     if (!entry)
         return cupolas_ERROR_NO_MEMORY;
 
+    /* === 编码契约: SHA-256 审计哈希链（BAN-129）=== */
+    cupolas_mutex_lock(&g_hash_chain_lock);
+    memcpy(entry->prev_hash, g_last_hash, sizeof(entry->prev_hash));
+    audit_compute_chain_hash(entry, g_last_hash, entry->curr_hash);
+    memcpy(g_last_hash, entry->curr_hash, sizeof(g_last_hash));
+    cupolas_mutex_unlock(&g_hash_chain_lock);
+
     int ret = audit_queue_try_push(logger->queue, entry);
     if (ret != cupolas_OK) {
         audit_entry_destroy(entry);
@@ -189,6 +258,58 @@ int audit_logger_log_workbench(audit_logger_t *logger, const char *agent_id, con
 {
     return audit_logger_log(logger, AUDIT_EVENT_WORKBENCH, agent_id, "execute", command, NULL,
                             exit_code);
+}
+
+/**
+ * @brief 验证审计哈希链完整性（BAN-129 编码契约）
+ *
+ * 从给定条目列表重新计算哈希链，验证每个条目的 curr_hash 是否与
+ * 基于 prev_hash + 条目内容的 SHA-256 哈希一致。
+ *
+ * @param entries     审计条目数组
+ * @param entry_count 条目数量
+ * @param first_prev_hash 链起始哈希（通常为全零）
+ * @param out_invalid_index 输出第一个无效条目的索引（-1 表示全部有效）
+ * @return true 如果哈希链完整，false 如果有篡改
+ */
+bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count,
+                               const char *first_prev_hash, int *out_invalid_index)
+{
+    if (!entries || entry_count == 0 || !first_prev_hash) {
+        if (out_invalid_index) *out_invalid_index = -1;
+        return false;
+    }
+
+    char expected_prev[65];
+    memcpy(expected_prev, first_prev_hash, 65);
+
+    for (size_t i = 0; i < entry_count; i++) {
+        const audit_entry_t *entry = entries[i];
+        if (!entry) {
+            if (out_invalid_index) *out_invalid_index = (int)i;
+            return false;
+        }
+
+        /* 验证 prev_hash 是否匹配 */
+        if (memcmp(entry->prev_hash, expected_prev, 65) != 0) {
+            if (out_invalid_index) *out_invalid_index = (int)i;
+            return false;
+        }
+
+        /* 重新计算 curr_hash 并验证 */
+        char recomputed_hash[65];
+        audit_compute_chain_hash(entry, expected_prev, recomputed_hash);
+        if (memcmp(entry->curr_hash, recomputed_hash, 65) != 0) {
+            if (out_invalid_index) *out_invalid_index = (int)i;
+            return false;
+        }
+
+        /* 前进到下一个条目 */
+        memcpy(expected_prev, entry->curr_hash, 65);
+    }
+
+    if (out_invalid_index) *out_invalid_index = -1;
+    return true;
 }
 
 void audit_logger_flush(audit_logger_t *logger)

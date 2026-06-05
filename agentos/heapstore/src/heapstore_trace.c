@@ -54,7 +54,7 @@ heapstore_error_t heapstore_trace_init(void)
     }
 
     const char *base_path = "agentos/heapstore/traces";
-    strncpy(s_trace_path, base_path, sizeof(s_trace_path) - 1);
+    AGENTOS_STRNCPY_TERM(s_trace_path, base_path, sizeof(s_trace_path));
     s_trace_path[sizeof(s_trace_path) - 1] = '\0';
 
     heapstore_ensure_directory(s_trace_path);
@@ -69,11 +69,11 @@ heapstore_error_t heapstore_trace_init(void)
     }
     s_span_count = 0;
 
-    memset(&s_exporter_config, 0, sizeof(s_exporter_config));
+    AGENTOS_MEMSET(&s_exporter_config, 0, sizeof(s_exporter_config));
     s_exporter_config.enabled = false;
     s_exporter_config.batch_size = heapstore_TRACE_BATCH_SIZE;
     s_exporter_config.export_interval_sec = 30;
-    strncpy(s_exporter_config.export_format, "json", sizeof(s_exporter_config.export_format) - 1);
+    AGENTOS_STRNCPY_TERM(s_exporter_config.export_format, "json", sizeof(s_exporter_config.export_format));
 
     s_initialized = true;
 
@@ -180,11 +180,9 @@ heapstore_error_t heapstore_trace_query_by_trace(const char *trace_id, heapstore
         return heapstore_ERR_NOT_FOUND;
     }
 
-    heapstore_span_t *result = (heapstore_span_t *)AGENTOS_MALLOC(match_count * sizeof(heapstore_span_t));
-    if (!result) {
-        agentos_mutex_unlock(&s_trace_lock);
-        return heapstore_ERR_OUT_OF_MEMORY;
-    }
+    heapstore_span_t *result = NULL;
+    SAFE_MALLOC_ARRAY(result, match_count, sizeof(heapstore_span_t));
+    agentos_mutex_unlock(&s_trace_lock);
 
     size_t idx = 0;
     for (size_t i = 0; i < s_span_count; i++) {
@@ -230,7 +228,8 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
         return heapstore_ERR_NOT_FOUND;
     }
 
-    heapstore_span_t *result = (heapstore_span_t *)AGENTOS_MALLOC(match_count * sizeof(heapstore_span_t));
+    heapstore_span_t *result =
+        (heapstore_span_t *)agentos_malloc_array(match_count, sizeof(heapstore_span_t));
     if (!result) {
         agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;

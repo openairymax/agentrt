@@ -5,7 +5,7 @@
  * 实现 token_standard.h 中定义的标准化接口，确保跨语言一致性。
  * 遵循 AgentOS 架构原则（E-3 资源确定性），提供确定性的 Token 计算。
  *
- * @version 1.0.0
+ * @version 0.1.0
  * @date 2026-04-07
  */
 

@@ -100,10 +100,10 @@ static int parse_url(const char *url, char *host, size_t host_size, int *port, c
     }
 
     if (slash) {
-        strncpy(path, slash, path_size - 1);
+        AGENTOS_STRNCPY_TERM(path, slash, path_size);
         path[path_size - 1] = '\0';
     } else {
-        strncpy(path, "/", path_size - 1);
+        AGENTOS_STRNCPY_TERM(path, "/", path_size);
         path[path_size - 1] = '\0';
     }
 
@@ -113,7 +113,7 @@ static int parse_url(const char *url, char *host, size_t host_size, int *port, c
 static SOCKET connect_to_host(const char *host, int port, int timeout_ms)
 {
     struct addrinfo hints, *result, *rp;
-    memset(&hints, 0, sizeof(hints));
+    AGENTOS_MEMSET(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
@@ -278,7 +278,7 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
         if (sscanf(request_str, "%2047s", url) != 1) {
             ATM_RET_ERR(AGENTOS_EINVAL);
         }
-        strncpy(method, "GET", sizeof(method) - 1);
+        AGENTOS_STRNCPY_TERM(method, "GET", sizeof(method));
     }
 
     char host[256] = {0};

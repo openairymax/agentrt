@@ -90,8 +90,7 @@ __attribute__((used)) agentos_error_t agentos_generate_uuid(char *buf)
         return AGENTOS_EINVAL;
     }
 
-    strncpy(buf, (char *)str, 37);
-    buf[36] = '\0';
+    AGENTOS_STRNCPY_TERM(buf, (char *)str, 37);
     RpcStringFreeA(&str);
 #else
     uuid_t uuid;

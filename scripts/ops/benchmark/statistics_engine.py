@@ -16,12 +16,13 @@ AgentOS 性能基准测试统计计算引擎
 3. 可解释性 - 提供清晰的分析结果
 4. 性能 - 优化大规模数据处理
 
-@version v1.0.0
+@version 0.1.0
 @date 2026-04-11
 @copyright (c) 2026 SPHARX. All Rights Reserved.
 """
 
 import json
+import logging
 import math
 import statistics
 import typing
@@ -33,6 +34,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from scipy import stats as scipy_stats
+
+logger = logging.getLogger(__name__)
 
 
 class DistributionType(Enum):
@@ -525,7 +528,8 @@ class StatisticsEngine:
             power = 1 - nct.cdf(t_critical, df, ncp) + nct.cdf(-t_critical, df, ncp)
             
             return min(max(power, 0), 1)  # 确保在[0,1]范围内
-        except:
+        except (ValueError, ZeroDivisionError, AttributeError) as e:
+            logger.debug("统计功效计算失败: %s", e)
             return 0.5  # 默认值
     
     def detect_outliers(self, method: str = "iqr", threshold: float = 1.5) -> Tuple[List[float], List[int]]:
@@ -823,7 +827,8 @@ def main():
                 try:
                     value = float(line.strip())
                     data.append(value)
-                except:
+                except (ValueError, TypeError) as e:
+                    logger.debug("跳过无效数据行: %s", e)
                     pass
     
     if not data:

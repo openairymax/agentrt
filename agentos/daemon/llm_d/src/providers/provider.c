@@ -90,7 +90,7 @@ void provider_base_init(provider_base_ctx_t *base_ctx, const char *api_key, cons
     if (!base_ctx)
         return;
 
-    memset(base_ctx, 0, sizeof(provider_base_ctx_t));
+    AGENTOS_MEMSET(base_ctx, 0, sizeof(provider_base_ctx_t));
 
     const char *resolved_key = resolve_api_key(api_key);
     if (!resolved_key || resolved_key[0] == '\0') {
@@ -400,7 +400,7 @@ typedef struct {
 
 static void sse_ctx_init(sse_stream_ctx_t *sse, provider_stream_chunk_cb_t cb, void *user_data)
 {
-    memset(sse, 0, sizeof(*sse));
+    AGENTOS_MEMSET(sse, 0, sizeof(*sse));
     sse->line_cap = 4096;
     sse->line_buf = (char *)AGENTOS_MALLOC(sse->line_cap);
     sse->on_chunk = cb;

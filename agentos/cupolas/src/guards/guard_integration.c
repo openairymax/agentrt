@@ -326,8 +326,8 @@ CUPOLAS_API void cupolas_guards_cleanup(void)
         guard_manager_destroy(g_guard_manager);
         g_guard_manager = NULL;
     }
-    memset(g_current_agent_id, 0, sizeof(g_current_agent_id));
-    strncpy(g_current_agent_id, "system", sizeof(g_current_agent_id) - 1);
+    AGENTOS_MEMSET(g_current_agent_id, 0, sizeof(g_current_agent_id));
+    AGENTOS_STRNCPY_TERM(g_current_agent_id, "system", sizeof(g_current_agent_id));
     g_guards_enabled = false;
 }
 
@@ -339,7 +339,7 @@ CUPOLAS_API void cupolas_guards_set_agent_id(const char *agent_id)
 {
     if (!agent_id)
         return;
-    strncpy(g_current_agent_id, agent_id, sizeof(g_current_agent_id) - 1);
+    AGENTOS_STRNCPY_TERM(g_current_agent_id, agent_id, sizeof(g_current_agent_id));
     g_current_agent_id[sizeof(g_current_agent_id) - 1] = '\0';
 }
 

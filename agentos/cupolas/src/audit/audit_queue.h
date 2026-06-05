@@ -46,6 +46,8 @@ typedef struct audit_entry {
     char *resource;           /**< Resource accessed */
     char *detail;             /**< Additional details */
     int result;               /**< Event result (1=success, 0=failure) */
+    char prev_hash[65];       /**< SHA-256 hash of previous entry (64 hex chars + null) */
+    char curr_hash[65];       /**< SHA-256 hash of current entry for chain validation */
     struct audit_entry *next; /**< Next entry in linked list */
 } audit_entry_t;
 

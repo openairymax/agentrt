@@ -166,7 +166,8 @@ char **string_common_strsplit(const char *str, const char *delim)
     count++;
 
     // 分配字符串数组
-    char **arr = (char **)AGENTOS_MALLOC((count + 1) * sizeof(char *));
+    char **arr;
+    arr = agentos_malloc_array((size_t)(count + 1), sizeof(char *));
     if (!arr) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;

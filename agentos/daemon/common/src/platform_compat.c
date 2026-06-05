@@ -200,7 +200,8 @@ int agentos_get_sysinfo(agentos_sysinfo_t *info)
     struct sysinfo si;
     if (sysinfo(&si) != 0)
         return AGENTOS_ERR_UNKNOWN;
-    strncpy(info->os_name, "Linux", sizeof(info->os_name));
+    strncpy(info->os_name, "Linux", sizeof(info->os_name) - 1);
+    info->os_name[sizeof(info->os_name) - 1] = '\0';
     info->cpu_count = (uint32_t)si.procs;
     info->memory_total = si.totalram * si.mem_unit;
     info->memory_free = si.freeram * si.mem_unit;
@@ -208,7 +209,8 @@ int agentos_get_sysinfo(agentos_sysinfo_t *info)
     info->os_version[0] = '\0';
     return 0;
 #elif defined(__APPLE__)
-    strncpy(info->os_name, "macOS", sizeof(info->os_name));
+    strncpy(info->os_name, "macOS", sizeof(info->os_name) - 1);
+    info->os_name[sizeof(info->os_name) - 1] = '\0';
     {
         int mib[2] = {CTL_HW, HW_MEMSIZE};
         int64_t memsize = 0;
@@ -345,6 +347,7 @@ agentos_socket_t agentos_socket_create_unix_server(const char *path)
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 
     unlink(path);
 

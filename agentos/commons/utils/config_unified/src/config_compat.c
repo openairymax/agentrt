@@ -335,7 +335,7 @@ int config_init(void)
         return 0;
     g_compat_ctx = config_context_create("compat_global");
     g_compat_initialized = true;
-    memset(&g_compat_stats, 0, sizeof(g_compat_stats));
+    AGENTOS_MEMSET(&g_compat_stats, 0, sizeof(g_compat_stats));
     return 0;
 }
 
@@ -487,7 +487,7 @@ int config_set_environment(const char *environment)
     g_compat_stats.total_calls++;
     if (!environment)
         return AGENTOS_EINVAL;
-    strncpy(g_environment, environment, sizeof(g_environment) - 1);
+    AGENTOS_STRNCPY_TERM(g_environment, environment, sizeof(g_environment));
     g_environment[sizeof(g_environment) - 1] = '\0';
     return 0;
 }

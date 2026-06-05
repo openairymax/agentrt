@@ -91,7 +91,7 @@ static const char *metric_type_string(um_metric_type_t type)
 AGENTOS_API um_config_t um_create_default_config(void)
 {
     um_config_t config;
-    memset(&config, 0, sizeof(um_config_t));
+    AGENTOS_MEMSET(&config, 0, sizeof(um_config_t));
     safe_strcpy(config.service_name, "agentos", sizeof(config.service_name));
     config.scrape_interval_ms = 15000;
     config.retention_ms = 300000;
@@ -114,9 +114,9 @@ AGENTOS_API int um_init(const um_config_t *config)
     if (err != AGENTOS_SUCCESS)
         return AGENTOS_ERR_UNKNOWN;
 
-    memset(g_um.modules, 0, sizeof(g_um.modules));
+    AGENTOS_MEMSET(g_um.modules, 0, sizeof(g_um.modules));
     g_um.module_count = 0;
-    memset(&g_um.stats, 0, sizeof(um_stats_t));
+    AGENTOS_MEMSET(&g_um.stats, 0, sizeof(um_stats_t));
     g_um.initialized = true;
 
     if (g_um.config.enable_default_metrics) {
@@ -169,7 +169,7 @@ AGENTOS_API int um_register_module(const char *module_name, const char *instance
     }
 
     um_module_metrics_t *mod = &g_um.modules[g_um.module_count];
-    memset(mod, 0, sizeof(um_module_metrics_t));
+    AGENTOS_MEMSET(mod, 0, sizeof(um_module_metrics_t));
     safe_strcpy(mod->module_name, module_name, UM_MODULE_NAME_LEN);
     if (instance_id) {
         safe_strcpy(mod->instance_id, instance_id, sizeof(mod->instance_id));
@@ -211,7 +211,7 @@ AGENTOS_API int um_unregister_module(const char *module_name)
     if (idx < g_um.module_count - 1) {
         g_um.modules[idx] = g_um.modules[g_um.module_count - 1];
     }
-    memset(&g_um.modules[g_um.module_count - 1], 0, sizeof(um_module_metrics_t));
+    AGENTOS_MEMSET(&g_um.modules[g_um.module_count - 1], 0, sizeof(um_module_metrics_t));
     g_um.module_count--;
     g_um.stats.active_modules = g_um.module_count;
 
@@ -255,7 +255,7 @@ AGENTOS_API int um_register_metric(const char *module_name, const char *name, um
     }
 
     um_metric_entry_t *entry = &mod->metrics[mod->metric_count];
-    memset(entry, 0, sizeof(um_metric_entry_t));
+    AGENTOS_MEMSET(entry, 0, sizeof(um_metric_entry_t));
     safe_strcpy(entry->name, name, UM_METRIC_NAME_LEN);
     if (help)
         safe_strcpy(entry->help, help, sizeof(entry->help));

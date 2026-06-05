@@ -58,7 +58,7 @@ heapstore_error_t heapstore_memory_init(void)
         snprintf(base_path, sizeof(base_path), "%s/agentos/heapstore/kernel/memory",
                  getenv("TMPDIR") ? getenv("TMPDIR") : AGENTOS_TMP_DIR);
     }
-    strncpy(s_memory_path, base_path, sizeof(s_memory_path) - 1);
+    AGENTOS_STRNCPY_TERM(s_memory_path, base_path, sizeof(s_memory_path));
     s_memory_path[sizeof(s_memory_path) - 1] = '\0';
 
     if (!heapstore_ensure_directory(s_memory_path)) {
@@ -83,8 +83,8 @@ heapstore_error_t heapstore_memory_init(void)
         return heapstore_ERR_DIR_CREATE_FAILED;
     }
 
-    memset(s_pools, 0, sizeof(s_pools));
-    memset(s_allocations, 0, sizeof(s_allocations));
+    AGENTOS_MEMSET(s_pools, 0, sizeof(s_pools));
+    AGENTOS_MEMSET(s_allocations, 0, sizeof(s_allocations));
     s_pool_count = 0;
     s_allocation_count = 0;
 
@@ -102,8 +102,8 @@ void heapstore_memory_shutdown(void)
 
     agentos_mutex_lock(&s_memory_lock);
 
-    memset(s_pools, 0, sizeof(s_pools));
-    memset(s_allocations, 0, sizeof(s_allocations));
+    AGENTOS_MEMSET(s_pools, 0, sizeof(s_pools));
+    AGENTOS_MEMSET(s_allocations, 0, sizeof(s_allocations));
     s_pool_count = 0;
     s_allocation_count = 0;
 
@@ -268,7 +268,7 @@ heapstore_error_t heapstore_memory_free_allocation(const char *allocation_id)
     for (size_t i = 0; i < s_allocation_count; i++) {
         if (strcmp(s_allocations[i].allocation_id, allocation_id) == 0) {
             s_allocations[i].freed_at = (uint64_t)time(NULL);
-            strncpy(s_allocations[i].status, "freed", sizeof(s_allocations[i].status) - 1);
+            AGENTOS_STRNCPY_TERM(s_allocations[i].status, "freed", sizeof(s_allocations[i].status));
             agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }

@@ -72,7 +72,7 @@ int test_memory_pool_basic(void) {
         return 1;
     }
 
-    memset(block1, 0xAB, 256);
+    AGENTOS_MEMSET(block1, 0xAB, 256);
 
     void* block2 = agentos_mem_pool_alloc(pool, 512);
     if (block2 == NULL) {
@@ -81,7 +81,7 @@ int test_memory_pool_basic(void) {
         return 1;
     }
 
-    memset(block2, 0xCD, 512);
+    AGENTOS_MEMSET(block2, 0xCD, 512);
 
     agentos_mem_pool_free(pool, block2);
     agentos_mem_pool_free(pool, block1);
@@ -100,7 +100,7 @@ int test_memory_guard(void) {
         return 1;
     }
 
-    memset(buffer, 'A', 99);
+    AGENTOS_MEMSET(buffer, 'A', 99);
     buffer[99] = '\0';
 
     agentos_write_guard(buffer, 100, 0xDE, 0, 100);

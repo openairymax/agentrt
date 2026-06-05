@@ -432,7 +432,7 @@ int openjiuwen_unified_to_native(const unified_message_t *msg, void *out_buffer,
 
     /* 构建OpenJiuwen消息头部 */
     openjiuwen_header_t header;
-    memset(&header, 0, sizeof(header));
+    AGENTOS_MEMSET(&header, 0, sizeof(header));
 
     header.message_id = generate_message_id();
     header.timestamp = get_timestamp();
@@ -481,7 +481,7 @@ int openjiuwen_native_to_unified(const void *in_buffer, size_t buffer_size, unif
     }
 
     /* 填充统一消息格式 */
-    memset(msg, 0, sizeof(unified_message_t));
+    AGENTOS_MEMSET(msg, 0, sizeof(unified_message_t));
 
     msg->protocol = AGENTOS_PROTOCOL_OPENJIUWEN;
     msg->message_id = header->message_id;
@@ -515,7 +515,7 @@ void openjiuwen_get_default_config(openjiuwen_config_t *config)
     if (!config)
         return;
 
-    memset(config, 0, sizeof(openjiuwen_config_t));
+    AGENTOS_MEMSET(config, 0, sizeof(openjiuwen_config_t));
 
     safe_strcpy(config->endpoint, "http://localhost:8080", sizeof(config->endpoint));
     config->timeout_ms = OPENJIUWEN_TIMEOUT_MS;

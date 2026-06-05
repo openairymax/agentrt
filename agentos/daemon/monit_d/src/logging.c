@@ -154,7 +154,7 @@ int structured_log_add_file_target(const char *path, log_level_t min_level, uint
     target->type = TARGET_FILE;
     target->min_level = min_level;
     target->enabled = true;
-    strncpy(target->config.file.path, path, sizeof(target->config.file.path) - 1);
+    AGENTOS_STRNCPY_TERM(target->config.file.path, path, sizeof(target->config.file.path));
     target->config.file.max_size_bytes = max_size_bytes > 0 ? max_size_bytes : 100 * 1024 * 1024;
     target->config.file.max_rotations = max_rotations > 0 ? max_rotations : 5;
     target->config.file.current_size = 0;
@@ -212,7 +212,7 @@ int structured_log_set_context(const char *key, const char *value)
 
     for (size_t i = 0; i < g_structured_log.global_context_count; i++) {
         if (strcmp(g_structured_log.global_context[i].key, key) == 0) {
-            strncpy(g_structured_log.global_context[i].value, value, MAX_FIELD_VALUE_LEN - 1);
+            AGENTOS_STRNCPY_TERM(g_structured_log.global_context[i].value, value, MAX_FIELD_VALUE_LEN);
             agentos_mutex_unlock(&g_structured_log.context_lock);
             return AGENTOS_SUCCESS;
         }
@@ -225,8 +225,8 @@ int structured_log_set_context(const char *key, const char *value)
 
     context_field_t *field =
         &g_structured_log.global_context[g_structured_log.global_context_count];
-    strncpy(field->key, key, MAX_FIELD_KEY_LEN - 1);
-    strncpy(field->value, value, MAX_FIELD_VALUE_LEN - 1);
+    AGENTOS_STRNCPY_TERM(field->key, key, MAX_FIELD_KEY_LEN);
+    AGENTOS_STRNCPY_TERM(field->value, value, MAX_FIELD_VALUE_LEN);
     g_structured_log.global_context_count++;
 
     agentos_mutex_unlock(&g_structured_log.context_lock);
@@ -321,14 +321,14 @@ int structured_log_write(log_level_t level, const char *service_name, const char
     ring_entry_t entry = {0};
     entry.level = level;
     entry.timestamp = (uint64_t)time(NULL) * 1000;
-    strncpy(entry.message, message, MAX_LOG_MESSAGE_LEN - 1);
+    AGENTOS_STRNCPY_TERM(entry.message, message, MAX_LOG_MESSAGE_LEN);
     if (service_name)
-        strncpy(entry.service_name, service_name, sizeof(entry.service_name) - 1);
+        AGENTOS_STRNCPY_TERM(entry.service_name, service_name, sizeof(entry.service_name));
     if (file)
-        strncpy(entry.file, file, sizeof(entry.file) - 1);
+        AGENTOS_STRNCPY_TERM(entry.file, file, sizeof(entry.file));
     entry.line = line;
     if (function)
-        strncpy(entry.function, function, sizeof(entry.function) - 1);
+        AGENTOS_STRNCPY_TERM(entry.function, function, sizeof(entry.function));
 
     agentos_mutex_lock(&g_structured_log.context_lock);
     entry.context_count = g_structured_log.global_context_count < MAX_CONTEXT_FIELDS

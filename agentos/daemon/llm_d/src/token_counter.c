@@ -95,7 +95,7 @@ token_counter_t *token_counter_create(const char *encoding_name)
 
     tc->encoding_name = AGENTOS_STRDUP(encoding_name ? encoding_name : "cl100k_base");
 
-    memset(&tc->config, 0, sizeof(tc->config));
+    AGENTOS_MEMSET(&tc->config, 0, sizeof(tc->config));
     tc->config.model_type = encoding_to_model_type(encoding_name);
     tc->config.model_name = tc->encoding_name;
     tc->config.cjk_ratio = 0.2f;

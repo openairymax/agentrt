@@ -192,12 +192,13 @@ static void result_set_add(result_set_t *set, const request_result_t *result)
 static void compute_statistics(const result_set_t *set, benchmark_stats_t *stats)
 {
     if (set->count == 0) {
-        memset(stats, 0, sizeof(benchmark_stats_t));
+        AGENTOS_MEMSET(stats, 0, sizeof(benchmark_stats_t));
         return;
     }
 
     size_t n = set->count;
-    double *latencies = (double *)AGENTOS_MALLOC(n * sizeof(double));
+    double *latencies;
+    SAFE_MALLOC_ARRAY(latencies, n, sizeof(double));
     if (!latencies)
         return;
 
@@ -539,14 +540,14 @@ static void print_usage(const char *prog)
 
 static int parse_args(int argc, char *argv[])
 {
-    memset(&g_config, 0, sizeof(g_config));
+    AGENTOS_MEMSET(&g_config, 0, sizeof(g_config));
 
-    strncpy(g_config.url, DEFAULT_URL, MAX_URL_LENGTH - 1);
+    AGENTOS_STRNCPY_TERM(g_config.url, DEFAULT_URL, MAX_URL_LENGTH);
     g_config.concurrent = 10;
     g_config.total_requests = 1000;
     g_config.duration_sec = 30;
-    strncpy(g_config.method, "GET", sizeof(g_config.method) - 1);
-    strncpy(g_config.output_file, "benchmark_report.json", sizeof(g_config.output_file) - 1);
+    AGENTOS_STRNCPY_TERM(g_config.method, "GET", sizeof(g_config.method) -);
+    AGENTOS_STRNCPY_TERM(g_config.output_file, "benchmark_report.json", sizeof(g_config.output_file) -);
     g_config.warmup_count = WARMUP_COUNT;
     g_config.verbose = 0;
     g_config.running = 1;
@@ -556,7 +557,7 @@ static int parse_args(int argc, char *argv[])
             print_usage(argv[0]);
             return 0;
         } else if (strcmp(argv[i], "--url") == 0 && i + 1 < argc) {
-            strncpy(g_config.url, argv[++i], MAX_URL_LENGTH - 1);
+            AGENTOS_STRNCPY_TERM(g_config.url, argv[++i], MAX_URL_LENGTH);
         } else if (strcmp(argv[i], "--concurrent") == 0 && i + 1 < argc) {
             g_config.concurrent = atoi(argv[++i]);
             if (g_config.concurrent < 1)
@@ -568,7 +569,7 @@ static int parse_args(int argc, char *argv[])
         } else if (strcmp(argv[i], "--duration") == 0 && i + 1 < argc) {
             g_config.duration_sec = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--method") == 0 && i + 1 < argc) {
-            strncpy(g_config.method, argv[++i], sizeof(g_config.method) - 1);
+            AGENTOS_STRNCPY_TERM(g_config.method, argv[++i], sizeof(g_config.method) -);
         } else if (strcmp(argv[i], "--payload") == 0 && i + 1 < argc) {
             FILE *pf = fopen(argv[++i], "rb");
             if (pf) {
@@ -584,7 +585,7 @@ static int parse_args(int argc, char *argv[])
                 fclose(pf);
             }
         } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
-            strncpy(g_config.output_file, argv[++i], sizeof(g_config.output_file) - 1);
+            AGENTOS_STRNCPY_TERM(g_config.output_file, argv[++i], sizeof(g_config.output_file) -);
         } else if (strcmp(argv[i], "--warmup") == 0 && i + 1 < argc) {
             g_config.warmup_count = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--verbose") == 0 || strcmp(argv[i], "-v") == 0) {
@@ -637,8 +638,10 @@ int main(int argc, char *argv[])
 
     pthread_barrier_init(&g_config.start_barrier, NULL, g_config.concurrent + 1);
 
-    pthread_t *threads = (pthread_t *)AGENTOS_MALLOC(g_config.concurrent * sizeof(pthread_t));
-    int *thread_ids = (int *)AGENTOS_MALLOC(g_config.concurrent * sizeof(int));
+    pthread_t *threads;
+    SAFE_MALLOC_ARRAY(threads, g_config.concurrent, sizeof(pthread_t));
+    int *thread_ids;
+    SAFE_MALLOC_ARRAY(thread_ids, g_config.concurrent, sizeof(int));
 
     printf("Creating %d worker threads...\n", g_config.concurrent);
     for (int i = 0; i < g_config.concurrent; i++) {

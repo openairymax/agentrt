@@ -313,7 +313,7 @@ agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callbac
     if (!ch)
         goto cleanup;
 
-    strncpy(ch->name, name, MAX_CHANNEL_NAME - 1);
+    AGENTOS_STRNCPY_TERM(ch->name, name, MAX_CHANNEL_NAME);
     ch->name[MAX_CHANNEL_NAME - 1] = '\0';
     ch->fd = -1;
     ch->is_server = callback ? 1 : 0;
@@ -331,7 +331,7 @@ agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callbac
         if (!node)
             goto cleanup;
 
-        strncpy(node->name, name, MAX_CHANNEL_NAME - 1);
+        AGENTOS_STRNCPY_TERM(node->name, name, MAX_CHANNEL_NAME);
         node->name[MAX_CHANNEL_NAME - 1] = '\0';
         node->callback = callback;
         node->userdata = userdata;
@@ -385,7 +385,7 @@ agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **ou
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
-    strncpy(ch->name, name, MAX_CHANNEL_NAME - 1);
+    AGENTOS_STRNCPY_TERM(ch->name, name, MAX_CHANNEL_NAME);
     ch->name[MAX_CHANNEL_NAME - 1] = '\0';
     ch->remote_target = target;
     ch->fd = -1;

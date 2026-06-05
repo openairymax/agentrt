@@ -11,6 +11,7 @@ set(MEMORYROVOL_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../memory)
 set(CL3_TEST_SOURCES
     unit/test_loop.c
     unit/test_cognition.c
+    unit/test_cognition_e2e.c
     unit/test_execution.c
     unit/test_memory.c
     unit/test_compensation.c

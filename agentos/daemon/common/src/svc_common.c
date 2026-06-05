@@ -344,7 +344,7 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
     service->thread_count = 0;
 
     /* 初始化统计信息 */
-    memset(&service->stats, 0, sizeof(agentos_svc_stats_t));
+    AGENTOS_MEMSET(&service->stats, 0, sizeof(agentos_svc_stats_t));
 
     /* 注册到内部注册表 */
     err = register_service_internal(service);
@@ -529,7 +529,7 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
         struct sigaction old_act, new_act;
         if (force) {
             g_svc_stop_timeout_flag = 0;
-            memset(&new_act, 0, sizeof(new_act));
+            AGENTOS_MEMSET(&new_act, 0, sizeof(new_act));
             new_act.sa_handler = svc_stop_timeout_handler;
             sigemptyset(&new_act.sa_mask);
             new_act.sa_flags = SA_RESETHAND;
@@ -807,7 +807,7 @@ void agentos_service_reset_stats(agentos_service_t svc)
     agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
 
     agentos_mutex_lock(&service->stats_mutex);
-    memset(&service->stats, 0, sizeof(agentos_svc_stats_t));
+    AGENTOS_MEMSET(&service->stats, 0, sizeof(agentos_svc_stats_t));
     agentos_mutex_unlock(&service->stats_mutex);
 
     LOG_DEBUG("Service '%s' stats reset", service->name);
@@ -1118,7 +1118,7 @@ agentos_error_t agentos_registry_init(const char *registry_url)
         agentos_mutex_unlock(&g_cross_registry.mutex);
         return AGENTOS_EINVAL;
     }
-    memset(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
+    AGENTOS_MEMSET(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
     g_cross_registry.entry_count = 0;
     g_cross_registry.initialized = true;
 
@@ -1190,7 +1190,7 @@ agentos_error_t agentos_registry_deregister(agentos_service_t service)
                 g_cross_registry.entries[i] =
                     g_cross_registry.entries[g_cross_registry.entry_count - 1];
             }
-            memset(&g_cross_registry.entries[g_cross_registry.entry_count - 1], 0,
+            AGENTOS_MEMSET(&g_cross_registry.entries[g_cross_registry.entry_count - 1], 0,
                    sizeof(registry_entry_t));
             g_cross_registry.entry_count--;
 
@@ -1342,7 +1342,7 @@ void agentos_registry_cleanup(void)
 {
     agentos_mutex_lock(&g_cross_registry.mutex);
 
-    memset(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
+    AGENTOS_MEMSET(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
     g_cross_registry.entry_count = 0;
     g_cross_registry.initialized = false;
     g_cross_registry.registry_url[0] = '\0';
@@ -1384,7 +1384,7 @@ static agentos_error_t config_mgr_init(void)
         return err;
     }
 
-    memset(g_config_mgr.watchers, 0, sizeof(g_config_mgr.watchers));
+    AGENTOS_MEMSET(g_config_mgr.watchers, 0, sizeof(g_config_mgr.watchers));
     g_config_mgr.watcher_count = 0;
     if (safe_strcpy(g_config_mgr.config_base_path, "./config",
                     sizeof(g_config_mgr.config_base_path)) != 0) {
@@ -1621,7 +1621,7 @@ static agentos_error_t monitor_init(void)
         return err;
     }
 
-    memset(g_monitor.services, 0, sizeof(g_monitor.services));
+    AGENTOS_MEMSET(g_monitor.services, 0, sizeof(g_monitor.services));
     g_monitor.count = 0;
     g_monitor.initialized = true;
 
@@ -1823,7 +1823,7 @@ agentos_error_t agentos_service_monitor_stop(agentos_service_t service)
                     if (j < g_monitor.count - 1) {
                         g_monitor.services[j] = g_monitor.services[g_monitor.count - 1];
                     }
-                    memset(&g_monitor.services[g_monitor.count - 1], 0,
+                    AGENTOS_MEMSET(&g_monitor.services[g_monitor.count - 1], 0,
                            sizeof(monitored_service_t));
                     g_monitor.count--;
                     break;

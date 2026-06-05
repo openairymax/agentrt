@@ -173,7 +173,7 @@ static void parse_params_cleanup(request_context_t *ctx, llm_request_config_t *c
 
 static int parse_params(cJSON *params, request_context_t *ctx, llm_request_config_t *cfg)
 {
-    memset(cfg, 0, sizeof(llm_request_config_t));
+    AGENTOS_MEMSET(cfg, 0, sizeof(llm_request_config_t));
 
     cJSON *model = cJSON_GetObjectItem(params, "model");
     if (!cJSON_IsString(model)) {
@@ -538,7 +538,7 @@ static void free_daemon_config(void)
 {
     AGENTOS_FREE(g_config.socket_path);
     AGENTOS_FREE(g_config.tcp_host);
-    memset(&g_config, 0, sizeof(g_config));
+    AGENTOS_MEMSET(&g_config, 0, sizeof(g_config));
 }
 
 /* ==================== 主函数 ==================== */
@@ -628,7 +628,7 @@ int main(int argc, char **argv)
 
     /* 创建事件驱动框架 */
     daemon_event_config_t ev_config;
-    memset(&ev_config, 0, sizeof(ev_config));
+    AGENTOS_MEMSET(&ev_config, 0, sizeof(ev_config));
     ev_config.max_events = 64;
     ev_config.thread_pool_min = g_config.max_threads > 0 ? g_config.max_threads : 4;
     ev_config.thread_pool_max = g_config.max_threads > 0 ? g_config.max_threads : 8;

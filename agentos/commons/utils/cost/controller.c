@@ -165,7 +165,7 @@ agentos_budget_controller_t *agentos_budget_controller_create(double max_cost_us
         return NULL;
     }
 
-    memset(controller, 0, sizeof(agentos_budget_controller_t));
+    AGENTOS_MEMSET(controller, 0, sizeof(agentos_budget_controller_t));
 
     controller->max_cost_usd = max_cost_usd;
     controller->warning_threshold = 0.8;

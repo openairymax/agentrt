@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
     config.max_channels = max_channels;
     if (socket_dir) {
-        strncpy(config.socket_dir, socket_dir, sizeof(config.socket_dir) - 1);
+        AGENTOS_STRNCPY_TERM(config.socket_dir, socket_dir, sizeof(config.socket_dir));
     }
 
     channel_service_t *svc = channel_service_create(&config);

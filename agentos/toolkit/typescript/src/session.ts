@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK Session
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-04-04
 
 import { SessionError } from './errors';

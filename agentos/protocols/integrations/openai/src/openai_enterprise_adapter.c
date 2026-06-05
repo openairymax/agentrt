@@ -492,7 +492,7 @@ static int openai_parse_chat_response(const char *json_str, char *content_out, s
         if (message) {
             cJSON *content = cJSON_GetObjectItem(message, "content");
             if (content && content->valuestring) {
-                strncpy(content_out, content->valuestring, content_len - 1);
+                AGENTOS_STRNCPY_TERM(content_out, content->valuestring, content_len);
                 content_out[content_len - 1] = '\0';
                 result = 0;
             }
@@ -623,10 +623,9 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
 
     openai_rate_result_t rate_status = openai_check_rate_limit(adapter, est_tokens);
     if (rate_status != OPENAI_RATE_OK) {
-        memset(out_response, 0, sizeof(*out_response));
+        AGENTOS_MEMSET(out_response, 0, sizeof(*out_response));
         out_response->created = (uint64_t)time(NULL);
-        strncpy(out_response->model, request->model ? request->model : "gpt-4o",
-                sizeof(out_response->model) - 1);
+        AGENTOS_STRNCPY_TERM(out_response->model, request->model ? request->model : "gpt-4o", sizeof(out_response->model));
         out_response->finish_reasons = AGENTOS_CALLOC(1, sizeof(openai_finish_reason_t));
         if (out_response->finish_reasons)
             out_response->finish_reasons[0] = OPENAI_FINISH_RATE_LIMITED;
@@ -635,9 +634,8 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
-    memset(out_response, 0, sizeof(*out_response));
-    strncpy(out_response->model, request->model ? request->model : "gpt-4o",
-            sizeof(out_response->model) - 1);
+    AGENTOS_MEMSET(out_response, 0, sizeof(*out_response));
+    AGENTOS_STRNCPY_TERM(out_response->model, request->model ? request->model : "gpt-4o", sizeof(out_response->model));
     out_response->created = (uint64_t)time(NULL);
 
     uint64_t ts_start_ms = agentos_time_ms();
@@ -720,7 +718,7 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
     cJSON_Delete(req_json);
 
     char api_response[8192];
-    memset(api_response, 0, sizeof(api_response));
+    AGENTOS_MEMSET(api_response, 0, sizeof(api_response));
     int api_result =
         openai_api_call(adapter->config.api_key, adapter->config.base_url, "/chat/completions",
                         req_str, api_response, sizeof(api_response));
@@ -731,7 +729,7 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
 
     if (api_result > 0) {
         char content_buf[OPENAI_MAX_RESPONSE_LEN];
-        memset(content_buf, 0, sizeof(content_buf));
+        AGENTOS_MEMSET(content_buf, 0, sizeof(content_buf));
         openai_usage_t api_usage = {0};
         int parse_result =
             openai_parse_chat_response(api_response, content_buf, sizeof(content_buf), &api_usage);
@@ -794,10 +792,9 @@ int openai_chat_completion_streaming(openai_handle_t handle, const openai_chat_r
 
     uint64_t ts_start_ms = agentos_time_ms();
 
-    memset(final_summary, 0, sizeof(*final_summary));
+    AGENTOS_MEMSET(final_summary, 0, sizeof(*final_summary));
     final_summary->created = (uint64_t)time(NULL);
-    strncpy(final_summary->model, request->model ? request->model : "gpt-4o",
-            sizeof(final_summary->model) - 1);
+    AGENTOS_STRNCPY_TERM(final_summary->model, request->model ? request->model : "gpt-4o", sizeof(final_summary->model));
 
     cJSON *req_json = cJSON_CreateObject();
     cJSON_AddStringToObject(req_json, "model", request->model ? request->model : "gpt-4o");
@@ -836,7 +833,7 @@ int openai_chat_completion_streaming(openai_handle_t handle, const openai_chat_r
     cJSON_Delete(req_json);
 
     char api_response[16384];
-    memset(api_response, 0, sizeof(api_response));
+    AGENTOS_MEMSET(api_response, 0, sizeof(api_response));
     int api_result =
         openai_api_call(adapter->config.api_key, adapter->config.base_url, "/chat/completions",
                         req_str, api_response, sizeof(api_response));
@@ -848,7 +845,7 @@ int openai_chat_completion_streaming(openai_handle_t handle, const openai_chat_r
         }
 
     char full_response[OPENAI_MAX_RESPONSE_LEN];
-    memset(full_response, 0, sizeof(full_response));
+    AGENTOS_MEMSET(full_response, 0, sizeof(full_response));
     openai_usage_t api_usage = {0};
     int parse_result =
         openai_parse_chat_response(api_response, full_response, sizeof(full_response), &api_usage);
@@ -928,10 +925,9 @@ int openai_create_embedding(openai_handle_t handle, const openai_embedding_reque
 
     uint64_t ts_start_ms = agentos_time_ms();
 
-    memset(out_response, 0, sizeof(*out_response));
+    AGENTOS_MEMSET(out_response, 0, sizeof(*out_response));
 
-    strncpy(out_response->model, request->model ? request->model : "text-embedding-ada-002",
-            sizeof(out_response->model) - 1);
+    AGENTOS_STRNCPY_TERM(out_response->model, request->model ? request->model : "text-embedding-ada-002", sizeof(out_response->model));
 
     int dims = OPENAI_EMBEDDING_DIM_DEFAULT;
     if (request->model) {
@@ -1031,7 +1027,7 @@ int openai_get_stats(void *handle, openai_rate_limit_t *out_stats)
         return AGENTOS_ERR_SYS_NOT_INIT;
         }
 
-    memset(out_stats, 0, sizeof(*out_stats));
+    AGENTOS_MEMSET(out_stats, 0, sizeof(*out_stats));
     out_stats->current_rpm = (double)adapter->rate_window_requests;
     out_stats->rpm_limit = (double)adapter->rate_limit_rpm;
     out_stats->current_tpm = (double)adapter->rate_window_tokens;
@@ -1067,7 +1063,7 @@ void openai_free_chat_response(openai_chat_response_t *response)
     }
     AGENTOS_FREE(response->choices);
     AGENTOS_FREE(response->finish_reasons);
-    memset(response, 0, sizeof(*response));
+    AGENTOS_MEMSET(response, 0, sizeof(*response));
 }
 
 void openai_free_embedding_response(openai_embedding_response_t *response)
@@ -1075,7 +1071,7 @@ void openai_free_embedding_response(openai_embedding_response_t *response)
     if (!response)
         return;
     AGENTOS_FREE(response->embeddings);
-    memset(response, 0, sizeof(*response));
+    AGENTOS_MEMSET(response, 0, sizeof(*response));
 }
 
 int openai_set_rate_limits(void *handle, uint32_t rpm, uint32_t tpm)
@@ -1139,7 +1135,7 @@ struct openai_enterprise_context_s {
 openai_enterprise_config_t openai_enterprise_config_default(void)
 {
     openai_enterprise_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
+    AGENTOS_MEMSET(&cfg, 0, sizeof(cfg));
     cfg.api_key = NULL;
     cfg.base_url = AGENTOS_STRDUP("https://api.openai.com/v1");
     cfg.default_model = AGENTOS_STRDUP("gpt-4o");
@@ -1233,7 +1229,7 @@ int openai_enterprise_chat_completion(openai_enterprise_context_t *ctx, const ch
         }
     const char *effective_model = model ? model : "gpt-4o";
     openai_chat_request_t req;
-    memset(&req, 0, sizeof(req));
+    AGENTOS_MEMSET(&req, 0, sizeof(req));
     req.model = AGENTOS_STRDUP(effective_model);
     if (messages && message_count > 0) {
         req.messages = (openai_message_t *)messages;
@@ -1258,14 +1254,14 @@ int openai_enterprise_chat_streaming(openai_enterprise_context_t *ctx, const cha
         }
     const char *effective_model = model ? model : "gpt-4o";
     openai_chat_request_t req;
-    memset(&req, 0, sizeof(req));
+    AGENTOS_MEMSET(&req, 0, sizeof(req));
     req.model = AGENTOS_STRDUP(effective_model);
     if (messages && message_count > 0) {
         req.messages = (openai_message_t *)messages;
         req.num_messages = message_count;
     }
     openai_chat_response_t final_resp;
-    memset(&final_resp, 0, sizeof(final_resp));
+    AGENTOS_MEMSET(&final_resp, 0, sizeof(final_resp));
     return openai_chat_completion_streaming(ctx->handle, &req, handler, user_data, &final_resp);
 }
 
@@ -1279,7 +1275,7 @@ int openai_enterprise_embeddings(openai_enterprise_context_t *ctx, const char *m
         return AGENTOS_ERR_UNKNOWN;
         }
     openai_embedding_request_t req;
-    memset(&req, 0, sizeof(req));
+    AGENTOS_MEMSET(&req, 0, sizeof(req));
     req.input_text =
         (inputs && input_count > 0 && inputs[0]) ? AGENTOS_STRDUP(inputs[0]) : AGENTOS_STRDUP("");
     req.embedding_dim = 1536;
@@ -1395,7 +1391,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t *ctx, const char
         msg.content =
             (body_json && body_json[0]) ? AGENTOS_STRDUP(body_json) : AGENTOS_STRDUP("hello");
         openai_chat_response_t resp;
-        memset(&resp, 0, sizeof(resp));
+        AGENTOS_MEMSET(&resp, 0, sizeof(resp));
         int rc =
             openai_enterprise_chat_completion(ctx, NULL, &msg, 1, NULL, 0, 0.7, 1.0, 4096, &resp);
         if (rc == 0 && resp.choices && resp.choice_count > 0) {
@@ -1434,7 +1430,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t *ctx, const char
     if (strcmp(path, "/v1/embeddings") == 0) {
         const char *inputs[1] = {body_json ? body_json : ""};
         openai_embedding_response_t emb_resp;
-        memset(&emb_resp, 0, sizeof(emb_resp));
+        AGENTOS_MEMSET(&emb_resp, 0, sizeof(emb_resp));
         int rc = openai_enterprise_embeddings(ctx, "text-embedding-ada-002", inputs, 1, &emb_resp);
         if (rc != 0) {
             *response_json = NULL;
@@ -1701,7 +1697,7 @@ static int openai_adapter_handle_request_cb(void *c, const void *r, void **rp)
     const char *request_json = (const char *)r;
     char *response_json = NULL;
     struct openai_enterprise_context_s ctx_local;
-    memset(&ctx_local, 0, sizeof(ctx_local));
+    AGENTOS_MEMSET(&ctx_local, 0, sizeof(ctx_local));
     ctx_local.handle = (openai_handle_t)adapter;
     int rc = openai_enterprise_route_request(&ctx_local, "/v1/chat/completions", "POST",
                                              request_json, &response_json);
@@ -1768,7 +1764,7 @@ const protocol_adapter_t *openai_enterprise_get_adapter(void)
     static protocol_adapter_t s_adapter;
     static bool s_init = false;
     if (!s_init) {
-        memset(&s_adapter, 0, sizeof(s_adapter));
+        AGENTOS_MEMSET(&s_adapter, 0, sizeof(s_adapter));
         s_adapter.type = AGENTOS_PROTOCOL_OPENAI;
         s_adapter.name = "openai-enterprise";
         s_adapter.version = OPENAI_ADAPTER_VERSION;
@@ -1819,7 +1815,7 @@ void openai_chat_response_destroy(openai_chat_response_t *resp)
         }
         AGENTOS_FREE(resp->tool_calls);
     }
-    memset(resp, 0, sizeof(*resp));
+    AGENTOS_MEMSET(resp, 0, sizeof(*resp));
 }
 
 void openai_embedding_response_destroy(openai_embedding_response_t *resp)
@@ -1830,7 +1826,7 @@ void openai_embedding_response_destroy(openai_embedding_response_t *resp)
     AGENTOS_FREE(resp->object);
     AGENTOS_FREE(resp->model);
     AGENTOS_FREE(resp->embeddings);
-    memset(resp, 0, sizeof(*resp));
+    AGENTOS_MEMSET(resp, 0, sizeof(*resp));
 }
 
 void openai_message_destroy(openai_message_t *msg)
@@ -1842,7 +1838,7 @@ void openai_message_destroy(openai_message_t *msg)
     AGENTOS_FREE(msg->tool_call_id);
     AGENTOS_FREE(msg->function_name);
     AGENTOS_FREE(msg->function_arguments_json);
-    memset(msg, 0, sizeof(*msg));
+    AGENTOS_MEMSET(msg, 0, sizeof(*msg));
 }
 
 void openai_model_destroy(openai_model_t *model)
@@ -1852,5 +1848,5 @@ void openai_model_destroy(openai_model_t *model)
     AGENTOS_FREE(model->id);
     AGENTOS_FREE(model->name);
     AGENTOS_FREE(model->owned_by);
-    memset(model, 0, sizeof(*model));
+    AGENTOS_MEMSET(model, 0, sizeof(*model));
 }

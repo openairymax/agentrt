@@ -19,6 +19,16 @@
 #include <time.h>
 
 // ============================================================================
+// 内存安全常量（SEC-02 合规）
+// ============================================================================
+
+/** @brief 最大输入数据大小（10 MB）— 防止恶意超大输入耗尽内存 */
+#define GUARD_MAX_INPUT_SIZE (10 * 1024 * 1024)
+
+/** @brief 最大自定义配置大小（1 MB）— 防止配置注入攻击 */
+#define GUARD_MAX_CUSTOM_CONFIG_SIZE (1 * 1024 * 1024)
+
+// ============================================================================
 // 内部数据结构
 // ============================================================================
 
@@ -136,8 +146,15 @@ static guard_context_t *copy_guard_context(const guard_context_t *src)
     if (src->session_id)
         dst->session_id = AGENTOS_STRDUP(src->session_id);
 
-    // 复制输入数据
+    // 复制输入数据（SEC-02: 前置大小校验防缓冲区溢出）
     if (src->input_data && src->input_size > 0) {
+        if (src->input_size > GUARD_MAX_INPUT_SIZE) {
+            agentos_error_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
+                                  "copy_guard_context: input_size %zu exceeds max %zu",
+                                  src->input_size, (size_t)GUARD_MAX_INPUT_SIZE);
+            free_guard_context(dst);
+            return NULL;
+        }
         dst->input_data = AGENTOS_MALLOC(src->input_size);
         if (dst->input_data) {
             memcpy(dst->input_data, src->input_data, src->input_size);
@@ -221,7 +238,7 @@ guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
     }
 
     // 初始化统计信息
-    memset(&manager->stats, 0, sizeof(manager->stats));
+    AGENTOS_MEMSET(&manager->stats, 0, sizeof(manager->stats));
 
     manager->next_guard_id = 1000;  // 起始ID
     manager->initialized = true;
@@ -385,7 +402,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
 
         // 执行检测
         guard_result_t result;
-        memset(&result, 0, sizeof(result));
+        AGENTOS_MEMSET(&result, 0, sizeof(result));
 
         int check_result = guard_check(guard, context, &result);
         if (check_result == CUPOLAS_OK) {
@@ -560,7 +577,7 @@ int guard_manager_reset_stats(guard_manager_t *manager)
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
     cupolas_mutex_lock(&priv->lock);
-    memset(&priv->stats, 0, sizeof(priv->stats));
+    AGENTOS_MEMSET(&priv->stats, 0, sizeof(priv->stats));
     cupolas_mutex_unlock(&priv->lock);
 
     return CUPOLAS_OK;
@@ -582,10 +599,10 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
         return NULL;
 
     // 复制名称和描述
-    strncpy(guard->name, name, GUARD_NAME_MAX_LEN - 1);
+    AGENTOS_STRNCPY_TERM(guard->name, name, GUARD_NAME_MAX_LEN);
     guard->name[GUARD_NAME_MAX_LEN - 1] = '\0';
     if (description) {
-        strncpy(guard->description, description, GUARD_DESC_MAX_LEN - 1);
+        AGENTOS_STRNCPY_TERM(guard->description, description, GUARD_DESC_MAX_LEN);
         guard->description[GUARD_DESC_MAX_LEN - 1] = '\0';
     }
 
@@ -603,7 +620,7 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
     memcpy(guard->ops, ops, sizeof(guard_ops_t));
 
     // 初始化统计信息
-    memset(&guard->stats, 0, sizeof(guard->stats));
+    AGENTOS_MEMSET(&guard->stats, 0, sizeof(guard->stats));
 
     guard->created_time = cupolas_get_timestamp_ns();
 
@@ -643,8 +660,14 @@ int guard_init(guard_t *guard, const guard_config_t *config)
     // 复制配置
     guard->config = *config;
 
-    // 复制自定义配置数据
+    // 复制自定义配置数据（SEC-02: 前置大小校验防缓冲区溢出）
     if (config->custom_config && config->custom_config_size > 0) {
+        if (config->custom_config_size > GUARD_MAX_CUSTOM_CONFIG_SIZE) {
+            agentos_error_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
+                                  "guard_init: custom_config_size %zu exceeds max %zu",
+                                  config->custom_config_size, (size_t)GUARD_MAX_CUSTOM_CONFIG_SIZE);
+            return cupolas_ERROR_INVALID_ARG;
+        }
         guard->config.custom_config = AGENTOS_MALLOC(config->custom_config_size);
         if (!guard->config.custom_config)
             return cupolas_ERROR_NO_MEMORY;
@@ -747,6 +770,6 @@ int guard_reset_stats(guard_t *guard)
     if (!guard)
         return cupolas_ERROR_INVALID_ARG;
 
-    memset(&guard->stats, 0, sizeof(guard->stats));
+    AGENTOS_MEMSET(&guard->stats, 0, sizeof(guard->stats));
     return CUPOLAS_OK;
 }

@@ -104,14 +104,14 @@ int gw_mcp_server_register_tool(gw_mcp_server_t *server, const char *name, const
         return AGENTOS_ERR_OVERFLOW;
 
     gw_mcp_tool_entry_t *entry = &server->tools[server->tool_count];
-    strncpy(entry->name, name, sizeof(entry->name) - 1);
+    AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
     entry->name[sizeof(entry->name) - 1] = '\0';
     if (description) {
-        strncpy(entry->description, description, sizeof(entry->description) - 1);
+        AGENTOS_STRNCPY_TERM(entry->description, description, sizeof(entry->description));
         entry->description[sizeof(entry->description) - 1] = '\0';
     }
     if (input_schema_json) {
-        strncpy(entry->input_schema, input_schema_json, sizeof(entry->input_schema) - 1);
+        AGENTOS_STRNCPY_TERM(entry->input_schema, input_schema_json, sizeof(entry->input_schema));
         entry->input_schema[sizeof(entry->input_schema) - 1] = '\0';
     }
     entry->exec_fn = exec_fn;
@@ -130,18 +130,18 @@ int gw_mcp_server_register_resource(gw_mcp_server_t *server, const char *uri, co
         return AGENTOS_ERR_OVERFLOW;
 
     gw_mcp_resource_entry_t *entry = &server->resources[server->resource_count];
-    strncpy(entry->uri, uri, sizeof(entry->uri) - 1);
+    AGENTOS_STRNCPY_TERM(entry->uri, uri, sizeof(entry->uri));
     entry->uri[sizeof(entry->uri) - 1] = '\0';
     if (name) {
-        strncpy(entry->name, name, sizeof(entry->name) - 1);
+        AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
         entry->name[sizeof(entry->name) - 1] = '\0';
     }
     if (description) {
-        strncpy(entry->description, description, sizeof(entry->description) - 1);
+        AGENTOS_STRNCPY_TERM(entry->description, description, sizeof(entry->description));
         entry->description[sizeof(entry->description) - 1] = '\0';
     }
     if (mime_type) {
-        strncpy(entry->mime_type, mime_type, sizeof(entry->mime_type) - 1);
+        AGENTOS_STRNCPY_TERM(entry->mime_type, mime_type, sizeof(entry->mime_type));
         entry->mime_type[sizeof(entry->mime_type) - 1] = '\0';
     }
     entry->read_fn = read_fn;

@@ -472,11 +472,11 @@ void *memory_realloc(void *ptr, size_t new_size, const char *tag)
     if (debug_info && g_state.debug_enabled) {
         debug_info_saved = true;
         if (debug_info->tag)
-            strncpy(saved_tag, debug_info->tag, sizeof(saved_tag) - 1);
+            AGENTOS_STRNCPY_TERM(saved_tag, debug_info->tag, sizeof(saved_tag));
         if (debug_info->file)
-            strncpy(saved_file, debug_info->file, sizeof(saved_file) - 1);
+            AGENTOS_STRNCPY_TERM(saved_file, debug_info->file, sizeof(saved_file));
         if (debug_info->function)
-            strncpy(saved_func, debug_info->function, sizeof(saved_func) - 1);
+            AGENTOS_STRNCPY_TERM(saved_func, debug_info->function, sizeof(saved_func));
         saved_line = debug_info->line;
         memory_remove_debug_info(old_ptr);
     }

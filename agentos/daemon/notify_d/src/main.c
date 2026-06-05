@@ -92,7 +92,7 @@ static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key,
     snprintf(combined, sizeof(combined), "%s%s", client_key, NOTIFY_D_WS_GUID);
 
     unsigned char sha1[20];
-    memset(sha1, 0, sizeof(sha1));
+    AGENTOS_MEMSET(sha1, 0, sizeof(sha1));
 
     unsigned int h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE;
     unsigned int h3 = 0x10325476, h4 = 0xC3D2E1F0;
@@ -432,7 +432,7 @@ static int notify_d_init(notify_d_service_t *svc, int port, const char *sock)
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
     return AGENTOS_EINVAL;
 
-    memset(svc, 0, sizeof(*svc));
+    AGENTOS_MEMSET(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : NOTIFY_D_DEFAULT_PORT;
     svc->socket_path = sock ? AGENTOS_STRDUP(sock) : AGENTOS_STRDUP(NOTIFY_D_DEFAULT_SOCKET);
     svc->start_time = (uint64_t)time(NULL);
@@ -546,7 +546,7 @@ static int notify_d_destroy(notify_d_service_t *svc)
     agentos_socket_cleanup();
     agentos_mutex_destroy(&svc->lock);
     AGENTOS_FREE(svc->socket_path);
-    memset(svc, 0, sizeof(*svc));
+    AGENTOS_MEMSET(svc, 0, sizeof(*svc));
     SVC_LOG_INFO("notify_d: service destroyed");
     return AGENTOS_SUCCESS;
 }
@@ -599,7 +599,7 @@ static void notify_d_handle_request(notify_d_service_t *svc, agentos_socket_t cl
         return;
     }
 
-    memset(client, 0, sizeof(*client));
+    AGENTOS_MEMSET(client, 0, sizeof(*client));
     client->fd = client_fd;
     client->connected_at = (uint64_t)time(NULL);
     client->last_activity = client->connected_at;

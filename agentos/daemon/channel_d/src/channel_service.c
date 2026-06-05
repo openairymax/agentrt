@@ -64,9 +64,9 @@ static channel_entry_t *find_channel(channel_service_t *svc, const char *channel
 static int create_socket_channel(channel_entry_t *entry, const char *endpoint)
 {
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
+    AGENTOS_MEMSET(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, endpoint, sizeof(addr.sun_path) - 1);
+    AGENTOS_STRNCPY_TERM(addr.sun_path, endpoint, sizeof(addr.sun_path));
 
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) {
@@ -120,7 +120,7 @@ static int create_shm_channel(channel_entry_t *entry, const char *endpoint __att
         AGENTOS_ERROR(AGENTOS_ERR_IO, "mmap failed on shm");
     }
 
-    memset(ptr, 0, shm_size);
+    AGENTOS_MEMSET(ptr, 0, shm_size);
 
     entry->shm_fd = fd;
     entry->shm_ptr = ptr;
@@ -247,18 +247,18 @@ int channel_service_open(channel_service_t *svc, const char *channel_id, const c
     }
 
     channel_entry_t *entry = &svc->channels[svc->channel_count];
-    memset(entry, 0, sizeof(channel_entry_t));
+    AGENTOS_MEMSET(entry, 0, sizeof(channel_entry_t));
     entry->socket_fd = -1;
     entry->shm_fd = -1;
 
-    strncpy(entry->info.channel_id, channel_id, sizeof(entry->info.channel_id) - 1);
-    strncpy(entry->info.name, name, sizeof(entry->info.name) - 1);
+    AGENTOS_STRNCPY_TERM(entry->info.channel_id, channel_id, sizeof(entry->info.channel_id));
+    AGENTOS_STRNCPY_TERM(entry->info.name, name, sizeof(entry->info.name));
     entry->info.type = type;
     entry->info.status = CHANNEL_STATUS_OPEN;
     entry->info.buffer_size = svc->config.default_buffer_size;
 
     if (endpoint) {
-        strncpy(entry->info.endpoint, endpoint, sizeof(entry->info.endpoint) - 1);
+        AGENTOS_STRNCPY_TERM(entry->info.endpoint, endpoint, sizeof(entry->info.endpoint));
     } else {
         if (type == CHANNEL_TYPE_SOCKET) {
             snprintf(entry->info.endpoint, sizeof(entry->info.endpoint), "%s/%s.sock",
@@ -323,7 +323,7 @@ int channel_service_close(channel_service_t *svc, const char *channel_id)
             destroy_channel(&svc->channels[i]);
             if (i < svc->channel_count - 1) {
                 svc->channels[i] = svc->channels[svc->channel_count - 1];
-                memset(&svc->channels[svc->channel_count - 1], 0, sizeof(channel_entry_t));
+                AGENTOS_MEMSET(&svc->channels[svc->channel_count - 1], 0, sizeof(channel_entry_t));
                 svc->channels[svc->channel_count - 1].socket_fd = -1;
                 svc->channels[svc->channel_count - 1].shm_fd = -1;
             }
@@ -358,9 +358,9 @@ int channel_service_send(channel_service_t *svc, const char *channel_id, const v
             AGENTOS_ERROR(AGENTOS_ERR_IO, "socket not open for send");
         }
         struct sockaddr_un client_addr;
-        memset(&client_addr, 0, sizeof(client_addr));
+        AGENTOS_MEMSET(&client_addr, 0, sizeof(client_addr));
         client_addr.sun_family = AF_UNIX;
-        strncpy(client_addr.sun_path, entry->info.endpoint, sizeof(client_addr.sun_path) - 1);
+        AGENTOS_STRNCPY_TERM(client_addr.sun_path, entry->info.endpoint, sizeof(client_addr.sun_path));
         client_addr.sun_path[sizeof(client_addr.sun_path) - 1] = '\0';
         int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
         if (client_fd < 0) {
@@ -673,9 +673,9 @@ int channel_service_ping(channel_service_t *svc, const char *channel_id, int64_t
         }
 
         struct sockaddr_un addr;
-        memset(&addr, 0, sizeof(addr));
+        AGENTOS_MEMSET(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
-        strncpy(addr.sun_path, entry->info.endpoint, sizeof(addr.sun_path) - 1);
+        AGENTOS_STRNCPY_TERM(addr.sun_path, entry->info.endpoint, sizeof(addr.sun_path));
 
         {
             struct timeval tv;

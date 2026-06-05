@@ -253,7 +253,7 @@ static int deepseek_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_c
     explicit_bzero(auth_header, sizeof(auth_header));
 
     ds_stream_acc_t acc;
-    memset(&acc, 0, sizeof(acc));
+    AGENTOS_MEMSET(&acc, 0, sizeof(acc));
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;

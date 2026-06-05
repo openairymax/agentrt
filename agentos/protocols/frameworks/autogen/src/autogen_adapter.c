@@ -121,7 +121,7 @@ void autogen_adapter_destroy(autogen_adapter_context_t *ctx)
         autogen_conversation_destroy(&ctx->conversations[i]);
     AGENTOS_FREE(ctx->conversations);
 
-    memset(ctx, 0, sizeof(autogen_adapter_context_t));
+    AGENTOS_MEMSET(ctx, 0, sizeof(autogen_adapter_context_t));
     AGENTOS_FREE(ctx);
 }
 
@@ -152,7 +152,7 @@ int autogen_create_agent(autogen_adapter_context_t *ctx, const autogen_agent_def
         return AGENTOS_ERR_OUT_OF_MEMORY;
     ctx->agents = agents;
 
-    memset(&ctx->agents[ctx->agent_count], 0, sizeof(autogen_agent_instance_t));
+    AGENTOS_MEMSET(&ctx->agents[ctx->agent_count], 0, sizeof(autogen_agent_instance_t));
     ctx->agents[ctx->agent_count].agent_id = AGENTOS_STRDUP(out_agent_id);
     ctx->agents[ctx->agent_count].name =
         definition->name ? AGENTOS_STRDUP(definition->name) : out_agent_id;
@@ -226,7 +226,7 @@ int autogen_create_group_chat(autogen_adapter_context_t *ctx,
         return AGENTOS_ERR_OUT_OF_MEMORY;
     ctx->group_chats = gcs;
 
-    memset(&ctx->group_chats[ctx->group_chat_count], 0, sizeof(autogen_group_chat_def_t));
+    AGENTOS_MEMSET(&ctx->group_chats[ctx->group_chat_count], 0, sizeof(autogen_group_chat_def_t));
     ctx->group_chats[ctx->group_chat_count].id = AGENTOS_STRDUP(out_group_id);
     ctx->group_chats[ctx->group_chat_count].name =
         definition
@@ -367,7 +367,7 @@ int autogen_initiate_chat(autogen_adapter_context_t *ctx, const char *group_id,
 
     ctx->total_chats_initiated++;
 
-    memset(result, 0, sizeof(autogen_group_chat_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(autogen_group_chat_result_t));
     result->group_id = group_id ? AGENTOS_STRDUP(group_id) : NULL;
     result->initiator_id = sender_id ? AGENTOS_STRDUP(sender_id) : NULL;
     result->initial_message = message ? AGENTOS_STRDUP(message) : NULL;
@@ -378,7 +378,7 @@ int autogen_initiate_chat(autogen_adapter_context_t *ctx, const char *group_id,
     conv_counter++;
 
     autogen_conversation_t conv;
-    memset(&conv, 0, sizeof(conv));
+    AGENTOS_MEMSET(&conv, 0, sizeof(conv));
     char cid[64];
     snprintf(cid, sizeof(cid), "ag-conv-%08x", conv_counter);
     conv.conversation_id = AGENTOS_STRDUP(cid);
@@ -409,7 +409,7 @@ int autogen_initiate_chat(autogen_adapter_context_t *ctx, const char *group_id,
             conv.messages[m].content = AGENTOS_STRDUP(message);
         } else {
             char resp_buf[AUTOGEN_MAX_RESPONSE_LEN];
-            memset(resp_buf, 0, sizeof(resp_buf));
+            AGENTOS_MEMSET(resp_buf, 0, sizeof(resp_buf));
             int agent_role_idx = (m / 2) % (ctx->agent_count > 0 ? (int)ctx->agent_count : 1);
             bool is_first_in_round = (m == 1);
             int rc = autogen_generate_response(ctx, message, agent_role_idx, (int)ctx->agent_count,
@@ -467,7 +467,7 @@ int autogen_send_message(autogen_adapter_context_t *ctx, const char *from_agent_
     static uint32_t msg_counter = 0;
     msg_counter++;
 
-    memset(reply, 0, sizeof(autogen_message_t));
+    AGENTOS_MEMSET(reply, 0, sizeof(autogen_message_t));
     reply->message_id = AGENTOS_MALLOC(32);
     snprintf(reply->message_id, 32, "ag-msg-%08x", msg_counter);
     reply->sender_id = to_agent_id ? AGENTOS_STRDUP(to_agent_id) : NULL;
@@ -476,7 +476,7 @@ int autogen_send_message(autogen_adapter_context_t *ctx, const char *from_agent_
 
     if (content && content[0]) {
         char resp_buf[AUTOGEN_MAX_RESPONSE_LEN];
-        memset(resp_buf, 0, sizeof(resp_buf));
+        AGENTOS_MEMSET(resp_buf, 0, sizeof(resp_buf));
         int rc = autogen_generate_response(ctx, content, (int)(msg_counter % 8),
                                            (int)ctx->agent_count, true, resp_buf, sizeof(resp_buf));
         if (rc == 0 && resp_buf[0]) {
@@ -534,7 +534,7 @@ int autogen_get_conversation(autogen_adapter_context_t *ctx, const char *group_i
 {
     if (!ctx || !conv)
         return AGENTOS_ERR_NULL_POINTER;
-    memset(conv, 0, sizeof(autogen_conversation_t));
+    AGENTOS_MEMSET(conv, 0, sizeof(autogen_conversation_t));
 
     if (!group_id)
         return AGENTOS_ERR_INVALID_PARAM;
@@ -737,7 +737,7 @@ void autogen_agent_def_destroy(autogen_agent_def_t *def)
     for (size_t i = 0; i < def->transition_count; i++)
         AGENTOS_FREE(def->allowed_transitions[i]);
     AGENTOS_FREE(def->allowed_transitions);
-    memset(def, 0, sizeof(autogen_agent_def_t));
+    AGENTOS_MEMSET(def, 0, sizeof(autogen_agent_def_t));
 }
 
 void autogen_agent_instance_destroy(autogen_agent_instance_t *inst)
@@ -746,7 +746,7 @@ void autogen_agent_instance_destroy(autogen_agent_instance_t *inst)
         return;
     AGENTOS_FREE(inst->agent_id);
     AGENTOS_FREE(inst->name);
-    memset(inst, 0, sizeof(autogen_agent_instance_t));
+    AGENTOS_MEMSET(inst, 0, sizeof(autogen_agent_instance_t));
 }
 
 void autogen_group_chat_def_destroy(autogen_group_chat_def_t *gc)
@@ -759,7 +759,7 @@ void autogen_group_chat_def_destroy(autogen_group_chat_def_t *gc)
     for (size_t i = 0; i < gc->participant_count; i++)
         AGENTOS_FREE(gc->participant_ids[i]);
     AGENTOS_FREE(gc->participant_ids);
-    memset(gc, 0, sizeof(autogen_group_chat_def_t));
+    AGENTOS_MEMSET(gc, 0, sizeof(autogen_group_chat_def_t));
 }
 
 void autogen_message_destroy(autogen_message_t *msg)
@@ -774,7 +774,7 @@ void autogen_message_destroy(autogen_message_t *msg)
     for (size_t i = 0; i < msg->tool_call_count; i++)
         AGENTOS_FREE(msg->tool_calls[i]);
     AGENTOS_FREE(msg->tool_calls);
-    memset(msg, 0, sizeof(autogen_message_t));
+    AGENTOS_MEMSET(msg, 0, sizeof(autogen_message_t));
 }
 
 void autogen_conversation_destroy(autogen_conversation_t *conv)
@@ -787,7 +787,7 @@ void autogen_conversation_destroy(autogen_conversation_t *conv)
     for (size_t i = 0; i < conv->message_count; i++)
         autogen_message_destroy(&conv->messages[i]);
     AGENTOS_FREE(conv->messages);
-    memset(conv, 0, sizeof(autogen_conversation_t));
+    AGENTOS_MEMSET(conv, 0, sizeof(autogen_conversation_t));
 }
 
 void autogen_group_chat_result_destroy(autogen_group_chat_result_t *result)
@@ -803,5 +803,5 @@ void autogen_group_chat_result_destroy(autogen_group_chat_result_t *result)
     }
     AGENTOS_FREE(result->final_summary);
     AGENTOS_FREE(result->error_message);
-    memset(result, 0, sizeof(autogen_group_chat_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(autogen_group_chat_result_t));
 }

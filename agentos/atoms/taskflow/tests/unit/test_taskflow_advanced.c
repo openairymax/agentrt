@@ -142,11 +142,11 @@ static void test_register_workflow(void)
     }
 
     taskflow_workflow_t wf;
-    memset(&wf, 0, sizeof(wf));
-    strncpy(wf.id, "wf_test_001", sizeof(wf.id) - 1);
-    strncpy(wf.name, "Test Workflow", sizeof(wf.name) - 1);
-    strncpy(wf.description, "A simple test workflow", sizeof(wf.description) - 1);
-    strncpy(wf.version, "1.0.0", sizeof(wf.version) - 1);
+    AGENTOS_MEMSET(&wf, 0, sizeof(wf));
+    AGENTOS_STRNCPY_TERM(wf.id, "wf_test_001", sizeof(wf.id) -);
+    AGENTOS_STRNCPY_TERM(wf.name, "Test Workflow", sizeof(wf.name) -);
+    AGENTOS_STRNCPY_TERM(wf.description, "A simple test workflow", sizeof(wf.description) -);
+    AGENTOS_STRNCPY_TERM(wf.version, "1.0.0", sizeof(wf.version) -);
     wf.initial_node_id = strdup("node_start");
     wf.default_timeout_ms = 5000;
 
@@ -174,9 +174,9 @@ static void test_start_execution(void)
     }
 
     taskflow_workflow_t wf;
-    memset(&wf, 0, sizeof(wf));
-    strncpy(wf.id, "wf_start_test", sizeof(wf.id) - 1);
-    strncpy(wf.name, "Start Test", sizeof(wf.name) - 1);
+    AGENTOS_MEMSET(&wf, 0, sizeof(wf));
+    AGENTOS_STRNCPY_TERM(wf.id, "wf_start_test", sizeof(wf.id) -);
+    AGENTOS_STRNCPY_TERM(wf.name, "Start Test", sizeof(wf.name) -);
     wf.initial_node_id = strdup("n1");
 
     taskflow_engine_register_handler(engine, "h1", mock_task_handler, NULL);
@@ -200,9 +200,9 @@ static void test_cancel_pause_resume(void)
         return;
 
     taskflow_workflow_t wf;
-    memset(&wf, 0, sizeof(wf));
-    strncpy(wf.id, "wf_cpr_test", sizeof(wf.id) - 1);
-    strncpy(wf.name, "CPR Test", sizeof(wf.name) - 1);
+    AGENTOS_MEMSET(&wf, 0, sizeof(wf));
+    AGENTOS_STRNCPY_TERM(wf.id, "wf_cpr_test", sizeof(wf.id) -);
+    AGENTOS_STRNCPY_TERM(wf.name, "CPR Test", sizeof(wf.name) -);
     wf.initial_node_id = strdup("n1");
     taskflow_engine_register_workflow(engine, &wf);
 
@@ -225,9 +225,9 @@ static void test_step_and_rtc(void)
         return;
 
     taskflow_workflow_t wf;
-    memset(&wf, 0, sizeof(wf));
-    strncpy(wf.id, "wf_step_test", sizeof(wf.id) - 1);
-    strncpy(wf.name, "Step Test", sizeof(wf.name) - 1);
+    AGENTOS_MEMSET(&wf, 0, sizeof(wf));
+    AGENTOS_STRNCPY_TERM(wf.id, "wf_step_test", sizeof(wf.id) -);
+    AGENTOS_STRNCPY_TERM(wf.name, "Step Test", sizeof(wf.name) -);
     wf.initial_node_id = strdup("n1");
     taskflow_engine_register_workflow(engine, &wf);
 
@@ -335,7 +335,7 @@ static void test_counts_after_registration(void)
 
     for (int i = 0; i < 5; i++) {
         taskflow_workflow_t wf;
-        memset(&wf, 0, sizeof(wf));
+        AGENTOS_MEMSET(&wf, 0, sizeof(wf));
         snprintf(wf.id, sizeof(wf.id), "wf_cnt_%03d", i);
         snprintf(wf.name, sizeof(wf.name), "Workflow %d", i);
         {
@@ -461,16 +461,16 @@ static void test_unregister_workflow(void)
     printf("    Unregister nonexistent: rc=%d (expected -1)\n", rc_before);
 
     taskflow_workflow_t wf;
-    memset(&wf, 0, sizeof(wf));
-    strncpy(wf.id, "wf_unregister", sizeof(wf.id) - 1);
-    strncpy(wf.name, "Workflow for Unregister", sizeof(wf.name) - 1);
-    strncpy(wf.version, "1.0", sizeof(wf.version) - 1);
+    AGENTOS_MEMSET(&wf, 0, sizeof(wf));
+    AGENTOS_STRNCPY_TERM(wf.id, "wf_unregister", sizeof(wf.id) -);
+    AGENTOS_STRNCPY_TERM(wf.name, "Workflow for Unregister", sizeof(wf.name) -);
+    AGENTOS_STRNCPY_TERM(wf.version, "1.0", sizeof(wf.version) -);
     wf.initial_node_id = strdup("node_start");
 
     taskflow_node_t node;
-    memset(&node, 0, sizeof(node));
-    strncpy(node.id, "node_start", sizeof(node.id) - 1);
-    strncpy(node.name, "Start", sizeof(node.name) - 1);
+    AGENTOS_MEMSET(&node, 0, sizeof(node));
+    AGENTOS_STRNCPY_TERM(node.id, "node_start", sizeof(node.id) -);
+    AGENTOS_STRNCPY_TERM(node.name, "Start", sizeof(node.name) -);
     node.type = TASKFLOW_NODE_TASK;
     node.task_handler_name = strdup("mock");
 

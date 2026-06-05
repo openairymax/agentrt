@@ -51,7 +51,7 @@ static permission_rule_t *cupolas_permission_create_rule(const char *agent_id, c
     if (!rule)
         return NULL;
 
-    memset(rule, 0, sizeof(permission_rule_t));
+    AGENTOS_MEMSET(rule, 0, sizeof(permission_rule_t));
 
     if (agent_id) {
         rule->agent_id = cupolas_strdup(agent_id);
@@ -120,7 +120,7 @@ rule_manager_t *rule_manager_create(const char *path)
     if (!mgr)
         return NULL;
 
-    memset(mgr, 0, sizeof(rule_manager_t));
+    AGENTOS_MEMSET(mgr, 0, sizeof(rule_manager_t));
 
     if (cupolas_rwlock_init(&mgr->rwlock) != cupolas_OK) {
         cupolas_mem_free(mgr);

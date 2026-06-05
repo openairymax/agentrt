@@ -1,7 +1,7 @@
 """
 AgentOS 性能回归检测框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 1.0.0
+Version: 0.1.0
 
 基于历史基准的性能回归检测系统
 用于检测性能退化并生成趋势报告

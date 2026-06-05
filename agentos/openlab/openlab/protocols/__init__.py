@@ -200,7 +200,7 @@ class ProtocolSessionManager:
                 try:
                     client = ProtocolClient(ProtocolConfig(
                         protocol_type=proto_type,
-                        endpoint="http://localhost:18789",
+                        endpoint=os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789"),
                     ))
                     if hasattr(client, 'detect_protocol'):
                         detection = await client.detect_protocol()

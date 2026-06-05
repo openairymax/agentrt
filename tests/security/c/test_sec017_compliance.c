@@ -114,7 +114,7 @@ static void sec_init_functions_real(void)
     void* p = agentos_mem_alloc(256);
     TEST_ASSERT_NOT_NULL(p, "agentos_mem_init: 分配成功（非桩）");
     if (p) {
-        memset(p, 0xAB, 256);
+        AGENTOS_MEMSET(p, 0xAB, 256);
         agentos_mem_free(p);
     }
     size_t leaks = agentos_mem_check_leaks();
@@ -389,8 +389,8 @@ static void sec_function_body_nonempty(void)
                 "内存分配函数有实际实现");
 
     if (p1 && p2) {
-        memset(p1, 'X', 128);
-        memset(p2, 'Y', 64);
+        AGENTOS_MEMSET(p1, 'X', 128);
+        AGENTOS_MEMSET(p2, 'Y', 64);
 
         unsigned char c1 = *(unsigned char*)p1;
         unsigned char c2 = *(unsigned char*)p2;

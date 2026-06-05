@@ -29,7 +29,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
 {
     tool_executor_config_t local_cfg;
     if (!cfg) {
-        memset(&local_cfg, 0, sizeof(local_cfg));
+        AGENTOS_MEMSET(&local_cfg, 0, sizeof(local_cfg));
         local_cfg.max_workers = 1;
         local_cfg.timeout_sec = 30;
         cfg = &local_cfg;

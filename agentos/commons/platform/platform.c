@@ -430,18 +430,18 @@ int agentos_process_start(const char *executable, char *const argv[], char *cons
 
     if (!proc)
         return AGENTOS_EINVAL;
-    memset(proc, 0, sizeof(agentos_process_info_t));
+    AGENTOS_MEMSET(proc, 0, sizeof(agentos_process_info_t));
 
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
-    memset(&si, 0, sizeof(si));
+    AGENTOS_MEMSET(&si, 0, sizeof(si));
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
     si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
     si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
     si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 
-    memset(&pi, 0, sizeof(pi));
+    AGENTOS_MEMSET(&pi, 0, sizeof(pi));
 
     char cmdline[4096] = {0};
     snprintf(cmdline, sizeof(cmdline), "\"%s\"", executable);
@@ -528,7 +528,7 @@ int agentos_process_start(const char *executable, char *const argv[], char *cons
 {
     if (!proc)
         return AGENTOS_EINVAL;
-    memset(proc, 0, sizeof(agentos_process_info_t));
+    AGENTOS_MEMSET(proc, 0, sizeof(agentos_process_info_t));
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -828,7 +828,7 @@ const char *agentos_strerror(int error)
 {
 #if AGENTOS_PLATFORM_WINDOWS
     static char msg[256];
-    memset(msg, 0, sizeof(msg));
+    AGENTOS_MEMSET(msg, 0, sizeof(msg));
     FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, (DWORD)error,
                    0, msg, sizeof(msg), NULL);
     return msg;

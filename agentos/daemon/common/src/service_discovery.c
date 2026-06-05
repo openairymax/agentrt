@@ -122,7 +122,7 @@ static void expire_stale_instances(sd_internal_t *sd)
                 if (j < entry->instance_count - 1) {
                     entry->instances[j] = entry->instances[entry->instance_count - 1];
                 }
-                memset(&entry->instances[entry->instance_count - 1], 0, sizeof(sd_instance_t));
+                AGENTOS_MEMSET(&entry->instances[entry->instance_count - 1], 0, sizeof(sd_instance_t));
                 entry->instance_count--;
                 sd->stats.expirations++;
 
@@ -137,7 +137,7 @@ static void expire_stale_instances(sd_internal_t *sd)
                 if (i < sd->service_count - 1) {
                     sd->services[i] = sd->services[sd->service_count - 1];
                 }
-                memset(&sd->services[sd->service_count - 1], 0, sizeof(sd_service_entry_t));
+                AGENTOS_MEMSET(&sd->services[sd->service_count - 1], 0, sizeof(sd_service_entry_t));
                 sd->service_count--;
                 i--;
             }
@@ -277,7 +277,7 @@ static agentos_error_t lb_least_load(const sd_service_entry_t *entry, sd_instanc
 AGENTOS_API sd_config_t sd_create_default_config(void)
 {
     sd_config_t config;
-    memset(&config, 0, sizeof(sd_config_t));
+    AGENTOS_MEMSET(&config, 0, sizeof(sd_config_t));
     config.heartbeat_interval_ms = SD_DEFAULT_HEARTBEAT_MS;
     config.expire_timeout_ms = SD_DEFAULT_EXPIRE_MS;
     config.default_lb_strategy = SD_LB_ROUND_ROBIN;
@@ -403,7 +403,7 @@ AGENTOS_API agentos_error_t sd_register(service_discovery_t sd_handle, const cha
         }
 
         entry = &sd->services[sd->service_count];
-        memset(entry, 0, sizeof(sd_service_entry_t));
+        AGENTOS_MEMSET(entry, 0, sizeof(sd_service_entry_t));
         safe_strcpy(entry->name, service_name, SD_MAX_NAME_LEN);
         safe_strcpy(entry->service_type, service_type, SD_MAX_TYPE_LEN);
         if (tags)
@@ -485,7 +485,7 @@ AGENTOS_API agentos_error_t sd_deregister(service_discovery_t sd_handle, const c
     if ((uint32_t)inst_idx < entry->instance_count - 1) {
         entry->instances[inst_idx] = entry->instances[entry->instance_count - 1];
     }
-    memset(&entry->instances[entry->instance_count - 1], 0, sizeof(sd_instance_t));
+    AGENTOS_MEMSET(&entry->instances[entry->instance_count - 1], 0, sizeof(sd_instance_t));
     entry->instance_count--;
     entry->last_updated = agentos_platform_get_time_ms();
 

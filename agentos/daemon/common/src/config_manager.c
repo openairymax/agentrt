@@ -97,7 +97,7 @@ static void add_history(const char *key, const char *old_value, const char *new_
                         const char *source)
 {
     cm_change_record_t *rec = &g_cm.history[g_cm.history_head];
-    memset(rec, 0, sizeof(cm_change_record_t));
+    AGENTOS_MEMSET(rec, 0, sizeof(cm_change_record_t));
     safe_strcpy(rec->key, key, CM_MAX_KEY_LEN);
     if (old_value)
         safe_strcpy(rec->old_value, old_value, CM_MAX_VALUE_LEN);
@@ -140,7 +140,7 @@ static bool validate_value(const char *key, const char *value)
 AGENTOS_API cm_config_t cm_create_default_config(void)
 {
     cm_config_t config;
-    memset(&config, 0, sizeof(cm_config_t));
+    AGENTOS_MEMSET(&config, 0, sizeof(cm_config_t));
     safe_strcpy(config.base_path, "./config", sizeof(config.base_path));
     safe_strcpy(config.environment, "development", sizeof(config.environment));
     config.watch_interval_ms = 5000;
@@ -156,7 +156,7 @@ AGENTOS_API int cm_init(const cm_config_t *config)
     if (g_cm.initialized)
         return 0;
 
-    memset(&g_cm, 0, sizeof(g_cm));
+    AGENTOS_MEMSET(&g_cm, 0, sizeof(g_cm));
 
     if (config) {
         memcpy(&g_cm.config, config, sizeof(cm_config_t));
@@ -290,7 +290,7 @@ AGENTOS_API int cm_set(const char *key, const char *value, const char *source)
     }
 
     entry = &g_cm.entries[g_cm.entry_count];
-    memset(entry, 0, sizeof(cm_entry_t));
+    AGENTOS_MEMSET(entry, 0, sizeof(cm_entry_t));
     safe_strcpy(entry->key, key, CM_MAX_KEY_LEN);
     if (value)
         safe_strcpy(entry->value, value, CM_MAX_VALUE_LEN);
@@ -562,7 +562,7 @@ AGENTOS_API int cm_unwatch(const char *key_pattern, cm_change_callback_t callbac
             if (i < g_cm.watcher_count - 1) {
                 g_cm.watchers[i] = g_cm.watchers[g_cm.watcher_count - 1];
             }
-            memset(&g_cm.watchers[g_cm.watcher_count - 1], 0, sizeof(cm_watcher_t));
+            AGENTOS_MEMSET(&g_cm.watchers[g_cm.watcher_count - 1], 0, sizeof(cm_watcher_t));
             g_cm.watcher_count--;
             break;
         }

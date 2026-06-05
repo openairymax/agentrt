@@ -40,7 +40,7 @@ static sched_adapter_ctx_t *sched_get_ctx(agentos_service_t service)
 static void sched_config_from_common(sched_config_t *sched_cfg,
                                      const agentos_svc_config_t *common_cfg)
 {
-    memset(sched_cfg, 0, sizeof(sched_config_t));
+    AGENTOS_MEMSET(sched_cfg, 0, sizeof(sched_config_t));
     sched_cfg->strategy = SCHED_STRATEGY_WEIGHTED;
     sched_cfg->health_check_interval_ms =
         (common_cfg && common_cfg->timeout_ms > 0) ? common_cfg->timeout_ms : 10000;

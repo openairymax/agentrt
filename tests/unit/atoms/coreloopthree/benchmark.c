@@ -30,7 +30,8 @@ static void benchmark_task_submit() {
     const char* input = "帮我分析最近的销售数�?;
     size_t input_len = strlen(input);
     int num_tasks = 1000;
-    char** task_ids = (char**)AGENTOS_MALLOC(num_tasks * sizeof(char*));
+    char** task_ids;
+    SAFE_MALLOC_ARRAY(task_ids, num_tasks, sizeof(char*));
     if (!task_ids) {
         agentos_loop_destroy(loop);
         return;
@@ -75,7 +76,8 @@ static void benchmark_task_query() {
 
     // 提交多个任务
     int num_tasks = 1000;
-    char** task_ids = (char**)AGENTOS_MALLOC(num_tasks * sizeof(char*));
+    char** task_ids;
+    SAFE_MALLOC_ARRAY(task_ids, num_tasks, sizeof(char*));
     if (!task_ids) {
         agentos_execution_destroy(engine);
         return;
@@ -147,7 +149,8 @@ static void benchmark_memory_write() {
     }
 
     int num_records = 1000;
-    char** record_ids = (char**)AGENTOS_MALLOC(num_records * sizeof(char*));
+    char** record_ids;
+    SAFE_MALLOC_ARRAY(record_ids, num_records, sizeof(char*));
     if (!record_ids) {
         agentos_memory_destroy(engine);
         return;

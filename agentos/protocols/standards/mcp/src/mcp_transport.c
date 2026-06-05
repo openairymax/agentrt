@@ -151,7 +151,7 @@ static int write_all(int fd, const char *buf, size_t len, uint32_t timeout_ms)
 mcp_transport_config_t mcp_transport_config_stdio_default(void)
 {
     mcp_transport_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
+    AGENTOS_MEMSET(&cfg, 0, sizeof(cfg));
     cfg.type = MCP_TRANSPORT_STDIO;
     cfg.read_timeout_ms = 30000;
     cfg.write_timeout_ms = 30000;
@@ -164,7 +164,7 @@ mcp_transport_config_t mcp_transport_config_stdio_default(void)
 mcp_transport_config_t mcp_transport_config_http_default(const char *base_url)
 {
     mcp_transport_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
+    AGENTOS_MEMSET(&cfg, 0, sizeof(cfg));
     cfg.type = MCP_TRANSPORT_HTTP_SSE;
     cfg.read_timeout_ms = 30000;
     cfg.write_timeout_ms = 30000;
@@ -332,7 +332,7 @@ int mcp_transport_start(mcp_transport_t *transport)
         AGENTOS_FREE(url_copy);
 
         struct addrinfo hints, *result;
-        memset(&hints, 0, sizeof(hints));
+        AGENTOS_MEMSET(&hints, 0, sizeof(hints));
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
 

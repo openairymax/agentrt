@@ -208,16 +208,16 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t *manager,
         sandbox->audit_count = 0;
         sandbox->audit_write_index = 0;
 
-        memset(&sandbox->policy, 0, sizeof(security_policy_t));
+        AGENTOS_MEMSET(&sandbox->policy, 0, sizeof(security_policy_t));
         sandbox->policy.version = 1;
         sandbox->policy.last_updated = (time_t)(agentos_time_ms() / 1000ULL);
-        strncpy(sandbox->policy.updated_by, "system", sizeof(sandbox->policy.updated_by) - 1);
+        AGENTOS_STRNCPY_TERM(sandbox->policy.updated_by, "system", sizeof(sandbox->policy.updated_by));
         sandbox->policy.allow_dynamic_update = 1;
         sandbox->policy.strict_mode = 0;
         sandbox->policy.audit_level = 1;
         sandbox->policy.risk_threshold = 0.7f;
 
-        memset(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
+        AGENTOS_MEMSET(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
         sandbox->perf_stats.stats_reset_time = (time_t)(agentos_time_ms() / 1000ULL);
 
         sandbox->enable_input_sanitization = 1;
@@ -672,7 +672,7 @@ static void sandbox_add_enhanced_audit_entry(agentos_sandbox_t *sandbox, int sys
 
     /* 复制系统调用名称（带截断保护） */
     if (syscall_name) {
-        strncpy(entry->syscall_name, syscall_name, sizeof(entry->syscall_name) - 1);
+        AGENTOS_STRNCPY_TERM(entry->syscall_name, syscall_name, sizeof(entry->syscall_name));
         entry->syscall_name[sizeof(entry->syscall_name) - 1] = '\0';
     } else {
         snprintf(entry->syscall_name, sizeof(entry->syscall_name), "%d", syscall_num);
@@ -680,7 +680,7 @@ static void sandbox_add_enhanced_audit_entry(agentos_sandbox_t *sandbox, int sys
 
     /* 复制消息（带截断保护） */
     if (message) {
-        strncpy(entry->message, message, sizeof(entry->message) - 1);
+        AGENTOS_STRNCPY_TERM(entry->message, message, sizeof(entry->message));
         entry->message[sizeof(entry->message) - 1] = '\0';
     } else {
         entry->message[0] = '\0';
@@ -794,7 +794,7 @@ agentos_error_t agentos_sandbox_reset_performance_stats(agentos_sandbox_t *sandb
 
     agentos_mutex_lock(sandbox->lock);
 
-    memset(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
+    AGENTOS_MEMSET(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
     sandbox->perf_stats.stats_reset_time = (time_t)(agentos_time_ms() / 1000ULL);
 
     agentos_mutex_unlock(sandbox->lock);

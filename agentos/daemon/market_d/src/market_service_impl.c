@@ -89,7 +89,7 @@ int market_service_create(const market_config_t *config, market_service_t **serv
     if (!service)
         return AGENTOS_ERR_INVALID_PARAM;
     if (!config) {
-        memset(&default_cfg, 0, sizeof(default_cfg));
+        AGENTOS_MEMSET(&default_cfg, 0, sizeof(default_cfg));
         default_cfg.cache_ttl_ms = 3600000;
         default_cfg.sync_interval_ms = 30000;
         config = &default_cfg;
@@ -739,7 +739,7 @@ int market_service_sync_registry(market_service_t *service)
     {
         size_t pos = 0;
         char tmp[1024];
-        strncpy(tmp, storage, sizeof(tmp) - 1);
+        AGENTOS_STRNCPY_TERM(tmp, storage, sizeof(tmp));
         tmp[sizeof(tmp) - 1] = '\0';
         while (tmp[pos]) {
             if (tmp[pos] == '/' && pos > 0) {

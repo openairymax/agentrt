@@ -161,6 +161,9 @@ int protocol_router_route(protocol_router_handle_t router, const unified_message
     // 收集所有规则到临时数组供决策函数使用
     protocol_rule_t *rule_array = NULL;
     if (r->rule_count > 0) {
+        if (r->rule_count > SIZE_MAX / sizeof(protocol_rule_t)) {
+            return AGENTOS_E_OVERFLOW;
+        }
         rule_array = (protocol_rule_t *)AGENTOS_MALLOC(r->rule_count * sizeof(protocol_rule_t));
         if (rule_array) {
             rule_node_t *node = r->rules;
@@ -224,8 +227,7 @@ int protocol_router_route(protocol_router_handle_t router, const unified_message
             transformed->protocol = matched_node->rule.target_protocol;
         }
         if (!transformed->endpoint[0] && matched_node->rule.target_endpoint) {
-            strncpy(transformed->endpoint, matched_node->rule.target_endpoint,
-                    sizeof(transformed->endpoint) - 1);
+            AGENTOS_STRNCPY_TERM(transformed->endpoint, matched_node->rule.target_endpoint, sizeof(transformed->endpoint));
         }
     }
 
@@ -630,7 +632,7 @@ static int __attribute__((unused)) match_endpoint_extract(const char *pattern, c
                     return 1;
                 if (info && info->param_count < ROUTER_MAX_PARAMS) {
                     route_param_t *param = &info->params[info->param_count];
-                    strncpy(param->name, "wildcard", ROUTER_PARAM_NAME_LEN - 1);
+                    AGENTOS_STRNCPY_TERM(param->name, "wildcard", ROUTER_PARAM_NAME_LEN);
                     const char *rest = e;
                     const char *next_seg = strchr(e, '/');
                     size_t vlen = next_seg ? (size_t)(next_seg - e) : strlen(e);
@@ -650,7 +652,7 @@ static int __attribute__((unused)) match_endpoint_extract(const char *pattern, c
                 p++;
                 if (info && info->param_count < ROUTER_MAX_PARAMS) {
                     route_param_t *param = &info->params[info->param_count];
-                    strncpy(param->name, "glob", ROUTER_PARAM_NAME_LEN - 1);
+                    AGENTOS_STRNCPY_TERM(param->name, "glob", ROUTER_PARAM_NAME_LEN);
                     const char *vs = e;
                     while (*e && *e != '/' && *e != '?' && *e != '#')
                         e++;

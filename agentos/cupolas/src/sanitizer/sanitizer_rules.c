@@ -37,7 +37,7 @@ sanitizer_rules_t *sanitizer_rules_create(const char *rules_path)
     if (!rules)
         return NULL;
 
-    memset(rules, 0, sizeof(sanitizer_rules_t));
+    AGENTOS_MEMSET(rules, 0, sizeof(sanitizer_rules_t));
 
     if (cupolas_mutex_init(&rules->lock) != cupolas_OK) {
         cupolas_mem_free(rules);
@@ -78,7 +78,7 @@ int sanitizer_rules_add(sanitizer_rules_t *rules, const char *pattern, const cha
     if (!rule)
         return cupolas_ERROR_NO_MEMORY;
 
-    memset(rule, 0, sizeof(struct sanitize_rule));
+    AGENTOS_MEMSET(rule, 0, sizeof(struct sanitize_rule));
 
     rule->pattern = cupolas_strdup(pattern);
     if (!rule->pattern) {
@@ -115,7 +115,7 @@ int sanitizer_rules_apply(sanitizer_rules_t *rules, const char *input, char *out
 
     cupolas_mutex_lock(&rules->lock);
 
-    strncpy(output, input, output_size - 1);
+    AGENTOS_STRNCPY_TERM(output, input, output_size);
     output[output_size - 1] = '\0';
 
     struct sanitize_rule *rule = rules->head;

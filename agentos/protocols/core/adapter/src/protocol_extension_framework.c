@@ -107,7 +107,7 @@ int proto_ext_register(proto_ext_framework_t *fw, const proto_ext_descriptor_t *
     }
 
     proto_ext_adapter_entry_t *entry = &fw->adapters[fw->adapter_count];
-    memset(entry, 0, sizeof(*entry));
+    AGENTOS_MEMSET(entry, 0, sizeof(*entry));
     memcpy(&entry->descriptor, descriptor, sizeof(proto_ext_descriptor_t));
     memcpy(&entry->callbacks, callbacks, sizeof(proto_ext_callbacks_t));
     entry->adapter_context = NULL;
@@ -404,7 +404,7 @@ int proto_ext_add_middleware(proto_ext_framework_t *fw, const char *name,
     }
 
     proto_middleware_t *mw = &fw->middlewares[fw->middleware_count];
-    strncpy(mw->name, name, PROTO_EXT_MAX_NAME_LEN - 1);
+    AGENTOS_STRNCPY_TERM(mw->name, name, PROTO_EXT_MAX_NAME_LEN);
     mw->name[PROTO_EXT_MAX_NAME_LEN - 1] = '\0';
     mw->process = middleware;
     mw->priority = priority;
@@ -502,7 +502,7 @@ int proto_ext_get_adapter_stats(proto_ext_framework_t *fw, const char *name,
         }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, name) == 0) {
-            strncpy(stats->name, fw->adapters[i].descriptor.name, PROTO_EXT_MAX_NAME_LEN - 1);
+            AGENTOS_STRNCPY_TERM(stats->name, fw->adapters[i].descriptor.name, PROTO_EXT_MAX_NAME_LEN);
             stats->state = fw->adapters[i].state;
             stats->error_count = fw->adapters[i].error_count;
             stats->last_activity_ms = fw->adapters[i].last_activity_ms;
@@ -747,21 +747,19 @@ int proto_ext_load_from_config(proto_ext_framework_t *fw, const char *config_jso
                                                   .capabilities = caps,
                                                   .priority = priority,
                                                   .hot_loadable = true};
-            strncpy(desc_struct.name, name, PROTO_EXT_MAX_NAME_LEN - 1);
+            AGENTOS_STRNCPY_TERM(desc_struct.name, name, PROTO_EXT_MAX_NAME_LEN);
             if (version)
-                strncpy(desc_struct.version, version, PROTO_EXT_MAX_VERSION_LEN - 1);
+                AGENTOS_STRNCPY_TERM(desc_struct.version, version, PROTO_EXT_MAX_VERSION_LEN);
             else {
-                strncpy(desc_struct.version, "1.0.0", PROTO_EXT_MAX_VERSION_LEN - 1);
-                desc_struct.version[PROTO_EXT_MAX_VERSION_LEN - 1] = '\0';
+                AGENTOS_STRNCPY_TERM(desc_struct.version, "1.0.0", PROTO_EXT_MAX_VERSION_LEN);
             }
             if (desc)
-                strncpy(desc_struct.description, desc, 255);
+                AGENTOS_STRNCPY_TERM(desc_struct.description, desc, sizeof(desc_struct.description));
             else {
-                strncpy(desc_struct.description, "Loaded from config", 255);
-                desc_struct.description[254] = '\0';
+                AGENTOS_STRNCPY_TERM(desc_struct.description, "Loaded from config", sizeof(desc_struct.description));
             }
             if (author)
-                strncpy(desc_struct.author, author, 127);
+                AGENTOS_STRNCPY_TERM(desc_struct.author, author, sizeof(desc_struct.author));
 
             proto_ext_callbacks_t empty_cbs = {0};
 
@@ -837,7 +835,7 @@ static int fw_adapter_decode(void *ctx, const void *data, size_t size, void *out
         }
 
     unified_message_t *msg = (unified_message_t *)out_msg;
-    memset(msg, 0, sizeof(*msg));
+    AGENTOS_MEMSET(msg, 0, sizeof(*msg));
     msg->payload = AGENTOS_MALLOC(size + 1);
     if (!msg->payload)
         AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");

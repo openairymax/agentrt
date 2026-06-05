@@ -116,7 +116,7 @@ int test_safe_strcat_empty_dest(void) {
     printf("  测试空目标拼接...\n");
 
     char dest[TEST_BUFFER_SIZE];
-    memset(dest, 0, sizeof(dest));
+    AGENTOS_MEMSET(dest, 0, sizeof(dest));
 
     int result = agentos_safe_strcat(dest, sizeof(dest), "test");
     if (result != 0 || strcmp(dest, "test") != 0) {

@@ -137,7 +137,7 @@ agentos_token_budget_t *agentos_token_budget_create(size_t max_tokens)
         return NULL;
     }
 
-    memset(budget, 0, sizeof(agentos_token_budget_t));
+    AGENTOS_MEMSET(budget, 0, sizeof(agentos_token_budget_t));
 
     budget->max_tokens = max_tokens;
     atomic_init(&budget->used_tokens, 0);

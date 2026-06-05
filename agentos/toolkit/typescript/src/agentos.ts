@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - Main Entry
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 提供 TypeScript 接口与 AgentOS 系统交互。

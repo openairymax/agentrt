@@ -130,11 +130,8 @@ int agentos_io_list_files(const char *path, char ***out_files, size_t *out_count
 
     size_t capacity = 64;
     size_t count = 0;
-    char **files = (char **)AGENTOS_MALLOC(capacity * sizeof(char *));
-    if (!files) {
-        FindClose(hFind);
-        return AGENTOS_EINVAL;
-    }
+    char **files = NULL;
+    SAFE_MALLOC_ARRAY(files, capacity, sizeof(char *));
 
     do {
         if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
@@ -173,11 +170,8 @@ int agentos_io_list_files(const char *path, char ***out_files, size_t *out_count
 
     size_t capacity = 64;
     size_t count = 0;
-    char **files = (char **)AGENTOS_MALLOC(capacity * sizeof(char *));
-    if (!files) {
-        closedir(dir);
-        return AGENTOS_EINVAL;
-    }
+    char **files = NULL;
+    SAFE_MALLOC_ARRAY(files, capacity, sizeof(char *));
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
@@ -243,7 +237,7 @@ int agentos_io_mkdir_p(const char *path, int mode)
 
     // 复制路径以便修改
     char path_copy[1024];
-    strncpy(path_copy, path, sizeof(path_copy) - 1);
+    AGENTOS_STRNCPY_TERM(path_copy, path, sizeof(path_copy));
     path_copy[sizeof(path_copy) - 1] = '\0';
 
     size_t len = strlen(path_copy);

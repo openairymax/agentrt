@@ -37,7 +37,7 @@ agentos_error_t memory_pool_init(memory_pool_t *pool, const memory_pool_config_t
         return AGENTOS_EINVAL;
     }
 
-    memset(pool, 0, sizeof(memory_pool_t));
+    AGENTOS_MEMSET(pool, 0, sizeof(memory_pool_t));
 
     if (manager) {
         pool->manager = *manager;
@@ -56,7 +56,7 @@ agentos_error_t memory_pool_init(memory_pool_t *pool, const memory_pool_config_t
         return AGENTOS_ENOMEM;
     }
 
-    memset(pool->pool, 0, pool_size);
+    AGENTOS_MEMSET(pool->pool, 0, pool_size);
     pool->used_blocks = 0;
     pool->peak_usage = 0;
 
@@ -227,7 +227,7 @@ void memory_get_global_stats(memory_stats_t *stats)
 
 void memory_reset_global_stats(void)
 {
-    memset(&g_memory_stats, 0, sizeof(g_memory_stats));
+    AGENTOS_MEMSET(&g_memory_stats, 0, sizeof(g_memory_stats));
 }
 
 void memory_set_strategy(memory_strategy_t strategy)

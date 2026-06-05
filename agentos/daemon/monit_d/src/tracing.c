@@ -230,11 +230,11 @@ int tracing_start_trace(const char *operation_name, const char *parent_trace_id,
     }
 
     trace_t *trace = &g_tracing.traces[g_tracing.trace_count];
-    memset(trace, 0, sizeof(trace_t));
+    AGENTOS_MEMSET(trace, 0, sizeof(trace_t));
     agentos_mutex_init(&trace->lock);
 
     if (parent_trace_id) {
-        strncpy(trace->trace_id, parent_trace_id, TRACE_ID_LEN - 1);
+        AGENTOS_STRNCPY_TERM(trace->trace_id, parent_trace_id, TRACE_ID_LEN);
     } else {
         generate_hex_id(trace->trace_id, TRACE_ID_LEN);
     }
@@ -264,7 +264,7 @@ int tracing_start_trace(const char *operation_name, const char *parent_trace_id,
 
     g_tracing.trace_count++;
 
-    strncpy(out_trace_id, trace->trace_id, trace_id_buf_len - 1);
+    AGENTOS_STRNCPY_TERM(out_trace_id, trace->trace_id, trace_id_buf_len);
     out_trace_id[trace_id_buf_len - 1] = '\0';
 
     agentos_mutex_unlock(&g_tracing.global_lock);
@@ -308,7 +308,7 @@ int tracing_start_span(const char *trace_id, const char *operation_name, span_ki
     generate_hex_id(span->span_id, SPAN_ID_LEN);
 
     if (trace->span_count > 0) {
-        strncpy(span->parent_span_id, trace->spans[trace->span_count - 1].span_id, SPAN_ID_LEN - 1);
+        AGENTOS_STRNCPY_TERM(span->parent_span_id, trace->spans[trace->span_count - 1].span_id, SPAN_ID_LEN);
     } else {
         span->parent_span_id[0] = '\0';
     }
@@ -323,7 +323,7 @@ int tracing_start_span(const char *trace_id, const char *operation_name, span_ki
     span->event_count = 0;
     trace->span_count++;
 
-    strncpy(out_span_id, span->span_id, span_id_buf_len - 1);
+    AGENTOS_STRNCPY_TERM(out_span_id, span->span_id, span_id_buf_len);
     out_span_id[span_id_buf_len - 1] = '\0';
 
     agentos_mutex_unlock(&trace->lock);

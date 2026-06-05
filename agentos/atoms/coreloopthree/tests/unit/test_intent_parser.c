@@ -296,7 +296,7 @@ static void test_intent_free_null(void)
 static void test_intent_struct_fields(void)
 {
     agentos_intent_t intent;
-    memset(&intent, 0, sizeof(intent));
+    AGENTOS_MEMSET(&intent, 0, sizeof(intent));
 
     assert(intent.intent_raw_text == NULL);
     assert(intent.intent_raw_len == 0);

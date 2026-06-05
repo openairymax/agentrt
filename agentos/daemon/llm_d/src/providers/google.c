@@ -283,7 +283,7 @@ typedef struct {
 
 static void gg_sse_init(gg_sse_ctx_t *s, gg_stream_acc_t *a)
 {
-    memset(s, 0, sizeof(*s));
+    AGENTOS_MEMSET(s, 0, sizeof(*s));
     s->line_cap = 4096;
     s->line_buf = (char *)AGENTOS_MALLOC(s->line_cap);
     s->acc = a;
@@ -519,7 +519,7 @@ static int google_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     explicit_bzero(auth_header, sizeof(auth_header));
 
     gg_stream_acc_t acc;
-    memset(&acc, 0, sizeof(acc));
+    AGENTOS_MEMSET(&acc, 0, sizeof(acc));
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;

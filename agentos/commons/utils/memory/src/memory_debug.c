@@ -978,7 +978,7 @@ unsigned int memory_debug_checkpoint(const char *name)
     cp->valid = true;
 
     if (name != NULL) {
-        strncpy(cp->name, name, sizeof(cp->name) - 1);
+        AGENTOS_STRNCPY_TERM(cp->name, name, sizeof(cp->name));
         cp->name[sizeof(cp->name) - 1] = '\0';
     } else {
         cp->name[0] = '\0';
