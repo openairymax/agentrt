@@ -495,6 +495,14 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
 
     engine->running = 1;
     engine->worker_count = max_concurrency;
+    if (engine->worker_count > SIZE_MAX / sizeof(agentos_thread_t)) {
+        agentos_mutex_free(engine->queue_lock);
+        agentos_mutex_free(engine->running_lock);
+        agentos_cond_free(engine->task_available_cond);
+        AGENTOS_FREE(engine);
+        AGENTOS_LOG_ERROR("Overflow in worker threads array allocation");
+        ATM_RET_ERR(AGENTOS_E_OVERFLOW);
+    }
     engine->worker_threads =
         (agentos_thread_t *)AGENTOS_MALLOC(engine->worker_count * sizeof(agentos_thread_t));
     if (!engine->worker_threads) {

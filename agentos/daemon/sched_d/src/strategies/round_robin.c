@@ -77,7 +77,7 @@ static agent_info_t *clone_agent_info(const agent_info_t *src)
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
-    memset(dest, 0, sizeof(agent_info_t));
+    AGENTOS_MEMSET(dest, 0, sizeof(agent_info_t));
 
     if (src->agent_id) {
         dest->agent_id = safe_strdup(src->agent_id);
@@ -125,7 +125,7 @@ static int round_robin_create(const sched_config_t *config, void **data)
     if (!rrd) {
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    memset(rrd, 0, sizeof(round_robin_data_t));
+    AGENTOS_MEMSET(rrd, 0, sizeof(round_robin_data_t));
 
     rrd->max_agents = config->max_agents > 0 ? config->max_agents : 100;
     rrd->agents = (agent_info_t **)AGENTOS_MALLOC(sizeof(agent_info_t *) * rrd->max_agents);
@@ -133,7 +133,7 @@ static int round_robin_create(const sched_config_t *config, void **data)
         AGENTOS_FREE(rrd);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    memset(rrd->agents, 0, sizeof(agent_info_t *) * rrd->max_agents);
+    AGENTOS_MEMSET(rrd->agents, 0, sizeof(agent_info_t *) * rrd->max_agents);
 
     rrd->agent_count = 0;
     rrd->current_index = 0;
@@ -300,7 +300,7 @@ static int round_robin_schedule(void *data, const task_info_t *task_info, sched_
             if (!res) {
                 return AGENTOS_ERR_OUT_OF_MEMORY;
             }
-            memset(res, 0, sizeof(sched_result_t));
+            AGENTOS_MEMSET(res, 0, sizeof(sched_result_t));
 
             if (agent->agent_id) {
                 res->selected_agent_id = safe_strdup(agent->agent_id);

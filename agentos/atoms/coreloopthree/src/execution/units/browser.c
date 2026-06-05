@@ -185,7 +185,7 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
         ATM_RET_ERR(AGENTOS_EINVAL);
 
     struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
+    AGENTOS_MEMSET(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons((uint16_t)port);
     addr.sin_addr.s_addr = inet_addr(host);
@@ -203,7 +203,7 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
 
     unsigned char nonce[16];
     if (secure_random_bytes(nonce, sizeof(nonce)) != 0)
-        memset(nonce, 0, sizeof(nonce));
+        AGENTOS_MEMSET(nonce, 0, sizeof(nonce));
     char key_b64[CDP_WS_KEY_LEN + 1];
     base64_encode(nonce, 16, key_b64, sizeof(key_b64));
 
@@ -256,7 +256,7 @@ static int browser_mgr_init(void)
                                                  memory_order_seq_cst, memory_order_seq_cst))
         return 0;
 
-    memset(&g_browser_mgr, 0, sizeof(g_browser_mgr));
+    AGENTOS_MEMSET(&g_browser_mgr, 0, sizeof(g_browser_mgr));
     g_browser_mgr.state = BROWSER_STATE_STOPPED;
     g_browser_mgr.remote_debugging_port = BROWSER_CDP_PORT_FIRST;
     g_browser_mgr.headless = 1;
@@ -379,7 +379,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
     fcntl(pipe_fd[0], F_SETFL, flags | O_NONBLOCK);
 
     char stderr_buf[4096];
-    memset(stderr_buf, 0, sizeof(stderr_buf));
+    AGENTOS_MEMSET(stderr_buf, 0, sizeof(stderr_buf));
     char ws_url[256] = {0};
     uint32_t start_ms = browser_get_time_ms();
     ssize_t total = 0;
@@ -411,7 +411,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
             int test_fd = socket(AF_INET, SOCK_STREAM, 0);
             if (test_fd >= 0) {
                 struct sockaddr_in test_addr;
-                memset(&test_addr, 0, sizeof(test_addr));
+                AGENTOS_MEMSET(&test_addr, 0, sizeof(test_addr));
                 test_addr.sin_family = AF_INET;
                 test_addr.sin_port = htons((uint16_t)g_browser_mgr.remote_debugging_port);
                 test_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -816,7 +816,7 @@ static int is_safe_url(const char *url)
         char hostname[256];
         if (extract_hostname(url, hostname, sizeof(hostname)) == 0) {
             struct addrinfo hints, *res;
-            memset(&hints, 0, sizeof(hints));
+            AGENTOS_MEMSET(&hints, 0, sizeof(hints));
             hints.ai_family = AF_UNSPEC;
             if (getaddrinfo(hostname, NULL, &hints, &res) == 0 && res) {
                 struct addrinfo *rp;
@@ -875,7 +875,7 @@ static int ws_send_frame(int fd, const char *payload, size_t payload_len)
 
     uint8_t mask_key[4];
     if (secure_random_bytes(mask_key, sizeof(mask_key)) != 0)
-        memset(mask_key, 0, sizeof(mask_key));
+        AGENTOS_MEMSET(mask_key, 0, sizeof(mask_key));
     memcpy(&header[header_size], mask_key, 4);
     header_size += 4;
 
@@ -2280,7 +2280,7 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
-    memset(unit, 0, sizeof(*unit));
+    AGENTOS_MEMSET(unit, 0, sizeof(*unit));
 
     browser_unit_data_t *data = (browser_unit_data_t *)AGENTOS_MALLOC(sizeof(browser_unit_data_t));
     if (!data) {
@@ -2288,7 +2288,7 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
-    memset(data, 0, sizeof(*data));
+    AGENTOS_MEMSET(data, 0, sizeof(*data));
 
     char meta[128];
     snprintf(meta, sizeof(meta), "{\"type\":\"browser\"}");
@@ -2313,7 +2313,7 @@ int agentos_browser_unit_set_agent(agentos_execution_unit_t *unit, const char *a
     if (!unit || !unit->execution_unit_data || !agent_id)
         ATM_RET_ERR(AGENTOS_EINVAL);
     browser_unit_data_t *data = (browser_unit_data_t *)unit->execution_unit_data;
-    strncpy(data->agent_id, agent_id, sizeof(data->agent_id) - 1);
+    AGENTOS_STRNCPY_TERM(data->agent_id, agent_id, sizeof(data->agent_id));
     data->agent_id[sizeof(data->agent_id) - 1] = '\0';
     return 0;
 }

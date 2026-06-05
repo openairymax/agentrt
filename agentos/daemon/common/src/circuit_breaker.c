@@ -93,7 +93,7 @@ static void transition_state(cb_internal_t *cb, cb_manager_internal_t *mgr, cb_s
     }
 
     cb_event_t event;
-    memset(&event, 0, sizeof(event));
+    AGENTOS_MEMSET(&event, 0, sizeof(event));
     event.type = CB_EVENT_STATE_CHANGE;
     safe_strcpy(event.breaker_name, cb->name, CB_MAX_NAME_LEN);
     event.old_state = old_state;
@@ -144,7 +144,7 @@ static bool should_trip(cb_internal_t *cb)
 AGENTOS_API cb_config_t cb_create_default_config(void)
 {
     cb_config_t config;
-    memset(&config, 0, sizeof(cb_config_t));
+    AGENTOS_MEMSET(&config, 0, sizeof(cb_config_t));
     config.failure_threshold = CB_DEFAULT_FAILURE_THRESHOLD;
     config.success_threshold = CB_DEFAULT_SUCCESS_THRESHOLD;
     config.timeout_ms = CB_DEFAULT_TIMEOUT_MS;
@@ -161,7 +161,7 @@ AGENTOS_API cb_config_t cb_create_default_config(void)
 AGENTOS_API cb_failover_config_t cb_create_default_failover_config(void)
 {
     cb_failover_config_t config;
-    memset(&config, 0, sizeof(cb_failover_config_t));
+    AGENTOS_MEMSET(&config, 0, sizeof(cb_failover_config_t));
     config.strategy = CB_FAILOVER_RETRY;
     config.max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
     config.retry_delay_ms = AGENTOS_DEFAULT_RETRY_DELAY_MS;

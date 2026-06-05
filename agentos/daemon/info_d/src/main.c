@@ -107,7 +107,7 @@ static int info_d_collect_system_info(system_info_snapshot_t *snap)
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "snap is NULL");
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    memset(snap, 0, sizeof(*snap));
+    AGENTOS_MEMSET(snap, 0, sizeof(*snap));
     snap->timestamp = (uint64_t)time(NULL);
 
 #ifdef _WIN32
@@ -220,7 +220,7 @@ static int info_d_init(info_d_service_t *svc, int port, const char *sock)
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
     return AGENTOS_EINVAL;
 
-    memset(svc, 0, sizeof(*svc));
+    AGENTOS_MEMSET(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : INFO_D_DEFAULT_PORT;
     svc->socket_path = sock ? AGENTOS_STRDUP(sock) : AGENTOS_STRDUP(INFO_D_DEFAULT_SOCKET);
     svc->start_time = (uint64_t)time(NULL);
@@ -313,7 +313,7 @@ static int info_d_destroy(info_d_service_t *svc)
     agentos_socket_cleanup();
     agentos_mutex_destroy(&svc->lock);
     AGENTOS_FREE(svc->socket_path);
-    memset(svc, 0, sizeof(*svc));
+    AGENTOS_MEMSET(svc, 0, sizeof(*svc));
     SVC_LOG_INFO("info_d: service destroyed");
     return AGENTOS_SUCCESS;
 }

@@ -120,7 +120,7 @@ void container_config_init(container_config_t *manager)
     if (!manager)
         return;
 
-    memset(manager, 0, sizeof(container_config_t));
+    AGENTOS_MEMSET(manager, 0, sizeof(container_config_t));
 
     manager->runtime = CONTAINER_RUNTIME_AUTO;
 
@@ -148,7 +148,7 @@ void *container_manager_create(const container_config_t *manager)
         return NULL;
     }
 
-    memset(handle, 0, sizeof(container_handle_t));
+    AGENTOS_MEMSET(handle, 0, sizeof(container_handle_t));
 
     if (manager) {
         memcpy(&handle->manager, manager, sizeof(container_config_t));
@@ -300,7 +300,7 @@ int container_start(void *mgr, const char *name, container_result_t *result)
     handle->is_running = true;
 
     if (result) {
-        memset(result, 0, sizeof(container_result_t));
+        AGENTOS_MEMSET(result, 0, sizeof(container_result_t));
         result->duration_ns = 0;
     }
 
@@ -355,7 +355,7 @@ int container_get_info(void *mgr, container_info_t *info)
 
     container_handle_t *handle = (container_handle_t *)mgr;
 
-    memset(info, 0, sizeof(container_info_t));
+    AGENTOS_MEMSET(info, 0, sizeof(container_info_t));
 
     snprintf(info->container_id, sizeof(info->container_id), "%s", handle->container_id);
     snprintf(info->name, sizeof(info->name), "%s", handle->container_name);
@@ -372,7 +372,7 @@ int container_get_stats(void *mgr, container_info_t *info)
     container_handle_t *handle = (container_handle_t *)mgr;
 
     if (!handle->is_running) {
-        memset(&info->stats, 0, sizeof(info->stats));
+        AGENTOS_MEMSET(&info->stats, 0, sizeof(info->stats));
         return cupolas_OK;
     }
 
@@ -381,7 +381,7 @@ int container_get_stats(void *mgr, container_info_t *info)
              handle->container_name);
 
     char output[256];
-    memset(output, 0, sizeof(output));
+    AGENTOS_MEMSET(output, 0, sizeof(output));
     if (execute_command(cmd, 5000, output, sizeof(output)) == 0 && output[0] != '\0') {
         unsigned long mem_used = 0;
         unsigned long mem_limit_val = 0;
@@ -508,7 +508,7 @@ int container_exec(void *mgr, const char *command, const char **args, size_t arg
     }
 
     if (result) {
-        memset(result, 0, sizeof(container_result_t));
+        AGENTOS_MEMSET(result, 0, sizeof(container_result_t));
         result->duration_ns = 0;
 
         int ret = execute_command(cmd, 30000, NULL, 0);
@@ -550,5 +550,5 @@ void container_result_free(container_result_t *result)
         cupolas_mem_free(result->stderr_data);
     }
 
-    memset(result, 0, sizeof(container_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(container_result_t));
 }

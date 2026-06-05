@@ -65,7 +65,7 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
             ctx->entries, new_cap * sizeof(agentos_context_entry_t));
         if (!new_entries)
             ATM_RET_ERR(AGENTOS_ENOMEM);
-        memset(new_entries + ctx->capacity, 0,
+        AGENTOS_MEMSET(new_entries + ctx->capacity, 0,
                (new_cap - ctx->capacity) * sizeof(agentos_context_entry_t));
         ctx->entries = new_entries;
         ctx->capacity = new_cap;
@@ -132,7 +132,7 @@ static agentos_error_t window_trimmer_process(agentos_context_processor_t __attr
                 AGENTOS_FREE(context->entries[i].content);
             if (context->entries[i].metadata)
                 AGENTOS_FREE(context->entries[i].metadata);
-            memset(&context->entries[i], 0, sizeof(agentos_context_entry_t));
+            AGENTOS_MEMSET(&context->entries[i], 0, sizeof(agentos_context_entry_t));
         }
         memmove(context->entries + kept_count, context->entries + recent_start,
                 preserve_recent * sizeof(agentos_context_entry_t));

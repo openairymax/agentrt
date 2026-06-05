@@ -134,7 +134,7 @@ int agentos_extraction_result_add(agentos_extraction_result_t *result,
         }
 
         /* 初始化新空间 */
-        memset(new_entities + result->capacity, 0,
+        AGENTOS_MEMSET(new_entities + result->capacity, 0,
                (new_capacity - result->capacity) * sizeof(agentos_entity_t));
 
         result->entities = new_entities;
@@ -189,7 +189,7 @@ static void extract_numbers(const char *input, size_t input_len,
             size_t len = p - start;
             if (len > 0 && len <= 20) { /* 合理的数字长度限制 */
                 agentos_entity_t entity;
-                memset(&entity, 0, sizeof(entity));
+                AGENTOS_MEMSET(&entity, 0, sizeof(entity));
                 entity.type = AGENTOS_ENTITY_NUMBER;
                 entity.type_name = agentos_entity_type_name(AGENTOS_ENTITY_NUMBER);
                 entity.value = (char *)AGENTOS_MALLOC(len + 1);
@@ -233,7 +233,7 @@ static void extract_urls(const char *input, size_t input_len, agentos_extraction
         size_t len = match.rm_eo - match.rm_so;
         if (len > 3 && len <= 256) { /* 合理的 URL 长度限制 */
             agentos_entity_t entity;
-            memset(&entity, 0, sizeof(entity));
+            AGENTOS_MEMSET(&entity, 0, sizeof(entity));
             entity.type = AGENTOS_ENTITY_URL;
             entity.type_name = agentos_entity_type_name(AGENTOS_ENTITY_URL);
             entity.value = (char *)AGENTOS_MALLOC(len + 1);
@@ -275,7 +275,7 @@ static void extract_emails(const char *input, size_t input_len, agentos_extracti
         size_t len = match.rm_eo - match.rm_so;
         if (len > 5 && len <= 128) { /* 合理的邮箱长度限制 */
             agentos_entity_t entity;
-            memset(&entity, 0, sizeof(entity));
+            AGENTOS_MEMSET(&entity, 0, sizeof(entity));
             entity.type = AGENTOS_ENTITY_EMAIL;
             entity.type_name = agentos_entity_type_name(AGENTOS_ENTITY_EMAIL);
             entity.value = (char *)AGENTOS_MALLOC(len + 1);
@@ -318,7 +318,7 @@ static void extract_filepaths(const char *input, size_t input_len,
         size_t len = match.rm_eo - match.rm_so;
         if (len > 2 && len <= 512) { /* 合理的路径长度限制 */
             agentos_entity_t entity;
-            memset(&entity, 0, sizeof(entity));
+            AGENTOS_MEMSET(&entity, 0, sizeof(entity));
             entity.type = AGENTOS_ENTITY_FILEPATH;
             entity.type_name = agentos_entity_type_name(AGENTOS_ENTITY_FILEPATH);
             entity.value = (char *)AGENTOS_MALLOC(len + 1);

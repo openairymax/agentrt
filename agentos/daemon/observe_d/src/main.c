@@ -273,7 +273,7 @@ static int observe_d_init(observe_d_service_t *svc, int port, const char *sock)
     if (!svc)
         return AGENTOS_EINVAL;
 
-    memset(svc, 0, sizeof(*svc));
+    AGENTOS_MEMSET(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : OBSERVE_D_DEFAULT_PORT;
     svc->metrics_port = OBSERVE_D_METRICS_PORT;
     svc->socket_path = sock ? AGENTOS_STRDUP(sock) : AGENTOS_STRDUP(OBSERVE_D_DEFAULT_SOCKET);
@@ -311,7 +311,7 @@ static int observe_d_start_http_server(observe_d_service_t *svc)
     setsockopt(svc->http_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse, sizeof(reuse));
 
     struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
+    AGENTOS_MEMSET(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons((uint16_t)svc->metrics_port);
@@ -442,7 +442,7 @@ static int observe_d_destroy(observe_d_service_t *svc)
     agentos_socket_cleanup();
     agentos_mutex_destroy(&svc->lock);
     AGENTOS_FREE(svc->socket_path);
-    memset(svc, 0, sizeof(*svc));
+    AGENTOS_MEMSET(svc, 0, sizeof(*svc));
     SVC_LOG_INFO("observe_d: service destroyed");
     return AGENTOS_SUCCESS;
 }

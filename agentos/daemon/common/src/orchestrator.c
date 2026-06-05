@@ -280,7 +280,7 @@ orch_pipeline_t *orchestrator_pipeline_create(orchestrator_t *orch, const char *
     }
 
     if (name)
-        strncpy(p->name, name, sizeof(p->name) - 1);
+        AGENTOS_STRNCPY_TERM(p->name, name, sizeof(p->name));
     else
         snprintf(p->name, sizeof(p->name), "pipeline-%u", orch->task_count);
 
@@ -316,7 +316,7 @@ static task_entry_t *find_or_create_task(orchestrator_t *orch, orch_phase_t phas
     }
 
     task_entry_t *t = &orch->tasks[orch->task_count++];
-    memset(t, 0, sizeof(*t));
+    AGENTOS_MEMSET(t, 0, sizeof(*t));
     generate_task_id(t->id, sizeof(t->id));
     t->phase = phase;
     t->status = ORCH_TASK_PENDING;
@@ -534,13 +534,13 @@ static char *call_llm_service(const char *prompt, const char *system_role)
     }
 
     ipc_bus_message_t request;
-    memset(&request, 0, sizeof(request));
+    AGENTOS_MEMSET(&request, 0, sizeof(request));
     request.payload = params;
     request.payload_size = strlen(params);
-    strncpy(request.header.target, "llm_d", sizeof(request.header.target) - 1);
+    AGENTOS_STRNCPY_TERM(request.header.target, "llm_d", sizeof(request.header.target));
 
     ipc_bus_message_t response;
-    memset(&response, 0, sizeof(response));
+    AGENTOS_MEMSET(&response, 0, sizeof(response));
 
     agentos_error_t err = ipc_service_bus_request(bus, "llm_d", &request, &response, 30000);
     if (err != AGENTOS_SUCCESS || !response.payload) {
@@ -1147,7 +1147,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 total_critique_rounds++;
 
                 agentos_thinking_step_t eval_step;
-                memset(&eval_step, 0, sizeof(eval_step));
+                AGENTOS_MEMSET(&eval_step, 0, sizeof(eval_step));
                 eval_step.step_id = (uint32_t)(100 + round);
                 eval_step.raw_input = (char *)original_input;
                 eval_step.raw_input_len = strlen(original_input);
@@ -1157,7 +1157,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 eval_step.status = 1;
 
                 mc_evaluation_result_t mc_result;
-                memset(&mc_result, 0, sizeof(mc_result));
+                AGENTOS_MEMSET(&mc_result, 0, sizeof(mc_result));
 
                 agentos_error_t mc_err =
                     agentos_mc_evaluate_step(orch->metacognition, &eval_step, original_input,

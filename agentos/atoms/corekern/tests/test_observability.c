@@ -47,7 +47,9 @@ void test_observability_init_shutdown(void)
     config.metrics_interval_ms = 1000;
     config.health_check_interval_ms = 5000;
     strncpy(config.metrics_endpoint, "/metrics", sizeof(config.metrics_endpoint) - 1);
+    config.metrics_endpoint[sizeof(config.metrics_endpoint) - 1] = '\0';
     strncpy(config.tracing_endpoint, "/traces", sizeof(config.tracing_endpoint) - 1);
+    config.tracing_endpoint[sizeof(config.tracing_endpoint) - 1] = '\0';
 
     int ret = agentos_observability_init(&config);
     /* 可能返回0或错误码（取决于依赖） */

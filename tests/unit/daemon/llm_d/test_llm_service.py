@@ -13,8 +13,12 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 import json
 import pytest
 from unittest.mock import MagicMock, patch
+from pathlib import Path
+import sys
 
-from tests.utils.python.base_test import BaseTestCase
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
+
+from utils.python.base_test import BaseTestCase
 
 
 class TestLLMProviderRouting(BaseTestCase):

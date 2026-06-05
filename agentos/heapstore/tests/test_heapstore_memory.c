@@ -32,7 +32,7 @@ static void test_memory_pool_crud(void)
     printf("Test: memory_pool_crud...");
 
     heapstore_memory_pool_t pool;
-    memset(&pool, 0, sizeof(pool));
+    AGENTOS_MEMSET(&pool, 0, sizeof(pool));
 
     snprintf(pool.pool_id, sizeof(pool.pool_id), "pool_%ld", (long)time(NULL));
     snprintf(pool.name, sizeof(pool.name), "Test Pool");
@@ -47,7 +47,7 @@ static void test_memory_pool_crud(void)
     heapstore_error_t err = heapstore_memory_record_pool(&pool);
     if (err == heapstore_SUCCESS) {
         heapstore_memory_pool_t get_pool;
-        memset(&get_pool, 0, sizeof(get_pool));
+        AGENTOS_MEMSET(&get_pool, 0, sizeof(get_pool));
 
         err = heapstore_memory_get_pool(pool.pool_id, &get_pool);
         assert(err == heapstore_SUCCESS);
@@ -67,7 +67,7 @@ static void test_memory_allocation_crud(void)
     printf("Test: memory_allocation_crud...");
 
     heapstore_memory_pool_t pool;
-    memset(&pool, 0, sizeof(pool));
+    AGENTOS_MEMSET(&pool, 0, sizeof(pool));
 
     snprintf(pool.pool_id, sizeof(pool.pool_id), "pool_alloc_%ld", (long)time(NULL));
     snprintf(pool.name, sizeof(pool.name), "Allocation Test Pool");
@@ -78,7 +78,7 @@ static void test_memory_allocation_crud(void)
     heapstore_error_t err = heapstore_memory_record_pool(&pool);
 
     heapstore_memory_allocation_t allocation;
-    memset(&allocation, 0, sizeof(allocation));
+    AGENTOS_MEMSET(&allocation, 0, sizeof(allocation));
 
     snprintf(allocation.allocation_id, sizeof(allocation.allocation_id), "alloc_%ld",
              (long)time(NULL));
@@ -92,7 +92,7 @@ static void test_memory_allocation_crud(void)
         err = heapstore_memory_record_allocation(&allocation);
         if (err == heapstore_SUCCESS) {
             heapstore_memory_allocation_t get_alloc;
-            memset(&get_alloc, 0, sizeof(get_alloc));
+            AGENTOS_MEMSET(&get_alloc, 0, sizeof(get_alloc));
 
             err = heapstore_memory_get_allocation(allocation.allocation_id, &get_alloc);
             assert(err == heapstore_SUCCESS);
@@ -137,7 +137,7 @@ static void test_memory_invalid_params(void)
     assert(err == heapstore_ERR_INVALID_PARAM);
 
     heapstore_memory_pool_t invalid_pool;
-    memset(&invalid_pool, 0, sizeof(invalid_pool));
+    AGENTOS_MEMSET(&invalid_pool, 0, sizeof(invalid_pool));
     err = heapstore_memory_record_pool(&invalid_pool);
     assert(err == heapstore_ERR_INVALID_PARAM);
 
@@ -145,7 +145,7 @@ static void test_memory_invalid_params(void)
     assert(err == heapstore_ERR_INVALID_PARAM);
 
     heapstore_memory_allocation_t invalid_alloc;
-    memset(&invalid_alloc, 0, sizeof(invalid_alloc));
+    AGENTOS_MEMSET(&invalid_alloc, 0, sizeof(invalid_alloc));
     err = heapstore_memory_record_allocation(&invalid_alloc);
     assert(err == heapstore_ERR_INVALID_PARAM);
 
@@ -169,14 +169,14 @@ static void test_memory_not_found(void)
     printf("Test: memory_not_found...");
 
     heapstore_memory_pool_t pool;
-    memset(&pool, 0, sizeof(pool));
+    AGENTOS_MEMSET(&pool, 0, sizeof(pool));
 
     heapstore_error_t err __attribute__((unused)) =
         heapstore_memory_get_pool("nonexistent_id", &pool);
     assert(err == heapstore_ERR_NOT_FOUND);
 
     heapstore_memory_allocation_t allocation;
-    memset(&allocation, 0, sizeof(allocation));
+    AGENTOS_MEMSET(&allocation, 0, sizeof(allocation));
 
     err = heapstore_memory_get_allocation("nonexistent_id", &allocation);
     assert(err == heapstore_ERR_NOT_FOUND);
@@ -195,7 +195,7 @@ static void test_memory_update_usage(void)
     printf("Test: memory_update_usage...");
 
     heapstore_memory_pool_t pool;
-    memset(&pool, 0, sizeof(pool));
+    AGENTOS_MEMSET(&pool, 0, sizeof(pool));
 
     snprintf(pool.pool_id, sizeof(pool.pool_id), "pool_update_%ld", (long)time(NULL));
     snprintf(pool.name, sizeof(pool.name), "Update Test Pool");
@@ -212,7 +212,7 @@ static void test_memory_update_usage(void)
         assert(err == heapstore_SUCCESS);
 
         heapstore_memory_pool_t get_pool;
-        memset(&get_pool, 0, sizeof(get_pool));
+        AGENTOS_MEMSET(&get_pool, 0, sizeof(get_pool));
 
         err = heapstore_memory_get_pool(pool.pool_id, &get_pool);
         assert(err == heapstore_SUCCESS);

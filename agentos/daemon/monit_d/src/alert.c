@@ -305,7 +305,7 @@ static void add_to_history(const alert_info_t *alert)
     }
 
     grouped_alert_t *entry = &g_alert_mgr.history[g_alert_mgr.history_count];
-    memset(entry, 0, sizeof(grouped_alert_t));
+    AGENTOS_MEMSET(entry, 0, sizeof(grouped_alert_t));
 
     entry->alert.alert_id = alert->alert_id ? AGENTOS_STRDUP(alert->alert_id) : NULL;
     entry->alert.message = alert->message ? AGENTOS_STRDUP(alert->message) : NULL;

@@ -92,6 +92,12 @@ static ThreadLocalBuffer *get_thread_local_buffer(void)
         g_tls_log_buffer = (ThreadLocalBuffer *)AGENTOS_CALLOC(1, sizeof(ThreadLocalBuffer));
         if (g_tls_log_buffer) {
             g_tls_log_buffer->capacity = g_atomic_state.manager.batch_commit_threshold;
+            if (g_tls_log_buffer->capacity > SIZE_MAX / sizeof(log_record_t)) {
+                AGENTOS_FREE(g_tls_log_buffer);
+                g_tls_log_buffer = NULL;
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+                return NULL;
+            }
             g_tls_log_buffer->buffer =
                 (log_record_t *)AGENTOS_MALLOC(g_tls_log_buffer->capacity * sizeof(log_record_t));
             g_tls_log_buffer->position = 0;
@@ -362,7 +368,7 @@ int atomic_logging_get_stats(atomic_logging_stats_t *stats)
         return AGENTOS_EINVAL;
     }
 
-    memset(stats, 0, sizeof(atomic_logging_stats_t));
+    AGENTOS_MEMSET(stats, 0, sizeof(atomic_logging_stats_t));
 
     agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
 
@@ -403,7 +409,7 @@ void atomic_logging_cleanup(void)
     agentos_mutex_destroy(&g_atomic_state.ring_buffer.mutex);
     AGENTOS_FREE(g_atomic_state.ring_buffer.nodes);
 
-    memset(&g_atomic_state, 0, sizeof(g_atomic_state));
+    AGENTOS_MEMSET(&g_atomic_state, 0, sizeof(g_atomic_state));
 }
 
 ThreadLocalBuffer *atomic_logging_get_thread_local_buffer(void)

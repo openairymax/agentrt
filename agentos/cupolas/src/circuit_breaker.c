@@ -122,7 +122,7 @@ circuit_breaker_t *circuit_breaker_create(const circuit_breaker_config_t *config
     if (!breaker)
         return NULL;
 
-    memset(breaker, 0, sizeof(circuit_breaker_t));
+    AGENTOS_MEMSET(breaker, 0, sizeof(circuit_breaker_t));
 
     if (config) {
         memcpy(&breaker->config, config, sizeof(circuit_breaker_config_t));
@@ -482,7 +482,7 @@ circuit_breaker_registry_t *circuit_breaker_registry_create(void)
     if (!registry)
         return NULL;
 
-    memset(registry, 0, sizeof(circuit_breaker_registry_t));
+    AGENTOS_MEMSET(registry, 0, sizeof(circuit_breaker_registry_t));
 
     if (cupolas_mutex_init(&registry->lock) != cupolas_OK) {
         cupolas_mem_free(registry);

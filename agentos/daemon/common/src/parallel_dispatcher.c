@@ -156,7 +156,7 @@ static void dispatch_worker(void *arg)
                  ctx->task.params_json ? ctx->task.params_json : "{}", ctx->task_index + 1);
 
         ipc_bus_message_t request;
-        memset(&request, 0, sizeof(request));
+        AGENTOS_MEMSET(&request, 0, sizeof(request));
         request.header.msg_type = IPC_BUS_MSG_REQUEST;
         request.header.protocol = IPC_BUS_PROTO_MCP;
         snprintf(request.header.target, sizeof(request.header.target), "tool_d");
@@ -165,7 +165,7 @@ static void dispatch_worker(void *arg)
         request.payload_size = strlen(request_payload) + 1;
 
         ipc_bus_message_t response;
-        memset(&response, 0, sizeof(response));
+        AGENTOS_MEMSET(&response, 0, sizeof(response));
 
         agentos_error_t err = ipc_service_bus_request(
             bus, "tool_d", &request, &response,
@@ -475,7 +475,7 @@ void parallel_result_free(parallel_result_t *results, size_t count)
 parallel_task_t parallel_task_create(const char *tool_id, const char *params_json)
 {
     parallel_task_t task;
-    memset(&task, 0, sizeof(task));
+    AGENTOS_MEMSET(&task, 0, sizeof(task));
     task.tool_id = tool_id ? AGENTOS_STRDUP(tool_id) : NULL;
     task.params_json = params_json ? AGENTOS_STRDUP(params_json) : NULL;
     task.user_data = NULL;

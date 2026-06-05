@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK Telemetry
-// Version: 2.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-23
 
 /** ﻟﺟﺛﻟﺕ۹ﮒﭦﻠﺑﻝﭘﮔ?*/

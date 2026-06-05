@@ -378,12 +378,12 @@ ipc_channel_t *ipc_channel_create(const ipc_config_t *config)
     channel->config = *config;
     channel->state = IPC_STATE_CLOSED;
     channel->msg_id_counter = 0;
-    memset(&channel->stats, 0, sizeof(ipc_stats_t));
+    AGENTOS_MEMSET(&channel->stats, 0, sizeof(ipc_stats_t));
     channel->event_cb = NULL;
     channel->event_user_data = NULL;
     channel->msg_cb = NULL;
     channel->msg_user_data = NULL;
-    memset(channel->error_msg, 0, sizeof(channel->error_msg));
+    AGENTOS_MEMSET(channel->error_msg, 0, sizeof(channel->error_msg));
 
     /* 初始化平台特定句柄为无效值 */
 #ifdef _WIN32
@@ -660,7 +660,7 @@ agentos_error_t ipc_channel_reset_stats(ipc_channel_t *channel)
         return AGENTOS_EINVAL;
     }
 
-    memset(&channel->stats, 0, sizeof(ipc_stats_t));
+    AGENTOS_MEMSET(&channel->stats, 0, sizeof(ipc_stats_t));
     return AGENTOS_SUCCESS;
 }
 
@@ -829,7 +829,7 @@ agentos_error_t ipc_send_request(ipc_channel_t *channel, ipc_message_t *request,
                                                                    : payload_len,
                          MSG_WAITALL);
                 if (n > 0) {
-                    memset(response, 0, sizeof(ipc_message_t));
+                    AGENTOS_MEMSET(response, 0, sizeof(ipc_message_t));
                     response->header.type = IPC_MSG_RESPONSE;
                     response->header.correlation_id = request->header.msg_id;
                     response->header.payload_len = (uint64_t)n;
@@ -843,7 +843,7 @@ agentos_error_t ipc_send_request(ipc_channel_t *channel, ipc_message_t *request,
         return AGENTOS_EIO;
     }
 
-    memset(response, 0, sizeof(ipc_message_t));
+    AGENTOS_MEMSET(response, 0, sizeof(ipc_message_t));
     response->header.type = IPC_MSG_RESPONSE;
     response->header.correlation_id = request->header.msg_id;
 
@@ -897,7 +897,7 @@ agentos_error_t ipc_receive(ipc_channel_t *channel, ipc_message_t *message, uint
         return AGENTOS_ENOTCONN;
     }
 
-    memset(message, 0, sizeof(ipc_message_t));
+    AGENTOS_MEMSET(message, 0, sizeof(ipc_message_t));
 
     /* 首先读取消息头 */
 #ifdef _WIN32
@@ -1084,7 +1084,7 @@ ipc_server_t *ipc_server_create(const ipc_config_t *config)
     server->connections = NULL;
     server->max_connections =
         config->max_connections > 0 ? config->max_connections : IPC_MAX_CONNECTIONS;
-    memset(server->error_msg, 0, sizeof(server->error_msg));
+    AGENTOS_MEMSET(server->error_msg, 0, sizeof(server->error_msg));
 
     return server;
 }
@@ -1281,7 +1281,7 @@ ipc_client_t *ipc_client_create(const ipc_config_t *config)
     client->config = *config;
     client->channel = NULL;
     client->state = IPC_STATE_CLOSED;
-    memset(client->error_msg, 0, sizeof(client->error_msg));
+    AGENTOS_MEMSET(client->error_msg, 0, sizeof(client->error_msg));
 
     return client;
 }
@@ -1319,10 +1319,10 @@ agentos_error_t ipc_client_connect(ipc_client_t *client, uint32_t timeout_ms)
         }
 
         struct sockaddr_un addr;
-        memset(&addr, 0, sizeof(addr));
+        AGENTOS_MEMSET(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
         const char *path = client->config.name ? client->config.name : AGENTOS_TMP_DIR "/ipc";
-        strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+        AGENTOS_STRNCPY_TERM(addr.sun_path, path, sizeof(addr.sun_path));
 
         if (timeout_ms > 0 && client->config.nonblocking) {
             int flags = fcntl(sock_fd, F_GETFL, 0);
@@ -1444,7 +1444,7 @@ ipc_shm_t *ipc_shm_create(const ipc_shm_config_t *config)
     shm->shm_fd = -1;
 #endif
 
-    memset(shm->error_msg, 0, sizeof(shm->error_msg));
+    AGENTOS_MEMSET(shm->error_msg, 0, sizeof(shm->error_msg));
 
     return shm;
 }
@@ -1736,7 +1736,7 @@ ipc_mq_t *ipc_mq_create(const ipc_mq_config_t *config)
     mq->total_dequeued = 0;
     mq->head = NULL;
     mq->tail = NULL;
-    memset(mq->error_msg, 0, sizeof(mq->error_msg));
+    AGENTOS_MEMSET(mq->error_msg, 0, sizeof(mq->error_msg));
 
     // 初始化同步原语
 #ifdef _WIN32
@@ -2021,12 +2021,12 @@ ipc_message_t *ipc_message_create(ipc_msg_type_t type, const void *payload, size
     msg->header.flags = 0;
     msg->header.msg_id = 0;
     msg->header.correlation_id = 0;
-    memset(msg->header.source, 0, sizeof(msg->header.source));
-    memset(msg->header.target, 0, sizeof(msg->header.target));
+    AGENTOS_MEMSET(msg->header.source, 0, sizeof(msg->header.source));
+    AGENTOS_MEMSET(msg->header.target, 0, sizeof(msg->header.target));
     msg->header.payload_len = payload_len;
     msg->header.checksum = 0;
     msg->header.timestamp = ipc_get_timestamp_ns();
-    memset(msg->header.reserved, 0, sizeof(msg->header.reserved));
+    AGENTOS_MEMSET(msg->header.reserved, 0, sizeof(msg->header.reserved));
 
     if (payload && payload_len > 0) {
         msg->payload = AGENTOS_MALLOC(payload_len);

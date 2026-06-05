@@ -520,7 +520,7 @@ const char *log_set_trace_id(const char *trace_id)
     if (!g_logging_state.initialized) return NULL;
 
     if (trace_id) {
-        strncpy(g_tls_trace_id, trace_id, sizeof(g_tls_trace_id) - 1);
+        AGENTOS_STRNCPY_TERM(g_tls_trace_id, trace_id, sizeof(g_tls_trace_id));
         g_tls_trace_id[sizeof(g_tls_trace_id) - 1] = '\0';
     } else {
         g_tls_trace_id[0] = '\0';
@@ -540,7 +540,7 @@ const char *log_set_span_id(const char *span_id)
     if (!g_logging_state.initialized) return NULL;
 
     if (span_id) {
-        strncpy(g_tls_span_id, span_id, sizeof(g_tls_span_id) - 1);
+        AGENTOS_STRNCPY_TERM(g_tls_span_id, span_id, sizeof(g_tls_span_id));
         g_tls_span_id[sizeof(g_tls_span_id) - 1] = '\0';
     } else {
         g_tls_span_id[0] = '\0';
@@ -575,8 +575,7 @@ int log_set_module_level(const char *module_pattern, log_level_t level)
     // 添加新模?
     if (g_logging_state.module_level_count <
         sizeof(g_logging_state.module_levels) / sizeof(g_logging_state.module_levels[0])) {
-        strncpy(g_logging_state.module_levels[g_logging_state.module_level_count].pattern,
-                module_pattern, sizeof(g_logging_state.module_levels[0].pattern) - 1);
+        AGENTOS_STRNCPY_TERM(g_logging_state.module_levels[g_logging_state.module_level_count].pattern, module_pattern, sizeof(g_logging_state.module_levels[0].pattern));
         g_logging_state.module_levels[g_logging_state.module_level_count]
             .pattern[sizeof(g_logging_state.module_levels[0].pattern) - 1] = '\0';
         g_logging_state.module_levels[g_logging_state.module_level_count].level = level;
@@ -702,7 +701,7 @@ void log_cleanup(void)
     g_tls_span_id[0] = '\0';
 
     for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
-        memset(&g_logging_state.module_levels[i], 0, sizeof(g_logging_state.module_levels[i]));
+        AGENTOS_MEMSET(&g_logging_state.module_levels[i], 0, sizeof(g_logging_state.module_levels[i]));
     }
     g_logging_state.module_level_count = 0;
 
@@ -711,5 +710,5 @@ void log_cleanup(void)
     agentos_mutex_unlock(&g_logging_state.mutex);
     agentos_mutex_destroy(&g_logging_state.mutex);
 
-    memset(&g_logging_state, 0, sizeof(g_logging_state));
+    AGENTOS_MEMSET(&g_logging_state, 0, sizeof(g_logging_state));
 }

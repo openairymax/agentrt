@@ -177,17 +177,17 @@ static trace_event_t *create_event(const char *name, const char *attributes)
         return NULL;
     }
 
-    memset(event, 0, sizeof(trace_event_t));
+    AGENTOS_MEMSET(event, 0, sizeof(trace_event_t));
 
     if (name) {
-        strncpy(event->name, name, sizeof(event->name) - 1);
+        AGENTOS_STRNCPY_TERM(event->name, name, sizeof(event->name));
         event->name[sizeof(event->name) - 1] = '\0';
     }
 
     event->timestamp = get_current_time_us();
 
     if (attributes) {
-        strncpy(event->attributes, attributes, sizeof(event->attributes) - 1);
+        AGENTOS_STRNCPY_TERM(event->attributes, attributes, sizeof(event->attributes));
         event->attributes[sizeof(event->attributes) - 1] = '\0';
     }
 
@@ -225,7 +225,7 @@ agentos_trace_span_t *agentos_trace_begin(const char *name, const char *parent_i
         return NULL;
     }
 
-    memset(span, 0, sizeof(agentos_trace_span_t));
+    AGENTOS_MEMSET(span, 0, sizeof(agentos_trace_span_t));
 
     uint64_t trace_id = atomic_fetch_add(&g_trace_state.trace_counter, 1);
     uint64_t span_id = atomic_fetch_add(&g_trace_state.span_counter, 1);
@@ -234,13 +234,13 @@ agentos_trace_span_t *agentos_trace_begin(const char *name, const char *parent_i
     generate_id(span->span_id, sizeof(span->span_id), span_id, "sp");
 
     if (parent_id) {
-        strncpy(span->parent_id, parent_id, sizeof(span->parent_id) - 1);
+        AGENTOS_STRNCPY_TERM(span->parent_id, parent_id, sizeof(span->parent_id));
         span->parent_id[sizeof(span->parent_id) - 1] = '\0';
     } else {
         span->parent_id[0] = '\0';
     }
 
-    strncpy(span->name, name, sizeof(span->name) - 1);
+    AGENTOS_STRNCPY_TERM(span->name, name, sizeof(span->name));
     span->name[sizeof(span->name) - 1] = '\0';
 
     span->start_time = get_current_time_us();

@@ -37,7 +37,7 @@ void sanitizer_default_context(sanitize_context_t *ctx)
     if (!ctx)
         return;
 
-    memset(ctx, 0, sizeof(sanitize_context_t));
+    AGENTOS_MEMSET(ctx, 0, sizeof(sanitize_context_t));
     ctx->level = SANITIZE_LEVEL_NORMAL;
     ctx->max_length = DEFAULT_MAX_LENGTH;
     ctx->allow_html = false;
@@ -52,7 +52,7 @@ sanitizer_t *sanitizer_create(const char *rules_path)
     if (!san)
         return NULL;
 
-    memset(san, 0, sizeof(sanitizer_t));
+    AGENTOS_MEMSET(san, 0, sizeof(sanitizer_t));
 
     if (cupolas_rwlock_init(&san->lock) != cupolas_OK) {
         cupolas_mem_free(san);
@@ -359,7 +359,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
     sanitize_result_t cached_result = SANITIZE_OK;
     char *cached_output = sanitizer_cache_get(sanitizer->cache, input, ctx->level);
     if (cached_output) {
-        strncpy(output, cached_output, output_size - 1);
+        AGENTOS_STRNCPY_TERM(output, cached_output, output_size);
         output[output_size - 1] = '\0';
         cupolas_mem_free(cached_output);
         cached = true;
@@ -390,7 +390,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
         return SANITIZE_MODIFIED;
     }
 
-    strncpy(output, input, output_size - 1);
+    AGENTOS_STRNCPY_TERM(output, input, output_size);
     output[output_size - 1] = '\0';
 
     cupolas_rwlock_wrlock(&sanitizer->lock);

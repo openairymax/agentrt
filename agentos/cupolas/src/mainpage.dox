@@ -260,7 +260,7 @@
  * - C 安全编码规范: docs/Capital_Specifications/coding_standard/C_Cpp_secure_coding_standard.md
  *
  * @author SPHARX Ltd. - AgentOS Team
- * @version 1.0.0
+ * @version 0.1.0
  * @date 2026-04-02
  *
  * @note 线程安全: 所有公共 API 均为线程安全（除非特别标注）

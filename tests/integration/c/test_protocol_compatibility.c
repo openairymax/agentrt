@@ -252,7 +252,7 @@ void test_multi_protocol_registration(void) {
 
 void test_openjiuwen_message_conversion(void) {
     unified_message_t msg;
-    memset(&msg, 0, sizeof(msg));
+    AGENTOS_MEMSET(&msg, 0, sizeof(msg));
 
     msg.protocol_type = UNIFIED_PROTOCOL_OPENJIUWEN;
     msg.message_id = 12345;

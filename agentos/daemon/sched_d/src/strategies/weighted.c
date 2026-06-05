@@ -144,7 +144,7 @@ static int weighted_unregister_agent(void *raw_data, const char *agent_id)
     AGENTOS_FREE(data->agents[idx].agent_id);
     for (size_t i = (size_t)idx; i < data->agent_count - 1; i++)
         data->agents[i] = data->agents[i + 1];
-    memset(&data->agents[--data->agent_count], 0, sizeof(agent_weight_t));
+    AGENTOS_MEMSET(&data->agents[--data->agent_count], 0, sizeof(agent_weight_t));
     normalize_weights(data);
     agentos_mutex_unlock(&data->lock);
     return AGENTOS_OK;

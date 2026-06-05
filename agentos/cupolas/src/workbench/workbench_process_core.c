@@ -73,8 +73,8 @@ int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const
 
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
-    memset(&si, 0, sizeof(si));
-    memset(&pi, 0, sizeof(pi));
+    AGENTOS_MEMSET(&si, 0, sizeof(si));
+    AGENTOS_MEMSET(&pi, 0, sizeof(pi));
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
 

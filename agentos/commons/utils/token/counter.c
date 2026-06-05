@@ -233,9 +233,9 @@ agentos_token_counter_t *agentos_token_counter_create(const char *model_name)
         return NULL;
     }
 
-    memset(counter, 0, sizeof(agentos_token_counter_t));
+    AGENTOS_MEMSET(counter, 0, sizeof(agentos_token_counter_t));
 
-    strncpy(counter->model_name, model_name, MAX_MODEL_NAME - 1);
+    AGENTOS_STRNCPY_TERM(counter->model_name, model_name, MAX_MODEL_NAME);
     counter->model_name[MAX_MODEL_NAME - 1] = '\0';
 
     if (agentos_mutex_init(&counter->mutex) != 0) {

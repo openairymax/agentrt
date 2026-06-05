@@ -259,7 +259,7 @@ agentos_error_t tc3_coordinator_create(const tc3_config_t *config, agentos_think
     coord->unit_results_capacity = 0;
     coord->unit_results_count = 0;
     coord->active = 0;
-    memset(&coord->stats, 0, sizeof(tc3_stats_t));
+    AGENTOS_MEMSET(&coord->stats, 0, sizeof(tc3_stats_t));
 
     *out_coord = coord;
     return AGENTOS_SUCCESS;
@@ -538,7 +538,7 @@ agentos_error_t tc3_coordinator_reset(tc3_coordinator_t *coord)
     free_unit_results(coord);
     if (coord->detector)
         su_stream_detector_reset(coord->detector);
-    memset(&coord->stats, 0, sizeof(tc3_stats_t));
+    AGENTOS_MEMSET(&coord->stats, 0, sizeof(tc3_stats_t));
     coord->active = 0;
     return AGENTOS_SUCCESS;
 }

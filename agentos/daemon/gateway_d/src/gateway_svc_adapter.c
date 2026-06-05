@@ -543,7 +543,7 @@ agentos_error_t gateway_service_adapter_create_from_config(agentos_service_t *ou
     if (!out_service || !config_path)
         return AGENTOS_EINVAL;
     agentos_svc_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.name = "gateway_d";
     config.version = "0.1.0";
     config.capabilities = AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_STREAMING;

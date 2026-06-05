@@ -52,7 +52,7 @@ static void free_agent_info(agent_info_t *info)
     AGENTOS_FREE(info->author);
     AGENTOS_FREE(info->repository);
     AGENTOS_FREE(info->dependencies);
-    memset(info, 0, sizeof(agent_info_t));
+    AGENTOS_MEMSET(info, 0, sizeof(agent_info_t));
 }
 
 static void free_agent_entry(agent_entry_t *entry)
@@ -151,7 +151,7 @@ int agent_registry_unregister(const char *agent_id)
     free_agent_entry(&g_registry.entries[idx]);
     for (size_t i = (size_t)idx; i < g_registry.entry_count - 1; i++)
         g_registry.entries[i] = g_registry.entries[i + 1];
-    memset(&g_registry.entries[--g_registry.entry_count], 0, sizeof(agent_entry_t));
+    AGENTOS_MEMSET(&g_registry.entries[--g_registry.entry_count], 0, sizeof(agent_entry_t));
 
     agentos_mutex_unlock(&g_registry.lock);
     return AGENTOS_OK;
@@ -172,7 +172,7 @@ int agent_registry_get(const char *agent_id, agent_info_t *out_info)
     }
 
     agent_entry_t *entry = &g_registry.entries[idx];
-    memset(out_info, 0, sizeof(agent_info_t));
+    AGENTOS_MEMSET(out_info, 0, sizeof(agent_info_t));
     out_info->agent_id = safe_strdup(entry->info.agent_id);
     out_info->name = safe_strdup(entry->info.name);
     out_info->version = safe_strdup(entry->info.version);

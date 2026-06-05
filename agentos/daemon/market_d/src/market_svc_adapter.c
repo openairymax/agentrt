@@ -40,7 +40,7 @@ static market_adapter_ctx_t *market_get_ctx(agentos_service_t service)
 static void market_config_from_common(market_config_t *market_cfg,
                                       const agentos_svc_config_t *common_cfg)
 {
-    memset(market_cfg, 0, sizeof(market_config_t));
+    AGENTOS_MEMSET(market_cfg, 0, sizeof(market_config_t));
     market_cfg->sync_interval_ms =
         (common_cfg && common_cfg->timeout_ms > 0) ? common_cfg->timeout_ms : 30000;
     market_cfg->cache_ttl_ms = 300000;

@@ -201,7 +201,7 @@ audit_rotator_t *audit_rotator_create(const char *log_dir, const char *log_prefi
     if (!rotator)
         return NULL;
 
-    memset(rotator, 0, sizeof(audit_rotator_t));
+    AGENTOS_MEMSET(rotator, 0, sizeof(audit_rotator_t));
 
     if (log_dir) {
         rotator->log_dir = cupolas_strdup(log_dir);

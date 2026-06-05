@@ -29,7 +29,7 @@ permission_engine_t *permission_engine_create(const char *rules_path)
     if (!engine)
         return NULL;
 
-    memset(engine, 0, sizeof(permission_engine_t));
+    AGENTOS_MEMSET(engine, 0, sizeof(permission_engine_t));
 
     if (cupolas_rwlock_init(&engine->rwlock) != cupolas_OK) {
         cupolas_mem_free(engine);

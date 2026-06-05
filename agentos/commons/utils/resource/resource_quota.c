@@ -42,7 +42,7 @@ agentos_error_t agentos_resource_manager_create(const agentos_resource_quota_t *
     }
 
     memcpy(&manager->quota, quota, sizeof(agentos_resource_quota_t));
-    memset(&manager->usage, 0, sizeof(agentos_resource_usage_t));
+    AGENTOS_MEMSET(&manager->usage, 0, sizeof(agentos_resource_usage_t));
 
     manager->resource_id = AGENTOS_STRDUP(resource_id);
     if (!manager->resource_id) {

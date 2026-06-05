@@ -145,7 +145,7 @@ taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config)
     }
 
     // 初始化统计信息
-    memset(&engine->stats, 0, sizeof(engine->stats));
+    AGENTOS_MEMSET(&engine->stats, 0, sizeof(engine->stats));
 
     engine->initialized = false;
     engine->running = false;
@@ -241,7 +241,7 @@ taskflow_error_t taskflow_engine_init(taskflow_handle_t engine)
     if (e->config.compute_func) {
         // 创建Pregel配置
         pregel_config_t pregel_config;
-        memset(&pregel_config, 0, sizeof(pregel_config));
+        AGENTOS_MEMSET(&pregel_config, 0, sizeof(pregel_config));
 
         pregel_config.max_workers = e->config.worker_threads;
         pregel_config.message_buffer_size = e->config.message_buffer_size;
@@ -979,7 +979,7 @@ taskflow_error_t taskflow_reset_stats(taskflow_handle_t engine)
         return TASKFLOW_ERROR_INVALID_ARG;
 
     struct taskflow_engine_s *e = (struct taskflow_engine_s *)engine;
-    memset(&e->stats, 0, sizeof(e->stats));
+    AGENTOS_MEMSET(&e->stats, 0, sizeof(e->stats));
 
     if (e->pregel_engine) {
         pregel_engine_reset_stats(e->pregel_engine);

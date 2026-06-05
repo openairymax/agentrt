@@ -172,6 +172,7 @@ int agentos_health_check_register(const char *name, agentos_health_check_cb call
 
     obs_health_entry_t *entry = &g_obs.health_checks[g_obs.health_check_count];
     strncpy(entry->name, name, sizeof(entry->name) - 1);
+        entry->name[sizeof(entry->name) - 1] = '\0';
     entry->name[sizeof(entry->name) - 1] = '\0';
     entry->callback = callback;
     entry->user_data = user_data;
@@ -232,8 +233,10 @@ int agentos_metric_record(const agentos_metric_sample_t *sample)
         obs_metric_entry_t *entry = &g_obs.metrics[g_obs.metric_count];
         strncpy(entry->name, sample->name, sizeof(entry->name) - 1);
         entry->name[sizeof(entry->name) - 1] = '\0';
+        entry->name[sizeof(entry->name) - 1] = '\0';
         if (sample->labels[0] != '\0') {
             strncpy(entry->labels, sample->labels, sizeof(entry->labels) - 1);
+            entry->labels[sizeof(entry->labels) - 1] = '\0';
             entry->labels[sizeof(entry->labels) - 1] = '\0';
         } else {
             entry->labels[0] = '\0';
@@ -267,9 +270,11 @@ int agentos_metric_counter_create(const char *name, const char *labels)
 
     obs_metric_entry_t *entry = &g_obs.metrics[g_obs.metric_count];
     strncpy(entry->name, name, sizeof(entry->name) - 1);
+        entry->name[sizeof(entry->name) - 1] = '\0';
     entry->name[sizeof(entry->name) - 1] = '\0';
     if (labels) {
         strncpy(entry->labels, labels, sizeof(entry->labels) - 1);
+        entry->labels[sizeof(entry->labels) - 1] = '\0';
         entry->labels[sizeof(entry->labels) - 1] = '\0';
     } else {
         entry->labels[0] = '\0';
@@ -326,9 +331,11 @@ int agentos_metric_gauge_create(const char *name, const char *labels, double ini
 
     obs_metric_entry_t *entry = &g_obs.metrics[g_obs.metric_count];
     strncpy(entry->name, name, sizeof(entry->name) - 1);
+        entry->name[sizeof(entry->name) - 1] = '\0';
     entry->name[sizeof(entry->name) - 1] = '\0';
     if (labels) {
         strncpy(entry->labels, labels, sizeof(entry->labels) - 1);
+        entry->labels[sizeof(entry->labels) - 1] = '\0';
         entry->labels[sizeof(entry->labels) - 1] = '\0';
     } else {
         entry->labels[0] = '\0';
@@ -383,12 +390,14 @@ int agentos_trace_span_start(agentos_trace_context_t *context, const char *servi
     if (service_name) {
         strncpy(context->service_name, service_name, sizeof(context->service_name) - 1);
         context->service_name[sizeof(context->service_name) - 1] = '\0';
+        context->service_name[sizeof(context->service_name) - 1] = '\0';
     } else {
         context->service_name[0] = '\0';
     }
 
     if (operation_name) {
         strncpy(context->operation_name, operation_name, sizeof(context->operation_name) - 1);
+        context->operation_name[sizeof(context->operation_name) - 1] = '\0';
         context->operation_name[sizeof(context->operation_name) - 1] = '\0';
     } else {
         context->operation_name[0] = '\0';

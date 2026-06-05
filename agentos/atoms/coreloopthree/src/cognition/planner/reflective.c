@@ -469,7 +469,7 @@ static agentos_error_t parse_llm_plan_json(const char *json_text, llm_plan_node_
         }
 
         llm_plan_node_t *node = &nodes[*node_count];
-        memset(node, 0, sizeof(*node));
+        AGENTOS_MEMSET(node, 0, sizeof(*node));
         size_t nlen = (size_t)(name_end - name_val);
         if (nlen >= sizeof(node->name))
             nlen = sizeof(node->name) - 1;
@@ -623,6 +623,15 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
                     snprintf(dep_id, sizeof(dep_id), "%s_%s", plan_id,
                              parsed_nodes[i].depends_on[d]);
                     node->task_node_depends_on[d] = AGENTOS_STRDUP(dep_id);
+                    if (!node->task_node_depends_on[d]) {
+                        /* SEC-09: STRDUP 失败时清理已分配的所有依赖项 */
+                        for (int e = 0; e < d; e++)
+                            AGENTOS_FREE(node->task_node_depends_on[e]);
+                        AGENTOS_FREE(node->task_node_depends_on);
+                        node->task_node_depends_on = NULL;
+                        node->task_node_depends_count = 0;
+                        break;
+                    }
                 }
             }
         }
@@ -646,6 +655,12 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
                     cn->task_node_depends_count = 1;
                     cn->task_node_depends_on[0] = AGENTOS_STRDUP(
                         plan->task_plan_nodes[plan->task_plan_node_count - 1]->task_node_id);
+                    if (!cn->task_node_depends_on[0]) {
+                        /* SEC-09: STRDUP 失败时清理已分配资源 */
+                        AGENTOS_FREE(cn->task_node_depends_on);
+                        cn->task_node_depends_on = NULL;
+                        cn->task_node_depends_count = 0;
+                    }
                 }
             }
             plan->task_plan_nodes[plan->task_plan_node_count++] = cn;

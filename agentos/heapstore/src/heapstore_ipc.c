@@ -106,7 +106,7 @@ static heapstore_error_t load_channel_from_file(const char *channel_id,
     FILE *fp = fopen(path, "r");
     if (!fp)
         return heapstore_ERR_NOT_FOUND;
-    memset(channel, 0, sizeof(*channel));
+    AGENTOS_MEMSET(channel, 0, sizeof(*channel));
     char buf[2048];
     if (fgets(buf, sizeof(buf), fp)) {
         char *v;
@@ -177,7 +177,7 @@ static heapstore_error_t load_buffer_from_file(const char *buffer_id,
     FILE *fp = fopen(path, "r");
     if (!fp)
         return heapstore_ERR_NOT_FOUND;
-    memset(buffer, 0, sizeof(*buffer));
+    AGENTOS_MEMSET(buffer, 0, sizeof(*buffer));
     char buf[2048];
     if (fgets(buf, sizeof(buf), fp)) {
         char *v;
@@ -280,7 +280,7 @@ heapstore_error_t heapstore_ipc_init(void)
     }
 
     const char *base_path = "agentos/heapstore/kernel/ipc";
-    strncpy(s_ipc_path, base_path, sizeof(s_ipc_path) - 1);
+    AGENTOS_STRNCPY_TERM(s_ipc_path, base_path, sizeof(s_ipc_path));
     s_ipc_path[sizeof(s_ipc_path) - 1] = '\0';
 
     heapstore_ensure_directory(s_ipc_path);
@@ -293,8 +293,8 @@ heapstore_error_t heapstore_ipc_init(void)
     snprintf(buffers_path, sizeof(buffers_path), "%s/buffers", s_ipc_path);
     heapstore_ensure_directory(buffers_path);
 
-    memset(s_channels, 0, sizeof(s_channels));
-    memset(s_buffers, 0, sizeof(s_buffers));
+    AGENTOS_MEMSET(s_channels, 0, sizeof(s_channels));
+    AGENTOS_MEMSET(s_buffers, 0, sizeof(s_buffers));
     s_channel_count = 0;
     s_buffer_count = 0;
 
@@ -326,8 +326,8 @@ void heapstore_ipc_shutdown(void)
     s_shm_region_count = 0;
 #endif
 
-    memset(s_channels, 0, sizeof(s_channels));
-    memset(s_buffers, 0, sizeof(s_buffers));
+    AGENTOS_MEMSET(s_channels, 0, sizeof(s_channels));
+    AGENTOS_MEMSET(s_buffers, 0, sizeof(s_buffers));
     s_channel_count = 0;
     s_buffer_count = 0;
 
@@ -575,8 +575,8 @@ static ipc_active_channel_t *create_active_channel(const char *channel_id, size_
         return NULL;
 
     ipc_active_channel_t *ac = &s_active_channels[s_active_count];
-    memset(ac, 0, sizeof(*ac));
-    strncpy(ac->channel_id, channel_id, sizeof(ac->channel_id) - 1);
+    AGENTOS_MEMSET(ac, 0, sizeof(*ac));
+    AGENTOS_STRNCPY_TERM(ac->channel_id, channel_id, sizeof(ac->channel_id));
 
     ac->shm = find_or_create_shm(channel_id, buffer_size);
     if (!ac->shm)
@@ -613,11 +613,11 @@ heapstore_error_t heapstore_ipc_create_channel(const char *channel_id, const cha
     }
 
     heapstore_ipc_channel_t ch;
-    memset(&ch, 0, sizeof(ch));
-    strncpy(ch.channel_id, channel_id, sizeof(ch.channel_id) - 1);
-    strncpy(ch.name, name, sizeof(ch.name) - 1);
-    strncpy(ch.type, type, sizeof(ch.type) - 1);
-    strncpy(ch.status, "open", sizeof(ch.status) - 1);
+    AGENTOS_MEMSET(&ch, 0, sizeof(ch));
+    AGENTOS_STRNCPY_TERM(ch.channel_id, channel_id, sizeof(ch.channel_id));
+    AGENTOS_STRNCPY_TERM(ch.name, name, sizeof(ch.name));
+    AGENTOS_STRNCPY_TERM(ch.type, type, sizeof(ch.type));
+    AGENTOS_STRNCPY_TERM(ch.status, "open", sizeof(ch.status));
     ch.buffer_size = buffer_size;
     ch.created_at = (uint64_t)time(NULL);
     ch.last_activity_at = ch.created_at;
@@ -816,7 +816,7 @@ heapstore_error_t heapstore_ipc_destroy_channel(const char *channel_id)
     for (size_t i = 0; i < s_channel_count; i++) {
         if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
             s_channels[i] = s_channels[s_channel_count - 1];
-            memset(&s_channels[s_channel_count - 1], 0, sizeof(heapstore_ipc_channel_t));
+            AGENTOS_MEMSET(&s_channels[s_channel_count - 1], 0, sizeof(heapstore_ipc_channel_t));
             s_channel_count--;
             agentos_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
@@ -891,7 +891,7 @@ heapstore_error_t heapstore_ipc_receive(const char *channel_id, void **out_data,
         agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    memset(data, 0, found->used > 0 ? found->used : 1);
+    AGENTOS_MEMSET(data, 0, found->used > 0 ? found->used : 1);
     *out_data = data;
     *out_len = found->used;
     snprintf(found->status, sizeof(found->status), "consumed");

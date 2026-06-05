@@ -93,7 +93,7 @@ cache_manager_t *cache_manager_create(size_t capacity, uint32_t ttl_ms)
     if (!cm)
         return NULL;
 
-    memset(cm, 0, sizeof(cache_manager_t));
+    AGENTOS_MEMSET(cm, 0, sizeof(cache_manager_t));
 
     size_t bucket_count = next_power_of_two(capacity / 4);
     if (bucket_count < DEFAULT_BUCKET_COUNT) {
@@ -108,7 +108,7 @@ cache_manager_t *cache_manager_create(size_t capacity, uint32_t ttl_ms)
         cupolas_mem_free(cm);
         return NULL;
     }
-    memset(cm->buckets, 0, bucket_count * sizeof(cache_entry_t *));
+    AGENTOS_MEMSET(cm->buckets, 0, bucket_count * sizeof(cache_entry_t *));
 
     cm->bucket_count = bucket_count;
     cm->capacity = capacity;
@@ -334,7 +334,7 @@ void cache_manager_clear(cache_manager_t *cm)
         entry = next;
     }
 
-    memset(cm->buckets, 0, cm->bucket_count * sizeof(cache_entry_t *));
+    AGENTOS_MEMSET(cm->buckets, 0, cm->bucket_count * sizeof(cache_entry_t *));
     cm->head = NULL;
     cm->tail = NULL;
     cm->size = 0;

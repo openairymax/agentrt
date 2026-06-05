@@ -190,7 +190,7 @@ int agentos_intent_classify(const char *input, size_t input_len,
     lower_input[input_len] = '\0';
     intent_to_lowercase(lower_input);
 
-    memset(result, 0, sizeof(*result));
+    AGENTOS_MEMSET(result, 0, sizeof(*result));
     result->type = AGENTOS_INTENT_UNKNOWN;
     result->confidence = 0.0f;
 
