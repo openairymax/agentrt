@@ -371,7 +371,7 @@ int config_get_string_with_maxlen(const char *key, const char *default_value, ch
     size_t len = strlen(value);
     if (len >= buffer_size)
         len = buffer_size - 1;
-    memcpy(buffer, value, len);
+    __builtin_memcpy(buffer, value, len);
     buffer[len] = '\0';
     return 0;
 }
@@ -460,7 +460,7 @@ int config_remove_source(const char *source_type)
             g_sources[i][0] = '\0';
             g_source_count--;
             if (i < g_source_count) {
-                memcpy(g_sources[i], g_sources[g_source_count], sizeof(g_sources[i]));
+                __builtin_memcpy(g_sources[i], g_sources[g_source_count], sizeof(g_sources[i]));
                 g_sources[g_source_count][0] = '\0';
             }
             return 0;

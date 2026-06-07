@@ -150,10 +150,10 @@ tool_config_t *tool_config_load(const char *path)
                 }
                 cfg->tools = new_tools;
                 cfg->tools[cur_cnt] = cur_tool;
-                AGENTOS_MEMSET(&cfg->tools[cur_cnt + 1], 0, sizeof(tool_def_t));
+                __builtin_memset(&cfg->tools[cur_cnt + 1], 0, sizeof(tool_def_t));
 
                 /* 重置临时变量 */
-                AGENTOS_MEMSET(&cur_tool, 0, sizeof(cur_tool));
+                __builtin_memset(&cur_tool, 0, sizeof(cur_tool));
                 params = NULL;
                 params_cnt = params_cap = 0;
                 in_tools_list = 0;

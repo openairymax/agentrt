@@ -40,7 +40,7 @@ static sched_adapter_ctx_t *sched_get_ctx(agentos_service_t service)
 static void sched_config_from_common(sched_config_t *sched_cfg,
                                      const agentos_svc_config_t *common_cfg)
 {
-    AGENTOS_MEMSET(sched_cfg, 0, sizeof(sched_config_t));
+    __builtin_memset(sched_cfg, 0, sizeof(sched_config_t));
     sched_cfg->strategy = SCHED_STRATEGY_WEIGHTED;
     sched_cfg->health_check_interval_ms =
         (common_cfg && common_cfg->timeout_ms > 0) ? common_cfg->timeout_ms : 10000;
@@ -61,7 +61,7 @@ static agentos_error_t sched_adapter_init(agentos_service_t service,
         return AGENTOS_EINVAL;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     }
 
     if (!ctx->sched_svc) {
@@ -176,7 +176,7 @@ agentos_error_t sched_service_adapter_create(agentos_service_t *out_service,
         return AGENTOS_ENOMEM;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "sched_d";
         ctx->common_cfg.version = "0.1.0";
@@ -219,7 +219,7 @@ agentos_error_t sched_service_adapter_wrap(agentos_service_t *out_service,
     ctx->owns_service = false;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "sched_d";
         ctx->common_cfg.version = "0.1.0";

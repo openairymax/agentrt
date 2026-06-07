@@ -401,7 +401,7 @@ static size_t openai_curl_write_cb(void *ptr, size_t size, size_t nmemb, void *u
     if (!new_data)
         return 0;
     buf->data = new_data;
-    memcpy(buf->data + buf->size, ptr, total);
+    __builtin_memcpy(buf->data + buf->size, ptr, total);
     buf->size += total;
     buf->data[buf->size] = '\0';
     return total;
@@ -460,7 +460,7 @@ static int openai_api_call(const char *api_key, const char *base_url, const char
         size_t copy_len = response_buf.size;
         if (copy_len >= buf_len)
             copy_len = buf_len - 1;
-        memcpy(out_buf, response_buf.data, copy_len);
+        __builtin_memcpy(out_buf, response_buf.data, copy_len);
         out_buf[copy_len] = '\0';
         AGENTOS_FREE(response_buf.data);
         return (int)copy_len;
@@ -874,7 +874,7 @@ int openai_chat_completion_streaming(openai_handle_t handle, const openai_chat_r
             chunk_len = 1;
 
         char chunk_buf[OPENAI_STREAM_CHUNK_SIZE + 4];
-        memcpy(chunk_buf, full_response + pos, chunk_len);
+        __builtin_memcpy(chunk_buf, full_response + pos, chunk_len);
         chunk_buf[chunk_len] = '\0';
         pos += chunk_len;
 
@@ -1562,7 +1562,7 @@ static int openai_adapter_encode_cb(void *c, const void *m, void **o, size_t *s)
         agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "strlen: allocation failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
         }
-    memcpy(buf, msg, len);
+    __builtin_memcpy(buf, msg, len);
     *o = buf;
     *s = len;
     return 0;
@@ -1576,7 +1576,7 @@ static int openai_adapter_decode_cb(void *c, const void *d, size_t s, void *o)
         return AGENTOS_ERR_UNKNOWN;
         }
     (void)c;
-    memcpy(o, d, s);
+    __builtin_memcpy(o, d, s);
     return 0;
 }
 
@@ -1664,7 +1664,7 @@ static int openai_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t)
             agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "openai: out of memory");
             return AGENTOS_ERR_OUT_OF_MEMORY;
         }
-        memcpy(buf, adapter->last_response_body, len);
+        __builtin_memcpy(buf, adapter->last_response_body, len);
         buf[len] = '\0';
         *d = buf;
         *s = len;

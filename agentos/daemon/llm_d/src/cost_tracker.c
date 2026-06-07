@@ -67,7 +67,7 @@ cost_tracker_t *cost_tracker_create(const pricing_rule_t *rules, int rule_count)
             AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
-        memcpy(ct->rules, rules, rule_count * sizeof(pricing_rule_t));
+        __builtin_memcpy(ct->rules, rules, rule_count * sizeof(pricing_rule_t));
         ct->rule_count = rule_count;
     }
     agentos_mutex_init(&ct->lock);

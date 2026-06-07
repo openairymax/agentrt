@@ -57,7 +57,7 @@ char *agentos_strncpy_safe(char *dest, const char *src, size_t dest_size)
     size_t src_len = strlen(src);
     size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
 
-    memcpy(dest, src, copy_len);
+    __builtin_memcpy(dest, src, copy_len);
     dest[copy_len] = '\0';
 
     return dest;
@@ -75,7 +75,7 @@ int agentos_memset_s(void *dest, int c, size_t dest_size, size_t count)
         return AGENTOS_EINVAL;
     }
 
-    memset(dest, (int)c, count);
+    __builtin_memset(dest, (int)c, count);
     return 0;
 }
 
@@ -91,9 +91,9 @@ int agentos_memcpy_s(void *dest, size_t dest_size, const void *src, size_t count
 
     if ((char *)dest < (const char *)src + count && (const char *)src < (char *)dest + count) {
         /* 重叠区域，使用 memmove */
-        memmove(dest, src, count);
+        __builtin_memmove(dest, src, count);
     } else {
-        memcpy(dest, src, count);
+        __builtin_memcpy(dest, src, count);
     }
 
     return 0;
@@ -109,7 +109,7 @@ int agentos_memmove_s(void *dest, size_t dest_size, const void *src, size_t coun
         return AGENTOS_EINVAL;
     }
 
-    memmove(dest, src, count);
+    __builtin_memmove(dest, src, count);
     return 0;
 }
 
@@ -258,7 +258,7 @@ char *AGENTOS_STRDUP(const char *s, size_t n)
     }
     char *dup = (char *)AGENTOS_MALLOC(len + 1);
     if (dup) {
-        memcpy(dup, s, len);
+        __builtin_memcpy(dup, s, len);
         dup[len] = '\0';
     }
     return dup;

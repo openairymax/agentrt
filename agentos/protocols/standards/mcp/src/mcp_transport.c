@@ -224,7 +224,7 @@ mcp_transport_t *mcp_transport_create(const mcp_transport_config_t *config)
             size_t host_len = path_start ? (size_t)(path_start - host_start) : strlen(host_start);
             char *host = (char *)AGENTOS_MALLOC(host_len + 1);
             if (host) {
-                memcpy(host, host_start, host_len);
+                __builtin_memcpy(host, host_start, host_len);
                 host[host_len] = '\0';
                 t->host_header = host;
             }
@@ -565,7 +565,7 @@ int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t
                 agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "if: allocation failed");
                 return AGENTOS_ERR_OUT_OF_MEMORY;
                 }
-            memcpy(msg, data, data_len);
+            __builtin_memcpy(msg, data, data_len);
             msg[data_len] = '\0';
             *out_message = msg;
             *out_length = data_len;

@@ -37,7 +37,7 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    license="MIT",
+    license="Apache-2.0",
     keywords="agentos sdk client agent memory session skill",
     project_urls={
         "Documentation": "https://github.com/spharx/agentos/tree/main/agentos/toolkit/python",

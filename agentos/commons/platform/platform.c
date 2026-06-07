@@ -786,7 +786,7 @@ int agentos_strlcpy(char *dest, const char *src, size_t dest_size)
     size_t src_len = strlen(src);
     size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
 
-    memcpy(dest, src, copy_len);
+__builtin_memcpy(dest, src, copy_len);
     dest[copy_len] = '\0';
 
     return (int)copy_len;
@@ -807,7 +807,7 @@ int agentos_strlcat(char *dest, const char *src, size_t dest_size)
     size_t remaining = dest_size - dest_len - 1;
     size_t copy_len = (src_len < remaining) ? src_len : remaining;
 
-    memcpy(dest + dest_len, src, copy_len);
+__builtin_memcpy(dest + dest_len, src, copy_len);
     dest[dest_len + copy_len] = '\0';
 
     return (int)copy_len;

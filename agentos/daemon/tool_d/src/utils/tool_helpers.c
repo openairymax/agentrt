@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "memory_compat.h"
 
 bool tool_is_valid_id(const char *id)
 {
@@ -47,7 +48,17 @@ int tool_parse_version(const char *version_str, int *major, int *minor, int *pat
     if (!version_str)
         return AGENTOS_ERR_INVALID_PARAM;
     int m = 0, n = 0, p = 0;
-    int fields = sscanf(version_str, "%d.%d.%d", &m, &n, &p);
+    char ver_copy[64];
+    AGENTOS_STRNCPY_TERM(ver_copy, version_str, sizeof(ver_copy));
+    ver_copy[sizeof(ver_copy) - 1] = '\0';
+    char *saveptr = NULL;
+    char *tok_m = strtok_r(ver_copy, ".", &saveptr);
+    char *tok_n = strtok_r(NULL, ".", &saveptr);
+    char *tok_p = strtok_r(NULL, ".\r\n", &saveptr);
+    int fields = 0;
+    if (tok_m) { m = (int)strtol(tok_m, NULL, 10); fields++; }
+    if (tok_n) { n = (int)strtol(tok_n, NULL, 10); fields++; }
+    if (tok_p) { p = (int)strtol(tok_p, NULL, 10); fields++; }
     if (fields < 1)
         return AGENTOS_ERR_PARSE_ERROR;
     if (major)

@@ -233,7 +233,7 @@ static agentos_error_t stdio_gateway_start(void *gateway_impl)
                 atomic_fetch_add(&gateway->bytes_received, input_len);
 
                 if (gateway->input_buffer_pos + input_len < gateway->input_buffer_size) {
-                    memcpy(gateway->input_buffer + gateway->input_buffer_pos, buffer, input_len);
+                    __builtin_memcpy(gateway->input_buffer + gateway->input_buffer_pos, buffer, input_len);
                     gateway->input_buffer_pos += input_len;
 
                     char *newline = memchr(gateway->input_buffer, '\n', gateway->input_buffer_pos);
@@ -241,7 +241,7 @@ static agentos_error_t stdio_gateway_start(void *gateway_impl)
                         *newline = '\0';
                         char *command_line = AGENTOS_STRDUP(gateway->input_buffer);
                         gateway->input_buffer_pos -= (newline + 1 - gateway->input_buffer);
-                        memmove(gateway->input_buffer, newline + 1, gateway->input_buffer_pos);
+                        __builtin_memmove(gateway->input_buffer, newline + 1, gateway->input_buffer_pos);
 
                         char *response = process_command(gateway, command_line);
                         AGENTOS_FREE(command_line);

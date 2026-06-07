@@ -552,7 +552,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
     if (!dep_from || !dep_to || !out_result)
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to resolve dependencies: null dep_from, dep_to, or out_result");
 
-    AGENTOS_MEMSET(out_result, 0, sizeof(agentos_dep_result_t));
+    __builtin_memset(out_result, 0, sizeof(agentos_dep_result_t));
 
     if (edge_count == 0)
         return AGENTOS_SUCCESS;
@@ -657,7 +657,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
         AGENTOS_FREE(queue);
         goto cleanup_oom;
     }
-    memcpy(in_degree_copy, in_degree, unique_count * sizeof(size_t));
+    __builtin_memcpy(in_degree_copy, in_degree, unique_count * sizeof(size_t));
 
     size_t q_head = 0, q_tail = 0;
     for (size_t i = 0; i < unique_count; i++) {
@@ -716,7 +716,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
                                       "Cycle detected: %zu nodes in dependency loop", cycle_count);
                     out_result->cycle->description = (char *)AGENTOS_MALLOC((size_t)dl + 1);
                     if (out_result->cycle->description) {
-                        memcpy(out_result->cycle->description, desc_buf, (size_t)dl);
+                        __builtin_memcpy(out_result->cycle->description, desc_buf, (size_t)dl);
                         out_result->cycle->description[dl] = '\0';
                         out_result->cycle->description_len = (size_t)dl;
                     }
@@ -772,7 +772,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
                         base_prio[from_pos] = base_prio[to_pos];
                 }
             }
-            memcpy(out_result->inherited_priorities, base_prio, sorted_cnt * sizeof(int));
+            __builtin_memcpy(out_result->inherited_priorities, base_prio, sorted_cnt * sizeof(int));
             AGENTOS_FREE(base_prio);
         }
         out_result->priority_count = sorted_cnt;
@@ -840,7 +840,7 @@ void agentos_scheduler_dep_result_free(agentos_dep_result_t *result)
             AGENTOS_FREE(result->cycle->description);
         AGENTOS_FREE(result->cycle);
     }
-    AGENTOS_MEMSET(result, 0, sizeof(agentos_dep_result_t));
+    __builtin_memset(result, 0, sizeof(agentos_dep_result_t));
 }
 
 agentos_error_t agentos_scheduler_priority_inherit(agentos_task_id_t blocking_task_id,

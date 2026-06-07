@@ -4,7 +4,7 @@
 import re
 import os
 
-BASE_DIR = '/home/spharx/SpharxWorks/OpenAirymax/AgentOS'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 def fix_error_h_include(filepath):
     """Ensure #include 'error.h' is at the top after the first #include."""

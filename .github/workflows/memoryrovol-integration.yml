@@ -120,13 +120,21 @@ jobs:
       - name: BAN-62 License Guard Coverage
         run: |
           echo "=== BAN-62: Verify MR_LICENSE_CHECK coverage ==="
-          PRO_FILES="agentos/atoms/memoryrovol/src/layer3_structure/*.c
-                     agentos/atoms/memoryrovol/src/layer4_pattern/*.c
-                     agentos/atoms/memoryrovol/src/forgetting/*.c
-                     agentos/atoms/memoryrovol/src/retrieval/attractor.c
-                     agentos/atoms/memoryrovol/src/retrieval/mount.c
-                     agentos/atoms/memoryrovol/src/retrieval/rerank.c
-                     agentos/atoms/memoryrovol/src/llm_client.c"
+          # MemoryRovol is now an external repo (R-09-01-6).
+          # Search for PRO source files in the sibling MemoryRovol directory.
+          MR_DIR="${{ github.workspace }}/../MemoryRovol"
+          if [ ! -d "$MR_DIR" ]; then
+            echo "  [SKIP] MemoryRovol external repo not found at $MR_DIR"
+            echo "  [INFO] BAN-62: License guard check delegated to MemoryRovol CI"
+            exit 0
+          fi
+          PRO_FILES="$MR_DIR/src/layer3_structure/*.c
+                     $MR_DIR/src/layer4_pattern/*.c
+                     $MR_DIR/src/forgetting/*.c
+                     $MR_DIR/src/retrieval/attractor.c
+                     $MR_DIR/src/retrieval/mount.c
+                     $MR_DIR/src/retrieval/rerank.c
+                     $MR_DIR/src/llm_client.c"
           for f in $PRO_FILES; do
             for file in $f; do
               if [ -f "$file" ]; then

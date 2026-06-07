@@ -51,22 +51,22 @@ static char *build_cache_key(const char *agent_id, const char *action, const cha
 
     char *p = key;
     if (agent_id) {
-        memcpy(p, agent_id, agent_len);
+        __builtin_memcpy(p, agent_id, agent_len);
         p += agent_len;
     }
     *p++ = ':';
     if (action) {
-        memcpy(p, action, action_len);
+        __builtin_memcpy(p, action, action_len);
         p += action_len;
     }
     *p++ = ':';
     if (resource) {
-        memcpy(p, resource, resource_len);
+        __builtin_memcpy(p, resource, resource_len);
         p += resource_len;
     }
     *p++ = ':';
     if (context) {
-        memcpy(p, context, context_len);
+        __builtin_memcpy(p, context, context_len);
         p += context_len;
     }
     *p = '\0';
@@ -93,7 +93,7 @@ cache_manager_t *cache_manager_create(size_t capacity, uint32_t ttl_ms)
     if (!cm)
         return NULL;
 
-    AGENTOS_MEMSET(cm, 0, sizeof(cache_manager_t));
+    __builtin_memset(cm, 0, sizeof(cache_manager_t));
 
     size_t bucket_count = next_power_of_two(capacity / 4);
     if (bucket_count < DEFAULT_BUCKET_COUNT) {
@@ -108,7 +108,7 @@ cache_manager_t *cache_manager_create(size_t capacity, uint32_t ttl_ms)
         cupolas_mem_free(cm);
         return NULL;
     }
-    AGENTOS_MEMSET(cm->buckets, 0, bucket_count * sizeof(cache_entry_t *));
+    __builtin_memset(cm->buckets, 0, bucket_count * sizeof(cache_entry_t *));
 
     cm->bucket_count = bucket_count;
     cm->capacity = capacity;
@@ -334,7 +334,7 @@ void cache_manager_clear(cache_manager_t *cm)
         entry = next;
     }
 
-    AGENTOS_MEMSET(cm->buckets, 0, cm->bucket_count * sizeof(cache_entry_t *));
+    __builtin_memset(cm->buckets, 0, cm->bucket_count * sizeof(cache_entry_t *));
     cm->head = NULL;
     cm->tail = NULL;
     cm->size = 0;

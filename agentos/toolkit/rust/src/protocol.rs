@@ -9,10 +9,9 @@
 //! - A2A (Agent-to-Agent) v0.3
 //! - OpenAI API 兼容
 
-use crate::error::{Error, ErrorCode};
-use crate::types::Client;
-use async_trait::async_trait;
-use reqwest::{header, Client as ReqwestClient, Response, StatusCode};
+use crate::client::Client;
+use crate::error::AgentOSError;
+use reqwest::{header, Client as ReqwestClient};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -99,19 +98,19 @@ pub struct ProtocolClient {
     stats: Arc<std::sync::Mutex<ProtocolStats>>,
 }
 
-#[derive(Debug, Default)]
-struct ProtocolStats {
-    requests_sent: u64,
-    transformations: u64,
+#[derive(Debug, Default, Clone)]
+pub struct ProtocolStats {
+    pub requests_sent: u64,
+    pub transformations: u64,
 }
 
 impl ProtocolClient {
     /// Create a new protocol client with given configuration
-    pub fn new(config: ProtocolConfig) -> Result<Self, Error> {
+    pub fn new(config: ProtocolConfig) -> Result<Self, AgentOSError> {
         let http_client = ReqwestClient::builder()
             .timeout(config.timeout)
             .build()
-            .map_err(|e| Error::NetworkError(e.to_string()))?;
+            .map_err(|e| AgentOSError::network(&e.to_string()))?;
 
         Ok(Self {
             config,
@@ -121,7 +120,7 @@ impl ProtocolClient {
     }
 
     /// Create from an existing AgentOS client reference
-    pub fn from_client(client: &Client) -> Result<Self, Error> {
+    pub fn from_client(client: &Client) -> Result<Self, AgentOSError> {
         let config = ProtocolConfig {
             endpoint: client.endpoint().to_string(),
             api_key: None,
@@ -131,12 +130,12 @@ impl ProtocolClient {
     }
 
     /// Auto-detect the appropriate protocol by querying the gateway
-    pub async fn detect_protocol(&self) -> Result<DetectionResult, Error> {
+    pub async fn detect_protocol(&self) -> Result<DetectionResult, AgentOSError> {
         let url = format!("{}/api/v1/protocols", self.config.endpoint);
         let resp = self.http_client.get(&url)
             .send()
             .await
-            .map_err(|e| Error::NetworkError(format!("detect request failed: {}", e)))?;
+            .map_err(|e| AgentOSError::network(&format!("detect request failed: {}", e)))?;
 
         let content_type = resp.headers()
             .get(header::CONTENT_TYPE)
@@ -146,7 +145,7 @@ impl ProtocolClient {
 
         let body = resp.text().await.unwrap_or_default();
         let mut confidence = 50.0_f64;
-        let detected = ProtocolType::JsonRpc;
+        let mut detected = ProtocolType::JsonRpc;
 
         if content_type.contains("application/json") {
             confidence += 20.0;
@@ -179,13 +178,13 @@ impl ProtocolClient {
         &self,
         method: &str,
         params: &serde_json::Value,
-    ) -> Result<serde_json::Value, Error> {
+    ) -> Result<serde_json::Value, AgentOSError> {
         let payload = self.build_request_payload(method, params);
         let url_path = self.get_url_path();
         let url = format!("{}{}", self.config.endpoint, url_path);
 
         let mut req_builder = self.http_client.post(&url).json(&payload);
-        self.apply_headers(&mut req_builder);
+        self.apply_headers(&mut req_builder)?;
 
         let mut last_error = None;
         let mut delay = self.config.retry_delay;
@@ -196,15 +195,15 @@ impl ProtocolClient {
                 delay *= 2;
             }
 
-            match req_builder.try_clone().unwrap().send().await {
+            match req_builder.try_clone().ok_or_else(|| AgentOSError::Network("failed to clone request for retry".into()))?.send().await {
                 Ok(resp) => {
                     if !resp.status().is_success() {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        return Err(Error::HttpError(status.as_u16(), body));
+                        return Err(AgentOSError::Http(format!("HTTP {}: {}", status.as_u16(), body)));
                     }
                     let body: serde_json::Value =
-                        resp.json().await.map_err(|e| Error::ParseError(e.to_string()))?;
+                        resp.json().await.map_err(|e| AgentOSError::json(&e.to_string()))?;
                     {
                         let mut stats = self.stats.lock().unwrap();
                         stats.requests_sent += 1;
@@ -216,16 +215,16 @@ impl ProtocolClient {
                 }
                 Err(e) => {
                     if e.is_timeout() || e.is_connect() {
-                        last_error = Some(Error::TimeoutError(e.to_string()));
+                        last_error = Some(AgentOSError::timeout(&e.to_string()));
                     } else {
-                        last_error = Some(Error::NetworkError(e.to_string()));
+                        last_error = Some(AgentOSError::network(&e.to_string()));
                         break;
                     }
                 }
             }
         }
 
-        Err(last_error.unwrap_or(Error::UnknownError("request failed".into())))
+        Err(last_error.unwrap_or(AgentOSError::Other("request failed".into())))
     }
 
     /// Send a streaming request and deliver chunks via callback
@@ -234,9 +233,9 @@ impl ProtocolClient {
         method: &str,
         params: &serde_json::Value,
         mut on_chunk: F,
-    ) -> Result<(), Error>
+    ) -> Result<(), AgentOSError>
     where
-        F: FnMut(bytes::Vec) + Send + 'static,
+        F: FnMut(Vec<u8>) + Send + 'static,
     {
         if !self.config.enable_streaming {
             let result = self.send_request(method, params).await?;
@@ -249,18 +248,18 @@ impl ProtocolClient {
 
         let mut req_builder = self.http_client.post(&url)
             .json(&payload);
-        self.apply_headers(&mut req_builder);
+        self.apply_headers(&mut req_builder)?;
 
         let resp = req_builder.send().await
-            .map_err(|e| Error::NetworkError(format!("stream request: {}", e)))?;
+            .map_err(|e| AgentOSError::network(&format!("stream request: {}", e)))?;
 
-        use futures_util::StreamExt;
+        use futures::StreamExt;
         let mut byte_stream = resp.bytes_stream();
 
         while let Some(chunk_result) = byte_stream.next().await {
             match chunk_result {
                 Ok(chunk) => on_chunk(chunk.to_vec()),
-                Err(e) => return Err(Error::StreamError(e.to_string())),
+                Err(e) => return Err(AgentOSError::network(&e.to_string())),
             }
         }
 
@@ -268,14 +267,14 @@ impl ProtocolClient {
     }
 
     /// List available protocols from the gateway
-    pub async fn list_protocols(&self) -> Result<Vec<String>, Error> {
+    pub async fn list_protocols(&self) -> Result<Vec<String>, AgentOSError> {
         let url = format!("{}/api/v1/protocols", self.config.endpoint);
         let resp = self.http_client.get(&url)
             .send().await
-            .map_err(|e| Error::NetworkError(e.to_string()))?;
+            .map_err(|e| AgentOSError::network(&e.to_string()))?;
 
         let data: serde_json::Value = resp.json().await
-            .map_err(|e| Error::ParseError(e.to_string()))?;
+            .map_err(|e| AgentOSError::json(&e.to_string()))?;
 
         let protocols = data["protocols"].as_array()
             .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(String::from).collect())
@@ -288,7 +287,7 @@ impl ProtocolClient {
     pub async fn test_connection(
         &self,
         protocol_name: &str,
-    ) -> Result<ConnectionTestResult, Error> {
+    ) -> Result<ConnectionTestResult, AgentOSError> {
         let url = format!(
             "{}/api/v1/protocols/{}/test",
             self.config.endpoint, protocol_name
@@ -306,13 +305,14 @@ impl ProtocolClient {
                 protocol: protocol_name.to_string(),
                 status: if resp.status().is_success() { "ok".into() } else { "error".into() },
                 status_code: Some(resp.status().as_u16()),
-                latency_ms: Some(latency_ms.round(2)),
+                latency_ms: Some((latency_ms * 100.0).round() / 100.0),
                 error: None,
             }),
             Err(e) => Ok(ConnectionTestResult {
                 protocol: protocol_name.to_string(),
                 status: "error".into(),
-                latency_ms: Some(latency_ms.round(2)),
+                status_code: None,
+                latency_ms: Some((latency_ms * 100.0).round() / 100.0),
                 error: Some(e.to_string()),
             }),
         }
@@ -322,17 +322,17 @@ impl ProtocolClient {
     pub async fn get_capabilities(
         &self,
         protocol_name: &str,
-    ) -> Result<serde_json::Value, Error> {
+    ) -> Result<serde_json::Value, AgentOSError> {
         let url = format!(
             "{}/api/v1/protocols/{}/capabilities",
             self.config.endpoint, protocol_name
         );
         let resp = self.http_client.get(&url)
             .send().await
-            .map_err(|e| Error::NetworkError(e.to_string()))?;
+            .map_err(|e| AgentOSError::network(&e.to_string()))?;
 
         resp.json().await
-            .map_err(|e| Error::ParseError(e.to_string()))
+            .map_err(|e| AgentOSError::json(&e.to_string()))
     }
 
     /// Get internal statistics about this client instance
@@ -344,15 +344,15 @@ impl ProtocolClient {
     // Internal helpers
     // ======================================================================
 
-    fn apply_headers<'a>(&self, builder: &'a mut reqwest::RequestBuilder) {
-        let headers = builder.headers_mut().unwrap();
-        headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
-        headers.insert(header::ACCEPT, "application/json".parse().unwrap());
+    fn apply_headers<'a>(&self, builder: &'a mut reqwest::RequestBuilder) -> Result<(), AgentOSError> {
+        let mut builder_tmp = builder.try_clone().ok_or_else(|| AgentOSError::Network("failed to clone request builder".into()))?;
+        builder_tmp = builder_tmp.header(header::CONTENT_TYPE, "application/json");
+        builder_tmp = builder_tmp.header(header::ACCEPT, "application/json");
 
         if let Some(ref key) = self.config.api_key {
-            headers.insert(
+            builder_tmp = builder_tmp.header(
                 header::AUTHORIZATION,
-                format!("Bearer {}", key).parse().unwrap(),
+                format!("Bearer {}", key),
             );
         }
 
@@ -361,9 +361,12 @@ impl ProtocolClient {
                 header::HeaderName::from_bytes(k.as_bytes()),
                 header::HeaderValue::from_bytes(v.as_bytes()),
             ) {
-                headers.insert(name, value);
+                builder_tmp = builder_tmp.header(name, value);
             }
         }
+
+        *builder = builder_tmp;
+        Ok(())
     }
 
     fn get_url_path(&self) -> &'static str {
@@ -388,7 +391,7 @@ impl ProtocolClient {
                 let temperature = params.get("temperature").and_then(|v| v.as_f64()).unwrap_or(0.7);
                 let max_tokens = params.get("max_tokens").and_then(|v| v.as_i64()).unwrap_or(2048);
 
-                json!({
+                serde_json::json!({
                     "model": model,
                     "messages": messages,
                     "temperature": temperature,
@@ -398,7 +401,7 @@ impl ProtocolClient {
             }
             ProtocolType::Mcp => {
                 let mcp_method = method.rsplit('.').next().unwrap_or(method);
-                json!({
+                serde_json::json!({
                     "protocol": "mcp",
                     "version": "1.0",
                     "method": mcp_method,
@@ -414,14 +417,14 @@ impl ProtocolClient {
                     .find(|(k, _)| *k == method)
                     .map(|(_, v)| *v)
                     .unwrap_or(method);
-                json!({
+                serde_json::json!({
                     "protocol": "a2a",
                     "version": "0.3",
                     "method": a2a_method,
                     "params": params,
                 })
             }
-            _ => json!({
+            _ => serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": format!("req_{}", chrono::Utc::now().timestamp_millis()),
                 "method": method,

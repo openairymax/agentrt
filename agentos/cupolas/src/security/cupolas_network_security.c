@@ -81,7 +81,7 @@ static void cupolas_free_filter_rule(cupolas_net_filter_rule_t *rule)
     AGENTOS_FREE(rule->dst_ip_pattern);
     AGENTOS_FREE(rule->host_pattern);
     AGENTOS_FREE(rule->url_pattern);
-    AGENTOS_MEMSET(rule, 0, sizeof(*rule));
+    __builtin_memset(rule, 0, sizeof(*rule));
 }
 
 static void cupolas_free_connection_info(cupolas_connection_info_t *info)
@@ -95,7 +95,7 @@ static void cupolas_free_connection_info(cupolas_connection_info_t *info)
     AGENTOS_FREE(info->hostname);
     AGENTOS_FREE(info->cipher_suite);
 #pragma GCC diagnostic pop
-    AGENTOS_MEMSET(info, 0, sizeof(*info));
+    __builtin_memset(info, 0, sizeof(*info));
 }
 
 int cupolas_net_security_init(const cupolas_tls_config_t *manager)
@@ -103,7 +103,7 @@ int cupolas_net_security_init(const cupolas_tls_config_t *manager)
     if (g_net_security.initialized)
         return 0;
 
-    AGENTOS_MEMSET(&g_net_security, 0, sizeof(g_net_security));
+    __builtin_memset(&g_net_security, 0, sizeof(g_net_security));
 
     CUPOLAS_MUTEX_INIT(&g_net_security.lock);
 #ifdef _WIN32
@@ -166,7 +166,7 @@ void cupolas_net_security_cleanup(void)
     WSACleanup();
 #endif
 
-    AGENTOS_MEMSET(&g_net_security, 0, sizeof(g_net_security));
+    __builtin_memset(&g_net_security, 0, sizeof(g_net_security));
 }
 
 int cupolas_net_security_get_config(cupolas_tls_config_t *manager)
@@ -370,10 +370,10 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
     }
 
     struct sockaddr_in addr;
-    AGENTOS_MEMSET(&addr, 0, sizeof(addr));
+    __builtin_memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    memcpy(&addr.sin_addr, host->h_addr, host->h_length);
+    __builtin_memcpy(&addr.sin_addr, host->h_addr, host->h_length);
 
     int connect_result = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (connect_result != 0) {
@@ -509,7 +509,7 @@ int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
         return AGENTOS_ERR_UNKNOWN;
 
     filter_rule_entry_t *entry = &g_net_security.filter_rules[g_net_security.filter_rule_count];
-    AGENTOS_MEMSET(entry, 0, sizeof(*entry));
+    __builtin_memset(entry, 0, sizeof(*entry));
 
     entry->rule.rule_id = cupolas_strdup(rule->rule_id);
     entry->rule.description = cupolas_strdup(rule->description);
@@ -612,8 +612,7 @@ int cupolas_net_list_rules(cupolas_net_filter_rule_t **rules, size_t *count)
         return AGENTOS_ERR_UNKNOWN;
 
     *count = g_net_security.filter_rule_count;
-    *rules =
-        SAFE_MALLOC_ARRAY(*rules, *count, sizeof(cupolas_net_filter_rule_t));
+    SAFE_MALLOC_ARRAY(*rules, *count, sizeof(cupolas_net_filter_rule_t));
     if (!*rules)
         return AGENTOS_ERR_UNKNOWN;
 
@@ -853,8 +852,6 @@ int cupolas_dns_configure(const cupolas_dns_security_config_t *manager)
         return AGENTOS_ERR_UNKNOWN;
     g_net_security.manager.dns.enable_dnssec = manager->enable_dnssec;
     AGENTOS_STRNCPY_TERM(g_net_security.manager.dns.upstream_server, manager->upstream_server, sizeof(g_net_security.manager.dns.upstream_server));
-    g_net_security.manager.dns
-        .upstream_server[sizeof(g_net_security.manager.dns.upstream_server) - 1] = '\0';
     return 0;
 }
 
@@ -883,7 +880,6 @@ int cupolas_dns_resolve(const char *hostname, char *ip_out, size_t ip_len)
         return AGENTOS_ERR_UNKNOWN;
 
     AGENTOS_STRNCPY_TERM(ip_out, ip, ip_len);
-    ip_out[ip_len - 1] = '\0';
 
     return 0;
 }
@@ -922,6 +918,18 @@ int cupolas_dns_verify_dnssec(const char *domain)
         return 0;
 
 #ifdef __linux__
+    /* 验证 domain 仅包含合法 DNS 字符，防止命令注入 */
+    const char *p = domain;
+    int valid = 1;
+    while (*p) {
+        if (!isalnum((unsigned char)*p) && *p != '-' && *p != '.' && *p != '_') {
+            valid = 0;
+            break;
+        }
+        p++;
+    }
+    if (!valid) return 0;
+
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "dig +dnssec +short %s DNSKEY 2>/dev/null", domain);
 
@@ -955,8 +963,7 @@ int cupolas_net_get_connections(cupolas_connection_info_t **connections, size_t 
         return AGENTOS_ERR_UNKNOWN;
 
     *count = g_net_security.connection_count;
-    *connections =
-        SAFE_MALLOC_ARRAY(*connections, *count, sizeof(cupolas_connection_info_t));
+    SAFE_MALLOC_ARRAY(*connections, *count, sizeof(cupolas_connection_info_t));
     if (!*connections)
         return AGENTOS_ERR_UNKNOWN;
 
@@ -1002,7 +1009,7 @@ int cupolas_net_get_stats(cupolas_net_stats_t *stats)
 
 void cupolas_net_reset_stats(void)
 {
-    AGENTOS_MEMSET(&g_net_security.stats, 0, sizeof(g_net_security.stats));
+    __builtin_memset(&g_net_security.stats, 0, sizeof(g_net_security.stats));
 }
 
 int cupolas_net_ids_enable(bool enabled)
@@ -1101,7 +1108,6 @@ int cupolas_net_parse_url(const char *url, char *scheme, char *host, uint16_t *p
     if (colon && scheme) {
         size_t scheme_len = colon - p;
         AGENTOS_STRNCPY_TERM(scheme, p, scheme_len);
-        scheme[scheme_len] = '\0';
         p = colon + 3;
     }
 
@@ -1118,7 +1124,7 @@ int cupolas_net_parse_url(const char *url, char *scheme, char *host, uint16_t *p
             host_len = strlen(p);
         }
         size_t copy_len = host_len < (size_t)255 ? host_len : 255;
-        memcpy(host, p, copy_len);
+        __builtin_memcpy(host, p, copy_len);
         host[copy_len] = '\0';
     }
 
@@ -1159,7 +1165,6 @@ int cupolas_net_ip_in_cidr(const char *ip, const char *cidr)
 
     char cidr_copy[64];
     AGENTOS_STRNCPY_TERM(cidr_copy, cidr, sizeof(cidr_copy));
-    cidr_copy[sizeof(cidr_copy) - 1] = '\0';
 
     char *slash = strchr(cidr_copy, '/');
     if (!slash)

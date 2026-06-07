@@ -165,14 +165,14 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
         size_t host_len = (size_t)(port_start - host_start);
         if (host_len >= sizeof(host))
             host_len = sizeof(host) - 1;
-        memcpy(host, host_start, host_len);
+        __builtin_memcpy(host, host_start, host_len);
         host[host_len] = '\0';
         port = (int)strtol(port_start + 1, NULL, 10);
     } else if (path_start) {
         size_t host_len = (size_t)(path_start - host_start);
         if (host_len >= sizeof(host))
             host_len = sizeof(host) - 1;
-        memcpy(host, host_start, host_len);
+        __builtin_memcpy(host, host_start, host_len);
         host[host_len] = '\0';
     }
 
@@ -185,7 +185,7 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
         ATM_RET_ERR(AGENTOS_EINVAL);
 
     struct sockaddr_in addr;
-    AGENTOS_MEMSET(&addr, 0, sizeof(addr));
+    __builtin_memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons((uint16_t)port);
     addr.sin_addr.s_addr = inet_addr(host);
@@ -203,7 +203,7 @@ static int cdp_ws_connect(const char *ws_url, int *out_fd)
 
     unsigned char nonce[16];
     if (secure_random_bytes(nonce, sizeof(nonce)) != 0)
-        AGENTOS_MEMSET(nonce, 0, sizeof(nonce));
+        __builtin_memset(nonce, 0, sizeof(nonce));
     char key_b64[CDP_WS_KEY_LEN + 1];
     base64_encode(nonce, 16, key_b64, sizeof(key_b64));
 
@@ -256,7 +256,7 @@ static int browser_mgr_init(void)
                                                  memory_order_seq_cst, memory_order_seq_cst))
         return 0;
 
-    AGENTOS_MEMSET(&g_browser_mgr, 0, sizeof(g_browser_mgr));
+    __builtin_memset(&g_browser_mgr, 0, sizeof(g_browser_mgr));
     g_browser_mgr.state = BROWSER_STATE_STOPPED;
     g_browser_mgr.remote_debugging_port = BROWSER_CDP_PORT_FIRST;
     g_browser_mgr.headless = 1;
@@ -379,7 +379,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
     fcntl(pipe_fd[0], F_SETFL, flags | O_NONBLOCK);
 
     char stderr_buf[4096];
-    AGENTOS_MEMSET(stderr_buf, 0, sizeof(stderr_buf));
+    __builtin_memset(stderr_buf, 0, sizeof(stderr_buf));
     char ws_url[256] = {0};
     uint32_t start_ms = browser_get_time_ms();
     ssize_t total = 0;
@@ -411,7 +411,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
             int test_fd = socket(AF_INET, SOCK_STREAM, 0);
             if (test_fd >= 0) {
                 struct sockaddr_in test_addr;
-                AGENTOS_MEMSET(&test_addr, 0, sizeof(test_addr));
+                __builtin_memset(&test_addr, 0, sizeof(test_addr));
                 test_addr.sin_family = AF_INET;
                 test_addr.sin_port = htons((uint16_t)g_browser_mgr.remote_debugging_port);
                 test_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -760,7 +760,7 @@ static int extract_hostname(const char *url, char *hostname, size_t hostname_siz
         size_t len = (size_t)(end - start);
         if (len >= hostname_size)
             len = hostname_size - 1;
-        memcpy(hostname, start, len);
+        __builtin_memcpy(hostname, start, len);
         hostname[len] = '\0';
         return 0;
     }
@@ -770,7 +770,7 @@ static int extract_hostname(const char *url, char *hostname, size_t hostname_siz
     size_t len = (size_t)(end - start);
     if (len >= hostname_size)
         len = hostname_size - 1;
-    memcpy(hostname, start, len);
+    __builtin_memcpy(hostname, start, len);
     hostname[len] = '\0';
     return 0;
 }
@@ -816,7 +816,7 @@ static int is_safe_url(const char *url)
         char hostname[256];
         if (extract_hostname(url, hostname, sizeof(hostname)) == 0) {
             struct addrinfo hints, *res;
-            AGENTOS_MEMSET(&hints, 0, sizeof(hints));
+            __builtin_memset(&hints, 0, sizeof(hints));
             hints.ai_family = AF_UNSPEC;
             if (getaddrinfo(hostname, NULL, &hints, &res) == 0 && res) {
                 struct addrinfo *rp;
@@ -875,8 +875,8 @@ static int ws_send_frame(int fd, const char *payload, size_t payload_len)
 
     uint8_t mask_key[4];
     if (secure_random_bytes(mask_key, sizeof(mask_key)) != 0)
-        AGENTOS_MEMSET(mask_key, 0, sizeof(mask_key));
-    memcpy(&header[header_size], mask_key, 4);
+        __builtin_memset(mask_key, 0, sizeof(mask_key));
+    __builtin_memcpy(&header[header_size], mask_key, 4);
     header_size += 4;
 
     if (send(fd, header, header_size, 0) != (ssize_t)header_size) {
@@ -1005,7 +1005,7 @@ static char *js_escape(const char *src, size_t src_len)
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
-                memcpy(n, dst, dp);
+                __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
                 dst = n;
             }
@@ -1020,7 +1020,7 @@ static char *js_escape(const char *src, size_t src_len)
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
-                memcpy(n, dst, dp);
+                __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
                 dst = n;
             }
@@ -1035,7 +1035,7 @@ static char *js_escape(const char *src, size_t src_len)
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
-                memcpy(n, dst, dp);
+                __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
                 dst = n;
             }
@@ -1050,7 +1050,7 @@ static char *js_escape(const char *src, size_t src_len)
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
-                memcpy(n, dst, dp);
+                __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
                 dst = n;
             }
@@ -1065,7 +1065,7 @@ static char *js_escape(const char *src, size_t src_len)
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
-                memcpy(n, dst, dp);
+                __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
                 dst = n;
             }
@@ -1080,7 +1080,7 @@ static char *js_escape(const char *src, size_t src_len)
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
-                memcpy(n, dst, dp);
+                __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
                 dst = n;
             }
@@ -1095,7 +1095,7 @@ static char *js_escape(const char *src, size_t src_len)
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
-                memcpy(n, dst, dp);
+                __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
                 dst = n;
             }
@@ -1162,7 +1162,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
             ret = AGENTOS_ENOMEM;
             goto cleanup;
         }
-        memcpy(url_copy, url_start, url_len + 1);
+        __builtin_memcpy(url_copy, url_start, url_len + 1);
         for (char *p = url_copy; *p; p++) {
             if (*p == ' ' || *p == '\n' || *p == '\r') {
                 *p = '\0';
@@ -1315,7 +1315,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 ret = AGENTOS_ENOMEM;
                 goto cleanup;
             }
-            memcpy(sel_copy, selector, sel_len + 1);
+            __builtin_memcpy(sel_copy, selector, sel_len + 1);
             for (char *p = sel_copy; *p; p++) {
                 if (*p == ' ' || *p == '\n' || *p == '\r') {
                     *p = '\0';
@@ -1796,7 +1796,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                     ret = AGENTOS_ENOMEM;
                     goto cleanup;
                 }
-                memcpy(sel_copy, wait_selector, sel_len + 1);
+                __builtin_memcpy(sel_copy, wait_selector, sel_len + 1);
                 for (char *p = sel_copy; *p; p++) {
                     if (*p == ' ' || *p == '\n' || *p == '\r' || *p == ',') {
                         *p = '\0';
@@ -1883,7 +1883,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                     ret = AGENTOS_ENOMEM;
                     goto cleanup;
                 }
-                memcpy(sel_copy, wait_selector, sel_len + 1);
+                __builtin_memcpy(sel_copy, wait_selector, sel_len + 1);
                 for (char *p = sel_copy; *p; p++) {
                     if (*p == ' ' || *p == '\n' || *p == '\r' || *p == ',') {
                         *p = '\0';
@@ -1927,7 +1927,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 ret = AGENTOS_ENOMEM;
                 goto cleanup;
             }
-            memcpy(sel_copy, wait_selector, sel_len + 1);
+            __builtin_memcpy(sel_copy, wait_selector, sel_len + 1);
             for (char *p = sel_copy; *p; p++) {
                 if (*p == ' ' || *p == '\n' || *p == '\r' || *p == ',') {
                     *p = '\0';
@@ -2009,7 +2009,7 @@ agentos_error_t agentos_browser_fill_form(void *conn_ptr, const char *selector, 
 
     char sel_buf[256];
     size_t copy_sel = selector_len < 255 ? selector_len : 254;
-    memcpy(sel_buf, selector ? selector : "", copy_sel);
+    __builtin_memcpy(sel_buf, selector ? selector : "", copy_sel);
     sel_buf[copy_sel] = '\0';
 
     char *escaped_sel = js_escape(sel_buf, strlen(sel_buf));
@@ -2061,7 +2061,7 @@ agentos_error_t agentos_browser_fill_form(void *conn_ptr, const char *selector, 
         int sva_id = cdp_get_id();
         char val_buf[512];
         size_t copy_val = value_len < 511 ? value_len : 510;
-        memcpy(val_buf, value ? value : "", copy_val);
+        __builtin_memcpy(val_buf, value ? value : "", copy_val);
         val_buf[copy_val] = '\0';
 
         char *es_val = js_escape(val_buf, strlen(val_buf));
@@ -2166,7 +2166,7 @@ agentos_error_t agentos_browser_wait_for_element(void *conn_ptr, const char *sel
         int cdp_id = cdp_get_id();
         char sel_buf[256];
         size_t copy_sel = selector_len < 255 ? selector_len : 254;
-        memcpy(sel_buf, selector, copy_sel);
+        __builtin_memcpy(sel_buf, selector, copy_sel);
         sel_buf[copy_sel] = '\0';
 
         char *escaped_sel = js_escape(sel_buf, strlen(sel_buf));
@@ -2280,7 +2280,7 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
-    AGENTOS_MEMSET(unit, 0, sizeof(*unit));
+    __builtin_memset(unit, 0, sizeof(*unit));
 
     browser_unit_data_t *data = (browser_unit_data_t *)AGENTOS_MALLOC(sizeof(browser_unit_data_t));
     if (!data) {
@@ -2288,7 +2288,7 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
-    AGENTOS_MEMSET(data, 0, sizeof(*data));
+    __builtin_memset(data, 0, sizeof(*data));
 
     char meta[128];
     snprintf(meta, sizeof(meta), "{\"type\":\"browser\"}");
@@ -2313,7 +2313,7 @@ int agentos_browser_unit_set_agent(agentos_execution_unit_t *unit, const char *a
     if (!unit || !unit->execution_unit_data || !agent_id)
         ATM_RET_ERR(AGENTOS_EINVAL);
     browser_unit_data_t *data = (browser_unit_data_t *)unit->execution_unit_data;
-    AGENTOS_STRNCPY_TERM(data->agent_id, agent_id, sizeof(data->agent_id));
+AGENTOS_STRNCPY_TERM(data->agent_id, agent_id, sizeof(data->agent_id));
     data->agent_id[sizeof(data->agent_id) - 1] = '\0';
     return 0;
 }

@@ -130,7 +130,7 @@ static heapstore_internal_metrics_t s_metrics = {.total_operations = 0,
 
 static void set_default_config(void)
 {
-    AGENTOS_MEMSET(&s_config, 0, sizeof(s_config));
+    __builtin_memset(&s_config, 0, sizeof(s_config));
     s_config.root_path = _get_default_root();
     s_config.max_log_size_mb = 100;
     s_config.log_retention_days = 7;
@@ -345,7 +345,6 @@ heapstore_error_t heapstore_init(const heapstore_config_t *manager)
     apply_user_config(manager);
 
     AGENTOS_STRNCPY_TERM(s_root_path, s_config.root_path, sizeof(s_root_path));
-    s_root_path[sizeof(s_root_path) - 1] = '\0';
 
     heapstore_error_t err = create_directory_structure();
     if (err != heapstore_SUCCESS) {
@@ -508,7 +507,7 @@ heapstore_error_t heapstore_get_stats(heapstore_stats_t *stats)
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    AGENTOS_MEMSET(stats, 0, sizeof(*stats));
+    __builtin_memset(stats, 0, sizeof(*stats));
 
     for (size_t i = 0; i < sizeof(s_path_order) / sizeof(s_path_order[0]); i++) {
         uint64_t dir_size = 0;
@@ -989,7 +988,7 @@ heapstore_batch_context_t *heapstore_batch_begin(size_t batch_size)
     if (!ctx) {
         return NULL;
     }
-    AGENTOS_MEMSET(ctx, 0, sizeof(heapstore_batch_context_t));
+    __builtin_memset(ctx, 0, sizeof(heapstore_batch_context_t));
     ctx->capacity = (batch_size > 0) ? batch_size : HEAPSTORE_BATCH_MAX_ITEMS;
     if (ctx->capacity > HEAPSTORE_BATCH_MAX_ITEMS) {
         ctx->capacity = HEAPSTORE_BATCH_MAX_ITEMS;
@@ -1016,7 +1015,7 @@ heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const 
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_LOG;
     AGENTOS_STRNCPY_TERM(item->data.log.service, service, sizeof(item->data.log.service));
     item->data.log.level = level;
@@ -1049,7 +1048,7 @@ heapstore_error_t heapstore_batch_add_log_with_trace(heapstore_batch_context_t *
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_LOG;
     AGENTOS_STRNCPY_TERM(item->data.log.service, service, sizeof(item->data.log.service));
     item->data.log.level = level;
@@ -1086,7 +1085,7 @@ heapstore_error_t heapstore_batch_add_trace(heapstore_batch_context_t *ctx, cons
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_SPAN;
     AGENTOS_STRNCPY_TERM(item->data.span.trace_id, trace_id, sizeof(item->data.span.trace_id));
     AGENTOS_STRNCPY_TERM(item->data.span.span_id, span_id, sizeof(item->data.span.span_id));
@@ -1125,9 +1124,9 @@ heapstore_error_t heapstore_batch_add_session(heapstore_batch_context_t *ctx,
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_SESSION;
-    memcpy(&item->data.session, record, sizeof(heapstore_session_record_t));
+    __builtin_memcpy(&item->data.session, record, sizeof(heapstore_session_record_t));
 
     if (ctx->tail) {
         ctx->tail->next = item;
@@ -1153,9 +1152,9 @@ heapstore_error_t heapstore_batch_add_agent(heapstore_batch_context_t *ctx,
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_AGENT;
-    memcpy(&item->data.agent, record, sizeof(heapstore_agent_record_t));
+    __builtin_memcpy(&item->data.agent, record, sizeof(heapstore_agent_record_t));
 
     if (ctx->tail) {
         ctx->tail->next = item;
@@ -1181,9 +1180,9 @@ heapstore_error_t heapstore_batch_add_skill(heapstore_batch_context_t *ctx,
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_SKILL;
-    memcpy(&item->data.skill, record, sizeof(heapstore_skill_record_t));
+    __builtin_memcpy(&item->data.skill, record, sizeof(heapstore_skill_record_t));
 
     if (ctx->tail) {
         ctx->tail->next = item;
@@ -1209,9 +1208,9 @@ heapstore_error_t heapstore_batch_add_memory_pool(heapstore_batch_context_t *ctx
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_MEMORY_POOL;
-    memcpy(&item->data.memory_pool, pool, sizeof(heapstore_memory_pool_t));
+    __builtin_memcpy(&item->data.memory_pool, pool, sizeof(heapstore_memory_pool_t));
 
     if (ctx->tail) {
         ctx->tail->next = item;
@@ -1237,9 +1236,9 @@ heapstore_error_t heapstore_batch_add_allocation(heapstore_batch_context_t *ctx,
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC;
-    memcpy(&item->data.memory_alloc, allocation, sizeof(heapstore_memory_allocation_t));
+    __builtin_memcpy(&item->data.memory_alloc, allocation, sizeof(heapstore_memory_allocation_t));
 
     if (ctx->tail) {
         ctx->tail->next = item;
@@ -1265,9 +1264,9 @@ heapstore_error_t heapstore_batch_add_ipc_channel(heapstore_batch_context_t *ctx
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_IPC_CHANNEL;
-    memcpy(&item->data.ipc_channel, channel, sizeof(heapstore_ipc_channel_t));
+    __builtin_memcpy(&item->data.ipc_channel, channel, sizeof(heapstore_ipc_channel_t));
 
     if (ctx->tail) {
         ctx->tail->next = item;
@@ -1293,9 +1292,9 @@ heapstore_error_t heapstore_batch_add_ipc_buffer(heapstore_batch_context_t *ctx,
     if (!item) {
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = HEAPSTORE_BATCH_ITEM_IPC_BUFFER;
-    memcpy(&item->data.ipc_buffer, buffer, sizeof(heapstore_ipc_buffer_t));
+    __builtin_memcpy(&item->data.ipc_buffer, buffer, sizeof(heapstore_ipc_buffer_t));
 
     if (ctx->tail) {
         ctx->tail->next = item;

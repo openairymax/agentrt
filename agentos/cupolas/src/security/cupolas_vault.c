@@ -51,6 +51,10 @@
 #define SALT_SIZE 32
 #define MAX_ACL_ENTRIES_PER_CREDENTIAL 64
 
+/* SEC-13: OOM 关键路径预分配常量 */
+#define VAULT_OOM_PREALLOC_SLOTS 16  /**< OOM 时预分配的凭证槽位数 */
+#define VAULT_OOM_PREALLOC_DATA_SIZE 4096  /**< OOM 时预分配的加密数据缓冲区大小 */
+
 /* ============================================================================
  * 内部结构
  * ============================================================================ */
@@ -87,6 +91,126 @@ typedef struct {
 static vault_global_ctx_t g_vault_ctx = {0};
 
 /* ============================================================================
+ * SEC-13: OOM 关键路径预分配池
+ *
+ * 启动时预分配 16 个凭证槽位和加密数据缓冲区。
+ * 当系统 OOM 时，使用预分配池代替系统 malloc，
+ * 确保证书存储关键路径在内存压力下仍可工作。
+ * ============================================================================ */
+
+/** @brief OOM 预分配凭证条目池 */
+static credential_entry_t g_vault_oom_entries[VAULT_OOM_PREALLOC_SLOTS];
+
+/** @brief OOM 预分配加密数据缓冲区池 */
+static uint8_t g_vault_oom_data[VAULT_OOM_PREALLOC_SLOTS][VAULT_OOM_PREALLOC_DATA_SIZE];
+
+/** @brief OOM 预分配池使用位图 */
+static bool g_vault_oom_used[VAULT_OOM_PREALLOC_SLOTS];
+
+/** @brief OOM 预分配池互斥锁 */
+static cupolas_mutex_t g_vault_oom_lock;
+
+/** @brief OOM 预分配池是否已初始化 */
+static bool g_vault_oom_initialized = false;
+
+/**
+ * @brief 初始化 OOM 预分配池（SEC-13.1）
+ *
+ * 在 cupolas_vault_init() 中调用，启动时预分配资源。
+ * 零内存分配——使用静态数组。
+ */
+static void vault_oom_pool_init(void)
+{
+    if (g_vault_oom_initialized) {
+        return;
+    }
+
+    cupolas_mutex_init(&g_vault_oom_lock);
+
+    __builtin_memset(g_vault_oom_entries, 0, sizeof(g_vault_oom_entries));
+    __builtin_memset(g_vault_oom_data, 0, sizeof(g_vault_oom_data));
+    __builtin_memset(g_vault_oom_used, 0, sizeof(g_vault_oom_used));
+
+    g_vault_oom_initialized = true;
+}
+
+/**
+ * @brief 从 OOM 预分配池获取一个凭证槽位（SEC-13.1）
+ *
+ * 当正常 AGENTOS_CALLOC 失败时调用。
+ * 从预分配池中分配一个槽位，不调用系统 malloc。
+ *
+ * @return 凭证条目指针，池耗尽返回 NULL
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static credential_entry_t *vault_oom_pool_alloc(void)
+{
+    if (!g_vault_oom_initialized) {
+        return NULL;
+    }
+
+    cupolas_mutex_lock(&g_vault_oom_lock);
+
+    for (int i = 0; i < VAULT_OOM_PREALLOC_SLOTS; i++) {
+        if (!g_vault_oom_used[i]) {
+            g_vault_oom_used[i] = true;
+            __builtin_memset(&g_vault_oom_entries[i], 0, sizeof(credential_entry_t));
+            cupolas_mutex_unlock(&g_vault_oom_lock);
+            return &g_vault_oom_entries[i];
+        }
+    }
+
+    cupolas_mutex_unlock(&g_vault_oom_lock);
+    return NULL;
+}
+
+/**
+ * @brief 从 OOM 预分配池获取加密数据缓冲区（SEC-13.1）
+ *
+ * 返回与槽位索引对应的预分配数据缓冲区。
+ *
+ * @param entry 从 vault_oom_pool_alloc() 获取的条目指针
+ * @return 数据缓冲区指针，无效条目返回 NULL
+ */
+static uint8_t *vault_oom_pool_get_data_buffer(credential_entry_t *entry)
+{
+    if (!entry || !g_vault_oom_initialized) {
+        return NULL;
+    }
+
+    /* 计算条目在静态数组中的索引 */
+    ptrdiff_t index = entry - g_vault_oom_entries;
+    if (index < 0 || index >= VAULT_OOM_PREALLOC_SLOTS) {
+        return NULL;
+    }
+
+    return g_vault_oom_data[index];
+}
+
+/**
+ * @brief 释放 OOM 预分配池槽位（SEC-13.1）
+ *
+ * @param entry 要释放的条目指针
+ */
+static void vault_oom_pool_free(credential_entry_t *entry)
+{
+    if (!entry || !g_vault_oom_initialized) {
+        return;
+    }
+
+    ptrdiff_t index = entry - g_vault_oom_entries;
+    if (index < 0 || index >= VAULT_OOM_PREALLOC_SLOTS) {
+        return;
+    }
+
+    cupolas_mutex_lock(&g_vault_oom_lock);
+    g_vault_oom_used[index] = false;
+    cupolas_mutex_unlock(&g_vault_oom_lock);
+}
+#pragma GCC diagnostic pop
+
+/* ============================================================================
  * 初始化/清理
  * ============================================================================ */
 
@@ -102,10 +226,10 @@ int cupolas_vault_init(const cupolas_vault_config_t *config)
 
     int expected = VLT_INIT_UNINIT;
     if (atomic_compare_exchange_strong(&g_vault_ctx.initialized, &expected, VLT_INIT_PROGRESS)) {
-        AGENTOS_MEMSET(&g_vault_ctx, 0, sizeof(g_vault_ctx));
+        __builtin_memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 
         if (config) {
-            memcpy(&g_vault_ctx.default_config, config, sizeof(cupolas_vault_config_t));
+            __builtin_memcpy(&g_vault_ctx.default_config, config, sizeof(cupolas_vault_config_t));
         } else {
             g_vault_ctx.default_config.enable_audit = true;
             g_vault_ctx.default_config.enable_auto_lock = true;
@@ -114,6 +238,9 @@ int cupolas_vault_init(const cupolas_vault_config_t *config)
         }
 
         cupolas_rwlock_init(&g_vault_ctx.global_lock);
+
+        /* SEC-13: 初始化 OOM 预分配池 */
+        vault_oom_pool_init();
 
         atomic_store(&g_vault_ctx.initialized, VLT_INIT_COMPLETE);
         return 0;
@@ -132,7 +259,7 @@ void cupolas_vault_cleanup(void)
     }
 
     cupolas_rwlock_destroy(&g_vault_ctx.global_lock);
-    AGENTOS_MEMSET(&g_vault_ctx, 0, sizeof(g_vault_ctx));
+    __builtin_memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 }
 
 int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault_t **vault)
@@ -171,14 +298,14 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
     v->entry_count = 0;
 
     cupolas_rwlock_init(&v->lock);
-    memcpy(&v->config, &g_vault_ctx.default_config, sizeof(cupolas_vault_config_t));
+    __builtin_memcpy(&v->config, &g_vault_ctx.default_config, sizeof(cupolas_vault_config_t));
 
     if (password) {
 #ifdef CUPOLAS_USE_OPENSSL
         uint8_t salt[SALT_SIZE] = {0};
         uint8_t id_hash[SHA256_DIGEST_LENGTH];
         SHA256((const unsigned char *)vault_id, strlen(vault_id), id_hash);
-        memcpy(salt, id_hash, SALT_SIZE);
+        __builtin_memcpy(salt, id_hash, SALT_SIZE);
         if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE, 100000, EVP_sha256(),
                               AES_KEY_SIZE, v->master_key) != 1) {
             cupolas_rwlock_destroy(&v->lock);
@@ -226,7 +353,7 @@ void cupolas_vault_close(cupolas_vault_t *vault)
         AGENTOS_FREE(vault->entries);
     }
 
-    AGENTOS_MEMSET(vault->master_key, 0, AES_KEY_SIZE);
+    __builtin_memset(vault->master_key, 0, AES_KEY_SIZE);
 
     cupolas_rwlock_unlock(&vault->lock);
     cupolas_rwlock_destroy(&vault->lock);
@@ -242,7 +369,7 @@ int cupolas_vault_lock(cupolas_vault_t *vault)
     }
 
     cupolas_rwlock_wrlock(&vault->lock);
-    AGENTOS_MEMSET(vault->master_key, 0, AES_KEY_SIZE);
+    __builtin_memset(vault->master_key, 0, AES_KEY_SIZE);
     vault->is_locked = true;
     cupolas_rwlock_unlock(&vault->lock);
 
@@ -262,7 +389,7 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
     uint8_t salt[SALT_SIZE] = {0};
     uint8_t id_hash[SHA256_DIGEST_LENGTH];
     SHA256((const unsigned char *)vault->vault_id, strlen(vault->vault_id), id_hash);
-    memcpy(salt, id_hash, SALT_SIZE);
+    __builtin_memcpy(salt, id_hash, SALT_SIZE);
     if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE, 100000, EVP_sha256(),
                           AES_KEY_SIZE, vault->master_key) != 1) {
         cupolas_rwlock_unlock(&vault->lock);
@@ -340,7 +467,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         AGENTOS_FREE(entry->metadata.cred_id);
     } else {
         entry = &vault->entries[vault->entry_count];
-        AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
+        __builtin_memset(entry, 0, sizeof(credential_entry_t));
         entry->cred_id = AGENTOS_STRDUP(cred_id);
     }
 
@@ -355,7 +482,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
+            __builtin_memset(entry, 0, sizeof(credential_entry_t));
         }
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
@@ -366,7 +493,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
+            __builtin_memset(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -382,7 +509,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
+            __builtin_memset(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -399,7 +526,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
+            __builtin_memset(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -414,7 +541,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AGENTOS_FREE(entry->cred_id);
             AGENTOS_FREE(entry->metadata.cred_id);
-            AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
+            __builtin_memset(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -583,7 +710,7 @@ int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char
             }
             AGENTOS_FREE(entry->acl.entries);
 
-            memmove(&vault->entries[i], &vault->entries[i + 1],
+            __builtin_memmove(&vault->entries[i], &vault->entries[i + 1],
                     (vault->entry_count - i - 1) * sizeof(credential_entry_t));
             vault->entry_count--;
 
@@ -787,7 +914,7 @@ int cupolas_vault_revoke_access(cupolas_vault_t *vault, const char *cred_id, con
     for (size_t i = 0; i < entry->acl.count; i++) {
         if (strcmp(entry->acl.entries[i].agent_id, agent_id) == 0) {
             AGENTOS_FREE(entry->acl.entries[i].agent_id);
-            memmove(&entry->acl.entries[i], &entry->acl.entries[i + 1],
+            __builtin_memmove(&entry->acl.entries[i], &entry->acl.entries[i + 1],
                     (entry->acl.count - i - 1) * sizeof(cupolas_vault_acl_entry_t));
             entry->acl.count--;
             cupolas_rwlock_unlock(&vault->lock);
@@ -839,7 +966,7 @@ void cupolas_vault_free_metadata(cupolas_vault_metadata_t *metadata)
     AGENTOS_FREE(metadata->description);
     AGENTOS_FREE(metadata->service);
     AGENTOS_FREE(metadata->account);
-    AGENTOS_MEMSET(metadata, 0, sizeof(cupolas_vault_metadata_t));
+    __builtin_memset(metadata, 0, sizeof(cupolas_vault_metadata_t));
 }
 
 int cupolas_vault_list(cupolas_vault_t *vault, cupolas_vault_cred_type_t type,
@@ -1409,12 +1536,12 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         }
 
         credential_entry_t *entry = &vault->entries[vault->entry_count];
-        AGENTOS_MEMSET(entry, 0, sizeof(credential_entry_t));
+        __builtin_memset(entry, 0, sizeof(credential_entry_t));
         entry->cred_id = cred_id;
         entry->type = type;
         entry->encrypted_data = (uint8_t *)AGENTOS_MALLOC(total_decrypted);
         if (entry->encrypted_data) {
-            memcpy(entry->encrypted_data, decrypted, total_decrypted);
+            __builtin_memcpy(entry->encrypted_data, decrypted, total_decrypted);
             entry->encrypted_len = total_decrypted;
         } else {
             entry->encrypted_data = NULL;
@@ -1464,28 +1591,32 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
                         }
                     }
                     {
-                        size_t __attribute__((unused)) _fr;
+                        size_t _fr;
                         _fr = fread(&entry->acl.entries[k].operations, sizeof(uint32_t), 1, f);
+                        if (_fr < 1) { break; }
                     }
                     {
-                        size_t __attribute__((unused)) _fr;
+                        size_t _fr;
                         _fr = fread(&entry->acl.entries[k].expires_at, sizeof(uint64_t), 1, f);
+                        if (_fr < 1) { break; }
                     }
                     {
-                        size_t __attribute__((unused)) _fr;
+                        size_t _fr;
                         _fr = fread(&entry->acl.entries[k].access_count, sizeof(uint32_t), 1, f);
+                        if (_fr < 1) { break; }
                     }
                     {
-                        size_t __attribute__((unused)) _fr;
+                        size_t _fr;
                         _fr =
                             fread(&entry->acl.entries[k].max_access_count, sizeof(uint32_t), 1, f);
+                        if (_fr < 1) { break; }
                     }
                 }
             }
         }
 
         {
-            AGENTOS_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
+            __builtin_memset(&entry->metadata, 0, sizeof(entry->metadata));
             char *meta_ptrs[4] = {NULL, NULL, NULL, NULL};
             for (int m = 0; m < 4; m++) {
                 size_t field_len = 0;
@@ -1508,24 +1639,29 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
             entry->metadata.service = meta_ptrs[2];
             entry->metadata.account = meta_ptrs[3];
             {
-                size_t __attribute__((unused)) _fr;
+                size_t _fr;
                 _fr = fread(&entry->metadata.type, sizeof(cupolas_vault_cred_type_t), 1, f);
+                if (_fr < 1) { break; }
             }
             {
-                size_t __attribute__((unused)) _fr;
+                size_t _fr;
                 _fr = fread(&entry->metadata.created_at, sizeof(uint64_t), 1, f);
+                if (_fr < 1) { break; }
             }
             {
-                size_t __attribute__((unused)) _fr;
+                size_t _fr;
                 _fr = fread(&entry->metadata.updated_at, sizeof(uint64_t), 1, f);
+                if (_fr < 1) { break; }
             }
             {
-                size_t __attribute__((unused)) _fr;
+                size_t _fr;
                 _fr = fread(&entry->metadata.expires_at, sizeof(uint64_t), 1, f);
+                if (_fr < 1) { break; }
             }
             {
-                size_t __attribute__((unused)) _fr;
+                size_t _fr;
                 _fr = fread(&entry->metadata.is_accessible, sizeof(bool), 1, f);
+                if (_fr < 1) { break; }
             }
         }
 
@@ -1568,8 +1704,8 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
                     entry->type = 0;
                     entry->encrypted_data = NULL;
                     entry->encrypted_len = 0;
-                    AGENTOS_MEMSET(&entry->acl, 0, sizeof(entry->acl));
-                    AGENTOS_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
+                    __builtin_memset(&entry->acl, 0, sizeof(entry->acl));
+                    __builtin_memset(&entry->metadata, 0, sizeof(entry->metadata));
                     vault->entry_count++;
                     imported++;
                 }
@@ -1585,8 +1721,8 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         entry->type = 0;
         entry->encrypted_data = NULL;
         entry->encrypted_len = 0;
-        AGENTOS_MEMSET(&entry->acl, 0, sizeof(entry->acl));
-        AGENTOS_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
+        __builtin_memset(&entry->acl, 0, sizeof(entry->acl));
+        __builtin_memset(&entry->metadata, 0, sizeof(entry->metadata));
         vault->entry_count++;
         imported++;
     }

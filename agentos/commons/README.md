@@ -19,7 +19,6 @@ Commons 是 AgentOS 的统一基础库，为整个系统提供跨平台、跨语
 
 ```
 commons/
-├── agentos_types.h              # 全项目统一类型定义权威源
 ├── CMakeLists.txt               # CMake 构建配置
 ├── README.md                    # 本文档
 ├── platform/                    # 平台抽象层

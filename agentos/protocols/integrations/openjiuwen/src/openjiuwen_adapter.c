@@ -166,7 +166,7 @@ static int openjiuwen_adapter_encode(void *context, const void *msg, void **out_
     void *encoded = AGENTOS_MALLOC((size_t)result);
     if (!encoded)
         return AGENTOS_ERR_OUT_OF_MEMORY;
-    memcpy(encoded, buffer, (size_t)result);
+    __builtin_memcpy(encoded, buffer, (size_t)result);
     *out_data = encoded;
     *out_size = (size_t)result;
     return 0;
@@ -281,7 +281,7 @@ static int openjiuwen_adapter_get_version(void *context, char *version_buf, size
     size_t len = strlen(ver);
     if (len >= max_size)
         len = max_size - 1;
-    memcpy(version_buf, ver, len);
+    __builtin_memcpy(version_buf, ver, len);
     version_buf[len] = '\0';
     return 0;
 }
@@ -456,11 +456,11 @@ int openjiuwen_unified_to_native(const unified_message_t *msg, void *out_buffer,
         return AGENTOS_ERR_IO;
     }
 
-    memcpy(out_buffer, &header, sizeof(openjiuwen_header_t));
+    __builtin_memcpy(out_buffer, &header, sizeof(openjiuwen_header_t));
 
     /* 写入载荷数据 */
     if (payload_length > 0 && msg->payload) {
-        memcpy((char *)out_buffer + sizeof(openjiuwen_header_t), msg->payload, payload_length);
+        __builtin_memcpy((char *)out_buffer + sizeof(openjiuwen_header_t), msg->payload, payload_length);
     }
 
     return (int)total_size;
@@ -495,7 +495,7 @@ int openjiuwen_native_to_unified(const void *in_buffer, size_t buffer_size, unif
         msg->payload_size = header->payload_length;
         msg->payload = AGENTOS_MALLOC(header->payload_length);
         if (msg->payload) {
-            memcpy(msg->payload, (const char *)in_buffer + sizeof(openjiuwen_header_t),
+            __builtin_memcpy(msg->payload, (const char *)in_buffer + sizeof(openjiuwen_header_t),
                    header->payload_length);
         } else {
             msg->payload_size = 0;
@@ -536,7 +536,7 @@ const protocol_adapter_t *openjiuwen_adapter_create(const openjiuwen_config_t *c
 
     /* 初始化配置 */
     if (config) {
-        memcpy(&adapter->config, config, sizeof(openjiuwen_config_t));
+        __builtin_memcpy(&adapter->config, config, sizeof(openjiuwen_config_t));
     } else {
         openjiuwen_get_default_config(&adapter->config);
     }

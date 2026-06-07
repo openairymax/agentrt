@@ -155,7 +155,7 @@ static int cupolas_parse_yaml_line(const char *line, char **key, char **value, i
     *key = (char *)AGENTOS_MALLOC(key_len + 1);
     if (!*key)
         return AGENTOS_EINVAL;
-    memcpy(*key, p, key_len);
+    __builtin_memcpy(*key, p, key_len);
     (*key)[key_len] = '\0';
     *key = cupolas_str_trim(*key);
 
@@ -175,7 +175,7 @@ static int cupolas_parse_yaml_line(const char *line, char **key, char **value, i
             *key = NULL;
             return AGENTOS_EINVAL;
         }
-        memcpy(*value, v, value_len);
+        __builtin_memcpy(*value, v, value_len);
         (*value)[value_len] = '\0';
     }
 
@@ -285,7 +285,7 @@ static const size_t g_key_handlers_count = sizeof(g_key_handlers) / sizeof(g_key
 static int cupolas_parse_entitlements_content(const char *content,
                                               cupolas_entitlements_info_t *info)
 {
-    memset(info, 0, sizeof(*info));
+    __builtin_memset(info, 0, sizeof(*info));
 
     char *dup = cupolas_strdup(content);
     if (!dup)
@@ -559,7 +559,7 @@ int cupolas_entitlements_sign(cupolas_entitlements_t *entitlements, const char *
                     AGENTOS_FREE(entitlements->signature);
                     entitlements->signature = (char *)AGENTOS_MALLOC(*sig_len);
                     if (entitlements->signature) {
-                        memcpy(entitlements->signature, signature_out, *sig_len);
+                        __builtin_memcpy(entitlements->signature, signature_out, *sig_len);
                         entitlements->sig_len = *sig_len;
                     }
                 }

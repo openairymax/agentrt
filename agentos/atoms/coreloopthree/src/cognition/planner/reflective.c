@@ -147,8 +147,8 @@ static __attribute__((unused)) agentos_error_t reflective_plan_init(void **out_c
     if (!out_context)
         ATM_RET_ERR(AGENTOS_EINVAL);
 
-    reflective_context_t *ctx =
-        (reflective_context_t *)AGENTOS_CALLOC(1, sizeof(reflective_context_t));
+    reflective_context_t *ctx;
+    SAFE_MALLOC_ARRAY(ctx, 1, sizeof(reflective_context_t));
     if (!ctx)
         ATM_RET_ERR(AGENTOS_ENOMEM);
 
@@ -469,11 +469,11 @@ static agentos_error_t parse_llm_plan_json(const char *json_text, llm_plan_node_
         }
 
         llm_plan_node_t *node = &nodes[*node_count];
-        AGENTOS_MEMSET(node, 0, sizeof(*node));
+        __builtin_memset(node, 0, sizeof(*node));
         size_t nlen = (size_t)(name_end - name_val);
         if (nlen >= sizeof(node->name))
             nlen = sizeof(node->name) - 1;
-        memcpy(node->name, name_val, nlen);
+        AGENTOS_MEMCPY_SAFE(node->name, name_val, nlen, sizeof(node->name));
 
         if (role_val) {
             const char *role_end = role_val;
@@ -482,7 +482,7 @@ static agentos_error_t parse_llm_plan_json(const char *json_text, llm_plan_node_
             size_t rlen = (size_t)(role_end - role_val);
             if (rlen >= sizeof(node->role))
                 rlen = sizeof(node->role) - 1;
-            memcpy(node->role, role_val, rlen);
+            AGENTOS_MEMCPY_SAFE(node->role, role_val, rlen, sizeof(node->role));
         } else {
             snprintf(node->role, sizeof(node->role), "worker");
         }
@@ -502,7 +502,7 @@ static agentos_error_t parse_llm_plan_json(const char *json_text, llm_plan_node_
                         de++;
                     size_t dlen = (size_t)(de - dep);
                     if (dlen > 0 && dlen < sizeof(node->depends_on[0])) {
-                        memcpy(node->depends_on[node->depends_on_count], dep, dlen);
+                        AGENTOS_MEMCPY_SAFE(node->depends_on[node->depends_on_count], dep, dlen, sizeof(node->depends_on[0]));
                         node->depends_on_count++;
                     }
                     dep = de;
@@ -572,8 +572,8 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
         return err;
     }
 
-    agentos_task_plan_t *plan =
-        (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
+    agentos_task_plan_t *plan;
+    SAFE_MALLOC_ARRAY(plan, 1, sizeof(agentos_task_plan_t));
     if (!plan)
         ATM_RET_ERR(AGENTOS_ENOMEM);
 
@@ -587,8 +587,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
     if (!aligned)
         total++;
 
-    plan->task_plan_nodes =
-        (agentos_task_node_t **)AGENTOS_CALLOC(total, sizeof(agentos_task_node_t *));
+    SAFE_MALLOC_ARRAY(plan->task_plan_nodes, total, sizeof(agentos_task_node_t *));
     if (!plan->task_plan_nodes && total > 0) {
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
@@ -596,8 +595,8 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
     }
 
     for (size_t i = 0; i < parsed_count; i++) {
-        agentos_task_node_t *node =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *node;
+        SAFE_MALLOC_ARRAY(node, 1, sizeof(agentos_task_node_t));
         if (!node)
             continue;
 
@@ -614,8 +613,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
             parsed_nodes[i].priority > 0 ? parsed_nodes[i].priority : (int)(200 - i * 15);
 
         if (parsed_nodes[i].depends_on_count > 0) {
-            node->task_node_depends_on =
-                (char **)AGENTOS_MALLOC(parsed_nodes[i].depends_on_count * sizeof(char *));
+            SAFE_MALLOC_ARRAY(node->task_node_depends_on, parsed_nodes[i].depends_on_count, sizeof(char *));
             if (node->task_node_depends_on) {
                 node->task_node_depends_count = (uint32_t)parsed_nodes[i].depends_on_count;
                 for (int d = 0; d < parsed_nodes[i].depends_on_count; d++) {
@@ -640,8 +638,8 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
     }
 
     if (!audit_passed) {
-        agentos_task_node_t *cn =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *cn;
+        SAFE_MALLOC_ARRAY(cn, 1, sizeof(agentos_task_node_t));
         if (cn) {
             char cid[256];
             snprintf(cid, sizeof(cid), "%s_correction", plan_id);
@@ -650,7 +648,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
             cn->task_node_timeout_ms = 20000;
             cn->task_node_priority = 250;
             if (plan->task_plan_node_count > 2) {
-                cn->task_node_depends_on = (char **)AGENTOS_MALLOC(sizeof(char *));
+                SAFE_MALLOC_ARRAY(cn->task_node_depends_on, 1, sizeof(char *));
                 if (cn->task_node_depends_on) {
                     cn->task_node_depends_count = 1;
                     cn->task_node_depends_on[0] = AGENTOS_STRDUP(
@@ -668,8 +666,8 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
     }
 
     if (!aligned) {
-        agentos_task_node_t *rn =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *rn;
+        SAFE_MALLOC_ARRAY(rn, 1, sizeof(agentos_task_node_t));
         if (rn) {
             char rid[256];
             snprintf(rid, sizeof(rid), "%s_realignment", plan_id);
@@ -678,7 +676,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
             rn->task_node_timeout_ms = 15000;
             rn->task_node_priority = 254;
             if (plan->task_plan_node_count > 2) {
-                rn->task_node_depends_on = (char **)AGENTOS_MALLOC(sizeof(char *));
+                SAFE_MALLOC_ARRAY(rn->task_node_depends_on, 1, sizeof(char *));
                 if (rn->task_node_depends_on) {
                     rn->task_node_depends_count = 1;
                     rn->task_node_depends_on[0] = AGENTOS_STRDUP(
@@ -689,7 +687,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
         }
     }
 
-    plan->task_plan_entry_points = (char **)AGENTOS_MALLOC(sizeof(char *));
+    SAFE_MALLOC_ARRAY(plan->task_plan_entry_points, 1, sizeof(char *));
     if (plan->task_plan_entry_points && plan->task_plan_node_count > 0) {
         plan->task_plan_entry_count = 1;
         plan->task_plan_entry_points[0] = AGENTOS_STRDUP(plan->task_plan_nodes[0]->task_node_id);
@@ -705,8 +703,8 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
                                                 int aligned, uint64_t session_count)
 {
 
-    agentos_task_plan_t *plan =
-        (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
+    agentos_task_plan_t *plan;
+    SAFE_MALLOC_ARRAY(plan, 1, sizeof(agentos_task_plan_t));
     if (!plan) return NULL;
 
     char plan_id[128];
@@ -714,8 +712,7 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
     plan->task_plan_id = AGENTOS_STRDUP(plan_id);
 
     size_t nc = 5 + (audit_passed ? 0 : 1) + (aligned ? 0 : 1);
-    plan->task_plan_nodes =
-        (agentos_task_node_t **)AGENTOS_CALLOC(nc, sizeof(agentos_task_node_t *));
+    SAFE_MALLOC_ARRAY(plan->task_plan_nodes, nc, sizeof(agentos_task_node_t *));
     if (!plan->task_plan_nodes) {
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
@@ -735,8 +732,8 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
                     {"align", "validator", 10000, 255}};
 
     for (int s = 0; s < 5; s++) {
-        agentos_task_node_t *node =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *node;
+        SAFE_MALLOC_ARRAY(node, 1, sizeof(agentos_task_node_t));
         if (!node)
             break;
 
@@ -748,7 +745,7 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
         node->task_node_priority = defaults[s].pri;
 
         if (s > 0) {
-            node->task_node_depends_on = (char **)AGENTOS_MALLOC(sizeof(char *));
+            SAFE_MALLOC_ARRAY(node->task_node_depends_on, 1, sizeof(char *));
             if (node->task_node_depends_on) {
                 node->task_node_depends_count = 1;
                 node->task_node_depends_on[0] =
@@ -759,8 +756,8 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
     }
 
     if (!audit_passed) {
-        agentos_task_node_t *cn =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *cn;
+        SAFE_MALLOC_ARRAY(cn, 1, sizeof(agentos_task_node_t));
         if (cn) {
             char cid[256];
             snprintf(cid, sizeof(cid), "%s_reaudit", plan_id);
@@ -768,7 +765,7 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
             cn->task_node_agent_role = AGENTOS_STRDUP("corrector");
             cn->task_node_timeout_ms = 20000;
             cn->task_node_priority = 250;
-            cn->task_node_depends_on = (char **)AGENTOS_MALLOC(sizeof(char *));
+            SAFE_MALLOC_ARRAY(cn->task_node_depends_on, 1, sizeof(char *));
             if (cn->task_node_depends_on && plan->task_plan_node_count > 0) {
                 cn->task_node_depends_count = 1;
                 cn->task_node_depends_on[0] = AGENTOS_STRDUP(
@@ -779,8 +776,8 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
     }
 
     if (!aligned) {
-        agentos_task_node_t *rn =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *rn;
+        SAFE_MALLOC_ARRAY(rn, 1, sizeof(agentos_task_node_t));
         if (rn) {
             char rid[256];
             snprintf(rid, sizeof(rid), "%s_realign", plan_id);
@@ -788,7 +785,7 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
             rn->task_node_agent_role = AGENTOS_STRDUP("realigner");
             rn->task_node_timeout_ms = 15000;
             rn->task_node_priority = 254;
-            rn->task_node_depends_on = (char **)AGENTOS_MALLOC(sizeof(char *));
+            SAFE_MALLOC_ARRAY(rn->task_node_depends_on, 1, sizeof(char *));
             if (rn->task_node_depends_on && plan->task_plan_node_count > 0) {
                 rn->task_node_depends_count = 1;
                 rn->task_node_depends_on[0] = AGENTOS_STRDUP(
@@ -798,7 +795,7 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
         }
     }
 
-    plan->task_plan_entry_points = (char **)AGENTOS_MALLOC(sizeof(char *));
+    SAFE_MALLOC_ARRAY(plan->task_plan_entry_points, 1, sizeof(char *));
     if (plan->task_plan_entry_points && plan->task_plan_node_count > 0) {
         plan->task_plan_entry_count = 1;
         plan->task_plan_entry_points[0] = AGENTOS_STRDUP(plan->task_plan_nodes[0]->task_node_id);

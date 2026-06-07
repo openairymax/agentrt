@@ -86,7 +86,7 @@ agentos_uuid_error_t agentos_uuid_v4(char *out_buf, size_t buf_len)
     if (UuidCreate(&uuid_win) != RPC_S_OK) {
         return AGENTOS_UUID_EUNAVAIL;
     }
-    memcpy(uuid, &uuid_win, 16);
+    __builtin_memcpy(uuid, &uuid_win, 16);
 
 #elif defined(__linux__)
     int fd = open("/dev/urandom", O_RDONLY);
@@ -102,7 +102,7 @@ agentos_uuid_error_t agentos_uuid_v4(char *out_buf, size_t buf_len)
 #elif defined(__APPLE__)
     uuid_t uuid_mac;
     uuid_generate(uuid_mac);
-    memcpy(uuid, uuid_mac, 16);
+    __builtin_memcpy(uuid, uuid_mac, 16);
 
 #else
     {

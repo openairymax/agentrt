@@ -83,9 +83,9 @@ int agent_registry_core_add(agent_registry_t *registry, const agent_entry_t *reg
 
     agentos_mutex_lock(&registry->lock);
     agent_entry_t *entry = &registry->entries[registry->entry_count];
-    AGENTOS_MEMSET(entry, 0, sizeof(agent_entry_t));
-    AGENTOS_STRNCPY_TERM(entry->id, reg->id, sizeof(entry->id));
-    AGENTOS_STRNCPY_TERM(entry->name, reg->name, sizeof(entry->name));
+    __builtin_memset(entry, 0, sizeof(agent_entry_t));
+AGENTOS_STRNCPY_TERM(entry->id, reg->id, sizeof(entry->id));
+AGENTOS_STRNCPY_TERM(entry->name, reg->name, sizeof(entry->name));
     if (reg->description)
         entry->description = AGENTOS_STRDUP(reg->description);
     if (reg->author)
@@ -173,17 +173,17 @@ int agent_registry_core_add_version(agent_registry_t *registry, const char *agen
                 return AGENTOS_ERR_OVERFLOW;
             }
             agent_version_t *v = &registry->entries[i].versions[registry->entries[i].version_count];
-            AGENTOS_MEMSET(v, 0, sizeof(agent_version_t));
-            AGENTOS_STRNCPY_TERM(v->version, version->version, sizeof(v->version));
+            __builtin_memset(v, 0, sizeof(agent_version_t));
+AGENTOS_STRNCPY_TERM(v->version, version->version, sizeof(v->version));
             v->version[sizeof(v->version) - 1] = '\0';
-            AGENTOS_STRNCPY_TERM(v->download_url, version->download_url, sizeof(v->download_url));
+AGENTOS_STRNCPY_TERM(v->download_url, version->download_url, sizeof(v->download_url));
             v->download_url[sizeof(v->download_url) - 1] = '\0';
-            AGENTOS_STRNCPY_TERM(v->checksum, version->checksum, sizeof(v->checksum));
+AGENTOS_STRNCPY_TERM(v->checksum, version->checksum, sizeof(v->checksum));
             v->checksum[sizeof(v->checksum) - 1] = '\0';
             v->created_at = (uint64_t)time(NULL);
             v->deprecated = version->deprecated;
             registry->entries[i].version_count++;
-            AGENTOS_STRNCPY_TERM(registry->entries[i].latest_version, version->version, sizeof(registry->entries[i].latest_version));
+AGENTOS_STRNCPY_TERM(registry->entries[i].latest_version, version->version, sizeof(registry->entries[i].latest_version));
             registry->entries[i].latest_version[sizeof(registry->entries[i].latest_version) - 1] =
                 '\0';
             agentos_mutex_unlock(&registry->lock);

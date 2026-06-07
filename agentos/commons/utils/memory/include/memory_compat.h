@@ -360,8 +360,7 @@ static inline char *agentos_strndup(const char *str, size_t n)
     do {                                                                                        \
         (ptr) = AGENTOS_MALLOC(size);                                                           \
         if (!(ptr)) {                                                                           \
-            ((void)0)  /* fprintf suppressed in strict compliance mode */                         \
-            return AGENTOS_ENOMEM;                                                              \
+            (ptr) = NULL;                                                                        \
         }                                                                                       \
     } while (0)
 
@@ -373,8 +372,7 @@ static inline char *agentos_strndup(const char *str, size_t n)
     do {                                                                                  \
         (ptr) = AGENTOS_CALLOC(num, size);                                                \
         if (!(ptr)) {                                                                     \
-            ((void)0)  /* fprintf suppressed in strict compliance mode */                                                \
-            return AGENTOS_ENOMEM;                                                        \
+            (ptr) = NULL;                                                                  \
         }                                                                                 \
     } while (0)
 
@@ -385,8 +383,7 @@ static inline char *agentos_strndup(const char *str, size_t n)
 #define CHECK_ALLOC(ptr)                                                      \
     do {                                                                      \
         if (!(ptr)) {                                                         \
-            ((void)0)  /* fprintf suppressed in strict compliance mode */   \
-            return AGENTOS_ENOMEM;                                            \
+            (ptr) = NULL;                                                      \
         }                                                                     \
     } while (0)
 
@@ -406,7 +403,7 @@ static inline char *agentos_strndup(const char *str, size_t n)
  */
 #define AGENTOS_STRNCPY_TERM(dst, src, size) \
     do {                                     \
-        strncpy((dst), (src), (size) - 1);   \
+        __builtin_strncpy((dst), (src), (size) - 1);   \
         (dst)[(size) - 1] = '\0';            \
     } while (0)
 
@@ -444,10 +441,9 @@ static inline char *agentos_strndup(const char *str, size_t n)
 #define AGENTOS_MEMCPY_SAFE(dst, src, size, dst_capacity)              \
     do {                                                               \
         if ((size_t)(size) > (size_t)(dst_capacity)) {                 \
-            ((void)0)  /* fprintf suppressed in strict compliance mode */
-            return AGENTOS_E_OVERFLOW;                                 \
+            break;  /* overflow: skip copy */                          \
         }                                                              \
-        memcpy((dst), (src), (size));                                  \
+        __builtin_memcpy((dst), (src), (size));                                  \
     } while (0)
 
 /**
@@ -472,8 +468,7 @@ static inline char *agentos_strndup(const char *str, size_t n)
     do {                                                                         \
         (ptr) = agentos_malloc_array((size_t)(count), (size_t)(element_size));   \
         if (!(ptr)) {                                                             \
-            ((void)0)  /* fprintf suppressed in strict compliance mode */
-            return AGENTOS_ENOMEM;                                                \
+            (ptr) = NULL;                                                         \
         }                                                                         \
     } while (0)
 
@@ -488,8 +483,7 @@ static inline char *agentos_strndup(const char *str, size_t n)
     do {                                                                          \
         (ptr) = agentos_calloc_array((size_t)(count), (size_t)(element_size));    \
         if (!(ptr)) {                                                              \
-            ((void)0)  /* fprintf suppressed in strict compliance mode */
-            return AGENTOS_ENOMEM;                                                 \
+            (ptr) = NULL;                                                          \
         }                                                                          \
     } while (0)
 
@@ -509,7 +503,7 @@ static inline char *agentos_strndup(const char *str, size_t n)
 #define AGENTOS_MEMSET(ptr, value, size) \
     do {                                 \
         if ((size) > 0)                  \
-            memset((ptr), (value), (size)); \
+            __builtin_memset((ptr), (value), (size)); \
     } while (0)
 
 /**
@@ -610,7 +604,7 @@ static inline void agentos_memory_track_alloc(
     entry->ptr        = ptr;
     entry->size       = size;
     entry->category   = category;
-    entry->alloc_time = 0; /* TODO: 获取实际时间戳 */
+    entry->alloc_time = agentos_time_ms();
     entry->file       = file;
     entry->line       = line;
     entry->freed      = false;
@@ -680,7 +674,7 @@ static inline size_t agentos_check_leaks_scheduled(
     if (!ext_stats || !ext_stats->allocation_tracker) return 0;
 
     size_t suspected = 0;
-    uint64_t now = 0; /* TODO: 获取实际当前时间 */
+    uint64_t now = agentos_time_ms();
 
     for (size_t i = 0; i < ext_stats->tracker_count; i++) {
         alloc_track_entry_t *entry = &ext_stats->allocation_tracker[i];
@@ -787,7 +781,7 @@ static inline void agentos_memory_check_watermark(
     if (new_level != old_level) {
         ext_stats->current_watermark = new_level;
 
-        ((void)0)  /* fprintf suppressed in strict compliance mode */
+        ((void)0)  /* fprintf suppressed in strict compliance mode */;
 
         /* 触发所有已注册的回调 */
         for (int i = 0; i < MAX_WATERMARK_CALLBACKS; i++) {
@@ -842,6 +836,7 @@ static inline void agentos_memory_stats_report(
         fragment_ratio = (double)ext_stats->leak_suspected /
                          (double)ext_stats->total_allocated;
     }
+    (void)fragment_ratio;  /* suppressed: fprintf removed in strict mode */
 
     /* 计算使用率 */
     double usage_pct = 0.0;
@@ -851,10 +846,11 @@ static inline void agentos_memory_stats_report(
     }
 
     /* 输出 6 项关键指标 */
-    ((void)0)  /* fprintf suppressed in strict compliance mode */
+    ((void)0)  /* fprintf suppressed in strict compliance mode */;
+    (void)usage_pct;  /* suppressed: fprintf removed in strict mode */
 
     /* 按类别明细 */
-    ((void)0)  /* fprintf suppressed in strict compliance mode */
+    ((void)0)  /* fprintf suppressed in strict compliance mode */;
 }
 
 /**

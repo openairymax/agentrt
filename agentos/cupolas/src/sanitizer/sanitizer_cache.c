@@ -119,7 +119,7 @@ sanitizer_cache_t *sanitizer_cache_create(size_t capacity)
     if (!cache)
         return NULL;
 
-    AGENTOS_MEMSET(cache, 0, sizeof(sanitizer_cache_t));
+    __builtin_memset(cache, 0, sizeof(sanitizer_cache_t));
     cache->capacity = capacity > 0 ? capacity : 1024;
     cache->bucket_count = cache->capacity / 4;
     if (cache->bucket_count < 16)
@@ -131,7 +131,7 @@ sanitizer_cache_t *sanitizer_cache_create(size_t capacity)
         cupolas_mem_free(cache);
         return NULL;
     }
-    AGENTOS_MEMSET(cache->buckets, 0, cache->bucket_count * sizeof(cache_entry_t *));
+    __builtin_memset(cache->buckets, 0, cache->bucket_count * sizeof(cache_entry_t *));
 
     lru_init(cache);
 

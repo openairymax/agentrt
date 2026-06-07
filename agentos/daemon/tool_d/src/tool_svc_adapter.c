@@ -47,7 +47,7 @@ static agentos_error_t tool_adapter_init(agentos_service_t service,
         return AGENTOS_EINVAL;
 
     if (config) {
-        AGENTOS_MEMSET(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
+        __builtin_memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
         ctx->common_cfg.name = config->name ? AGENTOS_STRDUP(config->name) : NULL;
         ctx->common_cfg.version = config->version ? AGENTOS_STRDUP(config->version) : NULL;
         ctx->common_cfg.capabilities = config->capabilities;
@@ -183,7 +183,7 @@ agentos_error_t tool_service_adapter_create(agentos_service_t *out_service,
         return AGENTOS_ENOMEM;
 
     if (config) {
-        AGENTOS_MEMSET(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
+        __builtin_memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
         ctx->common_cfg.name = config->name ? AGENTOS_STRDUP(config->name) : NULL;
         ctx->common_cfg.version = config->version ? AGENTOS_STRDUP(config->version) : NULL;
         ctx->common_cfg.capabilities = config->capabilities;
@@ -244,7 +244,7 @@ agentos_error_t tool_service_adapter_wrap(agentos_service_t *out_service, tool_s
     ctx->owns_service = false;
 
     if (config) {
-        AGENTOS_MEMSET(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
+        __builtin_memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
         ctx->common_cfg.name = config->name ? AGENTOS_STRDUP(config->name) : NULL;
         ctx->common_cfg.version = config->version ? AGENTOS_STRDUP(config->version) : NULL;
         ctx->common_cfg.capabilities = config->capabilities;

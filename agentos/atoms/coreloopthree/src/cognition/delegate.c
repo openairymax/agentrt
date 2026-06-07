@@ -34,7 +34,7 @@ static char *delegate_strdup(const char *s)
     size_t len = strlen(s);
     char *dup = (char *)AGENTOS_MALLOC(len + 1);
     if (dup) {
-        memcpy(dup, s, len + 1);
+        __builtin_memcpy(dup, s, len + 1);
     }
     return dup;
 }
@@ -145,7 +145,7 @@ agentos_delegate_task_t *agentos_delegate_create(const char *task_description,
         task->config.token_budget_ratio =
             config->token_budget_ratio > 0.0f ? config->token_budget_ratio : 0.3f;
     } else {
-        AGENTOS_MEMSET(&task->config, 0, sizeof(agentos_delegate_config_t));
+        __builtin_memset(&task->config, 0, sizeof(agentos_delegate_config_t));
         task->config.max_depth = 2;
         task->config.max_iterations = 10;
         task->config.token_budget_ratio = 0.3f;

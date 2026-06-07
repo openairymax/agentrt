@@ -49,7 +49,7 @@ int agentos_strlcpy(char *dest, const char *src, size_t dest_size)
     size_t src_len = strlen(src);
     size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
 
-    memcpy(dest, src, copy_len);
+    __builtin_memcpy(dest, src, copy_len);
     dest[copy_len] = '\0';
 
     return (int)(src_len >= dest_size);
@@ -70,7 +70,7 @@ int agentos_strlcat(char *dest, const char *src, size_t dest_size)
     size_t remaining = dest_size - dest_len - 1;
     size_t copy_len = (src_len < remaining) ? src_len : remaining;
 
-    memcpy(dest + dest_len, src, copy_len);
+    __builtin_memcpy(dest + dest_len, src, copy_len);
     dest[dest_len + copy_len] = '\0';
 
     return (int)(src_len > remaining);
@@ -85,7 +85,7 @@ char *agentos_strncpy_safe(char *dest, const char *src, size_t dest_size)
     size_t src_len = strlen(src);
     size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
 
-    memcpy(dest, src, copy_len);
+    __builtin_memcpy(dest, src, copy_len);
     dest[copy_len] = '\0';
 
     return dest;
@@ -101,7 +101,7 @@ int agentos_memset_s(void *dest, int c, size_t dest_size, size_t count)
         return AGENTOS_EINVAL;
     }
 
-    memset(dest, (int)c, count);
+    __builtin_memset(dest, (int)c, count);
     return 0;
 }
 
@@ -116,9 +116,9 @@ int agentos_memcpy_s(void *dest, size_t dest_size, const void *src, size_t count
     }
 
     if ((char *)dest < (const char *)src + count && (const char *)src < (char *)dest + count) {
-        memmove(dest, src, count);
+        __builtin_memmove(dest, src, count);
     } else {
-        memcpy(dest, src, count);
+        __builtin_memcpy(dest, src, count);
     }
 
     return 0;
@@ -134,7 +134,7 @@ int agentos_memmove_s(void *dest, size_t dest_size, const void *src, size_t coun
         return AGENTOS_EINVAL;
     }
 
-    memmove(dest, src, count);
+    __builtin_memmove(dest, src, count);
     return 0;
 }
 

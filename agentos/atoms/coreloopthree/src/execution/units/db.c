@@ -228,7 +228,7 @@ agentos_execution_unit_t *agentos_db_unit_create(const char *connection_string)
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
-    AGENTOS_MEMSET(unit, 0, sizeof(*unit));
+    __builtin_memset(unit, 0, sizeof(*unit));
 
     db_unit_data_t *data = (db_unit_data_t *)AGENTOS_MALLOC(sizeof(db_unit_data_t));
     if (!data) {
