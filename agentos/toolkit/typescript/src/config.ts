@@ -56,7 +56,7 @@ export function defaultConfig(): manager {
     timeout: 30000,
     maxRetries: 3,
     retryDelay: 1000,
-    userAgent: 'AgentOS-TypeScript-tools/3.0.0',
+    userAgent: 'AgentOS-TypeScript-tools/0.1.0',
     debug: false,
     logLevel: 'info',
     maxConnections: 10,

@@ -57,7 +57,7 @@ static agentos_error_t gateway_adapter_init(agentos_service_t service,
 
     // 保存通用配置
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     }
 
     // 将通用配置转换为网关特定配置
@@ -252,7 +252,7 @@ agentos_error_t gateway_service_adapter_create(agentos_service_t *out_service,
 
     // 保存通用配置
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         // 使用默认配置
         ctx->common_cfg.name = "gateway_d";
@@ -337,7 +337,7 @@ agentos_error_t gateway_service_adapter_wrap(agentos_service_t *out_service,
 
     // 保存通用配置
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         // 从网关服务获取配置信息
         ctx->common_cfg.name = "gateway_d";
@@ -543,7 +543,7 @@ agentos_error_t gateway_service_adapter_create_from_config(agentos_service_t *ou
     if (!out_service || !config_path)
         return AGENTOS_EINVAL;
     agentos_svc_config_t config;
-    AGENTOS_MEMSET(&config, 0, sizeof(config));
+    __builtin_memset(&config, 0, sizeof(config));
     config.name = "gateway_d";
     config.version = "0.1.0";
     config.capabilities = AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_STREAMING;

@@ -11,7 +11,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from agentos import AgentOS, AsyncAgentOS
-from agentos.exceptions import AgentOSError, NetworkError, TimeoutError
+from agentos.exceptions import AgentOSError, NetworkError, AgentOSTimeoutError
 
 class TestAgentOS(unittest.TestCase):
     """Test AgentOS client"""

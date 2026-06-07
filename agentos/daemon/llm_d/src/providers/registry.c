@@ -176,7 +176,7 @@ provider_registry_t *provider_registry_create_from_config(const service_config_t
     }
 
     if (reg->providers) {
-        memcpy(new_provs, reg->providers, old_count * sizeof(provider_t));
+        __builtin_memcpy(new_provs, reg->providers, old_count * sizeof(provider_t));
         AGENTOS_FREE(reg->providers);
     }
     reg->providers = new_provs;
@@ -206,13 +206,15 @@ provider_registry_t *provider_registry_create_from_config(const service_config_t
         if (cJSON_IsString(pkey_env) && pkey_env->valuestring[0]) {
             const char *env_val = getenv(pkey_env->valuestring);
             if (env_val && env_val[0]) {
-                AGENTOS_STRNCPY_TERM(api_key_buf, env_val, sizeof(api_key_buf));
+AGENTOS_STRNCPY_TERM(api_key_buf, env_val, sizeof(api_key_buf));
+                (api_key_buf)[sizeof(api_key_buf) - 1] = '\0';
             } else {
                 SVC_LOG_WARN("Env var '%s' not set for provider '%s'", pkey_env->valuestring,
                              name_str);
             }
         } else if (cJSON_IsString(pkey) && pkey->valuestring[0]) {
-            AGENTOS_STRNCPY_TERM(api_key_buf, pkey->valuestring, sizeof(api_key_buf));
+AGENTOS_STRNCPY_TERM(api_key_buf, pkey->valuestring, sizeof(api_key_buf));
+            (api_key_buf)[sizeof(api_key_buf) - 1] = '\0';
         }
 
         const char *base_str = cJSON_IsString(pbase) ? pbase->valuestring : NULL;

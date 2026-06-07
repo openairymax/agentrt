@@ -87,7 +87,7 @@ static const char *parse_skill_type_from_url(const char *url)
         const char *end = strchr(start, '?');
         size_t len = end ? (size_t)(end - start) : strlen(start);
         if (len > 0 && len < 63) {
-            memcpy(type_buf, start, len);
+            __builtin_memcpy(type_buf, start, len);
             type_buf[len] = '\0';
             return type_buf;
         }

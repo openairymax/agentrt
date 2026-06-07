@@ -48,8 +48,8 @@ static agentos_error_t example_service_init(agentos_service_t svc,
         return AGENTOS_ENOMEM;
     }
 
-    AGENTOS_MEMSET(ctx, 0, sizeof(example_service_context_t));
-    AGENTOS_STRNCPY_TERM(ctx->name, config->name, sizeof(ctx->name));
+    __builtin_memset(ctx, 0, sizeof(example_service_context_t));
+AGENTOS_STRNCPY_TERM(ctx->name, config->name, sizeof(ctx->name));
     ctx->counter = 0;
 
     /* 存储上下文到服务 */

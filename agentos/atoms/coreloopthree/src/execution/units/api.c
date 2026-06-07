@@ -86,7 +86,7 @@ static int parse_url(const char *url, char *host, size_t host_size, int *port, c
         size_t hlen = (size_t)(colon - p);
         if (hlen >= host_size)
             hlen = host_size - 1;
-        memcpy(host, p, hlen);
+        __builtin_memcpy(host, p, hlen);
         host[hlen] = '\0';
         *port = atoi(colon + 1);
         if (*port <= 0)
@@ -95,16 +95,14 @@ static int parse_url(const char *url, char *host, size_t host_size, int *port, c
         size_t hlen = slash ? (size_t)(slash - p) : strlen(p);
         if (hlen >= host_size)
             hlen = host_size - 1;
-        memcpy(host, p, hlen);
+        __builtin_memcpy(host, p, hlen);
         host[hlen] = '\0';
     }
 
     if (slash) {
         AGENTOS_STRNCPY_TERM(path, slash, path_size);
-        path[path_size - 1] = '\0';
     } else {
         AGENTOS_STRNCPY_TERM(path, "/", path_size);
-        path[path_size - 1] = '\0';
     }
 
     return 0;
@@ -113,7 +111,7 @@ static int parse_url(const char *url, char *host, size_t host_size, int *port, c
 static SOCKET connect_to_host(const char *host, int port, int timeout_ms)
 {
     struct addrinfo hints, *result, *rp;
-    AGENTOS_MEMSET(&hints, 0, sizeof(hints));
+    __builtin_memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
@@ -181,11 +179,11 @@ static char *http_request(SOCKET sock, const char *method, const char *host, con
             }
             request = new_req;
         }
-        memcpy(request + len, "\r\n", 2);
+        __builtin_memcpy(request + len, "\r\n", 2);
         len += 2;
-        memcpy(request + len, body, body_len);
+        __builtin_memcpy(request + len, body, body_len);
         len += (int)body_len;
-        memcpy(request + len, "\r\n", 2);
+        __builtin_memcpy(request + len, "\r\n", 2);
         len += 2;
     } else {
         len += snprintf(request + len, req_cap - len, "\r\n");
@@ -249,7 +247,7 @@ static char *extract_body(const char *response)
         if (content_len > 0) {
             char *result = (char *)AGENTOS_MALLOC(content_len + 1);
             if (result) {
-                memcpy(result, body, content_len);
+                __builtin_memcpy(result, body, content_len);
                 result[content_len] = '\0';
             }
             return result;
@@ -273,12 +271,42 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
     char url[MAX_URL_LENGTH] = {0};
     char body[MAX_BODY_SIZE] = {0};
 
-    if (sscanf(request_str, "method=%15[^&]&url=%2047[^&]&body=%4095[^\n]", method, url, body) <
-        2) {
-        if (sscanf(request_str, "%2047s", url) != 1) {
+    int parsed_fields = 0;
+    const char *method_start = request_str + 7;
+    const char *method_end = strchr(method_start, '&');
+    if (method_end) {
+        size_t method_len = (size_t)(method_end - method_start);
+        if (method_len >= sizeof(method)) method_len = sizeof(method) - 1;
+        __builtin_memcpy(method, method_start, method_len);
+        method[method_len] = '\0';
+        parsed_fields++;
+        const char *url_start = method_end + 4;
+        const char *url_end = strchr(url_start, '&');
+        if (url_end) {
+            size_t url_len = (size_t)(url_end - url_start);
+            if (url_len >= sizeof(url)) url_len = sizeof(url) - 1;
+            __builtin_memcpy(url, url_start, url_len);
+            url[url_len] = '\0';
+            parsed_fields++;
+            const char *body_start = url_end + 5;
+            size_t body_avail = strlen(body_start);
+            if (body_avail >= sizeof(body)) body_avail = sizeof(body) - 1;
+            __builtin_memcpy(body, body_start, body_avail);
+            body[body_avail] = '\0';
+            parsed_fields++;
+        }
+    }
+    if (parsed_fields < 2)
+    {
+        size_t url_copy_len = strlen(request_str);
+        if (url_copy_len >= sizeof(url)) url_copy_len = sizeof(url) - 1;
+        __builtin_memcpy(url, request_str, url_copy_len);
+        url[url_copy_len] = '\0';
+        if (url[0] == '\0') {
             ATM_RET_ERR(AGENTOS_EINVAL);
         }
-        AGENTOS_STRNCPY_TERM(method, "GET", sizeof(method));
+AGENTOS_STRNCPY_TERM(method, "GET", sizeof(method));
+        method[sizeof(method) - 1] = '\0';
     }
 
     char host[256] = {0};
@@ -405,7 +433,7 @@ agentos_error_t agentos_unit_api_create(const api_config_t *config,
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
-    memcpy(&data->config, config, sizeof(api_config_t));
+    __builtin_memcpy(&data->config, config, sizeof(api_config_t));
 
     data->cached_responses = (char **)AGENTOS_CALLOC(10, sizeof(char *));
     if (!data->cached_responses) {

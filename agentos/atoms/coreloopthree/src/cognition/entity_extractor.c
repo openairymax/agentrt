@@ -134,7 +134,7 @@ int agentos_extraction_result_add(agentos_extraction_result_t *result,
         }
 
         /* 初始化新空间 */
-        AGENTOS_MEMSET(new_entities + result->capacity, 0,
+        __builtin_memset(new_entities + result->capacity, 0,
                (new_capacity - result->capacity) * sizeof(agentos_entity_t));
 
         result->entities = new_entities;
@@ -152,7 +152,7 @@ int agentos_extraction_result_add(agentos_extraction_result_t *result,
     if (entity->value && entity->value_len > 0) {
         target->value = (char *)AGENTOS_MALLOC(entity->value_len + 1);
         if (target->value) {
-            memcpy(target->value, entity->value, entity->value_len);
+            __builtin_memcpy(target->value, entity->value, entity->value_len);
             target->value[entity->value_len] = '\0';
             target->value_len = entity->value_len;
         } else {
@@ -189,12 +189,12 @@ static void extract_numbers(const char *input, size_t input_len,
             size_t len = p - start;
             if (len > 0 && len <= 20) { /* 合理的数字长度限制 */
                 agentos_entity_t entity;
-                AGENTOS_MEMSET(&entity, 0, sizeof(entity));
+                __builtin_memset(&entity, 0, sizeof(entity));
                 entity.type = AGENTOS_ENTITY_NUMBER;
                 entity.type_name = agentos_entity_type_name(AGENTOS_ENTITY_NUMBER);
                 entity.value = (char *)AGENTOS_MALLOC(len + 1);
                 if (entity.value) {
-                    memcpy(entity.value, start, len);
+                    __builtin_memcpy(entity.value, start, len);
                     entity.value[len] = '\0';
                     entity.value_len = len;
                     entity.start_pos = start_pos;
@@ -233,12 +233,12 @@ static void extract_urls(const char *input, size_t input_len, agentos_extraction
         size_t len = match.rm_eo - match.rm_so;
         if (len > 3 && len <= 256) { /* 合理的 URL 长度限制 */
             agentos_entity_t entity;
-            AGENTOS_MEMSET(&entity, 0, sizeof(entity));
+            __builtin_memset(&entity, 0, sizeof(entity));
             entity.type = AGENTOS_ENTITY_URL;
             entity.type_name = agentos_entity_type_name(AGENTOS_ENTITY_URL);
             entity.value = (char *)AGENTOS_MALLOC(len + 1);
             if (entity.value) {
-                memcpy(entity.value, p + match.rm_so, len);
+                __builtin_memcpy(entity.value, p + match.rm_so, len);
                 entity.value[len] = '\0';
                 entity.value_len = len;
                 entity.start_pos = offset + match.rm_so;
@@ -275,12 +275,12 @@ static void extract_emails(const char *input, size_t input_len, agentos_extracti
         size_t len = match.rm_eo - match.rm_so;
         if (len > 5 && len <= 128) { /* 合理的邮箱长度限制 */
             agentos_entity_t entity;
-            AGENTOS_MEMSET(&entity, 0, sizeof(entity));
+            __builtin_memset(&entity, 0, sizeof(entity));
             entity.type = AGENTOS_ENTITY_EMAIL;
             entity.type_name = agentos_entity_type_name(AGENTOS_ENTITY_EMAIL);
             entity.value = (char *)AGENTOS_MALLOC(len + 1);
             if (entity.value) {
-                memcpy(entity.value, p + match.rm_so, len);
+                __builtin_memcpy(entity.value, p + match.rm_so, len);
                 entity.value[len] = '\0';
                 entity.value_len = len;
                 entity.start_pos = offset + match.rm_so;
@@ -318,12 +318,12 @@ static void extract_filepaths(const char *input, size_t input_len,
         size_t len = match.rm_eo - match.rm_so;
         if (len > 2 && len <= 512) { /* 合理的路径长度限制 */
             agentos_entity_t entity;
-            AGENTOS_MEMSET(&entity, 0, sizeof(entity));
+            __builtin_memset(&entity, 0, sizeof(entity));
             entity.type = AGENTOS_ENTITY_FILEPATH;
             entity.type_name = agentos_entity_type_name(AGENTOS_ENTITY_FILEPATH);
             entity.value = (char *)AGENTOS_MALLOC(len + 1);
             if (entity.value) {
-                memcpy(entity.value, p + match.rm_so, len);
+                __builtin_memcpy(entity.value, p + match.rm_so, len);
                 entity.value[len] = '\0';
                 entity.value_len = len;
                 entity.start_pos = offset + match.rm_so;
@@ -379,7 +379,7 @@ int agentos_entity_extract(const char *input, size_t input_len, agentos_extracti
         if (!new_result) {
             ATM_RET_ERR(AGENTOS_EINVAL);
         }
-        memcpy(result, new_result, sizeof(*result));
+        __builtin_memcpy(result, new_result, sizeof(*result));
         AGENTOS_FREE(new_result);
     }
 

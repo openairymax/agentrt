@@ -128,7 +128,7 @@ int taskflow_engine_register_handler(taskflow_engine_t *engine, const char *name
             return 0;
         }
     }
-    AGENTOS_STRNCPY_TERM(engine->handlers[engine->handler_count].name, name, sizeof(engine->handlers[0].name));
+AGENTOS_STRNCPY_TERM(engine->handlers[engine->handler_count].name, name, sizeof(engine->handlers[0].name));
     engine->handlers[engine->handler_count].handler = handler;
     engine->handlers[engine->handler_count].user_data = user_data;
     engine->handler_count++;
@@ -141,7 +141,7 @@ int taskflow_engine_unregister_handler(taskflow_engine_t *engine, const char *na
         ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->handler_count; i++) {
         if (strcmp(engine->handlers[i].name, name) == 0) {
-            memmove(&engine->handlers[i], &engine->handlers[i + 1],
+            __builtin_memmove(&engine->handlers[i], &engine->handlers[i + 1],
                     (engine->handler_count - i - 1) * sizeof(handler_entry_t));
             engine->handler_count--;
             return 0;
@@ -176,7 +176,7 @@ int taskflow_engine_unregister_workflow(taskflow_engine_t *engine, const char *w
         ATM_RET_ERR(AGENTOS_EINVAL);
     for (size_t i = 0; i < engine->workflow_count; i++) {
         if (strcmp(engine->workflows[i].workflow.id, workflow_id) == 0) {
-            memmove(&engine->workflows[i], &engine->workflows[i + 1],
+            __builtin_memmove(&engine->workflows[i], &engine->workflows[i + 1],
                     (engine->workflow_count - i - 1) * sizeof(workflow_entry_t));
             engine->workflow_count--;
             return 0;
@@ -192,7 +192,7 @@ int taskflow_engine_load_workflow_json(taskflow_engine_t *engine, const char *wo
     if (engine->workflow_count >= TASKFLOW_MAX_SUBFLOWS)
         ATM_RET_ERR(AGENTOS_ERR_OVERFLOW);
     workflow_entry_t *we = &engine->workflows[engine->workflow_count];
-    AGENTOS_MEMSET(we, 0, sizeof(workflow_entry_t));
+    __builtin_memset(we, 0, sizeof(workflow_entry_t));
     snprintf(we->workflow.id, sizeof(we->workflow.id), "wf_json_%zu", engine->workflow_count);
     snprintf(we->workflow.name, sizeof(we->workflow.name), "JSON Workflow %zu",
              engine->workflow_count);
@@ -242,11 +242,11 @@ int taskflow_engine_start(taskflow_engine_t *engine, const char *workflow_id,
         ATM_RET_ERR(AGENTOS_ERR_INVALID_PARAM);
 
     execution_entry_t *ee = &engine->executions[engine->execution_count];
-    AGENTOS_MEMSET(ee, 0, sizeof(execution_entry_t));
+    __builtin_memset(ee, 0, sizeof(execution_entry_t));
     uint64_t eid = generate_id(engine);
     snprintf(ee->execution.execution_id, sizeof(ee->execution.execution_id), "exec_%lu",
              (unsigned long)eid);
-    AGENTOS_STRNCPY_TERM(ee->execution.workflow_id, workflow_id, sizeof(ee->execution.workflow_id));
+AGENTOS_STRNCPY_TERM(ee->execution.workflow_id, workflow_id, sizeof(ee->execution.workflow_id));
     ee->execution.state = TASKFLOW_STATE_RUNNING;
     ee->execution.input_json = input_json ? AGENTOS_STRDUP(input_json) : NULL;
     ee->execution.progress = 0.0;
@@ -452,10 +452,10 @@ int taskflow_engine_create_checkpoint(taskflow_engine_t *engine, const char *exe
         taskflow_checkpoint_t *cp = &ee->checkpoints[ee->checkpoint_count];
         uint64_t cid = generate_id(engine);
         snprintf(cp->id, sizeof(cp->id), "cp_%lu", (unsigned long)cid);
-        AGENTOS_STRNCPY_TERM(cp->execution_id, execution_id, sizeof(cp->execution_id));
-        AGENTOS_STRNCPY_TERM(cp->workflow_id, ee->execution.workflow_id, sizeof(cp->workflow_id));
+AGENTOS_STRNCPY_TERM(cp->execution_id, execution_id, sizeof(cp->execution_id));
+AGENTOS_STRNCPY_TERM(cp->workflow_id, ee->execution.workflow_id, sizeof(cp->workflow_id));
         if (ee->execution.current_node_id)
-            AGENTOS_STRNCPY_TERM(cp->node_id, ee->execution.current_node_id, sizeof(cp->node_id));
+AGENTOS_STRNCPY_TERM(cp->node_id, ee->execution.current_node_id, sizeof(cp->node_id));
         cp->state = ee->execution.state;
         size_t snap_len = 256 + (ee->variables_json ? strlen(ee->variables_json) : 0);
         cp->snapshot_json = (char *)AGENTOS_MALLOC(snap_len);
@@ -627,7 +627,7 @@ int taskflow_engine_get_variable(taskflow_engine_t *engine, const char *executio
         size_t val_len = (size_t)(end - found);
         *value_json = (char *)AGENTOS_MALLOC(val_len + 1);
         if (*value_json) {
-            memcpy(*value_json, found, val_len);
+            __builtin_memcpy(*value_json, found, val_len);
             (*value_json)[val_len] = '\0';
         }
         return 0;

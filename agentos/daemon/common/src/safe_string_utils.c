@@ -22,13 +22,13 @@ int safe_strcpy(char *dest, const char *src, size_t dest_size)
 
     size_t src_len = strlen(src);
     if (src_len >= dest_size) {
-        memcpy(dest, src, dest_size - 1);
+        __builtin_memcpy(dest, src, dest_size - 1);
         dest[dest_size - 1] = '\0';
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "safe_strcpy: buffer overflow");
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    memcpy(dest, src, src_len + 1);
+    __builtin_memcpy(dest, src, src_len + 1);
     return 0;
 }
 
@@ -44,13 +44,13 @@ int safe_strcat(char *dest, const char *src, size_t dest_size)
 
     if (dest_len + src_len >= dest_size) {
         size_t remaining = dest_size - dest_len - 1;
-        memcpy(dest + dest_len, src, remaining);
+        __builtin_memcpy(dest + dest_len, src, remaining);
         dest[dest_len + remaining] = '\0';
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "safe_strncpy: buffer overflow");
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    memcpy(dest + dest_len, src, src_len + 1);
+    __builtin_memcpy(dest + dest_len, src, src_len + 1);
     return 0;
 }
 
@@ -134,7 +134,7 @@ char *safe_strdup_with_limit(const char *str, size_t max_copy_len)
         return NULL;
     }
 
-    memcpy(copy, str, len);
+    __builtin_memcpy(copy, str, len);
     copy[len] = '\0';
     return copy;
 }

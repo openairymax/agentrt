@@ -83,7 +83,7 @@ export class MockClient implements APIClient {
   async health(): Promise<HealthStatus> {
     return {
       status: 'healthy',
-      version: '3.0.0-mock',
+      version: '0.1.0-mock',
       uptime: 0,
       checks: { database: 'ok', memory: 'ok' },
       timestamp: new Date(),

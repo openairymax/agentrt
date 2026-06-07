@@ -50,7 +50,8 @@ corekern/
 │   ├── mem/
 │   │   ├── alloc.c                 # 内存分配器（malloc/free/realloc 封装 + 调试追踪）
 │   │   ├── pool.c                  # 内存池（固定块大小的高效分配）
-│   │   └── guard.c                 # 内存保护页（越界检测）
+│   │   ├── guard.c                 # 内存保护页（越界检测）
+│   │   └── oom_handler.c           # OOM 分级响应框架实现
 │   ├── task/
 │   │   ├── scheduler.c             # 调度器入口
 │   │   ├── scheduler_core.c        # 调度器核心逻辑（优先级队列、依赖解析）
@@ -123,6 +124,8 @@ typedef struct {
 | `agentos_mem_pool_free()` | 释放到内存池（双重释放检测） | 是 |
 | `agentos_mem_stats()` | 获取内存使用统计 | 是 |
 | `agentos_mem_check_leaks()` | 检查内存泄漏 | 否 |
+
+> **OOM Handler**：提供五级内存压力分级响应框架（NORMAL → WARNING → DEGRADED → CRITICAL → FATAL），在内存压力递增时依次触发预警、限流、降级、紧急释放和致命处理策略，确保系统在内存紧张场景下的可控降级与安全退出。
 
 ### 3. Scheduler — 任务调度器
 

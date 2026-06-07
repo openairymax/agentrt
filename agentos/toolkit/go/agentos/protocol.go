@@ -196,14 +196,15 @@ func (c *ProtocolClient) SendRequest(ctx context.Context,
 
 	url := fmt.Sprintf("%s%s", c.config.Endpoint, reqPath)
 	var lastErr error
+	delay := c.config.RetryDelay
 
 	for attempt := 0; attempt <= c.config.RetryCount; attempt++ {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
-			case <-time.After(c.config.RetryDelay):
-				c.config.RetryDelay *= 2
+			case <-time.After(delay):
+				delay *= 2
 			}
 		}
 

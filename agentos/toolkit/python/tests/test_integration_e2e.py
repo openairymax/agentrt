@@ -67,7 +67,7 @@ class TestErrorHandlingIntegration(unittest.TestCase):
         self.assertTrue(CODE_UNKNOWN.startswith("0x"))
 
     def test_timeout_error(self):
-        err = TimeoutError("request timed out")
+        err = AgentOSTimeoutError("request timed out")
         self.assertEqual(err.error_code, CODE_TIMEOUT)
 
     def test_network_error(self):

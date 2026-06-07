@@ -27,9 +27,22 @@
 | `setup/setup.ps1` | 全部模块 | 开发环境配置（Windows PowerShell） |
 | `cli/agentos` | `daemon/`, `manager/`, `openlab/` | 统一 CLI 命令行入口（服务管理/智能体管理/任务管理） |
 | `cmake/windows_preinclude.h` | `atoms/`, `commons/`, `cupolas/` | CMake 辅助配置（Windows MSVC 兼容性头） |
+| `cmake/Sanitizers.cmake` | `atoms/`, `commons/`, `cupolas/` | CMake Sanitizers 配置（ASan/MSan/UBSan） |
+| `docs/Doxyfile` | 全部模块 | Doxygen 文档生成配置 |
 | `utils/quickstart.sh` | 全部模块 | 一键快速启动脚本 |
 | `utils/validate.sh` | 全部模块 | 环境完整性验证脚本 |
 | `utils/add_error_push_ex.py` | `commons/`, `daemon/` | 错误码推送扩展生成工具 |
+| `utils/inject_error_push_ex.py` | `commons/`, `daemon/` | 错误码推送注入工具 |
+| `utils/fix_strncpy.py` | `atoms/`, `commons/` | strncpy 安全修复工具 |
+| `utils/fix_return_neg_N.py` | `atoms/`, `commons/` | 负返回值修复工具 |
+| `utils/fix_error_push_ex_order.py` | `commons/`, `daemon/` | 错误码推送顺序修复工具 |
+| `utils/fix_braces_and_codes.py` | `atoms/`, `commons/` | 大括号与错误码修复工具 |
+| `utils/fix_agentos_efail_macro.py` | `atoms/`, `commons/` | AGENTOS_EFAIL 宏修复工具 |
+| `utils/fix_agentos_efail.py` | `atoms/`, `commons/` | AGENTOS_EFAIL 修复工具 |
+| `utils/fix_indent_and_codes.py` | `atoms/`, `commons/` | 缩进与错误码修复工具 |
+| `utils/fix_includes_and_braces.py` | `atoms/`, `commons/` | 包含与大括号修复工具 |
+| `utils/fix_error_handle.py` | `commons/`, `daemon/` | 错误处理修复工具 |
+| `utils/check_memory_compat.py` | `atoms/`, `commons/` | 内存兼容性检查工具 |
 
 ## 目录结构
 
@@ -45,12 +58,26 @@ dev/
 │   └── setup.ps1                  #   开发环境配置（Windows PowerShell）
 ├── cli/                           # CLI 入口
 │   └── agentos                    #   统一 CLI 命令行入口（服务管理/智能体管理/任务管理）
-├── cmake/                         # CMake 辅助配置
-│   └── windows_preinclude.h       #   Windows MSVC 兼容性预包含头（WIN32_LEAN_AND_MEAN 等）
-└── utils/                         # 开发辅助工具（3 个文件）
+├── cmake/                         # CMake 辅助配置（2 个文件）
+│   ├── windows_preinclude.h       #   Windows MSVC 兼容性预包含头（WIN32_LEAN_AND_MEAN 等）
+│   └── Sanitizers.cmake           #   CMake Sanitizers 配置（ASan/MSan/UBSan）
+├── docs/                          # 文档生成（1 个文件）
+│   └── Doxyfile                   #   Doxygen 文档生成配置
+└── utils/                         # 开发辅助工具（14 个文件）
     ├── quickstart.sh              #   一键快速启动脚本
     ├── validate.sh                #   环境完整性验证脚本
-    └── add_error_push_ex.py       #   错误码推送扩展生成工具
+    ├── add_error_push_ex.py       #   错误码推送扩展生成工具
+    ├── inject_error_push_ex.py    #   错误码推送注入工具
+    ├── fix_strncpy.py             #   strncpy 安全修复工具
+    ├── fix_return_neg_N.py        #   负返回值修复工具
+    ├── fix_error_push_ex_order.py #   错误码推送顺序修复工具
+    ├── fix_braces_and_codes.py    #   大括号与错误码修复工具
+    ├── fix_agentos_efail_macro.py #   AGENTOS_EFAIL 宏修复工具
+    ├── fix_agentos_efail.py       #   AGENTOS_EFAIL 修复工具
+    ├── fix_indent_and_codes.py    #   缩进与错误码修复工具
+    ├── fix_includes_and_braces.py #   包含与大括号修复工具
+    ├── fix_error_handle.py        #   错误处理修复工具
+    └── check_memory_compat.py     #   内存兼容性检查工具
 ```
 
 ## 核心组件说明
@@ -81,12 +108,28 @@ dev/
 ### cmake/ — CMake 辅助配置
 
 - **windows_preinclude.h**：Windows MSVC 兼容性预包含头文件，定义 `WIN32_LEAN_AND_MEAN`、`NOMINMAX` 等宏，减少 Windows.h 的编译开销和命名冲突。在 CMake 构建系统中通过 `/FI` 编译选项强制预包含此头文件。
+- **Sanitizers.cmake**：CMake Sanitizers 配置模块，支持 AddressSanitizer（ASan）、MemorySanitizer（MSan）、UndefinedBehaviorSanitizer（UBSan）等编译器插桩工具，用于在开发和测试阶段检测内存错误和未定义行为。
+
+### docs/ — 文档生成
+
+- **Doxyfile**：Doxygen 文档生成配置文件，用于从 C/C++ 源码注释自动生成 API 参考文档。配置了输入源码路径、输出格式（HTML/LaTeX）和文档样式等参数。
 
 ### utils/ — 开发辅助工具
 
 - **quickstart.sh**：一键快速启动脚本，自动完成环境检查→依赖安装→项目构建→服务启动的全流程，适合新开发者快速上手。
 - **validate.sh**：环境完整性验证脚本，检查系统环境是否满足项目构建和运行的所有前置条件（编译器版本、CMake 版本、Python 版本、系统库等）。
 - **add_error_push_ex.py**：错误码推送扩展生成工具，用于生成和注册新的错误码及其描述信息。
+- **inject_error_push_ex.py**：错误码推送注入工具，将错误码定义注入到源码文件中。
+- **fix_strncpy.py**：strncpy 安全修复工具，将不安全的 `strncpy` 调用替换为安全替代方案。
+- **fix_return_neg_N.py**：负返回值修复工具，修复返回负数常量的错误码模式。
+- **fix_error_push_ex_order.py**：错误码推送顺序修复工具，确保错误码推送语句的正确顺序。
+- **fix_braces_and_codes.py**：大括号与错误码修复工具，统一代码风格和错误码格式。
+- **fix_agentos_efail_macro.py**：AGENTOS_EFAIL 宏修复工具，规范化 AGENTOS_EFAIL 宏的使用方式。
+- **fix_agentos_efail.py**：AGENTOS_EFAIL 修复工具，修复 AGENTOS_EFAIL 调用的常见问题。
+- **fix_indent_and_codes.py**：缩进与错误码修复工具，统一代码缩进和错误码格式。
+- **fix_includes_and_braces.py**：包含与大括号修复工具，修复头文件包含顺序和大括号风格。
+- **fix_error_handle.py**：错误处理修复工具，统一错误处理模式。
+- **check_memory_compat.py**：内存兼容性检查工具，检测内存相关 API 的兼容性问题。
 
 ## 使用方式
 
@@ -173,6 +216,8 @@ python scripts/dev/utils/add_error_push_ex.py
 | `setup/setup.ps1` | PowerShell 5.1+ | Windows 环境配置依赖 Chocolatey 或 Scoop 包管理器 |
 | `cli/agentos` | Bash 4.0+ | CLI 工具为纯 Shell 脚本实现 |
 | `cmake/windows_preinclude.h` | MSVC 2019+ | 预包含头仅在使用 MSVC 编译器时生效 |
+| `cmake/Sanitizers.cmake` | CMake 3.20+, Clang/GCC | Sanitizers 需要 Clang 或 GCC 编译器支持 |
+| `docs/Doxyfile` | Doxygen 1.9+ | 文档生成需要安装 Doxygen 工具 |
 | `utils/quickstart.sh` | Bash 4.0+, CMake, Python 3.8+ | 快速启动脚本依赖构建和运行时的全部工具 |
 | `utils/validate.sh` | Bash 4.0+ | 验证脚本仅检查环境，不安装任何依赖 |
 | `utils/add_error_push_ex.py` | Python 3.8+ | 错误码生成工具为纯 Python 实现 |

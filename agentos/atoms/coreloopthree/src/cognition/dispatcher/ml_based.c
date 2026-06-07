@@ -217,7 +217,7 @@ agentos_dispatching_ml_create(const char __attribute__((unused)) * model_path, v
     data->history_count = 0;
     data->history_pos = 0;
     data->last_dispatch_time_ns = 0;
-    AGENTOS_MEMSET(data->last_selected_agent_id, 0, sizeof(data->last_selected_agent_id));
+    __builtin_memset(data->last_selected_agent_id, 0, sizeof(data->last_selected_agent_id));
 
     if (model_path && model_path[0] != '\0') {
         FILE *f = fopen(model_path, "rb");

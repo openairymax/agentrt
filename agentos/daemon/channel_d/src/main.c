@@ -55,7 +55,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
                 size_t l = (size_t)(e - p);
                 if (l > 127)
                     l = 127;
-                memcpy(id, p, l);
+                __builtin_memcpy(id, p, l);
             }
         }
         int64_t latency_ms = 0;
@@ -137,7 +137,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
                 size_t l = (size_t)(e - p);
                 if (l > 127)
                     l = 127;
-                memcpy(id, p, l);
+                __builtin_memcpy(id, p, l);
             }
         }
 
@@ -149,7 +149,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
                 size_t l = (size_t)(e - p);
                 if (l > 255)
                     l = 255;
-                memcpy(name, p, l);
+                __builtin_memcpy(name, p, l);
             }
         }
 
@@ -192,7 +192,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
                 size_t l = (size_t)(e - p);
                 if (l > 127)
                     l = 127;
-                memcpy(id, p, l);
+                __builtin_memcpy(id, p, l);
             }
         }
 
@@ -223,7 +223,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
                 size_t l = (size_t)(e - p);
                 if (l > 127)
                     l = 127;
-                memcpy(id, p, l);
+                __builtin_memcpy(id, p, l);
             }
         }
 
@@ -284,7 +284,8 @@ int main(int argc, char *argv[])
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
     config.max_channels = max_channels;
     if (socket_dir) {
-        AGENTOS_STRNCPY_TERM(config.socket_dir, socket_dir, sizeof(config.socket_dir));
+AGENTOS_STRNCPY_TERM(config.socket_dir, socket_dir, sizeof(config.socket_dir));
+        (config.socket_dir)[sizeof(config.socket_dir) - 1] = '\0';
     }
 
     channel_service_t *svc = channel_service_create(&config);
@@ -303,7 +304,10 @@ int main(int argc, char *argv[])
                  config.socket_dir);
 
     while (atomic_load_explicit(&g_running, memory_order_acquire)) {
-        sleep(1);
+        /* 替代 sleep(1)，允许更快响应关闭信号 */
+        for (int _w = 0; _w < 10 && atomic_load_explicit(&g_running, memory_order_acquire); _w++) {
+            usleep(100000); /* 100ms */
+        }
     }
 
     SVC_LOG_INFO("channel_d shutting down");

@@ -3,30 +3,30 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(SOURCES
     platform/platform.c
-    utils/platform/platform_adapter.c
-    utils/token/counter.c
-    utils/token/budget.c
-    utils/token/token_standard.c
-    utils/cost/estimator.c
-    utils/cost/controller.c
-    utils/observability/logger.c
-    utils/observability/metrics.c
-    utils/observability/trace.c
-    utils/error/handler.c
-    utils/io/file_utils.c
-    utils/security/input_validator.c
-    utils/resource/resource_guard.c
-    utils/resource/resource_quota.c
+    utils/platform/src/platform_adapter.c
+    utils/token/src/counter.c
+    utils/token/src/budget.c
+    utils/token/src/token_standard.c
+    utils/cost/src/estimator.c
+    utils/cost/src/controller.c
+    utils/observability/src/logger.c
+    utils/observability/src/metrics.c
+    utils/observability/src/trace.c
+    utils/error/src/handler.c
+    utils/io/src/file_utils.c
+    utils/security/src/input_validator.c
+    utils/resource/src/resource_guard.c
+    utils/resource/src/resource_quota.c
     utils/logging/src/logging.c
     utils/logging/src/logging_compat.c
     utils/logging/src/atomic_logging.c
     utils/logging/src/service_logging.c
-    utils/logging/logging_common.c
+    utils/logging/src/logging_common.c
     utils/memory/src/memory.c
     utils/memory/src/memory_pool.c
     utils/memory/src/memory_debug.c
-    utils/memory/memory_common.c
-    utils/string/string_common.c
+    utils/memory/src/memory_common.c
+    utils/string/src/string_common.c
     utils/string/src/string.c
     utils/sync/src/sync.c
     utils/sync/src/sync_platform.c
@@ -39,14 +39,14 @@ set(SOURCES
     utils/sync/src/sync_event.c
     utils/sync/src/sync_barrier.c
     utils/sync/src/sync_recursive_mutex.c
-    utils/sync/sync_common.c
-    utils/cache/cache_common.c
+    utils/sync/src/sync_common.c
+    utils/cache/src/cache_common.c
     utils/compat/src/compat.c
     utils/compat/src/compat2.c
-    utils/cognition/cognition_common.c
-    utils/execution/execution_common.c
-    utils/strategy/strategy_common.c
-    utils/network/network_common.c
+    utils/cognition/src/cognition_common.c
+    utils/execution/src/execution_common.c
+    utils/strategy/src/strategy_common.c
+    utils/network/src/network_common.c
     utils/uuid/src/uuid_generator.c
     utils/config_unified/src/config_service.c
     utils/config_unified/src/core_config.c
@@ -54,7 +54,7 @@ set(SOURCES
     utils/config_unified/src/config_compat.c
 )
 if(NOT WIN32)
-    list(APPEND SOURCES utils/ipc/ipc_common.c)
+    list(APPEND SOURCES utils/ipc/src/ipc_common.c)
 endif()
 
 add_library(agentos_common STATIC ${SOURCES})
@@ -63,12 +63,12 @@ set_source_files_properties(
     utils/memory/src/memory.c
     utils/memory/src/memory_pool.c
     utils/memory/src/memory_debug.c
-    utils/memory/memory_common.c
+    utils/memory/src/memory_common.c
     utils/logging/src/logging.c
     utils/logging/src/logging_compat.c
     utils/logging/src/atomic_logging.c
     utils/logging/src/service_logging.c
-    utils/logging/logging_common.c
+    utils/logging/src/logging_common.c
     PROPERTIES COMPILE_DEFINITIONS "AGENTOS_COMPLIANCE_IMPL"
 )
 
@@ -146,8 +146,9 @@ install(DIRECTORY utils/error/include/ DESTINATION include/agentos/utils/error)
 install(DIRECTORY utils/config_unified/include/ DESTINATION include/agentos/utils/config_unified)
 install(DIRECTORY utils/io/include/ DESTINATION include/agentos/utils/io)
 install(DIRECTORY utils/types/include/ DESTINATION include/agentos/utils/types)
-install(FILES utils/security/input_validator.h DESTINATION include/agentos/utils/security)
-install(FILES utils/resource/resource_guard.h DESTINATION include/agentos/utils/resource)
+install(FILES utils/security/src/input_validator.h DESTINATION include/agentos/utils/security)
+install(FILES utils/resource/src/resource_guard.h DESTINATION include/agentos/utils/resource)
+install(FILES utils/resource/src/resource_quota.h DESTINATION include/agentos/utils/resource)
 install(DIRECTORY utils/memory/include/ DESTINATION include/agentos/utils/memory)
 install(DIRECTORY utils/string/include/ DESTINATION include/agentos/utils/string)
 install(DIRECTORY utils/sync/include/ DESTINATION include/agentos/utils/sync)

@@ -73,7 +73,7 @@ autogen_adapter_context_t *autogen_adapter_create(const autogen_config_t *config
     if (!ctx)
         return NULL;
 
-    memcpy(&ctx->config, config, sizeof(autogen_config_t));
+    __builtin_memcpy(&ctx->config, config, sizeof(autogen_config_t));
     if (config->base_url)
         ctx->config.base_url = AGENTOS_STRDUP(config->base_url);
     if (config->api_key)
@@ -148,8 +148,9 @@ int autogen_create_agent(autogen_adapter_context_t *ctx, const autogen_agent_def
 
     autogen_agent_instance_t *agents = (autogen_agent_instance_t *)AGENTOS_REALLOC(
         ctx->agents, (ctx->agent_count + 1) * sizeof(autogen_agent_instance_t));
-    if (!agents && ctx->agent_count > 0)
+    if (!agents) {
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
     ctx->agents = agents;
 
     AGENTOS_MEMSET(&ctx->agents[ctx->agent_count], 0, sizeof(autogen_agent_instance_t));
@@ -175,7 +176,7 @@ int autogen_destroy_agent(autogen_adapter_context_t *ctx, const char *agent_id)
         if (strcmp(ctx->agents[i].agent_id, agent_id) == 0) {
             autogen_agent_instance_destroy(&ctx->agents[i]);
             if (i < ctx->agent_count - 1) {
-                memmove(&ctx->agents[i], &ctx->agents[i + 1],
+                __builtin_memmove(&ctx->agents[i], &ctx->agents[i + 1],
                         (ctx->agent_count - i - 1) * sizeof(autogen_agent_instance_t));
             }
             ctx->agent_count--;
@@ -222,7 +223,7 @@ int autogen_create_group_chat(autogen_adapter_context_t *ctx,
 
     autogen_group_chat_def_t *gcs = (autogen_group_chat_def_t *)AGENTOS_REALLOC(
         ctx->group_chats, (ctx->group_chat_count + 1) * sizeof(autogen_group_chat_def_t));
-    if (!gcs && ctx->group_chat_count > 0)
+    if (!gcs)
         return AGENTOS_ERR_OUT_OF_MEMORY;
     ctx->group_chats = gcs;
 
@@ -338,7 +339,7 @@ static int autogen_generate_response(autogen_adapter_context_t *ctx, const char 
             size_t copy_len = strlen(llm_response);
             if (copy_len >= buf_len)
                 copy_len = buf_len - 1;
-            memcpy(out_buf, llm_response, copy_len);
+            __builtin_memcpy(out_buf, llm_response, copy_len);
             out_buf[copy_len] = '\0';
             AGENTOS_FREE(llm_response);
             return 0;
@@ -396,6 +397,13 @@ int autogen_initiate_chat(autogen_adapter_context_t *ctx, const char *group_id,
 
     for (int m = 0; m < msg_count; m++) {
         conv.messages[m].message_id = AGENTOS_MALLOC(32);
+        if (!conv.messages[m].message_id) {
+            for (int j = 0; j < m; j++)
+                AGENTOS_FREE(conv.messages[j].message_id);
+            AGENTOS_FREE(conv.messages);
+            conv.messages = NULL;
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
         snprintf(conv.messages[m].message_id, 32, "msg-%04d", m);
         conv.messages[m].sender_id =
             (m % 2 == 0) ? (sender_id ? AGENTOS_STRDUP(sender_id) : AGENTOS_STRDUP("user"))
@@ -434,7 +442,7 @@ int autogen_initiate_chat(autogen_adapter_context_t *ctx, const char *group_id,
 
     result->conversation =
         (autogen_conversation_t *)AGENTOS_CALLOC(1, sizeof(autogen_conversation_t));
-    memcpy(result->conversation, &conv, sizeof(autogen_conversation_t));
+    __builtin_memcpy(result->conversation, &conv, sizeof(autogen_conversation_t));
 
     result->total_time_ms = difftime(time(NULL), start) * 1000.0;
     result->total_rounds = chat_rounds;
@@ -469,6 +477,8 @@ int autogen_send_message(autogen_adapter_context_t *ctx, const char *from_agent_
 
     AGENTOS_MEMSET(reply, 0, sizeof(autogen_message_t));
     reply->message_id = AGENTOS_MALLOC(32);
+    if (!reply->message_id)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     snprintf(reply->message_id, 32, "ag-msg-%08x", msg_counter);
     reply->sender_id = to_agent_id ? AGENTOS_STRDUP(to_agent_id) : NULL;
     reply->receiver_id = from_agent_id ? AGENTOS_STRDUP(from_agent_id) : NULL;
@@ -516,8 +526,13 @@ int autogen_register_tool(autogen_adapter_context_t *ctx, const char *name, cons
     char **new_names =
         (char **)AGENTOS_REALLOC(ctx->tool_names, (ctx->tool_count + 1) * sizeof(char *));
 
-    if (!new_exec || !new_names)
+    if (!new_exec || !new_names) {
+        if (new_exec)
+            AGENTOS_FREE(new_exec);
+        if (new_names)
+            AGENTOS_FREE(new_names);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     ctx->tool_executors = new_exec;
     ctx->tool_names = new_names;
@@ -694,7 +709,7 @@ static int autogen_proto_get_version(void *context, char *buf, size_t max_size)
     size_t len = strlen(ver);
     if (len >= max_size)
         len = max_size - 1;
-    memcpy(buf, ver, len);
+    __builtin_memcpy(buf, ver, len);
     buf[len] = '\0';
     return 0;
 }

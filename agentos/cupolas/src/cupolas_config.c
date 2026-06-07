@@ -110,7 +110,7 @@ cupolas_config_t *cupolas_config_create(const char *config_dir)
         return NULL;
     }
 
-    AGENTOS_MEMSET(cfg, 0, sizeof(cupolas_config_t));
+    __builtin_memset(cfg, 0, sizeof(cupolas_config_t));
 
     if (config_dir) {
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s", config_dir);
@@ -222,7 +222,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
             size_t slen = strlen(serialized) + 1;
             entry->snapshot = AGENTOS_MALLOC(slen);
             if (entry->snapshot) {
-                memcpy(entry->snapshot, serialized, slen);
+                __builtin_memcpy(entry->snapshot, serialized, slen);
                 entry->snapshot_size = slen;
                 entry->snapshot_version = entry->version;
             }
@@ -338,7 +338,7 @@ int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
 
     cupolas_rwlock_rdlock(&cfg->lock);
 
-    AGENTOS_MEMSET(result, 0, sizeof(config_validation_result_t));
+    __builtin_memset(result, 0, sizeof(config_validation_result_t));
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t *entry = &cfg->entries[type];
@@ -451,7 +451,7 @@ int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type)
             }
             entry->data = AGENTOS_MALLOC(entry->snapshot_size);
             if (entry->data) {
-                memcpy(entry->data, entry->snapshot, entry->snapshot_size);
+                __builtin_memcpy(entry->data, entry->snapshot, entry->snapshot_size);
             }
             entry->version = entry->snapshot_version;
 
@@ -482,7 +482,7 @@ int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type)
                 }
                 entry->data = AGENTOS_MALLOC(entry->snapshot_size);
                 if (entry->data)
-                    memcpy(entry->data, entry->snapshot, entry->snapshot_size);
+                    __builtin_memcpy(entry->data, entry->snapshot, entry->snapshot_size);
                 entry->version = entry->snapshot_version;
             } else if (entry->file_path[0]) {
                 cupolas_config_load(cfg, (config_type_t)t, entry->file_path);
@@ -506,7 +506,7 @@ int cupolas_config_get_version(cupolas_config_t *cfg, config_type_t type, config
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t *entry = &cfg->entries[type];
-        memcpy(version, &entry->version, sizeof(config_version_t));
+        __builtin_memcpy(version, &entry->version, sizeof(config_version_t));
     }
 
     cupolas_rwlock_unlock(&cfg->lock);
@@ -734,7 +734,7 @@ size_t cupolas_config_export_yaml(cupolas_config_t *cfg, config_type_t type, cha
             const char *not_loaded = "  # (not loaded)\n";
             size_t nl_len = strlen(not_loaded);
             if (offset + nl_len + 1 < size) {
-                memcpy(buffer + offset, not_loaded, nl_len);
+                __builtin_memcpy(buffer + offset, not_loaded, nl_len);
                 offset += nl_len;
                 buffer[offset] = '\0';
             }

@@ -263,7 +263,7 @@ static int gw_request_adapter_trampoline(const char *raw_request, size_t request
     char request_buf[4096];
     size_t copy_len =
         request_size < sizeof(request_buf) - 1 ? request_size : sizeof(request_buf) - 1;
-    memcpy(request_buf, raw_request, copy_len);
+    __builtin_memcpy(request_buf, raw_request, copy_len);
     request_buf[copy_len] = '\0';
 
     int result =
@@ -328,7 +328,7 @@ static int gw_std_unregister_protocol(proto_gateway_iface_t *gw, const char *nam
         if (strcmp(g_gw_impl->protocols[i].name, name) == 0) {
             AGENTOS_FREE(g_gw_impl->protocols[i].adapter_ctx);
             g_gw_impl->protocols[i].adapter_ctx = NULL;
-            memmove(&g_gw_impl->protocols[i], &g_gw_impl->protocols[i + 1],
+            __builtin_memmove(&g_gw_impl->protocols[i], &g_gw_impl->protocols[i + 1],
                     (g_gw_impl->protocol_count - i - 1) * sizeof(gw_protocol_entry_t));
             g_gw_impl->protocol_count--;
             AGENTOS_MEMSET(&g_gw_impl->protocols[g_gw_impl->protocol_count], 0,

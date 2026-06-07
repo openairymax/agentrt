@@ -90,7 +90,7 @@ void provider_base_init(provider_base_ctx_t *base_ctx, const char *api_key, cons
     if (!base_ctx)
         return;
 
-    AGENTOS_MEMSET(base_ctx, 0, sizeof(provider_base_ctx_t));
+    __builtin_memset(base_ctx, 0, sizeof(provider_base_ctx_t));
 
     const char *resolved_key = resolve_api_key(api_key);
     if (!resolved_key || resolved_key[0] == '\0') {
@@ -101,26 +101,26 @@ void provider_base_init(provider_base_ctx_t *base_ctx, const char *api_key, cons
     if (resolved_key) {
         size_t key_len = strlen(resolved_key);
         if (key_len < sizeof(base_ctx->api_key)) {
-            memcpy(base_ctx->api_key, resolved_key, key_len + 1);
+            __builtin_memcpy(base_ctx->api_key, resolved_key, key_len + 1);
         }
     }
 
     if (api_base) {
         size_t base_len = strlen(api_base);
         if (base_len < sizeof(base_ctx->api_base)) {
-            memcpy(base_ctx->api_base, api_base, base_len + 1);
+            __builtin_memcpy(base_ctx->api_base, api_base, base_len + 1);
         }
     } else if (default_base) {
         size_t default_len = strlen(default_base);
         if (default_len < sizeof(base_ctx->api_base)) {
-            memcpy(base_ctx->api_base, default_base, default_len + 1);
+            __builtin_memcpy(base_ctx->api_base, default_base, default_len + 1);
         }
     }
 
     if (organization) {
         size_t org_len = strlen(organization);
         if (org_len < sizeof(base_ctx->organization)) {
-            memcpy(base_ctx->organization, organization, org_len + 1);
+            __builtin_memcpy(base_ctx->organization, organization, org_len + 1);
         }
     }
 
@@ -159,7 +159,7 @@ static size_t http_write_callback(void *contents, size_t size, size_t nmemb, voi
         mem->capacity = new_cap;
     }
 
-    memcpy(&(mem->data[mem->size]), contents, realsize);
+    __builtin_memcpy(&(mem->data[mem->size]), contents, realsize);
     mem->size += realsize;
     mem->data[mem->size] = '\0';
     return realsize;
@@ -400,7 +400,7 @@ typedef struct {
 
 static void sse_ctx_init(sse_stream_ctx_t *sse, provider_stream_chunk_cb_t cb, void *user_data)
 {
-    AGENTOS_MEMSET(sse, 0, sizeof(*sse));
+    __builtin_memset(sse, 0, sizeof(*sse));
     sse->line_cap = 4096;
     sse->line_buf = (char *)AGENTOS_MALLOC(sse->line_cap);
     sse->on_chunk = cb;
@@ -434,7 +434,7 @@ static int sse_feed_line(sse_stream_ctx_t *sse, const char *line, size_t len)
         if (sse->on_chunk) {
             char *tmp = (char *)AGENTOS_MALLOC(data_len + 1);
             if (tmp) {
-                memcpy(tmp, data_start, data_len);
+                __builtin_memcpy(tmp, data_start, data_len);
                 tmp[data_len] = '\0';
                 int ret = sse->on_chunk(tmp, sse->chunk_user_data);
                 AGENTOS_FREE(tmp);
@@ -477,7 +477,7 @@ static void sse_process_buffer(sse_stream_ctx_t *sse)
 
     if (p < end) {
         size_t remaining = (size_t)(end - p);
-        memmove(sse->line_buf, p, remaining);
+        __builtin_memmove(sse->line_buf, p, remaining);
         sse->line_len = remaining;
     } else {
         sse->line_len = 0;
@@ -504,7 +504,7 @@ static size_t sse_write_callback(void *contents, size_t size, size_t nmemb, void
         sse->line_cap = new_cap;
     }
 
-    memcpy(sse->line_buf + sse->line_len, contents, realsize);
+    __builtin_memcpy(sse->line_buf + sse->line_len, contents, realsize);
     sse->line_len += realsize;
     sse->line_buf[sse->line_len] = '\0';
 

@@ -22,7 +22,7 @@ void sandbox_quota_init(resource_quota_t *quota)
     if (!quota)
         return;
 
-    AGENTOS_MEMSET(quota, 0, sizeof(resource_quota_t));
+    __builtin_memset(quota, 0, sizeof(resource_quota_t));
 
     /* 设置默认限制 */
     quota->max_memory_bytes = 512 * 1024 * 1024; /* 512MB */
@@ -127,7 +127,7 @@ void sandbox_quota_reset(agentos_sandbox_t *sandbox)
     uint32_t max_network = quota->max_network_bytes;
 
     /* 重置为默认值 */
-    AGENTOS_MEMSET(quota, 0, sizeof(resource_quota_t));
+    __builtin_memset(quota, 0, sizeof(resource_quota_t));
 
     quota->max_memory_bytes = max_memory;
     quota->max_cpu_time_ms = max_cpu;

@@ -369,14 +369,14 @@ int protocol_transformer_default(const unified_message_t *source, unified_messag
             agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "if: allocation failed");
             return AGENTOS_ERR_OUT_OF_MEMORY;
             }
-        memcpy(new_payload, source->payload, source->payload_size);
+        __builtin_memcpy(new_payload, source->payload, source->payload_size);
         target->payload = new_payload;
     }
 
     if (source->body && source->body_length > 0) {
         void *new_body = AGENTOS_MALLOC(source->body_length);
         if (new_body) {
-            memcpy(new_body, source->body, source->body_length);
+            __builtin_memcpy(new_body, source->body, source->body_length);
             target->body = new_body;
         }
     }
@@ -571,7 +571,7 @@ static int __attribute__((unused)) match_endpoint_extract(const char *pattern, c
     if (!pattern || !endpoint)
         return 0;
     if (info)
-        memset(info, 0, sizeof(*info));
+        __builtin_memset(info, 0, sizeof(*info));
 
     size_t pat_len = strlen(pattern);
     size_t end_len = strlen(endpoint);
@@ -603,7 +603,7 @@ static int __attribute__((unused)) match_endpoint_extract(const char *pattern, c
                 size_t nlen = (size_t)(close - p - 1);
                 if (nlen >= ROUTER_PARAM_NAME_LEN)
                     nlen = ROUTER_PARAM_NAME_LEN - 1;
-                memcpy(param->name, p + 1, nlen);
+                __builtin_memcpy(param->name, p + 1, nlen);
                 param->name[nlen] = '\0';
 
                 const char *val_start = e;
@@ -612,7 +612,7 @@ static int __attribute__((unused)) match_endpoint_extract(const char *pattern, c
                 size_t vlen = (size_t)(e - val_start);
                 if (vlen >= ROUTER_PARAM_VAL_LEN)
                     vlen = ROUTER_PARAM_VAL_LEN - 1;
-                memcpy(param->value, val_start, vlen);
+                __builtin_memcpy(param->value, val_start, vlen);
                 param->value[vlen] = '\0';
                 info->param_count++;
             } else {
@@ -638,7 +638,7 @@ static int __attribute__((unused)) match_endpoint_extract(const char *pattern, c
                     size_t vlen = next_seg ? (size_t)(next_seg - e) : strlen(e);
                     if (vlen >= ROUTER_PARAM_VAL_LEN)
                         vlen = ROUTER_PARAM_VAL_LEN - 1;
-                    memcpy(param->value, rest, vlen);
+                    __builtin_memcpy(param->value, rest, vlen);
                     param->value[vlen] = '\0';
                     info->param_count++;
                 }
@@ -659,7 +659,7 @@ static int __attribute__((unused)) match_endpoint_extract(const char *pattern, c
                     size_t vl = (size_t)(e - vs);
                     if (vl >= ROUTER_PARAM_VAL_LEN)
                         vl = ROUTER_PARAM_VAL_LEN - 1;
-                    memcpy(param->value, vs, vl);
+                    __builtin_memcpy(param->value, vs, vl);
                     param->value[vl] = '\0';
                     info->param_count++;
                 } else {

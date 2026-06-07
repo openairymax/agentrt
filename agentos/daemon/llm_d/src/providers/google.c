@@ -283,7 +283,7 @@ typedef struct {
 
 static void gg_sse_init(gg_sse_ctx_t *s, gg_stream_acc_t *a)
 {
-    AGENTOS_MEMSET(s, 0, sizeof(*s));
+    __builtin_memset(s, 0, sizeof(*s));
     s->line_cap = 4096;
     s->line_buf = (char *)AGENTOS_MALLOC(s->line_cap);
     s->acc = a;
@@ -338,7 +338,7 @@ static int gg_feed_sse_data(gg_sse_ctx_t *s, const char *data, size_t data_len)
                                 }
                             }
                             if (acc->acc_content && acc->acc_len + clen < acc->acc_cap) {
-                                memcpy(acc->acc_content + acc->acc_len, chunk, clen);
+                                __builtin_memcpy(acc->acc_content + acc->acc_len, chunk, clen);
                                 acc->acc_len += clen;
                                 acc->acc_content[acc->acc_len] = '\0';
                             }
@@ -405,7 +405,7 @@ static void gg_process_buffer(gg_sse_ctx_t *s)
             size_t dlen = llen - (size_t)(ds - p);
             char *data_copy = (char *)AGENTOS_MALLOC(dlen + 1);
             if (data_copy) {
-                memcpy(data_copy, ds, dlen);
+                __builtin_memcpy(data_copy, ds, dlen);
                 data_copy[dlen] = '\0';
                 gg_feed_sse_data(s, data_copy, dlen);
                 AGENTOS_FREE(data_copy);
@@ -417,7 +417,7 @@ static void gg_process_buffer(gg_sse_ctx_t *s)
 
     if (p < end) {
         size_t rem = (size_t)(end - p);
-        memmove(s->line_buf, p, rem);
+        __builtin_memmove(s->line_buf, p, rem);
         s->line_len = rem;
     } else {
         s->line_len = 0;
@@ -443,7 +443,7 @@ static size_t gg_sse_write_cb(void *contents, size_t size, size_t nmemb, void *u
         s->line_cap = nc;
     }
 
-    memcpy(s->line_buf + s->line_len, contents, realsize);
+    __builtin_memcpy(s->line_buf + s->line_len, contents, realsize);
     s->line_len += realsize;
     s->line_buf[s->line_len] = '\0';
 
@@ -519,7 +519,7 @@ static int google_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     explicit_bzero(auth_header, sizeof(auth_header));
 
     gg_stream_acc_t acc;
-    AGENTOS_MEMSET(&acc, 0, sizeof(acc));
+    __builtin_memset(&acc, 0, sizeof(acc));
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;

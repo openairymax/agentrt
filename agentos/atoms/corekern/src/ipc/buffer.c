@@ -60,7 +60,7 @@ agentos_error_t agentos_ipc_buffer_write(agentos_ipc_buffer_t *buf, const void *
     if (buf->used + size > buf->capacity)
         ATM_RET_ERR(AGENTOS_ENOMEM);
 
-    memcpy(buf->data + buf->used, data, size);
+    __builtin_memcpy(buf->data + buf->used, data, size);
     buf->used += size;
     return AGENTOS_SUCCESS;
 }
@@ -72,7 +72,7 @@ agentos_error_t agentos_ipc_buffer_read(agentos_ipc_buffer_t *buf, void *out_dat
     if (!buf || !out_data)
         ATM_RET_ERR(AGENTOS_EINVAL);
     size_t to_read = (size < buf->used) ? size : buf->used;
-    memcpy(out_data, buf->data, to_read);
+    __builtin_memcpy(out_data, buf->data, to_read);
     if (out_read)
         *out_read = to_read;
     return AGENTOS_SUCCESS;

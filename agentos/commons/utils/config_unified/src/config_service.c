@@ -135,7 +135,7 @@ static char *duplicate_string(const char *str)
     size_t len = strlen(str);
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
     if (copy) {
-        memcpy(copy, str, len);
+        __builtin_memcpy(copy, str, len);
         copy[len] = '\0';
     }
     return copy;
@@ -406,7 +406,7 @@ bool config_validator_validate(config_validator_t *validator, const char *key,
             size_t min_len = (size_t)(comma - validator->pattern);
             if (min_len >= sizeof(min_buf))
                 min_len = sizeof(min_buf) - 1;
-            memcpy(min_buf, validator->pattern, min_len);
+            __builtin_memcpy(min_buf, validator->pattern, min_len);
             min_buf[min_len] = '\0';
             AGENTOS_STRNCPY_TERM(max_buf, comma + 1, sizeof(max_buf));
             max_buf[sizeof(max_buf) - 1] = '\0';
@@ -432,7 +432,7 @@ bool config_validator_validate(config_validator_t *validator, const char *key,
                 validator->pattern[pat_len - 1] == '$') {
                 char inner[256];
                 if (pat_len - 2 < sizeof(inner)) {
-                    memcpy(inner, validator->pattern + 1, pat_len - 2);
+                    __builtin_memcpy(inner, validator->pattern + 1, pat_len - 2);
                     inner[pat_len - 2] = '\0';
                     return strcmp(str_val, inner) == 0;
                 }
@@ -1053,7 +1053,10 @@ static unsigned char *config_hex_to_bytes(const char *hex, size_t *out_len)
         }
     for (size_t i = 0; i < byte_len; i++) {
         unsigned int val;
-        if (sscanf(hex + i * 2, "%2x", &val) != 1) {
+        char hex_byte[3] = {0};
+        __builtin_memcpy(hex_byte, hex + i * 2, 2);
+        val = (unsigned int)strtol(hex_byte, NULL, 16);
+        if (hex_byte[0] == '\0') {
             AGENTOS_FREE(bytes);
             AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
@@ -1142,9 +1145,9 @@ static config_value_t *config_encrypt_string_value(const char *plaintext, size_t
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
-    memcpy(encoded, tag, 16);
-    memcpy(encoded + 16, enc->iv, enc->iv_len);
-    memcpy(encoded + 16 + enc->iv_len, ciphertext, ct_len);
+    __builtin_memcpy(encoded, tag, 16);
+    __builtin_memcpy(encoded + 16, enc->iv, enc->iv_len);
+    __builtin_memcpy(encoded + 16 + enc->iv_len, ciphertext, ct_len);
     AGENTOS_FREE(ciphertext);
 
     char *hex = config_bytes_to_hex(encoded, encoded_len);
@@ -1693,7 +1696,7 @@ config_error_t config_expand_template(config_context_t *ctx, const char *templat
                 char key_buf[256];
                 if (key_len >= sizeof(key_buf))
                     key_len = sizeof(key_buf) - 1;
-                memcpy(key_buf, start, key_len);
+                __builtin_memcpy(key_buf, start, key_len);
                 key_buf[key_len] = '\0';
 
                 const config_value_t *val = config_context_get(ctx, key_buf);
@@ -1703,14 +1706,14 @@ config_error_t config_expand_template(config_context_t *ctx, const char *templat
                         size_t vlen = strlen(str_val);
                         if (out_pos + vlen >= result_size)
                             vlen = result_size - out_pos - 1;
-                        memcpy(result + out_pos, str_val, vlen);
+                        __builtin_memcpy(result + out_pos, str_val, vlen);
                         out_pos += vlen;
                     }
                 } else {
                     if (out_pos + key_len + 3 < result_size) {
                         result[out_pos++] = '$';
                         result[out_pos++] = '{';
-                        memcpy(result + out_pos, key_buf, key_len);
+                        __builtin_memcpy(result + out_pos, key_buf, key_len);
                         out_pos += key_len;
                         result[out_pos++] = '}';
                     }

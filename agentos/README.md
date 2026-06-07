@@ -136,7 +136,7 @@ Atoms 层是 AgentOS 的最底层基础，包含 7 个核心微内核组件：
 |------|------|----------|
 | **CoreKern** | 微内核核心 | IPC/Binder、内存管理、任务调度、定时器、插件管理 |
 | **CoreLoopThree** | 三环运行时 | 认知环/执行环/学习环、System 1/System 2 双处理理论 |
-| **Memory** | 内置记忆子系统 | L1 原始层+L2 特征层，无外部依赖 |
+| **Memory** | 内置记忆子系统 | L1 原始层+L2 关键词索引，可拔插提供商架构 |
 | **MemoryRovol** | 商业记忆桥接 | L1-L4 全功能，需外部 MemoryRovol 仓库 |
 | **Syscall** | 系统调用接口 | 5 类接口、4 层保护、线程安全（Mutex + RCU） |
 | **TaskFlow** | 任务流引擎 | DAG 编排、5 级优先级队列、SQLite 持久化 |

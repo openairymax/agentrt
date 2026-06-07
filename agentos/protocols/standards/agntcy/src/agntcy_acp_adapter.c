@@ -81,7 +81,7 @@ int agntcy_agent_unregister(agntcy_handle_t *h, const char *agent_id)
     for (size_t i = 0; i < h->agent_count; i++) {
         if (strcmp(h->agents[i].agent_id, agent_id) == 0) {
             if (i < h->agent_count - 1) {
-                memmove(&h->agents[i], &h->agents[i + 1],
+                __builtin_memmove(&h->agents[i], &h->agents[i + 1],
                         (h->agent_count - i - 1) * sizeof(agntcy_agent_card_t));
             }
             h->agent_count--;
@@ -157,7 +157,7 @@ int agntcy_channel_close(agntcy_handle_t *h, const char *channel_id)
     for (size_t i = 0; i < h->channel_count; i++) {
         if (strcmp(h->channels[i].channel_id, channel_id) == 0) {
             if (i < h->channel_count - 1) {
-                memmove(&h->channels[i], &h->channels[i + 1],
+                __builtin_memmove(&h->channels[i], &h->channels[i + 1],
                         (h->channel_count - i - 1) * sizeof(agntcy_channel_t));
             }
             h->channel_count--;
@@ -305,7 +305,7 @@ int agntcy_ack_negotiate(agntcy_handle_t *h, const char *agent_id, const agntcy_
     if (!agent_found)
         AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
-    memcpy(ack_response, ack_request, sizeof(agntcy_ack_t));
+    __builtin_memcpy(ack_response, ack_request, sizeof(agntcy_ack_t));
 
     ack_response->guaranteed_amount = ack_request->requested_amount;
     if (ack_request->requested_amount > (size_t)(1024 * 1024 * 1024)) {

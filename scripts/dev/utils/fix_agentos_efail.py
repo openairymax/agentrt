@@ -4,7 +4,7 @@
 import re
 import os
 
-BASE_DIR = '/home/spharx/SpharxWorks/OpenAirymax/AgentOS'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # Context keywords → error code mapping (order matters - first match wins)
 CONTEXT_MAP = [

@@ -520,7 +520,7 @@ int main(int argc, char **argv)
     SVC_LOG_INFO("Monitor service started successfully");
 
     daemon_event_config_t ev_config;
-    AGENTOS_MEMSET(&ev_config, 0, sizeof(ev_config));
+    __builtin_memset(&ev_config, 0, sizeof(ev_config));
     ev_config.max_events = 64;
     ev_config.thread_pool_min = 2;
     ev_config.thread_pool_max = 4;

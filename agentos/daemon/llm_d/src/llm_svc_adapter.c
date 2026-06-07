@@ -50,7 +50,7 @@ static agentos_error_t llm_adapter_init(agentos_service_t service,
         return AGENTOS_EINVAL;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     }
 
     if (!ctx->llm_svc) {
@@ -170,7 +170,7 @@ agentos_error_t llm_service_adapter_create(agentos_service_t *out_service,
         return AGENTOS_ENOMEM;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
         if (config->name) {
             size_t path_len = strlen(config->name) + strlen("_config.json") + 1;
             ctx->config_path = AGENTOS_CALLOC(1, path_len);
@@ -222,7 +222,7 @@ agentos_error_t llm_service_adapter_wrap(agentos_service_t *out_service, llm_ser
     ctx->owns_service = false;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "llm_d";
         ctx->common_cfg.version = "0.1.0";

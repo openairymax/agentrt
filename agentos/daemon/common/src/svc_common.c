@@ -333,18 +333,18 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
     }
 
     /* 复制配置 */
-    memcpy(&service->config, config, sizeof(agentos_svc_config_t));
+    __builtin_memcpy(&service->config, config, sizeof(agentos_svc_config_t));
     service->capabilities = config->capabilities;
 
     /* 复制接口 */
-    memcpy(&service->iface, iface, sizeof(agentos_svc_interface_t));
+    __builtin_memcpy(&service->iface, iface, sizeof(agentos_svc_interface_t));
 
     /* 初始化线程追踪 */
     service->threads = NULL;
     service->thread_count = 0;
 
     /* 初始化统计信息 */
-    AGENTOS_MEMSET(&service->stats, 0, sizeof(agentos_svc_stats_t));
+    __builtin_memset(&service->stats, 0, sizeof(agentos_svc_stats_t));
 
     /* 注册到内部注册表 */
     err = register_service_internal(service);
@@ -529,7 +529,7 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
         struct sigaction old_act, new_act;
         if (force) {
             g_svc_stop_timeout_flag = 0;
-            AGENTOS_MEMSET(&new_act, 0, sizeof(new_act));
+            __builtin_memset(&new_act, 0, sizeof(new_act));
             new_act.sa_handler = svc_stop_timeout_handler;
             sigemptyset(&new_act.sa_mask);
             new_act.sa_flags = SA_RESETHAND;
@@ -792,7 +792,7 @@ agentos_error_t agentos_service_get_stats(agentos_service_t svc, agentos_svc_sta
     agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
 
     agentos_mutex_lock(&service->stats_mutex);
-    memcpy(out_stats, &service->stats, sizeof(agentos_svc_stats_t));
+    __builtin_memcpy(out_stats, &service->stats, sizeof(agentos_svc_stats_t));
     agentos_mutex_unlock(&service->stats_mutex);
 
     return AGENTOS_SUCCESS;
@@ -807,7 +807,7 @@ void agentos_service_reset_stats(agentos_service_t svc)
     agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
 
     agentos_mutex_lock(&service->stats_mutex);
-    AGENTOS_MEMSET(&service->stats, 0, sizeof(agentos_svc_stats_t));
+    __builtin_memset(&service->stats, 0, sizeof(agentos_svc_stats_t));
     agentos_mutex_unlock(&service->stats_mutex);
 
     LOG_DEBUG("Service '%s' stats reset", service->name);
@@ -1118,7 +1118,7 @@ agentos_error_t agentos_registry_init(const char *registry_url)
         agentos_mutex_unlock(&g_cross_registry.mutex);
         return AGENTOS_EINVAL;
     }
-    AGENTOS_MEMSET(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
+    __builtin_memset(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
     g_cross_registry.entry_count = 0;
     g_cross_registry.initialized = true;
 
@@ -1149,7 +1149,7 @@ agentos_error_t agentos_registry_register(agentos_service_t service,
 
     for (uint32_t i = 0; i < g_cross_registry.entry_count; i++) {
         if (g_cross_registry.entries[i].service == service) {
-            memcpy(&g_cross_registry.entries[i].metadata, metadata,
+            __builtin_memcpy(&g_cross_registry.entries[i].metadata, metadata,
                    sizeof(agentos_service_metadata_t));
             g_cross_registry.entries[i].metadata.last_heartbeat = agentos_platform_get_time_ms();
             agentos_mutex_unlock(&g_cross_registry.mutex);
@@ -1159,7 +1159,7 @@ agentos_error_t agentos_registry_register(agentos_service_t service,
     }
 
     registry_entry_t *entry = &g_cross_registry.entries[g_cross_registry.entry_count];
-    memcpy(&entry->metadata, metadata, sizeof(agentos_service_metadata_t));
+    __builtin_memcpy(&entry->metadata, metadata, sizeof(agentos_service_metadata_t));
     entry->service = service;
     entry->registered = true;
     entry->register_time = agentos_platform_get_time_ms();
@@ -1190,7 +1190,7 @@ agentos_error_t agentos_registry_deregister(agentos_service_t service)
                 g_cross_registry.entries[i] =
                     g_cross_registry.entries[g_cross_registry.entry_count - 1];
             }
-            AGENTOS_MEMSET(&g_cross_registry.entries[g_cross_registry.entry_count - 1], 0,
+            __builtin_memset(&g_cross_registry.entries[g_cross_registry.entry_count - 1], 0,
                    sizeof(registry_entry_t));
             g_cross_registry.entry_count--;
 
@@ -1285,7 +1285,7 @@ agentos_service_metadata_t *agentos_registry_discover(const char *service_type,
         bool tag_match = tag_matches(filter_tags, entry->metadata.tags);
 
         if (type_match && tag_match) {
-            memcpy(&results[idx], &entry->metadata, sizeof(agentos_service_metadata_t));
+            __builtin_memcpy(&results[idx], &entry->metadata, sizeof(agentos_service_metadata_t));
             idx++;
         }
     }
@@ -1342,7 +1342,7 @@ void agentos_registry_cleanup(void)
 {
     agentos_mutex_lock(&g_cross_registry.mutex);
 
-    AGENTOS_MEMSET(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
+    __builtin_memset(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
     g_cross_registry.entry_count = 0;
     g_cross_registry.initialized = false;
     g_cross_registry.registry_url[0] = '\0';
@@ -1384,7 +1384,7 @@ static agentos_error_t config_mgr_init(void)
         return err;
     }
 
-    AGENTOS_MEMSET(g_config_mgr.watchers, 0, sizeof(g_config_mgr.watchers));
+    __builtin_memset(g_config_mgr.watchers, 0, sizeof(g_config_mgr.watchers));
     g_config_mgr.watcher_count = 0;
     if (safe_strcpy(g_config_mgr.config_base_path, "./config",
                     sizeof(g_config_mgr.config_base_path)) != 0) {
@@ -1621,7 +1621,7 @@ static agentos_error_t monitor_init(void)
         return err;
     }
 
-    AGENTOS_MEMSET(g_monitor.services, 0, sizeof(g_monitor.services));
+    __builtin_memset(g_monitor.services, 0, sizeof(g_monitor.services));
     g_monitor.count = 0;
     g_monitor.initialized = true;
 
@@ -1726,7 +1726,7 @@ agentos_error_t agentos_service_monitor_start(agentos_service_t service,
                 agentos_thread_join(g_monitor.services[i].monitor_thread, NULL);
                 agentos_mutex_lock(&g_monitor.mutex);
             }
-            memcpy(&g_monitor.services[i].config, config, sizeof(agentos_monitor_config_t));
+            __builtin_memcpy(&g_monitor.services[i].config, config, sizeof(agentos_monitor_config_t));
             g_monitor.services[i].active = true;
             g_monitor.services[i].consecutive_failures = 0;
             g_monitor.services[i].restart_attempts = 0;
@@ -1758,7 +1758,7 @@ agentos_error_t agentos_service_monitor_start(agentos_service_t service,
 
     monitored_service_t *mon = &g_monitor.services[g_monitor.count];
     mon->service = service;
-    memcpy(&mon->config, config, sizeof(agentos_monitor_config_t));
+    __builtin_memcpy(&mon->config, config, sizeof(agentos_monitor_config_t));
     mon->degradation_handler = NULL;
     mon->degradation_user_data = NULL;
     mon->active = true;
@@ -1823,7 +1823,7 @@ agentos_error_t agentos_service_monitor_stop(agentos_service_t service)
                     if (j < g_monitor.count - 1) {
                         g_monitor.services[j] = g_monitor.services[g_monitor.count - 1];
                     }
-                    AGENTOS_MEMSET(&g_monitor.services[g_monitor.count - 1], 0,
+                    __builtin_memset(&g_monitor.services[g_monitor.count - 1], 0,
                            sizeof(monitored_service_t));
                     g_monitor.count--;
                     break;
@@ -1911,7 +1911,13 @@ static size_t curl_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata
         buf->data = new_data;
         buf->capacity = new_cap;
     }
-    memcpy(buf->data + buf->size, ptr, total);
+    /* SEC-02: 二次校验，防御 realloc 异常返回 */
+    if (buf->size + total > buf->capacity) {
+        agentos_error_push_ex(AGENTOS_E_OVERFLOW, __FILE__, __LINE__, __func__,
+                               "curl_write_cb: buffer overflow");
+        return 0;
+    }
+    __builtin_memcpy(buf->data + buf->size, ptr, total);
     buf->size += total;
     buf->data[buf->size] = '\0';
     return total;
@@ -1966,6 +1972,7 @@ static agentos_error_t http_client_call(const char *service_name, const char *me
     snprintf(url, sizeof(url), "http://%s/api/%s", service_name, method);
 
 #ifdef AGENTOS_HAS_CURL
+    agentos_error_t ret_err = AGENTOS_SUCCESS;
     CURL *curl = curl_easy_init();
     if (!curl) {
         LOG_ERROR("Failed to initialize CURL for remote call to '%s'", service_name);
@@ -1996,12 +2003,14 @@ static agentos_error_t http_client_call(const char *service_name, const char *me
 
     if (res != CURLE_OK) {
         LOG_ERROR("CURL call to '%s' failed: %s", url, curl_easy_strerror(res));
-        return AGENTOS_EIO;
+        ret_err = AGENTOS_EIO;
+        goto cleanup;
     }
 
     if (http_code >= 400) {
         LOG_ERROR("Service '%s' returned HTTP %ld", service_name, http_code);
-        return AGENTOS_EIO;
+        ret_err = AGENTOS_EIO;
+        goto cleanup;
     }
 
     if (!resp_buf.data || resp_buf.size == 0) {
@@ -2013,12 +2022,16 @@ static agentos_error_t http_client_call(const char *service_name, const char *me
     } else {
         *response_json = resp_buf.data;
     }
+
+    return AGENTOS_SUCCESS;
+
+cleanup:
+    AGENTOS_FREE(resp_buf.data);
+    return ret_err;
 #else
     LOG_ERROR("Remote call to '%s' failed: libcurl not available", service_name);
     return AGENTOS_EIO;
 #endif
-
-    return AGENTOS_SUCCESS;
 }
 
 static agentos_error_t http_client_stream(const char *service_name, const char *method,

@@ -7,6 +7,7 @@
 
 #include "network_utils.h"
 
+#include "memory_compat.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>
@@ -35,7 +36,6 @@ int network_utils_parse_url(const char *url, char *scheme, char *host, uint16_t 
     if (colon && scheme) {
         size_t scheme_len = colon - p;
         AGENTOS_STRNCPY_TERM(scheme, p, scheme_len);
-        scheme[scheme_len] = '\0';
         p = colon + 3;
     }
 
@@ -52,7 +52,6 @@ int network_utils_parse_url(const char *url, char *scheme, char *host, uint16_t 
             host_len = strlen(p);
         }
         AGENTOS_STRNCPY_TERM(host, p, host_len);
-        host[host_len] = '\0';
     }
 
     if (port_colon && (!slash || port_colon < slash)) {
@@ -92,14 +91,16 @@ int network_utils_ip_in_cidr(const char *ip, const char *cidr)
 
     char cidr_copy[64];
     AGENTOS_STRNCPY_TERM(cidr_copy, cidr, sizeof(cidr_copy));
-    cidr_copy[sizeof(cidr_copy) - 1] = '\0';
 
     char *slash = strchr(cidr_copy, '/');
     if (!slash)
         return strcmp(ip, cidr_copy) == 0 ? 1 : 0;
 
     *slash = '\0';
-    int prefix_len = atoi(slash + 1);
+    char *endptr = NULL;
+    int prefix_len = (int)strtol(slash + 1, &endptr, 10);
+    if (*endptr != '\0' || prefix_len < 0 || prefix_len > 32)
+        return 0;
 
     struct in_addr ip_addr, cidr_addr;
     if (inet_pton(AF_INET, ip, &ip_addr) != 1)

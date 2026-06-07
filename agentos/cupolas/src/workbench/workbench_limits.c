@@ -75,7 +75,7 @@ limit_context_t *limits_create(size_t memory_limit_bytes, uint32_t cpu_time_limi
         return NULL;
     }
 
-    AGENTOS_MEMSET(ctx, 0, sizeof(limit_context_t));
+    __builtin_memset(ctx, 0, sizeof(limit_context_t));
 
     ctx->memory_limit = memory_limit_bytes;
     ctx->cpu_time_limit_ms = cpu_time_limit_ms;
@@ -408,7 +408,7 @@ int limits_get_stats(limit_context_t *ctx, resource_stats_t *stats)
     if (!ctx || !stats)
         return cupolas_ERROR_INVALID_ARG;
 
-    AGENTOS_MEMSET(stats, 0, sizeof(resource_stats_t));
+    __builtin_memset(stats, 0, sizeof(resource_stats_t));
 
 #if cupolas_PLATFORM_WINDOWS
     PROCESS_MEMORY_COUNTERS pmc;

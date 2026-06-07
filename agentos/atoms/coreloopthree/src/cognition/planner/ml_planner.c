@@ -78,7 +78,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t *data)
     /* [DESIGN] Rule-based planning is the current primary path.
      * ML runtime integration (ONNX/TFLite) is planned for a future release
      * to enhance planning quality with learned task decomposition patterns. */
-    data->model = (ml_model_t *)AGENTOS_CALLOC(1, sizeof(ml_model_t));
+    SAFE_MALLOC_ARRAY(data->model, 1, sizeof(ml_model_t));
     if (!data->model) {
         data->rule_based_active = true;
         return false;
@@ -217,8 +217,8 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     }
 
     /* 3. 构建计划结构 */
-    agentos_task_plan_t *plan =
-        (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
+    agentos_task_plan_t *plan;
+    SAFE_MALLOC_ARRAY(plan, 1, sizeof(agentos_task_plan_t));
     if (!plan)
         ATM_RET_ERR(AGENTOS_ENOMEM);
 
@@ -232,8 +232,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
-    plan->task_plan_nodes =
-        (agentos_task_node_t **)AGENTOS_CALLOC(subtask_count + 2, sizeof(agentos_task_node_t *));
+    SAFE_MALLOC_ARRAY(plan->task_plan_nodes, subtask_count + 2, sizeof(agentos_task_node_t *));
     if (!plan->task_plan_nodes && subtask_count > 0) {
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
@@ -266,8 +265,8 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
 
     /* 4. 创建节点（含优化后的依赖链） */
     for (size_t i = 0; i < subtask_count; i++) {
-        agentos_task_node_t *node =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *node;
+        SAFE_MALLOC_ARRAY(node, 1, sizeof(agentos_task_node_t));
         if (!node)
             goto cleanup_nodes;
 
@@ -335,7 +334,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
                 }
             } else {
                 /* 非并行: 依赖前一个任务 */
-                node->task_node_depends_on = (char **)AGENTOS_MALLOC(sizeof(char *));
+                SAFE_MALLOC_ARRAY(node->task_node_depends_on, 1, sizeof(char *));
                 if (node->task_node_depends_on) {
                     node->task_node_depends_count = 1;
                     node->task_node_depends_on[0] =
@@ -355,7 +354,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     }
 
     /* 5. 入口点 */
-    plan->task_plan_entry_points = (char **)AGENTOS_MALLOC(sizeof(char *));
+    SAFE_MALLOC_ARRAY(plan->task_plan_entry_points, 1, sizeof(char *));
     if (plan->task_plan_entry_points && plan->task_plan_node_count > 0) {
         plan->task_plan_entry_count = 1;
         plan->task_plan_entry_points[0] = AGENTOS_STRDUP(plan->task_plan_nodes[0]->task_node_id);
@@ -363,8 +362,8 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
 
     /* 6. DS-006: 条件验证步骤（仅在需要验证时添加） */
     if (needs_verify && subtask_count > 0) {
-        agentos_task_node_t *verify_node =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *verify_node;
+        SAFE_MALLOC_ARRAY(verify_node, 1, sizeof(agentos_task_node_t));
         if (verify_node) {
             char verify_id[128];
             snprintf(verify_id, sizeof(verify_id), "%s_verify", plan_id);
@@ -372,7 +371,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
             verify_node->task_node_agent_role = AGENTOS_STRDUP("verifier");
             verify_node->task_node_timeout_ms = 10000;
             verify_node->task_node_priority = 255;
-            verify_node->task_node_depends_on = (char **)AGENTOS_MALLOC(sizeof(char *));
+            SAFE_MALLOC_ARRAY(verify_node->task_node_depends_on, 1, sizeof(char *));
             if (verify_node->task_node_depends_on) {
                 verify_node->task_node_depends_count = 1;
                 verify_node->task_node_depends_on[0] = AGENTOS_STRDUP(
@@ -399,8 +398,8 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
 
     /* 7. DS-006: 可选的条件分支步骤（高复杂度任务添加质量门禁） */
     if (complexity >= 5 && subtask_count >= 4) {
-        agentos_task_node_t *qa_node =
-            (agentos_task_node_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        agentos_task_node_t *qa_node;
+        SAFE_MALLOC_ARRAY(qa_node, 1, sizeof(agentos_task_node_t));
         if (qa_node) {
             char qa_id[128];
             snprintf(qa_id, sizeof(qa_id), "%s_quality_gate", plan_id);
@@ -408,7 +407,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
             qa_node->task_node_agent_role = AGENTOS_STRDUP("quality_assurance");
             qa_node->task_node_timeout_ms = 8000;
             qa_node->task_node_priority = 254;
-            qa_node->task_node_depends_on = (char **)AGENTOS_MALLOC(sizeof(char *));
+            SAFE_MALLOC_ARRAY(qa_node->task_node_depends_on, 1, sizeof(char *));
             if (qa_node->task_node_depends_on) {
                 qa_node->task_node_depends_count = 1;
                 qa_node->task_node_depends_on[0] = AGENTOS_STRDUP(
@@ -489,11 +488,12 @@ static agentos_error_t ml_planner_plan(const agentos_intent_t *intent, void *con
 agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *llm)
 {
 
-    agentos_plan_strategy_t *strat =
-        (agentos_plan_strategy_t *)AGENTOS_MALLOC(sizeof(agentos_plan_strategy_t));
+    agentos_plan_strategy_t *strat;
+    SAFE_MALLOC_ARRAY(strat, 1, sizeof(agentos_plan_strategy_t));
     if (!strat) return NULL;
 
-    ml_planner_data_t *data = (ml_planner_data_t *)AGENTOS_CALLOC(1, sizeof(ml_planner_data_t));
+    ml_planner_data_t *data;
+    SAFE_MALLOC_ARRAY(data, 1, sizeof(ml_planner_data_t));
     if (!data) {
         AGENTOS_FREE(strat);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");

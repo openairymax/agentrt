@@ -103,6 +103,7 @@ from .exceptions import (
     CODE_SKILL_NOT_FOUND,
     CODE_SKILL_EXECUTION_FAILED,
     CODE_TELEMETRY_ERROR,
+    CODE_SYSCALL_ERROR,
     CODE_PERMISSION_DENIED,
     CODE_CORRUPTED_DATA,
 )
@@ -256,9 +257,9 @@ __all__ = [
     "AuthenticationError",
     "InvalidResponseError",
     "ServerError",
-    # 向后兼容别名
-    "TimeoutError",
-    "MemoryError",
+    # 向后兼容别名（使用 AgentOS_ 前缀避免遮蔽 Python 内置异常）
+    "AgentOS_TimeoutError",
+    "AgentOS_MemoryError",
 
     # ============================================================
     # 错误码常量
@@ -305,6 +306,7 @@ __all__ = [
     "CODE_SKILL_NOT_FOUND",
     "CODE_SKILL_EXECUTION_FAILED",
     "CODE_TELEMETRY_ERROR",
+    "CODE_SYSCALL_ERROR",
     "CODE_PERMISSION_DENIED",
     "CODE_CORRUPTED_DATA",
 
@@ -399,26 +401,5 @@ __all__ = [
     "Span",
 
     # 类型定义（向后兼容）
-    # 枚举类型
-    "TaskStatus",
-    "MemoryLayer",
-    "MemoryRecordType",
-    "SessionStatus",
-    "SkillStatus",
-    "SpanStatus",
-    # 领域模型
-    "Task",
-    "TaskResult",
-    "Memory",
-    "MemoryInfo",
-    "MemorySearchResult",
-    "Session",
-    "Skill",
-    "SkillResult",
-    "SkillInfo",
-    # 列表查询选项
-    "PaginationOptions",
-    "SortOptions",
-    "FilterOptions",
-    "ListOptions",
+    # 注：与上方"类型定义（v0.1.0 新增）"重复的条目已移除
 ]

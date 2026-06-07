@@ -147,7 +147,7 @@ void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
         pool->block_tags[idx] = BLOCK_ALLOCATED;
     }
 
-    AGENTOS_MEMSET(block, 0, pool->block_size);
+    __builtin_memset(block, 0, pool->block_size);
 
     if (pool->lock) {
         agentos_mutex_unlock(pool->lock);

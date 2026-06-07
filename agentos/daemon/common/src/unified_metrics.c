@@ -91,7 +91,7 @@ static const char *metric_type_string(um_metric_type_t type)
 AGENTOS_API um_config_t um_create_default_config(void)
 {
     um_config_t config;
-    AGENTOS_MEMSET(&config, 0, sizeof(um_config_t));
+    __builtin_memset(&config, 0, sizeof(um_config_t));
     safe_strcpy(config.service_name, "agentos", sizeof(config.service_name));
     config.scrape_interval_ms = 15000;
     config.retention_ms = 300000;
@@ -105,7 +105,7 @@ AGENTOS_API int um_init(const um_config_t *config)
         return 0;
 
     if (config) {
-        memcpy(&g_um.config, config, sizeof(um_config_t));
+        __builtin_memcpy(&g_um.config, config, sizeof(um_config_t));
     } else {
         g_um.config = um_create_default_config();
     }
@@ -114,9 +114,9 @@ AGENTOS_API int um_init(const um_config_t *config)
     if (err != AGENTOS_SUCCESS)
         return AGENTOS_ERR_UNKNOWN;
 
-    AGENTOS_MEMSET(g_um.modules, 0, sizeof(g_um.modules));
+    __builtin_memset(g_um.modules, 0, sizeof(g_um.modules));
     g_um.module_count = 0;
-    AGENTOS_MEMSET(&g_um.stats, 0, sizeof(um_stats_t));
+    __builtin_memset(&g_um.stats, 0, sizeof(um_stats_t));
     g_um.initialized = true;
 
     if (g_um.config.enable_default_metrics) {
@@ -169,7 +169,7 @@ AGENTOS_API int um_register_module(const char *module_name, const char *instance
     }
 
     um_module_metrics_t *mod = &g_um.modules[g_um.module_count];
-    AGENTOS_MEMSET(mod, 0, sizeof(um_module_metrics_t));
+    __builtin_memset(mod, 0, sizeof(um_module_metrics_t));
     safe_strcpy(mod->module_name, module_name, UM_MODULE_NAME_LEN);
     if (instance_id) {
         safe_strcpy(mod->instance_id, instance_id, sizeof(mod->instance_id));
@@ -211,7 +211,7 @@ AGENTOS_API int um_unregister_module(const char *module_name)
     if (idx < g_um.module_count - 1) {
         g_um.modules[idx] = g_um.modules[g_um.module_count - 1];
     }
-    AGENTOS_MEMSET(&g_um.modules[g_um.module_count - 1], 0, sizeof(um_module_metrics_t));
+    __builtin_memset(&g_um.modules[g_um.module_count - 1], 0, sizeof(um_module_metrics_t));
     g_um.module_count--;
     g_um.stats.active_modules = g_um.module_count;
 
@@ -255,7 +255,7 @@ AGENTOS_API int um_register_metric(const char *module_name, const char *name, um
     }
 
     um_metric_entry_t *entry = &mod->metrics[mod->metric_count];
-    AGENTOS_MEMSET(entry, 0, sizeof(um_metric_entry_t));
+    __builtin_memset(entry, 0, sizeof(um_metric_entry_t));
     safe_strcpy(entry->name, name, UM_METRIC_NAME_LEN);
     if (help)
         safe_strcpy(entry->help, help, sizeof(entry->help));
@@ -407,7 +407,7 @@ AGENTOS_API char *um_export_prometheus_module(const char *module_name)
                 agentos_mutex_unlock(&g_um.mutex);                                                 \
                 return NULL;                                                                       \
             }                                                                                      \
-            memcpy(nb, buf, pos);                                                                  \
+            __builtin_memcpy(nb, buf, pos);                                                                  \
             AGENTOS_FREE(buf);                                                                     \
             buf = nb;                                                                              \
             w = snprintf(buf + pos, buf_size - pos, fmt,                                           \
@@ -572,8 +572,15 @@ AGENTOS_API void um_update_default_metrics(void)
     FILE *f = fopen("/proc/self/statm", "r");
     if (f) {
         long rss = 0;
-        if (fscanf(f, "%*s %ld", &rss) == 1) {
-            um_gauge_set("system", "process_memory_bytes", (double)(rss * 4096));
+        char line[256];
+        if (fgets(line, sizeof(line), f)) {
+            char *saveptr = NULL;
+            char *tok = strtok_r(line, " \t", &saveptr);
+            tok = strtok_r(NULL, " \t", &saveptr); /* skip first field */
+            if (tok) {
+                rss = strtol(tok, NULL, 10);
+                um_gauge_set("system", "process_memory_bytes", (double)(rss * 4096));
+            }
         }
         fclose(f);
     }
@@ -591,7 +598,7 @@ AGENTOS_API int um_get_stats(um_stats_t *stats)
         return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_mutex_lock(&g_um.mutex);
-    memcpy(stats, &g_um.stats, sizeof(um_stats_t));
+    __builtin_memcpy(stats, &g_um.stats, sizeof(um_stats_t));
     agentos_mutex_unlock(&g_um.mutex);
 
     return 0;

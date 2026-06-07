@@ -48,27 +48,20 @@ CODE_AGENT_DISPATCH_FAILED = "0x2003"
 CODE_INTENT_PARSE_FAILED = "0x2004"
 
 CODE_TASK_FAILED = "0x3001"
-CODE_TASK_TIMEOUT = "0x3002"
-CODE_TASK_CANCELLED = "0x3003"
-CODE_TASK_NOT_FOUND = "0x3004"
+CODE_TASK_CANCELLED = "0x3002"
+CODE_TASK_TIMEOUT = "0x3003"
 
 CODE_MEMORY_NOT_FOUND = "0x4001"
-CODE_MEMORY_WRITE_FAILED = "0x4002"
-CODE_MEMORY_EVOLVE_FAILED = "0x4003"
-CODE_MEMORY_SEARCH_FAILED = "0x4004"
-CODE_MEMORY_LEVEL_INVALID = "0x4005"
+CODE_MEMORY_EVOLVE_FAILED = "0x4002"
+CODE_MEMORY_SEARCH_FAILED = "0x4003"
 
-CODE_SESSION_NOT_FOUND = "0x4101"
-CODE_SESSION_EXPIRED = "0x4102"
+CODE_SESSION_NOT_FOUND = "0x4004"
+CODE_SESSION_EXPIRED = "0x4005"
 CODE_SKILL_NOT_FOUND = "0x4006"
 CODE_SKILL_EXECUTION_FAILED = "0x4007"
 
-CODE_SYSCALL_FAILED = "0x5001"
-CODE_SYSCALL_TIMEOUT = "0x5002"
-CODE_SYSCALL_INVALID_PARAMS = "0x5003"
-
-CODE_TELEMETRY_ERROR = "0x5101"
-CODE_SYSCALL_ERROR = "0x5102"
+CODE_TELEMETRY_ERROR = "0x5001"
+CODE_SYSCALL_ERROR = "0x5002"
 
 CODE_PERMISSION_DENIED = "0x6001"
 CODE_CORRUPTED_DATA = "0x6002"
@@ -172,11 +165,16 @@ class NetworkError(AgentOSError):
         super().__init__(message=message, error_code=CODE_NETWORK_ERROR, cause=cause)
 
 
-class TimeoutError(AgentOSError):
-    """Operation timeout error."""
+class AgentOSTimeoutError(AgentOSError):
+    """AgentOS-specific timeout error with operation context."""
 
-    def __init__(self, message: str = "操作超时", cause: Optional[Exception] = None):
+    def __init__(self, message: str = "", operation: str = "", cause: Optional[Exception] = None):
+        if not message and operation:
+            message = f"操作超时：{operation}"
+        elif not message:
+            message = "操作超时"
         super().__init__(message=message, error_code=CODE_TIMEOUT, cause=cause)
+        self.operation = operation
 
 
 class ValidationError(AgentOSError):
@@ -214,7 +212,7 @@ class TaskError(AgentOSError):
         super().__init__(message=message, error_code=CODE_TASK_FAILED, cause=cause)
 
 
-class MemoryError(AgentOSError):
+class AgentOSMemoryError(AgentOSError):
     """Memory-related error."""
 
     def __init__(self, message: str = "", cause: Optional[Exception] = None):
@@ -226,15 +224,6 @@ class SessionError(AgentOSError):
 
     def __init__(self, message: str = "", cause: Optional[Exception] = None):
         super().__init__(message=message, error_code=CODE_SESSION_NOT_FOUND, cause=cause)
-
-
-class AgentOSTimeoutError(TimeoutError):
-    """AgentOS-specific timeout error with operation context."""
-
-    def __init__(self, operation: str = "", cause: Optional[Exception] = None):
-        message = f"操作超时：{operation}" if operation else "操作超时"
-        super().__init__(message=message, cause=cause)
-        self.operation = operation
 
 
 class ConfigurationError(AgentOSError):
@@ -262,7 +251,7 @@ class SyscallError(AgentOSError):
     """System call error."""
 
     def __init__(self, message: str = "系统调用失败", cause: Optional[Exception] = None):
-        super().__init__(message=message, error_code=CODE_SYSCALL_FAILED, cause=cause)
+        super().__init__(message=message, error_code=CODE_SYSCALL_ERROR, cause=cause)
 
 
 class SkillError(AgentOSError):
@@ -279,5 +268,4 @@ class InvalidResponseError(AgentOSError):
         super().__init__(message=message, error_code=CODE_INVALID_RESPONSE, cause=cause)
 
 
-AgentOSMemoryError = MemoryError
 ConfigError = ConfigurationError

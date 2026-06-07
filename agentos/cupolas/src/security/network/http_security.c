@@ -28,7 +28,7 @@ int http_security_init(const cupolas_http_security_config_t *config)
     if (g_http.initialized)
         return 0;
 
-    AGENTOS_MEMSET(&g_http, 0, sizeof(g_http));
+    __builtin_memset(&g_http, 0, sizeof(g_http));
 
     if (config) {
         g_http.config = *config;
@@ -61,7 +61,7 @@ void http_security_cleanup(void)
         AGENTOS_FREE(g_http.config.forbidden_headers);
     }
 
-    AGENTOS_MEMSET(&g_http, 0, sizeof(g_http));
+    __builtin_memset(&g_http, 0, sizeof(g_http));
 }
 
 int http_configure(const cupolas_http_security_config_t *config)

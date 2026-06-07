@@ -195,7 +195,7 @@ static char *duplicate_string(const char *str)
     size_t len = strlen(str);
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
     if (copy) {
-        memcpy(copy, str, len);
+        __builtin_memcpy(copy, str, len);
         copy[len] = '\0';
     }
     return copy;
@@ -322,7 +322,7 @@ static config_error_t parse_json_value(const char **pp, const char *end, config_
         size_t nlen = (size_t)(*pp - num_start);
         if (nlen >= sizeof(num_buf))
             nlen = sizeof(num_buf) - 1;
-        memcpy(num_buf, num_start, nlen);
+        __builtin_memcpy(num_buf, num_start, nlen);
         num_buf[nlen] = '\0';
         if (is_float) {
             *out = config_value_create_double(atof(num_buf));
@@ -497,7 +497,7 @@ static config_error_t parse_ini_simple(const char *data, size_t data_len, config
             size_t sec_len = (size_t)(p - sec_start);
             if (sec_len >= sizeof(section))
                 sec_len = sizeof(section) - 1;
-            memcpy(section, sec_start, sec_len);
+            __builtin_memcpy(section, sec_start, sec_len);
             section[sec_len] = '\0';
             while (p < end && *p != '\n')
                 p++;
@@ -528,19 +528,19 @@ static config_error_t parse_ini_simple(const char *data, size_t data_len, config
                 snprintf(key_buf, sizeof(key_buf), "%s.", section);
                 size_t sl = strlen(key_buf);
                 if (sl + key_len < sizeof(key_buf)) {
-                    memcpy(key_buf + sl, line_start, key_len);
+                    __builtin_memcpy(key_buf + sl, line_start, key_len);
                     key_buf[sl + key_len] = '\0';
                 }
             } else {
                 if (key_len >= sizeof(key_buf))
                     key_len = sizeof(key_buf) - 1;
-                memcpy(key_buf, line_start, key_len);
+                __builtin_memcpy(key_buf, line_start, key_len);
                 key_buf[key_len] = '\0';
             }
             char val_buf[1024];
             if (val_len >= sizeof(val_buf))
                 val_len = sizeof(val_buf) - 1;
-            memcpy(val_buf, val_start, val_len);
+            __builtin_memcpy(val_buf, val_start, val_len);
             val_buf[val_len] = '\0';
             config_value_t *cv = config_value_create_string(val_buf);
             if (cv)
@@ -1209,7 +1209,7 @@ static int file_source_init_rdcw(file_source_priv_t *priv)
     size_t len = strlen(priv->file_path);
     if (len >= MAX_PATH)
         return AGENTOS_EINVAL;
-    memcpy(dir_path, priv->file_path, len + 1);
+    __builtin_memcpy(dir_path, priv->file_path, len + 1);
 
     char *last_sep = strrchr(dir_path, '\\');
     if (!last_sep)
@@ -1494,11 +1494,11 @@ static config_error_t env_source_load(config_source_t *source, config_context_t 
             key_len -= offset;
             if (key_len >= sizeof(key))
                 key_len = sizeof(key) - 1;
-            memcpy(key, entry + offset, key_len);
+            __builtin_memcpy(key, entry + offset, key_len);
         } else {
             if (key_len >= sizeof(key))
                 key_len = sizeof(key) - 1;
-            memcpy(key, entry, key_len);
+            __builtin_memcpy(key, entry, key_len);
         }
         key[key_len] = '\0';
         if (priv->separator) {
@@ -1645,7 +1645,7 @@ static config_error_t args_source_load(config_source_t *source, config_context_t
         char key[512];
         if (key_len >= sizeof(key))
             key_len = sizeof(key) - 1;
-        memcpy(key, arg + prefix_len, key_len - prefix_len);
+        __builtin_memcpy(key, arg + prefix_len, key_len - prefix_len);
         key[key_len - prefix_len] = '\0';
         const char *val = eq + strlen(assign);
         config_value_t *cv = config_value_create_string(val);

@@ -15,6 +15,8 @@
 #include "private.h"
 #include "utils.h"
 
+#include "memory_compat.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,7 +61,6 @@ heapstore_error_t heapstore_memory_init(void)
                  getenv("TMPDIR") ? getenv("TMPDIR") : AGENTOS_TMP_DIR);
     }
     AGENTOS_STRNCPY_TERM(s_memory_path, base_path, sizeof(s_memory_path));
-    s_memory_path[sizeof(s_memory_path) - 1] = '\0';
 
     if (!heapstore_ensure_directory(s_memory_path)) {
         return heapstore_ERR_DIR_CREATE_FAILED;
@@ -83,8 +84,8 @@ heapstore_error_t heapstore_memory_init(void)
         return heapstore_ERR_DIR_CREATE_FAILED;
     }
 
-    AGENTOS_MEMSET(s_pools, 0, sizeof(s_pools));
-    AGENTOS_MEMSET(s_allocations, 0, sizeof(s_allocations));
+    __builtin_memset(s_pools, 0, sizeof(s_pools));
+    __builtin_memset(s_allocations, 0, sizeof(s_allocations));
     s_pool_count = 0;
     s_allocation_count = 0;
 
@@ -102,8 +103,8 @@ void heapstore_memory_shutdown(void)
 
     agentos_mutex_lock(&s_memory_lock);
 
-    AGENTOS_MEMSET(s_pools, 0, sizeof(s_pools));
-    AGENTOS_MEMSET(s_allocations, 0, sizeof(s_allocations));
+    __builtin_memset(s_pools, 0, sizeof(s_pools));
+    __builtin_memset(s_allocations, 0, sizeof(s_allocations));
     s_pool_count = 0;
     s_allocation_count = 0;
 
@@ -130,13 +131,13 @@ heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t *po
 
     for (size_t i = 0; i < s_pool_count; i++) {
         if (strcmp(s_pools[i].pool_id, pool->pool_id) == 0) {
-            memcpy(&s_pools[i], pool, sizeof(heapstore_memory_pool_t));
+            __builtin_memcpy(&s_pools[i], pool, sizeof(heapstore_memory_pool_t));
             agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    memcpy(&s_pools[s_pool_count], pool, sizeof(heapstore_memory_pool_t));
+    __builtin_memcpy(&s_pools[s_pool_count], pool, sizeof(heapstore_memory_pool_t));
     s_pool_count++;
 
     agentos_mutex_unlock(&s_memory_lock);
@@ -158,7 +159,7 @@ heapstore_error_t heapstore_memory_get_pool(const char *pool_id, heapstore_memor
 
     for (size_t i = 0; i < s_pool_count; i++) {
         if (strcmp(s_pools[i].pool_id, pool_id) == 0) {
-            memcpy(pool, &s_pools[i], sizeof(heapstore_memory_pool_t));
+            __builtin_memcpy(pool, &s_pools[i], sizeof(heapstore_memory_pool_t));
             agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
@@ -214,13 +215,13 @@ heapstore_memory_record_allocation(const heapstore_memory_allocation_t *allocati
 
     for (size_t i = 0; i < s_allocation_count; i++) {
         if (strcmp(s_allocations[i].allocation_id, allocation->allocation_id) == 0) {
-            memcpy(&s_allocations[i], allocation, sizeof(heapstore_memory_allocation_t));
+            __builtin_memcpy(&s_allocations[i], allocation, sizeof(heapstore_memory_allocation_t));
             agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    memcpy(&s_allocations[s_allocation_count], allocation, sizeof(heapstore_memory_allocation_t));
+    __builtin_memcpy(&s_allocations[s_allocation_count], allocation, sizeof(heapstore_memory_allocation_t));
     s_allocation_count++;
 
     agentos_mutex_unlock(&s_memory_lock);
@@ -243,7 +244,7 @@ heapstore_error_t heapstore_memory_get_allocation(const char *allocation_id,
 
     for (size_t i = 0; i < s_allocation_count; i++) {
         if (strcmp(s_allocations[i].allocation_id, allocation_id) == 0) {
-            memcpy(allocation, &s_allocations[i], sizeof(heapstore_memory_allocation_t));
+            __builtin_memcpy(allocation, &s_allocations[i], sizeof(heapstore_memory_allocation_t));
             agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }

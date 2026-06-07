@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../utils/test_framework.h"
-#include "../../utils/security/input_validator.h"
+#include "../../utils/security/src/input_validator.h"
 
 /**
  * @test 测试字符串长度验证

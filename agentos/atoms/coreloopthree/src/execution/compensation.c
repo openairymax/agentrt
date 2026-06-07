@@ -102,7 +102,7 @@ agentos_error_t agentos_compensation_register(agentos_compensation_t *manager,
         size_t input_len = strlen((const char *)input);
         entry->input = AGENTOS_MALLOC(input_len + 1);
         if (entry->input) {
-            memcpy(entry->input, input, input_len + 1);
+            __builtin_memcpy(entry->input, input, input_len + 1);
             entry->input_size = input_len + 1;
         }
     }

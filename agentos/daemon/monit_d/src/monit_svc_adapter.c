@@ -40,7 +40,7 @@ static monit_adapter_ctx_t *monit_get_ctx(agentos_service_t service)
 static void monit_config_from_common(monitor_config_t *monit_cfg,
                                      const agentos_svc_config_t *common_cfg)
 {
-    AGENTOS_MEMSET(monit_cfg, 0, sizeof(monitor_config_t));
+    __builtin_memset(monit_cfg, 0, sizeof(monitor_config_t));
     monit_cfg->metrics_collection_interval_ms = 5000;
     monit_cfg->health_check_interval_ms =
         (common_cfg && common_cfg->timeout_ms > 0) ? common_cfg->timeout_ms : 10000;
@@ -62,7 +62,7 @@ static agentos_error_t monit_adapter_init(agentos_service_t service,
         return AGENTOS_EINVAL;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     }
 
     if (!ctx->monit_svc) {
@@ -190,7 +190,7 @@ agentos_error_t monit_service_adapter_create(agentos_service_t *out_service,
         return AGENTOS_ENOMEM;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "monit_d";
         ctx->common_cfg.version = "0.1.0";
@@ -233,7 +233,7 @@ agentos_error_t monit_service_adapter_wrap(agentos_service_t *out_service, void 
     ctx->owns_service = false;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "monit_d";
         ctx->common_cfg.version = "0.1.0";

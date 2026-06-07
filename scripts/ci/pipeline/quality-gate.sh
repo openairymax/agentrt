@@ -91,11 +91,18 @@ gate_cpp_static_analysis() {
 
     local source_dirs=(
         "${PROJECT_ROOT}/agentos/daemon/common/src"
-        "${PROJECT_ROOT}/agentos/atoms/corekern/src"
-        "${PROJECT_ROOT}/agentos/atoms/coreloopthree/src"
-        "${PROJECT_ROOT}/agentos/commons/utils"
+        "${PROJECT_ROOT}/agentos/daemon/market_d/src"
+        "${PROJECT_ROOT}/agentos/daemon/sched_d/src"
+        "${PROJECT_ROOT}/agentos/daemon/monit_d/src"
+        "${PROJECT_ROOT}/agentos/daemon/tool_d/src"
+        "${PROJECT_ROOT}/agentos/daemon/observe_d/src"
         "${PROJECT_ROOT}/agentos/cupolas/src"
-        "${PROJECT_ROOT}/../MemoryRovol/src"
+        "${PROJECT_ROOT}/agentos/protocols/src"
+        "${PROJECT_ROOT}/agentos/protocols/common/src"
+        "${PROJECT_ROOT}/agentos/protocols/core/router/src"
+        "${PROJECT_ROOT}/agentos/protocols/core/transformers/src"
+        "${PROJECT_ROOT}/agentos/protocols/core/registry/src"
+        "${PROJECT_ROOT}/agentos/protocols/core/adapter/src"
     )
 
     local include_dirs=(
@@ -106,15 +113,13 @@ gate_cpp_static_analysis() {
         "${PROJECT_ROOT}/agentos/commons/utils/string/include"
         "${PROJECT_ROOT}/agentos/commons/utils/logging/include"
         "${PROJECT_ROOT}/agentos/commons/utils/error/include"
+        "${PROJECT_ROOT}/agentos/commons/utils/sync"
         "${PROJECT_ROOT}/agentos/commons/platform/include"
-        "${PROJECT_ROOT}/agentos/atoms/corekern/include"
-        "${PROJECT_ROOT}/agentos/atoms/coreloopthree/include"
-        "${PROJECT_ROOT}/agentos/protocols/include"
         "${PROJECT_ROOT}/agentos/daemon/common/include"
         "${PROJECT_ROOT}/agentos/cupolas/include"
         "${PROJECT_ROOT}/agentos/gateway/src"
-        "${PROJECT_ROOT}/../MemoryRovol/include"
-        "${PROJECT_ROOT}/../MemoryRovol/src"
+        "${PROJECT_ROOT}/agentos/protocols/include"
+        "${PROJECT_ROOT}/agentos/protocols/core"
     )
 
     local cppcheck_suppressions="${PROJECT_ROOT}/scripts/ci/pipeline/cppcheck_suppressions.txt"
@@ -139,7 +144,8 @@ gate_cpp_static_analysis() {
         log_info "Analyzing: $dir"
 
         local cppcheck_output
-        cppcheck_output=$(cppcheck \
+        # INF-01: 单目录超时30s，防止大目录卡死CI
+        cppcheck_output=$(timeout 30 cppcheck \
             --enable=warning,performance,portability,information,missingInclude \
             --std=c11 \
             --suppress=missingIncludeSystem \
@@ -623,18 +629,75 @@ gate_ban_strict_rules() {
         record_check_result "BAN-80" "false"
     fi
 
-    # BAN-90~93: TypeScript 代码质量（eslint 检查）
-    if command -v npx &>/dev/null && [[ -f "${PROJECT_ROOT}/../../Desktop/package.json" ]]; then
+    # BAN-90~93: TypeScript 代码质量（eslint + tsc + vitest 检查）
+    local DESKTOP_DIR="${PROJECT_ROOT}/../Desktop"
+    if command -v npx &>/dev/null && [[ -f "${DESKTOP_DIR}/package.json" ]]; then
         log_info "Checking TypeScript with eslint..."
         local ban90_ts_issues=0
-        # 简化检查：验证 eslint 配置存在
-        if [[ -f "${PROJECT_ROOT}/../../Desktop/.eslintrc.json" ]]; then
+
+        # BAN-90: ESLint 配置存在 + 实际运行
+        if [[ -f "${DESKTOP_DIR}/.eslintrc.json" || -f "${DESKTOP_DIR}/eslint.config.js" ]]; then
             log_ok "BAN-90: ESLint configuration exists"
             record_check_result "BAN-90" "true"
+
+            # 实际运行 ESLint
+            if (cd "$DESKTOP_DIR" && npx eslint src/ --max-warnings=0 --format compact 2>&1); then
+                log_ok "BAN-91: ESLint 0 error, 0 warning"
+                record_check_result "BAN-91" "true"
+            else
+                local eslint_exit=$?
+                ((ban90_ts_issues++)) || true
+                record_issue "medium" "BAN-91" "Desktop/src/" "ESLint found issues (exit code: $eslint_exit)"
+                log_error "BAN-91: ESLint check failed with exit code $eslint_exit"
+                record_check_result "BAN-91" "false"
+            fi
         else
-            record_issue "medium" "BAN-90" "Desktop/" "Missing .eslintrc.json"
             ((ban90_ts_issues++)) || true
+            record_issue "medium" "BAN-90" "Desktop/" "Missing ESLint configuration"
+            log_error "BAN-90: Missing .eslintrc.json or eslint.config.js"
             record_check_result "BAN-90" "false"
+            record_check_result "BAN-91" "false"
+        fi
+
+        # BAN-92: TypeScript 编译检查（tsc --noEmit）
+        log_info "Running TypeScript type checking (tsc --noEmit)..."
+        if (cd "$DESKTOP_DIR" && npx tsc --noEmit 2>&1); then
+            log_ok "BAN-92: TypeScript compilation: 0 errors"
+            record_check_result "BAN-92" "true"
+        else
+            ((ban90_ts_issues++)) || true
+            record_issue "high" "BAN-92" "Desktop/src/" "TypeScript compilation errors found"
+            log_error "BAN-92: tsc --noEmit found type errors"
+            record_check_result "BAN-92" "false"
+        fi
+
+        # BAN-93: Vitest 测试执行 + 覆盖率阈值
+        log_info "Running Vitest test suite..."
+        if (cd "$DESKTOP_DIR" && npx vitest run --reporter=verbose 2>&1); then
+            log_ok "BAN-93: All tests passed"
+            record_check_result "BAN-93" "true"
+
+            # 覆盖率检查（INF-03: ≥40%）
+            log_info "Checking test coverage threshold (≥40%)..."
+            if (cd "$DESKTOP_DIR" && npx vitest run --coverage 2>&1 | grep -q "All files.*|.*50\|All files.*|.*4[0-9]\.[0-9]"); then
+                log_ok "BAN-93: Test coverage ≥40% threshold met"
+                record_check_result "INF-03" "true"
+            else
+                log_warn "BAN-93: Coverage below 40% or unable to determine"
+                record_check_result "INF-03" "false"
+            fi
+        else
+            ((ban90_ts_issues++)) || true
+            record_issue "critical" "BAN-93" "Desktop/" "Vitest tests failed"
+            log_error "BAN-93: Vitest test suite has failures"
+            record_check_result "BAN-93" "false"
+            record_check_result "INF-03" "false"
+        fi
+
+        if [[ $ban90_ts_issues -eq 0 ]]; then
+            log_ok "BAN-90~93: All TypeScript quality checks passed"
+        else
+            log_error "BAN-90~93: $ban90_ts_issues TypeScript issue(s) found"
         fi
     else
         log_info "BAN-90~93: Desktop/ not accessible, skipping TypeScript checks"
@@ -1848,6 +1911,8 @@ gate_ban_extended_strict() {
         closes=$(grep -c '\bclose\b' "$f" 2>/dev/null || echo "0")
         if [[ $opens -gt $closes ]]; then echo "$f"; fi
     done | wc -l) || true
+    # 去除可能的换行符（grep -c 在文件不存在时可能输出多行）
+    fd_pairs=$(echo "$fd_pairs" | tr -d '[:space:]')
     if [[ $fd_pairs -eq 0 ]]; then
         log_ok "BAN-159~162 (strict): Resource cleanup patterns verified ($fd_pairs unmatched)"
         record_check_result "BAN-159~162" "true"

@@ -127,10 +127,12 @@ static void handle_register_agent(cJSON *params, int id, agentos_socket_t client
         return;
     }
 
-    AGENTOS_STRNCPY_TERM(info.agent_id, aid, sizeof(info.agent_id));
+AGENTOS_STRNCPY_TERM(info.agent_id, aid, sizeof(info.agent_id));
+    (info.agent_id)[sizeof(info.agent_id) - 1] = '\0';
     const char *aname = get_string_field(agent_json, "agent_name", NULL);
     if (aname)
-        AGENTOS_STRNCPY_TERM(info.agent_name, aname, sizeof(info.agent_name));
+AGENTOS_STRNCPY_TERM(info.agent_name, aname, sizeof(info.agent_name));
+        (info.agent_name)[sizeof(info.agent_name) - 1] = '\0';
 
     info.load_factor = get_double_field(agent_json, "load_factor", 0.0);
     info.success_rate = get_double_field(agent_json, "success_rate", 0.0);
@@ -173,11 +175,13 @@ static void handle_schedule_task(cJSON *params, int id, agentos_socket_t client_
         return;
     }
 
-    AGENTOS_STRNCPY_TERM(task.task_id, tid, sizeof(task.task_id));
+AGENTOS_STRNCPY_TERM(task.task_id, tid, sizeof(task.task_id));
+    (task.task_id)[sizeof(task.task_id) - 1] = '\0';
 
     const char *desc = get_string_field(task_json, "task_description", NULL);
     if (desc)
-        AGENTOS_STRNCPY_TERM(task.task_description, desc, sizeof(task.task_description));
+AGENTOS_STRNCPY_TERM(task.task_description, desc, sizeof(task.task_description));
+        (task.task_description)[sizeof(task.task_description) - 1] = '\0';
 
     task.priority = get_int_field(task_json, "priority", 0);
     task.timeout_ms = get_int_field(task_json, "timeout_ms", 30000);
@@ -434,7 +438,7 @@ int main(int argc, char **argv)
     SVC_LOG_INFO("Scheduler service started successfully");
 
     daemon_event_config_t ev_config;
-    AGENTOS_MEMSET(&ev_config, 0, sizeof(ev_config));
+    __builtin_memset(&ev_config, 0, sizeof(ev_config));
     ev_config.max_events = 64;
     ev_config.thread_pool_min = 4;
     ev_config.thread_pool_max = 8;

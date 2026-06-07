@@ -126,6 +126,9 @@ static void sort_guards_by_priority(guard_manager_private_t *manager)
     qsort(manager->guards, manager->guard_count, sizeof(guard_t *), compare_guard_priority);
 }
 
+// 前向声明
+static void free_guard_context(guard_context_t *context);
+
 // 复制检测上下文 - [INFRA] 保留供未来守卫上下文复制使用
 static guard_context_t *copy_guard_context(const guard_context_t *src)
 {
@@ -157,7 +160,7 @@ static guard_context_t *copy_guard_context(const guard_context_t *src)
         }
         dst->input_data = AGENTOS_MALLOC(src->input_size);
         if (dst->input_data) {
-            memcpy(dst->input_data, src->input_data, src->input_size);
+            __builtin_memcpy(dst->input_data, src->input_data, src->input_size);
             dst->input_size = src->input_size;
         }
     }
@@ -238,7 +241,7 @@ guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
     }
 
     // 初始化统计信息
-    AGENTOS_MEMSET(&manager->stats, 0, sizeof(manager->stats));
+    __builtin_memset(&manager->stats, 0, sizeof(manager->stats));
 
     manager->next_guard_id = 1000;  // 起始ID
     manager->initialized = true;
@@ -402,7 +405,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
 
         // 执行检测
         guard_result_t result;
-        AGENTOS_MEMSET(&result, 0, sizeof(result));
+        __builtin_memset(&result, 0, sizeof(result));
 
         int check_result = guard_check(guard, context, &result);
         if (check_result == CUPOLAS_OK) {
@@ -577,7 +580,7 @@ int guard_manager_reset_stats(guard_manager_t *manager)
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
     cupolas_mutex_lock(&priv->lock);
-    AGENTOS_MEMSET(&priv->stats, 0, sizeof(priv->stats));
+    __builtin_memset(&priv->stats, 0, sizeof(priv->stats));
     cupolas_mutex_unlock(&priv->lock);
 
     return CUPOLAS_OK;
@@ -600,10 +603,8 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
 
     // 复制名称和描述
     AGENTOS_STRNCPY_TERM(guard->name, name, GUARD_NAME_MAX_LEN);
-    guard->name[GUARD_NAME_MAX_LEN - 1] = '\0';
     if (description) {
         AGENTOS_STRNCPY_TERM(guard->description, description, GUARD_DESC_MAX_LEN);
-        guard->description[GUARD_DESC_MAX_LEN - 1] = '\0';
     }
 
     // 设置基本属性
@@ -617,10 +618,10 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
         AGENTOS_FREE(guard);
         return NULL;
     }
-    memcpy(guard->ops, ops, sizeof(guard_ops_t));
+    __builtin_memcpy(guard->ops, ops, sizeof(guard_ops_t));
 
     // 初始化统计信息
-    AGENTOS_MEMSET(&guard->stats, 0, sizeof(guard->stats));
+    __builtin_memset(&guard->stats, 0, sizeof(guard->stats));
 
     guard->created_time = cupolas_get_timestamp_ns();
 
@@ -671,14 +672,17 @@ int guard_init(guard_t *guard, const guard_config_t *config)
         guard->config.custom_config = AGENTOS_MALLOC(config->custom_config_size);
         if (!guard->config.custom_config)
             return cupolas_ERROR_NO_MEMORY;
-        memcpy(guard->config.custom_config, config->custom_config, config->custom_config_size);
+        __builtin_memcpy(guard->config.custom_config, config->custom_config, config->custom_config_size);
     }
 
     // 调用守卫初始化函数
     if (guard->ops->init) {
         int result = guard->ops->init(guard->priv_data, config);
-        if (result != CUPOLAS_OK)
+        if (result != CUPOLAS_OK) {
+            AGENTOS_FREE(guard->config.custom_config);
+            guard->config.custom_config = NULL;
             return result;
+        }
     }
 
     guard->state = GUARD_STATE_ENABLED;
@@ -770,6 +774,6 @@ int guard_reset_stats(guard_t *guard)
     if (!guard)
         return cupolas_ERROR_INVALID_ARG;
 
-    AGENTOS_MEMSET(&guard->stats, 0, sizeof(guard->stats));
+    __builtin_memset(&guard->stats, 0, sizeof(guard->stats));
     return CUPOLAS_OK;
 }

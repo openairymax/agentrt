@@ -63,8 +63,8 @@ tests/
 ├── 构建配置
 │   ├── CMakeLists.txt           # 测试构建入口（C 测试）
 │   └── Makefile                 # Make 测试入口
-├── unit/                        # 单元测试（137 个文件）
-│   ├── atoms/                   #   Atoms 微内核层测试（25 个文件）
+├── unit/                        # 单元测试（138 个文件）
+│   ├── atoms/                   #   Atoms 微内核层测试（26 个文件）
 │   │   ├── corekern/            #     微内核核心（7 个文件）
 │   │   ├── coreloopthree/       #     三环运行时（11 个文件）
 │   │   ├── memory/              #     内置记忆（1 个文件）
@@ -230,7 +230,9 @@ cd build && ctest -R security
 | `openlab/` | ✅ pytest | — | — | — |
 | `toolkit/` | ✅ pytest | — | — | ✅ pytest-benchmark |
 
-> **注意**：当前有 6 个 commons 测试处于禁用状态：`test_config`、`test_types`、`test_ipc`、`test_network`、`test_common_integration`、`test_unified_modules`。
+> **注意**：当前有 6 个 commons 测试处于禁用状态，分布在单元测试和集成测试中：
+> - 单元测试（4 个）：`test_config`、`test_types`、`test_ipc`、`test_network`
+> - 集成测试（2 个）：`test_common_integration`、`test_unified_modules`
 
 ---
 

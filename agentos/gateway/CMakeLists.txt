@@ -216,5 +216,10 @@ if(CPPCHECK)
     )
 endif()
 else()
-    message(STATUS "gateway: SKIPPED (cJSON not found, required for JSON protocol handling)")
+    # Stub library when cJSON is not available - provides link target but no functionality
+    add_library(gateway STATIC
+        src/gateway/gateway.c
+    )
+    target_compile_definitions(gateway PRIVATE AGENTOS_NO_CJSON)
+    message(STATUS "gateway: cJSON not found - building stub library")
 endif() # AGENTOS_HAS_CJSON

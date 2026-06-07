@@ -987,9 +987,6 @@ class AgentApplication:
         return 0.0
 
 
-from .errors import DEFAULT_RETRY_STRATEGY
-
-
 __all__ = [
     "AgentApplication",
     "AgentConfig",

@@ -53,7 +53,7 @@ static size_t claude_curl_write_cb(void *ptr, size_t size, size_t nmemb, void *u
     if (!new_data)
         return 0;
     buf->data = new_data;
-    memcpy(buf->data + buf->size, ptr, total);
+    __builtin_memcpy(buf->data + buf->size, ptr, total);
     buf->size += total;
     buf->data[buf->size] = '\0';
     return total;
@@ -318,7 +318,7 @@ static int claude_proto_get_version(void *context, char *buf, size_t max_size)
     size_t len = strlen(ver);
     if (len >= max_size)
         len = max_size - 1;
-    memcpy(buf, ver, len);
+    __builtin_memcpy(buf, ver, len);
     buf[len] = '\0';
     return 0;
 }
@@ -462,7 +462,7 @@ claude_adapter_context_t *claude_adapter_create(const claude_config_t *config)
     if (!ctx)
         return NULL;
 
-    memcpy(&ctx->config, config, sizeof(claude_config_t));
+    __builtin_memcpy(&ctx->config, config, sizeof(claude_config_t));
 
     if (config->api_key)
         ctx->config.api_key = AGENTOS_STRDUP(config->api_key);
@@ -706,7 +706,7 @@ int claude_messages_stream(claude_adapter_context_t *ctx, const claude_message_t
         }
 
         char chunk_buf[CLAUDE_STREAM_CHUNK_SIZE + 4];
-        memcpy(chunk_buf, full_response + pos, cLen);
+        __builtin_memcpy(chunk_buf, full_response + pos, cLen);
         chunk_buf[cLen] = '\0';
         pos += cLen;
 

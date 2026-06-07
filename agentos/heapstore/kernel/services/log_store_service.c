@@ -68,7 +68,6 @@ int log_store_service_init(const char *storage_path, uint64_t max_storage_bytes)
 
     // 设置存储路径
     AGENTOS_STRNCPY_TERM(g_ctx.storage_path, storage_path, sizeof(g_ctx.storage_path));
-    g_ctx.storage_path[sizeof(g_ctx.storage_path) - 1] = '\0';
 
     g_ctx.max_storage_bytes =
         max_storage_bytes > 0 ? max_storage_bytes : 100 * 1024 * 1024;  // 默认100MB
@@ -113,7 +112,8 @@ int log_store_service_store_entry(heapstore_log_level_t level, const char *compo
     }
 
     time_t now = timestamp ? *timestamp : time(NULL);
-    struct tm *tm_info = localtime(&now);
+    struct tm tm_buf;
+    struct tm *tm_info = localtime_r(&now, &tm_buf);
     if (!tm_info) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -259,14 +259,45 @@ int log_store_service_query_entries(const time_t *start_time, const time_t *end_
             char level_str[16] = {0};
             char comp_str[128] = {0};
 
-            if (sscanf(line, "[%*[^]]] [%15[^]]] [%127[^]]", level_str, comp_str) < 2) {
+            const char *p = line;
+            const char *bracket1 = strchr(p, '[');
+            if (!bracket1) { continue; }
+            const char *close1 = strchr(bracket1, ']');
+            if (!close1) { continue; }
+            const char *bracket2 = strchr(close1, '[');
+            if (!bracket2) { continue; }
+            const char *close2 = strchr(bracket2, ']');
+            if (!close2) { continue; }
+            size_t level_len = (size_t)(close2 - bracket2 - 1);
+            if (level_len >= sizeof(level_str)) { level_len = sizeof(level_str) - 1; }
+            __builtin_memcpy(level_str, bracket2 + 1, level_len);
+            level_str[level_len] = '\0';
+            const char *bracket3 = strchr(close2, '[');
+            int parsed = 1;
+            if (bracket3) {
+                const char *close3 = strchr(bracket3, ']');
+                if (close3) {
+                    size_t comp_len = (size_t)(close3 - bracket3 - 1);
+                    if (comp_len >= sizeof(comp_str)) { comp_len = sizeof(comp_str) - 1; }
+                    __builtin_memcpy(comp_str, bracket3 + 1, comp_len);
+                    comp_str[comp_len] = '\0';
+                    parsed = 2;
+                }
+            }
+            if (parsed < 2) {
                 continue;
             }
 
             struct tm tm_info;
-            AGENTOS_MEMSET(&tm_info, 0, sizeof(tm_info));
+            __builtin_memset(&tm_info, 0, sizeof(tm_info));
             char time_buf[32];
-            if (sscanf(line + 1, "%31[^]]", time_buf) == 1) {
+            const char *ts_start = line + 1;
+            const char *ts_end = strchr(ts_start, ']');
+            if (ts_end && (size_t)(ts_end - ts_start) > 0) {
+                size_t ts_len = (size_t)(ts_end - ts_start);
+                if (ts_len >= sizeof(time_buf)) { ts_len = sizeof(time_buf) - 1; }
+                __builtin_memcpy(time_buf, ts_start, ts_len);
+                time_buf[ts_len] = '\0';
                 strptime(time_buf, "%Y-%m-%d %H:%M:%S", &tm_info);
                 log_time = mktime(&tm_info);
             }
@@ -328,7 +359,7 @@ int log_store_service_query_entries(const time_t *start_time, const time_t *end_
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(final_results, results, found_count * sizeof(char *));
+    __builtin_memcpy(final_results, results, found_count * sizeof(char *));
     AGENTOS_FREE(results);
 
     *out_entries = final_results;
@@ -455,5 +486,5 @@ void log_store_service_shutdown(void)
         return;
     }
 
-    AGENTOS_MEMSET(&g_ctx, 0, sizeof(g_ctx));
+    __builtin_memset(&g_ctx, 0, sizeof(g_ctx));
 }

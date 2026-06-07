@@ -147,7 +147,7 @@ agentos_error_t agentos_coordinator_weighted_create(const char **model_names, co
         return AGENTOS_ENOMEM;
     }
 
-    memcpy(data->weights, weights, model_count * sizeof(float));
+    __builtin_memcpy(data->weights, weights, model_count * sizeof(float));
 
     base->data = data;
     base->coordinate = weighted_coordinate;

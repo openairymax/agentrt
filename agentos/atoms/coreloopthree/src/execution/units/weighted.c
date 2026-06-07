@@ -43,7 +43,7 @@ static void weighted_destroy(agentos_dispatching_strategy_t *strategy)
 static float compute_score(const agent_info_t *agent, const weighted_data_t *data)
 {
     strategy_agent_info_t strategy_agent;
-    AGENTOS_MEMSET(&strategy_agent, 0, sizeof(strategy_agent));
+    __builtin_memset(&strategy_agent, 0, sizeof(strategy_agent));
     strategy_agent.cost_estimate = agent->cost_estimate;
     strategy_agent.success_rate = agent->success_rate;
     strategy_agent.trust_score = agent->trust_score;
@@ -109,7 +109,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *manager, void *regi
     agentos_dispatching_strategy_t *strat =
         (agentos_dispatching_strategy_t *)AGENTOS_MALLOC(sizeof(agentos_dispatching_strategy_t));
     if (!strat) return NULL;
-    AGENTOS_MEMSET(strat, 0, sizeof(*strat));
+    __builtin_memset(strat, 0, sizeof(*strat));
 
     weighted_data_t *data = (weighted_data_t *)AGENTOS_MALLOC(sizeof(weighted_data_t));
     if (!data) {
@@ -117,7 +117,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *manager, void *regi
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
-    AGENTOS_MEMSET(data, 0, sizeof(*data));
+    __builtin_memset(data, 0, sizeof(*data));
 
     if (manager) {
         data->manager = *manager;

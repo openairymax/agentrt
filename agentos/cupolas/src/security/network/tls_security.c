@@ -46,7 +46,7 @@ int tls_security_init(const cupolas_tls_config_t *config)
     if (g_tls.initialized)
         return 0;
 
-    memset(&g_tls, 0, sizeof(g_tls));
+    __builtin_memset(&g_tls, 0, sizeof(g_tls));
     CUPOLAS_MUTEX_INIT(&g_tls.lock);
 
     SSL_library_init();
@@ -87,7 +87,7 @@ void tls_security_cleanup(void)
     ERR_free_strings();
 
     CUPOLAS_MUTEX_DESTROY(&g_tls.lock);
-    memset(&g_tls, 0, sizeof(g_tls));
+    __builtin_memset(&g_tls, 0, sizeof(g_tls));
 }
 
 int tls_configure(const cupolas_tls_config_t *config)
@@ -289,10 +289,10 @@ int tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_resul
     }
 
     struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
+    __builtin_memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    memcpy(&addr.sin_addr, host->h_addr, host->h_length);
+    __builtin_memcpy(&addr.sin_addr, host->h_addr, host->h_length);
 
     int connect_result = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (connect_result != 0) {

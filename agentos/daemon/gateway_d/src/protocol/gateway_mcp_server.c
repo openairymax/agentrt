@@ -104,14 +104,14 @@ int gw_mcp_server_register_tool(gw_mcp_server_t *server, const char *name, const
         return AGENTOS_ERR_OVERFLOW;
 
     gw_mcp_tool_entry_t *entry = &server->tools[server->tool_count];
-    AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
+AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
     entry->name[sizeof(entry->name) - 1] = '\0';
     if (description) {
-        AGENTOS_STRNCPY_TERM(entry->description, description, sizeof(entry->description));
+AGENTOS_STRNCPY_TERM(entry->description, description, sizeof(entry->description));
         entry->description[sizeof(entry->description) - 1] = '\0';
     }
     if (input_schema_json) {
-        AGENTOS_STRNCPY_TERM(entry->input_schema, input_schema_json, sizeof(entry->input_schema));
+AGENTOS_STRNCPY_TERM(entry->input_schema, input_schema_json, sizeof(entry->input_schema));
         entry->input_schema[sizeof(entry->input_schema) - 1] = '\0';
     }
     entry->exec_fn = exec_fn;
@@ -130,18 +130,18 @@ int gw_mcp_server_register_resource(gw_mcp_server_t *server, const char *uri, co
         return AGENTOS_ERR_OVERFLOW;
 
     gw_mcp_resource_entry_t *entry = &server->resources[server->resource_count];
-    AGENTOS_STRNCPY_TERM(entry->uri, uri, sizeof(entry->uri));
+AGENTOS_STRNCPY_TERM(entry->uri, uri, sizeof(entry->uri));
     entry->uri[sizeof(entry->uri) - 1] = '\0';
     if (name) {
-        AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
+AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
         entry->name[sizeof(entry->name) - 1] = '\0';
     }
     if (description) {
-        AGENTOS_STRNCPY_TERM(entry->description, description, sizeof(entry->description));
+AGENTOS_STRNCPY_TERM(entry->description, description, sizeof(entry->description));
         entry->description[sizeof(entry->description) - 1] = '\0';
     }
     if (mime_type) {
-        AGENTOS_STRNCPY_TERM(entry->mime_type, mime_type, sizeof(entry->mime_type));
+AGENTOS_STRNCPY_TERM(entry->mime_type, mime_type, sizeof(entry->mime_type));
         entry->mime_type[sizeof(entry->mime_type) - 1] = '\0';
     }
     entry->read_fn = read_fn;
@@ -256,7 +256,7 @@ static char *extract_jsonrpc_method(const char *body)
 
         return NULL;
     }
-    memcpy(method, p, len);
+    __builtin_memcpy(method, p, len);
     method[len] = '\0';
     return method;
 }
@@ -293,7 +293,7 @@ static char *__attribute__((used)) extract_jsonrpc_id(const char *body)
 
             return NULL;
         }
-        memcpy(id, p, len);
+        __builtin_memcpy(id, p, len);
         id[len] = '\0';
         return id;
     }
@@ -344,7 +344,7 @@ static char *extract_jsonrpc_params(const char *body)
                 char *params = (char *)AGENTOS_MALLOC(len + 1);
                 if (!params)
                     return AGENTOS_STRDUP("{}");
-                memcpy(params, start, len);
+                __builtin_memcpy(params, start, len);
                 params[len] = '\0';
                 return params;
             }
@@ -390,7 +390,7 @@ static char *extract_tool_name_from_params(const char *params_json)
 
         return NULL;
     }
-    memcpy(name, p, len);
+    __builtin_memcpy(name, p, len);
     name[len] = '\0';
     return name;
 }
@@ -423,7 +423,7 @@ static char *extract_tool_args_from_params(const char *params_json)
                 char *args = (char *)AGENTOS_MALLOC(len + 1);
                 if (!args)
                     return AGENTOS_STRDUP("{}");
-                memcpy(args, start, len);
+                __builtin_memcpy(args, start, len);
                 args[len] = '\0';
                 return args;
             }
@@ -469,7 +469,7 @@ static char *extract_resource_uri_from_params(const char *params_json)
 
         return NULL;
     }
-    memcpy(uri, p, len);
+    __builtin_memcpy(uri, p, len);
     uri[len] = '\0';
     return uri;
 }

@@ -2,10 +2,10 @@
 # 提供 L1+L2 基础功能，无 MemoryRovol / FAISS / SQLite 依赖
 
 add_library(agentos_memory STATIC
-    builtin_storage.c
-    builtin_index.c
-    builtin_retrieval.c
-    builtin_provider.c
+    src/builtin_storage.c
+    src/builtin_index.c
+    src/builtin_retrieval.c
+    src/builtin_provider.c
 )
 
 target_include_directories(agentos_memory PUBLIC
@@ -24,4 +24,4 @@ else()
 endif()
 
 install(TARGETS agentos_memory DESTINATION lib)
-install(FILES memory_provider.h DESTINATION include/agentos/memory)
+install(FILES src/memory_provider.h DESTINATION include/agentos/memory)

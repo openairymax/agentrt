@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "memory_compat.h"
+
 /**
  * @brief 错误处理辅助函数
  */

@@ -40,7 +40,7 @@ int network_filter_init(void)
     if (g_filter.initialized)
         return 0;
 
-    AGENTOS_MEMSET(&g_filter, 0, sizeof(g_filter));
+    __builtin_memset(&g_filter, 0, sizeof(g_filter));
     g_filter.initialized = 1;
     return 0;
 }
@@ -68,7 +68,7 @@ void network_filter_cleanup(void)
         AGENTOS_FREE(conn->cipher_suite);
     }
 
-    AGENTOS_MEMSET(&g_filter, 0, sizeof(g_filter));
+    __builtin_memset(&g_filter, 0, sizeof(g_filter));
 }
 
 static int match_host_pattern(const char *pattern, const char *host)
@@ -135,8 +135,22 @@ static int is_private_ip(const char *ip_addr)
     if (dot)
     {
         unsigned int a, b, c, d;
-        if (sscanf(ip_addr, "%u.%u.%u.%u", &a, &b, &c, &d) == 4)
+        char ip_copy[64];
+        AGENTOS_STRNCPY_TERM(ip_copy, ip_addr, sizeof(ip_copy));
+        ip_copy[sizeof(ip_copy) - 1] = '\0';
+        char *saveptr = NULL;
+        char *tok_a = strtok_r(ip_copy, ".", &saveptr);
+        char *tok_b = strtok_r(NULL, ".", &saveptr);
+        char *tok_c = strtok_r(NULL, ".", &saveptr);
+        char *tok_d = strtok_r(NULL, ".\r\n", &saveptr);
+        if (tok_a && tok_b && tok_c && tok_d)
         {
+            a = (unsigned int)strtoul(tok_a, NULL, 10);
+            b = (unsigned int)strtoul(tok_b, NULL, 10);
+            c = (unsigned int)strtoul(tok_c, NULL, 10);
+            d = (unsigned int)strtoul(tok_d, NULL, 10);
+            (void)c;
+            (void)d;
             /* 10.0.0.0/8 */
             if (a == 10)
                 return 1;
@@ -186,7 +200,7 @@ int network_filter_add_rule(const cupolas_net_filter_rule_t *rule)
         return AGENTOS_EINVAL;
 
     filter_rule_entry_t *entry = &g_filter.filter_rules[g_filter.filter_rule_count];
-    AGENTOS_MEMSET(entry, 0, sizeof(*entry));
+    __builtin_memset(entry, 0, sizeof(*entry));
 
     entry->rule.rule_id = cupolas_strdup(rule->rule_id);
     entry->rule.description = cupolas_strdup(rule->description);
@@ -299,8 +313,7 @@ int network_filter_list_rules(cupolas_net_filter_rule_t **rules, size_t *count)
         return AGENTOS_EINVAL;
 
     *count = g_filter.filter_rule_count;
-    *rules =
-        SAFE_MALLOC_ARRAY(*rules, *count, sizeof(cupolas_net_filter_rule_t));
+    SAFE_MALLOC_ARRAY(*rules, *count, sizeof(cupolas_net_filter_rule_t));
     if (!*rules)
         return AGENTOS_EINVAL;
 
@@ -322,7 +335,7 @@ int network_filter_check_access(const char *host, uint16_t port, cupolas_protoco
     /* === 编码契约: 私有地址检测（SSRF 防护）=== */
     if (is_private_ip(host))
     {
-        CUPOLAS_LOG_WARN("SSRF prevention: blocked access to private IP %s:%u", host, port);
+        CUPOLAS_LOG_ERROR("SSRF prevention: blocked access to private IP %s:%u", host, port);
         g_filter.stats.blocked_connections++;
         return 0;
     }
@@ -397,8 +410,7 @@ int network_filter_get_connections(cupolas_connection_info_t **connections, size
         return AGENTOS_EINVAL;
 
     *count = g_filter.connection_count;
-    *connections =
-        SAFE_MALLOC_ARRAY(*connections, *count, sizeof(cupolas_connection_info_t));
+    SAFE_MALLOC_ARRAY(*connections, *count, sizeof(cupolas_connection_info_t));
     if (!*connections)
         return AGENTOS_EINVAL;
 
@@ -424,7 +436,7 @@ int network_filter_close_connection(const char *local_ip, uint16_t local_port,
             AGENTOS_FREE(conn->remote_ip);
             AGENTOS_FREE(conn->hostname);
             AGENTOS_FREE(conn->cipher_suite);
-            AGENTOS_MEMSET(conn, 0, sizeof(*conn));
+            __builtin_memset(conn, 0, sizeof(*conn));
 
             for (size_t j = i; j < g_filter.connection_count - 1; j++) {
                 g_filter.connections[j] = g_filter.connections[j + 1];
@@ -448,5 +460,5 @@ int network_filter_get_stats(cupolas_net_stats_t *stats)
 
 void network_filter_reset_stats(void)
 {
-    AGENTOS_MEMSET(&g_filter.stats, 0, sizeof(g_filter.stats));
+    __builtin_memset(&g_filter.stats, 0, sizeof(g_filter.stats));
 }

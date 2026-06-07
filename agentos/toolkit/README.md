@@ -188,10 +188,10 @@ toolkit/
 
 | SDK | 核心依赖 | 构建工具 |
 |-----|----------|----------|
-| Python | requests, aiohttp, pydantic | pip / setup.py |
-| Go | 标准库 + testify | go mod |
-| Rust | tokio, serde, reqwest, tracing | Cargo |
-| TypeScript | node-fetch, events | npm / tsc |
+| Python | requests, aiohttp | pip / setup.py |
+| Go | 标准库 | go mod |
+| Rust | tokio, serde, reqwest | Cargo |
+| TypeScript | axios, ws | npm / tsc |
 
 ---
 

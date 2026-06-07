@@ -66,7 +66,7 @@ int gw_protocol_bridge_create(const gw_protocol_bridge_config_t *config,
     bridge->ext_framework = NULL;
 
     bridge->initialized = true;
-    AGENTOS_MEMSET(&bridge->stats, 0, sizeof(bridge->stats));
+    __builtin_memset(&bridge->stats, 0, sizeof(bridge->stats));
 
     *out_handle = bridge;
     return 0;
@@ -147,7 +147,7 @@ int gw_protocol_bridge_detect_protocol(gw_protocol_bridge_handle_t bridge, const
     }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
 
-    AGENTOS_MEMSET(out_result, 0, sizeof(*out_result));
+    __builtin_memset(out_result, 0, sizeof(*out_result));
 
     double confidence = 50.0;
     gw_proto_type_t detected = GW_PROTO_JSONRPC;
@@ -262,7 +262,7 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
         return AGENTOS_ERR_STATE_ERROR;
     }
 
-    AGENTOS_MEMSET(out_response, 0, sizeof(*out_response));
+    __builtin_memset(out_response, 0, sizeof(*out_response));
 
     uint64_t start_ns = agentos_time_ns();
 
@@ -284,7 +284,7 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
     out_response->detected_protocol = AGENTOS_STRDUP(detection.type_name);
 
     unified_message_t source_msg;
-    AGENTOS_MEMSET(&source_msg, 0, sizeof(source_msg));
+    __builtin_memset(&source_msg, 0, sizeof(source_msg));
     source_msg.protocol = PROTOCOL_HTTP;
     AGENTOS_STRNCPY_TERM(source_msg.protocol_name, detection.type_name, sizeof(source_msg.protocol_name));
     source_msg.payload = (void *)incoming->raw_data;
@@ -311,7 +311,7 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
             }
             out_response->response_data = (char *)AGENTOS_MALLOC(resp_size + 1);
             if (out_response->response_data) {
-                memcpy(out_response->response_data, result, resp_size);
+                __builtin_memcpy(out_response->response_data, result, resp_size);
                 out_response->response_data[resp_size] = '\0';
                 out_response->response_size = resp_size;
             }
@@ -336,7 +336,7 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
             }
             out_response->response_data = (char *)AGENTOS_MALLOC(resp_size + 1);
             if (out_response->response_data) {
-                memcpy(out_response->response_data, result, resp_size);
+                __builtin_memcpy(out_response->response_data, result, resp_size);
                 out_response->response_data[resp_size] = '\0';
                 out_response->response_size = resp_size;
             }
@@ -355,7 +355,7 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
             if (target_msg.payload && target_msg.payload_size > 0) {
                 out_response->response_data = AGENTOS_MALLOC(target_msg.payload_size + 1);
                 if (out_response->response_data) {
-                    memcpy(out_response->response_data, target_msg.payload,
+                    __builtin_memcpy(out_response->response_data, target_msg.payload,
                            target_msg.payload_size);
                     out_response->response_data[target_msg.payload_size] = '\0';
                     out_response->response_size = target_msg.payload_size;
@@ -393,7 +393,7 @@ int gw_protocol_bridge_get_stats(gw_protocol_bridge_handle_t bridge, gw_bridge_s
         return AGENTOS_ERR_UNKNOWN;
     }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
-    memcpy(out_stats, &b->stats, sizeof(*out_stats));
+    __builtin_memcpy(out_stats, &b->stats, sizeof(*out_stats));
 
     static const char *names[] = {"jsonrpc",    "mcp",      "a2a",   "openai",
                                   "openjiuwen", "openclaw", "claude"};
@@ -419,7 +419,7 @@ int gw_protocol_bridge_reset_stats(gw_protocol_bridge_handle_t bridge)
         return AGENTOS_ERR_UNKNOWN;
     }
     struct gw_protocol_bridge_s *b = (struct gw_protocol_bridge_s *)bridge;
-    AGENTOS_MEMSET(&b->stats, 0, sizeof(b->stats));
+    __builtin_memset(&b->stats, 0, sizeof(b->stats));
     return 0;
 }
 
