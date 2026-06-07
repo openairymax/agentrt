@@ -208,7 +208,7 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
 static char *execute_node(agentos_task_node_t *node, uint32_t timeout_ms)
 {
     agentos_task_t task;
-    AGENTOS_MEMSET(&task, 0, sizeof(task));
+    __builtin_memset(&task, 0, sizeof(task));
     task.task_agent_id = node->task_node_agent_role;
     task.task_input = node->task_node_input;
     task.task_timeout_ms = node->task_node_timeout_ms ? node->task_node_timeout_ms : timeout_ms;

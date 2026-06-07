@@ -15,6 +15,7 @@
 #include "sanitizer_rules.h"
 
 #include "utils/cupolas_utils.h"
+#include "memory_compat.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +38,7 @@ sanitizer_rules_t *sanitizer_rules_create(const char *rules_path)
     if (!rules)
         return NULL;
 
-    AGENTOS_MEMSET(rules, 0, sizeof(sanitizer_rules_t));
+    __builtin_memset(rules, 0, sizeof(sanitizer_rules_t));
 
     if (cupolas_mutex_init(&rules->lock) != cupolas_OK) {
         cupolas_mem_free(rules);
@@ -78,7 +79,7 @@ int sanitizer_rules_add(sanitizer_rules_t *rules, const char *pattern, const cha
     if (!rule)
         return cupolas_ERROR_NO_MEMORY;
 
-    AGENTOS_MEMSET(rule, 0, sizeof(struct sanitize_rule));
+    __builtin_memset(rule, 0, sizeof(struct sanitize_rule));
 
     rule->pattern = cupolas_strdup(pattern);
     if (!rule->pattern) {
@@ -116,7 +117,6 @@ int sanitizer_rules_apply(sanitizer_rules_t *rules, const char *input, char *out
     cupolas_mutex_lock(&rules->lock);
 
     AGENTOS_STRNCPY_TERM(output, input, output_size);
-    output[output_size - 1] = '\0';
 
     struct sanitize_rule *rule = rules->head;
     while (rule) {
@@ -129,9 +129,9 @@ int sanitizer_rules_apply(sanitizer_rules_t *rules, const char *input, char *out
                     size_t out_len = strlen(output);
 
                     if (out_len - pat_len + rep_len < output_size) {
-                        memmove(found + rep_len, found + pat_len,
+                        __builtin_memmove(found + rep_len, found + pat_len,
                                 out_len - (found - output) - pat_len);
-                        memcpy(found, rule->replacement, rep_len);
+                        __builtin_memcpy(found, rule->replacement, rep_len);
                     }
                 }
             } else {

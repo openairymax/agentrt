@@ -143,7 +143,7 @@ agentos_error_t agentos_cognition_create_ex(const agentos_cognition_config_t *ma
     engine->meta_acceptance_threshold = 0.7f;
     engine->dual_think_invocations = 0;
     engine->dual_think_corrections = 0;
-    AGENTOS_MEMSET(engine->align_history, 0, sizeof(engine->align_history));
+    __builtin_memset(engine->align_history, 0, sizeof(engine->align_history));
     engine->align_history_count = 0;
     engine->align_drift_detected = 0;
     engine->align_replan_count = 0;
@@ -242,7 +242,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
         return AGENTOS_EINVAL;
 
     agentos_intent_t intent;
-    AGENTOS_MEMSET(&intent, 0, sizeof(intent));
+    __builtin_memset(&intent, 0, sizeof(intent));
     intent.intent_raw_text = (char *)input;
     intent.intent_raw_len = input_len;
     intent.intent_goal = (char *)input;
@@ -254,7 +254,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
 
     /* ========== Stream Critic Phase 0: Intent Classification ========== */
     sc_intent_result_t sc_intent;
-    AGENTOS_MEMSET(&sc_intent, 0, sizeof(sc_intent));
+    __builtin_memset(&sc_intent, 0, sizeof(sc_intent));
     if (engine->stream_critic) {
         agentos_error_t ic_err =
             sc_intent_classifier(engine->stream_critic, input, input_len, &sc_intent);
@@ -732,7 +732,7 @@ agentos_error_t agentos_cognition_stats(agentos_cognition_engine_t *engine, char
     char *result = (char *)AGENTOS_MALLOC(len + 1);
     if (!result)
         return AGENTOS_ENOMEM;
-    memcpy(result, buffer, len + 1);
+    __builtin_memcpy(result, buffer, len + 1);
 
     *out_stats = result;
     if (out_len)

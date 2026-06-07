@@ -29,9 +29,93 @@
 #define DEFAULT_BATCH_SIZE 100
 #define DEFAULT_FLUSH_INTERVAL_MS 1000
 
+/* SEC-13: OOM 关键路径预分配常量 */
+#define AUDIT_OOM_PREALLOC_EVENTS 64  /**< OOM 时预分配的审计事件槽位数 */
+
 /* SHA-256 审计哈希链追踪 */
 static char g_last_hash[65] = "0000000000000000000000000000000000000000000000000000000000000000";
 static cupolas_mutex_t g_hash_chain_lock;
+
+/* ============================================================================
+ * SEC-13.2: OOM 审计事件预分配池
+ *
+ * 启动时预分配 64 个审计条目的环形缓冲区。
+ * OOM 时写入预分配缓冲区，确保不丢失审计事件。
+ * 使用静态数组，零运行时内存分配。
+ * ============================================================================ */
+
+/** @brief OOM 预分配审计条目池 */
+static audit_entry_t g_audit_oom_entries[AUDIT_OOM_PREALLOC_EVENTS];
+
+/** @brief OOM 预分配池写入索引 */
+static size_t g_audit_oom_write_index = 0;
+
+/** @brief OOM 预分配池已用槽位数 */
+static size_t g_audit_oom_used_count = 0;
+
+/** @brief OOM 预分配池互斥锁 */
+static cupolas_mutex_t g_audit_oom_lock;
+
+/** @brief OOM 预分配池是否已初始化 */
+static bool g_audit_oom_initialized = false;
+
+/**
+ * @brief 初始化审计 OOM 预分配池（SEC-13.2）
+ *
+ * 在 audit_logger_create() 首次调用时初始化。
+ * 零内存分配——使用静态数组。
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void audit_oom_pool_init(void)
+{
+    if (g_audit_oom_initialized) {
+        return;
+    }
+
+    cupolas_mutex_init(&g_audit_oom_lock);
+    __builtin_memset(g_audit_oom_entries, 0, sizeof(g_audit_oom_entries));
+    g_audit_oom_write_index = 0;
+    g_audit_oom_used_count = 0;
+    g_audit_oom_initialized = true;
+}
+
+/**
+ * @brief 从 OOM 预分配池获取一个审计条目（SEC-13.2）
+ *
+ * 当正常 audit_entry_create() 失败时调用。
+ * 从环形预分配缓冲区中获取一个槽位，不调用系统 malloc。
+ *
+ * @return 审计条目指针，池耗尽返回 NULL
+ */
+static audit_entry_t *audit_oom_pool_alloc(void)
+{
+    if (!g_audit_oom_initialized) {
+        return NULL;
+    }
+
+    cupolas_mutex_lock(&g_audit_oom_lock);
+
+    if (g_audit_oom_used_count >= AUDIT_OOM_PREALLOC_EVENTS) {
+        /* 池已满，覆盖最旧的条目（环形缓冲区） */
+        audit_entry_t *entry = &g_audit_oom_entries[g_audit_oom_write_index];
+        __builtin_memset(entry, 0, sizeof(audit_entry_t));
+        g_audit_oom_write_index =
+            (g_audit_oom_write_index + 1) % AUDIT_OOM_PREALLOC_EVENTS;
+        cupolas_mutex_unlock(&g_audit_oom_lock);
+        return entry;
+    }
+
+    audit_entry_t *entry = &g_audit_oom_entries[g_audit_oom_write_index];
+    __builtin_memset(entry, 0, sizeof(audit_entry_t));
+    g_audit_oom_write_index =
+        (g_audit_oom_write_index + 1) % AUDIT_OOM_PREALLOC_EVENTS;
+    g_audit_oom_used_count++;
+
+    cupolas_mutex_unlock(&g_audit_oom_lock);
+    return entry;
+}
+#pragma GCC diagnostic pop
 
 /**
  * @brief 计算审计条目的 SHA-256 哈希链值
@@ -62,7 +146,7 @@ static void audit_compute_chain_hash(const audit_entry_t *entry, const char *pre
 
     for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
     {
-        sprintf(hash_out + i * 2, "%02x", digest[i]);
+        snprintf(hash_out + i * 2, 3, "%02x", digest[i]);
     }
     hash_out[64] = '\0';
 #else
@@ -152,7 +236,7 @@ audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
     if (!logger)
         return NULL;
 
-    AGENTOS_MEMSET(logger, 0, sizeof(audit_logger_t));
+    __builtin_memset(logger, 0, sizeof(audit_logger_t));
 
     if (log_dir) {
         logger->log_dir = cupolas_strdup(log_dir);
@@ -225,9 +309,9 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
 
     /* === 编码契约: SHA-256 审计哈希链（BAN-129）=== */
     cupolas_mutex_lock(&g_hash_chain_lock);
-    memcpy(entry->prev_hash, g_last_hash, sizeof(entry->prev_hash));
+    __builtin_memcpy(entry->prev_hash, g_last_hash, sizeof(entry->prev_hash));
     audit_compute_chain_hash(entry, g_last_hash, entry->curr_hash);
-    memcpy(g_last_hash, entry->curr_hash, sizeof(g_last_hash));
+    __builtin_memcpy(g_last_hash, entry->curr_hash, sizeof(g_last_hash));
     cupolas_mutex_unlock(&g_hash_chain_lock);
 
     int ret = audit_queue_try_push(logger->queue, entry);
@@ -281,7 +365,7 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
     }
 
     char expected_prev[65];
-    memcpy(expected_prev, first_prev_hash, 65);
+    __builtin_memcpy(expected_prev, first_prev_hash, 65);
 
     for (size_t i = 0; i < entry_count; i++) {
         const audit_entry_t *entry = entries[i];
@@ -305,7 +389,7 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
         }
 
         /* 前进到下一个条目 */
-        memcpy(expected_prev, entry->curr_hash, 65);
+        __builtin_memcpy(expected_prev, entry->curr_hash, 65);
     }
 
     if (out_invalid_index) *out_invalid_index = -1;

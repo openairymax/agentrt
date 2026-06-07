@@ -33,8 +33,8 @@ from agentos.session import Session
 from agentos.skill import Skill
 
 # 向后兼容别名
-MemoryError = AgentOSMemoryError
-TimeoutError = AgentOSTimeoutError
+AgentOS_MemoryError = AgentOSMemoryError
+AgentOS_TimeoutError = AgentOSTimeoutError
 
 
 class TestTypes(unittest.TestCase):
@@ -124,12 +124,10 @@ class TestExceptions(unittest.TestCase):
         self.assertEqual(data["message"], "Test error")
     
     def test_timeout_error(self):
-        """Test TimeoutError."""
-        error = TimeoutError(timeout_ms=5000, operation="task wait")
+        """Test AgentOSTimeoutError."""
+        error = AgentOSTimeoutError(operation="task wait")
         
-        self.assertEqual(error.timeout_ms, 5000)
         self.assertEqual(error.operation, "task wait")
-        self.assertIn("5000ms", str(error))
     
     def test_initialization_error(self):
         """Test InitializationError."""

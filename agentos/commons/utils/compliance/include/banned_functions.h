@@ -30,6 +30,14 @@
 #pragma GCC poison gmtime
 #pragma GCC poison asprintf
 #pragma GCC poison vasprintf
+
+/* INF-06: 扩展 strict 模式至30条 — 新增危险函数毒化 */
+#pragma GCC poison fscanf          /* BAN-151: 无界文件输入 */
+#pragma GCC poison sscanf           /* BAN-152: 无界字符串解析 */
+#pragma GCC poison strncpy         /* BAN-155: 不保证null终止 */
+#pragma GCC poison memcpy           /* BAN-154: 需AGENTOS_MEMCPY_SAFE替代 */
+#pragma GCC poison memmove          /* BAN-154: 需安全包装替代 */
+#pragma GCC poison memset           /* BAN-154: 需验证大小参数 */
 #endif
 
 #else
@@ -40,6 +48,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdarg.h>
 
 __attribute__((deprecated("Use AGENTOS_MALLOC instead")))
 static inline void *__banned_malloc(size_t s) { return (malloc)(s); }
@@ -84,9 +93,26 @@ static inline struct tm *__banned_gmtime(const time_t *t) { return (gmtime)(t); 
 #define strcat(d, s)    __banned_strcat(d, s)
 #define strtok(s, d)    __banned_strtok(s, d)
 #define localtime(t)    __banned_localtime(t)
-#define gmtime(t)       __banned_gmtime(t)
-
+#define gmtime(t) __banned_gmtime(t)
 #endif
+
+/* BAN-151~BAN-162: 危险I/O函数 — gets/scanf系列在非strict模式下也标记为deprecated */
+__attribute__((deprecated("Use fgets instead — gets() has no buffer limit and causes buffer overflow")))
+static inline char *__banned_gets(char *s) { return (gets)(s); }
+
+__attribute__((deprecated("Use fgets+sscanf instead — scanf(\"%s\") has no buffer limit")))
+static inline int __banned_scanf(const char *fmt, ...) { va_list ap; va_start(ap, fmt); int r = vscanf(fmt, ap); va_end(ap); return r; }
+
+__attribute__((deprecated("Use fgets+sscanf instead — fscanf(\"%s\") has no buffer limit")))
+static inline int __banned_fscanf(FILE *fp, const char *fmt, ...) { va_list ap; va_start(ap, fmt); int r = vfscanf(fp, fmt, ap); va_end(ap); return r; }
+
+__attribute__((deprecated("Validate buffer bounds before sscanf — prefer snprintf for output")))
+static inline int __banned_sscanf(const char *s, const char *fmt, ...) { va_list ap; va_start(ap, fmt); int r = vsscanf(s, fmt, ap); va_end(ap); return r; }
+
+#define gets(s)         __banned_gets(s)
+#define scanf(fmt, ...) __banned_scanf(fmt, ##__VA_ARGS__)
+#define fscanf(fp, fmt, ...) __banned_fscanf(fp, fmt, ##__VA_ARGS__)
+#define sscanf(s, fmt, ...) __banned_sscanf(s, fmt, ##__VA_ARGS__)
 
 #endif
 

@@ -248,7 +248,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
         *out_len = 0;
         return;
     }
-    memcpy(msg, message, msg_len);
+    __builtin_memcpy(msg, message, msg_len);
     msg[msg_len] = 0x80;
 
     {
@@ -260,7 +260,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
 
     for (size_t chunk = 0; chunk < new_len / 64; chunk++) {
         uint32_t w[64];
-        AGENTOS_MEMSET(w, 0, sizeof(w));
+        __builtin_memset(w, 0, sizeof(w));
         for (int i = 0; i < 16; i++) {
             w[i] = ((uint32_t)msg[chunk * 64 + i * 4] << 24) |
                    ((uint32_t)msg[chunk * 64 + i * 4 + 1] << 16) |
@@ -299,8 +299,8 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
     size_t key_len = strlen(key);
     unsigned char k_ipad[64], k_opad[64];
 
-    AGENTOS_MEMSET(k_ipad, 0x36, sizeof(k_ipad));
-    AGENTOS_MEMSET(k_opad, 0x5c, sizeof(k_opad));
+    __builtin_memset(k_ipad, 0x36, sizeof(k_ipad));
+    __builtin_memset(k_opad, 0x5c, sizeof(k_opad));
 
     if (key_len > 64) {
         uint32_t kh[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
@@ -313,14 +313,14 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
             AGENTOS_FREE(msg);
             return;
         }
-        memcpy(km, key, key_len);
+        __builtin_memcpy(km, key, key_len);
         km[key_len] = 0x80;
         size_t bit_len = key_len * 8;
         km[padded_len - 1] = (uint8_t)(bit_len & 0xFF);
         km[padded_len - 2] = (uint8_t)((bit_len >> 8) & 0xFF);
         for (size_t chunk = 0; chunk < padded_len / 64; chunk++) {
             uint32_t w[64];
-            AGENTOS_MEMSET(w, 0, sizeof(w));
+            __builtin_memset(w, 0, sizeof(w));
             for (int i = 0; i < 16; i++) {
                 int off = (int)(chunk * 64 + (size_t)i * 4);
                 if (off + 3 < (int)padded_len)
@@ -380,8 +380,8 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
         AGENTOS_FREE(msg);
         return;
     }
-    memcpy(inner, k_ipad, 64);
-    memcpy(inner + 64, message, msg_len);
+    __builtin_memcpy(inner, k_ipad, 64);
+    __builtin_memcpy(inner + 64, message, msg_len);
     inner[ilen] = 0x80;
 
     {
@@ -396,7 +396,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
 
     for (size_t chunk = 0; chunk < inner_padded / 64; chunk++) {
         uint32_t w[64];
-        AGENTOS_MEMSET(w, 0, sizeof(w));
+        __builtin_memset(w, 0, sizeof(w));
         for (int i = 0; i < 16 && (chunk * 64 + i * 4 + 3) < inner_padded; i++) {
             int off = (int)(chunk * 64 + i * 4);
             if (off + 3 < (int)inner_padded)
@@ -436,7 +436,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
     if (!outer) {
         return;
     }
-    memcpy(outer, k_opad, 64);
+    __builtin_memcpy(outer, k_opad, 64);
     for (int i = 0; i < 8; i++) {
         outer[64 + i * 4] = (ih[i] >> 24) & 0xFF;
         outer[64 + i * 4 + 1] = (ih[i] >> 16) & 0xFF;
@@ -456,7 +456,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
 
     for (size_t chunk = 0; chunk < outer_padded / 64; chunk++) {
         uint32_t w[64];
-        AGENTOS_MEMSET(w, 0, sizeof(w));
+        __builtin_memset(w, 0, sizeof(w));
         for (int i = 0; i < 16 && (chunk * 64 + i * 4 + 3) < outer_padded; i++) {
             int off = (int)(chunk * 64 + i * 4);
             if (off + 3 < (int)outer_padded)
@@ -525,7 +525,7 @@ int auth_jwt_init(const jwt_config_t *config)
         AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT init: invalid config or secret");
     }
 
-    memcpy(&g_jwt.config, config, sizeof(jwt_config_t));
+    __builtin_memcpy(&g_jwt.config, config, sizeof(jwt_config_t));
 
     if (g_jwt.config.token_ttl_sec == 0)
         g_jwt.config.token_ttl_sec = DEFAULT_TOKEN_TTL;
@@ -668,7 +668,7 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
 
     agentos_mutex_lock(&g_jwt.lock);
 
-    AGENTOS_MEMSET(result, 0, sizeof(auth_result_t));
+    __builtin_memset(result, 0, sizeof(auth_result_t));
     result->status = AUTH_FAILED;
     result->error_message = "Token verification failed";
 
@@ -701,7 +701,7 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
         return AUTH_TOKEN_INVALID;
         AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc payload buffer failed");
     }
-    memcpy(payload_b64, dot1 + 1, payload_len);
+    __builtin_memcpy(payload_b64, dot1 + 1, payload_len);
     payload_b64[payload_len] = '\0';
 
     /* Base64 URL-safe -> Standard 转换 */
@@ -721,7 +721,7 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
-    memcpy(payload_padded, payload_b64, payload_len);
+    __builtin_memcpy(payload_padded, payload_b64, payload_len);
     for (size_t i = 0; i < pad; i++)
         payload_padded[payload_len + i] = '=';
     payload_padded[b64_total_len] = '\0';
@@ -811,9 +811,9 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             return AUTH_TOKEN_INVALID;
             AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_input failed");
         }
-        memcpy(sig_input, token, header_len);
+        __builtin_memcpy(sig_input, token, header_len);
         sig_input[header_len] = '.';
-        memcpy(sig_input + header_len + 1, dot1 + 1, payload_len);
+        __builtin_memcpy(sig_input + header_len + 1, dot1 + 1, payload_len);
         sig_input[sig_input_len] = '\0';
 
         size_t sig_b64_len = strlen(dot2 + 1);
@@ -826,7 +826,7 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             return AUTH_TOKEN_INVALID;
         }
         AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_b64 failed");
-        memcpy(sig_b64, dot2 + 1, sig_b64_len);
+        __builtin_memcpy(sig_b64, dot2 + 1, sig_b64_len);
         sig_b64[sig_b64_len] = '\0';
 
         for (size_t i = 0; i < sig_b64_len; i++) {
@@ -860,7 +860,7 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             return AUTH_TOKEN_INVALID;
             AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_padded failed");
         }
-        memcpy(sig_padded, sig_b64, sig_b64_len);
+        __builtin_memcpy(sig_padded, sig_b64, sig_b64_len);
         size_t sig_pad = (4 - (sig_b64_len % 4)) % 4;
         for (size_t i = 0; i < sig_pad; i++)
             sig_padded[sig_b64_len + i] = '=';
@@ -877,7 +877,7 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             return AUTH_TOKEN_INVALID;
             AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc provided_sig failed");
         }
-        AGENTOS_MEMSET(provided_sig, 0, 32);
+        __builtin_memset(provided_sig, 0, 32);
 
         size_t prov_idx = 0;
         for (size_t i = 0; i < sig_padded_len; i += 4) {
@@ -953,9 +953,9 @@ void auth_jwt_cleanup(void)
     if (g_jwt.initialized) {
         g_hmac_impl = NULL;
         g_jwt.initialized = 0;
-        AGENTOS_MEMSET(&g_jwt.config, 0, sizeof(jwt_config_t));
-        AGENTOS_MEMSET(g_jwt.subject_buf, 0, sizeof(g_jwt.subject_buf));
-        AGENTOS_MEMSET(g_jwt.role_buf, 0, sizeof(g_jwt.role_buf));
+        __builtin_memset(&g_jwt.config, 0, sizeof(jwt_config_t));
+        __builtin_memset(g_jwt.subject_buf, 0, sizeof(g_jwt.subject_buf));
+        __builtin_memset(g_jwt.role_buf, 0, sizeof(g_jwt.role_buf));
         SVC_LOG_INFO("JWT authentication module cleaned up");
     }
     agentos_mutex_unlock(&g_jwt.lock);
@@ -972,7 +972,7 @@ int auth_apikey_init(const apikey_config_t *config)
     agentos_mutex_init(&g_apikey.lock);
 
     if (config) {
-        memcpy(&g_apikey.config, config, sizeof(apikey_config_t));
+        __builtin_memcpy(&g_apikey.config, config, sizeof(apikey_config_t));
 
         /* 复制允许的 Key 列表 */
         if (config->allowed_keys && config->key_count > 0) {
@@ -989,7 +989,7 @@ int auth_apikey_init(const apikey_config_t *config)
         }
     } else {
         /* 默认空配置 */
-        AGENTOS_MEMSET(&g_apikey.config, 0, sizeof(apikey_config_t));
+        __builtin_memset(&g_apikey.config, 0, sizeof(apikey_config_t));
         g_apikey.capacity = 10;
         g_apikey.keys = (char **)AGENTOS_CALLOC(g_apikey.capacity, sizeof(*g_apikey.keys));
         if (!g_apikey.keys) {
@@ -1010,7 +1010,7 @@ int auth_apikey_verify(const char *api_key, auth_result_t *result)
         return AUTH_APIKEY_INVALID;
     }
 
-    AGENTOS_MEMSET(result, 0, sizeof(auth_result_t));
+    __builtin_memset(result, 0, sizeof(auth_result_t));
     result->status = AUTH_FAILED;
     result->error_message = "API Key invalid";
 
@@ -1022,6 +1022,7 @@ int auth_apikey_verify(const char *api_key, auth_result_t *result)
             result->status = AUTH_SUCCESS;
             result->error_message = NULL;
             AGENTOS_STRNCPY_TERM(g_apikey.subject_buf, api_key, sizeof(g_apikey.subject_buf));
+            (g_apikey.subject_buf)[sizeof(g_apikey.subject_buf) - 1] = '\0';
             g_apikey.subject_buf[sizeof(g_apikey.subject_buf) - 1] = '\0';
             result->subject = g_apikey.subject_buf;
             result->role = "api_user";
@@ -1132,7 +1133,7 @@ int auth_ratelimit_init(const rate_limit_config_t *config)
     agentos_mutex_init(&g_ratelimit.lock);
 
     if (config) {
-        memcpy(&g_ratelimit.config, config, sizeof(rate_limit_config_t));
+        __builtin_memcpy(&g_ratelimit.config, config, sizeof(rate_limit_config_t));
     } else {
         g_ratelimit.config.requests_per_sec = DEFAULT_RPS;
         g_ratelimit.config.burst_size = DEFAULT_BURST_SIZE;
@@ -1140,7 +1141,7 @@ int auth_ratelimit_init(const rate_limit_config_t *config)
     }
 
     /* 初始化所有条目为非活跃状态 */
-    AGENTOS_MEMSET(g_ratelimit.entries, 0, sizeof(g_ratelimit.entries));
+    __builtin_memset(g_ratelimit.entries, 0, sizeof(g_ratelimit.entries));
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
         g_ratelimit.entries[i].active = false;
     }
@@ -1283,7 +1284,7 @@ void auth_ratelimit_cleanup(void)
 {
     if (g_ratelimit.initialized) {
         agentos_mutex_lock(&g_ratelimit.lock);
-        AGENTOS_MEMSET(g_ratelimit.entries, 0, sizeof(g_ratelimit.entries));
+        __builtin_memset(g_ratelimit.entries, 0, sizeof(g_ratelimit.entries));
         agentos_mutex_unlock(&g_ratelimit.lock);
         agentos_mutex_destroy(&g_ratelimit.lock);
         g_ratelimit.initialized = 0;
@@ -1334,7 +1335,7 @@ int auth_authenticate(const char *auth_header, const char *client_id, auth_resul
         return AUTH_MISSING_CREDENTIALS;
     }
 
-    AGENTOS_MEMSET(result, 0, sizeof(auth_result_t));
+    __builtin_memset(result, 0, sizeof(auth_result_t));
 
     /* 步骤1: 速率限制检查 */
     if (g_ratelimit.initialized) {

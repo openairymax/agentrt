@@ -136,7 +136,7 @@ int transformer_mcp_to_jsonrpc_response(const unified_message_t *source, unified
                     if (val_end) {
                         size_t len = val_end - content_text;
                         char *tmp = AGENTOS_MALLOC(len + 1);
-                        memcpy(tmp, content_text, len);
+                        __builtin_memcpy(tmp, content_text, len);
                         tmp[len] = '\0';
                         snprintf(output_buf, sizeof(output_buf),
                                  "{\"output\":%s,\"status\":\"success\"}", tmp);
@@ -372,11 +372,11 @@ int transformer_jsonrpc_to_openai_chat(const unified_message_t *source, unified_
         }
         const char *temp_key = strstr((const char *)source->payload, "\"temperature\"");
         if (temp_key) {
-            sscanf(temp_key + 13, "%f", &temperature);
+            temperature = (float)strtod(temp_key + 13, NULL);
         }
         const char *max_tok_key = strstr((const char *)source->payload, "\"max_tokens\"");
         if (max_tok_key) {
-            sscanf(max_tok_key + 12, "%d", &max_tokens);
+            max_tokens = (int)strtol(max_tok_key + 12, NULL, 10);
         }
         const char *msgs_key = strstr((const char *)source->payload, "\"messages\"");
         if (msgs_key) {
@@ -610,10 +610,10 @@ int transformer_jsonrpc_to_openjiuwen(const unified_message_t *source, unified_m
     if (!binary_data)
         return AGENTOS_ERR_OUT_OF_MEMORY;
 
-    memcpy(binary_data, &header, sizeof(openjiuwen_header_t));
+    __builtin_memcpy(binary_data, &header, sizeof(openjiuwen_header_t));
 
     if (source->payload && payload_len > 0) {
-        memcpy(binary_data + sizeof(openjiuwen_header_t), source->payload, payload_len);
+        __builtin_memcpy(binary_data + sizeof(openjiuwen_header_t), source->payload, payload_len);
     }
 
     uint32_t crc = 0;
@@ -621,7 +621,7 @@ int transformer_jsonrpc_to_openjiuwen(const unified_message_t *source, unified_m
         crc ^= binary_data[i];
         crc = (crc << 1) | (crc >> 31);
     }
-    memcpy(binary_data + total_size - 4, &crc, sizeof(crc));
+    __builtin_memcpy(binary_data + total_size - 4, &crc, sizeof(crc));
 
     target->payload = binary_data;
     target->payload_size = total_size;
@@ -732,7 +732,7 @@ int protocol_auto_transform(const unified_message_t *source, unified_message_t *
         }
     }
 
-    memcpy(target, source, sizeof(*target));
+    __builtin_memcpy(target, source, sizeof(*target));
     return 0;
 }
 

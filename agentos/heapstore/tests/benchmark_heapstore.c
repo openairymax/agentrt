@@ -87,7 +87,7 @@ static void benchmark_registry_insert(void)
 
     for (int i = 0; i < 1000; i++) {
         heapstore_agent_record_t agent;
-        AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+        memset(&agent, 0, sizeof(agent));
         snprintf(agent.id, sizeof(agent.id), "bench_agent_%d", i);
         snprintf(agent.name, sizeof(agent.name), "Benchmark Agent %d", i);
         snprintf(agent.type, sizeof(agent.type), "benchmark");
@@ -115,7 +115,7 @@ static void benchmark_trace_write(void)
 
     for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
         heapstore_span_t span;
-        AGENTOS_MEMSET(&span, 0, sizeof(span));
+        memset(&span, 0, sizeof(span));
         snprintf(span.trace_id, sizeof(span.trace_id), "trace_bench_%d", i);
         snprintf(span.span_id, sizeof(span.span_id), "span_%d", i);
         snprintf(span.name, sizeof(span.name), "bench_operation");
@@ -147,7 +147,7 @@ static void benchmark_trace_batch_write(void)
 
     for (int batch = 0; batch < BENCHMARK_ITERATIONS / BENCHMARK_BATCH_SIZE; batch++) {
         for (int i = 0; i < BENCHMARK_BATCH_SIZE; i++) {
-            AGENTOS_MEMSET(&spans[i], 0, sizeof(heapstore_span_t));
+            memset(&spans[i], 0, sizeof(heapstore_span_t));
             snprintf(spans[i].trace_id, sizeof(spans[i].trace_id), "trace_batch_%d_%d", batch, i);
             snprintf(spans[i].span_id, sizeof(spans[i].span_id), "span_%d_%d", batch, i);
             snprintf(spans[i].name, sizeof(spans[i].name), "batch_operation");
@@ -178,7 +178,7 @@ static void benchmark_ipc_operations(void)
 
     for (int i = 0; i < 5000; i++) {
         heapstore_ipc_channel_t channel;
-        AGENTOS_MEMSET(&channel, 0, sizeof(channel));
+        memset(&channel, 0, sizeof(channel));
         snprintf(channel.channel_id, sizeof(channel.channel_id), "bench_ch_%d", i);
         snprintf(channel.name, sizeof(channel.name), "Benchmark Channel %d", i);
         snprintf(channel.type, sizeof(channel.type), "benchmark");
@@ -195,7 +195,7 @@ static void benchmark_ipc_operations(void)
 
     for (int i = 0; i < 5000; i++) {
         heapstore_ipc_channel_t channel;
-        AGENTOS_MEMSET(&channel, 0, sizeof(channel));
+        memset(&channel, 0, sizeof(channel));
         snprintf(channel.channel_id, sizeof(channel.channel_id), "bench_ch_%d", i);
         heapstore_ipc_get_channel(channel.channel_id, &channel);
     }
@@ -216,7 +216,7 @@ static void benchmark_memory_operations(void)
 
     for (int i = 0; i < 5000; i++) {
         heapstore_memory_pool_t pool;
-        AGENTOS_MEMSET(&pool, 0, sizeof(pool));
+        memset(&pool, 0, sizeof(pool));
         snprintf(pool.pool_id, sizeof(pool.pool_id), "bench_pool_%d", i);
         snprintf(pool.name, sizeof(pool.name), "Benchmark Pool %d", i);
         pool.total_size = 1024 * 1024;
@@ -236,7 +236,7 @@ static void benchmark_memory_operations(void)
 
     for (int i = 0; i < 5000; i++) {
         heapstore_memory_pool_t pool;
-        AGENTOS_MEMSET(&pool, 0, sizeof(pool));
+        memset(&pool, 0, sizeof(pool));
         snprintf(pool.pool_id, sizeof(pool.pool_id), "bench_pool_%d", i);
         heapstore_memory_get_pool(pool.pool_id, &pool);
     }
@@ -255,7 +255,7 @@ static void benchmark_stats_operations(void)
 
     for (int i = 0; i < 1000; i++) {
         heapstore_ipc_channel_t channel;
-        AGENTOS_MEMSET(&channel, 0, sizeof(channel));
+        memset(&channel, 0, sizeof(channel));
         snprintf(channel.channel_id, sizeof(channel.channel_id), "stats_ch_%d", i);
         snprintf(channel.name, sizeof(channel.name), "Stats Channel %d", i);
         snprintf(channel.type, sizeof(channel.type), "stats");

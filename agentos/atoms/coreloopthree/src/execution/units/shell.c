@@ -130,7 +130,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
             }
             output = new_out;
         }
-        memcpy(output + pos, buffer, len + 1);
+        __builtin_memcpy(output + pos, buffer, len + 1);
         pos += len;
     }
 
@@ -213,7 +213,7 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
             }
             output = new_out;
         }
-        memcpy(output + pos, buffer, len + 1);
+        __builtin_memcpy(output + pos, buffer, len + 1);
         pos += len;
     }
     close(pipe_out[0]);

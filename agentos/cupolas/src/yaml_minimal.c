@@ -1163,7 +1163,7 @@ int yaml_parse_string(yaml_document_t *doc, const char *input, size_t len)
 {
     if (!doc || !input)
         return AGENTOS_EINVAL;
-    AGENTOS_MEMSET(doc, 0, sizeof(*doc));
+    __builtin_memset(doc, 0, sizeof(*doc));
 
     size_t start_pos = 0;
     if (len >= 3 && (unsigned char)input[0] == 0xEF && (unsigned char)input[1] == 0xBB &&
@@ -1182,12 +1182,12 @@ int yaml_parse_string(yaml_document_t *doc, const char *input, size_t len)
     doc->source = (char *)AGENTOS_MALLOC(effective_len + 1);
     if (!doc->source)
         return AGENTOS_EINVAL;
-    memcpy(doc->source, input, effective_len);
+    __builtin_memcpy(doc->source, input, effective_len);
     doc->source[effective_len] = '\0';
     doc->source_len = effective_len;
 
     struct parse_ctx ctx;
-    AGENTOS_MEMSET(&ctx, 0, sizeof(ctx));
+    __builtin_memset(&ctx, 0, sizeof(ctx));
     ctx.src = doc->source;
     ctx.len = effective_len;
     ctx.pos = start_pos;
@@ -1228,11 +1228,11 @@ int yaml_parse_multi(yaml_document_t *doc, const char *input, size_t len)
     char *source_copy = (char *)AGENTOS_MALLOC(effective_len + 1);
     if (!source_copy)
         return AGENTOS_EINVAL;
-    memcpy(source_copy, input, effective_len);
+    __builtin_memcpy(source_copy, input, effective_len);
     source_copy[effective_len] = '\0';
 
     struct parse_ctx ctx;
-    AGENTOS_MEMSET(&ctx, 0, sizeof(ctx));
+    __builtin_memset(&ctx, 0, sizeof(ctx));
     ctx.src = source_copy;
     ctx.len = effective_len;
     ctx.pos = start_pos;
@@ -1539,7 +1539,7 @@ char *yaml_serialize(yaml_document_t *doc)
     size_t len = strlen(buf);
     char *result = (char *)AGENTOS_MALLOC(len + 1);
     if (result) {
-        memcpy(result, buf, len + 1);
+        __builtin_memcpy(result, buf, len + 1);
     }
     AGENTOS_FREE(buf);
     return result;

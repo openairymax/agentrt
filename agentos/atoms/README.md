@@ -90,7 +90,7 @@ atoms/
 |------|------|----------|------|----------|
 | **CoreKern** | `corekern/` | IPC/Binder、内存管理、任务调度、时间服务、可观测性 | C11 | [corekern/README.md](corekern/README.md) |
 | **CoreLoopThree** | `coreloopthree/` | 认知循环、执行循环、记忆循环、补偿事务、认知进化 | C11 | [coreloopthree/README.md](coreloopthree/README.md) |
-| **Memory** | `memory/` | L1 原始存储 + L2 向量索引，可拔插提供商架构 | C11 | — |
+| **Memory** | `memory/` | L1 原始存储 + L2 关键词索引，可拔插提供商架构 | C11 | [memory/README.md](memory/README.md) |
 | **MemoryRovol** | `memoryrovol/` | L1-L4 全功能记忆（商业），桥接内置 Memory | C11 | 独立仓库 |
 | **Syscall** | `syscall/` | 任务/内存/会话/遥测/代理 5 类调用 + Skill 管理 | C11 | [syscall/README.md](syscall/README.md) |
 | **TaskFlow** | `taskflow/` | Pregel 超步模型、DAG 编排、检查点容错 | C11 | [taskflow/README.md](taskflow/README.md) |

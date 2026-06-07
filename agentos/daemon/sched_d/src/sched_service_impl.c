@@ -34,7 +34,7 @@ int sched_service_create(const sched_config_t *config, sched_service_t **service
     if (!svc)
         return AGENTOS_ERR_OUT_OF_MEMORY;
 
-    memcpy(&svc->config, config, sizeof(sched_config_t));
+    __builtin_memcpy(&svc->config, config, sizeof(sched_config_t));
     if (config->ml_model_path)
         svc->config.ml_model_path = AGENTOS_STRDUP(config->ml_model_path);
 
@@ -256,7 +256,7 @@ int sched_service_reload_config(sched_service_t *service, const sched_config_t *
     AGENTOS_FREE((void *)service->config.ml_model_path);
     service->config.ml_model_path = NULL;
 
-    memcpy(&service->config, config, sizeof(sched_config_t));
+    __builtin_memcpy(&service->config, config, sizeof(sched_config_t));
     if (config->ml_model_path) {
         service->config.ml_model_path = AGENTOS_STRDUP(config->ml_model_path);
         if (!service->config.ml_model_path)

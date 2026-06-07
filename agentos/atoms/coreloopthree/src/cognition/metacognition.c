@@ -68,7 +68,7 @@ agentos_error_t agentos_mc_create(agentos_metacognition_t **out_mc)
     mc->record_count = 0;
     mc->record_head = 0;
 
-    AGENTOS_MEMSET(&mc->calibrator, 0, sizeof(mc_calibrator_t));
+    __builtin_memset(&mc->calibrator, 0, sizeof(mc_calibrator_t));
 
     mc->total_evaluations = 0;
     mc->total_corrections = 0;
@@ -78,7 +78,7 @@ agentos_error_t agentos_mc_create(agentos_metacognition_t **out_mc)
     mc->chain = NULL;
 
     /* DS-005: 初始化学习系统 */
-    AGENTOS_MEMSET(mc->patterns, 0, sizeof(mc->patterns));
+    __builtin_memset(mc->patterns, 0, sizeof(mc->patterns));
     mc->pattern_count = 0;
     mc->adaptive_acceptance_threshold = mc->acceptance_threshold;
     mc->consecutive_accepts = 0;
@@ -266,7 +266,7 @@ agentos_error_t agentos_mc_evaluate_step(agentos_metacognition_t *mc, agentos_th
     if (!mc || !step || !step->content || !out_result)
         return AGENTOS_EINVAL;
 
-    AGENTOS_MEMSET(out_result, 0, sizeof(mc_evaluation_result_t));
+    __builtin_memset(out_result, 0, sizeof(mc_evaluation_result_t));
     mc->total_evaluations++;
 
     const char *input = step->raw_input ? step->raw_input : "";
@@ -344,7 +344,7 @@ agentos_error_t agentos_mc_evaluate_step(agentos_metacognition_t *mc, agentos_th
 
     out_result->critique_text = (char *)AGENTOS_MALLOC(pos + 1);
     if (out_result->critique_text) {
-        memcpy(out_result->critique_text, buf, pos + 1);
+        __builtin_memcpy(out_result->critique_text, buf, pos + 1);
         out_result->critique_len = (size_t)pos;
     }
 
@@ -355,11 +355,11 @@ agentos_error_t agentos_mc_evaluate_step(agentos_metacognition_t *mc, agentos_th
             AGENTOS_FREE((void *)rec->result.critique_text);
         rec->step_id = step->step_id;
         rec->timestamp_ns = mc_time_now();
-        memcpy(&rec->result, out_result, sizeof(mc_evaluation_result_t));
+        __builtin_memcpy(&rec->result, out_result, sizeof(mc_evaluation_result_t));
         if (out_result->critique_text) {
             rec->result.critique_text = (char *)AGENTOS_MALLOC(out_result->critique_len + 1);
             if (rec->result.critique_text) {
-                memcpy((char *)rec->result.critique_text, out_result->critique_text,
+                __builtin_memcpy((char *)rec->result.critique_text, out_result->critique_text,
                        out_result->critique_len + 1);
             }
         }
@@ -646,7 +646,7 @@ void agentos_mc_reset(agentos_metacognition_t *mc)
     }
     mc->record_count = 0;
     mc->record_head = 0;
-    AGENTOS_MEMSET(&mc->calibrator, 0, sizeof(mc_calibrator_t));
+    __builtin_memset(&mc->calibrator, 0, sizeof(mc_calibrator_t));
     mc->total_evaluations = 0;
     mc->total_corrections = 0;
     mc->total_rejections = 0;
@@ -654,7 +654,7 @@ void agentos_mc_reset(agentos_metacognition_t *mc)
     mc->total_rerun_successes = 0;
 
     /* DS-005: 重置学习状态 */
-    AGENTOS_MEMSET(mc->patterns, 0, sizeof(mc->patterns));
+    __builtin_memset(mc->patterns, 0, sizeof(mc->patterns));
     mc->pattern_count = 0;
     mc->adaptive_acceptance_threshold = mc->acceptance_threshold;
     mc->consecutive_accepts = 0;
@@ -691,7 +691,7 @@ static size_t find_or_create_pattern(agentos_metacognition_t *mc, const char *ke
     if (mc->pattern_count >= MC_MAX_PATTERNS)
         return MC_MAX_PATTERNS;
     size_t idx = mc->pattern_count++;
-    AGENTOS_MEMSET(&mc->patterns[idx], 0, sizeof(mc_error_pattern_t));
+    __builtin_memset(&mc->patterns[idx], 0, sizeof(mc_error_pattern_t));
     snprintf(mc->patterns[idx].pattern_key, sizeof(mc->patterns[idx].pattern_key), "%s", key);
     return idx;
 }

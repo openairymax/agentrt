@@ -172,9 +172,8 @@ config := agentos.NewConfigFromEnv()
 
 ## 依赖关系
 
-- **Go 版本**: >= 1.21
+- **Go 版本**: >= 1.22
 - **核心依赖**: Go 标准库（net/http, encoding/json, context, sync）
-- **测试依赖**: testify
 - **无外部运行时依赖**
 
 ## 构建说明

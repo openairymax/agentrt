@@ -40,7 +40,7 @@ void workbench_default_config(workbench_config_t *manager)
     if (!manager)
         return;
 
-    AGENTOS_MEMSET(manager, 0, sizeof(workbench_config_t));
+    __builtin_memset(manager, 0, sizeof(workbench_config_t));
     manager->timeout_ms = DEFAULT_TIMEOUT_MS;
     manager->max_output_size = DEFAULT_MAX_OUTPUT_SIZE;
     manager->redirect_stdin = true;
@@ -54,10 +54,10 @@ workbench_t *workbench_create(const workbench_config_t *manager)
     if (!wb)
         return NULL;
 
-    AGENTOS_MEMSET(wb, 0, sizeof(workbench_t));
+    __builtin_memset(wb, 0, sizeof(workbench_t));
 
     if (manager) {
-        memcpy(&wb->manager, manager, sizeof(workbench_config_t));
+        __builtin_memcpy(&wb->manager, manager, sizeof(workbench_config_t));
     } else {
         workbench_default_config(&wb->manager);
     }
@@ -156,7 +156,7 @@ static int cupolas_workbench_read_single_pipe(cupolas_pipe_t *pipe, char *buf, s
             break;
 
         if (*size + bytes_read < capacity) {
-            memcpy(buf + *size, temp_buf, bytes_read);
+            __builtin_memcpy(buf + *size, temp_buf, bytes_read);
             *size += bytes_read;
         }
     }
@@ -194,7 +194,7 @@ static void cupolas_workbench_fill_result(workbench_t *wb, workbench_result_t *r
     if (!result)
         return;
 
-    AGENTOS_MEMSET(result, 0, sizeof(workbench_result_t));
+    __builtin_memset(result, 0, sizeof(workbench_result_t));
     result->exit_code = exit_code;
     result->signaled = signaled;
     result->signal = signal;
@@ -214,7 +214,7 @@ static void cupolas_workbench_fill_result(workbench_t *wb, workbench_result_t *r
  */
 static void cupolas_workbench_setup_process_attr(workbench_t *wb, cupolas_process_attr_t *attr)
 {
-    AGENTOS_MEMSET(attr, 0, sizeof(cupolas_process_attr_t));
+    __builtin_memset(attr, 0, sizeof(cupolas_process_attr_t));
     attr->working_dir = wb->manager.working_dir;
     attr->env = wb->manager.env_vars;
     attr->redirect_stdin = wb->manager.redirect_stdin;
@@ -222,13 +222,13 @@ static void cupolas_workbench_setup_process_attr(workbench_t *wb, cupolas_proces
     attr->redirect_stderr = wb->manager.redirect_stderr;
 
     if (wb->manager.redirect_stdin) {
-        memcpy(attr->stdin_pipe, wb->stdin_pipe, sizeof(attr->stdin_pipe));
+        __builtin_memcpy(attr->stdin_pipe, wb->stdin_pipe, sizeof(attr->stdin_pipe));
     }
     if (wb->manager.redirect_stdout) {
-        memcpy(attr->stdout_pipe, wb->stdout_pipe, sizeof(attr->stdout_pipe));
+        __builtin_memcpy(attr->stdout_pipe, wb->stdout_pipe, sizeof(attr->stdout_pipe));
     }
     if (wb->manager.redirect_stderr) {
-        memcpy(attr->stderr_pipe, wb->stderr_pipe, sizeof(attr->stderr_pipe));
+        __builtin_memcpy(attr->stderr_pipe, wb->stderr_pipe, sizeof(attr->stderr_pipe));
     }
 }
 
@@ -496,5 +496,5 @@ void workbench_result_free(workbench_result_t *result)
 
     cupolas_mem_free(result->stdout_data);
     cupolas_mem_free(result->stderr_data);
-    AGENTOS_MEMSET(result, 0, sizeof(workbench_result_t));
+    __builtin_memset(result, 0, sizeof(workbench_result_t));
 }

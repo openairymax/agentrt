@@ -199,7 +199,7 @@ int service_logging_init(const service_logging_config_t *manager)
     }
 
     if (manager) {
-        memcpy(&g_service_state.manager, manager, sizeof(service_logging_config_t));
+        __builtin_memcpy(&g_service_state.manager, manager, sizeof(service_logging_config_t));
     } else {
         g_service_state.manager.enable_rotation = false;
         g_service_state.manager.enable_filtering = false;
@@ -232,7 +232,7 @@ int service_logging_configure_rotation(const log_rotation_config_t *manager)
     if (!g_service_state.initialized || !manager)
         return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
-    memcpy(&g_service_state.rotation_config, manager, sizeof(log_rotation_config_t));
+    __builtin_memcpy(&g_service_state.rotation_config, manager, sizeof(log_rotation_config_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }
@@ -242,7 +242,7 @@ int service_logging_configure_transport(const log_transport_config_t *manager)
     if (!g_service_state.initialized || !manager)
         return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
-    memcpy(&g_service_state.transport_config, manager, sizeof(log_transport_config_t));
+    __builtin_memcpy(&g_service_state.transport_config, manager, sizeof(log_transport_config_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }
@@ -359,7 +359,7 @@ int service_logging_get_stats(service_logging_stats_t *stats)
     if (!g_service_state.initialized || !stats)
         return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
-    memcpy(stats, &g_service_state.stats, sizeof(service_logging_stats_t));
+    __builtin_memcpy(stats, &g_service_state.stats, sizeof(service_logging_stats_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }

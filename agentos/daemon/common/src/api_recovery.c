@@ -93,7 +93,7 @@ api_rec_pool_t *api_rec_pool_create(const char *name)
     }
 
     if (name) {
-        AGENTOS_STRNCPY_TERM(pool->name, name, sizeof(pool->name));
+AGENTOS_STRNCPY_TERM(pool->name, name, sizeof(pool->name));
         pool->name[sizeof(pool->name) - 1] = '\0';
     }
 
@@ -140,12 +140,12 @@ int api_rec_add_credential(api_rec_pool_t *pool, const char *api_key)
 
     size_t idx = pool->cred_count++;
     api_rec_credential_t *cred = &pool->credentials[idx];
-    AGENTOS_MEMSET(cred, 0, sizeof(*cred));
+    __builtin_memset(cred, 0, sizeof(*cred));
 
     size_t klen = strlen(api_key);
     if (klen >= API_REC_MAX_CRED_LEN)
         klen = API_REC_MAX_CRED_LEN - 1;
-    memcpy(cred->key, api_key, klen);
+    __builtin_memcpy(cred->key, api_key, klen);
     cred->key[klen] = '\0';
     cred->is_valid = true;
     cred->health_score = 1.0;
@@ -164,7 +164,7 @@ int api_rec_remove_credential(api_rec_pool_t *pool, size_t index)
     }
 
     pool->cred_count--;
-    AGENTOS_MEMSET(&pool->credentials[pool->cred_count], 0, sizeof(api_rec_credential_t));
+    __builtin_memset(&pool->credentials[pool->cred_count], 0, sizeof(api_rec_credential_t));
 
     if (pool->cred_index >= pool->cred_count && pool->cred_count > 0)
         pool->cred_index = 0;
@@ -261,12 +261,12 @@ int api_rec_add_fallback_model(api_rec_pool_t *pool, const char *model, float co
 
     size_t idx = pool->fallback_count++;
     api_rec_model_t *m = &pool->fallback_models[idx];
-    AGENTOS_MEMSET(m, 0, sizeof(*m));
+    __builtin_memset(m, 0, sizeof(*m));
 
     size_t mlen = strlen(model);
     if (mlen >= API_REC_MAX_MODEL_LEN)
         mlen = API_REC_MAX_MODEL_LEN - 1;
-    memcpy(m->model, model, mlen);
+    __builtin_memcpy(m->model, model, mlen);
     m->model[mlen] = '\0';
     m->cost_weight = cost_weight;
     m->priority = priority;
@@ -368,7 +368,7 @@ int api_rec_execute_with_recovery(api_rec_pool_t *pool, api_rec_request_fn reque
     if (!pool || !request_fn || !url || !body || !out_response)
         return AGENTOS_ERR_INVALID_PARAM;
     if (out_result)
-        AGENTOS_MEMSET(out_result, 0, sizeof(*out_result));
+        __builtin_memset(out_result, 0, sizeof(*out_result));
 
     *out_response = NULL;
     if (out_http_code)

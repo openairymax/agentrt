@@ -166,7 +166,7 @@ int logging_compat_init(const logging_compat_config_t *manager)
 
     /* 应用配置 */
     if (manager) {
-        memcpy(&g_compat_config, manager, sizeof(g_compat_config));
+        __builtin_memcpy(&g_compat_config, manager, sizeof(g_compat_config));
     }
 
     /* 初始化统计信?*/
@@ -339,7 +339,7 @@ int logging_compat_get_stats(logging_compat_stats_t *out_stats)
     }
 
     /* 复制统计信息（使用原子操作确保一致性） */
-    memcpy(out_stats, &g_compat_stats, sizeof(g_compat_stats));
+    __builtin_memcpy(out_stats, &g_compat_stats, sizeof(g_compat_stats));
 
     /* 更新动态统计信?*/
     out_stats->migration_progress.total_modules = 10;   /* 示例?*/

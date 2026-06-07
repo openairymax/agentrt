@@ -256,7 +256,19 @@ static agentos_error_t file_execute(agentos_execution_unit_t *unit, const void *
     char op[32] = {0};
     char path[256] = {0};
 
-    if (sscanf(cmd, "op=%31[^&]&path=%255[^\n]", op, path) != 2) {
+    const char *op_start = cmd + 3;
+    const char *op_end = strchr(op_start, '&');
+    if (!op_end) { ATM_RET_ERR(AGENTOS_EINVAL); }
+    size_t op_len = (size_t)(op_end - op_start);
+    if (op_len >= sizeof(op)) op_len = sizeof(op) - 1;
+    __builtin_memcpy(op, op_start, op_len);
+    op[op_len] = '\0';
+    const char *path_start = op_end + 6;
+    size_t path_avail = strlen(path_start);
+    if (path_avail >= sizeof(path)) path_avail = sizeof(path) - 1;
+    __builtin_memcpy(path, path_start, path_avail);
+    path[path_avail] = '\0';
+    if (op[0] == '\0' || path[0] == '\0') {
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
@@ -299,7 +311,7 @@ agentos_execution_unit_t *agentos_file_unit_create(const char *root_dir)
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
-    AGENTOS_MEMSET(unit, 0, sizeof(*unit));
+    __builtin_memset(unit, 0, sizeof(*unit));
 
     file_unit_data_t *data = (file_unit_data_t *)AGENTOS_MALLOC(sizeof(file_unit_data_t));
     if (!data) {

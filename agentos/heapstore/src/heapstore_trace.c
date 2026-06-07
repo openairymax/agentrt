@@ -55,7 +55,6 @@ heapstore_error_t heapstore_trace_init(void)
 
     const char *base_path = "agentos/heapstore/traces";
     AGENTOS_STRNCPY_TERM(s_trace_path, base_path, sizeof(s_trace_path));
-    s_trace_path[sizeof(s_trace_path) - 1] = '\0';
 
     heapstore_ensure_directory(s_trace_path);
 
@@ -69,7 +68,7 @@ heapstore_error_t heapstore_trace_init(void)
     }
     s_span_count = 0;
 
-    AGENTOS_MEMSET(&s_exporter_config, 0, sizeof(s_exporter_config));
+    __builtin_memset(&s_exporter_config, 0, sizeof(s_exporter_config));
     s_exporter_config.enabled = false;
     s_exporter_config.batch_size = heapstore_TRACE_BATCH_SIZE;
     s_exporter_config.export_interval_sec = 30;
@@ -120,7 +119,7 @@ heapstore_error_t heapstore_trace_write_span(const heapstore_span_t *span)
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(&s_span_buffer[s_span_count], span, sizeof(heapstore_span_t));
+    __builtin_memcpy(&s_span_buffer[s_span_count], span, sizeof(heapstore_span_t));
     s_span_count++;
 
     agentos_mutex_unlock(&s_trace_lock);
@@ -145,7 +144,7 @@ heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t *span
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(&s_span_buffer[s_span_count], spans, count * sizeof(heapstore_span_t));
+    __builtin_memcpy(&s_span_buffer[s_span_count], spans, count * sizeof(heapstore_span_t));
     s_span_count += count;
 
     agentos_mutex_unlock(&s_trace_lock);
@@ -187,7 +186,7 @@ heapstore_error_t heapstore_trace_query_by_trace(const char *trace_id, heapstore
     size_t idx = 0;
     for (size_t i = 0; i < s_span_count; i++) {
         if (strcmp(s_span_buffer[i].trace_id, trace_id) == 0) {
-            memcpy(&result[idx], &s_span_buffer[i], sizeof(heapstore_span_t));
+            __builtin_memcpy(&result[idx], &s_span_buffer[i], sizeof(heapstore_span_t));
             idx++;
         }
     }
@@ -239,7 +238,7 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
     for (size_t i = 0; i < s_span_count; i++) {
         if (s_span_buffer[i].start_time_ns >= start_time &&
             s_span_buffer[i].end_time_ns <= end_time) {
-            memcpy(&result[idx], &s_span_buffer[i], sizeof(heapstore_span_t));
+            __builtin_memcpy(&result[idx], &s_span_buffer[i], sizeof(heapstore_span_t));
             idx++;
         }
     }
@@ -270,7 +269,7 @@ heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter
     }
 
     agentos_mutex_lock(&s_trace_lock);
-    memcpy(&s_exporter_config, manager, sizeof(s_exporter_config));
+    __builtin_memcpy(&s_exporter_config, manager, sizeof(s_exporter_config));
     agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
@@ -293,8 +292,9 @@ heapstore_error_t heapstore_trace_flush(void)
 
     char filename[256];
     time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
-    strftime(filename, sizeof(filename), "spans_%Y%m%d_%H%M%S.json", tm_info);
+    struct tm tm_buf;
+    localtime_r(&now, &tm_buf);
+    strftime(filename, sizeof(filename), "spans_%Y%m%d_%H%M%S.json", &tm_buf);
 
     char filepath[heapstore_TRACE_MAX_PATH];
     snprintf(filepath, sizeof(filepath), "%s/spans/%s", s_trace_path, filename);

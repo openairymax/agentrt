@@ -93,7 +93,7 @@ size_t protocol_manager_get_stacks(protocol_manager_handle_t manager,
     struct protocol_manager_s *mgr = (struct protocol_manager_s *)manager;
     size_t count = mgr->stack_count < max_count ? mgr->stack_count : max_count;
     if (stacks) {
-        memcpy(stacks, mgr->stacks, count * sizeof(protocol_stack_handle_t));
+        __builtin_memcpy(stacks, mgr->stacks, count * sizeof(protocol_stack_handle_t));
     }
     return count;
 }

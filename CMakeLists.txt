@@ -60,6 +60,8 @@ option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
 option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)
 option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
 option(AGENTOS_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
+set(AGENTOS_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
+set(AGENTOS_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 if(BUILD_TESTS)
@@ -144,7 +146,7 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
         add_link_options(-fsanitize=address,undefined,leak,float-divide-by-zero)
         # CI环境变量：halt_on_error确保任何检测到的问题立即阻断
         set(ENV{ASAN_OPTIONS} "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1")
-        set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/.lsan-suppressions")
+        set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/agentos/manager/sanitizer/lsan-suppressions")
         set(ENV{UBSAN_OPTIONS} "halt_on_error=1:print_stacktrace=1")
         message(STATUS "Sanitizers enabled: ASan + LSan + UBSan (integer, float-divide-by-zero)")
     else()

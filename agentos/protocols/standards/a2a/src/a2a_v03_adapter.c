@@ -724,7 +724,7 @@ int a2a_v03_authenticate(a2a_v03_context_t *ctx, const char *agent_id, const cha
     g_a2a_auth.failed_attempts = 0;
 
     if (g_a2a_auth.token_count >= A2A_MAX_TOKENS) {
-        memmove(&g_a2a_auth.tokens[0], &g_a2a_auth.tokens[1],
+        __builtin_memmove(&g_a2a_auth.tokens[0], &g_a2a_auth.tokens[1],
                 (A2A_MAX_TOKENS - 1) * sizeof(a2a_auth_token_t));
         g_a2a_auth.token_count--;
     }
@@ -1499,7 +1499,7 @@ static int a2a_adapter_encode_cb(void *c, const void *m, void **o, size_t *s)
         agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "strlen: allocation failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
         }
-    memcpy(buf, msg, len);
+    __builtin_memcpy(buf, msg, len);
     *o = buf;
     *s = len;
     return 0;
@@ -1511,7 +1511,7 @@ static int a2a_adapter_decode_cb(void *c, const void *d, size_t s, void *o)
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_decode_cb: failed");
         return AGENTOS_ERR_UNKNOWN;
         }
-    memcpy(o, d, s);
+    __builtin_memcpy(o, d, s);
     return 0;
 }
 static int a2a_adapter_connect_cb(void *c, const char *e)

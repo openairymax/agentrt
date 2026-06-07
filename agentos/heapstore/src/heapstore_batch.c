@@ -54,7 +54,7 @@ static heapstore_error_t batch_commit_span(const void *data)
     }
 
     heapstore_span_t span_rec;
-    AGENTOS_MEMSET(&span_rec, 0, sizeof(span_rec));
+    __builtin_memset(&span_rec, 0, sizeof(span_rec));
 
     AGENTOS_STRNCPY_TERM(span_rec.trace_id, trace_entry->trace_id, sizeof(span_rec.trace_id));
     AGENTOS_STRNCPY_TERM(span_rec.span_id, trace_entry->span_id, sizeof(span_rec.span_id));
@@ -144,7 +144,7 @@ static heapstore_batch_item_t *batch_alloc_item(heapstore_batch_item_type_t type
         return NULL;
     }
 
-    AGENTOS_MEMSET(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = type;
     item->next = NULL;
 
@@ -215,7 +215,7 @@ static heapstore_error_t batch_add_generic(heapstore_batch_context_t *ctx,
     }
 
     if (data_size > 0) {
-        memcpy(&item->data, data, data_size);
+        __builtin_memcpy(&item->data, data, data_size);
     }
 
     return batch_append_item(ctx, item);
@@ -248,7 +248,7 @@ heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const 
     if (copy_len >= sizeof(item->data.log.service)) {
         copy_len = sizeof(item->data.log.service) - 1;
     }
-    memcpy(item->data.log.service, service, copy_len);
+    __builtin_memcpy(item->data.log.service, service, copy_len);
     item->data.log.service[copy_len] = '\0';
 
     item->data.log.trace_id[0] = '\0';
@@ -257,7 +257,7 @@ heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const 
     if (copy_len >= sizeof(item->data.log.message)) {
         copy_len = sizeof(item->data.log.message) - 1;
     }
-    memcpy(item->data.log.message, message, copy_len);
+    __builtin_memcpy(item->data.log.message, message, copy_len);
     item->data.log.message[copy_len] = '\0';
 
     return batch_append_item(ctx, item);
@@ -271,7 +271,7 @@ heapstore_error_t heapstore_batch_add_span(heapstore_batch_context_t *ctx,
         return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SPAN, span, sizeof(*span));
 
     heapstore_trace_entry_t converted;
-    AGENTOS_MEMSET(&converted, 0, sizeof(converted));
+    __builtin_memset(&converted, 0, sizeof(converted));
     AGENTOS_STRNCPY_TERM(converted.trace_id, span->trace_id, sizeof(converted.trace_id));
     AGENTOS_STRNCPY_TERM(converted.span_id, span->span_id, sizeof(converted.span_id));
     AGENTOS_STRNCPY_TERM(converted.parent_span_id, span->parent_span_id, sizeof(converted.parent_span_id));

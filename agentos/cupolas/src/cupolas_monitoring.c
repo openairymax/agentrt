@@ -132,7 +132,9 @@ static uint64_t get_process_rss_bytes(void)
     while (fgets(line, sizeof(line), f)) {
         if (strncmp(line, "VmRSS:", 6) == 0) {
             unsigned long kb = 0;
-            if (sscanf(line + 6, "%lu", &kb) == 1)
+            char *endptr = NULL;
+            kb = strtoul(line + 6, &endptr, 10);
+            if (endptr != line + 6)
                 rss = kb * 1024UL;
             break;
         }
@@ -182,7 +184,7 @@ static int get_thread_count(void)
     int threads = 1;
     while (fgets(line, sizeof(line), f)) {
         if (strncmp(line, "Threads:", 8) == 0) {
-            sscanf(line + 8, "%d", &threads);
+            threads = (int)strtol(line + 8, NULL, 10);
             break;
         }
     }
@@ -361,12 +363,12 @@ cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *manag
         return NULL;
     }
 
-    AGENTOS_MEMSET(mgr, 0, sizeof(cupolas_monitoring_t));
+    __builtin_memset(mgr, 0, sizeof(cupolas_monitoring_t));
 
     if (manager) {
-        memcpy(&mgr->manager, manager, sizeof(monitoring_config_t));
+        AGENTOS_MEMCPY_SAFE(&mgr->manager, manager, sizeof(monitoring_config_t), sizeof(monitoring_config_t));
     } else {
-        AGENTOS_MEMSET(&mgr->manager, 0, sizeof(monitoring_config_t));
+        __builtin_memset(&mgr->manager, 0, sizeof(monitoring_config_t));
         mgr->manager.backend = MONITORING_BACKEND_PROMETHEUS;
         mgr->manager.prometheus.listen_addr = "127.0.0.1";
         mgr->manager.prometheus.port = 9090;
@@ -531,7 +533,7 @@ size_t cupolas_monitoring_export(cupolas_monitoring_t *mgr, char *buffer, size_t
 
     size_t copied = 0;
     if (mgr->metrics_buffer_size > 0 && size > mgr->metrics_buffer_size) {
-        memcpy(buffer, mgr->metrics_buffer, mgr->metrics_buffer_size);
+        AGENTOS_MEMCPY_SAFE(buffer, mgr->metrics_buffer, mgr->metrics_buffer_size, size);
         copied = mgr->metrics_buffer_size;
     }
 
@@ -611,8 +613,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
             size_t line_len = (size_t)(metric_data - line_start);
             if (line_len > 0 && line_len < 256) {
                 char line[256];
-                AGENTOS_STRNCPY_TERM(line, line_start, line_len);
-                line[line_len] = '\0';
+                AGENTOS_STRNCPY_TERM(line, line_start, sizeof(line));
 
                 if (strncmp(line, "# HELP ", 7) == 0 || strncmp(line, "# TYPE ", 7) == 0) {
                     line_start = metric_data + 1;
@@ -629,10 +630,8 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
                     if (space_pos) {
                         size_t name_len = (size_t)(space_pos - line);
                         if (name_len < sizeof(metric_name)) {
-                            AGENTOS_STRNCPY_TERM(metric_name, line, name_len);
-                            metric_name[name_len] = '\0';
+                            AGENTOS_STRNCPY_TERM(metric_name, line, sizeof(metric_name));
                             AGENTOS_STRNCPY_TERM(metric_value, space_pos + 1, sizeof(metric_value));
-                            metric_value[sizeof(metric_value) - 1] = '\0';
 
                             if (!first_metric) {
                                 written += snprintf(buffer + written, size - written, ",\n");
@@ -757,7 +756,6 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
     if (include_patterns) {
         for (size_t i = 0; include_patterns[i] && mgr->include_count < MAX_FILTER_PATTERNS; i++) {
             AGENTOS_STRNCPY_TERM(mgr->include_patterns[mgr->include_count], include_patterns[i], MAX_PATTERN_LEN);
-            mgr->include_patterns[mgr->include_count][MAX_PATTERN_LEN - 1] = '\0';
             mgr->include_count++;
         }
     }
@@ -766,7 +764,6 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
     if (exclude_patterns) {
         for (size_t i = 0; exclude_patterns[i] && mgr->exclude_count < MAX_FILTER_PATTERNS; i++) {
             AGENTOS_STRNCPY_TERM(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i], MAX_PATTERN_LEN);
-            mgr->exclude_patterns[mgr->exclude_count][MAX_PATTERN_LEN - 1] = '\0';
             mgr->exclude_count++;
         }
     }
@@ -819,7 +816,7 @@ monitoring_config_t *monitoring_config_create_prometheus(uint16_t port)
     if (!manager)
         return NULL;
 
-    AGENTOS_MEMSET(manager, 0, sizeof(monitoring_config_t));
+    __builtin_memset(manager, 0, sizeof(monitoring_config_t));
 
     manager->backend = MONITORING_BACKEND_PROMETHEUS;
     manager->prometheus.listen_addr = "127.0.0.1";
@@ -840,7 +837,7 @@ monitoring_config_t *monitoring_config_create_opentelemetry(const char *endpoint
     if (!manager)
         return NULL;
 
-    AGENTOS_MEMSET(manager, 0, sizeof(monitoring_config_t));
+    __builtin_memset(manager, 0, sizeof(monitoring_config_t));
 
     manager->backend = MONITORING_BACKEND_OPENTELEMETRY;
     manager->opentelemetry.endpoint = endpoint;

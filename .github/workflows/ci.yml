@@ -279,7 +279,7 @@ jobs:
         working-directory: ${{ github.workspace }}/../AgentOS-asan-build
         run: |
           export ASAN_OPTIONS="halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1"
-          export LSAN_OPTIONS="suppressions=${{ github.workspace }}/.lsan-suppressions:print_suppressions=0"
+          export LSAN_OPTIONS="suppressions=${{ github.workspace }}/agentos/manager/sanitizer/lsan-suppressions:print_suppressions=0"
           export UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1:report_error_type=1"
           ctest --output-on-failure -j $(nproc) --timeout 300
 

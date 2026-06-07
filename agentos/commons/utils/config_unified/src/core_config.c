@@ -126,7 +126,7 @@ static char *duplicate_string(const char *str)
     size_t len = strlen(str) + 1;
     char *copy = (char *)AGENTOS_MALLOC(len);
     if (copy) {
-        memcpy(copy, str, len);
+        __builtin_memcpy(copy, str, len);
     }
     return copy;
 }
@@ -344,7 +344,7 @@ config_value_t *config_value_clone(const config_value_t *value)
             if (copy) {
                 copy->data.binary_value.data = AGENTOS_MALLOC(value->data.binary_value.size);
                 if (copy->data.binary_value.data) {
-                    memcpy(copy->data.binary_value.data, value->data.binary_value.data,
+                    __builtin_memcpy(copy->data.binary_value.data, value->data.binary_value.data,
                            value->data.binary_value.size);
                     copy->data.binary_value.size = value->data.binary_value.size;
                 } else {

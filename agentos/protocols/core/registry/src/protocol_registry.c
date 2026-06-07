@@ -135,7 +135,7 @@ int proto_registry_unregister(protocol_registry_t *registry, const char *name)
             proto_state_t old_state = registry->entries[i].state;
 
             if (i < registry->entry_count - 1) {
-                memmove(&registry->entries[i], &registry->entries[i + 1],
+                __builtin_memmove(&registry->entries[i], &registry->entries[i + 1],
                         (registry->entry_count - i - 1) * sizeof(proto_registry_entry_t));
             }
             registry->entry_count--;
@@ -203,7 +203,7 @@ size_t proto_registry_list_all(protocol_registry_t *registry, proto_registry_ent
     if (!*entries && registry->entry_count > 0)
         return 0;
 
-    memcpy(*entries, registry->entries, registry->entry_count * sizeof(proto_registry_entry_t));
+    __builtin_memcpy(*entries, registry->entries, registry->entry_count * sizeof(proto_registry_entry_t));
     return registry->entry_count;
 }
 

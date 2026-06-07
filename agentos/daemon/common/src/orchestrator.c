@@ -118,7 +118,7 @@ orchestrator_t *orchestrator_create(const orch_config_t *config)
     }
 
     if (config) {
-        memcpy(&orch->config, config, sizeof(orch_config_t));
+        __builtin_memcpy(&orch->config, config, sizeof(orch_config_t));
     } else {
         orch_config_get_defaults(&orch->config);
     }
@@ -280,7 +280,7 @@ orch_pipeline_t *orchestrator_pipeline_create(orchestrator_t *orch, const char *
     }
 
     if (name)
-        AGENTOS_STRNCPY_TERM(p->name, name, sizeof(p->name));
+AGENTOS_STRNCPY_TERM(p->name, name, sizeof(p->name));
     else
         snprintf(p->name, sizeof(p->name), "pipeline-%u", orch->task_count);
 
@@ -299,6 +299,7 @@ int orchestrator_pipeline_add_step(orch_pipeline_t *pipeline, const orch_pipelin
         return AGENTOS_ERR_INVALID_PARAM;
     if (pipeline->step_count >= ORCH_MAX_STEPS) {
         AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "pipeline step limit exceeded");
+        return AGENTOS_ERR_OVERFLOW;
     }
 
     pipeline->steps[pipeline->step_count] = *step;
@@ -316,7 +317,7 @@ static task_entry_t *find_or_create_task(orchestrator_t *orch, orch_phase_t phas
     }
 
     task_entry_t *t = &orch->tasks[orch->task_count++];
-    AGENTOS_MEMSET(t, 0, sizeof(*t));
+    __builtin_memset(t, 0, sizeof(*t));
     generate_task_id(t->id, sizeof(t->id));
     t->phase = phase;
     t->status = ORCH_TASK_PENDING;
@@ -534,13 +535,14 @@ static char *call_llm_service(const char *prompt, const char *system_role)
     }
 
     ipc_bus_message_t request;
-    AGENTOS_MEMSET(&request, 0, sizeof(request));
+    __builtin_memset(&request, 0, sizeof(request));
     request.payload = params;
     request.payload_size = strlen(params);
-    AGENTOS_STRNCPY_TERM(request.header.target, "llm_d", sizeof(request.header.target));
+AGENTOS_STRNCPY_TERM(request.header.target, "llm_d", sizeof(request.header.target));
+    (request.header.target)[sizeof(request.header.target) - 1] = '\0';
 
     ipc_bus_message_t response;
-    AGENTOS_MEMSET(&response, 0, sizeof(response));
+    __builtin_memset(&response, 0, sizeof(response));
 
     agentos_error_t err = ipc_service_bus_request(bus, "llm_d", &request, &response, 30000);
     if (err != AGENTOS_SUCCESS || !response.payload) {
@@ -757,7 +759,7 @@ static char *extract_field_string(const char *json, const char *field)
 
         return NULL;
     }
-    memcpy(val, p, len);
+    __builtin_memcpy(val, p, len);
     val[len] = '\0';
     return val;
 }
@@ -1147,7 +1149,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 total_critique_rounds++;
 
                 agentos_thinking_step_t eval_step;
-                AGENTOS_MEMSET(&eval_step, 0, sizeof(eval_step));
+                __builtin_memset(&eval_step, 0, sizeof(eval_step));
                 eval_step.step_id = (uint32_t)(100 + round);
                 eval_step.raw_input = (char *)original_input;
                 eval_step.raw_input_len = strlen(original_input);
@@ -1157,7 +1159,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 eval_step.status = 1;
 
                 mc_evaluation_result_t mc_result;
-                AGENTOS_MEMSET(&mc_result, 0, sizeof(mc_result));
+                __builtin_memset(&mc_result, 0, sizeof(mc_result));
 
                 agentos_error_t mc_err =
                     agentos_mc_evaluate_step(orch->metacognition, &eval_step, original_input,

@@ -97,7 +97,7 @@ static void add_history(const char *key, const char *old_value, const char *new_
                         const char *source)
 {
     cm_change_record_t *rec = &g_cm.history[g_cm.history_head];
-    AGENTOS_MEMSET(rec, 0, sizeof(cm_change_record_t));
+    __builtin_memset(rec, 0, sizeof(cm_change_record_t));
     safe_strcpy(rec->key, key, CM_MAX_KEY_LEN);
     if (old_value)
         safe_strcpy(rec->old_value, old_value, CM_MAX_VALUE_LEN);
@@ -140,7 +140,7 @@ static bool validate_value(const char *key, const char *value)
 AGENTOS_API cm_config_t cm_create_default_config(void)
 {
     cm_config_t config;
-    AGENTOS_MEMSET(&config, 0, sizeof(cm_config_t));
+    __builtin_memset(&config, 0, sizeof(cm_config_t));
     safe_strcpy(config.base_path, "./config", sizeof(config.base_path));
     safe_strcpy(config.environment, "development", sizeof(config.environment));
     config.watch_interval_ms = 5000;
@@ -156,10 +156,10 @@ AGENTOS_API int cm_init(const cm_config_t *config)
     if (g_cm.initialized)
         return 0;
 
-    AGENTOS_MEMSET(&g_cm, 0, sizeof(g_cm));
+    __builtin_memset(&g_cm, 0, sizeof(g_cm));
 
     if (config) {
-        memcpy(&g_cm.config, config, sizeof(cm_config_t));
+        __builtin_memcpy(&g_cm.config, config, sizeof(cm_config_t));
     } else {
         g_cm.config = cm_create_default_config();
     }
@@ -290,7 +290,7 @@ AGENTOS_API int cm_set(const char *key, const char *value, const char *source)
     }
 
     entry = &g_cm.entries[g_cm.entry_count];
-    AGENTOS_MEMSET(entry, 0, sizeof(cm_entry_t));
+    __builtin_memset(entry, 0, sizeof(cm_entry_t));
     safe_strcpy(entry->key, key, CM_MAX_KEY_LEN);
     if (value)
         safe_strcpy(entry->value, value, CM_MAX_VALUE_LEN);
@@ -386,7 +386,7 @@ AGENTOS_API int cm_load_json(const char *path, const char *namespace_)
             size_t klen = eq - line;
             if (klen >= CM_MAX_KEY_LEN)
                 klen = CM_MAX_KEY_LEN - 1;
-            memcpy(k, line, klen);
+            __builtin_memcpy(k, line, klen);
             k[klen] = '\0';
 
             while (klen > 0 && (k[klen - 1] == ' ' || k[klen - 1] == '\t'))
@@ -402,7 +402,7 @@ AGENTOS_API int cm_load_json(const char *path, const char *namespace_)
                 vlen--;
             if (vlen >= CM_MAX_VALUE_LEN)
                 vlen = CM_MAX_VALUE_LEN - 1;
-            memcpy(v, val_start, vlen);
+            __builtin_memcpy(v, val_start, vlen);
             v[vlen] = '\0';
 
             if (namespace_ && namespace_[0]) {
@@ -504,7 +504,7 @@ AGENTOS_API int cm_load_args(int argc, char **argv)
                 size_t klen = eq - argv[i] - 2;
                 if (klen >= CM_MAX_KEY_LEN)
                     klen = CM_MAX_KEY_LEN - 1;
-                memcpy(key, argv[i] + 2, klen);
+                __builtin_memcpy(key, argv[i] + 2, klen);
                 key[klen] = '\0';
                 cm_set(key, eq + 1, "cli");
                 count++;
@@ -562,7 +562,7 @@ AGENTOS_API int cm_unwatch(const char *key_pattern, cm_change_callback_t callbac
             if (i < g_cm.watcher_count - 1) {
                 g_cm.watchers[i] = g_cm.watchers[g_cm.watcher_count - 1];
             }
-            AGENTOS_MEMSET(&g_cm.watchers[g_cm.watcher_count - 1], 0, sizeof(cm_watcher_t));
+            __builtin_memset(&g_cm.watchers[g_cm.watcher_count - 1], 0, sizeof(cm_watcher_t));
             g_cm.watcher_count--;
             break;
         }
@@ -641,7 +641,7 @@ AGENTOS_API int cm_get_history(const char *key, cm_change_record_t *records, uin
         if (key && strcmp(rec->key, key) != 0)
             continue;
 
-        memcpy(&records[count], rec, sizeof(cm_change_record_t));
+        __builtin_memcpy(&records[count], rec, sizeof(cm_change_record_t));
         count++;
     }
 
