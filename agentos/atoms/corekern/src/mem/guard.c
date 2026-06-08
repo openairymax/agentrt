@@ -59,7 +59,7 @@ static guard_block_t *create_guarded_block(size_t size)
     block->user_ptr = (uint8_t *)block + sizeof(guard_block_t);
     fill_guard(block->user_ptr + size);
 
-    memset(block->user_ptr, 0xCD, size);
+    __builtin_memset(block->user_ptr, 0xCD, size);
     return block;
 }
 

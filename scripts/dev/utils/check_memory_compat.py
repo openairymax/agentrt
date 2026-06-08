@@ -4,7 +4,7 @@
 import re
 import os
 
-BASE_DIR = '/home/spharx/SpharxWorks/OpenAirymax/AgentOS'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 MEMORY_MACROS = [
     'AGENTOS_MALLOC', 'AGENTOS_FREE', 'AGENTOS_CALLOC',

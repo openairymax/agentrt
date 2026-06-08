@@ -20,7 +20,7 @@ target_include_directories(test_syscalls PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../coreloopthree/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/compat/include
 )
@@ -40,7 +40,7 @@ target_include_directories(test_syscall_extended PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/compat/include
 )

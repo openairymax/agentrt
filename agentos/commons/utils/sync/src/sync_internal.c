@@ -12,7 +12,7 @@ char *sync_internal_strdup(const char *str)
     size_t len = strlen(str) + 1;
     char *dup = (char *)AGENTOS_MALLOC(len);
     if (dup)
-        memcpy(dup, str, len);
+        __builtin_memcpy(dup, str, len);
     return dup;
 }
 

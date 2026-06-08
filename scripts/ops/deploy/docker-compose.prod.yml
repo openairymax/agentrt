@@ -10,8 +10,8 @@ services:
   agentos-atoms:
     build:
       context: ../../
-      dockerfile: scripts/deployment/docker/Dockerfile.kernel
-      target: production
+      dockerfile: scripts/ops/deploy/Dockerfile.kernel
+      target: runtime
     image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-atoms:${VERSION:-0.1.0}
     container_name: agentos-atoms
     hostname: agentos-atoms-prod
@@ -97,8 +97,8 @@ services:
     build:
       context: ../../
       # FIXME: Dockerfile.gateway does not exist, using service image fallback
-      dockerfile: scripts/deployment/docker/Dockerfile.service
-      target: production
+      dockerfile: scripts/ops/deploy/Dockerfile.service
+      target: gateway
     image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-gateway:${VERSION:-0.1.0}
     container_name: agentos-gateway
     hostname: agentos-gateway-prod
@@ -161,8 +161,8 @@ services:
   agentos-daemon:
     build:
       context: ../../
-      dockerfile: scripts/deployment/docker/Dockerfile.service
-      target: production
+      dockerfile: scripts/ops/deploy/Dockerfile.service
+      target: gateway
     image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-daemon:${VERSION:-0.1.0}
     container_name: agentos-daemon
     hostname: agentos-daemon-prod
@@ -224,8 +224,8 @@ services:
     build:
       context: ../../
       # FIXME: Dockerfile.openlab does not exist, using service image fallback
-      dockerfile: scripts/deployment/docker/Dockerfile.service
-      target: production
+      dockerfile: scripts/ops/deploy/Dockerfile.service
+      target: gateway
     image: ${DOCKER_REGISTRY:-ghcr.io/spharx}/agentos-openlab:${VERSION:-0.1.0}
     container_name: agentos-openlab
     hostname: agentos-openlab-prod

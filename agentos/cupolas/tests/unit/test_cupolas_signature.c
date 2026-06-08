@@ -132,7 +132,7 @@ TEST(test_signature_verify_integrity)
     ASSERT(result == 0, "Signature init should succeed");
 
     uint8_t expected_hash[32];
-    memset(expected_hash, 0, 32);
+    AGENTOS_MEMSET(expected_hash, 0, 32);
 
     int integrity_result =
         cupolas_signature_verify_integrity("test_data/test_file.bin", expected_hash);

@@ -426,7 +426,7 @@ taskflow_error_t workflow_add_node(workflow_context_t *context, const workflow_n
                 AGENTOS_FREE(dest->node_name);
             return TASKFLOW_ERROR_MEMORY;
         }
-        memcpy(dest->task_data, node->task_data, node->task_data_size);
+        __builtin_memcpy(dest->task_data, node->task_data, node->task_data_size);
         dest->task_data_size = node->task_data_size;
     }
 

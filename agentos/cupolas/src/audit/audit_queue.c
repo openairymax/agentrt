@@ -26,7 +26,7 @@ audit_entry_t *audit_entry_create(audit_event_type_t type, const char *agent_id,
     if (!entry)
         return NULL;
 
-    memset(entry, 0, sizeof(audit_entry_t));
+    __builtin_memset(entry, 0, sizeof(audit_entry_t));
 
     entry->timestamp_ms = cupolas_time_ms();
     entry->type = type;
@@ -78,7 +78,7 @@ audit_queue_t *audit_queue_create(size_t max_size)
     if (!queue)
         return NULL;
 
-    memset(queue, 0, sizeof(audit_queue_t));
+    __builtin_memset(queue, 0, sizeof(audit_queue_t));
     queue->max_size = max_size;
 
     if (cupolas_mutex_init(&queue->lock) != cupolas_OK) {

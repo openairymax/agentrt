@@ -48,7 +48,7 @@ static agentos_error_t record_unit_result(tc3_coordinator_t *coord, const tc3_un
     if (result->critique && result->critique_len > 0) {
         slot->critique = (char *)AGENTOS_MALLOC(result->critique_len + 1);
         if (slot->critique) {
-            memcpy(slot->critique, result->critique, result->critique_len);
+            __builtin_memcpy(slot->critique, result->critique, result->critique_len);
             slot->critique[result->critique_len] = '\0';
         }
     } else {
@@ -214,7 +214,7 @@ static agentos_error_t concatenate_units(const char **units, const size_t *lens,
 
     size_t pos = 0;
     for (size_t i = 0; i < count; i++) {
-        memcpy(buf + pos, units[i], lens[i]);
+        __builtin_memcpy(buf + pos, units[i], lens[i]);
         pos += lens[i];
     }
     buf[pos] = '\0';
@@ -259,7 +259,7 @@ agentos_error_t tc3_coordinator_create(const tc3_config_t *config, agentos_think
     coord->unit_results_capacity = 0;
     coord->unit_results_count = 0;
     coord->active = 0;
-    memset(&coord->stats, 0, sizeof(tc3_stats_t));
+    __builtin_memset(&coord->stats, 0, sizeof(tc3_stats_t));
 
     *out_coord = coord;
     return AGENTOS_SUCCESS;
@@ -538,7 +538,7 @@ agentos_error_t tc3_coordinator_reset(tc3_coordinator_t *coord)
     free_unit_results(coord);
     if (coord->detector)
         su_stream_detector_reset(coord->detector);
-    memset(&coord->stats, 0, sizeof(tc3_stats_t));
+    __builtin_memset(&coord->stats, 0, sizeof(tc3_stats_t));
     coord->active = 0;
     return AGENTOS_SUCCESS;
 }

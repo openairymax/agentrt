@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - Request/Response Types
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 定义 SDK 中使用的所有请求/响应结构。

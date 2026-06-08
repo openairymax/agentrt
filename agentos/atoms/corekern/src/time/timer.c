@@ -185,7 +185,7 @@ void agentos_time_timer_process(void)
                     break;
                 to_fire = new_buf;
                 capacity = new_capacity;
-                memset(to_fire + fire_count, 0, (capacity - fire_count) * sizeof(fire_entry_t));
+                __builtin_memset(to_fire + fire_count, 0, (capacity - fire_count) * sizeof(fire_entry_t));
             }
 
             to_fire[fire_count].callback = timer->callback;

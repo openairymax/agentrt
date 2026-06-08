@@ -76,19 +76,9 @@ static inline void agentos_cond_destroy_compat(agentos_cond_t *c)
 #define agentos_cond_create() agentos_cond_create_compat()
 #define agentos_cond_destroy_ptr(p) agentos_cond_destroy_compat(p)
 
-/* ==================== 平台相关宏定义 ==================== */
-
-static atomic_uint64_t next_msg_id = 1;
-static uint64_t generate_msg_id(void)
-{
-    return atomic_fetch_add_explicit(&next_msg_id, 1, memory_order_seq_cst);
-}
-
-/* ==================== 常量定义 ==================== */
-
 #define MAX_CHANNEL_NAME 64
 
-/* ==================== 数据结构 ==================== */
+/* ==================== 数据结构（前向声明，供 OOM 池使用） ==================== */
 
 typedef struct binder_node {
     char name[MAX_CHANNEL_NAME];
@@ -115,6 +105,135 @@ typedef struct ipc_message_node {
     agentos_kernel_ipc_message_t msg;
     struct ipc_message_node *next;
 } ipc_message_node_t;
+
+/* ==================== SEC-13: OOM 关键路径预分配内存池 ==================== */
+
+#define IPC_OOM_PREALLOC_MSG_NODES 32     /**< OOM 时预分配的 IPC 消息节点数 */
+#define IPC_OOM_PREALLOC_PENDING_CALLS 8  /**< OOM 时预分配的待处理调用数 */
+
+static ipc_message_node_t g_ipc_oom_msg_nodes[IPC_OOM_PREALLOC_MSG_NODES];
+static bool g_ipc_oom_msg_used[IPC_OOM_PREALLOC_MSG_NODES];
+static pending_call_t g_ipc_oom_pending_calls[IPC_OOM_PREALLOC_PENDING_CALLS];
+static bool g_ipc_oom_pending_used[IPC_OOM_PREALLOC_PENDING_CALLS];
+static bool g_ipc_oom_initialized = false;
+static agentos_mutex_t g_ipc_oom_lock_data;
+static agentos_mutex_t *g_ipc_oom_lock = NULL;
+
+static void ipc_oom_pool_init(void)
+{
+    if (g_ipc_oom_initialized) return;
+
+    __builtin_memset(g_ipc_oom_msg_nodes, 0, sizeof(g_ipc_oom_msg_nodes));
+    __builtin_memset(g_ipc_oom_msg_used, 0, sizeof(g_ipc_oom_msg_used));
+    __builtin_memset(g_ipc_oom_pending_calls, 0, sizeof(g_ipc_oom_pending_calls));
+    __builtin_memset(g_ipc_oom_pending_used, 0, sizeof(g_ipc_oom_pending_used));
+
+    /* 预初始化 pending_call 池中的 mutex 和 cond */
+    for (int i = 0; i < IPC_OOM_PREALLOC_PENDING_CALLS; i++) {
+        agentos_mutex_init(&g_ipc_oom_pending_calls[i].cond_lock);
+        agentos_cond_init(&g_ipc_oom_pending_calls[i].cond);
+    }
+
+    agentos_mutex_init(&g_ipc_oom_lock_data);
+    g_ipc_oom_lock = &g_ipc_oom_lock_data;
+    g_ipc_oom_initialized = true;
+}
+
+static void ipc_oom_pool_cleanup(void)
+{
+    if (!g_ipc_oom_initialized) return;
+
+    /* 销毁所有预初始化的 pending_call mutex 和 cond */
+    for (int i = 0; i < IPC_OOM_PREALLOC_PENDING_CALLS; i++) {
+        agentos_cond_destroy(&g_ipc_oom_pending_calls[i].cond);
+        agentos_mutex_destroy(&g_ipc_oom_pending_calls[i].cond_lock);
+    }
+
+    if (g_ipc_oom_lock) {
+        agentos_mutex_destroy(g_ipc_oom_lock);
+        g_ipc_oom_lock = NULL;
+    }
+    g_ipc_oom_initialized = false;
+}
+
+static ipc_message_node_t *ipc_oom_msg_node_alloc(void)
+{
+    if (!g_ipc_oom_initialized || !g_ipc_oom_lock) return NULL;
+
+    agentos_mutex_lock(g_ipc_oom_lock);
+    for (int i = 0; i < IPC_OOM_PREALLOC_MSG_NODES; i++) {
+        if (!g_ipc_oom_msg_used[i]) {
+            g_ipc_oom_msg_used[i] = true;
+            __builtin_memset(&g_ipc_oom_msg_nodes[i], 0, sizeof(ipc_message_node_t));
+            agentos_mutex_unlock(g_ipc_oom_lock);
+            return &g_ipc_oom_msg_nodes[i];
+        }
+    }
+    agentos_mutex_unlock(g_ipc_oom_lock);
+    return NULL;
+}
+
+static void ipc_oom_msg_node_free(ipc_message_node_t *node)
+{
+    if (!node || !g_ipc_oom_initialized || !g_ipc_oom_lock) return;
+
+    /* 检查是否属于 OOM 池 */
+    ptrdiff_t index = node - g_ipc_oom_msg_nodes;
+    if (index < 0 || index >= IPC_OOM_PREALLOC_MSG_NODES) return;
+
+    agentos_mutex_lock(g_ipc_oom_lock);
+    g_ipc_oom_msg_used[index] = false;
+    agentos_mutex_unlock(g_ipc_oom_lock);
+}
+
+static pending_call_t *ipc_oom_pending_call_alloc(void)
+{
+    if (!g_ipc_oom_initialized || !g_ipc_oom_lock) return NULL;
+
+    agentos_mutex_lock(g_ipc_oom_lock);
+    for (int i = 0; i < IPC_OOM_PREALLOC_PENDING_CALLS; i++) {
+        if (!g_ipc_oom_pending_used[i]) {
+            g_ipc_oom_pending_used[i] = true;
+            /* 重置 pending_call 字段（保留已初始化的 mutex/cond） */
+            pending_call_t *pc = &g_ipc_oom_pending_calls[i];
+            pc->msg_id = 0;
+            pc->response_buf = NULL;
+            pc->response_capacity = 0;
+            pc->response_size_ptr = NULL;
+            atomic_store_explicit(&pc->completed, 0, memory_order_seq_cst);
+            pc->next = NULL;
+            agentos_mutex_unlock(g_ipc_oom_lock);
+            return pc;
+        }
+    }
+    agentos_mutex_unlock(g_ipc_oom_lock);
+    return NULL;
+}
+
+static void ipc_oom_pending_call_free(pending_call_t *pc)
+{
+    if (!pc || !g_ipc_oom_initialized || !g_ipc_oom_lock) return;
+
+    /* 检查是否属于 OOM 池 */
+    ptrdiff_t index = pc - g_ipc_oom_pending_calls;
+    if (index < 0 || index >= IPC_OOM_PREALLOC_PENDING_CALLS) return;
+
+    agentos_mutex_lock(g_ipc_oom_lock);
+    g_ipc_oom_pending_used[index] = false;
+    agentos_mutex_unlock(g_ipc_oom_lock);
+}
+
+/* ==================== 平台相关宏定义 ==================== */
+
+static atomic_uint64_t next_msg_id = 1;
+static uint64_t generate_msg_id(void)
+{
+    return atomic_fetch_add_explicit(&next_msg_id, 1, memory_order_seq_cst);
+}
+
+/* ==================== 常量定义 ==================== */
+
+/* ==================== IPC Channel 结构 ==================== */
 
 struct agentos_ipc_channel {
     char name[MAX_CHANNEL_NAME];
@@ -193,7 +312,12 @@ static void remove_pending_call_locked(agentos_ipc_channel_t *ch, pending_call_t
 static pending_call_t *pending_call_create(void)
 {
     pending_call_t *pc = (pending_call_t *)AGENTOS_CALLOC(1, sizeof(pending_call_t));
-    if (!pc) return NULL;
+    if (!pc) {
+        /* SEC-13: OOM 回退 — 尝试从预分配池获取 */
+        pc = ipc_oom_pending_call_alloc();
+        if (pc) return pc;
+        return NULL;
+    }
 
     if (agentos_mutex_init(&pc->cond_lock) != 0) {
         AGENTOS_FREE(pc);
@@ -215,6 +339,14 @@ static void pending_call_destroy(pending_call_t *pc)
 {
     if (!pc)
         return;
+
+    /* SEC-13: 检查是否属于 OOM 预分配池 */
+    if (pc >= g_ipc_oom_pending_calls &&
+        pc < g_ipc_oom_pending_calls + IPC_OOM_PREALLOC_PENDING_CALLS) {
+        ipc_oom_pending_call_free(pc);
+        return;
+    }
+
     agentos_cond_destroy(&pc->cond);
     agentos_mutex_destroy(&pc->cond_lock);
     AGENTOS_FREE(pc);
@@ -227,7 +359,13 @@ static void channel_queue_clear_locked(agentos_ipc_channel_t *ch)
     ipc_message_node_t *node = ch->queue;
     while (node) {
         ipc_message_node_t *next = node->next;
-        AGENTOS_FREE(node);
+        /* SEC-13: 检查是否属于 OOM 预分配池 */
+        if (node >= g_ipc_oom_msg_nodes &&
+            node < g_ipc_oom_msg_nodes + IPC_OOM_PREALLOC_MSG_NODES) {
+            ipc_oom_msg_node_free(node);
+        } else {
+            AGENTOS_FREE(node);
+        }
         node = next;
     }
     ch->queue = NULL;
@@ -238,6 +376,9 @@ static void channel_queue_clear_locked(agentos_ipc_channel_t *ch)
 
 agentos_error_t agentos_ipc_init(void)
 {
+    /* SEC-13: 初始化 OOM 预分配池 */
+    ipc_oom_pool_init();
+
     if (!binder_global_lock) {
         agentos_mutex_t *new_lock = agentos_mutex_create();
         if (!new_lock)
@@ -285,6 +426,9 @@ void agentos_ipc_cleanup(void)
 
     agentos_mutex_destroy_ptr(binder_global_lock);
     binder_global_lock = NULL;
+
+    /* SEC-13: 清理 OOM 预分配池 */
+    ipc_oom_pool_cleanup();
 }
 
 agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callback_t callback,
@@ -313,8 +457,7 @@ agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callbac
     if (!ch)
         goto cleanup;
 
-    strncpy(ch->name, name, MAX_CHANNEL_NAME - 1);
-    ch->name[MAX_CHANNEL_NAME - 1] = '\0';
+AGENTOS_STRNCPY_TERM(ch->name, name, MAX_CHANNEL_NAME);
     ch->fd = -1;
     ch->is_server = callback ? 1 : 0;
 
@@ -331,8 +474,7 @@ agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callbac
         if (!node)
             goto cleanup;
 
-        strncpy(node->name, name, MAX_CHANNEL_NAME - 1);
-        node->name[MAX_CHANNEL_NAME - 1] = '\0';
+AGENTOS_STRNCPY_TERM(node->name, name, MAX_CHANNEL_NAME);
         node->callback = callback;
         node->userdata = userdata;
         node->channel = ch;
@@ -385,8 +527,7 @@ agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **ou
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
-    strncpy(ch->name, name, MAX_CHANNEL_NAME - 1);
-    ch->name[MAX_CHANNEL_NAME - 1] = '\0';
+AGENTOS_STRNCPY_TERM(ch->name, name, MAX_CHANNEL_NAME);
     ch->remote_target = target;
     ch->fd = -1;
     atomic_fetch_add_explicit(&target->ref_count, 1, memory_order_seq_cst);
@@ -515,11 +656,15 @@ agentos_error_t agentos_ipc_send(agentos_ipc_channel_t *channel,
 
     ipc_message_node_t *node = (ipc_message_node_t *)AGENTOS_CALLOC(1, sizeof(ipc_message_node_t));
     if (!node) {
-        agentos_mutex_unlock(channel->lock);
-        ATM_RET_ERR(AGENTOS_ENOMEM);
+        /* SEC-13: OOM 回退 — 尝试从预分配池获取 */
+        node = ipc_oom_msg_node_alloc();
+        if (!node) {
+            agentos_mutex_unlock(channel->lock);
+            ATM_RET_ERR(AGENTOS_ENOMEM);
+        }
     }
 
-    memcpy(&node->msg, msg, sizeof(agentos_kernel_ipc_message_t));
+    __builtin_memcpy(&node->msg, msg, sizeof(agentos_kernel_ipc_message_t));
     node->next = NULL;
 
     if (!channel->queue) {
@@ -562,7 +707,7 @@ agentos_error_t agentos_ipc_reply(agentos_ipc_channel_t *channel,
         if (copy_size > pc->response_capacity) {
             copy_size = pc->response_capacity;
         }
-        memcpy(pc->response_buf, msg->data, copy_size);
+        __builtin_memcpy(pc->response_buf, msg->data, copy_size);
     }
 
     if (pc->response_size_ptr) {
@@ -596,11 +741,18 @@ agentos_error_t agentos_ipc_recv(agentos_ipc_channel_t *channel, uint32_t timeou
     }
 
     ipc_message_node_t *node = channel->queue;
-    memcpy(out_msg, &node->msg, sizeof(agentos_kernel_ipc_message_t));
+    __builtin_memcpy(out_msg, &node->msg, sizeof(agentos_kernel_ipc_message_t));
 
     channel->queue = node->next;
     channel->queue_size--;
-    AGENTOS_FREE(node);
+
+    /* SEC-13: 检查是否属于 OOM 预分配池再释放 */
+    if (node >= g_ipc_oom_msg_nodes &&
+        node < g_ipc_oom_msg_nodes + IPC_OOM_PREALLOC_MSG_NODES) {
+        ipc_oom_msg_node_free(node);
+    } else {
+        AGENTOS_FREE(node);
+    }
 
     agentos_mutex_unlock(channel->lock);
 

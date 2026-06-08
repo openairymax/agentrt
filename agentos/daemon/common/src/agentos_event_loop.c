@@ -239,7 +239,7 @@ void agentos_event_loop_remove_fd(agentos_event_loop_t *loop, int fd)
 
     WSAEventSelect(sock, loop->fd_entries[idx].wsa_event, 0);
     WSACloseEvent(loop->fd_entries[idx].wsa_event);
-    memset(&loop->fd_entries[idx], 0, sizeof(fd_entry_t));
+    __builtin_memset(&loop->fd_entries[idx], 0, sizeof(fd_entry_t));
     loop->fd_count--;
 }
 
@@ -447,7 +447,7 @@ static int add_fd_internal(agentos_event_loop_t *loop, int fd, uint32_t events,
     }
 
     struct epoll_event ev;
-    memset(&ev, 0, sizeof(ev));
+    __builtin_memset(&ev, 0, sizeof(ev));
     ev.data.fd = fd;
 
     if (events & AGENTOS_EVENT_TYPE_READ)
@@ -517,7 +517,7 @@ agentos_event_loop_t *agentos_event_loop_create(int max_events)
     loop->wakeup_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (loop->wakeup_fd >= 0) {
         struct epoll_event ev;
-        memset(&ev, 0, sizeof(ev));
+        __builtin_memset(&ev, 0, sizeof(ev));
         ev.data.fd = loop->wakeup_fd;
         ev.events = EPOLLIN;
         if (epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, loop->wakeup_fd, &ev) < 0) {
@@ -567,7 +567,7 @@ int agentos_event_loop_mod_fd(agentos_event_loop_t *loop, int fd, uint32_t event
         return AGENTOS_ERR_INVALID_PARAM;
 
     struct epoll_event ev;
-    memset(&ev, 0, sizeof(ev));
+    __builtin_memset(&ev, 0, sizeof(ev));
     ev.data.fd = fd;
 
     if (events & AGENTOS_EVENT_TYPE_READ)
@@ -592,7 +592,7 @@ void agentos_event_loop_remove_fd(agentos_event_loop_t *loop, int fd)
     if (!loop || fd < 0 || fd >= loop->max_events)
         return;
     epoll_ctl(loop->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-    memset(&loop->fd_entries[fd], 0, sizeof(fd_entry_t));
+    __builtin_memset(&loop->fd_entries[fd], 0, sizeof(fd_entry_t));
 }
 
 uint64_t agentos_event_loop_add_timer(agentos_event_loop_t *loop, uint64_t interval_ms,

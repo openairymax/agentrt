@@ -84,7 +84,7 @@ static void string_set_error(string_error_t error, const char *message)
 {
     g_context.last_error = error;
     if (message != NULL) {
-        strncpy(g_context.error_message, message, sizeof(g_context.error_message) - 1);
+        AGENTOS_STRNCPY_TERM(g_context.error_message, message, sizeof(g_context.error_message));
         g_context.error_message[sizeof(g_context.error_message) - 1] = '\0';
     }
 }
@@ -138,13 +138,13 @@ int string_copy(char *dest, const char *src, size_t dest_size)
     size_t src_len = string_safe_strlen(src, dest_size - 1);
 
     if (src_len >= dest_size) {
-        memcpy(dest, src, dest_size - 1);
+        __builtin_memcpy(dest, src, dest_size - 1);
         dest[dest_size - 1] = '\0';
         string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return AGENTOS_EINVAL;
     }
 
-    memcpy(dest, src, src_len);
+    __builtin_memcpy(dest, src, src_len);
     dest[src_len] = '\0';
 
     return (int)src_len;
@@ -165,7 +165,7 @@ int string_copy_n(char *dest, const char *src, size_t count, size_t dest_size)
     if (copy_len >= dest_size) {
         // 缓冲区不足，复制尽可能多的字
         size_t actual_copy = (dest_size > 0) ? dest_size - 1 : 0;
-        memcpy(dest, src, actual_copy);
+        __builtin_memcpy(dest, src, actual_copy);
         if (dest_size > 0) {
             dest[actual_copy] = '\0';
         }
@@ -173,7 +173,7 @@ int string_copy_n(char *dest, const char *src, size_t count, size_t dest_size)
         return AGENTOS_EINVAL;
     }
 
-    memcpy(dest, src, copy_len);
+    __builtin_memcpy(dest, src, copy_len);
     dest[copy_len] = '\0';
 
     return (int)copy_len;
@@ -195,14 +195,14 @@ int string_concat(char *dest, const char *src, size_t dest_size)
         // 缓冲区不足，连接尽可能多的字
         size_t available = dest_size - dest_len - 1;
         if (available > 0) {
-            memcpy(dest + dest_len, src, available);
+            __builtin_memcpy(dest + dest_len, src, available);
             dest[dest_len + available] = '\0';
         }
         string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return AGENTOS_EINVAL;
     }
 
-    memcpy(dest + dest_len, src, src_len);
+    __builtin_memcpy(dest + dest_len, src, src_len);
     dest[dest_len + src_len] = '\0';
 
     return (int)(dest_len + src_len);
@@ -225,14 +225,14 @@ int string_concat_n(char *dest, const char *src, size_t count, size_t dest_size)
         // 缓冲区不足，连接尽可能多的字
         size_t available = dest_size - dest_len - 1;
         if (available > 0) {
-            memcpy(dest + dest_len, src, available);
+            __builtin_memcpy(dest + dest_len, src, available);
             dest[dest_len + available] = '\0';
         }
         string_set_error(STRING_ERROR_BUFFER_TOO_SMALL, "buffer too small");
         return AGENTOS_EINVAL;
     }
 
-    memcpy(dest + dest_len, src, copy_len);
+    __builtin_memcpy(dest + dest_len, src, copy_len);
     dest[dest_len + copy_len] = '\0';
 
     return (int)(dest_len + copy_len);
@@ -396,7 +396,7 @@ char *string_trim(char *str)
     // 移动字符串到开
     if (start != str) {
         size_t len = strlen(start) + 1;
-        memmove(str, start, len);
+        __builtin_memmove(str, start, len);
     }
 
     return str;
@@ -417,7 +417,7 @@ char *string_trim_start(char *str)
     // 移动字符串到开
     if (start != str) {
         size_t len = strlen(start) + 1;
-        memmove(str, start, len);
+        __builtin_memmove(str, start, len);
     }
 
     return str;
@@ -508,11 +508,11 @@ int string_replace(const char *str, const char *old_substr, const char *new_subs
     while ((next = strstr(current, old_substr)) != NULL) {
         // 复制旧子字符串之前的部分
         size_t copy_len = next - current;
-        memcpy(dest, current, copy_len);
+        __builtin_memcpy(dest, current, copy_len);
         dest += copy_len;
 
         // 复制新子字符
-        memcpy(dest, new_substr, new_len);
+        __builtin_memcpy(dest, new_substr, new_len);
         dest += new_len;
 
         current = next + old_len;
@@ -520,7 +520,7 @@ int string_replace(const char *str, const char *old_substr, const char *new_subs
 
     // 复制剩余部分
     size_t remaining_len = strlen(current);
-    memcpy(dest, current, remaining_len);
+    __builtin_memcpy(dest, current, remaining_len);
     dest += remaining_len;
     *dest = '\0';
 
@@ -639,12 +639,12 @@ int string_join(const string_list_t *list, const char *delimiter, char *result, 
         const string_view_t *item = &list->items[i];
 
         // 复制
-        memcpy(dest, item->data, item->length);
+        __builtin_memcpy(dest, item->data, item->length);
         dest += item->length;
 
         // 复制分隔符（除了最后一项）
         if (i < list->count - 1 && delimiter_len > 0) {
-            memcpy(dest, delimiter, delimiter_len);
+            __builtin_memcpy(dest, delimiter, delimiter_len);
             dest += delimiter_len;
         }
     }
@@ -1030,7 +1030,7 @@ char *string_alloc_copy(const char *str)
         return NULL;
     }
 
-    memcpy(copy, str, len);
+    __builtin_memcpy(copy, str, len);
     copy[len] = '\0';
 
     return copy;
@@ -1051,7 +1051,7 @@ char *string_alloc_copy_n(const char *str, size_t len)
         return NULL;
     }
 
-    memcpy(copy, str, actual_len);
+    __builtin_memcpy(copy, str, actual_len);
     copy[actual_len] = '\0';
 
     return copy;
@@ -1075,11 +1075,11 @@ char *string_alloc_concat(const char *str1, const char *str2)
     }
 
     if (str1 != NULL) {
-        memcpy(result, str1, len1);
+        __builtin_memcpy(result, str1, len1);
     }
 
     if (str2 != NULL) {
-        memcpy(result + len1, str2, len2);
+        __builtin_memcpy(result + len1, str2, len2);
     }
 
     result[len1 + len2] = '\0';
@@ -1164,7 +1164,7 @@ bool string_buffer_append_n(string_buffer_t *buffer, const char *str, size_t len
     }
 
     // 追加字符
-    memcpy(buffer->data + buffer->length, str, len);
+    __builtin_memcpy(buffer->data + buffer->length, str, len);
     buffer->length = new_length;
     buffer->data[buffer->length] = '\0';
 
@@ -1368,7 +1368,7 @@ char *string_view_to_cstr(const string_view_t *view)
         return NULL;
     }
 
-    memcpy(str, view->data, view->length);
+    __builtin_memcpy(str, view->data, view->length);
     str[view->length] = '\0';
 
     return str;
@@ -1379,6 +1379,9 @@ string_list_t string_list_create(size_t initial_capacity)
     string_list_t list = {.items = NULL, .count = 0, .capacity = 0};
 
     if (initial_capacity > 0) {
+        if (initial_capacity > SIZE_MAX / sizeof(string_view_t)) {
+            return list;
+        }
         list.items = (string_view_t *)AGENTOS_MALLOC(initial_capacity * sizeof(string_view_t));
         if (list.items != NULL) {
             list.capacity = initial_capacity;

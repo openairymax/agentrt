@@ -11,7 +11,7 @@ AgentOS 性能基准测试框架核心模块
 3. 可重复性 - 确保测试结果的可重复性和可比性
 4. 实时监控 - 实时收集性能指标和系统状态
 
-@version v1.0.0
+@version 0.1.0
 @date 2026-04-11
 @copyright (c) 2026 SPHARX. All Rights Reserved.
 """

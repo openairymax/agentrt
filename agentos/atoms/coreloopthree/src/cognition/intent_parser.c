@@ -211,7 +211,8 @@ static size_t extract_keywords(const char *text, char **keywords, size_t max_key
     if (!copy)
         return 0;
 
-    char *token = strtok(copy, " ,.!?;:\t\n\r");
+    char *token, *saveptr;
+    token = strtok_r(copy, " ,.!?;:\t\n\r", &saveptr);
     while (token && count < max_keywords) {
         // 过滤短词
         if (strlen(token) > 2) {
@@ -221,7 +222,7 @@ static size_t extract_keywords(const char *text, char **keywords, size_t max_key
                 count++;
             }
         }
-        token = strtok(NULL, " ,.!?;:\t\n\r");
+        token = strtok_r(NULL, " ,.!?;:\t\n\r", &saveptr);
     }
 
     AGENTOS_FREE(copy);
@@ -666,7 +667,7 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser, con
         parser->failure_count++;
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
-    memcpy(intent->intent_raw_text, input, input_len);
+    __builtin_memcpy(intent->intent_raw_text, input, input_len);
     intent->intent_raw_text[input_len] = '\0';
     intent->intent_raw_len = input_len;
 

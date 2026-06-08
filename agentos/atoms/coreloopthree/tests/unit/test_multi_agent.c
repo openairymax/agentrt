@@ -32,7 +32,7 @@ static int g_tests_failed = 0;
 static void register_test_agents(mac_framework_t *fw, int count, const char *prefix)
 {
     mac_agent_info_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     agent.performance_score = 0.9;
     agent.reliability_score = 0.95;
     agent.max_concurrent_tasks = 8;
@@ -59,7 +59,7 @@ static void test_mac_register_unregister(void)
     assert(fw != NULL);
 
     mac_agent_info_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     snprintf(agent.id, sizeof(agent.id), "test_agent_001");
     snprintf(agent.name, sizeof(agent.name), "TestAgent");
     agent.performance_score = 0.8;
@@ -236,7 +236,7 @@ static void test_consensus_weighted_approve(void)
     mac_framework_t *fw = mac_framework_create(MAC_MODE_CONSENSUS);
 
     mac_agent_info_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     agent.max_concurrent_tasks = 8;
     agent.available = true;
     agent.capabilities_json = NULL;

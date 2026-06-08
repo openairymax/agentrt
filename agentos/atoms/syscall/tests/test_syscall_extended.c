@@ -261,7 +261,7 @@ static void test_skill_uninstall_null_id(void)
 static void test_sandbox_invoke_dispatch(void)
 {
     void *args[5];
-    memset(args, 0, sizeof(args));
+    AGENTOS_MEMSET(args, 0, sizeof(args));
 
     void *r = agentos_syscall_invoke(SYS_TASK_SUBMIT, args, 4);
     ASSERT(r != NULL, "sandbox invoke returns non-NULL");
@@ -331,7 +331,7 @@ static void test_syscall_invoke_concurrent_safety(void)
 {
     volatile int errors = 0;
     void *args[5];
-    memset(args, 0, sizeof(args));
+    AGENTOS_MEMSET(args, 0, sizeof(args));
 
     for (int i = 0; i < 100; i++) {
         void *r = agentos_syscall_invoke(i % SYS_MAX, args, 0);

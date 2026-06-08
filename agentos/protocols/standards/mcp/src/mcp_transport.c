@@ -151,7 +151,7 @@ static int write_all(int fd, const char *buf, size_t len, uint32_t timeout_ms)
 mcp_transport_config_t mcp_transport_config_stdio_default(void)
 {
     mcp_transport_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
+    AGENTOS_MEMSET(&cfg, 0, sizeof(cfg));
     cfg.type = MCP_TRANSPORT_STDIO;
     cfg.read_timeout_ms = 30000;
     cfg.write_timeout_ms = 30000;
@@ -164,7 +164,7 @@ mcp_transport_config_t mcp_transport_config_stdio_default(void)
 mcp_transport_config_t mcp_transport_config_http_default(const char *base_url)
 {
     mcp_transport_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
+    AGENTOS_MEMSET(&cfg, 0, sizeof(cfg));
     cfg.type = MCP_TRANSPORT_HTTP_SSE;
     cfg.read_timeout_ms = 30000;
     cfg.write_timeout_ms = 30000;
@@ -224,7 +224,7 @@ mcp_transport_t *mcp_transport_create(const mcp_transport_config_t *config)
             size_t host_len = path_start ? (size_t)(path_start - host_start) : strlen(host_start);
             char *host = (char *)AGENTOS_MALLOC(host_len + 1);
             if (host) {
-                memcpy(host, host_start, host_len);
+                __builtin_memcpy(host, host_start, host_len);
                 host[host_len] = '\0';
                 t->host_header = host;
             }
@@ -332,7 +332,7 @@ int mcp_transport_start(mcp_transport_t *transport)
         AGENTOS_FREE(url_copy);
 
         struct addrinfo hints, *result;
-        memset(&hints, 0, sizeof(hints));
+        AGENTOS_MEMSET(&hints, 0, sizeof(hints));
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
 
@@ -565,7 +565,7 @@ int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t
                 agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "if: allocation failed");
                 return AGENTOS_ERR_OUT_OF_MEMORY;
                 }
-            memcpy(msg, data, data_len);
+            __builtin_memcpy(msg, data, data_len);
             msg[data_len] = '\0';
             *out_message = msg;
             *out_length = data_len;

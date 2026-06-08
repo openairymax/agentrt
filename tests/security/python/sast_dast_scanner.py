@@ -1,7 +1,7 @@
 """
 AgentOS SAST/DAST 安全扫描集成
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 1.0.0
+Version: 0.1.0
 
 集成静态应用安全测试(SAST)和动态应用安全测试(DAST)
 用于检测代码漏洞和运行时安全问题

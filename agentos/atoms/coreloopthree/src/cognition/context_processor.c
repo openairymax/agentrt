@@ -65,7 +65,7 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
             ctx->entries, new_cap * sizeof(agentos_context_entry_t));
         if (!new_entries)
             ATM_RET_ERR(AGENTOS_ENOMEM);
-        memset(new_entries + ctx->capacity, 0,
+        __builtin_memset(new_entries + ctx->capacity, 0,
                (new_cap - ctx->capacity) * sizeof(agentos_context_entry_t));
         ctx->entries = new_entries;
         ctx->capacity = new_cap;
@@ -74,14 +74,14 @@ agentos_error_t agentos_model_context_add_entry(agentos_model_context_t *ctx, co
     entry->content = (char *)AGENTOS_MALLOC(content_len + 1);
     if (!entry->content)
         ATM_RET_ERR(AGENTOS_ENOMEM);
-    memcpy(entry->content, content, content_len);
+    __builtin_memcpy(entry->content, content, content_len);
     entry->content[content_len] = '\0';
     entry->content_len = content_len;
     if (metadata) {
         size_t meta_len = strlen(metadata);
         entry->metadata = (char *)AGENTOS_MALLOC(meta_len + 1);
         if (entry->metadata) {
-            memcpy(entry->metadata, metadata, meta_len + 1);
+            __builtin_memcpy(entry->metadata, metadata, meta_len + 1);
             entry->metadata_len = meta_len;
         }
     }
@@ -132,9 +132,9 @@ static agentos_error_t window_trimmer_process(agentos_context_processor_t __attr
                 AGENTOS_FREE(context->entries[i].content);
             if (context->entries[i].metadata)
                 AGENTOS_FREE(context->entries[i].metadata);
-            memset(&context->entries[i], 0, sizeof(agentos_context_entry_t));
+            __builtin_memset(&context->entries[i], 0, sizeof(agentos_context_entry_t));
         }
-        memmove(context->entries + kept_count, context->entries + recent_start,
+        __builtin_memmove(context->entries + kept_count, context->entries + recent_start,
                 preserve_recent * sizeof(agentos_context_entry_t));
         context->entry_count = new_count;
         context->total_content_len = kept_chars + recent_chars;
@@ -174,11 +174,11 @@ static agentos_error_t compressor_process(agentos_context_processor_t __attribut
         char *compressed = (char *)AGENTOS_MALLOC(target_len + 1);
         if (!compressed)
             continue;
-        memcpy(compressed, entry->content, head_len);
+        __builtin_memcpy(compressed, entry->content, head_len);
         compressed[head_len] = '.';
         compressed[head_len + 1] = '.';
         compressed[head_len + 2] = '.';
-        memcpy(compressed + head_len + 3, entry->content + entry->content_len - tail_len, tail_len);
+        __builtin_memcpy(compressed + head_len + 3, entry->content + entry->content_len - tail_len, tail_len);
         compressed[target_len] = '\0';
 
         size_t old_len = entry->content_len;
@@ -234,7 +234,7 @@ static agentos_error_t summarizer_process(agentos_context_processor_t __attribut
     context->entries[0].metadata_len = 0;
     context->entries[0].priority = 0;
 
-    memmove(context->entries + 1, context->entries + context->entry_count - 1,
+    __builtin_memmove(context->entries + 1, context->entries + context->entry_count - 1,
             sizeof(agentos_context_entry_t));
     context->entry_count = 2;
     context->total_content_len = pos + context->entries[1].content_len;

@@ -12,7 +12,7 @@
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../utils/security/input_validator.h"
+#include "../../utils/security/src/input_validator.h"
 #include "../utils/test_framework.h"
 
 #include <stdbool.h>

@@ -1,6 +1,6 @@
 # Gateway Daemon — API 网关守护进程
 
-> **模块路径**: `agentos/daemon/gateway_d/` | **版本**: v0.1.0
+> **模块路径**: `agentos/daemon/gateway_d/` | **版本**: v0.0.5
 
 ## 概述
 

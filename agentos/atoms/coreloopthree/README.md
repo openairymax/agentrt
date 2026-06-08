@@ -2,7 +2,7 @@
 
 `agentos/atoms/coreloopthree/`
 
-**版本**: v0.1.0 | **API 版本**: 1.0.0
+**版本**: v0.0.5 | **API 版本**: 1.0.0
 
 ---
 
@@ -116,8 +116,13 @@ coreloopthree/
 │   │   ├── test_multi_agent.c             # 多智能体协作测试
 │   │   ├── test_browser.c                 # 浏览器单元测试
 │   │   ├── test_performance_benchmark.c   # 性能基准测试
+│   │   ├── bench_stream_validation.c      # 流式验证基准测试
+│   │   ├── test_metacognition_calibration.c # 元认知校准测试
+│   │   ├── test_semantic_unit.c           # 语义单元测试
+│   │   ├── test_thread_safety.c           # 线程安全测试
+│   │   ├── test_cognition_e2e.c          # 认知端到端测试
 │   │   └── test_cl3_stubs.c              # 桩函数测试
-│   └── CMakeLists.txt
+│   └── CMakeLists.txt                   # （代表性测试，完整列表见 tests/ 目录）
 └── CMakeLists.txt
 ```
 

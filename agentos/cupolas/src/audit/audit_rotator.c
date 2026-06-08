@@ -201,7 +201,7 @@ audit_rotator_t *audit_rotator_create(const char *log_dir, const char *log_prefi
     if (!rotator)
         return NULL;
 
-    memset(rotator, 0, sizeof(audit_rotator_t));
+    __builtin_memset(rotator, 0, sizeof(audit_rotator_t));
 
     if (log_dir) {
         rotator->log_dir = cupolas_strdup(log_dir);
@@ -283,8 +283,9 @@ int audit_rotator_write(audit_rotator_t *rotator, const audit_entry_t *entry)
 
     char timestamp[32];
     time_t ts = (time_t)(entry->timestamp_ms / 1000);
-    struct tm *tm_info = localtime(&ts);
-    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
+    struct tm tm_buf;
+    localtime_r(&ts, &tm_buf);
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_buf);
 
     char esc_agent[MAX_JSON_ESCAPE_LEN];
     char esc_action[MAX_JSON_ESCAPE_LEN];

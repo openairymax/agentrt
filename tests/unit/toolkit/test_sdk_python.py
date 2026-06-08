@@ -22,9 +22,9 @@ from typing import Dict, Any, List
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "base"))
+sys.path.insert(0, str(Path(__file__).parent))
 
-from base_test import SDKTestCase
+from base_test_case import BaseTestCase as SDKTestCase
 
 
 class TestAgentOSClient(SDKTestCase):

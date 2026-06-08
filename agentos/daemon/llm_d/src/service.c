@@ -55,7 +55,7 @@ static char *safe_strcat(char *dest, size_t dest_size, const char *src)
     size_t copy_len = (src_len < remaining) ? src_len : remaining;
 
     if (copy_len > 0) {
-        memcpy(dest + dest_len, src, copy_len);
+        __builtin_memcpy(dest + dest_len, src, copy_len);
         dest[dest_len + copy_len] = '\0';
     }
 
@@ -92,23 +92,36 @@ static char *make_cache_key(const llm_request_config_t *manager)
     char *p = key;
 
     /* 使用安全的字符串复制 */
-    size_t written = snprintf(p, len, "%s", manager->model);
-    p += written;
-
-    *p++ = '|';
+    size_t pos = 0;
+    size_t written = (size_t)snprintf(p, len, "%s", manager->model);
+    if (written < len) {
+        pos = written;
+    } else {
+        pos = len > 0 ? len - 1 : 0;
+    }
+    p[pos] = '|';
+    pos++;
 
     for (size_t i = 0; i < manager->message_count; ++i) {
         const char *role = manager->messages[i].role ? manager->messages[i].role : "";
         const char *content = manager->messages[i].content ? manager->messages[i].content : "";
-        written = snprintf(p, len - (p - key), "%s:%s|", role, content);
-        p += written;
+        size_t remaining = (pos < len) ? (len - pos) : 0;
+        written = (size_t)snprintf(p + pos, remaining, "%s:%s|", role, content);
+        if (written < remaining) {
+            pos += written;
+        } else {
+            pos = len > 0 ? len - 1 : 0;
+            break;
+        }
     }
 
     /* 确保字符串以 null 结尾 */
-    if (p > key && p[-1] == '|') {
-        p[-1] = '\0';
+    if (pos > 0 && key[pos - 1] == '|') {
+        key[pos - 1] = '\0';
+    } else if (pos < len) {
+        key[pos] = '\0';
     } else {
-        *p = '\0';
+        key[len - 1] = '\0';
     }
 
     return key;
@@ -205,7 +218,7 @@ llm_service_t *llm_service_create(const char *config_path)
 
     /* 加载基础配置 */
     service_config_t base_cfg;
-    memset(&base_cfg, 0, sizeof(base_cfg));
+    __builtin_memset(&base_cfg, 0, sizeof(base_cfg));
     base_cfg.cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
     base_cfg.cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
     base_cfg.max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
@@ -237,7 +250,7 @@ llm_service_t *llm_service_create(const char *config_path)
                             int rule_count = 0;
                             pricing_rule_t *rules = load_pricing_rules(root, &rule_count);
                             if (rules && rule_count > 0) {
-                                svc->rules = (void **)rules;
+                                svc->rules = rules;
                                 svc->rule_count = rule_count;
                                 SVC_LOG_INFO("Loaded %d pricing rules", rule_count);
                             } else if (rules) {
@@ -345,6 +358,104 @@ void llm_service_destroy(llm_service_t *svc)
 }
 
 /* ---------- 辅助函数（降低 llm_service_complete 复杂度） ---------- */
+
+/**
+ * @brief 复杂度评估等级（BAN-133 编码契约）
+ */
+typedef enum {
+    LLM_COMPLEXITY_SIMPLE   = 0,
+    LLM_COMPLEXITY_MODERATE = 1,
+    LLM_COMPLEXITY_COMPLEX  = 2
+} llm_complexity_level_t;
+
+/**
+ * @brief 基于输入文本评估复杂度（BAN-133: SIMPLE/MODERATE/COMPLEX）
+ *
+ * 评分规则:
+ *   - 输入长度 >500 字符 +2分
+ *   - 输入长度 >100 字符 +1分
+ *   - 含架构/设计/系统级关键词 +1分
+ *   - 含多步骤标志 +2分
+ *   - 含代码生成标志 +1分
+ *
+ * 路由:
+ *   - SIMPLE   (0-1分):  gpt-4o-mini
+ *   - MODERATE (2-4分):  gpt-4o
+ *   - COMPLEX  (5+分):   claude-sonnet
+ */
+static llm_complexity_level_t assess_complexity(const char *input)
+{
+    if (!input) return LLM_COMPLEXITY_SIMPLE;
+
+    size_t len = strlen(input);
+    int score = 0;
+
+    /* 输入长度评分 */
+    if (len > 500) score += 2;
+    else if (len > 100) score += 1;
+
+    /* 架构/设计/系统级关键词 */
+    const char *complex_kw[] = {
+        "architecture", "distributed", "system design", "scalability",
+        "架构", "分布式", "系统设计", "高可用", "微服务", "重构"
+    };
+    for (size_t i = 0; i < sizeof(complex_kw) / sizeof(complex_kw[0]); i++) {
+        if (strstr(input, complex_kw[i])) { score += 1; break; }
+    }
+
+    /* 多步骤标志 */
+    const char *multi_step_kw[] = {
+        "first", "then", "finally", "step 1", "step 2",
+        "首先", "然后", "最后", "第一步", "第二步"
+    };
+    for (size_t i = 0; i < sizeof(multi_step_kw) / sizeof(multi_step_kw[0]); i++) {
+        if (strstr(input, multi_step_kw[i])) { score += 2; break; }
+    }
+
+    /* 代码生成标志 */
+    const char *code_kw[] = {
+        "function", "algorithm", "implement", "write a",
+        "函数", "算法", "实现", "编写", "代码"
+    };
+    for (size_t i = 0; i < sizeof(code_kw) / sizeof(code_kw[0]); i++) {
+        if (strstr(input, code_kw[i])) { score += 1; break; }
+    }
+
+    if (score >= 5) return LLM_COMPLEXITY_COMPLEX;
+    if (score >= 2) return LLM_COMPLEXITY_MODERATE;
+    return LLM_COMPLEXITY_SIMPLE;
+}
+
+/**
+ * @brief 根据复杂度选择默认模型（BAN-133 编码契约）
+ */
+static __attribute__((unused)) const char *route_by_complexity(llm_complexity_level_t level)
+{
+    switch (level) {
+    case LLM_COMPLEXITY_SIMPLE:
+        return "gpt-4o-mini";
+    case LLM_COMPLEXITY_MODERATE:
+        return "gpt-4o";
+    case LLM_COMPLEXITY_COMPLEX:
+        return "claude-sonnet";
+    default:
+        return "gpt-4o-mini";
+    }
+}
+
+/**
+ * @brief 记录路由决策审计日志（BAN-137 编码契约）
+ */
+static void log_routing_decision(const char *model, llm_complexity_level_t complexity,
+                                 size_t input_len, const char *reason)
+{
+    const char *complexity_names[] = {"SIMPLE", "MODERATE", "COMPLEX"};
+    SVC_LOG_INFO("[ROUTING] model=%s complexity=%s input_len=%zu reason=%s",
+                 model ? model : "unknown",
+                 complexity_names[complexity],
+                 input_len,
+                 reason ? reason : "default");
+}
 
 /**
  * @brief 从缓存获取响应
@@ -460,6 +571,19 @@ int llm_service_complete(llm_service_t *svc, const llm_request_config_t *manager
         return AGENTOS_ERR_LLM_INVALID_MODEL;
     }
 
+    /* 审计日志: 记录模型路由决策（BAN-137 编码契约） */
+    {
+        /* 从消息中提取输入文本用于复杂度评估 */
+        const char *first_content = NULL;
+        size_t input_len = 0;
+        if (manager->message_count > 0 && manager->messages[0].content) {
+            first_content = manager->messages[0].content;
+            input_len = strlen(first_content);
+        }
+        llm_complexity_level_t complexity = assess_complexity(first_content);
+        log_routing_decision(manager->model, complexity, input_len, "user_specified");
+    }
+
     /* 调用提供商 */
     llm_response_t *resp = NULL;
     int ret = prov->ops->complete(prov->ctx, manager, &resp);
@@ -505,6 +629,18 @@ int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *
     if (!prov) {
         SVC_LOG_ERROR("No provider for model '%s'", manager->model);
         return AGENTOS_ERR_LLM_INVALID_MODEL;
+    }
+
+    /* 审计日志: 记录流式路由决策（BAN-137 编码契约） */
+    {
+        const char *first_content = NULL;
+        size_t input_len = 0;
+        if (manager->message_count > 0 && manager->messages[0].content) {
+            first_content = manager->messages[0].content;
+            input_len = strlen(first_content);
+        }
+        llm_complexity_level_t complexity = assess_complexity(first_content);
+        log_routing_decision(manager->model, complexity, input_len, "stream_user_specified");
     }
 
     /* 检查是否支持流式 */
@@ -575,7 +711,7 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
         return svc_config_load_yaml(config_path, cfg);
 #else
         SVC_LOG_WARN("YAML support not compiled, cannot load '%s'", config_path);
-        memset(cfg, 0, sizeof(service_config_t));
+        __builtin_memset(cfg, 0, sizeof(service_config_t));
         cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
         cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
         cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
@@ -584,7 +720,7 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
 #endif
     }
 
-    memset(cfg, 0, sizeof(service_config_t));
+    __builtin_memset(cfg, 0, sizeof(service_config_t));
 
     cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
     cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
@@ -652,7 +788,7 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
     if (item && cJSON_IsString(item)) {
         size_t enc_len = strlen(item->valuestring);
         if (enc_len < sizeof(cfg->token_encoding)) {
-            memcpy((char *)cfg->token_encoding, item->valuestring, enc_len + 1);
+            __builtin_memcpy((char *)cfg->token_encoding, item->valuestring, enc_len + 1);
         }
     }
 
@@ -692,10 +828,8 @@ static void yaml_map_add(yaml_map_t *m, const char *key, const char *value)
         m->pairs = new_pairs;
         m->capacity = new_cap;
     }
-    strncpy(m->pairs[m->count].key, key, sizeof(m->pairs[m->count].key) - 1);
-    m->pairs[m->count].key[sizeof(m->pairs[m->count].key) - 1] = '\0';
-    strncpy(m->pairs[m->count].value, value, sizeof(m->pairs[m->count].value) - 1);
-    m->pairs[m->count].value[sizeof(m->pairs[m->count].value) - 1] = '\0';
+    AGENTOS_STRNCPY_TERM(m->pairs[m->count].key, key, sizeof(m->pairs[m->count].key));
+    AGENTOS_STRNCPY_TERM(m->pairs[m->count].value, value, sizeof(m->pairs[m->count].value));
     m->count++;
 }
 
@@ -726,7 +860,7 @@ int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
     if (!cfg || !config_path)
         return AGENTOS_ERR_INVALID_PARAM;
 
-    memset(cfg, 0, sizeof(service_config_t));
+    __builtin_memset(cfg, 0, sizeof(service_config_t));
     cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
     cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
     cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
@@ -765,8 +899,7 @@ int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
                 in_global = 1;
             } else if (in_global && val) {
                 char key_buf[128];
-                strncpy(key_buf, val, sizeof(key_buf) - 1);
-                key_buf[sizeof(key_buf) - 1] = '\0';
+                AGENTOS_STRNCPY_TERM(key_buf, val, sizeof(key_buf));
 
                 yaml_event_t val_event;
                 if (yaml_parser_parse(&parser, &val_event)) {
@@ -803,7 +936,7 @@ int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
     if ((val = yaml_map_get(&current_map, "token_encoding"))) {
         size_t enc_len = strlen(val);
         if (enc_len < sizeof(cfg->token_encoding)) {
-            memcpy((char *)cfg->token_encoding, val, enc_len + 1);
+            __builtin_memcpy((char *)cfg->token_encoding, val, enc_len + 1);
         }
     }
 
@@ -862,12 +995,12 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
             const char *val = (const char *)event.data.scalar.value;
             if (val && strcmp(val, "models") == 0 && !in_models) {
                 in_models = 1;
+                yaml_event_delete(&event);
                 continue;
             }
             if (in_models && val) {
                 char key_buf[128];
-                strncpy(key_buf, val, sizeof(key_buf) - 1);
-                key_buf[sizeof(key_buf) - 1] = '\0';
+                AGENTOS_STRNCPY_TERM(key_buf, val, sizeof(key_buf));
 
                 yaml_event_t val_event;
                 if (yaml_parser_parse(&parser, &val_event)) {
@@ -896,16 +1029,13 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
                 const char *r = yaml_map_get(&item_map, "max_retries");
 
                 if (n && p) {
-                    memset(&models[model_count], 0, sizeof(model_entry_t));
-                    strncpy(models[model_count].name, n, sizeof(models[model_count].name) - 1);
-                    strncpy(models[model_count].provider, p,
-                            sizeof(models[model_count].provider) - 1);
+                    __builtin_memset(&models[model_count], 0, sizeof(model_entry_t));
+                    AGENTOS_STRNCPY_TERM(models[model_count].name, n, sizeof(models[model_count].name));
+                    AGENTOS_STRNCPY_TERM(models[model_count].provider, p, sizeof(models[model_count].provider));
                     if (e)
-                        strncpy(models[model_count].api_key_env, e,
-                                sizeof(models[model_count].api_key_env) - 1);
+                        AGENTOS_STRNCPY_TERM(models[model_count].api_key_env, e, sizeof(models[model_count].api_key_env));
                     if (ep)
-                        strncpy(models[model_count].endpoint, ep,
-                                sizeof(models[model_count].endpoint) - 1);
+                        AGENTOS_STRNCPY_TERM(models[model_count].endpoint, ep, sizeof(models[model_count].endpoint));
                     if (t)
                         models[model_count].timeout_sec = (int)strtol(t, NULL, 10);
                     if (r)
@@ -950,18 +1080,17 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
         if (j == prov_count) {
             if (prov_count >= 16)
                 break;
-            memset(&provs[prov_count], 0, sizeof(provider_agg_t));
-            strncpy(provs[prov_count].name, models[i].provider, sizeof(provs[prov_count].name) - 1);
+            __builtin_memset(&provs[prov_count], 0, sizeof(provider_agg_t));
+            AGENTOS_STRNCPY_TERM(provs[prov_count].name, models[i].provider, sizeof(provs[prov_count].name));
             if (models[i].api_key_env[0])
-                strncpy(provs[prov_count].api_key_env, models[i].api_key_env,
-                        sizeof(provs[prov_count].api_key_env) - 1);
+                AGENTOS_STRNCPY_TERM(provs[prov_count].api_key_env, models[i].api_key_env, sizeof(provs[prov_count].api_key_env));
             prov_count++;
         }
         if (provs[j].model_count < 64) {
             provs[j].model_names[provs[j].model_count++] = AGENTOS_STRDUP(models[i].name);
         }
         if (!provs[j].base_url[0] && models[i].endpoint[0]) {
-            strncpy(provs[j].base_url, models[i].endpoint, sizeof(provs[j].base_url) - 1);
+            AGENTOS_STRNCPY_TERM(provs[j].base_url, models[i].endpoint, sizeof(provs[j].base_url));
         }
         if (models[i].timeout_sec > provs[j].timeout_sec)
             provs[j].timeout_sec = models[i].timeout_sec;
@@ -981,8 +1110,8 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
             size_t env_key_len = strlen(provs[i].api_key_env);
             char *key_buf = (char *)AGENTOS_MALLOC(4 + env_key_len + 1);
             if (key_buf) {
-                memcpy(key_buf, env_prefix, 4);
-                memcpy(key_buf + 4, provs[i].api_key_env, env_key_len + 1);
+                __builtin_memcpy(key_buf, env_prefix, 4);
+                __builtin_memcpy(key_buf + 4, provs[i].api_key_env, env_key_len + 1);
                 result[i].api_key = key_buf;
             }
         }
@@ -1085,8 +1214,8 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
             size_t env_len = strlen(pkey_env->valuestring);
             char *key_buf = (char *)AGENTOS_MALLOC(4 + env_len + 1);
             if (key_buf) {
-                memcpy(key_buf, "env:", 4);
-                memcpy(key_buf + 4, pkey_env->valuestring, env_len + 1);
+                __builtin_memcpy(key_buf, "env:", 4);
+                __builtin_memcpy(key_buf + 4, pkey_env->valuestring, env_len + 1);
                 pcfg->api_key = key_buf;
             }
         }

@@ -118,7 +118,7 @@ int gw_proto_router_init(gw_proto_router_t *router)
     if (router->initialized)
         return 0;
 
-    memset(&router->stats, 0, sizeof(router->stats));
+    __builtin_memset(&router->stats, 0, sizeof(router->stats));
 
     gw_mcp_server_config_t mcp_cfg = GW_MCP_SERVER_CONFIG_DEFAULTS;
     router->mcp_server = gw_mcp_server_create(&mcp_cfg);

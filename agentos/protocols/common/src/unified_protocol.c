@@ -90,7 +90,7 @@ protocol_stack_handle_t protocol_stack_create(const protocol_stack_config_t *con
         char *name_copy = (char *)AGENTOS_MALLOC(name_len);
         if (name_copy) {
             safe_strcpy(name_copy, config->name, name_len);
-            strncpy(stack->config.name, name_copy, sizeof(stack->config.name) - 1);
+            AGENTOS_STRNCPY_TERM(stack->config.name, name_copy, sizeof(stack->config.name));
             stack->config.name[sizeof(stack->config.name) - 1] = '\0';
             AGENTOS_FREE(name_copy);
         }
@@ -272,7 +272,7 @@ int protocol_stack_receive(protocol_stack_handle_t handle, unified_message_t *me
 
     struct protocol_stack_s *stack = (struct protocol_stack_s *)handle;
 
-    memset(message, 0, sizeof(unified_message_t));
+    AGENTOS_MEMSET(message, 0, sizeof(unified_message_t));
 
     protocol_adapter_node_t *adapter_node = stack->adapters;
     while (adapter_node) {
@@ -363,7 +363,7 @@ int protocol_stack_get_stats(protocol_stack_handle_t handle, void *stats)
     } protocol_stats_t;
 
     protocol_stats_t *out = (protocol_stats_t *)stats;
-    memset(out, 0, sizeof(*out));
+    AGENTOS_MEMSET(out, 0, sizeof(*out));
 
     out->messages_sent = stack->messages_sent;
     out->messages_received = stack->messages_received;
@@ -384,7 +384,7 @@ unified_message_t unified_message_create(protocol_type_t protocol, message_direc
                                          size_t payload_size)
 {
     unified_message_t message;
-    memset(&message, 0, sizeof(message));
+    AGENTOS_MEMSET(&message, 0, sizeof(message));
 
     static uint64_t next_message_id = 1;
 
@@ -392,7 +392,7 @@ unified_message_t unified_message_create(protocol_type_t protocol, message_direc
     message.protocol = protocol;
     message.direction = direction;
     if (endpoint) {
-        strncpy(message.endpoint, endpoint, sizeof(message.endpoint) - 1);
+        AGENTOS_STRNCPY_TERM(message.endpoint, endpoint, sizeof(message.endpoint));
     }
     message.payload = (void *)payload;
     message.payload_size = payload_size;
@@ -407,7 +407,7 @@ void unified_message_destroy(unified_message_t *message)
         return;
 
     // 注意：这里不释放payload，由调用者管理
-    memset(message, 0, sizeof(unified_message_t));
+    AGENTOS_MEMSET(message, 0, sizeof(unified_message_t));
 }
 
 const char *protocol_type_to_string(protocol_type_t type)

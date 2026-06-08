@@ -100,7 +100,7 @@ int monitor_service_create(const monitor_config_t *config, monitor_service_t **s
     }
 
     if (config) {
-        memcpy(&svc->config, config, sizeof(monitor_config_t));
+        __builtin_memcpy(&svc->config, config, sizeof(monitor_config_t));
         if (config->log_file_path) {
             svc->config.log_file_path = AGENTOS_STRDUP(config->log_file_path);
         }
@@ -268,7 +268,7 @@ int monitor_service_trigger_alert(monitor_service_t *service, const alert_info_t
         AGENTOS_FREE(service->alerts[0].message);
         AGENTOS_FREE(service->alerts[0].service_name);
         AGENTOS_FREE(service->alerts[0].resource_id);
-        memmove(&service->alerts[0], &service->alerts[1],
+        __builtin_memmove(&service->alerts[0], &service->alerts[1],
                 (service->alert_count - 1) * sizeof(alert_entry_t));
         service->alert_count--;
     }
@@ -454,7 +454,7 @@ int monitor_service_reload_config(monitor_service_t *service, const monitor_conf
     AGENTOS_FREE(service->config.log_file_path);
     AGENTOS_FREE(service->config.metrics_storage_path);
 
-    memcpy(&service->config, config, sizeof(monitor_config_t));
+    __builtin_memcpy(&service->config, config, sizeof(monitor_config_t));
     service->config.log_file_path =
         config->log_file_path ? AGENTOS_STRDUP(config->log_file_path) : NULL;
     service->config.metrics_storage_path =
@@ -552,7 +552,7 @@ int monitor_service_start_agent_trace(monitor_service_t *service,
         AGENTOS_FREE(service->traces[0].trace_id);
         AGENTOS_FREE(service->traces[0].operation_name);
         AGENTOS_FREE(service->traces[0].service_name);
-        memmove(&service->traces[0], &service->traces[1],
+        __builtin_memmove(&service->traces[0], &service->traces[1],
                 (service->trace_count - 1) * sizeof(trace_entry_t));
         service->trace_count--;
     }

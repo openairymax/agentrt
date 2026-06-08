@@ -129,7 +129,7 @@ class MockClient(APIClient):
         self.calls["delete"].append({"path": path, "opts": opts})
         if self._delete_handler is not None:
             return self._delete_handler(path, opts)
-        raise ValueError("Mock DELETE handler not configured — set mock.delete_handler before calling mock.delete()")
+        raise NotImplementedError("Mock DELETE handler not configured")
 
     def reset(self) -> None:
         """

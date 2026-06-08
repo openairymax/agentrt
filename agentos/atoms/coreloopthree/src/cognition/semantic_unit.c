@@ -35,7 +35,7 @@ static agentos_error_t emit_unit(su_stream_detector_t *d, const char *text, size
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
     if (!copy)
         return AGENTOS_ENOMEM;
-    memcpy(copy, text, len);
+    __builtin_memcpy(copy, text, len);
     copy[len] = '\0';
 
     su_semantic_unit_t *unit = &d->pending_units[d->pending_count];
@@ -168,7 +168,7 @@ agentos_error_t su_stream_detector_feed(su_stream_detector_t *detector, const ch
         to_copy = (len < detector->buffer_capacity) ? len : detector->buffer_capacity;
     }
 
-    memcpy(detector->buffer + detector->buffer_used, tokens, to_copy);
+    __builtin_memcpy(detector->buffer + detector->buffer_used, tokens, to_copy);
     detector->buffer_used += to_copy;
     detector->current_token_estimate = su_estimate_tokens(detector->buffer, detector->buffer_used);
 
@@ -196,7 +196,7 @@ agentos_error_t su_stream_detector_feed(su_stream_detector_t *detector, const ch
     if (last_boundary > 0) {
         size_t remaining = detector->buffer_used - last_boundary;
         if (remaining > 0) {
-            memmove(detector->buffer, detector->buffer + last_boundary, remaining);
+            __builtin_memmove(detector->buffer, detector->buffer + last_boundary, remaining);
         }
         detector->buffer_used = remaining;
         detector->current_token_estimate =
@@ -318,7 +318,7 @@ agentos_error_t su_stream_detector_stats(const su_stream_detector_t *detector, c
     char *result = (char *)AGENTOS_MALLOC(len + 1);
     if (!result)
         return AGENTOS_ENOMEM;
-    memcpy(result, buf, len + 1);
+    __builtin_memcpy(result, buf, len + 1);
     *out_json = result;
     return AGENTOS_SUCCESS;
 }

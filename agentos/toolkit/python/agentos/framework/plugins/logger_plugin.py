@@ -1,5 +1,5 @@
 # AgentOS 示例插件 - 日志记录器
-# Version: 1.0.0
+# Version: 0.1.0
 
 """
 LoggerPlugin 示例插件

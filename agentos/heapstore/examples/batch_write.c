@@ -19,6 +19,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "memory_compat.h"
+
 /**
  * @brief 主函数：批量写入示例
  */
@@ -84,11 +86,11 @@ int main(int argc, char **argv)
         snprintf(trace_id, sizeof(trace_id), "trace-batch-%03d", i);
         snprintf(span_id, sizeof(span_id), "span-batch-%03d", i);
 
-        strncpy(entry.trace_id, trace_id, sizeof(entry.trace_id) - 1);
-        strncpy(entry.span_id, span_id, sizeof(entry.span_id) - 1);
-        strncpy(entry.parent_span_id, "parent-000", sizeof(entry.parent_span_id) - 1);
-        strncpy(entry.name, "batch_operation", sizeof(entry.name) - 1);
-        strncpy(entry.kind, "internal", sizeof(entry.kind) - 1);
+        AGENTOS_STRNCPY_TERM(entry.trace_id, trace_id, sizeof(entry.trace_id));
+        AGENTOS_STRNCPY_TERM(entry.span_id, span_id, sizeof(entry.span_id));
+        AGENTOS_STRNCPY_TERM(entry.parent_span_id, "parent-000", sizeof(entry.parent_span_id));
+        AGENTOS_STRNCPY_TERM(entry.name, "batch_operation", sizeof(entry.name));
+        AGENTOS_STRNCPY_TERM(entry.kind, "internal", sizeof(entry.kind));
 
         entry.start_time_us = (uint64_t)(time(NULL) - 100) * 1000000ULL;
         entry.end_time_us = (uint64_t)time(NULL) * 1000000ULL;
@@ -109,9 +111,9 @@ int main(int argc, char **argv)
         char session_id[32];
         snprintf(session_id, sizeof(session_id), "session-batch-%03d", i);
 
-        strncpy(session.session_id, session_id, sizeof(session.session_id) - 1);
-        strncpy(session.user_id, "user-001", sizeof(session.user_id) - 1);
-        strncpy(session.status, "active", sizeof(session.status) - 1);
+        AGENTOS_STRNCPY_TERM(session.session_id, session_id, sizeof(session.session_id));
+        AGENTOS_STRNCPY_TERM(session.user_id, "user-001", sizeof(session.user_id));
+        AGENTOS_STRNCPY_TERM(session.status, "active", sizeof(session.status));
         session.created_ns = (uint64_t)(time(NULL) - 3600) * 1000000000ULL;
         session.last_active_ns = (uint64_t)time(NULL) * 1000000000ULL;
 

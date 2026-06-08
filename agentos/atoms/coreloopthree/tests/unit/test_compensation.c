@@ -252,7 +252,7 @@ static void test_compensation_result_free_null(void)
 static void test_compensation_entry_fields(void)
 {
     agentos_compensation_entry_t entry;
-    memset(&entry, 0, sizeof(entry));
+    AGENTOS_MEMSET(&entry, 0, sizeof(entry));
 
     assert(entry.action_id == NULL);
     assert(entry.compensator_id == NULL);
@@ -265,7 +265,7 @@ static void test_compensation_entry_fields(void)
 static void test_compensation_manager_fields(void)
 {
     agentos_compensation_t mgr;
-    memset(&mgr, 0, sizeof(mgr));
+    AGENTOS_MEMSET(&mgr, 0, sizeof(mgr));
 
     assert(mgr.entries == NULL);
     assert(mgr.entry_count == 0);
@@ -281,7 +281,7 @@ static void test_compensation_manager_fields(void)
 static void test_compensation_result_fields(void)
 {
     agentos_compensation_result_t result;
-    memset(&result, 0, sizeof(result));
+    AGENTOS_MEMSET(&result, 0, sizeof(result));
 
     assert(result.status == AGENTOS_SUCCESS);
     assert(result.error_message == NULL);

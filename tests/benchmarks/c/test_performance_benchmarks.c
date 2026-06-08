@@ -443,7 +443,7 @@ static void* bm_concurrent_thread_fn(void* arg)
     for (int i = 0; i < 10000; i++) {
         void* p = agentos_mem_alloc(128 + (size_t)(ctx->thread_id % 8) * 16);
         if (p) {
-            memset(p, (unsigned char)(ctx->thread_id + i), 128 + (size_t)(ctx->thread_id % 8) * 16);
+            AGENTOS_MEMSET(p, (unsigned char)(ctx->thread_id + i), 128 + (size_t)(ctx->thread_id % 8) * 16);
             agentos_mem_free(p);
             ctx->alloc_count++;
         }

@@ -28,7 +28,7 @@ static void test_skill_registry_register_skill(void) {
     assert(reg != NULL);
 
     skill_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "test_skill_001";
     meta.name = "Test Skill";
     meta.version = "1.0.0";
@@ -49,7 +49,7 @@ static void test_skill_registry_get_skill(void) {
     assert(reg != NULL);
 
     skill_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "get_test_skill";
     meta.name = "Get Test Skill";
     meta.version = "1.0.0";
@@ -72,7 +72,7 @@ static void test_skill_registry_unregister_skill(void) {
     assert(reg != NULL);
 
     skill_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "unregister_skill_test";
     meta.name = "Unregister Test Skill";
     meta.version = "1.0.0";
@@ -97,13 +97,13 @@ static void test_skill_registry_list_skills(void) {
     assert(reg != NULL);
 
     skill_meta_t meta1;
-    memset(&meta1, 0, sizeof(meta1));
+    AGENTOS_MEMSET(&meta1, 0, sizeof(meta1));
     meta1.id = "list_skill_1";
     meta1.name = "List Skill 1";
     meta1.version = "1.0.0";
 
     skill_meta_t meta2;
-    memset(&meta2, 0, sizeof(meta2));
+    AGENTOS_MEMSET(&meta2, 0, sizeof(meta2));
     meta2.id = "list_skill_2";
     meta2.name = "List Skill 2";
     meta2.version = "1.0.0";
@@ -134,21 +134,21 @@ static void test_skill_registry_by_category(void) {
     assert(reg != NULL);
 
     skill_meta_t meta1;
-    memset(&meta1, 0, sizeof(meta1));
+    AGENTOS_MEMSET(&meta1, 0, sizeof(meta1));
     meta1.id = "cat_skill_1";
     meta1.name = "Category Skill 1";
     meta1.version = "1.0.0";
     meta1.category = "productivity";
 
     skill_meta_t meta2;
-    memset(&meta2, 0, sizeof(meta2));
+    AGENTOS_MEMSET(&meta2, 0, sizeof(meta2));
     meta2.id = "cat_skill_2";
     meta2.name = "Category Skill 2";
     meta2.version = "1.0.0";
     meta2.category = "productivity";
 
     skill_meta_t meta3;
-    memset(&meta3, 0, sizeof(meta3));
+    AGENTOS_MEMSET(&meta3, 0, sizeof(meta3));
     meta3.id = "cat_skill_3";
     meta3.name = "Category Skill 3";
     meta3.version = "1.0.0";

@@ -81,7 +81,7 @@ int agntcy_agent_unregister(agntcy_handle_t *h, const char *agent_id)
     for (size_t i = 0; i < h->agent_count; i++) {
         if (strcmp(h->agents[i].agent_id, agent_id) == 0) {
             if (i < h->agent_count - 1) {
-                memmove(&h->agents[i], &h->agents[i + 1],
+                __builtin_memmove(&h->agents[i], &h->agents[i + 1],
                         (h->agent_count - i - 1) * sizeof(agntcy_agent_card_t));
             }
             h->agent_count--;
@@ -139,8 +139,8 @@ int agntcy_channel_open(agntcy_handle_t *h, const char *initiator_id, const char
     }
     channel->session_token[AGNTCY_ACP_TOKEN_SIZE - 1] = '\0';
 
-    strncpy(channel->initiator_id, initiator_id, sizeof(channel->initiator_id) - 1);
-    strncpy(channel->responder_id, responder_id, sizeof(channel->responder_id) - 1);
+    AGENTOS_STRNCPY_TERM(channel->initiator_id, initiator_id, sizeof(channel->initiator_id));
+    AGENTOS_STRNCPY_TERM(channel->responder_id, responder_id, sizeof(channel->responder_id));
     channel->established_at = (uint64_t)time(NULL);
     channel->expires_at = channel->established_at + 3600;
     channel->encrypted = true;
@@ -157,7 +157,7 @@ int agntcy_channel_close(agntcy_handle_t *h, const char *channel_id)
     for (size_t i = 0; i < h->channel_count; i++) {
         if (strcmp(h->channels[i].channel_id, channel_id) == 0) {
             if (i < h->channel_count - 1) {
-                memmove(&h->channels[i], &h->channels[i + 1],
+                __builtin_memmove(&h->channels[i], &h->channels[i + 1],
                         (h->channel_count - i - 1) * sizeof(agntcy_channel_t));
             }
             h->channel_count--;
@@ -249,13 +249,13 @@ int agntcy_task_orchestrate(agntcy_handle_t *h, const char *task_id, const char 
         task = (agntcy_task_t *)AGENTOS_CALLOC(1, sizeof(agntcy_task_t));
         if (!task)
             AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
-        strncpy(task->task_id, task_id, sizeof(task->task_id) - 1);
+        AGENTOS_STRNCPY_TERM(task->task_id, task_id, sizeof(task->task_id));
         h->tasks[h->task_count++] = task;
     }
 
     AGENTOS_FREE(task->workflow_json);
     task->workflow_json = AGENTOS_STRDUP(workflow_json);
-    strncpy(task->name, "orchestrated-task", sizeof(task->name) - 1);
+    AGENTOS_STRNCPY_TERM(task->name, "orchestrated-task", sizeof(task->name));
     task->state = AGNTCY_TASK_DISPATCHED;
     task->created_at = (uint64_t)time(NULL);
     task->deadline_at = task->created_at + 3600;
@@ -263,7 +263,7 @@ int agntcy_task_orchestrate(agntcy_handle_t *h, const char *task_id, const char 
 
     for (size_t i = 0; i < h->agent_count && task->assigned_count < AGNTCY_ACP_MAX_AGENTS; i++) {
         if (h->agents[i].online && (h->agents[i].capabilities_mask & AGNTCY_CAP_ORCHESTRATE)) {
-            strncpy(task->assigned_agent_ids[task->assigned_count], h->agents[i].agent_id, 63);
+            AGENTOS_STRNCPY_TERM(task->assigned_agent_ids[task->assigned_count], h->agents[i].agent_id, sizeof(task->assigned_agent_ids[task->assigned_count]));
             task->assigned_count++;
         }
     }
@@ -305,7 +305,7 @@ int agntcy_ack_negotiate(agntcy_handle_t *h, const char *agent_id, const agntcy_
     if (!agent_found)
         AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "invalid parameter");
 
-    memcpy(ack_response, ack_request, sizeof(agntcy_ack_t));
+    __builtin_memcpy(ack_response, ack_request, sizeof(agntcy_ack_t));
 
     ack_response->guaranteed_amount = ack_request->requested_amount;
     if (ack_request->requested_amount > (size_t)(1024 * 1024 * 1024)) {

@@ -170,7 +170,7 @@ static void handle_search_agents(cJSON *params, int id, agentos_socket_t client_
     size_t count = 0;
 
     search_params_t sp;
-    memset(&sp, 0, sizeof(sp));
+    __builtin_memset(&sp, 0, sizeof(sp));
     sp.query = (char *)keyword;
     sp.limit = limit;
     sp.offset = offset;
@@ -279,7 +279,7 @@ static void handle_search_skills(cJSON *params, int id, agentos_socket_t client_
     size_t count = 0;
 
     search_params_t sp;
-    memset(&sp, 0, sizeof(sp));
+    __builtin_memset(&sp, 0, sizeof(sp));
     sp.query = (char *)keyword;
     sp.limit = 20;
     sp.offset = 0;

@@ -99,7 +99,7 @@ static char *safe_strdup(const char *src)
     size_t len = strlen(src);
     char *d = (char *)AGENTOS_MALLOC(len + 1);
     if (d) {
-        memcpy(d, src, len);
+        __builtin_memcpy(d, src, len);
         d[len] = '\0';
     }
     return d;
@@ -118,7 +118,7 @@ static char **safe_str_array_dup(char **src, size_t count)
 
         return NULL;
     }
-    memset(dst, 0, sizeof(char *) * count);
+    __builtin_memset(dst, 0, sizeof(char *) * count);
     for (size_t i = 0; i < count; i++) {
         dst[i] = safe_strdup(src[i]);
         if (!dst[i] && src[i]) {
@@ -146,14 +146,12 @@ static void init_fields(agentos_task_checkpoint_t *cp, const char *task_id, cons
 {
     if (!cp)
         return;
-    memset(cp, 0, sizeof(*cp));
+    __builtin_memset(cp, 0, sizeof(*cp));
     if (task_id) {
-        strncpy(cp->task_id, task_id, sizeof(cp->task_id) - 1);
-        cp->task_id[sizeof(cp->task_id) - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(cp->task_id, task_id, sizeof(cp->task_id));
     }
     if (session_id) {
-        strncpy(cp->session_id, session_id, sizeof(cp->session_id) - 1);
-        cp->session_id[sizeof(cp->session_id) - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(cp->session_id, session_id, sizeof(cp->session_id));
     }
     cp->sequence_num = seq;
     cp->timestamp = agentos_time_ns();
@@ -305,7 +303,7 @@ agentos_error_t agentos_checkpoint_init(const char *storage_path)
     size_t len = strlen(path);
     if (len == 0 || len >= sizeof(g_checkpoint_storage_path))
         return AGENTOS_EINVAL;
-    memcpy(g_checkpoint_storage_path, path, len);
+    __builtin_memcpy(g_checkpoint_storage_path, path, len);
     g_checkpoint_storage_path[len] = '\0';
 
     {
@@ -319,7 +317,7 @@ agentos_error_t agentos_checkpoint_init(const char *storage_path)
         }
     }
 
-    memset(&g_checkpoint_stats, 0, sizeof(g_checkpoint_stats));
+    __builtin_memset(&g_checkpoint_stats, 0, sizeof(g_checkpoint_stats));
     atomic_store_explicit(&g_checkpoint_initialized, 1, memory_order_seq_cst);
     return AGENTOS_SUCCESS;
 }
@@ -596,8 +594,7 @@ agentos_error_t agentos_checkpoint_restore(const char *task_id, uint64_t sequenc
 
     char *sid = json_extract_string(json_buf, "session_id");
     if (sid) {
-        strncpy(cp->session_id, sid, sizeof(cp->session_id) - 1);
-        cp->session_id[sizeof(cp->session_id) - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(cp->session_id, sid, sizeof(cp->session_id));
         AGENTOS_FREE(sid);
     }
     cp->sequence_num = json_extract_uint64(json_buf, "sequence_num");
@@ -668,7 +665,7 @@ agentos_error_t agentos_checkpoint_get_stats(agentos_checkpoint_stats_t *stats)
     if (!stats)
         return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_checkpoint_mutex);
-    memcpy(stats, &g_checkpoint_stats, sizeof(agentos_checkpoint_stats_t));
+    __builtin_memcpy(stats, &g_checkpoint_stats, sizeof(agentos_checkpoint_stats_t));
     agentos_mutex_unlock(&g_checkpoint_mutex);
     return AGENTOS_SUCCESS;
 }

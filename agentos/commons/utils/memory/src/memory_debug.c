@@ -25,13 +25,8 @@
 #include <dbghelp.h>
 #else
 #include <execinfo.h>
-#include <pthread.h>
 #include <sys/time.h>
-typedef pthread_mutex_t agentos_mutex_t;
-extern int agentos_mutex_init(agentos_mutex_t *mutex);
-extern void agentos_mutex_destroy(agentos_mutex_t *mutex);
-extern int agentos_mutex_lock(agentos_mutex_t *mutex);
-extern int agentos_mutex_unlock(agentos_mutex_t *mutex);
+#include "platform.h"
 #include <stdint.h>
 #endif
 
@@ -309,7 +304,7 @@ static bool memory_debug_validate_block(memory_debug_block_t *block, memory_erro
                                             .line = 0,
                                             .function = NULL,
                                             .timestamp = memory_debug_get_timestamp()};
-            memcpy(error, &report, sizeof(memory_error_report_t));
+            __builtin_memcpy(error, &report, sizeof(memory_error_report_t));
         }
         return false;
     }
@@ -325,7 +320,7 @@ static bool memory_debug_validate_block(memory_debug_block_t *block, memory_erro
                                             .line = 0,
                                             .function = NULL,
                                             .timestamp = memory_debug_get_timestamp()};
-            memcpy(error, &report, sizeof(memory_error_report_t));
+            __builtin_memcpy(error, &report, sizeof(memory_error_report_t));
         }
         return false;
     }
@@ -347,7 +342,7 @@ static bool memory_debug_validate_block(memory_debug_block_t *block, memory_erro
                                                     .line = block->line,
                                                     .function = block->function,
                                                     .timestamp = memory_debug_get_timestamp()};
-                    memcpy(error, &report, sizeof(memory_error_report_t));
+                    __builtin_memcpy(error, &report, sizeof(memory_error_report_t));
                 }
                 return false;
             }
@@ -391,7 +386,7 @@ bool memory_debug_init(const memory_debug_options_t *options)
 
     // 设置选项
     if (options != NULL) {
-        memcpy(&g_debug_state.options, options, sizeof(memory_debug_options_t));
+        __builtin_memcpy(&g_debug_state.options, options, sizeof(memory_debug_options_t));
     }
 
     // 初始化状态
@@ -537,14 +532,14 @@ bool memory_debug_validate(void *ptr, memory_error_report_t *error)
 {
     if (ptr == NULL) {
         if (error != NULL) {
-            memset(error, 0, sizeof(memory_error_report_t));
+            __builtin_memset(error, 0, sizeof(memory_error_report_t));
             error->type = MEMORY_ERROR_INVALID_FREE;
         }
         return false;
     }
     if (!g_debug_state.initialized) {
         if (error != NULL) {
-            memset(error, 0, sizeof(memory_error_report_t));
+            __builtin_memset(error, 0, sizeof(memory_error_report_t));
         }
         return false;
     }
@@ -564,7 +559,7 @@ bool memory_debug_validate(void *ptr, memory_error_report_t *error)
                                         .line = 0,
                                         .function = NULL,
                                         .timestamp = memory_debug_get_timestamp()};
-        memcpy(error, &report, sizeof(memory_error_report_t));
+        __builtin_memcpy(error, &report, sizeof(memory_error_report_t));
     }
 
     memory_debug_unlock();
@@ -878,7 +873,7 @@ size_t memory_debug_get_stack_trace(void *ptr, void **frames, size_t max_frames)
 
     if (block != NULL && block->stack_depth > 0) {
         depth = (block->stack_depth < max_frames) ? block->stack_depth : max_frames;
-        memcpy(frames, block->stack_trace, depth * sizeof(void *));
+        __builtin_memcpy(frames, block->stack_trace, depth * sizeof(void *));
     }
 
     memory_debug_unlock();
@@ -978,7 +973,7 @@ unsigned int memory_debug_checkpoint(const char *name)
     cp->valid = true;
 
     if (name != NULL) {
-        strncpy(cp->name, name, sizeof(cp->name) - 1);
+        AGENTOS_STRNCPY_TERM(cp->name, name, sizeof(cp->name));
         cp->name[sizeof(cp->name) - 1] = '\0';
     } else {
         cp->name[0] = '\0';
@@ -1011,7 +1006,7 @@ size_t memory_debug_compare_checkpoints(unsigned int checkpoint1, unsigned int c
                                         memory_leak_report_t *diff_report)
 {
     if (diff_report != NULL) {
-        memset(diff_report, 0, sizeof(memory_leak_report_t));
+        __builtin_memset(diff_report, 0, sizeof(memory_leak_report_t));
     }
 
     if (!g_debug_state.initialized) {
