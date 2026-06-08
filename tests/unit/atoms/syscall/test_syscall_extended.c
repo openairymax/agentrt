@@ -9,24 +9,15 @@
  */
 
 #include <stdio.h>
-#include "platform.h"
 #include <stdlib.h>
-#include "platform.h"
 #include <string.h>
-#include "platform.h"
 #include <assert.h>
-#include "platform.h"
 #include <time.h>
-#include "platform.h"
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "platform.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
-#include "platform.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 #include "syscalls.h"
-#include "platform.h"
 #include "agentos.h"
-#include "platform.h"
 
 int test_syscall_table_lookup(void) {
     printf("  测试系统调用表查找...\n");

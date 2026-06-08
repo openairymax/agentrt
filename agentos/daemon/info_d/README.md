@@ -1,6 +1,6 @@
 # Info Daemon — 系统信息守护进程
 
-> **模块路径**: `agentos/daemon/info_d/` | **版本**: v0.1.0
+> **模块路径**: `agentos/daemon/info_d/` | **版本**: v0.0.5
 
 ## 概述
 

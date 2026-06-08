@@ -34,7 +34,7 @@ set(CL3_COMMON_INCLUDES
     ${CORELOOPTHREE_DIR}/src/cognition
     ${COREKERN_INCLUDE_DIR}
     ${COMMONS_DIR}/platform/include
-    ${COMMONS_DIR}/utils/core/include
+    ${COMMONS_DIR}/utils/include
     ${COMMONS_DIR}/utils/error/include
     ${COMMONS_DIR}/utils/logging/include
     ${COMMONS_DIR}/utils/memory/include

@@ -2,7 +2,7 @@
 
 `agentos/atoms/corekern/`
 
-**版本**: v0.1.0 | **API 版本**: 1.0.0
+**版本**: v0.0.5 | **API 版本**: 1.0.0
 
 ---
 
@@ -40,6 +40,7 @@ corekern/
 │   ├── agentos_time.h              # 时间服务接口（单调/实时时钟、定时器、事件循环）
 │   ├── observability.h             # 可观测性子系统（指标、追踪、健康检查）
 │   ├── platform_core.h             # 平台类型委托（→ commons/platform）
+│   ├── oom_handler.h               # OOM 分级响应框架
 │   └── stdatomic.h                 # 原子操作兼容层
 ├── src/                            # 内核实现
 │   ├── core_init.c                 # agentos_core_init() / agentos_core_shutdown()
@@ -55,11 +56,11 @@ corekern/
 │   ├── task/
 │   │   ├── scheduler.c             # 调度器入口
 │   │   ├── scheduler_core.c        # 调度器核心逻辑（优先级队列、依赖解析）
+│   │   ├── scheduler_core.h        # 调度器内部头文件
 │   │   ├── scheduler_platform.c    # 平台抽象层
+│   │   ├── scheduler_platform.h    # 调度器平台头文件
 │   │   ├── scheduler_posix.c       # POSIX 线程调度实现
 │   │   ├── scheduler_windows.c     # Windows 线程调度实现
-│   │   ├── scheduler_core.h        # 调度器内部头文件
-│   │   ├── scheduler_platform.h    # 调度器平台头文件
 │   │   └── thread.c                # 线程管理
 │   ├── time/
 │   │   ├── clock.c                 # 单调/实时时钟实现
@@ -78,7 +79,7 @@ corekern/
 
 ---
 
-## 核心能力
+## 核心组件说明
 
 ### 1. IPC/Binder — 进程间通信
 
@@ -94,6 +95,7 @@ corekern/
 | `agentos_ipc_call()` | 同步调用（请求-响应） | 是 |
 | `agentos_ipc_reply()` | 回复消息 | 是 |
 | `agentos_ipc_close()` | 关闭通道 | 否 |
+| `agentos_ipc_get_fd()` | 获取通道文件描述符 | 否 |
 
 **消息结构**:
 
@@ -184,6 +186,7 @@ typedef struct {
 | 健康检查 | `agentos_health_check_register/run()` | 注册和执行健康检查 |
 | 性能监控 | `agentos_performance_get_metrics()` | CPU/内存/线程数 |
 | 导出 | `agentos_observability_export_prometheus()` | Prometheus 格式导出 |
+| | `agentos_health_export_status()` | 健康状态导出 |
 
 ---
 

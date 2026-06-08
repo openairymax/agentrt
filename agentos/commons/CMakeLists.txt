@@ -59,6 +59,64 @@ endif()
 
 add_library(agentos_common STATIC ${SOURCES})
 
+# 验证源文件存在性
+message(STATUS "[COMMONS] Verifying source files...")
+set(_missing_count 0)
+foreach(_src ${SOURCES})
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
+        message(WARNING "[COMMONS]   [MISSING] ${_src}")
+        math(EXPR _missing_count "${_missing_count} + 1")
+    endif()
+endforeach()
+if(_missing_count EQUAL 0)
+    message(STATUS "[COMMONS]   All source files verified OK")
+else()
+    message(WARNING "[COMMONS]   ${_missing_count} source file(s) MISSING!")
+endif()
+
+# 验证 include 目录存在性
+message(STATUS "[COMMONS] Verifying include directories...")
+set(_inc_dirs
+    platform/include
+    utils/types/include
+    utils/logging/include
+    utils/error/include
+    utils/sync/include
+    utils/execution/include
+    utils/include
+    utils/memory
+    utils/string
+    utils/compat/include
+    utils/token/include
+    utils/cost/include
+    utils/observability/include
+    utils/io/include
+    utils/security/include
+    utils/resource/include
+    utils/memory/include
+    utils/string/include
+    utils/cache/include
+    utils/platform/include
+    utils/config_unified/include
+    utils/cognition/include
+    utils/strategy/include
+    utils/network/include
+    utils/ipc/include
+    utils/uuid/include
+)
+set(_inc_missing 0)
+foreach(_inc ${_inc_dirs})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_inc}")
+        message(STATUS "[COMMONS]   [OK] ${_inc}")
+    else()
+        message(WARNING "[COMMONS]   [MISSING] ${_inc}")
+        math(EXPR _inc_missing "${_inc_missing} + 1")
+    endif()
+endforeach()
+if(_inc_missing GREATER 0)
+    message(WARNING "[COMMONS]   ${_inc_missing} include directory(ies) MISSING!")
+endif()
+
 set_source_files_properties(
     utils/memory/src/memory.c
     utils/memory/src/memory_pool.c
@@ -104,8 +162,6 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/network/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/ipc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/uuid/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/config/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/resource/include
 )
 
 target_compile_definitions(agentos_common PRIVATE _CRT_SECURE_NO_WARNINGS)

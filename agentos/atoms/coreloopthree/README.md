@@ -2,7 +2,7 @@
 
 `agentos/atoms/coreloopthree/`
 
-**版本**: v0.1.0 | **API 版本**: 1.0.0
+**版本**: v0.0.5 | **API 版本**: 1.0.0
 
 ---
 

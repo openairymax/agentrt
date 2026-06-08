@@ -12,8 +12,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../utils/test_framework.h"
-#include "../../utils/memory/include/memory.h"
+#include "test_framework.h"
+#include "memory.h"
 
 typedef struct {
     int fd;

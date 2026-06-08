@@ -3,7 +3,7 @@
  * @brief 思考链路模块完整实现 - DS-001
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * 实现双思考系统的三大核心组件:
+ * 实现Thinkdual的三大核心组件:
  * 1. Context Window - Token预算管理+滑动窗口
  * 2. Working Memory - 短期键值缓存+LRU淘汰
  * 3. Thinking Step DAG - 推理步骤依赖链

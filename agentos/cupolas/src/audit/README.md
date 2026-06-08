@@ -1,16 +1,16 @@
 # Audit — 审计系统
 
 **模块路径**: `agentos/cupolas/src/audit/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
-Audit 模块提供安全审计日志记录与事件追踪能力，确保所有安全相关操作的完整可追溯性。采用异步写入架构，后台线程批量写入，不阻塞业务线程。审计日志使用 HMAC 签名链确保防篡改性，支持日志轮转、溢出处理和多维度查询。
+Audit 模块提供安全审计日志记录与事件追踪能力，确保所有安全相关操作的完整可追溯性。采用异步写入架构，后台线程批量写入，不阻塞业务线程。审计日志使用 SHA-256 哈希链确保防篡改性，支持日志轮转、溢出处理和多维度查询。
 
 ## 设计目标
 
 - **完整记录**：记录所有安全相关事件，不遗漏任何关键操作
-- **防篡改**：使用 HMAC 签名链确保日志完整性
+- **防篡改**：使用 SHA-256 哈希链确保日志完整性
 - **异步写入**：后台线程批量写入，不阻塞业务线程
 - **高效查询**：支持按时间、级别、类型等多维度检索审计日志
 - **合规支持**：满足 SOC 2、ISO 27001 等审计合规要求
@@ -72,7 +72,7 @@ audit/
 
 | 函数 | 说明 |
 |------|------|
-| `audit_logger_create(log_dir, prefix, max_size, max_files)` | 创建审计日志器 |
+| `audit_logger_create(log_dir, log_prefix, max_file_size, max_files)` | 创建审计日志器 |
 | `audit_logger_destroy(logger)` | 销毁审计日志器（刷新待写日志） |
 | `audit_logger_log(logger, type, agent_id, action, resource, detail, result)` | 记录审计事件 |
 | `audit_logger_log_permission(logger, agent_id, action, resource, allowed)` | 记录权限事件 |
@@ -80,6 +80,7 @@ audit/
 | `audit_logger_log_workbench(logger, agent_id, command, exit_code)` | 记录工作台事件 |
 | `audit_logger_flush(logger)` | 刷新日志缓冲 |
 | `audit_logger_stats(logger, total_logged, total_failed)` | 获取日志统计 |
+| `audit_logger_verify_chain(entries, entry_count, first_prev_hash, out_invalid_index)` | 验证哈希链完整性 |
 
 ### 审计队列 API
 
@@ -116,20 +117,32 @@ uint64_t total, failed;
 audit_logger_stats(logger, &total, &failed);
 printf("Logged: %lu, Failed: %lu\n", total, failed);
 
+/* 验证哈希链完整性 */
+int invalid_index = -1;
+bool valid = audit_logger_verify_chain(entries, count, "000...0", &invalid_index);
+
 audit_logger_destroy(logger);
 ```
 
 ## 防篡改机制
 
-审计日志使用 HMAC-SHA256 签名链确保完整性：
+审计日志使用 SHA-256 哈希链确保完整性：
 
 ```
-日志1: [data1, hmac1=HMAC(data1)]
-日志2: [data2, hmac2=HMAC(data2 + hmac1)]
-日志3: [data3, hmac3=HMAC(data3 + hmac2)]
+日志1: [data1, hash1=SHA256(data1)]
+日志2: [data2, hash2=SHA256(data2 + hash1)]
+日志3: [data3, hash3=SHA256(data3 + hash2)]
 ```
 
-任何中间日志被篡改都会导致后续所有日志的 HMAC 校验失败。
+任何中间日志被篡改都会导致后续所有日志的哈希校验失败。可通过 `audit_logger_verify_chain()` 接口验证整条链的完整性。
+
+## 依赖关系
+
+| 依赖 | 说明 |
+|------|------|
+| `platform.h` | 平台抽象层（互斥锁、条件变量） |
+| `audit_queue.h` | 线程安全队列 |
+| `cupolas_utils.h` | 安全内存管理、日志宏 |
 
 ## 相关子系统
 

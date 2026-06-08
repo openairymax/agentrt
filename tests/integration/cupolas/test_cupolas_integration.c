@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "../include/cupolas.h"
+#include "cupolas.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)

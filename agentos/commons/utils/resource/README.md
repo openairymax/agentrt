@@ -1,7 +1,7 @@
 # Resource — 资源管理模块
 
 **模块路径**: `agentos/commons/utils/resource/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
@@ -19,11 +19,11 @@ Resource 模块提供资源作用域守卫（RAII 模式）和资源配额管理
 ```
 resource/
 ├── src/
-│   ├── resource_guard.h        # 资源作用域守卫接口定义
-│   ├── resource_guard.c        # 资源作用域守卫实现
-│   ├── resource_quota.h        # 资源配额管理接口定义
-│   └── resource_quota.c        # 资源配额管理实现
-└── README.md                   # 本文档
+│   ├── resource_guard.h         # 资源作用域守卫接口定义
+│   ├── resource_guard.c         # 资源作用域守卫实现
+│   ├── resource_quota.h         # 资源配额管理接口定义
+│   └── resource_quota.c         # 资源配额管理实现
+└── README.md                    # 本文档
 ```
 
 ## 核心数据结构

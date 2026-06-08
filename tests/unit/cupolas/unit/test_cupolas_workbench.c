@@ -16,10 +16,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "../../src/workbench/workbench.h"
-#include "../../src/workbench/workbench_limits.h"
-#include "../../src/workbench/workbench_container.h"
-#include "../../src/platform/platform.h"
+#include "workbench.h"
+#include "workbench_limits.h"
+#include "workbench_container.h"
+#include "platform.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) do { printf("[FAIL] %s: %s\n", name, msg); return 1; } while(0)
