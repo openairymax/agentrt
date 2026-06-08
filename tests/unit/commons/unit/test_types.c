@@ -26,8 +26,8 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "../../../utils/types/include/types.h"
-#include "../tests/utils/test_framework.h"
+#include "types.h"
+#include "test_framework.h"
 
 /* ============================================================================
  * 基础类型测试

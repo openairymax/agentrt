@@ -1,7 +1,7 @@
 # Commons — 统一基础库
 
 **模块路径**: `agentos/commons/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
@@ -48,7 +48,7 @@ commons/
 │   ├── cost/                    # 成本估算与控制
 │   ├── resource/                # 资源保护与配额
 │   ├── security/                # 输入校验与安全过滤
-│   ├── config/                  # 配置解析（JSON/YAML/TOML）
+│   ├── config/                  # 配置解析（JSON/YAML/TOML）[注：已合并至 config_unified]
 │   ├── cache/                   # 缓存管理（LRU/TTL）
 │   ├── compat/                  # 跨版本/跨平台兼容性适配
 │   ├── compliance/              # 合规性校验与策略执行

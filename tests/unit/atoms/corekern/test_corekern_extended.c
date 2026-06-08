@@ -13,8 +13,8 @@
 #include <assert.h>
 #include <time.h>
 
-#include "../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../../commons/utils/string/include/string_compat.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 #include "error.h"
 #include "task.h"
 #include "mem.h"

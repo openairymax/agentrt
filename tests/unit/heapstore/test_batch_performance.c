@@ -14,8 +14,8 @@
 #include <string.h>
 #include "platform.h"
 #include <time.h>
-#include "../include/heapstore.h"
-#include "../include/heapstore_registry.h"
+#include "heapstore.h"
+#include "heapstore_registry.h"
 
 #define NUM_RECORDS 1000
 

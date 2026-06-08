@@ -12,8 +12,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../utils/test_framework.h"
-#include "../../agentos/commons/utils/string/include/string_compat.h"
+#include "test_framework.h"
+#include "string_compat.h"
 
 /**
  * @test 测试安全字符串复制

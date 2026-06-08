@@ -20,20 +20,20 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../utils/memory/include/memory_compat.h"
-#include "../../utils/string/include/string_compat.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 
 /* 包含统一日志模块头文件 */
-#include "../../utils/logging/include/logging.h"
-#include "../../utils/logging/include/atomic_logging.h"
-#include "../../utils/logging/include/service_logging.h"
-#include "../../utils/logging/include/logging_compat.h"
+#include "logging.h"
+#include "atomic_logging.h"
+#include "service_logging.h"
+#include "logging_compat.h"
 
 /* 包含统一配置模块头文件 */
-#include "../../utils/config_unified/include/core_config.h"
-#include "../../utils/config_unified/include/config_source.h"
-#include "../../utils/config_unified/include/config_service.h"
-#include "../../utils/config_unified/include/config_compat.h"
+#include "core_config.h"
+#include "config_source.h"
+#include "config_service.h"
+#include "config_compat.h"
 
 int main(void) {
     printf("=== 统一日志和配置模块构建兼容性测试 ===\n");

@@ -1,6 +1,6 @@
 # Channel Daemon — IPC 通道守护进程
 
-> **模块路径**: `agentos/daemon/channel_d/` | **版本**: v0.1.0
+> **模块路径**: `agentos/daemon/channel_d/` | **版本**: v0.0.5
 
 ## 概述
 

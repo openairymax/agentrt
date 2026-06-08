@@ -4,10 +4,10 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../include/time.h"
-#include "../include/error.h"
-#include "../include/task.h"
-#include "../include/event.h"
+#include "time.h"
+#include "error.h"
+#include "task.h"
+#include "event.h"
 #include <stdio.h>
 #include <inttypes.h>
 

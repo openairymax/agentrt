@@ -1,6 +1,6 @@
 /**
  * @file engine.c
- * @brief 认知引擎核心实现 - 含双思考系统集成
+ * @brief 认知引擎核心实现 - 含Thinkdual集成
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 实现完整5阶段认知处理管线:

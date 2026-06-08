@@ -16,6 +16,7 @@
 #pragma GCC poison realloc
 #pragma GCC poison strdup
 #pragma GCC poison strndup
+#pragma GCC poison printf
 #pragma GCC poison fprintf
 #pragma GCC poison sprintf
 #pragma GCC poison vsprintf
@@ -97,6 +98,9 @@ static inline struct tm *__banned_gmtime(const time_t *t) { return (gmtime)(t); 
 #endif
 
 /* BAN-151~BAN-162: 危险I/O函数 — gets/scanf系列在非strict模式下也标记为deprecated */
+__attribute__((deprecated("Use AGENTOS_PRINTF instead — printf() has no output limit")))
+static inline int __agentos_banned_printf(const char *fmt, ...) { va_list ap; va_start(ap, fmt); int r = vprintf(fmt, ap); va_end(ap); return r; }
+
 __attribute__((deprecated("Use fgets instead — gets() has no buffer limit and causes buffer overflow")))
 static inline char *__banned_gets(char *s) { return (gets)(s); }
 
@@ -109,6 +113,7 @@ static inline int __banned_fscanf(FILE *fp, const char *fmt, ...) { va_list ap; 
 __attribute__((deprecated("Validate buffer bounds before sscanf — prefer snprintf for output")))
 static inline int __banned_sscanf(const char *s, const char *fmt, ...) { va_list ap; va_start(ap, fmt); int r = vsscanf(s, fmt, ap); va_end(ap); return r; }
 
+#define printf(fmt, ...) __agentos_banned_printf(fmt, ##__VA_ARGS__)
 #define gets(s)         __banned_gets(s)
 #define scanf(fmt, ...) __banned_scanf(fmt, ##__VA_ARGS__)
 #define fscanf(fp, fmt, ...) __banned_fscanf(fp, fmt, ##__VA_ARGS__)

@@ -13,9 +13,9 @@
 #include <assert.h>
 #include <math.h>
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
-#include "../../../agentos/commons/utils/quality/agentos_quality.h"
+#include "memory_compat.h"
+#include "string_compat.h"
+#include "agentos_quality.h"
 
 #define TEST_BUFFER_SIZE 256
 

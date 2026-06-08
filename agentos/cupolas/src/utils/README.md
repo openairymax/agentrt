@@ -1,18 +1,20 @@
 # Cupolas Utils — 安全工具库
 
 **模块路径**: `agentos/cupolas/src/utils/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
-Cupolas Utils 是 Cupolas 安全穹顶的内部工具库，提供所有 Cupolas 子模块共享的基础设施，包括安全内存管理、统一错误处理、日志桥接和编译器提示宏。该模块不对外暴露公共 API，仅供 Cupolas 内部子模块使用。
+Cupolas Utils 是 Cupolas 安全穹顶的内部工具库，提供所有 Cupolas 子模块共享的基础设施，包括安全内存管理、统一错误检查、线程同步原语、日志桥接、编译器提示、位操作、对齐工具和时间工具。该模块不对外暴露公共 API，仅供 Cupolas 内部子模块使用。
 
 ## 设计目标
 
-- **安全内存管理**：零化释放、安全拷贝、分配跟踪
-- **统一错误处理**：Cupolas 全模块共享的错误码体系
+- **安全内存管理**：零初始化分配、NULL 安全释放、类型安全
+- **统一错误检查**：Cupolas 全模块共享的参数校验和提前返回宏
+- **线程同步**：跨平台互斥锁抽象（Windows CRITICAL_SECTION / POSIX pthread）
 - **日志桥接**：将 Cupolas 内部日志桥接到 Commons 日志系统
 - **编译器提示**：跨编译器的属性注解和分支预测宏
+- **零成本抽象**：所有宏展开为直接 API 调用
 
 ## 目录结构
 
@@ -25,16 +27,41 @@ utils/
 
 ## 核心功能
 
+### 线程同步原语
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_MUTEX_TYPE` | 互斥锁类型（`cupolas_mutex_t`） |
+| `CUPOLAS_MUTEX_INIT(m)` | 初始化互斥锁 |
+| `CUPOLAS_MUTEX_LOCK(m)` | 加锁 |
+| `CUPOLAS_MUTEX_UNLOCK(m)` | 解锁 |
+| `CUPOLAS_MUTEX_DESTROY(m)` | 销毁互斥锁 |
+
+> 底层使用 `platform.h` 提供的跨平台互斥锁实现。非递归锁，同线程重复加锁将死锁。
+
 ### 安全内存管理
 
 | 宏 | 说明 |
 |------|------|
-| `CUPOLAS_MALLOC(size)` | 分配内存（失败时返回 NULL） |
-| `CUPOLAS_CALLOC(num, size)` | 零初始化分配 |
+| `CUPOLAS_ALLOC(type, count)` | 零初始化分配数组（calloc） |
+| `CUPOLAS_ALLOC_STRUCT(type)` | 零初始化分配单个结构体 |
+| `CUPOLAS_ALLOC_ARRAY(type, count)` | 未初始化分配数组（malloc，更快） |
+| `CUPOLAS_REALLOC(ptr, type, count)` | 类型安全的重新分配 |
 | `CUPOLAS_FREE(ptr)` | 释放内存并将指针置 NULL |
-| `CUPOLAS_SAFE_FREE(ptr)` | 安全释放（零化内存后释放） |
-| `CUPOLAS_SAFE_STRDUP(str)` | 安全字符串复制 |
-| `CUPOLAS_SAFE_COPY(dst, src, size)` | 安全内存拷贝（边界检查） |
+| `CUPOLAS_FREE_ARRAY(ptr)` | NULL 检查后释放并置 NULL |
+
+> 底层使用 Commons 的 `AGENTOS_CALLOC`/`AGENTOS_MALLOC`/`AGENTOS_FREE` 宏。
+
+### 错误检查宏
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_CHECK_NULL(ptr)` | NULL 检查，为空则返回 `AGENTOS_EINVAL` |
+| `CUPOLAS_CHECK_NULL_RET(ptr, ret)` | NULL 检查，自定义返回值 |
+| `CUPOLAS_CHECK_RESULT(expr)` | 表达式非零则返回 `AGENTOS_EINVAL` |
+| `CUPOLAS_CHECK_RESULT_RET(expr, ret)` | 表达式非零则返回自定义值 |
+| `CUPOLAS_CHECK_TRUE(cond)` | 条件为假则返回 `AGENTOS_EINVAL` |
+| `CUPOLAS_CHECK_TRUE_RET(cond, ret)` | 条件为假则返回自定义值 |
 
 ### 编译器提示
 
@@ -42,75 +69,116 @@ utils/
 |------|------|
 | `CUPOLAS_LIKELY(x)` | 分支预测：x 大概率为真 |
 | `CUPOLAS_UNLIKELY(x)` | 分支预测：x 大概率为假 |
-| `CUPOLAS_UNUSED(x)` | 抑制未使用变量警告 |
-| `CUPOLAS_ALIGNED(n)` | 内存对齐属性 |
-| `CUPOLAS_PACKED` | 紧凑结构体属性 |
+| `CUPOLAS_INLINE` | 强制内联 |
 | `CUPOLAS_NOINLINE` | 禁止内联 |
-| `CUPOLAS_HOT` | 热路径函数优化提示 |
-| `CUPOLAS_COLD` | 冷路径函数优化提示 |
+| `CUPOLAS_DEPRECATED(msg)` | 标记为已弃用 |
 
-### 错误处理
-
-| 宏 | 说明 |
-|------|------|
-| `CUPOLAS_CHECK_NULL(ptr, retval)` | NULL 检查，为空则返回 retval |
-| `CUPOLAS_CHECK_PARAM(cond, retval)` | 参数校验，条件不满足则返回 retval |
-| `CUPOLAS_GOTO_CLEANUP_IF(cond)` | 条件满足则跳转到 cleanup 标签 |
-| `CUPOLAS_RETURN_IF_ERROR(err)` | 错误则提前返回 |
-
-### 日志桥接
+### 日志宏
 
 | 宏 | 说明 |
 |------|------|
-| `CUPOLAS_LOG_DEBUG(fmt, ...)` | DEBUG 级别日志 |
-| `CUPOLAS_LOG_INFO(fmt, ...)` | INFO 级别日志 |
-| `CUPOLAS_LOG_WARN(fmt, ...)` | WARN 级别日志 |
-| `CUPOLAS_LOG_ERROR(fmt, ...)` | ERROR 级别日志 |
+| `CUPOLAS_LOG(fmt, ...)` | INFO 级别日志（需 `CUPOLAS_ENABLE_LOGGING`） |
+| `CUPOLAS_LOG_ERROR(fmt, ...)` | ERROR 级别日志（始终启用） |
+| `CUPOLAS_LOG_DEBUG(fmt, ...)` | DEBUG 级别日志（需 `CUPOLAS_ENABLE_LOGGING`） |
 
-> 日志桥接宏内部调用 Commons 的 `log_write` 函数，模块名自动设为 `cupolas`。
+> 未定义 `CUPOLAS_ENABLE_LOGGING` 时，`CUPOLAS_LOG` 和 `CUPOLAS_LOG_DEBUG` 编译为空操作，`CUPOLAS_LOG_ERROR` 始终启用。
 
-### 安全常量
+### 字符串与工具宏
 
-| 常量 | 值 | 说明 |
-|------|-----|------|
-| `CUPOLAS_MAX_PATH_LEN` | 4096 | 最大路径长度 |
-| `CUPOLAS_MAX_INPUT_LEN` | 65536 | 最大输入长度 |
-| `CUPOLAS_MAX_RULE_COUNT` | 1024 | 最大规则数量 |
-| `CUPOLAS_MAX_CACHE_SIZE` | 4096 | 最大缓存条目数 |
-| `CUPOLAS_HASH_SIZE` | 32 | SHA-256 哈希大小 |
-| `CUPOLAS_HMAC_SIZE` | 32 | HMAC-SHA256 大小 |
-| `CUPOLAS_AES_KEY_SIZE` | 32 | AES-256 密钥大小 |
-| `CUPOLAS_AES_NONCE_SIZE` | 12 | AES-GCM Nonce 大小 |
-| `CUPOLAS_AES_TAG_SIZE` | 16 | AES-GCM Tag 大小 |
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_STRINGIFY(x)` | 转字符串字面量 |
+| `CUPOLAS_TOSTRING(x)` | 二级字符串化（支持宏展开） |
+| `CUPOLAS_CONCAT(a, b)` | 拼接两个 token |
+| `CUPOLAS_CONCAT3(a, b, c)` | 拼接三个 token |
+| `CUPOLAS_ARRAY_SIZE(arr)` | 计算静态数组元素数 |
+| `CUPOLAS_MIN(a, b)` | 最小值 |
+| `CUPOLAS_MAX(a, b)` | 最大值 |
+| `CUPOLAS_CLAMP(x, lo, hi)` | 值域限制 |
+| `CUPOLAS_ABS(x)` | 绝对值 |
+
+### 对齐工具
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_ALIGN_UP(x, align)` | 向上对齐 |
+| `CUPOLAS_ALIGN_DOWN(x, align)` | 向下对齐 |
+| `CUPOLAS_IS_ALIGNED(x, align)` | 检查是否对齐 |
+
+### 位操作
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_BIT(n)` | 创建第 n 位掩码 |
+| `CUPOLAS_BIT_SET(x, n)` | 设置第 n 位 |
+| `CUPOLAS_BIT_CLEAR(x, n)` | 清除第 n 位 |
+| `CUPOLAS_BIT_TEST(x, n)` | 测试第 n 位 |
+| `CUPOLAS_BIT_FLIP(x, n)` | 翻转第 n 位 |
+
+### 时间工具
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_SLEEP_MS(ms)` | 跨平台毫秒级休眠 |
+
+### 编译时断言
+
+| 宏 | 说明 |
+|------|------|
+| `CUPOLAS_STATIC_ASSERT(cond, msg)` | 编译时断言 |
+
+### 工具函数
+
+| 函数 | 说明 |
+|------|------|
+| `cupolas_strdup(str)` | NULL 安全的字符串复制 |
+| `cupolas_strlcpy(dest, src, len)` | 安全字符串拷贝（始终 null 终止） |
+| `cupolas_memset_s(ptr, len)` | 安全内存清零（防止编译器优化移除） |
+| `cupolas_get_timestamp_ms()` | 获取当前时间戳（毫秒） |
+| `cupolas_get_timestamp_ns()` | 获取高精度时间戳（纳秒） |
+| `cupolas_hash_string(str)` | djb2 字符串哈希（32 位） |
+| `cupolas_log_message(level, fmt, ...)` | 统一日志函数 |
 
 ## 使用示例
 
 ```c
 #include "cupolas_utils.h"
 
-char *data = CUPOLAS_MALLOC(1024);
-if (CUPOLAS_UNLIKELY(data == NULL)) {
-    CUPOLAS_LOG_ERROR("内存分配失败");
-    return CUPOLAS_ERR_INTERNAL;
+int my_function(my_config_t *config) {
+    CUPOLAS_CHECK_NULL(config);
+
+    CUPOLAS_MUTEX_TYPE lock;
+    CUPOLAS_MUTEX_INIT(&lock);
+
+    my_data_t *data = CUPOLAS_ALLOC_STRUCT(my_data_t);
+    if (CUPOLAS_UNLIKELY(data == NULL)) {
+        CUPOLAS_LOG_ERROR("内存分配失败");
+        return cupolas_ERR_OUT_OF_MEMORY;
+    }
+
+    CUPOLAS_MUTEX_LOCK(&lock);
+    /* 临界区... */
+    CUPOLAS_MUTEX_UNLOCK(&lock);
+
+    /* 安全清零敏感数据 */
+    cupolas_memset_s(data->secret, sizeof(data->secret));
+
+    CUPOLAS_FREE(data);
+    CUPOLAS_MUTEX_DESTROY(&lock);
+    return 0;
 }
-
-CUPOLAS_SAFE_COPY(data, source, 1024);
-
-CUPOLAS_SAFE_FREE(data);
-
-CUPOLAS_CHECK_NULL(engine, CUPOLAS_ERR_INVALID_PARAM);
-CUPOLAS_CHECK_PARAM(size > 0 && size <= CUPOLAS_MAX_INPUT_LEN, CUPOLAS_ERR_INVALID_PARAM);
 ```
 
 ## 依赖关系
 
 | 依赖 | 说明 |
 |------|------|
-| `agentos_types.h` | 统一类型定义 |
-| `memory_compat.h` | Commons 内存管理宏 |
-| `logging.h` | Commons 日志系统（桥接目标） |
+| `platform.h` | 平台抽象层（互斥锁定义） |
+| `error.h`（Commons） | 统一错误码定义 |
+| `memory_compat.h`（Commons） | 内存管理宏 |
 | `<string.h>` | 字符串操作 |
 | `<stdlib.h>` | 标准库 |
+| `<stdint.h>` | 固定宽度整数类型 |
 
 ---
 

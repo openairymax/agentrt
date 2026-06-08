@@ -1,6 +1,6 @@
 # LLM Daemon — LLM 服务守护进程
 
-> **模块路径**: `agentos/daemon/llm_d/` | **版本**: v0.1.0
+> **模块路径**: `agentos/daemon/llm_d/` | **版本**: v0.0.5
 
 ## 概述
 

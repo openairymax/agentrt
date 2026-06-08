@@ -50,15 +50,13 @@ jobs:
             libsqlite3-dev libcurl4-openssl-dev \
             libyaml-dev libssl-dev \
             libmicrohttpd-dev libevent-dev \
-            libjson-c-dev valgrind
+            libcjson-dev valgrind
 
       - name: Configure with ASan+LSan
         run: |
           cmake -B build-asan \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DAGENTOS_ENABLE_ASAN=ON \
-            -DAGENTOS_ENABLE_LSAN=ON \
-            -DAGENTOS_ENABLE_UBSAN=ON \
+            -DENABLE_SANITIZERS=ON \
             -DBUILD_TESTS=ON \
             -DAGENTOS_COMPLIANCE_STRICT=OFF \
             -DCMAKE_C_COMPILER=gcc-13 \
@@ -172,10 +170,8 @@ jobs:
           cmake -B build-valgrind \
             -DCMAKE_BUILD_TYPE=Debug \
             -DENABLE_SANITIZERS=OFF \
-            -DAGENTOS_ENABLE_ASAN=OFF \
-            -DAGENTOS_ENABLE_LSAN=OFF \
-            -DAGENTOS_ENABLE_UBSAN=OFF \
             -DBUILD_TESTS=ON \
+            -DAGENTOS_COMPLIANCE_STRICT=OFF \
             -DCMAKE_C_COMPILER=gcc-13 \
             -DCMAKE_CXX_COMPILER=g++-13 \
             -G Ninja

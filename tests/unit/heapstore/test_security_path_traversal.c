@@ -13,8 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "../include/heapstore_log.h"
-#include "../include/utils.h"
+#include "heapstore_log.h"
+#include "utils.h"
 
 #define TEST_PASS(name) printf("✅ PASS: %s\n", name)
 #define TEST_FAIL(name, reason) printf("❌ FAIL: %s - %s\n", name, reason)

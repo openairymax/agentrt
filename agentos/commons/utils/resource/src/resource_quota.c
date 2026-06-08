@@ -10,7 +10,7 @@
 
 #include "resource_quota.h"
 
-#include "../../atoms/corekern/include/agentos.h"
+#include "../../../../atoms/corekern/include/agentos.h"
 #include "../../utils/observability/include/logger.h"
 
 #include <stdlib.h>

@@ -129,7 +129,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # 安装运行时依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
-    libevent-2.1-7 \
+    libevent-2.1-7a \
     libsqlite3-0 \
     libcjson1 \
     libcurl4 \

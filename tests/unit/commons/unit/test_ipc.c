@@ -28,8 +28,8 @@
 #include <setjmp.h>
 #include <string.h>
 #include <cmocka.h>
-#include "include/ipc_common.h"
-#include "../tests/utils/test_framework.h"
+#include "ipc_common.h"
+#include "test_framework.h"
 
 /* ============================================================================
  * 初始化与清理测试

@@ -244,9 +244,9 @@ AgentOS 集成了许多优秀的开源项目，在此表示诚挚的感谢：
 - **感谢**: 推动了深度学习理论的发展
 
 #### Daniel Kahneman
-- **贡献**: 双系统认知理论 (System 1 / System 2)
+- **贡献**: Thinkdual 认知双思系统 (System 1 / System 2)
 - **机构**: 普林斯顿大学 (已故, 1934-2024)
-- **感谢**: 其双系统认知理论深刻影响了 AgentOS CoreLoopThree 的架构设计
+- **感谢**: 其 Thinkdual 认知双思系统深刻影响了 AgentOS CoreLoopThree 的架构设计
 
 ---
 

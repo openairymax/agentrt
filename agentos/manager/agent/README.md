@@ -1,16 +1,24 @@
-# Manager Agent
+# Manager Agent — Agent 注册表配置
 
-AgentOS Manager 模块的 Agent 注册表配置。
+**模块路径**: `agentos/manager/agent/`
+**版本**: v0.0.5
 
-## 文件
+## 概述
 
-| 文件 | 说明 |
-|------|------|
-| `registry.yaml` | Agent 注册表定义（12 个内置 Agent + 1 个自定义模板） |
+`manager/agent/` 包含 AgentOS 的 Agent 注册表配置，定义了 12 个内置 Agent 和 1 个自定义模板的完整注册信息。每个 Agent 包含角色定义、能力声明、双系统模型配置、权限要求、成本概览、信任指标和资源限制等维度，遵循 `schema/agent-registry.schema.json` 规范。
 
-## 注册表结构
+## 目录结构
 
-`registry.yaml` 遵循 `schema/agent-registry.schema.json` 规范，每个 Agent 包含：
+```
+agent/
+└── registry.yaml          # Agent 注册表定义（12 个内置 Agent + 1 个自定义模板）
+```
+
+## 核心组件
+
+### registry.yaml
+
+Agent 注册表，每个 Agent 包含以下字段：
 
 | 字段 | 说明 |
 |------|------|
@@ -41,6 +49,13 @@ AgentOS Manager 模块的 Agent 注册表配置。
 | `analyst_v1` | 分析师 | 数据分析、趋势检测、报告生成、数据可视化 |
 | `custom_template_v1` | 自定义模板 | 可配置的自定义 Agent（默认禁用） |
 
-## 版本
+## 依赖关系
 
-v0.1.0
+| 组件 | 用途 |
+|------|------|
+| `schema/agent-registry.schema.json` | 注册表格式校验 |
+| PyYAML | YAML 配置解析 |
+
+---
+
+© 2026 SPHARX Ltd. All Rights Reserved.

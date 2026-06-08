@@ -549,7 +549,7 @@ check_ban_175_180() {
     log_info "BAN-175~180: Checking core innovation encoding contracts..."
     local contract_issues=0
 
-    # BAN-175: 双思考系统契约检查
+    # BAN-175: Thinkdual 契约检查
     log_info "BAN-175: Checking dual thinking system contracts..."
     local dt_contracts=0
     grep -rq 'thinking_chain_create\|thinking_chain_destroy' \

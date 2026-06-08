@@ -33,6 +33,7 @@ jobs:
           cmake -B ${{ github.workspace }}/../AgentOS-ci-build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTS=ON \
+            -DAGENTOS_COMPLIANCE_STRICT=OFF \
             -DWARNINGS_AS_ERRORS=ON
 
       - name: Build

@@ -1,7 +1,7 @@
 # Compliance — 合规性校验与策略执行
 
 **模块路径**: `agentos/commons/utils/compliance/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 

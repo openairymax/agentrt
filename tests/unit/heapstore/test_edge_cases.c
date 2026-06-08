@@ -14,8 +14,8 @@
 #include <string.h>
 #include "platform.h"
 #include <assert.h>
-#include "../include/heapstore.h"
-#include "../include/utils.h"
+#include "heapstore.h"
+#include "utils.h"
 
 #define TEST_PASS(name) printf("✅ PASS: %s\n", name)
 #define TEST_FAIL(name, reason) printf("❌ FAIL: %s - %s\n", name, reason)

@@ -1,11 +1,11 @@
-# Gateway 部署指南
+# Gateway Deploy — Kubernetes 部署配置
 
 **模块路径**: `agentos/gateway/deploy/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
-`gateway/deploy/` 包含 AgentOS Gateway 的 Kubernetes 和 Docker 部署配置，提供从开发环境到生产环境的完整部署方案。K8s 配置支持多环境 ConfigMap、滚动更新、自动扩缩容、网络策略和 Ingress TLS 终止。
+`gateway/deploy/` 包含 AgentOS Gateway 的 Kubernetes 部署配置，提供从开发环境到生产环境的完整部署方案。K8s 配置支持多环境 ConfigMap、滚动更新、自动扩缩容、网络策略和 Ingress TLS 终止。
 
 ## 目录结构
 
@@ -19,31 +19,67 @@ deploy/
 └── README.md               # 本文件
 ```
 
-## Docker 部署
+## 核心组件
 
-### 开发环境
+### namespace.yaml
 
-```bash
-docker-compose up -d
-```
+创建 `agentos-gateway` 命名空间，隔离网关资源，避免与其他服务冲突。
 
-### 生产环境
+### configmap.yaml
 
-```bash
-docker build -t agentos-gateway:latest .
-docker run -d \
-  --name agentos-gateway \
-  -p 8080:8080 \
-  -p 8081:8081 \
-  -p 9090:9090 \
-  -v /etc/agentos/config:/etc/agentos/gateway:ro \
-  -v /etc/agentos/certs:/etc/agentos/certs:ro \
-  agentos-gateway:latest
-```
+三环境配置分离，通过不同 ConfigMap 段管理 development / staging / production 的差异化配置：
 
-## Kubernetes 部署
+| 配置项 | Development | Staging | Production |
+|--------|-------------|---------|------------|
+| `AGENTOS_LOG_LEVEL` | DEBUG | INFO | WARN |
+| `AGENTOS_MAX_SESSIONS` | 100 | 500 | 1000 |
+| `AGENTOS_SESSION_TIMEOUT` | 3600 | 1800 | 900 |
 
-### 部署步骤
+ConfigMap 挂载到容器 `/etc/agentos/gateway`。
+
+### deployment.yaml
+
+| 资源 | 说明 |
+|------|------|
+| **Deployment** | 3 副本部署，滚动更新策略（maxSurge=1, maxUnavailable=0） |
+| **ServiceAccount** | 服务账户 `agentos-gateway`，用于 RBAC 权限控制 |
+| **HPA** | 基于 CPU(70%) 和内存(80%) 自动扩缩容，范围 3-10 副本，缩容稳定窗口 300s |
+| **安全上下文** | runAsNonRoot，UID 1000，只读根文件系统 |
+| **Pod 反亲和** | 优先调度到不同节点，提升可用性 |
+
+### service.yaml
+
+| 资源 | 说明 |
+|------|------|
+| **Service** | ClusterIP 类型，暴露 HTTP(8080) / WebSocket(8081) / Metrics(9090) |
+| **Headless Service** | 无头服务，用于 StatefulSet 场景下的 Pod 直接寻址 |
+| **Ingress** | Nginx Ingress + cert-manager TLS，支持 API 和 WebSocket 双域名路由 |
+| **NetworkPolicy** | 入站限制（仅 Ingress 和监控命名空间），出站限制（DNS + Redis + 外部 HTTPS） |
+
+## 端口映射
+
+| 端口 | 协议 | 用途 |
+|------|------|------|
+| 8080 | TCP | HTTP REST API |
+| 8081 | TCP | WebSocket 双向通信 |
+| 9090 | TCP | Prometheus 指标端点 |
+
+## 健康检查
+
+| 探针 | 路径 | 初始延迟 | 周期 | 超时 | 失败阈值 |
+|------|------|---------|------|------|---------|
+| **livenessProbe** | `/health` | 10s | 15s | 5s | 3 |
+| **readinessProbe** | `/health/ready` | 5s | 10s | 3s | 3 |
+| **startupProbe** | `/health` | 0s | 5s | 3s | 30 |
+
+## 资源限制
+
+| 资源 | Requests | Limits |
+|------|----------|--------|
+| CPU | 500m | 2 |
+| Memory | 128Mi | 512Mi |
+
+## 使用说明
 
 ```bash
 # 1. 创建命名空间
@@ -58,43 +94,6 @@ kubectl apply -f k8s/deployment.yaml
 # 4. 创建服务暴露（含 Service + Ingress + NetworkPolicy）
 kubectl apply -f k8s/service.yaml
 ```
-
-### K8s 资源说明
-
-| 资源 | 文件 | 说明 |
-|------|------|------|
-| **Namespace** | `namespace.yaml` | 隔离环境 `agentos-gateway`，避免资源冲突 |
-| **ConfigMap** | `configmap.yaml` | 三环境配置：development / staging / production，挂载到容器 `/etc/agentos/gateway` |
-| **Deployment** | `deployment.yaml` | 3 副本部署，滚动更新策略（maxSurge=1, maxUnavailable=0），含安全上下文（runAsNonRoot） |
-| **ServiceAccount** | `deployment.yaml` | 服务账户 `agentos-gateway`，用于 RBAC 权限控制 |
-| **HPA** | `deployment.yaml` | 基于 CPU(70%) 和内存(80%) 自动扩缩容，范围 3-10 副本，缩容稳定窗口 300s |
-| **Service** | `service.yaml` | ClusterIP 类型，暴露 HTTP(8080) / WebSocket(8081) / Metrics(9090) 三个端口 |
-| **Headless Service** | `service.yaml` | 无头服务，用于 StatefulSet 场景下的 Pod 直接寻址 |
-| **Ingress** | `service.yaml` | Nginx Ingress + cert-manager TLS，支持 API 和 WebSocket 双域名路由 |
-| **NetworkPolicy** | `service.yaml` | 入站限制（仅 Ingress 和监控命名空间），出站限制（DNS + Redis + 外部 HTTPS） |
-
-### 端口映射
-
-| 端口 | 协议 | 用途 |
-|------|------|------|
-| 8080 | TCP | HTTP REST API |
-| 8081 | TCP | WebSocket 双向通信 |
-| 9090 | TCP | Prometheus 指标端点 |
-
-### 健康检查
-
-| 探针 | 路径 | 初始延迟 | 周期 | 超时 | 失败阈值 |
-|------|------|---------|------|------|---------|
-| **livenessProbe** | `/health` | 10s | 15s | 5s | 3 |
-| **readinessProbe** | `/health/ready` | 5s | 10s | 3s | 3 |
-| **startupProbe** | `/health` | 0s | 5s | 3s | 30 |
-
-### 资源限制
-
-| 资源 | Requests | Limits |
-|------|----------|--------|
-| CPU | 500m | 2 |
-| Memory | 128Mi | 512Mi |
 
 ## 环境变量
 
@@ -114,14 +113,6 @@ kubectl apply -f k8s/service.yaml
 | `ENABLE_METRICS` | `true` | 是否启用 Prometheus 指标 |
 | `ENABLE_TRACING` | `true` | 是否启用链路追踪 |
 
-### 多环境 ConfigMap 差异
-
-| 配置项 | Development | Staging | Production |
-|--------|-------------|---------|------------|
-| `AGENTOS_LOG_LEVEL` | DEBUG | INFO | WARN |
-| `AGENTOS_MAX_SESSIONS` | 100 | 500 | 1000 |
-| `AGENTOS_SESSION_TIMEOUT` | 3600 | 1800 | 900 |
-
 ## 安全配置
 
 - **TLS**：通过 cert-manager + Let's Encrypt 自动证书管理，Ingress 层 TLS 终止
@@ -136,6 +127,16 @@ kubectl apply -f k8s/service.yaml
 - **Prometheus**：通过注解 `prometheus.io/scrape: "true"` 自动发现，采集端口 9090
 - **Grafana**：预配置 AgentOS 仪表盘（`docker/monitoring/grafana_agentos_dashboard.json`）
 - **告警规则**：`docker/monitoring/alerts.yml` 定义网关专用告警
+
+## 依赖关系
+
+| 组件 | 用途 |
+|------|------|
+| Kubernetes ≥ 1.24 | 容器编排平台 |
+| cert-manager | TLS 证书自动管理 |
+| Nginx Ingress Controller | Ingress 路由 |
+| Prometheus | 指标采集 |
+| Grafana | 可视化仪表盘 |
 
 ---
 
