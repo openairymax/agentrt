@@ -12,12 +12,12 @@
 #include <string.h>
 #include <assert.h>
 
-#include "../../daemon/common/include/safe_string_utils.h"
-#include "../../protocols/include/unified_protocol.h"
-#include "../../protocols/mcp/include/mcp_v1_adapter.h"
-#include "../../protocols/a2a/include/a2a_v03_adapter.h"
-#include "../../protocols/openai/include/openai_enterprise_adapter.h"
-#include "../../protocols/openjiuwen/include/openjiuwen_adapter.h"
+#include "safe_string_utils.h"
+#include "unified_protocol.h"
+#include "mcp_v1_adapter.h"
+#include "a2a_v03_adapter.h"
+#include "openai_enterprise_adapter.h"
+#include "openjiuwen_adapter.h"
 
 /* ============================================================================
  * 测试辅助宏

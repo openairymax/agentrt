@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../memory/memory_provider.h"
+#include "../../memory/src/memory_provider.h"
 #include "syscalls.h"
 extern void agentos_sys_set_memory_provider(void *provider);
 #include "../../coreloopthree/include/cognition.h"

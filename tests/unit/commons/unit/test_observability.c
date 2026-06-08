@@ -12,8 +12,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../utils/test_framework.h"
-#include "../../agentos/commons/utils/observability/include/observability_compat.h"
+#include "test_framework.h"
+#include "observability_compat.h"
 
 /**
  * @brief 模拟指标结构

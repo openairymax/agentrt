@@ -1,6 +1,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # AgentOS Daemon 模块顶层构建文件
 
+message(STATUS "[DAEMON] Configuring daemon module")
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

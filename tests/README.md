@@ -8,7 +8,7 @@
 
 本目录作为所有测试活动的根入口，包含全局配置文件、构建脚本以及五个子目录，分别对应不同测试层级。C 语言测试通过 CMake + CMocka 构建，Python 测试通过 pytest 驱动，性能基准测试使用 pytest-benchmark，Shell 脚本测试使用 bats-core。所有测试均可通过统一入口 `utils/python/run_tests.py` 执行，也支持直接使用 pytest 或 ctest 运行。
 
-> **版本**：v0.1.0
+> **版本**：v0.0.5
 
 ## 与 agentos/ 的对应关系
 

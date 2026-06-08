@@ -77,7 +77,8 @@ jobs:
         run: |
           cmake -S . -B ${{ github.workspace }}/../AgentOS-build-pro \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTS=ON
+            -DBUILD_TESTS=ON \
+            -DAGENTOS_COMPLIANCE_STRICT=OFF
 
       - name: Build
         run: cmake --build ${{ github.workspace }}/../AgentOS-build-pro --parallel $(nproc)

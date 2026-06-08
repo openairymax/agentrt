@@ -1,7 +1,7 @@
 # Types — 类型定义模块
 
 **模块路径**: `agentos/commons/utils/types/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
@@ -23,6 +23,7 @@ types/
 │   ├── sanitize_level.h            # 输入净化级别规范类型（STRICT / NORMAL / RELAXED）
 │   ├── cupolas_vault_cred_type.h   # 凭据类型规范类型（Password / Token / Key / Certificate / Secret / Note）
 │   └── cupolas_signer_info.h       # 代码签名者信息规范类型（X.509 证书身份字段）
+├── .keep                           # Git 目录占位文件
 └── README.md                       # 本文档
 ```
 

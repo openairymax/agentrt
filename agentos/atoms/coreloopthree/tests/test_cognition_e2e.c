@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * test_cognition_e2e.c - 双思考系统端到端集成测试 (INT-01)
+ * test_cognition_e2e.c - Thinkdual端到端集成测试 (INT-01)
  *
  * 验证覆盖:
  *   INT-01.1: 5阶段认知处理管线 (Phase0→Phase4)
@@ -569,7 +569,7 @@ int main(int argc, char *argv[])
 
     printf("=========================================\n");
     printf("  CoreLoopThree E2E Integration Tests\n");
-    printf("  Dual-Thinking System (INT-01)\n");
+    printf("  Thinkdual System (INT-01)\n");
     printf("=========================================\n\n");
 
     /* INT-01.1: 5阶段管线 */

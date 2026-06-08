@@ -1,7 +1,7 @@
 # Observability — 可观测性模块
 
 **模块路径**: `agentos/commons/utils/observability/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 

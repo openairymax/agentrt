@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * 元认知(Metacognition)是Agent对自身思考过程的监控与调节能力。
- * 本模块实现双思考系统中的S1验证角色核心逻辑：
+ * 本模块实现Thinkdual中的S1验证角色核心逻辑：
  * - 推理质量自评估（多维度评分）
  * - 错误检测与自动纠错
  * - 置信度校准（防止过度自信/不自信）

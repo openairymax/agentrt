@@ -4,6 +4,44 @@ target_link_libraries(agentos_atoms INTERFACE agentos_compile_defs)
 
 target_compile_definitions(agentos_atoms INTERFACE AGENTOS_VERSION="${PROJECT_VERSION}")
 
+# 验证 atoms include 目录
+message(STATUS "[ATOMS] Verifying include directories...")
+set(_atoms_inc_dirs
+    corekern/include
+    coreloopthree/include
+    syscall/include
+    ../commons/utils/logging/include
+    ../commons/utils/sync/include
+    ../commons/utils/platform/include
+    ../commons/utils/error/include
+    ../commons/utils/types/include
+    ../commons/utils/config_unified/include
+    ../commons/utils/observability/include
+    ../commons/utils/ipc/include
+    ../commons/utils/io/include
+    ../commons/utils/cache/include
+    ../commons/utils/cost/include
+    ../commons/utils/memory/include
+    ../commons/utils/string/include
+    ../commons/utils/token/include
+    ../commons/utils/network/include
+    ../commons/utils/security/include
+    ../commons/utils/resource/include
+    ../commons/utils/uuid/include
+)
+set(_atoms_inc_missing 0)
+foreach(_dir ${_atoms_inc_dirs})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
+        message(STATUS "[ATOMS]   [OK] ${_dir}")
+    else()
+        message(WARNING "[ATOMS]   [MISSING] ${_dir}")
+        math(EXPR _atoms_inc_missing "${_atoms_inc_missing} + 1")
+    endif()
+endforeach()
+if(_atoms_inc_missing GREATER 0)
+    message(WARNING "[ATOMS]   ${_atoms_inc_missing} include directory(ies) MISSING!")
+endif()
+
 target_include_directories(agentos_atoms INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/corekern/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/coreloopthree/include>

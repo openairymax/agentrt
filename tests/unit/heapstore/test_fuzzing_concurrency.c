@@ -22,10 +22,10 @@
 #include <time.h>
 #include <assert.h>
 
-#include "../include/heapstore.h"
-#include "../include/heapstore_log.h"
-#include "../include/heapstore_registry.h"
-#include "../include/utils.h"
+#include "heapstore.h"
+#include "heapstore_log.h"
+#include "heapstore_registry.h"
+#include "utils.h"
 
 /* ==================== 测试配置 ==================== */
 
