@@ -3,7 +3,7 @@
  * @brief 思考链路模块 - DS-001: Context Window管理+推理依赖链+Working Memory
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * 设计依据: AgentOS双思考系统全方位设计01.md
+ * 设计依据: AgentOS Thinkdual全方位设计01.md
  * - Phase 0: 指令拆解(S1) → Context Window初始化
  * - Phase 2: 执行-验证循环(流式批判) → Thinking Step链式管理
  * - Working Memory: 短期上下文缓存，支持跨步骤信息传递
@@ -41,7 +41,7 @@ typedef struct agentos_memory_engine agentos_memory_engine_t;
 /* ==================== 枚举类型 ==================== */
 
 /**
- * @brief 思考步骤类型（对应双思考系统Phase 0-4）
+ * @brief 思考步骤类型（对应Thinkdual Phase 0-4）
  */
 typedef enum {
     TC_STEP_DECOMPOSITION = 0, /**< Phase 0: 指令拆解 (S1) */
@@ -104,7 +104,7 @@ typedef enum {
 /**
  * @brief 单个思考步骤（链表节点）
  *
- * 每个步骤代表双思考系统中的一次推理操作，
+ * 每个步骤代表Thinkdual中的一次推理操作，
  * 步骤之间通过显式依赖关系链接形成有向无环图(DAG)。
  */
 struct agentos_thinking_step {
@@ -180,7 +180,7 @@ struct agentos_context_window {
  *
  * 短期记忆缓存，存储当前推理过程中的中间结果。
  * 支持按key存取，用于跨步骤信息传递。
- * 对应双思考设计文档中的"Working Memory"组件。
+ * 对应Thinkdual设计文档中的"Working Memory"组件。
  */
 struct agentos_working_memory {
     /* 键值存储 */
@@ -220,7 +220,7 @@ typedef struct {
  * @brief 思考链路（完整结构）
  *
  * 将Context Window + Thinking Steps + Working Memory
- * 整合为统一的双思考推理管线。
+ * 整合为统一的Thinkdual推理管线。
  */
 struct agentos_thinking_chain {
     uint64_t session_id;                   /**< 会话唯一ID */

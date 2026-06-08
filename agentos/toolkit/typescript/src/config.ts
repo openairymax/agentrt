@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - Configuration Module
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 提供客户端配置的定义、创建、验证和合并功能。
@@ -56,7 +56,7 @@ export function defaultConfig(): manager {
     timeout: 30000,
     maxRetries: 3,
     retryDelay: 1000,
-    userAgent: 'AgentOS-TypeScript-tools/3.0.0',
+    userAgent: 'AgentOS-TypeScript-tools/0.1.0',
     debug: false,
     logLevel: 'info',
     maxConnections: 10,

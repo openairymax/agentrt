@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -142,8 +143,8 @@ class CppAnalyzer(BaseLanguageAnalyzer):
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     total_lines += len(f.readlines())
-            except:
-                pass
+            except (OSError, UnicodeDecodeError) as e:
+                logging.warning("无法读取文件 %s: %s", file_path, e)
         
         self.metrics["total_lines"] = total_lines
         
@@ -180,8 +181,8 @@ class CppAnalyzer(BaseLanguageAnalyzer):
                     rule_id="FILE_TOO_LARGE",
                     tool="internal"
                 )
-        except:
-            pass
+        except OSError as e:
+            logging.debug("无法获取文件 %s 大小: %s", file_path, e)
     
     def _run_clang_tidy(self, directory: Path):
         """运行 clang-tidy"""
@@ -289,8 +290,8 @@ class CppAnalyzer(BaseLanguageAnalyzer):
                             rule_id="cppcheck",
                             tool="cppcheck"
                         )
-                except:
-                    pass
+                except (ValueError, IndexError) as e:
+                    logging.debug("解析 cppcheck 输出行失败: %s", e)
     
     def _calculate_complexity_metrics(self, directory: Path):
         """计算复杂度指标（简化版）"""
@@ -394,8 +395,8 @@ class PythonAnalyzer(BaseLanguageAnalyzer):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     total_lines += len(f.readlines())
-            except:
-                pass
+            except (OSError, UnicodeDecodeError) as e:
+                logging.warning("无法读取文件 %s: %s", file_path, e)
         
         self.metrics["total_lines"] = total_lines
         

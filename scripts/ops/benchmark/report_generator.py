@@ -16,7 +16,7 @@ AgentOS 性能基准测试报告生成器
 4. 可定制 - 支持自定义模板和样式
 5. 多平台 - 支持跨平台生成和查看
 
-@version v1.0.0
+@version 0.1.0
 @date 2026-04-11
 @copyright (c) 2026 SPHARX. All Rights Reserved.
 """

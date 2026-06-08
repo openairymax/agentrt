@@ -1,5 +1,5 @@
 # AgentOS 测试模块 Makefile
-# Version: 1.0.0.6
+# Version: 0.1.0
 # Last updated: 2026-03-22
 
 .PHONY: help install test test-unit test-integration test-security test-benchmark

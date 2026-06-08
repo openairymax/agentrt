@@ -4,7 +4,7 @@
 import re
 import os
 
-BASE_DIR = '/home/spharx/SpharxWorks/OpenAirymax/AgentOS'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 WRONG_ORDER_RE = re.compile(
     r'(agentos_error_push_ex\()'

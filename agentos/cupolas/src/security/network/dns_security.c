@@ -40,7 +40,7 @@ int dns_security_init(const cupolas_dns_security_config_t *config)
     if (g_dns.initialized)
         return 0;
 
-    memset(&g_dns, 0, sizeof(g_dns));
+    __builtin_memset(&g_dns, 0, sizeof(g_dns));
 
     if (config) {
         g_dns.config = *config;
@@ -78,7 +78,7 @@ void dns_security_cleanup(void)
         AGENTOS_FREE(g_dns.config.dns_servers);
     }
 
-    memset(&g_dns, 0, sizeof(g_dns));
+    __builtin_memset(&g_dns, 0, sizeof(g_dns));
 }
 
 int dns_configure(const cupolas_dns_security_config_t *config)
@@ -110,8 +110,7 @@ int dns_resolve(const char *hostname, char *ip_out, size_t ip_len)
     if (!ip)
         return AGENTOS_EINVAL;
 
-    strncpy(ip_out, ip, ip_len - 1);
-    ip_out[ip_len - 1] = '\0';
+    AGENTOS_STRNCPY_TERM(ip_out, ip, ip_len);
 
     return 0;
 }

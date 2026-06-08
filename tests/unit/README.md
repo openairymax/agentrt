@@ -4,7 +4,7 @@
 
 ## 概述
 
-`unit/` 目录是 AgentOS 的单元测试中心，共 **137 个文件**（含 3 个结构文件），涵盖从底层内核到上层框架的全面验证。C 语言使用 CMocka 框架，Python 使用 pytest 框架。每个测试文件专注于验证单个模块或函数的正确性，确保各组件在隔离环境下行为符合预期。
+`unit/` 目录是 AgentOS 的单元测试中心，共 **138 个文件**（含 3 个结构文件），涵盖从底层内核到上层框架的全面验证。C 语言使用 CMocka 框架，Python 使用 pytest 框架。每个测试文件专注于验证单个模块或函数的正确性，确保各组件在隔离环境下行为符合预期。
 
 单元测试遵循以下原则：
 - **隔离性**：每个测试用例独立运行，不依赖其他测试的状态
@@ -12,7 +12,7 @@
 - **快速执行**：单元测试应毫秒级完成，不涉及外部 I/O
 - **单一职责**：每个测试函数只验证一个行为
 
-> **版本**：v0.1.0
+> **版本**：v0.0.5
 
 ## 与 agentos/ 模块对应关系
 
@@ -40,11 +40,11 @@
 ## 目录结构
 
 ```
-unit/                              # 共 137 个文件
+unit/                              # 共 138 个文件
 ├── README.md                      # 本文档
 ├── CMakeLists.txt                 # 单元测试构建入口
 ├── __init__.py                    # Python 包初始化
-├── atoms/                         # Atoms 层单元测试（25 个文件）
+├── atoms/                         # Atoms 层单元测试（26 个文件）
 │   ├── test_common_utils.c        #   Atoms 公共工具函数测试
 │   ├── corekern/                  #   内核核心测试（7 个文件）
 │   │   ├── test_main.c            #     内核主入口测试
@@ -285,7 +285,7 @@ pytest tests/unit/ -v -n auto
 | `openlab/` | 10 | pytest | Agent 生命周期、任务调度、工具管理、视频编辑 |
 | `toolkit/` | 12 | pytest | Python/Rust SDK、管理器、检查点、导入完整性 |
 
-> **注意**：当前有 3 个 commons 测试处于禁用状态：`test_config`、`test_types`、`test_ipc`。
+> **注意**：当前有 4 个 commons 单元测试处于禁用状态：`test_config`、`test_types`、`test_ipc`、`test_network`。另有 2 个 commons 集成测试（`test_common_integration`、`test_unified_modules`）也处于禁用状态，共计 6 个。
 
 ---
 

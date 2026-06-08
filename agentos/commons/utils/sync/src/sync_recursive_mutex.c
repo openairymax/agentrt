@@ -33,7 +33,7 @@ sync_result_t sync_recursive_mutex_create(sync_recursive_mutex_t *mutex, const s
     if (attr != NULL && attr->name != NULL) {
         m->name = sync_internal_strdup(attr->name);
     }
-    memset(&m->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&m->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
     InitializeCriticalSection(&m->mutex);

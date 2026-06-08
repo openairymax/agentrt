@@ -77,7 +77,7 @@ static void bench_parallel_dispatcher_single(void)
     agentos_parallel_dispatcher_set_executor(d, mock_executor, NULL);
 
     agentos_tool_call_t call;
-    memset(&call, 0, sizeof(call));
+    AGENTOS_MEMSET(&call, 0, sizeof(call));
     call.tool_name = "bench";
     call.arguments = "{}";
     call.arguments_len = 2;
@@ -112,7 +112,7 @@ static void bench_parallel_dispatcher_multi(void)
     agentos_tool_call_t calls[10];
     const char *tools[] = {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"};
     for (int i = 0; i < 10; i++) {
-        memset(&calls[i], 0, sizeof(calls[i]));
+        AGENTOS_MEMSET(&calls[i], 0, sizeof(calls[i]));
         calls[i].tool_name = tools[i];
         calls[i].arguments = "{}";
         calls[i].arguments_len = 2;
@@ -142,7 +142,7 @@ static void bench_delegate_create_destroy(void)
 {
     BENCH_RUN("delegate create/destroy cycle (10000 iters)");
     agentos_delegate_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.max_depth = 2;
     config.max_iterations = 5;
 
@@ -164,7 +164,7 @@ static void bench_delegate_assign_collect(void)
 {
     BENCH_RUN("delegate assign+collect (5000 iters)");
     agentos_delegate_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.max_depth = 2;
     config.max_iterations = 5;
 
@@ -197,7 +197,7 @@ static void bench_mac_register_1000(void)
     assert(fw != NULL);
 
     mac_agent_info_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     agent.performance_score = 0.9;
     agent.reliability_score = 0.95;
     agent.max_concurrent_tasks = 4;
@@ -228,7 +228,7 @@ static void bench_mac_consensus_100_votes(void)
     assert(fw != NULL);
 
     mac_agent_info_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     agent.performance_score = 0.85;
     agent.reliability_score = 0.90;
     agent.max_concurrent_tasks = 8;
@@ -275,7 +275,7 @@ static void bench_mac_delegate_10_agents(void)
     assert(fw != NULL);
 
     mac_agent_info_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     agent.performance_score = 0.9;
     agent.reliability_score = 0.95;
     agent.max_concurrent_tasks = 4;
@@ -293,7 +293,7 @@ static void bench_mac_delegate_10_agents(void)
     uint64_t t_start = bench_time_ns();
     for (int i = 0; i < n_tasks; i++) {
         mac_collab_task_t task;
-        memset(&task, 0, sizeof(task));
+        AGENTOS_MEMSET(&task, 0, sizeof(task));
         snprintf(task.id, sizeof(task.id), "task_%d", i);
         task.input_json = "{\"type\":\"benchmark\"}";
         char *assigned = NULL;
@@ -321,7 +321,7 @@ static void bench_mac_consensus_100_accuracy(void)
     assert(fw != NULL);
 
     mac_agent_info_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     agent.performance_score = 0.9;
     agent.reliability_score = 0.95;
     agent.max_concurrent_tasks = 8;
@@ -387,7 +387,7 @@ static void bench_mac_1000_agents_no_crash(void)
     assert(fw != NULL);
 
     mac_agent_info_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     agent.performance_score = 0.85;
     agent.reliability_score = 0.90;
     agent.max_concurrent_tasks = 2;
@@ -461,7 +461,7 @@ static void bench_mac_batch_register_1000(void)
 
     mac_agent_info_t agents[1000];
     for (int i = 0; i < 1000; i++) {
-        memset(&agents[i], 0, sizeof(mac_agent_info_t));
+        AGENTOS_MEMSET(&agents[i], 0, sizeof(mac_agent_info_t));
         snprintf(agents[i].id, sizeof(agents[i].id), "batch_%04d", i);
         snprintf(agents[i].name, sizeof(agents[i].name), "BatchAgent_%04d", i);
         agents[i].performance_score = 0.8f + (float)(i % 20) * 0.01f;
@@ -492,7 +492,7 @@ static void bench_mac_hash_lookup_1000(void)
 
     mac_agent_info_t agents[1000];
     for (int i = 0; i < 1000; i++) {
-        memset(&agents[i], 0, sizeof(mac_agent_info_t));
+        AGENTOS_MEMSET(&agents[i], 0, sizeof(mac_agent_info_t));
         snprintf(agents[i].id, sizeof(agents[i].id), "hagent_%04d", i);
         snprintf(agents[i].name, sizeof(agents[i].name), "HashAgent_%04d", i);
         agents[i].performance_score = 0.9;

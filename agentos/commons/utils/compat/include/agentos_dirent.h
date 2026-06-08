@@ -48,7 +48,7 @@ static inline struct dirent *readdir(DIR *dir)
             return NULL;
     }
     dir->first = 0;
-    strncpy(dir->ent.d_name, dir->ffd.cFileName, AGENTOS_MAX_PATH - 1);
+    AGENTOS_STRNCPY_TERM(dir->ent.d_name, dir->ffd.cFileName, AGENTOS_MAX_PATH);
     dir->ent.d_name[AGENTOS_MAX_PATH - 1] = '\0';
     return &dir->ent;
 }

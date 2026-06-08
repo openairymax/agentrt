@@ -15,6 +15,8 @@
 #include "private.h"
 #include "utils.h"
 
+#include "memory_compat.h"
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,8 +88,9 @@ static const char *get_log_base_path(void)
 static void update_current_date(void)
 {
     time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
-    strftime(s_current_date, sizeof(s_current_date), "%Y-%m-%d", tm_info);
+    struct tm tm_buf;
+    localtime_r(&now, &tm_buf);
+    strftime(s_current_date, sizeof(s_current_date), "%Y-%m-%d", &tm_buf);
 }
 
 static FILE *get_main_log_file(void)
@@ -103,7 +106,7 @@ static FILE *get_main_log_file(void)
     }
 
     const char *base = get_log_base_path();
-    strncpy(s_log_root_path, base, sizeof(s_log_root_path) - 1);
+    AGENTOS_STRNCPY_TERM(s_log_root_path, base, sizeof(s_log_root_path));
 
     char kernel_path[heapstore_LOG_MAX_PATH];
     snprintf(kernel_path, sizeof(kernel_path), "%s/kernel", base);
@@ -154,8 +157,7 @@ static FILE *get_service_log_file(const char *service)
 
         FILE *fp = fopen(filepath, "a");
         if (fp) {
-            strncpy(s_service_logs[s_service_log_count].service_name, safe_service,
-                    heapstore_LOG_MAX_SERVICE_LEN - 1);
+            AGENTOS_STRNCPY_TERM(s_service_logs[s_service_log_count].service_name, safe_service, sizeof(heapstore_LOG_MAX_SERVICE_LEN)); (s_service_logs[s_service_log_count].service_name)[(heapstore_LOG_MAX_SERVICE_LEN)-1] = '\0';
             s_service_logs[s_service_log_count].file = fp;
             agentos_mutex_init(&s_service_logs[s_service_log_count].lock);
             s_service_log_count++;
@@ -176,7 +178,7 @@ heapstore_error_t heapstore_log_init(void)
     }
 
     const char *base = get_log_base_path();
-    strncpy(s_log_root_path, base, sizeof(s_log_root_path) - 1);
+    AGENTOS_STRNCPY_TERM(s_log_root_path, base, sizeof(s_log_root_path));
 
     heapstore_ensure_directory(base);
     heapstore_ensure_directory("agentos/heapstore/logs/kernel");
@@ -503,7 +505,7 @@ heapstore_error_t heapstore_log_get_file_info(const char *service, heapstore_log
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    memset(info, 0, sizeof(*info));
+    __builtin_memset(info, 0, sizeof(*info));
 
     char filepath[heapstore_LOG_MAX_PATH];
     const char *base = get_log_base_path();
@@ -514,7 +516,7 @@ heapstore_error_t heapstore_log_get_file_info(const char *service, heapstore_log
         snprintf(filepath, sizeof(filepath), "%s/kernel/agentos.log", base);
     }
 
-    strncpy(info->path, filepath, sizeof(info->path) - 1);
+    AGENTOS_STRNCPY_TERM(info->path, filepath, sizeof(info->path));
 
 #ifdef _WIN32
     struct _stat st;

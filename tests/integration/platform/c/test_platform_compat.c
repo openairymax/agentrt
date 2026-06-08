@@ -377,7 +377,7 @@ static void pt_memory_cross_platform(void)
     /* 写入并验证 */
     for (size_t i = 0; i < sizeof(sizes)/sizeof(sizes[0]); i++) {
         if (ptrs[i]) {
-            memset(ptrs[i], (unsigned char)(i & 0xFF), sizes[i]);
+            AGENTOS_MEMSET(ptrs[i], (unsigned char)(i & 0xFF), sizes[i]);
             unsigned char* p = (unsigned char*)ptrs[i];
             TEST_ASSERT(p[0] == (unsigned char)(i & 0xFF),
                         "写入数据可读回");
@@ -433,7 +433,7 @@ static void pt_string_encoding(void)
 
     /* memcpy/memset 跨平台 */
     char buf[128];
-    memset(buf, 'X', sizeof(buf));
+    AGENTOS_MEMSET(buf, 'X', sizeof(buf));
     TEST_ASSERT(buf[0] == 'X' && buf[127] == 'X', "memset全范围覆盖");
 
     memcpy(buf, "ABCDEF", 6);

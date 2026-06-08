@@ -3,6 +3,8 @@
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
+message(STATUS "[CUPOLAS] Configuring cupolas security module")
+
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
 option(BUILD_WITH_LOGGING "Enable detailed logging" ON)
@@ -125,7 +127,7 @@ set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/agentos/commons)
 # commons 模块的 include 目录
 set(COMMON_INCLUDE_DIRS
     ${COMMON_MODULE_DIR}/platform/include
-    ${COMMON_MODULE_DIR}/utils/core/include
+    ${COMMON_MODULE_DIR}/utils/include
     ${COMMON_MODULE_DIR}/utils/error/include
     ${COMMON_MODULE_DIR}/utils/observability/include
     ${COMMON_MODULE_DIR}/utils/types/include

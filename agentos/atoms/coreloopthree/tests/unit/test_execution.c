@@ -183,7 +183,7 @@ static void test_execution_submit_task(void)
     }
 
     agentos_task_t task;
-    memset(&task, 0, sizeof(task));
+    AGENTOS_MEMSET(&task, 0, sizeof(task));
     task.task_id = "test-task-001";
     task.task_id_len = strlen("test-task-001");
     task.task_timeout_ms = 5000;
@@ -231,7 +231,7 @@ static void test_execution_query_task(void)
     }
 
     agentos_task_t task;
-    memset(&task, 0, sizeof(task));
+    AGENTOS_MEMSET(&task, 0, sizeof(task));
     task.task_id = "query-test-001";
     task.task_id_len = strlen("query-test-001");
     task.task_timeout_ms = 30000;
@@ -268,7 +268,7 @@ static void test_execution_wait_task(void)
     }
 
     agentos_task_t task;
-    memset(&task, 0, sizeof(task));
+    AGENTOS_MEMSET(&task, 0, sizeof(task));
     task.task_id = "wait-test-001";
     task.task_id_len = strlen("wait-test-001");
     task.task_timeout_ms = 1000;
@@ -306,7 +306,7 @@ static void test_execution_get_result(void)
     }
 
     agentos_task_t task;
-    memset(&task, 0, sizeof(task));
+    AGENTOS_MEMSET(&task, 0, sizeof(task));
     task.task_id = "result-test-001";
     task.task_id_len = strlen("result-test-001");
     task.task_timeout_ms = 1000;
@@ -344,7 +344,7 @@ static void test_execution_cancel_task(void)
     }
 
     agentos_task_t task;
-    memset(&task, 0, sizeof(task));
+    AGENTOS_MEMSET(&task, 0, sizeof(task));
     task.task_id = "cancel-test-001";
     task.task_id_len = strlen("cancel-test-001");
     task.task_timeout_ms = 60000;

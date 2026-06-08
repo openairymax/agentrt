@@ -186,11 +186,11 @@ int agentos_intent_classify(const char *input, size_t input_len,
         return AGENTOS_EINVAL;
     }
 
-    memcpy(lower_input, input, input_len);
+    __builtin_memcpy(lower_input, input, input_len);
     lower_input[input_len] = '\0';
     intent_to_lowercase(lower_input);
 
-    memset(result, 0, sizeof(*result));
+    __builtin_memset(result, 0, sizeof(*result));
     result->type = AGENTOS_INTENT_UNKNOWN;
     result->confidence = 0.0f;
 

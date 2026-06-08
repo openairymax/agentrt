@@ -50,7 +50,7 @@ static void test_loop_create_default_config(void)
 static void test_loop_create_custom_config(void)
 {
     agentos_loop_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.loop_config_cognition_threads = 2;
     config.loop_config_execution_threads = 4;
     config.loop_config_memory_threads = 1;
@@ -71,7 +71,7 @@ static void test_loop_create_custom_config(void)
 static void test_loop_create_invalid_config_too_many_threads(void)
 {
     agentos_loop_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.loop_config_cognition_threads = 2000; /* 超过上限1024 */
     config.loop_config_execution_threads = 4;
     config.loop_config_memory_threads = 1;
@@ -93,7 +93,7 @@ static void test_loop_create_invalid_config_too_many_threads(void)
 static void test_loop_create_invalid_zero_queue(void)
 {
     agentos_loop_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.loop_config_max_queued_tasks = 0; /* 非法值 */
 
     agentos_core_loop_t *loop = NULL;
@@ -190,7 +190,7 @@ static void test_loop_get_engines_null_loop(void)
 static void test_loop_config_defaults(void)
 {
     agentos_loop_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
 
     assert(config.loop_config_cognition_threads == 0);
     assert(config.loop_config_execution_threads == 0);
@@ -225,7 +225,7 @@ static void test_api_version_constants(void)
 static void test_loop_config_checkpoint_defaults(void)
 {
     agentos_loop_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
 
     assert(config.loop_config_checkpoint_enabled == 0);
     assert(config.loop_config_checkpoint_path[0] == '\0');
@@ -237,7 +237,7 @@ static void test_loop_config_checkpoint_defaults(void)
 static void test_loop_config_checkpoint_custom(void)
 {
     agentos_loop_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.loop_config_checkpoint_enabled = 1;
     snprintf(config.loop_config_checkpoint_path, sizeof(config.loop_config_checkpoint_path),
              AGENTOS_TMP_DIR "/test_checkpoints");

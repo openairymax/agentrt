@@ -199,7 +199,7 @@ int service_logging_init(const service_logging_config_t *manager)
     }
 
     if (manager) {
-        memcpy(&g_service_state.manager, manager, sizeof(service_logging_config_t));
+        __builtin_memcpy(&g_service_state.manager, manager, sizeof(service_logging_config_t));
     } else {
         g_service_state.manager.enable_rotation = false;
         g_service_state.manager.enable_filtering = false;
@@ -212,7 +212,7 @@ int service_logging_init(const service_logging_config_t *manager)
         g_service_state.manager.config_reload_interval = DEFAULT_CONFIG_RELOAD_INTERVAL;
     }
 
-    memset(&g_service_state.stats, 0, sizeof(service_logging_stats_t));
+    AGENTOS_MEMSET(&g_service_state.stats, 0, sizeof(service_logging_stats_t));
 
     outputter_t *console_outputter = (outputter_t *)AGENTOS_CALLOC(1, sizeof(outputter_t));
     if (console_outputter) {
@@ -232,7 +232,7 @@ int service_logging_configure_rotation(const log_rotation_config_t *manager)
     if (!g_service_state.initialized || !manager)
         return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
-    memcpy(&g_service_state.rotation_config, manager, sizeof(log_rotation_config_t));
+    __builtin_memcpy(&g_service_state.rotation_config, manager, sizeof(log_rotation_config_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }
@@ -242,7 +242,7 @@ int service_logging_configure_transport(const log_transport_config_t *manager)
     if (!g_service_state.initialized || !manager)
         return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
-    memcpy(&g_service_state.transport_config, manager, sizeof(log_transport_config_t));
+    __builtin_memcpy(&g_service_state.transport_config, manager, sizeof(log_transport_config_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }
@@ -263,7 +263,7 @@ int service_logging_add_outputter(const char *name, int type, void *user_data)
     }
 
     outputter->type = type;
-    strncpy(outputter->name, name, sizeof(outputter->name) - 1);
+    AGENTOS_STRNCPY_TERM(outputter->name, name, sizeof(outputter->name));
     outputter->name[sizeof(outputter->name) - 1] = '\0';
     outputter->user_data = user_data;
 
@@ -302,7 +302,7 @@ int service_logging_add_filter(const char *name, int type, void *user_data)
     }
 
     filter->type = type;
-    strncpy(filter->name, name, sizeof(filter->name) - 1);
+    AGENTOS_STRNCPY_TERM(filter->name, name, sizeof(filter->name));
     filter->name[sizeof(filter->name) - 1] = '\0';
     filter->user_data = user_data;
 
@@ -359,7 +359,7 @@ int service_logging_get_stats(service_logging_stats_t *stats)
     if (!g_service_state.initialized || !stats)
         return AGENTOS_EINVAL;
     agentos_mutex_lock(&g_service_state.mutex);
-    memcpy(stats, &g_service_state.stats, sizeof(service_logging_stats_t));
+    __builtin_memcpy(stats, &g_service_state.stats, sizeof(service_logging_stats_t));
     agentos_mutex_unlock(&g_service_state.mutex);
     return 0;
 }
@@ -433,5 +433,5 @@ void service_logging_cleanup(void)
 
     agentos_mutex_destroy(&g_service_state.mutex);
 
-    memset(&g_service_state, 0, sizeof(g_service_state));
+    AGENTOS_MEMSET(&g_service_state, 0, sizeof(g_service_state));
 }

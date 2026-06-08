@@ -13,7 +13,7 @@ AgentOS 脚本工具集是项目全生命周期管理的核心基础设施，涵
 - **模块化编排**：每个子模块职责单一、接口清晰，可独立运行也可组合编排
 - **安全优先**：集成安全扫描、编码修复、桩函数检测等多层安全保障
 
-> **版本**：v0.1.0
+> **版本**：v0.0.5
 >
 > **规范**：所有构建脚本遵循 BAN-33 规则（禁止源内构建），构建产物必须输出到独立构建目录中。
 
@@ -53,8 +53,9 @@ scripts/
 │   ├── build/                     #   跨平台构建（BAN-33 源外构建，Linux/macOS/Windows）
 │   ├── setup/                     #   环境配置（交互式安装，Linux/macOS/Windows）
 │   ├── cli/                       #   CLI 入口（agentos 统一命令行工具）
-│   ├── cmake/                     #   CMake 辅助（Windows MSVC 兼容性预包含头）
-│   └── utils/                     #   开发辅助（快速启动/环境验证/错误码生成）
+│   ├── cmake/                     #   CMake 辅助（Windows MSVC 兼容性预包含头 + Sanitizers 配置）
+│   ├── docs/                      #   文档生成（Doxygen 配置）
+│   └── utils/                     #   开发辅助（快速启动/环境验证/错误码生成/代码修复工具集）
 ├── ops/                           # 运维部署与测试
 │   ├── deploy/                    #   Docker 部署（双 Dockerfile + 四环境 Compose 编排）
 │   ├── benchmark/                 #   性能基准测试框架（统计引擎/报告生成/历史对比）
@@ -77,7 +78,7 @@ scripts/
 
 - **pipeline/**：完整的 CI/CD 流水线编排，从依赖安装、模块编译、测试执行、质量门禁到产物部署的全链路自动化。集成 C 语言安全编码静态检查（`security_check.py`）和安全回归测试（`security_regression.sh`），支持 Linux 和 macOS 双平台依赖管理。
 - **quality/**：代码质量分析工具集，核心为 `unified_quality_analyzer.py` 统一质量分析器，支持多语言 SDK 质量检测。`fix_encoding.py` 合并了原有的三个编码修复脚本，提供 `check`、`fix-bom`、`fix-double` 三个子命令。
-- **verify/**：构建验证与安全扫描，覆盖 SDK 构建验证（Linux/macOS/Windows）、MemoryRovol 构建模式测试和 SEC-017 桩函数检测。
+- **verify/**：构建验证与安全扫描，覆盖 SDK 构建验证（Linux/macOS/Windows）、MemoryRovol 构建模式测试、SEC-017 桩函数检测、禁止函数检测和动态 memcpy 检查。
 - **release/**：发布管理，支持一键版本发布和历史构建产物清理。
 
 ### dev/ — 开发环境与构建工具
@@ -88,7 +89,9 @@ scripts/
 - **setup/**：交互式开发环境配置，自动检测系统环境并安装所需依赖和工具链。
 - **cli/agentos**：统一 CLI 命令行入口，提供服务管理、智能体管理、任务管理等子命令。
 - **cmake/windows_preinclude.h**：Windows MSVC 兼容性预包含头，定义 `WIN32_LEAN_AND_MEAN` 等宏以减少 Windows.h 的编译开销。
-- **utils/**：开发辅助工具，包含快速启动脚本和环境完整性验证。
+- **cmake/Sanitizers.cmake**：CMake Sanitizers 配置模块，支持 AddressSanitizer、MemorySanitizer、UndefinedBehaviorSanitizer 等编译器插桩工具。
+- **docs/Doxyfile**：Doxygen 文档生成配置文件，用于从源码注释自动生成 API 参考文档。
+- **utils/**：开发辅助工具，包含快速启动脚本、环境完整性验证和代码修复工具集（14 个文件）。
 
 ### ops/ — 运维部署与测试
 

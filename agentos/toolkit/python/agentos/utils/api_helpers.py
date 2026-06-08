@@ -15,6 +15,7 @@ from agentos.exceptions import (
     NetworkError,
     ServerError,
     http_status_to_error,
+    http_status_to_code,
 )
 
 
@@ -108,45 +109,6 @@ def handle_api_response(
     
     except ValueError as e:
         raise InvalidResponseError(f"JSON解析失败: {str(e)}")
-
-
-def http_status_to_code(status_code: int) -> str:
-    """
-    将 HTTP 状态码映射到 AgentOS 错误码
-    
-    Args:
-        status_code: HTTP 状态码
-    
-    Returns:
-        str: AgentOS 错误码
-    
-    Mapping:
-        400 -> 0x0002 (InvalidParameter)
-        401 -> 0x000D (Unauthorized)
-        403 -> 0x000E (Forbidden)
-        404 -> 0x0005 (NotFound)
-        408 -> 0x0004 (Timeout)
-        429 -> 0x000F (RateLimited)
-        500-504 -> 0x000C (ServerError)
-        Other -> 0x0001 (Unknown)
-    """
-    mapping = {
-        400: "0x0002",  # InvalidParameter
-        401: "0x000D",  # Unauthorized
-        403: "0x000E",  # Forbidden
-        404: "0x0005",  # NotFound
-        405: "0x0013",  # NotSupported
-        408: "0x0004",  # Timeout
-        409: "0x0007",  # Conflict
-        422: "0x0012",  # ValidationError
-        429: "0x000F",  # RateLimited
-        500: "0x000C",  # ServerError
-        502: "0x000C",  # ServerError
-        503: "0x000C",  # ServerError
-        504: "0x0004",  # Timeout
-    }
-    
-    return mapping.get(status_code, "0x0001")  # Unknown
 
 
 def validate_response_data(
@@ -254,6 +216,6 @@ def build_error_context(
         ctx.update(context)
     
     if isinstance(error, AgentOSError):
-        ctx["error_code"] = error.code
+        ctx["error_code"] = error.error_code
     
     return ctx

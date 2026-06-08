@@ -6,7 +6,12 @@
 # 演示如何通过基类消除重复代码
 
 import pytest
-from tests.utils.python.base_test import BaseTestCase
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
+
+from utils.python.base_test import BaseTestCase
 
 from agentos.modules.task.manager import TaskManager
 from agentos.types import TaskStatus

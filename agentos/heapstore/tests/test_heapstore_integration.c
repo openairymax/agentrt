@@ -132,7 +132,7 @@ static void test_registry_workflow(void)
     assert(err == heapstore_SUCCESS);
 
     heapstore_agent_record_t agent;
-    memset(&agent, 0, sizeof(agent));
+    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
     snprintf(agent.id, sizeof(agent.id), "agent_integration_%ld", (long)time(NULL));
     snprintf(agent.name, sizeof(agent.name), "Integration Test Agent");
     snprintf(agent.type, sizeof(agent.type), "planning");
@@ -170,7 +170,7 @@ static void test_trace_workflow(void)
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t span;
-    memset(&span, 0, sizeof(span));
+    AGENTOS_MEMSET(&span, 0, sizeof(span));
     snprintf(span.trace_id, sizeof(span.trace_id), "trace_integration_%ld", (long)time(NULL));
     snprintf(span.span_id, sizeof(span.span_id), "span_integration_001");
     span.parent_span_id[0] = '\0';

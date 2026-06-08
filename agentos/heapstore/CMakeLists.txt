@@ -1,3 +1,5 @@
+message(STATUS "[HEAPSTORE] Configuring heapstore module (SQLite3: ${AGENTOS_HAS_SQLITE3})")
+
 set(heapstore_SOURCES
     src/heapstore_core.c
     src/heapstore_registry.c

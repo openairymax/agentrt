@@ -16,12 +16,13 @@ AgentOS 性能基准测试历史比较器
 4. 自动化 - 支持CI/CD集成
 5. 可追溯性 - 完整的比较历史记录
 
-@version v1.0.0
+@version 0.1.0
 @date 2026-04-11
 @copyright (c) 2026 SPHARX. All Rights Reserved.
 """
 
 import json
+import logging
 import math
 import statistics
 from dataclasses import dataclass, field
@@ -33,6 +34,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats as scipy_stats
+
+logger = logging.getLogger(__name__)
 
 
 class ChangeSignificance(Enum):
@@ -621,7 +624,8 @@ class HistoryComparator:
                     continue
                 
                 candidates.append((result_id, result, days_diff))
-            except:
+            except (ValueError, TypeError) as e:
+                logger.debug("跳过无效时间戳结果 %s: %s", result_id, e)
                 continue
         
         if not candidates:
@@ -667,7 +671,8 @@ class HistoryComparator:
                 try:
                     timestamp = datetime.fromisoformat(result.timestamp.replace('Z', '+00:00'))
                     relevant_results.append((timestamp, result_id, result))
-                except:
+                except (ValueError, TypeError) as e:
+                    logger.debug("跳过无效时间戳结果: %s", e)
                     continue
         
         if len(relevant_results) < 2:
@@ -813,7 +818,8 @@ class HistoryComparator:
                     days_diff = (datetime.now() - result_date).days
                     if days_diff > days_back:
                         continue
-                except:
+                except (ValueError, TypeError) as e:
+                    logger.debug("跳过无效时间戳结果: %s", e)
                     continue
             
             # 计算关键指标

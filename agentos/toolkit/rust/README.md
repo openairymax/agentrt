@@ -1,7 +1,7 @@
 # Toolkit Rust — AgentOS Rust SDK
 
 **模块路径**: `agentos/toolkit/rust/`
-**版本**: v0.1.0 (SDK v0.1.0)
+**版本**: v0.0.5 (SDK v0.0.5)
 
 ## 概述
 
@@ -146,7 +146,10 @@ let client = new_client_with_api_key("http://localhost:18789", "key")?;
 ### TaskManager
 
 ```rust
-let task_mgr = client.task_manager();
+use std::sync::Arc;
+use agentos_rs::{new_client, TaskManager, MemoryManager, MemoryLayer};
+
+let task_mgr = TaskManager::new(Arc::new(client));
 
 let task = task_mgr.submit("analyze data").await?;
 let result = task_mgr.wait(&task.id, Duration::from_secs(30)).await?;
@@ -157,11 +160,14 @@ task_mgr.cancel(&task_id).await?;
 ### MemoryManager
 
 ```rust
-let memory_mgr = client.memory_manager();
+use std::sync::Arc;
+use agentos_rs::{new_client, MemoryManager, MemoryLayer};
 
-let memory_id = memory_mgr.write("content", None).await?;
+let memory_mgr = MemoryManager::new(Arc::new(client));
+
+let memory_id = memory_mgr.write("content", MemoryLayer::L1).await?;
 let memories = memory_mgr.search("query", 5).await?;
-let memory = memory_mgr.read(&memory_id).await?;
+let memory = memory_mgr.get(&memory_id).await?;
 memory_mgr.delete(&memory_id).await?;
 ```
 
@@ -192,7 +198,7 @@ cargo build --release
 cargo test
 
 # 运行基准测试
-cargo test --bench
+cargo test --test benchmark_test
 
 # 运行文档生成
 cargo doc --open
@@ -204,19 +210,20 @@ cargo clippy
 ## 使用示例
 
 ```rust
-use agentos_rs::{new_client, TaskManager, MemoryManager};
+use std::sync::Arc;
+use agentos_rs::{new_client, TaskManager, MemoryManager, MemoryLayer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = new_client("http://localhost:18789")?;
 
-    let task_mgr = client.task_manager();
+    let task_mgr = TaskManager::new(Arc::new(client.clone()));
     let task = task_mgr.submit("Analyze sales data").await?;
     let result = task_mgr.wait(&task.id, std::time::Duration::from_secs(60)).await?;
     println!("Task result: {:?}", result.output);
 
-    let memory_mgr = client.memory_manager();
-    let memory_id = memory_mgr.write("Analysis result stored", None).await?;
+    let memory_mgr = MemoryManager::new(Arc::new(client));
+    let memory_id = memory_mgr.write("Analysis result stored", MemoryLayer::L1).await?;
     println!("Memory saved: {}", memory_id);
 
     Ok(())

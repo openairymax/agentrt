@@ -128,12 +128,14 @@ class TestToolResult:
         assert "Warning 1" in result.warnings
 
 
-class SimpleTestTool:
+from openlab.core.tool import Tool, ToolResult, ToolCategory, ToolContext, ToolCapability
+
+class SimpleTestTool(Tool):
     """Simple concrete implementation of Tool for testing."""
 
     NAME = "test_tool"
     DESCRIPTION = "A test tool"
-    CATEGORY = None
+    CATEGORY = ToolCategory.CUSTOM
     CAPABILITIES = set()
     INPUT_SCHEMA = {
         "type": "object",
@@ -142,12 +144,9 @@ class SimpleTestTool:
     }
 
     def __init__(self, tool_id=None):
-        self.tool_id = tool_id or f"{self.NAME}_{id(self)}"
-        self._enabled = True
-        self._last_used = None
-        self._usage_count = 0
+        super().__init__(tool_id)
 
-    async def _do_execute(self, parameters: Dict[str, Any], context) -> Any:
+    async def _do_execute(self, parameters: Dict[str, Any], context: ToolContext) -> ToolResult:
         return ToolResult(success=True, output=f"Processed: {parameters['value']}")
 
 

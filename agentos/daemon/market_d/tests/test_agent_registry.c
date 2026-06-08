@@ -36,7 +36,7 @@ static void test_market_register_agent(void)
     assert(ret == 0 && svc != NULL);
 
     agent_info_t info;
-    memset(&info, 0, sizeof(info));
+    AGENTOS_MEMSET(&info, 0, sizeof(info));
     info.agent_id = "test_agent_001";
     info.name = "Test Agent";
     info.version = "1.0.0";
@@ -61,7 +61,7 @@ static void test_market_search_agents(void)
     assert(ret == 0 && svc != NULL);
 
     agent_info_t info;
-    memset(&info, 0, sizeof(info));
+    AGENTOS_MEMSET(&info, 0, sizeof(info));
     info.agent_id = "search_test_agent";
     info.name = "Search Test Agent";
     info.version = "1.0.0";
@@ -70,7 +70,7 @@ static void test_market_search_agents(void)
     market_service_register_agent(svc, &info);
 
     search_params_t params;
-    memset(&params, 0, sizeof(params));
+    AGENTOS_MEMSET(&params, 0, sizeof(params));
     params.query = "Search Test";
 
     agent_info_t **agents = NULL;
@@ -97,14 +97,14 @@ static void test_market_get_installed_agents(void)
     assert(ret == 0 && svc != NULL);
 
     agent_info_t info1;
-    memset(&info1, 0, sizeof(info1));
+    AGENTOS_MEMSET(&info1, 0, sizeof(info1));
     info1.agent_id = "installed_agent_1";
     info1.name = "Installed Agent 1";
     info1.version = "1.0.0";
     info1.type = AGENT_TYPE_ASSISTANT;
 
     agent_info_t info2;
-    memset(&info2, 0, sizeof(info2));
+    AGENTOS_MEMSET(&info2, 0, sizeof(info2));
     info2.agent_id = "installed_agent_2";
     info2.name = "Installed Agent 2";
     info2.version = "2.0.0";
@@ -135,7 +135,7 @@ static void test_market_uninstall_agent(void)
     assert(ret == 0 && svc != NULL);
 
     agent_info_t info;
-    memset(&info, 0, sizeof(info));
+    AGENTOS_MEMSET(&info, 0, sizeof(info));
     info.agent_id = "uninstall_test_agent";
     info.name = "Uninstall Test";
     info.version = "1.0.0";

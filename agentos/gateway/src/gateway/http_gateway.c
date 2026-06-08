@@ -619,16 +619,19 @@ gateway_t *http_gateway_create(const char *host, uint16_t port)
                     count++;
             }
 
-            gateway->cors.allowed_origins = AGENTOS_MALLOC(count * sizeof(char *));
-            if (gateway->cors.allowed_origins) {
-                char *saveptr = NULL;
-                char *token = strtok_r(origins_copy, ",", &saveptr);
-                size_t i = 0;
-                while (token && i < count) {
-                    gateway->cors.allowed_origins[i++] = AGENTOS_STRDUP(token);
-                    token = strtok_r(NULL, ",", &saveptr);
+            if (count <= SIZE_MAX / sizeof(char *)) {
+                gateway->cors.allowed_origins =
+                    (char **)agentos_malloc_array(count, sizeof(char *));
+                if (gateway->cors.allowed_origins) {
+                    char *saveptr = NULL;
+                    char *token = strtok_r(origins_copy, ",", &saveptr);
+                    size_t i = 0;
+                    while (token && i < count) {
+                        gateway->cors.allowed_origins[i++] = AGENTOS_STRDUP(token);
+                        token = strtok_r(NULL, ",", &saveptr);
+                    }
+                    gateway->cors.allowed_origins_count = i;
                 }
-                gateway->cors.allowed_origins_count = i;
             }
             AGENTOS_FREE(origins_copy);
         }

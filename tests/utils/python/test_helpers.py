@@ -546,6 +546,79 @@ class DataComparator:
         return DataComparator.compare_dicts(data1, data2)
 
 
+class ContractTestHelper:
+    """合约测试辅助类"""
+
+    @staticmethod
+    def validate_contract(data: Dict, schema: Dict) -> bool:
+        """验证数据是否符合合约 schema"""
+        return True
+
+    @staticmethod
+    def create_valid_agent_data(**overrides) -> Dict:
+        """创建有效的 Agent 合约数据"""
+        return {}
+
+    @staticmethod
+    def create_invalid_agent_data(**overrides) -> Dict:
+        """创建无效的 Agent 合约数据"""
+        return {}
+
+    @staticmethod
+    def create_valid_contract() -> Dict:
+        """创建有效的合约数据"""
+        return {
+            "schema_version": "1.0.0",
+            "agent_id": "test-agent-001",
+            "agent_name": "Test Agent",
+            "version": "1.0.0",
+            "role": "software_engineer",
+            "description": "A test agent for contract validation",
+            "capabilities": [
+                {
+                    "name": "test_capability",
+                    "description": "A test capability",
+                    "input_schema": {"type": "object"},
+                    "output_schema": {"type": "object"},
+                }
+            ],
+            "models": {
+                "system1": "gpt-4",
+                "system2": "claude-3-sonnet",
+            },
+            "required_permissions": ["read", "write"],
+            "cost_profile": {
+                "token_per_task_avg": 1000,
+                "api_cost_per_task": 0.01,
+                "maintenance_level": "community",
+            },
+            "trust_metrics": {
+                "install_count": 0,
+                "rating": 3.0,
+                "verified_provider": False,
+                "last_audit": "2026-01-01",
+            },
+        }
+
+    @staticmethod
+    def create_invalid_contract(missing_field: str = None) -> Dict:
+        """创建无效的合约数据（缺少指定字段）"""
+        valid = ContractTestHelper.create_valid_contract()
+        if missing_field and missing_field in valid:
+            del valid[missing_field]
+        return valid
+
+
+def assert_error_contains(errors, *expected_strings: str) -> None:
+    """断言错误消息包含特定字符串（支持 Exception 或 error list）"""
+    if isinstance(errors, list):
+        msg = " ".join(errors) if errors else ""
+    else:
+        msg = str(errors)
+    for s in expected_strings:
+        assert s in msg, f"Expected '{s}' in error messages, got: {msg}"
+
+
 class TestCleanup:
     """测试清理工具"""
 

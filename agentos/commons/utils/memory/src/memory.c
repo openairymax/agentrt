@@ -287,7 +287,7 @@ static void *memory_allocate_internal(size_t size, const char *tag, bool zero, s
 
     // 清零内存
     if (zero || g_state.options.zero_memory) {
-        memset(ptr, 0, size);
+        __builtin_memset(ptr, 0, size);
     }
 
     // 更新统计信息
@@ -316,10 +316,10 @@ bool memory_init(const memory_options_t *options)
 
     // 设置选项
     if (options != NULL) {
-        memcpy(&g_state.options, options, sizeof(memory_options_t));
+        __builtin_memcpy(&g_state.options, options, sizeof(memory_options_t));
     }
 
-    // 初始化统计信?    memset(&g_state.stats, 0, sizeof(memory_stats_t));
+    // 初始化统计信?    __builtin_memset(&g_state.stats, 0, sizeof(memory_stats_t));
 
     g_state.initialized = true;
     g_state.debug_enabled = false;
@@ -388,7 +388,7 @@ void *memory_alloc(size_t size, const char *tag)
         // 如果模块未初始化，使用系统默认分配
         void *ptr = malloc(size);
         if (ptr != NULL) {
-            memset(ptr, 0, size);
+            __builtin_memset(ptr, 0, size);
         }
         return ptr;
     }
@@ -421,7 +421,7 @@ void *memory_aligned_alloc(size_t alignment, size_t size, const char *tag)
 #ifdef _WIN32
         void *ptr = _aligned_malloc(size, alignment);
         if (ptr != NULL) {
-            memset(ptr, 0, size);
+            __builtin_memset(ptr, 0, size);
         }
         return ptr;
 #else
@@ -430,7 +430,7 @@ void *memory_aligned_alloc(size_t alignment, size_t size, const char *tag)
             return NULL;
         }
         if (ptr != NULL) {
-            memset(ptr, 0, size);
+            __builtin_memset(ptr, 0, size);
         }
         return ptr;
 #endif
@@ -472,11 +472,11 @@ void *memory_realloc(void *ptr, size_t new_size, const char *tag)
     if (debug_info && g_state.debug_enabled) {
         debug_info_saved = true;
         if (debug_info->tag)
-            strncpy(saved_tag, debug_info->tag, sizeof(saved_tag) - 1);
+            AGENTOS_STRNCPY_TERM(saved_tag, debug_info->tag, sizeof(saved_tag));
         if (debug_info->file)
-            strncpy(saved_file, debug_info->file, sizeof(saved_file) - 1);
+            AGENTOS_STRNCPY_TERM(saved_file, debug_info->file, sizeof(saved_file));
         if (debug_info->function)
-            strncpy(saved_func, debug_info->function, sizeof(saved_func) - 1);
+            AGENTOS_STRNCPY_TERM(saved_func, debug_info->function, sizeof(saved_func));
         saved_line = debug_info->line;
         memory_remove_debug_info(old_ptr);
     }
@@ -577,12 +577,12 @@ bool memory_get_stats(memory_stats_t *stats)
     }
 
     if (!g_state.initialized) {
-        memset(stats, 0, sizeof(memory_stats_t));
+        __builtin_memset(stats, 0, sizeof(memory_stats_t));
         return true;
     }
 
     memory_lock();
-    memcpy(stats, &g_state.stats, sizeof(memory_stats_t));
+    __builtin_memcpy(stats, &g_state.stats, sizeof(memory_stats_t));
 
     // 计算泄漏次数
     if (g_state.debug_enabled) {
@@ -607,7 +607,7 @@ void memory_reset_stats(void)
     }
 
     memory_lock();
-    memset(&g_state.stats, 0, sizeof(memory_stats_t));
+    __builtin_memset(&g_state.stats, 0, sizeof(memory_stats_t));
     memory_unlock();
 }
 

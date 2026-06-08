@@ -4,8 +4,10 @@
 # This CMakeLists.txt bridges the external repo into the AgentOS build.
 # The AGENTOS_WITH_MEMORYROVOL option is defined in the root CMakeLists.txt.
 
+message(STATUS "[MEMORYROVOL] AGENTOS_WITH_MEMORYROVOL=${AGENTOS_WITH_MEMORYROVOL}")
+
 if(NOT AGENTOS_WITH_MEMORYROVOL)
-    message(STATUS "MemoryRovol integration disabled (set -DAGENTOS_WITH_MEMORYROVOL=ON to enable)")
+    message(STATUS "[MEMORYROVOL] Integration disabled (set -DAGENTOS_WITH_MEMORYROVOL=ON to enable)")
     return()
 endif()
 
@@ -14,28 +16,34 @@ endif()
 #   1. MEMORYROVOL_DIR cmake variable
 #   2. MEMORYROVOL_ROOT environment variable
 #   3. Sibling directory relative to AgentOS root (OpenAirymax/MemoryRovol)
+message(STATUS "[MEMORYROVOL] Searching for external MemoryRovol source...")
 if(NOT MEMORYROVOL_DIR)
     if(DEFINED ENV{MEMORYROVOL_ROOT})
         set(MEMORYROVOL_DIR "$ENV{MEMORYROVOL_ROOT}")
+        message(STATUS "[MEMORYROVOL]   Found via MEMORYROVOL_ROOT env: ${MEMORYROVOL_DIR}")
     else()
         get_filename_component(_agentos_root "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
         get_filename_component(_workspace_root "${_agentos_root}/.." ABSOLUTE)
         set(_mr_candidate "${_workspace_root}/MemoryRovol")
+        message(STATUS "[MEMORYROVOL]   Checking sibling: ${_mr_candidate}")
         if(EXISTS "${_mr_candidate}/CMakeLists.txt")
             set(MEMORYROVOL_DIR "${_mr_candidate}")
+            message(STATUS "[MEMORYROVOL]   Found at sibling directory")
+        else()
+            message(STATUS "[MEMORYROVOL]   Sibling directory not found")
         endif()
     endif()
 endif()
 
 if(NOT MEMORYROVOL_DIR OR NOT EXISTS "${MEMORYROVOL_DIR}/CMakeLists.txt")
-    message(WARNING "MemoryRovol source not found. "
+    message(WARNING "[MEMORYROVOL] Source not found! "
         "Set MEMORYROVOL_DIR or MEMORYROVOL_ROOT environment variable. "
         "Falling back to builtin provider only.")
     set(AGENTOS_WITH_MEMORYROVOL OFF CACHE BOOL "Build with MemoryRovol" FORCE)
     return()
 endif()
 
-message(STATUS "MemoryRovol source found: ${MEMORYROVOL_DIR}")
+message(STATUS "[MEMORYROVOL] Source found: ${MEMORYROVOL_DIR}")
 
 # Propagate AgentOS workspace root and include paths to MemoryRovol build
 set(AGENTOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." CACHE PATH "AgentOS workspace root directory" FORCE)
@@ -72,7 +80,7 @@ target_include_directories(agentos_memoryrovol PRIVATE
 # Force-include AgentOS compat headers for MemoryRovol sources
 # that lack explicit #include of these headers
 target_compile_options(agentos_memoryrovol PRIVATE
-    "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/agentos_mr_force_includes.h"
+    "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/src/agentos_mr_force_includes.h"
 )
 
 # Create interface library that links MemoryRovol into AgentOS atoms

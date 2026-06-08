@@ -59,7 +59,7 @@ static int router_std_add_route(proto_router_iface_t *router, const char *source
         return AGENTOS_EINVAL;
 
     protocol_rule_t rule;
-    memset(&rule, 0, sizeof(rule));
+    AGENTOS_MEMSET(&rule, 0, sizeof(rule));
     rule.source_protocol = source_proto;
     rule.target_protocol = target_proto;
     rule.source_endpoint = source_pattern;
@@ -90,7 +90,7 @@ static int router_std_route(proto_router_iface_t *router, const unified_message_
     AGENTOS_CHECK(decision != NULL, AGENTOS_EINVAL, "decision is NULL");
 
     unified_message_t transformed;
-    memset(&transformed, 0, sizeof(transformed));
+    AGENTOS_MEMSET(&transformed, 0, sizeof(transformed));
 
     int result = protocol_router_route(impl->handle, message, &transformed);
     if (result == 0) {
@@ -263,7 +263,7 @@ static int gw_request_adapter_trampoline(const char *raw_request, size_t request
     char request_buf[4096];
     size_t copy_len =
         request_size < sizeof(request_buf) - 1 ? request_size : sizeof(request_buf) - 1;
-    memcpy(request_buf, raw_request, copy_len);
+    __builtin_memcpy(request_buf, raw_request, copy_len);
     request_buf[copy_len] = '\0';
 
     int result =
@@ -310,8 +310,8 @@ static int gw_std_register_protocol(proto_gateway_iface_t *gw, const char *name,
     }
 
     gw_protocol_entry_t *entry = &g_gw_impl->protocols[g_gw_impl->protocol_count++];
-    memset(entry, 0, sizeof(*entry));
-    strncpy(entry->name, name, sizeof(entry->name) - 1);
+    AGENTOS_MEMSET(entry, 0, sizeof(*entry));
+    AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
     entry->vtable = adapter;
     return 0;
 }
@@ -328,10 +328,10 @@ static int gw_std_unregister_protocol(proto_gateway_iface_t *gw, const char *nam
         if (strcmp(g_gw_impl->protocols[i].name, name) == 0) {
             AGENTOS_FREE(g_gw_impl->protocols[i].adapter_ctx);
             g_gw_impl->protocols[i].adapter_ctx = NULL;
-            memmove(&g_gw_impl->protocols[i], &g_gw_impl->protocols[i + 1],
+            __builtin_memmove(&g_gw_impl->protocols[i], &g_gw_impl->protocols[i + 1],
                     (g_gw_impl->protocol_count - i - 1) * sizeof(gw_protocol_entry_t));
             g_gw_impl->protocol_count--;
-            memset(&g_gw_impl->protocols[g_gw_impl->protocol_count], 0,
+            AGENTOS_MEMSET(&g_gw_impl->protocols[g_gw_impl->protocol_count], 0,
                    sizeof(gw_protocol_entry_t));
             return 0;
         }
@@ -504,7 +504,7 @@ static int gw_std_get_protocol_stats(proto_gateway_iface_t *gw, const char *name
     agentos_proto_gw_log(gw, "get_protocol_stats");
     if (!stats)
         return AGENTOS_EINVAL;
-    memset(stats, 0, sizeof(*stats));
+    AGENTOS_MEMSET(stats, 0, sizeof(*stats));
 
     if (!g_gw_impl)
         return AGENTOS_ERR_NOT_FOUND;

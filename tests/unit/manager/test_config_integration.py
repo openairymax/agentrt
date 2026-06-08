@@ -328,7 +328,7 @@ class ConfigIntegrationTester:
     
     def test_scheduler_dual_cognitive_system(self) -> IntegrationTestResult:
         """
-        测试调度器双系统认知配置
+        测试调度器Thinkdual认知配置
         
         验证 kernel/settings.yaml 中包含 System 1 和 System 2 的完整配置
         """
@@ -336,7 +336,7 @@ class ConfigIntegrationTester:
         
         if kernel_config is None:
             return IntegrationTestResult(
-                test_name="调度器双系统认知配置",
+                test_name="调度器Thinkdual认知配置",
                 passed=False,
                 details="无法加载 kernel/settings.yaml",
                 severity="error"
@@ -371,7 +371,7 @@ class ConfigIntegrationTester:
         is_pass = len(issues) == 0
         
         return IntegrationTestResult(
-            test_name="调度器双系统认知配置 (C-1 原则)",
+            test_name="调度器Thinkdual认知配置 (C-1 原则)",
             passed=is_pass,
             details=f"System 1: {'✅' if system1 else '❌'}, System 2: {'✅' if system2 else '❌'}" +
                    (f"\n问题: {'; '.join(issues)}" if issues else ""),

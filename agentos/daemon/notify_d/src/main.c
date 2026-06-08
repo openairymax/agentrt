@@ -92,7 +92,7 @@ static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key,
     snprintf(combined, sizeof(combined), "%s%s", client_key, NOTIFY_D_WS_GUID);
 
     unsigned char sha1[20];
-    memset(sha1, 0, sizeof(sha1));
+    __builtin_memset(sha1, 0, sizeof(sha1));
 
     unsigned int h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE;
     unsigned int h3 = 0x10325476, h4 = 0xC3D2E1F0;
@@ -104,7 +104,7 @@ static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key,
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "calloc failed for SHA1 padded buffer");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    memcpy(padded, combined, msg_len);
+    __builtin_memcpy(padded, combined, msg_len);
     padded[msg_len] = 0x80;
 
     uint64_t bit_len = (uint64_t)msg_len * 8;
@@ -214,7 +214,7 @@ static int notify_d_handle_ws_upgrade(notify_d_service_t *svc, notify_client_t *
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "Sec-WebSocket-Key too long");
         return AGENTOS_ERR_UNKNOWN;
     }
-    memcpy(client_key, key_start, key_len);
+    __builtin_memcpy(client_key, key_start, key_len);
     client_key[key_len] = '\0';
 
     char accept_key[64];
@@ -370,9 +370,15 @@ static DWORD WINAPI notify_d_event_loop(LPVOID arg)
         } else {
             agentos_mutex_unlock(&svc->lock);
 #ifndef _WIN32
-            sleep(1);
+            /* 替代 sleep(1)，允许更快响应关闭信号 */
+            for (int _w = 0; _w < 10 && svc->event_running; _w++) {
+                usleep(100000); /* 100ms */
+            }
 #else
-            Sleep(1000);
+            /* 替代 Sleep(1000)，允许更快响应关闭信号 */
+            for (int _w = 0; _w < 10 && svc->event_running; _w++) {
+                Sleep(100); /* 100ms */
+            }
 #endif
         }
     }
@@ -428,11 +434,12 @@ static notify_client_t *notify_d_find_client_slot(notify_d_service_t *svc)
 
 static int notify_d_init(notify_d_service_t *svc, int port, const char *sock)
 {
-    if (!svc)
+    if (!svc) {
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-    return AGENTOS_EINVAL;
+        return AGENTOS_EINVAL;
+    }
 
-    memset(svc, 0, sizeof(*svc));
+    __builtin_memset(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : NOTIFY_D_DEFAULT_PORT;
     svc->socket_path = sock ? AGENTOS_STRDUP(sock) : AGENTOS_STRDUP(NOTIFY_D_DEFAULT_SOCKET);
     svc->start_time = (uint64_t)time(NULL);
@@ -446,9 +453,10 @@ static int notify_d_init(notify_d_service_t *svc, int port, const char *sock)
 
 static int notify_d_start(notify_d_service_t *svc)
 {
-    if (!svc)
+    if (!svc) {
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-    return AGENTOS_EINVAL;
+        return AGENTOS_EINVAL;
+    }
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
@@ -478,9 +486,10 @@ static int notify_d_start(notify_d_service_t *svc)
 
 static int notify_d_stop(notify_d_service_t *svc, int force)
 {
-    if (!svc)
+    if (!svc) {
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-    return AGENTOS_EINVAL;
+        return AGENTOS_EINVAL;
+    }
 
     agentos_mutex_lock(&svc->lock);
     svc->running = 0;
@@ -534,9 +543,10 @@ static int notify_d_stop(notify_d_service_t *svc, int force)
 
 static int notify_d_destroy(notify_d_service_t *svc)
 {
-    if (!svc)
+    if (!svc) {
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-    return AGENTOS_EINVAL;
+        return AGENTOS_EINVAL;
+    }
 
     notify_d_stop(svc, 1);
 
@@ -546,7 +556,7 @@ static int notify_d_destroy(notify_d_service_t *svc)
     agentos_socket_cleanup();
     agentos_mutex_destroy(&svc->lock);
     AGENTOS_FREE(svc->socket_path);
-    memset(svc, 0, sizeof(*svc));
+    __builtin_memset(svc, 0, sizeof(*svc));
     SVC_LOG_INFO("notify_d: service destroyed");
     return AGENTOS_SUCCESS;
 }
@@ -563,12 +573,14 @@ static int notify_d_healthcheck(notify_d_service_t *svc)
         if (svc->clients[i].active)
             active_clients++;
     }
-    (void)svc->pending_count;
+    size_t pending = svc->pending_count;
+    size_t error_count = svc->error_count;
+    size_t notified_count = svc->notified_count;
     agentos_mutex_unlock(&svc->lock);
 
-    if (svc->pending_count >= NOTIFY_D_MAX_PENDING)
+    if (pending >= NOTIFY_D_MAX_PENDING)
         healthy = 0;
-    if (svc->error_count > svc->notified_count / 2 && svc->notified_count > 10)
+    if (error_count > notified_count / 2 && notified_count > 10)
         healthy = 0;
 
     return healthy;
@@ -599,7 +611,7 @@ static void notify_d_handle_request(notify_d_service_t *svc, agentos_socket_t cl
         return;
     }
 
-    memset(client, 0, sizeof(*client));
+    __builtin_memset(client, 0, sizeof(*client));
     client->fd = client_fd;
     client->connected_at = (uint64_t)time(NULL);
     client->last_activity = client->connected_at;
@@ -637,7 +649,7 @@ static void notify_d_handle_request(notify_d_service_t *svc, agentos_socket_t cl
                 size_t clen = (size_t)(che - (ch + strlen(channel_hdr)));
                 char *cn = (char *)AGENTOS_MALLOC(clen + 1);
                 if (cn) {
-                    memcpy(cn, ch + strlen(channel_hdr), clen);
+                    __builtin_memcpy(cn, ch + strlen(channel_hdr), clen);
                     cn[clen] = '\0';
                     channel = cn;
                 }

@@ -393,7 +393,7 @@ int log_init(const log_config_t *manager)
     g_tls_span_id[0] = '\0';
 
     if (manager) {
-        memcpy(&g_logging_state.manager, manager, sizeof(log_config_t));
+        __builtin_memcpy(&g_logging_state.manager, manager, sizeof(log_config_t));
     } else {
         g_logging_state.manager.level = DEFAULT_LOG_LEVEL;
         g_logging_state.manager.outputs = 1 << LOG_OUTPUT_CONSOLE;
@@ -414,7 +414,7 @@ int log_set_default_config(const log_config_t *manager)
     }
 
     agentos_mutex_lock(&g_logging_state.mutex);
-    memcpy(&g_logging_state.default_config, manager, sizeof(log_config_t));
+    __builtin_memcpy(&g_logging_state.default_config, manager, sizeof(log_config_t));
     agentos_mutex_unlock(&g_logging_state.mutex);
 
     return 0;
@@ -520,7 +520,7 @@ const char *log_set_trace_id(const char *trace_id)
     if (!g_logging_state.initialized) return NULL;
 
     if (trace_id) {
-        strncpy(g_tls_trace_id, trace_id, sizeof(g_tls_trace_id) - 1);
+        AGENTOS_STRNCPY_TERM(g_tls_trace_id, trace_id, sizeof(g_tls_trace_id));
         g_tls_trace_id[sizeof(g_tls_trace_id) - 1] = '\0';
     } else {
         g_tls_trace_id[0] = '\0';
@@ -540,7 +540,7 @@ const char *log_set_span_id(const char *span_id)
     if (!g_logging_state.initialized) return NULL;
 
     if (span_id) {
-        strncpy(g_tls_span_id, span_id, sizeof(g_tls_span_id) - 1);
+        AGENTOS_STRNCPY_TERM(g_tls_span_id, span_id, sizeof(g_tls_span_id));
         g_tls_span_id[sizeof(g_tls_span_id) - 1] = '\0';
     } else {
         g_tls_span_id[0] = '\0';
@@ -575,8 +575,7 @@ int log_set_module_level(const char *module_pattern, log_level_t level)
     // 添加新模?
     if (g_logging_state.module_level_count <
         sizeof(g_logging_state.module_levels) / sizeof(g_logging_state.module_levels[0])) {
-        strncpy(g_logging_state.module_levels[g_logging_state.module_level_count].pattern,
-                module_pattern, sizeof(g_logging_state.module_levels[0].pattern) - 1);
+        AGENTOS_STRNCPY_TERM(g_logging_state.module_levels[g_logging_state.module_level_count].pattern, module_pattern, sizeof(g_logging_state.module_levels[0].pattern));
         g_logging_state.module_levels[g_logging_state.module_level_count]
             .pattern[sizeof(g_logging_state.module_levels[0].pattern) - 1] = '\0';
         g_logging_state.module_levels[g_logging_state.module_level_count].level = level;
@@ -609,7 +608,22 @@ int log_reload_config(const char *config_path)
 
     while (fgets(line, sizeof(line), fp)) {
         char key[128], value[256];
-        if (sscanf(line, " %127[^= ] = %255[^\n\r]", key, value) == 2) {
+        char *saveptr = NULL;
+        char *key_tok = strtok_r(line, " =\r\n", &saveptr);
+        if (!key_tok) continue;
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+        char *val_tok = eq + 1;
+        while (*val_tok == ' ') val_tok++;
+        size_t key_len = strlen(key_tok);
+        if (key_len >= sizeof(key)) key_len = sizeof(key) - 1;
+        __builtin_memcpy(key, key_tok, key_len);
+        key[key_len] = '\0';
+        size_t val_len = strlen(val_tok);
+        if (val_len >= sizeof(value)) val_len = sizeof(value) - 1;
+        __builtin_memcpy(value, val_tok, val_len);
+        value[val_len] = '\0';
+        {
             if (strcmp(key, "level") == 0) {
                 log_level_t lvl = log_level_from_string(value);
                 if ((int)lvl >= 0 && lvl < LOG_LEVEL_COUNT) {
@@ -702,7 +716,7 @@ void log_cleanup(void)
     g_tls_span_id[0] = '\0';
 
     for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
-        memset(&g_logging_state.module_levels[i], 0, sizeof(g_logging_state.module_levels[i]));
+        AGENTOS_MEMSET(&g_logging_state.module_levels[i], 0, sizeof(g_logging_state.module_levels[i]));
     }
     g_logging_state.module_level_count = 0;
 
@@ -711,5 +725,5 @@ void log_cleanup(void)
     agentos_mutex_unlock(&g_logging_state.mutex);
     agentos_mutex_destroy(&g_logging_state.mutex);
 
-    memset(&g_logging_state, 0, sizeof(g_logging_state));
+    AGENTOS_MEMSET(&g_logging_state, 0, sizeof(g_logging_state));
 }

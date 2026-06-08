@@ -34,7 +34,7 @@ int protocol_adapter_create(agentos_protocol_type_t type, protocol_adapter_t *ad
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "protocol_adapter_create: failed");
         return AGENTOS_ERR_UNKNOWN;
         }
-    memset(adapter, 0, sizeof(*adapter));
+    AGENTOS_MEMSET(adapter, 0, sizeof(*adapter));
     adapter->type = type;
     adapter->init = NULL;
     return 0;
@@ -133,7 +133,7 @@ void protocol_handler_router_destroy(protocol_handler_router_t router)
 {
     if (!router)
         return;
-    memset(router->handlers, 0, sizeof(router->handlers));
+    AGENTOS_MEMSET(router->handlers, 0, sizeof(router->handlers));
     router->handler_count = 0;
     AGENTOS_FREE(router);
 }
@@ -154,7 +154,7 @@ protocol_handler_route_result_t protocol_handler_router_register(protocol_handle
         }
     }
 
-    strncpy(router->handlers[router->handler_count].name, protocol_name, MAX_HANDLER_NAME - 1);
+    AGENTOS_STRNCPY_TERM(router->handlers[router->handler_count].name, protocol_name, MAX_HANDLER_NAME);
     router->handlers[router->handler_count].name[MAX_HANDLER_NAME - 1] = '\0';
     router->handlers[router->handler_count].context = handler_context;
     router->handlers[router->handler_count].adapter = NULL;

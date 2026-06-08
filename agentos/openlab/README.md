@@ -1,13 +1,13 @@
 # OpenLab — 开放生态系统
 
 **模块路径**: `agentos/openlab/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
-> **Status**: OpenLab 作为 AgentOS v0.1.0 的正式组成部分，API 已稳定。
+> **Status**: OpenLab 作为 AgentOS 的正式组成部分，API 持续演进中。
 
 ## 概述
 
-OpenLab 是 AgentOS 的开放生态系统层，提供应用（Applications）、社区贡献（Contributions）、市场（Markets）和核心管理（Core）四大能力体系，构建开放、协作的 Agent 开发生态。各模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成，并通过 protocols 层进行通信。OpenLab 遵循 AgentOS 架构设计原则 V1.8，实现了生产级多智能体编排框架。
+OpenLab 是 AgentOS 的开放生态系统层，提供应用（Applications）、社区贡献（Contributions）、市场（Markets）和核心管理（Core）四大能力体系，构建开放、协作的 Agent 开发生态。各模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。OpenLab 遵循 AgentOS 架构设计原则 V1.8，实现了生产级多智能体编排框架。
 
 ## 设计目标
 
@@ -23,28 +23,35 @@ OpenLab 是 AgentOS 的开放生态系统层，提供应用（Applications）、
 openlab/
 ├── openlab/                    # 核心管理模块
 │   ├── core/                   # 核心组件（Agent/Task/Tool/Storage）
-│   │   ├── agent.py            # Agent 基类、注册表、状态管理
-│   │   ├── task.py             # 任务调度、状态机、执行计划
+│   │   ├── __init__.py         # 核心模块导出
+│   │   ├── agent.py            # Agent 基类、状态、注册表
+│   │   ├── task.py             # 任务定义、状态机、调度器
 │   │   ├── tool.py             # 工具抽象、注册表、执行器
 │   │   └── storage.py          # 存储抽象（Memory/SQLite）
 │   ├── agents/                 # 预构建 Agent 实现
 │   │   └── architect/          # 架构师 Agent
+│   │       ├── __init__.py
+│   │       └── agent.py
 │   ├── protocols/              # 协议处理模块
+│   │   └── __init__.py
 │   ├── utils/                  # 工具函数
+│   │   ├── __init__.py
 │   │   ├── exceptions.py       # 异常层级定义
 │   │   └── logging.py          # 日志配置
+│   ├── __init__.py             # 模块入口，导出所有核心类
 │   ├── config.yaml             # 核心配置文件
-│   └── requirements.txt        # Python 依赖
+│   ├── requirements.txt        # Python 依赖
+│   └── run.sh                  # 启动脚本
 ├── app/                        # 官方智能应用
 │   ├── docgen/                 # 文档生成应用
 │   ├── ecommerce/              # 电商助手应用
-│   ├── research/               # 研究助手应用
+│   ├── research/               # 研究助手应用（规划阶段）
 │   └── videoedit/              # 视频编辑应用
 ├── contrib/                    # 社区贡献
 │   ├── skills/                 # 可复用技能模块
-│   │   ├── browser_skill/      # 浏览器自动化技能
-│   │   ├── database_skill/     # 数据库操作技能
-│   │   └── github_skill/       # GitHub 集成技能
+│   │   ├── browser_skill/      # 浏览器自动化技能（规范定义阶段）
+│   │   ├── database_skill/     # 数据库操作技能（规范定义阶段）
+│   │   └── github_skill/       # GitHub 集成技能（规范定义阶段）
 │   ├── strategies/             # 调度和规划策略
 │   │   ├── dispatching/        # 任务调度策略
 │   │   └── planning/           # 任务规划策略
@@ -58,8 +65,8 @@ openlab/
 │       └── product_manager/    # 产品经理
 ├── markets/                    # 市场与模板
 │   ├── templates/              # 项目模板
-│   │   ├── python-agent/       # Python Agent 模板
-│   │   └── rust-skill/         # Rust Skill 模板
+│   │   ├── python-agent/       # Python Agent 模板（规范定义阶段）
+│   │   └── rust-skill/         # Rust Skill 模板（规范定义阶段）
 │   ├── agents/                 # Agent 市场
 │   │   ├── contracts/          # 契约验证
 │   │   ├── installer/          # 安装器 CLI
@@ -69,7 +76,17 @@ openlab/
 │       ├── installer/          # 安装器 CLI
 │       └── registry/           # 注册索引
 ├── tests/                      # 测试套件
+│   ├── conftest.py             # 测试配置
+│   ├── __init__.py
 │   └── unit/                   # 单元测试
+│       ├── test_agent.py
+│       ├── test_task.py
+│       ├── test_tool.py
+│       ├── test_storage.py
+│       ├── test_planning.py
+│       ├── test_dispatching.py
+│       └── test_videoedit.py
+├── __init__.py                 # 包入口
 ├── pyproject.toml              # 项目构建配置
 ├── Dockerfile                  # 容器化构建
 └── README.md                   # 本文件
@@ -95,8 +112,8 @@ openlab/
 |  |  (app/)          |  |  (contrib/)      |  |  (markets/)      | |
 |  |                  |  |                  |  |                  | |
 |  | • DocGen         |  | • Skills         |  | • Templates      | |
-|  | • E-Commerce     |  | • Strategies     |  | • Agents         | |
-|  | • Research       |  | • Agents         |  | • Skills         | |
+|  | • E-Commerce     |  | • Strategies     |  | • Agents Market  | |
+|  | • Research       |  | • Agents         |  | • Skills Market  | |
 |  | • VideoEdit      |  |                  |  |                  | |
 |  +------------------+  +------------------+  +------------------+ |
 +-------------------------------------------------------------------+
@@ -115,7 +132,7 @@ openlab/
 |------|------|------|
 | **DocGen** | `app/docgen/` | 智能文档生成，支持 Markdown/HTML/PDF 多格式输出，Jinja2 模板渲染 |
 | **E-Commerce** | `app/ecommerce/` | 智能电商助手，支持商品管理、订单处理、Stripe 支付集成 |
-| **Research** | `app/research/` | 智能研究助手，支持文献检索、数据分析、报告生成 |
+| **Research** | `app/research/` | 智能研究助手，支持文献检索、数据分析、报告生成（规划阶段） |
 | **VideoEdit** | `app/videoedit/` | 智能视频编辑，基于 FFmpeg，支持剪辑/合并/特效/字幕/GIF |
 
 ## 贡献指南
@@ -137,9 +154,9 @@ openlab/
 
 ## 依赖关系
 
-- **核心依赖**: Python >= 3.10, FastAPI, Pydantic, SQLAlchemy, PyYAML
+- **核心依赖**: Python >= 3.10, asyncio, dataclasses, abc, sqlite3, json, uuid, time
 - **协议依赖**: AgentOS protocols 层（JSON-RPC 2.0）
-- **可选依赖**: Redis, Stripe, OpenCV, MoviePy, Playwright, Selenium 等（按应用场景）
+- **可选依赖**: FastAPI, Pydantic, SQLAlchemy, PyYAML, Jinja2, FFmpeg, Redis, Stripe, OpenCV, MoviePy, Playwright, Selenium 等（按应用场景）
 
 ## 构建说明
 
@@ -161,24 +178,28 @@ docker build -t agentos-openlab .
 
 ```python
 import asyncio
-from openlab.core.agent import AgentManager, AgentRegistry
+from openlab.core.agent import Agent, AgentRegistry, AgentContext, AgentCapability
 from openlab.core.task import TaskScheduler, TaskDefinition, TaskCategory
-from openlab.agents.architect import ArchitectAgent
+from openlab.core.storage import MemoryStorage, DataCategory
 
 async def main():
     registry = AgentRegistry()
-    manager = AgentManager(registry)
+    storage = MemoryStorage()
+    await storage.initialize()
 
-    agent = await manager.create_agent(
-        agent_class=ArchitectAgent,
-        agent_id="architect-001",
-        manager={"verbose": True},
+    await storage.set("key1", {"data": "value"}, category=DataCategory.METADATA)
+    record = await storage.get("key1")
+
+    scheduler = TaskScheduler(max_concurrent=10)
+    definition = TaskDefinition(
+        name="example_task",
+        category=TaskCategory.IMMEDIATE,
+        priority=5,
     )
+    task_id = await scheduler.submit(definition)
 
-    result = await agent.execute(context, input_data)
-    print(result)
-
-    await manager.shutdown()
+    await storage.close()
+    await scheduler.shutdown()
 
 asyncio.run(main())
 ```

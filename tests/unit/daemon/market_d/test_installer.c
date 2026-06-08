@@ -47,7 +47,7 @@ static void test_installer_prepare_request(void) {
     assert(inst != NULL);
 
     install_request_t request;
-    memset(&request, 0, sizeof(request));
+    AGENTOS_MEMSET(&request, 0, sizeof(request));
     request.package_id = "test_package_001";
     request.version = "1.0.0";
     request.install_path = AGENTOS_TMP_DIR "/test_install";
@@ -87,7 +87,7 @@ static void test_installer_download_progress(void) {
     assert(inst != NULL);
 
     install_progress_t progress;
-    memset(&progress, 0, sizeof(progress));
+    AGENTOS_MEMSET(&progress, 0, sizeof(progress));
     progress.total_bytes = 1024;
     progress.downloaded_bytes = 512;
     progress.percentage = 50;
@@ -107,7 +107,7 @@ static void test_installer_rollback(void) {
     assert(inst != NULL);
 
     install_request_t request;
-    memset(&request, 0, sizeof(request));
+    AGENTOS_MEMSET(&request, 0, sizeof(request));
     request.package_id = "rollback_test";
     request.version = "1.0.0";
 

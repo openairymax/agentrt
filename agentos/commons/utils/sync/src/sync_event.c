@@ -34,7 +34,7 @@ sync_result_t sync_event_create(sync_event_t *event, bool manual_reset, bool ini
     if (attr != NULL && attr->name != NULL) {
         e->name = sync_internal_strdup(attr->name);
     }
-    memset(&e->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&e->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
     e->event = CreateEvent(NULL, (BOOL)manual_reset, (BOOL)initial_state, NULL);

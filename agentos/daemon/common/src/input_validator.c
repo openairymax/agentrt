@@ -51,7 +51,7 @@ int validator_add_rule(validation_result_t *validator, const validation_rule_t *
     }
 
     validation_rule_t *r = &validator->rules[validator->rule_count];
-    memset(r, 0, sizeof(*r));
+    __builtin_memset(r, 0, sizeof(*r));
     r->type = rule->type;
     r->required = rule->required;
     r->min_len = rule->min_len;

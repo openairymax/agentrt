@@ -28,7 +28,7 @@ static void test_registry_register_agent(void) {
     assert(reg != NULL);
 
     agent_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "test_agent_001";
     meta.name = "Test Agent";
     meta.version = "1.0.0";
@@ -49,7 +49,7 @@ static void test_registry_get_agent(void) {
     assert(reg != NULL);
 
     agent_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "get_test_agent";
     meta.name = "Get Test Agent";
     meta.version = "1.0.0";
@@ -72,7 +72,7 @@ static void test_registry_unregister_agent(void) {
     assert(reg != NULL);
 
     agent_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "unregister_test";
     meta.name = "Unregister Test";
     meta.version = "1.0.0";
@@ -97,13 +97,13 @@ static void test_registry_list_agents(void) {
     assert(reg != NULL);
 
     agent_meta_t meta1;
-    memset(&meta1, 0, sizeof(meta1));
+    AGENTOS_MEMSET(&meta1, 0, sizeof(meta1));
     meta1.id = "list_agent_1";
     meta1.name = "List Agent 1";
     meta1.version = "1.0.0";
 
     agent_meta_t meta2;
-    memset(&meta2, 0, sizeof(meta2));
+    AGENTOS_MEMSET(&meta2, 0, sizeof(meta2));
     meta2.id = "list_agent_2";
     meta2.name = "List Agent 2";
     meta2.version = "1.0.0";
@@ -134,14 +134,14 @@ static void test_registry_search_agents(void) {
     assert(reg != NULL);
 
     agent_meta_t meta1;
-    memset(&meta1, 0, sizeof(meta1));
+    AGENTOS_MEMSET(&meta1, 0, sizeof(meta1));
     meta1.id = "search_agent_1";
     meta1.name = "Search Test Agent";
     meta1.version = "1.0.0";
     meta1.description = "A searchable agent";
 
     agent_meta_t meta2;
-    memset(&meta2, 0, sizeof(meta2));
+    AGENTOS_MEMSET(&meta2, 0, sizeof(meta2));
     meta2.id = "search_agent_2";
     meta2.name = "Another Agent";
     meta2.version = "1.0.0";

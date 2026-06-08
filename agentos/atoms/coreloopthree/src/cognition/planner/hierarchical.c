@@ -102,8 +102,8 @@ static agentos_error_t hierarchical_plan_func(const agentos_intent_t __attribute
 
     hierarchical_data_t *data = (hierarchical_data_t *)context;
 
-    agentos_task_plan_t *plan =
-        (agentos_task_plan_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
+    agentos_task_plan_t *plan;
+    SAFE_MALLOC_ARRAY(plan, 1, sizeof(agentos_task_plan_t));
     if (!plan)
         ATM_RET_ERR(AGENTOS_ENOMEM);
 

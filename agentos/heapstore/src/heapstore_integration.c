@@ -118,12 +118,11 @@ agentos_error_t heapstore_integration_init(const char *root_path)
     }
 
     if (root_path) {
-        strncpy(g_root_path, root_path, sizeof(g_root_path) - 1);
-        g_root_path[sizeof(g_root_path) - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(g_root_path, root_path, sizeof(g_root_path));
     } else {
         const char *env = getenv("AGENTOS_HEAPSTORE_ROOT");
         if (env && env[0]) {
-            strncpy(g_root_path, env, sizeof(g_root_path) - 1);
+            AGENTOS_STRNCPY_TERM(g_root_path, env, sizeof(g_root_path));
         } else {
             snprintf(g_root_path, sizeof(g_root_path), "%s/agentos/heapstore",
                      getenv("TMPDIR") ? getenv("TMPDIR") : AGENTOS_TMP_DIR);
@@ -165,15 +164,15 @@ agentos_error_t heapstore_syscall_session_save(const char *session_id, const cha
     }
 
     heapstore_session_record_t record;
-    memset(&record, 0, sizeof(record));
-    strncpy(record.id, session_id, sizeof(record.id) - 1);
+    __builtin_memset(&record, 0, sizeof(record));
+    AGENTOS_STRNCPY_TERM(record.id, session_id, sizeof(record.id));
     if (metadata) {
-        strncpy(record.user_id, metadata, sizeof(record.user_id) - 1);
+        AGENTOS_STRNCPY_TERM(record.user_id, metadata, sizeof(record.user_id));
     }
     record.created_at = created_ns;
     record.last_active_at = last_active_ns;
     record.ttl_seconds = 0;
-    strncpy(record.status, "active", sizeof(record.status) - 1);
+    AGENTOS_STRNCPY_TERM(record.status, "active", sizeof(record.status));
 
     heapstore_error_t err = heapstore_registry_add_session(&record);
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
@@ -192,7 +191,7 @@ agentos_error_t heapstore_syscall_session_load(const char *session_id, char **ou
     }
 
     heapstore_session_record_t record;
-    memset(&record, 0, sizeof(record));
+    __builtin_memset(&record, 0, sizeof(record));
 
     heapstore_error_t err = heapstore_registry_get_session(session_id, &record);
     if (err != heapstore_SUCCESS) {
@@ -249,6 +248,10 @@ agentos_error_t heapstore_syscall_session_list(char ***out_sessions, size_t *out
 
     size_t count = 0;
     size_t capacity = 16;
+    if (capacity > SIZE_MAX / sizeof(char *)) {
+        heapstore_registry_iter_destroy(iter);
+        return AGENTOS_E_OVERFLOW;
+    }
     char **sessions = (char **)AGENTOS_MALLOC(capacity * sizeof(char *));
     if (!sessions) {
         heapstore_registry_iter_destroy(iter);
@@ -311,14 +314,14 @@ agentos_error_t heapstore_syscall_trace_save(const char *trace_id, const char *s
     }
 
     heapstore_span_t record;
-    memset(&record, 0, sizeof(record));
+    __builtin_memset(&record, 0, sizeof(record));
 
-    strncpy(record.trace_id, trace_id, sizeof(record.trace_id) - 1);
-    strncpy(record.span_id, span_id, sizeof(record.span_id) - 1);
+    AGENTOS_STRNCPY_TERM(record.trace_id, trace_id, sizeof(record.trace_id));
+    AGENTOS_STRNCPY_TERM(record.span_id, span_id, sizeof(record.span_id));
     if (parent_id) {
-        strncpy(record.parent_span_id, parent_id, sizeof(record.parent_span_id) - 1);
+        AGENTOS_STRNCPY_TERM(record.parent_span_id, parent_id, sizeof(record.parent_span_id));
     }
-    strncpy(record.name, name, sizeof(record.name) - 1);
+    AGENTOS_STRNCPY_TERM(record.name, name, sizeof(record.name));
     record.start_time_ns = (uint64_t)start_time_us * 1000;
     record.end_time_ns = (uint64_t)end_time_us * 1000;
     snprintf(record.status, sizeof(record.status), "%d", status);
@@ -366,17 +369,17 @@ agentos_error_t heapstore_memoryrovol_save(const void *data, size_t len, const c
     }
 
     heapstore_memory_pool_t pool;
-    memset(&pool, 0, sizeof(pool));
+    __builtin_memset(&pool, 0, sizeof(pool));
 
     snprintf(pool.pool_id, sizeof(pool.pool_id), "mem_raw_%llu", (unsigned long long)time(NULL));
-    strncpy(pool.name, "memoryrovol_raw", sizeof(pool.name) - 1);
+    AGENTOS_STRNCPY_TERM(pool.name, "memoryrovol_raw", sizeof(pool.name));
     pool.total_size = len;
     pool.used_size = len;
     pool.block_size = len;
     pool.block_count = 1;
     pool.free_block_count = 0;
     pool.created_at = (uint64_t)time(NULL);
-    strncpy(pool.status, "active", sizeof(pool.status) - 1);
+    AGENTOS_STRNCPY_TERM(pool.status, "active", sizeof(pool.status));
 
     heapstore_error_t err = heapstore_memory_record_pool(&pool);
     if (err != heapstore_SUCCESS) {
@@ -384,14 +387,14 @@ agentos_error_t heapstore_memoryrovol_save(const void *data, size_t len, const c
     }
 
     heapstore_memory_allocation_t alloc;
-    memset(&alloc, 0, sizeof(alloc));
-    strncpy(alloc.allocation_id, pool.pool_id, sizeof(alloc.allocation_id) - 1);
-    strncpy(alloc.pool_id, pool.pool_id, sizeof(alloc.pool_id) - 1);
+    __builtin_memset(&alloc, 0, sizeof(alloc));
+    AGENTOS_STRNCPY_TERM(alloc.allocation_id, pool.pool_id, sizeof(alloc.allocation_id));
+    AGENTOS_STRNCPY_TERM(alloc.pool_id, pool.pool_id, sizeof(alloc.pool_id));
     alloc.size = len;
     alloc.address = (uint64_t)(uintptr_t)data;
     alloc.allocated_at = (uint64_t)time(NULL);
     alloc.freed_at = 0;
-    strncpy(alloc.status, "allocated", sizeof(alloc.status) - 1);
+    AGENTOS_STRNCPY_TERM(alloc.status, "allocated", sizeof(alloc.status));
 
     heapstore_error_t alloc_err = heapstore_memory_record_allocation(&alloc);
     if (alloc_err != heapstore_SUCCESS) {
@@ -418,7 +421,7 @@ agentos_error_t heapstore_memoryrovol_load(const char *record_id, void **out_dat
     }
 
     heapstore_memory_pool_t pool;
-    memset(&pool, 0, sizeof(pool));
+    __builtin_memset(&pool, 0, sizeof(pool));
 
     heapstore_error_t err = heapstore_memory_get_pool(record_id, &pool);
     if (err != heapstore_SUCCESS) {
@@ -434,20 +437,20 @@ agentos_error_t heapstore_memoryrovol_load(const char *record_id, void **out_dat
     }
 
     heapstore_memory_allocation_t alloc;
-    memset(&alloc, 0, sizeof(alloc));
+    __builtin_memset(&alloc, 0, sizeof(alloc));
     heapstore_error_t alloc_err = heapstore_memory_get_allocation(record_id, &alloc);
     if (alloc_err != heapstore_SUCCESS) {
         *out_data = AGENTOS_MALLOC(pool.total_size);
         if (!*out_data)
             return AGENTOS_ENOMEM;
-        memset(*out_data, 0, pool.total_size);
+        __builtin_memset(*out_data, 0, pool.total_size);
         *out_len = pool.total_size;
     } else {
         size_t copy_len = alloc.size > 0 ? alloc.size : pool.total_size;
         *out_data = AGENTOS_MALLOC(copy_len);
         if (!*out_data)
             return AGENTOS_ENOMEM;
-        memset(*out_data, 0, copy_len);
+        __builtin_memset(*out_data, 0, copy_len);
         *out_len = copy_len;
     }
 
@@ -478,9 +481,9 @@ agentos_error_t heapstore_memoryrovol_delete(const char *record_id)
         // 如果不是分配记录，可能是内存池记录
         // 通过更新内存池使用量来实现逻辑删除
         heapstore_memory_pool_t pool;
-        memset(&pool, 0, sizeof(pool));
-        strncpy(pool.pool_id, record_id, sizeof(pool.pool_id) - 1);
-        strncpy(pool.status, "deleted", sizeof(pool.status) - 1);
+        __builtin_memset(&pool, 0, sizeof(pool));
+        AGENTOS_STRNCPY_TERM(pool.pool_id, record_id, sizeof(pool.pool_id));
+        AGENTOS_STRNCPY_TERM(pool.status, "deleted", sizeof(pool.status));
         err = heapstore_memory_record_pool(&pool);
     }
 
@@ -498,14 +501,14 @@ agentos_error_t heapstore_ipc_channel_save(const char *channel_id, const char *s
     }
 
     heapstore_ipc_channel_t record;
-    memset(&record, 0, sizeof(record));
+    __builtin_memset(&record, 0, sizeof(record));
 
-    strncpy(record.channel_id, channel_id, sizeof(record.channel_id) - 1);
-    strncpy(record.name, channel_id, sizeof(record.name) - 1);
-    strncpy(record.type, "binder", sizeof(record.type) - 1);
+    AGENTOS_STRNCPY_TERM(record.channel_id, channel_id, sizeof(record.channel_id));
+    AGENTOS_STRNCPY_TERM(record.name, channel_id, sizeof(record.name));
+    AGENTOS_STRNCPY_TERM(record.type, "binder", sizeof(record.type));
     record.created_at = (uint64_t)time(NULL);
     record.last_activity_at = (uint64_t)time(NULL);
-    strncpy(record.status, "active", sizeof(record.status) - 1);
+    AGENTOS_STRNCPY_TERM(record.status, "active", sizeof(record.status));
 
     heapstore_error_t err = heapstore_ipc_record_channel(&record);
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
@@ -522,7 +525,7 @@ agentos_error_t heapstore_ipc_channel_load(const char *channel_id, char **out_st
     }
 
     heapstore_ipc_channel_t record;
-    memset(&record, 0, sizeof(record));
+    __builtin_memset(&record, 0, sizeof(record));
 
     heapstore_error_t err = heapstore_ipc_get_channel(channel_id, &record);
     if (err != heapstore_SUCCESS) {
@@ -572,7 +575,7 @@ agentos_error_t heapstore_logging_write(const char *module, int level, const cha
     }
 
     heapstore_log_file_info_t info;
-    memset(&info, 0, sizeof(info));
+    __builtin_memset(&info, 0, sizeof(info));
 
     heapstore_log_write((int)log_level, module, trace_id, __FILE__, __LINE__, "%s", message);
 

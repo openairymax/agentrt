@@ -2,7 +2,7 @@
 
 `agentos/atoms/corekern/`
 
-**版本**: v0.1.0 | **API 版本**: 1.0.0
+**版本**: v0.0.5 | **API 版本**: 1.0.0
 
 ---
 
@@ -40,6 +40,7 @@ corekern/
 │   ├── agentos_time.h              # 时间服务接口（单调/实时时钟、定时器、事件循环）
 │   ├── observability.h             # 可观测性子系统（指标、追踪、健康检查）
 │   ├── platform_core.h             # 平台类型委托（→ commons/platform）
+│   ├── oom_handler.h               # OOM 分级响应框架
 │   └── stdatomic.h                 # 原子操作兼容层
 ├── src/                            # 内核实现
 │   ├── core_init.c                 # agentos_core_init() / agentos_core_shutdown()
@@ -50,15 +51,16 @@ corekern/
 │   ├── mem/
 │   │   ├── alloc.c                 # 内存分配器（malloc/free/realloc 封装 + 调试追踪）
 │   │   ├── pool.c                  # 内存池（固定块大小的高效分配）
-│   │   └── guard.c                 # 内存保护页（越界检测）
+│   │   ├── guard.c                 # 内存保护页（越界检测）
+│   │   └── oom_handler.c           # OOM 分级响应框架实现
 │   ├── task/
 │   │   ├── scheduler.c             # 调度器入口
 │   │   ├── scheduler_core.c        # 调度器核心逻辑（优先级队列、依赖解析）
+│   │   ├── scheduler_core.h        # 调度器内部头文件
 │   │   ├── scheduler_platform.c    # 平台抽象层
+│   │   ├── scheduler_platform.h    # 调度器平台头文件
 │   │   ├── scheduler_posix.c       # POSIX 线程调度实现
 │   │   ├── scheduler_windows.c     # Windows 线程调度实现
-│   │   ├── scheduler_core.h        # 调度器内部头文件
-│   │   ├── scheduler_platform.h    # 调度器平台头文件
 │   │   └── thread.c                # 线程管理
 │   ├── time/
 │   │   ├── clock.c                 # 单调/实时时钟实现
@@ -77,7 +79,7 @@ corekern/
 
 ---
 
-## 核心能力
+## 核心组件说明
 
 ### 1. IPC/Binder — 进程间通信
 
@@ -93,6 +95,7 @@ corekern/
 | `agentos_ipc_call()` | 同步调用（请求-响应） | 是 |
 | `agentos_ipc_reply()` | 回复消息 | 是 |
 | `agentos_ipc_close()` | 关闭通道 | 否 |
+| `agentos_ipc_get_fd()` | 获取通道文件描述符 | 否 |
 
 **消息结构**:
 
@@ -123,6 +126,8 @@ typedef struct {
 | `agentos_mem_pool_free()` | 释放到内存池（双重释放检测） | 是 |
 | `agentos_mem_stats()` | 获取内存使用统计 | 是 |
 | `agentos_mem_check_leaks()` | 检查内存泄漏 | 否 |
+
+> **OOM Handler**：提供五级内存压力分级响应框架（NORMAL → WARNING → DEGRADED → CRITICAL → FATAL），在内存压力递增时依次触发预警、限流、降级、紧急释放和致命处理策略，确保系统在内存紧张场景下的可控降级与安全退出。
 
 ### 3. Scheduler — 任务调度器
 
@@ -181,6 +186,7 @@ typedef struct {
 | 健康检查 | `agentos_health_check_register/run()` | 注册和执行健康检查 |
 | 性能监控 | `agentos_performance_get_metrics()` | CPU/内存/线程数 |
 | 导出 | `agentos_observability_export_prometheus()` | Prometheus 格式导出 |
+| | `agentos_health_export_status()` | 健康状态导出 |
 
 ---
 

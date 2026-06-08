@@ -8,7 +8,7 @@
  */
 
 #include "../../include/scheduler_service.h"
-#include "../include/strategy_interface.h"
+#include "../../../include/strategy_interface.h"
 #include "platform.h"
 
 #include <math.h>
@@ -162,7 +162,7 @@ static int ml_based_create(const sched_config_t *manager, void **data)
     mld->mae = 0.0f;
     mld->history_count = 0;
     mld->history_head = 0;
-    memset(mld->history, 0, sizeof(mld->history));
+    __builtin_memset(mld->history, 0, sizeof(mld->history));
 
     init_default_weights(&mld->weights);
 

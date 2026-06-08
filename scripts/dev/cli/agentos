@@ -81,7 +81,7 @@ BLUE = "\033[34m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
 
-GATEWAY_URL = os.environ.get("AGENTOS_GATEWAY_URL", "http://localhost:18789")
+GATEWAY_URL = os.environ.get("AGENTOS_ENDPOINT", "http://localhost:18789")
 API_KEY = os.environ.get("AGENTOS_API_KEY", "")
 
 

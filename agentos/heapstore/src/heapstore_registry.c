@@ -87,7 +87,7 @@ static void free_node_list(registry_node_t **head)
 
 heapstore_error_t heapstore_registry_init(void)
 {
-    memset(&s_registry, 0, sizeof(s_registry));
+    __builtin_memset(&s_registry, 0, sizeof(s_registry));
     s_registry.initialized = 1;
     return heapstore_SUCCESS;
 }
@@ -97,7 +97,7 @@ void heapstore_registry_shutdown(void)
     free_node_list(&s_registry.agents);
     free_node_list(&s_registry.skills);
     free_node_list(&s_registry.sessions);
-    memset(&s_registry, 0, sizeof(s_registry));
+    __builtin_memset(&s_registry, 0, sizeof(s_registry));
 }
 
 heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t *record)
@@ -117,7 +117,7 @@ heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t *r
         AGENTOS_FREE(node);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    memcpy(node->data, record, sizeof(heapstore_agent_record_t));
+    __builtin_memcpy(node->data, record, sizeof(heapstore_agent_record_t));
     node->data_size = sizeof(heapstore_agent_record_t);
     node->next = s_registry.agents;
     s_registry.agents = node;
@@ -135,7 +135,7 @@ heapstore_error_t heapstore_registry_get_agent(const char *id, heapstore_agent_r
         find_node_by_id(s_registry.agents, id, offsetof(heapstore_agent_record_t, id));
     if (!node)
         return heapstore_ERR_NOT_FOUND;
-    memcpy(record, node->data, sizeof(heapstore_agent_record_t));
+    __builtin_memcpy(record, node->data, sizeof(heapstore_agent_record_t));
     return heapstore_SUCCESS;
 }
 
@@ -149,7 +149,7 @@ heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t
         find_node_by_id(s_registry.agents, record->id, offsetof(heapstore_agent_record_t, id));
     if (!node)
         return heapstore_ERR_NOT_FOUND;
-    memcpy(node->data, record, sizeof(heapstore_agent_record_t));
+    __builtin_memcpy(node->data, record, sizeof(heapstore_agent_record_t));
     return heapstore_SUCCESS;
 }
 
@@ -210,7 +210,7 @@ heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t *r
         AGENTOS_FREE(node);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    memcpy(node->data, record, sizeof(heapstore_skill_record_t));
+    __builtin_memcpy(node->data, record, sizeof(heapstore_skill_record_t));
     node->data_size = sizeof(heapstore_skill_record_t);
     node->next = s_registry.skills;
     s_registry.skills = node;
@@ -228,7 +228,7 @@ heapstore_error_t heapstore_registry_get_skill(const char *id, heapstore_skill_r
         find_node_by_id(s_registry.skills, id, offsetof(heapstore_skill_record_t, id));
     if (!node)
         return heapstore_ERR_NOT_FOUND;
-    memcpy(record, node->data, sizeof(heapstore_skill_record_t));
+    __builtin_memcpy(record, node->data, sizeof(heapstore_skill_record_t));
     return heapstore_SUCCESS;
 }
 
@@ -288,7 +288,7 @@ heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_
         AGENTOS_FREE(node);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
-    memcpy(node->data, record, sizeof(heapstore_session_record_t));
+    __builtin_memcpy(node->data, record, sizeof(heapstore_session_record_t));
     node->data_size = sizeof(heapstore_session_record_t);
     node->next = s_registry.sessions;
     s_registry.sessions = node;
@@ -306,7 +306,7 @@ heapstore_error_t heapstore_registry_get_session(const char *id, heapstore_sessi
         find_node_by_id(s_registry.sessions, id, offsetof(heapstore_session_record_t, id));
     if (!node)
         return heapstore_ERR_NOT_FOUND;
-    memcpy(record, node->data, sizeof(heapstore_session_record_t));
+    __builtin_memcpy(record, node->data, sizeof(heapstore_session_record_t));
     return heapstore_SUCCESS;
 }
 
@@ -320,7 +320,7 @@ heapstore_error_t heapstore_registry_update_session(const heapstore_session_reco
         find_node_by_id(s_registry.sessions, record->id, offsetof(heapstore_session_record_t, id));
     if (!node)
         return heapstore_ERR_NOT_FOUND;
-    memcpy(node->data, record, sizeof(heapstore_session_record_t));
+    __builtin_memcpy(node->data, record, sizeof(heapstore_session_record_t));
     return heapstore_SUCCESS;
 }
 
@@ -369,7 +369,7 @@ heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t *iter, 
         return heapstore_ERR_INVALID_PARAM;
     if (!iter->current)
         return heapstore_ERR_NOT_FOUND;
-    memcpy(record, iter->current->data, iter->current->data_size);
+    __builtin_memcpy(record, iter->current->data, iter->current->data_size);
     iter->current = iter->current->next;
     return heapstore_SUCCESS;
 }
@@ -516,8 +516,7 @@ heapstore_error_t heapstore_registry_init(void)
     const char *configured_root = heapstore_get_root();
     char root_path[256];
     if (configured_root && configured_root[0] != '\0') {
-        strncpy(root_path, configured_root, sizeof(root_path) - 1);
-        root_path[sizeof(root_path) - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(root_path, configured_root, sizeof(root_path));
     } else {
         const char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp";
         snprintf(root_path, sizeof(root_path), "%s/agentos/heapstore", tmpdir);
@@ -543,7 +542,7 @@ heapstore_error_t heapstore_registry_init(void)
     heapstore_error_t err = init_database(s_registry.db);
     if (err != heapstore_SUCCESS) {
         sqlite3_close(s_registry.db);
-        memset(&s_registry, 0, sizeof(s_registry));
+        __builtin_memset(&s_registry, 0, sizeof(s_registry));
         return err;
     }
 
@@ -673,43 +672,37 @@ heapstore_error_t heapstore_registry_get_agent(const char *id, heapstore_agent_r
         const char *text;
         text = (const char *)sqlite3_column_text(stmt, 0);
         if (text) {
-            strncpy(record->id, text, sizeof(record->id) - 1);
-            record->id[sizeof(record->id) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->id, text, sizeof(record->id));
         } else
             record->id[0] = '\0';
 
         text = (const char *)sqlite3_column_text(stmt, 1);
         if (text) {
-            strncpy(record->name, text, sizeof(record->name) - 1);
-            record->name[sizeof(record->name) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->name, text, sizeof(record->name));
         } else
             record->name[0] = '\0';
 
         text = (const char *)sqlite3_column_text(stmt, 2);
         if (text) {
-            strncpy(record->type, text, sizeof(record->type) - 1);
-            record->type[sizeof(record->type) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->type, text, sizeof(record->type));
         } else
             record->type[0] = '\0';
 
         text = (const char *)sqlite3_column_text(stmt, 3);
         if (text) {
-            strncpy(record->version, text, sizeof(record->version) - 1);
-            record->version[sizeof(record->version) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->version, text, sizeof(record->version));
         } else
             record->version[0] = '\0';
 
         text = (const char *)sqlite3_column_text(stmt, 4);
         if (text) {
-            strncpy(record->status, text, sizeof(record->status) - 1);
-            record->status[sizeof(record->status) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->status, text, sizeof(record->status));
         } else
             record->status[0] = '\0';
 
         text = (const char *)sqlite3_column_text(stmt, 5);
         if (text) {
-            strncpy(record->config_path, text, sizeof(record->config_path) - 1);
-            record->config_path[sizeof(record->config_path) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->config_path, text, sizeof(record->config_path));
         } else
             record->config_path[0] = '\0';
 
@@ -928,28 +921,23 @@ heapstore_error_t heapstore_registry_get_skill(const char *id, heapstore_skill_r
         const char *text;
         text = (const char *)sqlite3_column_text(stmt, 0);
         if (text) {
-            strncpy(record->id, text, sizeof(record->id) - 1);
-            record->id[sizeof(record->id) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->id, text, sizeof(record->id));
         }
         text = (const char *)sqlite3_column_text(stmt, 1);
         if (text) {
-            strncpy(record->name, text, sizeof(record->name) - 1);
-            record->name[sizeof(record->name) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->name, text, sizeof(record->name));
         }
         text = (const char *)sqlite3_column_text(stmt, 2);
         if (text) {
-            strncpy(record->version, text, sizeof(record->version) - 1);
-            record->version[sizeof(record->version) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->version, text, sizeof(record->version));
         }
         text = (const char *)sqlite3_column_text(stmt, 3);
         if (text) {
-            strncpy(record->library_path, text, sizeof(record->library_path) - 1);
-            record->library_path[sizeof(record->library_path) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->library_path, text, sizeof(record->library_path));
         }
         text = (const char *)sqlite3_column_text(stmt, 4);
         if (text) {
-            strncpy(record->manifest_path, text, sizeof(record->manifest_path) - 1);
-            record->manifest_path[sizeof(record->manifest_path) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->manifest_path, text, sizeof(record->manifest_path));
         }
         record->installed_at = sqlite3_column_int64(stmt, 5);
         sqlite3_finalize(stmt);
@@ -1066,21 +1054,18 @@ heapstore_error_t heapstore_registry_get_session(const char *id, heapstore_sessi
         const char *text;
         text = (const char *)sqlite3_column_text(stmt, 0);
         if (text) {
-            strncpy(record->id, text, sizeof(record->id) - 1);
-            record->id[sizeof(record->id) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->id, text, sizeof(record->id));
         }
         text = (const char *)sqlite3_column_text(stmt, 1);
         if (text) {
-            strncpy(record->user_id, text, sizeof(record->user_id) - 1);
-            record->user_id[sizeof(record->user_id) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->user_id, text, sizeof(record->user_id));
         }
         record->created_at = sqlite3_column_int64(stmt, 2);
         record->last_active_at = sqlite3_column_int64(stmt, 3);
         record->ttl_seconds = sqlite3_column_int(stmt, 4);
         text = (const char *)sqlite3_column_text(stmt, 5);
         if (text) {
-            strncpy(record->status, text, sizeof(record->status) - 1);
-            record->status[sizeof(record->status) - 1] = '\0';
+            AGENTOS_STRNCPY_TERM(record->status, text, sizeof(record->status));
         }
         sqlite3_finalize(stmt);
         agentos_mutex_unlock(&s_registry.lock);
@@ -1289,68 +1274,68 @@ heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t *iter, 
     switch (iter->current_type) {
     case 0: { /* agents */
         heapstore_agent_record_t *agent_rec = (heapstore_agent_record_t *)record;
-        memset(agent_rec, 0, sizeof(*agent_rec));
+        __builtin_memset(agent_rec, 0, sizeof(*agent_rec));
 
         text = (const char *)sqlite3_column_text(iter->stmt, 0);
         if (text)
-            strncpy(agent_rec->id, text, sizeof(agent_rec->id) - 1);
+            AGENTOS_STRNCPY_TERM(agent_rec->id, text, sizeof(agent_rec->id));
         text = (const char *)sqlite3_column_text(iter->stmt, 1);
         if (text)
-            strncpy(agent_rec->name, text, sizeof(agent_rec->name) - 1);
+            AGENTOS_STRNCPY_TERM(agent_rec->name, text, sizeof(agent_rec->name));
         text = (const char *)sqlite3_column_text(iter->stmt, 2);
         if (text)
-            strncpy(agent_rec->type, text, sizeof(agent_rec->type) - 1);
+            AGENTOS_STRNCPY_TERM(agent_rec->type, text, sizeof(agent_rec->type));
         text = (const char *)sqlite3_column_text(iter->stmt, 3);
         if (text)
-            strncpy(agent_rec->version, text, sizeof(agent_rec->version) - 1);
+            AGENTOS_STRNCPY_TERM(agent_rec->version, text, sizeof(agent_rec->version));
         text = (const char *)sqlite3_column_text(iter->stmt, 4);
         if (text)
-            strncpy(agent_rec->status, text, sizeof(agent_rec->status) - 1);
+            AGENTOS_STRNCPY_TERM(agent_rec->status, text, sizeof(agent_rec->status));
         text = (const char *)sqlite3_column_text(iter->stmt, 5);
         if (text)
-            strncpy(agent_rec->config_path, text, sizeof(agent_rec->config_path) - 1);
+            AGENTOS_STRNCPY_TERM(agent_rec->config_path, text, sizeof(agent_rec->config_path));
         agent_rec->created_at = sqlite3_column_int64(iter->stmt, 6);
         agent_rec->updated_at = sqlite3_column_int64(iter->stmt, 7);
         break;
     }
     case 1: { /* skills */
         heapstore_skill_record_t *skill_rec = (heapstore_skill_record_t *)record;
-        memset(skill_rec, 0, sizeof(*skill_rec));
+        __builtin_memset(skill_rec, 0, sizeof(*skill_rec));
 
         text = (const char *)sqlite3_column_text(iter->stmt, 0);
         if (text)
-            strncpy(skill_rec->id, text, sizeof(skill_rec->id) - 1);
+            AGENTOS_STRNCPY_TERM(skill_rec->id, text, sizeof(skill_rec->id));
         text = (const char *)sqlite3_column_text(iter->stmt, 1);
         if (text)
-            strncpy(skill_rec->name, text, sizeof(skill_rec->name) - 1);
+            AGENTOS_STRNCPY_TERM(skill_rec->name, text, sizeof(skill_rec->name));
         text = (const char *)sqlite3_column_text(iter->stmt, 2);
         if (text)
-            strncpy(skill_rec->version, text, sizeof(skill_rec->version) - 1);
+            AGENTOS_STRNCPY_TERM(skill_rec->version, text, sizeof(skill_rec->version));
         text = (const char *)sqlite3_column_text(iter->stmt, 3);
         if (text)
-            strncpy(skill_rec->library_path, text, sizeof(skill_rec->library_path) - 1);
+            AGENTOS_STRNCPY_TERM(skill_rec->library_path, text, sizeof(skill_rec->library_path));
         text = (const char *)sqlite3_column_text(iter->stmt, 4);
         if (text)
-            strncpy(skill_rec->manifest_path, text, sizeof(skill_rec->manifest_path) - 1);
+            AGENTOS_STRNCPY_TERM(skill_rec->manifest_path, text, sizeof(skill_rec->manifest_path));
         skill_rec->installed_at = sqlite3_column_int64(iter->stmt, 5);
         break;
     }
     case 2: { /* sessions */
         heapstore_session_record_t *session_rec = (heapstore_session_record_t *)record;
-        memset(session_rec, 0, sizeof(*session_rec));
+        __builtin_memset(session_rec, 0, sizeof(*session_rec));
 
         text = (const char *)sqlite3_column_text(iter->stmt, 0);
         if (text)
-            strncpy(session_rec->id, text, sizeof(session_rec->id) - 1);
+            AGENTOS_STRNCPY_TERM(session_rec->id, text, sizeof(session_rec->id));
         text = (const char *)sqlite3_column_text(iter->stmt, 1);
         if (text)
-            strncpy(session_rec->user_id, text, sizeof(session_rec->user_id) - 1);
+            AGENTOS_STRNCPY_TERM(session_rec->user_id, text, sizeof(session_rec->user_id));
         session_rec->created_at = sqlite3_column_int64(iter->stmt, 2);
         session_rec->last_active_at = sqlite3_column_int64(iter->stmt, 3);
         session_rec->ttl_seconds = sqlite3_column_int(iter->stmt, 4);
         text = (const char *)sqlite3_column_text(iter->stmt, 5);
         if (text)
-            strncpy(session_rec->status, text, sizeof(session_rec->status) - 1);
+            AGENTOS_STRNCPY_TERM(session_rec->status, text, sizeof(session_rec->status));
         break;
     }
     default:

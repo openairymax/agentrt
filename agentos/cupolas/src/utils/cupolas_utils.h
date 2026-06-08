@@ -7,7 +7,7 @@
  * @brief Unified abstraction layer for Cupolas security module
  * @author Spharx AgentOS Team
  * @date 2026-04-05
- * @version 1.0.0
+ * @version 0.1.0
  *
  * This header provides platform-independent macros and utility functions
  * that eliminate code duplication across all Cupolas submodules.
@@ -128,7 +128,7 @@ extern "C" {
  *
  * @code
  * char* buffer = CUPOLAS_ALLOC_ARRAY(char, 4096);
- * memset(buffer, 0, 4096); // Manual init if needed
+ * AGENTOS_MEMSET(buffer, 0, 4096); // Manual init if needed
  * @endcode
  */
 #define CUPOLAS_ALLOC_ARRAY(type, count) ((type *)AGENTOS_MALLOC((count) * sizeof(type)))

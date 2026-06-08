@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include "memory_compat.h"
 #endif
 
 #define CONTAINER_ID_LENGTH 64
@@ -120,7 +121,7 @@ void container_config_init(container_config_t *manager)
     if (!manager)
         return;
 
-    memset(manager, 0, sizeof(container_config_t));
+    __builtin_memset(manager, 0, sizeof(container_config_t));
 
     manager->runtime = CONTAINER_RUNTIME_AUTO;
 
@@ -148,10 +149,10 @@ void *container_manager_create(const container_config_t *manager)
         return NULL;
     }
 
-    memset(handle, 0, sizeof(container_handle_t));
+    __builtin_memset(handle, 0, sizeof(container_handle_t));
 
     if (manager) {
-        memcpy(&handle->manager, manager, sizeof(container_config_t));
+        __builtin_memcpy(&handle->manager, manager, sizeof(container_config_t));
     } else {
         container_config_init(&handle->manager);
     }
@@ -218,7 +219,7 @@ static int execute_command(const char *cmd, int timeout_ms, char *output, size_t
             if (offset + len > output_size - 1) {
                 len = output_size - 1 - offset;
             }
-            memcpy(output + offset, buf, len);
+            __builtin_memcpy(output + offset, buf, len);
             offset += len;
         }
         output[offset] = '\0';
@@ -300,7 +301,7 @@ int container_start(void *mgr, const char *name, container_result_t *result)
     handle->is_running = true;
 
     if (result) {
-        memset(result, 0, sizeof(container_result_t));
+        __builtin_memset(result, 0, sizeof(container_result_t));
         result->duration_ns = 0;
     }
 
@@ -355,7 +356,7 @@ int container_get_info(void *mgr, container_info_t *info)
 
     container_handle_t *handle = (container_handle_t *)mgr;
 
-    memset(info, 0, sizeof(container_info_t));
+    __builtin_memset(info, 0, sizeof(container_info_t));
 
     snprintf(info->container_id, sizeof(info->container_id), "%s", handle->container_id);
     snprintf(info->name, sizeof(info->name), "%s", handle->container_name);
@@ -372,7 +373,7 @@ int container_get_stats(void *mgr, container_info_t *info)
     container_handle_t *handle = (container_handle_t *)mgr;
 
     if (!handle->is_running) {
-        memset(&info->stats, 0, sizeof(info->stats));
+        __builtin_memset(&info->stats, 0, sizeof(info->stats));
         return cupolas_OK;
     }
 
@@ -381,11 +382,22 @@ int container_get_stats(void *mgr, container_info_t *info)
              handle->container_name);
 
     char output[256];
-    memset(output, 0, sizeof(output));
+    __builtin_memset(output, 0, sizeof(output));
     if (execute_command(cmd, 5000, output, sizeof(output)) == 0 && output[0] != '\0') {
         unsigned long mem_used = 0;
         unsigned long mem_limit_val = 0;
-        if (sscanf(output, "%lu / %lu", &mem_used, &mem_limit_val) == 2) {
+        char out_copy[256];
+        AGENTOS_STRNCPY_TERM(out_copy, output, sizeof(out_copy));
+        out_copy[sizeof(out_copy) - 1] = '\0';
+        char *saveptr = NULL;
+        char *tok_used = strtok_r(out_copy, " /", &saveptr);
+        char *tok_sep = strtok_r(NULL, " /", &saveptr);
+        (void)tok_sep;
+        char *tok_limit = strtok_r(NULL, " /\r\n", &saveptr);
+        if (tok_used && tok_limit)
+        {
+            mem_used = strtoul(tok_used, NULL, 10);
+            mem_limit_val = strtoul(tok_limit, NULL, 10);
             info->stats.memory_usage = (uint64_t)mem_used;
             info->stats.memory_limit = (uint64_t)mem_limit_val;
         } else {
@@ -508,7 +520,7 @@ int container_exec(void *mgr, const char *command, const char **args, size_t arg
     }
 
     if (result) {
-        memset(result, 0, sizeof(container_result_t));
+        __builtin_memset(result, 0, sizeof(container_result_t));
         result->duration_ns = 0;
 
         int ret = execute_command(cmd, 30000, NULL, 0);
@@ -550,5 +562,5 @@ void container_result_free(container_result_t *result)
         cupolas_mem_free(result->stderr_data);
     }
 
-    memset(result, 0, sizeof(container_result_t));
+    __builtin_memset(result, 0, sizeof(container_result_t));
 }

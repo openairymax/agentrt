@@ -1,7 +1,6 @@
 # Toolkit Go — AgentOS Go SDK
 
-**模块路径**: `agentos/toolkit/go/`
-**版本**: v0.1.0 (SDK v0.1.0)
+**版本**: v0.0.5
 
 ## 概述
 
@@ -23,23 +22,33 @@ go/
 │   │   ├── modules.go          # 模块导出
 │   │   ├── base_manager.go     # BaseManager 基类
 │   │   ├── task/
-│   │   │   └── manager.go      # TaskManager
+│   │   │   ├── manager.go      # TaskManager
+│   │   │   ├── manager_test.go # TaskManager 测试
+│   │   │   └── benchmark_test.go # 性能基准
 │   │   ├── memory/
-│   │   │   └── manager.go      # MemoryManager
+│   │   │   ├── manager.go      # MemoryManager
+│   │   │   └── manager_test.go # MemoryManager 测试
 │   │   ├── session/
-│   │   │   └── manager.go      # SessionManager
+│   │   │   ├── manager.go      # SessionManager
+│   │   │   └── manager_test.go # SessionManager 测试
 │   │   └── skill/
-│   │       └── manager.go      # SkillManager
+│   │       ├── manager.go      # SkillManager
+│   │       └── manager_test.go # SkillManager 测试
 │   ├── plugin/
-│   │   └── plugin.go           # Plugin 系统
+│   │   ├── plugin.go           # Plugin 系统
+│   │   └── plugin_test.go      # Plugin 测试
 │   ├── syscall/
-│   │   └── syscall.go          # 系统调用绑定
+│   │   ├── syscall.go          # 系统调用绑定
+│   │   └── syscall_test.go     # 系统调用测试
 │   ├── telemetry/
-│   │   └── telemetry.go        # OpenTelemetry 遥测
+│   │   ├── telemetry.go        # OpenTelemetry 遥测
+│   │   └── telemetry_test.go   # 遥测测试
 │   ├── types/
-│   │   └── types.go            # 类型定义
+│   │   ├── types.go            # 类型定义
+│   │   └── types_test.go       # 类型测试
 │   └── utils/
-│       └── helpers.go          # 工具函数
+│       ├── helpers.go          # 工具函数
+│       └── helpers_test.go     # 工具函数测试
 ├── go.mod                      # Go 模块配置
 └── README.md                   # 本文件
 ```
@@ -90,7 +99,7 @@ go/
 | `CODE_SESSION_EXPIRED` | `0x4005` | 会话过期 |
 | `CODE_SKILL_NOT_FOUND` | `0x4006` | 技能未找到 |
 
-## 接口说明
+## 使用说明
 
 ### Client 初始化
 
@@ -148,7 +157,7 @@ result, err := skillManager.Execute(ctx, skill.ID, params)
 err := skillManager.Unload(ctx, skill.ID)
 ```
 
-## 配置说明
+### 配置说明
 
 ```go
 config := agentos.NewConfig(
@@ -172,12 +181,11 @@ config := agentos.NewConfigFromEnv()
 
 ## 依赖关系
 
-- **Go 版本**: >= 1.21
+- **Go 版本**: >= 1.22
 - **核心依赖**: Go 标准库（net/http, encoding/json, context, sync）
-- **测试依赖**: testify
 - **无外部运行时依赖**
 
-## 构建说明
+## 构建与测试
 
 ```bash
 # 安装
@@ -193,7 +201,7 @@ go test -bench=. ./...
 go test ./agentos/modules/task/...
 ```
 
-## 使用示例
+## 完整示例
 
 ```go
 package main

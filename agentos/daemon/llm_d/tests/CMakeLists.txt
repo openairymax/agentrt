@@ -27,6 +27,10 @@ set(LLM_TEST_SOURCES
     test_cache.c
     test_token_counter.c
     test_response.c
+    test_routing_e2e.c
+    test_complexity_routing.c
+    bench_routing_latency.c
+    test_cost_tracker.c
 )
 
 set(LLM_COMMON_INCLUDES
