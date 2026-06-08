@@ -312,7 +312,7 @@ static agentos_task_t *task_desc_deep_copy(const agentos_task_t *task)
         copy->task_input = AGENTOS_MALLOC(input_len + 1);
         if (!copy->task_input)
             goto fail;
-        memcpy(copy->task_input, task->task_input, input_len + 1);
+        __builtin_memcpy(copy->task_input, task->task_input, input_len + 1);
     }
     copy->task_timeout_ms = task->task_timeout_ms;
     return copy;
@@ -354,7 +354,7 @@ static agentos_task_t *task_result_deep_copy(const task_tcb_t *tcb)
         result->task_output = AGENTOS_MALLOC(tcb->result_len);
         if (!result->task_output)
             goto fail;
-        memcpy(result->task_output, tcb->result, tcb->result_len);
+        __builtin_memcpy(result->task_output, tcb->result, tcb->result_len);
     }
     return result;
 
@@ -495,6 +495,14 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
 
     engine->running = 1;
     engine->worker_count = max_concurrency;
+    if (engine->worker_count > SIZE_MAX / sizeof(agentos_thread_t)) {
+        agentos_mutex_free(engine->queue_lock);
+        agentos_mutex_free(engine->running_lock);
+        agentos_cond_free(engine->task_available_cond);
+        AGENTOS_FREE(engine);
+        AGENTOS_LOG_ERROR("Overflow in worker threads array allocation");
+        ATM_RET_ERR(AGENTOS_E_OVERFLOW);
+    }
     engine->worker_threads =
         (agentos_thread_t *)AGENTOS_MALLOC(engine->worker_count * sizeof(agentos_thread_t));
     if (!engine->worker_threads) {

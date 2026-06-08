@@ -31,7 +31,7 @@ sync_result_t sync_mutex_create(sync_mutex_t *mutex, const sync_attr_t *attr)
     if (attr != NULL && attr->name != NULL) {
         m->name = sync_internal_strdup(attr->name);
     }
-    memset(&m->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&m->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
     InitializeCriticalSection(&m->mutex);

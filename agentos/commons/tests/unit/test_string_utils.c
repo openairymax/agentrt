@@ -60,7 +60,7 @@ static void test_safe_strcat(void **state)
     AGENTOS_TEST_ASSERT_STRING_EQUAL("Hello, World!", dest);
 
     // 边界情况 - 接近满
-    strncpy(dest, "12345678901234567890", sizeof(dest) - 1);
+    AGENTOS_STRNCPY_TERM(dest, "12345678901234567890", sizeof(dest) -);
     dest[sizeof(dest) - 1] = '\0';
     result = safe_strcat(dest, sizeof(dest), "X");
     AGENTOS_TEST_ASSERT_SUCCESS(result);

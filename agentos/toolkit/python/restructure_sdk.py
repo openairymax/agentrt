@@ -430,7 +430,7 @@ __all__ = [
     "TimeoutError",
     "TelemetryError",
     "TaskError",
-    "MemoryError",
+    "AgentOSMemoryError",
     "SessionError",
     "SkillError",
     

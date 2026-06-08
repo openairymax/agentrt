@@ -1,6 +1,6 @@
 # Common — AgentOS 公共服务库
 
-> **模块路径**: `agentos/daemon/common/` | **版本**: v0.1.0
+> **模块路径**: `agentos/daemon/common/` | **版本**: v0.0.5
 
 ## 概述
 
@@ -91,7 +91,14 @@ common/
     ├── test_safe_string_utils.c
     ├── test_strategies_recovery.c
     ├── test_svc_auth.c
-    └── test_svc_stop.c
+    ├── test_svc_stop.c
+    ├── test_daemon_security.c
+    ├── test_service_discovery.c
+    ├── test_thread_pool.c
+    ├── test_log_sanitizer.c
+    ├── test_api_recovery.c
+    ├── test_agentos_event_loop.c
+    └── test_checkpoint.c
 ```
 
 ## 核心组件说明

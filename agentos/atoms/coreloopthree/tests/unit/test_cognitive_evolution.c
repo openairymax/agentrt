@@ -63,9 +63,9 @@ static cog_experience_t make_experience(const char *domain, const char *action,
                                         cog_feedback_t feedback)
 {
     cog_experience_t exp;
-    memset(&exp, 0, sizeof(exp));
-    strncpy(exp.id, "exp_001", sizeof(exp.id) - 1);
-    strncpy(exp.domain, domain, sizeof(exp.domain) - 1);
+    AGENTOS_MEMSET(&exp, 0, sizeof(exp));
+    AGENTOS_STRNCPY_TERM(exp.id, "exp_001", sizeof(exp.id) -);
+    AGENTOS_STRNCPY_TERM(exp.domain, domain, sizeof(exp.domain) -);
     exp.action_json = action ? strdup(action) : NULL;
     exp.outcome_json = strdup("{\"result\":\"ok\"}");
     exp.feedback = feedback;
@@ -172,9 +172,9 @@ static void test_record_multiple_experiences(void)
     int total_ok = 0;
     for (int i = 0; i < 10; i++) {
         cog_experience_t exp;
-        memset(&exp, 0, sizeof(exp));
+        AGENTOS_MEMSET(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "exp_%03d", i);
-        strncpy(exp.domain, "multi_test", sizeof(exp.domain) - 1);
+        AGENTOS_STRNCPY_TERM(exp.domain, "multi_test", sizeof(exp.domain) -);
         exp.action_json = strdup("{\"op\":\"test\"}");
         exp.outcome_json = strdup("{}");
         exp.feedback = (i % 3 == 0)   ? COG_FEEDBACK_POSITIVE
@@ -226,9 +226,9 @@ static void test_extract_patterns_basic(void)
 
     for (int i = 0; i < 20; i++) {
         cog_experience_t exp;
-        memset(&exp, 0, sizeof(exp));
+        AGENTOS_MEMSET(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "pat_%03d", i);
-        strncpy(exp.domain, "pattern_test", sizeof(exp.domain) - 1);
+        AGENTOS_STRNCPY_TERM(exp.domain, "pattern_test", sizeof(exp.domain) -);
         exp.action_json = strdup("{\"type\":\"query\"}");
         exp.outcome_json = strdup("{\"status\":\"success\"}");
         exp.feedback = (i < 15) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEGATIVE;
@@ -277,9 +277,9 @@ static void test_evolve_strategies_basic(void)
 
     for (int i = 0; i < 30; i++) {
         cog_experience_t exp;
-        memset(&exp, 0, sizeof(exp));
+        AGENTOS_MEMSET(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "strat_%03d", i);
-        strncpy(exp.domain, "strategy_test", sizeof(exp.domain) - 1);
+        AGENTOS_STRNCPY_TERM(exp.domain, "strategy_test", sizeof(exp.domain) -);
         exp.action_json = strdup("{\"plan\":\"A\"}");
         exp.outcome_json = strdup("{\"success\":true}");
         exp.feedback = (i % 4 != 0) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEGATIVE;
@@ -360,9 +360,9 @@ static void test_transfer_knowledge_basic(void)
 
     for (int i = 0; i < 15; i++) {
         cog_experience_t exp;
-        memset(&exp, 0, sizeof(exp));
+        AGENTOS_MEMSET(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "know_%03d", i);
-        strncpy(exp.domain, "source_domain", sizeof(exp.domain) - 1);
+        AGENTOS_STRNCPY_TERM(exp.domain, "source_domain", sizeof(exp.domain) -);
         exp.context_json = strdup("{\"concept\":\"data_analysis\"}");
         exp.action_json = strdup("{\"method\":\"aggregate\"}");
         exp.outcome_json = strdup("{\"accuracy\":0.95}");
@@ -420,9 +420,9 @@ static void test_evaluate_level_progression(void)
 
     for (int i = 0; i < 50; i++) {
         cog_experience_t exp;
-        memset(&exp, 0, sizeof(exp));
+        AGENTOS_MEMSET(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "eval_%03d", i);
-        strncpy(exp.domain, "learning_test", sizeof(exp.domain) - 1);
+        AGENTOS_STRNCPY_TERM(exp.domain, "learning_test", sizeof(exp.domain) -);
         exp.action_json = strdup("{\"learn\":\"true\"}");
         exp.outcome_json = strdup("{\"improved\":true}");
         exp.feedback = COG_FEEDBACK_POSITIVE;
@@ -497,9 +497,9 @@ static void test_get_counts_and_fitness(void)
 
     for (int i = 0; i < 25; i++) {
         cog_experience_t exp;
-        memset(&exp, 0, sizeof(exp));
+        AGENTOS_MEMSET(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "stat_%03d", i);
-        strncpy(exp.domain, "stats_test", sizeof(exp.domain) - 1);
+        AGENTOS_STRNCPY_TERM(exp.domain, "stats_test", sizeof(exp.domain) -);
         exp.action_json = strdup("{\"op\":\"count\"}");
         exp.outcome_json = strdup("{}");
         exp.feedback = (i < 18) ? COG_FEEDBACK_POSITIVE : COG_FEEDBACK_NEUTRAL;
@@ -602,9 +602,9 @@ static void test_full_lifecycle_workflow(void)
 
     for (int i = 0; i < 40; i++) {
         cog_experience_t exp;
-        memset(&exp, 0, sizeof(exp));
+        AGENTOS_MEMSET(&exp, 0, sizeof(exp));
         snprintf(exp.id, sizeof(exp.id), "wf_%03d", i);
-        strncpy(exp.domain, "workflow_domain", sizeof(exp.domain) - 1);
+        AGENTOS_STRNCPY_TERM(exp.domain, "workflow_domain", sizeof(exp.domain) -);
         exp.context_json = strdup("{\"context\":\"integration\"}");
         exp.action_json = strdup("{\"step\":\"process\"}");
         exp.outcome_json = strdup("{\"done\":true}");

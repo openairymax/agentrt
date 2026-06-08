@@ -157,7 +157,7 @@ static char *extract_json_field_string(const char *json, const char *field)
 
         return NULL;
     }
-    memcpy(val, p, len);
+    __builtin_memcpy(val, p, len);
     val[len] = '\0';
     return val;
 }
@@ -246,7 +246,7 @@ static char *extract_messages_array(const char *json)
 
                     return NULL;
                 }
-                memcpy(arr, start, len);
+                __builtin_memcpy(arr, start, len);
                 arr[len] = '\0';
                 return arr;
             }
@@ -298,7 +298,7 @@ static char *extract_functions_array(const char *json)
 
                     return NULL;
                 }
-                memcpy(arr, start, len);
+                __builtin_memcpy(arr, start, len);
                 arr[len] = '\0';
                 return arr;
             }
@@ -399,7 +399,7 @@ static int handle_embeddings(gw_openai_compat_t *compat, const char *body_json,
             size_t len = (size_t)(input_start - start);
             input_json = (char *)AGENTOS_MALLOC(len + 1);
             if (input_json) {
-                memcpy(input_json, start, len);
+                __builtin_memcpy(input_json, start, len);
                 input_json[len] = '\0';
             }
         }

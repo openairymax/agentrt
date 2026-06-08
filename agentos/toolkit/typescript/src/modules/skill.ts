@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - Skill Manager Module
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 提供技能的注册、加载、执行、卸载及验证功能。

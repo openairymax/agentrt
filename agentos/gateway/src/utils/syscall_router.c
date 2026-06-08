@@ -858,7 +858,7 @@ agentos_error_t agentos_sys_memory_write(const void *data, size_t len, const cha
         RUNTIME_UNLOCK();
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    memcpy(rec->data, data, len);
+    __builtin_memcpy(rec->data, data, len);
     rec->len = len;
     rec->metadata = metadata ? AGENTOS_STRDUP(metadata) : NULL;
     rec->score = 1.0f;
@@ -916,7 +916,7 @@ agentos_error_t agentos_sys_memory_get(const char *record_id, void **out_data, s
             RUNTIME_UNLOCK();
             return AGENTOS_ERR_OUT_OF_MEMORY;
         }
-        memcpy(*out_data, g_runtime.records[idx].data, g_runtime.records[idx].len);
+        __builtin_memcpy(*out_data, g_runtime.records[idx].data, g_runtime.records[idx].len);
         ((char *)*out_data)[g_runtime.records[idx].len] = '\0';
         *out_len = g_runtime.records[idx].len;
         RUNTIME_UNLOCK();
@@ -940,7 +940,7 @@ agentos_error_t agentos_sys_memory_delete(const char *record_id)
         AGENTOS_FREE(g_runtime.records[idx].record_id);
         AGENTOS_FREE(g_runtime.records[idx].data);
         AGENTOS_FREE(g_runtime.records[idx].metadata);
-        memmove(&g_runtime.records[idx], &g_runtime.records[idx + 1],
+        __builtin_memmove(&g_runtime.records[idx], &g_runtime.records[idx + 1],
                 (g_runtime.record_count - idx - 1) * sizeof(memory_record_t));
         g_runtime.record_count--;
         RUNTIME_UNLOCK();
@@ -1010,7 +1010,7 @@ agentos_error_t agentos_sys_session_close(const char *session_id)
         ht_remove(&g_runtime.session_index, session_id);
         AGENTOS_FREE(g_runtime.sessions[idx].session_id);
         AGENTOS_FREE(g_runtime.sessions[idx].metadata);
-        memmove(&g_runtime.sessions[idx], &g_runtime.sessions[idx + 1],
+        __builtin_memmove(&g_runtime.sessions[idx], &g_runtime.sessions[idx + 1],
                 (g_runtime.session_count - idx - 1) * sizeof(session_entry_t));
         g_runtime.session_count--;
         RUNTIME_UNLOCK();

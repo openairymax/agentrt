@@ -4,7 +4,7 @@
 import re
 import os
 
-BASE_DIR = '/home/spharx/SpharxWorks/OpenAirymax/AgentOS'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 def determine_error_code_from_message(message):
     """Determine error code based on the message string in AGENTOS_CHECK/AGENTOS_ERROR."""

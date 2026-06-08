@@ -335,7 +335,7 @@ int config_init(void)
         return 0;
     g_compat_ctx = config_context_create("compat_global");
     g_compat_initialized = true;
-    memset(&g_compat_stats, 0, sizeof(g_compat_stats));
+    AGENTOS_MEMSET(&g_compat_stats, 0, sizeof(g_compat_stats));
     return 0;
 }
 
@@ -371,7 +371,7 @@ int config_get_string_with_maxlen(const char *key, const char *default_value, ch
     size_t len = strlen(value);
     if (len >= buffer_size)
         len = buffer_size - 1;
-    memcpy(buffer, value, len);
+    __builtin_memcpy(buffer, value, len);
     buffer[len] = '\0';
     return 0;
 }
@@ -460,7 +460,7 @@ int config_remove_source(const char *source_type)
             g_sources[i][0] = '\0';
             g_source_count--;
             if (i < g_source_count) {
-                memcpy(g_sources[i], g_sources[g_source_count], sizeof(g_sources[i]));
+                __builtin_memcpy(g_sources[i], g_sources[g_source_count], sizeof(g_sources[i]));
                 g_sources[g_source_count][0] = '\0';
             }
             return 0;
@@ -487,7 +487,7 @@ int config_set_environment(const char *environment)
     g_compat_stats.total_calls++;
     if (!environment)
         return AGENTOS_EINVAL;
-    strncpy(g_environment, environment, sizeof(g_environment) - 1);
+    AGENTOS_STRNCPY_TERM(g_environment, environment, sizeof(g_environment));
     g_environment[sizeof(g_environment) - 1] = '\0';
     return 0;
 }

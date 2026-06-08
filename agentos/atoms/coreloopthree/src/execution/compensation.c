@@ -31,7 +31,7 @@ agentos_error_t agentos_compensation_create(agentos_compensation_t **out_manager
     }
 
     mgr->human_queue_capacity = 16;
-    mgr->human_queue = (char **)AGENTOS_MALLOC(mgr->human_queue_capacity * sizeof(char *));
+    SAFE_MALLOC_ARRAY(mgr->human_queue, mgr->human_queue_capacity, sizeof(char *));
     if (!mgr->human_queue) {
         agentos_mutex_free(mgr->lock);
         AGENTOS_FREE(mgr);
@@ -102,7 +102,7 @@ agentos_error_t agentos_compensation_register(agentos_compensation_t *manager,
         size_t input_len = strlen((const char *)input);
         entry->input = AGENTOS_MALLOC(input_len + 1);
         if (entry->input) {
-            memcpy(entry->input, input, input_len + 1);
+            __builtin_memcpy(entry->input, input, input_len + 1);
             entry->input_size = input_len + 1;
         }
     }
@@ -209,7 +209,8 @@ agentos_error_t agentos_compensation_get_human_queue(agentos_compensation_t *man
         return AGENTOS_SUCCESS;
     }
 
-    char **actions = (char **)AGENTOS_MALLOC(*out_count * sizeof(char *));
+    char **actions;
+    SAFE_MALLOC_ARRAY(actions, *out_count, sizeof(char *));
     if (!actions) {
         agentos_mutex_unlock(manager->lock);
         return AGENTOS_ENOMEM;

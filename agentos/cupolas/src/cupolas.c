@@ -23,6 +23,7 @@
 #include "sanitizer/sanitizer.h"
 #include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
+#include "memory_compat.h"
 #include "workbench/workbench.h"
 
 #include <stdio.h>
@@ -42,7 +43,7 @@ static void cupolas_internal_config_init_defaults(cupolas_internal_config_t *cfg
 {
     if (!cfg)
         return;
-    memset(cfg, 0, sizeof(*cfg));
+    __builtin_memset(cfg, 0, sizeof(*cfg));
 #ifdef _WIN32
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
              AGENTOS_CONFIG_DIR "\\cupolas\\permission_rules.yaml");
@@ -78,7 +79,7 @@ int cupolas_init(const char *config_path, agentos_error_t *error)
         return CUPOLAS_OK;
     }
 
-    memset(&g_cupolas, 0, sizeof(g_cupolas));
+    __builtin_memset(&g_cupolas, 0, sizeof(g_cupolas));
 
     if (cupolas_mutex_init(&g_cupolas.lock) != 0) {
         if (error)
@@ -438,13 +439,11 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
     }
 
     if (stdout_buf && stdout_size > 0 && result.stdout_data) {
-        strncpy(stdout_buf, result.stdout_data, stdout_size - 1);
-        stdout_buf[stdout_size - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(stdout_buf, result.stdout_data, stdout_size);
     }
 
     if (stderr_buf && stderr_size > 0 && result.stderr_data) {
-        strncpy(stderr_buf, result.stderr_data, stderr_size - 1);
-        stderr_buf[stderr_size - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(stderr_buf, result.stderr_data, stderr_size);
     }
 
     workbench_result_free(&result);

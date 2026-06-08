@@ -8,7 +8,7 @@
 
 本目录作为所有测试活动的根入口，包含全局配置文件、构建脚本以及五个子目录，分别对应不同测试层级。C 语言测试通过 CMake + CMocka 构建，Python 测试通过 pytest 驱动，性能基准测试使用 pytest-benchmark，Shell 脚本测试使用 bats-core。所有测试均可通过统一入口 `utils/python/run_tests.py` 执行，也支持直接使用 pytest 或 ctest 运行。
 
-> **版本**：v0.1.0
+> **版本**：v0.0.5
 
 ## 与 agentos/ 的对应关系
 
@@ -63,8 +63,8 @@ tests/
 ├── 构建配置
 │   ├── CMakeLists.txt           # 测试构建入口（C 测试）
 │   └── Makefile                 # Make 测试入口
-├── unit/                        # 单元测试（137 个文件）
-│   ├── atoms/                   #   Atoms 微内核层测试（25 个文件）
+├── unit/                        # 单元测试（138 个文件）
+│   ├── atoms/                   #   Atoms 微内核层测试（26 个文件）
 │   │   ├── corekern/            #     微内核核心（7 个文件）
 │   │   ├── coreloopthree/       #     三环运行时（11 个文件）
 │   │   ├── memory/              #     内置记忆（1 个文件）
@@ -230,7 +230,9 @@ cd build && ctest -R security
 | `openlab/` | ✅ pytest | — | — | — |
 | `toolkit/` | ✅ pytest | — | — | ✅ pytest-benchmark |
 
-> **注意**：当前有 6 个 commons 测试处于禁用状态：`test_config`、`test_types`、`test_ipc`、`test_network`、`test_common_integration`、`test_unified_modules`。
+> **注意**：当前有 6 个 commons 测试处于禁用状态，分布在单元测试和集成测试中：
+> - 单元测试（4 个）：`test_config`、`test_types`、`test_ipc`、`test_network`
+> - 集成测试（2 个）：`test_common_integration`、`test_unified_modules`
 
 ---
 

@@ -1429,12 +1429,12 @@ taskflow_error_t graph_engine_save(graph_engine_handle_t engine, graph_vertex_t 
 
     // 复制顶点
     if (e->vertex_count > 0) {
-        memcpy(vertices, e->vertices, e->vertex_count * sizeof(graph_vertex_t));
+        __builtin_memcpy(vertices, e->vertices, e->vertex_count * sizeof(graph_vertex_t));
     }
 
     // 复制边
     if (e->edge_count > 0) {
-        memcpy(edges, e->edges, e->edge_count * sizeof(graph_edge_t));
+        __builtin_memcpy(edges, e->edges, e->edge_count * sizeof(graph_edge_t));
     }
 
     *actual_vertices = e->vertex_count;

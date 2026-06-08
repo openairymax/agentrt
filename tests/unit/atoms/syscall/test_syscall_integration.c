@@ -221,7 +221,7 @@ static void test_edge_cases(void) {
     
     /* 超长字符串输入 */
     char long_input[10000];
-    memset(long_input, 'A', sizeof(long_input) - 1);
+    AGENTOS_MEMSET(long_input, 'A', sizeof(long_input) - 1);
     long_input[sizeof(long_input) - 1] = '\0';
     
     err = agentos_sys_task_submit(long_input, sizeof(long_input) - 1, 100, &result);

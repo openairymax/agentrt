@@ -263,6 +263,6 @@
  */
 #define TEST_GENERATE_BUFFER(var, size, value) \
     unsigned char var[size];                   \
-    memset(var, value, size)
+    AGENTOS_MEMSET(var, value, size)
 
 #endif /* AGENTOS_TEST_MACROS_H */

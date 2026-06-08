@@ -420,7 +420,7 @@ int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const
             return cupolas_ERROR_OVERFLOW;
         if (i > 0)
             cmdLine[offset++] = ' ';
-        memcpy(cmdLine + offset, argv[i], len);
+        __builtin_memcpy(cmdLine + offset, argv[i], len);
         offset += len;
     }
     cmdLine[offset] = '\0';
@@ -722,7 +722,7 @@ int cupolas_file_stat(const char *path, cupolas_file_stat_t *file_stat)
 {
     if (!path || !file_stat)
         return cupolas_ERROR_INVALID_ARG;
-    memset(file_stat, 0, sizeof(*file_stat));
+    __builtin_memset(file_stat, 0, sizeof(*file_stat));
 
 #if cupolas_PLATFORM_WINDOWS
     WIN32_FILE_ATTRIBUTE_DATA fad;
@@ -786,8 +786,7 @@ int cupolas_file_mkdir(const char *path, bool recursive)
 #if cupolas_PLATFORM_WINDOWS
     if (recursive) {
         char tmp[cupolas_PATH_MAX];
-        strncpy(tmp, path, sizeof(tmp) - 1);
-        tmp[sizeof(tmp) - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(tmp, path, sizeof(tmp));
         for (char *p = tmp + 1; *p; p++) {
             if (*p == '\\' || *p == '/') {
                 *p = '\0';
@@ -800,8 +799,7 @@ int cupolas_file_mkdir(const char *path, bool recursive)
 #else
     if (recursive) {
         char tmp[cupolas_PATH_MAX];
-        strncpy(tmp, path, sizeof(tmp) - 1);
-        tmp[sizeof(tmp) - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(tmp, path, sizeof(tmp));
         for (char *p = tmp + 1; *p; p++) {
             if (*p == '/') {
                 *p = '\0';
@@ -852,8 +850,7 @@ char *cupolas_file_abspath(const char *path, char *buf, size_t size)
     if (realpath(path, buf))
         return buf;
     if (strlen(path) < size) {
-        strncpy(buf, path, size - 1);
-        buf[size - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(buf, path, size);
         return buf;
     }
     return NULL;
@@ -869,8 +866,7 @@ char *cupolas_file_dirname(const char *path, char *buf, size_t size)
     if (len >= size)
         return NULL;
 
-    strncpy(buf, path, size);
-    buf[size - 1] = '\0';
+    AGENTOS_STRNCPY_TERM(buf, path, size);
 
     char *last_slash = strrchr(buf, '/');
 #if cupolas_PLATFORM_WINDOWS
@@ -901,7 +897,7 @@ void *cupolas_mem_alloc(size_t size)
 #else
     void *ptr = AGENTOS_MALLOC(size);
     if (ptr)
-        memset(ptr, 0, size);
+        __builtin_memset(ptr, 0, size);
     return ptr;
 #endif
 }
@@ -1123,7 +1119,7 @@ char *cupolas_strdup(const char *str)
     size_t len = strlen(str) + 1;
     char *dup = (char *)cupolas_mem_alloc(len);
     if (dup)
-        memcpy(dup, str, len);
+        __builtin_memcpy(dup, str, len);
     return dup;
 }
 
@@ -1136,7 +1132,7 @@ char *cupolas_strndup(const char *str, size_t n)
         len = n;
     char *dup = (char *)cupolas_mem_alloc(len + 1);
     if (dup) {
-        memcpy(dup, str, len);
+        __builtin_memcpy(dup, str, len);
         dup[len] = '\0';
     }
     return dup;

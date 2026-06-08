@@ -9,7 +9,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-from ..client.client import APIClient, manager, RequestOptions
+from ..client.client import APIClient, RequestOptions
 from ..utils import InputValidator
 
 
@@ -36,16 +36,16 @@ class BaseManager(ABC):
         ...         return self._api.post("/tasks", json={"content": content})
     """
     
-    def __init__(self, client: APIClient, config: Optional[manager] = None):
+    def __init__(self, client: APIClient, config: Optional[Dict[str, Any]] = None):
         """
         初始化 Manager
         
         Args:
             client: APIClient 实例
-            config: 可选的配置对象
+            config: 可选的配置字典
         """
         self._api = client
-        self._config = config or manager()
+        self._config = config or {}
         self._logger = logging.getLogger(self.__class__.__name__)
         self._validator = InputValidator()
     

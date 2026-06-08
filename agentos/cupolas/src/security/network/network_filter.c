@@ -40,7 +40,7 @@ int network_filter_init(void)
     if (g_filter.initialized)
         return 0;
 
-    memset(&g_filter, 0, sizeof(g_filter));
+    __builtin_memset(&g_filter, 0, sizeof(g_filter));
     g_filter.initialized = 1;
     return 0;
 }
@@ -68,7 +68,7 @@ void network_filter_cleanup(void)
         AGENTOS_FREE(conn->cipher_suite);
     }
 
-    memset(&g_filter, 0, sizeof(g_filter));
+    __builtin_memset(&g_filter, 0, sizeof(g_filter));
 }
 
 static int match_host_pattern(const char *pattern, const char *host)
@@ -104,6 +104,94 @@ static int match_url_pattern(const char *pattern, const char *url)
     return strstr(url, pattern) != NULL;
 }
 
+/**
+ * @brief 检测 IP 地址是否为私有地址 / 回环地址
+ * 
+ * 符合编码契约要求: 在请求前检测目标 IP 是否为私有地址，防止 SSRF 攻击。
+ * 
+ * IPv4 私有地址范围:
+ *   - 10.0.0.0/8       (10.0.0.0 - 10.255.255.255)
+ *   - 172.16.0.0/12     (172.16.0.0 - 172.31.255.255)
+ *   - 192.168.0.0/16    (192.168.0.0 - 192.168.255.255)
+ *   - 127.0.0.0/8       (回环地址)
+ *   - 169.254.0.0/16    (链路本地地址)
+ *   - 0.0.0.0/8         (当前网络)
+ * 
+ * IPv6 私有地址范围:
+ *   - ::1/128           (回环地址)
+ *   - fc00::/7          (唯一本地地址)
+ *   - fe80::/10         (链路本地地址)
+ * 
+ * @param ip_addr  IP 地址字符串 (IPv4 或 IPv6)
+ * @return 1 如果是私有地址，0 否则
+ */
+static int is_private_ip(const char *ip_addr)
+{
+    if (!ip_addr || ip_addr[0] == '\0')
+        return 0;
+
+    /* 检查是否为 IPv4 地址 (包含 '.') */
+    const char *dot = strchr(ip_addr, '.');
+    if (dot)
+    {
+        unsigned int a, b, c, d;
+        char ip_copy[64];
+        AGENTOS_STRNCPY_TERM(ip_copy, ip_addr, sizeof(ip_copy));
+        ip_copy[sizeof(ip_copy) - 1] = '\0';
+        char *saveptr = NULL;
+        char *tok_a = strtok_r(ip_copy, ".", &saveptr);
+        char *tok_b = strtok_r(NULL, ".", &saveptr);
+        char *tok_c = strtok_r(NULL, ".", &saveptr);
+        char *tok_d = strtok_r(NULL, ".\r\n", &saveptr);
+        if (tok_a && tok_b && tok_c && tok_d)
+        {
+            a = (unsigned int)strtoul(tok_a, NULL, 10);
+            b = (unsigned int)strtoul(tok_b, NULL, 10);
+            c = (unsigned int)strtoul(tok_c, NULL, 10);
+            d = (unsigned int)strtoul(tok_d, NULL, 10);
+            (void)c;
+            (void)d;
+            /* 10.0.0.0/8 */
+            if (a == 10)
+                return 1;
+            /* 172.16.0.0/12 */
+            if (a == 172 && b >= 16 && b <= 31)
+                return 1;
+            /* 192.168.0.0/16 */
+            if (a == 192 && b == 168)
+                return 1;
+            /* 127.0.0.0/8 (回环) */
+            if (a == 127)
+                return 1;
+            /* 169.254.0.0/16 (链路本地) */
+            if (a == 169 && b == 254)
+                return 1;
+            /* 0.0.0.0/8 (当前网络) */
+            if (a == 0)
+                return 1;
+        }
+        return 0;
+    }
+
+    /* 检查是否为 IPv6 地址 (包含 ':') */
+    const char *colon = strchr(ip_addr, ':');
+    if (colon)
+    {
+        /* ::1 (回环) */
+        if (strcmp(ip_addr, "::1") == 0)
+            return 1;
+        /* 检查以 "fc" 或 "fd" 开头 (fc00::/7) */
+        if (ip_addr[0] == 'f' && (ip_addr[1] == 'c' || ip_addr[1] == 'd'))
+            return 1;
+        /* 检查以 "fe80" 开头 (fe80::/10) */
+        if (strncmp(ip_addr, "fe80", 4) == 0)
+            return 1;
+        return 0;
+    }
+
+    return 0;
+}
+
 int network_filter_add_rule(const cupolas_net_filter_rule_t *rule)
 {
     if (!rule)
@@ -112,7 +200,7 @@ int network_filter_add_rule(const cupolas_net_filter_rule_t *rule)
         return AGENTOS_EINVAL;
 
     filter_rule_entry_t *entry = &g_filter.filter_rules[g_filter.filter_rule_count];
-    memset(entry, 0, sizeof(*entry));
+    __builtin_memset(entry, 0, sizeof(*entry));
 
     entry->rule.rule_id = cupolas_strdup(rule->rule_id);
     entry->rule.description = cupolas_strdup(rule->description);
@@ -225,8 +313,7 @@ int network_filter_list_rules(cupolas_net_filter_rule_t **rules, size_t *count)
         return AGENTOS_EINVAL;
 
     *count = g_filter.filter_rule_count;
-    *rules =
-        (cupolas_net_filter_rule_t *)AGENTOS_MALLOC(*count * sizeof(cupolas_net_filter_rule_t));
+    SAFE_MALLOC_ARRAY(*rules, *count, sizeof(cupolas_net_filter_rule_t));
     if (!*rules)
         return AGENTOS_EINVAL;
 
@@ -244,6 +331,14 @@ int network_filter_check_access(const char *host, uint16_t port, cupolas_protoco
         return 0;
 
     g_filter.stats.total_connections++;
+
+    /* === 编码契约: 私有地址检测（SSRF 防护）=== */
+    if (is_private_ip(host))
+    {
+        CUPOLAS_LOG_ERROR("SSRF prevention: blocked access to private IP %s:%u", host, port);
+        g_filter.stats.blocked_connections++;
+        return 0;
+    }
 
     for (size_t i = 0; i < g_filter.filter_rule_count; i++) {
         cupolas_net_filter_rule_t *rule = &g_filter.filter_rules[i].rule;
@@ -315,8 +410,7 @@ int network_filter_get_connections(cupolas_connection_info_t **connections, size
         return AGENTOS_EINVAL;
 
     *count = g_filter.connection_count;
-    *connections =
-        (cupolas_connection_info_t *)AGENTOS_MALLOC(*count * sizeof(cupolas_connection_info_t));
+    SAFE_MALLOC_ARRAY(*connections, *count, sizeof(cupolas_connection_info_t));
     if (!*connections)
         return AGENTOS_EINVAL;
 
@@ -342,7 +436,7 @@ int network_filter_close_connection(const char *local_ip, uint16_t local_port,
             AGENTOS_FREE(conn->remote_ip);
             AGENTOS_FREE(conn->hostname);
             AGENTOS_FREE(conn->cipher_suite);
-            memset(conn, 0, sizeof(*conn));
+            __builtin_memset(conn, 0, sizeof(*conn));
 
             for (size_t j = i; j < g_filter.connection_count - 1; j++) {
                 g_filter.connections[j] = g_filter.connections[j + 1];
@@ -366,5 +460,5 @@ int network_filter_get_stats(cupolas_net_stats_t *stats)
 
 void network_filter_reset_stats(void)
 {
-    memset(&g_filter.stats, 0, sizeof(g_filter.stats));
+    __builtin_memset(&g_filter.stats, 0, sizeof(g_filter.stats));
 }
