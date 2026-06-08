@@ -33,7 +33,7 @@ sync_result_t sync_rwlock_create(sync_rwlock_t *rwlock, const sync_attr_t *attr)
     if (attr != NULL && attr->name != NULL) {
         r->name = sync_internal_strdup(attr->name);
     }
-    memset(&r->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&r->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
     InitializeSRWLock(&r->rwlock);

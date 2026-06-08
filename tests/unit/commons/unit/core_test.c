@@ -4,13 +4,13 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "core/include/core.h"
+#include "core.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../utils/memory/include/memory_compat.h"
-#include "../../utils/string/include/string_compat.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 
 void test_version() {
     printf("=== 测试版本管理 ===\n");

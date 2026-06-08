@@ -38,7 +38,7 @@ Author: Spharx AgentOS Team
 Version: 0.1.0
 """
 
-from openlab.core import (
+from .core import (
     Agent,
     AgentCapability,
     AgentContext,
@@ -68,7 +68,7 @@ from openlab.core import (
     SQLiteStorage,
 )
 
-from openlab.agents.architect import ArchitectAgent, ArchitectConfig
+from .agents.architect import ArchitectAgent, ArchitectConfig
 
 __version__ = "0.1.0"
 

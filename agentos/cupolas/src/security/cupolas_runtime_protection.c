@@ -183,7 +183,7 @@ int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t *manager
 
     int expected = RTP_INIT_UNINIT;
     if (atomic_compare_exchange_strong(&g_runtime_prot.initialized, &expected, RTP_INIT_PROGRESS)) {
-        memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
+        __builtin_memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
 
         cupolas_mutex_init(&g_runtime_prot.lock);
 
@@ -226,7 +226,7 @@ void cupolas_runtime_protect_cleanup(void)
 
     CUPOLAS_MUTEX_DESTROY(&g_runtime_prot.lock);
 
-    memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
+    __builtin_memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
 }
 
 int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t *manager)
@@ -605,7 +605,7 @@ int cupolas_seccomp_add_rule(const char *syscall_name, uint32_t arg_index, const
     rule->action = action;
     rule->arg_index = arg_index;
     rule->arg_value = value;
-    strncpy(rule->op, op, sizeof(rule->op) - 1);
+AGENTOS_STRNCPY_TERM(rule->op, op, sizeof(rule->op));
     rule->op[sizeof(rule->op) - 1] = '\0';
     g_runtime_prot.seccomp_rule_count++;
     cupolas_mutex_unlock(&g_runtime_prot.lock);
@@ -845,7 +845,7 @@ void cupolas_violation_clear(void)
         AGENTOS_FREE(g_runtime_prot.violations.events[i].details);
         AGENTOS_FREE(g_runtime_prot.violations.events[i].syscall_name);
     }
-    memset(&g_runtime_prot.violations, 0, sizeof(g_runtime_prot.violations));
+    __builtin_memset(&g_runtime_prot.violations, 0, sizeof(g_runtime_prot.violations));
     cupolas_mutex_unlock(&g_runtime_prot.lock);
 }
 
@@ -952,9 +952,7 @@ int cupolas_protection_get_capabilities(char ***capabilities, size_t *count)
                                  "aslr", "dep"};
 
     *count = sizeof(caps) / sizeof(caps[0]);
-    *capabilities = (char **)AGENTOS_MALLOC(*count * sizeof(char *));
-    if (!*capabilities)
-        return AGENTOS_EINVAL;
+    SAFE_MALLOC_ARRAY(*capabilities, *count, sizeof(char *));
 
     for (size_t i = 0; i < *count; i++) {
         (*capabilities)[i] = cupolas_strdup(caps[i]);

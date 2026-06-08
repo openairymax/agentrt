@@ -14,8 +14,8 @@
 #include <string.h>
 #include "platform.h"
 #include <assert.h>
-#include "../include/heapstore.h"
-#include "../include/utils.h"
+#include "heapstore.h"
+#include "utils.h"
 
 #define TEST_PASS(name) printf("✅ PASS: %s\n", name)
 #define TEST_FAIL(name, reason) printf("❌ FAIL: %s - %s\n", name, reason)
@@ -122,7 +122,7 @@ static int test_very_long_input(void) {
     }
 
     char long_service[10000];
-    memset(long_service, 'A', sizeof(long_service));
+    AGENTOS_MEMSET(long_service, 'A', sizeof(long_service));
     long_service[sizeof(long_service) - 1] = '\0';
 
     err = heapstore_log_write_fast(long_service, 0, "test");
@@ -133,7 +133,7 @@ static int test_very_long_input(void) {
     }
 
     char long_message[100000];
-    memset(long_message, 'B', sizeof(long_message));
+    AGENTOS_MEMSET(long_message, 'B', sizeof(long_message));
     long_message[sizeof(long_message) - 1] = '\0';
 
     err = heapstore_log_write_fast("test_service", 0, long_message);
@@ -217,7 +217,7 @@ static int test_sanitize_function_edge_cases(void) {
     }
 
     char very_long[10000];
-    memset(very_long, 'A', sizeof(very_long) - 1);
+    AGENTOS_MEMSET(very_long, 'A', sizeof(very_long) - 1);
     very_long[sizeof(very_long) - 1] = '\0';
 
     if (heapstore_sanitize_path_component(output, very_long, sizeof(output)) != -1) {

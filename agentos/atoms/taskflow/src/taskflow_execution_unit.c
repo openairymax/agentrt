@@ -259,19 +259,19 @@ taskflow_task_input_t *taskflow_task_input_create(taskflow_graph_handle_t graph,
     // 如果有顶点数据，复制它们
     if (vertices && vertex_count > 0) {
         input->vertex_count = vertex_count;
-        input->vertices = (graph_vertex_t *)AGENTOS_MALLOC(vertex_count * sizeof(graph_vertex_t));
+        SAFE_MALLOC_ARRAY(input->vertices, vertex_count, sizeof(graph_vertex_t));
         if (!input->vertices) {
             AGENTOS_FREE(input);
             AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
-        memcpy(input->vertices, vertices, vertex_count * sizeof(graph_vertex_t));
+        __builtin_memcpy(input->vertices, vertices, vertex_count * sizeof(graph_vertex_t));
     }
 
     // 如果有边数据，复制它们
     if (edges && edge_count > 0) {
         input->edge_count = edge_count;
-        input->edges = (graph_edge_t *)AGENTOS_MALLOC(edge_count * sizeof(graph_edge_t));
+        SAFE_MALLOC_ARRAY(input->edges, edge_count, sizeof(graph_edge_t));
         if (!input->edges) {
             if (input->vertices)
                 AGENTOS_FREE(input->vertices);
@@ -279,7 +279,7 @@ taskflow_task_input_t *taskflow_task_input_create(taskflow_graph_handle_t graph,
             AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
-        memcpy(input->edges, edges, edge_count * sizeof(graph_edge_t));
+        __builtin_memcpy(input->edges, edges, edge_count * sizeof(graph_edge_t));
     }
 
     return input;
@@ -309,7 +309,7 @@ taskflow_task_output_t *taskflow_task_output_create(void)
     output->result = TASKFLOW_SUCCESS;
     output->completed_supersteps = 0;
     output->active_vertices = 0;
-    memset(&output->stats, 0, sizeof(output->stats));
+    __builtin_memset(&output->stats, 0, sizeof(output->stats));
     output->result_data = NULL;
     output->result_data_size = 0;
 
@@ -364,7 +364,7 @@ taskflow_error_t taskflow_pack_task_output(const taskflow_task_output_t *output,
             taskflow_task_output_destroy(packed);
             return TASKFLOW_ERROR_MEMORY;
         }
-        memcpy(packed->result_data, output->result_data, output->result_data_size);
+        __builtin_memcpy(packed->result_data, output->result_data, output->result_data_size);
         packed->result_data_size = output->result_data_size;
     }
 

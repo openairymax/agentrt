@@ -44,7 +44,7 @@ bool heapstore_ensure_directory(const char *path)
     char *p = NULL;
     size_t len;
 
-    strncpy(tmp, path, sizeof(tmp) - 1);
+    __builtin_strncpy(tmp, path, sizeof(tmp) - 1);
     tmp[sizeof(tmp) - 1] = '\0';
     len = strlen(tmp);
 
@@ -78,7 +78,7 @@ bool heapstore_ensure_directory(const char *path)
     char *p = NULL;
     size_t len;
 
-    strncpy(tmp, path, sizeof(tmp) - 1);
+    __builtin_strncpy(tmp, path, sizeof(tmp) - 1);
     tmp[sizeof(tmp) - 1] = '\0';
     len = strlen(tmp);
 

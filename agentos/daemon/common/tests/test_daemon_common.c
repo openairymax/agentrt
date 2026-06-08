@@ -684,9 +684,11 @@ static void test_am_rules(void)
 
     am_rule_t rule = {0};
     strncpy(rule.name, "cpu_high_rule", AM_MAX_NAME_LEN - 1);
+    rule.name[AM_MAX_NAME_LEN - 1] = '\0';
     rule.type = AM_RULE_THRESHOLD;
     rule.level = AM_LEVEL_WARNING;
     strncpy(rule.metric_name, "cpu_usage", sizeof(rule.metric_name) - 1);
+    rule.metric_name[sizeof(rule.metric_name) - 1] = '\0';
     rule.comparison = AM_OP_GT;
     rule.threshold = 80.0;
     rule.duration_seconds = 5;

@@ -201,7 +201,7 @@ static void test_register_and_process(void)
     }
 
     agentos_context_processor_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.max_tokens = 4096;
     config.target_tokens = 2048;
     config.compression_ratio = 0.5f;
@@ -220,7 +220,7 @@ static void test_register_and_process(void)
 static void test_config_parameters(void)
 {
     agentos_context_processor_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
 
     config.max_tokens = 8192;
     config.target_tokens = 4096;

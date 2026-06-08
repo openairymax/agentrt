@@ -14,6 +14,16 @@ set(SYSCALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/syscall")
 set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
 set(PROTOCOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../protocols")
 
+message(STATUS "[GATEWAY] Configuring gateway module (cJSON: ${AGENTOS_HAS_CJSON}, microhttpd: ${AGENTOS_HAS_MICROHTTPD}, websockets: ${AGENTOS_HAS_LIBWEBSOCKETS})")
+# 验证关键路径
+foreach(_dir ${COREKERN_DIR}/include ${SYSCALL_DIR}/include ${COMMONS_DIR} ${PROTOCOLS_DIR}/include ${PROTOCOLS_DIR}/common/include)
+    if(EXISTS "${_dir}")
+        message(STATUS "[GATEWAY]   [OK] ${_dir}")
+    else()
+        message(WARNING "[GATEWAY]   [MISSING] ${_dir}")
+    endif()
+endforeach()
+
 if(AGENTOS_HAS_CJSON)
 set(GATEWAY_SOURCES
     src/gateway/gateway_api.c
@@ -81,9 +91,7 @@ target_include_directories(gateway
         ${PROTOCOLS_DIR}/common/include
         ${PROTOCOLS_DIR}/src
         ${PROTOCOLS_DIR}/include
-        ${PROTOCOLS_DIR}/protocol/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/network_helper
         # R-09-124: cjson (system library)
         ${CJSON_INCLUDE_DIRS}/cjson
 )
@@ -216,5 +224,10 @@ if(CPPCHECK)
     )
 endif()
 else()
-    message(STATUS "gateway: SKIPPED (cJSON not found, required for JSON protocol handling)")
+    # Stub library when cJSON is not available - provides link target but no functionality
+    add_library(gateway STATIC
+        src/gateway/gateway.c
+    )
+    target_compile_definitions(gateway PRIVATE AGENTOS_NO_CJSON)
+    message(STATUS "gateway: cJSON not found - building stub library")
 endif() # AGENTOS_HAS_CJSON

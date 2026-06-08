@@ -32,7 +32,7 @@ sync_result_t sync_barrier_create(sync_barrier_t *barrier, unsigned int count,
     if (attr != NULL && attr->name != NULL) {
         b->name = sync_internal_strdup(attr->name);
     }
-    memset(&b->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&b->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
     InitializeCriticalSection(&b->barrier.cs);

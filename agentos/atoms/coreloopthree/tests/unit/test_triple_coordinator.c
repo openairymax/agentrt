@@ -65,7 +65,7 @@ typedef struct {
 
 static void mock_reset(mock_ctx_t *mc)
 {
-    memset(mc, 0, sizeof(*mc));
+    AGENTOS_MEMSET(mc, 0, sizeof(*mc));
 }
 
 /* ==================== Mock S2 生成器 ==================== */

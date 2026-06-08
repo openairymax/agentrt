@@ -124,8 +124,8 @@ static int test_sm4_not_initialized(void)
 static int test_sm4_bad_alignment(void)
 {
     china_eco_sm4_context_t ctx = {0};
-    memset(ctx.key, 0x01, CHINA_ECO_SM4_KEY_SIZE);
-    memset(ctx.iv, 0x02, CHINA_ECO_SM4_IV_SIZE);
+    AGENTOS_MEMSET(ctx.key, 0x01, CHINA_ECO_SM4_KEY_SIZE);
+    AGENTOS_MEMSET(ctx.iv, 0x02, CHINA_ECO_SM4_IV_SIZE);
     ctx.initialized = true;
 
     uint8_t data[128] = {0};

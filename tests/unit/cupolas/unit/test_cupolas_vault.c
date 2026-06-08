@@ -96,7 +96,7 @@ TEST(test_vault_large_secret) {
     char* secret = malloc(secret_size);
     ASSERT(secret != NULL, "Allocate large secret");
     
-    memset(secret, 'A', secret_size);
+    AGENTOS_MEMSET(secret, 'A', secret_size);
     
     int store_result = cupolas_vault_store(id, secret, secret_size);
     
