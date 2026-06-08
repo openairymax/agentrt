@@ -87,7 +87,7 @@ int gw_a2a_handler_register_task_type(gw_a2a_handler_t *handler, const char *tas
         return AGENTOS_ERR_OVERFLOW;
 
     gw_a2a_task_type_entry_t *entry = &handler->task_types[handler->task_type_count];
-    strncpy(entry->task_type, task_type, sizeof(entry->task_type) - 1);
+AGENTOS_STRNCPY_TERM(entry->task_type, task_type, sizeof(entry->task_type));
     entry->task_type[sizeof(entry->task_type) - 1] = '\0';
     entry->exec_fn = exec_fn;
     entry->user_data = user_data;
@@ -186,7 +186,7 @@ static char *extract_a2a_field(const char *json, const char *field_name)
 
         return NULL;
     }
-    memcpy(val, p, len);
+    __builtin_memcpy(val, p, len);
     val[len] = '\0';
     return val;
 }

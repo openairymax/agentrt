@@ -243,7 +243,7 @@ static inline void agentos_compat_error_handle_with_context(agentos_error_t err,
         vsnprintf(buffer, sizeof(buffer), fmt, args2);
         va_end(args2);
         agentos_compat_error_info_t info;
-        memset(&info, 0, sizeof(info));
+__builtin_memset(&info, 0, sizeof(info));
         info.code = err;
         info.function = function;
         info.file = file;

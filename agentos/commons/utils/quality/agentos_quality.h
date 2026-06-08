@@ -434,7 +434,7 @@ static inline int safe_memset(void *dest, size_t dest_size, int value, size_t co
     if (count > dest_size)
         return AGENTOS_EINVAL;
 
-    memset(dest, value, count);
+    AGENTOS_MEMSET(dest, value, count);
     return AGENTOS_SUCCESS;
 }
 

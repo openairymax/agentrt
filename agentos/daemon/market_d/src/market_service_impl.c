@@ -89,7 +89,7 @@ int market_service_create(const market_config_t *config, market_service_t **serv
     if (!service)
         return AGENTOS_ERR_INVALID_PARAM;
     if (!config) {
-        memset(&default_cfg, 0, sizeof(default_cfg));
+        __builtin_memset(&default_cfg, 0, sizeof(default_cfg));
         default_cfg.cache_ttl_ms = 3600000;
         default_cfg.sync_interval_ms = 30000;
         config = &default_cfg;
@@ -100,7 +100,7 @@ int market_service_create(const market_config_t *config, market_service_t **serv
         AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate service struct");
     }
 
-    memcpy(&svc->config, config, sizeof(market_config_t));
+    __builtin_memcpy(&svc->config, config, sizeof(market_config_t));
     if (config->registry_url)
         svc->config.registry_url = AGENTOS_STRDUP(config->registry_url);
     if (config->storage_path)
@@ -702,7 +702,7 @@ int market_service_reload_config(market_service_t *service, const market_config_
     service->config.registry_url = NULL;
     service->config.storage_path = NULL;
 
-    memcpy(&service->config, config, sizeof(market_config_t));
+    __builtin_memcpy(&service->config, config, sizeof(market_config_t));
     if (config->registry_url) {
         service->config.registry_url = AGENTOS_STRDUP(config->registry_url);
         if (!service->config.registry_url) {
@@ -739,7 +739,8 @@ int market_service_sync_registry(market_service_t *service)
     {
         size_t pos = 0;
         char tmp[1024];
-        strncpy(tmp, storage, sizeof(tmp) - 1);
+AGENTOS_STRNCPY_TERM(tmp, storage, sizeof(tmp));
+        (tmp)[sizeof(tmp) - 1] = '\0';
         tmp[sizeof(tmp) - 1] = '\0';
         while (tmp[pos]) {
             if (tmp[pos] == '/' && pos > 0) {
@@ -831,7 +832,7 @@ int market_service_sync_registry(market_service_t *service)
         size_t id_len = (size_t)(id_end - id_start);
         if (id_len > 0 && id_len < 128) {
             char found_id[128];
-            memcpy(found_id, id_start, id_len);
+            __builtin_memcpy(found_id, id_start, id_len);
             found_id[id_len] = '\0';
 
             int already_exists = 0;

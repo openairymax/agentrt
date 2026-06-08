@@ -1,22 +1,24 @@
 # Manager 测试套件
 
 **模块路径**: `agentos/manager/tests/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
-`manager/tests/` 包含 Manager 模块的完整测试套件，涵盖配置语法校验、JSON Schema 验证、配置集成测试、审计日志验证和配置漂移检测器测试。测试套件遵循 ARCHITECTURAL_PRINCIPLES.md 的 **E-8 可测试性原则**，提供统一的测试运行器，支持选择性执行和详细报告输出。
+`manager/tests/` 包含 Manager 模块的完整测试套件（计划中），涵盖配置语法校验、JSON Schema 验证、配置集成测试、审计日志验证和配置漂移检测器测试。测试套件遵循 ARCHITECTURAL_PRINCIPLES.md 的 **E-8 可测试性原则**，提供统一的测试运行器，支持选择性执行和详细报告输出。
+
+> **注意**：以下测试文件均为计划中，尚未实现。当前目录仅包含本 README 文件。
 
 ## 目录结构
 
 ```
 tests/
-├── test_config_syntax.py         # 配置文件语法验证测试
-├── test_schema_validation.py     # JSON Schema 校验测试
-├── test_config_integration.py    # 配置集成测试
-├── test_audit_log_validation.py  # 审计日志验证测试
-├── test_drift_detector.py        # 配置漂移检测器测试
-├── run_all_tests.py              # 测试套件运行器
+├── test_config_syntax.py         # 配置文件语法验证测试（计划中）
+├── test_schema_validation.py     # JSON Schema 校验测试（计划中）
+├── test_config_integration.py    # 配置集成测试（计划中）
+├── test_audit_log_validation.py  # 审计日志验证测试（计划中）
+├── test_drift_detector.py        # 配置漂移检测器测试（计划中）
+├── run_all_tests.py              # 测试套件运行器（计划中）
 └── README.md                     # 本文件
 ```
 

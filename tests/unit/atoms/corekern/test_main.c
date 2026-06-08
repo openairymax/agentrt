@@ -8,8 +8,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../../commons/utils/string/include/string_compat.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 #include <assert.h>
 
 /* 测试函数声明 */

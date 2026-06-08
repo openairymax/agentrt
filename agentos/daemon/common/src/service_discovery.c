@@ -122,7 +122,7 @@ static void expire_stale_instances(sd_internal_t *sd)
                 if (j < entry->instance_count - 1) {
                     entry->instances[j] = entry->instances[entry->instance_count - 1];
                 }
-                memset(&entry->instances[entry->instance_count - 1], 0, sizeof(sd_instance_t));
+                __builtin_memset(&entry->instances[entry->instance_count - 1], 0, sizeof(sd_instance_t));
                 entry->instance_count--;
                 sd->stats.expirations++;
 
@@ -137,7 +137,7 @@ static void expire_stale_instances(sd_internal_t *sd)
                 if (i < sd->service_count - 1) {
                     sd->services[i] = sd->services[sd->service_count - 1];
                 }
-                memset(&sd->services[sd->service_count - 1], 0, sizeof(sd_service_entry_t));
+                __builtin_memset(&sd->services[sd->service_count - 1], 0, sizeof(sd_service_entry_t));
                 sd->service_count--;
                 i--;
             }
@@ -159,7 +159,7 @@ static agentos_error_t lb_round_robin(sd_internal_t *sd, const sd_service_entry_
     for (uint32_t i = 0; i < entry->instance_count; i++) {
         uint32_t idx = (start + i) % entry->instance_count;
         if (entry->instances[idx].healthy) {
-            memcpy(result, &entry->instances[idx], sizeof(sd_instance_t));
+            __builtin_memcpy(result, &entry->instances[idx], sizeof(sd_instance_t));
             sd->rr_counter = idx + 1;
             return AGENTOS_SUCCESS;
         }
@@ -187,14 +187,14 @@ static agentos_error_t lb_weighted(const sd_service_entry_t *entry, sd_instance_
             continue;
         cumulative += entry->instances[i].weight;
         if (random_val < cumulative) {
-            memcpy(result, &entry->instances[i], sizeof(sd_instance_t));
+            __builtin_memcpy(result, &entry->instances[i], sizeof(sd_instance_t));
             return AGENTOS_SUCCESS;
         }
     }
 
     for (uint32_t i = 0; i < entry->instance_count; i++) {
         if (entry->instances[i].healthy) {
-            memcpy(result, &entry->instances[i], sizeof(sd_instance_t));
+            __builtin_memcpy(result, &entry->instances[i], sizeof(sd_instance_t));
             return AGENTOS_SUCCESS;
         }
     }
@@ -220,7 +220,7 @@ static agentos_error_t lb_least_connection(const sd_service_entry_t *entry, sd_i
         AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: health check failed");
         return AGENTOS_ENOENT;
     }
-    memcpy(result, &entry->instances[best_idx], sizeof(sd_instance_t));
+    __builtin_memcpy(result, &entry->instances[best_idx], sizeof(sd_instance_t));
     return AGENTOS_SUCCESS;
 }
 
@@ -239,7 +239,7 @@ static agentos_error_t lb_random(const sd_service_entry_t *entry, sd_instance_t 
     for (uint32_t i = 0; i < entry->instance_count; i++) {
         if (entry->instances[i].healthy) {
             if (count == idx) {
-                memcpy(result, &entry->instances[i], sizeof(sd_instance_t));
+                __builtin_memcpy(result, &entry->instances[i], sizeof(sd_instance_t));
                 return AGENTOS_SUCCESS;
             }
             count++;
@@ -268,7 +268,7 @@ static agentos_error_t lb_least_load(const sd_service_entry_t *entry, sd_instanc
 
     if (best_idx < 0)
         return AGENTOS_ENOENT;
-    memcpy(result, &entry->instances[best_idx], sizeof(sd_instance_t));
+    __builtin_memcpy(result, &entry->instances[best_idx], sizeof(sd_instance_t));
     return AGENTOS_SUCCESS;
 }
 
@@ -277,7 +277,7 @@ static agentos_error_t lb_least_load(const sd_service_entry_t *entry, sd_instanc
 AGENTOS_API sd_config_t sd_create_default_config(void)
 {
     sd_config_t config;
-    memset(&config, 0, sizeof(sd_config_t));
+    __builtin_memset(&config, 0, sizeof(sd_config_t));
     config.heartbeat_interval_ms = SD_DEFAULT_HEARTBEAT_MS;
     config.expire_timeout_ms = SD_DEFAULT_EXPIRE_MS;
     config.default_lb_strategy = SD_LB_ROUND_ROBIN;
@@ -298,7 +298,7 @@ AGENTOS_API service_discovery_t sd_create(const sd_config_t *config)
     }
 
     if (config) {
-        memcpy(&sd->config, config, sizeof(sd_config_t));
+        __builtin_memcpy(&sd->config, config, sizeof(sd_config_t));
     } else {
         sd->config = sd_create_default_config();
     }
@@ -403,7 +403,7 @@ AGENTOS_API agentos_error_t sd_register(service_discovery_t sd_handle, const cha
         }
 
         entry = &sd->services[sd->service_count];
-        memset(entry, 0, sizeof(sd_service_entry_t));
+        __builtin_memset(entry, 0, sizeof(sd_service_entry_t));
         safe_strcpy(entry->name, service_name, SD_MAX_NAME_LEN);
         safe_strcpy(entry->service_type, service_type, SD_MAX_TYPE_LEN);
         if (tags)
@@ -418,7 +418,7 @@ AGENTOS_API agentos_error_t sd_register(service_discovery_t sd_handle, const cha
 
     int32_t inst_idx = find_instance_index(entry, instance->instance_id);
     if (inst_idx >= 0) {
-        memcpy(&entry->instances[inst_idx], instance, sizeof(sd_instance_t));
+        __builtin_memcpy(&entry->instances[inst_idx], instance, sizeof(sd_instance_t));
         entry->instances[inst_idx].last_heartbeat = agentos_platform_get_time_ms();
         entry->instances[inst_idx].register_time = entry->instances[inst_idx].register_time > 0
                                                        ? entry->instances[inst_idx].register_time
@@ -430,7 +430,7 @@ AGENTOS_API agentos_error_t sd_register(service_discovery_t sd_handle, const cha
             return AGENTOS_ENOMEM;
         }
 
-        memcpy(&entry->instances[entry->instance_count], instance, sizeof(sd_instance_t));
+        __builtin_memcpy(&entry->instances[entry->instance_count], instance, sizeof(sd_instance_t));
         entry->instances[entry->instance_count].last_heartbeat = agentos_platform_get_time_ms();
         entry->instances[entry->instance_count].register_time = agentos_platform_get_time_ms();
         entry->instances[entry->instance_count].pid =
@@ -485,7 +485,7 @@ AGENTOS_API agentos_error_t sd_deregister(service_discovery_t sd_handle, const c
     if ((uint32_t)inst_idx < entry->instance_count - 1) {
         entry->instances[inst_idx] = entry->instances[entry->instance_count - 1];
     }
-    memset(&entry->instances[entry->instance_count - 1], 0, sizeof(sd_instance_t));
+    __builtin_memset(&entry->instances[entry->instance_count - 1], 0, sizeof(sd_instance_t));
     entry->instance_count--;
     entry->last_updated = agentos_platform_get_time_ms();
 
@@ -554,7 +554,7 @@ AGENTOS_API agentos_error_t sd_discover(service_discovery_t sd_handle, const cha
     uint32_t count = 0;
     for (uint32_t i = 0; i < entry->instance_count && count < max_count; i++) {
         if (entry->instances[i].healthy) {
-            memcpy(&instances[count], &entry->instances[i], sizeof(sd_instance_t));
+            __builtin_memcpy(&instances[count], &entry->instances[i], sizeof(sd_instance_t));
             count++;
         }
     }
@@ -585,7 +585,7 @@ AGENTOS_API agentos_error_t sd_discover_by_type(service_discovery_t sd_handle,
     uint32_t count = 0;
     for (uint32_t i = 0; i < sd->service_count && count < max_count; i++) {
         if (strcmp(sd->services[i].service_type, service_type) == 0) {
-            memcpy(&entries[count], &sd->services[i], sizeof(sd_service_entry_t));
+            __builtin_memcpy(&entries[count], &sd->services[i], sizeof(sd_service_entry_t));
             count++;
         }
     }
@@ -632,7 +632,7 @@ AGENTOS_API agentos_error_t sd_discover_by_tags(service_discovery_t sd_handle, c
                     }
                 }
                 if (!already_added) {
-                    memcpy(&entries[count], &sd->services[i], sizeof(sd_service_entry_t));
+                    __builtin_memcpy(&entries[count], &sd->services[i], sizeof(sd_service_entry_t));
                     count++;
                 }
             }
@@ -935,7 +935,7 @@ AGENTOS_API agentos_error_t sd_get_stats(service_discovery_t sd_handle, sd_stats
     sd_internal_t *sd = (sd_internal_t *)sd_handle;
 
     agentos_mutex_lock(&sd->mutex);
-    memcpy(stats, &sd->stats, sizeof(sd_stats_t));
+    __builtin_memcpy(stats, &sd->stats, sizeof(sd_stats_t));
     stats->active_services = sd->service_count;
     stats->active_instances = 0;
     for (uint32_t i = 0; i < sd->service_count; i++) {

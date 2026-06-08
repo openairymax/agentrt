@@ -1,7 +1,7 @@
 # Workbench — 安全工作台
 
 **模块路径**: `agentos/cupolas/src/workbench/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
@@ -34,36 +34,53 @@ workbench/
 
 ### workbench_config_t — 工作台配置
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `max_cpu_time_ms` | `uint32_t` | 30000 | 最大 CPU 时间（毫秒） |
-| `max_memory_mb` | `uint32_t` | 512 | 最大内存（MB） |
-| `max_file_size_kb` | `uint32_t` | 10240 | 最大文件大小（KB） |
-| `max_processes` | `uint32_t` | 10 | 最大子进程数 |
-| `max_output_bytes` | `uint32_t` | 1048576 | 最大输出大小（字节） |
-| `network_enabled` | `bool` | false | 是否允许网络访问 |
-| `filesystem_readonly` | `bool` | true | 文件系统是否只读 |
-| `isolation_level` | `workbench_isolation_t` | PROCESS | 隔离级别 |
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `working_dir` | `const char *` | 工作目录 |
+| `env_vars` | `const char **` | 环境变量数组 |
+| `env_count` | `size_t` | 环境变量数量 |
+| `timeout_ms` | `uint32_t` | 执行超时（毫秒） |
+| `max_output_size` | `size_t` | 最大输出大小 |
+| `redirect_stdin` | `bool` | 重定向标准输入 |
+| `redirect_stdout` | `bool` | 重定向标准输出 |
+| `redirect_stderr` | `bool` | 重定向标准错误 |
+| `limits` | `workbench_limits_t` | 资源限制配置 |
+| `enable_limits` | `bool` | 是否启用资源控制 |
+
+### workbench_limits_t — 资源限制配置
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `max_memory_bytes` | `size_t` | 最大内存限制（字节），0=无限制 |
+| `max_cpu_time_ms` | `uint32_t` | 最大 CPU 时间（毫秒），0=无限制 |
+| `max_output_bytes` | `size_t` | 最大输出大小（字节），0=默认 |
+| `max_processes` | `uint32_t` | 最大子进程数，0=无限制 |
+| `max_threads` | `uint32_t` | 最大线程数，0=无限制 |
+| `max_file_size_bytes` | `size_t` | 最大文件大小（字节），0=无限制 |
 
 ### workbench_result_t — 执行结果
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `exit_code` | `int` | 退出码 |
-| `stdout_output` | `char *` | 标准输出 |
-| `stderr_output` | `char *` | 标准错误 |
-| `cpu_time_ms` | `uint64_t` | 实际 CPU 时间 |
-| `memory_peak_kb` | `uint64_t` | 峰值内存使用 |
 | `timed_out` | `bool` | 是否超时 |
-| `oom_killed` | `bool` | 是否因内存超限被杀 |
+| `signaled` | `bool` | 是否被信号终止 |
+| `signal` | `int` | 终止信号编号 |
+| `stdout_data` | `char *` | 标准输出 |
+| `stdout_size` | `size_t` | 标准输出大小 |
+| `stderr_data` | `char *` | 标准错误 |
+| `stderr_size` | `size_t` | 标准错误大小 |
+| `start_time_ms` | `uint64_t` | 开始时间 |
+| `end_time_ms` | `uint64_t` | 结束时间 |
 
-### workbench_isolation_t — 隔离级别
+### workbench_state_t — 工作台状态
 
 | 枚举值 | 说明 |
 |--------|------|
-| `WORKBENCH_ISOLATION_NONE` | 无隔离（仅用于可信代码） |
-| `WORKBENCH_ISOLATION_PROCESS` | 进程级隔离（fork + 资源限制） |
-| `WORKBENCH_ISOLATION_CONTAINER` | 容器级隔离（Linux namespace + cgroup） |
+| `WORKBENCH_STATE_IDLE` | 空闲 |
+| `WORKBENCH_STATE_RUNNING` | 运行中 |
+| `WORKBENCH_STATE_STOPPED` | 已停止 |
+| `WORKBENCH_STATE_ERROR` | 错误 |
 
 ## 接口说明
 
@@ -71,90 +88,93 @@ workbench/
 
 | 函数 | 说明 |
 |------|------|
-| `workbench_create(config)` | 创建工作台实例 |
-| `workbench_destroy(wb)` | 销毁工作台实例 |
-| `workbench_execute(wb, command, agent_id, result)` | 执行命令 |
-| `workbench_execute_script(wb, script, language, agent_id, result)` | 执行脚本 |
-| `workbench_cancel(wb, execution_id)` | 取消执行 |
-| `workbench_get_status(wb, execution_id)` | 获取执行状态 |
-| `workbench_list_executions(wb)` | 列出所有执行 |
+| `workbench_create(config)` | 创建工作台实例（config 可为 NULL 使用默认配置） |
+| `workbench_destroy(wb)` | 销毁工作台实例（终止子进程） |
+| `workbench_execute(wb, command, argv, result)` | 同步执行命令 |
+| `workbench_execute_async(wb, command, argv)` | 异步执行命令 |
+| `workbench_wait(wb, result, timeout_ms)` | 等待异步执行完成 |
+| `workbench_terminate(wb)` | 终止执行 |
+| `workbench_get_state(wb)` | 获取工作台状态 |
+| `workbench_get_pid(wb)` | 获取进程 ID |
+| `workbench_write_stdin(wb, data, size, written)` | 写入标准输入 |
+| `workbench_read_stdout(wb, buf, size, read_size)` | 读取标准输出 |
+| `workbench_read_stderr(wb, buf, size, read_size)` | 读取标准错误 |
+| `workbench_result_free(result)` | 释放执行结果 |
+| `workbench_default_config(config)` | 获取默认配置 |
+| `workbench_set_limits(wb, limits)` | 设置资源限制 |
+| `workbench_get_limits(wb, limits)` | 获取资源限制 |
+| `workbench_get_usage(wb, memory_usage, cpu_usage)` | 获取资源使用情况 |
 
-### 进程管理 API
-
-| 函数 | 说明 |
-|------|------|
-| `workbench_process_create(config)` | 创建进程管理器 |
-| `workbench_process_destroy(pm)` | 销毁进程管理器 |
-| `workbench_process_spawn(pm, command, result)` | 启动子进程 |
-| `workbench_process_kill(pm, pid)` | 终止子进程 |
-| `workbench_process_wait(pm, pid, timeout_ms)` | 等待子进程结束 |
-| `workbench_process_get_stats(pm, pid, stats)` | 获取进程统计 |
-
-### 容器隔离 API
+### 资源限制 API（workbench_limits）
 
 | 函数 | 说明 |
 |------|------|
-| `workbench_container_create(config)` | 创建容器 |
-| `workbench_container_destroy(container)` | 销毁容器 |
-| `workbench_container_run(container, command, result)` | 在容器中执行命令 |
-| `workbench_container_pause(container)` | 暂停容器 |
-| `workbench_container_resume(container)` | 恢复容器 |
-| `workbench_container_get_info(container, info)` | 获取容器信息 |
+| `limits_create(memory_limit_bytes, cpu_time_limit_ms, processes_limit)` | 创建资源限制上下文 |
+| `limits_destroy(ctx)` | 销毁资源限制上下文 |
+| `limits_attach(ctx)` | 将当前进程/线程附加到限制上下文 |
+| `limits_detach(ctx)` | 从限制上下文分离 |
+| `limits_set_memory(ctx, limit_bytes, mode)` | 设置内存限制 |
+| `limits_set_cpu_time(ctx, limit_ms, mode)` | 设置 CPU 时间限制 |
+| `limits_set_cpu_weight(ctx, weight, mode)` | 设置 CPU 权重（1-10000） |
+| `limits_set_processes(ctx, limit, mode)` | 设置进程数限制 |
+| `limits_set_threads(ctx, limit, mode)` | 设置线程数限制 |
+| `limits_set_file_size(ctx, limit_bytes, mode)` | 设置文件大小限制 |
+| `limits_set_file_descriptors(ctx, limit, mode)` | 设置文件描述符限制 |
+| `limits_get_stats(ctx, stats)` | 获取资源统计 |
+| `limits_check(ctx, type, status)` | 检查是否超限 |
+| `limits_enforce(ctx)` | 强制执行限制（终止超限进程） |
+| `limits_set_exceeded_callback(ctx, callback, user_data)` | 设置超限回调 |
+| `limits_is_available()` | 检查平台是否支持资源限制 |
 
-### 资源限制 API
+**限制执行模式**：
 
-| 函数 | 说明 |
+| 模式 | 说明 |
 |------|------|
-| `workbench_limits_apply(pid, config)` | 对进程应用资源限制 |
-| `workbench_limits_check(pid, config)` | 检查进程是否超限 |
-| `workbench_limits_get_usage(pid, usage)` | 获取资源使用情况 |
+| `LIMIT_MODE_SOFT` | 软限制（仅警告） |
+| `LIMIT_MODE_HARD` | 硬限制（阻止分配） |
+| `LIMIT_MODE_ENFORCED` | 强制限制（终止进程） |
+
+**平台实现**：
+- Linux：cgroups v2（memory, cpu, pids）
+- Windows：Job Objects with CPU/Memory limits
+- macOS：Mach task with resource limits
 
 ## 使用示例
 
 ```c
 #include "workbench.h"
 
-workbench_config_t config = {
-    .max_cpu_time_ms = 10000,
-    .max_memory_mb = 256,
-    .max_file_size_kb = 5120,
-    .max_processes = 5,
-    .max_output_bytes = 65536,
-    .network_enabled = false,
-    .filesystem_readonly = true,
-    .isolation_level = WORKBENCH_ISOLATION_PROCESS
-};
+workbench_config_t config;
+workbench_default_config(&config);
+
+config.timeout_ms = 10000;
+config.enable_limits = true;
+config.limits.max_memory_bytes = 256 * 1024 * 1024;  /* 256 MB */
+config.limits.max_cpu_time_ms = 5000;                  /* 5 秒 */
+config.limits.max_processes = 5;
 
 workbench_t *wb = workbench_create(&config);
 
-workbench_result_t result;
-int rc = workbench_execute(wb, "python3 analyze.py", "agent-001", &result);
+workbench_result_t result = {0};
+char *argv[] = {"python3", "analyze.py", NULL};
+int rc = workbench_execute(wb, "python3", argv, &result);
 
 if (rc == 0) {
     printf("Exit code: %d\n", result.exit_code);
-    printf("CPU time: %lu ms\n", result.cpu_time_ms);
-    printf("Memory peak: %lu KB\n", result.memory_peak_kb);
+    printf("Duration: %lu ms\n", result.end_time_ms - result.start_time_ms);
     if (result.timed_out) {
         printf("Execution timed out!\n");
     }
+    if (result.signaled) {
+        printf("Killed by signal: %d\n", result.signal);
+    }
+    workbench_result_free(&result);
 } else {
-    printf("Execution failed\n");
+    printf("Execution failed: %d\n", rc);
 }
 
 workbench_destroy(wb);
 ```
-
-## 隔离级别对比
-
-| 特性 | NONE | PROCESS | CONTAINER |
-|------|------|---------|-----------|
-| 文件系统隔离 | 无 | chroot | Mount namespace |
-| 网络隔离 | 无 | 可选 | Network namespace |
-| PID 隔离 | 无 | 无 | PID namespace |
-| 用户隔离 | 无 | setuid | User namespace |
-| 资源限制 | 无 | setrlimit | cgroup v2 |
-| IPC 隔离 | 无 | 无 | IPC namespace |
-| 适用场景 | 可信代码 | 一般不可信代码 | 高风险不可信代码 |
 
 ## 安全流程
 
@@ -162,6 +182,13 @@ workbench_destroy(wb);
 请求执行 → 输入清洗(Sanitizer) → 权限检查(Permission) → 资源分配(Limits)
     → 进程/容器创建 → 执行监控 → 结果收集 → 审计记录(Audit)
 ```
+
+## 依赖关系
+
+| 依赖 | 说明 |
+|------|------|
+| `platform.h` | 平台抽象层 |
+| `cupolas_utils.h` | 安全内存管理、日志宏 |
 
 ## 相关子系统
 

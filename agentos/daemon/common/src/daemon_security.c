@@ -185,7 +185,7 @@ void daemon_security_shutdown(void)
 
     cupolas_cleanup();
 
-    memset(&g_daemon_security, 0, sizeof(g_daemon_security));
+    __builtin_memset(&g_daemon_security, 0, sizeof(g_daemon_security));
 
     SVC_LOG_INFO("Daemon security layer shutdown complete");
 }
@@ -579,7 +579,7 @@ int daemon_security_init(const daemon_security_config_t *config, agentos_error_t
         return 0;
     }
 
-    memset(&g_security_ctx, 0, sizeof(g_security_ctx));
+    __builtin_memset(&g_security_ctx, 0, sizeof(g_security_ctx));
     g_security_ctx.current_sanitize_level = SANITIZE_LEVEL_STRICT;
     g_security_ctx.permission_enabled = true;
     g_security_ctx.signature_enabled = true;
@@ -834,7 +834,7 @@ int daemon_verify_package_signature(const char *package_path, bool *is_valid,
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "verify_package_signature: null parameter");
     }
     if (signer_info)
-        memset(signer_info, 0, sizeof(cupolas_signer_info_t));
+        __builtin_memset(signer_info, 0, sizeof(cupolas_signer_info_t));
 
     *is_valid = false;
 
@@ -992,7 +992,7 @@ int daemon_verify_package_signature(const char *package_path, bool *is_valid,
                 size_t id_len = dot ? (size_t)(dot - entry->d_name) : name_len;
                 if (id_len >= sizeof(signer_info->key_id))
                     id_len = sizeof(signer_info->key_id) - 1;
-                memcpy(signer_info->key_id, entry->d_name, id_len);
+                __builtin_memcpy(signer_info->key_id, entry->d_name, id_len);
                 signer_info->key_id[id_len] = '\0';
                 signer_info->algorithm = AGENTOS_STRDUP("ED25519");
             }
@@ -1056,7 +1056,7 @@ int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_
                 AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY,
                               "failed to allocate credential data buffer");
             }
-            memcpy(g_security_ctx.credentials[i].data, data, data_len);
+            __builtin_memcpy(g_security_ctx.credentials[i].data, data, data_len);
             g_security_ctx.credentials[i].data_len = data_len;
             pthread_mutex_unlock(&g_security_mutex);
             SVC_LOG_INFO("Credential updated: %s (type=%d, %zu bytes)", cred_id, cred_type,
@@ -1073,7 +1073,7 @@ int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_
         pthread_mutex_unlock(&g_security_mutex);
         AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate credential data buffer");
     }
-    memcpy(entry->data, data, data_len);
+    __builtin_memcpy(entry->data, data, data_len);
     entry->data_len = data_len;
     entry->owner_agent_id = agent_id ? AGENTOS_STRDUP(agent_id) : AGENTOS_STRDUP("system");
 
@@ -1121,7 +1121,7 @@ int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_
             if (copy_len > *data_len)
                 copy_len = *data_len;
             if (g_security_ctx.credentials[i].data) {
-                memcpy(data, g_security_ctx.credentials[i].data, copy_len);
+                __builtin_memcpy(data, g_security_ctx.credentials[i].data, copy_len);
             }
             *data_len = copy_len;
             pthread_mutex_unlock(&g_security_mutex);

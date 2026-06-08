@@ -113,7 +113,7 @@ static void test_get_stats(void) {
     heapstore_error_t err = heapstore_init(&manager);
     if (err == heapstore_SUCCESS) {
         heapstore_stats_t stats;
-        memset(&stats, 0, sizeof(stats));
+        AGENTOS_MEMSET(&stats, 0, sizeof(stats));
 
         err = heapstore_get_stats(&stats);
         assert(err == heapstore_SUCCESS);
@@ -128,7 +128,7 @@ static void test_get_stats_not_initialized(void) {
     printf("Test: get_stats_not_initialized...");
 
     heapstore_stats_t stats;
-    memset(&stats, 0, sizeof(stats));
+    AGENTOS_MEMSET(&stats, 0, sizeof(stats));
 
     heapstore_error_t err = heapstore_get_stats(&stats);
     assert(err == heapstore_ERR_NOT_INITIALIZED);

@@ -1,5 +1,5 @@
 # AgentOS Manager Module - Git Ignore Configuration
-# Version: 1.0.0
+# Version: 0.1.0
 # Purpose: Exclude temporary, cache and generated files from version control
 
 # Python cache files

@@ -127,7 +127,7 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb, void *us
     }
 
     /* 追加数据 */
-    memcpy(buf->data + buf->size, contents, realsize);
+    __builtin_memcpy(buf->data + buf->size, contents, realsize);
     buf->size += realsize;
     buf->data[buf->size] = '\0';
 

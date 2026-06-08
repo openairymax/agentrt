@@ -4,7 +4,7 @@
 import re
 import os
 
-BASE_DIR = '/home/spharx/SpharxWorks/OpenAirymax/AgentOS'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 def fix_error_handle_pattern(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:

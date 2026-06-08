@@ -1,9 +1,9 @@
 # Browser Skill — 浏览器自动化技能
 
 **模块路径**: `agentos/openlab/contrib/skills/browser_skill/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
-> **Status**: 本模块作为 AgentOS v0.1.0 的正式组成部分，API 已稳定。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
 ## 概述
 
@@ -15,6 +15,8 @@ Browser Skill 为 AgentOS 智能体提供浏览器自动化能力，支持网页
 browser_skill/
 └── README.md                   # 本文件
 ```
+
+> **注意**: 本技能当前为规范定义阶段，源代码尚未实现。
 
 ## 核心能力
 

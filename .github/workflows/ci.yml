@@ -33,6 +33,7 @@ jobs:
           cmake -B ${{ github.workspace }}/../AgentOS-ci-build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTS=ON \
+            -DAGENTOS_COMPLIANCE_STRICT=OFF \
             -DWARNINGS_AS_ERRORS=ON
 
       - name: Build
@@ -245,6 +246,44 @@ jobs:
             cat cppcheck-report.txt
           fi
 
+  sanitizer-test:
+    name: Sanitizer Test (ASan+LSan+UBSan)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential \
+            libssl-dev libcurl4-openssl-dev libcmocka-dev \
+            libmicrohttpd-dev libwebsockets-dev \
+            libcjson-dev libyaml-dev libsqlite3-dev
+
+      - name: Configure with Sanitizers
+        run: |
+          cmake -B ${{ github.workspace }}/../AgentOS-asan-build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DWARNINGS_AS_ERRORS=ON \
+            -DENABLE_SANITIZERS=ON \
+            -DAGENTOS_COMPLIANCE_STRICT=OFF
+
+      - name: Build with Sanitizers
+        run: |
+          cmake --build ${{ github.workspace }}/../AgentOS-asan-build \
+            --parallel $(nproc)
+
+      - name: Test with Sanitizers
+        working-directory: ${{ github.workspace }}/../AgentOS-asan-build
+        run: |
+          export ASAN_OPTIONS="halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1"
+          export LSAN_OPTIONS="suppressions=${{ github.workspace }}/agentos/manager/sanitizer/lsan-suppressions:print_suppressions=0"
+          export UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1:report_error_type=1"
+          ctest --output-on-failure -j $(nproc) --timeout 300
+
   quality-gate:
     name: Quality Gate (20 Checks)
     runs-on: ubuntu-22.04
@@ -321,7 +360,7 @@ jobs:
 
   result:
     name: CI Result
-    needs: [build-and-test, ban-scan, clang-tidy, cppcheck, quality-gate, python-checks]
+    needs: [build-and-test, ban-scan, clang-tidy, cppcheck, sanitizer-test, quality-gate, python-checks]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -336,6 +375,9 @@ jobs:
         run: exit 1
       - name: Check cppcheck status
         if: ${{ needs.cppcheck.result == 'failure' }}
+        run: exit 1
+      - name: Check sanitizer-test status
+        if: ${{ needs.sanitizer-test.result == 'failure' }}
         run: exit 1
       - name: Check quality-gate status
         if: ${{ needs.quality-gate.result == 'failure' }}

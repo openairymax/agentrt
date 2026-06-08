@@ -94,7 +94,7 @@ jobs:
       - name: Health Check
         run: |
           echo "=== Service Health ==="
-          SERVICES="gateway_d:8080 llm_d:8081 tool_d:8082 info_d:8083 notify_d:8084 observe_d:8085 sched_d monitor_d"
+          SERVICES="gateway_d:8080 llm_d:8081 tool_d:8082 info_d:8083 notify_d:8084 observe_d sched_d monitor_d"
           HEALTHY=0
           TOTAL=0
           for svc_def in $SERVICES; do

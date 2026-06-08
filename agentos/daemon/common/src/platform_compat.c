@@ -3,6 +3,7 @@
 #endif
 #include "atomic_compat.h"
 #include "platform.h"
+#include "memory_compat.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -131,7 +132,7 @@ int agentos_mkdir(const char *path, int recursive)
         size_t len = strlen(path);
         if (len == 0 || len >= PATH_MAX)
             return AGENTOS_ERR_OVERFLOW;
-        memcpy(tmp, path, len + 1);
+        __builtin_memcpy(tmp, path, len + 1);
         for (size_t i = (tmp[0] == '/') ? 1 : 0; i <= len; i++) {
             if (tmp[i] == '/' || tmp[i] == '\0') {
                 char saved = tmp[i];
@@ -200,7 +201,7 @@ int agentos_get_sysinfo(agentos_sysinfo_t *info)
     struct sysinfo si;
     if (sysinfo(&si) != 0)
         return AGENTOS_ERR_UNKNOWN;
-    strncpy(info->os_name, "Linux", sizeof(info->os_name));
+    AGENTOS_STRNCPY_TERM(info->os_name, "Linux", sizeof(info->os_name));
     info->cpu_count = (uint32_t)si.procs;
     info->memory_total = si.totalram * si.mem_unit;
     info->memory_free = si.freeram * si.mem_unit;
@@ -208,7 +209,7 @@ int agentos_get_sysinfo(agentos_sysinfo_t *info)
     info->os_version[0] = '\0';
     return 0;
 #elif defined(__APPLE__)
-    strncpy(info->os_name, "macOS", sizeof(info->os_name));
+    AGENTOS_STRNCPY_TERM(info->os_name, "macOS", sizeof(info->os_name));
     {
         int mib[2] = {CTL_HW, HW_MEMSIZE};
         int64_t memsize = 0;
@@ -235,7 +236,7 @@ int agentos_get_sysinfo(agentos_sysinfo_t *info)
     info->os_version[0] = '\0';
     return 0;
 #else
-    memset(info, 0, sizeof(*info));
+    __builtin_memset(info, 0, sizeof(*info));
     return 0;
 #endif
 }
@@ -310,7 +311,7 @@ agentos_socket_t agentos_socket_create_tcp_server(const char *host, uint16_t por
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 
     struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
+    __builtin_memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
 
@@ -342,9 +343,9 @@ agentos_socket_t agentos_socket_create_unix_server(const char *path)
         return AGENTOS_ERR_IO;
 
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
+    __builtin_memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    AGENTOS_STRNCPY_TERM(addr.sun_path, path, sizeof(addr.sun_path));
 
     unlink(path);
 

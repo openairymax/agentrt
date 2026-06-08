@@ -190,7 +190,7 @@ sync_result_t sync_reset_stats(void *lock)
     }
 
     // 实际重置统计信息
-    memset(&base->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&base->stats, 0, sizeof(sync_stats_t));
 
     return SYNC_SUCCESS;
 }

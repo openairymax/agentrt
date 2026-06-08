@@ -93,7 +93,7 @@ static void transition_state(cb_internal_t *cb, cb_manager_internal_t *mgr, cb_s
     }
 
     cb_event_t event;
-    memset(&event, 0, sizeof(event));
+    __builtin_memset(&event, 0, sizeof(event));
     event.type = CB_EVENT_STATE_CHANGE;
     safe_strcpy(event.breaker_name, cb->name, CB_MAX_NAME_LEN);
     event.old_state = old_state;
@@ -144,7 +144,7 @@ static bool should_trip(cb_internal_t *cb)
 AGENTOS_API cb_config_t cb_create_default_config(void)
 {
     cb_config_t config;
-    memset(&config, 0, sizeof(cb_config_t));
+    __builtin_memset(&config, 0, sizeof(cb_config_t));
     config.failure_threshold = CB_DEFAULT_FAILURE_THRESHOLD;
     config.success_threshold = CB_DEFAULT_SUCCESS_THRESHOLD;
     config.timeout_ms = CB_DEFAULT_TIMEOUT_MS;
@@ -161,7 +161,7 @@ AGENTOS_API cb_config_t cb_create_default_config(void)
 AGENTOS_API cb_failover_config_t cb_create_default_failover_config(void)
 {
     cb_failover_config_t config;
-    memset(&config, 0, sizeof(cb_failover_config_t));
+    __builtin_memset(&config, 0, sizeof(cb_failover_config_t));
     config.strategy = CB_FAILOVER_RETRY;
     config.max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
     config.retry_delay_ms = AGENTOS_DEFAULT_RETRY_DELAY_MS;
@@ -249,7 +249,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
     safe_strcpy(cb->name, name, CB_MAX_NAME_LEN);
 
     if (config) {
-        memcpy(&cb->config, config, sizeof(cb_config_t));
+        __builtin_memcpy(&cb->config, config, sizeof(cb_config_t));
     } else {
         cb->config = cb_create_default_config();
     }
@@ -512,7 +512,7 @@ AGENTOS_API agentos_error_t cb_get_stats(circuit_breaker_t breaker, cb_stats_t *
         agentos_mutex_unlock(&cb->mutex);
         return AGENTOS_EINVAL;
     }
-    memcpy(stats, &cb->stats, sizeof(cb_stats_t));
+    __builtin_memcpy(stats, &cb->stats, sizeof(cb_stats_t));
     agentos_mutex_unlock(&cb->mutex);
 
     return AGENTOS_SUCCESS;
@@ -596,7 +596,7 @@ AGENTOS_API agentos_error_t cb_set_failover_config(circuit_breaker_t breaker,
         agentos_mutex_unlock(&cb->mutex);
         return AGENTOS_EINVAL;
     }
-    memcpy(&cb->failover_config, config, sizeof(cb_failover_config_t));
+    __builtin_memcpy(&cb->failover_config, config, sizeof(cb_failover_config_t));
     agentos_mutex_unlock(&cb->mutex);
 
     LOG_INFO("Circuit breaker '%s': failover config updated (strategy=%d)", cb->name,

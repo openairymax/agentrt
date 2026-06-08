@@ -395,7 +395,7 @@ def append_pagination(params: Optional[Dict[str, str]], page: int, page_size: in
 def validate_and_extract_data(
     resp: Optional[Any],
     error_msg: str = "响应格式异常",
-    error_code: int = None
+    error_code: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     验证并提取响应数据，如果数据无效则抛出错误。
@@ -472,7 +472,7 @@ def validate_positive_number(value: "int | float", param_name: str, error_code: 
         raise AgentOSError(f"{param_name}必须为正数", error_code=code)
 
 
-def validate_non_empty_list(value: Optional[List[Any]], param_name: str, error_code: int = None) -> None:
+def validate_non_empty_list(value: Optional[List[Any]], param_name: str, error_code: Optional[str] = None) -> None:
     """
     验证列表参数不为空。
 

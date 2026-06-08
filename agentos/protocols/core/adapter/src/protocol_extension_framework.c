@@ -107,9 +107,9 @@ int proto_ext_register(proto_ext_framework_t *fw, const proto_ext_descriptor_t *
     }
 
     proto_ext_adapter_entry_t *entry = &fw->adapters[fw->adapter_count];
-    memset(entry, 0, sizeof(*entry));
-    memcpy(&entry->descriptor, descriptor, sizeof(proto_ext_descriptor_t));
-    memcpy(&entry->callbacks, callbacks, sizeof(proto_ext_callbacks_t));
+    AGENTOS_MEMSET(entry, 0, sizeof(*entry));
+    __builtin_memcpy(&entry->descriptor, descriptor, sizeof(proto_ext_descriptor_t));
+    __builtin_memcpy(&entry->callbacks, callbacks, sizeof(proto_ext_callbacks_t));
     entry->adapter_context = NULL;
     entry->state = PROTO_EXT_STATE_UNLOADED;
     entry->error_count = 0;
@@ -136,7 +136,7 @@ int proto_ext_unregister(proto_ext_framework_t *fw, const char *name)
             if (fw->adapters[i].state >= PROTO_EXT_STATE_LOADED) {
                 proto_ext_unload(fw, name);
             }
-            memmove(&fw->adapters[i], &fw->adapters[i + 1],
+            __builtin_memmove(&fw->adapters[i], &fw->adapters[i + 1],
                     (fw->adapter_count - i - 1) * sizeof(proto_ext_adapter_entry_t));
             fw->adapter_count--;
             return 0;
@@ -404,7 +404,7 @@ int proto_ext_add_middleware(proto_ext_framework_t *fw, const char *name,
     }
 
     proto_middleware_t *mw = &fw->middlewares[fw->middleware_count];
-    strncpy(mw->name, name, PROTO_EXT_MAX_NAME_LEN - 1);
+    AGENTOS_STRNCPY_TERM(mw->name, name, PROTO_EXT_MAX_NAME_LEN);
     mw->name[PROTO_EXT_MAX_NAME_LEN - 1] = '\0';
     mw->process = middleware;
     mw->priority = priority;
@@ -432,7 +432,7 @@ int proto_ext_remove_middleware(proto_ext_framework_t *fw, const char *name)
         }
     for (size_t i = 0; i < fw->middleware_count; i++) {
         if (strcmp(fw->middlewares[i].name, name) == 0) {
-            memmove(&fw->middlewares[i], &fw->middlewares[i + 1],
+            __builtin_memmove(&fw->middlewares[i], &fw->middlewares[i + 1],
                     (fw->middleware_count - i - 1) * sizeof(proto_middleware_t));
             fw->middleware_count--;
             return 0;
@@ -502,7 +502,7 @@ int proto_ext_get_adapter_stats(proto_ext_framework_t *fw, const char *name,
         }
     for (size_t i = 0; i < fw->adapter_count; i++) {
         if (strcmp(fw->adapters[i].descriptor.name, name) == 0) {
-            strncpy(stats->name, fw->adapters[i].descriptor.name, PROTO_EXT_MAX_NAME_LEN - 1);
+            AGENTOS_STRNCPY_TERM(stats->name, fw->adapters[i].descriptor.name, PROTO_EXT_MAX_NAME_LEN);
             stats->state = fw->adapters[i].state;
             stats->error_count = fw->adapters[i].error_count;
             stats->last_activity_ms = fw->adapters[i].last_activity_ms;
@@ -684,7 +684,7 @@ static char *json_extract_string(const char *json, const char *key)
         return NULL;
     size_t len = end - p;
     char *result = AGENTOS_MALLOC(len + 1);
-    memcpy(result, p, len);
+    __builtin_memcpy(result, p, len);
     result[len] = '\0';
     return result;
 }
@@ -731,7 +731,7 @@ int proto_ext_load_from_config(proto_ext_framework_t *fw, const char *config_jso
 
         size_t obj_len = obj_end - obj_start + 1;
         char *obj_buf = AGENTOS_MALLOC(obj_len + 1);
-        memcpy(obj_buf, obj_start, obj_len);
+        __builtin_memcpy(obj_buf, obj_start, obj_len);
         obj_buf[obj_len] = '\0';
 
         char *name = json_extract_string(obj_buf, "name");
@@ -747,21 +747,19 @@ int proto_ext_load_from_config(proto_ext_framework_t *fw, const char *config_jso
                                                   .capabilities = caps,
                                                   .priority = priority,
                                                   .hot_loadable = true};
-            strncpy(desc_struct.name, name, PROTO_EXT_MAX_NAME_LEN - 1);
+            AGENTOS_STRNCPY_TERM(desc_struct.name, name, PROTO_EXT_MAX_NAME_LEN);
             if (version)
-                strncpy(desc_struct.version, version, PROTO_EXT_MAX_VERSION_LEN - 1);
+                AGENTOS_STRNCPY_TERM(desc_struct.version, version, PROTO_EXT_MAX_VERSION_LEN);
             else {
-                strncpy(desc_struct.version, "1.0.0", PROTO_EXT_MAX_VERSION_LEN - 1);
-                desc_struct.version[PROTO_EXT_MAX_VERSION_LEN - 1] = '\0';
+                AGENTOS_STRNCPY_TERM(desc_struct.version, "1.0.0", PROTO_EXT_MAX_VERSION_LEN);
             }
             if (desc)
-                strncpy(desc_struct.description, desc, 255);
+                AGENTOS_STRNCPY_TERM(desc_struct.description, desc, sizeof(desc_struct.description));
             else {
-                strncpy(desc_struct.description, "Loaded from config", 255);
-                desc_struct.description[254] = '\0';
+                AGENTOS_STRNCPY_TERM(desc_struct.description, "Loaded from config", sizeof(desc_struct.description));
             }
             if (author)
-                strncpy(desc_struct.author, author, 127);
+                AGENTOS_STRNCPY_TERM(desc_struct.author, author, sizeof(desc_struct.author));
 
             proto_ext_callbacks_t empty_cbs = {0};
 
@@ -823,7 +821,7 @@ static int fw_adapter_encode(void *ctx, const void *msg, void **out_data, size_t
     *out_data = AGENTOS_MALLOC(in_len);
     if (!*out_data)
         AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
-    memcpy(*out_data, umsg->payload ? umsg->payload : "", in_len);
+    __builtin_memcpy(*out_data, umsg->payload ? umsg->payload : "", in_len);
     *out_size = in_len;
     return 0;
 }
@@ -837,11 +835,11 @@ static int fw_adapter_decode(void *ctx, const void *data, size_t size, void *out
         }
 
     unified_message_t *msg = (unified_message_t *)out_msg;
-    memset(msg, 0, sizeof(*msg));
+    AGENTOS_MEMSET(msg, 0, sizeof(*msg));
     msg->payload = AGENTOS_MALLOC(size + 1);
     if (!msg->payload)
         AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
-    memcpy((void *)msg->payload, data, size);
+    __builtin_memcpy((void *)msg->payload, data, size);
     ((char *)msg->payload)[size] = '\0';
     msg->payload_size = size;
     return 0;
@@ -974,7 +972,7 @@ static int fw_adapter_get_version(void *ctx, char *buf, size_t max_size)
     size_t len = strlen(ver);
     if (len >= max_size)
         len = max_size - 1;
-    memcpy(buf, ver, len);
+    __builtin_memcpy(buf, ver, len);
     buf[len] = '\0';
     return 0;
 }

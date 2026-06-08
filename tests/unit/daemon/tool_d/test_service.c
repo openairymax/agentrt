@@ -48,7 +48,7 @@ static void test_service_register_tool(void) {
     assert(svc != NULL);
 
     tool_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.name = "test_tool";
     meta.version = "1.0.0";
     meta.description = "A test tool";
@@ -69,13 +69,13 @@ static void test_service_list_tools(void) {
     assert(svc != NULL);
 
     tool_meta_t meta1;
-    memset(&meta1, 0, sizeof(meta1));
+    AGENTOS_MEMSET(&meta1, 0, sizeof(meta1));
     meta1.name = "tool1";
     meta1.version = "1.0.0";
     meta1.executable = "/usr/bin/echo";
 
     tool_meta_t meta2;
-    memset(&meta2, 0, sizeof(meta2));
+    AGENTOS_MEMSET(&meta2, 0, sizeof(meta2));
     meta2.name = "tool2";
     meta2.version = "2.0.0";
     meta2.executable = "/usr/bin/cat";
@@ -106,7 +106,7 @@ static void test_service_get_tool(void) {
     assert(svc != NULL);
 
     tool_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.name = "get_test_tool";
     meta.version = "1.0.0";
     meta.executable = "/usr/bin/echo";
@@ -129,7 +129,7 @@ static void test_service_unregister_tool(void) {
     assert(svc != NULL);
 
     tool_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.name = "unregister_test";
     meta.version = "1.0.0";
     meta.executable = "/usr/bin/echo";

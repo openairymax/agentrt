@@ -210,7 +210,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
             }
             output = new_out;
         }
-        memcpy(output + total, buffer, len + 1);
+        __builtin_memcpy(output + total, buffer, len + 1);
         total += len;
     }
 
@@ -251,7 +251,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
             }
             output = new_out;
         }
-        memcpy(output + total, buffer, len + 1);
+        __builtin_memcpy(output + total, buffer, len + 1);
         total += len;
     }
 
@@ -379,7 +379,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
     agentos_execution_unit_t *unit =
         (agentos_execution_unit_t *)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
-    memset(unit, 0, sizeof(*unit));
+    __builtin_memset(unit, 0, sizeof(*unit));
 
     code_unit_data_t *data = (code_unit_data_t *)AGENTOS_MALLOC(sizeof(code_unit_data_t));
     if (!data) {

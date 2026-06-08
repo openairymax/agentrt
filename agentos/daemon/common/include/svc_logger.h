@@ -257,7 +257,7 @@ static inline void agentos_trace_set_session_id(const char *session_id)
     if (session_id) {
         agentos_trace_context_t *ctx = agentos_trace_current();
         if (ctx) {
-            strncpy(ctx->session_id, session_id, sizeof(ctx->session_id) - 1);
+            AGENTOS_STRNCPY_TERM(ctx->session_id, session_id, sizeof(ctx->session_id));
         }
     }
 }

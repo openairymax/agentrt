@@ -1,7 +1,7 @@
 """
 AgentOS 契约测试用例自动生成器
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 1.0.0
+Version: 0.1.0
 
 基于契约定义自动生成测试用例
 支持多种契约格式和测试框架

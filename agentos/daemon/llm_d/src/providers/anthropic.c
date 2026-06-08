@@ -256,7 +256,7 @@ typedef struct {
 
 static void ant_sse_init(ant_sse_ctx_t *s, ant_stream_acc_t *a)
 {
-    memset(s, 0, sizeof(*s));
+    __builtin_memset(s, 0, sizeof(*s));
     s->line_cap = 4096;
     s->line_buf = (char *)AGENTOS_MALLOC(s->line_cap);
     s->acc = a;
@@ -329,7 +329,7 @@ static int ant_feed_sse_event(ant_sse_ctx_t *s, const char *event, const char *d
                         }
                     }
                     if (acc->acc_content && acc->acc_len + tlen < acc->acc_cap) {
-                        memcpy(acc->acc_content + acc->acc_len, text, tlen);
+                        __builtin_memcpy(acc->acc_content + acc->acc_len, text, tlen);
                         acc->acc_len += tlen;
                         acc->acc_content[acc->acc_len] = '\0';
                     }
@@ -382,7 +382,7 @@ static void ant_process_buffer(ant_sse_ctx_t *s)
                 size_t elen = llen - (size_t)(ev - p);
                 if (elen >= sizeof(s->current_event))
                     elen = sizeof(s->current_event) - 1;
-                memcpy(s->current_event, ev, elen);
+                __builtin_memcpy(s->current_event, ev, elen);
                 s->current_event[elen] = '\0';
             } else if (llen >= 5 && memcmp(p, "data:", 5) == 0) {
                 const char *ds = p + 5;
@@ -402,7 +402,7 @@ static void ant_process_buffer(ant_sse_ctx_t *s)
 
     if (p < end) {
         size_t rem = (size_t)(end - p);
-        memmove(s->line_buf, p, rem);
+        __builtin_memmove(s->line_buf, p, rem);
         s->line_len = rem;
     } else {
         s->line_len = 0;
@@ -428,7 +428,7 @@ static size_t ant_sse_write_cb(void *contents, size_t size, size_t nmemb, void *
         s->line_cap = nc;
     }
 
-    memcpy(s->line_buf + s->line_len, contents, realsize);
+    __builtin_memcpy(s->line_buf + s->line_len, contents, realsize);
     s->line_len += realsize;
     s->line_buf[s->line_len] = '\0';
 
@@ -496,7 +496,7 @@ static int anthropic_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_
     explicit_bzero(auth_header, sizeof(auth_header));
 
     ant_stream_acc_t acc;
-    memset(&acc, 0, sizeof(acc));
+    __builtin_memset(&acc, 0, sizeof(acc));
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;

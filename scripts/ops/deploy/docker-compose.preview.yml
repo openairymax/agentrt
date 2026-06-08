@@ -9,8 +9,8 @@ services:
   agentos-preview:
     build:
       context: ../../
-      dockerfile: scripts/deployment/docker/Dockerfile.service
-      target: preview
+      dockerfile: scripts/ops/deploy/Dockerfile.service
+      target: gateway
     image: ${DOCKER_REGISTRY:-spharx}/agentos-preview:0.1.0
     container_name: agentos-preview
     hostname: agentos-preview

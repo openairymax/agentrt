@@ -12,7 +12,7 @@ agentos_error_t agentos_generate_uuid(char *buf)
 {
     if (!buf)
         return -1;
-    memset(buf, '0', 36);
+    AGENTOS_MEMSET(buf, '0', 36);
     buf[8] = '-';
     buf[13] = '-';
     buf[18] = '-';
@@ -25,7 +25,7 @@ void agentos_generate_plan_id(char *buf, size_t len)
 {
     if (!buf || len < 2)
         return;
-    memset(buf, 'P', len - 1);
+    AGENTOS_MEMSET(buf, 'P', len - 1);
     buf[0] = 'p';
     buf[len - 1] = '\0';
 }

@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - Logger Module
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-25
 //
 // 提供可配置的日志功能，遵循架构设计原则 E-2 可观测性原则。

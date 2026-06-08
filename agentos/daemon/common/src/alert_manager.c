@@ -142,7 +142,7 @@ static void dispatch_notifications(const am_alert_t *alert)
 AGENTOS_API am_config_t am_create_default_config(void)
 {
     am_config_t config;
-    memset(&config, 0, sizeof(am_config_t));
+    __builtin_memset(&config, 0, sizeof(am_config_t));
     config.evaluation_interval_ms = 10000;
     config.default_cooldown_ms = 60000;
     config.max_notifications_per_alert = 10;
@@ -158,7 +158,7 @@ AGENTOS_API int am_init(const am_config_t *config)
         return 0;
 
     if (config) {
-        memcpy(&g_am.config, config, sizeof(am_config_t));
+        __builtin_memcpy(&g_am.config, config, sizeof(am_config_t));
     } else {
         g_am.config = am_create_default_config();
     }
@@ -167,16 +167,16 @@ AGENTOS_API int am_init(const am_config_t *config)
     if (err != AGENTOS_SUCCESS)
         return AGENTOS_ERR_UNKNOWN;
 
-    memset(g_am.rules, 0, sizeof(g_am.rules));
+    __builtin_memset(g_am.rules, 0, sizeof(g_am.rules));
     g_am.rule_count = 0;
-    memset(g_am.active_alerts, 0, sizeof(g_am.active_alerts));
+    __builtin_memset(g_am.active_alerts, 0, sizeof(g_am.active_alerts));
     g_am.active_alert_count = 0;
     g_am.channel_count = 0;
     g_am.callback_count = 0;
     g_am.initialized = true;
 
     am_channel_t log_channel;
-    memset(&log_channel, 0, sizeof(am_channel_t));
+    __builtin_memset(&log_channel, 0, sizeof(am_channel_t));
     log_channel.type = AM_CHANNEL_LOG;
     safe_strcpy(log_channel.name, "default_log", AM_MAX_NAME_LEN);
     log_channel.min_level = AM_LEVEL_WARNING;
@@ -215,7 +215,7 @@ AGENTOS_API int am_add_rule(const am_rule_t *rule)
 
     if (find_rule(rule->name)) {
         am_rule_t *existing = find_rule(rule->name);
-        memcpy(existing, rule, sizeof(am_rule_t));
+        __builtin_memcpy(existing, rule, sizeof(am_rule_t));
         agentos_mutex_unlock(&g_am.mutex);
         return 0;
     }
@@ -225,7 +225,7 @@ AGENTOS_API int am_add_rule(const am_rule_t *rule)
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    memcpy(&g_am.rules[g_am.rule_count], rule, sizeof(am_rule_t));
+    __builtin_memcpy(&g_am.rules[g_am.rule_count], rule, sizeof(am_rule_t));
     g_am.rule_count++;
 
     agentos_mutex_unlock(&g_am.mutex);
@@ -247,7 +247,7 @@ AGENTOS_API int am_remove_rule(const char *name)
             if (i < g_am.rule_count - 1) {
                 g_am.rules[i] = g_am.rules[g_am.rule_count - 1];
             }
-            memset(&g_am.rules[g_am.rule_count - 1], 0, sizeof(am_rule_t));
+            __builtin_memset(&g_am.rules[g_am.rule_count - 1], 0, sizeof(am_rule_t));
             g_am.rule_count--;
             agentos_mutex_unlock(&g_am.mutex);
             return 0;
@@ -323,7 +323,7 @@ AGENTOS_API int am_fire(const char *name, am_level_t level, const char *message,
     }
 
     am_alert_t *alert = &g_am.active_alerts[g_am.active_alert_count];
-    memset(alert, 0, sizeof(am_alert_t));
+    __builtin_memset(alert, 0, sizeof(am_alert_t));
     safe_strcpy(alert->name, name, AM_MAX_NAME_LEN);
     alert->level = level;
     alert->state = AM_STATE_FIRING;
@@ -367,7 +367,7 @@ AGENTOS_API int am_resolve(const char *name)
     if (idx < g_am.active_alert_count - 1) {
         g_am.active_alerts[idx] = g_am.active_alerts[g_am.active_alert_count - 1];
     }
-    memset(&g_am.active_alerts[g_am.active_alert_count - 1], 0, sizeof(am_alert_t));
+    __builtin_memset(&g_am.active_alerts[g_am.active_alert_count - 1], 0, sizeof(am_alert_t));
     g_am.active_alert_count--;
 
     agentos_mutex_unlock(&g_am.mutex);
@@ -488,12 +488,10 @@ AGENTOS_API int am_record_metric(const char *metric_name, double value)
     }
 
     if (g_am.metric_count < AM_MAX_RULES) {
-        strncpy(g_am.latest_metrics[g_am.metric_count].name, metric_name, 127);
-        g_am.latest_metrics[g_am.metric_count].name[127] = '\0';
+        AGENTOS_STRNCPY_TERM(g_am.latest_metrics[g_am.metric_count].name, metric_name, sizeof(g_am.latest_metrics[g_am.metric_count].name));
         g_am.latest_metrics[g_am.metric_count].value = value;
 
-        strncpy(g_am.metric_history[g_am.metric_count].name, metric_name, 127);
-        g_am.metric_history[g_am.metric_count].name[127] = '\0';
+        AGENTOS_STRNCPY_TERM(g_am.metric_history[g_am.metric_count].name, metric_name, sizeof(g_am.metric_history[g_am.metric_count].name));
         g_am.metric_history[g_am.metric_count].values[0] = value;
         g_am.metric_history[g_am.metric_count].count = 1;
         g_am.metric_history[g_am.metric_count].head = 0;
@@ -593,7 +591,7 @@ AGENTOS_API int am_register_channel(const am_channel_t *channel)
         return AGENTOS_ERR_OVERFLOW;
     }
 
-    memcpy(&g_am.channels[g_am.channel_count], channel, sizeof(am_channel_t));
+    __builtin_memcpy(&g_am.channels[g_am.channel_count], channel, sizeof(am_channel_t));
     g_am.channel_count++;
 
     agentos_mutex_unlock(&g_am.mutex);
@@ -635,7 +633,7 @@ AGENTOS_API int am_get_active_alerts(am_alert_t *alerts, uint32_t max_count, uin
     agentos_mutex_lock(&g_am.mutex);
 
     uint32_t count = g_am.active_alert_count < max_count ? g_am.active_alert_count : max_count;
-    memcpy(alerts, g_am.active_alerts, count * sizeof(am_alert_t));
+    __builtin_memcpy(alerts, g_am.active_alerts, count * sizeof(am_alert_t));
     *found_count = count;
 
     agentos_mutex_unlock(&g_am.mutex);
@@ -653,7 +651,7 @@ AGENTOS_API int am_get_alerts_by_level(am_level_t level, am_alert_t *alerts, uin
     uint32_t count = 0;
     for (uint32_t i = 0; i < g_am.active_alert_count && count < max_count; i++) {
         if (g_am.active_alerts[i].level == level) {
-            memcpy(&alerts[count], &g_am.active_alerts[i], sizeof(am_alert_t));
+            __builtin_memcpy(&alerts[count], &g_am.active_alerts[i], sizeof(am_alert_t));
             count++;
         }
     }

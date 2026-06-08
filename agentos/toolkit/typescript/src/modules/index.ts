@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - Modules Entry
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-03-24
 //
 // 声明各业务子模块（task、memory、session、skill）。

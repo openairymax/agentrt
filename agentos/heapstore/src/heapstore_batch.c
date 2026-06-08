@@ -54,18 +54,17 @@ static heapstore_error_t batch_commit_span(const void *data)
     }
 
     heapstore_span_t span_rec;
-    memset(&span_rec, 0, sizeof(span_rec));
+    __builtin_memset(&span_rec, 0, sizeof(span_rec));
 
-    strncpy(span_rec.trace_id, trace_entry->trace_id, sizeof(span_rec.trace_id) - 1);
-    strncpy(span_rec.span_id, trace_entry->span_id, sizeof(span_rec.span_id) - 1);
+    AGENTOS_STRNCPY_TERM(span_rec.trace_id, trace_entry->trace_id, sizeof(span_rec.trace_id));
+    AGENTOS_STRNCPY_TERM(span_rec.span_id, trace_entry->span_id, sizeof(span_rec.span_id));
 
     if (trace_entry->parent_span_id[0]) {
-        strncpy(span_rec.parent_span_id, trace_entry->parent_span_id,
-                sizeof(span_rec.parent_span_id) - 1);
+        AGENTOS_STRNCPY_TERM(span_rec.parent_span_id, trace_entry->parent_span_id, sizeof(span_rec.parent_span_id));
     }
 
-    strncpy(span_rec.name, trace_entry->name, sizeof(span_rec.name) - 1);
-    strncpy(span_rec.kind, trace_entry->kind, sizeof(span_rec.kind) - 1);
+    AGENTOS_STRNCPY_TERM(span_rec.name, trace_entry->name, sizeof(span_rec.name));
+    AGENTOS_STRNCPY_TERM(span_rec.kind, trace_entry->kind, sizeof(span_rec.kind));
 
     span_rec.start_time_ns = (uint64_t)trace_entry->start_time_us * 1000ULL;
     span_rec.end_time_ns = (uint64_t)trace_entry->end_time_us * 1000ULL;
@@ -145,7 +144,7 @@ static heapstore_batch_item_t *batch_alloc_item(heapstore_batch_item_type_t type
         return NULL;
     }
 
-    memset(item, 0, sizeof(heapstore_batch_item_t));
+    __builtin_memset(item, 0, sizeof(heapstore_batch_item_t));
     item->type = type;
     item->next = NULL;
 
@@ -216,7 +215,7 @@ static heapstore_error_t batch_add_generic(heapstore_batch_context_t *ctx,
     }
 
     if (data_size > 0) {
-        memcpy(&item->data, data, data_size);
+        __builtin_memcpy(&item->data, data, data_size);
     }
 
     return batch_append_item(ctx, item);
@@ -249,7 +248,7 @@ heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const 
     if (copy_len >= sizeof(item->data.log.service)) {
         copy_len = sizeof(item->data.log.service) - 1;
     }
-    memcpy(item->data.log.service, service, copy_len);
+    __builtin_memcpy(item->data.log.service, service, copy_len);
     item->data.log.service[copy_len] = '\0';
 
     item->data.log.trace_id[0] = '\0';
@@ -258,7 +257,7 @@ heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const 
     if (copy_len >= sizeof(item->data.log.message)) {
         copy_len = sizeof(item->data.log.message) - 1;
     }
-    memcpy(item->data.log.message, message, copy_len);
+    __builtin_memcpy(item->data.log.message, message, copy_len);
     item->data.log.message[copy_len] = '\0';
 
     return batch_append_item(ctx, item);
@@ -272,12 +271,12 @@ heapstore_error_t heapstore_batch_add_span(heapstore_batch_context_t *ctx,
         return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SPAN, span, sizeof(*span));
 
     heapstore_trace_entry_t converted;
-    memset(&converted, 0, sizeof(converted));
-    strncpy(converted.trace_id, span->trace_id, sizeof(converted.trace_id) - 1);
-    strncpy(converted.span_id, span->span_id, sizeof(converted.span_id) - 1);
-    strncpy(converted.parent_span_id, span->parent_span_id, sizeof(converted.parent_span_id) - 1);
-    strncpy(converted.name, span->name, sizeof(converted.name) - 1);
-    strncpy(converted.kind, span->kind, sizeof(converted.kind) - 1);
+    __builtin_memset(&converted, 0, sizeof(converted));
+    AGENTOS_STRNCPY_TERM(converted.trace_id, span->trace_id, sizeof(converted.trace_id));
+    AGENTOS_STRNCPY_TERM(converted.span_id, span->span_id, sizeof(converted.span_id));
+    AGENTOS_STRNCPY_TERM(converted.parent_span_id, span->parent_span_id, sizeof(converted.parent_span_id));
+    AGENTOS_STRNCPY_TERM(converted.name, span->name, sizeof(converted.name));
+    AGENTOS_STRNCPY_TERM(converted.kind, span->kind, sizeof(converted.kind));
     converted.start_time_us = span->start_time_ns / 1000;
     converted.end_time_us = span->end_time_ns / 1000;
     converted.status = (strcmp(span->status, "ok") == 0) ? 0 : -1;

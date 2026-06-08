@@ -2,7 +2,7 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS CI 主编排脚本
 # 统一入口：依赖安装 → 构建 → 测试 → 质量门禁 → 部署
-# Version: 2.0.0
+# Version: 0.1.0
 # Last updated: 2026-04-06
 
 set -euo pipefail

@@ -48,7 +48,7 @@ langchain_adapter_context_t *langchain_adapter_create(const langchain_config_t *
     if (!ctx)
         return NULL;
 
-    memcpy(&ctx->config, config, sizeof(langchain_config_t));
+    __builtin_memcpy(&ctx->config, config, sizeof(langchain_config_t));
     if (config->base_url)
         ctx->config.base_url = AGENTOS_STRDUP(config->base_url);
     if (config->api_key)
@@ -99,7 +99,7 @@ void langchain_adapter_destroy(langchain_adapter_context_t *ctx)
     for (size_t i = 0; i < ctx->memory_count; i++)
         langchain_memory_destroy(&ctx->memories[i]);
 
-    memset(ctx, 0, sizeof(langchain_adapter_context_t));
+    AGENTOS_MEMSET(ctx, 0, sizeof(langchain_adapter_context_t));
     AGENTOS_FREE(ctx);
 }
 
@@ -121,7 +121,7 @@ int langchain_register_tool(langchain_adapter_context_t *ctx, const langchain_to
     if (ctx->tool_count >= LANGCHAIN_MAX_TOOLS)
         return AGENTOS_ERR_OVERFLOW;
 
-    memset(&ctx->tools[ctx->tool_count], 0, sizeof(langchain_tool_def_t));
+    AGENTOS_MEMSET(&ctx->tools[ctx->tool_count], 0, sizeof(langchain_tool_def_t));
     ctx->tools[ctx->tool_count].id = AGENTOS_STRDUP(tool->id);
     ctx->tools[ctx->tool_count].name = tool->name ? AGENTOS_STRDUP(tool->name) : NULL;
     ctx->tools[ctx->tool_count].description =
@@ -174,7 +174,7 @@ int langchain_create_chain(langchain_adapter_context_t *ctx,
     static uint32_t chain_counter = 0;
     chain_counter++;
 
-    memset(instance, 0, sizeof(langchain_chain_instance_t));
+    AGENTOS_MEMSET(instance, 0, sizeof(langchain_chain_instance_t));
 
     char cid[64];
     snprintf(cid, sizeof(cid), "lc-chain-%08x", chain_counter);
@@ -184,7 +184,7 @@ int langchain_create_chain(langchain_adapter_context_t *ctx,
     instance->compiled_executable = NULL;
 
     if (ctx->chain_count < LANGCHAIN_MAX_CHAINS) {
-        memcpy(&ctx->chains[ctx->chain_count], instance, sizeof(langchain_chain_instance_t));
+        __builtin_memcpy(&ctx->chains[ctx->chain_count], instance, sizeof(langchain_chain_instance_t));
         ctx->chains[ctx->chain_count].id = AGENTOS_STRDUP(instance->id);
         ctx->chains[ctx->chain_count].input_schema_json =
             instance->input_schema_json ? AGENTOS_STRDUP(instance->input_schema_json) : NULL;
@@ -305,7 +305,7 @@ static int lc_generate_chain_response(langchain_adapter_context_t *ctx, const ch
             size_t copy_len = strlen(llm_response);
             if (copy_len >= buf_len)
                 copy_len = buf_len - 1;
-            memcpy(out_buf, llm_response, copy_len);
+            __builtin_memcpy(out_buf, llm_response, copy_len);
             out_buf[copy_len] = '\0';
             AGENTOS_FREE(llm_response);
             return 0;
@@ -330,14 +330,14 @@ int langchain_execute_chain(langchain_adapter_context_t *ctx, const char *chain_
 
     ctx->total_chains_executed++;
 
-    memset(result, 0, sizeof(langchain_execution_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(langchain_execution_result_t));
     result->chain_id = chain_id ? AGENTOS_STRDUP(chain_id) : NULL;
     result->input_json = input_json ? AGENTOS_STRDUP(input_json) : NULL;
 
     time_t start = time(NULL);
 
     char resp_text[LC_MAX_RESPONSE_LEN];
-    memset(resp_text, 0, sizeof(resp_text));
+    AGENTOS_MEMSET(resp_text, 0, sizeof(resp_text));
     int rc = lc_generate_chain_response(ctx, input_json, ctx->tool_count, false, resp_text,
                                         sizeof(resp_text));
 
@@ -384,7 +384,7 @@ int langchain_execute_chain_streaming(langchain_adapter_context_t *ctx, const ch
     ctx->total_chains_executed++;
 
     char full_response[LC_MAX_RESPONSE_LEN];
-    memset(full_response, 0, sizeof(full_response));
+    AGENTOS_MEMSET(full_response, 0, sizeof(full_response));
     int rc = lc_generate_chain_response(ctx, input_json, ctx->tool_count, false, full_response,
                                         sizeof(full_response));
     if (rc != 0)
@@ -407,7 +407,7 @@ int langchain_execute_chain_streaming(langchain_adapter_context_t *ctx, const ch
             cLen = 1;
 
         char chunk_buf[LC_STREAM_CHUNK_SIZE + 4];
-        memcpy(chunk_buf, full_response + pos, cLen);
+        __builtin_memcpy(chunk_buf, full_response + pos, cLen);
         chunk_buf[cLen] = '\0';
         pos += cLen;
 
@@ -431,7 +431,7 @@ int langchain_create_agent(langchain_adapter_context_t *ctx,
     snprintf(out_agent_id, 64, "lc-agent-%08x", agent_counter);
 
     langchain_agent_instance_t *agent = &ctx->agents[ctx->agent_count];
-    memset(agent, 0, sizeof(*agent));
+    AGENTOS_MEMSET(agent, 0, sizeof(*agent));
     agent->id = AGENTOS_STRDUP(out_agent_id);
 
     if (definition) {
@@ -464,14 +464,14 @@ int langchain_agent_run(langchain_adapter_context_t *ctx, const char *agent_id,
 
     ctx->total_chains_executed++;
 
-    memset(result, 0, sizeof(langchain_execution_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(langchain_execution_result_t));
     result->chain_id = agent_id ? AGENTOS_STRDUP(agent_id) : NULL;
     result->input_json = task_input ? AGENTOS_STRDUP(task_input) : NULL;
 
     time_t start = time(NULL);
 
     char resp_text[LC_MAX_RESPONSE_LEN];
-    memset(resp_text, 0, sizeof(resp_text));
+    AGENTOS_MEMSET(resp_text, 0, sizeof(resp_text));
     size_t tool_cnt = (found && found->tool_count > 0) ? found->tool_count : ctx->tool_count;
     int rc =
         lc_generate_chain_response(ctx, task_input, tool_cnt, true, resp_text, sizeof(resp_text));
@@ -517,7 +517,7 @@ int langchain_create_memory(langchain_adapter_context_t *ctx, langchain_memory_t
     static uint32_t mem_counter = 0;
     mem_counter++;
 
-    memset(out_memory, 0, sizeof(langchain_memory_t));
+    AGENTOS_MEMSET(out_memory, 0, sizeof(langchain_memory_t));
     char mid[64];
     snprintf(mid, sizeof(mid), "lc-mem-%08x", mem_counter);
     out_memory->id = AGENTOS_STRDUP(mid);
@@ -530,7 +530,7 @@ int langchain_create_memory(langchain_adapter_context_t *ctx, langchain_memory_t
     out_memory->last_updated = (uint64_t)(time(NULL));
 
     if (ctx->memory_count < LANGCHAIN_MAX_MEMORY_ENTRIES) {
-        memcpy(&ctx->memories[ctx->memory_count], out_memory, sizeof(langchain_memory_t));
+        __builtin_memcpy(&ctx->memories[ctx->memory_count], out_memory, sizeof(langchain_memory_t));
         ctx->memories[ctx->memory_count].id = AGENTOS_STRDUP(out_memory->id);
         ctx->memory_count++;
     }
@@ -580,7 +580,7 @@ int langchain_memory_get(langchain_adapter_context_t *ctx, const char *memory_id
 
     for (size_t m = 0; m < ctx->memory_count; m++) {
         if (strcmp(ctx->memories[m].id, memory_id) == 0) {
-            memcpy(snapshot, &ctx->memories[m], sizeof(langchain_memory_t));
+            __builtin_memcpy(snapshot, &ctx->memories[m], sizeof(langchain_memory_t));
             snapshot->id = AGENTOS_STRDUP(ctx->memories[m].id);
             snapshot->messages =
                 (char **)AGENTOS_CALLOC(ctx->memories[m].message_count, sizeof(char *));
@@ -704,7 +704,7 @@ static int langchain_proto_get_version(void *context, char *buf, size_t max_size
     size_t len = strlen(ver);
     if (len >= max_size)
         len = max_size - 1;
-    memcpy(buf, ver, len);
+    __builtin_memcpy(buf, ver, len);
     buf[len] = '\0';
     return 0;
 }
@@ -743,7 +743,7 @@ void langchain_tool_def_destroy(langchain_tool_def_t *tool)
     AGENTOS_FREE(tool->name);
     AGENTOS_FREE(tool->description);
     AGENTOS_FREE(tool->function_schema_json);
-    memset(tool, 0, sizeof(langchain_tool_def_t));
+    AGENTOS_MEMSET(tool, 0, sizeof(langchain_tool_def_t));
 }
 
 void langchain_chain_def_destroy(langchain_chain_def_t *chain)
@@ -753,9 +753,9 @@ void langchain_chain_def_destroy(langchain_chain_def_t *chain)
     AGENTOS_FREE(chain->id);
     AGENTOS_FREE(chain->name);
     for (size_t i = 0; i < chain->step_count; i++)
-        AGENTOS_FREE(chain->step_ids);
+        AGENTOS_FREE(chain->step_ids[i]);
     AGENTOS_FREE(chain->step_ids);
-    memset(chain, 0, sizeof(langchain_chain_def_t));
+    AGENTOS_MEMSET(chain, 0, sizeof(langchain_chain_def_t));
 }
 
 void langchain_chain_instance_destroy(langchain_chain_instance_t *instance)
@@ -766,7 +766,7 @@ void langchain_chain_instance_destroy(langchain_chain_instance_t *instance)
     AGENTOS_FREE(instance->input_schema_json);
     AGENTOS_FREE(instance->output_schema_json);
     AGENTOS_FREE(instance->compiled_executable);
-    memset(instance, 0, sizeof(langchain_chain_instance_t));
+    AGENTOS_MEMSET(instance, 0, sizeof(langchain_chain_instance_t));
 }
 
 void langchain_agent_def_destroy(langchain_agent_def_t *agent)
@@ -778,9 +778,9 @@ void langchain_agent_def_destroy(langchain_agent_def_t *agent)
     AGENTOS_FREE(agent->llm_id);
     AGENTOS_FREE(agent->memory_id);
     for (size_t i = 0; i < agent->tool_count; i++)
-        AGENTOS_FREE(agent->tool_ids);
+        AGENTOS_FREE(agent->tool_ids[i]);
     AGENTOS_FREE(agent->tool_ids);
-    memset(agent, 0, sizeof(langchain_agent_def_t));
+    AGENTOS_MEMSET(agent, 0, sizeof(langchain_agent_def_t));
 }
 
 void langchain_memory_destroy(langchain_memory_t *mem)
@@ -792,7 +792,7 @@ void langchain_memory_destroy(langchain_memory_t *mem)
     for (size_t i = 0; i < mem->message_count; i++)
         AGENTOS_FREE(mem->messages[i]);
     AGENTOS_FREE(mem->messages);
-    memset(mem, 0, sizeof(langchain_memory_t));
+    AGENTOS_MEMSET(mem, 0, sizeof(langchain_memory_t));
 }
 
 void langchain_execution_result_destroy(langchain_execution_result_t *result)
@@ -806,5 +806,5 @@ void langchain_execution_result_destroy(langchain_execution_result_t *result)
     for (size_t i = 0; i < result->intermediate_count; i++)
         AGENTOS_FREE(result->intermediate_results[i]);
     AGENTOS_FREE(result->intermediate_results);
-    memset(result, 0, sizeof(langchain_execution_result_t));
+    AGENTOS_MEMSET(result, 0, sizeof(langchain_execution_result_t));
 }

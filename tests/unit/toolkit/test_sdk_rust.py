@@ -14,8 +14,12 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 import json
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
+from pathlib import Path
+import sys
 
-from tests.utils.python.base_test import SDKTestCase
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
+
+from utils.python.base_test import SDKTestCase
 
 
 class TestRustSDKClientInit(SDKTestCase):

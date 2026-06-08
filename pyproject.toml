@@ -10,7 +10,7 @@ repository = "https://gitee.com/spharx/agentos"
 documentation = "https://docs.spharx.cn/agentos"
 keywords = ["agent", "os", "ai", "memory", "cognition", "execution", "microkernel", "security"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
@@ -160,7 +160,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --cov=agentos --cov-report=term-missing"
+addopts = "-ra -q --cov=agentos/toolkit/python/agentos --cov=scripts/toolkit/src --cov-report=term-missing"
 testpaths = [
     "tests/unit",
     "tests/integration",

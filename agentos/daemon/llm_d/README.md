@@ -1,6 +1,6 @@
 # LLM Daemon — LLM 服务守护进程
 
-> **模块路径**: `agentos/daemon/llm_d/` | **版本**: v0.1.0
+> **模块路径**: `agentos/daemon/llm_d/` | **版本**: v0.0.5
 
 ## 概述
 
@@ -55,7 +55,10 @@ llm_d/
     ├── test_cache.c                  # 缓存测试
     ├── test_token_counter.c          # Token 计数测试
     ├── test_cost_tracker.c           # 成本追踪测试
-    └── test_response.c               # 响应处理测试
+    ├── test_response.c               # 响应处理测试
+    ├── test_complexity_routing.c     # 复杂度路由测试
+    ├── test_routing_e2e.c            # 路由端到端测试
+    └── bench_routing_latency.c       # 路由延迟基准测试
 ```
 
 ## 核心组件说明

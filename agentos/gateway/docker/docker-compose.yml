@@ -1,6 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Docker Compose configuration for AgentOS gateway Module
-# Version: 1.0.0
+# Version: 0.1.0
 #
 # 使用方法:
 #   开发环境: docker-compose up -d

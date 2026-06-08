@@ -2,7 +2,7 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 制品打包与部署脚本
 # 功能：构建产物归档、Docker镜像构建、发布包生成
-# Version: 2.0.0
+# Version: 0.1.0
 
 set -euo pipefail
 

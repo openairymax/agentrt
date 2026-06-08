@@ -20,15 +20,6 @@
 // 安全加固宏和辅助函数
 // ============================================================================
 
-/* 安全字符串复制宏（确保空字符结尾） */
-#define SAFE_STRNCPY(dst, src, size)           \
-    do {                                       \
-        if ((src) && (size) > 0) {             \
-            strncpy((dst), (src), (size) - 1); \
-            (dst)[(size) - 1] = '\0';          \
-        }                                      \
-    } while (0)
-
 /* 浮点数验证宏 */
 #define VALIDATE_FLOAT(value, min, max) \
     ((!isnan((value)) && !isinf((value)) && (value) >= (min) && (value) <= (max)))
@@ -193,7 +184,7 @@ static void init_performance_stats(performance_stats_t *stats)
     if (!stats)
         return;
 
-    memset(stats, 0, sizeof(performance_stats_t));
+    __builtin_memset(stats, 0, sizeof(performance_stats_t));
     stats->adaptive_threshold = 0.3f; /* 默认自适应阈值 */
 }
 
@@ -233,7 +224,7 @@ static void record_decision(performance_stats_t *stats, const char *model_name, 
 
     /* 记录到历史（环形缓冲） */
     decision_record_t *record = &stats->history[stats->history_index];
-    SAFE_STRNCPY(record->selected_model, model_name, sizeof(record->selected_model));
+AGENTOS_STRNCPY_TERM(record->selected_model, model_name, sizeof(record->selected_model));
     record->similarity = similarity;
     record->confidence = confidence;
     record->timestamp = agentos_get_monotonic_time_ns() / 1000000ULL;
@@ -499,11 +490,13 @@ static agentos_error_t dual_coordinate(agentos_coordinator_base_t *base,
     if (is_consistent) {
         /* 输出一致，根据权重选择 */
         if (coordinator->primary_weight >= coordinator->secondary_weight) {
-            SAFE_STRNCPY(selected_model, "Primary", sizeof(selected_model));
+AGENTOS_STRNCPY_TERM(selected_model, "Primary", sizeof(selected_model));
+            (selected_model)[sizeof(selected_model) - 1] = '\0';
             selected_output = primary_output;
             final_confidence = (primary_confidence + similarity) / 2.0f;
         } else {
-            SAFE_STRNCPY(selected_model, "Secondary", sizeof(selected_model));
+AGENTOS_STRNCPY_TERM(selected_model, "Secondary", sizeof(selected_model));
+            (selected_model)[sizeof(selected_model) - 1] = '\0';
             selected_output = secondary_output;
             final_confidence = (secondary_confidence + similarity) / 2.0f;
         }
@@ -512,7 +505,8 @@ static agentos_error_t dual_coordinate(agentos_coordinator_base_t *base,
         switch (validation_mode) {
         case CROSS_VALIDATION_BASIC:
             /* 基础模式：选择主模型 */
-            SAFE_STRNCPY(selected_model, "Primary (Basic)", sizeof(selected_model));
+AGENTOS_STRNCPY_TERM(selected_model, "Primary (Basic)", sizeof(selected_model));
+            (selected_model)[sizeof(selected_model) - 1] = '\0';
             selected_output = primary_output;
             final_confidence = primary_confidence * 0.7f; /* 不一致时降低置信度 */
             break;
@@ -520,11 +514,13 @@ static agentos_error_t dual_coordinate(agentos_coordinator_base_t *base,
         case CROSS_VALIDATION_ADVANCED:
             /* 高级模式：基于置信度选择 */
             if (primary_confidence >= secondary_confidence) {
-                SAFE_STRNCPY(selected_model, "Primary (Confidence)", sizeof(selected_model));
+AGENTOS_STRNCPY_TERM(selected_model, "Primary (Confidence)", sizeof(selected_model));
+                (selected_model)[sizeof(selected_model) - 1] = '\0';
                 selected_output = primary_output;
                 final_confidence = primary_confidence;
             } else {
-                SAFE_STRNCPY(selected_model, "Secondary (Confidence)", sizeof(selected_model));
+AGENTOS_STRNCPY_TERM(selected_model, "Secondary (Confidence)", sizeof(selected_model));
+                (selected_model)[sizeof(selected_model) - 1] = '\0';
                 selected_output = secondary_output;
                 final_confidence = secondary_confidence;
             }
@@ -563,13 +559,11 @@ static agentos_error_t dual_coordinate(agentos_coordinator_base_t *base,
                 } else {
                     /* 数据不足，回退到高级模式 */
                     if (primary_confidence >= secondary_confidence) {
-                        SAFE_STRNCPY(selected_model, "Primary (Adaptive-Fallback)",
-                                     sizeof(selected_model));
+AGENTOS_STRNCPY_TERM(selected_model, "Primary (Adaptive-Fallback)", sizeof(selected_model));
                         selected_output = primary_output;
                         final_confidence = primary_confidence;
                     } else {
-                        SAFE_STRNCPY(selected_model, "Secondary (Adaptive-Fallback)",
-                                     sizeof(selected_model));
+AGENTOS_STRNCPY_TERM(selected_model, "Secondary (Adaptive-Fallback)", sizeof(selected_model));
                         selected_output = secondary_output;
                         final_confidence = secondary_confidence;
                     }
@@ -579,7 +573,8 @@ static agentos_error_t dual_coordinate(agentos_coordinator_base_t *base,
 
         default:
             /* 未知模式，默认选择主模型 */
-            SAFE_STRNCPY(selected_model, "Primary (Default)", sizeof(selected_model));
+AGENTOS_STRNCPY_TERM(selected_model, "Primary (Default)", sizeof(selected_model));
+            (selected_model)[sizeof(selected_model) - 1] = '\0';
             selected_output = primary_output;
             final_confidence = primary_confidence * 0.5f;
             break;

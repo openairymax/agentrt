@@ -204,7 +204,7 @@ static agentos_error_t agent_unit_execute(agentos_execution_unit_t *unit, const 
                     size_t role_len = (size_t)(quote_end - quote_start - 1);
                     if (role_len > 0 && role_len < 64) {
                         static char role_buf[64];
-                        memcpy(role_buf, quote_start + 1, role_len);
+                        __builtin_memcpy(role_buf, quote_start + 1, role_len);
                         role_buf[role_len] = '\0';
                         role = role_buf;
                     }

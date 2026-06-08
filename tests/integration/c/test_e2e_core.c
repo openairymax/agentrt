@@ -360,7 +360,7 @@ static void* concurrent_thread_fn(void* arg)
     for (int round = 0; round < 50; round++) {
         void* p = agentos_mem_alloc(64 + (size_t)(thread_id % 8) * 32);
         if (p) {
-            memset(p, (unsigned char)(thread_id + round),
+            AGENTOS_MEMSET(p, (unsigned char)(thread_id + round),
                    64 + (size_t)(thread_id % 8) * 32);
             agentos_mem_free(p);
         }
@@ -795,12 +795,12 @@ static void e2e_scenario_15_memory_batch_fragmentation(void)
 
     #define ALLOC_COUNT 200
     void* ptrs[ALLOC_COUNT];
-    memset(ptrs, 0, sizeof(ptrs));
+    AGENTOS_MEMSET(ptrs, 0, sizeof(ptrs));
 
     for (int i = 0; i < ALLOC_COUNT; i++) {
         size_t sz = (size_t)(64 + (i % 16) * 32);
         ptrs[i] = agentos_mem_alloc(sz);
-        if (ptrs[i]) memset(ptrs[i], (unsigned char)(i & 0xFF), sz);
+        if (ptrs[i]) AGENTOS_MEMSET(ptrs[i], (unsigned char)(i & 0xFF), sz);
     }
     TEST_ASSERT(1, "Step 2: 批量分配200个不同大小的内存块");
 
@@ -819,7 +819,7 @@ static void e2e_scenario_15_memory_batch_fragmentation(void)
         size_t sz = (size_t)(128 + (i % 10) * 16);
         void* p = agentos_mem_alloc(sz);
         if (p) {
-            memset(p, 0xAB, sz);
+            AGENTOS_MEMSET(p, 0xAB, sz);
             agentos_mem_free(p);
         }
     }

@@ -1,6 +1,6 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Dockerfile for AgentOS Multi-Protocol Gateway
-# Version: 2.0.0
+# Version: 0.1.0
 #
 # 多阶段构建，支持MCP/A2A/OpenAI API多协议网关
 
