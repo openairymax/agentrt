@@ -299,13 +299,13 @@ static void add_to_history(const alert_info_t *alert)
         AGENTOS_FREE(g_alert_mgr.history[0].alert.message);
         AGENTOS_FREE(g_alert_mgr.history[0].alert.service_name);
         AGENTOS_FREE(g_alert_mgr.history[0].alert.resource_id);
-        memmove(&g_alert_mgr.history[0], &g_alert_mgr.history[1],
+        __builtin_memmove(&g_alert_mgr.history[0], &g_alert_mgr.history[1],
                 (g_alert_mgr.history_count - 1) * sizeof(grouped_alert_t));
         g_alert_mgr.history_count--;
     }
 
     grouped_alert_t *entry = &g_alert_mgr.history[g_alert_mgr.history_count];
-    memset(entry, 0, sizeof(grouped_alert_t));
+    __builtin_memset(entry, 0, sizeof(grouped_alert_t));
 
     entry->alert.alert_id = alert->alert_id ? AGENTOS_STRDUP(alert->alert_id) : NULL;
     entry->alert.message = alert->message ? AGENTOS_STRDUP(alert->message) : NULL;

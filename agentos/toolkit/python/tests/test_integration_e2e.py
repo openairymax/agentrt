@@ -1,6 +1,6 @@
 # AgentOS SDK 端到端集成测试
 # 验证: Config→Client→Modules→Plugin→ErrorHandling 完整链路
-# Version: 1.0.0
+# Version: 0.1.0
 
 import sys
 import os
@@ -67,7 +67,7 @@ class TestErrorHandlingIntegration(unittest.TestCase):
         self.assertTrue(CODE_UNKNOWN.startswith("0x"))
 
     def test_timeout_error(self):
-        err = TimeoutError("request timed out")
+        err = AgentOSTimeoutError("request timed out")
         self.assertEqual(err.error_code, CODE_TIMEOUT)
 
     def test_network_error(self):

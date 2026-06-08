@@ -65,7 +65,6 @@ static void *worker_thread_func(void *arg)
         }
     }
 
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     return NULL;
 }
 

@@ -5,6 +5,11 @@
 // 提供宏来减少 Manager 模块的重复代码。
 // 使用 Rust 宏系统实现代码生成。
 
+//! **注意：** 本模块中的宏为实验性/临时实现，尚未与实际的 Manager 类型签名集成，
+//! 因此当前为死代码。待后续重构时再正式对接。
+
+#![allow(dead_code)]
+
 /// 实现基础 Manager 结构
 #[macro_export]
 macro_rules! impl_base_manager {

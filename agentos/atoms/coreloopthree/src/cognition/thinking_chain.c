@@ -3,7 +3,7 @@
  * @brief 思考链路模块完整实现 - DS-001
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * 实现双思考系统的三大核心组件:
+ * 实现Thinkdual的三大核心组件:
  * 1. Context Window - Token预算管理+滑动窗口
  * 2. Working Memory - 短期键值缓存+LRU淘汰
  * 3. Thinking Step DAG - 推理步骤依赖链
@@ -328,7 +328,7 @@ agentos_error_t agentos_tc_working_memory_store(agentos_working_memory_t *mem, c
         void *new_val = AGENTOS_MALLOC(value_size);
         if (!new_val)
             return AGENTOS_ENOMEM;
-        memcpy(new_val, value, value_size);
+        __builtin_memcpy(new_val, value, value_size);
         AGENTOS_FREE(mem->entries[existing].value);
         mem->entries[existing].value = new_val;
         mem->entries[existing].value_size = value_size;
@@ -360,7 +360,7 @@ agentos_error_t agentos_tc_working_memory_store(agentos_working_memory_t *mem, c
         e->value = NULL;
         return AGENTOS_ENOMEM;
     }
-    memcpy(e->value, value, value_size);
+    __builtin_memcpy(e->value, value, value_size);
     e->value_size = value_size;
     e->type = type ? AGENTOS_STRDUP(type) : NULL;
     e->created_ns = tc_time_now_ns();
@@ -460,7 +460,7 @@ agentos_error_t agentos_tc_step_create(agentos_thinking_chain_t *chain, tc_step_
     }
 
     agentos_thinking_step_t *step = &chain->steps[chain->step_count];
-    memset(step, 0, sizeof(agentos_thinking_step_t));
+    __builtin_memset(step, 0, sizeof(agentos_thinking_step_t));
 
     step->step_id = chain->next_step_id++;
     step->type = type;
@@ -474,16 +474,16 @@ agentos_error_t agentos_tc_step_create(agentos_thinking_chain_t *chain, tc_step_
     if (input && input_len > 0) {
         step->raw_input = (char *)AGENTOS_MALLOC(input_len + 1);
         if (step->raw_input) {
-            memcpy(step->raw_input, input, input_len);
+            __builtin_memcpy(step->raw_input, input, input_len);
             step->raw_input[input_len] = '\0';
             step->raw_input_len = input_len;
         }
     }
 
     if (depends_on && depends_count > 0) {
-        step->depends_on = (uint32_t *)AGENTOS_MALLOC(depends_count * sizeof(uint32_t));
+        SAFE_MALLOC_ARRAY(step->depends_on, depends_count, sizeof(uint32_t));
         if (step->depends_on) {
-            memcpy(step->depends_on, depends_on, depends_count * sizeof(uint32_t));
+            __builtin_memcpy(step->depends_on, depends_on, depends_count * sizeof(uint32_t));
             step->depends_count = depends_count;
         }
     }
@@ -506,7 +506,7 @@ agentos_error_t agentos_tc_step_complete(agentos_thinking_step_t *step, const ch
     step->content = (char *)AGENTOS_MALLOC(content_len + 1);
     if (!step->content)
         return AGENTOS_ENOMEM;
-    memcpy(step->content, content, content_len);
+    __builtin_memcpy(step->content, content, content_len);
     step->content[content_len] = '\0';
     step->content_len = content_len;
 
@@ -530,7 +530,7 @@ agentos_error_t agentos_tc_step_verify(agentos_thinking_step_t *step, int *is_va
     if (critique && critique_len > 0) {
         step->critique = (char *)AGENTOS_MALLOC(critique_len + 1);
         if (step->critique) {
-            memcpy(step->critique, critique, critique_len);
+            __builtin_memcpy(step->critique, critique, critique_len);
             step->critique[critique_len] = '\0';
             step->critique_len = critique_len;
         }
@@ -568,7 +568,7 @@ agentos_error_t agentos_tc_step_correct(agentos_thinking_step_t *step,
     step->content = (char *)AGENTOS_MALLOC(corrected_len + 1);
     if (!step->content)
         return AGENTOS_ENOMEM;
-    memcpy(step->content, corrected_content, corrected_len);
+    __builtin_memcpy(step->content, corrected_content, corrected_len);
     step->content[corrected_len] = '\0';
     step->content_len = corrected_len;
     step->correction_count++;
@@ -802,7 +802,7 @@ agentos_error_t agentos_tc_chain_stats(agentos_thinking_chain_t *chain, char **o
     char *result = (char *)AGENTOS_MALLOC(len + 1);
     if (!result)
         return AGENTOS_ENOMEM;
-    memcpy(result, buf, len + 1);
+    __builtin_memcpy(result, buf, len + 1);
     *out_json = result;
     if (out_len)
         *out_len = (size_t)len;
@@ -845,7 +845,7 @@ agentos_error_t agentos_tc_context_window_prepopulate(agentos_thinking_chain_t *
     }
 
     agentos_memory_query_t query;
-    memset(&query, 0, sizeof(query));
+    __builtin_memset(&query, 0, sizeof(query));
     query.memory_query_text = (char *)query_text;
     query.memory_query_text_len = query_len;
     query.memory_query_limit = limit > 0 ? limit : 5;
@@ -872,8 +872,8 @@ agentos_error_t agentos_tc_context_window_prepopulate(agentos_thinking_chain_t *
         if (!buf)
             continue;
 
-        memcpy(buf, prefix, (size_t)plen);
-        memcpy(buf + plen, rec->memory_record_data, rec->memory_record_data_len);
+        __builtin_memcpy(buf, prefix, (size_t)plen);
+        __builtin_memcpy(buf + plen, rec->memory_record_data, rec->memory_record_data_len);
         buf[total_len - 1] = '\n';
 
         agentos_tc_context_window_append(chain->ctx_window, buf, total_len);
@@ -896,7 +896,7 @@ agentos_error_t agentos_tc_working_memory_sync_to_persistent(agentos_thinking_ch
         struct wm_entry *e = &chain->working_mem->entries[i];
         if (e->pinned && e->value && e->value_size > 0) {
             agentos_memory_record_t rec;
-            memset(&rec, 0, sizeof(rec));
+            __builtin_memset(&rec, 0, sizeof(rec));
             rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
             rec.memory_record_data = e->value;
             rec.memory_record_data_len = e->value_size;
@@ -928,7 +928,7 @@ agentos_error_t agentos_tc_step_write_to_memory(agentos_thinking_chain_t *chain,
         return AGENTOS_EINVAL;
 
     agentos_memory_record_t rec;
-    memset(&rec, 0, sizeof(rec));
+    __builtin_memset(&rec, 0, sizeof(rec));
     rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
     rec.memory_record_data = step->content;
     rec.memory_record_data_len = step->content_len;
@@ -972,7 +972,7 @@ agentos_error_t agentos_tc_metacognition_inform_memory(agentos_thinking_chain_t 
 
     if (eval_typed->critique_text && eval_typed->critique_len > 0) {
         agentos_memory_record_t rec;
-        memset(&rec, 0, sizeof(rec));
+        __builtin_memset(&rec, 0, sizeof(rec));
         rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
         rec.memory_record_data = (void *)eval_typed->critique_text;
         rec.memory_record_data_len = eval_typed->critique_len;
@@ -1040,7 +1040,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
     if (!config)
         config = &defaults;
 
-    memset(out_result, 0, sizeof(tc_monitor_result_t));
+    __builtin_memset(out_result, 0, sizeof(tc_monitor_result_t));
     out_result->anomaly = TC_ANOMALY_NONE;
     out_result->is_critical = 0;
     out_result->severity_score = 0.0f;
@@ -1058,7 +1058,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
                          step->step_id, (unsigned long long)elapsed_ms, config->default_timeout_ms);
             out_result->description = (char *)AGENTOS_MALLOC(dlen + 1);
             if (out_result->description) {
-                memcpy(out_result->description, desc, dlen + 1);
+                __builtin_memcpy(out_result->description, desc, dlen + 1);
                 out_result->description_len = (size_t)dlen;
             }
             return AGENTOS_SUCCESS;
@@ -1085,7 +1085,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
                             step->content_len, config->min_output_chars);
         out_result->description = (char *)AGENTOS_MALLOC(dlen + 1);
         if (out_result->description) {
-            memcpy(out_result->description, desc, dlen + 1);
+            __builtin_memcpy(out_result->description, desc, dlen + 1);
             out_result->description_len = (size_t)dlen;
         }
     }
@@ -1101,7 +1101,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
                                 step->content_len, config->max_output_chars);
             out_result->description = (char *)AGENTOS_MALLOC(dlen + 1);
             if (out_result->description) {
-                memcpy(out_result->description, desc, dlen + 1);
+                __builtin_memcpy(out_result->description, desc, dlen + 1);
                 out_result->description_len = (size_t)dlen;
             }
         }
@@ -1123,7 +1123,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
                 snprintf(desc, sizeof(desc), "Repetitive content detected (score=%.2f)", rep_score);
             out_result->description = (char *)AGENTOS_MALLOC(dlen + 1);
             if (out_result->description) {
-                memcpy(out_result->description, desc, dlen + 1);
+                __builtin_memcpy(out_result->description, desc, dlen + 1);
                 out_result->description_len = (size_t)dlen;
             }
         }
@@ -1145,7 +1145,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
                                     step->confidence, config->quality_gate_threshold);
                 out_result->description = (char *)AGENTOS_MALLOC(dlen + 1);
                 if (out_result->description) {
-                    memcpy(out_result->description, desc, dlen + 1);
+                    __builtin_memcpy(out_result->description, desc, dlen + 1);
                     out_result->description_len = (size_t)dlen;
                 }
             }
@@ -1217,7 +1217,7 @@ agentos_error_t agentos_tc_step_recover(agentos_thinking_chain_t *chain,
     if (!chain || !failed_step || !out_result)
         return AGENTOS_EINVAL;
 
-    memset(out_result, 0, sizeof(tc_recovery_result_t));
+    __builtin_memset(out_result, 0, sizeof(tc_recovery_result_t));
     out_result->strategy_used = TC_RECOVER_ABORT;
     out_result->success = 0;
 
@@ -1348,7 +1348,7 @@ uint32_t agentos_tc_chain_checkpoint(agentos_thinking_chain_t *chain)
     }
     if (slot < 0) {
         slot = 0;
-        memmove(&checkpoints[0], &checkpoints[1],
+        __builtin_memmove(&checkpoints[0], &checkpoints[1],
                 (TC_MAX_CHECKPOINTS - 1) * sizeof(tc_checkpoint_t));
         checkpoints[TC_MAX_CHECKPOINTS - 1].checkpoint_id = 0;
     }
@@ -1401,7 +1401,7 @@ size_t agentos_tc_chain_rollback(agentos_thinking_chain_t *chain, uint32_t check
                 AGENTOS_FREE(step->correction_history[h]);
             AGENTOS_FREE(step->correction_history);
         }
-        memset(step, 0, sizeof(agentos_thinking_step_t));
+        __builtin_memset(step, 0, sizeof(agentos_thinking_step_t));
     }
 
     chain->step_count = target_steps;

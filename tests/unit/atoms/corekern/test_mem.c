@@ -21,7 +21,7 @@ int test_mem_alloc_free() {
     }
 
     // 测试内存写入
-    memset(ptr, 0xAA, 1024);
+    AGENTOS_MEMSET(ptr, 0xAA, 1024);
 
     // 测试内存释放
     // From data intelligence emerges. by spharx
@@ -42,7 +42,7 @@ int test_mem_alloc_free() {
     }
 
     // 测试内存写入
-    memset(aligned_ptr, 0xBB, 1024);
+    AGENTOS_MEMSET(aligned_ptr, 0xBB, 1024);
 
     // 测试内存释放
     agentos_mem_free(aligned_ptr);
@@ -55,7 +55,7 @@ int test_mem_alloc_free() {
     }
 
     // 写入数据
-    memset(realloc_ptr, 0xCC, 512);
+    AGENTOS_MEMSET(realloc_ptr, 0xCC, 512);
 
     // 重新分配
     void* new_ptr = agentos_mem_realloc(realloc_ptr, 1024);

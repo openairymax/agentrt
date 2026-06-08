@@ -27,6 +27,7 @@
 #include <sys/sysinfo.h>
 #include <unistd.h>
 #include "error_compat.h"
+#include "memory_compat.h"
 
 #define ATM_RET_ERR(c) \
     do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
@@ -128,9 +129,9 @@ int agentos_observability_init(const agentos_observability_config_t *config)
     }
 
     if (config) {
-        memcpy(&g_obs.config, config, sizeof(agentos_observability_config_t));
+        __builtin_memcpy(&g_obs.config, config, sizeof(agentos_observability_config_t));
     } else {
-        memset(&g_obs.config, 0, sizeof(agentos_observability_config_t));
+        __builtin_memset(&g_obs.config, 0, sizeof(agentos_observability_config_t));
         g_obs.config.enable_metrics = 1;
         g_obs.config.enable_tracing = 1;
         g_obs.config.enable_health_check = 1;
@@ -171,7 +172,7 @@ int agentos_health_check_register(const char *name, agentos_health_check_cb call
     agentos_mutex_lock(g_obs.lock);
 
     obs_health_entry_t *entry = &g_obs.health_checks[g_obs.health_check_count];
-    strncpy(entry->name, name, sizeof(entry->name) - 1);
+    AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
     entry->name[sizeof(entry->name) - 1] = '\0';
     entry->callback = callback;
     entry->user_data = user_data;
@@ -230,10 +231,10 @@ int agentos_metric_record(const agentos_metric_sample_t *sample)
             ATM_RET_ERR(AGENTOS_ENOSPC);
         }
         obs_metric_entry_t *entry = &g_obs.metrics[g_obs.metric_count];
-        strncpy(entry->name, sample->name, sizeof(entry->name) - 1);
+        AGENTOS_STRNCPY_TERM(entry->name, sample->name, sizeof(entry->name));
         entry->name[sizeof(entry->name) - 1] = '\0';
         if (sample->labels[0] != '\0') {
-            strncpy(entry->labels, sample->labels, sizeof(entry->labels) - 1);
+            AGENTOS_STRNCPY_TERM(entry->labels, sample->labels, sizeof(entry->labels));
             entry->labels[sizeof(entry->labels) - 1] = '\0';
         } else {
             entry->labels[0] = '\0';
@@ -266,10 +267,10 @@ int agentos_metric_counter_create(const char *name, const char *labels)
     }
 
     obs_metric_entry_t *entry = &g_obs.metrics[g_obs.metric_count];
-    strncpy(entry->name, name, sizeof(entry->name) - 1);
+    AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
     entry->name[sizeof(entry->name) - 1] = '\0';
     if (labels) {
-        strncpy(entry->labels, labels, sizeof(entry->labels) - 1);
+        AGENTOS_STRNCPY_TERM(entry->labels, labels, sizeof(entry->labels));
         entry->labels[sizeof(entry->labels) - 1] = '\0';
     } else {
         entry->labels[0] = '\0';
@@ -325,10 +326,10 @@ int agentos_metric_gauge_create(const char *name, const char *labels, double ini
     }
 
     obs_metric_entry_t *entry = &g_obs.metrics[g_obs.metric_count];
-    strncpy(entry->name, name, sizeof(entry->name) - 1);
+    AGENTOS_STRNCPY_TERM(entry->name, name, sizeof(entry->name));
     entry->name[sizeof(entry->name) - 1] = '\0';
     if (labels) {
-        strncpy(entry->labels, labels, sizeof(entry->labels) - 1);
+        AGENTOS_STRNCPY_TERM(entry->labels, labels, sizeof(entry->labels));
         entry->labels[sizeof(entry->labels) - 1] = '\0';
     } else {
         entry->labels[0] = '\0';
@@ -381,14 +382,14 @@ int agentos_trace_span_start(agentos_trace_context_t *context, const char *servi
     context->error_code = 0;
 
     if (service_name) {
-        strncpy(context->service_name, service_name, sizeof(context->service_name) - 1);
+        AGENTOS_STRNCPY_TERM(context->service_name, service_name, sizeof(context->service_name));
         context->service_name[sizeof(context->service_name) - 1] = '\0';
     } else {
         context->service_name[0] = '\0';
     }
 
     if (operation_name) {
-        strncpy(context->operation_name, operation_name, sizeof(context->operation_name) - 1);
+        AGENTOS_STRNCPY_TERM(context->operation_name, operation_name, sizeof(context->operation_name));
         context->operation_name[sizeof(context->operation_name) - 1] = '\0';
     } else {
         context->operation_name[0] = '\0';
@@ -396,7 +397,7 @@ int agentos_trace_span_start(agentos_trace_context_t *context, const char *servi
 
     agentos_mutex_lock(g_obs.lock);
     if (g_obs.span_count < OBS_MAX_TRACE_SPANS) {
-        memcpy(&g_obs.spans[g_obs.span_count], context, sizeof(agentos_trace_context_t));
+        __builtin_memcpy(&g_obs.spans[g_obs.span_count], context, sizeof(agentos_trace_context_t));
         g_obs.span_count++;
     }
     agentos_mutex_unlock(g_obs.lock);
@@ -517,9 +518,21 @@ int agentos_performance_get_metrics(double *out_cpu_usage, double *out_memory_us
     double cpu_usage = 0.0;
     FILE *stat_fp = fopen("/proc/stat", "r");
     if (stat_fp) {
-        unsigned long long user, nice, cpu_system_t, idle, iowait, irq, softirq, steal;
-        if (fscanf(stat_fp, "cpu %llu %llu %llu %llu %llu %llu %llu %llu", &user, &nice, &cpu_system_t,
-                   &idle, &iowait, &irq, &softirq, &steal) == 8) {
+        char buf[256];
+        if (fgets(buf, sizeof(buf), stat_fp)) {
+            unsigned long long user, nice, cpu_system_t, idle, iowait, irq, softirq, steal;
+            char *p = buf;
+            /* Skip "cpu" prefix */
+            while (*p && *p == ' ') p++;
+            while (*p && *p != ' ') p++;
+            user = strtoull(p, &p, 10);
+            nice = strtoull(p, &p, 10);
+            cpu_system_t = strtoull(p, &p, 10);
+            idle = strtoull(p, &p, 10);
+            iowait = strtoull(p, &p, 10);
+            irq = strtoull(p, &p, 10);
+            softirq = strtoull(p, &p, 10);
+            steal = strtoull(p, &p, 10);
             unsigned long long total_idle = idle + iowait;
             unsigned long long total = user + nice + cpu_system_t + idle + iowait + irq + softirq + steal;
             if (total > 0) {

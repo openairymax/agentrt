@@ -1,7 +1,6 @@
 # Toolkit — 多语言 SDK 工具包
 
-**模块路径**: `agentos/toolkit/`
-**版本**: v0.1.0 (SDK v0.1.0)
+**版本**: v0.0.5
 
 ## 概述
 
@@ -23,14 +22,12 @@ toolkit/
 │   │   ├── syscall.py          # 系统调用绑定
 │   │   ├── telemetry.py        # OpenTelemetry 遥测
 │   │   ├── exceptions.py       # 异常层级与错误码
-│   │   ├── types.py            # 类型定义
-│   │   ├── utils.py            # 工具函数
 │   │   ├── client/             # 客户端层
 │   │   │   ├── client.py       # APIClient/ClientConfig
 │   │   │   └── mock.py         # MockClient 测试客户端
 │   │   ├── modules/            # 业务模块层
 │   │   │   ├── base_manager.py # BaseManager 基类
-│   │   │   ├── task/           # TaskManager
+│   │   │   ├── task/           # TaskManager + Checkpoint
 │   │   │   ├── memory/         # MemoryManager
 │   │   │   ├── session/        # SessionManager
 │   │   │   └── skill/          # SkillManager
@@ -40,11 +37,24 @@ toolkit/
 │   │   │   ├── lifecycle.py    # 生命周期管理
 │   │   │   ├── config.py       # 配置管理
 │   │   │   ├── event.py        # 事件系统
-│   │   │   └── plugins/        # 内置插件
+│   │   │   ├── state.py        # 状态管理
+│   │   │   ├── task.py         # 框架任务
+│   │   │   ├── skill.py        # 框架技能
+│   │   │   ├── errors.py       # 框架错误
+│   │   │   └── plugins/        # 内置插件（metrics/logger）
+│   │   ├── types/              # 类型定义（common.py）
 │   │   └── utils/              # 工具函数
+│   │       ├── helpers.py      # 通用工具
+│   │       ├── api_helpers.py  # API 辅助
+│   │       ├── event_emitter.py# EventEmitter
+│   │       ├── core.py         # 核心工具（向后兼容）
+│   │       └── token_optimizer.py # Token 优化（LRU 缓存）
 │   ├── tests/                  # 测试套件
 │   ├── examples/               # 使用示例
 │   ├── setup.py                # 包配置
+│   ├── pyproject.toml          # PEP 621 项目配置
+│   ├── requirements.txt        # 依赖清单
+│   ├── restructure_sdk.py      # SDK 重构脚本
 │   └── README.md
 ├── go/                         # Go SDK
 │   ├── agentos/                # 核心包
@@ -53,48 +63,82 @@ toolkit/
 │   │   ├── protocol.go         # 协议处理
 │   │   ├── errors.go           # 错误定义
 │   │   ├── client/             # 客户端层
+│   │   │   ├── client.go       # Client/APIClient/ClientConfig
+│   │   │   └── mock.go         # MockClient
 │   │   ├── modules/            # 业务模块层
-│   │   ├── plugin/             # 插件系统
-│   │   ├── syscall/            # 系统调用绑定
-│   │   ├── telemetry/          # 遥测
-│   │   ├── types/              # 类型定义
-│   │   └── utils/              # 工具函数
+│   │   │   ├── modules.go      # 模块导出
+│   │   │   ├── base_manager.go # BaseManager 基类
+│   │   │   ├── task/manager.go # TaskManager
+│   │   │   ├── memory/manager.go # MemoryManager
+│   │   │   ├── session/manager.go # SessionManager
+│   │   │   └── skill/manager.go # SkillManager
+│   │   ├── plugin/plugin.go    # Plugin 系统
+│   │   ├── syscall/syscall.go  # 系统调用绑定
+│   │   ├── telemetry/telemetry.go # OpenTelemetry 遥测
+│   │   ├── types/types.go      # 类型定义
+│   │   └── utils/helpers.go    # 工具函数
+│   ├── go.mod                  # Go 模块配置
 │   └── README.md
 ├── rust/                       # Rust SDK
 │   ├── src/
 │   │   ├── lib.rs              # 模块入口
 │   │   ├── agent.rs            # Agent 模块
-│   │   ├── error.rs            # 错误定义
+│   │   ├── error.rs            # AgentOSError/ErrorCode
 │   │   ├── protocol.rs         # 协议处理
 │   │   ├── syscall.rs          # 系统调用绑定
 │   │   ├── telemetry.rs        # 遥测
-│   │   ├── plugin.rs           # 插件系统
+│   │   ├── plugin.rs           # Plugin 系统
 │   │   ├── macros.rs           # 宏定义
+│   │   ├── task.rs             # Task（deprecated）
+│   │   ├── memory.rs           # Memory（deprecated）
+│   │   ├── session.rs          # Session（deprecated）
+│   │   ├── skill.rs            # Skill（deprecated）
 │   │   ├── client/             # 客户端层
+│   │   │   ├── mod.rs
+│   │   │   └── client.rs       # Client/APIClient
 │   │   ├── modules/            # 业务模块层
+│   │   │   ├── task/manager.rs # TaskManager
+│   │   │   ├── memory/manager.rs # MemoryManager
+│   │   │   ├── session/manager.rs # SessionManager
+│   │   │   └── skill/manager.rs # SkillManager
 │   │   ├── types/              # 类型定义
 │   │   └── utils/              # 工具函数
 │   ├── tests/                  # 集成测试
 │   ├── Cargo.toml              # Rust 项目配置
+│   ├── Cargo.lock              # 依赖锁定
 │   └── README.md
 ├── typescript/                 # TypeScript SDK
 │   ├── src/
 │   │   ├── index.ts            # 模块入口
 │   │   ├── agentos.ts          # AgentOS 主类
+│   │   ├── agent.ts            # Agent 模型
 │   │   ├── manager.ts          # 配置管理
-│   │   ├── errors.ts           # 错误定义
 │   │   ├── config.ts           # 配置类型
+│   │   ├── errors.ts           # 错误定义
 │   │   ├── protocol.ts         # 协议处理
 │   │   ├── syscall.ts          # 系统调用绑定
 │   │   ├── telemetry.ts        # 遥测
-│   │   ├── plugin.ts           # 插件系统
+│   │   ├── plugin.ts           # Plugin 系统
+│   │   ├── task.ts             # Task 领域模型
+│   │   ├── memory.ts           # Memory 领域模型
+│   │   ├── session.ts          # Session 领域模型
+│   │   ├── skill.ts            # Skill 领域模型
 │   │   ├── client/             # 客户端层
+│   │   │   ├── index.ts
+│   │   │   ├── client.ts       # Client/APIClient
+│   │   │   └── mock.ts         # MockClient
 │   │   ├── modules/            # 业务模块层
-│   │   ├── types/              # 类型定义
-│   │   └── utils/              # 工具函数
+│   │   │   ├── base_manager.ts # BaseManager
+│   │   │   ├── task.ts         # TaskManager
+│   │   │   ├── memory.ts       # MemoryManager
+│   │   │   ├── session.ts      # SessionManager
+│   │   │   └── skill.ts        # SkillManager
+│   │   ├── types/              # 类型定义（enums/models/requests）
+│   │   └── utils/              # 工具函数（helpers/logger）
 │   ├── tests/                  # 测试套件
 │   ├── package.json            # NPM 配置
 │   ├── tsconfig.json           # TypeScript 配置
+│   ├── jest.config.js          # Jest 配置
 │   └── README.md
 └── README.md                   # 本文件
 ```
@@ -188,10 +232,10 @@ toolkit/
 
 | SDK | 核心依赖 | 构建工具 |
 |-----|----------|----------|
-| Python | requests, aiohttp, pydantic | pip / setup.py |
-| Go | 标准库 + testify | go mod |
-| Rust | tokio, serde, reqwest, tracing | Cargo |
-| TypeScript | node-fetch, events | npm / tsc |
+| Python | requests, aiohttp | pip / setup.py |
+| Go | 标准库 | go mod |
+| Rust | tokio, serde, reqwest | Cargo |
+| TypeScript | axios, ws | npm / tsc |
 
 ---
 

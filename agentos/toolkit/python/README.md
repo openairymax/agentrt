@@ -1,7 +1,7 @@
 # Toolkit Python — AgentOS Python SDK
 
 **模块路径**: `agentos/toolkit/python/`
-**版本**: v0.1.0 (SDK v0.1.0)
+**版本**: v0.0.5 (SDK v0.0.5)
 
 ## 概述
 
@@ -80,7 +80,8 @@ python/
 │   ├── test_integration_e2e.py # 端到端集成测试
 │   ├── test_cross_platform.py  # 跨平台测试
 │   ├── test_concurrent_stress.py  # 并发压力测试
-│   └── test_benchmark_performance.py  # 性能基准测试
+│   ├── test_benchmark_performance.py  # 性能基准测试
+│   ├── test_plugin_lifecycle.py  # 插件生命周期测试
 ├── examples/                   # 使用示例
 │   ├── long_task_with_checkpoint.py  # Checkpoint 示例
 │   ├── openlab_integration.py  # OpenLab 集成示例

@@ -1,5 +1,5 @@
 // AgentOS TypeScript SDK - HTTP Client
-// Version: 3.0.0
+// Version: 0.1.0
 // Last updated: 2026-04-05
 //
 // 提供 HTTP 通信层、APIClient 接口定义和重试机制。

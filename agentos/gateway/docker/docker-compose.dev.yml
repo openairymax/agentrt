@@ -1,5 +1,5 @@
 # AgentOS Full Development Environment
-# Version: 2.0.0
+# Version: 0.1.0
 #
 # 一键启动完整开发环境:
 #   docker-compose up -d

@@ -56,10 +56,12 @@ option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OF
 option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
-option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
+option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
 option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)
 option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
 option(AGENTOS_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
+set(AGENTOS_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
+set(AGENTOS_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 if(BUILD_TESTS)
@@ -82,10 +84,22 @@ message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "Build shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "Build tests: ${BUILD_TESTS}")
+message(STATUS "Compliance strict: ${AGENTOS_COMPLIANCE_STRICT}")
 message(STATUS "Memory backend: ${AGENTOS_MEMORY_BACKEND}")
 message(STATUS "With MemoryRovol Pro: ${AGENTOS_WITH_MEMORYROVOL}")
 message(STATUS "Docker build: ${AGENTOS_DOCKER_BUILD}")
+message(STATUS "Sanitizers: ${ENABLE_SANITIZERS}")
 message(STATUS "=========================================")
+
+# 关键路径验证：确认核心目录存在
+message(STATUS "[PATH-CHECK] Source root: ${CMAKE_CURRENT_SOURCE_DIR}")
+foreach(_dir agentos agentos/atoms agentos/commons agentos/protocols agentos/gateway agentos/daemon agentos/cupolas agentos/heapstore)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
+        message(STATUS "[PATH-CHECK]   [OK] ${_dir}/")
+    else()
+        message(WARNING "[PATH-CHECK]   [MISSING] ${_dir}/")
+    endif()
+endforeach()
 
 # 导出编译命令数据库（供clangd/IDE使用）
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -137,13 +151,29 @@ else()
 endif()
 
 # Sanitizer支持（仅GCC/Clang）
+# 四重运行时检测：AddressSanitizer + LeakSanitizer + UndefinedBehaviorSanitizer + ThreadSanitizer
 if(ENABLE_SANITIZERS AND NOT MSVC)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        add_compile_options(-fsanitize=address,undefined)
-        add_link_options(-fsanitize=address,undefined)
-        message(STATUS "Sanitizers enabled (AddressSanitizer, UndefinedBehaviorSanitizer)")
+        add_compile_options(-fsanitize=address,undefined,leak,float-divide-by-zero -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined,leak,float-divide-by-zero)
+        # CI环境变量：halt_on_error确保任何检测到的问题立即阻断
+        set(ENV{ASAN_OPTIONS} "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1")
+        set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/agentos/manager/sanitizer/lsan-suppressions")
+        set(ENV{UBSAN_OPTIONS} "halt_on_error=1:print_stacktrace=1")
+        message(STATUS "Sanitizers enabled: ASan + LSan + UBSan (integer, float-divide-by-zero)")
     else()
         message(WARNING "Sanitizers only supported for GCC/Clang compilers")
+    endif()
+endif()
+
+# ThreadSanitizer 独立选项（不与 ASan 同时使用）
+option(ENABLE_TSAN "Enable ThreadSanitizer (disables other sanitizers)" OFF)
+if(ENABLE_TSAN AND NOT MSVC)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=thread)
+        set(ENV{TSAN_OPTIONS} "halt_on_error=1:history_size=7:second_deadlock_stack=1")
+        message(STATUS "ThreadSanitizer enabled")
     endif()
 endif()
 
@@ -415,6 +445,41 @@ if(AGENTOS_BUILD_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/agentos/daemon/common/include
         ${CMAKE_CURRENT_SOURCE_DIR}/agentos/gateway/src
     )
+
+    # 验证全局 include 路径是否存在
+    message(STATUS "[INCLUDE-CHECK] Verifying global include directories...")
+    set(_global_inc_dirs
+        agentos/commons
+        agentos/commons/utils/include
+        agentos/commons/utils/compat/include
+        agentos/commons/utils/memory/include
+        agentos/commons/utils/string/include
+        agentos/commons/utils/logging/include
+        agentos/commons/utils/error/include
+        agentos/commons/platform/include
+        agentos/atoms/corekern/include
+        agentos/protocols/include
+        agentos/daemon/common/include
+        agentos/gateway/src
+    )
+    foreach(_inc ${_global_inc_dirs})
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_inc}")
+            message(STATUS "[INCLUDE-CHECK]   [OK] ${_inc}")
+        else()
+            message(WARNING "[INCLUDE-CHECK]   [MISSING] ${_inc}")
+        endif()
+    endforeach()
+
+    # 依赖检测汇总
+    message(STATUS "[DEPS] Dependency detection summary:")
+    message(STATUS "[DEPS]   SQLite3:       ${AGENTOS_HAS_SQLITE3}")
+    message(STATUS "[DEPS]   cJSON:         ${AGENTOS_HAS_CJSON}")
+    message(STATUS "[DEPS]   libyaml:       ${AGENTOS_HAS_YAML}")
+    message(STATUS "[DEPS]   OpenSSL:       ${AGENTOS_HAS_OPENSSL}")
+    message(STATUS "[DEPS]   libcurl:       ${AGENTOS_HAS_CURL}")
+    message(STATUS "[DEPS]   libmicrohttpd: ${AGENTOS_HAS_MICROHTTPD}")
+    message(STATUS "[DEPS]   libwebsockets: ${AGENTOS_HAS_LIBWEBSOCKETS}")
+    message(STATUS "[DEPS]   libevent:      ${AGENTOS_HAS_LIBEVENT}")
 
     # 主要AgentOS组件
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentos")

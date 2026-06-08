@@ -14,6 +14,7 @@ pub mod error;
 pub mod types;
 pub mod utils;
 pub mod modules;
+pub mod protocol;
 
 // 保留旧模块以保持向后兼容（标记为 deprecated）
 #[deprecated(since = "0.1.0", note = "请使用 modules::task::TaskManager")]
@@ -85,6 +86,12 @@ pub use plugin::{
 // 业务模块管理器
 pub use modules::{
     TaskManager, MemoryManager, SessionManager, SkillManager,
+};
+
+// 协议层
+pub use protocol::{
+    ProtocolType, ProtocolConfig, ProtocolClient,
+    DetectionResult, ConnectionTestResult,
 };
 
 // 工具函数

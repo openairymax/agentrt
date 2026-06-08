@@ -1,11 +1,11 @@
 # Cupolas — 安全穹顶
 
 **模块路径**: `agentos/cupolas/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
-Cupolas（穹顶）是 AgentOS 的安全组件集合，提供全方位的安全防护能力。Cupolas 寓意全方位、无死角的系统保护，涵盖输入清洗、权限管理、审计追踪、安全防护引擎、策略工作台和可扩展的安全守卫框架。所有组件遵循纵深防御和零信任架构原则。
+Cupolas（穹顶）是 AgentOS 的安全组件集合，提供全方位的安全防护能力。Cupolas 寓意全方位、无死角的系统保护，涵盖输入清洗、权限管理、审计追踪、安全防护引擎、隔离工作台和可扩展的安全守卫框架。所有组件遵循纵深防御和零信任架构原则。
 
 ## 设计目标
 
@@ -67,7 +67,7 @@ cupolas/
 │   │   └── guard_integration.c/h    # 守卫集成
 │   ├── workbench/                   # 安全工作台
 │   │   ├── workbench.c/h            # 工作台核心
-│   │   ├── workbench_process.h      # 进程管理
+│   │   ├── workbench_process.h      # 进程管理接口
 │   │   ├── workbench_process_core.c # 进程管理实现
 │   │   ├── workbench_container.c/h  # 容器隔离
 │   │   └── workbench_limits.c/h     # 资源限制
@@ -75,10 +75,26 @@ cupolas/
 │       └── cupolas_utils.c/h        # 通用工具宏与函数
 ├── tests/                           # 测试套件
 │   ├── unit/                        # 单元测试
+│   │   ├── test_cupolas_core.c
+│   │   ├── test_cupolas_config.c
+│   │   ├── test_cupolas_metrics.c
+│   │   ├── test_cupolas_security.c
+│   │   ├── test_cupolas_signature.c
+│   │   ├── test_cupolas_vault.c
+│   │   ├── test_cupolas_workbench.c
+│   │   ├── test_circuit_breaker.c
+│   │   ├── test_sanitizer_cache.c
+│   │   ├── test_audit_overflow.c
+│   │   └── test_yaml_minimal.c
 │   ├── integration/                 # 集成测试
+│   │   └── test_cupolas_integration.c
 │   ├── stress/                      # 压力测试
+│   │   └── test_stress_concurrent.c
 │   ├── fuzz/                        # 模糊测试
+│   │   ├── fuzz_permission.c
+│   │   └── fuzz_sanitizer.c
 │   └── benchmark/                   # 性能基准
+│       └── benchmark_cupolas.c
 ├── CMakeLists.txt                   # CMake 构建配置
 └── README.md                        # 本文档
 ```
@@ -90,10 +106,10 @@ cupolas/
 | **输入清洗器** | `src/sanitizer/` | XSS/SQL 注入/命令注入/路径遍历防护 |
 | **权限管理** | `src/permission/` | RBAC + ABAC 权限引擎，规则优先级排序 |
 | **审计系统** | `src/audit/` | 异步写入、HMAC 签名链、日志轮转 |
-| **安全防护引擎** | `src/security/` | 文件扫描、API 防护、行为分析、网络安全 |
+| **安全防护引擎** | `src/security/` | 数字签名、密钥保险库、权利管理、运行时保护、网络安全 |
 | **安全工作台** | `src/workbench/` | 隔离执行环境、资源控制、进程管理 |
-| **安全守卫** | `src/guards/` | 可扩展的安全检测框架 |
-| **安全工具库** | `src/utils/` | 内存管理、错误处理、日志、编译器提示 |
+| **安全守卫** | `src/guards/` | 可扩展的安全检测框架（规则/模型/行为/启发式/外部/复合/自定义） |
+| **安全工具库** | `src/utils/` | 内存管理、错误处理、日志、编译器提示、位操作、时间工具 |
 
 ### 独立组件
 
@@ -111,12 +127,26 @@ cupolas/
 
 | 模块 | 源文件 | 职责 |
 |------|--------|------|
-| **数字签名** | `cupolas_signature.c` | RSA/ECDSA/Ed25519 签名验证、证书链校验 |
-| **密钥保险库** | `cupolas_vault.c` | AES-256-GCM 安全凭证存储，类似 iOS Keychain |
-| **权利管理** | `cupolas_entitlements.c` | 声明式权限（文件系统/网络/IPC/资源限制） |
+| **数字签名** | `cupolas_signature.c` | RSA/ECDSA/Ed25519 签名验证、证书链校验、完整性校验 |
+| **密钥保险库** | `cupolas_vault.c` | AES-256-GCM 安全凭证存储，ACL 访问控制，凭证轮换 |
+| **权利管理** | `cupolas_entitlements.c` | 声明式权限（文件系统/网络/IPC/Vault/资源限制/Syscall/Capability） |
 | **运行时保护** | `cupolas_runtime_protection.c` | seccomp、CFI、内存保护、完整性校验 |
-| **网络安全** | `cupolas_network_security.c` | TLS 连接管理、防火墙规则 |
+| **网络安全** | `cupolas_network_security.c` | TLS 连接管理、防火墙规则、证书验证 |
 | **TLS 安全** | `network/tls_security.c` | TLS/SSL 连接管理与证书验证 |
+
+## 公共 API（cupolas.h）
+
+| 函数 | 说明 |
+|------|------|
+| `cupolas_init(config_path, error)` | 初始化 Cupolas 模块 |
+| `cupolas_cleanup()` | 清理 Cupolas 模块 |
+| `cupolas_version()` | 获取版本字符串 |
+| `cupolas_check_permission(agent_id, action, resource, context)` | 权限检查（1=允许，0=拒绝） |
+| `cupolas_add_permission_rule(agent_id, action, resource, allow, priority)` | 添加权限规则 |
+| `cupolas_clear_permission_cache()` | 清除权限缓存 |
+| `cupolas_sanitize_input(input, output, output_size)` | 输入清洗 |
+| `cupolas_execute_command(command, argv, exit_code, ...)` | 隔离工作台执行命令 |
+| `cupolas_flush_audit_log()` | 刷新审计日志 |
 
 ## 架构总览
 

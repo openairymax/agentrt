@@ -145,7 +145,7 @@ taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config)
     }
 
     // 初始化统计信息
-    memset(&engine->stats, 0, sizeof(engine->stats));
+    __builtin_memset(&engine->stats, 0, sizeof(engine->stats));
 
     engine->initialized = false;
     engine->running = false;
@@ -241,7 +241,7 @@ taskflow_error_t taskflow_engine_init(taskflow_handle_t engine)
     if (e->config.compute_func) {
         // 创建Pregel配置
         pregel_config_t pregel_config;
-        memset(&pregel_config, 0, sizeof(pregel_config));
+        __builtin_memset(&pregel_config, 0, sizeof(pregel_config));
 
         pregel_config.max_workers = e->config.worker_threads;
         pregel_config.message_buffer_size = e->config.message_buffer_size;
@@ -758,7 +758,7 @@ taskflow_error_t taskflow_send_message(taskflow_handle_t engine, vertex_id_t sou
         agentos_mutex_unlock(&e->engine_mutex);
         return TASKFLOW_ERROR_MEMORY;
     }
-    memcpy(msg->payload, payload, payload_size);
+    __builtin_memcpy(msg->payload, payload, payload_size);
     e->message_count++;
     e->stats.total_messages++;
 
@@ -931,7 +931,7 @@ taskflow_error_t taskflow_delete_checkpoint(taskflow_handle_t engine, uint64_t c
 
     for (size_t i = 0; i < e->checkpoint_count; i++) {
         if (e->checkpoints[i].checkpoint_id == checkpoint_id) {
-            memmove(&e->checkpoints[i], &e->checkpoints[i + 1],
+            __builtin_memmove(&e->checkpoints[i], &e->checkpoints[i + 1],
                     (e->checkpoint_count - i - 1) * sizeof(checkpoint_entry_t));
             e->checkpoint_count--;
             return TASKFLOW_SUCCESS;
@@ -979,7 +979,7 @@ taskflow_error_t taskflow_reset_stats(taskflow_handle_t engine)
         return TASKFLOW_ERROR_INVALID_ARG;
 
     struct taskflow_engine_s *e = (struct taskflow_engine_s *)engine;
-    memset(&e->stats, 0, sizeof(e->stats));
+    __builtin_memset(&e->stats, 0, sizeof(e->stats));
 
     if (e->pregel_engine) {
         pregel_engine_reset_stats(e->pregel_engine);

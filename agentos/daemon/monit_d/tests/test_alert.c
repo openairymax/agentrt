@@ -36,7 +36,7 @@ static void test_alert_trigger(void)
     assert(ret == 0);
 
     alert_info_t alert;
-    memset(&alert, 0, sizeof(alert));
+    AGENTOS_MEMSET(&alert, 0, sizeof(alert));
     alert.alert_id = "test_alert_001";
     alert.message = "CPU usage exceeded threshold";
     alert.level = ALERT_LEVEL_WARNING;
@@ -73,7 +73,7 @@ static void test_alert_resolve(void)
     assert(ret == 0);
 
     alert_info_t alert;
-    memset(&alert, 0, sizeof(alert));
+    AGENTOS_MEMSET(&alert, 0, sizeof(alert));
     alert.alert_id = "resolve_test_001";
     alert.message = "Memory usage high";
     alert.level = ALERT_LEVEL_ERROR;
@@ -100,7 +100,7 @@ static void test_alert_get_alerts(void)
     assert(ret == 0);
 
     alert_info_t alert;
-    memset(&alert, 0, sizeof(alert));
+    AGENTOS_MEMSET(&alert, 0, sizeof(alert));
     alert.alert_id = "get_test_001";
     alert.message = "Test alert";
     alert.level = ALERT_LEVEL_WARNING;

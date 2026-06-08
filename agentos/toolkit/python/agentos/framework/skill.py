@@ -641,7 +641,7 @@ class SkillExecutionEngine:
 
         except asyncio.TimeoutError:
             result.error = f"Execution timed out after {timeout}s"
-            result.error_type = "TimeoutError"
+            result.error_type = "AgentOSTimeoutError"
             logger.error(f"Skill execution timeout: {skill_name}")
 
         except Exception as e:
@@ -835,9 +835,6 @@ class SkillResultCache:
     def clear(self) -> None:
         """清空缓存"""
         self._cache.clear()
-
-
-from datetime import timedelta
 
 
 __all__ = [

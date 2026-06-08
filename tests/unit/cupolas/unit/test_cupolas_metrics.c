@@ -16,8 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "../../src/cupolas_metrics.h"
-#include "../../src/platform/platform.h"
+#include "cupolas_metrics.h"
+#include "platform.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) do { printf("[FAIL] %s: %s\n", name, msg); return 1; } while(0)

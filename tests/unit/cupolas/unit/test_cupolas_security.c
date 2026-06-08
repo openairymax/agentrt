@@ -18,12 +18,12 @@
 #include <assert.h>
 
 /* Include security headers */
-#include "../../src/security/cupolas_error.h"
-#include "../../src/security/cupolas_signature.h"
-#include "../../src/security/cupolas_vault.h"
-#include "../../src/security/cupolas_entitlements.h"
-#include "../../src/security/cupolas_runtime_protection.h"
-#include "../../src/security/cupolas_network_security.h"
+#include "cupolas_error.h"
+#include "cupolas_signature.h"
+#include "cupolas_vault.h"
+#include "cupolas_entitlements.h"
+#include "cupolas_runtime_protection.h"
+#include "cupolas_network_security.h"
 
 /* Test macros */
 #define TEST_PASS(name) printf("[PASS] %s\n", name)

@@ -1,0 +1,60 @@
+# Valgrind Suppressions for AgentOS
+# Suppress known false positives from third-party libraries
+
+# === OpenSSL ===
+{
+   OpenSSL_init_1
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:CRYPTO_malloc
+   fun:CRYPTO_zalloc
+   ...
+}
+
+{
+   OpenSSL_init_2
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:OPENSSL_malloc
+   ...
+}
+
+# === glibc ===
+{
+   glibc_dl_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   obj:/lib*/ld-*.so
+   ...
+}
+
+# === libcurl global init ===
+{
+   libcurl_global_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:curl_global_init
+   ...
+}
+
+# === SQLite3 static allocs ===
+{
+   sqlite3_init_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:sqlite3_initialize
+   ...
+}
+
+# === libmicrohttpd ===
+{
+   microhttpd_internal
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:MHD_start_daemon
+   ...
+}
