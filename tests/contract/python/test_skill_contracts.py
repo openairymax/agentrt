@@ -766,8 +766,11 @@ class TestPermissionValidation:
         ]
 
         def is_valid_permission(perm: str) -> bool:
+            perm = perm.strip()
+            if not perm or "::" in perm:
+                return False
             pattern = r'^[a-z][a-z0-9_:./\*-]*[a-z0-9*]$|^[a-z][a-z0-9_:]*$'
-            return bool(re.match(pattern, perm.strip()))
+            return bool(re.match(pattern, perm))
 
         for perm in valid_permissions:
             assert is_valid_permission(perm), f"有效权限验证失败: {perm}"

@@ -101,8 +101,7 @@ int trace_store_service_init(const char *storage_path, uint64_t max_storage_byte
     }
 
     // 设置存储路径
-    strncpy(g_ctx.storage_path, storage_path, sizeof(g_ctx.storage_path) - 1);
-    g_ctx.storage_path[sizeof(g_ctx.storage_path) - 1] = '\0';
+    AGENTOS_STRNCPY_TERM(g_ctx.storage_path, storage_path, sizeof(g_ctx.storage_path));
 
     g_ctx.max_storage_bytes =
         max_storage_bytes > 0 ? max_storage_bytes : 500 * 1024 * 1024;  // 默认500MB
@@ -151,7 +150,8 @@ int trace_store_service_store_point(const heapstore_trace_point_t *trace_point)
     }
 
     time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
+    struct tm tm_buf;
+    struct tm *tm_info = localtime_r(&now, &tm_buf);
     if (!tm_info) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
@@ -265,8 +265,8 @@ int trace_store_service_query_traces(const heapstore_trace_query_t *query,
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    heapstore_trace_point_t *results =
-        (heapstore_trace_point_t *)AGENTOS_MALLOC(max_traces * sizeof(heapstore_trace_point_t));
+    heapstore_trace_point_t *results = NULL;
+    SAFE_MALLOC_ARRAY(results, max_traces, sizeof(heapstore_trace_point_t));
     if (!results) {
         closedir(dir);
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -325,14 +325,14 @@ int trace_store_service_query_traces(const heapstore_trace_query_t *query,
         return 0;
     }
 
-    heapstore_trace_point_t *final_results =
-        (heapstore_trace_point_t *)AGENTOS_MALLOC(found_count * sizeof(heapstore_trace_point_t));
+    heapstore_trace_point_t *final_results = NULL;
+    SAFE_MALLOC_ARRAY(final_results, found_count, sizeof(heapstore_trace_point_t));
     if (!final_results) {
         AGENTOS_FREE(results);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(final_results, results, found_count * sizeof(heapstore_trace_point_t));
+    __builtin_memcpy(final_results, results, found_count * sizeof(heapstore_trace_point_t));
     AGENTOS_FREE(results);
 
     *out_traces = final_results;
@@ -537,5 +537,5 @@ void trace_store_service_shutdown(void)
         return;
     }
 
-    memset(&g_ctx, 0, sizeof(g_ctx));
+    __builtin_memset(&g_ctx, 0, sizeof(g_ctx));
 }

@@ -215,14 +215,14 @@ static int sanitize_core(const char *message, char *buffer, size_t buffer_size)
                 }
 
                 /* 写入字段名 */
-                memcpy(out, pos, field_name_len);
+                __builtin_memcpy(out, pos, field_name_len);
                 out += field_name_len;
 
                 /* 写入分隔符 */
                 *out++ = '=';
 
                 /* 写入脱敏值 */
-                memcpy(out, g_patterns[i].replacement, repl_len);
+                __builtin_memcpy(out, g_patterns[i].replacement, repl_len);
                 out += repl_len;
 
                 *out = '\0';

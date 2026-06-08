@@ -194,10 +194,10 @@ mac_framework_t *mac_framework_create(mac_collab_mode_t default_mode)
     if (!fw) return NULL;
     fw->default_mode = default_mode;
     fw->lock_init = 0;
-    memset(fw->agent_hash, 0, sizeof(fw->agent_hash));
-    memset(fw->group_hash, 0, sizeof(fw->group_hash));
-    memset(fw->task_hash, 0, sizeof(fw->task_hash));
-    memset(fw->consensus_hash, 0, sizeof(fw->consensus_hash));
+    __builtin_memset(fw->agent_hash, 0, sizeof(fw->agent_hash));
+    __builtin_memset(fw->group_hash, 0, sizeof(fw->group_hash));
+    __builtin_memset(fw->task_hash, 0, sizeof(fw->task_hash));
+    __builtin_memset(fw->consensus_hash, 0, sizeof(fw->consensus_hash));
     return fw;
 }
 
@@ -250,7 +250,7 @@ int mac_framework_register_agent(mac_framework_t *fw, const mac_agent_info_t *ag
         MAC_RET_ERR(AGENTOS_ERR_NULL_POINTER);
     }
     mac_agent_info_t *slot = &fw->agents[fw->agent_count];
-    memcpy(slot, agent, sizeof(mac_agent_info_t));
+    __builtin_memcpy(slot, agent, sizeof(mac_agent_info_t));
     slot->capabilities_json = agent->capabilities_json ? AGENTOS_STRDUP(agent->capabilities_json) : NULL;
     slot->current_tasks = 0;
     slot->available = true;
@@ -281,7 +281,7 @@ int mac_framework_unregister_agent(mac_framework_t *fw, const char *agent_id)
         mac_hash_remove(fw->agent_hash, fw->agents[idx].id, fw->agent_count - 1);
         mac_hash_insert(fw->agent_hash, fw->agents[idx].id, (size_t)idx);
     }
-    memset(&fw->agents[fw->agent_count - 1], 0, sizeof(mac_agent_info_t));
+    __builtin_memset(&fw->agents[fw->agent_count - 1], 0, sizeof(mac_agent_info_t));
     fw->agent_count--;
     agentos_mutex_unlock(&fw->lock);
     return 0;
@@ -301,10 +301,10 @@ int mac_framework_create_group(mac_framework_t *fw, const char *name, mac_collab
     }
 
     mac_group_t *group = &fw->groups[fw->group_count];
-    memset(group, 0, sizeof(mac_group_t));
+    __builtin_memset(group, 0, sizeof(mac_group_t));
 
     generate_id(group->id, sizeof(group->id), "grp");
-    strncpy(group->name, name, sizeof(group->name) - 1);
+AGENTOS_STRNCPY_TERM(group->name, name, sizeof(group->name));
     group->name[sizeof(group->name) - 1] = '\0';
     group->mode = mode;
     group->created_at = agentos_time_ms();
@@ -321,12 +321,12 @@ int mac_framework_create_group(mac_framework_t *fw, const char *name, mac_collab
         for (size_t i = 0; i < agent_count; i++) {
             ssize_t aidx = mac_hash_find_agent(fw, agent_ids[i]);
             if (aidx >= 0) {
-                memcpy(&members[valid_count], &fw->agents[aidx], sizeof(mac_agent_info_t));
+                __builtin_memcpy(&members[valid_count], &fw->agents[aidx], sizeof(mac_agent_info_t));
                 if (members[valid_count].capabilities_json)
                     members[valid_count].capabilities_json =
                         AGENTOS_STRDUP(members[valid_count].capabilities_json);
                 if (valid_count == 0) {
-                    strncpy(group->leader_id, fw->agents[aidx].id, sizeof(group->leader_id) - 1);
+AGENTOS_STRNCPY_TERM(group->leader_id, fw->agents[aidx].id, sizeof(group->leader_id));
                     group->leader_id[sizeof(group->leader_id) - 1] = '\0';
                 }
                 valid_count++;
@@ -370,7 +370,7 @@ int mac_framework_disband_group(mac_framework_t *fw, const char *group_id)
         mac_hash_remove(fw->group_hash, fw->groups[idx].id, fw->group_count - 1);
         mac_hash_insert(fw->group_hash, fw->groups[idx].id, (size_t)idx);
     }
-    memset(&fw->groups[fw->group_count - 1], 0, sizeof(mac_group_t));
+    __builtin_memset(&fw->groups[fw->group_count - 1], 0, sizeof(mac_group_t));
     fw->group_count--;
     agentos_mutex_unlock(&fw->lock);
     return 0;
@@ -447,14 +447,14 @@ int mac_framework_delegate_task(mac_framework_t *fw, const char *group_id,
     }
 
     mac_collab_task_t *slot = &fw->tasks[fw->task_count];
-    memcpy(slot, task, sizeof(mac_collab_task_t));
+    __builtin_memcpy(slot, task, sizeof(mac_collab_task_t));
     slot->input_json = task->input_json ? AGENTOS_STRDUP(task->input_json) : NULL;
     slot->output_json = NULL;
     snprintf(slot->assigned_agent_id, sizeof(slot->assigned_agent_id), "%s", agent->id);
     slot->status = MAC_TASK_STATUS_ASSIGNED;
     slot->created_at = agentos_time_ms();
     if (group_id) {
-        strncpy(slot->group_id, group_id, sizeof(slot->group_id) - 1);
+AGENTOS_STRNCPY_TERM(slot->group_id, group_id, sizeof(slot->group_id));
         slot->group_id[sizeof(slot->group_id) - 1] = '\0';
     }
 
@@ -550,11 +550,11 @@ int mac_framework_start_consensus(mac_framework_t *fw, const char *group_id,
     }
 
     mac_consensus_t *c = &fw->consensuses[fw->consensus_count];
-    memset(c, 0, sizeof(mac_consensus_t));
+    __builtin_memset(c, 0, sizeof(mac_consensus_t));
 
     generate_id(c->id, sizeof(c->id), "cns");
     if (group_id) {
-        strncpy(c->group_id, group_id, sizeof(c->group_id) - 1);
+AGENTOS_STRNCPY_TERM(c->group_id, group_id, sizeof(c->group_id));
         c->group_id[sizeof(c->group_id) - 1] = '\0';
     }
     c->strategy = strategy;
@@ -853,7 +853,7 @@ int mac_framework_register_agents_batch(mac_framework_t *fw, const mac_agent_inf
             continue;
         }
         mac_agent_info_t *slot = &fw->agents[fw->agent_count];
-        memcpy(slot, &agents[i], sizeof(mac_agent_info_t));
+        __builtin_memcpy(slot, &agents[i], sizeof(mac_agent_info_t));
         slot->capabilities_json =
             agents[i].capabilities_json ? AGENTOS_STRDUP(agents[i].capabilities_json) : NULL;
         slot->current_tasks = 0;

@@ -66,7 +66,7 @@ kernel:
       cleanup_interval_sec: 60
 
     # ===========================================================================
-    # 双系统认知配置（按 ARCHITECTURAL_PRINCIPLES.md C-4 双系统协同原则）
+    # Thinkdual 认知配置（按 ARCHITECTURAL_PRINCIPLES.md C-4 Thinkdual 协同原则）
     # ===========================================================================
     cognitive_systems:
       # System 1: 快速直觉系统 - 用于简单查询、模式匹配、缓存命中等低延迟任务

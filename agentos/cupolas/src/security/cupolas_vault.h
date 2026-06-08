@@ -28,6 +28,18 @@ extern "C" {
 #include <cupolas_vault_cred_type.h>
 
 /**
+ * @brief 凭证轮换策略
+ * 
+ * 符合编码契约要求: 支持四种凭证轮换策略，用于多凭证集之间的切换。
+ */
+typedef enum {
+    CUPOLAS_VAULT_ROTATE_ROUND_ROBIN = 1,  /**< 轮询: 按顺序轮换凭证 */
+    CUPOLAS_VAULT_ROTATE_LEAST_USED  = 2,  /**< 最少使用: 轮换使用次数最少的凭证 */
+    CUPOLAS_VAULT_ROTATE_RATE_LIMITED = 3, /**< 速率限制: 按速率限制轮换凭证 */
+    CUPOLAS_VAULT_ROTATE_PRIORITY    = 4   /**< 优先级: 按优先级轮换凭证 */
+} cupolas_vault_rotation_strategy_t;
+
+/**
  * @brief Access operation types (bit flags)
  */
 typedef enum {
@@ -420,6 +432,22 @@ int cupolas_vault_generate_password(char *password_out, size_t length);
  */
 int cupolas_vault_generate_keypair(char *public_key_out, size_t *pub_len, char *private_key_out,
                                    size_t *priv_len);
+
+/**
+ * @brief 凭证轮换: 根据指定策略从凭证池中选择下一个凭证
+ * 
+ * 符合编码契约要求: 支持四种轮换策略。
+ * 
+ * @param[in] vault          Vault 上下文
+ * @param[in] cred_group     凭证组标识 (同组凭证共享轮换策略)
+ * @param[in] strategy        轮换策略
+ * @param[out] selected_id    选中的凭证 ID
+ * @param[in] id_buf_size     selected_id 缓冲区大小
+ * @return 0 成功, 负数失败
+ */
+int cupolas_vault_rotate_credential(cupolas_vault_t *vault, const char *cred_group,
+                                    cupolas_vault_rotation_strategy_t strategy,
+                                    char *selected_id, size_t id_buf_size);
 
 #ifdef __cplusplus
 }

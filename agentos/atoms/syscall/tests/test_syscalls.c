@@ -159,7 +159,7 @@ int test_sys_invoke_valid_dispatch(void)
     void *args[5];
     void *result;
 
-    memset(args, 0, sizeof(args));
+    AGENTOS_MEMSET(args, 0, sizeof(args));
 
     /* task_submit - 4 args */
     char *out_task = NULL;
@@ -209,7 +209,7 @@ int test_sys_all_syscalls_reachable(void)
 
     for (int num = 1; num < SYS_MAX; num++) {
         void *args[5];
-        memset(args, 0, sizeof(args));
+        AGENTOS_MEMSET(args, 0, sizeof(args));
         void *r = agentos_syscall_invoke(num, args, 0);
         total++;
         if ((intptr_t)r == AGENTOS_EINVAL) {
@@ -290,7 +290,7 @@ int test_sys_idempotent_init(void)
 int test_sys_boundary_numbers(void)
 {
     void *args[5];
-    memset(args, 0, sizeof(args));
+    AGENTOS_MEMSET(args, 0, sizeof(args));
     void *result;
 
     result = agentos_syscall_invoke(1, args, 0);

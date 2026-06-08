@@ -177,7 +177,8 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(agentos_parallel_dispatcher
         return AGENTOS_SUCCESS;
     }
 
-    int *group_id = (int *)AGENTOS_MALLOC(call_count * sizeof(int));
+    int *group_id;
+    SAFE_MALLOC_ARRAY(group_id, call_count, sizeof(int));
     int *serial_flags = (int *)AGENTOS_CALLOC(call_count, sizeof(int));
     if (!group_id || !serial_flags) {
         AGENTOS_FREE(group_id);

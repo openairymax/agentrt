@@ -72,6 +72,7 @@ pub const CODE_SKILL_EXECUTION_FAILED: &str = "0x4007";
 
 /// 系统调用错误码 (0x5xxx)
 pub const CODE_TELEMETRY_ERROR: &str = "0x5001";
+pub const CODE_SYSCALL_ERROR: &str = "0x5002";
 
 /// 安全域错误码 (0x6xxx)
 pub const CODE_PERMISSION_DENIED: &str = "0x6001";
@@ -157,6 +158,10 @@ pub enum AgentOSError {
     /// 缺少参数错误
     #[error("[{}] {}", CODE_MISSING_PARAMETER, .0)]
     MissingParameter(String),
+
+    /// 系统调用错误
+    #[error("[{}] {}", CODE_SYSCALL_ERROR, .0)]
+    SyscallError(String),
 
     /// 其他错误
     #[error("[{}] {}", CODE_UNKNOWN, .0)]
@@ -289,6 +294,7 @@ impl AgentOSError {
             AgentOSError::NotFound(_) => CODE_NOT_FOUND,
             AgentOSError::InvalidParameter(_) => CODE_INVALID_PARAMETER,
             AgentOSError::MissingParameter(_) => CODE_MISSING_PARAMETER,
+            AgentOSError::SyscallError(_) => CODE_SYSCALL_ERROR,
             AgentOSError::Other(_) => CODE_UNKNOWN,
         }
     }

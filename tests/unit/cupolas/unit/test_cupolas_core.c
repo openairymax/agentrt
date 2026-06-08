@@ -16,12 +16,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "../include/cupolas.h"
-#include "../src/platform/platform.h"
-#include "../src/permission/permission.h"
-#include "../src/audit/audit.h"
-#include "../src/sanitizer/sanitizer.h"
-#include "../src/workbench/workbench.h"
+#include "cupolas.h"
+#include "platform.h"
+#include "permission.h"
+#include "audit.h"
+#include "sanitizer.h"
+#include "workbench.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)

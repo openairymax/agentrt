@@ -14,8 +14,8 @@
  */
 
 #include "atoms_benchmarks.h"
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -51,7 +51,7 @@ static uint64_t get_time_ns(void) {
 
 static void init_benchmark_result(benchmark_result_t* result, const char* test_name) {
     if (result) {
-        memset(result, 0, sizeof(benchmark_result_t));
+        AGENTOS_MEMSET(result, 0, sizeof(benchmark_result_t));
         result->test_name = test_name;
     }
 }
@@ -111,7 +111,8 @@ int benchmark_ipc_latency(benchmark_result_t* result, const benchmark_config_t* 
     result->sla_requirement = "<1μs (1000ns)";
 
     size_t test_count = cfg->test_iterations;
-    uint64_t* times = (uint64_t*)AGENTOS_MALLOC(test_count * sizeof(uint64_t));
+    uint64_t* times;
+    SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) {
         result->failure_reason = "Failed to allocate memory";
         result->passed = false;
@@ -148,7 +149,8 @@ int benchmark_task_switch_latency(benchmark_result_t* result, const benchmark_co
     result->sla_requirement = "<1ms (1,000,000ns)";
 
     size_t test_count = cfg->test_iterations;
-    uint64_t* times = (uint64_t*)AGENTOS_MALLOC(test_count * sizeof(uint64_t));
+    uint64_t* times;
+    SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) {
         result->failure_reason = "Failed to allocate memory";
         result->passed = false;
@@ -178,7 +180,8 @@ int benchmark_memory_retrieval_latency(benchmark_result_t* result, const benchma
     result->sla_requirement = "<10ms (10,000,000ns)";
 
     size_t test_count = cfg->test_iterations / 10;
-    uint64_t* times = (uint64_t*)AGENTOS_MALLOC(test_count * sizeof(uint64_t));
+    uint64_t* times;
+    SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) {
         result->failure_reason = "Failed to allocate memory";
         result->passed = false;
@@ -187,7 +190,7 @@ int benchmark_memory_retrieval_latency(benchmark_result_t* result, const benchma
 
     char* test_data = (char*)AGENTOS_MALLOC(1024);
     if (!test_data) { AGENTOS_FREE(times); return -1; }
-    memset(test_data, 'A', 1024);
+    AGENTOS_MEMSET(test_data, 'A', 1024);
 
     for (size_t i = 0; i < test_count; i++) {
         uint64_t start = get_time_ns();
@@ -212,12 +215,13 @@ int benchmark_memory_write_throughput(benchmark_result_t* result, const benchmar
     result->sla_requirement = ">10,000 writes/sec";
 
     size_t test_count = cfg->test_iterations / 100;
-    uint64_t* times = (uint64_t*)AGENTOS_MALLOC(test_count * sizeof(uint64_t));
+    uint64_t* times;
+    SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) return -1;
 
     char* test_data = (char*)AGENTOS_MALLOC(256);
     if (!test_data) { AGENTOS_FREE(times); return -1; }
-    memset(test_data, 'A', 256);
+    AGENTOS_MEMSET(test_data, 'A', 256);
 
     for (size_t i = 0; i < test_count; i++) {
         uint64_t start = get_time_ns();
@@ -242,7 +246,8 @@ int benchmark_scheduler_throughput(benchmark_result_t* result, const benchmark_c
     result->sla_requirement = ">100,000 sched/sec";
 
     size_t test_count = cfg->test_iterations / 10;
-    uint64_t* times = (uint64_t*)AGENTOS_MALLOC(test_count * sizeof(uint64_t));
+    uint64_t* times;
+    SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) return -1;
 
     for (size_t i = 0; i < test_count; i++) {
@@ -268,7 +273,8 @@ int benchmark_execution_throughput(benchmark_result_t* result, const benchmark_c
     result->sla_requirement = ">10,000 exec/sec";
 
     size_t test_count = cfg->test_iterations / 100;
-    uint64_t* times = (uint64_t*)AGENTOS_MALLOC(test_count * sizeof(uint64_t));
+    uint64_t* times;
+    SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) return -1;
 
     for (size_t i = 0; i < test_count; i++) {
@@ -295,7 +301,8 @@ int benchmark_concurrent_performance(benchmark_result_t* result, const benchmark
     result->sla_requirement = "<50ms for 1000 concurrent ops";
 
     size_t test_count = cfg->test_iterations / 1000;
-    uint64_t* times = (uint64_t*)AGENTOS_MALLOC(test_count * sizeof(uint64_t));
+    uint64_t* times;
+    SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) return -1;
 
     for (size_t i = 0; i < test_count; i++) {
@@ -321,10 +328,12 @@ int benchmark_memory_efficiency(benchmark_result_t* result, const benchmark_conf
     result->sla_requirement = "<100ns per allocation";
 
     size_t test_count = cfg->test_iterations;
-    uint64_t* times = (uint64_t*)AGENTOS_MALLOC(test_count * sizeof(uint64_t));
+    uint64_t* times;
+    SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) return -1;
 
-    void** allocations = (void**)AGENTOS_MALLOC(1024 * sizeof(void*));
+    void** allocations;
+    SAFE_MALLOC_ARRAY(allocations, 1024, sizeof(void*));
     if (!allocations) { AGENTOS_FREE(times); return -1; }
 
     size_t alloc_count = 0;

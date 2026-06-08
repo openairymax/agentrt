@@ -52,7 +52,7 @@ DEFAULT_CONFIGS = {
         name="agentos.conf",
         description="AgentOS main configuration",
         content="""# AgentOS Main Configuration
-# Version: 1.0.0
+# Version: 0.1.0
 
 # System
 version = "0.1.0"

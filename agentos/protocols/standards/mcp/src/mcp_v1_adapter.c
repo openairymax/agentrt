@@ -901,7 +901,7 @@ void mcp_stream_event_init(mcp_stream_event_t *event, mcp_stream_event_type_t ty
 {
     if (!event)
         return;
-    memset(event, 0, sizeof(*event));
+    AGENTOS_MEMSET(event, 0, sizeof(*event));
     event->type = type;
     event->event_data = data ? AGENTOS_STRDUP(data) : NULL;
     event->data_size = data ? strlen(data) : 0;
@@ -1017,7 +1017,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t *ctx, const char *name,
                     chunk_size = text_len - offset;
 
                 char chunk_buf[256];
-                memcpy(chunk_buf, results[i].text + offset, chunk_size);
+                __builtin_memcpy(chunk_buf, results[i].text + offset, chunk_size);
                 chunk_buf[chunk_size] = '\0';
 
                 char *escaped_chunk = json_string_escape(chunk_buf);
@@ -1114,7 +1114,7 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t *ctx, const mcp_sampling_p
     AGENTOS_FREE(start_event.event_data);
 
     mcp_sampling_result_t result;
-    memset(&result, 0, sizeof(result));
+    AGENTOS_MEMSET(&result, 0, sizeof(result));
 
     ctx->sampling_handler(params, &result, ctx->sampling_user_data);
 
@@ -1129,7 +1129,7 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t *ctx, const mcp_sampling_p
                         chunk_size = text_len - offset;
 
                     char chunk_buf[256];
-                    memcpy(chunk_buf, result.content[i].text + offset, chunk_size);
+                    __builtin_memcpy(chunk_buf, result.content[i].text + offset, chunk_size);
                     chunk_buf[chunk_size] = '\0';
 
                     char *escaped_chunk = json_string_escape(chunk_buf);
@@ -1198,7 +1198,7 @@ int mcp_v1_route_request(mcp_v1_context_t *ctx, const char *method, const char *
             if (pj) {
                 cJSON *name_item = cJSON_GetObjectItem(pj, "name");
                 if (cJSON_IsString(name_item) && name_item->valuestring) {
-                    strncpy(tool_name, name_item->valuestring, sizeof(tool_name) - 1);
+                    AGENTOS_STRNCPY_TERM(tool_name, name_item->valuestring, sizeof(tool_name));
                     tool_name[sizeof(tool_name) - 1] = '\0';
                 }
                 cJSON_Delete(pj);
@@ -1215,7 +1215,7 @@ int mcp_v1_route_request(mcp_v1_context_t *ctx, const char *method, const char *
             if (pj) {
                 cJSON *uri_item = cJSON_GetObjectItem(pj, "uri");
                 if (cJSON_IsString(uri_item) && uri_item->valuestring) {
-                    strncpy(resource_uri, uri_item->valuestring, sizeof(resource_uri) - 1);
+                    AGENTOS_STRNCPY_TERM(resource_uri, uri_item->valuestring, sizeof(resource_uri));
                 }
                 cJSON_Delete(pj);
             }
@@ -1233,7 +1233,7 @@ int mcp_v1_route_request(mcp_v1_context_t *ctx, const char *method, const char *
             if (pj) {
                 cJSON *name_item = cJSON_GetObjectItem(pj, "name");
                 if (cJSON_IsString(name_item) && name_item->valuestring) {
-                    strncpy(prompt_name, name_item->valuestring, sizeof(prompt_name) - 1);
+                    AGENTOS_STRNCPY_TERM(prompt_name, name_item->valuestring, sizeof(prompt_name));
                 }
                 cJSON_Delete(pj);
             }
@@ -1316,7 +1316,7 @@ static int mcp_adapter_init(void *context)
         agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
-    memcpy(ctx, new_ctx, sizeof(mcp_v1_context_t));
+    __builtin_memcpy(ctx, new_ctx, sizeof(mcp_v1_context_t));
     AGENTOS_FREE(new_ctx);
     return 0;
 }
@@ -1373,7 +1373,7 @@ static int mcp_adapter_decode(void *context, const void *data, size_t data_size,
         agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
-    memcpy(input_copy, data, data_size);
+    __builtin_memcpy(input_copy, data, data_size);
     input_copy[data_size] = '\0';
 
     char *method = "tools/call";
@@ -1388,7 +1388,7 @@ static int mcp_adapter_decode(void *context, const void *data, size_t data_size,
                 size_t method_len = (size_t)(method_end - method_start);
                 char *method_buf = AGENTOS_MALLOC(method_len + 1);
                 if (method_buf) {
-                    memcpy(method_buf, method_start, method_len);
+                    __builtin_memcpy(method_buf, method_start, method_len);
                     method_buf[method_len] = '\0';
                     method = method_buf;
                     method_allocated = true;
@@ -1429,7 +1429,7 @@ static int mcp_adapter_connect(void *context, const char *address)
     }
     if (ctx->transport) {
         mcp_transport_config_t tcfg;
-        memset(&tcfg, 0, sizeof(tcfg));
+        AGENTOS_MEMSET(&tcfg, 0, sizeof(tcfg));
         tcfg.type = MCP_TRANSPORT_HTTP_SSE;
         tcfg.config.http.base_url = address;
         tcfg.config.http.sse_endpoint = "/sse";
@@ -1561,7 +1561,7 @@ static int mcp_adapter_get_version(void *context, char *buf, size_t max_size)
     size_t len = strlen(MCP_V1_VERSION);
     if (len >= max_size)
         len = max_size - 1;
-    memcpy(buf, MCP_V1_VERSION, len);
+    __builtin_memcpy(buf, MCP_V1_VERSION, len);
     buf[len] = '\0';
     return 0;
 }

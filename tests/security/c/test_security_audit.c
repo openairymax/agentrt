@@ -183,7 +183,7 @@ static void sec_audit_input_validation(void)
 
     /* 测试1: 超长键名 */
     char long_key[4096];
-    memset(long_key, 'A', sizeof(long_key) - 1);
+    AGENTOS_MEMSET(long_key, 'A', sizeof(long_key) - 1);
     long_key[sizeof(long_key) - 1] = '\0';
 
     int r1 = cm_set(long_key, "value", "test");
@@ -210,7 +210,7 @@ static void sec_audit_input_validation(void)
 
     /* 测试5: 超长值存储 */
     char long_val[8192];
-    memset(long_val, 'B', sizeof(long_val) - 1);
+    AGENTOS_MEMSET(long_val, 'B', sizeof(long_val) - 1);
     long_val[sizeof(long_val) - 1] = '\0';
 
     int r6 = cm_set("long.val", long_val, "test");
@@ -337,14 +337,14 @@ static void sec_audit_banned_patterns(void)
     /* BAN-07: 未检查返回值检查 */
     void* p2 = agentos_mem_alloc(512);
     if (p2) {
-        memset(p2, 0, 512);
+        AGENTOS_MEMSET(p2, 0, 512);
         agentos_mem_free(p2);
         TEST_ASSERT(1, "BAN-07: 返回值正确检查和处理");
     }
 
     /* BAN-08: 缓冲区溢出风险 */
     char small_buf[8];
-    memset(small_buf, 0, sizeof(small_buf));
+    AGENTOS_MEMSET(small_buf, 0, sizeof(small_buf));
     TEST_ASSERT(1, "BAN-08: 缓冲区操作有明确边界");
 
     /* BAN-09: 资源泄漏检查 */
@@ -377,7 +377,7 @@ static void sec_audit_double_free_protection(void)
     /* 测试1: 正确释放模式 */
     void* p1 = agentos_mem_alloc(256);
     if (p1) {
-        memset(p1, 0xAB, 256);
+        AGENTOS_MEMSET(p1, 0xAB, 256);
         agentos_mem_free(p1);
         TEST_ASSERT(1, "SEC-002-T1: 正确单次释放");
     }
@@ -415,7 +415,7 @@ static void sec_audit_use_after_free(void)
     /* 测试1: 正确的生命周期管理 */
     void* p1 = agentos_mem_alloc(256);
     if (p1) {
-        memset(p1, 0xAB, 256);
+        AGENTOS_MEMSET(p1, 0xAB, 256);
         /* 正确使用后释放 */
         agentos_mem_free(p1);
         TEST_ASSERT(1, "SEC-003-T1: 正确的内存生命周期");

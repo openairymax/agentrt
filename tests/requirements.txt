@@ -1,5 +1,5 @@
 # AgentOS 测试模块依赖
-# Version: 1.0.0.6
+# Version: 0.1.0
 # Last updated: 2026-03-22
 
 # 核心测试框架

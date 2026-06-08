@@ -1,9 +1,9 @@
 # DocGen — 智能文档生成应用
 
 **模块路径**: `agentos/openlab/app/docgen/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
-> **Status**: 本模块作为 AgentOS v0.1.0 的正式组成部分，API 已稳定。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
 ## 概述
 
@@ -14,6 +14,7 @@ DocGen 是基于 AgentOS 平台的智能文档生成应用，核心引擎 `Docum
 ```
 docgen/
 ├── src/
+│   ├── __init__.py             # 模块导出
 │   ├── main.py                 # 应用入口，CLI 接口
 │   └── generator.py            # DocumentationGenerator 核心引擎
 ├── templates/
@@ -35,19 +36,19 @@ docgen/
 | `DocumentationGenerator` | 核心生成器，管理文件发现、解析、模板渲染和输出生成 |
 | `FileType` | 支持的源文件类型：MARKDOWN/PYTHON/YAML/JSON/TEXT/UNKNOWN |
 | `OutputFormat` | 输出格式：HTML/PDF/MARKDOWN |
-| `FileMetadata` | 文件元数据，包含路径/类型/大小/校验和/标题/描述/标签/frontmatter |
-| `GenerationResult` | 生成结果，包含成功/失败/跳过文件列表和统计信息 |
+| `FileMetadata` | 文件元数据，包含 path/file_type/size/checksum/title/description/tags/frontmatter |
+| `GenerationResult` | 生成结果，包含 success/generated_files/skipped_files/failed_files/warnings/errors/stats |
 
 ### 核心能力
 
 - **多格式输入**：支持 Markdown、Python、YAML、JSON 源文件解析
 - **多格式输出**：支持 HTML、PDF、Markdown 输出格式
-- **模板系统**：基于 Jinja2 的模板渲染，支持自定义过滤器和全局变量
+- **模板系统**：基于 Jinja2 的模板渲染，支持自定义过滤器（slugify/markdown/tojson）和全局变量
 - **Frontmatter 解析**：自动提取 YAML frontmatter 中的标题、描述和标签
-- **文件监听**：基于 Watchdog 的文件变更监听，自动触发重建
+- **文件监听**：基于 Watchdog 的文件变更监听，自动触发重建（支持防抖）
 - **导航生成**：自动生成文档导航结构（navigation.json）
 - **搜索索引**：自动创建搜索索引（search_index.json）
-- **缓存优化**：基于文件校验和的缓存机制，支持 TTL 过期
+- **缓存优化**：基于文件 MD5 校验和的缓存机制，支持 TTL 过期
 - **并行处理**：支持 ThreadPoolExecutor 并行文件处理
 
 ## 接口说明
@@ -86,7 +87,7 @@ class GenerationResult:
 ### CLI 接口
 
 ```bash
-python -m docgen.src.main [config_path] [--watch] [--verbose]
+python -m docgen.src.main [config_path] [--watch] [--verbose] [--validate]
 ```
 
 ## 配置说明
@@ -104,7 +105,7 @@ python -m docgen.src.main [config_path] [--watch] [--verbose]
 | `max_workers` | 最大工作线程 | 4 |
 | `generate_navigation` | 生成导航 | `true` |
 | `enable_search` | 启用搜索 | `true` |
-| `markdown_extensions` | Markdown 扩展 | extra, codehilite, toc, tables |
+| `markdown_extensions` | Markdown 扩展 | extra, codehilite |
 
 ## 依赖关系
 

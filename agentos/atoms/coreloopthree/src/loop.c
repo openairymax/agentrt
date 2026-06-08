@@ -80,7 +80,7 @@ static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, co
 /* 默认配置 */
 static void init_default_config(agentos_loop_config_t *manager)
 {
-    memset(manager, 0, sizeof(agentos_loop_config_t));
+    __builtin_memset(manager, 0, sizeof(agentos_loop_config_t));
     manager->loop_config_cognition_threads = 4;
     manager->loop_config_execution_threads = 8;
     manager->loop_config_memory_threads = 2;
@@ -133,7 +133,7 @@ static agentos_core_loop_t *allocate_loop_memory(void)
     agentos_core_loop_t *loop =
         (agentos_core_loop_t *)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
     if (loop) {
-        memset(loop, 0, sizeof(agentos_core_loop_t));
+        __builtin_memset(loop, 0, sizeof(agentos_core_loop_t));
     }
     return loop;
 }
@@ -148,7 +148,7 @@ static agentos_error_t initialize_loop_resources(agentos_core_loop_t *loop,
                                                  const agentos_loop_config_t *manager)
 {
     if (manager) {
-        memcpy(&loop->manager, manager, sizeof(agentos_loop_config_t));
+        __builtin_memcpy(&loop->manager, manager, sizeof(agentos_loop_config_t));
     } else {
         init_default_config(&loop->manager);
     }
@@ -336,8 +336,8 @@ AGENTOS_API agentos_error_t agentos_loop_create(const agentos_loop_config_t *man
     loop->checkpoint_initialized = 0;
     loop->last_checkpoint_time_ms = 0;
     loop->checkpoint_seq = 0;
-    memset(loop->current_task_id, 0, sizeof(loop->current_task_id));
-    memset(loop->current_session_id, 0, sizeof(loop->current_session_id));
+    __builtin_memset(loop->current_task_id, 0, sizeof(loop->current_task_id));
+    __builtin_memset(loop->current_session_id, 0, sizeof(loop->current_session_id));
     loop->completed_node_ids = NULL;
     loop->completed_node_count = 0;
     loop->completed_node_capacity = 0;
@@ -541,7 +541,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(agentos_core_loop_t *loop, const
             continue;
 
         agentos_task_t task;
-        memset(&task, 0, sizeof(task));
+        __builtin_memset(&task, 0, sizeof(task));
         task.task_input = node->task_node_input ? node->task_node_input : (void *)process_input;
         task.task_timeout_ms = node->task_node_timeout_ms > 0
                                    ? node->task_node_timeout_ms
@@ -866,7 +866,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
             continue;
 
         agentos_task_t task;
-        memset(&task, 0, sizeof(task));
+        __builtin_memset(&task, 0, sizeof(task));
         task.task_input = node->task_node_input ? node->task_node_input : (void *)process_input;
         task.task_timeout_ms = node->task_node_timeout_ms > 0
                                    ? node->task_node_timeout_ms
@@ -989,7 +989,7 @@ AGENTOS_API agentos_error_t agentos_loop_restore_task(agentos_core_loop_t *loop,
                 size_t input_len = (size_t)(input_end - input_pos);
                 recovered_input = (char *)AGENTOS_MALLOC(input_len + 1);
                 if (recovered_input) {
-                    memcpy(recovered_input, input_pos, input_len);
+                    __builtin_memcpy(recovered_input, input_pos, input_len);
                     recovered_input[input_len] = '\0';
                     loop->persistent_original_input = AGENTOS_STRDUP(recovered_input);
                 }
@@ -1002,7 +1002,7 @@ AGENTOS_API agentos_error_t agentos_loop_restore_task(agentos_core_loop_t *loop,
             continue;
 
         agentos_task_t task;
-        memset(&task, 0, sizeof(task));
+        __builtin_memset(&task, 0, sizeof(task));
         task.task_input =
             recovered_input ? (void *)recovered_input : (void *)latest->pending_nodes[i];
         task.task_timeout_ms = loop->manager.loop_config_task_timeout_ms;
@@ -1080,7 +1080,7 @@ AGENTOS_API agentos_error_t agentos_loop_list_checkpoints(agentos_core_loop_t *l
         size_t tid_len = nlen - 5 - 11;
         if (tid_len >= sizeof(tid))
             tid_len = sizeof(tid) - 1;
-        memcpy(tid, name + 11, tid_len);
+        __builtin_memcpy(tid, name + 11, tid_len);
         tid[tid_len] = '\0';
 
         int dup = 0;
@@ -1104,7 +1104,7 @@ AGENTOS_API agentos_error_t agentos_loop_list_checkpoints(agentos_core_loop_t *l
                 ATM_RET_ERR(AGENTOS_ENOMEM);
             }
             ids = new_ids;
-            memset(ids + count, 0, (capacity - count) * sizeof(char *));
+            __builtin_memset(ids + count, 0, (capacity - count) * sizeof(char *));
         }
 
         ids[count] = AGENTOS_STRDUP(tid);
@@ -1131,7 +1131,7 @@ static void add_completed_node(agentos_core_loop_t *loop, const char *node_id)
         if (!new_arr)
             return;
         loop->completed_node_ids = new_arr;
-        memset(loop->completed_node_ids + loop->completed_node_capacity, 0,
+        __builtin_memset(loop->completed_node_ids + loop->completed_node_capacity, 0,
                (new_cap - loop->completed_node_capacity) * sizeof(char *));
         loop->completed_node_capacity = new_cap;
     }

@@ -65,7 +65,7 @@ static agentos_memory_record_t *deep_copy_record(const agentos_memory_record_t *
         copy->memory_record_data = AGENTOS_MALLOC(record->memory_record_data_len);
         if (!copy->memory_record_data)
             goto fail;
-        memcpy(copy->memory_record_data, record->memory_record_data,
+        __builtin_memcpy(copy->memory_record_data, record->memory_record_data,
                record->memory_record_data_len);
         copy->memory_record_data_len = record->memory_record_data_len;
     }
