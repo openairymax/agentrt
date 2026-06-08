@@ -103,7 +103,7 @@ static void test_batch_parameter_validation(void) {
     TEST_ASSERT(err != heapstore_SUCCESS, "batch_begin with NULL should fail");
 
     heapstore_batch_context_t ctx;
-    memset(&ctx, 0, sizeof(ctx));
+    AGENTOS_MEMSET(&ctx, 0, sizeof(ctx));
     ctx.capacity = 10;
     ctx.count = 5;
 

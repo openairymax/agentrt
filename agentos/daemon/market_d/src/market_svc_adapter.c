@@ -40,7 +40,7 @@ static market_adapter_ctx_t *market_get_ctx(agentos_service_t service)
 static void market_config_from_common(market_config_t *market_cfg,
                                       const agentos_svc_config_t *common_cfg)
 {
-    memset(market_cfg, 0, sizeof(market_config_t));
+    __builtin_memset(market_cfg, 0, sizeof(market_config_t));
     market_cfg->sync_interval_ms =
         (common_cfg && common_cfg->timeout_ms > 0) ? common_cfg->timeout_ms : 30000;
     market_cfg->cache_ttl_ms = 300000;
@@ -60,7 +60,7 @@ static agentos_error_t market_adapter_init(agentos_service_t service,
         return AGENTOS_EINVAL;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     }
 
     if (!ctx->market_svc) {
@@ -186,7 +186,7 @@ agentos_error_t market_service_adapter_create(agentos_service_t *out_service,
         return AGENTOS_ENOMEM;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "market_d";
         ctx->common_cfg.version = "0.1.0";
@@ -229,7 +229,7 @@ agentos_error_t market_service_adapter_wrap(agentos_service_t *out_service,
     ctx->owns_service = false;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        __builtin_memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
     } else {
         ctx->common_cfg.name = "market_d";
         ctx->common_cfg.version = "0.1.0";

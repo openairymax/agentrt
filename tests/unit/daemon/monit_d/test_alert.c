@@ -28,7 +28,7 @@ static void test_alert_rule_create(void) {
     assert(am != NULL);
 
     alert_rule_t rule;
-    memset(&rule, 0, sizeof(rule));
+    AGENTOS_MEMSET(&rule, 0, sizeof(rule));
     rule.name = "high_cpu_usage";
     rule.metric = "cpu_usage_percent";
     rule.condition = ALERT_CONDITION_GREATER_THAN;
@@ -51,7 +51,7 @@ static void test_alert_trigger(void) {
     assert(am != NULL);
 
     alert_rule_t rule;
-    memset(&rule, 0, sizeof(rule));
+    AGENTOS_MEMSET(&rule, 0, sizeof(rule));
     rule.name = "test_alert";
     rule.metric = "test_metric";
     rule.condition = ALERT_CONDITION_GREATER_THAN;
@@ -89,7 +89,7 @@ static void test_alert_notification(void) {
     assert(am != NULL);
 
     alert_notification_t notif;
-    memset(&notif, 0, sizeof(notif));
+    AGENTOS_MEMSET(&notif, 0, sizeof(notif));
     notif.type = NOTIFICATION_TYPE_WEBHOOK;
     notif.endpoint = "http://localhost:8080/alert";
     notif.enabled = 1;
@@ -109,7 +109,7 @@ static void test_alert_history(void) {
     assert(am != NULL);
 
     alert_rule_t rule;
-    memset(&rule, 0, sizeof(rule));
+    AGENTOS_MEMSET(&rule, 0, sizeof(rule));
     rule.name = "history_test";
     rule.metric = "test_value";
     rule.condition = ALERT_CONDITION_GREATER_THAN;

@@ -24,6 +24,7 @@
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
+#include "memory_compat.h"
 
 /* 平台特定头文件 */
 #ifdef _WIN32
@@ -138,7 +139,7 @@ heapstore_error_t heapstore_token_init(void)
     if (atomic_compare_exchange_strong_explicit(&g_token_initialized, &expected, 1,
                                                 memory_order_seq_cst, memory_order_seq_cst)) {
         token_mutex_init();
-        memset(g_budget_table, 0, sizeof(g_budget_table));
+        __builtin_memset(g_budget_table, 0, sizeof(g_budget_table));
         g_budget_count = 0;
 
         atomic_init(&g_total_prompt_tokens, 0);
@@ -161,7 +162,7 @@ heapstore_error_t heapstore_token_shutdown(void)
     }
 
     token_mutex_lock();
-    memset(g_budget_table, 0, sizeof(g_budget_table));
+    __builtin_memset(g_budget_table, 0, sizeof(g_budget_table));
     g_budget_count = 0;
     token_mutex_unlock();
 
@@ -299,8 +300,7 @@ heapstore_error_t heapstore_token_set_budget(const char *task_id,
     }
 
     task_budget_entry_t *entry = &g_budget_table[entry_idx];
-    strncpy(entry->task_id, task_id, MAX_TASK_ID_LEN - 1);
-    entry->task_id[MAX_TASK_ID_LEN - 1] = '\0';
+    AGENTOS_STRNCPY_TERM(entry->task_id, task_id, sizeof(MAX_TASK_ID_LEN));
     entry->budget = *budget;
     atomic_store(&entry->used_tokens, 0);
     entry->active = 1;

@@ -16,14 +16,9 @@
 #include "string_compat.h"
 #include "logging_compat.h"
 
-#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
-typedef pthread_mutex_t agentos_mutex_t;
-extern int agentos_mutex_init(agentos_mutex_t *mutex);
-extern void agentos_mutex_destroy(agentos_mutex_t *mutex);
-extern int agentos_mutex_lock(agentos_mutex_t *mutex);
-extern int agentos_mutex_unlock(agentos_mutex_t *mutex);
+#include "platform.h"
 #include <stdint.h>
 
 /**
@@ -270,7 +265,7 @@ memory_pool_t *memory_pool_create(const memory_pool_options_t *options)
     }
 
     // 复制选项
-    memcpy(&pool->options, options, sizeof(memory_pool_options_t));
+    __builtin_memcpy(&pool->options, options, sizeof(memory_pool_options_t));
 
     // 设置默认
     if (pool->options.initial_blocks == 0) {
@@ -282,7 +277,7 @@ memory_pool_t *memory_pool_create(const memory_pool_options_t *options)
     }
 
     // 初始化统计信
-    memset(&pool->stats, 0, sizeof(memory_pool_stats_t));
+    __builtin_memset(&pool->stats, 0, sizeof(memory_pool_stats_t));
     pool->stats.block_size = pool->options.block_size;
 
     // 初始化锁
@@ -295,7 +290,7 @@ memory_pool_t *memory_pool_create(const memory_pool_options_t *options)
     if (pool->options.name != NULL) {
         pool->name = memory_calloc(strlen(pool->options.name) + 1, "memory_pool_name");
         if (pool->name != NULL) {
-            memcpy(pool->name, pool->options.name, strlen(pool->options.name) + 1);
+            __builtin_memcpy(pool->name, pool->options.name, strlen(pool->options.name) + 1);
         }
     }
 
@@ -404,7 +399,7 @@ void *memory_pool_calloc(memory_pool_t *pool)
 {
     void *ptr = memory_pool_alloc(pool);
     if (ptr != NULL) {
-        memset(ptr, 0, pool->options.block_size);
+        __builtin_memset(ptr, 0, pool->options.block_size);
     }
     return ptr;
 }
@@ -451,7 +446,7 @@ bool memory_pool_get_stats(memory_pool_t *pool, memory_pool_stats_t *stats)
     }
 
     memory_pool_lock(pool);
-    memcpy(stats, &pool->stats, sizeof(memory_pool_stats_t));
+    __builtin_memcpy(stats, &pool->stats, sizeof(memory_pool_stats_t));
     memory_pool_unlock(pool);
 
     return true;
@@ -700,7 +695,7 @@ void memory_pool_set_name(memory_pool_t *pool, const char *name)
     if (name != NULL) {
         pool->name = memory_calloc(strlen(name) + 1, "memory_pool_name");
         if (pool->name != NULL) {
-            memcpy(pool->name, name, strlen(name) + 1);
+            __builtin_memcpy(pool->name, name, strlen(name) + 1);
         }
     }
 

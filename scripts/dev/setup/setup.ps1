@@ -1,5 +1,5 @@
 # AgentOS Windows Setup Script
-# Version: 1.0.0
+# Version: 0.1.0
 # Description: Windows development environment setup and build script for AgentOS
 # Compatible with: Windows 10/11, PowerShell 5.1+
 

@@ -111,7 +111,7 @@ static const size_t DEFAULT_BUCKET_COUNT = 11;
 
 static void metrics_init_once(void)
 {
-    memset(&g_metrics, 0, sizeof(g_metrics));
+    __builtin_memset(&g_metrics, 0, sizeof(g_metrics));
     g_metrics.sampling_interval_ms = 1000;
     cupolas_rwlock_init(&g_metrics_lock);
     g_init_state = 1;
@@ -162,7 +162,7 @@ static metric_entry_t *find_or_create_entry(const char *name)
     }
 
     metric_entry_t *entry = &g_metrics.entries[g_metrics.entry_count++];
-    memset(entry, 0, sizeof(metric_entry_t));
+    __builtin_memset(entry, 0, sizeof(metric_entry_t));
     entry->name = name;
 
     cupolas_rwlock_unlock(&g_metrics_lock);
@@ -298,7 +298,7 @@ metric_iterator_t *metrics_iter_create(const char *pattern)
         (metric_iterator_internal_t *)cupolas_mem_alloc(sizeof(metric_iterator_internal_t));
     if (!iter)
         return NULL;
-    memset(iter, 0, sizeof(metric_iterator_internal_t));
+    __builtin_memset(iter, 0, sizeof(metric_iterator_internal_t));
     iter->state = &g_metrics;
     iter->current_index = 0;
     iter->pattern = pattern;
@@ -321,7 +321,7 @@ bool metrics_iter_next(metric_iterator_t *iter, metric_sample_t *sample)
         if (!entry->registered || !entry->name)
             continue;
 
-        memset(sample, 0, sizeof(metric_sample_t));
+        __builtin_memset(sample, 0, sizeof(metric_sample_t));
         sample->name = entry->name;
 
         switch (entry->type) {

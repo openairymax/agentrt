@@ -14,8 +14,8 @@
 #include <string.h>
 #include "platform.h"
 #include <time.h>
-#include "../include/heapstore.h"
-#include "../include/heapstore_registry.h"
+#include "heapstore.h"
+#include "heapstore_registry.h"
 
 #define NUM_RECORDS 1000
 
@@ -26,7 +26,7 @@ static double get_time_ms(void) {
 }
 
 static void init_agent_record(heapstore_agent_record_t* record, int index) {
-    memset(record, 0, sizeof(*record));
+    AGENTOS_MEMSET(record, 0, sizeof(*record));
     snprintf(record->id, sizeof(record->id), "agent_%06d", index);
     snprintf(record->name, sizeof(record->name), "Test Agent %d", index);
     snprintf(record->type, sizeof(record->type), "test_type");

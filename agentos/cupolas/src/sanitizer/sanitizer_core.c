@@ -16,6 +16,7 @@
 #include "sanitizer_cache.h"
 #include "sanitizer_rules.h"
 #include "utils/cupolas_utils.h"
+#include "memory_compat.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -37,7 +38,7 @@ void sanitizer_default_context(sanitize_context_t *ctx)
     if (!ctx)
         return;
 
-    memset(ctx, 0, sizeof(sanitize_context_t));
+    __builtin_memset(ctx, 0, sizeof(sanitize_context_t));
     ctx->level = SANITIZE_LEVEL_NORMAL;
     ctx->max_length = DEFAULT_MAX_LENGTH;
     ctx->allow_html = false;
@@ -52,7 +53,7 @@ sanitizer_t *sanitizer_create(const char *rules_path)
     if (!san)
         return NULL;
 
-    memset(san, 0, sizeof(sanitizer_t));
+    __builtin_memset(san, 0, sizeof(sanitizer_t));
 
     if (cupolas_rwlock_init(&san->lock) != cupolas_OK) {
         cupolas_mem_free(san);
@@ -216,21 +217,21 @@ static bool cupolas_sanitizer_try_escape_html(char c, char *output, size_t *out_
     if (c == '<') {
         if (*out_pos + 4 >= output_size)
             return false;
-        memcpy(output + *out_pos, "&lt;", 4);
+        __builtin_memcpy(output + *out_pos, "&lt;", 4);
         *out_pos += 4;
         return true;
     }
     if (c == '>') {
         if (*out_pos + 4 >= output_size)
             return false;
-        memcpy(output + *out_pos, "&gt;", 4);
+        __builtin_memcpy(output + *out_pos, "&gt;", 4);
         *out_pos += 4;
         return true;
     }
     if (c == '&') {
         if (*out_pos + 5 >= output_size)
             return false;
-        memcpy(output + *out_pos, "&amp;", 5);
+        __builtin_memcpy(output + *out_pos, "&amp;", 5);
         *out_pos += 5;
         return true;
     }
@@ -359,8 +360,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
     sanitize_result_t cached_result = SANITIZE_OK;
     char *cached_output = sanitizer_cache_get(sanitizer->cache, input, ctx->level);
     if (cached_output) {
-        strncpy(output, cached_output, output_size - 1);
-        output[output_size - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(output, cached_output, output_size);
         cupolas_mem_free(cached_output);
         cached = true;
     }
@@ -390,8 +390,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
         return SANITIZE_MODIFIED;
     }
 
-    strncpy(output, input, output_size - 1);
-    output[output_size - 1] = '\0';
+    AGENTOS_STRNCPY_TERM(output, input, output_size);
 
     cupolas_rwlock_wrlock(&sanitizer->lock);
     sanitizer_cache_put(sanitizer->cache, input, output, ctx->level);
@@ -434,31 +433,31 @@ int sanitizer_escape_html(const char *input, char *output, size_t output_size)
         case '<':
             if (out_pos + 4 >= output_size)
                 goto overflow;
-            memcpy(output + out_pos, "&lt;", 4);
+            __builtin_memcpy(output + out_pos, "&lt;", 4);
             out_pos += 4;
             break;
         case '>':
             if (out_pos + 4 >= output_size)
                 goto overflow;
-            memcpy(output + out_pos, "&gt;", 4);
+            __builtin_memcpy(output + out_pos, "&gt;", 4);
             out_pos += 4;
             break;
         case '&':
             if (out_pos + 5 >= output_size)
                 goto overflow;
-            memcpy(output + out_pos, "&amp;", 5);
+            __builtin_memcpy(output + out_pos, "&amp;", 5);
             out_pos += 5;
             break;
         case '"':
             if (out_pos + 6 >= output_size)
                 goto overflow;
-            memcpy(output + out_pos, "&quot;", 6);
+            __builtin_memcpy(output + out_pos, "&quot;", 6);
             out_pos += 6;
             break;
         case '\'':
             if (out_pos + 6 >= output_size)
                 goto overflow;
-            memcpy(output + out_pos, "&#39;", 5);
+            __builtin_memcpy(output + out_pos, "&#39;", 5);
             out_pos += 5;
             break;
         default:

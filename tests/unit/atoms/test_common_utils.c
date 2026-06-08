@@ -13,9 +13,9 @@
 #include <assert.h>
 #include <math.h>
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
-#include "../../../agentos/commons/utils/quality/agentos_quality.h"
+#include "memory_compat.h"
+#include "string_compat.h"
+#include "agentos_quality.h"
 
 #define TEST_BUFFER_SIZE 256
 
@@ -116,7 +116,7 @@ int test_safe_strcat_empty_dest(void) {
     printf("  测试空目标拼接...\n");
 
     char dest[TEST_BUFFER_SIZE];
-    memset(dest, 0, sizeof(dest));
+    AGENTOS_MEMSET(dest, 0, sizeof(dest));
 
     int result = agentos_safe_strcat(dest, sizeof(dest), "test");
     if (result != 0 || strcmp(dest, "test") != 0) {

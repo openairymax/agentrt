@@ -67,7 +67,7 @@ static void test_lifecycle_start_stop(void **state)
 {
     (void)state;
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
-    strncpy(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir) - 1);
+    AGENTOS_STRNCPY_TERM(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir));
     config.max_channels = 16;
 
     channel_service_t *svc = channel_service_create(&config);
@@ -87,7 +87,7 @@ static void test_lifecycle_double_start(void **state)
 {
     (void)state;
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
-    strncpy(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir) - 1);
+    AGENTOS_STRNCPY_TERM(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir));
 
     channel_service_t *svc = channel_service_create(&config);
     assert_int_equal(channel_service_start(svc), 0);
@@ -124,7 +124,7 @@ static void test_channel_open_close_socket(void **state)
     (void)state;
     cleanup_test_dir();
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
-    strncpy(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir) - 1);
+    AGENTOS_STRNCPY_TERM(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir));
     config.max_channels = 16;
 
     channel_service_t *svc = channel_service_create(&config);
@@ -188,7 +188,7 @@ static void test_channel_duplicate_id(void **state)
     (void)state;
     cleanup_test_dir();
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
-    strncpy(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir) - 1);
+    AGENTOS_STRNCPY_TERM(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir));
     config.max_channels = 16;
 
     channel_service_t *svc = channel_service_create(&config);
@@ -212,7 +212,7 @@ static void test_send_receive_socket_roundtrip(void **state)
 {
     (void)state;
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
-    strncpy(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir) - 1);
+    AGENTOS_STRNCPY_TERM(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir));
     config.max_channels = 16;
 
     channel_service_t *svc = channel_service_create(&config);
@@ -301,7 +301,7 @@ static void test_latency_stress(void **state)
     (void)state;
     cleanup_test_dir();
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
-    strncpy(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir) - 1);
+    AGENTOS_STRNCPY_TERM(config.socket_dir, TEST_SOCKET_DIR, sizeof(config.socket_dir));
     config.max_channels = 32;
 
     channel_service_t *svc = channel_service_create(&config);

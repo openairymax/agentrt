@@ -275,7 +275,7 @@ static void test_builtin_provider_stats(void) {
     TEST_ASSERT(err == AGENTOS_SUCCESS, "provider init succeeds");
 
     agentos_memory_stats_t stats;
-    memset(&stats, 0, sizeof(stats));
+    AGENTOS_MEMSET(&stats, 0, sizeof(stats));
 
     if (provider->get_stats) {
         err = provider->get_stats(provider, &stats);

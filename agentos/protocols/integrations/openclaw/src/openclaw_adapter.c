@@ -115,7 +115,7 @@ openclaw_adapter_context_t *openclaw_adapter_create(const openclaw_config_t *con
     if (!ctx)
         return NULL;
 
-    memcpy(&ctx->config, config, sizeof(openclaw_config_t));
+    __builtin_memcpy(&ctx->config, config, sizeof(openclaw_config_t));
 
     if (config->endpoint_url)
         ctx->config.endpoint_url = AGENTOS_STRDUP(config->endpoint_url);
@@ -178,7 +178,7 @@ void openclaw_adapter_destroy(openclaw_adapter_context_t *ctx)
         openclaw_task_destroy(&ctx->tracked_tasks[i]);
     AGENTOS_FREE(ctx->tracked_tasks);
 
-    memset(ctx, 0, sizeof(openclaw_adapter_context_t));
+    AGENTOS_MEMSET(ctx, 0, sizeof(openclaw_adapter_context_t));
     AGENTOS_FREE(ctx);
 }
 
@@ -227,20 +227,20 @@ static int openclaw_parse_endpoint(const char *endpoint_url, char *host, size_t 
         size_t host_len = (size_t)(colon - host_start);
         if (host_len >= host_size)
             host_len = host_size - 1;
-        memcpy(host, host_start, host_len);
+        __builtin_memcpy(host, host_start, host_len);
         host[host_len] = '\0';
         *port = (int)strtol(colon + 1, NULL, 10);
     } else if (slash) {
         size_t host_len = (size_t)(slash - host_start);
         if (host_len >= host_size)
             host_len = host_size - 1;
-        memcpy(host, host_start, host_len);
+        __builtin_memcpy(host, host_start, host_len);
         host[host_len] = '\0';
     } else {
         size_t host_len = strlen(host_start);
         if (host_len >= host_size)
             host_len = host_size - 1;
-        memcpy(host, host_start, host_len);
+        __builtin_memcpy(host, host_start, host_len);
         host[host_len] = '\0';
     }
 
@@ -269,7 +269,7 @@ static int openclaw_socket_connect(socket_fd_t fd, const char *host, int port, u
     struct addrinfo *result = NULL;
     struct addrinfo *rp = NULL;
 
-    memset(&hints, 0, sizeof(hints));
+    AGENTOS_MEMSET(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
@@ -492,7 +492,7 @@ int openclaw_register_agent(openclaw_adapter_context_t *ctx, const openclaw_agen
 
     for (size_t i = 0; i < ctx->registered_agent_count; i++) {
         if (strcmp(ctx->registered_agents[i].agent_id, card->agent_id) == 0) {
-            memcpy(&ctx->registered_agents[i], card, sizeof(openclaw_agent_card_t));
+            __builtin_memcpy(&ctx->registered_agents[i], card, sizeof(openclaw_agent_card_t));
             if (card->agent_id)
                 ctx->registered_agents[i].agent_id = AGENTOS_STRDUP(card->agent_id);
             if (card->name)
@@ -511,7 +511,7 @@ int openclaw_register_agent(openclaw_adapter_context_t *ctx, const openclaw_agen
         AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     ctx->registered_agents = new_agents;
-    memset(&ctx->registered_agents[ctx->registered_agent_count], 0, sizeof(openclaw_agent_card_t));
+    AGENTOS_MEMSET(&ctx->registered_agents[ctx->registered_agent_count], 0, sizeof(openclaw_agent_card_t));
 
     openclaw_agent_card_t *target = &ctx->registered_agents[ctx->registered_agent_count];
     target->agent_id = card->agent_id ? AGENTOS_STRDUP(card->agent_id) : NULL;
@@ -589,7 +589,7 @@ int openclaw_unregister_agent(openclaw_adapter_context_t *ctx, const char *agent
         if (strcmp(ctx->registered_agents[i].agent_id, agent_id) == 0) {
             openclaw_agent_card_destroy(&ctx->registered_agents[i]);
             if (i < ctx->registered_agent_count - 1) {
-                memmove(&ctx->registered_agents[i], &ctx->registered_agents[i + 1],
+                __builtin_memmove(&ctx->registered_agents[i], &ctx->registered_agents[i + 1],
                         (ctx->registered_agent_count - i - 1) * sizeof(openclaw_agent_card_t));
             }
             ctx->registered_agent_count--;
@@ -633,7 +633,7 @@ int openclaw_register_tool(openclaw_adapter_context_t *ctx, const openclaw_tool_
         AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "null pointer");
 
     ctx->registered_tools = new_tools;
-    memset(&ctx->registered_tools[ctx->registered_tool_count], 0, sizeof(openclaw_tool_info_t));
+    AGENTOS_MEMSET(&ctx->registered_tools[ctx->registered_tool_count], 0, sizeof(openclaw_tool_info_t));
 
     openclaw_tool_info_t *target = &ctx->registered_tools[ctx->registered_tool_count];
     target->tool_id = tool->tool_id ? AGENTOS_STRDUP(tool->tool_id) : NULL;
@@ -714,7 +714,7 @@ int openclaw_create_session(openclaw_adapter_context_t *ctx,
     static uint32_t session_counter = 0;
     session_counter++;
 
-    memset(out_session, 0, sizeof(openclaw_session_t));
+    AGENTOS_MEMSET(out_session, 0, sizeof(openclaw_session_t));
 
     char sid[64];
     snprintf(sid, sizeof(sid), "oc-session-%08x", session_counter);
@@ -736,16 +736,16 @@ int openclaw_create_session(openclaw_adapter_context_t *ctx,
 
     openclaw_session_t *new_sessions = (openclaw_session_t *)AGENTOS_REALLOC(
         ctx->active_sessions, (ctx->active_session_count + 1) * sizeof(openclaw_session_t));
-    if (new_sessions) {
-        ctx->active_sessions = new_sessions;
-        memcpy(&ctx->active_sessions[ctx->active_session_count], out_session,
-               sizeof(openclaw_session_t));
-        ctx->active_sessions[ctx->active_session_count].session_id =
-            AGENTOS_STRDUP(out_session->session_id);
-        ctx->active_sessions[ctx->active_session_count].agent_id =
-            out_session->agent_id ? AGENTOS_STRDUP(out_session->agent_id) : NULL;
-        ctx->active_session_count++;
-    }
+    if (!new_sessions)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    ctx->active_sessions = new_sessions;
+    __builtin_memcpy(&ctx->active_sessions[ctx->active_session_count], out_session,
+           sizeof(openclaw_session_t));
+    ctx->active_sessions[ctx->active_session_count].session_id =
+        AGENTOS_STRDUP(out_session->session_id);
+    ctx->active_sessions[ctx->active_session_count].agent_id =
+        out_session->agent_id ? AGENTOS_STRDUP(out_session->agent_id) : NULL;
+    ctx->active_session_count++;
 
     return 0;
 }
@@ -763,7 +763,7 @@ int openclaw_close_session(openclaw_adapter_context_t *ctx, const char *session_
             ctx->active_sessions[i].is_active = false;
             openclaw_session_destroy(&ctx->active_sessions[i]);
             if (i < ctx->active_session_count - 1) {
-                memmove(&ctx->active_sessions[i], &ctx->active_sessions[i + 1],
+                __builtin_memmove(&ctx->active_sessions[i], &ctx->active_sessions[i + 1],
                         (ctx->active_session_count - i - 1) * sizeof(openclaw_session_t));
             }
             ctx->active_session_count--;
@@ -810,7 +810,7 @@ int openclaw_send_message(openclaw_adapter_context_t *ctx, const openclaw_messag
                 if (recv_ret == 0 && recv_len >= 6) {
                     size_t payload_offset = 6;
                     size_t payload_len = recv_len - 6;
-                    memset(response, 0, sizeof(openclaw_message_t));
+                    AGENTOS_MEMSET(response, 0, sizeof(openclaw_message_t));
                     response->message_id = msg->message_id ? AGENTOS_STRDUP(msg->message_id) : NULL;
                     response->session_id = msg->session_id ? AGENTOS_STRDUP(msg->session_id) : NULL;
                     response->sender_id =
@@ -821,7 +821,7 @@ int openclaw_send_message(openclaw_adapter_context_t *ctx, const openclaw_messag
                     if (payload_len > 0) {
                         response->payload = AGENTOS_MALLOC(payload_len + 1);
                         if (response->payload) {
-                            memcpy(response->payload, recv_buf + payload_offset, payload_len);
+                            __builtin_memcpy(response->payload, recv_buf + payload_offset, payload_len);
                             ((char *)response->payload)[payload_len] = '\0';
                             response->payload_size = payload_len;
                         }
@@ -833,7 +833,7 @@ int openclaw_send_message(openclaw_adapter_context_t *ctx, const openclaw_messag
         }
     }
 
-    memset(response, 0, sizeof(openclaw_message_t));
+    AGENTOS_MEMSET(response, 0, sizeof(openclaw_message_t));
     response->message_id = msg->message_id ? AGENTOS_STRDUP(msg->message_id) : NULL;
     response->session_id = msg->session_id ? AGENTOS_STRDUP(msg->session_id) : NULL;
     response->receiver_id = msg->sender_id ? AGENTOS_STRDUP(msg->sender_id) : NULL;
@@ -868,7 +868,7 @@ int openclaw_delegate_task(openclaw_adapter_context_t *ctx, const openclaw_task_
     static uint32_t task_counter = 0;
     task_counter++;
 
-    memset(result, 0, sizeof(openclaw_task_t));
+    AGENTOS_MEMSET(result, 0, sizeof(openclaw_task_t));
     char tid[64];
     snprintf(tid, sizeof(tid), "oc-task-%08x", task_counter);
     result->task_id = AGENTOS_STRDUP(tid);
@@ -888,19 +888,19 @@ int openclaw_delegate_task(openclaw_adapter_context_t *ctx, const openclaw_task_
 
     openclaw_task_t *new_tasks = (openclaw_task_t *)AGENTOS_REALLOC(
         ctx->tracked_tasks, (ctx->tracked_task_count + 1) * sizeof(openclaw_task_t));
-    if (new_tasks) {
-        ctx->tracked_tasks = new_tasks;
-        ctx->tracked_tasks[ctx->tracked_task_count] = *result;
-        ctx->tracked_tasks[ctx->tracked_task_count].task_id =
-            result->task_id ? AGENTOS_STRDUP(result->task_id) : NULL;
-        ctx->tracked_tasks[ctx->tracked_task_count].session_id =
-            result->session_id ? AGENTOS_STRDUP(result->session_id) : NULL;
-        ctx->tracked_tasks[ctx->tracked_task_count].description =
-            result->description ? AGENTOS_STRDUP(result->description) : NULL;
-        ctx->tracked_tasks[ctx->tracked_task_count].assigned_agent_id =
-            result->assigned_agent_id ? AGENTOS_STRDUP(result->assigned_agent_id) : NULL;
-        ctx->tracked_task_count++;
-    }
+    if (!new_tasks)
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    ctx->tracked_tasks = new_tasks;
+    ctx->tracked_tasks[ctx->tracked_task_count] = *result;
+    ctx->tracked_tasks[ctx->tracked_task_count].task_id =
+        result->task_id ? AGENTOS_STRDUP(result->task_id) : NULL;
+    ctx->tracked_tasks[ctx->tracked_task_count].session_id =
+        result->session_id ? AGENTOS_STRDUP(result->session_id) : NULL;
+    ctx->tracked_tasks[ctx->tracked_task_count].description =
+        result->description ? AGENTOS_STRDUP(result->description) : NULL;
+    ctx->tracked_tasks[ctx->tracked_task_count].assigned_agent_id =
+        result->assigned_agent_id ? AGENTOS_STRDUP(result->assigned_agent_id) : NULL;
+    ctx->tracked_task_count++;
 
     return 0;
 }
@@ -913,7 +913,7 @@ int openclaw_query_task(openclaw_adapter_context_t *ctx, const char *task_id,
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openclaw_query_task: failed");
         return AGENTOS_ERR_UNKNOWN;
         }
-    memset(result, 0, sizeof(openclaw_task_t));
+    AGENTOS_MEMSET(result, 0, sizeof(openclaw_task_t));
 
     for (size_t i = 0; i < ctx->tracked_task_count; i++) {
         if (ctx->tracked_tasks[i].task_id && strcmp(ctx->tracked_tasks[i].task_id, task_id) == 0) {
@@ -976,7 +976,7 @@ int openclaw_get_cluster_status(openclaw_adapter_context_t *ctx, openclaw_cluste
         return AGENTOS_ERR_UNKNOWN;
         }
 
-    memset(status, 0, sizeof(openclaw_cluster_status_t));
+    AGENTOS_MEMSET(status, 0, sizeof(openclaw_cluster_status_t));
     status->node_id = "agentos-node-001";
     status->cluster_name = ctx->config.cluster_id ? ctx->config.cluster_id : "default";
     status->total_nodes = 1;
@@ -1167,7 +1167,7 @@ static int openclaw_proto_handle_request(void *context, const void *req, void **
         if (ret == 0 && response.payload && response.payload_size > 0) {
             *resp = AGENTOS_MALLOC(response.payload_size + 1);
             if (*resp) {
-                memcpy(*resp, response.payload, response.payload_size);
+                __builtin_memcpy(*resp, response.payload, response.payload_size);
                 ((char *)*resp)[response.payload_size] = '\0';
             }
         } else if (ret == 0) {
@@ -1204,7 +1204,7 @@ static int openclaw_proto_get_version(void *context, char *buf, size_t max_size)
     size_t len = strlen(ver);
     if (len >= max_size)
         len = max_size - 1;
-    memcpy(buf, ver, len);
+    __builtin_memcpy(buf, ver, len);
     buf[len] = '\0';
     return 0;
 }
@@ -1246,7 +1246,7 @@ void openclaw_agent_card_destroy(openclaw_agent_card_t *card)
     AGENTOS_FREE(card->name);
     AGENTOS_FREE(card->description);
     AGENTOS_FREE(card->version);
-    memset(card, 0, sizeof(openclaw_agent_card_t));
+    AGENTOS_MEMSET(card, 0, sizeof(openclaw_agent_card_t));
 }
 
 void openclaw_tool_info_destroy(openclaw_tool_info_t *tool)
@@ -1258,7 +1258,7 @@ void openclaw_tool_info_destroy(openclaw_tool_info_t *tool)
     AGENTOS_FREE(tool->description);
     AGENTOS_FREE(tool->input_schema_json);
     AGENTOS_FREE(tool->output_schema_json);
-    memset(tool, 0, sizeof(openclaw_tool_info_t));
+    AGENTOS_MEMSET(tool, 0, sizeof(openclaw_tool_info_t));
 }
 
 void openclaw_session_destroy(openclaw_session_t *session)
@@ -1268,7 +1268,7 @@ void openclaw_session_destroy(openclaw_session_t *session)
     AGENTOS_FREE(session->session_id);
     AGENTOS_FREE(session->agent_id);
     AGENTOS_FREE(session->parent_session_id);
-    memset(session, 0, sizeof(openclaw_session_t));
+    AGENTOS_MEMSET(session, 0, sizeof(openclaw_session_t));
 }
 
 void openclaw_message_destroy(openclaw_message_t *msg)
@@ -1281,7 +1281,7 @@ void openclaw_message_destroy(openclaw_message_t *msg)
     AGENTOS_FREE(msg->receiver_id);
     AGENTOS_FREE(msg->content_type);
     AGENTOS_FREE(msg->payload);
-    memset(msg, 0, sizeof(openclaw_message_t));
+    AGENTOS_MEMSET(msg, 0, sizeof(openclaw_message_t));
 }
 
 void openclaw_task_destroy(openclaw_task_t *task)
@@ -1295,7 +1295,7 @@ void openclaw_task_destroy(openclaw_task_t *task)
     AGENTOS_FREE(task->assigned_agent_id);
     AGENTOS_FREE(task->result_json);
     AGENTOS_FREE(task->error_message);
-    memset(task, 0, sizeof(openclaw_task_t));
+    AGENTOS_MEMSET(task, 0, sizeof(openclaw_task_t));
 }
 
 void openclaw_cluster_status_destroy(openclaw_cluster_status_t *status)
@@ -1304,5 +1304,5 @@ void openclaw_cluster_status_destroy(openclaw_cluster_status_t *status)
         return;
     AGENTOS_FREE(status->node_id);
     AGENTOS_FREE(status->cluster_name);
-    memset(status, 0, sizeof(openclaw_cluster_status_t));
+    AGENTOS_MEMSET(status, 0, sizeof(openclaw_cluster_status_t));
 }

@@ -11,6 +11,7 @@ set(MEMORYROVOL_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../memory)
 set(CL3_TEST_SOURCES
     unit/test_loop.c
     unit/test_cognition.c
+    unit/test_cognition_e2e.c
     unit/test_execution.c
     unit/test_memory.c
     unit/test_compensation.c
@@ -33,7 +34,7 @@ set(CL3_COMMON_INCLUDES
     ${CORELOOPTHREE_DIR}/src/cognition
     ${COREKERN_INCLUDE_DIR}
     ${COMMONS_DIR}/platform/include
-    ${COMMONS_DIR}/utils/core/include
+    ${COMMONS_DIR}/utils/include
     ${COMMONS_DIR}/utils/error/include
     ${COMMONS_DIR}/utils/logging/include
     ${COMMONS_DIR}/utils/memory/include

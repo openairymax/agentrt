@@ -4,7 +4,7 @@
 import re
 import os
 
-BASE_DIR = '/home/spharx/SpharxWorks/OpenAirymax/AgentOS'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 def fix_braces_and_error_codes(filepath):
     """Fix missing braces around if-blocks containing error_push_ex + return, and fix wrong error codes."""

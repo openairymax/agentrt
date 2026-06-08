@@ -61,13 +61,13 @@ cost_tracker_t *cost_tracker_create(const pricing_rule_t *rules, int rule_count)
         return NULL;
     }
     if (rule_count > 0) {
-        ct->rules = AGENTOS_MALLOC(rule_count * sizeof(pricing_rule_t));
+        SAFE_MALLOC_ARRAY(ct->rules, rule_count, sizeof(pricing_rule_t));
         if (!ct->rules) {
             AGENTOS_FREE(ct);
             AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
-        memcpy(ct->rules, rules, rule_count * sizeof(pricing_rule_t));
+        __builtin_memcpy(ct->rules, rules, rule_count * sizeof(pricing_rule_t));
         ct->rule_count = rule_count;
     }
     agentos_mutex_init(&ct->lock);

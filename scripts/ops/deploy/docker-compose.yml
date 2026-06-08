@@ -9,7 +9,7 @@ services:
   agentos-kernel:
     build:
       context: ../../
-      dockerfile: scripts/deployment/docker/Dockerfile.kernel
+      dockerfile: scripts/ops/deploy/Dockerfile.kernel
       target: runtime
     image: ${DOCKER_REGISTRY:-spharx}/agentos-kernel:${AGENTOS_VERSION:-0.1.0}
     container_name: agentos-kernel
@@ -76,7 +76,7 @@ services:
   agentos-services:
     build:
       context: ../../
-      dockerfile: scripts/deployment/docker/Dockerfile.service
+      dockerfile: scripts/ops/deploy/Dockerfile.service
     image: ${DOCKER_REGISTRY:-spharx}/agentos-services:${AGENTOS_VERSION:-0.1.0}
     container_name: agentos-services
     hostname: agentos-services
@@ -194,7 +194,7 @@ services:
     environment:
       - POSTGRES_DB=agentos
       - POSTGRES_USER=agentos
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-agentos_dev}
 
     # 数据持久化
     volumes:
@@ -219,6 +219,16 @@ services:
     hostname: otel-collector
     restart: unless-stopped
 
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
     # 配置文件
     volumes:
       - ./agentos/manager/otel-collector-manager.yaml:/etc/otelcol-contrib/manager.yaml:ro
@@ -232,6 +242,14 @@ services:
       - "4317:4317" # OTLP gRPC
       - "4318:4318" # OTLP HTTP
       - "8888:8888" # Prometheus metrics
+
+    # 健康检查
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:13133/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
     # 依赖
     depends_on:
@@ -264,6 +282,14 @@ services:
         limits:
           cpus: '1.0'
           memory: 2G
+
+    # 健康检查
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
 # ==================== 数据卷 ====================
 volumes:

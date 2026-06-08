@@ -1,9 +1,9 @@
 # Research — 智能研究助手应用
 
 **模块路径**: `agentos/openlab/app/research/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
-> **Status**: 本模块作为 AgentOS v0.1.0 的正式组成部分，API 已稳定。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。当前为规划阶段，源代码尚未实现。
 
 ## 概述
 
@@ -16,7 +16,9 @@ research/
 └── README.md                   # 本文件
 ```
 
-## 核心能力
+> **注意**: 本应用当前为规划阶段，源代码尚未实现。
+
+## 核心能力（规划）
 
 - **文献检索**：自动检索和筛选相关学术文献，支持多数据库源
 - **数据分析**：数据清洗、统计分析和可视化，支持多种数据格式
@@ -25,7 +27,7 @@ research/
 - **趋势分析**：研究热点识别和趋势预测
 - **协作支持**：多人协作研究和版本管理
 
-## 接口说明
+## 接口说明（规划）
 
 ### 文献检索 API
 
@@ -56,24 +58,6 @@ research/
 
 - **核心依赖**: AgentOS OpenLab Core, FastAPI, Pydantic
 - **可选依赖**: 各种学术数据库 API 客户端
-
-## 使用示例
-
-```python
-from research import ResearchApp
-
-research = ResearchApp()
-
-papers = research.search_papers(
-    query="reinforcement learning",
-    max_results=20,
-    sort_by="citations"
-)
-
-summary = research.generate_summary(papers)
-
-research.export_report("output/research_report.md")
-```
 
 ---
 

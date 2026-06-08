@@ -5,7 +5,7 @@ import re
 import os
 import sys
 
-BASE_DIR = '/home/spharx/SpharxWorks/OpenAirymax/AgentOS'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # Context keywords → error code mapping
 # Priority: check preceding lines for these keywords (order matters!)

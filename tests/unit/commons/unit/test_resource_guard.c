@@ -12,8 +12,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../utils/test_framework.h"
-#include "../../utils/memory/include/memory.h"
+#include "test_framework.h"
+#include "memory.h"
 
 typedef struct {
     int fd;
@@ -137,7 +137,7 @@ static void test_large_memory_allocation(void** state) {
     void* ptr = malloc(large_size);
 
     if (ptr) {
-        memset(ptr, 0xAB, large_size);
+        AGENTOS_MEMSET(ptr, 0xAB, large_size);
         unsigned char* bytes = (unsigned char*)ptr;
         assert_int_equal(0xAB, bytes[0]);
         assert_int_equal(0xAB, bytes[large_size - 1]);

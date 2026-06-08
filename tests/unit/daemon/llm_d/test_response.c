@@ -62,7 +62,7 @@ static void test_response_add_choice(void) {
     assert(resp != NULL);
 
     llm_message_t choice;
-    memset(&choice, 0, sizeof(choice));
+    AGENTOS_MEMSET(&choice, 0, sizeof(choice));
     choice.role = strdup("assistant");
     choice.content = strdup("Hello! How can I help you?");
 
@@ -118,7 +118,7 @@ static void test_response_get_content(void) {
     assert(resp != NULL);
 
     llm_message_t choice;
-    memset(&choice, 0, sizeof(choice));
+    AGENTOS_MEMSET(&choice, 0, sizeof(choice));
     choice.role = strdup("assistant");
     choice.content = strdup("This is the response content.");
 
