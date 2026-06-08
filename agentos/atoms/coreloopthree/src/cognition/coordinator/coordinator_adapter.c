@@ -51,7 +51,7 @@ static agentos_error_t adapter_coordinate(const char **prompts, size_t count, vo
         ATM_RET_ERR(AGENTOS_EINVAL);
 
     agentos_coordination_context_t ctx;
-    memset(&ctx, 0, sizeof(ctx));
+    __builtin_memset(&ctx, 0, sizeof(ctx));
 
     return adapter->base->coordinate(adapter->base, &ctx, prompts, count, out_result);
 }

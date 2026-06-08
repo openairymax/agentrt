@@ -103,6 +103,7 @@ from .exceptions import (
     CODE_SKILL_NOT_FOUND,
     CODE_SKILL_EXECUTION_FAILED,
     CODE_TELEMETRY_ERROR,
+    CODE_SYSCALL_ERROR,
     CODE_PERMISSION_DENIED,
     CODE_CORRUPTED_DATA,
 )
@@ -192,27 +193,15 @@ from .utils import (
 from .agent import AgentOS, AsyncAgentOS
 
 # 导入工具函数（向后兼容）
-import sys
-import os
-
-# 直接导入 utils.py 文件
-utils_file_path = os.path.join(os.path.dirname(__file__), 'utils.py')
-sys.path.insert(0, os.path.dirname(utils_file_path))
-
-# 动态导入 utils 模块
-import importlib.util
-spec = importlib.util.spec_from_file_location('agentos_utils', utils_file_path)
-agentos_utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(agentos_utils)
-
-# 从动态导入的模块中获取函数
-generate_hash = agentos_utils.generate_hash
-get_env_var = agentos_utils.get_env_var
-parse_timeout = agentos_utils.parse_timeout
-merge_dicts = agentos_utils.merge_dicts
-retry_with_backoff = agentos_utils.retry_with_backoff
-Timer = agentos_utils.Timer
-RateLimiter = agentos_utils.RateLimiter
+from .utils.core import (
+    generate_hash,
+    get_env_var,
+    parse_timeout,
+    merge_dicts,
+    retry_with_backoff,
+    Timer,
+    RateLimiter,
+)
 
 # 导入遥测
 from .telemetry import (
@@ -268,9 +257,9 @@ __all__ = [
     "AuthenticationError",
     "InvalidResponseError",
     "ServerError",
-    # 向后兼容别名
-    "TimeoutError",
-    "MemoryError",
+    # 向后兼容别名（使用 AgentOS_ 前缀避免遮蔽 Python 内置异常）
+    "AgentOS_TimeoutError",
+    "AgentOS_MemoryError",
 
     # ============================================================
     # 错误码常量
@@ -317,6 +306,7 @@ __all__ = [
     "CODE_SKILL_NOT_FOUND",
     "CODE_SKILL_EXECUTION_FAILED",
     "CODE_TELEMETRY_ERROR",
+    "CODE_SYSCALL_ERROR",
     "CODE_PERMISSION_DENIED",
     "CODE_CORRUPTED_DATA",
 
@@ -411,26 +401,5 @@ __all__ = [
     "Span",
 
     # 类型定义（向后兼容）
-    # 枚举类型
-    "TaskStatus",
-    "MemoryLayer",
-    "MemoryRecordType",
-    "SessionStatus",
-    "SkillStatus",
-    "SpanStatus",
-    # 领域模型
-    "Task",
-    "TaskResult",
-    "Memory",
-    "MemoryInfo",
-    "MemorySearchResult",
-    "Session",
-    "Skill",
-    "SkillResult",
-    "SkillInfo",
-    # 列表查询选项
-    "PaginationOptions",
-    "SortOptions",
-    "FilterOptions",
-    "ListOptions",
+    # 注：与上方"类型定义（v0.1.0 新增）"重复的条目已移除
 ]

@@ -11,6 +11,18 @@ endif()
 
 message(STATUS "Configuring AgentOS core components...")
 
+# 子模块启用状态汇总
+message(STATUS "[MODULE] Submodule build status:")
+message(STATUS "[MODULE]   atoms:    ${BUILD_ATOMS}")
+message(STATUS "[MODULE]   commons:  ${BUILD_COMMONS}")
+message(STATUS "[MODULE]   cupolas:  ${BUILD_CUPOLAS}")
+message(STATUS "[MODULE]   daemon:   ${BUILD_DAEMON}")
+message(STATUS "[MODULE]   gateway:  ${BUILD_GATEWAY}")
+message(STATUS "[MODULE]   heapstore: ${BUILD_HEAPSTORE}")
+message(STATUS "[MODULE]   toolkit:  ${BUILD_TOOLKIT}")
+message(STATUS "[MODULE]   Memory backend: ${AGENTOS_MEMORY_BACKEND}")
+message(STATUS "[MODULE]   With MemoryRovol: ${AGENTOS_WITH_MEMORYROVOL}")
+
 # 全局特性测试宏定义 - 必须在所有其他配置之前
 # 这些宏确保POSIX函数和类型在所有平台上一致可用
 if(UNIX AND NOT APPLE)
@@ -29,8 +41,12 @@ elseif(APPLE)
 endif()
 
 if(MSVC)
-    message(STATUS "AgentOS: Windows MSVC force-include enabled")
-    add_compile_options(/FI"${CMAKE_SOURCE_DIR}/scripts/cmake/windows_preinclude.h")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/dev/cmake/windows_preinclude.h")
+        message(STATUS "[MSVC] Force-include file found: scripts/dev/cmake/windows_preinclude.h")
+    else()
+        message(WARNING "[MSVC] Force-include file NOT FOUND: scripts/dev/cmake/windows_preinclude.h")
+    endif()
+    add_compile_options(/FI"${CMAKE_SOURCE_DIR}/scripts/dev/cmake/windows_preinclude.h")
 endif()
 
 # 选项设置

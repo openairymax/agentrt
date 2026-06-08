@@ -173,7 +173,7 @@ static int loc_stream_on_chunk(const char *json_line, void *userdata)
                         }
                     }
                     if (acc->acc_content && acc->acc_len + tlen < acc->acc_cap) {
-                        memcpy(acc->acc_content + acc->acc_len, text, tlen);
+                        __builtin_memcpy(acc->acc_content + acc->acc_len, text, tlen);
                         acc->acc_len += tlen;
                         acc->acc_content[acc->acc_len] = '\0';
                     }
@@ -244,7 +244,7 @@ static int local_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_conf
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     loc_stream_acc_t acc;
-    memset(&acc, 0, sizeof(acc));
+    __builtin_memset(&acc, 0, sizeof(acc));
     acc.user_cb = callback;
     acc.user_data = user_data;
     acc.acc_cap = 4096;

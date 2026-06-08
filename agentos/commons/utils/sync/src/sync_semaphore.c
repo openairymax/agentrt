@@ -31,7 +31,7 @@ sync_result_t sync_semaphore_create(sync_semaphore_t *semaphore, unsigned int in
     if (attr != NULL && attr->name != NULL) {
         s->name = sync_internal_strdup(attr->name);
     }
-    memset(&s->stats, 0, sizeof(sync_stats_t));
+    AGENTOS_MEMSET(&s->stats, 0, sizeof(sync_stats_t));
 
 #ifdef _WIN32
     s->semaphore = CreateSemaphore(NULL, initial_value, max_value, NULL);

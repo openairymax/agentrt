@@ -38,7 +38,7 @@ repos:
     hooks:
       - id: black
         language_version: python3
-        exclude: ^(coreadd/|coresvc/|build/|dist/)
+        exclude: ^(build/|dist/)
 
   # Python import 排序
   - repo: https://github.com/pycqa/isort
@@ -46,14 +46,14 @@ repos:
     hooks:
       - id: isort
         name: isort (python)
-        exclude: ^(coreadd/|coresvc/|build/|dist/)
+        exclude: ^(build/|dist/)
 
   # Python 代码检查
   - repo: https://github.com/pycqa/flake8
     rev: 6.0.0
     hooks:
       - id: flake8
-        exclude: ^(coreadd/|coresvc/|build/|dist/|\.venv/)
+        exclude: ^(build/|dist/|\.venv/)
         args: [--max-line-length=127, --extend-ignore=E203]
 
   # Python 类型检查
@@ -61,7 +61,7 @@ repos:
     rev: v0.991
     hooks:
       - id: mypy
-        exclude: ^(coreadd/|coresvc/|build/|dist/|tests/)
+        exclude: ^(build/|dist/|tests/)
         additional_dependencies:
           - types-requests
           - types-PyYAML
@@ -110,7 +110,7 @@ repos:
   #         - --use-current-year
 
   # 提交信息格式检查（可选）
-  # - repo: https://github.com/commitizen-agentos/toolkit/commitizen
+  # - repo: https://github.com/commitizen-tools/commitizen
   #   rev: v2.38.0
   #   hooks:
   #     - id: commitizen

@@ -2,7 +2,7 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 模块构建脚本
 # 支持：多模块并行构建、多构建类型、增量构建、缓存感知
-# Version: 2.0.0
+# Version: 0.1.0
 
 set -euo pipefail
 

@@ -58,7 +58,7 @@ static void test_cognition_create_default(void)
 static void test_cognition_create_ex_with_config(void)
 {
     agentos_cognition_config_t config;
-    memset(&config, 0, sizeof(config));
+    AGENTOS_MEMSET(&config, 0, sizeof(config));
     config.cognition_default_timeout_ms = 5000;
     config.cognition_max_retries = 3;
 

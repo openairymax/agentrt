@@ -166,11 +166,11 @@ int logging_compat_init(const logging_compat_config_t *manager)
 
     /* 应用配置 */
     if (manager) {
-        memcpy(&g_compat_config, manager, sizeof(g_compat_config));
+        __builtin_memcpy(&g_compat_config, manager, sizeof(g_compat_config));
     }
 
     /* 初始化统计信?*/
-    memset(&g_compat_stats, 0, sizeof(g_compat_stats));
+    AGENTOS_MEMSET(&g_compat_stats, 0, sizeof(g_compat_stats));
 
     /* 标记为已初始?*/
     int _exp = 0;
@@ -192,18 +192,18 @@ const char *agentos_log_set_trace_id(const char *trace_id)
 
     if (trace_id) {
         /* 使用用户提供的追踪ID */
-        strncpy(g_thread_trace_id, trace_id, sizeof(g_thread_trace_id) - 1);
+        AGENTOS_STRNCPY_TERM(g_thread_trace_id, trace_id, sizeof(g_thread_trace_id));
         g_thread_trace_id[sizeof(g_thread_trace_id) - 1] = '\0';
     } else {
         if (g_compat_config.behavior.emulate_old_trace_id) {
             const char *old_id = generate_old_trace_id();
             if (old_id) {
-                strncpy(g_thread_trace_id, old_id, sizeof(g_thread_trace_id) - 1);
+                AGENTOS_STRNCPY_TERM(g_thread_trace_id, old_id, sizeof(g_thread_trace_id));
             }
         } else {
             const char *new_id = log_set_trace_id(NULL);
             if (new_id) {
-                strncpy(g_thread_trace_id, new_id, sizeof(g_thread_trace_id) - 1);
+                AGENTOS_STRNCPY_TERM(g_thread_trace_id, new_id, sizeof(g_thread_trace_id));
             }
         }
         g_thread_trace_id[sizeof(g_thread_trace_id) - 1] = '\0';
@@ -339,7 +339,7 @@ int logging_compat_get_stats(logging_compat_stats_t *out_stats)
     }
 
     /* 复制统计信息（使用原子操作确保一致性） */
-    memcpy(out_stats, &g_compat_stats, sizeof(g_compat_stats));
+    __builtin_memcpy(out_stats, &g_compat_stats, sizeof(g_compat_stats));
 
     /* 更新动态统计信?*/
     out_stats->migration_progress.total_modules = 10;   /* 示例?*/
@@ -380,10 +380,9 @@ int logging_compat_get_migration_list(migration_module_info_t *out_modules, int 
     }
 
     for (int i = 0; i < count; i++) {
-        strncpy(out_modules[i].module_name, default_modules[i],
-                sizeof(out_modules[i].module_name) - 1);
-        strncpy(out_modules[i].current_api, "legacy", sizeof(out_modules[i].current_api) - 1);
-        strncpy(out_modules[i].target_api, "new", sizeof(out_modules[i].target_api) - 1);
+        AGENTOS_STRNCPY_TERM(out_modules[i].module_name, default_modules[i], sizeof(out_modules[i].module_name));
+        AGENTOS_STRNCPY_TERM(out_modules[i].current_api, "legacy", sizeof(out_modules[i].current_api));
+        AGENTOS_STRNCPY_TERM(out_modules[i].target_api, "new", sizeof(out_modules[i].target_api));
         out_modules[i].migration_status = (i < 2) ? 1 : 0;
         out_modules[i].completion_percent = (i < 2) ? 100.0f : 0.0f;
     }
@@ -403,7 +402,7 @@ void logging_compat_cleanup(void)
     }
 
     /* 清理资源 */
-    memset(&g_compat_stats, 0, sizeof(g_compat_stats));
+    AGENTOS_MEMSET(&g_compat_stats, 0, sizeof(g_compat_stats));
     atomic_store_explicit(&g_compat_initialized, 0, memory_order_seq_cst);
 
     LOG_INFO("Logging compatibility layer cleaned up");
@@ -487,7 +486,7 @@ const migration_validation_result_t *logging_validate_migration(const char *modu
         .details = "Migration validation completed successfully"};
 
     if (module_name) {
-        strncpy(result.module_name, module_name, sizeof(result.module_name) - 1);
+        AGENTOS_STRNCPY_TERM(result.module_name, module_name, sizeof(result.module_name));
         result.module_name[sizeof(result.module_name) - 1] = '\0';
     }
 

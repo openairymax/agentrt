@@ -173,7 +173,7 @@ static bool message_queue_enqueue(message_queue_t *queue, vertex_id_t target, co
             AGENTOS_FREE(entry);
             return false;
         }
-        memcpy(entry->payload, payload, payload_size);
+        __builtin_memcpy(entry->payload, payload, payload_size);
     } else {
         entry->payload = NULL;
     }
@@ -430,7 +430,7 @@ pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
     engine->checkpoint_count = 0;
 
     // 初始化统计信息
-    memset(&engine->stats, 0, sizeof(engine->stats));
+    __builtin_memset(&engine->stats, 0, sizeof(engine->stats));
 
     // 初始化状态
     engine->current_superstep = 0;
@@ -867,12 +867,12 @@ uint64_t pregel_engine_create_checkpoint(pregel_engine_handle_t engine)
     void *snapshot = AGENTOS_MALLOC(snapshot_size);
     if (snapshot) {
         size_t offset = 0;
-        memcpy((char *)snapshot + offset, &e->current_superstep, sizeof(superstep_t));
+        __builtin_memcpy((char *)snapshot + offset, &e->current_superstep, sizeof(superstep_t));
         offset += sizeof(superstep_t);
-        memcpy((char *)snapshot + offset, &e->active_vertices, sizeof(size_t));
+        __builtin_memcpy((char *)snapshot + offset, &e->active_vertices, sizeof(size_t));
         offset += sizeof(size_t);
         if (e->vertex_states && states_size > 0) {
-            memcpy((char *)snapshot + offset, e->vertex_states, states_size);
+            __builtin_memcpy((char *)snapshot + offset, e->vertex_states, states_size);
         }
     }
 
@@ -892,7 +892,7 @@ uint64_t pregel_engine_create_checkpoint(pregel_engine_handle_t engine)
     } else {
         if (e->checkpoints[0].snapshot_data)
             AGENTOS_FREE(e->checkpoints[0].snapshot_data);
-        memmove(&e->checkpoints[0], &e->checkpoints[1], 15 * sizeof(checkpoint_t));
+        __builtin_memmove(&e->checkpoints[0], &e->checkpoints[1], 15 * sizeof(checkpoint_t));
         e->checkpoints[15].checkpoint_id = cp_id;
         e->checkpoints[15].superstep = e->current_superstep;
         e->checkpoints[15].timestamp = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
@@ -938,15 +938,15 @@ taskflow_error_t pregel_engine_restore_checkpoint(pregel_engine_handle_t engine,
     char *data = (char *)cp->snapshot_data;
     size_t offset = 0;
 
-    memcpy(&e->current_superstep, data + offset, sizeof(superstep_t));
+    __builtin_memcpy(&e->current_superstep, data + offset, sizeof(superstep_t));
     offset += sizeof(superstep_t);
 
-    memcpy(&e->active_vertices, data + offset, sizeof(size_t));
+    __builtin_memcpy(&e->active_vertices, data + offset, sizeof(size_t));
     offset += sizeof(size_t);
 
     size_t states_size = e->vertex_state_count * sizeof(pregel_vertex_state_t);
     if (e->vertex_states && states_size > 0 && cp->data_size >= offset + states_size) {
-        memcpy(e->vertex_states, data + offset, states_size);
+        __builtin_memcpy(e->vertex_states, data + offset, states_size);
     }
 
     e->computation_done = false;
@@ -977,7 +977,7 @@ taskflow_error_t pregel_engine_delete_checkpoint(pregel_engine_handle_t engine,
             }
 
             if (i != e->checkpoint_count - 1) {
-                memmove(&e->checkpoints[i], &e->checkpoints[i + 1],
+                __builtin_memmove(&e->checkpoints[i], &e->checkpoints[i + 1],
                         (e->checkpoint_count - i - 1) * sizeof(checkpoint_t));
             }
             e->checkpoint_count--;
@@ -1040,7 +1040,7 @@ taskflow_error_t pregel_engine_reset_stats(pregel_engine_handle_t engine)
 
     struct pregel_engine_s *e = (struct pregel_engine_s *)engine;
 
-    memset(&e->stats, 0, sizeof(e->stats));
+    __builtin_memset(&e->stats, 0, sizeof(e->stats));
 
     return TASKFLOW_SUCCESS;
 }
@@ -1157,7 +1157,7 @@ taskflow_error_t pregel_engine_run_superstep(pregel_engine_handle_t engine)
                     if (new_msgs) {
                         vs->incoming_messages = new_msgs;
                         graph_message_t *msg = &vs->incoming_messages[vs->incoming_message_count];
-                        memset(msg, 0, sizeof(graph_message_t));
+                        __builtin_memset(msg, 0, sizeof(graph_message_t));
                         msg->id = (message_id_t)(vs->incoming_message_count + 1);
                         msg->sender = entry->target;
                         msg->receiver = entry->target;

@@ -1,7 +1,7 @@
 # Logging — 日志系统
 
 **模块路径**: `agentos/commons/utils/logging/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
@@ -30,8 +30,8 @@ logging/
 │   ├── logging.c                # Core 层实现
 │   ├── logging_compat.c         # 兼容层实现
 │   ├── atomic_logging.c         # Atomic 层实现
-│   └── service_logging.c        # Service 层实现
-├── logging_common.c             # 公共功能实现
+│   ├── service_logging.c        # Service 层实现
+│   └── logging_common.c         # 公共功能实现
 ├── bench_atomic_logging.c       # Atomic 层性能基准测试
 ├── test/
 │   └── test_logging_unified.c   # 统一日志测试

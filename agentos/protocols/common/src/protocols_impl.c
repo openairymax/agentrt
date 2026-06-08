@@ -93,7 +93,7 @@ size_t protocol_manager_get_stacks(protocol_manager_handle_t manager,
     struct protocol_manager_s *mgr = (struct protocol_manager_s *)manager;
     size_t count = mgr->stack_count < max_count ? mgr->stack_count : max_count;
     if (stacks) {
-        memcpy(stacks, mgr->stacks, count * sizeof(protocol_stack_handle_t));
+        __builtin_memcpy(stacks, mgr->stacks, count * sizeof(protocol_stack_handle_t));
     }
     return count;
 }
@@ -193,9 +193,9 @@ const char *protocol_get_last_error(void)
 protocol_stack_config_t protocol_stack_config_default(const char *name)
 {
     protocol_stack_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
+    AGENTOS_MEMSET(&cfg, 0, sizeof(cfg));
     if (name) {
-        strncpy(cfg.name, name, sizeof(cfg.name) - 1);
+        AGENTOS_STRNCPY_TERM(cfg.name, name, sizeof(cfg.name));
         cfg.name[sizeof(cfg.name) - 1] = '\0';
     }
     cfg.default_protocol = PROTOCOL_HTTP;
@@ -211,5 +211,5 @@ void protocol_stack_config_destroy(protocol_stack_config_t *config)
 {
     if (!config)
         return;
-    memset(config, 0, sizeof(*config));
+    AGENTOS_MEMSET(config, 0, sizeof(*config));
 }

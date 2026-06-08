@@ -53,7 +53,7 @@ class TestTaskDefinition:
 
     def test_creation_with_defaults(self):
         """Test TaskDefinition with default values."""
-        from openlab.core.task import TaskDefinition
+        from openlab.core.task import TaskDefinition, TaskCategory
 
         task = TaskDefinition(name="Test Task")
         
@@ -67,7 +67,7 @@ class TestTaskDefinition:
 
     def test_creation_with_all_params(self):
         """Test TaskDefinition with all parameters."""
-        from openlab.core.task import TaskDefinition
+        from openlab.core.task import TaskDefinition, TaskCategory
 
         task = TaskDefinition(
             name="Complex Task",
@@ -84,7 +84,7 @@ class TestTaskDefinition:
         assert task.category == TaskCategory.LONG_RUNNING
         assert task.priority == 10
         assert task.input_data == {"key": "value"}
-        assert task.metadata["author"] == "test"
+        assert task.metadata["author"] == "Spharx AgentOS Team"
         assert task.timeout == 3600.0
         assert task.max_retries == 3
 
@@ -94,7 +94,7 @@ class TestTaskState:
 
     def test_initial_state(self):
         """Test initial state values."""
-        from openlab.core.task import TaskState
+        from openlab.core.task import TaskState, TaskStatus
 
         state = TaskState(task_id="task-001")
         
@@ -107,7 +107,7 @@ class TestTaskState:
 
     def test_state_serialization(self):
         """Test state to_dict/from_dict roundtrip."""
-        from openlab.core.task import TaskState
+        from openlab.core.task import TaskState, TaskStatus
 
         original = TaskState(
             task_id="task-002",
@@ -201,7 +201,7 @@ class TestTaskScheduler:
     @pytest.mark.asyncio
     async def test_submit_task(self, scheduler):
         """Test submitting a task."""
-        from openlab.core.task import TaskDefinition
+        from openlab.core.task import TaskDefinition, TaskCategory
         
         definition = TaskDefinition(name="Test Task")
         task_id = await scheduler.submit(definition)
@@ -212,9 +212,7 @@ class TestTaskScheduler:
     @pytest.mark.asyncio
     async def test_submit_full_queue(self, scheduler):
         """Test submitting to full queue raises error."""
-        from openlab.core.task import TaskDefinition
-        
-        # Create a scheduler with very small queue
+        from openlab.core.task import TaskDefinition, TaskCategory, TaskScheduler
         small_scheduler = TaskScheduler(max_concurrent=1, max_queue_size=2)
         
         await small_scheduler.submit(TaskDefinition(name="Task 1"))
@@ -226,7 +224,7 @@ class TestTaskScheduler:
     @pytest.mark.asyncio
     async def test_get_state(self, scheduler):
         """Test getting task state."""
-        from openlab.core.task import TaskDefinition
+        from openlab.core.task import TaskDefinition, TaskCategory, TaskStatus
         
         definition = TaskDefinition(name="Test Task")
         task_id = await scheduler.submit(definition)
@@ -240,7 +238,7 @@ class TestTaskScheduler:
     @pytest.mark.asyncio
     async def test_cancel_task(self, scheduler):
         """Test cancelling a task."""
-        from openlab.core.task import TaskDefinition
+        from openlab.core.task import TaskDefinition, TaskCategory
         
         definition = TaskDefinition(name="Cancellable Task")
         task_id = await scheduler.submit(definition)
@@ -254,7 +252,7 @@ class TestTaskScheduler:
     @pytest.mark.asyncio
     async def test_checkpoint_operations(self, scheduler):
         """Test checkpoint save and load."""
-        from openlab.core.task import TaskDefinition
+        from openlab.core.task import TaskDefinition, TaskCategory
         
         definition = TaskDefinition(name="Checkpoint Task")
         task_id = await scheduler.submit(definition)
@@ -278,7 +276,7 @@ class TestTaskScheduler:
     @pytest.mark.asyncio
     async def test_schedule_execution(self, scheduler):
         """Test scheduling and executing a task."""
-        from openlab.core.task import TaskDefinition
+        from openlab.core.task import TaskDefinition, TaskCategory
         
         executed_tasks = []
         

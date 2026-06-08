@@ -74,7 +74,7 @@ void china_eco_destroy(china_eco_handle_t *handle)
 {
     if (!handle)
         return;
-    memset(handle, 0, sizeof(china_eco_handle_t));
+    AGENTOS_MEMSET(handle, 0, sizeof(china_eco_handle_t));
     AGENTOS_FREE(handle);
 }
 
@@ -104,7 +104,7 @@ int china_eco_remove_llm_provider(china_eco_handle_t *h, china_eco_provider_type
     for (size_t i = 0; i < h->llm_provider_count; i++) {
         if (h->llm_providers[i].provider_type == type) {
             if (i < h->llm_provider_count - 1) {
-                memmove(&h->llm_providers[i], &h->llm_providers[i + 1],
+                __builtin_memmove(&h->llm_providers[i], &h->llm_providers[i + 1],
                         (h->llm_provider_count - i - 1) * sizeof(china_eco_llm_provider_t));
             }
             h->llm_provider_count--;
@@ -336,12 +336,12 @@ int china_eco_sm3_hash(const void *data, size_t size, uint8_t digest[CHINA_ECO_S
     if (!data && size > 0)
         return AGENTOS_ERR_INVALID_PARAM;
     if (!data || size == 0) {
-        memset(digest, 0, CHINA_ECO_SM3_DIGEST_SIZE);
+        AGENTOS_MEMSET(digest, 0, CHINA_ECO_SM3_DIGEST_SIZE);
         return 0;
     }
 
     uint32_t V[8];
-    memcpy(V, SM3_IV, sizeof(SM3_IV));
+    __builtin_memcpy(V, SM3_IV, sizeof(SM3_IV));
 
     uint64_t total_bits = (uint64_t)size * 8;
     const uint8_t *src = (const uint8_t *)data;
@@ -354,12 +354,12 @@ int china_eco_sm3_hash(const void *data, size_t size, uint8_t digest[CHINA_ECO_S
     }
 
     uint8_t final_block[64] = {0};
-    memcpy(final_block, src, remaining);
+    __builtin_memcpy(final_block, src, remaining);
     final_block[remaining] = 0x80;
 
     if (remaining >= 56) {
         sm3_compress(V, final_block);
-        memset(final_block, 0, 64);
+        AGENTOS_MEMSET(final_block, 0, 64);
     }
 
     for (int i = 0; i < 8; i++) {
@@ -517,15 +517,15 @@ int china_eco_sm4_encrypt(china_eco_sm4_context_t *ctx, const void *plaintext, s
     uint8_t block[CHINA_ECO_SM4_BLOCK_SIZE];
     uint8_t prev_block[CHINA_ECO_SM4_BLOCK_SIZE];
 
-    memcpy(prev_block, ctx->iv, CHINA_ECO_SM4_BLOCK_SIZE);
+    __builtin_memcpy(prev_block, ctx->iv, CHINA_ECO_SM4_BLOCK_SIZE);
 
     for (size_t offset = 0; offset < padded_size; offset += CHINA_ECO_SM4_BLOCK_SIZE) {
-        memset(block, 0, CHINA_ECO_SM4_BLOCK_SIZE);
+        AGENTOS_MEMSET(block, 0, CHINA_ECO_SM4_BLOCK_SIZE);
         if (offset < pt_size) {
             size_t copy_size = CHINA_ECO_SM4_BLOCK_SIZE;
             if (offset + copy_size > pt_size)
                 copy_size = pt_size - offset;
-            memcpy(block, pt + offset, copy_size);
+            __builtin_memcpy(block, pt + offset, copy_size);
 
             if (copy_size < CHINA_ECO_SM4_BLOCK_SIZE) {
                 uint8_t pad_val = (uint8_t)(CHINA_ECO_SM4_BLOCK_SIZE - copy_size);
@@ -533,14 +533,14 @@ int china_eco_sm4_encrypt(china_eco_sm4_context_t *ctx, const void *plaintext, s
                     block[j] = pad_val;
             }
         } else {
-            memset(block, CHINA_ECO_SM4_BLOCK_SIZE, CHINA_ECO_SM4_BLOCK_SIZE);
+            AGENTOS_MEMSET(block, CHINA_ECO_SM4_BLOCK_SIZE, CHINA_ECO_SM4_BLOCK_SIZE);
         }
 
         for (size_t j = 0; j < CHINA_ECO_SM4_BLOCK_SIZE; j++)
             block[j] ^= prev_block[j];
 
         sm4_encrypt_block(rk, block, ct + offset);
-        memcpy(prev_block, ct + offset, CHINA_ECO_SM4_BLOCK_SIZE);
+        __builtin_memcpy(prev_block, ct + offset, CHINA_ECO_SM4_BLOCK_SIZE);
     }
 
     return 0;
@@ -574,7 +574,7 @@ int china_eco_sm4_decrypt(china_eco_sm4_context_t *ctx, const void *ciphertext, 
     uint8_t decrypted[CHINA_ECO_SM4_BLOCK_SIZE];
     uint8_t pad_len = 0;
 
-    memcpy(prev_block, ctx->iv, CHINA_ECO_SM4_BLOCK_SIZE);
+    __builtin_memcpy(prev_block, ctx->iv, CHINA_ECO_SM4_BLOCK_SIZE);
 
     for (size_t offset = 0; offset < ct_size; offset += CHINA_ECO_SM4_BLOCK_SIZE) {
         sm4_decrypt_block(decrypt_rk, ct + offset, decrypted);
@@ -590,8 +590,8 @@ int china_eco_sm4_decrypt(china_eco_sm4_context_t *ctx, const void *ciphertext, 
             }
         }
 
-        memcpy(pt + offset, decrypted, copy_size);
-        memcpy(prev_block, ct + offset, CHINA_ECO_SM4_BLOCK_SIZE);
+        __builtin_memcpy(pt + offset, decrypted, copy_size);
+        __builtin_memcpy(prev_block, ct + offset, CHINA_ECO_SM4_BLOCK_SIZE);
     }
 
     *pt_size = ct_size - pad_len;

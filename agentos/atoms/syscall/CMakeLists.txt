@@ -132,7 +132,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
             ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/error/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/core/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/compat/include
         )

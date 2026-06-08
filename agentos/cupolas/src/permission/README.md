@@ -1,7 +1,7 @@
 # Permission — 权限管理
 
 **模块路径**: `agentos/cupolas/src/permission/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
 ## 概述
 
@@ -73,7 +73,7 @@ rules:
 | `permission_engine_destroy(engine)` | 销毁权限引擎 |
 | `permission_engine_ref(engine)` | 增加引用计数 |
 | `permission_engine_unref(engine)` | 减少引用计数 |
-| `permission_engine_check(engine, agent_id, action, resource, context)` | 权限检查（1=允许，0=拒绝） |
+| `permission_engine_check(engine, agent_id, action, resource, context)` | 权限检查（1=允许，0=拒绝，负数=错误） |
 | `permission_engine_reload(engine)` | 重新加载规则文件 |
 | `permission_engine_clear_cache(engine)` | 清除权限缓存 |
 | `permission_engine_add_rule(engine, agent_id, action, resource, allow, priority)` | 动态添加规则 |
@@ -120,6 +120,14 @@ permission_engine_destroy(engine);
 - **通配符支持**：`agent_id` 和 `action` 支持 `*` 通配符
 - **Glob 模式**：`resource` 支持 glob 模式（如 `/data/*`、`/api/v1/**`）
 - **默认拒绝**：无规则匹配时默认拒绝
+
+## 依赖关系
+
+| 依赖 | 说明 |
+|------|------|
+| `platform.h` | 平台抽象层（互斥锁） |
+| `cupolas_utils.h` | 安全内存管理、日志宏 |
+| `yaml_minimal.h` | YAML 规则文件解析 |
 
 ## 相关子系统
 

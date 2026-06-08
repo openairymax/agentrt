@@ -1,9 +1,9 @@
 # OpenLab Core — 开放生态核心管理模块
 
 **模块路径**: `agentos/openlab/openlab/`
-**版本**: v0.1.0
+**版本**: v0.0.5
 
-> **Status**: 本模块作为 AgentOS v0.1.0 的正式组成部分，API 已稳定。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
 
 ## 概述
 
@@ -43,13 +43,13 @@ openlab/
 
 | 类/枚举 | 说明 |
 |---------|------|
-| `Agent` | Agent 抽象基类，定义 `initialize()`/`execute()`/`shutdown()` 生命周期 |
+| `Agent` | Agent 抽象基类，定义 `initialize()`/`execute()`/`shutdown()` 生命周期，支持 `workbench_id` 和 `manager` 关联 |
 | `AgentStatus` | Agent 状态枚举：CREATED/INITIALIZING/READY/RUNNING/PAUSED/SHUTTING_DOWN/SHUTDOWN/ERROR |
 | `AgentCapability` | Agent 能力枚举：ARCHITECTURE_DESIGN/CODE_GENERATION/TEST_GENERATION/DOCUMENTATION/DEBUGGING/OPTIMIZATION |
 | `AgentContext` | Agent 执行上下文，包含 agent_id/task_id/session_id/metadata/timeout |
-| `AgentRegistry` | 线程安全的 Agent 注册表，支持注册/注销/查询/计数 |
+| `AgentRegistry` | 线程安全的 Agent 注册表，支持 register/unregister/get/list_agents/count |
 | `TaskResult` | 任务执行结果，包含 success/output/error/error_code/metrics/warnings |
-| `Message` | Agent 消息传递对象，支持 type/content/sender/receiver/metadata |
+| `Message` | Agent 消息传递对象，支持 type/content/sender/receiver/metadata/timestamp |
 
 ### 任务调度 (`core/task.py`)
 
@@ -59,10 +59,10 @@ openlab/
 |---------|------|
 | `TaskStatus` | 任务状态：PENDING/QUEUED/RUNNING/PAUSED/COMPLETED/FAILED/CANCELLED/TIMEOUT |
 | `TaskCategory` | 任务类别：IMMEDIATE/SCHEDULED/PERIODIC/LONG_RUNNING |
-| `TaskDefinition` | 任务定义，包含 task_id/name/description/category/priority/input_data/timeout/max_retries |
-| `TaskState` | 任务运行时状态，支持序列化/反序列化和 checkpoint |
-| `ExecutionPlan` | 执行计划，支持步骤管理和资源分配 |
-| `TaskScheduler` | 异步任务调度器，支持优先级队列、并发控制、超时管理、checkpoint |
+| `TaskDefinition` | 任务定义，包含 task_id/name/description/category/priority/input_data/metadata/timeout/max_retries/scheduled_at |
+| `TaskState` | 任务运行时状态，支持 `to_dict()`/`from_dict()` 序列化和 checkpoint_data |
+| `ExecutionPlan` | 执行计划，支持 `add_step()`/`get_next_step()` 步骤管理和 resources 分配 |
+| `TaskScheduler` | 异步任务调度器，支持优先级队列、并发控制（Semaphore）、超时管理、checkpoint、`get_stats()` 统计 |
 
 ### 工具系统 (`core/tool.py`)
 
@@ -70,13 +70,13 @@ openlab/
 
 | 类/枚举 | 说明 |
 |---------|------|
-| `Tool` | 工具抽象基类，支持 INPUT_SCHEMA/OUTPUT_SCHEMA 验证、安全前置检查 |
+| `Tool` | 工具抽象基类，支持 INPUT_SCHEMA/OUTPUT_SCHEMA 验证、`_pre_execute_check()` 安全前置检查、`get_info()` 元信息 |
 | `ToolCategory` | 工具类别：INPUT_OUTPUT/COMPUTATION/COMMUNICATION/DATA_ACCESS/SYSTEM/CUSTOM |
 | `ToolCapability` | 工具能力：READ/WRITE/EXECUTE/QUERY/TRANSFORM/ANALYZE |
-| `ToolContext` | 工具执行上下文 |
-| `ToolResult` | 工具执行结果，包含 success/output/error/error_code/execution_time/metrics |
-| `ToolRegistry` | 工具注册表，支持按类别/能力查找 |
-| `ToolExecutor` | 工具执行器，支持并发控制、超时管理、执行历史记录 |
+| `ToolContext` | 工具执行上下文，包含 tool_id/agent_id/task_id/session_id/timeout/metadata |
+| `ToolResult` | 工具执行结果，包含 success/output/error/error_code/execution_time/metrics/warnings |
+| `ToolRegistry` | 工具注册表，支持 register/unregister/get/list_tools/find_by_category/find_by_capability |
+| `ToolExecutor` | 工具执行器，支持并发控制（Semaphore）、超时管理、执行历史记录、`get_stats()` 统计 |
 
 ### 存储系统 (`core/storage.py`)
 
@@ -84,12 +84,22 @@ openlab/
 
 | 类/枚举 | 说明 |
 |---------|------|
-| `Storage` | 存储抽象基类，定义 get/set/delete/exists/query/clear 接口 |
+| `Storage` | 存储抽象基类，定义 initialize/close/get/set/delete/exists/query/clear/get_json/set_json 接口 |
 | `StorageType` | 存储类型：MEMORY/SQLITE/FILE/REDIS/CUSTOM |
 | `DataCategory` | 数据类别：TASK/AGENT/TOOL/CHECKPOINT/LOG/METADATA |
-| `StorageRecord` | 存储记录，支持 TTL/版本号/元数据 |
+| `StorageRecord` | 存储记录，支持 TTL/expires_at/版本号/元数据，支持 `to_dict()`/`from_dict()` |
+| `QueryResult` | 查询结果，包含 records/total/offset/limit |
 | `MemoryStorage` | 内存存储实现，支持 TTL 过期和条件查询 |
-| `SQLiteStorage` | SQLite 存储实现，支持索引和异步操作 |
+| `SQLiteStorage` | SQLite 存储实现，支持索引（category/expires_at）和异步操作（run_in_executor） |
+
+## 预构建 Agent (`agents/architect/`)
+
+内置架构师 Agent 实现：
+
+| 类 | 说明 |
+|----|------|
+| `ArchitectAgent` | 架构设计 Agent，支持 analyze/review/design 三种任务类型 |
+| `ArchitectConfig` | 配置类，包含 workspace_root/max_file_size/forbidden_paths/allowed_extensions |
 
 ## 异常层级 (`utils/exceptions.py`)
 
@@ -116,6 +126,15 @@ OpenLabError
     └── ConfigurationError
 ```
 
+## 日志配置 (`utils/logging.py`)
+
+提供集中式日志配置：
+
+| 函数 | 说明 |
+|------|------|
+| `setup_logger(name, level, log_file)` | 创建并配置 Logger 实例，支持控制台和文件输出 |
+| `get_logger(name)` | 获取已存在的 Logger 实例 |
+
 ## 接口说明
 
 ### Agent 生命周期
@@ -127,6 +146,7 @@ class Agent(ABC):
     async def shutdown(self) -> None             # 关闭 Agent
     async def handle_message(self, message)      # 处理消息
     def register_tool(self, name, tool)          # 注册工具
+    def get_tool(self, name) -> Optional[Any]    # 获取已注册工具
 ```
 
 ### TaskScheduler 核心 API
@@ -140,6 +160,7 @@ class TaskScheduler:
     async def save_checkpoint(self, task_id, data) -> bool       # 保存检查点
     async def load_checkpoint(self, task_id) -> Optional[Dict]   # 加载检查点
     async def shutdown(self, wait, timeout)                      # 关闭调度器
+    def get_stats(self) -> Dict[str, Any]                        # 获取统计信息
 ```
 
 ### Storage 核心 API

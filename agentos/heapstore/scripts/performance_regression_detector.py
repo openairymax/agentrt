@@ -134,7 +134,9 @@ class PerformanceDetector:
                 timeout=5
             )
             return result.stdout.split('\n')[0]
-        except:
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+            if self.verbose:
+                print(f"   ⚠️  编译器检测失败: {e}")
             return "Unknown"
     
     def run_benchmark(self):

@@ -28,6 +28,9 @@ if(WIN32)
     set(PROTOCOLS_ENABLE_CHINA_ECO OFF CACHE BOOL "China Eco requires Unix" FORCE)
 endif()
 
+message(STATUS "[PROTOCOLS] Configuring protocols module (cJSON: ${AGENTOS_HAS_CJSON})")
+message(STATUS "[PROTOCOLS]   MCP: ${PROTOCOLS_ENABLE_MCP}, A2A: ON, Claude: ${PROTOCOLS_ENABLE_CLAUDE}")
+
 option(PROTOCOLS_ENABLE_MCP "Enable MCP protocol adapter" ON)
 if(WIN32)
     set(PROTOCOLS_ENABLE_MCP OFF CACHE BOOL "MCP requires cJSON/unistd.h" FORCE)

@@ -74,7 +74,7 @@ static void test_memory_write_record(void)
     }
 
     agentos_memory_record_t record;
-    memset(&record, 0, sizeof(record));
+    AGENTOS_MEMSET(&record, 0, sizeof(record));
     record.memory_record_type = AGENTOS_MEMTYPE_TEXT;
     record.memory_record_importance = 0.85f;
 
@@ -126,7 +126,7 @@ static void test_memory_query_records(void)
     }
 
     agentos_memory_query_t query;
-    memset(&query, 0, sizeof(query));
+    AGENTOS_MEMSET(&query, 0, sizeof(query));
     query.memory_query_text = "test query for memory search";
     query.memory_query_text_len = strlen(query.memory_query_text);
     query.memory_query_limit = 10;
@@ -170,7 +170,7 @@ static void test_memory_get_by_id(void)
     }
 
     agentos_memory_record_t record;
-    memset(&record, 0, sizeof(record));
+    AGENTOS_MEMSET(&record, 0, sizeof(record));
     record.memory_record_type = AGENTOS_MEMTYPE_EMBEDDING;
     record.memory_record_importance = 0.9f;
     const char *data = "feature vector data";
@@ -212,7 +212,7 @@ static void test_memory_mount(void)
     }
 
     agentos_memory_record_t record;
-    memset(&record, 0, sizeof(record));
+    AGENTOS_MEMSET(&record, 0, sizeof(record));
     record.memory_record_type = AGENTOS_MEMTYPE_STRUCTURED;
     const char *data = "structured memory content";
     record.memory_record_data = (void *)data;
@@ -336,7 +336,7 @@ static void test_memory_write_all_types(void)
     int all_ok = 1;
     for (int i = 0; i < 4; i++) {
         agentos_memory_record_t rec;
-        memset(&rec, 0, sizeof(rec));
+        AGENTOS_MEMSET(&rec, 0, sizeof(rec));
         rec.memory_record_type = type_values[i];
         rec.memory_record_importance = 0.5f + (float)i * 0.1f;
         const char *d = "test data";
@@ -372,7 +372,7 @@ static void test_memory_query_with_limits(void)
     }
 
     agentos_memory_query_t query;
-    memset(&query, 0, sizeof(query));
+    AGENTOS_MEMSET(&query, 0, sizeof(query));
     query.memory_query_text = "search term";
     query.memory_query_text_len = strlen(query.memory_query_text);
     query.memory_query_limit = 3;

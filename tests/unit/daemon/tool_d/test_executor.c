@@ -43,7 +43,7 @@ static void test_tool_meta_validation(void) {
     printf("  test_tool_meta_validation...\n");
 
     tool_meta_t valid_meta;
-    memset(&valid_meta, 0, sizeof(valid_meta));
+    AGENTOS_MEMSET(&valid_meta, 0, sizeof(valid_meta));
     valid_meta.name = "test_tool";
     valid_meta.version = "1.0.0";
     valid_meta.executable = "/usr/bin/echo";
@@ -52,7 +52,7 @@ static void test_tool_meta_validation(void) {
     assert(ret == 0);
 
     tool_meta_t invalid_meta;
-    memset(&invalid_meta, 0, sizeof(invalid_meta));
+    AGENTOS_MEMSET(&invalid_meta, 0, sizeof(invalid_meta));
     invalid_meta.name = NULL;
 
     ret = tool_meta_validate(&invalid_meta);
@@ -65,7 +65,7 @@ static void test_executor_prepare_args(void) {
     printf("  test_executor_prepare_args...\n");
 
     tool_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.name = "echo_tool";
     meta.executable = "/usr/bin/echo";
 
@@ -88,7 +88,7 @@ static void test_executor_build_command(void) {
     printf("  test_executor_build_command...\n");
 
     tool_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.name = "test_command";
     meta.executable = "/usr/bin/cat";
     meta.args = (char*[]){"-n", NULL};
@@ -131,7 +131,7 @@ static void test_executor_output_capture(void) {
     size_t stderr_len = 0;
 
     tool_meta_t meta;
-    memset(&meta, 0, sizeof(meta));
+    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
     meta.name = "echo_test";
     meta.executable = "/usr/bin/echo";
     meta.timeout_ms = 5000;

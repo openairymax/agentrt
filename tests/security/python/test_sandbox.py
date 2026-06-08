@@ -1003,8 +1003,8 @@ class TestSandboxManagerOperations:
         验证:
             - 沙箱被正确销毁
         """
-        manager = SandboxConfig(sandbox_id="to_destroy", allowed_permissions=set())
-        manager.create_sandbox(manager)
+        config = SandboxConfig(sandbox_id="to_destroy", allowed_permissions=set())
+        manager.create_sandbox(config)
 
         result = manager.destroy_sandbox("to_destroy")
 

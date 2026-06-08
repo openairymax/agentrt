@@ -43,7 +43,7 @@ static int fw_safe_strcpy(char *dest, const char *src, size_t dest_size)
     size_t len = strlen(src);
     if (len >= dest_size)
         len = dest_size - 1;
-    memcpy(dest, src, len);
+    __builtin_memcpy(dest, src, len);
     dest[len] = '\0';
     return 0;
 }
@@ -96,7 +96,7 @@ static void notify_event(fw_manager_internal_t *mgr, agentos_framework_t framewo
                          agentos_fw_event_type_t type, const char *detail, int32_t error_code)
 {
     agentos_fw_event_t event;
-    memset(&event, 0, sizeof(event));
+    __builtin_memset(&event, 0, sizeof(event));
     event.type = type;
     event.framework = framework;
     event.detail = detail;
@@ -114,7 +114,7 @@ static void notify_event(fw_manager_internal_t *mgr, agentos_framework_t framewo
 static void init_fw_info(fw_instance_t *fw, agentos_framework_t type)
 {
     const fw_descriptor_t *desc = &g_fw_descriptors[type];
-    memset(&fw->info, 0, sizeof(agentos_fw_info_t));
+    __builtin_memset(&fw->info, 0, sizeof(agentos_fw_info_t));
     fw->info.type = type;
     fw_safe_strcpy(fw->info.name, desc->name, FW_MAX_NAME_LEN);
     fw_safe_strcpy(fw->info.version, desc->version, FW_MAX_VERSION_LEN);
@@ -177,7 +177,7 @@ AGENTOS_API int32_t agentos_fw_init(agentos_fw_manager_t manager, agentos_framew
         return AGENTOS_FW_OK;
 
     if (config) {
-        memcpy(&fw->config, config, sizeof(agentos_fw_config_t));
+        __builtin_memcpy(&fw->config, config, sizeof(agentos_fw_config_t));
     } else {
         fw->config = agentos_fw_create_default_config(framework);
     }
@@ -282,7 +282,7 @@ AGENTOS_API int32_t agentos_fw_get_info(agentos_fw_manager_t manager, agentos_fr
         return AGENTOS_FW_INVALID_ARG;
 
     fw_manager_internal_t *mgr = (fw_manager_internal_t *)manager;
-    memcpy(info, &mgr->frameworks[framework].info, sizeof(agentos_fw_info_t));
+    __builtin_memcpy(info, &mgr->frameworks[framework].info, sizeof(agentos_fw_info_t));
 
     return AGENTOS_FW_OK;
 }
@@ -297,7 +297,7 @@ AGENTOS_API int32_t agentos_fw_get_all_info(agentos_fw_manager_t manager, agento
 
     uint32_t count = max_count < AGENTOS_FW_COUNT ? max_count : AGENTOS_FW_COUNT;
     for (uint32_t i = 0; i < count; i++) {
-        memcpy(&infos[i], &mgr->frameworks[i].info, sizeof(agentos_fw_info_t));
+        __builtin_memcpy(&infos[i], &mgr->frameworks[i].info, sizeof(agentos_fw_info_t));
     }
     *found_count = count;
 
@@ -430,7 +430,7 @@ AGENTOS_API const char *agentos_fw_error_to_string(int32_t code)
 AGENTOS_API agentos_fw_config_t agentos_fw_create_default_config(agentos_framework_t framework)
 {
     agentos_fw_config_t config;
-    memset(&config, 0, sizeof(agentos_fw_config_t));
+    __builtin_memset(&config, 0, sizeof(agentos_fw_config_t));
     config.type = framework;
     config.max_retries = 3;
     config.timeout_ms = 5000;

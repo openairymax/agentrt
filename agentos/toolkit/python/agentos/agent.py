@@ -35,8 +35,6 @@ class AgentOS:
     """
     
     def __init__(self, endpoint: str = None, timeout: int = 30, api_key: Optional[str] = None):
-        if endpoint is None:
-            endpoint = os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789")
         """
         Initialize the AgentOS client.
         
@@ -45,6 +43,8 @@ class AgentOS:
             timeout: The request timeout in seconds.
             api_key: Optional API key for authentication.
         """
+        if endpoint is None:
+            endpoint = os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789")
         self.endpoint = endpoint.rstrip('/')
         self.timeout = timeout
         self.api_key = api_key
