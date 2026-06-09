@@ -13,6 +13,7 @@
 #include "oom_handler.h"
 #include "mem.h"
 #include "memory_compat.h"
+#include "memory_prealloc.h"
 #include "string_compat.h"
 
 #include "logging_compat.h"
@@ -235,6 +236,12 @@ agentos_error_t agentos_oom_init(size_t total_system_memory)
 
     g_oom_handler = handler;
 
+    /* SEC-13: Initialize pre-allocation pool for critical paths */
+    if (agentos_prealloc_init() != 0) {
+        AGENTOS_LOG_WARN("[OOM] Pre-allocation pool init failed; "
+                "critical path buffers unavailable");
+    }
+
     AGENTOS_LOG_INFO("[OOM] OOM handler initialized: system_memory=%zu bytes, "
             "tracker_capacity=%d",
             handler->total_system_memory, OOM_TRACKER_CAPACITY);
@@ -268,6 +275,9 @@ void agentos_oom_destroy(void)
 
     AGENTOS_FREE(handler);
     g_oom_handler = NULL;
+
+    /* SEC-13: Shutdown pre-allocation pool */
+    agentos_prealloc_shutdown();
 
     AGENTOS_LOG_INFO("[OOM] OOM handler destroyed");
 }

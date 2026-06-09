@@ -84,7 +84,8 @@ void agentos_registry_cleanup(void)
     atomic_store_ptr((_Atomic void **)&g_registry_lock, NULL, memory_order_release);
 }
 
-agentos_error_t agentos_registry_register_unit(const char *unit_id, agentos_execution_unit_t *unit)
+/* _take: caller transfers ownership */
+agentos_error_t agentos_registry_register_unit_take(const char *unit_id, agentos_execution_unit_t *unit)
 {
     if (!unit_id || !unit)
         ATM_RET_ERR(AGENTOS_EINVAL);

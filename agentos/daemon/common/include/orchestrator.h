@@ -67,9 +67,21 @@ typedef enum {
 
 /* ========== 回调类型 ========== */
 
+/**
+ * @brief Progress callback function type.
+ * @param phase Current phase.
+ * @param status Task status.
+ * @param task_id [in] Task identifier (BORROW - caller must not free, valid for callback scope only).
+ * @param user_data [in] User data (BORROW - caller must not free, valid for callback scope only).
+ */
 typedef void (*orch_progress_cb_t)(orch_phase_t phase, orch_task_status_t status,
                                    const char *task_id, void *user_data);
 
+/**
+ * @brief Condition function type.
+ * @param context [in] Context string (BORROW - caller must not free, valid for callback scope only).
+ * @param user_data [in] User data (BORROW - caller must not free, valid for callback scope only).
+ */
 typedef bool (*orch_condition_fn_t)(const char *context, void *user_data);
 
 /* ========== 配置 ========== */
@@ -116,49 +128,137 @@ typedef struct {
 
 /* ========== 生命周期 ========== */
 
+/**
+ * @brief Create a new orchestrator instance.
+ * @param config [in] Configuration (BORROW - not stored, copied internally).
+ * @return New orchestrator handle (OWNER - caller must call orchestrator_destroy).
+ */
 orchestrator_t *orchestrator_create(const orch_config_t *config);
 
+/**
+ * @brief Destroy an orchestrator instance.
+ * @param orch [in] Orchestrator handle (TRANSFER - function takes ownership and frees).
+ */
 void orchestrator_destroy(orchestrator_t *orch);
 
 /* ========== 管线操作 ========== */
 
+/**
+ * @brief Create a new pipeline.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param name [in] Pipeline name (BORROW - not stored, copied internally).
+ * @return New pipeline handle (OWNER - caller must call orchestrator_pipeline_destroy).
+ */
 orch_pipeline_t *orchestrator_pipeline_create(orchestrator_t *orch, const char *name);
 
+/**
+ * @brief Destroy a pipeline.
+ * @param pipeline [in] Pipeline handle (TRANSFER - function takes ownership and frees).
+ */
 void orchestrator_pipeline_destroy(orch_pipeline_t *pipeline);
 
+/**
+ * @brief Add a step to a pipeline.
+ * @param pipeline [in] Pipeline handle (BORROW - caller retains ownership).
+ * @param step [in] Step definition (BORROW - copied internally, not stored by pointer).
+ * @return 0 on success, non-zero on failure.
+ */
 int orchestrator_pipeline_add_step(orch_pipeline_t *pipeline, const orch_pipeline_step_t *step);
 
 /* ========== 执行 ========== */
 
+/**
+ * @brief Execute an orchestration run.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param input [in] Input string (BORROW - not stored, copied internally).
+ * @param out_results [out] Results array (OWNER - caller must call orchestrator_result_free on each, then free the array).
+ * @param out_count [out] Number of results (BORROW - caller provides buffer, function writes to it).
+ * @return 0 on success, non-zero on failure.
+ */
 int orchestrator_execute(orchestrator_t *orch, const char *input, orch_result_t **out_results,
                          size_t *out_count);
 
+/**
+ * @brief Execute a pipeline.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param pipeline [in] Pipeline handle (BORROW - caller retains ownership).
+ * @param input [in] Input string (BORROW - not stored, copied internally).
+ * @param out_results [out] Results array (OWNER - caller must call orchestrator_result_free on each, then free the array).
+ * @param out_count [out] Number of results (BORROW - caller provides buffer, function writes to it).
+ * @return 0 on success, non-zero on failure.
+ */
 int orchestrator_execute_pipeline(orchestrator_t *orch, orch_pipeline_t *pipeline,
                                   const char *input, orch_result_t **out_results,
                                   size_t *out_count);
 
+/**
+ * @brief Execute a single phase.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param phase Phase to execute.
+ * @param input [in] Input string (BORROW - not stored, copied internally).
+ * @param out_result [out] Result output (OWNER - caller must call orchestrator_result_free).
+ * @return 0 on success, non-zero on failure.
+ */
 int orchestrator_execute_phase(orchestrator_t *orch, orch_phase_t phase, const char *input,
                                orch_result_t **out_result);
 
 /* ========== 进度回调 ========== */
 
+/**
+ * @brief Set progress callback.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param callback [in] Callback function (BORROW - not stored by pointer, copied internally).
+ * @param user_data [in] User data passed to callback (BORROW - caller retains ownership, must remain valid).
+ */
 void orchestrator_set_progress_callback(orchestrator_t *orch, orch_progress_cb_t callback,
                                         void *user_data);
 
 /* ========== 查询 ========== */
 
+/**
+ * @brief Get task status.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param task_id [in] Task identifier (BORROW - not stored, copied internally).
+ * @return Task status enum.
+ */
 orch_task_status_t orchestrator_get_task_status(orchestrator_t *orch, const char *task_id);
 
+/**
+ * @brief Get task result.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param task_id [in] Task identifier (BORROW - not stored, copied internally).
+ * @return Task result (BORROW - belongs to orchestrator, do not free; call orchestrator_result_free on a copy if needed).
+ */
 orch_result_t *orchestrator_get_result(orchestrator_t *orch, const char *task_id);
 
+/**
+ * @brief Free a result structure.
+ * @param result [in] Result pointer (TRANSFER - function takes ownership and frees).
+ */
 void orchestrator_result_free(orch_result_t *result);
 
+/**
+ * @brief Get count of active tasks.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @return Number of active tasks.
+ */
 uint32_t orchestrator_active_count(orchestrator_t *orch);
 
 /* ========== 控制 ========== */
 
+/**
+ * @brief Cancel a task.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param task_id [in] Task identifier (BORROW - not stored, copied internally).
+ * @return 0 on success, non-zero on failure.
+ */
 int orchestrator_cancel(orchestrator_t *orch, const char *task_id);
 
+/**
+ * @brief Cancel all tasks.
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @return 0 on success, non-zero on failure.
+ */
 int orchestrator_cancel_all(orchestrator_t *orch);
 
 /* ========== 全局资源清理 ========== */

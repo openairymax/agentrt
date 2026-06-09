@@ -2383,6 +2383,7 @@ void config_source_manager_destroy(config_source_manager_t *manager)
     // 释放资源
     if (manager->sources)
         AGENTOS_FREE(manager->sources);
+    agentos_mutex_destroy(&manager->internal_mutex);
     AGENTOS_FREE(manager);
 }
 

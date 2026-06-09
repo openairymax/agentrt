@@ -175,7 +175,7 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t *loop)
 {
     agentos_error_t err;
 
-    err = agentos_cognition_create_ex(NULL, loop->manager.loop_config_plan_strategy,
+    err = agentos_cognition_create_ex_take(NULL, loop->manager.loop_config_plan_strategy,
                                       loop->manager.loop_config_coord_strategy,
                                       loop->manager.loop_config_disp_strategy, &loop->cognition);
 
