@@ -28,12 +28,7 @@
 #include "string_compat.h"
 #include "error.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 /* ==================== 内部数据结构 ==================== */
 

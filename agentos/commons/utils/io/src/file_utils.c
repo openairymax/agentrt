@@ -26,12 +26,7 @@
 #include <unistd.h>
 #endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 /**
  * @brief 读取文件内容

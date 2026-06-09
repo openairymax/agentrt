@@ -787,8 +787,8 @@ agentos_error_t agentos_snapshot_create(const char *task_id, const char *snap_pa
 
     char _cp_buf[2048];
     fputs("SNAPSHOT_V1\n", fp);
-    fprintf_sanitized(fp, "TaskID", cp->task_id);
-    fprintf_sanitized(fp, "SessionID", cp->session_id);
+    fprintf_sanitized(fp, "TaskID", cp->task_id); /* BAN-70 EXEMPT: checkpoint snapshot output */
+    fprintf_sanitized(fp, "SessionID", cp->session_id); /* BAN-70 EXEMPT: checkpoint snapshot output */
     snprintf(_cp_buf, sizeof(_cp_buf), "SequenceNum: %lu\n", (unsigned long)cp->sequence_num);
     fputs(_cp_buf, fp);
     snprintf(_cp_buf, sizeof(_cp_buf), "Timestamp: %lu\n", (unsigned long)cp->timestamp);

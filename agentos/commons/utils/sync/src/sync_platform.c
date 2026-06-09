@@ -31,12 +31,7 @@
     do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
          agentos_error_str(c)); return (c); } while(0)
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 int platform_mutex_init(platform_mutex_t *mutex)
 {
@@ -75,6 +70,15 @@ int platform_mutex_unlock(platform_mutex_t *mutex)
     return 0;
 #else
     return pthread_mutex_unlock(mutex);
+#endif
+}
+
+int platform_mutex_trylock(platform_mutex_t *mutex)
+{
+#ifdef _WIN32
+    return TryEnterCriticalSection(mutex) ? 0 : -1;
+#else
+    return pthread_mutex_trylock(mutex);
 #endif
 }
 
@@ -160,6 +164,24 @@ int platform_rwlock_wrlock(platform_rwlock_t *rwlock)
     return 0;
 #else
     return pthread_rwlock_wrlock(rwlock);
+#endif
+}
+
+int platform_rwlock_tryrdlock(platform_rwlock_t *rwlock)
+{
+#ifdef _WIN32
+    return TryAcquireSRWLockShared(rwlock) ? 0 : -1;
+#else
+    return pthread_rwlock_tryrdlock(rwlock);
+#endif
+}
+
+int platform_rwlock_trywrlock(platform_rwlock_t *rwlock)
+{
+#ifdef _WIN32
+    return TryAcquireSRWLockExclusive(rwlock) ? 0 : -1;
+#else
+    return pthread_rwlock_trywrlock(rwlock);
 #endif
 }
 
@@ -287,6 +309,23 @@ int platform_condition_wait(platform_condition_t *cond, platform_mutex_t *mutex)
     return SleepConditionVariableCS(cond, mutex, INFINITE) ? 0 : -1;
 #else
     return pthread_cond_wait(cond, mutex);
+#endif
+}
+
+int platform_condition_timedwait(platform_condition_t *cond, platform_mutex_t *mutex, uint32_t timeout_ms)
+{
+#ifdef _WIN32
+    return SleepConditionVariableCS(cond, mutex, timeout_ms) ? 0 : -1;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += timeout_ms / 1000;
+    ts.tv_nsec += (timeout_ms % 1000) * 1000000;
+    if (ts.tv_nsec >= 1000000000) {
+        ts.tv_sec++;
+        ts.tv_nsec -= 1000000000;
+    }
+    return pthread_cond_timedwait(cond, mutex, &ts);
 #endif
 }
 

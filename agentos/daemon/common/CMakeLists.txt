@@ -50,9 +50,9 @@ set(SVC_COMMON_SOURCES
     src/thread_pool.c         # 工作线程池
     src/parallel_dispatcher.c # 工具并行执行引擎
     src/checkpoint.c
-    ${ATOMS_DIR}/coreloopthree/src/cognition/metacognition.c
-    ${ATOMS_DIR}/coreloopthree/src/cognition/confidence_calibrator.c
-    ${ATOMS_DIR}/coreloopthree/src/cognition/thinking_chain.c
+    ${ATOMS_DIR}/coreloopthree/src/cognition/foundation/metacognition.c
+    ${ATOMS_DIR}/coreloopthree/src/cognition/critique/confidence_calibrator.c
+    ${ATOMS_DIR}/coreloopthree/src/cognition/foundation/thinking_chain.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/engine.c
     ${ATOMS_DIR}/coreloopthree/src/memory/engine.c
     ${ATOMS_DIR}/coreloopthree/src/utils/id_utils.c
@@ -90,6 +90,7 @@ elseif(APPLE)
 elseif(UNIX)
     target_compile_definitions(svc_common PRIVATE
         AGENTOS_PLATFORM_LINUX=1
+        _GNU_SOURCE
     )
     target_link_libraries(svc_common PRIVATE
         Threads::Threads

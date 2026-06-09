@@ -36,7 +36,7 @@
 #include "platform.h"
 #include "svc_logger.h"
 
-#include <pthread.h>
+/* pthread.h provided by platform.h — no direct pthread include (CROSS-01) */
 
 /* Internal state structure */
 static struct {
@@ -538,7 +538,16 @@ static struct {
     char audit_log_path[256];
 } g_security_ctx = {0};
 
-static pthread_mutex_t g_security_mutex = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t g_security_mutex; /* CROSS-01: initialized via agentos_mutex_init() */
+static bool g_security_mutex_initialized = false;
+
+static void ensure_mutex_initialized(void)
+{
+    if (!g_security_mutex_initialized) {
+        agentos_mutex_init(&g_security_mutex);
+        g_security_mutex_initialized = true;
+    }
+}
 
 static const char *DANGEROUS_PATTERNS[] = {";",  "|", "`",  "$(", "${", "&&", "||", ">",
                                            ">>", "<", "<<", "\\", "\n", "\r", NULL};
@@ -572,9 +581,10 @@ static void sanitize_string(char *output, const char *input, size_t max_len)
 
 int daemon_security_init(const daemon_security_config_t *config, agentos_error_t *error)
 {
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         SVC_LOG_INFO("Daemon security: already initialized");
         return 0;
     }
@@ -613,7 +623,7 @@ int daemon_security_init(const daemon_security_config_t *config, agentos_error_t
     }
 
     g_security_ctx.initialized = true;
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
     SVC_LOG_INFO("Daemon security: initialized in production mode (sanitize_level=%d)",
                  g_security_ctx.current_sanitize_level);
     return 0;
@@ -621,9 +631,10 @@ int daemon_security_init(const daemon_security_config_t *config, agentos_error_t
 
 void daemon_security_shutdown(void)
 {
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         return;
     }
 
@@ -653,7 +664,7 @@ void daemon_security_shutdown(void)
     g_security_ctx.signature_enabled = false;
     g_security_ctx.vault_enabled = false;
     g_security_ctx.audit_enabled = false;
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
     SVC_LOG_INFO("Daemon security: shutdown complete");
 }
 
@@ -664,15 +675,16 @@ int daemon_sanitize_llm_input(const char *input, char *output, size_t output_siz
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "sanitize_llm_input: null parameter");
     }
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         daemon_security_init(NULL, NULL);
-        pthread_mutex_lock(&g_security_mutex);
+        agentos_mutex_lock(&g_security_mutex);
     }
 
     sanitize_level_t level = g_security_ctx.current_sanitize_level;
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
 
     if (contains_dangerous_pattern(input)) {
         SVC_LOG_SECURITY(
@@ -704,13 +716,14 @@ int daemon_sanitize_tool_params(const char *tool_name, const char *params, char 
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "sanitize_tool_params: null parameter");
     }
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         daemon_security_init(NULL, NULL);
-        pthread_mutex_lock(&g_security_mutex);
+        agentos_mutex_lock(&g_security_mutex);
     }
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
 
     sanitize_string(sanitized_tool, tool_name, tool_buf_size);
 
@@ -738,15 +751,16 @@ int daemon_check_tool_permission(const char *agent_id, const char *tool_name, co
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "check_tool_permission: null parameter");
     }
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         daemon_security_init(NULL, NULL);
-        pthread_mutex_lock(&g_security_mutex);
+        agentos_mutex_lock(&g_security_mutex);
     }
 
     if (!g_security_ctx.permission_enabled) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         SVC_LOG_WARN("Permission check: disabled by configuration, DENYING %s/%s (fail-closed)",
                      agent_id, tool_name);
         return AGENTOS_EPERM;
@@ -765,7 +779,7 @@ int daemon_check_tool_permission(const char *agent_id, const char *tool_name, co
             break;
         }
     }
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
 
     if (result == AGENTOS_OK) {
         SVC_LOG_DEBUG("Permission GRANTED: agent=%s tool=%s action=%s", agent_id, tool_name,
@@ -784,15 +798,16 @@ int daemon_check_llm_permission(const char *agent_id, const char *model_name, co
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "check_llm_permission: null parameter");
     }
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         daemon_security_init(NULL, NULL);
-        pthread_mutex_lock(&g_security_mutex);
+        agentos_mutex_lock(&g_security_mutex);
     }
 
     if (!g_security_ctx.permission_enabled) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         SVC_LOG_WARN("LLM permission check: disabled by configuration, DENYING %s/%s (fail-closed)",
                      agent_id, model_name);
         return AGENTOS_EPERM;
@@ -814,7 +829,7 @@ int daemon_check_llm_permission(const char *agent_id, const char *model_name, co
             break;
         }
     }
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
 
     if (result == AGENTOS_OK) {
         SVC_LOG_DEBUG("LLM Permission GRANTED: agent=%s model=%s action=%s", agent_id, model_name,
@@ -838,20 +853,21 @@ int daemon_verify_package_signature(const char *package_path, bool *is_valid,
 
     *is_valid = false;
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         daemon_security_init(NULL, NULL);
-        pthread_mutex_lock(&g_security_mutex);
+        agentos_mutex_lock(&g_security_mutex);
     }
 
     if (!g_security_ctx.signature_enabled) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         SVC_LOG_WARN("Signature verification: disabled by configuration, package NOT verified");
         *is_valid = false;
         return AGENTOS_OK;
     }
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
 
     struct stat st;
     if (stat(package_path, &st) != 0) {
@@ -1028,20 +1044,21 @@ int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "store_credential: null parameter");
     }
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         daemon_security_init(NULL, NULL);
-        pthread_mutex_lock(&g_security_mutex);
+        agentos_mutex_lock(&g_security_mutex);
     }
 
     if (!g_security_ctx.vault_enabled) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         AGENTOS_ERROR(AGENTOS_ERR_NOT_SUPPORTED, "vault is disabled");
     }
 
     if (g_security_ctx.cred_count >= MAX_CREDENTIALS) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         SVC_LOG_ERROR("Credential storage full (max=%d)", MAX_CREDENTIALS);
         return AGENTOS_ERR_OUT_OF_MEMORY;
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "store_credential: vault storage full");
@@ -1052,13 +1069,13 @@ int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_
             AGENTOS_FREE(g_security_ctx.credentials[i].data);
             g_security_ctx.credentials[i].data = (uint8_t *)AGENTOS_MALLOC(data_len);
             if (!g_security_ctx.credentials[i].data) {
-                pthread_mutex_unlock(&g_security_mutex);
+                agentos_mutex_unlock(&g_security_mutex);
                 AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY,
                               "failed to allocate credential data buffer");
             }
             __builtin_memcpy(g_security_ctx.credentials[i].data, data, data_len);
             g_security_ctx.credentials[i].data_len = data_len;
-            pthread_mutex_unlock(&g_security_mutex);
+            agentos_mutex_unlock(&g_security_mutex);
             SVC_LOG_INFO("Credential updated: %s (type=%d, %zu bytes)", cred_id, cred_type,
                          data_len);
             return AGENTOS_OK;
@@ -1070,14 +1087,14 @@ int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_
     entry->type = cred_type;
     entry->data = (uint8_t *)AGENTOS_MALLOC(data_len);
     if (!entry->data) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate credential data buffer");
     }
     __builtin_memcpy(entry->data, data, data_len);
     entry->data_len = data_len;
     entry->owner_agent_id = agent_id ? AGENTOS_STRDUP(agent_id) : AGENTOS_STRDUP("system");
 
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
     SVC_LOG_INFO("Credential stored: %s (type=%d, %zu bytes, total=%zu)", cred_id, cred_type,
                  data_len, g_security_ctx.cred_count);
     return AGENTOS_OK;
@@ -1091,15 +1108,16 @@ int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "retrieve_credential: null parameter");
     }
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.initialized) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         daemon_security_init(NULL, NULL);
-        pthread_mutex_lock(&g_security_mutex);
+        agentos_mutex_lock(&g_security_mutex);
     }
 
     if (!g_security_ctx.vault_enabled) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         AGENTOS_ERROR(AGENTOS_ERR_NOT_SUPPORTED, "vault is disabled");
     }
 
@@ -1109,7 +1127,7 @@ int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_
             if (agent_id && g_security_ctx.credentials[i].owner_agent_id &&
                 strcmp(g_security_ctx.credentials[i].owner_agent_id, agent_id) != 0 &&
                 strcmp(agent_id, "system") != 0) {
-                pthread_mutex_unlock(&g_security_mutex);
+                agentos_mutex_unlock(&g_security_mutex);
                 SVC_LOG_SECURITY("Credential access DENIED: %s (agent=%s not owner=%s)", cred_id,
                                  agent_id, g_security_ctx.credentials[i].owner_agent_id);
                 return AGENTOS_ERR_PERMISSION_DENIED;
@@ -1124,12 +1142,12 @@ int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_
                 __builtin_memcpy(data, g_security_ctx.credentials[i].data, copy_len);
             }
             *data_len = copy_len;
-            pthread_mutex_unlock(&g_security_mutex);
+            agentos_mutex_unlock(&g_security_mutex);
             return AGENTOS_OK;
         }
     }
 
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
     SVC_LOG_WARN("Credential not found: %s", cred_id);
     return AGENTOS_ERR_NOT_FOUND;
     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "retrieve_credential: credential not found");
@@ -1147,9 +1165,10 @@ int daemon_audit_log_event(const char *service_name, const char *operation, cons
         daemon_security_init(NULL, NULL);
     }
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     if (!g_security_ctx.audit_enabled) {
-        pthread_mutex_unlock(&g_security_mutex);
+        agentos_mutex_unlock(&g_security_mutex);
         return 0;
     }
 
@@ -1177,7 +1196,7 @@ int daemon_audit_log_event(const char *service_name, const char *operation, cons
             SVC_LOG_WARN("[AUDIT] %s", log_msg);
         }
     }
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
 
     return AGENTOS_OK;
 }
@@ -1191,13 +1210,14 @@ int daemon_security_get_status(int *sanitizer_status, int *permission_status, in
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "security_get_status: null parameter");
     }
 
-    pthread_mutex_lock(&g_security_mutex);
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
     *sanitizer_status = g_security_ctx.initialized ? 1 : 0;
     *permission_status = g_security_ctx.permission_enabled ? 1 : 0;
     *signature_status = g_security_ctx.signature_enabled ? 1 : 0;
     *vault_status = g_security_ctx.vault_enabled ? 1 : 0;
     *audit_status = g_security_ctx.audit_enabled ? 1 : 0;
-    pthread_mutex_unlock(&g_security_mutex);
+    agentos_mutex_unlock(&g_security_mutex);
 
     return AGENTOS_OK;
 }

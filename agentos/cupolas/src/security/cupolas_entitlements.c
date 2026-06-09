@@ -35,9 +35,7 @@
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
+#include "error.h"
 
 #define cupolas_MAX_PATH_LEN 4096
 #define cupolas_MAX_HOST_LEN 256
@@ -97,9 +95,7 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
         return NULL;
 
     size_t capacity = 16;
-    if (capacity > SIZE_MAX / sizeof(char *))
-        return NULL;
-    char **arr = (char **)AGENTOS_MALLOC(capacity * sizeof(char *));
+    SAFE_MALLOC_ARRAY(arr, capacity, sizeof(char *));
     if (!arr)
         return NULL;
 

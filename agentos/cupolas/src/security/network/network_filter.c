@@ -14,9 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
+#include "error.h"
 
 #define MAX_FILTER_RULES 512
 #define MAX_CONNECTIONS 1024

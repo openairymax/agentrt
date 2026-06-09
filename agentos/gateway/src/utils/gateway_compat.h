@@ -16,20 +16,6 @@
 #ifndef GATEWAY_COMPAT_H
 #define GATEWAY_COMPAT_H
 
-#ifndef AGENTOS_SUCCESS
-#define AGENTOS_SUCCESS 0
-#endif
-
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-17)
-#endif
-
-#ifndef AGENTOS_ENOMEM
-#define AGENTOS_ENOMEM (-12)
-#endif
-
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
+#include "error.h"
 
 #endif /* GATEWAY_COMPAT_H */

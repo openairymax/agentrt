@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include "agentos.h"
-#include "cognition/delegate.h"
-#include "cognition/parallel_dispatcher.h"
+#include "cognition/dispatch/delegate.h"
+#include "cognition/dispatch/parallel_dispatcher.h"
 #include "multi_agent_collaboration.h"
 #include "platform.h"
 
