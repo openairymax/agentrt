@@ -725,5 +725,10 @@ void log_cleanup(void)
     agentos_mutex_unlock(&g_logging_state.mutex);
     agentos_mutex_destroy(&g_logging_state.mutex);
 
+    if (g_throttle_mutex_init) {
+        agentos_mutex_destroy(&g_throttle_mutex);
+        g_throttle_mutex_init = false;
+    }
+
     AGENTOS_MEMSET(&g_logging_state, 0, sizeof(g_logging_state));
 }

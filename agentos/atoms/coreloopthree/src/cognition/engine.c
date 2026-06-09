@@ -80,20 +80,22 @@ static void trigger_feedback(agentos_cognition_engine_t *engine, int level, cons
     }
 }
 
-agentos_error_t agentos_cognition_create(agentos_plan_strategy_t *plan_strategy,
-                                         agentos_coordinator_strategy_t *coord_strategy,
-                                         agentos_dispatching_strategy_t *disp_strategy,
-                                         agentos_cognition_engine_t **out_engine)
+/* _take: caller transfers ownership */
+agentos_error_t agentos_cognition_create_take(agentos_plan_strategy_t *plan_strategy,
+                                              agentos_coordinator_strategy_t *coord_strategy,
+                                              agentos_dispatching_strategy_t *disp_strategy,
+                                              agentos_cognition_engine_t **out_engine)
 {
-    return agentos_cognition_create_ex(NULL, plan_strategy, coord_strategy, disp_strategy,
-                                       out_engine);
+    return agentos_cognition_create_ex_take(NULL, plan_strategy, coord_strategy, disp_strategy,
+                                            out_engine);
 }
 
-agentos_error_t agentos_cognition_create_ex(const agentos_cognition_config_t *manager,
-                                            agentos_plan_strategy_t *plan_strategy,
-                                            agentos_coordinator_strategy_t *coord_strategy,
-                                            agentos_dispatching_strategy_t *disp_strategy,
-                                            agentos_cognition_engine_t **out_engine)
+/* _take: caller transfers ownership */
+agentos_error_t agentos_cognition_create_ex_take(const agentos_cognition_config_t *manager,
+                                                 agentos_plan_strategy_t *plan_strategy,
+                                                 agentos_coordinator_strategy_t *coord_strategy,
+                                                 agentos_dispatching_strategy_t *disp_strategy,
+                                                 agentos_cognition_engine_t **out_engine)
 {
 
     if (!out_engine)
@@ -202,8 +204,9 @@ void agentos_cognition_set_fallback_plan(agentos_cognition_engine_t *engine,
     agentos_mutex_unlock(engine->lock);
 }
 
-void agentos_cognition_set_context(agentos_cognition_engine_t *engine, void *context,
-                                   void (*destroy)(void *))
+/* _take: caller transfers ownership */
+void agentos_cognition_set_context_take(agentos_cognition_engine_t *engine, void *context,
+                                        void (*destroy)(void *))
 {
     if (!engine)
         return;

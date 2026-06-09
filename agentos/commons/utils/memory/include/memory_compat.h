@@ -312,7 +312,11 @@ static inline char *agentos_strndup(const char *str, size_t n)
  * @def AGENTOS_MALLOC(size)
  * @brief 安全内存分配宏
  */
-#define AGENTOS_MALLOC(size) agentos_malloc(size)
+#define AGENTOS_MALLOC(size) ({ \
+    void *__ptr = agentos_malloc(size); \
+    if (__ptr) { agentos_mem_stats_record_alloc(size); } \
+    __ptr; \
+})
 
 /**
  * @def AGENTOS_CALLOC(num, size)
@@ -329,8 +333,15 @@ static inline char *agentos_strndup(const char *str, size_t n)
 /**
  * @def AGENTOS_FREE(ptr)
  * @brief 安全内存释放宏
+ *
+ * Note: agentos_mem_stats_record_dealloc(0) is called because we don't
+ * track individual block sizes at free time. The dealloc counter is
+ * incremented but no bytes are subtracted from current_bytes_allocated.
  */
-#define AGENTOS_FREE(ptr) agentos_free(ptr)
+#define AGENTOS_FREE(ptr) do { \
+    agentos_mem_stats_record_dealloc(0); \
+    agentos_free(ptr); \
+} while (0)
 
 /**
  * @defgroup safe_memory_alloc 安全内存分配宏（SEC-016合规）

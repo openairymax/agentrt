@@ -157,7 +157,7 @@ orchestrator_t *orchestrator_create(const orch_config_t *config)
     }
 
     if (orch->config.enable_metacognition) {
-        agentos_error_t cog_err = agentos_cognition_create(NULL, NULL, NULL, &orch->cognition);
+        agentos_error_t cog_err = agentos_cognition_create_take(NULL, NULL, NULL, &orch->cognition);
         if (cog_err != AGENTOS_SUCCESS) {
             SVC_LOG_WARN(
                 "orchestrator: cognition init failed (err=%d), continuing without cognition",
@@ -192,7 +192,7 @@ orchestrator_t *orchestrator_create(const orch_config_t *config)
     }
 
     if (orch->cognition) {
-        agentos_cognition_set_context(orch->cognition,
+        agentos_cognition_set_context_take(orch->cognition,
                                       orch->memory ? "memory_integrated" : "standalone", NULL);
     }
 

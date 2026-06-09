@@ -144,7 +144,7 @@ static void print_result_ms(const bench_result_t *result)
 static agentos_cognition_engine_t *create_default_engine(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_OK);
     assert(engine != NULL);
     return engine;
@@ -595,7 +595,7 @@ TEST(int17_5_warm_vs_cold_cycle)
     /* 冷启动测试: 每次迭代都创建新引擎，测量第一个 process */
     for (int i = 0; i < BENCH_ITERATIONS; i++) {
         agentos_cognition_engine_t *engine = NULL;
-        agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+        agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
         if (err != AGENTOS_OK || engine == NULL) {
             cold_times[i] = 0;
             continue;

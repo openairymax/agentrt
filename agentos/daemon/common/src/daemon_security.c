@@ -665,6 +665,8 @@ void daemon_security_shutdown(void)
     g_security_ctx.vault_enabled = false;
     g_security_ctx.audit_enabled = false;
     agentos_mutex_unlock(&g_security_mutex);
+    agentos_mutex_destroy(&g_security_mutex);
+    g_security_mutex_initialized = false;
     SVC_LOG_INFO("Daemon security: shutdown complete");
 }
 

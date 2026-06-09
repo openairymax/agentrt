@@ -596,11 +596,13 @@ agentos_error_t agentos_checkpoint_restore(const char *task_id, uint64_t sequenc
     if (sid) {
         AGENTOS_STRNCPY_TERM(cp->session_id, sid, sizeof(cp->session_id));
         AGENTOS_FREE(sid);
+        sid = NULL;
     }
     cp->sequence_num = json_extract_uint64(json_buf, "sequence_num");
     cp->timestamp = json_extract_uint64(json_buf, "timestamp");
 
     AGENTOS_FREE(json_buf);
+    json_buf = NULL;
     agentos_mutex_lock(&g_checkpoint_mutex);
     g_checkpoint_stats.total_restore_ops++;
     agentos_mutex_unlock(&g_checkpoint_mutex);

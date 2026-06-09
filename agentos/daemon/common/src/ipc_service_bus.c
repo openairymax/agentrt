@@ -448,6 +448,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(ipc_service_bus_t bus_handle
                 pending->completed = 1;
             } else {
                 AGENTOS_FREE(err_payload);
+                err_payload = NULL;
             }
         }
         if (resp_json) {

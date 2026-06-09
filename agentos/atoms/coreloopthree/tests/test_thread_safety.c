@@ -45,7 +45,7 @@
 static agentos_cognition_engine_t *create_default_engine(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_SUCCESS);
     assert(engine != NULL);
     return engine;
@@ -76,7 +76,7 @@ static agentos_cognition_engine_t *create_engine_with_feedback(void)
     config.feedback_user_data = NULL;
 
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_SUCCESS);
     assert(engine != NULL);
     return engine;
@@ -127,7 +127,7 @@ static void *thread_worker(void *arg)
 
     /* 1. 创建引擎 */
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         printf("    [Thread %d] Engine created\n", args->thread_id);
 
@@ -210,7 +210,7 @@ static void *thread_feedback_worker(void *arg)
     config.feedback_user_data = NULL;
 
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         printf("    [FB-Thread %d] Engine created with feedback\n", args->thread_id);
 
@@ -340,7 +340,7 @@ static void *thread_strategy_worker(void *arg)
 
     /* 3. 创建引擎 */
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, coord, disp, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, coord, disp, &engine);
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         printf("    [ST-Thread %d] Engine created with strategies\n",
                args->thread_id);
@@ -585,7 +585,7 @@ static void *thread_mix_worker(void *arg)
 
     switch (args->type) {
     case MIX_TYPE_BASIC:
-        err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+        err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
         break;
     case MIX_TYPE_FEEDBACK: {
         agentos_cognition_config_t config;
@@ -594,7 +594,7 @@ static void *thread_mix_worker(void *arg)
         config.cognition_max_retries = 3;
         config.feedback_callback = null_feedback_callback;
         config.feedback_user_data = NULL;
-        err = agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine);
+        err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
         break;
     }
     case MIX_TYPE_STRATEGY: {
@@ -615,7 +615,7 @@ static void *thread_mix_worker(void *arg)
         disp->destroy = mock_disp_destroy;
         disp->data = NULL;
 
-        err = agentos_cognition_create(NULL, coord, disp, &engine);
+        err = agentos_cognition_create_take(NULL, coord, disp, &engine);
         coord->destroy(coord);
         disp->destroy(disp);
         break;
@@ -738,7 +738,7 @@ TEST(int02_2_null_input_handling)
     printf("    NULL out_plan → err=%s (expected: non-success)\n", error_str(err));
 
     /* 4. NULL out_engine → AGENTOS_EINVAL */
-    err = agentos_cognition_create(NULL, NULL, NULL, NULL);
+    err = agentos_cognition_create_take(NULL, NULL, NULL, NULL);
     assert(err != AGENTOS_SUCCESS);
     printf("    NULL out_engine → err=%s (expected: non-success)\n", error_str(err));
 
@@ -758,8 +758,8 @@ TEST(int02_2_null_engine_handling)
     agentos_cognition_set_fallback_plan(NULL, NULL);
     printf("    set_fallback_plan(NULL, NULL) → no crash\n");
 
-    /* 3. agentos_cognition_set_context(NULL, NULL, NULL) */
-    agentos_cognition_set_context(NULL, NULL, NULL);
+    /* 3. agentos_cognition_set_context_take(NULL, NULL, NULL) */
+    agentos_cognition_set_context_take(NULL, NULL, NULL);
     printf("    set_context(NULL, NULL, NULL) → no crash\n");
 
     /* 4. agentos_cognition_set_memory(NULL, NULL) */
@@ -851,7 +851,7 @@ TEST(int02_2_create_ex_error_handling)
 
     /* 1. NULL config → 使用默认配置 */
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create_ex(NULL, NULL, NULL, NULL,
+    agentos_error_t err = agentos_cognition_create_ex_take(NULL, NULL, NULL, NULL,
                                                       &engine);
     assert(err == AGENTOS_SUCCESS);
     assert(engine != NULL);
@@ -859,7 +859,7 @@ TEST(int02_2_create_ex_error_handling)
     agentos_cognition_destroy(engine);
 
     /* 2. NULL out_engine → 错误 */
-    err = agentos_cognition_create_ex(NULL, NULL, NULL, NULL, NULL);
+    err = agentos_cognition_create_ex_take(NULL, NULL, NULL, NULL, NULL);
     assert(err != AGENTOS_SUCCESS);
     printf("    create_ex(NULL out_engine) → err=%s\n", error_str(err));
 
@@ -868,7 +868,7 @@ TEST(int02_2_create_ex_error_handling)
     memset(&config, 0, sizeof(config));
     config.cognition_default_timeout_ms = 10000;
     config.cognition_max_retries = 1;
-    err = agentos_cognition_create_ex(&config, NULL, NULL, NULL, NULL);
+    err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, NULL);
     assert(err != AGENTOS_SUCCESS);
     printf("    create_ex(config, NULL out_engine) → err=%s\n", error_str(err));
 }

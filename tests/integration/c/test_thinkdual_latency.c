@@ -155,7 +155,7 @@ static int is_valid_json_prefix(const char *str)
 static agentos_cognition_engine_t *create_default_engine(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_OK);
     assert(engine != NULL);
     return engine;
@@ -598,7 +598,7 @@ TEST(int04_5_e2e_thinkdual_pipeline_latency)
         config.feedback_user_data = NULL;
 
         agentos_cognition_engine_t *engine = NULL;
-        agentos_error_t err = agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine);
+        agentos_error_t err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
         if (err != AGENTOS_OK || engine == NULL) {
             TEST_FAIL("INT-04.5", "engine creation failed");
             continue;

@@ -97,7 +97,7 @@ static int is_valid_json_prefix(const char *str)
 static agentos_cognition_engine_t *create_default_engine(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_OK);
     assert(engine != NULL);
     return engine;
@@ -962,7 +962,7 @@ static void *mixed_tsan_worker(void *arg)
             config.cognition_max_retries = 2;
             config.feedback_callback = null_feedback_callback;
             config.feedback_user_data = NULL;
-            err = agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine);
+            err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
         } else {
             agentos_coordinator_strategy_t *coord =
                 (agentos_coordinator_strategy_t *)calloc(1, sizeof(*coord));
@@ -971,7 +971,7 @@ static void *mixed_tsan_worker(void *arg)
             coord->destroy = mock_coordinator_destroy;
             coord->data = NULL;
 
-            err = agentos_cognition_create(NULL, coord, NULL, &engine);
+            err = agentos_cognition_create_take(NULL, coord, NULL, &engine);
             coord->destroy(coord);
         }
 
