@@ -54,12 +54,7 @@
 #include <string.h>
 #include "memory_compat.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 /* ==================== 网络初始化 ==================== */
 

@@ -216,6 +216,13 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ERR_INTERRUPTED (-19)
 #endif
 
+#ifndef AGENTOS_ERR_NOT_IMPLEMENTED
+#define AGENTOS_ERR_NOT_IMPLEMENTED (-30)
+#endif
+#ifndef AGENTOS_ERR_FAIL
+#define AGENTOS_ERR_FAIL (-31)
+#endif
+
 /* 系统与平台错误 (-100 到 -199) */
 #ifndef AGENTOS_ERR_SYS_BASE
 #define AGENTOS_ERR_SYS_BASE (-100)

@@ -7,8 +7,8 @@
  * 覆盖调度器生命周期、安全分类、冲突检测、并行分发、Delegate子Agent、Cancel取消。
  */
 
-#include "cognition/delegate.h"
-#include "cognition/parallel_dispatcher.h"
+#include "cognition/dispatch/delegate.h"
+#include "cognition/dispatch/parallel_dispatcher.h"
 
 #include <assert.h>
 #ifndef NDEBUG

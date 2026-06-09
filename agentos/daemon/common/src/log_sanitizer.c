@@ -279,6 +279,9 @@ void log_sanitizer_destroy(void)
     g_initialized = 0;
 
     agentos_mutex_unlock(&g_mutex);
+    agentos_mutex_destroy(&g_mutex);
+    g_mutex_initialized = 0;
+    SVC_LOG_INFO("Log sanitizer: destroyed");
 }
 
 bool log_sanitizer_add_pattern(const char *pattern, const char *replacement)

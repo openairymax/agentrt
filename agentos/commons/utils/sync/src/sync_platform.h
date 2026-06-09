@@ -128,6 +128,13 @@ int platform_mutex_lock(platform_mutex_t *mutex);
 int platform_mutex_unlock(platform_mutex_t *mutex);
 
 /**
+ * @brief 平台互斥锁尝试加锁
+ * @param[in] mutex 互斥锁指针
+ * @return 0 成功，非0 失败/忙
+ */
+int platform_mutex_trylock(platform_mutex_t *mutex);
+
+/**
  * @brief 平台递归互斥锁初始化
  * @return 0 成功，非0 失败
  */
@@ -180,6 +187,20 @@ int platform_rwlock_rdlock(platform_rwlock_t *rwlock);
  * @return 0 成功，非0 失败
  */
 int platform_rwlock_wrlock(platform_rwlock_t *rwlock);
+
+/**
+ * @brief 平台读锁尝试加锁
+ * @param[in] rwlock 读写锁指针
+ * @return 0 成功，非0 失败/忙
+ */
+int platform_rwlock_tryrdlock(platform_rwlock_t *rwlock);
+
+/**
+ * @brief 平台写锁尝试加锁
+ * @param[in] rwlock 读写锁指针
+ * @return 0 成功，非0 失败/忙
+ */
+int platform_rwlock_trywrlock(platform_rwlock_t *rwlock);
 
 /**
  * @brief 平台读写锁解锁
@@ -264,6 +285,15 @@ int platform_condition_destroy(platform_condition_t *cond);
  * @return 0 成功，非0 失败
  */
 int platform_condition_wait(platform_condition_t *cond, platform_mutex_t *mutex);
+
+/**
+ * @brief 平台条件变量超时等待
+ * @param[in] cond 条件变量指针
+ * @param[in] mutex 互斥锁指针
+ * @param[in] timeout_ms 超时时间（毫秒）
+ * @return 0 成功，非0 失败/超时
+ */
+int platform_condition_timedwait(platform_condition_t *cond, platform_mutex_t *mutex, uint32_t timeout_ms);
 
 /**
  * @brief 平台条件变量唤醒一个线程

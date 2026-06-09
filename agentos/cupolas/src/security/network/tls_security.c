@@ -30,9 +30,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
+#include "error.h"
 
 static struct {
     int initialized;

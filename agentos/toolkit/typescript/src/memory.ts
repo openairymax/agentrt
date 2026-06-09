@@ -3,7 +3,7 @@
 // Last updated: 2026-03-23
 
 import { MemoryError, AgentOSError } from './errors';
-import { Memory, MemoryLayer } from './types';
+import { Memory, MemoryLayer, MemoryRaw } from './types';
 import { AgentOS } from './agent';
 
 /** AgentOS 记忆管理�?*/
@@ -18,7 +18,7 @@ export class MemoryManager {
   /** 写入记忆 */
   async write(
     content: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     layer?: MemoryLayer,
   ): Promise<string> {
     const response = await this.client.request<{ memory_id: string }>(
@@ -34,16 +34,16 @@ export class MemoryManager {
 
   /** 获取记忆 */
   async get(memoryId: string): Promise<Memory> {
-    const response = await this.client.request<any>(
+    const response = await this.client.request<MemoryRaw>(
       'GET',
       `/api/v1/memories/${memoryId}`,
     );
     return {
-      id: response.memory_id || response.id,
+      id: response.memory_id || response.id || '',
       content: response.content,
-      layer: response.layer,
+      layer: response.layer as MemoryLayer,
       score: response.score || 0,
-      createdAt: new Date(response.created_at || response.createdAt),
+      createdAt: new Date(response.created_at || response.createdAt || Date.now()),
       updatedAt: new Date(response.updated_at || response.updatedAt || Date.now()),
       metadata: response.metadata,
     };
@@ -52,16 +52,16 @@ export class MemoryManager {
   /** 搜索记忆 */
   async search(query: string, topK: number = 5): Promise<Memory[]> {
     const encodedQuery = encodeURIComponent(query);
-    const response = await this.client.request<{ memories: any[] }>(
+    const response = await this.client.request<{ memories: MemoryRaw[] }>(
       'GET',
       `/api/v1/memories/search?query=${encodedQuery}&top_k=${topK}`,
     );
-    return (response.memories || []).map((mem) => ({
-      id: mem.memory_id || mem.id,
+    return (response.memories || []).map((mem: MemoryRaw) => ({
+      id: mem.memory_id || mem.id || '',
       content: mem.content,
-      layer: mem.layer,
+      layer: mem.layer as MemoryLayer,
       score: mem.score || 0,
-      createdAt: new Date(mem.created_at || mem.createdAt),
+      createdAt: new Date(mem.created_at || mem.createdAt || Date.now()),
       updatedAt: new Date(mem.updated_at || mem.updatedAt || Date.now()),
       metadata: mem.metadata,
     }));
@@ -91,16 +91,16 @@ export class MemoryManager {
     layer: MemoryLayer,
     topK: number = 10,
   ): Promise<Memory[]> {
-    const response = await this.client.request<{ memories: any[] }>(
+    const response = await this.client.request<{ memories: MemoryRaw[] }>(
       'GET',
       `/api/v1/memories?layer=${layer}&top_k=${topK}`,
     );
-    return (response.memories || []).map((mem) => ({
-      id: mem.memory_id || mem.id,
+    return (response.memories || []).map((mem: MemoryRaw) => ({
+      id: mem.memory_id || mem.id || '',
       content: mem.content,
-      layer: mem.layer,
+      layer: mem.layer as MemoryLayer,
       score: mem.score || 0,
-      createdAt: new Date(mem.created_at || mem.createdAt),
+      createdAt: new Date(mem.created_at || mem.createdAt || Date.now()),
       updatedAt: new Date(mem.updated_at || mem.updatedAt || Date.now()),
       metadata: mem.metadata,
     }));

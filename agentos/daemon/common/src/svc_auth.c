@@ -541,6 +541,7 @@ int auth_jwt_init(const jwt_config_t *config)
     g_hmac_impl = hmac_builtin;
 #endif
 
+    agentos_mutex_init(&g_jwt.lock);
     g_jwt.initialized = 1;
     SVC_LOG_INFO("JWT authentication module initialized (TTL=%llu sec, HMAC=%s)",
                  (unsigned long long)g_jwt.config.token_ttl_sec, HMAC_IMPL_NAME);

@@ -219,8 +219,10 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     /* 3. 构建计划结构 */
     agentos_task_plan_t *plan;
     SAFE_MALLOC_ARRAY(plan, 1, sizeof(agentos_task_plan_t));
-    if (!plan)
+    if (!plan) {
+        AGENTOS_LOG_ERROR("ML planner: plan allocation failed");
         ATM_RET_ERR(AGENTOS_ENOMEM);
+    }
 
     char plan_id[64];
     snprintf(plan_id, sizeof(plan_id), "rule_plan_%s_%d%s",
@@ -234,6 +236,7 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
 
     SAFE_MALLOC_ARRAY(plan->task_plan_nodes, subtask_count + 2, sizeof(agentos_task_node_t *));
     if (!plan->task_plan_nodes && subtask_count > 0) {
+        AGENTOS_LOG_ERROR("ML planner: task_plan_nodes allocation failed (count=%zu)", subtask_count + 2);
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
         ATM_RET_ERR(AGENTOS_ENOMEM);
@@ -267,8 +270,10 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
     for (size_t i = 0; i < subtask_count; i++) {
         agentos_task_node_t *node;
         SAFE_MALLOC_ARRAY(node, 1, sizeof(agentos_task_node_t));
-        if (!node)
+        if (!node) {
+            AGENTOS_LOG_ERROR("ML planner: node allocation failed at step %zu", i);
             goto cleanup_nodes;
+        }
 
         char node_id[128];
         if (subtasks && i < subtask_count) {
@@ -277,7 +282,18 @@ static agentos_error_t ml_planner_rule_based_plan(const agentos_intent_t *intent
             snprintf(node_id, sizeof(node_id), "%s_step%zu", plan_id, i + 1);
         }
         node->task_node_id = AGENTOS_STRDUP(node_id);
+        if (!node->task_node_id) {
+            AGENTOS_LOG_ERROR("ML planner: node id STRDUP failed at step %zu", i);
+            AGENTOS_FREE(node);
+            goto cleanup_nodes;
+        }
         node->task_node_agent_role = AGENTOS_STRDUP(primary_role);
+        if (!node->task_node_agent_role) {
+            AGENTOS_LOG_ERROR("ML planner: node role STRDUP failed at step %zu", i);
+            AGENTOS_FREE(node->task_node_id);
+            AGENTOS_FREE(node);
+            goto cleanup_nodes;
+        }
 
         /* DS-006: 动态超时——复杂步骤给更多时间 */
         int base_timeout = 15000;
@@ -455,6 +471,7 @@ cleanup_nodes:
     AGENTOS_FREE(plan->task_plan_nodes);
     AGENTOS_FREE(plan->task_plan_id);
     AGENTOS_FREE(plan);
+    AGENTOS_LOG_ERROR("ML planner: plan construction failed, cleaned up partial plan");
     ATM_RET_ERR(AGENTOS_ENOMEM);
 }
 
