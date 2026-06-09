@@ -79,7 +79,7 @@ static int is_valid_json_prefix(const char *str)
 static agentos_cognition_engine_t *create_default_engine(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_OK);
     assert(engine != NULL);
     return engine;
@@ -305,7 +305,7 @@ TEST(int01_2_triple_coordinator_dispatch)
 
     /* 7. 使用 t2 策略创建认知引擎并处理输入 */
     agentos_cognition_engine_t *engine = NULL;
-    ASSERT_OK(agentos_cognition_create(NULL, t2_strategy, NULL, &engine));
+    ASSERT_OK(agentos_cognition_create_take(NULL, t2_strategy, NULL, &engine));
     ASSERT_TRUE(engine != NULL);
 
     const char *input = "Analyze the following data and create a report: "
@@ -388,7 +388,7 @@ TEST(int01_3_execution_verification_loop)
 
     /* 2. 创建引擎 */
     agentos_cognition_engine_t *engine = NULL;
-    ASSERT_OK(agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine));
+    ASSERT_OK(agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine));
     ASSERT_TRUE(engine != NULL);
     printf("    Engine created with feedback callback\n");
 
@@ -697,7 +697,7 @@ TEST(int01_full_pipeline_e2e)
     config.feedback_user_data = NULL;
 
     agentos_cognition_engine_t *engine = NULL;
-    ASSERT_OK(agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine));
+    ASSERT_OK(agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine));
     ASSERT_TRUE(engine != NULL);
 
     /* 2. 创建并关联记忆引擎 */

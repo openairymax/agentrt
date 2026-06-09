@@ -45,7 +45,7 @@ static int tests_failed = 0;
 static void test_cognition_create_default(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
 
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         TEST_PASS("cognition_create with default strategies");
@@ -63,7 +63,7 @@ static void test_cognition_create_ex_with_config(void)
     config.cognition_max_retries = 3;
 
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
 
     if (err == AGENTOS_SUCCESS && engine != NULL) {
         TEST_PASS("cognition_create_ex with config");
@@ -75,7 +75,7 @@ static void test_cognition_create_ex_with_config(void)
 
 static void test_cognition_create_null_params(void)
 {
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, NULL);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, NULL);
     if (err != AGENTOS_SUCCESS) {
         TEST_PASS("cognition_create rejects NULL out param");
     } else {
@@ -94,7 +94,7 @@ static void test_cognition_destroy_null(void)
 static void test_cognition_process_simple_input(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("cognition_process", "create failed");
         return;
@@ -122,7 +122,7 @@ static void test_cognition_process_simple_input(void)
 static void test_cognition_process_empty_input(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("cognition_process empty", "create failed");
         return;
@@ -145,7 +145,7 @@ static void test_cognition_process_empty_input(void)
 static void test_cognition_process_null_params(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_cognition_create_take(NULL, NULL, NULL, &engine);
 
     agentos_error_t err = agentos_cognition_process(engine, NULL, 10, NULL);
     if (err != AGENTOS_SUCCESS) {
@@ -171,7 +171,7 @@ static void test_task_plan_free_null(void)
 static void test_cognition_set_fallback_null(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_cognition_create_take(NULL, NULL, NULL, &engine);
 
     agentos_cognition_set_fallback_plan(engine, NULL);
     TEST_PASS("set_fallback_plan accepts NULL fallback");
@@ -190,7 +190,7 @@ static void test_cognition_set_fallback_null_engine(void)
 static void test_cognition_stats(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_cognition_create_take(NULL, NULL, NULL, &engine);
 
     char *stats = NULL;
     size_t stats_len = 0;
@@ -212,7 +212,7 @@ static void test_cognition_stats(void)
 static void test_cognition_health_check(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_cognition_create_take(NULL, NULL, NULL, &engine);
 
     char *json = NULL;
     agentos_error_t err = agentos_cognition_health_check(engine, &json);
@@ -234,9 +234,9 @@ static void test_cognition_set_context(void)
 {
     static int context_data = 42;
     agentos_cognition_engine_t *engine = NULL;
-    agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_cognition_create_take(NULL, NULL, NULL, &engine);
 
-    agentos_cognition_set_context(engine, &context_data, NULL);
+    agentos_cognition_set_context_take(engine, &context_data, NULL);
     TEST_PASS("cognition_set_context accepts context");
 
     agentos_cognition_destroy(engine);

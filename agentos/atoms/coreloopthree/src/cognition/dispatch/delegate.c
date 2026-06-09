@@ -275,7 +275,7 @@ void delegate_shutdown(void)
     if (g_delegate_mutex_initialized) {
         agentos_mutex_destroy(&g_delegate_mutex);
         g_delegate_mutex_initialized = 0;
-        SVC_LOG_INFO("delegate: g_delegate_mutex destroyed");
+        fprintf(stderr, "[delegate] g_delegate_mutex destroyed\n");
     }
 }
 
