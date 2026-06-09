@@ -270,6 +270,15 @@ agentos_error_t agentos_delegate_cancel(agentos_delegate_task_t *task)
     return AGENTOS_SUCCESS;
 }
 
+void delegate_shutdown(void)
+{
+    if (g_delegate_mutex_initialized) {
+        agentos_mutex_destroy(&g_delegate_mutex);
+        g_delegate_mutex_initialized = 0;
+        SVC_LOG_INFO("delegate: g_delegate_mutex destroyed");
+    }
+}
+
 agentos_delegate_state_t agentos_delegate_get_state(const agentos_delegate_task_t *task)
 {
     if (!task)

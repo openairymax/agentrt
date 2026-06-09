@@ -11,10 +11,11 @@
  * - Phase 4: 目标对齐检查
  */
 
-#include "../metacognition.h"
-#include "../thinking_chain.h"
+#include "../foundation/metacognition.h"
+#include "../foundation/thinking_chain.h"
 #include "agentos.h"
 #include "cognition.h"
+#include "logging_compat.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 
@@ -519,6 +520,20 @@ static agentos_error_t parse_llm_plan_json(const char *json_text, llm_plan_node_
     return (*node_count > 0) ? AGENTOS_SUCCESS : AGENTOS_EINVAL;
 }
 
+static void reflective_destroy_single_node(agentos_task_node_t *node)
+{
+    if (!node)
+        return;
+    AGENTOS_FREE(node->task_node_id);
+    AGENTOS_FREE(node->task_node_agent_role);
+    if (node->task_node_depends_on) {
+        for (size_t d = 0; d < node->task_node_depends_count; d++)
+            AGENTOS_FREE(node->task_node_depends_on[d]);
+        AGENTOS_FREE(node->task_node_depends_on);
+    }
+    AGENTOS_FREE(node);
+}
+
 static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
                                               const agentos_intent_t *intent,
                                               agentos_task_plan_t **out_plan, int audit_passed,
@@ -574,12 +589,19 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
 
     agentos_task_plan_t *plan;
     SAFE_MALLOC_ARRAY(plan, 1, sizeof(agentos_task_plan_t));
-    if (!plan)
+    if (!plan) {
+        AGENTOS_LOG_ERROR("reflective: plan allocation failed");
         ATM_RET_ERR(AGENTOS_ENOMEM);
+    }
 
     char plan_id[128];
     snprintf(plan_id, sizeof(plan_id), "llm_dynamic_%zu", ctx->session_count);
     plan->task_plan_id = AGENTOS_STRDUP(plan_id);
+    if (!plan->task_plan_id) {
+        AGENTOS_LOG_ERROR("reflective: plan id allocation failed");
+        AGENTOS_FREE(plan);
+        ATM_RET_ERR(AGENTOS_ENOMEM);
+    }
 
     size_t total = parsed_count;
     if (!audit_passed)
@@ -589,6 +611,7 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
 
     SAFE_MALLOC_ARRAY(plan->task_plan_nodes, total, sizeof(agentos_task_node_t *));
     if (!plan->task_plan_nodes && total > 0) {
+        AGENTOS_LOG_ERROR("reflective: task_plan_nodes allocation failed (count=%zu)", total);
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
         ATM_RET_ERR(AGENTOS_ENOMEM);
@@ -597,16 +620,28 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
     for (size_t i = 0; i < parsed_count; i++) {
         agentos_task_node_t *node;
         SAFE_MALLOC_ARRAY(node, 1, sizeof(agentos_task_node_t));
-        if (!node)
+        if (!node) {
+            AGENTOS_LOG_WARN("reflective: node allocation failed at step %zu, skipping", i);
             continue;
+        }
 
         char nid[256];
         snprintf(nid, sizeof(nid), "%s_%s", plan_id,
                  parsed_nodes[i].name[0] ? parsed_nodes[i].name : "task");
 
         node->task_node_id = AGENTOS_STRDUP(nid);
+        if (!node->task_node_id) {
+            AGENTOS_LOG_WARN("reflective: node id STRDUP failed at step %zu, skipping", i);
+            reflective_destroy_single_node(node);
+            continue;
+        }
         node->task_node_agent_role =
             AGENTOS_STRDUP(parsed_nodes[i].role[0] ? parsed_nodes[i].role : "worker");
+        if (!node->task_node_agent_role) {
+            AGENTOS_LOG_WARN("reflective: node role STRDUP failed at step %zu, skipping", i);
+            reflective_destroy_single_node(node);
+            continue;
+        }
         node->task_node_timeout_ms =
             parsed_nodes[i].timeout_ms > 0 ? parsed_nodes[i].timeout_ms : 30000;
         node->task_node_priority =
@@ -681,6 +716,11 @@ static agentos_error_t llm_build_dynamic_plan(reflective_context_t *ctx,
                     rn->task_node_depends_count = 1;
                     rn->task_node_depends_on[0] = AGENTOS_STRDUP(
                         plan->task_plan_nodes[plan->task_plan_node_count - 1]->task_node_id);
+                    if (!rn->task_node_depends_on[0]) {
+                        AGENTOS_FREE(rn->task_node_depends_on);
+                        rn->task_node_depends_on = NULL;
+                        rn->task_node_depends_count = 0;
+                    }
                 }
             }
             plan->task_plan_nodes[plan->task_plan_node_count++] = rn;
@@ -710,6 +750,11 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
     char plan_id[128];
     snprintf(plan_id, sizeof(plan_id), "fallback_%zu", session_count);
     plan->task_plan_id = AGENTOS_STRDUP(plan_id);
+    if (!plan->task_plan_id) {
+        AGENTOS_LOG_ERROR("reflective: fallback plan id allocation failed");
+        AGENTOS_FREE(plan);
+        return NULL;
+    }
 
     size_t nc = 5 + (audit_passed ? 0 : 1) + (aligned ? 0 : 1);
     SAFE_MALLOC_ARRAY(plan->task_plan_nodes, nc, sizeof(agentos_task_node_t *));
@@ -734,13 +779,26 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
     for (int s = 0; s < 5; s++) {
         agentos_task_node_t *node;
         SAFE_MALLOC_ARRAY(node, 1, sizeof(agentos_task_node_t));
-        if (!node)
+        if (!node) {
+            AGENTOS_LOG_WARN("reflective: fallback node allocation failed at step %d", s);
             break;
+        }
 
         char nid[256];
         snprintf(nid, sizeof(nid), "%s_%s", plan_id, defaults[s].name);
         node->task_node_id = AGENTOS_STRDUP(nid);
+        if (!node->task_node_id) {
+            AGENTOS_LOG_WARN("reflective: fallback node id STRDUP failed at step %d", s);
+            AGENTOS_FREE(node);
+            break;
+        }
         node->task_node_agent_role = AGENTOS_STRDUP(defaults[s].role);
+        if (!node->task_node_agent_role) {
+            AGENTOS_LOG_WARN("reflective: fallback node role STRDUP failed at step %d", s);
+            AGENTOS_FREE(node->task_node_id);
+            AGENTOS_FREE(node);
+            break;
+        }
         node->task_node_timeout_ms = defaults[s].to;
         node->task_node_priority = defaults[s].pri;
 

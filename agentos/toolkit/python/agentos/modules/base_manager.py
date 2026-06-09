@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from ..client.client import APIClient, RequestOptions
-from ..utils import InputValidator
+from ..utils import validate_required_string, validate_positive_number
 
 
 class BaseManager(ABC):
@@ -47,7 +47,6 @@ class BaseManager(ABC):
         self._api = client
         self._config = config or {}
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._validator = InputValidator()
     
     def _validate_required_params(self, **kwargs):
         """
@@ -69,11 +68,6 @@ class BaseManager(ABC):
                     CODE_MISSING_PARAMETER,
                     f"缺少必需参数: {key}"
                 )
-            
-            # 使用验证器进行类型检查
-            validate_method = getattr(self._validator, f'validate_{key}', None)
-            if validate_method and value is not None:
-                validate_method(value)
     
     def _build_request_options(self, **kwargs) -> RequestOptions:
         """
@@ -147,12 +141,12 @@ class BaseManager(ABC):
         return self._api
     
     @property
-    def config(self) -> manager:
+    def config(self) -> Dict[str, Any]:
         """
         获取配置对象
         
         Returns:
-            manager: 配置对象
+            Dict[str, Any]: 配置字典
         """
         return self._config
     

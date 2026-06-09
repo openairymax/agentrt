@@ -161,10 +161,7 @@ int protocol_router_route(protocol_router_handle_t router, const unified_message
     // 收集所有规则到临时数组供决策函数使用
     protocol_rule_t *rule_array = NULL;
     if (r->rule_count > 0) {
-        if (r->rule_count > SIZE_MAX / sizeof(protocol_rule_t)) {
-            return AGENTOS_E_OVERFLOW;
-        }
-        rule_array = (protocol_rule_t *)AGENTOS_MALLOC(r->rule_count * sizeof(protocol_rule_t));
+        SAFE_MALLOC_ARRAY(rule_array, r->rule_count, sizeof(protocol_rule_t));
         if (rule_array) {
             rule_node_t *node = r->rules;
             size_t i = 0;

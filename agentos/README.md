@@ -104,7 +104,7 @@ agentos/
 │   ├── tools/          #     配置工具
 │   └── benchmark/      #     性能基准测试
 ├── toolkit/            # 多语言 SDK — Python/Go/Rust/TypeScript
-│   ├── python/         #     Python SDK（v0.0.5）
+│   ├── python/         #     Python SDK（v0.1.0）
 │   ├── go/             #     Go SDK
 │   ├── rust/           #     Rust SDK
 │   └── typescript/     #     TypeScript SDK
@@ -245,10 +245,10 @@ Manager 是统一配置管理中心，按领域模块组织配置文件和 Schem
 
 | 语言 | 版本 | 目录 |
 |------|------|------|
-| Python | v0.0.5 | `toolkit/python/` |
-| Go | v0.0.5 | `toolkit/go/` |
-| Rust | v0.0.5 | `toolkit/rust/` |
-| TypeScript | v0.0.5 | `toolkit/typescript/` |
+| Python | v0.1.0 | `toolkit/python/` |
+| Go | v0.1.0 | `toolkit/go/` |
+| Rust | v0.1.0 | `toolkit/rust/` |
+| TypeScript | v0.1.0 | `toolkit/typescript/` |
 
 所有 SDK 提供统一的 API 接口，涵盖 Agent/Task/Session/Memory/Skill/Syscall/Telemetry 七大核心功能。
 

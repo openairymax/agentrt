@@ -464,7 +464,9 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
     int existed = (entry != NULL);
     if (entry) {
         AGENTOS_FREE(entry->encrypted_data);
+        entry->encrypted_data = NULL;
         AGENTOS_FREE(entry->metadata.cred_id);
+        entry->metadata.cred_id = NULL;
     } else {
         entry = &vault->entries[vault->entry_count];
         __builtin_memset(entry, 0, sizeof(credential_entry_t));
@@ -588,6 +590,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
             if (!entry->acl.entries[i].agent_id) {
                 for (size_t j = 0; j < i; j++) {
                     AGENTOS_FREE(entry->acl.entries[j].agent_id);
+                    entry->acl.entries[j].agent_id = NULL;
                 }
                 AGENTOS_FREE(entry->acl.entries);
                 entry->acl.entries = NULL;
@@ -1504,7 +1507,9 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         uint8_t *enc_data = (uint8_t *)AGENTOS_MALLOC(enc_len);
         if (!enc_data || fread(enc_data, 1, enc_len, f) != enc_len) {
             AGENTOS_FREE(cred_id);
+            cred_id = NULL;
             AGENTOS_FREE(enc_data);
+            enc_data = NULL;
             break;
         }
 
@@ -1514,8 +1519,11 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         if (!decrypted || EVP_DecryptUpdate(ctx, decrypted, &out_len, enc_data, enc_len) != 1 ||
             EVP_DecryptFinal_ex(ctx, decrypted + out_len, &final_len) != 1) {
             AGENTOS_FREE(cred_id);
+            cred_id = NULL;
             AGENTOS_FREE(enc_data);
+            enc_data = NULL;
             AGENTOS_FREE(decrypted);
+            decrypted = NULL;
             continue;
         }
 
@@ -1527,8 +1535,11 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
                 vault->entries, new_cap * sizeof(credential_entry_t));
             if (!new_entries) {
                 AGENTOS_FREE(cred_id);
+                cred_id = NULL;
                 AGENTOS_FREE(enc_data);
+                enc_data = NULL;
                 AGENTOS_FREE(decrypted);
+                decrypted = NULL;
                 continue;
             }
             vault->entries = new_entries;
@@ -1553,7 +1564,9 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
             entry->encrypted_data = NULL;
             entry->encrypted_len = 0;
             AGENTOS_FREE(enc_data);
+            enc_data = NULL;
             AGENTOS_FREE(decrypted);
+            decrypted = NULL;
             continue;
         }
 
@@ -1565,7 +1578,9 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
                 entry->encrypted_data = NULL;
                 entry->encrypted_len = 0;
                 AGENTOS_FREE(enc_data);
+                enc_data = NULL;
                 AGENTOS_FREE(decrypted);
+                decrypted = NULL;
                 continue;
             }
             entry->acl.count = acl_count;
@@ -1669,7 +1684,9 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         imported++;
 
         AGENTOS_FREE(enc_data);
+        enc_data = NULL;
         AGENTOS_FREE(decrypted);
+        decrypted = NULL;
     }
 
     EVP_CIPHER_CTX_free(ctx);

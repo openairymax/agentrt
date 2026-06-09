@@ -429,6 +429,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(ipc_service_bus_t bus_handle
             pending->completed = 1;
         } else {
             AGENTOS_FREE(resp_json);
+            resp_json = NULL;
             pending->completed = 0;
         }
     } else {
@@ -449,8 +450,10 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(ipc_service_bus_t bus_handle
                 AGENTOS_FREE(err_payload);
             }
         }
-        if (resp_json)
+        if (resp_json) {
             AGENTOS_FREE(resp_json);
+            resp_json = NULL;
+        }
     }
 
     uint64_t elapsed = agentos_platform_get_time_ms() - start_time;

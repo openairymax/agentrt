@@ -14,7 +14,7 @@
 - **质量报告**：`test_quality_reporter.py` 和 `generate_combined_report.py` 生成综合测试报告
 - **测试模板**：提供 C/Python 测试文件模板，规范新测试的编写
 
-> **版本**：v0.0.5
+> **版本**：v0.1.0
 
 ## 与 agentos/ 模块对应关系
 

@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../intent_utils.h"
-#include "../metacognition.h"
+#include "../intent/intent_utils.h"
+#include "../foundation/metacognition.h"
 #include "agentos.h"
 #include "memory_compat.h"
 #include "observability_compat.h"

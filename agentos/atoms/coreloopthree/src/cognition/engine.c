@@ -26,11 +26,11 @@
 #endif
 
 #include "atomic_compat.h"
-#include "metacognition.h"
-#include "semantic_unit.h"
-#include "stream_critic.h"
-#include "thinking_chain.h"
-#include "triple_coordinator.h"
+#include "foundation/metacognition.h"
+#include "foundation/semantic_unit.h"
+#include "critique/stream_critic.h"
+#include "foundation/thinking_chain.h"
+#include "critique/triple_coordinator.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN

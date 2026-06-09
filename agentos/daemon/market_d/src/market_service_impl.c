@@ -159,11 +159,17 @@ int market_service_register_agent(market_service_t *service, const agent_info_t 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_info->agent_id) == 0) {
             AGENTOS_FREE(service->agents[i]->name);
+            service->agents[i]->name = NULL;
             AGENTOS_FREE(service->agents[i]->version);
+            service->agents[i]->version = NULL;
             AGENTOS_FREE(service->agents[i]->description);
+            service->agents[i]->description = NULL;
             AGENTOS_FREE(service->agents[i]->author);
+            service->agents[i]->author = NULL;
             AGENTOS_FREE(service->agents[i]->repository);
+            service->agents[i]->repository = NULL;
             AGENTOS_FREE(service->agents[i]->dependencies);
+            service->agents[i]->dependencies = NULL;
 
             service->agents[i]->name = agent_info->name ? AGENTOS_STRDUP(agent_info->name) : NULL;
             service->agents[i]->version =
@@ -231,11 +237,17 @@ int market_service_register_skill(market_service_t *service, const skill_info_t 
     for (size_t i = 0; i < service->skill_count; i++) {
         if (strcmp(service->skills[i]->skill_id, skill_info->skill_id) == 0) {
             AGENTOS_FREE(service->skills[i]->name);
+            service->skills[i]->name = NULL;
             AGENTOS_FREE(service->skills[i]->version);
+            service->skills[i]->version = NULL;
             AGENTOS_FREE(service->skills[i]->description);
+            service->skills[i]->description = NULL;
             AGENTOS_FREE(service->skills[i]->author);
+            service->skills[i]->author = NULL;
             AGENTOS_FREE(service->skills[i]->repository);
+            service->skills[i]->repository = NULL;
             AGENTOS_FREE(service->skills[i]->dependencies);
+            service->skills[i]->dependencies = NULL;
 
             service->skills[i]->name = skill_info->name ? AGENTOS_STRDUP(skill_info->name) : NULL;
             service->skills[i]->version =
@@ -698,8 +710,8 @@ int market_service_reload_config(market_service_t *service, const market_config_
         return AGENTOS_ERR_INVALID_PARAM;
 
     AGENTOS_FREE((void *)service->config.registry_url);
-    AGENTOS_FREE((void *)service->config.storage_path);
     service->config.registry_url = NULL;
+    AGENTOS_FREE((void *)service->config.storage_path);
     service->config.storage_path = NULL;
 
     __builtin_memcpy(&service->config, config, sizeof(market_config_t));
@@ -810,6 +822,7 @@ AGENTOS_STRNCPY_TERM(tmp, storage, sizeof(tmp));
     size_t nread = fread(idx_data, 1, (size_t)fsize, idx_fp);
     if (nread != (size_t)fsize) {
         AGENTOS_FREE(idx_data);
+        idx_data = NULL;
         fclose(idx_fp);
         AGENTOS_ERROR(AGENTOS_ERR_IO, "fread index file failed");
     }
@@ -860,6 +873,7 @@ AGENTOS_STRNCPY_TERM(tmp, storage, sizeof(tmp));
     }
 
     AGENTOS_FREE(idx_data);
+    idx_data = NULL;
     SVC_LOG_INFO("Sync registry: synced %d new agents from %s", synced, url);
     return 0;
 }

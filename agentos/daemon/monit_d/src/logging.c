@@ -328,7 +328,7 @@ AGENTOS_STRNCPY_TERM(entry.service_name, service_name, sizeof(entry.service_name
         (entry.file)[sizeof(entry.file) - 1] = '\0';
     entry.line = line;
     if (function)
-AGENTOS_STRNCPY_TERM(entry.function, function, sizeof(entry.function));
+__builtin_strncpy(entry.function, function, sizeof(entry.function)-1);
         (entry.function)[sizeof(entry.function) - 1] = '\0';
 
     agentos_mutex_lock(&g_structured_log.context_lock);

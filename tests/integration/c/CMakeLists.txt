@@ -44,3 +44,73 @@ add_test(NAME e2e_core COMMAND test_e2e_core
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 message(STATUS "  [integration] test_e2e_core: P2-C01 E2E integration tests configured")
+
+# ========================================================================
+# LLM Routing Integration Test (INT-15)
+# ========================================================================
+
+set(LLM_D_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/llm_d)
+set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons)
+set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms)
+set(SYSCALL_INCLUDE_DIR ${ATOMIC_DIR}/syscall/include)
+set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
+
+set(LLM_IMPL_SOURCES
+    ${LLM_D_DIR}/src/service.c
+    ${LLM_D_DIR}/src/cache.c
+    ${LLM_D_DIR}/src/token_counter.c
+    ${LLM_D_DIR}/src/response.c
+    ${LLM_D_DIR}/src/cost_tracker.c
+    ${LLM_D_DIR}/src/providers/registry.c
+    ${LLM_D_DIR}/src/providers/provider.c
+    ${LLM_D_DIR}/src/providers/openai.c
+    ${LLM_D_DIR}/src/providers/anthropic.c
+    ${LLM_D_DIR}/src/providers/deepseek.c
+    ${LLM_D_DIR}/src/providers/google.c
+    ${LLM_D_DIR}/src/providers/local.c
+)
+
+add_executable(test_llm_d_routing test_llm_d_routing.c ${LLM_IMPL_SOURCES})
+
+target_include_directories(test_llm_d_routing PRIVATE
+    ${LLM_D_DIR}/include
+    ${LLM_D_DIR}/src
+    ${LLM_D_DIR}/src/providers
+    ${COMMONS_DIR}
+    ${COMMONS_DIR}/platform/include
+    ${COMMONS_DIR}/utils/error/include
+    ${COMMONS_DIR}/utils/logging/include
+    ${COMMONS_DIR}/utils/config_unified/include
+    ${COMMONS_DIR}/utils/memory/include
+    ${COMMONS_DIR}/utils/string/include
+    ${COMMONS_DIR}/utils/sync/include
+    ${COMMONS_DIR}/utils/cache/include
+    ${COMMONS_DIR}/utils/compat/include
+    ${SYSCALL_INCLUDE_DIR}
+    ${COREKERN_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/include
+)
+
+target_link_libraries(test_llm_d_routing PRIVATE
+    svc_common
+    Threads::Threads
+)
+
+if(AGENTOS_HAS_CJSON)
+    target_link_libraries(test_llm_d_routing PRIVATE cjson)
+endif()
+
+if(AGENTOS_HAS_CURL)
+    target_include_directories(test_llm_d_routing PRIVATE ${CURL_INCLUDE_DIRS})
+    target_link_libraries(test_llm_d_routing PRIVATE ${CURL_LIBRARIES})
+endif()
+
+target_compile_features(test_llm_d_routing PRIVATE c_std_11)
+target_compile_options(test_llm_d_routing PRIVATE
+    -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
+)
+
+add_test(NAME llm_d_routing COMMAND test_llm_d_routing
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+message(STATUS "  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")

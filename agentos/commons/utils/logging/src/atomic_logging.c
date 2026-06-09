@@ -22,19 +22,7 @@
 #include "../../error/include/error.h"
 #include "error.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
 
 static AGENTOS_THREAD_LOCAL ThreadLocalBuffer *g_tls_log_buffer = NULL;
 
@@ -92,14 +80,7 @@ static ThreadLocalBuffer *get_thread_local_buffer(void)
         g_tls_log_buffer = (ThreadLocalBuffer *)AGENTOS_CALLOC(1, sizeof(ThreadLocalBuffer));
         if (g_tls_log_buffer) {
             g_tls_log_buffer->capacity = g_atomic_state.manager.batch_commit_threshold;
-            if (g_tls_log_buffer->capacity > SIZE_MAX / sizeof(log_record_t)) {
-                AGENTOS_FREE(g_tls_log_buffer);
-                g_tls_log_buffer = NULL;
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                return NULL;
-            }
-            g_tls_log_buffer->buffer =
-                (log_record_t *)AGENTOS_MALLOC(g_tls_log_buffer->capacity * sizeof(log_record_t));
+            SAFE_MALLOC_ARRAY(g_tls_log_buffer->buffer, g_tls_log_buffer->capacity, sizeof(log_record_t));
             g_tls_log_buffer->position = 0;
             g_tls_log_buffer->thread_id = (uint64_t)agentos_thread_id();
 

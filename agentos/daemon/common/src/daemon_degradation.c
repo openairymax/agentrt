@@ -15,10 +15,10 @@
  */
 
 #include "daemon_degradation.h"
+#include "error.h"
 #include "svc_cache.h"
 #include "svc_logger.h"
 
-#include <stdio.h>
 #include <string.h>
 
 /* ============================================================================
@@ -53,7 +53,7 @@ static int on_cache_degrade(degradation_handler_t *handler,
     (void)new_level;
 
     degrade_cache_ctx_t *ctx = (degrade_cache_ctx_t *)handler->context;
-    if (!ctx || !ctx->cache_handle) return -1;
+    if (!ctx || !ctx->cache_handle) return AGENTOS_ERR_INVALID_PARAM;
 
     size_t half_capacity = ctx->original_capacity / 2;
     if (half_capacity < 1) half_capacity = 1;
@@ -61,8 +61,7 @@ static int on_cache_degrade(degradation_handler_t *handler,
     svc_cache_set_capacity((svc_cache_t *)ctx->cache_handle, half_capacity);
     ctx->reduced_capacity = half_capacity;
 
-    fprintf(stderr, "[DEGRADE] Cache '%s': capacity reduced %zu → %zu\n",
-            handler->feature_name, ctx->original_capacity, half_capacity);
+    SVC_LOG_WARN("Cache '%s': capacity reduced %zu → %zu", handler->feature_name, ctx->original_capacity, half_capacity);
     return 0;
 }
 
@@ -77,12 +76,11 @@ static int on_cache_restore(degradation_handler_t *handler,
     (void)new_level;
 
     degrade_cache_ctx_t *ctx = (degrade_cache_ctx_t *)handler->context;
-    if (!ctx || !ctx->cache_handle) return -1;
+    if (!ctx || !ctx->cache_handle) return AGENTOS_ERR_INVALID_PARAM;
 
     svc_cache_set_capacity((svc_cache_t *)ctx->cache_handle, ctx->original_capacity);
 
-    fprintf(stderr, "[DEGRADE] Cache '%s': capacity restored %zu → %zu\n",
-            handler->feature_name, ctx->reduced_capacity, ctx->original_capacity);
+    SVC_LOG_WARN("Cache '%s': capacity restored %zu → %zu", handler->feature_name, ctx->reduced_capacity, ctx->original_capacity);
     return 0;
 }
 
@@ -97,13 +95,12 @@ static int on_log_degrade(degradation_handler_t *handler,
     (void)new_level;
 
     degrade_log_ctx_t *ctx = (degrade_log_ctx_t *)handler->context;
-    if (!ctx) return -1;
+    if (!ctx) return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_log_set_level(AGENTOS_LOG_ERROR);
     ctx->degraded_log_level = AGENTOS_LOG_ERROR;
 
-    fprintf(stderr, "[DEGRADE] Log level: raised to ERROR (was level %d)\n",
-            ctx->original_log_level);
+    SVC_LOG_WARN("Log level: raised to ERROR (was level %d)", ctx->original_log_level);
     return 0;
 }
 
@@ -118,12 +115,11 @@ static int on_log_restore(degradation_handler_t *handler,
     (void)new_level;
 
     degrade_log_ctx_t *ctx = (degrade_log_ctx_t *)handler->context;
-    if (!ctx) return -1;
+    if (!ctx) return AGENTOS_ERR_INVALID_PARAM;
 
     agentos_log_set_level((agentos_log_level_t)ctx->original_log_level);
 
-    fprintf(stderr, "[DEGRADE] Log level: restored to level %d\n",
-            ctx->original_log_level);
+    SVC_LOG_WARN("Log level: restored to level %d", ctx->original_log_level);
     return 0;
 }
 
@@ -138,7 +134,7 @@ static int on_batch_degrade(degradation_handler_t *handler,
     (void)new_level;
 
     degrade_batch_ctx_t *ctx = (degrade_batch_ctx_t *)handler->context;
-    if (!ctx || !ctx->batch_size_ptr) return -1;
+    if (!ctx || !ctx->batch_size_ptr) return AGENTOS_ERR_INVALID_PARAM;
 
     size_t half = ctx->original_batch_size / 2;
     if (half < 1) half = 1;
@@ -146,8 +142,7 @@ static int on_batch_degrade(degradation_handler_t *handler,
     *ctx->batch_size_ptr = half;
     ctx->reduced_batch_size = half;
 
-    fprintf(stderr, "[DEGRADE] Batch '%s': size reduced %zu → %zu\n",
-            handler->feature_name, ctx->original_batch_size, half);
+    SVC_LOG_WARN("Batch '%s': size reduced %zu → %zu", handler->feature_name, ctx->original_batch_size, half);
     return 0;
 }
 
@@ -162,12 +157,11 @@ static int on_batch_restore(degradation_handler_t *handler,
     (void)new_level;
 
     degrade_batch_ctx_t *ctx = (degrade_batch_ctx_t *)handler->context;
-    if (!ctx || !ctx->batch_size_ptr) return -1;
+    if (!ctx || !ctx->batch_size_ptr) return AGENTOS_ERR_INVALID_PARAM;
 
     *ctx->batch_size_ptr = ctx->original_batch_size;
 
-    fprintf(stderr, "[DEGRADE] Batch '%s': size restored %zu → %zu\n",
-            handler->feature_name, ctx->reduced_batch_size, ctx->original_batch_size);
+    SVC_LOG_WARN("Batch '%s': size restored %zu → %zu", handler->feature_name, ctx->reduced_batch_size, ctx->original_batch_size);
     return 0;
 }
 
@@ -182,12 +176,11 @@ static int on_conn_degrade(degradation_handler_t *handler,
     (void)new_level;
 
     degrade_conn_ctx_t *ctx = (degrade_conn_ctx_t *)handler->context;
-    if (!ctx || !ctx->reject_new_flag) return -1;
+    if (!ctx || !ctx->reject_new_flag) return AGENTOS_ERR_INVALID_PARAM;
 
     *ctx->reject_new_flag = true;
 
-    fprintf(stderr, "[DEGRADE] Connection '%s': rejecting new connections\n",
-            handler->feature_name);
+    SVC_LOG_WARN("Connection '%s': rejecting new connections", handler->feature_name);
     return 0;
 }
 
@@ -202,12 +195,11 @@ static int on_conn_restore(degradation_handler_t *handler,
     (void)new_level;
 
     degrade_conn_ctx_t *ctx = (degrade_conn_ctx_t *)handler->context;
-    if (!ctx || !ctx->reject_new_flag) return -1;
+    if (!ctx || !ctx->reject_new_flag) return AGENTOS_ERR_INVALID_PARAM;
 
     *ctx->reject_new_flag = false;
 
-    fprintf(stderr, "[DEGRADE] Connection '%s': accepting new connections\n",
-            handler->feature_name);
+    SVC_LOG_WARN("Connection '%s': accepting new connections", handler->feature_name);
     return 0;
 }
 
@@ -372,5 +364,5 @@ void daemon_degradation_unregister_all(void)
     }
     g_handler_count = 0;
 
-    fprintf(stderr, "[DEGRADE] All degradation handlers unregistered\n");
+    SVC_LOG_WARN("All degradation handlers unregistered");
 }

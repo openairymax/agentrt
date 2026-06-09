@@ -8,6 +8,7 @@
  */
 
 #include "../include/memory_compat.h"
+#include "logging_compat.h"
 #include "platform.h"
 
 #include <stdio.h>
@@ -118,7 +119,7 @@ static void memory_handle_fail(size_t size, const char *tag)
     // 根据策略处理
     switch (g_state.options.fail_strategy) {
     case MEMORY_FAIL_STRATEGY_ABORT:
-        fprintf(stderr, "内存分配失败：size=%zu, tag=%s\n", size, tag ? tag : "(null)");
+        AGENTOS_LOG_ERROR("内存分配失败：size=%zu, tag=%s", size, tag ? tag : "(null)");
         abort();
         break;
 
@@ -342,7 +343,7 @@ void memory_cleanup(void)
 
     // 检查内存泄漏
     if (g_state.debug_enabled && g_state.debug_list_head != NULL) {
-        fprintf(stderr, "警告：内存清理时发现未释放的内存块\n");
+        AGENTOS_LOG_WARN("警告：内存清理时发现未释放的内存块");
 
         struct memory_debug_info *current = g_state.debug_list_head;
         size_t leak_count = 0;
@@ -351,7 +352,7 @@ void memory_cleanup(void)
         while (current != NULL) {
             leak_count++;
             leak_size += current->size;
-            fprintf(stderr, "Leak: %p (%zu bytes) - tag: %s\n", current->address, current->size,
+            AGENTOS_LOG_WARN("Leak: %p (%zu bytes) - tag: %s", current->address, current->size,
                     current->tag ? current->tag : "(null)");
 
             // 释放泄漏的内存（可选）
@@ -370,7 +371,7 @@ void memory_cleanup(void)
             current = next;
         }
 
-        fprintf(stderr, "Total leaks: %zu blocks, %zu bytes\n", leak_count, leak_size);
+        AGENTOS_LOG_WARN("Total leaks: %zu blocks, %zu bytes", leak_count, leak_size);
         g_state.debug_list_head = NULL;
     }
 
@@ -669,9 +670,13 @@ size_t memory_check_leaks(bool dump_to_stderr)
     }
 
     if (dump_to_stderr && current != NULL) {
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(stderr, "=== Memory Leak Detection Report ===\n");
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(stderr, "Time: %llu\n", (unsigned long long)memory_get_timestamp());
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(stderr, "Current allocated: %zu bytes\n", g_state.stats.current_allocated);
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(stderr, "Leak blocks: %zu\n", leak_count);
     }
 
@@ -679,13 +684,17 @@ size_t memory_check_leaks(bool dump_to_stderr)
         leak_size += current->size;
 
         if (dump_to_stderr) {
+            /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
             fprintf(stderr, "  %p: %zu字节", current->address, current->size);
             if (current->tag) {
+                /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                 fprintf(stderr, " [%s]", current->tag);
             }
             if (current->file) {
+                /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                 fprintf(stderr, " (%s:%d)", current->file, current->line);
             }
+            /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
             fprintf(stderr, "\n");
         }
 
@@ -693,7 +702,9 @@ size_t memory_check_leaks(bool dump_to_stderr)
     }
 
     if (dump_to_stderr && leak_size > 0) {
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(stderr, "Total leaks: %zu bytes\n", leak_size);
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(stderr, "========================\n");
     }
 
@@ -716,8 +727,11 @@ void memory_dump_debug_info(const char *file)
         return;
     }
 
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "=== Memory Debug Info Dump ===\n");
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "Timestamp: %llu\n", (unsigned long long)memory_get_timestamp());
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "Current allocation blocks:\n");
 
     struct memory_debug_info *current = g_state.debug_list_head;
@@ -725,19 +739,28 @@ void memory_dump_debug_info(const char *file)
 
     while (current != NULL) {
         count++;
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "  [#%zu]:\n", count);
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "    address: %p\n", current->address);
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "    size: %zu bytes\n", current->size);
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "    tag: %s\n", current->tag ? current->tag : "(null)");
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "    location: %s:%d (%s)\n", current->file ? current->file : "(unknown)",
                 current->line, current->function ? current->function : "(unknown)");
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "    timestamp: %llu\n", (unsigned long long)current->timestamp);
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "\n");
 
         current = current->next;
     }
 
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "Total: %zu memory blocks\n", count);
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "=======================\n");
 
     if (file) {

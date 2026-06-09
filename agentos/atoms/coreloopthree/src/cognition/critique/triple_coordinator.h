@@ -18,9 +18,9 @@
 
 #include "agentos.h"
 #include "confidence_calibrator.h"
-#include "metacognition.h"
-#include "semantic_unit.h"
-#include "thinking_chain.h"
+#include "../foundation/metacognition.h"
+#include "../foundation/semantic_unit.h"
+#include "../foundation/thinking_chain.h"
 
 #include <stdbool.h>
 #include <stddef.h>

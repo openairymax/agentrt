@@ -4,6 +4,7 @@
 
 import { SessionError } from './errors';
 import { AgentOS } from './agent';
+import { MemoryRaw } from './types';
 
 /** AgentOS 会话管理�?*/
 export class Session {
@@ -22,7 +23,7 @@ export class Session {
   }
 
   /** 设置会话上下文�?*/
-  async setContext(key: string, value: any): Promise<boolean> {
+  async setContext(key: string, value: unknown): Promise<boolean> {
     const response = await this.client.request<{ success: boolean }>(
       'POST',
       `/api/v1/sessions/${this.sessionId}/context`,
@@ -31,9 +32,9 @@ export class Session {
     return response.success;
   }
 
-  /** 获取会话上下文�?*/
-  async getContext(key: string): Promise<any> {
-    const response = await this.client.request<{ value: any }>(
+  /** 获取会话上下文 */
+  async getContext(key: string): Promise<unknown> {
+    const response = await this.client.request<{ value: unknown }>(
       'GET',
       `/api/v1/sessions/${this.sessionId}/context/${key}`,
     );
@@ -50,8 +51,8 @@ export class Session {
   }
 
   /** 获取所有上下文 */
-  async getAllContext(): Promise<Record<string, any>> {
-    const response = await this.client.request<{ context: Record<string, any> }>(
+  async getAllContext(): Promise<Record<string, unknown>> {
+    const response = await this.client.request<{ context: Record<string, unknown> }>(
       'GET',
       `/api/v1/sessions/${this.sessionId}/context`,
     );

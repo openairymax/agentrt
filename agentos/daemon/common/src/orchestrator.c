@@ -267,6 +267,7 @@ void orchestrator_destroy(orchestrator_t *orch)
 orch_pipeline_t *orchestrator_pipeline_create(orchestrator_t *orch, const char *name)
 {
     if (!orch) {
+        SVC_LOG_ERROR("orchestrator_pipeline_create: NULL orchestrator handle");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -274,6 +275,7 @@ orch_pipeline_t *orchestrator_pipeline_create(orchestrator_t *orch, const char *
 
     orch_pipeline_t *p = (orch_pipeline_t *)AGENTOS_CALLOC(1, sizeof(orch_pipeline_t));
     if (!p) {
+        SVC_LOG_ERROR("orchestrator_pipeline_create: pipeline allocation failed");
         agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
                               "pipeline alloc failed");
         return NULL;
@@ -295,9 +297,14 @@ void orchestrator_pipeline_destroy(orch_pipeline_t *pipeline)
 
 int orchestrator_pipeline_add_step(orch_pipeline_t *pipeline, const orch_pipeline_step_t *step)
 {
-    if (!pipeline || !step)
+    if (!pipeline || !step) {
+        SVC_LOG_ERROR("orchestrator_pipeline_add_step: NULL pipeline=%p or step=%p",
+                      (void *)pipeline, (void *)step);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
     if (pipeline->step_count >= ORCH_MAX_STEPS) {
+        SVC_LOG_ERROR("orchestrator_pipeline_add_step: step limit exceeded (count=%u, max=%d)",
+                      pipeline->step_count, ORCH_MAX_STEPS);
         AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "pipeline step limit exceeded");
         return AGENTOS_ERR_OVERFLOW;
     }
@@ -311,6 +318,8 @@ static task_entry_t *find_or_create_task(orchestrator_t *orch, orch_phase_t phas
                                          const char *input)
 {
     if (orch->task_count >= ORCH_MAX_TASKS) {
+        SVC_LOG_ERROR("find_or_create_task: task table full (count=%u, max=%d)",
+                      orch->task_count, ORCH_MAX_TASKS);
         agentos_error_push_ex(AGENTOS_ERR_DAEMON_INIT_FAILED, __FILE__, __LINE__, __func__,
                               "task_count overflow: %u >= %u", orch->task_count, ORCH_MAX_TASKS);
         return NULL;
@@ -348,11 +357,13 @@ static void ensure_orch_bus_mutex(void)
 static char *memory_query_context(agentos_memory_provider_t *mem, const char *query, uint32_t limit)
 {
     if (!mem || !query) {
+        SVC_LOG_ERROR("memory_query_context: NULL mem=%p or query=%p", (void *)mem, (void *)query);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
     }
     if (!mem->query || !mem->get_raw) {
+        SVC_LOG_ERROR("memory_query_context: memory provider missing query/get_raw methods");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -366,9 +377,14 @@ static char *memory_query_context(agentos_memory_provider_t *mem, const char *qu
             for (size_t i = 0; i < count; i++)
                 AGENTOS_FREE(ids[i]);
             AGENTOS_FREE(ids);
+            ids = NULL;
         }
-        if (scores)
+        if (scores) {
             AGENTOS_FREE(scores);
+            scores = NULL;
+        }
+        SVC_LOG_WARN("memory_query_context: query returned no results (err=%d, count=%zu)",
+                     err, count);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
@@ -378,7 +394,10 @@ static char *memory_query_context(agentos_memory_provider_t *mem, const char *qu
         for (size_t i = 0; i < count; i++)
             AGENTOS_FREE(ids[i]);
         AGENTOS_FREE(ids);
+        ids = NULL;
         AGENTOS_FREE(scores);
+        scores = NULL;
+        SVC_LOG_ERROR("memory_query_context: context buffer allocation failed (size=%zu)", buf_sz);
         agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
                               "memory_query_context alloc failed (size=%zu)", buf_sz);
         return NULL;
@@ -401,6 +420,7 @@ static char *memory_query_context(agentos_memory_provider_t *mem, const char *qu
     }
     pos += snprintf(context + pos, buf_sz - pos, "]}");
     AGENTOS_FREE(ids);
+    ids = NULL;
     AGENTOS_FREE(scores);
     return context;
 }
@@ -450,6 +470,8 @@ static void memory_sync_persistent(agentos_memory_provider_t *mem)
 static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, const char *topic)
 {
     if (!mem || !topic || !mem->retrieve) {
+        SVC_LOG_ERROR("memory_retrieve_for_generation: NULL mem=%p, topic=%p, or missing retrieve method",
+                      (void *)mem, (void *)topic);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -463,9 +485,14 @@ static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, cons
             for (size_t i = 0; i < count; i++)
                 AGENTOS_FREE(ids[i]);
             AGENTOS_FREE(ids);
+            ids = NULL;
         }
-        if (scores)
+        if (scores) {
             AGENTOS_FREE(scores);
+            scores = NULL;
+        }
+        SVC_LOG_WARN("memory_retrieve_for_generation: retrieve returned no results (err=%d, count=%zu)",
+                     err, count);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
@@ -475,7 +502,10 @@ static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, cons
         for (size_t i = 0; i < count; i++)
             AGENTOS_FREE(ids[i]);
         AGENTOS_FREE(ids);
+        ids = NULL;
         AGENTOS_FREE(scores);
+        scores = NULL;
+        SVC_LOG_ERROR("memory_retrieve_for_generation: context buffer allocation failed (size=%zu)", buf_sz);
         agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
                               "memory_retrieve_for_generation alloc failed (size=%zu)", buf_sz);
         return NULL;
@@ -492,6 +522,7 @@ static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, cons
     for (size_t i = 0; i < count; i++)
         AGENTOS_FREE(ids[i]);
     AGENTOS_FREE(ids);
+    ids = NULL;
     AGENTOS_FREE(scores);
     return context;
 }
@@ -499,6 +530,7 @@ static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, cons
 static char *call_llm_service(const char *prompt, const char *system_role)
 {
     if (!prompt) {
+        SVC_LOG_ERROR("call_llm_service: NULL prompt");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -547,8 +579,10 @@ AGENTOS_STRNCPY_TERM(request.header.target, "llm_d", sizeof(request.header.targe
     agentos_error_t err = ipc_service_bus_request(bus, "llm_d", &request, &response, 30000);
     if (err != AGENTOS_SUCCESS || !response.payload) {
         SVC_LOG_WARN("orchestrator: LLM call failed (err=%d), using fallback", err);
-        if (response.payload)
+        if (response.payload) {
             AGENTOS_FREE(response.payload);
+            response.payload = NULL;
+        }
         agentos_error_push_ex(AGENTOS_ERR_LLM_PROVIDER_FAIL, __FILE__, __LINE__, __func__,
                               "LLM service call failed (err=%d)", err);
         return NULL;
@@ -564,6 +598,7 @@ static char *build_decomposition_prompt(const char *input)
     size_t len = strlen(input) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
+        SVC_LOG_ERROR("build_decomposition_prompt: allocation failed (len=%zu)", len);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -581,6 +616,7 @@ static char *build_planning_prompt(const char *decomposed)
     size_t len = strlen(decomposed) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
+        SVC_LOG_ERROR("build_planning_prompt: allocation failed (len=%zu)", len);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -599,6 +635,7 @@ static char *build_generation_prompt(const char *plan)
     size_t len = strlen(plan) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
+        SVC_LOG_ERROR("build_generation_prompt: allocation failed (len=%zu)", len);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -616,6 +653,7 @@ static char *build_verification_prompt(const char *original, const char *generat
     size_t len = strlen(original) + strlen(generated) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
+        SVC_LOG_ERROR("build_verification_prompt: allocation failed (len=%zu)", len);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -634,6 +672,7 @@ static char *build_audit_prompt(const char *output, const char *verification)
     size_t len = strlen(output) + strlen(verification) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
+        SVC_LOG_ERROR("build_audit_prompt: allocation failed (len=%zu)", len);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -652,6 +691,7 @@ static char *build_correction_prompt(const char *output, const char *critique)
     size_t len = strlen(output) + strlen(critique) + 512;
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
+        SVC_LOG_ERROR("build_correction_prompt: allocation failed (len=%zu)", len);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -707,6 +747,7 @@ static bool extract_bool_from_json(const char *json, const char *field)
     snprintf(key, flen, "\"%s\"", field);
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
+    key = NULL;
     if (!p)
         return false;
     p += strlen(field) + 3;
@@ -718,6 +759,7 @@ static bool extract_bool_from_json(const char *json, const char *field)
 static char *extract_field_string(const char *json, const char *field)
 {
     if (!json || !field) {
+        SVC_LOG_ERROR("extract_field_string: NULL json=%p or field=%p", (void *)json, (void *)field);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -725,6 +767,7 @@ static char *extract_field_string(const char *json, const char *field)
     size_t flen = strlen(field) + 4;
     char *key = (char *)AGENTOS_MALLOC(flen);
     if (!key) {
+        SVC_LOG_ERROR("extract_field_string: key allocation failed for field (len=%zu)", flen);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -733,6 +776,7 @@ static char *extract_field_string(const char *json, const char *field)
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
     if (!p) {
+        SVC_LOG_WARN("extract_field_string: field '%s' not found in JSON", field);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -741,6 +785,7 @@ static char *extract_field_string(const char *json, const char *field)
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '"') {
+        SVC_LOG_WARN("extract_field_string: field '%s' value is not a string", field);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -748,6 +793,7 @@ static char *extract_field_string(const char *json, const char *field)
     p++;
     const char *end = strchr(p, '"');
     if (!end) {
+        SVC_LOG_WARN("extract_field_string: field '%s' has unterminated string value", field);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -755,6 +801,8 @@ static char *extract_field_string(const char *json, const char *field)
     size_t len = (size_t)(end - p);
     char *val = (char *)AGENTOS_MALLOC(len + 1);
     if (!val) {
+        SVC_LOG_ERROR("extract_field_string: value allocation failed for field '%s' (len=%zu)",
+                      field, len);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -778,6 +826,8 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
 {
     task_entry_t *task = find_or_create_task(orch, phase, input);
     if (!task) {
+        SVC_LOG_ERROR("execute_single_phase: failed to create task entry for phase=%s",
+                      phase_name(phase));
         AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "failed to create task entry");
     }
 
@@ -888,6 +938,8 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                     pos += snprintf(plan_json + pos, buf_sz - pos, "]}");
                     task->output = plan_json;
                 } else {
+                    SVC_LOG_ERROR("execute_single_phase: decomposition plan_json allocation failed (size=%zu)",
+                                  buf_sz);
                     task->output = AGENTOS_STRDUP("{\"error\":\"memory_allocation_failed\","
                                                   "\"code\":-2,\"phase\":\"decomposition\"}");
                 }
@@ -917,14 +969,18 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                         "orchestrator: decomposition failed - no LLM, no cognition output");
                     task->status = ORCH_TASK_FAILED;
                     task->error_code = -1;
-                    if (mem_ctx)
+                    if (mem_ctx) {
                         AGENTOS_FREE(mem_ctx);
+                        mem_ctx = NULL;
+                    }
                     goto done;
                 }
             }
             memory_write_step(orch->memory, "decomposition", task->output, NULL);
-            if (mem_ctx)
+            if (mem_ctx) {
                 AGENTOS_FREE(mem_ctx);
+                mem_ctx = NULL;
+            }
             task->output_len = strlen(task->output);
             task->status = ORCH_TASK_COMPLETED;
         } break;
@@ -933,6 +989,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
             char *prompt = build_planning_prompt(input ? input : "{}");
             char *llm_result = call_llm_service(prompt, "You are a planning expert.");
             AGENTOS_FREE(prompt);
+            prompt = NULL;
 
             if (llm_result) {
                 task->output = llm_result;
@@ -1007,6 +1064,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
             char *t2_output = call_llm_service(
                 prompt, "You are an expert assistant. Provide thorough, accurate output.");
             AGENTOS_FREE(prompt);
+            prompt = NULL;
 
             if (!t2_output) {
                 if (gen_cog_has_output && gen_plan) {
@@ -1111,8 +1169,10 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 task->output = t2_output;
             }
             memory_write_step(orch->memory, "generation", task->output, ",\"critical_loop\":true");
-            if (mem_retrieved)
+            if (mem_retrieved) {
                 AGENTOS_FREE(mem_retrieved);
+                mem_retrieved = NULL;
+            }
             task->output_len = strlen(task->output);
             task->status = ORCH_TASK_COMPLETED;
         } break;
@@ -1364,6 +1424,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
 
             if (t1f_result) {
                 AGENTOS_FREE(t1f_result);
+                t1f_result = NULL;
             }
 
             task->output = AGENTOS_STRDUP(vbuf);
@@ -1382,6 +1443,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 audit_prompt,
                 "You are a t1-p expert audit agent. Check for correctness, completeness, safety.");
             AGENTOS_FREE(audit_prompt);
+            audit_prompt = NULL;
 
             bool audit_passed = false;
             char *severity = NULL;
@@ -1421,6 +1483,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                                      audit_passed);
             memory_write_step(orch->memory, "audit", task->output, NULL);
             AGENTOS_FREE(audit_result);
+            audit_result = NULL;
             AGENTOS_FREE(severity);
         } break;
 
@@ -1448,6 +1511,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 fact_score = extract_score_for_field(align_result, "fact_score");
                 goal_score = extract_score_for_field(align_result, "goal_score");
                 AGENTOS_FREE(align_result);
+                align_result = NULL;
             }
 
             float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
@@ -1504,6 +1568,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
         } break;
 
         default:
+            SVC_LOG_ERROR("execute_single_phase: unknown phase=%d (task=%s)", phase, task->id);
             task->status = ORCH_TASK_FAILED;
             task->error_code = AGENTOS_ERR_UNKNOWN;
             ret = AGENTOS_ERR_UNKNOWN;
@@ -1564,6 +1629,8 @@ done:
             r->thinking_chain_id = AGENTOS_STRDUP(task->thinking_chain_id);
             *out_result = r;
         } else {
+            SVC_LOG_ERROR("execute_single_phase: result allocation failed for phase=%s task=%s",
+                          phase_name(phase), task->id);
             agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
                                   "phase result alloc failed");
         }
@@ -1580,8 +1647,10 @@ done:
 int orchestrator_execute(orchestrator_t *orch, const char *input, orch_result_t **out_results,
                          size_t *out_count)
 {
-    if (!orch || !input)
+    if (!orch || !input) {
+        SVC_LOG_ERROR("orchestrator_execute: NULL orch=%p or input=%p", (void *)orch, (void *)input);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     orch->task_count = 0;
 
@@ -1599,11 +1668,16 @@ int orchestrator_execute(orchestrator_t *orch, const char *input, orch_result_t 
                     orch->memory->mount(orch->memory, "orch_volume_context", input);
                     SVC_LOG_DEBUG("orchestrator: volume context mounted to memory");
                 }
-                for (size_t v = 0; v < vol_count; v++) {
+            }
+            if (vol_ids) {
+                for (size_t v = 0; v < vol_count; v++)
                     AGENTOS_FREE(vol_ids[v]);
-                }
                 AGENTOS_FREE(vol_ids);
+                vol_ids = NULL;
+            }
+            if (vol_scores) {
                 AGENTOS_FREE(vol_scores);
+                vol_scores = NULL;
             }
         }
     }
@@ -1615,6 +1689,7 @@ int orchestrator_execute(orchestrator_t *orch, const char *input, orch_result_t 
     size_t phase_count = sizeof(default_phases) / sizeof(default_phases[0]);
     orch_result_t *results = (orch_result_t *)AGENTOS_CALLOC(phase_count, sizeof(orch_result_t));
     if (!results) {
+        SVC_LOG_ERROR("orchestrator_execute: results allocation failed (phase_count=%zu)", phase_count);
         agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
                               "orchestrator_execute results alloc failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -1627,21 +1702,33 @@ int orchestrator_execute(orchestrator_t *orch, const char *input, orch_result_t 
         orch_result_t *phase_result = NULL;
         int ret = execute_single_phase(orch, default_phases[i], current_input, &phase_result);
         if (ret != 0 || !phase_result) {
+            SVC_LOG_ERROR("orchestrator_execute: phase %s failed (ret=%d, phase_result=%p), aborting pipeline",
+                          phase_name(default_phases[i]), ret, (void *)phase_result);
             agentos_error_push_ex(AGENTOS_ERR_KERN_TASK, __FILE__, __LINE__, __func__,
                                   "phase %s execution failed (ret=%d)",
                                   phase_name(default_phases[i]), ret);
+            if (phase_result) {
+                orchestrator_result_free(phase_result);
+                AGENTOS_FREE(phase_result);
+                phase_result = NULL;
+            }
             for (size_t j = 0; j < completed; j++) {
                 orchestrator_result_free(&results[j]);
             }
             AGENTOS_FREE(results);
+            results = NULL;
             return AGENTOS_ERR_UNKNOWN;
         }
 
         results[completed] = *phase_result;
         AGENTOS_FREE(phase_result);
+        phase_result = NULL;
         completed++;
 
         if (results[completed - 1].status != ORCH_TASK_COMPLETED) {
+            SVC_LOG_WARN("orchestrator_execute: phase %s did not complete (status=%s), stopping pipeline at step %zu",
+                         phase_name(default_phases[i]),
+                         status_name(results[completed - 1].status), i);
             break;
         }
 
@@ -1663,14 +1750,19 @@ int orchestrator_execute(orchestrator_t *orch, const char *input, orch_result_t 
 int orchestrator_execute_pipeline(orchestrator_t *orch, orch_pipeline_t *pipeline,
                                   const char *input, orch_result_t **out_results, size_t *out_count)
 {
-    if (!orch || !pipeline || !input)
+    if (!orch || !pipeline || !input) {
+        SVC_LOG_ERROR("orchestrator_execute_pipeline: NULL orch=%p, pipeline=%p, or input=%p",
+                      (void *)orch, (void *)pipeline, (void *)input);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     orch->task_count = 0;
 
     orch_result_t *results =
         (orch_result_t *)AGENTOS_CALLOC(pipeline->step_count, sizeof(orch_result_t));
     if (!results) {
+        SVC_LOG_ERROR("orchestrator_execute_pipeline: results allocation failed (step_count=%u)",
+                      pipeline->step_count);
         agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
                               "orchestrator_execute_pipeline results alloc failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -1693,20 +1785,32 @@ int orchestrator_execute_pipeline(orchestrator_t *orch, orch_pipeline_t *pipelin
         orch_result_t *phase_result = NULL;
         int ret = execute_single_phase(orch, step->phase, current_input, &phase_result);
         if (ret != 0 || !phase_result) {
+            SVC_LOG_ERROR("orchestrator_execute_pipeline: step %u phase %s failed (ret=%d, phase_result=%p), aborting pipeline",
+                          i, phase_name(step->phase), ret, (void *)phase_result);
             agentos_error_push_ex(AGENTOS_ERR_KERN_TASK, __FILE__, __LINE__, __func__,
                                   "pipeline step %u phase %d failed (ret=%d)", i, step->phase, ret);
+            if (phase_result) {
+                orchestrator_result_free(phase_result);
+                AGENTOS_FREE(phase_result);
+                phase_result = NULL;
+            }
             for (size_t j = 0; j < completed; j++) {
                 orchestrator_result_free(&results[j]);
             }
             AGENTOS_FREE(results);
+            results = NULL;
             return AGENTOS_ERR_UNKNOWN;
         }
 
         results[completed] = *phase_result;
         AGENTOS_FREE(phase_result);
+        phase_result = NULL;
         completed++;
 
         if (results[completed - 1].status != ORCH_TASK_COMPLETED) {
+            SVC_LOG_WARN("orchestrator_execute_pipeline: step %u phase %s did not complete (status=%s), stopping pipeline",
+                         i, phase_name(step->phase),
+                         status_name(results[completed - 1].status));
             break;
         }
 
@@ -1735,20 +1839,26 @@ void orchestrator_set_progress_callback(orchestrator_t *orch, orch_progress_cb_t
 
 orch_task_status_t orchestrator_get_task_status(orchestrator_t *orch, const char *task_id)
 {
-    if (!orch || !task_id)
+    if (!orch || !task_id) {
+        SVC_LOG_WARN("orchestrator_get_task_status: NULL orch=%p or task_id=%p",
+                     (void *)orch, (void *)task_id);
         return ORCH_TASK_FAILED;
+    }
 
     for (uint32_t i = 0; i < orch->task_count; i++) {
         if (strcmp(orch->tasks[i].id, task_id) == 0) {
             return orch->tasks[i].status;
         }
     }
+    SVC_LOG_WARN("orchestrator_get_task_status: task '%s' not found", task_id);
     return ORCH_TASK_FAILED;
 }
 
 orch_result_t *orchestrator_get_result(orchestrator_t *orch, const char *task_id)
 {
     if (!orch || !task_id) {
+        SVC_LOG_ERROR("orchestrator_get_result: NULL orch=%p or task_id=%p",
+                      (void *)orch, (void *)task_id);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -1758,6 +1868,7 @@ orch_result_t *orchestrator_get_result(orchestrator_t *orch, const char *task_id
         if (strcmp(orch->tasks[i].id, task_id) == 0) {
             orch_result_t *r = (orch_result_t *)AGENTOS_CALLOC(1, sizeof(orch_result_t));
             if (!r) {
+                SVC_LOG_ERROR("orchestrator_get_result: result allocation failed for task='%s'", task_id);
                 agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
                                       "get_result alloc failed");
                 return NULL;
@@ -1781,8 +1892,11 @@ void orchestrator_result_free(orch_result_t *result)
     if (!result)
         return;
     AGENTOS_FREE(result->task_id);
+    result->task_id = NULL;
     AGENTOS_FREE(result->output);
+    result->output = NULL;
     AGENTOS_FREE(result->thinking_chain_id);
+    result->thinking_chain_id = NULL;
 }
 
 uint32_t orchestrator_active_count(orchestrator_t *orch)
@@ -1794,8 +1908,10 @@ uint32_t orchestrator_active_count(orchestrator_t *orch)
 
 int orchestrator_cancel(orchestrator_t *orch, const char *task_id)
 {
-    if (!orch || !task_id)
+    if (!orch || !task_id) {
+        SVC_LOG_WARN("orchestrator_cancel: NULL orch=%p or task_id=%p", (void *)orch, (void *)task_id);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     for (uint32_t i = 0; i < orch->task_count; i++) {
         if (strcmp(orch->tasks[i].id, task_id) == 0) {
@@ -1805,16 +1921,21 @@ int orchestrator_cancel(orchestrator_t *orch, const char *task_id)
                 SVC_LOG_INFO("orchestrator: task %s cancelled", task_id);
                 return 0;
             }
+            SVC_LOG_WARN("orchestrator_cancel: task '%s' not in cancellable state (status=%s)",
+                         task_id, status_name(orch->tasks[i].status));
             AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "task not in cancellable state");
         }
     }
+    SVC_LOG_WARN("orchestrator_cancel: task '%s' not found", task_id);
     AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "task not found");
 }
 
 int orchestrator_cancel_all(orchestrator_t *orch)
 {
-    if (!orch)
+    if (!orch) {
+        SVC_LOG_WARN("orchestrator_cancel_all: NULL orchestrator handle");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     uint32_t cancelled = 0;
     for (uint32_t i = 0; i < orch->task_count; i++) {
@@ -1829,4 +1950,18 @@ int orchestrator_cancel_all(orchestrator_t *orch)
         SVC_LOG_INFO("orchestrator: %u tasks cancelled", cancelled);
     }
     return 0;
+}
+
+void orchestrator_global_cleanup(void)
+{
+    if (g_orch_bus_mutex_initialized) {
+        agentos_mutex_destroy(&g_orch_bus_mutex);
+        g_orch_bus_mutex_initialized = 0;
+        SVC_LOG_INFO("orchestrator: g_orch_bus_mutex destroyed");
+    }
+    if (g_align_mutex_initialized) {
+        agentos_mutex_destroy(&g_align_mutex);
+        g_align_mutex_initialized = 0;
+        SVC_LOG_INFO("orchestrator: g_align_mutex destroyed");
+    }
 }

@@ -1,7 +1,7 @@
 # Heapstore Scripts — 运维工具脚本
 
 **模块路径**: `agentos/heapstore/scripts/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

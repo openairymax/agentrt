@@ -460,9 +460,7 @@ char *gateway_syscall_route(const char *method, cJSON *params, cJSON *request_id
 
 #include <time.h>
 
-#ifndef AGENTOS_OK
-#define AGENTOS_OK 0
-#endif
+
 
 #define MAX_TASKS_DEFAULT 256
 #define MAX_RECORDS_DEFAULT 1024

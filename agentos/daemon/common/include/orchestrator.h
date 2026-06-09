@@ -161,6 +161,15 @@ int orchestrator_cancel(orchestrator_t *orch, const char *task_id);
 
 int orchestrator_cancel_all(orchestrator_t *orch);
 
+/* ========== 全局资源清理 ========== */
+
+/**
+ * @brief 销毁全局静态 mutex（g_orch_bus_mutex, g_align_mutex）
+ *
+ * 应在进程退出时调用，确保所有懒初始化的全局 mutex 被正确销毁。
+ */
+void orchestrator_global_cleanup(void);
+
 /* ========== 默认配置 ========== */
 
 static inline void orch_config_get_defaults(orch_config_t *cfg)
