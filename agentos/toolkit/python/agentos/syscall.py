@@ -40,7 +40,7 @@ import platform
 from .exceptions import (
     AgentOSError,
     InitializationError,
-    MemoryError as AgentOSMemoryError,
+    AgentOSMemoryError,
     ValidationError,
     NetworkError,
     SyscallError as _ExceptionsSyscallError,

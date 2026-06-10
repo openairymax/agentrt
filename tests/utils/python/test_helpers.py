@@ -36,6 +36,8 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from functools import wraps, lru_cache
 
+from .mock_factory import UnifiedMockFactory, MockResponseConfig
+
 
 class TestDataGenerator:
     """测试数据生成器"""
@@ -102,34 +104,25 @@ class TestDataGenerator:
 
 
 class MockFactory:
-    """Mock 对象工厂"""
+    """Mock 对象工厂（兼容层，委托给统一工厂）"""
 
     @staticmethod
     def create_mock_response(status_code: int = 200, json_data: Dict = None) -> MagicMock:
-        """创建模拟 HTTP 响应"""
-        mock_resp = MagicMock()
-        mock_resp.status_code = status_code
-        mock_resp.json.return_value = json_data or {}
-        mock_resp.text = json.dumps(json_data or {})
-        return mock_resp
+        """创建模拟 HTTP 响应（委托给 UnifiedMockFactory）"""
+        return UnifiedMockFactory.create_response(MockResponseConfig(
+            status_code=status_code,
+            json_data=json_data
+        ))
 
     @staticmethod
     def create_mock_config(**kwargs) -> MagicMock:
-        """创建模拟配置对象"""
-        mock_config = MagicMock()
-        for key, value in kwargs.items():
-            setattr(mock_config, key, value)
-        return mock_config
+        """创建模拟配置对象（委托给统一工厂）"""
+        return UnifiedMockFactory.create_config(**kwargs)
 
     @staticmethod
     def create_mock_logger() -> MagicMock:
-        """创建模拟日志器"""
-        mock_logger = MagicMock()
-        mock_logger.debug = MagicMock()
-        mock_logger.info = MagicMock()
-        mock_logger.warning = MagicMock()
-        mock_logger.error = MagicMock()
-        return mock_logger
+        """创建模拟日志器（委托给统一工厂）"""
+        return UnifiedMockFactory.create_logger()
 
 
 class AssertHelpers:

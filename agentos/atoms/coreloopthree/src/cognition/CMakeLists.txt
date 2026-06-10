@@ -1,21 +1,21 @@
 
 add_library(agentos_cognition STATIC
     engine.c
-    intent_parser.c
-    intent_classifier.c
-    intent_utils.c
-    entity_extractor.c
-    context_processor.c
-    delegate.c
-    multi_agent_collaboration.c
-    confidence_calibrator.c
-    cognitive_evolution.c
-    triple_coordinator.c
-    metacognition.c
-    semantic_unit.c
-    thinking_chain.c
-    stream_critic.c
-    parallel_dispatcher.c
+    intent/intent_parser.c
+    intent/intent_classifier.c
+    intent/intent_utils.c
+    intent/entity_extractor.c
+    context/context_processor.c
+    dispatch/delegate.c
+    ext/multi_agent_collaboration.c
+    critique/confidence_calibrator.c
+    ext/cognitive_evolution.c
+    critique/triple_coordinator.c
+    foundation/metacognition.c
+    foundation/semantic_unit.c
+    foundation/thinking_chain.c
+    critique/stream_critic.c
+    dispatch/parallel_dispatcher.c
     planner/reactive.c
     planner/hierarchical.c
     planner/reflective.c

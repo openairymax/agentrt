@@ -596,11 +596,13 @@ agentos_error_t agentos_checkpoint_restore(const char *task_id, uint64_t sequenc
     if (sid) {
         AGENTOS_STRNCPY_TERM(cp->session_id, sid, sizeof(cp->session_id));
         AGENTOS_FREE(sid);
+        sid = NULL;
     }
     cp->sequence_num = json_extract_uint64(json_buf, "sequence_num");
     cp->timestamp = json_extract_uint64(json_buf, "timestamp");
 
     AGENTOS_FREE(json_buf);
+    json_buf = NULL;
     agentos_mutex_lock(&g_checkpoint_mutex);
     g_checkpoint_stats.total_restore_ops++;
     agentos_mutex_unlock(&g_checkpoint_mutex);
@@ -787,8 +789,8 @@ agentos_error_t agentos_snapshot_create(const char *task_id, const char *snap_pa
 
     char _cp_buf[2048];
     fputs("SNAPSHOT_V1\n", fp);
-    fprintf_sanitized(fp, "TaskID", cp->task_id);
-    fprintf_sanitized(fp, "SessionID", cp->session_id);
+    fprintf_sanitized(fp, "TaskID", cp->task_id); /* BAN-70 EXEMPT: checkpoint snapshot output */
+    fprintf_sanitized(fp, "SessionID", cp->session_id); /* BAN-70 EXEMPT: checkpoint snapshot output */
     snprintf(_cp_buf, sizeof(_cp_buf), "SequenceNum: %lu\n", (unsigned long)cp->sequence_num);
     fputs(_cp_buf, fp);
     snprintf(_cp_buf, sizeof(_cp_buf), "Timestamp: %lu\n", (unsigned long)cp->timestamp);

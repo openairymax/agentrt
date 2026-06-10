@@ -896,6 +896,7 @@ static int ws_send_frame(int fd, const char *payload, size_t payload_len)
 
     ssize_t sent = send(fd, masked, payload_len, 0);
     AGENTOS_FREE(masked);
+    masked = NULL;
 
     if (sent != (ssize_t)payload_len)
         ATM_RET_ERR(AGENTOS_EINVAL);
@@ -1002,6 +1003,7 @@ static char *js_escape(const char *src, size_t src_len)
                 char *n = (char *)AGENTOS_MALLOC(est);
                 if (!n) {
                     AGENTOS_FREE(dst);
+                    dst = NULL;
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
@@ -1017,6 +1019,7 @@ static char *js_escape(const char *src, size_t src_len)
                 char *n = (char *)AGENTOS_MALLOC(est);
                 if (!n) {
                     AGENTOS_FREE(dst);
+                    dst = NULL;
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
@@ -1032,6 +1035,7 @@ static char *js_escape(const char *src, size_t src_len)
                 char *n = (char *)AGENTOS_MALLOC(est);
                 if (!n) {
                     AGENTOS_FREE(dst);
+                    dst = NULL;
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
@@ -1047,6 +1051,7 @@ static char *js_escape(const char *src, size_t src_len)
                 char *n = (char *)AGENTOS_MALLOC(est);
                 if (!n) {
                     AGENTOS_FREE(dst);
+                    dst = NULL;
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
@@ -1062,6 +1067,7 @@ static char *js_escape(const char *src, size_t src_len)
                 char *n = (char *)AGENTOS_MALLOC(est);
                 if (!n) {
                     AGENTOS_FREE(dst);
+                    dst = NULL;
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
@@ -1077,6 +1083,7 @@ static char *js_escape(const char *src, size_t src_len)
                 char *n = (char *)AGENTOS_MALLOC(est);
                 if (!n) {
                     AGENTOS_FREE(dst);
+                    dst = NULL;
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
@@ -1092,6 +1099,7 @@ static char *js_escape(const char *src, size_t src_len)
                 char *n = (char *)AGENTOS_MALLOC(est);
                 if (!n) {
                     AGENTOS_FREE(dst);
+                    dst = NULL;
                     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                     return NULL;
                 }
@@ -1194,6 +1202,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                             }
                         }
                         AGENTOS_FREE(resp);
+                        resp = NULL;
                     }
                 }
             }
@@ -1204,6 +1213,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
             result_json = (char *)AGENTOS_MALLOC(buf_size);
             if (!result_json) {
                 AGENTOS_FREE(url_copy);
+                url_copy = NULL;
                 ret = AGENTOS_ENOMEM;
                 goto cleanup;
             }
@@ -1211,6 +1221,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                      "{\"status\":\"navigated\",\"url\":\"%s\",\"simulated\":true}", url_copy);
         }
         AGENTOS_FREE(url_copy);
+        url_copy = NULL;
         if (!result_json) {
             ret = AGENTOS_ENOMEM;
             goto cleanup;
@@ -1266,6 +1277,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                        "{\"expression\":\"%s\",\"returnByValue\":true}}",
                                        cdp_id, escaped_script);
                 AGENTOS_FREE(escaped_script);
+                escaped_script = NULL;
 
                 if (written > 0 && (size_t)written < sizeof(cdp_json)) {
                     if (ws_send_frame(conn->socket_fd, cdp_json, strlen(cdp_json)) == 0) {
@@ -1283,6 +1295,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                 }
                             }
                             AGENTOS_FREE(resp);
+                            resp = NULL;
                         }
                     }
                 }
@@ -1333,6 +1346,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 int written = snprintf(cdp_script, sizeof(cdp_script),
                                        "document.querySelector('%s').click()", escaped_sel);
                 AGENTOS_FREE(escaped_sel);
+                escaped_sel = NULL;
                 if (written > 0 && (size_t)written < sizeof(cdp_script)) {
                     char cdp_json[8192];
                     written = snprintf(cdp_json, sizeof(cdp_json),
@@ -1356,6 +1370,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                     }
                                 }
                                 AGENTOS_FREE(resp);
+                                resp = NULL;
                             }
                         }
                     }
@@ -1369,6 +1384,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 result_json = (char *)AGENTOS_MALLOC(buf_size);
                 if (!result_json) {
                     AGENTOS_FREE(sel_copy);
+                    sel_copy = NULL;
                     ret = AGENTOS_ENOMEM;
                     goto cleanup;
                 }
@@ -1381,12 +1397,14 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                              "\"simulated\":true}");
                 if (!result_json) {
                     AGENTOS_FREE(sel_copy);
+                    sel_copy = NULL;
                     ret = AGENTOS_ENOMEM;
                     goto cleanup;
                 }
             }
         }
         AGENTOS_FREE(sel_copy);
+        sel_copy = NULL;
         *out_output = result_json;
         goto cleanup;
     } else if (strstr(cmd, "screenshot") != NULL) {
@@ -1433,6 +1451,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                             }
                         }
                         AGENTOS_FREE(resp);
+                        resp = NULL;
                     }
                 }
             }
@@ -1495,10 +1514,12 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                         if (ws_recv_frame(conn->socket_fd, &focus_resp, NULL, 3000) == 0 &&
                             focus_resp) {
                             AGENTOS_FREE(focus_resp);
+                            focus_resp = NULL;
                         }
                     }
                 }
                 AGENTOS_FREE(escaped_sel);
+                escaped_sel = NULL;
             }
 
             if (strstr(cmd, "fill") != NULL) {
@@ -1518,11 +1539,14 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                     if (cw > 0 && (size_t)cw < sizeof(clear_json)) {
                         if (ws_send_frame(conn->socket_fd, clear_json, strlen(clear_json)) == 0) {
                             char *cr = NULL;
-                            if (ws_recv_frame(conn->socket_fd, &cr, NULL, 3000) == 0 && cr)
+                            if (ws_recv_frame(conn->socket_fd, &cr, NULL, 3000) == 0 && cr) {
                                 AGENTOS_FREE(cr);
+                                cr = NULL;
+                            }
                         }
                     }
                     AGENTOS_FREE(escaped_sel_fill);
+                    escaped_sel_fill = NULL;
                 }
 
                 int insert_id = cdp_get_id();
@@ -1534,6 +1558,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                       "\"params\":{\"text\":\"%s\"}}",
                                       insert_id, escaped_val);
                     AGENTOS_FREE(escaped_val);
+                    escaped_val = NULL;
                     if (iw > 0 && (size_t)iw < sizeof(insert_json)) {
                         if (ws_send_frame(conn->socket_fd, insert_json, strlen(insert_json)) == 0) {
                             char *ins_resp = NULL;
@@ -1554,6 +1579,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                     }
                                 }
                                 AGENTOS_FREE(ins_resp);
+                                ins_resp = NULL;
                             }
                         }
                     }
@@ -1570,6 +1596,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                            "\"selector\":\"%s\"}}",
                                            qs_id, es_sel2);
                         AGENTOS_FREE(es_sel2);
+                        es_sel2 = NULL;
                         if (qsw > 0 && (size_t)qsw < sizeof(qs_json)) {
                             if (ws_send_frame(conn->socket_fd, qs_json, strlen(qs_json)) == 0) {
                                 char *qsr = NULL;
@@ -1595,6 +1622,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                                                     "\"value\":\"%s\"}}",
                                                                     sva_id, node_id, es_val2);
                                                 AGENTOS_FREE(es_val2);
+                                                es_val2 = NULL;
                                                 if (svaw > 0 && (size_t)svaw < sizeof(sva_json)) {
                                                     if (ws_send_frame(conn->socket_fd, sva_json,
                                                                       strlen(sva_json)) == 0) {
@@ -1619,6 +1647,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                                                     sel_buf, val_buf);
                                                             }
                                                             AGENTOS_FREE(svar);
+                                                            svar = NULL;
                                                         }
                                                     }
                                                 }
@@ -1626,6 +1655,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                         }
                                     }
                                     AGENTOS_FREE(qsr);
+                                    qsr = NULL;
                                 }
                             }
                         }
@@ -1748,6 +1778,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 char *pe_resp = NULL;
                 if (ws_recv_frame(conn->socket_fd, &pe_resp, NULL, 5000) == 0 && pe_resp) {
                     AGENTOS_FREE(pe_resp);
+                    pe_resp = NULL;
                 }
             }
 
@@ -1805,6 +1836,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 }
                 char *escaped_sel = js_escape(sel_copy, strlen(sel_copy));
                 AGENTOS_FREE(sel_copy);
+                sel_copy = NULL;
                 if (escaped_sel) {
                     written = snprintf(cdp_js, sizeof(cdp_js),
                                        "(function(){var s='%s';var t=%u;"
@@ -1817,6 +1849,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                        "chk();})})()",
                                        escaped_sel, timeout_ms);
                     AGENTOS_FREE(escaped_sel);
+                    escaped_sel = NULL;
                 } else {
                     goto cdpskip;
                 }
@@ -1867,6 +1900,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                                 cdp_ok = 1;
                             }
                             AGENTOS_FREE(resp);
+                            resp = NULL;
                         }
                     }
                 }
@@ -1894,6 +1928,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                 result_json = (char *)AGENTOS_MALLOC(buf_size);
                 if (!result_json) {
                     AGENTOS_FREE(sel_copy);
+                    sel_copy = NULL;
                     ret = AGENTOS_ENOMEM;
                     goto cleanup;
                 }
@@ -1903,6 +1938,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                          sel_copy, timeout_ms,
                          load_event_fired ? "Page.loadEventFired" : "awaitPromise");
                 AGENTOS_FREE(sel_copy);
+                sel_copy = NULL;
             } else {
                 size_t buf_size = 200;
                 result_json = (char *)AGENTOS_MALLOC(buf_size);
@@ -1938,6 +1974,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
             result_json = (char *)AGENTOS_MALLOC(buf_size);
             if (!result_json) {
                 AGENTOS_FREE(sel_copy);
+                sel_copy = NULL;
                 ret = AGENTOS_ENOMEM;
                 goto cleanup;
             }
@@ -1946,6 +1983,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t *unit, const voi
                      "\"timeout_ms\":%u,\"simulated\":true}",
                      sel_copy, timeout_ms);
             AGENTOS_FREE(sel_copy);
+            sel_copy = NULL;
         } else {
             size_t buf_size = 160;
             result_json = (char *)AGENTOS_MALLOC(buf_size);
@@ -2022,6 +2060,7 @@ agentos_error_t agentos_browser_fill_form(void *conn_ptr, const char *selector, 
                        "\"params\":{\"nodeId\":0,\"selector\":\"%s\"}}",
                        qs_id, escaped_sel);
     AGENTOS_FREE(escaped_sel);
+    escaped_sel = NULL;
 
     if (qsw <= 0 || (size_t)qsw >= sizeof(qs_json))
         ATM_RET_ERR(AGENTOS_EOVERFLOW);
@@ -2073,13 +2112,16 @@ agentos_error_t agentos_browser_fill_form(void *conn_ptr, const char *selector, 
                                 "\"value\":\"%s\"}}",
                                 sva_id, node_id, es_val);
             AGENTOS_FREE(es_val);
+            es_val = NULL;
 
             if (svaw > 0 && (size_t)svaw < sizeof(sva_json)) {
                 if (ws_send_frame(conn->socket_fd, sva_json, strlen(sva_json)) == 0) {
                     char *svar = NULL;
                     ws_recv_frame(conn->socket_fd, &svar, NULL, 3000);
-                    if (svar)
+                    if (svar) {
                         AGENTOS_FREE(svar);
+                        svar = NULL;
+                    }
                     used_cdp = 1;
                 }
             }
@@ -2109,6 +2151,7 @@ agentos_error_t agentos_browser_fill_form(void *conn_ptr, const char *selector, 
     }
 
     AGENTOS_FREE(qsr);
+    qsr = NULL;
 
     if (!final_result)
         ATM_RET_ERR(AGENTOS_ENOMEM);
@@ -2153,8 +2196,10 @@ agentos_error_t agentos_browser_wait_for_element(void *conn_ptr, const char *sel
     snprintf(pe_json, sizeof(pe_json), "{\"id\":%d,\"method\":\"Page.enable\"}", pe_id);
     if (ws_send_frame(conn->socket_fd, pe_json, strlen(pe_json)) == 0) {
         char *pe_resp = NULL;
-        if (ws_recv_frame(conn->socket_fd, &pe_resp, NULL, 5000) == 0 && pe_resp)
+        if (ws_recv_frame(conn->socket_fd, &pe_resp, NULL, 5000) == 0 && pe_resp) {
             AGENTOS_FREE(pe_resp);
+            pe_resp = NULL;
+        }
     }
 
     int is_load = (wait_type && strcmp(wait_type, "load") == 0);
@@ -2183,6 +2228,7 @@ agentos_error_t agentos_browser_wait_for_element(void *conn_ptr, const char *sel
                      "chk();})})()",
                      escaped_sel, effective_timeout);
             AGENTOS_FREE(escaped_sel);
+            escaped_sel = NULL;
 
             char cdp_json[8192];
             int w2 = snprintf(cdp_json, sizeof(cdp_json),
@@ -2196,8 +2242,10 @@ agentos_error_t agentos_browser_wait_for_element(void *conn_ptr, const char *sel
                     char *resp = NULL;
                     uint32_t recv_to = effective_timeout + 10000;
                     ws_recv_frame(conn->socket_fd, &resp, NULL, recv_to);
-                    if (resp)
+                    if (resp) {
                         AGENTOS_FREE(resp);
+                        resp = NULL;
+                    }
                 }
             }
 
@@ -2243,8 +2291,10 @@ agentos_error_t agentos_browser_wait_for_element(void *conn_ptr, const char *sel
             char *resp = NULL;
             uint32_t recv_to = effective_timeout + 10000;
             ws_recv_frame(conn->socket_fd, &resp, NULL, recv_to);
-            if (resp)
+            if (resp) {
                 AGENTOS_FREE(resp);
+                resp = NULL;
+            }
         }
         load_event_fired = 1;
     }
@@ -2285,6 +2335,7 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
     browser_unit_data_t *data = (browser_unit_data_t *)AGENTOS_MALLOC(sizeof(browser_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
+        unit = NULL;
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -2296,7 +2347,9 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
 
     if (!data->metadata_json) {
         AGENTOS_FREE(data);
+        data = NULL;
         AGENTOS_FREE(unit);
+        unit = NULL;
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }

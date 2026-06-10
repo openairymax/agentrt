@@ -44,8 +44,9 @@ typedef struct agentos_execution_unit agentos_execution_unit_t;
 
 AGENTOS_API agentos_error_t agentos_registry_init(void);
 AGENTOS_API void agentos_registry_cleanup(void);
-AGENTOS_API agentos_error_t agentos_registry_register_unit(const char *unit_id,
-                                                           agentos_execution_unit_t *unit);
+/* _take: caller transfers ownership */
+AGENTOS_API agentos_error_t agentos_registry_register_unit_take(const char *unit_id,
+                                                                agentos_execution_unit_t *unit);
 AGENTOS_API void agentos_registry_unregister_unit(const char *unit_id);
 AGENTOS_API agentos_execution_unit_t *agentos_registry_get_unit(const char *unit_id);
 

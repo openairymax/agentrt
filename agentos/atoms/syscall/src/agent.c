@@ -59,7 +59,7 @@ static agentos_cognition_engine_t *ensure_cognition_engine(void)
 {
     if (g_cognition_engine)
         return g_cognition_engine;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &g_cognition_engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &g_cognition_engine);
     if (err != AGENTOS_SUCCESS || !g_cognition_engine) {
         g_cognition_engine = NULL;
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
@@ -322,7 +322,7 @@ agentos_error_t agentos_sys_agent_spawn(const char *agent_spec, char **out_agent
     inst->unit = unit;
 
     /* 注册到执行引擎 registry，使 worker 线程可通过 agent_id 查找 */
-    agentos_registry_register_unit(inst->agent_id, unit);
+    agentos_registry_register_unit_take(inst->agent_id, unit);
 
     agentos_mutex_lock(agent_lock);
     inst->next = agents;

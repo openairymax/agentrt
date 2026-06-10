@@ -19,6 +19,8 @@ from unittest.mock import Mock, MagicMock, patch, AsyncMock
 from pathlib import Path
 import pytest
 
+from .mock_factory import UnifiedMockFactory, MockResponseConfig
+
 # 添加项目根目录到路径
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "toolkit" / "python"))
@@ -105,7 +107,7 @@ class BaseTestCase:
                            json_data: Dict = None,
                            text: str = "") -> Mock:
         """
-        创建模拟HTTP响应。
+        创建模拟HTTP响应（委托给统一工厂）。
 
         Args:
             status_code: HTTP状态码
@@ -115,16 +117,15 @@ class BaseTestCase:
         Returns:
             模拟的响应对象
         """
-        response = Mock()
-        response.status_code = status_code
-        response.json.return_value = json_data or {}
-        response.text = text
-        response.ok = status_code < 400
-        return response
+        return UnifiedMockFactory.create_response(MockResponseConfig(
+            status_code=status_code,
+            json_data=json_data,
+            text=text
+        ))
 
     def create_mock_session(self, responses: List[Mock] = None) -> Mock:
         """
-        创建模拟会话对象。
+        创建模拟会话对象（委托给统一工厂）。
 
         Args:
             responses: 预设的响应列表
@@ -132,15 +133,7 @@ class BaseTestCase:
         Returns:
             模拟的会话对象
         """
-        session = Mock()
-
-        if responses:
-            session.get.side_effect = responses
-            session.post.side_effect = responses
-            session.put.side_effect = responses
-            session.delete.side_effect = responses
-
-        return session
+        return UnifiedMockFactory.create_session(responses)
 
     def assert_performance(self, operation: Callable, max_time: float, *args, **kwargs):
         """
