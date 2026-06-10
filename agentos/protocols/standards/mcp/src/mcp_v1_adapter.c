@@ -770,6 +770,7 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t *ctx, const char *name, const cha
     offset += snprintf(buf + offset, buf_size - offset,
                        "{\"description\":\"Prompt: %s\",\"messages\":[", name_esc);
     AGENTOS_FREE(name_esc);
+    name_esc = NULL;
 
     for (size_t i = 0; i < message_count && i < 100; i++) {
         if (i > 0)
@@ -953,6 +954,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t *ctx, const char *name,
     start_event.total = 100;
     callback(&start_event, user_data);
     AGENTOS_FREE(start_event.event_data);
+    start_event.event_data = NULL;
 
     mcp_tool_entry_t *found = NULL;
     for (size_t i = 0; i < ctx->tool_count; i++) {
@@ -970,6 +972,7 @@ int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t *ctx, const char *name,
             "{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"Tool not found: %s\"}]}",
             name_esc);
         AGENTOS_FREE(name_esc);
+        name_esc = NULL;
         emit_sse_event(callback, user_data, "tools/call/result", error_json);
 
         mcp_stream_event_t done_event;
@@ -1112,6 +1115,7 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t *ctx, const mcp_sampling_p
     start_event.total = 100;
     callback(&start_event, user_data);
     AGENTOS_FREE(start_event.event_data);
+    start_event.event_data = NULL;
 
     mcp_sampling_result_t result;
     AGENTOS_MEMSET(&result, 0, sizeof(result));
@@ -1164,7 +1168,9 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t *ctx, const mcp_sampling_p
              "{\"model\":%s,\"stopReason\":%s,\"stoppedEarly\":%s}", model_esc, stop_esc,
              result.stopped_early ? "true" : "false");
     AGENTOS_FREE(model_esc);
+    model_esc = NULL;
     AGENTOS_FREE(stop_esc);
+    stop_esc = NULL;
     emit_sse_event(callback, user_data, "sampling/result", final_result);
 
     mcp_stream_event_t done_event;
@@ -1399,9 +1405,12 @@ static int mcp_adapter_decode(void *context, const void *data, size_t data_size,
 
     char *response_json = NULL;
     int result = mcp_v1_route_request(ctx, method, input_copy, &response_json);
-    if (method_allocated)
+    if (method_allocated) {
         AGENTOS_FREE((void *)method);
+        method = NULL;
+    }
     AGENTOS_FREE(input_copy);
+    input_copy = NULL;
 
     if (result == 0 && response_json) {
         msg->payload = response_json;
@@ -1544,6 +1553,7 @@ static int mcp_adapter_handle_request(void *context, const void *req, void **res
         *resp = response_json;
     } else {
         AGENTOS_FREE(response_json);
+        response_json = NULL;
         *resp = AGENTOS_STRDUP("{\"error\":\"request failed\"}");
         result = -1;
     }

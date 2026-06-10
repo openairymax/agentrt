@@ -383,7 +383,7 @@ void cupolas_monitoring_shutdown_instance(void);
  * @reentrant No
  * @ownership mgr and gw: caller retains ownership
  *
- * @since 0.0.5
+ * @since 0.1.0
  */
 int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr, gateway_t *gw);
 

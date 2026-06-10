@@ -108,8 +108,8 @@ typedef struct agentos_service_s *agentos_service_t;
 
 /**
  * @brief 服务初始化函数类型
- * @param service 服务句柄
- * @param config 配置参数
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param config [in] 配置参数 (BORROW - not stored, copied internally).
  * @return 0成功，非0失败
  */
 typedef agentos_error_t (*agentos_svc_init_fn)(agentos_service_t service,
@@ -117,14 +117,14 @@ typedef agentos_error_t (*agentos_svc_init_fn)(agentos_service_t service,
 
 /**
  * @brief 服务启动函数类型
- * @param service 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  */
 typedef agentos_error_t (*agentos_svc_start_fn)(agentos_service_t service);
 
 /**
  * @brief 服务停止函数类型
- * @param service 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @param force 是否强制停止
  * @return 0成功，非0失败
  */
@@ -132,22 +132,39 @@ typedef agentos_error_t (*agentos_svc_stop_fn)(agentos_service_t service, bool f
 
 /**
  * @brief 服务销毁函数类型
- * @param service 服务句柄
+ * @param service [in] 服务句柄 (TRANSFER - function takes ownership and frees).
  */
 typedef void (*agentos_svc_destroy_fn)(agentos_service_t service);
 
 /**
  * @brief 服务健康检查函数类型
- * @param service 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0健康，非0不健康
  */
 typedef agentos_error_t (*agentos_svc_healthcheck_fn)(agentos_service_t service);
 
+/**
+ * @brief 服务请求处理函数类型
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param method [in] 方法名 (BORROW - valid for function scope only).
+ * @param params_json [in] 请求参数JSON (BORROW - valid for function scope only).
+ * @param response_json [out] 响应JSON (OWNER - caller must free).
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership).
+ * @return 错误码
+ */
 typedef agentos_error_t (*agentos_svc_handle_request_fn)(agentos_service_t service,
                                                          const char *method,
                                                          const char *params_json,
                                                          char **response_json, void *user_data);
 
+/**
+ * @brief 服务异步完成回调函数类型
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param method [in] 方法名 (BORROW - valid for callback scope only).
+ * @param error_code 错误码
+ * @param response_json [in] 响应JSON (TRANSFER - callback takes ownership and must free).
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership).
+ */
 typedef void (*agentos_svc_async_complete_fn)(agentos_service_t service, const char *method,
                                               agentos_error_t error_code, char *response_json,
                                               void *user_data);
@@ -165,13 +182,15 @@ typedef struct {
 
 /**
  * @brief 创建服务实例
- * @param service [out] 服务句柄输出
- * @param name [in] 服务名称
- * @param iface [in] 服务接口
- * @param config [in] 服务配置
+ * @param service [out] 服务句柄输出 (OWNER - caller must call agentos_service_destroy).
+ * @param name [in] 服务名称 (BORROW - not stored, copied internally).
+ * @param iface [in] 服务接口 (BORROW - copied internally, not stored by pointer).
+ * @param config [in] 服务配置 (BORROW - not stored, copied internally).
  * @return 0成功，非0失败
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: OWNER, name: BORROW, iface: BORROW, config: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_create(agentos_service_t *service, const char *name,
                                                    const agentos_svc_interface_t *iface,
@@ -179,42 +198,69 @@ AGENTOS_API agentos_error_t agentos_service_create(agentos_service_t *service, c
 
 /**
  * @brief 销毁服务实例
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (TRANSFER - function takes ownership and frees).
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: TRANSFER
  */
 AGENTOS_API void agentos_service_destroy(agentos_service_t service);
 
 /**
  * @brief 初始化服务
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 否
  * @reentrant 否
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_init(agentos_service_t service);
 
 /**
  * @brief 启动服务
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 否
  * @reentrant 否
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_start(agentos_service_t service);
 
 /**
  * @brief 停止服务
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @param force [in] 是否强制停止
  * @return 0成功，非0失败
  * @threadsafe 否
  * @reentrant 否
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_stop(agentos_service_t service, bool force);
 
+/**
+ * @brief Set thread pool for service.
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param pool [in] 线程池指针 (BORROW - service does not take ownership, caller manages lifecycle).
+ * @return 错误码
+ *
+ * @ownership service: BORROW, pool: BORROW
+ */
 AGENTOS_API agentos_error_t agentos_service_set_thread_pool(agentos_service_t service, void *pool);
 
+/**
+ * @brief Handle service request asynchronously.
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param method [in] 方法名 (BORROW - valid for function scope only).
+ * @param params_json [in] 请求参数JSON (BORROW - valid for function scope only).
+ * @param on_complete [in] 异步完成回调 (BORROW - not stored by pointer, copied internally).
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership, must remain valid until callback).
+ * @return 错误码
+ *
+ * @ownership service: BORROW, method: BORROW, params_json: BORROW, on_complete: BORROW, user_data: BORROW
+ */
 AGENTOS_API int agentos_service_handle_request_async(agentos_service_t service, const char *method,
                                                      const char *params_json,
                                                      agentos_svc_async_complete_fn on_complete,
@@ -222,19 +268,23 @@ AGENTOS_API int agentos_service_handle_request_async(agentos_service_t service, 
 
 /**
  * @brief 暂停服务
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 是
  * @reentrant 否
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_pause(agentos_service_t service);
 
 /**
  * @brief 恢复服务
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 是
  * @reentrant 否
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_resume(agentos_service_t service);
 
@@ -242,46 +292,56 @@ AGENTOS_API agentos_error_t agentos_service_resume(agentos_service_t service);
 
 /**
  * @brief 获取服务状态
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 服务状态
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_svc_state_t agentos_service_get_state(agentos_service_t service);
 
 /**
  * @brief 检查服务是否就绪
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return true就绪，false未就绪
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API bool agentos_service_is_ready(agentos_service_t service);
 
 /**
  * @brief 检查服务是否运行中
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return true运行中，false未运行
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API bool agentos_service_is_running(agentos_service_t service);
 
 /**
  * @brief 获取服务名称
- * @param service [in] 服务句柄
- * @return 服务名称
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @return 服务名称 (BORROW - internal string, do not free).
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW, return: BORROW
  */
 AGENTOS_API const char *agentos_service_get_name(agentos_service_t service);
 
 /**
  * @brief 获取服务版本
- * @param service [in] 服务句柄
- * @return 服务版本
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @return 服务版本 (BORROW - internal string, do not free).
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW, return: BORROW
  */
 AGENTOS_API const char *agentos_service_get_version(agentos_service_t service);
 
@@ -289,20 +349,24 @@ AGENTOS_API const char *agentos_service_get_version(agentos_service_t service);
 
 /**
  * @brief 获取服务统计信息
- * @param service [in] 服务句柄
- * @param stats [out] 统计信息输出
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param stats [out] 统计信息输出 (BORROW - caller-owned buffer, function writes to it).
  * @return 0成功，非0失败
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW, stats: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_get_stats(agentos_service_t service,
                                                       agentos_svc_stats_t *stats);
 
 /**
  * @brief 重置服务统计信息
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API void agentos_service_reset_stats(agentos_service_t service);
 
@@ -310,10 +374,12 @@ AGENTOS_API void agentos_service_reset_stats(agentos_service_t service);
 
 /**
  * @brief 执行服务健康检查
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0健康，非0不健康
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_healthcheck(agentos_service_t service);
 
@@ -321,11 +387,13 @@ AGENTOS_API agentos_error_t agentos_service_healthcheck(agentos_service_t servic
 
 /**
  * @brief 检查服务是否支持指定能力
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @param capability [in] 能力标志
  * @return true支持，false不支持
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API bool agentos_service_has_capability(agentos_service_t service,
                                                 agentos_svc_capability_t capability);
@@ -335,18 +403,22 @@ AGENTOS_API bool agentos_service_has_capability(agentos_service_t service,
 /**
  * @brief 服务状态转字符串
  * @param state [in] 服务状态
- * @return 状态字符串
+ * @return 状态字符串 (BORROW - static string, do not free).
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership return: BORROW
  */
 AGENTOS_API const char *agentos_svc_state_to_string(agentos_svc_state_t state);
 
 /**
  * @brief 字符串转服务状态
- * @param str [in] 状态字符串
+ * @param str [in] 状态字符串 (BORROW - not stored, copied internally).
  * @return 服务状态
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership str: BORROW
  */
 AGENTOS_API agentos_svc_state_t agentos_svc_state_from_string(const char *str);
 
@@ -354,28 +426,34 @@ AGENTOS_API agentos_svc_state_t agentos_svc_state_from_string(const char *str);
 
 /**
  * @brief 注册服务
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - registry stores a reference, caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_register(agentos_service_t service);
 
 /**
  * @brief 注销服务
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_unregister(agentos_service_t service);
 
 /**
  * @brief 根据名称查找服务
- * @param name [in] 服务名称
- * @return 服务句柄（未找到返回NULL）
+ * @param name [in] 服务名称 (BORROW - not stored, copied internally).
+ * @return 服务句柄（未找到返回NULL） (BORROW - belongs to registry, do not free).
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership name: BORROW, return: BORROW
  */
 AGENTOS_API agentos_service_t agentos_service_find(const char *name);
 
@@ -389,31 +467,37 @@ AGENTOS_API uint32_t agentos_service_count(void);
 
 /**
  * @brief 遍历所有服务
- * @param callback [in] 回调函数
- * @param user_data [in] 用户数据
+ * @param callback [in] 回调函数 (BORROW - not stored, called during iteration).
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership, valid during iteration).
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership callback: BORROW, user_data: BORROW
  */
 typedef void (*agentos_service_enum_fn)(agentos_service_t service, void *user_data);
 AGENTOS_API void agentos_service_foreach(agentos_service_enum_fn callback, void *user_data);
 
 /**
  * @brief 设置服务用户数据
- * @param service [in] 服务句柄
- * @param user_data [in] 用户数据指针
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param user_data [in] 用户数据指针 (BORROW - service does not take ownership, caller manages lifecycle).
  * @return 错误码
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW, user_data: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_set_user_data(agentos_service_t service,
                                                           void *user_data);
 
 /**
  * @brief 获取服务用户数据
- * @param service [in] 服务句柄
- * @return 用户数据指针（未设置返回NULL）
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @return 用户数据指针（未设置返回NULL） (BORROW - belongs to service, do not free).
  * @threadsafe 是
  * @reentrant 是
+ *
+ * @ownership service: BORROW, return: BORROW
  */
 AGENTOS_API void *agentos_service_get_user_data(agentos_service_t service);
 
@@ -447,52 +531,64 @@ typedef struct {
 
 /**
  * @brief 初始化服务注册中心客户端
- * @param registry_url [in] 注册中心URL（如 http://localhost:8080/registry）
+ * @param registry_url [in] 注册中心URL（如 http://localhost:8080/registry） (BORROW - not stored, copied internally).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership registry_url: BORROW
  */
 AGENTOS_API agentos_error_t agentos_registry_init(const char *registry_url);
 
 /**
  * @brief 向注册中心注册服务
- * @param service [in] 服务句柄
- * @param metadata [in] 服务元数据
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param metadata [in] 服务元数据 (BORROW - not stored, copied internally).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service: BORROW, metadata: BORROW
  */
 AGENTOS_API agentos_error_t agentos_registry_register(agentos_service_t service,
                                                       const agentos_service_metadata_t *metadata);
 
 /**
  * @brief 从注册中心注销服务
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_registry_deregister(agentos_service_t service);
 
 /**
  * @brief 从注册中心发现服务
- * @param service_type [in] 服务类型（如 "llm"、"tool"），NULL表示所有类型
- * @param filter_tags [in] 过滤标签（逗号分隔），NULL表示不过滤
- * @param result_count [out] 发现的服务数量
- * @return 服务元数据数组（需调用 agentos_registry_discover_free 释放）
+ * @param service_type [in] 服务类型（如 "llm"、"tool"），NULL表示所有类型 (BORROW - not stored, copied internally).
+ * @param filter_tags [in] 过滤标签（逗号分隔），NULL表示不过滤 (BORROW - not stored, copied internally).
+ * @param result_count [out] 发现的服务数量 (BORROW - caller-owned buffer, function writes to it).
+ * @return 服务元数据数组 (OWNER - caller must call agentos_registry_discover_free).
  * @threadsafe 是
+ *
+ * @ownership service_type: BORROW, filter_tags: BORROW, result_count: BORROW, return: OWNER
  */
 AGENTOS_API agentos_service_metadata_t *
 agentos_registry_discover(const char *service_type, const char *filter_tags, size_t *result_count);
 
 /**
  * @brief 释放服务发现结果
- * @param results [in] 服务元数据数组
+ * @param results [in] 服务元数据数组 (TRANSFER - function takes ownership and frees).
+ *
+ * @ownership results: TRANSFER
  */
 AGENTOS_API void agentos_registry_discover_free(agentos_service_metadata_t *results);
 
 /**
  * @brief 发送心跳到注册中心
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_registry_heartbeat(agentos_service_t service);
 
@@ -518,10 +614,12 @@ typedef struct {
 
 /**
  * @brief 配置变更回调函数类型
- * @param service_name [in] 服务名称
- * @param old_config [in] 旧配置
- * @param new_config [in] 新配置
- * @param user_data [in] 用户数据
+ * @param service_name [in] 服务名称 (BORROW - valid for callback scope only).
+ * @param old_config [in] 旧配置 (BORROW - valid for callback scope only, do not free).
+ * @param new_config [in] 新配置 (BORROW - valid for callback scope only, do not free).
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership).
+ *
+ * @ownership service_name: BORROW, old_config: BORROW, new_config: BORROW, user_data: BORROW
  */
 typedef void (*agentos_config_change_callback_t)(const char *service_name,
                                                  const agentos_config_t *old_config,
@@ -530,21 +628,25 @@ typedef void (*agentos_config_change_callback_t)(const char *service_name,
 
 /**
  * @brief 加载服务配置
- * @param service_name [in] 服务名称
- * @param config [out] 配置输出（需调用 agentos_config_free 释放）
+ * @param service_name [in] 服务名称 (BORROW - not stored, copied internally).
+ * @param config [out] 配置输出 (OWNER - caller must call agentos_config_free).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service_name: BORROW, config: OWNER
  */
 AGENTOS_API agentos_error_t agentos_config_load(const char *service_name,
                                                 agentos_config_t **config);
 
 /**
  * @brief 监视配置变更
- * @param service_name [in] 服务名称
- * @param callback [in] 变更回调函数
- * @param user_data [in] 用户数据
+ * @param service_name [in] 服务名称 (BORROW - not stored, copied internally).
+ * @param callback [in] 变更回调函数 (BORROW - stored by reference, must remain valid until unwatched).
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership, must remain valid until unwatched).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service_name: BORROW, callback: BORROW, user_data: BORROW
  */
 AGENTOS_API agentos_error_t agentos_config_watch(const char *service_name,
                                                  agentos_config_change_callback_t callback,
@@ -552,17 +654,21 @@ AGENTOS_API agentos_error_t agentos_config_watch(const char *service_name,
 
 /**
  * @brief 取消配置监视
- * @param service_name [in] 服务名称
- * @param callback [in] 要移除的回调函数，NULL表示移除所有
+ * @param service_name [in] 服务名称 (BORROW - not stored, copied internally).
+ * @param callback [in] 要移除的回调函数，NULL表示移除所有 (BORROW - used for identification only, not stored).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service_name: BORROW, callback: BORROW
  */
 AGENTOS_API agentos_error_t agentos_config_unwatch(const char *service_name,
                                                    agentos_config_change_callback_t callback);
 
 /**
  * @brief 释放配置资源
- * @param config [in] 配置指针
+ * @param config [in] 配置指针 (TRANSFER - function takes ownership and frees).
+ *
+ * @ownership config: TRANSFER
  */
 AGENTOS_API void agentos_config_free(agentos_config_t *config);
 
@@ -583,39 +689,47 @@ typedef struct {
 
 /**
  * @brief 降级处理函数类型
- * @param service [in] 服务句柄
- * @param reason [in] 降级原因
- * @param user_data [in] 用户数据
+ * @param service [in] 服务句柄 (BORROW - valid for callback scope only).
+ * @param reason [in] 降级原因 (BORROW - valid for callback scope only).
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership).
  * @return 0成功降级，非0降级失败
+ *
+ * @ownership service: BORROW, reason: BORROW, user_data: BORROW
  */
 typedef agentos_error_t (*agentos_degradation_handler_t)(agentos_service_t service,
                                                          const char *reason, void *user_data);
 
 /**
  * @brief 启动服务监控
- * @param service [in] 服务句柄
- * @param config [in] 监控配置
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param config [in] 监控配置 (BORROW - not stored, copied internally).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service: BORROW, config: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_monitor_start(agentos_service_t service,
                                                           const agentos_monitor_config_t *config);
 
 /**
  * @brief 停止服务监控
- * @param service [in] 服务句柄
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_monitor_stop(agentos_service_t service);
 
 /**
  * @brief 设置服务降级处理函数
- * @param service [in] 服务句柄
- * @param handler [in] 降级处理函数
- * @param user_data [in] 用户数据
+ * @param service [in] 服务句柄 (BORROW - caller retains ownership).
+ * @param handler [in] 降级处理函数 (BORROW - stored by reference, must remain valid).
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership, must remain valid).
  * @return 0成功，非0失败
  * @threadsafe 是
+ *
+ * @ownership service: BORROW, handler: BORROW, user_data: BORROW
  */
 AGENTOS_API agentos_error_t agentos_service_set_degradation_handler(
     agentos_service_t service, agentos_degradation_handler_t handler, void *user_data);
@@ -624,10 +738,12 @@ AGENTOS_API agentos_error_t agentos_service_set_degradation_handler(
 
 /**
  * @brief 流式回调函数类型
- * @param data [in] 数据块
+ * @param data [in] 数据块 (BORROW - valid for callback scope only).
  * @param data_size [in] 数据大小
- * @param user_data [in] 用户数据
+ * @param user_data [in] 用户数据 (BORROW - caller retains ownership).
  * @return 0继续，非0中断
+ *
+ * @ownership data: BORROW, user_data: BORROW
  */
 typedef int (*agentos_stream_callback_t)(const char *data, size_t data_size, void *user_data);
 
@@ -644,6 +760,9 @@ typedef enum {
 
 /**
  * @brief 服务通信客户端接口
+ *
+ * @ownership call: service_name BORROW, method BORROW, params_json BORROW, response_json OWNER (caller must free).
+ * @ownership stream: service_name BORROW, method BORROW, params_json BORROW, callback BORROW, user_data BORROW.
  */
 typedef struct {
     agentos_error_t (*call)(const char *service_name, const char *method, const char *params_json,
@@ -656,9 +775,11 @@ typedef struct {
 /**
  * @brief 创建服务通信客户端
  * @param protocol [in] 通信协议
- * @param config [in] 客户端配置（JSON格式字符串），NULL使用默认
- * @param client [out] 客户端输出
+ * @param config [in] 客户端配置（JSON格式字符串），NULL使用默认 (BORROW - not stored, copied internally).
+ * @param client [out] 客户端输出 (OWNER - caller must call agentos_service_client_destroy).
  * @return 0成功，非0失败
+ *
+ * @ownership config: BORROW, client: OWNER
  */
 AGENTOS_API agentos_error_t agentos_service_client_create(agentos_svc_protocol_type_t protocol,
                                                           const char *config,
@@ -666,7 +787,9 @@ AGENTOS_API agentos_error_t agentos_service_client_create(agentos_svc_protocol_t
 
 /**
  * @brief 销毁服务通信客户端
- * @param client [in] 客户端指针
+ * @param client [in] 客户端指针 (TRANSFER - function takes ownership and frees).
+ *
+ * @ownership client: TRANSFER
  */
 AGENTOS_API void agentos_service_client_destroy(agentos_service_client_t *client);
 

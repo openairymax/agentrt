@@ -28,12 +28,7 @@
 #include "string_compat.h"
 #include "error.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 /* ==================== 内部数据结构 ==================== */
 
@@ -2388,6 +2383,7 @@ void config_source_manager_destroy(config_source_manager_t *manager)
     // 释放资源
     if (manager->sources)
         AGENTOS_FREE(manager->sources);
+    agentos_mutex_destroy(&manager->internal_mutex);
     AGENTOS_FREE(manager);
 }
 

@@ -12,12 +12,12 @@ export enum SyscallNamespace {
 export interface SyscallRequest {
   namespace: SyscallNamespace;
   operation: string;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 export interface SyscallResponse {
   success: boolean;
-  data?: any;
+  data?: Record<string, unknown>;
   error?: string;
   error_code?: string;
 }
@@ -104,7 +104,7 @@ export class TaskSyscall {
 export class MemorySyscall {
   constructor(private binding: SyscallBinding) {}
 
-  async write(content: string, metadata?: Record<string, any>): Promise<SyscallResponse> {
+  async write(content: string, metadata?: Record<string, unknown>): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.MEMORY,
       operation: 'write',
@@ -178,7 +178,7 @@ export class SessionSyscall {
     });
   }
 
-  async setContext(sessionId: string, key: string, value: any): Promise<SyscallResponse> {
+  async setContext(sessionId: string, key: string, value: unknown): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.SESSION,
       operation: 'set_context',
@@ -206,7 +206,7 @@ export class SkillSyscall {
     });
   }
 
-  async execute(skillId: string, params: Record<string, any>): Promise<SyscallResponse> {
+  async execute(skillId: string, params: Record<string, unknown>): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.SKILL,
       operation: 'execute',
@@ -233,7 +233,7 @@ export class SkillSyscall {
 export class AgentSyscall {
   constructor(private binding: SyscallBinding) {}
 
-  async spawn(spec: Record<string, any>): Promise<SyscallResponse> {
+  async spawn(spec: Record<string, unknown>): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.AGENT,
       operation: 'spawn',
@@ -249,7 +249,7 @@ export class AgentSyscall {
     });
   }
 
-  async invoke(agentId: string, method: string, args: Record<string, any>): Promise<SyscallResponse> {
+  async invoke(agentId: string, method: string, args: Record<string, unknown>): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.AGENT,
       operation: 'invoke',

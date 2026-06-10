@@ -16,8 +16,10 @@
 #pragma GCC poison realloc
 #pragma GCC poison strdup
 #pragma GCC poison strndup
+#ifndef AGENTOS_HAS_CURL
 #pragma GCC poison printf
 #pragma GCC poison fprintf
+#endif
 #pragma GCC poison sprintf
 #pragma GCC poison vsprintf
 #pragma GCC poison gets

@@ -275,7 +275,7 @@ void heapstore_log_write(heapstore_log_level_t level, const char *service, const
         fputs(_buf3, fp);
     }
 
-    vfprintf(fp, format, args); /* flawfinder: ignore - logger forwarding va_list to file */
+    vfprintf(fp, format, args); /* BAN-70 EXEMPT: heapstore logging - direct FILE* output is the implementation mechanism */
     fputs("\n", fp);
     fflush(fp);
 

@@ -6,6 +6,14 @@
 // 与 Python SDK: framework/plugin.py 保持一致。
 
 /**
+ * PluginInstance - Internal interface for plugin instances with assignable pluginId
+ */
+interface PluginInstance {
+    pluginId: string;
+    [key: string]: unknown;
+}
+
+/**
  * PluginState - 插件状态枚举
  */
 export enum PluginState {
@@ -206,7 +214,7 @@ export class PluginRegistry {
 
     const instance = new pluginClass();
     try {
-      (instance as any).pluginId = pluginId;
+      (instance as PluginInstance).pluginId = pluginId;
     } catch {
       // Subclass may define pluginId as read-only getter
     }

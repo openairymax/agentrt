@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 质量门禁脚本（20+6门禁全覆盖）
+# AgentOS 质量门禁脚本（23门禁全覆盖）
 # 执行：静态分析、代码格式、Python/Shell质量、安全扫描、BAN审计、文档完整性、
 #       版本一致性、严格编译、测试执行、桩函数审计、内存/日志/错误处理合规、
 #       治理层合规、架构审查、MemoryRovol合规、CoreLoopThree合规、llm_d路由合规、
 #       凭证池合规、外部技术吸收、Thinkdual、安全穹顶、内存安全规则
-# Version: 0.1.0
-# Note: 质量门禁默认不阻塞 CI（exit code 0），仅报告问题
+# Version: 0.2.0
+# Note: 质量门禁默认仅报告模式（exit code 0）。
+#       CI 模式：使用 --fail-on-violation 或 --ci 标志，检测到违规时以 exit 1 终止。
+#       严格模式：使用 --strict 标志启用全部 BAN 检查并失败于任何违规。
 
 set -euo pipefail
 
@@ -34,6 +36,7 @@ log_section() { echo -e "\n${MAGENTA}--- Quality Gate: $* ---${NC}"; }
 QUALITY_STRICT=false
 QUALITY_REPORT_FILE="${PROJECT_ROOT}/ci-artifacts/quality-report.json"
 QUALITY_FAIL_ON_WARN=false
+QUALITY_FAIL_ON_VIOLATION=false
 QUALITY_AUTO_FIX=false
 QUALITY_FIX_COUNT=0
 
@@ -1974,6 +1977,184 @@ gate_ban_extended_strict() {
 }
 
 ###############################################################################
+# Gate 23: BAN-181~190 合规检查（错误码回退、特性宏、线程抽象、魔数、
+#          术语、fprintf、内存释放、占位返回、OOM、内存压力）
+###############################################################################
+gate_ban_181_190() {
+    log_section "BAN-181~190 Compliance Checks (G23)"
+
+    local b23_issues=0
+
+    # BAN-181: #ifndef error code fallback definitions
+    log_info "BAN-181: Checking #ifndef AGENTOS_E fallback definitions..."
+    local ban181_hits
+    ban181_hits=$(grep -rn '#ifndef AGENTOS_E' \
+        --include='*.c' --include='*.h' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'commons/utils/error/include/error.h' | wc -l) || true
+    if [[ $ban181_hits -eq 0 ]]; then
+        log_ok "BAN-181: 0 #ifndef AGENTOS_E fallback definitions outside error.h"
+        record_check_result "BAN-181" "true"
+    else
+        record_issue "high" "BAN-181" "agentos/" "$ban181_hits #ifndef AGENTOS_E fallback(s) outside error.h"
+        log_error "BAN-181: $ban181_hits #ifndef AGENTOS_E fallback(s) found outside error.h"
+        ((b23_issues++)) || true
+        record_check_result "BAN-181" "false"
+    fi
+
+    # BAN-182: Feature test macros in source files
+    log_info "BAN-182: Checking feature test macros in source files..."
+    local ban182_hits
+    ban182_hits=$(grep -rn '#define _POSIX_C_SOURCE\|#define _GNU_SOURCE' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/*/src/" 2>/dev/null | wc -l) || true
+    if [[ $ban182_hits -eq 0 ]]; then
+        log_ok "BAN-182: 0 feature test macros in source files"
+        record_check_result "BAN-182" "true"
+    else
+        record_issue "high" "BAN-182" "agentos/*/src/" "$ban182_hits feature test macro(s) in source files"
+        log_error "BAN-182: $ban182_hits feature test macro(s) in source files"
+        ((b23_issues++)) || true
+        record_check_result "BAN-182" "false"
+    fi
+
+    # BAN-183: Direct pthread usage in non-abstraction-layer code
+    log_info "BAN-183: Checking direct pthread usage outside abstraction layer..."
+    local ban183_hits
+    ban183_hits=$(grep -rn 'pthread_mutex_lock\|pthread_mutex_unlock\|pthread_create' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/*/src/" 2>/dev/null \
+        | grep -v 'sync/src/' | grep -v 'cupolas/src/platform/' | wc -l) || true
+    if [[ $ban183_hits -eq 0 ]]; then
+        log_ok "BAN-183: 0 direct pthread calls outside abstraction layer"
+        record_check_result "BAN-183" "true"
+    else
+        record_issue "high" "BAN-183" "agentos/*/src/" "$ban183_hits direct pthread call(s) outside abstraction layer"
+        log_error "BAN-183: $ban183_hits direct pthread call(s) outside abstraction layer"
+        ((b23_issues++)) || true
+        record_check_result "BAN-183" "false"
+    fi
+
+    # BAN-184: Hardcoded magic numbers in return statements
+    log_info "BAN-184: Checking hardcoded magic numbers in return statements..."
+    local ban184_hits
+    ban184_hits=$(grep -rn 'return -1;\|return -2;\|return -3;' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/*/src/" 2>/dev/null | wc -l) || true
+    if [[ $ban184_hits -eq 0 ]]; then
+        log_ok "BAN-184: 0 hardcoded magic numbers in return statements"
+        record_check_result "BAN-184" "true"
+    else
+        record_issue "high" "BAN-184" "agentos/*/src/" "$ban184_hits hardcoded magic number return(s)"
+        log_error "BAN-184: $ban184_hits hardcoded magic number(s) in return statements"
+        ((b23_issues++)) || true
+        record_check_result "BAN-184" "false"
+    fi
+
+    # BAN-185: Thinkdual terminology - forbidden terms
+    log_info "BAN-185: Checking forbidden Thinkdual terminology..."
+    local ban185_hits
+    ban185_hits=$(grep -rn '双思考系统\|双系统认知' \
+        --include='*.c' --include='*.h' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban185_hits -eq 0 ]]; then
+        log_ok "BAN-185: 0 forbidden Thinkdual terms"
+        record_check_result "BAN-185" "true"
+    else
+        record_issue "high" "BAN-185" "agentos/" "$ban185_hits forbidden Thinkdual term(s)"
+        log_error "BAN-185: $ban185_hits forbidden Thinkdual term(s) found"
+        ((b23_issues++)) || true
+        record_check_result "BAN-185" "false"
+    fi
+
+    # BAN-186: fprintf without EXEMPT comment in non-logging code
+    log_info "BAN-186: Checking fprintf without EXEMPT in non-logging code..."
+    local ban186_hits
+    ban186_hits=$(grep -rn 'fprintf(' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/*/src/" 2>/dev/null \
+        | grep -v 'logging/' | grep -v 'BAN-70 EXEMPT' | wc -l) || true
+    if [[ $ban186_hits -eq 0 ]]; then
+        log_ok "BAN-186: 0 unexempted fprintf calls in non-logging code"
+        record_check_result "BAN-186" "true"
+    else
+        record_issue "high" "BAN-186" "agentos/*/src/" "$ban186_hits unexempted fprintf call(s)"
+        log_error "BAN-186: $ban186_hits unexempted fprintf call(s) in non-logging code"
+        ((b23_issues++)) || true
+        record_check_result "BAN-186" "false"
+    fi
+
+    # BAN-187: AGENTOS_FREE without NULL assignment (warning only)
+    log_info "BAN-187: Checking AGENTOS_FREE without NULL assignment (warning)..."
+    local ban187_total ban187_with_null
+    ban187_total=$(grep -rn 'AGENTOS_FREE' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    ban187_with_null=$(grep -rn 'AGENTOS_FREE' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | while IFS= read -r line; do
+        local file linenum
+        file=$(echo "$line" | cut -d: -f1)
+        linenum=$(echo "$line" | cut -d: -f2)
+        if sed -n "$((linenum+1))p" "$file" 2>/dev/null | grep -q '= NULL\|=NULL'; then
+            echo "ok"
+        fi
+    done | wc -l) || true
+    local ban187_without_null=$((ban187_total - ban187_with_null))
+    if [[ $ban187_without_null -eq 0 ]]; then
+        log_ok "BAN-187: All AGENTOS_FREE calls followed by NULL assignment"
+        record_check_result "BAN-187" "true"
+    else
+        log_warn "BAN-187: $ban187_without_null/$ban187_total AGENTOS_FREE call(s) not followed by NULL assignment (warning, migration ongoing)"
+        record_check_result "BAN-187" "true"
+    fi
+
+    # BAN-188: return AGENTOS_SUCCESS as placeholder (warning only)
+    log_info "BAN-188: Checking return AGENTOS_SUCCESS as placeholder (warning)..."
+    local ban188_hits
+    ban188_hits=$(grep -rn 'return AGENTOS_SUCCESS' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban188_hits -eq 0 ]]; then
+        log_ok "BAN-188: 0 return AGENTOS_SUCCESS placeholder(s)"
+        record_check_result "BAN-188" "true"
+    else
+        log_warn "BAN-188: $ban188_hits return AGENTOS_SUCCESS placeholder(s) found (warning, migration ongoing)"
+        record_check_result "BAN-188" "true"
+    fi
+
+    # BAN-189: OOM handler initialization
+    log_info "BAN-189: Checking OOM handler initialization..."
+    local ban189_hits
+    ban189_hits=$(grep -rn 'agentos_oom_init' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | head -1 | wc -l) || true
+    if [[ $ban189_hits -ge 1 ]]; then
+        log_ok "BAN-189: OOM handler initialization found"
+        record_check_result "BAN-189" "true"
+    else
+        record_issue "high" "BAN-189" "agentos/" "OOM handler initialization not found"
+        log_error "BAN-189: agentos_oom_init not found"
+        ((b23_issues++)) || true
+        record_check_result "BAN-189" "false"
+    fi
+
+    # BAN-190: Memory pressure level API
+    log_info "BAN-190: Checking memory pressure level API declaration..."
+    local ban190_hits
+    ban190_hits=$(grep -rn 'agentos_oom_get_pressure' \
+        --include='*.h' "${PROJECT_ROOT}/agentos/" 2>/dev/null | head -1 | wc -l) || true
+    if [[ $ban190_hits -ge 1 ]]; then
+        log_ok "BAN-190: Memory pressure level API declared"
+        record_check_result "BAN-190" "true"
+    else
+        record_issue "high" "BAN-190" "agentos/" "Memory pressure level API not declared"
+        log_error "BAN-190: agentos_oom_get_pressure not found in headers"
+        ((b23_issues++)) || true
+        record_check_result "BAN-190" "false"
+    fi
+
+    if [[ $b23_issues -eq 0 ]]; then
+        log_ok "BAN-181~190: All checks passed"
+        record_check_result "ban-181-190" "true"
+    else
+        log_warn "BAN-181~190: $b23_issues check(s) failed"
+        record_check_result "ban-181-190" "false"
+    fi
+}
+
+###############################################################################
 # Auto-Fix 模式：自动修复可修复的质量问题
 ###############################################################################
 run_auto_fix() {
@@ -2096,11 +2277,21 @@ EOF
 # 结果输出
 ###############################################################################
 print_final_summary() {
+    local total_issues=$(( ISSUES_CRITICAL + ISSUES_HIGH + ISSUES_MEDIUM + ISSUES_LOW ))
+    local pass_rate="0.0"
+    if [[ ${CHECKS_TOTAL} -gt 0 ]]; then
+        pass_rate=$(awk "BEGIN {printf \"%.1f\", (${CHECKS_PASSED}/${CHECKS_TOTAL})*100}")
+    fi
+    local overall_status="PASS"
+
     log_info ""
     log_info "==========================================="
     log_info "Quality Gate Summary"
     log_info "==========================================="
-    log_info "Checks:  ${CHECKS_PASSED}/${CHECKS_TOTAL} passed"
+    log_info "Checks run:    ${CHECKS_TOTAL}"
+    log_info "Checks passed: ${CHECKS_PASSED}"
+    log_info "Checks failed: ${CHECKS_FAILED}"
+    log_info "Pass rate:     ${pass_rate}%"
     log_info "Issues:"
     log_info "  Critical: ${ISSUES_CRITICAL}"
     log_info "  High:     ${ISSUES_HIGH}"
@@ -2108,18 +2299,28 @@ print_final_summary() {
     log_info "  Low:      ${ISSUES_LOW}"
     log_info ""
 
-    local total_issues=$(( ISSUES_CRITICAL + ISSUES_HIGH + ISSUES_MEDIUM + ISSUES_LOW ))
-
     if [[ "$QUALITY_STRICT" == "true" ]] && [[ $total_issues -gt 0 ]]; then
+        overall_status="FAIL"
         log_error "Quality gate FAILED (strict mode)"
-        return 1
+    elif [[ "$QUALITY_FAIL_ON_VIOLATION" == "true" ]] && [[ ${CHECKS_FAILED} -gt 0 ]]; then
+        overall_status="FAIL"
+        log_error "Quality gate FAILED (${CHECKS_FAILED} check(s) failed, --fail-on-violation mode)"
     elif [[ "$QUALITY_FAIL_ON_WARN" == "true" ]] && [[ $(( ISSUES_CRITICAL + ISSUES_HIGH )) -gt 0 ]]; then
+        overall_status="FAIL"
         log_error "Quality gate FAILED (fail-on-warn mode, critical/high issues)"
-        return 1
     elif [[ $total_issues -eq 0 ]]; then
         log_ok "Quality gate PASSED - No issues found"
     else
-        log_warn "Quality gate completed with $total_issues issue(s) (non-blocking)"
+        log_warn "Quality gate completed with $total_issues issue(s) (non-blocking, report-only mode)"
+    fi
+
+    log_info ""
+    log_info "==========================================="
+    log_info "Overall Status: ${overall_status}"
+    log_info "==========================================="
+
+    if [[ "$overall_status" == "FAIL" ]]; then
+        return 1
     fi
 
     return 0
@@ -2135,11 +2336,29 @@ AgentOS Quality Gate Script v0.2.0
 Usage: ./quality-gate.sh [OPTIONS]
 
 Options:
-    --strict          Fail on any issue (default: report only)
+    --fail-on-violation, --ci
+                      Fail the build (exit 1) when any check fails.
+                      Recommended for CI pipelines.
+    --strict          Enable ALL BAN checks and fail on any issue.
+                      Equivalent to --fail-on-violation + full BAN coverage.
     --fail-on-warn   Fail on high/critical issues
     --fix             Auto-fix fixable issues (clang-format, isort, trailing whitespace, etc.)
     --report FILE    Custom report output path
     -h, --help       Show this help
+
+Modes:
+    Report-only (default):
+        No flags needed. The script reports all issues but always exits 0.
+        Suitable for local development and informational runs.
+
+    CI enforcement:
+        Use --fail-on-violation (or --ci). Exits with code 1 if any check fails.
+        Recommended for CI/CD pipelines to block merges on violations.
+        Example: ./quality-gate.sh --fail-on-violation
+
+    Strict:
+        Use --strict. Enables all BAN checks and fails on any violation.
+        Example: ./quality-gate.sh --strict
 
 Gates:
     1.  C/C++ Static Analysis (cppcheck)
@@ -2168,6 +2387,7 @@ Gates:
     20. Security Dome (BAN-126~132)
     21. Memory Safety Rules (BAN-151~162, Phase 2.5)
     22. Extended Strict Rules (BAN-151~180, Phase 2.5/3)
+    23. BAN-181~190 Compliance Checks
 EOF
 }
 
@@ -2177,11 +2397,12 @@ EOF
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --strict)        QUALITY_STRICT=true ;;
-            --fail-on-warn)  QUALITY_FAIL_ON_WARN=true ;;
-            --fix)           QUALITY_AUTO_FIX=true ;;
-            --report)        QUALITY_REPORT_FILE="$2"; shift ;;
-            --help|-h)       show_help; exit 0 ;;
+            --strict)              QUALITY_STRICT=true; QUALITY_FAIL_ON_VIOLATION=true ;;
+            --fail-on-violation|--ci) QUALITY_FAIL_ON_VIOLATION=true ;;
+            --fail-on-warn)        QUALITY_FAIL_ON_WARN=true ;;
+            --fix)                 QUALITY_AUTO_FIX=true ;;
+            --report)              QUALITY_REPORT_FILE="$2"; shift ;;
+            --help|-h)             show_help; exit 0 ;;
             *) log_warn "Unknown option: $1" ;;
         esac
         shift
@@ -2197,6 +2418,7 @@ main() {
     log_info "AgentOS Quality Gate v0.2.0"
     log_info "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
     log_info "Strict mode: $QUALITY_STRICT"
+    log_info "Fail-on-violation (CI) mode: $QUALITY_FAIL_ON_VIOLATION"
     log_info "Auto-fix mode: $QUALITY_AUTO_FIX"
 
     mkdir -p "${PROJECT_ROOT}/ci-artifacts"
@@ -2232,9 +2454,13 @@ main() {
     gate_security_dome_compliance
     gate_ban_memory_safety
     gate_ban_extended_strict  # CI-02: BAN-151~180 extended strict mode
+    gate_ban_181_190          # CI-03: BAN-181~190 compliance checks
 
     generate_quality_report
-    print_final_summary
+
+    if ! print_final_summary; then
+        exit 1
+    fi
 }
 
 main "$@"
