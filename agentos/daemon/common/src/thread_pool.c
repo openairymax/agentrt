@@ -2,6 +2,7 @@
 
 #include "error.h"
 #include "memory_compat.h"
+#include "svc_logger.h"
 
 #include <platform.h>
 #include <stdio.h>
@@ -72,6 +73,7 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
 {
     thread_pool_t *pool = (thread_pool_t *)AGENTOS_CALLOC(1, sizeof(thread_pool_t));
     if (!pool) {
+        SVC_LOG_ERROR("thread_pool_create: memory allocation failed for pool");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -90,6 +92,7 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
     pool->threads =
         (agentos_thread_t *)AGENTOS_CALLOC(pool->config.max_threads, sizeof(agentos_thread_t));
     if (!pool->threads) {
+        SVC_LOG_ERROR("thread_pool_create: memory allocation failed for threads array (max_threads=%u)", pool->config.max_threads);
         AGENTOS_FREE(pool);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
@@ -115,10 +118,13 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
         int rc = agentos_thread_create(&pool->threads[i], worker_thread_func, pool);
         if (rc == 0) {
             pool->thread_count++;
+        } else {
+            SVC_LOG_WARN("thread_pool_create: thread creation failed index=%u rc=%d", i, rc);
         }
     }
 
     if (pool->thread_count == 0) {
+        SVC_LOG_ERROR("thread_pool_create: all thread creations failed (attempted=%u)", num_threads);
         agentos_mutex_destroy(&pool->lock);
         agentos_cond_destroy(&pool->notify);
         AGENTOS_FREE(pool->threads);
@@ -159,14 +165,20 @@ void thread_pool_destroy(thread_pool_t *pool)
 
 int thread_pool_submit(thread_pool_t *pool, thread_task_fn_t task, void *arg)
 {
-    if (!pool || !task)
+    if (!pool || !task) {
+        SVC_LOG_ERROR("thread_pool_submit: null parameter pool=%p task=%p", (void *)pool, (void *)task);
         return AGENTOS_ERR_INVALID_PARAM;
-    if (!pool->running)
+    }
+    if (!pool->running) {
+        SVC_LOG_ERROR("thread_pool_submit: pool not running");
         return AGENTOS_ERR_UNKNOWN;
+    }
 
     task_node_t *node = (task_node_t *)AGENTOS_CALLOC(1, sizeof(task_node_t));
-    if (!node)
+    if (!node) {
+        SVC_LOG_ERROR("thread_pool_submit: memory allocation failed for task node");
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     node->fn = task;
     node->arg = arg;
@@ -177,12 +189,14 @@ int thread_pool_submit(thread_pool_t *pool, thread_task_fn_t task, void *arg)
     if (pool->shutdown) {
         agentos_mutex_unlock(&pool->lock);
         AGENTOS_FREE(node);
+        SVC_LOG_WARN("thread_pool_submit: pool is shutting down");
         return AGENTOS_ERR_UNKNOWN;
     }
 
     if (pool->queue_count >= pool->config.queue_size) {
         agentos_mutex_unlock(&pool->lock);
         AGENTOS_FREE(node);
+        SVC_LOG_WARN("thread_pool_submit: queue full queue_count=%u queue_size=%u", pool->queue_count, pool->config.queue_size);
         return AGENTOS_ERR_OVERFLOW;
     }
 
@@ -202,8 +216,10 @@ int thread_pool_submit(thread_pool_t *pool, thread_task_fn_t task, void *arg)
 
 uint32_t thread_pool_active_count(thread_pool_t *pool)
 {
-    if (!pool)
+    if (!pool) {
+        SVC_LOG_ERROR("thread_pool_active_count: null pool parameter");
         return 0;
+    }
     agentos_mutex_lock(&pool->lock);
     uint32_t count = pool->active_count;
     agentos_mutex_unlock(&pool->lock);
@@ -212,8 +228,10 @@ uint32_t thread_pool_active_count(thread_pool_t *pool)
 
 uint32_t thread_pool_pending_count(thread_pool_t *pool)
 {
-    if (!pool)
+    if (!pool) {
+        SVC_LOG_ERROR("thread_pool_pending_count: null pool parameter");
         return 0;
+    }
     agentos_mutex_lock(&pool->lock);
     uint32_t count = pool->queue_count;
     agentos_mutex_unlock(&pool->lock);
@@ -222,7 +240,9 @@ uint32_t thread_pool_pending_count(thread_pool_t *pool)
 
 bool thread_pool_is_running(thread_pool_t *pool)
 {
-    if (!pool)
+    if (!pool) {
+        SVC_LOG_ERROR("thread_pool_is_running: null pool parameter");
         return false;
+    }
     return pool->running;
 }

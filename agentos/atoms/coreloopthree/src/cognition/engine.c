@@ -309,6 +309,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                                                     preemptive_hint, hint_len + 1, "text/plain", 1);
                 }
                 AGENTOS_FREE(preemptive_hint);
+                preemptive_hint = NULL;
             }
         } else {
             AGENTOS_LOG_WARN("Thinking chain creation failed: err=%d", (int)tc_err);
@@ -350,8 +351,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                                  eval.overall_score, eval.strategy);
                 engine->dual_think_corrections++;
             }
-            if (eval.critique_text)
+            if (eval.critique_text) {
                 AGENTOS_FREE(eval.critique_text);
+                eval.critique_text = NULL;
+            }
         }
     }
 
@@ -454,6 +457,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 trigger_feedback(engine, 2, "phase2_critical_loop", fb);
 
                 AGENTOS_FREE(phase2_output);
+                phase2_output = NULL;
             } else if (gen_step) {
                 agentos_tc_step_complete(gen_step, "streaming_loop_failed", 21, 0.3f, "t2-failed");
             }
@@ -476,8 +480,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             if (mon_result.anomaly != TC_ANOMALY_NONE && mon_result.is_critical) {
                 trigger_feedback(engine, 1, "step_anomaly", "{\"anomaly\":1,\"critical\":true}");
             }
-            if (mon_result.description)
+            if (mon_result.description) {
                 AGENTOS_FREE(mon_result.description);
+                mon_result.description = NULL;
+            }
         }
     }
 
@@ -502,8 +508,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 agentos_tc_metacognition_inform_memory(engine->chain, &eval_audit, audit_step);
                 agentos_tc_step_write_to_memory(engine->chain, audit_step);
             }
-            if (eval_audit.critique_text)
+            if (eval_audit.critique_text) {
                 AGENTOS_FREE(eval_audit.critique_text);
+                eval_audit.critique_text = NULL;
+            }
         }
     }
 
@@ -534,8 +542,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                     if (goal_score < 0.0f)
                         goal_score = 0.0f;
                 }
-                if (recent_ctx)
+                if (recent_ctx) {
                     AGENTOS_FREE(recent_ctx);
+                    recent_ctx = NULL;
+                }
             }
 
             float composite = (logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f);
@@ -600,8 +610,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 }
             }
 
-            if (align_eval.critique_text)
+            if (align_eval.critique_text) {
                 AGENTOS_FREE(align_eval.critique_text);
+                align_eval.critique_text = NULL;
+            }
 
             if (engine->memory && engine->chain && align_step) {
                 agentos_tc_metacognition_inform_memory(engine->chain, &align_eval, align_step);
@@ -643,12 +655,14 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                      final_output_len);
             trigger_feedback(engine, 2, "stream_critic_complete", scp_fb);
             AGENTOS_FREE(final_output);
+            final_output = NULL;
         } else if (scp_err != AGENTOS_SUCCESS) {
             AGENTOS_LOG_WARN("Stream critic pipeline failed: err=%d", (int)scp_err);
         }
 
         if (pipeline_output && pipeline_output != input) {
             AGENTOS_FREE(pipeline_output);
+            pipeline_output = NULL;
         }
     }
 

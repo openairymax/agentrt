@@ -353,6 +353,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
             kh[7] += whh;
         }
         AGENTOS_FREE(km);
+        km = NULL;
         for (int i = 0; i < 8; i++) {
             k_ipad[i * 4] = (kh[i] >> 24) & 0xFF;
             k_ipad[i * 4 + 1] = (kh[i] >> 16) & 0xFF;
@@ -428,6 +429,7 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
         ih[7] += hh;
     }
     AGENTOS_FREE(inner);
+    inner = NULL;
 
     /* Outer hash - 正确处理多块 */
     size_t olen = 64 + 32;
@@ -599,6 +601,7 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
     base64_encode((const uint8_t *)payload_json, strlen(payload_json), payload_b64,
                   &payload_b64_size);
     AGENTOS_FREE(payload_json);
+    payload_json = NULL;
 
     /* 构建签名部分 */
     size_t sign_input_size = strlen(header_b64) + 1 + payload_b64_size + 100;
@@ -727,6 +730,7 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
         payload_padded[payload_len + i] = '=';
     payload_padded[b64_total_len] = '\0';
     AGENTOS_FREE(payload_b64);
+    payload_b64 = NULL;
 
     /* Base64 解码 */
 
@@ -754,6 +758,7 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
     }
     payload_decoded[out_idx] = '\0';
     AGENTOS_FREE(payload_padded);
+    payload_padded = NULL;
 
     cJSON *payload = cJSON_Parse((const char *)payload_decoded);
     if (!payload) {
@@ -907,9 +912,13 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
         }
 
         AGENTOS_FREE(sig_input);
+        sig_input = NULL;
         AGENTOS_FREE(sig_b64);
+        sig_b64 = NULL;
         AGENTOS_FREE(sig_padded);
+        sig_padded = NULL;
         AGENTOS_FREE(provided_sig);
+        provided_sig = NULL;
 
         if (!sig_match) {
             result->status = AUTH_FAILED;
