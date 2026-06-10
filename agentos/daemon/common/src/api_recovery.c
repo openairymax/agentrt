@@ -17,12 +17,7 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 static uint64_t rec_timestamp_ms(void)
 {

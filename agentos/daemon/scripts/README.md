@@ -1,6 +1,6 @@
 # Daemon Scripts — CI/CD 与质量保障脚本
 
-> **模块路径**: `agentos/daemon/scripts/` | **版本**: v0.0.5
+> **模块路径**: `agentos/daemon/scripts/` | **版本**: v0.1.0
 
 ## 概述
 

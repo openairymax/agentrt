@@ -12,6 +12,7 @@ from datetime import datetime
 
 from agentos.client.client import APIClient, APIResponse
 from agentos.exceptions import AgentOSError
+from tests.utils.python.mock_factory import UnifiedMockFactory, MockResponseConfig
 
 
 class BaseTestCase:
@@ -50,28 +51,27 @@ class BaseTestCase:
         self.test_timestamp = datetime(2026, 4, 5, 12, 0, 0)
     
     def create_mock_response(
-        self, 
-        status_code: int = 200, 
+        self,
+        status_code: int = 200,
         json_data: Optional[Dict[str, Any]] = None,
         success: bool = True
     ) -> APIResponse:
         """
-        创建标准 Mock 响应
-        
+        创建标准 Mock 响应（委托给统一工厂）。
+
         Args:
             status_code: HTTP 状态码
             json_data: JSON 数据
             success: 是否成功
-        
+
         Returns:
             APIResponse: 标准响应对象
         """
-        response = MagicMock()
-        response.status_code = status_code
-        response.json.return_value = json_data or {}
-        response.success = success
-        response.data = json_data.get("data", {}) if json_data else {}
-        return response
+        return UnifiedMockFactory.create_response(MockResponseConfig(
+            status_code=status_code,
+            json_data=json_data,
+            success=success
+        ))
     
     def create_task_response(
         self, 

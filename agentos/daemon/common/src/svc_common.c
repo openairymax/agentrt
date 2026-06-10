@@ -25,6 +25,7 @@
 #include "error.h"
 #include "ipc_client.h"
 #include "memory_compat.h"
+#include "memory_stats_reporter.h"
 #include "platform.h"
 #include "safe_string_utils.h"
 #include "svc_logger.h"
@@ -121,6 +122,10 @@ static agentos_error_t svc_common_module_init(void)
     }
 
     g_registry.initialized = 1;
+
+    /* Initialize memory stats reporter (SEC-15) */
+    agentos_mem_stats_reporter_init();
+
     LOG_DEBUG("Service common module initialized");
 
     return AGENTOS_SUCCESS;
@@ -1067,8 +1072,19 @@ void *agentos_service_get_user_data(agentos_service_t service)
 
 /* ==================== 模块清理 ==================== */
 
+static void monitor_shutdown(void)
+{
+    if (g_monitor.initialized) {
+        agentos_mutex_destroy(&g_monitor.mutex);
+        g_monitor.initialized = false;
+        SVC_LOG_INFO("Monitor: mutex destroyed");
+    }
+}
+
 void agentos_svc_common_cleanup(void)
 {
+    agentos_mem_stats_reporter_shutdown();
+    monitor_shutdown();
     svc_common_module_cleanup();
 }
 

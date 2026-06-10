@@ -4,6 +4,7 @@
 #include "ipc_service_bus.h"
 #include "memory_compat.h"
 #include "platform.h"
+#include "svc_logger.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,6 +50,7 @@ static uint64_t time_ms(void)
 static char *json_extract_field(const char *json, const char *key)
 {
     if (!json || !key) {
+        SVC_LOG_ERROR("json_extract_field: null parameter json=%p key=%p", (void *)json, (void *)key);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -57,6 +59,7 @@ static char *json_extract_field(const char *json, const char *key)
     snprintf(search, sizeof(search), "\"%s\"", key);
     const char *pos = strstr(json, search);
     if (!pos) {
+        SVC_LOG_WARN("json_extract_field: key '%s' not found in JSON", key);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -68,6 +71,7 @@ static char *json_extract_field(const char *json, const char *key)
         pos++;
         const char *end = strchr(pos, '"');
         if (!end) {
+            SVC_LOG_ERROR("json_extract_field: unterminated string for key '%s'", key);
             AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
             return NULL;
@@ -80,6 +84,7 @@ static char *json_extract_field(const char *json, const char *key)
         }
         return val;
     }
+    SVC_LOG_WARN("json_extract_field: value is not a string for key '%s'", key);
     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
@@ -116,8 +121,11 @@ static void session_release(dispatch_session_t *session)
 static void dispatch_worker(void *arg)
 {
     dispatch_context_t *ctx = (dispatch_context_t *)arg;
-    if (!ctx || !ctx->dispatcher || !ctx->session)
+    if (!ctx || !ctx->dispatcher || !ctx->session) {
+        SVC_LOG_ERROR("dispatch_worker: null context ctx=%p dispatcher=%p session=%p",
+                      (void *)ctx, ctx ? (void *)ctx->dispatcher : NULL, ctx ? (void *)ctx->session : NULL);
         return;
+    }
 
     dispatch_session_t *session = ctx->session;
 
@@ -187,9 +195,13 @@ static void dispatch_worker(void *arg)
         } else {
             char errbuf[128];
             snprintf(errbuf, sizeof(errbuf), "IPC request failed: error=%d", err);
+            SVC_LOG_ERROR("dispatch_worker: IPC request failed for tool '%s' error=%d",
+                          ctx->task.tool_id ? ctx->task.tool_id : "null", err);
             ctx->result_slot->error = AGENTOS_STRDUP(errbuf);
         }
     } else {
+        SVC_LOG_WARN("dispatch_worker: no IPC bus available for tool '%s'",
+                     ctx->task.tool_id ? ctx->task.tool_id : "null");
         ctx->result_slot->success = 0;
         ctx->result_slot->error = AGENTOS_STRDUP("no IPC bus available");
     }
@@ -219,6 +231,7 @@ parallel_dispatcher_t *parallel_dispatcher_create(thread_pool_t *pool,
                                                   const parallel_dispatch_config_t *config)
 {
     if (!pool) {
+        SVC_LOG_ERROR("parallel_dispatcher_create: null pool parameter");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
 
         return NULL;
@@ -227,6 +240,7 @@ parallel_dispatcher_t *parallel_dispatcher_create(thread_pool_t *pool,
     parallel_dispatcher_t *disp =
         (parallel_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(parallel_dispatcher_t));
     if (!disp) {
+        SVC_LOG_ERROR("parallel_dispatcher_create: memory allocation failed");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -281,6 +295,7 @@ static dispatch_session_t *session_create(parallel_dispatcher_t *dispatcher,
     dispatch_session_t *session =
         (dispatch_session_t *)AGENTOS_CALLOC(1, sizeof(dispatch_session_t));
     if (!session) {
+        SVC_LOG_ERROR("session_create: memory allocation failed for session");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -300,6 +315,7 @@ static dispatch_session_t *session_create(parallel_dispatcher_t *dispatcher,
     session->contexts =
         (dispatch_context_t *)AGENTOS_CALLOC(task_count, sizeof(dispatch_context_t));
     if (!session->contexts) {
+        SVC_LOG_ERROR("session_create: memory allocation failed for contexts (task_count=%zu)", task_count);
         agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         AGENTOS_FREE(session);
@@ -322,18 +338,24 @@ int parallel_dispatcher_execute(parallel_dispatcher_t *dispatcher, const paralle
                                 size_t task_count, parallel_result_t **results,
                                 size_t *result_count)
 {
-    if (!dispatcher || !tasks || task_count == 0 || !results)
+    if (!dispatcher || !tasks || task_count == 0 || !results) {
+        SVC_LOG_ERROR("parallel_dispatcher_execute: invalid parameter dispatcher=%p tasks=%p task_count=%zu results=%p",
+                      (void *)dispatcher, (void *)tasks, task_count, (void *)results);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     *results = (parallel_result_t *)AGENTOS_CALLOC(task_count, sizeof(parallel_result_t));
-    if (!*results)
+    if (!*results) {
+        SVC_LOG_ERROR("parallel_dispatcher_execute: memory allocation failed for results (task_count=%zu)", task_count);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
     if (result_count)
         *result_count = task_count;
 
     dispatch_session_t *session =
         session_create(dispatcher, tasks, task_count, *results, NULL, NULL);
     if (!session) {
+        SVC_LOG_ERROR("parallel_dispatcher_execute: session creation failed (task_count=%zu)", task_count);
         AGENTOS_FREE(*results);
         *results = NULL;
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -357,6 +379,7 @@ int parallel_dispatcher_execute(parallel_dispatcher_t *dispatcher, const paralle
 
         int rc = thread_pool_submit(dispatcher->pool, dispatch_worker, &session->contexts[i]);
         if (rc != 0) {
+            SVC_LOG_WARN("parallel_dispatcher_execute: task submit failed index=%zu rc=%d", i, rc);
             session->contexts[i].result_slot->success = 0;
             session->contexts[i].result_slot->error = AGENTOS_STRDUP("submit failed");
             session->contexts[i].result_slot->task_index = i;
@@ -380,6 +403,8 @@ wait_done: {
             break;
 
         if (time_ms() >= deadline) {
+            SVC_LOG_WARN("parallel_dispatcher_execute: timeout reached, cancelling remaining tasks (timeout_ms=%u)",
+                         dispatcher->config.timeout_ms);
             session->cancel_flag = 1;
             break;
         }
@@ -413,17 +438,23 @@ int parallel_dispatcher_execute_async(parallel_dispatcher_t *dispatcher,
                                       const parallel_task_t *tasks, size_t task_count,
                                       parallel_complete_cb_t on_complete, void *user_data)
 {
-    if (!dispatcher || !tasks || task_count == 0)
+    if (!dispatcher || !tasks || task_count == 0) {
+        SVC_LOG_ERROR("parallel_dispatcher_execute_async: invalid parameter dispatcher=%p tasks=%p task_count=%zu",
+                      (void *)dispatcher, (void *)tasks, task_count);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     parallel_result_t *results =
         (parallel_result_t *)AGENTOS_CALLOC(task_count, sizeof(parallel_result_t));
-    if (!results)
+    if (!results) {
+        SVC_LOG_ERROR("parallel_dispatcher_execute_async: memory allocation failed for results (task_count=%zu)", task_count);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     dispatch_session_t *session =
         session_create(dispatcher, tasks, task_count, results, on_complete, user_data);
     if (!session) {
+        SVC_LOG_ERROR("parallel_dispatcher_execute_async: session creation failed (task_count=%zu)", task_count);
         AGENTOS_FREE(results);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
@@ -434,6 +465,7 @@ int parallel_dispatcher_execute_async(parallel_dispatcher_t *dispatcher,
         if (rc == 0) {
             submitted++;
         } else {
+            SVC_LOG_WARN("parallel_dispatcher_execute_async: task submit failed index=%zu rc=%d", i, rc);
             results[i].success = 0;
             results[i].error = AGENTOS_STRDUP("submit failed");
             results[i].task_index = i;
@@ -447,6 +479,7 @@ int parallel_dispatcher_execute_async(parallel_dispatcher_t *dispatcher,
     }
 
     if (submitted == 0) {
+        SVC_LOG_ERROR("parallel_dispatcher_execute_async: all task submissions failed (task_count=%zu)", task_count);
         agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         if (session->contexts)
