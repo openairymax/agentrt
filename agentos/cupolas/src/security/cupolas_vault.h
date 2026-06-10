@@ -106,7 +106,7 @@ typedef struct cupolas_vault cupolas_vault_t;
  * @return 0 on success, negative on failure
  * @note Thread-safe: Safe to call from multiple threads (initialization only)
  * @reentrant No
- * @ownership config: caller retains ownership
+ * @ownership config: BORROW
  */
 int cupolas_vault_init(const cupolas_vault_config_t *config);
 
@@ -127,8 +127,8 @@ void cupolas_vault_cleanup(void);
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership vault_id and password: caller retains ownership
- * @ownership vault: caller provides buffer, function writes to it
+ * @ownership vault_id: BORROW, password: BORROW
+ * @ownership vault: OWNER (out parameter - caller must call cupolas_vault_close)
  */
 int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault_t **vault);
 
@@ -138,7 +138,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership vault: transferred to this function, will be closed
+ * @ownership vault: TRANSFER
  */
 void cupolas_vault_close(cupolas_vault_t *vault);
 
@@ -148,6 +148,8 @@ void cupolas_vault_close(cupolas_vault_t *vault);
  * @return 0 on success, negative on failure
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
+ *
+ * @ownership vault: BORROW
  */
 int cupolas_vault_lock(cupolas_vault_t *vault);
 
@@ -159,7 +161,7 @@ int cupolas_vault_lock(cupolas_vault_t *vault);
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership password: caller retains ownership
+ * @ownership vault: BORROW, password: BORROW
  */
 int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password);
 
@@ -169,6 +171,8 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password);
  * @return true if locked, false otherwise
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
+ *
+ * @ownership vault: BORROW
  */
 bool cupolas_vault_is_locked(cupolas_vault_t *vault);
 
@@ -184,8 +188,8 @@ bool cupolas_vault_is_locked(cupolas_vault_t *vault);
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership cred_id and data: caller retains ownership
- * @ownership acl: caller retains ownership
+ * @ownership vault: BORROW, cred_id: BORROW, data: BORROW
+ * @ownership vault: BORROW, acl: BORROW
  */
 int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vault_cred_type_t type,
                         const uint8_t *data, size_t data_len, const cupolas_vault_acl_t *acl);
@@ -201,8 +205,8 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership cred_id and agent_id: caller retains ownership
- * @ownership data_out: caller provides buffer, function writes to it
+ * @ownership vault: BORROW, cred_id: BORROW, agent_id: BORROW
+ * @ownership vault: BORROW, data_out: BORROW (caller-owned buffer, function writes to it)
  */
 int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const char *agent_id,
                            uint8_t *data_out, size_t *data_len);
@@ -216,7 +220,7 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership cred_id and agent_id: caller retains ownership
+ * @ownership vault: BORROW, cred_id: BORROW, agent_id: BORROW
  */
 int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char *agent_id);
 
@@ -227,7 +231,7 @@ int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char
  * @return true if exists, false otherwise
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
- * @ownership cred_id: caller retains ownership
+ * @ownership vault: BORROW, cred_id: BORROW
  */
 bool cupolas_vault_exists(cupolas_vault_t *vault, const char *cred_id);
 
@@ -242,7 +246,7 @@ bool cupolas_vault_exists(cupolas_vault_t *vault, const char *cred_id);
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership cred_id, data, and agent_id: caller retains ownership
+ * @ownership vault: BORROW, cred_id: BORROW, data: BORROW, agent_id: BORROW
  */
 int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint8_t *data,
                          size_t data_len, const char *agent_id);
@@ -255,8 +259,8 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
  * @return 0 on success, negative on failure
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
- * @ownership cred_id: caller retains ownership
- * @ownership metadata: caller provides buffer, function writes to it
+ * @ownership vault: BORROW, cred_id: BORROW
+ * @ownership vault: BORROW, metadata: BORROW (caller-owned buffer, function writes to it)
  */
 int cupolas_vault_get_metadata(cupolas_vault_t *vault, const char *cred_id,
                                cupolas_vault_metadata_t *metadata);
@@ -266,7 +270,7 @@ int cupolas_vault_get_metadata(cupolas_vault_t *vault, const char *cred_id,
  * @param[in] metadata Metadata pointer (may be NULL)
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
- * @ownership metadata: transferred to this function, will be freed
+ * @ownership metadata: TRANSFER
  */
 void cupolas_vault_free_metadata(cupolas_vault_metadata_t *metadata);
 
@@ -279,8 +283,8 @@ void cupolas_vault_free_metadata(cupolas_vault_metadata_t *metadata);
  * @return 0 on success, negative on failure
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
- * @ownership metadata_array: caller provides buffer, function writes to it
- * @ownership count: caller provides buffer, function writes to it
+ * @ownership vault: BORROW, metadata_array: OWNER (out parameter - caller must call cupolas_vault_free_list)
+ * @ownership vault: BORROW, acl: BORROW (caller-owned buffer, function writes to it)
  */
 int cupolas_vault_list(cupolas_vault_t *vault, cupolas_vault_cred_type_t type,
                        cupolas_vault_metadata_t **metadata_array, size_t *count);
@@ -291,7 +295,7 @@ int cupolas_vault_list(cupolas_vault_t *vault, cupolas_vault_cred_type_t type,
  * @param[in] count Number of entries
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
- * @ownership metadata_array: transferred to this function, will be freed
+ * @ownership metadata_array: TRANSFER
  */
 void cupolas_vault_free_list(cupolas_vault_metadata_t *metadata_array, size_t count);
 
@@ -304,7 +308,7 @@ void cupolas_vault_free_list(cupolas_vault_metadata_t *metadata_array, size_t co
  * @return true if allowed, false if denied
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
- * @ownership cred_id and agent_id: caller retains ownership
+ * @ownership vault: BORROW, cred_id: BORROW, agent_id: BORROW
  */
 bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, const char *agent_id,
                                 cupolas_vault_operation_t operation);
@@ -320,7 +324,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership cred_id and agent_id: caller retains ownership
+ * @ownership vault: BORROW, cred_id: BORROW, agent_id: BORROW
  */
 int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, const char *agent_id,
                                uint32_t operations, uint64_t expires_at);
@@ -334,7 +338,7 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership cred_id and agent_id: caller retains ownership
+ * @ownership vault: BORROW, cred_id: BORROW, agent_id: BORROW
  */
 int cupolas_vault_revoke_access(cupolas_vault_t *vault, const char *cred_id, const char *agent_id);
 
@@ -346,8 +350,8 @@ int cupolas_vault_revoke_access(cupolas_vault_t *vault, const char *cred_id, con
  * @return 0 on success, negative on failure
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
- * @ownership cred_id: caller retains ownership
- * @ownership acl: caller provides buffer, function writes to it
+ * @ownership vault: BORROW, cred_id: BORROW
+ * @ownership vault: BORROW, acl: BORROW (caller-owned buffer, function writes to it)
  */
 int cupolas_vault_get_acl(cupolas_vault_t *vault, const char *cred_id, cupolas_vault_acl_t *acl);
 
@@ -356,7 +360,7 @@ int cupolas_vault_get_acl(cupolas_vault_t *vault, const char *cred_id, cupolas_v
  * @param[in] acl ACL pointer (may be NULL)
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
- * @ownership acl: transferred to this function, will be freed
+ * @ownership acl: TRANSFER
  */
 void cupolas_vault_free_acl(cupolas_vault_acl_t *acl);
 
@@ -370,7 +374,7 @@ void cupolas_vault_free_acl(cupolas_vault_acl_t *acl);
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership export_path, password, and agent_id: caller retains ownership
+ * @ownership vault: BORROW, export_path: BORROW, password: BORROW, agent_id: BORROW
  */
 int cupolas_vault_export(cupolas_vault_t *vault, const char *export_path, const char *password,
                          const char *agent_id);
@@ -385,7 +389,7 @@ int cupolas_vault_export(cupolas_vault_t *vault, const char *export_path, const 
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other
  * operations)
  * @reentrant No
- * @ownership import_path, password, and agent_id: caller retains ownership
+ * @ownership vault: BORROW, import_path: BORROW, password: BORROW, agent_id: BORROW
  */
 int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const char *password,
                          const char *agent_id);
@@ -396,6 +400,8 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
  * @return Type name string (static, do not free)
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
+ *
+ * @ownership return: BORROW (static string, do not free)
  */
 const char *cupolas_vault_cred_type_string(cupolas_vault_cred_type_t type);
 
@@ -405,6 +411,8 @@ const char *cupolas_vault_cred_type_string(cupolas_vault_cred_type_t type);
  * @return Operation name string (static, do not free)
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
+ *
+ * @ownership return: BORROW (static string, do not free)
  */
 const char *cupolas_vault_operation_string(cupolas_vault_operation_t op);
 
@@ -415,7 +423,7 @@ const char *cupolas_vault_operation_string(cupolas_vault_operation_t op);
  * @return 0 on success, negative on failure
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant Yes
- * @ownership password_out: caller provides buffer, function writes to it
+ * @ownership password_out: BORROW (caller-owned buffer, function writes to it)
  */
 int cupolas_vault_generate_password(char *password_out, size_t length);
 
@@ -428,7 +436,8 @@ int cupolas_vault_generate_password(char *password_out, size_t length);
  * @return 0 on success, negative on failure
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant Yes
- * @ownership public_key_out and private_key_out: caller provides buffers, function writes to them
+ * @ownership public_key_out: BORROW (caller-owned buffer, function writes to it)
+ * @ownership private_key_out: BORROW (caller-owned buffer, function writes to it)
  */
 int cupolas_vault_generate_keypair(char *public_key_out, size_t *pub_len, char *private_key_out,
                                    size_t *priv_len);
@@ -438,12 +447,14 @@ int cupolas_vault_generate_keypair(char *public_key_out, size_t *pub_len, char *
  * 
  * 符合编码契约要求: 支持四种轮换策略。
  * 
- * @param[in] vault          Vault 上下文
- * @param[in] cred_group     凭证组标识 (同组凭证共享轮换策略)
+ * @param[in] vault          Vault 上下文 (BORROW - caller retains ownership)
+ * @param[in] cred_group     凭证组标识 (BORROW - not stored, copied internally)
  * @param[in] strategy        轮换策略
- * @param[out] selected_id    选中的凭证 ID
+ * @param[out] selected_id    选中的凭证 ID (BORROW - caller-owned buffer, function writes to it)
  * @param[in] id_buf_size     selected_id 缓冲区大小
  * @return 0 成功, 负数失败
+ *
+ * @ownership vault: BORROW, cred_group: BORROW, selected_id: BORROW
  */
 int cupolas_vault_rotate_credential(cupolas_vault_t *vault, const char *cred_group,
                                     cupolas_vault_rotation_strategy_t strategy,

@@ -4,7 +4,7 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { ClientConfig } from './manager';
-import { Memory, TaskResult, SkillInfo, SkillResult } from './types';
+import { Memory, TaskResult, SkillInfo, SkillResult, MemoryRaw, MemoryLayer } from './types';
 import { NetworkError, HttpError, TimeoutError, AgentOSError } from './errors';
 import { Task } from './task';
 import { Session } from './session';
@@ -67,7 +67,7 @@ export class AgentOS {
   }
 
   /** 判断是否可重试的错误 */
-  private isRetryableError(error: any): boolean {
+  private isRetryableError(error: unknown): boolean {
     if (error instanceof NetworkError || error instanceof TimeoutError) {
       return true;
     }
@@ -79,16 +79,16 @@ export class AgentOS {
   }
 
   /** 向 AgentOS 服务端发送 HTTP 请求（带重试） */
-  async request<T>(method: string, path: string, data?: any): Promise<T> {
-    let lastError: any;
+  async request<T>(method: string, path: string, data?: Record<string, unknown>): Promise<T> {
+    let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
         const manager: AxiosRequestConfig = { method, url: path, data };
         const response: AxiosResponse<T> = await this.client(manager);
         return response.data;
-      } catch (error) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
 
         if (attempt === this.maxRetries) {
           break;
@@ -104,7 +104,7 @@ export class AgentOS {
       }
     }
 
-    throw lastError;
+    throw lastError ?? new Error('All retries exhausted');
   }
 
   /** 提交任务到 AgentOS 系统 */
@@ -121,7 +121,7 @@ export class AgentOS {
   }
 
   /** 写入记忆到 AgentOS 系统 */
-  async writeMemory(content: string, metadata?: Record<string, any>): Promise<string> {
+  async writeMemory(content: string, metadata?: Record<string, unknown>): Promise<string> {
     const response = await this.request<{ memory_id: string }>(
       'POST',
       '/api/v1/memories',
@@ -136,19 +136,19 @@ export class AgentOS {
   /** 搜索记忆 */
   async searchMemory(query: string, topK: number = 5): Promise<Memory[]> {
     const encodedQuery = encodeURIComponent(query);
-    const response = await this.request<{ memories: any[] }>(
+    const response = await this.request<{ memories: MemoryRaw[] }>(
       'GET',
       `/api/v1/memories/search?query=${encodedQuery}&top_k=${topK}`,
     );
     if (!response.memories) {
       throw new AgentOSError('响应格式异常: 缺少 memories');
     }
-    return response.memories.map((mem: any) => ({
-      id: mem.memory_id || mem.id,
+    return response.memories.map((mem: MemoryRaw) => ({
+      id: mem.memory_id || mem.id || '',
       content: mem.content,
-      layer: mem.layer,
+      layer: mem.layer as MemoryLayer,
       score: mem.score || 0,
-      createdAt: new Date(mem.created_at || mem.createdAt),
+      createdAt: new Date(mem.created_at || mem.createdAt || Date.now()),
       updatedAt: new Date(mem.updated_at || mem.updatedAt || Date.now()),
       metadata: mem.metadata,
     }));
@@ -156,13 +156,13 @@ export class AgentOS {
 
   /** 根据 ID 获取记忆 */
   async getMemory(memoryId: string): Promise<Memory> {
-    const response = await this.request<any>('GET', `/api/v1/memories/${memoryId}`);
+    const response = await this.request<MemoryRaw>('GET', `/api/v1/memories/${memoryId}`);
     return {
-      id: response.memory_id || response.id,
+      id: response.memory_id || response.id || '',
       content: response.content,
-      layer: response.layer,
+      layer: response.layer as MemoryLayer,
       score: response.score || 0,
-      createdAt: new Date(response.created_at || response.createdAt),
+      createdAt: new Date(response.created_at || response.createdAt || Date.now()),
       updatedAt: new Date(response.updated_at || response.updatedAt || Date.now()),
       metadata: response.metadata,
     };
@@ -197,7 +197,7 @@ export class AgentOS {
   /** 健康检查 */
   async health(): Promise<boolean> {
     try {
-      await this.request<any>('GET', '/api/v1/health');
+      await this.request<unknown>('GET', '/api/v1/health');
       return true;
     } catch {
       return false;

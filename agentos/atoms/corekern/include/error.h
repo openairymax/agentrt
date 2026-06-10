@@ -45,32 +45,14 @@ extern "C" {
  * 基础错误码（SUCCESS, EINVAL, ENOMEM等）已统一到agentos_types.h
  */
 
-/**
- * @brief 操作被中断
- *
- * 操作被信号中断
- */
-#ifndef AGENTOS_EINTR
-#define AGENTOS_EINTR -31
-#endif
-
-#ifndef AGENTOS_EBADF
-#define AGENTOS_EBADF -32
-#endif
-
-#ifndef AGENTOS_ERESOURCE
-#define AGENTOS_ERESOURCE -33
-#endif
-
-#ifndef AGENTOS_ENOSYS
-#define AGENTOS_ENOSYS -34
-#endif
+/* 以下错误码现已统一到 centralized error.h (commons/utils/error/include/error.h) */
+/* AGENTOS_EINTR: now AGENTOS_ERR_INTERRUPTED in centralized error.h */
+/* AGENTOS_EBADF: now AGENTOS_ERR_SYS_FILE in centralized error.h */
+/* AGENTOS_ERESOURCE: now AGENTOS_ERR_SYS_RESOURCE in centralized error.h */
+/* AGENTOS_ENOSYS: now AGENTOS_ERR_NOT_IMPLEMENTED in centralized error.h */
+/* AGENTOS_EFAIL: now AGENTOS_ERR_FAIL in centralized error.h */
 
 #define AGENTOS_ECYCLE -35
-
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL -36
-#endif
 
 /* AGENTOS_ERROR 已统一为 AGENTOS_EUNKNOWN（见agentos_types.h） */
 

@@ -64,10 +64,13 @@ set(AGENTOS_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memor
 set(AGENTOS_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
+# R-09-SEC: Strict compliance mode and tests are now independent.
+# Tests MUST run under strict compliance to catch BAN violations at compile time.
+# Previously, strict mode forced BUILD_TESTS=OFF, which prevented test execution
+# in the default configuration. This was a design error (BAN-181 compliance fix).
 if(BUILD_TESTS)
     if(AGENTOS_COMPLIANCE_STRICT)
-        message(STATUS "Tests disabled in strict compliance mode (AGENTOS_COMPLIANCE_STRICT=ON)")
-        set(BUILD_TESTS OFF CACHE BOOL "Build unit tests" FORCE)
+        message(STATUS "Tests enabled with strict compliance (AGENTOS_COMPLIANCE_STRICT=ON)")
     endif()
 endif()
 if(BUILD_TESTS)

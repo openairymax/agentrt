@@ -18,7 +18,7 @@
 #include "agentos.h"
 #include "cognition.h"
 #include "confidence_calibrator.h"
-#include "intent_classifier.h"
+#include "../intent/intent_classifier.h"
 
 #include <stdbool.h>
 #include <stddef.h>

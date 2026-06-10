@@ -1,9 +1,9 @@
 
 add_library(agentos_execution STATIC
     engine.c
-    registry.c
-    compensation.c
-    trace.c
+    core/registry.c
+    core/trace.c
+    transaction/compensation.c
     units/api.c
     units/browser.c
     units/code.c

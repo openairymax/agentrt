@@ -13,12 +13,7 @@
 #include <string.h>
 #include "error.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 typedef void (*assert_handler_fn_t)(const char *cond, const char *file, int line, const char *func,
                                     const char *msg);

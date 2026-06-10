@@ -8,6 +8,7 @@
 import { APIClient } from '../client';
 import { APIResponse, ListOptions } from '../types';
 import { AgentOSError, ErrorCode } from '../errors';
+import { TaskResource, MemoryResource, SessionResource, SkillResource } from '../types';
 import {
   extractDataMap,
   validateAndExtractData,
@@ -230,8 +231,8 @@ export abstract class BaseManager<T> {
  */
 
 /** 任务转换器 */
-export class TaskConverter implements ResourceConverter<any> {
-  convert(data: Record<string, unknown>, context?: string): any {
+export class TaskConverter implements ResourceConverter<TaskResource> {
+  convert(data: Record<string, unknown>, context?: string): TaskResource {
     const taskId = data.task_id as string;
     if (!taskId) {
       throw new AgentOSError(
@@ -252,8 +253,8 @@ export class TaskConverter implements ResourceConverter<any> {
 }
 
 /** 记忆转换器 */
-export class MemoryConverter implements ResourceConverter<any> {
-  convert(data: Record<string, unknown>, context?: string): any {
+export class MemoryConverter implements ResourceConverter<MemoryResource> {
+  convert(data: Record<string, unknown>, context?: string): MemoryResource {
     const memoryId = data.memory_id as string;
     if (!memoryId) {
       throw new AgentOSError(
@@ -275,8 +276,8 @@ export class MemoryConverter implements ResourceConverter<any> {
 }
 
 /** 会话转换器 */
-export class SessionConverter implements ResourceConverter<any> {
-  convert(data: Record<string, unknown>, context?: string): any {
+export class SessionConverter implements ResourceConverter<SessionResource> {
+  convert(data: Record<string, unknown>, context?: string): SessionResource {
     const sessionId = data.session_id as string;
     if (!sessionId) {
       throw new AgentOSError(
@@ -297,8 +298,8 @@ export class SessionConverter implements ResourceConverter<any> {
 }
 
 /** 技能转换器 */
-export class SkillConverter implements ResourceConverter<any> {
-  convert(data: Record<string, unknown>, context?: string): any {
+export class SkillConverter implements ResourceConverter<SkillResource> {
+  convert(data: Record<string, unknown>, context?: string): SkillResource {
     const skillName = data.skill_name as string;
     if (!skillName) {
       throw new AgentOSError(

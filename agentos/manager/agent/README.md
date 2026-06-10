@@ -1,7 +1,7 @@
 # Manager Agent — Agent 注册表配置
 
 **模块路径**: `agentos/manager/agent/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

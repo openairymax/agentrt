@@ -186,8 +186,11 @@ static void log_output(log_level_t level, const log_context_t *context, const ch
 
     // 输出到控制台
     if (g_log_config.targets & LOG_TARGET_CONSOLE) {
+        /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
         fprintf(stdout, "%s", prefix);
+        /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
         vfprintf(stdout, format, args); /* flawfinder: ignore - variadic logging wrapper */
+        /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
         fprintf(stdout, "\n");
         fflush(stdout);
     }
@@ -209,8 +212,11 @@ static void log_output(log_level_t level, const log_context_t *context, const ch
             snprintf(file_prefix + strlen(file_prefix), sizeof(file_prefix) - strlen(file_prefix),
                      "%s:%d: ", context->function, context->line);
         }
+        /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
         fprintf(g_log_file, "%s", file_prefix);
+        /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
         vfprintf(g_log_file, format, args); /* flawfinder: ignore - variadic logging wrapper */
+        /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
         fprintf(g_log_file, "\n");
         fflush(g_log_file);
     }

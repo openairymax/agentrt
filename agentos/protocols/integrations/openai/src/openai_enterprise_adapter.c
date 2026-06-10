@@ -723,6 +723,7 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
         openai_api_call(adapter->config.api_key, adapter->config.base_url, "/chat/completions",
                         req_str, api_response, sizeof(api_response));
     AGENTOS_FREE(req_str);
+    req_str = NULL;
 
     uint64_t ts_end_ms = agentos_time_ms();
     double latency_ms = (double)(ts_end_ms - ts_start_ms);
@@ -838,6 +839,7 @@ int openai_chat_completion_streaming(openai_handle_t handle, const openai_chat_r
         openai_api_call(adapter->config.api_key, adapter->config.base_url, "/chat/completions",
                         req_str, api_response, sizeof(api_response));
     AGENTOS_FREE(req_str);
+    req_str = NULL;
 
     if (api_result <= 0) {
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "openai: unknown error");
@@ -992,6 +994,7 @@ int openai_create_embedding(openai_handle_t handle, const openai_embedding_reque
                 out_response->embeddings[i] = 0.0;
         }
         AGENTOS_FREE(accum);
+        accum = NULL;
     } else {
         for (int i = 0; i < dims; i++)
             out_response->embeddings[i] = 0.0;
@@ -1060,9 +1063,12 @@ void openai_free_chat_response(openai_chat_response_t *response)
         return;
     for (size_t i = 0; i < response->choice_count && i < 16; i++) {
         AGENTOS_FREE(response->choices[i].content);
+        response->choices[i].content = NULL;
     }
     AGENTOS_FREE(response->choices);
+    response->choices = NULL;
     AGENTOS_FREE(response->finish_reasons);
+    response->finish_reasons = NULL;
     AGENTOS_MEMSET(response, 0, sizeof(*response));
 }
 
@@ -1282,7 +1288,9 @@ int openai_enterprise_embeddings(openai_enterprise_context_t *ctx, const char *m
     req.model = model ? AGENTOS_STRDUP(model) : AGENTOS_STRDUP("text-embedding-3-small");
     int result = openai_create_embedding(ctx->handle, &req, response);
     AGENTOS_FREE(req.input_text);
+    req.input_text = NULL;
     AGENTOS_FREE(req.model);
+    req.model = NULL;
     return result;
 }
 
@@ -1407,6 +1415,7 @@ int openai_enterprise_route_request(openai_enterprise_context_t *ctx, const char
                     snprintf(json, sz, "{\"result\":\"%s\"}", escaped_content);
                 *response_json = json;
                 AGENTOS_FREE(escaped_content);
+                escaped_content = NULL;
             } else {
                 size_t sz = 64;
                 char *json = (char *)AGENTOS_MALLOC(sz);
@@ -1505,10 +1514,14 @@ int openai_enterprise_route_request(openai_enterprise_context_t *ctx, const char
                             "{\"id\":\"%s\",\"object\":\"model\",\"owned_by\":\"%s\"}", escaped_id,
                             escaped_owned_by);
             AGENTOS_FREE(models[i].id);
+            models[i].id = NULL;
             AGENTOS_FREE(models[i].name);
+            models[i].name = NULL;
             AGENTOS_FREE(models[i].owned_by);
+            models[i].owned_by = NULL;
         }
         AGENTOS_FREE(models);
+        models = NULL;
         pos += snprintf(json + pos, json_sz - pos, "]}");
         *response_json = json;
         return 0;
