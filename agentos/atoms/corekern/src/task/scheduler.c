@@ -138,6 +138,7 @@ static task_info_core_t *find_task_by_id(agentos_task_id_t tid)
 {
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
+        AGENTOS_LOG_ERROR("find_task_by_id: null scheduler context");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -173,6 +174,7 @@ static void release_task_lock(void)
 agentos_error_t agentos_task_init(void)
 {
     if (ensure_scheduler_fully_initialized() != 0) {
+        AGENTOS_LOG_ERROR("agentos_task_init: scheduler initialization failed");
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
@@ -193,23 +195,27 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
 {
     /* 参数检查 */
     if (!thread || !func) {
+        AGENTOS_LOG_ERROR("agentos_thread_create: null parameter, thread=%p func=%p", (void *)thread, (void *)(uintptr_t)func);
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to create thread: null thread or func pointer");
     }
 
     /* 确保调度器已初始化 */
     if (ensure_scheduler_fully_initialized() != 0) {
+        AGENTOS_LOG_ERROR("agentos_thread_create: scheduler not initialized");
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 获取平台适配器操作集 */
     const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
+        AGENTOS_LOG_ERROR("agentos_thread_create: platform ops not available");
         ATM_RET_ERR(AGENTOS_EPLATFORM);
     }
 
     /* 生成任务ID */
     uint64_t task_id = scheduler_core_fetch_add_task_id();
     if (task_id == 0) {
+        AGENTOS_LOG_ERROR("agentos_thread_create: failed to generate task ID");
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
@@ -224,12 +230,14 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
                                         arg, task_name, priority);
 
     if (!task_info) {
+        AGENTOS_LOG_ERROR("agentos_thread_create: task_info create failed, ENOMEM, task_id=%llu", (unsigned long long)task_id);
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
     /* 使用平台适配器创建线程 */
     void *platform_handle = ops->thread_create(task_info, stack_size);
     if (!platform_handle) {
+        AGENTOS_LOG_ERROR("agentos_thread_create: platform thread create failed, task_id=%llu", (unsigned long long)task_id);
         scheduler_core_task_info_destroy(task_info);
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
@@ -240,12 +248,11 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
     /* 获取核心上下文 */
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
+        AGENTOS_LOG_ERROR("agentos_thread_create: failed to get scheduler context, task_id=%llu", (unsigned long long)task_id);
         ops->cleanup_platform_resources(platform_handle, NULL);
         scheduler_core_task_info_destroy(task_info);
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
-
-    /* 将任务添加到核心层管理 */
     agentos_mutex_lock(ctx->task_table_lock);
 
     int add_result = scheduler_core_task_table_add(task_info);
@@ -258,6 +265,7 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
 
     if (add_result != 0) {
         /* 添加失败，清理资源 */
+        AGENTOS_LOG_ERROR("agentos_thread_create: task table add failed, task_id=%llu add_result=%d", (unsigned long long)task_id, add_result);
         ops->cleanup_platform_resources(platform_handle, NULL);
         scheduler_core_task_info_destroy(task_info);
         ATM_RET_ERR(AGENTOS_ENOMEM);
@@ -300,16 +308,19 @@ int agentos_thread_create(agentos_thread_t *thread, agentos_thread_func_t func, 
 agentos_error_t agentos_thread_join(agentos_thread_t thread, void **retval)
 {
     if (!thread) {
+        AGENTOS_LOG_ERROR("agentos_thread_join: null thread handle");
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to join thread: null thread handle");
     }
 
     const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
+        AGENTOS_LOG_ERROR("agentos_thread_join: platform ops not available");
         ATM_RET_ERR(AGENTOS_EPLATFORM);
     }
 
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
+        AGENTOS_LOG_ERROR("agentos_thread_join: null scheduler context");
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
@@ -347,11 +358,13 @@ agentos_error_t agentos_thread_join(agentos_thread_t thread, void **retval)
     agentos_mutex_unlock(ctx->task_table_lock);
 
     if (!task_info) {
+        AGENTOS_LOG_ERROR("agentos_thread_join: task not found in table");
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     int result = ops->thread_join(task_info->platform_handle, retval);
     if (result != 0) {
+        AGENTOS_LOG_ERROR("agentos_thread_join: platform thread_join failed, result=%d", result);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
@@ -463,23 +476,27 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
 {
     /* 验证优先级范围 */
     if (priority < AGENTOS_TASK_PRIORITY_MIN || priority > AGENTOS_TASK_PRIORITY_MAX) {
+        AGENTOS_LOG_ERROR("agentos_task_set_priority: priority out of range, priority=%d min=%d max=%d", priority, AGENTOS_TASK_PRIORITY_MIN, AGENTOS_TASK_PRIORITY_MAX);
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to set task priority: priority out of valid range");
     }
 
     /* 查找任务信息 */
     task_info_core_t *task_info = find_task_by_id(tid);
     if (!task_info) {
+        AGENTOS_LOG_ERROR("agentos_task_set_priority: task not found, tid=%llu", (unsigned long long)tid);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     const scheduler_platform_ops_t *ops = scheduler_platform_get_ops();
     if (!ops) {
+        AGENTOS_LOG_ERROR("agentos_task_set_priority: platform ops not available");
         release_task_lock();
         ATM_RET_ERR(AGENTOS_EPLATFORM);
     }
 
     int result = ops->thread_set_priority(task_info->platform_handle, priority);
     if (result != 0) {
+        AGENTOS_LOG_ERROR("agentos_task_set_priority: platform set_priority failed, result=%d tid=%llu priority=%d", result, (unsigned long long)tid, priority);
         release_task_lock();
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
@@ -502,11 +519,13 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
 agentos_error_t agentos_task_get_priority(agentos_task_id_t tid, int *out_priority)
 {
     if (!out_priority) {
+        AGENTOS_LOG_ERROR("agentos_task_get_priority: null output pointer");
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get task priority: null output pointer");
     }
 
     task_info_core_t *task_info = find_task_by_id(tid);
     if (!task_info) {
+        AGENTOS_LOG_ERROR("agentos_task_get_priority: task not found, tid=%llu", (unsigned long long)tid);
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get task priority: task not found");
     }
 
@@ -528,11 +547,13 @@ agentos_error_t agentos_task_get_priority(agentos_task_id_t tid, int *out_priori
 agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state_t *out_state)
 {
     if (!out_state) {
+        AGENTOS_LOG_ERROR("agentos_task_get_state: null output pointer");
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get task state: null output pointer");
     }
 
     task_info_core_t *task_info = find_task_by_id(tid);
     if (!task_info) {
+        AGENTOS_LOG_ERROR("agentos_task_get_state: task not found, tid=%llu", (unsigned long long)tid);
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to get task state: task not found");
     }
 
@@ -549,8 +570,10 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
                                                        agentos_dep_result_t *out_result)
 {
 
-    if (!dep_from || !dep_to || !out_result)
+    if (!dep_from || !dep_to || !out_result) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: null parameter, dep_from=%p dep_to=%p out_result=%p", (void *)dep_from, (void *)dep_to, (void *)out_result);
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to resolve dependencies: null dep_from, dep_to, or out_result");
+    }
 
     __builtin_memset(out_result, 0, sizeof(agentos_dep_result_t));
 
@@ -560,8 +583,10 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
     /* 收集所有唯一节点 */
     uint64_t *nodes;
     SAFE_MALLOC_ARRAY(nodes, edge_count * 2, sizeof(uint64_t));
-    if (!nodes)
+    if (!nodes) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: nodes alloc failed, edge_count=%zu", edge_count);
         ATM_RET_ERR(AGENTOS_ENOMEM);
+    }
     size_t node_count = 0;
 
     for (size_t i = 0; i < edge_count; i++) {
@@ -598,6 +623,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
     size_t *rev_cnt = (size_t *)AGENTOS_CALLOC(unique_count, sizeof(size_t));
 
     if (!in_degree || !adj || !adj_cap || !adj_cnt || !rev_adj || !rev_cap || !rev_cnt) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: graph alloc failed, unique_count=%zu", unique_count);
         AGENTOS_FREE(nodes);
         AGENTOS_FREE(in_degree);
         AGENTOS_FREE(adj);
@@ -625,8 +651,10 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
         if (adj_cnt[from_idx] >= adj_cap[from_idx]) {
             size_t new_cap = adj_cap[from_idx] ? adj_cap[from_idx] * 2 : 4;
             size_t *new_adj = (size_t *)AGENTOS_REALLOC(adj[from_idx], new_cap * sizeof(size_t));
-            if (!new_adj)
+            if (!new_adj) {
+                AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: adj realloc failed, from_idx=%zu new_cap=%zu", from_idx, new_cap);
                 goto cleanup_oom;
+            }
             adj[from_idx] = new_adj;
             adj_cap[from_idx] = new_cap;
         }
@@ -637,8 +665,10 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
         if (rev_cnt[to_idx] >= rev_cap[to_idx]) {
             size_t new_cap = rev_cap[to_idx] ? rev_cap[to_idx] * 2 : 4;
             size_t *new_rev = (size_t *)AGENTOS_REALLOC(rev_adj[to_idx], new_cap * sizeof(size_t));
-            if (!new_rev)
+            if (!new_rev) {
+                AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: rev_adj realloc failed, to_idx=%zu new_cap=%zu", to_idx, new_cap);
                 goto cleanup_oom;
+            }
             rev_adj[to_idx] = new_rev;
             rev_cap[to_idx] = new_cap;
         }
@@ -648,12 +678,15 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
     /* Kahn 拓扑排序 + 循环参与者追踪 */
     size_t *queue;
     SAFE_MALLOC_ARRAY(queue, unique_count, sizeof(size_t));
-    if (!queue)
+    if (!queue) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: queue alloc failed, unique_count=%zu", unique_count);
         goto cleanup_oom;
+    }
 
     size_t *in_degree_copy;
     SAFE_MALLOC_ARRAY(in_degree_copy, unique_count, sizeof(size_t));
     if (!in_degree_copy) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: in_degree_copy alloc failed, unique_count=%zu", unique_count);
         AGENTOS_FREE(queue);
         goto cleanup_oom;
     }
@@ -667,6 +700,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
 
     SAFE_MALLOC_ARRAY(out_result->sorted_tasks, unique_count, sizeof(uint64_t));
     if (!out_result->sorted_tasks) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: sorted_tasks alloc failed");
         AGENTOS_FREE(queue);
         AGENTOS_FREE(in_degree_copy);
         goto cleanup_oom;
@@ -732,6 +766,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
         out_result->sorted_count = 0;
 
         /* 清理并返回循环错误 */
+        AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: dependency cycle detected, cycle_nodes=%zu total_nodes=%zu", cycle_count, unique_count);
         for (size_t k = 0; k < unique_count; k++)
             AGENTOS_FREE(adj[k]);
         AGENTOS_FREE(adj);
@@ -797,6 +832,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
     return AGENTOS_SUCCESS;
 
 cleanup_oom:
+    AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: OOM during graph processing, unique_count=%zu", unique_count);
     for (size_t k = 0; k < unique_count; k++)
         AGENTOS_FREE(adj[k]);
     AGENTOS_FREE(adj);
@@ -812,6 +848,7 @@ cleanup_oom:
     ATM_RET_ERR(AGENTOS_ENOMEM);
 
 cleanup_fail:
+    AGENTOS_LOG_ERROR("agentos_scheduler_resolve_dependencies: invalid edge index during graph processing");
     for (size_t k = 0; k < unique_count; k++)
         AGENTOS_FREE(adj[k]);
     AGENTOS_FREE(adj);
@@ -849,16 +886,20 @@ agentos_error_t agentos_scheduler_priority_inherit(agentos_task_id_t blocking_ta
                                                    agentos_task_id_t blocked_task_id)
 {
 
-    if (blocking_task_id == 0 || blocked_task_id == 0)
+    if (blocking_task_id == 0 || blocked_task_id == 0) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_priority_inherit: null task id, blocking=%llu blocked=%llu", (unsigned long long)blocking_task_id, (unsigned long long)blocked_task_id);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
 
     task_info_core_t *blocking_task = find_task_by_id(blocking_task_id);
     if (!blocking_task) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_priority_inherit: blocking task not found, tid=%llu", (unsigned long long)blocking_task_id);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
     task_info_core_t *blocked_task = find_task_by_id(blocked_task_id);
     if (!blocked_task) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_priority_inherit: blocked task not found, tid=%llu", (unsigned long long)blocked_task_id);
         release_task_lock();
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
@@ -928,10 +969,12 @@ agentos_error_t agentos_scheduler_resource_reserve(size_t est_memory_kb, int est
     }
 
     if (est_memory_kb > avail_mem_kb) {
+        AGENTOS_LOG_WARN("agentos_scheduler_resource_reserve: memory insufficient, est=%zuKB avail=%zuKB", est_memory_kb, avail_mem_kb);
         ATM_RET_ERR(AGENTOS_ERESOURCE);
     }
 
     if (est_cpu_cores > avail_cpu_cores) {
+        AGENTOS_LOG_WARN("agentos_scheduler_resource_reserve: cpu cores insufficient, est=%d avail=%d", est_cpu_cores, avail_cpu_cores);
         ATM_RET_ERR(AGENTOS_ERESOURCE);
     }
 

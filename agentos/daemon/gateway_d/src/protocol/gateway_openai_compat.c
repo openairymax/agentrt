@@ -196,6 +196,7 @@ static int extract_json_field_int(const char *json, const char *field, int defau
     snprintf(key, flen, "\"%s\"", field);
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
+    key = NULL;
     if (!p)
         return default_val;
     p += strlen(field) + 3;
@@ -410,7 +411,9 @@ static int handle_embeddings(gw_openai_compat_t *compat, const char *body_json,
                               input_json ? input_json : "[]", &embed_response, compat->embed_data);
 
     AGENTOS_FREE(model);
+    model = NULL;
     AGENTOS_FREE(input_json);
+    input_json = NULL;
 
     if (rc != 0 || !embed_response) {
         AGENTOS_FREE(embed_response);

@@ -533,7 +533,9 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t *server, const char *method,
         char *tool_result = NULL;
         int rc = tool->exec_fn(tool_name, tool_args, &tool_result, tool->user_data);
         AGENTOS_FREE(tool_name);
+        tool_name = NULL;
         AGENTOS_FREE(tool_args);
+        tool_args = NULL;
         if (rc != 0 || !tool_result) {
             const char *err = "{\"jsonrpc\":\"2.0\",\"error\":"
                               "{\"code\":-32603,\"message\":\"Tool execution failed\"}}";
@@ -578,6 +580,7 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t *server, const char *method,
         char *mime = NULL;
         int rc = res->read_fn(uri, &content, &mime, res->user_data);
         AGENTOS_FREE(uri);
+        uri = NULL;
         if (rc != 0 || !content) {
             AGENTOS_FREE(content);
             AGENTOS_FREE(mime);

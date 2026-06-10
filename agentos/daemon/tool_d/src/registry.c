@@ -43,27 +43,93 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
         return NULL;
         }
     dst->id = AGENTOS_STRDUP(src->id);
+    if (!dst->id) {
+        AGENTOS_FREE(dst);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate id");
+        return NULL;
+    }
     dst->name = AGENTOS_STRDUP(src->name);
+    if (!dst->name) {
+        AGENTOS_FREE(dst->id);
+        AGENTOS_FREE(dst);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate name");
+        return NULL;
+    }
     dst->description = src->description ? AGENTOS_STRDUP(src->description) : NULL;
+    if (src->description && !dst->description) {
+        AGENTOS_FREE(dst->name);
+        AGENTOS_FREE(dst->id);
+        AGENTOS_FREE(dst);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate description");
+        return NULL;
+    }
     dst->executable = AGENTOS_STRDUP(src->executable);
+    if (!dst->executable) {
+        AGENTOS_FREE(dst->description);
+        AGENTOS_FREE(dst->name);
+        AGENTOS_FREE(dst->id);
+        AGENTOS_FREE(dst);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate executable");
+        return NULL;
+    }
     dst->timeout_sec = src->timeout_sec;
     dst->cacheable = src->cacheable;
     dst->permission_rule = src->permission_rule ? AGENTOS_STRDUP(src->permission_rule) : NULL;
+    if (src->permission_rule && !dst->permission_rule) {
+        AGENTOS_FREE(dst->executable);
+        AGENTOS_FREE(dst->description);
+        AGENTOS_FREE(dst->name);
+        AGENTOS_FREE(dst->id);
+        AGENTOS_FREE(dst);
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate permission_rule");
+        return NULL;
+    }
     if (src->param_count > 0) {
         dst->params = AGENTOS_CALLOC(src->param_count, sizeof(tool_param_t));
         if (!dst->params) {
-            AGENTOS_FREE(dst->id);
-            AGENTOS_FREE(dst->name);
-            AGENTOS_FREE(dst->description);
-            AGENTOS_FREE(dst->executable);
             AGENTOS_FREE(dst->permission_rule);
+            AGENTOS_FREE(dst->executable);
+            AGENTOS_FREE(dst->description);
+            AGENTOS_FREE(dst->name);
+            AGENTOS_FREE(dst->id);
             AGENTOS_FREE(dst);
             AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
         for (size_t i = 0; i < src->param_count; ++i) {
             dst->params[i].name = AGENTOS_STRDUP(src->params[i].name);
+            if (!dst->params[i].name) {
+                for (size_t k = 0; k < i; ++k) {
+                    AGENTOS_FREE(dst->params[k].name);
+                    AGENTOS_FREE(dst->params[k].schema);
+                }
+                AGENTOS_FREE(dst->params);
+                AGENTOS_FREE(dst->permission_rule);
+                AGENTOS_FREE(dst->executable);
+                AGENTOS_FREE(dst->description);
+                AGENTOS_FREE(dst->name);
+                AGENTOS_FREE(dst->id);
+                AGENTOS_FREE(dst);
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate param name");
+                return NULL;
+            }
             dst->params[i].schema = AGENTOS_STRDUP(src->params[i].schema);
+            if (!dst->params[i].schema) {
+                AGENTOS_FREE(dst->params[i].name);
+                for (size_t k = 0; k < i; ++k) {
+                    AGENTOS_FREE(dst->params[k].name);
+                    AGENTOS_FREE(dst->params[k].schema);
+                }
+                AGENTOS_FREE(dst->params);
+                AGENTOS_FREE(dst->permission_rule);
+                AGENTOS_FREE(dst->executable);
+                AGENTOS_FREE(dst->description);
+                AGENTOS_FREE(dst->name);
+                AGENTOS_FREE(dst->id);
+                AGENTOS_FREE(dst);
+                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate param schema");
+                return NULL;
+            }
         }
         dst->param_count = src->param_count;
     }
@@ -98,6 +164,15 @@ tool_registry_t *tool_registry_create(const tool_config_t *cfg)
                     if (params) {
                         for (size_t i = 0; i < cnt; ++i) {
                             params[i].name = AGENTOS_STRDUP(def->params[i]);
+                            if (!params[i].name) {
+                                for (size_t k = 0; k < i; ++k) {
+                                    AGENTOS_FREE((void *)params[k].name);
+                                    AGENTOS_FREE((void *)params[k].schema);
+                                }
+                                AGENTOS_FREE(params);
+                                params = NULL;
+                                break;
+                            }
                             const char *pname = def->params[i];
                             size_t pname_len = pname ? strlen(pname) : 0;
                             char schema[128];
@@ -119,9 +194,21 @@ tool_registry_t *tool_registry_create(const tool_config_t *cfg)
                                 snprintf(schema, sizeof(schema), "{}");
                             }
                             params[i].schema = AGENTOS_STRDUP(schema);
+                            if (!params[i].schema) {
+                                AGENTOS_FREE(params[i].name);
+                                for (size_t k = 0; k < i; ++k) {
+                                    AGENTOS_FREE((void *)params[k].name);
+                                    AGENTOS_FREE((void *)params[k].schema);
+                                }
+                                AGENTOS_FREE(params);
+                                params = NULL;
+                                break;
+                            }
                         }
-                        meta.params = params;
-                        meta.param_count = cnt;
+                        if (params) {
+                            meta.params = params;
+                            meta.param_count = cnt;
+                        }
                     }
                 }
             }
