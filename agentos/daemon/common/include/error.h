@@ -17,16 +17,9 @@
 /* 使用相对路径避免 include 搜索找到 daemon 自身的 error.h */
 #include "../../../commons/utils/error/include/error.h"
 
-#ifndef AGENTOS_OK
-#define AGENTOS_OK 0
-#endif
-
 /* ==================== 兼容性别名 ==================== */
 
 /* 旧的错误码名称映射到新的名称 */
-#ifndef AGENTOS_SUCCESS
-#define AGENTOS_SUCCESS AGENTOS_OK
-#endif
 #define AGENTOS_ERROR_UNKNOWN AGENTOS_ERR_UNKNOWN
 #define AGENTOS_ERROR_OUT_OF_MEMORY AGENTOS_ERR_OUT_OF_MEMORY
 #define AGENTOS_ERROR_INVALID_PARAMETER AGENTOS_ERR_INVALID_PARAM
@@ -107,18 +100,14 @@
 #define AGENTOS_ERROR_MONITOR_ALERT AGENTOS_ERR_SYS_RESOURCE
 
 /* Daemon 服务层错误码（commons 未定义，daemon 模块扩展） */
-#ifndef AGENTOS_ERR_DAEMON_BASE
 #define AGENTOS_ERR_DAEMON_BASE (-600)
-#endif
 #define AGENTOS_ERR_DAEMON_AUTH_FAIL (AGENTOS_ERR_DAEMON_BASE + 0x01)
 #define AGENTOS_ERR_DAEMON_CONFIG_INVALID (AGENTOS_ERR_DAEMON_BASE + 0x02)
 #define AGENTOS_ERR_DAEMON_INIT_FAILED (AGENTOS_ERR_DAEMON_BASE + 0x03)
 #define AGENTOS_ERR_DAEMON_ALREADY_INIT (AGENTOS_ERR_DAEMON_BASE + 0x04)
 
-/* Daemon 层兼容别名 */
-#ifndef AGENTOS_ERR_ALREADY_INIT
+/* Daemon 层兼容别名（daemon 模块扩展，非 commons 定义） */
 #define AGENTOS_ERR_ALREADY_INIT AGENTOS_ERR_DAEMON_ALREADY_INIT
-#endif
 
 /* ==================== 兼容性函数别名 ==================== */
 

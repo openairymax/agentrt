@@ -1,7 +1,7 @@
 # Gateway Config — 静态分析配置
 
 **模块路径**: `agentos/gateway/config/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

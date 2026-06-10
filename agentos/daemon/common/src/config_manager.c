@@ -419,6 +419,7 @@ AGENTOS_API int cm_load_json(const char *path, const char *namespace_)
     }
 
     AGENTOS_FREE(data);
+    data = NULL;
 
     LOG_INFO("Loaded %d config entries from %s (namespace=%s)", count, path,
              namespace_ ? namespace_ : "default");

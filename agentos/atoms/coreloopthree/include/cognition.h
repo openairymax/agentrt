@@ -38,11 +38,11 @@ typedef struct agentos_intent_parser agentos_intent_parser_t;
 /**
  * @brief 反馈回调函数类型
  * @param level 反馈级别：0=实时，1=轮次内，2=跨轮次
- * @param module 模块名称
- * @param event 事件类型
- * @param data 反馈数据（JSON格式）
+ * @param module [in] 模块名称 (BORROW - caller must not free, valid for callback scope only).
+ * @param event [in] 事件类型 (BORROW - caller must not free, valid for callback scope only).
+ * @param data [in] 反馈数据（JSON格式） (BORROW - caller must not free, valid for callback scope only).
  * @param data_len 数据长度
- * @param user_data 用户数据
+ * @param user_data [in] 用户数据 (BORROW - caller must not free, valid for callback scope only).
  */
 typedef void (*agentos_feedback_callback_t)(int level, const char *module, const char *event,
                                             const char *data, size_t data_len, void *user_data);
@@ -101,9 +101,9 @@ typedef struct agentos_task_plan {
 
 /**
  * @brief 规划策略函数类型，根据意图生成任务计划
- * @param intent 解析后的意图
- * @param context 上下文
- * @param out_plan 输出计划（需由调用者释放）
+ * @param intent [in] 解析后的意图 (BORROW - caller retains ownership).
+ * @param context [in] 上下文 (BORROW - caller retains ownership).
+ * @param out_plan [out] 输出计划 (OWNER - caller must call agentos_task_plan_free).
  * @return agentos_error_t
  */
 typedef agentos_error_t (*agentos_plan_func_t)(const agentos_intent_t *intent, void *context,
@@ -111,7 +111,7 @@ typedef agentos_error_t (*agentos_plan_func_t)(const agentos_intent_t *intent, v
 
 /**
  * @brief 规划策略释放函数
- * @param strategy 策略对象
+ * @param strategy [in] 策略对象 (TRANSFER - function takes ownership and frees).
  */
 typedef void (*agentos_plan_destroy_t)(agentos_plan_strategy_t *strategy);
 
@@ -128,10 +128,10 @@ struct agentos_plan_strategy {
 
 /**
  * @brief 协同策略函数类型，协调多个模型输出
- * @param prompts 多个模型的输入提示
+ * @param prompts [in] 多个模型的输入提示 (BORROW - caller retains ownership, valid for function scope only).
  * @param count 模型数量
- * @param context 上下文
- * @param out_result 输出协调结果
+ * @param context [in] 上下文 (BORROW - caller retains ownership).
+ * @param out_result [out] 输出协调结果 (OWNER - caller must free).
  * @return agentos_error_t
  */
 typedef agentos_error_t (*agentos_coordinate_func_t)(const char **prompts, size_t count,
@@ -139,6 +139,7 @@ typedef agentos_error_t (*agentos_coordinate_func_t)(const char **prompts, size_
 
 /**
  * @brief 协同策略释放函数
+ * @param strategy [in] 策略对象 (TRANSFER - function takes ownership and frees).
  */
 typedef void (*agentos_coordinator_destroy_t)(agentos_coordinator_strategy_t *strategy);
 
@@ -155,11 +156,11 @@ struct agentos_coordinator_strategy {
 
 /**
  * @brief 调度策略函数类型，从候选Agent中选择最合适的一个
- * @param task 待分配的任务节点
- * @param candidates 候选Agent信息数组（格式由策略定义）
+ * @param task [in] 待分配的任务节点 (BORROW - caller retains ownership).
+ * @param candidates [in] 候选Agent信息数组 (BORROW - caller retains ownership, valid for function scope only).
  * @param count 候选数量
- * @param context 上下文
- * @param out_agent_id 输出选中的Agent ID
+ * @param context [in] 上下文 (BORROW - caller retains ownership).
+ * @param out_agent_id [out] 输出选中的Agent ID (OWNER - caller must free).
  * @return agentos_error_t
  */
 typedef agentos_error_t (*agentos_dispatch_func_t)(const agentos_task_node_t *task,
@@ -168,6 +169,7 @@ typedef agentos_error_t (*agentos_dispatch_func_t)(const agentos_task_node_t *ta
 
 /**
  * @brief 调度策略释放函数
+ * @param strategy [in] 策略对象 (TRANSFER - function takes ownership and frees).
  */
 typedef void (*agentos_dispatch_destroy_t)(agentos_dispatching_strategy_t *strategy);
 
@@ -185,13 +187,13 @@ struct agentos_dispatching_strategy {
 /**
  * @brief 创建认知引擎（使用默认配置）
  *
- * @param plan_strategy [in] 规划策略（可选，若为NULL则使用默认策略）
- * @param coord_strategy [in] 协同策略（可选）
- * @param disp_strategy [in] 调度策略（可选）
- * @param out_engine [out] 输出引擎句柄（调用者负责销毁）
+ * @param plan_strategy [in] 规划策略（可选，若为NULL则使用默认策略） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ * @param coord_strategy [in] 协同策略（可选） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ * @param disp_strategy [in] 调度策略（可选） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ * @param out_engine [out] 输出引擎句柄 (OWNER - caller must call agentos_cognition_destroy).
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
  *
- * @ownership out_engine 由调用者负责通过 agentos_cognition_destroy() 释放
+ * @ownership out_engine: OWNER
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  *
@@ -200,24 +202,25 @@ struct agentos_dispatching_strategy {
  * - 调用者应确保在单个线程中创建认知引擎
  * - 创建完成后，引擎实例可以被多个线程使用，但需要外部同步
  *
- * @see agentos_cognition_create_ex(), agentos_cognition_destroy()
+ * @see agentos_cognition_create_ex_take(), agentos_cognition_destroy()
  */
-AGENTOS_API agentos_error_t agentos_cognition_create(agentos_plan_strategy_t *plan_strategy,
-                                                     agentos_coordinator_strategy_t *coord_strategy,
-                                                     agentos_dispatching_strategy_t *disp_strategy,
-                                                     agentos_cognition_engine_t **out_engine);
+/* _take: caller transfers ownership */
+AGENTOS_API agentos_error_t agentos_cognition_create_take(agentos_plan_strategy_t *plan_strategy,
+                                                          agentos_coordinator_strategy_t *coord_strategy,
+                                                          agentos_dispatching_strategy_t *disp_strategy,
+                                                          agentos_cognition_engine_t **out_engine);
 
 /**
  * @brief 创建认知引擎（带配置）
  *
- * @param manager [in] 配置（若为NULL使用默认）
- * @param plan_strategy [in] 规划策略（可选）
- * @param coord_strategy [in] 协同策略（可选）
- * @param disp_strategy [in] 调度策略（可选）
- * @param out_engine [out] 输出引擎句柄（调用者负责销毁）
+ * @param manager [in] 配置（若为NULL使用默认） (BORROW - not stored, copied internally).
+ * @param plan_strategy [in] 规划策略（可选） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ * @param coord_strategy [in] 协同策略（可选） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ * @param disp_strategy [in] 调度策略（可选） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ * @param out_engine [out] 输出引擎句柄 (OWNER - caller must call agentos_cognition_destroy).
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
  *
- * @ownership out_engine 由调用者负责通过 agentos_cognition_destroy() 释放
+ * @ownership out_engine: OWNER
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  *
@@ -226,9 +229,10 @@ AGENTOS_API agentos_error_t agentos_cognition_create(agentos_plan_strategy_t *pl
  * - 调用者应确保在单个线程中创建认知引擎
  * - 创建完成后，引擎实例可以被多个线程使用，但需要外部同步
  *
- * @see agentos_cognition_create(), agentos_cognition_destroy()
+ * @see agentos_cognition_create_take(), agentos_cognition_destroy()
  */
-AGENTOS_API agentos_error_t agentos_cognition_create_ex(
+/* _take: caller transfers ownership */
+AGENTOS_API agentos_error_t agentos_cognition_create_ex_take(
     const agentos_cognition_config_t *manager, agentos_plan_strategy_t *plan_strategy,
     agentos_coordinator_strategy_t *coord_strategy, agentos_dispatching_strategy_t *disp_strategy,
     agentos_cognition_engine_t **out_engine);
@@ -236,9 +240,9 @@ AGENTOS_API agentos_error_t agentos_cognition_create_ex(
 /**
  * @brief 销毁认知引擎
  *
- * @param engine [in] 引擎句柄（非NULL）
+ * @param engine [in] 引擎句柄（非NULL） (TRANSFER - function takes ownership and frees).
  *
- * @ownership 释放 engine 及其内部资源
+ * @ownership engine: TRANSFER
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  *
@@ -247,17 +251,17 @@ AGENTOS_API agentos_error_t agentos_cognition_create_ex(
  * - 调用者应确保在所有使用引擎的线程都已完成操作后再调用此函数
  * - 销毁后，引擎实例不应再被任何线程使用
  *
- * @see agentos_cognition_create(), agentos_cognition_create_ex()
+ * @see agentos_cognition_create_take(), agentos_cognition_create_ex_take()
  */
 AGENTOS_API void agentos_cognition_destroy(agentos_cognition_engine_t *engine);
 
 /**
  * @brief 设置回退规划策略
  *
- * @param engine [in] 认知引擎（非NULL）
- * @param fallback [in] 回退策略（可为NULL）
+ * @param engine [in] 认知引擎（非NULL） (BORROW - caller retains ownership).
+ * @param fallback [in] 回退策略（可为NULL） (BORROW - engine does not take ownership, caller manages lifecycle).
  *
- * @ownership 引擎不接管 fallback 的所有权，调用者仍需负责其生命周期
+ * @ownership fallback: BORROW
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
@@ -267,13 +271,13 @@ AGENTOS_API void agentos_cognition_set_fallback_plan(agentos_cognition_engine_t 
 /**
  * @brief 处理用户输入，生成任务计划
  *
- * @param engine [in] 认知引擎（非NULL）
- * @param input [in] 原始输入字符串（非NULL）
+ * @param engine [in] 认知引擎（非NULL） (BORROW - caller retains ownership).
+ * @param input [in] 原始输入字符串（非NULL） (BORROW - not stored, copied internally).
  * @param input_len [in] 输入长度
- * @param out_plan [out] 输出任务计划（调用者负责释放）
+ * @param out_plan [out] 输出任务计划 (OWNER - caller must call agentos_task_plan_free).
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
  *
- * @ownership out_plan 由调用者负责通过 agentos_task_plan_free() 释放
+ * @ownership out_plan: OWNER
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  *
@@ -291,9 +295,9 @@ AGENTOS_API agentos_error_t agentos_cognition_process(agentos_cognition_engine_t
 /**
  * @brief 释放任务计划
  *
- * @param plan [in] 要释放的计划（可为NULL）
+ * @param plan [in] 要释放的计划（可为NULL） (TRANSFER - function takes ownership and frees).
  *
- * @ownership 释放 plan 及其内部所有资源
+ * @ownership plan: TRANSFER
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  * @see agentos_cognition_process()
@@ -303,29 +307,37 @@ AGENTOS_API void agentos_task_plan_free(agentos_task_plan_t *plan);
 /**
  * @brief 设置认知引擎的全局上下文
  *
- * @param engine [in] 引擎句柄（非NULL）
- * @param context [in] 上下文指针（可为NULL）
+ * @param engine [in] 引擎句柄（非NULL） (BORROW - caller retains ownership).
+ * @param context [in] 上下文指针（可为NULL） (TRANSFER - if destroy is provided, engine takes ownership and will call destroy on shutdown).
  * @param destroy [in] 上下文释放函数（可为NULL）
  *
- * @ownership 如果提供了 destroy 函数，引擎会在销毁时调用它来释放 context
+ * @ownership context: TRANSFER (if destroy provided), BORROW (if destroy is NULL)
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
-AGENTOS_API void agentos_cognition_set_context(agentos_cognition_engine_t *engine, void *context,
-                                               void (*destroy)(void *));
+/* _take: caller transfers ownership */
+AGENTOS_API void agentos_cognition_set_context_take(agentos_cognition_engine_t *engine, void *context,
+                                                    void (*destroy)(void *));
 
+/**
+ * @brief Set memory engine for cognition engine.
+ * @param engine [in] Cognition engine handle (BORROW - caller retains ownership).
+ * @param memory [in] Memory engine handle (BORROW - engine does not take ownership, caller manages lifecycle).
+ *
+ * @ownership memory: BORROW
+ */
 AGENTOS_API void agentos_cognition_set_memory(agentos_cognition_engine_t *engine,
                                               agentos_memory_engine_t *memory);
 
 /**
  * @brief 获取认知引擎的当前统计信息
  *
- * @param engine [in] 引擎句柄（非NULL）
- * @param out_stats [out] 输出统计字符串（调用者负责释放）
+ * @param engine [in] 引擎句柄（非NULL） (BORROW - caller retains ownership).
+ * @param out_stats [out] 输出统计字符串 (OWNER - caller must free).
  * @param out_len [out] 输出长度
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
  *
- * @ownership out_stats 由调用者负责释放
+ * @ownership out_stats: OWNER
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
@@ -335,11 +347,11 @@ AGENTOS_API agentos_error_t agentos_cognition_stats(agentos_cognition_engine_t *
 /**
  * @brief 获取认知引擎健康状态
  *
- * @param engine [in] 认知引擎句柄（非NULL）
- * @param out_json [out] 输出 JSON 状态字符串（调用者负责释放）
+ * @param engine [in] 认知引擎句柄（非NULL） (BORROW - caller retains ownership).
+ * @param out_json [out] 输出 JSON 状态字符串 (OWNER - caller must free).
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
  *
- * @ownership out_json 由调用者负责释放
+ * @ownership out_json: OWNER
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
@@ -350,24 +362,30 @@ AGENTOS_API agentos_error_t agentos_cognition_health_check(agentos_cognition_eng
 
 /**
  * @brief 创建意图解析器
- * @param out_parser 输出解析器句柄
+ * @param out_parser [out] 输出解析器句柄 (OWNER - caller must call agentos_intent_parser_destroy).
  * @return agentos_error_t
+ *
+ * @ownership out_parser: OWNER
  */
 AGENTOS_API agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t **out_parser);
 
 /**
  * @brief 销毁意图解析器
- * @param parser 解析器句柄
+ * @param parser [in] 解析器句柄 (TRANSFER - function takes ownership and frees).
+ *
+ * @ownership parser: TRANSFER
  */
 AGENTOS_API void agentos_intent_parser_destroy(agentos_intent_parser_t *parser);
 
 /**
  * @brief 解析用户输入，提取意图
- * @param parser 解析器
- * @param input 用户输入文本
+ * @param parser [in] 解析器 (BORROW - caller retains ownership).
+ * @param input [in] 用户输入文本 (BORROW - not stored, copied internally).
  * @param input_len 输入长度
- * @param out_intent 输出意图结构
+ * @param out_intent [out] 输出意图结构 (OWNER - caller must call agentos_intent_free).
  * @return agentos_error_t
+ *
+ * @ownership out_intent: OWNER
  */
 AGENTOS_API agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t *parser,
                                                         const char *input, size_t input_len,
@@ -375,18 +393,22 @@ AGENTOS_API agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t 
 
 /**
  * @brief 释放意图结构
- * @param intent 意图结构
+ * @param intent [in] 意图结构 (TRANSFER - function takes ownership and frees).
+ *
+ * @ownership intent: TRANSFER
  */
 AGENTOS_API void agentos_intent_free(agentos_intent_t *intent);
 
 /**
  * @brief 添加自定义意图规则
- * @param parser 解析器
- * @param pattern 模式字符串
- * @param intent_name 意图名称
+ * @param parser [in] 解析器 (BORROW - caller retains ownership).
+ * @param pattern [in] 模式字符串 (BORROW - not stored, copied internally).
+ * @param intent_name [in] 意图名称 (BORROW - not stored, copied internally).
  * @param confidence 置信度
  * @param flags 标志位
  * @return agentos_error_t
+ *
+ * @ownership pattern: BORROW, intent_name: BORROW
  */
 AGENTOS_API agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t *parser,
                                                            const char *pattern,
@@ -395,24 +417,30 @@ AGENTOS_API agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser
 
 /**
  * @brief 获取解析器统计信息
- * @param parser 解析器
- * @param out_stats 输出统计JSON字符串
+ * @param parser [in] 解析器 (BORROW - caller retains ownership).
+ * @param out_stats [out] 输出统计JSON字符串 (OWNER - caller must free).
  * @return agentos_error_t
+ *
+ * @ownership out_stats: OWNER
  */
 AGENTOS_API agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t *parser,
                                                         char **out_stats);
 
 /**
  * @brief 重置解析器统计信息
- * @param parser 解析器
+ * @param parser [in] 解析器 (BORROW - caller retains ownership).
+ *
+ * @ownership parser: BORROW
  */
 AGENTOS_API void agentos_intent_parser_reset_stats(agentos_intent_parser_t *parser);
 
 /**
  * @brief 健康检查
- * @param parser 解析器
- * @param out_json 输出健康状态JSON
+ * @param parser [in] 解析器 (BORROW - caller retains ownership).
+ * @param out_json [out] 输出健康状态JSON (OWNER - caller must free).
  * @return agentos_error_t
+ *
+ * @ownership out_json: OWNER
  */
 AGENTOS_API agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t *parser,
                                                                char **out_json);

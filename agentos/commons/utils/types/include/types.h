@@ -35,6 +35,7 @@
 
 #include "../../../include/agentos_types.h"
 #include "../../../platform/include/platform.h"
+#include "../../error/include/error.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -72,9 +73,7 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ENOMEM (-2) /**< 内存不足 */
 #define AGENTOS_EBUSY (-3)  /**< 资源忙碌 */
 #define AGENTOS_ENOENT (-4) /**< 资源不存在 */
-#ifndef AGENTOS_EPERM
 #define AGENTOS_EPERM (-5) /**< 权限不足 */
-#endif
 #define AGENTOS_ETIMEDOUT (-6)   /**< 操作超时 */
 #define AGENTOS_EIO (-7)         /**< I/O 错误 */
 #define AGENTOS_EEXIST (-8)      /**< 资源已存在 */
@@ -85,27 +84,13 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_EPROTO (-13)     /**< 协议错误 */
 #define AGENTOS_ENOTCONN (-14)   /**< 未连接 */
 #define AGENTOS_ECONNRESET (-15) /**< 连接重置 */
-#ifndef AGENTOS_ENOSYS
 #define AGENTOS_ENOSYS (-16) /**< 函数未实现 */
-#endif
-#ifndef AGENTOS_EFAIL
 #define AGENTOS_EFAIL (-17) /**< 通用失败 */
-#endif
-#ifndef AGENTOS_ENOTFOUND
 #define AGENTOS_ENOTFOUND (-18) /**< 资源未找到 */
-#endif
-#ifndef AGENTOS_EPLATFORM
 #define AGENTOS_EPLATFORM (-27) /**< 平台未初始化 */
-#endif
-#ifndef AGENTOS_EPROTONOSUPPORT
 #define AGENTOS_EPROTONOSUPPORT (-28) /**< 协议/命令不支持 */
-#endif
-#ifndef AGENTOS_ESERVICE
 #define AGENTOS_ESERVICE (-29) /**< 服务不可用 */
-#endif
-#ifndef AGENTOS_EUNKNOWN
 #define AGENTOS_EUNKNOWN (-99) /**< 未知错误 */
-#endif
 
 /**
  * @brief 时间戳类型（纳秒）

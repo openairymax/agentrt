@@ -51,7 +51,7 @@ static int is_valid_json_prefix(const char *str)
 static agentos_cognition_engine_t *create_default_engine(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_SUCCESS);
     assert(engine != NULL);
     return engine;
@@ -233,7 +233,7 @@ TEST(int01_2_coordinator_status)
 
     /* 3. 使用该策略创建认知引擎 */
     agentos_cognition_engine_t *engine = NULL;
-    err = agentos_cognition_create(NULL, coord_strategy, NULL, &engine);
+    err = agentos_cognition_create_take(NULL, coord_strategy, NULL, &engine);
     assert(err == AGENTOS_SUCCESS);
     assert(engine != NULL);
     printf("    Engine created with custom coordinator strategy\n");
@@ -317,7 +317,7 @@ TEST(int01_3_stream_critic_validation)
 
     /* 2. 创建引擎 */
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create_ex(&config, NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_SUCCESS);
     assert(engine != NULL);
     printf("    Engine created with feedback callback configured\n");
@@ -466,7 +466,7 @@ TEST(int01_extra_memory_integration)
 
     /* 2. 创建认知引擎并关联记忆引擎 */
     agentos_cognition_engine_t *engine = NULL;
-    err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     assert(err == AGENTOS_SUCCESS);
     assert(engine != NULL);
 

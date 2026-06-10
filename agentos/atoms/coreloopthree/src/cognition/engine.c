@@ -26,11 +26,11 @@
 #endif
 
 #include "atomic_compat.h"
-#include "metacognition.h"
-#include "semantic_unit.h"
-#include "stream_critic.h"
-#include "thinking_chain.h"
-#include "triple_coordinator.h"
+#include "foundation/metacognition.h"
+#include "foundation/semantic_unit.h"
+#include "critique/stream_critic.h"
+#include "foundation/thinking_chain.h"
+#include "critique/triple_coordinator.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -80,20 +80,22 @@ static void trigger_feedback(agentos_cognition_engine_t *engine, int level, cons
     }
 }
 
-agentos_error_t agentos_cognition_create(agentos_plan_strategy_t *plan_strategy,
-                                         agentos_coordinator_strategy_t *coord_strategy,
-                                         agentos_dispatching_strategy_t *disp_strategy,
-                                         agentos_cognition_engine_t **out_engine)
+/* _take: caller transfers ownership */
+agentos_error_t agentos_cognition_create_take(agentos_plan_strategy_t *plan_strategy,
+                                              agentos_coordinator_strategy_t *coord_strategy,
+                                              agentos_dispatching_strategy_t *disp_strategy,
+                                              agentos_cognition_engine_t **out_engine)
 {
-    return agentos_cognition_create_ex(NULL, plan_strategy, coord_strategy, disp_strategy,
-                                       out_engine);
+    return agentos_cognition_create_ex_take(NULL, plan_strategy, coord_strategy, disp_strategy,
+                                            out_engine);
 }
 
-agentos_error_t agentos_cognition_create_ex(const agentos_cognition_config_t *manager,
-                                            agentos_plan_strategy_t *plan_strategy,
-                                            agentos_coordinator_strategy_t *coord_strategy,
-                                            agentos_dispatching_strategy_t *disp_strategy,
-                                            agentos_cognition_engine_t **out_engine)
+/* _take: caller transfers ownership */
+agentos_error_t agentos_cognition_create_ex_take(const agentos_cognition_config_t *manager,
+                                                 agentos_plan_strategy_t *plan_strategy,
+                                                 agentos_coordinator_strategy_t *coord_strategy,
+                                                 agentos_dispatching_strategy_t *disp_strategy,
+                                                 agentos_cognition_engine_t **out_engine)
 {
 
     if (!out_engine)
@@ -202,8 +204,9 @@ void agentos_cognition_set_fallback_plan(agentos_cognition_engine_t *engine,
     agentos_mutex_unlock(engine->lock);
 }
 
-void agentos_cognition_set_context(agentos_cognition_engine_t *engine, void *context,
-                                   void (*destroy)(void *))
+/* _take: caller transfers ownership */
+void agentos_cognition_set_context_take(agentos_cognition_engine_t *engine, void *context,
+                                        void (*destroy)(void *))
 {
     if (!engine)
         return;
@@ -306,6 +309,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                                                     preemptive_hint, hint_len + 1, "text/plain", 1);
                 }
                 AGENTOS_FREE(preemptive_hint);
+                preemptive_hint = NULL;
             }
         } else {
             AGENTOS_LOG_WARN("Thinking chain creation failed: err=%d", (int)tc_err);
@@ -347,8 +351,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                                  eval.overall_score, eval.strategy);
                 engine->dual_think_corrections++;
             }
-            if (eval.critique_text)
+            if (eval.critique_text) {
                 AGENTOS_FREE(eval.critique_text);
+                eval.critique_text = NULL;
+            }
         }
     }
 
@@ -451,6 +457,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 trigger_feedback(engine, 2, "phase2_critical_loop", fb);
 
                 AGENTOS_FREE(phase2_output);
+                phase2_output = NULL;
             } else if (gen_step) {
                 agentos_tc_step_complete(gen_step, "streaming_loop_failed", 21, 0.3f, "t2-failed");
             }
@@ -473,8 +480,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             if (mon_result.anomaly != TC_ANOMALY_NONE && mon_result.is_critical) {
                 trigger_feedback(engine, 1, "step_anomaly", "{\"anomaly\":1,\"critical\":true}");
             }
-            if (mon_result.description)
+            if (mon_result.description) {
                 AGENTOS_FREE(mon_result.description);
+                mon_result.description = NULL;
+            }
         }
     }
 
@@ -499,8 +508,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 agentos_tc_metacognition_inform_memory(engine->chain, &eval_audit, audit_step);
                 agentos_tc_step_write_to_memory(engine->chain, audit_step);
             }
-            if (eval_audit.critique_text)
+            if (eval_audit.critique_text) {
                 AGENTOS_FREE(eval_audit.critique_text);
+                eval_audit.critique_text = NULL;
+            }
         }
     }
 
@@ -531,8 +542,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                     if (goal_score < 0.0f)
                         goal_score = 0.0f;
                 }
-                if (recent_ctx)
+                if (recent_ctx) {
                     AGENTOS_FREE(recent_ctx);
+                    recent_ctx = NULL;
+                }
             }
 
             float composite = (logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f);
@@ -597,8 +610,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 }
             }
 
-            if (align_eval.critique_text)
+            if (align_eval.critique_text) {
                 AGENTOS_FREE(align_eval.critique_text);
+                align_eval.critique_text = NULL;
+            }
 
             if (engine->memory && engine->chain && align_step) {
                 agentos_tc_metacognition_inform_memory(engine->chain, &align_eval, align_step);
@@ -640,12 +655,14 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                      final_output_len);
             trigger_feedback(engine, 2, "stream_critic_complete", scp_fb);
             AGENTOS_FREE(final_output);
+            final_output = NULL;
         } else if (scp_err != AGENTOS_SUCCESS) {
             AGENTOS_LOG_WARN("Stream critic pipeline failed: err=%d", (int)scp_err);
         }
 
         if (pipeline_output && pipeline_output != input) {
             AGENTOS_FREE(pipeline_output);
+            pipeline_output = NULL;
         }
     }
 

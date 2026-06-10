@@ -91,25 +91,31 @@ static void free_node(struct yaml_node *node)
     switch (node->type) {
     case YAML_NODE_SCALAR:
         AGENTOS_FREE(node->scalar.value);
+        node->scalar.value = NULL;
         break;
     case YAML_NODE_MAPPING:
         if (node->mapping) {
             for (size_t i = 0; i < yaml_size(node); i++) {
                 AGENTOS_FREE(node->mapping[i].key);
+                node->mapping[i].key = NULL;
             }
             AGENTOS_FREE(node->mapping);
+            node->mapping = NULL;
         }
         break;
     case YAML_NODE_SEQUENCE:
         if (node->sequence.items) {
             AGENTOS_FREE(node->sequence.items);
+            node->sequence.items = NULL;
         }
         break;
     default:
         break;
     }
     AGENTOS_FREE(node->anchor_name);
+    node->anchor_name = NULL;
     AGENTOS_FREE(node->tag);
+    node->tag = NULL;
 }
 
 static void register_anchor(struct parse_ctx *ctx, const char *name, struct yaml_node *node)
@@ -1057,6 +1063,7 @@ static struct yaml_node *parse_value(struct parse_ctx *ctx, int base_indent)
     skip_ws(ctx);
     if (peek(ctx) == ':') {
         AGENTOS_FREE(scalar);
+        scalar = NULL;
         ctx->pos = saved_pos;
         struct yaml_node *m = parse_mapping(ctx, base_indent);
         if (m && anchor_name)
@@ -1084,6 +1091,7 @@ static struct yaml_node *parse_value(struct parse_ctx *ctx, int base_indent)
         }
     } else {
         AGENTOS_FREE(scalar);
+        scalar = NULL;
     }
     AGENTOS_FREE(anchor_name);
     AGENTOS_FREE(tag);

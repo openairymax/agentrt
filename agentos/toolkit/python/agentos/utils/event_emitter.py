@@ -9,7 +9,7 @@
 import asyncio
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
 from dataclasses import dataclass, field
 from functools import wraps
 import threading
@@ -381,7 +381,7 @@ class AsyncEventEmitter:
         event_name: str,
         callback: Union[
             Callable[[Event], None],
-            Callable[[Event], asyncio.coroutine]
+            Callable[[Event], Coroutine[Any, Any, None]]
         ],
         priority: int = 0,
         filter_func: Optional[Callable[[Event], bool]] = None

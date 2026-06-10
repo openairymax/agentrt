@@ -845,3 +845,14 @@ void agentos_error_set_handler(agentos_error_handler_t handler)
 {
     (void)handler;
 }
+
+void agentos_error_stats_shutdown(void)
+{
+#ifdef _WIN32
+    if (g_error_stats_initialized) {
+        agentos_mutex_destroy(&g_error_stats_mutex);
+        g_error_stats_initialized = 0;
+        AGENTOS_LOG_INFO("Error stats: mutex destroyed");
+    }
+#endif
+}
