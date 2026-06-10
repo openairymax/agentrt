@@ -15,12 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 /**
  * @brief 基于优先级的调度策略数据
@@ -58,7 +53,7 @@ static int priority_based_create(const sched_config_t *manager, void **data)
 
     // 初始化优先级权重表（默认：优先级越高，权重越大）
     pbd->priority_levels = 10;  // 假设有10个优先级级别
-    pbd->priority_weights = (float *)AGENTOS_MALLOC(sizeof(float) * pbd->priority_levels);
+    SAFE_MALLOC_ARRAY(pbd->priority_weights, pbd->priority_levels, sizeof(float));
     if (pbd->priority_weights) {
         for (size_t i = 0; i < pbd->priority_levels; i++) {
             // 指数权重：优先级越高，权重增长越快

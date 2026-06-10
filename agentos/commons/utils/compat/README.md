@@ -1,7 +1,7 @@
 # Compat — 跨版本/跨平台兼容性适配
 
 **模块路径**: `agentos/commons/utils/compat/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

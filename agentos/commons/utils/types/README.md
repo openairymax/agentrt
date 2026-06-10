@@ -1,7 +1,7 @@
 # Types — 类型定义模块
 
 **模块路径**: `agentos/commons/utils/types/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

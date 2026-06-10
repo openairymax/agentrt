@@ -796,8 +796,10 @@ agentos_error_t agentos_tc_chain_stats(agentos_thinking_chain_t *chain, char **o
         (unsigned long long)chain->working_mem->hits,
         (unsigned long long)chain->working_mem->misses);
 
-    if (cw_json)
+    if (cw_json) {
         AGENTOS_FREE(cw_json);
+        cw_json = NULL;
+    }
 
     char *result = (char *)AGENTOS_MALLOC(len + 1);
     if (!result)
@@ -909,6 +911,7 @@ agentos_error_t agentos_tc_working_memory_sync_to_persistent(agentos_thinking_ch
             if (err == AGENTOS_SUCCESS && record_id) {
                 synced++;
                 AGENTOS_FREE(record_id);
+                record_id = NULL;
             }
         }
     }
@@ -984,6 +987,7 @@ agentos_error_t agentos_tc_metacognition_inform_memory(agentos_thinking_chain_t 
         agentos_error_t err = agentos_memory_write(chain->memory, &rec, &record_id);
         if (err == AGENTOS_SUCCESS && record_id) {
             AGENTOS_FREE(record_id);
+            record_id = NULL;
         }
     }
 
@@ -1250,6 +1254,7 @@ agentos_error_t agentos_tc_step_recover(agentos_thinking_chain_t *chain,
             if (err == AGENTOS_SUCCESS && new_content && new_len > 0) {
                 agentos_tc_step_correct(failed_step, new_content, new_len);
                 AGENTOS_FREE(new_content);
+                new_content = NULL;
 
                 /* 验证修正后是否通过质量门禁 */
                 tc_monitor_result_t post_mon;

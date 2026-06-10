@@ -346,6 +346,9 @@ int a2a_v03_set_negotiation_handler(a2a_v03_context_t *ctx, a2a_negotiation_hand
 int a2a_v03_set_streaming_handler(a2a_v03_context_t *ctx, a2a_streaming_handler_t handler,
                                   void *user_data);
 
+int a2a_v03_set_transport(a2a_v03_context_t *ctx, int (*write_fn)(void *, const void *, size_t),
+                          void *transport_ctx);
+
 int a2a_v03_route_request(a2a_v03_context_t *ctx, const char *method, const char *params_json,
                           char **response_json);
 

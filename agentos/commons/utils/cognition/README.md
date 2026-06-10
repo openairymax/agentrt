@@ -1,7 +1,7 @@
 # Cognition — 认知管理
 
 **模块路径**: `agentos/commons/utils/cognition/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

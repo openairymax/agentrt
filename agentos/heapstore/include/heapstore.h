@@ -138,7 +138,7 @@ typedef struct heapstore_circuit_info {
  * @param manager [in] 配置参数（如果为 NULL，使用默认配置）
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 manager 的生命周期
+ * @ownership manager: BORROW
  * @threadsafe 否，不可多线程同时调用
  * @reentrant 否
  *
@@ -152,7 +152,7 @@ heapstore_error_t heapstore_init(const heapstore_config_t *manager);
 /**
  * @brief 关闭数据分区并清理资源
  *
- * @ownership 内部释放所有资源
+ * @ownership N/A (no pointer parameters)
  * @threadsafe 否，不可多线程同时调用
  * @reentrant 否
  *
@@ -179,7 +179,7 @@ bool heapstore_is_initialized(void);
  *
  * @return const char* 根路径字符串
  *
- * @ownership 返回内部字符串，调用者不应释放
+ * @ownership return: BORROW (internal string, do not free)
  * @threadsafe 是
  * @reentrant 是
  *
@@ -194,7 +194,7 @@ const char *heapstore_get_root(void);
  * @param type [in] 路径类型
  * @return const char* 路径字符串（不包含根路径前缀）
  *
- * @ownership 返回内部字符串，调用者不应释放
+ * @ownership return: BORROW (internal string, do not free)
  * @threadsafe 是
  * @reentrant 是
  *
@@ -210,7 +210,7 @@ const char *heapstore_get_path(heapstore_path_type_t type);
  * @param buffer_size [in] 缓冲区大小
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 buffer 的分配和释放
+ * @ownership buffer: BORROW (caller-owned buffer, function writes to it)
  * @threadsafe 是
  * @reentrant 是
  *
@@ -225,7 +225,7 @@ heapstore_error_t heapstore_get_full_path(heapstore_path_type_t type, char *buff
  * @param stats [out] 输出统计信息结构
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 stats 的分配和释放
+ * @ownership stats: BORROW (caller-owned buffer, function writes to it)
  * @threadsafe 是
  * @reentrant 是
  */
@@ -239,7 +239,7 @@ heapstore_error_t heapstore_get_stats(heapstore_stats_t *stats);
  * @param message [in] 日志消息
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 message 的生命周期
+ * @ownership message: BORROW
  * @threadsafe 是
  * @reentrant 是
  *
@@ -260,7 +260,7 @@ heapstore_error_t heapstore_log_write_fast(const char *service, int level, const
  * @param timeout_ms [in] 超时时间（毫秒）
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 message 的生命周期
+ * @ownership message: BORROW
  * @threadsafe 是
  * @reentrant 否
  *
@@ -280,7 +280,7 @@ heapstore_error_t heapstore_log_write_slow(const char *service, int level, const
  * @param freed_bytes [out] 输出实际释放的字节数（可为 NULL）
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 freed_bytes 的分配和释放
+ * @ownership freed_bytes: BORROW (caller-owned buffer, function writes to it, may be NULL)
  * @threadsafe 是
  * @reentrant 否
  *
@@ -294,7 +294,7 @@ heapstore_error_t heapstore_cleanup(bool dry_run, uint64_t *freed_bytes);
  * @param err [in] 错误码
  * @return const char* 错误描述
  *
- * @ownership 返回内部字符串，调用者不应释放
+ * @ownership return: BORROW (internal string, do not free)
  * @threadsafe 是
  * @reentrant 是
  */
@@ -306,7 +306,7 @@ const char *heapstore_strerror(heapstore_error_t err);
  * @param manager [in] 新配置
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 manager 的生命周期
+ * @ownership manager: BORROW
  * @threadsafe 否
  * @reentrant 否
  *
@@ -334,7 +334,7 @@ heapstore_error_t heapstore_flush(void);
  * @param memory_ok [out] 内存系统是否健康，可为 NULL
  * @return heapstore_error_t 错误码，heapstore_SUCCESS 表示整体健康
  *
- * @ownership 调用者负责所有输出参数的分配和释放
+ * @ownership 所有输出参数: BORROW (caller-owned buffers, function writes to them)
  * @threadsafe 是
  * @reentrant 是
  *
@@ -349,7 +349,7 @@ heapstore_error_t heapstore_health_check(bool *registry_ok, bool *trace_ok, bool
  * @param metrics [out] 输出性能指标结构
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 metrics 的分配和释放
+ * @ownership metrics: BORROW (caller-owned buffer, function writes to it)
  * @threadsafe 是
  * @reentrant 是
 
@@ -373,7 +373,7 @@ heapstore_error_t heapstore_reset_metrics(void);
  * @param info [out] 输出熔断器状态信息
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责 info 的分配和释放
+ * @ownership info: BORROW (caller-owned buffer, function writes to it)
  * @threadsafe 是
  * @reentrant 是
 
@@ -405,7 +405,7 @@ typedef struct heapstore_batch_context heapstore_batch_context_t;
  * @param batch_size [in] 批量大小（默认 100）
  * @return heapstore_batch_context_t* 批量写入上下文指针
  *
- * @ownership 调用者负责释放返回的上下文
+ * @ownership return: OWNER (caller must call heapstore_batch_context_destroy)
  * @threadsafe 是
  * @reentrant 是
  */
@@ -420,7 +420,7 @@ heapstore_batch_context_t *heapstore_batch_begin(size_t batch_size);
  * @param message [in] 日志消息
  * @return heapstore_error_t 错误码
  *
- * @ownership 调用者负责所有参数的生命周期
+ * @ownership ctx: BORROW, service: BORROW, message: BORROW
  * @threadsafe 是
  * @reentrant 是
 
@@ -428,37 +428,171 @@ heapstore_batch_context_t *heapstore_batch_begin(size_t batch_size);
 heapstore_error_t heapstore_batch_add_log(heapstore_batch_context_t *ctx, const char *service,
                                           int level, const char *message);
 
+/**
+ * @brief Add log with trace to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param service [in] Service name (BORROW - not stored, copied internally).
+ * @param level Log level
+ * @param trace_id [in] Trace ID (BORROW - not stored, copied internally).
+ * @param message [in] Log message (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, service: BORROW, trace_id: BORROW, message: BORROW
+ */
 heapstore_error_t heapstore_batch_add_log_with_trace(heapstore_batch_context_t *ctx,
                                                      const char *service, int level,
                                                      const char *trace_id, const char *message);
 
+/**
+ * @brief Add trace to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param trace_id [in] Trace ID (BORROW - not stored, copied internally).
+ * @param span_id [in] Span ID (BORROW - not stored, copied internally).
+ * @param parent_id [in] Parent span ID (BORROW - not stored, copied internally).
+ * @param name [in] Span name (BORROW - not stored, copied internally).
+ * @param start_time_us Start time in microseconds
+ * @param end_time_us End time in microseconds
+ * @param status Status code
+ * @param attributes [in] Attributes JSON (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, trace_id: BORROW, span_id: BORROW, parent_id: BORROW, name: BORROW, attributes: BORROW
+ */
 heapstore_error_t heapstore_batch_add_trace(heapstore_batch_context_t *ctx, const char *trace_id,
                                             const char *span_id, const char *parent_id,
                                             const char *name, int64_t start_time_us,
                                             int64_t end_time_us, int status,
                                             const char *attributes);
 
+/**
+ * @brief Add session record to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param record [in] Session record (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, record: BORROW
+ */
 heapstore_error_t heapstore_batch_add_session(heapstore_batch_context_t *ctx,
                                               const heapstore_session_record_t *record);
+
+/**
+ * @brief Add agent record to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param record [in] Agent record (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, record: BORROW
+ */
 heapstore_error_t heapstore_batch_add_agent(heapstore_batch_context_t *ctx,
                                             const heapstore_agent_record_t *record);
+
+/**
+ * @brief Add skill record to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param record [in] Skill record (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, record: BORROW
+ */
 heapstore_error_t heapstore_batch_add_skill(heapstore_batch_context_t *ctx,
                                             const heapstore_skill_record_t *record);
+
+/**
+ * @brief Add memory pool record to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param pool [in] Memory pool record (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, pool: BORROW
+ */
 heapstore_error_t heapstore_batch_add_memory_pool(heapstore_batch_context_t *ctx,
                                                   const heapstore_memory_pool_t *pool);
+
+/**
+ * @brief Add memory allocation record to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param allocation [in] Memory allocation record (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, allocation: BORROW
+ */
 heapstore_error_t heapstore_batch_add_allocation(heapstore_batch_context_t *ctx,
                                                  const heapstore_memory_allocation_t *allocation);
+
+/**
+ * @brief Add IPC channel record to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param channel [in] IPC channel record (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, channel: BORROW
+ */
 heapstore_error_t heapstore_batch_add_ipc_channel(heapstore_batch_context_t *ctx,
                                                   const heapstore_ipc_channel_t *channel);
+
+/**
+ * @brief Add IPC buffer record to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param buffer [in] IPC buffer record (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, buffer: BORROW
+ */
 heapstore_error_t heapstore_batch_add_ipc_buffer(heapstore_batch_context_t *ctx,
                                                  const heapstore_ipc_buffer_t *buffer);
+
+/**
+ * @brief Add span record to batch buffer
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @param span [in] Span record (BORROW - not stored, copied internally).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW, span: BORROW
+ */
 heapstore_error_t heapstore_batch_add_span(heapstore_batch_context_t *ctx,
                                            const heapstore_span_t *span);
 
+/**
+ * @brief Commit batch write
+ * @param ctx [in] Batch context (BORROW - caller retains ownership, may call again after commit).
+ * @return heapstore_error_t
+ *
+ * @ownership ctx: BORROW
+ */
 heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t *ctx);
+
+/**
+ * @brief Rollback batch write
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ *
+ * @ownership ctx: BORROW
+ */
 void heapstore_batch_rollback(heapstore_batch_context_t *ctx);
+
+/**
+ * @brief Destroy batch context
+ * @param ctx [in] Batch context (TRANSFER - function takes ownership and frees).
+ *
+ * @ownership ctx: TRANSFER
+ */
 void heapstore_batch_context_destroy(heapstore_batch_context_t *ctx);
+
+/**
+ * @brief Get batch count
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @return Number of items in batch
+ *
+ * @ownership ctx: BORROW
+ */
 size_t heapstore_batch_get_count(const heapstore_batch_context_t *ctx);
+
+/**
+ * @brief Get batch capacity
+ * @param ctx [in] Batch context (BORROW - caller retains ownership).
+ * @return Batch capacity
+ *
+ * @ownership ctx: BORROW
+ */
 size_t heapstore_batch_get_capacity(const heapstore_batch_context_t *ctx);
 
 #ifdef __cplusplus

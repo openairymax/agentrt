@@ -9,9 +9,8 @@
 
 #include "error.h"
 
-#ifndef AGENTOS_ERR_SERVICE_BASE
+/* Tool module-specific base error code (not in centralized error.h) */
 #define AGENTOS_ERR_SERVICE_BASE 3000
-#endif
 
 #define TOOL_ERR_BASE (AGENTOS_ERR_SERVICE_BASE + 100)
 #define TOOL_ERR_NOT_FOUND (TOOL_ERR_BASE + 1)
@@ -23,19 +22,12 @@
 #define TOOL_ERR_IO (TOOL_ERR_BASE + 7)
 #define TOOL_ERR_FORK (TOOL_ERR_BASE + 8)
 
-#ifndef AGENTOS_ERR_TOOL_NOT_FOUND
+/* Tool module-specific error code aliases (not in centralized error.h) */
 #define AGENTOS_ERR_TOOL_NOT_FOUND TOOL_ERR_NOT_FOUND
-#endif
-#ifndef AGENTOS_ERR_TOOL_VALIDATION
 #define AGENTOS_ERR_TOOL_VALIDATION TOOL_ERR_INVALID_PARAMS
-#endif
 
-#ifndef AGENTOS_ERR_TOOL_EXEC_FAIL
 #define AGENTOS_ERR_TOOL_EXEC_FAIL TOOL_ERR_EXEC_FAILED
-#endif
 
-#ifndef AGENTOS_ERR_TOOL_TIMEOUT
 #define AGENTOS_ERR_TOOL_TIMEOUT TOOL_ERR_TIMEOUT
-#endif
 
 #endif /* TOOL_ERRORS_H */

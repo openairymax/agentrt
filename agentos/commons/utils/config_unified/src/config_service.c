@@ -34,12 +34,7 @@
 #include <openssl/rand.h>
 #endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 /* ==================== 内部数据结构 ==================== */
 
@@ -198,8 +193,10 @@ static void clear_schema_errors(config_schema_t *schema)
         return;
 
     for (size_t i = 0; i < schema->error_count; i++) {
-        if (schema->errors[i])
+        if (schema->errors[i]) {
             AGENTOS_FREE(schema->errors[i]);
+            schema->errors[i] = NULL;
+        }
     }
 
     schema->error_count = 0;
@@ -1262,6 +1259,7 @@ static config_value_t *config_decrypt_string_value(const char *hex_data,
 
     EVP_CIPHER_CTX_free(ctx);
     AGENTOS_FREE(data);
+    data = NULL;
 
     config_value_t *result = config_value_create_string((const char *)plaintext);
     explicit_bzero(plaintext, ct_len + 1);

@@ -50,9 +50,7 @@ extern char __edata[];
 
 #include <openssl/sha.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
+#include "error.h"
 
 #define CUPOLAS_MAX_SECCOMP_RULES 256
 #define CUPOLAS_MAX_CFI_TARGETS 4096

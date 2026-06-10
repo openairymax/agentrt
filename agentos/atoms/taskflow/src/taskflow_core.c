@@ -846,8 +846,10 @@ taskflow_error_t taskflow_clear_messages(taskflow_handle_t engine, vertex_id_t v
     size_t write_idx = 0;
     for (size_t i = 0; i < e->message_count; i++) {
         if (e->message_queue[i].target == vertex_id) {
-            if (e->message_queue[i].payload)
+            if (e->message_queue[i].payload) {
                 AGENTOS_FREE(e->message_queue[i].payload);
+                e->message_queue[i].payload = NULL;
+            }
         } else {
             if (write_idx != i) {
                 e->message_queue[write_idx] = e->message_queue[i];

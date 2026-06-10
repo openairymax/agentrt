@@ -8,7 +8,7 @@ _config_version: "1.0.0"
 
 kernel:
   name: "AgentOS Core"
-  version: "0.0.5"
+  version: "0.1.0"
   log_level: "info"
 
   scheduler:

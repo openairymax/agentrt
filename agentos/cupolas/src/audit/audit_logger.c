@@ -304,8 +304,42 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
         return cupolas_ERROR_INVALID_ARG;
 
     audit_entry_t *entry = audit_entry_create(type, agent_id, action, resource, detail, result);
-    if (!entry)
+    if (!entry) {
+        /* SEC-13: Fallback to pre-allocated audit buffer under OOM */
+        void *emergency_buf = agentos_prealloc_acquire(AGENTOS_PREALLOC_AUDIT);
+        if (emergency_buf) {
+            /* Write a minimal audit record to the emergency buffer */
+            int written = snprintf((char *)emergency_buf,
+                    AGENTOS_PREALLOC_AUDIT_BUF_SIZE,
+                    "{\"type\":%d,\"agent_id\":\"%s\",\"action\":\"%s\","
+                    "\"resource\":\"%s\",\"detail\":\"%s\",\"result\":%d,"
+                    "\"emergency\":true}\n",
+                    (int)type,
+                    agent_id ? agent_id : "",
+                    action ? action : "",
+                    resource ? resource : "",
+                    detail ? detail : "",
+                    result);
+
+            if (written > 0 && (size_t)written < AGENTOS_PREALLOC_AUDIT_BUF_SIZE) {
+                /* Write emergency audit entry directly via rotator */
+                if (logger->rotator) {
+                    /* Construct a minimal entry from the emergency buffer
+                     * for the rotator to write */
+                    audit_entry_t *oom_entry = audit_oom_pool_alloc();
+                    if (oom_entry) {
+                        oom_entry->type = type;
+                        oom_entry->timestamp_ms = 0; /* best-effort */
+                        oom_entry->result = result;
+                        audit_rotator_write(logger->rotator, oom_entry);
+                    }
+                }
+            }
+
+            agentos_prealloc_release(AGENTOS_PREALLOC_AUDIT);
+        }
         return cupolas_ERROR_NO_MEMORY;
+    }
 
     /* === 编码契约: SHA-256 审计哈希链（BAN-129）=== */
     cupolas_mutex_lock(&g_hash_chain_lock);

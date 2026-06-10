@@ -1,7 +1,7 @@
 # Research — 智能研究助手应用
 
 **模块路径**: `agentos/openlab/app/research/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 > **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。当前为规划阶段，源代码尚未实现。
 

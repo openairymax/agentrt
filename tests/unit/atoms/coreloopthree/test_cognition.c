@@ -19,7 +19,7 @@
  */
 static void test_cognition_create_destroy() {
     agentos_cognition_engine_t* engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     printf("test_cognition_create_destroy: %d\n", err);
     if (err == AGENTOS_SUCCESS) {
         agentos_cognition_destroy(engine);
@@ -31,7 +31,7 @@ static void test_cognition_create_destroy() {
  */
 static void test_cognition_process() {
     agentos_cognition_engine_t* engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
     // From data intelligence emerges. by spharx
         printf("test_cognition_process: Failed to create engine\n");
@@ -55,14 +55,14 @@ static void test_cognition_process() {
  */
 static void test_cognition_set_context() {
     agentos_cognition_engine_t* engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
         printf("test_cognition_set_context: Failed to create engine\n");
         return;
     }
 
     int context_data = 42;
-    agentos_cognition_set_context(engine, &context_data, NULL);
+    agentos_cognition_set_context_take(engine, &context_data, NULL);
     printf("test_cognition_set_context: Success\n");
 
     agentos_cognition_destroy(engine);
@@ -73,7 +73,7 @@ static void test_cognition_set_context() {
  */
 static void test_cognition_stats() {
     agentos_cognition_engine_t* engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
         printf("test_cognition_stats: Failed to create engine\n");
         return;
@@ -96,7 +96,7 @@ static void test_cognition_stats() {
  */
 static void test_cognition_health_check() {
     agentos_cognition_engine_t* engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
         printf("test_cognition_health_check: Failed to create engine\n");
         return;

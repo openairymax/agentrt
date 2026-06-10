@@ -14,15 +14,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "error.h"
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
 #include <arpa/inet.h>
-#endif
-
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
 #endif
 
 int network_utils_parse_url(const char *url, char *scheme, char *host, uint16_t *port, char *path)
