@@ -21,6 +21,8 @@
 /* 前向声明 — 类型定义在 memory_compat.h 中 */
 #include "../../../commons/utils/memory/include/memory_compat.h"
 
+/* agentos_mutex_t 和 agentos_mutex_* API — 来自 platform.h（通过 agentos_types.h 间接包含） */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,6 +45,44 @@ extern "C" {
  * 对应五级压力级别的响应动作。
  */
 #define OOM_RESPONSE_FATAL_TERMINATE 4  /**< 立即中止进程（abort） */
+
+/* ============================================================================
+ * 内存压力分级系统（SEC-12 OOM 分级响应框架）
+ * ============================================================================ */
+
+/**
+ * @brief 五级内存压力级别（SEC-12 OOM 分级响应）
+ *
+ * 基于内存使用率的五级压力评估，阈值可配置。
+ */
+typedef enum {
+    AGENTOS_MEM_PRESSURE_NORMAL    = 0,  /**< <70% usage - normal operation */
+    AGENTOS_MEM_PRESSURE_WARNING   = 1,  /**< 70-80% usage - start cleanup */
+    AGENTOS_MEM_PRESSURE_DEGRADED  = 2,  /**< 80-90% usage - aggressive cleanup */
+    AGENTOS_MEM_PRESSURE_CRITICAL  = 3,  /**< 90-95% usage - deny non-essential allocations */
+    AGENTOS_MEM_PRESSURE_FATAL     = 4   /**< >95% usage - emergency shutdown */
+} agentos_mem_pressure_level_t;
+
+/** 每个压力级别最大回调注册数 */
+#define AGENTOS_PRESSURE_MAX_CALLBACKS 8
+
+/**
+ * @brief 压力变化回调函数类型
+ *
+ * @param level     当前压力级别
+ * @param user_data 注册时传入的用户数据
+ */
+typedef void (*agentos_pressure_callback_t)(
+    agentos_mem_pressure_level_t level, void *user_data);
+
+/**
+ * @brief 压力回调注册槽位
+ */
+typedef struct {
+    agentos_pressure_callback_t callback;  /**< 回调函数指针 */
+    void                       *user_data; /**< 用户数据 */
+    bool                        active;    /**< 是否激活 */
+} agentos_pressure_callback_slot_t;
 
 /* ============================================================================
  * 优雅降级处理器类型（SEC-14 合规）
@@ -125,6 +165,14 @@ typedef struct oom_handler {
 
     /* 扩展统计（指向 memory_stats_extended_t） */
     memory_stats_extended_t *ext_stats;
+
+    /* 压力分级系统（SEC-12 OOM 分级响应框架） */
+    agentos_mem_pressure_level_t current_pressure;  /**< 当前压力级别 */
+    agentos_mutex_t pressure_mutex;                  /**< 压力系统互斥锁 */
+    agentos_pressure_callback_slot_t
+        pressure_callbacks[5][AGENTOS_PRESSURE_MAX_CALLBACKS]; /**< 每级回调槽位 */
+    size_t pressure_denied_count;                    /**< 被拒绝的分配计数 */
+    size_t total_allocated_bytes;                    /**< 累计分配字节数 */
 } oom_handler_t;
 
 /* ============================================================================
@@ -169,7 +217,7 @@ AGENTOS_API oom_handler_t *agentos_oom_get_handler(void);
  * @param level 当前水位级别
  * @return 对应的 OOM 响应级别（int 值）
  */
-AGENTOS_API int agentos_oom_determine_response(watermark_level_t level);
+AGENTOS_API oom_response_level_t agentos_oom_determine_response(watermark_level_t level);
 
 /**
  * @brief 处理 OOM 事件（SEC-12.3）
@@ -242,6 +290,68 @@ AGENTOS_API watermark_level_t agentos_oom_get_watermark(void);
  * @return true 如果水位 >= WATERMARK_WARNING
  */
 AGENTOS_API bool agentos_oom_is_degraded(void);
+
+/* ============================================================================
+ * 内存压力分级 API（SEC-12 OOM 分级响应框架）
+ * ============================================================================ */
+
+/**
+ * @brief 获取当前内存压力级别（SEC-12）
+ *
+ * 基于当前内存使用率计算压力级别：
+ *   <70%  → NORMAL
+ *   70-80% → WARNING
+ *   80-90% → DEGRADED
+ *   90-95% → CRITICAL
+ *   >95%  → FATAL
+ *
+ * 如果压力级别发生变化，自动触发已注册的回调。
+ *
+ * @return 当前压力级别
+ */
+AGENTOS_API agentos_mem_pressure_level_t agentos_oom_get_pressure(void);
+
+/**
+ * @brief 注册压力变化回调（SEC-12）
+ *
+ * 当压力级别达到或超过指定级别时，回调被触发。
+ * 每个级别最多支持 AGENTOS_PRESSURE_MAX_CALLBACKS (8) 个回调。
+ *
+ * @param level     触发回调的压力级别
+ * @param callback  回调函数指针
+ * @param user_data 传递给回调的用户数据
+ * @return 0 成功，AGENTOS_EINVAL 参数无效，AGENTOS_EBUSY 槽位已满
+ */
+AGENTOS_API int agentos_oom_register_callback(
+    agentos_mem_pressure_level_t level,
+    void (*callback)(agentos_mem_pressure_level_t, void *),
+    void *user_data);
+
+/**
+ * @brief 检查分配是否应被允许（SEC-12）
+ *
+ * 根据当前压力级别决定是否允许内存分配：
+ *   NORMAL   → 允许所有分配
+ *   WARNING  → 允许所有分配（记录警告）
+ *   DEGRADED → 允许分配，但建议减少非必要分配
+ *   CRITICAL → 拒绝非必要分配
+ *   FATAL    → 拒绝所有分配
+ *
+ * @param requested_size 请求分配的字节数
+ * @return 0 允许分配，非0 拒绝分配
+ */
+AGENTOS_API int agentos_oom_check_allocation(size_t requested_size);
+
+/**
+ * @brief 报告内存压力统计信息（SEC-12）
+ *
+ * 通过 AGENTOS_LOG_INFO 输出当前内存压力统计：
+ *   - 当前压力级别和使用率
+ *   - 系统总内存和已分配内存
+ *   - 被拒绝的分配计数
+ *   - 各级别已注册的回调数量
+ */
+AGENTOS_API void agentos_oom_report_stats(void);
 
 #ifdef __cplusplus
 }

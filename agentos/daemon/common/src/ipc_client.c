@@ -439,6 +439,7 @@ int svc_rpc_call(const char *method, const char *params, char **out_result, uint
         do_rpc_call(entry, g_ipc_client->base_url, request, &response, timeout_ms, IPC_MAX_RETRIES);
 
     AGENTOS_FREE(request);
+    request = NULL;
 
     if (ret != SVC_OK) {
         buffer_free(&response);

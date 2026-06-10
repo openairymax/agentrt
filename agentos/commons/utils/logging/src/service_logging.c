@@ -22,12 +22,7 @@
 #include <time.h>
 #include "../../error/include/error.h"
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
-#ifndef AGENTOS_EFAIL
-#define AGENTOS_EFAIL (-1)
-#endif
+
 
 #define MAX_OUTPUTTERS 16
 #define MAX_FILTERS 32
@@ -74,6 +69,7 @@ static int console_outputter_output(outputter_t *self, const log_record_t *recor
     if (!record)
         return AGENTOS_EINVAL;
     FILE *stream = (record->level >= LOG_LEVEL_ERROR) ? stderr : stdout;
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(stream, "[SERVICE] %s:%d %s\n", record->module, record->line, record->message);
     return 0;
 }
@@ -128,6 +124,7 @@ static int file_outputter_output(outputter_t *self, const log_record_t *record)
         break;
     }
 
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "[%s] [%s] %s:%d - %s\n", time_buf, level_str, record->module, record->line,
             record->message);
     fflush(fp);

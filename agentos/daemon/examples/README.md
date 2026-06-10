@@ -1,6 +1,6 @@
 # Daemon Examples — 守护进程使用示例
 
-> **模块路径**: `agentos/daemon/examples/` | **版本**: v0.0.5
+> **模块路径**: `agentos/daemon/examples/` | **版本**: v0.1.0
 
 ## 概述
 

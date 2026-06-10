@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file protocol.ts
@@ -182,7 +182,7 @@ export class ProtocolClient {
         isStreaming,
         hasBinaryPayload: false,
       };
-    } catch (e) {
+    } catch (e: unknown) {
       return {
         detectedType: ProtocolType.JSONRPC,
         typeName: 'jsonrpc',
@@ -196,7 +196,7 @@ export class ProtocolClient {
   /**
    * Send a unified request through the configured protocol.
    */
-  async sendRequest(method: string, params: Record<string, any> = {}): Promise<any> {
+  async sendRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
     const payload = this.buildRequestPayload(method, params);
     const urlPath = this.getUrlPath();
 
@@ -213,8 +213,8 @@ export class ProtocolClient {
         }
 
         return response.data;
-      } catch (e: any) {
-        lastError = e;
+      } catch (e: unknown) {
+        lastError = e instanceof Error ? e : new Error(String(e));
         if (!this.isRetryableError(e)) break;
         if (attempt < this.config.retryCount) {
           await this.sleep(delay);
@@ -231,7 +231,7 @@ export class ProtocolClient {
    */
   async streamRequest(
     method: string,
-    params: Record<string, any> = {},
+    params: Record<string, unknown> = {},
     onChunk: (chunk: Buffer) => void | Promise<void>,
   ): Promise<void> {
     if (!this.config.enableStreaming) {
@@ -282,12 +282,12 @@ export class ProtocolClient {
         statusCode: response.status,
         latencyMs: Math.round(Date.now() - startTime),
       };
-    } catch (e: any) {
+    } catch (e: unknown) {
       return {
         protocol: protocolName,
         status: 'error',
         latencyMs: Math.round(Date.now() - startTime),
-        error: e.message,
+        error: e instanceof Error ? e.message : String(e),
       };
     }
   }
@@ -323,7 +323,7 @@ export class ProtocolClient {
     }
   }
 
-  private buildRequestPayload(method: string, params: Record<string, any>): any {
+  private buildRequestPayload(method: string, params: Record<string, unknown>): Record<string, unknown> {
     switch (this.config.protocolType) {
       case ProtocolType.OPENAI: {
         const { messages = [], model = 'gpt-4o', temperature = 0.7, maxTokens = 2048, ...rest } = params;
@@ -343,7 +343,7 @@ export class ProtocolClient {
     }
   }
 
-  private isRetryableError(e: any): boolean {
+  private isRetryableError(e: unknown): boolean {
     if (e instanceof TimeoutError || e instanceof NetworkError) return true;
     if (e instanceof HttpError && e.statusCode >= 500) return true;
     if (e instanceof HttpError && e.statusCode === 429) return true;

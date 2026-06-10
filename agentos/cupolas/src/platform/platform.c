@@ -45,9 +45,7 @@
 #include <unistd.h>
 #endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
+#include "error.h"
 
 extern char **environ;
 

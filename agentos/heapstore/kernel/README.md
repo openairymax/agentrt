@@ -1,7 +1,7 @@
 # Heapstore Kernel — 内核级服务
 
 **模块路径**: `agentos/heapstore/kernel/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

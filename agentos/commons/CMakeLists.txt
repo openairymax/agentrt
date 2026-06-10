@@ -164,7 +164,7 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/uuid/include
 )
 
-target_compile_definitions(agentos_common PRIVATE _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(agentos_common PRIVATE _CRT_SECURE_NO_WARNINGS _GNU_SOURCE _POSIX_C_SOURCE=200809L _XOPEN_SOURCE=700)
 if(NOT AGENTOS_HAS_CJSON)
     target_compile_definitions(agentos_common PRIVATE AGENTOS_NO_CJSON)
 endif()

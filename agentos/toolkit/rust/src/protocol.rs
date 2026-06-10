@@ -205,7 +205,7 @@ impl ProtocolClient {
                     let body: serde_json::Value =
                         resp.json().await.map_err(|e| AgentOSError::json(&e.to_string()))?;
                     {
-                        let mut stats = self.stats.lock().unwrap();
+                        let mut stats = self.stats.lock().unwrap_or_else(|e| e.into_inner());
                         stats.requests_sent += 1;
                         if self.config.protocol_type != ProtocolType::JsonRpc {
                             stats.transformations += 1;
@@ -337,7 +337,7 @@ impl ProtocolClient {
 
     /// Get internal statistics about this client instance
     pub fn get_stats(&self) -> ProtocolStats {
-        self.stats.lock().unwrap().clone()
+        self.stats.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     // ======================================================================

@@ -1,6 +1,6 @@
 # Daemon — AgentOS 用户态服务层
 
-> **模块路径**: `agentos/daemon/` | **版本**: v0.0.5
+> **模块路径**: `agentos/daemon/` | **版本**: v0.1.0
 
 ## 概述
 

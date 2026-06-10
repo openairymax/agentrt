@@ -2,7 +2,7 @@
 
 `agentos/atoms/coreloopthree/`
 
-**版本**: v0.0.5 | **API 版本**: 1.0.0
+**版本**: v0.1.0 | **API 版本**: 1.0.0
 
 ---
 
@@ -204,12 +204,12 @@ coreloopthree/
 
 | 接口 | 功能 |
 |------|------|
-| `agentos_cognition_create()` | 创建认知引擎（指定策略） |
-| `agentos_cognition_create_ex()` | 创建认知引擎（带配置） |
+| `agentos_cognition_create_take()` | 创建认知引擎（指定策略，获取策略所有权） |
+| `agentos_cognition_create_ex_take()` | 创建认知引擎（带配置，获取策略所有权） |
 | `agentos_cognition_destroy()` | 销毁认知引擎 |
 | `agentos_cognition_process()` | 处理用户输入，生成任务计划（DAG） |
 | `agentos_cognition_set_fallback_plan()` | 设置回退规划策略 |
-| `agentos_cognition_set_context()` | 设置全局上下文 |
+| `agentos_cognition_set_context_take()` | 设置全局上下文（获取上下文所有权） |
 | `agentos_cognition_set_memory()` | 绑定记忆引擎 |
 | `agentos_cognition_stats()` | 获取统计信息 |
 | `agentos_cognition_health_check()` | 健康检查 |

@@ -14,9 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
+#include "error.h"
 
 static struct {
     int initialized;

@@ -687,6 +687,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
 
     out_result->sorted_count = sorted_cnt;
     AGENTOS_FREE(queue);
+    queue = NULL;
 
     /* 循环检测: 若 sorted_cnt < unique_count，收集参与循环的节点 */
     if (sorted_cnt < unique_count) {
@@ -701,8 +702,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
             out_result->cycle =
                 (agentos_cycle_report_t *)AGENTOS_CALLOC(1, sizeof(agentos_cycle_report_t));
             if (out_result->cycle) {
-                out_result->cycle->cycle_nodes =
-                    (uint64_t *)AGENTOS_MALLOC(cycle_count * sizeof(uint64_t));
+                SAFE_MALLOC_ARRAY(out_result->cycle->cycle_nodes, cycle_count, sizeof(uint64_t));
                 if (out_result->cycle->cycle_nodes) {
                     out_result->cycle->cycle_node_count = cycle_count;
                     size_t ci = 0;
@@ -724,6 +724,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
             }
         }
         AGENTOS_FREE(in_degree_copy);
+        in_degree_copy = NULL;
 
         /* 释放排序结果（循环时无有效排序） */
         AGENTOS_FREE(out_result->sorted_tasks);
@@ -774,6 +775,7 @@ agentos_error_t agentos_scheduler_resolve_dependencies(const uint64_t *dep_from,
             }
             __builtin_memcpy(out_result->inherited_priorities, base_prio, sorted_cnt * sizeof(int));
             AGENTOS_FREE(base_prio);
+            base_prio = NULL;
         }
         out_result->priority_count = sorted_cnt;
     }

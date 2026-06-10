@@ -11,6 +11,8 @@
 #ifndef AGENTOS_MEMORY_COMPAT_H
 #define AGENTOS_MEMORY_COMPAT_H
 
+#include "error.h"
+
 #include "agentos_memory.h"
 
 #include <inttypes.h>
@@ -20,15 +22,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* SEC-02: 兼容性错误码定义，确保 AGENTOS_E_OVERFLOW 在所有
- * 包含 memory_compat.h 的编译单元中可用，无需额外包含 error.h */
-#ifndef AGENTOS_ENOMEM
-#define AGENTOS_ENOMEM (-2)  /**< Out of memory */
-#endif
-#ifndef AGENTOS_E_OVERFLOW
-#define AGENTOS_E_OVERFLOW (-12)  /**< Integer overflow / buffer overflow */
-#endif
 
 #ifndef AGENTOS_MEMORY_STATS_T_DEFINED
 #define AGENTOS_MEMORY_STATS_T_DEFINED
@@ -319,7 +312,11 @@ static inline char *agentos_strndup(const char *str, size_t n)
  * @def AGENTOS_MALLOC(size)
  * @brief 安全内存分配宏
  */
-#define AGENTOS_MALLOC(size) agentos_malloc(size)
+#define AGENTOS_MALLOC(size) ({ \
+    void *__ptr = agentos_malloc(size); \
+    if (__ptr) { agentos_mem_stats_record_alloc(size); } \
+    __ptr; \
+})
 
 /**
  * @def AGENTOS_CALLOC(num, size)
@@ -336,8 +333,15 @@ static inline char *agentos_strndup(const char *str, size_t n)
 /**
  * @def AGENTOS_FREE(ptr)
  * @brief 安全内存释放宏
+ *
+ * Note: agentos_mem_stats_record_dealloc(0) is called because we don't
+ * track individual block sizes at free time. The dealloc counter is
+ * incremented but no bytes are subtracted from current_bytes_allocated.
  */
-#define AGENTOS_FREE(ptr) agentos_free(ptr)
+#define AGENTOS_FREE(ptr) do { \
+    agentos_mem_stats_record_dealloc(0); \
+    agentos_free(ptr); \
+} while (0)
 
 /**
  * @defgroup safe_memory_alloc 安全内存分配宏（SEC-016合规）
@@ -563,13 +567,13 @@ static inline int agentos_memory_stats_extended_init(
     memory_stats_extended_t *ext_stats, size_t tracker_capacity)
 {
     if (!ext_stats || tracker_capacity == 0) {
-        return -1; /* AGENTOS_EINVAL */
+        return AGENTOS_EINVAL;
     }
     AGENTOS_MEMSET(ext_stats, 0, sizeof(*ext_stats));
     ext_stats->allocation_tracker =
         (alloc_track_entry_t *)AGENTOS_CALLOC(tracker_capacity, sizeof(alloc_track_entry_t));
     if (!ext_stats->allocation_tracker) {
-        return -2; /* AGENTOS_ENOMEM */
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     ext_stats->tracker_capacity = tracker_capacity;
     ext_stats->tracker_index = 0;
@@ -729,7 +733,7 @@ static inline int agentos_register_watermark_callback(
     void *context)
 {
     if (!ext_stats || !callback) {
-        return -1; /* AGENTOS_EINVAL */
+        return AGENTOS_EINVAL;
     }
 
     for (int i = 0; i < MAX_WATERMARK_CALLBACKS; i++) {
@@ -741,7 +745,7 @@ static inline int agentos_register_watermark_callback(
         }
     }
 
-    return -3; /* AGENTOS_EAGAIN — 回调槽位已满 */
+    return AGENTOS_ERR_BUSY; /* 回调槽位已满 */
 }
 
 /**
@@ -798,20 +802,10 @@ static inline void agentos_memory_check_watermark(
 /**
  * @brief 确定 OOM 响应级别（SEC-15）
  *
- * @param[in] level 当前水位级别
- * @return 对应的 OOM 响应级别
+ * 完整实现见 oom_handler.h / oom_handler.c（支持五级 FATAL_TERMINATE）。
+ * 此处仅保留声明，避免与 oom_handler.h 的 AGENTOS_API 定义冲突。
  */
-static inline oom_response_level_t agentos_oom_determine_response(
-    watermark_level_t level)
-{
-    switch (level) {
-        case WATERMARK_NORMAL:   return OOM_RESPONSE_WARNING;
-        case WATERMARK_WARNING:  return OOM_RESPONSE_DEGRADED;
-        case WATERMARK_HIGH:     return OOM_RESPONSE_CRITICAL;
-        case WATERMARK_CRITICAL: return OOM_RESPONSE_FATAL;
-        default:                 return OOM_RESPONSE_WARNING;
-    }
-}
+oom_response_level_t agentos_oom_determine_response(watermark_level_t level);
 
 /**
  * @brief 内存统计定期上报（SEC-15 核心功能）
@@ -826,6 +820,7 @@ static inline void agentos_memory_stats_report(
     memory_stats_extended_t *ext_stats, const char *tag)
 {
     if (!ext_stats) return;
+    (void)tag;  /* tag reserved for future logging integration */
 
     /* 更新水位 */
     ext_stats->current_watermark = agentos_memory_calc_watermark(ext_stats);

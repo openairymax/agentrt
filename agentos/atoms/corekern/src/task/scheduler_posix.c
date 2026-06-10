@@ -10,7 +10,7 @@
 #include "scheduler_core.h"
 #include "scheduler_platform.h"
 
-#include <pthread.h>
+#include "platform.h"
 #include <sched.h>
 #include <stdlib.h>
 #include <time.h>
@@ -35,13 +35,10 @@
  *
  * 存储POSIX平台特有的线程相关信息? */
 typedef struct posix_task_data {
-    /** @brief POSIX线程句柄 */
-    pthread_t thread_handle;
+    /** @brief 线程句柄 (CROSS-01: 使用平台抽象类型) */
+    agentos_thread_t thread_handle;
 
-    /** @brief 线程属性，用于栈大小设?*/
-    pthread_attr_t thread_attr;
-
-    /** @brief 是否使用了自定义栈大?*/
+    /** @brief 是否使用了自定义栈大小 */
     int has_custom_stack_size;
 } posix_task_data_t;
 
@@ -148,35 +145,21 @@ static void *posix_thread_create(task_info_core_t *info, size_t stack_size)
         return NULL;
     }
 
-    /* 初始化线程属?*/
-    ret = pthread_attr_init(&data->thread_attr);
-    if (ret != 0) {
-        AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
-    }
-
-    /* 设置栈大小（如果指定?*/
+    /* CROSS-01: 使用平台抽象层创建线程 */
+    /* TODO: agentos_platform_thread_create 不支持自定义栈大小，
+     * 当 stack_size > 0 时需要扩展 API 或使用其他机制 */
+    (void)stack_size;
     data->has_custom_stack_size = 0;
-    if (stack_size > 0) {
-        ret = pthread_attr_setstacksize(&data->thread_attr, stack_size);
-        if (ret == 0) {
-            data->has_custom_stack_size = 1;
-        }
-    }
 
-    /* 创建POSIX线程 */
-    ret =
-        pthread_create(&data->thread_handle, &data->thread_attr, posix_thread_entry_wrapper, info);
+    ret = agentos_platform_thread_create(&data->thread_handle, posix_thread_entry_wrapper, info);
 
     if (ret != 0) {
-        pthread_attr_destroy(&data->thread_attr);
         AGENTOS_FREE(data);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
-    /* 设置线程优先级（如果支持?*/
+    /* 设置线程优先级（如果支持）*/
     if (info->priority != AGENTOS_TASK_PRIORITY_NORMAL) {
         int sched_policy;
         struct sched_param sp = {0};
@@ -206,11 +189,8 @@ static int posix_thread_join(void *platform_handle, void **retval)
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
-    /* 等待线程结束 */
-    int ret = pthread_join(data->thread_handle, retval);
-
-    /* 清理线程属?*/
-    pthread_attr_destroy(&data->thread_attr);
+    /* CROSS-01: 使用平台抽象层等待线程结束 */
+    int ret = agentos_platform_thread_join(data->thread_handle, retval);
 
     return (ret == 0) ? 0 : -1;
 }
@@ -256,15 +236,15 @@ static int posix_thread_set_priority(void *platform_handle, int priority)
  */
 static uintptr_t posix_get_current_thread_id(void)
 {
-    /* POSIX线程ID是pthread_t类型，可以转换为uintptr_t */
-    return (uintptr_t)pthread_self();
+    /* CROSS-01: 使用平台抽象层获取线程ID */
+    return (uintptr_t)agentos_thread_id();
 }
 
 /**
  * @brief 获取POSIX线程的系统线程ID
  *
  * 获取指定POSIX线程的系统线程ID（通常是内核线程ID）? *
- * 注意：POSIX标准没有提供获取系统线程ID的便携方法， 这里返回pthread_t作为系统线程ID的近似? *
+ * 注意：POSIX标准没有提供获取系统线程ID的便携方法， 这里返回agentos_thread_t作为系统线程ID的近似? *
  * @param platform_handle 平台特定句柄（posix_task_data_t指针? * @return 系统线程ID，失败返回值
  */
 static uintptr_t posix_get_thread_system_id(void *platform_handle)
@@ -275,7 +255,7 @@ static uintptr_t posix_get_thread_system_id(void *platform_handle)
         return 0;
     }
 
-    /* POSIX中，pthread_t可以视为系统线程ID的近?*/
+    /* agentos_thread_t 在 POSIX 上可视为系统线程ID的近似 */
     return (uintptr_t)data->thread_handle;
 }
 
@@ -316,14 +296,11 @@ static void posix_cleanup_platform_resources(void *platform_handle, void *platfo
     posix_task_data_t *data = (posix_task_data_t *)platform_handle;
 
     if (data) {
-        /* 清理线程属?*/
-        pthread_attr_destroy(&data->thread_attr);
-
         /* 释放平台特定数据内存 */
         AGENTOS_FREE(data);
     }
 
-    /* platform_data当前未使?*/
+    /* platform_data当前未使用 */
     (void)platform_data;
 }
 

@@ -1,7 +1,7 @@
 # Adapter — 协议扩展框架
 
 **模块路径**: `agentos/protocols/core/adapter/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 
