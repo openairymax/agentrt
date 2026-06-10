@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "error_compat.h"
+#include "error.h"
 
 #define ATM_RET_ERR(c) \
     do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
@@ -35,10 +36,16 @@ static atomic_int timer_processing = 0;
 agentos_timer_t *agentos_timer_create(agentos_timer_callback_t callback, void *userdata)
 {
 
-    if (!callback) return NULL;
+    if (!callback) {
+        AGENTOS_LOG_ERROR("agentos_timer_create: null callback");
+        return NULL;
+    }
 
     agentos_timer_t *timer = (agentos_timer_t *)AGENTOS_CALLOC(1, sizeof(agentos_timer_t));
-    if (!timer) return NULL;
+    if (!timer) {
+        AGENTOS_LOG_ERROR("agentos_timer_create: calloc failed, ENOMEM");
+        return NULL;
+    }
 
     timer->callback = callback;
     timer->userdata = userdata;
@@ -48,13 +55,17 @@ agentos_timer_t *agentos_timer_create(agentos_timer_callback_t callback, void *u
 agentos_error_t agentos_timer_start(agentos_timer_t *timer, uint32_t interval_ms, int one_shot)
 {
 
-    if (!timer || interval_ms == 0)
+    if (!timer || interval_ms == 0) {
+        AGENTOS_LOG_ERROR("agentos_timer_start: invalid parameter, timer=%p interval_ms=%u", (void *)timer, interval_ms);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
 
     if (!timer_lock) {
         agentos_mutex_t *new_lock = agentos_mutex_create();
-        if (!new_lock)
+        if (!new_lock) {
+            AGENTOS_LOG_ERROR("agentos_timer_start: mutex create failed, ENOMEM");
             ATM_RET_ERR(AGENTOS_ENOMEM);
+        }
 
         agentos_mutex_t *expected = NULL;
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&timer_lock, (void **)&expected,
@@ -91,8 +102,10 @@ agentos_error_t agentos_timer_start(agentos_timer_t *timer, uint32_t interval_ms
 
 agentos_error_t agentos_timer_stop(agentos_timer_t *timer)
 {
-    if (!timer)
+    if (!timer) {
+        AGENTOS_LOG_ERROR("agentos_timer_stop: null timer");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
 
     if (!timer_lock)
         return AGENTOS_SUCCESS;
@@ -163,6 +176,7 @@ void agentos_time_timer_process(void)
     int capacity = 64;
     fire_entry_t *to_fire = (fire_entry_t *)AGENTOS_CALLOC(capacity, sizeof(fire_entry_t));
     if (!to_fire) {
+        AGENTOS_LOG_ERROR("agentos_time_timer_process: calloc failed for fire entries, capacity=%d", capacity);
         atomic_store_explicit(&timer_processing, 0, memory_order_seq_cst);
         return;
     }
@@ -181,8 +195,10 @@ void agentos_time_timer_process(void)
                 int new_capacity = capacity * 2;
                 fire_entry_t *new_buf =
                     (fire_entry_t *)AGENTOS_REALLOC(to_fire, new_capacity * sizeof(fire_entry_t));
-                if (!new_buf)
+                if (!new_buf) {
+                    AGENTOS_LOG_WARN("agentos_time_timer_process: realloc failed, fire_count=%d new_capacity=%d", fire_count, new_capacity);
                     break;
+                }
                 to_fire = new_buf;
                 capacity = new_capacity;
                 __builtin_memset(to_fire + fire_count, 0, (capacity - fire_count) * sizeof(fire_entry_t));

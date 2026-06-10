@@ -234,8 +234,11 @@ int gw_a2a_handler_handle_request(gw_a2a_handler_t *handler, const char *method,
                                 input_json ? input_json : "{}", &output, entry->user_data);
 
         AGENTOS_FREE(task_type);
+        task_type = NULL;
         AGENTOS_FREE(task_id);
+        task_id = NULL;
         AGENTOS_FREE(input_json);
+        input_json = NULL;
 
         if (rc != 0 || !output) {
             AGENTOS_FREE(output);
