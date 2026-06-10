@@ -709,24 +709,38 @@ int market_service_reload_config(market_service_t *service, const market_config_
     if (!service || !config || !service->initialized)
         return AGENTOS_ERR_INVALID_PARAM;
 
-    AGENTOS_FREE((void *)service->config.registry_url);
-    service->config.registry_url = NULL;
-    AGENTOS_FREE((void *)service->config.storage_path);
-    service->config.storage_path = NULL;
+    // Save old owned pointers
+    char *old_url = (char *)service->config.registry_url;
+    char *old_path = (char *)service->config.storage_path;
 
-    __builtin_memcpy(&service->config, config, sizeof(market_config_t));
-    if (config->registry_url) {
-        service->config.registry_url = AGENTOS_STRDUP(config->registry_url);
-        if (!service->config.registry_url) {
-            AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate registry_url");
-        }
+    // Copy non-pointer fields, preserving old owned pointers temporarily
+    {
+        market_config_t tmp = *config;
+        tmp.registry_url = old_url;
+        tmp.storage_path = old_path;
+        service->config = tmp;
     }
-    if (config->storage_path) {
-        service->config.storage_path = AGENTOS_STRDUP(config->storage_path);
-        if (!service->config.storage_path) {
-            AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate storage_path");
-        }
+
+    // Replace pointer fields with our own copies
+    char *new_url = config->registry_url ? AGENTOS_STRDUP(config->registry_url) : NULL;
+    char *new_path = config->storage_path ? AGENTOS_STRDUP(config->storage_path) : NULL;
+
+    if (config->registry_url && !new_url) {
+        AGENTOS_FREE(new_path);
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate registry_url");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
+    if (config->storage_path && !new_path) {
+        AGENTOS_FREE(new_url);
+        service->config.registry_url = new_url;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate storage_path");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
+
+    service->config.registry_url = new_url;
+    service->config.storage_path = new_path;
+    AGENTOS_FREE(old_url);
+    AGENTOS_FREE(old_path);
 
     return 0;
 }

@@ -618,8 +618,10 @@ AGENTOS_API agentos_error_t agentos_loop_wait(agentos_core_loop_t *loop, const c
             record.memory_record_importance = loop->manager.loop_config_memory_importance;
             char *new_record_id = NULL;
             agentos_error_t store_err = agentos_memory_write(loop->memory, &record, &new_record_id);
-            if (new_record_id)
+            if (new_record_id) {
                 AGENTOS_FREE(new_record_id);
+                new_record_id = NULL;
+            }
             if (store_err != AGENTOS_SUCCESS) {
                 AGENTOS_LOG_WARN("Failed to store execution result to memory: %d", store_err);
             } else {
@@ -754,6 +756,7 @@ static agentos_error_t save_plan_checkpoint(agentos_core_loop_t *loop,
         for (size_t i = 0; i < pending_count; i++)
             AGENTOS_FREE(pending_nodes[i]);
         AGENTOS_FREE(pending_nodes);
+        pending_nodes = NULL;
     }
 
     if (err != AGENTOS_SUCCESS || !checkpoint) {
@@ -1017,8 +1020,10 @@ AGENTOS_API agentos_error_t agentos_loop_restore_task(agentos_core_loop_t *loop,
             AGENTOS_FREE(node_task_id);
     }
 
-    if (recovered_input)
+    if (recovered_input) {
         AGENTOS_FREE(recovered_input);
+        recovered_input = NULL;
+    }
 
     *out_restored_task_id = AGENTOS_STRDUP(restored_id);
 

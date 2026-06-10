@@ -452,7 +452,9 @@ int monitor_service_reload_config(monitor_service_t *service, const monitor_conf
     }
 
     AGENTOS_FREE(service->config.log_file_path);
+    service->config.log_file_path = NULL;
     AGENTOS_FREE(service->config.metrics_storage_path);
+    service->config.metrics_storage_path = NULL;
 
     __builtin_memcpy(&service->config, config, sizeof(monitor_config_t));
     service->config.log_file_path =
