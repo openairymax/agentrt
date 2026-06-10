@@ -330,7 +330,7 @@ int mcp_transport_start(mcp_transport_t *transport)
         }
         snprintf(host, sizeof(host), "%s", host_start);
         AGENTOS_FREE(url_copy);
-
+        url_copy = NULL;
         struct addrinfo hints, *result;
         AGENTOS_MEMSET(&hints, 0, sizeof(hints));
         hints.ai_family = AF_UNSPEC;

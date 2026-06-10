@@ -14,6 +14,7 @@
 
 #include "agentos.h"
 #include "../intent/intent_utils.h"
+#include "logger.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 
@@ -123,13 +124,17 @@ static int contains_any_unsafe_pattern(const char *content, size_t len)
 
 agentos_error_t sc_stream_critic_create(const sc_config_t *config, sc_stream_critic_t **out_critic)
 {
-    if (!out_critic)
+    if (!out_critic) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_create: NULL out_critic parameter");
         return AGENTOS_EINVAL;
+    }
 
     sc_stream_critic_t *critic =
         (sc_stream_critic_t *)AGENTOS_CALLOC(1, sizeof(sc_stream_critic_t));
-    if (!critic)
+    if (!critic) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_create: allocation failed for stream critic");
         return AGENTOS_ENOMEM;
+    }
 
     if (config) {
         critic->config = *config;
@@ -141,6 +146,7 @@ agentos_error_t sc_stream_critic_create(const sc_config_t *config, sc_stream_cri
     critic->calibrator =
         confidence_calibrator_create(critic->config.calibrator_config.decay_factor);
     if (!critic->calibrator) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_create: calibrator creation failed");
         AGENTOS_FREE(critic);
         return AGENTOS_ENOMEM;
     }
@@ -148,6 +154,7 @@ agentos_error_t sc_stream_critic_create(const sc_config_t *config, sc_stream_cri
     critic->accumulated_critique_cap = 1024;
     critic->accumulated_critique = (char *)AGENTOS_CALLOC(1, critic->accumulated_critique_cap);
     if (!critic->accumulated_critique) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_create: accumulated_critique allocation failed (cap=%zu)", critic->accumulated_critique_cap);
         confidence_calibrator_destroy(critic->calibrator);
         AGENTOS_FREE(critic);
         return AGENTOS_ENOMEM;
@@ -173,8 +180,10 @@ void sc_stream_critic_destroy(sc_stream_critic_t *critic)
 
 agentos_error_t sc_stream_critic_reset(sc_stream_critic_t *critic)
 {
-    if (!critic)
+    if (!critic) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_reset: NULL critic parameter");
         return AGENTOS_EINVAL;
+    }
     if (critic->last_accepted_content) {
         AGENTOS_FREE(critic->last_accepted_content);
         critic->last_accepted_content = NULL;
@@ -193,15 +202,19 @@ agentos_error_t sc_stream_critic_reset(sc_stream_critic_t *critic)
 agentos_error_t sc_intent_classifier(sc_stream_critic_t *critic, const char *input,
                                      size_t input_len, sc_intent_result_t *out_result)
 {
-    if (!critic || !input || !out_result)
+    if (!critic || !input || !out_result) {
+        AGENTOS_LOG_ERROR("sc_intent_classifier: NULL params (critic=%p input=%p out_result=%p)", (void *)critic, (void *)input, (void *)out_result);
         return AGENTOS_EINVAL;
+    }
 
     __builtin_memset(out_result, 0, sizeof(sc_intent_result_t));
 
     agentos_intent_classification_t cls;
     int rc = agentos_intent_classify(input, input_len, &cls);
-    if (rc != 0)
+    if (rc != 0) {
+        AGENTOS_LOG_ERROR("sc_intent_classifier: intent classification failed (rc=%d input_len=%zu)", rc, input_len);
         return AGENTOS_EUNKNOWN;
+    }
 
     sc_intent_category_t cat = map_agentos_type_to_sc(cls.type);
     out_result->category = cat;
@@ -378,9 +391,12 @@ agentos_error_t sc_stream_validator(sc_stream_critic_t *critic, const char *cont
                                     size_t content_len, const sc_intent_result_t *intent_context,
                                     uint32_t validate_aspects, sc_validation_result_t *out_result)
 {
-    if (!critic || !content || !out_result)
+    if (!critic || !content || !out_result) {
+        AGENTOS_LOG_ERROR("sc_stream_validator: NULL params (critic=%p content=%p out_result=%p)", (void *)critic, (void *)content, (void *)out_result);
         return AGENTOS_EINVAL;
+    }
     if (content_len == 0) {
+        AGENTOS_LOG_ERROR("sc_stream_validator: empty content (content_len=0)");
         __builtin_memset(out_result, 0, sizeof(sc_validation_result_t));
         return AGENTOS_EINVAL;
     }
@@ -432,6 +448,7 @@ agentos_error_t sc_stream_validator(sc_stream_critic_t *critic, const char *cont
     if (!out_result->is_acceptable) {
         out_result->rejection_reason = "Overall quality below acceptance threshold";
         out_result->rejection_reason_len = 46;
+        AGENTOS_LOG_WARN("sc_stream_validator: content rejected (overall_score=%.2f threshold=%.2f content_len=%zu)", out_result->overall_score, critic->config.accept_threshold, content_len);
     }
 
     /* 更新历史 */
@@ -540,15 +557,19 @@ sc_output_corrector(sc_stream_critic_t *critic, const char *raw_output, size_t r
                     const sc_intent_result_t *__attribute__((unused)) intent_context,
                     sc_correction_result_t *out_result)
 {
-    if (!critic || !raw_output || !out_result)
+    if (!critic || !raw_output || !out_result) {
+        AGENTOS_LOG_ERROR("sc_output_corrector: NULL params (critic=%p raw_output=%p out_result=%p)", (void *)critic, (void *)raw_output, (void *)out_result);
         return AGENTOS_EINVAL;
+    }
 
     __builtin_memset(out_result, 0, sizeof(sc_correction_result_t));
 
     out_result->entries = (sc_correction_entry_t *)AGENTOS_CALLOC(critic->config.max_corrections,
                                                                   sizeof(sc_correction_entry_t));
-    if (!out_result->entries)
+    if (!out_result->entries) {
+        AGENTOS_LOG_ERROR("sc_output_corrector: entries allocation failed (max_corrections=%zu)", critic->config.max_corrections);
         return AGENTOS_ENOMEM;
+    }
     out_result->entries_capacity = critic->config.max_corrections;
 
     uint64_t start_ns = agentos_time_monotonic_ns();
@@ -572,6 +593,7 @@ sc_output_corrector(sc_stream_critic_t *critic, const char *raw_output, size_t r
     size_t final_cap = raw_output_len + 256;
     char *final_buf = (char *)AGENTOS_MALLOC(final_cap);
     if (!final_buf) {
+        AGENTOS_LOG_ERROR("sc_output_corrector: final buffer allocation failed (cap=%zu)", final_cap);
         AGENTOS_FREE(out_result->entries);
         out_result->entries = NULL;
         return AGENTOS_ENOMEM;
@@ -638,8 +660,10 @@ agentos_error_t sc_memory_confirmer(sc_stream_critic_t *critic, const char *outp
                                     agentos_memory_engine_t *__attribute__((unused)) memory_engine,
                                     sc_memory_result_t *out_result)
 {
-    if (!critic || !output || !out_result)
+    if (!critic || !output || !out_result) {
+        AGENTOS_LOG_ERROR("sc_memory_confirmer: NULL params (critic=%p output=%p out_result=%p)", (void *)critic, (void *)output, (void *)out_result);
         return AGENTOS_EINVAL;
+    }
 
     __builtin_memset(out_result, 0, sizeof(sc_memory_result_t));
 
@@ -647,8 +671,10 @@ agentos_error_t sc_memory_confirmer(sc_stream_critic_t *critic, const char *outp
 
     out_result->entries = (sc_memory_entry_t *)AGENTOS_CALLOC(critic->config.max_memory_entries,
                                                               sizeof(sc_memory_entry_t));
-    if (!out_result->entries)
+    if (!out_result->entries) {
+        AGENTOS_LOG_ERROR("sc_memory_confirmer: entries allocation failed (max_memory_entries=%zu)", critic->config.max_memory_entries);
         return AGENTOS_ENOMEM;
+    }
     out_result->entries_capacity = critic->config.max_memory_entries;
 
     /* 入口1: 完整输出 */
@@ -711,14 +737,18 @@ agentos_error_t sc_stream_critic_pipeline(sc_stream_critic_t *critic, const char
                                           char **out_final_output, size_t *out_final_len,
                                           float *out_final_quality)
 {
-    if (!critic || !input || !raw_output || !out_final_output)
+    if (!critic || !input || !raw_output || !out_final_output) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_pipeline: NULL params (critic=%p input=%p raw_output=%p out_final_output=%p)", (void *)critic, (void *)input, (void *)raw_output, (void *)out_final_output);
         return AGENTOS_EINVAL;
+    }
 
     /* Phase 0 */
     sc_intent_result_t intent;
     agentos_error_t err = sc_intent_classifier(critic, input, input_len, &intent);
-    if (err != AGENTOS_SUCCESS)
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_pipeline: Phase0 intent classification failed (err=%d)", (int)err);
         return err;
+    }
 
     /* Phase 1 */
     int validation_ok = 1;
@@ -738,6 +768,7 @@ agentos_error_t sc_stream_critic_pipeline(sc_stream_critic_t *critic, const char
     sc_correction_result_t corr;
     err = sc_output_corrector(critic, raw_output, raw_output_len, &intent, &corr);
     if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_pipeline: Phase3 output correction failed (err=%d raw_output_len=%zu)", (int)err, raw_output_len);
         sc_intent_result_free(&intent);
         return err;
     }
@@ -745,9 +776,12 @@ agentos_error_t sc_stream_critic_pipeline(sc_stream_critic_t *critic, const char
     /* Phase 4 — skip if validation failed (avoid persisting low-quality output) */
     if (critic->config.enable_memory_confirm && memory_engine && validation_ok) {
         sc_memory_result_t mem;
-        sc_memory_confirmer(critic, corr.final_output ? corr.final_output : raw_output,
+        agentos_error_t mem_err = sc_memory_confirmer(critic, corr.final_output ? corr.final_output : raw_output,
                             corr.final_output ? corr.final_output_len : raw_output_len, &intent,
                             memory_engine, &mem);
+        if (mem_err != AGENTOS_SUCCESS) {
+            AGENTOS_LOG_WARN("sc_stream_critic_pipeline: Phase4 memory confirmation failed (err=%d)", (int)mem_err);
+        }
         sc_memory_result_free(&mem);
     }
 
@@ -778,8 +812,10 @@ agentos_error_t sc_stream_critic_pipeline(sc_stream_critic_t *critic, const char
 agentos_error_t sc_stream_critic_get_stats(const sc_stream_critic_t *critic,
                                            sc_critic_stats_t *out_stats)
 {
-    if (!critic || !out_stats)
+    if (!critic || !out_stats) {
+        AGENTOS_LOG_ERROR("sc_stream_critic_get_stats: NULL params (critic=%p out_stats=%p)", (void *)critic, (void *)out_stats);
         return AGENTOS_EINVAL;
+    }
     *out_stats = critic->stats;
     return AGENTOS_SUCCESS;
 }
