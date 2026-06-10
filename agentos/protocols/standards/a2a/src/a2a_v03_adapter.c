@@ -26,6 +26,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Fallback AGENTOS_LOG_DEBUG if not provided by error.h */
+#ifndef AGENTOS_LOG_DEBUG
+#include <stdio.h>
+#define AGENTOS_LOG_DEBUG(fmt, ...) __builtin_fprintf(stderr, "[DEBUG] " fmt "\n", ##__VA_ARGS__)
+#endif
+
 /* Forward declarations for types defined in header */
 typedef struct a2a_v03_adapter_s a2a_v03_adapter_t;
 
@@ -122,6 +128,15 @@ typedef struct {
     char *capabilities_json;
 } a2a_internal_card_t;
 
+/* Transport write callback type for sending data through the transport layer */
+typedef int (*a2a_transport_write_fn)(void *transport_ctx, const void *data, size_t size);
+
+/* A2A v03 protocol message frame header constants */
+#define A2A_V03_FRAME_MAGIC   "A2A/0.3"
+#define A2A_V03_FRAME_HDR_SEP "\r\n"
+#define A2A_V03_FRAME_END     "\r\n\r\n"
+#define A2A_V03_FRAME_HDR_MAX 256
+
 /* Use header-declared types; define local adapter state */
 struct a2a_v03_adapter_s {
     a2a_internal_card_t agents[A2A_V03_MAX_AGENTS];
@@ -146,6 +161,12 @@ struct a2a_v03_adapter_s {
     void *negotiation_handler_user_data;
     a2a_streaming_handler_t streaming_handler;
     void *streaming_handler_user_data;
+    /* Transport layer for sending data */
+    a2a_transport_write_fn transport_write;
+    void *transport_ctx;
+    bool connected;
+    uint64_t bytes_sent;
+    uint64_t messages_sent;
 };
 
 static struct a2a_v03_adapter_s *g_a2a_instance = NULL;
@@ -495,6 +516,7 @@ int a2a_v03_stream_task(a2a_handle_t handle, const a2a_task_request_internal_t *
 
         on_chunk(event.detail_json, strlen(event.detail_json), (i == 4), user_data);
         AGENTOS_FREE((void *)event.detail_json);
+        event.detail_json = NULL;
     }
 
     final_response->status = A2A_TASK_STATUS_COMPLETED;
@@ -1044,7 +1066,9 @@ int a2a_v03_unregister_agent(a2a_v03_context_t *ctx, const char *agent_id)
     for (size_t i = 0; i < adapter->agent_count; i++) {
         if (strcmp(adapter->agents[i].id, agent_id) == 0) {
             AGENTOS_FREE(adapter->agents[i].name);
+            adapter->agents[i].name = NULL;
             AGENTOS_FREE(adapter->agents[i].url);
+            adapter->agents[i].url = NULL;
             if (i < adapter->agent_count - 1) {
                 adapter->agents[i] = adapter->agents[adapter->agent_count - 1];
             }
@@ -1391,6 +1415,21 @@ int a2a_v03_set_streaming_handler(a2a_v03_context_t *ctx, a2a_streaming_handler_
     return 0;
 }
 
+int a2a_v03_set_transport(a2a_v03_context_t *ctx, int (*write_fn)(void *, const void *, size_t),
+                          void *transport_ctx)
+{
+    if (!ctx || !write_fn)
+        {
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__,
+                              "a2a_v03_set_transport: invalid parameter");
+        return AGENTOS_ERR_INVALID_PARAM;
+        }
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)ctx;
+    adapter->transport_write = write_fn;
+    adapter->transport_ctx = transport_ctx;
+    return 0;
+}
+
 int a2a_v03_route_request(a2a_v03_context_t *ctx, const char *method, const char *params_json,
                           char **response_json)
 {
@@ -1521,6 +1560,10 @@ static int a2a_adapter_connect_cb(void *c, const char *e)
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_connect_cb: IO error");
         return AGENTOS_ERR_UNKNOWN;
         }
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)c;
+    adapter->connected = true;
+    AGENTOS_LOG_DEBUG("a2a_adapter_connect_cb: connected to %s",
+                      e ? e : "(unknown)");
     (void)e;
     return 0;
 }
@@ -1531,20 +1574,83 @@ static int a2a_adapter_disconnect_cb(void *c)
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_disconnect_cb: IO error");
         return AGENTOS_ERR_UNKNOWN;
         }
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)c;
+    adapter->connected = false;
+    AGENTOS_LOG_DEBUG("a2a_adapter_disconnect_cb: disconnected");
     return 0;
 }
 static int a2a_adapter_is_connected_cb(void *c)
 {
-    return c ? 1 : 0;
+    if (!c)
+        return 0;
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)c;
+    return adapter->connected ? 1 : 0;
 }
 static int a2a_adapter_send_cb(void *c, const void *d, size_t s)
 {
-    if (!c || !d || s == 0)
-        {
-        agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "a2a_adapter_send_cb: IO error");
-        return AGENTOS_ERR_UNKNOWN;
-        }
-    return AGENTOS_ENOTSUP;
+    if (!c || !d || s == 0) {
+        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__,
+                              "a2a_adapter_send_cb: invalid parameter");
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+    struct a2a_v03_adapter_s *adapter = (struct a2a_v03_adapter_s *)c;
+    if (!adapter->initialized) {
+        agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR, __FILE__, __LINE__, __func__,
+                              "not initialized");
+        return AGENTOS_ERR_STATE_ERROR;
+    }
+
+    if (!adapter->connected || !adapter->transport_write) {
+        agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__,
+                              "not connected or no transport");
+        return AGENTOS_ERR_NOT_SUPPORTED;
+    }
+
+    /* Format A2A v03 protocol message frame:
+     *   A2A/0.3\r\n
+     *   Content-Length: <size>\r\n
+     *   Content-Type: application/json\r\n
+     *   \r\n
+     *   <payload>
+     */
+    char header[A2A_V03_FRAME_HDR_MAX];
+    int hdr_len = snprintf(header, sizeof(header),
+                           A2A_V03_FRAME_MAGIC A2A_V03_FRAME_HDR_SEP
+                           "Content-Length: %zu" A2A_V03_FRAME_HDR_SEP
+                           "Content-Type: application/json" A2A_V03_FRAME_END,
+                           s);
+    if (hdr_len <= 0 || (size_t)hdr_len >= sizeof(header)) {
+        agentos_error_push_ex(AGENTOS_ERR_OVERFLOW, __FILE__, __LINE__, __func__,
+                              "header overflow");
+        return AGENTOS_ERR_OVERFLOW;
+    }
+
+    AGENTOS_LOG_DEBUG("a2a_adapter_send_cb: sending %zu bytes (frame hdr=%d)", s, hdr_len);
+
+    /* Send header */
+    int rc = adapter->transport_write(adapter->transport_ctx, header, (size_t)hdr_len);
+    if (rc != AGENTOS_OK) {
+        agentos_error_push_ex(AGENTOS_ERR_IO, __FILE__, __LINE__, __func__,
+                              "transport write header failed");
+        return AGENTOS_ERR_IO;
+    }
+
+    /* Send payload */
+    rc = adapter->transport_write(adapter->transport_ctx, d, s);
+    if (rc != AGENTOS_OK) {
+        agentos_error_push_ex(AGENTOS_ERR_IO, __FILE__, __LINE__, __func__,
+                              "transport write payload failed");
+        return AGENTOS_ERR_IO;
+    }
+
+    adapter->bytes_sent += (uint64_t)s + (uint64_t)hdr_len;
+    adapter->messages_sent++;
+
+    AGENTOS_LOG_DEBUG("a2a_adapter_send_cb: sent message #%llu (%zu bytes payload)",
+                      (unsigned long long)adapter->messages_sent, s);
+
+    return AGENTOS_OK;
 }
 static int a2a_adapter_receive_cb(void *c, void **d, size_t *s, uint32_t t)
 {

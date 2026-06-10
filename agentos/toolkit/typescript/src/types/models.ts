@@ -154,6 +154,78 @@ export interface SkillInfo {
 }
 
 /**
+ * 记忆原始响应数据（API 返回格式）
+ */
+export interface MemoryRaw {
+  memory_id?: string;
+  id?: string;
+  content: string;
+  layer: string;
+  score?: number;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  createdAt?: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
+/**
+ * 任务资源（转换器输出格式）
+ */
+export interface TaskResource {
+  id: string;
+  description: string;
+  status: string;
+  priority: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * 记忆资源（转换器输出格式）
+ */
+export interface MemoryResource {
+  id: string;
+  content: string;
+  layer: string;
+  score: number;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * 会话资源（转换器输出格式）
+ */
+export interface SessionResource {
+  id: string;
+  status: string;
+  context: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt?: Date;
+}
+
+/**
+ * 技能资源（转换器输出格式）
+ */
+export interface SkillResource {
+  name: string;
+  description: string;
+  status: string;
+  loaded: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * 协议请求载荷
+ */
+export interface RequestPayload {
+  [key: string]: unknown;
+}
+
+/**
  * 健康检查返回状态
  */
 export interface HealthStatus {

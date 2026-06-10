@@ -1,7 +1,7 @@
 # Gateway Deploy — Kubernetes 部署配置
 
 **模块路径**: `agentos/gateway/deploy/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

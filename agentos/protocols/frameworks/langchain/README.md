@@ -1,7 +1,7 @@
 # LangChain — 框架适配器
 
 **模块路径**: `agentos/protocols/frameworks/langchain/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

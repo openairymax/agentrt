@@ -1,7 +1,7 @@
 # Heapstore Services — 服务存储后端
 
 **模块路径**: `agentos/heapstore/services/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

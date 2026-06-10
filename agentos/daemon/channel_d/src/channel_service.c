@@ -72,7 +72,7 @@ AGENTOS_STRNCPY_TERM(addr.sun_path, endpoint, sizeof(addr.sun_path));
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) {
         AGENTOS_ERROR(AGENTOS_ERR_IO, "socket creation failed");
-        return -1;
+        return AGENTOS_ERR_IO;
     }
 
     unlink(endpoint);
@@ -80,14 +80,14 @@ AGENTOS_STRNCPY_TERM(addr.sun_path, endpoint, sizeof(addr.sun_path));
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(fd);
         AGENTOS_ERROR(AGENTOS_ERR_IO, "bind failed on endpoint");
-        return -1;
+        return AGENTOS_ERR_IO;
     }
 
     if (listen(fd, 128) < 0) {
         close(fd);
         unlink(endpoint);
         AGENTOS_ERROR(AGENTOS_ERR_IO, "listen failed on endpoint");
-        return -1;
+        return AGENTOS_ERR_IO;
     }
 
     int flags = fcntl(fd, F_GETFL, 0);
@@ -109,14 +109,14 @@ static int create_shm_channel(channel_entry_t *entry, const char *endpoint __att
     int fd = shm_open(entry->shm_name, O_CREAT | O_RDWR, 0600);
     if (fd < 0) {
         AGENTOS_ERROR(AGENTOS_ERR_IO, "shm_open failed");
-        return -1;
+        return AGENTOS_ERR_IO;
     }
 
     if (ftruncate(fd, (off_t)shm_size) < 0) {
         close(fd);
         shm_unlink(entry->shm_name);
         AGENTOS_ERROR(AGENTOS_ERR_IO, "ftruncate failed on shm");
-        return -1;
+        return AGENTOS_ERR_IO;
     }
 
     void *ptr = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -124,7 +124,7 @@ static int create_shm_channel(channel_entry_t *entry, const char *endpoint __att
         close(fd);
         shm_unlink(entry->shm_name);
         AGENTOS_ERROR(AGENTOS_ERR_IO, "mmap failed on shm");
-        return -1;
+        return AGENTOS_ERR_IO;
     }
 
     __builtin_memset(ptr, 0, shm_size);
@@ -293,13 +293,13 @@ AGENTOS_STRNCPY_TERM(entry->info.endpoint, endpoint, sizeof(entry->info.endpoint
         if (entry->info.endpoint[0]) {
             rc = mkfifo(entry->info.endpoint, 0666);
             if (rc < 0 && errno != EEXIST)
-                rc = -1;
+                rc = AGENTOS_ERR_IO;
             else
                 rc = 0;
         }
         break;
     default:
-        rc = -1;
+        rc = AGENTOS_ERR_NOT_SUPPORTED;
         break;
     }
 

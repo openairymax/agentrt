@@ -18,7 +18,7 @@ set(TEST_SOURCES
     test_jsonrpc_helpers.c
     test_safe_string_utils.c
     test_input_validator.c
-#    test_svc_stop.c  # TODO: 框架宏不兼容，待修复后重新启用
+    test_svc_stop.c
     test_ipc_service_bus.c
     test_strategies_recovery.c
     test_log_sanitizer.c

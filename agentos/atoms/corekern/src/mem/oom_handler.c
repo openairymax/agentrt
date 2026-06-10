@@ -13,9 +13,10 @@
 #include "oom_handler.h"
 #include "mem.h"
 #include "memory_compat.h"
+#include "memory_prealloc.h"
 #include "string_compat.h"
 
-#include <stdio.h>
+#include "logging_compat.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,6 +26,12 @@
 
 #define OOM_TRACKER_CAPACITY 1024  /**< 分配跟踪环形缓冲区容量 */
 #define OOM_DEFAULT_SYSTEM_MEMORY (512ULL * 1024 * 1024)  /**< 默认系统内存 512MB */
+
+/* 压力分级阈值（可配置） */
+#define OOM_PRESSURE_THRESHOLD_WARNING   0.70  /**< 70% → WARNING */
+#define OOM_PRESSURE_THRESHOLD_DEGRADED  0.80  /**< 80% → DEGRADED */
+#define OOM_PRESSURE_THRESHOLD_CRITICAL  0.90  /**< 90% → CRITICAL */
+#define OOM_PRESSURE_THRESHOLD_FATAL     0.95  /**< 95% → FATAL */
 
 /* ============================================================================
  * 全局 OOM 处理器单例
@@ -112,6 +119,69 @@ static const char *oom_response_name(int response)
     }
 }
 
+/**
+ * @brief 获取压力级别名称（用于日志）
+ */
+static const char *oom_pressure_name(agentos_mem_pressure_level_t level)
+{
+    switch (level) {
+    case AGENTOS_MEM_PRESSURE_NORMAL:   return "NORMAL";
+    case AGENTOS_MEM_PRESSURE_WARNING:  return "WARNING";
+    case AGENTOS_MEM_PRESSURE_DEGRADED: return "DEGRADED";
+    case AGENTOS_MEM_PRESSURE_CRITICAL: return "CRITICAL";
+    case AGENTOS_MEM_PRESSURE_FATAL:    return "FATAL";
+    default:                            return "UNKNOWN";
+    }
+}
+
+/**
+ * @brief 基于内存使用率计算压力级别
+ */
+static agentos_mem_pressure_level_t oom_calc_pressure_level(
+    size_t current_allocated, size_t total_memory)
+{
+    if (total_memory == 0) {
+        return AGENTOS_MEM_PRESSURE_NORMAL;
+    }
+
+    double usage = (double)current_allocated / (double)total_memory;
+
+    if (usage > OOM_PRESSURE_THRESHOLD_FATAL)      return AGENTOS_MEM_PRESSURE_FATAL;
+    else if (usage > OOM_PRESSURE_THRESHOLD_CRITICAL) return AGENTOS_MEM_PRESSURE_CRITICAL;
+    else if (usage > OOM_PRESSURE_THRESHOLD_DEGRADED) return AGENTOS_MEM_PRESSURE_DEGRADED;
+    else if (usage > OOM_PRESSURE_THRESHOLD_WARNING)  return AGENTOS_MEM_PRESSURE_WARNING;
+    else                                               return AGENTOS_MEM_PRESSURE_NORMAL;
+}
+
+/**
+ * @brief 触发压力级别变化回调
+ */
+static void oom_fire_pressure_callbacks(
+    agentos_mem_pressure_level_t old_level,
+    agentos_mem_pressure_level_t new_level)
+{
+    if (!g_oom_handler) {
+        return;
+    }
+
+    oom_handler_t *handler = g_oom_handler;
+
+    /* 对每个达到或超过的级别触发回调 */
+    int start = (new_level > old_level) ? (int)old_level + 1 : (int)new_level;
+    int end   = (int)new_level;
+
+    for (int level = start; level <= end; level++) {
+        for (int i = 0; i < AGENTOS_PRESSURE_MAX_CALLBACKS; i++) {
+            if (handler->pressure_callbacks[level][i].active &&
+                handler->pressure_callbacks[level][i].callback) {
+                handler->pressure_callbacks[level][i].callback(
+                    (agentos_mem_pressure_level_t)level,
+                    handler->pressure_callbacks[level][i].user_data);
+            }
+        }
+    }
+}
+
 /* ============================================================================
  * 公共 API 实现
  * ============================================================================ */
@@ -156,10 +226,24 @@ agentos_error_t agentos_oom_init(size_t total_system_memory)
     handler->ext_stats->total_system_memory = handler->total_system_memory;
     handler->current_watermark = WATERMARK_NORMAL;
 
+    /* 初始化压力分级系统 */
+    handler->current_pressure = AGENTOS_MEM_PRESSURE_NORMAL;
+    handler->pressure_denied_count = 0;
+    handler->total_allocated_bytes = 0;
+    agentos_mutex_init(&handler->pressure_mutex);
+    AGENTOS_MEMSET(handler->pressure_callbacks, 0,
+                   sizeof(handler->pressure_callbacks));
+
     g_oom_handler = handler;
 
-    fprintf(stderr, "[OOM] OOM handler initialized: system_memory=%zu bytes, "
-            "tracker_capacity=%d\n",
+    /* SEC-13: Initialize pre-allocation pool for critical paths */
+    if (agentos_prealloc_init() != 0) {
+        AGENTOS_LOG_WARN("[OOM] Pre-allocation pool init failed; "
+                "critical path buffers unavailable");
+    }
+
+    AGENTOS_LOG_INFO("[OOM] OOM handler initialized: system_memory=%zu bytes, "
+            "tracker_capacity=%d",
             handler->total_system_memory, OOM_TRACKER_CAPACITY);
 
     return AGENTOS_SUCCESS;
@@ -183,10 +267,19 @@ void agentos_oom_destroy(void)
     /* 降级处理器链表由调用者管理生命周期，此处仅清理引用 */
     handler->degradation_handlers = NULL;
 
+    /* 清理压力分级系统 */
+    agentos_mutex_destroy(&handler->pressure_mutex);
+    AGENTOS_MEMSET(handler->pressure_callbacks, 0,
+                   sizeof(handler->pressure_callbacks));
+    handler->current_pressure = AGENTOS_MEM_PRESSURE_NORMAL;
+
     AGENTOS_FREE(handler);
     g_oom_handler = NULL;
 
-    fprintf(stderr, "[OOM] OOM handler destroyed\n");
+    /* SEC-13: Shutdown pre-allocation pool */
+    agentos_prealloc_shutdown();
+
+    AGENTOS_LOG_INFO("[OOM] OOM handler destroyed");
 }
 
 oom_handler_t *agentos_oom_get_handler(void)
@@ -194,7 +287,7 @@ oom_handler_t *agentos_oom_get_handler(void)
     return g_oom_handler;
 }
 
-int agentos_oom_determine_response(watermark_level_t level)
+oom_response_level_t agentos_oom_determine_response(watermark_level_t level)
 {
     switch (level) {
     case WATERMARK_NORMAL:
@@ -244,8 +337,8 @@ int agentos_oom_handle(size_t requested, size_t available)
 
     int response = agentos_oom_determine_response(handler->current_watermark);
 
-    fprintf(stderr, "[OOM] OOM event #%llu: requested=%zu, available=%zu, "
-            "watermark=%s, response=%s\n",
+    AGENTOS_LOG_ERROR("[OOM] OOM event #%llu: requested=%zu, available=%zu, "
+            "watermark=%s, response=%s",
             (unsigned long long)handler->oom_event_count,
             requested, available,
             oom_watermark_name(handler->current_watermark),
@@ -272,8 +365,8 @@ int agentos_oom_handle(size_t requested, size_t available)
     case OOM_RESPONSE_FATAL_TERMINATE:
         /* 最后尝试降级，然后终止 */
         agentos_oom_degrade(old_level, handler->current_watermark);
-        fprintf(stderr, "[OOM] FATAL: terminating process. "
-                "requested=%zu, available=%zu, total_events=%llu\n",
+        AGENTOS_LOG_ERROR("[OOM] FATAL: terminating process. "
+                "requested=%zu, available=%zu, total_events=%llu",
                 requested, available,
                 (unsigned long long)handler->oom_event_count);
         abort();
@@ -313,7 +406,7 @@ agentos_error_t agentos_register_degradation(degradation_handler_t *handler)
     handler->is_degraded = false;
     oom->degradation_handlers = handler;
 
-    fprintf(stderr, "[OOM] Degradation handler registered: %s (trigger=%s)\n",
+    AGENTOS_LOG_INFO("[OOM] Degradation handler registered: %s (trigger=%s)",
             handler->feature_name,
             oom_watermark_name(handler->trigger_level));
 
@@ -335,7 +428,7 @@ void agentos_unregister_degradation(degradation_handler_t *handler)
             handler->next = NULL;
             handler->is_degraded = false;
 
-            fprintf(stderr, "[OOM] Degradation handler unregistered: %s\n",
+            AGENTOS_LOG_INFO("[OOM] Degradation handler unregistered: %s",
                     handler->feature_name);
             return;
         }
@@ -358,7 +451,7 @@ void agentos_oom_degrade(watermark_level_t old_level,
         if (new_level >= handler->trigger_level && !handler->is_degraded) {
             handler->is_degraded = true;
             if (handler->on_degrade) {
-                fprintf(stderr, "[OOM] Degrading: %s (level %s → %s)\n",
+                AGENTOS_LOG_WARN("[OOM] Degrading: %s (level %s → %s)",
                         handler->feature_name,
                         oom_watermark_name(old_level),
                         oom_watermark_name(new_level));
@@ -369,7 +462,7 @@ void agentos_oom_degrade(watermark_level_t old_level,
         else if (new_level < handler->trigger_level && handler->is_degraded) {
             handler->is_degraded = false;
             if (handler->on_restore) {
-                fprintf(stderr, "[OOM] Restoring: %s (level %s → %s)\n",
+                AGENTOS_LOG_INFO("[OOM] Restoring: %s (level %s → %s)",
                         handler->feature_name,
                         oom_watermark_name(old_level),
                         oom_watermark_name(new_level));
@@ -394,8 +487,8 @@ void agentos_oom_update_watermark(size_t current_allocated)
     if (new_level != old_level) {
         oom->current_watermark = new_level;
 
-        fprintf(stderr, "[OOM] Watermark changed: %s → %s "
-                "(allocated=%zu/%zu, %.1f%%)\n",
+        AGENTOS_LOG_WARN("[OOM] Watermark changed: %s → %s "
+                "(allocated=%zu/%zu, %.1f%%)",
                 oom_watermark_name(old_level),
                 oom_watermark_name(new_level),
                 current_allocated, oom->total_system_memory,
@@ -421,4 +514,225 @@ bool agentos_oom_is_degraded(void)
         return false;
     }
     return g_oom_handler->current_watermark >= WATERMARK_WARNING;
+}
+
+/* ============================================================================
+ * 内存压力分级 API 实现（SEC-12 OOM 分级响应框架）
+ * ============================================================================ */
+
+agentos_mem_pressure_level_t agentos_oom_get_pressure(void)
+{
+    if (!g_oom_handler) {
+        return AGENTOS_MEM_PRESSURE_NORMAL;
+    }
+
+    oom_handler_t *handler = g_oom_handler;
+
+    agentos_mutex_lock(&handler->pressure_mutex);
+
+    /* 获取当前已分配内存 */
+    size_t current_allocated = 0;
+    if (handler->ext_stats) {
+        current_allocated = handler->ext_stats->current_allocated;
+    }
+
+    agentos_mem_pressure_level_t old_level = handler->current_pressure;
+    agentos_mem_pressure_level_t new_level = oom_calc_pressure_level(
+        current_allocated, handler->total_system_memory);
+
+    if (new_level != old_level) {
+        handler->current_pressure = new_level;
+
+        AGENTOS_LOG_WARN("[OOM] Pressure changed: %s → %s "
+                "(allocated=%zu/%zu, %.1f%%)",
+                oom_pressure_name(old_level),
+                oom_pressure_name(new_level),
+                current_allocated, handler->total_system_memory,
+                100.0 * (double)current_allocated /
+                         (double)handler->total_system_memory);
+
+        /* 触发压力变化回调 */
+        oom_fire_pressure_callbacks(old_level, new_level);
+    }
+
+    agentos_mem_pressure_level_t result = handler->current_pressure;
+    agentos_mutex_unlock(&handler->pressure_mutex);
+
+    return result;
+}
+
+int agentos_oom_register_callback(
+    agentos_mem_pressure_level_t level,
+    void (*callback)(agentos_mem_pressure_level_t, void *),
+    void *user_data)
+{
+    if (!callback || level < 0 || level > AGENTOS_MEM_PRESSURE_FATAL) {
+        return AGENTOS_EINVAL;
+    }
+
+    if (!g_oom_handler) {
+        return AGENTOS_ENOTINIT;
+    }
+
+    oom_handler_t *handler = g_oom_handler;
+
+    agentos_mutex_lock(&handler->pressure_mutex);
+
+    /* 查找空闲槽位 */
+    for (int i = 0; i < AGENTOS_PRESSURE_MAX_CALLBACKS; i++) {
+        if (!handler->pressure_callbacks[level][i].active) {
+            handler->pressure_callbacks[level][i].callback = callback;
+            handler->pressure_callbacks[level][i].user_data = user_data;
+            handler->pressure_callbacks[level][i].active = true;
+
+            agentos_mutex_unlock(&handler->pressure_mutex);
+
+            AGENTOS_LOG_INFO("[OOM] Pressure callback registered: level=%s, slot=%d",
+                    oom_pressure_name(level), i);
+            return 0;
+        }
+    }
+
+    agentos_mutex_unlock(&handler->pressure_mutex);
+
+    AGENTOS_LOG_WARN("[OOM] Pressure callback registration failed: "
+            "level=%s, no free slots",
+            oom_pressure_name(level));
+    return AGENTOS_EBUSY;
+}
+
+int agentos_oom_check_allocation(size_t requested_size)
+{
+    if (!g_oom_handler) {
+        /* 未初始化时允许分配 */
+        return 0;
+    }
+
+    oom_handler_t *handler = g_oom_handler;
+
+    agentos_mutex_lock(&handler->pressure_mutex);
+
+    /* 获取当前已分配内存并计算压力级别 */
+    size_t current_allocated = 0;
+    if (handler->ext_stats) {
+        current_allocated = handler->ext_stats->current_allocated;
+    }
+
+    agentos_mem_pressure_level_t old_level = handler->current_pressure;
+    agentos_mem_pressure_level_t new_level = oom_calc_pressure_level(
+        current_allocated, handler->total_system_memory);
+
+    if (new_level != old_level) {
+        handler->current_pressure = new_level;
+        oom_fire_pressure_callbacks(old_level, new_level);
+    }
+
+    agentos_mem_pressure_level_t pressure = handler->current_pressure;
+
+    int result = 0; /* 0 = 允许 */
+
+    switch (pressure) {
+    case AGENTOS_MEM_PRESSURE_NORMAL:
+        /* 正常操作，允许所有分配 */
+        break;
+
+    case AGENTOS_MEM_PRESSURE_WARNING:
+        /* 允许分配，记录警告 */
+        AGENTOS_LOG_WARN("[OOM] Allocation under WARNING pressure: "
+                "size=%zu, usage=%.1f%%",
+                requested_size,
+                100.0 * (double)current_allocated /
+                         (double)handler->total_system_memory);
+        break;
+
+    case AGENTOS_MEM_PRESSURE_DEGRADED:
+        /* 允许分配，但建议减少非必要分配 */
+        AGENTOS_LOG_WARN("[OOM] Allocation under DEGRADED pressure: "
+                "size=%zu, usage=%.1f%%",
+                requested_size,
+                100.0 * (double)current_allocated /
+                         (double)handler->total_system_memory);
+        break;
+
+    case AGENTOS_MEM_PRESSURE_CRITICAL:
+        /* 拒绝非必要分配 */
+        handler->pressure_denied_count++;
+        result = AGENTOS_ENOMEM;
+        AGENTOS_LOG_ERROR("[OOM] Allocation DENIED under CRITICAL pressure: "
+                "size=%zu, usage=%.1f%%, denied_count=%zu",
+                requested_size,
+                100.0 * (double)current_allocated /
+                         (double)handler->total_system_memory,
+                handler->pressure_denied_count);
+        break;
+
+    case AGENTOS_MEM_PRESSURE_FATAL:
+        /* 拒绝所有分配 */
+        handler->pressure_denied_count++;
+        result = AGENTOS_ENOMEM;
+        AGENTOS_LOG_ERROR("[OOM] Allocation DENIED under FATAL pressure: "
+                "size=%zu, usage=%.1f%%, denied_count=%zu",
+                requested_size,
+                100.0 * (double)current_allocated /
+                         (double)handler->total_system_memory,
+                handler->pressure_denied_count);
+        break;
+    }
+
+    /* 跟踪总分配字节数（仅允许时） */
+    if (result == 0) {
+        handler->total_allocated_bytes += requested_size;
+    }
+
+    agentos_mutex_unlock(&handler->pressure_mutex);
+
+    return result;
+}
+
+void agentos_oom_report_stats(void)
+{
+    if (!g_oom_handler) {
+        AGENTOS_LOG_INFO("[OOM] OOM handler not initialized");
+        return;
+    }
+
+    oom_handler_t *handler = g_oom_handler;
+
+    agentos_mutex_lock(&handler->pressure_mutex);
+
+    size_t current_allocated = 0;
+    if (handler->ext_stats) {
+        current_allocated = handler->ext_stats->current_allocated;
+    }
+
+    double usage_pct = 0.0;
+    if (handler->total_system_memory > 0) {
+        usage_pct = 100.0 * (double)current_allocated /
+                         (double)handler->total_system_memory;
+    }
+
+    AGENTOS_LOG_INFO("[OOM] Pressure Stats: level=%s, usage=%.1f%%, "
+            "allocated=%zu/%zu bytes, total_allocated=%zu, denied=%zu",
+            oom_pressure_name(handler->current_pressure),
+            usage_pct,
+            current_allocated, handler->total_system_memory,
+            handler->total_allocated_bytes,
+            handler->pressure_denied_count);
+
+    /* 各级别回调统计 */
+    for (int level = 0; level <= AGENTOS_MEM_PRESSURE_FATAL; level++) {
+        int active_count = 0;
+        for (int i = 0; i < AGENTOS_PRESSURE_MAX_CALLBACKS; i++) {
+            if (handler->pressure_callbacks[level][i].active) {
+                active_count++;
+            }
+        }
+        if (active_count > 0) {
+            AGENTOS_LOG_INFO("[OOM]   %s callbacks: %d/%d",
+                    oom_pressure_name((agentos_mem_pressure_level_t)level),
+                    active_count, AGENTOS_PRESSURE_MAX_CALLBACKS);
+        }
+    }
+
+    agentos_mutex_unlock(&handler->pressure_mutex);
 }
