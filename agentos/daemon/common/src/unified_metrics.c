@@ -111,8 +111,10 @@ AGENTOS_API int um_init(const um_config_t *config)
     }
 
     agentos_error_t err = agentos_mutex_init(&g_um.mutex);
-    if (err != AGENTOS_SUCCESS)
+    if (err != AGENTOS_SUCCESS) {
+        SVC_LOG_ERROR("um_init: mutex init failed err=%d", err);
         return AGENTOS_ERR_UNKNOWN;
+    }
 
     __builtin_memset(g_um.modules, 0, sizeof(g_um.modules));
     g_um.module_count = 0;
@@ -150,8 +152,10 @@ AGENTOS_API bool um_is_initialized(void)
 
 AGENTOS_API int um_register_module(const char *module_name, const char *instance_id)
 {
-    if (!module_name)
+    if (!module_name) {
+        SVC_LOG_ERROR("um_register_module: null module_name parameter");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
     if (!g_um.initialized)
         um_init(NULL);
 
@@ -164,6 +168,8 @@ AGENTOS_API int um_register_module(const char *module_name, const char *instance
 
     if (g_um.module_count >= UM_MAX_MODULES) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_register_module: max modules reached count=%u max=%u module='%s'",
+                      g_um.module_count, UM_MAX_MODULES, module_name);
         LOG_ERROR("Max metric modules reached");
         return AGENTOS_ERR_OVERFLOW;
     }
@@ -194,14 +200,17 @@ AGENTOS_API int um_register_module(const char *module_name, const char *instance
 
 AGENTOS_API int um_unregister_module(const char *module_name)
 {
-    if (!module_name)
+    if (!module_name) {
+        SVC_LOG_ERROR("um_unregister_module: null module_name parameter");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t *mod = find_module(module_name);
     if (!mod) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_WARN("um_unregister_module: module '%s' not found", module_name);
         return AGENTOS_ERR_NOT_FOUND;
     }
 
@@ -225,8 +234,11 @@ AGENTOS_API int um_unregister_module(const char *module_name)
 AGENTOS_API int um_register_metric(const char *module_name, const char *name, um_metric_type_t type,
                                    const char *help, const char *labels)
 {
-    if (!module_name || !name)
+    if (!module_name || !name) {
+        SVC_LOG_ERROR("um_register_metric: null parameter module_name=%p name=%p",
+                      (void *)module_name, (void *)name);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
     if (!g_um.initialized)
         um_init(NULL);
 
@@ -240,6 +252,7 @@ AGENTOS_API int um_register_metric(const char *module_name, const char *name, um
         mod = find_module(module_name);
         if (!mod) {
             agentos_mutex_unlock(&g_um.mutex);
+            SVC_LOG_ERROR("um_register_metric: failed to find/create module '%s'", module_name);
             return AGENTOS_ERR_NOT_FOUND;
         }
     }
@@ -251,6 +264,8 @@ AGENTOS_API int um_register_metric(const char *module_name, const char *name, um
 
     if (mod->metric_count >= UM_MAX_METRICS_PER_MOD) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_register_metric: max metrics reached for module '%s' count=%u max=%u metric='%s'",
+                      module_name, mod->metric_count, UM_MAX_METRICS_PER_MOD, name);
         return AGENTOS_ERR_OVERFLOW;
     }
 
@@ -278,20 +293,25 @@ AGENTOS_API int um_register_metric(const char *module_name, const char *name, um
 
 AGENTOS_API int um_increment(const char *module_name, const char *name, uint64_t value)
 {
-    if (!module_name || !name)
+    if (!module_name || !name) {
+        SVC_LOG_ERROR("um_increment: null parameter module_name=%p name=%p",
+                      (void *)module_name, (void *)name);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t *mod = find_module(module_name);
     if (!mod) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_increment: module '%s' not found", module_name);
         return AGENTOS_ERR_NOT_FOUND;
     }
 
     um_metric_entry_t *entry = find_metric(mod, name);
     if (!entry) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_increment: metric '%s' not found in module '%s'", name, module_name);
         return AGENTOS_ERR_NOT_FOUND;
     }
 
@@ -307,20 +327,25 @@ AGENTOS_API int um_increment(const char *module_name, const char *name, uint64_t
 
 AGENTOS_API int um_gauge_set(const char *module_name, const char *name, double value)
 {
-    if (!module_name || !name)
+    if (!module_name || !name) {
+        SVC_LOG_ERROR("um_gauge_set: null parameter module_name=%p name=%p",
+                      (void *)module_name, (void *)name);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t *mod = find_module(module_name);
     if (!mod) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_gauge_set: module '%s' not found", module_name);
         return AGENTOS_ERR_NOT_FOUND;
     }
 
     um_metric_entry_t *entry = find_metric(mod, name);
     if (!entry) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_gauge_set: metric '%s' not found in module '%s'", name, module_name);
         return AGENTOS_ERR_NOT_FOUND;
     }
 
@@ -335,20 +360,25 @@ AGENTOS_API int um_gauge_set(const char *module_name, const char *name, double v
 
 AGENTOS_API int um_observe(const char *module_name, const char *name, double value)
 {
-    if (!module_name || !name)
+    if (!module_name || !name) {
+        SVC_LOG_ERROR("um_observe: null parameter module_name=%p name=%p",
+                      (void *)module_name, (void *)name);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t *mod = find_module(module_name);
     if (!mod) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_observe: module '%s' not found", module_name);
         return AGENTOS_ERR_NOT_FOUND;
     }
 
     um_metric_entry_t *entry = find_metric(mod, name);
     if (!entry) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_observe: metric '%s' not found in module '%s'", name, module_name);
         return AGENTOS_ERR_NOT_FOUND;
     }
 
@@ -373,6 +403,7 @@ AGENTOS_API char *um_export_prometheus(void)
 AGENTOS_API char *um_export_prometheus_module(const char *module_name)
 {
     if (!g_um.initialized) {
+        SVC_LOG_ERROR("um_export_prometheus_module: metrics not initialized");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -384,6 +415,7 @@ AGENTOS_API char *um_export_prometheus_module(const char *module_name)
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_export_prometheus_module: memory allocation failed for export buffer");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -480,6 +512,7 @@ AGENTOS_API char *um_export_prometheus_module(const char *module_name)
 AGENTOS_API char *um_export_json(void)
 {
     if (!g_um.initialized) {
+        SVC_LOG_ERROR("um_export_json: metrics not initialized");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -491,6 +524,7 @@ AGENTOS_API char *um_export_json(void)
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
         agentos_mutex_unlock(&g_um.mutex);
+        SVC_LOG_ERROR("um_export_json: memory allocation failed for export buffer");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -594,8 +628,10 @@ AGENTOS_API void um_update_default_metrics(void)
 
 AGENTOS_API int um_get_stats(um_stats_t *stats)
 {
-    if (!stats)
+    if (!stats) {
+        SVC_LOG_ERROR("um_get_stats: null stats parameter");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     agentos_mutex_lock(&g_um.mutex);
     __builtin_memcpy(stats, &g_um.stats, sizeof(um_stats_t));

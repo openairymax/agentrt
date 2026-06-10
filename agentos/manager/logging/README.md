@@ -1,7 +1,7 @@
 # Manager Logging — 日志配置
 
 **模块路径**: `agentos/manager/logging/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

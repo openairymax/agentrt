@@ -1,7 +1,7 @@
 # Audit — 审计系统
 
 **模块路径**: `agentos/cupolas/src/audit/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

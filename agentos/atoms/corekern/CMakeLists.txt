@@ -8,6 +8,7 @@ set(COREKERN_SOURCES
     src/ipc/binder.c
     src/ipc/buffer.c
     src/mem/alloc.c
+    src/mem/oom_handler.c
     src/mem/pool.c
     src/mem/guard.c
     src/task/scheduler.c

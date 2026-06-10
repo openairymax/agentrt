@@ -140,8 +140,9 @@ static void record_api_call(const char *api_name)
         atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_get_trace_id_calls, 1);
     }
 
-    /* 如果启用API映射日志，输出调试信?*/
+    /* 如果启用API映射日志，输出调试信息 */
     if (g_compat_config.enable_api_mapping_log) {
+        /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
         fprintf(stderr, "[LOGGING_COMPAT] API call: %s\n", api_name);
     }
 }
@@ -443,30 +444,48 @@ int logging_generate_migration_report(const char *report_path)
         return AGENTOS_EINVAL;
     }
 
-    /* 生成JSON格式的迁移报?*/
+    /* 生成JSON格式的迁移报告 */
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "{\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "  \"report_type\": \"logging_migration\",\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "  \"timestamp\": %ld,\n", (long)time(NULL));
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "  \"compatibility_layer_stats\": {\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "    \"total_api_calls\": %llu,\n",
             (unsigned long long)g_compat_stats.api_calls.agentos_log_write_calls);
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "    \"agentos_log_write_calls\": %llu,\n",
             (unsigned long long)g_compat_stats.api_calls.agentos_log_write_calls);
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "    \"migration_progress\": {\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "      \"migrated_modules\": %d,\n",
             g_compat_stats.migration_progress.migrated_modules);
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "      \"pending_modules\": %d,\n",
             g_compat_stats.migration_progress.pending_modules);
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "      \"total_modules\": %d\n", g_compat_stats.migration_progress.total_modules);
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "    }\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "  },\n");
 
     /* 迁移建议 */
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "  \"recommendations\": [\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "    \"Migrate high-usage modules first\",\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "    \"Use new API for new code\",\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "    \"Run validation after migration\"\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "  ]\n");
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
     fprintf(fp, "}\n");
 
     fclose(fp);

@@ -1100,8 +1100,13 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
 
     provider_config_t *result =
         (provider_config_t *)AGENTOS_CALLOC(prov_count + 1, sizeof(provider_config_t));
-    if (!result)
+    if (!result) {
+        for (size_t j = 0; j < prov_count; ++j) {
+            for (size_t k = 0; k < provs[j].model_count; ++k)
+                AGENTOS_FREE(provs[j].model_names[k]);
+        }
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     for (size_t i = 0; i < prov_count; ++i) {
         result[i].name = AGENTOS_STRDUP(provs[i].name);
@@ -1125,6 +1130,9 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
                 for (size_t k = 0; k < provs[i].model_count; ++k)
                     marr[k] = provs[i].model_names[k];
                 marr[provs[i].model_count] = NULL;
+            } else {
+                for (size_t k = 0; k < provs[i].model_count; ++k)
+                    AGENTOS_FREE(provs[i].model_names[k]);
             }
             result[i].models = marr;
         }

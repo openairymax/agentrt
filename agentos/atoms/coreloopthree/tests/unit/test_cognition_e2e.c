@@ -60,7 +60,7 @@ static int tests_failed = 0;
 static void test_e2e_five_phase_pipeline(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("e2e_phases", "failed to create engine");
         return;
@@ -108,7 +108,7 @@ static void test_e2e_five_phase_pipeline(void)
 static void test_e2e_sustained_processing(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("e2e_sustained", "failed to create engine");
         return;
@@ -154,7 +154,7 @@ static void test_e2e_sustained_processing(void)
 static void test_e2e_triple_coordinator_state(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("e2e_coordinator", "failed to create engine");
         return;
@@ -221,7 +221,7 @@ static void test_e2e_triple_coordinator_state(void)
 static void test_e2e_stream_critic_validations(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("e2e_stream_critic", "failed to create engine");
         return;
@@ -295,7 +295,7 @@ static void test_e2e_stream_critic_validations(void)
 static void test_e2e_metacognition_scoring(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("e2e_metacognition", "failed to create engine");
         return;
@@ -379,7 +379,7 @@ static void test_e2e_metacognition_scoring(void)
 static void test_e2e_parallel_dispatcher(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("e2e_parallel_dispatch", "failed to create engine");
         return;
@@ -419,7 +419,7 @@ static void test_e2e_parallel_dispatcher(void)
 static void test_e2e_context_processor(void)
 {
     agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS || !engine) {
         TEST_FAIL("e2e_context", "failed to create engine");
         return;
@@ -427,7 +427,7 @@ static void test_e2e_context_processor(void)
 
     /* 设置全局上下文 */
     const char *ctx_data = "Previous conversation: User asked about weather";
-    agentos_cognition_set_context(engine, (void *)ctx_data, NULL);
+    agentos_cognition_set_context_take(engine, (void *)ctx_data, NULL);
 
     /* 处理与上下文相关的输入 */
     const char *input = "What should I wear today?";

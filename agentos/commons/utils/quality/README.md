@@ -1,7 +1,7 @@
 # Quality — 质量保障模块
 
 **模块路径**: `agentos/commons/utils/quality/`
-**版本**: v0.0.5
+**版本**: v0.1.0
 
 ## 概述
 

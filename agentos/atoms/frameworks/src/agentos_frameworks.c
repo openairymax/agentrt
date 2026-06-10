@@ -24,9 +24,7 @@
 #define AGENTOS_API
 #endif
 
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL (-1)
-#endif
+
 
 #ifndef AGENTOS_CALLOC
 #define AGENTOS_CALLOC(nmemb, size) calloc(nmemb, size)

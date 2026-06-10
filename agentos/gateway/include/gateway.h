@@ -324,7 +324,7 @@ const char *gateway_get_name(gateway_t *gw);
  *
  * @note 应在 gateway_start() 之前调用，运行时注册需确保线程安全
  * @threadsafe 注册操作本身安全，但与请求处理并发时需注意
- * @since 0.0.5
+ * @since 0.1.0
  */
 int gateway_register_endpoint(gateway_t *gw, const char *method, const char *path,
                               gateway_endpoint_handler_t handler, void *user_data);

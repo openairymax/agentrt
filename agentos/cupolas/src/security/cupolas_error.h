@@ -16,6 +16,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "error.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -274,49 +276,6 @@ cupolas_runtime_error_t cupolas_error_to_runtime(cupolas_error_t error);
 /* ============================================================================
  * Backward Compatibility Aliases
  * ============================================================================ */
-
-#ifndef AGENTOS_OK
-#define AGENTOS_OK cupolas_ERR_OK
-#endif
-#ifndef AGENTOS_ERR_UNKNOWN
-#define AGENTOS_ERR_UNKNOWN cupolas_ERR_UNKNOWN
-#endif
-#ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM cupolas_ERR_INVALID_PARAM
-#endif
-#ifndef AGENTOS_ERR_NULL_POINTER
-#define AGENTOS_ERR_NULL_POINTER cupolas_ERR_NULL_POINTER
-#endif
-#ifndef AGENTOS_ERR_OUT_OF_MEMORY
-#define AGENTOS_ERR_OUT_OF_MEMORY cupolas_ERR_OUT_OF_MEMORY
-#endif
-#ifndef AGENTOS_ERR_BUFFER_TOO_SMALL
-#define AGENTOS_ERR_BUFFER_TOO_SMALL cupolas_ERR_BUFFER_TOO_SMALL
-#endif
-#ifndef AGENTOS_ERR_NOT_FOUND
-#define AGENTOS_ERR_NOT_FOUND cupolas_ERR_NOT_FOUND
-#endif
-#ifndef AGENTOS_ERR_ALREADY_EXISTS
-#define AGENTOS_ERR_ALREADY_EXISTS cupolas_ERR_ALREADY_EXISTS
-#endif
-#ifndef AGENTOS_ERR_TIMEOUT
-#define AGENTOS_ERR_TIMEOUT cupolas_ERR_TIMEOUT
-#endif
-#ifndef AGENTOS_ERR_NOT_SUPPORTED
-#define AGENTOS_ERR_NOT_SUPPORTED cupolas_ERR_NOT_SUPPORTED
-#endif
-#ifndef AGENTOS_ERR_PERMISSION_DENIED
-#define AGENTOS_ERR_PERMISSION_DENIED cupolas_ERR_PERMISSION_DENIED
-#endif
-#ifndef AGENTOS_ERR_IO
-#define AGENTOS_ERR_IO cupolas_ERR_IO
-#endif
-#ifndef AGENTOS_ERR_STATE_ERROR
-#define AGENTOS_ERR_STATE_ERROR cupolas_ERR_STATE_ERROR
-#endif
-#ifndef AGENTOS_ERR_OVERFLOW
-#define AGENTOS_ERR_OVERFLOW cupolas_ERR_OVERFLOW
-#endif
 
 #ifndef cupolas_OK
 #define cupolas_OK cupolas_ERR_OK

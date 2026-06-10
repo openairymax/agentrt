@@ -7,7 +7,7 @@
  * 覆盖引擎生命周期、4个处理器工厂函数、模型上下文管理。
  */
 
-#include "cognition/context_processor.h"
+#include "cognition/context/context_processor.h"
 
 #include <assert.h>
 #ifndef NDEBUG

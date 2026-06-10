@@ -10,6 +10,7 @@
 #include "memory_debug.h"
 
 #include "agentos_memory.h"
+#include "logging_compat.h"
 
 #include <stdlib.h>
 
@@ -193,24 +194,12 @@ static void __attribute__((unused)) memory_debug_record_error(memory_error_type_
 
     // 输出到日志
     if (g_debug_state.options.verbosity_level >= 1) {
-        FILE *log = stderr;
-        if (g_debug_state.options.log_file != NULL) {
-            log = fopen(g_debug_state.options.log_file, "a");
-            if (log == NULL) {
-                log = stderr;
-            }
-        }
-
-        fprintf(log, "[内存错误] 类型%d, 地址%p, 大小%zu\n", type, addr, size);
+        AGENTOS_LOG_ERROR("[内存错误] 类型%d, 地址%p, 大小%zu", type, addr, size);
         if (description != NULL) {
-            fprintf(log, "描述%s\n", description);
+            AGENTOS_LOG_ERROR("描述%s", description);
         }
         if (file != NULL && function != NULL) {
-            fprintf(log, "位置%s:%d (%s)\n", file, line, function);
-        }
-
-        if (log != stderr) {
-            fclose(log);
+            AGENTOS_LOG_ERROR("位置%s:%d (%s)", file, line, function);
         }
     }
 
@@ -477,12 +466,17 @@ size_t memory_debug_check_leaks(memory_leak_report_t *report, bool dump_to_log)
             }
         }
 
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(log, "=== 内存泄漏检测报告===\n");
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(log, "时间%llu\n", (unsigned long long)memory_debug_get_timestamp());
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(log, "泄漏块数%zu\n", leak_count);
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(log, "泄漏字节数：%zu\n", total_leaked_bytes);
 
         if (g_debug_state.options.verbosity_level >= 2) {
+            /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
             fprintf(log, "泄漏详情：\n");
 
             memory_debug_block_t *current = g_debug_state.block_list_head;
@@ -492,30 +486,38 @@ size_t memory_debug_check_leaks(memory_leak_report_t *report, bool dump_to_log)
                 if (current->allocated) {
                     count++;
                     void *user_ptr = (uint8_t *)current + g_debug_state.options.redzone_size;
+                    /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                     fprintf(log, "  %p: %zu字节", user_ptr, current->size);
 
                     if (current->tag != NULL) {
+                        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                         fprintf(log, " [%s]", current->tag);
                     }
 
                     if (current->file != NULL) {
+                        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                         fprintf(log, " (%s:%d", current->file, current->line);
                         if (current->function != NULL) {
+                            /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                             fprintf(log, " in %s", current->function);
                         }
+                        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                         fprintf(log, ")");
                     }
 
+                    /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                     fprintf(log, "\n");
                 }
                 current = current->next;
             }
 
             if (count >= 20) {
+                /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
                 fprintf(log, "  ...（更多泄漏，总计%zu个）\n", leak_count);
             }
         }
 
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(log, "========================\n");
 
         if (log != stderr) {
@@ -590,6 +592,7 @@ size_t memory_debug_validate_all(size_t *error_count, bool dump_to_log)
             }
         }
 
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(log, "=== 内存完整性验证===\n");
 
         if (log != stderr) {
@@ -613,7 +616,9 @@ size_t memory_debug_validate_all(size_t *error_count, bool dump_to_log)
             }
         }
 
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(log, "验证完成，发现错误：%zu个\n", errors_found);
+        /* BAN-70 EXEMPT: diagnostic report output to configurable FILE* stream */
         fprintf(log, "====================\n");
 
         if (log != stderr) {
@@ -646,19 +651,31 @@ void memory_debug_dump_info(const char *file, bool include_stack_trace)
         return;
     }
 
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "=== 内存调试信息转储 ===\n");
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "时间%llu\n", (unsigned long long)memory_debug_get_timestamp());
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "总分配次数：%zu\n", g_debug_state.total_allocations);
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "总释放次数：%zu\n", g_debug_state.total_frees);
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "当前分配块数%zu\n", g_debug_state.block_count);
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "错误数量%zu\n", g_debug_state.error_count);
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "调试选项：\n");
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "  泄漏检查：%s\n", g_debug_state.options.enable_leak_check ? "启用" : "禁用");
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "  边界检查：%s\n",
             g_debug_state.options.enable_boundary_check ? "启用" : "禁用");
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "  红区大小%zu字节\n", g_debug_state.options.redzone_size);
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "堆栈跟踪%s\n", g_debug_state.stack_trace_enabled ? "启用" : "禁用");
 
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "当前分配块：\n");
 
     memory_debug_block_t *current = g_debug_state.block_list_head;
@@ -668,42 +685,58 @@ void memory_debug_dump_info(const char *file, bool include_stack_trace)
         count++;
         void *user_ptr = (uint8_t *)current + g_debug_state.options.redzone_size;
 
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "：#%zu:\n", count);
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "  用户地址%p\n", user_ptr);
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "  块地址%p\n", (void *)current);
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "  大小%zu字节\n", current->size);
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "  已分配：%s\n", current->allocated ? "yes" : "no");
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "  标签%s\n", current->tag ? current->tag : "(null)");
 
         if (current->file != NULL) {
+            /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
             fprintf(output, "  位置%s:%d", current->file, current->line);
             if (current->function != NULL) {
+                /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
                 fprintf(output, " (%s)", current->function);
             }
+            /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
             fprintf(output, "\n");
         }
 
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "  时间戳：%llu\n", (unsigned long long)current->timestamp);
 
         if (include_stack_trace && current->stack_depth > 0) {
+            /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
             fprintf(output, "  堆栈跟踪%zu帧）：\n", current->stack_depth);
             for (size_t i = 0; i < current->stack_depth && i < 8; i++) {
+                /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
                 fprintf(output, "    [%zu] %p\n", i, current->stack_trace[i]);
             }
             if (current->stack_depth > 8) {
+                /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
                 fprintf(output, "    ...%zu更多帧）\n", current->stack_depth - 8);
             }
         }
 
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "\n");
 
         current = current->next;
     }
 
     if (count >= 50) {
+        /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
         fprintf(output, "...（更多块，总计%zu个）\n", g_debug_state.block_count);
     }
 
+    /* BAN-70 EXEMPT: memory diagnostic report/dump output to configurable FILE* stream */
     fprintf(output, "========================\n");
 
     if (output != stderr) {
@@ -900,33 +933,20 @@ void memory_debug_log_operation(const char *operation, void *ptr, size_t size, c
         return;
     }
 
-    FILE *log = stderr;
-    if (g_debug_state.options.log_file != NULL) {
-        log = fopen(g_debug_state.options.log_file, "a");
-        if (log == NULL) {
-            log = stderr;
-        }
-    }
-
-    fprintf(log, "[内存操作] %s", operation);
-
+    /* Build the full message for the debug log */
+    char log_buf[512];
+    int offset = 0;
+    offset += snprintf(log_buf + offset, sizeof(log_buf) - offset, "[内存操作] %s", operation);
     if (ptr != NULL) {
-        fprintf(log, " %p", ptr);
+        offset += snprintf(log_buf + offset, sizeof(log_buf) - offset, " %p", ptr);
     }
-
     if (size > 0) {
-        fprintf(log, " (%zu字节)", size);
+        offset += snprintf(log_buf + offset, sizeof(log_buf) - offset, " (%zu字节)", size);
     }
-
     if (file != NULL && function != NULL) {
-        fprintf(log, " at %s:%d (%s)", file, line, function);
+        offset += snprintf(log_buf + offset, sizeof(log_buf) - offset, " at %s:%d (%s)", file, line, function);
     }
-
-    fprintf(log, "\n");
-
-    if (log != stderr) {
-        fclose(log);
-    }
+    AGENTOS_LOG_DEBUG("%s", log_buf);
 }
 
 /**
@@ -982,19 +1002,7 @@ unsigned int memory_debug_checkpoint(const char *name)
     g_checkpoint_count++;
 
     if (g_debug_state.options.verbosity_level >= 2) {
-        FILE *log = stderr;
-        if (g_debug_state.options.log_file != NULL) {
-            log = fopen(g_debug_state.options.log_file, "a");
-            if (log == NULL) {
-                log = stderr;
-            }
-        }
-
-        fprintf(log, "[检查点] ID=%u, 名称=%s, 块数=%zu\n", id, cp->name, cp->block_count);
-
-        if (log != stderr) {
-            fclose(log);
-        }
+        AGENTOS_LOG_DEBUG("[检查点] ID=%u, 名称=%s, 块数=%zu", id, cp->name, cp->block_count);
     }
 
     memory_debug_unlock();
@@ -1075,23 +1083,11 @@ size_t memory_debug_compare_checkpoints(unsigned int checkpoint1, unsigned int c
     }
 
     if (g_debug_state.options.verbosity_level >= 2) {
-        FILE *log = stderr;
-        if (g_debug_state.options.log_file != NULL) {
-            log = fopen(g_debug_state.options.log_file, "a");
-            if (log == NULL) {
-                log = stderr;
-            }
-        }
-
-        fprintf(log, "[检查点比较] CP1(#%u) vs CP2(#%u)\n", checkpoint1, checkpoint2);
-        fprintf(log, "  新分配: %zu次\n", new_allocations);
-        fprintf(log, "  新释放: %zu次\n", new_frees);
-        fprintf(log, "  泄漏块: %zu个\n", diff_report ? diff_report->leak_count : 0);
-        fprintf(log, "  泄漏字节: %zu\n", leaked_bytes);
-
-        if (log != stderr) {
-            fclose(log);
-        }
+        AGENTOS_LOG_DEBUG("[检查点比较] CP1(#%u) vs CP2(#%u)", checkpoint1, checkpoint2);
+        AGENTOS_LOG_DEBUG("  新分配: %zu次", new_allocations);
+        AGENTOS_LOG_DEBUG("  新释放: %zu次", new_frees);
+        AGENTOS_LOG_DEBUG("  泄漏块: %zu个", diff_report ? diff_report->leak_count : 0);
+        AGENTOS_LOG_DEBUG("  泄漏字节: %zu", leaked_bytes);
     }
 
     memory_debug_unlock();

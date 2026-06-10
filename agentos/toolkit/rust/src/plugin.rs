@@ -216,28 +216,23 @@ impl PluginRegistry {
 
     /// 加载插件实例
     pub fn load(&mut self, plugin_id: &str) -> Result<&dyn BasePlugin, String> {
-        if !self.factories.contains_key(plugin_id) {
-            return Err(format!("plugin '{}' not found", plugin_id));
+        if let Some(factory) = self.factories.get(plugin_id) {
+            let mut instance = factory();
+            instance.set_plugin_id(plugin_id);
+
+            if let Err(e) = instance.on_load(&HashMap::new()) {
+                self.states.insert(plugin_id.to_string(), PluginState::Error);
+                instance.on_error(&e);
+                return Err(format!("plugin '{}' on_load failed: {}", plugin_id, e));
+            }
+
+            self.instances.insert(plugin_id.to_string(), instance);
+            self.states.insert(plugin_id.to_string(), PluginState::Loaded);
+
+            Ok(self.instances[plugin_id].as_ref())
+        } else {
+            Err(format!("plugin '{}' not found", plugin_id))
         }
-
-        if self.instances.contains_key(plugin_id) {
-            return Ok(self.instances[plugin_id].as_ref());
-        }
-
-        let factory = self.factories.get(plugin_id).unwrap();
-        let mut instance = factory();
-        instance.set_plugin_id(plugin_id);
-
-        if let Err(e) = instance.on_load(&HashMap::new()) {
-            self.states.insert(plugin_id.to_string(), PluginState::Error);
-            instance.on_error(&e);
-            return Err(format!("plugin '{}' on_load failed: {}", plugin_id, e));
-        }
-
-        self.instances.insert(plugin_id.to_string(), instance);
-        self.states.insert(plugin_id.to_string(), PluginState::Loaded);
-
-        Ok(self.instances[plugin_id].as_ref())
     }
 
     /// 卸载插件实例
@@ -382,13 +377,12 @@ impl PluginManager {
 
     /// 卸载插件
     pub fn unload_plugin(&mut self, plugin_id: &str) -> bool {
-        if !self.plugins.contains_key(plugin_id) {
+        if let Some(info) = self.plugins.get(plugin_id) {
+            if info.state == PluginState::Active {
+                self.deactivate_plugin(plugin_id);
+            }
+        } else {
             return false;
-        }
-
-        let info = self.plugins.get(plugin_id).unwrap();
-        if info.state == PluginState::Active {
-            self.deactivate_plugin(plugin_id);
         }
 
         self.plugins.remove(plugin_id);

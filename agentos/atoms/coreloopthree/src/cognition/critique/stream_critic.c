@@ -13,7 +13,7 @@
 #include "stream_critic.h"
 
 #include "agentos.h"
-#include "intent_utils.h"
+#include "../intent/intent_utils.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 

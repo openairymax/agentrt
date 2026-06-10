@@ -174,12 +174,14 @@ AGENTOS_API cb_manager_t cb_manager_create(void)
     cb_manager_internal_t *mgr =
         (cb_manager_internal_t *)AGENTOS_CALLOC(1, sizeof(cb_manager_internal_t));
     if (!mgr) {
+        SVC_LOG_ERROR("cb_manager_create: memory allocation failed");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     agentos_error_t err = agentos_mutex_init(&mgr->mutex);
     if (err != AGENTOS_SUCCESS) {
+        SVC_LOG_ERROR("cb_manager_create: mutex init failed err=%d", err);
         AGENTOS_FREE(mgr);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
@@ -217,6 +219,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
                                         const cb_config_t *config)
 {
     if (!manager || !name) {
+        SVC_LOG_ERROR("cb_create: null parameter manager=%p name=%p", (void *)manager, (void *)name);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -227,7 +230,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
 
     if (mgr->breaker_count >= CB_MAX_BREAKERS) {
         agentos_mutex_unlock(&mgr->mutex);
-        LOG_ERROR("Max circuit breakers reached");
+        SVC_LOG_ERROR("cb_create: max circuit breakers reached count=%u max=%u", mgr->breaker_count, CB_MAX_BREAKERS);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         return NULL;
     }
@@ -242,6 +245,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
     cb_internal_t *cb = (cb_internal_t *)AGENTOS_CALLOC(1, sizeof(cb_internal_t));
     if (!cb) {
         agentos_mutex_unlock(&mgr->mutex);
+        SVC_LOG_ERROR("cb_create: memory allocation failed for breaker '%s'", name);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -262,6 +266,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
 
     agentos_error_t err = agentos_mutex_init(&cb->mutex);
     if (err != AGENTOS_SUCCESS) {
+        SVC_LOG_ERROR("cb_create: mutex init failed for breaker '%s' err=%d", name, err);
         AGENTOS_FREE(cb);
         agentos_mutex_unlock(&mgr->mutex);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
@@ -316,13 +321,16 @@ AGENTOS_API void cb_destroy(circuit_breaker_t breaker)
 
 AGENTOS_API bool cb_allow_request(circuit_breaker_t breaker)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_allow_request: null breaker parameter");
         return false;
+    }
 
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_allow_request: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return false;
     }
@@ -362,13 +370,16 @@ AGENTOS_API bool cb_allow_request(circuit_breaker_t breaker)
 
 AGENTOS_API void cb_record_success(circuit_breaker_t breaker, uint32_t duration_ms)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_record_success: null breaker parameter");
         return;
+    }
 
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_record_success: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return;
     }
@@ -400,13 +411,16 @@ AGENTOS_API void cb_record_success(circuit_breaker_t breaker, uint32_t duration_
 
 AGENTOS_API void cb_record_failure(circuit_breaker_t breaker, int32_t error_code)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_record_failure: null breaker parameter");
         return;
+    }
 
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_record_failure: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return;
     }
@@ -427,9 +441,12 @@ AGENTOS_API void cb_record_failure(circuit_breaker_t breaker, int32_t error_code
 
     if (cb->state == CB_STATE_CLOSED) {
         if (should_trip(cb)) {
+            SVC_LOG_WARN("cb_record_failure: breaker '%s' threshold exceeded, tripping to OPEN (consecutive_failures=%u, failure_rate=%.1f%%)",
+                         cb->name, cb->stats.consecutive_failures, cb->stats.failure_rate);
             transition_state(cb, cb->manager, CB_STATE_OPEN);
         }
     } else if (cb->state == CB_STATE_HALF_OPEN) {
+        SVC_LOG_WARN("cb_record_failure: breaker '%s' failed in HALF_OPEN, reopening (error_code=%d)", cb->name, error_code);
         transition_state(cb, cb->manager, CB_STATE_OPEN);
     }
 
@@ -441,13 +458,16 @@ AGENTOS_API void cb_record_failure(circuit_breaker_t breaker, int32_t error_code
 
 AGENTOS_API void cb_record_timeout(circuit_breaker_t breaker)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_record_timeout: null breaker parameter");
         return;
+    }
 
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_record_timeout: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return;
     }
@@ -469,9 +489,12 @@ AGENTOS_API void cb_record_timeout(circuit_breaker_t breaker)
 
     if (cb->state == CB_STATE_CLOSED) {
         if (should_trip(cb)) {
+            SVC_LOG_WARN("cb_record_timeout: breaker '%s' threshold exceeded after timeout, tripping to OPEN (consecutive_failures=%u)",
+                         cb->name, cb->stats.consecutive_failures);
             transition_state(cb, cb->manager, CB_STATE_OPEN);
         }
     } else if (cb->state == CB_STATE_HALF_OPEN) {
+        SVC_LOG_WARN("cb_record_timeout: breaker '%s' timed out in HALF_OPEN, reopening", cb->name);
         transition_state(cb, cb->manager, CB_STATE_OPEN);
     }
 
@@ -484,8 +507,10 @@ AGENTOS_API void cb_record_timeout(circuit_breaker_t breaker)
 
 AGENTOS_API cb_state_t cb_get_state(circuit_breaker_t breaker)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_get_state: null breaker parameter");
         return CB_STATE_OPEN;
+    }
     cb_internal_t *cb = (cb_internal_t *)breaker;
     return cb->state;
 }
@@ -493,6 +518,7 @@ AGENTOS_API cb_state_t cb_get_state(circuit_breaker_t breaker)
 AGENTOS_API const char *cb_get_name(circuit_breaker_t breaker)
 {
     if (!breaker) {
+        SVC_LOG_ERROR("cb_get_name: null breaker parameter");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -502,13 +528,16 @@ AGENTOS_API const char *cb_get_name(circuit_breaker_t breaker)
 
 AGENTOS_API agentos_error_t cb_get_stats(circuit_breaker_t breaker, cb_stats_t *stats)
 {
-    if (!breaker || !stats)
+    if (!breaker || !stats) {
+        SVC_LOG_ERROR("cb_get_stats: null parameter breaker=%p stats=%p", (void *)breaker, (void *)stats);
         return AGENTOS_EINVAL;
+    }
 
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_get_stats: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return AGENTOS_EINVAL;
     }
@@ -520,13 +549,16 @@ AGENTOS_API agentos_error_t cb_get_stats(circuit_breaker_t breaker, cb_stats_t *
 
 AGENTOS_API void cb_reset(circuit_breaker_t breaker)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_reset: null breaker parameter");
         return;
+    }
 
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_reset: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return;
     }
@@ -553,12 +585,15 @@ AGENTOS_API void cb_reset(circuit_breaker_t breaker)
 
 AGENTOS_API void cb_force_open(circuit_breaker_t breaker)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_force_open: null breaker parameter");
         return;
+    }
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_force_open: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return;
     }
@@ -568,12 +603,15 @@ AGENTOS_API void cb_force_open(circuit_breaker_t breaker)
 
 AGENTOS_API void cb_force_close(circuit_breaker_t breaker)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_force_close: null breaker parameter");
         return;
+    }
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_force_close: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return;
     }
@@ -586,13 +624,16 @@ AGENTOS_API void cb_force_close(circuit_breaker_t breaker)
 AGENTOS_API agentos_error_t cb_set_failover_config(circuit_breaker_t breaker,
                                                    const cb_failover_config_t *config)
 {
-    if (!breaker || !config)
+    if (!breaker || !config) {
+        SVC_LOG_ERROR("cb_set_failover_config: null parameter breaker=%p config=%p", (void *)breaker, (void *)config);
         return AGENTOS_EINVAL;
+    }
 
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_set_failover_config: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return AGENTOS_EINVAL;
     }
@@ -607,13 +648,16 @@ AGENTOS_API agentos_error_t cb_set_failover_config(circuit_breaker_t breaker,
 AGENTOS_API agentos_error_t cb_execute_failover(circuit_breaker_t breaker, int32_t original_error,
                                                 char *fallback_result, size_t result_size)
 {
-    if (!breaker)
+    if (!breaker) {
+        SVC_LOG_ERROR("cb_execute_failover: null breaker parameter");
         return AGENTOS_EINVAL;
+    }
 
     cb_internal_t *cb = (cb_internal_t *)breaker;
 
     agentos_mutex_lock(&cb->mutex);
     if (cb->destroying) {
+        SVC_LOG_WARN("cb_execute_failover: breaker is being destroyed");
         agentos_mutex_unlock(&cb->mutex);
         return AGENTOS_EINVAL;
     }
@@ -651,6 +695,7 @@ AGENTOS_API agentos_error_t cb_execute_failover(circuit_breaker_t breaker, int32
         break;
 
     default:
+        SVC_LOG_WARN("cb_execute_failover: unknown failover strategy=%d for breaker '%s'", fc->strategy, cb->name);
         snprintf(fallback_result, result_size,
                  "{\"failover\":\"none\",\"service\":\"%s\",\"error\":%d}", cb->name,
                  original_error);
@@ -670,8 +715,10 @@ AGENTOS_API agentos_error_t cb_register_event_callback(cb_manager_t manager,
                                                        cb_event_callback_t callback,
                                                        void *user_data)
 {
-    if (!manager || !callback)
+    if (!manager || !callback) {
+        SVC_LOG_ERROR("cb_register_event_callback: null parameter manager=%p callback=%p", (void *)manager, (void *)callback);
         return AGENTOS_EINVAL;
+    }
 
     cb_manager_internal_t *mgr = (cb_manager_internal_t *)manager;
 
@@ -679,6 +726,7 @@ AGENTOS_API agentos_error_t cb_register_event_callback(cb_manager_t manager,
 
     if (mgr->callback_count >= CB_MAX_CALLBACKS) {
         agentos_mutex_unlock(&mgr->mutex);
+        SVC_LOG_ERROR("cb_register_event_callback: max callbacks reached count=%u max=%u", mgr->callback_count, CB_MAX_CALLBACKS);
         return AGENTOS_ENOMEM;
     }
 
@@ -694,6 +742,7 @@ AGENTOS_API agentos_error_t cb_register_event_callback(cb_manager_t manager,
 AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char *name)
 {
     if (!manager || !name) {
+        SVC_LOG_ERROR("cb_find: null parameter manager=%p name=%p", (void *)manager, (void *)name);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -710,14 +759,17 @@ AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char *name)
     }
 
     agentos_mutex_unlock(&mgr->mutex);
+    SVC_LOG_WARN("cb_find: breaker '%s' not found", name);
     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
 
 AGENTOS_API uint32_t cb_count(cb_manager_t manager)
 {
-    if (!manager)
+    if (!manager) {
+        SVC_LOG_ERROR("cb_count: null manager parameter");
         return 0;
+    }
     cb_manager_internal_t *mgr = (cb_manager_internal_t *)manager;
     return mgr->breaker_count;
 }
@@ -726,7 +778,9 @@ AGENTOS_API const char *cb_state_to_string(cb_state_t state)
 {
     static const char *state_strings[] = {"CLOSED", "OPEN", "HALF_OPEN"};
 
-    if (state < 0 || state > CB_STATE_HALF_OPEN)
+    if (state < 0 || state > CB_STATE_HALF_OPEN) {
+        SVC_LOG_WARN("cb_state_to_string: invalid state=%d", state);
         return "UNKNOWN";
+    }
     return state_strings[state];
 }
