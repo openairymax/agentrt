@@ -14,6 +14,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Fallback logging macros */
+#ifndef AGENTOS_LOG_ERROR
+#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+#ifndef AGENTOS_LOG_WARN
+#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+
 typedef enum {
     GW_STATE_CREATED = 0,
     GW_STATE_INITIALIZED,
@@ -126,8 +134,10 @@ agentos_error_t gateway_service_create(gateway_service_t *service,
     if (!service)
         return AGENTOS_EINVAL;
     gateway_service_t svc = (gateway_service_t)AGENTOS_CALLOC(1, sizeof(struct gateway_service_s));
-    if (!svc)
+    if (!svc) {
+        AGENTOS_LOG_ERROR("service allocation failed, size=%zu", sizeof(struct gateway_service_s));
         return AGENTOS_ENOMEM;
+    }
     if (config) {
         __builtin_memcpy(&svc->config, config, sizeof(gateway_service_config_t));
     } else {
@@ -170,6 +180,7 @@ agentos_error_t gateway_service_start(gateway_service_t service)
     if (service->state == GW_STATE_RUNNING)
         return AGENTOS_SUCCESS;
     if (service->state != GW_STATE_INITIALIZED && service->state != GW_STATE_STOPPED) {
+        AGENTOS_LOG_ERROR("service start rejected: invalid state=%d", service->state);
         return AGENTOS_EPERM;
     }
     service->state = GW_STATE_RUNNING;
@@ -179,6 +190,8 @@ agentos_error_t gateway_service_start(gateway_service_t service)
         service->http_gateway =
             http_gateway_create(service->config.http.host, service->config.http.port);
         if (!service->http_gateway) {
+            AGENTOS_LOG_ERROR("http_gateway_create failed: host=%s, port=%d",
+                              service->config.http.host, service->config.http.port);
             service->state = GW_STATE_STOPPED;
             return AGENTOS_ENOMEM;
         }

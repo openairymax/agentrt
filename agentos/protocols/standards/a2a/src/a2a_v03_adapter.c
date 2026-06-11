@@ -31,6 +31,12 @@
 #include <stdio.h>
 #define AGENTOS_LOG_DEBUG(fmt, ...) __builtin_fprintf(stderr, "[DEBUG] " fmt "\n", ##__VA_ARGS__)
 #endif
+#ifndef AGENTOS_LOG_ERROR
+#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+#ifndef AGENTOS_LOG_WARN
+#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
 
 /* Forward declarations for types defined in header */
 typedef struct a2a_v03_adapter_s a2a_v03_adapter_t;
@@ -711,6 +717,8 @@ int a2a_v03_authenticate(a2a_v03_context_t *ctx, const char *agent_id, const cha
     uint64_t now = a2a_timestamp_ms() / 1000;
 
     if (g_a2a_auth.lockout_until > 0 && now < g_a2a_auth.lockout_until) {
+        AGENTOS_LOG_ERROR("authentication locked out: agent_id=%s, lockout_until=%llu, now=%llu",
+                          agent_id, (unsigned long long)g_a2a_auth.lockout_until, (unsigned long long)now);
         agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__, "a2a_timestamp_ms: error AGENTOS_ERR_NOT_SUPPORTED");
         return AGENTOS_ERR_NOT_SUPPORTED;
     }
@@ -734,6 +742,8 @@ int a2a_v03_authenticate(a2a_v03_context_t *ctx, const char *agent_id, const cha
     }
 
     if (!cred_valid) {
+        AGENTOS_LOG_ERROR("authentication failed: agent_id=%s, method=%d, failed_attempts=%d",
+                          agent_id, g_a2a_auth.config.method, g_a2a_auth.failed_attempts + 1);
         g_a2a_auth.failed_attempts++;
         if (g_a2a_auth.failed_attempts >= g_a2a_auth.config.max_failed_attempts) {
             g_a2a_auth.lockout_until = now + 300;
@@ -789,6 +799,8 @@ int a2a_v03_verify_token(a2a_v03_context_t *ctx, const char *token_str,
             continue;
 
         if (now >= tok->expires_at) {
+            AGENTOS_LOG_WARN("token expired: agent_id=%s, expires_at=%llu, now=%llu",
+                             tok->agent_id, (unsigned long long)tok->expires_at, (unsigned long long)now);
             tok->valid = false;
             agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
             return AGENTOS_ERR_UNKNOWN;
@@ -800,6 +812,7 @@ int a2a_v03_verify_token(a2a_v03_context_t *ctx, const char *token_str,
     }
 
     agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
+    AGENTOS_LOG_WARN("token not found or invalid: token_count=%zu", g_a2a_auth.token_count);
     return AGENTOS_ERR_UNKNOWN;
 }
 
@@ -870,6 +883,7 @@ int a2a_v03_verify_signature(a2a_v03_context_t *ctx, const char *method, const c
 
     if (memcmp(expected, signature, 64) == 0)
         return 0;
+    AGENTOS_LOG_ERROR("signature verification failed: method=%s, expected vs actual mismatch", method);
     agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__, "operation failed");
     return AGENTOS_ERR_UNKNOWN;
 }
@@ -942,6 +956,8 @@ int a2a_v03_validate_session(a2a_v03_context_t *ctx, const char *session_id,
         uint64_t age_sec = (now - sess->created_at) / 1000;
 
         if (age_sec > (uint64_t)g_a2a_auth.config.token_ttl_sec * 2) {
+            AGENTOS_LOG_WARN("session expired: session_id=%s, age_sec=%llu, ttl=%d",
+                             sess->session_id, (unsigned long long)age_sec, g_a2a_auth.config.token_ttl_sec * 2);
             AGENTOS_MEMSET(sess, 0, sizeof(*sess));
             agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__, "a2a_timestamp_ms: error AGENTOS_ERR_NOT_SUPPORTED");
             return AGENTOS_ERR_NOT_SUPPORTED;
@@ -1508,6 +1524,7 @@ int a2a_v03_route_request(a2a_v03_context_t *ctx, const char *method, const char
     }
 
     *response_json = AGENTOS_STRDUP("{\"error\":\"unknown method\"}");
+    AGENTOS_LOG_WARN("unknown method in route_request: method=%s", method);
     agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__, "AGENTOS_STRDUP: error AGENTOS_ERR_OUT_OF_MEMORY");
     return AGENTOS_ERR_OUT_OF_MEMORY;
 }
@@ -1602,6 +1619,8 @@ static int a2a_adapter_send_cb(void *c, const void *d, size_t s)
     }
 
     if (!adapter->connected || !adapter->transport_write) {
+        AGENTOS_LOG_WARN("send failed: not connected or no transport, connected=%d, transport_write=%p",
+                         adapter->connected, (void *)adapter->transport_write);
         agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__,
                               "not connected or no transport");
         return AGENTOS_ERR_NOT_SUPPORTED;
