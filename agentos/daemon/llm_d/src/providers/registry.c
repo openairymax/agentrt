@@ -87,12 +87,31 @@ provider_registry_t *provider_registry_create(const service_config_t *cfg)
                 model_cnt++;
             models = AGENTOS_CALLOC(model_cnt + 1, sizeof(*models));
             if (models) {
-                for (size_t j = 0; j < model_cnt; ++j)
+                for (size_t j = 0; j < model_cnt; ++j) {
                     models[j] = AGENTOS_STRDUP(pcfg->models[j]);
+                    if (!models[j]) {
+                        SVC_LOG_ERROR("Failed to duplicate model name: out of memory");
+                        for (size_t k = 0; k < j; ++k)
+                            AGENTOS_FREE(models[k]);
+                        AGENTOS_FREE(models);
+                        models = NULL;
+                        break;
+                    }
+                }
             }
         }
 
         reg->providers[i].name = AGENTOS_STRDUP(pcfg->name);
+        if (!reg->providers[i].name) {
+            SVC_LOG_ERROR("Failed to duplicate provider name: out of memory");
+            if (models) {
+                for (size_t j = 0; models[j]; ++j)
+                    AGENTOS_FREE(models[j]);
+                AGENTOS_FREE(models);
+            }
+            ops->destroy(ctx);
+            continue;
+        }
         reg->providers[i].ops = ops;
         reg->providers[i].ctx = ctx;
         reg->providers[i].models = models;
@@ -235,14 +254,34 @@ AGENTOS_STRNCPY_TERM(api_key_buf, pkey->valuestring, sizeof(api_key_buf));
             if (models) {
                 for (int j = 0; j < mcount; ++j) {
                     cJSON *mitem = cJSON_GetArrayItem(pmodels, j);
-                    if (cJSON_IsString(mitem))
+                    if (cJSON_IsString(mitem)) {
                         models[j] = AGENTOS_STRDUP(mitem->valuestring);
+                        if (!models[j]) {
+                            SVC_LOG_ERROR("Failed to duplicate model name: out of memory");
+                            for (int k = 0; k < j; ++k)
+                                AGENTOS_FREE(models[k]);
+                            AGENTOS_FREE(models);
+                            models = NULL;
+                            break;
+                        }
+                    }
                 }
-                models[mcount] = NULL;
+                if (models)
+                    models[mcount] = NULL;
             }
         }
 
         reg->providers[valid_idx].name = AGENTOS_STRDUP(name_str);
+        if (!reg->providers[valid_idx].name) {
+            SVC_LOG_ERROR("Failed to duplicate provider name: out of memory");
+            if (models) {
+                for (int j = 0; models[j]; ++j)
+                    AGENTOS_FREE(models[j]);
+                AGENTOS_FREE(models);
+            }
+            ops->destroy(ctx);
+            continue;
+        }
         reg->providers[valid_idx].ops = ops;
         reg->providers[valid_idx].ctx = ctx;
         reg->providers[valid_idx].models = models;
