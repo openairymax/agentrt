@@ -38,6 +38,7 @@ static inline agentos_mutex_t *agentos_mutex_create_compat(void)
     agentos_mutex_t *m = (agentos_mutex_t *)AGENTOS_CALLOC(1, sizeof(agentos_mutex_t));
     if (m && agentos_mutex_init(m) != 0) {
         AGENTOS_FREE(m);
+        AGENTOS_LOG_ERROR("agentos_mutex_create_compat: mutex init failed");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
@@ -57,6 +58,7 @@ static inline agentos_cond_t *agentos_cond_create_compat(void)
     agentos_cond_t *c = (agentos_cond_t *)AGENTOS_CALLOC(1, sizeof(agentos_cond_t));
     if (c && agentos_cond_init(c) != 0) {
         AGENTOS_FREE(c);
+        AGENTOS_LOG_ERROR("agentos_cond_create_compat: cond init failed");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
@@ -260,8 +262,10 @@ static int ensure_binder_lock(void)
     if (binder_global_lock)
         return AGENTOS_SUCCESS;
     agentos_mutex_t *lock = agentos_mutex_create();
-    if (!lock)
+    if (!lock) {
+        AGENTOS_LOG_ERROR("ensure_binder_lock: mutex create failed, ENOMEM");
         ATM_RET_ERR(AGENTOS_ENOMEM);
+    }
     agentos_mutex_t *expected = NULL;
     if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&binder_global_lock,
                                             (void **)&expected, (void *)lock, memory_order_acq_rel,
@@ -293,6 +297,7 @@ static pending_call_t *find_pending_call_locked(agentos_ipc_channel_t *ch, uint6
             return pc;
         pc = pc->next;
     }
+    AGENTOS_LOG_WARN("find_pending_call_locked: pending call not found, msg_id=%llu", (unsigned long long)msg_id);
     AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
     return NULL;
 }
@@ -320,12 +325,14 @@ static pending_call_t *pending_call_create(void)
     }
 
     if (agentos_mutex_init(&pc->cond_lock) != 0) {
+        AGENTOS_LOG_ERROR("pending_call_create: mutex init failed");
         AGENTOS_FREE(pc);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
     }
 
     if (agentos_cond_init(&pc->cond) != 0) {
+        AGENTOS_LOG_ERROR("pending_call_create: cond init failed");
         agentos_mutex_destroy(&pc->cond_lock);
         AGENTOS_FREE(pc);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
@@ -381,8 +388,10 @@ agentos_error_t agentos_ipc_init(void)
 
     if (!binder_global_lock) {
         agentos_mutex_t *new_lock = agentos_mutex_create();
-        if (!new_lock)
+        if (!new_lock) {
+            AGENTOS_LOG_ERROR("agentos_ipc_init: mutex create failed, ENOMEM");
             ATM_RET_ERR(AGENTOS_ENOMEM);
+        }
 
         agentos_mutex_t *expected = NULL;
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&binder_global_lock,
@@ -435,10 +444,14 @@ agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callbac
                                            void *userdata, agentos_ipc_channel_t **out_channel)
 {
 
-    if (!name || !out_channel)
+    if (!name || !out_channel) {
+        AGENTOS_LOG_ERROR("agentos_ipc_create_channel: null parameter, name=%p out_channel=%p", (void *)name, (void *)out_channel);
         ATM_RET_ERR(AGENTOS_EINVAL);
-    if (strlen(name) >= MAX_CHANNEL_NAME)
+    }
+    if (strlen(name) >= MAX_CHANNEL_NAME) {
+        AGENTOS_LOG_ERROR("agentos_ipc_create_channel: name too long, len=%zu max=%d", strlen(name), MAX_CHANNEL_NAME);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     int err = ensure_binder_lock();
     if (err != AGENTOS_SUCCESS)
         return err;
@@ -450,29 +463,38 @@ agentos_error_t agentos_ipc_create_channel(const char *name, agentos_ipc_callbac
 
     if (callback && find_node_locked(name)) {
         agentos_mutex_unlock(binder_global_lock);
+        AGENTOS_LOG_ERROR("agentos_ipc_create_channel: channel already exists, name=%s", name);
         ATM_RET_ERR(AGENTOS_EEXIST);
     }
 
     ch = (agentos_ipc_channel_t *)AGENTOS_CALLOC(1, sizeof(agentos_ipc_channel_t));
-    if (!ch)
+    if (!ch) {
+        AGENTOS_LOG_ERROR("agentos_ipc_create_channel: channel alloc failed, ENOMEM");
         goto cleanup;
+    }
 
 AGENTOS_STRNCPY_TERM(ch->name, name, MAX_CHANNEL_NAME);
     ch->fd = -1;
     ch->is_server = callback ? 1 : 0;
 
     ch->lock = agentos_mutex_create();
-    if (!ch->lock)
+    if (!ch->lock) {
+        AGENTOS_LOG_ERROR("agentos_ipc_create_channel: channel lock create failed, ENOMEM");
         goto cleanup;
+    }
 
     ch->cond = agentos_cond_create();
-    if (!ch->cond)
+    if (!ch->cond) {
+        AGENTOS_LOG_ERROR("agentos_ipc_create_channel: channel cond create failed, ENOMEM");
         goto cleanup;
+    }
 
     if (callback) {
         node = (binder_node_t *)AGENTOS_CALLOC(1, sizeof(binder_node_t));
-        if (!node)
+        if (!node) {
+            AGENTOS_LOG_ERROR("agentos_ipc_create_channel: binder node alloc failed, ENOMEM");
             goto cleanup;
+        }
 
 AGENTOS_STRNCPY_TERM(node->name, name, MAX_CHANNEL_NAME);
         node->callback = callback;
@@ -506,8 +528,10 @@ cleanup:
 agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **out_channel)
 {
 
-    if (!name || !out_channel)
+    if (!name || !out_channel) {
+        AGENTOS_LOG_ERROR("agentos_ipc_connect: null parameter, name=%p out_channel=%p", (void *)name, (void *)out_channel);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     int err = ensure_binder_lock();
     if (err != AGENTOS_SUCCESS)
         return err;
@@ -517,6 +541,7 @@ agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **ou
     binder_node_t *target = find_node_locked(name);
     if (!target) {
         agentos_mutex_unlock(binder_global_lock);
+        AGENTOS_LOG_ERROR("agentos_ipc_connect: target not found, name=%s", name);
         ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
@@ -524,6 +549,7 @@ agentos_error_t agentos_ipc_connect(const char *name, agentos_ipc_channel_t **ou
         (agentos_ipc_channel_t *)AGENTOS_CALLOC(1, sizeof(agentos_ipc_channel_t));
     if (!ch) {
         agentos_mutex_unlock(binder_global_lock);
+        AGENTOS_LOG_ERROR("agentos_ipc_connect: channel alloc failed, ENOMEM");
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
 
@@ -534,6 +560,7 @@ AGENTOS_STRNCPY_TERM(ch->name, name, MAX_CHANNEL_NAME);
 
     ch->lock = agentos_mutex_create();
     if (!ch->lock) {
+        AGENTOS_LOG_ERROR("agentos_ipc_connect: channel lock create failed, ENOMEM");
         atomic_fetch_sub_explicit(&target->ref_count, 1, memory_order_seq_cst);
         AGENTOS_FREE(ch);
         agentos_mutex_unlock(binder_global_lock);
@@ -542,6 +569,7 @@ AGENTOS_STRNCPY_TERM(ch->name, name, MAX_CHANNEL_NAME);
 
     ch->cond = agentos_cond_create();
     if (!ch->cond) {
+        AGENTOS_LOG_ERROR("agentos_ipc_connect: channel cond create failed, ENOMEM");
         agentos_mutex_destroy_ptr(ch->lock);
         atomic_fetch_sub_explicit(&target->ref_count, 1, memory_order_seq_cst);
         AGENTOS_FREE(ch);
@@ -559,17 +587,23 @@ agentos_error_t agentos_ipc_call(agentos_ipc_channel_t *channel,
                                  size_t *response_size, uint32_t timeout_ms)
 {
 
-    if (!channel || !msg)
+    if (!channel || !msg) {
+        AGENTOS_LOG_ERROR("agentos_ipc_call: null parameter, channel=%p msg=%p", (void *)channel, (void *)msg);
         ATM_RET_ERR(AGENTOS_EINVAL);
-    if (!channel->remote_target)
+    }
+    if (!channel->remote_target) {
+        AGENTOS_LOG_ERROR("agentos_ipc_call: no remote target, channel=%p", (void *)channel);
         ATM_RET_ERR(AGENTOS_ENOENT);
+    }
 
     agentos_kernel_ipc_message_t call_msg = *msg;
     call_msg.msg_id = generate_msg_id();
 
     pending_call_t *pc = pending_call_create();
-    if (!pc)
+    if (!pc) {
+        AGENTOS_LOG_ERROR("agentos_ipc_call: pending call create failed, ENOMEM");
         ATM_RET_ERR(AGENTOS_ENOMEM);
+    }
 
     pc->msg_id = call_msg.msg_id;
     pc->response_buf = response;
@@ -587,6 +621,7 @@ agentos_error_t agentos_ipc_call(agentos_ipc_channel_t *channel,
         channel->remote_target->channel, &call_msg, channel->remote_target->userdata);
 
     if (cb_err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("agentos_ipc_call: remote callback failed, err=%d msg_id=%llu", cb_err, (unsigned long long)call_msg.msg_id);
         agentos_mutex_lock(channel->lock);
         remove_pending_call_locked(channel, pc);
         agentos_mutex_unlock(channel->lock);
@@ -609,6 +644,8 @@ agentos_error_t agentos_ipc_call(agentos_ipc_channel_t *channel,
         uint64_t elapsed = agentos_time_monotonic_ms() - start_time;
         if (elapsed >= timeout_ms) {
             agentos_mutex_unlock(&pc->cond_lock);
+
+            AGENTOS_LOG_WARN("agentos_ipc_call: timed out, msg_id=%llu timeout_ms=%u elapsed=%llu", (unsigned long long)call_msg.msg_id, timeout_ms, (unsigned long long)elapsed);
 
             agentos_mutex_lock(channel->lock);
             remove_pending_call_locked(channel, pc);
@@ -639,8 +676,10 @@ agentos_error_t agentos_ipc_send(agentos_ipc_channel_t *channel,
                                  const agentos_kernel_ipc_message_t *msg)
 {
 
-    if (!channel || !msg)
+    if (!channel || !msg) {
+        AGENTOS_LOG_ERROR("agentos_ipc_send: null parameter, channel=%p msg=%p", (void *)channel, (void *)msg);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
 
     if (channel->remote_target) {
         agentos_kernel_ipc_message_t send_msg = *msg;
@@ -659,6 +698,7 @@ agentos_error_t agentos_ipc_send(agentos_ipc_channel_t *channel,
         /* SEC-13: OOM 回退 — 尝试从预分配池获取 */
         node = ipc_oom_msg_node_alloc();
         if (!node) {
+            AGENTOS_LOG_ERROR("agentos_ipc_send: msg node alloc failed (OOM pool exhausted), ENOMEM");
             agentos_mutex_unlock(channel->lock);
             ATM_RET_ERR(AGENTOS_ENOMEM);
         }
@@ -691,14 +731,17 @@ agentos_error_t agentos_ipc_reply(agentos_ipc_channel_t *channel,
                                   const agentos_kernel_ipc_message_t *msg)
 {
 
-    if (!channel || !msg)
+    if (!channel || !msg) {
+        AGENTOS_LOG_ERROR("agentos_ipc_reply: null parameter, channel=%p msg=%p", (void *)channel, (void *)msg);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
 
     agentos_mutex_lock(channel->lock);
 
     pending_call_t *pc = find_pending_call_locked(channel, msg->msg_id);
     if (!pc) {
         agentos_mutex_unlock(channel->lock);
+        AGENTOS_LOG_WARN("agentos_ipc_reply: pending call not found, msg_id=%llu", (unsigned long long)msg->msg_id);
         ATM_RET_ERR(AGENTOS_ENOENT);
     }
 
@@ -726,8 +769,10 @@ agentos_error_t agentos_ipc_recv(agentos_ipc_channel_t *channel, uint32_t timeou
                                  agentos_kernel_ipc_message_t *out_msg)
 {
 
-    if (!channel || !out_msg)
+    if (!channel || !out_msg) {
+        AGENTOS_LOG_ERROR("agentos_ipc_recv: null parameter, channel=%p out_msg=%p", (void *)channel, (void *)out_msg);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
 
     agentos_mutex_lock(channel->lock);
 
@@ -737,6 +782,7 @@ agentos_error_t agentos_ipc_recv(agentos_ipc_channel_t *channel, uint32_t timeou
 
     if (!channel->queue) {
         agentos_mutex_unlock(channel->lock);
+        AGENTOS_LOG_WARN("agentos_ipc_recv: queue empty after wait, timeout_ms=%u", timeout_ms);
         ATM_RET_ERR(AGENTOS_ETIMEDOUT);
     }
 
@@ -761,18 +807,23 @@ agentos_error_t agentos_ipc_recv(agentos_ipc_channel_t *channel, uint32_t timeou
 
 int32_t agentos_ipc_get_fd(agentos_ipc_channel_t *channel)
 {
-    if (!channel)
+    if (!channel) {
+        AGENTOS_LOG_ERROR("agentos_ipc_get_fd: null channel");
         ATM_RET_ERR(AGENTOS_EINVAL);
-    return channel->fd;
+    }
 }
 
 agentos_error_t agentos_ipc_close(agentos_ipc_channel_t *channel)
 {
-    if (!channel)
+    if (!channel) {
+        AGENTOS_LOG_ERROR("agentos_ipc_close: null channel");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     int err = ensure_binder_lock();
-    if (err != AGENTOS_SUCCESS)
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("agentos_ipc_close: ensure_binder_lock failed, err=%d", err);
         return err;
+    }
 
     if (channel->remote_target) {
         if (atomic_fetch_sub_explicit(&channel->remote_target->ref_count, 1,

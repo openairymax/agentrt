@@ -7,6 +7,14 @@
 #include <string.h>
 #include "error.h"
 
+/* Fallback logging macros */
+#ifndef AGENTOS_LOG_ERROR
+#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+#ifndef AGENTOS_LOG_WARN
+#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+
 #define GW_MCP_MAX_TOOLS 256
 #define GW_MCP_MAX_RESOURCES 128
 #define GW_MCP_MAX_PROMPTS 64
@@ -47,6 +55,7 @@ gw_mcp_server_t *gw_mcp_server_create(const gw_mcp_server_config_t *config)
 {
     gw_mcp_server_t *server = (gw_mcp_server_t *)AGENTOS_CALLOC(1, sizeof(gw_mcp_server_t));
     if (!server) {
+        AGENTOS_LOG_ERROR("server allocation failed, size=%zu", sizeof(gw_mcp_server_t));
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -512,12 +521,14 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t *server, const char *method,
         char *tool_name = extract_tool_name_from_params(params_json);
         char *tool_args = extract_tool_args_from_params(params_json);
         if (!tool_name) {
+            AGENTOS_LOG_WARN("failed to extract tool name from params in tools/call");
             AGENTOS_FREE(tool_args);
             server->error_count++;
             return AGENTOS_ERR_PARSE_ERROR;
         }
         gw_mcp_tool_entry_t *tool = find_tool(server, tool_name);
         if (!tool) {
+            AGENTOS_LOG_WARN("tool not found: tool_name=%s, tool_count=%zu", tool_name, server->tool_count);
             const char *err = "{\"jsonrpc\":\"2.0\",\"error\":"
                               "{\"code\":-32601,\"message\":\"Tool not found: %s\"}}";
             size_t elen = snprintf(NULL, 0, err, tool_name);
@@ -533,8 +544,11 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t *server, const char *method,
         char *tool_result = NULL;
         int rc = tool->exec_fn(tool_name, tool_args, &tool_result, tool->user_data);
         AGENTOS_FREE(tool_name);
+        tool_name = NULL;
         AGENTOS_FREE(tool_args);
+        tool_args = NULL;
         if (rc != 0 || !tool_result) {
+            AGENTOS_LOG_ERROR("tool execution failed: tool_name=%s, rc=%d", tool_name, rc);
             const char *err = "{\"jsonrpc\":\"2.0\",\"error\":"
                               "{\"code\":-32603,\"message\":\"Tool execution failed\"}}";
             *response_json = AGENTOS_STRDUP(err);
@@ -565,11 +579,13 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t *server, const char *method,
     if (strcmp(method, "resources/read") == 0) {
         char *uri = extract_resource_uri_from_params(params_json);
         if (!uri) {
+            AGENTOS_LOG_WARN("failed to extract URI from params in resources/read");
             server->error_count++;
             return AGENTOS_ERR_PARSE_ERROR;
         }
         gw_mcp_resource_entry_t *res = find_resource(server, uri);
         if (!res) {
+            AGENTOS_LOG_WARN("resource not found: uri=%s, resource_count=%zu", uri, server->resource_count);
             AGENTOS_FREE(uri);
             server->error_count++;
             return AGENTOS_ERR_NOT_FOUND;
@@ -578,7 +594,9 @@ int gw_mcp_server_handle_jsonrpc(gw_mcp_server_t *server, const char *method,
         char *mime = NULL;
         int rc = res->read_fn(uri, &content, &mime, res->user_data);
         AGENTOS_FREE(uri);
+        uri = NULL;
         if (rc != 0 || !content) {
+            AGENTOS_LOG_ERROR("resource read failed: uri=%s, rc=%d", res->uri, rc);
             AGENTOS_FREE(content);
             AGENTOS_FREE(mime);
             server->error_count++;
@@ -613,6 +631,7 @@ int gw_mcp_server_handle_request(gw_mcp_server_t *server, const char *method, co
 
     char *rpc_method = extract_jsonrpc_method(body_json);
     if (!rpc_method) {
+        AGENTOS_LOG_WARN("failed to extract JSON-RPC method from request body");
         server->error_count++;
         return AGENTOS_ERR_PARSE_ERROR;
     }

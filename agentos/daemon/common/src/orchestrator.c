@@ -715,6 +715,7 @@ static float extract_score_for_field(const char *json, const char *field)
     snprintf(key, flen, "\"%s\"", field);
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
+    key = NULL;
     if (!p)
         return 0.0f;
     p += strlen(field) + 3;
@@ -775,6 +776,7 @@ static char *extract_field_string(const char *json, const char *field)
     snprintf(key, flen, "\"%s\"", field);
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
+    key = NULL;
     if (!p) {
         SVC_LOG_WARN("extract_field_string: field '%s' not found in JSON", field);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
@@ -954,6 +956,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 char *prompt = build_decomposition_prompt(input ? input : "");
                 char *llm_result = call_llm_service(prompt, "You are a task decomposition expert.");
                 AGENTOS_FREE(prompt);
+                prompt = NULL;
 
                 if (llm_result) {
                     task->output = llm_result;
@@ -1116,6 +1119,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 char *t1f_result = call_llm_service(
                     verify_prompt, "You are a fast verification agent (t1-f). Verify quickly.");
                 AGENTOS_FREE(verify_prompt);
+                verify_prompt = NULL;
 
                 float score = 0.0f;
                 bool verified = false;
@@ -1143,6 +1147,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 char *corrected = call_llm_service(
                     correction_prompt, "You are a correction agent. Improve the output.");
                 AGENTOS_FREE(correction_prompt);
+                correction_prompt = NULL;
 
                 if (corrected) {
                     AGENTOS_FREE(t2_output);
@@ -1165,6 +1170,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                          ORCH_VERIFY_MAX_ROUNDS, t2_output);
                 task->output = meta_buf;
                 AGENTOS_FREE(t2_output);
+                t2_output = NULL;
             } else {
                 task->output = t2_output;
             }
@@ -1301,6 +1307,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                         corr_input, "You are a self-correction agent. Critically improve the given "
                                     "output based on the S1 evaluation.");
                     AGENTOS_FREE(corr_input);
+                    corr_input = NULL;
 
                     if (corrected) {
                         AGENTOS_FREE(current_output);
@@ -1370,10 +1377,14 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                     AGENTOS_STRDUP("{\"phase\":\"critique\",\"error\":\"alloc_failed\"}");
             }
 
-            if (final_critique_text)
+            if (final_critique_text) {
                 AGENTOS_FREE(final_critique_text);
-            if (current_output)
+                final_critique_text = NULL;
+            }
+            if (current_output) {
                 AGENTOS_FREE(current_output);
+                current_output = NULL;
+            }
 
             memory_write_step(orch->memory, "critique", task->output, NULL);
             task->output_len = strlen(task->output);
@@ -1392,7 +1403,9 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
             char *t1f_result = call_llm_service(
                 verify_prompt, "You are a t1-f fast verification agent. Score 0.0-1.0.");
             AGENTOS_FREE(verify_prompt);
+            verify_prompt = NULL;
             AGENTOS_FREE(content);
+            content = NULL;
 
             float score = 0.5f;
             bool verified = false;
@@ -1407,6 +1420,7 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 char *corrected =
                     call_llm_service(correction_prompt, "You are a correction agent.");
                 AGENTOS_FREE(correction_prompt);
+                correction_prompt = NULL;
                 if (corrected) {
                     AGENTOS_FREE(t1f_result);
                     t1f_result = corrected;

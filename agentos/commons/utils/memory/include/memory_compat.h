@@ -15,6 +15,10 @@
 
 #include "agentos_memory.h"
 
+/* Forward declarations for memory stats reporter (memory_stats_reporter.h) */
+extern void agentos_mem_stats_record_alloc(size_t bytes);
+extern void agentos_mem_stats_record_dealloc(size_t bytes);
+
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>

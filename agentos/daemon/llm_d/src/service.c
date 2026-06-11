@@ -70,6 +70,7 @@ static char *safe_strcat(char *dest, size_t dest_size, const char *src)
 static char *make_cache_key(const llm_request_config_t *manager)
 {
     if (!manager || !manager->model) {
+        SVC_LOG_ERROR("make_cache_key: NULL parameter (manager=%p, model=%p)", (const void *)manager, manager ? (const void *)manager->model : NULL);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -84,6 +85,7 @@ static char *make_cache_key(const llm_request_config_t *manager)
 
     char *key = (char *)AGENTOS_MALLOC(len);
     if (!key) {
+        SVC_LOG_ERROR("make_cache_key: malloc failed for cache key (len=%zu)", len);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -138,6 +140,7 @@ static char *make_cache_key(const llm_request_config_t *manager)
 static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
 {
     if (!root || !count) {
+        SVC_LOG_ERROR("load_pricing_rules: NULL parameter (root=%p, count=%p)", (const void *)root, (const void *)count);
         *count = 0;
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
@@ -145,6 +148,7 @@ static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
 
     cJSON *pricing = cJSON_GetObjectItem(root, "pricing");
     if (!pricing || !cJSON_IsArray(pricing)) {
+        SVC_LOG_ERROR("load_pricing_rules: pricing array missing or not an array in config");
         *count = 0;
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
@@ -153,6 +157,7 @@ static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
     int n = cJSON_GetArraySize(pricing);
     pricing_rule_t *rules = (pricing_rule_t *)AGENTOS_CALLOC((size_t)n, sizeof(pricing_rule_t));
     if (!rules) {
+        SVC_LOG_ERROR("load_pricing_rules: calloc failed for %d pricing rules", n);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -167,6 +172,7 @@ static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
             rules[i].model_pattern = AGENTOS_STRDUP(pattern->valuestring);
             if (!rules[i].model_pattern) {
                 /* 内存分配失败，清理已分配的 */
+                SVC_LOG_ERROR("load_pricing_rules: strdup failed for model_pattern at index %d", i);
                 for (int j = 0; j < i; ++j) {
                     AGENTOS_FREE((void *)rules[j].model_pattern);
                 }
@@ -464,6 +470,7 @@ static int get_cached_response(llm_service_t *svc, const char *cache_key,
                                llm_response_t **out_response)
 {
     if (!svc || !cache_key || !out_response) {
+        SVC_LOG_ERROR("get_cached_response: NULL parameter (svc=%p, cache_key=%p, out_response=%p)", (const void *)svc, (const void *)cache_key, (const void *)out_response);
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -490,6 +497,7 @@ static int get_cached_response(llm_service_t *svc, const char *cache_key,
 static const provider_t *find_provider(llm_service_t *svc, const char *model)
 {
     if (!svc || !model) {
+        SVC_LOG_ERROR("find_provider: NULL parameter (svc=%p, model=%p)", (const void *)svc, (const void *)model);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -618,6 +626,7 @@ int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *
     }
 
     if (!manager->model) {
+        SVC_LOG_ERROR("llm_service_complete_stream: model name is NULL");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -665,11 +674,13 @@ int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *
 int llm_service_stats(llm_service_t *svc, char **out_json)
 {
     if (!svc || !out_json) {
+        SVC_LOG_ERROR("llm_service_stats: NULL parameter (svc=%p, out_json=%p)", (const void *)svc, (const void *)out_json);
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     cJSON *root = cJSON_CreateObject();
     if (!root) {
+        SVC_LOG_ERROR("llm_service_stats: cJSON_CreateObject failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -685,6 +696,7 @@ int llm_service_stats(llm_service_t *svc, char **out_json)
     cJSON_Delete(root);
 
     if (!json) {
+        SVC_LOG_ERROR("llm_service_stats: cJSON_PrintUnformatted failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -703,6 +715,7 @@ int llm_service_stats(llm_service_t *svc, char **out_json)
 int svc_config_load(const char *config_path, service_config_t *cfg)
 {
     if (!cfg || !config_path) {
+        SVC_LOG_ERROR("svc_config_load: NULL parameter (cfg=%p, config_path=%p)", (const void *)cfg, (const void *)config_path);
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -739,12 +752,14 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
 
     char *content = (char *)AGENTOS_MALLOC((size_t)len + 1);
     if (!content) {
+        SVC_LOG_ERROR("svc_config_load: malloc failed for config content (len=%ld)", len);
         fclose(f);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     size_t read_len = fread(content, 1, (size_t)len, f);
     if (read_len != (size_t)len) {
+        SVC_LOG_ERROR("svc_config_load: fread mismatch (expected=%ld, got=%zu)", len, read_len);
         AGENTOS_FREE(content);
         fclose(f);
         return AGENTOS_ERR_IO;
@@ -1149,8 +1164,10 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
 static int svc_load_model_config_json(const char *config_path, provider_config_t **out_providers,
                                       size_t *out_count)
 {
-    if (!config_path || !out_providers || !out_count)
+    if (!config_path || !out_providers || !out_count) {
+        SVC_LOG_ERROR("svc_load_model_config_json: NULL parameter (config_path=%p, out_providers=%p, out_count=%p)", (const void *)config_path, (const void *)out_providers, (const void *)out_count);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     *out_providers = NULL;
     *out_count = 0;
@@ -1167,6 +1184,7 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
 
     char *content = (char *)AGENTOS_MALLOC((size_t)len + 1);
     if (!content) {
+        SVC_LOG_ERROR("svc_load_model_config_json: malloc failed for content (len=%ld)", len);
         fclose(f);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
@@ -1198,6 +1216,7 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
     provider_config_t *result =
         (provider_config_t *)AGENTOS_CALLOC((size_t)n + 1, sizeof(provider_config_t));
     if (!result) {
+        SVC_LOG_ERROR("svc_load_model_config_json: calloc failed for %d providers", n);
         cJSON_Delete(root);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
@@ -1261,8 +1280,10 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
 int svc_load_model_config(const char *config_path, provider_config_t **out_providers,
                           size_t *out_count)
 {
-    if (!config_path || !out_providers || !out_count)
+    if (!config_path || !out_providers || !out_count) {
+        SVC_LOG_ERROR("svc_load_model_config: NULL parameter (config_path=%p, out_providers=%p, out_count=%p)", (const void *)config_path, (const void *)out_providers, (const void *)out_count);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     if (ends_with(config_path, ".yaml") || ends_with(config_path, ".yml")) {
 #ifdef HAVE_YAML

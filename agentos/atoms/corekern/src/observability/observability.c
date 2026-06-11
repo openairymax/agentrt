@@ -110,8 +110,10 @@ int agentos_observability_init(const agentos_observability_config_t *config)
 {
     if (!g_obs.lock) {
         agentos_mutex_t *new_lock = agentos_mutex_create();
-        if (!new_lock)
+        if (!new_lock) {
+            AGENTOS_LOG_ERROR("agentos_observability_init: mutex create failed, ENOMEM");
             ATM_RET_ERR(AGENTOS_ENOMEM);
+        }
 
         agentos_mutex_t *expected = NULL;
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&g_obs.lock, (void **)&expected,
@@ -214,8 +216,10 @@ agentos_health_status_t agentos_health_check_run(int timeout_ms)
 
 int agentos_metric_record(const agentos_metric_sample_t *sample)
 {
-    if (!sample)
+    if (!sample) {
+        AGENTOS_LOG_ERROR("agentos_metric_record: null sample");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
@@ -228,6 +232,7 @@ int agentos_metric_record(const agentos_metric_sample_t *sample)
     } else {
         if (g_obs.metric_count >= OBS_MAX_METRICS) {
             agentos_mutex_unlock(g_obs.lock);
+            AGENTOS_LOG_WARN("agentos_metric_record: max metrics reached, count=%u max=%d", g_obs.metric_count, OBS_MAX_METRICS);
             ATM_RET_ERR(AGENTOS_ENOSPC);
         }
         obs_metric_entry_t *entry = &g_obs.metrics[g_obs.metric_count];
@@ -251,18 +256,22 @@ int agentos_metric_record(const agentos_metric_sample_t *sample)
 
 int agentos_metric_counter_create(const char *name, const char *labels)
 {
-    if (!name)
+    if (!name) {
+        AGENTOS_LOG_ERROR("agentos_metric_counter_create: null name");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
     if (find_metric(name, labels)) {
         agentos_mutex_unlock(g_obs.lock);
+        AGENTOS_LOG_WARN("agentos_metric_counter_create: metric already exists, name=%s", name);
         ATM_RET_ERR(AGENTOS_EEXIST);
     }
     if (g_obs.metric_count >= OBS_MAX_METRICS) {
         agentos_mutex_unlock(g_obs.lock);
+        AGENTOS_LOG_WARN("agentos_metric_counter_create: max metrics reached, count=%u max=%d", g_obs.metric_count, OBS_MAX_METRICS);
         ATM_RET_ERR(AGENTOS_ENOSPC);
     }
 
@@ -286,8 +295,10 @@ int agentos_metric_counter_create(const char *name, const char *labels)
 
 int agentos_metric_counter_inc(const char *name, const char *labels, double value)
 {
-    if (!name)
+    if (!name) {
+        AGENTOS_LOG_ERROR("agentos_metric_counter_inc: null name");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
@@ -295,10 +306,12 @@ int agentos_metric_counter_inc(const char *name, const char *labels, double valu
     obs_metric_entry_t *entry = find_metric(name, labels);
     if (!entry) {
         agentos_mutex_unlock(g_obs.lock);
+        AGENTOS_LOG_ERROR("agentos_metric_counter_inc: metric not found, name=%s", name);
         ATM_RET_ERR(AGENTOS_ENOENT);
     }
     if (entry->type != AGENTOS_METRIC_COUNTER_E) {
         agentos_mutex_unlock(g_obs.lock);
+        AGENTOS_LOG_ERROR("agentos_metric_counter_inc: type mismatch, name=%s type=%d expected=COUNTER", name, entry->type);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
     entry->value += value;
@@ -310,18 +323,22 @@ int agentos_metric_counter_inc(const char *name, const char *labels, double valu
 
 int agentos_metric_gauge_create(const char *name, const char *labels, double initial_value)
 {
-    if (!name)
+    if (!name) {
+        AGENTOS_LOG_ERROR("agentos_metric_gauge_create: null name");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
 
     if (find_metric(name, labels)) {
         agentos_mutex_unlock(g_obs.lock);
+        AGENTOS_LOG_WARN("agentos_metric_gauge_create: metric already exists, name=%s", name);
         ATM_RET_ERR(AGENTOS_EEXIST);
     }
     if (g_obs.metric_count >= OBS_MAX_METRICS) {
         agentos_mutex_unlock(g_obs.lock);
+        AGENTOS_LOG_WARN("agentos_metric_gauge_create: max metrics reached, count=%u max=%d", g_obs.metric_count, OBS_MAX_METRICS);
         ATM_RET_ERR(AGENTOS_ENOSPC);
     }
 
@@ -345,8 +362,10 @@ int agentos_metric_gauge_create(const char *name, const char *labels, double ini
 
 int agentos_metric_gauge_set(const char *name, const char *labels, double value)
 {
-    if (!name)
+    if (!name) {
+        AGENTOS_LOG_ERROR("agentos_metric_gauge_set: null name");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
@@ -354,10 +373,12 @@ int agentos_metric_gauge_set(const char *name, const char *labels, double value)
     obs_metric_entry_t *entry = find_metric(name, labels);
     if (!entry) {
         agentos_mutex_unlock(g_obs.lock);
+        AGENTOS_LOG_ERROR("agentos_metric_gauge_set: metric not found, name=%s", name);
         ATM_RET_ERR(AGENTOS_ENOENT);
     }
     if (entry->type != AGENTOS_METRIC_GAUGE_E) {
         agentos_mutex_unlock(g_obs.lock);
+        AGENTOS_LOG_ERROR("agentos_metric_gauge_set: type mismatch, name=%s type=%d expected=GAUGE", name, entry->type);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
     entry->value = value;
@@ -370,8 +391,10 @@ int agentos_metric_gauge_set(const char *name, const char *labels, double value)
 int agentos_trace_span_start(agentos_trace_context_t *context, const char *service_name,
                              const char *operation_name)
 {
-    if (!context)
+    if (!context) {
+        AGENTOS_LOG_ERROR("agentos_trace_span_start: null context");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     generate_hex_id(context->trace_id, sizeof(context->trace_id), OBS_TRACE_ID_SIZE);
@@ -407,8 +430,10 @@ int agentos_trace_span_start(agentos_trace_context_t *context, const char *servi
 
 int agentos_trace_span_end(agentos_trace_context_t *context, int error_code)
 {
-    if (!context)
+    if (!context) {
+        AGENTOS_LOG_ERROR("agentos_trace_span_end: null context");
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     context->end_ns = agentos_time_monotonic_ns();
@@ -429,8 +454,10 @@ int agentos_trace_span_end(agentos_trace_context_t *context, int error_code)
 
 int agentos_trace_set_tag(agentos_trace_context_t *context, const char *key, const char *value)
 {
-    if (!context || !key)
+    if (!context || !key) {
+        AGENTOS_LOG_ERROR("agentos_trace_set_tag: null parameter, context=%p key=%p", (void *)context, (void *)key);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
@@ -456,8 +483,10 @@ int agentos_trace_set_tag(agentos_trace_context_t *context, const char *key, con
 
 int agentos_trace_log(agentos_trace_context_t *context, const char *message)
 {
-    if (!context || !message)
+    if (!context || !message) {
+        AGENTOS_LOG_ERROR("agentos_trace_log: null parameter, context=%p message=%p", (void *)context, (void *)message);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
@@ -485,6 +514,7 @@ int agentos_performance_get_metrics(double *out_cpu_usage, double *out_memory_us
                                     int *out_thread_count)
 {
     if (!out_cpu_usage || !out_memory_usage || !out_thread_count) {
+        AGENTOS_LOG_ERROR("agentos_performance_get_metrics: null parameter, out_cpu=%p out_mem=%p out_threads=%p", (void *)out_cpu_usage, (void *)out_memory_usage, (void *)out_thread_count);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
@@ -554,8 +584,10 @@ int agentos_performance_get_metrics(double *out_cpu_usage, double *out_memory_us
 
 int agentos_observability_export_prometheus(char *buffer, size_t buffer_size)
 {
-    if (!buffer || buffer_size == 0)
+    if (!buffer || buffer_size == 0) {
+        AGENTOS_LOG_ERROR("agentos_observability_export_prometheus: null buffer or zero size, buffer=%p buffer_size=%zu", (void *)buffer, buffer_size);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
@@ -588,6 +620,7 @@ int agentos_observability_export_prometheus(char *buffer, size_t buffer_size)
                          m->name, type_str, m->name, m->value);
         }
         if (n < 0 || (size_t)n >= buffer_size - written) {
+            AGENTOS_LOG_WARN("agentos_observability_export_prometheus: buffer overflow during export, written=%d metric_idx=%u", written, i);
             agentos_mutex_unlock(g_obs.lock);
             return written > 0 ? written : AGENTOS_EOVERFLOW;
         }
@@ -600,8 +633,10 @@ int agentos_observability_export_prometheus(char *buffer, size_t buffer_size)
 
 int agentos_health_export_status(char *buffer, size_t buffer_size)
 {
-    if (!buffer || buffer_size == 0)
+    if (!buffer || buffer_size == 0) {
+        AGENTOS_LOG_ERROR("agentos_health_export_status: null buffer or zero size, buffer=%p buffer_size=%zu", (void *)buffer, buffer_size);
         ATM_RET_ERR(AGENTOS_EINVAL);
+    }
     obs_ensure_init();
 
     agentos_mutex_lock(g_obs.lock);
@@ -628,6 +663,7 @@ int agentos_health_export_status(char *buffer, size_t buffer_size)
                          "%s{\"name\":\"%s\",\"status\":\"%s\"}", i > 0 ? "," : "", h->name,
                          status_str);
         if (n < 0 || (size_t)n >= buffer_size - written) {
+            AGENTOS_LOG_WARN("agentos_health_export_status: buffer overflow during check export, written=%d check_idx=%u", written, i);
             agentos_mutex_unlock(g_obs.lock);
             return written > 0 ? written : AGENTOS_EOVERFLOW;
         }
@@ -636,6 +672,7 @@ int agentos_health_export_status(char *buffer, size_t buffer_size)
 
     int n = snprintf(buffer + written, buffer_size - written, "]}");
     if (n < 0 || (size_t)n >= buffer_size - written) {
+        AGENTOS_LOG_WARN("agentos_health_export_status: buffer overflow at finalization, written=%d", written);
         agentos_mutex_unlock(g_obs.lock);
         return written > 0 ? written : AGENTOS_EOVERFLOW;
     }
