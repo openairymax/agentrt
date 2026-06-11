@@ -16,6 +16,11 @@
 
 #include "utils/cupolas_utils.h"
 
+/* Ensure logging macros are available */
+#ifndef AGENTOS_LOG_ERROR
+#include "../../../commons/utils/logging/include/logging_compat.h"
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -186,8 +191,15 @@ void permission_engine_unref(permission_engine_t *engine)
 int permission_engine_check(permission_engine_t *engine, const char *agent_id, const char *action,
                             const char *resource, const char *context)
 {
-    if (!engine)
+    if (!engine) {
+        AGENTOS_LOG_ERROR("permission_engine_check: NULL engine parameter");
         return 0;
+    }
+
+    if (!agent_id || !action || !resource) {
+        AGENTOS_LOG_ERROR("permission_engine_check: NULL parameter - agent_id=%p, action=%p, resource=%p", (void *)agent_id, (void *)action, (void *)resource);
+        return 0;
+    }
 
     int cached = cache_manager_get(engine->cache, agent_id, action, resource, context);
     if (cached >= 0) {
@@ -196,6 +208,12 @@ int permission_engine_check(permission_engine_t *engine, const char *agent_id, c
 
     int result = rule_manager_match(engine->rules, agent_id, action, resource, context);
 
+    if (result < 0) {
+        AGENTOS_LOG_ERROR("permission_engine_check: policy evaluation error - agent_id=%s, action=%s, resource=%s, result=%d", agent_id, action, resource, result);
+    } else if (result == 0) {
+        AGENTOS_LOG_WARN("permission_engine_check: access denied - agent_id=%s, action=%s, resource=%s", agent_id, action, resource);
+    }
+
     cache_manager_put(engine->cache, agent_id, action, resource, context, result);
 
     return result;
@@ -203,8 +221,10 @@ int permission_engine_check(permission_engine_t *engine, const char *agent_id, c
 
 int permission_engine_reload(permission_engine_t *engine)
 {
-    if (!engine)
+    if (!engine) {
+        AGENTOS_LOG_ERROR("permission_engine_reload: NULL engine parameter");
         return cupolas_ERROR_INVALID_ARG;
+    }
 
     int ret = rule_manager_reload(engine->rules);
     if (ret == cupolas_OK) {
@@ -225,10 +245,20 @@ void permission_engine_clear_cache(permission_engine_t *engine)
 int permission_engine_add_rule(permission_engine_t *engine, const char *agent_id,
                                const char *action, const char *resource, int allow, int priority)
 {
-    if (!engine)
+    if (!engine) {
+        AGENTOS_LOG_ERROR("permission_engine_add_rule: NULL engine parameter");
         return cupolas_ERROR_INVALID_ARG;
+    }
+
+    if (!agent_id || !action || !resource) {
+        AGENTOS_LOG_ERROR("permission_engine_add_rule: NULL parameter - agent_id=%p, action=%p, resource=%p", (void *)agent_id, (void *)action, (void *)resource);
+        return cupolas_ERROR_INVALID_ARG;
+    }
 
     int ret = rule_manager_add(engine->rules, agent_id, action, resource, allow, priority);
+    if (ret != cupolas_OK) {
+        AGENTOS_LOG_WARN("permission_engine_add_rule: rule conflict or error - agent_id=%s, action=%s, resource=%s, allow=%d, priority=%d, ret=%d", agent_id, action, resource, allow, priority, ret);
+    }
     if (ret == cupolas_OK) {
         cache_manager_clear(engine->cache);
     }

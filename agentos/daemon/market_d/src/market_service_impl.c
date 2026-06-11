@@ -86,8 +86,10 @@ struct market_service {
 int market_service_create(const market_config_t *config, market_service_t **service)
 {
     market_config_t default_cfg;
-    if (!service)
+    if (!service) {
+        SVC_LOG_ERROR("market_service_create: NULL service output parameter");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
     if (!config) {
         __builtin_memset(&default_cfg, 0, sizeof(default_cfg));
         default_cfg.cache_ttl_ms = 3600000;
@@ -113,8 +115,10 @@ int market_service_create(const market_config_t *config, market_service_t **serv
 
 int market_service_destroy(market_service_t *service)
 {
-    if (!service)
+    if (!service) {
+        SVC_LOG_ERROR("market_service_destroy: NULL service parameter");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (service->agents[i]) {
@@ -150,9 +154,12 @@ int market_service_destroy(market_service_t *service)
 
 int market_service_register_agent(market_service_t *service, const agent_info_t *agent_info)
 {
-    if (!service || !agent_info || !service->initialized)
+    if (!service || !agent_info || !service->initialized) {
+        SVC_LOG_ERROR("market_service_register_agent: NULL parameter or not initialized (service=%p, agent_info=%p, initialized=%d)", (const void *)service, (const void *)agent_info, service ? service->initialized : -1);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
     if (service->agent_count >= MAX_AGENTS) {
+        SVC_LOG_ERROR("market_service_register_agent: max agents exceeded (count=%zu, max=%d)", service->agent_count, MAX_AGENTS);
         AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "max agents exceeded");
     }
 
@@ -193,6 +200,7 @@ int market_service_register_agent(market_service_t *service, const agent_info_t 
 
     agent_info_t *new_agent = (agent_info_t *)AGENTOS_CALLOC(1, sizeof(agent_info_t));
     if (!new_agent) {
+        SVC_LOG_ERROR("market_service_register_agent: calloc failed for new agent entry");
         AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate agent entry");
     }
 
@@ -208,6 +216,7 @@ int market_service_register_agent(market_service_t *service, const agent_info_t 
     new_agent->dependencies =
         agent_info->dependencies ? AGENTOS_STRDUP(agent_info->dependencies) : NULL;
     if (!new_agent->agent_id || !new_agent->name || !new_agent->version) {
+        SVC_LOG_ERROR("market_service_register_agent: strdup failed for required agent fields (agent_id=%p, name=%p, version=%p)", (const void *)new_agent->agent_id, (const void *)new_agent->name, (const void *)new_agent->version);
         AGENTOS_FREE(new_agent->agent_id);
         AGENTOS_FREE(new_agent->name);
         AGENTOS_FREE(new_agent->version);
@@ -228,9 +237,12 @@ int market_service_register_agent(market_service_t *service, const agent_info_t 
 
 int market_service_register_skill(market_service_t *service, const skill_info_t *skill_info)
 {
-    if (!service || !skill_info || !service->initialized)
+    if (!service || !skill_info || !service->initialized) {
+        SVC_LOG_ERROR("market_service_register_skill: NULL parameter or not initialized (service=%p, skill_info=%p, initialized=%d)", (const void *)service, (const void *)skill_info, service ? service->initialized : -1);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
     if (service->skill_count >= MAX_SKILLS) {
+        SVC_LOG_ERROR("market_service_register_skill: max skills exceeded (count=%zu, max=%d)", service->skill_count, MAX_SKILLS);
         AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "max skills exceeded");
     }
 
@@ -305,12 +317,15 @@ int market_service_register_skill(market_service_t *service, const skill_info_t 
 int market_service_search_agents(market_service_t *service, const search_params_t *params,
                                  agent_info_t ***agents, size_t *count)
 {
-    if (!service || !params || !agents || !count || !service->initialized)
+    if (!service || !params || !agents || !count || !service->initialized) {
+        SVC_LOG_ERROR("market_service_search_agents: NULL parameter or not initialized (service=%p, params=%p, agents=%p, count=%p, initialized=%d)", (const void *)service, (const void *)params, (const void *)agents, (const void *)count, service ? service->initialized : -1);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     size_t results_size = 16;
     agent_info_t **results = (agent_info_t **)AGENTOS_MALLOC(sizeof(agent_info_t *) * results_size);
     if (!results) {
+        SVC_LOG_ERROR("market_service_search_agents: malloc failed for search results");
         AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate search results");
     }
 
@@ -330,6 +345,7 @@ int market_service_search_agents(market_service_t *service, const search_params_
             agent_info_t **tmp =
                 (agent_info_t **)AGENTOS_REALLOC(results, sizeof(agent_info_t *) * results_size);
             if (!tmp) {
+                SVC_LOG_ERROR("market_service_search_agents: realloc failed for search results (results_size=%zu)", results_size);
                 AGENTOS_FREE(results);
                 AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to resize search results");
             }
@@ -393,14 +409,18 @@ int market_service_search_skills(market_service_t *service, const search_params_
 int market_service_install_agent(market_service_t *service, const install_request_t *request,
                                  install_result_t **result)
 {
-    if (!service || !request || !result || !service->initialized)
+    if (!service || !request || !result || !service->initialized) {
+        SVC_LOG_ERROR("market_service_install_agent: NULL parameter or not initialized (service=%p, request=%p, result=%p, initialized=%d)", (const void *)service, (const void *)request, (const void *)result, service ? service->initialized : -1);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
     if (!is_safe_path_component(request->id)) {
+        SVC_LOG_ERROR("market_service_install_agent: unsafe path component in install request id (id=%s)", request->id ? request->id : "NULL");
         AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "install request id is unsafe");
     }
 
     install_result_t *res = (install_result_t *)AGENTOS_CALLOC(1, sizeof(install_result_t));
     if (!res) {
+        SVC_LOG_ERROR("market_service_install_agent: calloc failed for install result");
         AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate install result");
     }
 
@@ -430,6 +450,7 @@ int market_service_install_agent(market_service_t *service, const install_reques
     {
         int mkret = mkdir(install_dir, 0755);
         if (mkret != 0 && errno != EEXIST) {
+            SVC_LOG_ERROR("market_service_install_agent: mkdir failed for install directory (path=%s, errno=%d)", install_dir, errno);
             res->success = false;
             res->message = AGENTOS_STRDUP("Failed to create install directory");
             res->error_code = -4;
@@ -517,11 +538,14 @@ int market_service_install_agent(market_service_t *service, const install_reques
 int market_service_install_skill(market_service_t *service, const install_request_t *request,
                                  install_result_t **result)
 {
-    if (!service || !request || !result || !service->initialized)
+    if (!service || !request || !result || !service->initialized) {
+        SVC_LOG_ERROR("market_service_install_skill: NULL parameter or not initialized (service=%p, request=%p, result=%p, initialized=%d)", (const void *)service, (const void *)request, (const void *)result, service ? service->initialized : -1);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     install_result_t *res = (install_result_t *)AGENTOS_CALLOC(1, sizeof(install_result_t));
     if (!res) {
+        SVC_LOG_ERROR("market_service_install_skill: calloc failed for skill install result");
         AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to allocate skill install result");
     }
 
@@ -555,9 +579,12 @@ int market_service_install_skill(market_service_t *service, const install_reques
 
 int market_service_uninstall_agent(market_service_t *service, const char *agent_id)
 {
-    if (!service || !agent_id || !service->initialized)
+    if (!service || !agent_id || !service->initialized) {
+        SVC_LOG_ERROR("market_service_uninstall_agent: NULL parameter or not initialized (service=%p, agent_id=%p, initialized=%d)", (const void *)service, (const void *)agent_id, service ? service->initialized : -1);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
     if (!is_safe_path_component(agent_id)) {
+        SVC_LOG_ERROR("market_service_uninstall_agent: unsafe path component in agent_id (agent_id=%s)", agent_id);
         AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "agent_id is unsafe path component");
     }
 
