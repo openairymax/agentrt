@@ -262,6 +262,8 @@ int main(int argc, char *argv[])
                              HEALTH_CHECK_INTERVAL, stats.current_concurrent,
                              (unsigned long long)stats.request_count,
                              (unsigned long long)stats.error_count, stats.avg_time_ms);
+            } else {
+                SVC_LOG_WARN("Health check failed: unable to retrieve service stats");
             }
         }
     }

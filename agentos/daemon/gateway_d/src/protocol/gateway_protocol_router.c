@@ -11,6 +11,14 @@
 #include <time.h>
 #include "error.h"
 
+/* Fallback logging macros */
+#ifndef AGENTOS_LOG_ERROR
+#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+#ifndef AGENTOS_LOG_WARN
+#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+
 typedef struct {
     gw_proto_detect_result_t proto_type;
     gw_proto_request_handler_t handler;
@@ -249,6 +257,8 @@ int gw_proto_router_route(gw_proto_router_t *router, gw_proto_detect_result_t pr
     gw_proto_request_handler_t handler = find_handler(router, proto_type, &user_data);
 
     if (!handler) {
+        AGENTOS_LOG_WARN("no handler found for protocol type=%d, route_errors=%llu",
+                         proto_type, (unsigned long long)router->stats.route_errors);
         router->stats.route_errors++;
         switch (proto_type) {
         case GW_PROTO_DETECT_MCP:
@@ -290,6 +300,8 @@ int gw_proto_router_route(gw_proto_router_t *router, gw_proto_detect_result_t pr
 
     int result = handler(method, path, body_json, response_json, user_data);
     if (result != 0) {
+        AGENTOS_LOG_WARN("handler returned error: proto_type=%d, result=%d, path=%s",
+                         proto_type, result, path ? path : "(null)");
         router->stats.route_errors++;
     }
     return result;
