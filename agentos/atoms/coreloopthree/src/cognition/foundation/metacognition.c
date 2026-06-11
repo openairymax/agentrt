@@ -45,13 +45,17 @@ static const char *dim_name(mc_dimension_t d)
 
 agentos_error_t agentos_mc_create(agentos_metacognition_t **out_mc)
 {
-    if (!out_mc)
+    if (!out_mc) {
+        AGENTOS_LOG_ERROR("agentos_mc_create: NULL out_mc parameter");
         return AGENTOS_EINVAL;
+    }
 
     agentos_metacognition_t *mc =
         (agentos_metacognition_t *)AGENTOS_CALLOC(1, sizeof(agentos_metacognition_t));
-    if (!mc)
+    if (!mc) {
+        AGENTOS_LOG_ERROR("agentos_mc_create: allocation failed for metacognition");
         return AGENTOS_ENOMEM;
+    }
 
     mc->acceptance_threshold = 0.7f;
     mc->auto_correct_threshold = 0.5f;
@@ -62,6 +66,7 @@ agentos_error_t agentos_mc_create(agentos_metacognition_t **out_mc)
     mc->records = (mc_evaluation_record_t *)AGENTOS_CALLOC(mc->record_capacity,
                                                            sizeof(mc_evaluation_record_t));
     if (!mc->records) {
+        AGENTOS_LOG_ERROR("agentos_mc_create: records allocation failed (capacity=%zu)", mc->record_capacity);
         AGENTOS_FREE(mc);
         return AGENTOS_ENOMEM;
     }
@@ -263,8 +268,10 @@ agentos_error_t agentos_mc_evaluate_step(agentos_metacognition_t *mc, agentos_th
                                          mc_evaluation_result_t *out_result)
 {
 
-    if (!mc || !step || !step->content || !out_result)
+    if (!mc || !step || !step->content || !out_result) {
+        AGENTOS_LOG_ERROR("agentos_mc_evaluate_step: NULL/invalid params (mc=%p step=%p content=%p out_result=%p)", (void *)mc, (void *)step, step ? (void *)step->content : NULL, (void *)out_result);
         return AGENTOS_EINVAL;
+    }
 
     __builtin_memset(out_result, 0, sizeof(mc_evaluation_result_t));
     mc->total_evaluations++;
@@ -379,8 +386,10 @@ agentos_error_t agentos_mc_evaluate_quick(agentos_metacognition_t *mc,
                                           int *out_acceptable)
 {
 
-    if (!mc || !step || !out_score || !out_acceptable)
+    if (!mc || !step || !out_score || !out_acceptable) {
+        AGENTOS_LOG_ERROR("agentos_mc_evaluate_quick: NULL params (mc=%p step=%p out_score=%p out_acceptable=%p)", (void *)mc, (void *)step, (void *)out_score, (void *)out_acceptable);
         return AGENTOS_EINVAL;
+    }
 
     mc_evaluation_result_t result;
     agentos_error_t err = agentos_mc_evaluate_step(mc, step, NULL, 0, &result);
@@ -405,16 +414,20 @@ agentos_error_t agentos_mc_apply_correction(
     void *user_data)
 {
 
-    if (!mc || !step || !eval)
+    if (!mc || !step || !eval) {
+        AGENTOS_LOG_ERROR("agentos_mc_apply_correction: NULL params (mc=%p step=%p eval=%p)", (void *)mc, (void *)step, (void *)eval);
         return AGENTOS_EINVAL;
+    }
 
     switch (eval->strategy) {
     case MC_CORRECT_NONE:
         return AGENTOS_SUCCESS;
 
     case MC_CORRECT_AUTO: {
-        if (!corrector_fn)
+        if (!corrector_fn) {
+            AGENTOS_LOG_ERROR("agentos_mc_apply_correction: AUTO correction requested but corrector_fn is NULL (step_id=%u)", step->step_id);
             return AGENTOS_EINVAL;
+        }
         char *corrected = NULL;
         size_t corr_len = 0;
         agentos_error_t err =
@@ -435,6 +448,7 @@ agentos_error_t agentos_mc_apply_correction(
     case MC_CORRECT_RERUN: {
         mc->total_corrections++;
         if (!corrector_fn) {
+            AGENTOS_LOG_ERROR("agentos_mc_apply_correction: RERUN correction requested but corrector_fn is NULL (step_id=%u)", step->step_id);
             step->status = TC_STATUS_FAILED;
             mc->total_rejections++;
             return AGENTOS_EPERM;
@@ -493,6 +507,7 @@ agentos_error_t agentos_mc_apply_correction(
 
         step->status = TC_STATUS_FAILED;
         mc->total_rejections++;
+        AGENTOS_LOG_ERROR("agentos_mc_apply_correction: RERUN all retries exhausted (step_id=%u last_err=%d)", step->step_id, (int)last_err);
         return last_err;
     }
 
@@ -506,14 +521,18 @@ agentos_error_t agentos_mc_apply_correction(
         return AGENTOS_EPERM;
 
     default:
+        AGENTOS_LOG_ERROR("agentos_mc_apply_correction: unknown correction strategy (strategy=%d)", (int)eval->strategy);
         return AGENTOS_EINVAL;
     }
 }
 
 int agentos_mc_should_self_correct(agentos_metacognition_t *mc, tc_step_type_t step_type)
 {
-    if (!mc || mc->record_count < 3)
+    if (!mc || mc->record_count < 3) {
+        if (!mc)
+            AGENTOS_LOG_WARN("agentos_mc_should_self_correct: NULL mc parameter");
         return 0;
+    }
 
     size_t recent_failures = 0;
     size_t check_count = (mc->record_count > 10) ? 10 : mc->record_count;
@@ -535,7 +554,11 @@ int agentos_mc_should_self_correct(agentos_metacognition_t *mc, tc_step_type_t s
 
 float agentos_mc_calibrate_confidence(agentos_metacognition_t *mc, float raw_confidence)
 {
-    if (!mc || !mc->enable_confidence_calibration)
+    if (!mc) {
+        AGENTOS_LOG_WARN("agentos_mc_calibrate_confidence: NULL mc parameter, returning raw value");
+        return raw_confidence;
+    }
+    if (!mc->enable_confidence_calibration)
         return raw_confidence;
 
     raw_confidence = clampf(raw_confidence, 0.0f, 1.0f);
@@ -565,8 +588,10 @@ agentos_error_t agentos_mc_feedback(agentos_metacognition_t *mc, float predicted
                                     int was_correct)
 {
 
-    if (!mc)
+    if (!mc) {
+        AGENTOS_LOG_ERROR("agentos_mc_feedback: NULL mc parameter");
         return AGENTOS_EINVAL;
+    }
     if (!mc->enable_confidence_calibration)
         return AGENTOS_SUCCESS;
 
@@ -591,8 +616,10 @@ agentos_error_t agentos_mc_feedback(agentos_metacognition_t *mc, float predicted
 
 agentos_error_t agentos_mc_stats(agentos_metacognition_t *mc, char **out_json)
 {
-    if (!mc || !out_json)
+    if (!mc || !out_json) {
+        AGENTOS_LOG_ERROR("agentos_mc_stats: NULL params (mc=%p out_json=%p)", (void *)mc, (void *)out_json);
         return AGENTOS_EINVAL;
+    }
 
     char buf[1024];
     int written = snprintf(
@@ -612,12 +639,16 @@ agentos_error_t agentos_mc_stats(agentos_metacognition_t *mc, char **out_json)
             : 0.0f,
         mc->calibrator.overconfidence_rate, mc->calibrator.underconfidence_rate, mc->record_count);
 
-    if (written < 0 || (size_t)written >= sizeof(buf))
+    if (written < 0 || (size_t)written >= sizeof(buf)) {
+        AGENTOS_LOG_ERROR("agentos_mc_stats: stats JSON truncation or encoding error (written=%d buf_size=%zu)", written, sizeof(buf));
         return AGENTOS_ERANGE;
+    }
 
     char *result = AGENTOS_STRDUP(buf);
-    if (!result)
+    if (!result) {
+        AGENTOS_LOG_ERROR("agentos_mc_stats: result allocation failed");
         return AGENTOS_ENOMEM;
+    }
     *out_json = result;
     return AGENTOS_SUCCESS;
 }
@@ -626,8 +657,10 @@ agentos_error_t agentos_mc_get_history(agentos_metacognition_t *mc, size_t count
                                        mc_evaluation_record_t **out_records, size_t *out_count)
 {
 
-    if (!mc || !out_records || !out_count)
+    if (!mc || !out_records || !out_count) {
+        AGENTOS_LOG_ERROR("agentos_mc_get_history: NULL params (mc=%p out_records=%p out_count=%p)", (void *)mc, (void *)out_records, (void *)out_count);
         return AGENTOS_EINVAL;
+    }
 
     size_t avail = (count < mc->record_count) ? count : mc->record_count;
     *out_records =
@@ -641,8 +674,10 @@ void agentos_mc_reset(agentos_metacognition_t *mc)
     if (!mc)
         return;
     for (size_t i = 0; i < mc->record_count; i++) {
-        if (mc->records[i].result.critique_text)
+        if (mc->records[i].result.critique_text) {
             AGENTOS_FREE((void *)mc->records[i].result.critique_text);
+            mc->records[i].result.critique_text = NULL;
+        }
     }
     mc->record_count = 0;
     mc->record_head = 0;
@@ -699,8 +734,10 @@ static size_t find_or_create_pattern(agentos_metacognition_t *mc, const char *ke
 agentos_error_t agentos_mc_detect_patterns(agentos_metacognition_t *mc,
                                            mc_error_pattern_t **out_patterns, size_t *out_count)
 {
-    if (!mc || !out_patterns || !out_count)
+    if (!mc || !out_patterns || !out_count) {
+        AGENTOS_LOG_ERROR("agentos_mc_detect_patterns: NULL params (mc=%p out_patterns=%p out_count=%p)", (void *)mc, (void *)out_patterns, (void *)out_count);
         return AGENTOS_EINVAL;
+    }
     if (mc->record_count < 3) {
         *out_patterns = NULL;
         *out_count = 0;
@@ -789,8 +826,10 @@ agentos_error_t agentos_mc_detect_patterns(agentos_metacognition_t *mc,
 agentos_error_t agentos_mc_learn_best_strategy(agentos_metacognition_t *mc, const char *pattern_key,
                                                mc_correction_strategy_t *out_strategy)
 {
-    if (!mc || !pattern_key || !out_strategy)
+    if (!mc || !pattern_key || !out_strategy) {
+        AGENTOS_LOG_ERROR("agentos_mc_learn_best_strategy: NULL params (mc=%p pattern_key=%p out_strategy=%p)", (void *)mc, (void *)pattern_key, (void *)out_strategy);
         return AGENTOS_EINVAL;
+    }
 
     *out_strategy = MC_CORRECT_RERUN;
 
@@ -823,8 +862,10 @@ int agentos_mc_preemptive_check(agentos_metacognition_t *mc, tc_step_type_t step
                                 const char *input, size_t input_len, char **out_preemptive_hint,
                                 size_t *out_hint_len)
 {
-    if (!mc || !input || !out_preemptive_hint || !out_hint_len)
+    if (!mc || !input || !out_preemptive_hint || !out_hint_len) {
+        AGENTOS_LOG_ERROR("agentos_mc_preemptive_check: NULL params (mc=%p input=%p out_preemptive_hint=%p out_hint_len=%p)", (void *)mc, (void *)input, (void *)out_preemptive_hint, (void *)out_hint_len);
         return AGENTOS_EINVAL;
+    }
     *out_preemptive_hint = NULL;
     *out_hint_len = 0;
 
@@ -883,12 +924,16 @@ agentos_error_t agentos_mc_record_strategy_result(agentos_metacognition_t *mc,
                                                   const char *pattern_key,
                                                   mc_correction_strategy_t strategy, int success)
 {
-    if (!mc || !pattern_key)
+    if (!mc || !pattern_key) {
+        AGENTOS_LOG_ERROR("agentos_mc_record_strategy_result: NULL params (mc=%p pattern_key=%p)", (void *)mc, (void *)pattern_key);
         return AGENTOS_EINVAL;
+    }
 
     size_t pidx = find_or_create_pattern(mc, pattern_key);
-    if (pidx >= MC_MAX_PATTERNS)
+    if (pidx >= MC_MAX_PATTERNS) {
+        AGENTOS_LOG_ERROR("agentos_mc_record_strategy_result: pattern storage full, cannot record (pattern_key=%s pattern_count=%zu)", pattern_key, mc->pattern_count);
         return AGENTOS_ENOMEM;
+    }
 
     mc_error_pattern_t *pat = &mc->patterns[pidx];
     pat->occurrence_count++;
@@ -918,8 +963,10 @@ agentos_error_t agentos_mc_record_strategy_result(agentos_metacognition_t *mc,
 
 float agentos_mc_adapt_threshold(agentos_metacognition_t *mc)
 {
-    if (!mc)
+    if (!mc) {
+        AGENTOS_LOG_WARN("agentos_mc_adapt_threshold: NULL mc parameter, returning default threshold");
         return 0.7f;
+    }
 
     /* 初始化自适应阈值 */
     if (mc->adaptive_acceptance_threshold <= 0.0f)

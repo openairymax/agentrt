@@ -103,9 +103,18 @@ int monitor_service_create(const monitor_config_t *config, monitor_service_t **s
         __builtin_memcpy(&svc->config, config, sizeof(monitor_config_t));
         if (config->log_file_path) {
             svc->config.log_file_path = AGENTOS_STRDUP(config->log_file_path);
+            if (!svc->config.log_file_path) {
+                AGENTOS_FREE(svc);
+                AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate log_file_path");
+            }
         }
         if (config->metrics_storage_path) {
             svc->config.metrics_storage_path = AGENTOS_STRDUP(config->metrics_storage_path);
+            if (!svc->config.metrics_storage_path) {
+                AGENTOS_FREE(svc->config.log_file_path);
+                AGENTOS_FREE(svc);
+                AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate metrics_storage_path");
+            }
         }
     } else {
         svc->config.metrics_collection_interval_ms = 5000;
@@ -113,7 +122,16 @@ int monitor_service_create(const monitor_config_t *config, monitor_service_t **s
         svc->config.log_flush_interval_ms = 30000;
         svc->config.alert_check_interval_ms = 5000;
         svc->config.log_file_path = AGENTOS_STRDUP("monitor.log");
+        if (!svc->config.log_file_path) {
+            AGENTOS_FREE(svc);
+            AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate default log_file_path");
+        }
         svc->config.metrics_storage_path = AGENTOS_STRDUP("metrics");
+        if (!svc->config.metrics_storage_path) {
+            AGENTOS_FREE(svc->config.log_file_path);
+            AGENTOS_FREE(svc);
+            AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate default metrics_storage_path");
+        }
         svc->config.enable_tracing = true;
         svc->config.enable_alerting = true;
     }
@@ -212,7 +230,18 @@ int monitor_service_record_metric(monitor_service_t *service, const metric_info_
             return AGENTOS_ENOMEM;
         }
         entry->name = metric->name ? AGENTOS_STRDUP(metric->name) : NULL;
+        if (metric->name && !entry->name) {
+            AGENTOS_FREE(entry);
+            agentos_mutex_unlock(&service->metric_lock);
+            return AGENTOS_ENOMEM;
+        }
         entry->description = metric->description ? AGENTOS_STRDUP(metric->description) : NULL;
+        if (metric->description && !entry->description) {
+            AGENTOS_FREE(entry->name);
+            AGENTOS_FREE(entry);
+            agentos_mutex_unlock(&service->metric_lock);
+            return AGENTOS_ENOMEM;
+        }
         entry->type = metric->type;
         entry->value = metric->value;
         entry->timestamp = metric->timestamp ? metric->timestamp : get_timestamp_ms();
@@ -564,8 +593,23 @@ int monitor_service_start_agent_trace(monitor_service_t *service,
     snprintf(tid, sizeof(tid), "trace-%zu-%lu", service->trace_count,
              (unsigned long)get_timestamp_ms());
     entry->trace_id = AGENTOS_STRDUP(tid);
+    if (!entry->trace_id) {
+        agentos_mutex_unlock(&service->trace_lock);
+        return AGENTOS_ENOMEM;
+    }
     entry->operation_name = task_id ? AGENTOS_STRDUP(task_id) : AGENTOS_STRDUP("unknown");
+    if (!entry->operation_name) {
+        AGENTOS_FREE(entry->trace_id);
+        agentos_mutex_unlock(&service->trace_lock);
+        return AGENTOS_ENOMEM;
+    }
     entry->service_name = agent_id ? AGENTOS_STRDUP(agent_id) : NULL;
+    if (agent_id && !entry->service_name) {
+        AGENTOS_FREE(entry->operation_name);
+        AGENTOS_FREE(entry->trace_id);
+        agentos_mutex_unlock(&service->trace_lock);
+        return AGENTOS_ENOMEM;
+    }
     entry->start_time = get_timestamp_ms();
     entry->end_time = 0;
     entry->status = 0;
@@ -576,7 +620,19 @@ int monitor_service_start_agent_trace(monitor_service_t *service,
         (agent_execution_trace_t *)AGENTOS_CALLOC(1, sizeof(agent_execution_trace_t));
     if (t) {
         t->agent_id = agent_id ? AGENTOS_STRDUP(agent_id) : NULL;
-        t->task_id = task_id ? AGENTOS_STRDUP(task_id) : NULL;
+        if (agent_id && !t->agent_id) {
+            AGENTOS_FREE(t);
+            t = NULL;
+        } else {
+            t->task_id = task_id ? AGENTOS_STRDUP(task_id) : NULL;
+            if (task_id && !t->task_id) {
+                AGENTOS_FREE(t->agent_id);
+                AGENTOS_FREE(t);
+                t = NULL;
+            }
+        }
+    }
+    if (t) {
         t->current_state = AGENT_STATE_INITIALIZING;
     }
 

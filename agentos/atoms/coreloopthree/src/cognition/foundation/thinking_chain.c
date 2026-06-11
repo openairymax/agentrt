@@ -12,6 +12,7 @@
 #include "thinking_chain.h"
 
 #include "agentos.h"
+#include "logger.h"
 #include "memory_compat.h"
 #include "platform.h"
 #include "string_compat.h"
@@ -49,13 +50,17 @@ agentos_error_t agentos_tc_context_window_create(size_t max_tokens,
                                                  agentos_context_window_t **out_window)
 {
 
-    if (!out_window)
+    if (!out_window) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_create: NULL out_window parameter");
         return AGENTOS_EINVAL;
+    }
 
     agentos_context_window_t *w =
         (agentos_context_window_t *)AGENTOS_CALLOC(1, sizeof(agentos_context_window_t));
-    if (!w)
+    if (!w) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_create: allocation failed for context window (max_tokens=%zu)", max_tokens);
         return AGENTOS_ENOMEM;
+    }
 
     w->max_tokens = (max_tokens > 0) ? max_tokens : TC_MAX_TOKENS_DEFAULT;
     w->used_tokens = 0;
@@ -66,6 +71,7 @@ agentos_error_t agentos_tc_context_window_create(size_t max_tokens,
 
     w->buffer = (char *)AGENTOS_CALLOC(1, w->buffer_capacity);
     if (!w->buffer) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_create: buffer allocation failed (capacity=%zu)", w->buffer_capacity);
         AGENTOS_FREE(w);
         return AGENTOS_ENOMEM;
     }
@@ -99,12 +105,15 @@ ssize_t agentos_tc_context_window_append(agentos_context_window_t *window, const
                                          size_t len)
 {
 
-    if (!window || !data || len == 0)
+    if (!window || !data || len == 0) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_append: NULL/invalid params (window=%p data=%p len=%zu)", (void *)window, (void *)data, len);
         return (ssize_t)AGENTOS_EINVAL;
+    }
 
     size_t new_tokens = estimate_token_count(data, len);
 
     if (window->used_tokens + new_tokens > window->max_tokens) {
+        AGENTOS_LOG_WARN("agentos_tc_context_window_append: token limit exceeded (used=%zu + new=%zu > max=%zu), sliding window eviction triggered", window->used_tokens, new_tokens, window->max_tokens);
         /* 滑动窗口：丢弃最旧的数据以腾出空间 */
         size_t to_evict = (window->used_tokens + new_tokens) - window->max_tokens;
         size_t evicted_bytes = 0;
@@ -122,8 +131,10 @@ ssize_t agentos_tc_context_window_append(agentos_context_window_t *window, const
         window->buffer[window->buffer_head] = data[i];
         window->buffer_head = (window->buffer_head + 1) % window->buffer_capacity;
         window->buffer_used++;
-        if (window->buffer_used >= window->buffer_capacity)
+        if (window->buffer_used >= window->buffer_capacity) {
+            AGENTOS_LOG_WARN("agentos_tc_context_window_append: buffer capacity reached, truncating (buffer_used=%zu capacity=%zu input_len=%zu)", window->buffer_used, window->buffer_capacity, len);
             break;
+        }
     }
 
     window->used_tokens += new_tokens;
@@ -136,8 +147,10 @@ agentos_error_t agentos_tc_context_window_get_recent(agentos_context_window_t *w
                                                      size_t *out_len)
 {
 
-    if (!window || !out_data)
+    if (!window || !out_data) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_get_recent: NULL params (window=%p out_data=%p)", (void *)window, (void *)out_data);
         return AGENTOS_EINVAL;
+    }
 
     size_t avail =
         (token_count > 0 && token_count < window->used_tokens) ? token_count : window->used_tokens;
@@ -150,8 +163,10 @@ agentos_error_t agentos_tc_context_window_get_recent(agentos_context_window_t *w
 
     size_t est_bytes = avail * 4;
     char *result = (char *)AGENTOS_MALLOC(est_bytes + 1);
-    if (!result)
+    if (!result) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_get_recent: allocation failed (est_bytes=%zu)", est_bytes + 1);
         return AGENTOS_ENOMEM;
+    }
 
     size_t read_pos = (window->buffer_head > avail * 4) ? (window->buffer_head - avail * 4) : 0;
     if (read_pos >= window->buffer_capacity)
@@ -189,8 +204,10 @@ int agentos_tc_context_window_has_space(agentos_context_window_t *window, size_t
 agentos_error_t agentos_tc_context_window_stats(agentos_context_window_t *window, char **out_json)
 {
 
-    if (!window || !out_json)
+    if (!window || !out_json) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_stats: NULL params (window=%p out_json=%p)", (void *)window, (void *)out_json);
         return AGENTOS_EINVAL;
+    }
 
     char buf[512];
     int __attribute__((unused)) len = snprintf(
@@ -205,8 +222,10 @@ agentos_error_t agentos_tc_context_window_stats(agentos_context_window_t *window
                                : 0.0f);
 
     char *result = AGENTOS_STRDUP(buf);
-    if (!result)
+    if (!result) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_stats: STRDUP failed for stats JSON");
         return AGENTOS_ENOMEM;
+    }
     *out_json = result;
     return AGENTOS_SUCCESS;
 }
@@ -219,22 +238,28 @@ agentos_error_t agentos_tc_working_memory_create(size_t capacity,
                                                  agentos_working_memory_t **out_mem)
 {
 
-    if (!out_mem)
+    if (!out_mem) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_create: NULL out_mem parameter");
         return AGENTOS_EINVAL;
+    }
 
     size_t cap = (capacity > 0) ? capacity : TC_WORKING_MEM_CAPACITY;
     agentos_working_memory_t *mem =
         (agentos_working_memory_t *)AGENTOS_CALLOC(1, sizeof(agentos_working_memory_t));
-    if (!mem)
+    if (!mem) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_create: allocation failed for working memory (capacity=%zu)", cap);
         return AGENTOS_ENOMEM;
+    }
 
     mem->entries = (struct wm_entry *)AGENTOS_CALLOC(cap, sizeof(struct wm_entry));
     if (!mem->entries) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_create: entries allocation failed (capacity=%zu)", cap);
         AGENTOS_FREE(mem);
         return AGENTOS_ENOMEM;
     }
     mem->lru_order = (uint32_t *)AGENTOS_CALLOC(cap, sizeof(uint32_t));
     if (!mem->lru_order) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_create: lru_order allocation failed (capacity=%zu)", cap);
         AGENTOS_FREE(mem->entries);
         AGENTOS_FREE(mem);
         return AGENTOS_ENOMEM;
@@ -320,14 +345,18 @@ agentos_error_t agentos_tc_working_memory_store(agentos_working_memory_t *mem, c
                                                 const char *type, int pin)
 {
 
-    if (!mem || !key || !value || value_size == 0)
+    if (!mem || !key || !value || value_size == 0) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_store: NULL/invalid params (mem=%p key=%p value=%p value_size=%zu)", (void *)mem, (void *)key, (void *)value, value_size);
         return AGENTOS_EINVAL;
+    }
 
     size_t existing = wm_find_key(mem, key);
     if (existing != (size_t)-1) {
         void *new_val = AGENTOS_MALLOC(value_size);
-        if (!new_val)
+        if (!new_val) {
+            AGENTOS_LOG_ERROR("agentos_tc_working_memory_store: value update allocation failed for existing key (key=%s value_size=%zu)", key, value_size);
             return AGENTOS_ENOMEM;
+        }
         __builtin_memcpy(new_val, value, value_size);
         AGENTOS_FREE(mem->entries[existing].value);
         mem->entries[existing].value = new_val;
@@ -347,13 +376,16 @@ agentos_error_t agentos_tc_working_memory_store(agentos_working_memory_t *mem, c
     if (mem->count >= mem->capacity && !pin) {
         wm_evict_one(mem);
     }
-    if (mem->count >= mem->capacity)
+    if (mem->count >= mem->capacity) {
+        AGENTOS_LOG_WARN("agentos_tc_working_memory_store: capacity exhausted (count=%zu capacity=%zu key=%s)", mem->count, mem->capacity, key);
         return AGENTOS_ENOMEM;
+    }
 
     struct wm_entry *e = &mem->entries[mem->count];
     e->key = AGENTOS_STRDUP(key);
     e->value = AGENTOS_MALLOC(value_size);
     if (!e->key || !e->value) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_store: key/value allocation failed (key=%s value_size=%zu)", key, value_size);
         AGENTOS_FREE(e->key);
         AGENTOS_FREE(e->value);
         e->key = NULL;
@@ -377,12 +409,15 @@ agentos_error_t agentos_tc_working_memory_retrieve(agentos_working_memory_t *mem
                                                    void **out_value, size_t *out_size)
 {
 
-    if (!mem || !key || !out_value)
+    if (!mem || !key || !out_value) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_retrieve: NULL params (mem=%p key=%p out_value=%p)", (void *)mem, (void *)key, (void *)out_value);
         return AGENTOS_EINVAL;
+    }
 
     size_t idx = wm_find_key(mem, key);
     if (idx == (size_t)-1) {
         mem->misses++;
+        AGENTOS_LOG_WARN("agentos_tc_working_memory_retrieve: cache miss (key=%s misses=%llu)", key, (unsigned long long)mem->misses);
         return AGENTOS_ENOENT;
     }
 
@@ -397,12 +432,16 @@ agentos_error_t agentos_tc_working_memory_retrieve(agentos_working_memory_t *mem
 agentos_error_t agentos_tc_working_memory_remove(agentos_working_memory_t *mem, const char *key)
 {
 
-    if (!mem || !key)
+    if (!mem || !key) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_remove: NULL params (mem=%p key=%p)", (void *)mem, (void *)key);
         return AGENTOS_EINVAL;
+    }
 
     size_t idx = wm_find_key(mem, key);
-    if (idx == (size_t)-1)
+    if (idx == (size_t)-1) {
+        AGENTOS_LOG_WARN("agentos_tc_working_memory_remove: key not found (key=%s)", key);
         return AGENTOS_ENOENT;
+    }
 
     AGENTOS_FREE(mem->entries[idx].key);
     AGENTOS_FREE(mem->entries[idx].value);
@@ -443,18 +482,24 @@ agentos_error_t agentos_tc_step_create(agentos_thinking_chain_t *chain, tc_step_
                                        agentos_thinking_step_t **out_step)
 {
 
-    if (!chain || !out_step)
+    if (!chain || !out_step) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_create: NULL params (chain=%p out_step=%p)", (void *)chain, (void *)out_step);
         return AGENTOS_EINVAL;
+    }
 
-    if (chain->step_count >= TC_MAX_THINKING_STEPS)
+    if (chain->step_count >= TC_MAX_THINKING_STEPS) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_create: max thinking steps exceeded (step_count=%zu max=%d type=%d)", chain->step_count, TC_MAX_THINKING_STEPS, (int)type);
         return AGENTOS_ERANGE;
+    }
 
     if (chain->step_count >= chain->step_capacity) {
         size_t new_cap = chain->step_capacity * 2;
         agentos_thinking_step_t *new_steps = (agentos_thinking_step_t *)AGENTOS_REALLOC(
             chain->steps, new_cap * sizeof(agentos_thinking_step_t));
-        if (!new_steps)
+        if (!new_steps) {
+            AGENTOS_LOG_ERROR("agentos_tc_step_create: steps REALLOC failed (new_cap=%zu)", new_cap);
             return AGENTOS_ENOMEM;
+        }
         chain->steps = new_steps;
         chain->step_capacity = new_cap;
     }
@@ -500,12 +545,20 @@ agentos_error_t agentos_tc_step_complete(agentos_thinking_step_t *step, const ch
                                          size_t content_len, float confidence, const char *role)
 {
 
-    if (!step || !content || content_len == 0)
+    if (!step || !content || content_len == 0) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_complete: NULL/invalid params (step=%p content=%p content_len=%zu)", (void *)step, (void *)content, content_len);
         return AGENTOS_EINVAL;
+    }
+
+    if (step->status == TC_STATUS_COMPLETED || step->status == TC_STATUS_CORRECTED) {
+        AGENTOS_LOG_WARN("agentos_tc_step_complete: state transition error, step already in terminal state (step_id=%u status=%d)", step->step_id, (int)step->status);
+    }
 
     step->content = (char *)AGENTOS_MALLOC(content_len + 1);
-    if (!step->content)
+    if (!step->content) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_complete: content allocation failed (step_id=%u content_len=%zu)", step->step_id, content_len);
         return AGENTOS_ENOMEM;
+    }
     __builtin_memcpy(step->content, content, content_len);
     step->content[content_len] = '\0';
     step->content_len = content_len;
@@ -524,8 +577,10 @@ agentos_error_t agentos_tc_step_verify(agentos_thinking_step_t *step, int *is_va
                                        const char *critique, size_t critique_len)
 {
 
-    if (!step || !is_valid)
+    if (!step || !is_valid) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_verify: NULL params (step=%p is_valid=%p)", (void *)step, (void *)is_valid);
         return AGENTOS_EINVAL;
+    }
 
     if (critique && critique_len > 0) {
         step->critique = (char *)AGENTOS_MALLOC(critique_len + 1);
@@ -546,19 +601,27 @@ agentos_error_t agentos_tc_step_correct(agentos_thinking_step_t *step,
                                         const char *corrected_content, size_t corrected_len)
 {
 
-    if (!step || !corrected_content || corrected_len == 0)
+    if (!step || !corrected_content || corrected_len == 0) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_correct: NULL/invalid params (step=%p corrected_content=%p corrected_len=%zu)", (void *)step, (void *)corrected_content, corrected_len);
         return AGENTOS_EINVAL;
+    }
+    if (step->status == TC_STATUS_PENDING) {
+        AGENTOS_LOG_WARN("agentos_tc_step_correct: state transition error, correcting a PENDING step (step_id=%u)", step->step_id);
+    }
     if (step->correction_count >= (step->chain_ref
                                        ? step->chain_ref->ctx_window->max_corrections_per_chunk
                                        : TC_MAX_CORRECTIONS_DEFAULT)) {
+        AGENTOS_LOG_WARN("agentos_tc_step_correct: max corrections exceeded (step_id=%u correction_count=%d)", step->step_id, step->correction_count);
         step->status = TC_STATUS_SKIPPED;
         return AGENTOS_ERANGE;
     }
 
     char **new_history = (char **)AGENTOS_REALLOC(
         step->correction_history, (step->correction_history_count + 1) * sizeof(char *));
-    if (!new_history && step->correction_history_count > 0)
+    if (!new_history && step->correction_history_count > 0) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_correct: correction_history REALLOC failed (step_id=%u count=%zu)", step->step_id, step->correction_history_count);
         return AGENTOS_ENOMEM;
+    }
     step->correction_history = new_history;
 
     if (step->content) {
@@ -566,8 +629,10 @@ agentos_error_t agentos_tc_step_correct(agentos_thinking_step_t *step,
     }
 
     step->content = (char *)AGENTOS_MALLOC(corrected_len + 1);
-    if (!step->content)
+    if (!step->content) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_correct: content allocation failed (step_id=%u corrected_len=%zu)", step->step_id, corrected_len);
         return AGENTOS_ENOMEM;
+    }
     __builtin_memcpy(step->content, corrected_content, corrected_len);
     step->content[corrected_len] = '\0';
     step->content_len = corrected_len;
@@ -585,8 +650,10 @@ int agentos_tc_step_is_ready(const agentos_thinking_step_t *step,
                              const agentos_thinking_chain_t *chain)
 {
 
-    if (!step || !chain)
+    if (!step || !chain) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_is_ready: NULL params (step=%p chain=%p)", (void *)step, (void *)chain);
         return AGENTOS_EINVAL;
+    }
 
     for (size_t d = 0; d < step->depends_count; d++) {
         uint32_t dep_id = step->depends_on[d];
@@ -613,13 +680,17 @@ agentos_error_t agentos_tc_chain_create(const char *goal, size_t max_tokens, siz
                                         agentos_thinking_chain_t **out_chain)
 {
 
-    if (!out_chain)
+    if (!out_chain) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_create: NULL out_chain parameter");
         return AGENTOS_EINVAL;
+    }
 
     agentos_thinking_chain_t *chain =
         (agentos_thinking_chain_t *)AGENTOS_CALLOC(1, sizeof(agentos_thinking_chain_t));
-    if (!chain)
+    if (!chain) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_create: chain allocation failed (max_tokens=%zu wm_capacity=%zu)", max_tokens, wm_capacity);
         return AGENTOS_ENOMEM;
+    }
 
     chain->session_id = tc_time_now_ns();
     chain->session_goal = goal ? AGENTOS_STRDUP(goal) : AGENTOS_STRDUP("");
@@ -633,6 +704,7 @@ agentos_error_t agentos_tc_chain_create(const char *goal, size_t max_tokens, siz
 
     agentos_error_t err = agentos_tc_context_window_create(max_tokens, &chain->ctx_window);
     if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_create: context_window creation failed (err=%d max_tokens=%zu)", (int)err, max_tokens);
         if (chain->session_goal)
             AGENTOS_FREE(chain->session_goal);
         AGENTOS_FREE(chain);
@@ -641,6 +713,7 @@ agentos_error_t agentos_tc_chain_create(const char *goal, size_t max_tokens, siz
 
     err = agentos_tc_working_memory_create(wm_capacity, &chain->working_mem);
     if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_create: working_memory creation failed (err=%d wm_capacity=%zu)", (int)err, wm_capacity);
         agentos_tc_context_window_destroy(chain->ctx_window);
         if (chain->session_goal)
             AGENTOS_FREE(chain->session_goal);
@@ -652,6 +725,7 @@ agentos_error_t agentos_tc_chain_create(const char *goal, size_t max_tokens, siz
     chain->steps = (agentos_thinking_step_t *)AGENTOS_CALLOC(chain->step_capacity,
                                                              sizeof(agentos_thinking_step_t));
     if (!chain->steps) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_create: steps allocation failed (step_capacity=%zu)", chain->step_capacity);
         agentos_tc_working_memory_destroy(chain->working_mem);
         agentos_tc_context_window_destroy(chain->ctx_window);
         if (chain->session_goal)
@@ -701,8 +775,10 @@ void agentos_tc_chain_destroy(agentos_thinking_chain_t *chain)
 
 agentos_error_t agentos_tc_chain_start(agentos_thinking_chain_t *chain)
 {
-    if (!chain)
+    if (!chain) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_start: NULL chain parameter");
         return AGENTOS_EINVAL;
+    }
     chain->active = 1;
     chain->last_activity_ns = tc_time_now_ns();
     return AGENTOS_SUCCESS;
@@ -719,8 +795,10 @@ agentos_error_t agentos_tc_chain_next_ready_step(agentos_thinking_chain_t *chain
                                                  agentos_thinking_step_t **out_step)
 {
 
-    if (!chain || !out_step)
+    if (!chain || !out_step) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_next_ready_step: NULL params (chain=%p out_step=%p)", (void *)chain, (void *)out_step);
         return AGENTOS_EINVAL;
+    }
 
     for (size_t i = 0; i < chain->step_count; i++) {
         agentos_thinking_step_t *s = &chain->steps[i];
@@ -744,6 +822,7 @@ agentos_error_t agentos_tc_chain_next_ready_step(agentos_thinking_chain_t *chain
     }
 
     *out_step = NULL;
+    AGENTOS_LOG_WARN("agentos_tc_chain_next_ready_step: no ready step found (step_count=%zu)", chain->step_count);
     return AGENTOS_ENOENT;
 }
 
@@ -751,8 +830,10 @@ agentos_error_t agentos_tc_chain_stats(agentos_thinking_chain_t *chain, char **o
                                        size_t *out_len)
 {
 
-    if (!chain || !out_json)
+    if (!chain || !out_json) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_stats: NULL params (chain=%p out_json=%p)", (void *)chain, (void *)out_json);
         return AGENTOS_EINVAL;
+    }
 
     char *cw_json = NULL;
     agentos_tc_context_window_stats(chain->ctx_window, &cw_json);
@@ -802,8 +883,10 @@ agentos_error_t agentos_tc_chain_stats(agentos_thinking_chain_t *chain, char **o
     }
 
     char *result = (char *)AGENTOS_MALLOC(len + 1);
-    if (!result)
+    if (!result) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_stats: result allocation failed (len=%d)", len);
         return AGENTOS_ENOMEM;
+    }
     __builtin_memcpy(result, buf, len + 1);
     *out_json = result;
     if (out_len)
@@ -843,6 +926,7 @@ agentos_error_t agentos_tc_context_window_prepopulate(agentos_thinking_chain_t *
 {
 
     if (!chain || !query_text || !chain->memory || !chain->ctx_window) {
+        AGENTOS_LOG_ERROR("agentos_tc_context_window_prepopulate: NULL/invalid params (chain=%p query_text=%p memory=%p ctx_window=%p)", (void *)chain, (void *)query_text, (void *)(chain ? chain->memory : NULL), (void *)(chain ? chain->ctx_window : NULL));
         return AGENTOS_EINVAL;
     }
 
@@ -855,6 +939,7 @@ agentos_error_t agentos_tc_context_window_prepopulate(agentos_thinking_chain_t *
     agentos_memory_result_ext_t *result = NULL;
     agentos_error_t err = agentos_memory_query(chain->memory, &query, &result);
     if (err != AGENTOS_SUCCESS || !result || result->memory_result_count == 0) {
+        AGENTOS_LOG_WARN("agentos_tc_context_window_prepopulate: memory query failed or empty (err=%d result=%p count=%zu)", (int)err, (void *)result, result ? result->memory_result_count : 0);
         if (result)
             agentos_memory_result_free(result);
         return err == AGENTOS_SUCCESS ? AGENTOS_ENOENT : err;
@@ -890,8 +975,10 @@ agentos_error_t agentos_tc_working_memory_sync_to_persistent(agentos_thinking_ch
                                                              float min_importance)
 {
 
-    if (!chain || !chain->working_mem || !chain->memory)
+    if (!chain || !chain->working_mem || !chain->memory) {
+        AGENTOS_LOG_ERROR("agentos_tc_working_memory_sync_to_persistent: NULL params (chain=%p working_mem=%p memory=%p)", (void *)chain, (void *)(chain ? chain->working_mem : NULL), (void *)(chain ? chain->memory : NULL));
         return AGENTOS_EINVAL;
+    }
 
     uint32_t synced = 0;
     for (size_t i = 0; i < chain->working_mem->count; i++) {
@@ -923,12 +1010,18 @@ agentos_error_t agentos_tc_step_write_to_memory(agentos_thinking_chain_t *chain,
                                                 agentos_thinking_step_t *step)
 {
 
-    if (!chain || !step || !chain->memory)
+    if (!chain || !step || !chain->memory) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_write_to_memory: NULL params (chain=%p step=%p memory=%p)", (void *)chain, (void *)step, (void *)(chain ? chain->memory : NULL));
         return AGENTOS_EINVAL;
-    if (!step->content || step->content_len == 0)
+    }
+    if (!step->content || step->content_len == 0) {
+        AGENTOS_LOG_WARN("agentos_tc_step_write_to_memory: step has no content (step_id=%u)", step->step_id);
         return AGENTOS_EINVAL;
-    if (step->confidence < 0.6f)
+    }
+    if (step->confidence < 0.6f) {
+        AGENTOS_LOG_WARN("agentos_tc_step_write_to_memory: step confidence too low (step_id=%u confidence=%.2f)", step->step_id, step->confidence);
         return AGENTOS_EINVAL;
+    }
 
     agentos_memory_record_t rec;
     __builtin_memset(&rec, 0, sizeof(rec));
@@ -959,8 +1052,10 @@ agentos_error_t agentos_tc_metacognition_inform_memory(agentos_thinking_chain_t 
                                                        agentos_thinking_step_t *step)
 {
 
-    if (!chain || !eval || !step || !chain->memory)
+    if (!chain || !eval || !step || !chain->memory) {
+        AGENTOS_LOG_ERROR("agentos_tc_metacognition_inform_memory: NULL params (chain=%p eval=%p step=%p memory=%p)", (void *)chain, (void *)eval, (void *)step, (void *)(chain ? chain->memory : NULL));
         return AGENTOS_EINVAL;
+    }
     const mc_evaluation_result_t *eval_typed = (const mc_evaluation_result_t *)eval;
     if (eval_typed->strategy == MC_CORRECT_NONE)
         return AGENTOS_SUCCESS;
@@ -1037,8 +1132,10 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
                                         const tc_monitor_config_t *config,
                                         tc_monitor_result_t *out_result)
 {
-    if (!step || !out_result)
+    if (!step || !out_result) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_monitor: NULL params (step=%p out_result=%p)", (void *)step, (void *)out_result);
         return AGENTOS_EINVAL;
+    }
 
     tc_monitor_config_t defaults = TC_MONITOR_DEFAULTS;
     if (!config)
@@ -1053,6 +1150,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
     if (step->status == TC_STATUS_EXECUTING && step->start_time_ns > 0) {
         uint64_t elapsed_ms = (tc_time_now_ns() - step->start_time_ns) / 1000000ULL;
         if (elapsed_ms > config->default_timeout_ms) {
+            AGENTOS_LOG_ERROR("agentos_tc_step_monitor: timeout detected (step_id=%u elapsed=%llums limit=%ums)", step->step_id, (unsigned long long)elapsed_ms, config->default_timeout_ms);
             out_result->anomaly = TC_ANOMALY_TIMEOUT;
             out_result->is_critical = 1;
             out_result->severity_score = 0.95f;
@@ -1071,6 +1169,7 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
 
     /* 检查2: 空输出 */
     if (step->content_len == 0 || !step->content) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_monitor: empty output detected (step_id=%u type=%d)", step->step_id, (int)step->type);
         out_result->anomaly = TC_ANOMALY_EMPTY_OUTPUT;
         out_result->severity_score = 0.8f;
         out_result->is_critical = 1;
@@ -1162,8 +1261,10 @@ agentos_error_t agentos_tc_step_monitor(const agentos_thinking_step_t *step,
 agentos_error_t agentos_tc_chain_health_check(const agentos_thinking_chain_t *chain,
                                               size_t *out_anomaly_count, int *out_has_critical)
 {
-    if (!chain || !out_anomaly_count || !out_has_critical)
+    if (!chain || !out_anomaly_count || !out_has_critical) {
+        AGENTOS_LOG_ERROR("agentos_tc_chain_health_check: NULL params (chain=%p out_anomaly_count=%p out_has_critical=%p)", (void *)chain, (void *)out_anomaly_count, (void *)out_has_critical);
         return AGENTOS_EINVAL;
+    }
 
     *out_anomaly_count = 0;
     *out_has_critical = 0;
@@ -1218,8 +1319,10 @@ agentos_error_t agentos_tc_step_recover(agentos_thinking_chain_t *chain,
                                                                         char **, size_t *, void *),
                                         void *user_data, tc_recovery_result_t *out_result)
 {
-    if (!chain || !failed_step || !out_result)
+    if (!chain || !failed_step || !out_result) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_recover: NULL params (chain=%p failed_step=%p out_result=%p)", (void *)chain, (void *)failed_step, (void *)out_result);
         return AGENTOS_EINVAL;
+    }
 
     __builtin_memset(out_result, 0, sizeof(tc_recovery_result_t));
     out_result->strategy_used = TC_RECOVER_ABORT;
@@ -1233,8 +1336,10 @@ agentos_error_t agentos_tc_step_recover(agentos_thinking_chain_t *chain,
 
     size_t log_buf_size = 512;
     char *log_buf = (char *)AGENTOS_MALLOC(log_buf_size);
-    if (!log_buf)
+    if (!log_buf) {
+        AGENTOS_LOG_ERROR("agentos_tc_step_recover: log buffer allocation failed (size=%zu)", log_buf_size);
         return AGENTOS_ENOMEM;
+    }
     int log_pos = 0;
 
     log_pos += snprintf(log_buf + log_pos, log_buf_size - log_pos,
@@ -1440,8 +1545,10 @@ static float get_step_weight(tc_step_type_t type, const tc_attention_weights_t *
 agentos_error_t agentos_tc_set_attention_config(agentos_thinking_chain_t *chain,
                                                 const tc_attention_config_t *config)
 {
-    if (!chain || !config)
+    if (!chain || !config) {
+        AGENTOS_LOG_ERROR("agentos_tc_set_attention_config: NULL params (chain=%p config=%p)", (void *)chain, (void *)config);
         return AGENTOS_EINVAL;
+    }
     chain->attention_config = *config;
     chain->attention_configured = 1;
     return AGENTOS_SUCCESS;
@@ -1451,8 +1558,10 @@ agentos_error_t agentos_tc_allocate_attention(agentos_thinking_chain_t *chain,
                                               agentos_thinking_step_t *step,
                                               tc_allocation_result_t *out_alloc)
 {
-    if (!chain || !step || !out_alloc)
+    if (!chain || !step || !out_alloc) {
+        AGENTOS_LOG_ERROR("agentos_tc_allocate_attention: NULL params (chain=%p step=%p out_alloc=%p)", (void *)chain, (void *)step, (void *)out_alloc);
         return AGENTOS_EINVAL;
+    }
 
     tc_attention_config_t cfg = chain->attention_configured
                                     ? chain->attention_config
@@ -1494,8 +1603,10 @@ agentos_error_t agentos_tc_allocate_attention(agentos_thinking_chain_t *chain,
 agentos_error_t agentos_tc_adjust_dynamic_budget(agentos_thinking_chain_t *chain,
                                                  tc_step_type_t step_type, float performance_score)
 {
-    if (!chain || performance_score < 0.0f || performance_score > 1.0f)
+    if (!chain || performance_score < 0.0f || performance_score > 1.0f) {
+        AGENTOS_LOG_ERROR("agentos_tc_adjust_dynamic_budget: invalid params (chain=%p performance_score=%.2f)", (void *)chain, performance_score);
         return AGENTOS_EINVAL;
+    }
     if (!chain->attention_config.enable_dynamic_adjustment)
         return AGENTOS_SUCCESS;
 
@@ -1521,6 +1632,7 @@ agentos_error_t agentos_tc_adjust_dynamic_budget(agentos_thinking_chain_t *chain
         target_weight = &w->alignment_weight;
         break;
     default:
+        AGENTOS_LOG_ERROR("agentos_tc_adjust_dynamic_budget: unknown step type (step_type=%d)", (int)step_type);
         return AGENTOS_EINVAL;
     }
 
@@ -1613,8 +1725,10 @@ float agentos_tc_compute_priority(const agentos_thinking_step_t *step,
 agentos_error_t agentos_tc_wm_set_priority(agentos_working_memory_t *wm, const char *key,
                                            float priority)
 {
-    if (!wm || !key)
+    if (!wm || !key) {
+        AGENTOS_LOG_ERROR("agentos_tc_wm_set_priority: NULL params (wm=%p key=%p)", (void *)wm, (void *)key);
         return AGENTOS_EINVAL;
+    }
     if (priority < 0.0f)
         priority = 0.0f;
     if (priority > 1.0f)
@@ -1628,5 +1742,6 @@ agentos_error_t agentos_tc_wm_set_priority(agentos_working_memory_t *wm, const c
             return AGENTOS_SUCCESS;
         }
     }
+    AGENTOS_LOG_WARN("agentos_tc_wm_set_priority: key not found (key=%s)", key);
     return AGENTOS_ENOENT;
 }

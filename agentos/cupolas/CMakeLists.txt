@@ -129,6 +129,7 @@ set(COMMON_INCLUDE_DIRS
     ${COMMON_MODULE_DIR}/platform/include
     ${COMMON_MODULE_DIR}/utils/include
     ${COMMON_MODULE_DIR}/utils/error/include
+    ${COMMON_MODULE_DIR}/utils/memory/include
     ${COMMON_MODULE_DIR}/utils/observability/include
     ${COMMON_MODULE_DIR}/utils/types/include
 )
