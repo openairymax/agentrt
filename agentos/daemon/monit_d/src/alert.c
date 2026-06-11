@@ -193,12 +193,30 @@ int alert_add_threshold_rule(const char *rule_id, const char *metric_name, compa
     alert_rule_t *rule = &g_alert_mgr.rules[g_alert_mgr.rule_count];
     rule->type = ALERT_RULE_THRESHOLD;
     rule->rule.threshold.rule_id = AGENTOS_STRDUP(rule_id);
+    if (!rule->rule.threshold.rule_id) {
+        agentos_mutex_unlock(&g_alert_mgr.lock);
+        SVC_LOG_ERROR("Failed to duplicate rule_id: out of memory");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
     rule->rule.threshold.metric_name = AGENTOS_STRDUP(metric_name);
+    if (!rule->rule.threshold.metric_name) {
+        AGENTOS_FREE(rule->rule.threshold.rule_id);
+        agentos_mutex_unlock(&g_alert_mgr.lock);
+        SVC_LOG_ERROR("Failed to duplicate metric_name: out of memory");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
     rule->rule.threshold.op = op;
     rule->rule.threshold.threshold = threshold;
     rule->rule.threshold.level = level;
     rule->rule.threshold.message_template =
         message_template ? AGENTOS_STRDUP(message_template) : NULL;
+    if (message_template && !rule->rule.threshold.message_template) {
+        AGENTOS_FREE(rule->rule.threshold.metric_name);
+        AGENTOS_FREE(rule->rule.threshold.rule_id);
+        agentos_mutex_unlock(&g_alert_mgr.lock);
+        SVC_LOG_ERROR("Failed to duplicate message_template: out of memory");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
     rule->rule.threshold.evaluation_interval_ms = 10000;
     rule->rule.threshold.consecutive_count = consecutive_count > 0 ? consecutive_count : 1;
     rule->rule.threshold.current_count = 0;
@@ -308,10 +326,32 @@ static void add_to_history(const alert_info_t *alert)
     __builtin_memset(entry, 0, sizeof(grouped_alert_t));
 
     entry->alert.alert_id = alert->alert_id ? AGENTOS_STRDUP(alert->alert_id) : NULL;
+    if (alert->alert_id && !entry->alert.alert_id) {
+        SVC_LOG_ERROR("Failed to duplicate alert_id: out of memory");
+        return;
+    }
     entry->alert.message = alert->message ? AGENTOS_STRDUP(alert->message) : NULL;
+    if (alert->message && !entry->alert.message) {
+        AGENTOS_FREE(entry->alert.alert_id);
+        SVC_LOG_ERROR("Failed to duplicate alert message: out of memory");
+        return;
+    }
     entry->alert.level = alert->level;
     entry->alert.service_name = alert->service_name ? AGENTOS_STRDUP(alert->service_name) : NULL;
+    if (alert->service_name && !entry->alert.service_name) {
+        AGENTOS_FREE(entry->alert.message);
+        AGENTOS_FREE(entry->alert.alert_id);
+        SVC_LOG_ERROR("Failed to duplicate alert service_name: out of memory");
+        return;
+    }
     entry->alert.resource_id = alert->resource_id ? AGENTOS_STRDUP(alert->resource_id) : NULL;
+    if (alert->resource_id && !entry->alert.resource_id) {
+        AGENTOS_FREE(entry->alert.service_name);
+        AGENTOS_FREE(entry->alert.message);
+        AGENTOS_FREE(entry->alert.alert_id);
+        SVC_LOG_ERROR("Failed to duplicate alert resource_id: out of memory");
+        return;
+    }
     entry->alert.timestamp = alert->timestamp ? alert->timestamp : (uint64_t)time(NULL) * 1000;
     entry->alert.is_resolved = false;
     entry->occurrence_count = 1;

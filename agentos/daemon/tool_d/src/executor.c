@@ -37,6 +37,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
 
     tool_executor_t *exec = (tool_executor_t *)AGENTOS_CALLOC(1, sizeof(tool_executor_t));
     if (!exec) {
+        SVC_LOG_ERROR("tool_executor_create: calloc failed for executor");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -47,6 +48,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
         exec->manager.timeout_sec = 30;
     }
     if (agentos_mutex_init(&exec->lock) != 0) {
+        SVC_LOG_ERROR("tool_executor_create: mutex init failed");
         AGENTOS_FREE(exec);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
@@ -76,20 +78,24 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
                       tool_result_t **out_result)
 {
     if (!exec || !meta || !out_result) {
+        SVC_LOG_ERROR("tool_executor_run: NULL parameter (exec=%p, meta=%p, out_result=%p)", (const void *)exec, (const void *)meta, (const void *)out_result);
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     *out_result = NULL;
 
     tool_result_t *result = (tool_result_t *)AGENTOS_CALLOC(1, sizeof(tool_result_t));
-    if (!result)
+    if (!result) {
+        SVC_LOG_ERROR("tool_executor_run: calloc failed for result");
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     agentos_mutex_lock(&exec->lock);
     exec->total_executions++;
     time_t start_time = time(NULL);
 
     if (!meta->executable || strlen(meta->executable) == 0) {
+        SVC_LOG_ERROR("tool_executor_run: no executable specified in tool metadata (executable=%p)", (const void *)meta->executable);
         result->success = 0;
         result->output = AGENTOS_STRDUP("");
         result->error = AGENTOS_STRDUP("No executable specified in tool metadata");
@@ -108,6 +114,7 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
             continue;
         for (const char *dc = dangerous_chars; *dc; dc++) {
             if (strchr(check_inputs[ci], *dc)) {
+                SVC_LOG_ERROR("tool_executor_run: command rejected - prohibited shell metacharacter '%c' in input[%d]", *dc, ci);
                 result->success = 0;
                 result->output = AGENTOS_STRDUP("");
                 result->error =
@@ -131,6 +138,7 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
     /* flawfinder: ignore - input validated by SEC-011 metachar check above */
     FILE *pipe = popen(full_command, "r");
     if (!pipe) {
+        SVC_LOG_ERROR("tool_executor_run: popen failed for command '%s'", full_command);
         result->success = 0;
         result->output = AGENTOS_STRDUP("");
         result->error = AGENTOS_STRDUP("Failed to execute command: popen failed");
@@ -145,6 +153,7 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
     size_t output_len = 0;
     char *output_buffer = (char *)AGENTOS_MALLOC(output_size);
     if (!output_buffer) {
+        SVC_LOG_ERROR("tool_executor_run: malloc failed for output buffer (size=%zu)", output_size);
         pclose(pipe);
         result->success = 0;
         result->output = AGENTOS_STRDUP("");
@@ -179,18 +188,21 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
 
     if (!result->success) {
         if (WIFEXITED(exit_status)) {
+            SVC_LOG_ERROR("tool_executor_run: command failed with exit code %d (executable=%s)", WEXITSTATUS(exit_status), meta->executable ? meta->executable : "NULL");
             char err_msg[256];
             snprintf(err_msg, sizeof(err_msg), "Command exited with code %d",
                      WEXITSTATUS(exit_status));
             result->error = AGENTOS_STRDUP(err_msg);
             result->exit_code = WEXITSTATUS(exit_status);
         } else if (WIFSIGNALED(exit_status)) {
+            SVC_LOG_ERROR("tool_executor_run: command killed by signal %d (executable=%s)", WTERMSIG(exit_status), meta->executable ? meta->executable : "NULL");
             char err_msg[256];
             snprintf(err_msg, sizeof(err_msg), "Command killed by signal %d",
                      WTERMSIG(exit_status));
             result->error = AGENTOS_STRDUP(err_msg);
             result->exit_code = -WTERMSIG(exit_status);
         } else {
+            SVC_LOG_ERROR("tool_executor_run: unknown execution error (executable=%s)", meta->executable ? meta->executable : "NULL");
             result->error = AGENTOS_STRDUP("Unknown execution error");
             result->exit_code = -1;
         }
@@ -211,6 +223,7 @@ int tool_executor_run_async(tool_executor_t *exec, const tool_metadata_t *meta,
                             void *user_data, tool_result_t **out_result)
 {
     if (!exec || !meta) {
+        SVC_LOG_ERROR("tool_executor_run_async: NULL parameter (exec=%p, meta=%p)", (const void *)exec, (const void *)meta);
         return AGENTOS_ERR_INVALID_PARAM;
     }
 

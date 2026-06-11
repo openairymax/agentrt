@@ -153,6 +153,7 @@ static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key,
         h4 += e;
     }
     AGENTOS_FREE(padded);
+    padded = NULL;
 
     sha1[0] = (unsigned char)(h0 >> 24);
     sha1[1] = (unsigned char)(h0 >> 16);
