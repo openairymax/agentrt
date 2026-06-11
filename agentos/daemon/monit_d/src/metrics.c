@@ -163,7 +163,23 @@ static int create_series(metric_t *metric, const metric_label_t *labels, size_t 
 
     for (size_t i = 0; i < label_count; i++) {
         series->labels[i].key = AGENTOS_STRDUP(labels[i].key);
+        if (!series->labels[i].key) {
+            /* 回滚已分配的标签 */
+            for (size_t k = 0; k < i; k++) {
+                AGENTOS_FREE(series->labels[k].key);
+                AGENTOS_FREE(series->labels[k].value);
+            }
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
         series->labels[i].value = AGENTOS_STRDUP(labels[i].value);
+        if (!series->labels[i].value) {
+            AGENTOS_FREE(series->labels[i].key);
+            for (size_t k = 0; k < i; k++) {
+                AGENTOS_FREE(series->labels[k].key);
+                AGENTOS_FREE(series->labels[k].value);
+            }
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
     }
 
     series->value = 0.0;
@@ -309,8 +325,23 @@ int metrics_register(const char *name, const char *description, const char *unit
     /* 创建指标 */
     metric_t *metric = &g_metrics.metrics[g_metrics.metric_count];
     metric->name = AGENTOS_STRDUP(name);
+    if (!metric->name) {
+        agentos_mutex_unlock(&g_metrics.global_lock);
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to duplicate metric name");
+    }
     metric->description = description ? AGENTOS_STRDUP(description) : NULL;
+    if (description && !metric->description) {
+        AGENTOS_FREE(metric->name);
+        agentos_mutex_unlock(&g_metrics.global_lock);
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to duplicate metric description");
+    }
     metric->unit = unit ? AGENTOS_STRDUP(unit) : NULL;
+    if (unit && !metric->unit) {
+        AGENTOS_FREE(metric->description);
+        AGENTOS_FREE(metric->name);
+        agentos_mutex_unlock(&g_metrics.global_lock);
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to duplicate metric unit");
+    }
     metric->type = type;
     metric->series_count = 0;
     metric->initialized = 1;

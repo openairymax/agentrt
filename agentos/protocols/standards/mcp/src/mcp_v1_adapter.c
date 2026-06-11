@@ -19,6 +19,14 @@
 #include <string.h>
 #include <time.h>
 
+/* Fallback logging macros if not provided by error.h */
+#ifndef AGENTOS_LOG_ERROR
+#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+#ifndef AGENTOS_LOG_WARN
+#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+
 typedef struct {
     mcp_tool_t tool;
     mcp_tool_handler_t handler;
@@ -145,8 +153,10 @@ mcp_v1_config_t mcp_v1_config_default(void)
 mcp_v1_context_t *mcp_v1_context_create(const mcp_v1_config_t *config)
 {
     mcp_v1_context_t *ctx = AGENTOS_CALLOC(1, sizeof(mcp_v1_context_t));
-    if (!ctx)
+    if (!ctx) {
+        AGENTOS_LOG_ERROR("context allocation failed, size=%zu", sizeof(mcp_v1_context_t));
         return NULL;
+    }
 
     if (config) {
         ctx->config = *config;
@@ -159,6 +169,7 @@ mcp_v1_context_t *mcp_v1_context_create(const mcp_v1_config_t *config)
     ctx->tool_capacity = 32;
     ctx->tools = AGENTOS_CALLOC(ctx->tool_capacity, sizeof(mcp_tool_entry_t));
     if (!ctx->tools) {
+        AGENTOS_LOG_ERROR("tools array allocation failed, capacity=%zu", ctx->tool_capacity);
         AGENTOS_FREE(ctx);
         return NULL;
     }
@@ -166,6 +177,7 @@ mcp_v1_context_t *mcp_v1_context_create(const mcp_v1_config_t *config)
     ctx->resource_capacity = 16;
     ctx->resources = AGENTOS_CALLOC(ctx->resource_capacity, sizeof(mcp_resource_entry_t));
     if (!ctx->resources) {
+        AGENTOS_LOG_ERROR("resources array allocation failed, capacity=%zu", ctx->resource_capacity);
         AGENTOS_FREE(ctx->tools);
         AGENTOS_FREE(ctx);
         return NULL;
@@ -175,6 +187,7 @@ mcp_v1_context_t *mcp_v1_context_create(const mcp_v1_config_t *config)
     ctx->resource_templates =
         AGENTOS_CALLOC(ctx->template_capacity, sizeof(mcp_resource_template_t));
     if (!ctx->resource_templates) {
+        AGENTOS_LOG_ERROR("resource_templates allocation failed, capacity=%zu", ctx->template_capacity);
         AGENTOS_FREE(ctx->resources);
         AGENTOS_FREE(ctx->tools);
         AGENTOS_FREE(ctx);
@@ -184,6 +197,7 @@ mcp_v1_context_t *mcp_v1_context_create(const mcp_v1_config_t *config)
     ctx->prompt_capacity = 16;
     ctx->prompts = AGENTOS_CALLOC(ctx->prompt_capacity, sizeof(mcp_prompt_entry_t));
     if (!ctx->prompts) {
+        AGENTOS_LOG_ERROR("prompts array allocation failed, capacity=%zu", ctx->prompt_capacity);
         AGENTOS_FREE(ctx->resource_templates);
         AGENTOS_FREE(ctx->resources);
         AGENTOS_FREE(ctx->tools);
@@ -498,6 +512,7 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t *ctx, const char *name, const char
     }
 
     if (!found) {
+        AGENTOS_LOG_WARN("tool not found: name=%s, tool_count=%zu", name, ctx->tool_count);
         char *name_esc = json_string_escape(name);
         const char *safe_name = name_esc ? name_esc : name;
         size_t len = snprintf(
@@ -621,6 +636,7 @@ int mcp_v1_handle_resources_read(mcp_v1_context_t *ctx, const char *uri, char **
     }
 
     if (!found || !found->handler) {
+        AGENTOS_LOG_WARN("resource not found or no handler: uri=%s, resource_count=%zu", uri, ctx->resource_count);
         char *uri_esc = json_string_escape(uri);
         size_t len = snprintf(
             NULL, 0, "{\"contents\":[{\"uri\":%s,\"text\":\"Resource not found\"}]}", uri_esc);
@@ -749,6 +765,7 @@ int mcp_v1_handle_prompts_get(mcp_v1_context_t *ctx, const char *name, const cha
     }
 
     if (!found || !found->handler) {
+        AGENTOS_LOG_WARN("prompt not found or no handler: name=%s, prompt_count=%zu", name, ctx->prompt_count);
         *response_json = AGENTOS_STRDUP("{\"description\":\"Prompt not found\",\"messages\":[]}");
         agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
@@ -799,10 +816,12 @@ int mcp_v1_handle_sampling(mcp_v1_context_t *ctx, const mcp_sampling_params_t *p
         return AGENTOS_ERR_UNKNOWN;
         }
     if (!ctx->sampling_handler) {
+        AGENTOS_LOG_WARN("sampling handler not registered, cannot handle sampling request");
         agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
     if (!(ctx->config.capabilities & MCP_CAP_SAMPLING)) {
+        AGENTOS_LOG_WARN("sampling capability not enabled, caps=0x%x", ctx->config.capabilities);
         agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
         return AGENTOS_ERR_NULL_POINTER;
         }
@@ -1100,11 +1119,12 @@ int mcp_v1_handle_sampling_streaming(mcp_v1_context_t *ctx, const mcp_sampling_p
         return AGENTOS_ERR_UNKNOWN;
         }
     if (!ctx->sampling_handler) {
+        AGENTOS_LOG_WARN("sampling handler not registered for streaming request");
         agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
     if (!(ctx->config.capabilities & MCP_CAP_SAMPLING)) {
-        agentos_error_push_ex(AGENTOS_ERR_NULL_POINTER, __FILE__, __LINE__, __func__, "mcp_v1_adapter: null pointer");
+        AGENTOS_LOG_WARN("sampling capability not enabled for streaming, caps=0x%x", ctx->config.capabilities);
         return AGENTOS_ERR_NULL_POINTER;
         }
 
@@ -1304,6 +1324,7 @@ int mcp_v1_route_request(mcp_v1_context_t *ctx, const char *method, const char *
 
     *response_json =
         AGENTOS_STRDUP("{\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}");
+    AGENTOS_LOG_WARN("method not found in route_request: method=%s, request_counter=%llu", method, (unsigned long long)ctx->request_counter);
     agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
     return AGENTOS_ERR_INVALID_PARAM;
 }
@@ -1349,6 +1370,7 @@ static int mcp_adapter_encode(void *context, const void *msg, void **encoded, si
     int result =
         mcp_v1_route_request(ctx, umsg->endpoint, (const char *)umsg->payload, &response_json);
     if (result != 0 || !response_json) {
+        AGENTOS_LOG_ERROR("route_request failed in encode: endpoint=%s, result=%d", umsg->endpoint, result);
         *encoded = NULL;
         *size = 0;
         return result;
@@ -1367,6 +1389,7 @@ static int mcp_adapter_decode(void *context, const void *data, size_t data_size,
         return AGENTOS_ERR_UNKNOWN;
         }
     if (data_size == 0) {
+        AGENTOS_LOG_WARN("decode called with zero data_size");
         agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
@@ -1485,6 +1508,7 @@ static int mcp_adapter_send(void *context, const void *data, size_t size)
         }
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     if (!ctx->transport) {
+        AGENTOS_LOG_WARN("send called but no transport configured");
         agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
         return AGENTOS_ERR_INVALID_PARAM;
         }
@@ -1500,7 +1524,7 @@ static int mcp_adapter_receive(void *context, void **data, size_t *size)
         }
     mcp_v1_context_t *ctx = (mcp_v1_context_t *)context;
     if (!ctx->transport) {
-        agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "mcp_v1_adapter: invalid parameter");
+        AGENTOS_LOG_WARN("receive called but no transport configured");
         return AGENTOS_ERR_INVALID_PARAM;
         }
     char *msg = NULL;
