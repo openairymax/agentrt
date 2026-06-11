@@ -8,6 +8,14 @@
 #include <time.h>
 #include "error.h"
 
+/* Fallback logging macros */
+#ifndef AGENTOS_LOG_ERROR
+#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+#ifndef AGENTOS_LOG_WARN
+#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+
 struct gw_openai_compat {
     gw_openai_compat_config_t config;
     gw_openai_llm_call_fn llm_call_fn;
@@ -313,6 +321,7 @@ static int handle_chat_completions(gw_openai_compat_t *compat, const char *body_
                                    char **response_json)
 {
     if (!compat->llm_call_fn) {
+        AGENTOS_LOG_ERROR("no LLM backend configured for chat completions");
         *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"No LLM backend configured\","
                                         "\"type\":\"server_error\",\"code\":503}}");
         compat->error_count++;
@@ -320,6 +329,8 @@ static int handle_chat_completions(gw_openai_compat_t *compat, const char *body_
     }
 
     if (!check_rate_limit(compat)) {
+        AGENTOS_LOG_WARN("rate limit exceeded: window_requests=%u, limit=%u",
+                         compat->window_requests, compat->config.rate_limit_rpm);
         *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"Rate limit exceeded\","
                                         "\"type\":\"rate_limit_error\",\"code\":429}}");
         compat->error_count++;
@@ -345,6 +356,8 @@ static int handle_chat_completions(gw_openai_compat_t *compat, const char *body_
     AGENTOS_FREE(functions);
 
     if (rc != 0 || !llm_response) {
+        AGENTOS_LOG_ERROR("LLM call failed: model=%s, rc=%d",
+                          model ? model : compat->config.default_model, rc);
         AGENTOS_FREE(llm_response);
         *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"LLM call failed\","
                                         "\"type\":\"server_error\",\"code\":500}}");
@@ -361,6 +374,7 @@ static int handle_embeddings(gw_openai_compat_t *compat, const char *body_json,
                              char **response_json)
 {
     if (!compat->embed_fn) {
+        AGENTOS_LOG_ERROR("no embedding backend configured for embeddings endpoint");
         *response_json =
             AGENTOS_STRDUP("{\"error\":{\"message\":\"No embedding backend configured\","
                            "\"type\":\"server_error\",\"code\":503}}");
@@ -416,6 +430,8 @@ static int handle_embeddings(gw_openai_compat_t *compat, const char *body_json,
     input_json = NULL;
 
     if (rc != 0 || !embed_response) {
+        AGENTOS_LOG_ERROR("embedding call failed: model=%s, rc=%d",
+                          model ? model : "text-embedding-ada-002", rc);
         AGENTOS_FREE(embed_response);
         *response_json = AGENTOS_STRDUP("{\"error\":{\"message\":\"Embedding failed\","
                                         "\"type\":\"server_error\",\"code\":500}}");

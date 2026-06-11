@@ -7,6 +7,14 @@
 #include <string.h>
 #include "error.h"
 
+/* Fallback logging macros */
+#ifndef AGENTOS_LOG_ERROR
+#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+#ifndef AGENTOS_LOG_WARN
+#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+
 #define GW_A2A_MAX_TASK_TYPES 64
 
 typedef struct {
@@ -32,6 +40,7 @@ gw_a2a_handler_t *gw_a2a_handler_create(const gw_a2a_handler_config_t *config)
 {
     gw_a2a_handler_t *handler = (gw_a2a_handler_t *)AGENTOS_CALLOC(1, sizeof(gw_a2a_handler_t));
     if (!handler) {
+        AGENTOS_LOG_ERROR("handler allocation failed, size=%zu", sizeof(gw_a2a_handler_t));
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
 
         return NULL;
@@ -208,6 +217,7 @@ int gw_a2a_handler_handle_request(gw_a2a_handler_t *handler, const char *method,
         char *input_json = extract_a2a_field(body_json, "input");
 
         if (!task_type) {
+            AGENTOS_LOG_WARN("missing task type in A2A request, path=%s", path ? path : "(null)");
             AGENTOS_FREE(task_id);
             AGENTOS_FREE(input_json);
             handler->error_count++;
@@ -216,6 +226,7 @@ int gw_a2a_handler_handle_request(gw_a2a_handler_t *handler, const char *method,
 
         gw_a2a_task_type_entry_t *entry = find_task_type(handler, task_type);
         if (!entry) {
+            AGENTOS_LOG_WARN("unknown task type: task_type=%s, registered=%zu", task_type, handler->task_type_count);
             const char *err = "{\"error\":{\"code\":-32601,\"message\":\"Unknown task type: %s\"}}";
             size_t elen = snprintf(NULL, 0, err, task_type);
             char *ebuf = (char *)AGENTOS_MALLOC(elen + 1);
@@ -241,6 +252,7 @@ int gw_a2a_handler_handle_request(gw_a2a_handler_t *handler, const char *method,
         input_json = NULL;
 
         if (rc != 0 || !output) {
+            AGENTOS_LOG_ERROR("task execution failed: task_type=%s, rc=%d", task_type, rc);
             AGENTOS_FREE(output);
             handler->error_count++;
             return AGENTOS_ERR_EXEC_FAIL;

@@ -52,6 +52,7 @@ static agentos_error_t gateway_adapter_init(agentos_service_t service,
 
     gateway_adapter_ctx_t *ctx = (gateway_adapter_ctx_t *)agentos_service_get_user_data(service);
     if (!ctx) {
+        SVC_LOG_ERROR("gateway_adapter_init: adapter context is NULL");
         return AGENTOS_EINVAL;
     }
 
@@ -121,6 +122,7 @@ static agentos_error_t gateway_adapter_start(agentos_service_t service)
     }
 
     if (!ctx->gateway_svc) {
+        SVC_LOG_WARN("gateway_adapter_start: gateway service not initialized");
         return AGENTOS_ENOTINIT;
     }
 
@@ -148,6 +150,7 @@ static agentos_error_t gateway_adapter_stop(agentos_service_t service, bool forc
     }
 
     if (!ctx->gateway_svc) {
+        SVC_LOG_WARN("gateway_adapter_stop: gateway service not initialized");
         return AGENTOS_ENOTINIT;
     }
 
@@ -247,6 +250,7 @@ agentos_error_t gateway_service_adapter_create(agentos_service_t *out_service,
     // 分配适配器上下文
     gateway_adapter_ctx_t *ctx = AGENTOS_CALLOC(1, sizeof(gateway_adapter_ctx_t));
     if (!ctx) {
+        SVC_LOG_ERROR("gateway_service_adapter_create: context allocation failed");
         return AGENTOS_ENOMEM;
     }
 
@@ -272,6 +276,7 @@ agentos_error_t gateway_service_adapter_create(agentos_service_t *out_service,
                                                  &gateway_adapter_iface, &ctx->common_cfg);
 
     if (err != AGENTOS_SUCCESS) {
+        SVC_LOG_ERROR("gateway_service_adapter_create: agentos_service_create failed, err=%d", err);
         AGENTOS_FREE(ctx);
         return err;
     }
@@ -281,6 +286,7 @@ agentos_error_t gateway_service_adapter_create(agentos_service_t *out_service,
     // 而不是将service句柄强转为适配器上下文（避免类型混淆）
     err = agentos_service_set_user_data(svc_handle, ctx);
     if (err != AGENTOS_SUCCESS) {
+        SVC_LOG_ERROR("gateway_service_adapter_create: set_user_data failed, err=%d", err);
         agentos_service_destroy(svc_handle);
         AGENTOS_FREE(ctx);
         return err;
