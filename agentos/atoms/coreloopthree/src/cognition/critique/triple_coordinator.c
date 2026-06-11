@@ -7,6 +7,7 @@
 #include "triple_coordinator.h"
 
 #include "agentos.h"
+#include "logger.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 
@@ -21,6 +22,7 @@ static void free_unit_results(tc3_coordinator_t *coord)
     for (size_t i = 0; i < coord->unit_results_count; i++) {
         if (coord->unit_results[i].critique) {
             AGENTOS_FREE(coord->unit_results[i].critique);
+            coord->unit_results[i].critique = NULL;
         }
     }
     coord->unit_results_count = 0;
@@ -28,8 +30,10 @@ static void free_unit_results(tc3_coordinator_t *coord)
 
 static agentos_error_t record_unit_result(tc3_coordinator_t *coord, const tc3_unit_result_t *result)
 {
-    if (!coord || !result)
+    if (!coord || !result) {
+        AGENTOS_LOG_ERROR("record_unit_result: NULL params (coord=%p result=%p)", (void *)coord, (void *)result);
         return AGENTOS_EINVAL;
+    }
 
     if (coord->unit_results_count >= coord->unit_results_capacity) {
         size_t new_cap = coord->unit_results_capacity * 2;
@@ -37,8 +41,10 @@ static agentos_error_t record_unit_result(tc3_coordinator_t *coord, const tc3_un
             new_cap = 32;
         tc3_unit_result_t *new_arr = (tc3_unit_result_t *)AGENTOS_REALLOC(
             coord->unit_results, new_cap * sizeof(tc3_unit_result_t));
-        if (!new_arr)
+        if (!new_arr) {
+            AGENTOS_LOG_ERROR("record_unit_result: unit_results REALLOC failed (new_cap=%zu)", new_cap);
             return AGENTOS_ENOMEM;
+        }
         coord->unit_results = new_arr;
         coord->unit_results_capacity = new_cap;
     }
@@ -73,8 +79,10 @@ static agentos_error_t default_s1_verify(const char *content, size_t content_len
                                          int *out_acceptable, char **out_critique,
                                          size_t *out_critique_len, void *user_data)
 {
-    if (!content || !out_score)
+    if (!content || !out_score) {
+        AGENTOS_LOG_ERROR("default_s1_verify: NULL params (content=%p out_score=%p)", (void *)content, (void *)out_score);
         return AGENTOS_EINVAL;
+    }
 
     const tc3_config_t *config = (const tc3_config_t *)user_data;
     float accept_threshold = config ? config->accept_threshold : TC3_ACCEPT_THRESHOLD;
@@ -144,7 +152,11 @@ static agentos_error_t verify_with_metacognition(tc3_coordinator_t *coord,
                     *out_critique_len = 0;
                 }
                 return AGENTOS_SUCCESS;
+            } else {
+                AGENTOS_LOG_WARN("verify_with_metacognition: mc_evaluate_step failed (err=%d step_id=%u), falling back to s1_verify", (int)err, step->step_id);
             }
+        } else {
+            AGENTOS_LOG_WARN("verify_with_metacognition: mc_evaluate_quick failed (err=%d step_id=%u), falling back to s1_verify", (int)err, step->step_id);
         }
     }
 
@@ -169,6 +181,8 @@ static agentos_error_t verify_with_metacognition(tc3_coordinator_t *coord,
     } else if (vfy_err == AGENTOS_SUCCESS) {
         *out_score = raw_score;
         *out_acceptable = raw_acceptable;
+    } else {
+        AGENTOS_LOG_ERROR("verify_with_metacognition: s1_verify callback failed (vfy_err=%d content_len=%zu)", (int)vfy_err, content_len);
     }
     return vfy_err;
 }
@@ -180,8 +194,10 @@ static agentos_error_t build_correction_prompt(const char *original, size_t orig
 {
     size_t buf_sz = original_len + critique_len + 256;
     char *buf = (char *)AGENTOS_MALLOC(buf_sz);
-    if (!buf)
+    if (!buf) {
+        AGENTOS_LOG_ERROR("build_correction_prompt: allocation failed (buf_sz=%zu original_len=%zu critique_len=%zu)", buf_sz, original_len, critique_len);
         return AGENTOS_ENOMEM;
+    }
 
     int written = snprintf(buf, buf_sz,
                            "[Original]\n%.*s\n[Critique #%d: %.*s]\n"
@@ -191,6 +207,7 @@ static agentos_error_t build_correction_prompt(const char *original, size_t orig
                            critique ? critique : "quality insufficient");
 
     if (written <= 0 || (size_t)written >= buf_sz) {
+        AGENTOS_LOG_ERROR("build_correction_prompt: snprintf encoding error or truncation (written=%d buf_sz=%zu attempt=%d)", written, buf_sz, attempt);
         AGENTOS_FREE(buf);
         return AGENTOS_EUNKNOWN;
     }
@@ -209,8 +226,10 @@ static agentos_error_t concatenate_units(const char **units, const size_t *lens,
     }
 
     char *buf = (char *)AGENTOS_MALLOC(total + 1);
-    if (!buf)
+    if (!buf) {
+        AGENTOS_LOG_ERROR("concatenate_units: allocation failed (total=%zu count=%zu)", total + 1, count);
         return AGENTOS_ENOMEM;
+    }
 
     size_t pos = 0;
     for (size_t i = 0; i < count; i++) {
@@ -227,12 +246,16 @@ static agentos_error_t concatenate_units(const char **units, const size_t *lens,
 agentos_error_t tc3_coordinator_create(const tc3_config_t *config, agentos_thinking_chain_t *chain,
                                        agentos_metacognition_t *meta, tc3_coordinator_t **out_coord)
 {
-    if (!out_coord)
+    if (!out_coord) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_create: NULL out_coord parameter");
         return AGENTOS_EINVAL;
+    }
 
     tc3_coordinator_t *coord = (tc3_coordinator_t *)AGENTOS_CALLOC(1, sizeof(tc3_coordinator_t));
-    if (!coord)
+    if (!coord) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_create: allocation failed for coordinator");
         return AGENTOS_ENOMEM;
+    }
 
     if (config) {
         coord->config = *config;
@@ -245,12 +268,15 @@ agentos_error_t tc3_coordinator_create(const tc3_config_t *config, agentos_think
     coord->meta = meta;
     coord->calibrator = confidence_calibrator_create(CC_DEFAULT_DECAY_FACTOR);
     if (!coord->calibrator) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_create: calibrator creation failed");
         AGENTOS_FREE(coord);
         return AGENTOS_ENOMEM;
     }
 
     agentos_error_t err = su_stream_detector_create(&coord->config.stream_config, &coord->detector);
     if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_create: stream detector creation failed (err=%d)", (int)err);
+        confidence_calibrator_destroy(coord->calibrator);
         AGENTOS_FREE(coord);
         return err;
     }
@@ -282,14 +308,17 @@ void tc3_coordinator_destroy(tc3_coordinator_t *coord)
 agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *input,
                                         size_t input_len, char **out_output, size_t *out_output_len)
 {
-    if (!coord || !input || !out_output)
+    if (!coord || !input || !out_output) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_execute: NULL params (coord=%p input=%p out_output=%p)", (void *)coord, (void *)input, (void *)out_output);
         return AGENTOS_EINVAL;
+    }
 
     coord->active = 1;
     uint64_t start_ns = agentos_time_monotonic_ns();
 
     agentos_error_t err = su_stream_detector_reset(coord->detector);
     if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_execute: stream detector reset failed (err=%d)", (int)err);
         coord->active = 0;
         return err;
     }
@@ -299,6 +328,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
 
     tc3_s2_generate_fn s2_fn = coord->config.s2_generate;
     if (!s2_fn) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_execute: no S2 generate function configured, cannot execute");
         coord->active = 0;
         return AGENTOS_ESERVICE;
     }
@@ -307,6 +337,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
     size_t s2_output_len = 0;
     err = s2_fn(input, input_len, &s2_output, &s2_output_len, coord->config.s2_user_data);
     if (err != AGENTOS_SUCCESS || !s2_output) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_execute: S2 generate call failed (err=%d s2_output=%p input_len=%zu)", (int)err, (void *)s2_output, input_len);
         if (s2_output)
             AGENTOS_FREE(s2_output);
         coord->active = 0;
@@ -315,12 +346,14 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
 
     err = su_stream_detector_feed(coord->detector, s2_output, s2_output_len, 0.7f);
     if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_execute: stream detector feed failed (err=%d s2_output_len=%zu)", (int)err, s2_output_len);
         AGENTOS_FREE(s2_output);
         coord->active = 0;
         return err;
     }
     err = su_stream_detector_flush(coord->detector);
     if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_execute: stream detector flush failed (err=%d)", (int)err);
         AGENTOS_FREE(s2_output);
         coord->active = 0;
         return err;
@@ -383,6 +416,8 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
                     verified_by = TC3_ROLE_T1P;
                     if (expert_opinion)
                         AGENTOS_FREE(expert_opinion);
+                } else {
+                    AGENTOS_LOG_WARN("tc3_coordinator_execute: S1 expert call failed (exp_err=%d unit_index=%zu)", (int)exp_err, unit.unit_index);
                 }
                 coord->stats.escalated_units++;
                 break;
@@ -406,6 +441,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
             AGENTOS_FREE(correction_prompt);
 
             if (err != AGENTOS_SUCCESS || !corrected) {
+                AGENTOS_LOG_WARN("tc3_coordinator_execute: S2 correction call failed (err=%d corrected=%p attempt=%u unit_index=%zu)", (int)err, (void *)corrected, correction_attempts, unit.unit_index);
                 if (critique)
                     AGENTOS_FREE(critique);
                 break;
@@ -438,6 +474,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
 
         if (critique)
             AGENTOS_FREE(critique);
+        critique = NULL;
 
         switch (verdict) {
         case TC3_RESULT_ACCEPT:
@@ -471,6 +508,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
                 (const char **)AGENTOS_REALLOC(accepted_texts, new_cap * sizeof(char *));
             size_t *new_lens = (size_t *)AGENTOS_REALLOC(accepted_lens, new_cap * sizeof(size_t));
             if (!new_texts || !new_lens) {
+                AGENTOS_LOG_ERROR("tc3_coordinator_execute: accepted arrays REALLOC failed (new_cap=%zu accepted_count=%zu)", new_cap, accepted_count);
                 if (new_texts)
                     accepted_texts = new_texts;
                 if (new_lens)
@@ -525,16 +563,20 @@ agentos_error_t tc3_coordinator_execute_streaming(tc3_coordinator_t *coord, cons
 
 agentos_error_t tc3_coordinator_get_stats(const tc3_coordinator_t *coord, tc3_stats_t *out_stats)
 {
-    if (!coord || !out_stats)
+    if (!coord || !out_stats) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_get_stats: NULL params (coord=%p out_stats=%p)", (void *)coord, (void *)out_stats);
         return AGENTOS_EINVAL;
+    }
     *out_stats = coord->stats;
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t tc3_coordinator_reset(tc3_coordinator_t *coord)
 {
-    if (!coord)
+    if (!coord) {
+        AGENTOS_LOG_ERROR("tc3_coordinator_reset: NULL coord parameter");
         return AGENTOS_EINVAL;
+    }
     free_unit_results(coord);
     if (coord->detector)
         su_stream_detector_reset(coord->detector);

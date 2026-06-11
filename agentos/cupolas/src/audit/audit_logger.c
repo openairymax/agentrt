@@ -25,6 +25,11 @@
 #include <openssl/sha.h>
 #endif
 
+/* Ensure logging macros are available */
+#ifndef AGENTOS_LOG_ERROR
+#include "../../../commons/utils/logging/include/logging_compat.h"
+#endif
+
 #define DEFAULT_QUEUE_SIZE 10000
 #define DEFAULT_BATCH_SIZE 100
 #define DEFAULT_FLUSH_INTERVAL_MS 1000
@@ -198,6 +203,7 @@ static void *audit_writer_thread(void *arg)
                 if (audit_rotator_write(logger->rotator, batch[i]) == cupolas_OK) {
                     cupolas_atomic_add64(&logger->total_logged, 1);
                 } else {
+                    AGENTOS_LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed, entry_type=%d, total_failed=%llu", (int)batch[i]->type, (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
                     cupolas_atomic_add64(&logger->total_failed, 1);
                 }
                 audit_entry_destroy(batch[i]);
@@ -212,6 +218,7 @@ static void *audit_writer_thread(void *arg)
             if (audit_rotator_write(logger->rotator, entry) == cupolas_OK) {
                 cupolas_atomic_add64(&logger->total_logged, 1);
             } else {
+                AGENTOS_LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed during shutdown, total_failed=%llu", (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
                 cupolas_atomic_add64(&logger->total_failed, 1);
             }
             audit_entry_destroy(entry);
@@ -300,14 +307,17 @@ void audit_logger_destroy(audit_logger_t *logger)
 int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char *agent_id,
                      const char *action, const char *resource, const char *detail, int result)
 {
-    if (!logger)
+    if (!logger) {
+        AGENTOS_LOG_ERROR("audit_logger_log: NULL logger parameter");
         return cupolas_ERROR_INVALID_ARG;
+    }
 
     audit_entry_t *entry = audit_entry_create(type, agent_id, action, resource, detail, result);
     if (!entry) {
         /* SEC-13: Fallback to pre-allocated audit buffer under OOM */
         void *emergency_buf = agentos_prealloc_acquire(AGENTOS_PREALLOC_AUDIT);
         if (emergency_buf) {
+            AGENTOS_LOG_WARN("audit_logger_log: using emergency buffer fallback for type=%d, agent_id=%s, action=%s", (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)");
             /* Write a minimal audit record to the emergency buffer */
             int written = snprintf((char *)emergency_buf,
                     AGENTOS_PREALLOC_AUDIT_BUF_SIZE,
@@ -350,6 +360,7 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
 
     int ret = audit_queue_try_push(logger->queue, entry);
     if (ret != cupolas_OK) {
+        AGENTOS_LOG_ERROR("[CRITICAL] audit_logger_log: audit queue push failed (buffer overflow), type=%d, agent_id=%s, action=%s, ret=%d", (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)", ret);
         audit_entry_destroy(entry);
         cupolas_atomic_add64(&logger->total_failed, 1);
     }
@@ -394,6 +405,7 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
                                const char *first_prev_hash, int *out_invalid_index)
 {
     if (!entries || entry_count == 0 || !first_prev_hash) {
+        AGENTOS_LOG_ERROR("audit_logger_verify_chain: NULL/invalid parameter - entries=%p, entry_count=%zu, first_prev_hash=%p", (void *)entries, entry_count, (void *)first_prev_hash);
         if (out_invalid_index) *out_invalid_index = -1;
         return false;
     }
@@ -404,12 +416,14 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
     for (size_t i = 0; i < entry_count; i++) {
         const audit_entry_t *entry = entries[i];
         if (!entry) {
+            AGENTOS_LOG_ERROR("audit_logger_verify_chain: NULL entry at index=%zu", i);
             if (out_invalid_index) *out_invalid_index = (int)i;
             return false;
         }
 
         /* 验证 prev_hash 是否匹配 */
         if (memcmp(entry->prev_hash, expected_prev, 65) != 0) {
+            AGENTOS_LOG_ERROR("audit_logger_verify_chain: prev_hash mismatch at index=%zu, chain tampered", i);
             if (out_invalid_index) *out_invalid_index = (int)i;
             return false;
         }
@@ -418,6 +432,7 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
         char recomputed_hash[65];
         audit_compute_chain_hash(entry, expected_prev, recomputed_hash);
         if (memcmp(entry->curr_hash, recomputed_hash, 65) != 0) {
+            AGENTOS_LOG_ERROR("audit_logger_verify_chain: curr_hash mismatch at index=%zu, entry tampered or corrupted", i);
             if (out_invalid_index) *out_invalid_index = (int)i;
             return false;
         }
