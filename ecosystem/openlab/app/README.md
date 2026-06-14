@@ -1,6 +1,6 @@
 # Applications — 智能应用集合
 
-**模块路径**: `agentos/openlab/app/`
+**模块路径**: `ecosystem/openlab/app/`
 **版本**: v0.1.0
 
 > **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。各应用通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。

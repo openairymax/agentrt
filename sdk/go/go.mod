@@ -1,4 +1,4 @@
-module github.com/spharx/agentos/toolkit/go
+module github.com/spharx/agentos/sdk/go
 
 go 1.22
 

@@ -1,1 +1,1 @@
-# agentos/manager/benchmark  package
+# ecosystem/manager/benchmark  package

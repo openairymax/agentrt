@@ -9,8 +9,8 @@ package client
 import (
 	"context"
 
-	"github.com/spharx/agentos/toolkit/go/agentos"
-	"github.com/spharx/agentos/toolkit/go/agentos/types"
+	"github.com/spharx/agentos/sdk/go/agentos"
+	"github.com/spharx/agentos/sdk/go/agentos/types"
 )
 
 // MockAPIClient 是 APIClient 接口的 Mock 实现，支持通过函数字段自定义行为

@@ -1,6 +1,6 @@
 # Manager Logging — 日志配置
 
-**模块路径**: `agentos/manager/logging/`
+**模块路径**: `ecosystem/manager/logging/`
 **版本**: v0.1.0
 
 ## 概述

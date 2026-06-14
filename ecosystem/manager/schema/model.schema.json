@@ -91,6 +91,18 @@
             "prefer_cheaper": {"type": "boolean"},
             "max_cost_per_request": {"type": "number", "minimum": 0}
           }
+        },
+        "fallback_chain": {
+          "type": "array",
+          "description": "Ordered fallback provider chain (from agentos.yaml)",
+          "items": {"type": "string"},
+          "examples": [["openai", "anthropic", "deepseek"]]
+        },
+        "cost_budget_daily_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Daily cost budget in USD (from agentos.yaml)",
+          "examples": [5.0, 10.0, 25.0, 50.0, 100.0]
         }
       }
     },

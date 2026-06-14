@@ -1,6 +1,6 @@
 # Markets — 市场与模板
 
-**模块路径**: `agentos/openlab/markets/`
+**模块路径**: `ecosystem/openlab/markets/`
 **版本**: v0.1.0
 
 > **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
@@ -159,7 +159,7 @@ result = validator.validate_file("contract.json")
 
 ```bash
 # 命令行
-python -m agentos.openlab.markets.skills.contracts.validator --skill ./skill_contract.yaml
+python -m ecosystem.openlab.markets.skills.contracts.validator --skill ./skill_contract.yaml
 ```
 
 ```python

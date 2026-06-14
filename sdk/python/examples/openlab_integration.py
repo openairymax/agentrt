@@ -25,7 +25,7 @@ try:
     AGENTOS_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️  AgentOS SDK 未安装: {e}")
-    print("请运行: pip install -e agentos/toolkit/python")
+    print("请运行: pip install -e sdk/python")
     AGENTOS_AVAILABLE = False
 
 # 设置日志
@@ -592,7 +592,7 @@ async def main():
     if not AGENTOS_AVAILABLE:
         print("❌ AgentOS SDK 不可用")
         print("请先安装 AgentOS Python SDK:")
-        print("  pip install -e agentos/toolkit/python")
+        print("  pip install -e sdk/python")
         print()
         print("如果您正在开发环境中，可以模拟运行:")
         print("  python -c \"print('模拟运行: 集成功能正常')\"")
@@ -610,7 +610,7 @@ async def main():
         print("=" * 70)
         
         print("\n📚 下一步:")
-        print("1. 查看 OpenLab 文档: agentos/openlab/README.md")
+        print("1. 查看 OpenLab 文档: ecosystem/openlab/README.md")
         print("2. 探索更多 AgentOS SDK 功能")
         print("3. 集成到您的 OpenLab 应用中")
         print("4. 贡献集成改进代码")

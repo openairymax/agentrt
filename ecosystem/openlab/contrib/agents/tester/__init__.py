@@ -1,1 +1,1 @@
-# agentos/openlab/contrib/agents/tester  package
+# ecosystem/openlab/contrib/agents/tester  package

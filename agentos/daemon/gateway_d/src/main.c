@@ -14,6 +14,8 @@
  */
 
 #include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
 #include "gateway_service.h"
 #include "logging.h"
 #include "platform.h"
@@ -39,6 +41,8 @@
 static gateway_service_t g_service = NULL;
 static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
 
 /* ==================== 信号处理 ==================== */
 
@@ -240,6 +244,11 @@ int main(int argc, char *argv[])
                  config.ws.enabled ? "[enabled]" : "[disabled]");
     SVC_LOG_INFO("  Stdio:    %s", config.stdio.enabled ? "[enabled]" : "[disabled]");
 
+    g_bsd = daemon_bootstrap_sd_start("gateway_d", "gateway", config.http.host,
+                                      config.http.port, "gateway,core", 0);
+    g_bipc = daemon_bootstrap_ipc_start("gateway_d", "gateway", config.http.host,
+                                        config.http.port, IPC_BUS_PROTO_JSON_RPC);
+
     /* 主事件循环：信号驱动 + 周期性健康检查 */
     int loop_count = 0;
     const int HEALTH_CHECK_INTERVAL = 30;
@@ -268,6 +277,8 @@ int main(int argc, char *argv[])
         }
     }
 
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
     SVC_LOG_INFO("Gateway shutting down...");
     gateway_service_stop(g_service, false);
 

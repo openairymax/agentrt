@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spharx/agentos/toolkit/go/agentos/types"
+	"github.com/spharx/agentos/sdk/go/agentos/types"
 )
 
 // DefaultMaxDataPoints 每个指标名称的最大数据点数

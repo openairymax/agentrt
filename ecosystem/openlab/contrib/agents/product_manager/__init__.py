@@ -1,1 +1,1 @@
-# agentos/openlab/contrib/agents/product_manager  package
+# ecosystem/openlab/contrib/agents/product_manager  package

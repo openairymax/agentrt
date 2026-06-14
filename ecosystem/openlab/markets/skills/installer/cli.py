@@ -6,9 +6,9 @@ Command-line interface for installing, managing, and removing AgentOS skills
 from the marketplace. Supports local and remote skill packages.
 
 Usage:
-    python -m agentos.openlab.markets.skills.installer.cli install <skill_package>
-    python -m agentos.openlab.markets.skills.installer.cli list
-    python -m agentos.openlab.markets.skills.installer.cli remove <skill_name>
+    python -m ecosystem.openlab.markets.skills.installer.cli install <skill_package>
+    python -m ecosystem.openlab.markets.skills.installer.cli list
+    python -m ecosystem.openlab.markets.skills.installer.cli remove <skill_name>
 """
 
 from __future__ import annotations

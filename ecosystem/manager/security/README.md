@@ -1,6 +1,6 @@
 # Manager Security — 安全策略与权限配置
 
-**模块路径**: `agentos/manager/security/`
+**模块路径**: `ecosystem/manager/security/`
 **版本**: v0.1.0
 
 ## 概述

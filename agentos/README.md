@@ -13,7 +13,7 @@ AgentOS 采用自底向上的四层分层架构，每层职责明确、接口清
 ```
 ┌───────────────────────────────────────────────────────────┐
 │                    OpenLab 开放生态层                       │
-│  (agentos/openlab/) — Apps / Contrib / Markets / Templates  │
+│  (ecosystem/openlab/) — Apps / Contrib / Markets / Templates  │
 ├───────────────────────────────────────────────────────────┤
 │                    用户态服务层 (Daemon)                     │
 │  gateway_d → llm_d / tool_d / sched_d / market_d / monit_d  │

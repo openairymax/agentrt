@@ -1,4 +1,4 @@
-name: AgentOS CI
+name: AgentRT CI
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: agentos-ci-${{ github.ref }}
+  group: agentrt-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

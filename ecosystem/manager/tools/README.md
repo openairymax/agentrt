@@ -1,6 +1,6 @@
 # Manager 配置工具集
 
-**模块路径**: `agentos/manager/tools/`
+**模块路径**: `ecosystem/manager/tools/`
 **版本**: v0.1.0
 
 ## 概述

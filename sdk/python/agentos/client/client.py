@@ -53,7 +53,7 @@ class ClientConfig:
     """
     客户端配置
     
-    对应 Go SDK: agentos/manager.go
+    对应 Go SDK: sdk/go/agentos/manager.go
     """
     endpoint: str = field(default_factory=lambda: os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789"))
     timeout: float = 30.0

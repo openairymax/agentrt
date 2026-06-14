@@ -1,6 +1,6 @@
 # Manager Kernel — 内核级配置
 
-**模块路径**: `agentos/manager/kernel/`
+**模块路径**: `ecosystem/manager/kernel/`
 **版本**: v0.1.0
 
 ## 概述

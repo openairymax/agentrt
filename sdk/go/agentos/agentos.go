@@ -7,7 +7,7 @@ import (
 
 const (
 	Version = "0.1.0"
-	Author  = "SpharxWorks"
+	Author  = "SPHARX Ltd."
 	License = "MIT"
 )
 

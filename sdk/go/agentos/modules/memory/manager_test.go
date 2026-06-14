@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/spharx/agentos/toolkit/go/agentos"
-	"github.com/spharx/agentos/toolkit/go/agentos/client"
-	"github.com/spharx/agentos/toolkit/go/agentos/types"
+	"github.com/spharx/agentos/sdk/go/agentos"
+	"github.com/spharx/agentos/sdk/go/agentos/client"
+	"github.com/spharx/agentos/sdk/go/agentos/types"
 )
 
 func TestNewMemoryManager(t *testing.T) {

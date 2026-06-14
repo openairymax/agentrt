@@ -30,6 +30,8 @@ extern "C" {
 typedef struct orchestrator_s orchestrator_t;
 typedef struct orch_task_s orch_task_t;
 typedef struct orch_pipeline_s orch_pipeline_t;
+typedef struct llm_service llm_service_t;
+typedef struct tool_service tool_service_t;
 
 /* ========== 编排阶段枚举 ========== */
 
@@ -212,6 +214,34 @@ int orchestrator_execute_phase(orchestrator_t *orch, orch_phase_t phase, const c
  */
 void orchestrator_set_progress_callback(orchestrator_t *orch, orch_progress_cb_t callback,
                                         void *user_data);
+
+/* ========== C-L06: Orchestrator → CoreLoopThree 连接线 ========== */
+
+/**
+ * @brief C-L06: 将 llm_d 服务注入到编排器下的 CoreLoopThree 认知引擎
+ *
+ * 编排器持有认知引擎，通过此函数将 LLM 服务句柄传递到认知引擎，
+ * 使认知循环 Phase 2 能够调用外部 LLM 服务。
+ *
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param llm_svc [in] LLM service handle (BORROW - orchestrator does not take ownership, caller manages lifecycle).
+ *
+ * @ownership llm_svc: BORROW
+ */
+void orchestrator_set_cognition_llm_service(orchestrator_t *orch, llm_service_t *llm_svc);
+
+/**
+ * @brief C-L06: 将 tool_d 服务注入到编排器下的 CoreLoopThree 认知引擎
+ *
+ * 编排器持有认知引擎，通过此函数将工具服务句柄传递到认知引擎，
+ * 使编排器的任务分发可以路由工具调用。
+ *
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param tool_svc [in] Tool service handle (BORROW - orchestrator does not take ownership, caller manages lifecycle).
+ *
+ * @ownership tool_svc: BORROW
+ */
+void orchestrator_set_cognition_tool_service(orchestrator_t *orch, tool_service_t *tool_svc);
 
 /* ========== 查询 ========== */
 

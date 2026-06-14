@@ -15,6 +15,38 @@
       "type": "object",
       "required": ["default_policy", "rules", "audit", "sandbox"],
       "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable security enforcement (from agentos.yaml)",
+          "examples": [true, false]
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["disabled", "permissive", "standard", "strict"],
+          "default": "standard",
+          "description": "Security operation mode (from agentos.yaml)",
+          "examples": ["standard", "strict", "permissive"]
+        },
+        "permission": {
+          "type": "object",
+          "description": "Permission configuration (from agentos.yaml)",
+          "properties": {
+            "model": {
+              "type": "string",
+              "enum": ["rbac", "abac", "custom"],
+              "default": "rbac",
+              "examples": ["rbac", "abac"]
+            },
+            "cache_ttl_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3600,
+              "default": 300,
+              "examples": [60, 300, 600, 1800]
+            }
+          }
+        },
         "default_policy": {
           "type": "string",
           "enum": ["allow", "deny", "audit"],

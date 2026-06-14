@@ -1,6 +1,6 @@
 # Rust Skill 模板
 
-**模块路径**: `agentos/openlab/markets/templates/rust-skill/`
+**模块路径**: `ecosystem/openlab/markets/templates/rust-skill/`
 **版本**: v0.1.0
 
 > **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
@@ -72,7 +72,7 @@ impl Skill for MySkill {
 
 ```toml
 [dependencies]
-agentos-sdk = { path = "../../agentos/toolkit/rust" }
+agentos-sdk = { path = "../../../sdk/rust" }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -1,6 +1,6 @@
 # Manager Deployment — 部署环境配置
 
-**模块路径**: `agentos/manager/deployment/`
+**模块路径**: `ecosystem/manager/deployment/`
 **版本**: v0.1.0
 
 ## 概述

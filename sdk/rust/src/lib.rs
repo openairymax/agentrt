@@ -40,7 +40,7 @@ pub mod plugin;
 pub const VERSION: &str = "0.1.0";
 
 /// SDK 作者
-pub const AUTHOR: &str = "SpharxWorks";
+pub const AUTHOR: &str = "SPHARX Ltd.";
 
 /// SDK 许可证
 pub const LICENSE: &str = "MIT";
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_author() {
-        assert_eq!(AUTHOR, "SpharxWorks");
+        assert_eq!(AUTHOR, "SPHARX Ltd.");
     }
 
     #[test]

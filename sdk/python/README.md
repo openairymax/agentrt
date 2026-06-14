@@ -1,6 +1,6 @@
 # Toolkit Python — AgentOS Python SDK
 
-**模块路径**: `agentos/toolkit/python/`
+**模块路径**: `sdk/python/`
 **版本**: v0.1.0 (SDK v0.1.0)
 
 ## 概述

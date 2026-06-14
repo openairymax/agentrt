@@ -1,6 +1,6 @@
 [![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)
 
-# AgentOS
+# AgentRT
 Powered by OpenAirymax
 > The seminal fourth "Operating System Philosophy" in human computing history.
 
@@ -31,7 +31,7 @@ Powered by OpenAirymax
 
 ## 1️⃣ Introduction
 
-**AgentOS** is an intelligent agent operating system that provides comprehensive OS-level support for orchestrating agent teams.
+**AgentRT** is an intelligent agent runtime platform that provides comprehensive OS-level support for orchestrating agent teams.
 
 **1.1 Project Preview**
 
@@ -154,7 +154,7 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 |:-----|:---------|
 | C/C++ | Develop via `syscalls.h` system call interface |
 | Python | Install via `pip install agentos` then directly import |
-| Go | Use `import "github.com/spharx/agentos/toolkit/go"` |
+| Go | Use `import "github.com/spharx/agentos/sdk/go"` |
 | Rust | Use `use agentos_toolkit::prelude::*;` |
 | TypeScript | Install via `npm install @spharx/agentos-toolkit` then directly import |
 

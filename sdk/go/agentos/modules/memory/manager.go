@@ -12,10 +12,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spharx/agentos/toolkit/go/agentos"
-	"github.com/spharx/agentos/toolkit/go/agentos/client"
-	"github.com/spharx/agentos/toolkit/go/agentos/types"
-	"github.com/spharx/agentos/toolkit/go/agentos/utils"
+	"github.com/spharx/agentos/sdk/go/agentos"
+	"github.com/spharx/agentos/sdk/go/agentos/client"
+	"github.com/spharx/agentos/sdk/go/agentos/types"
+	"github.com/spharx/agentos/sdk/go/agentos/utils"
 )
 
 // MemoryWriteItem 批量写入时的单条记忆项

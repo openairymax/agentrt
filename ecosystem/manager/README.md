@@ -1,6 +1,6 @@
 # Manager — 统一配置与项目管理中心
 
-**模块路径**: `agentos/manager/`
+**模块路径**: `ecosystem/manager/`
 **版本**: v0.1.0
 
 ## 概述

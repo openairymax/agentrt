@@ -1,1 +1,1 @@
-# agentos/openlab/contrib/agents/architect  package
+# ecosystem/openlab/contrib/agents/architect  package
