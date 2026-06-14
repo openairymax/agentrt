@@ -25,13 +25,13 @@ from contextlib import contextmanager
 import pytest
 
 # 添加项目根目录到路径
-# 注意：agentos 的多个子包分布在 agentos/ 和 agentos/toolkit/python/ 下
+# 注意：agentos 的多个子包分布在 agentos/ 和 sdk/python/ 下
 PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "agentos" / "toolkit" / "python"))
+sys.path.insert(0, str(PROJECT_ROOT / "sdk" / "python"))
 sys.path.insert(0, str(PROJECT_ROOT / "agentos"))
-# 添加 manager 和 openlab 子包路径
-sys.path.insert(0, str(PROJECT_ROOT / "agentos" / "manager"))
-sys.path.insert(0, str(PROJECT_ROOT / "agentos" / "openlab"))
+# 添加 manager 和 openlab 子包路径（已移至 ecosystem/）
+sys.path.insert(0, str(PROJECT_ROOT / "ecosystem" / "manager"))
+sys.path.insert(0, str(PROJECT_ROOT / "ecosystem" / "openlab"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 

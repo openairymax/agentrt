@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spharx/agentos/toolkit/go/agentos"
-	"github.com/spharx/agentos/toolkit/go/agentos/types"
-	"github.com/spharx/agentos/toolkit/go/agentos/utils"
+	"github.com/spharx/agentos/sdk/go/agentos"
+	"github.com/spharx/agentos/sdk/go/agentos/types"
+	"github.com/spharx/agentos/sdk/go/agentos/utils"
 )
 
 const MaxResponseBodySize = 10 * 1024 * 1024

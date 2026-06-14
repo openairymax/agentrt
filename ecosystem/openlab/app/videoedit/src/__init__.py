@@ -1,1 +1,1 @@
-# agentos/openlab/app/videoedit/src  package
+# ecosystem/openlab/app/videoedit/src  package

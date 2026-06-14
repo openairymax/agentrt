@@ -16,6 +16,8 @@
  */
 
 #include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
 #include "jsonrpc_helpers.h"
 #include "logging.h"
 #include "market_service.h"
@@ -55,6 +57,8 @@ static market_service_t *g_service = NULL;
 static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t *g_dispatcher = NULL; /* 方法分发器 */
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
 
 /* ==================== 错误码定义 ==================== */
 #define MARKET_ERR_INVALID_PARAM AGENTOS_ERR_INVALID_PARAM
@@ -493,6 +497,10 @@ int main(int argc, char **argv)
             return 1;
         }
         SVC_LOG_INFO("Listening on TCP port %d", DEFAULT_TCP_PORT);
+        g_bsd = daemon_bootstrap_sd_start("market_d", "market", "127.0.0.1",
+                                          DEFAULT_TCP_PORT, "market,core", 0);
+        g_bipc = daemon_bootstrap_ipc_start("market_d", "market", "127.0.0.1",
+                                            DEFAULT_TCP_PORT, IPC_BUS_PROTO_JSON_RPC);
     } else {
 #if defined(AGENTOS_PLATFORM_WINDOWS)
         server_fd = agentos_socket_create_named_pipe_server(DEFAULT_SOCKET_PATH_WIN);
@@ -507,6 +515,10 @@ int main(int argc, char **argv)
             return 1;
         }
         SVC_LOG_INFO("Listening on Unix socket");
+        g_bsd = daemon_bootstrap_sd_start("market_d", "market", DEFAULT_SOCKET_PATH_UNIX,
+                                          0, "market,core", 0);
+        g_bipc = daemon_bootstrap_ipc_start("market_d", "market", DEFAULT_SOCKET_PATH_UNIX,
+                                            0, IPC_BUS_PROTO_JSON_RPC);
     }
 
     SVC_LOG_INFO("Market service started successfully");
@@ -537,6 +549,8 @@ int main(int argc, char **argv)
     }
 
     /* 清理资源 */
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
     SVC_LOG_INFO("Market service stopping...");
     thread_pool_destroy(pool);
     agentos_socket_close(server_fd);

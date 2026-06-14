@@ -1,6 +1,6 @@
 [![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)
 
-# AgentOS
+# AgentRT
 Powered by OpenAirymax
 > 成为人类计算工程史上，第四个"操作系统哲学"
 
@@ -31,7 +31,7 @@ Powered by OpenAirymax
 
 ## 1️⃣ 项目简介
 
-**AgentOS** 是一个智能体底层操作系统，为驱动智能体团队提供完整的操作系统级支持。
+**AgentRT** 是一个智能体运行时平台，为驱动智能体团队提供完整的操作系统级支持。
 
 **1.1  项目预览**
 
@@ -154,7 +154,7 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 |:-----|:---------|
 | C/C++ | 通过 `syscalls.h` 系统调用接口开发 |
 | Python | 通过 `pip install agentos` 后直接 import |
-| Go | 通过 `import "github.com/spharx/agentos/toolkit/go"` |
+| Go | 通过 `import "github.com/spharx/agentos/sdk/go"` |
 | Rust | 通过 `use agentos_toolkit::prelude::*;` |
 | TypeScript | 通过 `npm install @spharx/agentos-toolkit` 后直接 import |
 

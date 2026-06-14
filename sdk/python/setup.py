@@ -10,7 +10,7 @@ setup(
     description="AgentOS Python SDK - 官方多语言 SDK 集合",
     long_description=open("README.md", "r", encoding="utf-8").read() if __name__ == "__main__" else "",
     long_description_content_type="text/markdown",
-    author="SpharxWorks",
+    author="SPHARX Ltd.",
     author_email="team@spharx.com",
     url="https://github.com/spharx/agentos",
     packages=find_packages(exclude=["tests", "tests.*"]),
@@ -40,7 +40,7 @@ setup(
     license="Apache-2.0",
     keywords="agentos sdk client agent memory session skill",
     project_urls={
-        "Documentation": "https://github.com/spharx/agentos/tree/main/agentos/toolkit/python",
+        "Documentation": "https://github.com/spharx/agentos/tree/main/sdk/python",
         "Source": "https://github.com/spharx/agentos",
         "Bug Tracker": "https://github.com/spharx/agentos/issues",
     },

@@ -1,6 +1,6 @@
 # Manager Environment — 多环境配置
 
-**模块路径**: `agentos/manager/environment/`
+**模块路径**: `ecosystem/manager/environment/`
 **版本**: v0.1.0
 
 ## 概述

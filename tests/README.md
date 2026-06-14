@@ -28,9 +28,9 @@
 | `unit/daemon/monit_d/` | `agentos/daemon/monit_d/` | CMocka — 监控告警守护进程 |
 | `unit/daemon/tool_d/` | `agentos/daemon/tool_d/` | CMocka + pytest — 工具执行守护进程 |
 | `unit/heapstore/` | `agentos/heapstore/` | CMocka — 运行时数据存储（SQLite + 内存后端混合存储） |
-| `unit/manager/` | `agentos/manager/` | pytest — 统一配置管理中心（多模块 Schema + 热重载） |
-| `unit/openlab/` | `agentos/openlab/` | pytest — 开放生态系统（Apps/Contrib/Markets） |
-| `unit/toolkit/` | `agentos/toolkit/` + `scripts/toolkit/` | pytest — 运维工具包与多语言 SDK（Python/Rust） |
+| `unit/manager/` | `ecosystem/manager/` | pytest — 统一配置管理中心（多模块 Schema + 热重载） |
+| `unit/openlab/` | `ecosystem/openlab/` | pytest — 开放生态系统（Apps/Contrib/Markets） |
+| `unit/toolkit/` | `sdk/` + `scripts/toolkit/` | pytest — 运维工具包与多语言 SDK（Python/Rust） |
 | `integration/c/` | `agentos/atoms/`, `agentos/commons/`, `agentos/gateway/` | CMocka — C 层端到端核心集成与协议兼容性 |
 | `integration/python/` | `agentos/daemon/`, `agentos/gateway/`, `agentos/heapstore/` | pytest — Python 层端到端工作流与协议兼容性 |
 | `integration/commons/` | `agentos/commons/` | CMocka — Commons 统一基础库集成测试 |
@@ -45,7 +45,7 @@
 | `security/c/` | `agentos/cupolas/` | CMocka — C 层安全审计 |
 | `security/cupolas/` | `agentos/cupolas/` | C — Cupolas 安全模糊测试 |
 | `security/python/` | `agentos/cupolas/` | pytest — Python 层安全测试 |
-| `contract/python/` | `agentos/daemon/`, `agentos/openlab/` | pytest — 接口契约验证 |
+| `contract/python/` | `agentos/daemon/`, `ecosystem/openlab/` | pytest — 接口契约验证 |
 
 ## 目录结构
 

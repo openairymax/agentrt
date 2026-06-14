@@ -1,6 +1,6 @@
 # Manager Service — 服务配置
 
-**模块路径**: `agentos/manager/service/`
+**模块路径**: `ecosystem/manager/service/`
 **版本**: v0.1.0
 
 ## 概述

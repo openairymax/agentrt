@@ -1,1 +1,1 @@
-# agentos/manager/tools  package
+# ecosystem/manager/tools  package
