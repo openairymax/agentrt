@@ -1,6 +1,6 @@
 # Manager Model — LLM 模型配置
 
-**模块路径**: `agentos/manager/model/`
+**模块路径**: `ecosystem/manager/model/`
 **版本**: v0.1.0
 
 ## 概述

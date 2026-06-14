@@ -16,6 +16,8 @@
  */
 
 #include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
 #include "daemon_errors.h"
 #include "daemon_event_driver.h"
 #include "jsonrpc_helpers.h"
@@ -63,6 +65,8 @@ static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t *g_dispatcher = NULL;
 static daemon_event_driver_t *g_event_driver = NULL;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
 
 /* 服务配置 */
 typedef struct {
@@ -610,6 +614,10 @@ int main(int argc, char **argv)
             return 1;
         }
         SVC_LOG_INFO("Listening on TCP %s:%d", g_config.tcp_host, g_config.tcp_port);
+        g_bsd = daemon_bootstrap_sd_start("llm_d", "llm", g_config.tcp_host,
+                                          g_config.tcp_port, "ai,core", 0);
+        g_bipc = daemon_bootstrap_ipc_start("llm_d", "llm", g_config.tcp_host,
+                                            g_config.tcp_port, IPC_BUS_PROTO_JSON_RPC);
     } else {
 #if defined(AGENTOS_PLATFORM_WINDOWS)
         server_fd = agentos_socket_create_named_pipe_server(g_config.socket_path);
@@ -624,6 +632,10 @@ int main(int argc, char **argv)
             return 1;
         }
         SVC_LOG_INFO("Listening on %s", g_config.socket_path);
+        g_bsd = daemon_bootstrap_sd_start("llm_d", "llm", g_config.socket_path,
+                                          0, "ai,core", 0);
+        g_bipc = daemon_bootstrap_ipc_start("llm_d", "llm", g_config.socket_path,
+                                            0, IPC_BUS_PROTO_JSON_RPC);
     }
 
     /* 创建事件驱动框架 */
@@ -668,6 +680,8 @@ int main(int argc, char **argv)
     daemon_event_driver_run(g_event_driver);
 
     /* 清理 */
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
     SVC_LOG_INFO("LLM service stopping...");
     daemon_event_driver_destroy(g_event_driver);
     agentos_socket_close(server_fd);

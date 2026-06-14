@@ -1,6 +1,6 @@
 # OpenLab — 开放生态系统
 
-**模块路径**: `agentos/openlab/`
+**模块路径**: `ecosystem/openlab/`
 **版本**: v0.1.0
 
 > **Status**: OpenLab 作为 AgentOS 的正式组成部分，API 持续演进中。

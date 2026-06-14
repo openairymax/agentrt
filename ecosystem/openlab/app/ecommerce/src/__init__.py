@@ -1,1 +1,1 @@
-# agentos/openlab/app/ecommerce/src  package
+# ecosystem/openlab/app/ecommerce/src  package

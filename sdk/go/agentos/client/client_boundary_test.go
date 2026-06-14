@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spharx/agentos/toolkit/go/agentos"
+	"github.com/spharx/agentos/sdk/go/agentos"
 )
 
 func TestClient_TimeoutBoundary(t *testing.T) {

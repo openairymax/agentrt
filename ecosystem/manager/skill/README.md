@@ -1,6 +1,6 @@
 # Manager Skill — 技能注册表配置
 
-**模块路径**: `agentos/manager/skill/`
+**模块路径**: `ecosystem/manager/skill/`
 **版本**: v0.1.0
 
 ## 概述

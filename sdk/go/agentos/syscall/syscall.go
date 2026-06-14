@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/spharx/agentos/toolkit/go/agentos/client"
-	"github.com/spharx/agentos/toolkit/go/agentos/types"
+	"github.com/spharx/agentos/sdk/go/agentos/client"
+	"github.com/spharx/agentos/sdk/go/agentos/types"
 )
 
 // SyscallNamespace defines the namespace for system calls

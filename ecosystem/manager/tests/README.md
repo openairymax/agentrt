@@ -1,6 +1,6 @@
 # Manager 测试套件
 
-**模块路径**: `agentos/manager/tests/`
+**模块路径**: `ecosystem/manager/tests/`
 **版本**: v0.1.0
 
 ## 概述

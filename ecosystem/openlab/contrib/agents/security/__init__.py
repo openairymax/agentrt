@@ -1,1 +1,1 @@
-# agentos/openlab/contrib/agents/security  package
+# ecosystem/openlab/contrib/agents/security  package

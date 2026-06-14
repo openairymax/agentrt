@@ -1,6 +1,6 @@
 # Python Agent 模板
 
-**模块路径**: `agentos/openlab/markets/templates/python-agent/`
+**模块路径**: `ecosystem/openlab/markets/templates/python-agent/`
 **版本**: v0.1.0
 
 > **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
@@ -82,7 +82,7 @@ await client.get_status()               # 获取状态
 
 ## 依赖关系
 
-- **核心依赖**: agentos (AgentOS Python SDK), agentos.toolkit.python
+- **核心依赖**: agentos (AgentOS Python SDK), sdk.python
 - **Python**: >= 3.10
 
 ## 构建说明
@@ -103,7 +103,7 @@ python agent.py
 
 ```python
 from agentos import Agent
-from agentos.toolkit.python.client import AgentOSClient
+from sdk.python.agentos.client import AgentOSClient
 
 class MyCustomAgent(Agent):
     def __init__(self, config):

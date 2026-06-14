@@ -8,7 +8,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/spharx/agentos/toolkit/go/agentos/types"
+	"github.com/spharx/agentos/sdk/go/agentos/types"
 )
 
 // TestSyscallNamespace tests namespace constants

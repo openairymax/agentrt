@@ -16,6 +16,8 @@
  */
 
 #include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
 #include "daemon_event_driver.h"
 #include "jsonrpc_helpers.h"
 #include "logging.h"
@@ -47,6 +49,8 @@ static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t *g_dispatcher = NULL;
 static daemon_event_driver_t *g_event_driver = NULL;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
 
 /* ==================== 信号处理 ==================== */
 
@@ -501,6 +505,10 @@ int main(int argc, char **argv)
             return 1;
         }
         SVC_LOG_INFO("Listening on TCP port %d", DEFAULT_TCP_PORT);
+        g_bsd = daemon_bootstrap_sd_start("monit_d", "monitor", "127.0.0.1",
+                                          DEFAULT_TCP_PORT, "monitor,core", 0);
+        g_bipc = daemon_bootstrap_ipc_start("monit_d", "monitor", "127.0.0.1",
+                                            DEFAULT_TCP_PORT, IPC_BUS_PROTO_JSON_RPC);
     } else {
 #if defined(AGENTOS_PLATFORM_WINDOWS)
         server_fd = agentos_socket_create_named_pipe_server(DEFAULT_SOCKET_PATH_WIN);
@@ -515,6 +523,10 @@ int main(int argc, char **argv)
             return 1;
         }
         SVC_LOG_INFO("Listening on Unix socket");
+        g_bsd = daemon_bootstrap_sd_start("monit_d", "monitor", DEFAULT_SOCKET_PATH_UNIX,
+                                          0, "monitor,core", 0);
+        g_bipc = daemon_bootstrap_ipc_start("monit_d", "monitor", DEFAULT_SOCKET_PATH_UNIX,
+                                            0, IPC_BUS_PROTO_JSON_RPC);
     }
 
     SVC_LOG_INFO("Monitor service started successfully");
@@ -562,6 +574,8 @@ int main(int argc, char **argv)
     daemon_event_driver_run(g_event_driver);
 
     /* 清理资源 */
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
     SVC_LOG_INFO("Monitor service stopping...");
     daemon_event_driver_destroy(g_event_driver);
     agentos_socket_close(server_fd);

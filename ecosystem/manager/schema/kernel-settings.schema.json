@@ -73,6 +73,22 @@
               "description": "Time slice per task in milliseconds",
               "examples": [10, 20, 50, 100]
             },
+            "max_tasks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1024,
+              "description": "Maximum number of tasks (from agentos.yaml)",
+              "examples": [512, 1024, 2048, 4096]
+            },
+            "default_priority": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 50,
+              "description": "Default task priority (from agentos.yaml)",
+              "examples": [10, 25, 50, 75, 100]
+            },
             "max_concurrency": {
               "type": "integer",
               "minimum": 0,
@@ -285,6 +301,76 @@
               "description": "Maximum single allocation size in megabytes",
               "examples": [512, 1024, 2048, 4096]
             },
+            "oom_watermark_percent": {
+              "type": "integer",
+              "minimum": 50,
+              "maximum": 99,
+              "default": 85,
+              "description": "OOM watermark percentage threshold (from agentos.yaml)",
+              "examples": [80, 85, 90, 95]
+            },
+            "arena_default_size_kb": {
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 1024,
+              "default": 64,
+              "description": "Default arena allocator size in KB (from agentos.yaml)",
+              "examples": [16, 32, 64, 128, 256]
+            },
+            "pool_thread_cache_max": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 256,
+              "description": "Max thread cache objects per pool (from agentos.yaml)",
+              "examples": [64, 128, 256, 512]
+            },
+            "slab_min_objs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 8,
+              "description": "Minimum objects per slab (from agentos.yaml)",
+              "examples": [4, 8, 16, 32]
+            },
+            "mempool_reserved_mb": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024,
+              "default": 32,
+              "description": "Reserved mempool size in MB (from agentos.yaml)",
+              "examples": [16, 32, 64, 128]
+            },
+            "leak_scan_interval_sec": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 3600,
+              "default": 60,
+              "description": "Leak scan interval in seconds (from agentos.yaml)",
+              "examples": [30, 60, 120, 300]
+            },
+            "soak_test_rss_growth_percent": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 5,
+              "description": "Soak test RSS growth threshold percent (from agentos.yaml)",
+              "examples": [2, 5, 10, 20]
+            },
+            "sensitive_zero_on_free": {
+              "type": "boolean",
+              "default": true,
+              "description": "Zero memory on free for sensitive data (from agentos.yaml)",
+              "examples": [true, false]
+            },
+            "deferred_free_delay_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 60000,
+              "default": 1000,
+              "description": "Deferred free delay in milliseconds (from agentos.yaml)",
+              "examples": [500, 1000, 2000, 5000]
+            },
             "guard_enabled": {
               "type": "boolean",
               "default": true,
@@ -436,6 +522,22 @@
               "maximum": 65536,
               "default": 64,
               "description": "Shared buffer size per connection in kilobytes"
+            },
+            "max_message_size": {
+              "type": "integer",
+              "minimum": 256,
+              "maximum": 1048576,
+              "default": 65536,
+              "description": "Maximum message size in bytes (from agentos.yaml)",
+              "examples": [16384, 32768, 65536, 131072]
+            },
+            "shm_pool_size_mb": {
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 4096,
+              "default": 128,
+              "description": "Shared memory pool size in MB (from agentos.yaml)",
+              "examples": [64, 128, 256, 512]
             },
             "timeout_ms": {
               "type": "integer",

@@ -123,12 +123,12 @@ if [ "$MEMORYROV_PATH_CHECK" -ge 1 ]; then pass "storage.c: Memory path validati
 
 section "6. Python SDK Syntax Validation"
 PYTHON_FILES=(
-    "$AGENTOS_ROOT/agentos/toolkit/python/agentos/exceptions.py"
-    "$AGENTOS_ROOT/agentos/toolkit/python/agentos/agent.py"
-    "$AGENTOS_ROOT/agentos/toolkit/python/agentos/task.py"
-    "$AGENTOS_ROOT/agentos/toolkit/python/agentos/protocol.py"
-    "$AGENTOS_ROOT/agentos/toolkit/python/agentos/client/client.py"
-    "$AGENTOS_ROOT/agentos/toolkit/python/agentos/session.py"
+    "$AGENTOS_ROOT/sdk/python/agentos/exceptions.py"
+    "$AGENTOS_ROOT/sdk/python/agentos/agent.py"
+    "$AGENTOS_ROOT/sdk/python/agentos/task.py"
+    "$AGENTOS_ROOT/sdk/python/agentos/protocol.py"
+    "$AGENTOS_ROOT/sdk/python/agentos/client/client.py"
+    "$AGENTOS_ROOT/sdk/python/agentos/session.py"
 )
 PYTHON_FAIL=0
 PYTHON_FOUND=0

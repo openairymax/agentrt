@@ -8,6 +8,7 @@
 #define TOOL_EXECUTOR_H
 
 #include "config.h"
+#include "tool_approval.h"
 #include "tool_service.h"
 
 #ifdef __cplusplus
@@ -41,6 +42,9 @@ typedef void (*tool_execute_callback_t)(tool_result_t *result, void *user_data);
 int tool_executor_run_async(tool_executor_t *exec, const tool_metadata_t *meta,
                             const char *params_json, tool_execute_callback_t callback,
                             void *user_data, tool_result_t **out_result);
+
+/* C-L05: 设置工具审批上下文（Cupolas SafetyGuard → tool_d） */
+void tool_executor_set_approval_ctx(tool_executor_t *exec, tool_approval_ctx_t *approval_ctx);
 
 #ifdef __cplusplus
 }

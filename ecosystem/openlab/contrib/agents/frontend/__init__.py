@@ -1,1 +1,1 @@
-# agentos/openlab/contrib/agents/frontend  package
+# ecosystem/openlab/contrib/agents/frontend  package

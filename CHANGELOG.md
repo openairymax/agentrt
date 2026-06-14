@@ -282,7 +282,7 @@ AgentOS 首个正式发行版。经过多轮深度代码审计、版本统一、
   - 其他文档：持续更新中
 
 #### OpenLab 模块移动
-- **移动**: `openlab/` (项目根) → `agentos/openlab/`
+- **移动**: `openlab/` (项目根) → `ecosystem/openlab/`
   - 移动原因：符合模块化架构设计原则
   - 影响范围：manager 模块的 YAML 配置文件
   - 更新文件：skill/registry.yaml, agent/registry.yaml

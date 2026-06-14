@@ -1,1 +1,1 @@
-# agentos/openlab/app/docgen/src  package
+# ecosystem/openlab/app/docgen/src  package

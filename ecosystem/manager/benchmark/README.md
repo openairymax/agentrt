@@ -1,6 +1,6 @@
 # Manager 性能基准测试
 
-**模块路径**: `agentos/manager/benchmark/`
+**模块路径**: `ecosystem/manager/benchmark/`
 **版本**: v0.1.0
 
 ## 概述

@@ -1,6 +1,6 @@
 # Toolkit TypeScript — AgentOS TypeScript SDK
 
-**模块路径**: `agentos/toolkit/typescript/`
+**模块路径**: `sdk/typescript/`
 **版本**: v0.1.0 (SDK v0.1.0)
 
 ## 概述

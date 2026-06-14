@@ -1,6 +1,6 @@
 # Toolkit Rust — AgentOS Rust SDK
 
-**模块路径**: `agentos/toolkit/rust/`
+**模块路径**: `sdk/rust/`
 **版本**: v0.1.0 (SDK v0.1.0)
 
 ## 概述
