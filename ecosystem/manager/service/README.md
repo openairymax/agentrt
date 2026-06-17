@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/service/` 包含 AgentOS 各子服务的运行参数配置，每个守护进程拥有独立的配置子目录。当前包含 tool_d（工具守护进程）的服务配置，遵循 `schema/tool-service.schema.json` 规范。
+`manager/service/` 包含 AgentRT 各子服务的运行参数配置，每个守护进程拥有独立的配置子目录。当前包含 tool_d（工具守护进程）的服务配置，遵循 `schema/tool-service.schema.json` 规范。
 
 ## 目录结构
 

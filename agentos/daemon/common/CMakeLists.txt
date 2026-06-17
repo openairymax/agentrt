@@ -52,6 +52,8 @@ set(SVC_COMMON_SOURCES
     src/thread_pool.c         # 工作线程池
     src/parallel_dispatcher.c # 工具并行执行引擎
     src/checkpoint.c
+    src/daemon_oom.c          # P1.22: Daemon OOM 降级回调注册
+    src/ipc_backpressure.c    # P1.24: IPC Bus 背压控制
     ${ATOMS_DIR}/coreloopthree/src/cognition/foundation/metacognition.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/critique/confidence_calibrator.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/foundation/thinking_chain.c
@@ -240,6 +242,9 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_defaults.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/parallel_dispatcher.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/agentos_event_loop.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_oom.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ipc_backpressure.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_startup.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_event_driver.h
     DESTINATION include/agentos
 )

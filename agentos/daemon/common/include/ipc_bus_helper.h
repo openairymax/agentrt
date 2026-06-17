@@ -35,6 +35,7 @@
 #define AGENTOS_IPC_BUS_HELPER_H
 
 #include "ipc_service_bus.h"
+#include "ipc_backpressure.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -251,6 +252,80 @@ ipc_service_bus_t ipc_bus_helper_get_bus(ipc_bus_helper_t *ibh);
  * @return true 运行中
  */
 bool ipc_bus_helper_is_running(ipc_bus_helper_t *ibh);
+
+/* ==================== 背压控制集成（P1.24） ==================== */
+
+/**
+ * @brief P1.24: 为 IPC Bus 助手启用背压控制
+ *
+ * 创建背压控制器并关联到助手。启用后，send/notify 调用会自动
+ * 检查背压级别，丢弃可丢弃消息或拒绝发送。
+ *
+ * @param ibh    助手句柄
+ * @param config 背压配置（NULL 使用默认配置）
+ * @return 0 成功，非0 失败
+ */
+int ipc_bus_helper_enable_backpressure(ipc_bus_helper_t *ibh,
+                                       const ipc_bp_config_t *config);
+
+/**
+ * @brief P1.24: 更新队列深度（由 daemon 定期调用）
+ *
+ * daemon 应每 5s 调用一次，传入当前消息队列深度。
+ * 背压控制器根据深度自动调整级别。
+ *
+ * @param ibh           助手句柄
+ * @param current_depth 当前队列深度（消息数）
+ * @return 当前背压级别
+ */
+ipc_bp_level_t ipc_bus_helper_update_backpressure(ipc_bus_helper_t *ibh,
+                                                   size_t current_depth);
+
+/**
+ * @brief P1.24: 发送消息时自动检查背压
+ *
+ * 替代 ipc_bus_helper_send，在发送前检查背压级别。
+ * 如果背压级别为 DROP 且消息可丢弃，则丢弃消息。
+ * 如果背压级别为 REJECT 且消息非关键，则拒绝发送。
+ *
+ * @param ibh          助手句柄
+ * @param target       目标服务
+ * @param msg_type     消息类型
+ * @param protocol     协议
+ * @param payload      负载
+ * @param payload_size 负载大小
+ * @param is_droppable 消息是否可丢弃（日志/指标等低优先级）
+ * @return 0 成功，-1 失败，1 被背压丢弃
+ */
+int ipc_bus_helper_send_with_bp(ipc_bus_helper_t *ibh, const char *target,
+                                ipc_bus_msg_type_t msg_type, ipc_bus_proto_t protocol,
+                                const void *payload, size_t payload_size,
+                                bool is_droppable);
+
+/**
+ * @brief P1.24: 检查是否应接受新连接
+ *
+ * @param ibh 助手句柄
+ * @return true 接受，false 拒绝（背压 REJECT 级别）
+ */
+bool ipc_bus_helper_should_accept_connection(ipc_bus_helper_t *ibh);
+
+/**
+ * @brief P1.24: 获取背压统计
+ *
+ * @param ibh       助手句柄
+ * @param out_stats 输出统计
+ * @return 0 成功，非0 失败（未启用背压或参数无效）
+ */
+int ipc_bus_helper_get_bp_stats(ipc_bus_helper_t *ibh, ipc_bp_stats_t *out_stats);
+
+/**
+ * @brief P1.24: 获取当前背压级别
+ *
+ * @param ibh 助手句柄
+ * @return 背压级别（未启用背压返回 IPC_BP_NORMAL）
+ */
+ipc_bp_level_t ipc_bus_helper_get_bp_level(ipc_bus_helper_t *ibh);
 
 #ifdef __cplusplus
 }

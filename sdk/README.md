@@ -4,7 +4,7 @@
 
 ## 概述
 
-Toolkit 是 AgentOS 的多语言 SDK 工具包，为开发者提供统一的编程接口来与 AgentOS 系统交互。当前支持 Python、Go、Rust、TypeScript 四种语言，所有 SDK 共享统一的 API 设计、类型系统和错误码规范，确保跨语言开发体验的一致性。遵循 ARCHITECTURAL_PRINCIPLES.md 五维正交设计体系（K-1 内核最小化、K-2 接口契约化、E-3 资源确定性、A-1 简约至上、S-1 安全默认）。
+Toolkit 是 AgentRT 的多语言 SDK 工具包，为开发者提供统一的编程接口来与 AgentRT 系统交互。当前支持 Python、Go、Rust、TypeScript 四种语言，所有 SDK 共享统一的 API 设计、类型系统和错误码规范，确保跨语言开发体验的一致性。遵循 ARCHITECTURAL_PRINCIPLES.md 五维正交设计体系（K-1 内核最小化、K-2 接口契约化、E-3 资源确定性、A-1 简约至上、S-1 安全默认）。
 
 ## 目录结构
 
@@ -211,7 +211,7 @@ toolkit/
 │                    Transport Layer                            │
 │  HTTP/HTTPS (JSON-RPC 2.0)  │  WebSocket  │  gRPC           │
 ├──────────────────────────────────────────────────────────────┤
-│                    AgentOS Core Runtime                       │
+│                    AgentRT Core Runtime                       │
 └──────────────────────────────────────────────────────────────┘
 ```
 

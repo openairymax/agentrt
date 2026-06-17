@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/monitoring/` 包含 AgentOS Manager 模块的监控配置，提供 Cupolas 子系统的告警规则和 Grafana 可视化仪表盘，用于实时监控系统运行状态和异常告警。
+`manager/monitoring/` 包含 AgentRT Manager 模块的监控配置，提供 Cupolas 子系统的告警规则和 Grafana 可视化仪表盘，用于实时监控系统运行状态和异常告警。
 
 ## 目录结构
 

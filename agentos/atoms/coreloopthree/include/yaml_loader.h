@@ -317,6 +317,16 @@ int agentos_yaml_load(const char *yaml_path, agentos_yaml_config_t *config);
  *   - AGENTOS_OBSERVABILITY_LOGGING_LEVEL
  *   - AGENTOS_SECURITY_MODE
  *   - AGENTOS_KERNEL_MEMORY_MAX_ALLOC_MB
+ *   - AGENTOS_KERNEL_IPC_MAX_MESSAGE_SIZE
+ *   - AGENTOS_KERNEL_IPC_SHM_POOL_SIZE_MB
+ *   - AGENTOS_KERNEL_SCHEDULER_MAX_TASKS
+ *   - AGENTOS_KERNEL_SCHEDULER_TIME_SLICE_MS
+ *   - AGENTOS_KERNEL_MEMORY_OOM_WATERMARK_PERCENT
+ *   - AGENTOS_MEMORY_PROVIDER
+ *   - AGENTOS_MULTI_AGENT_MAX_CONCURRENT
+ *   - AGENTOS_SECURITY_SANDBOX_TYPE
+ *   - AGENTOS_SECURITY_AUDIT_LOG_PATH
+ *   - AGENTOS_OBSERVABILITY_TRACING_EXPORTER
  *
  * @param config 配置（被修改）
  * @return 0 成功，非0失败
@@ -333,6 +343,34 @@ void agentos_yaml_config_free(agentos_yaml_config_t *config);
  * @brief 验证配置完整性
  * @param config 配置
  * @return 0 有效，非0 返回第一个发现的错误码
+ *
+ * 错误码：
+ *   -1: config 为 NULL
+ *   -2: version 为空
+ *   -3: llm.default_provider 为空
+ *   -4: llm.provider_count 为 0
+ *   -5: llm.routing.strategy 为空
+ *   -6: llm.routing.fallback_count 为 0
+ *   -7: llm.cache.ttl_seconds 为 0
+ *   -8: llm.cache.max_entries 为 0
+ *   -9: memory.storage_path 为空
+ *  -10: security.mode 为空
+ *  -11: gateway.http.port 为 0
+ *  -12: observability.metrics.port 为 0
+ *  -13: kernel.memory.oom_watermark_percent > 100
+ *  -14: kernel.memory.oom_watermark_percent < 50
+ *  -15: kernel.ipc.max_message_size 为 0
+ *  -16: kernel.ipc.shm_pool_size_mb 为 0
+ *  -17: kernel.scheduler.max_tasks 为 0
+ *  -18: kernel.scheduler.time_slice_ms 为 0
+ *  -19: kernel.memory.max_alloc_mb 为 0
+ *  -20: multi_agent.max_concurrent_agents 为 0
+ *  -21: multi_agent.communication.protocol 为空
+ *  -22: multi_agent.collaboration.default_pattern 为空
+ *  -23: hooks.global_hooks 条目名称为空
+ *  -24: observability.logging.level 值无效
+ *  -25: security.mode 值无效
+ *  -26: memory.mode 值无效
  */
 int agentos_yaml_validate(const agentos_yaml_config_t *config);
 

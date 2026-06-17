@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/contrib/skills/database_skill/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-Database Skill 为 AgentOS 智能体提供数据库操作能力，支持多种关系型数据库的连接查询和数据管理。内置 SQL 注入防护机制，提供安全的查询执行环境。支持模式探索、数据导出等高级功能，适用于数据分析、报表生成和数据库管理等场景。
+Database Skill 为 AgentRT 智能体提供数据库操作能力，支持多种关系型数据库的连接查询和数据管理。内置 SQL 注入防护机制，提供安全的查询执行环境。支持模式探索、数据导出等高级功能，适用于数据分析、报表生成和数据库管理等场景。
 
 ## 目录结构
 
@@ -60,7 +60,7 @@ database_skill/
 
 ## 依赖关系
 
-- **核心依赖**: AgentOS OpenLab Core, SQLAlchemy
+- **核心依赖**: AgentRT OpenLab Core, SQLAlchemy
 - **数据库驱动**: psycopg2 (PostgreSQL), pymysql (MySQL), sqlite3 (SQLite, 内置)
 - **安装**: `pip install -e ".[ecommerce]"`
 

@@ -6,18 +6,17 @@
  * @file prometheus_exporter.c
  * @brief C-L10: Prometheus scrape endpoint 实现
  *
- * 实现功能:
- * - P1.9.1: 暴露 /metrics HTTP 端点
- * - P1.9.2: 注册 14 项必需指标
- * - P1.9.3: 支持 Prometheus scrape
+ * 实现 /metrics HTTP 端点，暴露 14 项必需指标供 Prometheus 抓取。
+ * 工程标准规范手册 16.1 定义的指标：
+ *   1-10: 核心可观测性指标
+ *   11-14: 内存可观测性指标
  */
 
 #include "prometheus_exporter.h"
 
-#include "daemon_errors.h"
-#include "monitor_service.h"
 #include "platform.h"
 #include "svc_logger.h"
+#include "unified_metrics.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,243 +24,254 @@
 
 /* ==================== 14 项必需指标定义 ==================== */
 
-/* 10 项核心指标 (工程标准规范手册 16.1) */
-#define METRIC_COGNITION_LATENCY    "agentos_cognition_latency_ms"
-#define METRIC_LLM_REQUEST_DURATION "agentos_llm_request_duration_ms"
-#define METRIC_LLM_COST_USD         "agentos_llm_cost_usd_total"
-#define METRIC_TOOL_CALL            "agentos_tool_call_total"
-#define METRIC_MEMORY_OPERATIONS    "agentos_memory_operations_total"
-#define METRIC_HOOK_EXECUTION       "agentos_hook_execution_ms"
-#define METRIC_CONNECTION_HEALTH    "agentos_connection_health"
-#define METRIC_PLUGIN_LIFECYCLE     "agentos_plugin_lifecycle_total"
-#define METRIC_LLM_RETRY            "agentos_llm_retry_total"
-#define METRIC_CONFIG_RELOAD        "agentos_config_reload_total"
+/* --- 核心可观测性指标 (Section 16.1) --- */
+static const char *REQUIRED_METRICS[][5] = {
+    /* {name, type, help, labels} */
+    {"agentos_cognition_latency_ms", "histogram", "Cognitive phase latency in milliseconds",
+     "agent_id"},
+    {"agentos_llm_request_duration_ms", "histogram", "LLM request duration in milliseconds",
+     "provider,model"},
+    {"agentos_llm_cost_usd_total", "counter", "Total LLM cost in USD", "provider"},
+    {"agentos_tool_call_total", "counter", "Total tool call count", "tool_name,status"},
+    {"agentos_memory_operations_total", "counter", "Total memory operations count",
+     "layer,operation"},
+    {"agentos_hook_execution_ms", "histogram", "Hook execution latency in milliseconds",
+     "hook_name,event"},
+    {"agentos_connection_health", "gauge", "Connection line health status (0=down, 1=up)",
+     "connection_id"},
+    {"agentos_plugin_lifecycle_total", "counter", "Plugin lifecycle events total",
+     "plugin_name,event"},
+    {"agentos_llm_retry_total", "counter", "Total LLM retry count", "provider,error_category"},
+    {"agentos_config_reload_total", "counter", "Total config reload count", "status"},
 
-/* 4 项内存可观测性指标 (工程标准规范手册 16.4) */
-#define METRIC_MEMORY_RSS            "agentos_memory_rss_bytes"
-#define METRIC_MEMORY_HEAP           "agentos_memory_heap_bytes"
-#define METRIC_MEMORY_POOL_UTIL      "agentos_memory_pool_utilization"
-#define METRIC_OOM_EVENTS            "agentos_oom_events_total"
+    /* --- 内存可观测性指标 --- */
+    {"agentos_memory_rss_bytes", "gauge", "Resident memory size in bytes", ""},
+    {"agentos_memory_heap_bytes", "gauge", "Heap memory usage in bytes", ""},
+    {"agentos_memory_pool_utilization", "gauge", "Memory pool utilization (0.0~1.0)", ""},
+    {"agentos_oom_events_total", "counter", "Total OOM event count", "level"},
+};
+
+#define REQUIRED_METRICS_COUNT                                                \
+    (sizeof(REQUIRED_METRICS) / sizeof(REQUIRED_METRICS[0]))
 
 /* ==================== 内部状态 ==================== */
 
-static int g_exporter_initialized = 0;
+static char g_module_name[UM_MODULE_NAME_LEN] = "monit_d";
+static int g_initialized = 0;
 
-/* 前向声明 metrics.c 的接口 */
-extern int metrics_init(const void *config);
-extern void metrics_shutdown(void);
-extern int metrics_register(const char *name, const char *description, const char *unit,
-                            metric_type_t type, const double *histogram_buckets,
-                            size_t bucket_count);
-extern char *metrics_export_prometheus(void);
-extern int metrics_counter_inc(const char *name, const void *labels, size_t label_count);
-extern int metrics_counter_add(const char *name, double value, const void *labels,
-                               size_t label_count);
-extern int metrics_gauge_set(const char *name, double value, const void *labels,
-                             size_t label_count);
-extern int metrics_histogram_observe(const char *name, double value, const void *labels,
-                                     size_t label_count);
-extern int metrics_get_value(const char *name, const void *labels, size_t label_count,
-                             double *value);
-extern size_t metrics_get_count(void);
+/* ==================== 辅助函数 ==================== */
 
-/* ==================== 默认直方图桶 ==================== */
-
-static const double k_default_latency_buckets[] = {
-    1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0,
-    1000.0, 2500.0, 5000.0, 10000.0, 30000.0, 60000.0
-};
-
-static const double k_default_size_buckets[] = {
-    1024.0, 4096.0, 16384.0, 65536.0, 262144.0,
-    1048576.0, 4194304.0, 16777216.0, 67108864.0
-};
+/**
+ * @brief 根据字符串名称获取指标类型枚举
+ */
+static um_metric_type_t parse_metric_type(const char *type_str)
+{
+    if (!type_str)
+        return UM_TYPE_GAUGE;
+    if (strcmp(type_str, "counter") == 0)
+        return UM_TYPE_COUNTER;
+    if (strcmp(type_str, "gauge") == 0)
+        return UM_TYPE_GAUGE;
+    if (strcmp(type_str, "histogram") == 0)
+        return UM_TYPE_HISTOGRAM;
+    if (strcmp(type_str, "summary") == 0)
+        return UM_TYPE_SUMMARY;
+    return UM_TYPE_GAUGE;
+}
 
 /* ==================== 公共接口实现 ==================== */
 
 int prometheus_exporter_init(const char *service_name)
 {
-    if (g_exporter_initialized) {
+    if (g_initialized) {
         SVC_LOG_WARN("C-L10: Prometheus exporter already initialized");
         return 0;
     }
 
-    /* 初始化指标系统 */
-    int ret = metrics_init(NULL);
-    if (ret != 0) {
-        SVC_LOG_ERROR("C-L10: Failed to initialize metrics system (err=%d)", ret);
-        return ret;
+    /* 设置模块名称 */
+    if (service_name && service_name[0]) {
+        AGENTOS_STRNCPY_TERM(g_module_name, service_name, sizeof(g_module_name));
     }
 
-    /* 注册 14 项必需指标 */
-    ret = prometheus_exporter_register_required_metrics();
-    if (ret != 0) {
-        SVC_LOG_ERROR("C-L10: Failed to register required metrics (err=%d)", ret);
-        metrics_shutdown();
-        return ret;
+    /* 初始化统一指标收集器 */
+    um_config_t config = um_create_default_config();
+    AGENTOS_STRNCPY_TERM(config.service_name, g_module_name, sizeof(config.service_name));
+    config.enable_default_metrics = true;
+    config.scrape_interval_ms = 15000;  /* 15s scrape interval */
+
+    if (um_init(&config) != 0) {
+        SVC_LOG_ERROR("C-L10: Failed to initialize unified metrics for '%s'", g_module_name);
+        return -1;
     }
 
-    g_exporter_initialized = 1;
-    SVC_LOG_INFO("C-L10: Prometheus exporter initialized for '%s' "
-                 "(14 required metrics registered)", service_name);
+    /* 注册模块 */
+    if (um_register_module(g_module_name, NULL) != 0) {
+        SVC_LOG_ERROR("C-L10: Failed to register metrics module '%s'", g_module_name);
+        um_shutdown();
+        return -1;
+    }
+
+    g_initialized = 1;
+    SVC_LOG_INFO("C-L10: Prometheus exporter initialized for '%s'", g_module_name);
     return 0;
 }
 
 void prometheus_exporter_shutdown(void)
 {
-    if (!g_exporter_initialized) {
+    if (!g_initialized)
         return;
-    }
 
-    metrics_shutdown();
-    g_exporter_initialized = 0;
+    um_unregister_module(g_module_name);
+    um_shutdown();
+    g_initialized = 0;
     SVC_LOG_INFO("C-L10: Prometheus exporter shutdown");
 }
 
 int prometheus_exporter_register_required_metrics(void)
 {
-    SVC_LOG_INFO("C-L10: Registering 14 required metrics...");
+    if (!g_initialized) {
+        SVC_LOG_ERROR("C-L10: Prometheus exporter not initialized, cannot register metrics");
+        return -1;
+    }
 
-    /*
-     * 10 项核心指标 (工程标准规范手册 16.1)
-     */
+    int registered = 0;
+    int failed = 0;
 
-    /* 1. agentos_cognition_latency_ms - Histogram */
-    metrics_register(METRIC_COGNITION_LATENCY,
-                     "认知阶段延迟（毫秒）",
-                     "ms",
-                     METRIC_TYPE_HISTOGRAM,
-                     k_default_latency_buckets,
-                     sizeof(k_default_latency_buckets) / sizeof(k_default_latency_buckets[0]));
+    for (size_t i = 0; i < REQUIRED_METRICS_COUNT; i++) {
+        const char *name = REQUIRED_METRICS[i][0];
+        const char *type_str = REQUIRED_METRICS[i][1];
+        const char *help = REQUIRED_METRICS[i][2];
+        const char *labels = REQUIRED_METRICS[i][3];
 
-    /* 2. agentos_llm_request_duration_ms - Histogram */
-    metrics_register(METRIC_LLM_REQUEST_DURATION,
-                     "LLM 请求延迟（毫秒）",
-                     "ms",
-                     METRIC_TYPE_HISTOGRAM,
-                     k_default_latency_buckets,
-                     sizeof(k_default_latency_buckets) / sizeof(k_default_latency_buckets[0]));
+        um_metric_type_t type = parse_metric_type(type_str);
 
-    /* 3. agentos_llm_cost_usd_total - Counter */
-    metrics_register(METRIC_LLM_COST_USD,
-                     "LLM 累计费用（美元）",
-                     "usd",
-                     METRIC_TYPE_COUNTER,
-                     NULL, 0);
+        if (um_register_metric(g_module_name, name, type, help, labels) == 0) {
+            SVC_LOG_DEBUG("C-L10: Registered metric [%zu/%zu] %s (type=%s, labels=%s)",
+                          i + 1, REQUIRED_METRICS_COUNT, name, type_str,
+                          labels[0] ? labels : "none");
+            registered++;
+        } else {
+            SVC_LOG_WARN("C-L10: Failed to register metric %s", name);
+            failed++;
+        }
+    }
 
-    /* 4. agentos_tool_call_total - Counter */
-    metrics_register(METRIC_TOOL_CALL,
-                     "工具调用次数",
-                     "calls",
-                     METRIC_TYPE_COUNTER,
-                     NULL, 0);
+    SVC_LOG_INFO("C-L10: Registered %d/%zu required metrics (%d failed)", registered,
+                 REQUIRED_METRICS_COUNT, failed);
 
-    /* 5. agentos_memory_operations_total - Counter */
-    metrics_register(METRIC_MEMORY_OPERATIONS,
-                     "记忆操作次数",
-                     "operations",
-                     METRIC_TYPE_COUNTER,
-                     NULL, 0);
-
-    /* 6. agentos_hook_execution_ms - Histogram */
-    metrics_register(METRIC_HOOK_EXECUTION,
-                     "Hook 执行延迟（毫秒）",
-                     "ms",
-                     METRIC_TYPE_HISTOGRAM,
-                     k_default_latency_buckets,
-                     sizeof(k_default_latency_buckets) / sizeof(k_default_latency_buckets[0]));
-
-    /* 7. agentos_connection_health - Gauge */
-    metrics_register(METRIC_CONNECTION_HEALTH,
-                     "连接线健康状态（1=健康, 0=不健康）",
-                     "boolean",
-                     METRIC_TYPE_GAUGE,
-                     NULL, 0);
-
-    /* 8. agentos_plugin_lifecycle_total - Counter */
-    metrics_register(METRIC_PLUGIN_LIFECYCLE,
-                     "Plugin 生命周期事件计数",
-                     "events",
-                     METRIC_TYPE_COUNTER,
-                     NULL, 0);
-
-    /* 9. agentos_llm_retry_total - Counter */
-    metrics_register(METRIC_LLM_RETRY,
-                     "LLM 重试次数",
-                     "retries",
-                     METRIC_TYPE_COUNTER,
-                     NULL, 0);
-
-    /* 10. agentos_config_reload_total - Counter */
-    metrics_register(METRIC_CONFIG_RELOAD,
-                     "配置重载次数",
-                     "reloads",
-                     METRIC_TYPE_COUNTER,
-                     NULL, 0);
-
-    /*
-     * 4 项内存可观测性指标 (工程标准规范手册 16.4)
-     */
-
-    /* 11. agentos_memory_rss_bytes - Gauge */
-    metrics_register(METRIC_MEMORY_RSS,
-                     "各 daemon 常驻内存（字节）",
-                     "bytes",
-                     METRIC_TYPE_GAUGE,
-                     NULL, 0);
-
-    /* 12. agentos_memory_heap_bytes - Gauge */
-    metrics_register(METRIC_MEMORY_HEAP,
-                     "堆内存使用量（字节）",
-                     "bytes",
-                     METRIC_TYPE_GAUGE,
-                     NULL, 0);
-
-    /* 13. agentos_memory_pool_utilization - Gauge */
-    metrics_register(METRIC_MEMORY_POOL_UTIL,
-                     "内存池使用率（0~1）",
-                     "ratio",
-                     METRIC_TYPE_GAUGE,
-                     NULL, 0);
-
-    /* 14. agentos_oom_events_total - Counter */
-    metrics_register(METRIC_OOM_EVENTS,
-                     "OOM 事件计数",
-                     "events",
-                     METRIC_TYPE_COUNTER,
-                     NULL, 0);
-
-    size_t count = metrics_get_count();
-    SVC_LOG_INFO("C-L10: Registered %zu metrics (14 required)", count);
-
-    return (count >= 14) ? 0 : -1;
+    return (failed > 0) ? -1 : 0;
 }
 
-/* ==================== HTTP 端点处理 ==================== */
+/* ==================== HTTP /metrics 端点 ==================== */
 
 int prometheus_exporter_handle_http(const char *request, size_t request_len,
                                     char **response, size_t *response_len)
 {
-    if (!request || !response || !response_len) {
+    if (!request || !response || !response_len)
+        return -1;
+
+    /* 检测是否为 HTTP GET /metrics 请求 */
+    if (request_len < 14)
+        return -1;
+
+    /* 匹配 "GET /metrics" 前缀 */
+    if (strncmp(request, "GET /metrics", 12) != 0)
+        return -1;
+
+    /* 获取 Prometheus 格式指标 */
+    char *metrics_text = prometheus_exporter_get_metrics();
+    if (!metrics_text) {
+        /* 500 Internal Server Error */
+        const char *err_body = "Failed to collect metrics\n";
+        size_t body_len = strlen(err_body);
+
+        size_t buf_size = 256 + body_len;
+        char *resp = (char *)AGENTOS_MALLOC(buf_size);
+        if (!resp)
+            return -1;
+
+        int header_len = snprintf(resp, buf_size,
+                                  "HTTP/1.1 500 Internal Server Error\r\n"
+                                  "Content-Type: text/plain\r\n"
+                                  "Content-Length: %zu\r\n"
+                                  "Connection: close\r\n"
+                                  "\r\n",
+                                  body_len);
+        memcpy(resp + header_len, err_body, body_len);
+        *response = resp;
+        *response_len = (size_t)header_len + body_len;
+        return 0;
+    }
+
+    size_t metrics_len = strlen(metrics_text);
+
+    /* 构建 HTTP 响应 */
+    size_t header_buf_size = 256;
+    char header_buf[256];
+    int header_len = snprintf(header_buf, sizeof(header_buf),
+                              "HTTP/1.1 200 OK\r\n"
+                              "Content-Type: text/plain; version=0.0.4\r\n"
+                              "Content-Length: %zu\r\n"
+                              "Connection: close\r\n"
+                              "\r\n",
+                              metrics_len);
+
+    size_t total_len = (size_t)header_len + metrics_len;
+    char *resp = (char *)AGENTOS_MALLOC(total_len + 1);
+    if (!resp) {
+        AGENTOS_FREE(metrics_text);
         return -1;
     }
 
-    /*
-     * 检测 HTTP GET /metrics 请求
-     * Prometheus scrape 发送:
-     *   GET /metrics HTTP/1.1\r\n
-     *   Host: localhost:9090\r\n
-     *   ...
-     */
-    if (request_len < 14 ||
-        strncmp(request, "GET /metrics", 12) != 0 ||
-        (request[12] != ' ' && request[12] != '?')) {
-        return -1; /* 非 /metrics 请求 */
+    memcpy(resp, header_buf, (size_t)header_len);
+    memcpy(resp + header_len, metrics_text, metrics_len);
+    resp[total_len] = '\0';
+
+    AGENTOS_FREE(metrics_text);
+
+    *response = resp;
+    *response_len = total_len;
+    return 0;
+}
+
+/* ==================== 指标值更新 ==================== */
+
+void prometheus_counter_inc(const char *name, double value)
+{
+    if (!g_initialized || !name)
+        return;
+    um_increment(g_module_name, name, (uint64_t)value);
+}
+
+void prometheus_gauge_set(const char *name, double value)
+{
+    if (!g_initialized || !name)
+        return;
+    um_gauge_set(g_module_name, name, value);
+}
+
+void prometheus_histogram_observe(const char *name, double value)
+{
+    if (!g_initialized || !name)
+        return;
+    um_observe(g_module_name, name, value);
+}
+
+char *prometheus_exporter_get_metrics(void)
+{
+    if (!g_initialized) {
+        SVC_LOG_WARN("C-L10: Prometheus exporter not initialized");
+        return NULL;
     }
 
-    SVC_LOG_DEBUG("C-L10: Handling Prometheus scrape request");
+    /* 更新默认系统指标（CPU/内存等） */
+    um_update_default_metrics();
 
-    /* 导出 Prometheus 格式指标 */
-    char *metrics_text = prometheus_exporter_get_metrics();
-    if (!metrics_text) {
-        SVC_LOG_ERROR("C-L10
+    /* 导出 Prometheus 格式 */
+    char *result = um_export_prometheus_module(g_module_name);
+    if (!result) {
+        SVC_LOG_WARN("C-L10: Failed to export Prometheus metrics");
+    }
+
+    return result;
+}

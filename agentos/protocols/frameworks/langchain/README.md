@@ -5,7 +5,7 @@
 
 ## 概述
 
-LangChain 框架适配器实现 AgentOS 与 LangChain 生态的完整集成。将 LangChain 的 Chain、Agent、Tool、Memory、Retriever 等核心概念映射到 AgentOS 的统一协议体系。
+LangChain 框架适配器实现 AgentRT 与 LangChain 生态的完整集成。将 LangChain 的 Chain、Agent、Tool、Memory、Retriever 等核心概念映射到 AgentRT 的统一协议体系。
 
 支持的 LangChain 组件：
 

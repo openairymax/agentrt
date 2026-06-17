@@ -257,6 +257,85 @@ gate_code_format() {
 }
 
 ###############################################################################
+# Gate 2.5: 硬编码路径扫描 (PATH-BAN-1~5)
+# P0.13.4: 集成到 quality-gate.sh
+###############################################################################
+gate_path_scan() {
+    log_section "Hardcoded Path Scan (PATH-BAN-1~5)"
+
+    local path_issues=0
+
+    # PATH-BAN-1: SpharxWorks 硬编码
+    local ban1
+    ban1=$(grep -rn "SpharxWorks" \
+        --include="*.c" --include="*.h" --include="*.py" --include="*.rs" \
+        --include="*.go" --include="*.ts" --include="*.js" \
+        --include="*.toml" --include="*.yaml" --include="*.yml" \
+        --include="CMakeLists.txt" \
+        --exclude-dir="target" --exclude-dir="node_modules" \
+        --exclude-dir="__pycache__" --exclude-dir="build" \
+        "${PROJECT_ROOT}/" 2>/dev/null | grep -v "\.pyc" | grep -v "\.d:" | wc -l) || true
+    if [[ $ban1 -gt 0 ]]; then
+        record_issue "high" "PATH-BAN-1" "project-wide" "$ban1 'SpharxWorks' reference(s)"
+        log_error "  PATH-BAN-1: $ban1 'SpharxWorks' reference(s)"
+        ((path_issues++)) || true
+    else
+        log_ok "  PATH-BAN-1: 0 'SpharxWorks' references"
+    fi
+
+    # PATH-BAN-2: /home/ 路径泄露
+    local ban2
+    ban2=$(grep -rn "/home/" --include="*.c" --include="*.h" \
+        "${PROJECT_ROOT}/agentos/" 2>/dev/null | grep -v "test_\|tests/" | wc -l) || true
+    if [[ $ban2 -gt 0 ]]; then
+        record_issue "high" "PATH-BAN-2" "agentos/" "$ban2 '/home/' path leak(s)"
+        log_error "  PATH-BAN-2: $ban2 '/home/' path leak(s)"
+        ((path_issues++)) || true
+    else
+        log_ok "  PATH-BAN-2: 0 '/home/' path leaks"
+    fi
+
+    # PATH-BAN-3: C:\\Users\\ Windows 路径泄露
+    local ban3
+    ban3=$(grep -rn "C:\\\\Users\\\\" --include="*.c" --include="*.h" \
+        "${PROJECT_ROOT}/agentos/" 2>/dev/null | grep -v "test_" | wc -l) || true
+    if [[ $ban3 -gt 0 ]]; then
+        record_issue "high" "PATH-BAN-3" "agentos/" "$ban3 'C:\\Users\\' path leak(s)"
+        log_error "  PATH-BAN-3: $ban3 'C:\\\\Users\\\\' path leak(s)"
+        ((path_issues++)) || true
+    else
+        log_ok "  PATH-BAN-3: 0 'C:\\\\Users\\\\' path leaks"
+    fi
+
+    # PATH-BAN-4: 用户特定路径模式
+    local ban4
+    ban4=$(grep -rn "D:\\\\SPHARX\|/mnt/d/agentos" --include="*.c" --include="*.h" --include="*.py" \
+        "${PROJECT_ROOT}/" 2>/dev/null | grep -v "test_\|.pyc\|node_modules\|target" | wc -l) || true
+    if [[ $ban4 -gt 0 ]]; then
+        record_issue "medium" "PATH-BAN-4" "project-wide" "$ban4 user-specific path(s)"
+        log_warn "  PATH-BAN-4: $ban4 user-specific path(s)"
+        ((path_issues++)) || true
+    else
+        log_ok "  PATH-BAN-4: 0 user-specific paths"
+    fi
+
+    # PATH-BAN-5: agentos/ 目录名确认存在
+    if [[ -d "${PROJECT_ROOT}/agentos/" ]]; then
+        log_ok "  PATH-BAN-5: agentos/ directory retained"
+    else
+        record_issue "critical" "PATH-BAN-5" "project-root" "agentos/ directory missing"
+        log_error "  PATH-BAN-5: agentos/ directory is missing"
+        ((path_issues++)) || true
+    fi
+
+    if [[ $path_issues -eq 0 ]]; then
+        record_check_result "path-scan" "true"
+    else
+        record_check_result "path-scan" "false"
+    fi
+}
+
+###############################################################################
 # Gate 3: Python 质量检查
 ###############################################################################
 gate_python_quality() {

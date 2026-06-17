@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentRT .gitignore 文件
-# 版本：11.0.0
-# 最后更新：2026-05-29
+# 版本：12.0.0
+# 最后更新：2026-06-15
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -12,27 +12,39 @@
 # 5. 项目必需文件使用否定规则明确保留
 # 6. 通配符规则限定作用范围，避免意外排除项目必需文件
 #
-# V11.0.0更新（v0.1.0发行准备 — 全面对齐实际项目结构）：
-# - scripts/ 目录结构已从扁平重组为 ci/dev/ops/resources/toolkit 五大模块
-# - 移除所有指向已不存在路径的规则（atomslite/interfaces/desktop-client/docs/manuals）
-# - 移除所有旧 scripts/ 子目录规则（cmake/code_quality/demo/deployment/
-#   development/library/pipeline/release/tests）并替换为新路径
-# - 新增 scripts/ci/ scripts/dev/ scripts/ops/ scripts/resources/ 肯定规则
-# - agentos/ 模块列表与 v0.1.0 实际源码完全一致
-# - 清理重复规则和非存在的配置文件引用
+# V12.0.0 更新（v0.1.1 发行准备 — 三智能体团队 + 合约优先）：
+# - manager/ 和 openlab/ 已移至 ecosystem/ 子目录
+# - toolkit/ 已移至 sdk/ 子目录
+# - 新增 deploy/ 目录（Docker 容器化部署）
+# - 新增 contracts/ 排除规则（本地开发辅助，不追踪）
+# - 新增 ecosystem/ 肯定规则
+# - 新增 sdk/ 肯定规则
+# - 更新项目模块结构说明
 #
-# 项目模块结构（2026-05-29 V11.0 当前）：
-# 核心源码 (agentos/) — 仅含源码，构建产物严禁在此外
+# 项目模块结构（2026-06-15 V12.0 当前）：
+# 核心源码 (agentos/) — 仅含源码，构建产物严禁在此
 #   - atoms/       : 微内核原子组件层（corekern/coreloopthree/memory/syscall/taskflow/frameworks）
 #   - commons/     : 统一基础库（平台抽象/日志/配置/内存/同步等 20+ 子模块）
 #   - cupolas/     : 安全穹顶层（防护/清洗/权限/审计/守卫框架）
 #   - daemon/      : 用户态守护进程层（gateway_d/llm_d/tool_d/sched_d 等 10+ 服务）
 #   - gateway/     : 协议网关层（HTTP/WS/Stdio → JSON-RPC 2.0）
 #   - heapstore/   : 运行时数据存储（SQLite + 内存后端混合存储）
-#   - manager/     : 统一配置管理中心（多模块 Schema + 热重载）
-#   - openlab/     : 开放生态系统（Apps/Contrib/Markets）
 #   - protocols/   : 统一协议栈（五层架构）
-#   - toolkit/     : 多语言 SDK 工具（Python/Go/Rust/TypeScript）
+#
+# 生态层 (ecosystem/) — 应用/配置/Prompt/Hook/技能
+#   - openlab/     : 开放生态系统（Apps/Contrib/Markets/Core）
+#   - manager/     : 统一配置管理中心（多模块 Schema + 热重载）
+#   - prompts/     : Prompt 模板体系（cognition/memory/security/system）
+#   - hooks/       : Hook 系统（审计/成本/注入/安全）
+#   - skills/      : 技能注册目录
+#
+# SDK 层 (sdk/) — 多语言 SDK
+#   - python/      : Python SDK
+#   - go/          : Go SDK
+#   - rust/        : Rust SDK
+#   - typescript/  : TypeScript SDK
+#
+# 部署 (deploy/) — Docker 容器化部署
 #
 # 脚本工具集 (scripts/) — CI/CD、开发环境、运维部署、资源管理
 #   - ci/           : 持续集成（pipeline/quality/release/verify）
@@ -59,8 +71,9 @@
 
 CHANGELOG.md
 
-# 跨团队合约文件（本地开发生成，不追踪）
-contracts/
+# 跨团队合约文件（源码追踪，构建产物不追踪）
+contracts/*.o
+contracts/contract_test
 
 # =============================================================================
 # CMake 构建系统（构建产物，不追踪）
@@ -69,6 +82,7 @@ contracts/
 # IDE 配置
 .clangd/
 .compile_flags.txt
+contracts/
 
 # .clangd 使用相对路径，可以追踪（方便新开发者开箱即用）
 !.clangd
@@ -226,12 +240,12 @@ dmypy.json
 # Go 语言 SDK（构建产物，不追踪）
 # =============================================================================
 
-agentos/toolkit/go/vendor/
-agentos/toolkit/go/go.sum
-agentos/toolkit/go/*.exe
-agentos/toolkit/go/testsuite/
-agentos/toolkit/go/coverage/
-agentos/toolkit/go/*.test
+sdk/go/vendor/
+sdk/go/go.sum
+sdk/go/*.exe
+sdk/go/testsuite/
+sdk/go/coverage/
+sdk/go/*.test
 cover.out
 cover.html
 
@@ -239,24 +253,24 @@ cover.html
 # Rust 语言 SDK（构建产物，不追踪）
 # =============================================================================
 
-agentos/toolkit/rust/target/
+sdk/rust/target/
 Cargo.lock
-agentos/toolkit/rust/debug/
-agentos/toolkit/rust/release/
-agentos/toolkit/rust/doc/
-agentos/toolkit/rust/target/doc/
+sdk/rust/debug/
+sdk/rust/release/
+sdk/rust/doc/
+sdk/rust/target/doc/
 
 # =============================================================================
 # TypeScript/JavaScript SDK（构建产物，不追踪）
 # =============================================================================
 
-agentos/toolkit/typescript/node_modules/
-agentos/toolkit/typescript/dist/
-agentos/toolkit/typescript/build/
-agentos/toolkit/typescript/coverage/
-agentos/toolkit/typescript/.tsbuildinfo
-agentos/toolkit/typescript/.pnpm-store/
-agentos/toolkit/typescript/tsbuildinfo/
+sdk/typescript/node_modules/
+sdk/typescript/dist/
+sdk/typescript/build/
+sdk/typescript/coverage/
+sdk/typescript/.tsbuildinfo
+sdk/typescript/.pnpm-store/
+sdk/typescript/tsbuildinfo/
 .next/
 .nuxt/
 
@@ -778,7 +792,7 @@ coverage_reports/
 !docker-compose*.yml
 !docker-compose*.yaml
 !scripts/ops/deploy/docker/Dockerfile*
-!agentos/openlab/Dockerfile
+!ecosystem/openlab/Dockerfile
 !agentos/gateway/docker/Dockerfile*
 !agentos/daemon/Dockerfile.ci
 
@@ -799,23 +813,46 @@ coverage_reports/
 !pyproject.toml
 
 # =============================================================================
-# toolkit/ 语言 SDK 配置
+# ecosystem/ 生态层配置文件
 # =============================================================================
 
-!agentos/toolkit/python/pyproject.toml
-!agentos/toolkit/python/setup.py
-!agentos/toolkit/go/go.mod
-!agentos/toolkit/rust/Cargo.toml
-!agentos/toolkit/typescript/package.json
-!agentos/toolkit/typescript/tsconfig.json
-!agentos/toolkit/typescript/jest.config.js
+!ecosystem/**/*.yaml
+!ecosystem/**/*.yml
+!ecosystem/**/*.json
+!ecosystem/**/*.py
+!ecosystem/**/*.sh
+!ecosystem/**/*.j2
+!ecosystem/**/*.md
+
+# =============================================================================
+# deploy/ 部署配置
+# =============================================================================
+
+!deploy/**/*.yml
+!deploy/**/*.yaml
+!deploy/**/*.json
+!deploy/**/Dockerfile*
+!deploy/**/*.md
+!deploy/**/.env.example
+
+# =============================================================================
+# sdk/ 语言 SDK 配置
+# =============================================================================
+
+!sdk/python/pyproject.toml
+!sdk/python/setup.py
+!sdk/go/go.mod
+!sdk/rust/Cargo.toml
+!sdk/typescript/package.json
+!sdk/typescript/tsconfig.json
+!sdk/typescript/jest.config.js
 
 # =============================================================================
 # 其他必须保留的文件
 # =============================================================================
 
-!agentos/openlab/pyproject.toml
-!agentos/openlab/requirements.txt
+!ecosystem/openlab/pyproject.toml
+!ecosystem/openlab/requirements.txt
 !agentos/commons/utils/types/.gitkeep
 !LICENSE
 !NOTICE
@@ -866,7 +903,7 @@ coverage_reports/
 # 结束
 # =============================================================================
 #
-# V11.0.0 维护说明：
+# V12.0.0 维护说明：
 # 1. scripts/ 子目录变更时需同步更新 scripts/ 肯定规则节
 # 2. agentos/ 新增模块时需在 CMake 配置节添加否定规则
 # 3. 根目录新增配置文件时需在根目录配置节添加否定规则
@@ -875,3 +912,6 @@ coverage_reports/
 # 6. 定期运行 git status --porcelain 检查是否有意外追踪的文件
 # 7. 项目必需文件必须在肯定规则节有明确的 ! 前缀规则
 # 8. agentos/ 路径仅含源码，构建产物输出至 AgentRT-build/
+# 9. ecosystem/ 包含 openlab/manager/prompts/hooks/skills，配置文件需保留
+# 10. sdk/ 包含四语言 SDK，各语言构建产物需排除但配置文件需保留
+# 11. contracts/ 源码追踪（.h/.c），构建产物不追踪

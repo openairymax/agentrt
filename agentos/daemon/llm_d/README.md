@@ -4,7 +4,7 @@
 
 ## 概述
 
-`daemon/llm_d/` 是 AgentOS 的大语言模型服务守护进程，提供统一的模型调用接口，屏蔽不同 LLM 提供商的 API 差异。它支持多提供商（OpenAI、Anthropic、DeepSeek、Google、本地模型），提供响应缓存、Token 计数、成本追踪等核心能力，是 AgentOS 智能体与 LLM 交互的关键桥梁。
+`daemon/llm_d/` 是 AgentRT 的大语言模型服务守护进程，提供统一的模型调用接口，屏蔽不同 LLM 提供商的 API 差异。它支持多提供商（OpenAI、Anthropic、DeepSeek、Google、本地模型），提供响应缓存、Token 计数、成本追踪等核心能力，是 AgentRT 智能体与 LLM 交互的关键桥梁。
 
 ### 核心职责
 

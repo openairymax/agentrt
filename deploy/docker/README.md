@@ -5,7 +5,7 @@
 
 ## 概述
 
-`gateway/docker/` 包含 AgentOS Gateway 的 Docker 容器化部署配置，提供多阶段构建、多环境编排和监控集成。支持 MCP/A2A/OpenAI API 多协议网关，通过 Docker Compose 实现开发、调试和生产三种环境的一键部署。
+`gateway/docker/` 包含 AgentRT Gateway 的 Docker 容器化部署配置，提供多阶段构建、多环境编排和监控集成。支持 MCP/A2A/OpenAI API 多协议网关，通过 Docker Compose 实现开发、调试和生产三种环境的一键部署。
 
 ## 目录结构
 
@@ -94,7 +94,7 @@ docker build -t agentos-gateway:latest -f docker/Dockerfile .
 
 # 运行容器
 docker run -d \
-  --name agentos-gateway \
+  --name agentrt-gateway \
   -p 8080:8080 -p 8081:8081 -p 9090:9090 \
   -v /etc/agentos/config:/etc/agentos/gateway:ro \
   -v /etc/agentos/certs:/etc/agentos/certs:ro \

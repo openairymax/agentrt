@@ -1,5 +1,5 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
-# Dockerfile for AgentOS Multi-Protocol Gateway
+# Dockerfile for AgentRT Multi-Protocol Gateway
 # Version: 0.1.0
 #
 # 多阶段构建，支持MCP/A2A/OpenAI API多协议网关
@@ -10,7 +10,7 @@
 FROM alpine:3.19 AS builder
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
-LABEL description="AgentOS Multi-Protocol Gateway Build Stage"
+LABEL description="AgentRT Multi-Protocol Gateway Build Stage"
 
 ARG BUILD_VERSION=2.0.0
 ARG BUILD_DATE
@@ -55,12 +55,12 @@ RUN cd build && DESTDIR=/install ninja install
 FROM alpine:3.19 AS runtime
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
-LABEL description="AgentOS Multi-Protocol Gateway Runtime"
+LABEL description="AgentRT Multi-Protocol Gateway Runtime"
 LABEL version="${BUILD_VERSION}"
 LABEL build-date="${BUILD_DATE}"
 LABEL org.opencontainers.image.source="https://github.com/spharx/agentos"
-LABEL org.opencontainers.image.title="AgentOS Multi-Protocol Gateway"
-LABEL org.opencontainers.image.description="AgentOS Gateway with MCP/A2A/OpenAI API support"
+LABEL org.opencontainers.image.title="AgentRT Multi-Protocol Gateway"
+LABEL org.opencontainers.image.description="AgentRT Gateway with MCP/A2A/OpenAI API support"
 LABEL org.opencontainers.image.vendor="SPHARX"
 
 ENV AGENTOS_MODULE=gateway \
@@ -107,7 +107,7 @@ CMD ["--manager", "/etc/agentos/gateway/manager.yaml"]
 # ==========================================================================
 FROM builder AS development
 
-LABEL description="AgentOS Multi-Protocol Gateway Development Image"
+LABEL description="AgentRT Multi-Protocol Gateway Development Image"
 
 RUN apk add --no-cache \
     gdb \

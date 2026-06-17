@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/security/` 包含 AgentOS 的安全策略和权限规则配置，定义系统的默认访问策略、细粒度权限规则、审计配置、沙箱隔离、入侵检测、密钥管理和会话安全。配置遵循 `schema/security-policy.schema.json` 规范，按双重责任模型归属 cupolas 模块。
+`manager/security/` 包含 AgentRT 的安全策略和权限规则配置，定义系统的默认访问策略、细粒度权限规则、审计配置、沙箱隔离、入侵检测、密钥管理和会话安全。配置遵循 `schema/security-policy.schema.json` 规范，按双重责任模型归属 cupolas 模块。
 
 ## 目录结构
 
