@@ -28,12 +28,16 @@ extern "C" {
 /* 前向声明 */
 typedef struct agentos_cognition_engine agentos_cognition_engine_t;
 typedef struct agentos_memory_engine agentos_memory_engine_t;
+typedef struct agentos_memory_provider agentos_memory_provider_t;
 typedef struct agentos_intent agentos_intent_t;
 typedef struct agentos_task_plan agentos_task_plan_t;
 typedef struct agentos_plan_strategy agentos_plan_strategy_t;
 typedef struct agentos_coordinator_strategy agentos_coordinator_strategy_t;
 typedef struct agentos_dispatching_strategy agentos_dispatching_strategy_t;
 typedef struct agentos_intent_parser agentos_intent_parser_t;
+typedef struct agentos_task_checkpoint agentos_task_checkpoint_t;
+typedef struct llm_service llm_service_t;
+typedef struct tool_service tool_service_t;
 
 /**
  * @brief 反馈回调函数类型
@@ -328,6 +332,112 @@ AGENTOS_API void agentos_cognition_set_context_take(agentos_cognition_engine_t *
  */
 AGENTOS_API void agentos_cognition_set_memory(agentos_cognition_engine_t *engine,
                                               agentos_memory_engine_t *memory);
+
+/**
+ * @brief C-L12: Set memory provider from MemoryRovol bridge.
+ *
+ * Sets the memory provider directly from the bridge, enabling
+ * provider switching (builtin ↔ MemoryRovol) at runtime.
+ *
+ * @param engine [in] Cognition engine handle (BORROW).
+ * @param provider [in] Memory provider from mrb_bridge_get_provider() (BORROW).
+ *
+ * @ownership provider: BORROW
+ */
+AGENTOS_API void agentos_cognition_set_memory_provider(agentos_cognition_engine_t *engine,
+                                                       agentos_memory_provider_t *provider);
+
+/**
+ * @brief C-L02: Set LLM service for cognition engine.
+ *
+ * Inject llm_d daemon's LLM service into CoreLoopThree cognitive loop.
+ * When set, Phase 2 (Streaming Critical Loop) will route generation
+ * requests through this service instead of local-only processing.
+ *
+ * @param engine [in] Cognition engine handle (BORROW - caller retains ownership).
+ * @param llm_svc [in] LLM service handle (BORROW - engine does not take ownership, caller manages lifecycle).
+ *
+ * @ownership llm_svc: BORROW
+ */
+AGENTOS_API void agentos_cognition_set_llm_service(agentos_cognition_engine_t *engine,
+                                                    llm_service_t *llm_svc);
+
+/**
+ * @brief C-L02 P1.2.2: Enable async streaming LLM callback.
+ *
+ * When enabled, LLM responses are delivered via streaming callback
+ * (llm_service_complete_stream) instead of blocking sync complete.
+ * The callback receives token chunks in real-time; the cognition engine
+ * assembles the full response before continuing the pipeline.
+ *
+ * @param engine [in] Cognition engine handle (BORROW).
+ * @param enabled Non-zero to enable streaming.
+ * @param callback Streaming chunk callback (BORROW).
+ * @param user_data User data for callback (BORROW).
+ */
+AGENTOS_API void agentos_cognition_set_llm_streaming(agentos_cognition_engine_t *engine,
+                                                     int enabled,
+                                                     llm_stream_callback_t callback,
+                                                     void *user_data);
+
+/**
+ * @brief C-L04: Set tool service for cognition engine.
+ *
+ * Inject tool_d daemon's tool service into CoreLoopThree cognitive loop.
+ * When set, task execution can route tool invocations through this service.
+ *
+ * @param engine [in] Cognition engine handle (BORROW - caller retains ownership).
+ * @param tool_svc [in] Tool service handle (BORROW - engine does not take ownership, caller manages lifecycle).
+ *
+ * @ownership tool_svc: BORROW
+ */
+AGENTOS_API void agentos_cognition_set_tool_service(agentos_cognition_engine_t *engine,
+                                                     tool_service_t *tool_svc);
+
+/**
+ * @brief C-L04: Get tool service from cognition engine.
+ *
+ * Retrieve the tool service handle for dispatching tool tasks.
+ *
+ * @param engine [in] Cognition engine handle (BORROW - caller retains ownership).
+ * @return Tool service handle (BORROW - belongs to engine, do not free), NULL if not set.
+ *
+ * @ownership return: BORROW
+ */
+AGENTOS_API tool_service_t *agentos_cognition_get_tool_service(
+    agentos_cognition_engine_t *engine);
+
+/**
+ * @brief C-L07: Enable checkpoint auto-save in cognition processing.
+ *
+ * When enabled, the cognition engine will automatically save task plan
+ * checkpoints between each processing phase (0-4), allowing fault
+ * recovery and task resumption.
+ *
+ * @param engine [in] Cognition engine handle (BORROW - caller retains ownership).
+ * @param enable 1 to enable auto-checkpoint, 0 to disable.
+ * @param session_id [in] Session identifier for checkpoint grouping (BORROW - copied internally).
+ *
+ * @ownership session_id: BORROW
+ */
+AGENTOS_API void agentos_cognition_enable_checkpoint(agentos_cognition_engine_t *engine,
+                                                      int enable, const char *session_id);
+
+/**
+ * @brief C-L07: Save a manual checkpoint of the current task plan state.
+ *
+ * Saves the current task plan state as a named checkpoint.
+ * Called automatically between phases when auto-checkpoint is enabled.
+ *
+ * @param engine [in] Cognition engine handle (BORROW - caller retains ownership).
+ * @param sequence_num Checkpoint sequence number.
+ * @param phase_name [in] Descriptive phase name for the checkpoint (BORROW - copied internally).
+ * @return 0 on success, non-zero on failure.
+ *
+ * @ownership phase_name: BORROW
+ */
+int agentos_cognition_save_checkpoint(agentos_cognition_engine_t *engine,
+                                       uint64_t sequence_num, const char *phase_name);
 
 /**
  * @brief 获取认知引擎的当前统计信息

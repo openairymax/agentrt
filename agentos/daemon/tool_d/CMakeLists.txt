@@ -32,6 +32,7 @@ set(TOOL_D_SOURCES
     src/validator.c
     src/cache.c
     src/tool_svc_adapter.c
+    src/tool_approval.c
     src/utils/tool_helpers.c
 )
 

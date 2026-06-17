@@ -1,0 +1,19 @@
+# AgentRT 完整服务 target — 启动所有 daemon
+# Copyright (C) 2025-2026 SPHARX Ltd.
+# P1.23.2: daemon 启动顺序编排
+
+[Unit]
+Description=AgentRT Full Service Stack
+After=agentrt-monit.service agentrt-observe.service agentrt-info.service agentrt-notify.service
+After=agentrt-sched.service agentrt-channel.service
+After=agentrt-llm.service agentrt-tool.service agentrt-hook.service agentrt-plugin.service
+After=agentrt-market.service
+After=agentrt-gateway.service
+Wants=agentrt-monit.service agentrt-observe.service agentrt-info.service agentrt-notify.service
+Wants=agentrt-sched.service agentrt-channel.service
+Wants=agentrt-llm.service agentrt-tool.service agentrt-hook.service agentrt-plugin.service
+Wants=agentrt-market.service
+Wants=agentrt-gateway.service
+
+[Install]
+WantedBy=multi-user.target

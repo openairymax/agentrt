@@ -1,0 +1,26 @@
+# AgentRT systemd unit 文件 — Layer 1: 核心服务
+# Copyright (C) 2025-2026 SPHARX Ltd.
+# P1.23.2: daemon 启动顺序编排
+
+[Unit]
+Description=AgentRT Channel Daemon
+After=network.target agentrt-notify.service
+Requires=agentrt-notify.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/channel_d
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=@AGENTOS_RUNTIME_DIR@
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target

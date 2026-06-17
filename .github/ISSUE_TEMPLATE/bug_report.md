@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-description: Report a bug in AgentOS
+description: Report a bug in AgentRT
 title: "[Bug]: "
 labels: ["bug"]
 assignees: []
@@ -27,7 +27,7 @@ assignees: []
 ## Environment
 
 - **OS**: <!-- e.g., Ubuntu 22.04, Windows 11, macOS 14 -->
-- **AgentOS Version**: <!-- commit hash or release tag -->
+- **AgentRT Version**: <!-- commit hash or release tag -->
 - **Compiler**: <!-- e.g., GCC 11.4, Clang 14 -->
 
 ## Error Log

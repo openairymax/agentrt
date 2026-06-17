@@ -4,7 +4,7 @@
 
 ## 概述
 
-`daemon/observe_d/` 是 AgentOS 的系统可观测性守护进程，提供 Prometheus 格式的指标采集与暴露服务。它支持 Gauge 和 Counter 两种指标类型，内置 HTTP metrics 服务端点，是 AgentOS 与 Prometheus 等外部监控系统集成的主要桥梁，为运维监控和性能分析提供标准化指标数据。
+`daemon/observe_d/` 是 AgentRT 的系统可观测性守护进程，提供 Prometheus 格式的指标采集与暴露服务。它支持 Gauge 和 Counter 两种指标类型，内置 HTTP metrics 服务端点，是 AgentRT 与 Prometheus 等外部监控系统集成的主要桥梁，为运维监控和性能分析提供标准化指标数据。
 
 ### 架构定位
 

@@ -1,5 +1,5 @@
 
-# AgentOS 端到端集成测试 (TeamC P2-C01)
+# AgentRT 端到端集成测试 (TeamC P2-C01)
 # 覆盖: corekern+daemon+syscall 跨模块联动
 # 场景: 初始化/配置/IPC/syscall/熔断/告警/多线程/追踪/定时器/压力/幂等
 

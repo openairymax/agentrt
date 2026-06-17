@@ -5,7 +5,7 @@
 
 ## 概述
 
-Compat 是 AgentOS 的跨平台兼容性适配层，提供编译器兼容性定义、平台抽象宏、位操作工具、共享库导出控制以及 POSIX 缺失头文件的兼容实现。该模块确保 AgentOS 代码在 GCC、Clang、MSVC 三大编译器以及 Linux、Windows、macOS 三大平台上均能一致编译和运行。
+Compat 是 AgentRT 的跨平台兼容性适配层，提供编译器兼容性定义、平台抽象宏、位操作工具、共享库导出控制以及 POSIX 缺失头文件的兼容实现。该模块确保 AgentOS 代码在 GCC、Clang、MSVC 三大编译器以及 Linux、Windows、macOS 三大平台上均能一致编译和运行。
 
 ## 设计目标
 

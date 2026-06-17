@@ -8,7 +8,7 @@
 
 ## 概述
 
-Memory 是 AgentOS 的免费开源内存子系统，提供 L1 原始存储与 L2 特征索引的基础能力。采用**可拔插提供商架构**，通过统一的 `agentos_memory_provider_t` 函数指针表实现提供商的热替换——内置免费提供商（builtin_provider）提供 L1+L2 基础功能，商业提供商 MemoryRovol 实现 L1-L4 全功能 PRO 记忆系统。
+Memory 是 AgentRT 的免费开源内存子系统，提供 L1 原始存储与 L2 特征索引的基础能力。采用**可拔插提供商架构**，通过统一的 `agentos_memory_provider_t` 函数指针表实现提供商的热替换——内置免费提供商（builtin_provider）提供 L1+L2 基础功能，商业提供商 MemoryRovol 实现 L1-L4 全功能 PRO 记忆系统。
 
 Memory 模块以纯 C 实现，无 FAISS / SQLite / 外部向量数据库依赖，是 AgentOS 八层架构中 Atoms 微内核层的核心存储底座。
 

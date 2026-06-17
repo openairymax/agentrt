@@ -4,7 +4,7 @@
 
 ## 概述
 
-`daemon/channel_d/` 是 AgentOS 的进程间通信通道管理守护进程，负责管理 IPC 通道的创建、销毁、数据收发和状态监控。它支持 Unix Socket、共享内存和命名管道三种通道类型，为 AgentOS 各守护进程间的高效通信提供统一的通道抽象层（IMP-08），是 IPC Service Bus 的底层传输基础设施。
+`daemon/channel_d/` 是 AgentRT 的进程间通信通道管理守护进程，负责管理 IPC 通道的创建、销毁、数据收发和状态监控。它支持 Unix Socket、共享内存和命名管道三种通道类型，为 AgentOS 各守护进程间的高效通信提供统一的通道抽象层（IMP-08），是 IPC Service Bus 的底层传输基础设施。
 
 ### 架构定位
 
