@@ -1,0 +1,18 @@
+# weather-agent 定义文件
+# 演示如何注册自定义工具
+
+name: "weather-agent"
+version: "1.0.0"
+model: "gpt-4"
+
+# 系统提示词：定义天气助手的角色
+system_prompt: |
+  你是 weather-agent，一个天气查询助手。
+  当用户询问天气时，使用 get_weather 工具查询城市天气信息。
+  回答时请包含温度、天气状况和出行建议。
+
+# 注册自定义工具
+tools:
+  - name: "get_weather"
+    module: "tools.weather_tool"
+    class: "WeatherTool"

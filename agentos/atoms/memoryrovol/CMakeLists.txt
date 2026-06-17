@@ -1,7 +1,7 @@
 
-# MemoryRovol bridge: integrates external MemoryRovol repo into AgentOS atoms tree
+# MemoryRovol bridge: integrates external MemoryRovol repo into AgentRT atoms tree
 # Per R-09-01-6, MemoryRovol migrated to independent repository.
-# This CMakeLists.txt bridges the external repo into the AgentOS build.
+# This CMakeLists.txt bridges the external repo into the AgentRT build.
 # The AGENTOS_WITH_MEMORYROVOL option is defined in the root CMakeLists.txt.
 
 message(STATUS "[MEMORYROVOL] AGENTOS_WITH_MEMORYROVOL=${AGENTOS_WITH_MEMORYROVOL}")
@@ -15,7 +15,7 @@ endif()
 # Search order:
 #   1. MEMORYROVOL_DIR cmake variable
 #   2. MEMORYROVOL_ROOT environment variable
-#   3. Sibling directory relative to AgentOS root (OpenAirymax/MemoryRovol)
+#   3. Sibling directory relative to AgentRT root (OpenAirymax/MemoryRovol)
 message(STATUS "[MEMORYROVOL] Searching for external MemoryRovol source...")
 if(NOT MEMORYROVOL_DIR)
     if(DEFINED ENV{MEMORYROVOL_ROOT})
@@ -45,16 +45,16 @@ endif()
 
 message(STATUS "[MEMORYROVOL] Source found: ${MEMORYROVOL_DIR}")
 
-# Propagate AgentOS workspace root and include paths to MemoryRovol build
-set(AGENTOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." CACHE PATH "AgentOS workspace root directory" FORCE)
-set(AGENTOS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." CACHE PATH "AgentOS agentos/ directory (includes daemon, atoms, etc.)" FORCE)
-set(AGENTOS_ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE PATH "AgentOS atoms source directory" FORCE)
+# Propagate AgentRT workspace root and include paths to MemoryRovol build
+set(AGENTOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." CACHE PATH "AgentRT workspace root directory" FORCE)
+set(AGENTOS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." CACHE PATH "AgentRT agentos/ directory (includes daemon, atoms, etc.)" FORCE)
+set(AGENTOS_ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE PATH "AgentRT atoms source directory" FORCE)
 
-# Inherit AgentOS build settings — build full PRO from source (not OSS)
+# Inherit AgentRT build settings — build full PRO from source (not OSS)
 set(MEMORYROVOL_OSS OFF CACHE BOOL "Build MemoryRovol in OSS mode (L1+L2 only)" FORCE)
-set(MEMORYROVOL_EMBEDDED ON CACHE BOOL "MemoryRovol embedded in AgentOS tree" FORCE)
+set(MEMORYROVOL_EMBEDDED ON CACHE BOOL "MemoryRovol embedded in AgentRT tree" FORCE)
 
-# Add MemoryRovol as subdirectory with binary dir under AgentOS build tree
+# Add MemoryRovol as subdirectory with binary dir under AgentRT build tree
 add_subdirectory("${MEMORYROVOL_DIR}" "${CMAKE_BINARY_DIR}/memoryrovol")
 
 # Verify the target was created
@@ -63,8 +63,8 @@ if(NOT TARGET agentos_memoryrovol)
     return()
 endif()
 
-# Propagate AgentOS include paths to MemoryRovol source files
-# The MemoryRovol external repo needs AgentOS headers for:
+# Propagate AgentRT include paths to MemoryRovol source files
+# The MemoryRovol external repo needs AgentRT headers for:
 #   - memory_compat.h  (AGENTOS_MALLOC/CALLOC/FREE)
 #   - service_logging.h (service_log_output_record)
 #   - platform.h        (agentos_sleep_ms, agentos_thread_*)
@@ -77,13 +77,13 @@ target_include_directories(agentos_memoryrovol PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
 )
 
-# Force-include AgentOS compat headers for MemoryRovol sources
+# Force-include AgentRT compat headers for MemoryRovol sources
 # that lack explicit #include of these headers
 target_compile_options(agentos_memoryrovol PRIVATE
     "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/src/agentos_mr_force_includes.h"
 )
 
-# Create interface library that links MemoryRovol into AgentOS atoms
+# Create interface library that links MemoryRovol into AgentRT atoms
 add_library(agentos_memoryrovol_bridge INTERFACE)
 target_link_libraries(agentos_memoryrovol_bridge INTERFACE agentos_memoryrovol)
 target_include_directories(agentos_memoryrovol_bridge INTERFACE
@@ -100,4 +100,4 @@ if(TARGET agentos_atoms)
     target_link_libraries(agentos_atoms INTERFACE agentos_memoryrovol)
 endif()
 
-message(STATUS "MemoryRovol integrated into AgentOS build (PRO mode)")
+message(STATUS "MemoryRovol integrated into AgentRT build (PRO mode)")

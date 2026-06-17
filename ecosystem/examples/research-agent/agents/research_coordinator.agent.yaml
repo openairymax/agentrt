@@ -1,0 +1,31 @@
+# research_coordinator 定义文件
+# 负责任务分配和结果汇总的协调者 Agent
+
+name: "research_coordinator"
+version: "1.0.0"
+model: "gpt-4"
+
+# 系统提示词：定义协调者的角色
+system_prompt: |
+  你是 research_coordinator，一个研究协调者。
+  你的职责是：
+  1. 分析用户的研究需求，拆解为可执行的子任务
+  2. 将子任务分配给 research_agent 执行
+  3. 汇总所有研究结果，生成结构化的研究报告
+  4. 利用记忆系统积累研究经验，优化后续研究效率
+
+  协调原则：任务拆解清晰、分配合理、汇总全面。
+
+# 协作模式配置
+collaboration:
+  pattern: "orchestrator"
+  workers:
+    - agent: "research_agent"
+      capabilities: ["search", "collect", "summarize"]
+
+# 协调者需要的权限
+permissions:
+  - "agent:invoke:research_agent"
+  - "memory:write"
+  - "memory:read"
+  - "task:manage:*"

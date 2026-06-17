@@ -8,8 +8,11 @@ set(COREKERN_SOURCES
     src/ipc/binder.c
     src/ipc/buffer.c
     src/mem/alloc.c
+    src/mem/arena.c
     src/mem/oom_handler.c
     src/mem/pool.c
+    src/mem/tcache.c
+    src/mem/refcount.c
     src/mem/guard.c
     src/task/scheduler.c
     src/task/scheduler_core.c
@@ -39,7 +42,7 @@ target_include_directories(agentos_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# 安全编译选项（基于AgentOS C编码风格指南附录A）
+# 安全编译选项（基于AgentRT C编码风格指南附录A）
 if(MSVC)
     target_compile_options(agentos_core PRIVATE /W4 /std:c11 /wd4819 /wd4117 /wd4273)
     target_compile_definitions(agentos_core PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_SECURE_NO_DEPRECATE)

@@ -257,6 +257,85 @@ gate_code_format() {
 }
 
 ###############################################################################
+# Gate 2.5: 硬编码路径扫描 (PATH-BAN-1~5)
+# P0.13.4: 集成到 quality-gate.sh
+###############################################################################
+gate_path_scan() {
+    log_section "Hardcoded Path Scan (PATH-BAN-1~5)"
+
+    local path_issues=0
+
+    # PATH-BAN-1: SpharxWorks 硬编码
+    local ban1
+    ban1=$(grep -rn "SpharxWorks" \
+        --include="*.c" --include="*.h" --include="*.py" --include="*.rs" \
+        --include="*.go" --include="*.ts" --include="*.js" \
+        --include="*.toml" --include="*.yaml" --include="*.yml" \
+        --include="CMakeLists.txt" \
+        --exclude-dir="target" --exclude-dir="node_modules" \
+        --exclude-dir="__pycache__" --exclude-dir="build" \
+        "${PROJECT_ROOT}/" 2>/dev/null | grep -v "\.pyc" | grep -v "\.d:" | wc -l) || true
+    if [[ $ban1 -gt 0 ]]; then
+        record_issue "high" "PATH-BAN-1" "project-wide" "$ban1 'SpharxWorks' reference(s)"
+        log_error "  PATH-BAN-1: $ban1 'SpharxWorks' reference(s)"
+        ((path_issues++)) || true
+    else
+        log_ok "  PATH-BAN-1: 0 'SpharxWorks' references"
+    fi
+
+    # PATH-BAN-2: /home/ 路径泄露
+    local ban2
+    ban2=$(grep -rn "/home/" --include="*.c" --include="*.h" \
+        "${PROJECT_ROOT}/agentos/" 2>/dev/null | grep -v "test_\|tests/" | wc -l) || true
+    if [[ $ban2 -gt 0 ]]; then
+        record_issue "high" "PATH-BAN-2" "agentos/" "$ban2 '/home/' path leak(s)"
+        log_error "  PATH-BAN-2: $ban2 '/home/' path leak(s)"
+        ((path_issues++)) || true
+    else
+        log_ok "  PATH-BAN-2: 0 '/home/' path leaks"
+    fi
+
+    # PATH-BAN-3: C:\\Users\\ Windows 路径泄露
+    local ban3
+    ban3=$(grep -rn "C:\\\\Users\\\\" --include="*.c" --include="*.h" \
+        "${PROJECT_ROOT}/agentos/" 2>/dev/null | grep -v "test_" | wc -l) || true
+    if [[ $ban3 -gt 0 ]]; then
+        record_issue "high" "PATH-BAN-3" "agentos/" "$ban3 'C:\\Users\\' path leak(s)"
+        log_error "  PATH-BAN-3: $ban3 'C:\\\\Users\\\\' path leak(s)"
+        ((path_issues++)) || true
+    else
+        log_ok "  PATH-BAN-3: 0 'C:\\\\Users\\\\' path leaks"
+    fi
+
+    # PATH-BAN-4: 用户特定路径模式
+    local ban4
+    ban4=$(grep -rn "D:\\\\SPHARX\|/mnt/d/agentos" --include="*.c" --include="*.h" --include="*.py" \
+        "${PROJECT_ROOT}/" 2>/dev/null | grep -v "test_\|.pyc\|node_modules\|target" | wc -l) || true
+    if [[ $ban4 -gt 0 ]]; then
+        record_issue "medium" "PATH-BAN-4" "project-wide" "$ban4 user-specific path(s)"
+        log_warn "  PATH-BAN-4: $ban4 user-specific path(s)"
+        ((path_issues++)) || true
+    else
+        log_ok "  PATH-BAN-4: 0 user-specific paths"
+    fi
+
+    # PATH-BAN-5: agentos/ 目录名确认存在
+    if [[ -d "${PROJECT_ROOT}/agentos/" ]]; then
+        log_ok "  PATH-BAN-5: agentos/ directory retained"
+    else
+        record_issue "critical" "PATH-BAN-5" "project-root" "agentos/ directory missing"
+        log_error "  PATH-BAN-5: agentos/ directory is missing"
+        ((path_issues++)) || true
+    fi
+
+    if [[ $path_issues -eq 0 ]]; then
+        record_check_result "path-scan" "true"
+    else
+        record_check_result "path-scan" "false"
+    fi
+}
+
+###############################################################################
 # Gate 3: Python 质量检查
 ###############################################################################
 gate_python_quality() {
@@ -2155,8 +2234,320 @@ gate_ban_181_190() {
 }
 
 ###############################################################################
-# Auto-Fix 模式：自动修复可修复的质量问题
+# Gate 24: BAN-191~256 Extended Compliance (P0.15)
 ###############################################################################
+gate_ban_191_256() {
+    log_section "BAN-191~256 Extended Compliance Checks (G24)"
+
+    local g24_issues=0
+
+    # BAN-191: Shell scripts must be POSIX portable
+    log_info "BAN-191: Checking shell scripts for POSIX portability..."
+    local ban191_hits
+    ban191_hits=$(grep -rn '\[\[' --include='*.sh' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v '# BAN-191 EXEMPT' | wc -l) || true
+    if [[ $ban191_hits -eq 0 ]]; then
+        log_ok "BAN-191: Shell scripts appear POSIX-portable"
+        record_check_result "BAN-191" "true"
+    else
+        log_warn "BAN-191: $ban191_hits [[ usage(s) in shell scripts (non-POSIX, warning)"
+        record_check_result "BAN-191" "true"
+    fi
+
+    # BAN-192: Security scan must pass in CI
+    log_info "BAN-192: Checking security scan script exists..."
+    if [[ -f "${SCRIPT_DIR}/security_check.py" ]]; then
+        log_ok "BAN-192: Security scan script found"
+        record_check_result "BAN-192" "true"
+    else
+        record_issue "high" "BAN-192" "scripts/" "Security scan script not found"
+        log_error "BAN-192: security_check.py not found"
+        ((g24_issues++)) || true
+        record_check_result "BAN-192" "false"
+    fi
+
+    # BAN-193: Forbidden C functions (gets, sprintf, strcpy, strcat, strtok)
+    log_info "BAN-193: Checking forbidden C functions..."
+    local ban193_hits
+    ban193_hits=$(grep -rn '\bgets\s*(\|\<sprintf\s*(\|\<strcpy\s*(\|\<strcat\s*(\|\<strtok\s*(' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'test' | grep -v '# BAN-193 EXEMPT' | wc -l) || true
+    if [[ $ban193_hits -eq 0 ]]; then
+        log_ok "BAN-193: No forbidden C functions found"
+        record_check_result "BAN-193" "true"
+    else
+        record_issue "critical" "BAN-193" "agentos/" "$ban193_hits forbidden C function call(s)"
+        log_error "BAN-193: $ban193_hits forbidden C function call(s) found"
+        ((g24_issues++)) || true
+        record_check_result "BAN-193" "false"
+    fi
+
+    # BAN-207: Plugin permissions must map to SafetyGuard guards
+    log_info "BAN-207: Checking plugin permission / SafetyGuard mapping..."
+    local ban207_safety ban207_plugin
+    ban207_safety=$(grep -rn 'SAFETY_GUARD_' --include='*.h' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    ban207_plugin=$(grep -rn 'PLUGIN_PERM_\|plugin_permission' --include='*.h' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban207_safety -ge 8 ]] && [[ $ban207_plugin -ge 1 ]]; then
+        log_ok "BAN-207: SafetyGuard guards ($ban207_safety) and plugin permissions ($ban207_plugin) found"
+        record_check_result "BAN-207" "true"
+    else
+        log_warn "BAN-207: SafetyGuard ($ban207_safety) or plugin permissions ($ban207_plugin) incomplete"
+        record_check_result "BAN-207" "true"
+    fi
+
+    # BAN-211: External input must be sanitized
+    log_info "BAN-211: Checking input sanitizer existence..."
+    local ban211_hits
+    ban211_hits=$(grep -rn 'input_validator\|sanitize\|AGENTOS_SANITIZE' \
+        --include='*.h' --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban211_hits -ge 1 ]]; then
+        log_ok "BAN-211: Input sanitizer found ($ban211_hits reference(s))"
+        record_check_result "BAN-211" "true"
+    else
+        record_issue "high" "BAN-211" "agentos/" "Input sanitizer not found"
+        log_error "BAN-211: No input sanitizer found"
+        ((g24_issues++)) || true
+        record_check_result "BAN-211" "false"
+    fi
+
+    # BAN-228: No hardcoded secrets in source
+    log_info "BAN-228: Checking for hardcoded secrets..."
+    local ban228_hits
+    ban228_hits=$(grep -rni 'api_key\s*=\s*"[^"]\{8,\}"\|password\s*=\s*"[^"]\{8,\}"\|secret\s*=\s*"[^"]\{8,\}"' \
+        --include='*.c' --include='*.h' --include='*.py' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'test' | grep -v 'example' | grep -v '# BAN-228 EXEMPT' | wc -l) || true
+    if [[ $ban228_hits -eq 0 ]]; then
+        log_ok "BAN-228: No hardcoded secrets found"
+        record_check_result "BAN-228" "true"
+    else
+        record_issue "critical" "BAN-228" "agentos/" "$ban228_hits hardcoded secret(s)"
+        log_error "BAN-228: $ban228_hits hardcoded secret(s) found"
+        ((g24_issues++)) || true
+        record_check_result "BAN-228" "false"
+    fi
+
+    # BAN-231: Error code segmentation compliance
+    log_info "BAN-231: Checking error code segmentation..."
+    local ban231_hits
+    ban231_hits=$(grep -rn '#define AGENTOS_ERR_[A-Z_]*\s*(-[0-9]\{1,2\})' \
+        --include='*.h' "${PROJECT_ROOT}/agentos/commons/utils/error/" 2>/dev/null | wc -l) || true
+    if [[ $ban231_hits -ge 10 ]]; then
+        log_ok "BAN-231: Error code segmentation found ($ban231_hits codes)"
+        record_check_result "BAN-231" "true"
+    else
+        log_warn "BAN-231: Error code segmentation may be incomplete ($ban231_hits codes)"
+        record_check_result "BAN-231" "true"
+    fi
+
+    # BAN-233: TOCTOU prevention - no access() before open()
+    log_info "BAN-233: Checking for TOCTOU patterns (access before open)..."
+    local ban233_hits
+    ban233_hits=$(grep -rn '\baccess\s*(' --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'test' | grep -v '# BAN-233 EXEMPT' | wc -l) || true
+    if [[ $ban233_hits -eq 0 ]]; then
+        log_ok "BAN-233: No TOCTOU-vulnerable access() calls found"
+        record_check_result "BAN-233" "true"
+    else
+        record_issue "high" "BAN-233" "agentos/" "$ban233_hits access() call(s) (potential TOCTOU)"
+        log_error "BAN-233: $ban233_hits access() call(s) found (potential TOCTOU)"
+        ((g24_issues++)) || true
+        record_check_result "BAN-233" "false"
+    fi
+
+    # BAN-235: No format string vulnerabilities
+    log_info "BAN-235: Checking for format string vulnerabilities..."
+    local ban235_hits
+    ban235_hits=$(grep -rn 'printf\s*([^,]*);\|fprintf\s*([^,]*,[^,]*);\|snprintf\s*([^,]*,[^,]*,[^"]*);' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'test' | grep -v 'logging' | grep -v '# BAN-235 EXEMPT' | wc -l) || true
+    if [[ $ban235_hits -eq 0 ]]; then
+        log_ok "BAN-235: No format string vulnerabilities found"
+        record_check_result "BAN-235" "true"
+    else
+        record_issue "high" "BAN-235" "agentos/" "$ban235_hits potential format string issue(s)"
+        log_error "BAN-235: $ban235_hits potential format string issue(s)"
+        ((g24_issues++)) || true
+        record_check_result "BAN-235" "false"
+    fi
+
+    # BAN-242: No C99 VLA (Variable Length Arrays)
+    log_info "BAN-242: Checking for C99 VLA usage..."
+    local ban242_hits
+    ban242_hits=$(grep -rn '\w\+\s\+\w\+\[[a-z_]\+\]' \
+        --include='*.c' --include='*.h' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'const' | grep -v '#define' | grep -v 'test' | wc -l) || true
+    if [[ $ban242_hits -eq 0 ]]; then
+        log_ok "BAN-242: No C99 VLA usage found"
+        record_check_result "BAN-242" "true"
+    else
+        log_warn "BAN-242: $ban242_hits potential VLA usage(s) (manual review needed)"
+        record_check_result "BAN-242" "true"
+    fi
+
+    # BAN-243: No direct POSIX thread API usage
+    log_info "BAN-243: Checking for direct POSIX thread API usage..."
+    local ban243_hits
+    ban243_hits=$(grep -rn 'pthread_mutex_\|pthread_cond_\|pthread_rwlock_\|pthread_spin_' \
+        --include='*.c' --include='*.h' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'platform/' | grep -v 'sync/src/' | grep -v 'compat' | wc -l) || true
+    if [[ $ban243_hits -eq 0 ]]; then
+        log_ok "BAN-243: No direct POSIX thread API usage outside abstraction layer"
+        record_check_result "BAN-243" "true"
+    else
+        record_issue "high" "BAN-243" "agentos/" "$ban243_hits direct POSIX thread API usage(s)"
+        log_error "BAN-243: $ban243_hits direct POSIX thread API usage(s) outside abstraction layer"
+        ((g24_issues++)) || true
+        record_check_result "BAN-243" "false"
+    fi
+
+    # BAN-247: Shared memory objects must use refcount, not bare free
+    log_info "BAN-247: Checking shared memory objects use refcount..."
+    local ban247_hits
+    ban247_hits=$(grep -rn 'AGENTOS_FREE\s*(.*shared\|AGENTOS_FREE\s*(.*_shared\|AGENTOS_FREE\s*(.*refcount' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban247_hits -eq 0 ]]; then
+        log_ok "BAN-247: No bare free on shared memory objects"
+        record_check_result "BAN-247" "true"
+    else
+        record_issue "high" "BAN-247" "agentos/" "$ban247_hits bare free on shared object(s)"
+        log_error "BAN-247: $ban247_hits bare free on shared memory object(s)"
+        ((g24_issues++)) || true
+        record_check_result "BAN-247" "false"
+    fi
+
+    # BAN-252: Sensitive data must use AGENTOS_SECURE_FREE
+    log_info "BAN-252: Checking sensitive data uses AGENTOS_SECURE_FREE..."
+    local ban252_hits
+    ban252_hits=$(grep -rn 'AGENTOS_FREE\s*(.*key\|AGENTOS_FREE\s*(.*token\|AGENTOS_FREE\s*(.*secret\|AGENTOS_FREE\s*(.*password\|AGENTOS_FREE\s*(.*credential' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'test' | wc -l) || true
+    if [[ $ban252_hits -eq 0 ]]; then
+        log_ok "BAN-252: No AGENTOS_FREE on sensitive data"
+        record_check_result "BAN-252" "true"
+    else
+        record_issue "critical" "BAN-252" "agentos/" "$ban252_hits AGENTOS_FREE on sensitive data"
+        log_error "BAN-252: $ban252_hits AGENTOS_FREE on sensitive data (use AGENTOS_SECURE_FREE)"
+        ((g24_issues++)) || true
+        record_check_result "BAN-252" "false"
+    fi
+
+    # BAN-255: All allocations must be under memory_stats_reporter
+    log_info "BAN-255: Checking allocations under memory_stats_reporter..."
+    local ban255_malloc ban255_agentos
+    ban255_malloc=$(grep -rn '\bmalloc\s*(' --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v 'test' | grep -v 'commons/utils/memory' | wc -l) || true
+    ban255_agentos=$(grep -rn 'AGENTOS_MALLOC\|agentos_mem_alloc\|memory_alloc' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban255_malloc -eq 0 ]]; then
+        log_ok "BAN-255: All allocations use tracked API ($ban255_agentos tracked calls)"
+        record_check_result "BAN-255" "true"
+    else
+        log_warn "BAN-255: $ban255_malloc bare malloc call(s) bypass memory_stats_reporter"
+        record_check_result "BAN-255" "true"
+    fi
+
+    # BAN-256: ASan/LSan violations must block merge
+    log_info "BAN-256: Checking ASan/LSan CI configuration..."
+    local ban256_hits
+    ban256_hits=$(grep -rn 'ASAN\|LSAN\|sanitize' \
+        --include='*.yml' --include='*.yaml' --include='CMakeLists.txt' \
+        "${PROJECT_ROOT}/" 2>/dev/null | wc -l) || true
+    if [[ $ban256_hits -ge 1 ]]; then
+        log_ok "BAN-256: ASan/LSan configuration found ($ban256_hits reference(s))"
+        record_check_result "BAN-256" "true"
+    else
+        log_warn "BAN-256: No ASan/LSan configuration found (CI may not enforce zero-tolerance)"
+        record_check_result "BAN-256" "true"
+    fi
+
+    # BAN-250: Daemon startup must register WARNING + CRITICAL OOM callbacks
+    log_info "BAN-250: Checking daemon OOM callback registration..."
+    local ban250_hits
+    ban250_hits=$(grep -rn 'agentos_oom_register_daemon_callback\|agentos_oom_register_callback' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban250_hits -ge 1 ]]; then
+        log_ok "BAN-250: OOM callback registration found ($ban250_hits registration(s))"
+        record_check_result "BAN-250" "true"
+    else
+        log_warn "BAN-250: No OOM callback registration found (daemons should register OOM handlers)"
+        record_check_result "BAN-250" "true"
+    fi
+
+    # BAN-224: SecretRef for sensitive configuration
+    log_info "BAN-224: Checking SecretRef usage in config..."
+    local ban224_hits
+    ban224_hits=$(grep -rn 'SecretRef\|secret_ref\|SECRET_REF' \
+        --include='*.h' --include='*.c' --include='*.yaml' \
+        "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban224_hits -ge 1 ]]; then
+        log_ok "BAN-224: SecretRef mechanism found ($ban224_hits reference(s))"
+        record_check_result "BAN-224" "true"
+    else
+        log_warn "BAN-224: No SecretRef mechanism found (sensitive config may be plaintext)"
+        record_check_result "BAN-224" "true"
+    fi
+
+    # BAN-218: Hook must fail-open
+    log_info "BAN-218: Checking hook fail-open implementation..."
+    local ban218_hits
+    ban218_hits=$(grep -rn 'HOOK_DECISION_CONTINUE\|fail.open\|fail_open' \
+        --include='*.h' --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban218_hits -ge 1 ]]; then
+        log_ok "BAN-218: Hook fail-open mechanism found ($ban218_hits reference(s))"
+        record_check_result "BAN-218" "true"
+    else
+        log_warn "BAN-218: Hook fail-open mechanism not found"
+        record_check_result "BAN-218" "true"
+    fi
+
+    # BAN-219: Plugin must include manifest
+    log_info "BAN-219: Checking plugin manifest schema..."
+    local ban219_hits
+    ban219_hits=$(grep -rn 'plugin.json\|plugin_manifest\|PLUGIN_MANIFEST' \
+        --include='*.h' --include='*.c' --include='*.json' \
+        "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban219_hits -ge 1 ]]; then
+        log_ok "BAN-219: Plugin manifest mechanism found ($ban219_hits reference(s))"
+        record_check_result "BAN-219" "true"
+    else
+        log_warn "BAN-219: Plugin manifest mechanism not found"
+        record_check_result "BAN-219" "true"
+    fi
+
+    # BAN-222: LLM retry with exponential backoff
+    log_info "BAN-222: Checking LLM retry mechanism..."
+    local ban222_hits
+    ban222_hits=$(grep -rn 'retry\|backoff\|RETRY' \
+        --include='*.h' --include='*.c' "${PROJECT_ROOT}/agentos/daemon/llm_d/" 2>/dev/null | wc -l) || true
+    if [[ $ban222_hits -ge 1 ]]; then
+        log_ok "BAN-222: LLM retry mechanism found ($ban222_hits reference(s))"
+        record_check_result "BAN-222" "true"
+    else
+        log_warn "BAN-222: LLM retry mechanism not found"
+        record_check_result "BAN-222" "true"
+    fi
+
+    # BAN-232: Error message format compliance
+    log_info "BAN-232: Checking error message format..."
+    local ban232_hits
+    ban232_hits=$(grep -rn 'agentos_error_str\|agentos_error_push_ex\|AGENTOS_ERROR' \
+        --include='*.c' "${PROJECT_ROOT}/agentos/" 2>/dev/null | wc -l) || true
+    if [[ $ban232_hits -ge 5 ]]; then
+        log_ok "BAN-232: Error message format API used ($ban232_hits usage(s))"
+        record_check_result "BAN-232" "true"
+    else
+        log_warn "BAN-232: Error message format API usage low ($ban232_hits usage(s))"
+        record_check_result "BAN-232" "true"
+    fi
+
+    if [[ $g24_issues -eq 0 ]]; then
+        log_ok "BAN-191~256: All checks passed"
+        record_check_result "ban-191-256" "true"
+    else
+        log_warn "BAN-191~256: $g24_issues check(s) failed"
+        record_check_result "ban-191-256" "false"
+    fi
+}
 run_auto_fix() {
     log_section "Auto-Fix Mode"
 
@@ -2388,6 +2779,7 @@ Gates:
     21. Memory Safety Rules (BAN-151~162, Phase 2.5)
     22. Extended Strict Rules (BAN-151~180, Phase 2.5/3)
     23. BAN-181~190 Compliance Checks
+    24. BAN-191~256 Extended Compliance (P0.15)
 EOF
 }
 

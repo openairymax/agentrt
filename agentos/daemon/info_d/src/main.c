@@ -6,6 +6,8 @@
 
 #include "agentos_event_loop.h"
 #include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
 #include "logging.h"
 #include "platform.h"
 #include "svc_logger.h"
@@ -66,6 +68,8 @@ typedef struct {
 static info_d_service_t g_service = {0};
 static atomic_int g_shutdown = 0;
 static agentos_event_loop_t *g_event_loop = NULL;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
 
 static void info_d_signal_handler(int sig)
 {
@@ -432,6 +436,11 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
         return 1;
     }
 
+    g_bsd = daemon_bootstrap_sd_start("info_d", "info", g_service.socket_path,
+                                      0, "info,core", 0);
+    g_bipc = daemon_bootstrap_ipc_start("info_d", "info", g_service.socket_path,
+                                        0, IPC_BUS_PROTO_JSON_RPC);
+
     g_event_loop = agentos_event_loop_create(64);
     if (!g_event_loop) {
         LOG_ERROR("Failed to create event loop");
@@ -449,6 +458,8 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     agentos_event_loop_destroy(g_event_loop);
     g_event_loop = NULL;
 
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
     info_d_stop(&g_service, g_shutdown ? 1 : 0);
     info_d_destroy(&g_service);
     log_cleanup();

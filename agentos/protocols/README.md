@@ -5,7 +5,7 @@
 
 ## 概述
 
-Protocols 层是 AgentOS 的统一通信协议栈，采用五层架构设计（Common / Core / Standards / Integrations / Frameworks），为系统内部模块间、服务间以及系统与外部平台之间的所有通信提供标准化协议和契约。协议层使用 C 语言实现，通过 CMake 构建系统管理编译选项，编译为 `libagentos_protocols` 共享库。
+Protocols 层是 AgentRT 的统一通信协议栈，采用五层架构设计（Common / Core / Standards / Integrations / Frameworks），为系统内部模块间、服务间以及系统与外部平台之间的所有通信提供标准化协议和契约。协议层使用 C 语言实现，通过 CMake 构建系统管理编译选项，编译为 `libagentos_protocols` 共享库。
 
 核心设计理念：
 
