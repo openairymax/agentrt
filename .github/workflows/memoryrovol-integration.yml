@@ -1,4 +1,4 @@
-name: AgentOS MemoryRovol Integration
+name: AgentRT MemoryRovol Integration
 
 on:
   push:
@@ -29,23 +29,23 @@ jobs:
 
       - name: Configure OSS Mode
         run: |
-          cmake -S . -B ${{ github.workspace }}/../AgentOS-build-oss \
+          cmake -S . -B ${{ github.workspace }}/../AgentRT-build-oss \
             -DCMAKE_BUILD_TYPE=Debug \
             -DMEMORYROVOL_OSS=ON \
             -DBUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/../AgentOS-build-oss --parallel $(nproc)
+        run: cmake --build ${{ github.workspace }}/../AgentRT-build-oss --parallel $(nproc)
 
       - name: Test
-        working-directory: ${{ github.workspace }}/../AgentOS-build-oss
+        working-directory: ${{ github.workspace }}/../AgentRT-build-oss
         run: ctest --output-on-failure -j $(nproc) --timeout 60
 
       - name: Verify OSS Symbol Stripping
         run: |
           echo "=== Verify L3/L4/Forgetting symbols NOT present in OSS mode ==="
-          for lib in ${{ github.workspace }}/../AgentOS-build-oss/libmemoryrovol*.a \
-                     ${{ github.workspace }}/../AgentOS-build-oss/agentos/atoms/memoryrovol/*.a; do
+          for lib in ${{ github.workspace }}/../AgentRT-build-oss/libmemoryrovol*.a \
+                     ${{ github.workspace }}/../AgentRT-build-oss/agentos/atoms/memoryrovol/*.a; do
             if [ -f "$lib" ]; then
               echo "Checking: $lib"
               for sym in layer3_create structure_query pattern_match forgetting_apply; do
@@ -75,24 +75,24 @@ jobs:
 
       - name: Configure PRO Mode
         run: |
-          cmake -S . -B ${{ github.workspace }}/../AgentOS-build-pro \
+          cmake -S . -B ${{ github.workspace }}/../AgentRT-build-pro \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTS=ON \
             -DAGENTOS_COMPLIANCE_STRICT=OFF
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/../AgentOS-build-pro --parallel $(nproc)
+        run: cmake --build ${{ github.workspace }}/../AgentRT-build-pro --parallel $(nproc)
 
       - name: Test
-        working-directory: ${{ github.workspace }}/../AgentOS-build-pro
+        working-directory: ${{ github.workspace }}/../AgentRT-build-pro
         run: ctest --output-on-failure -j $(nproc) --timeout 60
 
       - name: Verify PRO Symbols
         run: |
           echo "=== ACC-C: Verify L3/L4/Forgetting symbols in PRO mode ==="
           FOUND=0
-          for lib in ${{ github.workspace }}/../AgentOS-build-pro/libmemoryrovol*.a \
-                     ${{ github.workspace }}/../AgentOS-build-pro/agentos/atoms/memoryrovol/*.a; do
+          for lib in ${{ github.workspace }}/../AgentRT-build-pro/libmemoryrovol*.a \
+                     ${{ github.workspace }}/../AgentRT-build-pro/agentos/atoms/memoryrovol/*.a; do
             if [ -f "$lib" ]; then
               echo "Checking: $lib"
               for sym in layer3_create layer3_destroy structure_query structure_update \

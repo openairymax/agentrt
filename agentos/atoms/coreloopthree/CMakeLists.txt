@@ -37,10 +37,50 @@ add_library(agentos_coreloopthree STATIC
     src/loop.c
     src/config_loader.c
     src/memory/memory_service.c
+    src/memory/memoryrovol_bridge.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/src/checkpoint.c
 )
 
 target_link_libraries(agentos_coreloopthree PUBLIC agentos_atoms)
+
+# C-L12: MemoryRovol 构建模式
+# 三种模式：
+#   AGENTOS_MEMORY_BUILTIN    — 仅内置免费提供商
+#   AGENTOS_MEMORY_MEMORYROVOL — 仅 MemoryRovol 商业提供商
+#   AGENTOS_MEMORY_HYBRID     — 混合模式（默认，根据配置切换）
+if(NOT DEFINED AGENTOS_MEMORY_MODE)
+    set(AGENTOS_MEMORY_MODE "HYBRID" CACHE STRING "Memory provider mode: BUILTIN, MEMORYROVOL, HYBRID")
+endif()
+message(STATUS "coreloopthree: AGENTOS_MEMORY_MODE=${AGENTOS_MEMORY_MODE}")
+
+if(AGENTOS_MEMORY_MODE STREQUAL "BUILTIN")
+    target_compile_definitions(agentos_coreloopthree PRIVATE
+        AGENTOS_MEMORY_BUILTIN=1
+    )
+    message(STATUS "coreloopthree: Memory mode = BUILTIN (free provider only)")
+elseif(AGENTOS_MEMORY_MODE STREQUAL "MEMORYROVOL")
+    target_compile_definitions(agentos_coreloopthree PRIVATE
+        AGENTOS_MEMORY_MEMORYROVOL=1
+    )
+    if(TARGET agentos_memoryrovol)
+        target_link_libraries(agentos_coreloopthree PRIVATE agentos_memoryrovol)
+        message(STATUS "coreloopthree: Memory mode = MEMORYROVOL (commercial provider)")
+    else()
+        message(WARNING "coreloopthree: MEMORYROVOL mode but agentos_memoryrovol target not found, falling back to BUILTIN")
+        target_compile_definitions(agentos_coreloopthree PRIVATE AGENTOS_MEMORY_BUILTIN=1)
+    endif()
+else()
+    # 默认 HYBRID 模式
+    target_compile_definitions(agentos_coreloopthree PRIVATE
+        AGENTOS_MEMORY_HYBRID=1
+    )
+    if(TARGET agentos_memoryrovol)
+        target_link_libraries(agentos_coreloopthree PRIVATE agentos_memoryrovol)
+        message(STATUS "coreloopthree: Memory mode = HYBRID (builtin + MemoryRovol)")
+    else()
+        message(STATUS "coreloopthree: Memory mode = HYBRID (MemoryRovol not found, builtin fallback available)")
+    endif()
+endif()
 
 target_include_directories(agentos_coreloopthree PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

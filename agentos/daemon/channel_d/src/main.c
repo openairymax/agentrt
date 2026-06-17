@@ -1,5 +1,7 @@
 #include "atomic_compat.h"
 #include "channel_service.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
 #include "logging.h"
 #include "memory_compat.h"
 #include "svc_logger.h"
@@ -14,6 +16,8 @@
 
 static atomic_int g_running = 1;
 static channel_service_t *g_svc __attribute__((unused)) = NULL;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
 
 static void signal_handler(int sig __attribute__((unused)))
 {
@@ -303,6 +307,11 @@ AGENTOS_STRNCPY_TERM(config.socket_dir, socket_dir, sizeof(config.socket_dir));
     SVC_LOG_INFO("channel_d started (max_channels=%u, socket_dir=%s)", config.max_channels,
                  config.socket_dir);
 
+    g_bsd = daemon_bootstrap_sd_start("channel_d", "channel", AGENTOS_RUNTIME_DIR "/channel.sock",
+                                      0, "channel,core", 0);
+    g_bipc = daemon_bootstrap_ipc_start("channel_d", "channel", AGENTOS_RUNTIME_DIR "/channel.sock",
+                                        0, IPC_BUS_PROTO_JSON_RPC);
+
     while (atomic_load_explicit(&g_running, memory_order_acquire)) {
         /* 替代 sleep(1)，允许更快响应关闭信号 */
         for (int _w = 0; _w < 10 && atomic_load_explicit(&g_running, memory_order_acquire); _w++) {
@@ -310,6 +319,8 @@ AGENTOS_STRNCPY_TERM(config.socket_dir, socket_dir, sizeof(config.socket_dir));
         }
     }
 
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
     SVC_LOG_INFO("channel_d shutting down");
     channel_service_stop(svc);
     channel_service_destroy(svc);

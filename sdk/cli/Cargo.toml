@@ -1,0 +1,53 @@
+[package]
+name = "agentrt-cli"
+version = "0.1.1"
+edition = "2021"
+description = "AgentRT CLI - Command-line interface for AgentRT intelligent agent runtime"
+license = "MIT"
+repository = "https://github.com/spharx/agentrt"
+authors = ["SPHARX Ltd."]
+
+[[bin]]
+name = "agentrt"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# HTTP client for gateway communication
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "socks"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Terminal output
+colored = "2"
+indicatif = "0.17"
+
+# File system operations
+dirs = "5.0"
+tempfile = "3.0"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# URL handling
+url = "2.5"
+urlencoding = "2.1"
+
+# Shell completion
+clap_complete = "4.5"

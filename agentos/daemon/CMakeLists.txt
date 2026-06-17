@@ -1,5 +1,5 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
-# AgentOS Daemon 模块顶层构建文件
+# AgentRT Daemon 模块顶层构建文件
 
 message(STATUS "[DAEMON] Configuring daemon module")
 
@@ -16,7 +16,7 @@ set(DAEMON_VERSION "${PROJECT_VERSION}")
 
 # 打印构建配置
 message(STATUS "========================================")
-message(STATUS "  AgentOS Daemon Build Configuration")
+message(STATUS "  AgentRT Daemon Build Configuration")
 message(STATUS "========================================")
 message(STATUS "  Version:     ${DAEMON_VERSION}")
 message(STATUS "  Build Type:  ${CMAKE_BUILD_TYPE}")
@@ -39,6 +39,8 @@ add_subdirectory(channel_d)
 add_subdirectory(info_d)
 add_subdirectory(notify_d)
 add_subdirectory(observe_d)
+add_subdirectory(hook_d)
+add_subdirectory(plugin_d)
 
 # 全局测试支持
 if(BUILD_TESTS)
@@ -102,6 +104,8 @@ message(STATUS "  - channel_d : ${CMAKE_CURRENT_SOURCE_DIR}/channel_d")
 message(STATUS "  - info_d    : ${CMAKE_CURRENT_SOURCE_DIR}/info_d")
 message(STATUS "  - notify_d  : ${CMAKE_CURRENT_SOURCE_DIR}/notify_d")
 message(STATUS "  - observe_d : ${CMAKE_CURRENT_SOURCE_DIR}/observe_d")
+message(STATUS "  - hook_d    : ${CMAKE_CURRENT_SOURCE_DIR}/hook_d")
+message(STATUS "  - plugin_d  : ${CMAKE_CURRENT_SOURCE_DIR}/plugin_d")
 message(STATUS "")
 
 # 安装支持
@@ -140,14 +144,25 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/market_d/include/
     FILES_MATCHING PATTERN "*.h"
 )
 
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/hook_d/include/
+    DESTINATION include/agentos
+    FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/plugin_d/include/
+    DESTINATION include/agentos
+    FILES_MATCHING PATTERN "*.h"
+)
+
 # 导出项目配置
 if(TARGET svc_common AND TARGET agentos-gateway-d AND TARGET agentos-llm-d AND TARGET agentos-tool-d
    AND TARGET agentos-monit-d AND TARGET agentos-sched-d AND TARGET agentos-market-d
    AND TARGET agentos-channel-d AND TARGET agentos-info-d AND TARGET agentos-notify-d
-   AND TARGET agentos-observe-d)
-    export(TARGETS svc_common agentos-gateway-d agentos-llm-d agentos-tool-d 
+   AND TARGET agentos-observe-d AND TARGET agentos-hook-d AND TARGET agentos-plugin-d)
+    export(TARGETS svc_common agentos-gateway-d agentos-llm-d agentos-tool-d
                   agentos-monit-d agentos-sched-d agentos-market-d agentos-channel-d
                   agentos-info-d agentos-notify-d agentos-observe-d
+                  agentos-hook-d agentos-plugin-d
         FILE "${CMAKE_CURRENT_BINARY_DIR}/agentos-daemon-targets.cmake"
     )
     export(PACKAGE agentos-daemon)

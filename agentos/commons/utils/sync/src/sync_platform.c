@@ -283,6 +283,34 @@ int platform_semaphore_post(platform_semaphore_t *semaphore)
 #endif
 }
 
+int platform_semaphore_timedwait(platform_semaphore_t *semaphore, uint32_t timeout_ms)
+{
+#ifdef _WIN32
+    DWORD ret = WaitForSingleObject(*semaphore, timeout_ms);
+    return (ret == WAIT_OBJECT_0) ? 0 : -1;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += timeout_ms / 1000;
+    ts.tv_nsec += (timeout_ms % 1000) * 1000000L;
+    if (ts.tv_nsec >= 1000000000L) {
+        ts.tv_sec += 1;
+        ts.tv_nsec -= 1000000000L;
+    }
+    return (sem_timedwait(semaphore, &ts) == 0) ? 0 : -1;
+#endif
+}
+
+int platform_semaphore_trywait(platform_semaphore_t *semaphore)
+{
+#ifdef _WIN32
+    DWORD ret = WaitForSingleObject(*semaphore, 0);
+    return (ret == WAIT_OBJECT_0) ? 0 : -1;
+#else
+    return (sem_trywait(semaphore) == 0) ? 0 : -1;
+#endif
+}
+
 int platform_condition_init(platform_condition_t *cond)
 {
 #ifdef _WIN32

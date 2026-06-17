@@ -1,6 +1,4 @@
-[![Star History Rank](https://api.star-history.com/badge?repo=SpharxTeam/AgentOS)](https://www.star-history.com/spharxteam/agentos)
-
-# AgentOS
+# AgentRT - AI Agent Runtime Platform  
 Powered by OpenAirymax
 > 成为人类计算工程史上，第四个"操作系统哲学"
 
@@ -31,7 +29,7 @@ Powered by OpenAirymax
 
 ## 1️⃣ 项目简介
 
-**AgentOS** 是一个智能体底层操作系统，为驱动智能体团队提供完整的操作系统级支持。
+**AgentRT** 是一个智能体运行时平台，为驱动智能体团队提供完整的操作系统级支持。
 
 **1.1  项目预览**
 
@@ -47,7 +45,7 @@ Powered by OpenAirymax
 
 ⚡️
 
-**基石理论** **[《体系并行论》](#)**
+**基石理论** **[《体系并行论》](https://atomgit.com/openairymax/docs/blob/main/Basic_Theories/CN_01_%E4%BD%93%E7%B3%BB%E5%B9%B6%E8%A1%8C%E8%AE%BA.md)**
 
 </div>
 
@@ -81,7 +79,7 @@ Powered by OpenAirymax
 **4.1  架构设计**
 从内核到应用的完整架构：
 ```
-⬇️ 应用层 (openlab)
+⬇️ 生态层 (ecosystem) — 应用/配置/Prompt/Hook/技能
 ⇅ 服务层 (daemon) — 10+ 守护进程服务
 ⇅ 协议层 (protocols) — 5 层统一协议栈
 ⇅ 网关层 (gateway) — HTTP/WS/Stdio → JSON-RPC 2.0
@@ -89,11 +87,11 @@ Powered by OpenAirymax
 ⇅ 安全层 (cupolas) — 4 重内生安全
 ⇅ 内核层 (atoms) — 7 个原子模块
 ⇅ 支撑层 (commons) — 统一基础库
-⬆️ SDK 层 (toolkit)
+⬆️ SDK 层 (sdk) — Python/Go/Rust/TypeScript
 ```
 
 **4.2  设计原则**
-基于 [ARCHITECTURAL_PRINCIPLES](#) 构建：
+基于 [ARCHITECTURAL_PRINCIPLES](https://atomgit.com/openairymax/docs/blob/main/ARCHITECTURAL_PRINCIPLES.md) 构建：
 
 - 系统观：实时响应 <10ms
       反馈闭环，层次分解
@@ -130,8 +128,8 @@ git clone https://atomgit.com/openairymax/agentos.git && cd agentos
 sudo apt install -y build-essential cmake gcc g++ libssl-dev libsqlite3-dev ninja-build
 
 # 3. 构建内核（BAN-33 要求源外构建）
-mkdir /tmp/AgentOS-build && cd /tmp/AgentOS-build
-cmake /path/to/AgentOS -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+mkdir /tmp/AgentRT-build && cd /tmp/AgentRT-build
+cmake /path/to/AgentRT -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build . --parallel $(nproc)
 
 # 4. 运行测试
@@ -142,10 +140,10 @@ ctest --output-on-failure
 
 ```text
 # 构建镜像
-docker build -f scripts/ops/deploy/Dockerfile.kernel -t agentos:latest .
+docker build -f scripts/ops/deploy/Dockerfile.kernel -t agentrt:latest .
 
 # 运行容器
-docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
+docker run -d --name agentrt -p 8080:8080 -v ./config:/app/config agentrt:latest
 ```
 
 **5.4  使用方式**
@@ -154,7 +152,7 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 |:-----|:---------|
 | C/C++ | 通过 `syscalls.h` 系统调用接口开发 |
 | Python | 通过 `pip install agentos` 后直接 import |
-| Go | 通过 `import "github.com/spharx/agentos/toolkit/go"` |
+| Go | 通过 `import "github.com/spharx/agentos/sdk/go"` |
 | Rust | 通过 `use agentos_toolkit::prelude::*;` |
 | TypeScript | 通过 `npm install @spharx/agentos-toolkit` 后直接 import |
 
@@ -162,21 +160,21 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 
 | 文档                                          | 核心内容                 |
 | :------------------------------------------ | :------------------- |
-| [📘 架构原则](#) | 五维正交体系，24 条核心原则      |
-| [🚀 快速开始](#)        | 5 分钟上手指南             |
-| [⚙️ 编译指南](#)             | 详细构建步骤和选项            |
-| [🧪 测试指南](#)           | 单元/集成/契约测试           |
-| [🐳 部署指南](#)        | Docker/Kubernetes 部署 |
+| [📘 架构原则](https://atomgit.com/openairymax/docs/blob/main/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系，24 条核心原则      |
+| [🚀 快速开始](https://atomgit.com/openairymax/docs/blob/main/QUICK_START.md)        | 5 分钟上手指南             |
+| [⚙️ 编译指南](https://atomgit.com/openairymax/docs/blob/main/BUILD_GUIDE.md)             | 详细构建步骤和选项            |
+| [🧪 测试指南](https://atomgit.com/openairymax/docs/blob/main/TESTING_GUIDE.md)           | 单元/集成/契约测试           |
+| [🐳 部署指南](https://atomgit.com/openairymax/docs/blob/main/DEPLOYMENT_GUIDE.md)        | Docker/Kubernetes 部署 |
 
 
 **5.6  常见问题**
 
 <details>
-<summary>👉 Q1: AgentOS 与传统 AI Agent 框架有什么区别？</summary>
+<summary>👉 Q1: AgentRT 与传统 AI Agent 框架有什么区别？</summary>
 
-AgentOS 是操作系统级产品，而非单一框架：
+AgentRT 是操作系统级产品，而非单一框架：
 
-| 维度           | AgentOS    | 传统框架  |
+| 维度           | AgentRT    | 传统框架  |
 | ------------ | ---------- | ----- |
 | **定位**       | 多智能体协作 OS  | 单一智能体 |
 | **架构**       | 微内核 + 严格分层 | 松耦合模块 |
@@ -215,7 +213,7 @@ AgentOS 是操作系统级产品，而非单一框架：
 | 输入净化 | 正则过滤 + 类型检查      |
 | 审计追踪 | 全链路不可篡改日志        |
 
-详见 [cupolas 安全穹顶文档](agentos/cupolas/README.md)
+详见 [cupolas 安全穹顶文档](https://atomgit.com/openairymax/agentos/blob/main/agentos/cupolas/README.md)
 
 </details>
 
@@ -228,7 +226,7 @@ AgentOS 是操作系统级产品，而非单一框架：
 | 系统开发者 | C/C++, 操作系统基础 | 1-2 周深入 |
 | 架构师   | 微内核，分布式系统     | 1 月精通   |
 
-推荐路径：[快速开始](#) → [架构原则](#) → [CoreLoopThree](#)
+推荐路径：[快速开始](https://atomgit.com/openairymax/docs/blob/main/QUICK_START.md) → [架构原则](https://atomgit.com/openairymax/docs/blob/main/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](https://atomgit.com/openairymax/agentos/blob/main/agentos/atoms/coreloopthree/README.md)
 
 </details>
 
@@ -264,7 +262,7 @@ AgentOS 是操作系统级产品，而非单一框架：
 新功能建议，让项目更加强大
 
 **分享：**
-完善文档，帮助更多人了解 AgentOS
+完善文档，帮助更多人了解 AgentRT
 
 **编码：**
 提交 PR，共同创造历史
@@ -281,7 +279,7 @@ AgentOS 是操作系统级产品，而非单一框架：
 Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
 ```
 
-**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+**主要平台**：[AtomGit](https://atomgit.com/openairymax/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
 
 **6.2  贡献者名单：**
 详见 [AUTHORS.md](AUTHORS.md)
@@ -301,22 +299,4 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 <a href="https://atomgit.com/spharx/agentos">AtomGit</a> · <a href="https://gitee.com/spharx/agentos">Gitee</a> · <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> · <a href="https://spharx.cn">官方网站</a>
 
-© 2026 SPHARX Ltd. All Rights Reserved.
-
-</div>
-
-***
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left)](https://star-history.com/#SpharxTeam/AgentOS)
-
-## Global Rank
-
-<a href="https://www.star-history.com/spharxteam/agentos">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&style=landscape1" />
- </picture>
-</a>
+© 2026 SPHARX Ltd. All Rights Reserved.  

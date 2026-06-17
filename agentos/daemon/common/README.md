@@ -1,4 +1,4 @@
-# Common — AgentOS 公共服务库
+# Common — AgentRT 公共服务库
 
 > **模块路径**: `agentos/daemon/common/` | **版本**: v0.1.0
 

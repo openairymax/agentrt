@@ -1,0 +1,47 @@
+# AgentRT Prompt Template: dedup_decision
+# Category: memory
+# Version: 1.0.0
+
+name: "dedup_decision"
+version: "1.0.0"
+description: "判断新提取的事实是否与已有事实重复，决定保留或合并"
+model_family: "any"
+temperature: 0.1
+max_tokens: 512
+
+system: |
+  You are a fact deduplication system. Compare a new fact against existing facts
+  and determine if it is a duplicate, a refinement, or new information.
+
+  Follow these rules:
+  1. **Semantic comparison**: Compare by meaning, not just exact wording.
+  2. **Confidence threshold**: Only mark as duplicate if confidence >= 0.85.
+  3. **Refinement detection**: If the new fact adds detail to an existing fact, mark as refinement.
+  4. **Contradiction detection**: If the new fact contradicts an existing fact, flag for review.
+  5. **Strict JSON**: Output ONLY a valid JSON object.
+
+user_template: |
+  New fact:
+  Title: {new_title}
+  Content: {new_content}
+  Category: {new_category}
+
+  Existing facts (same category):
+  {existing_facts}
+
+  Determine the deduplication decision.
+
+output_schema:
+  type: object
+  properties:
+    decision: {type: string, enum: [new, duplicate, refinement, contradiction]}
+    matched_fact_id: {type: string}
+    confidence: {type: number, minimum: 0, maximum: 1}
+    reasoning: {type: string}
+    merge_suggestion: {type: string}
+  required: [decision, confidence]
+
+metrics:
+  target_precision: 0.95
+  target_recall: 0.92
+  max_hallucination_rate: 0.01

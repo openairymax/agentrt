@@ -1,11 +1,11 @@
 # =============================================================================
-# sanitizer-ci.yml — AgentOS Sanitizer CI Pipeline (SEC-05)
+# sanitizer-ci.yml — AgentRT Sanitizer CI Pipeline (SEC-05)
 # Phase 2.5: 内存安全四层防御体系 — Tier2 检测层自动化
 # 触发: push to main/develop + PR
 # 执行: ASan+LSan build + test + Valgrind memcheck (weekly)
 # =============================================================================
 
-name: AgentOS Sanitizer CI
+name: AgentRT Sanitizer CI
 
 on:
   push:

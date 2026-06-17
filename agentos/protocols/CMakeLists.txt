@@ -1,5 +1,5 @@
 # ========================================================================
-# AgentOS Unified Protocols Module
+# AgentRT Unified Protocols Module
 #
 # Copyright (C) 2026 SPHARX. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 SPHARX.
@@ -328,7 +328,7 @@ install(FILES ${PROTOCOLS_ALL_HEADERS}
 # 构建信息输出
 # ============================================================
 message(STATUS "")
-message(STATUS "=== AgentOS Protocols Module v${PROJECT_VERSION} ===")
+message(STATUS "=== AgentRT Protocols Module v${PROJECT_VERSION} ===")
 message(STATUS "  Common sources:   ${PROTOCOLS_COMMON_SOURCES}")
 message(STATUS "  Core sources:     ${PROTOCOLS_CORE_SOURCES}")
 message(STATUS "  Standard sources: ${PROTOCOLS_STANDARDS_SOURCES}")

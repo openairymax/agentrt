@@ -5,7 +5,7 @@
 
 ## 概述
 
-Integrations 层提供 AgentOS 与主流 AI 平台和生态的集成适配，将各平台特有的 API 和协议映射到 AgentOS 的统一协议体系。当前支持 OpenAI、Claude、OpenJiuwen、OpenClaw（九问）和国内生态五大集成方向。
+Integrations 层提供 AgentRT 与主流 AI 平台和生态的集成适配，将各平台特有的 API 和协议映射到 AgentRT 的统一协议体系。当前支持 OpenAI、Claude、OpenJiuwen、OpenClaw（九问）和国内生态五大集成方向。
 
 ## 目录结构
 

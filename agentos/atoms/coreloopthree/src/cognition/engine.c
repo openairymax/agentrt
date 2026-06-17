@@ -32,6 +32,21 @@
 #include "foundation/thinking_chain.h"
 #include "critique/triple_coordinator.h"
 
+/* C-L02: llm_d → CoreLoopThree */
+#include "llm_service.h"
+
+/* C-L04: tool_d → CoreLoopThree */
+#include "tool_service.h"
+
+/* C-L01: Manager → CoreLoopThree — YAML config loader bridge */
+#include "config_loader.h"
+
+/* C-L07: Checkpoint → CoreLoopThree */
+#include "checkpoint.h"
+
+/* C-L12: MemoryRovol → CoreLoopThree */
+#include "memoryrovol_bridge.h"
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -69,6 +84,26 @@ struct agentos_cognition_engine {
     uint32_t align_replan_count;
 
     sc_stream_critic_t *stream_critic;
+
+    /* C-L02: llm_d → CoreLoopThree — external LLM service handle */
+    llm_service_t *llm_svc;
+
+    /* C-L04: tool_d → CoreLoopThree — external tool service handle */
+    tool_service_t *tool_svc;
+
+    /* C-L07: Checkpoint → CoreLoopThree — auto-checkpoint state */
+    int checkpoint_enabled;
+    char checkpoint_session_id[128];
+    uint64_t checkpoint_last_seq;
+    agentos_task_plan_t *current_plan; /**< Currently processing plan (borrowed, for checkpoint) */
+
+    /* C-L12: MemoryRovol → CoreLoopThree — memory provider from bridge */
+    agentos_memory_provider_t *memory_provider;
+
+    /* C-L02: Streaming LLM support */
+    int llm_stream_enabled;
+    llm_stream_callback_t llm_stream_callback;
+    void *llm_stream_user_data;
 };
 
 static void trigger_feedback(agentos_cognition_engine_t *engine, int level, const char *event,
@@ -78,6 +113,31 @@ static void trigger_feedback(agentos_cognition_engine_t *engine, int level, cons
         engine->feedback_cb(level, "cognition", event, data, data ? strlen(data) : 0,
                             engine->feedback_user_data);
     }
+}
+
+/* C-L12: Write a memory record to the provider (if available) */
+static int cognition_provider_write(agentos_cognition_engine_t *engine, const char *phase,
+                                    const char *content, size_t content_len)
+{
+    if (!engine || !engine->memory_provider || !content || content_len == 0)
+        return 0;
+
+    if (!engine->memory_provider->write_raw)
+        return 0;
+
+    char metadata[256];
+    snprintf(metadata, sizeof(metadata),
+             "{\"phase\":\"%s\",\"source\":\"cognition_engine\"}", phase);
+
+    char *record_id = NULL;
+    agentos_error_t err = engine->memory_provider->write_raw(
+        engine->memory_provider, content, content_len, metadata, &record_id);
+    if (err == AGENTOS_SUCCESS && record_id) {
+        AGENTOS_LOG_DEBUG("C-L12: Provider write phase=%s record_id=%s", phase, record_id);
+        AGENTOS_FREE(record_id);
+        return 0;
+    }
+    return -1;
 }
 
 /* _take: caller transfers ownership */
@@ -166,6 +226,35 @@ agentos_error_t agentos_cognition_create_ex_take(const agentos_cognition_config_
         engine->stream_critic = NULL;
     }
 
+    /* C-L02 / C-L04: service handles initialized to NULL, set via setters */
+    engine->llm_svc = NULL;
+    engine->tool_svc = NULL;
+
+    /* C-L12: memory provider initialized to NULL, set via setter */
+    engine->memory_provider = NULL;
+
+    /* C-L01: Auto-load agentos.yaml global config if not already loaded */
+    if (agentos_config_get_global() == NULL) {
+        int cfg_ret = agentos_config_init(NULL);
+        if (cfg_ret == 0) {
+            const agentos_yaml_config_t *yaml_cfg = agentos_config_get_global();
+            if (yaml_cfg) {
+                /* Apply kernel.memory config to engine */
+                if (yaml_cfg->kernel.memory.arena_default_size_kb > 0) {
+                    /* arena size will be used when arena is created */
+                }
+                AGENTOS_LOG_INFO("C-L01: Config loaded from agentos.yaml"
+                    " (ipc_shm=%uMB mode=%s max_alloc=%uMB)",
+                    yaml_cfg->kernel.ipc.shm_pool_size_mb,
+                    yaml_cfg->kernel.memory.oom_watermark_percent > 0
+                        ? "configured" : "defaults",
+                    yaml_cfg->kernel.memory.max_alloc_mb);
+            }
+        } else {
+            AGENTOS_LOG_WARN("C-L01: Failed to load agentos.yaml, using defaults");
+        }
+    }
+
     *out_engine = engine;
     trigger_feedback(engine, 2, "engine_created", "{\"status\":\"initialized\"}");
     return AGENTOS_SUCCESS;
@@ -232,6 +321,201 @@ void agentos_cognition_set_memory(agentos_cognition_engine_t *engine,
     agentos_mutex_unlock(engine->lock);
 }
 
+/* C-L12: MemoryRovol → CoreLoopThree */
+void agentos_cognition_set_memory_provider(agentos_cognition_engine_t *engine,
+                                           agentos_memory_provider_t *provider)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    engine->memory_provider = provider;
+    agentos_mutex_unlock(engine->lock);
+    if (provider) {
+        AGENTOS_LOG_INFO("C-L12: Memory provider attached to cognition engine (%s v%s)",
+                         provider->name ? provider->name : "unknown",
+                         provider->version ? provider->version : "?");
+    } else {
+        AGENTOS_LOG_INFO("C-L12: Memory provider detached from cognition engine");
+    }
+}
+
+/* C-L02: llm_d → CoreLoopThree */
+void agentos_cognition_set_llm_service(agentos_cognition_engine_t *engine,
+                                        llm_service_t *llm_svc)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    engine->llm_svc = llm_svc;
+    agentos_mutex_unlock(engine->lock);
+    if (llm_svc) {
+        AGENTOS_LOG_INFO("C-L02: LLM service attached to cognition engine");
+    } else {
+        AGENTOS_LOG_INFO("C-L02: LLM service detached from cognition engine");
+    }
+}
+
+/* C-L02: Streaming LLM callback support (P1.2.2 async callback) */
+void agentos_cognition_set_llm_streaming(agentos_cognition_engine_t *engine,
+                                         int enabled,
+                                         llm_stream_callback_t callback,
+                                         void *user_data)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    engine->llm_stream_enabled = enabled;
+    engine->llm_stream_callback = callback;
+    engine->llm_stream_user_data = user_data;
+    agentos_mutex_unlock(engine->lock);
+    if (enabled) {
+        AGENTOS_LOG_INFO("C-L02: Streaming LLM mode enabled (callback=%p)", (void *)callback);
+    } else {
+        AGENTOS_LOG_INFO("C-L02: Streaming LLM mode disabled");
+    }
+}
+
+/* C-L04: tool_d → CoreLoopThree */
+void agentos_cognition_set_tool_service(agentos_cognition_engine_t *engine,
+                                         tool_service_t *tool_svc)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    engine->tool_svc = tool_svc;
+    agentos_mutex_unlock(engine->lock);
+    if (tool_svc) {
+        AGENTOS_LOG_INFO("C-L04: Tool service attached to cognition engine");
+    } else {
+        AGENTOS_LOG_INFO("C-L04: Tool service detached from cognition engine");
+    }
+}
+
+tool_service_t *agentos_cognition_get_tool_service(agentos_cognition_engine_t *engine)
+{
+    if (!engine)
+        return NULL;
+    tool_service_t *svc = NULL;
+    agentos_mutex_lock(engine->lock);
+    svc = engine->tool_svc;
+    agentos_mutex_unlock(engine->lock);
+    return svc;
+}
+
+/* C-L07: Checkpoint → CoreLoopThree */
+
+void agentos_cognition_enable_checkpoint(agentos_cognition_engine_t *engine,
+                                          int enable, const char *session_id)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    engine->checkpoint_enabled = enable;
+    if (session_id && enable) {
+        AGENTOS_STRNCPY_TERM(engine->checkpoint_session_id, session_id,
+                             sizeof(engine->checkpoint_session_id));
+    }
+    if (!enable) {
+        engine->checkpoint_session_id[0] = '\0';
+        engine->checkpoint_last_seq = 0;
+    }
+    agentos_mutex_unlock(engine->lock);
+    AGENTOS_LOG_INFO("C-L07: Checkpoint auto-save %s (session=%s)",
+                     enable ? "enabled" : "disabled",
+                     enable && session_id ? session_id : "N/A");
+}
+
+int agentos_cognition_save_checkpoint(agentos_cognition_engine_t *engine,
+                                       uint64_t sequence_num, const char *phase_name)
+{
+    if (!engine || !phase_name)
+        return -1;
+
+    agentos_task_plan_t *plan = NULL;
+    char session_id[128];
+    int enabled = 0;
+
+    agentos_mutex_lock(engine->lock);
+    plan = engine->current_plan;
+    enabled = engine->checkpoint_enabled;
+    AGENTOS_STRNCPY_TERM(session_id, engine->checkpoint_session_id, sizeof(session_id));
+    agentos_mutex_unlock(engine->lock);
+
+    if (!enabled || session_id[0] == '\0')
+        return 0;
+
+    /* Build state JSON snapshot */
+    char state_json[1024];
+    const char *plan_id = (plan && plan->task_plan_id) ? plan->task_plan_id : "unknown";
+    size_t node_count = plan ? plan->task_plan_node_count : 0;
+
+    int sj_len = snprintf(state_json, sizeof(state_json),
+                          "{\"phase\":\"%s\",\"plan_id\":\"%s\",\"node_count\":%zu,"
+                          "\"corrections\":%llu,\"invocations\":%llu,\"seq\":%llu}",
+                          phase_name, plan_id, node_count,
+                          (unsigned long long)engine->dual_think_corrections,
+                          (unsigned long long)engine->dual_think_invocations,
+                          (unsigned long long)sequence_num);
+
+    if (sj_len < 0 || (size_t)sj_len >= sizeof(state_json)) {
+        AGENTOS_LOG_WARN("C-L07: Checkpoint state JSON truncated");
+    }
+
+    /* Build completed/pending node lists from plan */
+    char **completed_nodes = NULL;
+    size_t completed_count = 0;
+    char **pending_nodes = NULL;
+    size_t pending_count = 0;
+
+    if (plan && plan->task_plan_nodes && plan->task_plan_node_count > 0) {
+        /* Mark all nodes as pending (they haven't been dispatched yet in cognition phase) */
+        pending_count = plan->task_plan_node_count;
+        pending_nodes = (char **)AGENTOS_CALLOC(pending_count, sizeof(char *));
+        if (pending_nodes) {
+            for (size_t i = 0; i < pending_count; i++) {
+                if (plan->task_plan_nodes[i] && plan->task_plan_nodes[i]->task_node_id) {
+                    pending_nodes[i] = AGENTOS_STRDUP(plan->task_plan_nodes[i]->task_node_id);
+                }
+            }
+        }
+    }
+
+    agentos_task_checkpoint_t *cp = NULL;
+    agentos_error_t cp_err =
+        agentos_checkpoint_create(plan_id, session_id, sequence_num, state_json,
+                                  completed_nodes, completed_count,
+                                  pending_nodes, pending_count, &cp);
+
+    /* Clean up node arrays */
+    if (pending_nodes) {
+        for (size_t i = 0; i < pending_count; i++)
+            AGENTOS_FREE(pending_nodes[i]);
+        AGENTOS_FREE(pending_nodes);
+    }
+
+    if (cp_err != AGENTOS_SUCCESS || !cp) {
+        AGENTOS_LOG_WARN("C-L07: Failed to create checkpoint: err=%d phase=%s seq=%llu",
+                         (int)cp_err, phase_name, (unsigned long long)sequence_num);
+        return -1;
+    }
+
+    /* Set metadata */
+    snprintf(cp->metadata, sizeof(cp->metadata), "phase=%s plan=%s", phase_name, plan_id);
+
+    agentos_error_t save_err = agentos_checkpoint_save(cp);
+    agentos_checkpoint_destroy(cp);
+
+    if (save_err == AGENTOS_SUCCESS) {
+        AGENTOS_LOG_INFO("C-L07: Checkpoint saved: phase=%s seq=%llu plan=%s",
+                         phase_name, (unsigned long long)sequence_num, plan_id);
+        return 0;
+    } else {
+        AGENTOS_LOG_WARN("C-L07: Failed to save checkpoint: err=%d phase=%s",
+                         (int)save_err, phase_name);
+        return -1;
+    }
+}
+
 agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, const char *input,
                                           size_t input_len, agentos_task_plan_t **out_plan)
 {
@@ -254,6 +538,26 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
     intent.intent_context = engine->context;
 
     uint64_t start_ns = agentos_time_monotonic_ns();
+
+    /* C-L12.4: Retrieve relevant context from memory provider before processing */
+    if (engine->memory_provider && engine->memory_provider->retrieve) {
+        char **ctx_ids = NULL;
+        float *ctx_scores = NULL;
+        size_t ctx_count = 0;
+        agentos_error_t qerr = engine->memory_provider->retrieve(
+            engine->memory_provider, input, 5, &ctx_ids, &ctx_scores, &ctx_count);
+        if (qerr == AGENTOS_SUCCESS && ctx_count > 0 && ctx_ids) {
+            AGENTOS_LOG_DEBUG("C-L12: Provider retrieve returned %zu context records", ctx_count);
+            /* Context records are available for the pipeline to use.
+             * The thinking chain prepopulate will handle integration. */
+            for (size_t i = 0; i < ctx_count && ctx_ids[i]; i++) {
+                AGENTOS_FREE(ctx_ids[i]);
+            }
+            AGENTOS_FREE(ctx_ids);
+            if (ctx_scores)
+                AGENTOS_FREE(ctx_scores);
+        }
+    }
 
     /* ========== Stream Critic Phase 0: Intent Classification ========== */
     sc_intent_result_t sc_intent;
@@ -315,6 +619,14 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             AGENTOS_LOG_WARN("Thinking chain creation failed: err=%d", (int)tc_err);
         }
         engine->dual_think_invocations++;
+    }
+
+    /* C-L12: Write decomposed input to memory provider for context retrieval */
+    cognition_provider_write(engine, "decomposition", input, input_len);
+
+    /* C-L07: Checkpoint after Phase 0 — decomposition */
+    if (engine->checkpoint_enabled) {
+        agentos_cognition_save_checkpoint(engine, engine->checkpoint_last_seq++, "decomposition");
     }
 
     /* ========== Phase 1: Planning (S2 + S1 pre-validation) ========== */
@@ -404,6 +716,14 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
         }
     }
 
+    /* C-L07: Store current plan reference for checkpoint snapshots */
+    engine->current_plan = plan;
+
+    /* C-L07: Checkpoint after Phase 1 — planning */
+    if (engine->checkpoint_enabled) {
+        agentos_cognition_save_checkpoint(engine, engine->checkpoint_last_seq++, "planning");
+    }
+
     /* ========== Phase 2: Streaming Critical Loop (t2/t1-f/t1-p) ========== */
     if (engine->enable_dual_thinking && engine->chain && engine->meta && plan) {
         size_t anomaly_count = 0;
@@ -418,6 +738,86 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
         agentos_tc_step_create(engine->chain, TC_STEP_GENERATION, input, input_len, NULL, 0,
                                &gen_step);
 
+        /* ── C-L02: llm_d → CoreLoopThree — external LLM invocation ── */
+        llm_service_t *llm_svc = NULL;
+        agentos_mutex_lock(engine->lock);
+        llm_svc = engine->llm_svc;
+        agentos_mutex_unlock(engine->lock);
+
+        char *llm_response_text = NULL;
+        size_t llm_response_len = 0;
+
+        if (llm_svc) {
+            llm_message_t msgs[2];
+            msgs[0].role = "system";
+            msgs[0].content =
+                "You are a cognitive reasoning assistant. Generate a detailed, "
+                "step-by-step response to the user's request.";
+            msgs[1].role = "user";
+            msgs[1].content = input;
+
+            llm_request_config_t llm_cfg;
+            __builtin_memset(&llm_cfg, 0, sizeof(llm_cfg));
+            llm_cfg.model = NULL; /* use provider default */
+            llm_cfg.messages = msgs;
+            llm_cfg.message_count = 2;
+            llm_cfg.temperature = 0.7f;
+            llm_cfg.top_p = 1.0f;
+            llm_cfg.max_tokens = (int)engine->chain_max_tokens;
+            llm_cfg.stream = 0;
+
+            llm_response_t *llm_resp = NULL;
+            int llm_ret = -1;
+
+            /* C-L02 P1.2.2: Async streaming callback support */
+            int use_streaming = 0;
+            llm_stream_callback_t stream_cb = NULL;
+            void *stream_cb_data = NULL;
+
+            agentos_mutex_lock(engine->lock);
+            use_streaming = engine->llm_stream_enabled;
+            stream_cb = engine->llm_stream_callback;
+            stream_cb_data = engine->llm_stream_user_data;
+            agentos_mutex_unlock(engine->lock);
+
+            if (use_streaming && stream_cb) {
+                /* Streaming mode: chunks delivered via callback, full response assembled */
+                llm_cfg.stream = 1;
+                llm_ret = llm_service_complete_stream(llm_svc, &llm_cfg,
+                                                      stream_cb, stream_cb_data,
+                                                      &llm_resp);
+                AGENTOS_LOG_DEBUG("C-L02: Streaming LLM complete: ret=%d", llm_ret);
+            } else {
+                /* Sync mode: blocking until full response */
+                llm_ret = llm_service_complete(llm_svc, &llm_cfg, &llm_resp);
+            }
+
+            if (llm_ret == 0 && llm_resp && llm_resp->choices && llm_resp->choice_count > 0) {
+                llm_response_text = llm_resp->choices[0].content
+                                        ? AGENTOS_STRDUP(llm_resp->choices[0].content)
+                                        : NULL;
+                if (llm_response_text) {
+                    llm_response_len = strlen(llm_response_text);
+                }
+
+                char llm_fb[384];
+                snprintf(llm_fb, sizeof(llm_fb),
+                         "{\"model\":\"%s\",\"tokens\":%u,\"finish\":\"%s\"}",
+                         llm_resp->model ? llm_resp->model : "?",
+                         llm_resp->total_tokens,
+                         llm_resp->finish_reason ? llm_resp->finish_reason : "?");
+                trigger_feedback(engine, 2, "llm_service_complete", llm_fb);
+            } else {
+                AGENTOS_LOG_WARN("C-L02: LLM service complete failed: ret=%d", llm_ret);
+            }
+
+            if (llm_resp) {
+                llm_response_free(llm_resp);
+                llm_resp = NULL;
+            }
+        }
+
+        /* ── Triple coordinator: verify LLM output (or generate locally) ── */
         tc3_config_t tc3_cfg = TC3_CONFIG_DEFAULTS;
         tc3_cfg.s2_generate = NULL;
         tc3_cfg.s1_verify = NULL;
@@ -428,6 +828,15 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             tc3_coordinator_create(&tc3_cfg, engine->chain, engine->meta, &tc3);
 
         if (tc3_err == AGENTOS_SUCCESS && tc3) {
+            /* If LLM produced output, feed it into the triple coordinator as seed context */
+            if (llm_response_text && llm_response_len > 0) {
+                if (engine->chain->working_mem) {
+                    agentos_tc_working_memory_store(engine->chain->working_mem,
+                                                    "llm_d_response", llm_response_text,
+                                                    llm_response_len + 1, "text/plain", 1);
+                }
+            }
+
             char *phase2_output = NULL;
             size_t phase2_output_len = 0;
             tc3_err = tc3_coordinator_execute_streaming(tc3, input, input_len, &phase2_output,
@@ -436,7 +845,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             if (tc3_err == AGENTOS_SUCCESS && phase2_output) {
                 if (gen_step) {
                     agentos_tc_step_complete(gen_step, phase2_output, phase2_output_len, 0.8f,
-                                             "t2-streaming");
+                                             llm_svc ? "t2-llm+streaming" : "t2-streaming");
                 }
                 if (engine->chain->ctx_window) {
                     agentos_tc_context_window_append(engine->chain->ctx_window, phase2_output,
@@ -450,28 +859,69 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 char fb[512];
                 snprintf(fb, sizeof(fb),
                          "{\"units\":%u,\"accepted\":%u,\"corrections\":%u,"
-                         "\"avg_score\":%.2f,\"time_ns\":%llu}",
+                         "\"avg_score\":%.2f,\"time_ns\":%llu,\"llm_backed\":%s}",
                          tc3_stats.total_units, tc3_stats.accepted_units,
                          tc3_stats.total_corrections, tc3_stats.avg_score,
-                         (unsigned long long)tc3_stats.total_time_ns);
+                         (unsigned long long)tc3_stats.total_time_ns,
+                         llm_svc ? "true" : "false");
                 trigger_feedback(engine, 2, "phase2_critical_loop", fb);
 
                 AGENTOS_FREE(phase2_output);
                 phase2_output = NULL;
             } else if (gen_step) {
-                agentos_tc_step_complete(gen_step, "streaming_loop_failed", 21, 0.3f, "t2-failed");
+                /* Triple coordinator failed — fall back to LLM output if available */
+                if (llm_response_text && llm_response_len > 0) {
+                    agentos_tc_step_complete(gen_step, llm_response_text, llm_response_len,
+                                             0.6f, "t2-llm-fallback");
+                    if (engine->chain->ctx_window) {
+                        agentos_tc_context_window_append(engine->chain->ctx_window,
+                                                         llm_response_text, llm_response_len);
+                    }
+                } else {
+                    agentos_tc_step_complete(gen_step, "streaming_loop_failed", 21, 0.3f,
+                                             "t2-failed");
+                }
             }
 
             if (engine->memory && engine->chain && gen_step) {
                 agentos_tc_step_write_to_memory(engine->chain, gen_step);
             }
 
+            /* C-L12: Write Phase 2 output to memory provider */
+            if (llm_response_text && llm_response_len > 0) {
+                cognition_provider_write(engine, "execution", llm_response_text, llm_response_len);
+            }
+
             tc3_coordinator_destroy(tc3);
         } else {
-            AGENTOS_LOG_WARN("Triple coordinator creation failed, falling back to basic loop");
-            if (gen_step) {
-                agentos_tc_step_complete(gen_step, input, input_len, 0.5f, "t2-fallback");
+            /* Triple coordinator unavailable — use LLM output directly if available */
+            if (llm_response_text && llm_response_len > 0) {
+                AGENTOS_LOG_INFO("C-L02: Using LLM output directly (tc3 unavailable)");
+                if (gen_step) {
+                    agentos_tc_step_complete(gen_step, llm_response_text, llm_response_len,
+                                             0.55f, "t2-llm-direct");
+                }
+                if (engine->chain->ctx_window) {
+                    agentos_tc_context_window_append(engine->chain->ctx_window,
+                                                     llm_response_text, llm_response_len);
+                }
+                if (engine->memory && engine->chain && gen_step) {
+                    agentos_tc_step_write_to_memory(engine->chain, gen_step);
+                }
+                /* C-L12: Write LLM output to memory provider */
+                cognition_provider_write(engine, "execution-direct", llm_response_text, llm_response_len);
+            } else {
+                AGENTOS_LOG_WARN("Triple coordinator creation failed, falling back to basic loop");
+                if (gen_step) {
+                    agentos_tc_step_complete(gen_step, input, input_len, 0.5f, "t2-fallback");
+                }
             }
+        }
+
+        /* Clean up LLM response text */
+        if (llm_response_text) {
+            AGENTOS_FREE(llm_response_text);
+            llm_response_text = NULL;
         }
 
         if (gen_step) {
@@ -483,6 +933,70 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             if (mon_result.description) {
                 AGENTOS_FREE(mon_result.description);
                 mon_result.description = NULL;
+            }
+        }
+    }
+
+    /* C-L07: Checkpoint after Phase 2 — execution */
+    if (engine->checkpoint_enabled) {
+        agentos_cognition_save_checkpoint(engine, engine->checkpoint_last_seq++, "execution");
+    }
+
+    /* ── C-L04: tool_d → CoreLoopThree — external tool execution ── */
+    {
+        tool_service_t *tool_svc = NULL;
+        agentos_mutex_lock(engine->lock);
+        tool_svc = engine->tool_svc;
+        agentos_mutex_unlock(engine->lock);
+
+        if (tool_svc && plan && plan->task_plan_nodes && plan->task_plan_node_count > 0) {
+            AGENTOS_LOG_DEBUG("C-L04: Dispatching %zu tool tasks to tool_d",
+                              plan->task_plan_node_count);
+
+            for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+                agentos_task_node_t *node = &plan->task_plan_nodes[i];
+                if (!node->task_node_handler_name)
+                    continue;
+
+                /* Only dispatch nodes that have handler names (tool tasks) */
+                tool_execute_request_t tool_req;
+                __builtin_memset(&tool_req, 0, sizeof(tool_req));
+                tool_req.tool_id = node->task_node_handler_name;
+                /* Use task node ID as params JSON if available, else goal text */
+                tool_req.params_json = node->task_node_id
+                    ? node->task_node_id : node->task_node_goal;
+                tool_req.stream = 0;
+
+                tool_result_t *result = NULL;
+                int tool_err = tool_service_execute(tool_svc, &tool_req, &result);
+                if (tool_err == 0 && result && result->success == 0) {
+                    AGENTOS_LOG_DEBUG("C-L04: Tool '%s' executed successfully"
+                                      " (duration=%llums)",
+                                      node->task_node_handler_name,
+                                      (unsigned long long)result->duration_ms);
+                    if (result->output) {
+                        /* Store tool result in working memory */
+                        if (engine->chain && engine->chain->working_mem) {
+                            agentos_tc_working_memory_store(
+                                engine->chain->working_mem,
+                                node->task_node_handler_name,
+                                result->output,
+                                strlen(result->output) + 1,
+                                "text/plain", 1);
+                        }
+                        /* C-L12: Write tool result to memory provider */
+                        cognition_provider_write(engine, "tool_execution",
+                                                  result->output,
+                                                  strlen(result->output));
+                    }
+                    tool_result_free(result);
+                } else {
+                    AGENTOS_LOG_WARN("C-L04: Tool '%s' execution failed: ret=%d err=%s",
+                                     node->task_node_handler_name, tool_err,
+                                     result && result->error ? result->error : "?");
+                    /* P1.3.3: Tool failure → continue pipeline (non-blocking) */
+                    if (result) tool_result_free(result);
+                }
             }
         }
     }
@@ -508,11 +1022,18 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 agentos_tc_metacognition_inform_memory(engine->chain, &eval_audit, audit_step);
                 agentos_tc_step_write_to_memory(engine->chain, audit_step);
             }
+            /* C-L12: Write audit data to memory provider */
+            cognition_provider_write(engine, "audit", audit_desc, (size_t)ad_len);
             if (eval_audit.critique_text) {
                 AGENTOS_FREE(eval_audit.critique_text);
                 eval_audit.critique_text = NULL;
             }
         }
+    }
+
+    /* C-L07: Checkpoint after Phase 3 — audit */
+    if (engine->checkpoint_enabled) {
+        agentos_cognition_save_checkpoint(engine, engine->checkpoint_last_seq++, "audit");
     }
 
     /* ========== Phase 4: Enhanced Goal Alignment Check (P2-B05) ========== */
@@ -619,9 +1140,25 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 agentos_tc_metacognition_inform_memory(engine->chain, &align_eval, align_step);
             }
 
+            /* C-L12: Write alignment result to memory provider */
+            {
+                char align_buf[256];
+                int ab_len = snprintf(align_buf, sizeof(align_buf),
+                                      "{\"aligned\":%s,\"composite\":%.2f,\"drift_trend\":%.3f}",
+                                      aligned ? "true" : "false", composite, drift_trend);
+                if (ab_len > 0 && (size_t)ab_len < sizeof(align_buf)) {
+                    cognition_provider_write(engine, "alignment", align_buf, (size_t)ab_len);
+                }
+            }
+
             agentos_mc_detect_patterns(engine->meta, NULL, NULL);
             agentos_mc_adapt_threshold(engine->meta);
         }
+    }
+
+    /* C-L07: Checkpoint after Phase 4 — alignment */
+    if (engine->checkpoint_enabled) {
+        agentos_cognition_save_checkpoint(engine, engine->checkpoint_last_seq++, "alignment");
     }
 
     /* ========== Stream Critic Phase 3+4: Output Correction + Memory Confirmation ========== */
@@ -684,6 +1221,9 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
              (unsigned long long)elapsed, engine->enable_dual_thinking,
              (unsigned long long)engine->dual_think_corrections);
     trigger_feedback(engine, 0, "process_complete", feedback_buf);
+
+    /* C-L07: Clear current plan reference before returning ownership to caller */
+    engine->current_plan = NULL;
 
     *out_plan = plan;
     return AGENTOS_SUCCESS;

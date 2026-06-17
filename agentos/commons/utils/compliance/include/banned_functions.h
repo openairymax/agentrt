@@ -100,11 +100,14 @@ static inline struct tm *__banned_gmtime(const time_t *t) { return (gmtime)(t); 
 #endif
 
 /* BAN-151~BAN-162: 危险I/O函数 — gets/scanf系列在非strict模式下也标记为deprecated */
+#include <stdarg.h>
+#include <stdio.h>
+
 __attribute__((deprecated("Use AGENTOS_PRINTF instead — printf() has no output limit")))
 static inline int __agentos_banned_printf(const char *fmt, ...) { va_list ap; va_start(ap, fmt); int r = vprintf(fmt, ap); va_end(ap); return r; }
 
 __attribute__((deprecated("Use fgets instead — gets() has no buffer limit and causes buffer overflow")))
-static inline char *__banned_gets(char *s) { return (gets)(s); }
+static inline char *__banned_gets(char *s) { (void)s; return NULL; }
 
 __attribute__((deprecated("Use fgets+sscanf instead — scanf(\"%s\") has no buffer limit")))
 static inline int __banned_scanf(const char *fmt, ...) { va_list ap; va_start(ap, fmt); int r = vscanf(fmt, ap); va_end(ap); return r; }

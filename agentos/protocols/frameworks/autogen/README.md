@@ -5,7 +5,7 @@
 
 ## 概述
 
-AutoGen 框架适配器实现 AgentOS 与 Microsoft AutoGen 多代理对话框架的完整集成。将 AutoGen 的 ConversableAgent、GroupChat、UserProxyAgent、CodeExecutor 等核心概念映射到 AgentOS 的统一协议体系。
+AutoGen 框架适配器实现 AgentRT 与 Microsoft AutoGen 多代理对话框架的完整集成。将 AutoGen 的 ConversableAgent、GroupChat、UserProxyAgent、CodeExecutor 等核心概念映射到 AgentRT 的统一协议体系。
 
 支持的 AutoGen 特性：
 

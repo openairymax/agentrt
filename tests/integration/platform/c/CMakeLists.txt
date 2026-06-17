@@ -1,5 +1,5 @@
 
-# AgentOS 跨平台兼容性测试 (TeamC P2-C04)
+# AgentRT 跨平台兼容性测试 (TeamC P2-C04)
 
 if(NOT TARGET svc_common)
     message(STATUS "  [platform] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
