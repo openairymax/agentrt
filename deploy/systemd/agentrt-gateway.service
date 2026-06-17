@@ -1,0 +1,28 @@
+# AgentRT systemd unit 文件 — Layer 4: 网关
+# Copyright (C) 2025-2026 SPHARX Ltd.
+# P1.23.2: daemon 启动顺序编排
+
+[Unit]
+Description=AgentRT Gateway Daemon
+After=network.target agentrt-llm.service agentrt-tool.service agentrt-market.service
+Requires=agentrt-llm.service agentrt-tool.service agentrt-market.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/gateway_d
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+# 网关需要绑定特权端口
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=@AGENTOS_RUNTIME_DIR@
+LimitNPROC=1024
+
+[Install]
+WantedBy=multi-user.target

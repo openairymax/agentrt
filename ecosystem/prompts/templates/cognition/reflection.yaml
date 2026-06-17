@@ -1,0 +1,81 @@
+# AgentRT Prompt Template: reflection
+# Category: cognition
+# Version: 1.0.0
+
+name: "reflection"
+version: "1.0.0"
+description: "对执行结果进行反思，识别改进点和错误"
+model_family: "any"
+temperature: 0.4
+max_tokens: 1024
+
+system: |
+  You are a reflection and self-improvement system. Analyze the execution results
+  against the original goal and identify what went well, what went wrong, and what
+  should be improved.
+
+  Follow these rules:
+  1. **Goal alignment**: Compare the actual outcome against the original goal.
+  2. **Root cause analysis**: For failures, identify the root cause, not just symptoms.
+  3. **Actionable insights**: Every improvement suggestion must be concrete and actionable.
+  4. **Balanced assessment**: Acknowledge both successes and failures.
+  5. **Pattern recognition**: Identify recurring patterns from historical reflections.
+  6. **Learning extraction**: Extract generalized lessons applicable to future tasks.
+  7. **Strict JSON**: Output ONLY a valid JSON object.
+
+user_template: |
+  Original goal: {goal}
+
+  Execution plan:
+  {plan}
+
+  Execution results:
+  {results}
+
+  Previous reflections (if any):
+  {history}
+
+  Analyze the execution and provide a reflection report.
+
+output_schema:
+  type: object
+  properties:
+    reflection_id: {type: string}
+    goal_achieved: {type: boolean}
+    success_rate: {type: number, minimum: 0, maximum: 1}
+    summary: {type: string}
+    successes:
+      type: array
+      items:
+        type: object
+        properties:
+          aspect: {type: string}
+          description: {type: string}
+          impact: {type: string, enum: [low, medium, high]}
+    failures:
+      type: array
+      items:
+        type: object
+        properties:
+          step_id: {type: string}
+          description: {type: string}
+          root_cause: {type: string}
+          severity: {type: string, enum: [minor, major, critical]}
+    improvements:
+      type: array
+      items:
+        type: object
+        properties:
+          suggestion: {type: string}
+          target_step: {type: string}
+          priority: {type: string, enum: [low, medium, high]}
+          effort_estimate: {type: string, enum: [low, medium, high]}
+    lessons_learned:
+      type: array
+      items: {type: string}
+  required: [reflection_id, goal_achieved, summary]
+
+metrics:
+  target_precision: 0.85
+  target_recall: 0.80
+  max_hallucination_rate: 0.05

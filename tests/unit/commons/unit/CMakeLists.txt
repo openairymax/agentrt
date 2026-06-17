@@ -1,4 +1,4 @@
-# AgentOS Commons 单元测试
+# AgentRT Commons 单元测试
 
 add_executable(commons_unit_test
     io_test.c

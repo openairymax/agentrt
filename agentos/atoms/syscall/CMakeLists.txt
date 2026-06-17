@@ -39,7 +39,7 @@ target_include_directories(agentos_syscall PUBLIC
     $<INSTALL_INTERFACE:include/agentos/syscall>
 )
 
-# 安全编译选项（基于 AgentOS C 编码风格指南附录 A）
+# 安全编译选项（基于 AgentRT C 编码风格指南附录 A）
 if(MSVC)
     target_compile_options(agentos_syscall PRIVATE /W4 /WX)
     target_compile_definitions(agentos_syscall PRIVATE _CRT_SECURE_NO_WARNINGS)

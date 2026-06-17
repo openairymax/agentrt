@@ -25,10 +25,10 @@ Closes #____ (如有)
 
 - [ ] 本地构建通过：
   ```bash
-  cmake -B ../AgentOS-build -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
-  cmake --build ../AgentOS-build --parallel 8
+  cmake -B ../AgentRT-build -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+  cmake --build ../AgentRT-build --parallel 8
   ```
-- [ ] 测试通过：`cd ../AgentOS-build && ctest --output-on-failure`
+- [ ] 测试通过：`cd ../AgentRT-build && ctest --output-on-failure`
 - [ ] 代码风格通过：`clang-format --dry-run --Werror` 对所有变更的 `.c`/`.h` 文件
 
 ### 代码质量

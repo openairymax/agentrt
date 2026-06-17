@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 更新manager模块中的openlab路径引用
-将 openlab/contrib/ 更新为 agentos/openlab/contrib/
+将 openlab/contrib/ 更新为 ecosystem/openlab/contrib/
 """
 
 import os
@@ -25,7 +25,7 @@ def update_file(file_path):
         # 执行替换
         new_content = re.sub(
             r'openlab/contrib/(agents|skills)/',
-            r'agentos/openlab/contrib/\1/',
+            r'ecosystem/openlab/contrib/\1/',
             content
         )
         
@@ -59,7 +59,7 @@ def update_file(file_path):
 def main():
     """主函数"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    base_dir = os.path.join(script_dir, "../../agentos/manager")
+    base_dir = os.path.join(script_dir, "../../ecosystem/manager")
     
     # 需要更新的文件
     files_to_update = [

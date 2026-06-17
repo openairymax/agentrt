@@ -124,11 +124,11 @@ sudo apt install -y build-essential cmake gcc g++ libssl-dev \
 ```bash
 # 使用 Poetry（推荐）
 curl -sSL https://install.python-poetry.org | python3 -
-cd agentos/openlab && poetry install && poetry shell
+cd ecosystem/openlab && poetry install && poetry shell
 
 # 或使用 pip
 python3 -m venv venv && source venv/bin/activate
-cd agentos/openlab && pip install -r requirements.txt
+cd ecosystem/openlab && pip install -r requirements.txt
 ```
 
 #### vcpkg C++ 包管理
@@ -193,12 +193,12 @@ git config commit.template .gitmessage-template
 find agentos -name "*.c" -o -name "*.h" | xargs clang-format -i
 
 # Python
-black agentos/openlab/ agentos/manager/
-isort agentos/openlab/ agentos/manager/
+black ecosystem/openlab/ ecosystem/manager/
+isort ecosystem/openlab/ ecosystem/manager/
 
 # 检查
-flake8 agentos/openlab/ agentos/manager/
-mypy agentos/openlab/
+flake8 ecosystem/openlab/ ecosystem/manager/
+mypy ecosystem/openlab/
 ```
 
 ---
@@ -283,12 +283,12 @@ git checkout -b feature/your-feature-name
 ```bash
 # 1. 代码格式化（BAN-34 合规）
 find agentos -name "*.c" -o -name "*.h" | xargs clang-format -i
-black agentos/openlab/ && isort agentos/openlab/
+black ecosystem/openlab/ && isort ecosystem/openlab/
 
 # 2. 静态分析
 cppcheck --enable=all agentos/
-flake8 agentos/openlab/
-mypy agentos/openlab/
+flake8 ecosystem/openlab/
+mypy ecosystem/openlab/
 
 # 3. 构建验证（S-02/S-05 合规：使用统一构建目录）
 cmake -B ../AgentOS-build -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
@@ -299,7 +299,7 @@ cd ../AgentOS-build && ctest --output-on-failure
 cd ../AgentOS && python -m pytest tests/ -v
 
 # 5. 安全检查
-bandit -r agentos/openlab/
+bandit -r ecosystem/openlab/
 
 # 6. BAN 检查（S-08 合规：运行质量门禁脚本）
 scripts/ci/pipeline/quality-gate.sh --strict

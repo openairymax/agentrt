@@ -17,6 +17,7 @@
 #include "confidence_calibrator.h"
 #include "daemon_defaults.h"
 #include "ipc_service_bus.h"
+#include "llm_service.h"
 #include "memory_compat.h"
 #include "memory_provider.h"
 #include "metacognition.h"
@@ -26,6 +27,7 @@
 #include "svc_common.h"
 #include "svc_logger.h"
 #include "thread_pool.h"
+#include "tool_service.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -1849,6 +1851,32 @@ void orchestrator_set_progress_callback(orchestrator_t *orch, orch_progress_cb_t
         return;
     orch->progress_cb = callback;
     orch->progress_data = user_data;
+}
+
+/* ── C-L06: Orchestrator → CoreLoopThree 连接线 ── */
+
+void orchestrator_set_cognition_llm_service(orchestrator_t *orch, llm_service_t *llm_svc)
+{
+    if (!orch)
+        return;
+    if (orch->cognition) {
+        agentos_cognition_set_llm_service(orch->cognition, llm_svc);
+        SVC_LOG_INFO("C-L06: LLM service injected into orchestrator's cognition engine");
+    } else {
+        SVC_LOG_WARN("C-L06: Cannot inject LLM service — cognition engine not initialized");
+    }
+}
+
+void orchestrator_set_cognition_tool_service(orchestrator_t *orch, tool_service_t *tool_svc)
+{
+    if (!orch)
+        return;
+    if (orch->cognition) {
+        agentos_cognition_set_tool_service(orch->cognition, tool_svc);
+        SVC_LOG_INFO("C-L06: Tool service injected into orchestrator's cognition engine");
+    } else {
+        SVC_LOG_WARN("C-L06: Cannot inject tool service — cognition engine not initialized");
+    }
 }
 
 orch_task_status_t orchestrator_get_task_status(orchestrator_t *orch, const char *task_id)

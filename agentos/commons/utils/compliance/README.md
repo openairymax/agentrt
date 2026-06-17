@@ -5,7 +5,7 @@
 
 ## 概述
 
-Compliance 是 AgentOS 的代码合规性实施模块，通过禁止危险函数、强制安全 API 替代、以及合规性策略校验，确保所有 AgentOS 代码满足安全编码标准。该模块是 Commons 安全基础设施的核心，与根 CMakeLists.txt 的 `AGENTOS_COMPLIANCE_STRICT` 选项联动，在编译期强制执行安全编码规范。
+Compliance 是 AgentRT 的代码合规性实施模块，通过禁止危险函数、强制安全 API 替代、以及合规性策略校验，确保所有 AgentOS 代码满足安全编码标准。该模块是 Commons 安全基础设施的核心，与根 CMakeLists.txt 的 `AGENTOS_COMPLIANCE_STRICT` 选项联动，在编译期强制执行安全编码规范。
 
 ## 设计目标
 

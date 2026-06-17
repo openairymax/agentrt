@@ -1,0 +1,32 @@
+# AgentRT Prompt 调优示例配置
+
+agent:
+  name: prompt-tuner-agent
+  version: "1.0.0"
+  model: gpt-4o
+  system_prompt: |
+    你是一个事实提取专家。请从用户提供的文本中提取所有关键事实，
+    以结构化格式输出，不遗漏关键信息，不编造不存在的信息。
+
+# 评估配置
+evaluation:
+  # 评估数据集路径
+  dataset: eval/sample_dataset.jsonl
+
+  # 评分策略
+  scorer:
+    strategy: fuzzy_match
+    # LLM Judge 配置（当 strategy 为 llm_judge 时使用）
+    # judge_model: gpt-4o
+    # judge_temperature: 0.0
+
+  # 评估输出
+  output:
+    format: json
+    path: eval/results/
+
+# 运行时配置
+runtime:
+  max_retries: 3
+  timeout: 60
+  log_level: info

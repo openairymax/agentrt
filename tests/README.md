@@ -4,7 +4,7 @@
 
 ## 概述
 
-`tests/` 目录是 AgentOS 项目的集中测试套件，涵盖从底层内核到上层应用的完整测试体系。测试框架采用 C（CMocka）和 Python（pytest）双语言实现，支持单元测试、集成测试、契约测试、性能基准测试和安全测试等多层次验证。
+`tests/` 目录是 AgentRT 项目的集中测试套件，涵盖从底层内核到上层应用的完整测试体系。测试框架采用 C（CMocka）和 Python（pytest）双语言实现，支持单元测试、集成测试、契约测试、性能基准测试和安全测试等多层次验证。
 
 本目录作为所有测试活动的根入口，包含全局配置文件、构建脚本以及五个子目录，分别对应不同测试层级。C 语言测试通过 CMake + CMocka 构建，Python 测试通过 pytest 驱动，性能基准测试使用 pytest-benchmark，Shell 脚本测试使用 bats-core。所有测试均可通过统一入口 `utils/python/run_tests.py` 执行，也支持直接使用 pytest 或 ctest 运行。
 
@@ -28,9 +28,9 @@
 | `unit/daemon/monit_d/` | `agentos/daemon/monit_d/` | CMocka — 监控告警守护进程 |
 | `unit/daemon/tool_d/` | `agentos/daemon/tool_d/` | CMocka + pytest — 工具执行守护进程 |
 | `unit/heapstore/` | `agentos/heapstore/` | CMocka — 运行时数据存储（SQLite + 内存后端混合存储） |
-| `unit/manager/` | `agentos/manager/` | pytest — 统一配置管理中心（多模块 Schema + 热重载） |
-| `unit/openlab/` | `agentos/openlab/` | pytest — 开放生态系统（Apps/Contrib/Markets） |
-| `unit/toolkit/` | `agentos/toolkit/` + `scripts/toolkit/` | pytest — 运维工具包与多语言 SDK（Python/Rust） |
+| `unit/manager/` | `ecosystem/manager/` | pytest — 统一配置管理中心（多模块 Schema + 热重载） |
+| `unit/openlab/` | `ecosystem/openlab/` | pytest — 开放生态系统（Apps/Contrib/Markets） |
+| `unit/toolkit/` | `sdk/` + `scripts/toolkit/` | pytest — 运维工具包与多语言 SDK（Python/Rust） |
 | `integration/c/` | `agentos/atoms/`, `agentos/commons/`, `agentos/gateway/` | CMocka — C 层端到端核心集成与协议兼容性 |
 | `integration/python/` | `agentos/daemon/`, `agentos/gateway/`, `agentos/heapstore/` | pytest — Python 层端到端工作流与协议兼容性 |
 | `integration/commons/` | `agentos/commons/` | CMocka — Commons 统一基础库集成测试 |
@@ -45,7 +45,7 @@
 | `security/c/` | `agentos/cupolas/` | CMocka — C 层安全审计 |
 | `security/cupolas/` | `agentos/cupolas/` | C — Cupolas 安全模糊测试 |
 | `security/python/` | `agentos/cupolas/` | pytest — Python 层安全测试 |
-| `contract/python/` | `agentos/daemon/`, `agentos/openlab/` | pytest — 接口契约验证 |
+| `contract/python/` | `agentos/daemon/`, `ecosystem/openlab/` | pytest — 接口契约验证 |
 
 ## 目录结构
 

@@ -4,7 +4,7 @@
 
 ## 概述
 
-`daemon/gateway_d/` 是 AgentOS 的 API 网关守护进程，作为整个系统的流量入口，负责将外部客户端的 HTTP/WebSocket/Stdio 请求转换为内部 JSON-RPC 2.0 调用，并路由到对应的服务守护进程。它是外部世界与 AgentOS 内部服务之间的唯一入口点，承担协议转换、请求路由、连接管理、限流熔断和 TLS 终止等核心职责。
+`daemon/gateway_d/` 是 AgentRT 的 API 网关守护进程，作为整个系统的流量入口，负责将外部客户端的 HTTP/WebSocket/Stdio 请求转换为内部 JSON-RPC 2.0 调用，并路由到对应的服务守护进程。它是外部世界与 AgentOS 内部服务之间的唯一入口点，承担协议转换、请求路由、连接管理、限流熔断和 TLS 终止等核心职责。
 
 ### 架构定位
 

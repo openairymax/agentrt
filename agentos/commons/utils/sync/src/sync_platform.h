@@ -266,6 +266,21 @@ int platform_semaphore_wait(platform_semaphore_t *semaphore);
 int platform_semaphore_post(platform_semaphore_t *semaphore);
 
 /**
+ * @brief 平台信号量超时等待
+ * @param[in] semaphore 信号量指针
+ * @param[in] timeout_ms 超时时间（毫秒）
+ * @return 0 成功，非0 失败/超时
+ */
+int platform_semaphore_timedwait(platform_semaphore_t *semaphore, uint32_t timeout_ms);
+
+/**
+ * @brief 平台信号量尝试等待
+ * @param[in] semaphore 信号量指针
+ * @return 0 成功，非0 失败/忙
+ */
+int platform_semaphore_trywait(platform_semaphore_t *semaphore);
+
+/**
  * @brief 平台条件变量初始化
  * @return 0 成功，非0 失败
  */

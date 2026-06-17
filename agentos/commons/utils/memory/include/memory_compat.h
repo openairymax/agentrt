@@ -347,6 +347,52 @@ static inline char *agentos_strndup(const char *str, size_t n)
     agentos_free(ptr); \
 } while (0)
 
+/* ==================== P1.19: Arena 分配器集成 ==================== */
+
+/**
+ * @defgroup arena_alloc Arena 短生命周期分配
+ * @{
+ *
+ * P1.19: ALLOC_SHORT_LIVED 类别使用 Arena 分配器。
+ * Arena 分配器提供 O(1) 分配和 O(1) 整体释放，适合请求处理路径。
+ *
+ * 用法：
+ *   AGENTOS_ARENA_PUSH(arena);          // 设置当前线程的 Arena
+ *   void *p = AGENTOS_ARENA_ALLOC(128); // 从 Arena 分配
+ *   AGENTOS_ARENA_POP();                // 恢复之前的 Arena
+ *
+ * 或者直接使用 Arena 句柄：
+ *   void *p = agentos_arena_alloc(arena, 128);
+ *   agentos_arena_reset(arena);  // 整体释放
+ */
+
+#include "arena.h"
+
+/**
+ * @def AGENTOS_ARENA_ALLOC(size)
+ * @brief 从当前线程 Arena 分配内存
+ *
+ * 如果当前线程没有设置 Arena，回退到 AGENTOS_MALLOC。
+ */
+#define AGENTOS_ARENA_ALLOC(size) \
+    (agentos_arena_get_current() ? \
+     agentos_arena_alloc(agentos_arena_get_current(), size) : \
+     AGENTOS_MALLOC(size))
+
+/**
+ * @brief 获取当前线程的 Arena（线程局部存储）
+ * @return Arena 句柄，未设置时返回 NULL
+ */
+agentos_arena_t *agentos_arena_get_current(void);
+
+/**
+ * @brief 设置当前线程的 Arena
+ * @param arena Arena 句柄（可为 NULL 清除）
+ */
+void agentos_arena_set_current(agentos_arena_t *arena);
+
+/** @} */
+
 /**
  * @defgroup safe_memory_alloc 安全内存分配宏（SEC-016合规）
  * @{

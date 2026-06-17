@@ -4,7 +4,7 @@
 
 ## 概述
 
-`unit/` 目录是 AgentOS 的单元测试中心，共 **138 个文件**（含 3 个结构文件），涵盖从底层内核到上层框架的全面验证。C 语言使用 CMocka 框架，Python 使用 pytest 框架。每个测试文件专注于验证单个模块或函数的正确性，确保各组件在隔离环境下行为符合预期。
+`unit/` 目录是 AgentRT 的单元测试中心，共 **138 个文件**（含 3 个结构文件），涵盖从底层内核到上层框架的全面验证。C 语言使用 CMocka 框架，Python 使用 pytest 框架。每个测试文件专注于验证单个模块或函数的正确性，确保各组件在隔离环境下行为符合预期。
 
 单元测试遵循以下原则：
 - **隔离性**：每个测试用例独立运行，不依赖其他测试的状态
@@ -33,9 +33,9 @@
 | `daemon/monit_d/` | `agentos/daemon/monit_d/` | 监控告警守护进程（监控器/追踪/告警/指标） |
 | `daemon/common/` | `agentos/daemon/common/` | 公共服务库（IPC 客户端/输入验证/服务认证/配置/错误处理/安全字符串/JSON-RPC 辅助/平台/日志） |
 | `heapstore/` | `agentos/heapstore/` | 运行时数据存储（核心/注册表/批量/IPC/日志/内存/追踪/集成/安全路径遍历/模糊并发/边界/基准/批量性能） |
-| `manager/` | `agentos/manager/` | 统一配置管理中心（配置验证/语法检查/集成/Schema 验证/漂移检测/审计日志验证） |
-| `openlab/` | `agentos/openlab/` | 开放生态系统（Agent/任务/工具/存储/规划/调度/视频编辑/多 Agent） |
-| `toolkit/` | `agentos/toolkit/` + `scripts/toolkit/` | 运维工具包与多语言 SDK（Python SDK/Rust SDK/管理器/检查点/导入/综合/基准性能/Agent/任务管理器重构） |
+| `manager/` | `ecosystem/manager/` | 统一配置管理中心（配置验证/语法检查/集成/Schema 验证/漂移检测/审计日志验证） |
+| `openlab/` | `ecosystem/openlab/` | 开放生态系统（Agent/任务/工具/存储/规划/调度/视频编辑/多 Agent） |
+| `toolkit/` | `sdk/` + `scripts/toolkit/` | 运维工具包与多语言 SDK（Python SDK/Rust SDK/管理器/检查点/导入/综合/基准性能/Agent/任务管理器重构） |
 
 ## 目录结构
 

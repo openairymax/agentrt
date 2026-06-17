@@ -16,7 +16,7 @@ from pathlib import Path
 # 添加agentos到路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "agentos" / "openlab"))
 
-# openlab 子模块结构: agentos/openlab/openlab/
+# openlab 子模块结构: ecosystem/openlab/openlab/
 # openlab.contrib.* 模块尚未实现，测试跳过
 pytestmark = pytest.mark.skip(reason="openlab.contrib.* 子模块尚未实现")
 
@@ -344,7 +344,7 @@ class TestAgentContracts:
     def test_architect_contract_exists(self):
         """测试架构师合约文件存在性"""
         contract_path = Path(__file__).parent.parent.parent / \
-                         "agentos/openlab/contrib/agents/architect/contract.json"
+                         "ecosystem/openlab/contrib/agents/architect/contract.json"
 
         assert contract_path.exists()
 
@@ -365,7 +365,7 @@ class TestAgentContracts:
 
         for agent_name in agents:
             contract_path = Path(__file__).parent.parent.parent / \
-                             f"agentos/openlab/contrib/agents/{agent_name}/contract.json"
+                             f"ecosystem/openlab/contrib/agents/{agent_name}/contract.json"
 
             assert contract_path.exists(), f"{agent_name} missing contract.json"
 
