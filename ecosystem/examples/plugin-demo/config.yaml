@@ -1,0 +1,39 @@
+# AgentRT 插件开发示例配置
+# 演示如何在配置中注册四种类型的插件
+
+agent:
+  name: plugin-demo-agent
+  version: "1.0.0"
+  model: gpt-4o
+  system_prompt: |
+    你是一个演示 Agent，展示了 AgentRT 的四种插件类型。
+    你可以使用天气查询工具，具备代码审查技能，
+    并且所有调用都会被日志钩子记录。
+
+# 插件注册
+plugins:
+  # AgentPlugin — 自定义 Agent 行为
+  agents:
+    - module: plugins.my_agent_plugin
+      class: MyCustomAgent
+
+  # ToolPlugin — 可调用的工具
+  tools:
+    - module: plugins.my_tool_plugin
+      class: WeatherTool
+
+  # HookPlugin — 生命周期钩子
+  hooks:
+    - module: plugins.my_hook_plugin
+      class: LoggingHook
+
+  # SkillPlugin — 可复用技能
+  skills:
+    - module: plugins.my_skill_plugin
+      class: CodeReviewSkill
+
+# 运行时配置
+runtime:
+  max_retries: 3
+  timeout: 30
+  log_level: info

@@ -84,4 +84,4 @@ if(BUILD_TESTS)
     endif()
 endif()
 
-message(STATUS "AgentOS heapstore v${PROJECT_VERSION}")
+message(STATUS "AgentRT heapstore v${PROJECT_VERSION}")

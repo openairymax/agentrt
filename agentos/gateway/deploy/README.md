@@ -5,7 +5,7 @@
 
 ## 概述
 
-`gateway/deploy/` 包含 AgentOS Gateway 的 Kubernetes 部署配置，提供从开发环境到生产环境的完整部署方案。K8s 配置支持多环境 ConfigMap、滚动更新、自动扩缩容、网络策略和 Ingress TLS 终止。
+`gateway/deploy/` 包含 AgentRT Gateway 的 Kubernetes 部署配置，提供从开发环境到生产环境的完整部署方案。K8s 配置支持多环境 ConfigMap、滚动更新、自动扩缩容、网络策略和 Ingress TLS 终止。
 
 ## 目录结构
 

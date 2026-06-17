@@ -736,3 +736,239 @@ void agentos_oom_report_stats(void)
 
     agentos_mutex_unlock(&handler->pressure_mutex);
 }
+
+/* ============================================================================
+ * OOM YAML 配置支持实现（P0.11）
+ * ============================================================================ */
+
+/* 当前活跃配置 */
+static agentos_oom_config_t g_oom_config;
+
+void agentos_oom_config_defaults(agentos_oom_config_t *config)
+{
+    if (!config) return;
+
+    config->warning_threshold     = OOM_PRESSURE_THRESHOLD_WARNING;
+    config->degraded_threshold    = OOM_PRESSURE_THRESHOLD_DEGRADED;
+    config->critical_threshold    = OOM_PRESSURE_THRESHOLD_CRITICAL;
+    config->fatal_threshold       = OOM_PRESSURE_THRESHOLD_FATAL;
+    config->check_interval_ms     = 1000;
+    config->recovery_cooldown_ms  = 5000;
+    config->enable_auto_recovery  = true;
+    config->enable_allocation_check = true;
+    config->emergency_pool_size   = 1024 * 1024; /* 1MB */
+    config->max_heap_size         = 0; /* 自动检测 */
+}
+
+int agentos_oom_config_load(const char *config_path,
+                             agentos_oom_config_t *config)
+{
+    if (!config_path || !config) return AGENTOS_EINVAL;
+
+    /* 先填充默认值 */
+    agentos_oom_config_defaults(config);
+
+    /* TODO: Phase 1 实现 - 使用 config_unified 解析 agentos.yaml 的
+     * agentos.oom.* 配置节，覆盖默认值。
+     * 当前返回默认配置，yaml 解析在 Phase 1 P1.19 中实现。 */
+
+    AGENTOS_LOG_INFO("[OOM] Config loaded (defaults, yaml parsing pending): %s",
+            config_path);
+    return 0;
+}
+
+int agentos_oom_config_apply(const agentos_oom_config_t *config)
+{
+    if (!config) return AGENTOS_EINVAL;
+    if (!g_oom_handler) return AGENTOS_ENOTINIT;
+
+    /* 验证阈值合理性 */
+    if (config->warning_threshold >= config->degraded_threshold ||
+        config->degraded_threshold >= config->critical_threshold ||
+        config->critical_threshold >= config->fatal_threshold) {
+        AGENTOS_LOG_ERROR("[OOM] Invalid threshold order in config");
+        return AGENTOS_EINVAL;
+    }
+
+    /* 保存配置 */
+    g_oom_config = *config;
+
+    AGENTOS_LOG_INFO("[OOM] Config applied: warning=%.0f%% degraded=%.0f%% "
+            "critical=%.0f%% fatal=%.0f%% auto_recovery=%s",
+            config->warning_threshold * 100,
+            config->degraded_threshold * 100,
+            config->critical_threshold * 100,
+            config->fatal_threshold * 100,
+            config->enable_auto_recovery ? "true" : "false");
+
+    return 0;
+}
+
+/* ============================================================================
+ * Per-Daemon OOM 回调实现（P0.11）
+ * ============================================================================ */
+
+#define OOM_MAX_DAEMON_CALLBACKS 16
+
+static agentos_daemon_oom_registration_t g_daemon_oom_callbacks[OOM_MAX_DAEMON_CALLBACKS];
+static size_t g_daemon_oom_count = 0;
+
+int agentos_oom_register_daemon_callback(
+    const agentos_daemon_oom_registration_t *reg)
+{
+    if (!reg || !reg->daemon_name || !reg->callback) return AGENTOS_EINVAL;
+    if (g_daemon_oom_count >= OOM_MAX_DAEMON_CALLBACKS) return AGENTOS_EBUSY;
+
+    /* 检查重名 */
+    for (size_t i = 0; i < g_daemon_oom_count; i++) {
+        if (strcmp(g_daemon_oom_callbacks[i].daemon_name,
+                   reg->daemon_name) == 0) {
+            /* 更新已有注册 */
+            g_daemon_oom_callbacks[i] = *reg;
+            return 0;
+        }
+    }
+
+    g_daemon_oom_callbacks[g_daemon_oom_count] = *reg;
+    g_daemon_oom_count++;
+
+    AGENTOS_LOG_INFO("[OOM] Daemon OOM callback registered: %s (priority=%d)",
+            reg->daemon_name, reg->priority);
+    return 0;
+}
+
+int agentos_oom_unregister_daemon_callback(const char *daemon_name)
+{
+    if (!daemon_name) return AGENTOS_EINVAL;
+
+    for (size_t i = 0; i < g_daemon_oom_count; i++) {
+        if (strcmp(g_daemon_oom_callbacks[i].daemon_name,
+                   daemon_name) == 0) {
+            g_daemon_oom_callbacks[i] =
+                g_daemon_oom_callbacks[g_daemon_oom_count - 1];
+            g_daemon_oom_count--;
+            return 0;
+        }
+    }
+    return AGENTOS_ENOENT;
+}
+
+size_t agentos_oom_fire_daemon_callbacks(agentos_mem_pressure_level_t pressure)
+{
+    if (!g_oom_handler) return 0;
+
+    size_t total_freed = 0;
+    size_t current_allocated = 0;
+    if (g_oom_handler->ext_stats) {
+        current_allocated = g_oom_handler->ext_stats->current_allocated;
+    }
+
+    /* 按优先级降序遍历（简化：线性扫描找最高优先级） */
+    for (int pass = 0; pass < 2; pass++) {
+        for (size_t i = 0; i < g_daemon_oom_count; i++) {
+            agentos_daemon_oom_registration_t *reg =
+                &g_daemon_oom_callbacks[i];
+            if (!reg->enabled) continue;
+
+            /* pass 0: 高优先级(>50), pass 1: 低优先级 */
+            bool is_high = reg->priority > 50;
+            if ((pass == 0 && !is_high) || (pass == 1 && is_high)) continue;
+
+            size_t freed = reg->callback(
+                reg->daemon_name,
+                pressure,
+                current_allocated,
+                g_oom_handler->total_system_memory,
+                reg->user_data);
+
+            if (freed > 0) {
+                total_freed += freed;
+                AGENTOS_LOG_INFO("[OOM] Daemon %s released %zu bytes "
+                        "under %s pressure",
+                        reg->daemon_name, freed,
+                        oom_pressure_name(pressure));
+            }
+        }
+    }
+
+    return total_freed;
+}
+
+/* ============================================================================
+ * OOM 恢复策略实现（P0.11）
+ * ============================================================================ */
+
+#define OOM_MAX_RECOVERY_CALLBACKS 8
+
+static agentos_oom_recovery_cb_t g_recovery_callbacks[OOM_MAX_RECOVERY_CALLBACKS];
+static void *g_recovery_user_data[OOM_MAX_RECOVERY_CALLBACKS];
+static size_t g_recovery_count = 0;
+static uint64_t g_last_recovery_time_ms = 0;
+
+int agentos_oom_register_recovery_callback(
+    agentos_oom_recovery_cb_t callback, void *user_data)
+{
+    if (!callback) return AGENTOS_EINVAL;
+    if (g_recovery_count >= OOM_MAX_RECOVERY_CALLBACKS) return AGENTOS_EBUSY;
+
+    g_recovery_callbacks[g_recovery_count] = callback;
+    g_recovery_user_data[g_recovery_count] = user_data;
+    g_recovery_count++;
+    return 0;
+}
+
+bool agentos_oom_should_recover(void)
+{
+    if (!g_oom_handler) return false;
+
+    /* 仅在压力低于 WARNING 时考虑恢复 */
+    if (g_oom_handler->current_pressure >= AGENTOS_MEM_PRESSURE_WARNING) {
+        return false;
+    }
+
+    /* 检查冷却期 */
+    uint64_t now = oom_get_timestamp_ms();
+    uint64_t cooldown = g_oom_config.recovery_cooldown_ms;
+    if (cooldown == 0) cooldown = 5000;
+
+    if (now - g_last_recovery_time_ms < cooldown) {
+        return false;
+    }
+
+    return true;
+}
+
+int agentos_oom_recover(void)
+{
+    if (!g_oom_handler) return AGENTOS_ENOTINIT;
+
+    agentos_mem_pressure_level_t old_level = g_oom_handler->current_pressure;
+    agentos_mem_pressure_level_t new_level = AGENTOS_MEM_PRESSURE_NORMAL;
+
+    g_last_recovery_time_ms = oom_get_timestamp_ms();
+
+    /* 通知所有恢复回调 */
+    for (size_t i = 0; i < g_recovery_count; i++) {
+        g_recovery_callbacks[i](OOM_RECOVERY_STARTED,
+                                old_level, new_level,
+                                g_recovery_user_data[i]);
+    }
+
+    /* 执行降级处理器的恢复 */
+    agentos_oom_degrade(
+        (watermark_level_t)old_level,
+        (watermark_level_t)new_level);
+
+    /* 通知恢复完成 */
+    for (size_t i = 0; i < g_recovery_count; i++) {
+        g_recovery_callbacks[i](OOM_RECOVERY_COMPLETED,
+                                old_level, new_level,
+                                g_recovery_user_data[i]);
+    }
+
+    AGENTOS_LOG_INFO("[OOM] Recovery completed: %s → %s",
+            oom_pressure_name(old_level),
+            oom_pressure_name(new_level));
+
+    return 0;
+}
