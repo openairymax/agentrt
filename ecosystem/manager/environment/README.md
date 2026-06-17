@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/environment/` 包含 AgentOS Manager 模块的多环境配置定义，提供 development / staging / production 三套环境配置覆盖。环境配置在 Base 配置之上覆盖环境特定的参数，实现同一套基础配置在不同环境下的差异化运行。
+`manager/environment/` 包含 AgentRT Manager 模块的多环境配置定义，提供 development / staging / production 三套环境配置覆盖。环境配置在 Base 配置之上覆盖环境特定的参数，实现同一套基础配置在不同环境下的差异化运行。
 
 ## 目录结构
 

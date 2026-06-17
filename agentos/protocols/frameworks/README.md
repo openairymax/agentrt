@@ -5,7 +5,7 @@
 
 ## 概述
 
-Frameworks 层提供主流 AI 框架与 AgentOS 的集成适配，将框架特有的概念和 API 映射到 AgentOS 的统一协议体系。当前支持 LangChain 和 AutoGen 两大框架，分别覆盖链式执行/工具调用/记忆管理和多代理对话/群聊编排等场景。
+Frameworks 层提供主流 AI 框架与 AgentRT 的集成适配，将框架特有的概念和 API 映射到 AgentRT 的统一协议体系。当前支持 LangChain 和 AutoGen 两大框架，分别覆盖链式执行/工具调用/记忆管理和多代理对话/群聊编排等场景。
 
 ## 目录结构
 

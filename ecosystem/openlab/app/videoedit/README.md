@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/app/videoedit/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-VideoEdit 是基于 AgentOS 平台的智能视频编辑应用，采用 FastAPI + FFmpeg 架构，通过 `EditPipeline` 管线编排器和 `FFmpegWrapper` FFmpeg 封装层实现视频剪辑、合并、特效、格式转换、字幕添加、缩略图提取、GIF 创建和音频提取等全功能视频处理。支持异步任务处理和进度追踪。
+VideoEdit 是基于 AgentRT 平台的智能视频编辑应用，采用 FastAPI + FFmpeg 架构，通过 `EditPipeline` 管线编排器和 `FFmpegWrapper` FFmpeg 封装层实现视频剪辑、合并、特效、格式转换、字幕添加、缩略图提取、GIF 创建和音频提取等全功能视频处理。支持异步任务处理和进度追踪。
 
 ## 目录结构
 

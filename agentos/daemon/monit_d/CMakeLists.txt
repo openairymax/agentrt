@@ -26,6 +26,7 @@ set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 set(MONIT_D_SOURCES
     src/main.c
     src/metrics.c
+    src/prometheus_exporter.c
     src/logging.c
     src/tracing.c
     src/alert.c

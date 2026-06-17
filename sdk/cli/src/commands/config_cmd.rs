@@ -7,7 +7,6 @@
 use anyhow::{Context, Result};
 use colored::Colorize;
 use std::fs;
-use std::path::Path;
 
 use crate::client::GatewayClient;
 

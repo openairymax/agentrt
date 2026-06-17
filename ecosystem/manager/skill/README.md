@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/skill/` 包含 AgentOS 的技能注册表配置，定义系统可用的技能列表及其参数。技能是 Agent 可调用的原子能力单元，注册表描述了每个技能的输入/输出规范、权限要求和资源消耗。配置遵循 `schema/skill-registry.schema.json` 规范。
+`manager/skill/` 包含 AgentRT 的技能注册表配置，定义系统可用的技能列表及其参数。技能是 Agent 可调用的原子能力单元，注册表描述了每个技能的输入/输出规范、权限要求和资源消耗。配置遵循 `schema/skill-registry.schema.json` 规范。
 
 ## 目录结构
 

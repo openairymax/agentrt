@@ -1,5 +1,5 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
-# AgentOS Daemon 模块顶层构建文件
+# AgentRT Daemon 模块顶层构建文件
 
 message(STATUS "[DAEMON] Configuring daemon module")
 
@@ -16,7 +16,7 @@ set(DAEMON_VERSION "${PROJECT_VERSION}")
 
 # 打印构建配置
 message(STATUS "========================================")
-message(STATUS "  AgentOS Daemon Build Configuration")
+message(STATUS "  AgentRT Daemon Build Configuration")
 message(STATUS "========================================")
 message(STATUS "  Version:     ${DAEMON_VERSION}")
 message(STATUS "  Build Type:  ${CMAKE_BUILD_TYPE}")

@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/model/` 包含 AgentOS 的 LLM 模型配置，定义各 AI 提供商的模型参数和 API 配置。提供 YAML 和 JSON 两种格式，分别服务于人类可读编辑和 C 守护进程程序化加载。配置遵循 `schema/model.schema.json` 规范。
+`manager/model/` 包含 AgentRT 的 LLM 模型配置，定义各 AI 提供商的模型参数和 API 配置。提供 YAML 和 JSON 两种格式，分别服务于人类可读编辑和 C 守护进程程序化加载。配置遵循 `schema/model.schema.json` 规范。
 
 ## 目录结构
 

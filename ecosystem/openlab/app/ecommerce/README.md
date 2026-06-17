@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/app/ecommerce/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。当前为骨架实现阶段。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。当前为骨架实现阶段。
 
 ## 概述
 
-E-Commerce 是基于 AgentOS 平台的智能电商助手应用，帮助商家管理商品、处理订单和优化运营。设计上集成 Stripe 支付网关、JWT 认证、Redis 缓存等企业级组件，支持多数据库后端（SQLite/PostgreSQL/MySQL），提供完整的电商运营解决方案。
+E-Commerce 是基于 AgentRT 平台的智能电商助手应用，帮助商家管理商品、处理订单和优化运营。设计上集成 Stripe 支付网关、JWT 认证、Redis 缓存等企业级组件，支持多数据库后端（SQLite/PostgreSQL/MySQL），提供完整的电商运营解决方案。
 
 ## 目录结构
 

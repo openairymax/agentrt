@@ -28,6 +28,7 @@ extern "C" {
 /* 前向声明 */
 typedef struct agentos_cognition_engine agentos_cognition_engine_t;
 typedef struct agentos_memory_engine agentos_memory_engine_t;
+typedef struct agentos_memory_provider agentos_memory_provider_t;
 typedef struct agentos_intent agentos_intent_t;
 typedef struct agentos_task_plan agentos_task_plan_t;
 typedef struct agentos_plan_strategy agentos_plan_strategy_t;
@@ -333,6 +334,20 @@ AGENTOS_API void agentos_cognition_set_memory(agentos_cognition_engine_t *engine
                                               agentos_memory_engine_t *memory);
 
 /**
+ * @brief C-L12: Set memory provider from MemoryRovol bridge.
+ *
+ * Sets the memory provider directly from the bridge, enabling
+ * provider switching (builtin ↔ MemoryRovol) at runtime.
+ *
+ * @param engine [in] Cognition engine handle (BORROW).
+ * @param provider [in] Memory provider from mrb_bridge_get_provider() (BORROW).
+ *
+ * @ownership provider: BORROW
+ */
+AGENTOS_API void agentos_cognition_set_memory_provider(agentos_cognition_engine_t *engine,
+                                                       agentos_memory_provider_t *provider);
+
+/**
  * @brief C-L02: Set LLM service for cognition engine.
  *
  * Inject llm_d daemon's LLM service into CoreLoopThree cognitive loop.
@@ -346,6 +361,24 @@ AGENTOS_API void agentos_cognition_set_memory(agentos_cognition_engine_t *engine
  */
 AGENTOS_API void agentos_cognition_set_llm_service(agentos_cognition_engine_t *engine,
                                                     llm_service_t *llm_svc);
+
+/**
+ * @brief C-L02 P1.2.2: Enable async streaming LLM callback.
+ *
+ * When enabled, LLM responses are delivered via streaming callback
+ * (llm_service_complete_stream) instead of blocking sync complete.
+ * The callback receives token chunks in real-time; the cognition engine
+ * assembles the full response before continuing the pipeline.
+ *
+ * @param engine [in] Cognition engine handle (BORROW).
+ * @param enabled Non-zero to enable streaming.
+ * @param callback Streaming chunk callback (BORROW).
+ * @param user_data User data for callback (BORROW).
+ */
+AGENTOS_API void agentos_cognition_set_llm_streaming(agentos_cognition_engine_t *engine,
+                                                     int enabled,
+                                                     llm_stream_callback_t callback,
+                                                     void *user_data);
 
 /**
  * @brief C-L04: Set tool service for cognition engine.

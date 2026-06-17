@@ -16,6 +16,7 @@
 #include "atomic_compat.h"
 #include "daemon_bootstrap_sd.h"
 #include "daemon_bootstrap_ipc.h"
+#include "gateway_forward.h"
 #include "gateway_service.h"
 #include "logging.h"
 #include "platform.h"
@@ -43,6 +44,7 @@ static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static daemon_bootstrap_sd_t *g_bsd = NULL;
 static daemon_bootstrap_ipc_t *g_bipc = NULL;
+static gw_forward_t *g_forward = NULL; /* C-L11: 协议转发器 */
 
 /* ==================== 信号处理 ==================== */
 
@@ -231,6 +233,17 @@ int main(int argc, char *argv[])
     }
 #endif
 
+    /* C-L11: 初始化协议转发器 — 连接 gateway → gateway_d → 目标 daemon */
+    {
+        gw_forward_config_t fwd_cfg = GW_FORWARD_CONFIG_DEFAULTS;
+        g_forward = gw_forward_create(&fwd_cfg);
+        if (!g_forward) {
+            SVC_LOG_ERROR("C-L11: Failed to create gateway forwarder");
+        } else {
+            SVC_LOG_INFO("C-L11: Gateway protocol forwarder initialized");
+        }
+    }
+
     err = gateway_service_start(g_service);
     if (err != AGENTOS_SUCCESS) {
         SVC_LOG_ERROR("Failed to start service (err=%d)", err);
@@ -274,11 +287,44 @@ int main(int argc, char *argv[])
             } else {
                 SVC_LOG_WARN("Health check failed: unable to retrieve service stats");
             }
+
+            /* C-L11: 报告转发器健康状态 */
+            if (g_forward && gw_forward_is_healthy(g_forward)) {
+                gw_forward_stats_t fwd_stats;
+                if (gw_forward_get_stats(g_forward, &fwd_stats) == 0 &&
+                    fwd_stats.total_forwarded > 0) {
+                    SVC_LOG_INFO("C-L11: Forwarder — forwarded=%llu errors=%llu "
+                                 "avg_latency=%lluus",
+                                 (unsigned long long)fwd_stats.total_forwarded,
+                                 (unsigned long long)fwd_stats.forward_errors,
+                                 (unsigned long long)fwd_stats.avg_latency_us);
+                }
+            }
         }
     }
 
     daemon_bootstrap_ipc_stop(g_bipc);
     daemon_bootstrap_sd_stop(g_bsd);
+
+    /* C-L11: 清理协议转发器 */
+    if (g_forward) {
+        gw_forward_stats_t fwd_stats;
+        if (gw_forward_get_stats(g_forward, &fwd_stats) == 0) {
+            SVC_LOG_INFO("C-L11: Forwarder stats — total=%llu (A2A=%llu MCP=%llu OpenAI=%llu "
+                         "JSONRPC=%llu) errors=%llu timeouts=%llu avg_latency=%lluus",
+                         (unsigned long long)fwd_stats.total_forwarded,
+                         (unsigned long long)fwd_stats.by_proto[GW_FWD_PROTO_A2A],
+                         (unsigned long long)fwd_stats.by_proto[GW_FWD_PROTO_MCP],
+                         (unsigned long long)fwd_stats.by_proto[GW_FWD_PROTO_OPENAI],
+                         (unsigned long long)fwd_stats.by_proto[GW_FWD_PROTO_JSONRPC],
+                         (unsigned long long)fwd_stats.forward_errors,
+                         (unsigned long long)fwd_stats.timeout_errors,
+                         (unsigned long long)fwd_stats.avg_latency_us);
+        }
+        gw_forward_destroy(g_forward);
+        g_forward = NULL;
+    }
+
     SVC_LOG_INFO("Gateway shutting down...");
     gateway_service_stop(g_service, false);
 

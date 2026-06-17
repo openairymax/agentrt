@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/markets/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-Markets 是 OpenLab 生态系统的市场与模板层，提供 Agent、Skill 的分发机制和项目模板。该模块包含三大核心子系统：Agent 市场（契约验证、安装器、注册索引）、Skill 市场（契约验证、安装器、注册索引）和项目模板（Python Agent 模板、Rust Skill 模板），构建完整的 AgentOS 生态分发链路。
+Markets 是 OpenLab 生态系统的市场与模板层，提供 Agent、Skill 的分发机制和项目模板。该模块包含三大核心子系统：Agent 市场（契约验证、安装器、注册索引）、Skill 市场（契约验证、安装器、注册索引）和项目模板（Python Agent 模板、Rust Skill 模板），构建完整的 AgentRT 生态分发链路。
 
 ## 架构定位
 
@@ -217,7 +217,7 @@ cargo build --release
 
 - **核心依赖**: Python >= 3.10, Pydantic, PyYAML, jsonschema >= 4.17.0
 - **可选依赖**: Rich（格式化输出）, PyGithub（模板集成）
-- **协议依赖**: AgentOS protocols 层（JSON-RPC 2.0）
+- **协议依赖**: AgentRT protocols 层（JSON-RPC 2.0）
 
 ---
 

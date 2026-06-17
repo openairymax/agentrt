@@ -2,8 +2,8 @@
   "dashboard": {
     "id": null,
     "uid": "agentos-overview",
-    "title": "AgentOS Overview",
-    "description": "AgentOS unified monitoring dashboard - service health, performance, and alerting",
+    "title": "AgentRT Overview",
+    "description": "AgentRT unified monitoring dashboard - service health, performance, and alerting",
     "tags": ["agentos", "overview"],
     "timezone": "browser",
     "schemaVersion": 38,

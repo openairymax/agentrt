@@ -47,6 +47,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # URL handling
 url = "2.5"
+urlencoding = "2.1"
 
 # Shell completion
 clap_complete = "4.5"

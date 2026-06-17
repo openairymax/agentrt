@@ -1,11 +1,11 @@
-# Toolkit Python — AgentOS Python SDK
+# Toolkit Python — AgentRT Python SDK
 
 **模块路径**: `sdk/python/`
 **版本**: v0.1.0 (SDK v0.1.0)
 
 ## 概述
 
-AgentOS Python SDK 是 AgentOS 系统的生产级 Python 接口，提供同步和异步两种客户端模式。SDK 遵循 ARCHITECTURAL_PRINCIPLES.md 五维正交设计体系，包含客户端层、业务模块层（Task/Memory/Session/Skill）、应用框架层、遥测和插件系统。支持跨平台（Linux/macOS/Windows）、Checkpoint 断点续传、Token 使用效率优化（LRU 缓存）和 OpenTelemetry 可观测性集成。
+AgentRT Python SDK 是 AgentRT 系统的生产级 Python 接口，提供同步和异步两种客户端模式。SDK 遵循 ARCHITECTURAL_PRINCIPLES.md 五维正交设计体系，包含客户端层、业务模块层（Task/Memory/Session/Skill）、应用框架层、遥测和插件系统。支持跨平台（Linux/macOS/Windows）、Checkpoint 断点续传、Token 使用效率优化（LRU 缓存）和 OpenTelemetry 可观测性集成。
 
 ## 目录结构
 

@@ -29,6 +29,8 @@ struct ipc_bus_helper_s {
     char daemon_name[IPC_BUS_SERVICE_ID_LEN];
     bool channel_registered;
     bool endpoint_registered;
+    /* P1.24: 背压控制器 */
+    ipc_bp_controller_t *bp_ctrl;    /* 背压控制器（NULL=未启用） */
 };
 
 /* ==================== 生命周期 ==================== */
@@ -77,6 +79,12 @@ ipc_bus_helper_t *ipc_bus_helper_init(const char *daemon_name,
 
 void ipc_bus_helper_shutdown(ipc_bus_helper_t *ibh) {
     if (!ibh) return;
+
+    /* P1.24: 销毁背压控制器 */
+    if (ibh->bp_ctrl) {
+        ipc_bp_destroy(ibh->bp_ctrl);
+        ibh->bp_ctrl = NULL;
+    }
 
     if (ibh->channel) {
         ipc_bus_channel_destroy(ibh->channel);
@@ -338,4 +346,80 @@ ipc_service_bus_t ipc_bus_helper_get_bus(ipc_bus_helper_t *ibh) {
 bool ipc_bus_helper_is_running(ipc_bus_helper_t *ibh) {
     if (!ibh) return false;
     return ipc_service_bus_is_running(ibh->bus);
+}
+
+/* ==================== 背压控制集成（P1.24） ==================== */
+
+int ipc_bus_helper_enable_backpressure(ipc_bus_helper_t *ibh,
+                                       const ipc_bp_config_t *config) {
+    if (!ibh) return -1;
+
+    /* 已存在则先销毁 */
+    if (ibh->bp_ctrl) {
+        ipc_bp_destroy(ibh->bp_ctrl);
+    }
+
+    ibh->bp_ctrl = ipc_bp_create(config);
+    if (!ibh->bp_ctrl) {
+        SVC_LOG_ERROR("P1.24: Failed to create backpressure controller for '%s'",
+                      ibh->daemon_name);
+        return -1;
+    }
+
+    SVC_LOG_INFO("P1.24: Backpressure enabled for daemon '%s'", ibh->daemon_name);
+    return 0;
+}
+
+ipc_bp_level_t ipc_bus_helper_update_backpressure(ipc_bus_helper_t *ibh,
+                                                   size_t current_depth) {
+    if (!ibh || !ibh->bp_ctrl)
+        return IPC_BP_NORMAL;
+
+    return ipc_bp_update(ibh->bp_ctrl, current_depth);
+}
+
+int ipc_bus_helper_send_with_bp(ipc_bus_helper_t *ibh, const char *target,
+                                ipc_bus_msg_type_t msg_type, ipc_bus_proto_t protocol,
+                                const void *payload, size_t payload_size,
+                                bool is_droppable) {
+    if (!ibh || !target || !payload) return -1;
+
+    /* 如果未启用背压，直接发送 */
+    if (!ibh->bp_ctrl) {
+        return ipc_bus_helper_send(ibh, target, msg_type, protocol,
+                                   payload, payload_size);
+    }
+
+    /* 检查背压是否允许发送 */
+    if (!ipc_bp_should_send(ibh->bp_ctrl, is_droppable)) {
+        SVC_LOG_DEBUG("P1.24: Message to '%s' dropped by backpressure (droppable=%d)",
+                      target, is_droppable);
+        return 1;  /* 被背压丢弃 */
+    }
+
+    /* 正常发送 */
+    return ipc_bus_helper_send(ibh, target, msg_type, protocol,
+                               payload, payload_size);
+}
+
+bool ipc_bus_helper_should_accept_connection(ipc_bus_helper_t *ibh) {
+    if (!ibh || !ibh->bp_ctrl)
+        return true;
+
+    return ipc_bp_should_accept_connection(ibh->bp_ctrl);
+}
+
+int ipc_bus_helper_get_bp_stats(ipc_bus_helper_t *ibh, ipc_bp_stats_t *out_stats) {
+    if (!ibh || !out_stats) return -1;
+    if (!ibh->bp_ctrl) return -1;
+
+    ipc_bp_get_stats(ibh->bp_ctrl, out_stats);
+    return 0;
+}
+
+ipc_bp_level_t ipc_bus_helper_get_bp_level(ipc_bus_helper_t *ibh) {
+    if (!ibh || !ibh->bp_ctrl)
+        return IPC_BP_NORMAL;
+
+    return ipc_bp_get_level(ibh->bp_ctrl);
 }

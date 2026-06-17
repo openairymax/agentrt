@@ -1,14 +1,14 @@
-# AgentOS 核心引擎
+# AgentRT 核心引擎
 
 `agentos/`
 
 ## 概述
 
-`agentos/` 是 AgentOS 项目的核心代码目录，包含了从微内核到应用生态层的完整实现。该目录按照"分层架构、模块隔离、协议驱动"的设计理念组织，涵盖 Atoms 微内核层、Commons 基础库、Cupolas 安全层、Daemon 服务层、Gateway 网关层、Heapstore 存储层、Manager 配置中心以及 Toolkit SDK 工具包，构成了完整的智能体操作系统内核。
+`agentos/` 是 AgentRT 项目的核心代码目录，包含了从微内核到应用生态层的完整实现。该目录按照"分层架构、模块隔离、协议驱动"的设计理念组织，涵盖 Atoms 微内核层、Commons 基础库、Cupolas 安全层、Daemon 服务层、Gateway 网关层、Heapstore 存储层、Manager 配置中心以及 Toolkit SDK 工具包，构成了完整的智能体操作系统内核。
 
 ## 架构总览
 
-AgentOS 采用自底向上的四层分层架构，每层职责明确、接口清晰：
+AgentRT 采用自底向上的四层分层架构，每层职责明确、接口清晰：
 
 ```
 ┌───────────────────────────────────────────────────────────┐
@@ -130,7 +130,7 @@ agentos/
 
 ### Atoms 微内核层
 
-Atoms 层是 AgentOS 的最底层基础，包含 7 个核心微内核组件：
+Atoms 层是 AgentRT 的最底层基础，包含 7 个核心微内核组件：
 
 | 模块 | 说明 | 关键特性 |
 |------|------|----------|
@@ -144,7 +144,7 @@ Atoms 层是 AgentOS 的最底层基础，包含 7 个核心微内核组件：
 
 ### Commons 基础库
 
-Commons 是 AgentOS 的统一基础库，不依赖任何上层模块，所有组件均可基于它构建：
+Commons 是 AgentRT 的统一基础库，不依赖任何上层模块，所有组件均可基于它构建：
 
 | 模块 | 说明 |
 |------|------|
@@ -254,7 +254,7 @@ Manager 是统一配置管理中心，按领域模块组织配置文件和 Schem
 
 ### OpenLab 开放生态
 
-OpenLab 是 AgentOS 的开放生态系统：
+OpenLab 是 AgentRT 的开放生态系统：
 
 | 模块 | 说明 |
 |------|------|
@@ -265,19 +265,19 @@ OpenLab 是 AgentOS 的开放生态系统：
 
 ## 通信协议
 
-AgentOS 采用三层协议体系：
+AgentRT 采用三层协议体系：
 
 | 层级 | 协议 | 用途 |
 |------|------|------|
 | **内核 IPC** | Binder | 微内核与用户态服务间的进程间通信 |
 | **服务间通信** | JSON-RPC 2.0 | 各守护进程之间的 RPC 调用 |
-| **外部协议** | HTTP/WS/MQTT/gRPC | 外部客户端与 AgentOS 的交互 |
+| **外部协议** | HTTP/WS/MQTT/gRPC | 外部客户端与 AgentRT 的交互 |
 
 ## 构建说明
 
 ```bash
 # Out-of-source 构建
-mkdir /tmp/AgentOS-build && cd /tmp/AgentOS-build
+mkdir /tmp/AgentRT-build && cd /tmp/AgentRT-build
 cmake /path/to/agentos -DCMAKE_BUILD_TYPE=Release
 cmake --build . --parallel $(nproc)
 

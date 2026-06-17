@@ -144,3 +144,40 @@ add_test(NAME svc_test_checkpoint COMMAND svc_test_checkpoint
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 message(STATUS "  [test] svc_test_checkpoint: configured")
+
+# ===== P1.24.4 IPC Backpressure Unit Tests (test_ipc_backpressure.c) =====
+add_executable(svc_test_ipc_backpressure test_ipc_backpressure.c)
+
+target_include_directories(svc_test_ipc_backpressure PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/types/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../atoms/corekern/include
+)
+
+target_link_libraries(svc_test_ipc_backpressure PRIVATE
+    svc_common
+    Threads::Threads
+)
+
+if(AGENTOS_HAS_CJSON)
+    target_link_libraries(svc_test_ipc_backpressure PRIVATE cjson)
+endif()
+
+if(AGENTOS_HAS_CURL)
+    target_include_directories(svc_test_ipc_backpressure PRIVATE ${CURL_INCLUDE_DIRS})
+    target_link_libraries(svc_test_ipc_backpressure PRIVATE ${CURL_LIBRARIES})
+endif()
+
+target_compile_options(svc_test_ipc_backpressure PRIVATE
+    -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
+)
+
+add_test(NAME svc_test_ipc_backpressure COMMAND svc_test_ipc_backpressure
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+message(STATUS "  [test] svc_test_ipc_backpressure: P1.24.4 configured")

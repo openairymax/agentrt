@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/contrib/skills/github_skill/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-GitHub Skill 为 AgentOS 提供全面的 GitHub 平台集成能力，支持版本仓库管理、Issue 跟踪、代码审查、CI/CD 操作等核心功能。该模块通过 GitHub REST API 和 GraphQL API 实现与 GitHub 生态的深度交互，内置速率限制处理和错误重试机制。
+GitHub Skill 为 AgentRT 提供全面的 GitHub 平台集成能力，支持版本仓库管理、Issue 跟踪、代码审查、CI/CD 操作等核心功能。该模块通过 GitHub REST API 和 GraphQL API 实现与 GitHub 生态的深度交互，内置速率限制处理和错误重试机制。
 
 ## 目录结构
 
@@ -91,7 +91,7 @@ github_skill/
 
 ## 依赖关系
 
-- **核心依赖**: AgentOS OpenLab Core, PyGithub >= 1.59.0, requests >= 2.31.0
+- **核心依赖**: AgentRT OpenLab Core, PyGithub >= 1.59.0, requests >= 2.31.0
 - **安装**: 已包含在核心依赖中
 
 ## 安全说明

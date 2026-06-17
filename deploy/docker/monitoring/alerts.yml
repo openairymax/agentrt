@@ -1,5 +1,5 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
-# Prometheus Alert Rules for AgentOS gateway Module
+# Prometheus Alert Rules for AgentRT gateway Module
 # Version: 0.1.0
 
 groups:

@@ -1,4 +1,4 @@
-# AgentOS 内置内存子系统（免费开源底座）
+# AgentRT 内置内存子系统（免费开源底座）
 # 提供 L1+L2 基础功能，无 MemoryRovol / FAISS / SQLite 依赖
 
 message(STATUS "[MEMORY] Configuring builtin memory module (backend: ${AGENTOS_MEMORY_BACKEND})")

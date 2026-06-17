@@ -141,12 +141,14 @@ pub struct RunResponse {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct ConfigSetRequest {
     pub key: String,
     pub value: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct MarketSearchRequest {
     pub keyword: String,
 }
@@ -166,6 +168,7 @@ pub struct MarketInstallRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct MarketInstallResult {
     pub status: String,
     pub message: String,

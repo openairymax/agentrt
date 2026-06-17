@@ -3,7 +3,7 @@
 **模块路径**: `ecosystem/openlab/contrib/skills/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
@@ -58,12 +58,12 @@ class Skill:
 
 | Skill | 核心依赖 | 可选依赖 |
 |-------|----------|----------|
-| Browser Skill | AgentOS OpenLab Core | Playwright >= 1.40.0 或 Selenium >= 4.15.0 |
-| Database Skill | AgentOS OpenLab Core, SQLAlchemy | psycopg2 (PostgreSQL), pymysql (MySQL) |
-| GitHub Skill | AgentOS OpenLab Core, PyGithub >= 1.59.0, requests >= 2.31.0 | — |
+| Browser Skill | AgentRT OpenLab Core | Playwright >= 1.40.0 或 Selenium >= 4.15.0 |
+| Database Skill | AgentRT OpenLab Core, SQLAlchemy | psycopg2 (PostgreSQL), pymysql (MySQL) |
+| GitHub Skill | AgentRT OpenLab Core, PyGithub >= 1.59.0, requests >= 2.31.0 | — |
 
 - **Python**: >= 3.10
-- **协议依赖**: AgentOS protocols 层（JSON-RPC 2.0）
+- **协议依赖**: AgentRT protocols 层（JSON-RPC 2.0）
 
 ---
 

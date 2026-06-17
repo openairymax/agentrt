@@ -1,11 +1,11 @@
-# Toolkit Rust — AgentOS Rust SDK
+# Toolkit Rust — AgentRT Rust SDK
 
 **模块路径**: `sdk/rust/`
 **版本**: v0.1.0 (SDK v0.1.0)
 
 ## 概述
 
-AgentOS Rust SDK 提供基于 Rust 语言的 AgentOS 系统编程接口，利用 Rust 的内存安全特性和零成本抽象，适用于对性能和安全要求较高的场景。SDK 包含客户端层、业务模块层（Task/Memory/Session/Skill）、系统调用绑定、遥测、插件系统和宏定义，与 Python/Go/TypeScript SDK 保持 API 一致性。
+AgentRT Rust SDK 提供基于 Rust 语言的 AgentRT 系统编程接口，利用 Rust 的内存安全特性和零成本抽象，适用于对性能和安全要求较高的场景。SDK 包含客户端层、业务模块层（Task/Memory/Session/Skill）、系统调用绑定、遥测、插件系统和宏定义，与 Python/Go/TypeScript SDK 保持 API 一致性。
 
 ## 目录结构
 

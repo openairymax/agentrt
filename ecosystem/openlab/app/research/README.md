@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/app/research/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。当前为规划阶段，源代码尚未实现。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。当前为规划阶段，源代码尚未实现。
 
 ## 概述
 
-Research 是基于 AgentOS 平台的智能研究助手应用，辅助研究人员进行文献检索、数据分析和报告生成。通过 AI 驱动的知识管理能力，帮助研究者高效完成从文献调研到成果输出的全流程工作。
+Research 是基于 AgentRT 平台的智能研究助手应用，辅助研究人员进行文献检索、数据分析和报告生成。通过 AI 驱动的知识管理能力，帮助研究者高效完成从文献调研到成果输出的全流程工作。
 
 ## 目录结构
 
@@ -56,7 +56,7 @@ research/
 
 ## 依赖关系
 
-- **核心依赖**: AgentOS OpenLab Core, FastAPI, Pydantic
+- **核心依赖**: AgentRT OpenLab Core, FastAPI, Pydantic
 - **可选依赖**: 各种学术数据库 API 客户端
 
 ---

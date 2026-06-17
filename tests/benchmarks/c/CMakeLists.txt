@@ -1,5 +1,5 @@
 
-# AgentOS 性能基准测试 (TeamC P2-C02)
+# AgentRT 性能基准测试 (TeamC P2-C02)
 
 if(NOT TARGET svc_common)
     message(STATUS "  [benchmarks] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
