@@ -29,7 +29,9 @@ set(SVC_COMMON_SOURCES
     src/svc_common.c          # 服务框架核心实现
     src/ipc_client.c
     src/ipc_service_bus.c     # IPC服务总线
+    src/ipc_bus_helper.c       # C-L09: daemon IPC Bus 自动注册便捷层
     src/service_discovery.c   # 跨进程服务发现
+    src/service_discovery_helper.c  # C-L08: daemon 自动注册便捷层
     src/circuit_breaker.c     # 熔断器与自愈
     src/unified_metrics.c     # 统一指标收集
     src/alert_manager.c       # 智能告警管理
@@ -50,6 +52,8 @@ set(SVC_COMMON_SOURCES
     src/thread_pool.c         # 工作线程池
     src/parallel_dispatcher.c # 工具并行执行引擎
     src/checkpoint.c
+    src/daemon_oom.c          # P1.22: Daemon OOM 降级回调注册
+    src/ipc_backpressure.c    # P1.24: IPC Bus 背压控制
     ${ATOMS_DIR}/coreloopthree/src/cognition/foundation/metacognition.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/critique/confidence_calibrator.c
     ${ATOMS_DIR}/coreloopthree/src/cognition/foundation/thinking_chain.c
@@ -225,7 +229,9 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/param_validator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/log_sanitizer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ipc_service_bus.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ipc_bus_helper.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/service_discovery.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/service_discovery_helper.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/circuit_breaker.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/unified_metrics.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/alert_manager.h
@@ -236,6 +242,9 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_defaults.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/parallel_dispatcher.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/agentos_event_loop.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_oom.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ipc_backpressure.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_startup.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_event_driver.h
     DESTINATION include/agentos
 )

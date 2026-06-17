@@ -11,6 +11,7 @@
 #include "executor.h"
 #include "platform.h"
 #include "svc_logger.h"
+#include "tool_approval.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,8 @@ struct tool_executor {
     agentos_mutex_t lock;
     uint64_t total_executions;
     uint64_t success_count;
+    /* C-L05: Cupolas SafetyGuard → tool_d 工具审批 */
+    tool_approval_ctx_t *approval_ctx;
 };
 
 tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
@@ -55,6 +58,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
     }
     exec->total_executions = 0;
     exec->success_count = 0;
+    exec->approval_ctx = NULL;
     return exec;
 }
 
@@ -72,6 +76,19 @@ void tool_executor_destroy(tool_executor_t *exec)
                  (unsigned long long)exec->success_count);
     agentos_mutex_destroy(&exec->lock);
     AGENTOS_FREE(exec);
+}
+
+/* C-L05: 设置工具审批上下文 */
+void tool_executor_set_approval_ctx(tool_executor_t *exec, tool_approval_ctx_t *approval_ctx)
+{
+    if (!exec)
+        return;
+    agentos_mutex_lock(&exec->lock);
+    exec->approval_ctx = approval_ctx;
+    agentos_mutex_unlock(&exec->lock);
+    if (approval_ctx) {
+        SVC_LOG_INFO("C-L05: Approval context attached to executor");
+    }
 }
 
 int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const char *params_json,
@@ -126,6 +143,30 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
                 return AGENTOS_EPERM;
             }
         }
+    }
+
+    /* ── C-L05: Cupolas SafetyGuard → tool_d 工具审批 ── */
+    if (exec->approval_ctx) {
+        tool_approval_detail_t approval_detail;
+        int app_ret =
+            tool_approval_check(exec->approval_ctx, meta, params_json, &approval_detail);
+        if (app_ret != 0) {
+            SVC_LOG_ERROR(
+                "C-L05: Tool approval denied for '%s': %s",
+                meta->name ? meta->name : "?", approval_detail.reason);
+            result->success = 0;
+            result->output = AGENTOS_STRDUP("");
+            result->error = AGENTOS_STRDUP(approval_detail.reason[0]
+                                               ? approval_detail.reason
+                                               : "Tool execution denied by safety guard");
+            result->exit_code = -1;
+            result->duration_ms = 0;
+            *out_result = result;
+            agentos_mutex_unlock(&exec->lock);
+            return AGENTOS_EPERM;
+        }
+        SVC_LOG_INFO("C-L05: Tool '%s' approved (decision=%d)", meta->name ? meta->name : "?",
+                     (int)approval_detail.decision);
     }
 
     char full_command[4096];

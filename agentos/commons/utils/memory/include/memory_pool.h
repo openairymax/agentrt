@@ -59,6 +59,8 @@ typedef struct {
 /**
  * @brief 创建内存池
  *
+ * @ownership alloc — 返回的内存池句柄由调用者持有，需通过 memory_pool_destroy 释放
+ *
  * @param[in] options 内存池选项（不能为NULL）
  * @return 成功返回内存池句柄，失败返回NULL
  *
@@ -69,6 +71,8 @@ memory_pool_t *memory_pool_create(const memory_pool_options_t *options);
 /**
  * @brief 销毁内存池
  *
+ * @ownership release — 释放 pool 句柄的所有权，销毁后 pool 失效
+ *
  * @param[in] pool 内存池句柄
  *
  * @note 如果池中还有未释放的内存块，会输出警告信息
@@ -78,6 +82,8 @@ void memory_pool_destroy(memory_pool_t *pool);
 
 /**
  * @brief 从内存池分配内存块
+ *
+ * @ownership alloc — 返回的内存块由调用者持有，需通过 memory_pool_free 归还
  *
  * @param[in] pool 内存池句柄
  * @return 成功返回内存块指针，失败返回NULL
@@ -90,6 +96,8 @@ void *memory_pool_alloc(memory_pool_t *pool);
 /**
  * @brief 从内存池分配并清零内存块
  *
+ * @ownership alloc — 返回的内存块由调用者持有，需通过 memory_pool_free 归还
+ *
  * @param[in] pool 内存池句柄
  * @return 成功返回内存块指针，失败返回NULL
  *
@@ -99,6 +107,8 @@ void *memory_pool_calloc(memory_pool_t *pool);
 
 /**
  * @brief 释放内存块回内存池
+ *
+ * @ownership release — 释放 ptr 的所有权，调用后 ptr 失效
  *
  * @param[in] pool 内存池句柄
  * @param[in] ptr 要释放的内存块指针

@@ -8,7 +8,7 @@
 
 ## 概述
 
-MemoryRovol 是 AgentOS 的商业桥接层，负责将外部 MemoryRovol PRO 仓库集成到 AgentOS 构建体系中。MemoryRovol PRO 实现 L1-L4 全功能记忆系统（原始存储、特征索引、结构绑定、模式识别），通过实现 `agentos_memory_provider_t` 接口无缝替换内置免费提供商。
+MemoryRovol 是 AgentRT 的商业桥接层，负责将外部 MemoryRovol PRO 仓库集成到 AgentOS 构建体系中。MemoryRovol PRO 实现 L1-L4 全功能记忆系统（原始存储、特征索引、结构绑定、模式识别），通过实现 `agentos_memory_provider_t` 接口无缝替换内置免费提供商。
 
 本模块不包含 MemoryRovol 的源代码，而是作为**构建桥接层**，通过 CMake 配置定位外部 MemoryRovol 仓库、注入 AgentOS 兼容头文件、并以 INTERFACE 库形式将其链接到 AgentOS atoms 聚合目标。
 
@@ -29,7 +29,7 @@ MemoryRovol 桥接层在构建时的工作：
   CMakeLists.txt → 定位外部源码 → add_subdirectory → agentos_memoryrovol_bridge → agentos_atoms
 ```
 
-MemoryRovol 模块位于 Atoms 层，与 memory 模块并列。它不提供运行时代码，而是解决**构建时集成**问题：如何将一个独立仓库的代码编译进 AgentOS 的构建树，并确保其能正确使用 AgentOS 的内存分配、日志和平台抽象 API。
+MemoryRovol 模块位于 Atoms 层，与 memory 模块并列。它不提供运行时代码，而是解决**构建时集成**问题：如何将一个独立仓库的代码编译进 AgentRT 的构建树，并确保其能正确使用 AgentRT 的内存分配、日志和平台抽象 API。
 
 ---
 

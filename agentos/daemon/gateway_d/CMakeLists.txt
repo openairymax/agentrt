@@ -1,4 +1,4 @@
-# Gateway Daemon - AgentOS 网关守护进程
+# Gateway Daemon - AgentRT 网关守护进程
 # Copyright (C) 2026 SPHARX. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -57,6 +57,7 @@ set(GATEWAY_D_SOURCES
     src/main.c
     src/service.c
     src/gateway_svc_adapter.c
+    src/gateway_forward.c
 )
 
 if(AGENTOS_ENABLE_PROTOCOLS)
@@ -146,7 +147,7 @@ target_include_directories(gateway_d PRIVATE
 # 如果使用独立构建，需确保 gateway 已预先编译或通过 add_subdirectory 引入。
 #
 # 方式一（推荐 - 通过上级 CMake 引入）:
-#   在 AgentOS 根 CMakeLists.txt 中同时 add_subdirectory(gateway) 和 add_subdirectory(daemon)
+#   在 AgentRT 根 CMakeLists.txt 中同时 add_subdirectory(gateway) 和 add_subdirectory(daemon)
 #   然后 gateway_d 可以直接链接 gateway target
 #
 # 方式二（独立构建 - 当前默认）:

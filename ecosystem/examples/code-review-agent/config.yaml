@@ -1,0 +1,51 @@
+# code-review-agent 运行时配置
+# 演示 Skill 系统和安全扫描
+
+# ─── 网关配置 ───
+gateway_url: "http://127.0.0.1:8080"
+
+# ─── 默认模型 ───
+default_model: "gpt-4"
+
+# ─── LLM 提供商 ───
+llm:
+  default_provider: "openai"
+  providers:
+    openai:
+      type: "openai"
+      api_key_env: "OPENAI_API_KEY"
+      base_url: "https://api.openai.com/v1"
+
+# ─── 记忆系统 ───
+memory:
+  enabled: true
+  mode: "full"
+  storage_path: "./data/code_review_memory"
+  layers:
+    l1:
+      compression: "zstd"
+    l2:
+      embedder: "openai"
+      embedding_dim: 1536
+
+# ─── 安全配置（Cupolas） ───
+security:
+  enabled: true
+  mode: "strict"
+  default_policy: "deny"
+  sandbox:
+    enabled: true
+    type: "seccomp"
+  audit:
+    enabled: true
+    log_path: "./logs/audit.log"
+
+# ─── 技能发现路径 ───
+plugins:
+  enabled: true
+  plugin_dirs:
+    - "skills/"
+
+# ─── Agent 加载路径 ───
+agents:
+  - "agents/code_review.agent.yaml"

@@ -1,5 +1,5 @@
 # ========================================================================
-# AgentOS TaskFlow Module
+# AgentRT TaskFlow Module
 #
 # Copyright (C) 2026 SPHARX. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 SPHARX.
@@ -101,7 +101,7 @@ if(TARGET agentos_coreloopthree)
     target_link_libraries(agentos_taskflow PUBLIC agentos_coreloopthree)
 endif()
 
-# 安全编译选项（基于 AgentOS C 编码风格指南附录 A）
+# 安全编译选项（基于 AgentRT C 编码风格指南附录 A）
 if(MSVC)
     target_compile_options(agentos_taskflow PRIVATE /W4 /WX)
     target_compile_definitions(agentos_taskflow PRIVATE _CRT_SECURE_NO_WARNINGS)
