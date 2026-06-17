@@ -4,7 +4,7 @@
 
 ## 概述
 
-`benchmarks/` 目录包含 AgentOS 的性能基准测试框架，共 **16 个文件**，覆盖 C/Python 双语言基准测试、Atoms 层性能、Cupolas 安全基准、并发压力、检索延迟和 Token 效率等多个维度。
+`benchmarks/` 目录包含 AgentRT 的性能基准测试框架，共 **16 个文件**，覆盖 C/Python 双语言基准测试、Atoms 层性能、Cupolas 安全基准、并发压力、检索延迟和 Token 效率等多个维度。
 
 性能基准测试的核心目标：
 - **性能回归检测**：通过 `regression_detector.py` 自动检测性能退化，确保代码变更不会引入性能问题

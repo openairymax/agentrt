@@ -1,4 +1,4 @@
-# gateway - AgentOS 网关模块
+# gateway - AgentRT 网关模块
 # 协议转换层：HTTP · WebSocket · Stdio
 #
 # Copyright (C) 2026 SPHARX. All Rights Reserved.

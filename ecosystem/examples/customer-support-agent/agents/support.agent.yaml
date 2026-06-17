@@ -1,0 +1,50 @@
+# support-agent 定义文件
+# 生产级客服 Agent，配备安全、审计、成本 Hook
+
+name: "support-agent"
+version: "1.0.0"
+model: "gpt-4"
+
+# 系统提示词：定义客服 Agent 的角色
+system_prompt: |
+  你是 support-agent，一个专业的客户支持助手。
+  你的职责是：
+  1. 理解客户的问题和需求
+  2. 查询订单、账户等信息
+  3. 提供准确、友好的解决方案
+  4. 在无法解决时升级到人工客服
+
+  行为准则：
+  - 绝不泄露客户敏感信息（密码、卡号等）
+  - 回答前确认操作安全性
+  - 保持专业和耐心
+  - 记录所有操作以备审计
+
+# 注册工具
+tools:
+  - name: "http_skill"
+    ref: "builtin"
+  - name: "filesystem_skill"
+    ref: "builtin"
+
+# 注册 Hook（按优先级排列）
+hooks:
+  - name: "security_reminder"
+    module: "hooks.support_hooks"
+    class: "SecurityReminderHook"
+    priority: 100
+  - name: "audit_hook"
+    module: "hooks.support_hooks"
+    class: "AuditHook"
+    priority: 50
+  - name: "cost_tracker"
+    module: "hooks.support_hooks"
+    class: "CostTrackerHook"
+    priority: 10
+
+# 权限声明
+permissions:
+  - "file:read:${AGENTOS_DATA_DIR}/support/*"
+  - "network:connect:api.internal.com:443"
+  - "memory:write"
+  - "memory:read"

@@ -5,7 +5,7 @@
 
 ## 概述
 
-Gateway 是 AgentOS 的协议网关层，负责将外部客户端的 HTTP、WebSocket、Stdio 请求统一转换为内部 JSON-RPC 2.0 协议调用，是连接外部世界与 AgentOS 内核服务的桥梁。网关层遵循 **K-1 内核极简** 原则——只做协议翻译，零业务逻辑，所有业务逻辑通过 `agentos/atoms/syscall` 接口调用。
+Gateway 是 AgentRT 的协议网关层，负责将外部客户端的 HTTP、WebSocket、Stdio 请求统一转换为内部 JSON-RPC 2.0 协议调用，是连接外部世界与 AgentRT 内核服务的桥梁。网关层遵循 **K-1 内核极简** 原则——只做协议翻译，零业务逻辑，所有业务逻辑通过 `agentos/atoms/syscall` 接口调用。
 
 架构定位：
 

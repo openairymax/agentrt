@@ -1,7 +1,6 @@
 #include "sync_common.h"
 
 #include "sync_platform.h"
-#include "sync_types.h"
 
 #include <stdlib.h>
 #include <string.h>

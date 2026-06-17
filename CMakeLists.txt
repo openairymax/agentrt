@@ -1,33 +1,33 @@
-# AgentOS - 智能体操作系统
+# AgentRT - 智能体运行时平台
 # 根目录构建配置文件
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
-project(AgentOS VERSION 0.1.0 LANGUAGES C CXX)
+project(AgentRT VERSION 0.1.0 LANGUAGES C CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
-        "AgentOS in-source builds are not allowed! (BAN-33)\n"
+        "AgentRT in-source builds are not allowed! (BAN-33)\n"
         "Please use out-of-source build with cmake -B:\n"
-        "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
-        "  cmake --build ../AgentOS-build\n"
-        "  cd ../AgentOS-build && ctest --output-on-failure\n"
+        "  cmake -B ../AgentRT-build -DCMAKE_BUILD_TYPE=Release\n"
+        "  cmake --build ../AgentRT-build\n"
+        "  cd ../AgentRT-build && ctest --output-on-failure\n"
         "See BUILD.md for details."
     )
 endif()
 
 # BAN-33强化：禁止在源码树内任何子目录构建
-# 使用 cmake_path 进行路径前缀检测（避免 "AgentOS-build" 误匹配 "AgentOS"）
+# 使用 cmake_path 进行路径前缀检测（避免 "AgentRT-build" 误匹配 "AgentRT"）
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.20")
     cmake_path(IS_PREFIX CMAKE_SOURCE_DIR "${CMAKE_BINARY_DIR}" _BAN33_IS_SUBDIR)
     cmake_path(IS_PREFIX CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}" _BAN33_IS_SAME_OR_PARENT)
     if((NOT _BAN33_IS_SAME_OR_PARENT) AND (_BAN33_IS_SUBDIR OR CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR))
         message(FATAL_ERROR
-            "AgentOS build directory MUST be outside the source tree! (BAN-33)\n"
+            "AgentRT build directory MUST be outside the source tree! (BAN-33)\n"
             "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
             "Please use an out-of-source build directory:\n"
-            "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
-            "  cmake --build ../AgentOS-build\n"
+            "  cmake -B ../AgentRT-build -DCMAKE_BUILD_TYPE=Release\n"
+            "  cmake --build ../AgentRT-build\n"
             "See BUILD.md for details."
         )
     endif()
@@ -36,11 +36,11 @@ else()
     string(FIND "${CMAKE_BINARY_DIR}/" "${CMAKE_SOURCE_DIR}/" _BAN33_BUILD_INSIDE)
     if(_BAN33_BUILD_INSIDE EQUAL 0 AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
         message(FATAL_ERROR
-            "AgentOS build directory MUST be outside the source tree! (BAN-33)\n"
+            "AgentRT build directory MUST be outside the source tree! (BAN-33)\n"
             "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
             "Please use an out-of-source build directory:\n"
-            "  cmake -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release\n"
-            "  cmake --build ../AgentOS-build\n"
+            "  cmake -B ../AgentRT-build -DCMAKE_BUILD_TYPE=Release\n"
+            "  cmake --build ../AgentRT-build\n"
             "See BUILD.md for details."
         )
     endif()
@@ -57,11 +57,11 @@ option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
-option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)
-option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
-option(AGENTOS_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
-set(AGENTOS_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
-set(AGENTOS_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
+option(AGENTRT_BUILD_ALL "Build all AgentRT components" ON)
+option(AGENTRT_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+option(AGENTRT_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
+set(AGENTRT_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
+set(AGENTRT_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 # R-09-SEC: Strict compliance mode and tests are now independent.
@@ -69,8 +69,8 @@ set(AGENTOS_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 # Previously, strict mode forced BUILD_TESTS=OFF, which prevented test execution
 # in the default configuration. This was a design error (BAN-181 compliance fix).
 if(BUILD_TESTS)
-    if(AGENTOS_COMPLIANCE_STRICT)
-        message(STATUS "Tests enabled with strict compliance (AGENTOS_COMPLIANCE_STRICT=ON)")
+    if(AGENTRT_COMPLIANCE_STRICT)
+        message(STATUS "Tests enabled with strict compliance (AGENTRT_COMPLIANCE_STRICT=ON)")
     endif()
 endif()
 if(BUILD_TESTS)
@@ -80,17 +80,17 @@ endif()
 
 # 输出构建配置信息
 message(STATUS "=========================================")
-message(STATUS "  AgentOS Build Configuration")
+message(STATUS "  AgentRT Build Configuration")
 message(STATUS "=========================================")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "Build shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "Build tests: ${BUILD_TESTS}")
-message(STATUS "Compliance strict: ${AGENTOS_COMPLIANCE_STRICT}")
-message(STATUS "Memory backend: ${AGENTOS_MEMORY_BACKEND}")
-message(STATUS "With MemoryRovol Pro: ${AGENTOS_WITH_MEMORYROVOL}")
-message(STATUS "Docker build: ${AGENTOS_DOCKER_BUILD}")
+message(STATUS "Compliance strict: ${AGENTRT_COMPLIANCE_STRICT}")
+message(STATUS "Memory backend: ${AGENTRT_MEMORY_BACKEND}")
+message(STATUS "With MemoryRovol Pro: ${AGENTRT_WITH_MEMORYROVOL}")
+message(STATUS "Docker build: ${AGENTRT_DOCKER_BUILD}")
 message(STATUS "Sanitizers: ${ENABLE_SANITIZERS}")
 message(STATUS "=========================================")
 
@@ -139,8 +139,8 @@ else()
     add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
     add_compile_definitions(_FORTIFY_SOURCE=2)
 
-    if(AGENTOS_COMPLIANCE_STRICT)
-        add_compile_definitions(AGENTOS_COMPLIANCE_STRICT)
+    if(AGENTRT_COMPLIANCE_STRICT)
+        add_compile_definitions(AGENTRT_COMPLIANCE_STRICT)
         add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/compliance/include/banned_functions.h)
     endif()
 
@@ -250,10 +250,10 @@ if(NOT SQLite3_FOUND AND NOT SQLITE3_FOUND)
     endif()
 endif()
 if(SQLite3_FOUND OR SQLITE3_FOUND)
-    set(AGENTOS_HAS_SQLITE3 TRUE CACHE BOOL "SQLite3 available")
+    set(AGENTRT_HAS_SQLITE3 TRUE CACHE BOOL "SQLite3 available")
     message(STATUS "SQLite3 found: ${SQLite3_LIBRARIES}${SQLITE3_LIBRARIES}")
 else()
-    set(AGENTOS_HAS_SQLITE3 FALSE CACHE BOOL "SQLite3 available")
+    set(AGENTRT_HAS_SQLITE3 FALSE CACHE BOOL "SQLite3 available")
     message(STATUS "SQLite3 not found, registry/vector-store features disabled")
 endif()
 
@@ -263,10 +263,10 @@ if(NOT cJSON_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(CJSON QUIET libcjson)
 endif()
 if(cJSON_FOUND OR CJSON_FOUND)
-    set(AGENTOS_HAS_CJSON TRUE CACHE BOOL "cJSON available")
+    set(AGENTRT_HAS_CJSON TRUE CACHE BOOL "cJSON available")
     message(STATUS "cJSON found: ${cJSON_VERSION}${CJSON_VERSION}")
 else()
-    set(AGENTOS_HAS_CJSON FALSE CACHE BOOL "cJSON available")
+    set(AGENTRT_HAS_CJSON FALSE CACHE BOOL "cJSON available")
     message(STATUS "cJSON not found, JSON features disabled")
 endif()
 
@@ -279,20 +279,20 @@ if(NOT YAML_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(YAML QUIET libyaml)
 endif()
 if(YAML_FOUND)
-    set(AGENTOS_HAS_YAML TRUE CACHE BOOL "libyaml available")
+    set(AGENTRT_HAS_YAML TRUE CACHE BOOL "libyaml available")
     message(STATUS "libyaml found: ${YAML_LIBRARIES}")
 else()
-    set(AGENTOS_HAS_YAML FALSE CACHE BOOL "libyaml available")
+    set(AGENTRT_HAS_YAML FALSE CACHE BOOL "libyaml available")
     message(STATUS "libyaml not found, YAML config features disabled")
 endif()
 
 # --- OpenSSL ---
 find_package(OpenSSL QUIET)
 if(OpenSSL_FOUND)
-    set(AGENTOS_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available")
+    set(AGENTRT_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available")
     message(STATUS "OpenSSL found: ${OpenSSL_VERSION}")
 else()
-    set(AGENTOS_HAS_OPENSSL FALSE CACHE BOOL "OpenSSL available")
+    set(AGENTRT_HAS_OPENSSL FALSE CACHE BOOL "OpenSSL available")
     message(STATUS "OpenSSL not found, crypto features disabled")
 endif()
 
@@ -302,10 +302,10 @@ if(NOT CURL_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(LIBCURL QUIET libcurl)
 endif()
 if(CURL_FOUND OR LIBCURL_FOUND)
-    set(AGENTOS_HAS_CURL TRUE CACHE BOOL "libcurl available")
+    set(AGENTRT_HAS_CURL TRUE CACHE BOOL "libcurl available")
     message(STATUS "libcurl found: ${CURL_LIBRARIES}${LIBCURL_LIBRARIES}")
 else()
-    set(AGENTOS_HAS_CURL FALSE CACHE BOOL "libcurl available")
+    set(AGENTRT_HAS_CURL FALSE CACHE BOOL "libcurl available")
     message(STATUS "libcurl not found, HTTP client features disabled")
 endif()
 
@@ -315,10 +315,10 @@ if(NOT libmicrohttpd_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(MICROHTTPD QUIET libmicrohttpd)
 endif()
 if(libmicrohttpd_FOUND OR MICROHTTPD_FOUND)
-    set(AGENTOS_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available")
+    set(AGENTRT_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available")
     message(STATUS "libmicrohttpd found")
 else()
-    set(AGENTOS_HAS_MICROHTTPD FALSE CACHE BOOL "libmicrohttpd available")
+    set(AGENTRT_HAS_MICROHTTPD FALSE CACHE BOOL "libmicrohttpd available")
     message(STATUS "libmicrohttpd not found, HTTP gateway may be limited")
 endif()
 
@@ -328,10 +328,10 @@ if(NOT libwebsockets_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
 endif()
 if(libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
-    set(AGENTOS_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available")
+    set(AGENTRT_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available")
     message(STATUS "libwebsockets found")
 else()
-    set(AGENTOS_HAS_LIBWEBSOCKETS FALSE CACHE BOOL "libwebsockets available")
+    set(AGENTRT_HAS_LIBWEBSOCKETS FALSE CACHE BOOL "libwebsockets available")
     message(STATUS "libwebsockets not found, WebSocket features disabled")
 endif()
 
@@ -341,10 +341,10 @@ if(NOT libevent_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(LIBEVENT QUIET libevent)
 endif()
 if(libevent_FOUND OR LIBEVENT_FOUND)
-    set(AGENTOS_HAS_LIBEVENT TRUE CACHE BOOL "libevent available")
+    set(AGENTRT_HAS_LIBEVENT TRUE CACHE BOOL "libevent available")
     message(STATUS "libevent found")
 else()
-    set(AGENTOS_HAS_LIBEVENT FALSE CACHE BOOL "libevent available")
+    set(AGENTRT_HAS_LIBEVENT FALSE CACHE BOOL "libevent available")
     message(STATUS "libevent not found, event-loop features disabled")
 endif()
 
@@ -352,10 +352,10 @@ endif()
 if(BUILD_TESTS)
     find_package(GTest QUIET)
     if(GTest_FOUND)
-        set(AGENTOS_HAS_GTEST TRUE CACHE BOOL "GTest available")
+        set(AGENTRT_HAS_GTEST TRUE CACHE BOOL "GTest available")
         message(STATUS "GTest found: ${GTEST_LIBRARIES}")
     else()
-        set(AGENTOS_HAS_GTEST FALSE CACHE BOOL "GTest available")
+        set(AGENTRT_HAS_GTEST FALSE CACHE BOOL "GTest available")
         message(STATUS "GTest not found, tests will use custom framework")
     endif()
 endif()
@@ -367,7 +367,7 @@ if(BUILD_TESTS)
         find_package(Cmocka QUIET)
     endif()
     if(cmocka_FOUND OR CMOCKA_FOUND)
-        set(AGENTOS_HAS_CMOCKA TRUE CACHE BOOL "cmocka available")
+        set(AGENTRT_HAS_CMOCKA TRUE CACHE BOOL "cmocka available")
         if(NOT CMOCKA_LIBRARIES)
             set(CMOCKA_LIBRARIES ${cmocka_LIBRARIES} CACHE STRING "cmocka libraries" FORCE)
         endif()
@@ -376,36 +376,36 @@ if(BUILD_TESTS)
         endif()
         message(STATUS "cmocka found")
     else()
-        set(AGENTOS_HAS_CMOCKA FALSE CACHE BOOL "cmocka available")
+        set(AGENTRT_HAS_CMOCKA FALSE CACHE BOOL "cmocka available")
         message(STATUS "cmocka not found, some tests may use stub framework")
     endif()
 endif()
 
 # 创建 INTERFACE 库用于传递全局依赖编译定义
 add_library(agentos_compile_defs INTERFACE)
-if(AGENTOS_HAS_SQLITE3)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_SQLITE3)
+if(AGENTRT_HAS_SQLITE3)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_SQLITE3)
 endif()
-if(AGENTOS_HAS_CJSON)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_CJSON)
+if(AGENTRT_HAS_CJSON)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_CJSON)
 endif()
-if(AGENTOS_HAS_YAML)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_YAML)
+if(AGENTRT_HAS_YAML)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_YAML)
 endif()
-if(AGENTOS_HAS_OPENSSL)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_OPENSSL)
+if(AGENTRT_HAS_OPENSSL)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_OPENSSL)
 endif()
-if(AGENTOS_HAS_CURL)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_CURL)
+if(AGENTRT_HAS_CURL)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_CURL)
 endif()
-if(AGENTOS_HAS_MICROHTTPD)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_MICROHTTPD)
+if(AGENTRT_HAS_MICROHTTPD)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_MICROHTTPD)
 endif()
-if(AGENTOS_HAS_LIBWEBSOCKETS)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_LIBWEBSOCKETS)
+if(AGENTRT_HAS_LIBWEBSOCKETS)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_LIBWEBSOCKETS)
 endif()
-if(AGENTOS_HAS_LIBEVENT)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTOS_HAS_LIBEVENT)
+if(AGENTRT_HAS_LIBEVENT)
+    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_LIBEVENT)
 endif()
 
 # ============================================================
@@ -430,8 +430,8 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # 包含子目录
-if(AGENTOS_BUILD_ALL)
-    message(STATUS "Building AgentOS core components...")
+if(AGENTRT_BUILD_ALL)
+    message(STATUS "Building AgentRT core components...")
 
     # 全局include路径（确保所有模块都能找到commons的头文件）
     include_directories(
@@ -475,16 +475,16 @@ if(AGENTOS_BUILD_ALL)
 
     # 依赖检测汇总
     message(STATUS "[DEPS] Dependency detection summary:")
-    message(STATUS "[DEPS]   SQLite3:       ${AGENTOS_HAS_SQLITE3}")
-    message(STATUS "[DEPS]   cJSON:         ${AGENTOS_HAS_CJSON}")
-    message(STATUS "[DEPS]   libyaml:       ${AGENTOS_HAS_YAML}")
-    message(STATUS "[DEPS]   OpenSSL:       ${AGENTOS_HAS_OPENSSL}")
-    message(STATUS "[DEPS]   libcurl:       ${AGENTOS_HAS_CURL}")
-    message(STATUS "[DEPS]   libmicrohttpd: ${AGENTOS_HAS_MICROHTTPD}")
-    message(STATUS "[DEPS]   libwebsockets: ${AGENTOS_HAS_LIBWEBSOCKETS}")
-    message(STATUS "[DEPS]   libevent:      ${AGENTOS_HAS_LIBEVENT}")
+    message(STATUS "[DEPS]   SQLite3:       ${AGENTRT_HAS_SQLITE3}")
+    message(STATUS "[DEPS]   cJSON:         ${AGENTRT_HAS_CJSON}")
+    message(STATUS "[DEPS]   libyaml:       ${AGENTRT_HAS_YAML}")
+    message(STATUS "[DEPS]   OpenSSL:       ${AGENTRT_HAS_OPENSSL}")
+    message(STATUS "[DEPS]   libcurl:       ${AGENTRT_HAS_CURL}")
+    message(STATUS "[DEPS]   libmicrohttpd: ${AGENTRT_HAS_MICROHTTPD}")
+    message(STATUS "[DEPS]   libwebsockets: ${AGENTRT_HAS_LIBWEBSOCKETS}")
+    message(STATUS "[DEPS]   libevent:      ${AGENTRT_HAS_LIBEVENT}")
 
-    # 主要AgentOS组件
+    # 主要AgentRT组件
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentos")
         add_subdirectory(agentos)
     else()
@@ -498,32 +498,32 @@ if(AGENTOS_BUILD_ALL)
 endif()
 
 # 安装配置
-if(AGENTOS_BUILD_ALL)
+if(AGENTRT_BUILD_ALL)
     # 创建安装目标
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs")
-        install(DIRECTORY docs/ DESTINATION share/doc/agentos
+        install(DIRECTORY docs/ DESTINATION share/doc/agentrt
                 PATTERN ".gitignore" EXCLUDE
                 PATTERN "*.pyc" EXCLUDE)
     endif()
 
     # 安装许可证文件
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-        install(FILES LICENSE DESTINATION share/licenses/agentos)
+        install(FILES LICENSE DESTINATION share/licenses/agentrt)
     endif()
 
     # 安装README文件
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
-        install(FILES README.md DESTINATION share/doc/agentos)
+        install(FILES README.md DESTINATION share/doc/agentrt)
     endif()
 endif()
 
 # 包生成支持
 include(InstallRequiredSystemLibraries)
 set(CPACK_SET_DESTDIR ON)
-set(CPACK_PACKAGE_NAME "AgentOS")
+set(CPACK_PACKAGE_NAME "AgentRT")
 set(CPACK_PACKAGE_VENDOR "SPHARX")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Intelligent Agent Operating System")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Intelligent Agent Runtime Platform")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 set(CPACK_PACKAGE_CONTACT "support@spharx.com")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "SPHARX <support@spharx.com>")
@@ -547,7 +547,7 @@ add_custom_target(clean-all
 
 # 构建后信息
 message(STATUS "")
-message(STATUS "AgentOS configured successfully!")
+message(STATUS "AgentRT configured successfully!")
 message(STATUS "  Build directory: ${CMAKE_BINARY_DIR}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")

@@ -16,6 +16,8 @@
  */
 
 #include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
 #include "daemon_event_driver.h"
 #include "jsonrpc_helpers.h"
 #include "logging.h"
@@ -23,6 +25,7 @@
 #include "monitor_service.h"
 #include "param_validator.h"
 #include "platform.h"
+#include "prometheus_exporter.h"
 #include "svc_logger.h"
 #include "thread_pool.h"
 
@@ -47,6 +50,8 @@ static atomic_int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t *g_dispatcher = NULL;
 static daemon_event_driver_t *g_event_driver = NULL;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
 
 /* ==================== 信号处理 ==================== */
 
@@ -373,6 +378,17 @@ static void handle_client(agentos_socket_t client_fd)
         return;
     }
 
+    /* C-L10: 检测 HTTP GET /metrics 请求，响应 Prometheus 格式指标 */
+    char *http_response = NULL;
+    size_t http_response_len = 0;
+    if (prometheus_exporter_handle_http(buffer, (size_t)n, &http_response,
+                                        &http_response_len) == 0) {
+        agentos_socket_send(client_fd, http_response, http_response_len);
+        AGENTOS_FREE(http_response);
+        agentos_socket_close(client_fd);
+        return;
+    }
+
     cJSON *req = cJSON_Parse(buffer);
     if (!req) {
         JSONRPC_SEND_ERROR(client_fd, JSONRPC_PARSE_ERROR, "Parse error: invalid JSON", -1);
@@ -488,6 +504,16 @@ int main(int argc, char **argv)
 
     SVC_LOG_INFO("Monitor service created successfully");
 
+    /* C-L10: 初始化 Prometheus exporter 并注册 14 项必需指标 */
+    if (prometheus_exporter_init("monit_d") == 0) {
+        int metrics_ret = prometheus_exporter_register_required_metrics();
+        if (metrics_ret != 0) {
+            SVC_LOG_WARN("C-L10: Some required metrics failed to register (ret=%d)", metrics_ret);
+        }
+    } else {
+        SVC_LOG_ERROR("C-L10: Failed to initialize Prometheus exporter");
+    }
+
     /* 创建服务器 Socket */
     agentos_socket_t server_fd;
 
@@ -501,6 +527,10 @@ int main(int argc, char **argv)
             return 1;
         }
         SVC_LOG_INFO("Listening on TCP port %d", DEFAULT_TCP_PORT);
+        g_bsd = daemon_bootstrap_sd_start("monit_d", "monitor", "127.0.0.1",
+                                          DEFAULT_TCP_PORT, "monitor,core", 0);
+        g_bipc = daemon_bootstrap_ipc_start("monit_d", "monitor", "127.0.0.1",
+                                            DEFAULT_TCP_PORT, IPC_BUS_PROTO_JSON_RPC);
     } else {
 #if defined(AGENTOS_PLATFORM_WINDOWS)
         server_fd = agentos_socket_create_named_pipe_server(DEFAULT_SOCKET_PATH_WIN);
@@ -515,6 +545,10 @@ int main(int argc, char **argv)
             return 1;
         }
         SVC_LOG_INFO("Listening on Unix socket");
+        g_bsd = daemon_bootstrap_sd_start("monit_d", "monitor", DEFAULT_SOCKET_PATH_UNIX,
+                                          0, "monitor,core", 0);
+        g_bipc = daemon_bootstrap_ipc_start("monit_d", "monitor", DEFAULT_SOCKET_PATH_UNIX,
+                                            0, IPC_BUS_PROTO_JSON_RPC);
     }
 
     SVC_LOG_INFO("Monitor service started successfully");
@@ -562,6 +596,9 @@ int main(int argc, char **argv)
     daemon_event_driver_run(g_event_driver);
 
     /* 清理资源 */
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
+    prometheus_exporter_shutdown();
     SVC_LOG_INFO("Monitor service stopping...");
     daemon_event_driver_destroy(g_event_driver);
     agentos_socket_close(server_fd);
