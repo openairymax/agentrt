@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/deployment/` 包含 AgentOS Manager 模块的部署环境配置，定义 Cupolas 子系统的多环境部署参数，包括各环境的资源限制、服务端点和监控配置。
+`manager/deployment/` 包含 AgentRT Manager 模块的部署环境配置，定义 Cupolas 子系统的多环境部署参数，包括各环境的资源限制、服务端点和监控配置。
 
 ## 目录结构
 

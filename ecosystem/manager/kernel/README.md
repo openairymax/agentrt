@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/kernel/` 包含 AgentOS 内核级配置文件，定义内核核心参数和运行时设置。配置覆盖调度器策略、内存管理、IPC 通信、定时器、错误处理、热更新和性能监控等子系统，遵循 `schema/kernel-settings.schema.json` 规范。按双重责任模型，内容定义责任归属 corekern 模块，管理责任归属 Manager 模块。
+`manager/kernel/` 包含 AgentRT 内核级配置文件，定义内核核心参数和运行时设置。配置覆盖调度器策略、内存管理、IPC 通信、定时器、错误处理、热更新和性能监控等子系统，遵循 `schema/kernel-settings.schema.json` 规范。按双重责任模型，内容定义责任归属 corekern 模块，管理责任归属 Manager 模块。
 
 ## 目录结构
 

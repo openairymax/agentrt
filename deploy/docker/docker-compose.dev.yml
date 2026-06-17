@@ -1,4 +1,4 @@
-# AgentOS Full Development Environment
+# AgentRT Full Development Environment
 # Version: 0.1.0
 #
 # 一键启动完整开发环境:
@@ -144,7 +144,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana_agentos_dashboard.json:/etc/grafana/provisioning/dashboards/agentos.json:ro
+      - ./monitoring/grafana_agentrt_dashboard.json:/etc/grafana/provisioning/dashboards/agentos.json:ro
     depends_on:
       - prometheus
     networks:

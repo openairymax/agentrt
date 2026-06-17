@@ -7,4 +7,4 @@
 
 mod client;
 
-pub use client::{APIClient, Client};
+pub use client::{APIClient, Client, ClientBuilder};

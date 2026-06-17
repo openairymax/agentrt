@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/app/docgen/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-DocGen 是基于 AgentOS 平台的智能文档生成应用，核心引擎 `DocumentationGenerator` 支持从多种源格式（Markdown/Python/YAML/JSON）自动生成结构化文档，输出 HTML/PDF/Markdown 等格式。采用 Jinja2 模板渲染引擎，支持文件监听自动重建、导航生成、搜索索引创建和缓存优化。
+DocGen 是基于 AgentRT 平台的智能文档生成应用，核心引擎 `DocumentationGenerator` 支持从多种源格式（Markdown/Python/YAML/JSON）自动生成结构化文档，输出 HTML/PDF/Markdown 等格式。采用 Jinja2 模板渲染引擎，支持文件监听自动重建、导航生成、搜索索引创建和缓存优化。
 
 ## 目录结构
 

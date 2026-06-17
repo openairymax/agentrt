@@ -81,8 +81,9 @@ fn test_backward_compatibility() {
     let client = Client::new("http://localhost:18789");
     assert!(client.is_ok(), "Client::new should succeed with valid endpoint");
 
-    let bad_client = Client::new("");
-    assert!(bad_client.is_err(), "Client::new should fail with empty endpoint");
+    // 空端点现在使用默认值 http://127.0.0.1:18789
+    let default_client = Client::new("");
+    assert!(default_client.is_ok(), "Client::new with empty endpoint should use default");
 
     let bad_client2 = Client::new("not-a-url");
     assert!(bad_client2.is_err(), "Client::new should fail with invalid endpoint");

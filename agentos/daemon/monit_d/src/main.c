@@ -25,6 +25,7 @@
 #include "monitor_service.h"
 #include "param_validator.h"
 #include "platform.h"
+#include "prometheus_exporter.h"
 #include "svc_logger.h"
 #include "thread_pool.h"
 
@@ -377,6 +378,17 @@ static void handle_client(agentos_socket_t client_fd)
         return;
     }
 
+    /* C-L10: 检测 HTTP GET /metrics 请求，响应 Prometheus 格式指标 */
+    char *http_response = NULL;
+    size_t http_response_len = 0;
+    if (prometheus_exporter_handle_http(buffer, (size_t)n, &http_response,
+                                        &http_response_len) == 0) {
+        agentos_socket_send(client_fd, http_response, http_response_len);
+        AGENTOS_FREE(http_response);
+        agentos_socket_close(client_fd);
+        return;
+    }
+
     cJSON *req = cJSON_Parse(buffer);
     if (!req) {
         JSONRPC_SEND_ERROR(client_fd, JSONRPC_PARSE_ERROR, "Parse error: invalid JSON", -1);
@@ -492,6 +504,16 @@ int main(int argc, char **argv)
 
     SVC_LOG_INFO("Monitor service created successfully");
 
+    /* C-L10: 初始化 Prometheus exporter 并注册 14 项必需指标 */
+    if (prometheus_exporter_init("monit_d") == 0) {
+        int metrics_ret = prometheus_exporter_register_required_metrics();
+        if (metrics_ret != 0) {
+            SVC_LOG_WARN("C-L10: Some required metrics failed to register (ret=%d)", metrics_ret);
+        }
+    } else {
+        SVC_LOG_ERROR("C-L10: Failed to initialize Prometheus exporter");
+    }
+
     /* 创建服务器 Socket */
     agentos_socket_t server_fd;
 
@@ -576,6 +598,7 @@ int main(int argc, char **argv)
     /* 清理资源 */
     daemon_bootstrap_ipc_stop(g_bipc);
     daemon_bootstrap_sd_stop(g_bsd);
+    prometheus_exporter_shutdown();
     SVC_LOG_INFO("Monitor service stopping...");
     daemon_event_driver_destroy(g_event_driver);
     agentos_socket_close(server_fd);

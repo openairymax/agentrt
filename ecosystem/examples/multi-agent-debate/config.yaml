@@ -1,0 +1,100 @@
+# 多 Agent 辩论示例配置
+# 演示四种协作模式：sequential, parallel, debate, hierarchical
+
+# 默认辩题
+topic: "人工智能利大于弊"
+
+# 协作模式（可通过 --mode 参数覆盖）
+mode: debate
+
+# 辩论参数
+debate:
+  max_rounds: 3           # 最大辩论轮次
+  speech_timeout: 30      # 每次发言超时（秒）
+  summary_after_round: true  # 每轮后主持人总结
+
+# Agent 注册
+agents:
+  moderator:
+    config: agents/moderator.agent.yaml
+    role: coordinator      # 协调者角色
+
+  proponent:
+    config: agents/proponent.agent.yaml
+    role: debater          # 辩论者角色
+    stance: support        # 支持辩题
+
+  opponent:
+    config: agents/opponent.agent.yaml
+    role: debater          # 辩论者角色
+    stance: oppose         # 反对辩题
+
+  judge:
+    config: agents/judge.agent.yaml
+    role: evaluator        # 评估者角色
+
+# 协作模式配置
+modes:
+  # 顺序模式：按固定顺序执行
+  sequential:
+    flow:
+      - agent: moderator
+        action: announce_topic
+      - agent: proponent
+        action: present_argument
+      - agent: opponent
+        action: present_argument
+      - agent: judge
+        action: evaluate
+
+  # 并行模式：正反方同时准备
+  parallel:
+    flow:
+      - agent: moderator
+        action: announce_topic
+      - parallel:
+          - agent: proponent
+            action: present_argument
+          - agent: opponent
+            action: present_argument
+      - agent: judge
+        action: evaluate
+
+  # 辩论模式：多轮交替反驳
+  debate:
+    flow:
+      - agent: moderator
+        action: announce_topic
+      - loop:
+          rounds: 3
+          steps:
+            - agent: proponent
+              action: argue
+            - agent: opponent
+              action: rebut
+            - agent: moderator
+              action: summarize_round
+      - agent: judge
+        action: evaluate
+
+  # 层级模式：主持人分配任务
+  hierarchical:
+    coordinator: moderator
+    flow:
+      - agent: moderator
+        action: assign_tasks
+      - parallel:
+          - agent: proponent
+            action: execute_task
+          - agent: opponent
+            action: execute_task
+      - agent: moderator
+        action: collect_results
+      - agent: judge
+        action: evaluate
+
+# 运行时配置
+runtime:
+  max_retries: 3
+  timeout: 120
+  log_level: info

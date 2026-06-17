@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-description: Suggest an idea for AgentOS
+description: Suggest an idea for AgentRT
 title: "[Feature]: "
 labels: ["enhancement"]
 assignees: []

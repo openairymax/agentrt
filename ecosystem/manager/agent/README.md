@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/agent/` 包含 AgentOS 的 Agent 注册表配置，定义了 12 个内置 Agent 和 1 个自定义模板的完整注册信息。每个 Agent 包含角色定义、能力声明、双系统模型配置、权限要求、成本概览、信任指标和资源限制等维度，遵循 `schema/agent-registry.schema.json` 规范。
+`manager/agent/` 包含 AgentRT 的 Agent 注册表配置，定义了 12 个内置 Agent 和 1 个自定义模板的完整注册信息。每个 Agent 包含角色定义、能力声明、双系统模型配置、权限要求、成本概览、信任指标和资源限制等维度，遵循 `schema/agent-registry.schema.json` 规范。
 
 ## 目录结构
 

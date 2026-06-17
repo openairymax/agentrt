@@ -240,7 +240,7 @@ static void test_string_parse(void)
     ASSERT(rc == 0, "parse should succeed");
     struct yaml_node *name = yaml_get(doc->root, "name");
     ASSERT(name != NULL, "name should exist");
-    ASSERT(strcmp(yaml_as_string(name, ""), "AgentOS") == 0, "name should be AgentOS");
+    ASSERT(strcmp(yaml_as_string(name, ""), "AgentRT") == 0, "name should be AgentRT");
     yaml_destroy(doc);
     PASS();
 }

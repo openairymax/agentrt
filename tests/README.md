@@ -4,7 +4,7 @@
 
 ## 概述
 
-`tests/` 目录是 AgentOS 项目的集中测试套件，涵盖从底层内核到上层应用的完整测试体系。测试框架采用 C（CMocka）和 Python（pytest）双语言实现，支持单元测试、集成测试、契约测试、性能基准测试和安全测试等多层次验证。
+`tests/` 目录是 AgentRT 项目的集中测试套件，涵盖从底层内核到上层应用的完整测试体系。测试框架采用 C（CMocka）和 Python（pytest）双语言实现，支持单元测试、集成测试、契约测试、性能基准测试和安全测试等多层次验证。
 
 本目录作为所有测试活动的根入口，包含全局配置文件、构建脚本以及五个子目录，分别对应不同测试层级。C 语言测试通过 CMake + CMocka 构建，Python 测试通过 pytest 驱动，性能基准测试使用 pytest-benchmark，Shell 脚本测试使用 bats-core。所有测试均可通过统一入口 `utils/python/run_tests.py` 执行，也支持直接使用 pytest 或 ctest 运行。
 

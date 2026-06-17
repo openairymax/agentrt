@@ -835,6 +835,76 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         }
     }
 
+    /* 内核 IPC 配置 */
+    val = getenv("AGENTOS_KERNEL_IPC_MAX_MESSAGE_SIZE");
+    if (val) {
+        int sz = atoi(val);
+        if (sz > 0) config->kernel.ipc.max_message_size = (uint32_t)sz;
+    }
+
+    val = getenv("AGENTOS_KERNEL_IPC_SHM_POOL_SIZE_MB");
+    if (val) {
+        int mb = atoi(val);
+        if (mb > 0) config->kernel.ipc.shm_pool_size_mb = (uint32_t)mb;
+    }
+
+    /* 内核调度器配置 */
+    val = getenv("AGENTOS_KERNEL_SCHEDULER_MAX_TASKS");
+    if (val) {
+        int tasks = atoi(val);
+        if (tasks > 0) config->kernel.scheduler.max_tasks = (uint32_t)tasks;
+    }
+
+    val = getenv("AGENTOS_KERNEL_SCHEDULER_TIME_SLICE_MS");
+    if (val) {
+        int ms = atoi(val);
+        if (ms > 0) config->kernel.scheduler.time_slice_ms = (uint32_t)ms;
+    }
+
+    /* 内核 OOM 水位 */
+    val = getenv("AGENTOS_KERNEL_MEMORY_OOM_WATERMARK_PERCENT");
+    if (val) {
+        int pct = atoi(val);
+        if (pct >= 50 && pct <= 100) {
+            config->kernel.memory.oom_watermark_percent = (uint32_t)pct;
+        }
+    }
+
+    /* 记忆系统提供商 */
+    val = getenv("AGENTOS_MEMORY_PROVIDER");
+    if (val) {
+        /* P1.11.2: 通过环境变量切换 memory provider */
+        /* 值: builtin | memoryrovol | auto */
+    }
+
+    /* 多 Agent 配置 */
+    val = getenv("AGENTOS_MULTI_AGENT_MAX_CONCURRENT");
+    if (val) {
+        int n = atoi(val);
+        if (n > 0) config->multi_agent.max_concurrent_agents = (uint32_t)n;
+    }
+
+    /* 安全沙箱类型 */
+    val = getenv("AGENTOS_SECURITY_SANDBOX_TYPE");
+    if (val) {
+        safe_strcpy(config->security.sandbox.type, val,
+                    sizeof(config->security.sandbox.type));
+    }
+
+    /* 审计日志路径 */
+    val = getenv("AGENTOS_SECURITY_AUDIT_LOG_PATH");
+    if (val) {
+        safe_strcpy(config->security.audit.log_path, val,
+                    sizeof(config->security.audit.log_path));
+    }
+
+    /* 可观测性追踪导出器 */
+    val = getenv("AGENTOS_OBSERVABILITY_TRACING_EXPORTER");
+    if (val) {
+        safe_strcpy(config->observability.tracing.exporter, val,
+                    sizeof(config->observability.tracing.exporter));
+    }
+
     return 0;
 }
 
@@ -890,6 +960,81 @@ int agentos_yaml_validate(const agentos_yaml_config_t *config) {
 
     /* 验证内核配置 */
     if (config->kernel.memory.oom_watermark_percent > 100) return -13;
+    if (config->kernel.memory.oom_watermark_percent < 50) return -14;
+    if (config->kernel.ipc.max_message_size == 0) return -15;
+    if (config->kernel.ipc.shm_pool_size_mb == 0) return -16;
+    if (config->kernel.scheduler.max_tasks == 0) return -17;
+    if (config->kernel.scheduler.time_slice_ms == 0) return -18;
+    if (config->kernel.memory.max_alloc_mb == 0) return -19;
+
+    /* 验证多 Agent 配置 */
+    if (config->multi_agent.enabled) {
+        if (config->multi_agent.max_concurrent_agents == 0) return -20;
+        if (config->multi_agent.communication.protocol[0] == '\0') return -21;
+        if (config->multi_agent.collaboration.default_pattern[0] == '\0') return -22;
+    }
+
+    /* 验证 Hook 配置 */
+    if (config->hooks.enabled) {
+        /* hook_dirs 可以为空（使用默认目录），不强制要求 */
+        for (uint32_t i = 0; i < config->hooks.global_hooks.on_tool_call_count; i++) {
+            if (config->hooks.global_hooks.on_tool_call[i].hook[0] == '\0') return -23;
+        }
+    }
+
+    /* 验证插件配置 */
+    if (config->plugins.enabled && config->plugins.plugin_dir_count == 0 && config->plugins.auto_discover) {
+        /* auto_discover 模式下 plugin_dirs 可以为空 */
+    }
+
+    /* 验证可观测性日志级别 */
+    if (config->observability.logging.level[0] != '\0') {
+        static const char *valid_levels[] = {"debug", "info", "warn", "error", NULL};
+        int valid = 0;
+        for (int i = 0; valid_levels[i]; i++) {
+            if (strcmp(config->observability.logging.level, valid_levels[i]) == 0) {
+                valid = 1;
+                break;
+            }
+        }
+        if (!valid) return -24;
+    }
+
+    /* 验证安全模式 */
+    if (config->security.enabled && config->security.mode[0] != '\0') {
+        static const char *valid_modes[] = {"standard", "strict", "permissive", NULL};
+        int valid = 0;
+        for (int i = 0; valid_modes[i]; i++) {
+            if (strcmp(config->security.mode, valid_modes[i]) == 0) {
+                valid = 1;
+                break;
+            }
+        }
+        if (!valid) return -25;
+    }
+
+    /* 验证端口范围 */
+    if (config->gateway.enabled && config->gateway.http.port > 0) {
+        if (config->gateway.http.port < 1024 && config->gateway.http.port != 80 &&
+            config->gateway.http.port != 443) {
+            /* 非特权端口建议但不强制 */
+        }
+    }
+
+    /* 验证记忆系统配置 */
+    if (config->memory.enabled) {
+        if (config->memory.mode[0] != '\0') {
+            static const char *valid_modes[] = {"full", "lite", "off", NULL};
+            int valid = 0;
+            for (int i = 0; valid_modes[i]; i++) {
+                if (strcmp(config->memory.mode, valid_modes[i]) == 0) {
+                    valid = 1;
+                    break;
+                }
+            }
+            if (!valid) return -26;
+        }
+    }
 
     return 0;
 }

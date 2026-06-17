@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/schema/` 包含 AgentOS Manager 模块的全部 JSON Schema 定义，用于验证各模块配置文件的格式正确性和语义约束。共 11 个 Schema 文件，覆盖约 272 项校验规则，确保配置数据的完整性和一致性。
+`manager/schema/` 包含 AgentRT Manager 模块的全部 JSON Schema 定义，用于验证各模块配置文件的格式正确性和语义约束。共 11 个 Schema 文件，覆盖约 272 项校验规则，确保配置数据的完整性和一致性。
 
 ## 目录结构
 

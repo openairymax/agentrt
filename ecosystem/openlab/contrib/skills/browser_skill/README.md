@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/contrib/skills/browser_skill/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-Browser Skill 为 AgentOS 智能体提供浏览器自动化能力，支持网页导航、数据抓取、表单操作和页面交互。基于 Playwright/Selenium 等浏览器驱动框架，实现无头浏览器控制，适用于 Web 自动化测试、数据采集和页面监控等场景。
+Browser Skill 为 AgentRT 智能体提供浏览器自动化能力，支持网页导航、数据抓取、表单操作和页面交互。基于 Playwright/Selenium 等浏览器驱动框架，实现无头浏览器控制，适用于 Web 自动化测试、数据采集和页面监控等场景。
 
 ## 目录结构
 
@@ -60,7 +60,7 @@ browser_skill/
 
 ## 依赖关系
 
-- **核心依赖**: AgentOS OpenLab Core
+- **核心依赖**: AgentRT OpenLab Core
 - **浏览器驱动**: Playwright >= 1.40.0 或 Selenium >= 4.15.0
 - **安装**: `pip install -e ".[browser]"`
 

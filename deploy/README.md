@@ -1,0 +1,90 @@
+# Deploy — 部署配置
+
+`deploy/`
+
+## 概述
+
+`deploy/` 目录包含 AgentRT 的部署配置，提供容器化部署方案、多环境编排和监控集成。当前以 Docker 容器化部署为核心，支持开发、调试和生产三种环境的一键部署。
+
+## 目录结构
+
+```
+deploy/
+├── docker/                        # Docker 容器化部署
+│   ├── Dockerfile                 #   多阶段构建镜像（builder → runtime → development）
+│   ├── docker-compose.yml         #   基础服务编排
+│   ├── docker-compose.dev.yml     #   开发环境覆盖
+│   ├── docker-compose.prod.yml    #   生产环境覆盖
+│   ├── .env.example               #   环境变量模板
+│   ├── monitoring/                #   监控配置
+│   │   ├── prometheus.yml         #     Prometheus 采集配置
+│   │   ├── alerts.yml             #     告警规则
+│   │   └── grafana_agentos_dashboard.json  # Grafana 仪表盘
+│   └── README.md                  #   Docker 部署详细文档
+└── README.md                      # 本文件
+```
+
+## 核心组件
+
+### docker/ — Docker 容器化部署
+
+Docker 部署方案采用双 Dockerfile 分层架构和多环境 Compose 编排：
+
+| 组件 | 说明 |
+|------|------|
+| **Dockerfile** | 三阶段构建：builder（编译）→ runtime（生产）→ development（调试） |
+| **docker-compose.yml** | 基础编排：Gateway + Redis + Prometheus + Grafana |
+| **docker-compose.dev.yml** | 开发覆盖：挂载源码、启用调试工具 |
+| **docker-compose.prod.yml** | 生产覆盖：资源限制、安全加固、日志轮转 |
+| **monitoring/** | Prometheus 采集 + Grafana 仪表盘 + 告警规则 |
+
+### 暴露端口
+
+| 端口 | 协议 | 用途 |
+|------|------|------|
+| 8080 | HTTP | API 网关 |
+| 8081 | WebSocket | WebSocket 网关 |
+| 9090 | HTTP | Prometheus Metrics |
+
+## 快速启动
+
+```bash
+# 1. 复制环境变量模板
+cp deploy/docker/.env.example deploy/docker/.env
+# 编辑 .env 填入实际密钥
+
+# 2. 开发环境启动
+docker-compose -f deploy/docker/docker-compose.yml \
+               -f deploy/docker/docker-compose.dev.yml up -d
+
+# 3. 生产环境启动
+docker-compose -f deploy/docker/docker-compose.yml \
+               -f deploy/docker/docker-compose.prod.yml up -d
+
+# 4. 查看日志
+docker-compose -f deploy/docker/docker-compose.yml logs -f gateway
+```
+
+## 依赖关系
+
+| 组件 | 版本 | 用途 |
+|------|------|------|
+| Docker | ≥ 20.10 | 容器运行时 |
+| Docker Compose | ≥ 2.0 | 服务编排 |
+| Alpine | 3.19 | 基础镜像 |
+| Redis | 7-alpine | 缓存与会话存储 |
+| Prometheus | v2.45.0 | 指标采集 |
+| Grafana | 10.2.0 | 可视化仪表盘 |
+
+## 与 scripts/ops/deploy/ 的关系
+
+`deploy/docker/` 和 `scripts/ops/deploy/` 均提供 Docker 部署方案，定位不同：
+
+| 目录 | 定位 | 用途 |
+|------|------|------|
+| `deploy/docker/` | Gateway 专用部署 | 网关服务的轻量级容器化部署 |
+| `scripts/ops/deploy/` | 全系统部署 | 完整 AgentRT 系统的多服务编排 |
+
+---
+
+© 2026 SPHARX Ltd. All Rights Reserved.

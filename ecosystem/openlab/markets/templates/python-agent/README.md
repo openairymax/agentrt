@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/markets/templates/python-agent/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-Python Agent 模板是 AgentOS 生态市场中提供的标准化 Agent 开发模板，帮助开发者快速创建基于 Python 的智能 Agent 应用。该模板遵循 AgentOS 的组件规范和通信协议，开箱即用，支持自定义技能注册、记忆管理和协议处理。
+Python Agent 模板是 AgentRT 生态市场中提供的标准化 Agent 开发模板，帮助开发者快速创建基于 Python 的智能 Agent 应用。该模板遵循 AgentRT 的组件规范和通信协议，开箱即用，支持自定义技能注册、记忆管理和协议处理。
 
 ## 目录结构
 
@@ -82,7 +82,7 @@ await client.get_status()               # 获取状态
 
 ## 依赖关系
 
-- **核心依赖**: agentos (AgentOS Python SDK), sdk.python
+- **核心依赖**: agentos (AgentRT Python SDK), sdk.python
 - **Python**: >= 3.10
 
 ## 构建说明

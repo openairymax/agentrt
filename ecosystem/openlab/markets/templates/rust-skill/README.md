@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/markets/templates/rust-skill/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-Rust Skill 模板是 AgentOS 生态市场中提供的标准化 Skill 开发模板，帮助开发者使用 Rust 语言创建高性能的系统级技能。该模板利用 Rust 的内存安全特性和零成本抽象，适用于对性能和安全要求较高的场景，如数据处理、加密运算、系统调用和实时计算。
+Rust Skill 模板是 AgentRT 生态市场中提供的标准化 Skill 开发模板，帮助开发者使用 Rust 语言创建高性能的系统级技能。该模板利用 Rust 的内存安全特性和零成本抽象，适用于对性能和安全要求较高的场景，如数据处理、加密运算、系统调用和实时计算。
 
 ## 目录结构
 
@@ -83,7 +83,7 @@ tracing = "0.1"
 
 ## 依赖关系
 
-- **核心依赖**: agentos-sdk (AgentOS Rust SDK), tokio, serde, anyhow, thiserror, tracing
+- **核心依赖**: agentos-sdk (AgentRT Rust SDK), tokio, serde, anyhow, thiserror, tracing
 - **Rust Edition**: 2021
 
 ## 构建说明
@@ -172,7 +172,7 @@ cargo build --release --target aarch64-unknown-linux-gnu
 # 为 x86_64 平台编译
 cargo build --release --target x86_64-unknown-linux-gnu
 
-# 构建与 AgentOS 集成的动态库
+# 构建与 AgentRT 集成的动态库
 cargo build --release --lib
 ```
 

@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/`
 **版本**: v0.1.0
 
-> **Status**: OpenLab 作为 AgentOS 的正式组成部分，API 持续演进中。
+> **Status**: OpenLab 作为 AgentRT 的正式组成部分，API 持续演进中。
 
 ## 概述
 
-OpenLab 是 AgentOS 的开放生态系统层，提供应用（Applications）、社区贡献（Contributions）、市场（Markets）和核心管理（Core）四大能力体系，构建开放、协作的 Agent 开发生态。各模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。OpenLab 遵循 AgentOS 架构设计原则 V1.8，实现了生产级多智能体编排框架。
+OpenLab 是 AgentRT 的开放生态系统层，提供应用（Applications）、社区贡献（Contributions）、市场（Markets）和核心管理（Core）四大能力体系，构建开放、协作的 Agent 开发生态。各模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。OpenLab 遵循 AgentRT 架构设计原则 V1.8，实现了生产级多智能体编排框架。
 
 ## 设计目标
 
@@ -120,11 +120,11 @@ openlab/
 |                     OpenLab Core (openlab/)                        |
 |  Agent Registry | Task Scheduler | Tool Executor | Storage         |
 +-------------------------------------------------------------------+
-|                        AgentOS 核心运行时 (protocols)              |
+|                        AgentRT 核心运行时 (protocols)              |
 +-------------------------------------------------------------------+
 ```
 
-> **注意**: OpenLab 通过 `agentos/protocols/` 协议层与 AgentOS 核心运行时通信，所有模块间交互均基于 JSON-RPC 2.0 协议规范。
+> **注意**: OpenLab 通过 `agentos/protocols/` 协议层与 AgentRT 核心运行时通信，所有模块间交互均基于 JSON-RPC 2.0 协议规范。
 
 ## 应用概述
 
@@ -155,7 +155,7 @@ openlab/
 ## 依赖关系
 
 - **核心依赖**: Python >= 3.10, asyncio, dataclasses, abc, sqlite3, json, uuid, time
-- **协议依赖**: AgentOS protocols 层（JSON-RPC 2.0）
+- **协议依赖**: AgentRT protocols 层（JSON-RPC 2.0）
 - **可选依赖**: FastAPI, Pydantic, SQLAlchemy, PyYAML, Jinja2, FFmpeg, Redis, Stripe, OpenCV, MoviePy, Playwright, Selenium 等（按应用场景）
 
 ## 构建说明

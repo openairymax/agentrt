@@ -3,11 +3,11 @@
 **模块路径**: `ecosystem/openlab/openlab/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
-OpenLab Core 是 OpenLab 生态系统的核心管理模块，提供 Agent 管理、任务调度、工具执行、数据存储四大核心能力，以及异常处理、日志记录等基础设施。本模块遵循 AgentOS 架构设计原则 V1.8，实现了生产级多智能体编排框架的核心抽象层。
+OpenLab Core 是 OpenLab 生态系统的核心管理模块，提供 Agent 管理、任务调度、工具执行、数据存储四大核心能力，以及异常处理、日志记录等基础设施。本模块遵循 AgentRT 架构设计原则 V1.8，实现了生产级多智能体编排框架的核心抽象层。
 
 ## 目录结构
 

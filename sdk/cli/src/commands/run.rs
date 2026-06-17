@@ -116,7 +116,7 @@ async fn run_interactive(client: &GatewayClient, agent_file: &str) -> Result<()>
                 println!();
                 println!("{}", response.response);
                 println!();
-                session_id = Some(response.session_id.clone());
+                _session_id = Some(response.session_id.clone());
             }
             Err(e) => {
                 eprintln!("{} Gateway error: {}", "✗".red(), e);

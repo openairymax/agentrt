@@ -116,6 +116,17 @@ void agentos_config_watch_stop(void);
  */
 int agentos_config_reload(const char *yaml_path);
 
+/**
+ * @brief CoreLoopThree 配置模块初始化（POSIX init）
+ *
+ * 在 agentos_init() 之后调用，加载 agentos.yaml 到全局配置。
+ * 如果文件不存在，使用默认配置。
+ *
+ * @param yaml_path agentos.yaml 文件路径（NULL 使用 ./agentos.yaml）
+ * @return 0 成功，非0失败
+ */
+int agentos_config_init(const char *yaml_path);
+
 #ifdef __cplusplus
 }
 #endif

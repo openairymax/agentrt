@@ -5,7 +5,7 @@
 
 ## 概述
 
-`manager/logging/` 包含 AgentOS Manager 模块的日志管理配置，定义日志级别、输出格式、输出目标和轮转策略。日志配置遵循 `schema/logging.schema.json` 规范，并可通过环境配置覆盖实现不同环境的差异化日志策略。
+`manager/logging/` 包含 AgentRT Manager 模块的日志管理配置，定义日志级别、输出格式、输出目标和轮转策略。日志配置遵循 `schema/logging.schema.json` 规范，并可通过环境配置覆盖实现不同环境的差异化日志策略。
 
 ## 目录结构
 

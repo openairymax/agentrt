@@ -4,7 +4,7 @@
 
 ## 概述
 
-`resources/` 目录存放 AgentOS 项目的技术演示脚本、静态图片资源和交互式教程素材。该模块是项目宣传、社区推广和新贡献者引导的核心资源库，提供从技术演示到入门教程的完整学习路径。
+`resources/` 目录存放 AgentRT 项目的技术演示脚本、静态图片资源和交互式教程素材。该模块是项目宣传、社区推广和新贡献者引导的核心资源库，提供从技术演示到入门教程的完整学习路径。
 
 资源模块的设计原则：
 
@@ -45,7 +45,7 @@ resources/
 
 技术演示脚本目录，包含可独立运行的演示模块：
 
-- **phase3_technology_demo.py**：第三阶段技术演示脚本，展示 AgentOS 的核心技术栈，包括：
+- **phase3_technology_demo.py**：第三阶段技术演示脚本，展示 AgentRT 的核心技术栈，包括：
   - 服务框架演示：展示 `daemon/` 和 `gateway/` 的服务架构和通信机制
   - 基准测试演示：展示 `atoms/` 层核心组件的性能特征
   - 工具链演示：展示 `toolkit/` 多语言 SDK 的使用方式
@@ -55,12 +55,12 @@ resources/
 
 项目宣传和社区推广使用的静态图片资源：
 
-- **AgentOS-desktop-preview.gif**：桌面端预览动图，用于项目 README、官网和宣传材料，展示 AgentOS 的桌面端交互界面
-- **feishu-community-qr.png**：飞书社区二维码，用于社区推广和用户引导，扫码即可加入 AgentOS 飞书社区
+- **AgentOS-desktop-preview.gif**：桌面端预览动图，用于项目 README、官网和宣传材料，展示 AgentRT 的桌面端交互界面
+- **feishu-community-qr.png**：飞书社区二维码，用于社区推广和用户引导，扫码即可加入 AgentRT 飞书社区
 
 ### tutorial/ — 交互式教程引擎
 
-交互式教程系统，帮助新贡献者快速了解 AgentOS 项目：
+交互式教程系统，帮助新贡献者快速了解 AgentRT 项目：
 
 - **tutorial_engine.py**：交互式教程引擎，支持两种运行模式：
   - **命令行模式**：在终端中运行，提供文本交互式学习体验

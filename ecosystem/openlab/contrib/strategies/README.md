@@ -3,7 +3,7 @@
 **模块路径**: `ecosystem/openlab/contrib/strategies/`
 **版本**: v0.1.0
 
-> **Status**: 本模块作为 AgentOS 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentOS 核心运行时集成。
+> **Status**: 本模块作为 AgentRT 的正式组成部分，API 持续演进中。本模块通过 JSON-RPC 2.0 协议与 AgentRT 核心运行时集成。
 
 ## 概述
 
@@ -236,7 +236,7 @@ for step in plan["steps"]:
 ## 依赖关系
 
 - **核心依赖**: Python >= 3.10, openlab.core, typing, dataclasses
-- **协议依赖**: AgentOS protocols 层（JSON-RPC 2.0）
+- **协议依赖**: AgentRT protocols 层（JSON-RPC 2.0）
 
 ---
 

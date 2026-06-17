@@ -1,10 +1,10 @@
-# Toolkit Go — AgentOS Go SDK
+# Toolkit Go — AgentRT Go SDK
 
 **版本**: v0.1.0
 
 ## 概述
 
-AgentOS Go SDK 提供基于 Go 语言的 AgentOS 系统编程接口，采用惯用的 Go 风格设计，支持 goroutine 并发模型。SDK 包含客户端层、业务模块层（Task/Memory/Session/Skill）、系统调用绑定、遥测、插件系统和类型定义，与 Python/Rust/TypeScript SDK 保持 API 一致性。
+AgentRT Go SDK 提供基于 Go 语言的 AgentRT 系统编程接口，采用惯用的 Go 风格设计，支持 goroutine 并发模型。SDK 包含客户端层、业务模块层（Task/Memory/Session/Skill）、系统调用绑定、遥测、插件系统和类型定义，与 Python/Rust/TypeScript SDK 保持 API 一致性。
 
 ## 目录结构
 

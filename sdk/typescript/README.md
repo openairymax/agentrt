@@ -1,11 +1,11 @@
-# Toolkit TypeScript — AgentOS TypeScript SDK
+# Toolkit TypeScript — AgentRT TypeScript SDK
 
 **模块路径**: `sdk/typescript/`
 **版本**: v0.1.0 (SDK v0.1.0)
 
 ## 概述
 
-AgentOS TypeScript SDK 提供基于 TypeScript 的 AgentOS 系统编程接口，适用于 Node.js 环境。SDK 采用模块化设计，包含客户端层、业务模块层（Task/Memory/Session/Skill）、系统调用绑定、遥测和插件系统，与 Python/Go/Rust SDK 保持 API 一致性。提供完整的类型定义和 ES Module 支持。
+AgentRT TypeScript SDK 提供基于 TypeScript 的 AgentRT 系统编程接口，适用于 Node.js 环境。SDK 采用模块化设计，包含客户端层、业务模块层（Task/Memory/Session/Skill）、系统调用绑定、遥测和插件系统，与 Python/Go/Rust SDK 保持 API 一致性。提供完整的类型定义和 ES Module 支持。
 
 ## 目录结构
 

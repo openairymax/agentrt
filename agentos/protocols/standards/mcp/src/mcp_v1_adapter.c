@@ -1303,7 +1303,7 @@ int mcp_v1_route_request(mcp_v1_context_t *ctx, const char *method, const char *
                      (ctx->config.capabilities & MCP_CAP_PROMPTS) ? "true" : "false",
                      (ctx->config.capabilities & MCP_CAP_SAMPLING) ? "true" : "false",
                      (ctx->config.capabilities & MCP_CAP_LOGGING) ? "true" : "false",
-                     ctx->config.server_name ? ctx->config.server_name : "AgentOS",
+                     ctx->config.server_name ? ctx->config.server_name : "AgentRT",
                      ctx->config.server_version ? ctx->config.server_version : MCP_V1_VERSION);
         char *resp = AGENTOS_MALLOC(len + 1);
         if (resp)
@@ -1316,7 +1316,7 @@ int mcp_v1_route_request(mcp_v1_context_t *ctx, const char *method, const char *
                      (ctx->config.capabilities & MCP_CAP_PROMPTS) ? "true" : "false",
                      (ctx->config.capabilities & MCP_CAP_SAMPLING) ? "true" : "false",
                      (ctx->config.capabilities & MCP_CAP_LOGGING) ? "true" : "false",
-                     ctx->config.server_name ? ctx->config.server_name : "AgentOS",
+                     ctx->config.server_name ? ctx->config.server_name : "AgentRT",
                      ctx->config.server_version ? ctx->config.server_version : MCP_V1_VERSION);
         *response_json = resp;
         return 0;

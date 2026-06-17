@@ -44,6 +44,26 @@ pub struct PluginDependency {
     pub optional: bool,
 }
 
+/// 插件类型（四型插件）
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PluginType {
+    Agent,
+    Tool,
+    Hook,
+    Skill,
+}
+
+impl std::fmt::Display for PluginType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PluginType::Agent => write!(f, "agent"),
+            PluginType::Tool => write!(f, "tool"),
+            PluginType::Hook => write!(f, "hook"),
+            PluginType::Skill => write!(f, "skill"),
+        }
+    }
+}
+
 /// 插件清单
 #[derive(Debug, Clone)]
 pub struct PluginManifest {
@@ -52,6 +72,7 @@ pub struct PluginManifest {
     pub version: String,
     pub description: String,
     pub author: String,
+    pub plugin_type: PluginType,
     pub entry_point: String,
     pub entry_class: String,
     pub dependencies: Vec<PluginDependency>,
@@ -72,6 +93,7 @@ impl PluginManifest {
             version: "1.0.0".to_string(),
             description: String::new(),
             author: String::new(),
+            plugin_type: PluginType::Agent,
             entry_point: String::new(),
             entry_class: String::new(),
             dependencies: Vec::new(),
@@ -466,6 +488,110 @@ impl PluginManager {
         );
 
         stats
+    }
+}
+
+// ─── Skill Plugin Trait ─────────────────────────────────────────
+
+/// Skill definition for registration and discovery.
+#[derive(Debug, Clone)]
+pub struct SkillDefinition {
+    pub name: String,
+    pub description: String,
+    pub version: String,
+    pub category: String,
+    pub tags: Vec<String>,
+    pub input_schema: HashMap<String, serde_json::Value>,
+    pub output_schema: HashMap<String, serde_json::Value>,
+    pub examples: Vec<HashMap<String, String>>,
+    pub requires: Vec<String>,
+}
+
+impl SkillDefinition {
+    pub fn new(name: &str, description: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            description: description.to_string(),
+            version: "0.1.0".to_string(),
+            category: "general".to_string(),
+            tags: Vec::new(),
+            input_schema: HashMap::new(),
+            output_schema: HashMap::new(),
+            examples: Vec::new(),
+            requires: Vec::new(),
+        }
+    }
+}
+
+/// Trait for implementing Skill-type plugins.
+///
+/// Skills are reusable capabilities that agents can activate
+/// and apply during task execution.
+///
+/// # Example
+///
+/// ```rust
+/// use agentos_rs::plugin::{SkillPlugin, SkillDefinition};
+/// use std::collections::HashMap;
+///
+/// struct CodeReviewSkill;
+///
+/// impl SkillPlugin for CodeReviewSkill {
+///     fn get_definition(&self) -> SkillDefinition {
+///         SkillDefinition::new("code_review", "Review code for issues")
+///     }
+///
+///     fn execute(
+///         &mut self,
+///         _context: &HashMap<String, serde_json::Value>,
+///     ) -> Result<serde_json::Value, String> {
+///         Ok(serde_json::json!({
+///             "issues": [],
+///             "suggestions": []
+///         }))
+///     }
+/// }
+/// ```
+pub trait SkillPlugin: Send + Sync {
+    /// Return the skill definition.
+    fn get_definition(&self) -> SkillDefinition;
+
+    /// Execute the skill with given context.
+    fn execute(
+        &mut self,
+        context: &HashMap<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, String>;
+
+    /// Return the prompt template for this skill (optional).
+    fn get_prompt_template(&self) -> Option<String> {
+        None
+    }
+
+    /// Return additional system instructions (optional).
+    fn get_system_instructions(&self) -> Option<String> {
+        None
+    }
+
+    /// Validate input context.
+    fn validate_input(&self, _context: &HashMap<String, serde_json::Value>) -> bool {
+        true
+    }
+
+    /// Pre-execution hook (optional).
+    fn pre_execute(
+        &mut self,
+        context: &HashMap<String, serde_json::Value>,
+    ) -> HashMap<String, serde_json::Value> {
+        context.clone()
+    }
+
+    /// Post-execution hook (optional).
+    fn post_execute(
+        &mut self,
+        _context: &HashMap<String, serde_json::Value>,
+        result: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        Ok(result)
     }
 }
 

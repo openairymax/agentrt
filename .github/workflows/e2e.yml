@@ -1,4 +1,4 @@
-name: AgentOS Desktop + Docker E2E
+name: AgentRT Desktop + Docker E2E
 
 on:
   push:

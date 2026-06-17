@@ -31,6 +31,7 @@ pub mod syscall;
 pub mod telemetry;
 pub mod agent;
 pub mod plugin;
+pub mod hook;
 
 // ============================================================
 // 版本信息
@@ -78,9 +79,15 @@ pub use types::{
 
 // 插件框架
 pub use plugin::{
-    PluginState, PluginManifest, PluginDependency, PluginInfo,
+    PluginState, PluginType, PluginManifest, PluginDependency, PluginInfo,
     BasePlugin, PluginFactory, PluginRegistry, PluginManager,
+    SkillDefinition, SkillPlugin,
     get_plugin_registry,
+};
+
+// Hook 系统
+pub use hook::{
+    Hook, HookContext, HookResult,
 };
 
 // 业务模块管理器
