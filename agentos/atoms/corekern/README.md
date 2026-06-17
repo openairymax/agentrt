@@ -8,7 +8,7 @@
 
 ## 概述
 
-CoreKern 是 AgentOS 的**"核中之核"**，是系统最底层的微内核实现。它提供最小化的核心服务集合，遵循经典的微内核架构设计理念——在内核态只保留绝对必要的服务，所有其他系统服务都以用户态进程的形式运行。CoreKern 的设计受到 L4 微内核和 seL4 形式化验证内核的启发，强调最小特权、机制与策略分离、服务化三大原则。
+CoreKern 是 AgentRT 的**"核中之核"**，是系统最底层的微内核实现。它提供最小化的核心服务集合，遵循经典的微内核架构设计理念——在内核态只保留绝对必要的服务，所有其他系统服务都以用户态进程的形式运行。CoreKern 的设计受到 L4 微内核和 seL4 形式化验证内核的启发，强调最小特权、机制与策略分离、服务化三大原则。
 
 CoreKern 以 C11 标准实现，通过 `AGENTOS_API` 宏导出符号，支持 Windows（`__declspec(dllexport/dllimport)`）和 POSIX（`__attribute__((visibility("default")))`）双平台。构建产物为静态库 `agentos_core`，启用安全编译选项（栈保护、FORTIFY_SOURCE、PIE、RELRO、控制流防护等）。
 
@@ -275,7 +275,7 @@ ctest --test-dir build -R corekern
 #include "agentos.h"
 
 int main(void) {
-    // 初始化 AgentOS 核心
+    // 初始化 AgentRT 核心
     int rc = agentos_core_init();
     if (rc != AGENTOS_SUCCESS) return 1;
 

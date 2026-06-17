@@ -1,4 +1,4 @@
-# AgentOS 核心组件构建文件
+# AgentRT 核心组件构建文件
 # agentos/CMakeLists.txt
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
@@ -6,10 +6,10 @@
 # CTest必须在此处启用，以便子目录测试能传播到根CTest
 if(BUILD_TESTS)
     enable_testing()
-    message(STATUS "AgentOS: CTest enabled")
+    message(STATUS "AgentRT: CTest enabled")
 endif()
 
-message(STATUS "Configuring AgentOS core components...")
+message(STATUS "Configuring AgentRT core components...")
 
 # 子模块启用状态汇总
 message(STATUS "[MODULE] Submodule build status:")
@@ -141,7 +141,7 @@ add_custom_target(agentos-all
         $<IF:$<TARGET_EXISTS:agentos_atoms>,agentos_atoms,>
         $<IF:$<TARGET_EXISTS:agentos_commons>,agentos_commons,>
         $<IF:$<TARGET_EXISTS:agentos_cupolas>,agentos_cupolas,>
-    COMMENT "Build all AgentOS core components"
+    COMMENT "Build all AgentRT core components"
 )
 
 # 安装配置
@@ -152,4 +152,4 @@ install(DIRECTORY commons/utils/memory/include/ DESTINATION include/agentos/comm
 install(DIRECTORY commons/utils/string/include/ DESTINATION include/agentos/commons/string)
 install(DIRECTORY commons/utils/logging/include/ DESTINATION include/agentos/commons/logging)
 
-message(STATUS "AgentOS core components configuration complete")
+message(STATUS "AgentRT core components configuration complete")

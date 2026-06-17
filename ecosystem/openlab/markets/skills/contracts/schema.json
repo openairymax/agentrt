@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Skill Contract Schema",
+  "description": "Schema for validating Skill contracts in openlab Market",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "description",
+    "capabilities",
+    "interface",
+    "permissions"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique name for the skill",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 3,
+      "maxLength": 100
+    },
+    "version": {
+      "type": "string",
+      "description": "Skill version in semantic versioning format",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9]+)?$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the skill",
+      "minLength": 10,
+      "maxLength": 1000
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "List of capabilities this skill provides",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "interface": {
+      "type": "object",
+      "description": "Interface specification for the skill",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["stdio", "http_rest", "websocket", "grpc", "message_queue", "function_call"]
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Optional endpoint URL for HTTP/WS/gRPC interfaces"
+        },
+        "schema": {
+          "type": "object",
+          "description": "Optional input/output schema definition"
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "description": "Required permissions for the skill",
+      "items": {
+        "type": "string",
+        "enum": [
+          "filesystem:read",
+          "filesystem:write",
+          "network:http",
+          "network:ws",
+          "process:spawn",
+          "memory:read",
+          "memory:write",
+          "storage:local",
+          "storage:cache",
+          "system:info",
+          "system:metrics"
+        ]
+      },
+      "minItems": 1
+    },
+    "entry_point": {
+      "type": "string",
+      "description": "Python import path to the skill class",
+      "pattern": "^[a-zA-Z0-9_.]+:[a-zA-Z0-9_]+$"
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "List of required dependencies",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" }
+        },
+        "required": ["name"]
+      }
+    },
+    "author": {
+      "type": "string",
+      "description": "Author or organization name"
+    },
+    "repository": {
+      "type": "string",
+      "description": "URL to source code repository",
+      "format": "uri"
+    },
+    "license": {
+      "type": "string",
+      "enum": ["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", "Proprietary"]
+    }
+  },
+  "additionalProperties": false
+}
