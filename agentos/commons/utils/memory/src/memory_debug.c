@@ -1052,6 +1052,8 @@ size_t memory_debug_compare_checkpoints(unsigned int checkpoint1, unsigned int c
     if (cp2->total_frees > cp1->total_frees) {
         new_frees = cp2->total_frees - cp1->total_frees;
     }
+    (void)new_allocations;
+    (void)new_frees;
 
     if (cp2->block_count > cp1->block_count && diff_report != NULL) {
         size_t leak_diff = cp2->block_count - cp1->block_count;

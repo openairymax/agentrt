@@ -15,10 +15,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-TS_DIR="$ROOT_DIR/agentos/toolkit/typescript"
-RUST_DIR="$ROOT_DIR/agentos/toolkit/rust"
-GO_DIR="$ROOT_DIR/agentos/toolkit/go"
-PYTHON_DIR="$ROOT_DIR/agentos/toolkit/python"
+TS_DIR="$ROOT_DIR/sdk/typescript"
+RUST_DIR="$ROOT_DIR/sdk/rust"
+GO_DIR="$ROOT_DIR/sdk/go"
+PYTHON_DIR="$ROOT_DIR/sdk/python"
 
 PASS=0
 FAIL=0

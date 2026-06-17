@@ -25,7 +25,7 @@ classifiers = [
     "Environment :: Console",
 ]
 include = [
-    "agentos/manager/*.yaml",
+    "ecosystem/manager/*.yaml",
     "scripts/**/*.py",
     "agentos/manuals/**/*.md",
 ]
@@ -160,7 +160,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --cov=agentos/toolkit/python/agentos --cov=scripts/toolkit/src --cov-report=term-missing"
+addopts = "-ra -q --cov=sdk/python/agentos --cov=scripts/toolkit/src --cov-report=term-missing"
 testpaths = [
     "tests/unit",
     "tests/integration",

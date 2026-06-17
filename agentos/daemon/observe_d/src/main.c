@@ -4,6 +4,8 @@
  */
 
 #include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
 #include "error.h"
 #include "platform.h"
 #include "svc_logger.h"
@@ -60,6 +62,8 @@ typedef struct {
 
 static observe_d_service_t g_service = {0};
 static atomic_int g_shutdown = 0;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
 
 static void observe_d_signal_handler(int sig)
 {
@@ -531,6 +535,11 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
         return 1;
     }
 
+    g_bsd = daemon_bootstrap_sd_start("observe_d", "observe", g_service.socket_path,
+                                      0, "observe,core", 0);
+    g_bipc = daemon_bootstrap_ipc_start("observe_d", "observe", g_service.socket_path,
+                                        0, IPC_BUS_PROTO_JSON_RPC);
+
     while (!g_shutdown && g_service.running) {
         agentos_socket_t client = agentos_socket_accept(g_service.server_fd, 1000);
         if (client != AGENTOS_INVALID_SOCKET) {
@@ -538,6 +547,8 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
         }
     }
 
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
     observe_d_stop(&g_service, g_shutdown ? 1 : 0);
     observe_d_destroy(&g_service);
     return 0;

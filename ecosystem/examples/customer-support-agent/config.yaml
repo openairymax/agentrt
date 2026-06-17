@@ -1,0 +1,95 @@
+# customer-support-agent 运行时配置
+# 演示 Hook 系统和生产级 Pipeline
+
+# ─── 网关配置 ───
+gateway_url: "http://127.0.0.1:8080"
+
+# ─── 默认模型 ───
+default_model: "gpt-4"
+
+# ─── LLM 提供商 ───
+llm:
+  default_provider: "openai"
+  providers:
+    openai:
+      type: "openai"
+      api_key_env: "OPENAI_API_KEY"
+      base_url: "https://api.openai.com/v1"
+  routing:
+    strategy: "cost_aware"
+    fallback_chain: ["openai"]
+    cost_budget_daily_usd: 10.0
+  cache:
+    enabled: true
+    ttl_seconds: 3600
+
+# ─── 记忆系统 ───
+memory:
+  enabled: true
+  mode: "full"
+  storage_path: "./data/support_memory"
+  layers:
+    l1:
+      compression: "zstd"
+    l2:
+      embedder: "openai"
+      embedding_dim: 1536
+    l3:
+      enabled: true
+      max_entities: 100000
+    l4:
+      enabled: true
+      clustering_algorithm: "hdbscan"
+
+# ─── 安全配置（Cupolas — 生产级严格模式） ───
+security:
+  enabled: true
+  mode: "strict"
+  default_policy: "deny"
+  sandbox:
+    enabled: true
+    type: "seccomp"
+  permission:
+    model: "rbac"
+    cache_ttl_seconds: 300
+  audit:
+    enabled: true
+    log_path: "./logs/audit.log"
+
+# ─── Hook 配置 ───
+hooks:
+  enabled: true
+  hook_dirs:
+    - "hooks/"
+  global_hooks:
+    on_tool_call:
+      - hook: "security_reminder"
+        priority: 100
+      - hook: "audit_hook"
+        priority: 50
+    on_llm_response:
+      - hook: "security_reminder"
+        priority: 100
+      - hook: "audit_hook"
+        priority: 50
+      - hook: "cost_tracker"
+        priority: 10
+
+# ─── 可观测性配置 ───
+observability:
+  metrics:
+    enabled: true
+    port: 9090
+  tracing:
+    enabled: true
+    exporter: "otlp"
+  logging:
+    level: "info"
+    format: "json"
+  health:
+    endpoint: "/healthz"
+    ready_endpoint: "/readyz"
+
+# ─── Agent 加载路径 ───
+agents:
+  - "agents/support.agent.yaml"

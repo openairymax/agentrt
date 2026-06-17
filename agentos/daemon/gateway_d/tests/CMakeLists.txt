@@ -49,10 +49,13 @@ foreach(TEST_SRC ${TEST_SOURCES})
 
     target_link_libraries(${TEST_NAME}
         PRIVATE
-            $<TARGET_OBJECTS:gateway_lib_obj>
             svc_common
             Threads::Threads
     )
+
+    if(AGENTOS_HAS_CJSON AND TARGET gateway_lib_obj)
+        target_link_libraries(${TEST_NAME} PRIVATE $<TARGET_OBJECTS:gateway_lib_obj>)
+    endif()
 
     if(AGENTOS_HAS_MICROHTTPD)
         if(libmicrohttpd_FOUND)

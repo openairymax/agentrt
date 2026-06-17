@@ -1,5 +1,5 @@
 
-# AgentOS 安全审计测试 (TeamC P2-C03)
+# AgentRT 安全审计测试 (TeamC P2-C03)
 
 if(NOT TARGET svc_common)
     message(STATUS "  [security] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
@@ -41,7 +41,7 @@ add_test(NAME security_audit COMMAND test_security_audit)
 
 message(STATUS "  [security] test_security_audit: P2-C03 configured")
 
-# AgentOS SEC-017 桩函数合规验证测试 (TeamC P2-C05)
+# AgentRT SEC-017 桩函数合规验证测试 (TeamC P2-C05)
 add_executable(test_sec017_compliance test_sec017_compliance.c)
 
 target_include_directories(test_sec017_compliance PRIVATE

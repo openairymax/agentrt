@@ -220,6 +220,50 @@ extern "C" {
         }                      \
     } while (0)
 
+/**
+ * @brief 安全释放内存：先清零再释放（SEC-15 合规）
+ *
+ * 用于释放包含敏感数据的内存（API Key、Token、密码等），
+ * 防止数据残留在堆上被泄露。
+ *
+ * @note 仅对通过 agentos_mem_alloc/malloc 分配的内存有效
+ * @note 释放后指针置 NULL，防止 use-after-free
+ *
+ * BAN-247: 敏感数据释放前必须清零
+ */
+#define AGENTOS_SECURE_FREE(ptr, size)                    \
+    do {                                                  \
+        if ((ptr) != NULL) {                              \
+            if ((size) > 0) {                             \
+                agentos_explicit_bzero((ptr), (size));    \
+            }                                             \
+            free((ptr));                                  \
+            (ptr) = NULL;                                 \
+        }                                                 \
+    } while (0)
+
+/**
+ * @brief 安全释放内存（自动计算大小版本，用于已知类型的指针）
+ *
+ * 用法: AGENTOS_SECURE_FREE_T(my_struct_ptr, my_struct_t)
+ */
+#define AGENTOS_SECURE_FREE_T(ptr, type) \
+    AGENTOS_SECURE_FREE((ptr), sizeof(type))
+
+/**
+ * @brief 显式内存清零（防止编译器优化掉 memset）
+ *
+ * 使用 volatile 函数指针确保编译器不会将清零操作优化掉。
+ * 这对于安全敏感数据的擦除至关重要。
+ */
+static inline void agentos_explicit_bzero(void *s, size_t n) {
+    if (s == NULL || n == 0) return;
+    volatile unsigned char *p = (volatile unsigned char *)s;
+    while (n--) {
+        *p++ = 0;
+    }
+}
+
 /* ==================== 数值验证函数 ==================== */
 
 /**

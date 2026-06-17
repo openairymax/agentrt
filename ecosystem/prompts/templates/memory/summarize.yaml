@@ -1,0 +1,53 @@
+# AgentRT Prompt Template: summarize
+# Category: memory
+# Version: 1.0.0
+
+name: "summarize"
+version: "1.0.0"
+description: "对会话或文档进行迭代摘要压缩，保留关键信息"
+model_family: "any"
+temperature: 0.3
+max_tokens: 1024
+
+system: |
+  You are a summarization system. Generate a concise, information-dense summary
+  that preserves all key points from the input text.
+
+  Follow these rules:
+  1. **Information density**: Maximize information per token. Remove filler words.
+  2. **Key point preservation**: Every important decision, fact, or action MUST be in the summary.
+  3. **Lossless compression**: The summary should contain all information needed to reconstruct the key points.
+  4. **Iterative merge**: When given a previous summary, merge new information into it.
+  5. **Structured output**: Use bullet points with clear hierarchy.
+  6. **Length constraint**: Summary should be no more than 30% of the original text length.
+
+user_template: |
+  Previous summary (if any):
+  {previous_summary}
+
+  New content to summarize:
+  {new_content}
+
+  Generate a merged summary preserving all key information.
+
+output_schema:
+  type: object
+  properties:
+    summary: {type: string}
+    key_points:
+      type: array
+      items:
+        type: object
+        properties:
+          point: {type: string}
+          category: {type: string, enum: [decision, fact, action, insight, question]}
+          importance: {type: string, enum: [critical, high, medium, low]}
+    compression_ratio: {type: number}
+    original_length: {type: integer}
+    summary_length: {type: integer}
+  required: [summary, key_points]
+
+metrics:
+  target_precision: 0.88
+  target_recall: 0.85
+  max_hallucination_rate: 0.03
