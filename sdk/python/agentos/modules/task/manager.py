@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Task Manager Implementation
+# AgentRT Python SDK - Task Manager Implementation
 # Version: 0.1.0
 # Last updated: 2026-03-24
 
@@ -56,14 +56,16 @@ class TaskManager:
         >>> result = task_mgr.wait(task.id, timeout=30)
     """
 
-    def __init__(self, api: APIClient):
+    def __init__(self, api: APIClient, config: Optional[Dict[str, Any]] = None):
         """
         初始化任务管理器。
 
         Args:
             api: APIClient 实例，用于 HTTP 通信
+            config: 可选配置参数
         """
         self._api = api
+        self._config = config or {}
 
     def submit(self, description: str) -> Task:
         """
@@ -477,7 +479,7 @@ class TaskManager:
         if not data:
             return []
 
-        items = get_list(data, "tasks")
+        items = get_list(data, "items")
         tasks = []
         for item in items:
             if isinstance(item, dict):

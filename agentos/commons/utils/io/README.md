@@ -5,7 +5,7 @@
 
 ## 概述
 
-IO 模块提供文件与目录操作的基础工具集，包括文件读写、目录创建和文件列表枚举。该模块是 AgentOS 中进行文件系统操作的标准接口，提供简洁的跨平台 API。
+IO 模块提供文件与目录操作的基础工具集，包括文件读写、目录创建和文件列表枚举。该模块是 AgentRT 中进行文件系统操作的标准接口，提供简洁的跨平台 API。
 
 ## 设计目标
 
@@ -57,7 +57,7 @@ if (content != NULL) {
 }
 
 // 写入文件
-const char *data = "Hello, AgentOS!";
+const char *data = "Hello, AgentRT!";
 if (agentos_io_write_file("/tmp/output.txt", data, (size_t)-1) == 0) {
     printf("Write successful\n");
 }

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file mcp_v1_adapter.c
  * @brief MCP v1.0 Protocol Adapter Implementation
@@ -145,7 +146,7 @@ mcp_v1_config_t mcp_v1_config_default(void)
     config.enable_progress_notifications = true;
     config.enable_cancellation = true;
     config.enable_sampling = false;
-    config.server_name = strdup_safe("AgentOS MCP Server");
+    config.server_name = strdup_safe("AgentRT MCP Server");
     config.server_version = strdup_safe(MCP_V1_VERSION);
     return config;
 }

@@ -235,7 +235,7 @@ static void test_string_parse(void)
 {
     TEST("Parse key: string value");
     yaml_document_t *doc = yaml_create();
-    const char *yaml = "name: AgentOS\n";
+    const char *yaml = "name: AgentRT\n";
     int rc = yaml_parse_string(doc, yaml, strlen(yaml));
     ASSERT(rc == 0, "parse should succeed");
     struct yaml_node *name = yaml_get(doc->root, "name");

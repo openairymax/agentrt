@@ -43,6 +43,7 @@ foreach(TEST_SRC ${TEST_SOURCES})
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/error/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/types/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/tests/utils
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../atoms/corekern/include
     )
     
@@ -60,6 +61,11 @@ foreach(TEST_SRC ${TEST_SOURCES})
     if(AGENTOS_HAS_CURL)
         target_include_directories(${TARGET_NAME} PRIVATE ${CURL_INCLUDE_DIRS})
         target_link_libraries(${TARGET_NAME} PRIVATE ${CURL_LIBRARIES})
+    endif()
+    
+    # OpenSSL found by root CMakeLists.txt (AGENTRT_HAS_OPENSSL)
+    if(AGENTRT_HAS_OPENSSL AND OPENSSL_FOUND)
+        target_link_libraries(${TARGET_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
     endif()
     
     target_compile_options(${TARGET_NAME} PRIVATE
@@ -81,6 +87,7 @@ target_include_directories(svc_test_daemon_common PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/tests/utils
 )
 
 target_link_libraries(svc_test_daemon_common PRIVATE
@@ -97,6 +104,10 @@ endif()
 if(AGENTOS_HAS_CURL)
     target_include_directories(svc_test_daemon_common PRIVATE ${CURL_INCLUDE_DIRS})
     target_link_libraries(svc_test_daemon_common PRIVATE ${CURL_LIBRARIES})
+endif()
+
+if(AGENTRT_HAS_OPENSSL AND OPENSSL_FOUND)
+    target_link_libraries(svc_test_daemon_common PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 target_compile_options(svc_test_daemon_common PRIVATE
@@ -136,6 +147,10 @@ if(AGENTOS_HAS_CURL)
     target_link_libraries(svc_test_checkpoint PRIVATE ${CURL_LIBRARIES})
 endif()
 
+if(AGENTRT_HAS_OPENSSL AND OPENSSL_FOUND)
+    target_link_libraries(svc_test_checkpoint PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
 target_compile_options(svc_test_checkpoint PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
 )
@@ -171,6 +186,10 @@ endif()
 if(AGENTOS_HAS_CURL)
     target_include_directories(svc_test_ipc_backpressure PRIVATE ${CURL_INCLUDE_DIRS})
     target_link_libraries(svc_test_ipc_backpressure PRIVATE ${CURL_LIBRARIES})
+endif()
+
+if(AGENTRT_HAS_OPENSSL AND OPENSSL_FOUND)
+    target_link_libraries(svc_test_ipc_backpressure PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 target_compile_options(svc_test_ipc_backpressure PRIVATE

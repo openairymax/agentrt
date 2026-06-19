@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file agntcy_acp_adapter.c
  * @brief AGNTCY Agent Communication Protocol Adapter Implementation

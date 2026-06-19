@@ -1,9 +1,9 @@
-# AgentOS Python SDK - Client Layer
+# AgentRT Python SDK - Client Layer
 # Version: 0.1.0
 # Last updated: 2026-03-24
 
 """
-Client layer providing HTTP communication with AgentOS server.
+Client layer providing HTTP communication with AgentRT server.
 
 This module implements the APIClient interface pattern from Go SDK,
 providing both sync and async client implementations.

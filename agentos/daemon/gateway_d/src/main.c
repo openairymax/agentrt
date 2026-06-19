@@ -93,7 +93,7 @@ static void svc_log_toggle_handler(int sig)
 static void print_usage(const char *prog)
 {
     char buf[256];
-    fputs("AgentOS Gateway Daemon\n", stdout);
+    fputs("AgentRT Gateway Daemon\n", stdout);
     snprintf(buf, sizeof(buf), "Usage: %s [options]\n\n", prog);
     fputs(buf, stdout);
     fputs("Options:\n", stdout);
@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
         goto cleanup_service;
     }
 
-    SVC_LOG_INFO("AgentOS Gateway Daemon started");
+    SVC_LOG_INFO("AgentRT Gateway Daemon started");
     SVC_LOG_INFO("  HTTP:     %s:%d %s", config.http.host, config.http.port,
                  config.http.enabled ? "[enabled]" : "[disabled]");
     SVC_LOG_INFO("  WebSocket: %s:%d %s", config.ws.host, config.ws.port,

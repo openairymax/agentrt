@@ -12,6 +12,7 @@
 #include "memory_compat.h"
 #include "memory_provider.h"
 #include "string_compat.h"
+#include "logging_compat.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +28,9 @@ agentos_error_t agentos_memory_create(const char *config_path, agentos_memory_en
 
     if (!out_engine)
         return AGENTOS_EINVAL;
+
+    AGENTOS_LOG_INFO("MemoryEngine: agentos_memory_create START (config=%s)",
+                     config_path ? config_path : "default");
 
     agentos_memory_engine_t *engine =
         (agentos_memory_engine_t *)AGENTOS_CALLOC(1, sizeof(agentos_memory_engine_t));
@@ -51,8 +55,10 @@ agentos_error_t agentos_memory_create(const char *config_path, agentos_memory_en
 
     engine->provider = agentos_memory_provider_get_active();
     if (!engine->provider) {
+        AGENTOS_LOG_INFO("MemoryEngine: no active provider, initializing builtin");
         agentos_error_t err = agentos_builtin_memory_provider_init(NULL);
         if (err != AGENTOS_SUCCESS) {
+            AGENTOS_LOG_ERROR("MemoryEngine: builtin provider init FAILED (err=%d)", err);
             agentos_mutex_free(engine->lock);
             if (engine->config_path)
                 AGENTOS_FREE(engine->config_path);
@@ -63,6 +69,7 @@ agentos_error_t agentos_memory_create(const char *config_path, agentos_memory_en
     }
 
     if (!engine->provider) {
+        AGENTOS_LOG_ERROR("MemoryEngine: no provider available after init");
         agentos_mutex_free(engine->lock);
         if (engine->config_path)
             AGENTOS_FREE(engine->config_path);
@@ -73,6 +80,7 @@ agentos_error_t agentos_memory_create(const char *config_path, agentos_memory_en
     if (engine->provider->init) {
         agentos_error_t err = engine->provider->init(engine->provider, config_path);
         if (err != AGENTOS_SUCCESS) {
+            AGENTOS_LOG_ERROR("MemoryEngine: provider init FAILED (err=%d)", err);
             agentos_mutex_free(engine->lock);
             if (engine->config_path)
                 AGENTOS_FREE(engine->config_path);
@@ -82,6 +90,8 @@ agentos_error_t agentos_memory_create(const char *config_path, agentos_memory_en
     }
 
     *out_engine = engine;
+    AGENTOS_LOG_INFO("MemoryEngine: created OK (provider=%s)",
+                     engine->provider->name ? engine->provider->name : "builtin");
     return AGENTOS_SUCCESS;
 }
 
@@ -89,6 +99,10 @@ void agentos_memory_destroy(agentos_memory_engine_t *engine)
 {
     if (!engine)
         return;
+
+    AGENTOS_LOG_INFO("MemoryEngine: destroy (provider=%s)",
+                     engine->provider && engine->provider->name ? engine->provider->name : "none");
+
     agentos_mutex_lock(engine->lock);
     if (engine->provider && engine->provider->destroy) {
         engine->provider->destroy(engine->provider);
@@ -110,6 +124,11 @@ agentos_error_t agentos_memory_write(agentos_memory_engine_t *engine,
     if (!engine->provider || !engine->provider->write_raw)
         return AGENTOS_ENOTINIT;
 
+    AGENTOS_LOG_DEBUG("MemoryEngine: write (type=%d, data_len=%zu, source=%s)",
+                      (int)record->memory_record_type,
+                      record->memory_record_data_len,
+                      record->memory_record_source_agent ? record->memory_record_source_agent : "(none)");
+
     char metadata[1024];
     int len =
         snprintf(metadata, sizeof(metadata), "{\"source\":\"%s\",\"trace\":\"%s\",\"type\":%d}",
@@ -127,6 +146,12 @@ agentos_error_t agentos_memory_write(agentos_memory_engine_t *engine,
                                     record->memory_record_data_len, metadata, out_record_id);
     agentos_mutex_unlock(engine->lock);
 
+    if (err == AGENTOS_SUCCESS && *out_record_id) {
+        AGENTOS_LOG_DEBUG("MemoryEngine: write OK (record_id=%s)", *out_record_id);
+    } else {
+        AGENTOS_LOG_WARN("MemoryEngine: write FAILED (err=%d)", err);
+    }
+
     return err;
 }
 
@@ -140,6 +165,9 @@ agentos_error_t agentos_memory_query(agentos_memory_engine_t *engine,
     if (!engine->provider || !engine->provider->query)
         return AGENTOS_ENOTINIT;
 
+    AGENTOS_LOG_DEBUG("MemoryEngine: query (text_len=%zu, limit=%u)",
+                      query->memory_query_text_len, query->memory_query_limit);
+
     char **results = NULL;
     float *scores = NULL;
     size_t count = 0;
@@ -150,8 +178,12 @@ agentos_error_t agentos_memory_query(agentos_memory_engine_t *engine,
                                 query->memory_query_limit, &results, &scores, &count);
     agentos_mutex_unlock(engine->lock);
 
-    if (err != AGENTOS_SUCCESS)
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_WARN("MemoryEngine: query FAILED (err=%d)", err);
         return err;
+    }
+
+    AGENTOS_LOG_DEBUG("MemoryEngine: query OK (results=%zu)", count);
 
     agentos_memory_result_ext_t *res =
         (agentos_memory_result_ext_t *)AGENTOS_CALLOC(1, sizeof(agentos_memory_result_ext_t));
@@ -205,6 +237,8 @@ agentos_error_t agentos_memory_get(agentos_memory_engine_t *engine, const char *
     if (!engine->provider || !engine->provider->get_raw)
         return AGENTOS_ENOTINIT;
 
+    AGENTOS_LOG_DEBUG("MemoryEngine: get (record_id=%s)", record_id);
+
     void *data = NULL;
     size_t len = 0;
 
@@ -212,8 +246,12 @@ agentos_error_t agentos_memory_get(agentos_memory_engine_t *engine, const char *
     agentos_error_t err = engine->provider->get_raw(engine->provider, record_id, &data, &len);
     agentos_mutex_unlock(engine->lock);
 
-    if (err != AGENTOS_SUCCESS)
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_DEBUG("MemoryEngine: get NOT FOUND (record_id=%s, err=%d)", record_id, err);
         return err;
+    }
+
+    AGENTOS_LOG_DEBUG("MemoryEngine: get OK (record_id=%s, data_len=%zu)", record_id, len);
 
     agentos_memory_record_t *rec =
         (agentos_memory_record_t *)AGENTOS_CALLOC(1, sizeof(agentos_memory_record_t));
@@ -293,9 +331,18 @@ agentos_error_t agentos_memory_evolve(agentos_memory_engine_t *engine, int force
     if (!engine->provider || !engine->provider->evolve)
         return AGENTOS_ENOTINIT;
 
+    AGENTOS_LOG_INFO("MemoryEngine: evolve START (force=%d)", force);
+
     agentos_mutex_lock(engine->lock);
     agentos_error_t err = engine->provider->evolve(engine->provider, force);
     agentos_mutex_unlock(engine->lock);
+
+    if (err == AGENTOS_SUCCESS) {
+        AGENTOS_LOG_INFO("MemoryEngine: evolve OK");
+    } else {
+        AGENTOS_LOG_WARN("MemoryEngine: evolve FAILED (err=%d)", err);
+    }
+
     return err;
 }
 

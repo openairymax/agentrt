@@ -425,7 +425,7 @@ int main(int argc, char **argv)
 
     printf("\n");
     printf("======================================================\n");
-    printf("  AgentOS Daemon Authentication Module Unit Tests\n");
+    printf("  AgentRT Daemon Authentication Module Unit Tests\n");
     printf("======================================================\n");
 
     /* JWT 测试 */

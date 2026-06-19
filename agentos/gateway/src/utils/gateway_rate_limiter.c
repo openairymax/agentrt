@@ -12,6 +12,7 @@
  */
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+// @owner: team-B
 #include "atomic_compat.h"
 
 /* Windows 特定头文件和定义 */

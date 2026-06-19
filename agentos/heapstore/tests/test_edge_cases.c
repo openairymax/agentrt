@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #include "../include/heapstore.h"
 #include "../include/utils.h"
 #include "platform.h"

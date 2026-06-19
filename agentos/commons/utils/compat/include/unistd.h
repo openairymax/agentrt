@@ -5,7 +5,7 @@
  * @brief Windows compatibility shim for POSIX <unistd.h>
  *
  * Provides Windows equivalents for common POSIX unistd functions/types
- * used across the AgentOS commons module.
+ * used across the AgentRT commons module.
  *
  * On non-Windows platforms, this header simply includes the system <unistd.h>.
  * On Windows, it provides shims for POSIX functions using Win32/Winsock APIs.

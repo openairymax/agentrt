@@ -1,4 +1,4 @@
-# AgentOS Python SDK - API 响应处理工具
+# AgentRT Python SDK - API 响应处理工具
 # Version: 0.1.0
 # Last updated: 2026-04-05
 #

@@ -605,7 +605,7 @@ int main(int argc, char **argv)
 
     if (g_config.use_tcp) {
         server_fd = agentos_socket_create_tcp_server(g_config.tcp_host, g_config.tcp_port);
-        if (server_fd == AGENTOS_INVALID_SOCKET) {
+        if (server_fd < 0) {
             SVC_LOG_ERROR("Failed to create TCP server on %s:%d", g_config.tcp_host,
                           g_config.tcp_port);
             llm_service_destroy(g_service);
@@ -624,7 +624,7 @@ int main(int argc, char **argv)
 #else
         server_fd = agentos_socket_create_unix_server(g_config.socket_path);
 #endif
-        if (server_fd == AGENTOS_INVALID_SOCKET) {
+        if (server_fd < 0) {
             SVC_LOG_ERROR("Failed to create socket at %s", g_config.socket_path);
             llm_service_destroy(g_service);
             free_daemon_config();

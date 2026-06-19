@@ -1,34 +1,18 @@
 /* Stub implementations for LTO-unresolvable symbols */
 #include "compensation.h"
+#include "daemon_bootstrap_ipc.h"
+#include "daemon_bootstrap_sd.h"
 #include "execution.h"
-#include "id_utils.h"
-#include "memory_provider.h"
+#include "ipc_bus_helper.h"
+#include "ipc_service_bus.h"
+#include "llm_service.h"
+#include "memory_compat.h"
+#include "service_discovery_helper.h"
+#include "tool_approval.h"
+#include "tool_service.h"
 
 #include <stdlib.h>
 #include <string.h>
-
-/* id_utils stubs */
-agentos_error_t agentos_generate_uuid(char *buf)
-{
-    if (!buf)
-        return -1;
-    AGENTOS_MEMSET(buf, '0', 36);
-    buf[8] = '-';
-    buf[13] = '-';
-    buf[18] = '-';
-    buf[23] = '-';
-    buf[36] = '\0';
-    return 0;
-}
-
-void agentos_generate_plan_id(char *buf, size_t len)
-{
-    if (!buf || len < 2)
-        return;
-    AGENTOS_MEMSET(buf, 'P', len - 1);
-    buf[0] = 'p';
-    buf[len - 1] = '\0';
-}
 
 /* execution engine stubs */
 agentos_error_t agentos_execution_register_unit(agentos_execution_engine_t *engine,
@@ -62,16 +46,8 @@ agentos_error_t agentos_compensation_compensate(agentos_compensation_t *mgr, con
     return AGENTOS_SUCCESS;
 }
 
-/* memory provider stubs - using provider interface instead of direct memoryrovol calls */
-static int g_memory_provider_initialized = 0;
-
 /* syscall stubs */
-void *agentos_sys_memory_search(const char *query, size_t limit)
-{
-    (void)query;
-    (void)limit;
-    return NULL;
-}
+/* agentos_sys_memory_search removed: defined in agentos_syscall */
 
 void agentos_sys_free(void *ptr)
 {
@@ -79,26 +55,150 @@ void agentos_sys_free(void *ptr)
     free(ptr);
 }
 
-agentos_memory_provider_t *agentos_memory_provider_get_active(void)
+/* ==================== LLM service stubs ==================== */
+
+int llm_service_complete(llm_service_t *svc, const llm_request_config_t *manager,
+                         llm_response_t **out_response)
 {
+    (void)svc;
+    (void)manager;
+    if (out_response) *out_response = NULL;
+    return -1;
+}
+
+int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *manager,
+                                llm_stream_callback_t callback, void *callback_data,
+                                llm_response_t **out_response)
+{
+    (void)svc;
+    (void)manager;
+    (void)callback;
+    (void)callback_data;
+    if (out_response) *out_response = NULL;
+    return -1;
+}
+
+void llm_response_free(llm_response_t *resp)
+{
+    (void)resp;
+}
+
+/* ==================== Tool service stubs ==================== */
+
+int tool_service_execute(tool_service_t *svc, const tool_execute_request_t *req,
+                         tool_result_t **out_result)
+{
+    (void)svc;
+    (void)req;
+    if (out_result) *out_result = NULL;
+    return -1;
+}
+
+void tool_result_free(tool_result_t *res)
+{
+    (void)res;
+}
+
+/* ==================== Daemon bootstrap stubs ==================== */
+
+daemon_bootstrap_sd_t *daemon_bootstrap_sd_start(const char *name, const char *type,
+                                                  const char *host, uint16_t port,
+                                                  const char *tags, uint32_t ttl_ms)
+{
+    (void)name;
+    (void)type;
+    (void)host;
+    (void)port;
+    (void)tags;
+    (void)ttl_ms;
     return NULL;
 }
 
-agentos_error_t agentos_builtin_memory_provider_init(const char *config_path)
+void daemon_bootstrap_sd_stop(daemon_bootstrap_sd_t *bsd)
 {
-    (void)config_path;
-    g_memory_provider_initialized = 1;
-    return AGENTOS_SUCCESS;
+    (void)bsd;
 }
 
-void agentos_memory_provider_free_query_results(char **results, float *scores, size_t count)
+sd_helper_t *daemon_bootstrap_sd_get_helper(daemon_bootstrap_sd_t *bsd)
 {
-    (void)count;
-    if (results) {
-        for (size_t i = 0; i < count; i++)
-            free(results[i]);
-        free(results);
-    }
-    if (scores)
-        free(scores);
+    (void)bsd;
+    return NULL;
+}
+
+int sd_helper_select_with_strategy(sd_helper_t *sdh, const char *service_name,
+                                   sd_lb_strategy_t strategy,
+                                   sd_instance_t *instance)
+{
+    (void)sdh;
+    (void)service_name;
+    (void)strategy;
+    (void)instance;
+    return -1;
+}
+
+daemon_bootstrap_ipc_t *daemon_bootstrap_ipc_start(const char *daemon_name,
+                                                    const char *channel_name,
+                                                    const char *host, uint16_t port,
+                                                    ipc_bus_proto_t protocol)
+{
+    (void)daemon_name;
+    (void)channel_name;
+    (void)host;
+    (void)port;
+    (void)protocol;
+    return NULL;
+}
+
+void daemon_bootstrap_ipc_stop(daemon_bootstrap_ipc_t *bipc)
+{
+    (void)bipc;
+}
+
+ipc_bus_helper_t *daemon_bootstrap_ipc_get_helper(daemon_bootstrap_ipc_t *bipc)
+{
+    (void)bipc;
+    return NULL;
+}
+
+int ipc_bus_helper_request(ipc_bus_helper_t *ibh, const char *target_service,
+                            const ipc_bus_message_t *request,
+                            ipc_bus_message_t *response, uint32_t timeout_ms)
+{
+    (void)ibh;
+    (void)target_service;
+    (void)request;
+    (void)response;
+    (void)timeout_ms;
+    return -1;
+}
+
+/* ==================== Tool approval stubs ==================== */
+
+tool_approval_ctx_t *tool_approval_create(const tool_approval_config_t *cfg)
+{
+    (void)cfg;
+    return NULL;
+}
+
+void tool_approval_destroy(tool_approval_ctx_t *ctx)
+{
+    (void)ctx;
+}
+
+int tool_approval_check(tool_approval_ctx_t *ctx, const tool_metadata_t *meta,
+                         const char *params_json, tool_approval_detail_t *detail)
+{
+    (void)ctx;
+    (void)meta;
+    (void)params_json;
+    (void)detail;
+    return -1;
+}
+
+/* ==================== Bootstrap misc stubs ==================== */
+
+bool daemon_bootstrap_ipc_is_running(daemon_bootstrap_ipc_t *bipc)
+{
+    (void)bipc;
+    return false;
 }

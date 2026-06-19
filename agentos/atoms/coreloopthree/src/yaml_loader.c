@@ -13,9 +13,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 /* 引入项目已有的 YAML 最小解析器 */
 #include "yaml_minimal.h"
+
+/* 日志宏 */
+#include "logging_compat.h"
+
+/* 安全内存分配宏 */
+#include "memory_compat.h"
 
 /* ── 默认值常量 ── */
 
@@ -186,6 +193,12 @@ void agentos_yaml_config_defaults(agentos_yaml_config_t *config) {
     config->multi_agent.lanes.enabled = true;
     safe_strcpy(config->multi_agent.lanes.default_isolation, "process",
                 sizeof(config->multi_agent.lanes.default_isolation));
+    /* P1.6: Checkpoint 默认配置 */
+    config->multi_agent.checkpoint_enabled = false;
+    config->multi_agent.checkpoint_interval_ms = 30000;
+    config->multi_agent.checkpoint_interval_turns = 0;
+    safe_strcpy(config->multi_agent.checkpoint_path, "./data/checkpoints",
+                sizeof(config->multi_agent.checkpoint_path));
 
     /* gateway */
     config->gateway.enabled = true;
@@ -630,6 +643,25 @@ int agentos_yaml_parse(const char *yaml_content,
             safe_strcpy(config->multi_agent.lanes.default_isolation, iso,
                         sizeof(config->multi_agent.lanes.default_isolation));
         }
+
+        /* P1.6: 解析 multi_agent.checkpoint */
+        struct yaml_node *checkpoint = yaml_get(ma, "checkpoint");
+        if (checkpoint) {
+            config->multi_agent.checkpoint_enabled = yaml_as_bool(
+                yaml_get(checkpoint, "enabled"),
+                config->multi_agent.checkpoint_enabled);
+            config->multi_agent.checkpoint_interval_ms = (uint32_t)yaml_as_int64(
+                yaml_get(checkpoint, "interval_ms"),
+                config->multi_agent.checkpoint_interval_ms);
+            config->multi_agent.checkpoint_interval_turns = (uint32_t)yaml_as_int64(
+                yaml_get(checkpoint, "interval_turns"),
+                config->multi_agent.checkpoint_interval_turns);
+            const char *cp_path = yaml_as_string(
+                yaml_get(checkpoint, "path"),
+                config->multi_agent.checkpoint_path);
+            safe_strcpy(config->multi_agent.checkpoint_path, cp_path,
+                        sizeof(config->multi_agent.checkpoint_path));
+        }
     }
 
     /* 解析 hooks */
@@ -702,7 +734,7 @@ int agentos_yaml_load(const char *yaml_path,
         return -1;
     }
 
-    char *content = (char *)malloc((size_t)size + 1);
+    char *content = (char *)AGENTOS_MALLOC((size_t)size + 1);
     if (!content) {
         fclose(fp);
         return -1;
@@ -712,13 +744,13 @@ int agentos_yaml_load(const char *yaml_path,
     fclose(fp);
 
     if (read != (size_t)size) {
-        free(content);
+        AGENTOS_FREE(content);
         return -1;
     }
     content[read] = '\0';
 
     int ret = agentos_yaml_parse(content, config);
-    free(content);
+    AGENTOS_FREE(content);
 
     /* 解析后应用环境变量覆盖 */
     if (ret == 0) {
@@ -759,33 +791,46 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         config->llm.routing.cost_budget_daily_usd = atof(val);
     }
 
-    /* 各提供商的 API Key */
-    static const char *provider_names[] = {
+    /* 各提供商的 API Key 环境变量覆盖 */
+    /* 格式: AGENTOS_LLM_PROVIDERS_<NAME>_API_KEY 或 <NAME>_API_KEY */
+    static const char *provider_env_names[] = {
         "OPENAI", "ANTHROPIC", "DEEPSEEK", "GOOGLE", "LOCAL",
         "OLLAMA", "AZURE", "COHERE", "MISTRAL", "GROQ", NULL
     };
 
-    for (int p = 0; provider_names[p]; p++) {
-        /* 查找对应提供商 */
+    for (int p = 0; provider_env_names[p]; p++) {
+        /* 构造 AGENTOS_LLM_PROVIDERS_<NAME>_API_KEY 环境变量名 */
+        char env_key[128];
+        snprintf(env_key, sizeof(env_key), "AGENTOS_LLM_PROVIDERS_%s_API_KEY",
+                 provider_env_names[p]);
+        val = getenv(env_key);
+
+        /* 回退到标准 <NAME>_API_KEY */
+        if (!val) {
+            char fallback_key[64];
+            snprintf(fallback_key, sizeof(fallback_key), "%s_API_KEY",
+                     provider_env_names[p]);
+            val = getenv(fallback_key);
+        }
+
+        if (!val) continue;
+
+        /* 查找匹配的提供商并更新 api_key_env */
         for (uint32_t i = 0; i < config->llm.provider_count; i++) {
-            /* 不区分大小写比较 */
-            /* 简化：直接按配置顺序匹配 */
+            /* 不区分大小写比较提供商名称 */
+            if (strcasecmp(config->llm.providers[i].name,
+                           provider_env_names[p]) == 0) {
+                /* 更新 api_key_env 指向实际被设置的环境变量 */
+                snprintf(env_key, sizeof(env_key), "AGENTOS_LLM_PROVIDERS_%s_API_KEY",
+                         provider_env_names[p]);
+                safe_strcpy(config->llm.providers[i].api_key_env,
+                            env_key, sizeof(config->llm.providers[i].api_key_env));
+                AGENTOS_LOG_DEBUG("C-L01: env override set api_key_env=%s for provider %s",
+                                  env_key, config->llm.providers[i].name);
+                break;
+            }
         }
     }
-
-    /* API Key 环境变量覆盖 */
-    /* AGENTOS_LLM_PROVIDERS_OPENAI_API_KEY → OPENAI_API_KEY */
-    val = getenv("AGENTOS_LLM_PROVIDERS_OPENAI_API_KEY");
-    if (!val) val = getenv("OPENAI_API_KEY");
-    if (val) {
-        /* 标记已有 API Key（实际使用时通过 api_key_env 环境变量名获取） */
-    }
-
-    val = getenv("AGENTOS_LLM_PROVIDERS_ANTHROPIC_API_KEY");
-    if (!val) val = getenv("ANTHROPIC_API_KEY");
-
-    val = getenv("AGENTOS_LLM_PROVIDERS_DEEPSEEK_API_KEY");
-    if (!val) val = getenv("DEEPSEEK_API_KEY");
 
     /* 记忆存储路径 */
     val = getenv("AGENTOS_MEMORY_STORAGE_PATH");
@@ -903,6 +948,44 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->observability.tracing.exporter, val,
                     sizeof(config->observability.tracing.exporter));
+    }
+
+    /* P1.6: Checkpoint 环境变量覆盖 */
+    val = getenv("AGENTOS_CHECKPOINT_ENABLED");
+    if (val) {
+        config->multi_agent.checkpoint_enabled =
+            (strcmp(val, "1") == 0 || strcasecmp(val, "true") == 0 ||
+             strcasecmp(val, "yes") == 0);
+        AGENTOS_LOG_DEBUG("C-L01: env override checkpoint_enabled=%d",
+                          config->multi_agent.checkpoint_enabled);
+    }
+
+    val = getenv("AGENTOS_CHECKPOINT_INTERVAL_MS");
+    if (val) {
+        int ms = atoi(val);
+        if (ms >= 1000) {
+            config->multi_agent.checkpoint_interval_ms = (uint32_t)ms;
+            AGENTOS_LOG_DEBUG("C-L01: env override checkpoint_interval_ms=%u",
+                              config->multi_agent.checkpoint_interval_ms);
+        }
+    }
+
+    val = getenv("AGENTOS_CHECKPOINT_INTERVAL_TURNS");
+    if (val) {
+        int turns = atoi(val);
+        if (turns > 0) {
+            config->multi_agent.checkpoint_interval_turns = (uint32_t)turns;
+            AGENTOS_LOG_DEBUG("C-L01: env override checkpoint_interval_turns=%u",
+                              config->multi_agent.checkpoint_interval_turns);
+        }
+    }
+
+    val = getenv("AGENTOS_CHECKPOINT_PATH");
+    if (val) {
+        safe_strcpy(config->multi_agent.checkpoint_path, val,
+                    sizeof(config->multi_agent.checkpoint_path));
+        AGENTOS_LOG_DEBUG("C-L01: env override checkpoint_path=%s",
+                          config->multi_agent.checkpoint_path);
     }
 
     return 0;

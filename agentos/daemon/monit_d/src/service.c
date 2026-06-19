@@ -508,7 +508,7 @@ int monitor_service_generate_report(monitor_service_t *service, char **report)
 
     size_t pos = 0;
     pos += snprintf(buf + pos, MAX_REPORT_SIZE - pos,
-                    "=== AgentOS Monitor Report ===\n"
+                    "=== AgentRT Monitor Report ===\n"
                     "Generated at: %llu\n\n",
                     (unsigned long long)get_timestamp_ms());
 

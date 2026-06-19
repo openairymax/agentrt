@@ -18,6 +18,7 @@
 #include "ipc_bus_helper.h"
 #include "memory_compat.h"
 #include "platform.h"
+#include "safe_string_utils.h"
 #include "svc_logger.h"
 
 #include <stdio.h>
@@ -232,7 +233,7 @@ static int do_forward(gw_forward_t *fw, gw_fwd_proto_t proto, const char *target
         return -1;
     }
 
-    uint64_t start_us = agentos_time_us();
+    uint64_t start_us = agentos_time_ns() / 1000;
 
     /* 构建 JSON-RPC 转发消息 */
     char *jsonrpc_msg = build_jsonrpc_forward(method, path, body, body_len);
@@ -247,16 +248,31 @@ static int do_forward(gw_forward_t *fw, gw_fwd_proto_t proto, const char *target
     SVC_LOG_DEBUG("C-L11: Forwarding %s request to '%s' via channel '%s' path=%s",
                   proto_to_string(proto), target_daemon, channel, path ? path : "/");
 
-    /* 通过 IPC Bus 发送到目标 daemon */
-    char *response = NULL;
-    size_t response_size = 0;
-
-    int ret = ipc_bus_helper_send_and_recv(fw->ipc_helper, channel, jsonrpc_msg,
-                                           strlen(jsonrpc_msg), &response, &response_size,
-                                           fw->config.request_timeout_ms);
+    /* 通过 IPC Bus 发送请求到目标 daemon */
+    ipc_bus_message_t *req = ipc_bus_message_create(IPC_BUS_MSG_REQUEST,
+                                                     IPC_BUS_PROTO_JSON_RPC,
+                                                     jsonrpc_msg,
+                                                     strlen(jsonrpc_msg));
     AGENTOS_FREE(jsonrpc_msg);
 
-    if (ret != 0 || !response) {
+    if (!req) {
+        SVC_LOG_ERROR("C-L11: Failed to create IPC request message for %s",
+                      proto_to_string(proto));
+        fw->stats.forward_errors++;
+        fw->healthy = false;
+        return -1;
+    }
+
+    safe_strcpy(req->header.target, target_daemon, sizeof(req->header.target));
+
+    ipc_bus_message_t resp;
+    __builtin_memset(&resp, 0, sizeof(resp));
+
+    int ret = ipc_bus_helper_request(fw->ipc_helper, target_daemon, req, &resp,
+                                     fw->config.request_timeout_ms);
+    ipc_bus_message_free(req);
+
+    if (ret != 0 || !resp.payload) {
         SVC_LOG_WARN("C-L11: Forward to '%s' failed (ret=%d, proto=%s)",
                      target_daemon, ret, proto_to_string(proto));
         fw->stats.forward_errors++;
@@ -277,10 +293,10 @@ static int do_forward(gw_forward_t *fw, gw_fwd_proto_t proto, const char *target
     }
 
     /* 成功：返回目标 daemon 的响应 */
-    *out_response = response;
-    *out_response_len = response_size;
+    *out_response = (char *)resp.payload;
+    *out_response_len = resp.payload_size;
 
-    uint64_t latency_us = agentos_time_us() - start_us;
+    uint64_t latency_us = agentos_time_ns() / 1000 - start_us;
 
     fw->stats.total_forwarded++;
     if (proto < GW_FWD_PROTO_COUNT)

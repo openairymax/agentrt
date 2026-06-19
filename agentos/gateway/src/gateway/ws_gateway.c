@@ -17,6 +17,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #include "ws_gateway.h"
 
 #include "../utils/gateway_rpc_handler.h"

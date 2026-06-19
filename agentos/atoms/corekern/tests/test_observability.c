@@ -243,7 +243,7 @@ void test_gauge_edge_cases(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS 内核可观测性测试套件\n");
+    printf("  AgentRT 内核可观测性测试套件\n");
     printf("========================================\n\n");
 
     test_observability_init_shutdown();

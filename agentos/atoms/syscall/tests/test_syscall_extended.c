@@ -13,6 +13,7 @@
 #include "agentos.h"
 #include "error.h"
 #include "mem.h"
+#include "memory_compat.h"
 #include "syscalls.h"
 
 #include <pthread.h>

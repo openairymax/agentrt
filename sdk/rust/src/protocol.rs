@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
 //! @file protocol.rs
-//! @brief AgentOS Rust SDK — Protocol Client Module
+//! @brief AgentRT Rust SDK — Protocol Client Module
 //!
 //! 提供多协议客户端支持，允许通过统一接口与不同协议后端交互：
 //! - JSON-RPC 2.0 (默认)

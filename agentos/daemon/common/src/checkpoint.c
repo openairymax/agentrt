@@ -1,6 +1,6 @@
 /**
  * @file checkpoint.c
- * @brief AgentOS 任务检查点实现（生产级 v0.1.0）
+ * @brief AgentRT 任务检查点实现（生产级 v0.1.0）
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0

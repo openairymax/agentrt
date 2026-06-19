@@ -26,7 +26,7 @@
  * - 内置超时和重试机制
  * - 线程安全设计
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-04-02
  * @version 0.1.0
  *
@@ -55,10 +55,10 @@ extern "C" {
  *    - 提供更细粒度的控制（如 IPC_TYPE_NAMED_PIPE 单独类型）
  *    - 包含完整的 IPC 功能（服务端/客户端/SHM/MQ）
  *
- * 2. AgentOS 统一类型（types.h 定义，使用 agentos_ 前缀）
+ * 2. AgentRT 统一类型（types.h 定义，使用 agentos_ 前缀）
  *    - 用于跨模块接口契约
  *    - 提供简化的抽象层
- *    - 与其他 AgentOS 组件保持一致
+ *    - 与其他 AgentRT 组件保持一致
  *
  * 使用建议：
  * - 在 IPC 模块内部实现中使用 ipc_* 类型
@@ -907,12 +907,12 @@ bool ipc_is_valid(const ipc_channel_t *channel);
 agentos_error_t ipc_flush(ipc_channel_t *channel);
 
 /* ============================================================================
- * 类型转换 API（IPC 内部类型 ↔ AgentOS 统一类型）
+ * 类型转换 API（IPC 内部类型 ↔ AgentRT 统一类型）
  * ============================================================================ */
 
 /**
- * @brief 将 AgentOS 统一 IPC 类型转换为 IPC 模块内部类型
- * @param agentos_type AgentOS 统一 IPC 类型
+ * @brief 将 AgentRT 统一 IPC 类型转换为 IPC 模块内部类型
+ * @param agentos_type AgentRT 统一 IPC 类型
  * @return IPC 模块内部类型
  */
 static inline ipc_type_t ipc_type_from_agentos(agentos_ipc_type_t agentos_type)
@@ -934,9 +934,9 @@ static inline ipc_type_t ipc_type_from_agentos(agentos_ipc_type_t agentos_type)
 }
 
 /**
- * @brief 将 IPC 模块内部类型转换为 AgentOS 统一 IPC 类型
+ * @brief 将 IPC 模块内部类型转换为 AgentRT 统一 IPC 类型
  * @param ipc_type IPC 模块内部类型
- * @return AgentOS 统一 IPC 类型
+ * @return AgentRT 统一 IPC 类型
  */
 static inline agentos_ipc_type_t ipc_type_to_agentos(ipc_type_t ipc_type)
 {

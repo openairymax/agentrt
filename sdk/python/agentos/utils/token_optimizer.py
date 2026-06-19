@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Token 优化器
+# AgentRT Python SDK - Token 优化器
 # Version: 0.1.0
 # Last updated: 2026-04-05
 #

@@ -125,7 +125,7 @@ kubectl apply -f k8s/service.yaml
 ## 监控集成
 
 - **Prometheus**：通过注解 `prometheus.io/scrape: "true"` 自动发现，采集端口 9090
-- **Grafana**：预配置 AgentOS 仪表盘（`docker/monitoring/grafana_agentos_dashboard.json`）
+- **Grafana**：预配置 AgentRT 仪表盘（`docker/monitoring/grafana_agentos_dashboard.json`）
 - **告警规则**：`docker/monitoring/alerts.yml` 定义网关专用告警
 
 ## 依赖关系

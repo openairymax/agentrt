@@ -1,6 +1,6 @@
 /**
  * @file test_macros.h
- * @brief AgentOS C 测试宏工具库
+ * @brief AgentRT C 测试宏工具库
  * @details 提供统一的测试宏，减少样板代码，提高测试代码可维护性
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -197,6 +197,19 @@
     printf("======================\n"); /* flawfinder: ignore - format string is compile-time \
                                            constant */                                        \
     return (failed_tests > 0) ? 1 : 0
+
+/** @brief 重置测试统计 */
+#define RESET_TEST_STATS() do { total_tests = 0; passed_tests = 0; failed_tests = 0; } while (0)
+
+/** @brief 打印测试统计 */
+#define PRINT_TEST_STATS() \
+    printf("\n======================\n" \
+           "Test Results: %d total, %d passed, %d failed\n" \
+           "======================\n", \
+           total_tests, passed_tests, failed_tests)
+
+/** @brief 检查是否所有测试通过 */
+#define TESTS_PASSED() (failed_tests == 0)
 
 /* ============================================================
  * 性能测试宏

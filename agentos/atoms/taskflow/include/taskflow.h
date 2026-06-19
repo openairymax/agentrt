@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file taskflow.h
- * @brief AgentOS TaskFlow Graph Execution System Main Header
+ * @brief AgentRT TaskFlow Graph Execution System Main Header
  *
  * TaskFlow 图执行系统主头文件，提供基于 Pregel 超步模型的分布式计算框架。
  * 支持大规模图计算的容错、分布式执行和状态管理。

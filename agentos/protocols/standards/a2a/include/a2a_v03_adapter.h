@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file a2a_v03_adapter.h
- * @brief A2A v0.3.0 Protocol Adapter for AgentOS
+ * @brief A2A v0.3.0 Protocol Adapter for AgentRT
  *
  * Agent-to-Agent Protocol v0.3.0 深度支持适配器。
  * 实现智能体发现、任务委派、协商与协作的完整A2A协议能力。

@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
     }
 
     printf("========================================\n");
-    printf("  AgentOS Cupolas Performance Benchmark\n");
+    printf("  AgentRT Cupolas Performance Benchmark\n");
     printf("  Iterations: %d\n", iterations);
     printf("========================================\n");
 

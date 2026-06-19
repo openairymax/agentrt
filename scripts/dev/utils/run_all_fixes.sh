@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # run_all_fixes.sh — 批量执行所有 auto-fixable BAN 规则修复脚本
-# 用法: bash scripts/dev/fix/run_all_fixes.sh [--dry-run] [--verbose]
+# 用法: bash scripts/dev/utils/run_all_fixes.sh [--dry-run] [--verbose]
 # P0.15: BAN 基线扫描 + 自动修复
 
 set -euo pipefail

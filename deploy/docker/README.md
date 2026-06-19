@@ -1,11 +1,11 @@
 # Gateway Docker — 容器化部署配置
 
-**模块路径**: `agentos/gateway/docker/`
+**模块路径**: `deploy/docker/`
 **版本**: v0.1.0
 
 ## 概述
 
-`gateway/docker/` 包含 AgentRT Gateway 的 Docker 容器化部署配置，提供多阶段构建、多环境编排和监控集成。支持 MCP/A2A/OpenAI API 多协议网关，通过 Docker Compose 实现开发、调试和生产三种环境的一键部署。
+`deploy/docker/` 包含 AgentRT Gateway 的 Docker 容器化部署配置，提供多阶段构建、多环境编排和监控集成。支持 MCP/A2A/OpenAI API 多协议网关，通过 Docker Compose 实现开发、调试和生产三种环境的一键部署。
 
 ## 目录结构
 

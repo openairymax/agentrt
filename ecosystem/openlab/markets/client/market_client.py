@@ -20,19 +20,22 @@ See market_service.h and market_d/src/main.c for the C-side definitions.
 from __future__ import annotations
 
 import json
+import logging
 import socket
 import struct
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ecosystem.openlab.markets.client.errors import (
+logger = logging.getLogger(__name__)
+
+from .errors import (
     MarketConnectionError,
     MarketError,
     MarketNotFoundError,
     market_error_from_code,
 )
-from ecosystem.openlab.markets.client.models import (
+from .models import (
     AgentInfo,
     InstallRequest,
     InstallResult,
@@ -200,7 +203,7 @@ class MarketClient:
                 try:
                     sock.close()
                 except OSError:
-                    pass
+                    logger.debug("Failed to close market_d socket", exc_info=True)
 
     # ── Agent Operations ──
 

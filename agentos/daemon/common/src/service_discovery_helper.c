@@ -279,7 +279,7 @@ void sd_helper_stop_heartbeat(sd_helper_t *sdh) {
     sdh->heartbeat_running = false;
 
     if (sdh->heartbeat_thread) {
-        agentos_thread_join(sdh->heartbeat_thread);
+        agentos_thread_join(sdh->heartbeat_thread, NULL);
         sdh->heartbeat_thread = NULL;
     }
 

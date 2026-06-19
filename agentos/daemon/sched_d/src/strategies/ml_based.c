@@ -8,7 +8,7 @@
  */
 
 #include "../../include/scheduler_service.h"
-#include "../../../include/strategy_interface.h"
+#include "../../include/strategy_interface.h"
 #include "platform.h"
 
 #include <math.h>

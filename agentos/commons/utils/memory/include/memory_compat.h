@@ -374,6 +374,10 @@ static inline char *agentos_strndup(const char *str, size_t n)
  *
  * 如果当前线程没有设置 Arena，回退到 AGENTOS_MALLOC。
  */
+
+/* 前向声明：agentos_arena_alloc 由 corekern/arena.h 提供 */
+void *agentos_arena_alloc(agentos_arena_t *arena, size_t size);
+
 #define AGENTOS_ARENA_ALLOC(size) \
     (agentos_arena_get_current() ? \
      agentos_arena_alloc(agentos_arena_get_current(), size) : \
@@ -457,8 +461,10 @@ void agentos_arena_set_current(agentos_arena_t *arena);
  */
 #define AGENTOS_STRNCPY_TERM(dst, src, size) \
     do {                                     \
-        __builtin_strncpy((dst), (src), (size) - 1);   \
-        (dst)[(size) - 1] = '\0';            \
+        size_t _len = __builtin_strlen(src); \
+        size_t _copy = ((_len) < ((size) - 1)) ? (_len) : ((size) - 1); \
+        __builtin_memcpy((dst), (src), _copy); \
+        (dst)[_copy] = '\0';                 \
     } while (0)
 
 /** @} */  // end of safe_memory_alloc

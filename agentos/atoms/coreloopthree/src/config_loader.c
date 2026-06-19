@@ -14,6 +14,7 @@
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
+#include "agentos_quality.h"
 
 #include <string.h>
 
@@ -98,16 +99,21 @@ int agentos_config_load_yaml(const char *yaml_path,
 
     const char *path = yaml_path ? yaml_path : AGENTOS_DEFAULT_CONFIG_PATH;
 
+    AGENTOS_LOG_INFO("ConfigLoader: loading YAML config from %s", path);
+
     /* 保存路径用于热重载 */
     safe_strcpy(g_config_path, path, sizeof(g_config_path));
 
     int ret = agentos_yaml_load(path, config);
     if (ret != 0) {
         /* 加载失败，使用默认配置 */
+        AGENTOS_LOG_WARN("ConfigLoader: YAML load failed for %s, using defaults", path);
         agentos_yaml_config_defaults(config);
         agentos_yaml_resolve_platform_paths(config);
         return 0; /* 返回成功但使用默认值 */
     }
+
+    AGENTOS_LOG_INFO("ConfigLoader: YAML loaded successfully from %s", path);
 
     /* 平台路径映射（P1.12.4） */
     agentos_yaml_resolve_platform_paths(config);
@@ -227,20 +233,28 @@ int agentos_config_reload(const char *yaml_path)
 {
     const char *path = yaml_path ? yaml_path : g_config_path;
 
+    AGENTOS_LOG_INFO("ConfigLoader: reload triggered for %s", path);
+
     agentos_yaml_config_t new_config;
     if (agentos_yaml_load(path, &new_config) != 0) {
+        AGENTOS_LOG_WARN("ConfigLoader: reload FAILED for %s", path);
         return -1;
     }
 
     if (agentos_yaml_validate(&new_config) != 0) {
+        AGENTOS_LOG_WARN("ConfigLoader: reload validation FAILED for %s", path);
         return -1;
     }
+
+    /* P1.1.3: 应用环境变量覆盖（C-L01） */
+    agentos_yaml_env_override(&new_config);
 
     agentos_yaml_config_t old_config = g_global_config;
     g_global_config = new_config;
     g_config_loaded = true;
 
     config_reload_notify(&old_config, &new_config);
+    AGENTOS_LOG_INFO("ConfigLoader: reload OK for %s", path);
     return 0;
 }
 
@@ -254,14 +268,21 @@ int agentos_config_init(const char *yaml_path)
 {
     const char *path = yaml_path ? yaml_path : AGENTOS_DEFAULT_CONFIG_PATH;
 
+    AGENTOS_LOG_INFO("ConfigLoader: init START (path=%s)", path);
+
     agentos_yaml_config_defaults(&g_global_config);
 
     if (agentos_yaml_load(path, &g_global_config) == 0) {
         g_config_loaded = true;
+        AGENTOS_LOG_INFO("ConfigLoader: init OK (config loaded from %s)", path);
     } else {
         /* 文件不存在时使用默认配置 */
         g_config_loaded = true;
+        AGENTOS_LOG_INFO("ConfigLoader: init OK (using defaults, %s not found)", path);
     }
+
+    /* P1.1.3: 应用环境变量覆盖（C-L01） */
+    agentos_yaml_env_override(&g_global_config);
 
     /* 平台路径映射（P1.12.4） */
     agentos_yaml_resolve_platform_paths(&g_global_config);

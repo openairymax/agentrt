@@ -6,6 +6,7 @@
  * Defines the transport abstraction for MCP protocol.
  * Supports STDIO and HTTP+SSE transport modes per MCP specification.
  */
+// @owner: team-B
 
 #ifndef AGENTOS_MCP_TRANSPORT_H
 #define AGENTOS_MCP_TRANSPORT_H

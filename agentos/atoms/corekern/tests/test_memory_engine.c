@@ -21,7 +21,7 @@
 #include "../../../commons/utils/memory/include/memory_compat.h"
 
 /*
- * 测试环境：绕过 AgentOS 内存抽象层
+ * 测试环境：绕过 AgentRT 内存抽象层
  * agentos_malloc/free/realloc 依赖内存子系统初始化，
  * 单元测试中直接使用标准库实现
  */

@@ -1,6 +1,6 @@
 /**
  * @file heapstore_token.h
- * @brief AgentOS heapstore Token 计数接口
+ * @brief AgentRT heapstore Token 计数接口
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -12,6 +12,7 @@
  *       符合 ARCHITECTURAL_PRINCIPLES.md 中的 E-2 可观测性原则。
  */
 
+// @owner: team-B
 #ifndef AGENTOS_HEAPSTORE_TOKEN_H
 #define AGENTOS_HEAPSTORE_TOKEN_H
 

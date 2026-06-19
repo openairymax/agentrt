@@ -13,8 +13,8 @@
  * 性能目标：单线程分配延迟降低 > 30%
  */
 
-#ifndef AGENTOS_TCACHE_H
-#define AGENTOS_TCACHE_H
+#ifndef AGENTOS_COREKERN_TCACHE_H
+#define AGENTOS_COREKERN_TCACHE_H
 
 #include "export.h"
 
@@ -120,4 +120,4 @@ AGENTOS_API void agentos_tcache_reset_stats(agentos_tcache_t *tcache);
 }
 #endif
 
-#endif /* AGENTOS_TCACHE_H */
+#endif /* AGENTOS_COREKERN_TCACHE_H */

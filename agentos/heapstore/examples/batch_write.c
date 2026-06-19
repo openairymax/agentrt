@@ -12,6 +12,7 @@
  *       包括批量日志、追踪、注册表等操作。
  */
 
+// @owner: team-B
 #include "heapstore.h"
 
 #include <stdio.h>

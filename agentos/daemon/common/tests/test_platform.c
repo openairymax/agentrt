@@ -104,7 +104,7 @@ static void test_strlcpy(void)
     printf("  test_strlcpy...\n");
 
     char dest[32];
-    const char *src = "Hello, AgentOS!";
+    const char *src = "Hello, AgentRT!";
 
     agentos_strlcpy(dest, src, sizeof(dest));
     assert(strcmp(dest, src) == 0);

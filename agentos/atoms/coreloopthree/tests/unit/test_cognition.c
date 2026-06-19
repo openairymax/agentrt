@@ -8,6 +8,7 @@
 #include "cognition.h"
 #include "execution.h"
 #include "memory.h"
+#include "memory_compat.h"
 
 #include <assert.h>
 #ifndef NDEBUG

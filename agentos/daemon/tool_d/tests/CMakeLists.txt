@@ -13,6 +13,7 @@ set(TOOL_IMPL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/executor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/validator.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/registry.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tool_approval.c
 )
 
 # YAML found by root CMakeLists.txt (AGENTOS_HAS_YAML)

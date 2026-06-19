@@ -206,7 +206,6 @@ int prometheus_exporter_handle_http(const char *request, size_t request_len,
     size_t metrics_len = strlen(metrics_text);
 
     /* 构建 HTTP 响应 */
-    size_t header_buf_size = 256;
     char header_buf[256];
     int header_len = snprintf(header_buf, sizeof(header_buf),
                               "HTTP/1.1 200 OK\r\n"

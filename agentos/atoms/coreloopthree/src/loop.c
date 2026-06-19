@@ -8,11 +8,13 @@
 
 #include "agentos.h"
 #include "agentos_dirent.h"
+#include "arena.h"
 #include "atomic_compat.h"
 #include "check.h"
 #include "checkpoint.h"
 #include "cognition.h"
 #include "execution.h"
+#include "logging_compat.h"
 #include "memory.h"
 #include "memory_common.h"
 #include "memory_compat.h"
@@ -45,15 +47,23 @@ struct agentos_core_loop {
     agentos_mutex_t *lock;
     agentos_cond_t *cond;
 
+    /* P1.19.4: Arena 分配器用于请求处理路径中的短生命周期分配 */
+    agentos_arena_t *arena;
+
     int checkpoint_initialized;
     uint64_t last_checkpoint_time_ms;
     uint64_t checkpoint_seq;
+    uint64_t loop_turn_count;          /* P1.6: 循环轮次计数器 */
+    uint64_t loop_checkpoint_last_turn; /* P1.6: 上次触发轮次检查点的轮次 */
     char current_task_id[128];
     char current_session_id[128];
     char **completed_node_ids;
     size_t completed_node_count;
     size_t completed_node_capacity;
     char *persistent_original_input;
+    char **tool_call_history;           /* P1.6.2: 工具调用历史 */
+    size_t tool_call_history_count;
+    size_t tool_call_history_capacity;
 };
 
 /* 辅助函数声明 - 用于重构降低圈复杂度 */
@@ -76,6 +86,10 @@ static void add_completed_node(agentos_core_loop_t *loop, const char *node_id);
 static void clear_completed_nodes(agentos_core_loop_t *loop);
 static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, const char *task_id,
                                                    const char *session_id, const char *node_id);
+static void add_tool_call_history(agentos_core_loop_t *loop, const char *tool_name, const char *tool_input);
+static void clear_tool_call_history(agentos_core_loop_t *loop);
+static char *build_rich_checkpoint_state(agentos_core_loop_t *loop, const char *task_id,
+                                         const char *extra_json);
 
 /* 默认配置 */
 static void init_default_config(agentos_loop_config_t *manager)
@@ -93,6 +107,7 @@ static void init_default_config(agentos_loop_config_t *manager)
     snprintf(manager->loop_config_checkpoint_path, sizeof(manager->loop_config_checkpoint_path),
              "./data/checkpoints");
     manager->loop_config_checkpoint_interval_ms = 30000;
+    manager->loop_config_checkpoint_interval_turns = 0;
 }
 
 /* ==================== 辅助函数实现 - 用于降低圈复杂度 ==================== */
@@ -252,8 +267,9 @@ static void cleanup_loop_resources(agentos_core_loop_t *loop)
 /**
  * @brief 释放记忆结果数组
  * @param memories 记忆数组指针
- * @param memory_count 记忆数量
+ * @param record_count 记录数量
  */
+__attribute__((unused))
 static void free_memories(agentos_memory_record_t **records, size_t record_count)
 {
     if (!records)
@@ -282,7 +298,8 @@ static char *build_enhanced_input(const char *input, size_t input_len,
         }
     }
 
-    char *enhanced_input = (char *)AGENTOS_MALLOC(total_len);
+    /* P1.19.4: 使用 Arena 分配短生命周期内存（如果可用），否则回退到 malloc */
+    char *enhanced_input = (char *)AGENTOS_ARENA_ALLOC(total_len);
     if (!enhanced_input) return NULL;
 
     size_t pos = 0;
@@ -311,6 +328,8 @@ AGENTOS_API agentos_error_t agentos_loop_create(const agentos_loop_config_t *man
     agentos_error_t err;
     agentos_core_loop_t *loop = NULL;
 
+    AGENTOS_LOG_INFO("CoreLoopThree: agentos_loop_create START");
+
     err = validate_loop_parameters(manager, out_loop);
     if (err != AGENTOS_SUCCESS)
         return err;
@@ -336,12 +355,26 @@ AGENTOS_API agentos_error_t agentos_loop_create(const agentos_loop_config_t *man
     loop->checkpoint_initialized = 0;
     loop->last_checkpoint_time_ms = 0;
     loop->checkpoint_seq = 0;
+    loop->loop_turn_count = 0;
+    loop->loop_checkpoint_last_turn = 0;
     __builtin_memset(loop->current_task_id, 0, sizeof(loop->current_task_id));
     __builtin_memset(loop->current_session_id, 0, sizeof(loop->current_session_id));
     loop->completed_node_ids = NULL;
     loop->completed_node_count = 0;
     loop->completed_node_capacity = 0;
     loop->persistent_original_input = NULL;
+    loop->tool_call_history = NULL;
+    loop->tool_call_history_count = 0;
+    loop->tool_call_history_capacity = 0;
+
+    /* P1.19.4: 创建 Arena 分配器（64KB chunk，无限制）用于请求处理短生命周期分配 */
+    loop->arena = arena_create(ARENA_DEFAULT_CHUNK_SIZE, 0);
+    if (!loop->arena) {
+        AGENTOS_LOG_WARN("CoreLoopThree: Arena creation failed, falling back to malloc");
+    } else {
+        AGENTOS_LOG_INFO("CoreLoopThree: Arena created (chunk_size=%zu) for request-level allocations",
+                         (size_t)ARENA_DEFAULT_CHUNK_SIZE);
+    }
 
     if (loop->manager.loop_config_checkpoint_enabled) {
         const char *cp_path = loop->manager.loop_config_checkpoint_path;
@@ -385,6 +418,27 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t *loop)
         loop->persistent_original_input = NULL;
     }
 
+    /* P1.6.2: 清理工具调用历史 */
+    if (loop->tool_call_history) {
+        for (size_t i = 0; i < loop->tool_call_history_count; i++) {
+            AGENTOS_FREE(loop->tool_call_history[i]);
+        }
+        AGENTOS_FREE(loop->tool_call_history);
+        loop->tool_call_history = NULL;
+        loop->tool_call_history_count = 0;
+        loop->tool_call_history_capacity = 0;
+    }
+
+    /* P1.19.4: 销毁 Arena 分配器 */
+    if (loop->arena) {
+        arena_stats_t astats;
+        arena_get_stats(loop->arena, &astats);
+        AGENTOS_LOG_INFO("CoreLoopThree: Arena destroy (allocs=%" PRIu64 ", chunks=%zu, total=%zu, reset=%" PRIu64 ")",
+                         astats.alloc_count, astats.chunk_count, astats.total_chunk_bytes, astats.reset_count);
+        arena_destroy(loop->arena);
+        loop->arena = NULL;
+    }
+
     if (loop->memory) {
         agentos_memory_destroy(loop->memory);
         loop->memory = NULL;
@@ -418,10 +472,14 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t *loop)
     loop->stop_requested = 0;
     agentos_mutex_unlock(loop->lock);
 
+    AGENTOS_LOG_INFO("CoreLoopThree: agentos_loop_run STARTED");
+
     uint64_t last_auto_checkpoint_ms = 0;
     uint32_t checkpoint_interval = loop->manager.loop_config_checkpoint_interval_ms;
     if (checkpoint_interval == 0)
         checkpoint_interval = 30000;
+
+    uint64_t last_stats_log_ms = 0;
 
     while (1) {
         agentos_mutex_lock(loop->lock);
@@ -433,13 +491,18 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t *loop)
             loop->task_pending = 0;
             agentos_cond_broadcast(loop->cond);
             agentos_mutex_unlock(loop->lock);
+            AGENTOS_LOG_INFO("CoreLoopThree: agentos_loop_run STOPPED (total_turns=%" PRIu64 ")",
+                             loop->loop_turn_count);
             break;
         }
         if (loop->task_pending) {
             loop->task_pending = 0;
+            AGENTOS_LOG_DEBUG("CoreLoopThree: task pending flag consumed (turn=%" PRIu64 ")",
+                              loop->loop_turn_count);
         }
         agentos_mutex_unlock(loop->lock);
 
+        /* P1.6.1: 时间基检查点触发 */
         if (loop->checkpoint_initialized && loop->current_task_id[0] != '\0' &&
             checkpoint_interval > 0) {
             uint64_t now_ms = agentos_time_ms();
@@ -448,7 +511,45 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t *loop)
                 agentos_error_t cp_err = agentos_checkpoint_trigger_auto(loop->current_task_id);
                 if (cp_err == AGENTOS_SUCCESS) {
                     last_auto_checkpoint_ms = now_ms;
+                    AGENTOS_LOG_DEBUG("CoreLoopThree: time-based auto-checkpoint triggered "
+                                      "(interval=%ums, turn=%" PRIu64 ")",
+                                      checkpoint_interval, loop->loop_turn_count);
                 }
+            }
+        }
+
+        /* P1.6.1: 轮次基检查点触发 */
+        if (loop->checkpoint_initialized &&
+            loop->manager.loop_config_checkpoint_interval_turns > 0 &&
+            loop->current_task_id[0] != '\0') {
+            uint32_t interval_turns = loop->manager.loop_config_checkpoint_interval_turns;
+            if (loop->loop_turn_count - loop->loop_checkpoint_last_turn >= interval_turns) {
+                agentos_error_t cp_err = agentos_checkpoint_trigger_auto(loop->current_task_id);
+                if (cp_err == AGENTOS_SUCCESS) {
+                    loop->loop_checkpoint_last_turn = loop->loop_turn_count;
+                    AGENTOS_LOG_INFO("CoreLoopThree: turn-based checkpoint triggered "
+                                     "(interval=%u turns, total_turns=%" PRIu64 ")",
+                                     interval_turns, loop->loop_turn_count);
+                }
+            }
+        }
+
+        /* P1.6: 定期输出 checkpoint 统计信息 */
+        if (loop->checkpoint_initialized && loop->manager.loop_config_stats_interval_ms > 0) {
+            uint64_t now_ms = agentos_time_ms();
+            if (last_stats_log_ms == 0 ||
+                (now_ms - last_stats_log_ms) >= loop->manager.loop_config_stats_interval_ms) {
+                agentos_checkpoint_stats_t stats;
+                if (agentos_checkpoint_get_stats(&stats) == AGENTOS_SUCCESS) {
+                    AGENTOS_LOG_INFO("CoreLoopThree: checkpoint stats "
+                                     "(total=%" PRIu64 ", success=%" PRIu64 ", fail=%" PRIu64
+                                     ", restores=%" PRIu64 ", avg_size=%" PRIu64 "B, "
+                                     "turns=%" PRIu64 ")",
+                                     stats.total_checkpoints, stats.successful_checkpoints,
+                                     stats.failed_checkpoints, stats.total_restore_ops,
+                                     stats.avg_checkpoint_size, loop->loop_turn_count);
+                }
+                last_stats_log_ms = now_ms;
             }
         }
     }
@@ -477,6 +578,19 @@ AGENTOS_API agentos_error_t agentos_loop_submit(agentos_core_loop_t *loop, const
     if (!loop->cognition || !loop->execution || !loop->memory)
         ATM_RET_ERR(AGENTOS_ENOTINIT);
 
+    AGENTOS_LOG_INFO("CoreLoopThree: agentos_loop_submit START (input_len=%zu)", input_len);
+
+    /* P1.6.1: 递增轮次计数器 */
+    agentos_mutex_lock(loop->lock);
+    loop->loop_turn_count++;
+    agentos_mutex_unlock(loop->lock);
+
+    /* P1.19.4: 设置当前线程的 Arena 用于请求级短生命周期分配 */
+    agentos_arena_t *prev_arena = agentos_arena_get_current();
+    if (loop->arena) {
+        agentos_arena_set_current(loop->arena);
+    }
+
     /* 步骤 1: 从记忆中检索相关上下文 */
     agentos_memory_query_t query = {0};
     query.memory_query_text = (char *)input;
@@ -490,12 +604,14 @@ AGENTOS_API agentos_error_t agentos_loop_submit(agentos_core_loop_t *loop, const
     agentos_memory_record_t **memories = NULL;
     if (err == AGENTOS_SUCCESS && result && result->memory_result_count > 0) {
         memory_count = result->memory_result_count;
-        memories = (agentos_memory_record_t **)AGENTOS_CALLOC(memory_count,
+        /* P1.19.4: 使用 Arena 分配短生命周期 memories 数组 */
+        memories = (agentos_memory_record_t **)AGENTOS_ARENA_ALLOC(memory_count *
                                                               sizeof(agentos_memory_record_t *));
         if (memories) {
             for (size_t i = 0; i < memory_count; i++) {
                 memories[i] = result->memory_result_items[i]->memory_result_item_record;
             }
+            AGENTOS_LOG_DEBUG("CoreLoopThree: memory query returned %zu records", memory_count);
         } else {
             memory_count = 0;
         }
@@ -511,7 +627,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(agentos_core_loop_t *loop, const
     /* 释放记忆结果（无论是否构建了增强输入） */
     if (result)
         agentos_memory_result_free(result);
-    free_memories(memories, memory_count);
+    /* memories 数组由 Arena 管理，无需单独释放 */
 
     /* 步骤 3: 认知层处理（带上下文增强） */
     const char *process_input = enhanced_input ? enhanced_input : input;
@@ -520,17 +636,18 @@ AGENTOS_API agentos_error_t agentos_loop_submit(agentos_core_loop_t *loop, const
     agentos_task_plan_t *plan = NULL;
     err = agentos_cognition_process(loop->cognition, process_input, process_len, &plan);
     if (err != AGENTOS_SUCCESS) {
-        if (enhanced_input)
-            AGENTOS_FREE(enhanced_input);
-        return err;
+        AGENTOS_LOG_WARN("CoreLoopThree: cognition process FAILED (err=%d)", err);
+        goto submit_cleanup;
     }
 
     if (!plan || plan->task_plan_node_count == 0) {
         agentos_task_plan_free(plan);
-        if (enhanced_input)
-            AGENTOS_FREE(enhanced_input);
+        AGENTOS_LOG_WARN("CoreLoopThree: empty or null task plan");
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to submit loop task: empty or null task plan");
+        /* 不会到达这里，AGENTOS_ERROR 会 return */
     }
+
+    AGENTOS_LOG_INFO("CoreLoopThree: plan created (nodes=%zu)", plan->task_plan_node_count);
 
     /* 步骤 4: 执行层按计划节点提交任务 */
     agentos_error_t first_err = AGENTOS_SUCCESS;
@@ -568,12 +685,23 @@ AGENTOS_API agentos_error_t agentos_loop_submit(agentos_core_loop_t *loop, const
         loop->task_pending = 1;
         agentos_cond_signal(loop->cond);
         agentos_mutex_unlock(loop->lock);
+        AGENTOS_LOG_INFO("CoreLoopThree: agentos_loop_submit OK (task_id=%s, nodes=%zu)",
+                         saved_task_id ? saved_task_id : "task-unknown",
+                         plan->task_plan_node_count);
+    } else {
+        AGENTOS_LOG_WARN("CoreLoopThree: agentos_loop_submit FAILED (err=%d)", first_err);
     }
 
     /* 清理临时资源 */
     agentos_task_plan_free(plan);
-    if (enhanced_input)
-        AGENTOS_FREE(enhanced_input);
+
+submit_cleanup:
+    /* P1.19.4: 重置 Arena，释放所有请求级短生命周期内存 */
+    if (loop->arena) {
+        arena_reset(loop->arena);
+    }
+    /* 恢复之前的 Arena */
+    agentos_arena_set_current(prev_arena);
 
     return first_err;
 }
@@ -586,6 +714,8 @@ AGENTOS_API agentos_error_t agentos_loop_wait(agentos_core_loop_t *loop, const c
         ATM_RET_ERR(AGENTOS_EINVAL);
     if (!loop->execution || !loop->memory)
         ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    AGENTOS_LOG_DEBUG("CoreLoopThree: agentos_loop_wait (task_id=%s, timeout=%u)", task_id, timeout_ms);
 
     /* 等待执行完成 */
     agentos_task_t *result_task = NULL;
@@ -674,17 +804,17 @@ static void loop_checkpoint_auto_hook(const char *task_id, const char *state_jso
     if (state_json && state_json[0]) {
         snprintf(state, sizeof(state), "%s", state_json);
     } else {
-        int written = snprintf(state, sizeof(state),
-                               "{\"type\":\"auto\",\"task_id\":\"%s\","
-                               "\"session_id\":\"%s\","
-                               "\"completed_nodes\":%zu,"
-                               "\"checkpoint_seq\":%lu}",
-                               task_id, loop->current_session_id, loop->completed_node_count,
-                               (unsigned long)loop->checkpoint_seq);
-        if (written <= 0 || (size_t)written >= sizeof(state)) {
+        /* P1.6.2: 使用 build_rich_checkpoint_state 构建丰富的 checkpoint 状态 */
+        char *rich_state = build_rich_checkpoint_state(loop, task_id, NULL);
+        if (rich_state) {
+            snprintf(state, sizeof(state), "%s", rich_state);
+            AGENTOS_FREE(rich_state);
+        } else {
+            /* 回退到简单状态 */
             snprintf(state, sizeof(state),
-                     "{\"state\":\"auto\",\"task_id\":\"%s\",\"session_id\":\"%s\"}", task_id,
-                     loop->current_session_id);
+                     "{\"state\":\"auto\",\"task_id\":\"%s\",\"session_id\":\"%s\","
+                     "\"turn_count\":%" PRIu64 "}",
+                     task_id, loop->current_session_id, loop->loop_turn_count);
         }
     }
 
@@ -696,8 +826,13 @@ static void loop_checkpoint_auto_hook(const char *task_id, const char *state_jso
     if (err == AGENTOS_SUCCESS && checkpoint) {
         err = agentos_checkpoint_save(checkpoint);
         if (err == AGENTOS_SUCCESS) {
-            AGENTOS_LOG_INFO("Auto-checkpoint saved for task %s (seq=%lu, completed=%zu)", task_id,
-                             (unsigned long)loop->checkpoint_seq, loop->completed_node_count);
+            AGENTOS_LOG_INFO("Auto-checkpoint saved for task %s (seq=%lu, completed=%zu, "
+                             "turns=%" PRIu64 ", tools=%zu)",
+                             task_id, (unsigned long)loop->checkpoint_seq,
+                             loop->completed_node_count, loop->loop_turn_count,
+                             loop->tool_call_history_count);
+        } else {
+            AGENTOS_LOG_WARN("Auto-checkpoint save FAILED for task %s (err=%d)", task_id, err);
         }
         agentos_checkpoint_destroy(checkpoint);
     }
@@ -719,11 +854,13 @@ static agentos_error_t save_plan_checkpoint(agentos_core_loop_t *loop,
     char **pending_nodes = NULL;
 
     if (pending_count > 0) {
-        pending_nodes = (char **)AGENTOS_CALLOC(pending_count, sizeof(char *));
+        /* P1.19.4: 使用 Arena 分配短生命周期 pending_nodes 数组 */
+        pending_nodes = (char **)AGENTOS_ARENA_ALLOC(pending_count * sizeof(char *));
         if (!pending_nodes)
             ATM_RET_ERR(AGENTOS_ENOMEM);
         for (size_t i = 0; i < pending_count; i++) {
             if (plan->task_plan_nodes[i] && plan->task_plan_nodes[i]->task_node_id) {
+                /* STRDUP 用于 checkpoint 持久化，不能使用 Arena（reset 后会失效） */
                 pending_nodes[i] = AGENTOS_STRDUP(plan->task_plan_nodes[i]->task_node_id);
             }
         }
@@ -787,6 +924,14 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
     if (!loop->cognition || !loop->execution || !loop->memory)
         ATM_RET_ERR(AGENTOS_ENOTINIT);
 
+    AGENTOS_LOG_INFO("CoreLoopThree: agentos_loop_submit_persistent START (input_len=%zu, session=%s)",
+                     input_len, session_id ? session_id : "auto");
+
+    /* P1.6.1: 递增轮次计数器 */
+    agentos_mutex_lock(loop->lock);
+    loop->loop_turn_count++;
+    agentos_mutex_unlock(loop->lock);
+
     char task_id_buf[128];
     generate_task_id(task_id_buf, sizeof(task_id_buf));
 
@@ -800,7 +945,14 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
     }
     loop->checkpoint_seq = 0;
     clear_completed_nodes(loop);
+    clear_tool_call_history(loop);
     agentos_mutex_unlock(loop->lock);
+
+    /* P1.19.4: 设置当前线程的 Arena 用于请求级短生命周期分配 */
+    agentos_arena_t *prev_arena = agentos_arena_get_current();
+    if (loop->arena) {
+        agentos_arena_set_current(loop->arena);
+    }
 
     agentos_memory_query_t query = {0};
     query.memory_query_text = (char *)input;
@@ -814,7 +966,8 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
     agentos_memory_record_t **memories = NULL;
     if (err == AGENTOS_SUCCESS && result && result->memory_result_count > 0) {
         memory_count = result->memory_result_count;
-        memories = (agentos_memory_record_t **)AGENTOS_CALLOC(memory_count,
+        /* P1.19.4: 使用 Arena 分配短生命周期 memories 数组 */
+        memories = (agentos_memory_record_t **)AGENTOS_ARENA_ALLOC(memory_count *
                                                               sizeof(agentos_memory_record_t *));
         if (memories) {
             for (size_t i = 0; i < memory_count; i++) {
@@ -833,7 +986,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
 
     if (result)
         agentos_memory_result_free(result);
-    free_memories(memories, memory_count);
+    /* memories 数组由 Arena 管理，无需单独释放 */
 
     const char *process_input = enhanced_input ? enhanced_input : input;
     size_t process_len = enhanced_input ? strlen(enhanced_input) : input_len;
@@ -841,17 +994,17 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
     agentos_task_plan_t *plan = NULL;
     err = agentos_cognition_process(loop->cognition, process_input, process_len, &plan);
     if (err != AGENTOS_SUCCESS) {
-        if (enhanced_input)
-            AGENTOS_FREE(enhanced_input);
-        return err;
+        AGENTOS_LOG_WARN("CoreLoopThree: persistent cognition process FAILED (err=%d)", err);
+        goto persistent_cleanup;
     }
 
     if (!plan || plan->task_plan_node_count == 0) {
         agentos_task_plan_free(plan);
-        if (enhanced_input)
-            AGENTOS_FREE(enhanced_input);
-        ATM_RET_ERR(AGENTOS_EINVAL);
+        AGENTOS_LOG_WARN("CoreLoopThree: persistent empty or null task plan");
+        goto persistent_cleanup;
     }
+
+    AGENTOS_LOG_INFO("CoreLoopThree: persistent plan created (nodes=%zu)", plan->task_plan_node_count);
 
     if (loop->checkpoint_initialized) {
         save_plan_checkpoint(loop, plan, task_id_buf, loop->current_session_id, process_input);
@@ -885,6 +1038,9 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
 
         if (err == AGENTOS_SUCCESS && loop->checkpoint_initialized && node->task_node_id) {
             add_completed_node(loop, node->task_node_id);
+            /* P1.6.2: 记录工具调用历史 */
+            add_tool_call_history(loop, node->task_node_id,
+                                  node->task_node_input ? (const char *)node->task_node_input : NULL);
             save_incremental_checkpoint(loop, task_id_buf, loop->current_session_id,
                                         node->task_node_id);
         }
@@ -899,11 +1055,21 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(agentos_core_loop_t *
         loop->task_pending = 1;
         agentos_cond_signal(loop->cond);
         agentos_mutex_unlock(loop->lock);
+        AGENTOS_LOG_INFO("CoreLoopThree: agentos_loop_submit_persistent OK (task_id=%s, nodes=%zu)",
+                         task_id_buf, plan->task_plan_node_count);
+    } else {
+        AGENTOS_LOG_WARN("CoreLoopThree: agentos_loop_submit_persistent FAILED (err=%d)", first_err);
     }
 
     agentos_task_plan_free(plan);
-    if (enhanced_input)
-        AGENTOS_FREE(enhanced_input);
+
+persistent_cleanup:
+    /* P1.19.4: 重置 Arena，释放所有请求级短生命周期内存 */
+    if (loop->arena) {
+        arena_reset(loop->arena);
+    }
+    /* 恢复之前的 Arena */
+    agentos_arena_set_current(prev_arena);
 
     return first_err;
 }
@@ -918,6 +1084,8 @@ AGENTOS_API agentos_error_t agentos_loop_restore_task(agentos_core_loop_t *loop,
         ATM_RET_ERR(AGENTOS_ENOTINIT);
     if (!loop->cognition || !loop->execution)
         ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    AGENTOS_LOG_INFO("CoreLoopThree: agentos_loop_restore_task (task_id=%s)", task_id);
 
     agentos_task_checkpoint_t **checkpoints = NULL;
     size_t cp_count = 0;
@@ -1198,4 +1366,187 @@ static agentos_error_t save_incremental_checkpoint(agentos_core_loop_t *loop, co
 
     loop->last_checkpoint_time_ms = get_time_ms();
     return err;
+}
+
+/* ==================== P1.6.2: 工具调用历史管理 ==================== */
+
+static void add_tool_call_history(agentos_core_loop_t *loop, const char *tool_name, const char *tool_input)
+{
+    if (!loop || !tool_name)
+        return;
+
+    if (loop->tool_call_history_count >= loop->tool_call_history_capacity) {
+        size_t new_cap =
+            loop->tool_call_history_capacity == 0 ? 8 : loop->tool_call_history_capacity * 2;
+        char **new_arr =
+            (char **)AGENTOS_REALLOC(loop->tool_call_history, new_cap * sizeof(char *));
+        if (!new_arr)
+            return;
+        loop->tool_call_history = new_arr;
+        __builtin_memset(loop->tool_call_history + loop->tool_call_history_capacity, 0,
+               (new_cap - loop->tool_call_history_capacity) * sizeof(char *));
+        loop->tool_call_history_capacity = new_cap;
+    }
+
+    /* 格式: "tool_name(input_truncated)" */
+    char entry[512];
+    size_t input_len = tool_input ? strlen(tool_input) : 0;
+    const char *truncated = (input_len > 64) ? "..." : "";
+    snprintf(entry, sizeof(entry), "%s(%.64s%s)", tool_name,
+             tool_input ? tool_input : "", truncated);
+
+    loop->tool_call_history[loop->tool_call_history_count] = AGENTOS_STRDUP(entry);
+    if (loop->tool_call_history[loop->tool_call_history_count])
+        loop->tool_call_history_count++;
+
+    AGENTOS_LOG_DEBUG("CoreLoopThree: tool call recorded: %s (total=%zu)",
+                      tool_name, loop->tool_call_history_count);
+}
+
+static void clear_tool_call_history(agentos_core_loop_t *loop)
+{
+    if (!loop || !loop->tool_call_history)
+        return;
+
+    for (size_t i = 0; i < loop->tool_call_history_count; i++) {
+        AGENTOS_FREE(loop->tool_call_history[i]);
+    }
+    AGENTOS_FREE(loop->tool_call_history);
+    loop->tool_call_history = NULL;
+    loop->tool_call_history_count = 0;
+    loop->tool_call_history_capacity = 0;
+}
+
+/* ==================== P1.6.2: 丰富的 checkpoint 状态构建 ==================== */
+
+static char *build_rich_checkpoint_state(agentos_core_loop_t *loop, const char *task_id,
+                                         const char *extra_json)
+{
+    if (!loop || !task_id)
+        return NULL;
+
+    /* 工具调用历史 JSON */
+    char tool_json[4096] = "";
+    size_t tpos = 0;
+    if (loop->tool_call_history_count > 0) {
+        tpos += snprintf(tool_json + tpos, sizeof(tool_json) - tpos, "\"tool_call_history\":[");
+        for (size_t i = 0; i < loop->tool_call_history_count && tpos < sizeof(tool_json) - 128; i++) {
+            if (loop->tool_call_history[i]) {
+                tpos += snprintf(tool_json + tpos, sizeof(tool_json) - tpos,
+                                 "%s\"%s\"", i > 0 ? "," : "", loop->tool_call_history[i]);
+            }
+        }
+        snprintf(tool_json + tpos, sizeof(tool_json) - tpos, "],");
+    }
+
+    /* 构建完整状态 JSON */
+    size_t state_size = 8192 + (extra_json ? strlen(extra_json) : 0);
+    char *state = (char *)AGENTOS_MALLOC(state_size);
+    if (!state)
+        return NULL;
+
+    int written = snprintf(state, state_size,
+                           "{\"type\":\"checkpoint\",\"task_id\":\"%s\","
+                           "\"session_id\":\"%s\","
+                           "\"checkpoint_seq\":%lu,"
+                           "\"turn_count\":%" PRIu64 ","
+                           "\"completed_nodes\":%zu,"
+                           "%s"
+                           "\"cognition_state\":\"active\","
+                           "\"memory_context\":\"%zu_memory_records\","
+                           "%s}",
+                           task_id, loop->current_session_id,
+                           (unsigned long)loop->checkpoint_seq,
+                           loop->loop_turn_count,
+                           loop->completed_node_count,
+                           tool_json,
+                           loop->completed_node_count,
+                           extra_json ? extra_json : "");
+
+    if (written <= 0 || (size_t)written >= state_size) {
+        AGENTOS_FREE(state);
+        return NULL;
+    }
+
+    return state;
+}
+
+/* ==================== P1.6.3: 快照 API 实现 ==================== */
+
+AGENTOS_API agentos_error_t agentos_loop_create_snapshot(agentos_core_loop_t *loop,
+                                                         const char *task_id,
+                                                         const char *snapshot_path)
+{
+    if (!loop || !task_id || !snapshot_path)
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    if (!loop->checkpoint_initialized)
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    AGENTOS_LOG_INFO("CoreLoopThree: creating snapshot for task %s (path=%s)",
+                     task_id, snapshot_path);
+
+    agentos_error_t err = agentos_snapshot_create(task_id, snapshot_path);
+    if (err == AGENTOS_SUCCESS) {
+        AGENTOS_LOG_INFO("CoreLoopThree: snapshot created OK (task=%s, path=%s, "
+                         "turns=%" PRIu64 ", completed=%zu)",
+                         task_id, snapshot_path, loop->loop_turn_count,
+                         loop->completed_node_count);
+    } else {
+        AGENTOS_LOG_WARN("CoreLoopThree: snapshot creation FAILED (task=%s, err=%d)",
+                         task_id, err);
+    }
+
+    return err;
+}
+
+AGENTOS_API agentos_error_t agentos_loop_restore_snapshot(agentos_core_loop_t *loop,
+                                                          const char *snapshot_path,
+                                                          char **out_restored_task_id)
+{
+    if (!loop || !snapshot_path || !out_restored_task_id)
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    if (!loop->checkpoint_initialized)
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    AGENTOS_LOG_INFO("CoreLoopThree: restoring from snapshot (path=%s)", snapshot_path);
+
+    *out_restored_task_id = NULL;
+
+    /* 从快照文件恢复 task_id */
+    char *task_id = NULL;
+    agentos_error_t err = agentos_snapshot_restore(snapshot_path, &task_id);
+    if (err != AGENTOS_SUCCESS || !task_id) {
+        AGENTOS_LOG_WARN("CoreLoopThree: snapshot restore FAILED (path=%s, err=%d)",
+                         snapshot_path, err);
+        if (task_id)
+            AGENTOS_FREE(task_id);
+        return err == AGENTOS_SUCCESS ? AGENTOS_EIO : err;
+    }
+
+    AGENTOS_LOG_INFO("CoreLoopThree: snapshot task_id recovered: %s", task_id);
+
+    /* 通过 restore_task 恢复完整状态 */
+    err = agentos_loop_restore_task(loop, task_id, out_restored_task_id);
+    AGENTOS_FREE(task_id);
+    task_id = NULL;
+
+    if (err == AGENTOS_SUCCESS) {
+        AGENTOS_LOG_INFO("CoreLoopThree: snapshot restored OK (new_task=%s)",
+                         *out_restored_task_id ? *out_restored_task_id : "unknown");
+    } else {
+        AGENTOS_LOG_WARN("CoreLoopThree: snapshot restore via restore_task FAILED (err=%d)", err);
+    }
+
+    return err;
+}
+
+AGENTOS_API agentos_error_t agentos_loop_get_checkpoint_stats(agentos_core_loop_t *loop,
+                                                              agentos_checkpoint_stats_t *out_stats)
+{
+    if (!loop || !out_stats)
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    if (!loop->checkpoint_initialized)
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    return agentos_checkpoint_get_stats(out_stats);
 }
