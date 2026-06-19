@@ -57,7 +57,7 @@ pub async fn status(gateway_url: &str) -> Result<()> {
 
     if !status.daemons.is_empty() {
         println!("  Daemons:");
-        println!("  {:<20} {:<10} {:<8} {:<10} {}", "Name", "Status", "PID", "Port", "Uptime");
+        println!("  {:<20} {:<10} {:<8} {:<10} Uptime", "Name", "Status", "PID", "Port");
         println!("  {:-<20} {:-<10} {:-<8} {:-<10} {:-<10}", "", "", "", "", "");
 
         for d in &status.daemons {

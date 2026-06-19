@@ -1,6 +1,8 @@
-# AgentOS Manager Module - Git Ignore Configuration
-# Version: 0.1.0
+# AgentRT Manager Module - Git Ignore Configuration
+# Version: 0.1.1
 # Purpose: Exclude temporary, cache and generated files from version control
+#
+# Part of Airymax open-source project (agentrt)
 
 # Python cache files
 __pycache__/
@@ -57,6 +59,7 @@ ENV/
 # IDE and editor files
 .idea/
 .vscode/
+.trae/
 *.swp
 *.swo
 *~

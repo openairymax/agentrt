@@ -1,0 +1,174 @@
+# AgentRT Helm Chart — 生产环境覆盖值
+# 使用: helm install agentrt . -f values.yaml -f values-prod.yaml
+# 或:   helm upgrade agentrt . -f values.yaml -f values-prod.yaml
+
+global:
+  env: production
+  image:
+    pullPolicy: Always
+  replicaCount: 3
+
+# 生产环境基础设施
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+    existingSecret: agentrt-redis-secret
+  master:
+    persistence:
+      enabled: true
+      size: 20Gi
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 20Gi
+
+postgresql:
+  enabled: true
+  auth:
+    existingSecret: agentrt-postgresql-secret
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi
+  readReplicas:
+    replicaCount: 1
+
+# 内核服务 — 生产 3 副本
+corekern:
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+coreloopthree:
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+taskflow:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+memory:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  persistence:
+    enabled: true
+    size: 50Gi
+
+# 业务 daemon — 生产 2 副本
+llm_d:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+tool_d:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+market_d:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+sched_d:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+hook_d:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+plugin_d:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+gateway_d:
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+  hosts:
+    - host: agentrt.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          port: 9000
+  tls:
+    - secretName: agentrt-tls
+      hosts:
+        - agentrt.example.com
+
+agentosConfig:
+  logLevel: info
+  deployEnv: production

@@ -16,7 +16,7 @@
  * - 零开销：内联函数 + 宏定义
  * - 类型安全：强类型封装
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-03-30
  * @version 2.0
  *
@@ -110,7 +110,7 @@ extern "C" {
 #define AGENTOS_TMP_DIR "C:\\ProgramData\\agentos\\tmp"
 #define AGENTOS_CACHE_DIR "C:\\ProgramData\\agentos\\cache"
 #else
-#define AGENTOS_RUNTIME_DIR "/run/agentos"
+#define AGENTOS_RUNTIME_DIR "/tmp/agentos"
 #define AGENTOS_LOG_DIR "/var/log/agentos"
 #define AGENTOS_CONFIG_DIR "/etc/agentos"
 #define AGENTOS_TMP_DIR "/var/tmp/agentos"
@@ -411,6 +411,12 @@ uint64_t agentos_time_ns(void);
  * @return 时间戳
  */
 uint64_t agentos_time_ms(void);
+
+/**
+ * @brief 睡眠指定毫秒数
+ * @param ms 毫秒数
+ */
+void agentos_sleep_ms(uint32_t ms);
 
 /* ==================== 随机数接口 ==================== */
 

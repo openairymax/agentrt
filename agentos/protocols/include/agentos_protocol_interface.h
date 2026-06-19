@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file agentos_protocol_interface.h
- * @brief AgentOS Protocol System Unified Interface Definition
+ * @brief AgentRT Protocol System Unified Interface Definition
  *
- * 定义 AgentOS 协议系统的公共接口契约，作为所有协议适配器、网关、SDK 的统一抽象层。
+ * 定义 AgentRT 协议系统的公共接口契约，作为所有协议适配器、网关、SDK 的统一抽象层。
  *
  * 原位置: agentos/interfaces/include/
  * 迁移至: agentos/protocols/include/ (2026-04-19 interfaces删除重构)

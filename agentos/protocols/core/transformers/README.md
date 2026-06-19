@@ -5,7 +5,7 @@
 
 ## 概述
 
-协议消息转换器（Protocol Transformers）实现了 AgentOS 支持的所有协议之间的双向消息格式转换。转换器以 JSON-RPC 2.0 作为内部统一中间格式，实现与 MCP、A2A、OpenAI API、OpenJiuwen 等协议的互操作。转换规则遵循 `agentos_contract/protocol_contract.md` 中定义的协议契约。
+协议消息转换器（Protocol Transformers）实现了 AgentRT 支持的所有协议之间的双向消息格式转换。转换器以 JSON-RPC 2.0 作为内部统一中间格式，实现与 MCP、A2A、OpenAI API、OpenJiuwen 等协议的互操作。转换规则遵循 `agentos_contract/protocol_contract.md` 中定义的协议契约。
 
 ## 目录结构
 

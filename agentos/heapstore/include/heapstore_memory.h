@@ -1,6 +1,6 @@
 /**
  * @file heapstore_memory.h
- * @brief AgentOS 数据分区内存管理数据存储接口
+ * @brief AgentRT 数据分区内存管理数据存储接口
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #ifndef AGENTOS_heapstore_MEMORY_H
 #define AGENTOS_heapstore_MEMORY_H
 

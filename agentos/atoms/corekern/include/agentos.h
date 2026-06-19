@@ -1,6 +1,6 @@
 /**
  * @file agentos.h
- * @brief AgentOS 微内核统一入口头文件
+ * @brief AgentRT 微内核统一入口头文件
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -8,7 +8,7 @@
  *
  * "From data intelligence emerges."
  *
- * @note 这是 AgentOS 微内核的统一入口点，提供了核心初始化的统一接口
+ * @note 这是 AgentRT 微内核的统一入口点，提供了核心初始化的统一接口
  */
 
 #ifndef AGENTOS_AGENTOS_H
@@ -61,7 +61,7 @@ extern "C" {
 #endif
 
 /**
- * @brief 初始化 AgentOS 核心
+ * @brief 初始化 AgentRT 核心
  *
  * @return agentos_error_t 错误码
  *
@@ -77,7 +77,7 @@ extern "C" {
 AGENTOS_API int agentos_core_init(void);
 
 /**
- * @brief 关闭 AgentOS 核心并清理资源
+ * @brief 关闭 AgentRT 核心并清理资源
  *
  * @ownership 内部释放所有核心资源
  * @threadsafe 否，不可多线程同时调用

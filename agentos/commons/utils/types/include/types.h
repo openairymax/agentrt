@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file types.h
- * @brief AgentOS 统一类型定义 - 核心基础类型
+ * @brief AgentRT 统一类型定义 - 核心基础类型
  *
  * @details
- * 本文件定义了 AgentOS 系统范围内使用的所有核心数据类型。
+ * 本文件定义了 AgentRT 系统范围内使用的所有核心数据类型。
  * 遵循 ARCHITECTURAL_PRINCIPLES.md 的设计原则：
  * - K-2 接口契约化：所有类型都有明确的语义和所有权规则
  * - E-5 命名语义化：类型名称精确表达其用途
@@ -20,7 +20,7 @@
  * 5. Agent类型：Agent契约、能力定义
  * 6. 可观测性类型：指标、追踪、日志
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-04-03
  * @version 0.1.0
  *

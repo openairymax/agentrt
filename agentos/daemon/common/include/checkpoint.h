@@ -1,6 +1,6 @@
 /**
  * @file checkpoint.h
- * @brief AgentOS 任务检查点接口
+ * @brief AgentRT 任务检查点接口
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.

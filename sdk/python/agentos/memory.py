@@ -1,9 +1,9 @@
-# AgentOS Python SDK Memory
+# AgentRT Python SDK Memory
 # Version: 0.1.0
 # Last updated: 2026-04-04
 
 """
-Memory class implementation for the AgentOS Python SDK.
+Memory class implementation for the AgentRT Python SDK.
 """
 
 from typing import Optional, Dict, Any
@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any
 class Memory:
     """Memory class for managing AgentOS memories.
     
-    This class represents a memory stored in the AgentOS system.
+    This class represents a memory stored in the AgentRT system.
     """
     
     def __init__(self, memory_id: str, content: str, created_at: str, metadata: Optional[Dict[str, Any]] = None):

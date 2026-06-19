@@ -6,7 +6,7 @@ Provides Python client for communicating with the market_d daemon
 via JSON-RPC over Unix domain socket / TCP.
 """
 
-from ecosystem.openlab.markets.client.models import (
+from .models import (
     AgentInfo,
     SkillInfo,
     InstallRequest,
@@ -16,7 +16,7 @@ from ecosystem.openlab.markets.client.models import (
     AgentStatus,
     SkillType,
 )
-from ecosystem.openlab.markets.client.errors import (
+from .errors import (
     MarketError,
     MarketConnectionError,
     MarketNotFoundError,
@@ -25,7 +25,7 @@ from ecosystem.openlab.markets.client.errors import (
     MarketValidationError,
     market_error_from_code,
 )
-from ecosystem.openlab.markets.client.market_client import MarketClient
+from .market_client import MarketClient
 
 __all__ = [
     "MarketClient",

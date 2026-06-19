@@ -1,6 +1,6 @@
 /**
  * @file heapstore_core.c
- * @brief AgentOS 数据分区核心实现
+ * @brief AgentRT 数据分区核心实现
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,10 +9,12 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #include "heapstore.h"
 #include "heapstore_ipc.h"
 #include "heapstore_log.h"
 #include "heapstore_memory.h"
+#include "heapstore_migration.h"
 #include "heapstore_registry.h"
 #include "heapstore_trace.h"
 #include "platform.h"
@@ -354,6 +356,40 @@ heapstore_error_t heapstore_init(const heapstore_config_t *manager)
     initialize_atomic_vars();
 
     s_initialized = true;
+
+    /* P3.20.1: Schema 版本检查与自动迁移
+     * 在子系统初始化之前检查数据格式版本，
+     * 如有需要则自动触发前向兼容迁移。 */
+    bool needs_migration = false;
+    uint32_t disk_version = 0;
+    heapstore_error_t mig_err = heapstore_migration_check(&needs_migration, &disk_version);
+    if (mig_err == heapstore_SUCCESS && needs_migration) {
+        char line_buf[4096];
+        snprintf(line_buf, sizeof(line_buf),
+                 "[heapstore] Schema version mismatch: disk=v%u, code=v%u. "
+                 "Running forward migration...\n",
+                 disk_version, HEAPSTORE_SCHEMA_VERSION_CURRENT);
+        fputs(line_buf, stderr);
+
+        heapstore_migration_report_t report;
+        mig_err = heapstore_migration_forward(0, &report);
+        if (mig_err != heapstore_SUCCESS) {
+            snprintf(line_buf, sizeof(line_buf),
+                     "[heapstore] Migration FAILED: %s. Data preserved at version v%u.\n",
+                     heapstore_strerror(mig_err), disk_version);
+            fputs(line_buf, stderr);
+            heapstore_migration_report_free(&report);
+            s_initialized = false;
+            return heapstore_ERR_INTERNAL;
+        }
+        snprintf(line_buf, sizeof(line_buf),
+                 "[heapstore] Migration complete: v%u → v%u (%lu steps, %lums)\n",
+                 report.from_version, report.to_version,
+                 (unsigned long)report.step_count,
+                 (unsigned long)report.total_duration_ms);
+        fputs(line_buf, stderr);
+        heapstore_migration_report_free(&report);
+    }
 
     err = heapstore_registry_init();
     if (err != heapstore_SUCCESS) {

@@ -33,25 +33,25 @@ frameworks/
 
 ## 框架概念映射
 
-### LangChain → AgentOS
+### LangChain → AgentRT
 
-| LangChain 概念 | AgentOS 映射 |
+| LangChain 概念 | AgentRT 映射 |
 |----------------|-------------|
-| Chain | AgentOS Task Pipeline |
-| Agent | AgentOS Agent + Protocol Session |
-| Tool | AgentOS MCP/OpenAI tool interface |
-| LLM | AgentOS LLM Daemon via protocol |
-| Memory | AgentOS MemoryRovol (L1-L4) |
-| Retriever | AgentOS memory.search protocol |
+| Chain | AgentRT Task Pipeline |
+| Agent | AgentRT Agent + Protocol Session |
+| Tool | AgentRT MCP/OpenAI tool interface |
+| LLM | AgentRT LLM Daemon via protocol |
+| Memory | AgentRT MemoryRovol (L1-L4) |
+| Retriever | AgentRT memory.search protocol |
 
-### AutoGen → AgentOS
+### AutoGen → AgentRT
 
-| AutoGen 概念 | AgentOS 映射 |
+| AutoGen 概念 | AgentRT 映射 |
 |-------------|-------------|
-| ConversableAgent | AgentOS Agent + Protocol Session |
-| GroupChat | AgentOS A2A multi-agent coordination |
-| UserProxyAgent | AgentOS human-in-the-loop interface |
-| CodeExecutor | AgentOS tool execution sandbox |
+| ConversableAgent | AgentRT Agent + Protocol Session |
+| GroupChat | AgentRT A2A multi-agent coordination |
+| UserProxyAgent | AgentRT human-in-the-loop interface |
+| CodeExecutor | AgentRT tool execution sandbox |
 | AssistantAgent | LLM-backed agent via protocol |
 | ChatCompletionClient | Protocol-based LLM client |
 

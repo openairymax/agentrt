@@ -11,6 +11,26 @@ endif()
 
 message(STATUS "Configuring AgentRT core components...")
 
+# 从根 CMakeLists.txt 传播依赖可用性标志
+if(AGENTRT_HAS_CJSON)
+    set(AGENTOS_HAS_CJSON TRUE CACHE BOOL "cJSON available for agentos")
+endif()
+if(AGENTRT_HAS_CURL)
+    set(AGENTOS_HAS_CURL TRUE CACHE BOOL "CURL available for agentos")
+endif()
+if(AGENTRT_HAS_YAML)
+    set(AGENTOS_HAS_YAML TRUE CACHE BOOL "libyaml available for agentos")
+endif()
+if(AGENTRT_HAS_OPENSSL)
+    set(AGENTOS_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available for agentos")
+endif()
+if(AGENTRT_HAS_MICROHTTPD)
+    set(AGENTOS_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available for agentos")
+endif()
+if(AGENTRT_HAS_LIBWEBSOCKETS)
+    set(AGENTOS_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available for agentos")
+endif()
+
 # 子模块启用状态汇总
 message(STATUS "[MODULE] Submodule build status:")
 message(STATUS "[MODULE]   atoms:    ${BUILD_ATOMS}")
@@ -73,16 +93,17 @@ option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)  # 默认关�
 # R-09-124: )
 
 # 包含子目录
-if(BUILD_ATOMS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/atoms/CMakeLists.txt")
-    add_subdirectory(atoms)
-else()
-    message(WARNING "atoms module not found or disabled")
-endif()
-
+# 构建顺序：commons（基础库）优先于 atoms（核心组件）
 if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
     add_subdirectory(commons)
 else()
     message(WARNING "commons module not found or disabled")
+endif()
+
+if(BUILD_ATOMS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/atoms/CMakeLists.txt")
+    add_subdirectory(atoms)
+else()
+    message(WARNING "atoms module not found or disabled")
 endif()
 
 # protocols模块（gateway依赖）

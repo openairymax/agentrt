@@ -1,3 +1,4 @@
+// @owner: team-B
 #include <stdbool.h>
 #include <stdint.h>
 // SPDX-FileCopyrightText: 2026 SPHARX.

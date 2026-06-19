@@ -6,9 +6,11 @@
  * SM3 测试向量来源: GB/T 32905-2016 附录A
  * SM4 测试向量来源: GB/T 32907-2016 附录A
  */
+// @owner: team-B
 
 #include "china_eco_adapter.h"
-#include "logging_compat.h"     
+#include "logging_compat.h"
+#include "memory_compat.h"     
 
 #include <assert.h>
 #include <stdio.h>

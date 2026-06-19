@@ -68,7 +68,7 @@ commons/
 
 ## 核心组件
 
-### AgentOS 类型系统（`agentos_types.h`）
+### AgentRT 类型系统（`agentos_types.h`）
 
 作为全项目唯一的类型定义权威源，定义了：
 

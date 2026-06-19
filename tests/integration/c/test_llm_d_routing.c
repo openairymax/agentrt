@@ -860,9 +860,12 @@ static void test_routing_decision_logging(void)
         else                             strncpy(entry->provider, "unknown", sizeof(entry->provider) - 1);
         entry->provider[sizeof(entry->provider) - 1] = '\0';
 
+        char provider_buf[64];
+        strncpy(provider_buf, entry->provider, sizeof(provider_buf) - 1);
+        provider_buf[sizeof(provider_buf) - 1] = '\0';
         snprintf(entry->reason, sizeof(entry->reason),
                  "Complexity=%s, len=%zu, routed to %s via %s",
-                 complexity_names[level], strlen(test_inputs[i]), model, entry->provider);
+                 complexity_names[level], strlen(test_inputs[i]), model, provider_buf);
     }
 
     /* 验证日志完整性 */

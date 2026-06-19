@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
- * test_agentos_event_loop.c - AgentOS Event Loop Module Unit Tests
+ * test_agentos_event_loop.c - AgentRT Event Loop Module Unit Tests
  */
 
 #include "../include/agentos_event_loop.h"
@@ -314,7 +314,7 @@ static void test_multiple_cycles(void)
 
 int main(void)
 {
-    printf("\n=== AgentOS Event Loop Module Unit Tests ===\n\n");
+    printf("\n=== AgentRT Event Loop Module Unit Tests ===\n\n");
 
     test_create_default();
     test_create_zero_events();

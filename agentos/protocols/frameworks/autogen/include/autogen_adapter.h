@@ -1,16 +1,17 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file autogen_adapter.h
- * @brief AutoGen Framework Integration Adapter for AgentOS
+ * @brief AutoGen Framework Integration Adapter for AgentRT
  *
  * AutoGen 框架适配器，实现AgentOS与Microsoft AutoGen多代理对话框架的集成。
  *
  * AutoGen核心概念映射:
- * - ConversableAgent → AgentOS Agent + Protocol Session
- * - GroupChat → AgentOS A2A multi-agent coordination
- * - UserProxyAgent → AgentOS human-in-the-loop interface
- * - CodeExecutor → AgentOS tool execution sandbox
+ * - ConversableAgent → AgentRT Agent + Protocol Session
+ * - GroupChat → AgentRT A2A multi-agent coordination
+ * - UserProxyAgent → AgentRT human-in-the-loop interface
+ * - CodeExecutor → AgentRT tool execution sandbox
  * - AssistantAgent → LLM-backed agent via protocol
  * - ChatCompletionClient → Protocol-based LLM client
  *

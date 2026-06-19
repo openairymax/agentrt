@@ -8,7 +8,7 @@
 /**
  * @file sanitizer_rules.c
  * @brief Sanitizer Rules Manager Implementation
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2024
  */
 

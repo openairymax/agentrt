@@ -513,7 +513,7 @@ static void free_daemon_config(void)
 static void print_usage(const char *prog)
 {
     char buf[256];
-    fputs("AgentOS Tool Daemon\n", stdout);
+    fputs("AgentRT Tool Daemon\n", stdout);
     snprintf(buf, sizeof(buf), "Usage: %s [options]\n\n", prog);
     fputs(buf, stdout);
     fputs("Options:\n", stdout);
@@ -588,7 +588,7 @@ int main(int argc, char **argv)
 
     if (g_config.use_tcp) {
         server_fd = agentos_socket_create_tcp_server(g_config.tcp_host, g_config.tcp_port);
-        if (server_fd == AGENTOS_INVALID_SOCKET) {
+        if (server_fd < 0) {
             SVC_LOG_ERROR("Failed to create TCP server on %s:%d", g_config.tcp_host,
                           g_config.tcp_port);
             tool_service_destroy(g_service);
@@ -608,7 +608,7 @@ int main(int argc, char **argv)
 #else
         server_fd = agentos_socket_create_unix_server(g_config.socket_path);
 #endif
-        if (server_fd == AGENTOS_INVALID_SOCKET) {
+        if (server_fd < 0) {
             SVC_LOG_ERROR("Failed to create socket at %s", g_config.socket_path);
             tool_service_destroy(g_service);
             free_daemon_config();

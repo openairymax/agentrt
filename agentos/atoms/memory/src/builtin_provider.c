@@ -1,6 +1,6 @@
 /**
  * @file builtin_provider.c
- * @brief AgentOS 内置免费内存提供商实现
+ * @brief AgentRT 内置免费内存提供商实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 实现 agentos_memory_provider_t 接口，提供 L1+L2 基础功能。
@@ -92,7 +92,7 @@ static agentos_error_t builtin_init(agentos_memory_provider_t *provider, const c
     snprintf(impl->stats.provider_name, sizeof(impl->stats.provider_name), "builtin");
     snprintf(impl->stats.provider_version, sizeof(impl->stats.provider_version), "0.1.0");
 
-    AGENTOS_LOG_INFO("[AgentOS] using built-in provider (free) - storage: %s", path);
+    AGENTOS_LOG_INFO("[AgentRT] using built-in provider (free) - storage: %s", path);
 
     return AGENTOS_SUCCESS;
 }

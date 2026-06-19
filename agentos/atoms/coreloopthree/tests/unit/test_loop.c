@@ -7,6 +7,8 @@
 
 #include "loop.h"
 
+#include "memory_compat.h"
+
 #include <assert.h>
 #ifndef NDEBUG
 #else

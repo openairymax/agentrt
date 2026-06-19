@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Skill Manager Implementation
+# AgentRT Python SDK - Skill Manager Implementation
 # Version: 0.1.0
 # Last updated: 2026-03-24
 
