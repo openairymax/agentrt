@@ -1,91 +1,73 @@
 /**
  * @file service.c
- * @brief Hook 服务实现骨架
+ * @brief Hook 服务实现 — Phase 2 完整版
  *
- * @owner team-A
+ * 使用 hook_registry、hook_executor、hook_timeout、hook_interceptor
+ * 模块实现完整的 Hook 生命周期管理。
+ *
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "hook_service.h"
+#include "hook_registry.h"
+#include "hook_executor.h"
+#include "hook_interceptor.h"
+#include "hook_timeout.h"
+#include "memory_compat.h"
 
 #include <string.h>
 
-/* ── Hook 注册表 ── */
+/* ==================== 服务 API ==================== */
 
-#define HOOK_MAX_REGISTRATIONS 64
+int hook_service_register(const hook_registration_t *reg)
+{
+    if (!reg || !reg->name)
+        return -1;
 
-static hook_registration_t g_hooks[HOOK_MAX_REGISTRATIONS];
-static size_t g_hook_count = 0;
+    /* 转换为 hook_entry_t */
+    hook_entry_t entry;
+    AGENTOS_MEMSET(&entry, 0, sizeof(entry));
 
-/* ── 服务 API 实现 ── */
+    AGENTOS_STRNCPY_TERM(entry.name, reg->name, sizeof(entry.name));
+    entry.type       = reg->type;
+    entry.impl_type  = HOOK_IMPL_CALLBACK;
+    entry.callback   = reg->callback;
+    entry.user_data  = reg->user_data;
+    entry.priority   = reg->priority;
+    entry.enabled    = reg->enabled;
 
-int hook_service_register(const hook_registration_t *reg) {
-    if (!reg || !reg->name || !reg->callback) return -1;
-    if (g_hook_count >= HOOK_MAX_REGISTRATIONS) return -1;
-
-    /* 检查重名 */
-    for (size_t i = 0; i < g_hook_count; i++) {
-        if (strcmp(g_hooks[i].name, reg->name) == 0) return -1;
-    }
-
-    g_hooks[g_hook_count] = *reg;
-    g_hook_count++;
-    return 0;
+    return hook_registry_register(&entry);
 }
 
-int hook_service_unregister(const char *name) {
-    if (!name) return -1;
+int hook_service_unregister(const char *name)
+{
+    return hook_registry_unregister(name);
+}
 
-    for (size_t i = 0; i < g_hook_count; i++) {
-        if (strcmp(g_hooks[i].name, name) == 0) {
-            /* 移动最后一个到当前位置 */
-            g_hooks[i] = g_hooks[g_hook_count - 1];
-            g_hook_count--;
-            return 0;
+hook_decision_t hook_service_fire(hook_context_t *ctx)
+{
+    if (!ctx)
+        return HOOK_DECISION_CONTINUE;
+
+    /* P2.1a: 在 PRE_TOOL / PRE_EXEC Hook 触发前执行拦截检查 */
+    if (ctx->type == HOOK_TYPE_PRE_TOOL || ctx->type == HOOK_TYPE_PRE_EXEC) {
+        hook_decision_t interceptor_decision = hook_interceptor_check(ctx);
+        if (interceptor_decision != HOOK_DECISION_CONTINUE) {
+            return interceptor_decision;
         }
     }
-    return -1;
+
+    /* 执行 Hook 链 */
+    return hook_executor_run(ctx, HOOK_EXEC_MODE_SEQUENTIAL);
 }
 
-hook_decision_t hook_service_fire(hook_context_t *ctx) {
-    if (!ctx) return HOOK_DECISION_CONTINUE;
-
-    hook_decision_t result = HOOK_DECISION_CONTINUE;
-
-    /* 按优先级排序遍历（简化实现：线性扫描） */
-    for (size_t i = 0; i < g_hook_count; i++) {
-        if (!g_hooks[i].enabled) continue;
-        if (g_hooks[i].type != ctx->type) continue;
-
-        hook_decision_t decision = g_hooks[i].callback(ctx);
-
-        /* 最严格决策优先 */
-        if (decision > result) {
-            result = decision;
-        }
-
-        /* ABORT 立即返回 */
-        if (decision == HOOK_DECISION_ABORT) break;
-    }
-
-    return result;
+int hook_service_get_stats(const char *name, hook_stats_t *stats)
+{
+    return hook_registry_get_stats(name, stats);
 }
 
-int hook_service_get_stats(const char *name, hook_stats_t *stats) {
-    (void)name;
-    if (!stats) return -1;
-    memset(stats, 0, sizeof(*stats));
-    /* TODO: Phase 2 实现 - 收集实际统计数据 */
-    return 0;
-}
-
-int hook_service_set_enabled(const char *name, bool enabled) {
-    if (!name) return -1;
-
-    for (size_t i = 0; i < g_hook_count; i++) {
-        if (strcmp(g_hooks[i].name, name) == 0) {
-            g_hooks[i].enabled = enabled;
-            return 0;
-        }
-    }
-    return -1;
+int hook_service_set_enabled(const char *name, bool enabled)
+{
+    return hook_registry_set_enabled(name, enabled);
 }

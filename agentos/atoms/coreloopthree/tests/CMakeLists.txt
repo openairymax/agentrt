@@ -32,6 +32,15 @@ set(CL3_COMMON_INCLUDES
     ${CORELOOPTHREE_DIR}/include
     ${CORELOOPTHREE_DIR}/src
     ${CORELOOPTHREE_DIR}/src/cognition
+    ${CORELOOPTHREE_DIR}/src/cognition/critique
+    ${CORELOOPTHREE_DIR}/src/cognition/foundation
+    ${CORELOOPTHREE_DIR}/../memory
+    ${CORELOOPTHREE_DIR}/../memory/src
+    ${CORELOOPTHREE_DIR}/../../daemon/common/include
+    ${CORELOOPTHREE_DIR}/../../daemon/llm_d/include
+    ${CORELOOPTHREE_DIR}/../../daemon/tool_d/include
+    ${CORELOOPTHREE_DIR}/../../commons/utils/quality
+    ${CORELOOPTHREE_DIR}/../../cupolas/src
     ${COREKERN_INCLUDE_DIR}
     ${COMMONS_DIR}/platform/include
     ${COMMONS_DIR}/utils/include
@@ -69,17 +78,38 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
         agentos_core
         agentos_memory
         agentos_atoms
+        agentos_syscall
+        svc_common
         pthread
         dl
         m
     )
+
+    if(AGENTRT_HAS_CJSON AND CJSON_FOUND)
+        target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE ${CJSON_LIBRARIES})
+    elseif(AGENTOS_CJSON_FOUND AND AGENTOS_CJSON_LIBRARIES)
+        target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE ${AGENTOS_CJSON_LIBRARIES})
+    endif()
+
+    if(AGENTRT_HAS_CURL)
+        if(CURL_FOUND AND CURL_LIBRARIES)
+            target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE ${CURL_LIBRARIES})
+        elseif(LIBCURL_FOUND AND LIBCURL_LIBRARIES)
+            target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE ${LIBCURL_LIBRARIES})
+        elseif(PC_CURL_LIBRARIES)
+            target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE ${PC_CURL_LIBRARIES})
+        else()
+            target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE curl)
+        endif()
+    endif()
 
     if(UNIX)
         target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE agentos_platform_libs)
     endif()
 
     target_compile_options(test_cl3_${TEST_SHORT_NAME} PRIVATE
-        -Wall -Wextra -g -Wno-unused-function
+        -Wall -Wextra -g -Wno-unused-function -Wno-deprecated-declarations
+        "SHELL:-include memory_compat.h"
     )
 
     target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE agentos_test_ldflags)
@@ -110,17 +140,38 @@ foreach(BENCH_SRC ${CL3_BENCH_SOURCES})
         agentos_core
         agentos_memory
         agentos_atoms
+        agentos_syscall
+        svc_common
         pthread
         dl
         m
     )
+
+    if(AGENTRT_HAS_CJSON AND CJSON_FOUND)
+        target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE ${CJSON_LIBRARIES})
+    elseif(AGENTOS_CJSON_FOUND AND AGENTOS_CJSON_LIBRARIES)
+        target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE ${AGENTOS_CJSON_LIBRARIES})
+    endif()
+
+    if(AGENTRT_HAS_CURL)
+        if(CURL_FOUND AND CURL_LIBRARIES)
+            target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE ${CURL_LIBRARIES})
+        elseif(LIBCURL_FOUND AND LIBCURL_LIBRARIES)
+            target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE ${LIBCURL_LIBRARIES})
+        elseif(PC_CURL_LIBRARIES)
+            target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE ${PC_CURL_LIBRARIES})
+        else()
+            target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE curl)
+        endif()
+    endif()
 
     if(UNIX)
         target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE agentos_platform_libs)
     endif()
 
     target_compile_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
-        -Wall -Wextra -g -Wno-unused-function
+        -Wall -Wextra -g -Wno-unused-function -Wno-deprecated-declarations
+        "SHELL:-include memory_compat.h"
     )
 
     target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE agentos_test_ldflags)

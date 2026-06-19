@@ -1,4 +1,4 @@
-// AgentOS Rust SDK - 工具函数模块
+// AgentRT Rust SDK - 工具函数模块
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //

@@ -8,10 +8,18 @@ if(NOT TARGET svc_common)
     return()
 endif()
 
-add_executable(test_e2e_core test_e2e_core.c)
+add_executable(test_e2e_core test_e2e_core.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c
+)
+
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c
+    PROPERTIES COMPILE_FLAGS "-fno-lto"
+)
 
 target_include_directories(test_e2e_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/corekern/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/syscall/include
@@ -25,13 +33,16 @@ target_include_directories(test_e2e_core PRIVATE
 target_link_libraries(test_e2e_core PRIVATE
     agentos_core
     agentos_syscall
+    -Wl,--whole-archive
+    agentos_coreloopthree
+    -Wl,--no-whole-archive
     svc_common
     Threads::Threads
     agentos_platform_libs
     m
 )
 
-if(AGENTOS_HAS_CJSON)
+if(AGENTRT_HAS_CJSON OR CJSON_FOUND)
     target_link_libraries(test_e2e_core PRIVATE cjson)
 endif()
 
@@ -96,13 +107,23 @@ target_link_libraries(test_llm_d_routing PRIVATE
     Threads::Threads
 )
 
-if(AGENTOS_HAS_CJSON)
+if(AGENTRT_HAS_CJSON OR CJSON_FOUND)
     target_link_libraries(test_llm_d_routing PRIVATE cjson)
 endif()
 
-if(AGENTOS_HAS_CURL)
-    target_include_directories(test_llm_d_routing PRIVATE ${CURL_INCLUDE_DIRS})
-    target_link_libraries(test_llm_d_routing PRIVATE ${CURL_LIBRARIES})
+if(AGENTRT_HAS_CURL)
+    if(CURL_INCLUDE_DIRS)
+        target_include_directories(test_llm_d_routing PRIVATE ${CURL_INCLUDE_DIRS})
+    endif()
+    if(CURL_LIBRARIES)
+        target_link_libraries(test_llm_d_routing PRIVATE ${CURL_LIBRARIES})
+    elseif(LIBCURL_LIBRARIES)
+        target_link_libraries(test_llm_d_routing PRIVATE ${LIBCURL_LIBRARIES})
+    elseif(PC_CURL_LIBRARIES)
+        target_link_libraries(test_llm_d_routing PRIVATE ${PC_CURL_LIBRARIES})
+    else()
+        target_link_libraries(test_llm_d_routing PRIVATE curl)
+    endif()
 endif()
 
 target_compile_features(test_llm_d_routing PRIVATE c_std_11)

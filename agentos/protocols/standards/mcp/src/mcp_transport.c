@@ -5,6 +5,7 @@
  *
  * Implements STDIO and HTTP+SSE transport for MCP protocol.
  */
+// @owner: team-B
 
 #include "mcp_transport.h"
 
@@ -436,6 +437,7 @@ int mcp_transport_send(mcp_transport_t *transport, const char *message, size_t l
     if (transport->state != MCP_TRANSPORT_CONNECTED) {
         AGENTOS_LOG_WARN("send attempted on non-connected transport, state=%d", transport->state);
         return AGENTOS_ERR_NOT_FOUND;
+    }
 
     if (transport->type == MCP_TRANSPORT_STDIO) {
         char header[32];
@@ -493,6 +495,7 @@ int mcp_transport_send(mcp_transport_t *transport, const char *message, size_t l
     return AGENTOS_EINVAL;
 }
 
+__attribute__((unused))
 int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t *out_length,
                           uint32_t timeout_ms)
 {
@@ -504,6 +507,7 @@ int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t
     if (transport->state != MCP_TRANSPORT_CONNECTED) {
         AGENTOS_LOG_WARN("send attempted on non-connected transport, state=%d", transport->state);
         return AGENTOS_ERR_NOT_FOUND;
+    }
 
     *out_message = NULL;
     *out_length = 0;
@@ -613,6 +617,7 @@ int mcp_transport_receive(mcp_transport_t *transport, char **out_message, size_t
     return AGENTOS_EINVAL;
 }
 
+__attribute__((unused))
 mcp_transport_state_t mcp_transport_get_state(const mcp_transport_t *transport)
 {
     if (!transport)
@@ -620,6 +625,7 @@ mcp_transport_state_t mcp_transport_get_state(const mcp_transport_t *transport)
     return transport->state;
 }
 
+__attribute__((unused))
 mcp_transport_type_t mcp_transport_get_type(const mcp_transport_t *transport)
 {
     if (!transport)
@@ -627,6 +633,7 @@ mcp_transport_type_t mcp_transport_get_type(const mcp_transport_t *transport)
     return transport->type;
 }
 
+__attribute__((unused))
 const char *mcp_transport_state_string(mcp_transport_state_t state)
 {
     switch (state) {
@@ -643,6 +650,7 @@ const char *mcp_transport_state_string(mcp_transport_state_t state)
     }
 }
 
+__attribute__((unused))
 const char *mcp_transport_type_string(mcp_transport_type_t type)
 {
     switch (type) {

@@ -22,6 +22,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* 前向声明 */
+typedef struct safety_guard_bridge_s safety_guard_bridge_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -133,6 +136,20 @@ int tool_approval_sanitize_params(tool_approval_ctx_t *ctx, const char *tool_nam
  */
 void tool_approval_get_stats(tool_approval_ctx_t *ctx, uint64_t *out_total_checks,
                              uint64_t *out_denied_count, uint64_t *out_sanitized_count);
+
+/**
+ * @brief C-L05: 设置 SafetyGuard 桥接层
+ *
+ * 将 safety_guard_bridge 注入到审批上下文中，使 tool_approval_check()
+ * 能够通过完整的 6 种守卫链进行安全检查。
+ *
+ * @param ctx 审批上下文
+ * @param bridge SafetyGuard 桥接句柄（NULL 禁用桥接）
+ *
+ * @ownership ctx: BORROW, bridge: BORROW (caller retains ownership)
+ */
+void tool_approval_set_safety_guard_bridge(tool_approval_ctx_t *ctx,
+                                           safety_guard_bridge_t *bridge);
 
 #ifdef __cplusplus
 }

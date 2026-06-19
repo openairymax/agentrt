@@ -8,7 +8,7 @@
 /**
  * @file cupolas_config.c
  * @brief Configuration Manager - Runtime configuration updates
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2024
  *
  * This module implements configuration management:

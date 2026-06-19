@@ -12,6 +12,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #include "stdio_gateway.h"
 
 #include "../utils/gateway_rpc_handler.h"
@@ -79,7 +80,7 @@ typedef struct stdio_gateway {
  */
 static char *show_help(void)
 {
-    return AGENTOS_STRDUP("AgentOS Stdio Gateway - Available Commands:\n"
+    return AGENTOS_STRDUP("AgentRT Stdio Gateway - Available Commands:\n"
                           "  help                     - Show this help\n"
                           "  rpc <json-rpc>           - Execute JSON-RPC call\n"
                           "  stats                    - Show gateway statistics\n"
@@ -200,7 +201,7 @@ static agentos_error_t stdio_gateway_start(void *gateway_impl)
     gateway->input_buffer_pos = 0;
     atomic_store(&gateway->running, true);
 
-    AGENTOS_LOG_INFO("AgentOS Stdio Gateway started. Type 'help' for available commands.");
+    AGENTOS_LOG_INFO("AgentRT Stdio Gateway started. Type 'help' for available commands.");
     AGENTOS_LOG_DEBUG("> ");
 
     while (atomic_load(&gateway->running)) {

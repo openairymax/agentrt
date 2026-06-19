@@ -1,6 +1,6 @@
 /**
  * @file builtin_storage.c
- * @brief AgentOS 内置存储实现（文件系统 + JSON 索引）
+ * @brief AgentRT 内置存储实现（文件系统 + JSON 索引）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 提供基于文件系统的 L1 原始存储和 JSON 索引。

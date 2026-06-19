@@ -1,6 +1,8 @@
 # =============================================================================
-# heapstore - AgentOS 数据分区核心模块
+# heapstore - AgentRT 数据分区核心模块
 # Git 忽略规则配置
+# 版本: 1.1.0
+# Part of Airymax open-source project (agentrt)
 # =============================================================================
 
 # ---------- 编译产物 ----------
@@ -49,6 +51,7 @@ out/
 
 # VS Code
 .vscode/
+.trae/
 !vscode/settings.json
 !vscode/tasks.json
 !vscode/launch.json

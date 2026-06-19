@@ -35,6 +35,7 @@ pub struct ChatMessage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum MessageRole {
     User,
     Agent,
@@ -45,6 +46,7 @@ pub enum MessageRole {
 
 /// Represents a log entry.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LogEntry {
     pub timestamp: String,
     pub level: String,

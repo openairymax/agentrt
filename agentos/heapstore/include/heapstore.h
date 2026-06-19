@@ -1,6 +1,6 @@
 /**
  * @file heapstore.h
- * @brief AgentOS 数据分区核心接口
+ * @brief AgentRT 数据分区核心接口
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #ifndef AGENTOS_heapstore_H
 #define AGENTOS_heapstore_H
 

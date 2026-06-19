@@ -51,7 +51,7 @@ class TestStorageRecord:
 
     def test_record_creation(self):
         """Test StorageRecord can be created."""
-        from openlab.core.storage import StorageRecord
+        from openlab.core.storage import StorageRecord, DataCategory
 
         record = StorageRecord(key="test-key", value={"data": "test"})
         
@@ -62,7 +62,7 @@ class TestStorageRecord:
 
     def test_record_serialization(self):
         """Test record to_dict/from_dict roundtrip."""
-        from openlab.core.storage import StorageRecord
+        from openlab.core.storage import StorageRecord, DataCategory
 
         original = StorageRecord(
             key="key-001",
@@ -185,6 +185,8 @@ class TestMemoryStorage:
     @pytest.mark.asyncio
     async def test_query_all(self, storage):
         """Test querying all records."""
+        from openlab.core.storage import DataCategory
+
         await storage.set("q1", "v1", category=DataCategory.TASK)
         await storage.set("q2", "v2", category=DataCategory.AGENT)
         await storage.set("q3", "v3", category=DataCategory.TASK)
@@ -197,6 +199,8 @@ class TestMemoryStorage:
     @pytest.mark.asyncio
     async def test_query_by_category(self, storage):
         """Test querying by category."""
+        from openlab.core.storage import DataCategory
+
         await storage.set("t1", "v1", category=DataCategory.TASK)
         await storage.set("a1", "v2", category=DataCategory.AGENT)
         await storage.set("t2", "v3", category=DataCategory.TASK)
@@ -291,6 +295,8 @@ class TestSQLiteStorage:
     @pytest.mark.asyncio
     async def test_query(self, storage):
         """Test querying in SQLite."""
+        from openlab.core.storage import DataCategory
+
         await storage.set("sq1", "v1", category=DataCategory.TASK)
         await storage.set("sq2", "v2", category=DataCategory.AGENT)
         

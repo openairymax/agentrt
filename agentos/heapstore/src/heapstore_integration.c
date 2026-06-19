@@ -1,6 +1,6 @@
 /**
  * @file heapstore_integration.c
- * @brief heapstore 与 AgentOS 核心模块集成实现
+ * @brief heapstore 与 AgentRT 核心模块集成实现
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #include "heapstore_integration.h"
 
 #include <stdio.h>
@@ -250,7 +251,7 @@ agentos_error_t heapstore_syscall_session_list(char ***out_sessions, size_t *out
     size_t capacity = 16;
     if (capacity > SIZE_MAX / sizeof(char *)) {
         heapstore_registry_iter_destroy(iter);
-        return AGENTOS_E_OVERFLOW;
+        return AGENTOS_EOVERFLOW;
     }
     char **sessions = (char **)AGENTOS_MALLOC(capacity * sizeof(char *));
     if (!sessions) {

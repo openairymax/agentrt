@@ -17,6 +17,7 @@
 // 破坏性更改需递增 MAJOR 并发布迁移说明
 
 #include "agentos.h"
+#include "llm_service.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -79,6 +80,8 @@ typedef struct agentos_intent {
 typedef struct agentos_task_node {
     char *task_node_id;             /**< 任务ID */
     size_t task_node_id_len;        /**< ID长度 */
+    char *task_node_handler_name;   /**< 处理器名称（工具名/Agent名） */
+    char *task_node_goal;           /**< 任务目标描述 */
     char *task_node_agent_role;     /**< 需要的Agent角色 */
     size_t task_node_role_len;      /**< 角色长度 */
     char **task_node_depends_on;    /**< 依赖的任务ID数组 */

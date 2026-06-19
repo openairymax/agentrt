@@ -401,7 +401,7 @@ def main() -> None:
         Path(args.output).write_text(output, encoding="utf-8")
         logger.info("Report saved to %s", args.output)
     else:
-        print(output)
+        print(output)  # noqa: T201
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Session Management Module
+# AgentRT Python SDK - Session Management Module
 # Version: 0.1.0
 # Last updated: 2026-03-24
 

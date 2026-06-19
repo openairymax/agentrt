@@ -10,6 +10,7 @@
 #include "error.h"
 #include "log_sanitizer.h"
 #include "platform.h"
+#include "svc_logger.h"
 
 #include <ctype.h>
 #include <stdlib.h>

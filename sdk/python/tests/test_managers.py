@@ -153,7 +153,7 @@ class TestTaskManager:
         mock_api.get.return_value = APIResponse(
             success=True,
             data={
-                "tasks": [
+                "items": [
                     {"task_id": "task_1", "status": "pending", "description": "task1"},
                     {"task_id": "task_2", "status": "running", "description": "task2"}
                 ]
@@ -168,7 +168,7 @@ class TestTaskManager:
 
     def test_list_with_options(self, task_manager, mock_api):
         """测试带选项列出任务"""
-        mock_api.get.return_value = APIResponse(success=True, data={"tasks": []})
+        mock_api.get.return_value = APIResponse(success=True, data={"items": []})
         
         opts = ListOptions(pagination=PaginationOptions(page=1, page_size=10))
         task_manager.list(opts)

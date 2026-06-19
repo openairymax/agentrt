@@ -1,6 +1,6 @@
 /**
  * @file yaml_minimal.h
- * @brief YAML 1.1 parser for AgentOS configuration files
+ * @brief YAML 1.1 parser for AgentRT configuration files
  *
  * Supports: Anchors (&), Aliases (*), Tags (!!), Document markers (---/...),
  * Folded scalars (>), Literal scalars (|), Merge keys (<<),

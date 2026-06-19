@@ -219,6 +219,11 @@ void agentos_mem_pool_destroy(agentos_mem_pool_t *pool_handle)
         pool->block_tags = NULL;
     }
 
+    if (pool->lock) {
+        agentos_mutex_destroy(pool->lock);
+        pool->lock = NULL;
+    }
+
     if (pool->raw_memory) {
         agentos_mem_aligned_free(pool->raw_memory);
         pool->raw_memory = NULL;
