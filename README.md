@@ -140,7 +140,7 @@ ctest --output-on-failure
 
 ```text
 # Build image
-docker build -f scripts/ops/deploy/Dockerfile.kernel -t agentrt:latest .
+docker build -f deploy/docker/Dockerfile -t agentrt:latest .
 
 # Run container
 docker run -d --name agentrt -p 8080:8080 -v ./config:/app/config agentrt:latest

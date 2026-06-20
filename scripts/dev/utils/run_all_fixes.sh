@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-UTILS_DIR="${SCRIPT_DIR}/../utils"
+UTILS_DIR="${SCRIPT_DIR}/fixes"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 DRY_RUN=false
@@ -89,4 +89,4 @@ if [[ "${FIXES_FAILED}" -gt 0 ]]; then
 fi
 
 echo "All auto-fixable BAN violations have been processed."
-echo "Run 'bash scripts/ci/pipeline/quality-gate.sh' to verify."
+echo "Run 'bash scripts/ci/pipeline/validate/quality-gate.sh' to verify."

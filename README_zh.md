@@ -140,7 +140,7 @@ ctest --output-on-failure
 
 ```text
 # 构建镜像
-docker build -f scripts/ops/deploy/Dockerfile.kernel -t agentrt:latest .
+docker build -f deploy/docker/Dockerfile -t agentrt:latest .
 
 # 运行容器
 docker run -d --name agentrt -p 8080:8080 -v ./config:/app/config agentrt:latest
