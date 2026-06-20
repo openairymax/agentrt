@@ -23,5 +23,5 @@ skills:
     module: "skills.code_review_skill"
     class: "CodeReviewSkill"
     # 也可引用生态系统中已有的技能：
-    # module: "ecosystem.skills.code_review"
+    # module: "ecosystem.skills.src.code_review"
     # class: "CodeReviewSkill"

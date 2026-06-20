@@ -132,7 +132,7 @@ report = evaluator.evaluate(
 ### A/B 测试 (`ab_test.py`)
 
 ```python
-from tuner.ab_test import ABTest
+from tuner.src.ab_test import ABTest
 
 ab = ABTest()
 result = ab.compare(

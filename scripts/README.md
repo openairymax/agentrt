@@ -29,7 +29,8 @@ AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵
 | `dev/setup/` | 全部模块 | 交互式开发环境配置（依赖安装、工具链设置） |
 | `dev/cli/` | `daemon/`, `manager/`, `openlab/` | 统一 CLI 入口（服务管理/智能体管理/任务管理） |
 | `dev/cmake/` | `atoms/`, `commons/`, `cupolas/` | CMake 辅助配置（Windows MSVC 兼容性头） |
-| `dev/utils/` | 全部模块 | 快速启动与环境验证工具 |
+| `dev/utils/` | 全部模块 | 快速启动/环境验证/BAN 规则批量修复/代码修复工具集 |
+| `ops/bin/` | `daemon/`, `gateway/` | 运维入口脚本（daemon 一键启动/示例项目快速创建） |
 | `ops/deploy/` | `daemon/`, `gateway/` | Docker 容器化部署（gateway_d, llm_d, sched_d, heapstore, monit_d 等） |
 | `ops/benchmark/` | `atoms/coreloopthree/`, `atoms/corekern/` | 性能基准测试覆盖核心内核组件 |
 | `ops/lib/` | 全部模块 | Shell 脚本公共库（日志/错误码/平台检测） |
@@ -57,6 +58,7 @@ scripts/
 │   ├── docs/                      #   文档生成（Doxygen 配置）
 │   └── utils/                     #   开发辅助（快速启动/环境验证/错误码生成/代码修复工具集）
 ├── ops/                           # 运维部署与测试
+│   ├── bin/                       #   运维入口脚本（daemon 启动/示例项目快速创建）
 │   ├── deploy/                    #   Docker 部署（双 Dockerfile + 四环境 Compose 编排）
 │   ├── benchmark/                 #   性能基准测试框架（统计引擎/报告生成/历史对比）
 │   ├── lib/                       #   Shell 公共库（日志/错误码/平台检测/通用工具）
@@ -91,12 +93,13 @@ scripts/
 - **cmake/windows_preinclude.h**：Windows MSVC 兼容性预包含头，定义 `WIN32_LEAN_AND_MEAN` 等宏以减少 Windows.h 的编译开销。
 - **cmake/Sanitizers.cmake**：CMake Sanitizers 配置模块，支持 AddressSanitizer、MemorySanitizer、UndefinedBehaviorSanitizer 等编译器插桩工具。
 - **docs/Doxyfile**：Doxygen 文档生成配置文件，用于从源码注释自动生成 API 参考文档。
-- **utils/**：开发辅助工具，包含快速启动脚本、环境完整性验证和代码修复工具集（14 个文件）。
+- **utils/**：开发辅助工具，包含快速启动脚本、环境完整性验证、BAN 规则批量修复入口（`run_all_fixes.sh`）、`fixes/` 代码修复工具集和 `archive/` 一次性脚本归档。
 
 ### ops/ — 运维部署与测试
 
 生产环境运维的核心模块：
 
+- **bin/**：运维入口脚本，包含 `agentrt-bootstrap.sh`（按 DAG 层级一键启动所有 daemon）和 `quickstart.sh`（5 分钟创建示例 Agent 项目）。
 - **deploy/**：Docker 容器化部署方案，采用双 Dockerfile 分层架构（内核基础镜像 + 服务层镜像），提供开发、预览、预发布和生产四种环境的 Compose 编排配置。
 - **benchmark/**：性能基准测试框架，包含统计计算引擎（分布拟合/显著性检验/回归分析）、多格式报告生成器（HTML/Markdown/PDF/JSON/Console）和历史版本对比器。
 - **lib/**：Shell 脚本公共库，提供日志输出、统一错误码体系（1000-2999+）和平台检测功能。
@@ -185,15 +188,13 @@ scripts/ci/release/release.sh 0.1.0 stable
 ### Docker 部署
 
 ```bash
-# 一键快速启动
-scripts/ops/deploy/quickstart.sh
-
-# 手动构建和启动（开发环境）
-scripts/ops/deploy/build.sh --release
-docker-compose -f scripts/ops/deploy/docker-compose.yml up -d
+# 开发环境启动
+docker-compose -f deploy/docker/docker-compose.yml \
+               -f deploy/docker/docker-compose.dev.yml up -d
 
 # 生产环境部署
-docker-compose -f scripts/ops/deploy/docker-compose.prod.yml up -d
+docker-compose -f deploy/docker/docker-compose.yml \
+               -f deploy/docker/docker-compose.prod.yml up -d
 ```
 
 ### 性能基准测试
