@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from ecosystem.prompts.tuner.evaluate import (
+from ecosystem.prompts.tuner.src.evaluate import (
     PromptCase,
     EvaluatedCase,
     EvaluationReport,
@@ -19,7 +19,7 @@ from ecosystem.prompts.tuner.evaluate import (
     _compute_field_recall,
     _detect_hallucination,
 )
-from ecosystem.prompts.tuner.ab_test import (
+from ecosystem.prompts.tuner.src.ab_test import (
     MetricDelta,
     SignificanceResult,
     ABTestReport,
@@ -27,7 +27,7 @@ from ecosystem.prompts.tuner.ab_test import (
     _normal_cdf,
     _paired_t_test,
 )
-from ecosystem.prompts.tuner.scorer import (
+from ecosystem.prompts.tuner.src.scorer import (
     DimensionScore,
     ScoreReport,
     AutoScorer,
