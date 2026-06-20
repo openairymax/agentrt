@@ -88,17 +88,15 @@ async fn run_app<B: Backend>(
             }
 
             match key.code {
-                KeyCode::Char('c') | KeyCode::Char('C') => {
-                    if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                KeyCode::Char('c') | KeyCode::Char('C')
+                    if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         app.shutdown().await?;
                         return Ok(());
                     }
-                }
-                KeyCode::Esc => {
-                    if app.active_panel != ActivePanel::Chat {
+                KeyCode::Esc
+                    if app.active_panel != ActivePanel::Chat => {
                         app.active_panel = ActivePanel::Chat;
                     }
-                }
                 KeyCode::F(1) => app.toggle_panel(ActivePanel::Help),
                 KeyCode::F(2) => app.toggle_panel(ActivePanel::Config),
                 KeyCode::F(3) => app.toggle_panel(ActivePanel::Logs),

@@ -16,6 +16,7 @@ set(UNIT_TEST_SOURCES
     # unit/test_types.c  # 禁用：需要cmocka测试框架
     # unit/test_ipc.c    # 禁用：需要cmocka测试框架
     # unit/test_network.c # 禁用：需要cmocka测试框架
+    unit/test_arena_tcache.c
 )
 
 set(INTEGRATION_TEST_SOURCES

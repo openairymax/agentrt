@@ -10,10 +10,10 @@
 /**
  * @file daemon_security.c
  * @brief Daemon Layer Security Integration - Unified Security for All Daemon Services
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-04-02
  *
- * This module provides unified security integration for all AgentOS daemon services:
+ * This module provides unified security integration for all AgentRT daemon services:
  * - tool_d: Tool execution security (sanitization + permission)
  * - llm_d: LLM service security (input sanitization + API key protection)
  * - market_d: Market service security (package signature verification)

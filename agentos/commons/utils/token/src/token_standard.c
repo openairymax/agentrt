@@ -3,7 +3,7 @@
  * @brief Token 计算标准化实现 - 统一 C/Python Token 计算算法
  *
  * 实现 token_standard.h 中定义的标准化接口，确保跨语言一致性。
- * 遵循 AgentOS 架构原则（E-3 资源确定性），提供确定性的 Token 计算。
+ * 遵循 AgentRT 架构原则（E-3 资源确定性），提供确定性的 Token 计算。
  *
  * @version 0.1.0
  * @date 2026-04-07
@@ -22,7 +22,7 @@
  * @brief 算法信息字符串
  */
 static const char *ALGORITHM_INFO =
-    "AgentOS Token Standard v1.0 - Unified Token Counting Algorithm";
+    "AgentRT Token Standard v1.0 - Unified Token Counting Algorithm";
 
 /**
  * @brief 从UTF-8多字节序列解码Unicode代码点

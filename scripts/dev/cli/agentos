@@ -63,6 +63,12 @@ Commands:
         version                   Show version
         status                    Show system status
         help                      Show help
+
+    Database:
+        db migrate [--target=v2]  Run heapstore schema migration
+        db migrate-status         Show migration status
+        db migrate-rollback       Rollback to previous schema version
+        db backup                 Create data backup
 """
 
 import sys
@@ -788,6 +794,209 @@ def cmd_dev_doctor(args):
         return 0
 
 
+# ============================================================================
+# P3.20.4: agentrt db migrate CLI 命令
+# ============================================================================
+
+def _get_heapstore_root():
+    """获取 heapstore 数据根目录"""
+    return os.environ.get(
+        "AGENTOS_HEAPSTORE_ROOT",
+        os.path.join(os.path.expanduser("~"), ".agentrt", "heapstore")
+    )
+
+
+def cmd_db_migrate(args):
+    """P3.20.4: 执行 heapstore Schema 迁移"""
+    print_header("AgentRT Database Migration")
+
+    target = getattr(args, "target", "v2")
+    heapstore_root = _get_heapstore_root()
+
+    print_info(f"Target version: {target}")
+    print_info(f"Data directory: {heapstore_root}")
+
+    # 尝试导入迁移引擎
+    try:
+        # 添加 toolkit src 到路径
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        toolkit_src = os.path.join(script_dir, "..", "..", "..", "scripts", "toolkit", "src")
+        toolkit_src = os.path.abspath(toolkit_src)
+        if toolkit_src not in sys.path:
+            sys.path.insert(0, toolkit_src)
+
+        from heapstore_migrate import MigrationEngine
+
+        engine = MigrationEngine(heapstore_root)
+
+        # 检查当前版本
+        status = engine.get_status()
+        print_info(f"Current version: {status['current_version_name']} "
+                   f"({status['current_version']})")
+
+        if not status["needs_migration"]:
+            print_success("Schema is already up to date. No migration needed.")
+            return 0
+
+        # 执行迁移
+        print_info(f"Running forward migration (v1 → {target})...")
+        report = engine.run_forward(target)
+
+        if report["success"]:
+            print_success(f"Migration completed successfully "
+                         f"({report['total_duration_ms']}ms)")
+            print_info(f"Records migrated: {report['total_records_migrated']}")
+            print_info(f"Backup saved at: {report.get('backup_path', 'N/A')}")
+
+            if report.get("steps"):
+                print(f"\n  {'Step':<40} {'Records':>8} {'Time':>10}")
+                print(f"  {'-'*40} {'-'*8} {'-'*10}")
+                for step in report["steps"]:
+                    print(f"  {step['name']:<40} "
+                          f"{step.get('records_migrated', 0):>8} "
+                          f"{step.get('duration_ms', 0):>8}ms")
+            return 0
+        else:
+            print_error(f"Migration failed: {report.get('error', 'Unknown error')}")
+            if report.get("rollback") == "backup_restored":
+                print_info("Data has been restored from backup.")
+            return 1
+
+    except ImportError:
+        print_error("Migration engine not available.")
+        print_info("Ensure scripts/toolkit/src/heapstore_migrate.py exists.")
+        return 1
+    except Exception as e:
+        print_error(f"Migration error: {e}")
+        return 1
+
+
+def cmd_db_migrate_status(args):
+    """查看迁移状态"""
+    print_header("Heapstore Migration Status")
+
+    heapstore_root = _get_heapstore_root()
+    print_info(f"Data directory: {heapstore_root}")
+
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        toolkit_src = os.path.join(script_dir, "..", "..", "..", "scripts", "toolkit", "src")
+        toolkit_src = os.path.abspath(toolkit_src)
+        if toolkit_src not in sys.path:
+            sys.path.insert(0, toolkit_src)
+
+        from heapstore_migrate import MigrationEngine
+
+        engine = MigrationEngine(heapstore_root)
+        status = engine.get_status()
+
+        print(f"\n  {'Current version:':<25} {status['current_version_name']} "
+              f"({status['current_version']})")
+        print(f"  {'Latest version:':<25} {status['latest_version_name']} "
+              f"({status['latest_version']})")
+
+        if status["needs_migration"]:
+            print_warning(f"  {'Status:':<25} Migration needed")
+        else:
+            print_success(f"  {'Status:':<25} Up to date")
+
+        if status["backups"]:
+            print(f"\n  Backups:")
+            for b in status["backups"][:5]:
+                print(f"    - {b['name']} ({b['created']})")
+
+        return 0
+
+    except ImportError:
+        print_error("Migration engine not available.")
+        return 1
+    except Exception as e:
+        print_error(f"Error: {e}")
+        return 1
+
+
+def cmd_db_migrate_rollback(args):
+    """回滚迁移"""
+    print_header("Heapstore Migration Rollback")
+
+    force = getattr(args, "force", False)
+    if not force:
+        print_error("Rollback requires --force flag for safety.")
+        print_info("This will discard new fields added in v2.")
+        print_info("Usage: agentos db migrate-rollback --force")
+        return 1
+
+    heapstore_root = _get_heapstore_root()
+    print_warning(f"Rolling back schema version...")
+    print_info(f"Data directory: {heapstore_root}")
+
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        toolkit_src = os.path.join(script_dir, "..", "..", "..", "scripts", "toolkit", "src")
+        toolkit_src = os.path.abspath(toolkit_src)
+        if toolkit_src not in sys.path:
+            sys.path.insert(0, toolkit_src)
+
+        from heapstore_migrate import MigrationEngine
+
+        engine = MigrationEngine(heapstore_root)
+        report = engine.run_rollback("v1")
+
+        if report["success"]:
+            print_success(f"Rollback completed ({report['total_duration_ms']}ms)")
+            print_info(f"Records affected: {report['total_records_affected']}")
+            print_info(f"Fields removed: {report['total_fields_removed']}")
+            print_info(f"Backup saved at: {report.get('backup_path', 'N/A')}")
+
+            if report.get("steps"):
+                print(f"\n  {'Step':<40} {'Records':>8} {'Fields':>8}")
+                print(f"  {'-'*40} {'-'*8} {'-'*8}")
+                for step in report["steps"]:
+                    print(f"  {step['name']:<40} "
+                          f"{step.get('records_affected', 0):>8} "
+                          f"{step.get('fields_removed', 0):>8}")
+            return 0
+        else:
+            print_error(f"Rollback failed: {report.get('error', 'Unknown error')}")
+            return 1
+
+    except ImportError:
+        print_error("Migration engine not available.")
+        return 1
+    except Exception as e:
+        print_error(f"Rollback error: {e}")
+        return 1
+
+
+def cmd_db_backup(args):
+    """创建数据备份"""
+    print_header("Heapstore Data Backup")
+
+    heapstore_root = _get_heapstore_root()
+    print_info(f"Data directory: {heapstore_root}")
+
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        toolkit_src = os.path.join(script_dir, "..", "..", "..", "scripts", "toolkit", "src")
+        toolkit_src = os.path.abspath(toolkit_src)
+        if toolkit_src not in sys.path:
+            sys.path.insert(0, toolkit_src)
+
+        from heapstore_migrate import MigrationEngine
+
+        engine = MigrationEngine(heapstore_root)
+        backup_path = engine.create_backup()
+        print_success(f"Backup created: {backup_path}")
+        return 0
+
+    except ImportError:
+        print_error("Migration engine not available.")
+        return 1
+    except Exception as e:
+        print_error(f"Backup error: {e}")
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="agentos",
@@ -867,6 +1076,16 @@ def main():
     subparsers.add_parser("version", help="Show version")
     subparsers.add_parser("status", help="Show system status")
 
+    # Database commands (P3.20.4)
+    db_parser = subparsers.add_parser("db", help="Database operations")
+    db_sub = db_parser.add_subparsers(dest="subcommand")
+    db_migrate = db_sub.add_parser("migrate", help="Run schema migration")
+    db_migrate.add_argument("--target", default="v2", help="Target version (default: v2)")
+    db_sub.add_parser("migrate-status", help="Show migration status")
+    db_migrate_rb = db_sub.add_parser("migrate-rollback", help="Rollback schema migration")
+    db_migrate_rb.add_argument("--force", action="store_true", help="Confirm rollback")
+    db_sub.add_parser("backup", help="Create data backup")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -900,6 +1119,12 @@ def main():
         },
         "dev": {
             "doctor": cmd_dev_doctor,
+        },
+        "db": {
+            "migrate": cmd_db_migrate,
+            "migrate-status": cmd_db_migrate_status,
+            "migrate-rollback": cmd_db_migrate_rollback,
+            "backup": cmd_db_backup,
         },
         "version": lambda a: cmd_version(a),
         "status": lambda a: cmd_status(a),

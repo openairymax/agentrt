@@ -13,7 +13,7 @@
  * - E-5 命名语义化：所有函数名精确表达用途
  * - E-6 错误可追溯：统一的错误码体系
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-04-03
  * @version 0.1.0
  */
@@ -156,7 +156,7 @@ static void set_socket_timeout(void *handle, int timeout_ms, int is_recv)
 
 /**
  * @brief 将 network_af_t 转换为系统地址族
- * @param af AgentOS 地址族枚举
+ * @param af AgentRT 地址族枚举
  * @return 系统地址族值
  */
 static int af_to_native(network_af_t af)
@@ -173,7 +173,7 @@ static int af_to_native(network_af_t af)
 
 /**
  * @brief 将 network_sock_type_t 转换为系统 Socket 类型
- * @param st AgentOS Socket 类型枚举
+ * @param st AgentRT Socket 类型枚举
  * @return 系统 Socket 类型值
  */
 static int socktype_to_native(network_sock_type_t st)

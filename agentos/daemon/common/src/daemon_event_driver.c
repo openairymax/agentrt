@@ -35,10 +35,17 @@ static int on_server_fd_event(int fd, uint32_t events, void *user_data)
     if (!(events & AGENTOS_EVENT_TYPE_READ))
         return 0;
 
+    int first = 1;
     while (1) {
         agentos_socket_t client_fd = agentos_socket_accept(fd, 0);
-        if (client_fd == AGENTOS_INVALID_SOCKET)
+        if (client_fd == AGENTOS_INVALID_SOCKET) {
+            if (first) {
+                SVC_LOG_ERROR("C-L02: EVENT-DRIVER: CLIENT-ERROR accept failed on fd=%d", fd);
+            }
             break;
+        }
+
+        SVC_LOG_DEBUG("C-L02: EVENT-DRIVER: CLIENT-ACCEPT fd=%d", (int)(uintptr_t)client_fd);
 
         if (driver->on_client) {
             driver->on_client(driver->service_ctx, client_fd);
@@ -47,6 +54,7 @@ static int on_server_fd_event(int fd, uint32_t events, void *user_data)
         } else {
             agentos_socket_close(client_fd);
         }
+        first = 0;
     }
 
     return 0;
@@ -56,6 +64,7 @@ static void on_health_timer(agentos_event_loop_t *loop, uint64_t timer_id, void 
 {
     (void)loop;
     (void)timer_id;
+    SVC_LOG_DEBUG("C-L02: EVENT-DRIVER: HEALTH-CHECK timer_id=%lu", (unsigned long)timer_id);
     daemon_event_driver_t *driver = (daemon_event_driver_t *)user_data;
     if (driver && driver->on_timer) {
         driver->on_timer(driver->service_ctx, timer_id);
@@ -65,6 +74,7 @@ static void on_health_timer(agentos_event_loop_t *loop, uint64_t timer_id, void 
 daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *config)
 {
     if (!config) {
+        SVC_LOG_ERROR("C-L02: EVENT-DRIVER: CREATE-FAIL null config, STACK: daemon_event_driver_create");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
 
         return NULL;
@@ -73,6 +83,7 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
     daemon_event_driver_t *driver =
         (daemon_event_driver_t *)AGENTOS_CALLOC(1, sizeof(daemon_event_driver_t));
     if (!driver) {
+        SVC_LOG_ERROR("C-L02: EVENT-DRIVER: CREATE-FAIL alloc driver, STACK: daemon_event_driver_create");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -81,6 +92,7 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
     int max_events = config->max_events > 0 ? config->max_events : 64;
     driver->loop = agentos_event_loop_create(max_events);
     if (!driver->loop) {
+        SVC_LOG_ERROR("C-L02: EVENT-DRIVER: CREATE-FAIL loop, STACK: daemon_event_driver_create");
         AGENTOS_FREE(driver);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
@@ -96,14 +108,14 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
         tp_config.idle_timeout_ms = 30000;
         driver->pool = thread_pool_create(&tp_config);
         if (!driver->pool) {
-            SVC_LOG_WARN("Failed to create thread pool, continuing without pool");
+            SVC_LOG_WARN("C-L02: EVENT-DRIVER: CREATE-WARN thread pool failed, STACK: daemon_event_driver_create");
         }
     }
 
     if (config->use_jsonrpc) {
         driver->dispatcher = method_dispatcher_create(16);
         if (!driver->dispatcher) {
-            SVC_LOG_ERROR("Failed to create method dispatcher for JSON-RPC");
+            SVC_LOG_ERROR("C-L02: EVENT-DRIVER: CREATE-FAIL dispatcher, STACK: daemon_event_driver_create");
             if (driver->pool)
                 thread_pool_destroy(driver->pool);
             agentos_event_loop_destroy(driver->loop);
@@ -126,8 +138,9 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
             agentos_event_loop_add_timer(driver->loop, interval_ms, on_health_timer, driver);
     }
 
-    SVC_LOG_INFO("Daemon event driver created (max_events=%d, pool=%s, jsonrpc=%s)", max_events,
-                 driver->pool ? "on" : "off", driver->dispatcher ? "on" : "off");
+    SVC_LOG_INFO("C-L02: EVENT-DRIVER: CREATE-OK max_events=%d pool=%s jsonrpc=%s health_check_interval=%ds",
+             max_events, driver->pool ? "on" : "off", driver->dispatcher ? "on" : "off",
+             driver->health_check_interval_sec);
 
     return driver;
 }
@@ -136,6 +149,7 @@ void daemon_event_driver_destroy(daemon_event_driver_t *driver)
 {
     if (!driver)
         return;
+    SVC_LOG_INFO("C-L02: EVENT-DRIVER: DESTROY");
     if (driver->pool)
         thread_pool_destroy(driver->pool);
     if (driver->dispatcher)
@@ -180,7 +194,7 @@ int daemon_event_driver_run(daemon_event_driver_t *driver)
 {
     if (!driver)
         return AGENTOS_ERR_INVALID_PARAM;
-    SVC_LOG_INFO("Daemon event driver running");
+    SVC_LOG_INFO("C-L02: EVENT-DRIVER: RUN");
     return agentos_event_loop_run(driver->loop);
 }
 
@@ -188,7 +202,7 @@ void daemon_event_driver_stop(daemon_event_driver_t *driver)
 {
     if (!driver)
         return;
-    SVC_LOG_INFO("Daemon event driver stopping");
+    SVC_LOG_INFO("C-L02: EVENT-DRIVER: STOP");
     agentos_event_loop_stop(driver->loop);
 }
 

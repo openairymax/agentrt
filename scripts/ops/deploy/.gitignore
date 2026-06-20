@@ -1,5 +1,6 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Docker .gitignore
+# AgentRT Deploy .gitignore
+# Part of Airymax open-source project (agentrt)
 
 # 环境变量文件（包含敏感信息）
 .env
@@ -34,7 +35,8 @@ backup/
 
 # IDE 配置
 .idea/
-.vscode/settings.json
+.vscode/
+.trae/
 
 # OS 文件
 .DS_Store

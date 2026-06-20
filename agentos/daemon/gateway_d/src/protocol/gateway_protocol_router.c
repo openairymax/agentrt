@@ -18,6 +18,23 @@
 #ifndef AGENTOS_LOG_WARN
 #define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
 #endif
+#ifndef AGENTOS_LOG_DEBUG
+#define AGENTOS_LOG_DEBUG(fmt, ...) __builtin_fprintf(stderr, "[DEBUG] %s: " fmt "\n", __func__, ##__VA_ARGS__)
+#endif
+
+/**
+ * @brief 将协议类型枚举转换为可读字符串
+ */
+static const char *proto_type_name(gw_proto_detect_result_t proto_type)
+{
+    switch (proto_type) {
+    case GW_PROTO_DETECT_MCP:     return "MCP";
+    case GW_PROTO_DETECT_A2A:     return "A2A";
+    case GW_PROTO_DETECT_OPENAI:  return "OpenAI";
+    case GW_PROTO_DETECT_JSONRPC: return "JSON-RPC";
+    default:                      return "Unknown";
+    }
+}
 
 typedef struct {
     gw_proto_detect_result_t proto_type;
@@ -244,6 +261,47 @@ find_handler(gw_proto_router_t *router, gw_proto_detect_result_t proto_type, voi
     return NULL;
 }
 
+/**
+ * @brief 统计协议请求计数
+ *
+ * 根据协议类型递增对应的统计计数器，并输出详细调试日志。
+ *
+ * @param stats 统计结构体指针
+ * @param proto_type 协议类型
+ */
+static void record_proto_stats(gw_proto_router_stats_t *stats, gw_proto_detect_result_t proto_type)
+{
+    const char *name = proto_type_name(proto_type);
+
+    switch (proto_type) {
+    case GW_PROTO_DETECT_MCP:
+        stats->mcp_requests++;
+        AGENTOS_LOG_DEBUG("protocol=%-8s count=%llu (mcp_requests)", name,
+                          (unsigned long long)stats->mcp_requests);
+        break;
+    case GW_PROTO_DETECT_A2A:
+        stats->a2a_requests++;
+        AGENTOS_LOG_DEBUG("protocol=%-8s count=%llu (a2a_requests)", name,
+                          (unsigned long long)stats->a2a_requests);
+        break;
+    case GW_PROTO_DETECT_OPENAI:
+        stats->openai_requests++;
+        AGENTOS_LOG_DEBUG("protocol=%-8s count=%llu (openai_requests)", name,
+                          (unsigned long long)stats->openai_requests);
+        break;
+    case GW_PROTO_DETECT_JSONRPC:
+        stats->jsonrpc_requests++;
+        AGENTOS_LOG_DEBUG("protocol=%-8s count=%llu (jsonrpc_requests)", name,
+                          (unsigned long long)stats->jsonrpc_requests);
+        break;
+    default:
+        stats->unknown_requests++;
+        AGENTOS_LOG_DEBUG("protocol=%-8s count=%llu (unknown_requests)", name,
+                          (unsigned long long)stats->unknown_requests);
+        break;
+    }
+}
+
 int gw_proto_router_route(gw_proto_router_t *router, gw_proto_detect_result_t proto_type,
                           const char *method, const char *path, const char *body_json,
                           char **response_json)
@@ -260,43 +318,11 @@ int gw_proto_router_route(gw_proto_router_t *router, gw_proto_detect_result_t pr
         AGENTOS_LOG_WARN("no handler found for protocol type=%d, route_errors=%llu",
                          proto_type, (unsigned long long)router->stats.route_errors);
         router->stats.route_errors++;
-        switch (proto_type) {
-        case GW_PROTO_DETECT_MCP:
-            router->stats.mcp_requests++;
-            break;
-        case GW_PROTO_DETECT_A2A:
-            router->stats.a2a_requests++;
-            break;
-        case GW_PROTO_DETECT_OPENAI:
-            router->stats.openai_requests++;
-            break;
-        case GW_PROTO_DETECT_JSONRPC:
-            router->stats.jsonrpc_requests++;
-            break;
-        default:
-            router->stats.unknown_requests++;
-            break;
-        }
+        record_proto_stats(&router->stats, proto_type);
         return AGENTOS_ERR_NOT_FOUND;
     }
 
-    switch (proto_type) {
-    case GW_PROTO_DETECT_MCP:
-        router->stats.mcp_requests++;
-        break;
-    case GW_PROTO_DETECT_A2A:
-        router->stats.a2a_requests++;
-        break;
-    case GW_PROTO_DETECT_OPENAI:
-        router->stats.openai_requests++;
-        break;
-    case GW_PROTO_DETECT_JSONRPC:
-        router->stats.jsonrpc_requests++;
-        break;
-    default:
-        router->stats.unknown_requests++;
-        break;
-    }
+    record_proto_stats(&router->stats, proto_type);
 
     int result = handler(method, path, body_json, response_json, user_data);
     if (result != 0) {

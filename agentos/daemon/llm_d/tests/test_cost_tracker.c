@@ -102,10 +102,12 @@ static void test_cost_tracker_export(void)
 
     int count = cJSON_GetArraySize(models);
     assert(count == 1);
+    (void)count;
 
     cJSON *model_obj = cJSON_GetArrayItem(models, 0);
     cJSON *model_name = cJSON_GetObjectItem(model_obj, "model");
     assert(model_name != NULL);
+    (void)model_name;
     assert(strcmp(model_name->valuestring, "gpt-4") == 0);
 
     cJSON_Delete(json);
@@ -157,6 +159,7 @@ static void test_cost_tracker_multiple_models(void)
     cJSON *models = cJSON_GetObjectItem(json, "models");
     int count = cJSON_GetArraySize(models);
     assert(count == 3);
+    (void)count;
 
     cJSON_Delete(json);
     cost_tracker_destroy(tracker);
@@ -194,6 +197,7 @@ static void test_cost_tracker_rule_matching(void)
     cJSON *models = cJSON_GetObjectItem(json, "models");
     int count = cJSON_GetArraySize(models);
     assert(count == 2);
+    (void)count;
 
     cJSON_Delete(json);
     cost_tracker_destroy(tracker);

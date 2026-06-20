@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Base Manager Implementation
+# AgentRT Python SDK - Base Manager Implementation
 # Version: 0.1.0
 # Last updated: 2026-04-05
 #

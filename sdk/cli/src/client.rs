@@ -103,6 +103,7 @@ fn truncate_body(body: &str) -> String {
 // ─── API Response Types ────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct HealthResponse {
     pub status: String,
     pub version: Option<String>,
@@ -110,14 +111,14 @@ pub struct HealthResponse {
     pub daemons: Option<Vec<DaemonStatus>>,
 }
 
+/// Status of a single daemon process.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct DaemonStatus {
     pub name: String,
     pub status: String,
     pub pid: Option<u32>,
-}
-
-#[derive(Debug, Deserialize)]
+}#[derive(Debug, Deserialize)]
 pub struct LlmProvider {
     pub name: String,
     pub models: Vec<String>,

@@ -1,6 +1,6 @@
 /**
  * @file heapstore_registry.c
- * @brief AgentOS 数据分区注册表实现
+ * @brief AgentRT 数据分区注册表实现
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #include "heapstore_registry.h"
 
 #include "../include/utils.h"

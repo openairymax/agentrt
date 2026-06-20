@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * cupolas.c - AgentOS Security Dome Core Implementation (Facade)
+ * cupolas.c - AgentRT Security Dome Core Implementation (Facade)
  *
  * This module implements the unified public API for the security dome,
  * providing a facade over all four protection layers:

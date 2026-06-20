@@ -8,7 +8,7 @@
 /**
  * @file cupolas_runtime_protection.c
  * @brief Enhanced Runtime Protection - seccomp, CFI Multi-defense Implementation
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026
  */
 

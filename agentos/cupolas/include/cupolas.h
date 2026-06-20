@@ -2,9 +2,9 @@
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * cupolas.h - AgentOS Security Dome Public Interface
+ * cupolas.h - AgentRT Security Dome Public Interface
  *
- * cupolas is AgentOS's security dome module providing:
+ * cupolas is AgentRT's security dome module providing:
  * - Permission裁决引擎 (Permission Engine): Rule-based access control
  * - 输入净化器 (Sanitizer): Injection attack prevention
  * - 审计日志 (Audit): Operation tracking and compliance

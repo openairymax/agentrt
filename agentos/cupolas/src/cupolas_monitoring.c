@@ -8,7 +8,7 @@
 /**
  * @file cupolas_monitoring.c
  * @brief Monitoring Interface - Prometheus / OpenTelemetry
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2024
  *
  * This module implements monitoring interface:
@@ -342,7 +342,7 @@ static int handle_index_endpoint(const gateway_endpoint_request_t *req __attribu
                                  gateway_endpoint_response_t *resp)
 {
     const char *body = "<html><head><title>Cupolas Monitoring</title></head><body>"
-                       "<h2>AgentOS Cupolas Monitoring</h2>"
+                       "<h2>AgentRT Cupolas Monitoring</h2>"
                        "<ul>"
                        "<li><a href=\"/metrics\">/metrics</a> - Prometheus exposition format</li>"
                        "<li><a href=\"/health\">/health</a> - Health check endpoint</li>"

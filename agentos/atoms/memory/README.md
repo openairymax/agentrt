@@ -10,21 +10,21 @@
 
 Memory 是 AgentRT 的免费开源内存子系统，提供 L1 原始存储与 L2 特征索引的基础能力。采用**可拔插提供商架构**，通过统一的 `agentos_memory_provider_t` 函数指针表实现提供商的热替换——内置免费提供商（builtin_provider）提供 L1+L2 基础功能，商业提供商 MemoryRovol 实现 L1-L4 全功能 PRO 记忆系统。
 
-Memory 模块以纯 C 实现，无 FAISS / SQLite / 外部向量数据库依赖，是 AgentOS 八层架构中 Atoms 微内核层的核心存储底座。
+Memory 模块以纯 C 实现，无 FAISS / SQLite / 外部向量数据库依赖，是 AgentRT 八层架构中 Atoms 微内核层的核心存储底座。
 
 ---
 
 ## 架构定位
 
 ```
-AgentOS 八层架构：
+AgentRT 八层架构：
   Atoms → Commons → Cupolas → Heapstore → Gateway → Protocols → Daemon → OpenLab + Toolkit SDK
 
 Atoms 层内部调用链：
   engine.c → agentos_memory_provider_t* → builtin_provider / MemoryRovol
 ```
 
-Memory 位于 Atoms 层，是整个 AgentOS 记忆能力的微内核抽象。上层模块（CoreLoopThree、Frameworks 等）通过 `agentos_memory_provider_t*` 指针访问记忆功能，无需感知底层提供商的具体实现。
+Memory 位于 Atoms 层，是整个 AgentRT 记忆能力的微内核抽象。上层模块（CoreLoopThree、Frameworks 等）通过 `agentos_memory_provider_t*` 指针访问记忆功能，无需感知底层提供商的具体实现。
 
 ---
 
@@ -146,7 +146,7 @@ builtin_provider_impl_t
 
 **默认数据路径**: `./data/agentos/memory`
 
-**启动日志**: `[AgentOS] using built-in provider (free) - storage: <path>`
+**启动日志**: `[AgentRT] using built-in provider (free) - storage: <path>`
 
 **遗忘策略**: 淘汰 10% 最旧记录（按 `updated_at` 排序，选择最久未更新的记录删除）。
 

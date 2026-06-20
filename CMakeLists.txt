@@ -3,7 +3,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
-project(AgentRT VERSION 0.1.0 LANGUAGES C CXX)
+project(AgentRT VERSION 0.1.1 LANGUAGES C CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
@@ -137,7 +137,7 @@ else()
         add_compile_options(-Wno-error=format-truncation)
     endif()
     add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
-    add_compile_definitions(_FORTIFY_SOURCE=2)
+    add_compile_definitions(_FORTIFY_SOURCE=2 _GNU_SOURCE)
 
     if(AGENTRT_COMPLIANCE_STRICT)
         add_compile_definitions(AGENTRT_COMPLIANCE_STRICT)
@@ -161,7 +161,7 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
         add_link_options(-fsanitize=address,undefined,leak,float-divide-by-zero)
         # CI环境变量：halt_on_error确保任何检测到的问题立即阻断
         set(ENV{ASAN_OPTIONS} "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1")
-        set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/agentos/manager/sanitizer/lsan-suppressions")
+        set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/ecosystem/manager/sanitizer/lsan-suppressions")
         set(ENV{UBSAN_OPTIONS} "halt_on_error=1:print_stacktrace=1")
         message(STATUS "Sanitizers enabled: ASan + LSan + UBSan (integer, float-divide-by-zero)")
     else()

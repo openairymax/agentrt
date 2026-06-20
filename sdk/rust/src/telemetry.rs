@@ -1,4 +1,4 @@
-// AgentOS Rust SDK Telemetry
+// AgentRT Rust SDK Telemetry
 // Version: 0.1.0
 // Last updated: 2026-03-23
 

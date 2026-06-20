@@ -62,6 +62,7 @@ static void test_registry_create_and_find(void)
     /* 验证未注册提供商查找失败 */
     const provider_t *p = provider_registry_find(reg, "nonexistent-model");
     assert(p == NULL);
+    (void)p;
     printf("    Nonexistent model correctly returns NULL\n");
 
     provider_registry_destroy(reg);
@@ -82,6 +83,7 @@ static void test_cache_hit_miss(void)
     char *value = NULL;
     int ret = cache_get(cache, "model:gpt-4o:hash123", &value);
     assert(ret != 1 || value == NULL);
+    (void)ret;
     printf("    Cache miss: OK\n");
 
     /* 写入缓存 */
@@ -190,15 +192,18 @@ static void test_unknown_provider_error(void)
     /* 查找不存在的模型应返回NULL */
     const provider_t *p = provider_registry_find(reg, "unknown-model-v999");
     assert(p == NULL);
+    (void)p;
     printf("    Unknown model correctly returns NULL\n");
 
     /* NULL参数检查 */
     const provider_t *null_p = provider_registry_find(NULL, "gpt-4o");
     assert(null_p == NULL);
+    (void)null_p;
     printf("    NULL registry correctly returns NULL\n");
 
     const provider_t *null_model = provider_registry_find(reg, NULL);
     assert(null_model == NULL);
+    (void)null_model;
     printf("    NULL model correctly returns NULL\n");
 
     provider_registry_destroy(reg);
