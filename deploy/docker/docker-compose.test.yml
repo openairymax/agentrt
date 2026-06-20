@@ -19,6 +19,12 @@
 
 version: '3.8'
 
+x-common-env: &common-env
+  AGENTOS_TEST_MODE: "1"
+  AGENTOS_LOG_LEVEL: "${LOG_LEVEL:-DEBUG}"
+  AGENTOS_CONFIG_PATH: "/etc/agentrt/agentos.yaml"
+  AGENTOS_DEPLOY_ENV: "test"
+
 x-common-daemon: &common-daemon
   build:
     context: ../..
@@ -28,10 +34,7 @@ x-common-daemon: &common-daemon
   networks:
     - agentrt-test-net
   environment:
-    - AGENTOS_TEST_MODE=1
-    - AGENTOS_LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-    - AGENTOS_CONFIG_PATH=/etc/agentrt/agentos.yaml
-    - AGENTOS_DEPLOY_ENV=test
+    <<: *common-env
   logging:
     driver: "json-file"
     options:
@@ -89,7 +92,7 @@ services:
     ports:
       - "${TEST_COREKERN_PORT:-19001}:9001"
     environment:
-      <<: *common-daemon
+      <<: *common-env
       AGENTOS_SERVICE_NAME: corekern
       AGENTOS_SERVICE_PORT: "9001"
     depends_on:

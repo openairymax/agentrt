@@ -30,6 +30,8 @@ extern "C" {
 /* 前向声明 */
 typedef struct agentos_core_loop agentos_core_loop_t;
 typedef struct agentos_checkpoint_stats agentos_checkpoint_stats_t;
+typedef struct agentos_manager_adapter_s agentos_manager_adapter_t;
+typedef struct orch_adapter_s orch_adapter_t;
 
 /**
  * @brief 核心循环配置
@@ -263,6 +265,28 @@ AGENTOS_API agentos_error_t agentos_loop_restore_snapshot(agentos_core_loop_t *l
  */
 AGENTOS_API agentos_error_t agentos_loop_get_checkpoint_stats(agentos_core_loop_t *loop,
                                                               agentos_checkpoint_stats_t *out_stats);
+
+/* ================================================================
+ * C-L01 + C-L06: 外部适配器注入
+ * ================================================================ */
+
+/**
+ * @brief C-L01: 设置 Manager 适配器到 CoreLoopThree
+ *
+ * @param loop CoreLoopThree 实例
+ * @param adapter Manager 适配器（BORROW，生命周期由调用者管理）
+ */
+AGENTOS_API void agentos_loop_set_manager_adapter(agentos_core_loop_t *loop,
+                                                   agentos_manager_adapter_t *adapter);
+
+/**
+ * @brief C-L06: 设置 Orchestrator 适配器到 CoreLoopThree
+ *
+ * @param loop CoreLoopThree 实例
+ * @param adapter Orchestrator 适配器（BORROW，生命周期由调用者管理）
+ */
+AGENTOS_API void agentos_loop_set_orch_adapter(agentos_core_loop_t *loop,
+                                                orch_adapter_t *adapter);
 
 #ifdef __cplusplus
 }

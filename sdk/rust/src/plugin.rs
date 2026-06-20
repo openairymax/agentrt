@@ -1,4 +1,4 @@
-// AgentRT Rust SDK - 插件框架
+// AgentOS Rust SDK - 插件框架
 // Version: 0.1.0
 // Last updated: 2026-04-26
 //

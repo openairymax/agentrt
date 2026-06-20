@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <unistd.h>
 
 #define HOOK_D_SOCKET_PATH AGENTOS_RUNTIME_DIR "/hook.sock"
@@ -56,17 +57,25 @@ int main(int argc, char *argv[]) {
     /* 创建 Unix Socket 服务器 */
     g_server_fd = agentos_socket_create_unix_server(HOOK_D_SOCKET_PATH);
     if (g_server_fd < 0) {
-        SVC_LOG_ERROR("hook_d: failed to create socket at %s", HOOK_D_SOCKET_PATH);
+        SVC_LOG_ERROR("P2.1: HookD: failed to create socket at %s (errno=%d: %s)",
+                      HOOK_D_SOCKET_PATH, errno, strerror(errno));
         return 1;
     }
-    SVC_LOG_INFO("hook_d: listening on %s (fd=%d)", HOOK_D_SOCKET_PATH, (int)g_server_fd);
+    SVC_LOG_INFO("P2.1: HookD: listening on %s (fd=%d)", HOOK_D_SOCKET_PATH, (int)g_server_fd);
 
     g_bsd = daemon_bootstrap_sd_start("hook_d", "hook", HOOK_D_SOCKET_PATH,
                                       0, "hook,core", 0);
+    if (!g_bsd) {
+        SVC_LOG_WARN("P2.1: HookD: SD bootstrap failed, continuing");
+    }
     g_bipc = daemon_bootstrap_ipc_start("hook_d", "hook", HOOK_D_SOCKET_PATH,
                                         0, IPC_BUS_PROTO_JSON_RPC);
+    if (!g_bipc) {
+        SVC_LOG_WARN("P2.1: HookD: IPC bootstrap failed, continuing");
+    }
 
-    SVC_LOG_INFO("hook_d: running, waiting for shutdown signal");
+    SVC_LOG_INFO("P2.1: HookD: running (sd=%s ipc=%s), waiting for shutdown signal",
+                 g_bsd ? "ok" : "no", g_bipc ? "ok" : "no");
 
     /* 等待关闭信号 */
     while (g_running) {
@@ -79,7 +88,8 @@ int main(int argc, char *argv[]) {
         agentos_socket_close(g_server_fd);
         g_server_fd = AGENTOS_INVALID_SOCKET;
     }
-    SVC_LOG_INFO("hook_d: shutting down");
+    SVC_LOG_INFO("P2.1: HookD: shutting down (sd=%s ipc=%s)",
+                 g_bsd ? "stopped" : "n/a", g_bipc ? "stopped" : "n/a");
     log_cleanup();
     return EXIT_SUCCESS;
 }

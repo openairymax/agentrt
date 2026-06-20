@@ -7,6 +7,7 @@
 #include "mem.h"
 #include "memory_compat.h"
 #include "string_compat.h"
+#include "logging_compat.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -111,6 +112,9 @@ agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_co
         pool->block_tags[idx] = BLOCK_FREED;
     }
 
+    AGENTOS_LOG_DEBUG("P3.15: Pool: CREATE OK (block_size=%zu, block_count=%u, total=%zu)",
+                      block_size, block_count, total_size);
+
     return pool;
 }
 
@@ -134,6 +138,8 @@ void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
         if (pool->lock) {
             agentos_mutex_unlock(pool->lock);
         }
+        AGENTOS_LOG_WARN("P3.15: Pool: EXHAUSTED (block_size=%zu, block_count=%u)",
+                         pool->block_size, pool->block_count);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -212,6 +218,9 @@ void agentos_mem_pool_destroy(agentos_mem_pool_t *pool_handle)
     if (pool->magic != POOL_MAGIC)
         return;
 
+    AGENTOS_LOG_DEBUG("P3.15: Pool: DESTROY (block_size=%zu, block_count=%u, free_count=%u)",
+                      pool->block_size, pool->block_count, pool->free_count);
+
     pool->magic = 0;
 
     if (pool->block_tags) {
@@ -220,7 +229,7 @@ void agentos_mem_pool_destroy(agentos_mem_pool_t *pool_handle)
     }
 
     if (pool->lock) {
-        agentos_mutex_destroy(pool->lock);
+        agentos_mutex_free(pool->lock);
         pool->lock = NULL;
     }
 

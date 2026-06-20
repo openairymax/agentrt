@@ -71,7 +71,7 @@ gate_compile() {
 }
 
 # ============================================================================
-# Gate 2: BAN 规则扫描 (PATH-BAN)
+# Gate 2: BAN 规则扫描 (PATH-BAN + BAN-191/193)
 # ============================================================================
 gate_ban() {
     section "Gate 2: BAN Rule Scan"
@@ -87,6 +87,32 @@ gate_ban() {
     else
         log_warn "BAN scan script not found: ${ban_script}"
         check_gate "BAN-Rules" 2
+    fi
+
+    # BAN-191: 禁止 head -z 管道（POSIX 兼容性）
+    log_info "BAN-191: Scanning for 'head -z' usage..."
+    local head_z_found
+    head_z_found=$(find "${PROJECT_ROOT}/scripts" -name "*.sh" -exec grep -lP "head\s+-z" {} \; 2>/dev/null || true)
+    if [ -n "$head_z_found" ]; then
+        log_err "BAN-191: 'head -z' found in:"
+        echo "$head_z_found" | while IFS= read -r f; do log_err "  $f"; done
+        check_gate "BAN-191" 1
+    else
+        log_ok "BAN-191: No 'head -z' usage found"
+        check_gate "BAN-191" 0
+    fi
+
+    # BAN-193: 危险函数扫描必须使用 \b 词边界
+    log_info "BAN-193: Scanning for unguarded dangerous function patterns..."
+    local dangerous_patterns
+    dangerous_patterns=$(find "${PROJECT_ROOT}/scripts" -name "*.sh" -exec grep -lP 'grep\s+(?!.*\\\\b).*"(strcpy|strcat|sprintf|gets|scanf)"' {} \; 2>/dev/null || true)
+    if [ -n "$dangerous_patterns" ]; then
+        log_err "BAN-193: Unguarded dangerous function grep found in:"
+        echo "$dangerous_patterns" | while IFS= read -r f; do log_err "  $f"; done
+        check_gate "BAN-193" 1
+    else
+        log_ok "BAN-193: No unguarded dangerous function patterns found"
+        check_gate "BAN-193" 0
     fi
 }
 
@@ -169,6 +195,7 @@ main() {
     local skip_security=false
     local security_only=false
     local skip_cross_repo=false
+    local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -184,12 +211,16 @@ main() {
                 skip_cross_repo=true
                 shift
                 ;;
+            --strict)
+                strict_mode=true
+                shift
+                ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
-                echo "  2. BAN Rule Scan (256 rules)"
+                echo "  2. BAN Rule Scan (256 rules + BAN-191/193)"
                 echo "  3. Security Scan (10 items: CVE, SAST, Docker, Secrets, SBOM, ...)"
                 echo "  4. Contract Version Check"
                 echo "  5. Cross-Repository Verification"
@@ -198,6 +229,7 @@ main() {
                 echo "  --security-scan      Run only security scan"
                 echo "  --skip-security       Skip security scan"
                 echo "  --skip-cross-repo     Skip cross-repo verification"
+                echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
             *)
@@ -229,6 +261,13 @@ main() {
     echo ""
 
     if [ "$GATE_FAIL" -eq 0 ]; then
+        if $strict_mode && [ "$GATE_WARN" -gt 0 ]; then
+            echo -e "${COLOR_RED}╔══════════════════════════════════════╗${COLOR_RESET}"
+            echo -e "${COLOR_RED}║     QUALITY GATE FAILED (STRICT)     ║${COLOR_RESET}"
+            echo -e "${COLOR_RED}║     ${GATE_WARN} WARNING(S) TREATED AS FAILURE  ║${COLOR_RESET}"
+            echo -e "${COLOR_RED}╚══════════════════════════════════════╝${COLOR_RESET}"
+            exit 1
+        fi
         echo -e "${COLOR_GREEN}╔══════════════════════════════════════╗${COLOR_RESET}"
         echo -e "${COLOR_GREEN}║     ALL QUALITY GATES PASSED         ║${COLOR_RESET}"
         echo -e "${COLOR_GREEN}╚══════════════════════════════════════╝${COLOR_RESET}"

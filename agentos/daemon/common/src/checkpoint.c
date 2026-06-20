@@ -301,8 +301,11 @@ agentos_error_t agentos_checkpoint_init(const char *storage_path)
         return AGENTOS_SUCCESS;
     const char *path = storage_path ? storage_path : "./" CHECKPOINT_DIRECTORY;
     size_t len = strlen(path);
-    if (len == 0 || len >= sizeof(g_checkpoint_storage_path))
+    if (len == 0 || len >= sizeof(g_checkpoint_storage_path)) {
+        SVC_LOG_ERROR("C-L07: Checkpoint: INIT-FAIL — invalid storage path "
+                      "len=%zu max=%zu", len, sizeof(g_checkpoint_storage_path));
         return AGENTOS_EINVAL;
+    }
     __builtin_memcpy(g_checkpoint_storage_path, path, len);
     g_checkpoint_storage_path[len] = '\0';
 
@@ -312,6 +315,8 @@ agentos_error_t agentos_checkpoint_init(const char *storage_path)
                                                     memory_order_seq_cst, memory_order_seq_cst)) {
             if (agentos_mutex_init(&g_checkpoint_mutex) != 0) {
                 atomic_store_explicit(&g_checkpoint_mutex_initialized, 0, memory_order_seq_cst);
+                SVC_LOG_ERROR("C-L07: Checkpoint: INIT-FAIL — mutex init failed "
+                              "path=%s", g_checkpoint_storage_path);
                 return DAEMON_EINIT;
             }
         }
@@ -319,6 +324,7 @@ agentos_error_t agentos_checkpoint_init(const char *storage_path)
 
     __builtin_memset(&g_checkpoint_stats, 0, sizeof(g_checkpoint_stats));
     atomic_store_explicit(&g_checkpoint_initialized, 1, memory_order_seq_cst);
+    SVC_LOG_INFO("C-L07: Checkpoint: INIT-OK path=%s", g_checkpoint_storage_path);
     return AGENTOS_SUCCESS;
 }
 
@@ -333,6 +339,11 @@ agentos_error_t agentos_checkpoint_shutdown(void)
     g_auto_hook = NULL;
     g_auto_hook_user_data = NULL;
     atomic_store_explicit(&g_checkpoint_initialized, 0, memory_order_seq_cst);
+    SVC_LOG_INFO("C-L07: Checkpoint: SHUTDOWN-OK "
+                 "total=%llu success=%llu failed=%llu",
+                 (unsigned long long)g_checkpoint_stats.total_checkpoints,
+                 (unsigned long long)g_checkpoint_stats.successful_checkpoints,
+                 (unsigned long long)g_checkpoint_stats.failed_checkpoints);
     return AGENTOS_SUCCESS;
 }
 
@@ -350,8 +361,10 @@ agentos_error_t agentos_checkpoint_create(const char *task_id, const char *sessi
 
     agentos_task_checkpoint_t *cp =
         (agentos_task_checkpoint_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_checkpoint_t));
-    if (!cp)
+    if (!cp) {
+        SVC_LOG_ERROR("C-L07: Checkpoint: CREATE-FAIL — OOM for task_id=%s", task_id);
         return AGENTOS_ENOMEM;
+    }
 
     init_fields(cp, task_id, session_id, sequence_num);
 
@@ -437,6 +450,8 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t *cp)
         agentos_mutex_lock(&g_checkpoint_mutex);
         g_checkpoint_stats.failed_checkpoints++;
         agentos_mutex_unlock(&g_checkpoint_mutex);
+        SVC_LOG_ERROR("C-L07: Checkpoint: SAVE-FAIL — cannot open file "
+                      "path=%s task_id=%s errno=%d", tmppath, cp->task_id, errno);
         return AGENTOS_EIO;
     }
 
@@ -508,6 +523,9 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t *cp)
         agentos_mutex_lock(&g_checkpoint_mutex);
         g_checkpoint_stats.failed_checkpoints++;
         agentos_mutex_unlock(&g_checkpoint_mutex);
+        SVC_LOG_ERROR("C-L07: Checkpoint: SAVE-FAIL — rename failed "
+                      "tmp=%s dst=%s task_id=%s errno=%d",
+                      tmppath, filepath, cp->task_id, errno);
         return AGENTOS_EIO;
     }
 
@@ -527,6 +545,8 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t *cp)
     }
     agentos_mutex_unlock(&g_checkpoint_mutex);
 
+    SVC_LOG_DEBUG("C-L07: Checkpoint: SAVE-OK task_id=%s seq=%llu size=%zu",
+                  cp->task_id, (unsigned long long)cp->sequence_num, cp->state_size);
     return AGENTOS_SUCCESS;
 }
 
@@ -544,20 +564,27 @@ agentos_error_t agentos_checkpoint_restore(const char *task_id, uint64_t sequenc
         return AGENTOS_EINVAL;
 
     FILE *fp = fopen(filepath, "r");
-    if (!fp)
+    if (!fp) {
+        SVC_LOG_WARN("C-L07: Checkpoint: RESTORE-FAIL — file not found "
+                     "path=%s task_id=%s errno=%d", filepath, task_id, errno);
         return AGENTOS_ENOENT;
+    }
 
     fseek(fp, 0, SEEK_END);
     long file_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
     if (file_size <= 0 || file_size > 10 * 1024 * 1024) {
         fclose(fp);
+        SVC_LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — invalid file size "
+                      "path=%s size=%ld task_id=%s", filepath, file_size, task_id);
         return AGENTOS_EIO;
     }
 
     char *json_buf = (char *)AGENTOS_MALLOC((size_t)(file_size + 1));
     if (!json_buf) {
         fclose(fp);
+        SVC_LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — OOM "
+                      "path=%s size=%ld task_id=%s", filepath, file_size, task_id);
         return AGENTOS_ENOMEM;
     }
 
@@ -565,6 +592,9 @@ agentos_error_t agentos_checkpoint_restore(const char *task_id, uint64_t sequenc
     if (read_len != (size_t)file_size) {
         AGENTOS_FREE(json_buf);
         fclose(fp);
+        SVC_LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — read error "
+                      "path=%s expected=%ld actual=%zu task_id=%s",
+                      filepath, file_size, read_len, task_id);
         return AGENTOS_EIO;
     }
     json_buf[read_len] = '\0';
@@ -607,6 +637,9 @@ agentos_error_t agentos_checkpoint_restore(const char *task_id, uint64_t sequenc
     g_checkpoint_stats.total_restore_ops++;
     agentos_mutex_unlock(&g_checkpoint_mutex);
     *out_cp = cp;
+    SVC_LOG_DEBUG("C-L07: Checkpoint: RESTORE-OK task_id=%s seq=%llu state=%s",
+                  task_id, (unsigned long long)cp->sequence_num,
+                  state_to_string(cp->state));
     return AGENTOS_SUCCESS;
 }
 
@@ -625,6 +658,12 @@ agentos_error_t agentos_checkpoint_delete(const char *task_id, uint64_t seq_num)
     int result = unlink(filepath);
     if (result == 0) {
         g_checkpoint_stats.total_checkpoints--;
+        SVC_LOG_INFO("C-L07: Checkpoint: DELETE-OK task_id=%s seq=%llu",
+                     task_id, (unsigned long long)seq_num);
+    } else {
+        SVC_LOG_WARN("C-L07: Checkpoint: DELETE-FAIL — unlink failed "
+                     "task_id=%s seq=%llu errno=%d",
+                     task_id, (unsigned long long)seq_num, errno);
     }
     agentos_mutex_unlock(&g_checkpoint_mutex);
 
@@ -784,6 +823,8 @@ agentos_error_t agentos_snapshot_create(const char *task_id, const char *snap_pa
     FILE *fp = fopen(snap_path, "wb");
     if (!fp) {
         agentos_checkpoint_destroy(cp);
+        SVC_LOG_ERROR("C-L07: Checkpoint: SNAPSHOT-CREATE-FAIL — cannot open file "
+                      "path=%s task_id=%s errno=%d", snap_path, task_id, errno);
         return AGENTOS_EIO;
     }
 
@@ -814,12 +855,17 @@ agentos_error_t agentos_snapshot_restore(const char *snap_path, char **tid)
         return AGENTOS_EINVAL;
 
     FILE *fp = fopen(snap_path, "rb");
-    if (!fp)
+    if (!fp) {
+        SVC_LOG_WARN("C-L07: Checkpoint: SNAPSHOT-RESTORE-FAIL — file not found "
+                     "path=%s errno=%d", snap_path, errno);
         return AGENTOS_ENOENT;
+    }
 
     char header[64];
     if (!fgets(header, sizeof(header), fp) || strncmp(header, "SNAPSHOT_V1", 11) != 0) {
         fclose(fp);
+        SVC_LOG_ERROR("C-L07: Checkpoint: SNAPSHOT-RESTORE-FAIL — bad header "
+                      "path=%s header=%.20s", snap_path, header);
         return AGENTOS_EIO;
     }
 

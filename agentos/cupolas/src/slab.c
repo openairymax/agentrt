@@ -13,7 +13,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define _GNU_SOURCE
 #include "slab.h"
 #include "memory_compat.h"
 #include "logging_compat.h"

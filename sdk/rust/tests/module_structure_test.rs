@@ -1,4 +1,4 @@
-// AgentRT Rust SDK - 模块结构测试
+// AgentOS Rust SDK - 模块结构测试
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //

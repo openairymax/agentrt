@@ -245,6 +245,13 @@ void orch_adapter_get_stats(orch_adapter_t *adapter,
  */
 bool orch_adapter_is_ready(orch_adapter_t *adapter);
 
+/**
+ * @brief C-L06: 输出编排器适配器统计摘要（单行格式，适合周期性日志）
+ *
+ * @param adapter 适配器句柄
+ */
+void orch_adapter_dump_stats(orch_adapter_t *adapter);
+
 #ifdef __cplusplus
 }
 #endif

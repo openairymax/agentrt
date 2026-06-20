@@ -37,11 +37,13 @@ int route_quality_first(const llm_route_request_t *request,
                                                  LLM_ROUTER_MAX_ENDPOINTS);
 
     if (eligible_count == 0) {
-        AGENTOS_LOG_WARN("QualityFirstRouter: no eligible endpoints");
+        AGENTOS_LOG_WARN("C-L02: Quality: no eligible endpoints "
+                "(caps=0x%x, total_endpoints=%zu) STACK: route_quality_first",
+                request->required_caps, router_ctx_get()->endpoint_count);
         return -1;
     }
 
-    AGENTOS_LOG_DEBUG("QualityFirstRouter: sorting %zu endpoints by quality",
+    AGENTOS_LOG_DEBUG("C-L02: Quality: sorting %zu endpoints by quality",
                       eligible_count);
 
     /* 按优先级排序（priority 越大越优先，相同时按 context_window 降序） */
@@ -64,11 +66,18 @@ int route_quality_first(const llm_route_request_t *request,
 
     /* 日志：打印排序后的端点列表 */
     for (size_t i = 0; i < eligible_count; i++) {
-        AGENTOS_LOG_DEBUG("QualityFirstRouter: rank[%zu] %s/%s priority=%d "
+        AGENTOS_LOG_DEBUG("C-L02: Quality: rank[%zu] %s/%s priority=%d "
                           "context=%u",
                           i, eligible[i]->provider_name, eligible[i]->model_name,
                           eligible[i]->priority, eligible[i]->context_window);
     }
+
+    /* 记录优先级范围 */
+    AGENTOS_LOG_DEBUG("C-L02: Quality: priority range max=%d min=%d "
+                      "across %zu endpoints",
+                      eligible[0]->priority,
+                      eligible[eligible_count - 1]->priority,
+                      eligible_count);
 
     llm_endpoint_t *ep = eligible[0];
     size_t input_tokens = router_estimate_tokens(request->prompt, request->prompt_len);
@@ -80,13 +89,13 @@ int route_quality_first(const llm_route_request_t *request,
     /* 降级：次优端点 */
     if (eligible_count > 1) {
         router_set_fallback(result, eligible[1]);
-        AGENTOS_LOG_DEBUG("QualityFirstRouter: fallback set to %s/%s "
+        AGENTOS_LOG_DEBUG("C-L02: Quality: fallback set to %s/%s "
                           "(priority=%d)",
                           eligible[1]->provider_name, eligible[1]->model_name,
                           eligible[1]->priority);
     }
 
-    AGENTOS_LOG_INFO("QualityFirstRouter: selected %s/%s priority=%d "
+    AGENTOS_LOG_INFO("C-L02: Quality: selected %s/%s priority=%d "
                      "context=%u",
                      ep->provider_name, ep->model_name,
                      ep->priority, ep->context_window);

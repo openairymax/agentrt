@@ -142,6 +142,49 @@ static int monit_on_client(void *service_ctx, agentos_socket_t client_fd)
     return 0;
 }
 
+/* C-L10: 周期性指标上报定时器回调 */
+static void monit_on_metrics_timer(agentos_event_loop_t *loop, uint64_t timer_id,
+                                   void *user_data)
+{
+    (void)loop;
+    (void)timer_id;
+    (void)user_data;
+
+    /* C-L10: 上报 Prometheus scrape 统计 */
+    uint64_t scrape_count = 0, scrape_errors = 0;
+    prometheus_exporter_get_scrape_stats(&scrape_count, &scrape_errors);
+    SVC_LOG_INFO("C-L10: Metrics report — scrapes=%llu errors=%llu",
+                 (unsigned long long)scrape_count,
+                 (unsigned long long)scrape_errors);
+
+    /* C-L10: 更新 scrape 指标到 Prometheus */
+    prometheus_gauge_set("agentos_monit_scrape_count", (double)scrape_count);
+    prometheus_gauge_set("agentos_monit_scrape_errors", (double)scrape_errors);
+
+    /* C-L10: 上报 IPC Bus 路由统计（如果有连接） */
+    if (g_bipc) {
+        ipc_bus_helper_t *ibh = daemon_bootstrap_ipc_get_helper(g_bipc);
+        if (ibh) {
+            uint64_t total_sends = 0, total_routes = 0, route_fallbacks = 0;
+            uint64_t send_failures = 0, bp_drops = 0, bp_rejects = 0;
+            if (ipc_bus_helper_get_routing_stats(ibh, &total_sends, &total_routes,
+                                                  &route_fallbacks, &send_failures,
+                                                  &bp_drops, &bp_rejects) == 0) {
+                if (total_sends > 0 || total_routes > 0) {
+                    SVC_LOG_INFO("C-L10: IPC Bus — sends=%llu routes=%llu fallbacks=%llu "
+                                 "failures=%llu bp_drops=%llu bp_rejects=%llu",
+                                 (unsigned long long)total_sends,
+                                 (unsigned long long)total_routes,
+                                 (unsigned long long)route_fallbacks,
+                                 (unsigned long long)send_failures,
+                                 (unsigned long long)bp_drops,
+                                 (unsigned long long)bp_rejects);
+                }
+            }
+        }
+    }
+}
+
 /* ==================== 请求处理方法 ==================== */
 
 /**
@@ -581,6 +624,11 @@ int main(int argc, char **argv)
     method_dispatcher_register(g_dispatcher, "health_check", on_health_check_method, NULL);
     method_dispatcher_register(g_dispatcher, "generate_report", on_generate_report_method, NULL);
     SVC_LOG_INFO("Registered %d RPC methods", 6);
+
+    /* C-L10: 注册周期性指标上报定时器（每 30s） */
+    daemon_event_driver_add_timer(g_event_driver, 30000,
+                                  monit_on_metrics_timer, NULL);
+    SVC_LOG_INFO("C-L10: Metrics report timer registered (30s interval)");
 
     if (daemon_event_driver_add_server_fd(g_event_driver, (int)server_fd) != 0) {
         SVC_LOG_ERROR("Failed to add server fd to event driver");

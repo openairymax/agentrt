@@ -340,3 +340,14 @@ uint32_t sd_helper_service_count(sd_helper_t *sdh) {
     if (!sdh) return 0;
     return sd_service_count(sdh->sd);
 }
+
+/* ==================== C-L08: 统计摘要 ==================== */
+
+void sd_helper_dump_stats(sd_helper_t *sdh)
+{
+    if (!sdh || !sdh->sd) {
+        SVC_LOG_WARN("C-L08: SD-HELPER-STATS unavailable");
+        return;
+    }
+    sd_dump_stats(sdh->sd);
+}

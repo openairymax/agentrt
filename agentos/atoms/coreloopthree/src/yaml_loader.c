@@ -769,6 +769,9 @@ int agentos_yaml_load(const char *yaml_path,
 int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (!config) return -1;
 
+    AGENTOS_LOG_DEBUG("C-L01: YAML-ENV-OVERRIDE: START");
+    int override_count = 0;
+
     const char *val;
 
     /* LLM 默认提供商 */
@@ -776,6 +779,8 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->llm.default_provider, val,
                     sizeof(config->llm.default_provider));
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_LLM_DEFAULT_PROVIDER=%s", val);
+        override_count++;
     }
 
     /* LLM 路由策略 */
@@ -783,12 +788,17 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->llm.routing.strategy, val,
                     sizeof(config->llm.routing.strategy));
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_LLM_ROUTING_STRATEGY=%s", val);
+        override_count++;
     }
 
     /* LLM 成本预算 */
     val = getenv("AGENTOS_LLM_ROUTING_COST_BUDGET_DAILY_USD");
     if (val) {
         config->llm.routing.cost_budget_daily_usd = atof(val);
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_LLM_ROUTING_COST_BUDGET_DAILY_USD=%.2f",
+                         config->llm.routing.cost_budget_daily_usd);
+        override_count++;
     }
 
     /* 各提供商的 API Key 环境变量覆盖 */
@@ -837,6 +847,8 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->memory.storage_path, val,
                     sizeof(config->memory.storage_path));
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_MEMORY_STORAGE_PATH=%s", val);
+        override_count++;
     }
 
     /* 网关 HTTP 端口 */
@@ -845,6 +857,11 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         int port = atoi(val);
         if (port > 0 && port <= 65535) {
             config->gateway.http.port = (uint16_t)port;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_GATEWAY_HTTP_PORT=%u",
+                             config->gateway.http.port);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_GATEWAY_HTTP_PORT=%s ignored (invalid port)", val);
         }
     }
 
@@ -854,6 +871,11 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         int port = atoi(val);
         if (port > 0 && port <= 65535) {
             config->observability.metrics.port = (uint16_t)port;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_OBSERVABILITY_METRICS_PORT=%u",
+                             config->observability.metrics.port);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_OBSERVABILITY_METRICS_PORT=%s ignored (invalid port)", val);
         }
     }
 
@@ -862,6 +884,8 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->observability.logging.level, val,
                     sizeof(config->observability.logging.level));
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_OBSERVABILITY_LOGGING_LEVEL=%s", val);
+        override_count++;
     }
 
     /* 安全模式 */
@@ -869,6 +893,8 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->security.mode, val,
                     sizeof(config->security.mode));
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_SECURITY_MODE=%s", val);
+        override_count++;
     }
 
     /* 内核内存限制 */
@@ -877,6 +903,11 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         int mb = atoi(val);
         if (mb > 0) {
             config->kernel.memory.max_alloc_mb = (uint32_t)mb;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_MEMORY_MAX_ALLOC_MB=%u",
+                             config->kernel.memory.max_alloc_mb);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_MEMORY_MAX_ALLOC_MB=%s ignored (invalid value)", val);
         }
     }
 
@@ -884,26 +915,54 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     val = getenv("AGENTOS_KERNEL_IPC_MAX_MESSAGE_SIZE");
     if (val) {
         int sz = atoi(val);
-        if (sz > 0) config->kernel.ipc.max_message_size = (uint32_t)sz;
+        if (sz > 0) {
+            config->kernel.ipc.max_message_size = (uint32_t)sz;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_IPC_MAX_MESSAGE_SIZE=%u",
+                             config->kernel.ipc.max_message_size);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_IPC_MAX_MESSAGE_SIZE=%s ignored (invalid value)", val);
+        }
     }
 
     val = getenv("AGENTOS_KERNEL_IPC_SHM_POOL_SIZE_MB");
     if (val) {
         int mb = atoi(val);
-        if (mb > 0) config->kernel.ipc.shm_pool_size_mb = (uint32_t)mb;
+        if (mb > 0) {
+            config->kernel.ipc.shm_pool_size_mb = (uint32_t)mb;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_IPC_SHM_POOL_SIZE_MB=%u",
+                             config->kernel.ipc.shm_pool_size_mb);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_IPC_SHM_POOL_SIZE_MB=%s ignored (invalid value)", val);
+        }
     }
 
     /* 内核调度器配置 */
     val = getenv("AGENTOS_KERNEL_SCHEDULER_MAX_TASKS");
     if (val) {
         int tasks = atoi(val);
-        if (tasks > 0) config->kernel.scheduler.max_tasks = (uint32_t)tasks;
+        if (tasks > 0) {
+            config->kernel.scheduler.max_tasks = (uint32_t)tasks;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_SCHEDULER_MAX_TASKS=%u",
+                             config->kernel.scheduler.max_tasks);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_SCHEDULER_MAX_TASKS=%s ignored (invalid value)", val);
+        }
     }
 
     val = getenv("AGENTOS_KERNEL_SCHEDULER_TIME_SLICE_MS");
     if (val) {
         int ms = atoi(val);
-        if (ms > 0) config->kernel.scheduler.time_slice_ms = (uint32_t)ms;
+        if (ms > 0) {
+            config->kernel.scheduler.time_slice_ms = (uint32_t)ms;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_SCHEDULER_TIME_SLICE_MS=%u",
+                             config->kernel.scheduler.time_slice_ms);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_SCHEDULER_TIME_SLICE_MS=%s ignored (invalid value)", val);
+        }
     }
 
     /* 内核 OOM 水位 */
@@ -912,6 +971,11 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         int pct = atoi(val);
         if (pct >= 50 && pct <= 100) {
             config->kernel.memory.oom_watermark_percent = (uint32_t)pct;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_MEMORY_OOM_WATERMARK_PERCENT=%u",
+                             config->kernel.memory.oom_watermark_percent);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_KERNEL_MEMORY_OOM_WATERMARK_PERCENT=%s ignored (out of range [50,100])", val);
         }
     }
 
@@ -920,13 +984,22 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         /* P1.11.2: 通过环境变量切换 memory provider */
         /* 值: builtin | memoryrovol | auto */
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_MEMORY_PROVIDER=%s", val);
+        override_count++;
     }
 
     /* 多 Agent 配置 */
     val = getenv("AGENTOS_MULTI_AGENT_MAX_CONCURRENT");
     if (val) {
         int n = atoi(val);
-        if (n > 0) config->multi_agent.max_concurrent_agents = (uint32_t)n;
+        if (n > 0) {
+            config->multi_agent.max_concurrent_agents = (uint32_t)n;
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_MULTI_AGENT_MAX_CONCURRENT=%u",
+                             config->multi_agent.max_concurrent_agents);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_MULTI_AGENT_MAX_CONCURRENT=%s ignored (invalid value)", val);
+        }
     }
 
     /* 安全沙箱类型 */
@@ -934,6 +1007,8 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->security.sandbox.type, val,
                     sizeof(config->security.sandbox.type));
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_SECURITY_SANDBOX_TYPE=%s", val);
+        override_count++;
     }
 
     /* 审计日志路径 */
@@ -941,6 +1016,8 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->security.audit.log_path, val,
                     sizeof(config->security.audit.log_path));
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_SECURITY_AUDIT_LOG_PATH=%s", val);
+        override_count++;
     }
 
     /* 可观测性追踪导出器 */
@@ -948,6 +1025,8 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->observability.tracing.exporter, val,
                     sizeof(config->observability.tracing.exporter));
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_OBSERVABILITY_TRACING_EXPORTER=%s", val);
+        override_count++;
     }
 
     /* P1.6: Checkpoint 环境变量覆盖 */
@@ -956,8 +1035,9 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         config->multi_agent.checkpoint_enabled =
             (strcmp(val, "1") == 0 || strcasecmp(val, "true") == 0 ||
              strcasecmp(val, "yes") == 0);
-        AGENTOS_LOG_DEBUG("C-L01: env override checkpoint_enabled=%d",
-                          config->multi_agent.checkpoint_enabled);
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_CHECKPOINT_ENABLED=%s -> %d",
+                         val, config->multi_agent.checkpoint_enabled);
+        override_count++;
     }
 
     val = getenv("AGENTOS_CHECKPOINT_INTERVAL_MS");
@@ -965,8 +1045,11 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         int ms = atoi(val);
         if (ms >= 1000) {
             config->multi_agent.checkpoint_interval_ms = (uint32_t)ms;
-            AGENTOS_LOG_DEBUG("C-L01: env override checkpoint_interval_ms=%u",
-                              config->multi_agent.checkpoint_interval_ms);
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_CHECKPOINT_INTERVAL_MS=%u",
+                             config->multi_agent.checkpoint_interval_ms);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_CHECKPOINT_INTERVAL_MS=%s ignored (< 1000ms)", val);
         }
     }
 
@@ -975,8 +1058,11 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
         int turns = atoi(val);
         if (turns > 0) {
             config->multi_agent.checkpoint_interval_turns = (uint32_t)turns;
-            AGENTOS_LOG_DEBUG("C-L01: env override checkpoint_interval_turns=%u",
-                              config->multi_agent.checkpoint_interval_turns);
+            AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_CHECKPOINT_INTERVAL_TURNS=%u",
+                             config->multi_agent.checkpoint_interval_turns);
+            override_count++;
+        } else {
+            AGENTOS_LOG_WARN("C-L01: ENV-OVERRIDE AGENTOS_CHECKPOINT_INTERVAL_TURNS=%s ignored (invalid value)", val);
         }
     }
 
@@ -984,10 +1070,11 @@ int agentos_yaml_env_override(agentos_yaml_config_t *config) {
     if (val) {
         safe_strcpy(config->multi_agent.checkpoint_path, val,
                     sizeof(config->multi_agent.checkpoint_path));
-        AGENTOS_LOG_DEBUG("C-L01: env override checkpoint_path=%s",
-                          config->multi_agent.checkpoint_path);
+        AGENTOS_LOG_INFO("C-L01: ENV-OVERRIDE AGENTOS_CHECKPOINT_PATH=%s", val);
+        override_count++;
     }
 
+    AGENTOS_LOG_INFO("C-L01: YAML-ENV-OVERRIDE: DONE — %d env var(s) applied", override_count);
     return 0;
 }
 
@@ -1002,72 +1089,139 @@ void agentos_yaml_config_free(agentos_yaml_config_t *config) {
 }
 
 int agentos_yaml_validate(const agentos_yaml_config_t *config) {
-    if (!config) return -1;
+    if (!config) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: NULL config pointer");
+        return -1;
+    }
+
+    AGENTOS_LOG_DEBUG("C-L01: YAML-VALIDATE: START");
 
     /* 验证 version */
-    if (config->version[0] == '\0') return -2;
+    if (config->version[0] == '\0') {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — version is empty");
+        return -2;
+    }
 
     /* 验证 LLM 配置 */
-    if (config->llm.default_provider[0] == '\0') return -3;
-    if (config->llm.provider_count == 0) return -4;
+    if (config->llm.default_provider[0] == '\0') {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — llm.default_provider is empty");
+        return -3;
+    }
+    if (config->llm.provider_count == 0) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — llm.provider_count is 0");
+        return -4;
+    }
 
     /* 验证路由策略 */
-    if (config->llm.routing.strategy[0] == '\0') return -5;
-    if (config->llm.routing.fallback_count == 0) return -6;
+    if (config->llm.routing.strategy[0] == '\0') {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — llm.routing.strategy is empty");
+        return -5;
+    }
+    if (config->llm.routing.fallback_count == 0) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — llm.routing.fallback_count is 0");
+        return -6;
+    }
 
     /* 验证 LLM 缓存配置 */
     if (config->llm.cache.enabled) {
-        if (config->llm.cache.ttl_seconds == 0) return -7;
-        if (config->llm.cache.max_entries == 0) return -8;
+        if (config->llm.cache.ttl_seconds == 0) {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — llm.cache.ttl_seconds is 0");
+            return -7;
+        }
+        if (config->llm.cache.max_entries == 0) {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — llm.cache.max_entries is 0");
+            return -8;
+        }
     }
 
     /* 验证内存配置 */
     if (config->memory.enabled) {
-        if (config->memory.storage_path[0] == '\0') return -9;
+        if (config->memory.storage_path[0] == '\0') {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — memory.storage_path is empty");
+            return -9;
+        }
     }
 
     /* 验证安全配置 */
     if (config->security.enabled) {
-        if (config->security.mode[0] == '\0') return -10;
+        if (config->security.mode[0] == '\0') {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — security.mode is empty");
+            return -10;
+        }
     }
 
     /* 验证网关配置 */
     if (config->gateway.enabled) {
-        if (config->gateway.http.port == 0) return -11;
+        if (config->gateway.http.port == 0) {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — gateway.http.port is 0");
+            return -11;
+        }
     }
 
     /* 验证可观测性配置 */
     if (config->observability.metrics.enabled) {
-        if (config->observability.metrics.port == 0) return -12;
+        if (config->observability.metrics.port == 0) {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — observability.metrics.port is 0");
+            return -12;
+        }
     }
 
     /* 验证内核配置 */
-    if (config->kernel.memory.oom_watermark_percent > 100) return -13;
-    if (config->kernel.memory.oom_watermark_percent < 50) return -14;
-    if (config->kernel.ipc.max_message_size == 0) return -15;
-    if (config->kernel.ipc.shm_pool_size_mb == 0) return -16;
-    if (config->kernel.scheduler.max_tasks == 0) return -17;
-    if (config->kernel.scheduler.time_slice_ms == 0) return -18;
-    if (config->kernel.memory.max_alloc_mb == 0) return -19;
+    if (config->kernel.memory.oom_watermark_percent > 100) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — oom_watermark_percent=%u > 100",
+                         config->kernel.memory.oom_watermark_percent);
+        return -13;
+    }
+    if (config->kernel.memory.oom_watermark_percent < 50) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — oom_watermark_percent=%u < 50",
+                         config->kernel.memory.oom_watermark_percent);
+        return -14;
+    }
+    if (config->kernel.ipc.max_message_size == 0) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — ipc.max_message_size is 0");
+        return -15;
+    }
+    if (config->kernel.ipc.shm_pool_size_mb == 0) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — ipc.shm_pool_size_mb is 0");
+        return -16;
+    }
+    if (config->kernel.scheduler.max_tasks == 0) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — scheduler.max_tasks is 0");
+        return -17;
+    }
+    if (config->kernel.scheduler.time_slice_ms == 0) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — scheduler.time_slice_ms is 0");
+        return -18;
+    }
+    if (config->kernel.memory.max_alloc_mb == 0) {
+        AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — memory.max_alloc_mb is 0");
+        return -19;
+    }
 
     /* 验证多 Agent 配置 */
     if (config->multi_agent.enabled) {
-        if (config->multi_agent.max_concurrent_agents == 0) return -20;
-        if (config->multi_agent.communication.protocol[0] == '\0') return -21;
-        if (config->multi_agent.collaboration.default_pattern[0] == '\0') return -22;
+        if (config->multi_agent.max_concurrent_agents == 0) {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — multi_agent.max_concurrent_agents is 0");
+            return -20;
+        }
+        if (config->multi_agent.communication.protocol[0] == '\0') {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — multi_agent.communication.protocol is empty");
+            return -21;
+        }
+        if (config->multi_agent.collaboration.default_pattern[0] == '\0') {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — multi_agent.collaboration.default_pattern is empty");
+            return -22;
+        }
     }
 
     /* 验证 Hook 配置 */
     if (config->hooks.enabled) {
-        /* hook_dirs 可以为空（使用默认目录），不强制要求 */
         for (uint32_t i = 0; i < config->hooks.global_hooks.on_tool_call_count; i++) {
-            if (config->hooks.global_hooks.on_tool_call[i].hook[0] == '\0') return -23;
+            if (config->hooks.global_hooks.on_tool_call[i].hook[0] == '\0') {
+                AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — hooks.on_tool_call[%u].hook is empty", i);
+                return -23;
+            }
         }
-    }
-
-    /* 验证插件配置 */
-    if (config->plugins.enabled && config->plugins.plugin_dir_count == 0 && config->plugins.auto_discover) {
-        /* auto_discover 模式下 plugin_dirs 可以为空 */
     }
 
     /* 验证可观测性日志级别 */
@@ -1080,7 +1234,11 @@ int agentos_yaml_validate(const agentos_yaml_config_t *config) {
                 break;
             }
         }
-        if (!valid) return -24;
+        if (!valid) {
+            AGENTOS_LOG_WARN("C-L01: YAML-VALIDATE: FAIL — invalid logging level '%s'",
+                             config->observability.logging.level);
+            return -24;
+        }
     }
 
     /* 验证安全模式 */
@@ -1118,6 +1276,17 @@ int agentos_yaml_validate(const agentos_yaml_config_t *config) {
             if (!valid) return -26;
         }
     }
+
+    AGENTOS_LOG_DEBUG("C-L01: YAML-VALIDATE: OK (version=%s, providers=%u, routing=%s, "
+                      "llm=%s memory=%s security=%s gateway=%s hooks=%s plugins=%s)",
+                      config->version, config->llm.provider_count,
+                      config->llm.routing.strategy,
+                      config->llm.default_provider[0] ? "on" : "off",
+                      config->memory.enabled ? "on" : "off",
+                      config->security.enabled ? "on" : "off",
+                      config->gateway.enabled ? "on" : "off",
+                      config->hooks.enabled ? "on" : "off",
+                      config->plugins.enabled ? "on" : "off");
 
     return 0;
 }

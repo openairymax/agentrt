@@ -347,7 +347,152 @@ static inline char *agentos_strndup(const char *str, size_t n)
     agentos_free(ptr); \
 } while (0)
 
-/* ==================== P1.19: Arena 分配器集成 ==================== */
+/* ==================== P0.11: AUTO_FREE 自动清理宏 ==================== */
+
+/**
+ * @defgroup auto_free AUTO_FREE 自动清理（P0.11.2）
+ * @{
+ *
+ * AUTO_FREE 使用 GCC/Clang 的 __attribute__((cleanup)) 实现自动内存释放。
+ * 当变量离开作用域时自动调用 agentos_free，无需手动释放。
+ *
+ * 用法：
+ *   AUTO_FREE char *buf = AGENTOS_MALLOC(1024);
+ *   // buf 在离开作用域时自动释放
+ *
+ * MSVC 不支持 cleanup 属性，回退到手动释放。
+ */
+
+#if defined(__GNUC__) || defined(__clang__)
+
+/**
+ * @brief 自动清理实现函数（由 AUTO_FREE 宏内部调用）
+ *
+ * 当 AUTO_FREE 标记的变量离开作用域时自动调用此函数。
+ * 如果指针非空，释放内存并将指针置 NULL。
+ *
+ * @param p 指向指针变量的指针
+ */
+static inline void agentos_auto_free_impl(void *p)
+{
+    void **pp = (void **)p;
+    if (*pp) {
+        agentos_free(*pp);
+        *pp = NULL;
+    }
+}
+
+/**
+ * @def AUTO_FREE
+ * @brief 自动内存清理属性（GCC/Clang）
+ *
+ * 用于局部变量声明，变量离开作用域时自动释放内存。
+ * 适用于函数返回前需要释放的临时缓冲区。
+ *
+ * 使用示例：
+ *   AUTO_FREE char *buf = (char *)AGENTOS_MALLOC(1024);
+ *   // 使用 buf...
+ *   // 函数返回时 buf 自动释放，无需手动 AGENTOS_FREE(buf)
+ */
+#define AUTO_FREE __attribute__((cleanup(agentos_auto_free_impl)))
+
+#elif defined(_MSC_VER)
+
+/**
+ * @def AUTO_FREE
+ * @brief 自动内存清理属性（MSVC — 回退到手动释放）
+ *
+ * MSVC 不支持 __attribute__((cleanup))，AUTO_FREE 为空宏。
+ * 使用 MSVC 时需手动调用 AGENTOS_FREE。
+ */
+#define AUTO_FREE /* MSVC: manual cleanup required */
+
+#else
+
+/**
+ * @def AUTO_FREE
+ * @brief 自动内存清理属性（未知编译器 — 回退到手动释放）
+ */
+#define AUTO_FREE /* unsupported compiler: manual cleanup required */
+
+#endif
+
+/** @} */  // end of auto_free
+
+/* ==================== P0.11: AGENTOS_SECURE_FREE 安全清零释放 ==================== */
+
+/**
+ * @defgroup secure_free 安全内存释放（P0.11.3）
+ * @{
+ *
+ * AGENTOS_SECURE_FREE 在释放敏感内存前先清零内容，防止敏感数据
+ * （密钥、令牌、PII）残留在内存中。
+ *
+ * 清零操作使用 volatile 指针和内存屏障，防止编译器优化掉清零操作。
+ * 适用于：
+ *   - API 密钥、Token
+ *   - 用户密码、凭证
+ *   - 个人身份信息（PII）
+ *   - 加密密钥材料
+ */
+
+/**
+ * @def AGENTOS_SECURE_FREE(ptr, size)
+ * @brief 安全清零并释放内存
+ *
+ * 1. 使用 volatile 指针将内存区域清零
+ * 2. 插入内存屏障防止编译器重排或优化掉清零
+ * 3. 调用 AGENTOS_FREE 释放内存
+ * 4. 将指针置为 NULL
+ *
+ * @param ptr  指向要释放的内存的指针变量
+ * @param size 内存块大小（字节），必须 > 0
+ *
+ * 使用示例：
+ *   char *api_key = AGENTOS_MALLOC(256);
+ *   // 使用 api_key...
+ *   AGENTOS_SECURE_FREE(api_key, 256);
+ *   // api_key 现在为 NULL，原内存内容已清零
+ *
+ * 安全测试验证：
+ *   1. 分配内存并写入已知模式
+ *   2. 调用 AGENTOS_SECURE_FREE
+ *   3. 检查内存是否已被清零（通过 /proc/self/mem 或调试器）
+ *
+ * 注意：
+ *   - MSVC 使用 SecureZeroMemory 而非手动循环
+ *   - 对于堆分配的内存，清零后释放前可能被其他线程读取
+ *   - 对于极高安全要求，考虑使用 mlock/munlock 防止换页到磁盘
+ */
+#if defined(_MSC_VER)
+/* MSVC 使用 SecureZeroMemory */
+#include <windows.h>
+#define AGENTOS_SECURE_FREE(ptr, size) do { \
+    if ((ptr) && (size) > 0) { \
+        SecureZeroMemory((ptr), (size)); \
+    } \
+    AGENTOS_FREE(ptr); \
+    (ptr) = NULL; \
+} while (0)
+#else
+/* GCC/Clang/Linux: 使用 volatile + 内存屏障 */
+#define AGENTOS_SECURE_FREE(ptr, size) do { \
+    if ((ptr) && (size) > 0) { \
+        volatile char *__agentos_sf_ptr = (volatile char *)(ptr); \
+        for (size_t __agentos_sf_i = 0; \
+             __agentos_sf_i < (size); \
+             __agentos_sf_i++) { \
+            __agentos_sf_ptr[__agentos_sf_i] = 0; \
+        } \
+        /* 内存屏障：防止编译器优化掉清零操作 */ \
+        __asm__ __volatile__("" : : "r"(__agentos_sf_ptr) : "memory"); \
+    } \
+    AGENTOS_FREE(ptr); \
+    (ptr) = NULL; \
+} while (0)
+#endif
+
+/** @} */  // end of secure_free
 
 /**
  * @defgroup arena_alloc Arena 短生命周期分配

@@ -198,67 +198,170 @@ run_valgrind_tests() {
 }
 
 # ============================================================================
+# Daemon 进程 RSS 采样
+# ============================================================================
+DAEMON_NAMES=(
+    "corekern" "coreloopthree" "taskflow" "memory"
+    "channel_d" "monit_d" "observe_d"
+    "llm_d" "tool_d" "market_d" "sched_d"
+    "hook_d" "plugin_d" "info_d" "notify_d"
+    "gateway_d"
+)
+
+# RSS 采样间隔（秒）
+RSS_SAMPLE_INTERVAL=60
+# RSS 增长阈值（百分比）— 超过此值判定为泄漏
+RSS_GROWTH_THRESHOLD=5
+# RSS 稳定期（秒）— 采样前等待 daemon 启动稳定
+RSS_WARMUP_SECONDS=120
+
+# 采样单个 daemon 的 RSS (KB)
+sample_daemon_rss() {
+    local daemon_name="$1"
+    local pid=$(pgrep -f "${daemon_name}" 2>/dev/null | head -1)
+    if [ -z "$pid" ]; then
+        echo "0"
+        return
+    fi
+    # 读取 /proc/PID/status 中的 VmRSS
+    local rss=$(awk '/VmRSS:/ {print $2}' "/proc/$pid/status" 2>/dev/null)
+    echo "${rss:-0}"
+}
+
+# 采样所有 daemon 的 RSS，返回 JSON 格式
+sample_all_rss() {
+    local timestamp=$(date +%s)
+    local result="{\"timestamp\": $timestamp"
+    for daemon in "${DAEMON_NAMES[@]}"; do
+        local rss=$(sample_daemon_rss "$daemon")
+        result+=", \"${daemon}\": $rss"
+    done
+    result+="}"
+    echo "$result"
+}
+
+# RSS 增长分析
+# 输入: 初始 RSS 采样文件, 当前 RSS 采样文件
+# 输出: JSON 格式的增长分析
+analyze_rss_growth() {
+    local initial_file="$1"
+    local current_file="$2"
+    local results=""
+
+    for daemon in "${DAEMON_NAMES[@]}"; do
+        local initial_rss=$(grep -o "\"${daemon}\": [0-9]*" "$initial_file" 2>/dev/null | grep -o '[0-9]*$' || echo "0")
+        local current_rss=$(grep -o "\"${daemon}\": [0-9]*" "$current_file" 2>/dev/null | grep -o '[0-9]*$' || echo "0")
+
+        if [ "$initial_rss" = "0" ] || [ "$current_rss" = "0" ]; then
+            continue
+        fi
+
+        local growth=$(( current_rss - initial_rss ))
+        local growth_pct=0
+        if [ "$initial_rss" -gt 0 ]; then
+            growth_pct=$(( growth * 100 / initial_rss ))
+        fi
+
+        # 取绝对值用于比较
+        local abs_growth_pct=${growth_pct#-}
+
+        if [ "$abs_growth_pct" -gt "$RSS_GROWTH_THRESHOLD" ]; then
+            if [ "$growth" -gt 0 ]; then
+                results+="$(printf '  {\"daemon\": \"%s\", \"initial_rss_kb\": %d, \"current_rss_kb\": %d, \"growth_kb\": %d, \"growth_pct\": %d, \"status\": \"LEAK\"}\n' \
+                    "$daemon" "$initial_rss" "$current_rss" "$growth" "$growth_pct")"
+            fi
+        fi
+    done
+
+    if [ -z "$results" ]; then
+        echo "PASS: All daemons RSS growth within ${RSS_GROWTH_THRESHOLD}% threshold"
+    else
+        echo -e "$results"
+    fi
+}
+
+# ============================================================================
 # 长期浸泡测试（仅 release/weekly 模式）
+# 包含：RSS 采样 + 增长判定 + daemon 进程监控
 # ============================================================================
 run_soak_test() {
     if [ "$MODE" = "pr" ]; then
-        log_info "PR mode: skipping long-term soak test"
+        log_info "PR mode: skipping long-term soak test (use --mode=weekly or --mode=release)"
         return
     fi
 
-    log_info "--- 长期浸泡测试 (${TIMEOUT_SECONDS}s) ---"
+    log_info "--- 长期浸泡测试 (${TIMEOUT_SECONDS}s, RSS threshold: ${RSS_GROWTH_THRESHOLD}%) ---"
 
-    cd "${BUILD_DIR}"
+    # 初始 RSS 采样文件
+    local initial_rss_file="${ARTIFACTS_DIR}/rss_initial.json"
+    local rss_log="${ARTIFACTS_DIR}/rss_samples.jsonl"
+    local growth_report="${ARTIFACTS_DIR}/rss_growth_report.txt"
 
-    # 构建一个持续运行的 soak 测试程序
-    local soak_src="${PROJECT_ROOT}/ci-artifacts/leak-detection/soak_test.c"
-    cat > "$soak_src" << 'SOAKEOF'
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
+    # 等待 daemon 启动稳定
+    log_info "Waiting ${RSS_WARMUP_SECONDS}s for daemon stabilization..."
+    sleep "$RSS_WARMUP_SECONDS"
 
-#define ALLOC_SIZE 4096
-#define SLEEP_US   100000  /* 100ms */
+    # 基线采样
+    log_info "Taking baseline RSS snapshot..."
+    sample_all_rss > "$initial_rss_file"
+    log_info "Baseline RSS: $(cat "$initial_rss_file")"
 
-int main(void) {
-    time_t start = time(NULL);
-    unsigned long alloc_count = 0;
-    unsigned long free_count = 0;
+    # 定期采样循环
+    local soak_start=$(date +%s)
+    local sample_count=0
+    local max_samples=$(( (TIMEOUT_SECONDS - RSS_WARMUP_SECONDS) / RSS_SAMPLE_INTERVAL ))
 
-    printf("Soak test started at %ld\n", (long)start);
-    fflush(stdout);
+    while true; do
+        local now=$(date +%s)
+        local elapsed=$(( now - soak_start ))
 
-    while (1) {
-        /* 分配/释放循环，模拟正常运行时内存使用 */
-        void *p = malloc(ALLOC_SIZE);
-        if (p) {
-            memset(p, 0xAB, ALLOC_SIZE);
-            alloc_count++;
-        }
-        free(p);
-        free_count++;
+        if [ "$elapsed" -ge "$TIMEOUT_SECONDS" ]; then
+            break
+        fi
 
-        usleep(SLEEP_US);
+        sample_count=$((sample_count + 1))
+        local sample=$(sample_all_rss)
+        echo "$sample" >> "$rss_log"
 
-        if (alloc_count % 10000 == 0) {
-            printf("Soak: %lu allocs, %lu frees, elapsed=%lds\n",
-                   alloc_count, free_count,
-                   (long)(time(NULL) - start));
-            fflush(stdout);
-        }
-    }
+        # 每 10 次采样做一次增长分析
+        if [ $((sample_count % 10)) -eq 0 ]; then
+            local current_rss_file="${ARTIFACTS_DIR}/rss_current_${sample_count}.json"
+            echo "$sample" > "$current_rss_file"
 
-    return 0;
-}
-SOAKEOF
+            local growth_result=$(analyze_rss_growth "$initial_rss_file" "$current_rss_file")
+            log_info "RSS check #${sample_count} (${elapsed}s elapsed): ${growth_result}"
 
-    gcc -o "${BUILD_DIR}/soak_test" "$soak_src" -fsanitize=address,leak
+            if echo "$growth_result" | grep -q "LEAK"; then
+                log_fail "RSS growth detected! See ${growth_report}"
+                echo "$growth_result" >> "$growth_report"
+                if [ "$MODE" = "release" ]; then
+                    log_fail "Release mode: aborting on RSS leak detection"
+                    exit 1
+                fi
+            fi
+        fi
 
-    timeout "${TIMEOUT_SECONDS}" "${BUILD_DIR}/soak_test" 2>&1 || true
+        sleep "$RSS_SAMPLE_INTERVAL"
+    done
 
-    log_info "Soak test completed"
+    # 最终分析
+    local final_rss_file="${ARTIFACTS_DIR}/rss_final.json"
+    sample_all_rss > "$final_rss_file"
+
+    log_info "Soak test completed: ${sample_count} RSS samples over ${TIMEOUT_SECONDS}s"
+    log_info "Initial RSS: $(cat "$initial_rss_file")"
+    log_info "Final RSS:   $(cat "$final_rss_file")"
+
+    local final_growth=$(analyze_rss_growth "$initial_rss_file" "$final_rss_file")
+    if echo "$final_growth" | grep -q "LEAK"; then
+        log_fail "FINAL RSS GROWTH EXCEEDS THRESHOLD:"
+        echo "$final_growth" >> "$growth_report"
+        if [ "$MODE" = "release" ]; then
+            exit 1
+        fi
+    else
+        log_pass "RSS growth within ${RSS_GROWTH_THRESHOLD}% threshold for all daemons"
+    fi
 }
 
 # ============================================================================
@@ -276,6 +379,7 @@ generate_report() {
 - **Mode**: ${MODE}
 - **Timestamp**: ${timestamp}
 - **Timeout**: ${TIMEOUT_SECONDS}s
+- **RSS Growth Threshold**: ${RSS_GROWTH_THRESHOLD}%
 - **ASan**: $([ "$ASAN_AVAILABLE" = "1" ] && echo "enabled" || echo "unavailable")
 - **Valgrind**: $([ "$VALGRIND_AVAILABLE" = "1" ] && echo "enabled" || echo "unavailable")
 
@@ -287,10 +391,28 @@ $(find "${ARTIFACTS_DIR}" -name "asan_report.*" -exec echo "- {}" \; 2>/dev/null
 
 $(find "${ARTIFACTS_DIR}" -name "valgrind_*.log" -exec echo "- {}" \; 2>/dev/null || echo "No Valgrind reports found")
 
+## RSS Growth Analysis
+
+$(if [ -f "${ARTIFACTS_DIR}/rss_final.json" ]; then
+    echo "Initial RSS: $(cat "${ARTIFACTS_DIR}/rss_initial.json" 2>/dev/null || echo 'N/A')"
+    echo ""
+    echo "Final RSS:   $(cat "${ARTIFACTS_DIR}/rss_final.json" 2>/dev/null || echo 'N/A')"
+    echo ""
+    if [ -f "${ARTIFACTS_DIR}/rss_growth_report.txt" ]; then
+        echo "Growth report:"
+        cat "${ARTIFACTS_DIR}/rss_growth_report.txt"
+    else
+        echo "All daemons within ${RSS_GROWTH_THRESHOLD}% RSS growth threshold"
+    fi
+else
+    echo "RSS growth analysis not performed (weekly/release mode only)"
+fi)
+
 ## Summary
 
 $(if [ -z "$(find "${ARTIFACTS_DIR}" -name "asan_report.*" 2>/dev/null)" ] && \
-      [ -z "$(find "${ARTIFACTS_DIR}" -name "valgrind_*.log" -exec grep -l "definitely lost" {} \; 2>/dev/null)" ]; then
+      [ -z "$(find "${ARTIFACTS_DIR}" -name "valgrind_*.log" -exec grep -l "definitely lost" {} \; 2>/dev/null)" ] && \
+      [ ! -f "${ARTIFACTS_DIR}/rss_growth_report.txt" ]; then
     echo "No memory leaks detected."
 else
     echo "Memory leaks detected. Check the artifacts directory for details."
@@ -302,9 +424,13 @@ EOF
     # 统计泄漏数量
     local asan_leaks=$(find "${ARTIFACTS_DIR}" -name "asan_report.*" 2>/dev/null | wc -l)
     local vg_leaks=$(find "${ARTIFACTS_DIR}" -name "valgrind_*.log" -exec grep -l "definitely lost" {} \; 2>/dev/null | wc -l)
+    local rss_leaks=0
+    if [ -f "${ARTIFACTS_DIR}/rss_growth_report.txt" ]; then
+        rss_leaks=$(grep -c "LEAK" "${ARTIFACTS_DIR}/rss_growth_report.txt" 2>/dev/null || echo 0)
+    fi
 
-    if [ "$asan_leaks" -gt 0 ] || [ "$vg_leaks" -gt 0 ]; then
-        log_fail "Leaks detected: ASan=${asan_leaks}, Valgrind=${vg_leaks}"
+    if [ "$asan_leaks" -gt 0 ] || [ "$vg_leaks" -gt 0 ] || [ "$rss_leaks" -gt 0 ]; then
+        log_fail "Leaks detected: ASan=${asan_leaks}, Valgrind=${vg_leaks}, RSS=${rss_leaks}"
         if [ "$MODE" = "release" ]; then
             exit 1
         fi
