@@ -14,12 +14,16 @@ docker/
 ├── Dockerfile                          # 多阶段构建镜像（builder → runtime → development）
 ├── docker-compose.yml                  # 基础服务编排（Gateway + Redis + Prometheus + Grafana）
 ├── docker-compose.dev.yml              # 开发调试环境覆盖
+├── docker-compose.test.yml             # 测试环境覆盖
+├── docker-compose.staging.yml          # 预发布环境覆盖
+├── docker-compose.preview.yml          # 预览环境覆盖
 ├── docker-compose.prod.yml             # 生产环境覆盖
 ├── .env.example                        # 环境变量模板
 ├── monitoring/                         # 监控配置
 │   ├── prometheus.yml                  # Prometheus 采集配置
 │   ├── alerts.yml                      # 告警规则
 │   └── grafana_agentos_dashboard.json  # Grafana 仪表盘
+├── secrets/                            # Docker Swarm 密钥目录（.gitkeep）
 └── README.md                           # 本文件
 ```
 

@@ -54,7 +54,7 @@ typedef struct agentos_manager_adapter_s agentos_manager_adapter_t;
  * 加载 agentos.yaml 配置，初始化全局配置和热重载系统。
  * 此函数应在 agentos_init() 之后、agentos_loop_create() 之前调用。
  *
- * @param yaml_path agentos.yaml 路径（NULL 使用 ./agentos.yaml）
+ * @param yaml_path agentos.yaml 路径（NULL 使用 ./configs/agentos.yaml）
  * @param out_adapter 输出适配器句柄
  * @return 0 成功，非0 失败
  *

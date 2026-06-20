@@ -17,14 +17,12 @@
 
 ## 与 agentos/ 模块对应关系
 
+> **注**：Docker 容器化部署已迁移至 `deploy/docker/`，详见 [deploy/docker/README.md](../../deploy/docker/README.md)。
+
 | scripts/ops/ 模块 | 对应的 agentos/ 模块 | 用途 |
 |-------------------|---------------------|------|
-| `deploy/Dockerfile.kernel` | `atoms/`, `commons/`, `cupolas/` | 内核基础镜像，包含 C/C++ 编译依赖和内核组件 |
-| `deploy/Dockerfile.service` | `daemon/`, `gateway/`, `heapstore/`, `manager/` | 服务层镜像，包含完整运行时和所有守护进程 |
-| `deploy/docker-compose.*.yml` | `daemon/`, `gateway/` | 多环境编排，覆盖 gateway_d, llm_d, sched_d, market_d, monit_d 等服务 |
-| `deploy/build.sh` | `daemon/`, `gateway/` | 镜像构建脚本（dev/release 模式） |
-| `deploy/quickstart.sh` | 全部模块 | 一键快速入门（环境检查→镜像构建→服务启动） |
-| `deploy/check_config.sh` | `manager/` | 配置和环境检查脚本 |
+| `bin/agentrt-bootstrap.sh` | `daemon/`, `gateway/` | 按 DAG 层级顺序一键启动所有 daemon |
+| `bin/quickstart.sh` | 全部模块 | 5 分钟快速创建示例 Agent 项目 |
 | `benchmark/benchmark_core.py` | `atoms/` | 测试框架核心（测试定义/执行/监控/结果收集） |
 | `benchmark/statistics_engine.py` | `atoms/corekern/`, `atoms/coreloopthree/` | 统计计算引擎（分布拟合/显著性检验/回归分析） |
 | `benchmark/report_generator.py` | 全部模块 | 报告生成器（HTML/Markdown/PDF/JSON/Console） |
@@ -47,20 +45,10 @@
 ```
 ops/
 ├── README.md                              # 本文档
-├── deploy/                                # Docker 容器化部署（14 个文件）
-│   ├── Dockerfile.kernel                  #   内核基础镜像（Ubuntu 22.04）
-│   ├── Dockerfile.service                 #   服务层镜像（自包含构建）
-│   ├── Makefile                           #   Docker 操作 Makefile
-│   ├── build.sh                           #   镜像构建脚本（dev/release 模式）
-│   ├── check_config.sh                    #   配置检查脚本
-│   ├── quickstart.sh                      #   一键快速入门
-│   ├── docker-compose.yml                 #   默认编排（开发环境）
-│   ├── docker-compose.preview.yml         #   预览环境
-│   ├── docker-compose.staging.yml         #   预发布环境
-│   ├── docker-compose.prod.yml            #   生产环境
-│   ├── .env.example                       #   环境变量模板
-│   ├── .gitignore                         #   Git 忽略规则
-│   └── secrets/                           #   密钥目录（.gitkeep）
+├── bin/                                   # 运维入口脚本（2 个文件）
+│   ├── agentrt-bootstrap.sh               #   AgentRT 一键按序启动所有 daemon
+│   └── quickstart.sh                      #   5 分钟快速创建示例 Agent 项目
+├── deploy/                                # Docker 部署已迁移至 deploy/docker/（仅保留指向 README）
 ├── benchmark/                             # 性能基准测试框架（6 个文件）
 │   ├── README.md                          #   基准测试框架说明文档
 │   ├── benchmark_core.py                  #   测试框架核心（测试定义/执行/监控/结果收集）
@@ -88,21 +76,18 @@ ops/
 
 ## 核心组件说明
 
-### deploy/ — Docker 容器化部署
+### deploy/ — Docker 容器化部署（已迁移）
 
-Docker 容器化部署方案，采用双 Dockerfile 分层架构：
+Docker 容器化部署方案已迁移至 `deploy/docker/`，采用单 Dockerfile 多阶段构建架构。原 `scripts/ops/deploy/` 下的双 Dockerfile（内核 + 服务层）配置已合并为统一的 `deploy/docker/Dockerfile`（多 daemon 运行时镜像）。
 
-- **Dockerfile.kernel**：内核基础镜像，基于 Ubuntu 22.04，包含 C/C++ 编译依赖和 `atoms/`、`commons/`、`cupolas/` 内核组件的编译产物。作为服务层镜像的构建基础，优化构建缓存。
-- **Dockerfile.service**：服务层镜像，基于内核基础镜像，包含 `daemon/`、`gateway/`、`heapstore/`、`manager/` 的完整运行时和所有守护进程。采用自包含构建模式，确保镜像可独立运行。
-- **docker-compose.yml**：默认编排（开发环境），服务直接暴露端口，启用调试日志。
-- **docker-compose.preview.yml**：预览环境，增加基本资源限制和健康检查。
-- **docker-compose.staging.yml**：预发布环境，配置与生产环境一致，用于最终验证。
-- **docker-compose.prod.yml**：生产环境，高可用配置、安全加固、监控完备、资源限制严格。
-- **build.sh**：镜像构建脚本，支持 `--dev`（开发模式，包含调试工具）和 `--release`（发布模式，精简镜像）两种构建模式。
-- **quickstart.sh**：一键快速入门，自动执行环境检查→镜像构建→服务启动全流程。
-- **check_config.sh**：配置和环境检查脚本，验证 Docker 版本、磁盘空间、端口占用等前置条件。
-- **Makefile**：Docker 操作 Makefile，提供 `make build`、`make up`、`make down`、`make clean` 等快捷命令。
-- **secrets/**：密钥目录，通过 `.gitkeep` 保持目录结构，实际密钥文件不应提交到版本控制。
+多环境编排（dev/test/staging/preview/prod）、监控集成（Prometheus + Grafana）和密钥目录均位于 `deploy/docker/`，详见 [deploy/docker/README.md](../../deploy/docker/README.md)。
+
+### bin/ — 运维入口脚本
+
+运维操作的入口脚本集合：
+
+- **agentrt-bootstrap.sh**：AgentRT 一键启动脚本，按 DAG 层级顺序启动所有 daemon（5 层启动 DAG：基础设施→核心服务→Agent 服务→业务服务→网关），等待每层健康检查通过后再启动下一层。支持 `-c`（配置文件）、`-b`（二进制目录）、`-r`（运行时目录）、`-t`（超时）、`-s`（静默）、`-n`（dry-run）等选项。`scripts/install/agentrt-bootstrap.sh` 为其安装侧包装器。
+- **quickstart.sh**：5 分钟快速创建示例 Agent 项目脚本，从 `examples/` 复制指定示例项目到目标目录，生成默认 `config.yaml` 和 `agents/main.agent.yaml`，引导新用户快速上手。
 
 ### benchmark/ — 性能基准测试框架
 
@@ -140,31 +125,22 @@ Docker 容器化部署方案，采用双 Dockerfile 分层架构：
 
 ### Docker 部署
 
+Docker 部署配置已迁移至 `deploy/docker/`，以下为常用命令：
+
 ```bash
-# 一键快速启动（环境检查→镜像构建→服务启动）
-cd scripts/ops/deploy
-./quickstart.sh
+# 开发环境启动
+docker-compose -f deploy/docker/docker-compose.yml \
+               -f deploy/docker/docker-compose.dev.yml up -d
 
-# 手动构建镜像
-./build.sh --release
+# 生产环境启动
+docker-compose -f deploy/docker/docker-compose.yml \
+               -f deploy/docker/docker-compose.prod.yml up -d
 
-# 开发模式构建
-./build.sh --dev
+# 预发布环境启动
+docker-compose -f deploy/docker/docker-compose.staging.yml up -d
 
-# 启动开发环境
-docker-compose up -d
-
-# 启动生产环境
-docker-compose -f docker-compose.prod.yml up -d
-
-# 使用 Makefile 快捷命令
-make build
-make up
-make down
-make clean
-
-# 配置检查
-./check_config.sh
+# 预览环境启动
+docker-compose -f deploy/docker/docker-compose.preview.yml up -d
 ```
 
 ### 性能基准测试
@@ -229,9 +205,8 @@ bash scripts/ops/tests/shell/test_common_utils.sh
 
 | 子模块 | 核心依赖 | 说明 |
 |--------|---------|------|
-| `deploy/` | Docker Engine 20.10+, Docker Compose v2 | 容器化部署需要 Docker 和 Docker Compose |
-| `deploy/Dockerfile.kernel` | Ubuntu 22.04 基础镜像, GCC, CMake | 内核镜像包含完整的 C/C++ 编译工具链 |
-| `deploy/Dockerfile.service` | Python 3.10+, Node.js 18+ | 服务层镜像包含 Python 和 Node.js 运行时 |
+| `bin/` | Bash 4.0+ | 运维入口脚本为纯 Bash 实现，依赖已安装的 daemon 二进制 |
+| `deploy/` | Docker Engine 20.10+, Docker Compose v2 | 容器化部署已迁移至 `deploy/docker/`，详见对应 README |
 | `benchmark/` | Python 3.8+, numpy, scipy, matplotlib | 统计计算依赖 numpy/scipy，报告生成依赖 matplotlib |
 | `lib/` | Bash 4.0+ | Shell 公共库为纯 Bash 实现，无外部依赖 |
 | `tests/python/` | Python 3.8+, pytest 7.0+ | Python 测试使用 pytest 框架 |

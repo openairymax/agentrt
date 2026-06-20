@@ -106,9 +106,9 @@ class CodeReviewSkill(SkillPlugin):
 
 ### 4. 利用 ecosystem.skills
 
-AgentRT 生态系统中已内置 `CodeReviewSkill`（位于 `ecosystem/skills/code_review.py`）。本示例展示了两种用法：
+AgentRT 生态系统中已内置 `CodeReviewSkill`（位于 `ecosystem/skills/src/code_review.py`）。本示例展示了两种用法：
 
-- **直接引用**：在 `agent.yaml` 中引用 `ecosystem.skills.code_review:CodeReviewSkill`
+- **直接引用**：在 `agent.yaml` 中引用 `ecosystem.skills.src.code_review:CodeReviewSkill`
 - **自定义扩展**：继承并扩展，添加项目特定的审查规则
 
 ## 扩展建议

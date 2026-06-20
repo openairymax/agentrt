@@ -31,7 +31,7 @@ LLM 生命周期:
 ## 使用方式
 
 ```python
-from ecosystem.hooks.security_reminder import SecurityReminderHook
+from ecosystem.hooks.src.security_reminder import SecurityReminderHook
 
 hook = SecurityReminderHook()
 # Hook 在 Agent 启动时自动注入安全提醒到 System Prompt
