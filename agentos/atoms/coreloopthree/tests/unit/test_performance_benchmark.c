@@ -543,7 +543,7 @@ static void bench_mutex_lock_unlock(void)
 int main(void)
 {
     printf("\n========================================\n");
-    printf("  AgentOS Performance Benchmark Suite\n");
+    printf("  AgentRT Performance Benchmark Suite\n");
     printf("========================================\n\n");
 
     bench_mutex_lock_unlock();

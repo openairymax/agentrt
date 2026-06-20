@@ -10,6 +10,7 @@
 #include "daemon_errors.h"
 #include "executor.h"
 #include "platform.h"
+#include "safety_guard_bridge.h"
 #include "svc_logger.h"
 #include "tool_approval.h"
 
@@ -26,6 +27,7 @@ struct tool_executor {
     uint64_t success_count;
     /* C-L05: Cupolas SafetyGuard → tool_d 工具审批 */
     tool_approval_ctx_t *approval_ctx;
+    safety_guard_bridge_t *safety_bridge;
 };
 
 tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
@@ -59,6 +61,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
     exec->total_executions = 0;
     exec->success_count = 0;
     exec->approval_ctx = NULL;
+    exec->safety_bridge = NULL;
     return exec;
 }
 
@@ -74,6 +77,10 @@ void tool_executor_destroy(tool_executor_t *exec)
     SVC_LOG_INFO("Executor destroyed: total=%llu, success=%llu",
                  (unsigned long long)exec->total_executions,
                  (unsigned long long)exec->success_count);
+    if (exec->safety_bridge) {
+        safety_guard_bridge_destroy(exec->safety_bridge);
+        exec->safety_bridge = NULL;
+    }
     agentos_mutex_destroy(&exec->lock);
     AGENTOS_FREE(exec);
 }
@@ -88,6 +95,33 @@ void tool_executor_set_approval_ctx(tool_executor_t *exec, tool_approval_ctx_t *
     agentos_mutex_unlock(&exec->lock);
     if (approval_ctx) {
         SVC_LOG_INFO("C-L05: Approval context attached to executor");
+
+        /* C-L05: 创建 SafetyGuard 桥接层并注入到审批上下文 */
+        if (!exec->safety_bridge) {
+            safety_guard_bridge_config_t bridge_cfg;
+            __builtin_memset(&bridge_cfg, 0, sizeof(bridge_cfg));
+            bridge_cfg.enable_permission_guard = true;
+            bridge_cfg.enable_rate_limit_guard = true;
+            bridge_cfg.enable_content_filter = true;
+            bridge_cfg.enable_input_sanitization = true;
+            bridge_cfg.enable_resource_quota = true;
+            bridge_cfg.enable_audit_guard = true;
+            bridge_cfg.rate_limit_per_minute = 0;  /* 无限制 */
+            bridge_cfg.max_params_size = 0;        /* 无限制 */
+            bridge_cfg.denied_patterns = NULL;
+            bridge_cfg.agent_id = "tool_d";
+
+            exec->safety_bridge = safety_guard_bridge_create(&bridge_cfg);
+            if (exec->safety_bridge) {
+                SVC_LOG_INFO("C-L05: SafetyGuard bridge created for executor");
+            } else {
+                SVC_LOG_WARN("C-L05: Failed to create SafetyGuard bridge, "
+                             "falling back to local checks");
+            }
+        }
+
+        /* 将桥接层注入到审批上下文 */
+        tool_approval_set_safety_guard_bridge(approval_ctx, exec->safety_bridge);
     }
 }
 

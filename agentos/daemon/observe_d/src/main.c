@@ -374,14 +374,14 @@ static int observe_d_start(observe_d_service_t *svc)
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
-    if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
+    if (svc->server_fd < 0) {
         SVC_LOG_ERROR("observe_d: failed to create socket at %s", svc->socket_path);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
         return AGENTOS_ERR_UNKNOWN;
     }
 #else
     svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1", (uint16_t)svc->tcp_port);
-    if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
+    if (svc->server_fd < 0) {
         SVC_LOG_ERROR("observe_d: failed to create TCP server");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create TCP server");
         return AGENTOS_ERR_UNKNOWN;

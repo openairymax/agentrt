@@ -1,8 +1,8 @@
-# AgentOS Python SDK Utilities - Core Utilities
+# AgentRT Python SDK Utilities - Core Utilities
 # Version: 0.1.0
 
 """
-Core utility functions for the AgentOS Python SDK.
+Core utility functions for the AgentRT Python SDK.
 
 This module provides hash generation, environment variable handling,
 timing, rate limiting, and input validation.

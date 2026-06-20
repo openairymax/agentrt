@@ -8,7 +8,7 @@
  *
  * "From data intelligence emerges."
  *
- * @note 定义了 AgentOS 内核统一的错误码体系，遵循 POSIX 错误码语义
+ * @note 定义了 AgentRT 内核统一的错误码体系，遵循 POSIX 错误码语义
  */
 
 #ifndef AGENTOS_ATOMS_COREKERN_ERROR_H
@@ -33,7 +33,7 @@ extern "C" {
 #define AGENTOS_COREKERN_API_VERSION 1
 
 /**
- * @brief AgentOS 统一错误类型
+ * @brief AgentRT 统一错误类型
  *
  * 使用 int32_t 确保跨平台一致性
  * 正值表示成功，负值表示错误

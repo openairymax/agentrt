@@ -262,9 +262,9 @@ class BaseTestCase:
             error: 错误对象
             expected_code: 期望的错误码
         """
-        assert hasattr(error, 'code'), "错误对象应包含 code 属性"
-        assert error.code == expected_code, \
-            f"期望错误码 {expected_code}，实际 {error.code}"
+        assert hasattr(error, 'error_code'), "错误对象应包含 error_code 属性"
+        assert error.error_code == expected_code, \
+            f"期望错误码 {expected_code}，实际 {error.error_code}"
 
 
 class AsyncTestCase(BaseTestCase):

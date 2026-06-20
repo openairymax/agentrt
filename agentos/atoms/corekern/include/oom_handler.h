@@ -312,6 +312,16 @@ AGENTOS_API bool agentos_oom_is_degraded(void);
 AGENTOS_API agentos_mem_pressure_level_t agentos_oom_get_pressure(void);
 
 /**
+ * @brief 手动设置压力级别（用于测试和调试）
+ *
+ * 直接设置当前压力级别，跳过基于内存使用率的自动计算。
+ * 调用后，agentos_oom_check_allocation 将基于新级别判断分配。
+ *
+ * @param level 目标压力级别
+ */
+AGENTOS_API void agentos_oom_set_pressure(agentos_mem_pressure_level_t level);
+
+/**
  * @brief 注册压力变化回调（SEC-12）
  *
  * 当压力级别达到或超过指定级别时，回调被触发。
@@ -352,6 +362,164 @@ AGENTOS_API int agentos_oom_check_allocation(size_t requested_size);
  *   - 各级别已注册的回调数量
  */
 AGENTOS_API void agentos_oom_report_stats(void);
+
+/* ============================================================================
+ * OOM 配置与恢复 API（P0.11）
+ * ============================================================================ */
+
+/**
+ * @brief OOM 恢复状态枚举
+ */
+typedef enum {
+    OOM_RECOVERY_STARTED   = 0,  /**< 恢复流程开始 */
+    OOM_RECOVERY_COMPLETED = 1,  /**< 恢复流程完成 */
+} oom_recovery_state_t;
+
+/**
+ * @brief OOM 恢复回调函数类型
+ *
+ * @param state     恢复状态（STARTED / COMPLETED）
+ * @param old_level 恢复前的压力级别
+ * @param new_level 恢复后的压力级别
+ * @param user_data 用户数据
+ */
+typedef void (*agentos_oom_recovery_cb_t)(
+    oom_recovery_state_t state,
+    agentos_mem_pressure_level_t old_level,
+    agentos_mem_pressure_level_t new_level,
+    void *user_data);
+
+/**
+ * @brief OOM 配置结构体
+ */
+typedef struct {
+    double warning_threshold;       /**< WARNING 级别阈值（默认 0.70） */
+    double degraded_threshold;      /**< DEGRADED 级别阈值（默认 0.80） */
+    double critical_threshold;      /**< CRITICAL 级别阈值（默认 0.90） */
+    double fatal_threshold;         /**< FATAL 级别阈值（默认 0.95） */
+    uint32_t check_interval_ms;     /**< 检查间隔（毫秒，默认 1000） */
+    uint32_t recovery_cooldown_ms;  /**< 恢复冷却时间（毫秒，默认 5000） */
+    bool enable_auto_recovery;      /**< 是否启用自动恢复 */
+    bool enable_allocation_check;   /**< 是否启用分配检查 */
+    size_t emergency_pool_size;     /**< 紧急内存池大小（默认 1MB） */
+    size_t max_heap_size;           /**< 最大堆大小（0 表示自动检测） */
+} agentos_oom_config_t;
+
+/**
+ * @brief 填充 OOM 配置默认值
+ *
+ * @param config 配置结构体指针
+ */
+AGENTOS_API void agentos_oom_config_defaults(agentos_oom_config_t *config);
+
+/**
+ * @brief 从 YAML 文件加载 OOM 配置
+ *
+ * @param config_path 配置文件路径
+ * @param config      输出配置结构体
+ * @return 0 成功，AGENTOS_EINVAL 参数无效
+ */
+AGENTOS_API int agentos_oom_config_load(const char *config_path,
+                                         agentos_oom_config_t *config);
+
+/**
+ * @brief 应用 OOM 配置
+ *
+ * @param config 配置结构体指针
+ * @return 0 成功，AGENTOS_EINVAL 参数无效，AGENTOS_ENOTINIT 未初始化
+ */
+AGENTOS_API int agentos_oom_config_apply(const agentos_oom_config_t *config);
+
+/**
+ * @brief 注册 OOM 恢复回调
+ *
+ * @param callback  恢复回调函数
+ * @param user_data 用户数据
+ * @return 0 成功，AGENTOS_EINVAL 参数无效，AGENTOS_EBUSY 槽位已满
+ */
+AGENTOS_API int agentos_oom_register_recovery_callback(
+    agentos_oom_recovery_cb_t callback, void *user_data);
+
+/**
+ * @brief 检查是否应该执行 OOM 恢复
+ *
+ * @return true 如果压力低于 WARNING 且冷却期已过
+ */
+AGENTOS_API bool agentos_oom_should_recover(void);
+
+/**
+ * @brief 执行 OOM 恢复流程
+ *
+ * 通知所有恢复回调，执行降级处理器的恢复，将压力级别重置为 NORMAL。
+ *
+ * @return 0 成功，AGENTOS_ENOTINIT 未初始化
+ */
+AGENTOS_API int agentos_oom_recover(void);
+
+/* ============================================================================
+ * Daemon OOM 回调 API（P0.11）
+ * ============================================================================ */
+
+/** 最大 daemon OOM 回调注册数 */
+#define OOM_MAX_DAEMON_CALLBACKS 16
+
+/**
+ * @brief Daemon OOM 回调函数类型
+ *
+ * @param daemon_name          Daemon 名称
+ * @param pressure             当前压力级别
+ * @param current_allocated    当前已分配内存
+ * @param total_system_memory  系统总内存
+ * @param user_data            用户数据
+ * @return 释放的字节数
+ */
+typedef size_t (*agentos_daemon_oom_callback_t)(
+    const char *daemon_name,
+    agentos_mem_pressure_level_t pressure,
+    size_t current_allocated,
+    size_t total_system_memory,
+    void *user_data);
+
+/**
+ * @brief Daemon OOM 注册条目
+ */
+typedef struct {
+    const char *daemon_name;            /**< Daemon 名称 */
+    bool enabled;                       /**< 是否启用 */
+    int priority;                       /**< 优先级（0-100，越高越优先） */
+    agentos_daemon_oom_callback_t callback; /**< OOM 回调函数 */
+    void *user_data;                    /**< 用户数据 */
+} agentos_daemon_oom_registration_t;
+
+/**
+ * @brief 注册 daemon OOM 回调
+ *
+ * @param reg 注册条目
+ * @return 0 成功，AGENTOS_EBUSY 槽位已满
+ */
+AGENTOS_API int agentos_oom_register_daemon_callback(
+    const agentos_daemon_oom_registration_t *reg);
+
+/**
+ * @brief 注销 daemon OOM 回调
+ *
+ * @param daemon_name Daemon 名称
+ * @return 0 成功，AGENTOS_ENOENT 未找到
+ */
+AGENTOS_API int agentos_oom_unregister_daemon_callback(
+    const char *daemon_name);
+
+/**
+ * @brief 触发所有 daemon OOM 回调
+ *
+ * 按优先级降序遍历所有已注册的 daemon 回调。
+ * 高优先级（>50）先执行，低优先级后执行。
+ *
+ * @param pressure 当前压力级别
+ * @return 总共释放的字节数
+ */
+AGENTOS_API size_t agentos_oom_fire_daemon_callbacks(
+    agentos_mem_pressure_level_t pressure);
 
 #ifdef __cplusplus
 }

@@ -28,7 +28,7 @@ pub async fn search(gateway_url: &str, keyword: &str) -> Result<()> {
         return Ok(());
     }
 
-    println!("  {:<25} {:<10} {:<10} {}", "Name", "Version", "Downloads", "Author");
+    println!("  {:<25} {:<10} {:<10} Author", "Name", "Version", "Downloads");
     println!("  {:-<25} {:-<10} {:-<10} {:-<20}", "", "", "", "");
 
     for r in &results {

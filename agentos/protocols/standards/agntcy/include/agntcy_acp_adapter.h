@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file agntcy_acp_adapter.h
- * @brief AGNTCY Agent Communication Protocol Adapter for AgentOS
+ * @brief AGNTCY Agent Communication Protocol Adapter for AgentRT
  *
  * AGNTCY ACP 是面向智能体间通信的开放标准协议，定义：
  * 1. agent/discover — 智能体注册与发现（capability card）

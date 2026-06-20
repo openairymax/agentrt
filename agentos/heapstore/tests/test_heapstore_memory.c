@@ -1,13 +1,15 @@
 /**
  * @file test_heapstore_memory.c
- * @brief AgentOS 数据分区内存管理数据存储单元测试
+ * @brief AgentRT 数据分区内存管理数据存储单元测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
  */
+// @owner: team-B
 
 #include "heapstore.h"
 #include "heapstore_memory.h"
+#include "memory_compat.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -225,7 +227,7 @@ static void test_memory_update_usage(void)
 
 int main(void)
 {
-    printf("=== AgentOS heapstore Memory Unit Tests ===\n\n");
+    printf("=== AgentRT heapstore Memory Unit Tests ===\n\n");
 
     test_memory_init_shutdown();
     test_memory_pool_crud();

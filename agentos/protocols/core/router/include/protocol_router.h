@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file protocol_router.h
  * @brief Protocol Routing and Transformation Engine

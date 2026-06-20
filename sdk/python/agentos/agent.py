@@ -1,11 +1,11 @@
-# AgentOS Python SDK Client
+# AgentRT Python SDK Client
 # Version: 0.1.0
 # Last updated: 2026-03-23
 
 """
-AgentOS Python SDK Client implementation.
+AgentRT Python SDK Client implementation.
 
-This module provides the main client classes for interacting with the AgentOS system.
+This module provides the main client classes for interacting with the AgentRT system.
 """
 
 import json
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class AgentOS:
     """AgentOS synchronous client.
     
-    This class provides a synchronous interface to interact with the AgentOS system.
+    This class provides a synchronous interface to interact with the AgentRT system.
     """
     
     def __init__(self, endpoint: str = None, timeout: int = 30, api_key: Optional[str] = None):
@@ -39,7 +39,7 @@ class AgentOS:
         Initialize the AgentOS client.
         
         Args:
-            endpoint: The AgentOS server endpoint.
+            endpoint: The AgentRT server endpoint.
             timeout: The request timeout in seconds.
             api_key: Optional API key for authentication.
         """
@@ -55,7 +55,7 @@ class AgentOS:
     
     def _request(self, method: str, path: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Make an HTTP request to the AgentOS server.
+        Make an HTTP request to the AgentRT server.
         
         Args:
             method: HTTP method (GET, POST, PUT, DELETE).
@@ -97,7 +97,7 @@ class AgentOS:
     
     def submit_task(self, task_description: str) -> Task:
         """
-        Submit a task to the AgentOS system.
+        Submit a task to the AgentRT system.
         
         Args:
             task_description: The task description.
@@ -114,7 +114,7 @@ class AgentOS:
     
     def write_memory(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
         """
-        Write a memory to the AgentOS system.
+        Write a memory to the AgentRT system.
         
         Args:
             content: The memory content.
@@ -132,7 +132,7 @@ class AgentOS:
     
     def search_memory(self, query: str, top_k: int = 5) -> List[Memory]:
         """
-        Search memories in the AgentOS system.
+        Search memories in the AgentRT system.
         
         Args:
             query: The search query.
@@ -219,7 +219,7 @@ class AgentOS:
 class AsyncAgentOS:
     """AgentOS asynchronous client.
     
-    This class provides an asynchronous interface to interact with the AgentOS system.
+    This class provides an asynchronous interface to interact with the AgentRT system.
     """
     
     def __init__(self, endpoint: str = None, timeout: int = 30, api_key: Optional[str] = None):
@@ -227,7 +227,7 @@ class AsyncAgentOS:
         Initialize the AsyncAgentOS client.
         
         Args:
-            endpoint: The AgentOS server endpoint.
+            endpoint: The AgentRT server endpoint.
             timeout: The request timeout in seconds.
             api_key: Optional API key for authentication.
         """
@@ -240,7 +240,7 @@ class AsyncAgentOS:
     
     async def _request(self, method: str, path: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Make an asynchronous HTTP request to the AgentOS server.
+        Make an asynchronous HTTP request to the AgentRT server.
         
         Args:
             method: HTTP method (GET, POST, PUT, DELETE).
@@ -293,7 +293,7 @@ class AsyncAgentOS:
     
     async def submit_task(self, task_description: str) -> Task:
         """
-        Submit a task to the AgentOS system asynchronously.
+        Submit a task to the AgentRT system asynchronously.
         
         Args:
             task_description: The task description.
@@ -310,7 +310,7 @@ class AsyncAgentOS:
     
     async def write_memory(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
         """
-        Write a memory to the AgentOS system asynchronously.
+        Write a memory to the AgentRT system asynchronously.
         
         Args:
             content: The memory content.
@@ -328,7 +328,7 @@ class AsyncAgentOS:
     
     async def search_memory(self, query: str, top_k: int = 5) -> List[Memory]:
         """
-        Search memories in the AgentOS system asynchronously.
+        Search memories in the AgentRT system asynchronously.
         
         Args:
             query: The search query.

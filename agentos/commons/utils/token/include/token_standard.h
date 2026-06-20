@@ -2,7 +2,7 @@
  * @file token_standard.h
  * @brief Token 计算标准化接口 - 统一 C/Python Token 计算算法
  *
- * 根据 AgentOS 架构原则（E-3 资源确定性）设计，提供确定性的 Token 计算标准。
+ * 根据 AgentRT 架构原则（E-3 资源确定性）设计，提供确定性的 Token 计算标准。
  * 确保跨语言实现的一致性，支持资源配额管理和监控集成。
  *
  * @version 0.1.0

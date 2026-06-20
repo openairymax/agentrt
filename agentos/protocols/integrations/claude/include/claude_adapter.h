@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file claude_adapter.h
- * @brief Anthropic Claude API Integration Adapter for AgentOS
+ * @brief Anthropic Claude API Integration Adapter for AgentRT
  *
  * Claude API 适配器，实现AgentOS与Anthropic Claude模型的完整集成。
  *

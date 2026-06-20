@@ -44,31 +44,31 @@ extern "C" {
 
 #define AGENTOS_USE_STDATOMIC 1
 
-static inline long atomic_load_32(volatile _Atomic long *ptr, memory_order order)
+static inline int atomic_load_32(volatile _Atomic int *ptr, memory_order order)
 {
-    return (long)atomic_load_explicit(ptr, order);
+    return (int)atomic_load_explicit(ptr, order);
 }
-static inline void atomic_store_32(volatile _Atomic long *ptr, long val, memory_order order)
+static inline void atomic_store_32(volatile _Atomic int *ptr, int val, memory_order order)
 {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-overflow="
     atomic_store_explicit(ptr, val, order);
 #pragma GCC diagnostic pop
 }
-static inline long atomic_fetch_add_32(volatile _Atomic long *ptr, long val, memory_order order)
+static inline int atomic_fetch_add_32(volatile _Atomic int *ptr, int val, memory_order order)
 {
-    return (long)atomic_fetch_add_explicit(ptr, val, order);
+    return (int)atomic_fetch_add_explicit(ptr, val, order);
 }
-static inline long atomic_fetch_sub_32(volatile _Atomic long *ptr, long val, memory_order order)
+static inline int atomic_fetch_sub_32(volatile _Atomic int *ptr, int val, memory_order order)
 {
-    return (long)atomic_fetch_sub_explicit(ptr, val, order);
+    return (int)atomic_fetch_sub_explicit(ptr, val, order);
 }
-static inline long atomic_exchange_32(volatile _Atomic long *ptr, long val, memory_order order)
+static inline int atomic_exchange_32(volatile _Atomic int *ptr, int val, memory_order order)
 {
-    return (long)atomic_exchange_explicit(ptr, val, order);
+    return (int)atomic_exchange_explicit(ptr, val, order);
 }
-static inline _Bool atomic_compare_exchange_strong_32(volatile _Atomic long *ptr, long *expected,
-                                                      long desired, memory_order succ,
+static inline _Bool atomic_compare_exchange_strong_32(volatile _Atomic int *ptr, int *expected,
+                                                      int desired, memory_order succ,
                                                       memory_order fail)
 {
     return atomic_compare_exchange_strong_explicit(ptr, expected, desired, succ, fail);

@@ -17,6 +17,7 @@
 // 破坏性更改需递增 MAJOR 并发布迁移说明
 
 #include "agentos.h"
+#include "llm_service.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -37,7 +38,9 @@ typedef struct agentos_dispatching_strategy agentos_dispatching_strategy_t;
 typedef struct agentos_intent_parser agentos_intent_parser_t;
 typedef struct agentos_task_checkpoint agentos_task_checkpoint_t;
 typedef struct llm_service llm_service_t;
+typedef struct llm_svc_adapter_s llm_svc_adapter_t;
 typedef struct tool_service tool_service_t;
+typedef struct tool_svc_adapter_s tool_svc_adapter_t;
 
 /**
  * @brief 反馈回调函数类型
@@ -79,6 +82,8 @@ typedef struct agentos_intent {
 typedef struct agentos_task_node {
     char *task_node_id;             /**< 任务ID */
     size_t task_node_id_len;        /**< ID长度 */
+    char *task_node_handler_name;   /**< 处理器名称（工具名/Agent名） */
+    char *task_node_goal;           /**< 任务目标描述 */
     char *task_node_agent_role;     /**< 需要的Agent角色 */
     size_t task_node_role_len;      /**< 角色长度 */
     char **task_node_depends_on;    /**< 依赖的任务ID数组 */
@@ -363,6 +368,23 @@ AGENTOS_API void agentos_cognition_set_llm_service(agentos_cognition_engine_t *e
                                                     llm_service_t *llm_svc);
 
 /**
+ * @brief C-L02 P1.2.1: Set LLM IPC adapter for cognition engine (preferred path).
+ *
+ * Inject the llm_svc_adapter that communicates with llm_d via IPC Bus.
+ * This is the preferred integration path for P1.2 — when set, the cognition
+ * engine will route LLM requests through the IPC adapter instead of calling
+ * llm_service_complete() directly. Falls back to direct llm_service_t if no
+ * adapter is set.
+ *
+ * @param engine [in] Cognition engine handle (BORROW - caller retains ownership).
+ * @param adapter [in] LLM service adapter handle (BORROW - engine does not take ownership, caller manages lifecycle).
+ *
+ * @ownership adapter: BORROW
+ */
+AGENTOS_API void agentos_cognition_set_llm_adapter(agentos_cognition_engine_t *engine,
+                                                    llm_svc_adapter_t *adapter);
+
+/**
  * @brief C-L02 P1.2.2: Enable async streaming LLM callback.
  *
  * When enabled, LLM responses are delivered via streaming callback
@@ -393,6 +415,23 @@ AGENTOS_API void agentos_cognition_set_llm_streaming(agentos_cognition_engine_t 
  */
 AGENTOS_API void agentos_cognition_set_tool_service(agentos_cognition_engine_t *engine,
                                                      tool_service_t *tool_svc);
+
+/**
+ * @brief C-L04 P1.3.1: Set tool IPC adapter for cognition engine (preferred path).
+ *
+ * Inject the tool_svc_adapter that communicates with tool_d via IPC Bus.
+ * This is the preferred integration path for P1.3 — when set, the cognition
+ * engine will route tool execution requests through the IPC adapter instead
+ * of calling tool_service_execute() directly. Falls back to direct
+ * tool_service_t if no adapter is set.
+ *
+ * @param engine [in] Cognition engine handle (BORROW - caller retains ownership).
+ * @param adapter [in] Tool service adapter handle (BORROW - engine does not take ownership, caller manages lifecycle).
+ *
+ * @ownership adapter: BORROW
+ */
+AGENTOS_API void agentos_cognition_set_tool_adapter(agentos_cognition_engine_t *engine,
+                                                     tool_svc_adapter_t *adapter);
 
 /**
  * @brief C-L04: Get tool service from cognition engine.

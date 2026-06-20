@@ -65,6 +65,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _parse_frame_rate(rate_str: str) -> float:
+    """安全解析帧率字符串（如 "30/1"、"24000/1001"），替代 eval()。
+
+    Args:
+        rate_str: ffprobe 返回的 r_frame_rate 字符串，格式为 "num/den"
+
+    Returns:
+        浮点帧率值
+    """
+    if not rate_str:
+        return 0.0
+    parts = rate_str.split("/")
+    if len(parts) == 2:
+        try:
+            num, den = float(parts[0]), float(parts[1])
+            return num / den if den != 0 else 0.0
+        except (ValueError, ZeroDivisionError):
+            return 0.0
+    try:
+        return float(rate_str)
+    except ValueError:
+        return 0.0
+
+
 class VideoFormat(Enum):
     """Supported video formats."""
     MP4 = "mp4"
@@ -271,7 +295,7 @@ class FFmpegWrapper:
                 duration=float(format_info.get("duration", 0)),
                 width=int(video_stream.get("width", 0)),
                 height=int(video_stream.get("height", 0)),
-                fps=eval(video_stream.get("r_frame_rate", "0/1")) if video_stream.get("r_frame_rate") else 0,
+                fps=_parse_frame_rate(video_stream.get("r_frame_rate")) if video_stream.get("r_frame_rate") else 0,
                 codec=video_stream.get("codec_name", "unknown"),
                 audio_codec=audio_stream.get("codec_name") if audio_stream else None,
                 audio_channels=int(audio_stream.get("channels", 0)) if audio_stream else 0,

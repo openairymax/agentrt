@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file orchestrator.h
- * @brief AgentOS 流程编排器
+ * @brief AgentRT 流程编排器
  *
  * 协调多agent/多skill的流程编排，支持：
  * - Phase 0-4 串行执行管线
@@ -216,6 +216,28 @@ void orchestrator_set_progress_callback(orchestrator_t *orch, orch_progress_cb_t
                                         void *user_data);
 
 /* ========== C-L06: Orchestrator → CoreLoopThree 连接线 ========== */
+
+/**
+ * @brief C-L06: 将 CoreLoopThree 实例注入到编排器
+ *
+ * 编排器通过此函数获取 CoreLoopThree 句柄，在 GENERATION 等阶段
+ * 使用 CoreLoopThree 的 agentos_loop_submit/agentos_loop_wait 进行
+ * 认知→执行→记忆三层循环处理，替代直接调用 LLM 服务。
+ *
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @param core_loop [in] CoreLoopThree handle (BORROW - orchestrator does not take ownership).
+ *
+ * @ownership core_loop: BORROW
+ */
+void orchestrator_set_core_loop(orchestrator_t *orch, void *core_loop);
+
+/**
+ * @brief 检查编排器是否已绑定 CoreLoopThree 实例
+ *
+ * @param orch [in] Orchestrator handle (BORROW - caller retains ownership).
+ * @return true 如果已绑定 CoreLoopThree
+ */
+bool orchestrator_has_core_loop(orchestrator_t *orch);
 
 /**
  * @brief C-L06: 将 llm_d 服务注入到编排器下的 CoreLoopThree 认知引擎

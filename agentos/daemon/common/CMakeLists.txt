@@ -54,12 +54,8 @@ set(SVC_COMMON_SOURCES
     src/checkpoint.c
     src/daemon_oom.c          # P1.22: Daemon OOM 降级回调注册
     src/ipc_backpressure.c    # P1.24: IPC Bus 背压控制
-    ${ATOMS_DIR}/coreloopthree/src/cognition/foundation/metacognition.c
-    ${ATOMS_DIR}/coreloopthree/src/cognition/critique/confidence_calibrator.c
-    ${ATOMS_DIR}/coreloopthree/src/cognition/foundation/thinking_chain.c
-    ${ATOMS_DIR}/coreloopthree/src/cognition/engine.c
-    ${ATOMS_DIR}/coreloopthree/src/memory/engine.c
-    ${ATOMS_DIR}/coreloopthree/src/utils/id_utils.c
+    src/daemon_bootstrap_sd.c    # P1.7 C-L08: daemon ServiceDiscovery 一键引导
+    src/daemon_bootstrap_ipc.c   # P1.7 C-L09: daemon IPC Bus 一键引导
 )
 
 # 创建静态库
@@ -132,7 +128,12 @@ target_include_directories(svc_common PUBLIC
 target_include_directories(svc_common PUBLIC
     $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/include>
     $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/src/cognition>
+    $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/src/cognition/critique>
+    $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/src/cognition/foundation>
     $<BUILD_INTERFACE:${ATOMS_DIR}/memory>
+    $<BUILD_INTERFACE:${ATOMS_DIR}/memory/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/tool_d/include>
 )
 if(AGENTOS_HAS_CURL)
     target_compile_definitions(svc_common PUBLIC AGENTOS_HAS_CURL)

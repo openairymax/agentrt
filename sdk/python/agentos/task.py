@@ -1,9 +1,9 @@
-# AgentOS Python SDK Task
+# AgentRT Python SDK Task
 # Version: 0.1.0
 # Last updated: 2026-04-04
 
 """
-Task class implementation for the AgentOS Python SDK.
+Task class implementation for the AgentRT Python SDK.
 """
 
 import time

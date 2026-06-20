@@ -1,9 +1,9 @@
-# AgentOS Python SDK - Types Module
+# AgentRT Python SDK - Types Module
 # Version: 0.1.0
 # Last updated: 2026-03-24
 
 """
-Type definitions for AgentOS Python SDK.
+Type definitions for AgentRT Python SDK.
 
 This module provides all enumeration types, domain models, and
 request/response structures used throughout the SDK.

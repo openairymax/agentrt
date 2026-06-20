@@ -13,6 +13,7 @@
 
 #include "sync.h"
 
+#include <limits.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -26,299 +27,225 @@ extern "C" {
 
 /* ==================== 互斥锁兼容API ==================== */
 
+#ifndef AGENTOS_PLATFORM_H  /* 避免与 platform.h 中的 agentos_mutex_init 等冲突 */
+
 /**
  * @brief 创建互斥锁（兼容pthread_mutex_init）
- *
- * @param[out] mutex 互斥锁句柄
- * @param[in] attrs 属性（可空）
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_mutex_init(sync_mutex_t *mutex, const void *attrs)
 {
     (void)attrs;
-    return sync_mutex_create(mutex) ? 0 : -1;
+    return sync_mutex_create(mutex, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 销毁互斥锁（兼容pthread_mutex_destroy）
- *
- * @param[in] mutex 互斥锁句柄
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_mutex_destroy(sync_mutex_t *mutex)
 {
-    return sync_mutex_destroy(mutex) ? 0 : -1;
+    return sync_mutex_free(*mutex) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 锁定互斥锁（兼容pthread_mutex_lock）
- *
- * @param[in] mutex 互斥锁句柄
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_mutex_lock(sync_mutex_t *mutex)
 {
-    return sync_mutex_lock(mutex) ? 0 : -1;
+    return sync_mutex_lock_ex(*mutex, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 尝试锁定互斥锁（兼容pthread_mutex_trylock）
- *
- * @param[in] mutex 互斥锁句柄
- * @return 成功锁定返回0，已锁定返回-1，失败返回其他错误码
  */
 static inline int agentos_mutex_trylock(sync_mutex_t *mutex)
 {
-    return sync_mutex_trylock(mutex) ? 0 : -1;
+    return sync_mutex_try_lock(*mutex) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 解锁互斥锁（兼容pthread_mutex_unlock）
- *
- * @param[in] mutex 互斥锁句柄
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_mutex_unlock(sync_mutex_t *mutex)
 {
-    return sync_mutex_unlock(mutex) ? 0 : -1;
+    return sync_mutex_unlock_ex(*mutex) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /* ==================== 条件变量兼容API ==================== */
 
 /**
  * @brief 创建条件变量（兼容pthread_cond_init）
- *
- * @param[out] cond 条件变量句柄
- * @param[in] attrs 属性（可空）
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_cond_init(sync_cond_t *cond, const void *attrs)
+static inline int agentos_cond_init(sync_condition_t *cond, const void *attrs)
 {
     (void)attrs;
-    return sync_cond_create(cond) ? 0 : -1;
+    return sync_condition_create(cond, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 销毁条件变量（兼容pthread_cond_destroy）
- *
- * @param[in] cond 条件变量句柄
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_cond_destroy(sync_cond_t *cond)
+static inline int agentos_cond_destroy(sync_condition_t *cond)
 {
-    return sync_cond_destroy(cond) ? 0 : -1;
+    return sync_condition_free(*cond) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 等待条件变量（兼容pthread_cond_wait）
- *
- * @param[in] cond 条件变量句柄
- * @param[in] mutex 关联的互斥锁句柄
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_cond_wait(sync_cond_t *cond, sync_mutex_t *mutex)
+static inline int agentos_cond_wait(sync_condition_t *cond, sync_mutex_t *mutex)
 {
-    return sync_cond_wait(cond, mutex) ? 0 : -1;
+    return sync_condition_wait_ex(*cond, *mutex, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 限时等待条件变量（兼容pthread_cond_timedwait）
- *
- * @param[in] cond 条件变量句柄
- * @param[in] mutex 关联的互斥锁句柄
- * @param[in] timeout_ms 超时时间（毫秒）
- * @return 成功返回0，超时返回-1，失败返回其他错误码
  */
-static inline int agentos_cond_timedwait(sync_cond_t *cond, sync_mutex_t *mutex, int timeout_ms)
+static inline int agentos_cond_timedwait(sync_condition_t *cond, sync_mutex_t *mutex, int timeout_ms)
 {
-    return sync_cond_timedwait(cond, mutex, timeout_ms) ? 0 : -1;
+    sync_timeout_t timeout;
+    timeout.absolute = false;
+    timeout.timeout_ms = (uint64_t)timeout_ms;
+    return sync_condition_wait_ex(*cond, *mutex, &timeout) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 通知一个等待线程（兼容pthread_cond_signal）
- *
- * @param[in] cond 条件变量句柄
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_cond_signal(sync_cond_t *cond)
+static inline int agentos_cond_signal(sync_condition_t *cond)
 {
-    return sync_cond_signal(cond) ? 0 : -1;
+    return sync_condition_signal_ex(*cond) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 通知所有等待线程（兼容pthread_cond_broadcast）
- *
- * @param[in] cond 条件变量句柄
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_cond_broadcast(sync_cond_t *cond)
+static inline int agentos_cond_broadcast(sync_condition_t *cond)
 {
-    return sync_cond_broadcast(cond) ? 0 : -1;
+    return sync_condition_broadcast_ex(*cond) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /* ==================== 读写锁兼容API ==================== */
 
 /**
  * @brief 创建读写锁（兼容pthread_rwlock_init）
- *
- * @param[out] rwlock 读写锁句柄
- * @param[in] attrs 属性（可空）
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_rwlock_init(sync_rwlock_t *rwlock, const void *attrs)
 {
     (void)attrs;
-    return sync_rwlock_create(rwlock) ? 0 : -1;
+    return sync_rwlock_create(rwlock, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 销毁读写锁（兼容pthread_rwlock_destroy）
- *
- * @param[in] rwlock 读写锁句柄
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_rwlock_destroy(sync_rwlock_t *rwlock)
 {
-    return sync_rwlock_destroy(rwlock) ? 0 : -1;
+    return sync_rwlock_free(*rwlock) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 获取读锁（兼容pthread_rwlock_rdlock）
- *
- * @param[in] rwlock 读写锁句柄
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_rwlock_rdlock(sync_rwlock_t *rwlock)
 {
-    return sync_rwlock_rdlock(rwlock) ? 0 : -1;
+    return sync_rwlock_read_lock_ex(*rwlock, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 尝试获取读锁（兼容pthread_rwlock_tryrdlock）
- *
- * @param[in] rwlock 读写锁句柄
- * @return 成功返回0，已锁定返回-1，失败返回其他错误码
  */
 static inline int agentos_rwlock_tryrdlock(sync_rwlock_t *rwlock)
 {
-    return sync_rwlock_tryrdlock(rwlock) ? 0 : -1;
+    return sync_rwlock_try_read_lock(*rwlock) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 获取写锁（兼容pthread_rwlock_wrlock）
- *
- * @param[in] rwlock 读写锁句柄
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_rwlock_wrlock(sync_rwlock_t *rwlock)
 {
-    return sync_rwlock_wrlock(rwlock) ? 0 : -1;
+    return sync_rwlock_write_lock_ex(*rwlock, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 尝试获取写锁（兼容pthread_rwlock_trywrlock）
- *
- * @param[in] rwlock 读写锁句柄
- * @return 成功返回0，已锁定返回-1，失败返回其他错误码
  */
 static inline int agentos_rwlock_trywrlock(sync_rwlock_t *rwlock)
 {
-    return sync_rwlock_trywrlock(rwlock) ? 0 : -1;
+    return sync_rwlock_try_write_lock(*rwlock) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 解锁读写锁（兼容pthread_rwlock_unlock）
- *
- * @param[in] rwlock 读写锁句柄
- * @return 成功返回0，失败返回错误码
  */
 static inline int agentos_rwlock_unlock(sync_rwlock_t *rwlock)
 {
-    return sync_rwlock_unlock(rwlock) ? 0 : -1;
+    return sync_rwlock_unlock_ex(*rwlock) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /* ==================== 信号量兼容API ==================== */
 
 /**
  * @brief 创建信号量（兼容sem_init）
- *
- * @param[out] sem 信号量句柄
- * @param[in] pshared 共享标志（跨进程）
- * @param[in] value 初始值
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_sem_init(sync_sem_t *sem, int pshared, unsigned int value)
+static inline int agentos_sem_init(sync_semaphore_t *sem, int pshared, unsigned int value)
 {
     (void)pshared;
-    return sync_sem_create(sem, value) ? 0 : -1;
+    return sync_semaphore_create(sem, value, UINT_MAX, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 销毁信号量（兼容sem_destroy）
- *
- * @param[in] sem 信号量句柄
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_sem_destroy(sync_sem_t *sem)
+static inline int agentos_sem_destroy(sync_semaphore_t *sem)
 {
-    return sync_sem_destroy(sem) ? 0 : -1;
+    return sync_semaphore_free(*sem) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 等待信号量（兼容sem_wait）
- *
- * @param[in] sem 信号量句柄
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_sem_wait(sync_sem_t *sem)
+static inline int agentos_sem_wait(sync_semaphore_t *sem)
 {
-    return sync_sem_wait(sem) ? 0 : -1;
+    return sync_semaphore_wait_ex(*sem, NULL) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 尝试等待信号量（兼容sem_trywait）
- *
- * @param[in] sem 信号量句柄
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_sem_trywait(sync_sem_t *sem)
+static inline int agentos_sem_trywait(sync_semaphore_t *sem)
 {
-    return sync_sem_trywait(sem) ? 0 : -1;
+    return sync_semaphore_try_wait(*sem) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 限时等待信号量（兼容sem_timedwait）
- *
- * @param[in] sem 信号量句柄
- * @param[in] timeout_ms 超时时间（毫秒）
- * @return 成功返回0，超时返回-1，失败返回其他错误码
  */
-static inline int agentos_sem_timedwait(sync_sem_t *sem, int timeout_ms)
+static inline int agentos_sem_timedwait(sync_semaphore_t *sem, int timeout_ms)
 {
-    return sync_sem_timedwait(sem, timeout_ms) ? 0 : -1;
+    sync_timeout_t timeout;
+    timeout.absolute = false;
+    timeout.timeout_ms = (uint64_t)timeout_ms;
+    return sync_semaphore_wait_ex(*sem, &timeout) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 发布信号量（兼容sem_post）
- *
- * @param[in] sem 信号量句柄
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_sem_post(sync_sem_t *sem)
+static inline int agentos_sem_post(sync_semaphore_t *sem)
 {
-    return sync_sem_post(sem) ? 0 : -1;
+    return sync_semaphore_post_ex(*sem) == SYNC_SUCCESS ? 0 : -1;
 }
 
 /**
  * @brief 获取信号量值（兼容sem_getvalue）
- *
- * @param[in] sem 信号量句柄
- * @param[out] value 当前值
- * @return 成功返回0，失败返回错误码
  */
-static inline int agentos_sem_getvalue(sync_sem_t *sem, int *value)
+static inline int agentos_sem_getvalue(sync_semaphore_t *sem, int *value)
 {
-    return sync_sem_getvalue(sem, value) ? 0 : -1;
+    unsigned int uval = 0;
+    sync_result_t r = sync_semaphore_get_value(*sem, &uval);
+    if (value) *value = (int)uval;
+    return r == SYNC_SUCCESS ? 0 : -1;
 }
 
 /* ==================== 兼容性宏定义 ==================== */
@@ -474,18 +401,78 @@ static inline int agentos_sem_getvalue(sync_sem_t *sem, int *value)
  */
 #define AGENTOS_SEM_GETVALUE(sem, value) agentos_sem_getvalue(sem, value)
 
-/**
- * @brief 迁移辅助：替换标准同步原语
- *
- * 建议的迁移步骤：
- * 1. 包含本头文件
- * 2. 将pthread_mutex_*替换为AGENTOS_MUTEX_*宏
- * 3. 将pthread_cond_*替换为AGENTOS_COND_*宏
- * 4. 将sem_*替换为AGENTOS_SEM_*宏
- * 5. 使用sync_thread_*函数替代pthread_create/join等
- */
+#endif /* AGENTOS_PLATFORM_H */
 
-/** @} */  // end of sync_compat_api
+/* ==================== 兼容性宏定义（始终可用） ====================
+ * 注意：这些宏始终可用，即使 platform.h 已包含。
+ * 当 platform.h 未包含时，宏调用上面的 sync_compat inline 包装函数。
+ * 当 platform.h 已包含时，宏调用 platform.h 中的 agentos_* 函数。
+ */
+#ifndef AGENTOS_PLATFORM_H
+
+#define AGENTOS_MUTEX_INIT(mutex, attrs) agentos_mutex_init(mutex, attrs)
+#define AGENTOS_MUTEX_DESTROY(mutex) agentos_mutex_destroy(mutex)
+#define AGENTOS_MUTEX_LOCK(mutex) agentos_mutex_lock(mutex)
+#define AGENTOS_MUTEX_TRYLOCK(mutex) agentos_mutex_trylock(mutex)
+#define AGENTOS_MUTEX_UNLOCK(mutex) agentos_mutex_unlock(mutex)
+
+#define AGENTOS_COND_INIT(cond, attrs) agentos_cond_init(cond, attrs)
+#define AGENTOS_COND_DESTROY(cond) agentos_cond_destroy(cond)
+#define AGENTOS_COND_WAIT(cond, mutex) agentos_cond_wait(cond, mutex)
+#define AGENTOS_COND_TIMEDWAIT(cond, mutex, timeout_ms) \
+    agentos_cond_timedwait(cond, mutex, timeout_ms)
+#define AGENTOS_COND_SIGNAL(cond) agentos_cond_signal(cond)
+#define AGENTOS_COND_BROADCAST(cond) agentos_cond_broadcast(cond)
+
+#define AGENTOS_RWLOCK_INIT(rwlock, attrs) agentos_rwlock_init(rwlock, attrs)
+#define AGENTOS_RWLOCK_DESTROY(rwlock) agentos_rwlock_destroy(rwlock)
+#define AGENTOS_RWLOCK_RDLOCK(rwlock) agentos_rwlock_rdlock(rwlock)
+#define AGENTOS_RWLOCK_TRYRDLOCK(rwlock) agentos_rwlock_tryrdlock(rwlock)
+#define AGENTOS_RWLOCK_WRLOCK(rwlock) agentos_rwlock_wrlock(rwlock)
+#define AGENTOS_RWLOCK_TRYWRLOCK(rwlock) agentos_rwlock_trywrlock(rwlock)
+#define AGENTOS_RWLOCK_UNLOCK(rwlock) agentos_rwlock_unlock(rwlock)
+
+#define AGENTOS_SEM_INIT(sem, pshared, value) agentos_sem_init(sem, pshared, value)
+#define AGENTOS_SEM_DESTROY(sem) agentos_sem_destroy(sem)
+#define AGENTOS_SEM_WAIT(sem) agentos_sem_wait(sem)
+#define AGENTOS_SEM_TRYWAIT(sem) agentos_sem_trywait(sem)
+#define AGENTOS_SEM_TIMEDWAIT(sem, timeout_ms) agentos_sem_timedwait(sem, timeout_ms)
+#define AGENTOS_SEM_POST(sem) agentos_sem_post(sem)
+#define AGENTOS_SEM_GETVALUE(sem, value) agentos_sem_getvalue(sem, value)
+
+#else /* AGENTOS_PLATFORM_H defined */
+
+#define AGENTOS_MUTEX_INIT(mutex, attrs) agentos_mutex_init(mutex)
+#define AGENTOS_MUTEX_DESTROY(mutex) agentos_mutex_destroy(mutex)
+#define AGENTOS_MUTEX_LOCK(mutex) agentos_mutex_lock(mutex)
+#define AGENTOS_MUTEX_TRYLOCK(mutex) agentos_mutex_trylock(mutex)
+#define AGENTOS_MUTEX_UNLOCK(mutex) agentos_mutex_unlock(mutex)
+
+#define AGENTOS_COND_INIT(cond, attrs) agentos_cond_init(cond)
+#define AGENTOS_COND_DESTROY(cond) agentos_cond_destroy(cond)
+#define AGENTOS_COND_WAIT(cond, mutex) agentos_cond_wait(cond, mutex)
+#define AGENTOS_COND_TIMEDWAIT(cond, mutex, timeout_ms) \
+    agentos_cond_timedwait(cond, mutex, timeout_ms)
+#define AGENTOS_COND_SIGNAL(cond) agentos_cond_signal(cond)
+#define AGENTOS_COND_BROADCAST(cond) agentos_cond_broadcast(cond)
+
+#define AGENTOS_RWLOCK_INIT(rwlock, attrs) ((void)(rwlock), (void)(attrs), 0)
+#define AGENTOS_RWLOCK_DESTROY(rwlock) ((void)(rwlock))
+#define AGENTOS_RWLOCK_RDLOCK(rwlock) ((void)(rwlock))
+#define AGENTOS_RWLOCK_TRYRDLOCK(rwlock) ((void)(rwlock))
+#define AGENTOS_RWLOCK_WRLOCK(rwlock) ((void)(rwlock))
+#define AGENTOS_RWLOCK_TRYWRLOCK(rwlock) ((void)(rwlock))
+#define AGENTOS_RWLOCK_UNLOCK(rwlock) ((void)(rwlock))
+
+#define AGENTOS_SEM_INIT(sem, pshared, value) ((void)(sem), (void)(pshared), (void)(value), 0)
+#define AGENTOS_SEM_DESTROY(sem) ((void)(sem))
+#define AGENTOS_SEM_WAIT(sem) ((void)(sem))
+#define AGENTOS_SEM_TRYWAIT(sem) ((void)(sem))
+#define AGENTOS_SEM_TIMEDWAIT(sem, timeout_ms) ((void)(sem), (void)(timeout_ms))
+#define AGENTOS_SEM_POST(sem) ((void)(sem))
+#define AGENTOS_SEM_GETVALUE(sem, value) ((void)(sem), (void)(value))
+
+#endif /* AGENTOS_PLATFORM_H */
 
 #ifdef __cplusplus
 }

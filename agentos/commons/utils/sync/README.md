@@ -5,7 +5,7 @@
 
 ## 概述
 
-Sync 模块提供跨平台、安全、高效的线程同步原语，是 AgentOS 并发编程的基础设施。该模块封装了互斥锁（Mutex）、递归互斥锁（Recursive Mutex）、读写锁（RWLock）、自旋锁（Spinlock）、信号量（Semaphore）、条件变量（Condition）、屏障（Barrier）和事件（Event）等完整的同步原语，支持 Windows 和 POSIX 系统，并提供了死锁检测、超时控制、统计信息和 POSIX 兼容层等功能。
+Sync 模块提供跨平台、安全、高效的线程同步原语，是 AgentRT 并发编程的基础设施。该模块封装了互斥锁（Mutex）、递归互斥锁（Recursive Mutex）、读写锁（RWLock）、自旋锁（Spinlock）、信号量（Semaphore）、条件变量（Condition）、屏障（Barrier）和事件（Event）等完整的同步原语，支持 Windows 和 POSIX 系统，并提供了死锁检测、超时控制、统计信息和 POSIX 兼容层等功能。
 
 ## 设计目标
 

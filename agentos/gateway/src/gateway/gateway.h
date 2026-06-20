@@ -1,3 +1,4 @@
+// @owner: team-B
 #ifndef AGENTOS_GATEWAY_INTERNAL_H
 #define AGENTOS_GATEWAY_INTERNAL_H
 

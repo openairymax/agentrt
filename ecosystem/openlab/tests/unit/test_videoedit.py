@@ -18,7 +18,7 @@ class TestVideoEditPipeline:
 
     def test_pipeline_initialization(self):
         """Test pipeline can be initialized."""
-        from App.videoedit.src.edit_pipeline import EditPipeline, PipelineConfig
+        from app.videoedit.src.edit_pipeline import EditPipeline, PipelineConfig
 
         manager = PipelineConfig()._default_config()
         pipeline = EditPipeline(manager)
@@ -29,7 +29,7 @@ class TestVideoEditPipeline:
 
     def test_generate_task_id(self):
         """Test task ID generation."""
-        from App.videoedit.src.edit_pipeline import EditPipeline, PipelineConfig
+        from app.videoedit.src.edit_pipeline import EditPipeline, PipelineConfig
 
         manager = PipelineConfig()._default_config()
         pipeline = EditPipeline(manager)
@@ -46,7 +46,7 @@ class TestVideoValidator:
 
     def test_validate_time_range_valid(self):
         """Test validating a valid time range."""
-        from App.videoedit.src.edit_pipeline import VideoValidator
+        from app.videoedit.src.edit_pipeline import VideoValidator
 
         valid, error = VideoValidator.validate_time_range(0.0, 10.0, 30.0)
 
@@ -55,7 +55,7 @@ class TestVideoValidator:
 
     def test_validate_time_range_invalid_start(self):
         """Test validating invalid start time."""
-        from App.videoedit.src.edit_pipeline import VideoValidator
+        from app.videoedit.src.edit_pipeline import VideoValidator
 
         valid, error = VideoValidator.validate_time_range(-1.0, 10.0, 30.0)
 
@@ -64,7 +64,7 @@ class TestVideoValidator:
 
     def test_validate_time_range_end_before_start(self):
         """Test validating when end time is before start time."""
-        from App.videoedit.src.edit_pipeline import VideoValidator
+        from app.videoedit.src.edit_pipeline import VideoValidator
 
         valid, error = VideoValidator.validate_time_range(20.0, 10.0, 30.0)
 
@@ -73,7 +73,7 @@ class TestVideoValidator:
 
     def test_validate_time_range_exceeds_duration(self):
         """Test validating when end time exceeds video duration."""
-        from App.videoedit.src.edit_pipeline import VideoValidator
+        from app.videoedit.src.edit_pipeline import VideoValidator
 
         valid, error = VideoValidator.validate_time_range(0.0, 40.0, 30.0)
 
@@ -82,7 +82,7 @@ class TestVideoValidator:
 
     def test_validate_resolution_valid(self):
         """Test validating a valid resolution."""
-        from App.videoedit.src.edit_pipeline import VideoValidator
+        from app.videoedit.src.edit_pipeline import VideoValidator
 
         valid, error = VideoValidator.validate_resolution(1920, 1080)
 
@@ -91,7 +91,7 @@ class TestVideoValidator:
 
     def test_validate_resolution_odd_dimensions(self):
         """Test validating resolution with odd dimensions."""
-        from App.videoedit.src.edit_pipeline import VideoValidator
+        from app.videoedit.src.edit_pipeline import VideoValidator
 
         valid, error = VideoValidator.validate_resolution(1921, 1080)
 
@@ -100,7 +100,7 @@ class TestVideoValidator:
 
     def test_validate_resolution_too_large(self):
         """Test validating resolution that is too large."""
-        from App.videoedit.src.edit_pipeline import VideoValidator
+        from app.videoedit.src.edit_pipeline import VideoValidator
 
         valid, error = VideoValidator.validate_resolution(10000, 10000)
 
@@ -113,7 +113,7 @@ class TestVideoMetadata:
 
     def test_video_metadata_creation(self):
         """Test creating video metadata."""
-        from App.videoedit.src.edit_pipeline import VideoMetadata
+        from app.videoedit.src.edit_pipeline import VideoMetadata
 
         metadata = VideoMetadata(
             file_path="/path/to/video.mp4",
@@ -141,7 +141,7 @@ class TestClipInfo:
 
     def test_clip_info_creation(self):
         """Test creating clip info."""
-        from App.videoedit.src.edit_pipeline import ClipInfo
+        from app.videoedit.src.edit_pipeline import ClipInfo
 
         clip = ClipInfo(
             source_path="/path/to/video.mp4",
@@ -163,7 +163,7 @@ class TestTaskResult:
 
     def test_task_result_creation(self):
         """Test creating task result."""
-        from App.videoedit.src.edit_pipeline import TaskResult, TaskStatus
+        from app.videoedit.src.edit_pipeline import TaskResult, TaskStatus
 
         result = TaskResult(
             task_id="task-001",

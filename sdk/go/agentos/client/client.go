@@ -58,9 +58,10 @@ func newClientWithConfig(config *agentos.Config) (*Client, error) {
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 			Transport: &http.Transport{
-				MaxIdleConns:       config.MaxConnections,
-				IdleConnTimeout:    config.IdleConnTimeout,
-				DisableCompression: false,
+				MaxIdleConns:        config.MaxConnections,
+				MaxConnsPerHost:     config.MaxConnections,
+				IdleConnTimeout:     config.IdleConnTimeout,
+				DisableCompression:  false,
 			},
 		},
 	}, nil

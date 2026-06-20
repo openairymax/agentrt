@@ -69,7 +69,21 @@ typedef enum {
     SAFETY_GUARD_RATE_LIMIT,
     SAFETY_GUARD_CONTENT_FILTER,
     SAFETY_GUARD_DATA_FLOW,
-    SAFETY_GUARD_CUSTOM
+    SAFETY_GUARD_CUSTOM,
+    SAFETY_GUARD_FILE_READ,
+    SAFETY_GUARD_FILE_WRITE,
+    SAFETY_GUARD_NETWORK,
+    SAFETY_GUARD_TOOL_EXEC,
+    SAFETY_GUARD_MEMORY,
+    SAFETY_GUARD_HOOK,
+    SAFETY_GUARD_SYSTEM,
+    SAFETY_GUARD_PROCESS,
+    SAFETY_GUARD_IPC,
+    SAFETY_GUARD_SERVICE_DISCOVERY,
+    SAFETY_GUARD_CONFIG,
+    SAFETY_GUARD_LOGGING,
+    SAFETY_GUARD_METRICS,
+    SAFETY_GUARD_VERSION_CHECK
 } safety_guard_type_t;
 
 typedef enum {
@@ -228,6 +242,10 @@ int safety_guard_emergency_release(safety_guard_context_t *ctx);
 size_t safety_guard_get_guard_count(safety_guard_context_t *ctx);
 size_t safety_guard_get_policy_count(safety_guard_context_t *ctx);
 size_t safety_guard_get_audit_count(safety_guard_context_t *ctx);
+
+int safety_guard_check_permission(safety_guard_context_t *ctx,
+                                  safety_guard_type_t guard_type,
+                                  const char *agent_id, bool *allowed);
 
 #endif /* AGENTOS_ENABLE_V2_API */
 

@@ -1,6 +1,6 @@
 /**
  * @file heapstore_integration.h
- * @brief heapstore 与 AgentOS 核心模块集成接口
+ * @brief heapstore 与 AgentRT 核心模块集成接口
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,7 +9,7 @@
  * "From data intelligence emerges."
  *
  * @details
- * 本文件定义 heapstore 数据分区存储系统与 AgentOS 核心模块的集成接口。
+ * 本文件定义 heapstore 数据分区存储系统与 AgentRT 核心模块的集成接口。
  * 遵循架构原则：
  * - S-2 层次分解原则：heapstore 作为底层存储引擎
  * - K-2 接口契约化原则：所有接口有完整契约定义
@@ -24,6 +24,7 @@
  * ```
  */
 
+// @owner: team-B
 #ifndef AGENTOS_heapstore_INTEGRATION_H
 #define AGENTOS_heapstore_INTEGRATION_H
 
@@ -42,7 +43,7 @@ extern "C" {
 /* ==================== 系统初始化集成 ==================== */
 
 /**
- * @brief 初始化 heapstore 并与 AgentOS 核心集成
+ * @brief 初始化 heapstore 并与 AgentRT 核心集成
  *
  * @param root_path [in] 数据分区根路径，为 NULL 使用默认路径
  * @return agentos_error_t 错误码

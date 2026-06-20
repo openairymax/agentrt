@@ -13,6 +13,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #ifndef GATEWAY_COMPAT_H
 #define GATEWAY_COMPAT_H
 

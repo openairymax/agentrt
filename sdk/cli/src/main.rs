@@ -94,6 +94,12 @@ enum Commands {
         subcommand: DeployCommand,
     },
 
+    /// Database migration management
+    Db {
+        #[command(subcommand)]
+        subcommand: DbCommand,
+    },
+
     /// Generate shell completions
     Completion {
         /// Shell type
@@ -225,6 +231,32 @@ enum DeployCommand {
     },
 }
 
+#[derive(Subcommand)]
+enum DbCommand {
+    /// Show migration status
+    Status,
+    /// Apply pending migrations
+    Migrate {
+        /// Dry-run: preview without executing
+        #[arg(long)]
+        dry_run: bool,
+        /// Force migration even if warnings exist
+        #[arg(long)]
+        force: bool,
+    },
+    /// Rollback most recent migration
+    Rollback {
+        /// Required: confirm rollback
+        #[arg(long)]
+        force: bool,
+    },
+    /// Create a new migration file template
+    New {
+        /// Migration name
+        name: Option<String>,
+    },
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -300,6 +332,14 @@ async fn main() -> anyhow::Result<()> {
             }
             DeployCommand::Logs { lines } => {
                 commands::deploy::logs(&cli.gateway_url, lines).await?;
+            }
+        },
+        Commands::Db { subcommand } => match subcommand {
+            DbCommand::Status => commands::db::status()?,
+            DbCommand::Migrate { dry_run, force } => commands::db::migrate(dry_run, force)?,
+            DbCommand::Rollback { force } => commands::db::rollback(force)?,
+            DbCommand::New { name } => {
+                commands::db::new_migration(name.as_deref().unwrap_or("migration"))?;
             }
         },
         Commands::Completion { shell } => {

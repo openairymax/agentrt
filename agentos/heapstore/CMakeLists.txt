@@ -10,6 +10,7 @@ set(heapstore_SOURCES
     src/heapstore_batch.c
     src/heapstore_token.c
     src/heapstore_integration.c
+    src/heapstore_migration.c
     src/utils.c
     kernel/services/trace_store_service.c
     kernel/services/log_store_service.c
@@ -23,6 +24,7 @@ set(heapstore_HEADERS
     include/heapstore_ipc.h
     include/heapstore_memory.h
     include/heapstore_batch.h
+    include/heapstore_migration.h
     include/heapstore_token.h
     include/heapstore_integration.h
     include/utils.h

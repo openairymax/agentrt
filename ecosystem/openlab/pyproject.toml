@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "OpenLab - Agent Operating System for intelligent agent management"
 readme = "README.md"
 license = {text = "MIT"}
-authors = ["Spharx AgentOS Team"]
+authors = ["Spharx AgentRT Team"]
 keywords = ["agent", "ai", "orchestration", "openlab", "multi-agent"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -81,10 +81,10 @@ openlab-agent = "openlab.agents.architect.agent:main"
 openlab-market = "openlab.markets.agents.installer.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/spharx/agentos"
-Documentation = "https://spharx.github.io/agentos"
-Repository = "https://github.com/spharx/agentos"
-Issues = "https://github.com/spharx/agentos/issues"
+Homepage = "https://github.com/spharx/agentrt"
+Documentation = "https://spharx.github.io/agentrt"
+Repository = "https://github.com/spharx/agentrt"
+Issues = "https://github.com/spharx/agentrt/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

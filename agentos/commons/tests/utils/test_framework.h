@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file test_framework.h
- * @brief AgentOS 测试框架 - CMocka 集成层
+ * @brief AgentRT 测试框架 - CMocka 集成层
  *
  * @details
  * 本文件提供 CMocka 测试框架的集成封装，包括：
@@ -31,7 +31,7 @@
  * }
  * @endcode
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-04-01
  * @version 1.0
  *

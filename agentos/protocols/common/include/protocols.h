@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file protocols.h
- * @brief Main header for AgentOS Unified Protocols Framework
+ * @brief Main header for AgentRT Unified Protocols Framework
  *
  * 统一协议栈框架主头文件，包含所有公共API和类型定义。
  * 使用此框架可实现协议无关的通信层。

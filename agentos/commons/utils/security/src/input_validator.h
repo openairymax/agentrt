@@ -16,7 +16,7 @@
  * 3. 边界检查必须严格
  * 4. 错误时安全失败
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-03-30
  * @version 2.0
  *

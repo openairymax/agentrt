@@ -46,6 +46,11 @@ set(LLM_D_SOURCES
     src/cost_tracker.c
     src/token_counter.c
     src/response.c
+    src/router/llm_router.c
+    src/router/cost_aware_router.c
+    src/router/round_robin_router.c
+    src/router/least_latency_router.c
+    src/router/quality_first_router.c
 )
 
 # 创建可执行文件

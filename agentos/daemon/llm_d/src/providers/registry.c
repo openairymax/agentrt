@@ -52,10 +52,8 @@ provider_registry_t *provider_registry_create(const service_config_t *cfg)
     }
     agentos_mutex_init(&reg->lock);
 
-    size_t count = 0;
-    while (cfg->providers && cfg->providers[count].name)
-        count++;
-    if (count == 0)
+    size_t count = cfg->provider_count;
+    if (count == 0 || !cfg->providers)
         return reg;
 
     reg->providers = AGENTOS_CALLOC(count + 1, sizeof(provider_t));

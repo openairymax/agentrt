@@ -17,6 +17,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #ifndef GATEWAY_RPC_HANDLER_H
 #define GATEWAY_RPC_HANDLER_H
 

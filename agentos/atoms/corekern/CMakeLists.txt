@@ -10,6 +10,8 @@ set(COREKERN_SOURCES
     src/mem/alloc.c
     src/mem/arena.c
     src/mem/oom_handler.c
+    src/mem/slab.c
+    src/mem/mempool.c
     src/mem/pool.c
     src/mem/tcache.c
     src/mem/refcount.c

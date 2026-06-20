@@ -22,6 +22,12 @@
 #include <time.h>
 #include "error.h"
 
+/* C-L08: ServiceDiscovery 日志前缀 */
+#define SD_LOG_INFO(fmt, ...)  LOG_INFO("C-L08: " fmt, ##__VA_ARGS__)
+#define SD_LOG_WARN(fmt, ...)  LOG_WARN("C-L08: " fmt, ##__VA_ARGS__)
+#define SD_LOG_ERROR(fmt, ...) LOG_ERROR("C-L08: " fmt, ##__VA_ARGS__)
+#define SD_LOG_DEBUG(fmt, ...) LOG_DEBUG("C-L08: " fmt, ##__VA_ARGS__)
+
 /* ==================== 内部常量 ==================== */
 
 #define SD_MAX_CALLBACKS 8
@@ -115,9 +121,12 @@ static void expire_stale_instances(sd_internal_t *sd)
         for (uint32_t j = 0; j < entry->instance_count;) {
             if (is_instance_expired(&entry->instances[j], sd->config.expire_timeout_ms)) {
                 sd_instance_t expired = entry->instances[j];
-                LOG_WARN("Instance '%s' of service '%s' expired (last heartbeat %llums ago)",
+                SD_LOG_WARN("EXPIRED instance='%s' service='%s' "
+                         "last_heartbeat=%llums ago "
+                         "(active_svcs=%u active_insts=%u)",
                          expired.instance_id, entry->name,
-                         (unsigned long long)(now - expired.last_heartbeat));
+                         (unsigned long long)(now - expired.last_heartbeat),
+                         sd->service_count, entry->instance_count);
 
                 if (j < entry->instance_count - 1) {
                     entry->instances[j] = entry->instances[entry->instance_count - 1];
@@ -316,7 +325,9 @@ AGENTOS_API service_discovery_t sd_create(const sd_config_t *config)
     sd->shm_ptr = NULL;
     sd->is_shm_owner = false;
 
-    LOG_INFO("Service discovery instance created");
+    SD_LOG_INFO("CREATE (heartbeat=%ums expire=%ums lb=%s)",
+             sd->config.heartbeat_interval_ms, sd->config.expire_timeout_ms,
+             sd_lb_strategy_to_string(sd->config.default_lb_strategy));
     return (service_discovery_t)sd;
 }
 
@@ -338,7 +349,7 @@ AGENTOS_API void sd_destroy(service_discovery_t sd_handle)
     agentos_mutex_destroy(&sd->mutex);
     AGENTOS_FREE(sd);
 
-    LOG_INFO("Service discovery instance destroyed");
+    SD_LOG_INFO("DESTROY");
 }
 
 AGENTOS_API agentos_error_t sd_start(service_discovery_t sd_handle)
@@ -357,7 +368,7 @@ AGENTOS_API agentos_error_t sd_start(service_discovery_t sd_handle)
     sd->running = true;
     agentos_mutex_unlock(&sd->mutex);
 
-    LOG_INFO("Service discovery started (heartbeat=%ums, expire=%ums)",
+    SD_LOG_INFO("START (heartbeat=%ums expire=%ums)",
              sd->config.heartbeat_interval_ms, sd->config.expire_timeout_ms);
     return AGENTOS_SUCCESS;
 }
@@ -373,7 +384,7 @@ AGENTOS_API agentos_error_t sd_stop(service_discovery_t sd_handle)
     sd->running = false;
     agentos_mutex_unlock(&sd->mutex);
 
-    LOG_INFO("Service discovery stopped");
+    SD_LOG_INFO("STOP");
     return AGENTOS_SUCCESS;
 }
 
@@ -398,7 +409,8 @@ AGENTOS_API agentos_error_t sd_register(service_discovery_t sd_handle, const cha
     } else {
         if (sd->service_count >= SD_MAX_SERVICES) {
             agentos_mutex_unlock(&sd->mutex);
-            LOG_ERROR("Service registry full, cannot register '%s'", service_name);
+            SD_LOG_ERROR("REGISTRY-FULL max=%u cannot register '%s'",
+                     SD_MAX_SERVICES, service_name);
             return AGENTOS_ENOMEM;
         }
 
@@ -426,7 +438,7 @@ AGENTOS_API agentos_error_t sd_register(service_discovery_t sd_handle, const cha
     } else {
         if (entry->instance_count >= SD_MAX_INSTANCES) {
             agentos_mutex_unlock(&sd->mutex);
-            LOG_ERROR("Instance limit reached for service '%s'", service_name);
+            SD_LOG_ERROR("INSTANCE-LIMIT max=%u service='%s'", SD_MAX_INSTANCES, service_name);
             return AGENTOS_ENOMEM;
         }
 
@@ -453,8 +465,11 @@ AGENTOS_API agentos_error_t sd_register(service_discovery_t sd_handle, const cha
 
     notify_event(sd, SD_EVENT_REGISTERED, service_name, instance);
 
-    LOG_INFO("Service '%s' instance '%s' registered (type=%s, endpoint=%s)", service_name,
-             instance->instance_id, service_type, instance->endpoint);
+    SD_LOG_INFO("REGISTER service='%s' instance='%s' type='%s' "
+             "endpoint='%s' (total_svcs=%u total_insts=%u)",
+             service_name, instance->instance_id, service_type,
+             instance->endpoint, sd->service_count,
+             sd->stats.active_instances);
     return AGENTOS_SUCCESS;
 }
 
@@ -499,7 +514,10 @@ AGENTOS_API agentos_error_t sd_deregister(service_discovery_t sd_handle, const c
 
     notify_event(sd, SD_EVENT_DEREGISTERED, service_name, &removed);
 
-    LOG_INFO("Service '%s' instance '%s' deregistered", service_name, instance_id);
+    SD_LOG_INFO("DEREGISTER service='%s' instance='%s' "
+             "(total_svcs=%u total_insts=%u)",
+             service_name, instance_id,
+             sd->service_count, sd->stats.active_instances);
     return AGENTOS_SUCCESS;
 }
 
@@ -524,7 +542,7 @@ AGENTOS_API agentos_error_t sd_deregister_all(service_discovery_t sd_handle,
 
     agentos_mutex_unlock(&sd->mutex);
 
-    LOG_INFO("All instances of service '%s' deregistered", service_name);
+    SD_LOG_INFO("DEREGISTER-ALL service='%s'", service_name);
     return AGENTOS_SUCCESS;
 }
 
@@ -564,7 +582,7 @@ AGENTOS_API agentos_error_t sd_discover(service_discovery_t sd_handle, const cha
 
     agentos_mutex_unlock(&sd->mutex);
 
-    LOG_DEBUG("Discovered %u healthy instances for service '%s'", count, service_name);
+    SD_LOG_DEBUG("DISCOVER service='%s' found=%u healthy", service_name, count);
     return AGENTOS_SUCCESS;
 }
 
@@ -770,9 +788,9 @@ AGENTOS_API agentos_error_t sd_update_health(service_discovery_t sd_handle,
         notify_event(sd, event, service_name, &entry->instances[inst_idx]);
 
         if (!healthy) {
-            LOG_WARN("Instance '%s' of service '%s' became unhealthy", instance_id, service_name);
+            SD_LOG_WARN("UNHEALTHY instance='%s' service='%s'", instance_id, service_name);
         } else {
-            LOG_INFO("Instance '%s' of service '%s' recovered", instance_id, service_name);
+            SD_LOG_INFO("RECOVERED instance='%s' service='%s'", instance_id, service_name);
         }
     }
 
@@ -975,4 +993,50 @@ AGENTOS_API const char *sd_lb_strategy_to_string(sd_lb_strategy_t strategy)
     if (strategy < 0 || strategy > SD_LB_LEAST_LOAD)
         return "UNKNOWN";
     return strategy_strings[strategy];
+}
+
+/* ==================== C-L08: 统计摘要 ==================== */
+
+AGENTOS_API void sd_dump_stats(service_discovery_t sd_handle)
+{
+    if (!sd_handle) {
+        SD_LOG_WARN("STATS unavailable (NULL handle)");
+        return;
+    }
+
+    sd_internal_t *sd = (sd_internal_t *)sd_handle;
+
+    agentos_mutex_lock(&sd->mutex);
+
+    sd_stats_t stats = sd->stats;
+    stats.active_services = sd->service_count;
+    stats.active_instances = 0;
+    for (uint32_t i = 0; i < sd->service_count; i++) {
+        stats.active_instances += sd->services[i].instance_count;
+    }
+
+    /* 计算健康实例数 */
+    uint32_t healthy_instances = 0;
+    for (uint32_t i = 0; i < sd->service_count; i++) {
+        for (uint32_t j = 0; j < sd->services[i].instance_count; j++) {
+            if (sd->services[i].instances[j].healthy) healthy_instances++;
+        }
+    }
+
+    agentos_mutex_unlock(&sd->mutex);
+
+    SD_LOG_INFO("SD-STATS services=%u instances=%u (%u healthy) "
+                "registrations=%llu deregistrations=%llu "
+                "discoveries=%llu heartbeats=%llu "
+                "expirations=%llu lb_selections=%llu "
+                "running=%s",
+                stats.active_services, stats.active_instances,
+                healthy_instances,
+                (unsigned long long)stats.registrations,
+                (unsigned long long)stats.deregistrations,
+                (unsigned long long)stats.discoveries,
+                (unsigned long long)stats.heartbeats,
+                (unsigned long long)stats.expirations,
+                (unsigned long long)stats.lb_selections,
+                sd->running ? "yes" : "no");
 }

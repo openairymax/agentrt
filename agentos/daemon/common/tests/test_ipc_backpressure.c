@@ -197,7 +197,7 @@ static void test_bp_recovery(void)
 
     /* 降到 80% — 不应立即恢复到 NORMAL（需低于 recover 阈值 60%） */
     ipc_bp_update(ctrl, 800);
-    TEST_ASSERT(ipc_bp_get_level(ctrl) <= IPC_BP_SLOW, "80% should not fully recover");
+    TEST_ASSERT(ipc_bp_get_level(ctrl) != IPC_BP_NORMAL, "80% should not recover to NORMAL");
 
     /* 降到 55% — 应恢复到 NORMAL */
     ipc_bp_level_t level = ipc_bp_update(ctrl, 550);

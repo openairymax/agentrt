@@ -928,7 +928,7 @@ static void test_svc_user_data_and_metadata(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS daemon/common 深度单元测试套件\n");
+    printf("  AgentRT daemon/common 深度单元测试套件\n");
     printf("  P1-C06: 目标覆盖率 >50%%\n");
     printf("========================================\n");
 

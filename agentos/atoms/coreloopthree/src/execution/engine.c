@@ -13,6 +13,7 @@
 #include "platform.h"
 
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -405,6 +406,10 @@ static void *worker_thread_func(void *arg)
         tcb->status = TASK_STATUS_RUNNING;
         agentos_mutex_unlock(tcb->tcb_lock);
 
+        AGENTOS_LOG_DEBUG("ExecutionEngine: worker executing task (task_id=%s, agent=%s)",
+                          tcb->task_id,
+                          tcb->task_desc->task_agent_id ? tcb->task_desc->task_agent_id : "(none)");
+
         agentos_execution_unit_t *unit = agentos_registry_get_unit(tcb->task_desc->task_agent_id);
         void *output = NULL;
         size_t output_len = 0;
@@ -427,6 +432,13 @@ static void *worker_thread_func(void *arg)
         tcb->result_len = output_len;
         agentos_cond_signal(tcb->completed_cond);
         agentos_mutex_unlock(tcb->tcb_lock);
+
+        uint64_t elapsed_ns = tcb->end_time_ns - tcb->start_time_ns;
+        AGENTOS_LOG_DEBUG("ExecutionEngine: worker task %s (task_id=%s, status=%s, elapsed_us=%" PRIu64 ")",
+                          exec_err == AGENTOS_SUCCESS ? "DONE" : "FAILED",
+                          tcb->task_id,
+                          exec_err == AGENTOS_SUCCESS ? "SUCCEEDED" : "FAILED",
+                          elapsed_ns / 1000);
 
         agentos_mutex_lock(engine->running_lock);
         remove_tcb_from_list(&engine->running_tasks, tcb);
@@ -501,7 +513,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
         agentos_cond_free(engine->task_available_cond);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Overflow in worker threads array allocation");
-        ATM_RET_ERR(AGENTOS_E_OVERFLOW);
+        ATM_RET_ERR(AGENTOS_EOVERFLOW);
     }
     engine->worker_threads =
         (agentos_thread_t *)AGENTOS_MALLOC(engine->worker_count * sizeof(agentos_thread_t));
@@ -544,6 +556,8 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
     }
 
     *out_engine = engine;
+    AGENTOS_LOG_INFO("ExecutionEngine: created (max_concurrency=%u, workers=%zu)",
+                     max_concurrency, engine->worker_count);
     return AGENTOS_SUCCESS;
 }
 
@@ -551,6 +565,9 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
 {
     if (!engine)
         return;
+
+    AGENTOS_LOG_INFO("ExecutionEngine: destroy START (workers=%zu, max_concurrency=%u)",
+                     engine->worker_count, engine->max_concurrency);
 
     agentos_mutex_lock(engine->queue_lock);
     engine->running = 0;
@@ -592,6 +609,7 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
     agentos_mutex_free(engine->running_lock);
     agentos_cond_free(engine->task_available_cond);
     AGENTOS_FREE(engine);
+    AGENTOS_LOG_DEBUG("ExecutionEngine: destroy done");
 }
 
 /**
@@ -676,6 +694,11 @@ agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine,
         AGENTOS_LOG_ERROR("Failed to duplicate task_id");
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
+
+    AGENTOS_LOG_DEBUG("ExecutionEngine: task submitted (task_id=%s, agent=%s, timeout=%u)",
+                      tcb->task_id,
+                      task_copy->task_agent_id ? task_copy->task_agent_id : "(none)",
+                      task_copy->task_timeout_ms);
 
     return AGENTOS_SUCCESS;
 }
