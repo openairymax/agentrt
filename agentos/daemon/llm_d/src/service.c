@@ -210,13 +210,13 @@ llm_service_t *llm_service_create(const char *config_path)
 {
     llm_service_t *svc = (llm_service_t *)AGENTOS_CALLOC(1, sizeof(llm_service_t));
     if (!svc) {
-        SVC_LOG_ERROR("Failed to allocate service context");
+        SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL allocate service context, STACK: llm_service_create");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     if (agentos_mutex_init(&svc->lock) != 0) {
-        SVC_LOG_ERROR("Failed to initialize service lock");
+        SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL init lock, STACK: llm_service_create");
         AGENTOS_FREE(svc);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
         return NULL;
@@ -279,7 +279,7 @@ llm_service_t *llm_service_create(const char *config_path)
     /* 创建提供商注册表 */
     svc->registry = provider_registry_create(&base_cfg);
     if (!svc->registry) {
-        SVC_LOG_ERROR("Failed to create provider registry");
+        SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL registry, STACK: llm_service_create");
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
@@ -289,7 +289,7 @@ llm_service_t *llm_service_create(const char *config_path)
     /* 创建缓存 */
     svc->cache = cache_create(base_cfg.cache_capacity, base_cfg.cache_ttl_sec);
     if (!svc->cache) {
-        SVC_LOG_ERROR("Failed to create cache");
+        SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL cache, STACK: llm_service_create");
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
@@ -300,7 +300,7 @@ llm_service_t *llm_service_create(const char *config_path)
     /* 创建成本追踪器 */
     svc->cost = cost_tracker_create((const pricing_rule_t *)svc->rules, (int)svc->rule_count);
     if (!svc->cost) {
-        SVC_LOG_ERROR("Failed to create cost tracker");
+        SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL cost_tracker, STACK: llm_service_create");
         cache_destroy(svc->cache);
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
@@ -312,7 +312,7 @@ llm_service_t *llm_service_create(const char *config_path)
     /* 创建 Token 计数器 */
     svc->token_counter = token_counter_create(base_cfg.token_encoding);
     if (!svc->token_counter) {
-        SVC_LOG_ERROR("Failed to create token counter");
+        SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL token_counter, STACK: llm_service_create");
         cost_tracker_destroy(svc->cost);
         cache_destroy(svc->cache);
         provider_registry_destroy(svc->registry);
@@ -322,7 +322,8 @@ llm_service_t *llm_service_create(const char *config_path)
         return NULL;
     }
 
-    SVC_LOG_INFO("LLM service initialized successfully");
+    SVC_LOG_INFO("C-L02: SVC: CREATE-OK pricing_rules=%d cache_capacity=%zu cache_ttl=%u",
+                 (int)svc->rule_count, base_cfg.cache_capacity, base_cfg.cache_ttl_sec);
     return svc;
 }
 
@@ -332,6 +333,8 @@ void llm_service_destroy(llm_service_t *svc)
 {
     if (!svc)
         return;
+
+    SVC_LOG_INFO("C-L02: SVC: DESTROY");
 
     if (svc->registry) {
         provider_registry_destroy(svc->registry);
@@ -545,19 +548,19 @@ int llm_service_complete(llm_service_t *svc, const llm_request_config_t *manager
 {
     /* 参数检查 */
     if (!svc || !manager || !out_response) {
-        SVC_LOG_ERROR("Invalid arguments to llm_service_complete");
+        SVC_LOG_ERROR("C-L02: SVC: COMPLETE-FAIL invalid arguments, STACK: llm_service_complete");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     if (!manager->model) {
-        SVC_LOG_ERROR("Model name is NULL");
+        SVC_LOG_ERROR("C-L02: SVC: COMPLETE-FAIL model=NULL, STACK: llm_service_complete");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     /* 生成缓存键 */
     char *cache_key = make_cache_key(manager);
     if (!cache_key) {
-        SVC_LOG_ERROR("Failed to generate cache key");
+        SVC_LOG_ERROR("C-L02: SVC: COMPLETE-FAIL cache_key alloc, STACK: llm_service_complete");
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -573,7 +576,8 @@ int llm_service_complete(llm_service_t *svc, const llm_request_config_t *manager
     /* 查找提供商 */
     const provider_t *prov = find_provider(svc, manager->model);
     if (!prov) {
-        SVC_LOG_ERROR("No provider for model '%s'", manager->model);
+        SVC_LOG_ERROR("C-L02: SVC: COMPLETE-FAIL model=%s, error=INVALID_MODEL, STACK: llm_service_complete",
+                      manager->model);
         AGENTOS_FREE(cache_key);
         cache_key = NULL;
         return AGENTOS_ERR_LLM_INVALID_MODEL;
@@ -596,8 +600,8 @@ int llm_service_complete(llm_service_t *svc, const llm_request_config_t *manager
     llm_response_t *resp = NULL;
     int ret = prov->ops->complete(prov->ctx, manager, &resp);
     if (ret != 0) {
-        SVC_LOG_ERROR("Provider '%s' failed for model '%s': error %d", prov->name, manager->model,
-                      ret);
+        SVC_LOG_ERROR("C-L02: SVC: COMPLETE-FAIL model=%s, error=%d, STACK: llm_service_complete",
+                      manager->model, ret);
         AGENTOS_FREE(cache_key);
         cache_key = NULL;
         return ret;
@@ -621,12 +625,12 @@ int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *
 {
     /* 参数检查 */
     if (!svc || !manager || !callback) {
-        SVC_LOG_ERROR("Invalid arguments to llm_service_complete_stream");
+        SVC_LOG_ERROR("C-L02: SVC: STREAM-FAIL invalid arguments, STACK: llm_service_complete_stream");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     if (!manager->model) {
-        SVC_LOG_ERROR("llm_service_complete_stream: model name is NULL");
+        SVC_LOG_ERROR("C-L02: SVC: STREAM-FAIL model=NULL, STACK: llm_service_complete_stream");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -636,7 +640,8 @@ int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *
     agentos_mutex_unlock(&svc->lock);
 
     if (!prov) {
-        SVC_LOG_ERROR("No provider for model '%s'", manager->model);
+        SVC_LOG_ERROR("C-L02: SVC: STREAM-FAIL model=%s, error=INVALID_MODEL, STACK: llm_service_complete_stream",
+                      manager->model);
         return AGENTOS_ERR_LLM_INVALID_MODEL;
     }
 
@@ -654,7 +659,8 @@ int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *
 
     /* 检查是否支持流式 */
     if (!prov->ops->complete_stream) {
-        SVC_LOG_WARN("Provider '%s' does not support streaming", prov->name);
+        SVC_LOG_ERROR("C-L02: SVC: STREAM-FAIL model=%s, error=NOT_SUPPORTED, STACK: llm_service_complete_stream",
+                      manager->model);
         return AGENTOS_ERR_NOT_SUPPORTED;
     }
 
@@ -715,7 +721,7 @@ int llm_service_stats(llm_service_t *svc, char **out_json)
 int svc_config_load(const char *config_path, service_config_t *cfg)
 {
     if (!cfg || !config_path) {
-        SVC_LOG_ERROR("svc_config_load: NULL parameter (cfg=%p, config_path=%p)", (const void *)cfg, (const void *)config_path);
+        SVC_LOG_ERROR("C-L02: SVC: CONFIG-FAIL NULL parameter, STACK: svc_config_load");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -723,7 +729,7 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
 #ifdef HAVE_YAML
         return svc_config_load_yaml(config_path, cfg);
 #else
-        SVC_LOG_WARN("YAML support not compiled, cannot load '%s'", config_path);
+        SVC_LOG_WARN("C-L02: SVC: CONFIG-WARN YAML not compiled, STACK: svc_config_load");
         __builtin_memset(cfg, 0, sizeof(service_config_t));
         cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
         cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
@@ -742,7 +748,7 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
 
     FILE *f = fopen(config_path, "rb");
     if (!f) {
-        SVC_LOG_WARN("Cannot open manager file '%s', using defaults", config_path);
+        SVC_LOG_WARN("C-L02: SVC: CONFIG-WARN cannot open file, STACK: svc_config_load");
         return 0; /* 使用默认值，不算错误 */
     }
 
@@ -752,14 +758,14 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
 
     char *content = (char *)AGENTOS_MALLOC((size_t)len + 1);
     if (!content) {
-        SVC_LOG_ERROR("svc_config_load: malloc failed for config content (len=%ld)", len);
+        SVC_LOG_ERROR("C-L02: SVC: CONFIG-FAIL malloc, STACK: svc_config_load");
         fclose(f);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
     size_t read_len = fread(content, 1, (size_t)len, f);
     if (read_len != (size_t)len) {
-        SVC_LOG_ERROR("svc_config_load: fread mismatch (expected=%ld, got=%zu)", len, read_len);
+        SVC_LOG_ERROR("C-L02: SVC: CONFIG-FAIL fread, STACK: svc_config_load");
         AGENTOS_FREE(content);
         fclose(f);
         return AGENTOS_ERR_IO;
@@ -772,7 +778,7 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
     AGENTOS_FREE(content);
 
     if (!root) {
-        SVC_LOG_WARN("Failed to parse manager file, using defaults");
+        SVC_LOG_WARN("C-L02: SVC: CONFIG-WARN parse failed, STACK: svc_config_load");
         return 0;
     }
 
@@ -883,14 +889,14 @@ int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
 
     FILE *f = fopen(config_path, "rb");
     if (!f) {
-        SVC_LOG_WARN("Cannot open YAML config '%s', using defaults", config_path);
+        SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN cannot open YAML, STACK: svc_config_load_yaml");
         return 0;
     }
 
     yaml_parser_t parser;
     if (!yaml_parser_initialize(&parser)) {
         fclose(f);
-        SVC_LOG_WARN("Failed to init YAML parser");
+        SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN YAML parser init, STACK: svc_config_load_yaml");
         return 0;
     }
     yaml_parser_set_input_file(&parser, f);
@@ -903,7 +909,7 @@ int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
 
     while (!done) {
         if (!yaml_parser_parse(&parser, &event)) {
-            SVC_LOG_WARN("YAML parse error in '%s'", config_path);
+            SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN YAML parse error, STACK: svc_config_load_yaml");
             break;
         }
         if (event.type == YAML_STREAM_END_EVENT) {
@@ -956,7 +962,7 @@ int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
     }
 
     yaml_map_free(&current_map);
-    SVC_LOG_INFO("Loaded YAML config from '%s'", config_path);
+    SVC_LOG_INFO("C-L02: SVC: MODEL-CONFIG-OK YAML loaded, STACK: svc_config_load_yaml");
     return AGENTOS_OK;
 }
 
@@ -980,14 +986,14 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
 
     FILE *f = fopen(config_path, "rb");
     if (!f) {
-        SVC_LOG_WARN("Cannot open model config '%s'", config_path);
+        SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN cannot open model config, STACK: svc_load_model_config_yaml");
         return 0;
     }
 
     yaml_parser_t parser;
     if (!yaml_parser_initialize(&parser)) {
         fclose(f);
-        SVC_LOG_WARN("Failed to init YAML parser for model config");
+        SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN YAML parser init, STACK: svc_load_model_config_yaml");
         return 0;
     }
     yaml_parser_set_input_file(&parser, f);
@@ -1069,7 +1075,7 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
     yaml_map_free(&item_map);
 
     if (model_count == 0) {
-        SVC_LOG_WARN("No models found in '%s'", config_path);
+        SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN no models found, STACK: svc_load_model_config_yaml");
         return 0;
     }
 
@@ -1155,7 +1161,7 @@ int svc_load_model_config_yaml(const char *config_path, provider_config_t **out_
 
     *out_providers = result;
     *out_count = prov_count;
-    SVC_LOG_INFO("Loaded %zu providers from YAML model config '%s'", prov_count, config_path);
+    SVC_LOG_INFO("C-L02: SVC: MODEL-CONFIG-OK YAML providers=%zu, STACK: svc_load_model_config_yaml", prov_count);
     return AGENTOS_OK;
 }
 
@@ -1165,7 +1171,7 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
                                       size_t *out_count)
 {
     if (!config_path || !out_providers || !out_count) {
-        SVC_LOG_ERROR("svc_load_model_config_json: NULL parameter (config_path=%p, out_providers=%p, out_count=%p)", (const void *)config_path, (const void *)out_providers, (const void *)out_count);
+        SVC_LOG_ERROR("C-L02: SVC: MODEL-CONFIG-FAIL NULL parameter, STACK: svc_load_model_config_json");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -1174,7 +1180,7 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
 
     FILE *f = fopen(config_path, "rb");
     if (!f) {
-        SVC_LOG_WARN("Cannot open model config '%s'", config_path);
+        SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN cannot open file, STACK: svc_load_model_config_json");
         return 0;
     }
 
@@ -1184,7 +1190,7 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
 
     char *content = (char *)AGENTOS_MALLOC((size_t)len + 1);
     if (!content) {
-        SVC_LOG_ERROR("svc_load_model_config_json: malloc failed for content (len=%ld)", len);
+        SVC_LOG_ERROR("C-L02: SVC: MODEL-CONFIG-FAIL malloc, STACK: svc_load_model_config_json");
         fclose(f);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
@@ -1196,14 +1202,14 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
     cJSON *root = cJSON_Parse(content);
     AGENTOS_FREE(content);
     if (!root) {
-        SVC_LOG_WARN("Failed to parse model config JSON");
+        SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN parse failed, STACK: svc_load_model_config_json");
         return 0;
     }
 
     cJSON *providers_arr = cJSON_GetObjectItem(root, "providers");
     if (!providers_arr || !cJSON_IsArray(providers_arr)) {
         cJSON_Delete(root);
-        SVC_LOG_WARN("No 'providers' array in model config");
+        SVC_LOG_WARN("C-L02: SVC: MODEL-CONFIG-WARN no providers, STACK: svc_load_model_config_json");
         return 0;
     }
 
@@ -1216,7 +1222,7 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
     provider_config_t *result =
         (provider_config_t *)AGENTOS_CALLOC((size_t)n + 1, sizeof(provider_config_t));
     if (!result) {
-        SVC_LOG_ERROR("svc_load_model_config_json: calloc failed for %d providers", n);
+        SVC_LOG_ERROR("C-L02: SVC: MODEL-CONFIG-FAIL calloc, STACK: svc_load_model_config_json");
         cJSON_Delete(root);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
@@ -1273,7 +1279,7 @@ static int svc_load_model_config_json(const char *config_path, provider_config_t
     cJSON_Delete(root);
     *out_providers = result;
     *out_count = valid_count;
-    SVC_LOG_INFO("Loaded %zu providers from JSON model config '%s'", valid_count, config_path);
+    SVC_LOG_INFO("C-L02: SVC: MODEL-CONFIG-OK providers=%zu, STACK: svc_load_model_config_json", valid_count);
     return AGENTOS_OK;
 }
 
@@ -1281,7 +1287,7 @@ int svc_load_model_config(const char *config_path, provider_config_t **out_provi
                           size_t *out_count)
 {
     if (!config_path || !out_providers || !out_count) {
-        SVC_LOG_ERROR("svc_load_model_config: NULL parameter (config_path=%p, out_providers=%p, out_count=%p)", (const void *)config_path, (const void *)out_providers, (const void *)out_count);
+        SVC_LOG_ERROR("C-L02: SVC: MODEL-CONFIG-FAIL NULL parameter, STACK: svc_load_model_config");
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
@@ -1289,7 +1295,7 @@ int svc_load_model_config(const char *config_path, provider_config_t **out_provi
 #ifdef HAVE_YAML
         return svc_load_model_config_yaml(config_path, out_providers, out_count);
 #else
-        SVC_LOG_ERROR("YAML support not compiled, cannot load '%s'", config_path);
+        SVC_LOG_ERROR("C-L02: SVC: MODEL-CONFIG-FAIL YAML not compiled, STACK: svc_load_model_config");
         return AGENTOS_ERR_NOT_SUPPORTED;
 #endif
     }

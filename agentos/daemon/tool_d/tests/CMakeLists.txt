@@ -13,6 +13,8 @@ set(TOOL_IMPL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/executor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/validator.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/registry.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tool_approval.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/safety_guard_bridge.c
 )
 
 # YAML found by root CMakeLists.txt (AGENTOS_HAS_YAML)
@@ -44,6 +46,8 @@ set(TOOL_COMMON_INCLUDES
     ${SYSCALL_INCLUDE_DIR}
     ${COREKERN_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../cupolas/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../cupolas/src/guards
 )
 
 foreach(TEST_SRC ${TOOL_TEST_SOURCES})
@@ -55,6 +59,7 @@ foreach(TEST_SRC ${TOOL_TEST_SOURCES})
 
     target_link_libraries(test_tool_${TEST_NAME} PRIVATE
         svc_common
+        cupolas
         Threads::Threads
     )
 
@@ -68,6 +73,11 @@ foreach(TEST_SRC ${TOOL_TEST_SOURCES})
     endif()
 
     target_compile_options(test_tool_${TEST_NAME} PRIVATE -Wall -Wextra -g -Wno-unused-function)
+
+    # C-L05: 启用 Cupolas SafetyGuard V2 API
+    target_compile_definitions(test_tool_${TEST_NAME} PRIVATE
+        AGENTOS_ENABLE_V2_API=1
+    )
 
     add_test(NAME tool_d_${TEST_NAME} COMMAND test_tool_${TEST_NAME}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

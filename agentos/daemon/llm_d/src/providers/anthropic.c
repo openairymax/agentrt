@@ -41,6 +41,8 @@ static provider_ctx_t *anthropic_init(const char *name __attribute__((unused)), 
 
     anthropic_ctx_t *ctx = (anthropic_ctx_t *)AGENTOS_CALLOC(1, sizeof(anthropic_ctx_t));
     if (!ctx) {
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: INIT-FAIL — OOM allocating ctx (size=%zu)",
+                      sizeof(anthropic_ctx_t));
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -48,12 +50,20 @@ static provider_ctx_t *anthropic_init(const char *name __attribute__((unused)), 
     provider_base_init(&ctx->base, api_key, api_base, organization, timeout_sec, max_retries,
                        ANTHROPIC_DEFAULT_BASE);
 
+    SVC_LOG_INFO("C-L02: ANTHROPIC: INIT api_base=%s model=%s timeout=%.1fs max_retries=%d "
+                 "has_api_key=%d",
+                 ctx->base.api_base,
+                 ANTHROPIC_DEFAULT_MODEL,
+                 timeout_sec, max_retries,
+                 (api_key && api_key[0]) ? 1 : 0);
+
     return (provider_ctx_t *)ctx;
 }
 
 static void anthropic_destroy(provider_ctx_t *ctx_ptr)
 {
     if (ctx_ptr) {
+        SVC_LOG_DEBUG("C-L02: ANTHROPIC: DESTROY ctx=%p", (void *)ctx_ptr);
         AGENTOS_FREE(ctx_ptr);
     }
 }
@@ -187,14 +197,26 @@ static int anthropic_complete(provider_ctx_t *ctx_ptr, const llm_request_config_
                               llm_response_t **out_response)
 {
     if (!ctx_ptr || !manager || !out_response) {
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: COMPLETE-FAIL — invalid params "
+                      "ctx=%p manager=%p out=%p",
+                      (void *)ctx_ptr, (void *)manager, (void *)out_response);
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
     anthropic_ctx_t *ctx = (anthropic_ctx_t *)ctx_ptr;
     provider_base_ctx_t *base = &ctx->base;
 
+    const char *model = (manager->model && manager->model[0]) ? manager->model : ANTHROPIC_DEFAULT_MODEL;
+
+    SVC_LOG_INFO("C-L02: ANTHROPIC: COMPLETE-START model=%s msgs=%zu max_tokens=%d temp=%.2f "
+                 "stream=%d",
+                 model, manager->message_count, manager->max_tokens,
+                 manager->temperature, manager->stream);
+
     char *req_body = anthropic_build_request(manager);
     if (!req_body) {
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: COMPLETE-FAIL — request body build failed "
+                      "model=%s", model);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -213,6 +235,9 @@ static int anthropic_complete(provider_ctx_t *ctx_ptr, const llm_request_config_
     provider_http_resp_t *http_resp = NULL;
     long http_code = 0;
 
+    SVC_LOG_DEBUG("C-L02: ANTHROPIC: HTTP-POST url=%s body_len=%zu timeout=%.1fs retries=%d",
+                  url, strlen(req_body), base->timeout_sec, base->max_retries);
+
     int ret = provider_http_post(url, headers, req_body, base->timeout_sec, base->max_retries,
                                  &http_resp, &http_code);
 
@@ -220,11 +245,48 @@ static int anthropic_complete(provider_ctx_t *ctx_ptr, const llm_request_config_
     AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
-        SVC_LOG_ERROR("anthropic: HTTP request failed, status=%ld", http_code);
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: COMPLETE-FAIL — HTTP request failed "
+                      "url=%s http_code=%ld ret=%d timeout=%.1fs "
+                      "STACK: provider_http_post() → anthropic_complete()",
+                      url, http_code, ret, base->timeout_sec);
         return ret;
     }
 
+    if (http_code != 200) {
+        size_t resp_body_len = http_resp ? strlen(http_resp->data) : 0;
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: COMPLETE-FAIL — HTTP error "
+                      "url=%s http_code=%ld resp_body_len=%zu "
+                      "DIAGNOSIS: %s",
+                      url, http_code, resp_body_len,
+                      (http_code == 401) ? "invalid x-api-key" :
+                      (http_code == 403) ? "forbidden (check API key permissions)" :
+                      (http_code == 429) ? "rate limited" :
+                      (http_code == 529) ? "overloaded" :
+                      "check API key and endpoint");
+        provider_http_resp_free(http_resp);
+        return AGENTOS_ERR_IO;
+    }
+
+    size_t resp_body_len = http_resp ? strlen(http_resp->data) : 0;
+    SVC_LOG_DEBUG("C-L02: ANTHROPIC: HTTP-RESPONSE http_code=%ld resp_body_len=%zu",
+                  http_code, resp_body_len);
+
     ret = anthropic_parse_response(http_resp->data, out_response);
+    if (ret != AGENTOS_OK) {
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: COMPLETE-FAIL — response parse failed "
+                      "ret=%d resp_body_len=%zu "
+                      "STACK: anthropic_parse_response() → anthropic_complete()",
+                      ret, resp_body_len);
+    } else if (*out_response) {
+        SVC_LOG_INFO("C-L02: ANTHROPIC: COMPLETE-OK model=%s tokens=(prompt=%u,completion=%u,total=%u) "
+                     "finish_reason=%s",
+                     (*out_response)->model ? (*out_response)->model : "unknown",
+                     (*out_response)->prompt_tokens,
+                     (*out_response)->completion_tokens,
+                     (*out_response)->total_tokens,
+                     (*out_response)->finish_reason ? (*out_response)->finish_reason : "none");
+    }
+
     provider_http_resp_free(http_resp);
 
     return ret;
@@ -470,18 +532,30 @@ static int anthropic_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_
                                      llm_stream_callback_t callback, void *user_data,
                                      llm_response_t **out_response)
 {
-    if (!ctx_ptr || !manager || !callback)
+    if (!ctx_ptr || !manager || !callback) {
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: STREAM-FAIL — invalid params "
+                      "ctx=%p manager=%p callback=%p",
+                      (void *)ctx_ptr, (void *)manager, (void *)callback);
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     anthropic_ctx_t *ctx = (anthropic_ctx_t *)ctx_ptr;
     provider_base_ctx_t *base = &ctx->base;
+
+    const char *model = (manager->model && manager->model[0]) ? manager->model : ANTHROPIC_DEFAULT_MODEL;
+
+    SVC_LOG_INFO("C-L02: ANTHROPIC: STREAM-START model=%s msgs=%zu max_tokens=%d temp=%.2f",
+                 model, manager->message_count, manager->max_tokens, manager->temperature);
 
     llm_request_config_t stream_cfg = *manager;
     stream_cfg.stream = 1;
 
     char *req_body = anthropic_build_request(&stream_cfg);
-    if (!req_body)
+    if (!req_body) {
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: STREAM-FAIL — request body build failed "
+                      "model=%s", model);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     char url[1024];
     snprintf(url, sizeof(url), "%s/messages", base->api_base);
@@ -505,11 +579,15 @@ static int anthropic_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_
     ant_sse_ctx_t sse;
     ant_sse_init(&sse, &acc);
     if (!sse.line_buf) {
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: STREAM-FAIL — SSE buffer alloc failed (OOM)");
         AGENTOS_FREE(req_body);
         curl_slist_free_all(headers);
         AGENTOS_FREE(acc.acc_content);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
+
+    SVC_LOG_DEBUG("C-L02: ANTHROPIC: STREAM-HTTP-POST url=%s body_len=%zu timeout=%.1fs",
+                  url, strlen(req_body), base->timeout_sec);
 
     CURL *curl = curl_easy_init();
     long http_code = 0;
@@ -538,7 +616,10 @@ static int anthropic_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_
         if (cres == CURLE_OK)
             ret = AGENTOS_OK;
         else
-            SVC_LOG_WARN("anthropic: Stream curl error: %s", curl_easy_strerror(cres));
+            SVC_LOG_WARN("C-L02: ANTHROPIC: STREAM — curl error: %s (code=%d)",
+                         curl_easy_strerror(cres), (int)cres);
+    } else {
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: STREAM-FAIL — curl_easy_init() failed");
     }
 
     ant_sse_destroy(&sse);
@@ -546,7 +627,10 @@ static int anthropic_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_
     AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
-        SVC_LOG_ERROR("anthropic: Stream HTTP error, status=%ld", http_code);
+        SVC_LOG_ERROR("C-L02: ANTHROPIC: STREAM-FAIL — HTTP stream error "
+                      "url=%s http_code=%ld ret=%d timeout=%.1fs "
+                      "STACK: curl_easy_perform() → anthropic_complete_stream()",
+                      url, http_code, ret, base->timeout_sec);
         AGENTOS_FREE(acc.acc_content);
         AGENTOS_FREE(acc.resp_id);
         AGENTOS_FREE(acc.resp_model);
@@ -559,6 +643,17 @@ static int anthropic_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_
     AGENTOS_FREE(acc.resp_id);
     AGENTOS_FREE(acc.resp_model);
     AGENTOS_FREE(acc.finish_reason);
+
+    if (resp) {
+        SVC_LOG_INFO("C-L02: ANTHROPIC: STREAM-OK model=%s tokens=(prompt=%u,completion=%u,total=%u) "
+                     "finish_reason=%s acc_len=%zu",
+                     resp->model ? resp->model : "unknown",
+                     resp->prompt_tokens, resp->completion_tokens, resp->total_tokens,
+                     resp->finish_reason ? resp->finish_reason : "none",
+                     resp->choices && resp->choices[0].content ? strlen(resp->choices[0].content) : 0);
+    } else {
+        SVC_LOG_WARN("C-L02: ANTHROPIC: STREAM — null response built");
+    }
 
     if (out_response)
         *out_response = resp;

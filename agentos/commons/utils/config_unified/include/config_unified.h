@@ -13,25 +13,25 @@
  * 3. 服务层：高级配置功能（验证、热更新、加密等）
  * 4. 兼容层：向后兼容现有配置API
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-03-30
  * @version 2.0
  *
  * @note 线程安全：所有公共接口均为线程安全
  * @see ARCHITECTURAL_PRINCIPLES.md E-2 可观测性原则
+ *
+ * 使用示例：
+ *   config_context_t *ctx = config_context_create("myapp");
+ *   config_value_t *val = config_value_create_string("localhost");
+ *   config_context_set(ctx, "database.host", val);
+ *   // 使用源适配器
+ *   config_file_source_options_t file_opts = {.file_path = "manager.yaml", .format = "yaml"};
+ *   config_source_t *source = config_source_create_file(&file_opts);
+ *   config_source_load(source, ctx);
+ *   // 使用服务层功能
+ *   config_hot_reload_manager_t *hot_reload = config_hot_reload_manager_create(ctx, NULL);
+ *   config_hot_reload_start(hot_reload, 5000);
  */
-**使用示例： **  // 基础使用
-     *config_context_t *ctx = config_context_create("myapp");
-*config_value_t *val = config_value_create_string("localhost");
-*config_context_set(ctx, "database.host", val);
-**  // 使用源适配器
- *config_file_source_options_t file_opts = {*.file_path = "manager.yaml", *.format = "yaml" * };
-*config_source_t *source = config_source_create_file(&file_opts);
-*config_source_load(source, ctx);
-**  // 使用服务层功能
- *config_hot_reload_manager_t *hot_reload = config_hot_reload_manager_create(ctx, NULL);
-*config_hot_reload_start(hot_reload, 5000);
-* /
 
 #ifndef AGENTOS_CONFIG_UNIFIED_H
 #define AGENTOS_CONFIG_UNIFIED_H

@@ -353,6 +353,17 @@ AGENTOS_API const char *sd_lb_strategy_to_string(sd_lb_strategy_t strategy);
  */
 AGENTOS_API sd_config_t sd_create_default_config(void);
 
+/**
+ * @brief C-L08: 输出服务发现统计摘要（单行格式，适合周期性日志）
+ *
+ * 格式: "C-L08: SD-STATS services=N instances=N "
+ *        "registrations=N deregistrations=N discoveries=N "
+ *        "heartbeats=N expirations=N lb_selections=N"
+ *
+ * @param sd 服务发现句柄
+ */
+AGENTOS_API void sd_dump_stats(service_discovery_t sd);
+
 #ifdef __cplusplus
 }
 #endif

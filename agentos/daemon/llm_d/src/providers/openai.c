@@ -214,7 +214,9 @@ static int openai_http_request_with_retry(openai_ctx_t *ctx, const char *url,
     while (attempt < max_attempts) {
         int ret = openai_rl_check_rpm(&ctx->rl);
         if (ret != 0) {
-            SVC_LOG_WARN("openai: RPM limit reached, waiting...");
+            SVC_LOG_WARN("C-L02: OPENAI: RATE-LIMIT url=%s reason=rpm_limit_reached "
+                         "attempt=%d/%d",
+                         url, attempt + 1, max_attempts);
             struct timespec ts = {.tv_sec = 1, .tv_nsec = 0};
             nanosleep(&ts, NULL);
             continue;
@@ -233,8 +235,9 @@ static int openai_http_request_with_retry(openai_ctx_t *ctx, const char *url,
             int retry_after = parse_retry_after(*out_response ? (*out_response)->data : NULL);
             openai_rl_record_429(&ctx->rl, retry_after);
 
-            SVC_LOG_WARN("openai: Rate limited (429), attempt %d/%d, retry_after=%ds", attempt + 1,
-                         max_attempts, retry_after);
+            SVC_LOG_WARN("C-L02: OPENAI: RATE-LIMIT url=%s http_code=429 attempt=%d/%d "
+                         "retry_after=%ds",
+                         url, attempt + 1, max_attempts, retry_after);
 
             if (*out_response) {
                 provider_http_resp_free(*out_response);
@@ -252,8 +255,9 @@ static int openai_http_request_with_retry(openai_ctx_t *ctx, const char *url,
         }
 
         if (*out_http_code >= 500 && *out_http_code < 600 && attempt < max_attempts - 1) {
-            SVC_LOG_WARN("openai: Server error %ld, attempt %d/%d, retrying...", *out_http_code,
-                         attempt + 1, max_attempts);
+            SVC_LOG_WARN("C-L02: OPENAI: SERVER-ERROR url=%s http_code=%ld attempt=%d/%d "
+                         "retrying",
+                         url, *out_http_code, attempt + 1, max_attempts);
 
             if (*out_response) {
                 provider_http_resp_free(*out_response);
@@ -284,6 +288,7 @@ static provider_ctx_t *openai_init(const char *name __attribute__((unused)), con
 
     openai_ctx_t *ctx = (openai_ctx_t *)AGENTOS_CALLOC(1, sizeof(openai_ctx_t));
     if (!ctx) {
+        SVC_LOG_ERROR("C-L02: OPENAI: INIT-FAIL reason=oom STACK: openai_init");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -295,8 +300,11 @@ static provider_ctx_t *openai_init(const char *name __attribute__((unused)), con
 
     agentos_random_init();
 
-    SVC_LOG_INFO("openai: adapter initialized (RPM=%d, TPM=%ld)", OPENAI_DEFAULT_RPM,
-                 (long)OPENAI_DEFAULT_TPM);
+    SVC_LOG_INFO("C-L02: OPENAI: INIT api_base=%s timeout=%.1fs retries=%d has_api_key=%d "
+                 "RPM=%d TPM=%ld",
+                 ctx->base.api_base[0] ? ctx->base.api_base : OPENAI_DEFAULT_BASE,
+                 ctx->base.timeout_sec, ctx->base.max_retries,
+                 ctx->base.api_key[0] ? 1 : 0, OPENAI_DEFAULT_RPM, (long)OPENAI_DEFAULT_TPM);
 
     return (provider_ctx_t *)ctx;
 }
@@ -305,6 +313,7 @@ static void openai_destroy(provider_ctx_t *ctx_ptr)
 {
     if (ctx_ptr) {
         openai_ctx_t *ctx = (openai_ctx_t *)ctx_ptr;
+        SVC_LOG_INFO("C-L02: OPENAI: DESTROY ctx=%p", (void *)ctx_ptr);
         openai_rl_destroy(&ctx->rl);
         AGENTOS_FREE(ctx_ptr);
     }
@@ -324,8 +333,17 @@ static int openai_complete(provider_ctx_t *ctx_ptr, const llm_request_config_t *
 
     char *req_body = provider_build_openai_request(manager, OPENAI_DEFAULT_MODEL);
     if (!req_body) {
+        SVC_LOG_ERROR("C-L02: OPENAI: COMPLETE-FAIL model=%s reason=build_request_oom "
+                      "STACK: openai_complete",
+                      manager->model ? manager->model : OPENAI_DEFAULT_MODEL);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
+
+    const char *model = manager->model && manager->model[0] ? manager->model : OPENAI_DEFAULT_MODEL;
+    SVC_LOG_INFO("C-L02: OPENAI: COMPLETE-START model=%s msgs=%zu max_tokens=%d temp=%.2f "
+                 "stream=%d",
+                 model, manager->message_count, manager->max_tokens, manager->temperature,
+                 manager->stream ? 1 : 0);
 
     char url[1024];
     snprintf(url, sizeof(url), "%s/chat/completions", base->api_base);
@@ -348,9 +366,13 @@ static int openai_complete(provider_ctx_t *ctx_ptr, const llm_request_config_t *
 
     if (ret != AGENTOS_OK) {
         if (http_code == 429) {
-            SVC_LOG_ERROR("openai: Rate limit exhausted after retries");
+            SVC_LOG_ERROR("C-L02: OPENAI: COMPLETE-FAIL model=%s http_code=%ld "
+                          "DIAGNOSIS=rate_limit_exhausted",
+                          model, http_code);
         } else {
-            SVC_LOG_ERROR("openai: HTTP request failed, status=%ld", http_code);
+            SVC_LOG_ERROR("C-L02: OPENAI: COMPLETE-FAIL model=%s http_code=%ld "
+                          "DIAGNOSIS=http_request_failed",
+                          model, http_code);
         }
         if (http_resp)
             provider_http_resp_free(http_resp);
@@ -359,6 +381,18 @@ static int openai_complete(provider_ctx_t *ctx_ptr, const llm_request_config_t *
 
     ret = provider_parse_openai_response(http_resp->data, out_response);
     provider_http_resp_free(http_resp);
+
+    if (ret == AGENTOS_OK && *out_response) {
+        SVC_LOG_INFO("C-L02: OPENAI: COMPLETE-OK model=%s tokens=(prompt=%u,completion=%u,total=%u) "
+                     "http_code=%ld",
+                     (*out_response)->model ? (*out_response)->model : model,
+                     (*out_response)->prompt_tokens, (*out_response)->completion_tokens,
+                     (*out_response)->total_tokens, http_code);
+    } else {
+        SVC_LOG_ERROR("C-L02: OPENAI: COMPLETE-FAIL model=%s http_code=%ld "
+                      "DIAGNOSIS=parse_response_failed ret=%d",
+                      model, http_code, ret);
+    }
 
     return ret;
 }
@@ -509,8 +543,15 @@ static int openai_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
 
     char *req_body = provider_build_openai_request(&stream_cfg, OPENAI_DEFAULT_MODEL);
     if (!req_body) {
+        SVC_LOG_ERROR("C-L02: OPENAI: STREAM-FAIL model=%s reason=build_request_oom "
+                      "STACK: openai_complete_stream",
+                      manager->model ? manager->model : OPENAI_DEFAULT_MODEL);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
+
+    const char *model = manager->model && manager->model[0] ? manager->model : OPENAI_DEFAULT_MODEL;
+    SVC_LOG_INFO("C-L02: OPENAI: STREAM-START model=%s msgs=%zu max_tokens=%d temp=%.2f",
+                 model, manager->message_count, manager->max_tokens, manager->temperature);
 
     char url[1024];
     snprintf(url, sizeof(url), "%s/chat/completions", base->api_base);
@@ -539,9 +580,13 @@ static int openai_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
 
     if (ret != AGENTOS_OK) {
         if (http_code == 429) {
-            SVC_LOG_ERROR("openai: Stream rate limit exhausted");
+            SVC_LOG_ERROR("C-L02: OPENAI: STREAM-FAIL model=%s http_code=%ld "
+                          "DIAGNOSIS=rate_limit_exhausted",
+                          model, http_code);
         } else {
-            SVC_LOG_ERROR("openai: Stream HTTP error, status=%ld", http_code);
+            SVC_LOG_ERROR("C-L02: OPENAI: STREAM-FAIL model=%s http_code=%ld "
+                          "DIAGNOSIS=http_stream_error",
+                          model, http_code);
         }
         AGENTOS_FREE(acc.acc_content);
         AGENTOS_FREE(acc.resp_id);
@@ -555,6 +600,17 @@ static int openai_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     AGENTOS_FREE(acc.resp_id);
     AGENTOS_FREE(acc.resp_model);
     AGENTOS_FREE(acc.finish_reason);
+
+    if (resp) {
+        SVC_LOG_INFO("C-L02: OPENAI: STREAM-OK model=%s tokens=(prompt=%u,completion=%u,total=%u) "
+                     "http_code=%ld",
+                     resp->model ? resp->model : model, resp->prompt_tokens,
+                     resp->completion_tokens, resp->total_tokens, http_code);
+    } else {
+        SVC_LOG_WARN("C-L02: OPENAI: STREAM-FAIL model=%s http_code=%ld "
+                     "DIAGNOSIS=null_response_built",
+                     model, http_code);
+    }
 
     if (out_response) {
         *out_response = resp;

@@ -10,7 +10,7 @@ from tests.base_test_case import BaseTestCase
 
 from agentos.modules.task.manager import TaskManager
 from agentos.types import TaskStatus
-from agentos.exceptions import AgentOSError, CODE_MISSING_PARAMETER
+from agentos.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE
 
 
 class TestTaskManager(BaseTestCase):
@@ -24,7 +24,7 @@ class TestTaskManager(BaseTestCase):
         result = mgr.submit("test task")
         
         assert result is not None
-        assert result["id"] == "task-123"
+        assert result.id == "task-123"
         self.mock_client.post.assert_called_once()
     
     def test_submit_with_options(self):
@@ -35,11 +35,11 @@ class TestTaskManager(BaseTestCase):
             status="pending"
         )
         
-        result = mgr.submit("test task", priority=10)
+        result = mgr.submit_with_options("test task", priority=10)
         
         assert result is not None
-        assert result["id"] == "task-456"
-    
+        assert result.id == "task-456"
+
     def test_submit_empty_description_raises_error(self):
         """测试空任务描述抛出异常"""
         mgr = TaskManager(self.mock_client, self.config)
@@ -60,7 +60,7 @@ class TestTaskManager(BaseTestCase):
         result = mgr.get("task-789")
         
         assert result is not None
-        assert result["id"] == "task-789"
+        assert result.id == "task-789"
         self.assert_api_called("get", "/api/v1/tasks/task-789")
     
     def test_list_success(self):
@@ -76,20 +76,19 @@ class TestTaskManager(BaseTestCase):
         result = mgr.list()
         
         assert result is not None
-        assert len(result["items"]) == 2
+        assert len(result) == 2
     
     def test_cancel_success(self):
         """测试任务取消"""
         mgr = TaskManager(self.mock_client, self.config)
-        self.mock_client.delete.return_value = self.create_mock_response(200, {
+        self.mock_client.post.return_value = self.create_mock_response(200, {
             "success": True,
             "data": {"id": "task-123", "status": "cancelled"}
         })
         
-        result = mgr.cancel("task-123")
+        mgr.cancel("task-123")
         
-        assert result is not None
-        self.assert_api_called("delete", "/api/v1/tasks/task-123")
+        self.mock_client.post.assert_called_once()
 
 
 class TestTaskManagerErrorHandling(BaseTestCase):
@@ -131,4 +130,4 @@ class TestTaskManagerErrorHandling(BaseTestCase):
         with pytest.raises(AgentOSError) as exc_info:
             mgr.submit("test task")
         
-        self.assert_error_code(exc_info.value, "0x000C")
+        self.assert_error_code(exc_info.value, CODE_INVALID_RESPONSE)

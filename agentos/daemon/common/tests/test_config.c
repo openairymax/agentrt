@@ -179,7 +179,7 @@ static void test_config_load_json(void)
     }
 
     fprintf(fp, "# Test config\n");
-    fprintf(fp, "app.name=AgentOS-Test\n");
+    fprintf(fp, "app.name=AgentRT-Test\n");
     fprintf(fp, "app.version=1.0.0\n");
     fprintf(fp, "server.port=9090\n");
     fprintf(fp, "debug.enabled=true\n");
@@ -189,7 +189,7 @@ static void test_config_load_json(void)
     TEST_ASSERT(count >= 3, "loaded entries from JSON");
 
     const char *name = cm_get("jsonns.app.name", NULL);
-    TEST_ASSERT(name != NULL && strcmp(name, "AgentOS-Test") == 0, "JSON loaded name");
+    TEST_ASSERT(name != NULL && strcmp(name, "AgentRT-Test") == 0, "JSON loaded name");
 
     int64_t port = cm_get_int("jsonns.server.port", 0);
     TEST_ASSERT(port == 9090, "JSON loaded port");

@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file protocol_transformers.h
  * @brief Protocol Message Transformers (Complete Implementation)
  *
- * 实现 AgentOS 支持的所有协议之间的双向消息转换：
+ * 实现 AgentRT 支持的所有协议之间的双向消息转换：
  * - JSON-RPC 2.0 ↔ MCP v1.0
  * - JSON-RPC 2.0 ↔ A2A v0.3
  * - JSON-RPC 2.0 ↔ OpenAI API

@@ -16,7 +16,7 @@ from agentos.framework.plugins.logger_plugin import LoggerPlugin
 from agentos.framework.plugins.metrics_plugin import MetricsPlugin
 from agentos.exceptions import (
     AgentOSError, NetworkError, ValidationError,
-    TimeoutError, CODE_NETWORK_ERROR, CODE_TIMEOUT,
+    TimeoutError, AgentOSTimeoutError, CODE_NETWORK_ERROR, CODE_TIMEOUT,
     CODE_VALIDATION_ERROR, CODE_UNKNOWN, CODE_INTERNAL,
 )
 from agentos.framework.event import EventBus

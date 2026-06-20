@@ -1,6 +1,6 @@
 /**
  * @file agentos_time.h
- * @brief AgentOS 时间服务接口
+ * @brief AgentRT 时间服务接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details

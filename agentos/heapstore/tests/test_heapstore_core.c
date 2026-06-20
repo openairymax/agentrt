@@ -1,12 +1,14 @@
 /**
  * @file test_heapstore_core.c
- * @brief AgentOS 数据分区核心模块单元测试
+ * @brief AgentRT 数据分区核心模块单元测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
  */
+// @owner: team-B
 
 #include "heapstore.h"
+#include "memory_compat.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -257,7 +259,7 @@ static void test_flush_not_initialized(void)
 
 int main(void)
 {
-    printf("=== AgentOS heapstore Core Unit Tests ===\n\n");
+    printf("=== AgentRT heapstore Core Unit Tests ===\n\n");
 
     test_init_shutdown();
     test_init_twice();

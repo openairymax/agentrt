@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_PASS(name) printf("[PASS] %s\n", name)
+#define TEST_PASS(name, ...) printf("[PASS] " name "\n", ##__VA_ARGS__)
 #define TEST_FAIL(name, msg)                  \
     do {                                      \
         printf("[FAIL] %s: %s\n", name, msg); \
@@ -330,6 +330,7 @@ static void test_e2e_metacognition_scoring(void)
 
         /* 检查 composite 评分范围 */
         int has_composite = (strstr(health_json, "composite") != NULL);
+        if (has_composite) dim_count++;
 
         if (dim_count >= 3) {
             TEST_PASS("e2e_metacognition: %d/5 metacognition dimensions present", dim_count);

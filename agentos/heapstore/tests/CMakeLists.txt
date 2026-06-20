@@ -11,7 +11,10 @@ set(TEST_FILES
 foreach(test ${TEST_FILES})
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${test}.c")
         add_executable(${test} ${test}.c)
-        target_include_directories(${test} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+        target_include_directories(${test} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../..
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+        )
         target_link_libraries(${test}
             PRIVATE agentos_heapstore
             Threads::Threads
@@ -31,7 +34,10 @@ option(BUILD_BENCHMARK "Build performance benchmark" ON)
 
 if(BUILD_BENCHMARK)
     add_executable(heapstore_benchmark benchmark_heapstore.c)
-    target_include_directories(heapstore_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+    target_include_directories(heapstore_benchmark PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../..
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+    )
     target_link_libraries(heapstore_benchmark
         PRIVATE agentos_heapstore
         Threads::Threads

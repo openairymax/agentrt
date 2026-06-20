@@ -1,6 +1,6 @@
 /**
  * @file heapstore_batch.c
- * @brief AgentOS heapstore 批量写入模块实现（优化版）
+ * @brief AgentRT heapstore 批量写入模块实现（优化版）
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -12,6 +12,7 @@
  *       将圈复杂度控制在7以下，提升可维护性。
  */
 
+// @owner: team-B
 #include "heapstore_batch.h"
 
 #include "heapstore.h"

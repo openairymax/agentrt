@@ -29,25 +29,27 @@ token_counter_t *token_counter_create(const char *encoding_name)
 {
     token_counter_t *tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
     if (!tc) {
+        SVC_LOG_ERROR("C-L02: TOKEN-COUNTER: CREATE-FAIL — OOM allocating struct");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
         return NULL;
     }
     tc->enc = tiktoken_get_encoding(encoding_name);
     if (!tc->enc) {
-        SVC_LOG_ERROR("Failed to get encoding %s", encoding_name);
+        SVC_LOG_ERROR("C-L02: TOKEN-COUNTER: CREATE-FAIL — "
+                      "tiktoken_get_encoding failed encoding=%s", encoding_name);
         AGENTOS_FREE(tc);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
     tc->encoding_name = AGENTOS_STRDUP(encoding_name);
+    SVC_LOG_INFO("C-L02: TOKEN-COUNTER: CREATE encoding=%s (tiktoken native)", encoding_name);
     return tc;
 }
 
 void token_counter_destroy(token_counter_t *tc)
 {
-    if (!tc)
-        return;
+    if (!tc) return;
+    SVC_LOG_INFO("C-L02: TOKEN-COUNTER: DESTROY encoding=%s", tc->encoding_name);
     tiktoken_free(tc->enc);
     AGENTOS_FREE(tc->encoding_name);
     AGENTOS_FREE(tc);
@@ -88,8 +90,8 @@ token_counter_t *token_counter_create(const char *encoding_name)
 {
     token_counter_t *tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
     if (!tc) {
+        SVC_LOG_ERROR("C-L02: TOKEN-COUNTER: CREATE-FAIL — OOM allocating struct");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
         return NULL;
     }
 
@@ -102,7 +104,8 @@ token_counter_t *token_counter_create(const char *encoding_name)
     tc->config.alpha_ratio = 0.4f;
     tc->config.flags = AGENTOS_TOKEN_FLAG_ACCURATE;
 
-    SVC_LOG_INFO("token_counter: using heuristic BPE estimation (encoding=%s, model_type=%d)",
+    SVC_LOG_INFO("C-L02: TOKEN-COUNTER: CREATE encoding=%s model_type=%d "
+                 "(heuristic BPE estimation fallback)",
                  tc->encoding_name, tc->config.model_type);
 
     return tc;
@@ -110,8 +113,8 @@ token_counter_t *token_counter_create(const char *encoding_name)
 
 void token_counter_destroy(token_counter_t *tc)
 {
-    if (!tc)
-        return;
+    if (!tc) return;
+    SVC_LOG_INFO("C-L02: TOKEN-COUNTER: DESTROY encoding=%s (heuristic)", tc->encoding_name);
     AGENTOS_FREE(tc->encoding_name);
     AGENTOS_FREE(tc);
 }

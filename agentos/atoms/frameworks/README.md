@@ -8,7 +8,7 @@
 
 ## 概述
 
-Frameworks 层是 AgentOS 连接外部 AI 框架的桥梁，采用**五大框架统一抽象**架构，将 Agent（CoreLoopThree）、Memory（MemoryRovol）、Task（CoreKern）、Safety（Cupolas）和 Tool（tool_d）五大核心框架封装为统一的 C API 接口。通过定义标准的"能力模型"和"框架管理器"，实现框架的热插拔、协议感知和可组合编排。
+Frameworks 层是 AgentRT 连接外部 AI 框架的桥梁，采用**五大框架统一抽象**架构，将 Agent（CoreLoopThree）、Memory（MemoryRovol）、Task（CoreKern）、Safety（Cupolas）和 Tool（tool_d）五大核心框架封装为统一的 C API 接口。通过定义标准的"能力模型"和"框架管理器"，实现框架的热插拔、协议感知和可组合编排。
 
 Frameworks 层以 C11 标准实现，通过 `agentos_frameworks.h` 提供统一入口，支持 JSON-RPC、MCP、A2A、OpenAI 等多种协议。框架管理器（Framework Manager）负责框架的完整生命周期管理，包括初始化、启动、停止、健康检查和事件回调。
 

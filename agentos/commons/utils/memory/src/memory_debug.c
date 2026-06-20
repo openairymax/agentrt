@@ -366,6 +366,12 @@ bool memory_debug_init(const memory_debug_options_t *options)
         return true;
     }
 
+    AGENTOS_LOG_INFO("memory_debug: memory_debug_init (redzone=%zu, track_alloc=%s, leak_check=%s, boundary_check=%s)",
+                     options ? options->redzone_size : 0,
+                     options && options->track_allocations ? "true" : "false",
+                     options && options->enable_leak_check ? "true" : "false",
+                     options && options->enable_boundary_check ? "true" : "false");
+
     // 初始化锁
     if (!memory_debug_lock_init()) {
         return false;
@@ -1001,7 +1007,11 @@ unsigned int memory_debug_checkpoint(const char *name)
 
     g_checkpoint_count++;
 
-    if (g_debug_state.options.verbosity_level >= 2) {
+    if (g_debug_state.options.verbosity_level >= 1) {
+        AGENTOS_LOG_INFO("[内存检查点] ID=%u, 名称=%s, 块数=%zu, 分配=%zu, 释放=%zu",
+                         id, cp->name, cp->block_count,
+                         cp->total_allocations, cp->total_frees);
+    } else if (g_debug_state.options.verbosity_level >= 2) {
         AGENTOS_LOG_DEBUG("[检查点] ID=%u, 名称=%s, 块数=%zu", id, cp->name, cp->block_count);
     }
 

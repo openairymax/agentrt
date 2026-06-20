@@ -1,6 +1,6 @@
 /**
  * @file builtin_provider.c
- * @brief AgentOS 内置免费内存提供商实现
+ * @brief AgentRT 内置免费内存提供商实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 实现 agentos_memory_provider_t 接口，提供 L1+L2 基础功能。
@@ -59,11 +59,27 @@ typedef struct builtin_provider_impl {
     agentos_memory_stats_t stats;
 } builtin_provider_impl_t;
 
+/* Forward declarations */
+static void setup_provider_capabilities(agentos_memory_provider_t *provider);
+static void setup_provider_vtable(agentos_memory_provider_t *provider);
+
 static agentos_error_t builtin_init(agentos_memory_provider_t *provider, const char *config_path)
 {
+    if (!provider)
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to init builtin provider: null provider");
 
-    if (!provider || !provider->impl)
-        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to init builtin provider: null provider or impl");
+    /* Re-allocate impl if destroyed by previous cleanup */
+    if (!provider->impl) {
+        AGENTOS_LOG_INFO("C-L07: Memory: BuiltinProvider RE-INIT (impl was destroyed, re-allocating)");
+        builtin_provider_impl_t *new_impl =
+            (builtin_provider_impl_t *)AGENTOS_CALLOC(1, sizeof(builtin_provider_impl_t));
+        if (!new_impl)
+            return AGENTOS_ENOMEM;
+        provider->impl = new_impl;
+        /* Re-setup vtable and capabilities since they were lost */
+        setup_provider_capabilities(provider);
+        setup_provider_vtable(provider);
+    }
 
     builtin_provider_impl_t *impl = (builtin_provider_impl_t *)provider->impl;
 
@@ -92,7 +108,7 @@ static agentos_error_t builtin_init(agentos_memory_provider_t *provider, const c
     snprintf(impl->stats.provider_name, sizeof(impl->stats.provider_name), "builtin");
     snprintf(impl->stats.provider_version, sizeof(impl->stats.provider_version), "0.1.0");
 
-    AGENTOS_LOG_INFO("[AgentOS] using built-in provider (free) - storage: %s", path);
+    AGENTOS_LOG_INFO("[AgentRT] using built-in provider (free) - storage: %s", path);
 
     return AGENTOS_SUCCESS;
 }

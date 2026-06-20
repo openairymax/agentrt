@@ -3,7 +3,7 @@
  * @brief 思考链路模块 - DS-001: Context Window管理+推理依赖链+Working Memory
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * 设计依据: AgentOS Thinkdual全方位设计01.md
+ * 设计依据: AgentRT Thinkdual全方位设计01.md
  * - Phase 0: 指令拆解(S1) → Context Window初始化
  * - Phase 2: 执行-验证循环(流式批判) → Thinking Step链式管理
  * - Working Memory: 短期上下文缓存，支持跨步骤信息传递
