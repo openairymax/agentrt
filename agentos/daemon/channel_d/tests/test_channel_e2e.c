@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#include "memory_compat.h"
 #include <time.h>
 #ifdef USE_CMOCKA_STUB
 #include "cmocka_stub.h"

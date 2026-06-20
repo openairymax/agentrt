@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from ecosystem.openlab.markets.client.errors import (
+from markets.client.errors import (
     MARKET_ERR_INVALID_PARAM,
     MARKET_ERR_NOT_FOUND,
     MARKET_ERR_ALREADY_EXISTS,
@@ -31,7 +31,7 @@ from ecosystem.openlab.markets.client.errors import (
     MarketInstallError,
     MarketValidationError,
 )
-from ecosystem.openlab.markets.client.models import (
+from markets.client.models import (
     AgentInfo,
     AgentType,
     AgentStatus,
@@ -41,7 +41,7 @@ from ecosystem.openlab.markets.client.models import (
     InstallResult,
     SearchParams,
 )
-from ecosystem.openlab.markets.client.contract_audit import ContractAuditor
+from markets.client.contract_audit import ContractAuditor
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -284,7 +284,7 @@ class TestRPCMethodConsistency:
 
     def test_client_has_all_rpc_methods(self):
         """MarketClient must expose all RPC methods defined in main.c."""
-        from ecosystem.openlab.markets.client.market_client import MarketClient
+        from markets.client.market_client import MarketClient
         client_methods = {
             name for name in dir(MarketClient)
             if not name.startswith("_") and callable(getattr(MarketClient, name, None))

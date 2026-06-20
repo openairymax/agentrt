@@ -13,19 +13,6 @@
 extern "C" {
 #endif
 
-typedef struct service_config {
-    size_t cache_capacity;
-    uint32_t cache_ttl_sec;
-    int max_retries;
-    uint32_t timeout_ms;
-    const char *token_encoding;
-    struct {
-        const char *name;
-        const char *enabled;
-    } *providers;
-    size_t provider_count;
-} service_config_t;
-
 typedef struct {
     const char *name;
     const char *api_key;
@@ -35,6 +22,16 @@ typedef struct {
     int max_retries;
     char **models;
 } provider_config_t;
+
+typedef struct service_config {
+    size_t cache_capacity;
+    uint32_t cache_ttl_sec;
+    int max_retries;
+    uint32_t timeout_ms;
+    const char *token_encoding;
+    provider_config_t *providers;
+    size_t provider_count;
+} service_config_t;
 
 typedef struct provider_registry provider_registry_t;
 

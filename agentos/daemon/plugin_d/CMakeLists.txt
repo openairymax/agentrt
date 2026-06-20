@@ -13,14 +13,19 @@ set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
 
 set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
 set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
+set(CUPOLAS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas)
 
 # Plugin 服务源文件
 set(PLUGIN_D_SOURCES
     src/main.c
     src/service.c
+    src/plugin_permission.c
+    src/plugin_discovery.c
 )
 
 add_executable(agentos-plugin-d ${PLUGIN_D_SOURCES})
+
+target_compile_definitions(agentos-plugin-d PRIVATE AGENTOS_ENABLE_V2_API=1)
 
 if(WIN32)
     target_compile_definitions(agentos-plugin-d PRIVATE
@@ -39,6 +44,7 @@ target_include_directories(agentos-plugin-d PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${DAEMON_COMMON_INCLUDE_DIR}
+    ${CUPOLAS_DIR}/include
     ${COMMONS_INCLUDE_DIR}
     ${COMMONS_INCLUDE_DIR}/platform/include
     ${COMMONS_INCLUDE_DIR}/utils/error/include
@@ -50,7 +56,7 @@ target_include_directories(agentos-plugin-d PRIVATE
 )
 
 target_link_libraries(agentos-plugin-d PRIVATE
-    svc_common Threads::Threads ${YAML_LIBRARIES}
+    svc_common cupolas Threads::Threads ${YAML_LIBRARIES}
 )
 
 if(BUILD_COVERAGE)

@@ -6,7 +6,7 @@
  * @file gateway_service.h
  * @brief Gateway守护进程服务接口
  *
- * gateway_d 是 AgentOS 的网关守护进程，负责：
+ * gateway_d 是 AgentRT 的网关守护进程，负责：
  * 1. 管理 HTTP/WebSocket/Stdio 网关实例
  * 2. 提供统一的配置管理
  * 3. 实现服务生命周期管理

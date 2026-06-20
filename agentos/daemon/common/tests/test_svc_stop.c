@@ -16,6 +16,11 @@
 #include "svc_common.h"
 #include "test_macros.h"
 
+/* 绕过 banned_functions.h 的 printf 宏重定义 */
+#ifdef printf
+#undef printf
+#endif
+
 #undef TEST_CASE_START
 #undef TEST_ASSERT_EQUAL_INT
 #undef TEST_ASSERT_NOT_NULL
@@ -33,6 +38,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include <unistd.h>
 
 static int g_test_stop_called = 0;
@@ -78,18 +84,20 @@ static void reset_test_state(void)
     g_test_start_called = 0;
 }
 
-static void test_stop_null_service(void)
+static int test_stop_null_service(void)
 {
     TEST_CASE_START(stop_null_service);
 
     agentos_error_t err = agentos_service_stop(NULL, false);
+    (void)err;
     TEST_ASSERT_EQUAL_INT(AGENTOS_EINVAL, err, "NULL服务返回EINVAL");
 
     err = agentos_service_stop(NULL, true);
     TEST_ASSERT_EQUAL_INT(AGENTOS_EINVAL, err, "NULL服务force模式返回EINVAL");
+    return 0;
 }
 
-static void test_stop_from_wrong_state(void)
+static int test_stop_from_wrong_state(void)
 {
     TEST_CASE_START(stop_from_wrong_state);
 
@@ -98,6 +106,7 @@ static void test_stop_from_wrong_state(void)
 
     agentos_service_t svc = NULL;
     agentos_error_t err = agentos_service_create(&svc, "test_stop_wrong", &iface, &g_test_config);
+    (void)err;
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
@@ -106,9 +115,10 @@ static void test_stop_from_wrong_state(void)
     TEST_ASSERT_TRUE(err != AGENTOS_SUCCESS, "未初始化服务stop应失败");
 
     agentos_service_destroy(svc);
+    return 0;
 }
 
-static void test_stop_normal_flow(void)
+static int test_stop_normal_flow(void)
 {
     TEST_CASE_START(stop_normal_flow);
 
@@ -119,6 +129,7 @@ static void test_stop_normal_flow(void)
 
     agentos_service_t svc = NULL;
     agentos_error_t err = agentos_service_create(&svc, "test_stop_normal", &iface, &g_test_config);
+    (void)err;
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
@@ -137,9 +148,10 @@ static void test_stop_normal_flow(void)
     TEST_ASSERT_STRING_CONTAINS(state_str, "STOPPED", "状态为STOPPED");
 
     agentos_service_destroy(svc);
+    return 0;
 }
 
-static void test_stop_then_start_again(void)
+static int test_stop_then_start_again(void)
 {
     TEST_CASE_START(stop_then_start_again);
 
@@ -150,6 +162,7 @@ static void test_stop_then_start_again(void)
 
     agentos_service_t svc = NULL;
     agentos_error_t err = agentos_service_create(&svc, "test_restart", &iface, &g_test_config);
+    (void)err;
     TEST_ASSERT_EQUAL_INT(AGENTOS_SUCCESS, err, "服务创建成功");
     TEST_ASSERT_NOT_NULL(svc, "服务句柄非空");
 
@@ -165,9 +178,10 @@ static void test_stop_then_start_again(void)
 
     agentos_service_stop(svc, false);
     agentos_service_destroy(svc);
+    return 0;
 }
 
-static void test_start_from_zombie_state(void)
+static int test_start_from_zombie_state(void)
 {
     TEST_CASE_START(start_from_zombie_state);
 
@@ -185,9 +199,10 @@ static void test_start_from_zombie_state(void)
     TEST_ASSERT_STRING_CONTAINS(zombie_str, "ZOMBIE", "状态字符串包含ZOMBIE");
 
     agentos_service_destroy(svc);
+    return 0;
 }
 
-static void test_state_to_string_boundary(void)
+static int test_state_to_string_boundary(void)
 {
     TEST_CASE_START(state_to_string_boundary);
 
@@ -208,9 +223,10 @@ static void test_state_to_string_boundary(void)
     const char *s_invalid = agentos_svc_state_to_string((agentos_svc_state_t)999);
     TEST_ASSERT_NOT_NULL(s_invalid, "越界状态返回非空");
     TEST_ASSERT_STRING_CONTAINS(s_invalid, "UNKNOWN", "越界返回UNKNOWN");
+    return 0;
 }
 
-static void test_service_create_and_destroy(void)
+static int test_service_create_and_destroy(void)
 {
     TEST_CASE_START(service_create_and_destroy);
 
@@ -230,10 +246,15 @@ static void test_service_create_and_destroy(void)
 
     agentos_service_destroy(svc);
     TEST_ASSERT_TRUE(1, "destroy不崩溃");
+    return 0;
 }
 
 int main(void)
 {
+    int total_tests = 0;
+    int passed_tests = 0;
+    int failed_tests = 0;
+
     printf("\n");
     printf("========================================\n");
     printf("  R-09-87 svc_common stop() 单元测试\n");

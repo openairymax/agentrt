@@ -1,8 +1,66 @@
 # 计算器工具 — MCP 工具示例
 # 演示如何实现一个 MCP 工具：数学表达式计算器
 
+import ast
 import math
+import operator
 import re
+
+# 安全运算符映射
+_SAFE_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+
+def _safe_eval(expr: str, allowed_names: dict) -> float:
+    """使用 AST 安全求值数学表达式，替代 eval()。
+
+    仅允许数字、基本运算符和白名单中的函数名，
+    防止任意代码注入。
+    """
+    tree = ast.parse(expr, mode="eval")
+
+    def _eval_node(node):
+        if isinstance(node, ast.Expression):
+            return _eval_node(node.body)
+        elif isinstance(node, ast.Constant):
+            return node.value
+        elif isinstance(node, ast.BinOp):
+            op_type = type(node.op)
+            if op_type not in _SAFE_OPS:
+                raise ValueError(f"不允许的运算符: {op_type.__name__}")
+            left = _eval_node(node.left)
+            right = _eval_node(node.right)
+            return _SAFE_OPS[op_type](left, right)
+        elif isinstance(node, ast.UnaryOp):
+            op_type = type(node.op)
+            if op_type not in _SAFE_OPS:
+                raise ValueError(f"不允许的一元运算符: {op_type.__name__}")
+            operand = _eval_node(node.operand)
+            return _SAFE_OPS[op_type](operand)
+        elif isinstance(node, ast.Call):
+            func_name = node.func.id
+            if func_name not in allowed_names:
+                raise ValueError(f"不允许的函数: {func_name}")
+            args = [_eval_node(arg) for arg in node.args]
+            return allowed_names[func_name](*args)
+        elif isinstance(node, ast.Name):
+            name = node.id
+            if name not in allowed_names:
+                raise ValueError(f"不允许的变量: {name}")
+            return allowed_names[name]
+        else:
+            raise ValueError(f"不支持的表达式类型: {type(node).__name__}")
+
+    return _eval_node(tree)
 
 
 class CalculatorTool:
@@ -35,8 +93,8 @@ class CalculatorTool:
             return f"错误：表达式包含不允许的字符或函数 — {expression}"
 
         try:
-            # 在受限环境中计算表达式
-            result = eval(expression, {"__builtins__": {}}, self.SAFE_FUNCTIONS)
+            # 使用安全 AST 求值代替 eval()（BAN 合规）
+            result = _safe_eval(expression, self.SAFE_FUNCTIONS)
             return f"计算结果：{expression} = {result}"
         except ZeroDivisionError:
             return "错误：除零错误"

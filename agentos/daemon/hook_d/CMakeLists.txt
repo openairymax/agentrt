@@ -14,13 +14,19 @@ set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
 set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
 set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 
-# Hook 服务源文件
+# Hook 服务源文件（Phase 2 完整版）
 set(HOOK_D_SOURCES
     src/main.c
     src/service.c
+    src/hook_registry.c
+    src/hook_executor.c
+    src/hook_interceptor.c
+    src/hook_timeout.c
 )
 
 add_executable(agentos-hook-d ${HOOK_D_SOURCES})
+
+target_compile_definitions(agentos-hook-d PRIVATE AGENTOS_ENABLE_V2_API=1)
 
 if(WIN32)
     target_compile_definitions(agentos-hook-d PRIVATE
@@ -46,11 +52,12 @@ target_include_directories(agentos-hook-d PRIVATE
     ${COMMONS_INCLUDE_DIR}/utils/config_unified/include
     ${COMMONS_INCLUDE_DIR}/utils/memory/include
     ${COMMONS_INCLUDE_DIR}/utils/sync/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/include
     ${YAML_INCLUDE_DIRS}
 )
 
 target_link_libraries(agentos-hook-d PRIVATE
-    svc_common Threads::Threads ${YAML_LIBRARIES}
+    svc_common cupolas Threads::Threads ${YAML_LIBRARIES}
 )
 
 if(BUILD_COVERAGE)

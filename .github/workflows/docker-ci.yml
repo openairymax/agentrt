@@ -1,4 +1,4 @@
-name: Docker CI/CD Pipeline
+name: AgentRT Docker CI/CD Pipeline
 
 on:
   push:

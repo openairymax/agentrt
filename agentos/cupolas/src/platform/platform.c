@@ -974,17 +974,17 @@ void cupolas_mem_unlock(void *ptr, size_t size)
 
 int32_t cupolas_atomic_load32(volatile int32_t *ptr)
 {
-    return (int32_t)atomic_load_32((volatile _Atomic long *)ptr, memory_order_seq_cst);
+    return (int32_t)atomic_load_32((volatile _Atomic int *)ptr, memory_order_seq_cst);
 }
 
 void cupolas_atomic_store32(volatile int32_t *ptr, int32_t val)
 {
-    atomic_store_32((volatile _Atomic long *)ptr, (long)val, memory_order_seq_cst);
+    atomic_store_32((volatile _Atomic int *)ptr, (int)val, memory_order_seq_cst);
 }
 
 int32_t cupolas_atomic_add32(volatile int32_t *ptr, int32_t delta)
 {
-    return (int32_t)(atomic_fetch_add_32((volatile _Atomic long *)ptr, (long)delta,
+    return (int32_t)(atomic_fetch_add_32((volatile _Atomic int *)ptr, (int)delta,
                                          memory_order_seq_cst) +
                      delta);
 }
@@ -1006,8 +1006,8 @@ int32_t cupolas_atomic_dec32(volatile int32_t *ptr)
 
 bool cupolas_atomic_cas32(volatile int32_t *ptr, int32_t expected, int32_t desired)
 {
-    long exp = (long)expected;
-    return atomic_compare_exchange_strong_32((volatile _Atomic long *)ptr, &exp, (long)desired,
+    int exp = (int)expected;
+    return atomic_compare_exchange_strong_32((volatile _Atomic int *)ptr, &exp, (int)desired,
                                              memory_order_seq_cst, memory_order_seq_cst);
 }
 

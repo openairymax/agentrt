@@ -308,6 +308,10 @@ bool memory_init(const memory_options_t *options)
         return true;
     }
 
+    AGENTOS_LOG_INFO("memory: memory_init (zero_memory=%s, alignment=%zu)",
+                     options && options->zero_memory ? "true" : "false",
+                     options ? options->alignment : 0);
+
     // 初始化锁
     if (!memory_lock_init()) {
         return false;
@@ -338,6 +342,11 @@ void memory_cleanup(void)
     if (!g_state.initialized) {
         return;
     }
+
+    AGENTOS_LOG_INFO("memory: memory_cleanup (total_alloc=%zu, current=%zu, peak=%zu, allocs=%zu, frees=%zu)",
+                     g_state.stats.total_allocated, g_state.stats.current_allocated,
+                     g_state.stats.peak_allocated, g_state.stats.allocation_count,
+                     g_state.stats.free_count);
 
     memory_lock();
 
@@ -484,6 +493,14 @@ void *memory_realloc(void *ptr, size_t new_size, const char *tag)
 
     void *new_ptr = realloc(ptr, new_size);
     if (new_ptr == NULL) {
+        /* realloc 失败，原始 ptr 仍有效，恢复 debug info */
+        if (debug_info_saved && g_state.debug_enabled) {
+            memory_add_debug_info(old_ptr, old_size,
+                                  saved_tag[0] ? saved_tag : tag,
+                                  saved_file[0] ? saved_file : __FILE__,
+                                  saved_line > 0 ? saved_line : __LINE__,
+                                  saved_func[0] ? saved_func : __func__);
+        }
         memory_handle_fail(new_size, tag);
         memory_unlock();
         return NULL;
@@ -617,6 +634,10 @@ bool memory_debug_enable(bool enable)
     if (!g_state.initialized) {
         return false;
     }
+
+    AGENTOS_LOG_INFO("memory: memory_debug_enable (enable=%s, prev=%s)",
+                     enable ? "true" : "false",
+                     g_state.debug_enabled ? "true" : "false");
 
     memory_lock();
 

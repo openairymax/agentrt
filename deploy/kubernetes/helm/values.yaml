@@ -13,6 +13,8 @@ global:
   serviceAccount:
     create: true
     name: agentrt
+    automount: true
+    annotations: {}
 
 # ===========================================================================
 # 基础设施服务
@@ -118,6 +120,18 @@ taskflow:
     limits:
       memory: "512Mi"
       cpu: "500m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9003
+    initialDelaySeconds: 15
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9003
+    initialDelaySeconds: 10
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -144,6 +158,18 @@ memory:
   persistence:
     enabled: true
     size: 20Gi
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9004
+    initialDelaySeconds: 20
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9004
+    initialDelaySeconds: 15
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -170,6 +196,18 @@ channel_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9101
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9101
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -191,6 +229,18 @@ monit_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9102
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9102
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -211,6 +261,18 @@ observe_d:
     limits:
       memory: "512Mi"
       cpu: "500m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9103
+    initialDelaySeconds: 15
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9103
+    initialDelaySeconds: 10
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -237,6 +299,18 @@ llm_d:
   env:
     LLM_PROVIDER: openai
     LLM_TIMEOUT: "30"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9201
+    initialDelaySeconds: 20
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9201
+    initialDelaySeconds: 15
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -257,6 +331,18 @@ tool_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9202
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9202
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -277,6 +363,18 @@ market_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9203
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9203
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -297,6 +395,18 @@ sched_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9204
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9204
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -320,6 +430,18 @@ hook_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9301
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9301
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -340,6 +462,18 @@ plugin_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9302
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9302
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -360,6 +494,18 @@ info_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9303
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9303
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -380,6 +526,18 @@ notify_d:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 9304
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 9304
+    initialDelaySeconds: 5
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -410,6 +568,18 @@ gateway_d:
     minReplicas: 1
     maxReplicas: 5
     targetCPUUtilizationPercentage: 80
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 5
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000

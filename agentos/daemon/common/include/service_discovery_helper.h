@@ -208,6 +208,13 @@ bool sd_helper_is_running(sd_helper_t *sdh);
  */
 uint32_t sd_helper_service_count(sd_helper_t *sdh);
 
+/**
+ * @brief C-L08: 输出服务发现统计摘要（单行格式，适合周期性日志）
+ *
+ * @param sdh 助手句柄
+ */
+void sd_helper_dump_stats(sd_helper_t *sdh);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file a2a_v03_adapter.c
  * @brief A2A (Agent-to-Agent) Protocol v0.3 Adapter Implementation
@@ -227,7 +228,7 @@ bool a2a_v03_is_initialized(a2a_handle_t handle)
 
 const char *a2a_v03_version(void)
 {
-    return "AgentOS-A2A/" A2A_VERSION;
+    return "AgentRT-A2A/" A2A_VERSION;
 }
 
 /* ============================================================================
@@ -1081,10 +1082,8 @@ int a2a_v03_unregister_agent(a2a_v03_context_t *ctx, const char *agent_id)
     }
     for (size_t i = 0; i < adapter->agent_count; i++) {
         if (strcmp(adapter->agents[i].id, agent_id) == 0) {
-            AGENTOS_FREE(adapter->agents[i].name);
-            adapter->agents[i].name = NULL;
-            AGENTOS_FREE(adapter->agents[i].url);
-            adapter->agents[i].url = NULL;
+            adapter->agents[i].name[0] = '\0';
+            adapter->agents[i].url[0] = '\0';
             if (i < adapter->agent_count - 1) {
                 adapter->agents[i] = adapter->agents[adapter->agent_count - 1];
             }

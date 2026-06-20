@@ -1,20 +1,21 @@
-# Copyright (c) 2026 SPHARX. All Rights Reserved.
-# Dockerfile for AgentRT Multi-Protocol Gateway
-# Version: 0.1.0
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Dockerfile for AgentRT — Multi-Daemon Runtime Image
+# P1.17: docker-compose 集成测试环境搭建
+# Version: 0.1.1
 #
-# 多阶段构建，支持MCP/A2A/OpenAI API多协议网关
+# 多阶段构建，支持所有 16 个 daemon 的统一运行时镜像。
+# 通过 AGENTOS_SERVICE_NAME 环境变量选择启动的 daemon。
 
 # ==========================================================================
-# 阶段1: 构建阶段
+# 阶段1: 构建阶段 — 编译所有 daemon 二进制文件
 # ==========================================================================
 FROM alpine:3.19 AS builder
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
-LABEL description="AgentRT Multi-Protocol Gateway Build Stage"
+LABEL description="AgentRT Multi-Daemon Build Stage"
 
-ARG BUILD_VERSION=2.0.0
+ARG BUILD_VERSION=0.1.1
 ARG BUILD_DATE
-ARG TARGETPLATFORM
 
 RUN apk add --no-cache \
     build-base \
@@ -27,15 +28,17 @@ RUN apk add --no-cache \
     cjson-dev \
     git \
     curl-dev \
-    grpc-dev \
-    protobuf-dev
+    yaml-dev \
+    libuv-dev \
+    protobuf-c-dev \
+    linux-headers
 
 WORKDIR /build
 
-COPY CMakeLists.txt .
-COPY src/ ./src/
-COPY include/ ./include/
+# 复制完整项目源码
+COPY . .
 
+# 创建构建目录并配置 CMake
 RUN mkdir -p build && cd build && \
     cmake .. -G "Ninja" \
     -DCMAKE_BUILD_TYPE=Release \
@@ -46,32 +49,30 @@ RUN mkdir -p build && cd build && \
     -DENABLE_A2A=ON \
     -DENABLE_OPENAI=ON
 
+# 编译所有 daemon
 RUN cd build && ninja -j$(nproc)
+
+# 安装到临时目录
 RUN cd build && DESTDIR=/install ninja install
 
 # ==========================================================================
-# 阶段2: 运行时镜像
+# 阶段2: 运行时镜像 — 所有 daemon 共享
 # ==========================================================================
 FROM alpine:3.19 AS runtime
 
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
-LABEL description="AgentRT Multi-Protocol Gateway Runtime"
+LABEL description="AgentRT Multi-Daemon Runtime"
 LABEL version="${BUILD_VERSION}"
-LABEL build-date="${BUILD_DATE}"
 LABEL org.opencontainers.image.source="https://github.com/spharx/agentos"
-LABEL org.opencontainers.image.title="AgentRT Multi-Protocol Gateway"
-LABEL org.opencontainers.image.description="AgentRT Gateway with MCP/A2A/OpenAI API support"
+LABEL org.opencontainers.image.title="AgentRT Runtime"
 LABEL org.opencontainers.image.vendor="SPHARX"
 
-ENV AGENTOS_MODULE=gateway \
-    AGENTOS_VERSION=${BUILD_VERSION} \
+# 默认环境变量
+ENV AGENTOS_VERSION=${BUILD_VERSION} \
     AGENTOS_LOG_LEVEL=INFO \
-    AGENTOS_HTTP_PORT=8080 \
-    AGENTOS_WS_PORT=8081 \
-    AGENTOS_METRICS_PORT=9090 \
-    AGENTOS_MCP_ENABLED=true \
-    AGENTOS_A2A_ENABLED=true \
-    AGENTOS_OPENAI_ENABLED=true
+    AGENTOS_TEST_MODE=0 \
+    AGENTOS_CONFIG_PATH=/etc/agentrt/agentos.yaml \
+    AGENTOS_DEPLOY_ENV=production
 
 RUN apk add --no-cache \
     libmicrohttpd \
@@ -81,43 +82,31 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     curl \
-    libstdc++ && \
+    wget \
+    yaml \
+    libuv \
+    libstdc++ \
+    protobuf-c \
+    bash && \
     addgroup -g 1000 agentos && \
     adduser -u 1000 -G agentos -s /bin/sh -D agentos && \
-    mkdir -p /var/log/agentos /var/run/agentos /etc/agentos/gateway && \
-    chown -R agentos:agentos /var/log/agentos /var/run/agentos /etc/agentos
+    mkdir -p /var/log/agentos /var/run/agentos /etc/agentrt && \
+    chown -R agentos:agentos /var/log/agentos /var/run/agentos /etc/agentrt
 
+# 从构建阶段复制安装文件
 COPY --from=builder /install/ /
-COPY manager/ /etc/agentos/gateway/
-RUN chown -R agentos:agentos /etc/agentos
+
+# 复制多 daemon 启动入口脚本
+COPY deploy/docker/entrypoint.sh /usr/local/bin/agentrt-entrypoint.sh
+RUN chmod +x /usr/local/bin/agentrt-entrypoint.sh
 
 USER agentos
 WORKDIR /home/agentos
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${AGENTOS_SERVICE_PORT:-8080}/healthz || exit 1
 
 EXPOSE 8080 8081 9090
 
-ENTRYPOINT ["/usr/bin/gateway"]
-CMD ["--manager", "/etc/agentos/gateway/manager.yaml"]
-
-# ==========================================================================
-# 阶段3: 开发镜像（可选）
-# ==========================================================================
-FROM builder AS development
-
-LABEL description="AgentRT Multi-Protocol Gateway Development Image"
-
-RUN apk add --no-cache \
-    gdb \
-    valgrind \
-    clang-extra-tools \
-    cppcheck \
-    grpc-plugins
-
-ENV CMAKE_BUILD_TYPE=Debug
-
-USER root
-CMD ["/bin/sh"]
-
+ENTRYPOINT ["/usr/local/bin/agentrt-entrypoint.sh"]
+CMD []

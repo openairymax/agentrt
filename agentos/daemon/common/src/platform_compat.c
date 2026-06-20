@@ -5,6 +5,7 @@
 
 #include <limits.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <time.h>
 #include "error.h"
@@ -51,18 +52,6 @@ void agentos_time_from_ms(uint64_t ms, agentos_timestamp_t *ts)
     if (!ts)
         return;
     *ts = ms * 1000000ULL;
-}
-
-void agentos_sleep_ms(uint32_t ms)
-{
-#ifdef _WIN32
-    Sleep(ms);
-#else
-    struct timespec ts;
-    ts.tv_sec = ms / 1000;
-    ts.tv_nsec = (ms % 1000) * 1000000L;
-    nanosleep(&ts, NULL);
-#endif
 }
 
 uint32_t agentos_process_self(void)
@@ -335,6 +324,20 @@ agentos_socket_t agentos_socket_create_unix_server(const char *path)
 {
     if (!path)
         return AGENTOS_ERR_INVALID_PARAM;
+
+    /* 确保父目录存在 */
+    {
+        char dir_buf[256];
+        size_t len = strlen(path);
+        if (len >= sizeof(dir_buf))
+            return AGENTOS_ERR_INVALID_PARAM;
+        memcpy(dir_buf, path, len + 1);
+        char *slash = strrchr(dir_buf, '/');
+        if (slash) {
+            *slash = '\0';
+            agentos_mkdir_p(dir_buf);
+        }
+    }
 
     int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd < 0)

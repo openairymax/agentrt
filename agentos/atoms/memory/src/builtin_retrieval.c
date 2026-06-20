@@ -1,6 +1,6 @@
 /**
  * @file builtin_retrieval.c
- * @brief AgentOS 内置检索实现（BM25 + 余弦相似度）
+ * @brief AgentRT 内置检索实现（BM25 + 余弦相似度）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 提供基于 BM25 的文本检索和基于余弦相似度的向量检索。

@@ -1,3 +1,4 @@
+// @owner: team-B
 #include "error.h"
 /**
  * @file trace_store_service.c
