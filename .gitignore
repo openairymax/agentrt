@@ -58,7 +58,7 @@
 # 项目根目录配置文件
 #   - .clang-format / .clang-tidy / .clangd : C/C++ 格式化与诊断
 #   - .editorconfig                        : 跨IDE基础规范
-#   - .env.example                         : 环境变量模板
+#   - configs/                             : 集中配置目录（agentos.yaml + env.example）
 #   - .gitattributes                       : Git 换行符处理
 #   - .pre-commit-config.yaml             : Pre-commit 钩子
 #   - vcpkg.json                           : C++ 依赖清单
@@ -68,10 +68,13 @@
 # =============================================================================
 # 本地文档（不追踪，仅保留在本地）
 # =============================================================================
-
 CHANGELOG.md
 
-# 跨团队合约文件（源码追踪，构建产物不追踪）
+# =============================================================================
+# 跨团队合约文件（本地开发辅助，不追踪）
+# contracts/ 存放跨团队接口合约草稿，属于本地开发辅助文件，不纳入版本控制
+# =============================================================================
+contracts/
 
 # =============================================================================
 # CMake 构建系统（构建产物，不追踪）
@@ -80,7 +83,6 @@ CHANGELOG.md
 # IDE 配置
 .clangd/
 .compile_flags.txt
-contracts/
 
 # .clangd 使用相对路径，可以追踪（方便新开发者开箱即用）
 !.clangd
@@ -573,12 +575,12 @@ agentos/heapstore/models/*.onnx
 /datasets/
 
 # 压缩包（部署目录下的）
-scripts/ops/deploy/**/*.tar.gz
-scripts/ops/deploy/**/*.tar.bz2
-scripts/ops/deploy/**/*.tar.xz
-scripts/ops/deploy/**/*.zip
-scripts/ops/deploy/**/*.rar
-scripts/ops/deploy/**/*.7z
+deploy/docker/**/*.tar.gz
+deploy/docker/**/*.tar.bz2
+deploy/docker/**/*.tar.xz
+deploy/docker/**/*.zip
+deploy/docker/**/*.rar
+deploy/docker/**/*.7z
 
 # Docker 覆盖和集群配置
 docker-compose.override.yml
@@ -590,8 +592,8 @@ docker-compose.override.yml
 # 部署和安装（构建产物，不追踪）
 # =============================================================================
 
-scripts/ops/deploy/artifacts/
-scripts/ops/deploy/packages/
+deploy/docker/artifacts/
+deploy/docker/packages/
 install/
 installed/
 VERSION
@@ -666,7 +668,8 @@ coverage_reports/
 # =============================================================================
 
 # 环境模板
-!.env.example
+!configs/env.example
+!configs/agentos.yaml
 
 # =============================================================================
 # 根目录配置文件
@@ -733,12 +736,6 @@ coverage_reports/
 !scripts/ops/**/*.py
 !scripts/ops/**/*.yaml
 !scripts/ops/**/*.yml
-!scripts/ops/deploy/docker/Dockerfile*
-!scripts/ops/deploy/docker/Makefile
-!scripts/ops/deploy/Makefile
-!scripts/ops/deploy/docker-compose*.yml
-!scripts/ops/deploy/docker-compose*.yaml
-!scripts/ops/deploy/docker/.gitignore
 !scripts/ops/deploy/k8s/**/*.yml
 !scripts/ops/deploy/k8s/**/*.yaml
 
@@ -759,8 +756,6 @@ coverage_reports/
 
 # 手写 Makefile（非 CMake 生成，需保留）
 !tests/Makefile
-!scripts/ops/deploy/docker/Makefile
-!scripts/ops/deploy/Makefile
 
 # =============================================================================
 # tests/ 测试目录
@@ -790,7 +785,6 @@ coverage_reports/
 !Dockerfile*
 !docker-compose*.yml
 !docker-compose*.yaml
-!scripts/ops/deploy/docker/Dockerfile*
 !ecosystem/openlab/Dockerfile
 !deploy/docker/Dockerfile*
 !agentos/daemon/Dockerfile.ci
@@ -913,4 +907,4 @@ coverage_reports/
 # 8. agentos/ 路径仅含源码，构建产物输出至 AgentRT-build/
 # 9. ecosystem/ 包含 openlab/manager/prompts/hooks/skills，配置文件需保留
 # 10. sdk/ 包含四语言 SDK，各语言构建产物需排除但配置文件需保留
-# 11. contracts/ 源码追踪（.h/.c），构建产物不追踪
+# 11. contracts/ 本地开发辅助文件，不追踪（.h/.c 合约草稿）

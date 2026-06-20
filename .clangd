@@ -1,17 +1,17 @@
-﻿# AgentOS clangd configuration
+# AgentRT clangd configuration
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: Apache-2.0
 #
 # This file uses RELATIVE paths and is safe to commit.
 # Each developer must build the project first to generate compile_commands.json:
-#   mkdir -p ../AgentOS-build && cd ../AgentOS-build
-#   cmake ../AgentOS -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+#   mkdir -p ../AgentRT-build && cd ../AgentRT-build
+#   cmake ../AgentRT -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 #
 # If compile_commands.json exists, clangd will use it for accurate analysis.
 # If not, the fallback CompileFlags below provide basic single-file analysis.
 
 CompileFlags:
-  CompilationDatabase: ../AgentOS-build
+  CompilationDatabase: ../AgentRT-build
   Add:
     - -std=c11
     - -D_GNU_SOURCE

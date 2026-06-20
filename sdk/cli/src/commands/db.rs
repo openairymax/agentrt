@@ -3,7 +3,7 @@
 // CLI command: agentrt db
 //
 // Database migration management for heapstore.
-// Delegates to scripts/ci/pipeline/db-migrate.sh for actual migration logic.
+// Delegates to scripts/ci/pipeline/deploy/db-migrate.sh for actual migration logic.
 
 use anyhow::{Context, Result};
 use colored::Colorize;
@@ -26,7 +26,7 @@ fn find_project_root() -> Result<PathBuf> {
 /// Run the db-migrate.sh script with the given arguments.
 fn run_migrate_script(args: &[&str]) -> Result<()> {
     let project_root = find_project_root()?;
-    let script = project_root.join("scripts/ci/pipeline/db-migrate.sh");
+    let script = project_root.join("scripts/ci/pipeline/deploy/db-migrate.sh");
 
     if !script.exists() {
         anyhow::bail!(
