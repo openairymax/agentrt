@@ -256,6 +256,7 @@ static int mock_handler(const char *request_str, char **response_str, void *user
 
     *response_str = cJSON_PrintUnformatted(response);
     cJSON_Delete(response);
+    cJSON_Delete(request);
 
     return 0;
 }
