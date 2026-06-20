@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file mcp_v1_adapter.h
- * @brief MCP v1.0 Protocol Adapter for AgentOS
+ * @brief MCP v1.0 Protocol Adapter for AgentRT
  *
  * Model Context Protocol v1.0 完整协议适配器。
  * 实现MCP规范定义的工具发现、调用、资源访问、采样等核心能力。

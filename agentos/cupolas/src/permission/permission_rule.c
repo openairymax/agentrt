@@ -8,7 +8,7 @@
 /**
  * @file permission_rule.c
  * @brief Permission Rule Manager Implementation
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2024
  */
 

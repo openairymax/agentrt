@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file autogen_adapter.c
  * @brief AutoGen Framework Adapter Implementation
@@ -305,7 +306,7 @@ static const autogen_response_role_t __attribute__((unused)) g_autogen_roles[] =
      3,
      {"I've received and processed the message. Standing by for next instruction.",
       "Message acknowledged and logged. Awaiting further direction.",
-      "Input received via AgentOS protocol bridge. Ready to proceed.",
+      "Input received via AgentRT protocol bridge. Ready to proceed.",
       "Confirmed. The data has been routed through the agent mesh.",
       "Roger. Message processed successfully.", "Affirmative. All systems operational."},
      6,

@@ -228,7 +228,7 @@ string/
 
 /* === 安全字符串复制 === */
 char dest[64];
-if (string_copy(dest, "Hello, AgentOS!", sizeof(dest)) < 0) {
+if (string_copy(dest, "Hello, AgentRT!", sizeof(dest)) < 0) {
     fprintf(stderr, "Buffer too small\n");
     return;
 }

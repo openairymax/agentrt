@@ -2,7 +2,7 @@
 /**
  * @file workbench.c
  * @brief 安全工作位实现 - 跨平台进程管理
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2024
  */
 

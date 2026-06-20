@@ -567,7 +567,7 @@ sc_output_corrector(sc_stream_critic_t *critic, const char *raw_output, size_t r
     out_result->entries = (sc_correction_entry_t *)AGENTOS_CALLOC(critic->config.max_corrections,
                                                                   sizeof(sc_correction_entry_t));
     if (!out_result->entries) {
-        AGENTOS_LOG_ERROR("sc_output_corrector: entries allocation failed (max_corrections=%zu)", critic->config.max_corrections);
+        AGENTOS_LOG_ERROR("sc_output_corrector: entries allocation failed (max_corrections=%u)", critic->config.max_corrections);
         return AGENTOS_ENOMEM;
     }
     out_result->entries_capacity = critic->config.max_corrections;
@@ -672,7 +672,7 @@ agentos_error_t sc_memory_confirmer(sc_stream_critic_t *critic, const char *outp
     out_result->entries = (sc_memory_entry_t *)AGENTOS_CALLOC(critic->config.max_memory_entries,
                                                               sizeof(sc_memory_entry_t));
     if (!out_result->entries) {
-        AGENTOS_LOG_ERROR("sc_memory_confirmer: entries allocation failed (max_memory_entries=%zu)", critic->config.max_memory_entries);
+        AGENTOS_LOG_ERROR("sc_memory_confirmer: entries allocation failed (max_memory_entries=%u)", critic->config.max_memory_entries);
         return AGENTOS_ENOMEM;
     }
     out_result->entries_capacity = critic->config.max_memory_entries;

@@ -1,6 +1,6 @@
 /**
  * @file utils.h
- * @brief AgentOS heapstore 公共工具函数接口
+ * @brief AgentRT heapstore 公共工具函数接口
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #ifndef heapstore_UTILS_H
 #define heapstore_UTILS_H
 

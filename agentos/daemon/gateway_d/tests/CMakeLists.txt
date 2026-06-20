@@ -13,8 +13,11 @@ set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons)
 
 # libmicrohttpd/libwebsockets found by root CMakeLists.txt
 
+set(PROTOCOL_ROUTER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol)
+
 set(TEST_SOURCES
     test_service.c
+    test_protocol_router.c
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})
@@ -24,6 +27,18 @@ foreach(TEST_SRC ${TEST_SOURCES})
         ${TEST_SRC}
         ${CMAKE_CURRENT_SOURCE_DIR}/../src/service.c
     )
+
+    if(${TEST_NAME} STREQUAL "test_protocol_router")
+        target_sources(${TEST_NAME} PRIVATE
+            ${PROTOCOL_ROUTER_DIR}/gateway_protocol_router.c
+            ${PROTOCOL_ROUTER_DIR}/gateway_mcp_server.c
+            ${PROTOCOL_ROUTER_DIR}/gateway_a2a_handler.c
+            ${PROTOCOL_ROUTER_DIR}/gateway_openai_compat.c
+        )
+        target_include_directories(${TEST_NAME} PRIVATE
+            ${PROTOCOL_ROUTER_DIR}
+        )
+    endif()
 
     target_include_directories(${TEST_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
@@ -53,7 +68,7 @@ foreach(TEST_SRC ${TEST_SOURCES})
             Threads::Threads
     )
 
-    if(AGENTOS_HAS_CJSON AND TARGET gateway_lib_obj)
+    if(AGENTOS_HAS_CJSON AND TARGET gateway_lib_obj AND AGENTOS_HAS_MICROHTTPD)
         target_link_libraries(${TEST_NAME} PRIVATE $<TARGET_OBJECTS:gateway_lib_obj>)
     endif()
 

@@ -811,6 +811,7 @@ int32_t agentos_ipc_get_fd(agentos_ipc_channel_t *channel)
         AGENTOS_LOG_ERROR("agentos_ipc_get_fd: null channel");
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
+    return channel->fd;
 }
 
 agentos_error_t agentos_ipc_close(agentos_ipc_channel_t *channel)

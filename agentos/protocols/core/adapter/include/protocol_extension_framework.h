@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file protocol_extension_framework.h
- * @brief Protocol Extension Framework for AgentOS
+ * @brief Protocol Extension Framework for AgentRT
  *
  * 自定义协议扩展框架，支持第三方开发者创建和注册自定义协议适配器。
  * 提供协议生命周期管理、消息转换管道、能力声明与发现等扩展机制。

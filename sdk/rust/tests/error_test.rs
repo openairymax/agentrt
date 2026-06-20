@@ -1,4 +1,4 @@
-// AgentOS Rust SDK - 错误码测试
+// AgentRT Rust SDK - 错误码测试
 // Version: 0.1.0
 // Last updated: 2026-04-27
 

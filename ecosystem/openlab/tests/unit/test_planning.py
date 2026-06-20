@@ -19,7 +19,7 @@ class TestTaskNode:
 
     def test_task_node_creation(self):
         """Test TaskNode can be created."""
-        from openlab.contrib.strategies.planning import TaskNode
+        from contrib.strategies.planning.planning import TaskNode
 
         node = TaskNode(
             id="task-001",
@@ -33,7 +33,7 @@ class TestTaskNode:
 
     def test_task_node_with_dependencies(self):
         """Test TaskNode with dependencies."""
-        from openlab.contrib.strategies.planning import TaskNode
+        from contrib.strategies.planning.planning import TaskNode
 
         node = TaskNode(
             id="task-002",
@@ -45,7 +45,7 @@ class TestTaskNode:
 
     def test_task_node_hash(self):
         """Test TaskNode can be hashed."""
-        from openlab.contrib.strategies.planning import TaskNode
+        from contrib.strategies.planning.planning import TaskNode
 
         node1 = TaskNode(id="task-001", name="Task 1")
         node2 = TaskNode(id="task-001", name="Task 1")
@@ -54,7 +54,7 @@ class TestTaskNode:
 
     def test_task_node_equality(self):
         """Test TaskNode equality comparison."""
-        from openlab.contrib.strategies.planning import TaskNode
+        from contrib.strategies.planning.planning import TaskNode
 
         node1 = TaskNode(id="task-001", name="Task 1")
         node2 = TaskNode(id="task-001", name="Different Name")
@@ -69,7 +69,7 @@ class TestTaskDAG:
 
     def test_dag_creation(self):
         """Test TaskDAG can be created."""
-        from openlab.contrib.strategies.planning import TaskDAG
+        from contrib.strategies.planning.planning import TaskDAG
 
         dag = TaskDAG(root_goal="Build a web app")
         assert dag.root_goal == "Build a web app"
@@ -78,7 +78,7 @@ class TestTaskDAG:
 
     def test_add_node(self):
         """Test adding nodes to DAG."""
-        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
+        from contrib.strategies.planning.planning import TaskDAG, TaskNode
 
         dag = TaskDAG(root_goal="Build a web app")
         node = TaskNode(id="task-001", name="Design")
@@ -89,7 +89,7 @@ class TestTaskDAG:
 
     def test_add_node_with_dependencies(self):
         """Test adding node with dependencies."""
-        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
+        from contrib.strategies.planning.planning import TaskDAG, TaskNode
 
         dag = TaskDAG(root_goal="Build a web app")
 
@@ -106,7 +106,7 @@ class TestTaskDAG:
 
     def test_get_execution_order(self):
         """Test topological sort for execution order."""
-        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
+        from contrib.strategies.planning.planning import TaskDAG, TaskNode
 
         dag = TaskDAG(root_goal="Build a web app")
 
@@ -128,7 +128,7 @@ class TestTaskDAG:
 
     def test_get_ready_tasks(self):
         """Test getting ready tasks."""
-        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
+        from contrib.strategies.planning.planning import TaskDAG, TaskNode
 
         dag = TaskDAG(root_goal="Build a web app")
 
@@ -150,7 +150,7 @@ class TestTaskDAG:
 
     def test_validate_dag_no_cycle(self):
         """Test DAG validation with no cycles."""
-        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
+        from contrib.strategies.planning.planning import TaskDAG, TaskNode
 
         dag = TaskDAG(root_goal="Build a web app")
         node1 = TaskNode(id="task-001", name="Task 1")
@@ -168,7 +168,7 @@ class TestPlanningContext:
 
     def test_context_creation(self):
         """Test PlanningContext can be created."""
-        from openlab.contrib.strategies.planning import PlanningContext
+        from contrib.strategies.planning.planning import PlanningContext
 
         context = PlanningContext(
             goal="Build a web app",
@@ -181,7 +181,7 @@ class TestPlanningContext:
 
     def test_context_with_constraints(self):
         """Test PlanningContext with constraints."""
-        from openlab.contrib.strategies.planning import PlanningContext
+        from contrib.strategies.planning.planning import PlanningContext
 
         context = PlanningContext(
             goal="Build a web app",
@@ -197,7 +197,7 @@ class TestHierarchicalPlanner:
     @pytest.fixture
     def planner(self):
         """Create a test planner."""
-        from openlab.contrib.strategies.planning import HierarchicalPlanner
+        from contrib.strategies.planning.planning import HierarchicalPlanner
         return HierarchicalPlanner(max_depth=3)
 
     def test_planner_creation(self, planner):
@@ -207,7 +207,7 @@ class TestHierarchicalPlanner:
 
     def test_simple_planning(self, planner):
         """Test simple goal planning."""
-        from openlab.contrib.strategies.planning import PlanningContext
+        from contrib.strategies.planning.planning import PlanningContext
 
         context = PlanningContext(
             goal="Build a simple web app",
@@ -222,7 +222,7 @@ class TestHierarchicalPlanner:
 
     def test_plan_returns_dag(self, planner):
         """Test plan() returns TaskDAG."""
-        from openlab.contrib.strategies.planning import TaskDAG
+        from contrib.strategies.planning.planning import TaskDAG
 
         dag = planner.plan("Test goal")
 
@@ -245,7 +245,7 @@ class TestReactivePlanner:
     @pytest.fixture
     def planner(self):
         """Create a test planner."""
-        from openlab.contrib.strategies.planning import ReactivePlanner
+        from contrib.strategies.planning.planning import ReactivePlanner
         return ReactivePlanner()
 
     def test_planner_creation(self, planner):
@@ -266,7 +266,7 @@ class TestReflectivePlanner:
     @pytest.fixture
     def planner(self):
         """Create a test planner."""
-        from openlab.contrib.strategies.planning import ReflectivePlanner
+        from contrib.strategies.planning.planning import ReflectivePlanner
         return ReflectivePlanner()
 
     def test_planner_creation(self, planner):

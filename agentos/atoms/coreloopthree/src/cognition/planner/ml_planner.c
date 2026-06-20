@@ -8,7 +8,7 @@
  * planning quality with learned task decomposition patterns.
  */
 
-#include "../../../../include/cognition.h"
+#include "../../include/cognition.h"
 #include "logging_compat.h"
 #include "memory_compat.h"
 #include "platform.h"

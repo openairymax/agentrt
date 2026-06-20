@@ -172,6 +172,11 @@ typedef struct {
         bool enabled;
         char default_isolation[16]; /**< process | thread | container */
     } lanes;
+    /* P1.6: Checkpoint 配置 */
+    bool checkpoint_enabled;
+    uint32_t checkpoint_interval_ms;
+    uint32_t checkpoint_interval_turns;
+    char checkpoint_path[256];
 } agentos_multi_agent_config_t;
 
 /* ── 网关配置 ── */

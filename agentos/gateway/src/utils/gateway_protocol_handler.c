@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file gateway_protocol_handler.c
  * @brief 多协议网关请求处理器实现（生产级）

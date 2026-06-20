@@ -3,6 +3,7 @@
  * @brief OpenClaw Adapter Unit Tests
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
+// @owner: team-B
 
 #include "openclaw_adapter.h"
 

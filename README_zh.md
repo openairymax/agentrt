@@ -6,7 +6,7 @@ Powered by OpenAirymax
 
 [![AtomGit](https://atomgit.com/openairymax/agentos/star/badge.svg)](https://atomgit.com/openairymax/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
-[![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentRT)](https://github.com/SpharxTeam/AgentRT/stargazers)
 
 [![Version](https://img.shields.io/badge/version-0.1.0-5a6b7e)](https://atomgit.com/openairymax/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
@@ -36,7 +36,7 @@ Powered by OpenAirymax
 个人用户客户端预告
 
 <div align="center">
-<img src="scripts/resources/images/AgentOS-desktop-preview.gif" alt="AgentOS 预览" width="800">
+<img src="scripts/resources/images/AgentRT-desktop-preview.gif" alt="AgentRT 预览" width="800">
 </div>
 
 ## 2️⃣ 创新要点
@@ -244,28 +244,20 @@ AgentRT 是操作系统级产品，而非单一框架：
 
 </div>
 
-**相信：**
-开源的精神能最大发挥群体的智慧；
-协作，推动人类族群走上新的高度。
+**相信**   
+开源的精神能最大发挥群体的智慧；  
+协作，推动人类族群走上新的高度。  
 
-**见证：**
+**见证**
 我们每一天的工作都是历史的一部分；
 必将铭刻在人类文明发展史的丰碑上。
 
-**贡献：**
-无论你是经验丰富的开发者，还是刚刚起步的新手：
-
-**发现：**
-报告 Bug，帮助我们改进质量
-
-**想法：**
-新功能建议，让项目更加强大
-
-**分享：**
-完善文档，帮助更多人了解 AgentRT
-
-**编码：**
-提交 PR，共同创造历史
+**贡献**  
+无论你是经验丰富的开发者，还是刚刚起步的新手：  
+- 报告 Bug，帮助我们改进质量  
+- 新功能建议，让项目更加强大  
+- 完善文档，帮助更多人了解 AgentRT  
+- 提交 PR，共同创造历史  
 
 <p align="center">
   <strong> 🔥 </strong><br>
@@ -279,7 +271,7 @@ AgentRT 是操作系统级产品，而非单一框架：
 Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
 ```
 
-**主要平台**：[AtomGit](https://atomgit.com/openairymax/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+**主要平台**：[AtomGit](https://atomgit.com/openairymax/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentRT)
 
 **6.2  贡献者名单：**
 详见 [AUTHORS.md](AUTHORS.md)
@@ -297,6 +289,6 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 <img src="scripts/resources/images/feishu-community-qr.png" width="200" />
 
-<a href="https://atomgit.com/spharx/agentos">AtomGit</a> · <a href="https://gitee.com/spharx/agentos">Gitee</a> · <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> · <a href="https://spharx.cn">官方网站</a>
+<a href="https://atomgit.com/spharx/agentos">AtomGit</a> · <a href="https://gitee.com/spharx/agentos">Gitee</a> · <a href="https://github.com/SpharxTeam/AgentRT">GitHub</a> · <a href="https://spharx.cn">官方网站</a>
 
 © 2026 SPHARX Ltd. All Rights Reserved.  

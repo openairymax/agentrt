@@ -6,6 +6,8 @@
 
 #include "monitor_service.h"
 
+#include "memory_compat.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>

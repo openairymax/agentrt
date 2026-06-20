@@ -156,7 +156,7 @@ class ContractAuditor:
         report = AuditReport()
 
         try:
-            from ecosystem.openlab.markets.client.models import AgentInfo, SkillInfo
+            from .models import AgentInfo, SkillInfo
             agent_fields = {f.name: f.type for f in AgentInfo.__dataclass_fields__.values()}
             skill_fields = {f.name: f.type for f in SkillInfo.__dataclass_fields__.values()}
         except ImportError as e:
@@ -207,7 +207,7 @@ class ContractAuditor:
         report = AuditReport()
 
         try:
-            from ecosystem.openlab.markets.client.market_client import MarketClient
+            from .market_client import MarketClient
             # Extract public RPC-calling methods
             rpc_methods = {
                 name for name in dir(MarketClient)
@@ -244,7 +244,7 @@ class ContractAuditor:
         report = AuditReport()
 
         try:
-            from ecosystem.openlab.markets.client import errors
+            from . import errors
             for name, expected_code in self.ERROR_CODES_EXPECTED.items():
                 actual = getattr(errors, name, None)
                 if actual is None:
@@ -273,7 +273,7 @@ class ContractAuditor:
 
         # A6: Verify _ERROR_CODE_MAP covers all defined codes
         try:
-            from ecosystem.openlab.markets.client.errors import _ERROR_CODE_MAP
+            from .errors import _ERROR_CODE_MAP
             for name, code in self.ERROR_CODES_EXPECTED.items():
                 if code not in _ERROR_CODE_MAP:
                     report.add(AuditFinding(
@@ -354,7 +354,7 @@ class ContractAuditor:
 
         # Verify the installer core imports market client correctly
         try:
-            from ecosystem.openlab.markets.agents.installer.core import (
+            from ..agents.installer.core import (
                 AgentInstaller,
                 install_agent,
                 InstallationSource,

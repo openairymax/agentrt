@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file gateway_protocol_bridge.c
  * @brief Gateway ↔ Protocols Module Bridge Implementation

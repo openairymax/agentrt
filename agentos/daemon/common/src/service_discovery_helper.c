@@ -279,7 +279,7 @@ void sd_helper_stop_heartbeat(sd_helper_t *sdh) {
     sdh->heartbeat_running = false;
 
     if (sdh->heartbeat_thread) {
-        agentos_thread_join(sdh->heartbeat_thread);
+        agentos_thread_join(sdh->heartbeat_thread, NULL);
         sdh->heartbeat_thread = NULL;
     }
 
@@ -339,4 +339,15 @@ bool sd_helper_is_running(sd_helper_t *sdh) {
 uint32_t sd_helper_service_count(sd_helper_t *sdh) {
     if (!sdh) return 0;
     return sd_service_count(sdh->sd);
+}
+
+/* ==================== C-L08: 统计摘要 ==================== */
+
+void sd_helper_dump_stats(sd_helper_t *sdh)
+{
+    if (!sdh || !sdh->sd) {
+        SVC_LOG_WARN("C-L08: SD-HELPER-STATS unavailable");
+        return;
+    }
+    sd_dump_stats(sdh->sd);
 }

@@ -5,10 +5,12 @@
  */
 
 #include "tool_approval.h"
+#include "safety_guard_bridge.h"
 #include "daemon_errors.h"
 #include "daemon_security.h"
 #include "error.h"
 #include "logger.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 #include <stdio.h>
@@ -21,6 +23,8 @@ struct tool_approval_ctx {
     uint64_t total_checks;
     uint64_t denied_count;
     uint64_t sanitized_count;
+    /* C-L05: SafetyGuard 桥接层 */
+    safety_guard_bridge_t *bridge;
 };
 
 tool_approval_ctx_t *tool_approval_create(const tool_approval_config_t *cfg)
@@ -48,6 +52,7 @@ tool_approval_ctx_t *tool_approval_create(const tool_approval_config_t *cfg)
     ctx->total_checks = 0;
     ctx->denied_count = 0;
     ctx->sanitized_count = 0;
+    ctx->bridge = NULL;
 
     AGENTOS_LOG_INFO("C-L05: Tool approval context created (safety_guard=%d, audit=%d)",
                      ctx->config.enable_safety_guard_chain,
@@ -64,6 +69,19 @@ void tool_approval_destroy(tool_approval_ctx_t *ctx)
                      (unsigned long long)ctx->denied_count,
                      (unsigned long long)ctx->sanitized_count);
     AGENTOS_FREE(ctx);
+}
+
+/* C-L05: 设置 SafetyGuard 桥接层 */
+void tool_approval_set_safety_guard_bridge(tool_approval_ctx_t *ctx,
+                                           safety_guard_bridge_t *bridge)
+{
+    if (!ctx) return;
+    ctx->bridge = bridge;
+    if (bridge) {
+        AGENTOS_LOG_INFO("C-L05: SafetyGuard bridge attached to approval context");
+    } else {
+        AGENTOS_LOG_INFO("C-L05: SafetyGuard bridge detached from approval context");
+    }
 }
 
 int tool_approval_sanitize_params(tool_approval_ctx_t *ctx, const char *tool_name,
@@ -113,6 +131,72 @@ int tool_approval_check(tool_approval_ctx_t *ctx, const tool_metadata_t *meta,
     const char *tool_name = meta->name ? meta->name : "unknown";
     const char *agent_id = ctx->config.agent_id ? ctx->config.agent_id : "unknown";
 
+    /* ── C-L05: 优先使用 SafetyGuard 桥接层（6 种守卫链） ── */
+    if (ctx->bridge) {
+        safety_guard_bridge_result_t bridge_result;
+        int bridge_ret = safety_guard_bridge_check(
+            ctx->bridge, meta, params_json, &bridge_result);
+
+        if (bridge_ret != 0) {
+            /* 守卫链拒绝 */
+            AGENTOS_LOG_WARN("C-L05: SafetyGuard bridge denied '%s' for '%s': %s",
+                             tool_name, agent_id, bridge_result.denial_reason);
+            if (detail) {
+                detail->decision = TOOL_APPROVAL_DENIED;
+                detail->permission_check_passed = bridge_result.permission_passed;
+                detail->safety_guard_passed = 0;
+                detail->params_were_sanitized = bridge_result.input_sanitized;
+                snprintf(detail->reason, sizeof(detail->reason), "%s",
+                         bridge_result.denial_reason[0]
+                             ? bridge_result.denial_reason
+                             : "Denied by SafetyGuard chain");
+                if (bridge_result.input_sanitized &&
+                    bridge_result.sanitized_params[0]) {
+                    snprintf(detail->sanitized_params,
+                             sizeof(detail->sanitized_params), "%s",
+                             bridge_result.sanitized_params);
+                }
+            }
+            ctx->denied_count++;
+
+            /* ── P1.4.3: DENY 审计日志 ── */
+            if (ctx->config.enable_audit_logging) {
+                daemon_audit_log_event("tool_d", "tool_execute_denied",
+                                       tool_name, 0, agent_id);
+            }
+
+            return AGENTOS_ERR_PERMISSION_DENIED;
+        }
+
+        /* 守卫链全部通过 */
+        if (detail) {
+            detail->decision = bridge_result.input_sanitized
+                                   ? TOOL_APPROVAL_SANITIZED
+                                   : TOOL_APPROVAL_ALLOWED;
+            detail->permission_check_passed = bridge_result.permission_passed;
+            detail->safety_guard_passed = 1;
+            detail->params_were_sanitized = bridge_result.input_sanitized;
+            if (bridge_result.input_sanitized &&
+                bridge_result.sanitized_params[0]) {
+                snprintf(detail->sanitized_params,
+                         sizeof(detail->sanitized_params), "%s",
+                         bridge_result.sanitized_params);
+            }
+            snprintf(detail->reason, sizeof(detail->reason),
+                     "Approved by SafetyGuard chain (%d/%d guards) for tool '%s'",
+                     bridge_result.guards_executed,
+                     bridge_result.guard_chain_length, tool_name);
+        }
+
+        AGENTOS_LOG_INFO("C-L05: SafetyGuard bridge approved '%s' "
+                         "(%d/%d guards executed)",
+                         tool_name, bridge_result.guards_executed,
+                         bridge_result.guard_chain_length);
+        return 0;
+    }
+
+    /* ── 降级路径：桥接层不可用时使用本地安全检查 ── */
+
     /* ── 步骤 1: 参数净化 ── */
     char sanitized[4096] = {0};
     if (params_json && params_json[0] != '\0') {
@@ -141,6 +225,12 @@ int tool_approval_check(tool_approval_ctx_t *ctx, const tool_metadata_t *meta,
                      "Permission denied: agent '%s' cannot execute tool '%s'", agent_id, tool_name);
         }
         ctx->denied_count++;
+
+        /* ── P1.4.3: DENY 审计日志 ── */
+        if (ctx->config.enable_audit_logging) {
+            daemon_audit_log_event("tool_d", "tool_execute_denied",
+                                   tool_name, 0, agent_id);
+        }
         return AGENTOS_ERR_PERMISSION_DENIED;
     }
 
@@ -158,7 +248,7 @@ int tool_approval_check(tool_approval_ctx_t *ctx, const tool_metadata_t *meta,
         }
     }
 
-    /* ── 步骤 4: 审计日志 ── */
+    /* ── 步骤 4: 审计日志（成功路径） ── */
     if (ctx->config.enable_audit_logging) {
         daemon_audit_log_event("tool_d", "tool_execute", tool_name, 1, agent_id);
     }
