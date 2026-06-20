@@ -136,8 +136,8 @@ class SchemaDiffer:
         if agentos_root:
             self._root = Path(agentos_root)
         else:
-            self._root = Path(__file__).parent.parent.parent
-        self._yaml_path = self._root / "agentos.yaml"
+            self._root = Path(__file__).parent.parent.parent.parent
+        self._yaml_path = self._root / "configs" / "agentos.yaml"
         self._schema_dir = self._root / "ecosystem" / "manager" / "schema"
 
     def run(self) -> DiffReport:

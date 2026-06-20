@@ -10,10 +10,10 @@ from pathlib import Path
 import pytest
 
 from ecosystem.hooks import BaseHook, HookContext, HookResult
-from ecosystem.hooks.audit_hook import AuditHook
-from ecosystem.hooks.cost_tracker import CostTrackerHook
-from ecosystem.hooks.security_reminder import SecurityReminderHook
-from ecosystem.hooks.prompt_injector import PromptInjectorHook
+from ecosystem.hooks.src.audit_hook import AuditHook
+from ecosystem.hooks.src.cost_tracker import CostTrackerHook
+from ecosystem.hooks.src.security_reminder import SecurityReminderHook
+from ecosystem.hooks.src.prompt_injector import PromptInjectorHook
 
 
 # ============================================================

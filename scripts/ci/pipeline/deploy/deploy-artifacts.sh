@@ -10,7 +10,7 @@ set -euo pipefail
 # 路径定义
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 ###############################################################################
 # 错误处理
@@ -213,10 +213,7 @@ collect_binaries() {
 # 3. Docker 镜像构建
 ###############################################################################
 build_docker_images() {
-    local docker_dir="${PROJECT_ROOT}/scripts/deployment/docker"
-    if [[ ! -d "$docker_dir" ]]; then
-        docker_dir="${PROJECT_ROOT}/scripts/deploy/docker"
-    fi
+    local docker_dir="${PROJECT_ROOT}/deploy/docker"
 
     if [[ ! -d "$docker_dir" ]]; then
         log_warn "Docker directory not found: $docker_dir"
@@ -234,45 +231,25 @@ build_docker_images() {
 
     log_info "Building Docker images..."
 
-    # Kernel 镜像
-    if [[ -f "${docker_dir}/Dockerfile.kernel" ]]; then
-        local kernel_image="${image_base}:kernel-${version}"
-        log_info "Building kernel image: $kernel_image"
+    # 统一运行时镜像（多 daemon，多阶段构建）
+    if [[ -f "${docker_dir}/Dockerfile" ]]; then
+        local runtime_image="${image_base}:runtime-${version}"
+        log_info "Building runtime image: $runtime_image"
 
         if docker build \
-            -f "${docker_dir}/Dockerfile.kernel" \
-            -t "$kernel_image" \
-            -t "${image_base}:kernel-latest" \
-            "${docker_dir}" 2>&1 | tail -5; then
-            log_ok "Kernel image built: $kernel_image"
+            -f "${docker_dir}/Dockerfile" \
+            --target runtime \
+            -t "$runtime_image" \
+            -t "${image_base}:runtime-latest" \
+            "${PROJECT_ROOT}" 2>&1 | tail -5; then
+            log_ok "Runtime image built: $runtime_image"
 
             if [[ "$DOCKER_PUSH" == "true" ]]; then
-                docker push "$kernel_image" 2>/dev/null || log_warn "Push failed for kernel image"
-                docker push "${image_base}:kernel-latest" 2>/dev/null || true
+                docker push "$runtime_image" 2>/dev/null || log_warn "Push failed for runtime image"
+                docker push "${image_base}:runtime-latest" 2>/dev/null || true
             fi
         else
-            log_warn "Kernel image build failed"
-        fi
-    fi
-
-    # Service 镜像
-    if [[ -f "${docker_dir}/Dockerfile.service" ]]; then
-        local service_image="${image_base}:service-${version}"
-        log_info "Building service image: $service_image"
-
-        if docker build \
-            -f "${docker_dir}/Dockerfile.service" \
-            -t "$service_image" \
-            -t "${image_base}:service-latest" \
-            "${docker_dir}" 2>&1 | tail -5; then
-            log_ok "Service image built: $service_image"
-
-            if [[ "$DOCKER_PUSH" == "true" ]]; then
-                docker push "$service_image" 2>/dev/null || log_warn "Push failed for service image"
-                docker push "${image_base}:service-latest" 2>/dev/null || true
-            fi
-        else
-            log_warn "Service image build failed"
+            log_warn "Runtime image build failed"
         fi
     fi
 }

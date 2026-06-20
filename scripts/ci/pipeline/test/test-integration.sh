@@ -4,7 +4,7 @@
 # P1.17.3: 编写启动验证脚本
 #
 # 用法:
-#   bash scripts/ci/pipeline/test-integration.sh [--up] [--down] [--verify] [--logs]
+#   bash scripts/ci/pipeline/test/test-integration.sh [--up] [--down] [--verify] [--logs]
 #
 # 选项:
 #   --up       启动所有测试服务
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 COMPOSE_FILE="${PROJECT_ROOT}/deploy/docker/docker-compose.test.yml"
 
 # 颜色

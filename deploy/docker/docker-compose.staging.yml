@@ -8,8 +8,8 @@ services:
   # ==================== AgentOS Scripts 服务 ====================
   agentos-scripts:
     build:
-      context: ../../
-      dockerfile: scripts/ops/deploy/Dockerfile.service
+      context: ..
+      dockerfile: docker/Dockerfile
       target: runtime
     image: ${DOCKER_REGISTRY:-spharx}/agentos-scripts:0.1.0-staging
     container_name: agentos-scripts
