@@ -1,6 +1,6 @@
 /**
  * @file utils.c
- * @brief AgentOS heapstore 公共工具函数实现
+ * @brief AgentRT heapstore 公共工具函数实现
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #include "utils.h"
 
 #include "error.h"

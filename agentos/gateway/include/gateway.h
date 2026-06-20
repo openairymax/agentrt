@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file gateway.h
- * @brief AgentOS 网关统一公共接口
+ * @brief AgentRT 网关统一公共接口
  *
  * 网关层只负责协议转换，将外部请求转换为系统调用。
  * 所有业务逻辑通过 agentos/atoms/syscall 接口调用。
@@ -22,6 +22,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #ifndef AGENTOS_GATEWAY_H
 #define AGENTOS_GATEWAY_H
 
@@ -38,7 +39,7 @@ extern "C" {
 /* ========== 错误码 ========== */
 
 /**
- * @brief 网关专用错误码（扩展 AgentOS 标准错误码）
+ * @brief 网关专用错误码（扩展 AgentRT 标准错误码）
  *
  * @note 网关层 API 同时返回 agentos_error_t 和 gateway_error_t。
  *       gateway_error_t 用于网关特有的错误场景。

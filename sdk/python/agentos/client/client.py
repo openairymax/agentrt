@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Client Implementation
+# AgentRT Python SDK - Client Implementation
 # Version: 0.1.0
 # Last updated: 2026-04-05
 
@@ -62,7 +62,7 @@ class ClientConfig:
     max_connections: int = 100
     idle_conn_timeout: float = 90.0
     api_key: Optional[str] = None
-    user_agent: str = "AgentOS-Python-tools/0.1.0"
+    user_agent: str = "AgentRT-Python-tools/0.1.0"
     headers: Dict[str, str] = field(default_factory=dict)
 
     def validate(self) -> None:
@@ -166,7 +166,7 @@ class APIClient(ABC):
 
 
 class Client(APIClient):
-    """AgentOS Python SDK 核心客户端"""
+    """AgentRT Python SDK 核心客户端"""
 
     def __init__(self, config: Optional[ClientConfig] = None, **kwargs):
         """初始化客户端"""
@@ -271,7 +271,7 @@ class Client(APIClient):
         self.close()
 
     def __repr__(self) -> str:
-        return f"AgentOS Client[endpoint={self._config.endpoint}, timeout={self._config.timeout}]"
+        return f"AgentRT Client[endpoint={self._config.endpoint}, timeout={self._config.timeout}]"
 
     def _build_url(self, path: str, query_params: Optional[Dict[str, str]] = None) -> str:
         """构建完整 URL"""

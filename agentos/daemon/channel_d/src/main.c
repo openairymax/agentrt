@@ -4,6 +4,7 @@
 #include "daemon_bootstrap_ipc.h"
 #include "logging.h"
 #include "memory_compat.h"
+#include "platform.h"
 #include "svc_logger.h"
 
 #include <inttypes.h>
@@ -14,10 +15,13 @@
 #include <unistd.h>
 #include "error.h"
 
+#define CHANNEL_D_SOCKET_PATH AGENTOS_RUNTIME_DIR "/channel.sock"
+
 static atomic_int g_running = 1;
 static channel_service_t *g_svc __attribute__((unused)) = NULL;
 static daemon_bootstrap_sd_t *g_bsd = NULL;
 static daemon_bootstrap_ipc_t *g_bipc = NULL;
+static agentos_socket_t g_server_fd = AGENTOS_INVALID_SOCKET;
 
 static void signal_handler(int sig __attribute__((unused)))
 {
@@ -307,9 +311,18 @@ AGENTOS_STRNCPY_TERM(config.socket_dir, socket_dir, sizeof(config.socket_dir));
     SVC_LOG_INFO("channel_d started (max_channels=%u, socket_dir=%s)", config.max_channels,
                  config.socket_dir);
 
-    g_bsd = daemon_bootstrap_sd_start("channel_d", "channel", AGENTOS_RUNTIME_DIR "/channel.sock",
+    /* 创建 Unix Socket 服务器用于健康检查 */
+    g_server_fd = agentos_socket_create_unix_server(CHANNEL_D_SOCKET_PATH);
+    if (g_server_fd < 0) {
+        SVC_LOG_ERROR("channel_d: failed to create socket at %s", CHANNEL_D_SOCKET_PATH);
+        channel_service_destroy(svc);
+        return 1;
+    }
+    SVC_LOG_INFO("channel_d: listening on %s (fd=%d)", CHANNEL_D_SOCKET_PATH, (int)g_server_fd);
+
+    g_bsd = daemon_bootstrap_sd_start("channel_d", "channel", CHANNEL_D_SOCKET_PATH,
                                       0, "channel,core", 0);
-    g_bipc = daemon_bootstrap_ipc_start("channel_d", "channel", AGENTOS_RUNTIME_DIR "/channel.sock",
+    g_bipc = daemon_bootstrap_ipc_start("channel_d", "channel", CHANNEL_D_SOCKET_PATH,
                                         0, IPC_BUS_PROTO_JSON_RPC);
 
     while (atomic_load_explicit(&g_running, memory_order_acquire)) {
@@ -321,6 +334,10 @@ AGENTOS_STRNCPY_TERM(config.socket_dir, socket_dir, sizeof(config.socket_dir));
 
     daemon_bootstrap_ipc_stop(g_bipc);
     daemon_bootstrap_sd_stop(g_bsd);
+    if (g_server_fd >= 0) {
+        agentos_socket_close(g_server_fd);
+        g_server_fd = AGENTOS_INVALID_SOCKET;
+    }
     SVC_LOG_INFO("channel_d shutting down");
     channel_service_stop(svc);
     channel_service_destroy(svc);

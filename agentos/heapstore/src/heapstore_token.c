@@ -1,6 +1,6 @@
 /**
  * @file heapstore_token.c
- * @brief AgentOS heapstore Token 计数实现
+ * @brief AgentRT heapstore Token 计数实现
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -12,6 +12,7 @@
  *       符合 ARCHITECTURAL_PRINCIPLES.md 中的 E-2 可观测性原则。
  */
 
+// @owner: team-B
 #include "heapstore_token.h"
 #include "error.h"
 

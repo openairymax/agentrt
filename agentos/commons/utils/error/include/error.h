@@ -13,7 +13,7 @@
  * 4. 线程安全的错误信息存储
  * 5. 支持结构化错误上下文
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-03-30
  * @version 2.0
  *
@@ -35,7 +35,7 @@ extern "C" {
 
 /* ==================== 错误码类型 ==================== */
 
-typedef int32_t agentos_error_t;
+/* agentos_error_t 已在 agentos_types.h 中定义（BAN-196 权威源），此处不再重复定义 */
 
 /* ==================== 成功/失败基础 ==================== */
 

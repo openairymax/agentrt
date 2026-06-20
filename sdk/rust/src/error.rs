@@ -1,4 +1,4 @@
-// AgentOS Rust SDK - 统一错误体系
+// AgentRT Rust SDK - 统一错误体系
 // Version: 0.1.0
 // Last updated: 2026-04-05
 //
@@ -82,7 +82,7 @@ pub const CODE_CORRUPTED_DATA: &str = "0x6002";
 // 错误类型定义
 // ============================================================
 
-/// ErrorCode 表示 AgentOS SDK 的错误码类型
+/// ErrorCode 表示 AgentRT SDK 的错误码类型
 pub type ErrorCode = &'static str;
 
 /// AgentOSError 是 SDK 所有错误的统一基类

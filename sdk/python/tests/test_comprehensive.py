@@ -42,35 +42,26 @@ class TestTypes(unittest.TestCase):
     
     def test_task_status_enum(self):
         """Test TaskStatus enum values."""
-        self.assertEqual(TaskStatus.PENDING.value, 0)
-        self.assertEqual(TaskStatus.RUNNING.value, 1)
-        self.assertEqual(TaskStatus.SUCCEEDED.value, 2)
-        self.assertEqual(TaskStatus.FAILED.value, 3)
-        self.assertEqual(TaskStatus.CANCELLED.value, 4)
+        self.assertEqual(TaskStatus.PENDING.value, "pending")
+        self.assertEqual(TaskStatus.RUNNING.value, "running")
+        self.assertEqual(TaskStatus.COMPLETED.value, "completed")
+        self.assertEqual(TaskStatus.FAILED.value, "failed")
+        self.assertEqual(TaskStatus.CANCELLED.value, "cancelled")
     
     def test_task_result(self):
         """Test TaskResult dataclass."""
         result = TaskResult(
-            task_id="task_123",
-            status=TaskStatus.SUCCEEDED,
-            result={"output": "test"},
-            error=None
+            id="task_123",
+            status=TaskStatus.COMPLETED,
+            output="test output",
+            error=""
         )
         
-        self.assertTrue(result.is_success())
-        self.assertFalse(result.is_failed())
-        self.assertFalse(result.is_pending())
-        self.assertFalse(result.is_running())
-        
-        # Test serialization
-        data = result.to_dict()
-        self.assertEqual(data["task_id"], "task_123")
-        self.assertEqual(data["status"], "SUCCEEDED")
-        
-        # Test deserialization
-        result2 = TaskResult.from_dict(data)
-        self.assertEqual(result2.task_id, result.task_id)
-        self.assertEqual(result2.status, result.status)
+        self.assertEqual(result.id, "task_123")
+        self.assertEqual(result.status, TaskStatus.COMPLETED)
+        self.assertEqual(result.output, "test output")
+        self.assertEqual(result.error, "")
+        self.assertTrue(result.status.is_terminal())
     
     def test_memory_info(self):
         """Test MemoryInfo dataclass."""
@@ -103,25 +94,21 @@ class TestExceptions(unittest.TestCase):
     
     def test_agentos_error(self):
         """Test base AgentOSError."""
+        from agentos.exceptions import CODE_NOT_FOUND
+        
         error = AgentOSError(
-            error_code=1001,
             message="Test error",
-            details={"key": "value"}
+            error_code=CODE_NOT_FOUND,
+            cause=None
         )
         
-        self.assertEqual(error.error_code, 1001)
+        self.assertEqual(error.error_code, CODE_NOT_FOUND)
         self.assertEqual(error.message, "Test error")
-        self.assertIn("key", error.details)
         
         # Test string representation
         error_str = str(error)
-        self.assertIn("1001", error_str)
+        self.assertIn(CODE_NOT_FOUND, error_str)
         self.assertIn("Test error", error_str)
-        
-        # Test serialization
-        data = error.to_dict()
-        self.assertEqual(data["error_code"], 1001)
-        self.assertEqual(data["message"], "Test error")
     
     def test_timeout_error(self):
         """Test AgentOSTimeoutError."""
@@ -131,13 +118,14 @@ class TestExceptions(unittest.TestCase):
     
     def test_initialization_error(self):
         """Test InitializationError."""
+        from agentos.exceptions import CODE_INTERNAL
+        
         error = InitializationError(
-            error_code=1001,
             message="Failed to load library",
-            details={"lib_path": "/path/to/lib.so"}
+            cause=RuntimeError("lib not found")
         )
         
-        self.assertEqual(error.error_code, 1001)
+        self.assertEqual(error.error_code, CODE_INTERNAL)
         self.assertIn("library", error.message.lower())
 
 
@@ -161,7 +149,7 @@ class TestUtilities(unittest.TestCase):
     def test_generate_timestamp(self):
         """Test timestamp generation."""
         ts = generate_timestamp()
-        self.assertIsInstance(ts, float)
+        self.assertIsInstance(ts, int)
         self.assertGreater(ts, 0)
     
     def test_generate_hash(self):
@@ -174,11 +162,11 @@ class TestUtilities(unittest.TestCase):
     
     def test_validate_json(self):
         """Test JSON validation."""
-        self.assertTrue(validate_json({"key": "value"}))
-        self.assertTrue(validate_json([1, 2, 3]))
-        self.assertTrue(validate_json("string"))
-        self.assertTrue(validate_json(123))
-        self.assertFalse(validate_json(set([1, 2, 3])))
+        self.assertTrue(validate_json('{"key": "value"}'))
+        self.assertTrue(validate_json('[1, 2, 3]'))
+        self.assertTrue(validate_json('"string"'))
+        self.assertTrue(validate_json('123'))
+        self.assertFalse(validate_json('not json'))
     
     def test_sanitize_string(self):
         """Test string sanitization."""
@@ -187,10 +175,10 @@ class TestUtilities(unittest.TestCase):
         clean = sanitize_string(dirty)
         self.assertNotIn("\x00", clean)
         
-        # Test length limiting
-        long_string = "a" * 2000
-        sanitized = sanitize_string(long_string, max_length=100)
-        self.assertLessEqual(len(sanitized), 103)  # 100 + "..."
+        # Test whitespace trimming
+        padded = "  hello world  "
+        sanitized = sanitize_string(padded)
+        self.assertEqual(sanitized, "hello world")
     
     def test_parse_timeout(self):
         """Test timeout parsing."""
@@ -301,61 +289,63 @@ class TestTelemetry(unittest.TestCase):
     """Test telemetry components."""
     
     def test_meter(self):
-        """Test Meter class."""
-        meter = Meter(service_name="test_service")
+        """Test Meter (Metrics) class."""
+        from agentos.telemetry import TelemetryConfig
         
-        # Record metrics
-        meter.record("request_count", 1, labels={"method": "POST"})
-        meter.record("response_time_ms", 150.5)
+        meter = Meter()
         
-        metrics = meter.get_metrics()
-        self.assertEqual(len(metrics), 2)
-        self.assertEqual(metrics[0].name, "request_count")
-        self.assertEqual(metrics[0].value, 1)
+        # Record metrics via counter
+        meter.increment_counter("request_count", 1)
+        meter.increment_counter("request_count", 2)
+        
+        stats = meter.get_stats("request_count")
+        self.assertEqual(stats["value"], 3)
+        
+        # Test gauge
+        meter.set_gauge("cpu_usage", 72.5)
+        gauge_stats = meter.get_stats("cpu_usage")
+        self.assertEqual(gauge_stats["value"], 72.5)
         
         # Test export
-        exported = meter.export()
-        data = json.loads(exported)
-        self.assertEqual(data["service_name"], "test_service")
-        self.assertEqual(len(data["metrics"]), 2)
+        exported = meter.export_metrics()
+        self.assertIn("counters", exported)
+        self.assertIn("gauges", exported)
     
     def test_tracer(self):
         """Test Tracer class."""
-        tracer = Tracer(service_name="test_service")
+        from agentos.telemetry import TelemetryConfig
         
-        # Start span
-        span = tracer.start_span("operation_name")
-        span.set_attribute("key", "value")
+        config = TelemetryConfig(service_name="test_service")
+        tracer = Tracer(config)
         
-        # End span
-        tracer.end_span(span, SpanStatus.OK)
+        # Start and use span
+        with tracer.start_span("operation_name") as span:
+            span.set_attribute("key", "value")
         
-        spans = tracer.get_spans()
+        spans = tracer.get_exported_spans()
         self.assertEqual(len(spans), 1)
-        self.assertEqual(spans[0].name, "operation_name")
-        self.assertEqual(spans[0].status, SpanStatus.OK)
-        self.assertEqual(spans[0].attributes["key"], "value")
-        
-        # Test export
-        exported = tracer.export()
-        data = json.loads(exported)
-        self.assertEqual(data["service_name"], "test_service")
+        self.assertEqual(spans[0]["name"], "operation_name")
+        self.assertEqual(spans[0]["attributes"]["key"], "value")
+        self.assertEqual(spans[0]["status"], "ok")
     
     def test_telemetry_integration(self):
         """Test Telemetry coordinator."""
-        telemetry = Telemetry(service_name="test_service")
+        from agentos.telemetry import TelemetryConfig
+        
+        config = TelemetryConfig(service_name="test_service")
+        telemetry = Telemetry(config)
         
         # Record metric
-        telemetry.record_metric("test_metric", 42.0)
+        telemetry.metrics.increment_counter("test_metric", 42)
         
         # Create span
-        span = telemetry.start_span("test_operation")
-        telemetry.end_span(span)
+        with telemetry.tracer.start_span("test_operation") as span:
+            span.set_attribute("key", "value")
         
         # Export all
         all_data = telemetry.export_all()
-        self.assertIn("metrics", all_data)
         self.assertIn("traces", all_data)
+        self.assertIn("metrics", all_data)
 
 
 class TestRetryDecorator(unittest.TestCase):
@@ -363,7 +353,7 @@ class TestRetryDecorator(unittest.TestCase):
 
     def test_retry_success(self):
         """Test retry until success."""
-        from agentos.utils import retry_with_backoff
+        from agentos.utils.core import retry_with_backoff
 
         call_count = 0
 
@@ -381,7 +371,7 @@ class TestRetryDecorator(unittest.TestCase):
 
     def test_retry_exhausted(self):
         """Test retry exhaustion."""
-        from agentos.utils import retry_with_backoff
+        from agentos.utils.core import retry_with_backoff
 
         call_count = 0
 

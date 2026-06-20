@@ -23,7 +23,7 @@ pub async fn list(gateway_url: &str) -> Result<()> {
 
     println!("{} LLM Providers:", "🤖".blue().bold());
     println!();
-    println!("  {:<20} {:<15} {}", "Provider", "Status", "Models");
+    println!("  {:<20} {:<15} Models", "Provider", "Status");
     println!("  {:-<20} {:-<15} {:-<30}", "", "", "");
 
     for p in &providers {
@@ -83,7 +83,7 @@ pub async fn cost(gateway_url: &str) -> Result<()> {
 
     if let Some(by_provider) = &costs.by_provider {
         if !by_provider.is_empty() {
-            println!("  {:<20} {:<15} {}", "Provider", "Tokens", "Cost (USD)");
+            println!("  {:<20} {:<15} Cost (USD)", "Provider", "Tokens");
             println!("  {:-<20} {:-<15} {:-<15}", "", "", "");
             for pc in by_provider {
                 println!(

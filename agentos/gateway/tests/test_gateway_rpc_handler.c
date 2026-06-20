@@ -15,6 +15,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #include "gateway_rpc_handler.h"
 #include "jsonrpc.h"
 #include "memory_compat.h"

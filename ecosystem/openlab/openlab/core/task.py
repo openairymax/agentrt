@@ -63,6 +63,7 @@ class TaskState:
     completed_at: Optional[float] = None
     checkpoint_data: Optional[Dict[str, Any]] = None
     metrics: Dict[str, Any] = field(default_factory=dict)
+    version: int = 1
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -77,6 +78,7 @@ class TaskState:
             "completed_at": self.completed_at,
             "checkpoint_data": self.checkpoint_data,
             "metrics": self.metrics,
+            "version": self.version,
         }
 
     @classmethod
@@ -93,6 +95,7 @@ class TaskState:
             completed_at=data.get("completed_at"),
             checkpoint_data=data.get("checkpoint_data"),
             metrics=data.get("metrics", {}),
+            version=data.get("version", 1),
         )
 
 
@@ -135,12 +138,12 @@ class TaskScheduler:
         if self._queue.qsize() >= self.max_queue_size:
             raise RuntimeError("Task queue is full")
 
-        state = TaskState(task_id=definition.task_id)
+        state = TaskState(task_id=definition.task_id, status=TaskStatus.QUEUED)
         async with self._lock:
             self._task_states[definition.task_id] = state
 
         priority = -definition.priority
-        await self._queue.put((priority, definition))
+        await self._queue.put((priority, id(definition), definition))
 
         return definition.task_id
 

@@ -1,6 +1,6 @@
 /**
  * @file logger.h
- * @brief AgentOS 统一日志接口
+ * @brief AgentRT 统一日志接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 日志级别值定义（与 logging.h 统一）：

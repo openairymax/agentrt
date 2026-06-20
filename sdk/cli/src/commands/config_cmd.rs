@@ -79,7 +79,7 @@ pub fn validate() -> Result<()> {
 
     if let Some(mapping) = config.as_mapping() {
         for key in &required_keys {
-            if !mapping.contains_key(&serde_yaml::Value::String(key.to_string())) {
+            if !mapping.contains_key(serde_yaml::Value::String(key.to_string())) {
                 errors.push(format!("Missing required section: '{}'", key));
             }
         }

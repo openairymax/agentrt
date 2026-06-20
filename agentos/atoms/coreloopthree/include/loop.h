@@ -29,6 +29,9 @@ extern "C" {
 
 /* 前向声明 */
 typedef struct agentos_core_loop agentos_core_loop_t;
+typedef struct agentos_checkpoint_stats agentos_checkpoint_stats_t;
+typedef struct agentos_manager_adapter_s agentos_manager_adapter_t;
+typedef struct orch_adapter_s orch_adapter_t;
 
 /**
  * @brief 核心循环配置
@@ -48,6 +51,7 @@ typedef struct agentos_loop_config {
     uint32_t loop_config_checkpoint_enabled; /**< Checkpoint启用标志（0禁用，1启用） */
     char loop_config_checkpoint_path[256];   /**< Checkpoint存储路径 */
     uint32_t loop_config_checkpoint_interval_ms; /**< Checkpoint保存间隔（毫秒，默认30000） */
+    uint32_t loop_config_checkpoint_interval_turns; /**< P1.6: 每N轮触发checkpoint（0禁用轮次触发，默认0） */
 } agentos_loop_config_t;
 
 /**
@@ -209,6 +213,80 @@ AGENTOS_API agentos_error_t agentos_loop_restore_task(agentos_core_loop_t *loop,
  */
 AGENTOS_API agentos_error_t agentos_loop_list_checkpoints(agentos_core_loop_t *loop,
                                                           char ***out_task_ids, size_t *out_count);
+
+/**
+ * @brief P1.6: 创建任务的完整快照（序列化到文件）
+ *
+ * 将当前任务状态完整序列化到指定路径的快照文件，包含认知状态、
+ * 记忆上下文和工具调用历史。
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param task_id [in] 任务ID（非NULL）
+ * @param snapshot_path [in] 快照文件路径（非NULL）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
+ *
+ * @ownership 无所有权转移
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t agentos_loop_create_snapshot(agentos_core_loop_t *loop,
+                                                         const char *task_id,
+                                                         const char *snapshot_path);
+
+/**
+ * @brief P1.6: 从快照文件恢复任务
+ *
+ * 从指定路径的快照文件恢复任务ID，然后通过 agentos_loop_restore_task
+ * 恢复完整的任务状态。
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param snapshot_path [in] 快照文件路径（非NULL）
+ * @param out_restored_task_id [out] 输出恢复后的新任务ID（调用者负责释放）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
+ *
+ * @ownership out_restored_task_id 由调用者负责释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t agentos_loop_restore_snapshot(agentos_core_loop_t *loop,
+                                                          const char *snapshot_path,
+                                                          char **out_restored_task_id);
+
+/**
+ * @brief P1.6: 获取 checkpoint 统计信息
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param out_stats [out] 输出统计信息（调用者提供缓冲区）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
+ *
+ * @ownership out_stats 由调用者管理
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t agentos_loop_get_checkpoint_stats(agentos_core_loop_t *loop,
+                                                              agentos_checkpoint_stats_t *out_stats);
+
+/* ================================================================
+ * C-L01 + C-L06: 外部适配器注入
+ * ================================================================ */
+
+/**
+ * @brief C-L01: 设置 Manager 适配器到 CoreLoopThree
+ *
+ * @param loop CoreLoopThree 实例
+ * @param adapter Manager 适配器（BORROW，生命周期由调用者管理）
+ */
+AGENTOS_API void agentos_loop_set_manager_adapter(agentos_core_loop_t *loop,
+                                                   agentos_manager_adapter_t *adapter);
+
+/**
+ * @brief C-L06: 设置 Orchestrator 适配器到 CoreLoopThree
+ *
+ * @param loop CoreLoopThree 实例
+ * @param adapter Orchestrator 适配器（BORROW，生命周期由调用者管理）
+ */
+AGENTOS_API void agentos_loop_set_orch_adapter(agentos_core_loop_t *loop,
+                                                orch_adapter_t *adapter);
 
 #ifdef __cplusplus
 }

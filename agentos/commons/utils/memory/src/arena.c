@@ -10,9 +10,11 @@
 
 #include "arena.h"
 
+#include "logging_compat.h"
 #include "memory_compat.h"
 #include "platform.h"
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,10 +54,14 @@ struct agentos_arena {
 static arena_chunk_t *chunk_create(size_t size)
 {
     arena_chunk_t *chunk = (arena_chunk_t *)malloc(sizeof(arena_chunk_t));
-    if (!chunk) return NULL;
+    if (!chunk) {
+        AGENTOS_LOG_ERROR("arena: chunk_create failed to alloc chunk_t (size=%zu)", size);
+        return NULL;
+    }
 
     chunk->start = (uint8_t *)malloc(size);
     if (!chunk->start) {
+        AGENTOS_LOG_ERROR("arena: chunk_create failed to alloc data region (size=%zu)", size);
         free(chunk);
         return NULL;
     }
@@ -64,6 +70,9 @@ static arena_chunk_t *chunk_create(size_t size)
     chunk->end  = chunk->start + size;
     chunk->size = size;
     chunk->next = NULL;
+
+    AGENTOS_LOG_DEBUG("arena: chunk_create ok (size=%zu, start=%p, end=%p)",
+                      size, (void *)chunk->start, (void *)chunk->end);
     return chunk;
 }
 
@@ -88,8 +97,14 @@ agentos_arena_t *arena_create(size_t chunk_size, size_t max_chunks)
         chunk_size = ARENA_MAX_CHUNK_SIZE;
     }
 
+    AGENTOS_LOG_INFO("arena: arena_create (chunk_size=%zu, max_chunks=%zu)",
+                     chunk_size, max_chunks);
+
     agentos_arena_t *arena = (agentos_arena_t *)AGENTOS_CALLOC(1, sizeof(agentos_arena_t));
-    if (!arena) return NULL;
+    if (!arena) {
+        AGENTOS_LOG_ERROR("arena: arena_create failed to alloc arena struct");
+        return NULL;
+    }
 
     arena->chunk_size = chunk_size;
     arena->max_chunks = max_chunks;
@@ -98,6 +113,7 @@ agentos_arena_t *arena_create(size_t chunk_size, size_t max_chunks)
     /* 创建第一个 chunk */
     arena->first_chunk = chunk_create(chunk_size);
     if (!arena->first_chunk) {
+        AGENTOS_LOG_ERROR("arena: arena_create failed to create first chunk");
         AGENTOS_FREE(arena);
         return NULL;
     }
@@ -106,6 +122,8 @@ agentos_arena_t *arena_create(size_t chunk_size, size_t max_chunks)
 
     agentos_mutex_init(&arena->lock);
 
+    AGENTOS_LOG_INFO("arena: arena_create ok (chunk_size=%zu, arena=%p)",
+                     chunk_size, (void *)arena);
     return arena;
 }
 
@@ -113,9 +131,14 @@ void arena_destroy(agentos_arena_t *arena)
 {
     if (!arena) return;
 
+    AGENTOS_LOG_INFO("arena: arena_destroy (arena=%p, chunks=%zu, total_alloc=%zu, allocs=%" PRIu64 ")",
+                     (void *)arena, arena->num_chunks, arena->total_allocated, arena->alloc_count);
+
     agentos_mutex_destroy(&arena->lock);
     chunk_destroy(arena->first_chunk);
     AGENTOS_FREE(arena);
+
+    AGENTOS_LOG_DEBUG("arena: arena_destroy done");
 }
 
 void *arena_alloc(agentos_arena_t *arena, size_t size)
@@ -133,7 +156,10 @@ void *arena_alloc(agentos_arena_t *arena, size_t size)
         arena->total_allocated += aligned;
         arena->alloc_count++;
         agentos_mutex_unlock(&arena->lock);
-        return AGENTOS_MALLOC(aligned);
+        void *ptr = malloc(aligned);
+        AGENTOS_LOG_DEBUG("arena: arena_alloc FALLBACK (size=%zu, aligned=%zu, ptr=%p, fallback#=%" PRIu64 ")",
+                          size, aligned, ptr, arena->fallback_count);
+        return ptr;
     }
 
     /* 当前 chunk 空间不足，分配新 chunk */
@@ -141,6 +167,8 @@ void *arena_alloc(agentos_arena_t *arena, size_t size)
         /* 检查 chunk 数量限制 */
         if (arena->max_chunks > 0 && arena->num_chunks >= arena->max_chunks) {
             agentos_mutex_unlock(&arena->lock);
+            AGENTOS_LOG_WARN("arena: arena_alloc OOM (size=%zu, aligned=%zu, chunks=%zu/%zu)",
+                             size, aligned, arena->num_chunks, arena->max_chunks);
             return NULL;  /* 达到 chunk 上限 */
         }
 
@@ -151,9 +179,13 @@ void *arena_alloc(agentos_arena_t *arena, size_t size)
             if (new_size > ARENA_MAX_CHUNK_SIZE) new_size = ARENA_MAX_CHUNK_SIZE;
         }
 
+        AGENTOS_LOG_INFO("arena: arena_alloc NEW_CHUNK (chunk#=%zu→%zu, new_size=%zu, aligned=%zu)",
+                         arena->num_chunks, arena->num_chunks + 1, new_size, aligned);
+
         arena_chunk_t *new_chunk = chunk_create(new_size);
         if (!new_chunk) {
             agentos_mutex_unlock(&arena->lock);
+            AGENTOS_LOG_ERROR("arena: arena_alloc failed to create new chunk (size=%zu)", new_size);
             return NULL;
         }
 
@@ -172,6 +204,8 @@ void *arena_alloc(agentos_arena_t *arena, size_t size)
 
     agentos_mutex_unlock(&arena->lock);
 
+    AGENTOS_LOG_DEBUG("arena: arena_alloc ok (size=%zu, aligned=%zu, ptr=%p, chunk#=%zu, alloc#=%" PRIu64 ")",
+                      size, aligned, ptr, arena->num_chunks, arena->alloc_count);
     return ptr;
 }
 
@@ -188,6 +222,9 @@ void arena_reset(agentos_arena_t *arena)
 {
     if (!arena) return;
 
+    AGENTOS_LOG_INFO("arena: arena_reset (arena=%p, chunks=%zu, reset#=%" PRIu64 "→%" PRIu64 ")",
+                     (void *)arena, arena->num_chunks, arena->reset_count, arena->reset_count + 1);
+
     agentos_mutex_lock(&arena->lock);
 
     /* 将所有 chunk 的 bump 指针回退到起始位置 */
@@ -203,6 +240,8 @@ void arena_reset(agentos_arena_t *arena)
     arena->reset_count++;
 
     agentos_mutex_unlock(&arena->lock);
+
+    AGENTOS_LOG_DEBUG("arena: arena_reset done");
 }
 
 /* ==================== 标记 / 回退 API ==================== */
@@ -218,6 +257,9 @@ void arena_mark(agentos_arena_t *arena, arena_mark_t *mark)
     mark->chunk = (agentos_arena_t *)arena->current;
 
     agentos_mutex_unlock(&arena->lock);
+
+    AGENTOS_LOG_DEBUG("arena: arena_mark (arena=%p, bump=%p, chunk=%p)",
+                      (void *)arena, mark->bump, mark->chunk);
 }
 
 void arena_release(arena_mark_t *mark)
@@ -226,6 +268,9 @@ void arena_release(arena_mark_t *mark)
 
     agentos_arena_t *arena = mark->arena;
     arena_chunk_t *target = (arena_chunk_t *)mark->chunk;
+
+    AGENTOS_LOG_INFO("arena: arena_release (arena=%p, target_chunk=%p, bump=%p)",
+                     (void *)arena, (void *)target, mark->bump);
 
     agentos_mutex_lock(&arena->lock);
 
@@ -256,6 +301,8 @@ void arena_release(arena_mark_t *mark)
     arena->current = target;
 
     agentos_mutex_unlock(&arena->lock);
+
+    AGENTOS_LOG_DEBUG("arena: arena_release done");
 }
 
 /* ==================== 查询 API ==================== */

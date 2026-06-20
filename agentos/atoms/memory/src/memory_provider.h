@@ -1,10 +1,10 @@
 /**
  * @file memory_provider.h
- * @brief AgentOS 内存提供商接口（可拔插架构）
+ * @brief AgentRT 内存提供商接口（可拔插架构）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 定义内存提供商的函数指针表和能力标记。
- * AgentOS 内置免费提供商（builtin_provider）实现此接口，
+ * AgentRT 内置免费提供商（builtin_provider）实现此接口，
  * MemoryRovol 商业提供商同样实现此接口。
  *
  * 架构：

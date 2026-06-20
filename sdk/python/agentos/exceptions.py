@@ -1,11 +1,11 @@
-# AgentOS Python SDK Exceptions
+# AgentRT Python SDK Exceptions
 # Version: 0.1.0
 # Last updated: 2026-04-04
 
 """
-Exception classes for the AgentOS Python SDK.
+Exception classes for the AgentRT Python SDK.
 
-This module defines a comprehensive exception hierarchy for all AgentOS operations.
+This module defines a comprehensive exception hierarchy for all AgentRT operations.
 All exceptions inherit from AgentOSError and include rich error information.
 错误码常量与 Go SDK errors.go 保持一致的十六进制体系。
 """
@@ -269,3 +269,6 @@ class InvalidResponseError(AgentOSError):
 
 
 ConfigError = ConfigurationError
+
+# 别名（兼容历史接口）
+TimeoutError = AgentOSTimeoutError

@@ -66,3 +66,27 @@ target_link_libraries(test_memory_engine
 
 add_test(NAME memory_engine COMMAND test_memory_engine)
 message(STATUS "corekern test: test_memory_engine (memory/engine/scheduler/strategy)")
+
+add_executable(test_oom_handler test_oom_handler.c)
+
+target_include_directories(test_oom_handler PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/types/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/platform/include
+)
+
+target_compile_features(test_oom_handler PRIVATE c_std_11)
+target_compile_options(test_oom_handler PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-address -Wno-unused-function
+)
+
+target_link_libraries(test_oom_handler
+    PRIVATE agentos_test_ldflags
+    PRIVATE agentos_core
+    PRIVATE Threads::Threads agentos_platform_libs
+)
+
+add_test(NAME oom_handler COMMAND test_oom_handler)
+message(STATUS "corekern test: test_oom_handler (OOM trigger→degrade→restore)")

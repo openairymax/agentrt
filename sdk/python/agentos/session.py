@@ -1,9 +1,9 @@
-# AgentOS Python SDK Session
+# AgentRT Python SDK Session
 # Version: 0.1.0
 # Last updated: 2026-03-21
 
 """
-Session class implementation for the AgentOS Python SDK.
+Session class implementation for the AgentRT Python SDK.
 """
 
 from typing import Optional, Dict, Any

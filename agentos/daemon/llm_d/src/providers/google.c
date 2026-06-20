@@ -35,9 +35,15 @@ static provider_ctx_t *google_init(const char *name __attribute__((unused)), con
                                    const char *organization __attribute__((unused)),
                                    double timeout_sec, int max_retries)
 {
+    SVC_LOG_INFO("C-L02: GOOGLE: INIT api_base=%s model=%s timeout=%.1fs retries=%d has_api_key=%d",
+                 api_base ? api_base : GOOGLE_DEFAULT_BASE,
+                 GOOGLE_DEFAULT_MODEL,
+                 timeout_sec, max_retries,
+                 (api_key && api_key[0]) ? 1 : 0);
 
     google_ctx_t *ctx = (google_ctx_t *)AGENTOS_CALLOC(1, sizeof(google_ctx_t));
     if (!ctx) {
+        SVC_LOG_ERROR("C-L02: GOOGLE: INIT-FAIL reason=alloc_failed");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
@@ -45,11 +51,13 @@ static provider_ctx_t *google_init(const char *name __attribute__((unused)), con
     provider_base_init(&ctx->base, api_key, api_base, organization, timeout_sec, max_retries,
                        GOOGLE_DEFAULT_BASE);
 
+    SVC_LOG_INFO("C-L02: GOOGLE: INIT ctx=%p", (void *)ctx);
     return (provider_ctx_t *)ctx;
 }
 
 static void google_destroy(provider_ctx_t *ctx_ptr)
 {
+    SVC_LOG_INFO("C-L02: GOOGLE: DESTROY ctx=%p", (void *)ctx_ptr);
     if (ctx_ptr) {
         AGENTOS_FREE(ctx_ptr);
     }
@@ -219,8 +227,13 @@ static int google_complete(provider_ctx_t *ctx_ptr, const llm_request_config_t *
     const char *model =
         (manager->model && manager->model[0]) ? manager->model : GOOGLE_DEFAULT_MODEL;
 
+    SVC_LOG_INFO("C-L02: GOOGLE: COMPLETE-START model=%s msg_count=%zu max_tokens=%d temp=%.2f stream=%d",
+                 model, manager->message_count, manager->max_tokens, manager->temperature,
+                 manager->stream);
+
     char *req_body = google_build_request(manager);
     if (!req_body) {
+        SVC_LOG_ERROR("C-L02: GOOGLE: COMPLETE-FAIL model=%s reason=build_request_failed", model);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
 
@@ -235,6 +248,10 @@ static int google_complete(provider_ctx_t *ctx_ptr, const llm_request_config_t *
     headers = curl_slist_append(headers, "Content-Type: application/json");
     explicit_bzero(auth_header, sizeof(auth_header));
 
+    size_t body_len = strlen(req_body);
+    SVC_LOG_INFO("C-L02: GOOGLE: HTTP-POST url=%s body_len=%zu timeout=%.1fs retries=%d auth=x-goog-api-key",
+                 url, body_len, base->timeout_sec, base->max_retries);
+
     provider_http_resp_t *http_resp = NULL;
     long http_code = 0;
 
@@ -244,19 +261,47 @@ static int google_complete(provider_ctx_t *ctx_ptr, const llm_request_config_t *
     curl_slist_free_all(headers);
     AGENTOS_FREE(req_body);
 
+    size_t resp_body_len = (http_resp && http_resp->data) ? strlen(http_resp->data) : 0;
+    SVC_LOG_INFO("C-L02: GOOGLE: HTTP-RESPONSE http_code=%ld resp_body_len=%zu", http_code, resp_body_len);
+
     if (ret != AGENTOS_OK) {
-        SVC_LOG_ERROR("google: HTTP request failed, status=%ld", http_code);
+        SVC_LOG_ERROR("C-L02: GOOGLE: COMPLETE-FAIL model=%s reason=http_request_failed http_code=%ld ret=%d",
+                      model, http_code, ret);
+        SVC_LOG_ERROR("C-L02: GOOGLE: STACK: google_complete http_request_failed url=%s", url);
         return ret;
     }
 
     if (http_code != 200) {
-        SVC_LOG_ERROR("google: HTTP error, status=%ld", http_code);
+        const char *diagnosis = "";
+        switch (http_code) {
+            case 401: diagnosis = "DIAGNOSIS: invalid_api_key_or_expired"; break;
+            case 403: diagnosis = "DIAGNOSIS: access_denied_or_quota_exceeded"; break;
+            case 429: diagnosis = "DIAGNOSIS: rate_limited"; break;
+            case 500: diagnosis = "DIAGNOSIS: google_internal_server_error"; break;
+            case 503: diagnosis = "DIAGNOSIS: google_service_unavailable_or_overloaded"; break;
+            default:  diagnosis = "DIAGNOSIS: unexpected_http_error"; break;
+        }
+        SVC_LOG_ERROR("C-L02: GOOGLE: COMPLETE-FAIL model=%s http_code=%ld %s resp_body=%s",
+                      model, http_code, diagnosis,
+                      (http_resp && http_resp->data) ? http_resp->data : "(null)");
+        SVC_LOG_ERROR("C-L02: GOOGLE: STACK: google_complete http_error url=%s http_code=%ld", url, http_code);
         provider_http_resp_free(http_resp);
         return AGENTOS_ERR_IO;
     }
 
     ret = google_parse_response(http_resp->data, out_response);
     provider_http_resp_free(http_resp);
+
+    if (ret == AGENTOS_OK && *out_response) {
+        llm_response_t *r = *out_response;
+        SVC_LOG_INFO("C-L02: GOOGLE: COMPLETE-OK model=%s prompt_tokens=%u completion_tokens=%u total_tokens=%u finish_reason=%s",
+                     r->model ? r->model : model,
+                     r->prompt_tokens, r->completion_tokens, r->total_tokens,
+                     r->finish_reason ? r->finish_reason : "unknown");
+    } else {
+        SVC_LOG_ERROR("C-L02: GOOGLE: COMPLETE-FAIL model=%s reason=parse_response_failed ret=%d", model, ret);
+        SVC_LOG_ERROR("C-L02: GOOGLE: STACK: google_complete parse_failed");
+    }
 
     return ret;
 }
@@ -500,12 +545,18 @@ static int google_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     const char *model =
         (manager->model && manager->model[0]) ? manager->model : GOOGLE_DEFAULT_MODEL;
 
+    SVC_LOG_INFO("C-L02: GOOGLE: STREAM-START model=%s msg_count=%zu max_tokens=%d temp=%.2f stream=%d",
+                 model, manager->message_count, manager->max_tokens, manager->temperature,
+                 manager->stream);
+
     llm_request_config_t stream_cfg = *manager;
     stream_cfg.stream = 1;
 
     char *req_body = google_build_request(&stream_cfg);
-    if (!req_body)
+    if (!req_body) {
+        SVC_LOG_ERROR("C-L02: GOOGLE: STREAM-FAIL model=%s reason=build_request_failed", model);
         return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
 
     char url[1024];
     snprintf(url, sizeof(url), "%s/models/%s:streamGenerateContent?alt=sse", base->api_base, model);
@@ -518,6 +569,10 @@ static int google_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     headers = curl_slist_append(headers, "Content-Type: application/json");
     explicit_bzero(auth_header, sizeof(auth_header));
 
+    size_t body_len = strlen(req_body);
+    SVC_LOG_INFO("C-L02: GOOGLE: STREAM-HTTP-POST url=%s body_len=%zu timeout=%.1fs retries=%d auth=x-goog-api-key sse=alt=sse",
+                 url, body_len, base->timeout_sec, base->max_retries);
+
     gg_stream_acc_t acc;
     __builtin_memset(&acc, 0, sizeof(acc));
     acc.user_cb = callback;
@@ -528,6 +583,7 @@ static int google_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     gg_sse_ctx_t sse;
     gg_sse_init(&sse, &acc);
     if (!sse.line_buf) {
+        SVC_LOG_ERROR("C-L02: GOOGLE: STREAM-FAIL model=%s reason=sse_alloc_failed", model);
         AGENTOS_FREE(req_body);
         curl_slist_free_all(headers);
         AGENTOS_FREE(acc.acc_content);
@@ -560,8 +616,12 @@ static int google_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
 
         if (cres == CURLE_OK)
             ret = AGENTOS_OK;
-        else
-            SVC_LOG_WARN("google: Stream curl error: %s", curl_easy_strerror(cres));
+        else {
+            SVC_LOG_WARN("C-L02: GOOGLE: STREAM-FAIL model=%s reason=curl_error err=%s",
+                         model, curl_easy_strerror(cres));
+        }
+    } else {
+        SVC_LOG_ERROR("C-L02: GOOGLE: STREAM-FAIL model=%s reason=curl_init_failed", model);
     }
 
     gg_sse_destroy(&sse);
@@ -569,7 +629,9 @@ static int google_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     AGENTOS_FREE(req_body);
 
     if (ret != AGENTOS_OK) {
-        SVC_LOG_ERROR("google: Stream HTTP error, status=%ld", http_code);
+        SVC_LOG_ERROR("C-L02: GOOGLE: STREAM-FAIL model=%s reason=http_error http_code=%ld ret=%d",
+                      model, http_code, ret);
+        SVC_LOG_ERROR("C-L02: GOOGLE: STACK: google_complete_stream stream_failed url=%s http_code=%ld", url, http_code);
         AGENTOS_FREE(acc.acc_content);
         AGENTOS_FREE(acc.resp_model);
         AGENTOS_FREE(acc.finish_reason);
@@ -580,6 +642,16 @@ static int google_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_con
     AGENTOS_FREE(acc.acc_content);
     AGENTOS_FREE(acc.resp_model);
     AGENTOS_FREE(acc.finish_reason);
+
+    if (resp) {
+        SVC_LOG_INFO("C-L02: GOOGLE: STREAM-OK model=%s prompt_tokens=%u completion_tokens=%u total_tokens=%u finish_reason=%s",
+                     resp->model ? resp->model : model,
+                     resp->prompt_tokens, resp->completion_tokens, resp->total_tokens,
+                     resp->finish_reason ? resp->finish_reason : "unknown");
+    } else {
+        SVC_LOG_ERROR("C-L02: GOOGLE: STREAM-FAIL model=%s reason=build_response_failed", model);
+        SVC_LOG_ERROR("C-L02: GOOGLE: STACK: google_complete_stream build_response_failed");
+    }
 
     if (out_response)
         *out_response = resp;

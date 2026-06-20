@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file openai_enterprise_adapter.h
- * @brief OpenAI API Enterprise Adapter for AgentOS
+ * @brief OpenAI API Enterprise Adapter for AgentRT
  *
  * OpenAI API 企业级特性适配器，实现完整的Chat Completions、
  * Embeddings、Function Calling、Streaming、Rate Limiting等企业级能力。

@@ -6,10 +6,12 @@
  * cupolas_network_security.c - Network Security: TLS Hardening and Traffic Implementation
  */
 
+#include <ctype.h>
+
 /**
  * @file cupolas_network_security.c
  * @brief Network Security - TLS Hardening and Traffic Implementation
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026
  */
 

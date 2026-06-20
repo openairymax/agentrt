@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file agentos_protocol_interface.c
- * @brief AgentOS Protocol System Unified Interface Implementation
+ * @brief AgentRT Protocol System Unified Interface Implementation
  *
  * 原位置: agentos/interfaces/src/
  * 迁移至: agentos/protocols/src/ (2026-04-19 interfaces删除重构)

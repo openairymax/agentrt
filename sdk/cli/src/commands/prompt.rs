@@ -31,7 +31,7 @@ pub fn list() -> Result<()> {
     for entry in entries {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "yaml" || ext == "yml") {
+        if path.extension().is_some_and(|ext| ext == "yaml" || ext == "yml") {
             let name = path.file_stem().unwrap().to_string_lossy();
             // Read first few lines to get description
             let description = get_description(&path);

@@ -17,6 +17,7 @@
 #include "string_compat.h"
 
 #include "logging_compat.h"
+#include "config_unified.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -92,7 +93,7 @@ static watermark_level_t oom_calc_five_level_watermark(
 /**
  * @brief 获取水位级别名称（用于日志）
  */
-static const char *oom_watermark_name(watermark_level_t level)
+static const char *oom_watermark_name(int level)
 {
     switch (level) {
     case WATERMARK_NORMAL:   return "NORMAL";
@@ -289,7 +290,7 @@ oom_handler_t *agentos_oom_get_handler(void)
 
 oom_response_level_t agentos_oom_determine_response(watermark_level_t level)
 {
-    switch (level) {
+    switch ((int)level) {
     case WATERMARK_NORMAL:
         return OOM_RESPONSE_WARNING;
     case WATERMARK_WARNING:
@@ -561,6 +562,31 @@ agentos_mem_pressure_level_t agentos_oom_get_pressure(void)
     return result;
 }
 
+void agentos_oom_set_pressure(agentos_mem_pressure_level_t level)
+{
+    if (!g_oom_handler) {
+        return;
+    }
+
+    oom_handler_t *handler = g_oom_handler;
+
+    agentos_mutex_lock(&handler->pressure_mutex);
+
+    agentos_mem_pressure_level_t old_level = handler->current_pressure;
+    handler->current_pressure = level;
+
+    if (level != old_level) {
+        AGENTOS_LOG_WARN("[OOM] Pressure manually set: %s → %s",
+                oom_pressure_name(old_level),
+                oom_pressure_name(level));
+
+        /* 触发压力变化回调 */
+        oom_fire_pressure_callbacks(old_level, level);
+    }
+
+    agentos_mutex_unlock(&handler->pressure_mutex);
+}
+
 int agentos_oom_register_callback(
     agentos_mem_pressure_level_t level,
     void (*callback)(agentos_mem_pressure_level_t, void *),
@@ -612,21 +638,6 @@ int agentos_oom_check_allocation(size_t requested_size)
 
     agentos_mutex_lock(&handler->pressure_mutex);
 
-    /* 获取当前已分配内存并计算压力级别 */
-    size_t current_allocated = 0;
-    if (handler->ext_stats) {
-        current_allocated = handler->ext_stats->current_allocated;
-    }
-
-    agentos_mem_pressure_level_t old_level = handler->current_pressure;
-    agentos_mem_pressure_level_t new_level = oom_calc_pressure_level(
-        current_allocated, handler->total_system_memory);
-
-    if (new_level != old_level) {
-        handler->current_pressure = new_level;
-        oom_fire_pressure_callbacks(old_level, new_level);
-    }
-
     agentos_mem_pressure_level_t pressure = handler->current_pressure;
 
     int result = 0; /* 0 = 允许 */
@@ -639,19 +650,17 @@ int agentos_oom_check_allocation(size_t requested_size)
     case AGENTOS_MEM_PRESSURE_WARNING:
         /* 允许分配，记录警告 */
         AGENTOS_LOG_WARN("[OOM] Allocation under WARNING pressure: "
-                "size=%zu, usage=%.1f%%",
+                "size=%zu, total_allocated=%zu",
                 requested_size,
-                100.0 * (double)current_allocated /
-                         (double)handler->total_system_memory);
+                handler->total_allocated_bytes);
         break;
 
     case AGENTOS_MEM_PRESSURE_DEGRADED:
         /* 允许分配，但建议减少非必要分配 */
         AGENTOS_LOG_WARN("[OOM] Allocation under DEGRADED pressure: "
-                "size=%zu, usage=%.1f%%",
+                "size=%zu, total_allocated=%zu",
                 requested_size,
-                100.0 * (double)current_allocated /
-                         (double)handler->total_system_memory);
+                handler->total_allocated_bytes);
         break;
 
     case AGENTOS_MEM_PRESSURE_CRITICAL:
@@ -659,10 +668,9 @@ int agentos_oom_check_allocation(size_t requested_size)
         handler->pressure_denied_count++;
         result = AGENTOS_ENOMEM;
         AGENTOS_LOG_ERROR("[OOM] Allocation DENIED under CRITICAL pressure: "
-                "size=%zu, usage=%.1f%%, denied_count=%zu",
+                "size=%zu, total_allocated=%zu, denied_count=%zu",
                 requested_size,
-                100.0 * (double)current_allocated /
-                         (double)handler->total_system_memory,
+                handler->total_allocated_bytes,
                 handler->pressure_denied_count);
         break;
 
@@ -671,10 +679,9 @@ int agentos_oom_check_allocation(size_t requested_size)
         handler->pressure_denied_count++;
         result = AGENTOS_ENOMEM;
         AGENTOS_LOG_ERROR("[OOM] Allocation DENIED under FATAL pressure: "
-                "size=%zu, usage=%.1f%%, denied_count=%zu",
+                "size=%zu, total_allocated=%zu, denied_count=%zu",
                 requested_size,
-                100.0 * (double)current_allocated /
-                         (double)handler->total_system_memory,
+                handler->total_allocated_bytes,
                 handler->pressure_denied_count);
         break;
     }
@@ -768,12 +775,65 @@ int agentos_oom_config_load(const char *config_path,
     /* 先填充默认值 */
     agentos_oom_config_defaults(config);
 
-    /* TODO: Phase 1 实现 - 使用 config_unified 解析 agentos.yaml 的
-     * agentos.oom.* 配置节，覆盖默认值。
-     * 当前返回默认配置，yaml 解析在 Phase 1 P1.19 中实现。 */
+    /* 使用 config_unified 加载 YAML 配置并覆盖默认值 */
+    config_context_t *cfg_ctx = config_service_create("oom", NULL, false, false);
+    if (cfg_ctx) {
+        config_file_source_options_t file_opts = {
+            .file_path = config_path,
+            .format = "yaml"
+        };
+        config_source_t *source = config_source_create_file(&file_opts);
+        if (source) {
+            config_error_t err = config_service_load(cfg_ctx, &source, 1);
+            if (err == CONFIG_SUCCESS) {
+                /* 读取 agentos.oom.* 配置节，覆盖默认值 */
+                const config_value_t *val;
 
-    AGENTOS_LOG_INFO("[OOM] Config loaded (defaults, yaml parsing pending): %s",
-            config_path);
+                val = config_context_get(cfg_ctx, "agentos.oom.warning_threshold");
+                if (val) config->warning_threshold = config_value_get_double(val, config->warning_threshold);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.degraded_threshold");
+                if (val) config->degraded_threshold = config_value_get_double(val, config->degraded_threshold);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.critical_threshold");
+                if (val) config->critical_threshold = config_value_get_double(val, config->critical_threshold);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.fatal_threshold");
+                if (val) config->fatal_threshold = config_value_get_double(val, config->fatal_threshold);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.check_interval_ms");
+                if (val) config->check_interval_ms = (uint32_t)config_value_get_int(val, (int)config->check_interval_ms);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.recovery_cooldown_ms");
+                if (val) config->recovery_cooldown_ms = (uint32_t)config_value_get_int(val, (int)config->recovery_cooldown_ms);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.enable_auto_recovery");
+                if (val) config->enable_auto_recovery = config_value_get_bool(val, config->enable_auto_recovery);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.enable_allocation_check");
+                if (val) config->enable_allocation_check = config_value_get_bool(val, config->enable_allocation_check);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.emergency_pool_size");
+                if (val) config->emergency_pool_size = (size_t)config_value_get_int(val, (int)config->emergency_pool_size);
+
+                val = config_context_get(cfg_ctx, "agentos.oom.max_heap_size");
+                if (val) config->max_heap_size = (size_t)config_value_get_int(val, (int)config->max_heap_size);
+
+                AGENTOS_LOG_INFO("[OOM] Config loaded from: %s", config_path);
+            } else {
+                AGENTOS_LOG_WARN("[OOM] Failed to parse YAML config: %s, using defaults",
+                        config_path);
+            }
+            config_source_destroy(source);
+        } else {
+            AGENTOS_LOG_WARN("[OOM] Cannot open config file: %s, using defaults",
+                    config_path);
+        }
+        config_context_destroy(cfg_ctx);
+    } else {
+        AGENTOS_LOG_WARN("[OOM] Config system unavailable, using defaults: %s",
+                config_path);
+    }
     return 0;
 }
 
@@ -927,7 +987,7 @@ bool agentos_oom_should_recover(void)
     }
 
     /* 检查冷却期 */
-    uint64_t now = oom_get_timestamp_ms();
+    uint64_t now = oom_get_time_ms();
     uint64_t cooldown = g_oom_config.recovery_cooldown_ms;
     if (cooldown == 0) cooldown = 5000;
 
@@ -945,7 +1005,7 @@ int agentos_oom_recover(void)
     agentos_mem_pressure_level_t old_level = g_oom_handler->current_pressure;
     agentos_mem_pressure_level_t new_level = AGENTOS_MEM_PRESSURE_NORMAL;
 
-    g_last_recovery_time_ms = oom_get_timestamp_ms();
+    g_last_recovery_time_ms = oom_get_time_ms();
 
     /* 通知所有恢复回调 */
     for (size_t i = 0; i < g_recovery_count; i++) {

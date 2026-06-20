@@ -1,5 +1,5 @@
 /*
- * AgentOS Unified Protocol - 统一协议接口
+ * AgentRT Unified Protocol - 统一协议接口
  *
  * 本文件定义AgentOS统一协议系统的核心接口，提供对多种
  * 通信协议（JSON-RPC、MCP、A2A、OpenAI、OpenJiuwen）的
@@ -9,6 +9,7 @@
  * 迁移至: agentos/protocols/include/ (2026-04-19 include/整合重构)
  */
 
+// @owner: team-B
 #ifndef AGENTOS_UNIFIED_PROTOCOL_H
 #define AGENTOS_UNIFIED_PROTOCOL_H
 

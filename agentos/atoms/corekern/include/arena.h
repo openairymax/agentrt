@@ -22,8 +22,8 @@
  *   agentos_arena_destroy(arena);
  */
 
-#ifndef AGENTOS_ARENA_H
-#define AGENTOS_ARENA_H
+#ifndef AGENTOS_COREKERN_ARENA_H
+#define AGENTOS_COREKERN_ARENA_H
 
 #include "export.h"
 
@@ -157,4 +157,4 @@ AGENTOS_API size_t agentos_arena_capacity(agentos_arena_t *arena);
 }
 #endif
 
-#endif /* AGENTOS_ARENA_H */
+#endif /* AGENTOS_COREKERN_ARENA_H */
