@@ -107,6 +107,11 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
         target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE agentos_platform_libs)
     endif()
 
+    # C-L12: Link MemoryRovol if available
+    if(TARGET agentos_memoryrovol)
+        target_link_libraries(test_cl3_${TEST_SHORT_NAME} PRIVATE agentos_memoryrovol)
+    endif()
+
     target_compile_options(test_cl3_${TEST_SHORT_NAME} PRIVATE
         -Wall -Wextra -g -Wno-unused-function -Wno-deprecated-declarations
         "SHELL:-include memory_compat.h"
@@ -167,6 +172,11 @@ foreach(BENCH_SRC ${CL3_BENCH_SOURCES})
 
     if(UNIX)
         target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE agentos_platform_libs)
+    endif()
+
+    # C-L12: Link MemoryRovol if available
+    if(TARGET agentos_memoryrovol)
+        target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE agentos_memoryrovol)
     endif()
 
     target_compile_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE

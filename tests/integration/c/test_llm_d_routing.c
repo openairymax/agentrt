@@ -169,14 +169,16 @@ static void test_int15_1_provider_registry(void)
     printf("\n--- [INT-15.1] Provider Registry: 注册与发现 ---\n");
 
     /* 构建配置 */
-    struct {
-        const char *name;
-        const char *enabled;
-    } prov_cfg_entries[TEST_PROVIDER_COUNT];
+    provider_config_t prov_cfg_entries[TEST_PROVIDER_COUNT];
 
     for (size_t i = 0; i < TEST_PROVIDER_COUNT; i++) {
-        prov_cfg_entries[i].name    = test_providers[i].name;
-        prov_cfg_entries[i].enabled = "true";
+        prov_cfg_entries[i].name         = test_providers[i].name;
+        prov_cfg_entries[i].api_key      = test_providers[i].api_key;
+        prov_cfg_entries[i].api_base     = test_providers[i].api_base;
+        prov_cfg_entries[i].organization = NULL;
+        prov_cfg_entries[i].timeout_sec  = test_providers[i].timeout_sec;
+        prov_cfg_entries[i].max_retries  = test_providers[i].max_retries;
+        prov_cfg_entries[i].models       = test_providers[i].models;
     }
 
     service_config_t cfg = {
@@ -255,12 +257,9 @@ static void test_int15_2_find_provider(void)
 {
     printf("\n--- [INT-15.2] find_provider: 查找与错误处理 ---\n");
 
-    struct {
-        const char *name;
-        const char *enabled;
-    } prov_cfg[] = {
-        {"openai", "true"},
-        {"anthropic", "true"},
+    provider_config_t prov_cfg[] = {
+        {"openai",    NULL, NULL, NULL, 30.0, 3, NULL},
+        {"anthropic", NULL, NULL, NULL, 30.0, 3, NULL},
     };
 
     service_config_t cfg = {
@@ -587,12 +586,9 @@ static void test_int15_5_provider_health_check(void)
                    "Step 5: 恢复2个提供商后可路由");
 
     /* Step 6: 健康提供商的模型仍可通过 registry 查找 */
-    struct {
-        const char *name;
-        const char *enabled;
-    } prov_cfg[] = {
-        {"deepseek", "true"},
-        {"local",    "true"},
+    provider_config_t prov_cfg[] = {
+        {"deepseek", NULL, NULL, NULL, 30.0, 3, NULL},
+        {"local",    NULL, NULL, NULL, 60.0, 1, NULL},
     };
 
     service_config_t cfg = {
@@ -630,12 +626,9 @@ static void test_int15_6_e2e_routing_pipeline(void)
     printf("\n--- [INT-15.6] E2E Routing Pipeline: 端到端路由管线 ---\n");
 
     /* Step 1: 创建服务配置与注册表 */
-    struct {
-        const char *name;
-        const char *enabled;
-    } prov_cfg[] = {
-        {"openai",   "true"},
-        {"deepseek", "true"},
+    provider_config_t prov_cfg[] = {
+        {"openai",   NULL, NULL, NULL, 30.0, 3, NULL},
+        {"deepseek", NULL, NULL, NULL, 30.0, 3, NULL},
     };
 
     service_config_t cfg = {

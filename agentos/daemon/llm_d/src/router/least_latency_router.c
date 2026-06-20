@@ -33,11 +33,13 @@ int route_least_latency(const llm_route_request_t *request,
                                                  LLM_ROUTER_MAX_ENDPOINTS);
 
     if (eligible_count == 0) {
-        AGENTOS_LOG_WARN("LeastLatencyRouter: no eligible endpoints");
+        AGENTOS_LOG_WARN("C-L02: Latency: no eligible endpoints "
+                "(caps=0x%x, total_endpoints=%zu) STACK: route_least_latency",
+                request->required_caps, router_ctx_get()->endpoint_count);
         return -1;
     }
 
-    AGENTOS_LOG_DEBUG("LeastLatencyRouter: evaluating %zu endpoints for latency",
+    AGENTOS_LOG_DEBUG("C-L02: Latency: evaluating %zu endpoints for latency",
                       eligible_count);
 
     /* 选择延迟最低的端点 */
@@ -45,7 +47,7 @@ int route_least_latency(const llm_route_request_t *request,
     uint32_t best_latency = UINT32_MAX;
 
     for (size_t i = 0; i < eligible_count; i++) {
-        AGENTOS_LOG_DEBUG("LeastLatencyRouter: endpoint[%zu] %s/%s latency=%ums",
+        AGENTOS_LOG_DEBUG("C-L02: Latency: endpoint[%zu] %s/%s latency=%ums",
                           i, eligible[i]->provider_name, eligible[i]->model_name,
                           eligible[i]->avg_latency_ms);
 
@@ -53,6 +55,20 @@ int route_least_latency(const llm_route_request_t *request,
             best_latency = eligible[i]->avg_latency_ms;
             best_idx = i;
         }
+    }
+
+    /* 记录延迟范围 */
+    {
+        uint32_t min_lat = UINT32_MAX, max_lat = 0;
+        for (size_t i = 0; i < eligible_count; i++) {
+            if (eligible[i]->avg_latency_ms < min_lat)
+                min_lat = eligible[i]->avg_latency_ms;
+            if (eligible[i]->avg_latency_ms > max_lat)
+                max_lat = eligible[i]->avg_latency_ms;
+        }
+        AGENTOS_LOG_DEBUG("C-L02: Latency: latency range min=%ums max=%ums "
+                          "across %zu endpoints",
+                          min_lat, max_lat, eligible_count);
     }
 
     llm_endpoint_t *ep = eligible[best_idx];
@@ -74,7 +90,7 @@ int route_least_latency(const llm_route_request_t *request,
         }
         if (second_best != UINT32_MAX) {
             router_set_fallback(result, eligible[fallback_idx]);
-            AGENTOS_LOG_DEBUG("LeastLatencyRouter: fallback set to %s/%s "
+            AGENTOS_LOG_DEBUG("C-L02: Latency: fallback set to %s/%s "
                               "(latency=%ums)",
                               eligible[fallback_idx]->provider_name,
                               eligible[fallback_idx]->model_name,
@@ -82,7 +98,7 @@ int route_least_latency(const llm_route_request_t *request,
         }
     }
 
-    AGENTOS_LOG_INFO("LeastLatencyRouter: selected %s/%s latency=%ums",
+    AGENTOS_LOG_INFO("C-L02: Latency: selected %s/%s latency=%ums",
                      ep->provider_name, ep->model_name, best_latency);
 
     return 0;

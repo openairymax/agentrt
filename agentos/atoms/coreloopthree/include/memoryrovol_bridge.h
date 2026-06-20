@@ -218,6 +218,19 @@ int memoryrovol_bridge_health_check(memoryrovol_bridge_t *bridge,
  */
 bool memoryrovol_bridge_is_ready(memoryrovol_bridge_t *bridge);
 
+/**
+ * @brief C-L12: 输出桥接器统计摘要（单行格式，适合周期性日志）
+ *
+ * 格式: "C-L12: BRIDGE-STATS mode=X reads=N writes=N queries=N "
+ *        "errors=N deletes=N evolves=N forgets=N "
+ *        "write_latency=avg/max/min us read_latency=avg/max/min us "
+ *        "query_latency=avg/max/min us bytes_written=N bytes_read=N "
+ *        "query_results=N"
+ *
+ * @param bridge 桥接器句柄
+ */
+void memoryrovol_bridge_dump_stats(memoryrovol_bridge_t *bridge);
+
 #ifdef __cplusplus
 }
 #endif

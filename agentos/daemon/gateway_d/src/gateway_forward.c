@@ -136,18 +136,32 @@ gw_fwd_proto_t gw_forward_detect_proto(const char *content_type, const char *pat
                                        const char *body, size_t body_len)
 {
     (void)body_len;
+    gw_fwd_proto_t detected = GW_FWD_PROTO_JSONRPC;
+    const char *detection_method = "default";
 
     /* 1. Path-based detection (highest priority) */
     if (path) {
-        if (strncmp(path, "/a2a", 4) == 0 || strncmp(path, "/agent/", 7) == 0)
-            return GW_FWD_PROTO_A2A;
-        if (strncmp(path, "/mcp", 4) == 0 || strncmp(path, "/tools/", 7) == 0)
-            return GW_FWD_PROTO_MCP;
+        if (strncmp(path, "/a2a", 4) == 0 || strncmp(path, "/agent/", 7) == 0) {
+            detected = GW_FWD_PROTO_A2A;
+            detection_method = "path";
+            goto log_detection;
+        }
+        if (strncmp(path, "/mcp", 4) == 0 || strncmp(path, "/tools/", 7) == 0) {
+            detected = GW_FWD_PROTO_MCP;
+            detection_method = "path";
+            goto log_detection;
+        }
         if (strncmp(path, "/v1/chat", 8) == 0 || strncmp(path, "/v1/completions", 15) == 0 ||
-            strncmp(path, "/openai/", 8) == 0)
-            return GW_FWD_PROTO_OPENAI;
-        if (strncmp(path, "/rpc", 4) == 0 || strncmp(path, "/api/", 5) == 0)
-            return GW_FWD_PROTO_JSONRPC;
+            strncmp(path, "/openai/", 8) == 0) {
+            detected = GW_FWD_PROTO_OPENAI;
+            detection_method = "path";
+            goto log_detection;
+        }
+        if (strncmp(path, "/rpc", 4) == 0 || strncmp(path, "/api/", 5) == 0) {
+            detected = GW_FWD_PROTO_JSONRPC;
+            detection_method = "path";
+            goto log_detection;
+        }
     }
 
     /* 2. Content-Type hint */
@@ -156,36 +170,65 @@ gw_fwd_proto_t gw_forward_detect_proto(const char *content_type, const char *pat
             /* JSON body detection */
             if (body) {
                 if (strstr(body, "\"jsonrpc\"") && strstr(body, "\"2.0\"")) {
-                    if (strstr(body, "\"tools/") || strstr(body, "\"resources/"))
-                        return GW_FWD_PROTO_MCP;
-                    return GW_FWD_PROTO_JSONRPC;
+                    if (strstr(body, "\"tools/") || strstr(body, "\"resources/")) {
+                        detected = GW_FWD_PROTO_MCP;
+                        detection_method = "content-type+body(mcp)";
+                        goto log_detection;
+                    }
+                    detected = GW_FWD_PROTO_JSONRPC;
+                    detection_method = "content-type+body(jsonrpc)";
+                    goto log_detection;
                 }
                 if ((strstr(body, "\"model\"") && strstr(body, "\"messages\"")) ||
-                    strstr(body, "\"chat/completions\""))
-                    return GW_FWD_PROTO_OPENAI;
+                    strstr(body, "\"chat/completions\"")) {
+                    detected = GW_FWD_PROTO_OPENAI;
+                    detection_method = "content-type+body(openai)";
+                    goto log_detection;
+                }
                 if (strstr(body, "\"a2a\"") || strstr(body, "\"agentCard\"") ||
-                    strstr(body, "\"task/delegate\""))
-                    return GW_FWD_PROTO_A2A;
+                    strstr(body, "\"task/delegate\"")) {
+                    detected = GW_FWD_PROTO_A2A;
+                    detection_method = "content-type+body(a2a)";
+                    goto log_detection;
+                }
             }
-            return GW_FWD_PROTO_JSONRPC;
+            detected = GW_FWD_PROTO_JSONRPC;
+            detection_method = "content-type(fallback)";
+            goto log_detection;
         }
-        if (strstr(content_type, "text/event-stream"))
-            return GW_FWD_PROTO_OPENAI;
+        if (strstr(content_type, "text/event-stream")) {
+            detected = GW_FWD_PROTO_OPENAI;
+            detection_method = "content-type(sse)";
+            goto log_detection;
+        }
     }
 
     /* 3. Body-only detection */
     if (body) {
-        if (strstr(body, "\"a2a\"") || strstr(body, "\"agentCard\""))
-            return GW_FWD_PROTO_A2A;
-        if (strstr(body, "\"tools/") || strstr(body, "\"resources/"))
-            return GW_FWD_PROTO_MCP;
-        if (strstr(body, "\"model\"") && strstr(body, "\"messages\""))
-            return GW_FWD_PROTO_OPENAI;
-        if (strstr(body, "\"jsonrpc\"") && strstr(body, "\"2.0\""))
-            return GW_FWD_PROTO_JSONRPC;
+        if (strstr(body, "\"a2a\"") || strstr(body, "\"agentCard\"")) {
+            detected = GW_FWD_PROTO_A2A;
+            detection_method = "body(a2a)";
+        } else if (strstr(body, "\"tools/") || strstr(body, "\"resources/")) {
+            detected = GW_FWD_PROTO_MCP;
+            detection_method = "body(mcp)";
+        } else if (strstr(body, "\"model\"") && strstr(body, "\"messages\"")) {
+            detected = GW_FWD_PROTO_OPENAI;
+            detection_method = "body(openai)";
+        } else if (strstr(body, "\"jsonrpc\"") && strstr(body, "\"2.0\"")) {
+            detected = GW_FWD_PROTO_JSONRPC;
+            detection_method = "body(jsonrpc)";
+        } else {
+            detection_method = "default";
+        }
     }
 
-    return GW_FWD_PROTO_JSONRPC; /* default */
+log_detection:
+    SVC_LOG_DEBUG("C-L11: PROTO-DETECT method=%s result=%s path=%s ct=%s body_len=%zu",
+                  detection_method, proto_to_string(detected),
+                  path ? path : "(none)",
+                  content_type ? content_type : "(none)",
+                  body_len);
+    return detected;
 }
 
 /* ==================== 构建 JSON-RPC 转发消息 ==================== */
@@ -229,7 +272,8 @@ static int do_forward(gw_forward_t *fw, gw_fwd_proto_t proto, const char *target
                       size_t *out_response_len)
 {
     if (!fw || !out_response || !out_response_len) {
-        SVC_LOG_ERROR("C-L11: do_forward invalid params");
+        SVC_LOG_ERROR("C-L11: do_forward invalid params (fw=%p out_resp=%p out_len=%p)",
+                      (void *)fw, (void *)out_response, (void *)out_response_len);
         return -1;
     }
 
@@ -238,26 +282,31 @@ static int do_forward(gw_forward_t *fw, gw_fwd_proto_t proto, const char *target
     /* 构建 JSON-RPC 转发消息 */
     char *jsonrpc_msg = build_jsonrpc_forward(method, path, body, body_len);
     if (!jsonrpc_msg) {
-        SVC_LOG_ERROR("C-L11: Failed to build JSON-RPC forward message for %s",
-                      proto_to_string(proto));
+        SVC_LOG_ERROR("C-L11: Failed to build JSON-RPC forward message for %s (path=%s body_len=%zu)",
+                      proto_to_string(proto), path ? path : "/", body_len);
         fw->stats.forward_errors++;
         fw->healthy = false;
         return -1;
     }
 
-    SVC_LOG_DEBUG("C-L11: Forwarding %s request to '%s' via channel '%s' path=%s",
-                  proto_to_string(proto), target_daemon, channel, path ? path : "/");
+    size_t msg_len = strlen(jsonrpc_msg);
+
+    SVC_LOG_DEBUG("C-L11: FORWARD [%s] → target=%s channel=%s method=%s path=%s "
+                  "body_len=%zu msg_len=%zu",
+                  proto_to_string(proto), target_daemon, channel,
+                  method ? method : "POST", path ? path : "/",
+                  body_len, msg_len);
 
     /* 通过 IPC Bus 发送请求到目标 daemon */
     ipc_bus_message_t *req = ipc_bus_message_create(IPC_BUS_MSG_REQUEST,
                                                      IPC_BUS_PROTO_JSON_RPC,
                                                      jsonrpc_msg,
-                                                     strlen(jsonrpc_msg));
+                                                     msg_len);
     AGENTOS_FREE(jsonrpc_msg);
 
     if (!req) {
-        SVC_LOG_ERROR("C-L11: Failed to create IPC request message for %s",
-                      proto_to_string(proto));
+        SVC_LOG_ERROR("C-L11: Failed to create IPC request message for %s → %s",
+                      proto_to_string(proto), target_daemon);
         fw->stats.forward_errors++;
         fw->healthy = false;
         return -1;
@@ -273,19 +322,28 @@ static int do_forward(gw_forward_t *fw, gw_fwd_proto_t proto, const char *target
     ipc_bus_message_free(req);
 
     if (ret != 0 || !resp.payload) {
-        SVC_LOG_WARN("C-L11: Forward to '%s' failed (ret=%d, proto=%s)",
-                     target_daemon, ret, proto_to_string(proto));
-        fw->stats.forward_errors++;
-        if (ret == -2) { /* timeout */
+        const char *err_reason;
+        if (ret == -2) {
+            err_reason = "timeout";
             fw->stats.timeout_errors++;
+        } else if (ret == -3) {
+            err_reason = "backpressure";
+        } else if (ret == -4) {
+            err_reason = "service_unavailable";
+        } else {
+            err_reason = "unknown";
         }
+        SVC_LOG_WARN("C-L11: FORWARD-FAIL [%s] → %s ret=%d reason=%s timeout=%ums",
+                     proto_to_string(proto), target_daemon, ret, err_reason,
+                     fw->config.request_timeout_ms);
+        fw->stats.forward_errors++;
 
         /* 返回错误响应 */
-        const char *err_fmt = "{\"error\":{\"code\":%d,\"message\":\"Forward to %s failed\"}}";
-        size_t err_len = snprintf(NULL, 0, err_fmt, ret, target_daemon) + 1;
+        const char *err_fmt = "{\"error\":{\"code\":%d,\"message\":\"Forward to %s failed: %s\"}}";
+        size_t err_len = snprintf(NULL, 0, err_fmt, ret, target_daemon, err_reason) + 1;
         char *err_resp = (char *)AGENTOS_MALLOC(err_len);
         if (err_resp) {
-            snprintf(err_resp, err_len, err_fmt, ret, target_daemon);
+            snprintf(err_resp, err_len, err_fmt, ret, target_daemon, err_reason);
             *out_response = err_resp;
             *out_response_len = strlen(err_resp);
         }
@@ -302,16 +360,35 @@ static int do_forward(gw_forward_t *fw, gw_fwd_proto_t proto, const char *target
     if (proto < GW_FWD_PROTO_COUNT)
         fw->stats.by_proto[proto]++;
 
+    /* C-L11: 更新吞吐量统计 */
+    fw->stats.body_size_total += body_len;
+    fw->stats.response_size_total += resp.payload_size;
+    fw->stats.last_latency_us = latency_us;
+    fw->stats.last_forward_time = (uint64_t)time(NULL);
+
     /* 更新平均延迟 */
     if (fw->stats.total_forwarded > 1) {
         fw->stats.avg_latency_us =
-            (fw->stats.avg_latency_us + latency_us) / 2;
+            (fw->stats.avg_latency_us * (fw->stats.total_forwarded - 1) + latency_us)
+            / fw->stats.total_forwarded;
     } else {
         fw->stats.avg_latency_us = latency_us;
     }
 
-    SVC_LOG_DEBUG("C-L11: Forward to '%s' succeeded (proto=%s, latency=%lluus)",
-                  target_daemon, proto_to_string(proto), (unsigned long long)latency_us);
+    /* 更新最大/最小延迟 */
+    if (latency_us > fw->stats.max_latency_us)
+        fw->stats.max_latency_us = latency_us;
+    if (fw->stats.min_latency_us == 0 || latency_us < fw->stats.min_latency_us)
+        fw->stats.min_latency_us = latency_us;
+
+    SVC_LOG_DEBUG("C-L11: FORWARD-OK [%s] → %s latency=%lluus resp_len=%zu "
+                  "(total=%llu avg=%lluus min=%lluus max=%lluus)",
+                  proto_to_string(proto), target_daemon,
+                  (unsigned long long)latency_us, resp.payload_size,
+                  (unsigned long long)fw->stats.total_forwarded,
+                  (unsigned long long)fw->stats.avg_latency_us,
+                  (unsigned long long)fw->stats.min_latency_us,
+                  (unsigned long long)fw->stats.max_latency_us);
 
     return 0;
 }
@@ -376,5 +453,46 @@ void gw_forward_reset_stats(gw_forward_t *fw)
 
 bool gw_forward_is_healthy(gw_forward_t *fw)
 {
-    return fw && fw->initialized && fw->healthy;
+    if (!fw || !fw->initialized)
+        return false;
+
+    if (!fw->healthy) {
+        SVC_LOG_DEBUG("C-L11: HEALTH-CHECK unhealthy — total=%llu errors=%llu timeouts=%llu",
+                      (unsigned long long)fw->stats.total_forwarded,
+                      (unsigned long long)fw->stats.forward_errors,
+                      (unsigned long long)fw->stats.timeout_errors);
+        return false;
+    }
+    return true;
+}
+
+void gw_forward_dump_stats(gw_forward_t *fw, uint32_t interval_sec)
+{
+    if (!fw || !fw->initialized) {
+        SVC_LOG_WARN("C-L11: STATS unavailable (forwarder not initialized)");
+        return;
+    }
+
+    gw_forward_stats_t *s = &fw->stats;
+    uint64_t throughput = interval_sec > 0 ? s->total_forwarded / interval_sec : 0;
+
+    SVC_LOG_INFO("C-L11: STATS total=%llu "
+                 "(A2A=%llu MCP=%llu OpenAI=%llu JSONRPC=%llu) "
+                 "errors=%llu timeouts=%llu "
+                 "latency=avg=%llu/max=%llu/min=%llu us "
+                 "throughput=%llu req/s "
+                 "body=%llu resp=%llu bytes",
+                 (unsigned long long)s->total_forwarded,
+                 (unsigned long long)s->by_proto[GW_FWD_PROTO_A2A],
+                 (unsigned long long)s->by_proto[GW_FWD_PROTO_MCP],
+                 (unsigned long long)s->by_proto[GW_FWD_PROTO_OPENAI],
+                 (unsigned long long)s->by_proto[GW_FWD_PROTO_JSONRPC],
+                 (unsigned long long)s->forward_errors,
+                 (unsigned long long)s->timeout_errors,
+                 (unsigned long long)s->avg_latency_us,
+                 (unsigned long long)s->max_latency_us,
+                 (unsigned long long)s->min_latency_us,
+                 (unsigned long long)throughput,
+                 (unsigned long long)s->body_size_total,
+                 (unsigned long long)s->response_size_total);
 }

@@ -64,6 +64,7 @@ static void ensure_initialized(void)
     g_pattern_capacity = 32;
     g_patterns = AGENTOS_CALLOC(g_pattern_capacity, sizeof(sensitive_field_t));
     if (!g_patterns) {
+        SVC_LOG_ERROR("C-L02: SANITIZER: ALLOC-FAIL capacity=%zu", g_pattern_capacity);
         agentos_mutex_unlock(&g_mutex);
         return;
     }
@@ -174,8 +175,10 @@ static const char *find_value_end(const char *value_start)
  */
 static int sanitize_core(const char *message, char *buffer, size_t buffer_size)
 {
-    if (!message || !buffer || buffer_size == 0)
+    if (!message || !buffer || buffer_size == 0) {
+        SVC_LOG_ERROR("C-L02: SANITIZER: SANITIZE-FAIL reason=invalid_param");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     ensure_initialized();
 
@@ -212,6 +215,8 @@ static int sanitize_core(const char *message, char *buffer, size_t buffer_size)
                 size_t needed = field_name_len + 1 + repl_len + 1;
                 if ((size_t)(out_end - out) < needed) {
                     *out = '\0';
+                    SVC_LOG_ERROR("C-L02: SANITIZER: SANITIZE-FAIL reason=overflow buffer_size=%zu needed=%zu",
+                                  buffer_size, needed);
                     return AGENTOS_ERR_OVERFLOW;
                 }
 
@@ -264,6 +269,8 @@ void log_sanitizer_init(size_t max_fields)
 
     g_initialized = 1;
     agentos_mutex_unlock(&g_mutex);
+
+    SVC_LOG_INFO("C-L02: SANITIZER: INIT count=%zu capacity=%zu", g_pattern_count, g_pattern_capacity);
 }
 
 void log_sanitizer_destroy(void)
@@ -282,7 +289,7 @@ void log_sanitizer_destroy(void)
     agentos_mutex_unlock(&g_mutex);
     agentos_mutex_destroy(&g_mutex);
     g_mutex_initialized = 0;
-    SVC_LOG_INFO("Log sanitizer: destroyed");
+    SVC_LOG_INFO("C-L02: SANITIZER: DESTROY");
 }
 
 bool log_sanitizer_add_pattern(const char *pattern, const char *replacement)
@@ -295,6 +302,8 @@ bool log_sanitizer_add_pattern(const char *pattern, const char *replacement)
     ensure_initialized();
 
     if (g_pattern_count >= g_pattern_capacity) {
+        SVC_LOG_ERROR("C-L02: SANITIZER: ADD-PATTERN-FAIL pattern=%s count=%zu capacity=%zu",
+                      pattern, g_pattern_count, g_pattern_capacity);
         agentos_mutex_unlock(&g_mutex);
         return false;
     }
@@ -326,12 +335,15 @@ char *log_sanitize_dup(const char *message)
 
     char *buffer = AGENTOS_MALLOC(alloc_size);
     if (!buffer) {
+        SVC_LOG_ERROR("C-L02: SANITIZER: DUP-FAIL reason=alloc alloc_size=%zu", alloc_size);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;
     }
 
     int result = sanitize_core(message, buffer, alloc_size);
     if (result < 0) {
+        SVC_LOG_ERROR("C-L02: SANITIZER: SANITIZE-FAIL reason=sanitize_core_error result=%d alloc_size=%zu",
+                      result, alloc_size);
         AGENTOS_FREE(buffer);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         return NULL;

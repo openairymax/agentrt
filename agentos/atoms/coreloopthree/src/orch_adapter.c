@@ -105,8 +105,8 @@ static agentos_core_loop_t *acquire_loop_instance(orch_adapter_t *adapter)
 
         if (adapter->config.checkpoint_path) {
             safe_strcpy(loop_cfg.loop_config_checkpoint_path,
-                        adapter->config.checkpoint_path,
-                        sizeof(loop_cfg.loop_config_checkpoint_path));
+                        sizeof(loop_cfg.loop_config_checkpoint_path),
+                        adapter->config.checkpoint_path);
         }
 
         agentos_core_loop_t *loop = NULL;
@@ -472,4 +472,35 @@ bool orch_adapter_is_ready(orch_adapter_t *adapter)
 {
     if (!adapter) return false;
     return adapter->orch != NULL;
+}
+
+/* ==================== C-L06: 统计摘要 ==================== */
+
+void orch_adapter_dump_stats(orch_adapter_t *adapter)
+{
+    if (!adapter) {
+        AGENTOS_LOG_WARN("C-L06: ORCH-ADAPTER-STATS unavailable");
+        return;
+    }
+
+    uint64_t avg_step_latency_ms = 0;
+    if (adapter->total_steps > 0) {
+        avg_step_latency_ms = (uint64_t)(
+            (double)adapter->total_latency_us /
+            (double)adapter->total_steps / 1000.0);
+    }
+
+    AGENTOS_LOG_INFO("C-L06: ORCH-ADAPTER-STATS "
+                     "pipelines=%llu steps=%llu errors=%llu "
+                     "avg_step_latency=%llums "
+                     "instances=%u/%u "
+                     "checkpoint=%s llm=%s tool=%s",
+                     (unsigned long long)adapter->total_pipelines,
+                     (unsigned long long)adapter->total_steps,
+                     (unsigned long long)adapter->total_errors,
+                     (unsigned long long)avg_step_latency_ms,
+                     adapter->instance_count, adapter->max_instances,
+                     adapter->config.enable_checkpoint ? "on" : "off",
+                     adapter->llm_adapter ? "yes" : "no",
+                     adapter->tool_adapter ? "yes" : "no");
 }

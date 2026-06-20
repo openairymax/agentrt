@@ -288,17 +288,9 @@ int main(int argc, char *argv[])
                 SVC_LOG_WARN("Health check failed: unable to retrieve service stats");
             }
 
-            /* C-L11: 报告转发器健康状态 */
+            /* C-L11: 报告转发器统计 */
             if (g_forward && gw_forward_is_healthy(g_forward)) {
-                gw_forward_stats_t fwd_stats;
-                if (gw_forward_get_stats(g_forward, &fwd_stats) == 0 &&
-                    fwd_stats.total_forwarded > 0) {
-                    SVC_LOG_INFO("C-L11: Forwarder — forwarded=%llu errors=%llu "
-                                 "avg_latency=%lluus",
-                                 (unsigned long long)fwd_stats.total_forwarded,
-                                 (unsigned long long)fwd_stats.forward_errors,
-                                 (unsigned long long)fwd_stats.avg_latency_us);
-                }
+                gw_forward_dump_stats(g_forward, HEALTH_CHECK_INTERVAL);
             }
         }
     }

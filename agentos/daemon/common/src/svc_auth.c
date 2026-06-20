@@ -761,8 +761,9 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
     payload_padded = NULL;
 
     cJSON *payload = cJSON_Parse((const char *)payload_decoded);
+    AGENTOS_FREE(payload_decoded);
+    payload_decoded = NULL;
     if (!payload) {
-        AGENTOS_FREE(payload_decoded);
         result->error_message = "Invalid token payload";
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;

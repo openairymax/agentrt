@@ -34,17 +34,17 @@ int llm_router_init(const char *config_path)
     router_ctx_t *ctx = router_ctx_get();
 
     if (ctx->initialized) {
-        AGENTOS_LOG_INFO("LLMRouter: already initialized, skipping");
+        AGENTOS_LOG_INFO("C-L02: LLMRouter: already initialized, skipping");
         return 0;
     }
 
     AGENTOS_MEMSET(ctx, 0, sizeof(router_ctx_t));
     ctx->default_strategy = LLM_ROUTE_COST;
 
-    AGENTOS_LOG_INFO("LLMRouter: initializing with default_strategy=COST");
+    AGENTOS_LOG_INFO("C-L02: LLMRouter: initializing with default_strategy=COST");
 
     if (AGENTOS_MUTEX_INIT(&ctx->mutex, NULL) != 0) {
-        AGENTOS_LOG_ERROR("LLMRouter: failed to initialize mutex");
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: failed to initialize mutex STACK: llm_router_init");
         return -1;
     }
 
@@ -59,25 +59,25 @@ int llm_router_init(const char *config_path)
     ctx->cost_tracker = cost_tracker_create(default_rules,
         sizeof(default_rules) / sizeof(default_rules[0]));
     if (!ctx->cost_tracker) {
-        AGENTOS_LOG_ERROR("LLMRouter: failed to create cost_tracker");
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: failed to create cost_tracker STACK: llm_router_init");
         AGENTOS_MUTEX_DESTROY(&ctx->mutex);
         return -1;
     }
-    AGENTOS_LOG_INFO("LLMRouter: cost_tracker initialized with %zu pricing rules",
+    AGENTOS_LOG_INFO("C-L02: LLMRouter: cost_tracker initialized with %zu pricing rules",
                      sizeof(default_rules) / sizeof(default_rules[0]));
 
     /* 初始化 token 计数器 (P3.1.6) */
     ctx->token_counter = token_counter_create("cl100k_base");
     if (!ctx->token_counter) {
-        AGENTOS_LOG_WARN("LLMRouter: token_counter creation failed, "
+        AGENTOS_LOG_WARN("C-L02: LLMRouter: token_counter creation failed, "
                          "will use heuristic estimation");
     } else {
-        AGENTOS_LOG_INFO("LLMRouter: token_counter initialized (encoding=cl100k_base)");
+        AGENTOS_LOG_INFO("C-L02: LLMRouter: token_counter initialized (encoding=cl100k_base)");
     }
 
     ctx->initialized = true;
 
-    AGENTOS_LOG_INFO("LLMRouter: initialization complete (config=%s)",
+    AGENTOS_LOG_INFO("C-L02: LLMRouter: initialization complete (config=%s)",
                      config_path ? config_path : "default");
     (void)config_path;
     return 0;
@@ -88,11 +88,11 @@ void llm_router_destroy(void)
     router_ctx_t *ctx = router_ctx_get();
 
     if (!ctx->initialized) {
-        AGENTOS_LOG_DEBUG("LLMRouter: not initialized, skip destroy");
+        AGENTOS_LOG_DEBUG("C-L02: LLMRouter: not initialized, skip destroy");
         return;
     }
 
-    AGENTOS_LOG_INFO("LLMRouter: destroying (total_requests=%llu, "
+    AGENTOS_LOG_INFO("C-L02: LLMRouter: destroying (total_requests=%llu, "
                      "total_cost=$%.6f, total_tokens=%llu, fallbacks=%llu, errors=%llu)",
                      (unsigned long long)ctx->stats.total_requests,
                      ctx->stats.total_cost,
@@ -112,7 +112,7 @@ void llm_router_destroy(void)
     AGENTOS_MUTEX_DESTROY(&ctx->mutex);
     AGENTOS_MEMSET(ctx, 0, sizeof(router_ctx_t));
 
-    AGENTOS_LOG_INFO("LLMRouter: destroyed");
+    AGENTOS_LOG_INFO("C-L02: LLMRouter: destroyed");
 }
 
 /* ==================== 端点管理 ==================== */
@@ -122,15 +122,17 @@ int llm_router_register_endpoint(const llm_endpoint_t *endpoint)
     router_ctx_t *ctx = router_ctx_get();
 
     if (!endpoint) {
-        AGENTOS_LOG_ERROR("LLMRouter: register_endpoint called with NULL endpoint");
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: register_endpoint called with NULL endpoint STACK: llm_router_register_endpoint");
         return -1;
     }
 
     AGENTOS_MUTEX_LOCK(&ctx->mutex);
 
     if (ctx->endpoint_count >= LLM_ROUTER_MAX_ENDPOINTS) {
-        AGENTOS_LOG_ERROR("LLMRouter: endpoint limit reached (%zu/%d)",
-                          ctx->endpoint_count, LLM_ROUTER_MAX_ENDPOINTS);
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: endpoint limit reached (%zu/%d), "
+                          "cannot register %s/%s STACK: llm_router_register_endpoint",
+                          ctx->endpoint_count, LLM_ROUTER_MAX_ENDPOINTS,
+                          endpoint->provider_name, endpoint->model_name);
         AGENTOS_MUTEX_UNLOCK(&ctx->mutex);
         return -1;
     }
@@ -139,7 +141,7 @@ int llm_router_register_endpoint(const llm_endpoint_t *endpoint)
            sizeof(llm_endpoint_t));
     ctx->endpoint_count++;
 
-    AGENTOS_LOG_INFO("LLMRouter: registered endpoint %s/%s (total=%zu, "
+    AGENTOS_LOG_INFO("C-L02: LLMRouter: registered endpoint %s/%s (total=%zu, "
                      "caps=0x%x, cost=$%.6f/$%.6f, latency=%ums)",
                      endpoint->provider_name, endpoint->model_name,
                      ctx->endpoint_count,
@@ -157,7 +159,7 @@ int llm_router_unregister_endpoint(const char *provider_name,
     router_ctx_t *ctx = router_ctx_get();
 
     if (!provider_name || !model_name) {
-        AGENTOS_LOG_ERROR("LLMRouter: unregister_endpoint with NULL params");
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: unregister_endpoint with NULL params STACK: llm_router_unregister_endpoint");
         return -1;
     }
 
@@ -167,7 +169,7 @@ int llm_router_unregister_endpoint(const char *provider_name,
         llm_endpoint_t *ep = &ctx->endpoints[i];
         if (strcmp(ep->provider_name, provider_name) == 0 &&
             strcmp(ep->model_name, model_name) == 0) {
-            AGENTOS_LOG_INFO("LLMRouter: unregistering endpoint %s/%s",
+            AGENTOS_LOG_INFO("C-L02: LLMRouter: unregistering endpoint %s/%s",
                              provider_name, model_name);
             /* 用最后一个覆盖 */
             if (i < ctx->endpoint_count - 1) {
@@ -180,8 +182,9 @@ int llm_router_unregister_endpoint(const char *provider_name,
         }
     }
 
-    AGENTOS_LOG_WARN("LLMRouter: endpoint %s/%s not found for unregister",
-                     provider_name, model_name);
+    AGENTOS_LOG_WARN("C-L02: LLMRouter: endpoint %s/%s not found for unregister "
+                     "(total_endpoints=%zu) STACK: llm_router_unregister_endpoint",
+                     provider_name, model_name, ctx->endpoint_count);
     AGENTOS_MUTEX_UNLOCK(&ctx->mutex);
     return -1;
 }
@@ -194,12 +197,12 @@ int llm_router_route(const llm_route_request_t *request,
     router_ctx_t *ctx = router_ctx_get();
 
     if (!request || !result) {
-        AGENTOS_LOG_ERROR("LLMRouter: route called with NULL request or result");
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: route called with NULL request or result STACK: llm_router_route");
         return -1;
     }
 
     if (!ctx->initialized) {
-        AGENTOS_LOG_ERROR("LLMRouter: route called before initialization");
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: route called before initialization STACK: llm_router_route");
         return -1;
     }
 
@@ -208,10 +211,10 @@ int llm_router_route(const llm_route_request_t *request,
     llm_route_strategy_t strategy = request->strategy;
     if (strategy >= LLM_ROUTE_COUNT) {
         strategy = ctx->default_strategy;
-        AGENTOS_LOG_DEBUG("LLMRouter: invalid strategy, using default=%d", strategy);
+        AGENTOS_LOG_DEBUG("C-L02: LLMRouter: invalid strategy, using default=%d", strategy);
     }
 
-    AGENTOS_LOG_DEBUG("LLMRouter: routing request (strategy=%d, caps=0x%x, "
+    AGENTOS_LOG_DEBUG("C-L02: LLMRouter: routing request (strategy=%d, caps=0x%x, "
                       "max_cost=$%.6f, max_latency=%ums, prompt_len=%zu)",
                       strategy, request->required_caps,
                       request->max_cost, request->max_latency_ms,
@@ -226,7 +229,7 @@ int llm_router_route(const llm_route_request_t *request,
         ret = route_cost_aware(request, result);
         /* 如果成本路由失败，降级到轮询 */
         if (ret != 0) {
-            AGENTOS_LOG_WARN("LLMRouter: cost_aware failed, falling back to round_robin");
+            AGENTOS_LOG_WARN("C-L02: LLMRouter: cost_aware failed, falling back to round_robin");
             ctx->stats.fallback_count++;
             AGENTOS_MEMSET(result, 0, sizeof(llm_route_result_t));
             ret = route_round_robin(request, result);
@@ -252,12 +255,12 @@ int llm_router_route(const llm_route_request_t *request,
         /* 降级路由：尝试所有端点，返回第一个可用的 */
         ret = route_round_robin(request, result);
         if (ret != 0) {
-            AGENTOS_LOG_DEBUG("LLMRouter: fallback round_robin failed, "
+            AGENTOS_LOG_DEBUG("C-L02: LLMRouter: fallback round_robin failed, "
                               "trying cost_aware");
             ret = route_cost_aware(request, result);
         }
         if (ret != 0) {
-            AGENTOS_LOG_DEBUG("LLMRouter: fallback cost_aware failed, "
+            AGENTOS_LOG_DEBUG("C-L02: LLMRouter: fallback cost_aware failed, "
                               "trying least_latency");
             ret = route_least_latency(request, result);
         }
@@ -279,7 +282,7 @@ int llm_router_route(const llm_route_request_t *request,
             ctx->stats.total_tokens +=
                 router_estimate_tokens(request->prompt, request->prompt_len);
         }
-        AGENTOS_LOG_INFO("LLMRouter: routed via %s -> %s/%s "
+        AGENTOS_LOG_INFO("C-L02: LLMRouter: routed via %s -> %s/%s "
                          "(cost=$%.6f, latency=%ums, confidence=%d%%)",
                          strategy_name,
                          result->provider_name, result->model_name,
@@ -287,9 +290,13 @@ int llm_router_route(const llm_route_request_t *request,
                          result->confidence);
     } else {
         ctx->stats.error_count++;
-        AGENTOS_LOG_ERROR("LLMRouter: all routing strategies failed for request "
-                          "(strategy=%d, caps=0x%x)",
-                          strategy, request->required_caps);
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: all routing strategies failed for request "
+                          "(strategy=%d, caps=0x%x, max_cost=$%.6f, "
+                          "max_latency=%ums, prompt_len=%zu, "
+                          "total_endpoints=%zu) STACK: llm_router_route",
+                          strategy, request->required_caps,
+                          request->max_cost, request->max_latency_ms,
+                          request->prompt_len, ctx->endpoint_count);
     }
     AGENTOS_MUTEX_UNLOCK(&ctx->mutex);
 
@@ -303,7 +310,7 @@ int llm_router_get_stats(llm_router_stats_t *stats)
     router_ctx_t *ctx = router_ctx_get();
 
     if (!stats) {
-        AGENTOS_LOG_ERROR("LLMRouter: get_stats called with NULL stats");
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: get_stats called with NULL stats STACK: llm_router_get_stats");
         return -1;
     }
 
@@ -311,7 +318,7 @@ int llm_router_get_stats(llm_router_stats_t *stats)
     memcpy(stats, &ctx->stats, sizeof(llm_router_stats_t));
     AGENTOS_MUTEX_UNLOCK(&ctx->mutex);
 
-    AGENTOS_LOG_DEBUG("LLMRouter: stats queried (total=%llu, cost=$%.6f)",
+    AGENTOS_LOG_DEBUG("C-L02: LLMRouter: stats queried (total=%llu, cost=$%.6f)",
                       (unsigned long long)stats->total_requests,
                       stats->total_cost);
 
@@ -323,7 +330,7 @@ int llm_router_set_default_strategy(llm_route_strategy_t strategy)
     router_ctx_t *ctx = router_ctx_get();
 
     if (strategy >= LLM_ROUTE_COUNT) {
-        AGENTOS_LOG_ERROR("LLMRouter: invalid strategy %d", strategy);
+        AGENTOS_LOG_ERROR("C-L02: LLMRouter: invalid strategy %d STACK: llm_router_set_default_strategy", strategy);
         return -1;
     }
 
@@ -332,7 +339,7 @@ int llm_router_set_default_strategy(llm_route_strategy_t strategy)
     ctx->default_strategy = strategy;
     AGENTOS_MUTEX_UNLOCK(&ctx->mutex);
 
-    AGENTOS_LOG_INFO("LLMRouter: default strategy changed %d -> %d",
+    AGENTOS_LOG_INFO("C-L02: LLMRouter: default strategy changed %d -> %d",
                      old, strategy);
 
     return 0;

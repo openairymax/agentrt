@@ -331,13 +331,16 @@ quality_checks_fallback() {
     if command -v clang-format &>/dev/null; then
         log_info "Checking code format with clang-format..."
         local format_issues=0
+        local fmt_count=0
         while IFS= read -r -d '' file; do
+            [[ $fmt_count -ge 50 ]] && break
             if ! clang-format --dry-run --Werror "$file" &>/dev/null; then
                 ((format_issues++))
                 log_warn "Format issue: $file"
             fi
+            ((fmt_count++)) || true
         done < <(find "${PROJECT_ROOT}/agentos" \( -name "*.c" -o -name "*.h" \) \
-            ! -path "*/tests/*" -print0 2>/dev/null | head -z -50)
+            ! -path "*/tests/*" -print0 2>/dev/null)
 
         if [[ $format_issues -gt 0 ]]; then
             log_warn "clang-format: $format_issues file(s) need formatting"
@@ -350,15 +353,18 @@ quality_checks_fallback() {
     if command -v python3 &>/dev/null; then
         log_info "Checking Python syntax..."
         local py_errors=0
+        local py_count=0
         while IFS= read -r -d '' file; do
+            [[ $py_count -ge 100 ]] && break
             if ! python3 -m py_compile "$file" 2>/dev/null; then
                 ((py_errors++))
                 log_warn "Syntax error: $file"
             fi
+            ((py_count++)) || true
         done < <(find "${PROJECT_ROOT}" -name "*.py" \
             ! -path "*/__pycache__/*" ! -path "*/.git/*" \
             ! -path "*/node_modules/*" ! -path "*/venv/*" \
-            -print0 2>/dev/null | head -z -100)
+            -print0 2>/dev/null)
 
         if [[ $py_errors -eq 0 ]]; then
             log_ok "Python syntax check: All files valid"
