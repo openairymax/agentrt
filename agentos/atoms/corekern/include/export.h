@@ -1,6 +1,6 @@
 /**
  * @file export.h
- * @brief AgentOS 符号导出管理
+ * @brief AgentRT 符号导出管理
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.

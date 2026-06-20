@@ -1,3 +1,4 @@
+// @owner: team-B
 #define GATEWAY_API_IMPLEMENTATION
 #include "error.h"
 #include "gateway_compat.h"

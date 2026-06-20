@@ -193,7 +193,7 @@ const char *agentos_build_info(void)
 
     if (build_info[0] == '\0') {
         snprintf(build_info, sizeof(build_info),
-                 "AgentOS v%s | Compiler: %s | Platform: %s | Build: %s %s", "0.1.0", "gcc",
+                 "AgentRT v%s | Compiler: %s | Platform: %s | Build: %s %s", "0.1.0", "gcc",
                  "linux", __DATE__, __TIME__);
     }
 

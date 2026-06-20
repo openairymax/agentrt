@@ -12,6 +12,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #include "http_gateway_routes.h"
 
 #include "gateway_rate_limiter.h"
@@ -456,7 +457,7 @@ int handle_http_request(void *cls, struct MHD_Connection *connection, const char
             struct MHD_Response *response = MHD_create_response_from_buffer(
                 strlen(error_response), (void *)error_response, MHD_RESPMEM_PERSISTENT);
             MHD_add_response_header(response, "Content-Type", "application/json");
-            MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
+            MHD_add_response_header(response, "Server", "AgentRT-gateway/1.0");
             int ret = MHD_queue_response(connection, 429, response);
             MHD_destroy_response(response);
             return ret;

@@ -71,8 +71,19 @@ COMMAND_INJECTION_PATTERN = re.compile(
     r'(?:system|popen)\s*\(\s*[^"\s]+\w'
 )
 
+# BAN-192: 安全扫描正则精准化 — 禁止宽泛 Base64 超敏感匹配
+# 仅匹配已知密钥格式，避免误报（如 password = "test"）
 HARDCODED_SECRET_PATTERN = re.compile(
-    r'(?:password|secret|api_key|token|private_key)\s*=\s*"[^"]{4,}"',
+    r'(?:password|secret|api_key|token|private_key|auth_token|access_key)\s*=\s*"('
+    r'sk-(?:proj-)?[a-zA-Z0-9]{32,}'  # OpenAI / Stripe 密钥
+    r'|AKIA[0-9A-Z]{16}'              # AWS Access Key ID
+    r'|ghp_[a-zA-Z0-9]{36}'           # GitHub Personal Access Token
+    r'|ghs_[a-zA-Z0-9]{36}'           # GitHub Server-to-Server Token
+    r'|xox[bprs]-[a-zA-Z0-9-]+'       # Slack Bot/User Token
+    r'|glpat-[a-zA-Z0-9_-]{20,}'      # GitLab Personal Access Token
+    r'|eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}'  # JWT Token
+    r'|[A-Za-z0-9+/]{32,}={0,2}'      # Generic Base64 high-entropy secret
+    r')"',
     re.IGNORECASE
 )
 

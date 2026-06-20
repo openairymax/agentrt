@@ -1,6 +1,6 @@
 /**
  * @file private.h
- * @brief AgentOS 数据分区内部头文件
+ * @brief AgentRT 数据分区内部头文件
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #ifndef AGENTOS_heapstore_PRIVATE_H
 #define AGENTOS_heapstore_PRIVATE_H
 

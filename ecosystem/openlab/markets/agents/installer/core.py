@@ -22,7 +22,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ecosystem.openlab.markets.client import (
+from ...client import (
     AgentInfo,
     InstallRequest,
     InstallResult,
@@ -167,7 +167,7 @@ class AgentInstaller:
         # Step 3: Search for agent in registry
         self._add_step(result, "search", "started")
         try:
-            from ecosystem.openlab.markets.client.models import SearchParams
+            from ...client.models import SearchParams
             agents = self._market_client.search_agents(
                 SearchParams(query=resolved_id, limit=5)
             )
@@ -273,7 +273,7 @@ class AgentInstaller:
         result.version = contract.get("version", "0.0.0")
 
         # Validate contract
-        from ecosystem.openlab.markets.agents.contracts.validator import (
+        from ..contracts.validator import (
             AgentContractValidator,
         )
         validator = AgentContractValidator()

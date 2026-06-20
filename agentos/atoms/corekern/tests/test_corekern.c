@@ -1053,7 +1053,7 @@ static void test_api_version_constants(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS corekern 深度单元测试套件\n");
+    printf("  AgentRT corekern 深度单元测试套件\n");
     printf("  P1-C05: 目标覆盖率 >60%%\n");
     printf("========================================\n");
 

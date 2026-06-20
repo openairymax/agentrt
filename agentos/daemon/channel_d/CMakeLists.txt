@@ -73,6 +73,7 @@ if(AGENTOS_HAS_CMOCKA)
     target_include_directories(test_channel_e2e PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMONS_INCLUDE_DIR}/utils/string/include
     )
     target_link_libraries(test_channel_e2e PRIVATE
         ${CMOCKA_LIBRARIES}
@@ -89,6 +90,7 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMONS_DIR}/tests/utils
+        ${COMMONS_INCLUDE_DIR}/utils/string/include
     )
     target_link_libraries(test_channel_e2e PRIVATE Threads::Threads agentos_platform_libs svc_common agentos_common)
     target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)

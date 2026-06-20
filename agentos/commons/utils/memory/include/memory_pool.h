@@ -257,6 +257,44 @@ void memory_pool_set_name(memory_pool_t *pool, const char *name);
  */
 memory_pool_t *memory_pool_create_default(size_t block_size);
 
+/* ==================== P1.20.3: 批量操作 API ==================== */
+
+/**
+ * @brief P1.20.3: 批量分配内存块（单次锁获取）
+ *
+ * @ownership alloc — 返回的内存块由调用者持有，需逐个通过 memory_pool_free 归还
+ *
+ * 一次锁操作分配多个内存块，减少锁竞争开销。
+ * 专为 tcache 批量填充设计，也可用于其他批量分配场景。
+ *
+ * @param[in]  pool       内存池句柄
+ * @param[in]  count      请求分配的块数
+ * @param[out] out_blocks 输出块指针数组（调用者分配，大小 >= count）
+ * @return 实际分配的块数（可能 < count 如果池已空）
+ *
+ * @note 返回的块未初始化
+ * @note 性能：比循环调用 memory_pool_alloc 减少 N-1 次锁操作
+ */
+size_t memory_pool_batch_alloc(memory_pool_t *pool, size_t count, void **out_blocks);
+
+/**
+ * @brief P1.20.3: 批量释放内存块（单次锁获取）
+ *
+ * @ownership release — 释放 blocks 中所有指针的所有权
+ *
+ * 一次锁操作释放多个内存块，减少锁竞争开销。
+ * 专为 tcache 批量归还设计，也可用于其他批量释放场景。
+ *
+ * @param[in] pool   内存池句柄
+ * @param[in] blocks 要释放的块指针数组
+ * @param[in] count  块数量
+ * @return 成功释放的块数
+ *
+ * @note 无效块（NULL 或不属于此池）会被跳过
+ * @note 性能：比循环调用 memory_pool_free 减少 N-1 次锁操作
+ */
+size_t memory_pool_batch_free(memory_pool_t *pool, void **blocks, size_t count);
+
 /** @} */  // end of memory_pool_api
 
 #ifdef __cplusplus

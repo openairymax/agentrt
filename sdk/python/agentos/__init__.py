@@ -1,9 +1,9 @@
-# AgentOS Python SDK
+# AgentRT Python SDK
 # Version: 0.1.0
 # Last updated: 2026-04-06
 
 """
-AgentOS Python SDK - AgentOS 系统的生产级 Python 接口
+AgentRT Python SDK - AgentOS 系统的生产级 Python 接口
 
 功能特性：
     - 高级业务模块（任务、记忆、会话、技能）

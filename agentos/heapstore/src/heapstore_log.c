@@ -1,6 +1,6 @@
 /**
  * @file heapstore_log.c
- * @brief AgentOS 数据分区日志管理实现
+ * @brief AgentRT 数据分区日志管理实现
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #include "heapstore_log.h"
 
 #include "platform.h"

@@ -4,7 +4,7 @@
  *
  * @module_positioning 模块定位说明
  *
- * 本模块位于 AgentOS commons 的 utils/platform/ 目录下，
+ * 本模块位于 AgentRT commons 的 utils/platform/ 目录下，
  * 提供面向应用层的高级跨平台工具功能。
  *
  * ## 与顶层 platform/ 模块的区别
@@ -20,7 +20,7 @@
  *
  * ## 设计理念
  *
- * 遵循 AgentOS 五维正交体系中的"工程维度"原则：
+ * 遵循 AgentRT 五维正交体系中的"工程维度"原则：
  * - ✅ 统一接口: 所有平台差异通过本模块透明处理
  * - ✅ 最小惊讶: API 设计符合直觉，参数语义清晰
  * - ✅ 渐进式迁移: 可逐步替换原有平台相关代码

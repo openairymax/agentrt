@@ -12,6 +12,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #include "http_gateway.h"
 
 #include "../../../commons/utils/error/include/error.h"
@@ -128,7 +129,7 @@ create_http_response_ex(http_gateway_t *gateway, struct MHD_Connection *connecti
     }
 
     MHD_add_response_header(response, "Content-Type", "application/json");
-    MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
+    MHD_add_response_header(response, "Server", "AgentRT-gateway/1.0");
 
     gateway_apply_security_headers(response);
 
@@ -175,7 +176,7 @@ struct MHD_Response *create_http_response(int status_code, const char *content, 
     }
 
     MHD_add_response_header(response, "Content-Type", "application/json");
-    MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
+    MHD_add_response_header(response, "Server", "AgentRT-gateway/1.0");
 
     gateway_apply_security_headers(response);
 

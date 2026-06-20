@@ -1,6 +1,6 @@
 /**
  * @file observability.c
- * @brief AgentOS 可观测性子系统实现
+ * @brief AgentRT 可观测性子系统实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 提供生产级可观测性功能：指标收集、健康检查、分布式追踪、性能监控

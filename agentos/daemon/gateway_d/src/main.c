@@ -93,7 +93,7 @@ static void svc_log_toggle_handler(int sig)
 static void print_usage(const char *prog)
 {
     char buf[256];
-    fputs("AgentOS Gateway Daemon\n", stdout);
+    fputs("AgentRT Gateway Daemon\n", stdout);
     snprintf(buf, sizeof(buf), "Usage: %s [options]\n\n", prog);
     fputs(buf, stdout);
     fputs("Options:\n", stdout);
@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
         goto cleanup_service;
     }
 
-    SVC_LOG_INFO("AgentOS Gateway Daemon started");
+    SVC_LOG_INFO("AgentRT Gateway Daemon started");
     SVC_LOG_INFO("  HTTP:     %s:%d %s", config.http.host, config.http.port,
                  config.http.enabled ? "[enabled]" : "[disabled]");
     SVC_LOG_INFO("  WebSocket: %s:%d %s", config.ws.host, config.ws.port,
@@ -288,17 +288,9 @@ int main(int argc, char *argv[])
                 SVC_LOG_WARN("Health check failed: unable to retrieve service stats");
             }
 
-            /* C-L11: 报告转发器健康状态 */
+            /* C-L11: 报告转发器统计 */
             if (g_forward && gw_forward_is_healthy(g_forward)) {
-                gw_forward_stats_t fwd_stats;
-                if (gw_forward_get_stats(g_forward, &fwd_stats) == 0 &&
-                    fwd_stats.total_forwarded > 0) {
-                    SVC_LOG_INFO("C-L11: Forwarder — forwarded=%llu errors=%llu "
-                                 "avg_latency=%lluus",
-                                 (unsigned long long)fwd_stats.total_forwarded,
-                                 (unsigned long long)fwd_stats.forward_errors,
-                                 (unsigned long long)fwd_stats.avg_latency_us);
-                }
+                gw_forward_dump_stats(g_forward, HEALTH_CHECK_INTERVAL);
             }
         }
     }

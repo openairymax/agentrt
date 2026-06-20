@@ -20,7 +20,7 @@ void test_file_operations()
     printf("=== 测试文件操作 ===\n");
 
     const char *test_file = "test_file.txt";
-    const char *test_content = "This is a test file for AgentOS utils.";
+    const char *test_content = "This is a test file for AgentRT utils.";
 
     // 测试文件写入
     int result = agentos_io_write_file(test_file, test_content, strlen(test_content));

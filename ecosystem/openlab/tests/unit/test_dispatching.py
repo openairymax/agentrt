@@ -19,7 +19,7 @@ class TestAgentMetrics:
 
     def test_agent_metrics_creation(self):
         """Test AgentMetrics can be created."""
-        from openlab.contrib.strategies.dispatching import AgentMetrics
+        from contrib.strategies.dispatching.dispatching import AgentMetrics
 
         metrics = AgentMetrics(agent_id="agent-001")
         assert metrics.agent_id == "agent-001"
@@ -29,7 +29,7 @@ class TestAgentMetrics:
 
     def test_agent_metrics_with_values(self):
         """Test AgentMetrics with custom values."""
-        from openlab.contrib.strategies.dispatching import AgentMetrics
+        from contrib.strategies.dispatching.dispatching import AgentMetrics
 
         metrics = AgentMetrics(
             agent_id="agent-002",
@@ -54,7 +54,7 @@ class TestTaskContext:
 
     def test_task_context_creation(self):
         """Test TaskContext can be created."""
-        from openlab.contrib.strategies.dispatching import TaskContext
+        from contrib.strategies.dispatching.dispatching import TaskContext
 
         context = TaskContext(task_id="task-001")
         assert context.task_id == "task-001"
@@ -63,7 +63,7 @@ class TestTaskContext:
 
     def test_task_context_with_requirements(self):
         """Test TaskContext with requirements."""
-        from openlab.contrib.strategies.dispatching import TaskContext
+        from contrib.strategies.dispatching.dispatching import TaskContext
 
         context = TaskContext(
             task_id="task-002",
@@ -86,7 +86,7 @@ class TestDispatchStrategy:
 
     def test_strategy_stats(self):
         """Test strategy statistics tracking."""
-        from openlab.contrib.strategies.dispatching import WeightedRoundRobinStrategy
+        from contrib.strategies.dispatching.dispatching import WeightedRoundRobinStrategy
 
         strategy = WeightedRoundRobinStrategy()
         stats = strategy.get_stats()
@@ -102,7 +102,7 @@ class TestWeightedRoundRobinStrategy:
     @pytest.fixture
     def strategy(self):
         """Create a test strategy."""
-        from openlab.contrib.strategies.dispatching import WeightedRoundRobinStrategy
+        from contrib.strategies.dispatching.dispatching import WeightedRoundRobinStrategy
         return WeightedRoundRobinStrategy()
 
     def test_strategy_creation(self, strategy):
@@ -111,7 +111,7 @@ class TestWeightedRoundRobinStrategy:
 
     def test_select_single_candidate(self, strategy):
         """Test selecting from single candidate."""
-        from openlab.contrib.strategies.dispatching import AgentMetrics
+        from contrib.strategies.dispatching.dispatching import AgentMetrics
 
         candidates = [AgentMetrics(agent_id="agent-001")]
         selected = strategy.select(candidates)
@@ -126,7 +126,7 @@ class TestWeightedRoundRobinStrategy:
 
     def test_select_multiple_candidates(self, strategy):
         """Test selecting from multiple candidates."""
-        from openlab.contrib.strategies.dispatching import AgentMetrics
+        from contrib.strategies.dispatching.dispatching import AgentMetrics
 
         candidates = [
             AgentMetrics(agent_id="agent-001", weight=1.0),
@@ -139,7 +139,7 @@ class TestWeightedRoundRobinStrategy:
 
     def test_select_with_weights(self):
         """Test selection with custom weights."""
-        from openlab.contrib.strategies.dispatching import (
+        from contrib.strategies.dispatching.dispatching import (
             WeightedRoundRobinStrategy,
             AgentMetrics
         )
@@ -165,7 +165,7 @@ class TestWeightedRoundRobinStrategy:
 
     def test_stats_update(self, strategy):
         """Test statistics are updated after selection."""
-        from openlab.contrib.strategies.dispatching import AgentMetrics
+        from contrib.strategies.dispatching.dispatching import AgentMetrics
 
         candidates = [AgentMetrics(agent_id="agent-001")]
         strategy.select(candidates)
@@ -181,7 +181,7 @@ class TestPriorityBasedStrategy:
     @pytest.fixture
     def strategy(self):
         """Create a test strategy."""
-        from openlab.contrib.strategies.dispatching import PriorityBasedStrategy
+        from contrib.strategies.dispatching.dispatching import PriorityBasedStrategy
         return PriorityBasedStrategy()
 
     def test_strategy_creation(self, strategy):
@@ -190,7 +190,7 @@ class TestPriorityBasedStrategy:
 
     def test_select_highest_priority(self, strategy):
         """Test selecting agent with highest priority."""
-        from openlab.contrib.strategies.dispatching import AgentMetrics
+        from contrib.strategies.dispatching.dispatching import AgentMetrics
 
         candidates = [
             AgentMetrics(agent_id="agent-001", priority=5),
@@ -209,7 +209,7 @@ class TestLeastLoadedStrategy:
     @pytest.fixture
     def strategy(self):
         """Create a test strategy."""
-        from openlab.contrib.strategies.dispatching import LeastLoadedStrategy
+        from contrib.strategies.dispatching.dispatching import LeastLoadedStrategy
         return LeastLoadedStrategy()
 
     def test_strategy_creation(self, strategy):
@@ -218,7 +218,7 @@ class TestLeastLoadedStrategy:
 
     def test_select_least_loaded(self, strategy):
         """Test selecting agent with least load."""
-        from openlab.contrib.strategies.dispatching import AgentMetrics
+        from contrib.strategies.dispatching.dispatching import AgentMetrics
 
         candidates = [
             AgentMetrics(agent_id="agent-001", current_load=0.8),
@@ -238,7 +238,7 @@ class TestAdaptiveMLStrategy:
     @pytest.fixture
     def strategy(self):
         """Create a test strategy."""
-        from openlab.contrib.strategies.dispatching import AdaptiveMLStrategy
+        from contrib.strategies.dispatching.dispatching import AdaptiveMLStrategy
         return AdaptiveMLStrategy()
 
     def test_strategy_creation(self, strategy):
@@ -247,7 +247,7 @@ class TestAdaptiveMLStrategy:
 
     def test_select_adaptive(self, strategy):
         """Test adaptive selection."""
-        from openlab.contrib.strategies.dispatching import AgentMetrics, TaskContext
+        from contrib.strategies.dispatching.dispatching import AgentMetrics, TaskContext
 
         candidates = [
             AgentMetrics(

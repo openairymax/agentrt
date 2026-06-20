@@ -4,7 +4,7 @@
 
 ## 概述
 
-`daemon/notify_d/` 是 AgentRT 的多协议通知守护进程，负责系统事件的广播与推送。它支持 WebSocket、Unix Socket 和 SSE（Server-Sent Events）三种客户端协议，提供事件队列管理、频道订阅过滤和实时广播能力，是 AgentOS 事件驱动架构的核心通知枢纽。
+`daemon/notify_d/` 是 AgentRT 的多协议通知守护进程，负责系统事件的广播与推送。它支持 WebSocket、Unix Socket 和 SSE（Server-Sent Events）三种客户端协议，提供事件队列管理、频道订阅过滤和实时广播能力，是 AgentRT 事件驱动架构的核心通知枢纽。
 
 ### 架构定位
 

@@ -27,11 +27,11 @@ extern void agentos_sys_set_memory_provider(void *provider);
 #else
 #include <cjson/cJSON.h>
 #include "error.h"
+#endif
 
 #define TASK_RET_ERR(c) \
     do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
          agentos_error_str(c)); return (c); } while(0)
-#endif
 
 static agentos_cognition_engine_t *g_cognition = NULL;
 static agentos_execution_engine_t *g_execution = NULL;

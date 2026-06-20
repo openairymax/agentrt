@@ -109,11 +109,14 @@ typedef struct {
     bool memoryrovol_available;
 } mrb_bridge_impl_t;
 
-struct mrb_bridge_s {
+struct memoryrovol_bridge_s {
     mrb_bridge_impl_t impl;
 };
 
 /* ==================== 辅助函数 ==================== */
+
+/* 前向声明 */
+static void mrb_bridge_destroy(mrb_bridge_t *bridge);
 
 static bool is_memoryrovol_linked(void)
 {
@@ -517,7 +520,6 @@ mrb_bridge_t *mrb_bridge_create(const mrb_config_t *config)
             /* 设置双向同步 */
             impl->builtin->sync_target = impl->rovol;
             impl->rovol->sync_target = impl->builtin;
-            impl->enable_sync = impl->config.enable_sync;
 
             /* 根据配置选择活跃提供商 */
             if (impl->config.provider_type == MRB_PROVIDER_MEMORYROVOL) {
@@ -531,7 +533,7 @@ mrb_bridge_t *mrb_bridge_create(const mrb_config_t *config)
             SVC_LOG_INFO("C-L12: Hybrid mode — builtin=%p, rovol=%p, active=%s, sync=%s",
                          (void *)impl->builtin, (void *)impl->rovol,
                          impl->active_type == MRB_PROVIDER_MEMORYROVOL ? "MemoryRovol" : "builtin",
-                         impl->enable_sync ? "enabled" : "disabled");
+                         impl->config.enable_sync ? "enabled" : "disabled");
         } else {
             SVC_LOG_WARN("C-L12: Hybrid mode — MemoryRovol provider creation failed, "
                          "falling back to builtin");
@@ -639,6 +641,13 @@ int mrb_bridge_switch_provider(mrb_bridge_t *bridge, mrb_provider_type_t type)
         }
         target = impl->rovol;
         break;
+    case MRB_PROVIDER_HYBRID:
+        /* HYBRID: 优先 MemoryRovol，降级到内置 */
+        if (impl->memoryrovol_available && impl->rovol)
+            target = impl->rovol;
+        else
+            target = impl->builtin;
+        break;
     case MRB_PROVIDER_AUTO:
         /* AUTO: HYBRID模式下优先MemoryRovol，否则内置 */
         if (impl->memoryrovol_available && impl->rovol)
@@ -681,6 +690,7 @@ int mrb_bridge_select_from_config(mrb_bridge_t *bridge, const char *config_yaml)
     if (!bridge || !config_yaml)
         return -1;
 
+    __attribute__((unused))
     mrb_bridge_impl_t *impl = &bridge->impl;
 
     /* 解析 memory.provider 配置 */

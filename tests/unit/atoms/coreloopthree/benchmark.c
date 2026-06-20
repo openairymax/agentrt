@@ -14,7 +14,6 @@
 #include "string_compat.h"
 #include <string.h>
 #include <time.h>
-#include "strategy.h"
 
 /**
  * @brief 基准测试：任务提交性能
@@ -27,7 +26,7 @@ static void benchmark_task_submit() {
         return;
     }
 
-    const char* input = "帮我分析最近的销售数�?;
+    const char* input = "帮我分析最近的销售数据";
     size_t input_len = strlen(input);
     int num_tasks = 1000;
     char** task_ids;
@@ -35,7 +34,6 @@ static void benchmark_task_submit() {
     if (!task_ids) {
         agentos_loop_destroy(loop);
         return;
-        // From data intelligence emerges. by spharx
     }
 
     clock_t start = clock();
@@ -52,7 +50,6 @@ static void benchmark_task_submit() {
     printf("benchmark_task_submit: %d tasks in %.3f seconds (%.3f tasks/sec)\n",
            num_tasks, elapsed, num_tasks / elapsed);
 
-    // 释放任务 ID
     for (int i = 0; i < num_tasks; i++) {
         if (task_ids[i]) {
             AGENTOS_FREE(task_ids[i]);
@@ -74,7 +71,6 @@ static void benchmark_task_query() {
         return;
     }
 
-    // 提交多个任务
     int num_tasks = 1000;
     char** task_ids;
     SAFE_MALLOC_ARRAY(task_ids, num_tasks, sizeof(char*));
@@ -86,19 +82,19 @@ static void benchmark_task_query() {
     for (int i = 0; i < num_tasks; i++) {
         agentos_task_t task = {
             .task_id = NULL,
-            .id_len = 0,
-            .agent_id = "test_agent",
-            .agent_id_len = strlen("test_agent"),
-            .status = TASK_STATUS_PENDING,
-            .input = NULL,
-            .output = NULL,
-            .created_ns = 0,
-            .started_ns = 0,
-            .completed_ns = 0,
-            .timeout_ms = 1000,
-            .retry_count = 0,
-            .max_retries = 3,
-            .error_msg = NULL
+            .task_id_len = 0,
+            .task_agent_id = "test_agent",
+            .task_agent_id_len = strlen("test_agent"),
+            .task_status = TASK_STATUS_PENDING,
+            .task_input = NULL,
+            .task_output = NULL,
+            .task_created_ns = 0,
+            .task_started_ns = 0,
+            .task_completed_ns = 0,
+            .task_timeout_ms = 1000,
+            .task_retry_count = 0,
+            .task_max_retries = 3,
+            .task_error_msg = NULL
         };
 
         err = agentos_execution_submit(engine, &task, &task_ids[i]);
@@ -108,7 +104,6 @@ static void benchmark_task_query() {
         }
     }
 
-    // 测试查询性能
     clock_t start = clock();
     for (int i = 0; i < num_tasks; i++) {
         if (task_ids[i]) {
@@ -126,7 +121,6 @@ static void benchmark_task_query() {
     printf("benchmark_task_query: %d queries in %.3f seconds (%.3f queries/sec)\n",
            num_tasks, elapsed, num_tasks / elapsed);
 
-    // 释放任务 ID
     for (int i = 0; i < num_tasks; i++) {
         if (task_ids[i]) {
             AGENTOS_FREE(task_ids[i]);
@@ -157,18 +151,18 @@ static void benchmark_memory_write() {
     }
 
     agentos_memory_record_t record = {
-        .record_id = NULL,
-        .id_len = 0,
-        .type = MEMORY_TYPE_RAW,
-        .timestamp_ns = 0,
-        .source_agent = "test_agent",
-        .source_len = strlen("test_agent"),
-        .trace_id = "test_trace",
-        .trace_len = strlen("test_trace"),
-        .data = (void*)"test data",
-        .data_len = strlen("test data"),
-        .importance = 0.5,
-        .access_count = 0
+        .memory_record_id = NULL,
+        .memory_record_id_len = 0,
+        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_timestamp_ns = 0,
+        .memory_record_source_agent = "test_agent",
+        .memory_record_source_len = strlen("test_agent"),
+        .memory_record_trace_id = "test_trace",
+        .memory_record_trace_len = strlen("test_trace"),
+        .memory_record_data = (void*)"test data",
+        .memory_record_data_len = strlen("test data"),
+        .memory_record_importance = 0.5f,
+        .memory_record_access_count = 0
     };
 
     clock_t start = clock();
@@ -185,7 +179,6 @@ static void benchmark_memory_write() {
     printf("benchmark_memory_write: %d records in %.3f seconds (%.3f records/sec)\n",
            num_records, elapsed, num_records / elapsed);
 
-    // 释放记录 ID
     for (int i = 0; i < num_records; i++) {
         if (record_ids[i]) {
             AGENTOS_FREE(record_ids[i]);
@@ -207,22 +200,21 @@ static void benchmark_memory_query() {
         return;
     }
 
-    // 写入一些记�?
     int num_records = 1000;
     for (int i = 0; i < num_records; i++) {
         agentos_memory_record_t record = {
-            .record_id = NULL,
-            .id_len = 0,
-            .type = MEMORY_TYPE_RAW,
-            .timestamp_ns = 0,
-            .source_agent = "test_agent",
-            .source_len = strlen("test_agent"),
-            .trace_id = "test_trace",
-            .trace_len = strlen("test_trace"),
-            .data = (void*)"test data",
-            .data_len = strlen("test data"),
-            .importance = 0.5,
-            .access_count = 0
+            .memory_record_id = NULL,
+            .memory_record_id_len = 0,
+            .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+            .memory_record_timestamp_ns = 0,
+            .memory_record_source_agent = "test_agent",
+            .memory_record_source_len = strlen("test_agent"),
+            .memory_record_trace_id = "test_trace",
+            .memory_record_trace_len = strlen("test_trace"),
+            .memory_record_data = (void*)"test data",
+            .memory_record_data_len = strlen("test data"),
+            .memory_record_importance = 0.5f,
+            .memory_record_access_count = 0
         };
 
         char* record_id = NULL;
@@ -232,17 +224,16 @@ static void benchmark_memory_query() {
         }
     }
 
-    // 测试查询性能
     agentos_memory_query_t query = {
-        .text = "test",
-        .text_len = strlen("test"),
-        .start_time = 0,
-        .end_time = 0,
-        .source_agent = NULL,
-        .trace_id = NULL,
-        .limit = 10,
-        .offset = 0,
-        .include_raw = 1
+        .memory_query_text = "test",
+        .memory_query_text_len = strlen("test"),
+        .memory_query_start_time = 0,
+        .memory_query_end_time = 0,
+        .memory_query_source_agent = NULL,
+        .memory_query_trace_id = NULL,
+        .memory_query_limit = 10,
+        .memory_query_offset = 0,
+        .memory_query_include_raw = 1
     };
 
     int num_queries = 100;
@@ -263,127 +254,12 @@ static void benchmark_memory_query() {
     agentos_memory_destroy(engine);
 }
 
-/**
- * @brief 基准测试：双模型基本协调性能
- */
-static void benchmark_dual_model_basic() {
-    agentos_coordinator_strategy_t* coordinator = NULL;
-    agentos_error_t err = agentos_dual_model_coordinator_create(&coordinator);
-    if (err != AGENTOS_SUCCESS) {
-        printf("benchmark_dual_model_basic: Failed to create coordinator\n");
-        return;
-    }
-
-    agentos_cognition_result_t result_a = {
-        .action = "action_a",
-        .confidence = 0.7f
-    };
-    
-    agentos_cognition_result_t result_b = {
-        .action = "action_b", 
-        .confidence = 0.9f
-    };
-
-    const char* final_action = NULL;
-    float confidence = 0.0f;
-    
-    int num_iterations = 1000;
-    clock_t start = clock();
-    
-    for (int i = 0; i < num_iterations; i++) {
-        err = agentos_dual_model_coordinate(coordinator, &result_a, &result_b, &final_action, &confidence);
-        if (err != AGENTOS_SUCCESS) {
-            printf("benchmark_dual_model_basic: Failed to coordinate at iteration %d\n", i);
-            break;
-        }
-    }
-    
-    clock_t end = clock();
-    double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
-    
-    printf("benchmark_dual_model_basic: %d iterations in %.3f seconds (%.3f ops/sec)\n",
-           num_iterations, elapsed, num_iterations / elapsed);
-    
-    agentos_dual_model_coordinator_destroy(coordinator);
-}
-
-/**
- * @brief 基准测试：双模型自适应学习性能
- */
-static void benchmark_dual_model_adaptive() {
-    agentos_coordinator_strategy_t* coordinator = NULL;
-    agentos_error_t err = agentos_dual_model_coordinator_create(&coordinator);
-    if (err != AGENTOS_SUCCESS) {
-        printf("benchmark_dual_model_adaptive: Failed to create coordinator\n");
-        return;
-    }
-
-    /* 启用自适应学习 */
-    agentos_coordinator_base_t* base = (agentos_coordinator_base_t*)coordinator;
-    err = agentos_coordinator_dual_model_enable_adaptive_learning(base, 1, 0.1f);
-    if (err != AGENTOS_SUCCESS) {
-        printf("benchmark_dual_model_adaptive: Failed to enable adaptive learning\n");
-        agentos_dual_model_coordinator_destroy(coordinator);
-        return;
-    }
-
-    /* 设置自适应验证模式 */
-    err = agentos_coordinator_dual_model_set_validation_mode(base, 3); /* CROSS_VALIDATION_ADAPTIVE */
-    if (err != AGENTOS_SUCCESS) {
-        printf("benchmark_dual_model_adaptive: Failed to set validation mode\n");
-        agentos_dual_model_coordinator_destroy(coordinator);
-        return;
-    }
-
-    agentos_cognition_result_t result_a = {
-        .action = "action_a",
-        .confidence = 0.7f
-    };
-    
-    agentos_cognition_result_t result_b = {
-        .action = "action_b", 
-        .confidence = 0.9f
-    };
-
-    const char* final_action = NULL;
-    float confidence = 0.0f;
-    
-    int num_iterations = 1000;
-    clock_t start = clock();
-    
-    for (int i = 0; i < num_iterations; i++) {
-        err = agentos_dual_model_coordinate(coordinator, &result_a, &result_b, &final_action, &confidence);
-        if (err != AGENTOS_SUCCESS) {
-            printf("benchmark_dual_model_adaptive: Failed to coordinate at iteration %d\n", i);
-            break;
-        }
-    }
-    
-    clock_t end = clock();
-    double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
-    
-    printf("benchmark_dual_model_adaptive: %d iterations in %.3f seconds (%.3f ops/sec)\n",
-           num_iterations, elapsed, num_iterations / elapsed);
-    
-    /* 获取统计信息 */
-    char* stats_json = NULL;
-    err = agentos_coordinator_dual_model_get_stats(base, &stats_json);
-    if (err == AGENTOS_SUCCESS && stats_json) {
-        printf("benchmark_dual_model_adaptive: Stats collected\n");
-        AGENTOS_FREE(stats_json);
-    }
-    
-    agentos_dual_model_coordinator_destroy(coordinator);
-}
-
 int main() {
     printf("=== Running Benchmark Tests ===\n");
     benchmark_task_submit();
     benchmark_task_query();
     benchmark_memory_write();
     benchmark_memory_query();
-    benchmark_dual_model_basic();
-    benchmark_dual_model_adaptive();
     printf("=== Benchmark Tests Complete ===\n");
     return 0;
 }

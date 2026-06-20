@@ -19,7 +19,7 @@
  * - 平台特定功能使用条件编译（#ifdef _WIN32）
  * - 共享内存和消息队列提供基础框架
  *
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-04-02
  * @version 1.0
  *

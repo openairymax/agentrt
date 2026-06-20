@@ -17,8 +17,10 @@
  */
 
 #include "tcache.h"
+#include "logging_compat.h"
 #include "memory_compat.h"
 
+#include <inttypes.h>
 #include <string.h>
 
 /* ============================================================================
@@ -74,8 +76,14 @@ agentos_tcache_t *tcache_create(memory_pool_t *pool, size_t batch_size, size_t m
         batch_size = max_cached;
     }
 
+    AGENTOS_LOG_INFO("tcache: tcache_create (batch_size=%zu, max_cached=%zu)",
+                     batch_size, max_cached);
+
     agentos_tcache_t *tc = (agentos_tcache_t *)AGENTOS_CALLOC(1, sizeof(agentos_tcache_t));
-    if (!tc) return NULL;
+    if (!tc) {
+        AGENTOS_LOG_ERROR("tcache: tcache_create failed to alloc tcache struct");
+        return NULL;
+    }
 
     tc->pool         = pool;
     tc->head         = NULL;
@@ -84,7 +92,9 @@ agentos_tcache_t *tcache_create(memory_pool_t *pool, size_t batch_size, size_t m
     tc->batch_size   = batch_size;
 
     /* 预填充一部分块以提高首次分配性能 */
-    tcache_batch_fill(tc);
+    size_t filled = tcache_batch_fill(tc);
+    AGENTOS_LOG_INFO("tcache: tcache_create ok (tc=%p, pre_filled=%zu, cached=%zu)",
+                     (void *)tc, filled, tc->cached_count);
 
     return tc;
 }
@@ -93,10 +103,18 @@ void tcache_destroy(agentos_tcache_t *tc)
 {
     if (!tc) return;
 
+    AGENTOS_LOG_INFO("tcache: tcache_destroy (tc=%p, cached=%zu, allocs=%" PRIu64 ", hits=%" PRIu64
+                     ", miss=%" PRIu64 ", fill=%" PRIu64 ", flush=%" PRIu64 ", bypass=%" PRIu64 ")",
+                     (void *)tc, tc->cached_count,
+                     tc->alloc_count, tc->hit_count, tc->miss_count,
+                     tc->batch_fill_count, tc->batch_flush_count, tc->bypass_count);
+
     /* 将所有缓存块归还到全局池 */
     tcache_flush_all(tc);
 
     AGENTOS_FREE(tc);
+
+    AGENTOS_LOG_DEBUG("tcache: tcache_destroy done");
 }
 
 /* ============================================================================
@@ -115,17 +133,24 @@ void *tcache_alloc(agentos_tcache_t *tc)
         tc->head = slot->next;
         tc->cached_count--;
         tc->hit_count++;
+        AGENTOS_LOG_DEBUG("tcache: tcache_alloc HIT (tc=%p, ptr=%p, cached=%zu/%zu, alloc#=%" PRIu64 ")",
+                          (void *)tc, (void *)slot, tc->cached_count, tc->max_cached, tc->alloc_count);
         return (void *)slot;
     }
 
     /* 缓存为空，从全局池批量填充 */
     tc->miss_count++;
+    AGENTOS_LOG_DEBUG("tcache: tcache_alloc MISS (tc=%p, cached=0, miss#=%" PRIu64 ")",
+                      (void *)tc, tc->miss_count);
 
     size_t filled = tcache_batch_fill(tc);
     if (filled == 0) {
         /* 全局池也空了，直接尝试从池获取一块 */
         tc->bypass_count++;
-        return memory_pool_alloc(tc->pool);
+        void *ptr = memory_pool_alloc(tc->pool);
+        AGENTOS_LOG_WARN("tcache: tcache_alloc BYPASS (tc=%p, ptr=%p, bypass#=%" PRIu64 ")",
+                         (void *)tc, ptr, tc->bypass_count);
+        return ptr;
     }
 
     /* 从刚填充的缓存中取一块 */
@@ -133,6 +158,8 @@ void *tcache_alloc(agentos_tcache_t *tc)
     tc->head = slot->next;
     tc->cached_count--;
     tc->hit_count++;
+    AGENTOS_LOG_DEBUG("tcache: tcache_alloc FILLED (tc=%p, ptr=%p, filled=%zu, cached=%zu/%zu)",
+                      (void *)tc, (void *)slot, filled, tc->cached_count, tc->max_cached);
     return (void *)slot;
 }
 
@@ -145,7 +172,10 @@ void tcache_free(agentos_tcache_t *tc, void *ptr)
     /* 检查缓存是否已满 */
     if (tc->cached_count >= tc->max_cached) {
         /* 缓存满，批量归还到全局池 */
-        tcache_batch_flush(tc);
+        size_t flushed = tcache_batch_flush(tc);
+        (void)flushed; /* 用于日志，非 DEBUG 模式下避免 unused 警告 */
+        AGENTOS_LOG_DEBUG("tcache: tcache_free FLUSH (tc=%p, flushed=%zu, cached=%zu/%zu)",
+                          (void *)tc, flushed, tc->cached_count, tc->max_cached);
     }
 
     /* 插入到缓存链表头部（LIFO） */
@@ -153,6 +183,9 @@ void tcache_free(agentos_tcache_t *tc, void *ptr)
     slot->next = tc->head;
     tc->head = slot;
     tc->cached_count++;
+
+    AGENTOS_LOG_DEBUG("tcache: tcache_free ok (tc=%p, ptr=%p, cached=%zu/%zu, free#=%" PRIu64 ")",
+                      (void *)tc, ptr, tc->cached_count, tc->max_cached, tc->free_count);
 }
 
 /* ============================================================================
@@ -169,21 +202,27 @@ size_t tcache_batch_fill(agentos_tcache_t *tc)
 
     size_t batch = (tc->batch_size < remaining) ? tc->batch_size : remaining;
 
-    size_t filled = 0;
-    for (size_t i = 0; i < batch; i++) {
-        void *block = memory_pool_alloc(tc->pool);
-        if (!block) break;
+    AGENTOS_LOG_DEBUG("tcache: tcache_batch_fill START (tc=%p, batch=%zu, remaining=%zu)",
+                      (void *)tc, batch, remaining);
 
-        tcache_slot_t *slot = (tcache_slot_t *)block;
+    /* P1.20.3: 使用 pool 批量分配 API，一次锁获取多个块 */
+    void *blocks[TCACHE_DEFAULT_BATCH_SIZE > 64 ? TCACHE_DEFAULT_BATCH_SIZE : 64];
+    size_t filled = memory_pool_batch_alloc(tc->pool, batch, blocks);
+
+    /* 将获取的块插入 tcache 链表 */
+    for (size_t i = 0; i < filled; i++) {
+        tcache_slot_t *slot = (tcache_slot_t *)blocks[i];
         slot->next = tc->head;
         tc->head = slot;
         tc->cached_count++;
-        filled++;
     }
 
     if (filled > 0) {
         tc->batch_fill_count++;
     }
+
+    AGENTOS_LOG_DEBUG("tcache: tcache_batch_fill DONE (tc=%p, filled=%zu/%zu, cached=%zu/%zu, fill#=%" PRIu64 ")",
+                      (void *)tc, filled, batch, tc->cached_count, tc->max_cached, tc->batch_fill_count);
 
     return filled;
 }
@@ -207,21 +246,29 @@ size_t tcache_batch_flush(agentos_tcache_t *tc)
         to_flush = tc->batch_size;
     }
 
-    size_t flushed = 0;
+    AGENTOS_LOG_DEBUG("tcache: tcache_batch_flush START (tc=%p, to_flush=%zu, cached=%zu/%zu)",
+                      (void *)tc, to_flush, tc->cached_count, tc->max_cached);
+
+    /* P1.20.3: 从 tcache 链表取出块，然后使用 pool 批量释放 API */
+    void *blocks[TCACHE_DEFAULT_BATCH_SIZE > 64 ? TCACHE_DEFAULT_BATCH_SIZE : 64];
+    size_t collected = 0;
     for (size_t i = 0; i < to_flush; i++) {
         if (!tc->head) break;
-
         tcache_slot_t *slot = tc->head;
         tc->head = slot->next;
         tc->cached_count--;
-
-        memory_pool_free(tc->pool, (void *)slot);
-        flushed++;
+        blocks[collected++] = (void *)slot;
     }
 
-    if (flushed > 0) {
+    /* 一次锁操作释放所有块 */
+    size_t flushed = 0;
+    if (collected > 0) {
+        flushed = memory_pool_batch_free(tc->pool, blocks, collected);
         tc->batch_flush_count++;
     }
+
+    AGENTOS_LOG_DEBUG("tcache: tcache_batch_flush DONE (tc=%p, flushed=%zu/%zu, cached=%zu, flush#=%" PRIu64 ")",
+                      (void *)tc, flushed, to_flush, tc->cached_count, tc->batch_flush_count);
 
     return flushed;
 }

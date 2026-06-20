@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file china_eco_adapter.h
- * @brief China Domestic Ecosystem Protocol Adapter for AgentOS
+ * @brief China Domestic Ecosystem Protocol Adapter for AgentRT
  *
  * 国内生态协议兼容适配器，提供：
  * 1. LLM Provider Bridge — 百炼(Bailian)/文心(Wenxin)/DashScope等国内平台OpenAI兼容层

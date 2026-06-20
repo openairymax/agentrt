@@ -186,7 +186,7 @@ func TestHTTPStatusToError_FullCoverage(t *testing.T) {
 			}))
 			defer ts.Close()
 
-			c, err := NewClient(agentos.WithEndpoint(ts.URL))
+			c, err := NewClient(agentos.WithEndpoint(ts.URL), agentos.WithMaxRetries(0))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -239,7 +239,7 @@ func TestHTTPStatusToError_EdgeCases(t *testing.T) {
 			}))
 			defer ts.Close()
 
-			c, err := NewClient(agentos.WithEndpoint(ts.URL))
+			c, err := NewClient(agentos.WithEndpoint(ts.URL), agentos.WithMaxRetries(0))
 			if err != nil {
 				t.Fatal(err)
 			}

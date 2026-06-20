@@ -176,7 +176,7 @@ static void test_mem_realloc(void)
     void *ptr = agentos_mem_alloc(64);
     TEST_ASSERT_NOT_NULL(ptr, "初始分配64字节");
 
-    const char *test_str = "Hello, AgentOS Memory System!";
+    const char *test_str = "Hello, AgentRT Memory System!";
     size_t test_len = strlen(test_str);
     memcpy((char *)ptr, test_str, test_len + 1);
 
@@ -720,7 +720,7 @@ static void test_health_export(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS corekern 模块集成测试套件\n");
+    printf("  AgentRT corekern 模块集成测试套件\n");
     printf("========================================\n");
 
     /* 1. 系统生命周期 */

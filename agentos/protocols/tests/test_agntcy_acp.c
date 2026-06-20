@@ -3,6 +3,7 @@
  * @brief AGNTCY ACP协议适配器单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
+// @owner: team-B
 
 #include "agntcy_acp_adapter.h"
 #include "logging_compat.h"

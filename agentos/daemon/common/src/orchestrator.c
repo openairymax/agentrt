@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file orchestrator.c
- * @brief AgentOS 流程编排器实现
+ * @brief AgentRT 流程编排器实现
  *
  * P2-B01: 实现Phase 0-4串行编排管线，支持子任务分发、
  * 结果聚合、超时控制、熔断集成、思考链路追踪。
@@ -18,6 +18,7 @@
 #include "daemon_defaults.h"
 #include "ipc_service_bus.h"
 #include "llm_service.h"
+#include "loop.h"
 #include "memory_compat.h"
 #include "memory_provider.h"
 #include "metacognition.h"
@@ -81,6 +82,9 @@ struct orchestrator_s {
 
     agentos_metacognition_t *metacognition;
     confidence_calibrator_t *calibrator;
+
+    /* C-L06: CoreLoopThree 句柄，用于 GENERATION 等阶段的三层循环处理 */
+    agentos_core_loop_t *core_loop;
 
     char thinking_chain_root[ORCH_ID_LEN];
 };
@@ -219,15 +223,19 @@ orchestrator_t *orchestrator_create(const orch_config_t *config)
         }
     }
 
+    /* C-L06: CoreLoopThree 句柄初始为空，由 orch_adapter 注入 */
+    orch->core_loop = NULL;
+
     generate_task_id(orch->thinking_chain_root, sizeof(orch->thinking_chain_root));
 
     SVC_LOG_INFO("orchestrator: created (timeout=%ums, retries=%u, strategy=%d, pool=%s, "
-                 "memory=%s, cognition=%s, breaker=%s, critique=%s)",
+                 "memory=%s, cognition=%s, breaker=%s, critique=%s, core_loop=%s)",
                  orch->config.timeout_ms, orch->config.max_retries, orch->config.default_strategy,
                  orch->pool ? "enabled" : "disabled", orch->memory ? "enabled" : "disabled",
                  orch->cognition ? "enabled" : "disabled",
                  orch->config.enable_circuit_breaker ? "enabled" : "disabled",
-                 orch->metacognition ? "enabled" : "disabled");
+                 orch->metacognition ? "enabled" : "disabled",
+                 orch->core_loop ? "enabled" : "disabled");
 
     return orch;
 }
@@ -1039,6 +1047,47 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
                 }
             }
 
+            /* C-L06: 优先使用 CoreLoopThree 进行三层循环处理 */
+            if (orch->core_loop) {
+                SVC_LOG_INFO("C-L06: Using CoreLoopThree for generation phase");
+                char *task_id = NULL;
+                agentos_error_t loop_err = agentos_loop_submit(
+                    orch->core_loop, input ? input : "", strlen(input ? input : ""), &task_id);
+                if (loop_err == AGENTOS_SUCCESS && task_id) {
+                    SVC_LOG_INFO("C-L06: CoreLoopThree task submitted (task_id=%s)", task_id);
+                    char *loop_result = NULL;
+                    size_t loop_result_len = 0;
+                    agentos_error_t wait_err = agentos_loop_wait(
+                        orch->core_loop, task_id,
+                        orch->config.timeout_ms > 0 ? orch->config.timeout_ms : 30000,
+                        &loop_result, &loop_result_len);
+                    if (wait_err == AGENTOS_SUCCESS && loop_result) {
+                        SVC_LOG_INFO("C-L06: CoreLoopThree generation completed (output_len=%zu)",
+                                     loop_result_len);
+                        task->output = loop_result;
+                        task->output_len = loop_result_len;
+                    } else {
+                        SVC_LOG_WARN("C-L06: CoreLoopThree wait failed (err=%d), falling back to LLM",
+                                     wait_err);
+                        if (loop_result) AGENTOS_FREE(loop_result);
+                        loop_result = NULL;
+                        /* 回退到 LLM */
+                        goto generation_llm_fallback;
+                    }
+                    AGENTOS_FREE(task_id);
+                    task_id = NULL;
+                } else {
+                    SVC_LOG_WARN("C-L06: CoreLoopThree submit failed (err=%d), falling back to LLM",
+                                 loop_err);
+                    if (task_id) AGENTOS_FREE(task_id);
+                    task_id = NULL;
+                    goto generation_llm_fallback;
+                }
+                /* 跳过 LLM 回退 */
+                goto generation_skip_llm;
+            }
+
+generation_llm_fallback: {
             char *prompt = build_generation_prompt(input ? input : "{}");
             if (gen_cog_has_output && gen_plan) {
                 size_t hint_len = 0;
@@ -1176,6 +1225,9 @@ static int execute_single_phase(orchestrator_t *orch, orch_phase_t phase, const 
             } else {
                 task->output = t2_output;
             }
+            } /* generation_llm_fallback */
+
+generation_skip_llm:
             memory_write_step(orch->memory, "generation", task->output, ",\"critical_loop\":true");
             if (mem_retrieved) {
                 AGENTOS_FREE(mem_retrieved);
@@ -1854,6 +1906,23 @@ void orchestrator_set_progress_callback(orchestrator_t *orch, orch_progress_cb_t
 }
 
 /* ── C-L06: Orchestrator → CoreLoopThree 连接线 ── */
+
+void orchestrator_set_core_loop(orchestrator_t *orch, void *core_loop)
+{
+    if (!orch)
+        return;
+    orch->core_loop = (agentos_core_loop_t *)core_loop;
+    if (orch->core_loop) {
+        SVC_LOG_INFO("C-L06: CoreLoopThree instance injected into orchestrator");
+    } else {
+        SVC_LOG_INFO("C-L06: CoreLoopThree instance removed from orchestrator");
+    }
+}
+
+bool orchestrator_has_core_loop(orchestrator_t *orch)
+{
+    return orch && orch->core_loop != NULL;
+}
 
 void orchestrator_set_cognition_llm_service(orchestrator_t *orch, llm_service_t *llm_svc)
 {

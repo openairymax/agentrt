@@ -141,16 +141,30 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
     )
 
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
+        PROPERTIES COMPILE_FLAGS "-fno-lto"
+    )
+
     target_include_directories(test_taskflow_advanced PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit
+        ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/tool_d/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/src
         ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
+    )
+
+    target_compile_options(test_taskflow_advanced PRIVATE
+        -Wall -Wextra -g -Wno-unused-function -Wno-deprecated-declarations
     )
 
     target_link_libraries(test_taskflow_advanced PRIVATE
         agentos_taskflow
         agentos_core
         agentos_common
+        svc_common
     )
 
     if(UNIX AND NOT APPLE)

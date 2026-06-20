@@ -78,8 +78,6 @@ pub async fn execute(
 
 /// Run in interactive mode, reading user input in a loop.
 async fn run_interactive(client: &GatewayClient, agent_file: &str) -> Result<()> {
-    let mut session_id: Option<String> = None;
-
     loop {
         // Print prompt
         print!("{} ", ">".cyan().bold());
@@ -116,7 +114,7 @@ async fn run_interactive(client: &GatewayClient, agent_file: &str) -> Result<()>
                 println!();
                 println!("{}", response.response);
                 println!();
-                _session_id = Some(response.session_id.clone());
+                // session_id tracked by gateway
             }
             Err(e) => {
                 eprintln!("{} Gateway error: {}", "✗".red(), e);

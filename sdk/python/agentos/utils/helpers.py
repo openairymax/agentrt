@@ -1,9 +1,9 @@
-# AgentOS Python SDK - Utilities Module
+# AgentRT Python SDK - Utilities Module
 # Version: 0.1.0
 # Last updated: 2026-03-24
 
 """
-Utility functions for AgentOS Python SDK.
+Utility functions for AgentRT Python SDK.
 
 Provides type-safe map data extraction, API response parsing,
 URL building, and other commons utility functions.

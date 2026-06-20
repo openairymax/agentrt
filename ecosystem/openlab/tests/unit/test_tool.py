@@ -18,13 +18,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from openlab.core.tool import Tool, ToolCategory, ToolCapability, ToolContext, ToolResult
+
 
 class TestToolCategory:
     """Tests for ToolCategory enum."""
 
     def test_category_values(self):
         """Test ToolCategory enum has correct values."""
-        from openlab.core.tool import ToolCategory
 
         assert ToolCategory.INPUT_OUTPUT.value == "input_output"
         assert ToolCategory.COMPUTATION.value == "computation"
@@ -128,26 +129,20 @@ class TestToolResult:
         assert "Warning 1" in result.warnings
 
 
-class SimpleTestTool:
+class SimpleTestTool(Tool):
     """Simple concrete implementation of Tool for testing."""
 
     NAME = "test_tool"
     DESCRIPTION = "A test tool"
-    CATEGORY = None
-    CAPABILITIES = set()
+    CATEGORY = ToolCategory.COMPUTATION
+    CAPABILITIES = {ToolCapability.EXECUTE}
     INPUT_SCHEMA = {
         "type": "object",
         "properties": {"value": {"type": "string"}},
         "required": ["value"],
     }
 
-    def __init__(self, tool_id=None):
-        self.tool_id = tool_id or f"{self.NAME}_{id(self)}"
-        self._enabled = True
-        self._last_used = None
-        self._usage_count = 0
-
-    async def _do_execute(self, parameters: Dict[str, Any], context) -> Any:
+    async def _do_execute(self, parameters: Dict[str, Any], context: ToolContext) -> ToolResult:
         return ToolResult(success=True, output=f"Processed: {parameters['value']}")
 
 

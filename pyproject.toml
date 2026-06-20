@@ -1,13 +1,13 @@
 [tool.poetry]
-name = "agentos"
+name = "agentrt"
 version = "0.1.0"
-description = "AgentOS - 智能体操作系统核心引擎 (A+ 94/100 行业标杆评级)"
-authors = ["Spharx AgentOS Team"]
+description = "AgentRT - Agent Runtime Platform"
+authors = ["Spharx AgentRT Team"]
 license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://spharx.cn"
-repository = "https://gitee.com/spharx/agentos"
-documentation = "https://docs.spharx.cn/agentos"
+repository = "https://gitee.com/spharx/agentrt"
+documentation = "https://docs.spharx.cn/agentrt"
 keywords = ["agent", "os", "ai", "memory", "cognition", "execution", "microkernel", "security"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -103,10 +103,10 @@ bandit = "^1.7.0"
 safety = "^2.0.0"
 
 [tool.poetry.scripts]
-agentos-init = "scripts.init_config:main"
-agentos-docs = "scripts.generate_docs:main"
-agentos-benchmark = "scripts.benchmark:main"
-agentos-validate = "scripts.validate:main"
+agentrt-init = "scripts.init_config:main"
+agentrt-docs = "scripts.generate_docs:main"
+agentrt-benchmark = "scripts.benchmark:main"
+agentrt-validate = "scripts.validate:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -160,7 +160,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --cov=sdk/python/agentos --cov=scripts/toolkit/src --cov-report=term-missing"
+addopts = "-ra -q"
 testpaths = [
     "tests/unit",
     "tests/integration",

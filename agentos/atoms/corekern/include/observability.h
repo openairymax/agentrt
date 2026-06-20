@@ -1,6 +1,6 @@
 /**
  * @file observability.h
- * @brief AgentOS 微内核可观测性子系统
+ * @brief AgentRT 微内核可观测性子系统
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 提供生产级可观测性功能，包括指标收集、健康检查、性能监控、

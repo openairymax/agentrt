@@ -3,7 +3,7 @@
 /** @note This API is planned for next release. Enable with AGENTOS_ENABLE_V2_API to access. */
 /**
  * @file dynamic_policy_engine.h
- * @brief Dynamic Policy Engine for AgentOS SafetyGuard
+ * @brief Dynamic Policy Engine for AgentRT SafetyGuard
  *
  * 动态安全策略引擎，支持运行时策略加载、版本管理、
  * 冲突检测与解决、策略热更新和合规性验证。

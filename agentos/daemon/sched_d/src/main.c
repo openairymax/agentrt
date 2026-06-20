@@ -334,7 +334,7 @@ static void svc_log_toggle_handler(int sig)
 static void print_usage(const char *prog)
 {
     char buf[256];
-    fputs("AgentOS Scheduler Daemon\n", stdout);
+    fputs("AgentRT Scheduler Daemon\n", stdout);
     snprintf(buf, sizeof(buf), "Usage: %s [options]\n\n", prog);
     fputs(buf, stdout);
     fputs("Options:\n", stdout);
@@ -415,7 +415,7 @@ int main(int argc, char **argv)
 
     if (use_tcp) {
         server_fd = agentos_socket_create_tcp_server("127.0.0.1", DEFAULT_TCP_PORT);
-        if (server_fd == AGENTOS_INVALID_SOCKET) {
+        if (server_fd < 0) {
             SVC_LOG_ERROR("Failed to create TCP server on port %d", DEFAULT_TCP_PORT);
             sched_service_destroy(g_service);
             agentos_mutex_destroy(&g_running_lock);
@@ -433,7 +433,7 @@ int main(int argc, char **argv)
 #else
         server_fd = agentos_socket_create_unix_server(DEFAULT_SOCKET_PATH_UNIX);
 #endif
-        if (server_fd == AGENTOS_INVALID_SOCKET) {
+        if (server_fd < 0) {
             SVC_LOG_ERROR("Failed to create socket at default path");
             sched_service_destroy(g_service);
             agentos_mutex_destroy(&g_running_lock);

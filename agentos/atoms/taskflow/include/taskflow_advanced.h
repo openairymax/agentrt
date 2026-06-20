@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file taskflow_advanced.h
- * @brief TaskFlow Advanced Workflow Engine for AgentOS
+ * @brief TaskFlow Advanced Workflow Engine for AgentRT
  *
  * 基于Pregel超步计算模型的高级工作流引擎，支持条件分支、
  * 并行汇聚、子工作流、循环迭代等复杂工作流模式。

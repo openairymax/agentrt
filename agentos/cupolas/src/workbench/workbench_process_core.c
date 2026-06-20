@@ -8,7 +8,7 @@
 /**
  * @file workbench_process_core.c
  * @brief Cross-platform Process Management Implementation
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2024
  */
 

@@ -7,6 +7,8 @@
 #include "executor.h"
 #include "tool_service.h"
 
+#include "memory_compat.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

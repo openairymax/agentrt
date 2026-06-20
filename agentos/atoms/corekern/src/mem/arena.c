@@ -9,28 +9,14 @@
  * P1.19: Arena 分配器用于 ALLOC_SHORT_LIVED 场景。
  */
 
-#include "arena.h"
+#include "../../include/arena.h"
 #include "error.h"
+#include "memory_compat.h"
 
-#include <stdlib.h>
 #include <string.h>
 
-/* 线程局部存储：当前线程的 Arena */
-#ifdef _WIN32
-static __declspec(thread) agentos_arena_t *tls_current_arena = NULL;
-#else
-static __thread agentos_arena_t *tls_current_arena = NULL;
-#endif
-
-agentos_arena_t *agentos_arena_get_current(void)
-{
-    return tls_current_arena;
-}
-
-void agentos_arena_set_current(agentos_arena_t *arena)
-{
-    tls_current_arena = arena;
-}
+/* P1.19.4: agentos_arena_get_current / agentos_arena_set_current
+ * 已在 commons/utils/memory/src/arena.c 中实现，此处不再重复定义 */
 
 /* 默认块大小 64KB */
 #define ARENA_DEFAULT_BLOCK_SIZE (64 * 1024)
@@ -84,7 +70,7 @@ struct agentos_arena {
 static agentos_arena_block_t *arena_block_create(size_t data_size)
 {
     size_t total = sizeof(agentos_arena_block_t) + data_size;
-    agentos_arena_block_t *block = (agentos_arena_block_t *)malloc(total);
+    agentos_arena_block_t *block = (agentos_arena_block_t *)AGENTOS_MALLOC(total);
     if (!block)
         return NULL;
 
@@ -104,7 +90,7 @@ static void arena_block_destroy(agentos_arena_block_t *block)
     if (!block || block->magic != ARENA_BLOCK_MAGIC)
         return;
     block->magic = 0;
-    free(block);
+    AGENTOS_FREE(block);
 }
 
 /* ==================== 对齐辅助 ==================== */
@@ -118,7 +104,7 @@ static inline size_t align_up(size_t value, size_t alignment)
 
 agentos_arena_t *agentos_arena_create(size_t block_size)
 {
-    agentos_arena_t *arena = (agentos_arena_t *)calloc(1, sizeof(agentos_arena_t));
+    agentos_arena_t *arena = (agentos_arena_t *)AGENTOS_CALLOC(1, sizeof(agentos_arena_t));
     if (!arena)
         return NULL;
 
@@ -129,7 +115,7 @@ agentos_arena_t *agentos_arena_create(size_t block_size)
     /* 创建第一个块 */
     arena->first = arena_block_create(arena->block_size);
     if (!arena->first) {
-        free(arena);
+        AGENTOS_FREE(arena);
         return NULL;
     }
 
@@ -152,8 +138,10 @@ void agentos_arena_destroy(agentos_arena_t *arena)
         block = next;
     }
 
-    free(arena);
+    AGENTOS_FREE(arena);
 }
+
+void *agentos_arena_alloc_aligned(agentos_arena_t *arena, size_t size, size_t alignment);
 
 void *agentos_arena_alloc(agentos_arena_t *arena, size_t size)
 {
@@ -256,9 +244,12 @@ void agentos_arena_reset(agentos_arena_t *arena)
 
 agentos_arena_mark_t agentos_arena_mark(agentos_arena_t *arena)
 {
-    agentos_arena_mark_t mark = {0, 0};
-    if (!arena)
+    agentos_arena_mark_t mark;
+    if (!arena) {
+        mark.offset = 0;
+        mark.block_idx = 0;
         return mark;
+    }
 
     /* 找到当前块在链表中的索引 */
     size_t idx = 0;

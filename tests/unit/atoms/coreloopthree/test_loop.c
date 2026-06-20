@@ -38,9 +38,9 @@ static void test_loop_submit() {
         return;
     }
 
-    // 提交一个任�?
+    // 提交一个任务
     char* task_id = NULL;
-    const char* input = "帮我分析最近的销售数�?;
+    const char* input = "帮我分析最近的销售数据";
     err = agentos_loop_submit(loop, input, strlen(input), &task_id);
     printf("test_loop_submit: %d\n", err);
     if (err == AGENTOS_SUCCESS && task_id) {
@@ -79,14 +79,14 @@ static void test_loop_get_engines() {
 static void test_loop_config() {
     // 创建配置
     agentos_loop_config_t manager = {
-        .cognition_threads = 2,
-        .execution_threads = 4,
-        .memory_threads = 2,
-        .max_queued_tasks = 100,
-        .stats_interval_ms = 10000,
-        .plan_strategy = NULL,
-        .coord_strategy = NULL,
-        .disp_strategy = NULL
+        .loop_config_cognition_threads = 2,
+        .loop_config_execution_threads = 4,
+        .loop_config_memory_threads = 2,
+        .loop_config_max_queued_tasks = 100,
+        .loop_config_stats_interval_ms = 10000,
+        .loop_config_plan_strategy = NULL,
+        .loop_config_coord_strategy = NULL,
+        .loop_config_disp_strategy = NULL
     };
 
     agentos_core_loop_t* loop = NULL;

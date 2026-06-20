@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file openai_enterprise_adapter.c
  * @brief OpenAI API Enterprise Adapter Implementation
@@ -217,7 +218,7 @@ bool openai_is_initialized(openai_handle_t handle)
 
 const char *openai_version(void)
 {
-    return "AgentOS-OpenAI/" OPENAI_VERSION;
+    return "AgentRT-OpenAI/" OPENAI_VERSION;
 }
 
 /* ============================================================================
@@ -559,6 +560,7 @@ static openai_rate_result_t openai_check_rate_limit(struct openai_enterprise_ada
     return OPENAI_RATE_OK;
 }
 
+__attribute__((unused))
 static void openai_record_request(struct openai_enterprise_adapter_s *adapter,
                                   uint32_t input_tokens, uint32_t output_tokens)
 {
@@ -638,6 +640,7 @@ int openai_chat_completion(openai_handle_t handle, const openai_chat_request_t *
     AGENTOS_STRNCPY_TERM(out_response->model, request->model ? request->model : "gpt-4o", sizeof(out_response->model));
     out_response->created = (uint64_t)time(NULL);
 
+    __attribute__((unused))
     uint64_t ts_start_ms = agentos_time_ms();
 
 #ifndef AGENTOS_HAS_CURL

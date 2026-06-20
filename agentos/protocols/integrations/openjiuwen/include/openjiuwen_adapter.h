@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file openjiuwen_adapter.h
  * @brief OpenJiuwen Protocol Adapter Interface

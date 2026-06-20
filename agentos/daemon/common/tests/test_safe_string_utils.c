@@ -149,8 +149,9 @@ static int test_safe_strdup_with_limit(void)
     return 0;
 }
 
-/* is_valid_ascii function does not exist in the current API */
-/* TODO: Implement is_valid_ascii in safe_string_utils.c if needed
+/* is_valid_ascii: 当前 API 中无此函数，预留测试占位
+ * 待 safe_string_utils.c 中实现 is_valid_ascii 后取消注释
+#if 0
 static int test_is_valid_ascii(void) {
     if (!is_valid_ascii("Hello World!", 12)) {
         TEST_FAIL("is_valid_ascii", "Valid ASCII rejected");
@@ -167,6 +168,7 @@ static int test_is_valid_ascii(void) {
     TEST_PASS("is_valid_ascii");
     return 0;
 }
+#endif
 */
 
 static int test_secure_clear(void)

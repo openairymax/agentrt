@@ -3,7 +3,7 @@
 /** @note This API is planned for next release. Enable with AGENTOS_ENABLE_V2_API to access. */
 /**
  * @file zero_trust_integration.h
- * @brief Zero Trust Architecture Integration for AgentOS
+ * @brief Zero Trust Architecture Integration for AgentRT
  *
  * 零信任架构集成模块，实现"永不信任，始终验证"的安全原则。
  * 与Cupolas安全穹顶和SafetyGuard守卫框架深度集成。
