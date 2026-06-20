@@ -7,8 +7,8 @@ AgentOS Python SDK 模块导入测试脚本
 import sys
 import os
 
-# 添加当前目录到路径
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 添加父目录到路径（agentos 包所在目录）
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def test_imports():
     """测试所有模块导入"""

@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 # ============================================================================
 # 颜色输出
@@ -76,7 +76,7 @@ gate_compile() {
 gate_ban() {
     section "Gate 2: BAN Rule Scan"
 
-    local ban_script="${SCRIPT_DIR}/../verify/forbidden_functions.sh"
+    local ban_script="${SCRIPT_DIR}/../../verify/forbidden_functions.sh"
     if [ -x "$ban_script" ]; then
         log_info "Running BAN rule scan..."
         if bash "$ban_script" 2>&1 | tail -10; then
@@ -128,7 +128,7 @@ gate_security() {
         return
     fi
 
-    local sec_script="${SCRIPT_DIR}/security-scan.sh"
+    local sec_script="${SCRIPT_DIR}/../security/security-scan.sh"
     if [ -x "$sec_script" ]; then
         log_info "Running security scan..."
         if bash "$sec_script" "$@" 2>&1 | tail -20; then

@@ -11,13 +11,13 @@
 #   5. 版本已 bump → 通知受影响团队
 #
 # 用法：
-#   bash scripts/ci/pipeline/contract-version-check.sh [--baseline-branch <branch>]
-#   bash scripts/ci/pipeline/contract-version-check.sh --baseline-snapshot <snapshot_file>
+#   bash scripts/ci/pipeline/validate/contract-version-check.sh [--baseline-branch <branch>]
+#   bash scripts/ci/pipeline/validate/contract-version-check.sh --baseline-snapshot <snapshot_file>
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 CONTRACTS_DIR="${PROJECT_ROOT}/contracts"
 BASELINE_BRANCH="main"
 BASELINE_SNAPSHOT=""

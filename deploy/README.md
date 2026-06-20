@@ -14,12 +14,16 @@ deploy/
 │   ├── Dockerfile                 #   多阶段构建镜像（builder → runtime → development）
 │   ├── docker-compose.yml         #   基础服务编排
 │   ├── docker-compose.dev.yml     #   开发环境覆盖
+│   ├── docker-compose.test.yml    #   测试环境覆盖
+│   ├── docker-compose.staging.yml #   预发布环境覆盖
+│   ├── docker-compose.preview.yml #   预览环境覆盖
 │   ├── docker-compose.prod.yml    #   生产环境覆盖
 │   ├── .env.example               #   环境变量模板
 │   ├── monitoring/                #   监控配置
 │   │   ├── prometheus.yml         #     Prometheus 采集配置
 │   │   ├── alerts.yml             #     告警规则
 │   │   └── grafana_agentos_dashboard.json  # Grafana 仪表盘
+│   ├── secrets/                   #   Docker Swarm 密钥目录（.gitkeep）
 │   └── README.md                  #   Docker 部署详细文档
 └── README.md                      # 本文件
 ```
@@ -76,14 +80,9 @@ docker-compose -f deploy/docker/docker-compose.yml logs -f gateway
 | Prometheus | v2.45.0 | 指标采集 |
 | Grafana | 10.2.0 | 可视化仪表盘 |
 
-## 与 scripts/ops/deploy/ 的关系
+## 部署目录说明
 
-`deploy/docker/` 和 `scripts/ops/deploy/` 均提供 Docker 部署方案，定位不同：
-
-| 目录 | 定位 | 用途 |
-|------|------|------|
-| `deploy/docker/` | Gateway 专用部署 | 网关服务的轻量级容器化部署 |
-| `scripts/ops/deploy/` | 全系统部署 | 完整 AgentRT 系统的多服务编排 |
+`deploy/docker/` 是 AgentRT 唯一的 Docker 容器化部署目录，提供从开发到生产的全环境编排（dev/test/staging/preview/prod）。早期的 `scripts/ops/deploy/` 配置已合并至此，详见 [docker/README.md](docker/README.md)。
 
 ---
 

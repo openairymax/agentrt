@@ -10,8 +10,8 @@ set -euo pipefail
 # 路径定义
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-LIB_DIR="${SCRIPT_DIR}/../library"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+LIB_DIR="${SCRIPT_DIR}/../../library"
 
 ###############################################################################
 # 颜色和日志

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 AGENTOS_ROOT="$PROJECT_ROOT/agentos"
 BUILD_DIR="${AGENTOS_ROOT}/build/leak-detection"
 ARTIFACTS_DIR="${PROJECT_ROOT}/ci-artifacts/leak-detection"

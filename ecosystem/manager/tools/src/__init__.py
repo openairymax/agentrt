@@ -1,0 +1,1 @@
+"""Manager tools implementations."""

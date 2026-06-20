@@ -1,6 +1,6 @@
 # AgentRT Installer Script (Windows)
 # Version: 0.1.1
-# Usage: Invoke-WebRequest -Uri https://raw.githubusercontent.com/spharx/agentrt/main/scripts/get-agentrt.ps1 | Invoke-Expression
+# Usage: Invoke-WebRequest -Uri https://raw.githubusercontent.com/spharx/agentrt/main/scripts/install/get-agentrt.ps1 | Invoke-Expression
 #        or: .\get-agentrt.ps1
 
 param(

@@ -3,11 +3,11 @@
 
 import pytest
 
-from ecosystem.skills.code_review import CodeReviewSkill
-from ecosystem.skills.web_search import WebSearchSkill
-from ecosystem.skills.data_analysis import DataAnalysisSkill
-from ecosystem.skills.security_audit import SecurityAuditSkill
-from ecosystem.skills.text_summarization import TextSummarizationSkill
+from ecosystem.skills.src.code_review import CodeReviewSkill
+from ecosystem.skills.src.web_search import WebSearchSkill
+from ecosystem.skills.src.data_analysis import DataAnalysisSkill
+from ecosystem.skills.src.security_audit import SecurityAuditSkill
+from ecosystem.skills.src.text_summarization import TextSummarizationSkill
 
 
 # ============================================================

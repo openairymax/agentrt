@@ -5,7 +5,7 @@ import pytest
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "tools" / "src"))
 
 from schema_diff import (
     DiffSeverity,
@@ -194,7 +194,9 @@ class TestSchemaDiffer:
         assert result is None
 
     def test_load_yaml_valid(self, tmp_path):
-        yaml_path = tmp_path / "agentos.yaml"
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        yaml_path = configs_dir / "agentos.yaml"
         yaml_path.write_text("kernel:\n  ipc:\n    max_message_size: 4096\n")
         differ = SchemaDiffer(agentos_root=str(tmp_path))
         result = differ._load_yaml()

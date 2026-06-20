@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Optional
 
 # ─── Configuration ──────────────────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 REPORT_DIR = PROJECT_ROOT / "build" / "security-reports"
 THRESHOLD = "HIGH"  # HIGH+ = CI fail, MEDIUM = warn, LOW = info
 
