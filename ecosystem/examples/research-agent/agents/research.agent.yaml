@@ -25,7 +25,7 @@ tools:
 
 skills:
   - name: "web_search"
-    ref: "ecosystem.skills.web_search"
+    ref: "ecosystem.skills.src.web_search"
 
 # 权限声明
 permissions:

@@ -54,7 +54,7 @@ agentos_error_t agentos_config_parse_weights(const char *config_json, float *out
  * 整合 config_loader.c 的文件读取 + yaml_loader.c 的解析，
  * 自动应用环境变量覆盖。
  *
- * @param yaml_path agentos.yaml 文件路径（NULL 使用默认路径 ./agentos.yaml）
+ * @param yaml_path agentos.yaml 文件路径（NULL 使用默认路径 ./configs/agentos.yaml）
  * @param config 输出配置
  * @return 0 成功，非0失败
  *
@@ -122,7 +122,7 @@ int agentos_config_reload(const char *yaml_path);
  * 在 agentos_init() 之后调用，加载 agentos.yaml 到全局配置。
  * 如果文件不存在，使用默认配置。
  *
- * @param yaml_path agentos.yaml 文件路径（NULL 使用 ./agentos.yaml）
+ * @param yaml_path agentos.yaml 文件路径（NULL 使用 ./configs/agentos.yaml）
  * @return 0 成功，非0失败
  */
 int agentos_config_init(const char *yaml_path);

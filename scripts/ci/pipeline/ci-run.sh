@@ -139,7 +139,7 @@ phase_deps() {
 
     timer_start
 
-    local deps_script="${CI_DIR}/install-deps.sh"
+    local deps_script="${CI_DIR}/build/install-deps.sh"
     if [[ ! -f "$deps_script" ]]; then
         log_error "Dependency script not found: $deps_script"
         return 1
@@ -197,7 +197,7 @@ phase_build() {
 
     timer_start
 
-    local build_script="${CI_DIR}/build-module.sh"
+    local build_script="${CI_DIR}/build/build-module.sh"
     if [[ -f "$build_script" ]]; then
         chmod +x "$build_script"
         if ! bash "$build_script" --module "$CI_MODULE" --type "$CI_BUILD_TYPE"; then
@@ -252,7 +252,7 @@ phase_test() {
 
     timer_start
 
-    local test_script="${CI_DIR}/run-tests.sh"
+    local test_script="${CI_DIR}/test/run-tests.sh"
     if [[ -f "$test_script" ]]; then
         chmod +x "$test_script"
         if ! bash "$test_script" --module "$CI_MODULE"; then
@@ -311,7 +311,7 @@ phase_quality() {
 
     timer_start
 
-    local quality_script="${CI_DIR}/quality-gate.sh"
+    local quality_script="${CI_DIR}/validate/quality-gate.sh"
     if [[ -f "$quality_script" ]]; then
         chmod +x "$quality_script"
         if ! bash "$quality_script"; then
@@ -407,7 +407,7 @@ phase_deploy() {
 
     timer_start
 
-    local deploy_script="${CI_DIR}/deploy-artifacts.sh"
+    local deploy_script="${CI_DIR}/deploy/deploy-artifacts.sh"
     if [[ -f "$deploy_script" ]]; then
         chmod +x "$deploy_script"
         bash "$deploy_script" --output "$CI_ARTIFACT_DIR" || true

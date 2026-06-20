@@ -86,7 +86,7 @@ int manager_adapter_init(const char *yaml_path,
         return -1;
     }
 
-    const char *path = yaml_path ? yaml_path : "./agentos.yaml";
+    const char *path = yaml_path ? yaml_path : "./configs/agentos.yaml";
     safe_strcpy(adapter->yaml_path, sizeof(adapter->yaml_path), path);
 
     AGENTOS_LOG_INFO("ManagerAdapter: init START (path=%s)", path);
