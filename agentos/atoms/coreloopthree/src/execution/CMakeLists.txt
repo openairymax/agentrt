@@ -1,6 +1,7 @@
 
 add_library(agentos_execution STATIC
     engine.c
+    tool_svc_adapter.c
     core/registry.c
     core/trace.c
     transaction/compensation.c
@@ -21,6 +22,10 @@ target_include_directories(agentos_execution PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/strategy/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/quality
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/llm_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/tool_d/include
 )
 
 target_link_libraries(agentos_execution

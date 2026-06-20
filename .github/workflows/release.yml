@@ -1,0 +1,242 @@
+# =============================================================================
+# release.yml — AgentRT Release Workflow (P4.7)
+# 触发: tag push v* (e.g. v0.1.1)
+# 执行: CPack 打包 → Cosign 签名 → SPDX SBOM 生成 → GitHub Release 发布
+# =============================================================================
+
+name: AgentRT Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.1.1)'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  # ===========================================================================
+  # Job 1: 构建 + CPack 打包
+  # ===========================================================================
+  build-package:
+    name: Build & Package
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential \
+            libssl-dev libcurl4-openssl-dev libcmocka-dev \
+            libmicrohttpd-dev libwebsockets-dev \
+            libcjson-dev libyaml-dev libsqlite3-dev
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure CMake
+        run: |
+          cmake -B build-release \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DWARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: |
+          cmake --build build-release --parallel $(nproc)
+
+      - name: CPack — Generate .tar.gz + .deb
+        working-directory: build-release
+        run: |
+          cpack -G TGZ
+          cpack -G DEB 2>/dev/null || echo "DEB packaging skipped (non-Debian system)"
+
+      - name: List packages
+        run: |
+          echo "Generated packages:"
+          find build-release -maxdepth 1 \( -name "*.tar.gz" -o -name "*.deb" \) -exec ls -lh {} \;
+
+      - name: Upload packages as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentrt-packages-${{ steps.version.outputs.VERSION }}
+          path: |
+            build-release/*.tar.gz
+            build-release/*.deb
+          retention-days: 30
+
+  # ===========================================================================
+  # Job 2: SBOM 生成
+  # ===========================================================================
+  generate-sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    needs: [build-package]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SPDX SBOM
+        run: |
+          mkdir -p ci-artifacts/release
+          syft "dir:." -o "spdx-json=ci-artifacts/release/sbom-${{ steps.version.outputs.VERSION }}.spdx.json"
+          echo "SBOM size: $(stat -c%s ci-artifacts/release/sbom-${{ steps.version.outputs.VERSION }}.spdx.json) bytes"
+
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentrt-sbom-${{ steps.version.outputs.VERSION }}
+          path: ci-artifacts/release/sbom-${{ steps.version.outputs.VERSION }}.spdx.json
+          retention-days: 90
+
+  # ===========================================================================
+  # Job 3: Cosign 签名
+  # ===========================================================================
+  sign-artifacts:
+    name: Sign with Cosign
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    needs: [build-package, generate-sbom]
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.2.4'
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: agentrt-packages-${{ steps.version.outputs.VERSION }}
+          path: packages/
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: agentrt-sbom-${{ steps.version.outputs.VERSION }}
+          path: sbom/
+
+      - name: Sign packages with Cosign (keyless via OIDC)
+        run: |
+          mkdir -p signatures/
+          for pkg in packages/*.tar.gz packages/*.deb; do
+            if [ -f "$pkg" ]; then
+              echo "Signing: $(basename $pkg)"
+              cosign sign-blob --yes \
+                --output-signature "signatures/$(basename $pkg).sig" \
+                --output-certificate "signatures/$(basename $pkg).cert" \
+                "$pkg"
+            fi
+          done
+
+      - name: Sign SBOM with Cosign
+        run: |
+          for sbom_file in sbom/*.spdx.json; do
+            if [ -f "$sbom_file" ]; then
+              echo "Signing SBOM: $(basename $sbom_file)"
+              cosign sign-blob --yes \
+                --output-signature "signatures/$(basename $sbom_file).sig" \
+                --output-certificate "signatures/$(basename $sbom_file).cert" \
+                "$sbom_file"
+            fi
+          done
+
+      - name: Upload signatures as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentrt-signatures-${{ steps.version.outputs.VERSION }}
+          path: signatures/
+          retention-days: 90
+
+  # ===========================================================================
+  # Job 4: GitHub Release 发布
+  # ===========================================================================
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    needs: [sign-artifacts]
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets/
+
+      - name: Generate changelog (from git log)
+        run: |
+          git log --oneline --no-decorate $(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD > release-assets/CHANGELOG.txt 2>/dev/null || echo "Initial release" > release-assets/CHANGELOG.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AgentRT v${{ steps.version.outputs.VERSION }}
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          body_path: release-assets/CHANGELOG.txt
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, 'rc') || contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') }}
+          files: |
+            release-assets/agentrt-packages-${{ steps.version.outputs.VERSION }}/*
+            release-assets/agentrt-sbom-${{ steps.version.outputs.VERSION }}/*
+            release-assets/agentrt-signatures-${{ steps.version.outputs.VERSION }}/*
+          fail_on_unmatched_files: false

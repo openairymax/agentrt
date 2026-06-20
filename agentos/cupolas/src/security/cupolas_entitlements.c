@@ -8,7 +8,7 @@
 /**
  * @file cupolas_entitlements.c
  * @brief Entitlements Permission Declarations - Fine-grained Permission Mechanism Implementation
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026
  */
 
@@ -90,6 +90,7 @@ static void cupolas_free_string_array(char **arr, size_t count)
 
 static char **cupolas_parse_string_array(const char *content, size_t *count)
 {
+    char **arr = NULL;
     *count = 0;
     if (!content)
         return NULL;

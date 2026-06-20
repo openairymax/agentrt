@@ -269,7 +269,7 @@ tool_service_register(svc, &meta);
 ```c
 tool_execute_request_t req = {
     .tool_id = "web-search",
-    .params_json = "{\"query\":\"AgentOS architecture\",\"limit\":10}",
+    .params_json = "{\"query\":\"AgentRT architecture\",\"limit\":10}",
     .stream = 0
 };
 

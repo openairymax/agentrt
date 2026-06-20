@@ -33,6 +33,15 @@ typedef struct memory_pool_block {
 } memory_pool_block_t;
 
 /**
+ * @brief 旧内存区域链表节点（用于追踪扩展时产生的旧区域，销毁时统一释放）
+ */
+typedef struct memory_region_node {
+    void *region;                     /**< 旧内存区域指针 */
+    size_t region_size;               /**< 旧内存区域大小 */
+    struct memory_region_node *next;  /**< 下一个旧区域 */
+} memory_region_node_t;
+
+/**
  * @brief 内存池内部结? */
 struct memory_pool {
     // 配置选项
@@ -55,6 +64,9 @@ struct memory_pool {
 
     // 名称（用于调试）
     char *name; /**< 内存池名?*/
+
+    /* P1.20.3: 旧内存区域追踪链表（扩展时产生，销毁时统一释放） */
+    memory_region_node_t *old_regions; /**< 旧内存区域链表头 */
 };
 
 /**
@@ -156,21 +168,26 @@ static bool memory_pool_allocate_blocks(memory_pool_t *pool, size_t block_count)
         return false;
     }
 
-    // 分配内存区域
+    // 分配内存区域（新增块使用独立内存区域，避免 realloc 导致旧指针失效）
     void *new_memory = memory_aligned_alloc(sizeof(void *), total_size, "memory_pool");
     if (new_memory == NULL) {
         return false;
     }
 
-    // 如果已有内存区域，需要合并（需要重新分配内存区域）
+    // 注意：不使用 realloc 合并旧内存区域，因为旧块指针指向旧区域，
+    // realloc 移动内存后会导致所有已分配块的指针失效。
+    // 将旧内存区域记录到 old_regions 链表，销毁时统一释放。
     if (pool->memory_area != NULL) {
-        void *merged = memory_realloc(pool->memory_area, total_size, "memory_pool_expand");
-        if (merged == NULL) {
-            memory_free(new_memory);
-            return false;
+        memory_region_node_t *node =
+            (memory_region_node_t *)memory_calloc(sizeof(memory_region_node_t), "old_region_node");
+        if (node) {
+            node->region = pool->memory_area;
+            node->region_size = pool->memory_area_size;
+            node->next = pool->old_regions;
+            pool->old_regions = node;
         }
-        memory_free(new_memory);
-        new_memory = merged;
+        AGENTOS_LOG_DEBUG("memory_pool: expanding with new region (old=%p, new=%p, old_size=%zu, new_size=%zu)",
+                          pool->memory_area, new_memory, pool->memory_area_size, total_size);
     }
 
     pool->memory_area = new_memory;
@@ -239,6 +256,18 @@ static void memory_pool_free_blocks(memory_pool_t *pool)
         pool->memory_area_size = 0;
     }
 
+    /* 释放所有旧内存区域（扩展时产生的独立区域） */
+    memory_region_node_t *region = pool->old_regions;
+    while (region) {
+        memory_region_node_t *next = region->next;
+        if (region->region) {
+            memory_free(region->region);
+        }
+        memory_free(region);
+        region = next;
+    }
+    pool->old_regions = NULL;
+
     if (pool->blocks != NULL) {
         memory_free(pool->blocks);
         pool->blocks = NULL;
@@ -257,6 +286,11 @@ memory_pool_t *memory_pool_create(const memory_pool_options_t *options)
 {
     if (options == NULL || options->block_size == 0)
         return NULL;
+
+    AGENTOS_LOG_INFO("memory_pool: memory_pool_create (block_size=%zu, initial_blocks=%zu, max_blocks=%zu, thread_safe=%s, name=%s)",
+                     options->block_size, options->initial_blocks, options->max_blocks,
+                     options->thread_safe ? "true" : "false",
+                     options->name ? options->name : "(unnamed)");
 
     // 分配内存池结
     memory_pool_t *pool = memory_calloc(sizeof(memory_pool_t), "memory_pool_instance");
@@ -309,6 +343,9 @@ memory_pool_t *memory_pool_create(const memory_pool_options_t *options)
 
     memory_pool_unlock(pool);
 
+    AGENTOS_LOG_INFO("memory_pool: memory_pool_create ok (pool=%p, block_size=%zu, total_blocks=%zu)",
+                     (void *)pool, pool->options.block_size, pool->stats.total_blocks);
+
     return pool;
 }
 
@@ -317,6 +354,14 @@ void memory_pool_destroy(memory_pool_t *pool)
     if (pool == NULL) {
         return;
     }
+
+    const char *pool_name = pool->name ? pool->name : "(unnamed)";
+    AGENTOS_LOG_INFO("memory_pool: memory_pool_destroy (pool=%p, name=%s, total_blocks=%zu, "
+                     "allocated=%zu, free=%zu, allocs=%" PRIu64 ", frees=%" PRIu64 ", hits=%" PRIu64 ", miss=%" PRIu64 ")",
+                     (void *)pool, pool_name, pool->stats.total_blocks,
+                     pool->stats.allocated_blocks, pool->stats.free_blocks,
+                     pool->stats.allocation_count, pool->stats.free_count,
+                     pool->stats.hit_count, pool->stats.miss_count);
 
     size_t leaked_blocks = 0;
     const char *pool_name_for_log = NULL;
@@ -364,9 +409,12 @@ void *memory_pool_alloc(memory_pool_t *pool)
     // 如果没有空闲块，尝试扩展
     if (pool->free_list == NULL) {
         pool->stats.miss_count++;
+        AGENTOS_LOG_DEBUG("memory_pool: memory_pool_alloc MISS (pool=%p, free_blocks=0, miss#=%" PRIu64 ")",
+                          (void *)pool, pool->stats.miss_count);
 
         if (!memory_pool_allocate_blocks(pool, pool->options.expansion_size)) {
             memory_pool_unlock(pool);
+            AGENTOS_LOG_WARN("memory_pool: memory_pool_alloc EXPAND_FAILED (pool=%p)", (void *)pool);
             return NULL;
         }
     } else {
@@ -392,6 +440,12 @@ void *memory_pool_alloc(memory_pool_t *pool)
 
     memory_pool_unlock(pool);
 
+    AGENTOS_LOG_DEBUG("memory_pool: memory_pool_alloc ok (pool=%p, ptr=%p, block_index=%zu, "
+                      "free=%zu/%zu, alloc#=%" PRIu64 ")",
+                      (void *)pool, data_ptr, block->index,
+                      pool->stats.free_blocks, pool->stats.total_blocks,
+                      pool->stats.allocation_count);
+
     return data_ptr;
 }
 
@@ -402,6 +456,109 @@ void *memory_pool_calloc(memory_pool_t *pool)
         __builtin_memset(ptr, 0, pool->options.block_size);
     }
     return ptr;
+}
+
+/* ==================== P1.20.3: 批量操作实现 ==================== */
+
+size_t memory_pool_batch_alloc(memory_pool_t *pool, size_t count, void **out_blocks)
+{
+    if (pool == NULL || out_blocks == NULL || count == 0) {
+        return 0;
+    }
+
+    AGENTOS_LOG_DEBUG("memory_pool: memory_pool_batch_alloc START (pool=%p, count=%zu, free=%zu)",
+                      (void *)pool, count, pool->stats.free_blocks);
+
+    memory_pool_lock(pool);
+
+    size_t allocated = 0;
+    for (size_t i = 0; i < count; i++) {
+        /* 如果空闲链表为空，尝试扩展 */
+        if (pool->free_list == NULL) {
+            if (!memory_pool_allocate_blocks(pool, pool->options.expansion_size)) {
+                break; /* 扩展失败，返回已分配的数量 */
+            }
+        }
+
+        /* 从空闲链表获取一个块 */
+        memory_pool_block_t *block = pool->free_list;
+        pool->free_list = block->next;
+
+        block->allocated = true;
+        block->next = NULL;
+
+        void *data_ptr = (uint8_t *)block + sizeof(memory_pool_block_t);
+        out_blocks[allocated] = data_ptr;
+
+        pool->stats.allocated_blocks++;
+        pool->stats.free_blocks--;
+        pool->stats.used_memory += pool->options.block_size;
+        pool->stats.allocation_count++;
+        allocated++;
+    }
+
+    /* 更新 hit/miss 统计 */
+    pool->stats.hit_count += allocated;
+    if (allocated < count) {
+        pool->stats.miss_count += (count - allocated);
+    }
+
+    memory_pool_unlock(pool);
+
+    AGENTOS_LOG_DEBUG("memory_pool: memory_pool_batch_alloc DONE (pool=%p, requested=%zu, allocated=%zu, "
+                      "free=%zu/%zu, alloc_total=%" PRIu64 ")",
+                      (void *)pool, count, allocated,
+                      pool->stats.free_blocks, pool->stats.total_blocks,
+                      pool->stats.allocation_count);
+
+    return allocated;
+}
+
+size_t memory_pool_batch_free(memory_pool_t *pool, void **blocks, size_t count)
+{
+    if (pool == NULL || blocks == NULL || count == 0) {
+        return 0;
+    }
+
+    AGENTOS_LOG_DEBUG("memory_pool: memory_pool_batch_free START (pool=%p, count=%zu, allocated=%zu)",
+                      (void *)pool, count, pool->stats.allocated_blocks);
+
+    memory_pool_lock(pool);
+
+    size_t freed = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (blocks[i] == NULL) continue;
+
+        memory_pool_block_t *block =
+            (memory_pool_block_t *)((uint8_t *)blocks[i] - sizeof(memory_pool_block_t));
+
+        /* O(1) 所有权验证 */
+        if (block->pool != pool || !block->allocated) {
+            AGENTOS_LOG_WARN("memory_pool: memory_pool_batch_free skip invalid block (pool=%p, ptr=%p)",
+                             (void *)pool, blocks[i]);
+            continue;
+        }
+
+        block->allocated = false;
+        block->next = pool->free_list;
+        pool->free_list = block;
+
+        pool->stats.allocated_blocks--;
+        pool->stats.free_blocks++;
+        pool->stats.used_memory -= pool->options.block_size;
+        pool->stats.free_count++;
+        freed++;
+    }
+
+    memory_pool_unlock(pool);
+
+    AGENTOS_LOG_DEBUG("memory_pool: memory_pool_batch_free DONE (pool=%p, count=%zu, freed=%zu, "
+                      "free=%zu/%zu, free_total=%" PRIu64 ")",
+                      (void *)pool, count, freed,
+                      pool->stats.free_blocks, pool->stats.total_blocks,
+                      pool->stats.free_count);
+
+    return freed;
 }
 
 void memory_pool_free(memory_pool_t *pool, void *ptr)
@@ -437,6 +594,12 @@ void memory_pool_free(memory_pool_t *pool, void *ptr)
     pool->stats.free_count++;
 
     memory_pool_unlock(pool);
+
+    AGENTOS_LOG_DEBUG("memory_pool: memory_pool_free ok (pool=%p, ptr=%p, block_index=%zu, "
+                      "free=%zu/%zu, free#=%" PRIu64 ")",
+                      (void *)pool, ptr, block->index,
+                      pool->stats.free_blocks, pool->stats.total_blocks,
+                      pool->stats.free_count);
 }
 
 bool memory_pool_get_stats(memory_pool_t *pool, memory_pool_stats_t *stats)
@@ -475,6 +638,8 @@ bool memory_pool_prealloc(memory_pool_t *pool, size_t count)
         return false;
     }
 
+    AGENTOS_LOG_INFO("memory_pool: memory_pool_prealloc (pool=%p, count=%zu)", (void *)pool, count);
+
     memory_pool_lock(pool);
     bool result = memory_pool_allocate_blocks(pool, count);
     memory_pool_unlock(pool);
@@ -487,6 +652,9 @@ void memory_pool_clear(memory_pool_t *pool)
     if (pool == NULL) {
         return;
     }
+
+    AGENTOS_LOG_INFO("memory_pool: memory_pool_clear (pool=%p, allocated=%zu, total=%zu)",
+                     (void *)pool, pool->stats.allocated_blocks, pool->stats.total_blocks);
 
     memory_pool_lock(pool);
 
@@ -545,6 +713,10 @@ bool memory_pool_expand(memory_pool_t *pool, size_t additional_blocks)
         return false;
     }
 
+    AGENTOS_LOG_INFO("memory_pool: memory_pool_expand (pool=%p, additional=%zu, total=%zu→%zu)",
+                     (void *)pool, additional_blocks,
+                     pool->stats.total_blocks, pool->stats.total_blocks + additional_blocks);
+
     memory_pool_lock(pool);
     bool result = memory_pool_allocate_blocks(pool, additional_blocks);
     memory_pool_unlock(pool);
@@ -557,6 +729,9 @@ size_t memory_pool_shrink(memory_pool_t *pool, size_t blocks_to_keep)
     if (pool == NULL) {
         return 0;
     }
+
+    AGENTOS_LOG_INFO("memory_pool: memory_pool_shrink (pool=%p, keep=%zu, total=%zu)",
+                     (void *)pool, blocks_to_keep, pool->stats.total_blocks);
 
     memory_pool_lock(pool);
 

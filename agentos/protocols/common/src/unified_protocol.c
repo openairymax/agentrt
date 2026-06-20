@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file unified_protocol.c
  * @brief Unified Protocol Implementation

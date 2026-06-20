@@ -4,6 +4,7 @@
 
 pub mod config_cmd;
 pub mod create;
+pub mod db;
 pub mod deploy;
 pub mod init;
 pub mod llm;

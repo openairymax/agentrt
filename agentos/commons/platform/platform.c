@@ -627,6 +627,18 @@ uint64_t agentos_time_ms(void)
     return agentos_time_ns() / 1000000ULL;
 }
 
+void agentos_sleep_ms(uint32_t ms)
+{
+#ifdef _WIN32
+    Sleep(ms);
+#else
+    struct timespec ts;
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000L;
+    nanosleep(&ts, NULL);
+#endif
+}
+
 /* ==================== 随机数接口 ==================== */
 
 static AGENTOS_THREAD_LOCAL unsigned int g_random_seed = 0;

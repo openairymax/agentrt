@@ -34,9 +34,11 @@
 
 /* C-L02: llm_d → CoreLoopThree */
 #include "llm_service.h"
+#include "llm_svc_adapter.h"
 
 /* C-L04: tool_d → CoreLoopThree */
 #include "tool_service.h"
+#include "tool_svc_adapter.h"
 
 /* C-L01: Manager → CoreLoopThree — YAML config loader bridge */
 #include "config_loader.h"
@@ -85,11 +87,17 @@ struct agentos_cognition_engine {
 
     sc_stream_critic_t *stream_critic;
 
-    /* C-L02: llm_d → CoreLoopThree — external LLM service handle */
+    /* C-L02: llm_d → CoreLoopThree — external LLM service handle (direct) */
     llm_service_t *llm_svc;
+
+    /* C-L02: llm_d → CoreLoopThree — IPC adapter (preferred over direct llm_svc) */
+    llm_svc_adapter_t *llm_adapter;
 
     /* C-L04: tool_d → CoreLoopThree — external tool service handle */
     tool_service_t *tool_svc;
+
+    /* C-L04: tool_d → CoreLoopThree — IPC adapter (preferred over direct tool_svc) */
+    tool_svc_adapter_t *tool_adapter;
 
     /* C-L07: Checkpoint → CoreLoopThree — auto-checkpoint state */
     int checkpoint_enabled;
@@ -228,7 +236,9 @@ agentos_error_t agentos_cognition_create_ex_take(const agentos_cognition_config_
 
     /* C-L02 / C-L04: service handles initialized to NULL, set via setters */
     engine->llm_svc = NULL;
+    engine->llm_adapter = NULL;
     engine->tool_svc = NULL;
+    engine->tool_adapter = NULL;
 
     /* C-L12: memory provider initialized to NULL, set via setter */
     engine->memory_provider = NULL;
@@ -349,9 +359,27 @@ void agentos_cognition_set_llm_service(agentos_cognition_engine_t *engine,
     engine->llm_svc = llm_svc;
     agentos_mutex_unlock(engine->lock);
     if (llm_svc) {
-        AGENTOS_LOG_INFO("C-L02: LLM service attached to cognition engine");
+        AGENTOS_LOG_INFO("C-L02: LLM service attached to cognition engine (direct)");
     } else {
         AGENTOS_LOG_INFO("C-L02: LLM service detached from cognition engine");
+    }
+}
+
+/* C-L02: llm_d → CoreLoopThree — IPC adapter (P1.2.1 preferred path) */
+void agentos_cognition_set_llm_adapter(agentos_cognition_engine_t *engine,
+                                        llm_svc_adapter_t *adapter)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    engine->llm_adapter = adapter;
+    agentos_mutex_unlock(engine->lock);
+    if (adapter) {
+        AGENTOS_LOG_INFO("C-L02: LLM IPC adapter attached to cognition engine"
+                         " (requests=%llu errors=%llu)",
+                         (unsigned long long)0, (unsigned long long)0);
+    } else {
+        AGENTOS_LOG_INFO("C-L02: LLM IPC adapter detached from cognition engine");
     }
 }
 
@@ -385,9 +413,25 @@ void agentos_cognition_set_tool_service(agentos_cognition_engine_t *engine,
     engine->tool_svc = tool_svc;
     agentos_mutex_unlock(engine->lock);
     if (tool_svc) {
-        AGENTOS_LOG_INFO("C-L04: Tool service attached to cognition engine");
+        AGENTOS_LOG_INFO("C-L04: Tool service attached to cognition engine (direct)");
     } else {
         AGENTOS_LOG_INFO("C-L04: Tool service detached from cognition engine");
+    }
+}
+
+/* C-L04: tool_d → CoreLoopThree — IPC adapter (P1.3.1 preferred path) */
+void agentos_cognition_set_tool_adapter(agentos_cognition_engine_t *engine,
+                                         tool_svc_adapter_t *adapter)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    engine->tool_adapter = adapter;
+    agentos_mutex_unlock(engine->lock);
+    if (adapter) {
+        AGENTOS_LOG_INFO("C-L04: Tool IPC adapter attached to cognition engine");
+    } else {
+        AGENTOS_LOG_INFO("C-L04: Tool IPC adapter detached from cognition engine");
     }
 }
 
@@ -740,14 +784,16 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
 
         /* ── C-L02: llm_d → CoreLoopThree — external LLM invocation ── */
         llm_service_t *llm_svc = NULL;
+        llm_svc_adapter_t *llm_adapter = NULL;
         agentos_mutex_lock(engine->lock);
         llm_svc = engine->llm_svc;
+        llm_adapter = engine->llm_adapter;
         agentos_mutex_unlock(engine->lock);
 
         char *llm_response_text = NULL;
         size_t llm_response_len = 0;
 
-        if (llm_svc) {
+        if (llm_adapter || llm_svc) {
             llm_message_t msgs[2];
             msgs[0].role = "system";
             msgs[0].content =
@@ -780,16 +826,42 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             stream_cb_data = engine->llm_stream_user_data;
             agentos_mutex_unlock(engine->lock);
 
-            if (use_streaming && stream_cb) {
-                /* Streaming mode: chunks delivered via callback, full response assembled */
-                llm_cfg.stream = 1;
-                llm_ret = llm_service_complete_stream(llm_svc, &llm_cfg,
-                                                      stream_cb, stream_cb_data,
-                                                      &llm_resp);
-                AGENTOS_LOG_DEBUG("C-L02: Streaming LLM complete: ret=%d", llm_ret);
-            } else {
-                /* Sync mode: blocking until full response */
-                llm_ret = llm_service_complete(llm_svc, &llm_cfg, &llm_resp);
+            /* P1.2.1: Prefer IPC adapter path over direct LLM service */
+            if (llm_adapter) {
+                AGENTOS_LOG_DEBUG("C-L02: Using IPC adapter for LLM request"
+                                  " (streaming=%s)",
+                                  (use_streaming && stream_cb) ? "on" : "off");
+
+                if (use_streaming && stream_cb) {
+                    /* P1.2.2: Streaming via IPC adapter */
+                    llm_cfg.stream = 1;
+                    llm_ret = llm_svc_adapter_complete_stream(
+                        llm_adapter, &llm_cfg,
+                        stream_cb, stream_cb_data, &llm_resp);
+                    AGENTOS_LOG_DEBUG("C-L02: IPC streaming complete: ret=%d", llm_ret);
+                } else {
+                    /* P1.2.1: Sync via IPC adapter */
+                    llm_ret = llm_svc_adapter_complete(
+                        llm_adapter, &llm_cfg, &llm_resp);
+                    AGENTOS_LOG_DEBUG("C-L02: IPC sync complete: ret=%d", llm_ret);
+                }
+            } else if (llm_svc) {
+                AGENTOS_LOG_DEBUG("C-L02: Using direct LLM service (no IPC adapter)"
+                                  " streaming=%s",
+                                  (use_streaming && stream_cb) ? "on" : "off");
+
+                if (use_streaming && stream_cb) {
+                    /* Streaming mode: chunks delivered via callback, full response assembled */
+                    llm_cfg.stream = 1;
+                    llm_ret = llm_service_complete_stream(llm_svc, &llm_cfg,
+                                                          stream_cb, stream_cb_data,
+                                                          &llm_resp);
+                    AGENTOS_LOG_DEBUG("C-L02: Direct streaming complete: ret=%d", llm_ret);
+                } else {
+                    /* Sync mode: blocking until full response */
+                    llm_ret = llm_service_complete(llm_svc, &llm_cfg, &llm_resp);
+                    AGENTOS_LOG_DEBUG("C-L02: Direct sync complete: ret=%d", llm_ret);
+                }
             }
 
             if (llm_ret == 0 && llm_resp && llm_resp->choices && llm_resp->choice_count > 0) {
@@ -945,13 +1017,18 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
     /* ── C-L04: tool_d → CoreLoopThree — external tool execution ── */
     {
         tool_service_t *tool_svc = NULL;
+        tool_svc_adapter_t *tool_adapter = NULL;
         agentos_mutex_lock(engine->lock);
         tool_svc = engine->tool_svc;
+        tool_adapter = engine->tool_adapter;
         agentos_mutex_unlock(engine->lock);
 
-        if (tool_svc && plan && plan->task_plan_nodes && plan->task_plan_node_count > 0) {
-            AGENTOS_LOG_DEBUG("C-L04: Dispatching %zu tool tasks to tool_d",
-                              plan->task_plan_node_count);
+        if ((tool_adapter || tool_svc) && plan && plan->task_plan_nodes
+            && plan->task_plan_node_count > 0) {
+            AGENTOS_LOG_DEBUG("C-L04: Dispatching %zu tool tasks to tool_d"
+                              " (adapter=%s)",
+                              plan->task_plan_node_count,
+                              tool_adapter ? "IPC" : (tool_svc ? "direct" : "none"));
 
             for (size_t i = 0; i < plan->task_plan_node_count; i++) {
                 agentos_task_node_t *node = &plan->task_plan_nodes[i];
@@ -968,7 +1045,19 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 tool_req.stream = 0;
 
                 tool_result_t *result = NULL;
-                int tool_err = tool_service_execute(tool_svc, &tool_req, &result);
+                int tool_err = -1;
+
+                /* P1.3.1: Prefer IPC adapter path over direct tool service */
+                if (tool_adapter) {
+                    tool_err = tool_svc_adapter_execute(
+                        tool_adapter, &tool_req, &result);
+                    AGENTOS_LOG_DEBUG("C-L04: IPC tool '%s' execute: ret=%d",
+                                      node->task_node_handler_name, tool_err);
+                } else if (tool_svc) {
+                    tool_err = tool_service_execute(tool_svc, &tool_req, &result);
+                    AGENTOS_LOG_DEBUG("C-L04: Direct tool '%s' execute: ret=%d",
+                                      node->task_node_handler_name, tool_err);
+                }
                 if (tool_err == 0 && result && result->success == 0) {
                     AGENTOS_LOG_DEBUG("C-L04: Tool '%s' executed successfully"
                                       " (duration=%llums)",

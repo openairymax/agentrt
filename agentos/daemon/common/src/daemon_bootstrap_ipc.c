@@ -87,6 +87,23 @@ daemon_bootstrap_ipc_t *daemon_bootstrap_ipc_start(const char *daemon_name,
     bipc->protocol = protocol;
     bipc->running = true;
 
+    /* P1.8: 启用背压控制（生产环境推荐） */
+    {
+        ipc_bp_config_t bp_cfg;
+        __builtin_memset(&bp_cfg, 0, sizeof(bp_cfg));
+        bp_cfg.queue_capacity = 1024;
+        bp_cfg.slow_threshold_pct = 80;
+        bp_cfg.drop_threshold_pct = 90;
+        bp_cfg.reject_threshold_pct = 95;
+        bp_cfg.recover_threshold_pct = 60;
+        bp_cfg.sample_interval_ms = 5000;
+
+        if (ipc_bus_helper_enable_backpressure(bipc->ibh, &bp_cfg) == 0) {
+            SVC_LOG_INFO("C-L09: Backpressure enabled for '%s' (capacity=%zu)",
+                         daemon_name, bp_cfg.queue_capacity);
+        }
+    }
+
     SVC_LOG_INFO("C-L09: IPC Bus bootstrapped for '%s' (channel=%s, proto=%s, endpoint=%s)",
                  daemon_name, channel_name,
                  ipc_bus_proto_to_string(protocol), endpoint);
@@ -129,6 +146,23 @@ daemon_bootstrap_ipc_t *daemon_bootstrap_ipc_start_unix(const char *daemon_name,
     bipc->protocol = protocol;
     bipc->running = true;
 
+    /* P1.8: 启用背压控制（Unix socket 版本） */
+    {
+        ipc_bp_config_t bp_cfg;
+        __builtin_memset(&bp_cfg, 0, sizeof(bp_cfg));
+        bp_cfg.queue_capacity = 1024;
+        bp_cfg.slow_threshold_pct = 80;
+        bp_cfg.drop_threshold_pct = 90;
+        bp_cfg.reject_threshold_pct = 95;
+        bp_cfg.recover_threshold_pct = 60;
+        bp_cfg.sample_interval_ms = 5000;
+
+        if (ipc_bus_helper_enable_backpressure(bipc->ibh, &bp_cfg) == 0) {
+            SVC_LOG_INFO("C-L09: Backpressure enabled for '%s' (capacity=%zu, unix)",
+                         daemon_name, bp_cfg.queue_capacity);
+        }
+    }
+
     SVC_LOG_INFO("C-L09: IPC Bus bootstrapped for '%s' (unix:%s, proto=%s)",
                  daemon_name, socket_path, ipc_bus_proto_to_string(protocol));
     return bipc;
@@ -162,6 +196,10 @@ int daemon_bootstrap_ipc_send(daemon_bootstrap_ipc_t *bipc,
                                const void *payload, size_t payload_size)
 {
     if (!bipc || !target_service || !payload) return -1;
+
+    SVC_LOG_DEBUG("C-L09: daemon_send [%s] → [%s] payload=%zub",
+                  bipc->daemon_name, target_service, payload_size);
+
     return ipc_bus_helper_route_auto(bipc->ibh, target_service,
                                       payload, payload_size);
 }

@@ -1,6 +1,6 @@
 /**
  * @file heapstore_batch.h
- * @brief AgentOS heapstore 批量写入接口
+ * @brief AgentRT heapstore 批量写入接口
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #ifndef AGENTOS_HEAPSTORE_BATCH_H
 #define AGENTOS_HEAPSTORE_BATCH_H
 

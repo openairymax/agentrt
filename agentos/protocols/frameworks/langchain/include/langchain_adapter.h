@@ -1,18 +1,19 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file langchain_adapter.h
- * @brief LangChain Framework Integration Adapter for AgentOS
+ * @brief LangChain Framework Integration Adapter for AgentRT
  *
  * LangChain 框架适配器，实现AgentOS与LangChain生态的完整集成。
  *
  * LangChain核心概念映射:
- * - Chain → AgentOS Task Pipeline
- * - Agent → AgentOS Agent + Protocol Session
- * - Tool → AgentOS MCP/OpenAI tool interface
- * - LLM → AgentOS LLM Daemon via protocol
- * - Memory → AgentOS MemoryRovol (L1-L4)
- * - Retriever → AgentOS memory.search protocol
+ * - Chain → AgentRT Task Pipeline
+ * - Agent → AgentRT Agent + Protocol Session
+ * - Tool → AgentRT MCP/OpenAI tool interface
+ * - LLM → AgentRT LLM Daemon via protocol
+ * - Memory → AgentRT MemoryRovol (L1-L4)
+ * - Retriever → AgentRT memory.search protocol
  *
  * 支持的LangChain组件:
  * 1. LCEL (LangChain Expression Language) 链式执行

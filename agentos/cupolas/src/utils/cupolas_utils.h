@@ -5,7 +5,7 @@
  * cupolas_utils.h - Common Utility Macros and Functions
  *
  * @brief Unified abstraction layer for Cupolas security module
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2026-04-05
  * @version 0.1.0
  *

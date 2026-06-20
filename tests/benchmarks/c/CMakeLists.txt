@@ -6,10 +6,18 @@ if(NOT TARGET svc_common)
     return()
 endif()
 
-add_executable(test_performance_benchmarks test_performance_benchmarks.c)
+add_executable(test_performance_benchmarks test_performance_benchmarks.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c
+)
+
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c
+    PROPERTIES COMPILE_FLAGS "-fno-lto"
+)
 
 target_include_directories(test_performance_benchmarks PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/corekern/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/syscall/include
@@ -22,6 +30,9 @@ target_include_directories(test_performance_benchmarks PRIVATE
 target_link_libraries(test_performance_benchmarks PRIVATE
     agentos_core
     agentos_syscall
+    -Wl,--whole-archive
+    agentos_coreloopthree
+    -Wl,--no-whole-archive
     svc_common
     Threads::Threads
     agentos_platform_libs

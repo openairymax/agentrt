@@ -15,7 +15,7 @@
 #include <string.h>
 
 /**
- * @brief 测试记忆引擎创建和销�?
+ * @brief 测试记忆引擎创建和销毁
  */
 static void test_memory_create_destroy() {
     agentos_memory_engine_t* engine = NULL;
@@ -33,25 +33,23 @@ static void test_memory_write() {
     agentos_memory_engine_t* engine = NULL;
     agentos_error_t err = agentos_memory_create(NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
-    // From data intelligence emerges. by spharx
         printf("test_memory_write: Failed to create engine\n");
         return;
     }
 
-    // 创建一个记忆记�?
     agentos_memory_record_t record = {
-        .record_id = NULL,
-        .id_len = 0,
-        .type = MEMORY_TYPE_RAW,
-        .timestamp_ns = 0,
-        .source_agent = "test_agent",
-        .source_len = strlen("test_agent"),
-        .trace_id = "test_trace",
-        .trace_len = strlen("test_trace"),
-        .data = (void*)"test data",
-        .data_len = strlen("test data"),
-        .importance = 0.5,
-        .access_count = 0
+        .memory_record_id = NULL,
+        .memory_record_id_len = 0,
+        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_timestamp_ns = 0,
+        .memory_record_source_agent = "test_agent",
+        .memory_record_source_len = strlen("test_agent"),
+        .memory_record_trace_id = "test_trace",
+        .memory_record_trace_len = strlen("test_trace"),
+        .memory_record_data = (void*)"test data",
+        .memory_record_data_len = strlen("test data"),
+        .memory_record_importance = 0.5f,
+        .memory_record_access_count = 0
     };
 
     char* record_id = NULL;
@@ -76,43 +74,41 @@ static void test_memory_query() {
         return;
     }
 
-    // 创建一个记忆记�?
     agentos_memory_record_t record = {
-        .record_id = NULL,
-        .id_len = 0,
-        .type = MEMORY_TYPE_RAW,
-        .timestamp_ns = 0,
-        .source_agent = "test_agent",
-        .source_len = strlen("test_agent"),
-        .trace_id = "test_trace",
-        .trace_len = strlen("test_trace"),
-        .data = (void*)"test data",
-        .data_len = strlen("test data"),
-        .importance = 0.5,
-        .access_count = 0
+        .memory_record_id = NULL,
+        .memory_record_id_len = 0,
+        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_timestamp_ns = 0,
+        .memory_record_source_agent = "test_agent",
+        .memory_record_source_len = strlen("test_agent"),
+        .memory_record_trace_id = "test_trace",
+        .memory_record_trace_len = strlen("test_trace"),
+        .memory_record_data = (void*)"test data",
+        .memory_record_data_len = strlen("test data"),
+        .memory_record_importance = 0.5f,
+        .memory_record_access_count = 0
     };
 
     char* record_id = NULL;
     err = agentos_memory_write(engine, &record, &record_id);
     if (err == AGENTOS_SUCCESS && record_id) {
-        // 创建查询条件
         agentos_memory_query_t query = {
-            .text = "test",
-            .text_len = strlen("test"),
-            .start_time = 0,
-            .end_time = 0,
-            .source_agent = NULL,
-            .trace_id = NULL,
-            .limit = 10,
-            .offset = 0,
-            .include_raw = 1
+            .memory_query_text = "test",
+            .memory_query_text_len = strlen("test"),
+            .memory_query_start_time = 0,
+            .memory_query_end_time = 0,
+            .memory_query_source_agent = NULL,
+            .memory_query_trace_id = NULL,
+            .memory_query_limit = 10,
+            .memory_query_offset = 0,
+            .memory_query_include_raw = 1
         };
 
-        agentos_memory_result_t* result = NULL;
+        agentos_memory_result_ext_t* result = NULL;
         err = agentos_memory_query(engine, &query, &result);
         printf("test_memory_query: %d\n", err);
         if (err == AGENTOS_SUCCESS && result) {
-            printf("Query results: %zu\n", result->count);
+            printf("Query results: %zu\n", result->memory_result_count);
             agentos_memory_result_free(result);
         }
 
@@ -133,31 +129,29 @@ static void test_memory_get() {
         return;
     }
 
-    // 创建一个记忆记�?
     agentos_memory_record_t record = {
-        .record_id = NULL,
-        .id_len = 0,
-        .type = MEMORY_TYPE_RAW,
-        .timestamp_ns = 0,
-        .source_agent = "test_agent",
-        .source_len = strlen("test_agent"),
-        .trace_id = "test_trace",
-        .trace_len = strlen("test_trace"),
-        .data = (void*)"test data",
-        .data_len = strlen("test data"),
-        .importance = 0.5,
-        .access_count = 0
+        .memory_record_id = NULL,
+        .memory_record_id_len = 0,
+        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_timestamp_ns = 0,
+        .memory_record_source_agent = "test_agent",
+        .memory_record_source_len = strlen("test_agent"),
+        .memory_record_trace_id = "test_trace",
+        .memory_record_trace_len = strlen("test_trace"),
+        .memory_record_data = (void*)"test data",
+        .memory_record_data_len = strlen("test data"),
+        .memory_record_importance = 0.5f,
+        .memory_record_access_count = 0
     };
 
     char* record_id = NULL;
     err = agentos_memory_write(engine, &record, &record_id);
     if (err == AGENTOS_SUCCESS && record_id) {
-        // 根据 ID 获取记录
         agentos_memory_record_t* retrieved_record = NULL;
         err = agentos_memory_get(engine, record_id, 1, &retrieved_record);
         printf("test_memory_get: %d\n", err);
         if (err == AGENTOS_SUCCESS && retrieved_record) {
-            printf("Retrieved record ID: %s\n", retrieved_record->record_id);
+            printf("Retrieved record ID: %s\n", retrieved_record->memory_record_id);
             agentos_memory_record_free(retrieved_record);
         }
 
@@ -178,26 +172,24 @@ static void test_memory_mount() {
         return;
     }
 
-    // 创建一个记忆记�?
     agentos_memory_record_t record = {
-        .record_id = NULL,
-        .id_len = 0,
-        .type = MEMORY_TYPE_RAW,
-        .timestamp_ns = 0,
-        .source_agent = "test_agent",
-        .source_len = strlen("test_agent"),
-        .trace_id = "test_trace",
-        .trace_len = strlen("test_trace"),
-        .data = (void*)"test data",
-        .data_len = strlen("test data"),
-        .importance = 0.5,
-        .access_count = 0
+        .memory_record_id = NULL,
+        .memory_record_id_len = 0,
+        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_timestamp_ns = 0,
+        .memory_record_source_agent = "test_agent",
+        .memory_record_source_len = strlen("test_agent"),
+        .memory_record_trace_id = "test_trace",
+        .memory_record_trace_len = strlen("test_trace"),
+        .memory_record_data = (void*)"test data",
+        .memory_record_data_len = strlen("test data"),
+        .memory_record_importance = 0.5f,
+        .memory_record_access_count = 0
     };
 
     char* record_id = NULL;
     err = agentos_memory_write(engine, &record, &record_id);
     if (err == AGENTOS_SUCCESS && record_id) {
-        // 挂载记忆
         err = agentos_memory_mount(engine, record_id, "test_context");
         printf("test_memory_mount: %d\n", err);
 
@@ -218,7 +210,6 @@ static void test_memory_evolve() {
         return;
     }
 
-    // 触发记忆进化
     err = agentos_memory_evolve(engine, 0);
     printf("test_memory_evolve: %d\n", err);
 
@@ -226,7 +217,7 @@ static void test_memory_evolve() {
 }
 
 /**
- * @brief 测试记忆引擎健康检�?
+ * @brief 测试记忆引擎健康检查
  */
 static void test_memory_health_check() {
     agentos_memory_engine_t* engine = NULL;

@@ -36,3 +36,5 @@ endif()
 
 install(TARGETS agentos_memory DESTINATION lib)
 install(FILES src/memory_provider.h DESTINATION include/agentos/memory)
+
+target_link_libraries(agentos_memory PUBLIC agentos_common)

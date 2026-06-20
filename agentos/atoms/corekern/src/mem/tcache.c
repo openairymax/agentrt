@@ -9,7 +9,7 @@
  * P1.20: 每个线程维护本地空闲链表，减少全局池锁竞争。
  */
 
-#include "tcache.h"
+#include "../../include/tcache.h"
 
 #include <stdlib.h>
 #include <string.h>

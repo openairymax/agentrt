@@ -23,13 +23,13 @@ extern "C" {
 #endif
 
 /* ============================================================================
- * Unified Error Codes (Compatible with AgentOS Standard)
+ * Unified Error Codes (Compatible with AgentRT Standard)
  * ============================================================================ */
 
 /**
  * @brief Unified Error Codes
  *
- * Used in public API layer, compatible with AgentOS standard error codes.
+ * Used in public API layer, compatible with AgentRT standard error codes.
  * Error codes follow these conventions:
  * - Success: 0
  * - Invalid parameters: -1 to -99

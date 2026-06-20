@@ -11,6 +11,7 @@
  * @note 测试覆盖目标: 90%+
  */
 
+// @owner: team-B
 #include "heapstore.h"
 #include "private.h"
 

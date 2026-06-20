@@ -291,7 +291,7 @@ static agentos_cognition_engine_t *g_cognition_engine = NULL;
 
 agentos_error_t agentos_syscalls_init(void)
 {
-    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &g_cognition_engine);
+    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &g_cognition_engine);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_WARN("Cognition engine init failed: %d, continuing without cognition", err);
     }

@@ -87,6 +87,16 @@ void prometheus_histogram_observe(const char *name, double value);
  */
 char *prometheus_exporter_get_metrics(void);
 
+/* ==================== C-L10: 抓取统计 ==================== */
+
+/**
+ * @brief C-L10: 获取 Prometheus scrape 统计
+ *
+ * @param out_count  输出：总抓取次数（可为 NULL）
+ * @param out_errors 输出：抓取错误次数（可为 NULL）
+ */
+void prometheus_exporter_get_scrape_stats(uint64_t *out_count, uint64_t *out_errors);
+
 #ifdef __cplusplus
 }
 #endif

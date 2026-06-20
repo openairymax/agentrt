@@ -8,7 +8,7 @@
 /**
  * @file audit_logger.c
  * @brief Audit Logger Implementation
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2024
  */
 
@@ -16,6 +16,8 @@
 #include "audit_queue.h"
 #include "audit_rotator.h"
 #include "utils/cupolas_utils.h"
+
+#include "memory_prealloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>

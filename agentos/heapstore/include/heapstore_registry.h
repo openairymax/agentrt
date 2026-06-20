@@ -1,6 +1,6 @@
 /**
  * @file heapstore_registry.h
- * @brief AgentOS 数据分区注册表接口
+ * @brief AgentRT 数据分区注册表接口
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
@@ -9,6 +9,7 @@
  * "From data intelligence emerges."
  */
 
+// @owner: team-B
 #ifndef AGENTOS_heapstore_REGISTRY_H
 #define AGENTOS_heapstore_REGISTRY_H
 

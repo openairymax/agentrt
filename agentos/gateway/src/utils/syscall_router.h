@@ -12,6 +12,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #ifndef GATEWAY_SYSCALL_ROUTER_H
 #define GATEWAY_SYSCALL_ROUTER_H
 

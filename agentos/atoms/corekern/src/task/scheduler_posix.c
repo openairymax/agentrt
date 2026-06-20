@@ -146,8 +146,10 @@ static void *posix_thread_create(task_info_core_t *info, size_t stack_size)
     }
 
     /* CROSS-01: 使用平台抽象层创建线程 */
-    /* TODO: agentos_platform_thread_create 不支持自定义栈大小，
-     * 当 stack_size > 0 时需要扩展 API 或使用其他机制 */
+    /* NOTE: agentos_platform_thread_create 当前使用默认栈大小。
+     * 当需要自定义栈大小时（stack_size > 0），需扩展平台抽象层 API，
+     * 例如新增 agentos_platform_thread_create_ex() 支持 pthread_attr_setstacksize。
+     * 当前阶段使用默认栈大小，忽略 stack_size 参数。 */
     (void)stack_size;
     data->has_custom_stack_size = 0;
 

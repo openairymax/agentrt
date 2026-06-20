@@ -6,7 +6,7 @@
  * @details
  * 提供安全字符串操作函数，替代不安全的 strcpy/strcat/sprintf/gets 等。
  * 所有函数均进行边界检查和空指针验证，防止缓冲区溢出。
- * 遵循 AgentOS 安全编码规范 3.2.2 节要求。
+ * 遵循 AgentRT 安全编码规范 3.2.2 节要求。
  */
 
 #ifndef AGENTOS_SAFE_STRING_UTILS_H

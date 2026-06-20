@@ -243,4 +243,4 @@ jobs:
         run: |
           chmod +x scripts/ci/pipeline/quality-gate.sh
           bash scripts/ci/pipeline/quality-gate.sh --strict
-        continue-on-error: true  # 不阻塞CI，但报告问题
+        continue-on-error: false

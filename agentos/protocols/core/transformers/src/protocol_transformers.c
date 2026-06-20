@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file protocol_transformers.c
  * @brief Protocol Message Transformers — Complete Implementation
