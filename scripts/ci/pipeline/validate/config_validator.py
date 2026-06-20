@@ -3,7 +3,7 @@
 # config_validator.py — AgentRT agentos.yaml Schema 校验器 (ACC-C19)
 #
 # 用法:
-#   python3 scripts/ci/pipeline/config_validator.py [--config agentos.yaml] [--strict]
+#   python3 scripts/ci/pipeline/validate/config_validator.py [--config agentos.yaml] [--strict]
 #
 # 校验项:
 #   1. YAML 语法合法性
@@ -381,8 +381,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(
         description="AgentRT agentos.yaml Schema Validator (ACC-C19)")
-    parser.add_argument("--config", default="agentos.yaml",
-                        help="Path to agentos.yaml (default: agentos.yaml)")
+    parser.add_argument("--config", default="configs/agentos.yaml",
+                        help="Path to agentos.yaml (default: configs/agentos.yaml)")
     parser.add_argument("--strict", action="store_true",
                         help="Treat warnings as errors")
     parser.add_argument("--json", action="store_true",
@@ -393,7 +393,7 @@ def main():
     if not os.path.isabs(config_path):
         # Try relative to project root
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.abspath(os.path.join(script_dir, "..", "..", ".."))
+        project_root = os.path.abspath(os.path.join(script_dir, "..", "..", "..", ".."))
         config_path = os.path.join(project_root, config_path)
 
     all_errors = []

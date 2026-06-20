@@ -4,7 +4,7 @@
 # P4.8: 6 个子仓库版本一致性检查 → API 合约兼容性 → 依赖版本对齐
 #
 # 用法:
-#   bash scripts/ci/pipeline/cross-repo-verify.sh [--ci] [--json]
+#   bash scripts/ci/pipeline/validate/cross-repo-verify.sh [--ci] [--json]
 #
 # 检查项:
 #   1. 版本一致性: 所有子仓库版本号对齐
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${PROJECT_ROOT}/.." && pwd)"
 ARTIFACT_DIR="${PROJECT_ROOT}/ci-artifacts/cross-repo"
 

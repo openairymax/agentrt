@@ -2,7 +2,7 @@
 # ──────────────────────────────────────────────────────────
 # AgentRT Installer Script (Linux/macOS)
 # Version: 0.1.1
-# Usage: curl -fsSL https://raw.githubusercontent.com/spharx/agentrt/main/scripts/get-agentrt.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/spharx/agentrt/main/scripts/install/get-agentrt.sh | bash
 # ──────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -194,7 +194,7 @@ echo -e "  2. 运行 Agent:"
 echo -e "     ${CYAN}cd my-first-agent && agentrt run \"你好，世界！\"${NC}"
 echo ""
 echo -e "  3. 或使用 QuickStart 脚本:"
-echo -e "     ${CYAN}${INSTALL_DIR}/AgentRT/scripts/ops/quickstart.sh${NC}"
+echo -e "     ${CYAN}${INSTALL_DIR}/AgentRT/scripts/ops/bin/quickstart.sh${NC}"
 echo ""
 echo -e "  4. 查看文档:"
 echo -e "     ${CYAN}agentrt --help${NC}"

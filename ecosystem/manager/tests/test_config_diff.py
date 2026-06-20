@@ -8,7 +8,7 @@ from pathlib import Path
 # Add manager tools to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from tools.config_diff import (
+from tools.src.config_diff import (
     DiffType,
     ValueType,
     DiffEntry,

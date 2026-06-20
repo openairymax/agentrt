@@ -4,7 +4,7 @@
 # P1.18: CI/CD 集成测试 job 接入
 #
 # 用法:
-#   bash scripts/ci/pipeline/run-connection-tests.sh [--line L01] [--all] [--ci]
+#   bash scripts/ci/pipeline/test/run-connection-tests.sh [--line L01] [--all] [--ci]
 #
 # 选项:
 #   --line <ID>   只运行指定连接线测试（如 L01, L02, ... L12）
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 COMPOSE_FILE="${PROJECT_ROOT}/deploy/docker/docker-compose.test.yml"
 INTEG_SCRIPT="${SCRIPT_DIR}/test-integration.sh"
 ARTIFACT_DIR="${PROJECT_ROOT}/ci-artifacts/tests"

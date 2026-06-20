@@ -300,7 +300,7 @@ if __name__ == '__main__':
     target = sys.argv[1] if len(sys.argv) > 1 else 'agentos'
     if not os.path.isabs(target):
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        target = os.path.normpath(os.path.join(script_dir, '..', '..', target))
+        target = os.path.normpath(os.path.join(script_dir, '..', '..', '..', target))
 
     print(f"Scanning: {target}")
     findings = scan_directory(target)

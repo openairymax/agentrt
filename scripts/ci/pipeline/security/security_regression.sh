@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AGENTOS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+AGENTOS_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 BUILD_DIR="${AGENTOS_BUILD_DIR:-$(mktemp -d /tmp/agentos_build_XXXXXX)}"
 
 COLOR_RED='\033[0;31m'

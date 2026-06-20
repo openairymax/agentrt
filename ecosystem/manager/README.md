@@ -194,13 +194,13 @@ python manager/scripts/apply_config.py --env production
 python manager/tools/drift_detector.py --action both --output drift_report.json
 
 # 配置差异对比
-python manager/tools/config_diff.py config_v1.json config_v2.json
+python manager/tools/src/config_diff.py config_v1.json config_v2.json
 
 # 版本历史清理
 python manager/tools/config_version_cleanup.py --keep 10
 
 # 审计日志生成
-python manager/tools/audit_log_generator.py --count 10 --output audit.json
+python manager/tools/src/audit_log_generator.py --count 10 --output audit.json
 
 # 运行所有测试 — 计划中
 python manager/tests/run_all_tests.py --verbose

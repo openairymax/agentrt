@@ -165,7 +165,7 @@ echo -e "  4. 运行 Agent:"
 echo -e "     ${CYAN}agentrt run --agent-file agents/main.agent.yaml${NC}"
 echo ""
 echo -e "  5. 尝试其他示例:"
-echo -e "     ${CYAN}./scripts/ops/quickstart.sh weather-agent ./my-weather-agent${NC}"
+echo -e "     ${CYAN}./scripts/ops/bin/quickstart.sh weather-agent ./my-weather-agent${NC}"
 echo ""
 echo -e "${BOLD}可用示例项目:${NC}"
 for d in "${EXAMPLES_DIR}"/*/; do
