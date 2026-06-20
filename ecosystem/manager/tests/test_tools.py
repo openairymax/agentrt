@@ -9,14 +9,14 @@ from pathlib import Path
 
 import pytest
 
-from ecosystem.manager.tools.audit_log_generator import (
+from ecosystem.manager.tools.src.audit_log_generator import (
     ActionType, OperatorType, Operator, ChangeItem, Checksum,
     Metadata, Result, AuditLogEntry, AuditLogGenerator,
 )
-from ecosystem.manager.tools.drift_detector import (
+from ecosystem.manager.tools.src.drift_detector import (
     DriftSeverity, DriftType, DriftItem, DriftReport, ConfigDriftDetector,
 )
-from ecosystem.manager.tools.config_version_cleanup import (
+from ecosystem.manager.tools.src.config_version_cleanup import (
     VersionInfo, CleanupResult, ConfigVersionCleanup, format_bytes,
 )
 

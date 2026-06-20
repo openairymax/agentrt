@@ -77,7 +77,7 @@ agentos_error_t agentos_config_load(const char *path, char **out_json)
 
 #include <sys/stat.h>
 
-#define AGENTOS_DEFAULT_CONFIG_PATH  "./agentos.yaml"
+#define AGENTOS_DEFAULT_CONFIG_PATH  "./configs/agentos.yaml"
 #define AGENTOS_CONFIG_WATCH_INTERVAL_MS 1000
 #define AGENTOS_MAX_RELOAD_CALLBACKS 32
 
