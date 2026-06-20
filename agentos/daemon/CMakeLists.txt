@@ -6,6 +6,9 @@ message(STATUS "[DAEMON] Configuring daemon module")
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# 统一 daemon 二进制输出目录
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
 # 构建选项
 option(BUILD_TESTS "Build all unit tests" ON)
 option(BUILD_COVERAGE "Build with code coverage support" OFF)

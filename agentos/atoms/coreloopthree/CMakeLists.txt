@@ -8,7 +8,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 # 使用根级依赖检测结果 (BAN-12: 单一依赖检测点)
-if(AGENTOS_HAS_CJSON)
+if(AGENTRT_HAS_CJSON)
     set(AGENTOS_CJSON_FOUND ON CACHE INTERNAL "cJSON available for coreloopthree")
     if(cJSON_FOUND)
         set(AGENTOS_CJSON_INCLUDE_DIRS "${cJSON_INCLUDE_DIRS}" CACHE INTERNAL "")
@@ -36,9 +36,16 @@ endif()
 add_library(agentos_coreloopthree STATIC
     src/loop.c
     src/config_loader.c
+    src/yaml_loader.c
+    src/prompt_loader.c
+    src/orch_adapter.c
+    src/checkpoint_adapter.c
+    src/manager_adapter.c
     src/memory/memory_service.c
     src/memory/memoryrovol_bridge.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/src/checkpoint.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/src/orchestrator.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/src/yaml_minimal.c
 )
 
 target_link_libraries(agentos_coreloopthree PUBLIC agentos_atoms)
@@ -84,6 +91,7 @@ endif()
 
 target_include_directories(agentos_coreloopthree PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include>
     $<INSTALL_INTERFACE:include/agentos/coreloopthree>
 )
 
@@ -110,8 +118,16 @@ endif()
 
 target_include_directories(agentos_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cognition
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cognition/critique
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cognition/foundation
     ${CMAKE_CURRENT_SOURCE_DIR}/../memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../memory/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/tool_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/quality
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/src
 )
 
 target_link_libraries(agentos_coreloopthree PUBLIC
@@ -119,6 +135,7 @@ target_link_libraries(agentos_coreloopthree PUBLIC
     agentos_execution
     agentos_core
     agentos_memory
+    svc_common
 )
 
 if(AGENTOS_CJSON_FOUND)

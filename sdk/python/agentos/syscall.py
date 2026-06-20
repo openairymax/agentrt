@@ -1,11 +1,11 @@
-# AgentOS Python SDK FFI Binding Layer
+# AgentRT Python SDK FFI Binding Layer
 # Version: 0.1.0
 # Aligned with syscalls.h API
 
 """
-FFI binding layer for AgentOS C API.
+FFI binding layer for AgentRT C API.
 
-This module provides high-performance bindings to the AgentOS C API
+This module provides high-performance bindings to the AgentRT C API
 defined in syscalls.h, with comprehensive error handling, resource management,
 and cross-platform compatibility.
 
@@ -65,7 +65,7 @@ class SyscallError(_ExceptionsSyscallError):
 
 
 class SyscallProxy:
-    """High-performance FFI proxy for AgentOS system calls.
+    """High-performance FFI proxy for AgentRT system calls.
 
     All function signatures strictly match syscalls.h C declarations.
     See syscalls.h for authoritative API documentation.
@@ -141,7 +141,7 @@ class SyscallProxy:
             lib_path = self._find_library()
 
         try:
-            logger.info(f"Loading AgentOS library from: {lib_path}")
+            logger.info(f"Loading AgentRT library from: {lib_path}")
             self._lib = ctypes.CDLL(lib_path)
             self._lib_path = lib_path
         except OSError as e:
@@ -164,7 +164,7 @@ class SyscallProxy:
             lib_names = ['agentos.dll', 'libagentos']
         else:
             raise FileNotFoundError(
-                f"AgentOS library not found on {system}/{arch}. "
+                f"AgentRT library not found on {system}/{arch}. "
                 f"Please install it or set AGENTOS_LIB_PATH env var."
             )
 
@@ -187,7 +187,7 @@ class SyscallProxy:
                     return full_path
 
         raise FileNotFoundError(
-            f"AgentOS library not found. Searched paths: {search_paths}"
+            f"AgentRT library not found. Searched paths: {search_paths}"
         )
 
     def _setup_function_signatures(self) -> None:

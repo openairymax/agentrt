@@ -180,19 +180,25 @@ collect_binaries() {
     fi
 
     local found=0
+    local bin_count=0
 
     while IFS= read -r -d '' bin_file; do
+        [[ $bin_count -ge 20 ]] && break
         if [[ -x "$bin_file" ]] && [[ -f "$bin_file" ]]; then
             cp "$bin_file" "${bin_dir}/$(basename "$bin_file")" 2>/dev/null || true
             ((found++))
         fi
+        ((bin_count++)) || true
     done < <(find "$BUILD_DIR" -type f \( -executable -o -name "*.dll" -o -name "*.exe" \) \
-        ! -path "*/tests/*" ! -name "ctest" -print0 2>/dev/null | head -z -20)
+        ! -path "*/tests/*" ! -name "ctest" -print0 2>/dev/null)
 
+    local lib_count=0
     while IFS= read -r -d '' lib_file; do
+        [[ $lib_count -ge 20 ]] && break
         cp "$lib_file" "${bin_dir}/" 2>/dev/null || true
+        ((lib_count++)) || true
     done < <(find "$BUILD_DIR" \( -name "*.so" -o -name "*.dylib" -o -name "*.a" \) \
-        -print0 2>/dev/null | head -z -20)
+        -print0 2>/dev/null)
 
     if [[ $found -gt 0 ]]; then
         local size

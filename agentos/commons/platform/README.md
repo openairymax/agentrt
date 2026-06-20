@@ -131,7 +131,7 @@ agentos_thread_join(thread, NULL);
 | POSIX 线程（Linux/macOS） | `libpthread` |
 | Win32 API（Windows） | `kernel32.lib`、`ws2_32.lib` |
 
-> Platform 模块不依赖任何 AgentOS 内部模块，是 Commons 的零依赖基础层。
+> Platform 模块不依赖任何 AgentRT 内部模块，是 Commons 的零依赖基础层。
 
 ---
 

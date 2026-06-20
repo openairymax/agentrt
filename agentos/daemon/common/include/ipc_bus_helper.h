@@ -327,6 +327,32 @@ int ipc_bus_helper_get_bp_stats(ipc_bus_helper_t *ibh, ipc_bp_stats_t *out_stats
  */
 ipc_bp_level_t ipc_bus_helper_get_bp_level(ipc_bus_helper_t *ibh);
 
+/* ==================== P1.8: 路由统计查询 ==================== */
+
+/**
+ * @brief P1.8: 获取 IPC Bus 路由统计信息
+ *
+ * 返回消息路由的累计统计，包括发送次数、自动路由次数、
+ * 降级次数、失败次数、背压丢弃/拒绝次数。
+ * 所有输出参数均可为 NULL（跳过对应统计）。
+ *
+ * @param ibh                  助手句柄
+ * @param out_total_sends      总发送次数（可为 NULL）
+ * @param out_total_routes     总自动路由次数（可为 NULL）
+ * @param out_route_fallbacks  路由降级次数（可为 NULL）
+ * @param out_send_failures    发送失败次数（可为 NULL）
+ * @param out_bp_drops         背压丢弃次数（可为 NULL）
+ * @param out_bp_rejects       背压拒绝次数（可为 NULL）
+ * @return 0 成功，非0 失败
+ */
+int ipc_bus_helper_get_routing_stats(ipc_bus_helper_t *ibh,
+                                     uint64_t *out_total_sends,
+                                     uint64_t *out_total_routes,
+                                     uint64_t *out_route_fallbacks,
+                                     uint64_t *out_send_failures,
+                                     uint64_t *out_bp_drops,
+                                     uint64_t *out_bp_rejects);
+
 #ifdef __cplusplus
 }
 #endif

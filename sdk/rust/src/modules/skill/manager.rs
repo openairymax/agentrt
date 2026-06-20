@@ -1,4 +1,4 @@
-// AgentOS Rust SDK - 技能管理器实现
+// AgentRT Rust SDK - 技能管理器实现
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //

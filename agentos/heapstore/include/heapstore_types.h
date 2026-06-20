@@ -1,6 +1,6 @@
 /**
  * @file heapstore_types.h
- * @brief AgentOS heapstore 共享类型定义（打破循环依赖）
+ * @brief AgentRT heapstore 共享类型定义（打破循环依赖）
  *
  * 本文件集中定义所有子模块间共享的结构体类型，
  * 避免循环包含导致的类型可见性问题。
@@ -10,6 +10,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// @owner: team-B
 #ifndef AGENTOS_HEAPSTORE_TYPES_H
 #define AGENTOS_HEAPSTORE_TYPES_H
 

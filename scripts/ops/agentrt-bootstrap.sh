@@ -88,6 +88,23 @@ declare -A DAEMON_PORT=(
     [gateway_d]=8080 [tool_d]=8082
 )
 
+# daemon 二进制名称映射 (daemon_name -> binary_name)
+# CMake 构建产出使用 agentos-<name>-d 命名，channel_d/gateway_d 例外
+declare -A DAEMON_BIN_NAME=(
+    [monit_d]="agentos-monit-d"
+    [observe_d]="agentos-observe-d"
+    [info_d]="agentos-info-d"
+    [notify_d]="agentos-notify-d"
+    [sched_d]="agentos-sched-d"
+    [channel_d]="channel_d"
+    [llm_d]="agentos-llm-d"
+    [tool_d]="agentos-tool-d"
+    [hook_d]="agentos-hook-d"
+    [plugin_d]="agentos-plugin-d"
+    [market_d]="agentos-market-d"
+    [gateway_d]="gateway_d"
+)
+
 # ==================== 运行时状态 ====================
 
 declare -A DAEMON_PIDS=()       # daemon_name -> PID
@@ -143,7 +160,9 @@ parse_args() {
 
 check_daemon_health_unix() {
     local name="$1"
-    local sock_path="${AGENTOS_RUNTIME_DIR}/${name}.sock"
+    # daemon socket 名称不带 _d 后缀 (monit_d → monit.sock)
+    local short_name="${name%_d}"
+    local sock_path="${AGENTOS_RUNTIME_DIR}/${short_name}.sock"
 
     # 检查 Unix Socket 是否存在且可连接
     if [[ -S "$sock_path" ]]; then
@@ -171,7 +190,9 @@ check_daemon_health_tcp() {
         ss -tln 2>/dev/null | grep -q ":${port} " && return 0
     fi
 
-    return 1
+    # TCP 检查失败，回退到 Unix Socket 检查
+    check_daemon_health_unix "$name"
+    return $?
 }
 
 check_daemon_health() {
@@ -212,7 +233,8 @@ wait_for_daemon() {
 
 start_daemon() {
     local name="$1"
-    local bin_path="${AGENTOS_BINDIR}/${name}"
+    local bin_name="${DAEMON_BIN_NAME[$name]:-$name}"
+    local bin_path="${AGENTOS_BINDIR}/${bin_name}"
 
     local cmd=("$bin_path")
     if [[ -n "$AGENTOS_CONFIG" ]]; then

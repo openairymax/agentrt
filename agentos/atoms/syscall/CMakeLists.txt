@@ -39,6 +39,11 @@ target_include_directories(agentos_syscall PUBLIC
     $<INSTALL_INTERFACE:include/agentos/syscall>
 )
 
+target_include_directories(agentos_syscall PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../memory/src
+)
+
 # 安全编译选项（基于 AgentRT C 编码风格指南附录 A）
 if(MSVC)
     target_compile_options(agentos_syscall PRIVATE /W4 /WX)
@@ -124,8 +129,14 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
     # 扩展单元测试 (TeamC P1-C07 扩展, 覆盖率>50%)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscall_extended.c")
-        add_executable(test_syscall_extended tests/test_syscall_extended.c)
+        add_executable(test_syscall_extended tests/test_syscall_extended.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
+        )
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
+            PROPERTIES COMPILE_FLAGS "-fno-lto"
+        )
         target_include_directories(test_syscall_extended PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/../../corekern/include
@@ -160,8 +171,14 @@ endif()
 
 # TeamC P1-C07: Syscall 核心单元测试
 if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscalls.c")
-    add_executable(test_syscalls tests/test_syscalls.c)
+    add_executable(test_syscalls tests/test_syscalls.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
+    )
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
+        PROPERTIES COMPILE_FLAGS "-fno-lto"
+    )
     target_include_directories(test_syscalls PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/error/include

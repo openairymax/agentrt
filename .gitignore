@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentRT .gitignore 文件
-# 版本：12.0.0
-# 最后更新：2026-06-15
+# 版本：12.1.0
+# 最后更新：2026-06-19
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -72,8 +72,6 @@
 CHANGELOG.md
 
 # 跨团队合约文件（源码追踪，构建产物不追踪）
-contracts/*.o
-contracts/contract_test
 
 # =============================================================================
 # CMake 构建系统（构建产物，不追踪）
@@ -319,6 +317,7 @@ override.yaml
 
 # Visual Studio Code
 .vscode/
+.trae/
 *.code-workspace
 *.code-snippets
 .vscode-test/
@@ -682,12 +681,12 @@ coverage_reports/
 !vcpkg.json
 !Doxyfile
 
-# agentos/manager/ 配置文件
-!agentos/manager/**/*.yaml
-!agentos/manager/**/*.yml
-!agentos/manager/**/*.template
-!agentos/manager/**/*.schema.json
-!agentos/manager/.env.template
+# ecosystem/manager/ 配置文件
+!ecosystem/manager/**/*.yaml
+!ecosystem/manager/**/*.yml
+!ecosystem/manager/**/*.template
+!ecosystem/manager/**/*.schema.json
+!ecosystem/manager/.env.template
 
 # 关键文档
 !BUILD.md
@@ -793,7 +792,7 @@ coverage_reports/
 !docker-compose*.yaml
 !scripts/ops/deploy/docker/Dockerfile*
 !ecosystem/openlab/Dockerfile
-!agentos/gateway/docker/Dockerfile*
+!deploy/docker/Dockerfile*
 !agentos/daemon/Dockerfile.ci
 
 # =============================================================================

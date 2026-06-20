@@ -126,6 +126,10 @@ void provider_base_init(provider_base_ctx_t *base_ctx, const char *api_key, cons
 
     base_ctx->timeout_sec = timeout_sec > 0 ? timeout_sec : 30.0;
     base_ctx->max_retries = max_retries > 0 ? max_retries : 3;
+
+    SVC_LOG_INFO("C-L02: PROVIDER: BASE-INIT api_base=%s timeout=%.1fs retries=%d has_api_key=%d",
+                 base_ctx->api_base[0] ? base_ctx->api_base : "(none)", base_ctx->timeout_sec,
+                 base_ctx->max_retries, base_ctx->api_key[0] ? 1 : 0);
 }
 
 /* ---------- HTTP 响应管理 ---------- */
@@ -190,7 +194,9 @@ int provider_http_post(const char *url, struct curl_slist *headers, const char *
     while (retry <= max_retries) {
         curl = curl_easy_init();
         if (!curl) {
-            SVC_LOG_ERROR("provider_http_post: curl_easy_init failed");
+            SVC_LOG_ERROR("C-L02: PROVIDER: HTTP-POST-FAIL url=%s errno=%d retry=%d/%d "
+                          "STACK: provider_http_post curl_easy_init",
+                          url, errno, retry, max_retries);
             provider_http_resp_free(resp);
             return AGENTOS_ERR_UNKNOWN;
         }
@@ -215,8 +221,9 @@ int provider_http_post(const char *url, struct curl_slist *headers, const char *
             break;
         }
 
-        SVC_LOG_WARN("provider_http_post: attempt %d failed: %s", retry + 1,
-                     curl_easy_strerror(res));
+        SVC_LOG_WARN("C-L02: PROVIDER: HTTP-POST-FAIL url=%s errno=%d retry=%d/%d "
+                     "curl_error=%s",
+                     url, errno, retry + 1, max_retries, curl_easy_strerror(res));
         retry++;
         curl_easy_cleanup(curl);
         if (retry <= max_retries) {
@@ -249,6 +256,8 @@ char *provider_build_openai_request(const llm_request_config_t *manager, const c
 
     cJSON *root = cJSON_CreateObject();
     if (!root) {
+        SVC_LOG_ERROR("C-L02: PROVIDER: REQUEST-BUILD-FAIL reason=oom_root "
+                      "STACK: provider_build_openai_request");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
         return NULL;
@@ -313,11 +322,15 @@ int provider_parse_openai_response(const char *body, llm_response_t **out)
 
     cJSON *root = cJSON_Parse(body);
     if (!root) {
+        SVC_LOG_ERROR("C-L02: PROVIDER: PARSE-FAIL reason=cjson_parse_error "
+                      "STACK: provider_parse_openai_response");
         return AGENTOS_ERR_PARSE_ERROR;
     }
 
     llm_response_t *resp = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
+        SVC_LOG_ERROR("C-L02: PROVIDER: PARSE-FAIL reason=oom_resp "
+                      "STACK: provider_parse_openai_response");
         cJSON_Delete(root);
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
@@ -344,6 +357,8 @@ int provider_parse_openai_response(const char *body, llm_response_t **out)
         resp->choices = (llm_message_t *)AGENTOS_CALLOC((size_t)size, sizeof(llm_message_t));
 
         if (!resp->choices) {
+            SVC_LOG_ERROR("C-L02: PROVIDER: PARSE-FAIL reason=oom_choices "
+                          "STACK: provider_parse_openai_response");
             cJSON_Delete(root);
             llm_response_free(resp);
             return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -403,6 +418,11 @@ static void sse_ctx_init(sse_stream_ctx_t *sse, provider_stream_chunk_cb_t cb, v
     __builtin_memset(sse, 0, sizeof(*sse));
     sse->line_cap = 4096;
     sse->line_buf = (char *)AGENTOS_MALLOC(sse->line_cap);
+    if (!sse->line_buf) {
+        SVC_LOG_ERROR("C-L02: PROVIDER: SSE-INIT-FAIL reason=oom cap=%zu "
+                      "STACK: sse_ctx_init",
+                      sse->line_cap);
+    }
     sse->on_chunk = cb;
     sse->chunk_user_data = user_data;
 }
@@ -533,7 +553,9 @@ int provider_http_post_stream(const char *url, struct curl_slist *headers, const
     CURL *curl = curl_easy_init();
     if (!curl) {
         sse_ctx_destroy(&sse);
-        SVC_LOG_ERROR("provider_http_post_stream: curl_easy_init failed");
+        SVC_LOG_ERROR("C-L02: PROVIDER: STREAM-FAIL url=%s errno=%d "
+                      "STACK: provider_http_post_stream curl_easy_init",
+                      url, errno);
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -562,7 +584,8 @@ int provider_http_post_stream(const char *url, struct curl_slist *headers, const
     sse_ctx_destroy(&sse);
 
     if (res != CURLE_OK) {
-        SVC_LOG_WARN("provider_http_post_stream: curl error: %s", curl_easy_strerror(res));
+        SVC_LOG_WARN("C-L02: PROVIDER: STREAM-FAIL url=%s errno=%d curl_error=%s", url, errno,
+                 curl_easy_strerror(res));
         return AGENTOS_ERR_IO;
     }
 

@@ -8,7 +8,7 @@
 /**
  * @file workbench_container.c
  * @brief Container Mode Implementation - Docker/runc-based Isolated Execution
- * @author Spharx AgentOS Team
+ * @author Spharx AgentRT Team
  * @date 2024
  *
  * This module implements container management:

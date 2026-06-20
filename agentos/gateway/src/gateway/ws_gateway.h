@@ -9,6 +9,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #ifndef AGENTOS_GATEWAY_WS_H
 #define AGENTOS_GATEWAY_WS_H
 

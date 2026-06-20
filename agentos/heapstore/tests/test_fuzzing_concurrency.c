@@ -13,6 +13,7 @@
  *       3. 内存泄漏检测 - 验证资源管理
  */
 
+// @owner: team-B
 #include "../include/heapstore.h"
 #include "../include/heapstore_log.h"
 #include "../include/heapstore_registry.h"

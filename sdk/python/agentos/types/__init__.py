@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Types Module Entry
+# AgentRT Python SDK - Types Module Entry
 # Version: 0.1.0
 # Last updated: 2026-03-24
 

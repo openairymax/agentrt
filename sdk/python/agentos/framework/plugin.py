@@ -689,27 +689,35 @@ class PluginManager:
                 return info
 
             # 加载插件模块
-            instance = await self._load_plugin_module(path, manifest)
-            if instance:
-                info.instance = instance
+            if plugin_path:
+                instance = await self._load_plugin_module(path, manifest)
+                if instance:
+                    info.instance = instance
+                    info.state = PluginState.LOADED
+                    info.loaded_at = datetime.now()
+
+                    # 调用on_load
+                    if hasattr(instance, 'on_load'):
+                        if self._sandbox:
+                            await self._sandbox.execute_in_sandbox(
+                                instance, instance.on_load, {}
+                            )
+                        else:
+                            await instance.on_load({})
+
+                    # 注册已安装
+                    self._dependency_resolver.register_installed(
+                        plugin_id, manifest.version
+                    )
+
+                    logger.info(f"Plugin loaded: {plugin_id} v{manifest.version}")
+                else:
+                    info.state = PluginState.ERROR
+                    info.error_message = "Failed to load plugin module"
+            elif manifest_override:
+                # manifest_override 提供且无实际模块文件 → 直接标记为已加载
                 info.state = PluginState.LOADED
                 info.loaded_at = datetime.now()
-
-                # 调用on_load
-                if hasattr(instance, 'on_load'):
-                    if self._sandbox:
-                        await self._sandbox.execute_in_sandbox(
-                            instance, instance.on_load, {}
-                        )
-                    else:
-                        await instance.on_load({})
-
-                # 注册已安装
-                self._dependency_resolver.register_installed(
-                    plugin_id, manifest.version
-                )
-
-                logger.info(f"Plugin loaded: {plugin_id} v{manifest.version}")
             else:
                 info.state = PluginState.ERROR
                 info.error_message = "Failed to load plugin module"

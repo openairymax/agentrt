@@ -32,6 +32,7 @@
  * @copyright (c) 2026 SPHARX / TeamC Integration Group
  */
 
+// @owner: team-B
 #include <math.h>
 #include <pthread.h>
 #include <signal.h>
@@ -359,7 +360,7 @@ static void print_report(const benchmark_stats_t *warmup_stats,
 {
     printf("\n\n");
     printf("╔══════════════════════════════════════════════════════════════╗\n");
-    printf("║         AgentOS Gateway Performance Benchmark Report        ║\n");
+    printf("║         AgentRT Gateway Performance Benchmark Report        ║\n");
     printf("║                    Version %s                    ║\n", BENCHMARK_VERSION);
     printf("╠══════════════════════════════════════════════════════════════╣\n");
     printf("║ Test Configuration:                                         ║\n");
@@ -518,7 +519,7 @@ static void signal_handler(int signum)
 
 static void print_usage(const char *prog)
 {
-    printf("AgentOS Gateway Benchmark Tool v%s\n\n", BENCHMARK_VERSION);
+    printf("AgentRT Gateway Benchmark Tool v%s\n\n", BENCHMARK_VERSION);
     printf("Usage: %s [options]\n\n", prog);
     printf("Options:\n");
     printf("  --url <URL>          Target URL (default: %s)\n", DEFAULT_URL);
@@ -585,7 +586,8 @@ static int parse_args(int argc, char *argv[])
                 fclose(pf);
             }
         } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
-            strncpy((g_config.output_file),(argv[++i]),(sizeof(g_config.output_file)-1); (g_config.output_file)[(sizeof(g_config.output_file))-1] = '\0'; -);
+            strncpy(g_config.output_file, argv[++i], sizeof(g_config.output_file) - 1);
+            g_config.output_file[sizeof(g_config.output_file) - 1] = '\0';
         } else if (strcmp(argv[i], "--warmup") == 0 && i + 1 < argc) {
             g_config.warmup_count = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--verbose") == 0 || strcmp(argv[i], "-v") == 0) {
@@ -604,7 +606,7 @@ static int parse_args(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-    printf("AgentOS Gateway Performance Benchmark v%s\n", BENCHMARK_VERSION);
+    printf("AgentRT Gateway Performance Benchmark v%s\n", BENCHMARK_VERSION);
     printf("TeamC Integration Group | C-W1-004 Task\n\n");
 
     int ret = parse_args(argc, argv);

@@ -33,6 +33,7 @@ set(TOOL_D_SOURCES
     src/cache.c
     src/tool_svc_adapter.c
     src/tool_approval.c
+    src/safety_guard_bridge.c
     src/utils/tool_helpers.c
 )
 
@@ -75,6 +76,8 @@ target_include_directories(agentos-tool-d PRIVATE
     ${COMMONS_INCLUDE_DIR}/utils/sync/include
     ${COMMONS_INCLUDE_DIR}/utils/cache/include
     ${COMMONS_INCLUDE_DIR}/utils/compat/include
+    # C-L05: Cupolas SafetyGuard 头文件路径
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/include
     # 新增网络和IPC模块
     ${COMMONS_INCLUDE_DIR}/utils/network/include
     ${COMMONS_INCLUDE_DIR}/utils/ipc/include
@@ -85,6 +88,7 @@ target_include_directories(agentos-tool-d PRIVATE
 # 链接库
 target_link_libraries(agentos-tool-d PRIVATE
     svc_common
+    cupolas
     Threads::Threads
     ${CJSON_LIBRARIES}
     ${YAML_LIBRARIES}
@@ -99,6 +103,11 @@ target_compile_options(agentos-tool-d PRIVATE
     -Werror=return-type
     $<$<CONFIG:Debug>:-g -O0>
     $<$<CONFIG:Release>:-O3 -DNDEBUG>
+)
+
+# C-L05: 启用 Cupolas SafetyGuard V2 API
+target_compile_definitions(agentos-tool-d PRIVATE
+    AGENTOS_ENABLE_V2_API=1
 )
 
 # 测试支持

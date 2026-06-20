@@ -1,6 +1,6 @@
 /**
  * @file export.h
- * @brief AgentOS 符号导出管理（commons平台层副本）
+ * @brief AgentRT 符号导出管理（commons平台层副本）
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0

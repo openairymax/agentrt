@@ -220,9 +220,10 @@ static void *info_d_collect_loop(void *arg)
 
 static int info_d_init(info_d_service_t *svc, int port, const char *sock)
 {
-    if (!svc)
+    if (!svc) {
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-    return AGENTOS_EINVAL;
+        return AGENTOS_EINVAL;
+    }
 
     __builtin_memset(svc, 0, sizeof(*svc));
     svc->tcp_port = port > 0 ? port : INFO_D_DEFAULT_PORT;
@@ -241,20 +242,21 @@ static int info_d_init(info_d_service_t *svc, int port, const char *sock)
 
 static int info_d_start(info_d_service_t *svc)
 {
-    if (!svc)
+    if (!svc) {
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-    return AGENTOS_EINVAL;
+        return AGENTOS_EINVAL;
+    }
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
-    if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
+    if (svc->server_fd < 0) {
         SVC_LOG_ERROR("info_d: failed to create socket at %s", svc->socket_path);
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
         return AGENTOS_ERR_UNKNOWN;
     }
 #else
     svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1", (uint16_t)svc->tcp_port);
-    if (svc->server_fd == AGENTOS_INVALID_SOCKET) {
+    if (svc->server_fd < 0) {
         SVC_LOG_ERROR("info_d: failed to create TCP server");
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create TCP server");
         return AGENTOS_ERR_UNKNOWN;
@@ -273,9 +275,10 @@ static int info_d_start(info_d_service_t *svc)
 
 static int info_d_stop(info_d_service_t *svc, int force)
 {
-    if (!svc)
+    if (!svc) {
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-    return AGENTOS_EINVAL;
+        return AGENTOS_EINVAL;
+    }
 
     agentos_mutex_lock(&svc->lock);
     svc->running = 0;
@@ -307,9 +310,10 @@ static int info_d_stop(info_d_service_t *svc, int force)
 
 static int info_d_destroy(info_d_service_t *svc)
 {
-    if (!svc)
+    if (!svc) {
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-    return AGENTOS_EINVAL;
+        return AGENTOS_EINVAL;
+    }
 
     if (svc->server_fd != AGENTOS_INVALID_SOCKET) {
         agentos_socket_close(svc->server_fd);

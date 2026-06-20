@@ -1,9 +1,9 @@
-# AgentOS Python SDK Skill
+# AgentRT Python SDK Skill
 # Version: 0.1.0
 # Last updated: 2026-04-04
 
 """
-Skill class implementation for the AgentOS Python SDK.
+Skill class implementation for the AgentRT Python SDK.
 """
 
 from typing import Optional, Dict, Any

@@ -6,7 +6,7 @@ Powered by OpenAirymax
 
 [![AtomGit](https://atomgit.com/openairymax/agentos/star/badge.svg)](https://atomgit.com/openairymax/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
-[![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentRT)](https://github.com/SpharxTeam/AgentRT/stargazers)
 
 [![Version](https://img.shields.io/badge/version-0.1.0-5a6b7e)](https://atomgit.com/openairymax/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
@@ -36,7 +36,7 @@ Powered by OpenAirymax
 Personal Client Preview
 
 <div align="center">
-<img src="scripts/resources/images/AgentOS-desktop-preview.gif" alt="AgentOS Preview" width="800">
+<img src="scripts/resources/images/AgentRT-desktop-preview.gif" alt="AgentRT Preview" width="800">
 </div>
 
 ## 2️⃣ Innovation Highlights
@@ -279,7 +279,7 @@ See [Contributing Guide](CONTRIBUTING.md)
 Fork Project → Create Branch → Develop & Test → Submit PR → Code Review → Merge to Main
 ```
 
-**Main Platforms:** [AtomGit](https://atomgit.com/openairymax/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+**Main Platforms:** [AtomGit](https://atomgit.com/openairymax/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentRT)
 
 **6.2  Contributors:**
 See [AUTHORS.md](AUTHORS.md) for the list of contributors.
@@ -297,6 +297,6 @@ From data, to intelligence.
 
 <img src="scripts/resources/images/feishu-community-qr.png" width="200" />
 
-<a href="https://atomgit.com/spharx/agentos">AtomGit</a> · <a href="https://gitee.com/spharx/agentos">Gitee</a> · <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> · <a href="https://spharx.cn">Official Website</a>
+<a href="https://atomgit.com/spharx/agentos">AtomGit</a> · <a href="https://gitee.com/spharx/agentos">Gitee</a> · <a href="https://github.com/SpharxTeam/AgentRT">GitHub</a> · <a href="https://spharx.cn">Official Website</a>
 
 © 2026 SPHARX Ltd. All Rights Reserved.

@@ -71,6 +71,13 @@ typedef struct {
     uint64_t forward_errors;
     uint64_t timeout_errors;
     uint64_t avg_latency_us;
+    /* C-L11: 扩展统计字段 */
+    uint64_t max_latency_us;        /**< 最大延迟（微秒） */
+    uint64_t min_latency_us;        /**< 最小延迟（微秒，0=未初始化） */
+    uint64_t last_latency_us;       /**< 最近一次延迟（微秒） */
+    uint64_t last_forward_time;     /**< 最近一次转发的时间戳（秒） */
+    uint64_t body_size_total;       /**< 累计请求体大小（字节） */
+    uint64_t response_size_total;   /**< 累计响应体大小（字节） */
 } gw_forward_stats_t;
 
 /* ==================== 转发句柄 ==================== */
@@ -169,6 +176,18 @@ void gw_forward_reset_stats(gw_forward_t *fw);
  * @brief 检查转发器健康状态
  */
 bool gw_forward_is_healthy(gw_forward_t *fw);
+
+/**
+ * @brief C-L11: 输出转发统计摘要（单行格式，适合周期性日志）
+ *
+ * 格式: "C-L11: STATS total=N (A2A=N MCP=N OpenAI=N JSONRPC=N) "
+ *        "errors=N timeouts=N latency=avg/max/min us "
+ *        "throughput=req/s body=N resp=N"
+ *
+ * @param fw 转发器句柄
+ * @param interval_sec 统计周期（秒），用于计算吞吐量
+ */
+void gw_forward_dump_stats(gw_forward_t *fw, uint32_t interval_sec);
 
 #ifdef __cplusplus
 }

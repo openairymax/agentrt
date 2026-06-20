@@ -1,4 +1,4 @@
-// AgentOS Rust SDK - HTTP 客户端实现
+// AgentRT Rust SDK - HTTP 客户端实现
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //
@@ -28,7 +28,7 @@ pub trait APIClient: Send + Sync {
     async fn delete(&self, path: &str, opts: Option<Vec<RequestOption>>) -> Result<APIResponse, AgentOSError>;
 }
 
-/// Client 是 AgentOS Rust SDK 的核心 HTTP 客户端
+/// Client 是 AgentRT Rust SDK 的核心 HTTP 客户端
 #[derive(Debug, Clone)]
 pub struct Client {
     endpoint: String,

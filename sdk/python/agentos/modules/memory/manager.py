@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Memory Manager Implementation
+# AgentRT Python SDK - Memory Manager Implementation
 # Version: 0.1.0
 # Last updated: 2026-03-24
 

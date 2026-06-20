@@ -1,6 +1,6 @@
 /**
  * @file agentos_quality.h
- * @brief AgentOS 代码质量保证框架
+ * @brief AgentRT 代码质量保证框架
  *
  * 提供标准化的代码质量保证工具，包括：
  * - 输入验证宏（NULL检查、范围检查、类型检查）
@@ -16,6 +16,7 @@
 #ifndef AGENTOS_QUALITY_H
 #define AGENTOS_QUALITY_H
 
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include "error.h"
@@ -494,11 +495,19 @@ static inline int safe_strcpy(char *dest, size_t dest_size, const char *src)
     if (!dest || !src || dest_size == 0)
         return AGENTOS_EINVAL;
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overread"
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
     size_t src_len = strlen(src);
     if (src_len >= dest_size)
         return AGENTOS_EINVAL;
 
     memcpy(dest, src, src_len + 1);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     return AGENTOS_SUCCESS;
 }
 

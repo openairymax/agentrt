@@ -111,7 +111,7 @@ static agentos_svc_interface_t create_example_service_interface(void)
 
 int main(void)
 {
-    printf("=== AgentOS 服务管理框架使用示例 ===\n\n");
+    printf("=== AgentRT 服务管理框架使用示例 ===\n\n");
 
     agentos_error_t err = AGENTOS_SUCCESS;
     agentos_service_t service = NULL;

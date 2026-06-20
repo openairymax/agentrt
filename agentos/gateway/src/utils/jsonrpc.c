@@ -9,6 +9,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+// @owner: team-B
 #include "jsonrpc.h"
 
 #include "error.h"
@@ -390,10 +391,14 @@ char *jsonrpc_process_batch(const cJSON *batch_json,
                 cJSON_AddItemToArray(responses, resp_parsed);
             } else {
                 const cJSON *id = jsonrpc_get_id(item);
-                cJSON *err_parsed = cJSON_Parse(
-                    jsonrpc_create_internal_error_response(id, "Handler returned invalid JSON"));
-                if (err_parsed) {
-                    cJSON_AddItemToArray(responses, err_parsed);
+                char *err_resp_str =
+                    jsonrpc_create_internal_error_response(id, "Handler returned invalid JSON");
+                if (err_resp_str) {
+                    cJSON *err_parsed = cJSON_Parse(err_resp_str);
+                    if (err_parsed) {
+                        cJSON_AddItemToArray(responses, err_parsed);
+                    }
+                    AGENTOS_FREE(err_resp_str);
                 }
             }
             AGENTOS_FREE(resp_str);

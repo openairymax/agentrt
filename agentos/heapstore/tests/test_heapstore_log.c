@@ -1,13 +1,15 @@
 /**
  * @file test_heapstore_log.c
- * @brief AgentOS 数据分区日志管理单元测试
+ * @brief AgentRT 数据分区日志管理单元测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
  */
+// @owner: team-B
 
 #include "heapstore.h"
 #include "heapstore_log.h"
+#include "memory_compat.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -224,7 +226,7 @@ static void test_log_multiple_services(void)
 
 int main(void)
 {
-    printf("=== AgentOS heapstore Log Unit Tests ===\n\n");
+    printf("=== AgentRT heapstore Log Unit Tests ===\n\n");
 
     test_log_init_shutdown();
     test_log_write();

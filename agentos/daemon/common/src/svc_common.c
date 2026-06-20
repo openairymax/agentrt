@@ -6,7 +6,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 实现 svc_common.h 中定义的统一服务管理接口。
- * 本模块为 AgentOS daemon 模块提供标准化的服务生命周期管理、
+ * 本模块为 AgentRT daemon 模块提供标准化的服务生命周期管理、
  * 状态监控、健康检查和统计收集功能。
  *
  * 设计原则：
@@ -117,8 +117,8 @@ static agentos_error_t svc_common_module_init(void)
     err = agentos_mutex_init(&g_registry.registry_mutex);
     if (err != AGENTOS_SUCCESS) {
         LOG_ERROR("Failed to initialize registry mutex: %d", err);
-        return DAEMON_EINIT;
         AGENTOS_ERROR_HANDLE(DAEMON_EINIT, "svc_common: registry mutex init failed");
+        return DAEMON_EINIT;
     }
 
     g_registry.initialized = 1;
@@ -175,8 +175,8 @@ static agentos_service_internal_t *find_service_internal(const char *name)
 static agentos_error_t register_service_internal(agentos_service_internal_t *service)
 {
     if (!service || !g_registry.initialized) {
-        return AGENTOS_EINVAL;
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "register_service_internal: null service");
+        return AGENTOS_EINVAL;
     }
 
     agentos_mutex_lock(&g_registry.registry_mutex);
@@ -308,15 +308,15 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
     /* 初始化基本信息 */
     if (safe_strcpy(service->name, name, MAX_SERVICE_NAME_LEN) != 0) {
         AGENTOS_FREE(service);
-        return AGENTOS_EINVAL;
         AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: name copy failed");
+        return AGENTOS_EINVAL;
     }
 
     if (config->version) {
         if (safe_strcpy(service->version, config->version, MAX_SERVICE_VERSION_LEN) != 0) {
             AGENTOS_FREE(service);
-            return AGENTOS_EINVAL;
             AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: version copy failed");
+            return AGENTOS_EINVAL;
         }
     }
 
@@ -1072,6 +1072,30 @@ void *agentos_service_get_user_data(agentos_service_t service)
 
 /* ==================== 模块清理 ==================== */
 
+/* 前向声明：g_monitor 定义在文件末尾 */
+#define MAX_MONITORED_SERVICES 32
+typedef struct {
+    agentos_service_t service;
+    agentos_monitor_config_t config;
+    agentos_degradation_handler_t degradation_handler;
+    void *degradation_user_data;
+    bool active;
+    uint32_t consecutive_failures;
+    uint32_t restart_attempts;
+    uint64_t last_check_time;
+    uint64_t next_restart_time;
+    bool degraded;
+    agentos_thread_t monitor_thread;
+    atomic_int stop_requested;
+} monitored_service_t;
+
+static struct {
+    monitored_service_t services[MAX_MONITORED_SERVICES];
+    uint32_t count;
+    bool initialized;
+    agentos_mutex_t mutex;
+} g_monitor;
+
 static void monitor_shutdown(void)
 {
     if (g_monitor.initialized) {
@@ -1602,30 +1626,6 @@ void agentos_config_free(agentos_config_t *config)
 
 /* ==================== 故障恢复（Phase 3.3） ==================== */
 
-#define MAX_MONITORED_SERVICES 32
-
-typedef struct {
-    agentos_service_t service;
-    agentos_monitor_config_t config;
-    agentos_degradation_handler_t degradation_handler;
-    void *degradation_user_data;
-    bool active;
-    uint32_t consecutive_failures;
-    uint32_t restart_attempts;
-    uint64_t last_check_time;
-    uint64_t next_restart_time;
-    bool degraded;
-    agentos_thread_t monitor_thread;
-    atomic_int stop_requested;
-} monitored_service_t;
-
-static struct {
-    monitored_service_t services[MAX_MONITORED_SERVICES];
-    uint32_t count;
-    bool initialized;
-    agentos_mutex_t mutex;
-} g_monitor = {0};
-
 static agentos_error_t monitor_init(void)
 {
     if (g_monitor.initialized) {
@@ -1929,7 +1929,7 @@ static size_t curl_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata
     }
     /* SEC-02: 二次校验，防御 realloc 异常返回 */
     if (buf->size + total > buf->capacity) {
-        agentos_error_push_ex(AGENTOS_E_OVERFLOW, __FILE__, __LINE__, __func__,
+        agentos_error_push_ex(AGENTOS_EOVERFLOW, __FILE__, __LINE__, __func__,
                                "curl_write_cb: buffer overflow");
         return 0;
     }

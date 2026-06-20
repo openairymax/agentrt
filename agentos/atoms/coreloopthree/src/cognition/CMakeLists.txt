@@ -1,6 +1,7 @@
 
 add_library(agentos_cognition STATIC
     engine.c
+    llm_svc_adapter.c
     intent/intent_parser.c
     intent/intent_classifier.c
     intent/intent_utils.c
@@ -38,7 +39,12 @@ target_include_directories(agentos_cognition PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../memory/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/llm_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/tool_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/quality
 )
 
 target_link_libraries(agentos_cognition

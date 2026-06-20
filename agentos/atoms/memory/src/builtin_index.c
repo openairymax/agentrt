@@ -1,6 +1,6 @@
 /**
  * @file builtin_index.c
- * @brief AgentOS 内置哈希索引实现（无 FAISS 依赖）
+ * @brief AgentRT 内置哈希索引实现（无 FAISS 依赖）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 提供基于哈希表的记录索引和简单的 TF-IDF 文本索引。

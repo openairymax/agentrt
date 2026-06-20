@@ -417,7 +417,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
                     if (expert_opinion)
                         AGENTOS_FREE(expert_opinion);
                 } else {
-                    AGENTOS_LOG_WARN("tc3_coordinator_execute: S1 expert call failed (exp_err=%d unit_index=%zu)", (int)exp_err, unit.unit_index);
+                    AGENTOS_LOG_WARN("tc3_coordinator_execute: S1 expert call failed (exp_err=%d unit_index=%u)", (int)exp_err, (unsigned int)unit.unit_index);
                 }
                 coord->stats.escalated_units++;
                 break;
@@ -441,7 +441,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
             AGENTOS_FREE(correction_prompt);
 
             if (err != AGENTOS_SUCCESS || !corrected) {
-                AGENTOS_LOG_WARN("tc3_coordinator_execute: S2 correction call failed (err=%d corrected=%p attempt=%u unit_index=%zu)", (int)err, (void *)corrected, correction_attempts, unit.unit_index);
+                AGENTOS_LOG_WARN("tc3_coordinator_execute: S2 correction call failed (err=%d corrected=%p attempt=%u unit_index=%u)", (int)err, (void *)corrected, correction_attempts, (unsigned int)unit.unit_index);
                 if (critique)
                     AGENTOS_FREE(critique);
                 break;

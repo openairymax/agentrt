@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @owner: team-B
 /**
  * @file openclaw_adapter.h
- * @brief OpenClaw Platform Integration Adapter for AgentOS
+ * @brief OpenClaw Platform Integration Adapter for AgentRT
  *
  * OpenClaw (九问) 是开源AI Agent平台，专注于政务和企业应用。
  * 本适配器实现AgentOS与OpenClaw平台的完整集成。
@@ -15,7 +16,7 @@
  * 5. 多智能体原生 — 内置多Agent编排引擎
  *
  * 集成模式:
- * - 双向桥接: AgentOS ↔ OpenClaw 消息互通
+ * - 双向桥接: AgentRT ↔ OpenClaw 消息互通
  * - 工具共享: AgentOS工具注册到OpenClaw工具链
  * - 能力映射: OpenClaw能力 → AgentOS协议转换
  *

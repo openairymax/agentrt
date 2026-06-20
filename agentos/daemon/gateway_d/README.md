@@ -4,7 +4,7 @@
 
 ## 概述
 
-`daemon/gateway_d/` 是 AgentRT 的 API 网关守护进程，作为整个系统的流量入口，负责将外部客户端的 HTTP/WebSocket/Stdio 请求转换为内部 JSON-RPC 2.0 调用，并路由到对应的服务守护进程。它是外部世界与 AgentOS 内部服务之间的唯一入口点，承担协议转换、请求路由、连接管理、限流熔断和 TLS 终止等核心职责。
+`daemon/gateway_d/` 是 AgentRT 的 API 网关守护进程，作为整个系统的流量入口，负责将外部客户端的 HTTP/WebSocket/Stdio 请求转换为内部 JSON-RPC 2.0 调用，并路由到对应的服务守护进程。它是外部世界与 AgentRT 内部服务之间的唯一入口点，承担协议转换、请求路由、连接管理、限流熔断和 TLS 终止等核心职责。
 
 ### 架构定位
 
@@ -21,7 +21,7 @@ gateway_d/ → agentos/gateway/ → agentos/atoms/syscall/
 - **连接管理**：管理客户端长连接和 WebSocket 会话
 - **限流熔断**：请求速率限制和服务熔断保护
 - **TLS 终止**：HTTPS 连接管理与证书维护
-- **MCP 协议支持**：允许 MCP 客户端通过网关与 AgentOS 后端服务交互
+- **MCP 协议支持**：允许 MCP 客户端通过网关与 AgentRT 后端服务交互
 - **A2A 协议支持**：Agent-to-Agent 通信协议处理
 - **OpenAI API 兼容**：支持 OpenAI API 格式的请求直接接入
 
@@ -70,7 +70,7 @@ gateway_d/
 
 | 协议 | 处理器 | 说明 |
 |------|--------|------|
-| MCP | `gateway_mcp_server` | Model Context Protocol，允许 MCP 客户端与 AgentOS 交互 |
+| MCP | `gateway_mcp_server` | Model Context Protocol，允许 MCP 客户端与 AgentRT 交互 |
 | A2A | `gateway_a2a_handler` | Agent-to-Agent Protocol，Agent 间通信 |
 | OpenAI API | `gateway_openai_compat` | OpenAI API 兼容层，支持 Chat/Completions 等端点 |
 
