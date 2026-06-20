@@ -11,10 +11,11 @@
 
 ```
 tools/
-├── config_diff.py              # 配置差异对比工具
-├── config_version_cleanup.py   # 版本历史清理工具
-├── drift_detector.py           # 配置漂移检测器
-├── audit_log_generator.py      # 审计日志生成器
+├── src/                        # 工具实现
+│   ├── config_diff.py          # 配置差异对比工具
+│   ├── config_version_cleanup.py   # 版本历史清理工具
+│   ├── drift_detector.py       # 配置漂移检测器
+│   └── audit_log_generator.py  # 审计日志生成器
 ├── base/                       # 工具基础库
 │   ├── __init__.py             # 包初始化
 │   └── utils.py                # 公共工具函数
@@ -221,7 +222,7 @@ config-validation:
 ```yaml
 - name: Config Drift Check
   run: |
-    python manager/tools/drift_detector.py \
+    python manager/tools/src/drift_detector.py \
       --action both \
       --fail-on-drift \
       --output drift_report.json \

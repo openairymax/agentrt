@@ -54,7 +54,6 @@ toolkit/
 │   ├── setup.py                # 包配置
 │   ├── pyproject.toml          # PEP 621 项目配置
 │   ├── requirements.txt        # 依赖清单
-│   ├── restructure_sdk.py      # SDK 重构脚本
 │   └── README.md
 ├── go/                         # Go SDK
 │   ├── agentos/                # 核心包
