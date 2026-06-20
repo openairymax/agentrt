@@ -716,6 +716,29 @@ static void __attribute__((constructor)) runtime_init(void)
 
 static void __attribute__((destructor)) runtime_cleanup(void)
 {
+    /* 释放每个 task entry 的字符串字段 */
+    for (size_t i = 0; i < g_runtime.task_count; i++) {
+        AGENTOS_FREE(g_runtime.tasks[i].task_id);
+        AGENTOS_FREE(g_runtime.tasks[i].input);
+        AGENTOS_FREE(g_runtime.tasks[i].result);
+    }
+    /* 释放每个 memory record 的字符串字段 */
+    for (size_t i = 0; i < g_runtime.record_count; i++) {
+        AGENTOS_FREE(g_runtime.records[i].record_id);
+        AGENTOS_FREE(g_runtime.records[i].data);
+        AGENTOS_FREE(g_runtime.records[i].metadata);
+    }
+    /* 释放每个 session entry 的字符串字段 */
+    for (size_t i = 0; i < g_runtime.session_count; i++) {
+        AGENTOS_FREE(g_runtime.sessions[i].session_id);
+        AGENTOS_FREE(g_runtime.sessions[i].metadata);
+    }
+    /* 释放每个 agent entry 的字符串字段 */
+    for (size_t i = 0; i < g_runtime.agent_count; i++) {
+        AGENTOS_FREE(g_runtime.agents[i].agent_id);
+        AGENTOS_FREE(g_runtime.agents[i].spec);
+    }
+
     agentos_mutex_destroy(&g_runtime.mutex);
     ht_destroy(&g_runtime.task_index);
     ht_destroy(&g_runtime.record_index);
@@ -760,7 +783,7 @@ agentos_error_t agentos_sys_task_submit(const char *input, size_t len, uint32_t 
         RUNTIME_UNLOCK();
         return AGENTOS_ERR_OUT_OF_MEMORY;
     }
-    task->input = strndup(input, len);
+    task->input = AGENTOS_STRNDUP(input, len);
     task->input_len = len;
     task->status = 1;
     task->result = NULL;

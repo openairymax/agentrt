@@ -46,11 +46,31 @@ struct memoryrovol_bridge_s {
     bool initialized;
     bool sync_active;
 
-    /* 统计 */
+    /* C-L12: 统计 */
     uint64_t total_reads;
     uint64_t total_writes;
     uint64_t total_queries;
     uint64_t total_errors;
+    uint64_t total_deletes;
+    uint64_t total_evolves;
+    uint64_t total_forgets;
+    uint64_t total_mounts;
+
+    /* C-L12: 延迟统计 */
+    uint64_t write_latency_total_us;
+    uint64_t read_latency_total_us;
+    uint64_t query_latency_total_us;
+    uint64_t max_write_latency_us;
+    uint64_t max_read_latency_us;
+    uint64_t max_query_latency_us;
+    uint64_t min_write_latency_us;
+    uint64_t min_read_latency_us;
+    uint64_t min_query_latency_us;
+
+    /* C-L12: 吞吐量 */
+    uint64_t total_bytes_written;
+    uint64_t total_bytes_read;
+    uint64_t total_query_results;
 };
 
 /* ==================== 内部辅助函数 ==================== */
@@ -115,12 +135,32 @@ static agentos_error_t bridge_write_raw(struct agentos_memory_provider *provider
         (memoryrovol_bridge_t *)provider->impl;
     if (!bridge || !bridge->rov_handle) return AGENTOS_ERR_INVALID_STATE;
 
+    uint64_t start_us = agentos_time_ns() / 1000;
+
     agentos_error_t ret = agentos_memoryrov_write_raw(
         bridge->rov_handle, data, len, metadata_json, out_record_id);
+
+    uint64_t latency_us = agentos_time_ns() / 1000 - start_us;
+
     if (ret == AGENTOS_SUCCESS) {
         bridge->total_writes++;
+        bridge->total_bytes_written += len;
+        bridge->write_latency_total_us += latency_us;
+        if (latency_us > bridge->max_write_latency_us)
+            bridge->max_write_latency_us = latency_us;
+        if (bridge->min_write_latency_us == 0 || latency_us < bridge->min_write_latency_us)
+            bridge->min_write_latency_us = latency_us;
+
+        AGENTOS_LOG_DEBUG("C-L12: WRITE-OK id=%s len=%zu latency=%lluus "
+                          "(total_writes=%llu bytes=%llu)",
+                          out_record_id && *out_record_id ? *out_record_id : "?",
+                          len, (unsigned long long)latency_us,
+                          (unsigned long long)bridge->total_writes,
+                          (unsigned long long)bridge->total_bytes_written);
     } else {
         bridge->total_errors++;
+        AGENTOS_LOG_WARN("C-L12: WRITE-FAIL len=%zu ret=%d latency=%lluus",
+                         len, ret, (unsigned long long)latency_us);
     }
     return ret;
 }
@@ -133,12 +173,34 @@ static agentos_error_t bridge_get_raw(struct agentos_memory_provider *provider,
         (memoryrovol_bridge_t *)provider->impl;
     if (!bridge || !bridge->rov_handle) return AGENTOS_ERR_INVALID_STATE;
 
+    uint64_t start_us = agentos_time_ns() / 1000;
+
     agentos_error_t ret = agentos_memoryrov_get_raw(
         bridge->rov_handle, record_id, out_data, out_len);
+
+    uint64_t latency_us = agentos_time_ns() / 1000 - start_us;
+
     if (ret == AGENTOS_SUCCESS) {
         bridge->total_reads++;
+        if (out_len && *out_len) bridge->total_bytes_read += *out_len;
+        bridge->read_latency_total_us += latency_us;
+        if (latency_us > bridge->max_read_latency_us)
+            bridge->max_read_latency_us = latency_us;
+        if (bridge->min_read_latency_us == 0 || latency_us < bridge->min_read_latency_us)
+            bridge->min_read_latency_us = latency_us;
+
+        AGENTOS_LOG_DEBUG("C-L12: READ-OK id=%s len=%zu latency=%lluus "
+                          "(total_reads=%llu bytes=%llu)",
+                          record_id ? record_id : "?",
+                          out_len && *out_len ? *out_len : 0,
+                          (unsigned long long)latency_us,
+                          (unsigned long long)bridge->total_reads,
+                          (unsigned long long)bridge->total_bytes_read);
     } else {
         bridge->total_errors++;
+        AGENTOS_LOG_DEBUG("C-L12: READ-FAIL id=%s ret=%d latency=%lluus",
+                          record_id ? record_id : "?", ret,
+                          (unsigned long long)latency_us);
     }
     return ret;
 }
@@ -150,7 +212,18 @@ static agentos_error_t bridge_delete_raw(struct agentos_memory_provider *provide
         (memoryrovol_bridge_t *)provider->impl;
     if (!bridge || !bridge->rov_handle) return AGENTOS_ERR_INVALID_STATE;
 
-    return agentos_memoryrov_delete_raw(bridge->rov_handle, record_id);
+    agentos_error_t ret = agentos_memoryrov_delete_raw(bridge->rov_handle, record_id);
+    if (ret == AGENTOS_SUCCESS) {
+        bridge->total_deletes++;
+        AGENTOS_LOG_DEBUG("C-L12: DELETE-OK id=%s (total_deletes=%llu)",
+                          record_id ? record_id : "?",
+                          (unsigned long long)bridge->total_deletes);
+    } else {
+        bridge->total_errors++;
+        AGENTOS_LOG_WARN("C-L12: DELETE-FAIL id=%s ret=%d",
+                         record_id ? record_id : "?", ret);
+    }
+    return ret;
 }
 
 static agentos_error_t bridge_query(struct agentos_memory_provider *provider,
@@ -164,13 +237,37 @@ static agentos_error_t bridge_query(struct agentos_memory_provider *provider,
 
     if (limit == 0) limit = (uint32_t)bridge->config.query_default_limit;
 
+    uint64_t start_us = agentos_time_ns() / 1000;
+
     agentos_error_t ret = agentos_memoryrov_query(
         bridge->rov_handle, query_text, limit,
         out_record_ids, out_scores, out_count);
+
+    uint64_t latency_us = agentos_time_ns() / 1000 - start_us;
+
     if (ret == AGENTOS_SUCCESS) {
         bridge->total_queries++;
+        if (out_count) bridge->total_query_results += *out_count;
+        bridge->query_latency_total_us += latency_us;
+        if (latency_us > bridge->max_query_latency_us)
+            bridge->max_query_latency_us = latency_us;
+        if (bridge->min_query_latency_us == 0 || latency_us < bridge->min_query_latency_us)
+            bridge->min_query_latency_us = latency_us;
+
+        AGENTOS_LOG_DEBUG("C-L12: QUERY-OK "
+                          "q=\"%.64s\" limit=%u results=%zu latency=%lluus "
+                          "(total_queries=%llu results=%llu)",
+                          query_text ? query_text : "?",
+                          limit,
+                          out_count ? *out_count : 0,
+                          (unsigned long long)latency_us,
+                          (unsigned long long)bridge->total_queries,
+                          (unsigned long long)bridge->total_query_results);
     } else {
         bridge->total_errors++;
+        AGENTOS_LOG_WARN("C-L12: QUERY-FAIL q=\"%.64s\" limit=%u ret=%d latency=%lluus",
+                         query_text ? query_text : "?", limit, ret,
+                         (unsigned long long)latency_us);
     }
     return ret;
 }
@@ -192,7 +289,17 @@ static agentos_error_t bridge_evolve(struct agentos_memory_provider *provider,
         (memoryrovol_bridge_t *)provider->impl;
     if (!bridge || !bridge->rov_handle) return AGENTOS_ERR_INVALID_STATE;
 
-    return agentos_memoryrov_evolve(bridge->rov_handle, force);
+    AGENTOS_LOG_INFO("C-L12: EVOLVE force=%d (total_evolves=%llu)",
+                     force, (unsigned long long)bridge->total_evolves);
+
+    agentos_error_t ret = agentos_memoryrov_evolve(bridge->rov_handle, force);
+    if (ret == AGENTOS_SUCCESS) {
+        bridge->total_evolves++;
+    } else {
+        bridge->total_errors++;
+        AGENTOS_LOG_WARN("C-L12: EVOLVE-FAIL force=%d ret=%d", force, ret);
+    }
+    return ret;
 }
 
 static agentos_error_t bridge_forget(struct agentos_memory_provider *provider)
@@ -201,7 +308,17 @@ static agentos_error_t bridge_forget(struct agentos_memory_provider *provider)
         (memoryrovol_bridge_t *)provider->impl;
     if (!bridge || !bridge->rov_handle) return AGENTOS_ERR_INVALID_STATE;
 
-    return agentos_memoryrov_forget(bridge->rov_handle);
+    AGENTOS_LOG_INFO("C-L12: FORGET (total_forgets=%llu)",
+                     (unsigned long long)bridge->total_forgets);
+
+    agentos_error_t ret = agentos_memoryrov_forget(bridge->rov_handle);
+    if (ret == AGENTOS_SUCCESS) {
+        bridge->total_forgets++;
+    } else {
+        bridge->total_errors++;
+        AGENTOS_LOG_WARN("C-L12: FORGET-FAIL ret=%d", ret);
+    }
+    return ret;
 }
 
 static agentos_error_t bridge_stats(struct agentos_memory_provider *provider,
@@ -238,7 +355,19 @@ static agentos_error_t bridge_mount(struct agentos_memory_provider *provider,
         (memoryrovol_bridge_t *)provider->impl;
     if (!bridge || !bridge->rov_handle) return AGENTOS_ERR_INVALID_STATE;
 
-    return agentos_memoryrov_mount(bridge->rov_handle, record_id, context);
+    agentos_error_t ret = agentos_memoryrov_mount(bridge->rov_handle, record_id, context);
+    if (ret == AGENTOS_SUCCESS) {
+        bridge->total_mounts++;
+        AGENTOS_LOG_DEBUG("C-L12: MOUNT-OK id=%s ctx=%.32s (total_mounts=%llu)",
+                          record_id ? record_id : "?",
+                          context ? context : "(none)",
+                          (unsigned long long)bridge->total_mounts);
+    } else {
+        bridge->total_errors++;
+        AGENTOS_LOG_WARN("C-L12: MOUNT-FAIL id=%s ret=%d",
+                         record_id ? record_id : "?", ret);
+    }
+    return ret;
 }
 
 static agentos_error_t bridge_health_check(struct agentos_memory_provider *provider,
@@ -573,4 +702,48 @@ int memoryrovol_bridge_health_check(memoryrovol_bridge_t *bridge,
 bool memoryrovol_bridge_is_ready(memoryrovol_bridge_t *bridge)
 {
     return bridge ? bridge->initialized : false;
+}
+
+void memoryrovol_bridge_dump_stats(memoryrovol_bridge_t *bridge)
+{
+    if (!bridge || !bridge->initialized) {
+        AGENTOS_LOG_WARN("C-L12: BRIDGE-STATS unavailable");
+        return;
+    }
+
+    uint64_t avg_write = bridge->total_writes > 0
+        ? bridge->write_latency_total_us / bridge->total_writes : 0;
+    uint64_t avg_read = bridge->total_reads > 0
+        ? bridge->read_latency_total_us / bridge->total_reads : 0;
+    uint64_t avg_query = bridge->total_queries > 0
+        ? bridge->query_latency_total_us / bridge->total_queries : 0;
+
+    AGENTOS_LOG_INFO("C-L12: BRIDGE-STATS mode=%s "
+                     "reads=%llu writes=%llu queries=%llu "
+                     "errors=%llu deletes=%llu evolves=%llu forgets=%llu mounts=%llu "
+                     "write_lat=%llu/%llu/%lluus "
+                     "read_lat=%llu/%llu/%lluus "
+                     "query_lat=%llu/%llu/%lluus "
+                     "bytes_written=%llu bytes_read=%llu query_results=%llu",
+                     bridge->current_mode[0] ? bridge->current_mode : "?",
+                     (unsigned long long)bridge->total_reads,
+                     (unsigned long long)bridge->total_writes,
+                     (unsigned long long)bridge->total_queries,
+                     (unsigned long long)bridge->total_errors,
+                     (unsigned long long)bridge->total_deletes,
+                     (unsigned long long)bridge->total_evolves,
+                     (unsigned long long)bridge->total_forgets,
+                     (unsigned long long)bridge->total_mounts,
+                     (unsigned long long)avg_write,
+                     (unsigned long long)bridge->max_write_latency_us,
+                     (unsigned long long)bridge->min_write_latency_us,
+                     (unsigned long long)avg_read,
+                     (unsigned long long)bridge->max_read_latency_us,
+                     (unsigned long long)bridge->min_read_latency_us,
+                     (unsigned long long)avg_query,
+                     (unsigned long long)bridge->max_query_latency_us,
+                     (unsigned long long)bridge->min_query_latency_us,
+                     (unsigned long long)bridge->total_bytes_written,
+                     (unsigned long long)bridge->total_bytes_read,
+                     (unsigned long long)bridge->total_query_results);
 }

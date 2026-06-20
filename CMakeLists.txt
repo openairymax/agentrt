@@ -3,7 +3,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
-project(AgentRT VERSION 0.1.0 LANGUAGES C CXX)
+project(AgentRT VERSION 0.1.1 LANGUAGES C CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
@@ -137,7 +137,7 @@ else()
         add_compile_options(-Wno-error=format-truncation)
     endif()
     add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
-    add_compile_definitions(_FORTIFY_SOURCE=2)
+    add_compile_definitions(_FORTIFY_SOURCE=2 _GNU_SOURCE)
 
     if(AGENTRT_COMPLIANCE_STRICT)
         add_compile_definitions(AGENTRT_COMPLIANCE_STRICT)

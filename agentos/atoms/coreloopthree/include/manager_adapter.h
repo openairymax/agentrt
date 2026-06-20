@@ -198,6 +198,13 @@ int manager_adapter_get_status(agentos_manager_adapter_t *adapter,
                                bool *out_watch_running,
                                const char **out_config_path);
 
+/**
+ * @brief C-L01: 输出 Manager 适配器统计摘要（单行格式，适合周期性日志）
+ *
+ * @param adapter 适配器句柄
+ */
+void manager_adapter_dump_stats(agentos_manager_adapter_t *adapter);
+
 #ifdef __cplusplus
 }
 #endif

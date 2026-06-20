@@ -325,3 +325,22 @@ int manager_adapter_get_status(agentos_manager_adapter_t *adapter,
 
     return 0;
 }
+
+/* ================================================================
+ * C-L01: 统计摘要
+ * ================================================================ */
+
+void manager_adapter_dump_stats(agentos_manager_adapter_t *adapter)
+{
+    if (!adapter) {
+        AGENTOS_LOG_WARN("C-L01: MANAGER-ADAPTER-STATS unavailable");
+        return;
+    }
+
+    AGENTOS_LOG_INFO("C-L01: MANAGER-ADAPTER-STATS path=%s "
+                     "config_loaded=%s watch_running=%s callbacks=%zu",
+                     adapter->yaml_path,
+                     adapter->config_loaded ? "yes" : "no",
+                     adapter->watch_running ? "yes" : "no",
+                     adapter->callback_count);
+}

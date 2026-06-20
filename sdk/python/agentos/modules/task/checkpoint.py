@@ -11,7 +11,7 @@ import hashlib
 import time
 import logging
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -144,7 +144,7 @@ class CheckpointManager:
         
         # 生成检查点 ID
         checkpoint_id = self._generate_checkpoint_id(task_id)
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         
         # 创建检查点对象
         checkpoint = CheckpointData(
@@ -302,7 +302,7 @@ class CheckpointManager:
         checkpoints = self.list_checkpoints(task_id)
         deleted_count = 0
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         for i, checkpoint in enumerate(checkpoints):
             # 保留最近的 N 个

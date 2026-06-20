@@ -18,6 +18,7 @@
 
 #include "plugin_service.h"
 #include "platform.h"
+#include "svc_logger.h"
 #include "sync_compat.h"
 #include "memory_compat.h"
 
@@ -78,7 +79,7 @@ static void *load_symbol(void *handle, const char *name)
 {
     void *sym = dlsym(handle, name);
     if (!sym) {
-        fprintf(stderr, "[plugin_d] Symbol not found: %s (%s)\n", name, dlerror());
+        SVC_LOG_ERROR("P2.2: PluginD: Symbol not found: %s (%s)", name, dlerror());
     }
     return sym;
 }
@@ -112,8 +113,7 @@ int plugin_service_load(const char *library_path, const char *config_path,
     /* 打开动态库 */
     void *handle = dlopen(library_path, RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
-        fprintf(stderr, "[plugin_d] dlopen failed: %s (%s)\n",
-                library_path, dlerror());
+        SVC_LOG_ERROR("P2.2: PluginD: dlopen failed: %s (%s)", library_path, dlerror());
         return -1;
     }
 
@@ -127,7 +127,7 @@ int plugin_service_load(const char *library_path, const char *config_path,
 
     const plugin_metadata_t *metadata = get_metadata();
     if (!metadata || !metadata->name[0]) {
-        fprintf(stderr, "[plugin_d] Invalid plugin metadata\n");
+        SVC_LOG_ERROR("P2.2: PluginD: Invalid plugin metadata");
         dlclose(handle);
         return -1;
     }
@@ -136,7 +136,7 @@ int plugin_service_load(const char *library_path, const char *config_path,
     AGENTOS_RWLOCK_WRLOCK(&g_plugin_registry.rwlock);
     if (find_node(metadata->name)) {
         AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
-        fprintf(stderr, "[plugin_d] Plugin already loaded: %s\n", metadata->name);
+        SVC_LOG_WARN("P2.2: PluginD: Plugin already loaded: %s", metadata->name);
         dlclose(handle);
         return -1;
     }
@@ -149,7 +149,8 @@ int plugin_service_load(const char *library_path, const char *config_path,
     plugin_stop_fn stop_fn = (plugin_stop_fn)load_symbol(handle, "plugin_stop");
 
     if (!init_fn || !destroy_fn) {
-        fprintf(stderr, "[plugin_d] Missing required symbols (init/destroy)\n");
+        SVC_LOG_ERROR("P2.2: PluginD: Missing required symbols (init/destroy) for %s",
+                      metadata->name);
         dlclose(handle);
         return -1;
     }
@@ -183,8 +184,8 @@ int plugin_service_load(const char *library_path, const char *config_path,
     void *user_data = NULL;
     int init_ret = init_fn(config_path, &user_data);
     if (init_ret != 0) {
-        fprintf(stderr, "[plugin_d] Plugin init failed: %s (err=%d)\n",
-                metadata->name, init_ret);
+        SVC_LOG_ERROR("P2.2: PluginD: Plugin init failed: %s (err=%d)",
+                      metadata->name, init_ret);
         node->desc.state = PLUGIN_STATE_ERROR;
         node->stats.error_count++;
         /* 继续添加，允许用户重试 */
@@ -206,8 +207,8 @@ int plugin_service_load(const char *library_path, const char *config_path,
         *out_name = metadata->name;
     }
 
-    printf("[plugin_d] Plugin loaded: %s v%s (type=%d, state=%d)\n",
-           metadata->name, metadata->version, metadata->type, node->desc.state);
+    SVC_LOG_INFO("P2.2: PluginD: Plugin loaded: %s v%s (type=%d, state=%d)",
+               metadata->name, metadata->version, metadata->type, node->desc.state);
 
     return 0;
 }
@@ -242,7 +243,7 @@ int plugin_service_unload(const char *name)
             g_plugin_registry.count--;
 
             AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
-            printf("[plugin_d] Plugin unloaded: %s\n", name);
+            SVC_LOG_INFO("P2.2: PluginD: Plugin unloaded: %s", name);
             return 0;
         }
         prev = &(*prev)->next;
@@ -279,7 +280,7 @@ int plugin_service_start(const char *name)
             node->desc.state = PLUGIN_STATE_ERROR;
             node->stats.error_count++;
             AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
-            fprintf(stderr, "[plugin_d] Plugin start failed: %s (err=%d)\n", name, ret);
+            SVC_LOG_ERROR("P2.2: PluginD: Plugin start failed: %s (err=%d)", name, ret);
             return -1;
         }
     }
@@ -287,7 +288,7 @@ int plugin_service_start(const char *name)
     node->desc.state = PLUGIN_STATE_RUNNING;
     AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
 
-    printf("[plugin_d] Plugin started: %s\n", name);
+    SVC_LOG_INFO("P2.2: PluginD: Plugin started: %s", name);
     return 0;
 }
 
@@ -322,7 +323,7 @@ int plugin_service_stop(const char *name)
 
     AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
 
-    printf("[plugin_d] Plugin stopped: %s\n", name);
+    SVC_LOG_INFO("P2.2: PluginD: Plugin stopped: %s", name);
     return 0;
 }
 

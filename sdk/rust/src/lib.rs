@@ -1,4 +1,4 @@
-// AgentRT Rust SDK - 主入口
+// AgentOS Rust SDK - 主入口
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //

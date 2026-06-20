@@ -59,11 +59,27 @@ typedef struct builtin_provider_impl {
     agentos_memory_stats_t stats;
 } builtin_provider_impl_t;
 
+/* Forward declarations */
+static void setup_provider_capabilities(agentos_memory_provider_t *provider);
+static void setup_provider_vtable(agentos_memory_provider_t *provider);
+
 static agentos_error_t builtin_init(agentos_memory_provider_t *provider, const char *config_path)
 {
+    if (!provider)
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to init builtin provider: null provider");
 
-    if (!provider || !provider->impl)
-        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to init builtin provider: null provider or impl");
+    /* Re-allocate impl if destroyed by previous cleanup */
+    if (!provider->impl) {
+        AGENTOS_LOG_INFO("C-L07: Memory: BuiltinProvider RE-INIT (impl was destroyed, re-allocating)");
+        builtin_provider_impl_t *new_impl =
+            (builtin_provider_impl_t *)AGENTOS_CALLOC(1, sizeof(builtin_provider_impl_t));
+        if (!new_impl)
+            return AGENTOS_ENOMEM;
+        provider->impl = new_impl;
+        /* Re-setup vtable and capabilities since they were lost */
+        setup_provider_capabilities(provider);
+        setup_provider_vtable(provider);
+    }
 
     builtin_provider_impl_t *impl = (builtin_provider_impl_t *)provider->impl;
 

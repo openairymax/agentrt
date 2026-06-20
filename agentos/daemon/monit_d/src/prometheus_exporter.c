@@ -58,6 +58,8 @@ static const char *REQUIRED_METRICS[][5] = {
 
 static char g_module_name[UM_MODULE_NAME_LEN] = "monit_d";
 static int g_initialized = 0;
+static uint64_t g_scrape_count = 0;       /* C-L10: 抓取计数 */
+static uint64_t g_scrape_errors = 0;      /* C-L10: 抓取错误计数 */
 
 /* ==================== 辅助函数 ==================== */
 
@@ -178,9 +180,15 @@ int prometheus_exporter_handle_http(const char *request, size_t request_len,
     if (strncmp(request, "GET /metrics", 12) != 0)
         return -1;
 
+    SVC_LOG_DEBUG("C-L10: Prometheus scrape request received (scrape #%llu)",
+                  (unsigned long long)(g_scrape_count + 1));
+
     /* 获取 Prometheus 格式指标 */
     char *metrics_text = prometheus_exporter_get_metrics();
     if (!metrics_text) {
+        g_scrape_errors++;
+        SVC_LOG_ERROR("C-L10: Failed to collect metrics for scrape #%llu",
+                      (unsigned long long)(g_scrape_count + 1));
         /* 500 Internal Server Error */
         const char *err_body = "Failed to collect metrics\n";
         size_t body_len = strlen(err_body);
@@ -203,7 +211,11 @@ int prometheus_exporter_handle_http(const char *request, size_t request_len,
         return 0;
     }
 
+    g_scrape_count++;
     size_t metrics_len = strlen(metrics_text);
+
+    SVC_LOG_INFO("C-L10: Prometheus scrape #%llu — %zu bytes of metrics",
+                 (unsigned long long)g_scrape_count, metrics_len);
 
     /* 构建 HTTP 响应 */
     char header_buf[256];
@@ -266,6 +278,10 @@ char *prometheus_exporter_get_metrics(void)
     /* 更新默认系统指标（CPU/内存等） */
     um_update_default_metrics();
 
+    /* C-L10: 更新 scrape 统计指标 */
+    prometheus_gauge_set("agentos_monit_scrape_count", (double)g_scrape_count);
+    prometheus_gauge_set("agentos_monit_scrape_errors", (double)g_scrape_errors);
+
     /* 导出 Prometheus 格式 */
     char *result = um_export_prometheus_module(g_module_name);
     if (!result) {
@@ -273,4 +289,12 @@ char *prometheus_exporter_get_metrics(void)
     }
 
     return result;
+}
+
+/* ==================== C-L10: 抓取统计 ==================== */
+
+void prometheus_exporter_get_scrape_stats(uint64_t *out_count, uint64_t *out_errors)
+{
+    if (out_count)  *out_count = g_scrape_count;
+    if (out_errors) *out_errors = g_scrape_errors;
 }

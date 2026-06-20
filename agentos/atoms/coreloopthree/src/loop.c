@@ -14,7 +14,12 @@
 #include "checkpoint.h"
 #include "cognition.h"
 #include "execution.h"
+#include "llm_svc_adapter.h"
 #include "logging_compat.h"
+#include "manager_adapter.h"
+#include "memoryrovol_bridge.h"
+#include "orch_adapter.h"
+#include "tool_svc_adapter.h"
 #include "memory.h"
 #include "memory_common.h"
 #include "memory_compat.h"
@@ -49,6 +54,21 @@ struct agentos_core_loop {
 
     /* P1.19.4: Arena 分配器用于请求处理路径中的短生命周期分配 */
     agentos_arena_t *arena;
+
+    /* C-L02: llm_d → CoreLoopThree — IPC adapter for LLM requests */
+    llm_svc_adapter_t *llm_adapter;
+
+    /* C-L04: tool_d → CoreLoopThree — IPC adapter for tool execution */
+    tool_svc_adapter_t *tool_adapter;
+
+    /* C-L12: CoreLoopThree → MemoryRovol — 内存提供商桥接 */
+    memoryrovol_bridge_t *memory_bridge;
+
+    /* C-L01: Manager → CoreLoopThree — 配置管理适配器 */
+    agentos_manager_adapter_t *manager_adapter;
+
+    /* C-L06: Orchestrator → CoreLoopThree — 编排器适配器 */
+    orch_adapter_t *orch_adapter;
 
     int checkpoint_initialized;
     uint64_t last_checkpoint_time_ms;
@@ -211,6 +231,91 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t *loop)
 
     agentos_cognition_set_memory(loop->cognition, loop->memory);
 
+    /* C-L02: Create and wire LLM IPC adapter if configured */
+    {
+        llm_svc_adapter_config_t adapter_cfg;
+        __builtin_memset(&adapter_cfg, 0, sizeof(adapter_cfg));
+        adapter_cfg.llm_d_service_name = "llm_d";
+        adapter_cfg.channel_name = "coreloopthree-llm";
+        adapter_cfg.request_timeout_ms = loop->manager.loop_config_task_timeout_ms > 0
+                                             ? loop->manager.loop_config_task_timeout_ms
+                                             : 30000;
+        adapter_cfg.enable_streaming = true;
+
+        loop->llm_adapter = llm_svc_adapter_create(&adapter_cfg);
+        if (loop->llm_adapter) {
+            agentos_cognition_set_llm_adapter(loop->cognition, loop->llm_adapter);
+            AGENTOS_LOG_INFO("C-L02: LLM IPC adapter wired to cognition engine");
+        } else {
+            AGENTOS_LOG_WARN("C-L02: Failed to create LLM IPC adapter, "
+                             "cognition will use direct LLM service if available");
+        }
+    }
+
+    /* C-L04: Create and wire tool IPC adapter */
+    {
+        tool_svc_adapter_config_t tool_cfg;
+        __builtin_memset(&tool_cfg, 0, sizeof(tool_cfg));
+        tool_cfg.tool_d_service_name = "tool_d";
+        tool_cfg.channel_name = "coreloopthree-tool";
+        tool_cfg.request_timeout_ms = loop->manager.loop_config_task_timeout_ms > 0
+                                          ? loop->manager.loop_config_task_timeout_ms
+                                          : 60000;
+        tool_cfg.enable_approval = (loop->manager.loop_config_checkpoint_enabled != 0);
+
+        loop->tool_adapter = tool_svc_adapter_create(&tool_cfg);
+        if (loop->tool_adapter) {
+            agentos_cognition_set_tool_adapter(loop->cognition, loop->tool_adapter);
+            AGENTOS_LOG_INFO("C-L04: Tool IPC adapter wired to cognition engine"
+                             " (approval=%s)",
+                             tool_cfg.enable_approval ? "on" : "off");
+        } else {
+            AGENTOS_LOG_WARN("C-L04: Failed to create tool IPC adapter, "
+                             "cognition will use direct tool service if available");
+        }
+    }
+
+    /* C-L12: Create and wire MemoryRovol bridge */
+    {
+        memoryrovol_bridge_config_t bridge_cfg;
+        __builtin_memset(&bridge_cfg, 0, sizeof(bridge_cfg));
+        bridge_cfg.provider_name = "MemoryRovol";
+        bridge_cfg.provider_version = "v0.1.1";
+        bridge_cfg.enable_l1_raw = true;
+        bridge_cfg.enable_l2_feature = true;
+        bridge_cfg.enable_l3_structure = true;
+        bridge_cfg.enable_l4_pattern = true;
+        bridge_cfg.enable_forgetting = true;
+        bridge_cfg.enable_faiss = true;
+        bridge_cfg.enable_async_ops = true;
+        bridge_cfg.enable_llm_integration = true;
+        bridge_cfg.query_default_limit = 10;
+        bridge_cfg.sync_interval_ms = 5000;
+
+        loop->memory_bridge = memoryrovol_bridge_create(&bridge_cfg);
+        if (loop->memory_bridge) {
+            agentos_memory_provider_t *provider =
+                memoryrovol_bridge_get_provider(loop->memory_bridge);
+            if (provider) {
+                agentos_cognition_set_memory_provider(loop->cognition, provider);
+                AGENTOS_LOG_INFO("C-L12: MemoryRovol bridge wired to cognition engine "
+                                 "(provider=%s v%s, L1=%d L2=%d L3=%d L4=%d)",
+                                 provider->name ? provider->name : "?",
+                                 provider->version ? provider->version : "?",
+                                 provider->capabilities.l1_raw,
+                                 provider->capabilities.l2_feature,
+                                 provider->capabilities.l3_structure,
+                                 provider->capabilities.l4_pattern);
+            } else {
+                AGENTOS_LOG_WARN("C-L12: Bridge created but provider unavailable");
+            }
+        } else {
+            AGENTOS_LOG_WARN("C-L12: Failed to create MemoryRovol bridge, "
+                             "cognition will use builtin memory provider if available");
+            loop->memory_bridge = NULL;
+        }
+    }
+
     return AGENTOS_SUCCESS;
 }
 
@@ -249,6 +354,24 @@ static void cleanup_loop_resources(agentos_core_loop_t *loop)
     if (loop->cognition) {
         agentos_cognition_destroy(loop->cognition);
         loop->cognition = NULL;
+    }
+
+    /* C-L02: Clean up LLM IPC adapter */
+    if (loop->llm_adapter) {
+        llm_svc_adapter_destroy(loop->llm_adapter);
+        loop->llm_adapter = NULL;
+    }
+
+    /* C-L04: Clean up tool IPC adapter */
+    if (loop->tool_adapter) {
+        tool_svc_adapter_destroy(loop->tool_adapter);
+        loop->tool_adapter = NULL;
+    }
+
+    /* C-L12: Clean up MemoryRovol bridge */
+    if (loop->memory_bridge) {
+        memoryrovol_bridge_destroy(loop->memory_bridge);
+        loop->memory_bridge = NULL;
     }
 
     if (loop->cond) {
@@ -367,6 +490,10 @@ AGENTOS_API agentos_error_t agentos_loop_create(const agentos_loop_config_t *man
     loop->tool_call_history_count = 0;
     loop->tool_call_history_capacity = 0;
 
+    /* C-L01 + C-L06: 外部适配器初始化（通过 setter 函数注入） */
+    loop->manager_adapter = NULL;
+    loop->orch_adapter = NULL;
+
     /* P1.19.4: 创建 Arena 分配器（64KB chunk，无限制）用于请求处理短生命周期分配 */
     loop->arena = arena_create(ARENA_DEFAULT_CHUNK_SIZE, 0);
     if (!loop->arena) {
@@ -480,6 +607,9 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t *loop)
         checkpoint_interval = 30000;
 
     uint64_t last_stats_log_ms = 0;
+    uint64_t last_bridge_stats_ms = 0; /* C-L12: bridge stats timer */
+    uint64_t last_manager_stats_ms = 0; /* C-L01: manager adapter stats timer */
+    uint64_t last_orch_stats_ms = 0;    /* C-L06: orchestrator adapter stats timer */
 
     while (1) {
         agentos_mutex_lock(loop->lock);
@@ -550,6 +680,36 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t *loop)
                                      stats.avg_checkpoint_size, loop->loop_turn_count);
                 }
                 last_stats_log_ms = now_ms;
+            }
+        }
+
+        /* C-L12: 定期输出 MemoryRovol 桥接器统计 */
+        if (loop->memory_bridge && loop->manager.loop_config_stats_interval_ms > 0) {
+            uint64_t now_ms = agentos_time_ms();
+            if (last_bridge_stats_ms == 0 ||
+                (now_ms - last_bridge_stats_ms) >= loop->manager.loop_config_stats_interval_ms) {
+                memoryrovol_bridge_dump_stats(loop->memory_bridge);
+                last_bridge_stats_ms = now_ms;
+            }
+        }
+
+        /* C-L01: 定期输出 Manager 适配器统计 */
+        if (loop->manager_adapter && loop->manager.loop_config_stats_interval_ms > 0) {
+            uint64_t now_ms = agentos_time_ms();
+            if (last_manager_stats_ms == 0 ||
+                (now_ms - last_manager_stats_ms) >= loop->manager.loop_config_stats_interval_ms) {
+                manager_adapter_dump_stats(loop->manager_adapter);
+                last_manager_stats_ms = now_ms;
+            }
+        }
+
+        /* C-L06: 定期输出 Orchestrator 适配器统计 */
+        if (loop->orch_adapter && loop->manager.loop_config_stats_interval_ms > 0) {
+            uint64_t now_ms = agentos_time_ms();
+            if (last_orch_stats_ms == 0 ||
+                (now_ms - last_orch_stats_ms) >= loop->manager.loop_config_stats_interval_ms) {
+                orch_adapter_dump_stats(loop->orch_adapter);
+                last_orch_stats_ms = now_ms;
             }
         }
     }
@@ -1549,4 +1709,26 @@ AGENTOS_API agentos_error_t agentos_loop_get_checkpoint_stats(agentos_core_loop_
         ATM_RET_ERR(AGENTOS_ENOTINIT);
 
     return agentos_checkpoint_get_stats(out_stats);
+}
+
+/* ================================================================
+ * C-L01 + C-L06: 外部适配器注入
+ * ================================================================ */
+
+AGENTOS_API void agentos_loop_set_manager_adapter(agentos_core_loop_t *loop,
+                                                   agentos_manager_adapter_t *adapter)
+{
+    if (!loop) return;
+    loop->manager_adapter = adapter;
+    AGENTOS_LOG_INFO("C-L01: Manager adapter %s to CoreLoopThree",
+                     adapter ? "attached" : "detached");
+}
+
+AGENTOS_API void agentos_loop_set_orch_adapter(agentos_core_loop_t *loop,
+                                                orch_adapter_t *adapter)
+{
+    if (!loop) return;
+    loop->orch_adapter = adapter;
+    AGENTOS_LOG_INFO("C-L06: Orchestrator adapter %s to CoreLoopThree",
+                     adapter ? "attached" : "detached");
 }

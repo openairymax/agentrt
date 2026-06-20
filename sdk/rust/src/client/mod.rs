@@ -1,4 +1,4 @@
-// AgentRT Rust SDK - 客户端模块
+// AgentOS Rust SDK - 客户端模块
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //

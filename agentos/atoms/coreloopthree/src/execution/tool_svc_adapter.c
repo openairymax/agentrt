@@ -273,10 +273,10 @@ tool_svc_adapter_t *tool_svc_adapter_create(const tool_svc_adapter_config_t *con
                                        : DEFAULT_SD_POLL_INTERVAL_MS;
     adapter->enable_approval = config ? config->enable_approval : false;
 
-    safe_strcpy(adapter->tool_d_service_name, svc_name,
-                sizeof(adapter->tool_d_service_name));
-    safe_strcpy(adapter->channel_name, ch_name,
-                sizeof(adapter->channel_name));
+    safe_strcpy(adapter->tool_d_service_name, sizeof(adapter->tool_d_service_name),
+                svc_name);
+    safe_strcpy(adapter->channel_name, sizeof(adapter->channel_name),
+                ch_name);
 
     /* 初始化 ServiceDiscovery（C-L08） */
     adapter->bsd = daemon_bootstrap_sd_start(

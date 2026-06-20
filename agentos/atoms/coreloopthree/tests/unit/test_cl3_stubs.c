@@ -7,6 +7,7 @@
 #include "ipc_service_bus.h"
 #include "llm_service.h"
 #include "memory_compat.h"
+#include "memoryrovol_bridge.h"
 #include "service_discovery_helper.h"
 #include "tool_approval.h"
 #include "tool_service.h"
@@ -201,4 +202,28 @@ bool daemon_bootstrap_ipc_is_running(daemon_bootstrap_ipc_t *bipc)
 {
     (void)bipc;
     return false;
+}
+
+/* ==================== C-L12: MemoryRovol bridge stubs ==================== */
+
+memoryrovol_bridge_t *memoryrovol_bridge_create(const memoryrovol_bridge_config_t *config)
+{
+    (void)config;
+    return NULL;
+}
+
+void memoryrovol_bridge_destroy(memoryrovol_bridge_t *bridge)
+{
+    (void)bridge;
+}
+
+agentos_memory_provider_t *memoryrovol_bridge_get_provider(memoryrovol_bridge_t *bridge)
+{
+    (void)bridge;
+    return NULL;
+}
+
+void memoryrovol_bridge_dump_stats(memoryrovol_bridge_t *bridge)
+{
+    (void)bridge;
 }
