@@ -10,6 +10,7 @@
 # ============================================================================
 set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/memory
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/tool_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/include
@@ -18,7 +19,10 @@ set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/hook_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/config_unified/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/cupolas/include
     ${CMAKE_CURRENT_SOURCE_DIR}
 )

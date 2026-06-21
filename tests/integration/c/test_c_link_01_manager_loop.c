@@ -22,8 +22,7 @@
 
 #include "memory_compat.h"
 #include "config_loader.h"
-#include "config_service.h"
-#include "core_config.h"
+#include "config_unified.h"
 
 /* ============================================================================
  * Test Helpers
@@ -68,10 +67,10 @@ static int g_tests_total = 0;
 static void test_normal_config_load(void) {
     TEST("C-L01 Normal: Load valid agentos.yaml");
 
-    config_service_t *svc = config_service_create();
-    CHECK(svc != NULL, "config_service_create returned NULL");
+    config_context_t *ctx = config_service_create("test_normal", NULL, false, false);
+    CHECK(ctx != NULL, "config_service_create returned NULL");
 
-    /* Load a minimal valid configuration */
+    /* Load a minimal valid configuration via memory source */
     const char *yaml_content =
         "kernel:\n"
         "  max_alloc_mb: 2048\n"
@@ -85,18 +84,27 @@ static void test_normal_config_load(void) {
         "memory:\n"
         "  provider: builtin\n";
 
-    config_error_t err = config_service_load_from_string(svc, yaml_content);
-    CHECK_EQ(err, CONFIG_OK, "config_service_load_from_string failed");
+    config_memory_source_options_t mem_opts = {
+        .data = yaml_content,
+        .data_len = strlen(yaml_content),
+        .format = "yaml"
+    };
+    config_source_t *source = config_source_create_memory(&mem_opts);
+    CHECK(source != NULL, "config_source_create_memory returned NULL");
+
+    config_error_t err = config_source_load(source, ctx);
+    CHECK_EQ(err, CONFIG_SUCCESS, "config_source_load failed");
 
     /* Verify a config value is accessible */
-    core_config_t *cfg = config_service_get_core_config(svc);
-    CHECK(cfg != NULL, "config_service_get_core_config returned NULL");
+    const config_value_t *val = config_context_get(ctx, "kernel.max_alloc_mb");
+    CHECK(val != NULL, "config_context_get for kernel.max_alloc_mb returned NULL");
 
     /* Verify kernel.max_alloc_mb */
-    int max_alloc = core_config_get_int(cfg, "kernel.max_alloc_mb", 0);
+    int max_alloc = config_value_get_int(val, 0);
     CHECK_EQ(max_alloc, 2048, "kernel.max_alloc_mb should be 2048");
 
-    config_service_destroy(svc);
+    config_source_destroy(source);
+    config_context_destroy(ctx);
     PASS();
 }
 
@@ -107,15 +115,22 @@ static void test_normal_config_load(void) {
 static void test_error_invalid_yaml(void) {
     TEST("C-L01 Error: Invalid YAML returns error");
 
-    config_service_t *svc = config_service_create();
-    CHECK(svc != NULL, "config_service_create returned NULL");
+    config_context_t *ctx = config_service_create("test_invalid_yaml", NULL, false, false);
+    CHECK(ctx != NULL, "config_service_create returned NULL");
 
     /* Load malformed YAML */
     const char *bad_yaml = "kernel: [unclosed\n  invalid: ::: syntax:\n";
-    config_error_t err = config_service_load_from_string(svc, bad_yaml);
-    CHECK(err != CONFIG_OK, "Invalid YAML should return error, not CONFIG_OK");
+    config_memory_source_options_t mem_opts = {
+        .data = bad_yaml,
+        .data_len = strlen(bad_yaml),
+        .format = "yaml"
+    };
+    config_source_t *source = config_source_create_memory(&mem_opts);
+    config_error_t err = config_source_load(source, ctx);
+    CHECK(err != CONFIG_SUCCESS, "Invalid YAML should return error, not CONFIG_SUCCESS");
 
-    config_service_destroy(svc);
+    if (source) config_source_destroy(source);
+    config_context_destroy(ctx);
     PASS();
 }
 
@@ -126,18 +141,24 @@ static void test_error_invalid_yaml(void) {
 static void test_error_missing_fields(void) {
     TEST("C-L01 Error: Missing required fields");
 
-    config_service_t *svc = config_service_create();
-    CHECK(svc != NULL, "config_service_create returned NULL");
+    config_context_t *ctx = config_service_create("test_missing_fields", NULL, false, false);
+    CHECK(ctx != NULL, "config_service_create returned NULL");
 
     /* Load YAML without required kernel section */
     const char *minimal_yaml = "unknown_section:\n  value: 1\n";
-    config_error_t err = config_service_load_from_string(svc, minimal_yaml);
+    config_memory_source_options_t mem_opts = {
+        .data = minimal_yaml,
+        .data_len = strlen(minimal_yaml),
+        .format = "yaml"
+    };
+    config_source_t *source = config_source_create_memory(&mem_opts);
+    config_source_load(source, ctx);
 
     /* Should still load but with defaults */
-    core_config_t *cfg = config_service_get_core_config(svc);
-    CHECK(cfg != NULL, "Should have config even with unknown sections");
+    CHECK(ctx != NULL, "Should have config even with unknown sections");
 
-    config_service_destroy(svc);
+    if (source) config_source_destroy(source);
+    config_context_destroy(ctx);
     PASS();
 }
 
@@ -148,18 +169,25 @@ static void test_error_missing_fields(void) {
 static void test_timeout_config_load(void) {
     TEST("C-L01 Timeout: Config loading timeout handling");
 
-    config_service_t *svc = config_service_create();
-    CHECK(svc != NULL, "config_service_create returned NULL");
+    config_context_t *ctx = config_service_create("test_timeout", NULL, false, false);
+    CHECK(ctx != NULL, "config_service_create returned NULL");
 
-    /* Set a very short timeout and verify the service handles it */
-    config_service_set_timeout(svc, 100); /* 100ms timeout */
+    /* Set a very short hot-reload interval and verify the service handles it */
+    config_context_set_hot_reload(ctx, true, 100); /* 100ms interval */
 
     /* Load a valid config with timeout set */
     const char *yaml = "kernel:\n  max_alloc_mb: 1024\n";
-    config_error_t err = config_service_load_from_string(svc, yaml);
-    CHECK_EQ(err, CONFIG_OK, "Config load within timeout should succeed");
+    config_memory_source_options_t mem_opts = {
+        .data = yaml,
+        .data_len = strlen(yaml),
+        .format = "yaml"
+    };
+    config_source_t *source = config_source_create_memory(&mem_opts);
+    config_error_t err = config_source_load(source, ctx);
+    CHECK_EQ(err, CONFIG_SUCCESS, "Config load within timeout should succeed");
 
-    config_service_destroy(svc);
+    if (source) config_source_destroy(source);
+    config_context_destroy(ctx);
     PASS();
 }
 
@@ -171,7 +199,7 @@ static void test_timeout_config_load(void) {
 #define RELOADS_PER_THREAD 10
 
 typedef struct {
-    config_service_t *svc;
+    config_context_t *ctx;
     int thread_id;
     int success_count;
     int error_count;
@@ -185,8 +213,15 @@ static void *concurrent_reload_thread(void *arg) {
             "kernel:\n  max_alloc_mb: %d\n  thread: %d\n  iter: %d\n",
             1024 + args->thread_id, args->thread_id, i);
 
-        config_error_t err = config_service_load_from_string(args->svc, yaml);
-        if (err == CONFIG_OK) {
+        config_memory_source_options_t mem_opts = {
+            .data = yaml,
+            .data_len = strlen(yaml),
+            .format = "yaml"
+        };
+        config_source_t *source = config_source_create_memory(&mem_opts);
+        config_error_t err = config_source_load(source, args->ctx);
+        if (source) config_source_destroy(source);
+        if (err == CONFIG_SUCCESS) {
             args->success_count++;
         } else {
             args->error_count++;
@@ -198,15 +233,15 @@ static void *concurrent_reload_thread(void *arg) {
 static void test_concurrent_config_reloads(void) {
     TEST("C-L01 Concurrent: Multiple simultaneous config reloads");
 
-    config_service_t *svc = config_service_create();
-    CHECK(svc != NULL, "config_service_create returned NULL");
+    config_context_t *ctx = config_service_create("test_concurrent", NULL, false, false);
+    CHECK(ctx != NULL, "config_service_create returned NULL");
 
     pthread_t threads[CONCURRENT_THREADS];
     thread_args_t args[CONCURRENT_THREADS];
 
     /* Launch concurrent threads */
     for (int i = 0; i < CONCURRENT_THREADS; i++) {
-        args[i].svc = svc;
+        args[i].ctx = ctx;
         args[i].thread_id = i;
         args[i].success_count = 0;
         args[i].error_count = 0;
@@ -230,7 +265,7 @@ static void test_concurrent_config_reloads(void) {
     CHECK(total_success == CONCURRENT_THREADS * RELOADS_PER_THREAD,
           "All config reloads should succeed");
 
-    config_service_destroy(svc);
+    config_context_destroy(ctx);
     PASS();
 }
 
@@ -241,28 +276,40 @@ static void test_concurrent_config_reloads(void) {
 static void test_config_hot_reload(void) {
     TEST("C-L01 Normal: Configuration hot reload");
 
-    config_service_t *svc = config_service_create();
-    CHECK(svc != NULL, "config_service_create returned NULL");
+    config_context_t *ctx = config_service_create("test_hot_reload", NULL, false, false);
+    CHECK(ctx != NULL, "config_service_create returned NULL");
 
     /* Load initial config */
     const char *initial = "kernel:\n  max_alloc_mb: 512\n";
-    config_error_t err = config_service_load_from_string(svc, initial);
-    CHECK_EQ(err, CONFIG_OK, "Initial config load failed");
+    config_memory_source_options_t mem_opts1 = {
+        .data = initial,
+        .data_len = strlen(initial),
+        .format = "yaml"
+    };
+    config_source_t *source1 = config_source_create_memory(&mem_opts1);
+    config_error_t err = config_source_load(source1, ctx);
+    CHECK_EQ(err, CONFIG_SUCCESS, "Initial config load failed");
 
-    core_config_t *cfg = config_service_get_core_config(svc);
-    int val1 = core_config_get_int(cfg, "kernel.max_alloc_mb", 0);
-    CHECK_EQ(val1, 512, "Initial value should be 512");
+    int v1 = CONFIG_GET_INT_SAFE(ctx, "kernel.max_alloc_mb", 0);
+    CHECK_EQ(v1, 512, "Initial value should be 512");
 
     /* Hot reload with new value */
     const char *updated = "kernel:\n  max_alloc_mb: 4096\n";
-    err = config_service_load_from_string(svc, updated);
-    CHECK_EQ(err, CONFIG_OK, "Hot reload failed");
+    config_memory_source_options_t mem_opts2 = {
+        .data = updated,
+        .data_len = strlen(updated),
+        .format = "yaml"
+    };
+    config_source_t *source2 = config_source_create_memory(&mem_opts2);
+    err = config_source_load(source2, ctx);
+    CHECK_EQ(err, CONFIG_SUCCESS, "Hot reload failed");
 
-    cfg = config_service_get_core_config(svc);
-    int val2 = core_config_get_int(cfg, "kernel.max_alloc_mb", 0);
-    CHECK_EQ(val2, 4096, "Hot reloaded value should be 4096");
+    int v2 = CONFIG_GET_INT_SAFE(ctx, "kernel.max_alloc_mb", 0);
+    CHECK_EQ(v2, 4096, "Hot reloaded value should be 4096");
 
-    config_service_destroy(svc);
+    if (source1) config_source_destroy(source1);
+    if (source2) config_source_destroy(source2);
+    config_context_destroy(ctx);
     PASS();
 }
 
@@ -276,21 +323,40 @@ static void test_env_var_override(void) {
     /* Set an environment variable for testing */
     setenv("AGENTOS_KERNEL_MAX_ALLOC_MB", "8192", 1);
 
-    config_service_t *svc = config_service_create();
-    CHECK(svc != NULL, "config_service_create returned NULL");
+    config_context_t *ctx = config_service_create("test_env_override", NULL, false, false);
+    CHECK(ctx != NULL, "config_service_create returned NULL");
 
     const char *yaml = "kernel:\n  max_alloc_mb: 1024\n";
-    config_error_t err = config_service_load_from_string(svc, yaml);
-    CHECK_EQ(err, CONFIG_OK, "Config load failed");
+    config_memory_source_options_t mem_opts = {
+        .data = yaml,
+        .data_len = strlen(yaml),
+        .format = "yaml"
+    };
+    config_source_t *source = config_source_create_memory(&mem_opts);
+    config_error_t err = config_source_load(source, ctx);
+    CHECK_EQ(err, CONFIG_SUCCESS, "Config load failed");
 
-    core_config_t *cfg = config_service_get_core_config(svc);
-    int val = core_config_get_int(cfg, "kernel.max_alloc_mb", 0);
+    /* Also load from env source */
+    config_env_source_options_t env_opts = {
+        .prefix = "AGENTOS_",
+        .case_sensitive = false,
+        .separator = "_",
+        .expand_vars = true
+    };
+    config_source_t *env_source = config_source_create_env(&env_opts);
+    if (env_source) {
+        config_source_load(env_source, ctx);
+    }
+
+    int val = CONFIG_GET_INT_SAFE(ctx, "kernel.max_alloc_mb", 0);
 
     /* Env var should override YAML value */
     CHECK_EQ(val, 8192, "Environment variable should override YAML (8192)");
 
     unsetenv("AGENTOS_KERNEL_MAX_ALLOC_MB");
-    config_service_destroy(svc);
+    if (source) config_source_destroy(source);
+    if (env_source) config_source_destroy(env_source);
+    config_context_destroy(ctx);
     PASS();
 }
 

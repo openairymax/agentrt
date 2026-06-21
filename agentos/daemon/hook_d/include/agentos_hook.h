@@ -27,6 +27,8 @@
 #include "hook_service.h"
 #include "hook_registry.h"
 #include "hook_executor.h"
+#include "hook_timeout.h"
+#include "memory_compat.h"
 
 #include <stdbool.h>
 #include <stddef.h>

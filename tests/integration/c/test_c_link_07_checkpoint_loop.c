@@ -141,7 +141,7 @@ static void test_normal_multiple_checkpoints(void) {
         fill_snapshot(&snap, "task-multi-001", (uint64_t)i, (uint32_t)(i * 10));
         int ret = checkpoint_adapter_save(adapter, "task-multi-001",
                                            "session-001", (uint64_t)i, &snap);
-        CHECK_EQ(ret, 0, "Save checkpoint %d should succeed", i);
+        CHECK_EQ(ret, 0, "Save checkpoint should succeed");
         checkpoint_snapshot_free(&snap);
     }
 
