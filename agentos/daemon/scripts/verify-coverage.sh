@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKS_ROOT="$(dirname "$SCRIPT_DIR")"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 COVERAGE_TARGET="${COVERAGE_TARGET:-80}"
-EXTERNAL_BUILD_DIR="${PROJECT_ROOT}/../AgentOS-build"
+EXTERNAL_BUILD_DIR="${PROJECT_ROOT}/../AgentRT-build"
 REPORT_DIR="${EXTERNAL_BUILD_DIR}/reports"
 
 # 颜色定义

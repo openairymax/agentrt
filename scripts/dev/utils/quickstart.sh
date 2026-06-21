@@ -73,7 +73,7 @@ init_environment() {
     # 复制环境变量文件
     if [ ! -f .env ]; then
         print_info "复制环境变量模板..."
-        cp .env.example .env
+        cp configs/env.example .env
         print_success "环境变量已配置"
     else
         print_info ".env 文件已存在，跳过"
@@ -109,7 +109,7 @@ build_kernel() {
         print_info "构建 C++ 内核..."
 
         local PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-        local BUILD_DIR="${PROJECT_ROOT}/../AgentOS-build"
+        local BUILD_DIR="${PROJECT_ROOT}/../AgentRT-build"
 
         mkdir -p "${BUILD_DIR}"
         cd "${BUILD_DIR}"

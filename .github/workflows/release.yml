@@ -83,6 +83,7 @@ jobs:
             build-release/*.tar.gz
             build-release/*.deb
           retention-days: 30
+          if-no-files-found: ignore
 
   # ===========================================================================
   # Job 2: SBOM 生成
@@ -121,6 +122,7 @@ jobs:
           name: agentrt-sbom-${{ steps.version.outputs.VERSION }}
           path: ci-artifacts/release/sbom-${{ steps.version.outputs.VERSION }}.spdx.json
           retention-days: 90
+          if-no-files-found: ignore
 
   # ===========================================================================
   # Job 3: Cosign 签名
@@ -194,6 +196,7 @@ jobs:
           name: agentrt-signatures-${{ steps.version.outputs.VERSION }}
           path: signatures/
           retention-days: 90
+          if-no-files-found: ignore
 
   # ===========================================================================
   # Job 4: GitHub Release 发布
