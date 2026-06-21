@@ -44,7 +44,7 @@ services:
     volumes:
       - staging-logs:/var/log/agentos:rw
       - staging-data:/var/lib/agentos:rw
-      - ../../agentos/manager/staging:/etc/agentos:ro
+      - ../../ecosystem/manager/staging:/etc/agentos:ro
 
     # 网络配置
     networks:

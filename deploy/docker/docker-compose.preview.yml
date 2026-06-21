@@ -43,7 +43,7 @@ services:
     volumes:
       - preview-logs:/var/log/agentos:rw
       - preview-data:/var/lib/agentos:rw
-      - ../../agentos/manager/preview:/etc/agentos:ro
+      - ../../ecosystem/manager/preview:/etc/agentos:ro
 
     # 网络配置
     networks:

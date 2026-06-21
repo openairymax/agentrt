@@ -451,7 +451,7 @@ Examples:
     parser.add_argument(
         "--config-dir",
         type=Path,
-        default=Path(__file__).parent.parent.parent,
+        default=Path(__file__).parent.parent.parent.parent,
         help="Configuration directory path (default: ../)"
     )
     parser.add_argument(
