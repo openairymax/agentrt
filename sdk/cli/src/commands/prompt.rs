@@ -32,7 +32,7 @@ pub fn list() -> Result<()> {
         let entry = entry?;
         let path = entry.path();
         if path.extension().is_some_and(|ext| ext == "yaml" || ext == "yml") {
-            let name = path.file_stem().unwrap().to_string_lossy();
+            let name = path.file_stem().expect("YAML file must have a stem").to_string_lossy();
             // Read first few lines to get description
             let description = get_description(&path);
             println!("  {} {}  {}", "•".cyan(), name.cyan().bold(), description);
