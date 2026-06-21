@@ -749,6 +749,29 @@ int monitor_service_end_agent_trace(monitor_service_t *service, agent_execution_
     }
     agentos_mutex_unlock(&service->trace_lock);
 
+    /* 释放 trace 内部字符串字段 */
+    AGENTOS_FREE(trace->agent_id);
+    AGENTOS_FREE(trace->task_id);
+    AGENTOS_FREE(trace->trace_id);
+    AGENTOS_FREE(trace->service_name);
+
+    /* 释放轨迹点数组中的字符串 */
+    if (trace->trace_points) {
+        for (size_t i = 0; i < trace->trace_point_count; i++) {
+            AGENTOS_FREE(trace->trace_points[i].location);
+        }
+        AGENTOS_FREE(trace->trace_points);
+    }
+
+    /* 释放位置历史数组 */
+    if (trace->locations) {
+        for (size_t i = 0; i < trace->location_count; i++) {
+            AGENTOS_FREE(trace->locations[i]);
+        }
+        AGENTOS_FREE(trace->locations);
+    }
+    AGENTOS_FREE(trace->location_times);
+
     AGENTOS_FREE(trace);
     return AGENTOS_SUCCESS;
 }
