@@ -81,7 +81,7 @@ function(agentos_enable_asan target scope)
     # 运行时环境变量（通过 CMake 属性传递给 ctest）
     set_target_properties(${target} PROPERTIES
         ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1"
-        LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/agentos/manager/sanitizer/lsan-suppressions:print_suppressions=0"
+        LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0"
     )
 endfunction()
 
