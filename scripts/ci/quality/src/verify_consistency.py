@@ -67,7 +67,7 @@ def verify_file(file_path):
 
 def main():
     script_dir = Path(__file__).resolve().parent
-    docs_dir = script_dir / "../../../docs"
+    docs_dir = script_dir / "../../../../docs"
 
     # Exclude Basic_Theories as per user request
     exclude_dirs = {'Basic_Theories', '.git'}
