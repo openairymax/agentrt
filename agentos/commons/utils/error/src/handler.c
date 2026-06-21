@@ -383,6 +383,11 @@ void agentos_error_clear(void)
     if (state == NULL || !state->initialized) {
         return;
     }
+    /* 释放错误链中每个条目的 message 字符串 */
+    for (int i = 0; i < state->chain.depth; i++) {
+        AGENTOS_FREE((void *)state->chain.contexts[i].message);
+        state->chain.contexts[i].message = NULL;
+    }
     state->chain.code = AGENTOS_OK;
     state->chain.depth = 0;
 }

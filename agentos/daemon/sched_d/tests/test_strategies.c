@@ -57,6 +57,8 @@ static void test_round_robin_strategy(void)
     ret = strategy->schedule(data, &task, &result);
     if (ret == 0 && result != NULL) {
         printf("    Selected agent: %s\n", result->selected_agent_id);
+        AGENTOS_FREE(result->selected_agent_id);
+        AGENTOS_FREE(result);
     }
 
     size_t agent_count __attribute__((unused)) = strategy->get_available_agent_count(data);
@@ -111,6 +113,8 @@ static void test_weighted_strategy(void)
     if (ret == 0 && result != NULL) {
         printf("    Selected agent: %s (confidence: %.2f)\n", result->selected_agent_id,
                result->confidence);
+        AGENTOS_FREE(result->selected_agent_id);
+        AGENTOS_FREE(result);
     }
 
     strategy->destroy(data);
@@ -149,6 +153,10 @@ static void test_ml_based_strategy(void)
 
         sched_result_t *result = NULL;
         strategy->schedule(data, &task, &result);
+        if (result) {
+            AGENTOS_FREE(result->selected_agent_id);
+            AGENTOS_FREE(result);
+        }
 
         strategy->destroy(data);
     } else {
@@ -195,6 +203,10 @@ static void test_priority_based_strategy(void)
 
     sched_result_t *result = NULL;
     strategy->schedule(data, &high_task, &result);
+    if (result) {
+        AGENTOS_FREE(result->selected_agent_id);
+        AGENTOS_FREE(result);
+    }
 
     strategy->destroy(data);
 

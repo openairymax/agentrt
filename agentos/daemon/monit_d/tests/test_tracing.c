@@ -166,8 +166,12 @@ static void test_agent_active_agents(void)
     ret = monitor_service_get_active_agents(svc, &agent_ids, &count);
     if (ret == 0) {
         printf("    Active agents: %zu\n", count);
-        if (agent_ids)
-            free(agent_ids);
+        if (agent_ids) {
+            for (size_t i = 0; i < count; i++) {
+                AGENTOS_FREE(agent_ids[i]);
+            }
+            AGENTOS_FREE(agent_ids);
+        }
     }
 
     monitor_service_destroy(svc);
