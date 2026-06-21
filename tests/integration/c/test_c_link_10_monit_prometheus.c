@@ -218,7 +218,7 @@ static void test_timeout_scrape_stats(void) {
         size_t response_len = 0;
         ret = prometheus_exporter_handle_http(request, strlen(request),
                                                &response, &response_len);
-        CHECK_EQ(ret, 0, "Scrape %d should succeed", i);
+        CHECK_EQ(ret, 0, "Scrape should succeed");
         free(response);
     }
 

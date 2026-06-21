@@ -67,12 +67,13 @@ static int g_tests_total = 0;
 
 static int g_handler_call_count = 0;
 
-static ipc_bus_status_t test_message_handler(const ipc_bus_message_t *msg,
-                                              void *user_data) {
+static int test_message_handler(ipc_bus_channel_t channel, const ipc_bus_message_t *msg,
+                                             void *user_data) {
+    (void)channel;
     (void)msg;
     (void)user_data;
     g_handler_call_count++;
-    return IPC_BUS_OK;
+    return 0;
 }
 
 /* ============================================================================
@@ -153,7 +154,7 @@ static void test_normal_multiple_channels(void) {
 
     for (int i = 0; i < 4; i++) {
         int ret = ipc_bus_helper_register_channel(ibh, channels[i], protos[i]);
-        CHECK_EQ(ret, 0, "Register channel %s should succeed", channels[i]);
+        CHECK_EQ(ret, 0, "Register channel should succeed");
     }
 
     /* Try auto route to a service */
@@ -238,9 +239,11 @@ static void test_timeout_request(void) {
     /* Send a request with very short timeout */
     ipc_bus_message_t request;
     memset(&request, 0, sizeof(request));
-    request.type = IPC_BUS_MSG_REQUEST;
-    request.protocol = IPC_BUS_PROTO_JSON_RPC;
-    snprintf(request.payload, sizeof(request.payload), "{\"op\": \"ping\"}");
+    request.header.msg_type = IPC_BUS_MSG_REQUEST;
+    request.header.protocol = IPC_BUS_PROTO_JSON_RPC;
+    const char *payload_str = "{\"op\": \"ping\"}";
+    request.payload = (void *)payload_str;
+    request.payload_size = strlen(payload_str);
 
     ipc_bus_message_t response;
     memset(&response, 0, sizeof(response));
