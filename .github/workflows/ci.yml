@@ -172,7 +172,7 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=OFF \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -G Ninja
       - name: Run clang-tidy
-        if: steps.changed-files.outputs.has_checks == 'true'
+        if: steps.changed-files.outputs.has_changes == 'true'
         run: |
           echo "${{ steps.changed-files.outputs.files }}" | while read -r file; do
             if [ -n "$file" ] && [ -f "$file" ]; then
@@ -251,6 +251,7 @@ jobs:
           name: asan-report-${{ github.run_id }}
           path: build-asan/
           retention-days: 7
+          if-no-files-found: ignore
 
   # ===========================================================================
   # Job 6: MemoryRovol OSS 模式构建 & 测试
