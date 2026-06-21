@@ -102,6 +102,8 @@ static void test_normal_all_guards_pass(void) {
     CHECK(result.resource_quota_passed, "Resource quota guard should pass");
     CHECK(result.audit_recorded, "Audit guard should record");
 
+    free(meta.name);
+    free(meta.description);
     safety_guard_bridge_destroy(bridge);
     PASS();
 }
@@ -167,6 +169,8 @@ static void test_error_permission_denied(void) {
     CHECK(ret != 0 || !result.permission_passed,
           "Restricted agent should be denied shell_exec");
 
+    free(meta.name);
+    free(meta.description);
     safety_guard_bridge_destroy(bridge);
     PASS();
 }
@@ -262,6 +266,8 @@ static void test_timeout_guard_chain(void) {
     CHECK_EQ(result.guard_chain_length, 6, "Should have 6 guards in chain");
     CHECK_EQ(result.guards_executed, 6, "All 6 guards should be executed");
 
+    free(meta.name);
+    free(meta.description);
     safety_guard_bridge_destroy(bridge);
     PASS();
 }

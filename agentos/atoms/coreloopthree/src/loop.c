@@ -566,6 +566,24 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t *loop)
         loop->arena = NULL;
     }
 
+    /* C-L02: 销毁 LLM IPC 适配器 */
+    if (loop->llm_adapter) {
+        llm_svc_adapter_destroy(loop->llm_adapter);
+        loop->llm_adapter = NULL;
+    }
+
+    /* C-L04: 销毁工具 IPC 适配器 */
+    if (loop->tool_adapter) {
+        tool_svc_adapter_destroy(loop->tool_adapter);
+        loop->tool_adapter = NULL;
+    }
+
+    /* C-L12: 销毁 MemoryRovol 桥接器 */
+    if (loop->memory_bridge) {
+        memoryrovol_bridge_destroy(loop->memory_bridge);
+        loop->memory_bridge = NULL;
+    }
+
     if (loop->memory) {
         agentos_memory_destroy(loop->memory);
         loop->memory = NULL;
