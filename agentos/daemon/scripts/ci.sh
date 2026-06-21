@@ -8,8 +8,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKS_DIR="$(dirname "$SCRIPT_DIR")"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-BUILD_DIR="${PROJECT_ROOT}/../AgentOS-build"
-REPORT_DIR="${PROJECT_ROOT}/../AgentOS-build/reports"
+BUILD_DIR="${PROJECT_ROOT}/../AgentRT-build"
+REPORT_DIR="${PROJECT_ROOT}/../AgentRT-build/reports"
 
 # 颜色定义
 RED='\033[0;31m'
