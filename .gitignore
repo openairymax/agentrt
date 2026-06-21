@@ -736,8 +736,8 @@ coverage_reports/
 !scripts/ops/**/*.py
 !scripts/ops/**/*.yaml
 !scripts/ops/**/*.yml
-!scripts/ops/deploy/k8s/**/*.yml
-!scripts/ops/deploy/k8s/**/*.yaml
+!deploy/docker/k8s/**/*.yml
+!deploy/docker/k8s/**/*.yaml
 
 # scripts/resources/ — 项目资源
 !scripts/resources/**/*.sh
