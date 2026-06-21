@@ -12,7 +12,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 PARALLEL_JOBS="${PARALLEL_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 ENABLE_COVERAGE="${ENABLE_COVERAGE:-OFF}"
-EXTERNAL_BUILD_DIR="${PROJECT_ROOT}/../AgentOS-build"
+EXTERNAL_BUILD_DIR="${PROJECT_ROOT}/../AgentRT-build"
 REPORT_DIR="${EXTERNAL_BUILD_DIR}/reports"
 
 # 颜色定义

@@ -11,6 +11,7 @@ use std::fs;
 use crate::client::GatewayClient;
 
 const CONFIG_FILE: &str = "agentos.yaml";
+const CONFIG_FILE_ALT: &str = "configs/agentos.yaml";
 
 /// Show the current configuration.
 pub fn show() -> Result<()> {
@@ -125,9 +126,15 @@ fn find_config() -> Result<std::path::PathBuf> {
     // Check current directory first, then parent directories
     let mut current = std::env::current_dir().context("Failed to get current directory")?;
     loop {
+        // Try root-level agentos.yaml first (user project convention)
         let candidate = current.join(CONFIG_FILE);
         if candidate.exists() {
             return Ok(candidate);
+        }
+        // Fallback: try configs/agentos.yaml (AgentRT source repo layout)
+        let candidate_alt = current.join(CONFIG_FILE_ALT);
+        if candidate_alt.exists() {
+            return Ok(candidate_alt);
         }
         if !current.pop() {
             break;
