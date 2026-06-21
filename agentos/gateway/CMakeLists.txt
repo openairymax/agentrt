@@ -57,6 +57,9 @@ set(GATEWAY_HEADERS
 # ========== 库目标 ==========
 add_library(gateway STATIC ${GATEWAY_SOURCES})
 
+# jsonrpc.c / syscall_router.c 等源文件使用 AGENTOS_HAS_CJSON 守卫
+target_compile_definitions(gateway PUBLIC AGENTOS_HAS_CJSON=1)
+
 if(AGENTOS_HAS_LIBWEBSOCKETS)
     set_source_files_properties(
         src/gateway/ws_gateway.c

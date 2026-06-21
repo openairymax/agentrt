@@ -101,6 +101,7 @@ static void test_service_get_tool(void)
     tool_metadata_t *found __attribute__((unused)) = tool_service_get(svc, "get_test_tool");
     assert(found != NULL);
     assert(strcmp(found->name, "get_test_tool") == 0);
+    tool_metadata_free(found);
 
     tool_service_destroy(svc);
 
