@@ -76,6 +76,12 @@ endif()
 if(BUILD_TESTS)
     enable_testing()
     message(STATUS "CTest enabled at root level (before subdirectories)")
+    # 为所有测试设置 sanitizer 环境变量（set(ENV{}) 不会传递给 ctest）
+    if(ENABLE_SANITIZERS AND NOT MSVC)
+        set(AGENTRT_ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1")
+        set(AGENTRT_LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0")
+        set(AGENTRT_UBSAN_OPTIONS "halt_on_error=1:print_stacktrace=1")
+    endif()
 endif()
 
 # 输出构建配置信息
@@ -537,6 +543,19 @@ else()
 endif()
 
 include(CPack)
+
+# 为所有测试设置 sanitizer 环境变量
+# 使用 CMake 的 CMAKE_TEST_LAUNCHER 或在子目录的 CMakeLists.txt 中设置 set_tests_properties
+# 最可靠的方式：创建一个 wrapper 脚本，但更简单的是直接在 shell 中设置环境变量
+# 这里我们通过 configure_file 生成一个 ctest 包装脚本
+if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
+    configure_file(
+        "${CMAKE_SOURCE_DIR}/cmake/ctest_wrapper.sh.in"
+        "${CMAKE_BINARY_DIR}/run_tests.sh"
+        @ONLY
+    )
+    message(STATUS "Test wrapper script: ${CMAKE_BINARY_DIR}/run_tests.sh")
+endif()
 
 # 自定义目标：清理构建
 add_custom_target(clean-all
