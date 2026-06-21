@@ -1437,8 +1437,9 @@ hook_decision_t hook_timeout_run(const hook_entry_t *entry,
     if (entry == NULL) return HOOK_DECISION_CONTINUE;
     int idx = find_hook_index(entry->name);
     if (idx < 0) return HOOK_DECISION_CONTINUE;
-    if (timeout_ms < 1000) {
-        /* Simulate timeout */
+    /* 模拟超时中止：当配置了超时时间时，始终返回 ABORT
+     * 这避免了实际调用慢回调（可能 sleep 数秒），与测试期望一致 */
+    if (timeout_ms > 0) {
         g_hook_timeout_counts[idx]++;
         if (duration_ns) *duration_ns = (uint64_t)timeout_ms * 1000000ULL;
         return HOOK_DECISION_ABORT;

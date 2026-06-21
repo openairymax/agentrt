@@ -454,7 +454,9 @@ static void *worker_thread_func(void *arg)
         }
         tcb_release(tcb);
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
+
+    /* 线程退出前清理线程局部错误状态，避免 LSan 报告内存泄漏 */
+    agentos_error_thread_cleanup();
     return NULL;
 }
 
