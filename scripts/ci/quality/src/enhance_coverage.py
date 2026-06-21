@@ -329,7 +329,7 @@ def main():
     args = parser.parse_args()
     
     # 初始化分析器
-    project_root = Path(__file__).parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent.parent.parent
     analyzer = CoverageAnalyzer(project_root)
     
     print("="*60)
