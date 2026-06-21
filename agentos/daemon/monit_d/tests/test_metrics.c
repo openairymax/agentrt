@@ -122,6 +122,9 @@ static void test_monitor_get_metrics(void)
         printf("    Found %zu metrics\n", count);
     }
 
+    /* 释放 monitor_service_get_metrics 返回的数组 */
+    AGENTOS_FREE(metrics);
+
     monitor_service_destroy(svc);
 
     printf("    PASSED\n");

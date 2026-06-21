@@ -18,6 +18,8 @@
 // @owner: team-B
 #include "jsonrpc.h"
 
+#include "error.h"
+
 #include <assert.h>
 #include <cjson/cJSON.h>
 #include <stdio.h>
@@ -251,6 +253,7 @@ static void test_create_success_response(void)
 
     cJSON_Delete(resp_json);
     cJSON_free(response);
+    /* result 已被 jsonrpc_create_success_response 接管并释放，不可再删 */
     cJSON_Delete(id);
 
     TEST_PASS();
@@ -356,6 +359,7 @@ static void test_create_error_response_with_data(void)
 
     cJSON_Delete(resp_json);
     cJSON_free(response);
+    /* data 已被 jsonrpc_create_error_response 接管并释放，不可再删 */
     cJSON_Delete(id);
 
     TEST_PASS();
@@ -669,6 +673,9 @@ int main(int argc, char **argv)
     printf("========================================\n");
     printf("  Results: %d/%d passed\n", g_tests_passed, g_tests_run);
     printf("========================================\n\n");
+
+    /* 清理错误链，释放 AGENTOS_ERROR/AGENTOS_CHECK 分配的消息字符串 */
+    agentos_error_clear();
 
     return (g_tests_passed == g_tests_run) ? 0 : 1;
 }

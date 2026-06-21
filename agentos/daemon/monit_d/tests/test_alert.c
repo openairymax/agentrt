@@ -118,6 +118,14 @@ static void test_alert_get_alerts(void)
         printf("    Found %zu alerts\n", count);
     }
 
+    /* 释放 monitor_service_get_alerts 返回的数组 */
+    if (alerts) {
+        for (size_t i = 0; i < count; i++) {
+            AGENTOS_FREE(alerts[i]);
+        }
+        AGENTOS_FREE(alerts);
+    }
+
     monitor_service_destroy(svc);
 
     printf("    PASSED\n");
