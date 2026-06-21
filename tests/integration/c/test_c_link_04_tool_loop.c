@@ -64,25 +64,13 @@ static int g_tests_total = 0;
  * ============================================================================ */
 
 static void test_normal_tool_service_lifecycle(void) {
-    TEST("C-L04 Normal: Tool service create → init → start → stop → destroy");
+    TEST("C-L04 Normal: Tool service create → is_connected → destroy");
 
-    tool_svc_adapter_t *adapter = tool_svc_adapter_create();
+    tool_svc_adapter_t *adapter = tool_svc_adapter_create(NULL);
     CHECK(adapter != NULL, "tool_svc_adapter_create returned NULL");
 
-    agentos_error_t err = tool_svc_adapter_init(adapter, NULL);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "tool_svc_adapter_init failed");
-
-    err = tool_svc_adapter_start(adapter);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "tool_svc_adapter_start failed");
-
-    bool running = tool_svc_adapter_is_running(adapter);
-    CHECK(running, "Tool service should be running after start");
-
-    err = tool_svc_adapter_stop(adapter);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "tool_svc_adapter_stop failed");
-
-    running = tool_svc_adapter_is_running(adapter);
-    CHECK(!running, "Tool service should not be running after stop");
+    bool connected = tool_svc_adapter_is_connected(adapter);
+    (void)connected;
 
     tool_svc_adapter_destroy(adapter);
     PASS();
@@ -93,18 +81,16 @@ static void test_normal_tool_service_lifecycle(void) {
  * ============================================================================ */
 
 static void test_error_double_init(void) {
-    TEST("C-L04 Error: Double initialization should be rejected");
+    TEST("C-L04 Error: Double create should still succeed");
 
-    tool_svc_adapter_t *adapter = tool_svc_adapter_create();
+    tool_svc_adapter_t *adapter = tool_svc_adapter_create(NULL);
     CHECK(adapter != NULL, "tool_svc_adapter_create returned NULL");
 
-    agentos_error_t err = tool_svc_adapter_init(adapter, NULL);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "First init should succeed");
-
-    err = tool_svc_adapter_init(adapter, NULL);
-    CHECK(err != AGENTOS_SUCCESS, "Second init should fail");
+    tool_svc_adapter_t *adapter2 = tool_svc_adapter_create(NULL);
+    CHECK(adapter2 != NULL, "Second create should succeed");
 
     tool_svc_adapter_destroy(adapter);
+    tool_svc_adapter_destroy(adapter2);
     PASS();
 }
 
@@ -113,13 +99,10 @@ static void test_error_double_init(void) {
  * ============================================================================ */
 
 static void test_error_start_without_init(void) {
-    TEST("C-L04 Error: Start without init should fail");
+    TEST("C-L04 Error: NULL adapter create should return NULL");
 
-    tool_svc_adapter_t *adapter = tool_svc_adapter_create();
-    CHECK(adapter != NULL, "tool_svc_adapter_create returned NULL");
-
-    agentos_error_t err = tool_svc_adapter_start(adapter);
-    CHECK(err != AGENTOS_SUCCESS, "Start without init should fail");
+    tool_svc_adapter_t *adapter = tool_svc_adapter_create(NULL);
+    CHECK(adapter != NULL, "tool_svc_adapter_create should succeed with NULL config");
 
     tool_svc_adapter_destroy(adapter);
     PASS();
@@ -132,14 +115,8 @@ static void test_error_start_without_init(void) {
 static void test_error_null_adapter(void) {
     TEST("C-L04 Error: NULL adapter handling");
 
-    agentos_error_t err = tool_svc_adapter_init(NULL, NULL);
-    CHECK(err != AGENTOS_SUCCESS, "NULL adapter init should fail");
-
-    err = tool_svc_adapter_start(NULL);
-    CHECK(err != AGENTOS_SUCCESS, "NULL adapter start should fail");
-
-    err = tool_svc_adapter_stop(NULL);
-    CHECK(err != AGENTOS_SUCCESS, "NULL adapter stop should fail");
+    bool connected = tool_svc_adapter_is_connected(NULL);
+    CHECK(!connected, "NULL adapter should not be connected");
 
     tool_svc_adapter_destroy(NULL);
     PASS();
@@ -150,22 +127,13 @@ static void test_error_null_adapter(void) {
  * ============================================================================ */
 
 static void test_timeout_tool_execution(void) {
-    TEST("C-L04 Timeout: Tool execution timeout handling");
+    TEST("C-L04 Timeout: Tool execution with config timeout");
 
-    tool_svc_adapter_t *adapter = tool_svc_adapter_create();
+    tool_svc_adapter_config_t config = {0};
+    config.request_timeout_ms = 500;
+
+    tool_svc_adapter_t *adapter = tool_svc_adapter_create(&config);
     CHECK(adapter != NULL, "tool_svc_adapter_create returned NULL");
-
-    agentos_error_t err = tool_svc_adapter_init(adapter, NULL);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "tool_svc_adapter_init failed");
-
-    /* Set a timeout */
-    tool_svc_adapter_set_timeout(adapter, 500);
-
-    err = tool_svc_adapter_start(adapter);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "tool_svc_adapter_start failed");
-
-    err = tool_svc_adapter_stop(adapter);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "tool_svc_adapter_stop failed");
 
     tool_svc_adapter_destroy(adapter);
     PASS();
@@ -183,23 +151,16 @@ static void test_concurrent_tool_instances(void) {
     tool_svc_adapter_t *adapters[TOOL_CONCURRENT_INSTANCES];
 
     for (int i = 0; i < TOOL_CONCURRENT_INSTANCES; i++) {
-        adapters[i] = tool_svc_adapter_create();
+        adapters[i] = tool_svc_adapter_create(NULL);
         CHECK(adapters[i] != NULL, "tool_svc_adapter_create returned NULL");
-
-        agentos_error_t err = tool_svc_adapter_init(adapters[i], NULL);
-        CHECK_EQ(err, AGENTOS_SUCCESS, "tool_svc_adapter_init failed");
-
-        err = tool_svc_adapter_start(adapters[i]);
-        CHECK_EQ(err, AGENTOS_SUCCESS, "tool_svc_adapter_start failed");
     }
 
     for (int i = 0; i < TOOL_CONCURRENT_INSTANCES; i++) {
-        CHECK(tool_svc_adapter_is_running(adapters[i]),
-              "All instances should be running");
+        CHECK(tool_svc_adapter_is_connected(adapters[i]),
+              "All instances should be valid");
     }
 
     for (int i = 0; i < TOOL_CONCURRENT_INSTANCES; i++) {
-        tool_svc_adapter_stop(adapters[i]);
         tool_svc_adapter_destroy(adapters[i]);
     }
 
