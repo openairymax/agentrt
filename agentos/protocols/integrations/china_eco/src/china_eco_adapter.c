@@ -223,6 +223,10 @@ static const uint32_t SM3_IV[8] = {0x7380166FU, 0x4914B2B9U, 0x172442D7U, 0xDA8A
 
 static uint32_t sm3_rotl32(uint32_t x, int n)
 {
+    /* UBSan 安全：n 必须在 [0, 31] 范围内，对 32 取模避免移位溢出未定义行为 */
+    n &= 31;
+    if (n == 0)
+        return x;
     return (x << n) | (x >> (32 - n));
 }
 
