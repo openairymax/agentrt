@@ -19,11 +19,10 @@ def test_imports():
     # 测试 client 模块
     print("\n[1/5] 测试 client 模块...")
     try:
-        from agentos.client import Client, APIClient, manager, MockClient
+        from agentos.client import Client, APIClient, MockClient
         print("  OK client 模块导入成功")
         print(f"    - Client: {Client}")
         print(f"    - APIClient: {APIClient}")
-        print(f"    - manager: {manager}")
         print(f"    - MockClient: {MockClient}")
     except Exception as e:
         print(f"  FAIL client 模块导入失败: {e}")

@@ -621,6 +621,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                      sc_intent.requires_multi_step);
             trigger_feedback(engine, 0, "intent_classified", ic_fb);
         }
+        sc_intent_result_free(&sc_intent);
     }
 
     /* ========== Phase 0: Instruction Decomposition (S1) ========== */

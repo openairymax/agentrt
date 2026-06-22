@@ -196,6 +196,7 @@ int test_sys_invoke_valid_dispatch(void)
         free(out_metrics);
     }
 
+    agentos_syscalls_cleanup();
     TEST_PASS("sys_invoke_valid_dispatch");
     return 0;
 }
@@ -223,6 +224,7 @@ int test_sys_all_syscalls_reachable(void)
     TEST_ASSERT(reachable == 18, "all 18 should reject with EINVAL on wrong argc");
 
     printf("    (checked %d syscalls)\n", total);
+    agentos_syscalls_cleanup();
     TEST_PASS("sys_all_syscalls_reachable");
     return 0;
 }

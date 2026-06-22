@@ -119,8 +119,10 @@ static void test_cache_ttl(void)
 
     char *retrieved = NULL;
     int ret = cache_get(cache, key, &retrieved);
-    if (ret == 0 && retrieved != NULL) {
+    (void)ret; /* suppress unused warning when -Werror */
+    if (retrieved != NULL) {
         free(retrieved);
+        retrieved = NULL;
     }
 
 #ifdef _WIN32
@@ -132,6 +134,9 @@ static void test_cache_ttl(void)
     retrieved = NULL;
     ret = cache_get(cache, key, &retrieved);
     assert(ret != 0 || retrieved == NULL);
+    if (retrieved) {
+        free(retrieved);
+    }
 
     cache_destroy(cache);
 
