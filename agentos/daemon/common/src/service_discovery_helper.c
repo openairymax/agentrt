@@ -39,7 +39,7 @@ struct sd_helper_s {
     bool registered;
 
     /* 心跳线程 */
-    void *heartbeat_thread;           /* 平台线程句柄 */
+    agentos_thread_t heartbeat_thread;  /* 平台线程句柄 */
     volatile bool heartbeat_running;
     uint32_t heartbeat_interval_ms;
 };
@@ -109,7 +109,7 @@ sd_helper_t *sd_helper_init(const sd_config_t *config) {
 
     sdh->registered = false;
     sdh->heartbeat_running = false;
-    sdh->heartbeat_thread = NULL;
+    sdh->heartbeat_thread = AGENTOS_INVALID_THREAD;
 
     SVC_LOG_INFO("Service discovery helper initialized");
     return sdh;
@@ -278,9 +278,9 @@ void sd_helper_stop_heartbeat(sd_helper_t *sdh) {
 
     sdh->heartbeat_running = false;
 
-    if (sdh->heartbeat_thread) {
+    if (sdh->heartbeat_thread != AGENTOS_INVALID_THREAD) {
         agentos_thread_join(sdh->heartbeat_thread, NULL);
-        sdh->heartbeat_thread = NULL;
+        sdh->heartbeat_thread = AGENTOS_INVALID_THREAD;
     }
 
     SVC_LOG_INFO("Heartbeat stopped for service '%s'", sdh->service_name);
