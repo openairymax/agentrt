@@ -214,7 +214,7 @@ export class PluginRegistry {
 
     const instance = new pluginClass();
     try {
-      (instance as PluginInstance).pluginId = pluginId;
+      (instance as unknown as PluginInstance).pluginId = pluginId;
     } catch {
       // Subclass may define pluginId as read-only getter
     }

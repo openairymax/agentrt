@@ -186,7 +186,7 @@ set(PROTOCOLS_ALL_SOURCES
 # ============================================================
 set(PROTOCOLS_COMMON_HEADERS
     common/include/protocols.h
-    common/include/unified_protocol.h
+    include/unified_protocol.h
 )
 
 # ============================================================
