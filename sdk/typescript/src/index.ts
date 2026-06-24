@@ -23,7 +23,7 @@
 export { AgentOS, createAgentOS } from './agentos';
 
 // 客户端
-export { Client, APIClient } from './client';
+export { Client, APIClient, MockClient } from './client';
 
 // 配置
 export {

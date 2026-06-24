@@ -31,8 +31,8 @@ typedef struct {
     hook_context_t *ctx;           /**< Hook 上下文 */
     hook_decision_t result;        /**< 执行结果 */
     bool finished;                 /**< 是否完成 */
-    sync_mutex_t mutex;            /**< 结果保护锁 */
-    sync_condition_t cond;             /**< 完成信号 */
+    agentos_mutex_t mutex;         /**< 结果保护锁 */
+    agentos_cond_t cond;           /**< 完成信号 */
 } timeout_exec_arg_t;
 
 /**
@@ -42,7 +42,7 @@ static struct {
     hook_timeout_entry_t entries[HOOK_TIMEOUT_MAX_ENTRIES];
     size_t count;
     uint32_t default_timeout_ms;
-    sync_mutex_t mutex;
+    agentos_mutex_t mutex;
     bool initialized;
 } g_timeout_mgr;
 

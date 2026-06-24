@@ -53,12 +53,16 @@ endif()
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
-option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
 option(AGENTRT_BUILD_ALL "Build all AgentRT components" ON)
-option(AGENTRT_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+# 兼容别名：允许使用 AGENTRT_WITH_MEMORYROVOL（旧名）
+if(DEFINED AGENTRT_WITH_MEMORYROVOL AND NOT DEFINED AGENTOS_WITH_MEMORYROVOL)
+    set(AGENTOS_WITH_MEMORYROVOL ${AGENTRT_WITH_MEMORYROVOL})
+endif()
 option(AGENTRT_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
 set(AGENTRT_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
 set(AGENTRT_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")

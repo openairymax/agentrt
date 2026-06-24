@@ -41,7 +41,7 @@ typedef struct {
     llm_router_stats_t stats;
     cost_tracker_t *cost_tracker;
     token_counter_t *token_counter;
-    sync_mutex_t mutex;
+    agentos_mutex_t mutex;  /* platform.h 的 mutex 类型（通过 types.h→platform.h 包含）*/
     bool initialized;
 
     /* P3.1.2: 轮询计数器 */

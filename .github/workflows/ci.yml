@@ -588,7 +588,20 @@ jobs:
         run: |
           FAILED=0
           for job in build-and-test ban-scan clang-tidy cppcheck sanitizer-test memoryrovol-oss memoryrovol-pro contract-check connection-tests quality-gate python-checks; do
-            STATUS="${{ needs[job].result }}"
+            case "$job" in
+              build-and-test)    STATUS="${{ needs.build-and-test.result }}" ;;
+              ban-scan)          STATUS="${{ needs.ban-scan.result }}" ;;
+              clang-tidy)        STATUS="${{ needs.clang-tidy.result }}" ;;
+              cppcheck)          STATUS="${{ needs.cppcheck.result }}" ;;
+              sanitizer-test)    STATUS="${{ needs.sanitizer-test.result }}" ;;
+              memoryrovol-oss)   STATUS="${{ needs.memoryrovol-oss.result }}" ;;
+              memoryrovol-pro)   STATUS="${{ needs.memoryrovol-pro.result }}" ;;
+              contract-check)    STATUS="${{ needs.contract-check.result }}" ;;
+              connection-tests)  STATUS="${{ needs.connection-tests.result }}" ;;
+              quality-gate)      STATUS="${{ needs.quality-gate.result }}" ;;
+              python-checks)     STATUS="${{ needs.python-checks.result }}" ;;
+              *)                 STATUS="skipped" ;;
+            esac
             echo "  $job: $STATUS"
             if [ "$STATUS" = "failure" ]; then
               FAILED=1

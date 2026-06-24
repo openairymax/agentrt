@@ -1032,7 +1032,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                               tool_adapter ? "IPC" : (tool_svc ? "direct" : "none"));
 
             for (size_t i = 0; i < plan->task_plan_node_count; i++) {
-                agentos_task_node_t *node = &plan->task_plan_nodes[i];
+                agentos_task_node_t *node = plan->task_plan_nodes[i];
                 if (!node->task_node_handler_name)
                     continue;
 
