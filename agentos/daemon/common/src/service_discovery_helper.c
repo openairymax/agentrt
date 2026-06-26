@@ -83,7 +83,7 @@ sd_helper_t *sd_helper_init(const sd_config_t *config) {
 
     /* 复制或使用默认配置 */
     if (config) {
-        memcpy(&sdh->config, config, sizeof(sd_config_t));
+        AGENTOS_MEMCPY(&sdh->config, config, sizeof(sd_config_t));
     } else {
         sdh->config = sd_create_default_config();
     }
@@ -167,7 +167,7 @@ int sd_helper_register(sd_helper_t *sdh, const char *name, const char *type,
 
     /* 填充实例信息 */
     sd_instance_t inst;
-    memset(&inst, 0, sizeof(inst));
+    AGENTOS_MEMSET(&inst, 0, sizeof(inst));
     safe_strcpy(inst.instance_id, instance_id, sizeof(inst.instance_id));
     safe_strcpy(inst.endpoint, endpoint, sizeof(inst.endpoint));
     inst.state = AGENTOS_SVC_STATE_RUNNING;
@@ -220,7 +220,7 @@ int sd_helper_register_unix(sd_helper_t *sdh, const char *name, const char *type
     snprintf(instance_id, sizeof(instance_id), "%s-%s-%u", name, socket_path, pid);
 
     sd_instance_t inst;
-    memset(&inst, 0, sizeof(inst));
+    AGENTOS_MEMSET(&inst, 0, sizeof(inst));
     safe_strcpy(inst.instance_id, instance_id, sizeof(inst.instance_id));
     safe_strcpy(inst.endpoint, socket_path, sizeof(inst.endpoint));
     inst.state = AGENTOS_SVC_STATE_RUNNING;

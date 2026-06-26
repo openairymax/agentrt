@@ -147,11 +147,23 @@ else()
         add_compile_options(-Wno-error=format-truncation)
     endif()
     add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
-    add_compile_definitions(_FORTIFY_SOURCE=2 _GNU_SOURCE)
+    add_compile_definitions(_GNU_SOURCE)
+    # _FORTIFY_SOURCE=2 需要 -O1 或更高优化级别，Debug 构建时跳过以避免
+    # "_FORTIFY_SOURCE requires compiling with optimization" 警告
+    if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
+        add_compile_definitions(_FORTIFY_SOURCE=2)
+    endif()
 
     if(AGENTRT_COMPLIANCE_STRICT)
-        add_compile_definitions(AGENTRT_COMPLIANCE_STRICT)
+        add_compile_definitions(AGENTRT_COMPLIANCE_STRICT AGENTOS_COMPLIANCE_STRICT)
         add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/compliance/include/banned_functions.h)
+
+        # 注意：内存子系统实现层的 AGENTOS_COMPLIANCE_IMPL 豁免由各子目录的
+        # CMakeLists.txt 中的 set_source_files_properties 设置，因为该属性
+        # 仅在目标创建的目录作用域内生效。
+        # 详见：agentos/atoms/corekern/CMakeLists.txt
+        #       agentos/cupolas/CMakeLists.txt
+        #       agentos/commons/CMakeLists.txt
     endif()
 
     # 链接器安全选项
@@ -211,9 +223,13 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(/O2 /Ob2 /Oi /Ot /GL)  # 优化选项
         add_link_options(/LTCG)  # 链接时代码生成
     else()
-        add_compile_options(-O3 -flto)
+        # -ffat-lto-objects: 让 LTO 对象同时包含 GIMPLE 字节码和机器代码。
+        # 这样链接器扫描静态库时可用传统符号表解析，避免 LTO 符号摘要导致的
+        # undefined reference 错误（LTO + ASan 组合下尤其常见）。
+        # 代价：对象文件体积约增加 2x，但保留了 LTO 跨模块优化能力。
+        add_compile_options(-O3 -flto -ffat-lto-objects)
         add_compile_definitions(NDEBUG)
-        add_link_options(-flto)
+        add_link_options(-flto -ffat-lto-objects)
     endif()
 endif()
 
@@ -554,7 +570,7 @@ include(CPack)
 # 这里我们通过 configure_file 生成一个 ctest 包装脚本
 if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
     configure_file(
-        "${CMAKE_SOURCE_DIR}/cmake/ctest_wrapper.sh.in"
+        "${CMAKE_SOURCE_DIR}/scripts/dev/cmake/ctest_wrapper.sh.in"
         "${CMAKE_BINARY_DIR}/run_tests.sh"
         @ONLY
     )

@@ -17,7 +17,9 @@
  * 每项测试运行 100 次迭代，10 次预热
  */
 
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 199309L
+#endif
 
 #include "cache.h"
 #include "cost_tracker.h"

@@ -3,7 +3,7 @@
 """
 Manager 模块配置加载集成测试
 
-本测试脚本验证 AgentOS/manager 模块配置的完整性和一致性，包括：
+本测试脚本验证 AgentRT/manager 模块配置的完整性和一致性，包括：
 1. 配置文件之间的引用关系
 2. 环境变量定义的完整性
 3. 配置值的合理性和约束
@@ -14,7 +14,7 @@ Manager 模块配置加载集成测试
 使用方法:
     python test_config_integration.py [--verbose] [--config-dir <path>]
 
-作者: Spharx AgentOS Team
+作者: Spharx AgentRT Team
 版本: v1.0.0
 日期: 2026-04-01
 """
@@ -55,7 +55,7 @@ class ConfigIntegrationTester:
     
     # 环境变量定义（从 .env.template 提取）
     EXPECTED_ENV_VARS = {
-        'AGENTOS_ROOT': {'required': True, 'description': 'AgentOS 根目录'},
+        'AGENTOS_ROOT': {'required': True, 'description': 'AgentRT 根目录'},
         'AGENTOS_DATA_DIR': {'required': True, 'description': '数据存储目录'},
         'AGENTOS_LOG_DIR': {'required': True, 'description': '日志存储目录'},
         'AGENTOS_TEMP_DIR': {'required': True, 'description': '临时文件目录'},
@@ -667,7 +667,7 @@ class ConfigIntegrationTester:
             Tuple[int, int, int]: (通过数, 失败数, 总计)
         """
         print("=" * 80)
-        print("AgentOS Manager 模块配置集成测试")
+        print("AgentRT Manager 模块配置集成测试")
         print("=" * 80)
         print(f"配置目录: {self.config_dir}")
         print(f"测试时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -746,7 +746,7 @@ class ConfigIntegrationTester:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description='AgentOS Manager 模块配置集成测试工具',
+        description='AgentRT Manager 模块配置集成测试工具',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例用法:

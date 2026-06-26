@@ -3,7 +3,7 @@
 # Last updated: 2026-04-06
 
 """
-AgentRT Python SDK - AgentOS 系统的生产级 Python 接口
+AgentRT Python SDK - AgentRT 系统的生产级 Python 接口
 
 功能特性：
     - 高级业务模块（任务、记忆、会话、技能）
@@ -17,8 +17,8 @@ AgentRT Python SDK - AgentOS 系统的生产级 Python 接口
     - EventEmitter 事件驱动架构
 
 快速入门：
-    >>> from agentos import AgentOS
-    >>> client = AgentOS(endpoint="http://localhost:18789")
+    >>> from agentos import AgentRT
+    >>> client = AgentRT(endpoint="http://localhost:18789")
     >>> task = client.submit_task('{"input": "analyze this data"}')
     >>> result = task.wait(timeout=30)
 
@@ -40,7 +40,7 @@ Version History:
 """
 
 __version__ = "0.1.0"
-__author__ = "Spharx AgentOS Team"
+__author__ = "Spharx AgentRT Team"
 __license__ = "MIT"
 
 # 导入异常类和错误码常量
@@ -108,9 +108,9 @@ from .exceptions import (
     CODE_CORRUPTED_DATA,
 )
 
-# 向后兼容别名 — 使用 AgentOS_ 前缀避免遮蔽 Python 内置异常
-AgentOS_TimeoutError = AgentOSTimeoutError
-AgentOS_MemoryError = AgentOSMemoryError
+# 向后兼容别名 — 使用 AgentRT_ 前缀避免遮蔽 Python 内置异常
+AgentRT_TimeoutError = AgentOSTimeoutError
+AgentRT_MemoryError = AgentOSMemoryError
 
 # ============================================================
 # 新模块化架构导入（v0.1.0）
@@ -190,7 +190,7 @@ from .utils import (
 # ============================================================
 
 # 导入客户端（向后兼容）
-from .agent import AgentOS, AsyncAgentOS
+from .agent import AgentRT, AsyncAgentRT
 
 # 导入工具函数（向后兼容）
 from .utils.core import (
@@ -257,9 +257,9 @@ __all__ = [
     "AuthenticationError",
     "InvalidResponseError",
     "ServerError",
-    # 向后兼容别名（使用 AgentOS_ 前缀避免遮蔽 Python 内置异常）
-    "AgentOS_TimeoutError",
-    "AgentOS_MemoryError",
+    # 向后兼容别名（使用 AgentRT_ 前缀避免遮蔽 Python 内置异常）
+    "AgentRT_TimeoutError",
+    "AgentRT_MemoryError",
 
     # ============================================================
     # 错误码常量
@@ -382,8 +382,8 @@ __all__ = [
     # 向后兼容（保持现有代码可用）
     # ============================================================
     # 客户端（向后兼容）
-    "AgentOS",
-    "AsyncAgentOS",
+    "AgentRT",
+    "AsyncAgentRT",
 
     # 工具函数（向后兼容）
     "generate_hash",

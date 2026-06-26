@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Errors Module
+// AgentRT TypeScript SDK - Errors Module
 // Version: 0.1.0
 // Last updated: 2026-04-05
 //
@@ -88,7 +88,7 @@ export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
 // ============================================================
 
 /**
- * AgentOS 基础错误类
+ * AgentRT 基础错误类
  */
 export class AgentOSError extends Error {
   /** 错误码 */
@@ -97,7 +97,7 @@ export class AgentOSError extends Error {
   public readonly cause?: Error;
 
   /**
-   * 创建 AgentOS 错误
+   * 创建 AgentRT 错误
    * @param message - 错误消息
    * @param code - 错误码
    * @param cause - 原始错误

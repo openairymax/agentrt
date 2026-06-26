@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentOS 技能注册表配置文件
+# AgentRT 技能注册表配置文件
 # 版本: v1.0.0
 # 最后更新: 2026-04-02
 # Schema: schema/skill-registry.schema.json
@@ -11,7 +11,7 @@
 _owner:
   module: "cupolas"
   contact: "cupolas-team@example.com"
-  path: "AgentOS/cupolas"
+  path: "AgentRT/cupolas"
   description: "内容定义责任归属 cupolas 模块，管理责任归属 Manager 模块"
 
 # 配置版本
@@ -58,7 +58,7 @@ skills:
       - "filesystem"
       - "io"
       - "core"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -90,7 +90,7 @@ skills:
       - "shell"
       - "execution"
       - "system"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -122,7 +122,7 @@ skills:
       - "http"
       - "network"
       - "api"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -154,7 +154,7 @@ skills:
       - "python"
       - "code"
       - "execution"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -186,7 +186,7 @@ skills:
       - "javascript"
       - "nodejs"
       - "code"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -219,7 +219,7 @@ skills:
       - "database"
       - "sql"
       - "storage"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -255,7 +255,7 @@ skills:
       - "browser"
       - "automation"
       - "scraping"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -293,7 +293,7 @@ skills:
       - "git"
       - "version_control"
       - "devops"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -327,7 +327,7 @@ skills:
       - "embedding"
       - "search"
       - "ai"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"
@@ -362,7 +362,7 @@ skills:
       - "logs"
       - "analysis"
       - "monitoring"
-    author: "Spharx AgentOS Team"
+    author: "Spharx AgentRT Team"
     license: "MIT"
     created_at: "2026-01-01T00:00:00Z"
     updated_at: "2026-03-23T00:00:00Z"

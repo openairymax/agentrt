@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/spharx/agentos/sdk/go/agentos/client"
-	"github.com/spharx/agentos/sdk/go/agentos/types"
+	"github.com/spharx/agentrt/sdk/go/agentos/client"
+	"github.com/spharx/agentrt/sdk/go/agentos/types"
 )
 
 func TestNewSessionManager(t *testing.T) {

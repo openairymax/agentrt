@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spharx/agentos/sdk/go/agentos"
-	"github.com/spharx/agentos/sdk/go/agentos/client"
-	"github.com/spharx/agentos/sdk/go/agentos/types"
+	"github.com/spharx/agentrt/sdk/go/agentos"
+	"github.com/spharx/agentrt/sdk/go/agentos/client"
+	"github.com/spharx/agentrt/sdk/go/agentos/types"
 )
 
 func TestNewTaskManager(t *testing.T) {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file protocol.ts
- * @brief AgentOS TypeScript SDK — Protocol Client Module
+ * @brief AgentRT TypeScript SDK — Protocol Client Module
  *
  * Provides multi-protocol client support for communicating via:
  * - JSON-RPC 2.0 (default)
@@ -74,7 +74,7 @@ export interface ProtocolCapabilities {
 // ============================================================================
 
 /**
- * Unified multi-protocol client for AgentOS.
+ * Unified multi-protocol client for AgentRT.
  *
  * Provides a single interface for communicating via JSON-RPC, MCP, A2A,
  * or OpenAI-compatible endpoints. Automatically handles message format

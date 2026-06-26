@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "config-audit-log.schema.json",
   "title": "ConfigAuditLogEntry",
-  "description": "AgentOS配置变更审计日志条目Schema定义",
+  "description": "AgentRT配置变更审计日志条目Schema定义",
   "type": "object",
   "required": [
     "timestamp",

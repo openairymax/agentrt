@@ -18,7 +18,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #ifdef __linux__
 #include <sys/inotify.h>
 #endif

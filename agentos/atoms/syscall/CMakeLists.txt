@@ -54,7 +54,7 @@ if(MSVC)
 else()
     target_compile_options(agentos_syscall PRIVATE -Wall -Wextra -Wpedantic )
     target_compile_options(agentos_syscall PRIVATE -fstack-protector-strong)
-    target_compile_options(agentos_syscall PRIVATE -D_FORTIFY_SOURCE=2)
+    target_compile_options(agentos_syscall PRIVATE $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
     target_compile_options(agentos_syscall PRIVATE -fPIE)
     target_compile_options(agentos_syscall PRIVATE -Wformat -Wformat-security)
     target_compile_options(agentos_syscall PRIVATE -fno-omit-frame-pointer)
@@ -86,6 +86,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     # 单元测试
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_syscall_entry.c")
         add_executable(test_syscall_entry tests/unit/test_syscall_entry.c)
+        target_compile_definitions(test_syscall_entry PRIVATE AGENTOS_COMPLIANCE_IMPL)
         target_include_directories(test_syscall_entry PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
@@ -100,6 +101,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_syscall_table.c")
         add_executable(test_syscall_table tests/unit/test_syscall_table.c)
+        target_compile_definitions(test_syscall_table PRIVATE AGENTOS_COMPLIANCE_IMPL)
         target_include_directories(test_syscall_table PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
@@ -115,6 +117,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     # 集成测试
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/test_full_workflow.c")
         add_executable(test_full_workflow tests/integration/test_full_workflow.c)
+        target_compile_definitions(test_full_workflow PRIVATE AGENTOS_COMPLIANCE_IMPL)
         target_include_directories(test_full_workflow PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
@@ -132,6 +135,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         add_executable(test_syscall_extended tests/test_syscall_extended.c
             ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
         )
+        target_compile_definitions(test_syscall_extended PRIVATE AGENTOS_COMPLIANCE_IMPL)
         set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
             PROPERTIES COMPILE_FLAGS "-fno-lto"
         )
@@ -161,6 +165,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         )
         target_link_libraries(test_syscall_extended PRIVATE agentos_test_ldflags)
         target_compile_options(test_syscall_extended PRIVATE -g -O0 -fno-lto)
+        # -O0 与 _FORTIFY_SOURCE=2 不兼容（需要 -O1+），取消定义以避免警告
+        target_compile_options(test_syscall_extended PRIVATE -U_FORTIFY_SOURCE)
         add_test(NAME test_syscall_extended COMMAND test_syscall_extended)
         message(STATUS "  syscall_tests: test_syscall_extended configured (P1-C07 extended)")
     endif()
@@ -174,6 +180,7 @@ if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscalls.c")
     add_executable(test_syscalls tests/test_syscalls.c
         ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
     )
+    target_compile_definitions(test_syscalls PRIVATE AGENTOS_COMPLIANCE_IMPL)
     set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
         PROPERTIES COMPILE_FLAGS "-fno-lto"
     )

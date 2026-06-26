@@ -1,4 +1,4 @@
-# AgentOS Plugin Framework
+# AgentRT Plugin Framework
 # Version: 0.1.0
 # Last updated: 2026-04-11
 
@@ -6,7 +6,7 @@
 插件化框架
 
 实现运行时的动态功能扩展能力，支持插件的热加载、卸载、
-隔离和依赖管理，使AgentOS具备极强的可扩展性。
+隔离和依赖管理，使AgentRT具备极强的可扩展性。
 
 核心组件:
 - PluginManager: 插件生命周期管理
@@ -129,7 +129,7 @@ class BasePlugin:
     """
     插件基类
 
-    所有AgentOS插件都应继承此类，实现标准化的插件接口。
+    所有AgentRT插件都应继承此类，实现标准化的插件接口。
     """
 
     @property

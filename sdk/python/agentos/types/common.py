@@ -67,7 +67,7 @@ class MemoryLayer(str, Enum):
 
 class MemoryRecordType(IntEnum):
     """
-    Types of memory records supported by AgentOS.
+    Types of memory records supported by AgentRT.
 
     对应 Go SDK: types.MemoryRecordType
     """
@@ -117,7 +117,7 @@ class SpanStatus(str, Enum):
 @dataclass
 class Task:
     """
-    表示 AgentOS 系统中的一个执行任务。
+    表示 AgentRT 系统中的一个执行任务。
 
     对应 Go SDK: types.Task
     """
@@ -151,7 +151,7 @@ class TaskResult:
 @dataclass
 class Memory:
     """
-    表示 AgentOS 系统中的一条记忆记录。
+    表示 AgentRT 系统中的一条记忆记录。
 
     对应 Go SDK: types.Memory
     """
@@ -242,7 +242,7 @@ class Session:
 @dataclass
 class Skill:
     """
-    表示 AgentOS 系统中的可插拔能力单元。
+    表示 AgentRT 系统中的可插拔能力单元。
 
     对应 Go SDK: types.Skill
     """

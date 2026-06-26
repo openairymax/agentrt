@@ -716,7 +716,7 @@ AGENTOS_API agentos_error_t cb_register_event_callback(cb_manager_t manager,
                                                        void *user_data)
 {
     if (!manager || !callback) {
-        SVC_LOG_ERROR("cb_register_event_callback: null parameter manager=%p callback=%p", (void *)manager, (void *)callback);
+        SVC_LOG_ERROR("cb_register_event_callback: null parameter manager=%p callback=%p", (void *)manager, (void *)(uintptr_t)callback);
         return AGENTOS_EINVAL;
     }
 

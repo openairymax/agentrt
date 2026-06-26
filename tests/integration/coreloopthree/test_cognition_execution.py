@@ -1,4 +1,4 @@
-# AgentOS 集成测试 - CoreLoopThree
+# AgentRT 集成测试 - CoreLoopThree
 # Version: 0.1.0
 # Last updated: 2026-03-22
 
@@ -115,9 +115,9 @@ class TestCognitionLayerIntegration:
         mock_session.return_value = mock_session_instance
         mock_session_instance.post.return_value = mock_response
 
-        from agentos import AgentOS
+        from agentos import AgentRT
 
-        client = AgentOS()
+        client = AgentRT()
 
         user_input = "分析销售数据"
         task = client.submit_task(user_input)
@@ -222,9 +222,9 @@ class TestExecutionLayerIntegration:
             "status": "completed"
         }
 
-        from agentos import AgentOS
+        from agentos import AgentRT
 
-        client = AgentOS()
+        client = AgentRT()
 
         memories = client.search_memory("数据分析偏好")
         task = client.submit_task("分析数据")
@@ -354,9 +354,9 @@ class TestMemoryLayerIntegration:
             ]
         }
 
-        from agentos import AgentOS
+        from agentos import AgentRT
 
-        client = AgentOS()
+        client = AgentRT()
 
         session = client.create_session()
         memories = client.search_memory("会话上下文")
@@ -402,9 +402,9 @@ class TestEndToEndFlow:
             {"memories": []}
         ]
 
-        from agentos import AgentOS
+        from agentos import AgentRT
 
-        client = AgentOS()
+        client = AgentRT()
 
         task = client.submit_task("分析销售数据")
         memory_id = client.write_memory("分析结果：销售额增长15%")
@@ -437,9 +437,9 @@ class TestEndToEndFlow:
             {"task_id": "task_003"}
         ]
 
-        from agentos import AgentOS
+        from agentos import AgentRT
 
-        client = AgentOS()
+        client = AgentRT()
 
         tasks = [
             client.submit_task("任务1：数据收集"),

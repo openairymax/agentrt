@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Configuration Module
+// AgentRT TypeScript SDK - Configuration Module
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //
@@ -9,7 +9,7 @@
 import { ConfigError, ErrorCode } from './errors';
 
 /**
- * manager 定义 AgentOS 客户端的完整配置
+ * manager 定义 AgentRT 客户端的完整配置
  */
 export interface manager {
   /** 服务端点地址 */
@@ -56,7 +56,7 @@ export function defaultConfig(): manager {
     timeout: 30000,
     maxRetries: 3,
     retryDelay: 1000,
-    userAgent: 'AgentOS-TypeScript-tools/3.0.0',
+    userAgent: 'AgentRT-TypeScript-tools/3.0.0',
     debug: false,
     logLevel: 'info',
     maxConnections: 10,

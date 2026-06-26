@@ -1,7 +1,7 @@
 {
   "name": "@agentos/sdk",
   "version": "0.1.0",
-  "description": "AgentOS TypeScript SDK",
+  "description": "AgentRT TypeScript SDK",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -35,7 +35,7 @@
     "sdk",
     "typescript"
   ],
-  "author": "Spharx AgentOS Team",
+  "author": "Spharx AgentRT Team",
   "license": "MIT",
   "repository": {
     "type": "git",

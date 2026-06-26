@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any
 from .exceptions import SessionError
 
 class Session:
-    """Session class for managing AgentOS sessions.
+    """Session class for managing AgentRT sessions.
     
     This class provides methods to set and get session context, and close the session.
     """
@@ -21,7 +21,7 @@ class Session:
         Initialize a Session object.
         
         Args:
-            client: The AgentOS client instance.
+            client: The AgentRT client instance.
             session_id: The session ID.
         """
         self.client = client

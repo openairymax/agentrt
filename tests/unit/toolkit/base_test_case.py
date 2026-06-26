@@ -1,4 +1,4 @@
-# AgentOS Python SDK - 测试基类
+# AgentRT Python SDK - 测试基类
 # Version: 0.1.0
 # Last updated: 2026-04-05
 #

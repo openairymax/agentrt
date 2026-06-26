@@ -1,6 +1,6 @@
-# AgentOS 变更日志 CHANGELOG
+# AgentRT 变更日志 CHANGELOG
 
-本文档记录 AgentOS 的所有重要变更。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+本文档记录 AgentRT 的所有重要变更。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## 📋 目录
 
@@ -22,7 +22,7 @@
 
 ### 🎯 首个正式发行版
 
-AgentOS 首个正式发行版。经过多轮深度代码审计、版本统一、目录结构重组和文档全面更新，项目已达到可对外发布的成熟度。
+AgentRT 首个正式发行版。经过多轮深度代码审计、版本统一、目录结构重组和文档全面更新，项目已达到可对外发布的成熟度。
 
 ### 🏗️ 版本统一与规范化
 
@@ -246,7 +246,7 @@ AgentOS 首个正式发行版。经过多轮深度代码审计、版本统一、
 #### GIF 预览修复
 - **修复**: README 中的 GIF 图片在 GitHub/Gitee 上无法显示的问题
   - 路径分隔符标准化：将反斜杠 `\` 改为正斜杠 `/`
-  - 文件名优化：将中文文件名改为英文 `AgentOS-desktop-preview.gif`
+  - 文件名优化：将中文文件名改为英文 `AgentRT-desktop-preview.gif`
   - Git LFS 配置调整：将 GIF 从 LFS 跟踪中移除，改为普通二进制存储
   - 引用链接验证：确保所有 README 文件中的图片引用正确
 - **同步**: 英文版 README.md 与中文版 README_CN.md 保持同步
@@ -429,7 +429,7 @@ AgentOS 首个正式发行版。经过多轮深度代码审计、版本统一、
 - **新增**: Daemon V6 检查成果 - 代码重复率仅 **1.8%** (业界通常 5-15%)
 - **新增**: Heapstore 三阶段优化完成 - 生产就绪度达 **98%**
 - **新增**: Cupolas V4 安全增强 - 新增 TLS/HTTP/DNS 网络安全子模块
-- **结论**: AgentOS 项目真实状态为 **行业标杆级别**，强烈推荐上线
+- **结论**: AgentRT 项目真实状态为 **行业标杆级别**，强烈推荐上线
 
 ### 🚀 CI/CD 优化
 
@@ -834,7 +834,7 @@ _（v0.0.6 为向后兼容的功能增强版本，无破坏性变更）_
   - 规则生成引擎原型
   - 进化委员会联动机制
 
-##### 微内核基础模块 (core)
+##### 微核心基础模块 (core)
 - **新增**: IPC Binder 通信机制
   - 基于 Socket 的进程间通信
   - 连接管理和复用
@@ -1012,7 +1012,7 @@ _（v0.0.6 为向后兼容的功能增强版本，无破坏性变更）_
 - **新增**: CoreLoopThree 架构详解
 - **新增**: MemoryRovol 架构详解
 - **新增**: IPC 机制详解
-- **新增**: 微内核设计文档
+- **新增**: 微核心设计文档
 - **新增**: 系统调用详解
 - **新增**: 快速入门指南
 - **新增**: Agent 开发教程
@@ -1072,7 +1072,7 @@ _（v0.0.3 为首次公开发布版本，无破坏性变更）_
 #### 新增
 - MemoryRovol 概念设计和原型
 - CoreLoopThree 理论框架
-- 微内核架构设计
+- 微核心架构设计
 
 #### 改进
 - 需求分析和系统设计
@@ -1122,7 +1122,7 @@ _（v0.0.3 为首次公开发布版本，无破坏性变更）_
 ## 联系方式
 
 - **Gitee**: https://gitee.com/spharx/agentos
-- **GitHub**: https://github.com/SpharxTeam/AgentOS
+- **GitHub**: https://github.com/SpharxTeam/AgentRT
 - **技术支持**: support@spharx.cn
 - **安全问题**: security@spharx.cn
 - **商务合作**: business@spharx.cn

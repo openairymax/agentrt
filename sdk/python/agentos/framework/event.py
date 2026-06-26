@@ -1,4 +1,4 @@
-# AgentOS Event Framework
+# AgentRT Event Framework
 # Version: 0.1.0
 # Last updated: 2026-04-11
 
@@ -6,7 +6,7 @@
 事件驱动框架
 
 提供松耦合的组件间通信机制，支持同步/异步事件处理、
-消息路由和事件溯源，是AgentOS系统的神经系统。
+消息路由和事件溯源，是AgentRT系统的神经系统。
 
 核心组件:
 - EventBus: 事件总线，发布/订阅核心
@@ -398,7 +398,7 @@ class EventBus:
     """
     事件总线
     
-    AgentOS事件系统的核心组件，提供发布/订阅模式的事件通信。
+    AgentRT事件系统的核心组件，提供发布/订阅模式的事件通信。
     支持同步/异步处理器、中间件链、事件路由和持久化。
     
     使用示例:

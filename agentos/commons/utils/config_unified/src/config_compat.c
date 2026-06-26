@@ -12,6 +12,9 @@
 #include "core_config.h"
 #include "error.h"
 
+/* 跨平台路径常量（AGENTOS_CONFIG_DIR） */
+#include "platform.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -505,7 +508,7 @@ int config_load_environment_config(const char *environment)
     char path[512];
     snprintf(path, sizeof(path), "%s.d/%s.conf", environment, environment);
     if (config_load_file(path) != 0) {
-        snprintf(path, sizeof(path), "/etc/agentos/%s.conf", environment);
+        snprintf(path, sizeof(path), AGENTOS_CONFIG_DIR "/%s.conf", environment);
         config_load_file(path);
     }
     config_set_environment(environment);

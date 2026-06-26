@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Checkpoint Manager
+# AgentRT Checkpoint Manager
 # Migrated from scripts/operations/checkpoint_manager.py
 
 """
-AgentOS State Checkpoint Manager
+AgentRT State Checkpoint Manager
 
-Manages persistent state snapshots for AgentOS agents:
+Manages persistent state snapshots for AgentRT agents:
 - Create, list, restore, and delete checkpoints
 - Automatic checkpoint rotation
 - JSON-based state serialization

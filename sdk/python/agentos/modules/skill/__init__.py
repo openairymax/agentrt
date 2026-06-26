@@ -3,7 +3,7 @@
 # Last updated: 2026-03-24
 
 """
-Skill management module for AgentOS SDK.
+Skill management module for AgentRT SDK.
 
 Provides skill registration, loading, execution, unloading, and validation operations.
 

@@ -137,8 +137,8 @@ int llm_router_register_endpoint(const llm_endpoint_t *endpoint)
         return -1;
     }
 
-    memcpy(&ctx->endpoints[ctx->endpoint_count], endpoint,
-           sizeof(llm_endpoint_t));
+    AGENTOS_MEMCPY(&ctx->endpoints[ctx->endpoint_count], endpoint,
+                  sizeof(llm_endpoint_t));
     ctx->endpoint_count++;
 
     AGENTOS_LOG_INFO("C-L02: LLMRouter: registered endpoint %s/%s (total=%zu, "
@@ -173,8 +173,8 @@ int llm_router_unregister_endpoint(const char *provider_name,
                              provider_name, model_name);
             /* 用最后一个覆盖 */
             if (i < ctx->endpoint_count - 1) {
-                memcpy(ep, &ctx->endpoints[ctx->endpoint_count - 1],
-                       sizeof(llm_endpoint_t));
+                AGENTOS_MEMCPY(ep, &ctx->endpoints[ctx->endpoint_count - 1],
+                              sizeof(llm_endpoint_t));
             }
             ctx->endpoint_count--;
             AGENTOS_MUTEX_UNLOCK(&ctx->mutex);
@@ -315,7 +315,7 @@ int llm_router_get_stats(llm_router_stats_t *stats)
     }
 
     AGENTOS_MUTEX_LOCK(&ctx->mutex);
-    memcpy(stats, &ctx->stats, sizeof(llm_router_stats_t));
+    AGENTOS_MEMCPY(stats, &ctx->stats, sizeof(llm_router_stats_t));
     AGENTOS_MUTEX_UNLOCK(&ctx->mutex);
 
     AGENTOS_LOG_DEBUG("C-L02: LLMRouter: stats queried (total=%llu, cost=$%.6f)",

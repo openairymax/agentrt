@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 测试质量报告工具
+AgentRT 测试质量报告工具
 
 生成详细的测试质量报告，包括：
 - 测试覆盖率统计
@@ -142,7 +142,7 @@ class TestQualityReporter:
 
         report = []
         report.append("=" * 60)
-        report.append("📊 AgentOS 测试质量报告")
+        report.append("📊 AgentRT 测试质量报告")
         report.append("=" * 60)
         report.append(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         report.append(f"测试目录: {self.tests_dir}")
@@ -319,7 +319,7 @@ class ReportFormatter:
     def to_markdown(data: Dict[str, Any]) -> str:
         """转换为Markdown格式"""
         lines = []
-        lines.append("# AgentOS 测试质量报告")
+        lines.append("# AgentRT 测试质量报告")
         lines.append("")
         lines.append(f"**生成时间**: {data.get('timestamp', 'N/A')}")
         lines.append("")
@@ -346,7 +346,7 @@ class ReportFormatter:
     def to_html(data: Dict[str, Any]) -> str:
         """转换为HTML格式"""
         html = ['<!DOCTYPE html>', '<html lang="zh-CN">', '<head>',
-                '<meta charset="UTF-8">', '<title>AgentOS 测试质量报告</title>',
+                '<meta charset="UTF-8">', '<title>AgentRT 测试质量报告</title>',
                 '<style>',
                 'body { font-family: Arial, sans-serif; margin: 20px; }',
                 'h1 { color: #333; }',
@@ -357,7 +357,7 @@ class ReportFormatter:
                 '.bad { color: #f44336; }',
                 '</style>', '</head>', '<body>']
 
-        html.append('<h1>📊 AgentOS 测试质量报告</h1>')
+        html.append('<h1>📊 AgentRT 测试质量报告</h1>')
         html.append(f'<p>生成时间: {data.get("timestamp", "N/A")}</p>')
 
         if 'stats' in data:

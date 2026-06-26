@@ -2,7 +2,7 @@
 
 **最后更新**: 2026-04-10
 
-如果您在使用 AgentOS 过程中遇到问题或需要帮助，请参考以下支持渠道。
+如果您在使用 AgentRT 过程中遇到问题或需要帮助，请参考以下支持渠道。
 
 ## 📑 目录
 
@@ -30,7 +30,7 @@
 
 - **[CoreLoopThree 架构](agentos/atoms/coreloopthree/README.md)** - 三层认知运行时详解
 - **[MemoryRovol 架构](agentos/atoms/memoryrovol/README.md)** - 四层记忆系统详解
-- **[微内核设计](docs/Capital_Architecture/microkernel.md)** - 微内核架构详解
+- **[微核心设计](docs/Capital_Architecture/microkernel.md)** - 微核心架构详解
 - **[系统调用](docs/Capital_Architecture/syscall.md)** - 系统调用接口规范
 - **[IPC 通信](docs/Capital_Architecture/ipc.md)** - 进程间通信机制
 - **[统一日志系统](docs/)** - 日志规范
@@ -65,9 +65,9 @@
 
 ### 技术社区
 
-- **知乎**: 关注 AgentOS 官方账号
-- **CSDN**: 搜索 AgentOS 技术博客
-- **掘金**: 查看 AgentOS 相关文章
+- **知乎**: 关注 AgentRT 官方账号
+- **CSDN**: 搜索 AgentRT 技术博客
+- **掘金**: 查看 AgentRT 相关文章
 
 ---
 
@@ -81,7 +81,7 @@
 |---------|------|---------|
 | **技术支持** | 7x24 小时技术支持，SLA 保障 | 2 小时响应 |
 | **定制开发** | 根据企业需求定制功能 | 按需协商 |
-| **培训服务** | AgentOS 架构和使用培训 | 按需安排 |
+| **培训服务** | AgentRT 架构和使用培训 | 按需安排 |
 | **安全审计** | 安全渗透测试和代码审计 | 5 个工作日 |
 | **咨询服务** | 架构设计和最佳实践咨询 | 3 个工作日 |
 
@@ -125,7 +125,7 @@
 
 - **AtomGit**: https://atomgit.com/spharx/agentos（推荐，国内访问最快）
 - **Gitee**: https://gitee.com/spharx/agentos
-- **GitHub**: https://github.com/SpharxTeam/AgentOS
+- **GitHub**: https://github.com/SpharxTeam/AgentRT
 - **官方网站**: https://spharx.cn
 
 ---
@@ -142,7 +142,7 @@
 ### Q: 提问时应该提供哪些信息？
 
 **A**: 为了提高问题解决效率，请提供：
-- AgentOS 版本号
+- AgentRT 版本号
 - 操作系统和版本
 - 详细的错误信息或日志
 - 复现步骤

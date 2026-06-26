@@ -205,7 +205,7 @@ int prometheus_exporter_handle_http(const char *request, size_t request_len,
                                   "Connection: close\r\n"
                                   "\r\n",
                                   body_len);
-        memcpy(resp + header_len, err_body, body_len);
+        AGENTOS_MEMCPY(resp + header_len, err_body, body_len);
         *response = resp;
         *response_len = (size_t)header_len + body_len;
         return 0;
@@ -234,8 +234,8 @@ int prometheus_exporter_handle_http(const char *request, size_t request_len,
         return -1;
     }
 
-    memcpy(resp, header_buf, (size_t)header_len);
-    memcpy(resp + header_len, metrics_text, metrics_len);
+    AGENTOS_MEMCPY(resp, header_buf, (size_t)header_len);
+    AGENTOS_MEMCPY(resp + header_len, metrics_text, metrics_len);
     resp[total_len] = '\0';
 
     AGENTOS_FREE(metrics_text);

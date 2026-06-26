@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file gateway_svc_adapter.c
- * @brief Gateway服务适配器：将网关服务适配到统一的AgentOS服务管理框架
+ * @brief Gateway服务适配器：将网关服务适配到统一的AgentRT服务管理框架
  *
  * 本文件实现了网关服务与agentos_service_t通用接口的适配层。
  * 通过适配器模式，网关服务可以无缝集成到服务管理框架中，

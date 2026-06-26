@@ -1,4 +1,4 @@
-'''OpenLab Core Agent Module - AgentOS 架构设计原则 V1.8'''
+'''OpenLab Core Agent Module - AgentRT 架构设计原则 V1.8'''
 
 
 

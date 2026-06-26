@@ -1,5 +1,5 @@
 /**
- * AgentOS TypeScript SDK Performance Benchmarks
+ * AgentRT TypeScript SDK Performance Benchmarks
  *
  * This file contains performance benchmark tests to ensure
  * the SDK meets production performance standards.
@@ -24,7 +24,7 @@ const PERFORMANCE_THRESHOLDS = {
   maxBulkOperationTime: 200,
 };
 
-describe('AgentOS Performance Benchmarks', () => {
+describe('AgentRT Performance Benchmarks', () => {
   describe('Task Operations', () => {
     it('should submit task within threshold', async () => {
       const mock = new MockClient();

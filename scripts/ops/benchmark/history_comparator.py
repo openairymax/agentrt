@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 性能基准测试历史比较器
+AgentRT 性能基准测试历史比较器
 
 提供历史测试结果的比较和分析功能：
 1. 版本间性能对比
@@ -854,7 +854,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="AgentOS 性能基准测试历史比较器",
+        description="AgentRT 性能基准测试历史比较器",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:

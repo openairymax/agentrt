@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - HTTP Client
+// AgentRT TypeScript SDK - HTTP Client
 // Version: 0.1.0
 // Last updated: 2026-04-05
 //
@@ -64,7 +64,7 @@ export interface APIClient {
 }
 
 /**
- * Client 是 AgentOS TypeScript SDK 的核心 HTTP 客户端
+ * Client 是 AgentRT TypeScript SDK 的核心 HTTP 客户端
  * 与 Go SDK Client 结构体保持一致
  */
 export class Client implements APIClient {
@@ -110,7 +110,7 @@ export class Client implements APIClient {
   }
 
   /**
-   * 检查 AgentOS 服务的健康状态
+   * 检查 AgentRT 服务的健康状态
    */
   async health(): Promise<HealthStatus> {
     const resp = await this.get<{ status: string; version: string; uptime: number; checks: Record<string, string> }>('/health');
@@ -125,7 +125,7 @@ export class Client implements APIClient {
   }
 
   /**
-   * 获取 AgentOS 系统运行指标
+   * 获取 AgentRT 系统运行指标
    */
   async metrics(): Promise<Metrics> {
     const resp = await this.get<{
@@ -168,7 +168,7 @@ export class Client implements APIClient {
    * 返回客户端的可读描述
    */
   toString(): string {
-    return `AgentOS Client[endpoint=${this.manager.endpoint}, timeout=${this.manager.timeout}ms]`;
+    return `AgentRT Client[endpoint=${this.manager.endpoint}, timeout=${this.manager.timeout}ms]`;
   }
 
   // ============================================================

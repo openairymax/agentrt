@@ -1,4 +1,6 @@
 # AgentRT 集成测试 CMake 配置
+# 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
+add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 # @owner: team-C
 # P1.16m: 12 条连接线集成测试 + P2.8: Hook 系统集成测试
 #

@@ -1,4 +1,4 @@
-# AgentOS State Manager
+# AgentRT State Manager
 # Version: 0.1.0
 # Last updated: 2026-04-11
 

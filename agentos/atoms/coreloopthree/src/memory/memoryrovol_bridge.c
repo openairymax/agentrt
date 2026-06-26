@@ -562,15 +562,18 @@ mrb_bridge_t *mrb_bridge_create(const mrb_config_t *config)
         }
     }
 
-    SVC_LOG_INFO("C-L12: MemoryRovol bridge created (%s mode, memoryrovol=%s)",
+    {
+        const char *mode =
 #if AGENTOS_MEMORY_BUILTIN
-                 "BUILTIN",
+            "BUILTIN";
 #elif AGENTOS_MEMORY_MEMORYROVOL
-                 "MEMORYROVOL",
+            "MEMORYROVOL";
 #else
-                 "HYBRID",
+            "HYBRID";
 #endif
-                 impl->memoryrovol_available ? "available" : "N/A");
+        SVC_LOG_INFO("C-L12: MemoryRovol bridge created (%s mode, memoryrovol=%s)",
+                     mode, impl->memoryrovol_available ? "available" : "N/A");
+    }
 
     return bridge;
 }
