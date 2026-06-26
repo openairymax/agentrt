@@ -1,14 +1,14 @@
-# OpenLab 与 AgentOS Python SDK 集成示例
+# OpenLab 与 AgentRT Python SDK 集成示例
 #
 # 版本: 1.0.0
 # 最后更新: 2026-04-10
-# 作者: Spharx AgentOS Team
+# 作者: Spharx AgentRT Team
 #
-# 本示例展示如何在 OpenLab 应用中集成 AgentOS Python SDK，
+# 本示例展示如何在 OpenLab 应用中集成 AgentRT Python SDK，
 # 实现以下功能：
-# 1. 通过 AgentOS SDK 创建和管理任务
-# 2. 使用 AgentOS 记忆系统存储和检索数据
-# 3. 调用 AgentOS 技能执行特定操作
+# 1. 通过 AgentRT SDK 创建和管理任务
+# 2. 使用 AgentRT 记忆系统存储和检索数据
+# 3. 调用 AgentRT 技能执行特定操作
 # 4. 监控任务执行状态和性能指标
 
 import asyncio
@@ -17,14 +17,14 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-# 导入 AgentOS Python SDK
+# 导入 AgentRT Python SDK
 try:
     from agentos import AgentOSClient, Task, Memory, Skill
     from agentos.types import TaskStatus, MemoryType, SkillCategory
     from agentos.utils.event_emitter import EventEmitter, BuiltinEvents
     AGENTOS_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️  AgentOS SDK 未安装: {e}")
+    print(f"⚠️  AgentRT SDK 未安装: {e}")
     print("请运行: pip install -e sdk/python")
     AGENTOS_AVAILABLE = False
 
@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 
 class OpenLabAgentOSIntegration:
     """
-    OpenLab 与 AgentOS 集成类
+    OpenLab 与 AgentRT 集成类
     
-    提供 OpenLab 应用与 AgentOS 核心系统的无缝集成，
+    提供 OpenLab 应用与 AgentRT 核心系统的无缝集成，
     基于五维正交系统设计原则实现。
     """
     
@@ -46,10 +46,10 @@ class OpenLabAgentOSIntegration:
         初始化集成
         
         Args:
-            agentos_base_url: AgentOS 网关地址
+            agentos_base_url: AgentRT 网关地址
         """
         if not AGENTOS_AVAILABLE:
-            raise RuntimeError("AgentOS SDK 未安装，无法初始化集成")
+            raise RuntimeError("AgentRT SDK 未安装，无法初始化集成")
         
         self.base_url = agentos_base_url
         self.client = AgentOSClient(base_url=agentos_base_url)
@@ -59,11 +59,11 @@ class OpenLabAgentOSIntegration:
         self.connected = False
         self.initialized = False
         
-        logger.info(f"✅ OpenLab-AgentOS 集成初始化完成，连接到: {agentos_base_url}")
+        logger.info(f"✅ OpenLab-AgentRT 集成初始化完成，连接到: {agentos_base_url}")
     
     async def connect(self) -> bool:
         """
-        连接到 AgentOS 服务
+        连接到 AgentRT 服务
         
         Returns:
             bool: 连接是否成功
@@ -74,18 +74,18 @@ class OpenLabAgentOSIntegration:
             
             if health.get("status") == "healthy":
                 self.connected = True
-                logger.info(f"✅ 成功连接到 AgentOS 服务 (版本: {health.get('version', 'unknown')})")
+                logger.info(f"✅ 成功连接到 AgentRT 服务 (版本: {health.get('version', 'unknown')})")
                 
                 # 订阅系统事件
                 self._setup_event_handlers()
                 
                 return True
             else:
-                logger.error(f"❌ AgentOS 服务不健康: {health}")
+                logger.error(f"❌ AgentRT 服务不健康: {health}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ 连接到 AgentOS 失败: {e}")
+            logger.error(f"❌ 连接到 AgentRT 失败: {e}")
             return False
     
     def _setup_event_handlers(self):
@@ -138,7 +138,7 @@ class OpenLabAgentOSIntegration:
                 "tags": ["research", "openlab", "agentos"]
             }
             
-            # 通过 AgentOS SDK 创建任务
+            # 通过 AgentRT SDK 创建任务
             task = await self.client.task.create(
                 name=f"研究任务: {topic}",
                 description=description,
@@ -193,7 +193,7 @@ class OpenLabAgentOSIntegration:
                 "timestamp": datetime.now().isoformat()
             }
             
-            # 通过 AgentOS SDK 存储记忆
+            # 通过 AgentRT SDK 存储记忆
             memory = await self.client.memory.store(
                 content=content,
                 metadata={
@@ -243,7 +243,7 @@ class OpenLabAgentOSIntegration:
                 "timestamp": datetime.now().isoformat()
             }
             
-            # 通过 AgentOS SDK 执行技能
+            # 通过 AgentRT SDK 执行技能
             result = await self.client.skill.execute(
                 skill_name="data_analysis",
                 parameters=skill_params,
@@ -275,7 +275,7 @@ class OpenLabAgentOSIntegration:
             List[Dict[str, Any]]: 相关记忆列表
         """
         try:
-            # 通过 AgentOS SDK 搜索记忆
+            # 通过 AgentRT SDK 搜索记忆
             memories = await self.client.memory.search(
                 query=query,
                 limit=limit,
@@ -402,7 +402,7 @@ class OpenLabAgentOSIntegration:
         """关闭集成连接"""
         self.connected = False
         self.initialized = False
-        logger.info("🔌 OpenLab-AgentOS 集成连接已关闭")
+        logger.info("🔌 OpenLab-AgentRT 集成连接已关闭")
 
 
 # ============================================================================
@@ -413,16 +413,16 @@ async def example_basic_integration():
     """
     基础集成示例
     
-    演示 OpenLab 与 AgentOS 的基本集成流程
+    演示 OpenLab 与 AgentRT 的基本集成流程
     """
     print("=" * 70)
-    print("OpenLab 与 AgentOS 集成示例 - 基础流程")
+    print("OpenLab 与 AgentRT 集成示例 - 基础流程")
     print("=" * 70)
     
     # 1. 初始化集成
     integration = OpenLabAgentOSIntegration()
     
-    # 2. 连接到 AgentOS
+    # 2. 连接到 AgentRT
     connected = await integration.connect()
     if not connected:
         print("❌ 连接失败，退出示例")
@@ -512,7 +512,7 @@ async def example_advanced_workflow():
     演示复杂的研究工作流集成
     """
     print("\n" + "=" * 70)
-    print("OpenLab 与 AgentOS 集成示例 - 高级工作流")
+    print("OpenLab 与 AgentRT 集成示例 - 高级工作流")
     print("=" * 70)
     
     integration = OpenLabAgentOSIntegration()
@@ -584,14 +584,14 @@ async def main():
     
     运行所有集成示例
     """
-    print("🚀 启动 OpenLab 与 AgentOS 集成示例")
+    print("🚀 启动 OpenLab 与 AgentRT 集成示例")
     print("基于五维正交系统设计原则")
     print()
     
-    # 检查 AgentOS SDK 可用性
+    # 检查 AgentRT SDK 可用性
     if not AGENTOS_AVAILABLE:
-        print("❌ AgentOS SDK 不可用")
-        print("请先安装 AgentOS Python SDK:")
+        print("❌ AgentRT SDK 不可用")
+        print("请先安装 AgentRT Python SDK:")
         print("  pip install -e sdk/python")
         print()
         print("如果您正在开发环境中，可以模拟运行:")
@@ -611,7 +611,7 @@ async def main():
         
         print("\n📚 下一步:")
         print("1. 查看 OpenLab 文档: ecosystem/openlab/README.md")
-        print("2. 探索更多 AgentOS SDK 功能")
+        print("2. 探索更多 AgentRT SDK 功能")
         print("3. 集成到您的 OpenLab 应用中")
         print("4. 贡献集成改进代码")
         

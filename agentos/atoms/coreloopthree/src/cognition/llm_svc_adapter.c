@@ -166,7 +166,7 @@ static llm_response_t *parse_llm_response_json(const char *json)
                     resp->choices[0].content =
                         (char *)AGENTOS_MALLOC(len + 1);
                     if (resp->choices[0].content) {
-                        memcpy(resp->choices[0].content, content_start, len);
+                        AGENTOS_MEMCPY((void *)resp->choices[0].content, content_start, len);
                         ((char *)resp->choices[0].content)[len] = '\0';
                     }
                     resp->choice_count = 1;
@@ -190,7 +190,7 @@ static llm_response_t *parse_llm_response_json(const char *json)
             if (len > 0 && len < 64) {
                 resp->finish_reason = (char *)AGENTOS_MALLOC(len + 1);
                 if (resp->finish_reason) {
-                    memcpy(resp->finish_reason, finish_start, len);
+                    AGENTOS_MEMCPY(resp->finish_reason, finish_start, len);
                     resp->finish_reason[len] = '\0';
                 }
             }
@@ -212,7 +212,7 @@ static llm_response_t *parse_llm_response_json(const char *json)
             if (len > 0 && len < 64) {
                 resp->model = (char *)AGENTOS_MALLOC(len + 1);
                 if (resp->model) {
-                    memcpy(resp->model, model_start, len);
+                    AGENTOS_MEMCPY(resp->model, model_start, len);
                     resp->model[len] = '\0';
                 }
             }

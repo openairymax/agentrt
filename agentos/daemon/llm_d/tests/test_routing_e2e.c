@@ -6,7 +6,9 @@
  * 验证: registry → find_provider → 缓存 → 成本追踪 的完整调用链
  */
 
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 199309L
+#endif
 
 #include "cache.h"
 #include "cost_tracker.h"

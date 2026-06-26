@@ -397,7 +397,7 @@ void agentos_cognition_set_llm_streaming(agentos_cognition_engine_t *engine,
     engine->llm_stream_user_data = user_data;
     agentos_mutex_unlock(engine->lock);
     if (enabled) {
-        AGENTOS_LOG_INFO("C-L02: Streaming LLM mode enabled (callback=%p)", (void *)callback);
+        AGENTOS_LOG_INFO("C-L02: Streaming LLM mode enabled (callback=%p)", (void *)(uintptr_t)callback);
     } else {
         AGENTOS_LOG_INFO("C-L02: Streaming LLM mode disabled");
     }
@@ -621,6 +621,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                      sc_intent.requires_multi_step);
             trigger_feedback(engine, 0, "intent_classified", ic_fb);
         }
+        sc_intent_result_free(&sc_intent);
     }
 
     /* ========== Phase 0: Instruction Decomposition (S1) ========== */
@@ -1031,7 +1032,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                               tool_adapter ? "IPC" : (tool_svc ? "direct" : "none"));
 
             for (size_t i = 0; i < plan->task_plan_node_count; i++) {
-                agentos_task_node_t *node = &plan->task_plan_nodes[i];
+                agentos_task_node_t *node = plan->task_plan_nodes[i];
                 if (!node->task_node_handler_name)
                     continue;
 

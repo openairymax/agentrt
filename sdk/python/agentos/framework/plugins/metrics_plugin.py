@@ -1,4 +1,4 @@
-# AgentOS 示例插件 - 指标采集器
+# AgentRT 示例插件 - 指标采集器
 # Version: 0.1.0
 
 """

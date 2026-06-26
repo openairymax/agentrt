@@ -1,5 +1,7 @@
 
 # AgentRT 跨平台兼容性测试 (TeamC P2-C04)
+# 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
+add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
     message(STATUS "  [platform] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")

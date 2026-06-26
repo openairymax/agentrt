@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 性能基准测试报告生成器
+AgentRT 性能基准测试报告生成器
 
 生成专业、美观的性能测试报告，支持多种格式：
 1. HTML 报告 - 交互式、可视化
@@ -63,7 +63,7 @@ class ReportTheme(Enum):
     """报告主题"""
     LIGHT = "light"
     DARK = "dark"
-    AGENTOS = "agentos"  # AgentOS品牌主题
+    AGENTOS = "agentos"  # AgentRT品牌主题
 
 
 @dataclass
@@ -100,11 +100,11 @@ class ReportTable:
 @dataclass
 class ReportMetadata:
     """报告元数据"""
-    project_name: str = "AgentOS"
+    project_name: str = "AgentRT"
     project_version: str = "1.0.0"
     report_title: str = "性能基准测试报告"
     report_subtitle: str = ""
-    author: str = "AgentOS Benchmark Framework"
+    author: str = "AgentRT Benchmark Framework"
     generation_date: str = ""
     benchmark_date: str = ""
     environment: Dict[str, str] = field(default_factory=dict)
@@ -150,7 +150,7 @@ class ReportGenerator:
         """设置Matplotlib样式"""
         plt.style.use('seaborn-v0_8-darkgrid')
         
-        # AgentOS品牌颜色
+        # AgentRT品牌颜色
         agentos_colors = {
             'primary': '#4A90E2',    # 主蓝色
             'secondary': '#50E3C2',   # 青色
@@ -509,7 +509,7 @@ class ReportGenerator:
         
         <footer>
             <p>© {{ now.year }} {{ metadata.project_name }}. 所有权利保留。</p>
-            <p>报告由 AgentOS 性能基准测试框架生成 | 始于数据，终于智能</p>
+            <p>报告由 AgentRT 性能基准测试框架生成 | 始于数据，终于智能</p>
         </footer>
     </div>
     
@@ -590,7 +590,7 @@ class ReportGenerator:
 
 ---
 
-*报告由 AgentOS 性能基准测试框架生成*  
+*报告由 AgentRT 性能基准测试框架生成*  
 *© {{ now.year }} {{ metadata.project_name }}. 所有权利保留.*
 """
         
@@ -1044,11 +1044,11 @@ def example_usage():
     """示例使用"""
     # 创建报告元数据
     metadata = ReportMetadata(
-        project_name="AgentOS",
+        project_name="AgentRT",
         project_version="1.0.0",
-        report_title="AgentOS 性能基准测试报告",
+        report_title="AgentRT 性能基准测试报告",
         report_subtitle="网关服务吞吐量测试",
-        author="AgentOS 性能测试团队",
+        author="AgentRT 性能测试团队",
         benchmark_date="2026-04-11T10:30:00",
         environment={
             "操作系统": "Ubuntu 22.04",
@@ -1095,7 +1095,7 @@ def example_usage():
         content="""
         <p>本次测试在标准开发环境中进行，模拟真实生产环境配置。</p>
         <ul>
-            <li><strong>测试工具</strong>: AgentOS 性能基准测试框架 v1.0.0</li>
+            <li><strong>测试工具</strong>: AgentRT 性能基准测试框架 v1.0.0</li>
             <li><strong>测试时长</strong>: 每个测试运行30分钟，包含5分钟预热和5分钟冷却</li>
             <li><strong>数据收集</strong>: 每秒收集一次性能指标</li>
             <li><strong>测试目标</strong>: 验证网关服务在高并发场景下的稳定性和性能</li>
@@ -1146,7 +1146,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="AgentOS 性能基准测试报告生成器",
+        description="AgentRT 性能基准测试报告生成器",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:

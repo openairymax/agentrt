@@ -1,9 +1,9 @@
-# AgentOS 记忆层集成测试
+# AgentRT 记忆层集成测试
 # Version: 0.1.0
 # Last updated: 2026-03-23
 
 """
-AgentOS 记忆层集成测试模块。
+AgentRT 记忆层集成测试模块。
 
 测试四层记忆系统（L1原始卷、L2特征层、L3结构层、L4模式层）的功能和集成。
 """

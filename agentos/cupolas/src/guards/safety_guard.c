@@ -655,18 +655,18 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
         if (!id_val) break; /* 没有更多策略 */
 
         safety_policy_t policy;
-        memset(&policy, 0, sizeof(policy));
+        AGENTOS_MEMSET(&policy, 0, sizeof(policy));
 
         const char *s = config_value_get_string(id_val, "");
-        strncpy(policy.id, s, sizeof(policy.id) - 1);
+        AGENTOS_STRNCPY_TERM(policy.id, s, sizeof(policy.id) - 1);
 
         snprintf(key_buf, sizeof(key_buf), "%d.name", i);
         s = config_value_get_string(config_context_get(cfg, key_buf), "");
-        strncpy(policy.name, s, sizeof(policy.name) - 1);
+        AGENTOS_STRNCPY_TERM(policy.name, s, sizeof(policy.name) - 1);
 
         snprintf(key_buf, sizeof(key_buf), "%d.description", i);
         s = config_value_get_string(config_context_get(cfg, key_buf), "");
-        strncpy(policy.description, s, sizeof(policy.description) - 1);
+        AGENTOS_STRNCPY_TERM(policy.description, s, sizeof(policy.description) - 1);
 
         snprintf(key_buf, sizeof(key_buf), "%d.default_decision", i);
         policy.default_decision = (safety_decision_t)config_value_get_int(

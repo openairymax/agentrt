@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProtocolType(IntEnum):
-    """Supported protocol types for AgentOS communication."""
+    """Supported protocol types for AgentRT communication."""
     JSONRPC = 0
     MCP = 1
     A2A = 2
@@ -89,7 +89,7 @@ class ConnectionTestResult:
 
 class ProtocolClient:
     """
-    Unified multi-protocol client for AgentOS.
+    Unified multi-protocol client for AgentRT.
 
     Provides a single interface for communicating via JSON-RPC, MCP, A2A,
     or OpenAI-compatible endpoints. Automatically handles message format

@@ -14,7 +14,7 @@
  * - 性能监控和资源使用统计
  */
 
-#include "../include/logger.h"
+#include "logger.h"
 #include "../include/syscalls.h"
 #include "agentos.h"
 #include "sandbox_permission.h"
@@ -95,7 +95,7 @@ agentos_error_t agentos_sandbox_manager_init(void)
     g_sandbox_manager = (sandbox_manager_t *)AGENTOS_CALLOC(1, sizeof(sandbox_manager_t));
     if (!g_sandbox_manager) {
         AGENTOS_LOG_ERROR("Failed to allocate sandbox manager");
-        agentos_mutex_destroy(g_manager_lock);
+        agentos_mutex_free(g_manager_lock);
         g_manager_lock = NULL;
         return AGENTOS_ENOMEM;
     }
@@ -105,7 +105,7 @@ agentos_error_t agentos_sandbox_manager_init(void)
         AGENTOS_LOG_ERROR("Failed to create sandbox manager lock");
         AGENTOS_FREE(g_sandbox_manager);
         g_sandbox_manager = NULL;
-        agentos_mutex_destroy(g_manager_lock);
+        agentos_mutex_free(g_manager_lock);
         g_manager_lock = NULL;
         return AGENTOS_ENOMEM;
     }
@@ -132,12 +132,12 @@ void agentos_sandbox_manager_destroy(void)
         }
     }
 
-    agentos_mutex_destroy(g_sandbox_manager->lock);
+    agentos_mutex_free(g_sandbox_manager->lock);
     AGENTOS_FREE(g_sandbox_manager);
     g_sandbox_manager = NULL;
 
     agentos_mutex_unlock(g_manager_lock);
-    agentos_mutex_destroy(g_manager_lock);
+    agentos_mutex_free(g_manager_lock);
     g_manager_lock = NULL;
 
     AGENTOS_LOG_INFO("Sandbox manager destroyed");
@@ -279,7 +279,7 @@ void agentos_sandbox_destroy(agentos_sandbox_t *sandbox)
     }
 
     if (sandbox->lock) {
-        agentos_mutex_destroy(sandbox->lock);
+        agentos_mutex_free(sandbox->lock);
     }
 
     uint64_t sandbox_id __attribute__((unused)) = sandbox->sandbox_id;

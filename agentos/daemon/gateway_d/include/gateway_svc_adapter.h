@@ -6,7 +6,7 @@
  * @file gateway_svc_adapter.h
  * @brief Gateway服务适配器头文件
  *
- * 提供网关服务与AgentOS统一服务管理框架的适配接口。
+ * 提供网关服务与AgentRT统一服务管理框架的适配接口。
  * 通过本适配器，网关服务可以无缝集成到服务注册表、服务发现、
  * 统一生命周期管理等框架功能中。
  *
@@ -37,7 +37,7 @@ extern "C" {
  * @brief 创建网关服务适配器
  *
  * 创建一个新的网关服务适配器实例，该实例实现了agentos_service_t接口，
- * 可以通过统一的AgentOS服务管理框架进行管理。
+ * 可以通过统一的AgentRT服务管理框架进行管理。
  *
  * @param[out] out_service 输出服务句柄
  * @param[in] config 通用服务配置（可为NULL，使用默认配置）

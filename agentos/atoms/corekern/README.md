@@ -1,4 +1,4 @@
-# CoreKern — 微内核
+# CoreKern — 微核心
 
 `agentos/atoms/corekern/`
 
@@ -8,7 +8,7 @@
 
 ## 概述
 
-CoreKern 是 AgentRT 的**"核中之核"**，是系统最底层的微内核实现。它提供最小化的核心服务集合，遵循经典的微内核架构设计理念——在内核态只保留绝对必要的服务，所有其他系统服务都以用户态进程的形式运行。CoreKern 的设计受到 L4 微内核和 seL4 形式化验证内核的启发，强调最小特权、机制与策略分离、服务化三大原则。
+CoreKern 是 AgentRT 的**"核中之核"**，是系统最底层的微核心实现。它提供最小化的核心服务集合，遵循经典的微核心架构设计理念——在内核态只保留绝对必要的服务，所有其他系统服务都以用户态进程的形式运行。CoreKern 的设计受到 L4 微内核和 seL4 形式化验证内核的启发，强调最小特权、机制与策略分离、服务化三大原则。
 
 CoreKern 以 C11 标准实现，通过 `AGENTOS_API` 宏导出符号，支持 Windows（`__declspec(dllexport/dllimport)`）和 POSIX（`__attribute__((visibility("default")))`）双平台。构建产物为静态库 `agentos_core`，启用安全编译选项（栈保护、FORTIFY_SOURCE、PIE、RELRO、控制流防护等）。
 
@@ -83,7 +83,7 @@ corekern/
 
 ### 1. IPC/Binder — 进程间通信
 
-提供统一、高效的进程间通信机制，是微内核的核心通信方式。内核级 IPC 消息 `agentos_kernel_ipc_message_t` 仅 40 字节，与应用层 `agentos_ipc_message_t`（200+ 字节）区分设计。
+提供统一、高效的进程间通信机制，是微核心的核心通信方式。内核级 IPC 消息 `agentos_kernel_ipc_message_t` 仅 40 字节，与应用层 `agentos_ipc_message_t`（200+ 字节）区分设计。
 
 | 接口 | 功能 | 线程安全 |
 |------|------|----------|

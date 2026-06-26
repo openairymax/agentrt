@@ -79,6 +79,35 @@ typedef SSIZE_T ssize_t;
 
 #define strtok_r        strtok_s
 
+/* GCC __builtin_* 函数映射到标准 C 函数（MSVC 不支持 __builtin_ 前缀）*/
+#define __builtin_memcpy    memcpy
+#define __builtin_memset    memset
+#define __builtin_memmove   memmove
+#define __builtin_fprintf   fprintf
+#define __builtin_strcmp    strcmp
+#define __builtin_strncpy   strncpy
+#define __builtin_strncmp   strncmp
+#define __builtin_strlen    strlen
+#define __builtin_expect(x, y)  (x)
+#define __builtin_prefetch(x, ...)  ((void)(x))
+#define __builtin_offsetof(type, member)  offsetof(type, member)
+
+/* MSVC 等效的位操作内建函数 */
+static inline int agentos_msvc_ctz(unsigned int x) {
+    unsigned long r;
+    _BitScanForward(&r, x);
+    return (int)r;
+}
+static inline int agentos_msvc_clz(unsigned int x) {
+    unsigned long r;
+    _BitScanReverse(&r, x);
+    return 31 - (int)r;
+}
+#define __builtin_ctz(x)        agentos_msvc_ctz((unsigned int)(x))
+#define __builtin_clz(x)        agentos_msvc_clz((unsigned int)(x))
+#define __builtin_popcount(x)   __popcnt((unsigned int)(x))
+#define __builtin_unreachable() __assume(0)
+
 #ifndef MSG_NOSIGNAL
 #define MSG_NOSIGNAL    0
 #endif

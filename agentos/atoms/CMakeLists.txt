@@ -25,8 +25,8 @@ set(_atoms_inc_dirs
     ../commons/utils/string/include
     ../commons/utils/token/include
     ../commons/utils/network/include
-    ../commons/utils/security/include
-    ../commons/utils/resource/include
+    ../commons/utils/security/src
+    ../commons/utils/resource/src
     ../commons/utils/uuid/include
 )
 set(_atoms_inc_missing 0)
@@ -90,6 +90,13 @@ write_basic_package_version_file(
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/AgentRTConfigVersion.cmake
+configure_package_config_file(
+    "${CMAKE_SOURCE_DIR}/scripts/dev/cmake/AgentRTConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/AgentRTConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/AgentRT
+)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/AgentRTConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/AgentRTConfigVersion.cmake
     DESTINATION lib/cmake/AgentRT
 )

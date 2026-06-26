@@ -32,7 +32,8 @@ static void teardown_temp_dir(void)
     agentos_checkpoint_shutdown();
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_storage_path);
-    system(cmd);
+    int _system_ret = system(cmd);
+    (void)_system_ret;
 }
 
 static void test_init_shutdown(void)
