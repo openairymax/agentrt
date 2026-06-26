@@ -3,7 +3,7 @@
 # Last updated: 2026-03-24
 
 """
-Session management module for AgentOS SDK.
+Session management module for AgentRT SDK.
 
 Provides session creation, query, context management, and cleanup operations.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Unified Code Quality Analyzer
+AgentRT Unified Code Quality Analyzer
 
 统一代码质量分析工具：支持 C/C++、Python、Go、TypeScript 的多语言代码质量分析
 
@@ -67,7 +67,7 @@ class LanguageReport:
 @dataclass
 class QualityReport:
     """统一质量报告"""
-    project: str = "AgentOS"
+    project: str = "AgentRT"
     timestamp: str = ""
     languages: Dict[str, LanguageReport] = field(default_factory=dict)
     overall_score: float = 0.0
@@ -552,7 +552,7 @@ class UnifiedQualityAnalyzer:
     def analyze_all(self) -> QualityReport:
         """分析所有支持的语言"""
         print("=" * 70)
-        print("🔬 AgentOS 统一代码质量分析")
+        print("🔬 AgentRT 统一代码质量分析")
         print("=" * 70)
         
         report = QualityReport(
@@ -622,7 +622,7 @@ class UnifiedQualityAnalyzer:
             return
         
         print("\n" + "=" * 70)
-        print("📊 AgentOS 代码质量分析报告")
+        print("📊 AgentRT 代码质量分析报告")
         print("=" * 70)
         
         print(f"\n📈 总体质量得分: {report.overall_score:.1f}/100")
@@ -684,7 +684,7 @@ class UnifiedQualityAnalyzer:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="AgentOS Unified Code Quality Analyzer",
+        description="AgentRT Unified Code Quality Analyzer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

@@ -379,6 +379,7 @@ if(BUILD_TESTS)
             common/src/unified_protocol.c
             core/transformers/src/protocol_transformers.c
         )
+        target_compile_definitions(test_openclaw_adapter PRIVATE AGENTOS_COMPLIANCE_IMPL)
         target_include_directories(test_openclaw_adapter PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})
         target_link_libraries(test_openclaw_adapter PRIVATE agentos_common svc_common m)
         if(UNIX)
@@ -394,6 +395,7 @@ if(BUILD_TESTS)
             common/src/unified_protocol.c
             core/transformers/src/protocol_transformers.c
         )
+        target_compile_definitions(test_agntcy_acp PRIVATE AGENTOS_COMPLIANCE_IMPL)
         target_include_directories(test_agntcy_acp PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})
         target_link_libraries(test_agntcy_acp PRIVATE agentos_common svc_common m)
         if(UNIX)
@@ -409,6 +411,7 @@ if(BUILD_TESTS)
             common/src/unified_protocol.c
             core/transformers/src/protocol_transformers.c
         )
+        target_compile_definitions(test_china_eco_crypto PRIVATE AGENTOS_COMPLIANCE_IMPL)
         target_include_directories(test_china_eco_crypto PRIVATE ${PROTOCOL_TEST_INCLUDE_DIRS})
         target_link_libraries(test_china_eco_crypto PRIVATE agentos_common svc_common m)
         if(UNIX)

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/_metadata.schema.json",
-  "title": "AgentOS Configuration Metadata Schema",
-  "description": "Common metadata properties for AgentOS configuration files. This schema defines the standard metadata attributes used across all configuration files.",
+  "title": "AgentRT Configuration Metadata Schema",
+  "description": "Common metadata properties for AgentRT configuration files. This schema defines the standard metadata attributes used across all configuration files.",
   "type": "object",
   "properties": {
     "_owner": {
@@ -23,7 +23,7 @@
         "path": {
           "type": "string",
           "description": "File path within the module",
-          "examples": ["AgentOS/manager", "AgentOS/atoms/corekern"]
+          "examples": ["AgentRT/manager", "AgentRT/atoms/corekern"]
         },
         "description": {
           "type": "string",
@@ -51,12 +51,12 @@
         "min_agentos_version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
-          "description": "Minimum compatible AgentOS version"
+          "description": "Minimum compatible AgentRT version"
         },
         "max_agentos_version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
-          "description": "Maximum compatible AgentOS version"
+          "description": "Maximum compatible AgentRT version"
         },
         "deprecated": {
           "type": "boolean",

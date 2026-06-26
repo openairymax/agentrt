@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Logger Module
+// AgentRT TypeScript SDK - Logger Module
 // Version: 0.1.0
 // Last updated: 2026-03-25
 //
@@ -77,7 +77,7 @@ export class Logger {
    */
   private defaultOutput(level: LogLevel, message: string, ...args: unknown[]): void {
     const timestamp = new Date().toISOString();
-    const prefix = `[AgentOS][${timestamp}]`;
+    const prefix = `[AgentRT][${timestamp}]`;
     switch (level) {
       case LogLevel.DEBUG:
         console.debug(`${prefix} [DEBUG] ${message}`, ...args);

@@ -1,11 +1,11 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Docker Compose 配置文件 - Preview 环境
+# AgentRT Docker Compose 配置文件 - Preview 环境
 # 用于功能预览和测试
 
 version: '3.8'
 
 services:
-  # ==================== AgentOS Preview 服务 ====================
+  # ==================== AgentRT Preview 服务 ====================
   agentos-preview:
     build:
       context: ..
@@ -60,7 +60,7 @@ services:
     # 启动命令
     command: >
       bash -c "
-        echo 'Starting AgentOS Preview...';
+        echo 'Starting AgentRT Preview...';
         python3 -m scripts.core.cli --manager /etc/agentos/manager.yaml;
       "
 

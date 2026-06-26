@@ -139,7 +139,11 @@ heapstore_error_t heapstore_migration_get_version(uint32_t *version)
     }
 
     uint32_t ver = 0;
-    if (fscanf(f, "%u", &ver) != 1) {
+    /* BAN-151: 使用 fgets+strtoul 替代被禁止的 fscanf */
+    char ver_buf[32];
+    if (fgets(ver_buf, sizeof(ver_buf), f) != NULL) {
+        ver = (uint32_t)strtoul(ver_buf, NULL, 10);
+    } else {
         fclose(f);
         *version = 0;
         return heapstore_SUCCESS;
@@ -717,7 +721,7 @@ heapstore_error_t heapstore_migration_list_fields(const char *record_type, char 
             AGENTOS_FREE(out);
             return heapstore_ERR_OUT_OF_MEMORY;
         }
-        strcpy(out[i], selected[i]);
+        AGENTOS_STRNCPY_TERM(out[i], selected[i], strlen(selected[i]) + 1);
     }
     out[count] = NULL;
 

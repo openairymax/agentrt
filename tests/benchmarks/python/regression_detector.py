@@ -1,5 +1,5 @@
 """
-AgentOS 性能回归检测框架
+AgentRT 性能回归检测框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 0.1.0
 
@@ -430,7 +430,7 @@ def run_performance_regression_check():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("AgentOS 性能回归检测框架")
+    print("AgentRT 性能回归检测框架")
     print("Copyright (c) 2026 SPHARX Ltd.")
     print("=" * 60)
 

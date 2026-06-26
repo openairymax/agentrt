@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Manager Module - Base Utilities
+AgentRT Manager Module - Base Utilities
 
 提供Manager模块各工具共享的基础工具类，包括：
 - ConfigLoader: 配置文件加载器

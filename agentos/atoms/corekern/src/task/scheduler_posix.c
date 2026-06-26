@@ -67,9 +67,9 @@ static void *posix_thread_entry_wrapper(void *param)
 }
 
 /**
- * @brief 将AgentOS优先级转换为POSIX调度参数
+ * @brief 将AgentRT优先级转换为POSIX调度参数
  *
- * AgentOS优先级范围为AGENTOS_TASK_PRIORITY_MIN到AGENTOS_TASK_PRIORITY_MAX? *
+ * AgentRT优先级范围为AGENTOS_TASK_PRIORITY_MIN到AGENTOS_TASK_PRIORITY_MAX? *
  * 需要映射到POSIX调度优先级范围? *
  * @param agentos_priority AgentOS优先? * @param sched_policy 调度策略（输出参数）
  * @param sched_param 调度参数（输出参数）
@@ -98,7 +98,7 @@ static int map_priority_to_posix(int agentos_priority, int *sched_policy, struct
         }
     }
 
-    /* 将AgentOS优先级映射到POSIX优先级范?*/
+    /* 将AgentRT优先级映射到POSIX优先级范?*/
     sp->sched_priority = min_prio + (int)((max_prio - min_prio) * (double)agentos_priority / 100.0);
 
     return 0;

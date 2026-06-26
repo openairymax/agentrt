@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Modules Entry
+// AgentRT TypeScript SDK - Modules Entry
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //

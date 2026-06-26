@@ -103,18 +103,67 @@ extern "C" {
 #endif
 
 /* ==================== 标准路径常量 (BAN-32合规) ==================== */
+/* 注意：使用 #ifndef 守卫，允许 CMake target_compile_definitions 覆盖（如 cupolas/channel_d） */
 #if AGENTOS_PLATFORM_WINDOWS
+/* Windows: 系统级数据目录（%ProgramData%） */
+#ifndef AGENTOS_RUNTIME_DIR
 #define AGENTOS_RUNTIME_DIR "C:\\ProgramData\\agentos\\run"
+#endif
+#ifndef AGENTOS_LOG_DIR
 #define AGENTOS_LOG_DIR "C:\\ProgramData\\agentos\\logs"
+#endif
+#ifndef AGENTOS_CONFIG_DIR
 #define AGENTOS_CONFIG_DIR "C:\\ProgramData\\agentos\\config"
+#endif
+#ifndef AGENTOS_DATA_DIR
+#define AGENTOS_DATA_DIR "C:\\ProgramData\\agentos\\data"
+#endif
+#ifndef AGENTOS_TMP_DIR
 #define AGENTOS_TMP_DIR "C:\\ProgramData\\agentos\\tmp"
+#endif
+#ifndef AGENTOS_CACHE_DIR
 #define AGENTOS_CACHE_DIR "C:\\ProgramData\\agentos\\cache"
-#else
+#endif
+#elif AGENTOS_PLATFORM_LINUX
+/* Linux: FHS 标准路径（保持原有行为不变） */
+#ifndef AGENTOS_RUNTIME_DIR
 #define AGENTOS_RUNTIME_DIR "/tmp/agentos"
+#endif
+#ifndef AGENTOS_LOG_DIR
 #define AGENTOS_LOG_DIR "/var/log/agentos"
+#endif
+#ifndef AGENTOS_CONFIG_DIR
 #define AGENTOS_CONFIG_DIR "/etc/agentos"
+#endif
+#ifndef AGENTOS_DATA_DIR
+#define AGENTOS_DATA_DIR "/var/lib/agentos"
+#endif
+#ifndef AGENTOS_TMP_DIR
 #define AGENTOS_TMP_DIR "/var/tmp/agentos"
+#endif
+#ifndef AGENTOS_CACHE_DIR
 #define AGENTOS_CACHE_DIR "/var/cache/agentos"
+#endif
+#else
+/* macOS 及其他 POSIX: 相对路径（避免硬编码 /var 与 /etc，保持 Linux 行为不变） */
+#ifndef AGENTOS_RUNTIME_DIR
+#define AGENTOS_RUNTIME_DIR "./agentos/run"
+#endif
+#ifndef AGENTOS_LOG_DIR
+#define AGENTOS_LOG_DIR "./agentos/logs"
+#endif
+#ifndef AGENTOS_CONFIG_DIR
+#define AGENTOS_CONFIG_DIR "./agentos/config"
+#endif
+#ifndef AGENTOS_DATA_DIR
+#define AGENTOS_DATA_DIR "./agentos/data"
+#endif
+#ifndef AGENTOS_TMP_DIR
+#define AGENTOS_TMP_DIR "./agentos/tmp"
+#endif
+#ifndef AGENTOS_CACHE_DIR
+#define AGENTOS_CACHE_DIR "./agentos/cache"
+#endif
 #endif
 
 /* ==================== 平台头文件包含 ==================== */
@@ -363,6 +412,12 @@ typedef struct {
     int stdin_fd;
     int stdout_fd;
     int stderr_fd;
+#if AGENTOS_PLATFORM_WINDOWS
+    /* Windows 子进程句柄，存入结构体以支持多进程并发与线程安全，
+     * 替代原先的全局变量（单进程限制）。使用 void* 避免在此处引入 windows.h。 */
+    void *process_handle; /* HANDLE to the child process */
+    void *thread_handle;  /* HANDLE to the child's primary thread */
+#endif
 } agentos_process_info_t;
 
 /**

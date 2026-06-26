@@ -397,7 +397,7 @@ void agentos_cognition_set_llm_streaming(agentos_cognition_engine_t *engine,
     engine->llm_stream_user_data = user_data;
     agentos_mutex_unlock(engine->lock);
     if (enabled) {
-        AGENTOS_LOG_INFO("C-L02: Streaming LLM mode enabled (callback=%p)", (void *)callback);
+        AGENTOS_LOG_INFO("C-L02: Streaming LLM mode enabled (callback=%p)", (void *)(uintptr_t)callback);
     } else {
         AGENTOS_LOG_INFO("C-L02: Streaming LLM mode disabled");
     }

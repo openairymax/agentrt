@@ -11,11 +11,14 @@
 
 #include "hook_timeout.h"
 #include "hook_registry.h"
+#include "platform.h"
 #include "memory_compat.h"
 #include "sync_compat.h"
 
 #include <errno.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include <string.h>
 #include <time.h>
 
@@ -240,11 +243,10 @@ hook_decision_t hook_timeout_run(const hook_entry_t *entry,
     }
 
     /* 创建线程执行回调 */
-    struct timespec start_time, end_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    uint64_t start_ns = agentos_time_ns();
 
-    pthread_t thread;
-    int ret = pthread_create(&thread, NULL, timeout_thread_func, &exec);
+    agentos_thread_t thread;
+    int ret = agentos_thread_create(&thread, timeout_thread_func, &exec);
     if (ret != 0) {
         AGENTOS_MUTEX_DESTROY(&exec.mutex);
         AGENTOS_COND_DESTROY(&exec.cond);
@@ -256,14 +258,6 @@ hook_decision_t hook_timeout_run(const hook_entry_t *entry,
     AGENTOS_MUTEX_LOCK(&exec.mutex);
 
     bool timed_out = false;
-    struct timespec abs_time;
-    clock_gettime(CLOCK_REALTIME, &abs_time);
-    abs_time.tv_sec += effective_timeout / 1000;
-    abs_time.tv_nsec += (effective_timeout % 1000) * 1000000;
-    if (abs_time.tv_nsec >= 1000000000) {
-        abs_time.tv_sec += 1;
-        abs_time.tv_nsec -= 1000000000;
-    }
 
     while (!exec.finished && !timed_out) {
         int wait_ret = AGENTOS_COND_TIMEDWAIT(&exec.cond, &exec.mutex,
@@ -279,8 +273,11 @@ hook_decision_t hook_timeout_run(const hook_entry_t *entry,
     if (timed_out) {
         /* 超时：取消线程并增加超时计数器 */
         AGENTOS_MUTEX_UNLOCK(&exec.mutex);
+#ifndef _WIN32
+        /* POSIX 可通过 pthread_cancel 强制终止线程 */
         pthread_cancel(thread);
-        pthread_join(thread, NULL);
+#endif
+        agentos_thread_join(thread, NULL);
 
         result = HOOK_DECISION_ABORT;
 
@@ -298,14 +295,13 @@ hook_decision_t hook_timeout_run(const hook_entry_t *entry,
     } else {
         result = exec.result;
         AGENTOS_MUTEX_UNLOCK(&exec.mutex);
-        pthread_join(thread, NULL);
+        agentos_thread_join(thread, NULL);
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    uint64_t end_ns = agentos_time_ns();
 
     if (out_duration_ns) {
-        *out_duration_ns = (uint64_t)(end_time.tv_sec - start_time.tv_sec) * 1000000000ULL
-                         + (uint64_t)(end_time.tv_nsec - start_time.tv_nsec);
+        *out_duration_ns = end_ns - start_ns;
     }
 
     AGENTOS_MUTEX_DESTROY(&exec.mutex);

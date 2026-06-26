@@ -28,7 +28,7 @@ static bool g_initialized = false;
 int hook_interceptor_init(const hook_interceptor_config_t *config)
 {
     if (config) {
-        memcpy(&g_interceptor_config, config, sizeof(hook_interceptor_config_t));
+        AGENTOS_MEMCPY(&g_interceptor_config, config, sizeof(hook_interceptor_config_t));
     }
     g_initialized = true;
     return 0;
@@ -44,14 +44,14 @@ void hook_interceptor_destroy(void)
 int hook_interceptor_get_config(hook_interceptor_config_t *config)
 {
     if (!config || !g_initialized) return -1;
-    memcpy(config, &g_interceptor_config, sizeof(hook_interceptor_config_t));
+    AGENTOS_MEMCPY(config, &g_interceptor_config, sizeof(hook_interceptor_config_t));
     return 0;
 }
 
 int hook_interceptor_set_config(const hook_interceptor_config_t *config)
 {
     if (!config || !g_initialized) return -1;
-    memcpy(&g_interceptor_config, config, sizeof(hook_interceptor_config_t));
+    AGENTOS_MEMCPY(&g_interceptor_config, config, sizeof(hook_interceptor_config_t));
     return 0;
 }
 

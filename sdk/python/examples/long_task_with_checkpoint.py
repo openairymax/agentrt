@@ -1,4 +1,4 @@
-# AgentOS Python SDK - 长时间任务示例（带检查点）
+# AgentRT Python SDK - 长时间任务示例（带检查点）
 # Version: 0.1.0
 # Last updated: 2026-04-05
 #

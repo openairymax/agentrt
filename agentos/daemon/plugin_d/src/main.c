@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
             /* 权限校验 */
             char denied[512] = {0};
             plugin_permission_result_t perm_result = plugin_permission_check(
-                results[i].permissions,
+                (const char (*)[64])results[i].permissions,
                 results[i].permission_count,
                 results[i].name,
                 denied, sizeof(denied));

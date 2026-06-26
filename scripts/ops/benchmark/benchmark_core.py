@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 性能基准测试框架核心模块
+AgentRT 性能基准测试框架核心模块
 
 提供统一的基准测试框架API，支持测试定义、执行、监控和结果收集。
 本模块是性能基准测试框架的基础，所有基准测试都应基于此框架构建。
@@ -654,7 +654,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="AgentOS 性能基准测试框架",
+        description="AgentRT 性能基准测试框架",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:

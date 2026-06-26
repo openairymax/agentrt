@@ -14,7 +14,7 @@
 
 | 测试目录 | 对应的 agentos/ 模块 | 测试框架 |
 |----------|---------------------|----------|
-| `unit/atoms/corekern/` | `agentos/atoms/corekern/` | CMocka — 微内核核心（IPC/Binder、内存管理、任务调度、定时器） |
+| `unit/atoms/corekern/` | `agentos/atoms/corekern/` | CMocka — 微核心核心（IPC/Binder、内存管理、任务调度、定时器） |
 | `unit/atoms/coreloopthree/` | `agentos/atoms/coreloopthree/` | CMocka + pytest — 三环运行时（认知环/执行环/学习环） |
 | `unit/atoms/memory/` | `agentos/atoms/memory/` | CMocka — 内置记忆子系统（L1+L2 层） |
 | `unit/atoms/syscall/` | `agentos/atoms/syscall/` | CMocka — 系统调用接口（5 类接口 + 4 层保护） |
@@ -64,8 +64,8 @@ tests/
 │   ├── CMakeLists.txt           # 测试构建入口（C 测试）
 │   └── Makefile                 # Make 测试入口
 ├── unit/                        # 单元测试（138 个文件）
-│   ├── atoms/                   #   Atoms 微内核层测试（26 个文件）
-│   │   ├── corekern/            #     微内核核心（7 个文件）
+│   ├── atoms/                   #   Atoms 微核心层测试（26 个文件）
+│   │   ├── corekern/            #     微核心核心（7 个文件）
 │   │   ├── coreloopthree/       #     三环运行时（11 个文件）
 │   │   ├── memory/              #     内置记忆（1 个文件）
 │   │   └── syscall/             #     系统调用层（6 个文件）
