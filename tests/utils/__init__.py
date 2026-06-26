@@ -1,5 +1,5 @@
 """
-AgentOS Tests - Utils Module
+AgentRT Tests - Utils Module
 
 测试工具模块，提供测试辅助函数和类。
 """

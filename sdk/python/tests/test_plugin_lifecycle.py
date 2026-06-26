@@ -1,4 +1,4 @@
-# AgentOS PluginSDK 生命周期测试
+# AgentRT PluginSDK 生命周期测试
 # 验证: 注册→发现→加载→调用→卸载 完整生命周期
 
 import asyncio

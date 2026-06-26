@@ -1,9 +1,9 @@
-# AgentOS 输入净化安全测试
+# AgentRT 输入净化安全测试
 # Version: 0.1.0
 # Last updated: 2026-04-04
 
 """
-AgentOS 输入净化安全测试模块。
+AgentRT 输入净化安全测试模块。
 
 测试输入净化器的各种安全防护能力，包括 XSS 防护、SQL 注入防护、
 命令注入防护、路径遍历防护等。

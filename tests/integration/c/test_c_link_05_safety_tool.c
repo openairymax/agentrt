@@ -85,9 +85,8 @@ static void test_normal_all_guards_pass(void) {
 
     /* Create tool metadata */
     tool_metadata_t meta = {0};
-    snprintf(meta.name, sizeof(meta.name), "file_read");
-    snprintf(meta.version, sizeof(meta.version), "1.0.0");
-    snprintf(meta.description, sizeof(meta.description), "Read a file from disk");
+    meta.name = strdup("file_read");
+    meta.description = strdup("Read a file from disk");
 
     const char *params = "{\"path\": \"/tmp/test.txt\", \"max_size\": 1024}";
     safety_guard_bridge_result_t result;
@@ -103,6 +102,8 @@ static void test_normal_all_guards_pass(void) {
     CHECK(result.resource_quota_passed, "Resource quota guard should pass");
     CHECK(result.audit_recorded, "Audit guard should record");
 
+    free(meta.name);
+    free(meta.description);
     safety_guard_bridge_destroy(bridge);
     PASS();
 }
@@ -156,8 +157,8 @@ static void test_error_permission_denied(void) {
     CHECK(bridge != NULL, "safety_guard_bridge_create returned NULL");
 
     tool_metadata_t meta = {0};
-    snprintf(meta.name, sizeof(meta.name), "shell_exec");
-    snprintf(meta.version, sizeof(meta.version), "1.0.0");
+    meta.name = strdup("shell_exec");
+    meta.description = strdup("Execute a shell command");
 
     const char *params = "{\"command\": \"rm -rf /\"}";
     safety_guard_bridge_result_t result;
@@ -168,6 +169,8 @@ static void test_error_permission_denied(void) {
     CHECK(ret != 0 || !result.permission_passed,
           "Restricted agent should be denied shell_exec");
 
+    free(meta.name);
+    free(meta.description);
     safety_guard_bridge_destroy(bridge);
     PASS();
 }
@@ -250,7 +253,8 @@ static void test_timeout_guard_chain(void) {
     CHECK(bridge != NULL, "safety_guard_bridge_create returned NULL");
 
     tool_metadata_t meta = {0};
-    snprintf(meta.name, sizeof(meta.name), "quick_tool");
+    meta.name = strdup("quick_tool");
+    meta.description = strdup("A quick tool");
 
     const char *params = "{}";
     safety_guard_bridge_result_t result;
@@ -262,6 +266,8 @@ static void test_timeout_guard_chain(void) {
     CHECK_EQ(result.guard_chain_length, 6, "Should have 6 guards in chain");
     CHECK_EQ(result.guards_executed, 6, "All 6 guards should be executed");
 
+    free(meta.name);
+    free(meta.description);
     safety_guard_bridge_destroy(bridge);
     PASS();
 }
@@ -285,7 +291,10 @@ static void *concurrent_safety_thread(void *arg) {
 
     for (int i = 0; i < SAFETY_CHECKS_PER_THREAD; i++) {
         tool_metadata_t meta = {0};
-        snprintf(meta.name, sizeof(meta.name), "tool_%d_%d", args->thread_id, i);
+        char name_buf[64];
+        snprintf(name_buf, sizeof(name_buf), "tool_%d_%d", args->thread_id, i);
+        meta.name = name_buf;
+        meta.description = "test tool";
 
         char params[256];
         snprintf(params, sizeof(params), "{\"thread\": %d, \"iter\": %d}",
@@ -385,7 +394,7 @@ static void test_audit_log_recording(void) {
     /* Verify stats reflect the denies */
     uint64_t total_checks = 0, denied = 0, rate_limited = 0;
     safety_guard_bridge_get_stats(bridge, &total_checks, &denied, &rate_limited);
-    CHECK(denied >= 0, "Stats should be accessible");
+    CHECK((int64_t)denied >= 0, "Stats should be accessible");
 
     safety_guard_bridge_destroy(bridge);
     PASS();

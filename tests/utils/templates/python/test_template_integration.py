@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 测试模板 - 集成测试
+AgentRT 测试模板 - 集成测试
 
 使用方法:
 1. 复制此文件到 integration/ 目录

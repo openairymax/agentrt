@@ -18,7 +18,7 @@
 
 | tests/unit/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
 |------------------|---------------------|----------|
-| `atoms/corekern/` | `agentos/atoms/corekern/` | 微内核核心（IPC/Binder、内存管理、任务调度、定时器） |
+| `atoms/corekern/` | `agentos/atoms/corekern/` | 微核心核心（IPC/Binder、内存管理、任务调度、定时器） |
 | `atoms/coreloopthree/` | `agentos/atoms/coreloopthree/` | 三环核心运行时（认知环/执行环/学习环、协调器、多数投票） |
 | `atoms/memory/` | `agentos/atoms/memory/` | 内置记忆子系统（L1+L2 层 Memory Provider） |
 | `atoms/syscall/` | `agentos/atoms/syscall/` | 系统调用接口（任务/内存/会话/遥测/Agent 5 类接口 + 4 层保护） |

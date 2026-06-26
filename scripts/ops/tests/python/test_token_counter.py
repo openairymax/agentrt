@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Token 计数器测试
+# AgentRT Token 计数器测试
 
 """
 Token 计数器单元测试

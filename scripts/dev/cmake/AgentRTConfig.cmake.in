@@ -1,0 +1,22 @@
+# AgentRTConfig.cmake.in - AgentRT package configuration template.
+# Generated into <build>/AgentRTConfig.cmake by configure_package_config_file().
+#
+# Usage from a downstream project:
+#   find_package(AgentRT CONFIG REQUIRED)
+#   target_link_libraries(my_target PRIVATE AgentRT::atoms)
+#
+# AgentRT atoms is a header-only INTERFACE library; headers are installed
+# under ${PACKAGE_PREFIX_DIR}/include/agentos.
+
+@PACKAGE_INIT@
+
+set(AgentRT_VERSION "@PROJECT_VERSION@")
+
+# Include directories for the header-only atoms interface.
+set_and_check(AgentRT_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/include/agentos")
+
+# Backwards-compatible alias variables.
+set(AgentRT_LIBRARIES "")
+set(AgentRT_INCLUDE_DIR "${AgentRT_INCLUDE_DIRS}")
+
+check_required_components(AgentRT)

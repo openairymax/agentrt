@@ -164,22 +164,26 @@ if(BUILD_TESTS)
 
     # syscall_router 测试 (8个用例)
     add_executable(test_syscall_router tests/test_syscall_router.c)
+    target_compile_definitions(test_syscall_router PRIVATE AGENTOS_COMPLIANCE_IMPL)
     target_link_libraries(test_syscall_router gateway)
     add_test(NAME syscall_router_test COMMAND test_syscall_router)
 
     # jsonrpc 协议测试 (17个用例)
     add_executable(test_jsonrpc tests/test_jsonrpc.c)
+    target_compile_definitions(test_jsonrpc PRIVATE AGENTOS_COMPLIANCE_IMPL)
     target_link_libraries(test_jsonrpc gateway)
     add_test(NAME jsonrpc_test COMMAND test_jsonrpc)
 
     # gateway_rpc_handler 统一RPC处理模块测试 (14个用例)
     add_executable(test_rpc_handler tests/test_gateway_rpc_handler.c)
+    target_compile_definitions(test_rpc_handler PRIVATE AGENTOS_COMPLIANCE_IMPL)
     target_link_libraries(test_rpc_handler gateway)
     add_test(NAME rpc_handler_test COMMAND test_rpc_handler)
 
     # 性能基准测试工具 (C-W1-004 / PERF-001~003)
     if(BUILD_BENCHMARK)
         add_executable(gateway_benchmark tests/gateway_benchmark.c)
+        target_compile_definitions(gateway_benchmark PRIVATE AGENTOS_COMPLIANCE_IMPL)
         target_include_directories(gateway_benchmark PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../commons/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include

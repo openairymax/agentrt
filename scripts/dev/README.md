@@ -140,7 +140,7 @@ dev/
   - **fix_sec22.py**：SEC-22 安全规则修复工具。
   - **check_memory_compat.py**：内存兼容性检查工具，检测内存相关 API 的兼容性问题。
 - **archive/**：已完成的一次性脚本归档，保留以备历史查阅，不再活跃使用。
-  - **restructure_sdk.py**：AgentOS Python SDK 重构脚本（已完成的一次性重构）。
+  - **restructure_sdk.py**：AgentRT Python SDK 重构脚本（已完成的一次性重构）。
 
 ## 使用方式
 

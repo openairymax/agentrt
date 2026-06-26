@@ -313,7 +313,7 @@ TaskFlow 采用 Pregel 超步迭代计算模型，每个超步包含三个阶段
 
 | 依赖项 | 来源 | 用途 |
 |--------|------|------|
-| CoreKern | atoms/corekern | 微内核调度能力 |
+| CoreKern | atoms/corekern | 微核心调度能力 |
 | Syscall | atoms/syscall | 系统调用接口 |
 | commons | agentos/commons | 统一类型和平台抽象 |
 
@@ -385,7 +385,7 @@ int main(void) {
 ## 与相关模块的关系
 
 - **CoreLoopThree**: 在执行循环中集成 TaskFlow，将行动计划转换为 DAG 任务流
-- **CoreKern**: 利用微内核的任务调度能力
+- **CoreKern**: 利用微核心的任务调度能力
 - **Syscall**: 通过系统调用接口管理任务生命周期
 - **Daemon - sched_d**: sched_d 守护进程使用 TaskFlow 进行跨服务任务调度
 

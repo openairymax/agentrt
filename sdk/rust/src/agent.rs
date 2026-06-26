@@ -4,14 +4,14 @@
 
 use crate::Client;
 
-/// AgentOS 代理入口
+/// AgentRT 代理入口
 #[derive(Debug, Clone)]
 pub struct Agent {
     client: Client,
 }
 
 impl Agent {
-    /// 创建新的 AgentOS 代理
+    /// 创建新的 AgentRT 代理
     pub fn new(client: Client) -> Self {
         Agent { client }
     }

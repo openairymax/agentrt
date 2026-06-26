@@ -1,4 +1,4 @@
-# AgentOS 示例插件 - 日志记录器
+# AgentRT 示例插件 - 日志记录器
 # Version: 0.1.0
 
 """

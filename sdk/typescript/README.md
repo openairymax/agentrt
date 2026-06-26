@@ -13,7 +13,7 @@ AgentRT TypeScript SDK 提供基于 TypeScript 的 AgentRT 系统编程接口，
 typescript/
 ├── src/
 │   ├── index.ts                # 模块入口，导出所有公共 API
-│   ├── agentos.ts              # AgentOS 主类 / createAgentOS 工厂
+│   ├── agentos.ts              # AgentRT 主类 / createAgentRT 工厂
 │   ├── manager.ts              # 配置管理（ConfigOption/环境变量）
 │   ├── config.ts               # 配置类型定义
 │   ├── errors.ts               # 错误定义与错误码
@@ -63,18 +63,18 @@ typescript/
 
 ## 核心组件
 
-### AgentOS 主类
+### AgentRT 主类
 
 ```typescript
-import { AgentOS, createAgentOS } from 'agentos';
+import { AgentRT, createAgentRT } from 'agentos';
 
-const client = new AgentOS({
+const client = new AgentRT({
     endpoint: 'http://localhost:18789',
     timeout: 30,
     apiKey: 'your-api-key',
 });
 
-const client2 = createAgentOS({
+const client2 = createAgentRT({
     endpoint: 'http://localhost:18789',
 });
 ```
@@ -222,9 +222,9 @@ npm run lint
 ### 基本使用
 
 ```typescript
-import { AgentOS } from 'agentos';
+import { AgentRT } from 'agentos';
 
-const client = new AgentOS({ endpoint: 'http://localhost:18789' });
+const client = new AgentRT({ endpoint: 'http://localhost:18789' });
 
 const task = await client.taskManager().submit('Generate a report');
 const result = await client.taskManager().wait(task.id, 60000);
@@ -236,9 +236,9 @@ await client.close();
 ### 使用工厂函数
 
 ```typescript
-import { createAgentOS } from 'agentos';
+import { createAgentRT } from 'agentos';
 
-const client = createAgentOS({
+const client = createAgentRT({
     endpoint: 'http://localhost:18789',
     apiKey: process.env.AGENTOS_API_KEY,
     timeout: 30000,

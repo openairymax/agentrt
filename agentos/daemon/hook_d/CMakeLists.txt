@@ -57,8 +57,11 @@ target_include_directories(agentos-hook-d PRIVATE
 )
 
 target_link_libraries(agentos-hook-d PRIVATE
-    svc_common cupolas Threads::Threads ${YAML_LIBRARIES}
+    svc_common cupolas ${YAML_LIBRARIES}
 )
+if(NOT WIN32)
+    target_link_libraries(agentos-hook-d PRIVATE Threads::Threads)
+endif()
 
 if(BUILD_COVERAGE)
     target_compile_options(agentos-hook-d PRIVATE

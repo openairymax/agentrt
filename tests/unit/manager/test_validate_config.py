@@ -1,5 +1,5 @@
 """
-AgentOS 配置验证单元测试
+AgentRT 配置验证单元测试
 测试配置验证脚本的功能
 
 注意：scripts.dev.validate_config 模块尚未实现，测试已跳过。

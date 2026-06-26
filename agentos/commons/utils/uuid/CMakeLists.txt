@@ -28,7 +28,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(agentos_uuid PRIVATE
         -Wall -Wextra -Wpedantic
         -fstack-protector-strong
-        -D_FORTIFY_SOURCE=2
+        $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>
     )
 endif()
 

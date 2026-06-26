@@ -282,7 +282,6 @@ static void test_concurrent_bridge_instances(void) {
     TEST("C-L12 Concurrent: Multiple bridge instances");
 
     memoryrovol_bridge_t *bridges[MRB_CONCURRENT_INSTANCES];
-    agentos_memory_provider_t *providers[MRB_CONCURRENT_INSTANCES];
 
     /* Create multiple bridge instances */
     for (int i = 0; i < MRB_CONCURRENT_INSTANCES; i++) {
@@ -299,18 +298,16 @@ static void test_concurrent_bridge_instances(void) {
         CHECK(bridges[i] != NULL, "memoryrovol_bridge_create returned NULL");
 
         CHECK(memoryrovol_bridge_is_ready(bridges[i]),
-              "Bridge %d should be ready", i);
+              "Bridge should be ready");
 
-        providers[i] = memoryrovol_bridge_get_provider(bridges[i]);
-        CHECK(providers[i] != NULL, "Provider %d should not be NULL", i);
-    }
+        agentos_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridges[i]);
+        CHECK(provider != NULL, "Provider should not be NULL");
 
-    /* Verify all providers are independent */
-    for (int i = 0; i < MRB_CONCURRENT_INSTANCES; i++) {
-        CHECK(providers[i]->write_raw != NULL,
-              "Provider %d should have write_raw", i);
-        CHECK(providers[i]->query != NULL,
-              "Provider %d should have query", i);
+        /* Verify provider has required function pointers */
+        CHECK(provider->write_raw != NULL,
+              "Provider should have write_raw");
+        CHECK(provider->query != NULL,
+              "Provider should have query");
     }
 
     /* Cleanup */

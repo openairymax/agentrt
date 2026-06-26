@@ -75,7 +75,7 @@ class TestTaskDefinition:
             category=TaskCategory.LONG_RUNNING,
             priority=10,
             input_data={"key": "value"},
-            metadata={"author": "Spharx AgentOS Team"},
+            metadata={"author": "Spharx AgentRT Team"},
             timeout=3600.0,
             max_retries=3,
         )
@@ -84,7 +84,7 @@ class TestTaskDefinition:
         assert task.category == TaskCategory.LONG_RUNNING
         assert task.priority == 10
         assert task.input_data == {"key": "value"}
-        assert task.metadata["author"] == "Spharx AgentOS Team"
+        assert task.metadata["author"] == "Spharx AgentRT Team"
         assert task.timeout == 3600.0
         assert task.max_retries == 3
 

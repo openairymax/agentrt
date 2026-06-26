@@ -1,5 +1,5 @@
 """
-AgentOS 端到端测试 - 完整用户场景验证
+AgentRT 端到端测试 - 完整用户场景验证
 
 验证从用户请求到系统响应的完整链路：
 - Agent 创建 → Skill 绑定 → 任务执行 → 结果获取
@@ -93,8 +93,8 @@ class TestE2ESessionMemoryWorkflow(BaseTestCase):
 
         # Step 2: 第一轮对话
         messages = [
-            {"role": "user", "content": "What is AgentOS?"},
-            {"role": "assistant", "content": "AgentOS is a microkernel-based agent operating system."},
+            {"role": "user", "content": "What is AgentRT?"},
+            {"role": "assistant", "content": "AgentRT is a microkernel-based agent operating system."},
         ]
 
         # Step 3: 存储对话到记忆
@@ -107,13 +107,13 @@ class TestE2ESessionMemoryWorkflow(BaseTestCase):
         messages.append(follow_up)
 
         # Step 5: 检索相关记忆
-        query = "AgentOS IPC"
+        query = "AgentRT IPC"
         search_results = [{"id": "mem_001", "score": 0.92, "content": "IPC mechanism"}]
         assert len(search_results) > 0
 
         # Step 6: 验证上下文传递
         context = {
-            "conversation_summary": "User is asking about AgentOS architecture",
+            "conversation_summary": "User is asking about AgentRT architecture",
             "current_topic": "IPC mechanism",
             "related_memory_ids": ["mem_001"]
         }

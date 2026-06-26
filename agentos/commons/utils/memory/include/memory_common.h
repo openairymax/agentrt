@@ -28,34 +28,11 @@ typedef enum {
     MEMORY_STRATEGY_LOW_LATENCY
 } memory_strategy_t;
 
-typedef struct {
-    size_t block_size;
-    size_t block_count;
-    memory_strategy_t strategy;
-    bool thread_safe;
-} memory_pool_config_t;
-
-#ifndef MEMORY_POOL_T_DEFINED
-#define MEMORY_POOL_T_DEFINED
-typedef struct {
-    void *pool;
-    memory_pool_config_t manager;
-    size_t used_blocks;
-    size_t peak_usage;
-} memory_pool_t;
-
-agentos_error_t memory_pool_init(memory_pool_t *pool, const memory_pool_config_t *manager);
-
-void *memory_pool_alloc(memory_pool_t *pool, size_t size);
-
-void memory_pool_free(memory_pool_t *pool, void *ptr);
-
-void memory_pool_cleanup(memory_pool_t *pool);
-
-void memory_pool_get_stats(const memory_pool_t *pool, memory_stats_t *stats);
-#endif
-
-memory_pool_config_t memory_create_default_pool_config(void);
+/* 注意：旧版 memory_pool_t / memory_pool_config_t / memory_pool_init /
+ *       memory_pool_alloc 等已移除，与 memory_pool.h 中的新版实现冲突。
+ *       新版内存池 API 详见 memory_pool.h（memory_pool_create / memory_pool_alloc 等）。
+ *       保留的 memory_pool_t 定义在 memory_pool.h 中（不透明指针 struct memory_pool *）。
+ */
 
 void *memory_safe_alloc(size_t size);
 

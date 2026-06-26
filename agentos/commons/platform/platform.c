@@ -14,7 +14,9 @@
 
 /* 1. POSIX标准头文件（必须最先包含，确保特性测试宏生效） */
 #include <time.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 /* 2. C标准库头文件 */
 #include <stdbool.h>
@@ -415,9 +417,6 @@ void agentos_socket_close(agentos_socket_t sock)
 
 #if AGENTOS_PLATFORM_WINDOWS
 
-static HANDLE g_process_handle = NULL;
-static HANDLE g_thread_handle = NULL;
-
 int agentos_process_start(const char *executable, char *const argv[], char *const envp[],
                           agentos_process_info_t *proc)
 {
@@ -455,8 +454,9 @@ int agentos_process_start(const char *executable, char *const argv[], char *cons
         return AGENTOS_EINVAL;
     }
 
-    g_process_handle = pi.hProcess;
-    g_thread_handle = pi.hThread;
+    /* 将句柄存入 proc 而非全局变量，支持同时跟踪多个子进程且线程安全 */
+    proc->process_handle = (void *)pi.hProcess;
+    proc->thread_handle = (void *)pi.hThread;
     proc->pid = pi.dwProcessId;
 
     return 0;
@@ -464,12 +464,11 @@ int agentos_process_start(const char *executable, char *const argv[], char *cons
 
 int agentos_process_wait(agentos_process_info_t *proc, uint32_t timeout_ms, int *exit_code)
 {
-    (void)proc;
-
-    if (!g_process_handle)
+    if (!proc || !proc->process_handle)
         return AGENTOS_EINVAL;
 
-    DWORD result = WaitForSingleObject(g_process_handle, timeout_ms == 0 ? INFINITE : timeout_ms);
+    HANDLE h_process = (HANDLE)proc->process_handle;
+    DWORD result = WaitForSingleObject(h_process, timeout_ms == 0 ? INFINITE : timeout_ms);
     if (result == WAIT_TIMEOUT) {
         return AGENTOS_ERR_TIMEOUT;
     }
@@ -478,7 +477,7 @@ int agentos_process_wait(agentos_process_info_t *proc, uint32_t timeout_ms, int 
     }
 
     DWORD code;
-    if (!GetExitCodeProcess(g_process_handle, &code)) {
+    if (!GetExitCodeProcess(h_process, &code)) {
         return AGENTOS_EINVAL;
     }
 
@@ -486,33 +485,34 @@ int agentos_process_wait(agentos_process_info_t *proc, uint32_t timeout_ms, int 
         *exit_code = (int)code;
     }
 
-    CloseHandle(g_process_handle);
-    CloseHandle(g_thread_handle);
-    g_process_handle = NULL;
-    g_thread_handle = NULL;
+    CloseHandle(h_process);
+    if (proc->thread_handle) {
+        CloseHandle((HANDLE)proc->thread_handle);
+        proc->thread_handle = NULL;
+    }
+    proc->process_handle = NULL;
 
     return 0;
 }
 
 int agentos_process_kill(agentos_process_info_t *proc)
 {
-    (void)proc;
-    if (g_process_handle) {
-        return TerminateProcess(g_process_handle, 1) ? 0 : -1;
-    }
-    return AGENTOS_EINVAL;
+    if (!proc || !proc->process_handle)
+        return AGENTOS_EINVAL;
+    return TerminateProcess((HANDLE)proc->process_handle, 1) ? 0 : -1;
 }
 
 void agentos_process_close_pipes(agentos_process_info_t *proc)
 {
-    (void)proc;
-    if (g_thread_handle) {
-        CloseHandle(g_thread_handle);
-        g_thread_handle = NULL;
+    if (!proc)
+        return;
+    if (proc->thread_handle) {
+        CloseHandle((HANDLE)proc->thread_handle);
+        proc->thread_handle = NULL;
     }
-    if (g_process_handle) {
-        CloseHandle(g_process_handle);
-        g_process_handle = NULL;
+    if (proc->process_handle) {
+        CloseHandle((HANDLE)proc->process_handle);
+        proc->process_handle = NULL;
     }
 }
 

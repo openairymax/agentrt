@@ -214,7 +214,7 @@ int cache_get(cache_t *cache, const char *key, char **out_value)
         return 0;
     }
 
-    if (cache->ttl_sec > 0 && (time(NULL) - e->timestamp) > cache->ttl_sec) {
+    if (cache->ttl_sec > 0 && (time(NULL) - e->timestamp) >= cache->ttl_sec) {
         agentos_mutex_unlock(&cache->buckets[idx].lock);
         cache_put(cache, key, NULL);
         return 0;

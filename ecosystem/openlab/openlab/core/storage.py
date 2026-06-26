@@ -2,7 +2,7 @@
 OpenLab Core Storage Module
 
 Data storage abstraction core module
-Following AgentOS architecture design principles V1.8
+Following AgentRT architecture design principles V1.8
 """
 
 from abc import ABC, abstractmethod

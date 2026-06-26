@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 性能基准测试统计计算引擎
+AgentRT 性能基准测试统计计算引擎
 
 提供高级统计计算和分析功能，包括：
 1. 描述性统计分析
@@ -746,7 +746,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="AgentOS 统计计算引擎",
+        description="AgentRT 统计计算引擎",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:

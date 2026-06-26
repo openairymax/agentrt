@@ -50,7 +50,7 @@ static void ensure_agent_lock(void)
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&agent_lock, (void **)&expected,
                                                 (void *)new_lock, memory_order_acq_rel,
                                                 memory_order_acquire)) {
-            agentos_mutex_destroy(new_lock);
+            agentos_mutex_free(new_lock);
         }
     }
 }
@@ -531,7 +531,7 @@ void agentos_sys_agent_cleanup(void)
     agents = NULL;
     agentos_mutex_unlock(agent_lock);
 
-    agentos_mutex_destroy(agent_lock);
+    agentos_mutex_free(agent_lock);
     agent_lock = NULL;
 
     AGENTOS_LOG_INFO("Agent syscall cleanup completed");

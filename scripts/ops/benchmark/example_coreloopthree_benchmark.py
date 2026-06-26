@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS CoreLoopThree 性能基准测试示例
+AgentRT CoreLoopThree 性能基准测试示例
 
 本示例展示如何使用性能基准测试框架测试 CoreLoopThree 模块。
 由于 CoreLoopThree 是 C 语言实现的系统核心模块，本示例使用模拟接口
@@ -360,7 +360,7 @@ class CoreLoopThreeMemoryBenchmark(BenchmarkBase):
 async def run_coreloopthree_benchmarks():
     """运行 CoreLoopThree 基准测试套件"""
     print("=" * 70)
-    print("AgentOS CoreLoopThree 性能基准测试套件")
+    print("AgentRT CoreLoopThree 性能基准测试套件")
     print("=" * 70)
 
     # 创建基准测试运行器

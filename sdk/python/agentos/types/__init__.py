@@ -3,7 +3,7 @@
 # Last updated: 2026-03-24
 
 """
-Types module providing all type definitions for AgentOS SDK.
+Types module providing all type definitions for AgentRT SDK.
 
 This module exports all enumeration types, domain models, and
 request/response structures.

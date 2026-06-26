@@ -1,16 +1,16 @@
-// AgentOS TypeScript SDK
+// AgentRT TypeScript SDK
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //
-// 提供 TypeScript 接口与 AgentOS 系统交互。
+// 提供 TypeScript 接口与 AgentRT 系统交互。
 // 包含任务管理、记忆操作、会话管理、技能加载功能。
 // 与 Go SDK 结构保持一致。
 
 /**
- * AgentOS TypeScript SDK
+ * AgentRT TypeScript SDK
  *
  * 模块化结构：
- * - agentos.ts: 主入口，提供 AgentOS 类
+ * - agentos.ts: 主入口，提供 AgentRT 类
  * - manager.ts: 配置管理
  * - errors.ts: 错误定义
  * - client/: HTTP 客户端层
@@ -20,10 +20,10 @@
  */
 
 // 主入口
-export { AgentOS, createAgentOS } from './agentos';
+export { AgentRT, createAgentRT } from './agentos';
 
 // 客户端
-export { Client, APIClient } from './client';
+export { Client, APIClient, MockClient } from './client';
 
 // 配置
 export {

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/security-policy-v1.schema.json",
-  "title": "AgentOS Security Policy Schema",
+  "title": "AgentRT Security Policy Schema",
   "description": "Configuration schema for security policy and access control",
   "type": "object",
   "required": ["_config_version", "security"],

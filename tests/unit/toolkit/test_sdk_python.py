@@ -1,4 +1,4 @@
-# AgentOS Python SDK 单元测试（V2.0 重构版）
+# AgentRT Python SDK 单元测试（V2.0 重构版）
 # Version: 0.1.0
 # Last updated: 2026-04-06
 #
@@ -9,7 +9,7 @@
 # - 性能基准测试集成
 
 """
-AgentOS Python SDK 单元测试模块（V2.0 重构版）。
+AgentRT Python SDK 单元测试模块（V2.0 重构版）。
 
 使用基类减少重复代码，提高可维护性。
 """
@@ -28,7 +28,7 @@ from base_test_case import BaseTestCase as SDKTestCase
 
 
 class TestAgentOSClient(SDKTestCase):
-    """AgentOS客户端测试"""
+    """AgentRT客户端测试"""
 
     def test_client_initialization(self):
         client = self.create_mock_client()
@@ -44,7 +44,7 @@ class TestAgentOSClient(SDKTestCase):
             mock_session = Mock()
             mock_session_class.return_value = mock_session
 
-            client = self.AgentOS(
+            client = self.AgentRT(
                 endpoint="http://localhost:18789",
                 api_key="test_key",
                 timeout=60
@@ -203,7 +203,7 @@ class TestAgentOSClient(SDKTestCase):
 
 
 class TestAsyncAgentOSClient(SDKTestCase):
-    """异步AgentOS客户端测试"""
+    """异步AgentRT客户端测试"""
 
     def test_async_client_initialization(self):
         client = self.create_mock_async_client()

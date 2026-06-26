@@ -1,5 +1,5 @@
 """
-AgentOS Tests - Security Module
+AgentRT Tests - Security Module
 
 安全测试模块，验证安全机制。
 """

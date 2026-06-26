@@ -82,8 +82,8 @@ daemon_bootstrap_ipc_t *daemon_bootstrap_ipc_start(const char *daemon_name,
         /* 非致命 — 通道已注册即可接收消息 */
     }
 
-    strncpy(bipc->daemon_name, daemon_name, sizeof(bipc->daemon_name) - 1);
-    strncpy(bipc->channel_name, channel_name, sizeof(bipc->channel_name) - 1);
+    AGENTOS_STRNCPY_TERM(bipc->daemon_name, daemon_name, sizeof(bipc->daemon_name) - 1);
+    AGENTOS_STRNCPY_TERM(bipc->channel_name, channel_name, sizeof(bipc->channel_name) - 1);
     bipc->protocol = protocol;
     bipc->running = true;
 
@@ -141,8 +141,8 @@ daemon_bootstrap_ipc_t *daemon_bootstrap_ipc_start_unix(const char *daemon_name,
     ipc_bus_helper_register_endpoint(bipc->ibh, daemon_name, socket_path,
                                       protos, 1);
 
-    strncpy(bipc->daemon_name, daemon_name, sizeof(bipc->daemon_name) - 1);
-    strncpy(bipc->channel_name, channel_name, sizeof(bipc->channel_name) - 1);
+    AGENTOS_STRNCPY_TERM(bipc->daemon_name, daemon_name, sizeof(bipc->daemon_name) - 1);
+    AGENTOS_STRNCPY_TERM(bipc->channel_name, channel_name, sizeof(bipc->channel_name) - 1);
     bipc->protocol = protocol;
     bipc->running = true;
 

@@ -1,5 +1,5 @@
 """
-AgentOS 系统调用集成测试
+AgentRT 系统调用集成测试
 
 验证系统调用层各模块间的交互和数据流，确保：
 - Agent/Task/Memory/Session/Telemetry/Skill 各子系统正确协作
@@ -151,7 +151,7 @@ class TestSyscallMemoryOperations(IntegrationTestCase):
 
     def test_memory_search_with_query(self):
         """测试记忆搜索"""
-        data = b"AgentOS microkernel architecture design"
+        data = b"AgentRT microkernel architecture design"
         metadata = json.dumps({"tags": ["architecture", "kernel"]})
         self._syscall_memory_write(data, metadata)
 

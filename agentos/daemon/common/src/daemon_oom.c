@@ -104,9 +104,9 @@ int daemon_oom_register(const daemon_oom_config_t *config)
     }
 
     daemon_oom_ctx_t *ctx = &g_daemon_oom_slots[g_daemon_oom_count];
-    memset(ctx, 0, sizeof(*ctx));
+    AGENTOS_MEMSET(ctx, 0, sizeof(*ctx));
 
-    strncpy(ctx->daemon_name, config->daemon_name, sizeof(ctx->daemon_name) - 1);
+    AGENTOS_STRNCPY_TERM(ctx->daemon_name, config->daemon_name, sizeof(ctx->daemon_name) - 1);
     ctx->drop_cache_on_warning = config->drop_cache_on_warning;
     ctx->reject_requests_on_critical = config->reject_requests_on_critical;
     ctx->user_context = config->user_context;
