@@ -27,6 +27,19 @@
 #include <string.h>
 #include <time.h>
 
+/* ==================== dlsym 函数指针安全获取 ==================== */
+/* dlsym 返回 void*（对象指针），但插件符号是函数指针。
+ * ISO C 禁止函数指针↔对象指针直接转换，使用 memcpy 模式避免 -Wpedantic 警告。
+ * 这是 POSIX 推荐的 dlsym 函数指针获取方式（避免未定义行为）。 */
+#define PLUGIN_DLSYM_FUNC(handle, name, fn_var) do { \
+    void *_plugin_sym = load_symbol((handle), (name)); \
+    if (_plugin_sym) { \
+        AGENTOS_MEMCPY(&(fn_var), &_plugin_sym, sizeof(_plugin_sym)); \
+    } else { \
+        (fn_var) = NULL; \
+    } \
+} while (0)
+
 /* ==================== 常量 ==================== */
 
 #define PLUGIN_MAX_COUNT     64     /**< 最大插件数 */
@@ -119,7 +132,8 @@ int plugin_service_load(const char *library_path, const char *config_path,
 
     /* 加载元数据 */
     typedef const plugin_metadata_t *(*metadata_fn_t)(void);
-    metadata_fn_t get_metadata = (metadata_fn_t)load_symbol(handle, "plugin_get_metadata");
+    metadata_fn_t get_metadata = NULL;
+    PLUGIN_DLSYM_FUNC(handle, "plugin_get_metadata", get_metadata);
     if (!get_metadata) {
         dlclose(handle);
         return -1;
@@ -143,10 +157,14 @@ int plugin_service_load(const char *library_path, const char *config_path,
     AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
 
     /* 加载入口点 */
-    plugin_init_fn init_fn = (plugin_init_fn)load_symbol(handle, "plugin_init");
-    plugin_destroy_fn destroy_fn = (plugin_destroy_fn)load_symbol(handle, "plugin_destroy");
-    plugin_start_fn start_fn = (plugin_start_fn)load_symbol(handle, "plugin_start");
-    plugin_stop_fn stop_fn = (plugin_stop_fn)load_symbol(handle, "plugin_stop");
+    plugin_init_fn init_fn = NULL;
+    plugin_destroy_fn destroy_fn = NULL;
+    plugin_start_fn start_fn = NULL;
+    plugin_stop_fn stop_fn = NULL;
+    PLUGIN_DLSYM_FUNC(handle, "plugin_init", init_fn);
+    PLUGIN_DLSYM_FUNC(handle, "plugin_destroy", destroy_fn);
+    PLUGIN_DLSYM_FUNC(handle, "plugin_start", start_fn);
+    PLUGIN_DLSYM_FUNC(handle, "plugin_stop", stop_fn);
 
     if (!init_fn || !destroy_fn) {
         SVC_LOG_ERROR("P2.2: PluginD: Missing required symbols (init/destroy) for %s",
@@ -163,7 +181,7 @@ int plugin_service_load(const char *library_path, const char *config_path,
     }
 
     /* 填充描述符 */
-    memcpy(&node->desc.metadata, metadata, sizeof(plugin_metadata_t));
+    AGENTOS_MEMCPY(&node->desc.metadata, metadata, sizeof(plugin_metadata_t));
     node->desc.init      = init_fn;
     node->desc.destroy   = destroy_fn;
     node->desc.start     = start_fn;
@@ -338,7 +356,7 @@ int plugin_service_get_metadata(const char *name, plugin_metadata_t *metadata)
         return -1;
     }
 
-    memcpy(metadata, &node->desc.metadata, sizeof(plugin_metadata_t));
+    AGENTOS_MEMCPY(metadata, &node->desc.metadata, sizeof(plugin_metadata_t));
     AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
     return 0;
 }
@@ -365,7 +383,7 @@ int plugin_service_get_stats(const char *name, plugin_stats_t *stats)
         return -1;
     }
 
-    memcpy(stats, &node->stats, sizeof(plugin_stats_t));
+    AGENTOS_MEMCPY(stats, &node->stats, sizeof(plugin_stats_t));
 
     /* 如果正在运行，更新 uptime */
     if (node->desc.state == PLUGIN_STATE_RUNNING) {

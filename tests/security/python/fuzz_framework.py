@@ -1,5 +1,5 @@
 """
-AgentOS 模糊测试框架
+AgentRT 模糊测试框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 0.1.0
 
@@ -66,7 +66,7 @@ class FuzzTestFramework:
             测试结果汇总
         """
         results = {
-            "framework": "AgentOS Fuzz Test Framework",
+            "framework": "AgentRT Fuzz Test Framework",
             "version": "0.1.0",
             "tests": [],
             "summary": {
@@ -296,7 +296,7 @@ def run_fuzz_tests():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("AgentOS 模糊测试框架")
+    print("AgentRT 模糊测试框架")
     print("Copyright (c) 2026 SPHARX Ltd.")
     print("=" * 60)
 

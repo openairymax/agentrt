@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Configuration Drift Detector Tests
+AgentRT Configuration Drift Detector Tests
 
 测试配置漂移检测器的功能
 

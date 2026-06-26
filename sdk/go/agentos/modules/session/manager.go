@@ -12,10 +12,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spharx/agentos/sdk/go/agentos"
-	"github.com/spharx/agentos/sdk/go/agentos/client"
-	"github.com/spharx/agentos/sdk/go/agentos/types"
-	"github.com/spharx/agentos/sdk/go/agentos/utils"
+	"github.com/spharx/agentrt/sdk/go/agentos"
+	"github.com/spharx/agentrt/sdk/go/agentos/client"
+	"github.com/spharx/agentrt/sdk/go/agentos/types"
+	"github.com/spharx/agentrt/sdk/go/agentos/utils"
 )
 
 // SessionManager 管理会话完整生命周期

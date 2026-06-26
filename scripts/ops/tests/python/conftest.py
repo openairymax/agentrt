@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Scripts 测试套件
+# AgentRT Scripts 测试套件
 # pytest 配置文件
 
 """
-pytest configuration for AgentOS Scripts
+pytest configuration for AgentRT Scripts
 
 Usage:
     pytest scripts/tests/python/

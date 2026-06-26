@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Token Utilities
+# AgentRT Token Utilities
 # Merged from scripts/operations/token_counter.py + token_budget.py
 
 """
-AgentOS Token Utilities
+AgentRT Token Utilities
 
 Combined token counting and budget management:
 - TokenCounter: Count tokens in text with multiple encoding strategies

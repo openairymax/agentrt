@@ -34,7 +34,7 @@ Example:
 
     asyncio.run(main())
 
-Author: Spharx AgentOS Team
+Author: Spharx AgentRT Team
 Version: 0.1.0
 """
 

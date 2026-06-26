@@ -11,11 +11,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/inotify.h>
-#include <pthread.h>
 #include <errno.h>
+
+/* Cross-platform abstraction layer (provides agentos_thread_t,
+ * agentos_platform_thread_create/join — works on Linux, macOS, Windows) */
+#include "platform.h"
+
+/* Platform-specific headers */
+#ifndef _WIN32
+#include <unistd.h>
+#include <pthread.h>
+#endif
+#include <sys/stat.h>
+#ifdef __linux__
+#include <sys/inotify.h>
+#endif
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
@@ -92,7 +102,7 @@ static void *g_reload_userdata[AGENTOS_MAX_RELOAD_CALLBACKS];
 static size_t g_reload_cb_count = 0;
 
 /* ── 监听线程 ── */
-static pthread_t g_watch_thread;
+static agentos_thread_t g_watch_thread;
 static volatile bool g_watch_running = false;
 static int g_inotify_fd = -1;     /* P3.15: inotify 文件描述符 */
 
@@ -162,6 +172,7 @@ static void config_reload_notify(const agentos_yaml_config_t *old_config,
     }
 }
 
+#ifdef __linux__
 /**
  * @brief P3.15: inotify 文件监听线程
  *
@@ -344,7 +355,7 @@ static void *config_watch_thread(void *arg)
             usleep(50000); /* 50ms */
 
             agentos_yaml_config_t new_config;
-            memset(&new_config, 0, sizeof(new_config));
+            AGENTOS_MEMSET(&new_config, 0, sizeof(new_config));
 
             /* 分步执行以捕获详细错误码 */
             int load_rc = agentos_yaml_load(g_config_path, &new_config);
@@ -449,6 +460,7 @@ static void *config_watch_thread(void *arg)
     AGENTOS_LOG_INFO("C-L01: ConfigLoader: WATCH-STOPPED path=%s", g_config_path);
     return NULL;
 }
+#endif /* __linux__ — config_watch_thread uses Linux inotify API */
 
 int agentos_config_watch_start(const char *yaml_path, uint32_t interval_ms)
 {
@@ -467,11 +479,21 @@ int agentos_config_watch_start(const char *yaml_path, uint32_t interval_ms)
                      "(P3.15: inotify-based, interval_ms ignored)",
                      g_config_path, interval_ms);
 
-    if (pthread_create(&g_watch_thread, NULL, config_watch_thread, NULL) != 0) {
-        AGENTOS_LOG_ERROR("C-L01: ConfigLoader: WATCH-FAIL — pthread_create failed");
+#ifdef __linux__
+    if (agentos_platform_thread_create(&g_watch_thread, config_watch_thread, NULL) != 0) {
+        AGENTOS_LOG_ERROR("C-L01: ConfigLoader: WATCH-FAIL — agentos_platform_thread_create failed");
         g_watch_running = false;
         return -1;
     }
+#else
+    /* macOS/Windows: inotify 不可用 — 优雅降级（返回成功但不实际监视文件）。
+     * 手动热重载仍可通过 agentos_config_reload() 触发。 */
+    AGENTOS_LOG_WARN("C-L01: ConfigLoader: WATCH-START — inotify not supported on this "
+                     "platform, config file watching disabled (graceful degradation). "
+                     "Manual reload via agentos_config_reload() is still available. path=%s",
+                     g_config_path);
+    g_watch_running = false;
+#endif
 
     return 0;
 }
@@ -488,15 +510,17 @@ void agentos_config_watch_stop(void)
     g_watch_running = false;
 
     /* P3.15: 关闭 inotify fd 以唤醒阻塞的 read() */
+#ifdef __linux__
     if (g_inotify_fd >= 0) {
         close(g_inotify_fd);
         g_inotify_fd = -1;
     }
+#endif
 
     /* P3.15: 等待监听线程退出 */
-    int join_rc = pthread_join(g_watch_thread, NULL);
+    int join_rc = agentos_platform_thread_join(g_watch_thread, NULL);
     if (join_rc != 0) {
-        AGENTOS_LOG_WARN("C-L01: ConfigLoader: WATCH-STOP — pthread_join failed (errno=%d)",
+        AGENTOS_LOG_WARN("C-L01: ConfigLoader: WATCH-STOP — agentos_platform_thread_join failed (rc=%d)",
                          join_rc);
     } else {
         AGENTOS_LOG_INFO("C-L01: ConfigLoader: WATCH-STOPPED — thread joined successfully");
@@ -511,7 +535,7 @@ int agentos_config_reload(const char *yaml_path)
                      path, (int)g_config_loaded);
 
     agentos_yaml_config_t new_config;
-    memset(&new_config, 0, sizeof(new_config));
+    AGENTOS_MEMSET(&new_config, 0, sizeof(new_config));
 
     int load_rc = agentos_yaml_load(path, &new_config);
     if (load_rc != 0) {

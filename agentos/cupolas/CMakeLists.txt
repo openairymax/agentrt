@@ -141,6 +141,16 @@ set(COMMON_INCLUDE_DIRS
 
 add_library(cupolas STATIC ${CUPOLAS_SOURCES} ${CUPOLAS_HEADERS})
 
+# 豁免内存子系统实现层：mempool.c 和 slab.c 实现底层内存管理，
+# 必须使用底层 malloc/calloc/memset，需定义 AGENTOS_COMPLIANCE_IMPL 跳过 poison
+if(AGENTRT_COMPLIANCE_STRICT)
+    set_source_files_properties(
+        src/mempool.c
+        src/slab.c
+        PROPERTIES COMPILE_DEFINITIONS AGENTOS_COMPLIANCE_IMPL
+    )
+endif()
+
 if(BUILD_WITH_LOGGING)
     target_compile_definitions(cupolas PRIVATE CUPOLAS_ENABLE_LOGGING=1)
 endif()
@@ -202,7 +212,7 @@ else()
         -Wformat=2 -Wformat-security
         -fstack-protector-strong
         -fstack-clash-protection
-        -D_FORTIFY_SOURCE=2
+        $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>
         -fvisibility=hidden
     )
 
@@ -235,6 +245,7 @@ if(BUILD_TESTS)
     enable_testing()
 
     add_executable(test_cupolas_core tests/unit/test_cupolas_core.c)
+    target_compile_definitions(test_cupolas_core PRIVATE AGENTOS_COMPLIANCE_IMPL)
     target_include_directories(test_cupolas_core PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src

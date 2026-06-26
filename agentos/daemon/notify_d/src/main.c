@@ -182,7 +182,8 @@ static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key,
 
     static const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     size_t off = 0;
-    for (int i = 0; i < 20 && off < out_size - 4; i += 3) {
+    /* 处理前 18 字节（6 组 3 字节 → 24 字符） */
+    for (int i = 0; i < 18 && off + 4 <= out_size; i += 3) {
         unsigned int val = ((unsigned int)sha1[i] << 16) | ((unsigned int)sha1[i + 1] << 8) |
                            (unsigned int)sha1[i + 2];
         out_key[off++] = b64[(val >> 18) & 0x3F];
@@ -190,8 +191,15 @@ static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key,
         out_key[off++] = b64[(val >> 6) & 0x3F];
         out_key[off++] = b64[val & 0x3F];
     }
-    out_key[27] = '=';
-    out_key[28] = '\0';
+    /* 处理最后 2 字节 → 3 字符 + '='（避免访问 sha1[20] 越界） */
+    if (off + 4 <= out_size) {
+        unsigned int val = ((unsigned int)sha1[18] << 16) | ((unsigned int)sha1[19] << 8);
+        out_key[off++] = b64[(val >> 18) & 0x3F];
+        out_key[off++] = b64[(val >> 12) & 0x3F];
+        out_key[off++] = b64[(val >> 6) & 0x3F];
+        out_key[off++] = '=';
+    }
+    out_key[off] = '\0';
 
     return 0;
 }

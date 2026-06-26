@@ -13,7 +13,7 @@ from .types import TaskStatus, TaskResult
 from .exceptions import TaskError, AgentOSTimeoutError
 
 class Task:
-    """Task class for managing AgentOS tasks.
+    """Task class for managing AgentRT tasks.
     
     This class provides methods to query, wait for, and cancel tasks.
     """
@@ -23,7 +23,7 @@ class Task:
         Initialize a Task object.
         
         Args:
-            client: The AgentOS client instance.
+            client: The AgentRT client instance.
             task_id: The task ID.
         """
         self.client = client

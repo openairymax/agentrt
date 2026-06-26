@@ -1,4 +1,7 @@
 
+# 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
+add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
+
 # AgentRT 顶层测试入口
 # 包含各子模块测试和集成测试
 

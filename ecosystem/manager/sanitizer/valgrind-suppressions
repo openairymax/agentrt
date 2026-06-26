@@ -1,4 +1,4 @@
-# Valgrind Suppressions for AgentOS
+# Valgrind Suppressions for AgentRT
 # Suppress known false positives from third-party libraries
 
 # === OpenSSL ===

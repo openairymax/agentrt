@@ -13,7 +13,7 @@ toolkit/
 ├── python/                     # Python SDK
 │   ├── agentos/                # 核心包
 │   │   ├── __init__.py         # 模块入口（导出所有公共 API）
-│   │   ├── agent.py            # AgentOS/AsyncAgentOS 客户端
+│   │   ├── agent.py            # AgentRT/AsyncAgentRT 客户端
 │   │   ├── task.py             # Task 领域模型
 │   │   ├── memory.py           # Memory 领域模型
 │   │   ├── session.py          # Session 领域模型
@@ -109,7 +109,7 @@ toolkit/
 ├── typescript/                 # TypeScript SDK
 │   ├── src/
 │   │   ├── index.ts            # 模块入口
-│   │   ├── agentos.ts          # AgentOS 主类
+│   │   ├── agentos.ts          # AgentRT 主类
 │   │   ├── agent.ts            # Agent 模型
 │   │   ├── manager.ts          # 配置管理
 │   │   ├── config.ts           # 配置类型
@@ -150,7 +150,7 @@ toolkit/
 
 | 模块 | 说明 | Python | Go | Rust | TypeScript |
 |------|------|--------|-----|------|------------|
-| **Agent** | Agent 管理 | `AgentOS` / `AsyncAgentOS` | `Client` | `Client` | `AgentOS` |
+| **Agent** | Agent 管理 | `AgentRT` / `AsyncAgentRT` | `Client` | `Client` | `AgentRT` |
 | **Task** | 任务管理 | `TaskManager` | `TaskManager` | `TaskManager` | `TaskManager` |
 | **Memory** | 记忆管理 | `MemoryManager` | `MemoryManager` | `MemoryManager` | `MemoryManager` |
 | **Session** | 会话管理 | `SessionManager` | `SessionManager` | `SessionManager` | `SessionManager` |

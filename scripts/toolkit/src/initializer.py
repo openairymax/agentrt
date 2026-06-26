@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Configuration Initializer
+# AgentRT Configuration Initializer
 # Migrated from scripts/init/init_config.py
 
 """
-AgentOS Configuration Initializer
+AgentRT Configuration Initializer
 
-Initialize and configure AgentOS system, including:
+Initialize and configure AgentRT system, including:
 - Create default configuration files
 - Validate configuration completeness
 - Generate environment-specific configurations
@@ -50,8 +50,8 @@ class ConfigTemplate:
 DEFAULT_CONFIGS = {
     "agentos.conf": ConfigTemplate(
         name="agentos.conf",
-        description="AgentOS main configuration",
-        content="""# AgentOS Main Configuration
+        description="AgentRT main configuration",
+        content="""# AgentRT Main Configuration
 # Version: 0.1.0
 
 # System
@@ -96,7 +96,7 @@ telemetry.interval = 60
     "logging.conf": ConfigTemplate(
         name="logging.conf",
         description="Logging configuration",
-        content="""# AgentOS Logging Configuration
+        content="""# AgentRT Logging Configuration
 
 # Log Levels: debug, info, warn, error, fatal
 level = "info"
@@ -135,7 +135,7 @@ level = "error"
     "memory.conf": ConfigTemplate(
         name="memory.conf",
         description="Memory system configuration",
-        content="""# AgentOS Memory System Configuration
+        content="""# AgentRT Memory System Configuration
 
 # Memory Limits
 max_memory = "512M"
@@ -183,7 +183,7 @@ index.dimension = 512
     "coreloopthree.conf": ConfigTemplate(
         name="coreloopthree.conf",
         description="Three-layer cognitive runtime configuration",
-        content="""# AgentOS CoreLoopThree Configuration
+        content="""# AgentRT CoreLoopThree Configuration
 
 # System 1 (Fast Path)
 [system1]
@@ -222,7 +222,7 @@ agent_startup_timeout = 5000
     "security.conf": ConfigTemplate(
         name="security.conf",
         description="Security configuration",
-        content="""# AgentOS Security Configuration
+        content="""# AgentRT Security Configuration
 
 # Security Features
 enabled = true
@@ -414,7 +414,7 @@ class ConfigInitializer:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AgentOS Configuration Initialization Tool",
+        description="AgentRT Configuration Initialization Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
@@ -451,7 +451,7 @@ def main():
         return 0
 
     if args.init:
-        print("\nInitializing AgentOS Configuration...")
+        print("\nInitializing AgentRT Configuration...")
         print(f"Configuration directory: {initializer.config_dir}")
         initializer.init_configs(force=args.force)
         print(f"\nCreated {len(initializer.created_files)} configuration file(s)")
@@ -467,7 +467,7 @@ def main():
         return 0
 
     if args.validate:
-        print("\nValidating AgentOS Configuration...")
+        print("\nValidating AgentRT Configuration...")
         errors = initializer.validate_configs()
         if errors:
             print("\nValidation Errors:")

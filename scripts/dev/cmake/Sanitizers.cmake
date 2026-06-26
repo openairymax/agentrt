@@ -164,6 +164,13 @@ function(agentos_enable_fortify target scope)
         return()
     endif()
 
+    # _FORTIFY_SOURCE=2 需要 -O1 或更高优化级别，Debug 构建时跳过以避免
+    # "_FORTIFY_SOURCE requires compiling with optimization" 警告
+    if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR "${CMAKE_BUILD_TYPE}" STREQUAL "")
+        message(STATUS "FORTIFY_SOURCE=2 skipped for ${target} (Debug build, requires -O1+)")
+        return()
+    endif()
+
     target_compile_definitions(${target} ${scope}
         _FORTIFY_SOURCE=2
     )

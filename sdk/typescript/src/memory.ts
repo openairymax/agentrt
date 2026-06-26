@@ -1,17 +1,17 @@
-// AgentOS TypeScript SDK Memory
+// AgentRT TypeScript SDK Memory
 // Version: 0.1.0
 // Last updated: 2026-03-23
 
 import { MemoryError, AgentOSError } from './errors';
 import { Memory, MemoryLayer, MemoryRaw } from './types';
-import { AgentOS } from './agent';
+import { AgentRT } from './agent';
 
-/** AgentOS 记忆管理�?*/
+/** AgentRT 记忆管理�?*/
 export class MemoryManager {
-  private client: AgentOS;
+  private client: AgentRT;
 
   /** 创建新的 MemoryManager */
-  constructor(client: AgentOS) {
+  constructor(client: AgentRT) {
     this.client = client;
   }
 

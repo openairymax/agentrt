@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 第三阶段技术演示
+AgentRT 第三阶段技术演示
 
 本演示展示第三阶段（系统完善）实现的核心功能：
 1. 服务管理框架 - 统一的服务生命周期管理
@@ -8,7 +8,7 @@ AgentOS 第三阶段技术演示
 3. 开发工具链增强 - 代码质量分析和交互式教程
 4. 开源治理准备 - 项目治理和贡献者指南
 
-通过本演示，您可以了解 AgentOS 在系统完善方面的进展和实际应用。
+通过本演示，您可以了解 AgentRT 在系统完善方面的进展和实际应用。
 
 @version 0.1.0
 @date 2026-04-11
@@ -79,7 +79,7 @@ class TechnologyDemo:
             print("❌ 无法导入所需模块，演示中止")
             return False
 
-        self.print_header("AgentOS 第三阶段技术演示")
+        self.print_header("AgentRT 第三阶段技术演示")
         print("演示内容: 服务框架完善、性能基准建立、开发体验提升、生态基础准备")
         print(f"开始时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -392,7 +392,7 @@ class TechnologyDemo:
         total_duration = end_time - self.start_time
 
         report_data = {
-            "demo_title": "AgentOS 第三阶段技术演示",
+            "demo_title": "AgentRT 第三阶段技术演示",
             "demo_date": time.strftime("%Y-%m-%d %H:%M:%S"),
             "total_duration_seconds": total_duration,
             "phase3_completion_status": "all_tasks_completed",
@@ -456,7 +456,7 @@ class TechnologyDemo:
         # 同时生成一个简明的Markdown报告
         md_report_file = report_dir / f"phase3_demo_report_{int(time.time())}.md"
 
-        md_content = f"""# AgentOS 第三阶段技术演示报告
+        md_content = f"""# AgentRT 第三阶段技术演示报告
 
 ## 演示概况
 - **演示标题**: {report_data['demo_title']}
@@ -499,7 +499,7 @@ class TechnologyDemo:
 
         # 打印总结
         self.print_header("演示完成总结")
-        print(f"🎉 AgentOS 第三阶段技术演示成功完成!")
+        print(f"🎉 AgentRT 第三阶段技术演示成功完成!")
         print(f"⏱️  总耗时: {total_duration:.2f} 秒")
         print(f"📈 演示环节: 4个主要领域")
         print(f"✅ 完成状态: 所有第三阶段任务均已实现")

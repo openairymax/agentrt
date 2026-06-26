@@ -3,7 +3,7 @@
 /** @note This API is planned for next release. Enable with AGENTOS_ENABLE_V2_API to access. */
 /**
  * @file safety_guard.h
- * @brief SafetyGuard - AgentOS细粒度安全守卫框架
+ * @brief SafetyGuard - AgentRT细粒度安全守卫框架
  *
  * 事件驱动安全守卫框架，实现细粒度安全控制与动态策略管理。
  * 与现有Cupolas安全穹顶非侵入式集成，提供守卫链执行、

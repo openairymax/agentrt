@@ -90,6 +90,13 @@ write_basic_package_version_file(
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/AgentRTConfigVersion.cmake
+configure_package_config_file(
+    "${CMAKE_SOURCE_DIR}/scripts/dev/cmake/AgentRTConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/AgentRTConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/AgentRT
+)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/AgentRTConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/AgentRTConfigVersion.cmake
     DESTINATION lib/cmake/AgentRT
 )

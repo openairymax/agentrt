@@ -32,6 +32,9 @@
 #include "agentos_quality.h"
 #include "tool_svc_adapter.h"
 
+/* 跨平台路径常量（AGENTOS_DATA_DIR） */
+#include "platform.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,7 +44,7 @@
 #define DEFAULT_MAX_PARALLEL_INSTANCES  8
 #define DEFAULT_INSTANCE_TIMEOUT_MS     60000
 #define DEFAULT_PIPELINE_TIMEOUT_MS     300000
-#define DEFAULT_CHECKPOINT_PATH         "/var/lib/agentos/checkpoints"
+#define DEFAULT_CHECKPOINT_PATH         AGENTOS_DATA_DIR "/checkpoints"
 
 /* ==================== 适配器内部结构 ==================== */
 

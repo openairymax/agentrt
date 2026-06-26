@@ -203,7 +203,7 @@ impl std::fmt::Display for SpanStatus {
 // 领域模型
 // ============================================================
 
-/// Task 表示 AgentOS 系统中的一个执行任务
+/// Task 表示 AgentRT 系统中的一个执行任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     /// 任务 ID
@@ -252,7 +252,7 @@ pub struct TaskResult {
     pub duration: f64,
 }
 
-/// Memory 表示 AgentOS 系统中的一条记忆记录
+/// Memory 表示 AgentRT 系统中的一条记忆记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Memory {
     /// 记忆 ID
@@ -311,7 +311,7 @@ pub struct Session {
     pub last_activity: String,
 }
 
-/// Skill 表示 AgentOS 系统中的可插拔能力单元
+/// Skill 表示 AgentRT 系统中的可插拔能力单元
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Skill {
     /// 技能 ID

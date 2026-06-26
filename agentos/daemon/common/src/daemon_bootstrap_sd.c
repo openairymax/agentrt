@@ -75,7 +75,7 @@ daemon_bootstrap_sd_t *daemon_bootstrap_sd_start(const char *name, const char *t
         /* 非致命，继续运行 */
     }
 
-    strncpy(bsd->service_name, name, sizeof(bsd->service_name) - 1);
+    AGENTOS_STRNCPY_TERM(bsd->service_name, name, sizeof(bsd->service_name) - 1);
     bsd->service_name[sizeof(bsd->service_name) - 1] = '\0';
     bsd->running = true;
 
@@ -114,7 +114,7 @@ daemon_bootstrap_sd_t *daemon_bootstrap_sd_start_unix(const char *name, const ch
         SVC_LOG_WARN("daemon_bootstrap_sd_start_unix: heartbeat start failed for '%s'", name);
     }
 
-    strncpy(bsd->service_name, name, sizeof(bsd->service_name) - 1);
+    AGENTOS_STRNCPY_TERM(bsd->service_name, name, sizeof(bsd->service_name) - 1);
     bsd->service_name[sizeof(bsd->service_name) - 1] = '\0';
     bsd->running = true;
 
