@@ -341,7 +341,7 @@ CoreLoopThree 维护四种类型的上下文状态：
 
 | 依赖项 | 来源 | 用途 |
 |--------|------|------|
-| CoreKern | atoms/corekern | 微内核调度和 IPC 能力 |
+| CoreKern | atoms/corekern | 微核心调度和 IPC 能力 |
 | Syscall | atoms/syscall | 系统调用接口 |
 | Memory | atoms/memory | 记忆存储和检索 |
 | TaskFlow | atoms/taskflow | DAG 任务编排 |
@@ -405,7 +405,7 @@ int main(void) {
 
 ## 与相关模块的关系
 
-- **CoreKern**: 依赖微内核的调度和服务能力
+- **CoreKern**: 依赖微核心的调度和服务能力
 - **Syscall**: 通过标准化接口调用系统能力
 - **Memory/MemoryRovol**: 管理记忆上下文的持久化和检索
 - **TaskFlow**: 在执行循环中驱动 DAG 任务流

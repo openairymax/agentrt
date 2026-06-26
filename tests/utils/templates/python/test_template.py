@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 测试模板 - Python 单元测试
+AgentRT 测试模板 - Python 单元测试
 
 使用方法:
 1. 复制此文件到目标目录

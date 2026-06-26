@@ -105,7 +105,7 @@
  * @return 配置值
  */
 #define CONFIG_GET_STRING_SAFE(ctx, key, default_value)                    \
-    ({                                                                     \
+    __extension__({                                                                     \
         const config_value_t *val = config_context_get(ctx, key);          \
         val ? config_value_get_string(val, default_value) : default_value; \
     })
@@ -118,7 +118,7 @@
  * @return 配置值
  */
 #define CONFIG_GET_INT_SAFE(ctx, key, default_value)                    \
-    ({                                                                  \
+    __extension__({                                                                  \
         const config_value_t *val = config_context_get(ctx, key);       \
         val ? config_value_get_int(val, default_value) : default_value; \
     })
@@ -131,7 +131,7 @@
  * @return 配置值
  */
 #define CONFIG_GET_BOOL_SAFE(ctx, key, default_value)                    \
-    ({                                                                   \
+    __extension__({                                                                   \
         const config_value_t *val = config_context_get(ctx, key);        \
         val ? config_value_get_bool(val, default_value) : default_value; \
     })
@@ -144,7 +144,7 @@
  * @return 配置值
  */
 #define CONFIG_GET_DOUBLE_SAFE(ctx, key, default_value)                    \
-    ({                                                                     \
+    __extension__({                                                                     \
         const config_value_t *val = config_context_get(ctx, key);          \
         val ? config_value_get_double(val, default_value) : default_value; \
     })
@@ -266,7 +266,7 @@
  * @return 配置上下文
  */
 #define CONFIG_INIT_WITH_DEFAULTS(ctx_name, defaults, count)                         \
-    ({                                                                               \
+    __extension__({                                                                               \
         config_context_t *ctx = config_context_create(ctx_name);                     \
         if (ctx) {                                                                   \
             for (size_t i = 0; i < (count); i += 2) {                                \

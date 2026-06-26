@@ -83,7 +83,7 @@ int method_dispatcher_register(method_dispatcher_t *disp, const char *method, me
 {
     if (!disp || !method || !handler) {
         SVC_LOG_ERROR("method_dispatcher_register: null parameter disp=%p method=%p handler=%p",
-                      (void *)disp, (void *)method, (void *)handler);
+                      (void *)disp, (void *)method, (void *)(uintptr_t)handler);
         return AGENTOS_ERR_INVALID_PARAM;
     }
     if (disp->method_count >= disp->max_methods) {

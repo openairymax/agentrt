@@ -1,4 +1,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
+
+# 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
+add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 # agentos/daemon/common 单元测试 (TeamC)
 # 对齐: 看板v14.0 C-W1-003 / 规范手册v13.0 TEST-01~06
 

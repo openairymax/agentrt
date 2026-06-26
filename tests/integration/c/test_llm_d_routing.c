@@ -16,7 +16,9 @@
  * INT-15.6: 端到端路由管线 - registry→find_provider→请求构建→响应解析
  */
 
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 199309L
+#endif
 
 #include "cache.h"
 #include "cost_tracker.h"

@@ -1,5 +1,5 @@
 """
-AgentOS Manager Tools - Base Utilities Package
+AgentRT Manager Tools - Base Utilities Package
 
 提供Manager模块工具共享的基础工具类：
 - ConfigLoader: 配置文件加载器

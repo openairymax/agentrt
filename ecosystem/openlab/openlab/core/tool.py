@@ -1,4 +1,4 @@
-'''OpenLab Core Tool Module - AgentOS 架构设计原则 V1.8'''
+'''OpenLab Core Tool Module - AgentRT 架构设计原则 V1.8'''
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field

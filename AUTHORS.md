@@ -3,7 +3,7 @@
 **最新**: 2026-04-20
 **版本**: 0.1.0
 
-本文档记录 OpenAirymax AgentOS 项目的核心贡献者和主要贡献者。
+本文档记录 OpenAirymax AgentRT 项目的核心贡献者和主要贡献者。
 
 ---
 
@@ -38,7 +38,7 @@
 
 | 贡献者 | 主要贡献 | 活跃状态 |
 |--------|----------|----------|
-| *待添加* | 微内核核心、认知循环、记忆系统开发 | - |
+| *待添加* | 微核心核心、认知循环、记忆系统开发 | - |
 
 ### 团队 B - 安全与服务组
 
@@ -64,7 +64,7 @@
 
 | 模块 | 负责人 | 职责范围 |
 |------|--------|----------|
-| `atoms/corekern` | *待添加* | 微内核核心机制 |
+| `atoms/corekern` | *待添加* | 微核心核心机制 |
 | `atoms/coreloopthree` | *待添加* | 三层认知循环 |
 | `atoms/memoryrovol` | *待添加* | 四层记忆系统 |
 | `atoms/syscall` | *待添加* | 系统调用层 |
@@ -157,7 +157,7 @@ Bug 修复 ████████ 待统计
 
 ## 特别感谢
 
-感谢所有为 AgentOS 项目做出贡献的开发者！
+感谢所有为 AgentRT 项目做出贡献的开发者！
 
 ### 开源项目和机构
 
@@ -177,8 +177,8 @@ Bug 修复 ████████ 待统计
 
 | 用途 | 联系方式 |
 |------|---------|
-| 技术讨论 | [GitHub Discussions](https://github.com/SpharxTeam/AgentOS/discussions) |
-| 问题反馈 | [Issues](https://github.com/SpharxTeam/AgentOS/issues) |
+| 技术讨论 | [GitHub Discussions](https://github.com/SpharxTeam/AgentRT/discussions) |
+| 问题反馈 | [Issues](https://github.com/SpharxTeam/AgentRT/issues) |
 | 商务合作 | business@spharx.cn |
 | 安全问题 | security@spharx.cn |
 

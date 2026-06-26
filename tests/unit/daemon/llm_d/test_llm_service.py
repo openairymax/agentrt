@@ -1,5 +1,5 @@
 """
-AgentOS LLM 服务单元测试
+AgentRT LLM 服务单元测试
 
 验证 LLM 守护进程的核心功能：
 - Provider 路由与适配

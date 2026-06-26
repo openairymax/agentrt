@@ -308,7 +308,7 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
                                       "handler response size %zu exceeds max %zu",
                                       resp_size, (size_t)BRIDGE_MAX_RESPONSE_SIZE);
                 AGENTOS_FREE(result);
-                return NULL;
+                return -1;
             }
             out_response->response_data = (char *)AGENTOS_MALLOC(resp_size + 1);
             if (out_response->response_data) {
@@ -333,7 +333,7 @@ int gw_protocol_bridge_process_request(gw_protocol_bridge_handle_t bridge,
                                       "default_handler response size %zu exceeds max %zu",
                                       resp_size, (size_t)BRIDGE_MAX_RESPONSE_SIZE);
                 AGENTOS_FREE(result);
-                return NULL;
+                return -1;
             }
             out_response->response_data = (char *)AGENTOS_MALLOC(resp_size + 1);
             if (out_response->response_data) {

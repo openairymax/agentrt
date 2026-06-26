@@ -225,7 +225,7 @@ class Client(APIClient):
         return self._config.endpoint
 
     def health(self) -> HealthStatus:
-        """检查 AgentOS 服务的健康状态"""
+        """检查 AgentRT 服务的健康状态"""
         resp = self.get("/api/v1/health")
         if not resp.success or not isinstance(resp.data, dict):
             raise InvalidResponseError("健康检查响应格式异常")
@@ -240,7 +240,7 @@ class Client(APIClient):
         )
 
     def metrics(self) -> Metrics:
-        """获取 AgentOS 系统运行指标"""
+        """获取 AgentRT 系统运行指标"""
         resp = self.get("/api/v1/metrics")
         if not resp.success or not isinstance(resp.data, dict):
             raise InvalidResponseError("指标响应格式异常")

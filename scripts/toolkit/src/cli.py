@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 交互式 CLI 增强模块
+# AgentRT 交互式 CLI 增强模块
 # 提供 TUI 和交互式诊断功能
 
 """
-AgentOS 交互式 CLI
+AgentRT 交互式 CLI
 
 提供增强的用户交互体验，包括：
 - 彩色输出和格式化
@@ -39,7 +39,7 @@ from .logger import (
 
 
 class AgentOSCLI:
-    """AgentOS CLI 主类 - 增强的用户交互体验"""
+    """AgentRT CLI 主类 - 增强的用户交互体验"""
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose

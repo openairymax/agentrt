@@ -1,9 +1,9 @@
-# AgentOS 性能基准测试模块
+# AgentRT 性能基准测试模块
 # Version: 0.1.0
 # Last updated: 2026-03-22
 
 """
-AgentOS 性能基准测试模块。
+AgentRT 性能基准测试模块。
 
 测试系统性能指标，包括并发性能、检索延迟、吞吐量等。
 """

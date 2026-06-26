@@ -1,0 +1,12 @@
+#!/bin/bash
+# AgentRT 测试运行包装脚本
+# 自动设置 sanitizer 环境变量后运行 ctest
+# 用法: ./run_tests.sh [ctest参数...]
+
+set -e
+
+export ASAN_OPTIONS="@AGENTRT_ASAN_OPTIONS@"
+export LSAN_OPTIONS="@AGENTRT_LSAN_OPTIONS@"
+export UBSAN_OPTIONS="@AGENTRT_UBSAN_OPTIONS@"
+
+exec ctest "$@"

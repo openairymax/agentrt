@@ -12,7 +12,7 @@ from .types import SkillInfo, SkillResult
 from .exceptions import SkillError
 
 class Skill:
-    """Skill class for managing AgentOS skills.
+    """Skill class for managing AgentRT skills.
     
     This class provides methods to execute skills and get skill information.
     """
@@ -22,7 +22,7 @@ class Skill:
         Initialize a Skill object.
         
         Args:
-            client: The AgentOS client instance.
+            client: The AgentRT client instance.
             skill_name: The skill name.
         """
         self.client = client
