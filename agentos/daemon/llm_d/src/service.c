@@ -225,7 +225,7 @@ llm_service_t *llm_service_create(const char *config_path)
     /* 加载基础配置 */
     service_config_t base_cfg;
     __builtin_memset(&base_cfg, 0, sizeof(base_cfg));
-    base_cfg.cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
+    base_cfg.llm_cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
     base_cfg.cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
     base_cfg.max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
     base_cfg.timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
@@ -287,7 +287,7 @@ llm_service_t *llm_service_create(const char *config_path)
     }
 
     /* 创建缓存 */
-    svc->cache = cache_create(base_cfg.cache_capacity, base_cfg.cache_ttl_sec);
+    svc->cache = llm_cache_create(base_cfg.llm_cache_capacity, base_cfg.cache_ttl_sec);
     if (!svc->cache) {
         SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL cache, STACK: llm_service_create");
         provider_registry_destroy(svc->registry);
@@ -301,7 +301,7 @@ llm_service_t *llm_service_create(const char *config_path)
     svc->cost = cost_tracker_create((const pricing_rule_t *)svc->rules, (int)svc->rule_count);
     if (!svc->cost) {
         SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL cost_tracker, STACK: llm_service_create");
-        cache_destroy(svc->cache);
+        llm_cache_destroy(svc->cache);
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
@@ -314,7 +314,7 @@ llm_service_t *llm_service_create(const char *config_path)
     if (!svc->token_counter) {
         SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL token_counter, STACK: llm_service_create");
         cost_tracker_destroy(svc->cost);
-        cache_destroy(svc->cache);
+        llm_cache_destroy(svc->cache);
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
@@ -322,8 +322,8 @@ llm_service_t *llm_service_create(const char *config_path)
         return NULL;
     }
 
-    SVC_LOG_INFO("C-L02: SVC: CREATE-OK pricing_rules=%d cache_capacity=%zu cache_ttl=%u",
-                 (int)svc->rule_count, base_cfg.cache_capacity, base_cfg.cache_ttl_sec);
+    SVC_LOG_INFO("C-L02: SVC: CREATE-OK pricing_rules=%d llm_cache_capacity=%zu cache_ttl=%u",
+                 (int)svc->rule_count, base_cfg.llm_cache_capacity, base_cfg.cache_ttl_sec);
     return svc;
 }
 
@@ -342,7 +342,7 @@ void llm_service_destroy(llm_service_t *svc)
     }
 
     if (svc->cache) {
-        cache_destroy(svc->cache);
+        llm_cache_destroy(svc->cache);
         svc->cache = NULL;
     }
 
@@ -478,7 +478,7 @@ static int get_cached_response(llm_service_t *svc, const char *cache_key,
     }
 
     char *cached_json = NULL;
-    if (cache_get(svc->cache, cache_key, &cached_json) == 1 && cached_json) {
+    if (llm_cache_get(svc->cache, cache_key, &cached_json) == 1 && cached_json) {
         llm_response_t *cached_resp = response_from_json(cached_json);
         AGENTOS_FREE(cached_json);
         cached_json = NULL;
@@ -523,7 +523,7 @@ static void cache_response(llm_service_t *svc, const char *cache_key, llm_respon
 
     char *resp_json = response_to_json(resp);
     if (resp_json) {
-        cache_put(svc->cache, cache_key, resp_json);
+        llm_cache_put(svc->cache, cache_key, resp_json);
         AGENTOS_FREE(resp_json);
         resp_json = NULL;
     }
@@ -695,8 +695,8 @@ int llm_service_stats(llm_service_t *svc, char **out_json)
         cJSON_AddItemToObject(root, "cost", cost_json);
     }
 
-    cJSON_AddNumberToObject(root, "cache_size", cache_size(svc->cache));
-    cJSON_AddNumberToObject(root, "cache_capacity", cache_capacity(svc->cache));
+    cJSON_AddNumberToObject(root, "llm_cache_size", llm_cache_size(svc->cache));
+    cJSON_AddNumberToObject(root, "llm_cache_capacity", llm_cache_capacity(svc->cache));
 
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -731,7 +731,7 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
 #else
         SVC_LOG_WARN("C-L02: SVC: CONFIG-WARN YAML not compiled, STACK: svc_config_load");
         __builtin_memset(cfg, 0, sizeof(service_config_t));
-        cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
+        cfg->llm_cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
         cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
         cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
         cfg->timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
@@ -741,7 +741,7 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
 
     __builtin_memset(cfg, 0, sizeof(service_config_t));
 
-    cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
+    cfg->llm_cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
     cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
     cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
     cfg->timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
@@ -785,9 +785,9 @@ int svc_config_load(const char *config_path, service_config_t *cfg)
     /* 提取配置值 */
     cJSON *item;
 
-    item = cJSON_GetObjectItem(root, "cache_capacity");
+    item = cJSON_GetObjectItem(root, "llm_cache_capacity");
     if (item && cJSON_IsNumber(item)) {
-        cfg->cache_capacity = item->valueint;
+        cfg->llm_cache_capacity = item->valueint;
     }
 
     item = cJSON_GetObjectItem(root, "cache_ttl_sec");
@@ -882,7 +882,7 @@ int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
         return AGENTOS_ERR_INVALID_PARAM;
 
     __builtin_memset(cfg, 0, sizeof(service_config_t));
-    cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
+    cfg->llm_cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
     cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
     cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
     cfg->timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
@@ -942,8 +942,8 @@ int svc_config_load_yaml(const char *config_path, service_config_t *cfg)
     fclose(f);
 
     const char *val;
-    if ((val = yaml_map_get(&current_map, "cache_capacity"))) {
-        cfg->cache_capacity = (size_t)atol(val);
+    if ((val = yaml_map_get(&current_map, "llm_cache_capacity"))) {
+        cfg->llm_cache_capacity = (size_t)atol(val);
     }
     if ((val = yaml_map_get(&current_map, "cache_ttl_sec"))) {
         cfg->cache_ttl_sec = (uint32_t)atol(val);
