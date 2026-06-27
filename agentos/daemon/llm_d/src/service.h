@@ -16,7 +16,7 @@
 
 struct llm_service {
     provider_registry_t *registry;
-    cache_t *cache;
+    llm_cache_t *cache;
     cost_tracker_t *cost;
     token_counter_t *token_counter;
     agentos_mutex_t lock; /* 保护 registry 和 cost 等 */
