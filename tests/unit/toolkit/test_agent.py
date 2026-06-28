@@ -1,4 +1,4 @@
-# AgentOS Python SDK Tests
+# AgentRT Python SDK Tests
 # Version: 0.1.0
 # Last updated: 2026-04-04
 
@@ -10,11 +10,11 @@ import os
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from agentos import AgentOS, AsyncAgentOS
+from agentos import AgentRT, AsyncAgentRT
 from agentos.exceptions import AgentOSError, NetworkError, TimeoutError
 
-class TestAgentOS(unittest.TestCase):
-    """Test AgentOS client"""
+class TestAgentRT(unittest.TestCase):
+    """Test AgentRT client"""
 
     def setUp(self):
         """Set up test fixtures"""
@@ -32,7 +32,7 @@ class TestAgentOS(unittest.TestCase):
         mock_session_instance.post.return_value = mock_response
 
         # Create client
-        client = AgentOS(endpoint=self.endpoint)
+        client = AgentRT(endpoint=self.endpoint)
 
         # Call the method
         task = client.submit_task("Test task")
@@ -53,7 +53,7 @@ class TestAgentOS(unittest.TestCase):
         mock_session_instance.post.return_value = mock_response
 
         # Create client
-        client = AgentOS(endpoint=self.endpoint)
+        client = AgentRT(endpoint=self.endpoint)
 
         # Call the method
         memory_id = client.write_memory("Test memory")
@@ -83,7 +83,7 @@ class TestAgentOS(unittest.TestCase):
         mock_session_instance.get.return_value = mock_response
 
         # Create client
-        client = AgentOS(endpoint=self.endpoint)
+        client = AgentRT(endpoint=self.endpoint)
 
         # Call the method
         memories = client.search_memory("test")
@@ -110,7 +110,7 @@ class TestAgentOS(unittest.TestCase):
         mock_session_instance.get.return_value = mock_response
 
         # Create client
-        client = AgentOS(endpoint=self.endpoint)
+        client = AgentRT(endpoint=self.endpoint)
 
         # Call the method
         memory = client.get_memory("test-memory-id")
@@ -132,7 +132,7 @@ class TestAgentOS(unittest.TestCase):
         mock_session_instance.delete.return_value = mock_response
 
         # Create client
-        client = AgentOS(endpoint=self.endpoint)
+        client = AgentRT(endpoint=self.endpoint)
 
         # Call the method
         result = client.delete_memory("test-memory-id")
@@ -153,7 +153,7 @@ class TestAgentOS(unittest.TestCase):
         mock_session_instance.post.return_value = mock_response
 
         # Create client
-        client = AgentOS(endpoint=self.endpoint)
+        client = AgentRT(endpoint=self.endpoint)
 
         # Call the method
         session = client.create_session()
@@ -165,7 +165,7 @@ class TestAgentOS(unittest.TestCase):
     def test_load_skill(self):
         """Test load_skill method"""
         # Create client
-        client = AgentOS(endpoint=self.endpoint)
+        client = AgentRT(endpoint=self.endpoint)
 
         # Call the method
         skill = client.load_skill("test-skill")

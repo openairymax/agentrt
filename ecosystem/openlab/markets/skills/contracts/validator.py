@@ -1,9 +1,9 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 """
-AgentOS OpenLab: Skills Contract Validator
+AgentRT OpenLab: Skills Contract Validator
 
 Validates skill contract specifications for marketplace deployment.
-Ensures compliance with AgentOS security, capability, and interface standards.
+Ensures compliance with AgentRT security, capability, and interface standards.
 
 Usage:
     python -m agentos.openlab.markets.skills.contracts.validator --skill <skill_path>
@@ -184,7 +184,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="agentos-skill-validator",
-        description="AgentOS Skill Contract Validator",
+        description="AgentRT Skill Contract Validator",
     )
     parser.add_argument(
         "--skill", type=Path, required=True,
@@ -196,22 +196,22 @@ def main() -> None:
 
     try:
         contract = validator.load(args.skill)
-        print(f"[AgentOS] Loaded contract: {contract.get('name', 'unknown')}")
+        print(f"[AgentRT] Loaded contract: {contract.get('name', 'unknown')}")
 
         errors = validator.validate()
         if errors:
-            print(f"[AgentOS] Validation failed with {len(errors)} error(s):")
+            print(f"[AgentRT] Validation failed with {len(errors)} error(s):")
             for err in errors:
                 print(f"  [ERROR] {err}")
             sys.exit(1)
         else:
-            print("[AgentOS] Contract validation passed.")
+            print("[AgentRT] Contract validation passed.")
             sys.exit(0)
     except ContractValidationError as e:
-        print(f"[AgentOS] {e}", file=sys.stderr)
+        print(f"[AgentRT] {e}", file=sys.stderr)
         sys.exit(2)
     except Exception as e:
-        print(f"[AgentOS] Unexpected error: {e}", file=sys.stderr)
+        print(f"[AgentRT] Unexpected error: {e}", file=sys.stderr)
         sys.exit(3)
 
 

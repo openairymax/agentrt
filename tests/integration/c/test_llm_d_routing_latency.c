@@ -17,7 +17,9 @@
  * 每项测试运行 100 次迭代，10 次预热
  */
 
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 199309L
+#endif
 
 #include "cache.h"
 #include "cost_tracker.h"
@@ -210,8 +212,8 @@ static provider_registry_t *create_test_registry(void)
     };
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -240,7 +242,7 @@ TEST(int18_1_simple_query_routing_latency)
         return;
     }
 
-    cache_t *cache = cache_create(1000, 3600);
+    llm_cache_t *cache = llm_cache_create(1000, 3600);
     if (!cache) {
         provider_registry_destroy(reg);
         TEST_FAIL("INT-18.1", "cache creation failed");
@@ -261,7 +263,7 @@ TEST(int18_1_simple_query_routing_latency)
 
     uint64_t *all_times = (uint64_t *)malloc(BENCH_ITERATIONS * sizeof(uint64_t));
     if (!all_times) {
-        cache_destroy(cache);
+        llm_cache_destroy(cache);
         provider_registry_destroy(reg);
         TEST_FAIL("INT-18.1", "memory allocation failed");
         return;
@@ -289,7 +291,7 @@ TEST(int18_1_simple_query_routing_latency)
             char cache_key[128];
             snprintf(cache_key, sizeof(cache_key), "%s:%s", model, "simple_hash");
             char *cached = NULL;
-            int cache_hit = cache_get(cache, cache_key, &cached);
+            int cache_hit = llm_cache_get(cache, cache_key, &cached);
 
             /* Step 4: Provider 查找 (缓存未命中时) */
             if (!cache_hit || !cached) {
@@ -318,7 +320,7 @@ TEST(int18_1_simple_query_routing_latency)
     }
 
     free(all_times);
-    cache_destroy(cache);
+    llm_cache_destroy(cache);
     provider_registry_destroy(reg);
     TEST_PASS("INT-18.1: simple query routing latency benchmark completed");
 }
@@ -341,7 +343,7 @@ TEST(int18_2_complex_query_routing_latency)
         return;
     }
 
-    cache_t *cache = cache_create(1000, 3600);
+    llm_cache_t *cache = llm_cache_create(1000, 3600);
     if (!cache) {
         provider_registry_destroy(reg);
         TEST_FAIL("INT-18.2", "cache creation failed");
@@ -372,7 +374,7 @@ TEST(int18_2_complex_query_routing_latency)
 
     uint64_t *times = (uint64_t *)malloc(BENCH_ITERATIONS * sizeof(uint64_t));
     if (!times) {
-        cache_destroy(cache);
+        llm_cache_destroy(cache);
         provider_registry_destroy(reg);
         TEST_FAIL("INT-18.2", "memory allocation failed");
         return;
@@ -406,7 +408,7 @@ TEST(int18_2_complex_query_routing_latency)
             char cache_key[128];
             snprintf(cache_key, sizeof(cache_key), "%s:%s", model, "complex_hash");
             char *cached = NULL;
-            int cache_hit = cache_get(cache, cache_key, &cached);
+            int cache_hit = llm_cache_get(cache, cache_key, &cached);
 
             /* Step 4: Provider 查找 + Fallback */
             const provider_t *provider = NULL;
@@ -445,7 +447,7 @@ TEST(int18_2_complex_query_routing_latency)
     }
 
     free(times);
-    cache_destroy(cache);
+    llm_cache_destroy(cache);
     provider_registry_destroy(reg);
     TEST_PASS("INT-18.2: complex query routing latency benchmark completed");
 }
@@ -550,8 +552,8 @@ TEST(int18_3_registry_lookup_latency)
     /* 场景 4: 空注册表查找 */
     {
         service_config_t empty_cfg = {
-            .cache_capacity = 10,
-            .cache_ttl_sec  = 3600,
+            .llm_cache_capacity = 10,
+            .llm_cache_ttl_sec  = 3600,
             .max_retries    = 3,
             .timeout_ms     = 30000,
             .token_encoding = "cl100k_base",
@@ -594,7 +596,7 @@ TEST(int18_4_cache_hit_vs_miss)
 {
     printf("    --- Cache Hit vs Miss Routing Latency ---\n");
 
-    cache_t *cache = cache_create(1000, 3600);
+    llm_cache_t *cache = llm_cache_create(1000, 3600);
     if (!cache) {
         TEST_FAIL("INT-18.4", "cache creation failed");
         return;
@@ -602,7 +604,7 @@ TEST(int18_4_cache_hit_vs_miss)
 
     provider_registry_t *reg = create_test_registry();
     if (!reg) {
-        cache_destroy(cache);
+        llm_cache_destroy(cache);
         TEST_FAIL("INT-18.4", "registry creation failed");
         return;
     }
@@ -612,7 +614,7 @@ TEST(int18_4_cache_hit_vs_miss)
     const char *cache_value = "{\"id\":\"chatcmpl-bench\",\"model\":\"gpt-4o\","
                               "\"choices\":[{\"message\":{\"content\":\"cached response\"}}],"
                               "\"usage\":{\"prompt_tokens\":50,\"completion_tokens\":25}}";
-    cache_put(cache, cache_key, cache_value);
+    llm_cache_put(cache, cache_key, cache_value);
 
     uint64_t *hit_times  = (uint64_t *)malloc(BENCH_ITERATIONS * sizeof(uint64_t));
     uint64_t *miss_times = (uint64_t *)malloc(BENCH_ITERATIONS * sizeof(uint64_t));
@@ -620,7 +622,7 @@ TEST(int18_4_cache_hit_vs_miss)
         free(hit_times);
         free(miss_times);
         provider_registry_destroy(reg);
-        cache_destroy(cache);
+        llm_cache_destroy(cache);
         TEST_FAIL("INT-18.4", "memory allocation failed");
         return;
     }
@@ -630,7 +632,7 @@ TEST(int18_4_cache_hit_vs_miss)
         /* 预热 */
         for (int w = 0; w < BENCH_WARMUP; w++) {
             char *val = NULL;
-            cache_get(cache, cache_key, &val);
+            llm_cache_get(cache, cache_key, &val);
             free(val);
         }
 
@@ -639,7 +641,7 @@ TEST(int18_4_cache_hit_vs_miss)
 
             /* 完整路由: 缓存检查 → 命中直接返回 */
             char *val = NULL;
-            int hit = cache_get(cache, cache_key, &val);
+            int hit = llm_cache_get(cache, cache_key, &val);
             if (hit && val) {
                 /* 缓存命中，跳过 provider 查找 */
             } else {
@@ -668,7 +670,7 @@ TEST(int18_4_cache_hit_vs_miss)
         /* 预热 */
         for (int w = 0; w < BENCH_WARMUP; w++) {
             char *val = NULL;
-            cache_get(cache, "nonexistent_key_warmup", &val);
+            llm_cache_get(cache, "nonexistent_key_warmup", &val);
             free(val);
         }
 
@@ -680,7 +682,7 @@ TEST(int18_4_cache_hit_vs_miss)
 
             /* 完整路由: 缓存检查 → 未命中 → provider 查找 */
             char *val = NULL;
-            int hit = cache_get(cache, miss_key, &val);
+            int hit = llm_cache_get(cache, miss_key, &val);
             if (!hit || !val) {
                 provider_registry_find(reg, "gpt-4o");
             }
@@ -712,7 +714,7 @@ TEST(int18_4_cache_hit_vs_miss)
     free(hit_times);
     free(miss_times);
     provider_registry_destroy(reg);
-    cache_destroy(cache);
+    llm_cache_destroy(cache);
     TEST_PASS("INT-18.4: cache hit vs miss routing latency benchmark completed");
 }
 
@@ -734,7 +736,7 @@ TEST(int18_5_concurrent_routing)
         return;
     }
 
-    cache_t *cache = cache_create(1000, 3600);
+    llm_cache_t *cache = llm_cache_create(1000, 3600);
     if (!cache) {
         provider_registry_destroy(reg);
         TEST_FAIL("INT-18.5", "cache creation failed");
@@ -748,7 +750,7 @@ TEST(int18_5_concurrent_routing)
     for (int i = 0; i < 3; i++) {
         char key[64];
         snprintf(key, sizeof(key), "%s:concurrent_hash", cached_models[i]);
-        cache_put(cache, key, "{\"cached\":true}");
+        llm_cache_put(cache, key, "{\"cached\":true}");
     }
 
     const char *concurrent_inputs[CONCURRENT_ROUTING_COUNT] = {
@@ -766,7 +768,7 @@ TEST(int18_5_concurrent_routing)
 
     uint64_t *batch_times = (uint64_t *)malloc(BENCH_ITERATIONS * sizeof(uint64_t));
     if (!batch_times) {
-        cache_destroy(cache);
+        llm_cache_destroy(cache);
         provider_registry_destroy(reg);
         TEST_FAIL("INT-18.5", "memory allocation failed");
         return;
@@ -780,7 +782,7 @@ TEST(int18_5_concurrent_routing)
             char key[64];
             snprintf(key, sizeof(key), "%s:concurrent_hash", model);
             char *val = NULL;
-            int hit = cache_get(cache, key, &val);
+            int hit = llm_cache_get(cache, key, &val);
             if (!hit || !val) {
                 provider_registry_find(reg, model);
             }
@@ -803,7 +805,7 @@ TEST(int18_5_concurrent_routing)
             char key[64];
             snprintf(key, sizeof(key), "%s:concurrent_hash", model);
             char *val = NULL;
-            int hit = cache_get(cache, key, &val);
+            int hit = llm_cache_get(cache, key, &val);
 
             /* Step 4: Provider 查找 (缓存未命中时) */
             if (!hit || !val) {
@@ -845,7 +847,7 @@ TEST(int18_5_concurrent_routing)
     }
 
     free(batch_times);
-    cache_destroy(cache);
+    llm_cache_destroy(cache);
     provider_registry_destroy(reg);
     TEST_PASS("INT-18.5: concurrent routing throughput benchmark completed");
 }

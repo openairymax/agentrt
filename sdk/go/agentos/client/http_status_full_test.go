@@ -12,7 +12,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spharx/agentos/sdk/go/agentos"
+	"github.com/spharx/agentrt/sdk/go/agentos"
 )
 
 func TestHTTPStatusToError_FullCoverage(t *testing.T) {

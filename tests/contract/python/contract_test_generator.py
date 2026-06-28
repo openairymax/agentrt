@@ -1,5 +1,5 @@
 """
-AgentOS 契约测试用例自动生成器
+AgentRT 契约测试用例自动生成器
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 0.1.0
 
@@ -560,7 +560,7 @@ def generate_tests_from_contract(contract_path: str, output_dir: str) -> Dict[st
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("AgentOS 契约测试用例自动生成器")
+    print("AgentRT 契约测试用例自动生成器")
     print("Copyright (c) 2026 SPHARX Ltd.")
     print("=" * 60)
 

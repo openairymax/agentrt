@@ -61,7 +61,7 @@ describe('TaskSyscall', () => {
     });
     const resp = await syscall.submit('test task');
     expect(resp.success).toBe(true);
-    expect(resp.data.task_id).toBe('task-001');
+    expect(resp.data?.task_id).toBe('task-001');
 
     const reqs = binding.getRequests();
     expect(reqs).toHaveLength(1);

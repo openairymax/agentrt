@@ -1,8 +1,8 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 """
-AgentOS OpenLab: Skills Installer CLI
+AgentRT OpenLab: Skills Installer CLI
 
-Command-line interface for installing, managing, and removing AgentOS skills
+Command-line interface for installing, managing, and removing AgentRT skills
 from the marketplace. Supports local and remote skill packages.
 
 Usage:
@@ -48,7 +48,7 @@ class SkillInstallerCLI:
                 shutil.copy2(package_path, dest_dir / package_path.name)
                 return True
         except Exception as e:
-            print(f"[AgentOS] Error extracting package: {e}", file=sys.stderr)
+            print(f"[AgentRT] Error extracting package: {e}", file=sys.stderr)
             return False
 
     def _read_manifest(self, skill_dir: Path) -> Optional[dict]:
@@ -66,10 +66,10 @@ class SkillInstallerCLI:
     def install(self, package_path: Path, force: bool = False) -> bool:
         """Install a skill package by extracting and registering it."""
         if not package_path.exists():
-            print(f"[AgentOS] Package not found: {package_path}", file=sys.stderr)
+            print(f"[AgentRT] Package not found: {package_path}", file=sys.stderr)
             return False
 
-        print(f"[AgentOS] Installing skill from: {package_path}")
+        print(f"[AgentRT] Installing skill from: {package_path}")
 
         with tempfile.TemporaryDirectory(prefix="agentos_skill_") as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -85,7 +85,7 @@ class SkillInstallerCLI:
                             break
 
             if not manifest or 'name' not in manifest:
-                print("[AgentOS] No valid skill manifest found in package", file=sys.stderr)
+                print("[AgentRT] No valid skill manifest found in package", file=sys.stderr)
                 return False
 
             skill_name = manifest['name']
@@ -94,7 +94,7 @@ class SkillInstallerCLI:
 
             if target_dir.exists():
                 if not force:
-                    print(f"[AgentOS] Skill '{skill_name}' is already installed. Use --force to reinstall.", file=sys.stderr)
+                    print(f"[AgentRT] Skill '{skill_name}' is already installed. Use --force to reinstall.", file=sys.stderr)
                     return False
                 shutil.rmtree(target_dir)
 
@@ -105,7 +105,7 @@ class SkillInstallerCLI:
                 with open(manifest_file, 'w', encoding='utf-8') as f:
                     json.dump(manifest, f, indent=2)
 
-            print(f"[AgentOS] Skill '{skill_name}' v{skill_version} installed successfully.")
+            print(f"[AgentRT] Skill '{skill_name}' v{skill_version} installed successfully.")
             return True
 
     def list_skills(self) -> List[str]:
@@ -129,15 +129,15 @@ class SkillInstallerCLI:
         target_dir = self._skills_dir / skill_name
 
         if not target_dir.exists():
-            print(f"[AgentOS] Skill '{skill_name}' is not installed.", file=sys.stderr)
+            print(f"[AgentRT] Skill '{skill_name}' is not installed.", file=sys.stderr)
             return False
 
         try:
             shutil.rmtree(target_dir)
-            print(f"[AgentOS] Skill '{skill_name}' removed successfully.")
+            print(f"[AgentRT] Skill '{skill_name}' removed successfully.")
             return True
         except Exception as e:
-            print(f"[AgentOS] Failed to remove skill '{skill_name}': {e}", file=sys.stderr)
+            print(f"[AgentRT] Failed to remove skill '{skill_name}': {e}", file=sys.stderr)
             return False
 
 
@@ -145,7 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="agentos-skill-installer",
-        description="AgentOS Skill Installer CLI",
+        description="AgentRT Skill Installer CLI",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -174,11 +174,11 @@ def main() -> None:
     elif args.command == "list":
         skills = installer.list_skills()
         if skills:
-            print("[AgentOS] Installed skills:")
+            print("[AgentRT] Installed skills:")
             for skill in skills:
                 print(f"  - {skill}")
         else:
-            print("[AgentOS] No skills installed.")
+            print("[AgentRT] No skills installed.")
         sys.exit(0)
     elif args.command == "remove":
         success = installer.remove(args.skill_name)

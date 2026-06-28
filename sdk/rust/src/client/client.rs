@@ -44,10 +44,10 @@ pub struct Client {
 const MAX_RESPONSE_BODY_SIZE: usize = 10 * 1024 * 1024;
 
 impl Client {
-    /// 创建新的 AgentOS 客户端（使用默认配置）
+    /// 创建新的 AgentRT 客户端（使用默认配置）
     ///
     /// # 参数
-    /// - `endpoint`: AgentOS 服务端点地址，如 "http://localhost:18789"
+    /// - `endpoint`: AgentRT 服务端点地址，如 "http://localhost:18789"
     ///
     /// # 返回
     /// 返回 Result<Client, AgentOSError>
@@ -65,7 +65,7 @@ impl Client {
     /// 创建客户端构建器
     ///
     /// # 参数
-    /// - `endpoint`: AgentOS 服务端点地址
+    /// - `endpoint`: AgentRT 服务端点地址
     ///
     /// # 返回
     /// 返回 ClientBuilder 实例
@@ -73,10 +73,10 @@ impl Client {
         ClientBuilder::new(endpoint)
     }
 
-    /// 创建带自定义超时的 AgentOS 客户端
+    /// 创建带自定义超时的 AgentRT 客户端
     ///
     /// # 参数
-    /// - `endpoint`: AgentOS 服务端点地址
+    /// - `endpoint`: AgentRT 服务端点地址
     /// - `timeout`: 请求超时时间
     pub fn new_with_timeout(endpoint: &str, timeout: Duration) -> Result<Self, AgentOSError> {
         Self::builder(endpoint)
@@ -84,10 +84,10 @@ impl Client {
             .build()
     }
 
-    /// 创建带 API Key 的 AgentOS 客户端
+    /// 创建带 API Key 的 AgentRT 客户端
     ///
     /// # 参数
-    /// - `endpoint`: AgentOS 服务端点地址
+    /// - `endpoint`: AgentRT 服务端点地址
     /// - `api_key`: API 密钥
     pub fn new_with_api_key(endpoint: &str, api_key: &str) -> Result<Self, AgentOSError> {
         Self::builder(endpoint)
@@ -105,7 +105,7 @@ impl Client {
         self.api_key.as_deref()
     }
 
-    /// 健康检查 AgentOS 服务状态
+    /// 健康检查 AgentRT 服务状态
     ///
     /// # 返回
     /// 返回健康状态信息
@@ -135,7 +135,7 @@ impl Client {
         })
     }
 
-    /// 获取 AgentOS 系统运行指标
+    /// 获取 AgentRT 系统运行指标
     ///
     /// # 返回
     /// 返回系统指标快照
@@ -365,7 +365,7 @@ impl ClientBuilder {
             max_retries: 3,
             retry_delay: Duration::from_secs(1),
             api_key: None,
-            user_agent: "AgentOS-Rust-tools/0.1.0".to_string(),
+            user_agent: "AgentRT-Rust-tools/0.1.0".to_string(),
             max_connections: 10,
             idle_conn_timeout: Duration::from_secs(90),
         }

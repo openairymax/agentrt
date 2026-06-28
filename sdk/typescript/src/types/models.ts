@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Domain Models
+// AgentRT TypeScript SDK - Domain Models
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //
@@ -8,7 +8,7 @@
 import { TaskStatus, MemoryLayer, SessionStatus, SkillStatus } from './enums';
 
 /**
- * 任务表示 AgentOS 系统中的一个执行任务
+ * 任务表示 AgentRT 系统中的一个执行任务
  */
 export interface Task {
   /** 任务 ID */
@@ -52,7 +52,7 @@ export interface TaskResult {
 }
 
 /**
- * 记忆表示 AgentOS 系统中的一条记忆记录
+ * 记忆表示 AgentRT 系统中的一条记忆记录
  */
 export interface Memory {
   /** 记忆 ID */
@@ -106,7 +106,7 @@ export interface Session {
 }
 
 /**
- * 技能表示 AgentOS 系统中的可插拔能力单元
+ * 技能表示 AgentRT 系统中的可插拔能力单元
  */
 export interface Skill {
   /** 技能 ID */

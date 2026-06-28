@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Logger - Terminal output formatting and interaction utilities
+# AgentRT Logger - Terminal output formatting and interaction utilities
 
 """
-AgentOS Logger Module
+AgentRT Logger Module
 
 Provides terminal color/style constants, formatted output, progress bars,
 spinners, and table rendering for CLI applications.

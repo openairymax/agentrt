@@ -194,7 +194,7 @@ int manager_adapter_yaml_to_loop_config(
     if (!yaml_config || !out_loop_config) return -1;
 
     /* 清零并设置默认值 */
-    memset(out_loop_config, 0, sizeof(*out_loop_config));
+    AGENTOS_MEMSET(out_loop_config, 0, sizeof(*out_loop_config));
 
     /* 从 YAML kernel 配置映射到 Loop 配置 */
     out_loop_config->loop_config_cognition_threads = 4;

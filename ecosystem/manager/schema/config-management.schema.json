@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://agentos.spharx.com/schemas/manager-management.schema.json",
-  "title": "AgentOS Configuration Management Schema",
-  "description": "Schema for AgentOS configuration management settings including hot reload, version control, rollback, validation, audit, encryption, import/export, and sync",
+  "title": "AgentRT Configuration Management Schema",
+  "description": "Schema for AgentRT configuration management settings including hot reload, version control, rollback, validation, audit, encryption, import/export, and sync",
   "type": "object",
   "required": ["_config_version", "hot_reload", "version_control", "rollback", "validation", "audit", "encryption", "import_export", "sync"],
   "properties": {

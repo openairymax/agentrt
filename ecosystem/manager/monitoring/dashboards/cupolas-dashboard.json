@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "AgentOS cupolas Module CI/CD Dashboard",
+    "title": "AgentRT cupolas Module CI/CD Dashboard",
     "uid": "agentos-cupolas-cicd",
     "tags": ["agentos", "cupolas", "cicd"],
     "timezone": "browser",
@@ -16,11 +16,11 @@
         "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
         "targets": [
           {
-            "expr": "sum(github_actions_workflow_run_conclusion{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", conclusion=\"success\"}) or vector(0)",
+            "expr": "sum(github_actions_workflow_run_conclusion{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\", conclusion=\"success\"}) or vector(0)",
             "legendFormat": "Success"
           },
           {
-            "expr": "sum(github_actions_workflow_run_conclusion{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", conclusion=\"failure\"}) or vector(0)",
+            "expr": "sum(github_actions_workflow_run_conclusion{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\", conclusion=\"failure\"}) or vector(0)",
             "legendFormat": "Failure"
           }
         ],
@@ -48,7 +48,7 @@
         "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
         "targets": [
           {
-            "expr": "sum(rate(github_actions_workflow_run_conclusion{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", conclusion=\"success\"}[1h])) / sum(rate(github_actions_workflow_run_total{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\"}[1h])) * 100"
+            "expr": "sum(rate(github_actions_workflow_run_conclusion{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\", conclusion=\"success\"}[1h])) / sum(rate(github_actions_workflow_run_total{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\"}[1h])) * 100"
           }
         ],
         "fieldConfig": {
@@ -73,7 +73,7 @@
         "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
         "targets": [
           {
-            "expr": "codecov_coverage_percent{repository=\"AgentOS\", flag=\"cupolas\"} or vector(0)"
+            "expr": "codecov_coverage_percent{repository=\"AgentRT\", flag=\"cupolas\"} or vector(0)"
           }
         ],
         "fieldConfig": {
@@ -98,7 +98,7 @@
         "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
         "targets": [
           {
-            "expr": "sum(trivy_vulnerabilities{repository=\"AgentOS\", module=\"cupolas\", severity=~\"CRITICAL|HIGH\"}) or vector(0)",
+            "expr": "sum(trivy_vulnerabilities{repository=\"AgentRT\", module=\"cupolas\", severity=~\"CRITICAL|HIGH\"}) or vector(0)",
             "legendFormat": "Critical/High"
           }
         ],
@@ -121,11 +121,11 @@
         "gridPos": {"x": 0, "y": 4, "w": 12, "h": 6},
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(github_actions_workflow_run_duration_seconds_bucket{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\"}[1h]))",
+            "expr": "histogram_quantile(0.95, rate(github_actions_workflow_run_duration_seconds_bucket{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\"}[1h]))",
             "legendFormat": "P95"
           },
           {
-            "expr": "histogram_quantile(0.50, rate(github_actions_workflow_run_duration_seconds_bucket{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\"}[1h]))",
+            "expr": "histogram_quantile(0.50, rate(github_actions_workflow_run_duration_seconds_bucket{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\"}[1h]))",
             "legendFormat": "P50"
           }
         ],
@@ -141,19 +141,19 @@
         "gridPos": {"x": 12, "y": 4, "w": 12, "h": 6},
         "targets": [
           {
-            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", job=\"code-quality\"}[1h])",
+            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\", job=\"code-quality\"}[1h])",
             "legendFormat": "Code Quality"
           },
           {
-            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", job=\"build-unix\"}[1h])",
+            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\", job=\"build-unix\"}[1h])",
             "legendFormat": "Build Unix"
           },
           {
-            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", job=\"build-windows\"}[1h])",
+            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\", job=\"build-windows\"}[1h])",
             "legendFormat": "Build Windows"
           },
           {
-            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", job=\"coverage\"}[1h])",
+            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentRT\", workflow=\"cupolas-ci.yml\", job=\"coverage\"}[1h])",
             "legendFormat": "Coverage"
           }
         ],
@@ -239,7 +239,7 @@
         "gridPos": {"x": 0, "y": 22, "w": 8, "h": 6},
         "targets": [
           {
-            "expr": "sum(trivy_vulnerabilities{repository=\"AgentOS\", module=\"cupolas\"}) by (severity)",
+            "expr": "sum(trivy_vulnerabilities{repository=\"AgentRT\", module=\"cupolas\"}) by (severity)",
             "legendFormat": "{{ severity }}"
           }
         ],

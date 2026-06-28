@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 遥测模块
+# AgentRT 遥测模块
 # 性能指标收集和监控系统
 
 """
-AgentOS 遥测系统
+AgentRT 遥测系统
 
 提供全面的性能监控和指标收集，包括：
 - 实时指标采集

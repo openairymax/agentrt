@@ -1,4 +1,7 @@
 
+# 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
+add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
+
 # Syscall 模块单元测试 (TeamC P1-C07)
 # 覆盖: init/cleanup, invoke分发, 参数验证, 边界条件
 # 对齐: 看板v09 P1-C07 / 规范手册v09 TEST-03

@@ -28,15 +28,15 @@ from .skill import Skill
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class AgentOS:
-    """AgentOS synchronous client.
+class AgentRT:
+    """AgentRT synchronous client.
     
     This class provides a synchronous interface to interact with the AgentRT system.
     """
     
     def __init__(self, endpoint: str = None, timeout: int = 30, api_key: Optional[str] = None):
         """
-        Initialize the AgentOS client.
+        Initialize the AgentRT client.
         
         Args:
             endpoint: The AgentRT server endpoint.
@@ -216,15 +216,15 @@ class AgentOS:
         """
         self.session.close()
 
-class AsyncAgentOS:
-    """AgentOS asynchronous client.
+class AsyncAgentRT:
+    """AgentRT asynchronous client.
     
     This class provides an asynchronous interface to interact with the AgentRT system.
     """
     
     def __init__(self, endpoint: str = None, timeout: int = 30, api_key: Optional[str] = None):
         """
-        Initialize the AsyncAgentOS client.
+        Initialize the AsyncAgentRT client.
         
         Args:
             endpoint: The AgentRT server endpoint.

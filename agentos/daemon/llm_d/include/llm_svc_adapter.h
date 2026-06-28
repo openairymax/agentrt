@@ -6,7 +6,7 @@
  * @file llm_svc_adapter.h
  * @brief LLM服务适配器头文件
  *
- * 提供LLM服务与AgentOS统一服务管理框架的适配接口。
+ * 提供LLM服务与AgentRT统一服务管理框架的适配接口。
  *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */

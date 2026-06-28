@@ -1,5 +1,5 @@
 """
-AgentOS 测试数据管理自动化框架
+AgentRT 测试数据管理自动化框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 0.1.0
 Last updated: 2026-04-23
@@ -729,7 +729,7 @@ def generate_all_test_data(output_dir: str = "tests/fixtures/data") -> Dict[str,
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("AgentOS 测试数据管理框架")
+    print("AgentRT 测试数据管理框架")
     print("Copyright (c) 2026 SPHARX Ltd.")
     print("=" * 60)
 

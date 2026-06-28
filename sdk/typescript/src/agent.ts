@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK Agent
+// AgentRT TypeScript SDK Agent
 // Version: 0.1.0
 // Last updated: 2026-03-23
 
@@ -11,15 +11,15 @@ import { Session } from './session';
 import { Skill } from './skill';
 import { getLogger } from './utils/logger';
 
-/** AgentOS 客户端类 */
-export class AgentOS {
+/** AgentRT 客户端类 */
+export class AgentRT {
   private client: AxiosInstance;
   private endpoint: string;
   private apiKey?: string;
   private maxRetries: number;
   private retryDelay: number;
 
-  /** 创建新的 AgentOS 客户端 */
+  /** 创建新的 AgentRT 客户端 */
   constructor(manager: ClientConfig = {}) {
     this.endpoint = manager.endpoint || 'http://localhost:18789';
     this.endpoint = this.endpoint.endsWith('/')
@@ -78,7 +78,7 @@ export class AgentOS {
     return false;
   }
 
-  /** 向 AgentOS 服务端发送 HTTP 请求（带重试） */
+  /** 向 AgentRT 服务端发送 HTTP 请求（带重试） */
   async request<T>(method: string, path: string, data?: Record<string, unknown>): Promise<T> {
     let lastError: Error | null = null;
 
@@ -107,7 +107,7 @@ export class AgentOS {
     throw lastError ?? new Error('All retries exhausted');
   }
 
-  /** 提交任务到 AgentOS 系统 */
+  /** 提交任务到 AgentRT 系统 */
   async submitTask(taskDescription: string): Promise<Task> {
     const response = await this.request<{ task_id: string }>(
       'POST',
@@ -120,7 +120,7 @@ export class AgentOS {
     return new Task(this, response.task_id);
   }
 
-  /** 写入记忆到 AgentOS 系统 */
+  /** 写入记忆到 AgentRT 系统 */
   async writeMemory(content: string, metadata?: Record<string, unknown>): Promise<string> {
     const response = await this.request<{ memory_id: string }>(
       'POST',

@@ -285,7 +285,7 @@ def extract_int_stats(data: Dict[str, Any]) -> Dict[str, int]:
 
 def generate_id(prefix: str = "aos") -> str:
     """
-    生成唯一的 AgentOS ID（时间戳+密码学安全随机数）。
+    生成唯一的 AgentRT ID（时间戳+密码学安全随机数）。
 
     Args:
         prefix: ID 前缀

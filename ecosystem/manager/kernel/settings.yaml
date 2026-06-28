@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentOS 内核配置文件
+# AgentRT 内核配置文件
 # 版本: v1.0.0
 # 最后更新: 2026-04-01
 # Schema: schema/kernel-settings.schema.json
@@ -10,7 +10,7 @@
 _owner:
   module: "corekern"
   contact: "corekern-team@example.com"
-  path: "AgentOS/agentos/atoms/corekern"
+  path: "AgentRT/agentos/atoms/corekern"
   description: "内容定义责任归属 corekern 模块，管理责任归属 Manager 模块"
 
 # 配置版本
@@ -29,7 +29,7 @@ _compatibility:
 # =============================================================================
 kernel:
   # 内核名称和版本标识
-  name: "AgentOS Core"
+  name: "AgentRT Core"
   version: "1.0.0.3"
 
   # 日志级别: trace, debug, info, warning, error, critical, off

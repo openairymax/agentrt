@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 智能体应用框架使用示例
+AgentRT 智能体应用框架使用示例
 
 本示例展示如何使用AgentApplication构建完整的智能体应用，
 包括生命周期管理、状态管理、配置管理、错误处理、事件系统、
@@ -50,7 +50,7 @@ async def example_basic_usage():
     await app.start()
     print(f"  启动成功，状态: {app.state.value}")
 
-    result = await app.execute("Hello, AgentOS Framework!")
+    result = await app.execute("Hello, AgentRT Framework!")
     if result.success:
         print(f"  执行成功: {result.output}")
         print(f"  执行时间: {result.execution_time_ms:.2f}ms")
@@ -345,7 +345,7 @@ async def example_health_check():
 
 async def main():
     print("=" * 70)
-    print("AgentOS 智能体应用框架 使用示例")
+    print("AgentRT 智能体应用框架 使用示例")
     print("=" * 70)
 
     try:

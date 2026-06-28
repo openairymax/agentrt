@@ -165,6 +165,12 @@ void agentos_resource_track_clear(void);
  */
 #define AGENTOS_UNIQUE_NAME(prefix) AGENTOS_CONCAT(prefix, __LINE__)
 
+/* AGENTOS_CONCAT 需要两层展开确保 __LINE__ 先展开再拼接。
+ * 某些头文件（types.h, compat.h）定义了单层版本 a##b，会导致 __LINE__ 不展开。
+ * 这里强制使用两层版本以避免重定义警告并确保正确展开。 */
+#ifdef AGENTOS_CONCAT
+#undef AGENTOS_CONCAT
+#endif
 #define AGENTOS_CONCAT(a, b) AGENTOS_CONCAT_IMPL(a, b)
 
 #define AGENTOS_CONCAT_IMPL(a, b) a##b

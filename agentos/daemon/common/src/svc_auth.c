@@ -495,6 +495,9 @@ static void __attribute__((unused)) hmac_builtin(const char *key, const char *me
     for (size_t i = 0; i < *out_len; i++)
         output[i] = (oh[i / 4] >> ((3 - (i % 4)) * 8)) & 0xFF;
 
+    AGENTOS_FREE(outer);
+    outer = NULL;
+
 #undef ROTRIGHT
 #undef CH
 #undef MAJ

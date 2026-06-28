@@ -1,9 +1,9 @@
-// AgentOS TypeScript SDK Comprehensive Tests
+// AgentRT TypeScript SDK Comprehensive Tests
 // Version: 0.1.0
 // Last updated: 2026-03-24
 
 import {
-  AgentOS,
+  AgentRT,
   MockClient,
   TaskManager,
   MemoryManager,
@@ -23,37 +23,37 @@ import {
   ErrorCode,
 } from '../src';
 
-describe('AgentOS Client', () => {
+describe('AgentRT Client', () => {
   test('should create client with default manager', () => {
-    const client = new AgentOS();
+    const client = new AgentRT();
     const manager = client.getConfig();
     expect(manager.endpoint).toBe('http://localhost:18789');
     client.close();
   });
 
   test('should create client with custom endpoint', () => {
-    const client = new AgentOS([withEndpoint('http://localhost:9999')]);
+    const client = new AgentRT([withEndpoint('http://localhost:9999')]);
     const manager = client.getConfig();
     expect(manager.endpoint).toBe('http://localhost:9999');
     client.close();
   });
 
   test('should strip trailing slash from endpoint', () => {
-    const client = new AgentOS([withEndpoint('http://localhost:9999/')]);
+    const client = new AgentRT([withEndpoint('http://localhost:9999/')]);
     const manager = client.getConfig();
     expect(manager.endpoint).toBe('http://localhost:9999');
     client.close();
   });
 
   test('should create client with API key', () => {
-    const client = new AgentOS([withAPIKey('test-api-key')]);
+    const client = new AgentRT([withAPIKey('test-api-key')]);
     const manager = client.getConfig();
     expect(manager.apiKey).toBe('test-api-key');
     client.close();
   });
 
   test('should create client with timeout', () => {
-    const client = new AgentOS([withTimeout(5000)]);
+    const client = new AgentRT([withTimeout(5000)]);
     const manager = client.getConfig();
     expect(manager.timeout).toBe(5000);
     client.close();
@@ -343,33 +343,33 @@ describe('MockClient', () => {
   });
 });
 
-describe('AgentOS Integration', () => {
+describe('AgentRT Integration', () => {
   test('should access task manager', () => {
-    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    const client = new AgentRT([withEndpoint('http://localhost:18789')]);
     expect(client.tasks).toBeInstanceOf(TaskManager);
     client.close();
   });
 
   test('should access memory manager', () => {
-    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    const client = new AgentRT([withEndpoint('http://localhost:18789')]);
     expect(client.memories).toBeInstanceOf(MemoryManager);
     client.close();
   });
 
   test('should access session manager', () => {
-    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    const client = new AgentRT([withEndpoint('http://localhost:18789')]);
     expect(client.sessions).toBeInstanceOf(SessionManager);
     client.close();
   });
 
   test('should access skill manager', () => {
-    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    const client = new AgentRT([withEndpoint('http://localhost:18789')]);
     expect(client.skills).toBeInstanceOf(SkillManager);
     client.close();
   });
 
   test('should return API client', () => {
-    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    const client = new AgentRT([withEndpoint('http://localhost:18789')]);
     expect(client.api).toBeDefined();
     client.close();
   });

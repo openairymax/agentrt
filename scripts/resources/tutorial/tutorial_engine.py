@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 交互式教程引擎
+AgentRT 交互式教程引擎
 
 提供命令行和Web两种交互式学习方式，支持渐进式学习路径和实时验证。
 
@@ -127,19 +127,19 @@ class TutorialEngine:
         new_contributor_path = TutorialPath(
             id="new-contributor",
             title="新贡献者入门指南",
-            description="面向首次接触AgentOS的贡献者，涵盖环境配置、代码结构和第一个PR提交",
+            description="面向首次接触AgentRT的贡献者，涵盖环境配置、代码结构和第一个PR提交",
             role=TutorialRole.NEW_CONTRIBUTOR,
             estimated_hours=4,
             steps=[
                 TutorialStep(
                     id="welcome",
-                    title="欢迎来到AgentOS",
-                    description="了解AgentOS的基本概念和项目愿景",
+                    title="欢迎来到AgentRT",
+                    description="了解AgentRT的基本概念和项目愿景",
                     step_type=TutorialStepType.THEORY,
                     content="""
-# 欢迎来到AgentOS！
+# 欢迎来到AgentRT！
 
-**AgentOS** 是一个基于**体系并行论 (MCIS)** 理论构建的智能体操作系统。
+**AgentRT** 是一个基于**体系并行论 (MCIS)** 理论构建的智能体操作系统。
 
 ## 核心概念
 - **智能体 (Agent)**: 具有自主决策和执行能力的软件实体
@@ -152,7 +152,7 @@ class TutorialEngine:
 
 ## 学习目标
 完成本教程后，你将能够：
-1. 搭建AgentOS开发环境
+1. 搭建AgentRT开发环境
 2. 理解项目代码结构
 3. 提交你的第一个Pull Request
                     """,
@@ -225,10 +225,10 @@ gcc --version
                 TutorialStep(
                     id="project-structure",
                     title="项目结构分析",
-                    description="了解AgentOS的代码组织结构",
+                    description="了解AgentRT的代码组织结构",
                     step_type=TutorialStepType.THEORY,
                     content="""
-# AgentOS 项目结构
+# AgentRT 项目结构
 
 ## 主要目录
 ```
@@ -264,10 +264,10 @@ find agentos -name "*.md" | head -10
                 TutorialStep(
                     id="first-build",
                     title="首次构建",
-                    description="构建AgentOS项目，验证环境配置",
+                    description="构建AgentRT项目，验证环境配置",
                     step_type=TutorialStepType.PRACTICE,
                     content="""
-# 首次构建AgentOS
+# 首次构建AgentRT
 
 ## 构建步骤
 
@@ -300,7 +300,7 @@ make -j%NUMBER_OF_PROCESSORS%  # Windows
 ```
 
 ## 实践任务
-按照上述步骤构建AgentOS项目。
+按照上述步骤构建AgentRT项目。
 
 **注意**: 首次构建可能需要较长时间（10-30分钟），具体取决于你的系统性能。
                     """,
@@ -324,13 +324,13 @@ make -j%NUMBER_OF_PROCESSORS%  # Windows
 ## 贡献流程
 
 ### 1. Fork 项目
-- 访问 https://github.com/SpharxTeam/AgentOS
+- 访问 https://github.com/SpharxTeam/AgentRT
 - 点击右上角的 "Fork" 按钮
 
 ### 2. 克隆你的分支
 ```bash
-git clone https://github.com/YOUR_USERNAME/AgentOS.git
-cd AgentOS
+git clone https://github.com/YOUR_USERNAME/AgentRT.git
+cd AgentRT
 ```
 
 ### 3. 创建特性分支
@@ -386,9 +386,9 @@ git push origin fix-typo-docs
 恭喜你完成了新贡献者入门教程！
 
 ## 学习成果
-✅ 配置了AgentOS开发环境  
+✅ 配置了AgentRT开发环境  
 ✅ 了解了项目结构和架构设计  
-✅ 成功构建了AgentOS项目  
+✅ 成功构建了AgentRT项目  
 ✅ 学习了贡献流程和PR提交  
 
 ## 下一步建议
@@ -404,11 +404,11 @@ git push origin fix-typo-docs
 - 审查他人的PR
 
 ### 3. 选择下一个教程
-- **模块开发者**: 学习如何开发AgentOS模块
-- **系统集成者**: 学习如何部署和集成AgentOS
+- **模块开发者**: 学习如何开发AgentRT模块
+- **系统集成者**: 学习如何部署和集成AgentRT
 
 ## 持续学习
-AgentOS是一个不断发展的项目，持续学习和参与是成为核心贡献者的关键。
+AgentRT是一个不断发展的项目，持续学习和参与是成为核心贡献者的关键。
 
 感谢你的贡献！🎉
                     """,
@@ -737,7 +737,7 @@ class TutorialWebServer:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgentOS 交互式教程</title>
+    <title>AgentRT 交互式教程</title>
     <style>
         * {
             margin: 0;
@@ -909,8 +909,8 @@ class TutorialWebServer:
 <body>
     <div class="container">
         <header>
-            <h1>AgentOS 交互式教程</h1>
-            <p>通过渐进式学习路径，快速掌握 AgentOS 开发与贡献</p>
+            <h1>AgentRT 交互式教程</h1>
+            <p>通过渐进式学习路径，快速掌握 AgentRT 开发与贡献</p>
         </header>
         
         <div class="card-grid">
@@ -920,7 +920,7 @@ class TutorialWebServer:
                     <span class="badge">初学者</span>
                     <span class="time">⏱️ 4 小时</span>
                 </div>
-                <p>面向首次接触 AgentOS 的贡献者，涵盖环境配置、代码结构和第一个 PR 提交。</p>
+                <p>面向首次接触 AgentRT 的贡献者，涵盖环境配置、代码结构和第一个 PR 提交。</p>
                 <div class="steps">
                     <div class="step-item">
                         <span class="step-number">1</span>
@@ -952,7 +952,7 @@ class TutorialWebServer:
                     <span class="badge">中级</span>
                     <span class="time">⏱️ 8 小时</span>
                 </div>
-                <p>学习如何开发 AgentOS 模块，理解模块架构、API 设计和测试编写。</p>
+                <p>学习如何开发 AgentRT 模块，理解模块架构、API 设计和测试编写。</p>
                 <div class="steps">
                     <div class="step-item">
                         <span class="step-number">1</span>
@@ -984,7 +984,7 @@ class TutorialWebServer:
                     <span class="badge">高级</span>
                     <span class="time">⏱️ 12 小时</span>
                 </div>
-                <p>学习如何部署和集成 AgentOS，掌握系统配置、监控调试和故障排查。</p>
+                <p>学习如何部署和集成 AgentRT，掌握系统配置、监控调试和故障排查。</p>
                 <div class="steps">
                     <div class="step-item">
                         <span class="step-number">1</span>
@@ -1022,14 +1022,14 @@ python tutorial_engine.py start --tutorial new-contributor</pre>
         
         <div class="cli-instruction">
             <h3>🎯 立即开始学习</h3>
-            <p>打开终端，运行以下命令开始你的 AgentOS 学习之旅：</p>
+            <p>打开终端，运行以下命令开始你的 AgentRT 学习之旅：</p>
             <pre style="display: inline-block; background: rgba(0,0,0,0.2); color: white; padding: 0.5rem 1rem; border-radius: 4px; margin-top: 1rem;">
 python tutorial_engine.py list</pre>
         </div>
     </div>
     
     <footer>
-        <p>© 2026 SPHARX Ltd. | AgentOS 交互式教程系统 v1.0</p>
+        <p>© 2026 SPHARX Ltd. | AgentRT 交互式教程系统 v1.0</p>
         <p style="margin-top: 0.5rem; font-size: 0.875rem; opacity: 0.8;">"From data intelligence emerges."</p>
     </footer>
     
@@ -1053,7 +1053,7 @@ python tutorial_engine.py list</pre>
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="AgentOS 交互式教程引擎",
+        description="AgentRT 交互式教程引擎",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:

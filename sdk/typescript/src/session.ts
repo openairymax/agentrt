@@ -1,18 +1,18 @@
-// AgentOS TypeScript SDK Session
+// AgentRT TypeScript SDK Session
 // Version: 0.1.0
 // Last updated: 2026-04-04
 
 import { SessionError } from './errors';
-import { AgentOS } from './agent';
+import { AgentRT } from './agent';
 import { MemoryRaw } from './types';
 
-/** AgentOS 会话管理�?*/
+/** AgentRT 会话管理�?*/
 export class Session {
-  private client: AgentOS;
+  private client: AgentRT;
   private sessionId: string;
 
   /** 创建新的 Session 对象 */
-  constructor(client: AgentOS, sessionId: string) {
+  constructor(client: AgentRT, sessionId: string) {
     this.client = client;
     this.sessionId = sessionId;
   }

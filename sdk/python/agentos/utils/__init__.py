@@ -3,7 +3,7 @@
 # Last updated: 2026-03-24
 
 """
-Utilities module providing helper functions for AgentOS SDK.
+Utilities module providing helper functions for AgentRT SDK.
 
 This module exports all utility functions for type-safe data extraction,
 API response parsing, URL building, and ID generation.

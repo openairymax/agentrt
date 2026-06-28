@@ -24,14 +24,17 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 
+/* 跨平台路径常量（AGENTOS_DATA_DIR / AGENTOS_CONFIG_DIR） */
+#include "platform.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 /* ==================== 默认配置 ==================== */
 
-#define DEFAULT_STORAGE_PATH     "/var/lib/agentos/memoryrovol"
-#define DEFAULT_CONFIG_PATH      "/etc/agentos/memoryrovol.yaml"
+#define DEFAULT_STORAGE_PATH     AGENTOS_DATA_DIR "/memoryrovol"
+#define DEFAULT_CONFIG_PATH      AGENTOS_CONFIG_DIR "/memoryrovol.yaml"
 #define DEFAULT_QUERY_LIMIT      10
 #define DEFAULT_SYNC_INTERVAL_MS 5000
 

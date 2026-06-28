@@ -3,7 +3,7 @@
 """
 Manager 模块配置文件语法验证测试
 
-本测试脚本验证 AgentOS/manager 模块中所有 YAML/JSON 配置文件的语法正确性。
+本测试脚本验证 AgentRT/manager 模块中所有 YAML/JSON 配置文件的语法正确性。
 遵循 ARCHITECTURAL_PRINCIPLES.md 的 E-8（可测试性原则）和 E-6（错误可追溯原则）。
 
 使用方法:
@@ -13,7 +13,7 @@ Manager 模块配置文件语法验证测试
     - PyYAML (>= 5.0)
     - jsonschema (>= 4.0) [可选，用于Schema验证]
 
-作者: Spharx AgentOS Team
+作者: Spharx AgentRT Team
 版本: v1.0.0
 日期: 2026-04-01
 """
@@ -356,7 +356,7 @@ class ConfigSyntaxValidator:
             Tuple[int, int, int]: (通过数, 失败数, 总计)
         """
         print("=" * 80)
-        print("AgentOS Manager 模块配置文件语法验证测试")
+        print("AgentRT Manager 模块配置文件语法验证测试")
         print("=" * 80)
         print(f"配置目录: {self.config_dir}")
         print(f"测试时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -443,7 +443,7 @@ class ConfigSyntaxValidator:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description='AgentOS Manager 模块配置文件语法验证工具',
+        description='AgentRT Manager 模块配置文件语法验证工具',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例用法:

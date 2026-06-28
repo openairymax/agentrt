@@ -1,11 +1,11 @@
-# AgentOS Skill 契约测试
+# AgentRT Skill 契约测试
 # Version: 0.1.0
 # Last updated: 2026-03-23
 
 """
-AgentOS Skill 契约测试模块。
+AgentRT Skill 契约测试模块。
 
-验证 Skill 契约的格式、结构和语义正确性，确保符合 AgentOS 规范。
+验证 Skill 契约的格式、结构和语义正确性，确保符合 AgentRT 规范。
 """
 
 import pytest
@@ -416,7 +416,7 @@ class TestSkillContractStructure:
                 "last_audit": "2026-03-15"
             },
             "extensions": {
-                "author": "Spharx AgentOS Team",
+                "author": "Spharx AgentRT Team",
                 "license": "MIT"
             }
         }

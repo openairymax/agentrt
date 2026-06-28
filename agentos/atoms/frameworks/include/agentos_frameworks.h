@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file agentos_frameworks.h
- * @brief AgentOS统一框架抽象层 - 五大框架生产级接口
+ * @brief AgentRT统一框架抽象层 - 五大框架生产级接口
  *
  * 提供AgentOS五大核心框架的统一抽象接口：
  * - Agent框架 (CoreLoopThree): 认知-行动-记忆三层循环

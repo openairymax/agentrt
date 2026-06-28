@@ -48,7 +48,7 @@ print_header() {
 # ============================================================================
 gate_compile() {
     section "Gate 1: Compilation Check"
-    local build_dir="${PROJECT_ROOT}/../AgentRT-build"
+    local build_dir="${PROJECT_ROOT}/build-ci"
 
     if [ ! -f "${PROJECT_ROOT}/CMakeLists.txt" ]; then
         log_warn "CMakeLists.txt not found, skipping compilation check"

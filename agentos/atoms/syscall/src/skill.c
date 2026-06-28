@@ -46,7 +46,7 @@ static void ensure_skill_lock(void)
         if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&skill_lock, (void **)&expected,
                                                 (void *)new_lock, memory_order_acq_rel,
                                                 memory_order_acquire)) {
-            agentos_mutex_destroy(new_lock);
+            agentos_mutex_free(new_lock);
         }
     }
 }
@@ -515,6 +515,6 @@ void agentos_sys_skill_cleanup(void)
     }
     skill_list = NULL;
     agentos_mutex_unlock(skill_lock);
-    agentos_mutex_destroy(skill_lock);
+    agentos_mutex_free(skill_lock);
     skill_lock = NULL;
 }

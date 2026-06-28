@@ -53,16 +53,16 @@ struct agentos_arena {
 
 static arena_chunk_t *chunk_create(size_t size)
 {
-    arena_chunk_t *chunk = (arena_chunk_t *)malloc(sizeof(arena_chunk_t));
+    arena_chunk_t *chunk = (arena_chunk_t *)AGENTOS_MALLOC(sizeof(arena_chunk_t));
     if (!chunk) {
         AGENTOS_LOG_ERROR("arena: chunk_create failed to alloc chunk_t (size=%zu)", size);
         return NULL;
     }
 
-    chunk->start = (uint8_t *)malloc(size);
+    chunk->start = (uint8_t *)AGENTOS_MALLOC(size);
     if (!chunk->start) {
         AGENTOS_LOG_ERROR("arena: chunk_create failed to alloc data region (size=%zu)", size);
-        free(chunk);
+        AGENTOS_FREE(chunk);
         return NULL;
     }
 
@@ -80,8 +80,8 @@ static void chunk_destroy(arena_chunk_t *chunk)
 {
     while (chunk) {
         arena_chunk_t *next = chunk->next;
-        free(chunk->start);
-        free(chunk);
+        AGENTOS_FREE(chunk->start);
+        AGENTOS_FREE(chunk);
         chunk = next;
     }
 }
@@ -150,13 +150,13 @@ void *arena_alloc(agentos_arena_t *arena, size_t size)
 
     agentos_mutex_lock(&arena->lock);
 
-    /* 超大分配直接回退到 malloc */
+    /* 超大分配直接回退到 AGENTOS_MALLOC */
     if (aligned > arena->chunk_size / 2) {
         arena->fallback_count++;
         arena->total_allocated += aligned;
         arena->alloc_count++;
         agentos_mutex_unlock(&arena->lock);
-        void *ptr = malloc(aligned);
+        void *ptr = AGENTOS_MALLOC(aligned);
         AGENTOS_LOG_DEBUG("arena: arena_alloc FALLBACK (size=%zu, aligned=%zu, ptr=%p, fallback#=%" PRIu64 ")",
                           size, aligned, ptr, arena->fallback_count);
         return ptr;

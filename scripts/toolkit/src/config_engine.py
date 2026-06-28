@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Configuration Template Engine
+# AgentRT Configuration Template Engine
 
 """
-AgentOS Configuration Template Engine
+AgentRT Configuration Template Engine
 
 Jinja2-based configuration template rendering system:
 - Multi-environment support (dev/staging/production/testing)

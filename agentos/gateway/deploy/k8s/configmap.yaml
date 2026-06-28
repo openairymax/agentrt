@@ -1,5 +1,5 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# Kubernetes ConfigMap for AgentOS gateway Module - Development Environment
+# Kubernetes ConfigMap for AgentRT gateway Module - Development Environment
 # Version: 0.1.0
 
 apiVersion: v1
@@ -25,7 +25,7 @@ data:
   ENABLE_TRACING: "true"
 ---
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# Kubernetes ConfigMap for AgentOS gateway Module - Staging Environment
+# Kubernetes ConfigMap for AgentRT gateway Module - Staging Environment
 # Version: 0.1.0
 
 apiVersion: v1
@@ -51,7 +51,7 @@ data:
   ENABLE_TRACING: "true"
 ---
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# Kubernetes ConfigMap for AgentOS gateway Module - Production Environment
+# Kubernetes ConfigMap for AgentRT gateway Module - Production Environment
 # Version: 0.1.0
 
 apiVersion: v1

@@ -27,7 +27,7 @@ describe('Config - defaultConfig', () => {
     expect(config.timeout).toBe(30000);
     expect(config.maxRetries).toBe(3);
     expect(config.retryDelay).toBe(1000);
-    expect(config.userAgent).toBe('AgentOS-TypeScript-tools/3.0.0');
+    expect(config.userAgent).toBe('AgentRT-TypeScript-tools/3.0.0');
     expect(config.debug).toBe(false);
     expect(config.logLevel).toBe('info');
     expect(config.maxConnections).toBe(10);
@@ -115,7 +115,7 @@ describe('Config - newConfig', () => {
 
   test('should ignore empty userAgent', () => {
     const config = newConfig(withUserAgent(''));
-    expect(config.userAgent).toBe('AgentOS-TypeScript-tools/3.0.0');
+    expect(config.userAgent).toBe('AgentRT-TypeScript-tools/3.0.0');
   });
 
   test('should apply withDebug option', () => {

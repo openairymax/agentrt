@@ -35,6 +35,24 @@ endif()
 
 add_library(agentos_core STATIC ${COREKERN_SOURCES})
 
+# 豁免内存子系统实现层：这些文件实现 AGENTOS_MALLOC/FREE/MEMSET 安全宏，
+# 必须使用底层 malloc/free/calloc/memset，需定义 AGENTOS_COMPLIANCE_IMPL 跳过 poison
+# 注意：set_source_files_properties 必须在目标创建的目录作用域内才能生效
+if(AGENTRT_COMPLIANCE_STRICT)
+    set_source_files_properties(
+        src/mem/alloc.c
+        src/mem/arena.c
+        src/mem/guard.c
+        src/mem/mempool.c
+        src/mem/oom_handler.c
+        src/mem/pool.c
+        src/mem/refcount.c
+        src/mem/slab.c
+        src/mem/tcache.c
+        PROPERTIES COMPILE_DEFINITIONS AGENTOS_COMPLIANCE_IMPL
+    )
+endif()
+
 # 使用统一的头文件路径管理
 target_link_libraries(agentos_core PUBLIC agentos_atoms agentos_common)
 
@@ -56,7 +74,7 @@ else()
     target_compile_options(agentos_core PRIVATE -Wall -Wextra -Wpedantic)
     # GCC/Clang安全选项
     target_compile_options(agentos_core PRIVATE -fstack-protector-strong)
-    target_compile_options(agentos_core PRIVATE -D_FORTIFY_SOURCE=2)
+    target_compile_options(agentos_core PRIVATE $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
     target_compile_options(agentos_core PRIVATE -fPIE)
     target_compile_options(agentos_core PRIVATE -Wformat -Wformat-security)
     target_compile_options(agentos_core PRIVATE -fno-omit-frame-pointer)

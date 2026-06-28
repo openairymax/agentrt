@@ -81,7 +81,7 @@ function(agentos_enable_asan target scope)
     # 运行时环境变量（通过 CMake 属性传递给 ctest）
     set_target_properties(${target} PROPERTIES
         ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1"
-        LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/agentos/manager/sanitizer/lsan-suppressions:print_suppressions=0"
+        LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0"
     )
 endfunction()
 
@@ -161,6 +161,13 @@ endfunction()
 # =============================================================================
 function(agentos_enable_fortify target scope)
     if(NOT AGENTOS_ENABLE_FORTIFY OR MSVC)
+        return()
+    endif()
+
+    # _FORTIFY_SOURCE=2 需要 -O1 或更高优化级别，Debug 构建时跳过以避免
+    # "_FORTIFY_SOURCE requires compiling with optimization" 警告
+    if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR "${CMAKE_BUILD_TYPE}" STREQUAL "")
+        message(STATUS "FORTIFY_SOURCE=2 skipped for ${target} (Debug build, requires -O1+)")
         return()
     endif()
 

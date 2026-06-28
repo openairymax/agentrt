@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentOS 内核配置文件 (kernel.yaml)
+# AgentRT 内核配置文件 (kernel.yaml)
 # 此文件由 compose 中的 kernel 服务使用
 # =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
@@ -7,7 +7,7 @@
 _config_version: "1.0.0"
 
 kernel:
-  name: "AgentOS Core"
+  name: "AgentRT Core"
   version: "0.1.0"
   log_level: "info"
 

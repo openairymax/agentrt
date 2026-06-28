@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Memory Manager
+# AgentRT Memory Manager
 # Migrated from scripts/operations/memory_manager.py
 
 """
-AgentOS Memory Manager
+AgentRT Memory Manager
 
-Manages the multi-layer memory system for AgentOS agents:
+Manages the multi-layer memory system for AgentRT agents:
 - L1 Raw Volume: Raw sensory data storage
 - L2 Feature: Extracted features and embeddings
 - L3 Structural: Knowledge graphs and relationships
@@ -72,7 +72,7 @@ class MemoryConfig:
 
 class MemoryManager:
     """
-    AgentOS Multi-Layer Memory Manager
+    AgentRT Multi-Layer Memory Manager
     
     Manages memory allocation, garbage collection, and statistics
     across four cognitive layers.

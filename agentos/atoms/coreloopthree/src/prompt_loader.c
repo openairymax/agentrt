@@ -110,7 +110,7 @@ int agentos_prompt_loader_init(const agentos_prompt_loader_config_t *config)
     AGENTOS_MEMSET(&g_prompt_loader, 0, sizeof(g_prompt_loader));
 
     if (config) {
-        memcpy(&g_prompt_loader.config, config, sizeof(*config));
+        AGENTOS_MEMCPY(&g_prompt_loader.config, config, sizeof(*config));
     } else {
         config_defaults(&g_prompt_loader.config);
     }
@@ -431,7 +431,7 @@ static int parse_template_yaml(const char *yaml_content,
             size_t slen = strlen(system_text);
             tmpl->system_prompt = (char *)AGENTOS_MALLOC(slen + 1);
             if (tmpl->system_prompt) {
-                memcpy(tmpl->system_prompt, system_text, slen + 1);
+                AGENTOS_MEMCPY(tmpl->system_prompt, system_text, slen + 1);
                 tmpl->system_prompt_len = slen;
             }
         }
@@ -445,7 +445,7 @@ static int parse_template_yaml(const char *yaml_content,
             size_t ulen = strlen(user_text);
             tmpl->user_template = (char *)AGENTOS_MALLOC(ulen + 1);
             if (tmpl->user_template) {
-                memcpy(tmpl->user_template, user_text, ulen + 1);
+                AGENTOS_MEMCPY(tmpl->user_template, user_text, ulen + 1);
                 tmpl->user_template_len = ulen;
             }
         }
@@ -461,7 +461,7 @@ static int parse_template_yaml(const char *yaml_content,
         if (slen > 0) {
             tmpl->output_schema = (char *)AGENTOS_MALLOC(slen + 1);
             if (tmpl->output_schema) {
-                memcpy(tmpl->output_schema, schema_buf, slen + 1);
+                AGENTOS_MEMCPY(tmpl->output_schema, schema_buf, slen + 1);
                 tmpl->output_schema_len = slen;
             }
         }
@@ -709,7 +709,7 @@ static char *substitute_variables(const char *template_str,
                         strncmp(p + 1, variables[i].name, var_len) == 0) {
                         const char *val = variables[i].value;
                         size_t val_len = strlen(val);
-                        memcpy(dst, val, val_len);
+                        AGENTOS_MEMCPY(dst, val, val_len);
                         dst += val_len;
                         found = true;
                         break;
@@ -719,7 +719,7 @@ static char *substitute_variables(const char *template_str,
                 if (!found) {
                     /* 未找到变量，保留原样 */
                     size_t placeholder_len = (size_t)(close - p + 1);
-                    memcpy(dst, p, placeholder_len);
+                    AGENTOS_MEMCPY(dst, p, placeholder_len);
                     dst += placeholder_len;
                 }
                 p = close + 1;
@@ -950,7 +950,7 @@ static void cache_insert(agentos_prompt_template_t *tmpl)
         template_free_internal(g_prompt_loader.cache[0]);
         AGENTOS_FREE(g_prompt_loader.cache[0]);
         /* 移动所有条目 */
-        memmove(&g_prompt_loader.cache[0], &g_prompt_loader.cache[1],
+        AGENTOS_MEMMOVE(&g_prompt_loader.cache[0], &g_prompt_loader.cache[1],
                 (g_prompt_loader.cache_count - 1) * sizeof(g_prompt_loader.cache[0]));
         g_prompt_loader.cache_count--;
     }

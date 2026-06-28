@@ -51,7 +51,10 @@ set(AGENTOS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." CACHE PATH "AgentRT 
 set(AGENTOS_ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE PATH "AgentRT atoms source directory" FORCE)
 
 # Inherit AgentRT build settings — build full PRO from source (not OSS)
-set(MEMORYROVOL_OSS OFF CACHE BOOL "Build MemoryRovol in OSS mode (L1+L2 only)" FORCE)
+# 尊重外部传入的 MEMORYROVOL_OSS 值（CI 的 OSS job 会传 ON）
+if(NOT DEFINED MEMORYROVOL_OSS)
+    set(MEMORYROVOL_OSS OFF CACHE BOOL "Build MemoryRovol in OSS mode (L1+L2 only)")
+endif()
 set(MEMORYROVOL_EMBEDDED ON CACHE BOOL "MemoryRovol embedded in AgentRT tree" FORCE)
 
 # Add MemoryRovol as subdirectory with binary dir under AgentRT build tree

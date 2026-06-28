@@ -1,19 +1,19 @@
-// AgentOS TypeScript SDK Task
+// AgentRT TypeScript SDK Task
 // Version: 0.1.0
 // Last updated: 2026-04-04
 
 import { TaskStatus, TaskResult } from './types';
 import { TaskError, TimeoutError } from './errors';
-import { AgentOS } from './agent';
+import { AgentRT } from './agent';
 import { DEFAULT_POLL_INTERVAL_MS } from './manager';
 
-/** AgentOS 任务管理�?*/
+/** AgentRT 任务管理�?*/
 export class Task {
-  private client: AgentOS;
+  private client: AgentRT;
   private taskId: string;
 
   /** 创建新的 Task 对象 */
-  constructor(client: AgentOS, taskId: string) {
+  constructor(client: AgentRT, taskId: string) {
     this.client = client;
     this.taskId = taskId;
   }

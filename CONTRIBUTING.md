@@ -315,7 +315,7 @@ cd ../AgentRT-build && ctest -R benchmark
 
 | 渠道 | 用途 | 链接 |
 |------|------|------|
-| GitHub Issues | Bug 报告 / 功能建议 | [SpharxTeam/AgentOS](https://github.com/SpharxTeam/AgentOS/issues) |
+| GitHub Issues | Bug 报告 / 功能建议 | [SpharxTeam/AgentRT](https://github.com/SpharxTeam/AgentRT/issues) |
 | AtomGit Issues | Bug 报告 / 功能建议 | [openairymax/agentos](https://atomgit.com/openairymax/agentos/issues) |
 | Gitee Issues | Bug 报告 / 功能建议 | [spharx/agentos](https://gitee.com/spharx/agentos/issues) |
 | 飞书社群 | 技术交流与社区讨论 | 扫描 README 中飞书社群二维码加入 |

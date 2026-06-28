@@ -1,5 +1,5 @@
 """
-AgentOS Tool 服务单元测试
+AgentRT Tool 服务单元测试
 
 验证 Tool 守护进程的核心功能：
 - 工具注册与发现
@@ -77,12 +77,12 @@ class TestToolRegistry(BaseTestCase):
 class TestToolExecution(BaseTestCase):
 
     def test_execute_tool_with_valid_input(self):
-        tool_input = {"query": "AgentOS architecture", "limit": 5}
+        tool_input = {"query": "AgentRT architecture", "limit": 5}
         expected_output = [
-            {"title": "AgentOS Microkernel", "relevance": 0.95},
+            {"title": "AgentRT Microkernel", "relevance": 0.95},
             {"title": "IPC Design Patterns", "relevance": 0.87}
         ]
-        assert tool_input["query"] == "AgentOS architecture"
+        assert tool_input["query"] == "AgentRT architecture"
         assert len(expected_output) == 2
 
     def test_execute_tool_with_missing_required_field(self):
@@ -155,7 +155,7 @@ class TestToolCache(BaseTestCase):
 
     def test_cache_stores_execution_result(self):
         cache = {}
-        cache_key = "web_search:AgentOS:5"
+        cache_key = "web_search:AgentRT:5"
         cache[cache_key] = {"results": ["item1", "item2"], "cached_at": 1672531200}
         assert cache_key in cache
 

@@ -166,7 +166,7 @@ void thread_pool_destroy(thread_pool_t *pool)
 int thread_pool_submit(thread_pool_t *pool, thread_task_fn_t task, void *arg)
 {
     if (!pool || !task) {
-        SVC_LOG_ERROR("thread_pool_submit: null parameter pool=%p task=%p", (void *)pool, (void *)task);
+        SVC_LOG_ERROR("thread_pool_submit: null parameter pool=%p task=%p", (void *)pool, (void *)(uintptr_t)task);
         return AGENTOS_ERR_INVALID_PARAM;
     }
     if (!pool->running) {

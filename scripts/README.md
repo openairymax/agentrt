@@ -214,12 +214,12 @@ python scripts/ops/benchmark/example_coreloopthree_benchmark.py
 
 ```python
 from scripts.toolkit import (
-    AgentOSDoctor,
+    AgentRTDoctor,
     MemoryManager,
     TokenCounter,
     TokenBudget,
     CheckpointManager,
-    AgentOSBenchmark,
+    AgentRTBenchmark,
     ContractValidator,
     ConfigEngine,
     PluginRegistry,
@@ -229,7 +229,7 @@ from scripts.toolkit import (
     ConfigInitializer,
 )
 
-doctor = AgentOSDoctor()
+doctor = AgentRTDoctor()
 doctor.run_all()
 
 mm = MemoryManager()

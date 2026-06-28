@@ -1,5 +1,5 @@
 """
-AgentOS Tests - Benchmarks Module
+AgentRT Tests - Benchmarks Module
 
 性能基准测试模块。
 """

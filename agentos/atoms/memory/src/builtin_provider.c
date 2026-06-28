@@ -83,6 +83,21 @@ static agentos_error_t builtin_init(agentos_memory_provider_t *provider, const c
 
     builtin_provider_impl_t *impl = (builtin_provider_impl_t *)provider->impl;
 
+    /* 幂等性保护：如果 storage/index/retrieval 已存在（重复 init 调用），
+     * 先销毁旧对象，避免直接覆盖指针导致内存泄漏 */
+    if (impl->storage) {
+        builtin_storage_destroy(impl->storage);
+        impl->storage = NULL;
+    }
+    if (impl->index) {
+        builtin_index_destroy(impl->index);
+        impl->index = NULL;
+    }
+    if (impl->retrieval) {
+        builtin_retrieval_destroy(impl->retrieval);
+        impl->retrieval = NULL;
+    }
+
     const char *path = config_path ? config_path : "./data/agentos/memory";
     impl->storage = builtin_storage_create(path);
     if (!impl->storage)

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file cognitive_evolution.h
- * @brief CognitiveEvolution - AgentOS认知进化系统
+ * @brief CognitiveEvolution - AgentRT认知进化系统
  *
  * 认知进化系统，实现智能体认知能力的自适应提升。
  * 基于MCIS理论中的认知观(C维度)设计，支持经验积累、

@@ -2,7 +2,7 @@
 OpenLab Core Task Module
 
 Task scheduling and state machine core module
-Following AgentOS architecture design principles V1.8
+Following AgentRT architecture design principles V1.8
 """
 
 from dataclasses import dataclass, field
