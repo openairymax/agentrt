@@ -63,7 +63,7 @@ pub struct TaskResult {
 
 type Result<T> = std::result::Result<T, AgentOSError>;
 
-/// AgentOS 任务
+/// AgentRT 任务
 #[derive(Debug, Clone)]
 pub struct Task {
     client: Client,

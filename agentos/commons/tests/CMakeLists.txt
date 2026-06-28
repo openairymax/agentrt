@@ -1,4 +1,7 @@
 # commons 模块测试 CMakeLists.txt
+
+# 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
+add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 # 包含单元测试和集成测试
 
 enable_testing()

@@ -9,7 +9,7 @@ Memory class implementation for the AgentRT Python SDK.
 from typing import Optional, Dict, Any
 
 class Memory:
-    """Memory class for managing AgentOS memories.
+    """Memory class for managing AgentRT memories.
     
     This class represents a memory stored in the AgentRT system.
     """

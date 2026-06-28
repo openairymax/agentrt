@@ -1,4 +1,4 @@
-# AgentOS 测试夹具和共享配置
+# AgentRT 测试夹具和共享配置
 # Version: 0.1.0
 # Last updated: 2026-04-04
 
@@ -197,10 +197,10 @@ def mock_http_response():
 @pytest.fixture(scope="function")
 def mock_agentos_client():
     """
-    提供模拟的AgentOS客户端。
+    提供模拟的AgentRT客户端。
 
     Returns:
-        Mock: 模拟的AgentOS客户端
+        Mock: 模拟的AgentRT客户端
     """
     client = Mock()
     client.endpoint = TestConfig.DEFAULT_ENDPOINT
@@ -603,7 +603,7 @@ def project_info():
         Dict: 项目信息字典
     """
     return {
-        "name": "AgentOS",
+        "name": "AgentRT",
         "version": "0.1.0",
         "root": PROJECT_ROOT,
         "tests_dir": PROJECT_ROOT / "tests",

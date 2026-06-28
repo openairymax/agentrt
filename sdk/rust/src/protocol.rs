@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Supported protocol types for AgentOS communication
+/// Supported protocol types for AgentRT communication
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProtocolType {
@@ -91,7 +91,7 @@ pub struct ConnectionTestResult {
     pub error: Option<String>,
 }
 
-/// Unified multi-protocol client for AgentOS
+/// Unified multi-protocol client for AgentRT
 pub struct ProtocolClient {
     config: ProtocolConfig,
     http_client: ReqwestClient,
@@ -119,7 +119,7 @@ impl ProtocolClient {
         })
     }
 
-    /// Create from an existing AgentOS client reference
+    /// Create from an existing AgentRT client reference
     pub fn from_client(client: &Client) -> Result<Self, AgentOSError> {
         let config = ProtocolConfig {
             endpoint: client.endpoint().to_string(),

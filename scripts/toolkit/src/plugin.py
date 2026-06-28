@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 插件系统
+# AgentRT 插件系统
 # 支持动态加载和扩展脚本功能
 
 """
-AgentOS 插件系统
+AgentRT 插件系统
 
 提供灵活的插件架构，支持：
 - 动态插件发现和加载

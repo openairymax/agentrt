@@ -177,7 +177,7 @@ AgentRT 是操作系统级产品，而非单一框架：
 | 维度           | AgentRT    | 传统框架  |
 | ------------ | ---------- | ----- |
 | **定位**       | 多智能体协作 OS  | 单一智能体 |
-| **架构**       | 微内核 + 严格分层 | 松耦合模块 |
+| **架构**       | 微核心 + 严格分层 | 松耦合模块 |
 | **安全**       | 四重内生安全     | 应用层防护 |
 | **记忆**       | 四层卷载系统     | 向量数据库 |
 | **Token 效率** | 节省约 500%   | 无优化   |
@@ -224,7 +224,7 @@ AgentRT 是操作系统级产品，而非单一框架：
 | --------- | ------------- | ------- |
 | 应用开发者 | Python/Go 基础  | 1-2 天上手 |
 | 系统开发者 | C/C++, 操作系统基础 | 1-2 周深入 |
-| 架构师   | 微内核，分布式系统     | 1 月精通   |
+| 架构师   | 微核心，分布式系统     | 1 月精通   |
 
 推荐路径：[快速开始](https://atomgit.com/openairymax/docs/blob/main/QUICK_START.md) → [架构原则](https://atomgit.com/openairymax/docs/blob/main/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](https://atomgit.com/openairymax/agentos/blob/main/agentos/atoms/coreloopthree/README.md)
 

@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file llm_svc_adapter.c
- * @brief LLM服务适配器：将LLM服务适配到统一的AgentOS服务管理框架
+ * @brief LLM服务适配器：将LLM服务适配到统一的AgentRT服务管理框架
  *
  * LLM服务的create接口接受config_path字符串而非配置结构体，
  * 本适配器将通用服务配置转换为LLM服务所需的配置路径格式。

@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: Apache-2.0
 """
-AgentOS Performance Benchmark Suite
+AgentRT Performance Benchmark Suite
 
 Benchmarks:
   1. JSON-RPC request throughput
@@ -94,7 +94,7 @@ def run_benchmark(name: str, func, iterations: int = 100) -> Dict:
 
 def main():
     global GATEWAY_URL
-    parser = argparse.ArgumentParser(description="AgentOS Performance Benchmarks")
+    parser = argparse.ArgumentParser(description="AgentRT Performance Benchmarks")
     parser.add_argument("--gateway", default=None)
     parser.add_argument("--iterations", "-n", type=int, default=100)
     parser.add_argument("--json", action="store_true")
@@ -104,7 +104,7 @@ def main():
         GATEWAY_URL = args.gateway
 
     print(f"\n{'=' * 60}")
-    print(f"  AgentOS Performance Benchmark Suite")
+    print(f"  AgentRT Performance Benchmark Suite")
     print(f"  Gateway: {GATEWAY_URL}")
     print(f"  Iterations: {args.iterations}")
     print(f"{'=' * 60}")

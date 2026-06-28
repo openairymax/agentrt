@@ -1619,7 +1619,7 @@ static int a2a_adapter_send_cb(void *c, const void *d, size_t s)
 
     if (!adapter->connected || !adapter->transport_write) {
         AGENTOS_LOG_WARN("send failed: not connected or no transport, connected=%d, transport_write=%p",
-                         adapter->connected, (void *)adapter->transport_write);
+                         adapter->connected, (void *)(uintptr_t)adapter->transport_write);
         agentos_error_push_ex(AGENTOS_ERR_NOT_SUPPORTED, __FILE__, __LINE__, __func__,
                               "not connected or no transport");
         return AGENTOS_ERR_NOT_SUPPORTED;

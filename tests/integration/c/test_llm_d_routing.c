@@ -16,7 +16,9 @@
  * INT-15.6: 端到端路由管线 - registry→find_provider→请求构建→响应解析
  */
 
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 199309L
+#endif
 
 #include "cache.h"
 #include "cost_tracker.h"
@@ -182,8 +184,8 @@ static void test_int15_1_provider_registry(void)
     }
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -263,8 +265,8 @@ static void test_int15_2_find_provider(void)
     };
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -306,8 +308,8 @@ static void test_int15_2_find_provider(void)
 
     /* Step 5: 空注册表查找 */
     service_config_t empty_cfg = {
-        .cache_capacity = 10,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 10,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -592,8 +594,8 @@ static void test_int15_5_provider_health_check(void)
     };
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -632,8 +634,8 @@ static void test_int15_6_e2e_routing_pipeline(void)
     };
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -732,21 +734,21 @@ static void test_int15_6_e2e_routing_pipeline(void)
     }
 
     /* Step 7: 缓存集成验证 */
-    cache_t *cache = cache_create(100, 3600);
+    llm_cache_t *cache = llm_cache_create(100, 3600);
     TEST_ASSERT_NOT_NULL(cache, "Step 7: 缓存创建成功");
 
     /* 缓存未命中 */
     char *cached_val = NULL;
-    int cache_ret = cache_get(cache, "gpt-4o:e2e_hash", &cached_val);
+    int cache_ret = llm_cache_get(cache, "gpt-4o:e2e_hash", &cached_val);
     TEST_ASSERT(cache_ret != 1 || cached_val == NULL,
                 "Step 7: 首次查询缓存未命中");
 
     /* 写入缓存 */
-    cache_put(cache, "gpt-4o:e2e_hash", mock_response_json);
+    llm_cache_put(cache, "gpt-4o:e2e_hash", mock_response_json);
 
     /* 缓存命中 */
     cached_val = NULL;
-    cache_ret = cache_get(cache, "gpt-4o:e2e_hash", &cached_val);
+    cache_ret = llm_cache_get(cache, "gpt-4o:e2e_hash", &cached_val);
     TEST_ASSERT(cache_ret == 1 && cached_val != NULL,
                 "Step 7: 二次查询缓存命中");
     if (cached_val) {
@@ -755,7 +757,7 @@ static void test_int15_6_e2e_routing_pipeline(void)
         free(cached_val);
     }
 
-    cache_destroy(cache);
+    llm_cache_destroy(cache);
     provider_registry_destroy(reg);
     TEST_ASSERT(1, "Step 8: 端到端管线资源清理完成");
 }
@@ -769,8 +771,8 @@ static void test_registry_concurrent_safety(void)
     printf("\n--- [补充] Registry 并发安全与幂等性 ---\n");
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",

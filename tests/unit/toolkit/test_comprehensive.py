@@ -1,5 +1,5 @@
 """
-Unit tests for AgentOS Python SDK.
+Unit tests for AgentRT Python SDK.
 
 This module contains comprehensive tests for the SDK components.
 Run with: pytest tests/test_agent.py -v
@@ -13,7 +13,7 @@ import time
 # Import all available public APIs
 try:
     from agentos import (
-        AgentOS, AsyncAgentOS,
+        AgentRT, AsyncAgentRT,
         Telemetry, Meter, Tracer, Span, SpanStatus,
         TaskStatus, TaskResult, SkillResult, SkillInfo,
         MemoryInfo, MemoryRecordType,
@@ -28,7 +28,7 @@ try:
     )
 except ImportError:
     # Fallback
-    from agentos import AgentOS, AsyncAgentOS
+    from agentos import AgentRT, AsyncAgentRT
     AgentOSError = getattr(__import__('agentos.exceptions', fromlist=['AgentOSError']), 'AgentOSError', Exception)
     TaskError = AgentOSError
     AgentOSMemoryError = AgentOSError

@@ -191,7 +191,7 @@ static tool_result_t *parse_tool_result_json(const char *json)
             if (len > 0) {
                 result->output = (char *)AGENTOS_MALLOC(len + 1);
                 if (result->output) {
-                    memcpy(result->output, output_start, len);
+                    AGENTOS_MEMCPY(result->output, output_start, len);
                     result->output[len] = '\0';
                 }
             }
@@ -217,7 +217,7 @@ static tool_result_t *parse_tool_result_json(const char *json)
             if (len > 0) {
                 result->error = (char *)AGENTOS_MALLOC(len + 1);
                 if (result->error) {
-                    memcpy(result->error, error_start, len);
+                    AGENTOS_MEMCPY(result->error, error_start, len);
                     result->error[len] = '\0';
                 }
             }
@@ -624,7 +624,7 @@ int tool_svc_adapter_list(tool_svc_adapter_t *adapter, char **out_json)
     if (ipc_ret == 0 && response_msg.payload && response_msg.payload_size > 0) {
         *out_json = (char *)AGENTOS_MALLOC(response_msg.payload_size + 1);
         if (*out_json) {
-            memcpy(*out_json, response_msg.payload, response_msg.payload_size);
+            AGENTOS_MEMCPY(*out_json, response_msg.payload, response_msg.payload_size);
             (*out_json)[response_msg.payload_size] = '\0';
         }
     }

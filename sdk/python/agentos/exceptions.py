@@ -122,7 +122,7 @@ def http_status_to_error(status: int, details: str = "") -> "AgentOSError":
 
 class AgentOSError(Exception):
     """
-    Base exception class for all AgentOS errors.
+    Base exception class for all AgentRT errors.
 
     Attributes:
         error_code (str): The hexadecimal error code (e.g., "0x0001")
@@ -166,7 +166,7 @@ class NetworkError(AgentOSError):
 
 
 class AgentOSTimeoutError(AgentOSError):
-    """AgentOS-specific timeout error with operation context."""
+    """AgentRT-specific timeout error with operation context."""
 
     def __init__(self, message: str = "", operation: str = "", cause: Optional[Exception] = None):
         if not message and operation:

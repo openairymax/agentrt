@@ -195,7 +195,7 @@ agentos_error_t ret = agentos_sys_task_submit(
 
 | 依赖项 | 来源 | 用途 |
 |--------|------|------|
-| CoreKern | atoms/corekern | 微内核 IPC 和调度能力 |
+| CoreKern | atoms/corekern | 微核心 IPC 和调度能力 |
 | commons | agentos/commons | 统一类型和平台抽象 |
 | agentos_types.h | commons | 统一类型定义 |
 

@@ -1,9 +1,9 @@
-# AgentOS Python SDK - Manager Classes Unit Tests
+# AgentRT Python SDK - Manager Classes Unit Tests
 # Version: 0.1.0
 # Last updated: 2026-04-04
 
 """
-Unit tests for AgentOS Manager classes.
+Unit tests for AgentRT Manager classes.
 
 This module contains comprehensive tests for TaskManager, SessionManager,
 MemoryManager, and SkillManager classes.

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Toolkit - Unified Python tools for AgentOS
+# AgentRT Toolkit - Unified Python tools for AgentRT
 
 """
-AgentOS Toolkit Module
+AgentRT Toolkit Module
 
-Consolidated Python utilities for AgentOS, including:
+Consolidated Python utilities for AgentRT, including:
 - Initializer: Environment setup and configuration generation
 - Doctor: System health diagnostics
 - MemoryManager: Memory layer management

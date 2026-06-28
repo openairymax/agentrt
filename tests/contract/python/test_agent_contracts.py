@@ -1,5 +1,5 @@
 """
-AgentOS Agent 契约测试模块（V2.0 优化版）
+AgentRT Agent 契约测试模块（V2.0 优化版）
 Version: 0.1.0
 Last updated: 2026-04-06
 

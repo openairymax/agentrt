@@ -1,4 +1,4 @@
-# AgentOS Python SDK - Checkpoint Manager Tests
+# AgentRT Python SDK - Checkpoint Manager Tests
 # Version: 0.1.0
 # Last updated: 2026-04-05
 #

@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentOS Agent 注册表配置文件
+# AgentRT Agent 注册表配置文件
 # 版本: v1.1.0
 # 最后更新: 2026-04-02
 # Schema: schema/agent-registry.schema.json
@@ -11,7 +11,7 @@
 _owner:
   module: "cupolas"
   contact: "cupolas-team@example.com"
-  path: "AgentOS/cupolas"
+  path: "AgentRT/cupolas"
   description: "内容定义责任归属 cupolas 模块，管理责任归属 Manager 模块"
 
 # 配置版本

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Config Audit Log Generator
+AgentRT Config Audit Log Generator
 
 用于生成测试用的配置变更审计日志，符合config-audit-log.schema.json规范
 
@@ -433,7 +433,7 @@ class AuditLogGenerator:
 def main():
     """CLI入口"""
     parser = argparse.ArgumentParser(
-        description="Generate AgentOS config audit logs",
+        description="Generate AgentRT config audit logs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

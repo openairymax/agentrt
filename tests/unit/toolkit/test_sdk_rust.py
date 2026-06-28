@@ -1,5 +1,5 @@
 """
-AgentOS Rust SDK 单元测试
+AgentRT Rust SDK 单元测试
 
 验证 Rust SDK 的核心功能：
 - 客户端初始化与配置

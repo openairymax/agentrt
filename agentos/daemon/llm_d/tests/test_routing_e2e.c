@@ -6,7 +6,9 @@
  * 验证: registry → find_provider → 缓存 → 成本追踪 的完整调用链
  */
 
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 199309L
+#endif
 
 #include "cache.h"
 #include "cost_tracker.h"
@@ -46,8 +48,8 @@ static void test_registry_create_and_find(void)
 
     /* 创建注册表 */
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -76,22 +78,22 @@ static void test_cache_hit_miss(void)
 {
     printf("  [INT-15.2] Cache hit/miss mechanism...\n");
 
-    cache_t *cache = cache_create(100, 3600);
+    llm_cache_t *cache = llm_cache_create(100, 3600);
     assert(cache != NULL);
 
     /* 缓存未命中 */
     char *value = NULL;
-    int ret = cache_get(cache, "model:gpt-4o:hash123", &value);
+    int ret = llm_cache_get(cache, "model:gpt-4o:hash123", &value);
     assert(ret != 1 || value == NULL);
     (void)ret;
     printf("    Cache miss: OK\n");
 
     /* 写入缓存 */
     const char *response_json = "{\"id\":\"chatcmpl-123\",\"model\":\"gpt-4o\",\"choices\":[{\"message\":{\"content\":\"Hello\"}}]}";
-    cache_put(cache, "model:gpt-4o:hash123", response_json);
+    llm_cache_put(cache, "model:gpt-4o:hash123", response_json);
 
     /* 缓存命中 */
-    ret = cache_get(cache, "model:gpt-4o:hash123", &value);
+    ret = llm_cache_get(cache, "model:gpt-4o:hash123", &value);
     assert(ret == 1);
     assert(value != NULL);
     assert(strcmp(value, response_json) == 0);
@@ -99,12 +101,12 @@ static void test_cache_hit_miss(void)
     printf("    Cache hit: OK (same response)\n");
 
     /* TTL 过期验证 */
-    cache_t *ttl_cache = cache_create(10, 1); /* 1秒TTL */
+    llm_cache_t *ttl_cache = llm_cache_create(10, 1); /* 1秒TTL */
     assert(ttl_cache != NULL);
 
-    cache_put(ttl_cache, "ttl_key", "ttl_value");
+    llm_cache_put(ttl_cache, "ttl_key", "ttl_value");
     value = NULL;
-    ret = cache_get(ttl_cache, "ttl_key", &value);
+    ret = llm_cache_get(ttl_cache, "ttl_key", &value);
     assert(ret == 1);
     free(value);
 
@@ -119,12 +121,12 @@ static void test_cache_hit_miss(void)
 #endif
 
     value = NULL;
-    ret = cache_get(ttl_cache, "ttl_key", &value);
+    ret = llm_cache_get(ttl_cache, "ttl_key", &value);
     assert(ret != 1 || value == NULL);
     printf("    TTL expiry: OK (cache miss after %ds)\n", 1);
 
-    cache_destroy(ttl_cache);
-    cache_destroy(cache);
+    llm_cache_destroy(ttl_cache);
+    llm_cache_destroy(cache);
     TEST_PASS();
     printf("    PASSED\n");
 }
@@ -177,8 +179,8 @@ static void test_unknown_provider_error(void)
 
     /* 查找不存在的模型 */
     service_config_t cfg = {
-        .cache_capacity = 10,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 10,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -218,8 +220,8 @@ static void test_registry_thread_safety(void)
     printf("  [INT-15.5] Registry thread safety (basic)...\n");
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",

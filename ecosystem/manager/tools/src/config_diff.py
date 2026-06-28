@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Manager 模块配置差异对比工具
+AgentRT Manager 模块配置差异对比工具
 
 本工具用于比较两个配置文件之间的差异，支持：
 - YAML 配置文件的比较
@@ -395,7 +395,7 @@ def print_diff_result(result: DiffResult, color: bool = True) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AgentOS Manager 配置差异对比工具"
+        description="AgentRT Manager 配置差异对比工具"
     )
     parser.add_argument(
         "file1",

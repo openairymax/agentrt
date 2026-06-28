@@ -33,7 +33,9 @@
 #if AGENTOS_PLATFORM_POSIX
 #include <dlfcn.h>
 #include <sys/stat.h>
+#ifdef __linux__
 #include <sys/sysinfo.h>
+#endif
 #include <sys/utsname.h>
 #endif
 

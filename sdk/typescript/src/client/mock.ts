@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Mock Client
+// AgentRT TypeScript SDK - Mock Client
 // Version: 0.1.0
 // Last updated: 2026-04-27
 //

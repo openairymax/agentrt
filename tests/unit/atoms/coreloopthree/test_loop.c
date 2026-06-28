@@ -68,7 +68,7 @@ static void test_loop_get_engines() {
     agentos_memory_engine_t* memory = NULL;
     agentos_loop_get_engines(loop, &cognition, &execution, &memory);
     printf("test_loop_get_engines: cognition=%p, execution=%p, memory=%p\n",
-           cognition, execution, memory);
+           (void *)cognition, (void *)execution, (void *)memory);
 
     agentos_loop_destroy(loop);
 }

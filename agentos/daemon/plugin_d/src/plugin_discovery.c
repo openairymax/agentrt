@@ -72,7 +72,7 @@ static char *parse_yaml_value(const char *line, const char *key)
     char *result = (char *)AGENTOS_MALLOC(val_len + 1);
     if (!result) return NULL;
 
-    memcpy(result, rest, val_len);
+    AGENTOS_MEMCPY(result, rest, val_len);
     result[val_len] = '\0';
     return result;
 }

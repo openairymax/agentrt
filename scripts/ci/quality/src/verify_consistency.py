@@ -73,7 +73,7 @@ def main():
     exclude_dirs = {'Basic_Theories', '.git'}
 
     print("=" * 80)
-    print("📋 AgentOS Documentation V1.9 Consistency Verification")
+    print("📋 AgentRT Documentation V1.9 Consistency Verification")
     print(f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
 

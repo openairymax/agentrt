@@ -1,7 +1,7 @@
 /*
  * AgentRT Unified Protocol - 统一协议接口
  *
- * 本文件定义AgentOS统一协议系统的核心接口，提供对多种
+ * 本文件定义AgentRT统一协议系统的核心接口，提供对多种
  * 通信协议（JSON-RPC、MCP、A2A、OpenAI、OpenJiuwen）的
  * 统一抽象层。
  *

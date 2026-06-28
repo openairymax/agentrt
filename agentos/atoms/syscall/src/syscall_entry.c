@@ -291,6 +291,12 @@ static agentos_cognition_engine_t *g_cognition_engine = NULL;
 
 agentos_error_t agentos_syscalls_init(void)
 {
+    /* 幂等性保护：如果认知引擎已存在（重复 init 调用），直接返回成功，
+     * 避免覆盖 g_cognition_engine 指针导致前一个引擎泄漏 */
+    if (g_cognition_engine) {
+        return AGENTOS_SUCCESS;
+    }
+
     agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &g_cognition_engine);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_WARN("Cognition engine init failed: %d, continuing without cognition", err);

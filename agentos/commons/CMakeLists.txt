@@ -95,8 +95,8 @@ set(_inc_dirs
     utils/cost/include
     utils/observability/include
     utils/io/include
-    utils/security/include
-    utils/resource/include
+    utils/security/src
+    utils/resource/src
     utils/memory/include
     utils/string/include
     utils/cache/include
@@ -158,8 +158,8 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cost/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/observability/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/io/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/security/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/resource/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/security/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/resource/src
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/string/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cache/include

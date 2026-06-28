@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Plugin Framework
+// AgentRT TypeScript SDK - Plugin Framework
 // Version: 0.1.0
 // Last updated: 2026-04-26
 //
@@ -73,7 +73,7 @@ export interface PluginInfo {
 /**
  * BasePlugin - 插件基类
  *
- * 所有 AgentOS 插件都应继承此类，实现标准化的插件接口。
+ * 所有 AgentRT 插件都应继承此类，实现标准化的插件接口。
  */
 export abstract class BasePlugin {
   protected _pluginId: string;
@@ -214,7 +214,7 @@ export class PluginRegistry {
 
     const instance = new pluginClass();
     try {
-      (instance as PluginInstance).pluginId = pluginId;
+      (instance as unknown as PluginInstance).pluginId = pluginId;
     } catch {
       // Subclass may define pluginId as read-only getter
     }

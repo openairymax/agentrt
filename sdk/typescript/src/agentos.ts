@@ -1,8 +1,8 @@
-// AgentOS TypeScript SDK - Main Entry
+// AgentRT TypeScript SDK - Main Entry
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //
-// 提供 TypeScript 接口与 AgentOS 系统交互。
+// 提供 TypeScript 接口与 AgentRT 系统交互。
 // 包含任务管理、记忆操作、会话管理、技能加载、遥测和系统调用功能。
 // 与 Go SDK agentos.go 保持一致。
 
@@ -38,10 +38,10 @@ import {
 } from './types';
 
 /**
- * AgentOS 是 TypeScript SDK 的主入口类
+ * AgentRT 是 TypeScript SDK 的主入口类
  * 提供对各个业务模块的统一访问入口
  */
-export class AgentOS {
+export class AgentRT {
   private client: Client;
   private _tasks?: TaskManager;
   private _memories?: MemoryManager;
@@ -49,7 +49,7 @@ export class AgentOS {
   private _skills?: SkillManager;
 
   /**
-   * 创建新的 AgentOS 客户端实例
+   * 创建新的 AgentRT 客户端实例
    * @param manager - 配置对象或配置选项
    */
   constructor(manager?: manager | ConfigOption[]) {
@@ -68,11 +68,11 @@ export class AgentOS {
   }
 
   /**
-   * 从环境变量创建 AgentOS 客户端
+   * 从环境变量创建 AgentRT 客户端
    */
-  static fromEnv(): AgentOS {
+  static fromEnv(): AgentRT {
     const manager = newConfigFromEnv();
-    return new AgentOS(manager);
+    return new AgentRT(manager);
   }
 
   /**
@@ -159,11 +159,11 @@ export class AgentOS {
 }
 
 /**
- * 创建新的 AgentOS 客户端实例（快捷方式）
+ * 创建新的 AgentRT 客户端实例（快捷方式）
  * @param opts - 配置选项
  */
-export function createAgentOS(...opts: ConfigOption[]): AgentOS {
-  return new AgentOS(opts);
+export function createAgentRT(...opts: ConfigOption[]): AgentRT {
+  return new AgentRT(opts);
 }
 
 // ============================================================

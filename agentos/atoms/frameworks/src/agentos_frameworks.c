@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file agentos_frameworks.c
- * @brief AgentOS统一框架抽象层实现
+ * @brief AgentRT统一框架抽象层实现
  *
  * @see agentos_frameworks.h
  */

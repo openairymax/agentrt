@@ -6,7 +6,9 @@
  * 验证: SIMPLE/MODERATE/COMPLEX 三档复杂度评估 + 用户显式model参数覆盖
  */
 
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 199309L
+#endif
 
 #include "cache.h"
 #include "cost_tracker.h"

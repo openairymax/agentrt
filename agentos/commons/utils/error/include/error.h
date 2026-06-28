@@ -539,6 +539,12 @@ agentos_error_chain_t *agentos_error_get_chain(void);
 void agentos_error_clear(void);
 
 /**
+ * @brief 清理当前线程的错误状态（释放线程局部存储）
+ * @note 应在线程退出前调用，以释放 thread_error_state_t 及其错误链中的 message 字符串
+ */
+void agentos_error_thread_cleanup(void);
+
+/**
  * @brief 添加错误上下文
  * @param code 错误码
  * @param file 源文件名

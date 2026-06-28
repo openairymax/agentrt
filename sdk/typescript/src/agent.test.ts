@@ -1,27 +1,27 @@
-// AgentOS TypeScript SDK Tests
+// AgentRT TypeScript SDK Tests
 // Version: 0.1.0
 // Last updated: 2026-03-21
 
 import axios from 'axios';
-import { AgentOS } from './agent';
+import { AgentRT } from './agent';
 import { TaskStatus } from './types';
 
 // Mock axios
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-describe('AgentOS', () => {
-  let agent: AgentOS;
+describe('AgentRT', () => {
+  let agent: AgentRT;
 
   beforeEach(() => {
-    agent = new AgentOS({ endpoint: 'http://localhost:18789' });
+    agent = new AgentRT({ endpoint: 'http://localhost:18789' });
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  test('should create a new AgentOS client', () => {
+  test('should create a new AgentRT client', () => {
     expect(agent).toBeDefined();
   });
 
@@ -43,7 +43,7 @@ describe('AgentOS', () => {
     } as any);
 
     // Create a new agent to use the mocked axios
-    const testAgent = new AgentOS({ endpoint: 'http://localhost:18789' });
+    const testAgent = new AgentRT({ endpoint: 'http://localhost:18789' });
     const task = await testAgent.submitTask('Test task');
 
     expect(task.id).toBe('test-task-id');
@@ -67,7 +67,7 @@ describe('AgentOS', () => {
     } as any);
 
     // Create a new agent to use the mocked axios
-    const testAgent = new AgentOS({ endpoint: 'http://localhost:18789' });
+    const testAgent = new AgentRT({ endpoint: 'http://localhost:18789' });
     const memoryId = await testAgent.writeMemory('Test memory');
 
     expect(memoryId).toBe('test-memory-id');
@@ -100,7 +100,7 @@ describe('AgentOS', () => {
     } as any);
 
     // Create a new agent to use the mocked axios
-    const testAgent = new AgentOS({ endpoint: 'http://localhost:18789' });
+    const testAgent = new AgentRT({ endpoint: 'http://localhost:18789' });
     const memories = await testAgent.searchMemory('test');
 
     expect(memories).toHaveLength(1);
@@ -130,7 +130,7 @@ describe('AgentOS', () => {
     } as any);
 
     // Create a new agent to use the mocked axios
-    const testAgent = new AgentOS({ endpoint: 'http://localhost:18789' });
+    const testAgent = new AgentRT({ endpoint: 'http://localhost:18789' });
     const memory = await testAgent.getMemory('test-memory-id');
 
     expect(memory.id).toBe('test-memory-id');
@@ -155,7 +155,7 @@ describe('AgentOS', () => {
     } as any);
 
     // Create a new agent to use the mocked axios
-    const testAgent = new AgentOS({ endpoint: 'http://localhost:18789' });
+    const testAgent = new AgentRT({ endpoint: 'http://localhost:18789' });
     const result = await testAgent.deleteMemory('test-memory-id');
 
     expect(result).toBe(true);
@@ -179,7 +179,7 @@ describe('AgentOS', () => {
     } as any);
 
     // Create a new agent to use the mocked axios
-    const testAgent = new AgentOS({ endpoint: 'http://localhost:18789' });
+    const testAgent = new AgentRT({ endpoint: 'http://localhost:18789' });
     const session = await testAgent.createSession();
 
     expect(session.id).toBe('test-session-id');

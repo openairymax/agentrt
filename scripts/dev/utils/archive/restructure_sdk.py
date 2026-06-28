@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Python SDK 重构脚本
+AgentRT Python SDK 重构脚本
 
 此脚本用于自动化重构 agentos 包结构，实现高度模块化设计。
 
@@ -97,7 +97,7 @@ class SDKRestructurer:
         print("\n📝 生成 __init__.py 文件...")
 
         # core/__init__.py
-        core_init = '''# AgentOS Python SDK - Core Layer
+        core_init = '''# AgentRT Python SDK - Core Layer
 # Version: 0.1.0
 
 """
@@ -121,7 +121,7 @@ except ImportError:
         print("  ✓ core/__init__.py")
 
         # modules/__init__.py
-        modules_init = '''# AgentOS Python SDK - Business Modules Layer
+        modules_init = '''# AgentRT Python SDK - Business Modules Layer
 # Version: 0.1.0
 
 """
@@ -135,7 +135,7 @@ __all__ = ["task", "memory", "session", "skill"]
 
         # 为每个子模块生成 __init__.py
         for module_name in ['task', 'memory', 'session', 'skill']:
-            module_init = f'''# AgentOS Python SDK - {module_name.title()} Module
+            module_init = f'''# AgentRT Python SDK - {module_name.title()} Module
 # Version: 0.1.0
 
 """
@@ -161,19 +161,19 @@ except ImportError:
             print(f"  ✓ modules/{module_name}/__init__.py")
 
         # client/__init__.py
-        client_init = '''# AgentOS Python SDK - Client Layer
+        client_init = '''# AgentRT Python SDK - Client Layer
 # Version: 0.1.0
 
 """
-Client classes for interacting with AgentOS system.
+Client classes for interacting with AgentRT system.
 """
 
 try:
     from .base import BaseClient
-    from .sync import AgentOS
-    from .async_ import AsyncAgentOS
+    from .sync import AgentRT
+    from .async_ import AsyncAgentRT
     
-    __all__ = ["BaseClient", "AgentOS", "AsyncAgentOS"]
+    __all__ = ["BaseClient", "AgentRT", "AsyncAgentRT"]
 except ImportError:
     __all__ = []
 '''
@@ -181,7 +181,7 @@ except ImportError:
         print("  ✓ client/__init__.py")
 
         # utils/__init__.py
-        utils_init = '''# AgentOS Python SDK - Utilities Layer
+        utils_init = '''# AgentRT Python SDK - Utilities Layer
 # Version: 0.1.0
 
 """
@@ -212,7 +212,7 @@ except ImportError:
         print("  ✓ utils/__init__.py")
 
         # telemetry/__init__.py
-        telemetry_init = '''# AgentOS Python SDK - Telemetry Layer
+        telemetry_init = '''# AgentRT Python SDK - Telemetry Layer
 # Version: 0.1.0
 
 """
@@ -239,7 +239,7 @@ except ImportError:
         print("  ✓ telemetry/__init__.py")
 
         # types/__init__.py
-        types_init = '''# AgentOS Python SDK - Type Definitions
+        types_init = '''# AgentRT Python SDK - Type Definitions
 # Version: 0.1.0
 
 """
@@ -273,14 +273,14 @@ except ImportError:
         """更新顶层 __init__.py"""
         print("\n🔄 更新顶层 __init__.py...")
 
-        top_init = '''# AgentOS Python SDK
+        top_init = '''# AgentRT Python SDK
 # Version: 0.1.0
 # Last updated: 2026-03-21
 
 """
-AgentOS Python SDK - Production-ready interface to AgentOS system.
+AgentRT Python SDK - Production-ready interface to AgentRT system.
 
-This SDK provides a clean, Pythonic interface to interact with the AgentOS system,
+This SDK provides a clean, Pythonic interface to interact with the AgentRT system,
 featuring:
     - High-level business logic modules (task, memory, session, skill)
     - Low-level FFI bindings with comprehensive error handling
@@ -289,8 +289,8 @@ featuring:
     - Asynchronous programming support
 
 Quick Start:
-    >>> from agentos import AgentOS
-    >>> client = AgentOS(endpoint="http://localhost:18789")
+    >>> from agentos import AgentRT
+    >>> client = AgentRT(endpoint="http://localhost:18789")
     >>> 
     >>> # Submit a task
     >>> task = client.submit_task('{"input": "analyze this data"}')
@@ -299,7 +299,7 @@ Quick Start:
 
 Example:
     >>> # Using context managers
-    >>> with AgentOS() as client:
+    >>> with AgentRT() as client:
     ...     session = client.create_session()
     ...     with session:
     ...         result = client.execute_skill("my_skill", {"param": "value"})
@@ -308,7 +308,7 @@ For more information, see the documentation at https://agentos.dev
 """
 
 __version__ = "0.1.0"
-__author__ = "Spharx AgentOS Team"
+__author__ = "Spharx AgentRT Team"
 __license__ = "Apache-2.0"
 
 # Import version info
@@ -326,7 +326,7 @@ from ._version import (
 if not check_python_version():
     import warnings
     warnings.warn(
-        f"This version of AgentOS requires Python 3.7-3.13, "
+        f"This version of AgentRT requires Python 3.7-3.13, "
         f"but you are using Python {'.'.join(map(str, __import__('sys').version_info[:2]))}",
         RuntimeWarning
     )
@@ -363,7 +363,7 @@ except ImportError:
 
 # Import clients
 try:
-    from .client import AgentOS, AsyncAgentOS, BaseClient
+    from .client import AgentRT, AsyncAgentRT, BaseClient
 except ImportError:
     pass
 
@@ -440,8 +440,8 @@ __all__ = [
     "get_default_proxy",
     
     # Clients
-    "AgentOS",
-    "AsyncAgentOS",
+    "AgentRT",
+    "AsyncAgentRT",
     "BaseClient",
     
     # Managers
@@ -554,7 +554,7 @@ __all__ = [
     def run(self) -> bool:
         """执行重构"""
         print("=" * 70)
-        print("🚀 AgentOS Python SDK 重构开始")
+        print("🚀 AgentRT Python SDK 重构开始")
         print("=" * 70)
 
         try:

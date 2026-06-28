@@ -1,9 +1,9 @@
-# AgentOS 安全测试模块
+# AgentRT 安全测试模块
 # Version: 0.1.0
 # Last updated: 2026-03-22
 
 """
-AgentOS 安全测试模块。
+AgentRT 安全测试模块。
 
 测试权限控制、沙箱隔离、输入净化等安全机制。
 """

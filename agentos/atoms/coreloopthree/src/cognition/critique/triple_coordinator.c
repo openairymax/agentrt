@@ -394,7 +394,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
 
         char *current_text = unit.text;
         size_t current_len = unit.text_len;
-        int owns_current = 0;
+        int owns_current = 1;  /* pop_pending 已转移 unit.text 的所有权 */
 
         while (verdict != TC3_RESULT_ACCEPT && verdict != TC3_RESULT_REJECT &&
                correction_attempts < coord->config.max_verify_rounds) {
@@ -530,6 +530,11 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
     if (accepted_count > 0) {
         concatenate_units(accepted_texts, accepted_lens, accepted_count, &full_output,
                           &full_output_len);
+        /* concatenate_units 已创建拼接副本，释放各片段原文 */
+        for (size_t i = 0; i < accepted_count; i++) {
+            if (accepted_texts[i])
+                AGENTOS_FREE((void *)accepted_texts[i]);
+        }
     }
 
     if (accepted_texts)

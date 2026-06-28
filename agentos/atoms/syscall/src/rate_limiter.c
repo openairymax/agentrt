@@ -165,7 +165,7 @@ void agentos_sys_rate_limiter_destroy(void)
     AGENTOS_LOG_INFO("Rate limiter destroyed");
 
     if (g_rate_limiter->lock) {
-        agentos_mutex_destroy(g_rate_limiter->lock);
+        agentos_mutex_free(g_rate_limiter->lock);
     }
     AGENTOS_FREE(g_rate_limiter);
     g_rate_limiter = NULL;

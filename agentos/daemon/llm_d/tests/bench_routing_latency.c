@@ -87,8 +87,8 @@ static void bench_provider_lookup(void)
     printf("  [INT-18.1] Provider lookup latency benchmark...\n");
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -138,13 +138,13 @@ static void bench_cache_hit_latency(void)
 {
     printf("  [INT-18.2] Cache hit latency benchmark...\n");
 
-    cache_t *cache = cache_create(1000, 3600);
+    llm_cache_t *cache = llm_cache_create(1000, 3600);
     assert(cache != NULL);
 
     /* 预填充缓存 */
     const char *test_key = "model:gpt-4o:hash_complex_key_12345";
     const char *test_value = "{\"id\":\"chatcmpl-123\",\"model\":\"gpt-4o\",\"choices\":[{\"message\":{\"content\":\"Benchmark response content\"}}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":50}}";
-    cache_put(cache, test_key, test_value);
+    llm_cache_put(cache, test_key, test_value);
 
     double *samples = (double *)malloc(BENCH_ITERATIONS * sizeof(double));
     assert(samples != NULL);
@@ -152,7 +152,7 @@ static void bench_cache_hit_latency(void)
     /* 预热 */
     for (int i = 0; i < 100; i++) {
         char *val = NULL;
-        cache_get(cache, test_key, &val);
+        llm_cache_get(cache, test_key, &val);
         free(val);
     }
 
@@ -160,7 +160,7 @@ static void bench_cache_hit_latency(void)
     for (int i = 0; i < BENCH_ITERATIONS; i++) {
         double start = get_time_us();
         char *val = NULL;
-        cache_get(cache, test_key, &val);
+        llm_cache_get(cache, test_key, &val);
         double end = get_time_us();
         free(val);
         samples[i] = end - start;
@@ -179,7 +179,7 @@ static void bench_cache_hit_latency(void)
     }
 
     free(samples);
-    cache_destroy(cache);
+    llm_cache_destroy(cache);
     printf("    PASSED\n");
 }
 
@@ -189,7 +189,7 @@ static void bench_cache_miss_latency(void)
 {
     printf("  [INT-18.3] Cache miss latency benchmark...\n");
 
-    cache_t *cache = cache_create(1000, 3600);
+    llm_cache_t *cache = llm_cache_create(1000, 3600);
     assert(cache != NULL);
 
     double *samples = (double *)malloc(BENCH_ITERATIONS / 10 * sizeof(double));
@@ -202,7 +202,7 @@ static void bench_cache_miss_latency(void)
 
         double start = get_time_us();
         char *val = NULL;
-        cache_get(cache, key, &val);
+        llm_cache_get(cache, key, &val);
         double end = get_time_us();
         samples[i] = end - start;
     }
@@ -212,7 +212,7 @@ static void bench_cache_miss_latency(void)
     print_bench_result("Cache miss (hash lookup)", &result);
 
     free(samples);
-    cache_destroy(cache);
+    llm_cache_destroy(cache);
     printf("    PASSED\n");
 }
 
@@ -222,12 +222,12 @@ static void bench_full_routing_decision(void)
 {
     printf("  [INT-18.4] Full routing decision latency (cache + lookup)...\n");
 
-    cache_t *cache = cache_create(1000, 3600);
+    llm_cache_t *cache = llm_cache_create(1000, 3600);
     assert(cache != NULL);
 
     service_config_t cfg = {
-        .cache_capacity = 100,
-        .cache_ttl_sec  = 3600,
+        .llm_cache_capacity = 100,
+        .llm_cache_ttl_sec  = 3600,
         .max_retries    = 3,
         .timeout_ms     = 30000,
         .token_encoding = "cl100k_base",
@@ -245,10 +245,10 @@ static void bench_full_routing_decision(void)
     const char *cache_key = "model:gpt-4o:hash_routing_bench";
 
     /* 预热 */
-    cache_put(cache, cache_key, "{\"cached\":true}");
+    llm_cache_put(cache, cache_key, "{\"cached\":true}");
     for (int i = 0; i < 100; i++) {
         char *val = NULL;
-        if (cache_get(cache, cache_key, &val) != 1) {
+        if (llm_cache_get(cache, cache_key, &val) != 1) {
             provider_registry_find(reg, model);
         }
         free(val);
@@ -260,7 +260,7 @@ static void bench_full_routing_decision(void)
 
         /* 步骤1: 检查缓存 */
         char *cached = NULL;
-        int cache_hit = cache_get(cache, cache_key, &cached);
+        int cache_hit = llm_cache_get(cache, cache_key, &cached);
 
         if (!cache_hit || !cached) {
             /* 步骤2: 查找提供商 */
@@ -286,7 +286,7 @@ static void bench_full_routing_decision(void)
 
     free(samples);
     provider_registry_destroy(reg);
-    cache_destroy(cache);
+    llm_cache_destroy(cache);
     printf("    PASSED\n");
 }
 

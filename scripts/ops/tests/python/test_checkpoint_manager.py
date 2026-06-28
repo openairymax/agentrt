@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 检查点管理器测试
+# AgentRT 检查点管理器测试
 
 """
 检查点管理器单元测试

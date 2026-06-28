@@ -16,21 +16,21 @@
 
 #define HASH_SIZE 1024
 
-typedef struct cache_entry {
+typedef struct llm_cache_entry {
     char *key;
     char *value;
     time_t timestamp;
-    struct cache_entry *prev;
-    struct cache_entry *next;
-    struct cache_entry *hnext;
+    struct llm_cache_entry *prev;
+    struct llm_cache_entry *next;
+    struct llm_cache_entry *hnext;
 } cache_entry_t;
 
-typedef struct cache_bucket {
+typedef struct llm_cache_bucket {
     cache_entry_t *head;
     agentos_mutex_t lock;
 } cache_bucket_t;
 
-struct cache {
+struct llm_cache {
     cache_bucket_t buckets[HASH_SIZE];
     cache_entry_t *lru_head;
     cache_entry_t *lru_tail;
@@ -101,7 +101,7 @@ static void entry_memory_safe_free(cache_entry_t *e)
  * @param cache 缓存实例
  * @param e 要移除的条目
  */
-static void lru_remove(cache_t *cache, cache_entry_t *e)
+static void lru_remove(llm_cache_t *cache, cache_entry_t *e)
 {
     if (e->prev)
         e->prev->next = e->next;
@@ -119,7 +119,7 @@ static void lru_remove(cache_t *cache, cache_entry_t *e)
  * @param cache 缓存实例
  * @param e 要移动的条目
  */
-static void lru_move_to_head(cache_t *cache, cache_entry_t *e)
+static void lru_move_to_head(llm_cache_t *cache, cache_entry_t *e)
 {
     if (cache->lru_head == e)
         return;
@@ -132,7 +132,7 @@ static void lru_move_to_head(cache_t *cache, cache_entry_t *e)
         cache->lru_tail = e;
 }
 
-static void evict_lru(cache_t *cache)
+static void evict_lru(llm_cache_t *cache)
 {
     agentos_mutex_lock(&cache->lru_lock);
     if (!cache->lru_tail) {
@@ -159,9 +159,9 @@ static void evict_lru(cache_t *cache)
     agentos_mutex_unlock(&cache->lru_lock);
 }
 
-cache_t *cache_create(size_t capacity, int ttl_sec)
+llm_cache_t *llm_cache_create(size_t capacity, int ttl_sec)
 {
-    cache_t *cache = AGENTOS_CALLOC(1, sizeof(cache_t));
+    llm_cache_t *cache = AGENTOS_CALLOC(1, sizeof(llm_cache_t));
     if (!cache) {
         AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
 
@@ -175,7 +175,7 @@ cache_t *cache_create(size_t capacity, int ttl_sec)
     return cache;
 }
 
-void cache_destroy(cache_t *cache)
+void llm_cache_destroy(llm_cache_t *cache)
 {
     if (!cache)
         return;
@@ -194,7 +194,7 @@ void cache_destroy(cache_t *cache)
     memory_safe_free(cache);
 }
 
-int cache_get(cache_t *cache, const char *key, char **out_value)
+int llm_cache_get(llm_cache_t *cache, const char *key, char **out_value)
 {
     if (!cache || !key || !out_value)
         return AGENTOS_ERR_INVALID_PARAM;
@@ -214,9 +214,9 @@ int cache_get(cache_t *cache, const char *key, char **out_value)
         return 0;
     }
 
-    if (cache->ttl_sec > 0 && (time(NULL) - e->timestamp) > cache->ttl_sec) {
+    if (cache->ttl_sec > 0 && (time(NULL) - e->timestamp) >= cache->ttl_sec) {
         agentos_mutex_unlock(&cache->buckets[idx].lock);
-        cache_put(cache, key, NULL);
+        llm_cache_put(cache, key, NULL);
         return 0;
     }
 
@@ -230,7 +230,7 @@ int cache_get(cache_t *cache, const char *key, char **out_value)
     return 1;
 }
 
-void cache_put(cache_t *cache, const char *key, const char *value)
+void llm_cache_put(llm_cache_t *cache, const char *key, const char *value)
 {
     if (!cache || !key)
         return;
@@ -289,7 +289,7 @@ void cache_put(cache_t *cache, const char *key, const char *value)
     }
 }
 
-void cache_clear(cache_t *cache)
+void llm_cache_clear(llm_cache_t *cache)
 {
     if (!cache)
         return;
@@ -310,12 +310,12 @@ void cache_clear(cache_t *cache)
     agentos_mutex_unlock(&cache->lru_lock);
 }
 
-size_t cache_size(cache_t *cache)
+size_t llm_cache_size(llm_cache_t *cache)
 {
     return cache ? cache->size : 0;
 }
 
-size_t cache_capacity(cache_t *cache)
+size_t llm_cache_capacity(llm_cache_t *cache)
 {
     return cache ? cache->capacity : 0;
 }

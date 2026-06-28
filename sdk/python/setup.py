@@ -1,5 +1,5 @@
 """
-AgentOS Python SDK 安装脚本
+AgentRT Python SDK 安装脚本
 提供 setuptools 安装配置，支持 pip install
 """
 from setuptools import setup, find_packages
@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 setup(
     name="agentos",
     version="0.1.0",
-    description="AgentOS Python SDK - 官方多语言 SDK 集合",
+    description="AgentRT Python SDK - 官方多语言 SDK 集合",
     long_description=open("README.md", "r", encoding="utf-8").read() if __name__ == "__main__" else "",
     long_description_content_type="text/markdown",
     author="SPHARX Ltd.",

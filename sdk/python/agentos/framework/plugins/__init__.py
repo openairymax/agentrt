@@ -1,4 +1,4 @@
-# AgentOS 示例插件包
+# AgentRT 示例插件包
 # Version: 0.1.0
 
 from .logger_plugin import LoggerPlugin

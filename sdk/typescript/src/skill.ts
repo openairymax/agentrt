@@ -1,18 +1,18 @@
-// AgentOS TypeScript SDK Skill
+// AgentRT TypeScript SDK Skill
 // Version: 0.1.0
 // Last updated: 2026-04-04
 
 import { SkillInfo, SkillResult } from './types';
 import { SkillError } from './errors';
-import { AgentOS } from './agent';
+import { AgentRT } from './agent';
 
-/** AgentOS 技能管理类 */
+/** AgentRT 技能管理类 */
 export class Skill {
-  private client: AgentOS;
+  private client: AgentRT;
   private skillName: string;
 
   /** 创建新的 Skill 对象 */
-  constructor(client: AgentOS, skillName: string) {
+  constructor(client: AgentRT, skillName: string) {
     this.client = client;
     this.skillName = skillName;
   }
