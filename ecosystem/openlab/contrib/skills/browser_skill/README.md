@@ -78,7 +78,7 @@ data = await browser.extract(
     attribute="text"
 )
 
-await browser.type("#search-input", "AgentOS")
+await browser.type("#search-input", "AgentRT")
 await browser.click("#search-button")
 
 await browser.screenshot("output/page.png")

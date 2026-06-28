@@ -1,12 +1,12 @@
-# AgentOS Application Framework
+# AgentRT Application Framework
 # Version: 0.1.0
 # Last updated: 2026-04-11
 
 """
-AgentOS 统一应用框架
+AgentRT 统一应用框架
 
 提供智能体应用的完整生命周期管理、状态控制、配置管理和错误处理能力。
-本框架是AgentOS应用开发的最高层抽象，为所有应用提供统一的基础设施支持。
+本框架是AgentRT应用开发的最高层抽象，为所有应用提供统一的基础设施支持。
 
 核心模块:
 1. 应用框架 (application.py) - 生命周期、状态、配置、错误处理统一入口
@@ -23,7 +23,7 @@ AgentOS 统一应用框架
         await app.initialize()
         await app.start()
 
-        result = await app.execute("Hello, AgentOS!")
+        result = await app.execute("Hello, AgentRT!")
         print(result)
 
         await app.stop()

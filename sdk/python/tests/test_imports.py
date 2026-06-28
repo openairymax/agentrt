@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-AgentOS Python SDK 模块导入测试脚本
+AgentRT Python SDK 模块导入测试脚本
 """
 
 import sys
@@ -13,17 +13,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 def test_imports():
     """测试所有模块导入"""
     print("=" * 60)
-    print("AgentOS Python SDK v0.1.0 模块导入测试")
+    print("AgentRT Python SDK v0.1.0 模块导入测试")
     print("=" * 60)
     
     # 测试 client 模块
     print("\n[1/5] 测试 client 模块...")
     try:
-        from agentos.client import Client, APIClient, manager, MockClient
+        from agentos.client import Client, APIClient, MockClient
         print("  OK client 模块导入成功")
         print(f"    - Client: {Client}")
         print(f"    - APIClient: {APIClient}")
-        print(f"    - manager: {manager}")
         print(f"    - MockClient: {MockClient}")
     except Exception as e:
         print(f"  FAIL client 模块导入失败: {e}")
@@ -90,10 +89,10 @@ def test_imports():
     # 测试向后兼容
     print("\n[向后兼容] 测试向后兼容导入...")
     try:
-        from agentos import AgentOS, AsyncAgentOS
+        from agentos import AgentRT, AsyncAgentRT
         print("  OK 向后兼容导入成功")
-        print(f"    - AgentOS: {AgentOS}")
-        print(f"    - AsyncAgentOS: {AsyncAgentOS}")
+        print(f"    - AgentRT: {AgentRT}")
+        print(f"    - AsyncAgentRT: {AsyncAgentRT}")
     except Exception as e:
         print(f"  FAIL 向后兼容导入失败: {e}")
         return False

@@ -1,4 +1,4 @@
-# AgentOS 测试基类
+# AgentRT 测试基类
 # Version: 0.1.0
 # Last updated: 2026-03-22
 
@@ -186,14 +186,14 @@ class SDKTestCase(BaseTestCase):
 
         # 导入SDK模块
         try:
-            from agentos import AgentOS, AsyncAgentOS
+            from agentos import AgentRT, AsyncAgentRT
             from agentos.exceptions import (
                 AgentOSError, NetworkError, TimeoutError as AgentOSTimeoutError,
                 TaskError, MemoryError as AgentOSMemoryError, SessionError, SkillError
             )
 
-            self.AgentOS = AgentOS
-            self.AsyncAgentOS = AsyncAgentOS
+            self.AgentRT = AgentRT
+            self.AsyncAgentRT = AsyncAgentRT
             self.AgentOSError = AgentOSError
             self.NetworkError = NetworkError
             self.AgentOSTimeoutError = AgentOSTimeoutError
@@ -226,7 +226,7 @@ class SDKTestCase(BaseTestCase):
             mock_session.put.return_value = mock_response
             mock_session.delete.return_value = mock_response
 
-            client = self.AgentOS(endpoint=endpoint)
+            client = self.AgentRT(endpoint=endpoint)
             client._session = mock_session
 
             return client
@@ -254,7 +254,7 @@ class SDKTestCase(BaseTestCase):
             mock_session.put.return_value.__aenter__.return_value = mock_response
             mock_session.delete.return_value.__aenter__.return_value = mock_response
 
-            client = self.AsyncAgentOS(endpoint=endpoint)
+            client = self.AsyncAgentRT(endpoint=endpoint)
             client._session = mock_session
 
             return client
@@ -271,7 +271,7 @@ class APITestCase(BaseTestCase):
         self.api_version = "v1"
         self.headers = {
             "Content-Type": "application/json",
-            "User-Agent": "AgentOS-Test/1.0.0"
+            "User-Agent": "AgentRT-Test/1.0.0"
         }
 
     def get_api_url(self, endpoint: str) -> str:
@@ -328,7 +328,7 @@ class IntegrationTestCase(BaseTestCase):
 
     def check_external_dependencies(self):
         """检查外部依赖"""
-        # 检查AgentOS服务是否可用
+        # 检查AgentRT服务是否可用
         import socket
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -340,7 +340,7 @@ class IntegrationTestCase(BaseTestCase):
             self.agentos_available = False
 
         if not self.agentos_available:
-            pytest.skip("AgentOS服务不可用，跳过集成测试")
+            pytest.skip("AgentRT服务不可用，跳过集成测试")
 
     def wait_for_service(self, host: str = "localhost", port: int = 18789,
                         timeout: int = 30) -> bool:

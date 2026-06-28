@@ -1,11 +1,11 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Docker Compose 配置文件 - Staging 环境
+# AgentRT Docker Compose 配置文件 - Staging 环境
 # 用于预发布环境和生产部署前的验证
 
 version: '3.8'
 
 services:
-  # ==================== AgentOS Scripts 服务 ====================
+  # ==================== AgentRT Scripts 服务 ====================
   agentos-scripts:
     build:
       context: ..
@@ -61,7 +61,7 @@ services:
     # 启动命令
     command: >
       bash -c "
-        echo 'Starting AgentOS Scripts (Staging)...';
+        echo 'Starting AgentRT Scripts (Staging)...';
         python3 -m scripts.core.cli --manager /etc/agentos/manager.yaml;
       "
 

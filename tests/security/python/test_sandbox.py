@@ -1,9 +1,9 @@
-# AgentOS 沙箱安全测试
+# AgentRT 沙箱安全测试
 # Version: 0.1.0
 # Last updated: 2026-03-23
 
 """
-AgentOS 沙箱安全测试模块。
+AgentRT 沙箱安全测试模块。
 
 测试沙箱隔离机制、权限控制、资源限制等安全功能。
 """

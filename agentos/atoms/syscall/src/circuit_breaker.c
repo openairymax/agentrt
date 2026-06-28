@@ -204,7 +204,7 @@ void agentos_sys_circuit_breaker_destroy(void)
     AGENTOS_LOG_INFO("Circuit breaker destroyed");
 
     if (g_circuit_breaker->lock) {
-        agentos_mutex_destroy(g_circuit_breaker->lock);
+        agentos_mutex_free(g_circuit_breaker->lock);
     }
     AGENTOS_FREE(g_circuit_breaker);
     g_circuit_breaker = NULL;

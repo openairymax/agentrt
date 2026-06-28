@@ -80,6 +80,8 @@ if(AGENTOS_ENABLE_PROTOCOLS)
 endif()
 
 # ==================== 平台特定配置 ====================
+# 注意：agentos_common 不在此处直接链接，而是通过 svc_common 的 PUBLIC
+# 传递依赖处理，避免在链接命令中重复出现导致 LTO 符号解析失败。
 if(WIN32)
     target_compile_definitions(gateway_d PRIVATE
         AGENTOS_PLATFORM_WINDOWS=1
@@ -88,13 +90,11 @@ if(WIN32)
         _CRT_SECURE_NO_WARNINGS
     )
     target_link_libraries(gateway_d PRIVATE
-        agentos_common
         ws2_32
         bcrypt
     )
 elseif(UNIX)
     target_link_libraries(gateway_d PRIVATE
-        agentos_common
         Threads::Threads
         agentos_platform_libs
     )
@@ -202,36 +202,58 @@ target_include_directories(gateway_lib_obj PUBLIC
 endif()
 
 # 条件包含外部库头文件和定义（使用根级缓存变量）
+# 注意：gateway_lib_obj 仅在 AGENTOS_HAS_CJSON 时创建，此处必须检查目标存在性
 if(AGENTOS_HAS_MICROHTTPD)
-    if(libmicrohttpd_FOUND)
-        target_include_directories(gateway_lib_obj PUBLIC ${libmicrohttpd_INCLUDE_DIRS})
-    elseif(MICROHTTPD_FOUND)
-        target_include_directories(gateway_lib_obj PUBLIC ${MICROHTTPD_INCLUDE_DIRS})
+    if(TARGET gateway_lib_obj)
+        if(libmicrohttpd_FOUND)
+            target_include_directories(gateway_lib_obj PUBLIC ${libmicrohttpd_INCLUDE_DIRS})
+        elseif(MICROHTTPD_FOUND)
+            target_include_directories(gateway_lib_obj PUBLIC ${MICROHTTPD_INCLUDE_DIRS})
+        endif()
+        target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
     endif()
-    target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
     target_compile_definitions(gateway_d PRIVATE GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
 else()
     message(STATUS "libmicrohttpd not found, HTTP gateway may not compile.")
 endif()
 
 if(AGENTOS_HAS_LIBWEBSOCKETS)
-    if(libwebsockets_FOUND)
-        target_include_directories(gateway_lib_obj PUBLIC ${libwebsockets_INCLUDE_DIRS})
-    elseif(LIBWEBSOCKETS_FOUND)
-        target_include_directories(gateway_lib_obj PUBLIC ${LIBWEBSOCKETS_INCLUDE_DIRS})
+    if(TARGET gateway_lib_obj)
+        if(libwebsockets_FOUND)
+            target_include_directories(gateway_lib_obj PUBLIC ${libwebsockets_INCLUDE_DIRS})
+        elseif(LIBWEBSOCKETS_FOUND)
+            target_include_directories(gateway_lib_obj PUBLIC ${LIBWEBSOCKETS_INCLUDE_DIRS})
+        endif()
+        target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_WS=1)
     endif()
-    target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_WS=1)
     target_compile_definitions(gateway_d PRIVATE GATEWAY_HAS_WS=1)
 else()
     message(STATUS "libwebsockets not found, WebSocket gateway may not compile.")
 endif()
 
-target_link_libraries(gateway_d PRIVATE
-    svc_common
-    agentos_common
-    agentos_protocols
-    Threads::Threads
-)
+# 链接策略说明：
+#   LTO + ASan 组合下，链接器扫描静态库时使用 LTO 符号摘要，可能漏掉符号
+#   （表现为 undefined reference to memory_alloc 等，但符号确实存在于 .a 中）。
+#   根 CMakeLists.txt 已添加 -ffat-lto-objects，让 LTO 对象同时包含机器代码，
+#   链接器可用传统符号表解析静态库，无需 --whole-archive。
+#   使用 --start-group/--end-group 处理 svc_common 与 agentos_common 之间的
+#   传递依赖符号解析（agentos_common 通过 svc_common PUBLIC 传递，位于组外之后，
+#   单次扫描即可解析）。
+if(NOT MSVC AND NOT APPLE)
+    target_link_libraries(gateway_d PRIVATE
+        "-Wl,--start-group"
+        svc_common
+        agentos_protocols
+        "-Wl,--end-group"
+        Threads::Threads
+    )
+else()
+    target_link_libraries(gateway_d PRIVATE
+        svc_common
+        agentos_protocols
+        Threads::Threads
+    )
+endif()
 if(AGENTOS_HAS_CJSON)
     target_link_libraries(gateway_d PRIVATE
         $<TARGET_OBJECTS:gateway_lib_obj>

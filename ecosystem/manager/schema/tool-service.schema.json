@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://agentos.spharx.com/schemas/tool-service.schema.json",
-  "title": "AgentOS Tool Service Configuration Schema",
+  "title": "AgentRT Tool Service Configuration Schema",
   "description": "Schema for Tool Daemon service configuration",
   "type": "object",
   "required": ["_config_version", "tool_d"],

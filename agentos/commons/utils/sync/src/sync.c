@@ -426,3 +426,103 @@ void sync_yield(void)
     sched_yield();
 #endif
 }
+
+/**
+ * @brief 线程休眠（匹配 sync.h 声明的签名）
+ */
+void sync_sleep(unsigned int ms)
+{
+    sync_sleep_ms((uint64_t)ms);
+}
+
+/**
+ * @brief 检查死锁（占位实现，当前不支持死锁检测）
+ */
+sync_result_t sync_check_deadlock(sync_deadlock_info_t *info, size_t max_info_size)
+{
+    (void)info;
+    (void)max_info_size;
+    return SYNC_SUCCESS;
+}
+
+/**
+ * @brief 设置锁名称（占位实现）
+ */
+sync_result_t sync_set_name(void *lock, const char *name)
+{
+    (void)lock;
+    (void)name;
+    return SYNC_SUCCESS;
+}
+
+/**
+ * @brief 获取当前线程ID
+ */
+uint64_t sync_get_thread_id(void)
+{
+#ifdef _WIN32
+    return (uint64_t)GetCurrentThreadId();
+#else
+    return (uint64_t)pthread_self();
+#endif
+}
+
+/**
+ * @brief 原子操作：比较并交换
+ */
+bool sync_atomic_cas(volatile void *ptr, uintptr_t expected, uintptr_t desired)
+{
+#ifdef _WIN32
+    return _InterlockedCompareExchange64((volatile LONG64 *)ptr, (LONG64)desired, (LONG64)expected) == (LONG64)expected;
+#else
+    return __sync_bool_compare_and_swap((volatile uintptr_t *)ptr, expected, desired);
+#endif
+}
+
+/**
+ * @brief 原子操作：增加
+ */
+uintptr_t sync_atomic_add(volatile void *ptr, uintptr_t value)
+{
+#ifdef _WIN32
+    return (uintptr_t)_InterlockedExchangeAdd64((volatile LONG64 *)ptr, (LONG64)value);
+#else
+    return __sync_fetch_and_add((volatile uintptr_t *)ptr, value);
+#endif
+}
+
+/**
+ * @brief 原子操作：减少
+ */
+uintptr_t sync_atomic_sub(volatile void *ptr, uintptr_t value)
+{
+#ifdef _WIN32
+    return (uintptr_t)_InterlockedExchangeAdd64((volatile LONG64 *)ptr, -(LONG64)value);
+#else
+    return __sync_fetch_and_sub((volatile uintptr_t *)ptr, value);
+#endif
+}
+
+/**
+ * @brief 原子操作：获取
+ */
+uintptr_t sync_atomic_load(volatile void *ptr)
+{
+#ifdef _WIN32
+    return (uintptr_t)_InterlockedExchangeAdd64((volatile LONG64 *)ptr, 0);
+#else
+    return __sync_fetch_and_add((volatile uintptr_t *)ptr, 0);
+#endif
+}
+
+/**
+ * @brief 原子操作：存储
+ */
+void sync_atomic_store(volatile void *ptr, uintptr_t value)
+{
+#ifdef _WIN32
+    _InterlockedExchange64((volatile LONG64 *)ptr, (LONG64)value);
+#else
+    __sync_lock_test_and_set((volatile uintptr_t *)ptr, value);
+#endif
+}

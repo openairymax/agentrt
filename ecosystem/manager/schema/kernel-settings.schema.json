@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/kernel-settings-v1.schema.json",
-  "title": "AgentOS Kernel Settings Schema",
-  "description": "Configuration schema for AgentOS microkernel core settings. Based on ARCHITECTURAL_PRINCIPLES.md and error_code_reference.md specifications.",
+  "title": "AgentRT Kernel Settings Schema",
+  "description": "Configuration schema for AgentRT microkernel core settings. Based on ARCHITECTURAL_PRINCIPLES.md and error_code_reference.md specifications.",
   "type": "object",
   "required": ["_config_version", "kernel"],
   "properties": {
@@ -19,13 +19,13 @@
         "min_agentos_version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
-          "description": "Minimum compatible AgentOS version",
+          "description": "Minimum compatible AgentRT version",
           "examples": ["1.0.0"]
         },
         "max_agentos_version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
-          "description": "Maximum compatible AgentOS version",
+          "description": "Maximum compatible AgentRT version",
           "examples": ["2.0.0"]
         }
       }
@@ -39,7 +39,7 @@
           "minLength": 1,
           "maxLength": 64,
           "description": "Kernel instance name",
-          "examples": ["AgentOS-Core-01", "agentos-production"]
+          "examples": ["AgentRT-Core-01", "agentos-production"]
         },
         "version": {
           "type": "string",

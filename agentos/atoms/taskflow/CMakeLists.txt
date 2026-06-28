@@ -113,7 +113,7 @@ else()
     target_compile_options(agentos_taskflow PRIVATE -Wall -Wextra -Wpedantic )
     # GCC/Clang安全选项
     target_compile_options(agentos_taskflow PRIVATE -fstack-protector-strong)
-    target_compile_options(agentos_taskflow PRIVATE -D_FORTIFY_SOURCE=2)
+    target_compile_options(agentos_taskflow PRIVATE $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
     target_compile_options(agentos_taskflow PRIVATE -fPIE)
     target_compile_options(agentos_taskflow PRIVATE -Wformat -Wformat-security)
     target_compile_options(agentos_taskflow PRIVATE -fno-omit-frame-pointer)
@@ -140,6 +140,7 @@ if(BUILD_TESTS)
         tests/unit/test_taskflow_advanced.c
         ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
     )
+    target_compile_definitions(test_taskflow_advanced PRIVATE AGENTOS_COMPLIANCE_IMPL)
 
     set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
         PROPERTIES COMPILE_FLAGS "-fno-lto"

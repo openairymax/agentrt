@@ -316,7 +316,7 @@ static inline char *agentos_strndup(const char *str, size_t n)
  * @def AGENTOS_MALLOC(size)
  * @brief 安全内存分配宏
  */
-#define AGENTOS_MALLOC(size) ({ \
+#define AGENTOS_MALLOC(size) __extension__({ \
     void *__ptr = agentos_malloc(size); \
     if (__ptr) { agentos_mem_stats_record_alloc(size); } \
     __ptr; \
@@ -709,6 +709,40 @@ void agentos_arena_set_current(agentos_arena_t *arena);
     do {                                 \
         if ((size) > 0)                  \
             __builtin_memset((ptr), (value), (size)); \
+    } while (0)
+
+/**
+ * @def AGENTOS_MEMCPY(dst, src, size)
+ * @brief 安全内存复制宏（绕过 BAN poison，调用者需确保边界安全）
+ *
+ * 使用 __builtin_memcpy 绕过 BAN-154 的 memcpy poison。
+ * 适用于已进行边界检查的场景。如需自动边界检查，使用 AGENTOS_MEMCPY_SAFE。
+ *
+ * @param dst  目标指针
+ * @param src  源指针
+ * @param size 复制字节数
+ */
+#define AGENTOS_MEMCPY(dst, src, size) \
+    do { \
+        if ((size) > 0) \
+            __builtin_memcpy((dst), (src), (size)); \
+    } while (0)
+
+/**
+ * @def AGENTOS_MEMMOVE(dst, src, size)
+ * @brief 安全内存移动宏（处理重叠区域，绕过 BAN poison）
+ *
+ * 使用 __builtin_memmove 绕过 BAN-154 的 memmove poison。
+ * 适用于源和目标可能重叠的内存复制场景。
+ *
+ * @param dst  目标指针
+ * @param src  源指针
+ * @param size 移动字节数
+ */
+#define AGENTOS_MEMMOVE(dst, src, size) \
+    do { \
+        if ((size) > 0) \
+            __builtin_memmove((dst), (src), (size)); \
     } while (0)
 
 /**

@@ -3,7 +3,7 @@
 # Last updated: 2026-03-24
 
 """
-Task management module for AgentOS SDK.
+Task management module for AgentRT SDK.
 
 Provides task submission, query, wait, cancel, and list operations.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Concurrent Stress Test Suite
+AgentRT Concurrent Stress Test Suite
 Tests: PluginRegistry concurrent operations, SDK thread safety, QPS measurement
 Target: QPS >= 500 for plugin operations
 """
@@ -287,7 +287,7 @@ def test_mixed_concurrent_operations():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("  AgentOS Concurrent Stress Test Report")
+    print("  AgentRT Concurrent Stress Test Report")
     print("=" * 60)
 
     results = []

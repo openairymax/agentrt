@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 事件总线系统
+# AgentRT 事件总线系统
 # 统一的遥测和事件处理框架
 
 """
-AgentOS 事件总线
+AgentRT 事件总线
 
 提供统一的事件处理架构，支持：
 - 同步/异步事件处理

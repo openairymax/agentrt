@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/sanitizer-rules-v1.schema.json",
-  "title": "AgentOS Sanitizer Rules Schema",
+  "title": "AgentRT Sanitizer Rules Schema",
   "description": "Configuration schema for input sanitization and security filtering rules",
   "type": "object",
   "required": ["_config_version", "rules"],

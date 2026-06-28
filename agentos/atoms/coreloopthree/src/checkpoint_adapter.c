@@ -24,6 +24,9 @@
 #include "string_compat.h"
 #include "agentos_quality.h"
 
+/* 跨平台路径常量（AGENTOS_DATA_DIR） */
+#include "platform.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,7 +34,7 @@
 
 /* ==================== 默认配置 ==================== */
 
-#define DEFAULT_STORAGE_PATH          "/var/lib/agentos/checkpoints"
+#define DEFAULT_STORAGE_PATH          AGENTOS_DATA_DIR "/checkpoints"
 #define DEFAULT_SAVE_INTERVAL_TURNS   10
 #define DEFAULT_SAVE_INTERVAL_MS      30000
 #define DEFAULT_MAX_CHECKPOINTS       100

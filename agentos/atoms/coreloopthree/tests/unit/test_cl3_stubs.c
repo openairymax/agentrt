@@ -15,29 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* execution engine stubs */
-agentos_error_t agentos_execution_register_unit(agentos_execution_engine_t *engine,
-                                                const char *name, agentos_execution_unit_t unit)
-{
-    (void)engine;
-    (void)name;
-    (void)unit;
-    return AGENTOS_SUCCESS;
-}
-
-void agentos_execution_unregister_unit(agentos_execution_engine_t *engine, const char *name)
-{
-    (void)engine;
-    (void)name;
-}
-
-void agentos_execution_set_feedback_callback(agentos_execution_engine_t *engine,
-                                             agentos_feedback_callback_t callback, void *user_data)
-{
-    (void)engine;
-    (void)callback;
-    (void)user_data;
-}
+/* execution engine stubs — register_unit/unregister_unit/set_feedback_callback
+ * are now implemented in engine.c, removed from stubs to avoid multiple definition */
 
 /* compensation stubs */
 agentos_error_t agentos_compensation_compensate(agentos_compensation_t *mgr, const char *action_id)

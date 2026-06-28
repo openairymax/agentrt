@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spharx/agentos/sdk/go/agentos"
-	"github.com/spharx/agentos/sdk/go/agentos/client"
-	"github.com/spharx/agentos/sdk/go/agentos/types"
-	"github.com/spharx/agentos/sdk/go/agentos/utils"
+	"github.com/spharx/agentrt/sdk/go/agentos"
+	"github.com/spharx/agentrt/sdk/go/agentos/client"
+	"github.com/spharx/agentrt/sdk/go/agentos/types"
+	"github.com/spharx/agentrt/sdk/go/agentos/utils"
 )
 
 // TaskManager 管理任务完整生命周期

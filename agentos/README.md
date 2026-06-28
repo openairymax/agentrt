@@ -4,7 +4,7 @@
 
 ## 概述
 
-`agentos/` 是 AgentRT 项目的核心代码目录，包含了从微内核到应用生态层的完整实现。该目录按照"分层架构、模块隔离、协议驱动"的设计理念组织，涵盖 Atoms 微内核层、Commons 基础库、Cupolas 安全层、Daemon 服务层、Gateway 网关层、Heapstore 存储层、Manager 配置中心以及 Toolkit SDK 工具包，构成了完整的智能体操作系统内核。
+`agentos/` 是 AgentRT 项目的核心代码目录，包含了从微核心到应用生态层的完整实现。该目录按照"分层架构、模块隔离、协议驱动"的设计理念组织，涵盖 Atoms 微核心层、Commons 基础库、Cupolas 安全层、Daemon 服务层、Gateway 网关层、Heapstore 存储层、Manager 配置中心以及 Toolkit SDK 工具包，构成了完整的智能体操作系统内核。
 
 ## 架构总览
 
@@ -21,7 +21,7 @@ AgentRT 采用自底向上的四层分层架构，每层职责明确、接口清
 │                    基础设施层                                │
 │  gateway / heapstore / manager / cupolas / commons           │
 ├───────────────────────────────────────────────────────────┤
-│                    Atoms 微内核层                            │
+│                    Atoms 微核心层                            │
 │  CoreKern / CoreLoopThree / Memory / MemoryRovol / Syscall / ... │
 └───────────────────────────────────────────────────────────┘
 ```
@@ -30,8 +30,8 @@ AgentRT 采用自底向上的四层分层架构，每层职责明确、接口清
 
 ```
 agentos/
-├── atoms/              # 微内核原子组件层 — 系统的最底层基础
-│   ├── corekern/       #     微内核核心 — IPC/Binder、内存管理、任务调度、定时器
+├── atoms/              # 微核心原子组件层 — 系统的最底层基础
+│   ├── corekern/       #     微核心核心 — IPC/Binder、内存管理、任务调度、定时器
 │   ├── coreloopthree/  #     三环核心运行时 — 认知环/执行环/学习环
 │   ├── memory/         #     内置记忆子系统（L1+L2）
 │   ├── memoryrovol/    #     MemoryRovol PRO 桥接（L1-L4，需 -DAGENTOS_WITH_MEMORYROVOL=ON）
@@ -128,13 +128,13 @@ agentos/
 
 ## 核心模块说明
 
-### Atoms 微内核层
+### Atoms 微核心层
 
-Atoms 层是 AgentRT 的最底层基础，包含 7 个核心微内核组件：
+Atoms 层是 AgentRT 的最底层基础，包含 7 个核心微核心组件：
 
 | 模块 | 说明 | 关键特性 |
 |------|------|----------|
-| **CoreKern** | 微内核核心 | IPC/Binder、内存管理、任务调度、定时器、插件管理 |
+| **CoreKern** | 微核心核心 | IPC/Binder、内存管理、任务调度、定时器、插件管理 |
 | **CoreLoopThree** | 三环运行时 | 认知环/执行环/学习环、System 1/System 2 双处理理论 |
 | **Memory** | 内置记忆子系统 | L1 原始层+L2 关键词索引，可拔插提供商架构 |
 | **MemoryRovol** | 商业记忆桥接 | L1-L4 全功能，需外部 MemoryRovol 仓库 |
@@ -269,7 +269,7 @@ AgentRT 采用三层协议体系：
 
 | 层级 | 协议 | 用途 |
 |------|------|------|
-| **内核 IPC** | Binder | 微内核与用户态服务间的进程间通信 |
+| **内核 IPC** | Binder | 微核心与用户态服务间的进程间通信 |
 | **服务间通信** | JSON-RPC 2.0 | 各守护进程之间的 RPC 调用 |
 | **外部协议** | HTTP/WS/MQTT/gRPC | 外部客户端与 AgentRT 的交互 |
 
