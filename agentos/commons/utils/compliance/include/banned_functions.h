@@ -16,7 +16,8 @@
 #pragma GCC poison realloc
 #pragma GCC poison strdup
 #pragma GCC poison strndup
-#ifndef AGENTOS_HAS_CURL
+/* 兼容 AGENTRT_HAS_CURL（新名）和 AGENTOS_HAS_CURL（旧名）两种宏定义 */
+#if !defined(AGENTOS_HAS_CURL) && !defined(AGENTRT_HAS_CURL)
 #pragma GCC poison printf
 #pragma GCC poison fprintf
 #endif

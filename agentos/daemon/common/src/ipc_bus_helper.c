@@ -122,7 +122,7 @@ int ipc_bus_helper_register_channel(ipc_bus_helper_t *ibh,
     }
 
     ipc_bus_channel_config_t ch_config;
-    memset(&ch_config, 0, sizeof(ch_config));
+    AGENTOS_MEMSET(&ch_config, 0, sizeof(ch_config));
     safe_strcpy(ch_config.name, channel_name, sizeof(ch_config.name));
     ch_config.default_protocol = default_protocol;
     ch_config.timeout_ms = IPC_BUS_DEFAULT_TIMEOUT_MS;
@@ -152,7 +152,7 @@ int ipc_bus_helper_register_endpoint(ipc_bus_helper_t *ibh,
         return -1;
 
     ipc_bus_endpoint_t ep;
-    memset(&ep, 0, sizeof(ep));
+    AGENTOS_MEMSET(&ep, 0, sizeof(ep));
     safe_strcpy(ep.service_name, service_name, sizeof(ep.service_name));
     safe_strcpy(ep.endpoint, endpoint, sizeof(ep.endpoint));
     ep.healthy = true;

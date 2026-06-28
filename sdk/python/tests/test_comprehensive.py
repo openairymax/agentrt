@@ -1,5 +1,5 @@
 """
-Unit tests for AgentOS Python SDK.
+Unit tests for AgentRT Python SDK.
 
 This module contains comprehensive tests for the SDK components.
 Run with: pytest tests/test_agent.py -v
@@ -12,7 +12,7 @@ import time
 
 # Import all available public APIs
 from agentos import (
-    AgentOS, AsyncAgentOS,
+    AgentRT, AsyncAgentRT,
     Telemetry, Meter, Tracer, Span, SpanStatus,
     TaskStatus, TaskResult, SkillInfo, SkillResult,
     Memory, MemorySearchResult, Session, Skill,
@@ -33,8 +33,8 @@ from agentos.session import Session
 from agentos.skill import Skill
 
 # 向后兼容别名
-AgentOS_MemoryError = AgentOSMemoryError
-AgentOS_TimeoutError = AgentOSTimeoutError
+AgentRT_MemoryError = AgentOSMemoryError
+AgentRT_TimeoutError = AgentOSTimeoutError
 
 
 class TestTypes(unittest.TestCase):

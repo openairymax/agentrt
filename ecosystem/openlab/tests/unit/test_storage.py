@@ -68,7 +68,7 @@ class TestStorageRecord:
             key="key-001",
             value="value_data",
             category=DataCategory.TASK,
-            metadata={"author": "Spharx AgentOS Team"},
+            metadata={"author": "Spharx AgentRT Team"},
             version=3,
         )
         

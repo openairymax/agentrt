@@ -67,13 +67,13 @@ static DWORD WINAPI windows_thread_entry_wrapper(LPVOID param)
 }
 
 /**
- * @brief 将AgentOS优先级转换为Windows优先? *
- * AgentOS优先级范围为AGENTOS_TASK_PRIORITY_MIN到AGENTOS_TASK_PRIORITY_MAX? *
+ * @brief 将AgentRT优先级转换为Windows优先? *
+ * AgentRT优先级范围为AGENTOS_TASK_PRIORITY_MIN到AGENTOS_TASK_PRIORITY_MAX? *
  * 需要映射到Windows的THREAD_PRIORITY_*常量? *
  * @param agentos_priority AgentOS优先? * @return Windows优先级常? */
 static int map_priority_to_windows(int agentos_priority)
 {
-    /* AgentOS优先级范围映射到Windows优先?*/
+    /* AgentRT优先级范围映射到Windows优先?*/
     if (agentos_priority >= AGENTOS_TASK_PRIORITY_HIGH) {
         return THREAD_PRIORITY_HIGHEST;
     } else if (agentos_priority <= AGENTOS_TASK_PRIORITY_LOW) {

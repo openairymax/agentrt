@@ -454,7 +454,9 @@ static void *worker_thread_func(void *arg)
         }
         tcb_release(tcb);
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
+
+    /* 线程退出前清理线程局部错误状态，避免 LSan 报告内存泄漏 */
+    agentos_error_thread_cleanup();
     return NULL;
 }
 
@@ -610,6 +612,46 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
     agentos_cond_free(engine->task_available_cond);
     AGENTOS_FREE(engine);
     AGENTOS_LOG_DEBUG("ExecutionEngine: destroy done");
+}
+
+/**
+ * @brief 注册执行单元到引擎
+ *
+ * 当前为占位实现：接受注册但不存储单元引用。
+ * 调用者仍负责单元的生命周期管理。
+ */
+agentos_error_t agentos_execution_register_unit(agentos_execution_engine_t *engine,
+                                                const char *name, agentos_execution_unit_t unit)
+{
+    if (!engine || !name)
+        return AGENTOS_EINVAL;
+    (void)unit;
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 从引擎注销执行单元
+ *
+ * 当前为占位实现：接受注销但不执行实际清理。
+ */
+void agentos_execution_unregister_unit(agentos_execution_engine_t *engine, const char *name)
+{
+    if (!engine || !name)
+        return;
+}
+
+/**
+ * @brief 设置反馈回调
+ *
+ * 当前为占位实现：接受回调设置但不存储。
+ */
+void agentos_execution_set_feedback_callback(agentos_execution_engine_t *engine,
+                                             agentos_feedback_callback_t callback, void *user_data)
+{
+    if (!engine)
+        return;
+    (void)callback;
+    (void)user_data;
 }
 
 /**
@@ -770,12 +812,12 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
     if (!engine || !task_id)
         ATM_RET_ERR(AGENTOS_EINVAL);
 
-    // 使用哈希表快速查找任?
+    // 使用哈希表快速查找任务（task_hash_table_find 会 retain，需在所有路径 release）
     task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (!tcb)
         ATM_RET_ERR(AGENTOS_ENOENT);
 
-    // 检查任务是否在队列?
+    // 检查任务是否在队列中
     agentos_mutex_lock(engine->queue_lock);
     task_tcb_t **p = &engine->task_queue;
     while (*p) {
@@ -784,7 +826,7 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
             tcb->next = NULL;
             agentos_mutex_unlock(engine->queue_lock);
 
-            // 从哈希表中移除任?
+            // 从哈希表中移除任务（内部会 release 一次，释放哈希表的引用）
             task_hash_table_remove(engine->task_map, task_id);
 
             agentos_mutex_lock(tcb->tcb_lock);
@@ -792,12 +834,18 @@ agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, con
             tcb->end_time_ns = agentos_time_monotonic_ns();
             agentos_cond_signal(tcb->completed_cond);
             agentos_mutex_unlock(tcb->tcb_lock);
+            /* 释放两次引用：
+             * 1. task_hash_table_find 的 retain
+             * 2. submit 时的初始引用 (ref_count=1)
+             * task_hash_table_remove 已释放哈希表引用，故共需 2 次 release */
+            tcb_release(tcb);
             tcb_release(tcb);
             return AGENTOS_SUCCESS;
         }
         p = &(*p)->next;
     }
     agentos_mutex_unlock(engine->queue_lock);
+    /* 任务不在队列中（可能已被 worker 取走），仅释放 find 的 retain */
     tcb_release(tcb);
     ATM_RET_ERR(AGENTOS_ENOENT);
 }

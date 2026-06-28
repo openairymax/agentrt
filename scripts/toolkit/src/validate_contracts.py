@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Contract Validator
+# AgentRT Contract Validator
 # Migrated from scripts/operations/validate_contracts.py
 
 """
-AgentOS Contract Validation Tool
+AgentRT Contract Validation Tool
 
 Validates interface contracts between system components:
 - Syscall header completeness and signatures
@@ -221,7 +221,7 @@ class ContractValidator:
                  ValidationStatus.SKIP: "\033[0;36m-\033[0m"}
         
         print("=" * 70)
-        print("AgentOS Contract Validation Report")
+        print("AgentRT Contract Validation Report")
         print("=" * 70)
         print(f"Timestamp: {self.report.timestamp}\n")
         print(f"{'Contract':<25} {'Status':<8} {'Message'}")
@@ -245,7 +245,7 @@ class ContractValidator:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AgentOS Contract Validation Tool")
+    parser = argparse.ArgumentParser(description="AgentRT Contract Validation Tool")
     parser.add_argument("-t", "--type", choices=["syscall","config","api","all"], default="all")
     parser.add_argument("--spec", type=str)
     parser.add_argument("--dir", type=str)

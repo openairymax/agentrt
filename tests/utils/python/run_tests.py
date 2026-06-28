@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 测试运行脚本
+AgentRT 测试运行脚本
 提供统一的测试运行接口和错误诊断
 """
 
@@ -369,7 +369,7 @@ class TestRunner:
     def print_report(self, report: Dict):
         """打印测试报告"""
         print("\n" + "="*60)
-        print("📊 AgentOS 测试诊断报告")
+        print("📊 AgentRT 测试诊断报告")
         print("="*60)
         print(f"时间: {report['timestamp']}")
         print(f"状态: {report['summary']['status']}")
@@ -407,7 +407,7 @@ def main():
     """主函数"""
     runner = TestRunner()
 
-    print("🚀 开始AgentOS测试模块诊断...")
+    print("🚀 开始AgentRT测试模块诊断...")
 
     report = runner.generate_report()
     runner.print_report(report)

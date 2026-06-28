@@ -19,7 +19,7 @@
 | resources/ 组件 | 支持的 agentos/ 模块 | 用途 |
 |-----------------|---------------------|------|
 | `demos/phase3_technology_demo.py` | 全部模块 | 第三阶段技术演示（服务框架/基准测试/工具链/开源治理） |
-| `images/AgentOS-desktop-preview.gif` | 全部模块 | 桌面端预览动图，用于 README 和宣传材料 |
+| `images/AgentRT-desktop-preview.gif` | 全部模块 | 桌面端预览动图，用于 README 和宣传材料 |
 | `images/feishu-community-qr.png` | 全部模块 | 飞书社区二维码，用于社区推广 |
 | `tutorial/tutorial_engine.py` | `openlab/` | 交互式教程引擎，帮助新贡献者了解 OpenLab 生态系统 |
 | `tutorial/new-contributor.json` | `openlab/contrib/` | 新贡献者入门教程配置（Skills/Strategies/Agents） |
@@ -32,7 +32,7 @@ resources/
 ├── demos/                                 # 技术演示脚本（1 个文件）
 │   └── phase3_technology_demo.py          #   第三阶段技术演示（服务框架/基准测试/工具链/开源治理）
 ├── images/                                # 静态图片资源（2 个文件）
-│   ├── AgentOS-desktop-preview.gif        #   桌面端预览动图
+│   ├── AgentRT-desktop-preview.gif        #   桌面端预览动图
 │   └── feishu-community-qr.png            #   飞书社区二维码
 └── tutorial/                              # 交互式教程引擎（2 个文件）
     ├── tutorial_engine.py                 #   交互式教程引擎（命令行/Web 双模式，渐进式学习路径）
@@ -55,7 +55,7 @@ resources/
 
 项目宣传和社区推广使用的静态图片资源：
 
-- **AgentOS-desktop-preview.gif**：桌面端预览动图，用于项目 README、官网和宣传材料，展示 AgentRT 的桌面端交互界面
+- **AgentRT-desktop-preview.gif**：桌面端预览动图，用于项目 README、官网和宣传材料，展示 AgentRT 的桌面端交互界面
 - **feishu-community-qr.png**：飞书社区二维码，用于社区推广和用户引导，扫码即可加入 AgentRT 飞书社区
 
 ### tutorial/ — 交互式教程引擎
@@ -114,7 +114,7 @@ python scripts/resources/tutorial/tutorial_engine.py --list
 在 Markdown 文档中引用图片资源：
 
 ```markdown
-![AgentOS Desktop Preview](scripts/resources/images/AgentOS-desktop-preview.gif)
+![AgentRT Desktop Preview](scripts/resources/images/AgentRT-desktop-preview.gif)
 ![Feishu Community](scripts/resources/images/feishu-community-qr.png)
 ```
 

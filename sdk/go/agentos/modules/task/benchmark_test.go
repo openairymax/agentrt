@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spharx/agentos/sdk/go/agentos/types"
+	"github.com/spharx/agentrt/sdk/go/agentos/types"
 )
 
 func BenchmarkTaskSubmit(b *testing.B) {

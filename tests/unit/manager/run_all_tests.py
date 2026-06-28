@@ -13,7 +13,7 @@ Manager 模块测试套件运行器
 使用方法:
     python run_all_tests.py [--verbose] [--config-dir <path>] [test_name...]
 
-作者: Spharx AgentOS Team
+作者: Spharx AgentRT Team
 版本: v1.0.0
 日期: 2026-04-01
 """
@@ -201,7 +201,7 @@ class TestSuiteRunner:
         """生成测试报告"""
         print("\n")
         print("=" * 80)
-        print("📊 AgentOS Manager 模块测试报告")
+        print("📊 AgentRT Manager 模块测试报告")
         print("=" * 80)
         print(f"测试时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"配置目录: {self.config_dir}")
@@ -241,7 +241,7 @@ class TestSuiteRunner:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description='AgentOS Manager 模块测试套件运行器',
+        description='AgentRT Manager 模块测试套件运行器',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例用法:

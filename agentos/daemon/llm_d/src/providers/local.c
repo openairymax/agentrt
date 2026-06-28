@@ -286,7 +286,7 @@ static int local_complete_stream(provider_ctx_t *ctx_ptr, const llm_request_conf
     if (!ctx_ptr || !manager || !callback) {
         SVC_LOG_ERROR("C-L02: LOCAL: STREAM-FAIL — invalid params "
                       "ctx=%p manager=%p callback=%p",
-                      (void *)ctx_ptr, (void *)manager, (void *)callback);
+                      (void *)ctx_ptr, (void *)manager, (void *)(uintptr_t)callback);
         return AGENTOS_ERR_INVALID_PARAM;
     }
 

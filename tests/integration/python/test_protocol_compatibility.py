@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: Apache-2.0
 """
-AgentOS Protocol Compatibility Integration Test Suite
+AgentRT Protocol Compatibility Integration Test Suite
 
 Tests:
   1. JSON-RPC 2.0 protocol compatibility
@@ -466,7 +466,7 @@ class ProtocolTestSuite:
 
     def run_all(self):
         print(f"\n{'=' * 60}")
-        print(f"  AgentOS Protocol Compatibility Integration Tests")
+        print(f"  AgentRT Protocol Compatibility Integration Tests")
         print(f"  Gateway: {self.gateway_url}")
         print(f"  Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'=' * 60}")
@@ -578,7 +578,7 @@ class ProtocolTestSuite:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AgentOS Protocol Compatibility Tests")
+    parser = argparse.ArgumentParser(description="AgentRT Protocol Compatibility Tests")
     parser.add_argument("--gateway", default=GATEWAY_URL, help="Gateway URL")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--json", action="store_true", help="Output JSON report")

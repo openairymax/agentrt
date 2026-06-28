@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS C语言安全编码静态检查工具
-# 遵循 AgentOS 安全编码规范 3.2 节
+# AgentRT C语言安全编码静态检查工具
+# 遵循 AgentRT 安全编码规范 3.2 节
 
 """
-AgentOS 安全编码静态检查工具
+AgentRT 安全编码静态检查工具
 
 检查项目：
 1. 不安全字符串函数 (strcpy/strcat/gets/sprintf/vsprintf)
@@ -267,7 +267,7 @@ def print_report(findings: List[Finding]):
         counts[s] = sum(1 for f in findings if f.severity == s)
 
     print("\n" + "=" * 80)
-    print("AgentOS Security Static Analysis Report")
+    print("AgentRT Security Static Analysis Report")
     print("=" * 80)
     print(f"\nTotal findings: {len(findings)}")
     print(f"  CRITICAL: {counts[Severity.CRITICAL]}")

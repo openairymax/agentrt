@@ -118,7 +118,7 @@ static void test_normal_register_discover_select(void) {
     sd_instance_t inst = {0};
     snprintf(inst.instance_id, sizeof(inst.instance_id), "llm_d-001");
     snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:8080");
-    inst.state = AGENTOS_SVC_RUNNING;
+    inst.state = AGENTOS_SVC_STATE_RUNNING;
     inst.healthy = true;
     inst.weight = 10;
     inst.active_connections = 0;
@@ -170,7 +170,7 @@ static void test_normal_discover_by_type_tags(void) {
         sd_instance_t inst = {0};
         snprintf(inst.instance_id, sizeof(inst.instance_id), "tool_d-%03d", i);
         snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:%d", 9000 + i);
-        inst.state = AGENTOS_SVC_RUNNING;
+        inst.state = AGENTOS_SVC_STATE_RUNNING;
         inst.healthy = true;
         inst.weight = 10;
         inst.pid = (uint32_t)getpid();
@@ -285,7 +285,7 @@ static void test_timeout_heartbeat_expire(void) {
     sd_instance_t inst = {0};
     snprintf(inst.instance_id, sizeof(inst.instance_id), "heartbeat-test-001");
     snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:9999");
-    inst.state = AGENTOS_SVC_RUNNING;
+    inst.state = AGENTOS_SVC_STATE_RUNNING;
     inst.healthy = true;
     inst.weight = 10;
     inst.pid = (uint32_t)getpid();
@@ -346,7 +346,7 @@ static void *concurrent_sd_thread(void *arg) {
         snprintf(inst.instance_id, sizeof(inst.instance_id), "%s", id);
         snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:%d",
                  10000 + args->thread_id * 100 + i);
-        inst.state = AGENTOS_SVC_RUNNING;
+        inst.state = AGENTOS_SVC_STATE_RUNNING;
         inst.healthy = true;
         inst.weight = 10;
         inst.pid = (uint32_t)getpid();
@@ -432,7 +432,7 @@ static void test_event_callback_and_stats(void) {
     sd_instance_t inst = {0};
     snprintf(inst.instance_id, sizeof(inst.instance_id), "event-test-001");
     snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:8000");
-    inst.state = AGENTOS_SVC_RUNNING;
+    inst.state = AGENTOS_SVC_STATE_RUNNING;
     inst.healthy = true;
     inst.weight = 10;
     inst.pid = (uint32_t)getpid();

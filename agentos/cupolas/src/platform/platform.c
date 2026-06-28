@@ -234,7 +234,7 @@ int cupolas_cond_destroy(cupolas_cond_t *cond)
 int cupolas_cond_wait(cupolas_cond_t *cond, cupolas_mutex_t *mutex)
 {
 #if cupolas_PLATFORM_WINDOWS
-    SleepConditionVariableCS(cond, mutex, INFINITE) ? 0 : -1;
+    return SleepConditionVariableCS(cond, mutex, INFINITE) ? 0 : -1;
 #else
     return pthread_cond_wait(cond, mutex) == 0 ? 0 : -1;
 #endif

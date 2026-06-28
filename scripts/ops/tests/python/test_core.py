@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Core 模块单元测试
+# AgentRT Core 模块单元测试
 
 """
-AgentOS Core 模块单元测试
+AgentRT Core 模块单元测试
 
 测试覆盖：
 - plugin.py: 插件系统
