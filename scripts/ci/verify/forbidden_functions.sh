@@ -573,7 +573,7 @@ check_ban_175_180() {
     log_info "BAN-176: Checking MemoryRovol contracts..."
     local mr_contracts=0
     grep -rq 'layer1_raw\|layer2_feature\|layer3_structure\|layer4_pattern' \
-        --include="*.h" "${PROJECT_ROOT}/../MemoryRovol/include/" 2>/dev/null && ((mr_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentos/atoms/memoryrovol/include/" 2>/dev/null && ((mr_contracts++)) || true
     grep -rq 'memory_bridge\|memoryrovol_integration' \
         --include="*.h" "${PROJECT_ROOT}/agentos/atoms/" 2>/dev/null && ((mr_contracts++)) || true
     if [[ $mr_contracts -ge 1 ]]; then

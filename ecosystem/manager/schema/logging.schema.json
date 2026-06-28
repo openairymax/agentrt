@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/logging-v1.schema.json",
-  "title": "AgentOS Logging Configuration Schema",
+  "title": "AgentRT Logging Configuration Schema",
   "description": "Configuration schema for logging system settings. Based on Log_standard.md specifications.",
   "type": "object",
   "required": ["_config_version", "logging"],
@@ -57,7 +57,7 @@
             "description": {
               "type": "string",
               "description": "Domain description",
-              "examples": ["AgentOS Manager Module Log Domain"]
+              "examples": ["AgentRT Manager Module Log Domain"]
             },
             "allocation": {
               "type": "object",

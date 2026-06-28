@@ -57,6 +57,8 @@ set(LLM_D_SOURCES
 add_executable(agentos-llm-d ${LLM_D_SOURCES})
 
 # 平台特定配置
+# 注意：agentos_common 不在此处直接链接，而是通过 svc_common 的 PUBLIC
+# 传递依赖处理，避免在链接命令中重复出现导致 LTO 符号解析失败。
 if(WIN32)
     target_compile_definitions(agentos-llm-d PRIVATE
         AGENTOS_PLATFORM_WINDOWS=1
@@ -65,13 +67,11 @@ if(WIN32)
         _CRT_SECURE_NO_WARNINGS
     )
     target_link_libraries(agentos-llm-d PRIVATE
-        agentos_common
         ws2_32
         bcrypt
     )
 elseif(UNIX)
     target_link_libraries(agentos-llm-d PRIVATE
-        agentos_common
         Threads::Threads
         agentos_platform_libs
     )
@@ -101,13 +101,31 @@ target_include_directories(agentos-llm-d PRIVATE
 )
 
 # 链接库
-target_link_libraries(agentos-llm-d PRIVATE
-    svc_common
-    Threads::Threads
-    ${CURL_LIBRARIES}
-    ${CJSON_LIBRARIES}
-    ${YAML_LIBRARIES}
-)
+# 链接策略说明：
+#   LTO + ASan 组合下，链接器扫描静态库时使用 LTO 符号摘要，可能漏掉符号。
+#   根 CMakeLists.txt 已添加 -ffat-lto-objects，让 LTO 对象同时包含机器代码，
+#   链接器可用传统符号表解析静态库。
+#   agentos_common 通过 svc_common 的 PUBLIC 传递依赖引入，位于链接命令末尾，
+#   单次扫描即可解析 svc_common 引用的符号。
+if(NOT MSVC AND NOT APPLE)
+    target_link_libraries(agentos-llm-d PRIVATE
+        "-Wl,--start-group"
+        svc_common
+        "-Wl,--end-group"
+        Threads::Threads
+        ${CURL_LIBRARIES}
+        ${CJSON_LIBRARIES}
+        ${YAML_LIBRARIES}
+    )
+else()
+    target_link_libraries(agentos-llm-d PRIVATE
+        svc_common
+        Threads::Threads
+        ${CURL_LIBRARIES}
+        ${CJSON_LIBRARIES}
+        ${YAML_LIBRARIES}
+    )
+endif()
 
 # 编译选项
 if(BUILD_COVERAGE)

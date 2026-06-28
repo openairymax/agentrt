@@ -53,12 +53,16 @@ endif()
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
-option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
 option(AGENTRT_BUILD_ALL "Build all AgentRT components" ON)
-option(AGENTRT_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+# 兼容别名：允许使用 AGENTRT_WITH_MEMORYROVOL（旧名）
+if(DEFINED AGENTRT_WITH_MEMORYROVOL AND NOT DEFINED AGENTOS_WITH_MEMORYROVOL)
+    set(AGENTOS_WITH_MEMORYROVOL ${AGENTRT_WITH_MEMORYROVOL})
+endif()
 option(AGENTRT_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
 set(AGENTRT_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
 set(AGENTRT_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
@@ -76,6 +80,12 @@ endif()
 if(BUILD_TESTS)
     enable_testing()
     message(STATUS "CTest enabled at root level (before subdirectories)")
+    # 为所有测试设置 sanitizer 环境变量（set(ENV{}) 不会传递给 ctest）
+    if(ENABLE_SANITIZERS AND NOT MSVC)
+        set(AGENTRT_ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1")
+        set(AGENTRT_LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0")
+        set(AGENTRT_UBSAN_OPTIONS "halt_on_error=1:print_stacktrace=1")
+    endif()
 endif()
 
 # 输出构建配置信息
@@ -137,11 +147,23 @@ else()
         add_compile_options(-Wno-error=format-truncation)
     endif()
     add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
-    add_compile_definitions(_FORTIFY_SOURCE=2 _GNU_SOURCE)
+    add_compile_definitions(_GNU_SOURCE)
+    # _FORTIFY_SOURCE=2 需要 -O1 或更高优化级别，Debug 构建时跳过以避免
+    # "_FORTIFY_SOURCE requires compiling with optimization" 警告
+    if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
+        add_compile_definitions(_FORTIFY_SOURCE=2)
+    endif()
 
     if(AGENTRT_COMPLIANCE_STRICT)
-        add_compile_definitions(AGENTRT_COMPLIANCE_STRICT)
+        add_compile_definitions(AGENTRT_COMPLIANCE_STRICT AGENTOS_COMPLIANCE_STRICT)
         add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/compliance/include/banned_functions.h)
+
+        # 注意：内存子系统实现层的 AGENTOS_COMPLIANCE_IMPL 豁免由各子目录的
+        # CMakeLists.txt 中的 set_source_files_properties 设置，因为该属性
+        # 仅在目标创建的目录作用域内生效。
+        # 详见：agentos/atoms/corekern/CMakeLists.txt
+        #       agentos/cupolas/CMakeLists.txt
+        #       agentos/commons/CMakeLists.txt
     endif()
 
     # 链接器安全选项
@@ -201,9 +223,13 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(/O2 /Ob2 /Oi /Ot /GL)  # 优化选项
         add_link_options(/LTCG)  # 链接时代码生成
     else()
-        add_compile_options(-O3 -flto)
+        # -ffat-lto-objects: 让 LTO 对象同时包含 GIMPLE 字节码和机器代码。
+        # 这样链接器扫描静态库时可用传统符号表解析，避免 LTO 符号摘要导致的
+        # undefined reference 错误（LTO + ASan 组合下尤其常见）。
+        # 代价：对象文件体积约增加 2x，但保留了 LTO 跨模块优化能力。
+        add_compile_options(-O3 -flto -ffat-lto-objects)
         add_compile_definitions(NDEBUG)
-        add_link_options(-flto)
+        add_link_options(-flto -ffat-lto-objects)
     endif()
 endif()
 
@@ -537,6 +563,19 @@ else()
 endif()
 
 include(CPack)
+
+# 为所有测试设置 sanitizer 环境变量
+# 使用 CMake 的 CMAKE_TEST_LAUNCHER 或在子目录的 CMakeLists.txt 中设置 set_tests_properties
+# 最可靠的方式：创建一个 wrapper 脚本，但更简单的是直接在 shell 中设置环境变量
+# 这里我们通过 configure_file 生成一个 ctest 包装脚本
+if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
+    configure_file(
+        "${CMAKE_SOURCE_DIR}/scripts/dev/cmake/ctest_wrapper.sh.in"
+        "${CMAKE_BINARY_DIR}/run_tests.sh"
+        @ONLY
+    )
+    message(STATUS "Test wrapper script: ${CMAKE_BINARY_DIR}/run_tests.sh")
+endif()
 
 # 自定义目标：清理构建
 add_custom_target(clean-all

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Performance Benchmark
+# AgentRT Performance Benchmark
 # Migrated from scripts/operations/benchmark.py
 
 """
-AgentOS Performance Benchmark Tool
+AgentRT Performance Benchmark Tool
 
 Performance testing for core components:
 - IPC latency measurement
@@ -55,7 +55,7 @@ class BenchmarkSuite:
 
 
 class AgentOSBenchmark:
-    """AgentOS performance benchmark framework"""
+    """AgentRT performance benchmark framework"""
 
     def __init__(self, iterations: int = 1000, warmup: int = 100):
         self.iterations = iterations
@@ -112,7 +112,7 @@ class AgentOSBenchmark:
         return self._create_result(f"Task Scheduling ({count} tasks)", self._measure(schedule))
 
     def benchmark_string_operations(self) -> BenchmarkResult:
-        s = "AgentOS Operating System Framework"
+        s = "AgentRT Operating System Framework"
         def ops():
             _ = s.upper(); _ = s.lower(); _ = s.split(); _ = s.replace(" ", "_")
         return self._create_result("String Operations", self._measure(ops))
@@ -124,7 +124,7 @@ class AgentOSBenchmark:
 
     def run_all_suites(self) -> BenchmarkSuite:
         suite = BenchmarkSuite(
-            name="AgentOS Full Benchmark",
+            name="AgentRT Full Benchmark",
             description="Complete performance benchmark suite",
             platform=self.platform, python_version=self.python_version
         )
@@ -148,7 +148,7 @@ class AgentOSBenchmark:
 class BenchmarkReporter:
     @staticmethod
     def format_text(suite: BenchmarkSuite) -> str:
-        lines = ["=" * 70, "AgentOS Performance Benchmark Report", "=" * 70]
+        lines = ["=" * 70, "AgentRT Performance Benchmark Report", "=" * 70]
         lines += [f"Timestamp: {suite.timestamp}", f"Platform: {suite.platform}",
                   f"Python: {suite.python_version}", ""]
         lines += [f"{'Test Name':<35} {'Ops/sec':>12} {'Avg (ms)':>10} {'Std Dev':>10}",
@@ -186,7 +186,7 @@ class BenchmarkReporter:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AgentOS Performance Benchmark")
+    parser = argparse.ArgumentParser(description="AgentRT Performance Benchmark")
     parser.add_argument("-n", "--iterations", type=int, default=1000)
     parser.add_argument("-w", "--warmup", type=int, default=100)
     parser.add_argument("-s", "--suite", choices=["all","ipc","memory","context","task","string","json"], default="all")

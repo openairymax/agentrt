@@ -1,5 +1,5 @@
 """
-AgentOS SAST/DAST 安全扫描集成
+AgentRT SAST/DAST 安全扫描集成
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 0.1.0
 
@@ -460,7 +460,7 @@ class SecurityScanOrchestrator:
             "",
             "---",
             "",
-            "*报告由 AgentOS 安全扫描框架生成*",
+            "*报告由 AgentRT 安全扫描框架生成*",
             "*Copyright (c) 2026 SPHARX Ltd.*"
         ])
 
@@ -490,7 +490,7 @@ def run_security_scan(target_dir: str = ".") -> Dict[str, Any]:
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("AgentOS SAST/DAST 安全扫描框架")
+    print("AgentRT SAST/DAST 安全扫描框架")
     print("Copyright (c) 2026 SPHARX Ltd.")
     print("=" * 60)
 

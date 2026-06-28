@@ -24,6 +24,9 @@
 /* 安全内存分配宏 */
 #include "memory_compat.h"
 
+/* 跨平台路径常量（AGENTOS_DATA_DIR / AGENTOS_LOG_DIR / AGENTOS_CONFIG_DIR） */
+#include "platform.h"
+
 /* ── 默认值常量 ── */
 
 #define DEFAULT_IPC_MAX_MESSAGE_SIZE   65536
@@ -53,7 +56,7 @@ static void safe_strcpy(char *dst, const char *src, size_t dst_size) {
     if (!dst || !src || dst_size == 0) return;
     size_t len = strlen(src);
     if (len >= dst_size) len = dst_size - 1;
-    memcpy(dst, src, len);
+    AGENTOS_MEMCPY(dst, src, len);
     dst[len] = '\0';
 }
 
@@ -97,7 +100,7 @@ static void parse_llm_provider(struct yaml_node *node,
 
 void agentos_yaml_config_defaults(agentos_yaml_config_t *config) {
     if (!config) return;
-    memset(config, 0, sizeof(*config));
+    AGENTOS_MEMSET(config, 0, sizeof(*config));
 
     /* version */
     safe_strcpy(config->version, "0.1.1", sizeof(config->version));
@@ -154,7 +157,7 @@ void agentos_yaml_config_defaults(agentos_yaml_config_t *config) {
     /* memory */
     config->memory.enabled = true;
     safe_strcpy(config->memory.mode, "full", sizeof(config->memory.mode));
-    safe_strcpy(config->memory.storage_path, "/var/lib/agentos/memory",
+    safe_strcpy(config->memory.storage_path, AGENTOS_DATA_DIR "/memory",
                 sizeof(config->memory.storage_path));
     safe_strcpy(config->memory.l1.compression, "zstd",
                 sizeof(config->memory.l1.compression));
@@ -179,7 +182,7 @@ void agentos_yaml_config_defaults(agentos_yaml_config_t *config) {
     config->security.permission.cache_ttl_seconds = 300;
     config->security.audit.enabled = true;
     safe_strcpy(config->security.audit.log_path,
-                "/var/log/agentos/audit.log",
+                AGENTOS_LOG_DIR "/audit.log",
                 sizeof(config->security.audit.log_path));
 
     /* multi_agent */
@@ -213,7 +216,7 @@ void agentos_yaml_config_defaults(agentos_yaml_config_t *config) {
 
     /* hooks */
     config->hooks.enabled = true;
-    safe_strcpy(config->hooks.hook_dirs[0], "/etc/agentos/hooks.d/",
+    safe_strcpy(config->hooks.hook_dirs[0], AGENTOS_CONFIG_DIR "/hooks.d/",
                 sizeof(config->hooks.hook_dirs[0]));
     safe_strcpy(config->hooks.hook_dirs[1], "~/.agentos/hooks/",
                 sizeof(config->hooks.hook_dirs[1]));

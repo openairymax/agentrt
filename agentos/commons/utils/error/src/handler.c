@@ -392,6 +392,34 @@ void agentos_error_clear(void)
     state->chain.depth = 0;
 }
 
+void agentos_error_thread_cleanup(void)
+{
+#ifdef _WIN32
+    if (g_tls_index != TLS_OUT_OF_INDEXES) {
+        thread_error_state_t *state = (thread_error_state_t *)TlsGetValue(g_tls_index);
+        if (state != NULL) {
+            /* 先释放错误链中的所有 message */
+            for (int i = 0; i < state->chain.depth; i++) {
+                AGENTOS_FREE((void *)state->chain.contexts[i].message);
+                state->chain.contexts[i].message = NULL;
+            }
+            AGENTOS_FREE(state);
+            TlsSetValue(g_tls_index, NULL);
+        }
+    }
+#else
+    if (g_tls_error_state != NULL) {
+        /* 先释放错误链中的所有 message */
+        for (int i = 0; i < g_tls_error_state->chain.depth; i++) {
+            AGENTOS_FREE((void *)g_tls_error_state->chain.contexts[i].message);
+            g_tls_error_state->chain.contexts[i].message = NULL;
+        }
+        AGENTOS_FREE(g_tls_error_state);
+        g_tls_error_state = NULL;
+    }
+#endif
+}
+
 /* ==================== 时间获取函数 ==================== */
 
 /**

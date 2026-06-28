@@ -221,12 +221,12 @@ LLM Token 的统计和预算管理工具：
 ```python
 from scripts.toolkit import (
     ConfigInitializer,
-    AgentOSDoctor,
+    AgentRTDoctor,
     MemoryManager,
     TokenCounter,
     TokenBudget,
     CheckpointManager,
-    AgentOSBenchmark,
+    AgentRTBenchmark,
     ContractValidator,
     ConfigEngine,
     PluginRegistry,
@@ -239,7 +239,7 @@ from scripts.toolkit import (
 ### 系统诊断
 
 ```python
-doctor = AgentOSDoctor()
+doctor = AgentRTDoctor()
 doctor.run_all()
 
 # 只运行特定类别

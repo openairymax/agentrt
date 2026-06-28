@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Config Audit Log Validation Tests
+AgentRT Config Audit Log Validation Tests
 
 测试审计日志是否符合config-audit-log.schema.json规范
 
@@ -429,7 +429,7 @@ class AuditLogValidator:
 def main():
     """主函数"""
     print("=" * 70)
-    print("AgentOS Config Audit Log Validation Tests")
+    print("AgentRT Config Audit Log Validation Tests")
     print("=" * 70)
     print()
     

@@ -1,4 +1,4 @@
-# AgentOS 测试数据管理器
+# AgentRT 测试数据管理器
 # Version: 0.1.0
 # Last updated: 2026-03-22
 
@@ -70,7 +70,7 @@ class TestDataManager:
         # 任务模板
         templates['task'] = TestDataTemplate(
             name="task",
-            description="AgentOS任务数据模板",
+            description="AgentRT任务数据模板",
             schema={
                 "task_id": {"type": "string", "required": True},
                 "description": {"type": "string", "required": True},
@@ -92,7 +92,7 @@ class TestDataManager:
         # 记忆模板
         templates['memory'] = TestDataTemplate(
             name="memory",
-            description="AgentOS记忆数据模板",
+            description="AgentRT记忆数据模板",
             schema={
                 "memory_id": {"type": "string", "required": True},
                 "content": {"type": "string", "required": True},
@@ -114,7 +114,7 @@ class TestDataManager:
         # 会话模板
         templates['session'] = TestDataTemplate(
             name="session",
-            description="AgentOS会话数据模板",
+            description="AgentRT会话数据模板",
             schema={
                 "session_id": {"type": "string", "required": True},
                 "user_id": {"type": "string", "required": True},
@@ -136,7 +136,7 @@ class TestDataManager:
         # 技能模板
         templates['skill'] = TestDataTemplate(
             name="skill",
-            description="AgentOS技能数据模板",
+            description="AgentRT技能数据模板",
             schema={
                 "skill_id": {"type": "string", "required": True},
                 "name": {"type": "string", "required": True},

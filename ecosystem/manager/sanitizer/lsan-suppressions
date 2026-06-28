@@ -1,5 +1,5 @@
-# LeakSanitizer Suppressions for AgentOS
-# Suppress known leaks from third-party libraries (OpenSSL, etc.)
+# LeakSanitizer Suppressions for AgentRT
+# Suppress known leaks from third-party libraries and test stubs
 
 # OpenSSL known allocations (initialization routines, not actual leaks)
 leak:CRYPTO_malloc
@@ -31,3 +31,11 @@ leak:sqlite3_malloc
 # libevent global base
 leak:event_base_new
 leak:event_base_free
+
+# 测试 stub 已知泄漏（test_stubs.c 中的简化实现，不释放内存）
+leak:config_context_create
+leak:config_source_create_memory
+leak:config_source_create_env
+leak:config_source_create_file
+leak:config_service_create
+leak:stub_alloc

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS 测试环境验证器
+AgentRT 测试环境验证器
 
 验证测试环境是否满足运行测试的所有要求。
 
@@ -203,7 +203,7 @@ class EnvironmentValidator:
         """生成报告"""
         lines = []
         lines.append("=" * 60)
-        lines.append("🔍 AgentOS 测试环境验证报告")
+        lines.append("🔍 AgentRT 测试环境验证报告")
         lines.append("=" * 60)
         lines.append(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append(f"平台: {platform.system()} {platform.release()}")

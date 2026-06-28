@@ -1,5 +1,7 @@
 
 # AgentRT 安全审计测试 (TeamC P2-C03)
+# 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
+add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
     message(STATUS "  [security] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")

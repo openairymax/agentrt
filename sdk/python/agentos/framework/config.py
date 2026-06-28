@@ -1,4 +1,4 @@
-# AgentOS Configuration Center
+# AgentRT Configuration Center
 # Version: 0.1.0
 # Last updated: 2026-04-11
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Token 预算管理测试
+# AgentRT Token 预算管理测试
 
 """
 Token 预算管理单元测试

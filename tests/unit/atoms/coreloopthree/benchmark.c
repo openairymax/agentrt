@@ -239,7 +239,7 @@ static void benchmark_memory_query() {
     int num_queries = 100;
     clock_t start = clock();
     for (int i = 0; i < num_queries; i++) {
-        agentos_memory_result_t* result = NULL;
+        agentos_memory_result_ext_t* result = NULL;
         err = agentos_memory_query(engine, &query, &result);
         if (err == AGENTOS_SUCCESS && result) {
             agentos_memory_result_free(result);

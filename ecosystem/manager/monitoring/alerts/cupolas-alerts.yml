@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentOS cupolas Module Monitoring Configuration
+# AgentRT cupolas Module Monitoring Configuration
 # Version: 0.1.0
 # Description: Prometheus alerting rules and Grafana dashboard configuration
 # =============================================================================
@@ -12,7 +12,7 @@ groups:
       - alert: CupolasBuildFailure
         expr: |
           github_actions_workflow_run_conclusion{
-            repository="AgentOS",
+            repository="AgentRT",
             workflow="cupolas-ci.yml",
             conclusion="failure"
           } == 1
@@ -30,7 +30,7 @@ groups:
       - alert: CupolasBuildTimeout
         expr: |
           github_actions_workflow_run_duration_minutes{
-            repository="AgentOS",
+            repository="AgentRT",
             workflow="cupolas-ci.yml"
           } > 30
         for: 5m
@@ -47,13 +47,13 @@ groups:
         expr: |
           (
             sum(rate(github_actions_workflow_run_conclusion{
-              repository="AgentOS",
+              repository="AgentRT",
               workflow="cupolas-ci.yml",
               conclusion="success"
             }[1h]))
             /
             sum(rate(github_actions_workflow_run_total{
-              repository="AgentOS",
+              repository="AgentRT",
               workflow="cupolas-ci.yml"
             }[1h]))
           ) < 0.8
@@ -73,7 +73,7 @@ groups:
       - alert: CupolasTestCoverageDrop
         expr: |
           codecov_coverage_percent{
-            repository="AgentOS",
+            repository="AgentRT",
             flag="cupolas"
           } < 80
         for: 0m
@@ -107,7 +107,7 @@ groups:
       - alert: CupolasCriticalVulnerability
         expr: |
           trivy_vulnerabilities{
-            repository="AgentOS",
+            repository="AgentRT",
             module="cupolas",
             severity="CRITICAL"
           } > 0
@@ -124,7 +124,7 @@ groups:
       - alert: CupolasHighVulnerabilities
         expr: |
           sum(trivy_vulnerabilities{
-            repository="AgentOS",
+            repository="AgentRT",
             module="cupolas",
             severity=~"CRITICAL|HIGH"
           }) > 5
@@ -141,7 +141,7 @@ groups:
       - alert: CupolasSecretDetected
         expr: |
           trufflehog_secrets_found{
-            repository="AgentOS",
+            repository="AgentRT",
             module="cupolas"
           } > 0
         for: 0m
@@ -240,16 +240,16 @@ groups:
         expr: |
           (
             rate(github_actions_workflow_run_duration_seconds{
-              repository="AgentOS",
+              repository="AgentRT",
               workflow="cupolas-ci.yml"
             }[1h])
             -
             rate(github_actions_workflow_run_duration_seconds{
-              repository="AgentOS",
+              repository="AgentRT",
               workflow="cupolas-ci.yml"
             }[1h] offset 24h)
           ) / rate(github_actions_workflow_run_duration_seconds{
-            repository="AgentOS",
+            repository="AgentRT",
             workflow="cupolas-ci.yml"
           }[1h] offset 24h) > 0.5
         for: 30m

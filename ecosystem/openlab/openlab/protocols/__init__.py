@@ -1,12 +1,12 @@
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: Apache-2.0
 """
-AgentOS openlab.protocols — Protocol Integration Bindings
+AgentRT openlab.protocols — Protocol Integration Bindings
 
-将 AgentOS 协议系统集成到 OpenLab 应用框架中,提供:
+将 AgentRT 协议系统集成到 OpenLab 应用框架中,提供:
 - ProtocolSessionManager — 协议会话管理器
 - ProtocolAgentAdapter — 协议感知的智能体适配器
-- ProtocolToolBridge — 协议工具桥接(MCP工具→AgentOS Skill)
+- ProtocolToolBridge — 协议工具桥接(MCP工具→AgentRT Skill)
 - UnifiedProtocolRunner — 统一协议运行器
 
 @since 0.1.0
@@ -58,10 +58,10 @@ class SessionState(IntEnum):
 
 
 class ToolBindingMode(IntEnum):
-    """How MCP/A2A tools map to AgentOS skills."""
+    """How MCP/A2A tools map to AgentRT skills."""
     DIRECT_PROXY = 0       # Pass-through to original protocol
-    SANDBOXED_WRAP = 1     # Wrap in AgentOS sandbox
-    CONVERTED_NATIVE = 2   # Convert to native AgentOS skill format
+    SANDBOXED_WRAP = 1     # Wrap in AgentRT sandbox
+    CONVERTED_NATIVE = 2   # Convert to native AgentRT skill format
 
 
 @dataclass

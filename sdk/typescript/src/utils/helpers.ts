@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Helper Functions
+// AgentRT TypeScript SDK - Helper Functions
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //
@@ -296,7 +296,7 @@ export function appendPagination(
 // ============================================================
 
 /**
- * 生成唯一的 AgentOS ID（时间戳+随机数）
+ * 生成唯一的 AgentRT ID（时间戳+随机数）
  */
 export function generateId(): string {
   const timestamp = Date.now();
