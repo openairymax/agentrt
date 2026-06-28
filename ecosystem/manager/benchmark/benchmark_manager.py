@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Manager 模块性能基准测试
+AgentRT Manager 模块性能基准测试
 
 本脚本用于测试 Manager 模块的性能指标，包括：
 - 任务管理器吞吐量
@@ -136,7 +136,7 @@ class PerformanceBenchmark:
         """打印测试摘要"""
         elapsed = time.time() - self.start_time
         print("\n" + "=" * 70)
-        print("AgentOS Manager 模块性能基准测试报告")
+        print("AgentRT Manager 模块性能基准测试报告")
         print("=" * 70)
         print(f"测试时间: {datetime.now().isoformat()}")
         print(f"总耗时: {elapsed:.2f}秒")
@@ -328,7 +328,7 @@ def benchmark_skill_manager(benchmark: PerformanceBenchmark, iterations: int) ->
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AgentOS Manager 模块性能基准测试"
+        description="AgentRT Manager 模块性能基准测试"
     )
     parser.add_argument(
         "-v", "--verbose",
@@ -356,7 +356,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 70)
-    print("AgentOS Manager 模块性能基准测试")
+    print("AgentRT Manager 模块性能基准测试")
     print("=" * 70)
     print(f"迭代次数: {args.iterations}")
     print(f"详细模式: {'是' if args.verbose else '否'}")

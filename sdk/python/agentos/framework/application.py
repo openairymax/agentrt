@@ -1,4 +1,4 @@
-# AgentOS Application Framework
+# AgentRT Application Framework
 # Version: 0.1.0
 # Last updated: 2026-04-11
 
@@ -6,7 +6,7 @@
 智能体应用统一入口
 
 整合生命周期管理、状态管理、配置管理和错误处理，
-为所有AgentOS应用提供一致的开发体验。
+为所有AgentRT应用提供一致的开发体验。
 同时集成技能框架、任务框架、事件框架和插件框架，
 实现设计文档中的完整 IAgentApplication 接口。
 
@@ -17,7 +17,7 @@
         app = AgentApplication(AgentConfig(
             name="my_agent",
             version="1.0.0",
-            description="My first AgentOS application"
+            description="My first AgentRT application"
         ))
 
         await app.initialize()

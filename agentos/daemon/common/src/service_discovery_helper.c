@@ -39,7 +39,7 @@ struct sd_helper_s {
     bool registered;
 
     /* 心跳线程 */
-    void *heartbeat_thread;           /* 平台线程句柄 */
+    agentos_thread_t heartbeat_thread;  /* 平台线程句柄 */
     volatile bool heartbeat_running;
     uint32_t heartbeat_interval_ms;
 };
@@ -83,7 +83,7 @@ sd_helper_t *sd_helper_init(const sd_config_t *config) {
 
     /* 复制或使用默认配置 */
     if (config) {
-        memcpy(&sdh->config, config, sizeof(sd_config_t));
+        AGENTOS_MEMCPY(&sdh->config, config, sizeof(sd_config_t));
     } else {
         sdh->config = sd_create_default_config();
     }
@@ -109,7 +109,7 @@ sd_helper_t *sd_helper_init(const sd_config_t *config) {
 
     sdh->registered = false;
     sdh->heartbeat_running = false;
-    sdh->heartbeat_thread = NULL;
+    sdh->heartbeat_thread = AGENTOS_INVALID_THREAD;
 
     SVC_LOG_INFO("Service discovery helper initialized");
     return sdh;
@@ -167,7 +167,7 @@ int sd_helper_register(sd_helper_t *sdh, const char *name, const char *type,
 
     /* 填充实例信息 */
     sd_instance_t inst;
-    memset(&inst, 0, sizeof(inst));
+    AGENTOS_MEMSET(&inst, 0, sizeof(inst));
     safe_strcpy(inst.instance_id, instance_id, sizeof(inst.instance_id));
     safe_strcpy(inst.endpoint, endpoint, sizeof(inst.endpoint));
     inst.state = AGENTOS_SVC_STATE_RUNNING;
@@ -220,7 +220,7 @@ int sd_helper_register_unix(sd_helper_t *sdh, const char *name, const char *type
     snprintf(instance_id, sizeof(instance_id), "%s-%s-%u", name, socket_path, pid);
 
     sd_instance_t inst;
-    memset(&inst, 0, sizeof(inst));
+    AGENTOS_MEMSET(&inst, 0, sizeof(inst));
     safe_strcpy(inst.instance_id, instance_id, sizeof(inst.instance_id));
     safe_strcpy(inst.endpoint, socket_path, sizeof(inst.endpoint));
     inst.state = AGENTOS_SVC_STATE_RUNNING;
@@ -278,9 +278,9 @@ void sd_helper_stop_heartbeat(sd_helper_t *sdh) {
 
     sdh->heartbeat_running = false;
 
-    if (sdh->heartbeat_thread) {
+    if (sdh->heartbeat_thread != AGENTOS_INVALID_THREAD) {
         agentos_thread_join(sdh->heartbeat_thread, NULL);
-        sdh->heartbeat_thread = NULL;
+        sdh->heartbeat_thread = AGENTOS_INVALID_THREAD;
     }
 
     SVC_LOG_INFO("Heartbeat stopped for service '%s'", sdh->service_name);

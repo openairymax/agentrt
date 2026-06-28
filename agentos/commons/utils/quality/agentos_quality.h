@@ -21,6 +21,11 @@
 #include <stdint.h>
 #include "error.h"
 
+/* 前向声明安全内存函数（避免裸 malloc/calloc/free 触发 BAN 合规违规） */
+void *agentos_malloc(size_t size);
+void *agentos_calloc(size_t num, size_t size);
+void agentos_free(const void *ptr);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,12 +40,14 @@ extern "C" {
 /**
  * @brief 检查指针是否为NULL，如果为NULL则返回错误码
  */
+#ifndef AGENTOS_CHECK_NULL
 #define AGENTOS_CHECK_NULL(ptr, error_code) \
     do {                                    \
         if ((ptr) == NULL) {                \
             return (error_code);            \
         }                                   \
     } while (0)
+#endif
 
 /**
  * @brief 检查指针是否为NULL，如果为NULL则跳转到错误标签
@@ -159,7 +166,7 @@ extern "C" {
  */
 #define AGENTOS_SAFE_ALLOC(var, size, cleanup_label, error_var) \
     do {                                                        \
-        (var) = malloc((size));                                 \
+        (var) = agentos_malloc((size));                          \
         if (!(var)) {                                           \
             (error_var) = -1;                                   \
             goto cleanup_label;                                 \
@@ -171,7 +178,7 @@ extern "C" {
  */
 #define AGENTOS_SAFE_CALLOC(var, size, cleanup_label, error_var) \
     do {                                                         \
-        (var) = calloc(1, (size));                               \
+        (var) = agentos_calloc(1, (size));                      \
         if (!(var)) {                                            \
             (error_var) = -1;                                    \
             goto cleanup_label;                                  \
@@ -202,8 +209,10 @@ extern "C" {
 /**
  * @brief 自动释放资源的宏（用于局部变量）
  */
+#ifndef AGENTOS_AUTO_FREE
 #define AGENTOS_AUTO_FREE(ptr) \
     __attribute__((cleanup(agentos_auto_free))) char **_auto_##ptr = &(char *)(ptr)
+#endif
 
 /**
  * @brief 自动关闭文件描述符的宏
@@ -216,7 +225,7 @@ extern "C" {
 #define AGENTOS_SAFE_FREE(ptr) \
     do {                       \
         if ((ptr) != NULL) {   \
-            free((ptr));       \
+            agentos_free((ptr)); \
             (ptr) = NULL;      \
         }                      \
     } while (0)
@@ -232,6 +241,7 @@ extern "C" {
  *
  * BAN-247: 敏感数据释放前必须清零
  */
+#ifndef AGENTOS_SECURE_FREE
 #define AGENTOS_SECURE_FREE(ptr, size)                    \
     do {                                                  \
         if ((ptr) != NULL) {                              \
@@ -242,6 +252,7 @@ extern "C" {
             (ptr) = NULL;                                 \
         }                                                 \
     } while (0)
+#endif
 
 /**
  * @brief 安全释放内存（自动计算大小版本，用于已知类型的指针）
@@ -460,7 +471,7 @@ static inline int safe_memcpy(void *dest, size_t dest_size, const void *src, siz
     if (src_size > dest_size)
         return AGENTOS_EINVAL;
 
-    memcpy(dest, src, src_size);
+    AGENTOS_MEMCPY(dest, src, src_size);
     return AGENTOS_SUCCESS;
 }
 
@@ -504,7 +515,7 @@ static inline int safe_strcpy(char *dest, size_t dest_size, const char *src)
     if (src_len >= dest_size)
         return AGENTOS_EINVAL;
 
-    memcpy(dest, src, src_len + 1);
+    AGENTOS_MEMCPY(dest, src, src_len + 1);
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
@@ -529,7 +540,7 @@ static inline int safe_strcat(char *dest, size_t dest_size, const char *src)
     if (current_len + src_len >= dest_size)
         return AGENTOS_EINVAL;
 
-    memcpy(dest + current_len, src, src_len + 1);
+    AGENTOS_MEMCPY(dest + current_len, src, src_len + 1);
     return AGENTOS_SUCCESS;
 }
 

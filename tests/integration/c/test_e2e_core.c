@@ -229,6 +229,9 @@ static void e2e_scenario_3_ipc_dispatcher_link(void)
 
     cJSON_Delete(req);
 
+    if (ch) {
+        agentos_ipc_close(ch);
+    }
     agentos_ipc_cleanup();
     method_dispatcher_destroy(disp);
     TEST_ASSERT(1, "Step 5: IPC和分发器清理完成");

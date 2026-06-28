@@ -31,6 +31,8 @@ RUN apk add --no-cache \
     yaml-dev \
     libuv-dev \
     protobuf-c-dev \
+    sqlite-dev \
+    libevent-dev \
     linux-headers
 
 WORKDIR /build

@@ -1,5 +1,7 @@
 
 # AgentRT CoreLoopThree 单元测试
+# 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
+add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 
 set(STUBS_FILE ${CMAKE_SOURCE_DIR}/agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c)
 set(STUBS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/agentos/atoms/coreloopthree/tests/unit)

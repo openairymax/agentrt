@@ -70,6 +70,7 @@ if(BUILD_TESTS)
 if(AGENTOS_HAS_CMOCKA)
     enable_testing()
     add_executable(test_channel_e2e tests/test_channel_e2e.c src/channel_service.c)
+    target_compile_definitions(test_channel_e2e PRIVATE AGENTOS_COMPLIANCE_IMPL)
     target_include_directories(test_channel_e2e PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -86,6 +87,7 @@ if(AGENTOS_HAS_CMOCKA)
 else()
     enable_testing()
     add_executable(test_channel_e2e tests/test_channel_e2e.c src/channel_service.c)
+    target_compile_definitions(test_channel_e2e PRIVATE AGENTOS_COMPLIANCE_IMPL)
     target_include_directories(test_channel_e2e PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src

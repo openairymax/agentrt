@@ -492,6 +492,7 @@ static void test_unregister_workflow(void)
     assert(taskflow_engine_get_workflow_count(engine) == 0);
 
     free(wf.initial_node_id);
+    free(node.task_handler_name);
     taskflow_engine_destroy(engine);
     TEST_PASS("unregister workflow");
 }

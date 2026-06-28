@@ -132,7 +132,7 @@ int hook_registry_register(const hook_entry_t *entry)
     if (!new_node)
         return -1;
 
-    memcpy(&new_node->entry, entry, sizeof(hook_entry_t));
+    AGENTOS_MEMCPY(&new_node->entry, entry, sizeof(hook_entry_t));
     AGENTOS_STRNCPY_TERM(new_node->entry.name, entry->name,
                          sizeof(new_node->entry.name));
 

@@ -1,9 +1,9 @@
-# AgentOS Tests Codecov Configuration
+# AgentRT Tests Codecov Configuration
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # Version: 0.1.0
 #
 # Codecov 覆盖率报告配置
-# 遵循 AgentOS 质量标准
+# 遵循 AgentRT 质量标准
 
 codecov:
   require_ci_to_pass: true

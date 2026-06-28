@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS System Doctor - Health Diagnostics
+# AgentRT System Doctor - Health Diagnostics
 # Migrated from scripts/operations/doctor.py
 
 """
-AgentOS System Health Diagnostic Tool
+AgentRT System Health Diagnostic Tool
 
 Comprehensive system health checker with 8 diagnostic categories:
 - System (OS, CPU, Memory, Disk)
@@ -430,7 +430,7 @@ class AgentOSDoctor:
         }
 
         print("=" * 70)
-        print("AgentOS System Health Report")
+        print("AgentRT System Health Report")
         print("=" * 70)
         print(f"Timestamp : {self.report.timestamp}")
         print(f"Hostname   : {self.report.hostname}")
@@ -476,7 +476,7 @@ class AgentOSDoctor:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AgentOS System Health Diagnostic Tool",
+        description="AgentRT System Health Diagnostic Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 

@@ -1,4 +1,4 @@
-// AgentOS TypeScript SDK - Types Module
+// AgentRT TypeScript SDK - Types Module
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //

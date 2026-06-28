@@ -1,4 +1,4 @@
-// AgentOS Rust SDK - 主入口
+// AgentRT Rust SDK - 主入口
 // Version: 0.1.0
 // Last updated: 2026-03-24
 //
@@ -150,10 +150,10 @@ pub use error::{
 // 便捷函数
 // ============================================================
 
-/// 创建新的 AgentOS 客户端
+/// 创建新的 AgentRT 客户端
 ///
 /// # 参数
-/// - `endpoint`: AgentOS 服务端点地址
+/// - `endpoint`: AgentRT 服务端点地址
 ///
 /// # 返回
 /// 返回 Result<Client, AgentOSError>
@@ -168,10 +168,10 @@ pub fn new_client(endpoint: &str) -> Result<Client, AgentOSError> {
     Client::new(endpoint)
 }
 
-/// 创建带 API Key 的 AgentOS 客户端
+/// 创建带 API Key 的 AgentRT 客户端
 ///
 /// # 参数
-/// - `endpoint`: AgentOS 服务端点地址
+/// - `endpoint`: AgentRT 服务端点地址
 /// - `api_key`: API 密钥
 ///
 /// # 返回

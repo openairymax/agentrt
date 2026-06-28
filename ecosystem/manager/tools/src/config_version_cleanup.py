@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Manager 模块配置版本历史清理工具
+AgentRT Manager 模块配置版本历史清理工具
 
 本工具用于清理过期的配置版本历史，包括：
 - 自动清理超过保留期限的版本
@@ -300,7 +300,7 @@ def print_result(result: CleanupResult) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AgentOS Manager 配置版本历史清理工具"
+        description="AgentRT Manager 配置版本历史清理工具"
     )
     parser.add_argument(
         "--history-dir",
@@ -348,7 +348,7 @@ def main():
     history_dir = os.path.expandvars(args.history_dir)
 
     print("=" * 70)
-    print("AgentOS Manager 配置版本历史清理工具")
+    print("AgentRT Manager 配置版本历史清理工具")
     print("=" * 70)
     print(f"历史目录: {history_dir}")
     print(f"干运行模式: {'是' if args.dry_run else '否'}")

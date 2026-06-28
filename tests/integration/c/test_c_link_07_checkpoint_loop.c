@@ -82,6 +82,19 @@ static void fill_snapshot(checkpoint_snapshot_t *snap, const char *task_id,
     snap->progress_percent = (float)turn / 100.0f * 100.0f;
 }
 
+/* 释放栈上分配的快照内部字段（不释放结构体本身，避免对栈地址调用 free） */
+static void free_snapshot_fields(checkpoint_snapshot_t *snap) {
+    if (!snap) return;
+    free(snap->task_id);
+    free(snap->session_id);
+    free(snap->cognition_state_json);
+    free(snap->memory_context_json);
+    free(snap->tool_call_history_json);
+    free(snap->pending_nodes_json);
+    free(snap->completed_nodes_json);
+    memset(snap, 0, sizeof(*snap));
+}
+
 /* ============================================================================
  * P1.16g-1: Normal Path — Checkpoint save and restore
  * ============================================================================ */
@@ -117,7 +130,7 @@ static void test_normal_save_restore(void) {
           "Cognition state should be restored");
 
     checkpoint_snapshot_free(restored);
-    checkpoint_snapshot_free(&snap);
+    free_snapshot_fields(&snap);
 
     /* Clean up checkpoint */
     checkpoint_adapter_delete(adapter, "task-save-restore-001", 0);
@@ -141,8 +154,8 @@ static void test_normal_multiple_checkpoints(void) {
         fill_snapshot(&snap, "task-multi-001", (uint64_t)i, (uint32_t)(i * 10));
         int ret = checkpoint_adapter_save(adapter, "task-multi-001",
                                            "session-001", (uint64_t)i, &snap);
-        CHECK_EQ(ret, 0, "Save checkpoint %d should succeed", i);
-        checkpoint_snapshot_free(&snap);
+        CHECK_EQ(ret, 0, "Save checkpoint should succeed");
+        free_snapshot_fields(&snap);
     }
 
     /* List checkpoints */
@@ -210,7 +223,7 @@ static void test_error_null_adapter(void) {
     fill_snapshot(&snap, "null-test", 1, 1);
     int ret = checkpoint_adapter_save(NULL, "null-test", "s1", 1, &snap);
     CHECK(ret != 0, "NULL adapter save should fail");
-    checkpoint_snapshot_free(&snap);
+    free_snapshot_fields(&snap);
 
     /* NULL adapter restore should fail */
     checkpoint_snapshot_t *restored = NULL;
@@ -273,7 +286,7 @@ static void test_timeout_checkpoint_ops(void) {
     CHECK(restored != NULL, "Restored snapshot should not be NULL");
 
     checkpoint_snapshot_free(restored);
-    checkpoint_snapshot_free(&snap);
+    free_snapshot_fields(&snap);
     checkpoint_adapter_delete(adapter, "task-timeout-001", 0);
     checkpoint_adapter_destroy(adapter);
     PASS();
@@ -306,7 +319,7 @@ static void *concurrent_checkpoint_thread(void *arg) {
 
         int ret = checkpoint_adapter_save(args->adapter, task_id,
                                            "session-concurrent", (uint64_t)i, &snap);
-        checkpoint_snapshot_free(&snap);
+        free_snapshot_fields(&snap);
 
         if (ret == 0) {
             args->success_count++;
@@ -393,7 +406,7 @@ static void test_snapshot_management(void) {
         free(restored_task_id);
     }
 
-    checkpoint_snapshot_free(&snap);
+    free_snapshot_fields(&snap);
     checkpoint_adapter_delete(adapter, "task-snap-001", 0);
     checkpoint_adapter_destroy(adapter);
     PASS();

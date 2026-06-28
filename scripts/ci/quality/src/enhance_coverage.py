@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentOS Test Coverage Enhancement Script (V1.0)
+AgentRT Test Coverage Enhancement Script (V1.0)
 ==========================================
 
 本脚本用于提升关键模块的测试覆盖率至90%以上。
@@ -316,7 +316,7 @@ int main(void) {{
 
 
 def main():
-    parser = argparse.ArgumentParser(description='AgentOS Test Coverage Enhancement Tool')
+    parser = argparse.ArgumentParser(description='AgentRT Test Coverage Enhancement Tool')
     parser.add_argument('--module', '-m', default='all',
                        help='Module to analyze (default: all)')
     parser.add_argument('--target', '-t', type=float, default=90.0,
@@ -333,7 +333,7 @@ def main():
     analyzer = CoverageAnalyzer(project_root)
     
     print("="*60)
-    print("🧪 AgentOS Test Coverage Enhancement Tool")
+    print("🧪 AgentRT Test Coverage Enhancement Tool")
     print("="*60)
     print(f"\nProject Root: {project_root}")
     print(f"Target Coverage: {args.target}%")
