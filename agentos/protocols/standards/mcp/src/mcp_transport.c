@@ -29,13 +29,7 @@
 #include "../../../../commons/utils/error/include/error.h"
 #include "error.h"
 
-/* Fallback logging macros if not provided by error.h */
-#ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
-#ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
+#include "logging_compat.h"
 
 struct mcp_transport {
     mcp_transport_type_t type;

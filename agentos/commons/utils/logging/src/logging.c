@@ -42,6 +42,57 @@ static const char *LEVEL_NAMES[] = {"DEBUG", "INFO", "WARN", "ERROR", "FATAL"};
 /** 日志级别名称数组大小 */
 static const size_t LEVEL_NAMES_COUNT = sizeof(LEVEL_NAMES) / sizeof(LEVEL_NAMES[0]);
 
+/* ── 文件输出状态（合并自 logging_common.c）── */
+static FILE *g_log_file = NULL;
+static size_t g_log_file_current_size = 0;
+static agentos_mutex_t g_log_file_mutex;
+static bool g_log_file_mutex_init = false;
+
+/* ── ANSI 终端色彩转义码 (仅当输出到终端时使用) ── */
+#define ANSI_RESET   "\033[0m"
+#define ANSI_BOLD    "\033[1m"
+#define ANSI_DIM     "\033[2m"
+#define ANSI_RED     "\033[31m"
+#define ANSI_GREEN   "\033[32m"
+#define ANSI_YELLOW  "\033[33m"
+#define ANSI_BLUE    "\033[34m"
+#define ANSI_MAGENTA "\033[35m"
+#define ANSI_CYAN    "\033[36m"
+#define ANSI_GRAY    "\033[90m"
+#define ANSI_BG_RED  "\033[41m"
+
+/** 各日志级别对应的 ANSI 色彩 */
+static const char *LEVEL_COLORS[] = {
+    ANSI_GRAY,     /* DEBUG  — 灰色 */
+    ANSI_BLUE,     /* INFO   — 蓝色 */
+    ANSI_YELLOW,   /* WARN   — 黄色 */
+    ANSI_RED,      /* ERROR  — 红色 */
+    ANSI_MAGENTA,  /* FATAL  — 品红 */
+};
+
+/** 是否在日志中使用色彩 (通过环境变量 AGENTRT_LOG_COLOR=0 关闭) */
+static bool g_log_use_color = true;
+
+/** 检测 fd 是否为终端 (POSIX) */
+static bool is_terminal(int fd)
+{
+#ifdef _WIN32
+    return false;  /* Windows 终端色彩通过 SetConsoleMode 处理 */
+#else
+    static int cached_stdout_tty = -1;
+    static int cached_stderr_tty = -1;
+    if (fd == STDOUT_FILENO) {
+        if (cached_stdout_tty < 0) cached_stdout_tty = isatty(STDOUT_FILENO) ? 1 : 0;
+        return cached_stdout_tty == 1;
+    }
+    if (fd == STDERR_FILENO) {
+        if (cached_stderr_tty < 0) cached_stderr_tty = isatty(STDERR_FILENO) ? 1 : 0;
+        return cached_stderr_tty == 1;
+    }
+    return isatty(fd) == 1;
+#endif
+}
+
 /** 默认日志级别 */
 static const log_level_t DEFAULT_LOG_LEVEL = LOG_LEVEL_INFO;
 
@@ -146,6 +197,7 @@ static bool throttle_should_suppress(const char *module, int line, const char *m
             agentos_mutex_unlock(&g_throttle_mutex);
 
             if (suppressed == 1) {
+                /* BAN-70 EXEMPT: logging module - diagnostic throttle notification */
                 __builtin_fprintf(stderr, "[THROTTLE] Suppressing further identical messages: %s:%d\n",
                         module ? module : "?", line);
             }
@@ -160,6 +212,7 @@ static bool throttle_should_suppress(const char *module, int line, const char *m
         uint32_t old_suppressed = bucket->count - g_throttle_max_per_sec;
         if (old_suppressed > 0) {
             agentos_mutex_unlock(&g_throttle_mutex);
+            /* BAN-70 EXEMPT: logging module - diagnostic throttle notification */
             __builtin_fprintf(stderr, "[THROTTLE] Previous bucket flushed: %u messages suppressed\n",
                     old_suppressed);
             agentos_mutex_lock(&g_throttle_mutex);
@@ -209,9 +262,12 @@ static logging_state_t g_logging_state = {.initialized = false, .module_level_co
  *
  * @return 当前时间戳（毫秒?
  */
+/** 获取当前时间戳（毫秒，基于 CLOCK_REALTIME，用于显示准确的日期时间） */
 static uint64_t get_current_timestamp(void)
 {
-    return agentos_time_ms();
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
 }
 
 /**
@@ -263,10 +319,20 @@ static size_t format_log_message(const log_record_t *record, char *buffer, size_
 
     const char *level_name = log_level_to_string(record->level);
 
+    // 获取对应级别的 ANSI 色彩或空字符?
+    const char *color = "";
+    const char *reset = "";
+    if (g_log_use_color && record->level < LEVEL_NAMES_COUNT) {
+        color = LEVEL_COLORS[record->level];
+        reset = ANSI_RESET;
+    }
+
     int len =
-        snprintf(buffer, buffer_size, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s] [%s:%d]",
+        snprintf(buffer, buffer_size, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s%s%s] [%s:%d]",
                  tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday, tm_info->tm_hour,
-                 tm_info->tm_min, tm_info->tm_sec, ms, level_name, record->module, record->line);
+                 tm_info->tm_min, tm_info->tm_sec, ms,
+                 color, level_name, reset,
+                 record->module, record->line);
     if (len < 0)
         return 0;
     if ((size_t)len >= buffer_size)
@@ -343,6 +409,132 @@ static bool should_log(log_level_t level, const char *module)
 
 /* ==================== 公开API实现 ==================== */
 
+/* ── 文件输出内部函数（合并自 logging_common.c）── */
+
+/** 打开/重开日志文件 */
+static int log_file_open(const char *path)
+{
+    if (!path || !g_log_file_mutex_init)
+        return AGENTOS_EINVAL;
+
+    agentos_mutex_lock(&g_log_file_mutex);
+    if (g_log_file) {
+        fclose(g_log_file);
+        g_log_file = NULL;
+    }
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
+    g_log_file = fopen(path, "a");
+    if (!g_log_file) {
+        agentos_mutex_unlock(&g_log_file_mutex);
+        return AGENTOS_EIO;
+    }
+    /* 获取当前文件大小用于轮转判断 */
+    fseek(g_log_file, 0, SEEK_END);
+    g_log_file_current_size = (size_t)ftell(g_log_file);
+    agentos_mutex_unlock(&g_log_file_mutex);
+    return 0;
+}
+
+/** 日志文件轮转：超过 max_size 时重命名为 .1 并重开 */
+static void log_file_rotate_if_needed(void)
+{
+    if (!g_log_file || !g_log_file_mutex_init)
+        return;
+
+    size_t max_size = g_logging_state.manager.max_file_size;
+    int max_backup = g_logging_state.manager.max_backup_count;
+    if (max_size == 0)
+        max_size = 10 * 1024 * 1024; /* 默认 10MB */
+    if (max_backup <= 0)
+        max_backup = 5;
+
+    if (g_log_file_current_size < max_size)
+        return;
+
+    const char *path = g_logging_state.manager.file_path;
+    if (!path)
+        return;
+
+    /* 关闭当前文件 */
+    fclose(g_log_file);
+    g_log_file = NULL;
+
+    /* 滚动备份：file.N-1 → file.N, ..., file.0 → file.1, file → file.0 */
+    char old_path[512];
+    char new_path[512];
+    for (int i = max_backup - 1; i >= 0; i--) {
+        if (i == 0) {
+            snprintf(old_path, sizeof(old_path), "%s", path);
+        } else {
+            snprintf(old_path, sizeof(old_path), "%s.%d", path, i);
+        }
+        snprintf(new_path, sizeof(new_path), "%s.%d", path, i + 1);
+        rename(old_path, new_path);
+    }
+
+    /* 重开新文件 */
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
+    g_log_file = fopen(path, "a");
+    g_log_file_current_size = 0;
+}
+
+/** 写入一条日志到文件（无色彩，含完整元数据） */
+static void log_file_write(const log_record_t *record, const char *formatted_message,
+                           size_t formatted_len)
+{
+    if (!g_log_file || !g_log_file_mutex_init || !record)
+        return;
+
+    agentos_mutex_lock(&g_log_file_mutex);
+    if (!g_log_file) {
+        agentos_mutex_unlock(&g_log_file_mutex);
+        return;
+    }
+
+    /* 文件输出不使用 ANSI 色彩，使用纯文本格式 */
+    char file_buffer[MAX_MESSAGE_LEN * 2];
+    time_t sec = record->timestamp / 1000;
+    int ms = (int)(record->timestamp % 1000);
+    struct tm tm_storage;
+    localtime_r(&sec, &tm_storage);
+    const char *level_name = log_level_to_string(record->level);
+
+    int len = snprintf(file_buffer, sizeof(file_buffer),
+                       "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s] [%s:%d]",
+                       tm_storage.tm_year + 1900, tm_storage.tm_mon + 1, tm_storage.tm_mday,
+                       tm_storage.tm_hour, tm_storage.tm_min, tm_storage.tm_sec, ms,
+                       level_name, record->module ? record->module : "?", record->line);
+    if (len < 0) {
+        agentos_mutex_unlock(&g_log_file_mutex);
+        return;
+    }
+    if ((size_t)len >= sizeof(file_buffer))
+        len = (int)sizeof(file_buffer) - 1;
+
+    if (record->trace_id && record->trace_id[0]) {
+        int tlen = snprintf(file_buffer + len, sizeof(file_buffer) - (size_t)len,
+                            " [trace:%s]", record->trace_id);
+        if (tlen > 0) len += tlen;
+        if ((size_t)len >= sizeof(file_buffer))
+            len = (int)sizeof(file_buffer) - 1;
+    }
+
+    /* 追加消息内容（formatted_message 已含换行符） */
+    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
+    fwrite(file_buffer, 1, (size_t)len, g_log_file);
+    fwrite(" ", 1, 1, g_log_file);
+    fwrite(record->message ? record->message : "", 1,
+           record->message ? strlen(record->message) : 0, g_log_file);
+    fwrite("\n", 1, 1, g_log_file);
+    fflush(g_log_file);
+
+    g_log_file_current_size += (size_t)len + 1 +
+                               (record->message ? strlen(record->message) : 0) + 1;
+
+    log_file_rotate_if_needed();
+    agentos_mutex_unlock(&g_log_file_mutex);
+}
+
 const char *log_level_to_string(log_level_t level)
 {
     if (level >= 0 && level < LEVEL_NAMES_COUNT) {
@@ -389,8 +581,33 @@ int log_init(const log_config_t *manager)
         }
     }
 
+    /* 初始化文件输出互斥锁（合并自 logging_common.c） */
+    if (!g_log_file_mutex_init) {
+        if (agentos_mutex_init(&g_log_file_mutex) == 0) {
+            g_log_file_mutex_init = true;
+        }
+    }
+
     g_tls_trace_id[0] = '\0';
     g_tls_span_id[0] = '\0';
+
+    /* ── 色彩检测：仅在终端环境启用 ANSI 色彩，可通过环境变量覆盖 ── */
+    {
+        const char *env_color = getenv("AGENTRT_LOG_COLOR");
+        if (env_color) {
+            /* 环境变量显式控制 */
+            if (strcmp(env_color, "0") == 0 || strcmp(env_color, "no") == 0 ||
+                strcmp(env_color, "false") == 0 || strcmp(env_color, "off") == 0 ||
+                strcmp(env_color, "never") == 0) {
+                g_log_use_color = false;
+            } else {
+                g_log_use_color = true;
+            }
+        } else {
+            /* 自动检测：仅当输出到终端时启用 */
+            g_log_use_color = is_terminal(STDOUT_FILENO) || is_terminal(STDERR_FILENO);
+        }
+    }
 
     if (manager) {
         __builtin_memcpy(&g_logging_state.manager, manager, sizeof(log_config_t));
@@ -400,6 +617,15 @@ int log_init(const log_config_t *manager)
         g_logging_state.manager.format = DEFAULT_LOG_FORMAT;
         g_logging_state.manager.async_mode = false;
         g_logging_state.manager.enable_statistics = false;
+    }
+
+    /* 如果配置了文件输出，打开日志文件（合并自 logging_common.c） */
+    if ((g_logging_state.manager.outputs & (1 << LOG_OUTPUT_FILE)) &&
+        g_logging_state.manager.file_path && g_log_file_mutex_init) {
+        if (log_file_open(g_logging_state.manager.file_path) != 0) {
+            /* 文件打开失败不致命，降级到仅控制台输出 */
+            g_logging_state.manager.outputs &= ~(1 << LOG_OUTPUT_FILE);
+        }
     }
 
     g_logging_state.initialized = true;
@@ -461,16 +687,21 @@ void log_write(log_level_t level, const char *module, int line, const char *fmt,
                            .thread_id = get_current_thread_id(),
                            .process_id = get_current_process_id()};
 
-    // 格式化输?
+    // 格式化输出
     char formatted_buffer[MAX_MESSAGE_LEN * 2];
     size_t formatted_len = format_log_message(&record, formatted_buffer, sizeof(formatted_buffer));
 
-    // 输出到控制台?
+    // 输出到控制台
     if (formatted_len > 0) {
-        // 根据级别选择输出?
+        // 根据级别选择输出流
         FILE *stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
         fwrite(formatted_buffer, 1, formatted_len, stream);
         fflush(stream);
+    }
+
+    /* 输出到文件（如果配置了 LOG_OUTPUT_FILE） */
+    if (g_logging_state.manager.outputs & (1 << LOG_OUTPUT_FILE)) {
+        log_file_write(&record, formatted_buffer, formatted_len);
     }
 }
 
@@ -503,7 +734,7 @@ void log_write_va(log_level_t level, const char *module, int line, const char *f
                            .thread_id = get_current_thread_id(),
                            .process_id = get_current_process_id()};
 
-    // 格式化输?
+    // 格式化输出
     char formatted_buffer[MAX_MESSAGE_LEN * 2];
     size_t formatted_len = format_log_message(&record, formatted_buffer, sizeof(formatted_buffer));
 
@@ -512,6 +743,11 @@ void log_write_va(log_level_t level, const char *module, int line, const char *f
         FILE *stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
         fwrite(formatted_buffer, 1, formatted_len, stream);
         fflush(stream);
+    }
+
+    /* 输出到文件（如果配置了 LOG_OUTPUT_FILE） */
+    if (g_logging_state.manager.outputs & (1 << LOG_OUTPUT_FILE)) {
+        log_file_write(&record, formatted_buffer, formatted_len);
     }
 }
 
@@ -655,6 +891,7 @@ int log_reload_config(const char *config_path)
     agentos_mutex_unlock(&g_logging_state.mutex);
 
     if (changes > 0) {
+        /* BAN-70 EXEMPT: logging module - diagnostic config reload notification */
         __builtin_fprintf(stderr, "[LOGGING] Config reloaded from '%s' (%d changes applied)\n", config_path,
                 changes);
     }
@@ -664,9 +901,13 @@ int log_reload_config(const char *config_path)
 
 void log_flush(void)
 {
-    // 控制台输出立即刷?
+    // 控制台输出立即刷新
     fflush(stdout);
     fflush(stderr);
+    /* 文件输出刷新 */
+    if (g_log_file) {
+        fflush(g_log_file);
+    }
 }
 
 void log_set_throttle(bool enable, uint32_t max_per_sec)
@@ -728,6 +969,20 @@ void log_cleanup(void)
     if (g_throttle_mutex_init) {
         agentos_mutex_destroy(&g_throttle_mutex);
         g_throttle_mutex_init = false;
+    }
+
+    /* 关闭日志文件并销毁文件互斥锁（合并自 logging_common.c） */
+    if (g_log_file_mutex_init) {
+        agentos_mutex_lock(&g_log_file_mutex);
+        if (g_log_file) {
+            fflush(g_log_file);
+            fclose(g_log_file);
+            g_log_file = NULL;
+        }
+        g_log_file_current_size = 0;
+        agentos_mutex_unlock(&g_log_file_mutex);
+        agentos_mutex_destroy(&g_log_file_mutex);
+        g_log_file_mutex_init = false;
     }
 
     AGENTOS_MEMSET(&g_logging_state, 0, sizeof(g_logging_state));

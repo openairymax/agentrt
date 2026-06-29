@@ -14,13 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Fallback logging macros */
-#ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
-#ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
+#include "logging_compat.h"
 
 typedef enum {
     GW_STATE_CREATED = 0,

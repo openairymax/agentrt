@@ -50,7 +50,7 @@ set(SVC_COMMON_SOURCES
     src/api_recovery.c        # API恢复系统
     src/orchestrator.c        # 流程编排器
     src/thread_pool.c         # 工作线程池
-    src/parallel_dispatcher.c # 工具并行执行引擎
+    src/daemon_task_dispatcher.c # 工具并行执行引擎（原 parallel_dispatcher.c，重命名以消除与 atoms/coreloopthree 同名冲突）
     src/checkpoint.c
     src/daemon_oom.c          # P1.22: Daemon OOM 降级回调注册
     src/ipc_backpressure.c    # P1.24: IPC Bus 背压控制

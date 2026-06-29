@@ -21,17 +21,15 @@ Logging 模块是 AgentRT 的统一分层日志系统，采用三层架构设计
 ```
 logging/
 ├── include/
-│   ├── logging.h                # Core 层：日志核心 API
-│   ├── logging_common.h         # 日志公共定义（内部使用）
-│   ├── logging_compat.h         # 日志兼容层
+│   ├── logging.h                # Core 层：日志核心 API（含文件输出与轮转）
+│   ├── logging_compat.h         # 日志兼容层（SVC_LOG_* / AGENTOS_LOG_* 宏）
 │   ├── atomic_logging.h         # Atomic 层：无锁队列与批量写入
 │   └── service_logging.h        # Service 层：轮转/过滤/传输/监控
 ├── src/
-│   ├── logging.c                # Core 层实现
+│   ├── logging.c                # Core 层实现（含文件输出、色彩、时间戳、节流）
 │   ├── logging_compat.c         # 兼容层实现
 │   ├── atomic_logging.c         # Atomic 层实现
-│   ├── service_logging.c        # Service 层实现
-│   └── logging_common.c         # 公共功能实现
+│   └── service_logging.c        # Service 层实现（console_outputter 路由到 log_write）
 ├── bench_atomic_logging.c       # Atomic 层性能基准测试
 ├── test/
 │   └── test_logging_unified.c   # 统一日志测试
@@ -55,13 +53,16 @@ logging/
 
 ### Core 层
 
-日志核心层提供基础日志能力：
+日志核心层提供基础日志能力（含文件输出与轮转，原 `logging_common.c` 已合并到 `logging.c`）：
 
 - **5 级日志级别**：DEBUG、INFO、WARN、ERROR、FATAL
 - **5 种输出目标**：Console、File、Syslog、Network、Buffer
 - **4 种输出格式**：Text、JSON、Structured、Binary
 - **追踪 ID**：`log_set_trace_id` / `log_set_span_id`（OpenTelemetry 兼容）
 - **模块级别**：`log_set_module_level`，支持通配符匹配
+- **ANSI 色彩输出**：终端自动启用（INFO=蓝/WARN=黄/ERROR=红/FATAL=品红/DEBUG=灰），管道/文件自动禁用
+- **文件轮转**：基于大小自动轮转，支持 backup 滑动窗口
+- **节流（Throttling）**：相同日志按哈希桶限速，避免日志洪水
 
 ### Atomic 层
 
@@ -185,6 +186,36 @@ log_cleanup();
 | **同步** | 直接写入目标，写入完成前阻塞 | 调试、开发环境 |
 | **异步** | 写入环形缓冲区后立即返回，后台批量写入 | 生产环境（默认） |
 | **安全** | 双重写入（本地 + 远程），HMAC 签名确保完整性 | 审计、合规场景 |
+
+## 环境变量
+
+| 变量 | 取值 | 说明 |
+|------|------|------|
+| `AGENTRT_LOG_COLOR` | `0` / `1` | 强制禁用/启用 ANSI 色彩输出。未设置时自动检测：终端启用，管道/文件禁用 |
+
+**示例**：
+
+```bash
+# 强制启用色彩（即使输出到管道）
+AGENTRT_LOG_COLOR=1 ./build/agentos/daemon/gateway_d/src/gateway_d | cat
+
+# 强制禁用色彩（即使输出到终端）
+AGENTRT_LOG_COLOR=0 ./build/agentos/daemon/gateway_d/src/gateway_d
+```
+
+## 时间源
+
+日志时间戳使用 **`CLOCK_REALTIME`**（墙钟时间），与网络北京时间或宿主机系统时间对齐，格式为 `[YYYY-MM-DD HH:MM:SS.sss]`。
+
+> **重要**：项目内**严禁**使用 `agentos_time_monotonic_ns()` / `agentos_time_monotonic_ms()`（基于 `CLOCK_MONOTONIC`，系统启动时间）作为日志时间戳。`CLOCK_MONOTONIC` 仅用于超时计算、调度、性能基准等子系统内部场景。
+
+时间源分离原则：
+
+| 用途 | 时钟 | API |
+|------|------|-----|
+| 日志时间戳 | `CLOCK_REALTIME` | `log_write()` 内部 `clock_gettime(CLOCK_REALTIME, ...)` |
+| 超时/调度 | `CLOCK_MONOTONIC` | `agentos_time_monotonic_ns()` / `agentos_time_monotonic_ms()` |
+| 墙钟时间查询 | `CLOCK_REALTIME` | `agentos_time_realtime_ns()` |
 
 ## 性能特性
 
