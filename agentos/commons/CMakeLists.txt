@@ -21,7 +21,6 @@ set(SOURCES
     utils/logging/src/logging_compat.c
     utils/logging/src/atomic_logging.c
     utils/logging/src/service_logging.c
-    utils/logging/src/logging_common.c
     utils/memory/src/memory.c
     utils/memory/src/memory_pool.c
     utils/memory/src/memory_debug.c
@@ -134,7 +133,6 @@ set_source_files_properties(
     utils/logging/src/logging_compat.c
     utils/logging/src/atomic_logging.c
     utils/logging/src/service_logging.c
-    utils/logging/src/logging_common.c
     PROPERTIES COMPILE_DEFINITIONS "AGENTOS_COMPLIANCE_IMPL"
 )
 
