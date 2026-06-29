@@ -2,6 +2,7 @@
 
 #include "agentos.h"
 #include "atomic_compat.h"
+#include "logging.h"
 #include "memory_compat.h"
 #include "platform.h"
 
@@ -275,7 +276,7 @@ void delegate_shutdown(void)
     if (g_delegate_mutex_initialized) {
         agentos_mutex_destroy(&g_delegate_mutex);
         g_delegate_mutex_initialized = 0;
-        fprintf(stderr, "[delegate] g_delegate_mutex destroyed\n");
+        log_write(LOG_LEVEL_DEBUG, __FILE__, __LINE__, "[delegate] g_delegate_mutex destroyed");
     }
 }
 
