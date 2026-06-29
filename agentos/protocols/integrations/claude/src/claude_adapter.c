@@ -16,7 +16,7 @@
 #include "claude_adapter.h"
 
 #include "error.h"
-#include "logging_common.h"
+#include "logging.h"
 #include "memory_compat.h"
 #include "protocol_transformers.h"
 #include "types.h"
