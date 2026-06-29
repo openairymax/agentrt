@@ -29,6 +29,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <time.h>
 
@@ -212,7 +213,147 @@ static checkpoint_snapshot_t *checkpoint_to_snapshot(
 }
 
 /**
+ * @brief 解析 JSON 字符串数组（如 ["a","b","c"]）为 char** 数组
+ *
+ * 自包含解析器，不依赖 cJSON，处理由 checkpoint_to_snapshot 生成的标准格式。
+ * 调用者负责通过 AGENTOS_FREE 释放返回的数组及其中的每个字符串。
+ *
+ * @param json JSON 数组字符串（可为 NULL 或 "[]"）
+ * @param out_array 输出字符串数组（NULL 表示空数组）
+ * @param out_count 输出元素数量
+ * @return 0 成功，-1 解析错误，-2 内存不足
+ */
+static int parse_json_string_array(const char *json, char ***out_array, size_t *out_count)
+{
+    *out_array = NULL;
+    *out_count = 0;
+
+    if (!json || !json[0])
+        return 0;
+
+    /* 跳过前导空白 */
+    const char *p = json;
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+        p++;
+
+    if (*p != '[')
+        return -1;  /* 不是 JSON 数组 */
+    p++;  /* 跳过 '[' */
+
+    /* 空数组检查 */
+    while (*p == ' ' || *p == '\t')
+        p++;
+    if (*p == ']')
+        return 0;  /* 空数组 */
+
+    /* 第一遍：计算元素数量 */
+    const char *scan = p;
+    size_t count = 0;
+    bool in_string = false;
+    while (*scan) {
+        if (*scan == '"') {
+            if (!in_string) {
+                count++;
+                in_string = true;
+            } else {
+                in_string = false;
+            }
+        } else if (*scan == ']' && !in_string) {
+            break;
+        }
+        scan++;
+    }
+
+    if (count == 0)
+        return 0;
+
+    /* 分配数组 */
+    char **array = (char **)AGENTOS_CALLOC(count, sizeof(char *));
+    if (!array)
+        return -2;
+
+    /* 第二遍：提取每个字符串 */
+    size_t idx = 0;
+    while (*p && idx < count) {
+        /* 跳过到下一个引号 */
+        while (*p && *p != '"')
+            p++;
+        if (*p != '"')
+            break;
+        p++;  /* 跳过开引号 */
+
+        /* 计算字符串长度（处理转义） */
+        const char *start = p;
+        size_t len = 0;
+        while (*p) {
+            if (*p == '\\' && *(p + 1)) {
+                len++;
+                p += 2;
+            } else if (*p == '"') {
+                break;
+            } else {
+                len++;
+                p++;
+            }
+        }
+
+        if (*p != '"') {
+            /* 格式错误：未闭合的字符串 */
+            for (size_t i = 0; i < idx; i++)
+                AGENTOS_FREE(array[i]);
+            AGENTOS_FREE(array);
+            return -1;
+        }
+
+        /* 分配并复制字符串（处理转义） */
+        char *str = (char *)AGENTOS_MALLOC(len + 1);
+        if (!str) {
+            for (size_t i = 0; i < idx; i++)
+                AGENTOS_FREE(array[i]);
+            AGENTOS_FREE(array);
+            return -2;
+        }
+
+        const char *src = start;
+        size_t di = 0;
+        while (src < p) {
+            if (*src == '\\' && *(src + 1)) {
+                src++;
+                switch (*src) {
+                case 'n':  str[di++] = '\n'; break;
+                case 't':  str[di++] = '\t'; break;
+                case 'r':  str[di++] = '\r'; break;
+                case '"':  str[di++] = '"';  break;
+                case '\\': str[di++] = '\\'; break;
+                default:   str[di++] = *src; break;
+                }
+                src++;
+            } else {
+                str[di++] = *src++;
+            }
+        }
+        str[di] = '\0';
+        array[idx++] = str;
+
+        p++;  /* 跳过闭引号 */
+
+        /* 跳过到下一个元素或数组结束 */
+        while (*p && *p != ',' && *p != ']')
+            p++;
+        if (*p == ',')
+            p++;
+    }
+
+    *out_array = array;
+    *out_count = idx;
+    return 0;
+}
+
+/**
  * @brief 构建 completed_nodes 和 pending_nodes 数组
+ *
+ * 从 snapshot 的 JSON 字符串字段解析出节点名数组。
+ * 调用者负责释放返回的数组。
  */
 static int build_node_arrays(const checkpoint_snapshot_t *snapshot,
                              char ***out_completed_nodes,
@@ -220,16 +361,34 @@ static int build_node_arrays(const checkpoint_snapshot_t *snapshot,
                              char ***out_pending_nodes,
                              size_t *out_pending_count)
 {
-    /* 简化实现：从 JSON 数组字符串解析节点名 */
-    /* 生产环境应使用 cJSON 库进行完整解析 */
+    int rc = 0;
 
     if (out_completed_nodes && out_completed_count) {
-        *out_completed_nodes = NULL;
-        *out_completed_count = 0;
+        rc = parse_json_string_array(snapshot ? snapshot->completed_nodes_json : NULL,
+                                     out_completed_nodes, out_completed_count);
+        if (rc != 0) {
+            *out_completed_nodes = NULL;
+            *out_completed_count = 0;
+            return rc;
+        }
     }
+
     if (out_pending_nodes && out_pending_count) {
-        *out_pending_nodes = NULL;
-        *out_pending_count = 0;
+        rc = parse_json_string_array(snapshot ? snapshot->pending_nodes_json : NULL,
+                                     out_pending_nodes, out_pending_count);
+        if (rc != 0) {
+            /* 释放已分配的 completed 数组 */
+            if (out_completed_nodes && *out_completed_nodes) {
+                for (size_t i = 0; i < *out_completed_count; i++)
+                    AGENTOS_FREE((*out_completed_nodes)[i]);
+                AGENTOS_FREE(*out_completed_nodes);
+                *out_completed_nodes = NULL;
+                *out_completed_count = 0;
+            }
+            *out_pending_nodes = NULL;
+            *out_pending_count = 0;
+            return rc;
+        }
     }
 
     return 0;

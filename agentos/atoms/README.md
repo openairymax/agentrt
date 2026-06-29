@@ -76,10 +76,10 @@ atoms/
 │   ├── src/                    # 引擎实现（核心、图、Pregel、工作流模式）
 │   ├── tests/                  # 单元测试
 │   └── CMakeLists.txt
-└── frameworks/                 # 框架集成层 — 五大框架统一抽象
-    ├── include/                # agentos_frameworks.h
-    ├── src/                    # 框架管理器实现
-    └── CMakeLists.txt
+├── frameworks/                 # 外部 AI 框架适配器桥接层 — 行业底座兼容驱动
+│   ├── include/                # agentos_frameworks.h 适配器接口 + 注册表 API
+│   ├── src/                    # 线程安全注册表 + 实例生命周期管理
+│   └── CMakeLists.txt
 ```
 
 ---
@@ -94,7 +94,7 @@ atoms/
 | **MemoryRovol** | `memoryrovol/` | L1-L4 全功能记忆（商业），桥接内置 Memory | C11 | 独立仓库 |
 | **Syscall** | `syscall/` | 任务/内存/会话/遥测/代理 5 类调用 + Skill 管理 | C11 | [syscall/README.md](syscall/README.md) |
 | **TaskFlow** | `taskflow/` | Pregel 超步模型、DAG 编排、检查点容错 | C11 | [taskflow/README.md](taskflow/README.md) |
-| **Frameworks** | `frameworks/` | Agent/Memory/Task/Safety/Tool 五大框架统一抽象 | C11 | [frameworks/README.md](frameworks/README.md) |
+| **Frameworks** | `frameworks/` | 外部 AI 框架适配器桥接层，兼容驱动 LangChain/AutoGen 等 | C11 | [frameworks/README.md](frameworks/README.md) |
 
 ---
 
@@ -127,8 +127,8 @@ atoms/
 
     ┌──────────────────────────────────────┐
     │            Frameworks                │
-    │  (Agent / Memory / Task / Safety /   │
-    │   Tool 五大框架统一抽象)              │
+    │  (外部 AI 框架适配器桥接层 —          │
+    │   兼容驱动 LangChain/AutoGen 等)      │
     └──────────────────────────────────────┘
 ```
 
@@ -138,7 +138,7 @@ atoms/
 - **Memory** 提供内置 L1+L2 记忆能力，通过可拔插提供商架构支持扩展
 - **MemoryRovol** 通过桥接扩展至 L1-L4，需 CMake 选项激活
 - **TaskFlow** 在 CoreKern 调度之上提供基于 Pregel 超步模型的高级任务编排
-- **Frameworks** 通过统一抽象层接入五大框架（Agent/Memory/Task/Safety/Tool）
+- **Frameworks** 作为行业底座桥接层，通过标准适配器接口兼容驱动外部 AI 框架（LangChain/AutoGen/CrewAI 等），使其接入 Airymax 内核基础设施
 
 ---
 
@@ -166,7 +166,7 @@ atoms/
 | MemoryRovol | CoreKern、Memory | CoreLoopThree（可选） |
 | Syscall | CoreKern、commons | CoreLoopThree、TaskFlow |
 | TaskFlow | CoreKern、Syscall | CoreLoopThree |
-| Frameworks | 所有模块 | 外部框架、Daemon 服务 |
+| Frameworks | 所有模块 | 外部 AI 框架、Daemon 服务 |
 
 ---
 
