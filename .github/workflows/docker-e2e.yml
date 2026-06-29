@@ -43,7 +43,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BASE: ${{ github.repository_owner }}/agentos
+  IMAGE_BASE: ${{ github.repository_owner }}/agentrt
   DOCKER_DIR: deploy/docker
 
 concurrency:
@@ -87,7 +87,7 @@ jobs:
             if [ -f "$compose_file" ]; then
               echo "::group::Validating $compose_file"
               docker compose -f "$compose_file" config --quiet 2>&1 || \
-                echo "::warning::Validation issue in $compose_file (may need env vars)"
+                { echo "::error::Validation failed for $compose_file"; exit 1; }
               echo "::endgroup::"
             fi
           done
