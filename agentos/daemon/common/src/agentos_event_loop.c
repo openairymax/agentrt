@@ -724,66 +724,8 @@ int agentos_event_loop_get_fd_count(agentos_event_loop_t *loop)
     return count;
 }
 
-#else  /* !defined(_WIN32) && !defined(__linux__) — macOS/其他 POSIX 平台桩实现 */
+#else  /* !defined(_WIN32) && !defined(__linux__) — 不支持的平台 */
 
-/* macOS 使用 kqueue，尚未实现完整支持。提供桩函数避免链接错误。 */
-#include <stdio.h>
-
-agentos_event_loop_t *agentos_event_loop_create(int max_events)
-{
-    (void)max_events;
-    fprintf(stderr, "agentos_event_loop: epoll-based implementation requires Linux; kqueue support not yet implemented\n");
-    return NULL;
-}
-
-void agentos_event_loop_destroy(agentos_event_loop_t *loop) { (void)loop; }
-
-int agentos_event_loop_add_fd(agentos_event_loop_t *loop, int fd, uint32_t events,
-                              agentos_event_callback_t cb, void *user_data)
-{
-    (void)loop; (void)fd; (void)events; (void)cb; (void)user_data;
-    return AGENTOS_ERR_NOT_SUPPORTED;
-}
-
-int agentos_event_loop_add_fd_lt(agentos_event_loop_t *loop, int fd, uint32_t events,
-                                 agentos_event_callback_t cb, void *user_data)
-{
-    (void)loop; (void)fd; (void)events; (void)cb; (void)user_data;
-    return AGENTOS_ERR_NOT_SUPPORTED;
-}
-
-int agentos_event_loop_mod_fd(agentos_event_loop_t *loop, int fd, uint32_t events)
-{
-    (void)loop; (void)fd; (void)events;
-    return AGENTOS_ERR_NOT_SUPPORTED;
-}
-
-void agentos_event_loop_remove_fd(agentos_event_loop_t *loop, int fd) { (void)loop; (void)fd; }
-
-int agentos_event_loop_cancel_timer(agentos_event_loop_t *loop, uint64_t timer_id)
-{
-    (void)loop; (void)timer_id;
-    return AGENTOS_ERR_NOT_SUPPORTED;
-}
-
-int agentos_event_loop_run(agentos_event_loop_t *loop)
-{
-    (void)loop;
-    return AGENTOS_ERR_NOT_SUPPORTED;
-}
-
-void agentos_event_loop_stop(agentos_event_loop_t *loop) { (void)loop; }
-
-int agentos_event_loop_get_fd_count(agentos_event_loop_t *loop)
-{
-    (void)loop;
-    return 0;
-}
-
-int agentos_event_loop_wakeup(agentos_event_loop_t *loop)
-{
-    (void)loop;
-    return AGENTOS_ERR_NOT_SUPPORTED;
-}
+#error "Airymax 0.1.1 仅支持 Linux 和 Windows 平台；macOS/kqueue 及其他 POSIX 平台支持未规划。请使用 Linux 构建环境。"
 
 #endif

@@ -53,6 +53,57 @@ void agentos_trace_cleanup(void);
  */
 int agentos_trace_get_span_count(void);
 
+/* ==================== Span 字段访问器（用于持久化） ==================== */
+
+/**
+ * @brief 获取 span 的追踪 ID
+ * @param span 跨度句柄（必须非 NULL）
+ * @return 追踪 ID 字符串（只读，span 生命周期内有效）
+ */
+const char *agentos_trace_span_get_trace_id(const agentos_trace_span_t *span);
+
+/**
+ * @brief 获取 span 的 ID
+ * @param span 跨度句柄（必须非 NULL）
+ * @return Span ID 字符串（只读，span 生命周期内有效）
+ */
+const char *agentos_trace_span_get_span_id(const agentos_trace_span_t *span);
+
+/**
+ * @brief 获取 span 的父 ID
+ * @param span 跨度句柄（必须非 NULL）
+ * @return 父 Span ID 字符串（只读，可能为空字符串）
+ */
+const char *agentos_trace_span_get_parent_id(const agentos_trace_span_t *span);
+
+/**
+ * @brief 获取 span 的名称
+ * @param span 跨度句柄（必须非 NULL）
+ * @return 名称字符串（只读，span 生命周期内有效）
+ */
+const char *agentos_trace_span_get_name(const agentos_trace_span_t *span);
+
+/**
+ * @brief 获取 span 的开始时间
+ * @param span 跨度句柄（必须非 NULL）
+ * @return 开始时间（微秒）
+ */
+int64_t agentos_trace_span_get_start_time_us(const agentos_trace_span_t *span);
+
+/**
+ * @brief 获取 span 的结束时间
+ * @param span 跨度句柄（必须非 NULL）
+ * @return 结束时间（微秒），0 表示仍在运行
+ */
+int64_t agentos_trace_span_get_end_time_us(const agentos_trace_span_t *span);
+
+/**
+ * @brief 获取 span 的状态
+ * @param span 跨度句柄（必须非 NULL）
+ * @return 状态：0=运行中, 1=完成, 2=错误
+ */
+int agentos_trace_span_get_status(const agentos_trace_span_t *span);
+
 #ifdef __cplusplus
 }
 #endif
