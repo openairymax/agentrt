@@ -1,5 +1,15 @@
-#ifndef AGENTOS_PARALLEL_DISPATCHER_H
-#define AGENTOS_PARALLEL_DISPATCHER_H
+/*
+ * daemon_task_dispatcher.h — Daemon 层并行任务调度器
+ *
+ * 职责：基于线程池的并行工具执行引擎，供 daemon 层的 orchestrator/scheduler 使用。
+ * 字段约定：tool_id / params_json / duration_ms（毫秒）。
+ *
+ * 注意：本头文件与 atoms/coreloopthree/src/cognition/dispatch/parallel_dispatcher.h
+ * 同名但职责完全不同（后者为认知层工具调度，字段为 tool_name/arguments/elapsed_ns）。
+ * 为消除 include guard 冲突，本头文件使用 AGENTOS_DAEMON_TASK_DISPATCHER_H 守卫。
+ */
+#ifndef AGENTOS_DAEMON_TASK_DISPATCHER_H
+#define AGENTOS_DAEMON_TASK_DISPATCHER_H
 
 #include "thread_pool.h"
 
@@ -66,4 +76,4 @@ void parallel_task_free(parallel_task_t *task);
 }
 #endif
 
-#endif
+#endif /* AGENTOS_DAEMON_TASK_DISPATCHER_H */
