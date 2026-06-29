@@ -490,3 +490,40 @@ int agentos_trace_get_span_count(void)
 
     return count;
 }
+
+/* ==================== Span 字段访问器 ==================== */
+
+const char *agentos_trace_span_get_trace_id(const agentos_trace_span_t *span)
+{
+    return span ? span->trace_id : NULL;
+}
+
+const char *agentos_trace_span_get_span_id(const agentos_trace_span_t *span)
+{
+    return span ? span->span_id : NULL;
+}
+
+const char *agentos_trace_span_get_parent_id(const agentos_trace_span_t *span)
+{
+    return span ? span->parent_id : NULL;
+}
+
+const char *agentos_trace_span_get_name(const agentos_trace_span_t *span)
+{
+    return span ? span->name : NULL;
+}
+
+int64_t agentos_trace_span_get_start_time_us(const agentos_trace_span_t *span)
+{
+    return span ? span->start_time : 0;
+}
+
+int64_t agentos_trace_span_get_end_time_us(const agentos_trace_span_t *span)
+{
+    return span ? span->end_time : 0;
+}
+
+int agentos_trace_span_get_status(const agentos_trace_span_t *span)
+{
+    return span ? atomic_load(&span->status) : 0;
+}

@@ -104,31 +104,12 @@ extern "C" {
 
 #include <stdio.h>
 
-/* ── AGENTOS_LOG_* 宏 (POSIX 回退实现) ──
- * 注意：若需要彩色 + 时间戳的完整日志，请在包含本文件之前
- * 先包含 #include "logging.h" 或 #include "svc_logger.h"。
- * 届时 logging_compat.h 的 #ifndef 保护会优先使用 log_write()。
- */
-
-#ifndef AGENTOS_LOG_DEBUG
-#define AGENTOS_LOG_DEBUG(fmt, ...) \
-    do { if (0) {}} while (0) /* __builtin_fprintf(stderr, "[DEBUG] %s: " fmt "\n", __func__, ##__VA_ARGS__) */
-#endif
-
-#ifndef AGENTOS_LOG_INFO
-#define AGENTOS_LOG_INFO(fmt, ...) \
-    do { if (0) {}} while (0)
-#endif
-
-#ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...) \
-    do { if (0) {}} while (0)
-#endif
-
-#ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...) \
-    do { if (0) {}} while (0)
-#endif
+/* ── AGENTOS_LOG_* 宏 (POSIX 路径) ──
+ * POSIX 路径已自动委托给统一日志系统（G2.4 替换原 no-op 桩宏）。
+ * logging_compat.h 的 #ifndef 保护会跳过已由 logging.h/svc_logger.h
+ * 先行定义的 AGENTOS_LOG_* 宏，避免重复定义；若未先行包含，则提供
+ * 委托到 agentos_log_write() 的真实实现（彩色输出 + CLOCK_REALTIME 时间戳）。 */
+#include "../../../commons/utils/logging/include/logging_compat.h"
 
 #endif /* _WIN32 */
 

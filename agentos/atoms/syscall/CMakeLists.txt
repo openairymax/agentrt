@@ -74,6 +74,21 @@ target_link_libraries(agentos_syscall PUBLIC
     $<$<BOOL:${CJSON_FOUND}>:${CJSON_LIBRARIES}>
 )
 
+# libcurl 用于 skill.c 的 web_search/image_gen/audio_process HTTP API 调用
+if(AGENTRT_HAS_CURL)
+    target_compile_definitions(agentos_syscall PRIVATE AGENTRT_HAS_CURL=1)
+    if(CURL_FOUND)
+        target_link_libraries(agentos_syscall PRIVATE ${CURL_LIBRARIES})
+        target_include_directories(agentos_syscall PRIVATE ${CURL_INCLUDE_DIRS})
+    elseif(LIBCURL_FOUND)
+        target_link_libraries(agentos_syscall PRIVATE ${LIBCURL_LIBRARIES})
+        target_include_directories(agentos_syscall PRIVATE ${LIBCURL_INCLUDE_DIRS})
+    endif()
+    message(STATUS "  syscall: libcurl enabled for skill HTTP features (web_search/image_gen/audio_process)")
+else()
+    message(WARNING "  syscall: libcurl not found - web_search/image_gen/audio_process HTTP features will be unavailable")
+endif()
+
 install(TARGETS agentos_syscall DESTINATION lib)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/syscalls.h DESTINATION include/agentos)
 

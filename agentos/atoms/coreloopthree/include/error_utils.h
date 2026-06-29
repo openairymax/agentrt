@@ -31,21 +31,10 @@ const char *agentos_error_string(agentos_error_t err);
  */
 agentos_error_t agentos_error_to_json(agentos_error_t err, const char *message, char **out_json);
 
-#ifndef AGENTOS_ERROR_CONTEXT_T_DEFINED
-#define AGENTOS_ERROR_CONTEXT_T_DEFINED
-/**
- * @brief 错误上下文结构，用于记录错误的详细信息
- * @note 这是agentos_error_context_t的完整版定义（含动态分配和时间戳）
- */
-typedef struct agentos_error_context {
-    agentos_error_t code;  /**< 错误码 */
-    char *message;         /**< 错误消息 */
-    char *file;            /**< 发生错误的文件名 */
-    int line;              /**< 发生错误的行号 */
-    char *function;        /**< 发生错误的函数名 */
-    uint64_t timestamp_ns; /**< 错误发生时间戳 */
-} agentos_error_context_t;
-#endif /* AGENTOS_ERROR_CONTEXT_T_DEFINED */
+/* agentos_error_context_t 的权威定义位于 commons/utils/error/include/error.h
+ * （guard: AGENTOS_ERROR_CONTEXT_T_DEFINED）。本文件通过 #include "agentos.h"
+ * → corekern/error.h → commons/error.h 传递包含该类型，无需重复定义。
+ * （G2.3 统一错误码表：消除重复定义） */
 
 /**
  * @brief 创建错误上下文
