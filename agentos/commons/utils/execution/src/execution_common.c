@@ -12,7 +12,7 @@
 
 #include <agentos_time.h>
 #include <inttypes.h>
-#include <logging_common.h>
+#include <logging.h>
 #include <memory_common.h>
 #include <platform.h>
 #include <stdio.h>

@@ -47,54 +47,34 @@ extern "C" {
 #endif
 
 /* ==================== 向后兼容别名 ==================== */
-/* 兼容旧的 AGENTOS_E* 命名 */
-/* 使用 #ifndef 防止与 types.h 中的定义冲突 */
-#ifndef AGENTOS_SUCCESS
-#define AGENTOS_SUCCESS AGENTOS_OK
-#endif
-#ifndef AGENTOS_EUNKNOWN
-#define AGENTOS_EUNKNOWN AGENTOS_ERR_UNKNOWN
-#endif
-#ifndef AGENTOS_EINVAL
-#define AGENTOS_EINVAL AGENTOS_ERR_INVALID_PARAM
-#endif
-#ifndef AGENTOS_ENOMEM
-#define AGENTOS_ENOMEM AGENTOS_ERR_OUT_OF_MEMORY
-#endif
-#ifndef AGENTOS_EBUSY
-#define AGENTOS_EBUSY AGENTOS_ERR_BUSY
-#endif
-#ifndef AGENTOS_ENOENT
-#define AGENTOS_ENOENT AGENTOS_ERR_NOT_FOUND
-#endif
-#undef AGENTOS_EPERM
-#define AGENTOS_EPERM AGENTOS_ERR_PERMISSION_DENIED
-#ifndef AGENTOS_ETIMEDOUT
-#define AGENTOS_ETIMEDOUT AGENTOS_ERR_TIMEOUT
-#endif
-#ifndef AGENTOS_EEXIST
-#define AGENTOS_EEXIST AGENTOS_ERR_ALREADY_EXISTS
-#endif
+/*
+ * 权威源说明（G2.1 统一错误码表）：
+ *
+ * POSIX 风格错误码（AGENTOS_EINVAL / AGENTOS_ENOMEM / AGENTOS_EBUSY 等）
+ * 的权威定义位于 agentos_types.h（硬定义，无 #ifndef 保护）。
+ *
+ * 本文件原先用 #ifndef 为上述 POSIX 码提供"别名到 AGENTOS_ERR_* 扩展码"
+ * 的兼容层，但因 types.h 总是先被 include（本文件 line 27），#ifndef 恒为
+ * false，这些别名均为死代码。已于 G2.1 清理。
+ *
+ * 下方仅保留两类活跃定义：
+ *   1. types.h 未定义的扩展别名（EINTR/EBADF/ERESOURCE/ESECURITY/ESANITIZE/
+ *      ECANCELED/ENOTDIR/ENAMETOOLONG）——本文件为唯一源
+ *   2. #undef AGENTOS_EPERM 重定义——使 EPERM 与 ERR_PERMISSION_DENIED 数值
+ *      一致（-10），消除语义歧义
+ *
+ * 已知技术债（计划 0.1.2 消除）：types.h POSIX 码（-1 到 -29）与本文件
+ * AGENTOS_ERR_* 扩展码（-1 到 -19）在数值区间存在重叠（如 EINVAL=-1 与
+ * ERR_UNKNOWN=-1）。调用方应始终使用语义宏，严禁与字面量直接比较。
+ */
 #ifndef AGENTOS_ECANCELED
 #define AGENTOS_ECANCELED AGENTOS_ERR_CANCELED
-#endif
-#ifndef AGENTOS_ENOTSUP
-#define AGENTOS_ENOTSUP AGENTOS_ERR_NOT_SUPPORTED
-#endif
-#ifndef AGENTOS_EIO
-#define AGENTOS_EIO AGENTOS_ERR_IO
 #endif
 #ifndef AGENTOS_EINTR
 #define AGENTOS_EINTR AGENTOS_ERR_INTERRUPTED
 #endif
-#ifndef AGENTOS_EOVERFLOW
-#define AGENTOS_EOVERFLOW AGENTOS_ERR_OVERFLOW
-#endif
 #ifndef AGENTOS_EBADF
 #define AGENTOS_EBADF AGENTOS_ERR_SYS_FILE
-#endif
-#ifndef AGENTOS_ENOTINIT
-#define AGENTOS_ENOTINIT AGENTOS_ERR_SYS_NOT_INIT
 #endif
 #ifndef AGENTOS_ERESOURCE
 #define AGENTOS_ERESOURCE AGENTOS_ERR_SYS_RESOURCE
@@ -105,40 +85,8 @@ extern "C" {
 #ifndef AGENTOS_ESANITIZE
 #define AGENTOS_ESANITIZE AGENTOS_ERR_ESANITIZE
 #endif
-
-#ifndef AGENTOS_EACCES
-#define AGENTOS_EACCES AGENTOS_ERR_PERMISSION_DENIED
-#endif
-#ifndef AGENTOS_ECONNREFUSED
-#define AGENTOS_ECONNREFUSED (-20)
-#endif
-#ifndef AGENTOS_ECONNRESET
-#define AGENTOS_ECONNRESET (-21)
-#endif
-#ifndef AGENTOS_ENOTCONN
-#define AGENTOS_ENOTCONN (-22)
-#endif
-#ifndef AGENTOS_EPROTO
-#define AGENTOS_EPROTO (-23)
-#endif
-#ifndef AGENTOS_EMSGSIZE
-#define AGENTOS_EMSGSIZE (-24)
-#endif
-#ifndef AGENTOS_ENOSPC
-#define AGENTOS_ENOSPC (-25)
-#endif
-#ifndef AGENTOS_ERANGE
-#define AGENTOS_ERANGE (-26)
-#endif
-#ifndef AGENTOS_EDEADLK
-#define AGENTOS_EDEADLK AGENTOS_ERR_SYS_DEADLOCK
-#endif
-#ifndef AGENTOS_EAGAIN
-#define AGENTOS_EAGAIN AGENTOS_ERR_WOULD_BLOCK
-#endif
-#ifndef AGENTOS_E2BIG
-#define AGENTOS_E2BIG (-27)
-#endif
+#undef AGENTOS_EPERM
+#define AGENTOS_EPERM AGENTOS_ERR_PERMISSION_DENIED
 #ifndef AGENTOS_ENOTDIR
 #define AGENTOS_ENOTDIR (-28)
 #endif

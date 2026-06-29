@@ -1,3 +1,14 @@
+/*
+ * parallel_dispatcher.h — 认知层工具并行调度器
+ *
+ * 职责：CoreLoopThree 认知引擎的工具调用并行调度，供 cognition/dispatch 使用。
+ * 字段约定：tool_name / arguments / elapsed_ns（纳秒）。
+ *
+ * 注意：daemon/common/include/daemon_task_dispatcher.h（原 parallel_dispatcher.h）
+ * 同名但职责不同（daemon 层并行任务执行，字段为 tool_id/params_json/duration_ms）。
+ * 两者 include guard 已分离：本文件用 AGENTOS_PARALLEL_DISPATCHER_H，
+ * daemon 侧用 AGENTOS_DAEMON_TASK_DISPATCHER_H。
+ */
 #ifndef AGENTOS_PARALLEL_DISPATCHER_H
 #define AGENTOS_PARALLEL_DISPATCHER_H
 

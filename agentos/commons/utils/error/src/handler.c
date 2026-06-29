@@ -13,6 +13,7 @@
 /* 使用明确的相对路径确保包含commons的error.h */
 #include "atomic_compat.h"
 #include "error.h"
+#include "error_compat.h"
 #include "logging_compat.h"
 
 #include <stdarg.h>
@@ -888,4 +889,21 @@ void agentos_error_stats_shutdown(void)
         AGENTOS_LOG_INFO("Error stats: mutex destroyed");
     }
 #endif
+}
+
+/* ==================== G2.5 兼容层全局回调定义 ==================== */
+/* 原 error_compat.h 中的 static 全局变量导致 per-TU 独立副本，跨翻译单元不可见。
+ * 现集中定义于本文件（handler.c 为 error 模块唯一编译单元），通过 extern
+ * 声明供所有包含 error_compat.h 的翻译单元共享，确保全局回调机制生效。 */
+agentos_compat_error_handler_t g_compat_error_handler = NULL;
+agentos_compat_error_info_handler_t g_compat_error_info_handler = NULL;
+
+void agentos_compat_error_set_handler(agentos_compat_error_handler_t handler)
+{
+    g_compat_error_handler = handler;
+}
+
+void agentos_compat_error_set_info_handler(agentos_compat_error_info_handler_t handler)
+{
+    g_compat_error_info_handler = handler;
 }
