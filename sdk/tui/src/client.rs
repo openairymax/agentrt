@@ -4,9 +4,10 @@
 // Simplified version for the TUI.
 
 use anyhow::{Context, Result};
+use log::{debug, error, info};
 use reqwest::Client as HttpClient;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Gateway API client for the TUI application.
 pub struct GatewayClient {
@@ -30,8 +31,13 @@ impl GatewayClient {
 
     pub async fn health_check(&self) -> Result<HealthResponse> {
         let url = format!("{}/api/v1/health", self.base_url);
+        let start = Instant::now();
+        debug!("GET {}", url);
         let resp = self.http.get(&url).send().await?;
+        let elapsed = start.elapsed();
         let body = resp.text().await?;
+        debug!("← health {} ({}ms, {} bytes)",
+              resp.status(), elapsed.as_millis(), body.len());
         serde_json::from_str(&body).context("Failed to parse health response")
     }
 
@@ -48,15 +54,25 @@ impl GatewayClient {
             interactive: true,
         };
 
+        let start = Instant::now();
+        info!("POST {} (prompt_len={})", url, prompt.len());
         let resp = self.http.post(&url).json(&request).send().await?;
+        let elapsed = start.elapsed();
         let status = resp.status();
         let body = resp.text().await?;
 
         if !status.is_success() {
-            anyhow::bail!("Gateway error: {}", body);
+            error!("← agent/run FAILED: HTTP {} ({}ms) → {}", status.as_u16(),
+                   elapsed.as_millis(), body);
+            anyhow::bail!("Gateway error (HTTP {}): {}", status.as_u16(), body);
         }
 
-        serde_json::from_str(&body).context("Failed to parse run response")
+        let response: RunResponse = serde_json::from_str(&body)
+            .context("Failed to parse run response")?;
+        info!("← agent/run OK ({}ms, {} tokens)",
+              elapsed.as_millis(),
+              response.tokens_used.unwrap_or(0));
+        Ok(response)
     }
 
     #[allow(dead_code)]

@@ -27,17 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Fallback AGENTOS_LOG_DEBUG if not provided by error.h */
-#ifndef AGENTOS_LOG_DEBUG
-#include <stdio.h>
-#define AGENTOS_LOG_DEBUG(fmt, ...) __builtin_fprintf(stderr, "[DEBUG] " fmt "\n", ##__VA_ARGS__)
-#endif
-#ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
-#ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
+#include "logging_compat.h"
 
 /* Forward declarations for types defined in header */
 typedef struct a2a_v03_adapter_s a2a_v03_adapter_t;
