@@ -15,6 +15,14 @@ set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
 set(PROTOCOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../protocols")
 
 message(STATUS "[GATEWAY] Configuring gateway module (cJSON: ${AGENTOS_HAS_CJSON}, microhttpd: ${AGENTOS_HAS_MICROHTTPD}, websockets: ${AGENTOS_HAS_LIBWEBSOCKETS})")
+
+# cJSON 是网关模块的硬依赖（0.1.1 零技术债：不允许桩库）
+if(NOT AGENTOS_HAS_CJSON)
+    message(FATAL_ERROR "[GATEWAY] cJSON is a hard dependency for Airymax 0.1.1. "
+                        "Please install cJSON (e.g. apt install libcjson-dev) and reconfigure. "
+                        "Stub gateway library is not supported.")
+endif()
+
 # 验证关键路径
 foreach(_dir ${COREKERN_DIR}/include ${SYSCALL_DIR}/include ${COMMONS_DIR} ${PROTOCOLS_DIR}/include ${PROTOCOLS_DIR}/common/include)
     if(EXISTS "${_dir}")
@@ -230,11 +238,4 @@ if(CPPCHECK)
         COMMENT "Running cppcheck static analysis"
     )
 endif()
-else()
-    # Stub library when cJSON is not available - provides link target but no functionality
-    add_library(gateway STATIC
-        src/gateway/gateway.c
-    )
-    target_compile_definitions(gateway PRIVATE AGENTOS_NO_CJSON)
-    message(STATUS "gateway: cJSON not found - building stub library")
-endif() # AGENTOS_HAS_CJSON
+endif()
