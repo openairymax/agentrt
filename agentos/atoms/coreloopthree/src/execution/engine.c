@@ -38,6 +38,9 @@
 #define ATM_RET_ERR(c) \
     do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
 
+/* 执行单元注册表最大容量 */
+#define AGENTOS_EXECUTION_MAX_UNITS 64
+
 
 typedef struct task_control_block {
     char *task_id;
@@ -73,6 +76,14 @@ struct agentos_execution_engine {
     agentos_thread_t *worker_threads;
     size_t worker_count;
     atomic_int running;
+    /* 执行单元注册表 */
+    agentos_execution_unit_t registered_units[AGENTOS_EXECUTION_MAX_UNITS];
+    char *registered_unit_names[AGENTOS_EXECUTION_MAX_UNITS];
+    uint32_t registered_unit_count;
+    agentos_mutex_t *registry_lock;
+    /* 反馈回调 */
+    agentos_feedback_callback_t feedback_callback;
+    void *feedback_user_data;
 };
 
 static void tcb_retain(task_tcb_t *tcb);
@@ -495,17 +506,24 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
     engine->queue_lock = agentos_mutex_create();
     engine->running_lock = agentos_mutex_create();
     engine->task_available_cond = agentos_cond_create();
-    if (!engine->queue_lock || !engine->running_lock || !engine->task_available_cond) {
+    engine->registry_lock = agentos_mutex_create();
+    if (!engine->queue_lock || !engine->running_lock || !engine->task_available_cond ||
+        !engine->registry_lock) {
         if (engine->queue_lock)
             agentos_mutex_free(engine->queue_lock);
         if (engine->running_lock)
             agentos_mutex_free(engine->running_lock);
         if (engine->task_available_cond)
             agentos_cond_free(engine->task_available_cond);
+        if (engine->registry_lock)
+            agentos_mutex_free(engine->registry_lock);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to create synchronization primitives");
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
+    engine->registered_unit_count = 0;
+    engine->feedback_callback = NULL;
+    engine->feedback_user_data = NULL;
 
     engine->running = 1;
     engine->worker_count = max_concurrency;
@@ -513,6 +531,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
         agentos_mutex_free(engine->queue_lock);
         agentos_mutex_free(engine->running_lock);
         agentos_cond_free(engine->task_available_cond);
+        agentos_mutex_free(engine->registry_lock);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Overflow in worker threads array allocation");
         ATM_RET_ERR(AGENTOS_EOVERFLOW);
@@ -523,6 +542,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
         agentos_mutex_free(engine->queue_lock);
         agentos_mutex_free(engine->running_lock);
         agentos_cond_free(engine->task_available_cond);
+        agentos_mutex_free(engine->registry_lock);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to allocate worker threads array");
         ATM_RET_ERR(AGENTOS_ENOMEM);
@@ -535,6 +555,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
         agentos_mutex_free(engine->queue_lock);
         agentos_mutex_free(engine->running_lock);
         agentos_cond_free(engine->task_available_cond);
+        agentos_mutex_free(engine->registry_lock);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to create task hash table");
         ATM_RET_ERR(AGENTOS_ENOMEM);
@@ -551,6 +572,7 @@ agentos_error_t agentos_execution_create(uint32_t max_concurrency,
             agentos_mutex_free(engine->queue_lock);
             agentos_mutex_free(engine->running_lock);
             agentos_cond_free(engine->task_available_cond);
+            agentos_mutex_free(engine->registry_lock);
             AGENTOS_FREE(engine);
             AGENTOS_LOG_ERROR("Failed to create worker thread %zu", i);
             ATM_RET_ERR(AGENTOS_ENOMEM);
@@ -607,9 +629,24 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
     task_hash_table_destroy(engine->task_map);
     engine->task_map = NULL;
 
+    /* 清理执行单元注册表 */
+    agentos_mutex_lock(engine->registry_lock);
+    for (uint32_t i = 0; i < engine->registered_unit_count; i++) {
+        if (engine->registered_units[i].execution_unit_destroy) {
+            engine->registered_units[i].execution_unit_destroy(&engine->registered_units[i]);
+        }
+        if (engine->registered_unit_names[i]) {
+            AGENTOS_FREE(engine->registered_unit_names[i]);
+            engine->registered_unit_names[i] = NULL;
+        }
+    }
+    engine->registered_unit_count = 0;
+    agentos_mutex_unlock(engine->registry_lock);
+
     agentos_mutex_free(engine->queue_lock);
     agentos_mutex_free(engine->running_lock);
     agentos_cond_free(engine->task_available_cond);
+    agentos_mutex_free(engine->registry_lock);
     AGENTOS_FREE(engine);
     AGENTOS_LOG_DEBUG("ExecutionEngine: destroy done");
 }
@@ -617,41 +654,120 @@ void agentos_execution_destroy(agentos_execution_engine_t *engine)
 /**
  * @brief 注册执行单元到引擎
  *
- * 当前为占位实现：接受注册但不存储单元引用。
- * 调用者仍负责单元的生命周期管理。
+ * 将执行单元存储到引擎注册表中，按名称索引。引擎接管单元的生命周期管理。
+ * 注册的单元可通过名称查找并在任务执行路径中被调用。
  */
 agentos_error_t agentos_execution_register_unit(agentos_execution_engine_t *engine,
                                                 const char *name, agentos_execution_unit_t unit)
 {
     if (!engine || !name)
         return AGENTOS_EINVAL;
-    (void)unit;
+
+    agentos_mutex_lock(engine->registry_lock);
+
+    /* 检查容量 */
+    if (engine->registered_unit_count >= AGENTOS_EXECUTION_MAX_UNITS) {
+        agentos_mutex_unlock(engine->registry_lock);
+        AGENTOS_LOG_ERROR("ExecutionEngine: unit registry full (max=%d)",
+                          AGENTOS_EXECUTION_MAX_UNITS);
+        return AGENTOS_EBUSY;
+    }
+
+    /* 检查重名 */
+    for (uint32_t i = 0; i < engine->registered_unit_count; i++) {
+        if (engine->registered_unit_names[i] &&
+            strcmp(engine->registered_unit_names[i], name) == 0) {
+            agentos_mutex_unlock(engine->registry_lock);
+            AGENTOS_LOG_ERROR("ExecutionEngine: unit '%s' already registered", name);
+            return AGENTOS_EEXIST;
+        }
+    }
+
+    /* 复制名称 */
+    size_t name_len = strlen(name);
+    char *name_copy = (char *)AGENTOS_MALLOC(name_len + 1);
+    if (!name_copy) {
+        agentos_mutex_unlock(engine->registry_lock);
+        AGENTOS_LOG_ERROR("ExecutionEngine: failed to allocate unit name '%s'", name);
+        return AGENTOS_ENOMEM;
+    }
+    memcpy(name_copy, name, name_len + 1);
+
+    /* 存储单元 */
+    uint32_t slot = engine->registered_unit_count;
+    engine->registered_units[slot] = unit;
+    engine->registered_unit_names[slot] = name_copy;
+    engine->registered_unit_count++;
+
+    agentos_mutex_unlock(engine->registry_lock);
+    AGENTOS_LOG_INFO("ExecutionEngine: registered unit '%s' (slot=%u, total=%u)",
+                     name, slot, engine->registered_unit_count);
     return AGENTOS_SUCCESS;
 }
 
 /**
  * @brief 从引擎注销执行单元
  *
- * 当前为占位实现：接受注销但不执行实际清理。
+ * 从注册表中移除指定名称的执行单元，并调用其 destroy 回调释放资源。
+ * 使用交换删除法保持数组紧凑。
  */
 void agentos_execution_unregister_unit(agentos_execution_engine_t *engine, const char *name)
 {
     if (!engine || !name)
         return;
+
+    agentos_mutex_lock(engine->registry_lock);
+
+    for (uint32_t i = 0; i < engine->registered_unit_count; i++) {
+        if (engine->registered_unit_names[i] &&
+            strcmp(engine->registered_unit_names[i], name) == 0) {
+            /* 调用单元的 destroy 回调 */
+            if (engine->registered_units[i].execution_unit_destroy) {
+                engine->registered_units[i].execution_unit_destroy(&engine->registered_units[i]);
+            }
+            /* 释放名称副本 */
+            AGENTOS_FREE(engine->registered_unit_names[i]);
+
+            /* 交换删除：用最后一个元素填补空位 */
+            uint32_t last = engine->registered_unit_count - 1;
+            if (i != last) {
+                engine->registered_units[i] = engine->registered_units[last];
+                engine->registered_unit_names[i] = engine->registered_unit_names[last];
+            }
+            engine->registered_unit_names[last] = NULL;
+            engine->registered_unit_count--;
+
+            AGENTOS_LOG_INFO("ExecutionEngine: unregistered unit '%s' (remaining=%u)",
+                             name, engine->registered_unit_count);
+            agentos_mutex_unlock(engine->registry_lock);
+            return;
+        }
+    }
+
+    agentos_mutex_unlock(engine->registry_lock);
+    AGENTOS_LOG_WARN("ExecutionEngine: unit '%s' not found for unregister", name);
 }
 
 /**
  * @brief 设置反馈回调
  *
- * 当前为占位实现：接受回调设置但不存储。
+ * 存储回调函数与用户数据，引擎在任务执行路径中通过此回调
+ * 向上层反馈任务状态（开始/完成/失败/重试等）。
+ * 传入 NULL callback 可取消回调。
  */
 void agentos_execution_set_feedback_callback(agentos_execution_engine_t *engine,
                                              agentos_feedback_callback_t callback, void *user_data)
 {
     if (!engine)
         return;
-    (void)callback;
-    (void)user_data;
+
+    agentos_mutex_lock(engine->registry_lock);
+    engine->feedback_callback = callback;
+    engine->feedback_user_data = user_data;
+    agentos_mutex_unlock(engine->registry_lock);
+
+    AGENTOS_LOG_INFO("ExecutionEngine: feedback callback %s",
+                     callback ? "set" : "cleared");
 }
 
 /**

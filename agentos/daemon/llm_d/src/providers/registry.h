@@ -24,8 +24,8 @@ typedef struct {
 } provider_config_t;
 
 typedef struct service_config {
-    size_t cache_capacity;
-    uint32_t cache_ttl_sec;
+    size_t llm_cache_capacity;
+    uint32_t llm_cache_ttl_sec;
     int max_retries;
     uint32_t timeout_ms;
     const char *token_encoding;

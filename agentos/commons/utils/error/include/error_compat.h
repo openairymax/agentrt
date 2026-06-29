@@ -183,19 +183,13 @@ static inline agentos_compat_error_category_t agentos_compat_error_get_category(
  * @param handler 错误处理回调函数
  * @note 统一模块使用不同的错误处理机制，此函数提供基本兼容
  */
-static agentos_compat_error_handler_t g_compat_error_handler = NULL;
-static agentos_compat_error_info_handler_t g_compat_error_info_handler = NULL;
+/* G2.5 统一错误码表：原为 static 全局变量（per-TU 独立副本，跨 TU 不可见），
+ * 已改为 extern 声明，定义位于 handler.c，确保全局回调机制跨翻译单元生效。 */
+extern agentos_compat_error_handler_t g_compat_error_handler;
+extern agentos_compat_error_info_handler_t g_compat_error_info_handler;
 
-static inline void agentos_compat_error_set_handler(agentos_compat_error_handler_t handler)
-{
-    g_compat_error_handler = handler;
-}
-
-static inline void
-agentos_compat_error_set_info_handler(agentos_compat_error_info_handler_t handler)
-{
-    g_compat_error_info_handler = handler;
-}
+void agentos_compat_error_set_handler(agentos_compat_error_handler_t handler);
+void agentos_compat_error_set_info_handler(agentos_compat_error_info_handler_t handler);
 
 /**
  * @brief 处理错误并记录日志（兼容接口）

@@ -10,6 +10,7 @@ set(_atoms_inc_dirs
     corekern/include
     coreloopthree/include
     syscall/include
+    frameworks/include
     ../commons/utils/logging/include
     ../commons/utils/sync/include
     ../commons/utils/platform/include
@@ -46,6 +47,7 @@ target_include_directories(agentos_atoms INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/corekern/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/coreloopthree/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/syscall/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/frameworks/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/platform/include>
@@ -75,14 +77,12 @@ if(AGENTOS_WITH_MEMORYROVOL OR EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/memoryrovol/C
 endif()
 add_subdirectory(syscall)
 add_subdirectory(taskflow)
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/frameworks/CMakeLists.txt")
-    add_subdirectory(frameworks)
-endif()
+add_subdirectory(frameworks)
 
 install(DIRECTORY corekern/include/ DESTINATION include/agentos/corekern)
 install(DIRECTORY coreloopthree/include/ DESTINATION include/agentos/coreloopthree)
 install(DIRECTORY syscall/include/ DESTINATION include/agentos/syscall)
+install(DIRECTORY frameworks/include/ DESTINATION include/agentos/frameworks)
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
