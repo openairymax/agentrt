@@ -42,6 +42,51 @@ static const char *LEVEL_NAMES[] = {"DEBUG", "INFO", "WARN", "ERROR", "FATAL"};
 /** 日志级别名称数组大小 */
 static const size_t LEVEL_NAMES_COUNT = sizeof(LEVEL_NAMES) / sizeof(LEVEL_NAMES[0]);
 
+/* ── ANSI 终端色彩转义码 (仅当输出到终端时使用) ── */
+#define ANSI_RESET   "\033[0m"
+#define ANSI_BOLD    "\033[1m"
+#define ANSI_DIM     "\033[2m"
+#define ANSI_RED     "\033[31m"
+#define ANSI_GREEN   "\033[32m"
+#define ANSI_YELLOW  "\033[33m"
+#define ANSI_BLUE    "\033[34m"
+#define ANSI_MAGENTA "\033[35m"
+#define ANSI_CYAN    "\033[36m"
+#define ANSI_GRAY    "\033[90m"
+#define ANSI_BG_RED  "\033[41m"
+
+/** 各日志级别对应的 ANSI 色彩 */
+static const char *LEVEL_COLORS[] = {
+    ANSI_GRAY,     /* DEBUG  — 灰色 */
+    ANSI_BLUE,     /* INFO   — 蓝色 */
+    ANSI_YELLOW,   /* WARN   — 黄色 */
+    ANSI_RED,      /* ERROR  — 红色 */
+    ANSI_MAGENTA,  /* FATAL  — 品红 */
+};
+
+/** 是否在日志中使用色彩 (通过环境变量 AGENTRT_LOG_COLOR=0 关闭) */
+static bool g_log_use_color = true;
+
+/** 检测 fd 是否为终端 (POSIX) */
+static bool is_terminal(int fd)
+{
+#ifdef _WIN32
+    return false;  /* Windows 终端色彩通过 SetConsoleMode 处理 */
+#else
+    static int cached_stdout_tty = -1;
+    static int cached_stderr_tty = -1;
+    if (fd == STDOUT_FILENO) {
+        if (cached_stdout_tty < 0) cached_stdout_tty = isatty(STDOUT_FILENO) ? 1 : 0;
+        return cached_stdout_tty == 1;
+    }
+    if (fd == STDERR_FILENO) {
+        if (cached_stderr_tty < 0) cached_stderr_tty = isatty(STDERR_FILENO) ? 1 : 0;
+        return cached_stderr_tty == 1;
+    }
+    return isatty(fd) == 1;
+#endif
+}
+
 /** 默认日志级别 */
 static const log_level_t DEFAULT_LOG_LEVEL = LOG_LEVEL_INFO;
 
@@ -209,9 +254,12 @@ static logging_state_t g_logging_state = {.initialized = false, .module_level_co
  *
  * @return 当前时间戳（毫秒?
  */
+/** 获取当前时间戳（毫秒，基于 CLOCK_REALTIME，用于显示准确的日期时间） */
 static uint64_t get_current_timestamp(void)
 {
-    return agentos_time_ms();
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
 }
 
 /**
@@ -263,10 +311,20 @@ static size_t format_log_message(const log_record_t *record, char *buffer, size_
 
     const char *level_name = log_level_to_string(record->level);
 
+    // 获取对应级别的 ANSI 色彩或空字符?
+    const char *color = "";
+    const char *reset = "";
+    if (g_log_use_color && record->level < LEVEL_NAMES_COUNT) {
+        color = LEVEL_COLORS[record->level];
+        reset = ANSI_RESET;
+    }
+
     int len =
-        snprintf(buffer, buffer_size, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s] [%s:%d]",
+        snprintf(buffer, buffer_size, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s%s%s] [%s:%d]",
                  tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday, tm_info->tm_hour,
-                 tm_info->tm_min, tm_info->tm_sec, ms, level_name, record->module, record->line);
+                 tm_info->tm_min, tm_info->tm_sec, ms,
+                 color, level_name, reset,
+                 record->module, record->line);
     if (len < 0)
         return 0;
     if ((size_t)len >= buffer_size)
@@ -391,6 +449,24 @@ int log_init(const log_config_t *manager)
 
     g_tls_trace_id[0] = '\0';
     g_tls_span_id[0] = '\0';
+
+    /* ── 色彩检测：仅在终端环境启用 ANSI 色彩，可通过环境变量覆盖 ── */
+    {
+        const char *env_color = getenv("AGENTRT_LOG_COLOR");
+        if (env_color) {
+            /* 环境变量显式控制 */
+            if (strcmp(env_color, "0") == 0 || strcmp(env_color, "no") == 0 ||
+                strcmp(env_color, "false") == 0 || strcmp(env_color, "off") == 0 ||
+                strcmp(env_color, "never") == 0) {
+                g_log_use_color = false;
+            } else {
+                g_log_use_color = true;
+            }
+        } else {
+            /* 自动检测：仅当输出到终端时启用 */
+            g_log_use_color = is_terminal(STDOUT_FILENO) || is_terminal(STDERR_FILENO);
+        }
+    }
 
     if (manager) {
         __builtin_memcpy(&g_logging_state.manager, manager, sizeof(log_config_t));
