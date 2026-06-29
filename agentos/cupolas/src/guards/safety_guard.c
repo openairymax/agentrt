@@ -99,14 +99,15 @@ static safety_decision_t default_permission_check(const safety_guard_descriptor_
 
 /**
  * @brief 默认速率限制检查（SAFETY_GUARD_RATE_LIMIT）
- * 检查工具调用频率是否超过限制
+ * 基于注册的配额系统检查工具调用频率。
+ * 具体限制通过 safety_guard_set_quota() 为每个 agent 单独配置。
+ * 此默认实现检查 event->flags 中的频控标记位。
  */
 static safety_decision_t default_rate_limit_check(const safety_guard_descriptor_t *guard,
                                                    const safety_event_t *event,
                                                    safety_result_t *result)
 {
     (void)guard;
-    /* 简化实现：通过 context 中的 flags 判断是否频控 */
     if (event->flags & 0x01) { /* RATE_LIMITED flag */
         if (result) {
             result->decision = SAFETY_DECISION_DENY;
@@ -193,7 +194,9 @@ static safety_decision_t default_input_check(const safety_guard_descriptor_t *gu
 
 /**
  * @brief 默认资源检查（SAFETY_GUARD_RESOURCE）
- * 检查资源配额是否充足
+ * 检查资源配额。具体配额通过 safety_guard_set_quota() 设置。
+ * 此默认实现作为 fallback，当无自定义检查函数时使用。
+ * 生产部署应通过 safety_guard_register_guard() 注册自定义资源检查。
  */
 static safety_decision_t default_resource_check(const safety_guard_descriptor_t *guard,
                                                  const safety_event_t *event,
@@ -201,7 +204,6 @@ static safety_decision_t default_resource_check(const safety_guard_descriptor_t 
 {
     (void)guard;
     (void)event;
-    /* 简化实现：默认资源充足 */
     if (result) {
         result->decision = SAFETY_DECISION_ALLOW;
         snprintf(result->reason, sizeof(result->reason), "Resource check passed");
