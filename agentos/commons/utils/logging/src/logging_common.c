@@ -64,6 +64,23 @@ agentos_error_t log_init(const log_config_t *manager)
         g_log_config = *manager;
     }
 
+    /* ── 色彩检测：环境变量 AGENTRT_LOG_COLOR 强制覆盖 ── */
+    {
+        const char *env_color = getenv("AGENTRT_LOG_COLOR");
+        if (env_color) {
+            if (strcmp(env_color, "0") == 0 || strcmp(env_color, "no") == 0 ||
+                strcmp(env_color, "false") == 0 || strcmp(env_color, "off") == 0 ||
+                strcmp(env_color, "never") == 0) {
+                g_log_config.use_colors = false;
+            } else {
+                g_log_config.use_colors = true;
+            }
+        } else {
+            /* 自动检测：仅当输出到终端时启用 */
+            g_log_config.use_colors = isatty(STDOUT_FILENO) || isatty(STDERR_FILENO);
+        }
+    }
+
     // 打开日志文件
     if (g_log_config.targets & LOG_TARGET_FILE && g_log_config.log_file) {
         g_log_file = fopen(g_log_config.log_file, "a");
@@ -127,15 +144,22 @@ void log_get_config(log_config_t *manager)
 }
 
 /**
- * @brief 格式化日志时间戳
+ * @brief 格式化日志时间戳（含毫秒）
  * @param buffer 缓冲区
  * @param size 缓冲区大小
  */
 static void log_format_timestamp(char *buffer, size_t size)
 {
-    time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
-    strftime(buffer, size, "%Y-%m-%d %H:%M:%S", tm_info);
+    struct timespec ts;
+    struct tm tm_info;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    localtime_r(&ts.tv_sec, &tm_info);
+    strftime(buffer, size, "%Y-%m-%d %H:%M:%S", &tm_info);
+    int ms = (int)(ts.tv_nsec / 1000000L);
+    int len = (int)strlen(buffer);
+    if (len + 5 < (int)size) {
+        snprintf(buffer + len, (size_t)(size - len), ".%03d", ms);
+    }
 }
 
 /**
