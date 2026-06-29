@@ -68,7 +68,7 @@ common/
 │   ├── log_sanitizer.c
 │   ├── method_dispatcher.c
 │   ├── orchestrator.c
-│   ├── parallel_dispatcher.c
+│   ├── daemon_task_dispatcher.c
 │   ├── param_validator.c
 │   ├── platform_compat.c
 │   ├── safe_string_utils.c

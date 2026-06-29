@@ -11,16 +11,7 @@
 #include <time.h>
 #include "error.h"
 
-/* Fallback logging macros */
-#ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...) __builtin_fprintf(stderr, "[ERROR] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
-#ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...) __builtin_fprintf(stderr, "[WARN] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
-#ifndef AGENTOS_LOG_DEBUG
-#define AGENTOS_LOG_DEBUG(fmt, ...) __builtin_fprintf(stderr, "[DEBUG] %s: " fmt "\n", __func__, ##__VA_ARGS__)
-#endif
+#include "logging_compat.h"
 
 /**
  * @brief 将协议类型枚举转换为可读字符串

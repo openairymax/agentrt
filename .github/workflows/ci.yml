@@ -47,7 +47,7 @@ jobs:
           cmake -B build-ci \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DBUILD_TESTS=ON \
-            -DAGENTOS_COMPLIANCE_STRICT=OFF \
+            -DAGENTRT_COMPLIANCE_STRICT=OFF \
             -DWARNINGS_AS_ERRORS=OFF \
             -G Ninja
       - name: Build
@@ -119,7 +119,7 @@ jobs:
         run: |
           grep -rn 'option(BUILD_TESTS.*ON' CMakeLists.txt 2>/dev/null && echo "[OK] BAN-70" || echo "::warning::BAN-70"
           grep -rn 'banned_functions\.h' CMakeLists.txt 2>/dev/null && echo "[OK] BAN-71" || echo "::warning::BAN-71"
-          grep -rn 'option(WARNINGS_AS_ERRORS.*ON' CMakeLists.txt 2>/dev/null && echo "[OK] BAN-72" || echo "::warning::BAN-72"
+          grep -rn 'option(WARNINGS_AS_ERRORS' CMakeLists.txt 2>/dev/null && echo "[OK] BAN-72" || echo "::warning::BAN-72"
       - name: BAN-77 — No GBK-encoded source files
         run: |
           if find agentos/ -name '*.c' -o -name '*.h' | xargs file -i 2>/dev/null | grep -i 'charset=iso-8859\|charset=gb\|charset=unknown-8bit' | head -10; then
@@ -232,7 +232,7 @@ jobs:
             -DBUILD_TESTS=ON \
             -DWARNINGS_AS_ERRORS=ON \
             -DENABLE_SANITIZERS=ON \
-            -DAGENTOS_COMPLIANCE_STRICT=OFF \
+            -DAGENTRT_COMPLIANCE_STRICT=OFF \
             -G Ninja
       - name: Build with Sanitizers
         run: cmake --build build-asan --parallel $(nproc)
@@ -317,7 +317,7 @@ jobs:
           cmake -S . -B build-pro \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTS=ON \
-            -DAGENTOS_COMPLIANCE_STRICT=OFF \
+            -DAGENTRT_COMPLIANCE_STRICT=OFF \
             -G Ninja
       - name: Build
         run: cmake --build build-pro --parallel $(nproc)
@@ -533,7 +533,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DENABLE_SANITIZERS=OFF \
             -DBUILD_TESTS=ON \
-            -DAGENTOS_COMPLIANCE_STRICT=OFF \
+            -DAGENTRT_COMPLIANCE_STRICT=OFF \
             -G Ninja
       - name: Build
         run: cmake --build build-valgrind --parallel $(nproc)

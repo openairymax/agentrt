@@ -24,41 +24,24 @@
 /*
  * External Dependency Guard (E-1 安全内生 + E-3 资源确定性 + S-2 层次分解)
  *
- * daemon_security 依赖 cupolas 安全框架。提供两种编译模式:
- * 1. 正常模式 (默认): 直接包含 cupolas 头文件
- * 2. Fail-closed 模式 (DAEMON_SECURITY_STUB_MODE): 不链接 cupolas，安全函数返回拒绝/失败
+ * daemon_security 使用独立生产级安全实现，不依赖 cupolas 库。
+ * 安全功能（签名验证/凭据保险库/审计日志/输入消毒/ACL）均在 daemon_security.c 中真实实现。
+ *
+ * 类型定义复用 commons/utils/types/include/ 下的规范头文件：
+ * - cupolas_signer_info.h: 签名者信息结构
+ * - cupolas_vault_cred_type.h: 凭据类型枚举
  *
  * 设计决策依据 ARCHITECTURAL_PRINCIPLES.md:
- * - K-4 零信任: cupolas 不可用时所有安全操作必须 fail-closed
- * - E-6 错误可追溯: fail-closed 模式下记录明确的降级警告日志
+ * - K-4 零信任: 所有安全操作 fail-closed，默认拒绝
+ * - E-6 错误可追溯: 完整审计日志
+ * - S-2 层次分解: 安全类型定义与实现分离
  */
-#ifdef DAEMON_SECURITY_STUB_MODE
-#define CUPOLAS_AVAILABLE 0
-#else
-#ifdef __has_include
-#if __has_include("../../../agentos/cupolas/include/cupolas.h")
-#define CUPOLAS_AVAILABLE 1
-#include "../../../agentos/cupolas/include/cupolas.h"
-#include "../../../agentos/cupolas/src/permission/permission.h"
-#include "../../../agentos/cupolas/src/sanitizer/sanitizer.h"
-#include "../../../agentos/cupolas/src/security/cupolas_signature.h"
-#include "../../../agentos/cupolas/src/security/cupolas_vault.h"
-#else
-#define CUPOLAS_AVAILABLE 0
-#endif
-#else
-#define CUPOLAS_AVAILABLE 0
-#endif
-#endif
-
-#if !CUPOLAS_AVAILABLE
 #include "cupolas_signer_info.h"
 #include "cupolas_vault_cred_type.h"
 #include "sanitize_level.h"
 #define SANITIZE_LEVEL_NONE 0
 #define SANITIZE_LEVEL_NORMAL 1
 #define SANITIZE_LEVEL_STRICT 2
-#endif
 
 #ifdef __cplusplus
 extern "C" {

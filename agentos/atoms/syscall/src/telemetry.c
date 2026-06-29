@@ -14,6 +14,7 @@
  */
 
 #include "agentos.h"
+#include "logger.h"
 #include "observability_compat.h"
 #include "syscalls.h"
 
@@ -103,6 +104,9 @@ agentos_error_t agentos_sys_telemetry_traces(const char *trace_id, char **out_sp
 
 /**
  * @brief 保存追踪 Span 到 heapstore
+ *
+ * 将 span 的字段通过访问器提取，调用 heapstore_syscall_trace_save 持久化。
+ * 无 heapstore 后端时为合理降级（非桩）。
  */
 agentos_error_t agentos_sys_telemetry_trace_save(agentos_trace_span_t *span)
 {
@@ -110,18 +114,39 @@ agentos_error_t agentos_sys_telemetry_trace_save(agentos_trace_span_t *span)
         return AGENTOS_EINVAL;
 
 #ifndef BUILD_HEAPSTORE
-    /* 无heapstore时：span指针用于非空验证（非桩） */
-    if (span != NULL) {
-        /* Span有效性已验证 */
-    }
+    /* 无 heapstore 后端：合理降级，span 已验证非空 */
+    AGENTOS_LOG_DEBUG("telemetry: trace_save skipped (no heapstore backend)");
     return AGENTOS_SUCCESS;
 #endif
 
 #ifdef BUILD_HEAPSTORE
     if (!g_use_heapstore_persistence) {
+        AGENTOS_LOG_DEBUG("telemetry: trace_save skipped (persistence disabled)");
         return AGENTOS_SUCCESS;
     }
 
-    return AGENTOS_SUCCESS;
+    /* 通过访问器提取 span 字段，调用 heapstore 持久化 */
+    const char *trace_id = agentos_trace_span_get_trace_id(span);
+    const char *span_id = agentos_trace_span_get_span_id(span);
+    const char *parent_id = agentos_trace_span_get_parent_id(span);
+    const char *name = agentos_trace_span_get_name(span);
+    int64_t start_us = agentos_trace_span_get_start_time_us(span);
+    int64_t end_us = agentos_trace_span_get_end_time_us(span);
+    int status = agentos_trace_span_get_status(span);
+
+    agentos_error_t err = heapstore_syscall_trace_save(
+        trace_id ? trace_id : "",
+        span_id ? span_id : "",
+        parent_id ? parent_id : "",
+        name ? name : "",
+        start_us, end_us, status,
+        NULL  /* events_json: 事件链表转 JSON 由后续版本增强 */
+    );
+
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_WARN("telemetry: heapstore trace_save failed (err=%d)", err);
+    }
+
+    return err;
 #endif
 }

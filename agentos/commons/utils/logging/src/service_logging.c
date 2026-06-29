@@ -12,6 +12,7 @@
 
 #include "service_logging.h"
 
+#include "logging.h"
 #include "memory_compat.h"
 #include "platform.h"
 #include "string_compat.h"
@@ -68,9 +69,9 @@ static int console_outputter_output(outputter_t *self, const log_record_t *recor
     (void)self;
     if (!record)
         return AGENTOS_EINVAL;
-    FILE *stream = (record->level >= LOG_LEVEL_ERROR) ? stderr : stdout;
-    /* BAN-70 EXEMPT: logging module - direct FILE* output is the implementation mechanism */
-    fprintf(stream, "[SERVICE] %s:%d %s\n", record->module, record->line, record->message);
+    /* 路由到核心层 log_write()，统一处理色彩/时间戳/节流/trace_id
+     * 注意：此处使用 log_write 而非直接 fprintf，确保所有日志经核心层格式化 */
+    log_write(record->level, record->module, record->line, "[SERVICE] %s", record->message);
     return 0;
 }
 
