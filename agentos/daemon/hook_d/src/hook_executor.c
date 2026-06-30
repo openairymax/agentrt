@@ -8,11 +8,62 @@
 
 #include "hook_executor.h"
 #include "hook_timeout.h"
+#include "svc_logger.h"
 #include "memory_compat.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/wait.h>
 #include <time.h>
+#include <unistd.h>
+
+#ifdef AGENTOS_HAS_CURL
+#include <curl/curl.h>
+#endif
+
+/* ==================== 子进程执行常量 ==================== */
+
+/* Shell/Python 脚本执行超时（对齐 HOOK_TIMEOUT_MAX_MS=30s，防止恶意脚本挂起） */
+#define HOOK_SHELL_TIMEOUT_SEC    30
+/* Webhook HTTP 请求超时（对齐原 curl --max-time 5） */
+#define HOOK_WEBHOOK_TIMEOUT_SEC   5
+
+/* ==================== 子进程执行基础设施（前向声明） ==================== */
+
+/*
+ * 安全的子进程执行：fork + execve/execvp + pipe(捕获输出) + select 超时 + waitpid。
+ *
+ * 设计要点（BAN-211/235 安全合规）：
+ *   - 绝不使用 system() 或 /bin/sh -c 拼接命令字符串（命令注入风险）
+ *   - 通过 argv[] 数组传参，环境变量通过 envp[] 传递（不拼入命令行）
+ *   - envp != NULL 时使用 execve（完整路径 + 自定义环境）
+ *   - envp == NULL 时使用 execvp（PATH 搜索 + 继承 environ，用于 curl 后备）
+ *   - 捕获并丢弃子进程输出，防止管道阻塞导致挂起
+ *   - 超时后 SIGKILL 终止并回收僵尸进程
+ *
+ * 返回值：子进程退出码(0-255)；-1=启动失败；-2=超时
+ */
+static int hook_run_subprocess(const char *const argv[], char **envp, int timeout_sec);
+
+/* 构建环境数组 = 继承 environ + AGENTOS_HOOK_CONTEXT=<json>，返回 NULL 终止数组 */
+static char **hook_build_env_with_context(const char *context_json);
+
+/* 释放 hook_build_env_with_context 返回的环境数组 */
+static void hook_free_env(char **env);
+
+/*
+ * 通用脚本执行：序列化上下文 → 构建环境 → fork+execve 运行解释器。
+ * interpreter = "/bin/sh"（Shell Hook）或 "/usr/bin/python3"（Python Hook）。
+ * 返回退出码（0=CONTINUE, 1=SKIP, 2=RETRY, 3=ABORT, 4=MODIFY），-1=失败。
+ */
+static int hook_run_script(const char *interpreter, const char *script_path,
+                           hook_context_t *ctx, int timeout_sec);
 
 /* ==================== 决策聚合 ==================== */
 
@@ -119,14 +170,12 @@ hook_decision_t hook_executor_run_one(const hook_entry_t *entry,
         break;
     }
     case HOOK_IMPL_PYTHON: {
-        /* Python 脚本通过 shell 执行（python3 script.py） */
+        /* Python 脚本：fork + execve /usr/bin/python3（不经过 shell，无注入风险） */
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start);
 
-        char cmd[HOOK_HOOK_PATH_MAX_LEN + 32];
-        snprintf(cmd, sizeof(cmd), "python3 %s", entry->script_path);
-        /* 简化：直接调用 shell 执行 */
-        int exit_code = hook_executor_run_shell(cmd, ctx);
+        int exit_code = hook_run_script("/usr/bin/python3", entry->script_path,
+                                        ctx, HOOK_SHELL_TIMEOUT_SEC);
 
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (out_duration_ns) {
@@ -209,45 +258,269 @@ hook_decision_t hook_executor_run(hook_context_t *ctx, hook_exec_mode_t mode)
     return final_decision;
 }
 
-/* ==================== Shell 执行 ==================== */
+/* ==================== 子进程执行基础设施 ==================== */
 
-int hook_executor_run_shell(const char *script_path, hook_context_t *ctx)
+char **hook_build_env_with_context(const char *context_json)
 {
-    if (!script_path || !ctx) return -1;
+    if (!context_json)
+        return NULL;
 
-    /* 序列化上下文为 JSON */
+    /* 统计 environ 条目数（继承父进程环境，保持与原 system() 行为一致） */
+    extern char **environ;
+    char **ep = environ;
+    size_t env_count = 0;
+    while (ep && *ep) { env_count++; ep++; }
+
+    /* 分配 env_count + 2（AGENTOS_HOOK_CONTEXT + NULL 终止符） */
+    char **env = (char **)AGENTOS_MALLOC(sizeof(char *) * (env_count + 2));
+    if (!env) return NULL;
+
+    size_t i = 0;
+    for (ep = environ; ep && *ep; ep++) {
+        env[i] = AGENTOS_STRDUP(*ep);
+        if (!env[i]) {
+            for (size_t j = 0; j < i; j++) AGENTOS_FREE(env[j]);
+            AGENTOS_FREE(env);
+            return NULL;
+        }
+        i++;
+    }
+
+    /* 追加 AGENTOS_HOOK_CONTEXT=<json>（环境变量传递，不拼入命令行 — 无注入风险） */
+    static const char prefix[] = "AGENTOS_HOOK_CONTEXT=";
+    const size_t prefix_len = sizeof(prefix) - 1;
+    const size_t json_len = strlen(context_json);
+    env[i] = (char *)AGENTOS_MALLOC(prefix_len + json_len + 1);
+    if (!env[i]) {
+        for (size_t j = 0; j < i; j++) AGENTOS_FREE(env[j]);
+        AGENTOS_FREE(env);
+        return NULL;
+    }
+    __builtin_memcpy(env[i], prefix, prefix_len);
+    __builtin_memcpy(env[i] + prefix_len, context_json, json_len);
+    env[i][prefix_len + json_len] = '\0';
+    i++;
+
+    env[i] = NULL;
+    return env;
+}
+
+void hook_free_env(char **env)
+{
+    if (!env) return;
+    for (size_t i = 0; env[i]; i++) AGENTOS_FREE(env[i]);
+    AGENTOS_FREE(env);
+}
+
+int hook_run_subprocess(const char *const argv[], char **envp, int timeout_sec)
+{
+    if (!argv || !argv[0]) return -1;
+
+    int pipefd[2];
+    if (pipe(pipefd) < 0) return -1;
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return -1;
+    }
+
+    if (pid == 0) {
+        /* 子进程：重定向 stdout/stderr 到管道写端，关闭读端 */
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        dup2(pipefd[1], STDERR_FILENO);
+        close(pipefd[1]);
+
+        /* envp != NULL → execve（自定义环境 + 完整路径）
+         * envp == NULL → execvp（PATH 搜索 + 继承 environ） */
+        if (envp) {
+            execve(argv[0], (char *const *)argv, envp);
+        } else {
+            execvp(argv[0], (char *const *)argv);
+        }
+        /* exec 失败：退出码 127（对齐 shell 约定） */
+        _exit(127);
+    }
+
+    /* 父进程：关闭写端，持续读取输出直到 EOF 或超时（防止管道阻塞致挂起） */
+    close(pipefd[1]);
+
+    time_t start = time(NULL);
+    char discard[4096];
+    int timed_out = 0;
+    for (;;) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(pipefd[0], &rfds);
+        struct timeval tv;
+        tv.tv_sec = 1;
+        tv.tv_usec = 0;
+
+        int retval = select(pipefd[0] + 1, &rfds, NULL, NULL, &tv);
+        if (retval > 0) {
+            ssize_t n = read(pipefd[0], discard, sizeof(discard));
+            if (n <= 0) break; /* EOF（子进程退出）或错误 */
+        } else if (retval == 0) {
+            /* 1 秒无数据：检查总超时 */
+            if (timeout_sec > 0 && (time(NULL) - start) >= timeout_sec) {
+                timed_out = 1;
+                kill(pid, SIGKILL);
+                /* 排空管道以避免子进程写端阻塞（已 SIGKILL，fd 即将关闭） */
+                while (read(pipefd[0], discard, sizeof(discard)) > 0) { /* drain */ }
+                break;
+            }
+            /* 继续等待 */
+        } else {
+            if (errno == EINTR) continue;
+            break; /* select 出错 */
+        }
+    }
+
+    close(pipefd[0]);
+
+    /* 回收子进程（阻塞等待，子进程已被 EOF 或 SIGKILL 终止） */
+    int status = 0;
+    while (waitpid(pid, &status, 0) < 0) {
+        if (errno != EINTR) break;
+    }
+
+    if (timed_out) return -2;
+    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+    return -1;
+}
+
+int hook_run_script(const char *interpreter, const char *script_path,
+                    hook_context_t *ctx, int timeout_sec)
+{
+    if (!interpreter || !script_path || !ctx) return -1;
+
+    /* 序列化上下文为 JSON（通过环境变量传递，不拼入命令行） */
     char json_buf[4096];
     int json_len = hook_executor_ctx_to_json(ctx, json_buf, sizeof(json_buf));
     if (json_len < 0) return -1;
 
-    /* 构建命令 */
-    char cmd[HOOK_HOOK_PATH_MAX_LEN + 64];
-    snprintf(cmd, sizeof(cmd),
-             "AGENTOS_HOOK_CONTEXT='%s' /bin/sh %s 2>/dev/null",
-             json_buf, script_path);
+    char **env = hook_build_env_with_context(json_buf);
+    if (!env) {
+        SVC_LOG_ERROR("hook_executor: failed to build env for script '%s'", script_path);
+        return -1;
+    }
 
-    int exit_code = system(cmd);
-    return WEXITSTATUS(exit_code);
+    const char *const argv[] = {interpreter, script_path, NULL};
+    int exit_code = hook_run_subprocess(argv, env, timeout_sec);
+    hook_free_env(env);
+
+    if (exit_code == -2) {
+        SVC_LOG_WARN("hook_executor: script hook '%s' timed out (%ds)", script_path, timeout_sec);
+        return -1;
+    }
+    if (exit_code < 0) {
+        SVC_LOG_ERROR("hook_executor: failed to launch interpreter '%s' for '%s'",
+                      interpreter, script_path);
+        return -1;
+    }
+    return exit_code;
+}
+
+/* ==================== Shell 执行 ==================== */
+
+int hook_executor_run_shell(const char *script_path, hook_context_t *ctx)
+{
+    /* fork + execve /bin/sh，上下文经 AGENTOS_HOOK_CONTEXT 环境变量传递 */
+    return hook_run_script("/bin/sh", script_path, ctx, HOOK_SHELL_TIMEOUT_SEC);
 }
 
 /* ==================== Webhook 执行 ==================== */
+
+#ifdef AGENTOS_HAS_CURL
+/* libcurl 响应丢弃回调（仅消费响应体，webhook 不需要返回数据） */
+static size_t hook_webhook_discard_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
+{
+    (void)ptr;
+    (void)userdata;
+    return size * nmemb;
+}
+
+/* libcurl 真实 HTTP POST 实现 */
+static int hook_webhook_post_curl(const char *url, const char *json_body)
+{
+    CURL *curl = curl_easy_init();
+    if (!curl) {
+        SVC_LOG_ERROR("hook_executor: curl_easy_init failed for webhook '%s'", url);
+        return -1;
+    }
+
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_body);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, hook_webhook_discard_cb);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)HOOK_WEBHOOK_TIMEOUT_SEC);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, (long)HOOK_WEBHOOK_TIMEOUT_SEC);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        SVC_LOG_WARN("hook_executor: webhook POST '%s' failed: %s", url, curl_easy_strerror(res));
+        return -1;
+    }
+    if (http_code < 200 || http_code >= 300) {
+        SVC_LOG_WARN("hook_executor: webhook '%s' returned HTTP %ld", url, http_code);
+        return -1;
+    }
+    return 0;
+}
+#endif /* AGENTOS_HAS_CURL */
 
 int hook_executor_run_webhook(const char *url, hook_context_t *ctx)
 {
     if (!url || !ctx) return -1;
 
-    /* 序列化上下文为 JSON */
+    /* 序列化上下文为 JSON（作为 POST body） */
     char json_buf[4096];
     int json_len = hook_executor_ctx_to_json(ctx, json_buf, sizeof(json_buf));
     if (json_len < 0) return -1;
 
-    /* 使用 curl 发送 POST 请求 */
-    char cmd[HOOK_HOOK_PATH_MAX_LEN + 8192];
-    snprintf(cmd, sizeof(cmd),
-             "curl -s -X POST -H 'Content-Type: application/json' "
-             "-d '%s' --max-time 5 '%s' > /dev/null 2>&1",
-             json_buf, url);
-
-    int exit_code = system(cmd);
-    return WEXITSTATUS(exit_code);
+#ifdef AGENTOS_HAS_CURL
+    /* 首选：libcurl 真实 HTTP POST（进程内，无外部二进制依赖） */
+    return hook_webhook_post_curl(url, json_buf);
+#else
+    /* 后备：fork + execvp curl 二进制（argv 数组传参，无 shell 注入风险） */
+    const char *const argv[] = {
+        "curl", "-s", "-S",
+        "-X", "POST",
+        "-H", "Content-Type: application/json",
+        "-d", json_buf,
+        "--max-time", "5",
+        "-o", "/dev/null",
+        url,
+        NULL
+    };
+    int exit_code = hook_run_subprocess(argv, NULL, HOOK_WEBHOOK_TIMEOUT_SEC + 5);
+    if (exit_code == -2) {
+        SVC_LOG_WARN("hook_executor: webhook curl '%s' timed out", url);
+        return -1;
+    }
+    if (exit_code < 0) {
+        SVC_LOG_ERROR("hook_executor: failed to launch curl for webhook '%s'", url);
+        return -1;
+    }
+    if (exit_code != 0) {
+        SVC_LOG_WARN("hook_executor: webhook curl '%s' exit=%d", url, exit_code);
+        return -1;
+    }
+    return 0;
+#endif
 }

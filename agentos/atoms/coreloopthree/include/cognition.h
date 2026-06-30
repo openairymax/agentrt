@@ -345,7 +345,7 @@ AGENTOS_API void agentos_cognition_set_memory(agentos_cognition_engine_t *engine
  * provider switching (builtin ↔ MemoryRovol) at runtime.
  *
  * @param engine [in] Cognition engine handle (BORROW).
- * @param provider [in] Memory provider from mrb_bridge_get_provider() (BORROW).
+ * @param provider [in] Memory provider from memoryrovol_bridge_get_provider() (BORROW).
  *
  * @ownership provider: BORROW
  */

@@ -14,6 +14,10 @@
  *       - AGENTOS_MEMORY_MEMORYROVOL: 仅 MemoryRovol
  *       - AGENTOS_MEMORY_HYBRID: 混合模式（配置切换 + 双向同步）
  *   P1.11.4: L1 写入 → L2 嵌入 → L3 实体绑定 → 检索 完整数据流
+ *
+ * 公共 API 完整实现头文件 memoryrovol_bridge.h 声明的全部接口，
+ * 消除命名不一致技术债（原 mrb_bridge_* 内部命名已对齐为
+ * memoryrovol_bridge_* 公共命名）。
  */
 
 #include "memoryrovol_bridge.h"
@@ -99,29 +103,48 @@ extern int memoryrovol_has_active_sync(void *ctx)
 /* ==================== 内部结构 ==================== */
 
 typedef struct {
-    void *mr_ctx;                      /* MemoryRovol 上下文 */
-    agentos_memory_provider_t *builtin; /* 内置提供商（HYBRID模式） */
-    agentos_memory_provider_t *rovol;   /* Rovol 提供商 */
-    agentos_memory_provider_t *active;  /* 当前活跃提供商 */
+    void *mr_ctx;                              /* MemoryRovol 上下文 */
+    agentos_memory_provider_t *builtin;        /* 内置提供商（HYBRID模式） */
+    agentos_memory_provider_t *rovol;          /* Rovol 提供商 */
+    agentos_memory_provider_t *active;         /* 当前活跃提供商 */
     mrb_provider_type_t active_type;
-    mrb_config_t config;
+    memoryrovol_bridge_config_t config;        /* 完整配置副本 */
     bool initialized;
     bool memoryrovol_available;
-} mrb_bridge_impl_t;
+    bool sync_active;                          /* 同步是否活跃 */
+} memoryrovol_bridge_impl_t;
 
 struct memoryrovol_bridge_s {
-    mrb_bridge_impl_t impl;
+    memoryrovol_bridge_impl_t impl;
 };
 
 /* ==================== 辅助函数 ==================== */
 
 /* 前向声明 */
-static void mrb_bridge_destroy(mrb_bridge_t *bridge);
+static void mrb_bridge_destroy_internal(memoryrovol_bridge_t *bridge);
 
 static bool is_memoryrovol_linked(void)
 {
     /* 检查弱符号是否被实际链接 */
     return (memoryrovol_init != NULL);
+}
+
+/* 从配置提取能力位掩码 */
+static void apply_capability_flags(agentos_memory_provider_t *provider,
+                                   const memoryrovol_bridge_config_t *cfg)
+{
+    if (!provider || !cfg)
+        return;
+    provider->capabilities.l1_raw = cfg->enable_l1_raw ? 1 : 0;
+    provider->capabilities.l2_feature = cfg->enable_l2_feature ? 1 : 0;
+    provider->capabilities.l3_structure = cfg->enable_l3_structure ? 1 : 0;
+    provider->capabilities.l4_pattern = cfg->enable_l4_pattern ? 1 : 0;
+    provider->capabilities.forgetting = cfg->enable_forgetting ? 1 : 0;
+    provider->capabilities.attractor = cfg->enable_attractor ? 1 : 0;
+    provider->capabilities.persistence = cfg->enable_persistence ? 1 : 0;
+    provider->capabilities.faiss = cfg->enable_faiss ? 1 : 0;
+    provider->capabilities.async_ops = cfg->enable_async_ops ? 1 : 0;
+    provider->capabilities.llm_integration = cfg->enable_llm_integration ? 1 : 0;
 }
 
 /* ==================== MemoryRovol Provider 函数指针实现 ==================== */
@@ -133,28 +156,22 @@ static agentos_error_t mr_init(agentos_memory_provider_t *provider, const char *
     if (!provider || !provider->impl)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     if (!impl->memoryrovol_available || !memoryrovol_init) {
         SVC_LOG_ERROR("C-L12: MemoryRovol not available");
         return AGENTOS_ENOTSUP;
     }
 
-    const char *cfg = config_path ? config_path : impl->config.memoryrovol_config_path;
+    const char *cfg = config_path ? config_path : impl->config.config_path;
     int ret = memoryrovol_init(cfg, &impl->mr_ctx);
     if (ret != 0 || !impl->mr_ctx) {
         SVC_LOG_ERROR("C-L12: MemoryRovol init failed (ret=%d)", ret);
         return AGENTOS_EIO;
     }
 
-    provider->capabilities.l1_raw = 1;
-    provider->capabilities.l2_feature = 1;
-    provider->capabilities.l3_structure = 1;
-    provider->capabilities.l4_pattern = 1;
-    provider->capabilities.forgetting = 1;
-    provider->capabilities.faiss = 1;
-    provider->capabilities.async_ops = 1;
-    provider->capabilities.llm_integration = 1;
+    /* 根据配置能力标记填充 capabilities */
+    apply_capability_flags(provider, &impl->config);
 
     SVC_LOG_INFO("C-L12: MemoryRovol provider initialized (ctx=%p)", impl->mr_ctx);
     return AGENTOS_SUCCESS;
@@ -165,7 +182,7 @@ static void mr_destroy(agentos_memory_provider_t *provider)
     if (!provider || !provider->impl)
         return;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
     if (impl->mr_ctx && memoryrovol_shutdown) {
         memoryrovol_shutdown(impl->mr_ctx);
         impl->mr_ctx = NULL;
@@ -179,7 +196,7 @@ static agentos_error_t mr_write_raw(agentos_memory_provider_t *provider, const v
     if (!provider || !provider->impl || !data || !out_record_id)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     if (!memoryrovol_l1_write)
         return AGENTOS_ENOTSUP;
@@ -189,7 +206,7 @@ static agentos_error_t mr_write_raw(agentos_memory_provider_t *provider, const v
         return AGENTOS_EIO;
 
     /* P1.11.4: L1 写入后触发 L2 嵌入 */
-    if (memoryrovol_l2_index && *out_record_id) {
+    if (impl->config.enable_l2_feature && memoryrovol_l2_index && *out_record_id) {
         int l2_ret = memoryrovol_l2_index(impl->mr_ctx, *out_record_id, data, len, metadata_json);
         if (l2_ret != 0) {
             SVC_LOG_WARN("C-L12: L2 index failed for record %s (ret=%d)", *out_record_id, l2_ret);
@@ -205,7 +222,7 @@ static agentos_error_t mr_get_raw(agentos_memory_provider_t *provider, const cha
     if (!provider || !provider->impl || !record_id || !out_data || !out_len)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     if (!memoryrovol_l1_read)
         return AGENTOS_ENOTSUP;
@@ -219,7 +236,7 @@ static agentos_error_t mr_delete_raw(agentos_memory_provider_t *provider, const 
     if (!provider || !provider->impl || !record_id)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     if (!memoryrovol_l1_delete)
         return AGENTOS_ENOTSUP;
@@ -235,10 +252,14 @@ static agentos_error_t mr_query(agentos_memory_provider_t *provider, const char 
     if (!provider || !provider->impl || !query_text)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
+
+    /* 应用配置默认 limit */
+    if (limit == 0 && impl->config.query_default_limit > 0)
+        limit = impl->config.query_default_limit;
 
     /* P1.11.4: 检索优先使用 L2 向量索引 */
-    if (memoryrovol_l2_search) {
+    if (impl->config.enable_l2_feature && memoryrovol_l2_search) {
         int ret = memoryrovol_l2_search(impl->mr_ctx, query_text, limit,
                                         out_record_ids, out_scores, out_count);
         if (ret == 0 && *out_count > 0)
@@ -246,7 +267,7 @@ static agentos_error_t mr_query(agentos_memory_provider_t *provider, const char 
     }
 
     /* 降级：使用 L3 关系查询 */
-    if (memoryrovol_l3_query_relations) {
+    if (impl->config.enable_l3_structure && memoryrovol_l3_query_relations) {
         char *relations_json = NULL;
         int ret = memoryrovol_l3_query_relations(impl->mr_ctx, query_text, &relations_json);
         if (ret == 0 && relations_json) {
@@ -282,9 +303,9 @@ static agentos_error_t mr_evolve(agentos_memory_provider_t *provider, int force)
     if (!provider || !provider->impl)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
-    if (!memoryrovol_l4_evolve)
+    if (!impl->config.enable_l4_pattern || !memoryrovol_l4_evolve)
         return AGENTOS_ENOTSUP;
 
     /* P1.11.4: L4 模式识别进化 */
@@ -299,9 +320,9 @@ static agentos_error_t mr_forget(agentos_memory_provider_t *provider)
     if (!provider || !provider->impl)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
-    if (!memoryrovol_l4_forget)
+    if (!impl->config.enable_forgetting || !memoryrovol_l4_forget)
         return AGENTOS_ENOTSUP;
 
     int ret = memoryrovol_l4_forget(impl->mr_ctx);
@@ -313,11 +334,13 @@ static agentos_error_t mr_stats(agentos_memory_provider_t *provider, agentos_mem
     if (!provider || !provider->impl || !out_stats)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     __builtin_memset(out_stats, 0, sizeof(*out_stats));
-    snprintf(out_stats->provider_name, sizeof(out_stats->provider_name), "MemoryRovol");
-    snprintf(out_stats->provider_version, sizeof(out_stats->provider_version), "2.0.0");
+    snprintf(out_stats->provider_name, sizeof(out_stats->provider_name),
+             "%s", impl->config.provider_name ? impl->config.provider_name : "MemoryRovol");
+    snprintf(out_stats->provider_version, sizeof(out_stats->provider_version),
+             "%s", impl->config.provider_version ? impl->config.provider_version : "2.0.0");
 
     if (memoryrovol_get_stats && impl->mr_ctx) {
         memoryrovol_get_stats(impl->mr_ctx, out_stats, sizeof(*out_stats));
@@ -332,10 +355,10 @@ static agentos_error_t mr_mount(agentos_memory_provider_t *provider, const char 
     if (!provider || !provider->impl || !record_id)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     /* P1.11.4: L3 实体绑定 */
-    if (memoryrovol_l3_bind_entity && context) {
+    if (impl->config.enable_l3_structure && memoryrovol_l3_bind_entity && context) {
         int ret = memoryrovol_l3_bind_entity(impl->mr_ctx, record_id, "memory_record", context);
         if (ret != 0) {
             SVC_LOG_WARN("C-L12: L3 entity bind failed for %s (ret=%d)", record_id, ret);
@@ -350,7 +373,7 @@ static agentos_error_t mr_health_check(agentos_memory_provider_t *provider, char
     if (!provider || !provider->impl || !out_json)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     if (memoryrovol_health_check && impl->mr_ctx) {
         int ret = memoryrovol_health_check(impl->mr_ctx, out_json);
@@ -373,7 +396,7 @@ static agentos_error_t mr_sync_push(agentos_memory_provider_t *provider, const c
     if (!provider || !provider->impl)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     if (!memoryrovol_sync_push)
         return AGENTOS_ENOTSUP;
@@ -388,7 +411,7 @@ static agentos_error_t mr_sync_pull(agentos_memory_provider_t *provider, const c
     if (!provider || !provider->impl)
         return AGENTOS_EINVAL;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     if (!memoryrovol_sync_pull)
         return AGENTOS_ENOTSUP;
@@ -402,7 +425,7 @@ static int mr_has_active_sync(agentos_memory_provider_t *provider)
     if (!provider || !provider->impl)
         return 0;
 
-    mrb_bridge_impl_t *impl = (mrb_bridge_impl_t *)provider->impl;
+    memoryrovol_bridge_impl_t *impl = (memoryrovol_bridge_impl_t *)provider->impl;
 
     if (memoryrovol_has_active_sync && impl->mr_ctx)
         return memoryrovol_has_active_sync(impl->mr_ctx);
@@ -416,15 +439,16 @@ static int mr_has_active_sync(agentos_memory_provider_t *provider)
 
 #if AGENTOS_MEMORY_MEMORYROVOL || AGENTOS_MEMORY_HYBRID
 
-static agentos_memory_provider_t *memoryrovol_provider_create(mrb_bridge_impl_t *impl)
+static agentos_memory_provider_t *memoryrovol_provider_create(memoryrovol_bridge_impl_t *impl)
 {
     agentos_memory_provider_t *provider =
         (agentos_memory_provider_t *)AGENTOS_CALLOC(1, sizeof(agentos_memory_provider_t));
     if (!provider)
         return NULL;
 
-    provider->name = "MemoryRovol";
-    provider->version = "2.0.0";
+    /* 使用配置中的名称/版本，回退到默认 */
+    provider->name = impl->config.provider_name ? impl->config.provider_name : "MemoryRovol";
+    provider->version = impl->config.provider_version ? impl->config.provider_version : "2.0.0";
     provider->impl = impl;
 
     /* 填充函数指针表 */
@@ -445,6 +469,9 @@ static agentos_memory_provider_t *memoryrovol_provider_create(mrb_bridge_impl_t 
     provider->sync_pull = mr_sync_pull;
     provider->has_active_sync = mr_has_active_sync;
 
+    /* 根据配置能力标记填充 capabilities（init 后会再次确认） */
+    apply_capability_flags(provider, &impl->config);
+
     SVC_LOG_INFO("C-L12: MemoryRovol provider created (name=%s, version=%s)",
                  provider->name, provider->version);
     return provider;
@@ -452,22 +479,24 @@ static agentos_memory_provider_t *memoryrovol_provider_create(mrb_bridge_impl_t 
 
 #endif
 
-/* ==================== 桥接实现 ==================== */
+/* ==================== 桥接实现：公共 API ==================== */
 
-mrb_bridge_t *mrb_bridge_create(const mrb_config_t *config)
+memoryrovol_bridge_t *memoryrovol_bridge_create(const memoryrovol_bridge_config_t *config)
 {
-    mrb_bridge_t *bridge = (mrb_bridge_t *)AGENTOS_CALLOC(1, sizeof(mrb_bridge_t));
+    memoryrovol_bridge_t *bridge =
+        (memoryrovol_bridge_t *)AGENTOS_CALLOC(1, sizeof(memoryrovol_bridge_t));
     if (!bridge) {
-        SVC_LOG_ERROR("C-L12: mrb_bridge_create OOM");
+        SVC_LOG_ERROR("C-L12: memoryrovol_bridge_create OOM");
         return NULL;
     }
 
-    mrb_bridge_impl_t *impl = &bridge->impl;
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
 
+    /* 存储完整配置副本（NULL 使用零初始化默认值） */
     if (config) {
         impl->config = *config;
     } else {
-        impl->config = (mrb_config_t)MRB_CONFIG_DEFAULTS;
+        __builtin_memset(&impl->config, 0, sizeof(impl->config));
     }
 
     /* 检测 MemoryRovol 可用性 */
@@ -517,12 +546,13 @@ mrb_bridge_t *mrb_bridge_create(const mrb_config_t *config)
         /* MemoryRovol 可用 */
         impl->rovol = memoryrovol_provider_create(impl);
         if (impl->rovol) {
-            /* 设置双向同步 */
+            /* 设置双向同步链路（sync_active 控制是否启用） */
             impl->builtin->sync_target = impl->rovol;
             impl->rovol->sync_target = impl->builtin;
 
             /* 根据配置选择活跃提供商 */
-            if (impl->config.provider_type == MRB_PROVIDER_MEMORYROVOL) {
+            if (impl->config.provider_name &&
+                strcmp(impl->config.provider_name, "memoryrovol") == 0) {
                 impl->active = impl->rovol;
                 impl->active_type = MRB_PROVIDER_MEMORYROVOL;
             } else {
@@ -530,10 +560,9 @@ mrb_bridge_t *mrb_bridge_create(const mrb_config_t *config)
                 impl->active = impl->builtin;
                 impl->active_type = MRB_PROVIDER_BUILTIN;
             }
-            SVC_LOG_INFO("C-L12: Hybrid mode — builtin=%p, rovol=%p, active=%s, sync=%s",
+            SVC_LOG_INFO("C-L12: Hybrid mode — builtin=%p, rovol=%p, active=%s",
                          (void *)impl->builtin, (void *)impl->rovol,
-                         impl->active_type == MRB_PROVIDER_MEMORYROVOL ? "MemoryRovol" : "builtin",
-                         impl->config.enable_sync ? "enabled" : "disabled");
+                         impl->active_type == MRB_PROVIDER_MEMORYROVOL ? "MemoryRovol" : "builtin");
         } else {
             SVC_LOG_WARN("C-L12: Hybrid mode — MemoryRovol provider creation failed, "
                          "falling back to builtin");
@@ -553,11 +582,11 @@ mrb_bridge_t *mrb_bridge_create(const mrb_config_t *config)
 
     /* 初始化活跃提供商 */
     if (impl->active && impl->active->init) {
-        const char *cfg_path = impl->config.storage_path;
+        const char *cfg_path = impl->config.config_path;
         agentos_error_t err = impl->active->init(impl->active, cfg_path);
         if (err != AGENTOS_SUCCESS) {
             SVC_LOG_ERROR("C-L12: Provider init failed (err=%d)", err);
-            mrb_bridge_destroy(bridge);
+            mrb_bridge_destroy_internal(bridge);
             return NULL;
         }
     }
@@ -578,12 +607,12 @@ mrb_bridge_t *mrb_bridge_create(const mrb_config_t *config)
     return bridge;
 }
 
-void mrb_bridge_destroy(mrb_bridge_t *bridge)
+static void mrb_bridge_destroy_internal(memoryrovol_bridge_t *bridge)
 {
     if (!bridge)
         return;
 
-    mrb_bridge_impl_t *impl = &bridge->impl;
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
 
     if (impl->rovol) {
         if (impl->rovol->destroy)
@@ -601,78 +630,76 @@ void mrb_bridge_destroy(mrb_bridge_t *bridge)
 
     impl->active = NULL;
     impl->initialized = false;
+    impl->sync_active = false;
+}
 
+void memoryrovol_bridge_destroy(memoryrovol_bridge_t *bridge)
+{
+    if (!bridge)
+        return;
+
+    mrb_bridge_destroy_internal(bridge);
     AGENTOS_FREE(bridge);
     SVC_LOG_INFO("C-L12: MemoryRovol bridge destroyed");
 }
 
 /* ==================== 提供商获取 ==================== */
 
-agentos_memory_provider_t *mrb_bridge_get_provider(mrb_bridge_t *bridge)
+agentos_memory_provider_t *memoryrovol_bridge_get_provider(memoryrovol_bridge_t *bridge)
 {
     if (!bridge || !bridge->impl.initialized)
         return NULL;
     return bridge->impl.active;
 }
 
-agentos_memory_provider_t *mrb_bridge_get_builtin(mrb_bridge_t *bridge)
-{
-    if (!bridge || !bridge->impl.initialized)
-        return NULL;
-    return bridge->impl.builtin;
-}
-
 /* ==================== 提供商切换 ==================== */
 
-int mrb_bridge_switch_provider(mrb_bridge_t *bridge, mrb_provider_type_t type)
+int memoryrovol_bridge_switch_mode(memoryrovol_bridge_t *bridge, const char *mode)
 {
-    if (!bridge || !bridge->impl.initialized)
+    if (!bridge || !bridge->impl.initialized || !mode)
         return -1;
 
-    mrb_bridge_impl_t *impl = &bridge->impl;
-
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
     agentos_memory_provider_t *target = NULL;
+    mrb_provider_type_t target_type = MRB_PROVIDER_BUILTIN;
 
-    switch (type) {
-    case MRB_PROVIDER_BUILTIN:
+    if (strcmp(mode, "builtin") == 0) {
         target = impl->builtin;
-        break;
-    case MRB_PROVIDER_MEMORYROVOL:
+        target_type = MRB_PROVIDER_BUILTIN;
+    } else if (strcmp(mode, "memoryrovol") == 0) {
         if (!impl->memoryrovol_available || !impl->rovol) {
             SVC_LOG_WARN("C-L12: Cannot switch to MemoryRovol — not available");
             return -1;
         }
         target = impl->rovol;
-        break;
-    case MRB_PROVIDER_HYBRID:
+        target_type = MRB_PROVIDER_MEMORYROVOL;
+    } else if (strcmp(mode, "hybrid") == 0) {
         /* HYBRID: 优先 MemoryRovol，降级到内置 */
-        if (impl->memoryrovol_available && impl->rovol)
+        if (impl->memoryrovol_available && impl->rovol) {
             target = impl->rovol;
-        else
+            target_type = MRB_PROVIDER_MEMORYROVOL;
+        } else {
             target = impl->builtin;
-        break;
-    case MRB_PROVIDER_AUTO:
-        /* AUTO: HYBRID模式下优先MemoryRovol，否则内置 */
-        if (impl->memoryrovol_available && impl->rovol)
-            target = impl->rovol;
-        else
-            target = impl->builtin;
-        break;
+            target_type = MRB_PROVIDER_BUILTIN;
+        }
+    } else {
+        SVC_LOG_ERROR("C-L12: Unknown mode '%s'", mode);
+        return -1;
     }
 
     if (!target) {
-        SVC_LOG_ERROR("C-L12: Switch provider — no target available for type=%d", type);
+        SVC_LOG_ERROR("C-L12: Switch mode — no target available for mode=%s", mode);
         return -1;
     }
 
     if (target == impl->active) {
-        SVC_LOG_DEBUG("C-L12: Provider already active (type=%d)", type);
+        SVC_LOG_DEBUG("C-L12: Provider already active (mode=%s)", mode);
         return 0;
     }
 
     /* 初始化目标提供商（如果尚未初始化） */
     if (target->init && target != impl->active) {
-        agentos_error_t err = target->init(target, impl->config.storage_path);
+        agentos_error_t err = target->init(target, impl->config.config_path);
         if (err != AGENTOS_SUCCESS) {
             SVC_LOG_ERROR("C-L12: Failed to init target provider (err=%d)", err);
             return -1;
@@ -680,69 +707,153 @@ int mrb_bridge_switch_provider(mrb_bridge_t *bridge, mrb_provider_type_t type)
     }
 
     impl->active = target;
-    impl->active_type = (target == impl->rovol) ? MRB_PROVIDER_MEMORYROVOL
-                                                : MRB_PROVIDER_BUILTIN;
+    impl->active_type = target_type;
 
     SVC_LOG_INFO("C-L12: Provider switched to %s",
                  impl->active_type == MRB_PROVIDER_MEMORYROVOL ? "MemoryRovol" : "builtin");
     return 0;
 }
 
-int mrb_bridge_select_from_config(mrb_bridge_t *bridge, const char *config_yaml)
+const char *memoryrovol_bridge_get_mode(memoryrovol_bridge_t *bridge)
 {
-    if (!bridge || !config_yaml)
+    if (!bridge || !bridge->impl.initialized)
+        return NULL;
+
+    switch (bridge->impl.active_type) {
+    case MRB_PROVIDER_MEMORYROVOL:
+        return "memoryrovol";
+    case MRB_PROVIDER_BUILTIN:
+        return "builtin";
+    case MRB_PROVIDER_HYBRID:
+        return "hybrid";
+    default:
+        return "unknown";
+    }
+}
+
+/* ==================== 同步控制 ==================== */
+
+int memoryrovol_bridge_start_sync(memoryrovol_bridge_t *bridge)
+{
+    if (!bridge || !bridge->impl.initialized)
         return -1;
 
-    __attribute__((unused))
-    mrb_bridge_impl_t *impl = &bridge->impl;
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
 
-    /* 解析 memory.provider 配置 */
-    if (strstr(config_yaml, "\"provider\":\"memoryrovol\"") ||
-        strstr(config_yaml, "provider: memoryrovol")) {
-        SVC_LOG_INFO("C-L12: Config selects MemoryRovol provider");
-        return mrb_bridge_switch_provider(bridge, MRB_PROVIDER_MEMORYROVOL);
-    } else if (strstr(config_yaml, "\"provider\":\"builtin\"") ||
-               strstr(config_yaml, "provider: builtin")) {
-        SVC_LOG_INFO("C-L12: Config selects builtin provider");
-        return mrb_bridge_switch_provider(bridge, MRB_PROVIDER_BUILTIN);
-    } else {
-        SVC_LOG_INFO("C-L12: Config has no explicit provider, using AUTO");
-        return mrb_bridge_switch_provider(bridge, MRB_PROVIDER_AUTO);
+    /* HYBRID 模式下需要两个提供商都存在才能同步 */
+    if (!impl->builtin || !impl->rovol) {
+        SVC_LOG_WARN("C-L12: Cannot start sync — hybrid providers not available");
+        return -1;
     }
+
+    /* 连接双向同步链路 */
+    impl->builtin->sync_target = impl->rovol;
+    impl->rovol->sync_target = impl->builtin;
+    impl->sync_active = true;
+
+    SVC_LOG_INFO("C-L12: Sync started (interval=%ums)",
+                 impl->config.sync_interval_ms);
+    return 0;
+}
+
+void memoryrovol_bridge_stop_sync(memoryrovol_bridge_t *bridge)
+{
+    if (!bridge || !bridge->impl.initialized)
+        return;
+
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
+
+    /* 断开同步链路 */
+    if (impl->builtin)
+        impl->builtin->sync_target = NULL;
+    if (impl->rovol)
+        impl->rovol->sync_target = NULL;
+
+    impl->sync_active = false;
+    SVC_LOG_INFO("C-L12: Sync stopped");
+}
+
+bool memoryrovol_bridge_has_active_sync(memoryrovol_bridge_t *bridge)
+{
+    if (!bridge || !bridge->impl.initialized)
+        return false;
+
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
+
+    /* 检查本地标志 + MemoryRovol 库的同步状态 */
+    if (impl->sync_active) {
+        if (impl->active && impl->active->has_active_sync) {
+            return impl->active->has_active_sync(impl->active) != 0;
+        }
+        return true;
+    }
+    return false;
 }
 
 /* ==================== 状态查询 ==================== */
 
-mrb_provider_type_t mrb_bridge_get_active_type(mrb_bridge_t *bridge)
+int memoryrovol_bridge_get_stats(memoryrovol_bridge_t *bridge,
+                                 agentos_memory_stats_t *out_stats)
 {
-    if (!bridge)
-        return MRB_PROVIDER_BUILTIN;
-    return bridge->impl.active_type;
+    if (!bridge || !out_stats)
+        return -1;
+
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
+
+    if (impl->active && impl->active->stats) {
+        agentos_error_t err = impl->active->stats(impl->active, out_stats);
+        return (err == AGENTOS_SUCCESS) ? 0 : -1;
+    }
+
+    __builtin_memset(out_stats, 0, sizeof(*out_stats));
+    return 0;
 }
 
-bool mrb_bridge_is_memoryrovol_available(mrb_bridge_t *bridge)
+int memoryrovol_bridge_health_check(memoryrovol_bridge_t *bridge, char **out_json)
 {
-    if (!bridge)
-        return false;
-    return bridge->impl.memoryrovol_available && bridge->impl.rovol != NULL;
+    if (!bridge || !out_json)
+        return -1;
+
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
+
+    if (impl->active && impl->active->health_check) {
+        agentos_error_t err = impl->active->health_check(impl->active, out_json);
+        return (err == AGENTOS_SUCCESS) ? 0 : -1;
+    }
+
+    *out_json = AGENTOS_STRDUP("{\"status\":\"unknown\",\"provider\":\"none\"}");
+    return (*out_json) ? 0 : -1;
 }
 
-bool mrb_bridge_is_healthy(mrb_bridge_t *bridge)
+bool memoryrovol_bridge_is_ready(memoryrovol_bridge_t *bridge)
 {
     return bridge && bridge->impl.initialized && bridge->impl.active != NULL;
 }
 
-int mrb_bridge_get_stats(mrb_bridge_t *bridge, agentos_memory_stats_t *stats)
+void memoryrovol_bridge_dump_stats(memoryrovol_bridge_t *bridge)
 {
-    if (!bridge || !stats)
-        return -1;
+    if (!bridge || !bridge->impl.initialized)
+        return;
 
-    mrb_bridge_impl_t *impl = &bridge->impl;
+    memoryrovol_bridge_impl_t *impl = &bridge->impl;
+    agentos_memory_stats_t stats;
+    __builtin_memset(&stats, 0, sizeof(stats));
 
     if (impl->active && impl->active->stats) {
-        return (int)impl->active->stats(impl->active, stats);
+        impl->active->stats(impl->active, &stats);
     }
 
-    __builtin_memset(stats, 0, sizeof(*stats));
-    return 0;
+    const char *mode = memoryrovol_bridge_get_mode(bridge);
+    SVC_LOG_INFO("C-L12: BRIDGE-STATS mode=%s provider=%s sync=%s "
+                 "records=%llu bytes=%llu l1=%llu l2=%llu l3=%llu l4=%llu util=%.2f",
+                 mode ? mode : "?",
+                 stats.provider_name[0] ? stats.provider_name : "?",
+                 impl->sync_active ? "on" : "off",
+                 (unsigned long long)stats.total_records,
+                 (unsigned long long)stats.total_bytes,
+                 (unsigned long long)stats.l1_count,
+                 (unsigned long long)stats.l2_indexed,
+                 (unsigned long long)stats.l3_relations,
+                 (unsigned long long)stats.l4_patterns,
+                 stats.index_utilization);
 }

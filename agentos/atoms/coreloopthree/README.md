@@ -121,7 +121,6 @@ coreloopthree/
 │   │   ├── test_semantic_unit.c           # 语义单元测试
 │   │   ├── test_thread_safety.c           # 线程安全测试
 │   │   ├── test_cognition_e2e.c          # 认知端到端测试
-│   │   └── test_cl3_stubs.c              # 桩函数测试
 │   └── CMakeLists.txt                   # （代表性测试，完整列表见 tests/ 目录）
 └── CMakeLists.txt
 ```

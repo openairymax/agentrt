@@ -691,7 +691,7 @@ agentos_error_t agentos_execution_register_unit(agentos_execution_engine_t *engi
         AGENTOS_LOG_ERROR("ExecutionEngine: failed to allocate unit name '%s'", name);
         return AGENTOS_ENOMEM;
     }
-    memcpy(name_copy, name, name_len + 1);
+    __builtin_memcpy(name_copy, name, name_len + 1);
 
     /* 存储单元 */
     uint32_t slot = engine->registered_unit_count;
