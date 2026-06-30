@@ -766,3 +766,55 @@ int daemon_security_get_status(int *sanitizer_status, int *permission_status, in
     return AGENTOS_OK;
 }
 
+int daemon_security_add_acl_rule(const char *agent_id, const char *resource, bool allowed)
+{
+    if (!agent_id || !resource || agent_id[0] == '\0' || resource[0] == '\0') {
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+    if (strlen(agent_id) >= sizeof(g_security_ctx.acl_table[0].agent_id) ||
+        strlen(resource) >= sizeof(g_security_ctx.acl_table[0].resource)) {
+        SVC_LOG_ERROR("ACL rule rejected: agent_id or resource too long (agent=%s resource=%s)",
+                      agent_id, resource);
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
+    if (!g_security_ctx.initialized) {
+        agentos_mutex_unlock(&g_security_mutex);
+        daemon_security_init(NULL, NULL);
+        agentos_mutex_lock(&g_security_mutex);
+    }
+
+    /* 查找已有的同 (agent_id, resource) 条目，覆盖其 allowed 状态 */
+    for (size_t i = 0; i < g_security_ctx.acl_count; i++) {
+        if (strcmp(g_security_ctx.acl_table[i].agent_id, agent_id) == 0 &&
+            strcmp(g_security_ctx.acl_table[i].resource, resource) == 0) {
+            g_security_ctx.acl_table[i].allowed = allowed;
+            agentos_mutex_unlock(&g_security_mutex);
+            SVC_LOG_DEBUG("ACL rule updated: agent=%s resource=%s allowed=%d",
+                          agent_id, resource, allowed ? 1 : 0);
+            return AGENTOS_OK;
+        }
+    }
+
+    if (g_security_ctx.acl_count >= MAX_ACL_ENTRIES) {
+        agentos_mutex_unlock(&g_security_mutex);
+        SVC_LOG_ERROR("ACL table full (max=%d), cannot add rule for agent=%s resource=%s",
+                      MAX_ACL_ENTRIES, agent_id, resource);
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
+
+    acl_entry_t *entry = &g_security_ctx.acl_table[g_security_ctx.acl_count];
+    snprintf(entry->agent_id, sizeof(entry->agent_id), "%s", agent_id);
+    snprintf(entry->resource, sizeof(entry->resource), "%s", resource);
+    entry->operations = 0xFFFFFFFF; /* 所有操作（execute/read/write） */
+    entry->allowed = allowed;
+    g_security_ctx.acl_count++;
+    agentos_mutex_unlock(&g_security_mutex);
+
+    SVC_LOG_INFO("ACL rule added: agent=%s resource=%s allowed=%d (count=%zu/%d)",
+                 agent_id, resource, allowed ? 1 : 0, g_security_ctx.acl_count, MAX_ACL_ENTRIES);
+    return AGENTOS_OK;
+}
+
