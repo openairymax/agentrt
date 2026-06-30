@@ -4,9 +4,10 @@ add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 # @owner: team-C
 # P1.16m: 12 条连接线集成测试 + P2.8: Hook 系统集成测试
 #
-# Phase 1.7 重构：消除 test_stubs.c 桩文件依赖
-# - 8 个 PURE_DUPLICATE 测试已迁移到真实库链接（无 test_stubs.c）
-# - 5 个 BEHAVIOR_DIFF 测试暂保留 test_stubs.c（Phase 2-4 修复后迁移）
+# Phase 1.7 重构完成：test_stubs.c 桩文件已完全消除（v0.1.1）
+# - 7 个 PURE_DUPLICATE 测试直接迁移到真实库链接
+# - 6 个 BEHAVIOR_DIFF/FICTIONAL_API 测试修复行为差异后迁移到真实库链接
+# - 全部 13 个集成测试现在链接真实生产库，零桩文件依赖
 
 # ============================================================================
 # 公共 include 路径
@@ -83,35 +84,7 @@ function(configure_real_lib_test test_name)
 endfunction()
 
 # ============================================================================
-# 辅助函数：配置使用 test_stubs.c 的集成测试（BEHAVIOR_DIFF，待迁移）
-# ============================================================================
-function(configure_stub_test test_name)
-    add_executable(${test_name}
-        ${CMAKE_CURRENT_SOURCE_DIR}/${test_name}.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_stubs.c
-    )
-
-    target_include_directories(${test_name} PRIVATE ${INTEGRATION_INCLUDE_DIRS})
-    target_compile_features(${test_name} PRIVATE c_std_11)
-    target_compile_options(${test_name} PRIVATE
-        -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
-        -Wno-unused-parameter
-    )
-    target_link_libraries(${test_name} PRIVATE
-        Threads::Threads
-        m
-    )
-
-    add_test(NAME integration_${test_name}
-        COMMAND ${test_name}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-
-    message(STATUS "  [integration] ${test_name}: configured (stubs, pending migration)")
-endfunction()
-
-# ============================================================================
-# PURE_DUPLICATE 测试（7个）— 已迁移到真实库，无 test_stubs.c
+# PURE_DUPLICATE 测试（7个）— 直接链接真实库
 # ============================================================================
 
 # C-L03: market_d → OpenLab（自包含 mock，仅需头文件）
@@ -164,23 +137,49 @@ configure_real_lib_test(test_hook_system
 )
 
 # ============================================================================
-# BEHAVIOR_DIFF / FICTIONAL_API 测试（6个）— 暂保留 test_stubs.c，Phase 2-4 修复后迁移
+# BEHAVIOR_DIFF / FICTIONAL_API 测试（6个）— v0.1.1 修复后迁移到真实库
+# 全部 6 个测试已修复行为差异/虚构 API，链接真实生产库：
+#   test_01 ✅ config_unified 6 个 bug 修复
+#   test_02 ✅ llm_svc_adapter 真实实现验证
+#   test_04 ✅ tool_svc_adapter 真实实现验证
+#   test_05 ✅ daemon_security ACL 注册 API 补全
+#   test_11 ✅ gateway detect_proto 真实实现
+#   test_12 ✅ memoryrovol_bridge builtin 降级
 # ============================================================================
 
-# C-L01: Manager → CoreLoopThree（env var override 行为差异）
-configure_stub_test(test_c_link_01_manager_loop)
+# C-L01: Manager → CoreLoopThree（已迁移到真实库 agentos_common）
+# v0.1.1 修复：memory_source_load 补全 yaml 分支（Bug A），env_source_load
+# 使用双分隔符 __ 作为层级分隔符 + lowercase + int 优先解析（Bug B），
+# 对齐桩函数行为。测试 env var 从 AGENTOS_KERNEL_MAX_ALLOC_MB 改为
+# AGENTOS_KERNEL__MAX_ALLOC_MB（双下划线分隔层级）。
+configure_real_lib_test(test_c_link_01_manager_loop
+    LIBS agentos_common
+)
 
-# C-L02: llm_d → CoreLoopThree（FICTIONAL_API）
-# 注意：测试代码使用 llm_svc_adapter_t* + llm_svc_adapter_* 虚构 API，
-#       而真实头文件 llm_svc_adapter.h 提供 llm_service_adapter_* 框架式 API
-#       （agentos_service_t 句柄 + agentos_error_t 返回值），需 Phase 3 重写。
-configure_stub_test(test_c_link_02_llm_loop)
+# C-L02: llm_d → CoreLoopThree（已迁移到真实库）
+# v0.1.1 修正：CMake 注释此前误标为 FICTIONAL_API，实际 coreloopthree 的
+# llm_svc_adapter.h 提供 llm_svc_adapter_* API（与测试一致），真实实现完整存在。
+# 真实 create 会启动 SD+IPC 引导，与 test_04 同模式。
+configure_real_lib_test(test_c_link_02_llm_loop
+    LIBS agentos_cognition agentos_core svc_common
+)
 
-# C-L04: tool_d → CoreLoopThree（is_connected 桩返回 true，真实返回 false）
-configure_stub_test(test_c_link_04_tool_loop)
+# C-L04: tool_d → CoreLoopThree（已迁移到真实库）
+# v0.1.1 修正：is_connected 在 create 成功后行为与桩一致（都返回 true）。
+# 真实 create 会启动 SD+IPC 引导，但 ipc_bus_helper_register_channel 按 ibh 实例
+# 独立注册（非全局 channel 名唯一性检查），多实例同 channel 名不冲突。
+configure_real_lib_test(test_c_link_04_tool_loop
+    LIBS agentos_execution agentos_core svc_common agentos_tool_service
+)
 
-# C-L05: Cupolas SafetyGuard → tool_d（RBAC 硬编码规则行为差异）
-configure_stub_test(test_c_link_05_safety_tool)
+# C-L05: Cupolas SafetyGuard → tool_d（已迁移到真实库）
+# v0.1.1 修复：真实 daemon_security 采用 fail-closed，新增 daemon_security_add_acl_rule
+# 公开 API 允许测试预注册 ACL 条目。测试 main() 初始化 ACL 表为所需的
+# (agent_id, tool_name) 组合授权，"restricted-agent"+"shell_exec" 不注册以验证拒绝路径。
+# 并发测试改用固定 tool_name（真实 ACL 精确匹配，不支持通配符）。
+configure_real_lib_test(test_c_link_05_safety_tool
+    LIBS agentos_tool_service svc_common cupolas
+)
 
 # C-L11: gateway_d → Gateway（已迁移到真实库 agentos_gateway_service）
 # v0.1.1 修复：detect_proto 真实实现用 strncmp 前缀匹配 + body 检测，

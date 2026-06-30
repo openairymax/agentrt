@@ -21,6 +21,7 @@
 #include "sync.h"
 
 #include "error.h"
+#include "sync_internal.h"
 #include "sync_types.h"
 
 #include <stdarg.h>
@@ -246,9 +247,9 @@ sync_result_t sync_set_option(void *lock, int option, void *value)
 
     switch (option) {
     case SYNC_OPTION_NAME: {
-        const char *name = (const char *)value;
-        base->name = name;
-        return SYNC_SUCCESS;
+        /* v0.1.1 修复：委托给 sync_set_name 进行 strdup + 注册，
+         * 此前直接 base->name = name 赋值裸指针会导致悬垂指针/泄漏/非法 free。 */
+        return sync_set_name(lock, (const char *)value);
     }
     case SYNC_OPTION_TIMEOUT: {
         uint64_t timeout = *(uint64_t *)value;
@@ -435,23 +436,369 @@ void sync_sleep(unsigned int ms)
     sync_sleep_ms((uint64_t)ms);
 }
 
-/**
- * @brief 检查死锁（占位实现，当前不支持死锁检测）
- */
-sync_result_t sync_check_deadlock(sync_deadlock_info_t *info, size_t max_info_size)
+/* ==================== 锁注册表（用于死锁检测诊断） ==================== */
+
+#define SYNC_MAX_REGISTRY 256
+
+typedef struct {
+    void *lock;
+    char *name;          /* strdup 副本，注册表拥有所有权 */
+    sync_type_t type;
+    bool in_use;
+} sync_registry_entry_t;
+
+static sync_registry_entry_t s_lock_registry[SYNC_MAX_REGISTRY];
+static size_t s_registry_count = 0;
+
+#ifdef _WIN32
+static CRITICAL_SECTION s_registry_mutex;
+static bool s_registry_mutex_init = false;
+static void registry_ensure_init(void)
 {
-    (void)info;
-    (void)max_info_size;
+    if (!s_registry_mutex_init) {
+        InitializeCriticalSection(&s_registry_mutex);
+        s_registry_mutex_init = true;
+    }
+}
+#define REGISTRY_LOCK()   do { registry_ensure_init(); EnterCriticalSection(&s_registry_mutex); } while(0)
+#define REGISTRY_UNLOCK() LeaveCriticalSection(&s_registry_mutex)
+#else
+static pthread_mutex_t s_registry_mutex = PTHREAD_MUTEX_INITIALIZER;
+#define REGISTRY_LOCK()   (void)pthread_mutex_lock(&s_registry_mutex)
+#define REGISTRY_UNLOCK() (void)pthread_mutex_unlock(&s_registry_mutex)
+#endif
+
+/**
+ * @brief 向全局注册表注册/更新一个命名锁（用于死锁检测诊断）
+ */
+static void registry_register(void *lock, const char *name, sync_type_t type)
+{
+    REGISTRY_LOCK();
+
+    /* 已注册则更新名称 */
+    for (size_t i = 0; i < s_registry_count; i++) {
+        if (s_lock_registry[i].in_use && s_lock_registry[i].lock == lock) {
+            if (s_lock_registry[i].name)
+                AGENTOS_FREE(s_lock_registry[i].name);
+            s_lock_registry[i].name = name ? sync_internal_strdup(name) : NULL;
+            s_lock_registry[i].type = type;
+            REGISTRY_UNLOCK();
+            return;
+        }
+    }
+
+    /* 复用已释放的槽位 */
+    for (size_t i = 0; i < s_registry_count; i++) {
+        if (!s_lock_registry[i].in_use) {
+            s_lock_registry[i].lock = lock;
+            s_lock_registry[i].name = name ? sync_internal_strdup(name) : NULL;
+            s_lock_registry[i].type = type;
+            s_lock_registry[i].in_use = true;
+            REGISTRY_UNLOCK();
+            return;
+        }
+    }
+
+    /* 追加新条目 */
+    if (s_registry_count < SYNC_MAX_REGISTRY) {
+        s_lock_registry[s_registry_count].lock = lock;
+        s_lock_registry[s_registry_count].name = name ? sync_internal_strdup(name) : NULL;
+        s_lock_registry[s_registry_count].type = type;
+        s_lock_registry[s_registry_count].in_use = true;
+        s_registry_count++;
+    }
+
+    REGISTRY_UNLOCK();
+}
+
+/**
+ * @brief 从全局注册表移除一个锁
+ */
+static void registry_unregister(void *lock)
+{
+    REGISTRY_LOCK();
+    for (size_t i = 0; i < s_registry_count; i++) {
+        if (s_lock_registry[i].in_use && s_lock_registry[i].lock == lock) {
+            if (s_lock_registry[i].name)
+                AGENTOS_FREE(s_lock_registry[i].name);
+            s_lock_registry[i].in_use = false;
+            s_lock_registry[i].lock = NULL;
+            s_lock_registry[i].name = NULL;
+            break;
+        }
+    }
+    REGISTRY_UNLOCK();
+}
+
+/**
+ * @brief 使用非阻塞 trylock 探测锁是否被持有
+ *
+ * 对已注册的锁执行 trylock：成功获取则立即释放（未被持有），
+ * 返回 EBUSY/EAGAIN 则说明锁被持有。
+ * 对于 condition/barrier/event 等无"持有"概念的类型，跳过探测。
+ */
+static bool registry_lock_is_held(void *lock, sync_type_t type)
+{
+    struct sync_mutex *base = (struct sync_mutex *)lock;
+    if (!base->initialized)
+        return false;
+
+    switch (type) {
+    case SYNC_TYPE_MUTEX:
+    case SYNC_TYPE_RECURSIVE_MUTEX: {
+        struct sync_mutex *m = (struct sync_mutex *)lock;
+#ifdef _WIN32
+        if (TryEnterCriticalSection(&m->mutex)) {
+            LeaveCriticalSection(&m->mutex);
+            return false;
+        }
+        return true;
+#else
+        int rc = pthread_mutex_trylock(&m->mutex);
+        if (rc == 0) {
+            pthread_mutex_unlock(&m->mutex);
+            return false;
+        }
+        return true; /* EBUSY → 被持有 */
+#endif
+    }
+    case SYNC_TYPE_SPINLOCK: {
+        struct sync_spinlock *sp = (struct sync_spinlock *)lock;
+#ifdef _WIN32
+        /* Windows 自旋锁使用 atomic int，用 CAS 探测 */
+        int expected = 0;
+        if (_InterlockedCompareExchange((volatile LONG *)&sp->lock, 1, expected) == expected) {
+            _InterlockedExchange((volatile LONG *)&sp->lock, 0);
+            return false;
+        }
+        return true;
+#else
+        int rc = pthread_spin_trylock(&sp->lock);
+        if (rc == 0) {
+            pthread_spin_unlock(&sp->lock);
+            return false;
+        }
+        return true;
+#endif
+    }
+    case SYNC_TYPE_RWLOCK: {
+        struct sync_rwlock *rw = (struct sync_rwlock *)lock;
+#ifdef _WIN32
+        if (TryAcquireSRWLockShared(&rw->rwlock)) {
+            ReleaseSRWLockShared(&rw->rwlock);
+            return false;
+        }
+        return true;
+#else
+        int rc = pthread_rwlock_tryrdlock(&rw->rwlock);
+        if (rc == 0) {
+            pthread_rwlock_unlock(&rw->rwlock);
+            return false;
+        }
+        return true;
+#endif
+    }
+    case SYNC_TYPE_SEMAPHORE: {
+        struct sync_semaphore *sem = (struct sync_semaphore *)lock;
+#ifdef _WIN32
+        DWORD wr = WaitForSingleObject(sem->semaphore, 0);
+        if (wr == WAIT_OBJECT_0) {
+            ReleaseSemaphore(sem->semaphore, 1, NULL);
+            return false;
+        }
+        return true; /* WAIT_TIMEOUT → 被持有 */
+#else
+        int rc = sem_trywait(&sem->semaphore);
+        if (rc == 0) {
+            sem_post(&sem->semaphore);
+            return false;
+        }
+        return true; /* EAGAIN/EWOULDBLOCK → 被持有 */
+#endif
+    }
+    default:
+        /* condition/barrier/event 无"持有"概念，跳过 */
+        return false;
+    }
+}
+
+/**
+ * @brief 设置锁名称
+ *
+ * 使用 strdup 复制名称（注册表拥有独立副本），释放旧名称，
+ * 按锁类型分发到正确的结构体字段。同时将锁注册到全局注册表，
+ * 供 sync_check_deadlock() 诊断使用。
+ * 传入 name=NULL 时取消注册并清除名称。
+ */
+sync_result_t sync_set_name(void *lock, const char *name)
+{
+    if (lock == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+
+    struct sync_mutex *base = (struct sync_mutex *)lock;
+    if (!base->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+
+    sync_type_t type = base->type;
+
+    /* 释放旧名称（create 路径和本函数都用 sync_internal_strdup 分配） */
+    const char *old_name = sync_get_name(lock);
+
+    /* 按类型分发，设置新名称 */
+    char *new_name = NULL;
+    if (name) {
+        new_name = sync_internal_strdup(name);
+        if (!new_name)
+            return SYNC_ERROR_MEMORY;
+    }
+
+    /* 释放旧名称并设置新名称 */
+    switch (type) {
+    case SYNC_TYPE_MUTEX:
+    case SYNC_TYPE_RECURSIVE_MUTEX: {
+        struct sync_mutex *m = (struct sync_mutex *)lock;
+        if (old_name)
+            AGENTOS_FREE((void *)m->name);
+        m->name = new_name;
+        break;
+    }
+    case SYNC_TYPE_RWLOCK: {
+        struct sync_rwlock *rw = (struct sync_rwlock *)lock;
+        if (old_name)
+            AGENTOS_FREE((void *)rw->name);
+        rw->name = new_name;
+        break;
+    }
+    case SYNC_TYPE_SPINLOCK: {
+        struct sync_spinlock *sp = (struct sync_spinlock *)lock;
+        if (old_name)
+            AGENTOS_FREE((void *)sp->name);
+        sp->name = new_name;
+        break;
+    }
+    case SYNC_TYPE_SEMAPHORE: {
+        struct sync_semaphore *sem = (struct sync_semaphore *)lock;
+        if (old_name)
+            AGENTOS_FREE((void *)sem->name);
+        sem->name = new_name;
+        break;
+    }
+    case SYNC_TYPE_CONDITION: {
+        struct sync_condition *c = (struct sync_condition *)lock;
+        if (old_name)
+            AGENTOS_FREE((void *)c->name);
+        c->name = new_name;
+        break;
+    }
+    case SYNC_TYPE_BARRIER: {
+        struct sync_barrier *b = (struct sync_barrier *)lock;
+        if (old_name)
+            AGENTOS_FREE((void *)b->name);
+        b->name = new_name;
+        break;
+    }
+    case SYNC_TYPE_EVENT: {
+        struct sync_event *e = (struct sync_event *)lock;
+        if (old_name)
+            AGENTOS_FREE((void *)e->name);
+        e->name = new_name;
+        break;
+    }
+    default:
+        if (new_name)
+            AGENTOS_FREE(new_name);
+        return SYNC_ERROR_UNSUPPORTED;
+    }
+
+    /* 注册/注销到全局注册表 */
+    if (name) {
+        registry_register(lock, name, type);
+    } else {
+        registry_unregister(lock);
+    }
+
     return SYNC_SUCCESS;
 }
 
 /**
- * @brief 设置锁名称（占位实现）
+ * @brief 检查死锁
+ *
+ * 遍历全局锁注册表，对每个已注册的命名锁执行非阻塞 trylock 探测，
+ * 检测当前被持有的锁。被持有的锁可能是死锁的参与者。
+ * 自清理：遍历时移除已释放（initialized=false）的陈旧条目。
+ *
+ * @param[out] info 死锁信息（如果检测到）
+ * @param[in] max_info_size lock_names/thread_names 数组的最大条目数
+ * @return 检测到被持有的锁返回 SYNC_ERROR_DEADLOCK，否则返回 SYNC_SUCCESS
  */
-sync_result_t sync_set_name(void *lock, const char *name)
+sync_result_t sync_check_deadlock(sync_deadlock_info_t *info, size_t max_info_size)
 {
-    (void)lock;
-    (void)name;
+    if (info == NULL || max_info_size == 0) {
+        return SYNC_ERROR_INVALID;
+    }
+
+    AGENTOS_MEMSET(info, 0, sizeof(sync_deadlock_info_t));
+    info->detection_time = (uint64_t)time(NULL);
+
+    /* 本地缓冲：收集被持有的锁名 */
+    size_t cap = (max_info_size < SYNC_MAX_REGISTRY) ? max_info_size : SYNC_MAX_REGISTRY;
+    char *held_names[SYNC_MAX_REGISTRY];
+    for (size_t i = 0; i < SYNC_MAX_REGISTRY; i++)
+        held_names[i] = NULL;
+    size_t held_count = 0;   /* 实际写入 held_names 的数量 */
+    size_t total_held = 0;   /* 被持有的锁总数（可能超过 cap） */
+
+    REGISTRY_LOCK();
+    for (size_t i = 0; i < s_registry_count; i++) {
+        if (!s_lock_registry[i].in_use)
+            continue;
+
+        struct sync_mutex *base = (struct sync_mutex *)s_lock_registry[i].lock;
+
+        /* 自清理：移除已释放的陈旧条目 */
+        if (base == NULL || !base->initialized) {
+            if (s_lock_registry[i].name)
+                AGENTOS_FREE(s_lock_registry[i].name);
+            s_lock_registry[i].in_use = false;
+            s_lock_registry[i].lock = NULL;
+            s_lock_registry[i].name = NULL;
+            continue;
+        }
+
+        /* trylock 探测锁是否被持有 */
+        if (registry_lock_is_held(s_lock_registry[i].lock, s_lock_registry[i].type)) {
+            total_held++;
+            if (held_count < cap && s_lock_registry[i].name) {
+                held_names[held_count] = sync_internal_strdup(s_lock_registry[i].name);
+                if (held_names[held_count])
+                    held_count++;
+            }
+        }
+    }
+    REGISTRY_UNLOCK();
+
+    info->lock_count = total_held;
+
+    if (total_held > 0) {
+        /* 分配输出数组并转移所有权 */
+        if (held_count > 0) {
+            info->lock_names = (char **)AGENTOS_CALLOC(held_count, sizeof(char *));
+            if (info->lock_names) {
+                for (size_t i = 0; i < held_count; i++)
+                    info->lock_names[i] = held_names[i];
+            } else {
+                /* 内存不足，释放本地缓冲 */
+                for (size_t i = 0; i < held_count; i++) {
+                    if (held_names[i])
+                        AGENTOS_FREE(held_names[i]);
+                }
+            }
+        }
+        return SYNC_ERROR_DEADLOCK;
+    }
+
     return SYNC_SUCCESS;
 }
 

@@ -22,7 +22,6 @@
 
 #include "memory_compat.h"
 #include "llm_svc_adapter.h"
-#include "config_unified.h"
 
 /* ============================================================================
  * Test Helpers
