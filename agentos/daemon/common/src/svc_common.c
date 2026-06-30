@@ -282,7 +282,6 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
 
     if (!out_service || !name || !iface || !config) {
         return AGENTOS_EINVAL;
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: null parameter");
     }
 
     /* 初始化模块（如果未初始化） */
@@ -424,7 +423,6 @@ agentos_error_t agentos_service_init(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot initialize from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_init: invalid state transition");
     }
 
     /* 更新状态 */
@@ -467,7 +465,6 @@ agentos_error_t agentos_service_start(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot start from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_start: invalid state transition");
     }
 
     /* 更新状态 */
@@ -519,7 +516,6 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_WARN("Service '%s' cannot stop from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_stop: invalid state transition");
     }
 
     /* 更新状态 */
@@ -641,16 +637,18 @@ int agentos_service_handle_request_async(agentos_service_t service, const char *
                                          const char *params_json,
                                          agentos_svc_async_complete_fn on_complete, void *user_data)
 {
-    if (!service || !method)
+    if (!service || !method) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "handle_request_async: null service or method");
         return AGENTOS_ERR_INVALID_PARAM;
+    }
 
     agentos_service_internal_t *svc = (agentos_service_internal_t *)service;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "handle_request_async: null service or method");
 
     async_request_context_t *ctx = (async_request_context_t *)AGENTOS_CALLOC(1, sizeof(*ctx));
-    if (!ctx)
+    if (!ctx) {
+        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "handle_request_async: calloc ctx failed");
         return AGENTOS_ERR_OUT_OF_MEMORY;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "handle_request_async: calloc ctx failed");
+    }
 
     ctx->service = service;
     ctx->method = AGENTOS_STRDUP(method);
@@ -688,7 +686,6 @@ agentos_error_t agentos_service_pause(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot pause from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_pause: invalid state");
     }
 
     /* 检查是否支持暂停 */
@@ -722,7 +719,6 @@ agentos_error_t agentos_service_resume(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot resume from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_resume: invalid state");
     }
 
     /* 更新状态 */
@@ -1143,7 +1139,6 @@ agentos_error_t agentos_registry_init(const char *registry_url)
     err = agentos_mutex_init(&g_cross_registry.mutex);
     if (err != AGENTOS_SUCCESS) {
         return err;
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_registry_init: mutex init failed");
     }
 
     agentos_mutex_lock(&g_cross_registry.mutex);

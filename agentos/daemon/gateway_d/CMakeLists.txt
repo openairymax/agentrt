@@ -7,7 +7,7 @@
 #   它依赖 gateway 库提供的公共 API (include/gateway.h)，
 #   并通过 gateway 库间接调用 agentos/atoms/syscall 接口。
 #
-#   依赖链：gateway_d --> gateway (静态库) --> agentos/atoms/syscall + agentos/atoms/corekern
+#   依赖链：gateway_d --> agentos_gateway_service (静态库) --> gateway 库 (OBJECT) --> agentos/atoms/syscall + agentos/atoms/corekern
 
 
 
@@ -52,16 +52,18 @@ set(PROTOCOLS_COMMON_INCLUDE_DIR ${PROTOCOLS_DIR}/common/include)
 # ==================== 协议栈开关 ====================
 option(AGENTOS_ENABLE_PROTOCOLS "Enable MCP/A2A/OpenAI protocol stack" ON)
 
-# ==================== 源文件 ====================
-set(GATEWAY_D_SOURCES
-    src/main.c
+# ==================== Gateway 服务静态库 ====================
+# 提取 service/gateway_svc_adapter/gateway_forward + protocol/* 为独立静态库，
+# 供 gateway_d 可执行文件和集成测试共用，消除桩函数依赖。
+# 排除 main.c（含 main()）。
+set(GATEWAY_SERVICE_SOURCES
     src/service.c
     src/gateway_svc_adapter.c
     src/gateway_forward.c
 )
 
 if(AGENTOS_ENABLE_PROTOCOLS)
-    list(APPEND GATEWAY_D_SOURCES
+    list(APPEND GATEWAY_SERVICE_SOURCES
         src/protocol/gateway_mcp_server.c
         src/protocol/gateway_a2a_handler.c
         src/protocol/gateway_openai_compat.c
@@ -72,36 +74,29 @@ else()
     message(STATUS "[gateway_d] Protocol stack: DISABLED")
 endif()
 
-# 可执行文件
-add_executable(gateway_d ${GATEWAY_D_SOURCES})
+add_library(agentos_gateway_service STATIC ${GATEWAY_SERVICE_SOURCES})
 
 if(AGENTOS_ENABLE_PROTOCOLS)
-    target_compile_definitions(gateway_d PRIVATE AGENTOS_HAS_PROTOCOLS=1)
+    target_compile_definitions(agentos_gateway_service PRIVATE AGENTOS_HAS_PROTOCOLS=1)
 endif()
 
 # ==================== 平台特定配置 ====================
-# 注意：agentos_common 不在此处直接链接，而是通过 svc_common 的 PUBLIC
-# 传递依赖处理，避免在链接命令中重复出现导致 LTO 符号解析失败。
 if(WIN32)
-    target_compile_definitions(gateway_d PRIVATE
+    target_compile_definitions(agentos_gateway_service PRIVATE
         AGENTOS_PLATFORM_WINDOWS=1
         WIN32_LEAN_AND_MEAN
         NOMINMAX
         _CRT_SECURE_NO_WARNINGS
     )
-    target_link_libraries(gateway_d PRIVATE
-        ws2_32
-        bcrypt
-    )
 elseif(UNIX)
-    target_link_libraries(gateway_d PRIVATE
-        Threads::Threads
-        agentos_platform_libs
+    target_compile_definitions(agentos_gateway_service PRIVATE
+        AGENTOS_PLATFORM_LINUX=1
+        _GNU_SOURCE
     )
 endif()
 
 # ==================== 包含目录 ====================
-target_include_directories(gateway_d PRIVATE
+target_include_directories(agentos_gateway_service PUBLIC
     # 本模块头文件
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -137,23 +132,56 @@ target_include_directories(gateway_d PRIVATE
     ${PROTOCOLS_MCP_DIR}/include
     ${PROTOCOLS_A2A_INCLUDE_DIR}
     ${PROTOCOLS_OPENAI_INCLUDE_DIR}
-    # 外部依赖
+)
+
+target_include_directories(agentos_gateway_service PRIVATE
     ${CJSON_INCLUDE_DIRS}
 )
 
-# ==================== 链接库 ====================
-#
-# 注意：gateway 库需要在构建时可用。
-# 如果使用独立构建，需确保 gateway 已预先编译或通过 add_subdirectory 引入。
-#
-# 方式一（推荐 - 通过上级 CMake 引入）:
-#   在 AgentRT 根 CMakeLists.txt 中同时 add_subdirectory(gateway) 和 add_subdirectory(daemon)
-#   然后 gateway_d 可以直接链接 gateway target
-#
-# 方式二（独立构建 - 当前默认）:
-#   gateway_d 自行编译 gateway 源码并链接（见下方）
+# 链接库：svc_common 提供 daemon 公共层，agentos_protocols 提供协议栈
+# 注意：agentos_common 不在此处直接链接，而是通过 svc_common 的 PUBLIC
+# 传递依赖处理，避免在链接命令中重复出现导致 LTO 符号解析失败。
+target_link_libraries(agentos_gateway_service PUBLIC svc_common agentos_protocols)
 
-# 将 gateway 库的源文件直接加入编译（确保符号可解析）
+if(UNIX)
+    target_link_libraries(agentos_gateway_service PUBLIC Threads::Threads agentos_platform_libs)
+endif()
+
+# 条件包含外部库头文件和定义（使用根级缓存变量）
+if(AGENTOS_HAS_MICROHTTPD)
+    target_compile_definitions(agentos_gateway_service PRIVATE GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
+else()
+    message(STATUS "libmicrohttpd not found, HTTP gateway may not compile.")
+endif()
+
+if(AGENTOS_HAS_LIBWEBSOCKETS)
+    target_compile_definitions(agentos_gateway_service PRIVATE GATEWAY_HAS_WS=1)
+else()
+    message(STATUS "libwebsockets not found, WebSocket gateway may not compile.")
+endif()
+
+if(AGENTOS_HAS_CJSON)
+    if(cJSON_FOUND)
+        target_link_libraries(agentos_gateway_service PUBLIC cjson)
+    elseif(CJSON_FOUND)
+        target_link_libraries(agentos_gateway_service PUBLIC ${CJSON_LIBRARIES})
+    endif()
+endif()
+
+# 编译选项
+if(NOT MSVC)
+    target_compile_options(agentos_gateway_service PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror=implicit-function-declaration
+        -Werror=return-type
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3 -DNDEBUG>
+    )
+endif()
+
+# ==================== Gateway 库对象（gateway 模块源码） ====================
 # gateway 库大量依赖 cJSON，不可用时整个库跳过
 if(AGENTOS_HAS_CJSON)
 set(GATEWAY_LIB_SOURCES
@@ -212,9 +240,6 @@ if(AGENTOS_HAS_MICROHTTPD)
         endif()
         target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
     endif()
-    target_compile_definitions(gateway_d PRIVATE GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
-else()
-    message(STATUS "libmicrohttpd not found, HTTP gateway may not compile.")
 endif()
 
 if(AGENTOS_HAS_LIBWEBSOCKETS)
@@ -226,31 +251,95 @@ if(AGENTOS_HAS_LIBWEBSOCKETS)
         endif()
         target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_WS=1)
     endif()
-    target_compile_definitions(gateway_d PRIVATE GATEWAY_HAS_WS=1)
-else()
-    message(STATUS "libwebsockets not found, WebSocket gateway may not compile.")
 endif()
 
+# ==================== Gateway daemon 可执行文件 ====================
+# main.c 仅属于 daemon 可执行文件；服务代码已纳入 agentos_gateway_service 库
+add_executable(gateway_d
+    src/main.c
+)
+
+if(AGENTOS_ENABLE_PROTOCOLS)
+    target_compile_definitions(gateway_d PRIVATE AGENTOS_HAS_PROTOCOLS=1)
+endif()
+
+# ==================== 平台特定配置 ====================
+if(WIN32)
+    target_compile_definitions(gateway_d PRIVATE
+        AGENTOS_PLATFORM_WINDOWS=1
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+    )
+    target_link_libraries(gateway_d PRIVATE
+        ws2_32
+        bcrypt
+    )
+elseif(UNIX)
+    target_link_libraries(gateway_d PRIVATE
+        Threads::Threads
+        agentos_platform_libs
+    )
+endif()
+
+# ==================== 包含目录 ====================
+target_include_directories(gateway_d PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol
+    ${GATEWAY_INCLUDE_DIR}
+    ${GATEWAY_SRC_DIR}
+    ${GATEWAY_SRC_DIR}/gateway
+    ${GATEWAY_SRC_DIR}/utils
+    ${SYSCALL_INCLUDE_DIR}
+    ${COREKERN_INCLUDE_DIR}
+    ${DAEMON_COMMON_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}/platform/include
+    ${COMMONS_INCLUDE_DIR}/utils/error/include
+    ${COMMONS_INCLUDE_DIR}/utils/logging/include
+    ${COMMONS_INCLUDE_DIR}/utils/config_unified/include
+    ${COMMONS_INCLUDE_DIR}/utils/memory/include
+    ${COMMONS_INCLUDE_DIR}/utils/string/include
+    ${COMMONS_INCLUDE_DIR}/utils/sync/include
+    ${COMMONS_INCLUDE_DIR}/utils/cache/include
+    ${COMMONS_INCLUDE_DIR}/utils/compat/include
+    ${COMMONS_INCLUDE_DIR}/utils/network/include
+    ${COMMONS_INCLUDE_DIR}/utils/ipc/include
+    ${PROTOCOLS_INCLUDE_DIR}
+    ${PROTOCOLS_COMMON_INCLUDE_DIR}
+    ${PROTOCOLS_MCP_DIR}/include
+    ${PROTOCOLS_A2A_INCLUDE_DIR}
+    ${PROTOCOLS_OPENAI_INCLUDE_DIR}
+    ${CJSON_INCLUDE_DIRS}
+)
+
+if(AGENTOS_HAS_MICROHTTPD)
+    target_compile_definitions(gateway_d PRIVATE GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
+endif()
+
+if(AGENTOS_HAS_LIBWEBSOCKETS)
+    target_compile_definitions(gateway_d PRIVATE GATEWAY_HAS_WS=1)
+endif()
+
+# ==================== 链接库 ====================
 # 链接策略说明：
 #   LTO + ASan 组合下，链接器扫描静态库时使用 LTO 符号摘要，可能漏掉符号
 #   （表现为 undefined reference to memory_alloc 等，但符号确实存在于 .a 中）。
 #   根 CMakeLists.txt 已添加 -ffat-lto-objects，让 LTO 对象同时包含机器代码，
 #   链接器可用传统符号表解析静态库，无需 --whole-archive。
-#   使用 --start-group/--end-group 处理 svc_common 与 agentos_common 之间的
-#   传递依赖符号解析（agentos_common 通过 svc_common PUBLIC 传递，位于组外之后，
-#   单次扫描即可解析）。
+#   使用 --start-group/--end-group 处理 agentos_gateway_service 与 svc_common/
+#   agentos_protocols 之间的传递依赖符号解析。
 if(NOT MSVC AND NOT APPLE)
     target_link_libraries(gateway_d PRIVATE
         "-Wl,--start-group"
-        svc_common
-        agentos_protocols
+        agentos_gateway_service
         "-Wl,--end-group"
         Threads::Threads
     )
 else()
     target_link_libraries(gateway_d PRIVATE
-        svc_common
-        agentos_protocols
+        agentos_gateway_service
         Threads::Threads
     )
 endif()
@@ -258,14 +347,6 @@ if(AGENTOS_HAS_CJSON)
     target_link_libraries(gateway_d PRIVATE
         $<TARGET_OBJECTS:gateway_lib_obj>
     )
-endif()
-
-if(AGENTOS_HAS_CJSON)
-    if(cJSON_FOUND)
-        target_link_libraries(gateway_d PRIVATE cjson)
-    elseif(CJSON_FOUND)
-        target_link_libraries(gateway_d PRIVATE ${CJSON_LIBRARIES})
-    endif()
 endif()
 
 if(AGENTOS_HAS_MICROHTTPD)

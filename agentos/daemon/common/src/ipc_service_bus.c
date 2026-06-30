@@ -433,24 +433,11 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(ipc_service_bus_t bus_handle
             pending->completed = 0;
         }
     } else {
-        size_t err_len = 128;
-        char *err_payload = (char *)AGENTOS_MALLOC(err_len);
-        if (err_payload) {
-            int elen =
-                snprintf(err_payload, err_len,
-                         "{\"error\":{\"code\":%d,\"message\":\"service_call_failed\"}}", svc_err);
-            pending->response = (ipc_bus_message_t *)AGENTOS_CALLOC(1, sizeof(ipc_bus_message_t));
-            if (pending->response) {
-                pending->response->header.msg_type = IPC_BUS_MSG_RESPONSE;
-                pending->response->header.protocol = request->header.protocol;
-                pending->response->payload = err_payload;
-                pending->response->payload_size = (size_t)(elen > 0 ? elen : 0) + 1;
-                pending->completed = 1;
-            } else {
-                AGENTOS_FREE(err_payload);
-                err_payload = NULL;
-            }
-        }
+        /* RPC 调用失败：不创建错误响应消息，由函数返回 svc_err 表示传输失败。
+         * 调用者通过返回值区分"传输失败"（err != SUCCESS，response 未填充）
+         * 和"业务错误"（err == SUCCESS，response.payload 包含业务层错误信息）。
+         * 之前在此处创建 {"error":{"code":...}} 消息并返回 SUCCESS，
+         * 混淆了传输错误与业务错误，违反 API 契约"0成功，非0失败"。 */
         if (resp_json) {
             AGENTOS_FREE(resp_json);
             resp_json = NULL;
@@ -468,8 +455,15 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(ipc_service_bus_t bus_handle
     }
 
     if (pending->completed && pending->response) {
+        /* 将响应消息（含 payload 所有权）转移给调用者。
+         * 注意：此处只释放 pending->response 结构体本身，payload 所有权归调用者，
+         * 由调用者在用完后通过 AGENTOS_FREE(response->payload) 释放。
+         * 不能调用 ipc_bus_message_free()，因为它会同时释放 payload，
+         * 会导致调用者的 response->payload 变成悬垂指针（use-after-free）。
+         * 所有调用者（orchestrator.c, daemon_task_dispatcher.c, ipc_bus_helper.c）
+         * 都已遵循"调用者负责释放 response.payload"的契约。 */
         __builtin_memcpy(response, pending->response, sizeof(ipc_bus_message_t));
-        ipc_bus_message_free(pending->response);
+        AGENTOS_FREE(pending->response);
         pending->response = NULL;
     }
 
@@ -486,7 +480,9 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(ipc_service_bus_t bus_handle
 
     LOG_DEBUG("Bus '%s': request to '%s' completed in %llums (completed=%d)", bus->name,
               target_service, (unsigned long long)latency, pending->completed);
-    return AGENTOS_SUCCESS;
+    /* RPC 成功返回 SUCCESS；RPC 失败返回 svc_err（AGENTOS_EIO 等）。
+     * 遵循 API 契约"0成功，非0失败"。 */
+    return svc_err;
 }
 
 AGENTOS_API agentos_error_t ipc_service_bus_broadcast(ipc_service_bus_t bus_handle,
