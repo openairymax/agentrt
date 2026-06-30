@@ -566,6 +566,14 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
         return CONFIG_ERROR_INVALID_ARG;
     }
 
+    /* v0.1.1 修复（并发安全 Bug E）：config_context_set 缺少 mutex 保护。
+     * 此前 config_context_get/delete/foreach 等操作均持有 mutex，唯独 set 未加锁，
+     * 导致多线程并发调用 config_source_load 写入同一 context 时，
+     * find_item_index + config_value_destroy + 赋值之间存在 TOCTOU 竞争，
+     * 产生 double-free（ASAN 检测到 config_value_destroy 对同一指针被两个线程
+     * 同时调用）。修复：对 set 操作加 mutex，与 get/delete 保持一致。 */
+    agentos_mutex_lock(&ctx->mutex);
+
     // 查找现有项
     int index = find_item_index(ctx, key);
 
@@ -573,6 +581,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
         // 替换现有项
         config_value_destroy(ctx->items[index].value);
         ctx->items[index].value = value;
+        agentos_mutex_unlock(&ctx->mutex);
         return CONFIG_SUCCESS;
     } else {
         // 添加新项
@@ -580,6 +589,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
             config_error_t err = expand_context_capacity(ctx);
             if (err != CONFIG_SUCCESS) {
                 config_value_destroy(value);
+                agentos_mutex_unlock(&ctx->mutex);
                 return err;
             }
         }
@@ -587,6 +597,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
         char *key_copy = duplicate_string(key);
         if (!key_copy) {
             config_value_destroy(value);
+            agentos_mutex_unlock(&ctx->mutex);
             return CONFIG_ERROR_OUT_OF_MEMORY;
         }
 
@@ -594,6 +605,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
         ctx->items[ctx->count].value = value;
         ctx->count++;
 
+        agentos_mutex_unlock(&ctx->mutex);
         return CONFIG_SUCCESS;
     }
 }

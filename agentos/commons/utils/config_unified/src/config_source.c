@@ -13,6 +13,7 @@
 #include "core_config.h"
 #include "observability.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -631,7 +632,18 @@ static config_error_t yaml_parse_mapping(yaml_parse_state_t *s, int base_indent,
     char full_key[1024];
 
     while (s->pos < s->len) {
-        yaml_ps_skip_ws_nl(s);
+        /* v0.1.1 修复（YAML 解析 Bug C）：只跳过空行，保留行首缩进空格。
+         * 此前 yaml_ps_skip_ws_nl(s) 在 yaml_ps_count_indent(s) 之前调用，
+         * 会消耗行首缩进空格，导致 indent 始终为 0，嵌套 YAML 层级丢失。
+         * 例如 "kernel:\n  max_alloc_mb: 2048" 的 key 存储为 "max_alloc_mb"
+         * 而非 "kernel.max_alloc_mb"。修复后只跳过纯换行行，保留缩进供 count_indent。 */
+        while (s->pos < s->len) {
+            if (yaml_ps_peek(s) == '\n' || yaml_ps_peek(s) == '\r') {
+                yaml_ps_skip_eol(s);
+            } else {
+                break;
+            }
+        }
         if (s->pos >= s->len)
             break;
 
@@ -691,7 +703,14 @@ static config_error_t yaml_parse_mapping(yaml_parse_state_t *s, int base_indent,
 
         if (s->pos >= s->len || yaml_ps_peek(s) == '\n' || yaml_ps_peek(s) == '\r') {
             yaml_ps_skip_eol(s);
-            yaml_ps_skip_ws_nl(s);
+            /* v0.1.1 修复（YAML 解析 Bug C 同类问题）：只跳过空行 */
+            while (s->pos < s->len) {
+                if (yaml_ps_peek(s) == '\n' || yaml_ps_peek(s) == '\r') {
+                    yaml_ps_skip_eol(s);
+                } else {
+                    break;
+                }
+            }
             if (s->pos < s->len) {
                 int next_ind = yaml_ps_count_indent(s);
                 if (next_ind > ind) {
@@ -715,7 +734,14 @@ static config_error_t yaml_parse_sequence(yaml_parse_state_t *s, int base_indent
 {
     int idx = 0;
     while (s->pos < s->len) {
-        yaml_ps_skip_ws_nl(s);
+        /* v0.1.1 修复（YAML 解析 Bug C 同类问题）：只跳过空行，保留行首缩进 */
+        while (s->pos < s->len) {
+            if (yaml_ps_peek(s) == '\n' || yaml_ps_peek(s) == '\r') {
+                yaml_ps_skip_eol(s);
+            } else {
+                break;
+            }
+        }
         if (s->pos >= s->len)
             break;
 
@@ -738,7 +764,14 @@ static config_error_t yaml_parse_sequence(yaml_parse_state_t *s, int base_indent
 
         if (s->pos >= s->len || yaml_ps_peek(s) == '\n' || yaml_ps_peek(s) == '\r') {
             yaml_ps_skip_eol(s);
-            yaml_ps_skip_ws_nl(s);
+            /* v0.1.1 修复（YAML 解析 Bug C 同类问题）：只跳过空行 */
+            while (s->pos < s->len) {
+                if (yaml_ps_peek(s) == '\n' || yaml_ps_peek(s) == '\r') {
+                    yaml_ps_skip_eol(s);
+                } else {
+                    break;
+                }
+            }
             if (s->pos < s->len) {
                 int next_ind = yaml_ps_count_indent(s);
                 if (next_ind > ind) {
@@ -895,7 +928,11 @@ static config_error_t yaml_parse_value(yaml_parse_state_t *s, int base_indent, c
         yaml_ps_advance(s);
         yaml_ps_skip_ws(s);
         int idx = 0;
-        while (s->pos < s->len && yaml_ps_peek(s) != ']') {
+        /* v0.1.1 修复（YAML 解析 Bug D）：未闭合 `[` 导致无限循环。
+         * 原外层 while 条件仅检查 `!= ']'`，遇到 `[unclosed\n` 时
+         * 内层 while 因 `\n` break，外层 while 因不是 `,`/`]` 继续，
+         * 进入死循环。修复：遇到换行符视为语法错误，终止解析。 */
+        while (s->pos < s->len && yaml_ps_peek(s) != ']' && yaml_ps_peek(s) != '\n' && yaml_ps_peek(s) != '\r') {
             if (yaml_ps_peek(s) == ',') {
                 yaml_ps_advance(s);
                 yaml_ps_skip_ws(s);
@@ -997,7 +1034,15 @@ static config_error_t yaml_parse_value(yaml_parse_state_t *s, int base_indent, c
 
     yaml_ps_skip_ws(s);
     if (s->pos < s->len && yaml_ps_peek(s) == ':') {
-        yaml_parse_mapping(s, base_indent, prefix, ctx);
+        /* v0.1.1 修复（YAML 解析 Bug C 根因）：val_buf 是 key 名，
+         * 应作为 yaml_parse_mapping 的 prefix 传入，而非使用外部 prefix。
+         * 此前传 prefix（通常为空），导致 "kernel:\n  max_alloc_mb: 2048"
+         * 的 key 存储为 "max_alloc_mb" 而非 "kernel.max_alloc_mb"。
+         * 同时需要先消耗 ':' 和后续空白/换行，否则 yaml_parse_mapping
+         * 第一次迭代会在 ':' 处读到空 key_buf，产生 "prefix." 这样的错误 key。 */
+        yaml_ps_advance(s); /* 消耗 ':' */
+        yaml_ps_skip_ws(s); /* 跳过冒号后空格 */
+        yaml_parse_mapping(s, base_indent, val_buf, ctx);
         return CONFIG_SUCCESS;
     }
 
@@ -1498,15 +1543,67 @@ static config_error_t env_source_load(config_source_t *source, config_context_t 
             __builtin_memcpy(key, entry, key_len);
         }
         key[key_len] = '\0';
-        if (priv->separator) {
-            for (char *p = key; *p; p++) {
-                if (*p == '_')
-                    *p = '.';
+
+        /* v0.1.1 修复（BEHAVIOR_DIFF）：环境变量 key 映射对齐 YAML dotted path。
+         * 修复三个缺陷：
+         * 1. 未使用 case_sensitive 选项：当 case_sensitive=false 时应对 key 做 tolower
+         * 2. 替换所有 _ 为 .：应使用双分隔符（如 __）作为层级分隔符，
+         *    单分隔符保留为键内词边界（Viper/Django 等配置系统通用惯例）
+         * 3. 未使用 separator 选项值：硬编码替换 _ 而非使用 priv->separator
+         * 修复后语义示例：AGENTOS_KERNEL__MAX_ALLOC_MB → kernel.max_alloc_mb
+         *   （双 __ 分隔层级，单 _ 保留为词边界，与 YAML dotted path 对齐） */
+
+        /* 1. 大小写处理 */
+        if (!priv->case_sensitive) {
+            for (char *p = key; *p; p++)
+                *p = (char)tolower((unsigned char)*p);
+        }
+
+        /* 2. 构建双分隔符模式（若 separator="_" 则 double_sep="__"） */
+        const char *sep = priv->separator ? priv->separator : "_";
+        size_t sep_len = strlen(sep);
+        char double_sep[64];
+        snprintf(double_sep, sizeof(double_sep), "%s%s", sep, sep);
+        size_t dsep_len = sep_len * 2;
+
+        /* 3. 将双分隔符替换为 '.'，单分隔符保留为词边界 */
+        char mapped_key[512];
+        size_t mi = 0;
+        const char *src = key;
+        while (*src && mi < sizeof(mapped_key) - 1) {
+            if (dsep_len > 0 && strncmp(src, double_sep, dsep_len) == 0) {
+                mapped_key[mi++] = '.';
+                src += dsep_len;
+            } else {
+                mapped_key[mi++] = *src++;
             }
         }
-        config_value_t *cv = config_value_create_string(val);
+        mapped_key[mi] = '\0';
+
+        /* 4. 尝试 int/bool 解析，回退 string（对齐桩函数和 YAML 解析器行为） */
+        config_value_t *cv = NULL;
+        char *endptr;
+        long int_val = strtol(val, &endptr, 10);
+        if (*endptr == '\0' && endptr != val) {
+            cv = config_value_create_int((int32_t)int_val);
+        } else {
+            /* 大小写不敏感的 bool 检测 */
+            char lower_val[64];
+            size_t vlen = strlen(val);
+            if (vlen < sizeof(lower_val)) {
+                for (size_t vi = 0; vi < vlen; vi++)
+                    lower_val[vi] = (char)tolower((unsigned char)val[vi]);
+                lower_val[vlen] = '\0';
+                if (strcmp(lower_val, "true") == 0)
+                    cv = config_value_create_bool(true);
+                else if (strcmp(lower_val, "false") == 0)
+                    cv = config_value_create_bool(false);
+            }
+            if (!cv)
+                cv = config_value_create_string(val);
+        }
         if (cv)
-            config_context_set(ctx, key, cv);
+            config_context_set(ctx, mapped_key, cv);
     }
     priv->env_hash = compute_env_hash(priv);
     return CONFIG_SUCCESS;
@@ -1731,15 +1828,22 @@ static config_error_t memory_source_load(config_source_t *source, config_context
     if (!priv || !priv->data)
         return CONFIG_ERROR_INVALID_ARG;
 
-    // 根据格式解析配置
+    // 根据格式解析配置（v0.1.1 修复：补全 yaml 分支 + 未知格式回退，
+    // 此前 memory_source_load 漏接 yaml，导致 format="yaml" 落入 else
+    // 走 parse_json_full 对非 JSON 内容返回 CONFIG_ERROR_PARSE）
     config_error_t error = CONFIG_SUCCESS;
     if (priv->format && strcmp(priv->format, "json") == 0) {
         error = parse_json_full(priv->data, priv->data_len, ctx);
+    } else if (priv->format && strcmp(priv->format, "yaml") == 0) {
+        error = parse_yaml_full(priv->data, priv->data_len, ctx);
     } else if (priv->format && strcmp(priv->format, "ini") == 0) {
         error = parse_ini_simple(priv->data, priv->data_len, ctx);
     } else {
-        // 默认尝试JSON格式
+        // 默认尝试JSON格式，失败则回退YAML（与 file_source_load 行为一致）
         error = parse_json_full(priv->data, priv->data_len, ctx);
+        if (error != CONFIG_SUCCESS) {
+            error = parse_yaml_full(priv->data, priv->data_len, ctx);
+        }
     }
 
     return error;
