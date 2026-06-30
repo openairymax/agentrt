@@ -78,7 +78,9 @@ static int32_t find_service_index(sd_internal_t *sd, const char *name)
         if (strcmp(sd->services[i].name, name) == 0)
             return (int32_t)i;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "service_discovery: service not found");
+    /* "未找到"是正常控制流（调用者通过返回值判断），不是错误。
+     * 之前调用 AGENTOS_ERROR_HANDLE 会在每次查找未命中时分配 error context，
+     * 导致内存泄漏（尤其在并发注册场景下）。 */
     return AGENTOS_ERR_NOT_FOUND;
 }
 
@@ -88,7 +90,7 @@ static int32_t find_instance_index(sd_service_entry_t *entry, const char *instan
         if (strcmp(entry->instances[i].instance_id, instance_id) == 0)
             return (int32_t)i;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "service_discovery: no healthy instances");
+    /* 同 find_service_index：正常控制流，不分配 error context */
     return AGENTOS_ERR_NOT_FOUND;
 }
 

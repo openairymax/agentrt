@@ -38,7 +38,9 @@ static um_module_metrics_t *find_module(const char *name)
         if (strcmp(g_um.modules[i].module_name, name) == 0)
             return &g_um.modules[i];
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
+    /* "未找到"是正常控制流（调用者通过返回值判断并记录具体错误日志），
+     * 不应在此分配 error context，否则导致内存泄漏。
+     * 之前还错误使用了 AGENTOS_ERR_OVERFLOW（"limit exceeded"）码，语义不符。 */
     return NULL;
 }
 
@@ -48,7 +50,7 @@ static um_metric_entry_t *find_metric(um_module_metrics_t *mod, const char *name
         if (strcmp(mod->metrics[i].name, name) == 0)
             return &mod->metrics[i];
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
+    /* 同 find_module：正常控制流，不分配 error context */
     return NULL;
 }
 

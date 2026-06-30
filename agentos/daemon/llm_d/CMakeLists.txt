@@ -31,9 +31,9 @@ set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
 set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 
 # ==================== LLM 服务静态库 ====================
-# 提取 service/providers/cache/cost_tracker/token_counter/response 为独立静态库，
-# 供 agentos-llm-d 可执行文件和 atoms/coreloopthree 测试共用，消除桩函数依赖。
-# 排除 main.c（含 main()）和 llm_svc_adapter.c（daemon 侧适配器，非服务核心）。
+# 提取 service/providers/cache/cost_tracker/token_counter/response/llm_svc_adapter
+# 为独立静态库，供 agentos-llm-d 可执行文件、atoms/coreloopthree 测试和集成测试共用，
+# 消除桩函数依赖。排除 main.c（含 main()）。
 set(LLM_SERVICE_SOURCES
     src/service.c
     src/cache.c
@@ -52,6 +52,7 @@ set(LLM_SERVICE_SOURCES
     src/router/round_robin_router.c
     src/router/least_latency_router.c
     src/router/quality_first_router.c
+    src/llm_svc_adapter.c
 )
 
 add_library(agentos_llm_service STATIC ${LLM_SERVICE_SOURCES})
@@ -137,10 +138,9 @@ else()
 endif()
 
 # ==================== LLM daemon 可执行文件 ====================
-# main.c + llm_svc_adapter.c 仅属于 daemon 可执行文件，不入库
+# main.c 仅属于 daemon 可执行文件；llm_svc_adapter.c 已纳入 agentos_llm_service 库
 add_executable(agentos-llm-d
     src/main.c
-    src/llm_svc_adapter.c
 )
 
 if(WIN32)
