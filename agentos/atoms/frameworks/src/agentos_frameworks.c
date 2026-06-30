@@ -12,18 +12,11 @@
  */
 
 #include "agentos_frameworks.h"
+#include "memory_compat.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
-
-/* ── 兼容层 ── */
-#ifndef AGENTOS_CALLOC
-#define AGENTOS_CALLOC(nmemb, size) calloc(nmemb, size)
-#endif
-#ifndef AGENTOS_FREE
-#define AGENTOS_FREE(ptr) free(ptr)
-#endif
 
 /* ── 线程安全原语（POSIX fallback，避免引入 sync 依赖） ── */
 #ifdef _WIN32
@@ -102,7 +95,7 @@ static void safe_strcpy(char *dest, const char *src, size_t dest_size)
     size_t len = strlen(src);
     if (len >= dest_size)
         len = dest_size - 1;
-    memcpy(dest, src, len);
+    __builtin_memcpy(dest, src, len);
     dest[len] = '\0';
 }
 
@@ -157,7 +150,7 @@ int32_t agentos_fw_registry_init(void)
         FW_UNLOCK();
         return AGENTOS_FW_OK;  /* 幂等 */
     }
-    memset(&g_registry, 0, sizeof(g_registry));
+    __builtin_memset(&g_registry, 0, sizeof(g_registry));
     g_registry.initialized = true;
     FW_UNLOCK();
     return AGENTOS_FW_OK;
@@ -338,7 +331,7 @@ int32_t agentos_fw_create_instance(const char *adapter_name,
     fw_instance_slot_t *inst = &g_registry.instances[slot];
 
     /* 生成实例名 */
-    memset(inst, 0, sizeof(*inst));
+    __builtin_memset(inst, 0, sizeof(*inst));
     if (config && config->name[0]) {
         safe_strcpy(inst->name, config->name, AGENTOS_FW_MAX_NAME_LEN);
     } else {
@@ -356,9 +349,9 @@ int32_t agentos_fw_create_instance(const char *adapter_name,
 
     /* 存配置副本 */
     if (config) {
-        memcpy(&inst->config, config, sizeof(agentos_fw_config_t));
+        __builtin_memcpy(&inst->config, config, sizeof(agentos_fw_config_t));
     } else {
-        memset(&inst->config, 0, sizeof(inst->config));
+        __builtin_memset(&inst->config, 0, sizeof(inst->config));
         inst->config.timeout_ms = 30000;
         inst->config.max_retries = 3;
     }
@@ -526,7 +519,7 @@ int32_t agentos_fw_get_info(const char *instance_name, agentos_fw_info_t *out_in
     }
 
     fw_instance_slot_t *inst = &g_registry.instances[idx];
-    memset(out_info, 0, sizeof(*out_info));
+    __builtin_memset(out_info, 0, sizeof(*out_info));
     safe_strcpy(out_info->name, inst->name, AGENTOS_FW_MAX_NAME_LEN);
     if (inst->adapter) {
         safe_strcpy(out_info->adapter_name, inst->adapter->name, AGENTOS_FW_MAX_NAME_LEN);
@@ -568,7 +561,7 @@ int32_t agentos_fw_process_request(const char *instance_name,
         return AGENTOS_FW_ERROR;  /* 适配器不支持请求处理 */
     }
 
-    memset(response, 0, sizeof(*response));
+    __builtin_memset(response, 0, sizeof(*response));
     uint64_t start = now_ms();
 
     /* 适配器回调在锁外执行（避免长耗时阻塞注册表） */

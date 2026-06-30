@@ -47,7 +47,6 @@ set(SOURCES
     utils/compat/src/compat.c
     utils/compat/src/compat2.c
     utils/cognition/src/cognition_common.c
-    utils/execution/src/execution_common.c
     utils/strategy/src/strategy_common.c
     utils/network/src/network_common.c
     utils/uuid/src/uuid_generator.c
@@ -85,7 +84,6 @@ set(_inc_dirs
     utils/logging/include
     utils/error/include
     utils/sync/include
-    utils/execution/include
     utils/include
     utils/memory
     utils/string
@@ -146,7 +144,6 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/error/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/sync/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/execution/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/memory
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/string
@@ -220,7 +217,6 @@ install(DIRECTORY utils/network/include/ DESTINATION include/agentos/utils/netwo
 install(DIRECTORY utils/ipc/include/ DESTINATION include/agentos/utils/ipc)
 install(DIRECTORY utils/platform/include/ DESTINATION include/agentos/utils/platform)
 install(DIRECTORY utils/cognition/include/ DESTINATION include/agentos/utils/cognition)
-install(DIRECTORY utils/execution/include/ DESTINATION include/agentos/utils/execution)
 install(DIRECTORY utils/strategy/include/ DESTINATION include/agentos/utils/strategy)
 
 option(BUILD_TESTS "Build unit tests" ON)

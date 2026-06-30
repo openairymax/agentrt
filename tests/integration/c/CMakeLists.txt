@@ -82,13 +82,7 @@ endforeach()
 
 # 端到端核心测试 (P2-C01)
 if(TARGET svc_common)
-    add_executable(test_e2e_core test_e2e_core.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c
-    )
-
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c
-        PROPERTIES COMPILE_FLAGS "-fno-lto"
-    )
+    add_executable(test_e2e_core test_e2e_core.c)
 
     target_include_directories(test_e2e_core PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/corekern/include
@@ -111,6 +105,14 @@ if(TARGET svc_common)
         agentos_coreloopthree
         -Wl,--no-whole-archive
         svc_common
+        -Wl,--start-group
+        agentos_cognition
+        agentos_execution
+        agentos_memory
+        agentos_atoms
+        agentos_llm_service
+        agentos_tool_service
+        -Wl,--end-group
         Threads::Threads
         agentos_platform_libs
         m

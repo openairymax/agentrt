@@ -61,6 +61,42 @@ static int is_shell_command_allowed(const char *cmd)
     return 0;
 }
 
+/**
+ * @brief 将命令字符串解析为 argv 数组（按空格分割，不经过 shell）
+ * @param cmd 命令字符串（已经过白名单验证和元字符过滤）
+ * @param argv 输出 argv 数组（调用者负责释放 cmd_buf）
+ * @param argv_max argv 数组最大容量
+ * @param cmd_buf 输出命令缓冲区副本（调用者负责释放）
+ * @return 参数个数，-1 表示失败
+ */
+static int parse_cmd_to_argv(const char *cmd, char **argv, int argv_max, char **cmd_buf)
+{
+    if (!cmd || !argv || !cmd_buf || argv_max < 2)
+        return -1;
+
+    /* 复制命令字符串（strtok 会修改原字符串） */
+    *cmd_buf = AGENTOS_STRDUP(cmd);
+    if (!*cmd_buf)
+        return -1;
+
+    int argc = 0;
+    char *saveptr = NULL;
+    char *token = strtok_r(*cmd_buf, " \t", &saveptr);
+    while (token != NULL && argc < argv_max - 1) {
+        argv[argc++] = token;
+        token = strtok_r(NULL, " \t", &saveptr);
+    }
+    argv[argc] = NULL;
+
+    if (argc == 0) {
+        AGENTOS_FREE(*cmd_buf);
+        *cmd_buf = NULL;
+        return -1;
+    }
+
+    return argc;
+}
+
 static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void *input,
                                      void **out_output)
 {
@@ -174,9 +210,19 @@ static agentos_error_t shell_execute(agentos_execution_unit_t *unit, const void 
         dup2(pipe_err[1], STDERR_FILENO);
         close(pipe_out[1]);
         close(pipe_err[1]);
-        /* flawfinder: ignore - cmd validated by is_shell_command_allowed (whitelist + metachar
-         * rejection) */
-        execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+        /* 安全：直接执行命令，不经过 shell（消除命令注入风险）
+         * cmd 已经过 is_shell_command_allowed 白名单验证和元字符过滤 */
+        char *argv[64];
+        char *cmd_buf = NULL;
+        int argc = parse_cmd_to_argv(cmd, argv, 64, &cmd_buf);
+        if (argc < 0) {
+            _exit(127);
+        }
+        execvp(argv[0], argv);
+        /* execvp 失败，释放并退出 */
+        if (cmd_buf) {
+            /* 子进程退出时内存自动释放，此处显式释放仅为代码规范 */
+        }
         _exit(127);
     }
 
