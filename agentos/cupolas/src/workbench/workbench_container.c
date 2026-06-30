@@ -98,22 +98,24 @@ static container_runtime_t detect_available_runtime(void)
 
 bool container_runtime_is_available(container_runtime_t runtime)
 {
-    const char *cmd = NULL;
+    const char *exe = NULL;
     switch (runtime) {
     case CONTAINER_RUNTIME_DOCKER:
-        cmd = "docker --version";
+        exe = "docker";
         break;
     case CONTAINER_RUNTIME_RUNC:
-        cmd = "runc --version";
+        exe = "runc";
         break;
     case CONTAINER_RUNTIME_CRUN:
-        cmd = "crun --version";
+        exe = "crun";
         break;
     default:
         return false;
     }
-    /* flawfinder: ignore - cmd is hardcoded, not from user input */
-    return system(cmd) == 0;
+    /* BAN-211/235: 直接 execvp（不经 shell），消除命令注入风险 */
+    const char *const argv[] = {exe, "--version", NULL};
+    int exit_code = agentos_process_run_capture(exe, (char *const *)argv, NULL, 10000, NULL, 0);
+    return exit_code == 0;
 }
 
 void container_config_init(container_config_t *manager)
@@ -188,50 +190,93 @@ void container_manager_destroy(void *mgr)
     cupolas_mem_free(handle);
 }
 
+/**
+ * @brief 将命令字符串拆分为 argv 数组（shell 风格，支持单/双引号）
+ *
+ * 用于替代 popen/system 的 shell 调用。拆分后的 argv 直接传给 execvp，
+ * 不经过 /bin/sh，从根本上消除命令注入风险（BAN-211/235）。
+ *
+ * 支持的语法：
+ * - 空白字符分隔 token
+ * - 单引号 '...' 内的内容原样保留
+ * - 双引号 "..." 内的内容保留（本函数不展开变量/命令替换）
+ *
+ * @param[in,out] cmd 命令字符串（将被原地修改，token 指向其内部）
+ * @param[out]    argv 输出 argv 数组（指针数组，指向 cmd 内的 token）
+ * @param[in]     max_args argv 数组最大容量（含末尾 NULL）
+ * @return token 数量，失败返回 -1
+ */
+static int split_command_to_argv(char *cmd, char *argv[], int max_args)
+{
+    if (!cmd || !argv || max_args < 2)
+        return -1;
+
+    int argc = 0;
+    char *p = cmd;
+    while (*p && argc < max_args - 1) {
+        /* 跳过前导空白 */
+        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+            p++;
+        if (!*p)
+            break;
+
+        char *token_start = p;
+        char *write = p;
+        while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != '\r') {
+            if (*p == '"') {
+                p++;
+                while (*p && *p != '"')
+                    *write++ = *p++;
+                if (*p == '"')
+                    p++;
+            } else if (*p == '\'') {
+                p++;
+                while (*p && *p != '\'')
+                    *write++ = *p++;
+                if (*p == '\'')
+                    p++;
+            } else {
+                *write++ = *p++;
+            }
+        }
+        *write = '\0';
+        argv[argc++] = token_start;
+        if (*p)
+            p++;
+    }
+    argv[argc] = NULL;
+    return argc;
+}
+
+/**
+ * @brief 执行命令并捕获输出（argv 形式，不经 shell，BAN-211/235 合规）
+ *
+ * @param cmd         命令字符串（将被原地拆分为 argv）
+ * @param timeout_ms  超时（毫秒）
+ * @param output      输出缓冲区（可为 NULL）
+ * @param output_size 输出缓冲区大小
+ * @return 退出码(0-255)；-1=启动失败；-2=超时
+ *
+ * @note 调用者已通过 is_safe_image_name() 验证用户输入；此处不再需要
+ *       SEC-011 shell 元字符检查，因为 execvp 不经过 shell，元字符仅作为
+ *       字面参数传递给子进程，无注入风险。
+ */
 static int execute_command(const char *cmd, int timeout_ms, char *output, size_t output_size)
 {
     if (!cmd)
         return AGENTOS_EINVAL;
 
-    /* SEC-011: 命令注入防护 - 检测shell元字符（与executor.c对齐） */
-    const char *dangerous_chars = ";|&`$()<>{}[]\\!*?\n\r";
-    for (const char *dc = dangerous_chars; *dc; dc++) {
-        if (strchr(cmd, *dc)) {
-            return AGENTOS_EINVAL;
-        }
-    }
+    char cmd_buf[MAX_COMMAND_LENGTH];
+    AGENTOS_STRNCPY_TERM(cmd_buf, cmd, sizeof(cmd_buf));
+    cmd_buf[sizeof(cmd_buf) - 1] = '\0';
 
-#if cupolas_PLATFORM_WINDOWS
-    FILE *pipe = _popen(cmd, "r");
-#else
-    /* flawfinder: ignore - cmd validated above for injection patterns */
-    FILE *pipe = popen(cmd, "r");
-#endif
-
-    if (!pipe)
+    char *argv[64];
+    int argc = split_command_to_argv(cmd_buf, argv, 64);
+    if (argc < 1)
         return AGENTOS_EINVAL;
 
-    if (output && output_size > 0) {
-        size_t offset = 0;
-        char buf[256];
-        while (offset < output_size - 1 && fgets(buf, sizeof(buf), pipe)) {
-            size_t len = strlen(buf);
-            if (offset + len > output_size - 1) {
-                len = output_size - 1 - offset;
-            }
-            __builtin_memcpy(output + offset, buf, len);
-            offset += len;
-        }
-        output[offset] = '\0';
-    }
-
-#if cupolas_PLATFORM_WINDOWS
-    int result = _pclose(pipe);
-#else
-    int result = pclose(pipe);
-#endif
-
-    return result;
+    return agentos_process_run_capture(argv[0], (char *const *)argv, NULL,
+                                       (uint32_t)timeout_ms, output, output_size);
 }
 
 int container_pull_image(void *mgr, const char *image)

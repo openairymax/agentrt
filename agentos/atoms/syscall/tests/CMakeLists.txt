@@ -6,13 +6,7 @@ add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 # 覆盖: init/cleanup, invoke分发, 参数验证, 边界条件
 # 对齐: 看板v09 P1-C07 / 规范手册v09 TEST-03
 
-add_executable(test_syscalls test_syscalls.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../coreloopthree/tests/unit/test_cl3_stubs.c
-)
-
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../coreloopthree/tests/unit/test_cl3_stubs.c
-    PROPERTIES COMPILE_FLAGS "-fno-lto"
-)
+add_executable(test_syscalls test_syscalls.c)
 
 target_include_directories(test_syscalls PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include

@@ -261,7 +261,7 @@ void tool_cache_put(tool_cache_t *cache, const char *key, const char *value)
     }
 }
 
-void cache_clear(tool_cache_t *cache)
+void tool_cache_clear(tool_cache_t *cache)
 {
     if (!cache)
         return;

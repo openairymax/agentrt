@@ -63,6 +63,28 @@ if(NOT WIN32)
     target_link_libraries(agentos-hook-d PRIVATE Threads::Threads)
 endif()
 
+# libcurl: 用于 hook_executor_run_webhook 的真实 HTTP POST（替代不安全的 system("curl ...")）
+# 当 libcurl 可用时编译 AGENTOS_HAS_CURL=1，webhook 走进程内 libcurl；
+# 不可用时回退到 fork+execvp("curl") 二进制（argv 数组传参，无 shell 注入风险）。
+if(AGENTRT_HAS_CURL)
+    target_compile_definitions(agentos-hook-d PRIVATE AGENTOS_HAS_CURL=1)
+    if(CURL_INCLUDE_DIRS)
+        target_include_directories(agentos-hook-d PRIVATE ${CURL_INCLUDE_DIRS})
+    endif()
+    if(CURL_LIBRARIES)
+        target_link_libraries(agentos-hook-d PRIVATE ${CURL_LIBRARIES})
+    elseif(LIBCURL_LIBRARIES)
+        target_link_libraries(agentos-hook-d PRIVATE ${LIBCURL_LIBRARIES})
+    elseif(PC_CURL_LIBRARIES)
+        target_link_libraries(agentos-hook-d PRIVATE ${PC_CURL_LIBRARIES})
+    else()
+        target_link_libraries(agentos-hook-d PRIVATE curl)
+    endif()
+    message(STATUS "  hook_d: libcurl enabled for webhook HTTP POST (BAN-211/235)")
+else()
+    message(STATUS "  hook_d: libcurl not found, webhook falls back to curl binary via execvp")
+endif()
+
 if(BUILD_COVERAGE)
     target_compile_options(agentos-hook-d PRIVATE
         -Wall -Wextra -Wpedantic -fprofile-arcs -ftest-coverage -g -O0)

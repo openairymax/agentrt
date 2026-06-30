@@ -354,7 +354,7 @@ int agentos_browser_launch(const char *browser_path, int port, int headless,
             argv[argc++] = "--headless=new";
             argv[argc++] = "--disable-gpu";
         }
-        argv[argc++] = "--no-sandbox";
+        /* 安全：不使用 --no-sandbox，保持 Chromium 默认沙箱启用（E-1 安全内生） */
         argv[argc++] = "--disable-dev-shm-usage";
         argv[argc++] = "--disable-extensions";
         argv[argc++] = "--disable-background-networking";
