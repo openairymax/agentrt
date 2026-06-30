@@ -23,10 +23,10 @@ set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
 set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 
 # ==================== Tool 服务静态库 ====================
-# 提取 service/registry/executor/validator/cache/tool_approval/safety_guard_bridge
-# 为独立静态库，供 agentos-tool-d 可执行文件和 atoms/coreloopthree 测试共用，
-# 消除桩函数依赖。排除 main.c（含 main()）、config.c、tool_svc_adapter.c（daemon
-# 侧适配器）、utils/tool_helpers.c（daemon 专用工具函数）。
+# 提取 service/registry/executor/validator/cache/tool_approval/safety_guard_bridge/
+# tool_svc_adapter 为独立静态库，供 agentos-tool-d 可执行文件、atoms/coreloopthree
+# 测试和集成测试共用，消除桩函数依赖。
+# 排除 main.c（含 main()）、config.c、utils/tool_helpers.c（daemon 专用工具函数）。
 set(TOOL_SERVICE_SOURCES
     src/service.c
     src/registry.c
@@ -35,6 +35,7 @@ set(TOOL_SERVICE_SOURCES
     src/cache.c
     src/tool_approval.c
     src/safety_guard_bridge.c
+    src/tool_svc_adapter.c
 )
 
 add_library(agentos_tool_service STATIC ${TOOL_SERVICE_SOURCES})
@@ -111,10 +112,11 @@ target_compile_options(agentos_tool_service PRIVATE
 target_compile_definitions(agentos_tool_service PRIVATE AGENTOS_ENABLE_V2_API=1)
 
 # ==================== Tool daemon 可执行文件 ====================
+# main.c 仅属于 daemon 可执行文件；config.c 和 utils/tool_helpers.c 为 daemon 专用工具函数；
+# tool_svc_adapter.c 已纳入 agentos_tool_service 库
 add_executable(agentos-tool-d
     src/main.c
     src/config.c
-    src/tool_svc_adapter.c
     src/utils/tool_helpers.c
 )
 
