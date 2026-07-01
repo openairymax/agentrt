@@ -52,7 +52,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
-include(${CMAKE_CURRENT_SOURCE_DIR}/agentos/cmake/agentos_print.cmake)
+# v3.1: 模块从 agentos/cmake/ 整合至 scripts/dev/cmake/（消除 agentos/cmake/ 独立目录）
+include(${CMAKE_CURRENT_SOURCE_DIR}/scripts/dev/cmake/agentos_print.cmake)
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
