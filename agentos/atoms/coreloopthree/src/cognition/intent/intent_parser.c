@@ -262,8 +262,7 @@ static intent_rule_t *create_intent_rule(const char *pattern, const char *intent
     intent_rule_t *rule = (intent_rule_t *)AGENTOS_CALLOC(1, sizeof(intent_rule_t));
     if (!rule) {
         AGENTOS_LOG_ERROR("Failed to allocate intent rule");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     rule->pattern = AGENTOS_STRDUP(pattern);
@@ -280,8 +279,7 @@ static intent_rule_t *create_intent_rule(const char *pattern, const char *intent
             AGENTOS_FREE(rule->intent_name);
         AGENTOS_FREE(rule);
         AGENTOS_LOG_ERROR("Failed to duplicate strings for intent rule");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 转换为小写以支持不区分大小写匹配

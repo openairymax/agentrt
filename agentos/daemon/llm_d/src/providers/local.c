@@ -45,8 +45,7 @@ static provider_ctx_t *local_init(const char *name __attribute__((unused)),
     if (!ctx) {
         SVC_LOG_ERROR("C-L02: LOCAL: INIT-FAIL — OOM allocating ctx (size=%zu)",
                       sizeof(local_ctx_t));
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     double timeout = timeout_sec > 0 ? timeout_sec : LOCAL_DEFAULT_TIMEOUT;
@@ -255,9 +254,7 @@ static llm_response_t *loc_build_stream_response(loc_stream_acc_t *acc)
 {
     llm_response_t *resp = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     resp->id = acc->resp_id ? acc->resp_id : AGENTOS_STRDUP("");

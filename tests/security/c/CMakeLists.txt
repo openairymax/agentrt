@@ -4,7 +4,7 @@
 add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
-    message(STATUS "  [security] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    agentos_print_warn("  [security] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
     return()
 endif()
 
@@ -41,7 +41,7 @@ target_compile_options(test_security_audit PRIVATE
 
 add_test(NAME security_audit COMMAND test_security_audit)
 
-message(STATUS "  [security] test_security_audit: P2-C03 configured")
+agentos_print_ok("  [security] test_security_audit: P2-C03 configured")
 
 # AgentRT SEC-017 桩函数合规验证测试 (TeamC P2-C05)
 add_executable(test_sec017_compliance test_sec017_compliance.c)
@@ -81,4 +81,4 @@ target_compile_options(test_sec017_compliance PRIVATE
 
 add_test(NAME sec017_compliance COMMAND test_sec017_compliance)
 
-message(STATUS "  [security] test_sec017_compliance: P2-C05 configured")
+agentos_print_ok("  [security] test_sec017_compliance: P2-C05 configured")

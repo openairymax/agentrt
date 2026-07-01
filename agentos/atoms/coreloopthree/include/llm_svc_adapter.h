@@ -12,15 +12,15 @@
  *   // 1. 初始化适配器
  *   llm_svc_adapter_t *adapter = llm_svc_adapter_create(NULL);
  *
- *   // 2. 获取模拟的 llm_service_t 句柄
- *   llm_service_t *svc = llm_svc_adapter_get_service(adapter);
+ *   // 2. 注入到认知引擎（IPC adapter 路径，P1.2.1 首选）
+ *   agentos_cognition_set_llm_adapter(engine, adapter);
  *
- *   // 3. 注入到认知引擎
- *   agentos_cognition_set_llm_service(engine, svc);
- *
- *   // 4. 关闭时销毁
+ *   // 3. 关闭时销毁
  *   llm_svc_adapter_destroy(adapter);
  * @endcode
+ *
+ * 注意：llm_svc_adapter_get_service() 保留为接口兼容，始终返回 NULL
+ * （llm_service_t 由 llm_d daemon 内部管理，coreloopthree 不直接持有）。
  *
  * @see service_discovery.h
  * @see ipc_service_bus.h
@@ -83,15 +83,16 @@ void llm_svc_adapter_destroy(llm_svc_adapter_t *adapter);
 /* ==================== 服务接口 ==================== */
 
 /**
- * @brief 获取适配器包装的 llm_service_t 句柄
+ * @brief 获取 llm_service_t 句柄（接口兼容，始终返回 NULL）
  *
- * 返回的句柄可注入到认知引擎，通过 IPC 透明调用 llm_d。
- * 句柄生命周期由适配器管理，在 adapter 销毁后失效。
+ * llm_service_t 是 llm_d daemon 的内部结构（含 registry/cache/cost/lock 等），
+ * 由 daemon 构造和管理，coreloopthree 无法真实构造。本函数保留为接口兼容，
+ * 始终返回 NULL。应改用 agentos_cognition_set_llm_adapter() 注入 IPC adapter。
  *
  * @param adapter 适配器句柄
- * @return llm_service_t 句柄（BORROW），NULL 如果适配器未就绪
+ * @return 始终返回 NULL
  *
- * @ownership return: BORROW
+ * @ownership return: NONE
  */
 llm_service_t *llm_svc_adapter_get_service(llm_svc_adapter_t *adapter);
 
@@ -117,13 +118,15 @@ int llm_svc_adapter_complete(llm_svc_adapter_t *adapter,
                              llm_response_t **out_response);
 
 /**
- * @brief 通过 IPC 发送流式 LLM 请求
+ * @brief 通过 IPC 发送 LLM 请求并在响应到达后回调
  *
- * 使用流式回调模式，每个 token chunk 通过 callback 实时推送。
+ * 当前实现为批处理回调模式：通过 IPC Bus 同步等待 llm_d 完整响应，
+ * 收齐后调用 callback 一次，传入整段 JSON（非 token 级流式推送）。
+ * token 级流式需要 IPC Bus 流式原语支持，规划在 1.0.x。
  *
  * @param adapter 适配器句柄
  * @param config  请求配置
- * @param callback 流式回调
+ * @param callback 响应到达后调用的回调（传入整段 JSON）
  * @param callback_data 回调数据
  * @param out_response 输出完整响应
  * @return 0 成功，非0 失败

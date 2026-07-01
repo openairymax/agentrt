@@ -22,7 +22,7 @@
 #include "sync_compat.h"
 #include "memory_compat.h"
 
-#include <dlfcn.h>
+/* dlfcn.h 已由 platform.h 的 agentos_dl_* 跨平台抽象替代 */
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -90,9 +90,9 @@ static plugin_node_t *find_node(const char *name)
  */
 static void *load_symbol(void *handle, const char *name)
 {
-    void *sym = dlsym(handle, name);
+    void *sym = agentos_dl_sym(handle, name);
     if (!sym) {
-        SVC_LOG_ERROR("P2.2: PluginD: Symbol not found: %s (%s)", name, dlerror());
+        SVC_LOG_ERROR("P2.2: PluginD: Symbol not found: %s (%s)", name, agentos_dl_error());
     }
     return sym;
 }
@@ -124,9 +124,9 @@ int plugin_service_load(const char *library_path, const char *config_path,
     if (registry_init() != 0) return -1;
 
     /* 打开动态库 */
-    void *handle = dlopen(library_path, RTLD_NOW | RTLD_LOCAL);
+    void *handle = agentos_dl_open(library_path);
     if (!handle) {
-        SVC_LOG_ERROR("P2.2: PluginD: dlopen failed: %s (%s)", library_path, dlerror());
+        SVC_LOG_ERROR("P2.2: PluginD: dlopen failed: %s (%s)", library_path, agentos_dl_error());
         return -1;
     }
 
@@ -135,14 +135,14 @@ int plugin_service_load(const char *library_path, const char *config_path,
     metadata_fn_t get_metadata = NULL;
     PLUGIN_DLSYM_FUNC(handle, "plugin_get_metadata", get_metadata);
     if (!get_metadata) {
-        dlclose(handle);
+        agentos_dl_close(handle);
         return -1;
     }
 
     const plugin_metadata_t *metadata = get_metadata();
     if (!metadata || !metadata->name[0]) {
         SVC_LOG_ERROR("P2.2: PluginD: Invalid plugin metadata");
-        dlclose(handle);
+        agentos_dl_close(handle);
         return -1;
     }
 
@@ -151,7 +151,7 @@ int plugin_service_load(const char *library_path, const char *config_path,
     if (find_node(metadata->name)) {
         AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
         SVC_LOG_WARN("P2.2: PluginD: Plugin already loaded: %s", metadata->name);
-        dlclose(handle);
+        agentos_dl_close(handle);
         return -1;
     }
     AGENTOS_RWLOCK_UNLOCK(&g_plugin_registry.rwlock);
@@ -169,14 +169,14 @@ int plugin_service_load(const char *library_path, const char *config_path,
     if (!init_fn || !destroy_fn) {
         SVC_LOG_ERROR("P2.2: PluginD: Missing required symbols (init/destroy) for %s",
                       metadata->name);
-        dlclose(handle);
+        agentos_dl_close(handle);
         return -1;
     }
 
     /* 分配插件节点 */
     plugin_node_t *node = (plugin_node_t *)AGENTOS_CALLOC(1, sizeof(plugin_node_t));
     if (!node) {
-        dlclose(handle);
+        agentos_dl_close(handle);
         return -1;
     }
 
@@ -253,7 +253,7 @@ int plugin_service_unload(const char *name)
 
             /* 关闭动态库 */
             if (node->desc.handle) {
-                dlclose(node->desc.handle);
+                agentos_dl_close(node->desc.handle);
             }
 
             *prev = node->next;

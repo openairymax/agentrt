@@ -279,8 +279,7 @@ bool platform_move_file(const char *src, const char *dest)
 char *platform_get_env(const char *name, const char *default_value)
 {
     if (!name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
 #if defined(_WIN32)
@@ -290,8 +289,7 @@ char *platform_get_env(const char *name, const char *default_value)
         if (default_value) {
             return AGENTOS_STRDUP(default_value);
         }
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     char *value = (char *)AGENTOS_MALLOC(size + 1);
@@ -307,8 +305,7 @@ char *platform_get_env(const char *name, const char *default_value)
     if (default_value) {
         return AGENTOS_STRDUP(default_value);
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 #endif
 }
 
@@ -346,8 +343,7 @@ char *platform_get_cwd(void)
         return copy;
     }
 #endif
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -383,8 +379,7 @@ char *platform_get_temp_dir(void)
     }
     return AGENTOS_STRDUP("/tmp");
 #endif
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -394,8 +389,7 @@ char *platform_get_temp_file(const char *prefix)
 {
     char *temp_dir = platform_get_temp_dir();
     if (!temp_dir) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     char *path = NULL;
@@ -427,8 +421,7 @@ char *platform_get_temp_file(const char *prefix)
 char *platform_path_join(const char *path1, const char *path2)
 {
     if (!path1 || !path2) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t len1 = strlen(path1);
@@ -438,8 +431,7 @@ char *platform_path_join(const char *path1, const char *path2)
 
     char *result = (char *)AGENTOS_MALLOC(total_len);
     if (!result) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (needs_slash) {
@@ -456,8 +448,7 @@ char *platform_path_join(const char *path1, const char *path2)
 char *platform_path_normalize(const char *path)
 {
     if (!path) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // Simple implementation - real implementation would handle .. and .
@@ -470,8 +461,7 @@ char *platform_path_normalize(const char *path)
 char *platform_path_basename(const char *path)
 {
     if (!path) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     const char *last_slash = strrchr(path, PLATFORM_SLASH);
@@ -487,8 +477,7 @@ char *platform_path_basename(const char *path)
 char *platform_path_dirname(const char *path)
 {
     if (!path) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     const char *last_slash = strrchr(path, PLATFORM_SLASH);

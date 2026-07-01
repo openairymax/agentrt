@@ -811,7 +811,11 @@ int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *polic
     } else if (policy_b) {
         *resolved_decision = policy_b->default_decision;
     } else {
-        *resolved_decision = SAFETY_DECISION_ALLOW;
+        /* 两个策略 ID 均未在上下文中注册：无法解析冲突。
+         * 安全穹顶遵循 fail-closed 原则——拒绝而非放行，
+         * 并返回错误码告知调用方策略 ID 无效。 */
+        *resolved_decision = SAFETY_DECISION_DENY;
+        return -1;
     }
     return 0;
 }

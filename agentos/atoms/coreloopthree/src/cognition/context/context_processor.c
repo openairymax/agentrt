@@ -28,8 +28,7 @@ agentos_model_context_t *agentos_model_context_create(size_t capacity)
         (agentos_context_entry_t *)AGENTOS_CALLOC(ctx->capacity, sizeof(agentos_context_entry_t));
     if (!ctx->entries) {
         AGENTOS_FREE(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     ctx->entry_count = 0;
     ctx->total_content_len = 0;
@@ -350,8 +349,7 @@ agentos_context_engine_t *agentos_context_engine_create(void)
         engine->processor_capacity, sizeof(agentos_context_processor_t *));
     if (!engine->processors) {
         AGENTOS_FREE(engine);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     engine->processor_count = 0;
     return engine;

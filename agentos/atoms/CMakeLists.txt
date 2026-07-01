@@ -5,7 +5,7 @@ target_link_libraries(agentos_atoms INTERFACE agentos_compile_defs)
 target_compile_definitions(agentos_atoms INTERFACE AGENTOS_VERSION="${PROJECT_VERSION}")
 
 # 验证 atoms include 目录
-message(STATUS "[ATOMS] Verifying include directories...")
+agentos_print_info("[ATOMS] Verifying include directories...")
 set(_atoms_inc_dirs
     corekern/include
     coreloopthree/include
@@ -33,14 +33,14 @@ set(_atoms_inc_dirs
 set(_atoms_inc_missing 0)
 foreach(_dir ${_atoms_inc_dirs})
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
-        message(STATUS "[ATOMS]   [OK] ${_dir}")
+        agentos_print_ok("[ATOMS]   [OK] ${_dir}")
     else()
-        message(WARNING "[ATOMS]   [MISSING] ${_dir}")
+        agentos_print_warn("[ATOMS]   [MISSING] ${_dir}")
         math(EXPR _atoms_inc_missing "${_atoms_inc_missing} + 1")
     endif()
 endforeach()
 if(_atoms_inc_missing GREATER 0)
-    message(WARNING "[ATOMS]   ${_atoms_inc_missing} include directory(ies) MISSING!")
+    agentos_print_warn("[ATOMS]   ${_atoms_inc_missing} include directory(ies) MISSING!")
 endif()
 
 target_include_directories(agentos_atoms INTERFACE
@@ -70,11 +70,15 @@ target_include_directories(agentos_atoms INTERFACE
 )
 
 add_subdirectory(corekern)
-add_subdirectory(coreloopthree)
 add_subdirectory(memory)
+# memoryrovol 必须在 coreloopthree 之前处理：coreloopthree 的 CMakeLists 通过
+# if(TARGET agentos_memoryrovol) 决定是否链接 MemoryRovol（弱符号 bridge 需要
+# 强符号覆盖）。若 memoryrovol 在 coreloopthree 之后，该检查恒为 FALSE，
+# MemoryRovol 永远不会被链接，bridge 弱符号恒为 NULL，永远降级 builtin。
 if(AGENTOS_WITH_MEMORYROVOL OR EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/memoryrovol/CMakeLists.txt")
     add_subdirectory(memoryrovol)
 endif()
+add_subdirectory(coreloopthree)
 add_subdirectory(syscall)
 add_subdirectory(taskflow)
 add_subdirectory(frameworks)

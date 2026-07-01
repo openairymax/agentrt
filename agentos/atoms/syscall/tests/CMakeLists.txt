@@ -25,7 +25,7 @@ target_include_directories(test_syscalls PRIVATE
 target_link_libraries(test_syscalls PRIVATE agentos_syscall)
 
 add_test(NAME syscalls_test COMMAND test_syscalls)
-message(STATUS "  syscall_tests: configured (test_syscalls)")
+agentos_print_ok("  syscall_tests: configured (test_syscalls)")
 
 # Syscall 扩展单元测试 (TeamC P1-C07 扩展, 覆盖率>50%)
 add_executable(test_syscall_extended test_syscall_extended.c)
@@ -47,4 +47,4 @@ target_link_libraries(test_syscall_extended PRIVATE agentos_syscall)
 target_compile_options(test_syscall_extended PRIVATE -g -O0 -fno-lto)
 
 add_test(NAME syscall_extended_test COMMAND test_syscall_extended)
-message(STATUS "  syscall_tests: configured (test_syscall_extended)")
+agentos_print_ok("  syscall_tests: configured (test_syscall_extended)")

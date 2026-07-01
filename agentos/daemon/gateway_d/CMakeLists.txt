@@ -69,9 +69,9 @@ if(AGENTOS_ENABLE_PROTOCOLS)
         src/protocol/gateway_openai_compat.c
         src/protocol/gateway_protocol_router.c
     )
-    message(STATUS "[gateway_d] Protocol stack: ENABLED (MCP/A2A/OpenAI)")
+    agentos_print_ok("[gateway_d] Protocol stack: ENABLED (MCP/A2A/OpenAI)")
 else()
-    message(STATUS "[gateway_d] Protocol stack: DISABLED")
+    agentos_print_warn("[gateway_d] Protocol stack: DISABLED")
 endif()
 
 add_library(agentos_gateway_service STATIC ${GATEWAY_SERVICE_SOURCES})
@@ -151,13 +151,13 @@ endif()
 if(AGENTOS_HAS_MICROHTTPD)
     target_compile_definitions(agentos_gateway_service PRIVATE GATEWAY_HAS_HTTP=1 GATEWAY_HAS_LIBMICROHTTPD=1)
 else()
-    message(STATUS "libmicrohttpd not found, HTTP gateway may not compile.")
+    agentos_print_warn("libmicrohttpd not found, HTTP gateway may not compile.")
 endif()
 
 if(AGENTOS_HAS_LIBWEBSOCKETS)
     target_compile_definitions(agentos_gateway_service PRIVATE GATEWAY_HAS_WS=1)
 else()
-    message(STATUS "libwebsockets not found, WebSocket gateway may not compile.")
+    agentos_print_warn("libwebsockets not found, WebSocket gateway may not compile.")
 endif()
 
 if(AGENTOS_HAS_CJSON)

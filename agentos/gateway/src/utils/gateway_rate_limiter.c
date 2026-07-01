@@ -467,7 +467,8 @@ bool gateway_rate_limiter_allow(gateway_rate_limiter_t *limiter, const char *cli
     /* 步骤 4: 获取或创建客户端状态（内部使用自己的 time()） */
     client_state_t *client = get_or_create_client(limiter, client_key, now_ns);
     if (!client) {
-        /* 内存分配失败，为安全起见允许通过 */
+        /* 内存分配失败：采用可用性优先策略放行，避免内存压力导致网关全量拒绝服务。
+         * 此为 fail-open 取舍——已知风险：极端 OOM 下速率限制可被绕过。 */
         return true;
     }
 

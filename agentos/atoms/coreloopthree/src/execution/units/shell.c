@@ -295,16 +295,14 @@ agentos_execution_unit_t *agentos_shell_unit_create(void)
     shell_unit_data_t *data = (shell_unit_data_t *)AGENTOS_CALLOC(1, sizeof(shell_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     data->metadata_json = AGENTOS_STRDUP("{\"type\":\"shell\"}");
     if (!data->metadata_json) {
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     unit->execution_unit_data = data;

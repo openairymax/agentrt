@@ -1004,8 +1004,7 @@ static char *js_escape(const char *src, size_t src_len)
                 if (!n) {
                     AGENTOS_FREE(dst);
                     dst = NULL;
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 }
                 __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
@@ -1020,8 +1019,7 @@ static char *js_escape(const char *src, size_t src_len)
                 if (!n) {
                     AGENTOS_FREE(dst);
                     dst = NULL;
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 }
                 __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
@@ -1036,8 +1034,7 @@ static char *js_escape(const char *src, size_t src_len)
                 if (!n) {
                     AGENTOS_FREE(dst);
                     dst = NULL;
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 }
                 __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
@@ -1052,8 +1049,7 @@ static char *js_escape(const char *src, size_t src_len)
                 if (!n) {
                     AGENTOS_FREE(dst);
                     dst = NULL;
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 }
                 __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
@@ -1068,8 +1064,7 @@ static char *js_escape(const char *src, size_t src_len)
                 if (!n) {
                     AGENTOS_FREE(dst);
                     dst = NULL;
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 }
                 __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
@@ -1084,8 +1079,7 @@ static char *js_escape(const char *src, size_t src_len)
                 if (!n) {
                     AGENTOS_FREE(dst);
                     dst = NULL;
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 }
                 __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
@@ -1100,8 +1094,7 @@ static char *js_escape(const char *src, size_t src_len)
                 if (!n) {
                     AGENTOS_FREE(dst);
                     dst = NULL;
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
                 }
                 __builtin_memcpy(n, dst, dp);
                 AGENTOS_FREE(dst);
@@ -2336,8 +2329,7 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
     if (!data) {
         AGENTOS_FREE(unit);
         unit = NULL;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     __builtin_memset(data, 0, sizeof(*data));
 
@@ -2350,8 +2342,7 @@ agentos_execution_unit_t *agentos_browser_unit_create(void)
         data = NULL;
         AGENTOS_FREE(unit);
         unit = NULL;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     unit->execution_unit_data = data;

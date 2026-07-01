@@ -406,9 +406,7 @@ AGENTOS_API char *um_export_prometheus_module(const char *module_name)
 {
     if (!g_um.initialized) {
         SVC_LOG_ERROR("um_export_prometheus_module: metrics not initialized");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     agentos_mutex_lock(&g_um.mutex);
@@ -418,8 +416,7 @@ AGENTOS_API char *um_export_prometheus_module(const char *module_name)
     if (!buf) {
         agentos_mutex_unlock(&g_um.mutex);
         SVC_LOG_ERROR("um_export_prometheus_module: memory allocation failed for export buffer");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     size_t pos = 0;
 
@@ -515,9 +512,7 @@ AGENTOS_API char *um_export_json(void)
 {
     if (!g_um.initialized) {
         SVC_LOG_ERROR("um_export_json: metrics not initialized");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     agentos_mutex_lock(&g_um.mutex);
@@ -527,8 +522,7 @@ AGENTOS_API char *um_export_json(void)
     if (!buf) {
         agentos_mutex_unlock(&g_um.mutex);
         SVC_LOG_ERROR("um_export_json: memory allocation failed for export buffer");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     size_t pos = 0;
 
