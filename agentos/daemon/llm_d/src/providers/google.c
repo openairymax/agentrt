@@ -44,8 +44,7 @@ static provider_ctx_t *google_init(const char *name __attribute__((unused)), con
     google_ctx_t *ctx = (google_ctx_t *)AGENTOS_CALLOC(1, sizeof(google_ctx_t));
     if (!ctx) {
         SVC_LOG_ERROR("C-L02: GOOGLE: INIT-FAIL reason=alloc_failed");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     provider_base_init(&ctx->base, api_key, api_base, organization, timeout_sec, max_retries,
@@ -66,16 +65,12 @@ static void google_destroy(provider_ctx_t *ctx_ptr)
 static char *google_build_request(const llm_request_config_t *manager)
 {
     if (!manager) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     cJSON *root = cJSON_CreateObject();
     if (!root) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     cJSON *contents = cJSON_CreateArray();
@@ -500,9 +495,7 @@ static llm_response_t *gg_build_stream_response(gg_stream_acc_t *acc)
 {
     llm_response_t *r = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!r) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     r->id = AGENTOS_STRDUP("");

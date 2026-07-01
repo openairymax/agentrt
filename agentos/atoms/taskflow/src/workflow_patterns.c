@@ -287,8 +287,7 @@ workflow_context_t *workflow_context_create(const workflow_pattern_config_t *con
         context->nodes = (workflow_node_t *)AGENTOS_CALLOC(config->max_nodes, sizeof(workflow_node_t));
         if (!context->nodes) {
             AGENTOS_FREE(context);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     }
 
@@ -299,8 +298,7 @@ workflow_context_t *workflow_context_create(const workflow_pattern_config_t *con
             if (context->nodes)
                 AGENTOS_FREE(context->nodes);
             AGENTOS_FREE(context);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     }
 
@@ -323,8 +321,7 @@ workflow_context_t *workflow_context_create(const workflow_pattern_config_t *con
             if (context->nodes)
                 AGENTOS_FREE(context->nodes);
             AGENTOS_FREE(context);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
         taskflow_engine_init(context->taskflow_engine);
@@ -341,8 +338,7 @@ workflow_context_t *workflow_context_create(const workflow_pattern_config_t *con
         if (context->nodes)
             AGENTOS_FREE(context->nodes);
         AGENTOS_FREE(context);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     return context;

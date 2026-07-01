@@ -486,9 +486,7 @@ char *tracing_export_json(const char *trace_id)
 {
     if (!trace_id) {
         SVC_LOG_ERROR("tracing_export_json: NULL trace_id parameter");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     agentos_mutex_lock(&g_tracing.global_lock);
@@ -504,8 +502,7 @@ char *tracing_export_json(const char *trace_id)
     if (!trace) {
         SVC_LOG_ERROR("tracing_export_json: trace not found (trace_id=%s)", trace_id ? trace_id : "NULL");
         agentos_mutex_unlock(&g_tracing.global_lock);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_mutex_lock(&trace->lock);
@@ -515,8 +512,7 @@ char *tracing_export_json(const char *trace_id)
     if (!buf) {
         SVC_LOG_ERROR("tracing_export_json: malloc failed for export buffer (size=%d)", MAX_TRACE_EXPORT_SIZE);
         agentos_mutex_unlock(&trace->lock);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t pos = 0;

@@ -126,8 +126,7 @@ static int parse_args(int argc, char *argv[], gateway_service_config_t *config)
             agentos_error_t err = gateway_service_load_config(config, argv[++i]);
             if (err != AGENTOS_SUCCESS) {
                 SVC_LOG_ERROR("Failed to load config: %s", argv[i]);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_IO, "failed to load config file");
-                return AGENTOS_ERR_IO;
+                AGENTOS_ERROR(AGENTOS_ERR_IO, "failed to load config file");
             }
         } else if (strcmp(argv[i], "-h") == 0 && i + 1 < argc) {
             config->http.host = argv[++i];
@@ -146,8 +145,7 @@ static int parse_args(int argc, char *argv[], gateway_service_config_t *config)
             pid_t pid = fork();
             if (pid < 0) {
                 SVC_LOG_ERROR("Failed to fork");
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "fork failed when daemonizing");
-                return AGENTOS_ERR_UNKNOWN;
+                AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "fork failed when daemonizing");
             }
             if (pid > 0)
                 exit(0);
@@ -165,8 +163,7 @@ static int parse_args(int argc, char *argv[], gateway_service_config_t *config)
 #endif
         } else {
             SVC_LOG_ERROR("Unknown option: %s", argv[i]);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "unknown option");
-            return AGENTOS_ERR_INVALID_PARAM;
+            AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "unknown option");
         }
     }
     return 0;

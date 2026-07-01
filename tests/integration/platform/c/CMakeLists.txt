@@ -4,7 +4,7 @@
 add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
-    message(STATUS "  [platform] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    agentos_print_warn("  [platform] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
     return()
 endif()
 
@@ -39,7 +39,7 @@ target_compile_options(test_platform_compat PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
 )
 
-message(STATUS "  [platform] test_platform_compat: P2-C04 configured")
+agentos_print_ok("  [platform] test_platform_compat: P2-C04 configured")
 
 add_executable(test_mkdir_recursive test_mkdir_recursive.c)
 
@@ -64,4 +64,4 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-message(STATUS "  [platform] test_mkdir_recursive: R-09-87 configured")
+agentos_print_ok("  [platform] test_mkdir_recursive: R-09-87 configured")

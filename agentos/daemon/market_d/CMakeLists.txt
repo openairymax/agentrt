@@ -10,7 +10,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # PkgConfig found by root CMakeLists.txt
 # cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
 if(NOT AGENTOS_HAS_CJSON)
-    message(STATUS "libcjson not found, JSON features may be limited")
+    agentos_print_warn("libcjson not found, JSON features may be limited")
 endif()
 
 # ==================== 路径设置 ====================

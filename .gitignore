@@ -253,12 +253,12 @@ cover.html
 # Rust 语言 SDK（构建产物，不追踪）
 # =============================================================================
 
-sdk/rust/target/
+# 所有 Rust crate 的 target/ 目录（sdk/rust/, sdk/cli/, sdk/tui/ 等）
+**/target/
 Cargo.lock
 sdk/rust/debug/
 sdk/rust/release/
 sdk/rust/doc/
-sdk/rust/target/doc/
 
 # =============================================================================
 # TypeScript/JavaScript SDK（构建产物，不追踪）
@@ -476,6 +476,11 @@ tests/fuzz/*.fuzz
 tests/fuzz/corpus/
 tests/fuzz/seeds/
 tests/fuzz/hangs/
+
+# MemoryRovol 运行时记忆数据（测试或运行时生成的 .bin 记录文件）
+**/agentos/memory/
+# CoreLoopThree 检查点数据（运行时生成）
+**/agentos/checkpoints/
 
 # 基准测试结果
 tests/benchmarks/**/results/

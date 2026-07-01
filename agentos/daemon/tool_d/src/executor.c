@@ -17,8 +17,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <time.h>
+
+#ifndef _WIN32
+#include <sys/wait.h> /* POSIX 专用头文件（当前文件未直接使用，保留以备扩展） */
+#endif
 
 struct tool_executor {
     tool_executor_config_t manager;
@@ -43,9 +46,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
     tool_executor_t *exec = (tool_executor_t *)AGENTOS_CALLOC(1, sizeof(tool_executor_t));
     if (!exec) {
         SVC_LOG_ERROR("tool_executor_create: calloc failed for executor");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     exec->manager = *cfg;
@@ -55,8 +56,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
     if (agentos_mutex_init(&exec->lock) != 0) {
         SVC_LOG_ERROR("tool_executor_create: mutex init failed");
         AGENTOS_FREE(exec);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     exec->total_executions = 0;
     exec->success_count = 0;

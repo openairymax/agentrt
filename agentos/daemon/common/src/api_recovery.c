@@ -82,9 +82,7 @@ api_rec_pool_t *api_rec_pool_create(const char *name)
 {
     api_rec_pool_t *pool = AGENTOS_CALLOC(1, sizeof(api_rec_pool_t));
     if (!pool) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (name) {
@@ -170,9 +168,7 @@ int api_rec_remove_credential(api_rec_pool_t *pool, size_t index)
 const char *api_rec_next_credential(api_rec_pool_t *pool)
 {
     if (!pool || pool->cred_count == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t attempts = 0;
@@ -275,9 +271,7 @@ int api_rec_add_fallback_model(api_rec_pool_t *pool, const char *model, float co
 const char *api_rec_current_model(api_rec_pool_t *pool)
 {
     if (!pool) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (pool->current_level == API_REC_DEGRADE_NONE ||

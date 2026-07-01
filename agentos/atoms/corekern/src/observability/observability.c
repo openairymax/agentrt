@@ -102,8 +102,7 @@ static obs_metric_entry_t *find_metric(const char *name, const char *labels)
             }
         }
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 int agentos_observability_init(const agentos_observability_config_t *config)

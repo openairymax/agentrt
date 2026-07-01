@@ -79,8 +79,7 @@ static agentos_coordinator_strategy_t *wrap_base_to_strategy(agentos_coordinator
     if (!strategy) {
         if (base->destroy)
             base->destroy(base);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     strategy_adapter_data_t *adapter =
@@ -89,8 +88,7 @@ static agentos_coordinator_strategy_t *wrap_base_to_strategy(agentos_coordinator
         if (base->destroy)
             base->destroy(base);
         AGENTOS_FREE(strategy);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     adapter->base = base;

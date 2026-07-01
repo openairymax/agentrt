@@ -15,10 +15,10 @@ option(BUILD_COVERAGE "Build with code coverage" OFF)
 # cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
 # CURL found by root CMakeLists.txt (AGENTOS_HAS_CURL)
 if(NOT AGENTOS_HAS_CURL)
-    message(STATUS "libcurl not found, LLM remote API features may be limited")
+    agentos_print_warn("libcurl not found, LLM remote API features may be limited")
 endif()
 if(NOT AGENTOS_HAS_CJSON)
-    message(STATUS "libcjson not found, JSON features may be limited")
+    agentos_print_warn("libcjson not found, JSON features may be limited")
 endif()
 
 # ==================== 路径设置 ====================

@@ -162,8 +162,7 @@ static agentos_error_t lb_round_robin(sd_internal_t *sd, const sd_service_entry_
                                       sd_instance_t *result)
 {
     if (entry->instance_count == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: endpoint not found");
-        return AGENTOS_ENOENT;
+        AGENTOS_ERROR(AGENTOS_ENOENT, "service_discovery: endpoint not found");
     }
 
     uint32_t start = sd->rr_counter % entry->instance_count;
@@ -187,8 +186,7 @@ static agentos_error_t lb_weighted(const sd_service_entry_t *entry, sd_instance_
         }
     }
     if (total_weight == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: no endpoints registered");
-        return AGENTOS_ENOENT;
+        AGENTOS_ERROR(AGENTOS_ENOENT, "service_discovery: no endpoints registered");
     }
 
     uint32_t random_val = agentos_random_uint32(0, total_weight - 1);
@@ -209,8 +207,7 @@ static agentos_error_t lb_weighted(const sd_service_entry_t *entry, sd_instance_
             return AGENTOS_SUCCESS;
         }
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: service not registered");
-    return AGENTOS_ENOENT;
+    AGENTOS_ERROR(AGENTOS_ENOENT, "service_discovery: service not registered");
 }
 
 static agentos_error_t lb_least_connection(const sd_service_entry_t *entry, sd_instance_t *result)
@@ -228,8 +225,7 @@ static agentos_error_t lb_least_connection(const sd_service_entry_t *entry, sd_i
     }
 
     if (best_idx < 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ENOENT, "service_discovery: health check failed");
-        return AGENTOS_ENOENT;
+        AGENTOS_ERROR(AGENTOS_ENOENT, "service_discovery: health check failed");
     }
     __builtin_memcpy(result, &entry->instances[best_idx], sizeof(sd_instance_t));
     return AGENTOS_SUCCESS;
@@ -303,9 +299,7 @@ AGENTOS_API service_discovery_t sd_create(const sd_config_t *config)
 {
     sd_internal_t *sd = (sd_internal_t *)AGENTOS_CALLOC(1, sizeof(sd_internal_t));
     if (!sd) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (config) {
@@ -317,8 +311,7 @@ AGENTOS_API service_discovery_t sd_create(const sd_config_t *config)
     agentos_error_t err = agentos_mutex_init(&sd->mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(sd);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     sd->running = false;

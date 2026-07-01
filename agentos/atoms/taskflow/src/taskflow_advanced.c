@@ -215,8 +215,7 @@ static taskflow_workflow_t *find_workflow(taskflow_engine_t *engine, const char 
         if (strcmp(engine->workflows[i].workflow.id, workflow_id) == 0)
             return &engine->workflows[i].workflow;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static handler_entry_t *find_handler(taskflow_engine_t *engine, const char *name)
@@ -226,8 +225,7 @@ static handler_entry_t *find_handler(taskflow_engine_t *engine, const char *name
         if (strcmp(engine->handlers[i].name, name) == 0)
             return &engine->handlers[i];
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 int taskflow_engine_start(taskflow_engine_t *engine, const char *workflow_id,

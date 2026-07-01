@@ -58,24 +58,20 @@ static cache_entry_t *entry_create(const char *key, const char *value)
 {
     cache_entry_t *e = memory_safe_alloc(sizeof(cache_entry_t));
     if (!e) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     e->key = memory_safe_strdup(key);
     if (!e->key) {
         memory_safe_free(e);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     e->value = memory_safe_strdup(value);
     if (!e->value) {
         memory_safe_free(e->key);
         memory_safe_free(e);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     e->timestamp = time(NULL);
@@ -163,9 +159,7 @@ llm_cache_t *llm_cache_create(size_t capacity, int ttl_sec)
 {
     llm_cache_t *cache = AGENTOS_CALLOC(1, sizeof(llm_cache_t));
     if (!cache) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     cache->capacity = capacity;
     cache->ttl_sec = ttl_sec;

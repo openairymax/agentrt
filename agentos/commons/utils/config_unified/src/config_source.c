@@ -1580,7 +1580,7 @@ static config_error_t env_source_load(config_source_t *source, config_context_t 
         }
         mapped_key[mi] = '\0';
 
-        /* 4. 尝试 int/bool 解析，回退 string（对齐桩函数和 YAML 解析器行为） */
+        /* 4. 尝试 int/bool 解析，回退 string（与 YAML 解析器的标量推断语义一致） */
         config_value_t *cv = NULL;
         char *endptr;
         long int_val = strtol(val, &endptr, 10);
@@ -2122,8 +2122,7 @@ config_source_t *config_source_create_file(const config_file_source_options_t *o
     file_source_priv_t *priv = (file_source_priv_t *)AGENTOS_CALLOC(1, sizeof(file_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 复制选项数据
@@ -2146,8 +2145,7 @@ config_source_t *config_source_create_file(const config_file_source_options_t *o
             AGENTOS_FREE(priv->encoding);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     // 更新属
@@ -2186,8 +2184,7 @@ config_source_t *config_source_create_env(const config_env_source_options_t *opt
     env_source_priv_t *priv = (env_source_priv_t *)AGENTOS_CALLOC(1, sizeof(env_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 复制选项数据
@@ -2205,8 +2202,7 @@ config_source_t *config_source_create_env(const config_env_source_options_t *opt
             AGENTOS_FREE(priv->prefix);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 更新属
@@ -2231,8 +2227,7 @@ config_source_t *config_source_create_args(const config_args_source_options_t *o
     args_source_priv_t *priv = (args_source_priv_t *)AGENTOS_CALLOC(1, sizeof(args_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 复制选项数据
@@ -2249,8 +2244,7 @@ config_source_t *config_source_create_args(const config_args_source_options_t *o
             AGENTOS_FREE(priv->prefix);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 更新属
@@ -2274,8 +2268,7 @@ config_source_t *config_source_create_memory(const config_memory_source_options_
         (memory_source_priv_t *)AGENTOS_CALLOC(1, sizeof(memory_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 复制选项数据
@@ -2292,8 +2285,7 @@ config_source_t *config_source_create_memory(const config_memory_source_options_
             AGENTOS_FREE(priv->format);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 更新属
@@ -2318,8 +2310,7 @@ config_source_t *config_source_create_defaults(const char *const *default_values
         (defaults_source_priv_t *)AGENTOS_CALLOC(1, sizeof(defaults_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 分配键值对数组
@@ -2332,8 +2323,7 @@ config_source_t *config_source_create_defaults(const char *const *default_values
             AGENTOS_FREE(priv->vals);
         AGENTOS_FREE(priv);
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     priv->num_entries = count / 2;
@@ -2365,8 +2355,7 @@ config_source_t *config_source_create_remote(const char *url, const char *token,
         (remote_source_priv_t *)AGENTOS_CALLOC(1, sizeof(remote_source_priv_t));
     if (!priv) {
         config_source_free_base(source);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     priv->url = duplicate_string(url);
@@ -2427,8 +2416,7 @@ bool config_source_has_changed(config_source_t *source)
 const config_source_attr_t *config_source_get_attributes(config_source_t *source)
 {
     if (!source || !source->adapter || !source->adapter->get_attributes) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     return source->adapter->get_attributes(source);
@@ -2460,8 +2448,7 @@ config_source_manager_t *config_source_manager_create(void)
         (config_source_t **)AGENTOS_CALLOC(manager->capacity, sizeof(config_source_t *));
     if (!manager->sources) {
         AGENTOS_FREE(manager);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     manager->count = 0;
@@ -2558,8 +2545,7 @@ config_source_t *config_source_manager_find(config_source_manager_t *manager, co
         }
     }
 
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 config_error_t config_source_manager_load_all(config_source_manager_t *manager,

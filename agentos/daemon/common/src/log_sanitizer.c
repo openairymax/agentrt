@@ -83,16 +83,14 @@ static void ensure_initialized(void)
 static const char *log_strcasestr(const char *haystack, const char *needle)
 {
     if (!haystack || !needle) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t haystack_len = strlen(haystack);
     size_t needle_len = strlen(needle);
 
     if (needle_len > haystack_len) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     for (size_t i = 0; i <= haystack_len - needle_len; i++) {
@@ -106,8 +104,7 @@ static const char *log_strcasestr(const char *haystack, const char *needle)
         if (match)
             return &haystack[i];
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -136,8 +133,7 @@ static const char *find_pattern(const char *message, const sensitive_field_t *pa
 
         return pos;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -146,8 +142,7 @@ static const char *find_pattern(const char *message, const sensitive_field_t *pa
 static const char *find_value_end(const char *value_start)
 {
     if (!value_start || !*value_start) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     char quote = 0;
@@ -324,8 +319,7 @@ int log_sanitize(const char *message, char *buffer, size_t buffer_size)
 char *log_sanitize_dup(const char *message)
 {
     if (!message) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 预分配缓冲区 */
@@ -336,8 +330,7 @@ char *log_sanitize_dup(const char *message)
     char *buffer = AGENTOS_MALLOC(alloc_size);
     if (!buffer) {
         SVC_LOG_ERROR("C-L02: SANITIZER: DUP-FAIL reason=alloc alloc_size=%zu", alloc_size);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     int result = sanitize_core(message, buffer, alloc_size);
@@ -345,8 +338,7 @@ char *log_sanitize_dup(const char *message)
         SVC_LOG_ERROR("C-L02: SANITIZER: SANITIZE-FAIL reason=sanitize_core_error result=%d alloc_size=%zu",
                       result, alloc_size);
         AGENTOS_FREE(buffer);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     return buffer;

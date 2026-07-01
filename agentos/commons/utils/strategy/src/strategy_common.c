@@ -127,8 +127,7 @@ void strategy_cleanup_data(void *data, void (*free_func)(void *))
 char *strategy_generate_name(const char *base_name, const char *suffix)
 {
     if (!base_name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t base_len = strlen(base_name);
@@ -137,8 +136,7 @@ char *strategy_generate_name(const char *base_name, const char *suffix)
 
     char *name = (char *)AGENTOS_MALLOC(total_len);
     if (!name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (suffix && suffix_len > 0) {

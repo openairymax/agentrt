@@ -32,6 +32,10 @@
 
 #include "error.h"
 
+#ifdef AGENTOS_HAS_CJSON
+#include <cjson/cJSON.h>
+#endif
+
 /* ==================== 构建模式检测 ==================== */
 
 /* 默认行为：如果没有任何模式定义，使用 HYBRID */
@@ -245,6 +249,78 @@ static agentos_error_t mr_delete_raw(agentos_memory_provider_t *provider, const 
     return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
+#ifdef AGENTOS_HAS_CJSON
+/* 从 L3 关系查询返回的 JSON 中提取记录 ID。
+ *
+ * 防御性解析，兼容多种合理 schema：
+ *   {"relations":[{"to_id":"id1","from_id":"id2"}, ...]}
+ *   {"record_ids":["id1","id2",...]} / {"ids":[...]}
+ *   ["id1","id2",...]（顶层字符串数组）
+ * 提取 to_id/from_id/id/record_id 字段值与字符串数组元素，
+ * 去重后填充 *out_ids（受 limit 约束）。返回提取的数量。
+ * 调用方拥有 *out_ids 及其中每个字符串的所有权。失败/无匹配返回 0。
+ */
+static size_t extract_ids_from_relations_json(const char *json, uint32_t limit,
+                                               char ***out_ids)
+{
+    cJSON *root = cJSON_Parse(json);
+    if (!root) return 0;
+
+    cJSON *arr = NULL;
+    if (cJSON_IsArray(root)) {
+        arr = root;
+    } else if (cJSON_IsObject(root)) {
+        arr = cJSON_GetObjectItem(root, "relations");
+        if (!cJSON_IsArray(arr)) arr = cJSON_GetObjectItem(root, "record_ids");
+        if (!cJSON_IsArray(arr)) arr = cJSON_GetObjectItem(root, "ids");
+    }
+
+    uint32_t id_limit = (limit > 0) ? limit : 32;
+    size_t cap = (id_limit < 256) ? id_limit : 256;
+    if (cap == 0) cap = 8;
+    char **ids = (char **)AGENTOS_CALLOC(cap, sizeof(char *));
+    if (!ids) { cJSON_Delete(root); return 0; }
+
+    size_t count = 0;
+    if (arr) {
+        cJSON *item;
+        cJSON_ArrayForEach(item, arr) {
+            if (count >= id_limit) break;
+            const char *id_str = NULL;
+            if (cJSON_IsString(item)) {
+                id_str = item->valuestring;
+            } else if (cJSON_IsObject(item)) {
+                cJSON *f = cJSON_GetObjectItem(item, "to_id");
+                if (!cJSON_IsString(f)) f = cJSON_GetObjectItem(item, "from_id");
+                if (!cJSON_IsString(f)) f = cJSON_GetObjectItem(item, "id");
+                if (!cJSON_IsString(f)) f = cJSON_GetObjectItem(item, "record_id");
+                if (cJSON_IsString(f)) id_str = f->valuestring;
+            }
+            if (id_str && id_str[0]) {
+                bool dup = false;
+                for (size_t i = 0; i < count; i++) {
+                    if (strcmp(ids[i], id_str) == 0) { dup = true; break; }
+                }
+                if (!dup && count < cap) {
+                    ids[count] = AGENTOS_STRDUP(id_str);
+                    if (!ids[count]) break;
+                    count++;
+                }
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+
+    if (count == 0) {
+        AGENTOS_FREE(ids);
+        return 0;
+    }
+    *out_ids = ids;
+    return count;
+}
+#endif /* AGENTOS_HAS_CJSON */
+
 static agentos_error_t mr_query(agentos_memory_provider_t *provider, const char *query_text,
                                 uint32_t limit, char ***out_record_ids, float **out_scores,
                                 size_t *out_count)
@@ -266,21 +342,28 @@ static agentos_error_t mr_query(agentos_memory_provider_t *provider, const char 
             return AGENTOS_SUCCESS;
     }
 
-    /* 降级：使用 L3 关系查询 */
+    /* 降级：使用 L3 关系查询，从返回的关系 JSON 中提取真实记录 ID */
     if (impl->config.enable_l3_structure && memoryrovol_l3_query_relations) {
         char *relations_json = NULL;
         int ret = memoryrovol_l3_query_relations(impl->mr_ctx, query_text, &relations_json);
         if (ret == 0 && relations_json) {
-            /* 从关系 JSON 中提取记录 ID */
-            *out_record_ids = (char **)AGENTOS_CALLOC(1, sizeof(char *));
-            if (*out_record_ids) {
-                (*out_record_ids)[0] = relations_json; /* 简化：直接返回关系JSON */
-                *out_scores = (float *)AGENTOS_CALLOC(1, sizeof(float));
-                if (*out_scores) (*out_scores)[0] = 1.0f;
-                *out_count = 1;
+#ifdef AGENTOS_HAS_CJSON
+            char **ids = NULL;
+            size_t id_count = extract_ids_from_relations_json(relations_json, limit, &ids);
+            AGENTOS_FREE(relations_json);
+            if (id_count > 0 && ids) {
+                *out_record_ids = ids;
+                *out_scores = (float *)AGENTOS_CALLOC(id_count, sizeof(float));
+                if (*out_scores) {
+                    for (size_t i = 0; i < id_count; i++) (*out_scores)[i] = 1.0f;
+                }
+                *out_count = id_count;
                 return AGENTOS_SUCCESS;
             }
+            /* JSON 解析未提取到 ID：诚实返回空结果 */
+#else
             AGENTOS_FREE(relations_json);
+#endif
         }
     }
 
@@ -380,7 +463,16 @@ static agentos_error_t mr_health_check(agentos_memory_provider_t *provider, char
         return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
     }
 
-    *out_json = AGENTOS_STRDUP("{\"status\":\"healthy\",\"provider\":\"memoryrovol\"}");
+    /* health_check 弱符号未链接或上下文未初始化：无法执行实际健康验证，
+     * 诚实报告 degraded 状态而非虚假声称 healthy。 */
+    const char *reason = (!impl->mr_ctx)
+        ? "context not initialized"
+        : "native health_check unavailable (MemoryRovol provider not linked)";
+    char json_buf[192];
+    snprintf(json_buf, sizeof(json_buf),
+             "{\"status\":\"degraded\",\"provider\":\"memoryrovol\",\"reason\":\"%s\"}",
+             reason);
+    *out_json = AGENTOS_STRDUP(json_buf);
     return (*out_json) ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }
 

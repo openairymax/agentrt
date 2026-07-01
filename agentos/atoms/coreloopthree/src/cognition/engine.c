@@ -31,6 +31,7 @@
 #include "critique/stream_critic.h"
 #include "foundation/thinking_chain.h"
 #include "critique/triple_coordinator.h"
+#include "critique/tc3_llm_callbacks.h"
 
 /* C-L02: llm_d → CoreLoopThree */
 #include "llm_service.h"
@@ -815,6 +816,8 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
 
             llm_response_t *llm_resp = NULL;
             int llm_ret = -1;
+            AGENTOS_LOG_INFO("C-L02: Phase 2 LLM call started (max_tokens=%u)",
+                            engine->chain_max_tokens);
 
             /* C-L02 P1.2.2: Async streaming callback support */
             int use_streaming = 0;
@@ -890,11 +893,52 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             }
         }
 
-        /* ── Triple coordinator: verify LLM output (or generate locally) ── */
+        /* ── Triple coordinator: LLM-driven t2/t1-f/t1-p 批判循环 ──
+         *
+         * ThinkDual 升级: 将三个回调从 NULL 替换为 LLM 驱动实现，使 tc3 的
+         * 生成→验证→修正→专家仲裁循环真正生效（原先回调为 NULL 导致 tc3
+         * 立即失败，LLM 输出未经任何验证直接采用）。
+         *
+         * - s2_generate: 首轮复用 engine 的 LLM seed（避免重复调用），
+         *   后续修正轮独立调用 LLM。
+         * - s1_verify:   LLM 评估逻辑正确性 + 任务对齐度（不偏离任务）。
+         * - s1_expert:   LLM 扮演领域专家，在 MAJOR_FIX 时升级仲裁。
+         *
+         * LLM 不可用时，各回调内部有启发式回退，tc3 循环不中断。
+         * 若 seed 也为 NULL（LLM 完全不可用），s2_generate 返回错误，
+         * tc3 失败后走 fallback 路径（line 969-991），行为与升级前一致。
+         */
+        tc3_llm_ctx_t tc3_ctx;
+        __builtin_memset(&tc3_ctx, 0, sizeof(tc3_ctx));
+        tc3_ctx.llm_adapter = llm_adapter;
+        tc3_ctx.llm_svc = llm_svc;
+        tc3_ctx.lock = engine->lock;
+        tc3_ctx.max_tokens = engine->chain_max_tokens;
+        tc3_ctx.seed_text = llm_response_text;
+        tc3_ctx.seed_len = llm_response_len;
+        tc3_ctx.seed_consumed = 0;
+        tc3_ctx.original_input = input;
+        tc3_ctx.original_input_len = input_len;
+
         tc3_config_t tc3_cfg = TC3_CONFIG_DEFAULTS;
-        tc3_cfg.s2_generate = NULL;
-        tc3_cfg.s1_verify = NULL;
-        tc3_cfg.s1_expert = NULL;
+        if (llm_adapter || llm_svc) {
+            /* LLM 可用 — 注入 LLM 驱动回调，激活 ThinkDual 批判循环 */
+            tc3_cfg.s2_generate = tc3_llm_s2_generate;
+            tc3_cfg.s1_verify = tc3_llm_s1_verify;
+            tc3_cfg.s1_expert = tc3_llm_s1_expert;
+            tc3_cfg.s2_user_data = &tc3_ctx;
+            tc3_cfg.s1_user_data = &tc3_ctx;
+            tc3_cfg.s1_expert_user_data = &tc3_ctx;
+            AGENTOS_LOG_INFO("C-L02: ThinkDual activated (LLM-driven t2/t1-f/t1-p "
+                            "critique loop enabled)");
+        } else {
+            /* LLM 不可用 — 保持回调为 NULL，tc3 将失败并走 fallback */
+            tc3_cfg.s2_generate = NULL;
+            tc3_cfg.s1_verify = NULL;
+            tc3_cfg.s1_expert = NULL;
+            AGENTOS_LOG_INFO("C-L02: ThinkDual inactive (no LLM available, "
+                            "using direct fallback)");
+        }
 
         tc3_coordinator_t *tc3 = NULL;
         agentos_error_t tc3_err =
@@ -928,6 +972,9 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 tc3_stats_t tc3_stats;
                 tc3_coordinator_get_stats(tc3, &tc3_stats);
                 engine->dual_think_corrections += tc3_stats.total_corrections;
+                AGENTOS_LOG_INFO("C-L02: ThinkDual tc3 success (phase2_output_len=%zu units=%u corrections=%u avg_score=%.2f)",
+                                phase2_output_len, (unsigned)tc3_stats.total_units,
+                                (unsigned)tc3_stats.total_corrections, (double)tc3_stats.avg_score);
 
                 char fb[512];
                 snprintf(fb, sizeof(fb),
@@ -942,6 +989,8 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 AGENTOS_FREE(phase2_output);
                 phase2_output = NULL;
             } else if (gen_step) {
+                AGENTOS_LOG_WARN("C-L02: ThinkDual tc3 failed (err=%d), falling back to LLM output",
+                                (int)tc3_err);
                 /* Triple coordinator failed — fall back to LLM output if available */
                 if (llm_response_text && llm_response_len > 0) {
                     agentos_tc_step_complete(gen_step, llm_response_text, llm_response_len,

@@ -761,8 +761,7 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
     if (!plan->task_plan_nodes) {
         AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     static const struct {

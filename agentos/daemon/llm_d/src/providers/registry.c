@@ -39,16 +39,14 @@ static const provider_ops_t *get_ops_by_name(const char *name)
         return &google_ops;
     if (strcmp(name, "local") == 0)
         return &local_ops;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 provider_registry_t *provider_registry_create(const service_config_t *cfg)
 {
     provider_registry_t *reg = AGENTOS_CALLOC(1, sizeof(provider_registry_t));
     if (!reg) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     agentos_mutex_init(&reg->lock);
 
@@ -59,8 +57,7 @@ provider_registry_t *provider_registry_create(const service_config_t *cfg)
     reg->providers = AGENTOS_CALLOC(count + 1, sizeof(provider_t));
     if (!reg->providers) {
         AGENTOS_FREE(reg);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     for (size_t i = 0; i < count; ++i) {
@@ -123,8 +120,7 @@ provider_registry_t *provider_registry_create_from_config(const service_config_t
 {
     provider_registry_t *reg = provider_registry_create(cfg);
     if (!reg) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (!config_path)
@@ -319,14 +315,12 @@ void provider_registry_destroy(provider_registry_t *reg)
 const provider_t *provider_registry_find(provider_registry_t *reg, const char *model)
 {
     if (!reg) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     agentos_mutex_lock(&reg->lock);
     if (!reg->providers) {
         agentos_mutex_unlock(&reg->lock);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     for (provider_t *p = reg->providers; p->name; ++p) {
         if (!p->models)
@@ -339,6 +333,5 @@ const provider_t *provider_registry_find(provider_registry_t *reg, const char *m
         }
     }
     agentos_mutex_unlock(&reg->lock);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }

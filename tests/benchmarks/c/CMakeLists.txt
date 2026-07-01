@@ -4,7 +4,7 @@
 add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
-    message(STATUS "  [benchmarks] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    agentos_print_warn("  [benchmarks] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
     return()
 endif()
 
@@ -48,4 +48,4 @@ target_compile_options(test_performance_benchmarks PRIVATE
 
 add_test(NAME performance_benchmarks COMMAND test_performance_benchmarks)
 
-message(STATUS "  [benchmarks] test_performance_benchmarks: P2-C02 configured")
+agentos_print_ok("  [benchmarks] test_performance_benchmarks: P2-C02 configured")

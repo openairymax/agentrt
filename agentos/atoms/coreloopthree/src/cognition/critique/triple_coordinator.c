@@ -127,6 +127,48 @@ static agentos_error_t verify_with_metacognition(tc3_coordinator_t *coord,
                                                  int *out_acceptable, char **out_critique,
                                                  size_t *out_critique_len)
 {
+    /* ── ThinkDual 升级: 验证优先级 ──
+     *
+     * 优先级 1: LLM 驱动的 s1_verify 回调（如果已注入）
+     *   - 当 engine 注入了 LLM 驱动的 s1_verify 时，它优先于 strstr 启发式，
+     *     因为 LLM 能真正检查逻辑正确性和任务对齐度（不偏离任务）。
+     *
+     * 优先级 2: Metacognition 启发式（strstr 关键词匹配）
+     *   - 当 s1_verify 未注入或调用失败时，使用 5 维度启发式评分作为回退。
+     *
+     * 优先级 3: default_s1_verify（内置启发式）
+     *   - 当 metacognition 也不可用时，使用最简单的长度/关键词评分。
+     *
+     * 原实现将 metacognition 置于最高优先级，导致 LLM 驱动的 s1_verify
+     * 永远不会被调用（metacognition 的 strstr 启发式几乎总是成功）。
+     */
+
+    /* 优先级 1: LLM 驱动的 s1_verify 回调 */
+    if (coord->config.s1_verify) {
+        float raw_score = 0.0f;
+        int raw_acceptable = 0;
+        agentos_error_t vfy_err = coord->config.s1_verify(
+            content, content_len, &raw_score, &raw_acceptable, out_critique,
+            out_critique_len, coord->config.s1_user_data);
+
+        if (vfy_err == AGENTOS_SUCCESS) {
+            if (coord->calibrator) {
+                double calibrated = confidence_calibrator_calibrate(
+                    coord->calibrator, (double)raw_score, CC_DIM_ACCURACY);
+                *out_score = (float)calibrated;
+            } else {
+                *out_score = raw_score;
+            }
+            *out_acceptable = raw_acceptable;
+            return AGENTOS_SUCCESS;
+        }
+        /* s1_verify 失败 — 降级到 metacognition 启发式 */
+        AGENTOS_LOG_WARN("verify_with_metacognition: s1_verify callback failed "
+                         "(err=%d content_len=%zu), falling back to metacognition",
+                         (int)vfy_err, content_len);
+    }
+
+    /* 优先级 2: Metacognition 启发式（strstr 关键词匹配） */
     if (coord->meta && step) {
         mc_evaluation_result_t eval;
         agentos_error_t err =
@@ -153,25 +195,23 @@ static agentos_error_t verify_with_metacognition(tc3_coordinator_t *coord,
                 }
                 return AGENTOS_SUCCESS;
             } else {
-                AGENTOS_LOG_WARN("verify_with_metacognition: mc_evaluate_step failed (err=%d step_id=%u), falling back to s1_verify", (int)err, step->step_id);
+                AGENTOS_LOG_WARN("verify_with_metacognition: mc_evaluate_step failed "
+                                 "(err=%d step_id=%u), falling back to default_s1_verify",
+                                 (int)err, step->step_id);
             }
         } else {
-            AGENTOS_LOG_WARN("verify_with_metacognition: mc_evaluate_quick failed (err=%d step_id=%u), falling back to s1_verify", (int)err, step->step_id);
+            AGENTOS_LOG_WARN("verify_with_metacognition: mc_evaluate_quick failed "
+                             "(err=%d step_id=%u), falling back to default_s1_verify",
+                             (int)err, step->step_id);
         }
     }
 
+    /* 优先级 3: default_s1_verify（内置启发式） */
     float raw_score = 0.0f;
     int raw_acceptable = 0;
-    agentos_error_t vfy_err;
-
-    if (coord->config.s1_verify) {
-        vfy_err =
-            coord->config.s1_verify(content, content_len, &raw_score, &raw_acceptable, out_critique,
-                                    out_critique_len, coord->config.s1_user_data);
-    } else {
-        vfy_err = default_s1_verify(content, content_len, &raw_score, &raw_acceptable, out_critique,
-                                    out_critique_len, (void *)&coord->config);
-    }
+    agentos_error_t vfy_err = default_s1_verify(content, content_len, &raw_score,
+                                                &raw_acceptable, out_critique,
+                                                out_critique_len, (void *)&coord->config);
 
     if (vfy_err == AGENTOS_SUCCESS && coord->calibrator) {
         double calibrated =
@@ -182,7 +222,9 @@ static agentos_error_t verify_with_metacognition(tc3_coordinator_t *coord,
         *out_score = raw_score;
         *out_acceptable = raw_acceptable;
     } else {
-        AGENTOS_LOG_ERROR("verify_with_metacognition: s1_verify callback failed (vfy_err=%d content_len=%zu)", (int)vfy_err, content_len);
+        AGENTOS_LOG_ERROR("verify_with_metacognition: default_s1_verify failed "
+                          "(vfy_err=%d content_len=%zu)",
+                          (int)vfy_err, content_len);
     }
     return vfy_err;
 }
@@ -315,6 +357,8 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
 
     coord->active = 1;
     uint64_t start_ns = agentos_time_monotonic_ns();
+    AGENTOS_LOG_INFO("C-L02: ThinkDual tc3 execute started (input_len=%zu max_rounds=%u accept_threshold=%.2f)",
+                    input_len, coord->config.max_verify_rounds, (double)coord->config.accept_threshold);
 
     agentos_error_t err = su_stream_detector_reset(coord->detector);
     if (err != AGENTOS_SUCCESS) {
@@ -344,6 +388,7 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
         return err ? err : AGENTOS_EUNKNOWN;
     }
 
+    AGENTOS_LOG_DEBUG("C-L02: ThinkDual S2 generated (s2_output_len=%zu)", s2_output_len);
     err = su_stream_detector_feed(coord->detector, s2_output, s2_output_len, 0.7f);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("tc3_coordinator_execute: stream detector feed failed (err=%d s2_output_len=%zu)", (int)err, s2_output_len);
@@ -391,6 +436,8 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
         tc3_verdict_t verdict = score_to_verdict(score, &coord->config);
         uint32_t correction_attempts = 0;
         tc3_role_t verified_by = TC3_ROLE_T1F;
+        AGENTOS_LOG_DEBUG("C-L02: ThinkDual unit[%u] initial verify (score=%.2f verdict=%d)",
+                         (unsigned int)unit.unit_index, (double)score, (int)verdict);
 
         char *current_text = unit.text;
         size_t current_len = unit.text_len;
@@ -414,6 +461,8 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
                     verdict = expert_verdict;
                     score = expert_score;
                     verified_by = TC3_ROLE_T1P;
+                    AGENTOS_LOG_DEBUG("C-L02: ThinkDual unit[%u] expert arbitration (verdict=%d score=%.2f)",
+                                     (unsigned int)unit.unit_index, (int)expert_verdict, (double)expert_score);
                     if (expert_opinion)
                         AGENTOS_FREE(expert_opinion);
                 } else {
@@ -461,6 +510,8 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
             verify_with_metacognition(coord, gen_step, current_text, current_len, &score,
                                       &acceptable, &critique, &critique_len);
             verdict = score_to_verdict(score, &coord->config);
+            AGENTOS_LOG_DEBUG("C-L02: ThinkDual unit[%u] correction round %u (score=%.2f verdict=%d)",
+                             (unsigned int)unit.unit_index, correction_attempts, (double)score, (int)verdict);
         }
 
         tc3_unit_result_t result = {.unit_index = unit.unit_index,
@@ -476,6 +527,9 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
             AGENTOS_FREE(critique);
         critique = NULL;
 
+        AGENTOS_LOG_INFO("C-L02: ThinkDual unit[%u] final (verdict=%d score=%.2f attempts=%u by=%d)",
+                        (unsigned int)unit.unit_index, (int)verdict, (double)score,
+                        correction_attempts, (int)verified_by);
         switch (verdict) {
         case TC3_RESULT_ACCEPT:
             coord->stats.accepted_units++;
@@ -544,6 +598,11 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
     AGENTOS_FREE(s2_output);
 
     coord->stats.total_time_ns = agentos_time_monotonic_ns() - start_ns;
+    AGENTOS_LOG_INFO("C-L02: ThinkDual tc3 complete (units=%u accepted=%u minor=%u major=%u rejected=%u avg_score=%.2f time=%llu ms)",
+                    (unsigned)coord->stats.total_units, (unsigned)coord->stats.accepted_units,
+                    (unsigned)coord->stats.minor_fix_units, (unsigned)coord->stats.major_fix_units,
+                    (unsigned)coord->stats.rejected_units, (double)coord->stats.avg_score,
+                    (unsigned long long)(coord->stats.total_time_ns / 1000000ULL));
     if (coord->stats.total_units > 0) {
         float sum = 0.0f;
         for (size_t i = 0; i < coord->unit_results_count; i++) {

@@ -35,18 +35,14 @@ method_dispatcher_t *method_dispatcher_create(size_t max_methods)
 {
     if (max_methods == 0) {
         SVC_LOG_ERROR("method_dispatcher_create: max_methods is zero");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     method_dispatcher_t *disp =
         (method_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(method_dispatcher_t));
     if (!disp) {
         SVC_LOG_ERROR("method_dispatcher_create: memory allocation failed for dispatcher");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     disp->handlers =
@@ -54,8 +50,7 @@ method_dispatcher_t *method_dispatcher_create(size_t max_methods)
     if (!disp->handlers) {
         SVC_LOG_ERROR("method_dispatcher_create: memory allocation failed for handlers (max_methods=%zu)", max_methods);
         AGENTOS_FREE(disp);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     disp->max_methods = max_methods;

@@ -12,16 +12,21 @@
 #include "memory_compat.h"
 
 #include <errno.h>
-#include <fcntl.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#ifndef _WIN32
+/* hook_run_subprocess 的 fork/execve/execvp/pipe/select/waitpid 实现仅 POSIX
+ * 可用；Windows 分支见 hook_run_subprocess 的 _WIN32 实现。 */
+#include <fcntl.h>
+#include <signal.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
+#endif
 
 #ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
@@ -316,6 +321,7 @@ int hook_run_subprocess(const char *const argv[], char **envp, int timeout_sec)
 {
     if (!argv || !argv[0]) return -1;
 
+#ifndef _WIN32
     int pipefd[2];
     if (pipe(pipefd) < 0) return -1;
 
@@ -390,6 +396,19 @@ int hook_run_subprocess(const char *const argv[], char **envp, int timeout_sec)
     if (WIFEXITED(status)) return WEXITSTATUS(status);
     if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
     return -1;
+#else  /* _WIN32 */
+    /* Windows 无 fork/execve/pipe/select/waitpid，且无安全的轻量方案可等价实现
+     * "超时 + 输出捕获 + SIGKILL 强杀" 语义（需 overlapped I/O 或读线程排空
+     * 管道以防子进程写满阻塞，复杂度高且易引入句柄泄漏/死锁）。
+     * 为避免引入不安全的桩实现（违反 BAN-211/235 安全合规与"禁桩函数"约束），
+     * 此处明确拒绝执行并在日志中指明替代路径。调用方（hook_run_script /
+     * hook_run_shell）会处理 -1 返回值（记录失败并返回错误）。 */
+    (void)envp;
+    (void)timeout_sec;
+    SVC_LOG_ERROR("hook_executor: subprocess execution not supported on Windows, "
+                  "use tool_d IPC instead (fork/execve unavailable)");
+    return -1;
+#endif /* _WIN32 */
 }
 
 int hook_run_script(const char *interpreter, const char *script_path,

@@ -95,9 +95,9 @@ if(AGENTRT_HAS_CURL)
     else()
         target_link_libraries(agentos_hook_service PUBLIC curl)
     endif()
-    message(STATUS "  hook_d: libcurl enabled for webhook HTTP POST (BAN-211/235)")
+    agentos_print_ok("  hook_d: libcurl enabled for webhook HTTP POST (BAN-211/235)")
 else()
-    message(STATUS "  hook_d: libcurl not found, webhook falls back to curl binary via execvp")
+    agentos_print_warn("  hook_d: libcurl not found, webhook falls back to curl binary via execvp")
 endif()
 
 # 编译选项

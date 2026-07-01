@@ -97,8 +97,8 @@ static int on_log_degrade(degradation_handler_t *handler,
     degrade_log_ctx_t *ctx = (degrade_log_ctx_t *)handler->context;
     if (!ctx) return AGENTOS_ERR_INVALID_PARAM;
 
-    agentos_log_set_level(AGENTOS_LOG_ERROR);
-    ctx->degraded_log_level = AGENTOS_LOG_ERROR;
+    agentos_log_set_level(LOG_LEVEL_ERROR);
+    ctx->degraded_log_level = LOG_LEVEL_ERROR;
 
     SVC_LOG_WARN("Log level: raised to ERROR (was level %d)", ctx->original_log_level);
     return 0;

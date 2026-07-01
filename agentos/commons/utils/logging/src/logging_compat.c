@@ -35,12 +35,34 @@
 
 static size_t log_get_registered_module_count(void)
 {
-    return 0;
+    return log_get_module_count();
 }
-static void log_get_registered_modules(void *out_modules, int max_modules)
+
+/* 将核心日志系统的模块级别过滤表翻译为迁移监控视图。
+ * 注册表中条目均通过 log_set_module_level（新API）写入，
+ * 故标记为已完成迁移（status=1, completion=100）。 */
+static size_t log_get_registered_modules(migration_module_info_t *out_modules, int max_modules)
 {
-    (void)out_modules;
-    (void)max_modules;
+    if (out_modules == NULL || max_modules <= 0) {
+        return 0;
+    }
+
+    log_module_info_t info[32];
+    size_t available = log_get_module_info(info, 32);
+    size_t count = (available < (size_t)max_modules) ? available : (size_t)max_modules;
+
+    for (size_t i = 0; i < count; i++) {
+        AGENTOS_STRNCPY_TERM(out_modules[i].module_name, info[i].pattern,
+                             sizeof(out_modules[i].module_name));
+        out_modules[i].module_name[sizeof(out_modules[i].module_name) - 1] = '\0';
+        AGENTOS_STRNCPY_TERM(out_modules[i].current_api, "new",
+                             sizeof(out_modules[i].current_api));
+        AGENTOS_STRNCPY_TERM(out_modules[i].target_api, "new",
+                             sizeof(out_modules[i].target_api));
+        out_modules[i].migration_status = 1;        /* 已使用新API配置级别 */
+        out_modules[i].completion_percent = 100.0f;
+    }
+    return count;
 }
 
 /* ==================== 内部全局状态 ===================== */
@@ -343,9 +365,16 @@ int logging_compat_get_stats(logging_compat_stats_t *out_stats)
     __builtin_memcpy(out_stats, &g_compat_stats, sizeof(g_compat_stats));
 
     /* 更新动态统计信?*/
-    out_stats->migration_progress.total_modules = 10;   /* 示例?*/
-    out_stats->migration_progress.migrated_modules = 2; /* 示例?*/
-    out_stats->migration_progress.pending_modules = 8;  /* 示例?*/
+    /* 从核心日志系统获取真实模块注册数据，替换原硬编码示例值 */
+    size_t registered = log_get_module_count();
+    out_stats->migration_progress.migrated_modules = (int)registered;
+    /* 已知迁移范围内的模块总数（默认已知模块列表规模） */
+    const int known_module_scope = 8;
+    out_stats->migration_progress.total_modules = known_module_scope;
+    out_stats->migration_progress.pending_modules =
+        (registered < (size_t)known_module_scope)
+            ? (int)(known_module_scope - (int)registered)
+            : 0;
 
     return 0;
 }
@@ -356,13 +385,11 @@ int logging_compat_get_migration_list(migration_module_info_t *out_modules, int 
         return 0;
     }
 
-    /* 从运行时注册的模块过滤器中获取实际模块列表 */
+    /* 从核心日志系统运行时注册的模块级别过滤表获取实际模块列表 */
     size_t registered_count = log_get_registered_module_count();
     if (registered_count > 0) {
-        registered_count =
-            (registered_count < (size_t)max_modules) ? registered_count : (size_t)max_modules;
-        log_get_registered_modules(out_modules, max_modules);
-        return (int)registered_count;
+        size_t filled = log_get_registered_modules(out_modules, max_modules);
+        return (int)filled;
     }
 
     /* 返回默认已知模块列表 */

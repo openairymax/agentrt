@@ -523,8 +523,9 @@ int agentos_process_run_capture(const char *executable, char *const argv[],
 {
     (void)envp;
     (void)timeout_ms;
-    /* Windows 无 fork/execvp，重建命令字符串并用 _popen 执行（与现有 Windows 代码模式一致）。
-     * executable 和 argv 由调用者控制（非任意用户输入），注入风险可控。 */
+    /* BAN-211/235: 使用 CreateProcess + 匿名管道替代 _popen（消除 cmd.exe 注入风险）。
+     * CreateProcess 直接解析命令行，不经 shell，行为对齐 POSIX 的 fork/execvp。
+     * 与 market_service_impl.c 的 win_run_command 安全模式一致。 */
     char cmdline[4096] = {0};
     snprintf(cmdline, sizeof(cmdline), "\"%s\"", executable);
     for (int i = 1; argv && argv[i]; i++) {
@@ -533,25 +534,60 @@ int agentos_process_run_capture(const char *executable, char *const argv[],
             snprintf(cmdline + strlen(cmdline), remaining, " \"%s\"", argv[i]);
     }
 
-    FILE *pipe = _popen(cmdline, "r");
-    if (!pipe)
+    /* 创建匿名管道捕获子进程 stdout */
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.lpSecurityDescriptor = NULL;
+    sa.bInheritHandle = TRUE;
+    HANDLE pipe_read = NULL, pipe_write = NULL;
+    if (!CreatePipe(&pipe_read, &pipe_write, &sa, 0)) {
         return -1;
+    }
+    /* 确保管道读端不被子进程继承 */
+    SetHandleInformation(pipe_read, HANDLE_FLAG_INHERIT, 0);
 
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = pipe_write;
+    si.hStdError = pipe_write;
+    si.hStdInput = NULL;
+    ZeroMemory(&pi, sizeof(pi));
+
+    BOOL ok = CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+    CloseHandle(pipe_write); /* 父进程关闭写端，以便读端收到 EOF */
+    if (!ok) {
+        CloseHandle(pipe_read);
+        return -1;
+    }
+
+    /* 读取子进程输出 */
     size_t offset = 0;
     if (output && output_size > 0) {
         char buf[4096];
-        while (offset + 1 < output_size && fgets(buf, sizeof(buf), pipe)) {
-            size_t len = strlen(buf);
+        DWORD bytes_read;
+        while (ReadFile(pipe_read, buf, sizeof(buf) - 1, &bytes_read, NULL) && bytes_read > 0) {
+            size_t len = (size_t)bytes_read;
             if (offset + len >= output_size)
                 len = output_size - 1 - offset;
             __builtin_memcpy(output + offset, buf, len);
             offset += len;
+            if (offset + 1 >= output_size)
+                break;
         }
         output[offset] = '\0';
     }
 
-    int result = _pclose(pipe);
-    return result;
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code = 1;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+
+    CloseHandle(pipe_read);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return (int)exit_code;
 }
 
 #else

@@ -61,8 +61,7 @@ char *string_common_strlcat(char *dest, size_t dest_size, const char *src)
 char *string_common_strdup(const char *str)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t len = strlen(str) + 1;
@@ -79,8 +78,7 @@ char *string_common_strdup(const char *str)
 char *string_common_strndup(const char *str, size_t n)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t len = strnlen(str, n);
@@ -151,8 +149,7 @@ char *string_common_strstr(const char *haystack, const char *needle)
 char **string_common_strsplit(const char *str, const char *delim)
 {
     if (!str || !delim) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t count = 0;
@@ -169,8 +166,7 @@ char **string_common_strsplit(const char *str, const char *delim)
     char **arr;
     arr = agentos_malloc_array((size_t)(count + 1), sizeof(char *));
     if (!arr) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 分割字符串
@@ -365,8 +361,7 @@ size_t string_common_ftoa(double value, int precision, char *buf, size_t buf_siz
 char *string_common_strtrim(char *str)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 去除开头空白字符
@@ -391,8 +386,7 @@ char *string_common_strtrim(char *str)
 char *string_common_strtolower(char *str)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     char *ptr = str;
@@ -410,8 +404,7 @@ char *string_common_strtolower(char *str)
 char *string_common_strtoupper(char *str)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     char *ptr = str;

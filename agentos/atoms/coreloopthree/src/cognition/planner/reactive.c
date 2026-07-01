@@ -250,8 +250,7 @@ agentos_plan_strategy_t *agentos_plan_reactive_create(agentos_llm_service_t *llm
     reactive_data_t *rdata = (reactive_data_t *)AGENTOS_CALLOC(1, sizeof(reactive_data_t));
     if (!rdata) {
         AGENTOS_FREE(strat);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     rdata->llm = llm;
@@ -259,8 +258,7 @@ agentos_plan_strategy_t *agentos_plan_reactive_create(agentos_llm_service_t *llm
     if (!rdata->lock) {
         AGENTOS_FREE(rdata);
         AGENTOS_FREE(strat);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     strat->plan = reactive_plan;

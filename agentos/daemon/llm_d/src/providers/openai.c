@@ -289,8 +289,7 @@ static provider_ctx_t *openai_init(const char *name __attribute__((unused)), con
     openai_ctx_t *ctx = (openai_ctx_t *)AGENTOS_CALLOC(1, sizeof(openai_ctx_t));
     if (!ctx) {
         SVC_LOG_ERROR("C-L02: OPENAI: INIT-FAIL reason=oom STACK: openai_init");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     provider_base_init(&ctx->base, api_key, api_base, organization, timeout_sec, max_retries,
@@ -488,9 +487,7 @@ static llm_response_t *oai_build_stream_response(oai_stream_acc_t *acc)
 {
     llm_response_t *resp = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (acc->resp_id)

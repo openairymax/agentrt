@@ -532,16 +532,13 @@ int metrics_histogram_observe(const char *name, double value, const metric_label
 char *metrics_export_prometheus(void)
 {
     if (!g_metrics.initialized) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     size_t buf_size = 64 * 1024; /* 64KB */
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null buffer");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null buffer");
     }
 
     size_t pos = 0;
