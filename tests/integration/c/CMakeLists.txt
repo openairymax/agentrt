@@ -80,7 +80,7 @@ function(configure_real_lib_test test_name)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
-    message(STATUS "  [integration] ${test_name}: configured (real libs, no stubs)")
+    agentos_print_ok("  [integration] ${test_name}: configured (real libs, no stubs)")
 endfunction()
 
 # ============================================================================
@@ -251,9 +251,9 @@ if(TARGET svc_common)
     add_test(NAME e2e_core COMMAND test_e2e_core
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    message(STATUS "  [integration] test_e2e_core: P2-C01 E2E integration tests configured")
+    agentos_print_ok("  [integration] test_e2e_core: P2-C01 E2E integration tests configured")
 else()
-    message(STATUS "  [integration] Skipping test_e2e_core: svc_common not available (BUILD_DAEMON=OFF)")
+    agentos_print_warn("  [integration] Skipping test_e2e_core: svc_common not available (BUILD_DAEMON=OFF)")
 endif()
 
 # LLM Routing Integration Test (INT-15)
@@ -331,4 +331,4 @@ target_compile_options(test_llm_d_routing PRIVATE
 add_test(NAME llm_d_routing COMMAND test_llm_d_routing
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-message(STATUS "  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")
+agentos_print_ok("  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")

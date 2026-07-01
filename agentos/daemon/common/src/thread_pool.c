@@ -74,8 +74,7 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
     thread_pool_t *pool = (thread_pool_t *)AGENTOS_CALLOC(1, sizeof(thread_pool_t));
     if (!pool) {
         SVC_LOG_ERROR("thread_pool_create: memory allocation failed for pool");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (config) {
@@ -94,8 +93,7 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
     if (!pool->threads) {
         SVC_LOG_ERROR("thread_pool_create: memory allocation failed for threads array (max_threads=%u)", pool->config.max_threads);
         AGENTOS_FREE(pool);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_mutex_init(&pool->lock);
@@ -129,8 +127,7 @@ thread_pool_t *thread_pool_create(const thread_pool_config_t *config)
         agentos_cond_destroy(&pool->notify);
         AGENTOS_FREE(pool->threads);
         AGENTOS_FREE(pool);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     return pool;

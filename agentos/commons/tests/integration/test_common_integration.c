@@ -71,7 +71,8 @@ static int test_full_workflow(void)
     }
 
     printf("  Step 5: Error handling...\n");
-    agentos_error_t err = AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "Test error");
+    agentos_error_t err = AGENTOS_ERR_INVALID_PARAM;
+    agentos_error_push_ex(err, __FILE__, __LINE__, __func__, "%s", "Test error");
     const char *err_str = agentos_strerror(err);
     printf("    Error: %s\n", err_str);
 

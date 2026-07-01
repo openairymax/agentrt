@@ -316,8 +316,7 @@ agentos_execution_unit_t *agentos_file_unit_create(const char *root_dir)
     file_unit_data_t *data = (file_unit_data_t *)AGENTOS_MALLOC(sizeof(file_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     data->root_dir = root_dir ? AGENTOS_STRDUP(root_dir) : NULL;
@@ -333,8 +332,7 @@ agentos_execution_unit_t *agentos_file_unit_create(const char *root_dir)
             AGENTOS_FREE(data->metadata_json);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     unit->execution_unit_data = data;

@@ -404,8 +404,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
 {
     if (!language) return NULL;
     if (strlen(language) > 32) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     agentos_execution_unit_t *unit =
@@ -416,8 +415,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
     code_unit_data_t *data = (code_unit_data_t *)AGENTOS_MALLOC(sizeof(code_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     data->language = AGENTOS_STRDUP(language);
@@ -445,8 +443,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
             AGENTOS_FREE(data->metadata_json);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     unit->execution_unit_data = data;

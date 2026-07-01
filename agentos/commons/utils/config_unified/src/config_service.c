@@ -124,8 +124,7 @@ struct config_version_manager {
 static char *duplicate_string(const char *str)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     size_t len = strlen(str);
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
@@ -301,15 +300,13 @@ static int find_schema_item(const config_schema_t *schema, const char *key)
 config_validator_t *config_validator_create(const validator_options_t *options)
 {
     if (!options) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     config_validator_t *validator =
         (config_validator_t *)AGENTOS_CALLOC(1, sizeof(config_validator_t));
     if (!validator) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     validator->type = options->type;
@@ -321,8 +318,7 @@ config_validator_t *config_validator_create(const validator_options_t *options)
         validator->pattern = duplicate_string(options->pattern);
         if (!validator->pattern) {
             AGENTOS_FREE(validator);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     }
 
@@ -333,8 +329,7 @@ config_validator_t *config_validator_create(const validator_options_t *options)
             if (validator->pattern)
                 AGENTOS_FREE(validator->pattern);
             AGENTOS_FREE(validator);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
         for (size_t i = 0; i < options->enum_count; i++) {
@@ -350,8 +345,7 @@ config_validator_t *config_validator_create(const validator_options_t *options)
                     if (validator->pattern)
                         AGENTOS_FREE(validator->pattern);
                     AGENTOS_FREE(validator);
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
                 }
             }
         }
@@ -454,8 +448,7 @@ bool config_validator_validate(config_validator_t *validator, const char *key,
 config_validator_t *config_validator_create_range(const char *min, const char *max)
 {
     if (!min || !max) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     validator_options_t options = {.type = VALIDATOR_TYPE_RANGE,
@@ -469,8 +462,7 @@ config_validator_t *config_validator_create_range(const char *min, const char *m
     size_t pattern_len = strlen(min) + strlen(max) + 2;
     char *pattern = (char *)AGENTOS_MALLOC(pattern_len);
     if (!pattern) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     snprintf(pattern, pattern_len, "%s,%s", min, max);
@@ -485,8 +477,7 @@ config_validator_t *config_validator_create_range(const char *min, const char *m
 config_validator_t *config_validator_create_regex(const char *pattern)
 {
     if (!pattern) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     validator_options_t options = {.type = VALIDATOR_TYPE_REGEX,
@@ -502,8 +493,7 @@ config_validator_t *config_validator_create_regex(const char *pattern)
 config_validator_t *config_validator_create_enum(const char **values, size_t count)
 {
     if (!values || count == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         }
 
     validator_options_t options = {.type = VALIDATOR_TYPE_ENUM,
@@ -521,21 +511,18 @@ config_validator_t *config_validator_create_enum(const char **values, size_t cou
 config_schema_t *config_schema_create(const char *name)
 {
     if (!name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     config_schema_t *schema = (config_schema_t *)AGENTOS_CALLOC(1, sizeof(config_schema_t));
     if (!schema) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     schema->name = duplicate_string(name);
     if (!schema->name) {
         AGENTOS_FREE(schema);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 初始容量
@@ -545,8 +532,7 @@ config_schema_t *config_schema_create(const char *name)
     if (!schema->items) {
         AGENTOS_FREE(schema->name);
         AGENTOS_FREE(schema);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     schema->count = 0;
@@ -556,8 +542,7 @@ config_schema_t *config_schema_create(const char *name)
         AGENTOS_FREE(schema->items);
         AGENTOS_FREE(schema->name);
         AGENTOS_FREE(schema);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     schema->error_count = 0;
@@ -721,8 +706,7 @@ bool config_schema_validate(config_schema_t *schema, const config_context_t *ctx
 const char *config_schema_get_error(config_schema_t *schema, int index)
 {
     if (!schema || index < 0 || (size_t)index >= schema->error_count) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     return schema->errors[index];
@@ -793,15 +777,13 @@ config_hot_reload_manager_t *
 config_hot_reload_manager_create(config_context_t *ctx, config_source_manager_t *source_manager)
 {
     if (!ctx || !source_manager) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     config_hot_reload_manager_t *manager =
         (config_hot_reload_manager_t *)AGENTOS_CALLOC(1, sizeof(config_hot_reload_manager_t));
     if (!manager) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     manager->ctx = ctx;
@@ -817,8 +799,7 @@ config_hot_reload_manager_create(config_context_t *ctx, config_source_manager_t 
                                                                   sizeof(change_callback_item_t));
     if (!manager->callbacks) {
         AGENTOS_FREE(manager);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     manager->callback_count = 0;
@@ -827,8 +808,7 @@ config_hot_reload_manager_create(config_context_t *ctx, config_source_manager_t 
     if (!manager->lock) {
         AGENTOS_FREE(manager->callbacks);
         AGENTOS_FREE(manager);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     agentos_mutex_init((agentos_mutex_t *)manager->lock);
 
@@ -946,8 +926,7 @@ static void *config_hot_reload_thread_func(void *arg)
 {
     config_hot_reload_manager_t *manager = (config_hot_reload_manager_t *)arg;
     if (!manager) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     while (manager->running) {
@@ -966,8 +945,7 @@ static void *config_hot_reload_thread_func(void *arg)
         }
     }
 
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
 }
 
 config_error_t config_hot_reload_trigger(config_hot_reload_manager_t *manager)
@@ -1026,8 +1004,7 @@ static char *config_bytes_to_hex(const unsigned char *data, size_t len)
 {
     char *hex = (char *)AGENTOS_CALLOC(1, len * 2 + 1);
     if (!hex) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     for (size_t i = 0; i < len; i++) {
         snprintf(hex + i * 2, 3, "%02x", data[i]);
@@ -1039,14 +1016,12 @@ static unsigned char *config_hex_to_bytes(const char *hex, size_t *out_len)
 {
     size_t hex_len = strlen(hex);
     if (hex_len % 2 != 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
         }
     size_t byte_len = hex_len / 2;
     unsigned char *bytes = (unsigned char *)AGENTOS_CALLOC(1, byte_len);
     if (!bytes) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     for (size_t i = 0; i < byte_len; i++) {
         unsigned int val;
@@ -1055,8 +1030,7 @@ static unsigned char *config_hex_to_bytes(const char *hex, size_t *out_len)
         val = (unsigned int)strtol(hex_byte, NULL, 16);
         if (hex_byte[0] == '\0') {
             AGENTOS_FREE(bytes);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         bytes[i] = (unsigned char)val;
     }
@@ -1069,42 +1043,36 @@ static config_value_t *config_encrypt_string_value(const char *plaintext, size_t
                                                    const encryption_config_t *enc)
 {
     if (!plaintext || !enc || !enc->key || enc->key_len < 32 || !enc->iv || enc->iv_len < 12) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
 #ifdef HAVE_OPENSSL
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1) {
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, (int)enc->iv_len, NULL) != 1) {
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (EVP_EncryptInit_ex(ctx, NULL, NULL, (const unsigned char *)enc->key,
                            (const unsigned char *)enc->iv) != 1) {
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     size_t ct_max = plaintext_len + 16;
     unsigned char *ciphertext = (unsigned char *)AGENTOS_CALLOC(1, ct_max);
     if (!ciphertext) {
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     int out_len = 0;
@@ -1112,16 +1080,14 @@ static config_value_t *config_encrypt_string_value(const char *plaintext, size_t
                           (int)plaintext_len) != 1) {
         AGENTOS_FREE(ciphertext);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     int final_len = 0;
     if (EVP_EncryptFinal_ex(ctx, ciphertext + out_len, &final_len) != 1) {
         AGENTOS_FREE(ciphertext);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t ct_len = (size_t)(out_len + final_len);
 
@@ -1129,8 +1095,7 @@ static config_value_t *config_encrypt_string_value(const char *plaintext, size_t
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag) != 1) {
         AGENTOS_FREE(ciphertext);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     EVP_CIPHER_CTX_free(ctx);
@@ -1139,8 +1104,7 @@ static config_value_t *config_encrypt_string_value(const char *plaintext, size_t
     unsigned char *encoded = (unsigned char *)AGENTOS_CALLOC(1, encoded_len);
     if (!encoded) {
         AGENTOS_FREE(ciphertext);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     __builtin_memcpy(encoded, tag, 16);
     __builtin_memcpy(encoded + 16, enc->iv, enc->iv_len);
@@ -1150,8 +1114,7 @@ static config_value_t *config_encrypt_string_value(const char *plaintext, size_t
     char *hex = config_bytes_to_hex(encoded, encoded_len);
     AGENTOS_FREE(encoded);
     if (!hex) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     config_value_t *result = config_value_create_string(hex);
@@ -1159,8 +1122,7 @@ static config_value_t *config_encrypt_string_value(const char *plaintext, size_t
     return result;
 #else
     (void)plaintext_len;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 #endif
 }
 
@@ -1168,8 +1130,7 @@ static config_value_t *config_decrypt_string_value(const char *hex_data,
                                                    const encryption_config_t *enc)
 {
     if (!hex_data || !enc || !enc->key || enc->key_len < 32) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
 #ifdef HAVE_OPENSSL
@@ -1177,8 +1138,7 @@ static config_value_t *config_decrypt_string_value(const char *hex_data,
     unsigned char *data = config_hex_to_bytes(hex_data, &data_len);
     if (!data || data_len < 16 + 12) {
         AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     const unsigned char *tag = data;
@@ -1186,8 +1146,7 @@ static config_value_t *config_decrypt_string_value(const char *hex_data,
     size_t iv_len = enc->iv_len > 0 ? enc->iv_len : 12;
     if (16 + iv_len > data_len) {
         AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
     const unsigned char *ciphertext = data + 16 + iv_len;
     size_t ct_len = data_len - 16 - iv_len;
@@ -1195,37 +1154,32 @@ static config_value_t *config_decrypt_string_value(const char *hex_data,
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1) {
         AGENTOS_FREE(data);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, (int)iv_len, NULL) != 1) {
         AGENTOS_FREE(data);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (EVP_DecryptInit_ex(ctx, NULL, NULL, (const unsigned char *)enc->key, iv) != 1) {
         AGENTOS_FREE(data);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     unsigned char *plaintext = (unsigned char *)AGENTOS_CALLOC(1, ct_len + 1);
     if (!plaintext) {
         AGENTOS_FREE(data);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     int out_len = 0;
@@ -1233,16 +1187,14 @@ static config_value_t *config_decrypt_string_value(const char *hex_data,
         AGENTOS_FREE(plaintext);
         AGENTOS_FREE(data);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, (void *)tag) != 1) {
         AGENTOS_FREE(plaintext);
         AGENTOS_FREE(data);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     int final_len = 0;
@@ -1250,8 +1202,7 @@ static config_value_t *config_decrypt_string_value(const char *hex_data,
         AGENTOS_FREE(plaintext);
         AGENTOS_FREE(data);
         EVP_CIPHER_CTX_free(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     size_t pt_len = (size_t)(out_len + final_len);
@@ -1275,8 +1226,7 @@ config_value_t *config_encrypt_value(const config_value_t *value,
                                      const encryption_config_t *manager)
 {
     if (!value) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     if (!manager || manager->algorithm == ENCRYPTION_NONE) {
         return config_value_clone(value);
@@ -1286,8 +1236,7 @@ config_value_t *config_encrypt_value(const config_value_t *value,
     if (type == CONFIG_TYPE_STRING) {
         const char *str = config_value_get_string(value, NULL);
         if (!str) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             }
         size_t str_len = strlen(str);
         config_value_t *encrypted = config_encrypt_string_value(str, str_len, manager);
@@ -1301,8 +1250,7 @@ config_value_t *config_decrypt_value(const config_value_t *encrypted_value,
                                      const encryption_config_t *manager)
 {
     if (!encrypted_value) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     if (!manager || manager->algorithm == ENCRYPTION_NONE) {
         return config_value_clone(encrypted_value);
@@ -1312,8 +1260,7 @@ config_value_t *config_decrypt_value(const config_value_t *encrypted_value,
     if (type == CONFIG_TYPE_STRING) {
         const char *hex_data = config_value_get_string(encrypted_value, NULL);
         if (!hex_data) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             }
         config_value_t *decrypted = config_decrypt_string_value(hex_data, manager);
         return decrypted ? decrypted : config_value_clone(encrypted_value);
@@ -1326,8 +1273,7 @@ config_source_t *config_source_create_encrypted(config_source_t *source,
                                                 const encryption_config_t *manager)
 {
     if (!source) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     if (!manager || manager->algorithm == ENCRYPTION_NONE)
         return source;
@@ -1339,15 +1285,13 @@ config_source_t *config_source_create_encrypted(config_source_t *source,
 config_version_manager_t *config_version_manager_create(config_context_t *ctx, size_t max_versions)
 {
     if (!ctx) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     config_version_manager_t *manager =
         (config_version_manager_t *)AGENTOS_CALLOC(1, sizeof(config_version_manager_t));
     if (!manager) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     manager->ctx = ctx;
@@ -1360,8 +1304,7 @@ config_version_manager_t *config_version_manager_create(config_context_t *ctx, s
         (config_version_item_t *)AGENTOS_CALLOC(manager->capacity, sizeof(config_version_item_t));
     if (!manager->versions) {
         AGENTOS_FREE(manager);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     manager->count = 0;
@@ -1759,14 +1702,12 @@ config_context_t *config_service_create(const char *service_name, config_schema_
                                         bool enable_hot_reload, bool enable_encryption)
 {
     if (!service_name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     config_context_t *ctx = config_context_create(service_name);
     if (!ctx) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     if (schema) {

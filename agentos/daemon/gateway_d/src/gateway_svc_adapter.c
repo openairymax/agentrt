@@ -307,8 +307,7 @@ agentos_error_t gateway_service_adapter_create(agentos_service_t *out_service,
 gateway_service_t gateway_service_adapter_get_original(agentos_service_t service)
 {
     if (!service) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     gateway_adapter_ctx_t *ctx = (gateway_adapter_ctx_t *)agentos_service_get_user_data(service);

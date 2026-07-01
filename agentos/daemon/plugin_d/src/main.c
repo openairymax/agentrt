@@ -45,6 +45,27 @@ static void signal_handler(int sig)
     AGENTOS_LOG_INFO("Plugin_d: received shutdown signal");
 }
 
+#ifdef _WIN32
+/**
+ * @brief Windows 控制台事件处理函数（对齐 gateway_d/src/main.c 模式）
+ *
+ * Windows 无 POSIX signal() 语义，用 SetConsoleCtrlHandler 接收控制台事件
+ * 并复用现有 signal_handler 触发优雅停机。
+ */
+static BOOL WINAPI console_handler(DWORD fdwCtrlType)
+{
+    switch (fdwCtrlType) {
+    case CTRL_C_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        signal_handler((int)fdwCtrlType);
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+#endif
+
 /* ==================== 主入口 ==================== */
 
 int main(int argc, char *argv[])
@@ -57,8 +78,12 @@ int main(int argc, char *argv[])
     AGENTOS_LOG_INFO("============================================");
 
     /* 注册信号处理 */
+#ifdef _WIN32
+    SetConsoleCtrlHandler(console_handler, TRUE);
+#else
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
+#endif
 
     /* 创建 Unix Socket 服务器 */
     g_server_fd = agentos_socket_create_unix_server(PLUGIN_D_SOCKET_PATH);

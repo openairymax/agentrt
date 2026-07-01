@@ -96,14 +96,12 @@ static int base64_encode(const uint8_t *data, size_t len, char *output, size_t *
     static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     if (!data || !output || !out_len || len == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "base64_encode: null parameter");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "base64_encode: null parameter");
     }
 
     size_t needed = ((len + 2) / 3) * 4;
     if (*out_len < needed + 1) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "base64_encode: output buffer too small");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "base64_encode: output buffer too small");
     }
 
     size_t i = 0, j = 0;
@@ -565,9 +563,8 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
 
     if (strlen(subject) > MAX_SUBJECT_SIZE) {
         SVC_LOG_ERROR("JWT generate: subject too long");
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: subject too long");
         agentos_mutex_unlock(&g_jwt.lock);
-        return AUTH_TOKEN_INVALID;
+        AGENTOS_ERROR(AUTH_TOKEN_INVALID, "JWT generate: subject too long");
     }
 
     /* 构建 Header: {"alg":"HS256","typ":"JWT"} */
@@ -824,7 +821,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
         }
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_b64 failed");
         __builtin_memcpy(sig_b64, dot2 + 1, sig_b64_len);
         sig_b64[sig_b64_len] = '\0';
 
