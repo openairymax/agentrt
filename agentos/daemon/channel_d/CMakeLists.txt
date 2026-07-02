@@ -15,6 +15,8 @@ set(CHANNEL_D_SOURCES
 )
 
 add_executable(channel_d ${CHANNEL_D_SOURCES})
+# DEP-06 合规：二进制输出名统一为 agentos-<name>-d 格式
+set_target_properties(channel_d PROPERTIES OUTPUT_NAME agentos-channel-d)
 
 target_include_directories(channel_d PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include

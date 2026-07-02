@@ -54,6 +54,18 @@ typedef struct tc3_llm_ctx {
     /* LLM 请求的 max_tokens 上限 */
     uint32_t max_tokens;
 
+    /* P2.7: 三独立模型字段 — S2 生成 / S1-F 验证 / S1-P 专家仲裁。
+     *
+     * 为 NULL 时使用 provider 默认模型（向后兼容）。
+     * 非 NULL 时，三个回调分别使用各自指定的模型，实现多模型激活：
+     *   - s2_model:        T2 主思考生成模型（如高吞吐生成模型）
+     *   - s1_verify_model: T1-F 快思考验证模型（如轻量评估模型）
+     *   - s1_expert_model: T1-P 专家仲裁模型（如强推理模型）
+     * 所有字符串均为 borrowed（由 engine 配置管理生命周期）。 */
+    const char *s2_model;
+    const char *s1_verify_model;
+    const char *s1_expert_model;
+
     /* Seed: engine.c 第一次 LLM 调用的结果（borrowed，不拥有）。
      * s2_generate 首次调用时返回此 seed 的副本（避免重复 LLM 调用），
      * 后续（修正轮次）调用 LLM 独立生成。
