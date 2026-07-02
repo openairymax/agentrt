@@ -288,6 +288,20 @@ void agentos_cognition_destroy(agentos_cognition_engine_t *engine)
     if (engine->context && engine->context_destroy) {
         engine->context_destroy(engine->context);
     }
+    /* P1.14: 销毁 TRANSFER ownership 的策略对象 */
+    if (engine->plan_strat && engine->plan_strat->destroy) {
+        engine->plan_strat->destroy(engine->plan_strat);
+        engine->plan_strat = NULL;
+    }
+    if (engine->coord_strat && engine->coord_strat->destroy) {
+        engine->coord_strat->destroy(engine->coord_strat);
+        engine->coord_strat = NULL;
+    }
+    if (engine->disp_strat && engine->disp_strat->destroy) {
+        engine->disp_strat->destroy(engine->disp_strat);
+        engine->disp_strat = NULL;
+    }
+    /* fallback_plan_strat 是 BORROW，不由 engine 销毁 */
     if (engine->lock) {
         agentos_mutex_free(engine->lock);
     }
@@ -302,6 +316,63 @@ void agentos_cognition_set_fallback_plan(agentos_cognition_engine_t *engine,
     agentos_mutex_lock(engine->lock);
     engine->fallback_plan_strat = fallback;
     agentos_mutex_unlock(engine->lock);
+}
+
+/* P1.14: 主规划策略 setter — 替换旧策略（TRANSFER ownership） */
+void agentos_cognition_set_plan_strategy(agentos_cognition_engine_t *engine,
+                                          agentos_plan_strategy_t *strategy)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    if (engine->plan_strat && engine->plan_strat->destroy)
+        engine->plan_strat->destroy(engine->plan_strat);
+    engine->plan_strat = strategy;
+    agentos_mutex_unlock(engine->lock);
+    if (strategy) {
+        AGENTOS_LOG_INFO("P1.14: plan_strategy injected into cognition engine (plan=%p destroy=%p)",
+                         (void *)strategy->plan, (void *)strategy->destroy);
+    } else {
+        AGENTOS_LOG_WARN("P1.14: plan_strategy detached from cognition engine");
+    }
+}
+
+/* P1.14: 协同策略 setter — 替换旧策略（TRANSFER ownership） */
+void agentos_cognition_set_coord_strategy(agentos_cognition_engine_t *engine,
+                                           agentos_coordinator_strategy_t *strategy)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    if (engine->coord_strat && engine->coord_strat->destroy)
+        engine->coord_strat->destroy(engine->coord_strat);
+    engine->coord_strat = strategy;
+    agentos_mutex_unlock(engine->lock);
+    if (strategy) {
+        AGENTOS_LOG_INFO("P1.14: coord_strategy injected into cognition engine (coordinate=%p)",
+                         (void *)strategy->coordinate);
+    } else {
+        AGENTOS_LOG_WARN("P1.14: coord_strategy detached from cognition engine");
+    }
+}
+
+/* P1.14: 调度策略 setter — 替换旧策略（TRANSFER ownership） */
+void agentos_cognition_set_disp_strategy(agentos_cognition_engine_t *engine,
+                                          agentos_dispatching_strategy_t *strategy)
+{
+    if (!engine)
+        return;
+    agentos_mutex_lock(engine->lock);
+    if (engine->disp_strat && engine->disp_strat->destroy)
+        engine->disp_strat->destroy(engine->disp_strat);
+    engine->disp_strat = strategy;
+    agentos_mutex_unlock(engine->lock);
+    if (strategy) {
+        AGENTOS_LOG_INFO("P1.14: disp_strategy injected into cognition engine (dispatch=%p)",
+                         (void *)strategy->dispatch);
+    } else {
+        AGENTOS_LOG_WARN("P1.14: disp_strategy detached from cognition engine");
+    }
 }
 
 /* _take: caller transfers ownership */
@@ -584,25 +655,13 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
 
     uint64_t start_ns = agentos_time_monotonic_ns();
 
-    /* C-L12.4: Retrieve relevant context from memory provider before processing */
-    if (engine->memory_provider && engine->memory_provider->retrieve) {
-        char **ctx_ids = NULL;
-        float *ctx_scores = NULL;
-        size_t ctx_count = 0;
-        agentos_error_t qerr = engine->memory_provider->retrieve(
-            engine->memory_provider, input, 5, &ctx_ids, &ctx_scores, &ctx_count);
-        if (qerr == AGENTOS_SUCCESS && ctx_count > 0 && ctx_ids) {
-            AGENTOS_LOG_DEBUG("C-L12: Provider retrieve returned %zu context records", ctx_count);
-            /* Context records are available for the pipeline to use.
-             * The thinking chain prepopulate will handle integration. */
-            for (size_t i = 0; i < ctx_count && ctx_ids[i]; i++) {
-                AGENTOS_FREE(ctx_ids[i]);
-            }
-            AGENTOS_FREE(ctx_ids);
-            if (ctx_scores)
-                AGENTOS_FREE(ctx_scores);
-        }
-    }
+    /* P3.11-C1: 记忆上下文检索已统一到 thinking_chain prepopulate 路径（Phase 0 中调用
+     * agentos_tc_context_window_prepopulate → agentos_memory_query → provider->query）。
+     *
+     * 此前此处有一段冗余的 memory_provider->retrieve 调用，但结果（ctx_ids + ctx_scores）
+     * 被 直接 free 丢弃，从未读取记录内容——数据流断裂。且 prepopulate 走 memory engine
+     * 路径，此处走 cognition memory_provider 路径，P3.11-C9 后两者共用同一 bridge provider，
+     * 完全冗余。删除以消除双重检索浪费和数据流断裂。 */
 
     /* ========== Stream Critic Phase 0: Intent Classification ========== */
     sc_intent_result_t sc_intent;
@@ -645,8 +704,107 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             agentos_thinking_step_t *decomp_step = NULL;
             agentos_tc_step_create(engine->chain, TC_STEP_DECOMPOSITION, input, input_len, NULL, 0,
                                    &decomp_step);
-            if (decomp_step) {
-                agentos_tc_step_complete(decomp_step, input, input_len, 0.8f, "S1-decomposer");
+
+            /* P2.9-B1: Phase 0 LLM 指令拆解 — 输出结构化子任务 JSON（ACC-DT05）。
+             *
+             * 原 Phase 0 是空操作（decomp_step 直接用 input 作为 output），
+             * 现改为：LLM 可用时调用 LLM 拆解指令为 subtasks JSON；LLM 不可
+             * 用时降级为单元素 subtasks JSON。拆解结果存入 thinking chain
+             * 和 working memory，供后续 Phase 1 规划和 Phase 4 对齐访问。
+             */
+            char *decomp_output = NULL;
+            size_t decomp_output_len = 0;
+            float decomp_confidence = 0.5f;
+            const char *decomp_agent = "S1-decomposer";
+
+            llm_service_t *decomp_llm_svc = NULL;
+            llm_svc_adapter_t *decomp_llm_adapter = NULL;
+            agentos_mutex_lock(engine->lock);
+            decomp_llm_svc = engine->llm_svc;
+            decomp_llm_adapter = engine->llm_adapter;
+            agentos_mutex_unlock(engine->lock);
+
+            if (decomp_llm_adapter || decomp_llm_svc) {
+                llm_message_t decomp_msgs[2];
+                decomp_msgs[0].role = "system";
+                decomp_msgs[0].content =
+                    "You are an instruction decomposition assistant. Break down the user's "
+                    "request into structured subtasks. Respond ONLY in JSON format: "
+                    "{\"subtasks\":[{\"id\":1,\"goal\":\"...\",\"type\":\"analysis|generation|"
+                    "retrieval|execution|verification\"}]}. Keep subtasks atomic and ordered.";
+                decomp_msgs[1].role = "user";
+                decomp_msgs[1].content = input;
+
+                llm_request_config_t decomp_cfg;
+                __builtin_memset(&decomp_cfg, 0, sizeof(decomp_cfg));
+                decomp_cfg.model = NULL;
+                decomp_cfg.messages = decomp_msgs;
+                decomp_cfg.message_count = 2;
+                decomp_cfg.temperature = 0.3f; /* 低温度保证结构化输出 */
+                decomp_cfg.top_p = 1.0f;
+                decomp_cfg.max_tokens = 1024;
+                decomp_cfg.stream = 0;
+
+                llm_response_t *decomp_resp = NULL;
+                int decomp_ret = -1;
+                if (decomp_llm_adapter) {
+                    decomp_ret = llm_svc_adapter_complete(decomp_llm_adapter, &decomp_cfg,
+                                                          &decomp_resp);
+                } else {
+                    decomp_ret = llm_service_complete(decomp_llm_svc, &decomp_cfg, &decomp_resp);
+                }
+
+                if (decomp_ret == 0 && decomp_resp && decomp_resp->choices &&
+                    decomp_resp->choice_count > 0 && decomp_resp->choices[0].content) {
+                    decomp_output = AGENTOS_STRDUP(decomp_resp->choices[0].content);
+                    if (decomp_output) {
+                        decomp_output_len = strlen(decomp_output);
+                        decomp_confidence = 0.85f;
+                    }
+                    AGENTOS_LOG_INFO("Phase 0: LLM decomposition succeeded (len=%zu)",
+                                     decomp_output_len);
+                } else {
+                    AGENTOS_LOG_WARN("Phase 0: LLM decomposition failed (ret=%d), using fallback",
+                                     decomp_ret);
+                }
+                if (decomp_resp) {
+                    llm_response_free(decomp_resp);
+                    decomp_resp = NULL;
+                }
+            }
+
+            /* LLM 不可用或调用失败：降级生成单元素 subtasks JSON */
+            if (!decomp_output) {
+                size_t fb_sz = input_len + 128;
+                decomp_output = (char *)AGENTOS_MALLOC(fb_sz);
+                if (decomp_output) {
+                    int dn = snprintf(decomp_output, fb_sz,
+                                      "{\"subtasks\":[{\"id\":1,\"goal\":\"%.*s\","
+                                      "\"type\":\"unknown\"}]}",
+                                      (int)(input_len > 200 ? 200 : input_len), input);
+                    if (dn > 0 && (size_t)dn < fb_sz) {
+                        decomp_output_len = (size_t)dn;
+                        decomp_confidence = 0.5f;
+                    } else {
+                        AGENTOS_FREE(decomp_output);
+                        decomp_output = NULL;
+                    }
+                }
+            }
+
+            if (decomp_step && decomp_output) {
+                agentos_tc_step_complete(decomp_step, decomp_output, decomp_output_len,
+                                         decomp_confidence, decomp_agent);
+                /* 存入 working memory 供后续 Phase 1 规划访问 */
+                if (engine->chain->working_mem) {
+                    agentos_tc_working_memory_store(engine->chain->working_mem,
+                                                    "decomposed_subtasks", decomp_output,
+                                                    decomp_output_len + 1, "application/json", 1);
+                }
+            }
+            if (decomp_output) {
+                AGENTOS_FREE(decomp_output);
+                decomp_output = NULL;
             }
 
             char *preemptive_hint = NULL;
@@ -914,6 +1072,11 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
         tc3_ctx.llm_svc = llm_svc;
         tc3_ctx.lock = engine->lock;
         tc3_ctx.max_tokens = engine->chain_max_tokens;
+        /* P2.7: 三独立模型字段 — 默认 NULL（provider 默认模型）。
+         * 后续可通过 engine 配置注入不同模型名实现多模型激活。 */
+        tc3_ctx.s2_model = NULL;
+        tc3_ctx.s1_verify_model = NULL;
+        tc3_ctx.s1_expert_model = NULL;
         tc3_ctx.seed_text = llm_response_text;
         tc3_ctx.seed_len = llm_response_len;
         tc3_ctx.seed_consumed = 0;
@@ -972,16 +1135,20 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 tc3_stats_t tc3_stats;
                 tc3_coordinator_get_stats(tc3, &tc3_stats);
                 engine->dual_think_corrections += tc3_stats.total_corrections;
-                AGENTOS_LOG_INFO("C-L02: ThinkDual tc3 success (phase2_output_len=%zu units=%u corrections=%u avg_score=%.2f)",
+                AGENTOS_LOG_INFO("C-L02: ThinkDual tc3 success (phase2_output_len=%zu units=%u "
+                                 "corrections=%u loops=%u avg_score=%.2f)",
                                 phase2_output_len, (unsigned)tc3_stats.total_units,
-                                (unsigned)tc3_stats.total_corrections, (double)tc3_stats.avg_score);
+                                (unsigned)tc3_stats.total_corrections,
+                                (unsigned)tc3_stats.loop_detected_units,
+                                (double)tc3_stats.avg_score);
 
                 char fb[512];
                 snprintf(fb, sizeof(fb),
                          "{\"units\":%u,\"accepted\":%u,\"corrections\":%u,"
-                         "\"avg_score\":%.2f,\"time_ns\":%llu,\"llm_backed\":%s}",
+                         "\"loops\":%u,\"avg_score\":%.2f,\"time_ns\":%llu,\"llm_backed\":%s}",
                          tc3_stats.total_units, tc3_stats.accepted_units,
-                         tc3_stats.total_corrections, tc3_stats.avg_score,
+                         tc3_stats.total_corrections, tc3_stats.loop_detected_units,
+                         tc3_stats.avg_score,
                          (unsigned long long)tc3_stats.total_time_ns,
                          llm_svc ? "true" : "false");
                 trigger_feedback(engine, 2, "phase2_critical_loop", fb);
@@ -1114,6 +1281,12 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                                       node->task_node_handler_name,
                                       (unsigned long long)result->duration_ms);
                     if (result->output) {
+                        /* P2.9-B6: 回写工具执行结果到 task_node_output，
+                         * 供后续阶段（审计、目标对齐）访问 */
+                        if (node->task_node_output) {
+                            AGENTOS_FREE(node->task_node_output);
+                        }
+                        node->task_node_output = AGENTOS_STRDUP(result->output);
                         /* Store tool result in working memory */
                         if (engine->chain && engine->chain->working_mem) {
                             agentos_tc_working_memory_store(
@@ -1266,7 +1439,62 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                                  trigger_replan ? "goal_drift_critical" : "goal_drift", fb);
 
                 if (trigger_replan) {
+                    /* P2.9-B4: 真正触发重规划 — 替代原先仅 ++count 的死代码。
+                     *
+                     * 当目标对齐检测到 critical 漂移时，调用 plan_strat->plan
+                     * 重新生成任务计划。新计划替换旧计划作为 process() 的输出，
+                     * 调用方（loop.c）可据此决定是否用新计划重新执行。
+                     *
+                     * 重规划失败时保留旧计划并记录 ERROR，不中断当前流程
+                     * （旧计划的 Phase 2/3 结果仍可用于返回）。 */
                     engine->align_replan_count++;
+                    if (plan_strat && plan_strat->plan) {
+                        agentos_task_plan_t *replan = NULL;
+                        agentos_error_t replan_err =
+                            plan_strat->plan(&intent, plan_strat->data, &replan);
+                        if (replan_err == AGENTOS_SUCCESS && replan) {
+                            AGENTOS_LOG_WARN("Phase 4: goal drift triggered replan "
+                                             "(old_plan_id=%s new_nodes=%zu drift=%.3f composite=%.2f)",
+                                             (plan && plan->task_plan_id) ? plan->task_plan_id
+                                                                          : "(null)",
+                                             replan->task_plan_node_count,
+                                             (double)drift_trend, (double)composite);
+                            /* 生成新 plan_id 以区分重规划产生的计划 */
+                            if (replan->task_plan_id) {
+                                AGENTOS_FREE(replan->task_plan_id);
+                            }
+                            char rp_id[64];
+                            int rp_n = snprintf(rp_id, sizeof(rp_id),
+                                                "replan_%016" PRIx64,
+                                                (uint64_t)agentos_time_monotonic_ns());
+                            if (rp_n > 0 && (size_t)rp_n < sizeof(rp_id)) {
+                                replan->task_plan_id = AGENTOS_STRDUP(rp_id);
+                                replan->task_plan_id_len = (size_t)rp_n;
+                            }
+                            /* 释放旧计划，使用新计划 */
+                            if (plan) {
+                                agentos_task_plan_free(plan);
+                            }
+                            plan = replan;
+                            engine->current_plan = plan;
+
+                            char rp_fb[256];
+                            snprintf(rp_fb, sizeof(rp_fb),
+                                     "{\"replan\":true,\"new_plan_id\":\"%s\","
+                                     "\"new_nodes\":%zu,\"drift_trend\":%.3f,\"composite\":%.2f}",
+                                     (plan && plan->task_plan_id) ? plan->task_plan_id : "",
+                                     plan ? plan->task_plan_node_count : 0,
+                                     (double)drift_trend, (double)composite);
+                            trigger_feedback(engine, 3, "goal_drift_replan", rp_fb);
+                        } else {
+                            AGENTOS_LOG_ERROR("Phase 4: replan failed (err=%d), "
+                                              "retaining old plan",
+                                              (int)replan_err);
+                        }
+                    } else {
+                        AGENTOS_LOG_WARN("Phase 4: goal drift detected but no plan_strategy "
+                                         "available for replan");
+                    }
                 }
             }
 
@@ -1313,6 +1541,11 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
         }
 
         if (!pipeline_output || pipeline_output_len == 0) {
+            /* P1.14: 释放 get_recent 返回的空字符串，避免覆盖后泄漏 */
+            if (pipeline_output) {
+                AGENTOS_FREE(pipeline_output);
+                pipeline_output = NULL;
+            }
             pipeline_output = AGENTOS_STRDUP(input);
             pipeline_output_len = input_len;
         }
@@ -1368,6 +1601,11 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
     return AGENTOS_SUCCESS;
 
 process_fail:
+    /* P1.14: 释放已生成的 plan（plan_strat->plan 返回错误但仍设置了 plan 的防御性释放） */
+    if (plan) {
+        agentos_task_plan_free(plan);
+        plan = NULL;
+    }
     if (engine->chain) {
         agentos_tc_chain_stop(engine->chain);
         agentos_tc_chain_destroy(engine->chain);
@@ -1387,6 +1625,14 @@ void agentos_task_plan_free(agentos_task_plan_t *plan)
                 AGENTOS_FREE(node->task_node_id);
             if (node->task_node_agent_role)
                 AGENTOS_FREE(node->task_node_agent_role);
+            /* P2.9: 释放 handler_name、goal、output（原先遗漏导致潜在泄漏） */
+            if (node->task_node_handler_name)
+                AGENTOS_FREE(node->task_node_handler_name);
+            if (node->task_node_goal)
+                AGENTOS_FREE(node->task_node_goal);
+            if (node->task_node_output)
+                AGENTOS_FREE(node->task_node_output);
+            /* task_node_input 由策略管理，不由 plan_free 释放 */
             if (node->task_node_depends_on) {
                 for (size_t j = 0; j < node->task_node_depends_count; j++) {
                     AGENTOS_FREE(node->task_node_depends_on[j]);
@@ -1397,8 +1643,15 @@ void agentos_task_plan_free(agentos_task_plan_t *plan)
         }
     }
     AGENTOS_FREE(plan->task_plan_nodes);
-    if (plan->task_plan_entry_points)
+    /* P1.14: 释放 entry_points 数组中的每个字符串（reactive/hierarchical 规划器
+     * 通过 AGENTOS_STRDUP 分配 entry_points[i]，原先只释放数组本身导致泄漏） */
+    if (plan->task_plan_entry_points) {
+        for (size_t e = 0; e < plan->task_plan_entry_count; e++) {
+            if (plan->task_plan_entry_points[e])
+                AGENTOS_FREE(plan->task_plan_entry_points[e]);
+        }
         AGENTOS_FREE(plan->task_plan_entry_points);
+    }
     if (plan->task_plan_id)
         AGENTOS_FREE(plan->task_plan_id);
     AGENTOS_FREE(plan);
