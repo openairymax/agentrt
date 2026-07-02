@@ -30,6 +30,9 @@ if(BUILD_SHARED_LIBS)
     target_compile_definitions(agentos_syscall PRIVATE AGENTOS_BUILDING_SHARED)
 endif()
 
+# P3.20: 启用 heapstore 持久化代码 — session.c/telemetry.c 中 #ifdef BUILD_HEAPSTORE 代码块
+target_compile_definitions(agentos_syscall PRIVATE BUILD_HEAPSTORE)
+
 target_link_libraries(agentos_syscall PUBLIC agentos_atoms)
 
 target_include_directories(agentos_syscall PUBLIC
@@ -70,6 +73,7 @@ endif()
 target_link_libraries(agentos_syscall PUBLIC
     agentos_core
     agentos_coreloopthree
+    agentos_heapstore
     Threads::Threads
     $<$<BOOL:${CJSON_FOUND}>:${CJSON_LIBRARIES}>
 )

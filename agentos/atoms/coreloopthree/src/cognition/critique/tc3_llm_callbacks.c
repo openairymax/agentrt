@@ -42,17 +42,24 @@ static const char S2_SYSTEM_PROMPT[] =
     "If given a correction instruction, improve your previous response accordingly.";
 
 static const char S1_VERIFY_SYSTEM_PROMPT[] =
-    "You are a quality evaluator in a dual-thinking system. Your job is to verify "
-    "whether a response is logically correct and does not deviate from the original task. "
-    "Evaluate across four dimensions:\n"
-    "1. Logical correctness: Is the reasoning sound? Are there logical fallacies or factual errors?\n"
-    "2. Task alignment: Does the response address the original task without drifting off-topic?\n"
-    "3. Completeness: Does it fully answer the task?\n"
-    "4. Clarity: Is the response clear and well-structured?\n"
+    "You are an adversarial critic in a dual-thinking system. Your sole job is to find bugs, "
+    "flaws, and deviations in the response — assume it is defective until proven otherwise.\n"
+    "Hunt aggressively for problems across four dimensions:\n"
+    "1. Logical flaws: Find fallacies, unsupported claims, contradictions, or faulty reasoning. "
+    "Do NOT assume the reasoning is sound — probe it.\n"
+    "2. Task deviation: Identify ANY drift from the original task. Flag tangential, missing, or "
+    "over-scoped content. Even subtle misalignment is a bug.\n"
+    "3. Gaps: Find what is incomplete, hand-waved, or left unanswered. Vague answers are defects.\n"
+    "4. Errors: Hunt for factual errors, incorrect assumptions, and broken logic chains.\n"
+    "Be skeptical and rigorous. A long or well-formatted response is NOT automatically correct — "
+    "length and clarity do not excuse logical defects. Only assign a high score if you genuinely "
+    "cannot find any bugs after thorough scrutiny.\n"
     "Reply with ONLY a JSON object (no markdown fences, no extra text):\n"
-    "{\"score\": <float 0.0-1.0>, \"acceptable\": <true|false>, \"critique\": \"<specific issues or empty string>\"}\n"
-    "Score guide: 0.9-1.0=excellent, 0.7-0.89=acceptable, 0.5-0.69=needs minor fix, "
-    "0.3-0.49=needs major fix, below 0.3=reject.";
+    "{\"score\": <float 0.0-1.0>, \"acceptable\": <true|false>, \"critique\": \"<list every bug found, "
+    "or empty string only if flawless>\"}\n"
+    "Score guide: 0.9-1.0=no bugs found after rigorous scrutiny, 0.7-0.89=minor issues only, "
+    "0.5-0.69=several bugs or one significant flaw, 0.3-0.49=major flaws present, "
+    "below 0.3=critical defects, reject.";
 
 static const char S1_EXPERT_SYSTEM_PROMPT[] =
     "You are a domain expert arbitrator in a dual-thinking system. A fast verifier has "
@@ -80,12 +87,14 @@ static const char S1_EXPERT_SYSTEM_PROMPT[] =
  * @param ctx       回调上下文
  * @param system    system prompt
  * @param user      user prompt
+ * @param model     P2.7: 指定模型名（NULL = provider 默认模型）
  * @param out_text  [out] 响应文本（AGENTOS_MALLOC 分配，调用方释放）
  * @param out_len   [out] 响应文本长度
  * @return AGENTOS_SUCCESS 或错误码
  */
 static agentos_error_t tc3_llm_call(const tc3_llm_ctx_t *ctx, const char *system,
-                                    const char *user, char **out_text, size_t *out_len)
+                                    const char *user, const char *model,
+                                    char **out_text, size_t *out_len)
 {
     if (!ctx || !system || !user || !out_text || !out_len) {
         return AGENTOS_EINVAL;
@@ -121,7 +130,9 @@ static agentos_error_t tc3_llm_call(const tc3_llm_ctx_t *ctx, const char *system
 
     llm_request_config_t llm_cfg;
     __builtin_memset(&llm_cfg, 0, sizeof(llm_cfg));
-    llm_cfg.model = NULL; /* 使用 provider 默认模型 */
+    /* P2.7: 使用调用方指定的模型（支持 S2/S1-F/S1-P 三独立模型），
+     * NULL 时回退到 provider 默认模型（向后兼容）。 */
+    llm_cfg.model = model;
     llm_cfg.messages = msgs;
     llm_cfg.message_count = 2;
     llm_cfg.temperature = 0.3f; /* 验证/仲裁需要确定性，低 temperature */
@@ -445,7 +456,8 @@ agentos_error_t tc3_llm_s2_generate(const char *input, size_t input_len, char **
     /* 后续轮（修正）: 调用 LLM 独立生成 */
     size_t prompt_len = input_len > TC3_LLM_MAX_PROMPT_LEN ? TC3_LLM_MAX_PROMPT_LEN : input_len;
 
-    agentos_error_t err = tc3_llm_call(ctx, S2_SYSTEM_PROMPT, input, output, &prompt_len);
+    agentos_error_t err = tc3_llm_call(ctx, S2_SYSTEM_PROMPT, input, ctx->s2_model,
+                                        output, &prompt_len);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_WARN("TC3 s2_generate: LLM call failed (err=%d round=%d), "
                         "tc3 correction loop will abort this unit",
@@ -519,27 +531,31 @@ agentos_error_t tc3_llm_s1_verify(const char *content, size_t content_len, float
     /* 调用 LLM */
     char *llm_resp = NULL;
     size_t llm_resp_len = 0;
-    agentos_error_t err = tc3_llm_call(ctx, S1_VERIFY_SYSTEM_PROMPT, prompt,
+    agentos_error_t err = tc3_llm_call(ctx, S1_VERIFY_SYSTEM_PROMPT, prompt, ctx->s1_verify_model,
                                        &llm_resp, &llm_resp_len);
     AGENTOS_FREE(prompt);
 
     if (err != AGENTOS_SUCCESS || !llm_resp || llm_resp_len == 0) {
-        /* LLM 不可用 — 回退到启发式评分（保证 tc3 循环不中断） */
-        AGENTOS_LOG_WARN("TC3 s1_verify: LLM unavailable (err=%d), using heuristic fallback",
+        /* P2.8: LLM 不可用时不再字数加分放行（原逻辑会让长文本自动 acceptable）。
+         *
+         * 对抗式验证的核心原则：无法验证 = 无法通过。当 LLM 不可用时，
+         * 返回保守低分（0.3）+ acceptable=0，强制 tc3 走修正路径或升级
+         * 专家仲裁，而非自动放行。这避免了"长文即合格"的假验证。
+         *
+         * 返回 AGENTOS_SUCCESS 表示"验证已完成"（只是结果是不通过），
+         * 调用方 verify_with_metacognition 会据此降级到 metacognition
+         * 或 default_s1_verify 做进一步评估。 */
+        AGENTOS_LOG_WARN("TC3 s1_verify: LLM unavailable (err=%d), applying conservative "
+                         "fail-closed verdict (score=0.3, not acceptable)",
                         (int)err);
 
-        float score = 0.5f;
-        if (content_len > 20) score += 0.1f;
-        if (content_len > 50) score += 0.1f;
-        if (content_len > 100) score += 0.05f;
-        if (score > 1.0f) score = 1.0f;
-
-        *out_score = score;
-        if (out_acceptable) *out_acceptable = (score >= 0.7f) ? 1 : 0;
+        *out_score = 0.3f;
+        if (out_acceptable)
+            *out_acceptable = 0;
 
         if (out_critique && out_critique_len) {
-            const char *fb = "LLM evaluator unavailable; heuristic score applied. "
-                             "Cannot verify logical correctness or task alignment without LLM.";
+            const char *fb = "Adversarial verification unavailable (LLM offline). "
+                             "Cannot confirm absence of bugs — fail-closed: content unverified.";
             size_t fb_len = strlen(fb);
             char *fb_copy = (char *)AGENTOS_MALLOC(fb_len + 1);
             if (fb_copy) {
@@ -549,7 +565,7 @@ agentos_error_t tc3_llm_s1_verify(const char *content, size_t content_len, float
                 *out_critique_len = fb_len;
             }
         }
-        return AGENTOS_SUCCESS; /* 回退成功，不是错误 */
+        return AGENTOS_SUCCESS;
     }
 
     /* 解析 LLM 响应 */
@@ -735,7 +751,7 @@ agentos_error_t tc3_llm_s1_expert(const char *content, size_t content_len, const
     /* 调用 LLM */
     char *llm_resp = NULL;
     size_t llm_resp_len = 0;
-    agentos_error_t err = tc3_llm_call(ctx, S1_EXPERT_SYSTEM_PROMPT, prompt,
+    agentos_error_t err = tc3_llm_call(ctx, S1_EXPERT_SYSTEM_PROMPT, prompt, ctx->s1_expert_model,
                                        &llm_resp, &llm_resp_len);
     AGENTOS_FREE(prompt);
 

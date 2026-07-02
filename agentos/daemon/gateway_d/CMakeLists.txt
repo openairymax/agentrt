@@ -258,6 +258,8 @@ endif()
 add_executable(gateway_d
     src/main.c
 )
+# DEP-06 合规：二进制输出名统一为 agentos-<name>-d 格式
+set_target_properties(gateway_d PROPERTIES OUTPUT_NAME agentos-gateway-d)
 
 if(AGENTOS_ENABLE_PROTOCOLS)
     target_compile_definitions(gateway_d PRIVATE AGENTOS_HAS_PROTOCOLS=1)

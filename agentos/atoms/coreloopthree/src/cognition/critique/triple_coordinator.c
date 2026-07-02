@@ -87,26 +87,39 @@ static agentos_error_t default_s1_verify(const char *content, size_t content_len
     const tc3_config_t *config = (const tc3_config_t *)user_data;
     float accept_threshold = config ? config->accept_threshold : TC3_ACCEPT_THRESHOLD;
 
-    float score = 0.5f;
-    if (content_len > 20)
-        score += 0.1f;
+    /* P2.8: 对抗式验证改造 — 移除确认偏误关键词加分。
+     *
+     * 原 default_s1_verify 基于"because"/"therefore"关键词加分，这是
+     * 确认偏误（用表面关键词判断正确性）。对抗式验证的核心是"假设有
+     * 缺陷，寻找证据"，而非"假设正确，寻找确认信号"。
+     *
+     * 新评分逻辑仅基于最低限度的结构完整性检查（内容非空、有基本长度、
+     * 含句号表示完整句子），作为 LLM 和 metacognition 都不可用时的
+     * 最后回退。这是"无法验证时的保守估计"，而非"验证通过"。
+     *
+     * 基准分 0.4（保守），长度加分上限 0.2，最高 0.6 — 低于大多数
+     * accept_threshold（0.55~0.7），确保 default_s1_verify 不会自动
+     * 放行，强制走修正路径或专家仲裁。
+     */
+    float score = 0.4f;
     if (content_len > 50)
         score += 0.1f;
-    if (strstr(content, "because") || strstr(content, "therefore"))
+    if (content_len > 200)
         score += 0.1f;
-    if (content_len > 100 && strchr(content, '.'))
-        score += 0.05f;
+    if (content_len > 0 && strchr(content, '.'))
+        score += 0.05f; /* 含句号 = 至少有一个完整句子 */
 
-    if (score > 1.0f)
-        score = 1.0f;
+    if (score > 0.65f)
+        score = 0.65f; /* default_s1_verify 最高 0.65，不自动放行 */
     *out_score = score;
     if (out_acceptable)
         *out_acceptable = (score >= accept_threshold) ? 1 : 0;
 
     if (out_critique && out_critique_len) {
         if (score < accept_threshold) {
-            const char *tmpl = "Quality below threshold (%.2f < %.2f). Needs improvement.";
-            size_t buf_sz = 128;
+            const char *tmpl = "Default heuristic: content unverified (score=%.2f < %.2f). "
+                               "LLM/metacognition unavailable — conservative verdict applied.";
+            size_t buf_sz = 192;
             char *buf = (char *)AGENTOS_MALLOC(buf_sz);
             if (buf) {
                 snprintf(buf, buf_sz, tmpl, score, (double)accept_threshold);
@@ -496,6 +509,29 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
                 break;
             }
 
+            /* P2.9: 语义循环检测 — 修正内容与当前内容完全相同则中止
+             *
+             * 当 S2 生成的 corrected 与 current_text 完全相同时，说明修正陷入
+             * 循环（S2 无视了 critique，重复生成相同内容）。继续循环只会消耗
+             * 资源而无法改善，因此中止修正循环，保留当前 verdict（通常为
+             * MINOR_FIX/MAJOR_FIX），交由外层 ACCEPT/REJECT 决策处理。
+             *
+             * 这是最低成本的循环检测：完全相同（memcmp）。更复杂的相似度
+             * 检测（如编辑距离、Jaccard）可由后续版本通过 s1_verify 回调
+             * 在评分阶段实现，此处不引入额外依赖。
+             */
+            if (current_text && corrected && current_len == corrected_len &&
+                current_len > 0 &&
+                __builtin_memcmp(current_text, corrected, corrected_len) == 0) {
+                AGENTOS_LOG_WARN("tc3: unit[%u] semantic loop detected — corrected text "
+                                 "identical to current (attempt=%u len=%zu), aborting correction",
+                                 (unsigned int)unit.unit_index, correction_attempts, corrected_len);
+                coord->stats.loop_detected_units++;
+                AGENTOS_FREE(corrected);
+                corrected = NULL;
+                break;
+            }
+
             if (owns_current && current_text)
                 AGENTOS_FREE(current_text);
             current_text = corrected;
@@ -549,6 +585,17 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
         coord->stats.total_units++;
 
         if (verdict == TC3_RESULT_REJECT) {
+            /* P2.9: REJECT 不再静默丢弃 — 记录 WARN 级别日志含拒绝率，
+             * 供调用方（engine.c）据此调整策略 */
+            AGENTOS_LOG_WARN("tc3: unit[%u] REJECTED (score=%.2f attempts=%u "
+                             "rejected=%zu/%zu=%.0f%%)",
+                             (unsigned int)unit.unit_index, (double)score,
+                             correction_attempts, coord->stats.rejected_units,
+                             coord->stats.total_units,
+                             coord->stats.total_units > 0
+                                 ? (double)coord->stats.rejected_units /
+                                       (double)coord->stats.total_units * 100.0
+                                 : 0.0);
             if (owns_current)
                 AGENTOS_FREE(current_text);
             continue;
@@ -598,10 +645,12 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
     AGENTOS_FREE(s2_output);
 
     coord->stats.total_time_ns = agentos_time_monotonic_ns() - start_ns;
-    AGENTOS_LOG_INFO("C-L02: ThinkDual tc3 complete (units=%u accepted=%u minor=%u major=%u rejected=%u avg_score=%.2f time=%llu ms)",
+    AGENTOS_LOG_INFO("C-L02: ThinkDual tc3 complete (units=%u accepted=%u minor=%u major=%u "
+                     "rejected=%u loops=%u corrections=%u avg_score=%.2f time=%llu ms)",
                     (unsigned)coord->stats.total_units, (unsigned)coord->stats.accepted_units,
                     (unsigned)coord->stats.minor_fix_units, (unsigned)coord->stats.major_fix_units,
-                    (unsigned)coord->stats.rejected_units, (double)coord->stats.avg_score,
+                    (unsigned)coord->stats.rejected_units, (unsigned)coord->stats.loop_detected_units,
+                    (unsigned)coord->stats.total_corrections, (double)coord->stats.avg_score,
                     (unsigned long long)(coord->stats.total_time_ns / 1000000ULL));
     if (coord->stats.total_units > 0) {
         float sum = 0.0f;

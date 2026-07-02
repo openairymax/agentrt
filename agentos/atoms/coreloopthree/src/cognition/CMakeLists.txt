@@ -18,6 +18,7 @@ add_library(agentos_cognition STATIC
     foundation/thinking_chain.c
     critique/stream_critic.c
     dispatch/parallel_dispatcher.c
+    planner/llm_client.c
     planner/reactive.c
     planner/hierarchical.c
     planner/reflective.c
