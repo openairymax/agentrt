@@ -242,6 +242,49 @@ static agentos_error_t verify_with_metacognition(tc3_coordinator_t *coord,
     return vfy_err;
 }
 
+/* P3.11-B6: 基于字符频率余弦相似度的语义环路检测。
+ *
+ * 此前环路检测仅用 memcmp 完全匹配（L523-525），无法捕获 paraphrase、近义改写、
+ * 局部重复等语义循环——S2 无视 critique 但做了微调（如改标点、换行）即可绕过检测，
+ * 导致 correction 循环空转消耗资源。
+ *
+ * 改进为字符频率余弦相似度：对 UTF-8 字节流统计 256 个字节值的出现频率，计算
+ * 频率向量的余弦相似度。对中英文均有效（中文 UTF-8 字节频率具区分性）。
+ *
+ * 阈值 0.95：memcmp 对应 cosine=1.0，0.95 允许微小改动但仍判定为环路。
+ * 使用平方比较（cosine² > 0.95² ≈ 0.9025）避免 math.h sqrt 依赖。
+ *
+ * 局限性：字符频率相似度对"相同字符不同顺序"的文本会给出高分（如 "abc" vs "cba"），
+ * 但在 correction 场景中，S2 生成的内容与当前内容字符顺序通常一致（仅微调），
+ * 此局限可接受。1.0.1 可升级为 bigram Jaccard 或编辑距离。 */
+static int text_is_semantic_loop(const char *a, size_t a_len, const char *b, size_t b_len)
+{
+    if (a_len == 0 || b_len == 0)
+        return 0;
+
+    int freq_a[256] = {0};
+    int freq_b[256] = {0};
+
+    for (size_t i = 0; i < a_len; i++)
+        freq_a[(unsigned char)a[i]]++;
+    for (size_t i = 0; i < b_len; i++)
+        freq_b[(unsigned char)b[i]]++;
+
+    double dot = 0.0, norm_a = 0.0, norm_b = 0.0;
+    for (int i = 0; i < 256; i++) {
+        dot += (double)freq_a[i] * (double)freq_b[i];
+        norm_a += (double)freq_a[i] * (double)freq_a[i];
+        norm_b += (double)freq_b[i] * (double)freq_b[i];
+    }
+
+    if (norm_a == 0.0 || norm_b == 0.0)
+        return 0;
+
+    /* cosine² = dot² / (norm_a * norm_b)，阈值 0.95² ≈ 0.9025 */
+    double cosine_sq = (dot * dot) / (norm_a * norm_b);
+    return cosine_sq > 0.9025;
+}
+
 static agentos_error_t build_correction_prompt(const char *original, size_t original_len,
                                                const char *critique, size_t critique_len,
                                                int attempt, char **out_prompt,
@@ -509,23 +552,23 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
                 break;
             }
 
-            /* P2.9: 语义循环检测 — 修正内容与当前内容完全相同则中止
+            /* P3.11-B6: 语义循环检测 — 基于字符频率余弦相似度
              *
-             * 当 S2 生成的 corrected 与 current_text 完全相同时，说明修正陷入
-             * 循环（S2 无视了 critique，重复生成相同内容）。继续循环只会消耗
-             * 资源而无法改善，因此中止修正循环，保留当前 verdict（通常为
+             * 当 S2 生成的 corrected 与 current_text 语义高度相似（cosine > 0.92）时，
+             * 说明修正陷入循环（S2 无视了 critique，仅做微调重复生成）。继续循环只会
+             * 消耗资源而无法改善，因此中止修正循环，保留当前 verdict（通常为
              * MINOR_FIX/MAJOR_FIX），交由外层 ACCEPT/REJECT 决策处理。
              *
-             * 这是最低成本的循环检测：完全相同（memcmp）。更复杂的相似度
-             * 检测（如编辑距离、Jaccard）可由后续版本通过 s1_verify 回调
-             * 在评分阶段实现，此处不引入额外依赖。
+             * P2.9 原实现仅检测完全相同（memcmp），S2 改标点/换行/微调即可绕过。
+             * P3.11-B6 升级为字符频率余弦相似度，捕获 paraphrase / 近义改写 / 局部重复。
              */
-            if (current_text && corrected && current_len == corrected_len &&
-                current_len > 0 &&
-                __builtin_memcmp(current_text, corrected, corrected_len) == 0) {
+            if (current_text && corrected && current_len > 0 && corrected_len > 0 &&
+                text_is_semantic_loop(current_text, current_len, corrected, corrected_len)) {
                 AGENTOS_LOG_WARN("tc3: unit[%u] semantic loop detected — corrected text "
-                                 "identical to current (attempt=%u len=%zu), aborting correction",
-                                 (unsigned int)unit.unit_index, correction_attempts, corrected_len);
+                                 "highly similar to current (attempt=%u cur_len=%zu "
+                                 "corr_len=%zu cosine>0.95), aborting correction",
+                                 (unsigned int)unit.unit_index, correction_attempts,
+                                 current_len, corrected_len);
                 coord->stats.loop_detected_units++;
                 AGENTOS_FREE(corrected);
                 corrected = NULL;
@@ -585,20 +628,112 @@ agentos_error_t tc3_coordinator_execute(tc3_coordinator_t *coord, const char *in
         coord->stats.total_units++;
 
         if (verdict == TC3_RESULT_REJECT) {
-            /* P2.9: REJECT 不再静默丢弃 — 记录 WARN 级别日志含拒绝率，
-             * 供调用方（engine.c）据此调整策略 */
-            AGENTOS_LOG_WARN("tc3: unit[%u] REJECTED (score=%.2f attempts=%u "
-                             "rejected=%zu/%zu=%.0f%%)",
-                             (unsigned int)unit.unit_index, (double)score,
-                             correction_attempts, coord->stats.rejected_units,
-                             coord->stats.total_units,
-                             coord->stats.total_units > 0
-                                 ? (double)coord->stats.rejected_units /
-                                       (double)coord->stats.total_units * 100.0
-                                 : 0.0);
-            if (owns_current)
-                AGENTOS_FREE(current_text);
-            continue;
+            /* P3.11-B5: REJECT 大声失败 + 一次"完全重写"重试
+             *
+             * P2.9 原实现仅记录 WARN 日志后 continue 丢弃，无重试机制。
+             * P3.11-B5 改为：
+             *   1. 用 "complete rewrite from scratch" 指令调用 s2_fn 重新生成一次
+             *      （区别于 correction 的 "improve based on critique" 指令）
+             *   2. 重新验证：若 verdict 改善（非 REJECT），接受重试结果
+             *   3. 若重试仍 REJECT，记录 ERROR 级别日志（大声失败）并丢弃
+             */
+            int retry_succeeded = 0;
+            if (s2_fn && current_text && current_len > 0) {
+                /* 构建 rewrite prompt（不截断，完整传入 current_text） */
+                size_t rw_sz = current_len + 256;
+                char *rw_prompt = (char *)AGENTOS_MALLOC(rw_sz);
+                if (rw_prompt) {
+                    int rw_written = snprintf(rw_prompt, rw_sz,
+                        "[Rejected Content (quality insufficient after %u corrections)]\n"
+                        "%.*s\n\n"
+                        "[Instruction: Completely rewrite this from scratch with high quality. "
+                        "Do not merely patch the above — produce a fresh, correct version.]",
+                        (unsigned)correction_attempts,
+                        (int)current_len, current_text);
+
+                    if (rw_written > 0 && (size_t)rw_written < rw_sz) {
+                        char *rewritten = NULL;
+                        size_t rewritten_len = 0;
+                        agentos_error_t rw_err = s2_fn(rw_prompt, (size_t)rw_written,
+                                                        &rewritten, &rewritten_len,
+                                                        coord->config.s2_user_data);
+                        if (rw_err == AGENTOS_SUCCESS && rewritten && rewritten_len > 0) {
+                            float retry_score = 0.0f;
+                            int retry_acceptable = 0;
+                            char *retry_critique = NULL;
+                            size_t retry_critique_len = 0;
+                            verify_with_metacognition(coord, gen_step, rewritten, rewritten_len,
+                                                      &retry_score, &retry_acceptable,
+                                                      &retry_critique, &retry_critique_len);
+                            tc3_verdict_t retry_verdict = score_to_verdict(retry_score, &coord->config);
+                            if (retry_critique)
+                                AGENTOS_FREE(retry_critique);
+
+                            if (retry_verdict != TC3_RESULT_REJECT) {
+                                /* 重试成功 — 撤回 REJECT 计数，更新 verdict 和统计 */
+                                coord->stats.rejected_units--;
+                                if (owns_current && current_text)
+                                    AGENTOS_FREE(current_text);
+                                current_text = rewritten;
+                                current_len = rewritten_len;
+                                owns_current = 1;
+                                verdict = retry_verdict;
+                                score = retry_score;
+                                correction_attempts++; /* 计入重试 */
+                                switch (verdict) {
+                                case TC3_RESULT_ACCEPT:
+                                    coord->stats.accepted_units++;
+                                    break;
+                                case TC3_RESULT_MINOR_FIX:
+                                    coord->stats.minor_fix_units++;
+                                    break;
+                                case TC3_RESULT_MAJOR_FIX:
+                                    coord->stats.major_fix_units++;
+                                    break;
+                                case TC3_RESULT_ESCALATE:
+                                    break;
+                                default:
+                                    break;
+                                }
+                                retry_succeeded = 1;
+                                AGENTOS_LOG_INFO("tc3: unit[%u] REJECT retry SUCCEEDED "
+                                                 "(rewrite verdict=%d score=%.2f)",
+                                                 (unsigned int)unit.unit_index,
+                                                 (int)verdict, (double)score);
+                            } else {
+                                AGENTOS_FREE(rewritten);
+                                AGENTOS_LOG_DEBUG("tc3: unit[%u] REJECT retry still REJECTED "
+                                                  "(score=%.2f)",
+                                                  (unsigned int)unit.unit_index,
+                                                  (double)retry_score);
+                            }
+                        } else {
+                            AGENTOS_LOG_WARN("tc3: unit[%u] REJECT retry S2 call failed "
+                                             "(err=%d rewritten=%p)",
+                                             (unsigned int)unit.unit_index,
+                                             (int)rw_err, (void *)rewritten);
+                        }
+                    }
+                    AGENTOS_FREE(rw_prompt);
+                }
+            }
+
+            if (!retry_succeeded) {
+                /* P3.11-B5: 大声失败 — ERROR 级别日志（P2.9 为 WARN） */
+                AGENTOS_LOG_ERROR("tc3: unit[%u] REJECTED after retry (score=%.2f attempts=%u "
+                                  "rejected=%zu/%zu=%.0f%%) — content discarded",
+                                  (unsigned int)unit.unit_index, (double)score,
+                                  correction_attempts, coord->stats.rejected_units,
+                                  coord->stats.total_units,
+                                  coord->stats.total_units > 0
+                                      ? (double)coord->stats.rejected_units /
+                                            (double)coord->stats.total_units * 100.0
+                                      : 0.0);
+                if (owns_current)
+                    AGENTOS_FREE(current_text);
+                continue;
+            }
+            /* 重试成功，fall through 到 accepted 数组 */
         }
 
         if (accepted_count >= accepted_capacity) {

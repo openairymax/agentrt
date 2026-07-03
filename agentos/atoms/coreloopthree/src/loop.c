@@ -663,15 +663,20 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t *loop)
         loop->tool_adapter = NULL;
     }
 
+    /* P3.11-C9: memory engine 必须在 bridge 之前 destroy。
+     * memory engine 的 provider 是 borrowed（指向 bridge 的 active provider），
+     * 若 bridge 先 destroy 会释放 provider，memory engine destroy 时访问 provider->name
+     * 导致 use-after-free。交换顺序：memory engine 先 destroy（不销毁 borrowed provider），
+     * bridge 后 destroy（销毁 provider）。 */
+    if (loop->memory) {
+        agentos_memory_destroy(loop->memory);
+        loop->memory = NULL;
+    }
+
     /* C-L12: 销毁 MemoryRovol 桥接器 */
     if (loop->memory_bridge) {
         memoryrovol_bridge_destroy(loop->memory_bridge);
         loop->memory_bridge = NULL;
-    }
-
-    if (loop->memory) {
-        agentos_memory_destroy(loop->memory);
-        loop->memory = NULL;
     }
     if (loop->execution) {
         agentos_execution_destroy(loop->execution);

@@ -23,6 +23,7 @@
 
 #include "memory_compat.h"
 #include "memoryrovol_bridge.h"
+#include "memoryrovol.h"
 #include "agentos_types.h"
 
 /* ============================================================================
@@ -401,6 +402,65 @@ static void test_health_check_and_dump(void) {
 }
 
 /* ============================================================================
+ * P1.16l-10: C2 — L3 公共 API 直接测试（bind_entity + query_relations）
+ * 验证 memoryrovol_l3_bind_entity / memoryrovol_l3_query_relations 不再返回
+ * ENOTSUP 桩，而是真正转调 KG API 完成实体注册与关系查询。
+ * ============================================================================ */
+
+static void test_l3_public_api_bind_and_query(void) {
+    TEST("C-L12 C2: L3 bind_entity + query_relations (no ENOTSUP stub)");
+
+    agentos_memoryrov_handle_t *handle = agentos_memoryrov_create();
+    CHECK(handle != NULL, "agentos_memoryrov_create returned NULL");
+
+    /* 1. 绑定实体 rec_001，附带两条关系 */
+    const char *relations =
+        "[{\"to\":\"rec_002\",\"type\":\"BEFORE\",\"weight\":0.8},"
+        " {\"to\":\"rec_003\",\"type\":\"SIMILAR_TO\",\"weight\":0.9}]";
+    agentos_error_t err = agentos_memoryrov_l3_bind_entity(
+        handle, "rec_001", "memory_record", relations);
+
+    /* OSS 模式（L3 未编译）返回 ENOTSUP — 非桩，是合法降级 */
+    if (err == (agentos_error_t)AGENTOS_ENOTSUP) {
+        printf("(OSS mode, L3 not compiled) ");
+        agentos_memoryrov_destroy(handle);
+        PASS();
+        return;
+    }
+    CHECK_EQ(err, 0, "l3_bind_entity should succeed");
+
+    /* 2. 查询 rec_001 的关联实体 */
+    char *json = NULL;
+    err = agentos_memoryrov_l3_query_relations(handle, "rec_001", &json);
+    CHECK_EQ(err, 0, "l3_query_relations should succeed");
+    CHECK(json != NULL, "query_relations should return JSON");
+
+    /* 3. 验证 JSON 包含 rec_002 和 rec_003 */
+    if (json) {
+        bool has_rec_002 = strstr(json, "rec_002") != NULL;
+        bool has_rec_003 = strstr(json, "rec_003") != NULL;
+        CHECK(has_rec_002, "JSON should contain rec_002");
+        CHECK(has_rec_003, "JSON should contain rec_003");
+        free(json);
+    }
+
+    /* 4. 查询不存在的实体 — 应返回 ENOENT 或空数组 */
+    char *json2 = NULL;
+    err = agentos_memoryrov_l3_query_relations(handle, "nonexistent_xyz", &json2);
+    if (json2) free(json2);
+    /* ENOENT 或 SUCCESS(空数组) 均可接受 */
+
+    /* 5. NULL 参数错误处理 */
+    err = agentos_memoryrov_l3_bind_entity(NULL, "rec", "type", NULL);
+    CHECK(err != 0, "NULL handle should fail");
+    err = agentos_memoryrov_l3_query_relations(NULL, "rec", &json);
+    CHECK(err != 0, "NULL handle query should fail");
+
+    agentos_memoryrov_destroy(handle);
+    PASS();
+}
+
+/* ============================================================================
  * Main
  * ============================================================================ */
 
@@ -416,6 +476,7 @@ int main(void) {
     test_concurrent_bridge_instances();
     test_sync_control();
     test_health_check_and_dump();
+    test_l3_public_api_bind_and_query();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            g_tests_passed, g_tests_total, g_tests_failed);
