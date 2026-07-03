@@ -32,9 +32,7 @@ typedef struct {
 static llm_adapter_ctx_t *llm_get_ctx(agentos_service_t service)
 {
     if (!service) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     return (llm_adapter_ctx_t *)agentos_service_get_user_data(service);
 }
@@ -250,9 +248,7 @@ agentos_error_t llm_service_adapter_wrap(agentos_service_t *out_service, llm_ser
 llm_service_t *llm_service_adapter_get_original(agentos_service_t service)
 {
     if (!service) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     llm_adapter_ctx_t *ctx = llm_get_ctx(service);
     return ctx ? ctx->llm_svc : NULL;

@@ -20,6 +20,10 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <ftw.h>
+#include <dirent.h>
 
 #include "memory_compat.h"
 #include "checkpoint_adapter.h"
@@ -61,6 +65,22 @@ static int g_tests_total = 0;
     } \
 } while(0)
 
+/* 用于需要资源清理的测试函数：CHECK 失败时跳转到 cleanup 标签，
+ * 确保已分配的 adapter/snapshot 资源被正确释放，避免内存泄漏。
+ * 这与 ASAN 的 leak detector 配合，确保测试失败时也是 0 泄漏。 */
+#define CHECK_GOTO(cond, reason, label) do { \
+    if (!(cond)) { FAIL(reason); goto label; } \
+} while(0)
+
+#define CHECK_EQ_GOTO(a, b, reason, label) do { \
+    if ((a) != (b)) { \
+        char buf[256]; \
+        snprintf(buf, sizeof(buf), "%s (got %d, expected %d)", reason, \
+                 (int)(a), (int)(b)); \
+        FAIL(buf); goto label; \
+    } \
+} while(0)
+
 /* ============================================================================
  * Helper: Create a sample snapshot
  * ============================================================================ */
@@ -96,46 +116,113 @@ static void free_snapshot_fields(checkpoint_snapshot_t *snap) {
 }
 
 /* ============================================================================
+ * Test storage path helpers
+ *
+ * 生产代码默认存储路径为 /var/lib/agentos/checkpoints/，在普通用户测试环境
+ * 下不存在（errno=ENOENT），导致 agentos_checkpoint_save → fopen 失败。
+ * 测试使用 /tmp/test_ckpt_<pid>/ 作为可写临时目录，并在退出时清理。
+ * ============================================================================ */
+
+static char g_test_storage_path[256];
+
+/* nftw 回调：递归删除文件/目录 */
+static int rm_cb(const char *path, const struct stat *sb,
+                 int typeflag, struct FTW *ftwbuf) {
+    (void)sb; (void)typeflag; (void)ftwbuf;
+    return remove(path);
+}
+
+/* 创建使用临时目录的 adapter。
+ * 多次调用会复用同一目录路径（进程级唯一），依赖测试间使用不同 task_id
+ * 避免相互干扰。目录在 main() 退出时由 cleanup_test_dir() 统一清理。 */
+static checkpoint_adapter_t *create_test_adapter(void) {
+    if (g_test_storage_path[0] == '\0') {
+        snprintf(g_test_storage_path, sizeof(g_test_storage_path),
+                 "/tmp/test_ckpt_%d", (int)getpid());
+    }
+
+    /* mkdir 创建目录（已存在则忽略 EEXIST） */
+    if (mkdir(g_test_storage_path, 0755) != 0 && errno != EEXIST) {
+        fprintf(stderr, "C-L07: cannot create test storage dir '%s': errno=%d\n",
+                g_test_storage_path, errno);
+        return NULL;
+    }
+
+    checkpoint_adapter_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.storage_path = g_test_storage_path;
+    config.save_interval_turns = 1;   /* 测试中每次 save 都立即落盘 */
+    config.save_interval_ms = 100;
+    config.enable_incremental_save = false;
+    config.enable_compression = false;
+    config.max_checkpoints_per_task = 100;
+    config.max_age_seconds = 3600;
+
+    return checkpoint_adapter_create(&config);
+}
+
+static void cleanup_test_dir(void) {
+    if (g_test_storage_path[0] != '\0') {
+        nftw(g_test_storage_path, rm_cb, 16, FTW_DEPTH | FTW_PHYS);
+        g_test_storage_path[0] = '\0';
+    }
+}
+
+/* ============================================================================
  * P1.16g-1: Normal Path — Checkpoint save and restore
  * ============================================================================ */
 
 static void test_normal_save_restore(void) {
     TEST("C-L07 Normal: Save checkpoint → restore → verify state");
 
-    checkpoint_adapter_t *adapter = checkpoint_adapter_create(NULL);
-    CHECK(adapter != NULL, "checkpoint_adapter_create returned NULL");
+    checkpoint_adapter_t *adapter = NULL;
+    checkpoint_snapshot_t snap;
+    checkpoint_snapshot_t *restored = NULL;
+    memset(&snap, 0, sizeof(snap));
 
-    CHECK(checkpoint_adapter_is_ready(adapter),
-          "Adapter should be ready after creation");
+    adapter = create_test_adapter();
+    CHECK_GOTO(adapter != NULL, "checkpoint_adapter_create returned NULL", cleanup);
+
+    CHECK_GOTO(checkpoint_adapter_is_ready(adapter),
+               "Adapter should be ready after creation", cleanup);
 
     /* Create and save a snapshot */
-    checkpoint_snapshot_t snap;
     fill_snapshot(&snap, "task-save-restore-001", 1, 10);
 
     int ret = checkpoint_adapter_save(adapter, "task-save-restore-001",
                                        "session-001", 1, &snap);
-    CHECK_EQ(ret, 0, "checkpoint_adapter_save should succeed");
+    CHECK_EQ_GOTO(ret, 0, "checkpoint_adapter_save should succeed", cleanup);
 
     /* Restore the saved snapshot */
-    checkpoint_snapshot_t *restored = NULL;
     ret = checkpoint_adapter_restore(adapter, "task-save-restore-001", &restored);
-    CHECK_EQ(ret, 0, "checkpoint_adapter_restore should succeed");
-    CHECK(restored != NULL, "Restored snapshot should not be NULL");
+    CHECK_EQ_GOTO(ret, 0, "checkpoint_adapter_restore should succeed", cleanup);
+    CHECK_GOTO(restored != NULL, "Restored snapshot should not be NULL", cleanup);
 
     /* Verify restored data */
-    CHECK(restored->sequence_num == 1, "Sequence number should match");
-    CHECK(restored->current_turn == 10, "Current turn should match");
-    CHECK(restored->total_turns == 100, "Total turns should match");
-    CHECK(restored->cognition_state_json != NULL,
-          "Cognition state should be restored");
+    CHECK_GOTO(restored->sequence_num == 1, "Sequence number should match", cleanup);
+    CHECK_GOTO(restored->current_turn == 10, "Current turn should match", cleanup);
+    CHECK_GOTO(restored->total_turns == 100, "Total turns should match", cleanup);
+    CHECK_GOTO(restored->cognition_state_json != NULL,
+               "Cognition state should be restored", cleanup);
 
     checkpoint_snapshot_free(restored);
+    restored = NULL;
     free_snapshot_fields(&snap);
 
     /* Clean up checkpoint */
     checkpoint_adapter_delete(adapter, "task-save-restore-001", 0);
     checkpoint_adapter_destroy(adapter);
+    adapter = NULL;
     PASS();
+    return;
+
+cleanup:
+    if (restored) checkpoint_snapshot_free(restored);
+    free_snapshot_fields(&snap);
+    if (adapter) {
+        checkpoint_adapter_delete(adapter, "task-save-restore-001", 0);
+        checkpoint_adapter_destroy(adapter);
+    }
 }
 
 /* ============================================================================
@@ -145,44 +232,65 @@ static void test_normal_save_restore(void) {
 static void test_normal_multiple_checkpoints(void) {
     TEST("C-L07 Normal: Multiple checkpoints → list → restore by sequence");
 
-    checkpoint_adapter_t *adapter = checkpoint_adapter_create(NULL);
-    CHECK(adapter != NULL, "checkpoint_adapter_create returned NULL");
+    checkpoint_adapter_t *adapter = NULL;
+    checkpoint_snapshot_t **snapshots = NULL;
+    size_t count = 0;
+    checkpoint_snapshot_t *seq2 = NULL;
+
+    adapter = create_test_adapter();
+    CHECK_GOTO(adapter != NULL, "checkpoint_adapter_create returned NULL", cleanup);
 
     /* Save multiple checkpoints */
     for (int i = 1; i <= 3; i++) {
         checkpoint_snapshot_t snap;
+        memset(&snap, 0, sizeof(snap));
         fill_snapshot(&snap, "task-multi-001", (uint64_t)i, (uint32_t)(i * 10));
         int ret = checkpoint_adapter_save(adapter, "task-multi-001",
                                            "session-001", (uint64_t)i, &snap);
-        CHECK_EQ(ret, 0, "Save checkpoint should succeed");
         free_snapshot_fields(&snap);
+        CHECK_EQ_GOTO(ret, 0, "Save checkpoint should succeed", cleanup);
     }
 
     /* List checkpoints */
-    checkpoint_snapshot_t **snapshots = NULL;
-    size_t count = 0;
     int ret = checkpoint_adapter_list(adapter, "task-multi-001",
                                        &snapshots, &count);
-    CHECK_EQ(ret, 0, "checkpoint_adapter_list should succeed");
-    CHECK(count >= 3, "Should have at least 3 checkpoints");
+    CHECK_EQ_GOTO(ret, 0, "checkpoint_adapter_list should succeed", cleanup);
+    CHECK_GOTO(count >= 3, "Should have at least 3 checkpoints", cleanup);
 
     /* Restore by specific sequence */
-    checkpoint_snapshot_t *seq2 = NULL;
     ret = checkpoint_adapter_restore_seq(adapter, "task-multi-001", 2, &seq2);
-    CHECK_EQ(ret, 0, "Restore sequence 2 should succeed");
-    CHECK(seq2 != NULL, "Restored snapshot should not be NULL");
-    CHECK_EQ(seq2->sequence_num, (uint64_t)2, "Should restore sequence 2");
+    CHECK_EQ_GOTO(ret, 0, "Restore sequence 2 should succeed", cleanup);
+    CHECK_GOTO(seq2 != NULL, "Restored snapshot should not be NULL", cleanup);
+    CHECK_EQ_GOTO(seq2->sequence_num, (uint64_t)2, "Should restore sequence 2", cleanup);
     checkpoint_snapshot_free(seq2);
+    seq2 = NULL;
 
     /* Cleanup */
     for (size_t i = 0; i < count; i++) {
         checkpoint_snapshot_free(snapshots[i]);
     }
     free(snapshots);
+    snapshots = NULL;
+    count = 0;
 
     checkpoint_adapter_delete(adapter, "task-multi-001", 0);
     checkpoint_adapter_destroy(adapter);
+    adapter = NULL;
     PASS();
+    return;
+
+cleanup:
+    if (seq2) checkpoint_snapshot_free(seq2);
+    if (snapshots) {
+        for (size_t i = 0; i < count; i++) {
+            checkpoint_snapshot_free(snapshots[i]);
+        }
+        free(snapshots);
+    }
+    if (adapter) {
+        checkpoint_adapter_delete(adapter, "task-multi-001", 0);
+        checkpoint_adapter_destroy(adapter);
+    }
 }
 
 /* ============================================================================
@@ -192,16 +300,22 @@ static void test_normal_multiple_checkpoints(void) {
 static void test_error_restore_nonexistent(void) {
     TEST("C-L07 Error: Restore non-existent checkpoint → AGENTOS_ENOENT");
 
-    checkpoint_adapter_t *adapter = checkpoint_adapter_create(NULL);
-    CHECK(adapter != NULL, "checkpoint_adapter_create returned NULL");
+    checkpoint_adapter_t *adapter = create_test_adapter();
+    CHECK_GOTO(adapter != NULL, "checkpoint_adapter_create returned NULL", cleanup);
 
     checkpoint_snapshot_t *restored = NULL;
     int ret = checkpoint_adapter_restore(adapter, "non-existent-task", &restored);
-    CHECK(ret != 0, "Restore non-existent should return error");
-    CHECK(restored == NULL, "Restored snapshot should be NULL for non-existent");
+    CHECK_GOTO(ret != 0, "Restore non-existent should return error", cleanup);
+    CHECK_GOTO(restored == NULL, "Restored snapshot should be NULL for non-existent", cleanup);
 
     checkpoint_adapter_destroy(adapter);
+    adapter = NULL;
     PASS();
+    return;
+
+cleanup:
+    if (restored) checkpoint_snapshot_free(restored);
+    if (adapter) checkpoint_adapter_destroy(adapter);
 }
 
 /* ============================================================================
@@ -211,30 +325,36 @@ static void test_error_restore_nonexistent(void) {
 static void test_error_null_adapter(void) {
     TEST("C-L07 Error: NULL adapter handling");
 
+    checkpoint_snapshot_t snap;
+    memset(&snap, 0, sizeof(snap));
+
     /* NULL adapter destroy should be safe */
     checkpoint_adapter_destroy(NULL);
 
     /* NULL adapter is_ready should return false */
     bool ready = checkpoint_adapter_is_ready(NULL);
-    CHECK(!ready, "NULL adapter should not be ready");
+    CHECK_GOTO(!ready, "NULL adapter should not be ready", cleanup);
 
     /* NULL adapter save should fail */
-    checkpoint_snapshot_t snap;
     fill_snapshot(&snap, "null-test", 1, 1);
     int ret = checkpoint_adapter_save(NULL, "null-test", "s1", 1, &snap);
-    CHECK(ret != 0, "NULL adapter save should fail");
+    CHECK_GOTO(ret != 0, "NULL adapter save should fail", cleanup);
     free_snapshot_fields(&snap);
 
     /* NULL adapter restore should fail */
     checkpoint_snapshot_t *restored = NULL;
     ret = checkpoint_adapter_restore(NULL, "null-test", &restored);
-    CHECK(ret != 0, "NULL adapter restore should fail");
+    CHECK_GOTO(ret != 0, "NULL adapter restore should fail", cleanup);
 
     /* NULL adapter delete should fail */
     ret = checkpoint_adapter_delete(NULL, "null-test", 0);
-    CHECK(ret != 0, "NULL adapter delete should fail");
+    CHECK_GOTO(ret != 0, "NULL adapter delete should fail", cleanup);
 
     PASS();
+    return;
+
+cleanup:
+    free_snapshot_fields(&snap);
 }
 
 /* ============================================================================
@@ -244,14 +364,19 @@ static void test_error_null_adapter(void) {
 static void test_error_null_snapshot(void) {
     TEST("C-L07 Error: Save with NULL snapshot");
 
-    checkpoint_adapter_t *adapter = checkpoint_adapter_create(NULL);
-    CHECK(adapter != NULL, "checkpoint_adapter_create returned NULL");
+    checkpoint_adapter_t *adapter = create_test_adapter();
+    CHECK_GOTO(adapter != NULL, "checkpoint_adapter_create returned NULL", cleanup);
 
     int ret = checkpoint_adapter_save(adapter, "task-001", "session-001", 1, NULL);
-    CHECK(ret != 0, "Save with NULL snapshot should fail");
+    CHECK_GOTO(ret != 0, "Save with NULL snapshot should fail", cleanup);
 
     checkpoint_adapter_destroy(adapter);
+    adapter = NULL;
     PASS();
+    return;
+
+cleanup:
+    if (adapter) checkpoint_adapter_destroy(adapter);
 }
 
 /* ============================================================================
@@ -261,7 +386,24 @@ static void test_error_null_snapshot(void) {
 static void test_timeout_checkpoint_ops(void) {
     TEST("C-L07 Timeout: Checkpoint operations with interval config");
 
-    checkpoint_adapter_config_t config = {0};
+    checkpoint_adapter_t *adapter = NULL;
+    checkpoint_snapshot_t snap;
+    checkpoint_snapshot_t *restored = NULL;
+    memset(&snap, 0, sizeof(snap));
+
+    /* 确保临时目录已创建（复用 create_test_adapter 的路径初始化逻辑） */
+    if (g_test_storage_path[0] == '\0') {
+        snprintf(g_test_storage_path, sizeof(g_test_storage_path),
+                 "/tmp/test_ckpt_%d", (int)getpid());
+    }
+    if (mkdir(g_test_storage_path, 0755) != 0 && errno != EEXIST) {
+        FAIL("cannot create test storage dir");
+        return;
+    }
+
+    checkpoint_adapter_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.storage_path = g_test_storage_path;
     config.save_interval_turns = 5;
     config.save_interval_ms = 100;
     config.enable_incremental_save = true;
@@ -269,27 +411,36 @@ static void test_timeout_checkpoint_ops(void) {
     config.max_checkpoints_per_task = 10;
     config.max_age_seconds = 3600;
 
-    checkpoint_adapter_t *adapter = checkpoint_adapter_create(&config);
-    CHECK(adapter != NULL, "checkpoint_adapter_create returned NULL");
+    adapter = checkpoint_adapter_create(&config);
+    CHECK_GOTO(adapter != NULL, "checkpoint_adapter_create returned NULL", cleanup);
 
     /* Save and restore should complete quickly */
-    checkpoint_snapshot_t snap;
     fill_snapshot(&snap, "task-timeout-001", 1, 5);
 
     int ret = checkpoint_adapter_save(adapter, "task-timeout-001",
                                        "session-001", 1, &snap);
-    CHECK_EQ(ret, 0, "Save should complete within timeout");
+    CHECK_EQ_GOTO(ret, 0, "Save should complete within timeout", cleanup);
 
-    checkpoint_snapshot_t *restored = NULL;
     ret = checkpoint_adapter_restore(adapter, "task-timeout-001", &restored);
-    CHECK_EQ(ret, 0, "Restore should complete within timeout");
-    CHECK(restored != NULL, "Restored snapshot should not be NULL");
+    CHECK_EQ_GOTO(ret, 0, "Restore should complete within timeout", cleanup);
+    CHECK_GOTO(restored != NULL, "Restored snapshot should not be NULL", cleanup);
 
     checkpoint_snapshot_free(restored);
+    restored = NULL;
     free_snapshot_fields(&snap);
     checkpoint_adapter_delete(adapter, "task-timeout-001", 0);
     checkpoint_adapter_destroy(adapter);
+    adapter = NULL;
     PASS();
+    return;
+
+cleanup:
+    if (restored) checkpoint_snapshot_free(restored);
+    free_snapshot_fields(&snap);
+    if (adapter) {
+        checkpoint_adapter_delete(adapter, "task-timeout-001", 0);
+        checkpoint_adapter_destroy(adapter);
+    }
 }
 
 /* ============================================================================
@@ -345,8 +496,8 @@ static void *concurrent_checkpoint_thread(void *arg) {
 static void test_concurrent_checkpoint_ops(void) {
     TEST("C-L07 Concurrent: Multiple simultaneous checkpoint operations");
 
-    checkpoint_adapter_t *adapter = checkpoint_adapter_create(NULL);
-    CHECK(adapter != NULL, "checkpoint_adapter_create returned NULL");
+    checkpoint_adapter_t *adapter = create_test_adapter();
+    CHECK_GOTO(adapter != NULL, "checkpoint_adapter_create returned NULL", cleanup);
 
     pthread_t threads[CKPT_CONCURRENT_THREADS];
     ckpt_thread_args_t args[CKPT_CONCURRENT_THREADS];
@@ -367,13 +518,18 @@ static void test_concurrent_checkpoint_ops(void) {
         total_errors += args[i].error_count;
     }
 
-    CHECK(total_success > 0, "At least some checkpoint ops should succeed");
-    CHECK_EQ(total_success + total_errors,
-             CKPT_CONCURRENT_THREADS * CKPT_OPS_PER_THREAD,
-             "All checkpoint operations should complete");
+    CHECK_GOTO(total_success > 0, "At least some checkpoint ops should succeed", cleanup);
+    CHECK_EQ_GOTO(total_success + total_errors,
+                  CKPT_CONCURRENT_THREADS * CKPT_OPS_PER_THREAD,
+                  "All checkpoint operations should complete", cleanup);
 
     checkpoint_adapter_destroy(adapter);
+    adapter = NULL;
     PASS();
+    return;
+
+cleanup:
+    if (adapter) checkpoint_adapter_destroy(adapter);
 }
 
 /* ============================================================================
@@ -383,33 +539,49 @@ static void test_concurrent_checkpoint_ops(void) {
 static void test_snapshot_management(void) {
     TEST("C-L07 Normal: Snapshot create → restore from snapshot file");
 
-    checkpoint_adapter_t *adapter = checkpoint_adapter_create(NULL);
-    CHECK(adapter != NULL, "checkpoint_adapter_create returned NULL");
+    checkpoint_adapter_t *adapter = NULL;
+    checkpoint_snapshot_t snap;
+    memset(&snap, 0, sizeof(snap));
+    char *restored_task_id = NULL;
+
+    adapter = create_test_adapter();
+    CHECK_GOTO(adapter != NULL, "checkpoint_adapter_create returned NULL", cleanup);
 
     /* Save a checkpoint first */
-    checkpoint_snapshot_t snap;
     fill_snapshot(&snap, "task-snap-001", 1, 15);
     int ret = checkpoint_adapter_save(adapter, "task-snap-001",
                                        "session-001", 1, &snap);
-    CHECK_EQ(ret, 0, "Save should succeed");
+    CHECK_EQ_GOTO(ret, 0, "Save should succeed", cleanup);
 
     /* Create a full snapshot to file */
-    const char *snap_path = "/tmp/test_ckpt_snapshot_001.json";
+    char snap_path[256];
+    snprintf(snap_path, sizeof(snap_path), "%s/test_ckpt_snapshot_001.json",
+             g_test_storage_path);
     ret = checkpoint_adapter_snapshot_create(adapter, "task-snap-001", snap_path);
     /* May succeed or fail depending on storage backend */
     (void)ret;
 
     /* Try snapshot restore */
-    char *restored_task_id = NULL;
     ret = checkpoint_adapter_snapshot_restore(adapter, snap_path, &restored_task_id);
     if (ret == 0 && restored_task_id != NULL) {
         free(restored_task_id);
+        restored_task_id = NULL;
     }
 
     free_snapshot_fields(&snap);
     checkpoint_adapter_delete(adapter, "task-snap-001", 0);
     checkpoint_adapter_destroy(adapter);
+    adapter = NULL;
     PASS();
+    return;
+
+cleanup:
+    if (restored_task_id) free(restored_task_id);
+    free_snapshot_fields(&snap);
+    if (adapter) {
+        checkpoint_adapter_delete(adapter, "task-snap-001", 0);
+        checkpoint_adapter_destroy(adapter);
+    }
 }
 
 /* ============================================================================
@@ -430,5 +602,9 @@ int main(void) {
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            g_tests_passed, g_tests_total, g_tests_failed);
+
+    /* 清理测试临时目录（无论测试通过与否） */
+    cleanup_test_dir();
+
     return g_tests_failed > 0 ? 1 : 0;
 }

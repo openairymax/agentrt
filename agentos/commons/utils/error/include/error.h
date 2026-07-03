@@ -538,6 +538,18 @@ char *agentos_error_chain_to_json(const agentos_error_chain_t *chain);
     } while (0)
 
 /**
+ * @brief 设置错误并返回 NULL（用于返回指针的函数）
+ *
+ * 与 AGENTOS_ERROR 的区别：返回 NULL 而非错误码，适用于函数返回类型为指针的场景。
+ * 错误码通过 error stack 传递，调用者可通过 agentos_error_last() 获取。
+ */
+#define AGENTOS_ERROR_NULL(code, msg)                                             \
+    do {                                                                          \
+        agentos_error_push_ex((code), __FILE__, __LINE__, __func__, "%s", (msg)); \
+        return NULL;                                                              \
+    } while (0)
+
+/**
  * @brief 条件检查，失败时返回错误
  */
 #define AGENTOS_CHECK(cond, code, msg)    \

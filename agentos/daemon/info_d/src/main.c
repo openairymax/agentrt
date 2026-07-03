@@ -94,8 +94,7 @@ static int info_d_on_client(int fd, uint32_t events, void *user_data)
     (void)events;
     info_d_service_t *svc = (info_d_service_t *)user_data;
     if (!svc || !svc->running) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "svc is NULL or not running");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "svc is NULL or not running");
     }
 
     agentos_socket_t client = agentos_socket_accept(fd, 0);
@@ -108,8 +107,7 @@ static int info_d_on_client(int fd, uint32_t events, void *user_data)
 static int info_d_collect_system_info(system_info_snapshot_t *snap)
 {
     if (!snap) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "snap is NULL");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "snap is NULL");
     }
     __builtin_memset(snap, 0, sizeof(*snap));
     snap->timestamp = (uint64_t)time(NULL);
@@ -183,8 +181,7 @@ static void *info_d_collect_loop(void *arg)
 #ifdef _WIN32
         return 1;
 #else
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
 #endif
     }
 
@@ -221,8 +218,7 @@ static void *info_d_collect_loop(void *arg)
 static int info_d_init(info_d_service_t *svc, int port, const char *sock)
 {
     if (!svc) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "svc is NULL");
     }
 
     __builtin_memset(svc, 0, sizeof(*svc));
@@ -243,23 +239,20 @@ static int info_d_init(info_d_service_t *svc, int port, const char *sock)
 static int info_d_start(info_d_service_t *svc)
 {
     if (!svc) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "svc is NULL");
     }
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
     if (svc->server_fd < 0) {
         SVC_LOG_ERROR("info_d: failed to create socket at %s", svc->socket_path);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
     }
 #else
     svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1", (uint16_t)svc->tcp_port);
     if (svc->server_fd < 0) {
         SVC_LOG_ERROR("info_d: failed to create TCP server");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create TCP server");
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "failed to create TCP server");
     }
 #endif
 
@@ -276,8 +269,7 @@ static int info_d_start(info_d_service_t *svc)
 static int info_d_stop(info_d_service_t *svc, int force)
 {
     if (!svc) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "svc is NULL");
     }
 
     agentos_mutex_lock(&svc->lock);
@@ -311,8 +303,7 @@ static int info_d_stop(info_d_service_t *svc, int force)
 static int info_d_destroy(info_d_service_t *svc)
 {
     if (!svc) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "svc is NULL");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "svc is NULL");
     }
 
     if (svc->server_fd != AGENTOS_INVALID_SOCKET) {

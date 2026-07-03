@@ -59,8 +59,7 @@ static void *tool_exec_thread(void *arg)
 {
     tool_exec_context_t *ctx = (tool_exec_context_t *)arg;
     if (!ctx || !ctx->executor || !ctx->call || !ctx->result) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     uint64_t start_ns = agentos_time_ns();

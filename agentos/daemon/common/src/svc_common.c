@@ -31,7 +31,11 @@
 #include "svc_logger.h"
 #include "thread_pool.h"
 
+#ifndef _WIN32
+/* SIGALRM/alarm/sigaction 仅 POSIX 可用；Windows 分支不依赖 signal.h
+ *（force-stop 超时机制在 Windows 退化为告警，见 agentos_service_stop） */
 #include <signal.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -117,8 +121,7 @@ static agentos_error_t svc_common_module_init(void)
     err = agentos_mutex_init(&g_registry.registry_mutex);
     if (err != AGENTOS_SUCCESS) {
         LOG_ERROR("Failed to initialize registry mutex: %d", err);
-        AGENTOS_ERROR_HANDLE(DAEMON_EINIT, "svc_common: registry mutex init failed");
-        return DAEMON_EINIT;
+        AGENTOS_ERROR(DAEMON_EINIT, "svc_common: registry mutex init failed");
     }
 
     g_registry.initialized = 1;
@@ -153,8 +156,7 @@ static void svc_common_module_cleanup(void)
 static agentos_service_internal_t *find_service_internal(const char *name)
 {
     if (!name || !g_registry.initialized) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_service_internal_t *current = g_registry.services;
@@ -165,8 +167,7 @@ static agentos_service_internal_t *find_service_internal(const char *name)
         current = current->next;
     }
 
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -175,8 +176,7 @@ static agentos_service_internal_t *find_service_internal(const char *name)
 static agentos_error_t register_service_internal(agentos_service_internal_t *service)
 {
     if (!service || !g_registry.initialized) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "register_service_internal: null service");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "register_service_internal: null service");
     }
 
     agentos_mutex_lock(&g_registry.registry_mutex);
@@ -282,7 +282,6 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
 
     if (!out_service || !name || !iface || !config) {
         return AGENTOS_EINVAL;
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: null parameter");
     }
 
     /* 初始化模块（如果未初始化） */
@@ -301,22 +300,19 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
     agentos_service_internal_t *service =
         (agentos_service_internal_t *)AGENTOS_CALLOC(1, sizeof(agentos_service_internal_t));
     if (!service) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ENOMEM, "agentos_service_create: calloc service failed");
-        return AGENTOS_ENOMEM;
+        AGENTOS_ERROR(AGENTOS_ENOMEM, "agentos_service_create: calloc service failed");
     }
 
     /* 初始化基本信息 */
     if (safe_strcpy(service->name, name, MAX_SERVICE_NAME_LEN) != 0) {
         AGENTOS_FREE(service);
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: name copy failed");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "agentos_service_create: name copy failed");
     }
 
     if (config->version) {
         if (safe_strcpy(service->version, config->version, MAX_SERVICE_VERSION_LEN) != 0) {
             AGENTOS_FREE(service);
-            AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: version copy failed");
-            return AGENTOS_EINVAL;
+            AGENTOS_ERROR(AGENTOS_EINVAL, "agentos_service_create: version copy failed");
         }
     }
 
@@ -325,8 +321,7 @@ agentos_error_t agentos_service_create(agentos_service_t *out_service, const cha
     err = agentos_mutex_init(&service->state_mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(service);
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_service_create: state mutex init failed");
-        return err;
+        AGENTOS_ERROR(err, "agentos_service_create: state mutex init failed");
     }
 
     /* 初始化统计互斥锁 */
@@ -424,7 +419,6 @@ agentos_error_t agentos_service_init(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot initialize from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_init: invalid state transition");
     }
 
     /* 更新状态 */
@@ -467,7 +461,6 @@ agentos_error_t agentos_service_start(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot start from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_start: invalid state transition");
     }
 
     /* 更新状态 */
@@ -495,6 +488,9 @@ agentos_error_t agentos_service_start(agentos_service_t svc)
     return AGENTOS_SUCCESS;
 }
 
+#ifndef _WIN32
+/* force-stop 超时机制依赖 SIGALRM/alarm，仅 POSIX 可用。
+ * Windows 分支不引用这些符号（见 agentos_service_stop 的 _WIN32 分支）。 */
 #define FORCE_STOP_TIMEOUT_SEC 5
 
 static volatile sig_atomic_t g_svc_stop_timeout_flag = 0;
@@ -503,6 +499,7 @@ static void svc_stop_timeout_handler(int signum __attribute__((unused)))
 {
     g_svc_stop_timeout_flag = 1;
 }
+#endif /* !_WIN32 */
 
 agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
 {
@@ -519,7 +516,6 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_WARN("Service '%s' cannot stop from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_stop: invalid state transition");
     }
 
     /* 更新状态 */
@@ -531,6 +527,7 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
     bool zombie = false;
 
     if (service->iface.stop) {
+#ifndef _WIN32
         struct sigaction old_act, new_act;
         if (force) {
             g_svc_stop_timeout_flag = 0;
@@ -576,6 +573,18 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force)
 #endif
             }
         }
+#else  /* _WIN32 */
+        /* Windows 无 SIGALRM/alarm/sigaction 机制，无法对 force stop 施加超时
+         * 强杀。退化语义：直接调用服务的 stop；超时保护不可用，若 stop 阻塞
+         * 将挂起该调用。明确告警以避免静默退化（ARCHITECTURAL_PRINCIPLES E-6
+         * 错误可追溯）。正常（非 force）停机路径不受影响。 */
+        if (force) {
+            LOG_WARN("Service '%s' force stop timeout not supported on Windows "
+                     "(SIGALRM/alarm unavailable) - force stop may hang",
+                     service->name);
+        }
+        err = service->iface.stop(svc, force);
+#endif /* _WIN32 */
     }
 
     agentos_mutex_lock(&service->state_mutex);
@@ -641,16 +650,16 @@ int agentos_service_handle_request_async(agentos_service_t service, const char *
                                          const char *params_json,
                                          agentos_svc_async_complete_fn on_complete, void *user_data)
 {
-    if (!service || !method)
-        return AGENTOS_ERR_INVALID_PARAM;
+    if (!service || !method) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "handle_request_async: null service or method");
+    }
 
     agentos_service_internal_t *svc = (agentos_service_internal_t *)service;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "handle_request_async: null service or method");
 
     async_request_context_t *ctx = (async_request_context_t *)AGENTOS_CALLOC(1, sizeof(*ctx));
-    if (!ctx)
-        return AGENTOS_ERR_OUT_OF_MEMORY;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "handle_request_async: calloc ctx failed");
+    if (!ctx) {
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "handle_request_async: calloc ctx failed");
+    }
 
     ctx->service = service;
     ctx->method = AGENTOS_STRDUP(method);
@@ -688,7 +697,6 @@ agentos_error_t agentos_service_pause(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot pause from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_pause: invalid state");
     }
 
     /* 检查是否支持暂停 */
@@ -722,7 +730,6 @@ agentos_error_t agentos_service_resume(agentos_service_t svc)
         agentos_mutex_unlock(&service->state_mutex);
         LOG_ERROR("Service '%s' cannot resume from state %d", service->name, service->state);
         return DAEMON_ESTATE;
-        AGENTOS_ERROR_HANDLE(DAEMON_ESTATE, "agentos_service_resume: invalid state");
     }
 
     /* 更新状态 */
@@ -766,8 +773,7 @@ bool agentos_service_is_running(agentos_service_t svc)
 const char *agentos_service_get_name(agentos_service_t svc)
 {
     if (!svc) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
@@ -777,8 +783,7 @@ const char *agentos_service_get_name(agentos_service_t svc)
 const char *agentos_service_get_version(agentos_service_t svc)
 {
     if (!svc) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_service_internal_t *service = (agentos_service_internal_t *)svc;
@@ -998,8 +1003,7 @@ agentos_error_t agentos_service_unregister(agentos_service_t svc)
 agentos_service_t agentos_service_find(const char *name)
 {
     if (!name || !g_registry.initialized) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_mutex_lock(&g_registry.registry_mutex);
@@ -1058,8 +1062,7 @@ agentos_error_t agentos_service_set_user_data(agentos_service_t service, void *u
 void *agentos_service_get_user_data(agentos_service_t service)
 {
     if (!service) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_service_internal_t *internal = (agentos_service_internal_t *)service;
@@ -1143,7 +1146,6 @@ agentos_error_t agentos_registry_init(const char *registry_url)
     err = agentos_mutex_init(&g_cross_registry.mutex);
     if (err != AGENTOS_SUCCESS) {
         return err;
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_registry_init: mutex init failed");
     }
 
     agentos_mutex_lock(&g_cross_registry.mutex);
@@ -1272,15 +1274,13 @@ agentos_service_metadata_t *agentos_registry_discover(const char *service_type,
                                                       const char *filter_tags, size_t *result_count)
 {
     if (!result_count) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     *result_count = 0;
 
     if (!g_cross_registry.initialized && g_cross_registry.entry_count == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_mutex_lock(&g_cross_registry.mutex);
@@ -1302,16 +1302,14 @@ agentos_service_metadata_t *agentos_registry_discover(const char *service_type,
 
     if (match_count == 0) {
         agentos_mutex_unlock(&g_cross_registry.mutex);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     agentos_service_metadata_t *results = (agentos_service_metadata_t *)AGENTOS_CALLOC(
         match_count, sizeof(agentos_service_metadata_t));
     if (!results) {
         agentos_mutex_unlock(&g_cross_registry.mutex);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t idx = 0;
@@ -1450,7 +1448,6 @@ agentos_error_t agentos_config_load(const char *service_name, agentos_config_t *
     if (!service_name || !config) {
         return AGENTOS_EINVAL;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "agentos_config_load: null parameter");
 
     config_mgr_init();
 
@@ -1477,7 +1474,6 @@ agentos_error_t agentos_config_load(const char *service_name, agentos_config_t *
     if (!cfg) {
         return AGENTOS_ENOMEM;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ENOMEM, "agentos_config_load: calloc config failed");
 
     if (!fp) {
         cfg->raw_config = AGENTOS_CALLOC(1, 1);
@@ -1518,7 +1514,6 @@ agentos_error_t agentos_config_load(const char *service_name, agentos_config_t *
         AGENTOS_FREE(cfg);
         return AGENTOS_EIO;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_EIO, "agentos_config_load: fread size mismatch");
 
     cfg->config_size = bytes_read;
     cfg->raw_config[bytes_read] = '\0';
@@ -1648,8 +1643,7 @@ static void *monitor_thread_func(void *arg)
 {
     monitored_service_t *mon = (monitored_service_t *)arg;
     if (!mon || !mon->service) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     const char *svc_name = agentos_service_get_name(mon->service);
@@ -1719,8 +1713,7 @@ static void *monitor_thread_func(void *arg)
     }
 
     LOG_INFO("Monitor thread stopped for service '%s'", svc_name);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 agentos_error_t agentos_service_monitor_start(agentos_service_t service,

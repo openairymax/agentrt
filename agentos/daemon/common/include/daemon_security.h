@@ -388,6 +388,42 @@ int daemon_audit_log_event(const char *service_name, const char *operation, cons
 int daemon_security_get_status(int *sanitizer_status, int *permission_status, int *signature_status,
                                int *vault_status, int *audit_status);
 
+/**
+ * @brief Register an ACL permission rule
+ *
+ * Adds an entry to the in-memory ACL table used by daemon_check_tool_permission()
+ * and daemon_check_llm_permission(). This is the programmatic equivalent of
+ * loading a permission_rules.yaml entry, and is intended for use by:
+ *   - Test harnesses that need to provision ACL entries before running
+ *   - Runtime administrators who need to grant/deny permissions dynamically
+ *   - Bootstrap paths that provision permissions before the rule-file loader runs
+ *
+ * The ACL table is fail-closed: daemon_check_tool_permission() returns DENY
+ * for any (agent_id, tool_name) pair without a matching allowed=true entry.
+ * Without calling this function (or loading a rules file), all permission
+ * checks will fail.
+ *
+ * @param[in] agent_id Agent identifier (max 63 chars, NUL-terminated)
+ * @param[in] resource Resource name: tool_name for tool checks, model_name for LLM checks
+ *                     (max 127 chars, NUL-terminated)
+ * @param[in] allowed  true to grant permission, false to explicitly deny
+ * @return 0 on success, negative on failure (AGENTOS_ERR_INVALID_PARAM / AGENTOS_ERR_OUT_OF_MEMORY)
+ *
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ *
+ * @ownership All parameters: caller retains ownership, function copies internally
+ *
+ * @example
+ * @code
+ * // Grant agent-001 permission to execute file_read
+ * daemon_security_add_acl_rule("agent-001", "file_read", true);
+ * // Explicitly deny restricted-agent from shell_exec
+ * daemon_security_add_acl_rule("restricted-agent", "shell_exec", false);
+ * @endcode
+ */
+int daemon_security_add_acl_rule(const char *agent_id, const char *resource, bool allowed);
+
 #ifdef __cplusplus
 }
 #endif

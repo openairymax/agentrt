@@ -4,17 +4,11 @@
 add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
-    message(STATUS "  [benchmarks] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    agentos_print_warn("  [benchmarks] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
     return()
 endif()
 
-add_executable(test_performance_benchmarks test_performance_benchmarks.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c
-)
-
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit/test_cl3_stubs.c
-    PROPERTIES COMPILE_FLAGS "-fno-lto"
-)
+add_executable(test_performance_benchmarks test_performance_benchmarks.c)
 
 target_include_directories(test_performance_benchmarks PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/corekern/include
@@ -36,6 +30,8 @@ target_link_libraries(test_performance_benchmarks PRIVATE
     agentos_coreloopthree
     -Wl,--no-whole-archive
     svc_common
+    agentos_llm_service
+    agentos_tool_service
     Threads::Threads
     agentos_platform_libs
     m
@@ -52,4 +48,4 @@ target_compile_options(test_performance_benchmarks PRIVATE
 
 add_test(NAME performance_benchmarks COMMAND test_performance_benchmarks)
 
-message(STATUS "  [benchmarks] test_performance_benchmarks: P2-C02 configured")
+agentos_print_ok("  [benchmarks] test_performance_benchmarks: P2-C02 configured")

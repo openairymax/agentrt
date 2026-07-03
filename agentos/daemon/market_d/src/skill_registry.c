@@ -25,8 +25,7 @@ int skill_registry_register(market_service_t *service, const skill_info_t *skill
 skill_info_t *skill_registry_find(market_service_t *service, const char *skill_id)
 {
     if (!service || !skill_id) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     search_params_t params = {0};
@@ -37,8 +36,7 @@ skill_info_t *skill_registry_find(market_service_t *service, const char *skill_i
     size_t count = 0;
     int ret = market_service_search_skills(service, &params, &results, &count);
     if (ret != 0 || count == 0 || !results) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     skill_info_t *found = results[0];

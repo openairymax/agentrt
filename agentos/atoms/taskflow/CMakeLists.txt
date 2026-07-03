@@ -138,13 +138,8 @@ target_include_directories(agentos_taskflow PRIVATE
 if(BUILD_TESTS)
     add_executable(test_taskflow_advanced
         tests/unit/test_taskflow_advanced.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
     )
     target_compile_definitions(test_taskflow_advanced PRIVATE AGENTOS_COMPLIANCE_IMPL)
-
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
-        PROPERTIES COMPILE_FLAGS "-fno-lto"
-    )
 
     target_include_directories(test_taskflow_advanced PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -166,6 +161,8 @@ if(BUILD_TESTS)
         agentos_core
         agentos_common
         svc_common
+        agentos_llm_service
+        agentos_tool_service
     )
 
     if(UNIX AND NOT APPLE)

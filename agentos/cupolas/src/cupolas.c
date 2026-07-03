@@ -84,7 +84,7 @@ int cupolas_init(const char *config_path, agentos_error_t *error)
     if (cupolas_mutex_init(&g_cupolas.lock) != 0) {
         if (error)
             *error = AGENTOS_ERR_IO;
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_UNKNOWN, "cupolas_init: mutex init failed");
+        CUPOLAS_LOG_ERROR("cupolas_init: mutex init failed");
         return cupolas_ERR_UNKNOWN;
     }
 
@@ -117,7 +117,7 @@ int cupolas_init(const char *config_path, agentos_error_t *error)
             g_cupolas.config_mgr = NULL;
         }
         cupolas_mutex_unlock(&g_cupolas.lock);
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_OUT_OF_MEMORY, "cupolas_init: calloc permission engine failed");
+        CUPOLAS_LOG_ERROR("cupolas_init: calloc permission engine failed");
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
@@ -132,7 +132,7 @@ int cupolas_init(const char *config_path, agentos_error_t *error)
             g_cupolas.config_mgr = NULL;
         }
         cupolas_mutex_unlock(&g_cupolas.lock);
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_OUT_OF_MEMORY, "cupolas_init: calloc sanitizer failed");
+        CUPOLAS_LOG_ERROR("cupolas_init: calloc sanitizer failed");
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
@@ -153,7 +153,7 @@ int cupolas_init(const char *config_path, agentos_error_t *error)
             g_cupolas.config_mgr = NULL;
         }
         cupolas_mutex_unlock(&g_cupolas.lock);
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_OUT_OF_MEMORY, "cupolas_init: calloc workbench failed");
+        CUPOLAS_LOG_ERROR("cupolas_init: calloc audit_logger failed");
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
@@ -214,12 +214,12 @@ int cupolas_check_permission(const char *agent_id, const char *action, const cha
                              const char *context)
 {
     if (!agent_id || !action || !resource) {
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_INVALID_PARAM, "cupolas_sanitize: null parameter");
+        CUPOLAS_LOG_ERROR("cupolas_check_permission: null parameter");
         return cupolas_ERR_INVALID_PARAM;
     }
 
     if (!g_cupolas.initialized || !g_cupolas.perm) {
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_STATE_ERROR, "cupolas_sanitize: not initialized");
+        CUPOLAS_LOG_ERROR("cupolas_check_permission: not initialized");
         return cupolas_ERR_STATE_ERROR;
     }
 
@@ -273,7 +273,7 @@ int cupolas_add_permission_rule(const char *agent_id, const char *action, const 
                                 int allow, int priority)
 {
     if (!g_cupolas.initialized || !g_cupolas.perm) {
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_STATE_ERROR, "cupolas_check_permission: not initialized");
+        CUPOLAS_LOG_ERROR("cupolas_add_permission_rule: not initialized");
         return cupolas_ERR_STATE_ERROR;
     }
 
@@ -292,14 +292,14 @@ void cupolas_clear_permission_cache(void)
 int cupolas_sanitize_input(const char *input, char *output, size_t output_size)
 {
     if (!input || !output || output_size == 0) {
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_INVALID_PARAM, "cupolas_create_workbench: null parameter");
+        CUPOLAS_LOG_ERROR("cupolas_sanitize_input: null parameter");
         return cupolas_ERR_INVALID_PARAM;
     }
 
     cupolas_mutex_lock(&g_cupolas.lock);
     if (!g_cupolas.initialized || !g_cupolas.san) {
         cupolas_mutex_unlock(&g_cupolas.lock);
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_STATE_ERROR, "cupolas_create_workbench: not initialized");
+        CUPOLAS_LOG_ERROR("cupolas_sanitize_input: not initialized");
         return cupolas_ERR_STATE_ERROR;
     }
 
@@ -358,14 +358,14 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
                             size_t stderr_size)
 {
     if (!command || !argv) {
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_INVALID_PARAM, "cupolas_audit_log: null parameter");
+        CUPOLAS_LOG_ERROR("cupolas_execute_command: null parameter");
         return cupolas_ERR_INVALID_PARAM;
     }
 
     cupolas_mutex_lock(&g_cupolas.lock);
     if (!g_cupolas.initialized) {
         cupolas_mutex_unlock(&g_cupolas.lock);
-        AGENTOS_ERROR_HANDLE(cupolas_ERR_STATE_ERROR, "cupolas_audit_log: not initialized");
+        CUPOLAS_LOG_ERROR("cupolas_execute_command: not initialized");
         return cupolas_ERR_STATE_ERROR;
     }
 

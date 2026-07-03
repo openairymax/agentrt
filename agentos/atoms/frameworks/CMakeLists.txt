@@ -59,6 +59,11 @@ endif()
 target_include_directories(agentos_frameworks PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include/agentos/frameworks>
+    ${COMMONS_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}/utils/memory/include
+    ${COMMONS_INCLUDE_DIR}/utils/error/include
+    ${COMMONS_INCLUDE_DIR}/utils/sync/include
+    ${COMMONS_INCLUDE_DIR}/platform/include
 )
 
 # 链接依赖：Frameworks 是 atoms 层薄模块，仅依赖基础平台与线程库

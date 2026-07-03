@@ -162,7 +162,9 @@ static void test_list_checkpoints(void)
     size_t count = 0;
     err = agentos_checkpoint_list("task_list", &list, &count);
     ASSERT(err == AGENTOS_OK, "list should succeed");
-    ASSERT(count == 1, "should have 1 checkpoint (per task_id file)");
+    /* v0.1.1: 文件名含 sequence_num，seq=1 与 seq=2 各自独立落盘，
+     * 不再相互覆盖，故 list 返回 2 个检查点。 */
+    ASSERT(count == 2, "should have 2 checkpoints (one per sequence)");
 
     for (size_t i = 0; i < count; i++) {
         agentos_checkpoint_destroy(list[i]);

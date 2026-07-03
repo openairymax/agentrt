@@ -254,8 +254,7 @@ agentos_dispatching_ml_create(const char __attribute__((unused)) * model_path, v
         (agentos_dispatching_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_dispatching_strategy_t));
     if (!strategy) {
         AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     strategy->dispatch = ml_dispatch;

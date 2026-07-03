@@ -513,8 +513,7 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
     SAFE_MALLOC_ARRAY(data, 1, sizeof(ml_planner_data_t));
     if (!data) {
         AGENTOS_FREE(strat);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     data->model = NULL;
@@ -522,8 +521,7 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
     if (model_path && !data->model_path) {
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     data->llm = llm;
     data->rule_based_active = false;
@@ -533,8 +531,7 @@ agentos_plan_strategy_t *agentos_plan_ml_create(const char *model_path, void *ll
             AGENTOS_FREE(data->model_path);
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* Attempt to load model if path provided */

@@ -160,14 +160,29 @@ static void test_audit_queue(void)
         audit_entry_create(AUDIT_EVENT_PERMISSION, "agent1", "read", "/data", NULL, 1);
     assert(entry1 != NULL);
 
-    assert(audit_queue_push(queue, entry1) == cupolas_OK);
+    /* v0.1.1 修复（BAN-318 测试反模式）：
+     * 此前 audit_queue_push 被包裹在 assert() 中，在 -DNDEBUG（Release）构建下
+     * 整个表达式不求值，导致 entry1 既未入队也未释放。audit_queue_destroy 仅释放
+     * 队列内条目，entry1 因此泄漏 210 字节（entry 结构体 + agent_id/action/resource
+     * 三个字符串），是全量测试套件中唯一失败的用例。
+     *
+     * 修复方式：将 push 从 assert 中拆出，确保 NDEBUG 下仍执行；push 失败时显式
+     * 释放 entry1 避免悬挂。同理拆出 try_pop，确保 entry2 始终被正确释放。 */
+    int push_ret = audit_queue_push(queue, entry1);
+    assert(push_ret == cupolas_OK);
+    if (push_ret != cupolas_OK) {
+        audit_entry_destroy(entry1);
+    }
     assert(audit_queue_size(queue) == 1);
 
     audit_entry_t *entry2 = NULL;
-    assert(audit_queue_try_pop(queue, &entry2) == cupolas_OK);
+    int pop_ret __attribute__((unused)) = audit_queue_try_pop(queue, &entry2);
+    assert(pop_ret == cupolas_OK);
     assert(entry2 != NULL);
-    assert(strcmp(entry2->agent_id, "agent1") == 0);
-    audit_entry_destroy(entry2);
+    if (entry2) {
+        assert(strcmp(entry2->agent_id, "agent1") == 0);
+        audit_entry_destroy(entry2);
+    }
 
     audit_queue_destroy(queue);
 

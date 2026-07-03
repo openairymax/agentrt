@@ -151,12 +151,10 @@ void agentos_registry_unregister_unit(const char *unit_id)
 agentos_execution_unit_t *agentos_registry_get_unit(const char *unit_id)
 {
     if (!unit_id) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     if (ensure_registry_init() != AGENTOS_SUCCESS) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     agentos_mutex_lock(g_registry_lock);
     registry_entry_t *entry = g_registry;
@@ -169,6 +167,5 @@ agentos_execution_unit_t *agentos_registry_get_unit(const char *unit_id)
         entry = entry->next;
     }
     agentos_mutex_unlock(g_registry_lock);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }

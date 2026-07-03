@@ -175,16 +175,14 @@ AGENTOS_API cb_manager_t cb_manager_create(void)
         (cb_manager_internal_t *)AGENTOS_CALLOC(1, sizeof(cb_manager_internal_t));
     if (!mgr) {
         SVC_LOG_ERROR("cb_manager_create: memory allocation failed");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_error_t err = agentos_mutex_init(&mgr->mutex);
     if (err != AGENTOS_SUCCESS) {
         SVC_LOG_ERROR("cb_manager_create: mutex init failed err=%d", err);
         AGENTOS_FREE(mgr);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     LOG_INFO("Circuit breaker manager created");
@@ -220,8 +218,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
 {
     if (!manager || !name) {
         SVC_LOG_ERROR("cb_create: null parameter manager=%p name=%p", (void *)manager, (void *)name);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     cb_manager_internal_t *mgr = (cb_manager_internal_t *)manager;
@@ -231,8 +228,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
     if (mgr->breaker_count >= CB_MAX_BREAKERS) {
         agentos_mutex_unlock(&mgr->mutex);
         SVC_LOG_ERROR("cb_create: max circuit breakers reached count=%u max=%u", mgr->breaker_count, CB_MAX_BREAKERS);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     for (uint32_t i = 0; i < mgr->breaker_count; i++) {
@@ -246,8 +242,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
     if (!cb) {
         agentos_mutex_unlock(&mgr->mutex);
         SVC_LOG_ERROR("cb_create: memory allocation failed for breaker '%s'", name);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     safe_strcpy(cb->name, name, CB_MAX_NAME_LEN);
@@ -269,8 +264,7 @@ AGENTOS_API circuit_breaker_t cb_create(cb_manager_t manager, const char *name,
         SVC_LOG_ERROR("cb_create: mutex init failed for breaker '%s' err=%d", name, err);
         AGENTOS_FREE(cb);
         agentos_mutex_unlock(&mgr->mutex);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     mgr->breakers[mgr->breaker_count] = cb;
@@ -519,8 +513,7 @@ AGENTOS_API const char *cb_get_name(circuit_breaker_t breaker)
 {
     if (!breaker) {
         SVC_LOG_ERROR("cb_get_name: null breaker parameter");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     cb_internal_t *cb = (cb_internal_t *)breaker;
     return cb->name;
@@ -743,8 +736,7 @@ AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char *name)
 {
     if (!manager || !name) {
         SVC_LOG_ERROR("cb_find: null parameter manager=%p name=%p", (void *)manager, (void *)name);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     cb_manager_internal_t *mgr = (cb_manager_internal_t *)manager;
@@ -760,8 +752,7 @@ AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char *name)
 
     agentos_mutex_unlock(&mgr->mutex);
     SVC_LOG_WARN("cb_find: breaker '%s' not found", name);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 AGENTOS_API uint32_t cb_count(cb_manager_t manager)

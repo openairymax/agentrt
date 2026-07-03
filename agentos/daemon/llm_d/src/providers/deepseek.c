@@ -44,8 +44,7 @@ static provider_ctx_t *deepseek_init(const char *name __attribute__((unused)), c
     if (!ctx) {
         SVC_LOG_ERROR("C-L02: DEEPSEEK: INIT-FAIL — OOM allocating ctx (size=%zu)",
                       sizeof(deepseek_ctx_t));
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     provider_base_init(&ctx->base, api_key, api_base, organization, timeout_sec, max_retries,
@@ -258,9 +257,7 @@ static llm_response_t *ds_build_stream_response(ds_stream_acc_t *acc)
 {
     llm_response_t *resp = (llm_response_t *)AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     resp->id = acc->resp_id ? acc->resp_id : AGENTOS_STRDUP("");

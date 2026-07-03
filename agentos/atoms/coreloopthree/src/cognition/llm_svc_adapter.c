@@ -41,7 +41,6 @@
 struct llm_svc_adapter_s {
     daemon_bootstrap_sd_t *bsd;          /* ServiceDiscovery 引导 */
     daemon_bootstrap_ipc_t *bipc;        /* IPC Bus 引导 */
-    llm_service_t *wrapper_svc;          /* 包装的 llm_service_t（模拟句柄） */
     char llm_d_service_name[64];         /* llm_d 服务名 */
     char channel_name[64];               /* IPC 通道名 */
     uint32_t request_timeout_ms;         /* 请求超时 */
@@ -55,15 +54,13 @@ struct llm_svc_adapter_s {
     uint64_t total_latency_us;
 };
 
-/* ==================== 内部：包装 llm_service_t 的虚函数表 ==================== */
+/* ==================== 内部：JSON-RPC 消息构建 ==================== */
 
 /*
- * 适配器包装的 llm_service_t 句柄实际上是一个占位符。
- * 真正的 IPC 调用通过 llm_svc_adapter_complete() 完成。
- * 此句柄用于注入到认知引擎的 set_llm_service() 接口。
+ * 设计说明：coreloopthree 不直接持有 llm_service_t 句柄（该结构由 llm_d daemon
+ * 内部构造和管理）。真正的 LLM 调用通过 llm_svc_adapter_complete() 经 IPC Bus
+ * 发送到 llm_d。认知引擎经 agentos_cognition_set_llm_adapter() 注入本适配器。
  */
-
-/* ==================== 内部：JSON-RPC 消息构建 ==================== */
 
 /**
  * @brief 将 llm_request_config_t 序列化为 JSON-RPC 请求字符串
@@ -107,7 +104,7 @@ static char *build_llm_request_json(const llm_request_config_t *config)
     snprintf(json, 131072,
              "{"
              "\"jsonrpc\":\"2.0\","
-             "\"method\":\"llm.complete\","
+             "\"method\":\"complete\","
              "\"id\":1,"
              "\"params\":{"
              "\"model\":\"%s\","
@@ -288,18 +285,13 @@ llm_svc_adapter_t *llm_svc_adapter_create(const llm_svc_adapter_config_t *config
         return NULL;
     }
 
-    /* 创建包装的 llm_service_t（占位符句柄，llm_service_t 是不透明类型） */
-    adapter->wrapper_svc = (llm_service_t *)AGENTOS_MALLOC(1);
-    if (!adapter->wrapper_svc) {
-        AGENTOS_LOG_ERROR("C-L02: Failed to allocate wrapper service handle");
-        daemon_bootstrap_ipc_stop(adapter->bipc);
-        if (adapter->bsd) {
-            daemon_bootstrap_sd_stop(adapter->bsd);
-        }
-        AGENTOS_FREE(adapter);
-        return NULL;
-    }
-
+    /* llm_service_t 由 llm_d daemon 内部构造和管理（见 daemon/llm_d/src/service.h，
+     * 含 registry/cache/cost/lock 等字段）。coreloopthree 通过 IPC adapter 与
+     * llm_d 通信，不直接持有 llm_service_t。llm_svc_adapter_get_service() 保留
+     * 为接口兼容，始终返回 NULL；认知引擎应通过
+     * agentos_cognition_set_llm_adapter() 注入 adapter。
+     * 旧实现在此 AGENTOS_MALLOC(1) 分配 1 字节占位符桩并作为 llm_service_t 返回，
+     * 若被 llm_service_complete() 解引用会堆越界读——已移除。 */
     adapter->connected = true;
     adapter->total_requests = 0;
     adapter->total_errors = 0;
@@ -321,9 +313,6 @@ void llm_svc_adapter_destroy(llm_svc_adapter_t *adapter)
                      (unsigned long long)adapter->total_requests,
                      (unsigned long long)adapter->total_errors);
 
-    if (adapter->wrapper_svc) {
-        AGENTOS_FREE(adapter->wrapper_svc);
-    }
     if (adapter->bipc) {
         daemon_bootstrap_ipc_stop(adapter->bipc);
     }
@@ -337,8 +326,15 @@ void llm_svc_adapter_destroy(llm_svc_adapter_t *adapter)
 
 llm_service_t *llm_svc_adapter_get_service(llm_svc_adapter_t *adapter)
 {
-    if (!adapter || !adapter->connected) return NULL;
-    return adapter->wrapper_svc;
+    /* llm_service_t 是 llm_d daemon 的内部结构（含 registry/cache/cost/lock 等，
+     * 见 daemon/llm_d/src/service.h:17），coreloopthree 无法真实构造。
+     * 本函数保留为接口兼容，始终返回 NULL。认知引擎应通过
+     * agentos_cognition_set_llm_adapter() 注入 IPC adapter，由 adapter 通过
+     * IPC 调用 llm_d，而非直接持有 llm_service_t 句柄。
+     * 旧实现返回 1 字节 AGENTOS_MALLOC(1) 占位符桩，若被 llm_service_complete()
+     * 解引用会导致堆越界读——已移除。 */
+    (void)adapter;
+    return NULL;
 }
 
 int llm_svc_adapter_complete(llm_svc_adapter_t *adapter,
@@ -474,11 +470,14 @@ int llm_svc_adapter_complete_stream(llm_svc_adapter_t *adapter,
         return -1;
     }
 
-    /* 解析响应并调用流式回调 */
+    /* 解析响应并调用回调。
+     * 注意：当前实现为批处理回调模式——收齐完整响应后调用 callback 一次，
+     * 传入整段 JSON，非 token 级流式推送。token 级流式需要 IPC Bus 支持
+     * 流式原语（daemon 端 SSE chunked 推送 + bus 多次回调），规划在 1.0.x。
+     * llm_svc_adapter.h 的 complete_stream 契约已据此更新。 */
     if (response_msg.payload && response_msg.payload_size > 0) {
         const char *resp_json = (const char *)response_msg.payload;
 
-        /* 如果设置了回调，通知每个 chunk */
         if (callback) {
             callback(resp_json, callback_data);
         }

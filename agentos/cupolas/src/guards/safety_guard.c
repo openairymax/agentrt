@@ -194,19 +194,70 @@ static safety_decision_t default_input_check(const safety_guard_descriptor_t *gu
 
 /**
  * @brief 默认资源检查（SAFETY_GUARD_RESOURCE）
- * 检查资源配额。具体配额通过 safety_guard_set_quota() 设置。
- * 此默认实现作为 fallback，当无自定义检查函数时使用。
- * 生产部署应通过 safety_guard_register_guard() 注册自定义资源检查。
+ *
+ * 基于事件数据进行资源验证：
+ * 1. 检查 event->flags 中的资源耗尽标志位（bit 1 = RESOURCE_EXHAUSTED）
+ * 2. 检查 context_size 是否超过单次资源操作上限（100MB）
+ * 3. 检查 resource 字段是否为已知受限资源
+ *
+ * 注意：默认检查函数签名不含 context，无法访问 ctx->quotas。
+ * 精确配额检查通过 safety_guard_check_quota() API 或注册自定义
+ * check_fn（将 ctx 作为 user_data 传入）实现。
  */
 static safety_decision_t default_resource_check(const safety_guard_descriptor_t *guard,
                                                  const safety_event_t *event,
                                                  safety_result_t *result)
 {
     (void)guard;
-    (void)event;
+
+    /* 检查资源耗尽标志位（bit 1） */
+    if (event->flags & 0x02) {
+        if (result) {
+            result->decision = SAFETY_DECISION_DENY;
+            snprintf(result->reason, sizeof(result->reason),
+                     "Resource exhausted: %s flagged as over limit", event->resource);
+            result->severity = SAFETY_SEVERITY_ERROR;
+        }
+        return SAFETY_DECISION_DENY;
+    }
+
+    /* 检查单次资源操作大小上限（100MB） */
+    const size_t MAX_RESOURCE_OP_SIZE = 100 * 1024 * 1024;
+    if (event->context_size > MAX_RESOURCE_OP_SIZE) {
+        if (result) {
+            result->decision = SAFETY_DECISION_DENY;
+            snprintf(result->reason, sizeof(result->reason),
+                     "Resource operation too large: %zu bytes (max %zu)",
+                     event->context_size, MAX_RESOURCE_OP_SIZE);
+            result->severity = SAFETY_SEVERITY_ERROR;
+        }
+        return SAFETY_DECISION_DENY;
+    }
+
+    /* 检查受限资源模式：阻止对系统关键路径的写操作 */
+    if (event->resource[0] != '\0') {
+        static const char *restricted_resources[] = {
+            "/proc/kcore", "/dev/mem", "/dev/kmem", "/dev/port",
+            NULL
+        };
+        for (int i = 0; restricted_resources[i]; i++) {
+            if (strstr(event->resource, restricted_resources[i])) {
+                if (result) {
+                    result->decision = SAFETY_DECISION_DENY;
+                    snprintf(result->reason, sizeof(result->reason),
+                             "Resource access denied: '%s' is restricted",
+                             restricted_resources[i]);
+                    result->severity = SAFETY_SEVERITY_ERROR;
+                }
+                return SAFETY_DECISION_DENY;
+            }
+        }
+    }
+
     if (result) {
         result->decision = SAFETY_DECISION_ALLOW;
-        snprintf(result->reason, sizeof(result->reason), "Resource check passed");
+        snprintf(result->reason, sizeof(result->reason),
+                 "Resource check passed for %s", event->resource[0] ? event->resource : "(none)");
         result->severity = SAFETY_SEVERITY_INFO;
     }
     return SAFETY_DECISION_ALLOW;
@@ -214,19 +265,37 @@ static safety_decision_t default_resource_check(const safety_guard_descriptor_t 
 
 /**
  * @brief 默认审计检查（SAFETY_GUARD_AUDIT）
- * 确保审计日志记录
+ *
+ * 审计守卫的设计语义：审计不阻止操作，只记录事件。
+ * 实际的审计日志写入由编排函数（safety_guard_check / check_chain）
+ * 在调用本函数后通过 safety_guard_record_audit() 完成。
+ *
+ * 本函数的职责：
+ * 1. 验证事件具有审计所需的最小元数据（subject + action）
+ * 2. 标记审计结果，供编排函数记录
+ * 3. 始终返回 ALLOW（审计不阻断业务流）
  */
 static safety_decision_t default_audit_check(const safety_guard_descriptor_t *guard,
                                               const safety_event_t *event,
                                               safety_result_t *result)
 {
     (void)guard;
-    (void)event;
-    /* 审计检查总是允许，但记录审计信息 */
+
+    /* 验证审计所需的最小元数据 */
+    if (event->subject[0] == '\0' || event->action[0] == '\0') {
+        if (result) {
+            result->decision = SAFETY_DECISION_ALLOW;
+            snprintf(result->reason, sizeof(result->reason),
+                     "Audit warning: incomplete event metadata (subject/action empty)");
+            result->severity = SAFETY_SEVERITY_WARNING;
+        }
+        return SAFETY_DECISION_ALLOW;
+    }
+
     if (result) {
         result->decision = SAFETY_DECISION_ALLOW;
         snprintf(result->reason, sizeof(result->reason),
-                 "Audit: event logged for %s", event->subject);
+                 "Audit: event recorded for %s → %s", event->subject, event->action);
         result->severity = SAFETY_SEVERITY_INFO;
     }
     return SAFETY_DECISION_ALLOW;
@@ -742,7 +811,11 @@ int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *polic
     } else if (policy_b) {
         *resolved_decision = policy_b->default_decision;
     } else {
-        *resolved_decision = SAFETY_DECISION_ALLOW;
+        /* 两个策略 ID 均未在上下文中注册：无法解析冲突。
+         * 安全穹顶遵循 fail-closed 原则——拒绝而非放行，
+         * 并返回错误码告知调用方策略 ID 无效。 */
+        *resolved_decision = SAFETY_DECISION_DENY;
+        return -1;
     }
     return 0;
 }

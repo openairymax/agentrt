@@ -55,9 +55,7 @@ static cache_entry_t *entry_create(const char *key, const char *value)
 {
     cache_entry_t *e = memory_safe_alloc(sizeof(cache_entry_t));
     if (!e) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     e->key = memory_safe_strdup(key);
     e->value = memory_safe_strdup(value);
@@ -65,8 +63,7 @@ static cache_entry_t *entry_create(const char *key, const char *value)
         memory_safe_free(e->key);
         memory_safe_free(e->value);
         memory_safe_free(e);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     e->timestamp = time(NULL);
     e->prev = e->next = e->hnext = NULL;
@@ -139,9 +136,7 @@ tool_cache_t *tool_cache_create(size_t capacity, int ttl_sec)
 {
     tool_cache_t *cache = AGENTOS_CALLOC(1, sizeof(tool_cache_t));
     if (!cache) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     cache->capacity = capacity;
     cache->ttl_sec = ttl_sec;
@@ -261,7 +256,7 @@ void tool_cache_put(tool_cache_t *cache, const char *key, const char *value)
     }
 }
 
-void cache_clear(tool_cache_t *cache)
+void tool_cache_clear(tool_cache_t *cache)
 {
     if (!cache)
         return;
@@ -288,9 +283,7 @@ void cache_clear(tool_cache_t *cache)
 char *tool_cache_key(const char *tool_id, const char *params_json)
 {
     if (!tool_id || !params_json) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     size_t tool_id_len = strlen(tool_id);
@@ -299,9 +292,7 @@ char *tool_cache_key(const char *tool_id, const char *params_json)
 
     char *key = memory_safe_alloc(len);
     if (!key) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     snprintf(key, len, "%s|%s", tool_id, params_json);
@@ -312,15 +303,12 @@ tool_result_t *tool_result_from_json(const char *json)
 {
     cJSON *root = cJSON_Parse(json);
     if (!root) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     tool_result_t *res = AGENTOS_CALLOC(1, sizeof(tool_result_t));
     if (!res) {
         cJSON_Delete(root);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     cJSON *success = cJSON_GetObjectItem(root, "success");
     if (cJSON_IsNumber(success))

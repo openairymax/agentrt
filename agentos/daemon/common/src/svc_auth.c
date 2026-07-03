@@ -95,14 +95,14 @@ static int base64_encode(const uint8_t *data, size_t len, char *output, size_t *
 {
     static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-    if (!data || !output || !out_len || len == 0)
-        return AGENTOS_ERR_INVALID_PARAM;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "base64_encode: null parameter");
+    if (!data || !output || !out_len || len == 0) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "base64_encode: null parameter");
+    }
 
     size_t needed = ((len + 2) / 3) * 4;
-    if (*out_len < needed + 1)
-        return AGENTOS_ERR_INVALID_PARAM;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "base64_encode: output buffer too small");
+    if (*out_len < needed + 1) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "base64_encode: output buffer too small");
+    }
 
     size_t i = 0, j = 0;
     uint8_t arr3[3] = {0}, arr4[4] = {0};
@@ -527,7 +527,6 @@ int auth_jwt_init(const jwt_config_t *config)
         SVC_LOG_ERROR("JWT init: invalid config");
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT init: invalid config or secret");
     }
 
     __builtin_memcpy(&g_jwt.config, config, sizeof(jwt_config_t));
@@ -564,9 +563,8 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
 
     if (strlen(subject) > MAX_SUBJECT_SIZE) {
         SVC_LOG_ERROR("JWT generate: subject too long");
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: subject too long");
         agentos_mutex_unlock(&g_jwt.lock);
-        return AUTH_TOKEN_INVALID;
+        AGENTOS_ERROR(AUTH_TOKEN_INVALID, "JWT generate: subject too long");
     }
 
     /* 构建 Header: {"alg":"HS256","typ":"JWT"} */
@@ -588,7 +586,6 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
     if (!payload_json) {
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: cJSON_PrintUnformatted failed");
     }
 
     /* Base64 编码 Payload */
@@ -598,7 +595,6 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
         AGENTOS_FREE(payload_json);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: malloc payload_b64 failed");
     }
 
     base64_encode((const uint8_t *)payload_json, strlen(payload_json), payload_b64,
@@ -613,7 +609,6 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
         AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: malloc sign_input failed");
     }
     snprintf(sign_input, sign_input_size, "%s.%s", header_b64, payload_b64);
 
@@ -625,7 +620,6 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
         AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: HMAC computation failed");
     }
 
     size_t sig_b64_size = 128;
@@ -635,7 +629,6 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
         AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: malloc sig_b64 failed");
     }
     if (base64_encode(hmac_output, hmac_len, sig_b64, &sig_b64_size) != AGENTOS_SUCCESS) {
         AGENTOS_FREE(sign_input);
@@ -654,7 +647,6 @@ int auth_jwt_generate_token(const char *subject, const char *role, char **out_to
         AGENTOS_FREE(payload_b64);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT generate: malloc token failed");
     }
     snprintf(*out_token, token_size, "%s.%s", sign_input, sig_b64);
 
@@ -697,7 +689,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
         result->error_message = "Invalid token format";
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: invalid token format");
     }
 
     /* 解析 Payload */
@@ -706,7 +697,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
     if (!payload_b64) {
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc payload buffer failed");
     }
     __builtin_memcpy(payload_b64, dot1 + 1, payload_len);
     payload_b64[payload_len] = '\0';
@@ -743,7 +733,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
         AGENTOS_FREE(payload_padded);
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc decoded buffer failed");
     }
 
     size_t out_idx = 0;
@@ -770,7 +759,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
         result->error_message = "Invalid token payload";
         agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: invalid token payload JSON");
     }
 
     /* 提取字段 - 必须在 cJSON_Delete 前复制字符串 */
@@ -805,7 +793,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_EXPIRED;
-            AGENTOS_ERROR_HANDLE(AUTH_TOKEN_EXPIRED, "JWT verify: token has expired");
         }
     }
 
@@ -819,7 +806,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
-            AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_input failed");
         }
         __builtin_memcpy(sig_input, token, header_len);
         sig_input[header_len] = '.';
@@ -835,7 +821,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
         }
-        AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_b64 failed");
         __builtin_memcpy(sig_b64, dot2 + 1, sig_b64_len);
         sig_b64[sig_b64_len] = '\0';
 
@@ -856,7 +841,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
-            AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: HMAC computation failed");
         }
 
         size_t sig_padded_len = sig_b64_len + ((4 - (sig_b64_len % 4)) % 4);
@@ -868,7 +852,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
-            AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc sig_padded failed");
         }
         __builtin_memcpy(sig_padded, sig_b64, sig_b64_len);
         size_t sig_pad = (4 - (sig_b64_len % 4)) % 4;
@@ -885,7 +868,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             cJSON_Delete(payload);
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
-            AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: malloc provided_sig failed");
         }
         __builtin_memset(provided_sig, 0, 32);
 
@@ -931,7 +913,6 @@ int auth_jwt_verify_token(const char *token, auth_result_t *result)
             SVC_LOG_WARN("JWT signature verification FAILED for token");
             agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_INVALID;
-            AGENTOS_ERROR_HANDLE(AUTH_TOKEN_INVALID, "JWT verify: signature mismatch");
         }
     }
     /* ========== 签名验证结束 ========== */
@@ -1009,7 +990,6 @@ int auth_apikey_init(const apikey_config_t *config)
         if (!g_apikey.keys) {
             g_apikey.capacity = 0;
             return AUTH_FAILED;
-            AGENTOS_ERROR_HANDLE(AUTH_FAILED, "APIKey init: calloc keys array failed");
         }
     }
 
@@ -1075,7 +1055,6 @@ int auth_apikey_add(const char *new_key)
         if (!new_keys) {
             agentos_mutex_unlock(&g_apikey.lock);
             return AGENTOS_ERR_OUT_OF_MEMORY;
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "APIKey add: realloc keys failed");
         }
         g_apikey.keys = new_keys;
         g_apikey.capacity = new_cap;

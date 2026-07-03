@@ -81,16 +81,14 @@ agentos_extraction_result_t *agentos_extraction_result_create(size_t initial_cap
     agentos_extraction_result_t *result =
         (agentos_extraction_result_t *)AGENTOS_CALLOC(1, sizeof(agentos_extraction_result_t));
     if (!result) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_EUNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_EUNKNOWN, "validation failed");
     }
 
     result->entities =
         (agentos_entity_t *)AGENTOS_CALLOC(initial_capacity, sizeof(agentos_entity_t));
     if (!result->entities) {
         AGENTOS_FREE(result);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     result->entity_count = 0;

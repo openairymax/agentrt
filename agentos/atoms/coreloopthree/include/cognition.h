@@ -278,6 +278,51 @@ AGENTOS_API void agentos_cognition_set_fallback_plan(agentos_cognition_engine_t 
                                                      agentos_plan_strategy_t *fallback);
 
 /**
+ * @brief P1.14: 设置主规划策略
+ *
+ * 替换引擎当前的主规划策略。旧策略非NULL时将调用其 destroy 释放。
+ *
+ * @param engine [in] 认知引擎（非NULL） (BORROW - caller retains ownership).
+ * @param strategy [in] 新规划策略（可为NULL） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ *
+ * @ownership strategy: TRANSFER (if non-NULL), BORROW (if NULL)
+ * @threadsafe 是（内部使用 mutex 保护）
+ * @reentrant 否
+ */
+AGENTOS_API void agentos_cognition_set_plan_strategy(agentos_cognition_engine_t *engine,
+                                                      agentos_plan_strategy_t *strategy);
+
+/**
+ * @brief P1.14: 设置协同策略
+ *
+ * 替换引擎当前的协同策略。旧策略非NULL时将调用其 destroy 释放。
+ *
+ * @param engine [in] 认知引擎（非NULL） (BORROW - caller retains ownership).
+ * @param strategy [in] 新协同策略（可为NULL） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ *
+ * @ownership strategy: TRANSFER (if non-NULL), BORROW (if NULL)
+ * @threadsafe 是（内部使用 mutex 保护）
+ * @reentrant 否
+ */
+AGENTOS_API void agentos_cognition_set_coord_strategy(agentos_cognition_engine_t *engine,
+                                                       agentos_coordinator_strategy_t *strategy);
+
+/**
+ * @brief P1.14: 设置调度策略
+ *
+ * 替换引擎当前的调度策略。旧策略非NULL时将调用其 destroy 释放。
+ *
+ * @param engine [in] 认知引擎（非NULL） (BORROW - caller retains ownership).
+ * @param strategy [in] 新调度策略（可为NULL） (TRANSFER - engine takes ownership if non-NULL, will call destroy on shutdown).
+ *
+ * @ownership strategy: TRANSFER (if non-NULL), BORROW (if NULL)
+ * @threadsafe 是（内部使用 mutex 保护）
+ * @reentrant 否
+ */
+AGENTOS_API void agentos_cognition_set_disp_strategy(agentos_cognition_engine_t *engine,
+                                                      agentos_dispatching_strategy_t *strategy);
+
+/**
  * @brief 处理用户输入，生成任务计划
  *
  * @param engine [in] 认知引擎（非NULL） (BORROW - caller retains ownership).
@@ -345,7 +390,7 @@ AGENTOS_API void agentos_cognition_set_memory(agentos_cognition_engine_t *engine
  * provider switching (builtin ↔ MemoryRovol) at runtime.
  *
  * @param engine [in] Cognition engine handle (BORROW).
- * @param provider [in] Memory provider from mrb_bridge_get_provider() (BORROW).
+ * @param provider [in] Memory provider from memoryrovol_bridge_get_provider() (BORROW).
  *
  * @ownership provider: BORROW
  */
