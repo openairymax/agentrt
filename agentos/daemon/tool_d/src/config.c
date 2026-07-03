@@ -30,8 +30,7 @@ tool_config_t *tool_config_load(const char *path)
     FILE *f = fopen(path, "rb");
     if (!f) {
         SVC_LOG_ERROR("Cannot open manager: %s", path);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     yaml_parser_t parser;
@@ -43,8 +42,7 @@ tool_config_t *tool_config_load(const char *path)
     if (!cfg) {
         fclose(f);
         yaml_parser_delete(&parser);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 设置默认值 */
@@ -180,8 +178,7 @@ error:
             AGENTOS_FREE(params[i]);
         AGENTOS_FREE(params);
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 void tool_config_free(tool_config_t *cfg)

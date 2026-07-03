@@ -4,10 +4,10 @@
 # This CMakeLists.txt bridges the external repo into the AgentRT build.
 # The AGENTOS_WITH_MEMORYROVOL option is defined in the root CMakeLists.txt.
 
-message(STATUS "[MEMORYROVOL] AGENTOS_WITH_MEMORYROVOL=${AGENTOS_WITH_MEMORYROVOL}")
+agentos_print_info("[MEMORYROVOL] AGENTOS_WITH_MEMORYROVOL=${AGENTOS_WITH_MEMORYROVOL}")
 
 if(NOT AGENTOS_WITH_MEMORYROVOL)
-    message(STATUS "[MEMORYROVOL] Integration disabled (set -DAGENTOS_WITH_MEMORYROVOL=ON to enable)")
+    agentos_print_warn("[MEMORYROVOL] Integration disabled (set -DAGENTOS_WITH_MEMORYROVOL=ON to enable)")
     return()
 endif()
 
@@ -16,34 +16,37 @@ endif()
 #   1. MEMORYROVOL_DIR cmake variable
 #   2. MEMORYROVOL_ROOT environment variable
 #   3. Sibling directory relative to AgentRT root (OpenAirymax/MemoryRovol)
-message(STATUS "[MEMORYROVOL] Searching for external MemoryRovol source...")
+agentos_print_info("[MEMORYROVOL] Searching for external MemoryRovol source...")
 if(NOT MEMORYROVOL_DIR)
     if(DEFINED ENV{MEMORYROVOL_ROOT})
-        set(MEMORYROVOL_DIR "$ENV{MEMORYROVOL_ROOT}")
-        message(STATUS "[MEMORYROVOL]   Found via MEMORYROVOL_ROOT env: ${MEMORYROVOL_DIR}")
+        set(MEMORYROVOL_DIR "$ENV{MEMORYROVOL_ROOT}" CACHE PATH "External MemoryRovol source directory")
+        agentos_print_ok("[MEMORYROVOL]   Found via MEMORYROVOL_ROOT env: ${MEMORYROVOL_DIR}")
     else()
         get_filename_component(_agentos_root "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
         get_filename_component(_workspace_root "${_agentos_root}/.." ABSOLUTE)
         set(_mr_candidate "${_workspace_root}/MemoryRovol")
-        message(STATUS "[MEMORYROVOL]   Checking sibling: ${_mr_candidate}")
+        agentos_print_info("[MEMORYROVOL]   Checking sibling: ${_mr_candidate}")
         if(EXISTS "${_mr_candidate}/CMakeLists.txt")
-            set(MEMORYROVOL_DIR "${_mr_candidate}")
-            message(STATUS "[MEMORYROVOL]   Found at sibling directory")
+            # CACHE + FORCE：使 MEMORYROVOL_DIR 在父目录及兄弟目录（coreloopthree）
+            # 作用域可见。coreloopthree 的 CMakeLists 据此将 memoryrovol_bridge_api.c
+            # 直接编译进 agentos_coreloopthree，解决静态库+弱符号不抽取问题。
+            set(MEMORYROVOL_DIR "${_mr_candidate}" CACHE PATH "External MemoryRovol source directory" FORCE)
+            agentos_print_ok("[MEMORYROVOL]   Found at sibling directory")
         else()
-            message(STATUS "[MEMORYROVOL]   Sibling directory not found")
+            agentos_print_warn("[MEMORYROVOL]   Sibling directory not found")
         endif()
     endif()
 endif()
 
 if(NOT MEMORYROVOL_DIR OR NOT EXISTS "${MEMORYROVOL_DIR}/CMakeLists.txt")
-    message(WARNING "[MEMORYROVOL] Source not found! "
+    agentos_print_warn("[MEMORYROVOL] Source not found! "
         "Set MEMORYROVOL_DIR or MEMORYROVOL_ROOT environment variable. "
         "Falling back to builtin provider only.")
     set(AGENTOS_WITH_MEMORYROVOL OFF CACHE BOOL "Build with MemoryRovol" FORCE)
     return()
 endif()
 
-message(STATUS "[MEMORYROVOL] Source found: ${MEMORYROVOL_DIR}")
+agentos_print_ok("[MEMORYROVOL] Source found: ${MEMORYROVOL_DIR}")
 
 # Propagate AgentRT workspace root and include paths to MemoryRovol build
 set(AGENTOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." CACHE PATH "AgentRT workspace root directory" FORCE)
@@ -62,7 +65,7 @@ add_subdirectory("${MEMORYROVOL_DIR}" "${CMAKE_BINARY_DIR}/memoryrovol")
 
 # Verify the target was created
 if(NOT TARGET agentos_memoryrovol)
-    message(WARNING "MemoryRovol build did not produce 'agentos_memoryrovol' target")
+    agentos_print_warn("MemoryRovol build did not produce 'agentos_memoryrovol' target")
     return()
 endif()
 
@@ -103,4 +106,4 @@ if(TARGET agentos_atoms)
     target_link_libraries(agentos_atoms INTERFACE agentos_memoryrovol)
 endif()
 
-message(STATUS "MemoryRovol integrated into AgentRT build (PRO mode)")
+agentos_print_ok("MemoryRovol integrated into AgentRT build (PRO mode)")

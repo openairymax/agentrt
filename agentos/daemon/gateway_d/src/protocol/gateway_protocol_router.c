@@ -104,9 +104,7 @@ gw_proto_router_t *gw_proto_router_create(void)
 {
     gw_proto_router_t *router = (gw_proto_router_t *)AGENTOS_CALLOC(1, sizeof(gw_proto_router_t));
     if (!router) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     router->adapter_count = 0;
     router->initialized = false;
@@ -248,8 +246,7 @@ find_handler(gw_proto_router_t *router, gw_proto_detect_result_t proto_type, voi
             return router->adapters[i].handler;
         }
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 /**

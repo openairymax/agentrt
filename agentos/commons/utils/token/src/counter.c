@@ -222,15 +222,13 @@ static size_t count_tokens_by_model(const char *model_name, const char *text, si
 agentos_token_counter_t *agentos_token_counter_create(const char *model_name)
 {
     if (!model_name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_token_counter_t *counter =
         (agentos_token_counter_t *)AGENTOS_MALLOC(sizeof(agentos_token_counter_t));
     if (!counter) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     AGENTOS_MEMSET(counter, 0, sizeof(agentos_token_counter_t));
@@ -240,8 +238,7 @@ agentos_token_counter_t *agentos_token_counter_create(const char *model_name)
 
     if (agentos_mutex_init(&counter->mutex) != 0) {
         AGENTOS_FREE(counter);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     counter->total_count = 0;
@@ -315,8 +312,7 @@ char *agentos_token_counter_truncate(agentos_token_counter_t *counter, const cha
                                      size_t max_tokens, const char *side)
 {
     if (!counter || !text || max_tokens == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     size_t length = strlen(text);

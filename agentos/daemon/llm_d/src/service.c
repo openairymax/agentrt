@@ -71,8 +71,7 @@ static char *make_cache_key(const llm_request_config_t *manager)
 {
     if (!manager || !manager->model) {
         SVC_LOG_ERROR("make_cache_key: NULL parameter (manager=%p, model=%p)", (const void *)manager, manager ? (const void *)manager->model : NULL);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 计算所需缓冲区大小 */
@@ -86,8 +85,7 @@ static char *make_cache_key(const llm_request_config_t *manager)
     char *key = (char *)AGENTOS_MALLOC(len);
     if (!key) {
         SVC_LOG_ERROR("make_cache_key: malloc failed for cache key (len=%zu)", len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 构建缓存键 */
@@ -142,24 +140,21 @@ static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
     if (!root || !count) {
         SVC_LOG_ERROR("load_pricing_rules: NULL parameter (root=%p, count=%p)", (const void *)root, (const void *)count);
         *count = 0;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     cJSON *pricing = cJSON_GetObjectItem(root, "pricing");
     if (!pricing || !cJSON_IsArray(pricing)) {
         SVC_LOG_ERROR("load_pricing_rules: pricing array missing or not an array in config");
         *count = 0;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     int n = cJSON_GetArraySize(pricing);
     pricing_rule_t *rules = (pricing_rule_t *)AGENTOS_CALLOC((size_t)n, sizeof(pricing_rule_t));
     if (!rules) {
         SVC_LOG_ERROR("load_pricing_rules: calloc failed for %d pricing rules", n);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     for (int i = 0; i < n; ++i) {
@@ -178,8 +173,7 @@ static pricing_rule_t *load_pricing_rules(cJSON *root, int *count)
                 }
                 AGENTOS_FREE(rules);
                 *count = 0;
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                return NULL;
+                AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             }
             rules[i].input_price_per_k = input->valuedouble;
             rules[i].output_price_per_k = output->valuedouble;
@@ -211,15 +205,13 @@ llm_service_t *llm_service_create(const char *config_path)
     llm_service_t *svc = (llm_service_t *)AGENTOS_CALLOC(1, sizeof(llm_service_t));
     if (!svc) {
         SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL allocate service context, STACK: llm_service_create");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (agentos_mutex_init(&svc->lock) != 0) {
         SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL init lock, STACK: llm_service_create");
         AGENTOS_FREE(svc);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     /* 加载基础配置 */
@@ -282,8 +274,7 @@ llm_service_t *llm_service_create(const char *config_path)
         SVC_LOG_ERROR("C-L02: SVC: CREATE-FAIL registry, STACK: llm_service_create");
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 创建缓存 */
@@ -293,8 +284,7 @@ llm_service_t *llm_service_create(const char *config_path)
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 创建成本追踪器 */
@@ -305,8 +295,7 @@ llm_service_t *llm_service_create(const char *config_path)
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 创建 Token 计数器 */
@@ -318,8 +307,7 @@ llm_service_t *llm_service_create(const char *config_path)
         provider_registry_destroy(svc->registry);
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     SVC_LOG_INFO("C-L02: SVC: CREATE-OK pricing_rules=%d llm_cache_capacity=%zu cache_ttl=%u",
@@ -501,8 +489,7 @@ static const provider_t *find_provider(llm_service_t *svc, const char *model)
 {
     if (!svc || !model) {
         SVC_LOG_ERROR("find_provider: NULL parameter (svc=%p, model=%p)", (const void *)svc, (const void *)model);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_mutex_lock(&svc->lock);
@@ -857,15 +844,13 @@ static void yaml_map_add(yaml_map_t *m, const char *key, const char *value)
 static const char *yaml_map_get(const yaml_map_t *m, const char *key)
 {
     if (!m || !key) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     for (size_t i = 0; i < m->count; ++i) {
         if (strcmp(m->pairs[i].key, key) == 0)
             return m->pairs[i].value;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
 }
 
 static void yaml_map_free(yaml_map_t *m)

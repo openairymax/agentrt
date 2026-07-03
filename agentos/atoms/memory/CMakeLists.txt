@@ -1,14 +1,14 @@
 # AgentRT 内置内存子系统（免费开源底座）
 # 提供 L1+L2 基础功能，无 MemoryRovol / FAISS / SQLite 依赖
 
-message(STATUS "[MEMORY] Configuring builtin memory module (backend: ${AGENTOS_MEMORY_BACKEND})")
+agentos_print_info("[MEMORY] Configuring builtin memory module (backend: ${AGENTOS_MEMORY_BACKEND})")
 
 # 验证源文件
 foreach(_src src/builtin_storage.c src/builtin_index.c src/builtin_retrieval.c src/builtin_provider.c src/memory_provider.h)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
-        message(STATUS "[MEMORY]   [OK] ${_src}")
+        agentos_print_ok("[MEMORY]   [OK] ${_src}")
     else()
-        message(WARNING "[MEMORY]   [MISSING] ${_src}")
+        agentos_print_warn("[MEMORY]   [MISSING] ${_src}")
     endif()
 endforeach()
 

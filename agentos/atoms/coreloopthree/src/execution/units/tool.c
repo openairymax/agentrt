@@ -94,8 +94,7 @@ agentos_execution_unit_t *agentos_tool_unit_create(const char *tool_name)
     tool_unit_data_t *data = (tool_unit_data_t *)AGENTOS_MALLOC(sizeof(tool_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     data->tool_name = AGENTOS_STRDUP(tool_name);
@@ -110,8 +109,7 @@ agentos_execution_unit_t *agentos_tool_unit_create(const char *tool_name)
             AGENTOS_FREE(data->metadata_json);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     unit->execution_unit_data = data;

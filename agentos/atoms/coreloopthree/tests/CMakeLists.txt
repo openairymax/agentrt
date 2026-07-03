@@ -62,13 +62,7 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
     string(REPLACE "test_" "" TEST_SHORT_NAME ${TEST_NAME})
 
-    add_executable(test_cl3_${TEST_SHORT_NAME} ${TEST_SRC}
-        ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_cl3_stubs.c
-    )
-
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/unit/test_cl3_stubs.c
-        PROPERTIES COMPILE_FLAGS "-fno-lto"
-    )
+    add_executable(test_cl3_${TEST_SHORT_NAME} ${TEST_SRC})
 
     target_include_directories(test_cl3_${TEST_SHORT_NAME} PRIVATE ${CL3_COMMON_INCLUDES})
 
@@ -83,6 +77,8 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
         agentos_atoms
         agentos_syscall
         svc_common
+        agentos_llm_service
+        agentos_tool_service
         pthread
         dl
         m
@@ -129,13 +125,7 @@ foreach(BENCH_SRC ${CL3_BENCH_SOURCES})
     get_filename_component(BENCH_NAME ${BENCH_SRC} NAME_WE)
     string(REPLACE "test_" "" BENCH_SHORT_NAME ${BENCH_NAME})
 
-    add_executable(test_cl3_${BENCH_SHORT_NAME} ${BENCH_SRC}
-        ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_cl3_stubs.c
-    )
-
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/unit/test_cl3_stubs.c
-        PROPERTIES COMPILE_FLAGS "-fno-lto"
-    )
+    add_executable(test_cl3_${BENCH_SHORT_NAME} ${BENCH_SRC})
 
     target_include_directories(test_cl3_${BENCH_SHORT_NAME} PRIVATE ${CL3_COMMON_INCLUDES})
 
@@ -150,6 +140,8 @@ foreach(BENCH_SRC ${CL3_BENCH_SOURCES})
         agentos_atoms
         agentos_syscall
         svc_common
+        agentos_llm_service
+        agentos_tool_service
         pthread
         dl
         m

@@ -35,8 +35,7 @@ agentos_ipc_buffer_t *agentos_ipc_buffer_create(size_t capacity)
     buf->data = (uint8_t *)agentos_mem_alloc(capacity);
     if (!buf->data) {
         AGENTOS_FREE(buf);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     buf->capacity = capacity;
     buf->used = 0;

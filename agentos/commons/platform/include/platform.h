@@ -453,6 +453,24 @@ int agentos_process_kill(agentos_process_info_t *proc);
  */
 void agentos_process_close_pipes(agentos_process_info_t *proc);
 
+/**
+ * @brief 运行命令并捕获合并输出（高层便捷接口）
+ *
+ * 内部完成 start → 读取 stdout+stderr 合并输出 → wait → close 全流程。
+ * POSIX 路径使用 fork + execvp（不经过 shell，无命令注入风险，BAN-211/235 合规）。
+ *
+ * @param executable 可执行文件路径（execvp 搜索 PATH）
+ * @param argv       参数数组（以 NULL 结尾，argv[0] 通常为程序名）
+ * @param envp       环境变量数组（以 NULL 结尾，可为 NULL 表示继承）
+ * @param timeout_ms 超时（毫秒），0 表示无限等待
+ * @param output     输出缓冲区（可为 NULL 表示不捕获，但仍排空管道防止子进程阻塞）
+ * @param output_size 输出缓冲区大小（含 '\0'）
+ * @return 退出码(0-255)；-1=启动失败；-2=超时
+ */
+int agentos_process_run_capture(const char *executable, char *const argv[],
+                                char *const envp[], uint32_t timeout_ms,
+                                char *output, size_t output_size);
+
 /* ==================== 时间接口 ==================== */
 
 /**

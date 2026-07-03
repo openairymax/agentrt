@@ -61,6 +61,7 @@ typedef struct {
     int generate_call_count;
     int expert_call_count;
     int correction_requested_count;
+    int force_loop; /**< P2.9: 为 1 时修正路径不附加序号，返回固定 correction_output 以触发循环检测 */
 } mock_ctx_t;
 
 static void mock_reset(mock_ctx_t *mc)
@@ -91,6 +92,34 @@ static agentos_error_t mock_s2_gen(const char *input, size_t input_len, char **o
 
     if (!src || len == 0)
         return -1;
+
+    /* P2.9: 修正路径附加序号后缀，使每次修正输出略有不同。
+     *
+     * 真实 LLM 每次修正会生成略有差异的内容，mock 也应模拟这一行为。
+     * 若每次返回完全相同的 correction_output，会触发 tc3 的语义循环
+     * 检测（corrected == current_text）而提前中止修正循环，导致无法
+     * 验证 max_rounds 耗尽路径。
+     *
+     * 附加 " #N" 后缀（N=correction_requested_count）保证内容不同，
+     * 同时不影响评分（default_s1_verify 仅依据长度和关键词评分，
+     * 短内容附加 3 字节后仍 <20 字符，分数不变；长内容仍 >50 字符）。
+     */
+    if (!mc->force_loop && mc->correction_requested_count > 0 && input && strstr(input, "critique")) {
+        size_t buf_sz = len + 16;
+        char *vbuf = (char *)malloc(buf_sz);
+        if (!vbuf)
+            return -1;
+        int n = snprintf(vbuf, buf_sz, "%.*s #%d", (int)len, src,
+                         mc->correction_requested_count);
+        if (n <= 0 || (size_t)n >= buf_sz) {
+            free(vbuf);
+            return -1;
+        }
+        *output = vbuf;
+        *output_len = (size_t)n;
+        return 0;
+    }
+
     char *buf = (char *)malloc(len + 1);
     if (!buf)
         return -1;
@@ -637,19 +666,26 @@ static void test_tc3_correction_prompt_contains_critique(void)
 }
 
 /* ==================================================================
- * 用例 13: 含 "because" 关键字的输出自动获得更高评分
+ * 用例 13: 长内容通过保守评分（P2.8 改造后无关键词加分）
+ *
+ * P2.8 移除了 "because"/"therefore" 关键词加分（确认偏误）。
+ * default_s1_verify 改为保守评分：基准 0.4 + 长度加分 + 句号加分，
+ * 最高 0.65。此测试验证足够长的内容仍能通过 accept_threshold。
  * ================================================================== */
 
-static void test_tc3_because_keyword_bonus(void)
+static void test_tc3_long_content_accept(void)
 {
     mock_ctx_t mc;
     mock_reset(&mc);
-    mc.generate_output = "This is correct because the evidence supports it.";
+    mc.generate_output = "This is a comprehensive analysis of the topic that covers "
+                         "multiple aspects including background context, methodology, "
+                         "findings, and implications. The evidence supports the conclusion "
+                         "drawn herein, and the reasoning chain is logically sound throughout.";
     mc.generate_output_len = strlen(mc.generate_output);
 
     tc3_coordinator_t *c = make_coord(&mc);
     if (!c) {
-        TEST_FAIL("because", "create failed");
+        TEST_FAIL("long_accept", "create failed");
         return;
     }
 
@@ -657,19 +693,72 @@ static void test_tc3_because_keyword_bonus(void)
     size_t out_len = 0;
     agentos_error_t err = tc3_coordinator_execute(c, "fact", 4, &out, &out_len);
     if (err != 0) {
-        TEST_FAIL("because", "execute error");
+        TEST_FAIL("long_accept", "execute error");
         tc3_coordinator_destroy(c);
         return;
     }
 
-    /* "because" bonus + 长度 > 20 => score 0.7 → accepted, 不应触发修正 */
+    /* P2.8: 长内容（>200 字符 + 句号）→ score 0.65 >= 0.55 → accepted，
+     * 不应触发修正。验证对抗式改造后长内容仍能通过保守评分。 */
     if (mc.correction_requested_count > 0)
-        TEST_FAIL("because", "unexpected correction - because bonus should raise score");
-    assert_stat(c, 1, 0, 0, 0, "because");
+        TEST_FAIL("long_accept", "unexpected correction - long content should pass");
+    assert_stat(c, 1, 0, 0, 0, "long_accept");
 
     if (out)
         free(out);
     tc3_coordinator_destroy(c);
+}
+
+/* ==================================================================
+ * 用例 14: 语义循环检测 — 修正输出固定不变时提前中止
+ *
+ * 当 S2 修正持续返回相同内容时，tc3 应检测到 corrected == current_text
+ * 并提前中止修正循环（而非耗尽 max_rounds）。这避免了无意义的重复调用。
+ * ================================================================== */
+
+static void test_tc3_semantic_loop_detection(void)
+{
+    mock_ctx_t mc;
+    mock_reset(&mc);
+    mc.generate_output = "Bad output."; /* score 0.5 → minor_fix */
+    mc.generate_output_len = strlen(mc.generate_output);
+    mc.correction_output = "Fixed bad."; /* score 0.5, 固定不变 */
+    mc.correction_output_len = strlen(mc.correction_output);
+    mc.force_loop = 1; /* 禁用序号附加，模拟 S2 持续返回相同内容 */
+
+    tc3_coordinator_t *c = make_coord(&mc);
+    if (!c) {
+        TEST_FAIL("loop_detect", "create failed");
+        return;
+    }
+
+    char *out = NULL;
+    size_t out_len = 0;
+    agentos_error_t err = tc3_coordinator_execute(c, "input", 5, &out, &out_len);
+    if (err != 0) {
+        TEST_FAIL("loop_detect", "execute error");
+        tc3_coordinator_destroy(c);
+        return;
+    }
+
+    /* 应至少触发 2 次修正（第 1 次内容不同，第 2 次相同触发循环检测） */
+    if (mc.correction_requested_count < 2)
+        TEST_FAIL("loop_detect", "should attempt at least 2 corrections before loop detected");
+
+    /* 循环检测应被触发 */
+    tc3_stats_t s;
+    tc3_coordinator_get_stats(c, &s);
+    if (s.loop_detected_units < 1)
+        TEST_FAIL("loop_detect", "loop_detected_units should be >= 1");
+
+    /* 未耗尽 3 轮（gen + 2 corrections = 3 次调用，而非 gen + 3 = 4 次） */
+    if (mc.generate_call_count > 3)
+        TEST_FAIL("loop_detect", "should abort before exhausting max_rounds");
+
+    if (out)
+        free(out);
+    tc3_coordinator_destroy(c);
+    TEST_PASS("loop_detect");
 }
 
 /* ==================================================================
@@ -694,7 +783,8 @@ int main(void)
     RUN_TEST(test_tc3_empty_input);
     RUN_TEST(test_tc3_destroy_null);
     RUN_TEST(test_tc3_correction_prompt_contains_critique);
-    RUN_TEST(test_tc3_because_keyword_bonus);
+    RUN_TEST(test_tc3_long_content_accept);
+    RUN_TEST(test_tc3_semantic_loop_detection);
 
     printf("\n=======================================================\n");
     printf("  Results: %d/%d passed (%d failed)\n", tests_passed, tests_run, tests_failed);

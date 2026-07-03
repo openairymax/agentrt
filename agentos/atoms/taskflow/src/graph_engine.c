@@ -624,8 +624,7 @@ static vertex_hashset_t *hashset_create(size_t size)
     set->buckets = (hashset_node_t **)AGENTOS_CALLOC(size, sizeof(hashset_node_t *));
     if (!set->buckets) {
         AGENTOS_FREE(set);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     return set;
@@ -702,15 +701,13 @@ static bool hashset_add(vertex_hashset_t *set, vertex_id_t vertex_id)
 graph_engine_handle_t graph_engine_create(const taskflow_config_t *config)
 {
     if (!config) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     struct graph_engine_s *engine =
         (struct graph_engine_s *)AGENTOS_CALLOC(1, sizeof(struct graph_engine_s));
     if (!engine) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     // 复制配置
@@ -723,16 +720,14 @@ graph_engine_handle_t graph_engine_create(const taskflow_config_t *config)
     engine->vertices = (graph_vertex_t *)AGENTOS_CALLOC(engine->vertex_capacity, sizeof(graph_vertex_t));
     if (!engine->vertices) {
         AGENTOS_FREE(engine);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     engine->edges = (graph_edge_t *)AGENTOS_CALLOC(engine->edge_capacity, sizeof(graph_edge_t));
     if (!engine->edges) {
         AGENTOS_FREE(engine->vertices);
         AGENTOS_FREE(engine);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 计算哈希表大小
@@ -758,8 +753,7 @@ graph_engine_handle_t graph_engine_create(const taskflow_config_t *config)
         AGENTOS_FREE(engine->vertices);
         AGENTOS_FREE(engine->edges);
         AGENTOS_FREE(engine);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     engine->vertex_count = 0;
@@ -1117,7 +1111,7 @@ taskflow_error_t graph_engine_get_edge(graph_engine_handle_t engine, edge_id_t e
 }
 
 // ============================================================================
-// 其他API实现（存根）
+// 其他辅助 API 实现（均为完整真实实现）
 // ============================================================================
 
 size_t graph_engine_get_out_edges(graph_engine_handle_t engine, vertex_id_t vertex_id,

@@ -14,7 +14,7 @@ set(SYSCALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/syscall")
 set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
 set(PROTOCOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../protocols")
 
-message(STATUS "[GATEWAY] Configuring gateway module (cJSON: ${AGENTOS_HAS_CJSON}, microhttpd: ${AGENTOS_HAS_MICROHTTPD}, websockets: ${AGENTOS_HAS_LIBWEBSOCKETS})")
+agentos_print_info("[GATEWAY] Configuring gateway module (cJSON: ${AGENTOS_HAS_CJSON}, microhttpd: ${AGENTOS_HAS_MICROHTTPD}, websockets: ${AGENTOS_HAS_LIBWEBSOCKETS})")
 
 # cJSON 是网关模块的硬依赖（0.1.1 零技术债：不允许桩库）
 if(NOT AGENTOS_HAS_CJSON)
@@ -26,9 +26,9 @@ endif()
 # 验证关键路径
 foreach(_dir ${COREKERN_DIR}/include ${SYSCALL_DIR}/include ${COMMONS_DIR} ${PROTOCOLS_DIR}/include ${PROTOCOLS_DIR}/common/include)
     if(EXISTS "${_dir}")
-        message(STATUS "[GATEWAY]   [OK] ${_dir}")
+        agentos_print_ok("[GATEWAY]   [OK] ${_dir}")
     else()
-        message(WARNING "[GATEWAY]   [MISSING] ${_dir}")
+        agentos_print_warn("[GATEWAY]   [MISSING] ${_dir}")
     endif()
 endforeach()
 
@@ -207,12 +207,12 @@ if(BUILD_TESTS)
             target_include_directories(gateway_benchmark PRIVATE ${CURL_INCLUDE_DIRS})
             target_link_libraries(gateway_benchmark PRIVATE ${CURL_LIBRARIES})
             target_compile_definitions(gateway_benchmark PRIVATE USE_CURL=1)
-            message(STATUS "  gateway_benchmark: with libcurl support")
+            agentos_print_info("  gateway_benchmark: with libcurl support")
         else()
-            message(STATUS "  gateway_benchmark: simulation mode (no libcurl)")
+            agentos_print_warn("  gateway_benchmark: simulation mode (no libcurl)")
         endif()
 
-        message(STATUS "  gateway_benchmark: configured (TeamC C-W1-004)")
+        agentos_print_ok("  gateway_benchmark: configured (TeamC C-W1-004)")
     endif()
 endif()
 

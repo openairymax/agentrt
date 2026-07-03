@@ -408,7 +408,7 @@ static int handle_ws_unknown_message(struct lws *wsi, const char *unknown_type)
     char *error_json = jsonrpc_create_error_response(NULL, -32600, err_buf, NULL);
     if (!error_json) {
         agentos_error_push_ex(AGENTOS_ERR_UNKNOWN, __FILE__, __LINE__, __func__,
-                              "snprintf: not supported");
+                              "jsonrpc_create_error_response returned NULL");
         return AGENTOS_ERR_UNKNOWN;
     }
 
