@@ -83,155 +83,10 @@ const char *platform_get_name(void)
     }
 }
 
-/**
- * @brief 执行系统命令
- */
-platform_exec_result_t platform_exec(const char *command, unsigned int timeout_ms)
-{
-    platform_exec_result_t result = {
-        .exit_code = -1, .output = NULL, .output_length = 0, .success = false};
-
-    if (!command) {
-        return result;
-    }
-
-#if defined(_WIN32)
-    // Windows implementation
-    HANDLE hReadPipe, hWritePipe;
-    SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), NULL, TRUE};
-
-    if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
-        return result;
-    }
-
-    STARTUPINFOA si = {0};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdError = hWritePipe;
-    si.hStdOutput = hWritePipe;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-
-    PROCESS_INFORMATION pi = {0};
-    char cmdBuf[4096];
-    snprintf(cmdBuf, sizeof(cmdBuf), "cmd.exe /c %s", command);
-
-    if (!CreateProcessA(NULL, cmdBuf, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
-        CloseHandle(hReadPipe);
-        CloseHandle(hWritePipe);
-        return result;
-    }
-
-    CloseHandle(hWritePipe);
-
-    // Read output
-    char buffer[4096];
-    DWORD bytesRead;
-    size_t totalRead = 0;
-
-    while (ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0) {
-        buffer[bytesRead] = '\0';
-        char *newOutput = (char *)AGENTOS_REALLOC(result.output, totalRead + bytesRead + 1);
-        if (!newOutput) {
-            break;
-        }
-        result.output = newOutput;
-        __builtin_memcpy(result.output + totalRead, buffer, bytesRead);
-        totalRead += bytesRead;
-    }
-
-    if (result.output) {
-        result.output[totalRead] = '\0';
-        result.output_length = totalRead;
-    }
-
-    // Wait for process to exit
-    if (timeout_ms > 0) {
-        if (WaitForSingleObject(pi.hProcess, timeout_ms) == WAIT_TIMEOUT) {
-            TerminateProcess(pi.hProcess, 0);
-        }
-    } else {
-        WaitForSingleObject(pi.hProcess, INFINITE);
-    }
-
-    GetExitCodeProcess(pi.hProcess, (DWORD *)&result.exit_code);
-    result.success = (result.exit_code == 0);
-
-    CloseHandle(hReadPipe);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-#else
-    // POSIX implementation
-    int pipefd[2];
-    if (pipe(pipefd) == -1) {
-        return result;
-    }
-
-    pid_t pid = fork();
-    if (pid == -1) {
-        close(pipefd[0]);
-        close(pipefd[1]);
-        return result;
-    }
-
-    if (pid == 0) {
-        // Child process
-        close(pipefd[0]);
-        dup2(pipefd[1], STDOUT_FILENO);
-        dup2(pipefd[1], STDERR_FILENO);
-        close(pipefd[1]);
-
-        /* flawfinder: ignore - command parameter is caller-controlled, not arbitrary user input */
-        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
-        exit(1);
-    }
-
-    // Parent process
-    close(pipefd[1]);
-
-    char buffer[4096];
-    ssize_t bytesRead;
-    size_t totalRead = 0;
-
-    while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0) {
-        char *newOutput = (char *)AGENTOS_REALLOC(result.output, totalRead + bytesRead + 1);
-        if (!newOutput) {
-            break;
-        }
-        result.output = newOutput;
-        __builtin_memcpy(result.output + totalRead, buffer, bytesRead);
-        totalRead += bytesRead;
-    }
-
-    if (result.output) {
-        result.output[totalRead] = '\0';
-        result.output_length = totalRead;
-    }
-
-    close(pipefd[0]);
-
-    int status;
-    waitpid(pid, &status, 0);
-
-    if (WIFEXITED(status)) {
-        result.exit_code = WEXITSTATUS(status);
-        result.success = (result.exit_code == 0);
-    }
-#endif
-
-    return result;
-}
-
-/**
- * @brief 释放执行结果
- */
-void platform_free_exec_result(platform_exec_result_t *result)
-{
-    if (result && result->output) {
-        AGENTOS_FREE(result->output);
-        result->output = NULL;
-        result->output_length = 0;
-    }
-}
+/* platform_exec() / platform_free_exec_result() 已移除（BAN-211/235 安全合规）。
+ * 这两个函数通过 /bin/sh -c 执行命令字符串，存在命令注入风险，且全仓库零调用者。
+ * 统一使用 agentos_process_run_capture()（fork+execvp，不经 shell）作为规范子进程 API。
+ * 见 platform.h 的 agentos_process_run_capture 声明。 */
 
 /**
  * @brief 获取文件信息
@@ -424,8 +279,7 @@ bool platform_move_file(const char *src, const char *dest)
 char *platform_get_env(const char *name, const char *default_value)
 {
     if (!name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
 #if defined(_WIN32)
@@ -435,8 +289,7 @@ char *platform_get_env(const char *name, const char *default_value)
         if (default_value) {
             return AGENTOS_STRDUP(default_value);
         }
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     char *value = (char *)AGENTOS_MALLOC(size + 1);
@@ -452,8 +305,7 @@ char *platform_get_env(const char *name, const char *default_value)
     if (default_value) {
         return AGENTOS_STRDUP(default_value);
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 #endif
 }
 
@@ -491,8 +343,7 @@ char *platform_get_cwd(void)
         return copy;
     }
 #endif
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -528,8 +379,7 @@ char *platform_get_temp_dir(void)
     }
     return AGENTOS_STRDUP("/tmp");
 #endif
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -539,8 +389,7 @@ char *platform_get_temp_file(const char *prefix)
 {
     char *temp_dir = platform_get_temp_dir();
     if (!temp_dir) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     char *path = NULL;
@@ -572,8 +421,7 @@ char *platform_get_temp_file(const char *prefix)
 char *platform_path_join(const char *path1, const char *path2)
 {
     if (!path1 || !path2) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t len1 = strlen(path1);
@@ -583,8 +431,7 @@ char *platform_path_join(const char *path1, const char *path2)
 
     char *result = (char *)AGENTOS_MALLOC(total_len);
     if (!result) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (needs_slash) {
@@ -601,8 +448,7 @@ char *platform_path_join(const char *path1, const char *path2)
 char *platform_path_normalize(const char *path)
 {
     if (!path) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // Simple implementation - real implementation would handle .. and .
@@ -615,8 +461,7 @@ char *platform_path_normalize(const char *path)
 char *platform_path_basename(const char *path)
 {
     if (!path) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     const char *last_slash = strrchr(path, PLATFORM_SLASH);
@@ -632,8 +477,7 @@ char *platform_path_basename(const char *path)
 char *platform_path_dirname(const char *path)
 {
     if (!path) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     const char *last_slash = strrchr(path, PLATFORM_SLASH);

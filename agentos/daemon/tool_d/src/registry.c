@@ -39,29 +39,25 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
 {
     tool_metadata_t *dst = AGENTOS_CALLOC(1, sizeof(tool_metadata_t));
     if (!dst) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     dst->id = AGENTOS_STRDUP(src->id);
     if (!dst->id) {
         AGENTOS_FREE(dst);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate id");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate id");
     }
     dst->name = AGENTOS_STRDUP(src->name);
     if (!dst->name) {
         AGENTOS_FREE(dst->id);
         AGENTOS_FREE(dst);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate name");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate name");
     }
     dst->description = src->description ? AGENTOS_STRDUP(src->description) : NULL;
     if (src->description && !dst->description) {
         AGENTOS_FREE(dst->name);
         AGENTOS_FREE(dst->id);
         AGENTOS_FREE(dst);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate description");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate description");
     }
     dst->executable = AGENTOS_STRDUP(src->executable);
     if (!dst->executable) {
@@ -69,8 +65,7 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
         AGENTOS_FREE(dst->name);
         AGENTOS_FREE(dst->id);
         AGENTOS_FREE(dst);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate executable");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate executable");
     }
     dst->timeout_sec = src->timeout_sec;
     dst->cacheable = src->cacheable;
@@ -81,8 +76,7 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
         AGENTOS_FREE(dst->name);
         AGENTOS_FREE(dst->id);
         AGENTOS_FREE(dst);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate permission_rule");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate permission_rule");
     }
     if (src->param_count > 0) {
         dst->params = AGENTOS_CALLOC(src->param_count, sizeof(tool_param_t));
@@ -93,8 +87,7 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
             AGENTOS_FREE(dst->name);
             AGENTOS_FREE(dst->id);
             AGENTOS_FREE(dst);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         for (size_t i = 0; i < src->param_count; ++i) {
             dst->params[i].name = AGENTOS_STRDUP(src->params[i].name);
@@ -110,8 +103,7 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
                 AGENTOS_FREE(dst->name);
                 AGENTOS_FREE(dst->id);
                 AGENTOS_FREE(dst);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate param name");
-                return NULL;
+                AGENTOS_ERROR_NULL(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate param name");
             }
             dst->params[i].schema = AGENTOS_STRDUP(src->params[i].schema);
             if (!dst->params[i].schema) {
@@ -127,8 +119,7 @@ static tool_metadata_t *dup_metadata(const tool_metadata_t *src)
                 AGENTOS_FREE(dst->name);
                 AGENTOS_FREE(dst->id);
                 AGENTOS_FREE(dst);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate param schema");
-                return NULL;
+                AGENTOS_ERROR_NULL(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate param schema");
             }
         }
         dst->param_count = src->param_count;
@@ -140,8 +131,7 @@ tool_registry_t *tool_registry_create(const tool_config_t *cfg)
 {
     tool_registry_t *reg = AGENTOS_CALLOC(1, sizeof(tool_registry_t));
     if (!reg) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     agentos_mutex_init(&reg->lock);
 
@@ -303,8 +293,7 @@ int tool_registry_remove(tool_registry_t *reg, const char *tool_id)
 tool_metadata_t *tool_registry_get(tool_registry_t *reg, const char *tool_id)
 {
     if (!reg || !tool_id) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     unsigned int idx = hash(tool_id);
     agentos_mutex_lock(&reg->lock);
@@ -316,8 +305,7 @@ tool_metadata_t *tool_registry_get(tool_registry_t *reg, const char *tool_id)
         }
     }
     agentos_mutex_unlock(&reg->lock);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 char *tool_registry_list_json(tool_registry_t *reg)

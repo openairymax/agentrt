@@ -108,6 +108,7 @@ typedef struct {
     uint32_t escalated_units;
     uint32_t rejected_units;
     uint32_t total_corrections;
+    uint32_t loop_detected_units; /**< P2.9: 检测到语义循环（修正内容与当前相同）的单元数 */
     float avg_score;
     uint64_t total_time_ns;
 } tc3_stats_t;

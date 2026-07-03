@@ -30,6 +30,9 @@ if(BUILD_SHARED_LIBS)
     target_compile_definitions(agentos_syscall PRIVATE AGENTOS_BUILDING_SHARED)
 endif()
 
+# P3.20: 启用 heapstore 持久化代码 — session.c/telemetry.c 中 #ifdef BUILD_HEAPSTORE 代码块
+target_compile_definitions(agentos_syscall PRIVATE BUILD_HEAPSTORE)
+
 target_link_libraries(agentos_syscall PUBLIC agentos_atoms)
 
 target_include_directories(agentos_syscall PUBLIC
@@ -70,9 +73,20 @@ endif()
 target_link_libraries(agentos_syscall PUBLIC
     agentos_core
     agentos_coreloopthree
+    agentos_heapstore
     Threads::Threads
     $<$<BOOL:${CJSON_FOUND}>:${CJSON_LIBRARIES}>
 )
+
+# cJSON 用于 skill.c 的 data_transform/file_io/image_gen/audio_process JSON 解析
+# 使用全局 AGENTRT_HAS_CJSON（根 CMakeLists.txt 检测）确保与项目一致
+if(AGENTRT_HAS_CJSON)
+    target_compile_definitions(agentos_syscall PRIVATE AGENTOS_HAS_CJSON=1)
+    if(CJSON_INCLUDE_DIRS)
+        target_include_directories(agentos_syscall PRIVATE ${CJSON_INCLUDE_DIRS})
+    endif()
+    agentos_print_ok("  syscall: cJSON enabled for skill JSON features (data_transform/file_io/image_gen/audio_process)")
+endif()
 
 # libcurl 用于 skill.c 的 web_search/image_gen/audio_process HTTP API 调用
 if(AGENTRT_HAS_CURL)
@@ -84,9 +98,9 @@ if(AGENTRT_HAS_CURL)
         target_link_libraries(agentos_syscall PRIVATE ${LIBCURL_LIBRARIES})
         target_include_directories(agentos_syscall PRIVATE ${LIBCURL_INCLUDE_DIRS})
     endif()
-    message(STATUS "  syscall: libcurl enabled for skill HTTP features (web_search/image_gen/audio_process)")
+    agentos_print_ok("  syscall: libcurl enabled for skill HTTP features (web_search/image_gen/audio_process)")
 else()
-    message(WARNING "  syscall: libcurl not found - web_search/image_gen/audio_process HTTP features will be unavailable")
+    agentos_print_warn("  syscall: libcurl not found - web_search/image_gen/audio_process HTTP features will be unavailable")
 endif()
 
 install(TARGETS agentos_syscall DESTINATION lib)
@@ -147,13 +161,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
     # 扩展单元测试 (TeamC P1-C07 扩展, 覆盖率>50%)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscall_extended.c")
-        add_executable(test_syscall_extended tests/test_syscall_extended.c
-            ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
-        )
+        add_executable(test_syscall_extended tests/test_syscall_extended.c)
         target_compile_definitions(test_syscall_extended PRIVATE AGENTOS_COMPLIANCE_IMPL)
-        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
-            PROPERTIES COMPILE_FLAGS "-fno-lto"
-        )
         target_include_directories(test_syscall_extended PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit
             ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -171,8 +180,15 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
             -Wl,--whole-archive
             agentos_coreloopthree
             -Wl,--no-whole-archive
+            agentos_cognition
+            agentos_execution
             agentos_core
+            agentos_memory
+            agentos_atoms
             agentos_common
+            svc_common
+            agentos_llm_service
+            agentos_tool_service
             Threads::Threads
             uuid
             agentos_platform_libs
@@ -183,22 +199,17 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         # -O0 与 _FORTIFY_SOURCE=2 不兼容（需要 -O1+），取消定义以避免警告
         target_compile_options(test_syscall_extended PRIVATE -U_FORTIFY_SOURCE)
         add_test(NAME test_syscall_extended COMMAND test_syscall_extended)
-        message(STATUS "  syscall_tests: test_syscall_extended configured (P1-C07 extended)")
+        agentos_print_ok("  syscall_tests: test_syscall_extended configured (P1-C07 extended)")
     endif()
 else()
-    message(WARNING "Tests directory not found, skipping syscall tests")
+    agentos_print_warn("Tests directory not found, skipping syscall tests")
 endif()
 endif()
 
 # TeamC P1-C07: Syscall 核心单元测试
 if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscalls.c")
-    add_executable(test_syscalls tests/test_syscalls.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
-    )
+    add_executable(test_syscalls tests/test_syscalls.c)
     target_compile_definitions(test_syscalls PRIVATE AGENTOS_COMPLIANCE_IMPL)
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
-        PROPERTIES COMPILE_FLAGS "-fno-lto"
-    )
     target_include_directories(test_syscalls PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -212,8 +223,15 @@ if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscalls.c")
         -Wl,--whole-archive
         agentos_coreloopthree
         -Wl,--no-whole-archive
+        agentos_cognition
+        agentos_execution
         agentos_core
+        agentos_memory
+        agentos_atoms
         agentos_common
+        svc_common
+        agentos_llm_service
+        agentos_tool_service
         Threads::Threads
         uuid
     )
@@ -226,5 +244,5 @@ if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscalls.c")
     endif()
     target_link_libraries(test_syscalls PRIVATE agentos_test_ldflags)
     add_test(NAME syscalls_test COMMAND test_syscalls)
-    message(STATUS "  syscall_tests: test_syscalls configured (P1-C07)")
+    agentos_print_ok("  syscall_tests: test_syscalls configured (P1-C07)")
 endif()

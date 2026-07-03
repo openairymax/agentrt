@@ -6,13 +6,7 @@ add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 # 覆盖: init/cleanup, invoke分发, 参数验证, 边界条件
 # 对齐: 看板v09 P1-C07 / 规范手册v09 TEST-03
 
-add_executable(test_syscalls test_syscalls.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../coreloopthree/tests/unit/test_cl3_stubs.c
-)
-
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../coreloopthree/tests/unit/test_cl3_stubs.c
-    PROPERTIES COMPILE_FLAGS "-fno-lto"
-)
+add_executable(test_syscalls test_syscalls.c)
 
 target_include_directories(test_syscalls PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
@@ -31,7 +25,7 @@ target_include_directories(test_syscalls PRIVATE
 target_link_libraries(test_syscalls PRIVATE agentos_syscall)
 
 add_test(NAME syscalls_test COMMAND test_syscalls)
-message(STATUS "  syscall_tests: configured (test_syscalls)")
+agentos_print_ok("  syscall_tests: configured (test_syscalls)")
 
 # Syscall 扩展单元测试 (TeamC P1-C07 扩展, 覆盖率>50%)
 add_executable(test_syscall_extended test_syscall_extended.c)
@@ -53,4 +47,4 @@ target_link_libraries(test_syscall_extended PRIVATE agentos_syscall)
 target_compile_options(test_syscall_extended PRIVATE -g -O0 -fno-lto)
 
 add_test(NAME syscall_extended_test COMMAND test_syscall_extended)
-message(STATUS "  syscall_tests: configured (test_syscall_extended)")
+agentos_print_ok("  syscall_tests: configured (test_syscall_extended)")

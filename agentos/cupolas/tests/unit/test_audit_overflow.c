@@ -80,7 +80,17 @@ static void test_overflow_null_handling(void)
 {
     printf("Test: overflow_null_handling... ");
 
-    assert(overflow_handler_create(NULL, 0, 0) != NULL);
+    /* v0.1.1 修复（BAN-318 测试反模式）：
+     * 此前 overflow_handler_create(NULL, 0, 0) 的返回值被包裹在 assert() 中，
+     * Debug 模式下 handler 被创建（含内存+文件句柄+flush 线程）但指针被丢弃，
+     * 导致内存+文件+线程泄漏。NDEBUG 模式下整个表达式不求值，handler 不会被创建。
+     * 修复：将 create 从 assert 中拆出，确保两种模式下都正确创建+销毁。
+     * overflow_handler_create(NULL, 0, 0) 使用默认值创建，应返回非 NULL。 */
+    overflow_handler_t *null_handler = overflow_handler_create(NULL, 0, 0);
+    assert(null_handler != NULL);
+    if (null_handler) {
+        overflow_handler_destroy(null_handler);
+    }
 
     audit_entry_t *entry = audit_entry_create(AUDIT_EVENT_SYSTEM, NULL, NULL, NULL, NULL, 0);
     if (entry) {

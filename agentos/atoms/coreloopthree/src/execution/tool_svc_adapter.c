@@ -45,7 +45,6 @@
 struct tool_svc_adapter_s {
     daemon_bootstrap_sd_t *bsd;           /* ServiceDiscovery 引导 */
     daemon_bootstrap_ipc_t *bipc;         /* IPC Bus 引导 */
-    tool_service_t *wrapper_svc;          /* 包装的 tool_service_t（模拟句柄） */
     tool_approval_ctx_t *approval_ctx;    /* C-L05: 工具审批上下文 */
     char tool_d_service_name[64];         /* tool_d 服务名 */
     char channel_name[64];                /* IPC 通道名 */
@@ -322,16 +321,12 @@ tool_svc_adapter_t *tool_svc_adapter_create(const tool_svc_adapter_config_t *con
         }
     }
 
-    /* 创建包装的 tool_service_t（占位符句柄，tool_service_t 是不透明类型） */
-    adapter->wrapper_svc = (tool_service_t *)AGENTOS_MALLOC(1);
-    if (!adapter->wrapper_svc) {
-        AGENTOS_LOG_ERROR("C-L04: Failed to allocate wrapper service handle");
-        if (adapter->approval_ctx) tool_approval_destroy(adapter->approval_ctx);
-        daemon_bootstrap_ipc_stop(adapter->bipc);
-        if (adapter->bsd) daemon_bootstrap_sd_stop(adapter->bsd);
-        AGENTOS_FREE(adapter);
-        return NULL;
-    }
+    /* tool_service_t 由 tool_d daemon 内部构造和管理（见 daemon/tool_d/src/service.h，
+     * 含 registry/cancel_token 等字段）。coreloopthree 通过 IPC adapter 与 tool_d 通信，
+     * 不直接持有 tool_service_t。tool_svc_adapter_get_service() 保留为接口兼容，
+     * 始终返回 NULL；认知引擎应通过 agentos_cognition_set_tool_adapter() 注入 adapter。
+     * 旧实现在此 AGENTOS_MALLOC(1) 分配 1 字节占位符桩并作为 tool_service_t 返回，
+     * 若被 tool_service_execute() 解引用会堆越界读——已移除。 */
 
     adapter->connected = true;
     adapter->total_executions = 0;
@@ -354,7 +349,6 @@ void tool_svc_adapter_destroy(tool_svc_adapter_t *adapter)
                      (unsigned long long)adapter->total_executions,
                      (unsigned long long)adapter->total_errors);
 
-    if (adapter->wrapper_svc) AGENTOS_FREE(adapter->wrapper_svc);
     if (adapter->approval_ctx) tool_approval_destroy(adapter->approval_ctx);
     if (adapter->bipc) daemon_bootstrap_ipc_stop(adapter->bipc);
     if (adapter->bsd) daemon_bootstrap_sd_stop(adapter->bsd);
@@ -365,8 +359,15 @@ void tool_svc_adapter_destroy(tool_svc_adapter_t *adapter)
 
 tool_service_t *tool_svc_adapter_get_service(tool_svc_adapter_t *adapter)
 {
-    if (!adapter || !adapter->connected) return NULL;
-    return adapter->wrapper_svc;
+    /* tool_service_t 是 tool_d daemon 的内部结构（含 registry/cancel_token 等，
+     * 见 daemon/tool_d/src/service.h），由 daemon 构造和管理，coreloopthree 无法
+     * 真实构造。本函数保留为接口兼容，始终返回 NULL。认知引擎应通过
+     * agentos_cognition_set_tool_adapter() 注入 IPC adapter，由 adapter 通过
+     * IPC 调用 tool_d，而非直接持有 tool_service_t 句柄。
+     * 旧实现返回 1 字节 AGENTOS_MALLOC(1) 占位符桩，若被 tool_service_execute()
+     * 解引用会导致堆越界读——已移除。 */
+    (void)adapter;
+    return NULL;
 }
 
 int tool_svc_adapter_execute(tool_svc_adapter_t *adapter,

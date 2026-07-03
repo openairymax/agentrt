@@ -357,6 +357,37 @@ const char *log_get_span_id(void);
 int log_set_module_level(const char *module_pattern, log_level_t level);
 
 /**
+ * @brief 模块日志级别配置信息（只读快照）
+ *
+ * 描述单个模块级别过滤规则，由 log_get_module_info() 填充。
+ */
+typedef struct {
+    char pattern[128];   /**< 模块名称模式（支持通配符*） */
+    log_level_t level;   /**< 该模块的日志级别 */
+} log_module_info_t;
+
+/**
+ * @brief 获取已配置模块级别过滤器的数量
+ *
+ * 返回通过 log_set_module_level() 注册的模块级别过滤器数量，
+ * 用于日志系统内省与迁移监控。线程安全。
+ *
+ * @return 已注册的模块级别过滤器数量（未初始化时返回0）
+ */
+size_t log_get_module_count(void);
+
+/**
+ * @brief 枚举已配置的模块级别过滤器
+ *
+ * 将当前模块级别过滤表的内容快照复制到 out_info 数组。线程安全。
+ *
+ * @param[out] out_info 输出数组，可为NULL（此时返回0）
+ * @param[in] max_count out_info 数组容量
+ * @return 实际填充的条目数（不超过 max_count 和注册总数）
+ */
+size_t log_get_module_info(log_module_info_t *out_info, size_t max_count);
+
+/**
  * @brief 重新加载日志配置
  *
  * 从配置文件重新加载日志配置，支持热重载。
