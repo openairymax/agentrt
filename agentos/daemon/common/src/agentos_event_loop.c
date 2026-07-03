@@ -148,9 +148,7 @@ agentos_event_loop_t *agentos_event_loop_create(int max_events)
     agentos_event_loop_t *loop =
         (agentos_event_loop_t *)AGENTOS_CALLOC(1, sizeof(agentos_event_loop_t));
     if (!loop) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (max_events <= 0)
@@ -161,16 +159,14 @@ agentos_event_loop_t *agentos_event_loop_create(int max_events)
     loop->fd_entries = (fd_entry_t *)AGENTOS_CALLOC((size_t)max_events, sizeof(fd_entry_t));
     if (!loop->fd_entries) {
         AGENTOS_FREE(loop);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     loop->wakeup_event = CreateEventW(NULL, TRUE, FALSE, NULL);
     if (!loop->wakeup_event) {
         AGENTOS_FREE(loop->fd_entries);
         AGENTOS_FREE(loop);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     loop->next_timer_id = 1;
@@ -483,9 +479,7 @@ agentos_event_loop_t *agentos_event_loop_create(int max_events)
     agentos_event_loop_t *loop =
         (agentos_event_loop_t *)AGENTOS_CALLOC(1, sizeof(agentos_event_loop_t));
     if (!loop) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (max_events <= 0)
@@ -494,8 +488,7 @@ agentos_event_loop_t *agentos_event_loop_create(int max_events)
     loop->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if (loop->epoll_fd < 0) {
         AGENTOS_FREE(loop);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     loop->max_events = max_events;
@@ -508,8 +501,7 @@ agentos_event_loop_t *agentos_event_loop_create(int max_events)
         AGENTOS_FREE(loop->epoll_events);
         AGENTOS_FREE(loop->fd_entries);
         AGENTOS_FREE(loop);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     loop->wakeup_fd = -1;

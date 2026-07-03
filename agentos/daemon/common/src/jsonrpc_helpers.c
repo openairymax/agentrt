@@ -21,8 +21,7 @@ char *jsonrpc_build_error(int code, const char *message, int id)
 
     cJSON *root = cJSON_CreateObject();
     if (!root) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "cJSON_CreateObject failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OUT_OF_MEMORY, "cJSON_CreateObject failed");
     }
 
     cJSON_AddStringToObject(root, "jsonrpc", "2.0");
@@ -177,13 +176,11 @@ int jsonrpc_get_bool_param(cJSON *params, const char *key, int default_value)
 cJSON *jsonrpc_get_array_param(cJSON *params, const char *key)
 {
     if (!params || !key) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "jsonrpc_get_array_param: null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "jsonrpc_get_array_param: null parameter");
     }
     cJSON *item = cJSON_GetObjectItem(params, key);
     if (!item || !cJSON_IsArray(item)) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "jsonrpc_get_array_param: not an array");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "jsonrpc_get_array_param: not an array");
     }
     return item;
 }
@@ -191,13 +188,11 @@ cJSON *jsonrpc_get_array_param(cJSON *params, const char *key)
 cJSON *jsonrpc_get_object_param(cJSON *params, const char *key)
 {
     if (!params || !key) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "jsonrpc_get_object_param: null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "jsonrpc_get_object_param: null parameter");
     }
     cJSON *item = cJSON_GetObjectItem(params, key);
     if (!item || !cJSON_IsObject(item)) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "jsonrpc_get_object_param: not an object");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "jsonrpc_get_object_param: not an object");
     }
     return item;
 }
@@ -215,8 +210,7 @@ char *jsonrpc_build_notification(const char *method, cJSON *params)
     if (!method) {
         if (params)
             cJSON_Delete(params);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     cJSON *root = cJSON_CreateObject();

@@ -267,13 +267,12 @@ int orch_adapter_set_llm_service(orch_adapter_t *adapter,
 
     adapter->llm_adapter = (llm_svc_adapter_t *)llm_svc_adapter;
 
-    /* 注入到编排器（C-L06 P1.5.1） */
-    if (adapter->llm_adapter) {
-        llm_service_t *llm_svc = llm_svc_adapter_get_service(adapter->llm_adapter);
-        if (llm_svc) {
-            orchestrator_set_cognition_llm_service(adapter->orch, llm_svc);
-        }
-    }
+    /* C-L06 P1.5.1: adapter 句柄暂存。LLM 能力经 loop.c 的
+     * agentos_cognition_set_llm_adapter() 注入到认知引擎（IPC 路径，
+     * P1.2.1 首选）。旧代码通过 llm_svc_adapter_get_service() 获取
+     * llm_service_t 句柄并经 orchestrator_set_cognition_llm_service() 注入，
+     * 但 get_service 始终返回 NULL（llm_service_t 由 llm_d daemon 内部管理，
+     * coreloopthree 不直接持有），该路径已移除。 */
 
     AGENTOS_LOG_INFO("C-L06: LLM service injected into orchestrator");
     return 0;
@@ -286,14 +285,12 @@ int orch_adapter_set_tool_service(orch_adapter_t *adapter,
 
     adapter->tool_adapter = (tool_svc_adapter_t *)tool_svc_adapter;
 
-    /* 注入到编排器（C-L06 P1.5.1） */
-    if (adapter->tool_adapter) {
-        tool_service_t *tool_svc =
-            tool_svc_adapter_get_service(adapter->tool_adapter);
-        if (tool_svc) {
-            orchestrator_set_cognition_tool_service(adapter->orch, tool_svc);
-        }
-    }
+    /* C-L06 P1.5.1: adapter 句柄暂存。Tool 能力经 engine.c 的
+     * agentos_cognition_set_tool_adapter() 注入到认知引擎（IPC 路径，
+     * P1.3.1 首选）。旧代码通过 tool_svc_adapter_get_service() 获取
+     * tool_service_t 句柄并经 orchestrator_set_cognition_tool_service() 注入，
+     * 但 get_service 始终返回 NULL（tool_service_t 由 tool_d daemon 内部管理，
+     * coreloopthree 不直接持有），该路径已移除。 */
 
     AGENTOS_LOG_INFO("C-L06: Tool service injected into orchestrator");
     return 0;
@@ -324,32 +321,10 @@ int orch_adapter_execute_pipeline(orch_adapter_t *adapter,
         return -1;
     }
 
-    /* 注入 LLM 和 Tool 服务到 CoreLoopThree */
-    if (adapter->llm_adapter) {
-        agentos_cognition_engine_t *cog = NULL;
-        agentos_loop_get_engines(loop, &cog, NULL, NULL);
-        if (cog) {
-            llm_service_t *llm_svc =
-                llm_svc_adapter_get_service(adapter->llm_adapter);
-            if (llm_svc) {
-                /* 注入 LLM 服务到认知引擎 */
-                /* agentos_cognition_set_llm_service(cog, llm_svc); */
-            }
-        }
-    }
-
-    if (adapter->tool_adapter) {
-        agentos_execution_engine_t *exec = NULL;
-        agentos_loop_get_engines(loop, NULL, &exec, NULL);
-        if (exec) {
-            tool_service_t *tool_svc =
-                tool_svc_adapter_get_service(adapter->tool_adapter);
-            if (tool_svc) {
-                /* 注入 Tool 服务到执行引擎 */
-                /* agentos_execution_set_tool_service(exec, tool_svc); */
-            }
-        }
-    }
+    /* 注入 Tool 服务到 CoreLoopThree（LLM adapter 经 loop.c 的
+     * set_llm_adapter 路径注入，此处无需重复）。Tool adapter 经
+     * engine.c 的 set_tool_adapter 路径注入，此处亦无需重复。 */
+    (void)adapter;
 
     /* P1.5.2: 执行流水线 — 通过编排器的 orchestrator_execute_pipeline */
     /* C-L06: 将 CoreLoopThree 实例注入到编排器，使 GENERATION 阶段使用三层循环 */

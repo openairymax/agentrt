@@ -142,15 +142,13 @@ agentos_budget_controller_t *agentos_budget_controller_create(double max_cost_us
                                                               uint32_t period_seconds)
 {
     if (max_cost_usd <= 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     agentos_budget_controller_t *controller =
         (agentos_budget_controller_t *)AGENTOS_MALLOC(sizeof(agentos_budget_controller_t));
     if (!controller) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     AGENTOS_MEMSET(controller, 0, sizeof(agentos_budget_controller_t));
@@ -164,8 +162,7 @@ agentos_budget_controller_t *agentos_budget_controller_create(double max_cost_us
 
     if (budget_ctrl_mutex_init(&controller->mutex) != 0) {
         AGENTOS_FREE(controller);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     controller->period_start = get_current_time();

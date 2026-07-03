@@ -75,18 +75,14 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
 {
     if (!config) {
         SVC_LOG_ERROR("C-L02: EVENT-DRIVER: CREATE-FAIL null config, STACK: daemon_event_driver_create");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     daemon_event_driver_t *driver =
         (daemon_event_driver_t *)AGENTOS_CALLOC(1, sizeof(daemon_event_driver_t));
     if (!driver) {
         SVC_LOG_ERROR("C-L02: EVENT-DRIVER: CREATE-FAIL alloc driver, STACK: daemon_event_driver_create");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     int max_events = config->max_events > 0 ? config->max_events : 64;
@@ -94,8 +90,7 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
     if (!driver->loop) {
         SVC_LOG_ERROR("C-L02: EVENT-DRIVER: CREATE-FAIL loop, STACK: daemon_event_driver_create");
         AGENTOS_FREE(driver);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (config->thread_pool_max > 0) {
@@ -120,8 +115,7 @@ daemon_event_driver_t *daemon_event_driver_create(const daemon_event_config_t *c
                 thread_pool_destroy(driver->pool);
             agentos_event_loop_destroy(driver->loop);
             AGENTOS_FREE(driver);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     }
 

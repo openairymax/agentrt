@@ -62,8 +62,7 @@ static cm_entry_t *find_entry(const char *key)
         if (strcmp(g_cm.entries[i].key, key) == 0)
             return &g_cm.entries[i];
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static bool pattern_matches(const char *pattern, const char *key)
@@ -723,9 +722,7 @@ AGENTOS_API int cm_load_environment_config(const char *env)
 AGENTOS_API char *cm_export_json(const char *namespace_)
 {
     if (!g_cm.initialized) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     agentos_mutex_lock(&g_cm.mutex);

@@ -17,8 +17,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <time.h>
+
+#ifndef _WIN32
+#include <sys/wait.h> /* POSIX 专用头文件（当前文件未直接使用，保留以备扩展） */
+#endif
 
 struct tool_executor {
     tool_executor_config_t manager;
@@ -43,9 +46,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
     tool_executor_t *exec = (tool_executor_t *)AGENTOS_CALLOC(1, sizeof(tool_executor_t));
     if (!exec) {
         SVC_LOG_ERROR("tool_executor_create: calloc failed for executor");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     exec->manager = *cfg;
@@ -55,8 +56,7 @@ tool_executor_t *tool_executor_create(const tool_executor_config_t *cfg)
     if (agentos_mutex_init(&exec->lock) != 0) {
         SVC_LOG_ERROR("tool_executor_create: mutex init failed");
         AGENTOS_FREE(exec);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     exec->total_executions = 0;
     exec->success_count = 0;
@@ -157,27 +157,8 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    /* SEC-011: 命令注入防护 - 检测shell元字符 */
-    const char *dangerous_chars = ";|&`$()<>{}[]\\!*?\n\r";
-    const char *check_inputs[] = {meta->executable, params_json, NULL};
-    for (int ci = 0; check_inputs[ci]; ci++) {
-        if (!check_inputs[ci])
-            continue;
-        for (const char *dc = dangerous_chars; *dc; dc++) {
-            if (strchr(check_inputs[ci], *dc)) {
-                SVC_LOG_ERROR("tool_executor_run: command rejected - prohibited shell metacharacter '%c' in input[%d]", *dc, ci);
-                result->success = 0;
-                result->output = AGENTOS_STRDUP("");
-                result->error =
-                    AGENTOS_STRDUP("Command rejected: contains prohibited shell metacharacters");
-                result->exit_code = -1;
-                result->duration_ms = 0;
-                *out_result = result;
-                agentos_mutex_unlock(&exec->lock);
-                return AGENTOS_EPERM;
-            }
-        }
-    }
+    /* BAN-211/235: 使用 execvp 直接执行（不经 shell），无需 SEC-011 shell 元字符检查。
+     * params_json 作为单个 argv 元素传递给工具，工具自行解析 JSON。 */
 
     /* ── C-L05: Cupolas SafetyGuard → tool_d 工具审批 ── */
     if (exec->approval_ctx) {
@@ -203,33 +184,21 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
                      (int)approval_detail.decision);
     }
 
-    char full_command[4096];
+    /* BAN-211/235: 构建 argv 并通过 execvp 直接执行（不经 shell），消除命令注入风险。
+     * params_json 作为单个 argv 元素传递给工具，工具自行解析。 */
+    const char *argv[3];
+    int arg_count = 0;
+    argv[arg_count++] = meta->executable;
     if (params_json && strlen(params_json) > 0) {
-        snprintf(full_command, sizeof(full_command), "%s %s", meta->executable, params_json);
-    } else {
-        snprintf(full_command, sizeof(full_command), "%s", meta->executable);
+        argv[arg_count++] = params_json;
     }
+    argv[arg_count] = NULL;
 
-    /* flawfinder: ignore - input validated by SEC-011 metachar check above */
-    FILE *pipe = popen(full_command, "r");
-    if (!pipe) {
-        SVC_LOG_ERROR("tool_executor_run: popen failed for command '%s'", full_command);
-        result->success = 0;
-        result->output = AGENTOS_STRDUP("");
-        result->error = AGENTOS_STRDUP("Failed to execute command: popen failed");
-        result->exit_code = -1;
-        result->duration_ms = (uint32_t)((time(NULL) - start_time) * 1000);
-        *out_result = result;
-        agentos_mutex_unlock(&exec->lock);
-        return AGENTOS_EIO;
-    }
-
-    size_t output_size = 4096;
-    size_t output_len = 0;
-    char *output_buffer = (char *)AGENTOS_MALLOC(output_size);
+    /* 分配输出捕获缓冲区（1MB 上限，覆盖绝大多数工具输出，同时防止失控输出 OOM） */
+    size_t cap_size = 1024 * 1024;
+    char *output_buffer = (char *)AGENTOS_MALLOC(cap_size);
     if (!output_buffer) {
-        SVC_LOG_ERROR("tool_executor_run: malloc failed for output buffer (size=%zu)", output_size);
-        pclose(pipe);
+        SVC_LOG_ERROR("tool_executor_run: malloc failed for output buffer (size=%zu)", cap_size);
         result->success = 0;
         result->output = AGENTOS_STRDUP("");
         result->error = AGENTOS_STRDUP("Memory allocation failed for output buffer");
@@ -241,49 +210,55 @@ int tool_executor_run(tool_executor_t *exec, const tool_metadata_t *meta, const 
     }
     output_buffer[0] = '\0';
 
-    size_t bytes_read;
-    while ((bytes_read = fread(output_buffer + output_len, 1, output_size - output_len - 1, pipe)) >
-           0) {
-        output_len += bytes_read;
-        if (output_len >= output_size - 256) {
-            output_size *= 2;
-            char *new_buf = (char *)AGENTOS_REALLOC(output_buffer, output_size);
-            if (!new_buf)
-                break;
-            output_buffer = new_buf;
+    uint32_t timeout_ms = (uint32_t)exec->manager.timeout_sec * 1000;
+    int ret = agentos_process_run_capture(meta->executable, (char *const *)argv, NULL,
+                                          timeout_ms, output_buffer, cap_size);
+
+    /* 缩减缓冲区到实际输出长度，避免内存浪费 */
+    size_t actual_len = strlen(output_buffer);
+    if (actual_len + 1 < cap_size) {
+        char *shrunk = (char *)AGENTOS_REALLOC(output_buffer, actual_len + 1);
+        if (shrunk) {
+            output_buffer = shrunk;
         }
     }
-    output_buffer[output_len] = '\0';
 
-    int exit_status = pclose(pipe);
-
-    result->success = (WIFEXITED(exit_status) && WEXITSTATUS(exit_status) == 0) ? 1 : 0;
     result->output = output_buffer;
     result->error = NULL;
 
-    if (!result->success) {
-        if (WIFEXITED(exit_status)) {
-            SVC_LOG_ERROR("tool_executor_run: command failed with exit code %d (executable=%s)", WEXITSTATUS(exit_status), meta->executable ? meta->executable : "NULL");
-            char err_msg[256];
-            snprintf(err_msg, sizeof(err_msg), "Command exited with code %d",
-                     WEXITSTATUS(exit_status));
-            result->error = AGENTOS_STRDUP(err_msg);
-            result->exit_code = WEXITSTATUS(exit_status);
-        } else if (WIFSIGNALED(exit_status)) {
-            SVC_LOG_ERROR("tool_executor_run: command killed by signal %d (executable=%s)", WTERMSIG(exit_status), meta->executable ? meta->executable : "NULL");
-            char err_msg[256];
-            snprintf(err_msg, sizeof(err_msg), "Command killed by signal %d",
-                     WTERMSIG(exit_status));
-            result->error = AGENTOS_STRDUP(err_msg);
-            result->exit_code = -WTERMSIG(exit_status);
-        } else {
-            SVC_LOG_ERROR("tool_executor_run: unknown execution error (executable=%s)", meta->executable ? meta->executable : "NULL");
-            result->error = AGENTOS_STRDUP("Unknown execution error");
-            result->exit_code = -1;
-        }
-    } else {
+    if (ret == -1) {
+        SVC_LOG_ERROR("tool_executor_run: failed to start command '%s'",
+                      meta->executable ? meta->executable : "NULL");
+        result->success = 0;
+        result->error = AGENTOS_STRDUP("Failed to execute command: execvp failed");
+        result->exit_code = -1;
+    } else if (ret == -2) {
+        SVC_LOG_ERROR("tool_executor_run: command timed out after %u ms (executable=%s)",
+                      timeout_ms, meta->executable ? meta->executable : "NULL");
+        result->success = 0;
+        result->error = AGENTOS_STRDUP("Command timed out");
+        result->exit_code = -1;
+    } else if (ret == 0) {
+        result->success = 1;
         result->exit_code = 0;
         exec->success_count++;
+    } else if (ret > 0) {
+        SVC_LOG_ERROR("tool_executor_run: command failed with exit code %d (executable=%s)", ret,
+                      meta->executable ? meta->executable : "NULL");
+        result->success = 0;
+        char err_msg[256];
+        snprintf(err_msg, sizeof(err_msg), "Command exited with code %d", ret);
+        result->error = AGENTOS_STRDUP(err_msg);
+        result->exit_code = ret;
+    } else {
+        /* ret < 0 且非 -1/-2：信号终止（exit_code = -signum） */
+        SVC_LOG_ERROR("tool_executor_run: command killed by signal %d (executable=%s)", -ret,
+                      meta->executable ? meta->executable : "NULL");
+        result->success = 0;
+        char err_msg[256];
+        snprintf(err_msg, sizeof(err_msg), "Command killed by signal %d", -ret);
+        result->error = AGENTOS_STRDUP(err_msg);
+        result->exit_code = ret;
     }
 
     result->duration_ms = (uint32_t)((time(NULL) - start_time) * 1000);

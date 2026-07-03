@@ -131,7 +131,135 @@ static char *snapshot_to_state_json(const checkpoint_snapshot_t *snapshot)
 }
 
 /**
+ * @brief 从 JSON 字符串中提取指定 key 的值（对象或数组）
+ *
+ * 使用平衡括号匹配提取完整的 JSON 对象 `{...}` 或数组 `[...]`，
+ * 正确处理字符串内的括号和转义字符。适用于 checkpoint state_json
+ * 这种扁平顶层结构的字段提取。
+ *
+ * @param json JSON 字符串
+ * @param key  字段名（不含引号）
+ * @return AGENTOS_MALLOC 分配的字符串（含外层括号/方括号），调用者释放；
+ *         未找到或格式错误返回 NULL
+ */
+static char *extract_json_value(const char *json, const char *key)
+{
+    if (!json || !key) return NULL;
+
+    /* 搜索 "key" — 带双引号的完整 key 不会误匹配前缀重叠的 key 名
+     * （如 "turn" 不会匹配 "current_turn"，因为后者中 turn 前是 _ 不是 "） */
+    char search[256];
+    int sn = snprintf(search, sizeof(search), "\"%s\"", key);
+    if (sn <= 0 || (size_t)sn >= sizeof(search))
+        return NULL;
+
+    const char *p = strstr(json, search);
+    if (!p) return NULL;
+    p += strlen(search);
+
+    /* 跳过空白，期望冒号 */
+    while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r'))
+        p++;
+    if (*p != ':') return NULL;
+    p++;
+    while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r'))
+        p++;
+
+    /* 值必须是对象或数组 */
+    if (*p != '{' && *p != '[') return NULL;
+
+    char open_ch = *p;
+    char close_ch = (open_ch == '{') ? '}' : ']';
+    const char *start = p;
+    int depth = 0;
+    bool in_string = false;
+    bool escaped = false;
+
+    while (*p) {
+        if (escaped) {
+            escaped = false;
+            p++;
+            continue;
+        }
+        if (in_string && *p == '\\') {
+            escaped = true;
+            p++;
+            continue;
+        }
+        if (*p == '"') {
+            in_string = !in_string;
+        } else if (!in_string) {
+            if (*p == open_ch) {
+                depth++;
+            } else if (*p == close_ch) {
+                depth--;
+                if (depth == 0) {
+                    p++;  /* 包含闭括号 */
+                    size_t len = (size_t)(p - start);
+                    char *val = (char *)AGENTOS_MALLOC(len + 1);
+                    if (!val) return NULL;
+                    __builtin_memcpy(val, start, len);
+                    val[len] = '\0';
+                    return val;
+                }
+            }
+        }
+        p++;
+    }
+    return NULL;  /* 未闭合，格式错误 */
+}
+
+/**
+ * @brief 从 JSON 字符串中提取 uint32 标量值
+ */
+static uint32_t extract_uint32_from_json(const char *json, const char *key)
+{
+    if (!json || !key) return 0;
+    char search[256];
+    int sn = snprintf(search, sizeof(search), "\"%s\"", key);
+    if (sn <= 0 || (size_t)sn >= sizeof(search))
+        return 0;
+    const char *p = strstr(json, search);
+    if (!p) return 0;
+    p += strlen(search);
+    while (*p && (*p == ' ' || *p == '\t' || *p == ':' || *p == '\n' || *p == '\r'))
+        p++;
+    uint32_t v = 0;
+    while (*p >= '0' && *p <= '9') {
+        v = v * 10u + (uint32_t)(*p - '0');
+        p++;
+    }
+    return v;
+}
+
+/**
+ * @brief 从 JSON 字符串中提取 float 标量值
+ */
+static float extract_float_from_json(const char *json, const char *key)
+{
+    if (!json || !key) return 0.0f;
+    char search[256];
+    int sn = snprintf(search, sizeof(search), "\"%s\"", key);
+    if (sn <= 0 || (size_t)sn >= sizeof(search))
+        return 0.0f;
+    const char *p = strstr(json, search);
+    if (!p) return 0.0f;
+    p += strlen(search);
+    while (*p && (*p == ' ' || *p == '\t' || *p == ':' || *p == '\n' || *p == '\r'))
+        p++;
+    return (float)strtod(p, NULL);
+}
+
+/**
  * @brief 从 agentos_task_checkpoint_t 恢复快照
+ *
+ * 从 ckpt->state_json（由 snapshot_to_state_json 生成的扁平 JSON 对象）
+ * 中解析出全部字段：cognition_state、memory_context、tool_call_history、
+ * pending_nodes、completed_nodes（嵌套 JSON 值），以及 current_turn、
+ * total_turns、progress_percent（标量）。
+ *
+ * 回退路径：若 state_json 中未含 completed_nodes/pending_nodes（非 adapter
+ * 路径直接创建的 checkpoint），则从 ckpt 的节点数组重建 JSON。
  */
 static checkpoint_snapshot_t *checkpoint_to_snapshot(
     const agentos_task_checkpoint_t *ckpt)
@@ -148,11 +276,30 @@ static checkpoint_snapshot_t *checkpoint_to_snapshot(
     snapshot->timestamp = ckpt->timestamp;
 
     if (ckpt->state_json) {
-        /* 从 state_json 中提取各字段 */
-        snapshot->cognition_state_json = AGENTOS_STRDUP(ckpt->state_json);
+        /* 提取嵌套 JSON 值（对象/数组） */
+        snapshot->cognition_state_json =
+            extract_json_value(ckpt->state_json, "cognition_state");
+        snapshot->memory_context_json =
+            extract_json_value(ckpt->state_json, "memory_context");
+        snapshot->tool_call_history_json =
+            extract_json_value(ckpt->state_json, "tool_call_history");
+        snapshot->pending_nodes_json =
+            extract_json_value(ckpt->state_json, "pending_nodes");
+        snapshot->completed_nodes_json =
+            extract_json_value(ckpt->state_json, "completed_nodes");
 
-        /* 提取 completed_nodes 和 pending_nodes */
-        if (ckpt->completed_count > 0 && ckpt->completed_nodes) {
+        /* 提取标量字段 */
+        snapshot->current_turn =
+            extract_uint32_from_json(ckpt->state_json, "current_turn");
+        snapshot->total_turns =
+            extract_uint32_from_json(ckpt->state_json, "total_turns");
+        snapshot->progress_percent =
+            extract_float_from_json(ckpt->state_json, "progress_percent");
+
+        /* 回退：若 state_json 中未含 completed_nodes（非 adapter 路径
+         * 创建的 checkpoint），从 ckpt 数组重建 JSON 字符串。 */
+        if (!snapshot->completed_nodes_json && ckpt->completed_count > 0 &&
+            ckpt->completed_nodes) {
             size_t total_len = 0;
             for (size_t i = 0; i < ckpt->completed_count; i++) {
                 if (ckpt->completed_nodes[i]) {
@@ -180,7 +327,8 @@ static checkpoint_snapshot_t *checkpoint_to_snapshot(
             }
         }
 
-        if (ckpt->pending_count > 0 && ckpt->pending_nodes) {
+        if (!snapshot->pending_nodes_json && ckpt->pending_count > 0 &&
+            ckpt->pending_nodes) {
             size_t total_len = 0;
             for (size_t i = 0; i < ckpt->pending_count; i++) {
                 if (ckpt->pending_nodes[i]) {
@@ -518,6 +666,21 @@ int checkpoint_adapter_save(checkpoint_adapter_t *adapter,
         &checkpoint);
 
     AGENTOS_FREE(state_json);
+
+    /* agentos_checkpoint_create 通过 copy_nodes 深拷贝了节点数组，
+     * 调用者负责释放 build_node_arrays 分配的原数组及其字符串。 */
+    if (completed_nodes) {
+        for (size_t i = 0; i < completed_count; i++)
+            AGENTOS_FREE(completed_nodes[i]);
+        AGENTOS_FREE(completed_nodes);
+        completed_nodes = NULL;
+    }
+    if (pending_nodes) {
+        for (size_t i = 0; i < pending_count; i++)
+            AGENTOS_FREE(pending_nodes[i]);
+        AGENTOS_FREE(pending_nodes);
+        pending_nodes = NULL;
+    }
 
     if (ret != AGENTOS_SUCCESS || !checkpoint) {
         AGENTOS_LOG_ERROR("C-L07: Failed to create checkpoint for task '%s': "

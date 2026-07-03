@@ -65,8 +65,7 @@ static am_alert_t *find_active_alert(const char *name)
         if (strcmp(g_am.active_alerts[i].name, name) == 0)
             return &g_am.active_alerts[i];
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static am_rule_t *find_rule(const char *name)
@@ -75,8 +74,7 @@ static am_rule_t *find_rule(const char *name)
         if (strcmp(g_am.rules[i].name, name) == 0)
             return &g_am.rules[i];
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static bool evaluate_condition(double value, am_comparison_t op, double threshold)

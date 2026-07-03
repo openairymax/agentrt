@@ -43,6 +43,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -516,6 +517,79 @@ void agentos_process_close_pipes(agentos_process_info_t *proc)
     }
 }
 
+int agentos_process_run_capture(const char *executable, char *const argv[],
+                                char *const envp[], uint32_t timeout_ms,
+                                char *output, size_t output_size)
+{
+    (void)envp;
+    (void)timeout_ms;
+    /* BAN-211/235: 使用 CreateProcess + 匿名管道替代 _popen（消除 cmd.exe 注入风险）。
+     * CreateProcess 直接解析命令行，不经 shell，行为对齐 POSIX 的 fork/execvp。
+     * 与 market_service_impl.c 的 win_run_command 安全模式一致。 */
+    char cmdline[4096] = {0};
+    snprintf(cmdline, sizeof(cmdline), "\"%s\"", executable);
+    for (int i = 1; argv && argv[i]; i++) {
+        size_t remaining = sizeof(cmdline) - strlen(cmdline);
+        if (remaining > 0)
+            snprintf(cmdline + strlen(cmdline), remaining, " \"%s\"", argv[i]);
+    }
+
+    /* 创建匿名管道捕获子进程 stdout */
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.lpSecurityDescriptor = NULL;
+    sa.bInheritHandle = TRUE;
+    HANDLE pipe_read = NULL, pipe_write = NULL;
+    if (!CreatePipe(&pipe_read, &pipe_write, &sa, 0)) {
+        return -1;
+    }
+    /* 确保管道读端不被子进程继承 */
+    SetHandleInformation(pipe_read, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = pipe_write;
+    si.hStdError = pipe_write;
+    si.hStdInput = NULL;
+    ZeroMemory(&pi, sizeof(pi));
+
+    BOOL ok = CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+    CloseHandle(pipe_write); /* 父进程关闭写端，以便读端收到 EOF */
+    if (!ok) {
+        CloseHandle(pipe_read);
+        return -1;
+    }
+
+    /* 读取子进程输出 */
+    size_t offset = 0;
+    if (output && output_size > 0) {
+        char buf[4096];
+        DWORD bytes_read;
+        while (ReadFile(pipe_read, buf, sizeof(buf) - 1, &bytes_read, NULL) && bytes_read > 0) {
+            size_t len = (size_t)bytes_read;
+            if (offset + len >= output_size)
+                len = output_size - 1 - offset;
+            __builtin_memcpy(output + offset, buf, len);
+            offset += len;
+            if (offset + 1 >= output_size)
+                break;
+        }
+        output[offset] = '\0';
+    }
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code = 1;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+
+    CloseHandle(pipe_read);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return (int)exit_code;
+}
+
 #else
 
 int agentos_process_start(const char *executable, char *const argv[], char *const envp[],
@@ -524,13 +598,39 @@ int agentos_process_start(const char *executable, char *const argv[], char *cons
     if (!proc)
         return AGENTOS_EINVAL;
     AGENTOS_MEMSET(proc, 0, sizeof(agentos_process_info_t));
+    proc->stdin_fd = -1;
+    proc->stdout_fd = -1;
+    proc->stderr_fd = -1;
+
+    /* 创建 stdout/stderr 管道以捕获子进程输出（补全 agentos_process_info_t 设计意图） */
+    int stdout_pipe[2];
+    int stderr_pipe[2];
+    if (pipe(stdout_pipe) < 0)
+        return AGENTOS_EINVAL;
+    if (pipe(stderr_pipe) < 0) {
+        close(stdout_pipe[0]);
+        close(stdout_pipe[1]);
+        return AGENTOS_EINVAL;
+    }
 
     pid_t pid = fork();
     if (pid < 0) {
+        close(stdout_pipe[0]);
+        close(stdout_pipe[1]);
+        close(stderr_pipe[0]);
+        close(stderr_pipe[1]);
         return AGENTOS_EINVAL;
     }
 
     if (pid == 0) {
+        /* 子进程：重定向 stdout/stderr 到管道写端，关闭所有读端 */
+        close(stdout_pipe[0]);
+        close(stderr_pipe[0]);
+        dup2(stdout_pipe[1], STDOUT_FILENO);
+        dup2(stderr_pipe[1], STDERR_FILENO);
+        close(stdout_pipe[1]);
+        close(stderr_pipe[1]);
+
         if (envp) {
             for (int i = 0; envp[i]; i++) {
                 putenv(envp[i]);
@@ -542,7 +642,12 @@ int agentos_process_start(const char *executable, char *const argv[], char *cons
         _exit(127);
     }
 
+    /* 父进程：关闭写端，保留读端供调用者读取输出 */
+    close(stdout_pipe[1]);
+    close(stderr_pipe[1]);
     proc->pid = pid;
+    proc->stdout_fd = stdout_pipe[0];
+    proc->stderr_fd = stderr_pipe[0];
     return 0;
 }
 
@@ -601,7 +706,105 @@ int agentos_process_kill(agentos_process_info_t *proc)
 
 void agentos_process_close_pipes(agentos_process_info_t *proc)
 {
-    (void)proc;
+    if (!proc)
+        return;
+    if (proc->stdout_fd >= 0) {
+        close(proc->stdout_fd);
+        proc->stdout_fd = -1;
+    }
+    if (proc->stderr_fd >= 0) {
+        close(proc->stderr_fd);
+        proc->stderr_fd = -1;
+    }
+    if (proc->stdin_fd >= 0) {
+        close(proc->stdin_fd);
+        proc->stdin_fd = -1;
+    }
+}
+
+int agentos_process_run_capture(const char *executable, char *const argv[],
+                                char *const envp[], uint32_t timeout_ms,
+                                char *output, size_t output_size)
+{
+    agentos_process_info_t proc;
+    if (agentos_process_start(executable, argv, envp, &proc) != 0)
+        return -1;
+
+    /* 读取 stdout + stderr 合并输出（select 多路复用，防止管道写满阻塞子进程） */
+    size_t offset = 0;
+    if (output && output_size > 0)
+        output[0] = '\0';
+
+    time_t start = time(NULL);
+    int timed_out = 0;
+
+    for (;;) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        int max_fd = -1;
+        if (proc.stdout_fd >= 0) {
+            FD_SET(proc.stdout_fd, &rfds);
+            if (proc.stdout_fd > max_fd) max_fd = proc.stdout_fd;
+        }
+        if (proc.stderr_fd >= 0) {
+            FD_SET(proc.stderr_fd, &rfds);
+            if (proc.stderr_fd > max_fd) max_fd = proc.stderr_fd;
+        }
+        if (max_fd < 0)
+            break; /* 所有管道已 EOF，子进程已退出 */
+
+        struct timeval tv;
+        tv.tv_sec = 1;
+        tv.tv_usec = 0;
+        int retval = select(max_fd + 1, &rfds, NULL, NULL, &tv);
+        if (retval > 0) {
+            char buf[4096];
+            if (proc.stdout_fd >= 0 && FD_ISSET(proc.stdout_fd, &rfds)) {
+                ssize_t n = read(proc.stdout_fd, buf, sizeof(buf));
+                if (n <= 0) {
+                    close(proc.stdout_fd);
+                    proc.stdout_fd = -1;
+                } else if (output && offset + 1 < output_size) {
+                    size_t copy = (offset + (size_t)n < output_size) ? (size_t)n
+                                                                     : output_size - 1 - offset;
+                    __builtin_memcpy(output + offset, buf, copy);
+                    offset += copy;
+                }
+            }
+            if (proc.stderr_fd >= 0 && FD_ISSET(proc.stderr_fd, &rfds)) {
+                ssize_t n = read(proc.stderr_fd, buf, sizeof(buf));
+                if (n <= 0) {
+                    close(proc.stderr_fd);
+                    proc.stderr_fd = -1;
+                } else if (output && offset + 1 < output_size) {
+                    size_t copy = (offset + (size_t)n < output_size) ? (size_t)n
+                                                                     : output_size - 1 - offset;
+                    __builtin_memcpy(output + offset, buf, copy);
+                    offset += copy;
+                }
+            }
+        } else if (retval == 0) {
+            /* 1 秒无数据：检查总超时 */
+            if (timeout_ms > 0 &&
+                (uint32_t)((time(NULL) - start) * 1000) >= timeout_ms) {
+                timed_out = 1;
+                agentos_process_kill(&proc);
+                /* SIGKILL 后子进程 fd 关闭，select 将返回 EOF，循环自然退出 */
+            }
+        } else if (errno != EINTR) {
+            break; /* select 出错 */
+        }
+    }
+
+    agentos_process_close_pipes(&proc);
+
+    int exit_code = -1;
+    /* 阻塞等待回收子进程（此时子进程已退出或被 SIGKILL） */
+    agentos_process_wait(&proc, 0, &exit_code);
+
+    if (output && output_size > 0)
+        output[offset] = '\0';
+    return timed_out ? -2 : exit_code;
 }
 
 #endif

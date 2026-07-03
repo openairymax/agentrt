@@ -21,6 +21,7 @@ struct agentos_memory_engine {
     agentos_memory_provider_t *provider;
     agentos_mutex_t *lock;
     char *config_path;
+    int provider_borrowed; /* P3.11-C9: 1=provider 为 borrowed（如 bridge active），destroy 时不销毁 */
 };
 
 agentos_error_t agentos_memory_create(const char *config_path, agentos_memory_engine_t **out_engine)
@@ -100,11 +101,13 @@ void agentos_memory_destroy(agentos_memory_engine_t *engine)
     if (!engine)
         return;
 
-    AGENTOS_LOG_INFO("MemoryEngine: destroy (provider=%s)",
-                     engine->provider && engine->provider->name ? engine->provider->name : "none");
+    AGENTOS_LOG_INFO("MemoryEngine: destroy (provider=%s, borrowed=%d)",
+                     engine->provider && engine->provider->name ? engine->provider->name : "none",
+                     engine->provider_borrowed);
 
     agentos_mutex_lock(engine->lock);
-    if (engine->provider && engine->provider->destroy) {
+    /* P3.11-C9: borrowed provider（如 bridge active）不销毁，由所有方（bridge）负责 */
+    if (!engine->provider_borrowed && engine->provider && engine->provider->destroy) {
         engine->provider->destroy(engine->provider);
     }
     engine->provider = NULL;
@@ -113,6 +116,32 @@ void agentos_memory_destroy(agentos_memory_engine_t *engine)
     if (engine->config_path)
         AGENTOS_FREE(engine->config_path);
     AGENTOS_FREE(engine);
+}
+
+agentos_error_t agentos_memory_set_provider(agentos_memory_engine_t *engine,
+                                            agentos_memory_provider_t *provider)
+{
+    if (!engine || !provider)
+        return AGENTOS_EINVAL;
+
+    agentos_mutex_lock(engine->lock);
+
+    /* P3.11-C9: 切换 provider。
+     * 旧 provider（通常为 builtin）不销毁——它可能被全局 registry 或 bridge 持有。
+     * 新 provider（bridge active）为 borrowed 语义，engine 不负责销毁。
+     * 新 provider 应已被调用方 init 过（bridge_create 中已 init），此处不重复 init。 */
+    agentos_memory_provider_t *old = engine->provider;
+    int old_borrowed = engine->provider_borrowed;
+    engine->provider = provider;
+    engine->provider_borrowed = 1; /* bridge provider 为 borrowed */
+    agentos_mutex_unlock(engine->lock);
+
+    AGENTOS_LOG_INFO("P3.11-C9: MemoryEngine provider switched "
+                     "(old=%s borrowed=%d → new=%s)",
+                     (old && old->name) ? old->name : "(none)", old_borrowed,
+                     provider->name ? provider->name : "(unknown)");
+
+    return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_memory_write(agentos_memory_engine_t *engine,
@@ -216,6 +245,45 @@ agentos_error_t agentos_memory_query(agentos_memory_engine_t *engine,
             }
             res->memory_result_items[i]->memory_result_item_record_id = results[i];
             res->memory_result_items[i]->memory_result_item_score = scores ? scores[i] : 0.0f;
+
+            /* P3.11-C1: 当 include_raw 为真时，通过 get_raw 获取记录内容填充
+             * memory_result_item_record。此前 query 仅返回 record_id + score，
+             * thinking_chain prepopulate 期望 rec->memory_record_data 但永远拿到 NULL，
+             * 导致记忆内容从未注入 context window — 数据流断裂。 */
+            if (query->memory_query_include_raw && results[i] && engine->provider->get_raw) {
+                void *data = NULL;
+                size_t data_len = 0;
+                agentos_mutex_lock(engine->lock);
+                agentos_error_t get_err =
+                    engine->provider->get_raw(engine->provider, results[i], &data, &data_len);
+                agentos_mutex_unlock(engine->lock);
+
+                if (get_err == AGENTOS_SUCCESS && data && data_len > 0) {
+                    agentos_memory_record_t *rec =
+                        (agentos_memory_record_t *)AGENTOS_CALLOC(1, sizeof(agentos_memory_record_t));
+                    if (rec) {
+                        rec->memory_record_id = AGENTOS_STRDUP(results[i]);
+                        rec->memory_record_data = data;
+                        rec->memory_record_data_len = data_len;
+                        rec->memory_record_type = AGENTOS_MEMTYPE_TEXT;
+                        if (!rec->memory_record_id) {
+                            AGENTOS_FREE(data);
+                            AGENTOS_FREE(rec);
+                        } else {
+                            res->memory_result_items[i]->memory_result_item_record = rec;
+                        }
+                    } else {
+                        AGENTOS_FREE(data);
+                    }
+                } else {
+                    /* get_raw 失败（记录可能已被删除或 provider 不支持），释放 data */
+                    if (data)
+                        AGENTOS_FREE(data);
+                    AGENTOS_LOG_DEBUG("MemoryEngine: query get_raw failed for "
+                                      "record_id=%s (err=%d) — item will have no content",
+                                      results[i], (int)get_err);
+                }
+            }
         }
     }
 
